@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <title>Health Engine</title>
+</head>
+<body>
+  <pre id="output">Загрузка...</pre>
+
+  <script type="module">
+    import axes from "./data/file7_axes.json" assert { type: "json" };
+    import { buildFullReport } from "./modules/report/report.engine.js";
+
+    // Пример входных данных — потом заменишь на реальные
+    const userScores = {
+      ENERGY: 70,
+      STRESS: 55,
+      INFLAMMATION: 80
+    };
+
+    const userRisks = {
+      LIVER_STRESS: 30,
+      GI_IRRITATION: 60
+    };
+
+    const report = buildFullReport(axes, userScores, userRisks);
+
+    document.getElementById("output").textContent =
+      JSON.stringify(report, null, 2);
+  </script>
+</body>
+</html>
