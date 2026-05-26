@@ -6,8 +6,7 @@ export default defineConfig({
     target: 'esnext',
     outDir: 'dist',
     sourcemap: false,
-    minify: 'terser',
-    rollupOptions: {
+      rollupOptions: {
       output: {
         manualChunks: {
           engines: ['src/engines/readiness.engine.ts', 'src/engines/risk.engine.ts', 'src/engines/dosage.engine.ts']
