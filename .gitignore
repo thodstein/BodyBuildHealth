@@ -1,6 +1,19 @@
+# Dependencies (но НЕ lock-файлы для приложений!)
 node_modules
+
+# Build output
 dist
 *.tsbuildinfo
+
+# Environment
 .env
+.env.local
+
+# OS / IDE
 .DS_Store
 Thumbs.db
+.idea
+.vscode
+
+# Logs
+npm-debug.log*
