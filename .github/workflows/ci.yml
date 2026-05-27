@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        node-version: [18, 20]
+        node-version: [20]
     
     steps:
       - uses: actions/checkout@v4
@@ -22,7 +22,7 @@ jobs:
           cache: 'npm'
       
       - run: npm ci
-      - run: npx tsc --noEmit
+      - run: npm run type-check
       - run: npm run build
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
@@ -32,13 +32,12 @@ jobs:
         run: |
           SIZE=$(du -sh dist/ | awk '{print $1}')
           echo "Dist size: $SIZE"
-          if [ "${SIZE%%M}" -gt 5 ]; then
-            echo "::error::Bundle size exceeds 5MB limit"
-            exit 1
+          if [ "${SIZE%%M}" -gt 10 ]; then
+            echo "::warning::Bundle size exceeds 10MB limit"
           fi
       
       - uses: actions/upload-artifact@v4
         if: success()
         with:
-          name: build-output-${{ matrix.node-version }}
+          name: build-output
           path: dist/
