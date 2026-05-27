@@ -44,7 +44,7 @@ const MARKER_ALIASES: Record<string, string> = {
   'Цинк': 'ZN', 'Zn': 'ZN', 'Zinc': 'ZN',
   'Медь': 'CU', 'Cu': 'CU', 'Copper': 'CU',
   'Железо': 'FE', 'Fe': 'FE', 'Iron': 'FE',
-  'ОЖСС': 'TIBC', 'ОЖСС': 'TIBC', 'Total Iron Binding Capacity': 'TIBC',
+  'ОЖСС': 'TIBC', 'Total Iron Binding Capacity': 'TIBC',
   'СРБ': 'CRP', 'CRP': 'CRP', 'C-Reactive Protein': 'CRP', 'С-реактивный белок': 'CRP',
   'Гомоцистеин': 'HOMOCYSTEINE', 'Homocysteine': 'HOMOCYSTEINE', 'Hcy': 'HOMOCYSTEINE',
   'Кортизол': 'CORTISOL', 'Cortisol': 'CORTISOL', 'Корт': 'CORTISOL',
@@ -62,7 +62,7 @@ const UNIT_ALIASES: Record<string, string> = {
   'пг/мл': 'pg/mL', 'pg/ml': 'pg/mL', 'мкМЕ/мл': 'mIU/mL', 'миу/мл': 'mIU/mL', 'mIU/ml': 'mIU/mL',
   'ммоль/л': 'mmol/L', 'моль/л': 'mol/L', 'mmol/l': 'mmol/L',
   'г/л': 'g/L', 'г/дл': 'g/dL', 'g/l': 'g/L', 'g/dl': 'g/dL',
-  '%': '%', 'процентов': '%', 'тыс/мкл': 'K/uL', 'тыс/мкл': 'K/uL', '10^9/л': '10^9/L',
+  '%': '%', 'процентов': '%', 'тыс/мкл': 'K/uL', '10^9/л': '10^9/L',
   'мкг/дл': 'mcg/dL', 'мкг/л': 'mcg/L', 'мкг/мл': 'mcg/mL',
   'нмоль/л': 'nmol/L', 'пмоль/л': 'pmol/L'
 };

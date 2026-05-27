@@ -1,6 +1,6 @@
 import { createWorker, Worker } from 'tesseract.js';
 import { parseLabText, ParsedLabResult } from './lab-auto-parser';
-import { parseNutritionScreenshot, ParsedMeal } from './nutrition-ocr-parser';
+import { parseNutritionScreenshot, type ParsedMeal } from './nutrition-ocr-parser';
 
 let worker: Worker | null = null;
 

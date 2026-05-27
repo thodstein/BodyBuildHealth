@@ -11,7 +11,7 @@ export function generateCheckpoints(
   const checkpoints: LabCheckpoint[] = [];
   const start = new Date(startDate);
 
-  rules.forEach(rule => {
+  rules.checkpoints.forEach(rule => {
     if (rule.week > totalWeeks) return;
     const due = new Date(start.getTime() + rule.week * 7 * 24 * 60 * 60 * 1000);
     checkpoints.push({

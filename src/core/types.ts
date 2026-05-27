@@ -13,6 +13,23 @@ export type PCTSchedule = any;
 export type Exercise = any;
 export type FoodItem = any;
 export type ParsedLabResult = any;
+export interface ParsedMeal {
+  name: string;
+  protein: number;
+  fats: number;
+  carbs: number;
+  calories: number;
+  confidence: number;
+  raw: string;
+}
+export interface UserProfile {
+  id: string;
+  name: string;
+  age: number;
+  sex: 'male' | 'female';
+  role: UserRole;
+  email?: string;
+}
 
 export interface ReadinessInput {
   sleepHours: number; sleepQuality: number; nightAwakenings: number; hrvRatio: number;

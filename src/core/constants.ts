@@ -1,3 +1,5 @@
+import type { LabPhaseType, UserRole, DynamicRefRange } from './types';
+
 export const GENETIC_MULTIPLIERS: Record<string, Record<string, number>> = {
   COMT_Val158Met: { 'Met/Met': 2.0, 'Val/Met': 1.5, 'Val/Val': 1.0 },
   MTHFR_C677T:    { TT: 1.7, CT: 1.3, CC: 1.0 },
@@ -117,34 +119,44 @@ export const PKPD_DEFAULTS = { ka: 0.024, k10: 0.055, k12: 0.020, k21: 0.015, Vd
 export const ROLE_PERMISSIONS: Record<UserRole, string[]> = {
   user: ['view_own_labs', 'add_labs', 'view_risks', 'view_schedule', 'export_csv'],
   coach: ['view_own_labs', 'add_labs', 'view_risks', 'view_schedule', 'view_trends', 'add_notes'],
-  doctor: ['view_own_labs', 'add_labs', 'view_risks', 'view_schedule', 'view_trends', 'add_notes', 'export_pdf', 'view_raw_data', 'override_ref']
+  doctor: ['view_own_labs', 'add_labs', 'view_risks', 'view_schedule', 'view_trends', 'add_notes', 'export_pdf', 'view_raw_data', 'override_ref'],
+  admin: ['view_all', 'edit_all', 'delete_all', 'manage_users', 'manage_roles'],
+  editor: ['view_own_labs', 'add_labs', 'edit_articles', 'publish_articles']
 } as const;
 
 export const PHASE_SCHEDULE_RULES: Record<string, { checkpoints: { type: string; week: number; markers: string[] }[] }> = {
-  course: [
-    { type: 'baseline', week: 0, markers: REQUIRED_LABS_PER_PHASE.baseline },
-    { type: 'mid_course', week: 4, markers: REQUIRED_LABS_PER_PHASE.on_cycle.slice(0, 8) },
-    { type: 'end_course', week: 8, markers: REQUIRED_LABS_PER_PHASE.on_cycle },
-    { type: 'end_course', week: 12, markers: REQUIRED_LABS_PER_PHASE.on_cycle }
-  ],
-  'course-bridge-course': [
-    { type: 'baseline', week: 0, markers: REQUIRED_LABS_PER_PHASE.baseline },
-    { type: 'end_course', week: 8, markers: REQUIRED_LABS_PER_PHASE.on_cycle },
-    { type: 'bridge', week: 10, markers: REQUIRED_LABS_PER_PHASE.bridge },
-    { type: 'baseline', week: 12, markers: REQUIRED_LABS_PER_PHASE.baseline }
-  ],
-  'course-pct': [
-    { type: 'baseline', week: 0, markers: REQUIRED_LABS_PER_PHASE.baseline },
-    { type: 'end_course', week: 8, markers: REQUIRED_LABS_PER_PHASE.on_cycle },
-    { type: 'start_pct', week: 9, markers: REQUIRED_LABS_PER_PHASE.pct },
-    { type: 'mid_pct', week: 11, markers: REQUIRED_LABS_PER_PHASE.pct.slice(0, 6) },
-    { type: 'end_pct', week: 13, markers: REQUIRED_LABS_PER_PHASE.post_pct }
-  ],
-  pct: [
-    { type: 'start_pct', week: 0, markers: REQUIRED_LABS_PER_PHASE.pct },
-    { type: 'mid_pct', week: 2, markers: REQUIRED_LABS_PER_PHASE.pct.slice(0, 6) },
-    { type: 'end_pct', week: 4, markers: REQUIRED_LABS_PER_PHASE.post_pct }
-  ]
+  course: {
+    checkpoints: [
+      { type: 'baseline', week: 0, markers: REQUIRED_LABS_PER_PHASE.baseline },
+      { type: 'mid_course', week: 4, markers: REQUIRED_LABS_PER_PHASE.on_cycle.slice(0, 8) },
+      { type: 'end_course', week: 8, markers: REQUIRED_LABS_PER_PHASE.on_cycle },
+      { type: 'end_course', week: 12, markers: REQUIRED_LABS_PER_PHASE.on_cycle }
+    ]
+  },
+  'course-bridge-course': {
+    checkpoints: [
+      { type: 'baseline', week: 0, markers: REQUIRED_LABS_PER_PHASE.baseline },
+      { type: 'end_course', week: 8, markers: REQUIRED_LABS_PER_PHASE.on_cycle },
+      { type: 'bridge', week: 10, markers: REQUIRED_LABS_PER_PHASE.bridge },
+      { type: 'baseline', week: 12, markers: REQUIRED_LABS_PER_PHASE.baseline }
+    ]
+  },
+  'course-pct': {
+    checkpoints: [
+      { type: 'baseline', week: 0, markers: REQUIRED_LABS_PER_PHASE.baseline },
+      { type: 'end_course', week: 8, markers: REQUIRED_LABS_PER_PHASE.on_cycle },
+      { type: 'start_pct', week: 9, markers: REQUIRED_LABS_PER_PHASE.pct },
+      { type: 'mid_pct', week: 11, markers: REQUIRED_LABS_PER_PHASE.pct.slice(0, 6) },
+      { type: 'end_pct', week: 13, markers: REQUIRED_LABS_PER_PHASE.post_pct }
+    ]
+  },
+  pct: {
+    checkpoints: [
+      { type: 'start_pct', week: 0, markers: REQUIRED_LABS_PER_PHASE.pct },
+      { type: 'mid_pct', week: 2, markers: REQUIRED_LABS_PER_PHASE.pct.slice(0, 6) },
+      { type: 'end_pct', week: 4, markers: REQUIRED_LABS_PER_PHASE.post_pct }
+    ]
+  }
 } as const;
 
 export const DYNAMIC_REFS: Record<string, DynamicRefRange> = {
