@@ -12,12 +12,16 @@ import { generateWeeklyReportHTML, triggerPrintReport } from '../engines/weekly-
 import { setRole } from '../core/profile-manager';
 import { logoutUser } from '../core/auth-manager';
 import { db } from '../core/db';
-import type { UserProfile } from '../core/types';
+import type { UserProfile, UserSettings, LabPhaseType } from '../core/types';
+
+interface ExtendedUserProfile extends UserProfile {
+  settings: UserSettings;
+}
 
 let labsRendered = false, pharmaRendered = false, articlesRendered = false, nutritionRendered = false;
 
-export function renderDashboard(profile: UserProfile) {
-  const ctx = {
+export function renderDashboard(profile: ExtendedUserProfile) {
+  const ctx: { role: any; age: number; sex: 'male' | 'female'; weight: number; goal: string; phase: LabPhaseType; courseStartDate: string } = {
     role: profile.role, age: profile.settings.age, sex: profile.settings.sex,
     weight: profile.settings.weight, goal: profile.settings.goal,
     phase: 'course', courseStartDate: new Date().toISOString()
@@ -92,27 +96,27 @@ export function renderDashboard(profile: UserProfile) {
       app.querySelectorAll('#main-tabs .tab').forEach(t => t.classList.remove('active'));
       app.querySelectorAll('.page').forEach(p => (p as HTMLElement).style.display = 'none');
       tab.classList.add('active');
-      const page = app.getElementById(`page-${tab.dataset.tab}`);
+      const page = document.getElementById(`page-${(tab as HTMLElement).dataset.tab}`);
       if (page) (page as HTMLElement).style.display = 'block';
 
-      const tabId = tab.dataset.tab;
+      const tabId = (tab as HTMLElement).dataset.tab;
       if (tabId === 'food' && !nutritionRendered) {
-        import('./nutrition-module').then(m => { m.renderNutritionModule(app.getElementById('nutrition-container')!, profile, []); nutritionRendered = true; });
+        import('./nutrition-module').then(m => { m.renderNutritionModule(document.getElementById('nutrition-container')!, profile, []); nutritionRendered = true; });
       }
       if (tabId === 'labs' && !labsRendered) {
-        import('./labs-diagnostics').then(m => { m.renderLabsDiagnostics(app.getElementById('labs-container')!); labsRendered = true; });
+        import('./labs-diagnostics').then(m => { m.renderLabsDiagnostics(document.getElementById('labs-container')!); labsRendered = true; });
       }
       if (tabId === 'pharma' && !pharmaRendered) {
-        import('./pharma-course').then(m => { m.renderPharmaModule(app.getElementById('pharma-container')!, []); pharmaRendered = true; });
+        import('./pharma-course').then(m => { m.renderPharmaModule(document.getElementById('pharma-container')!, []); pharmaRendered = true; });
       }
       if (tabId === 'articles' && !articlesRendered) {
-        import('./articles-workflow').then(m => { m.renderArticlesWorkflow(app.getElementById('articles-container')!, ctx.role, profile.id); articlesRendered = true; });
+        import('./articles-workflow').then(m => { m.renderArticlesWorkflow(document.getElementById('articles-container')!, ctx.role, profile.id); articlesRendered = true; });
       }
     });
   });
 
-  const qaIn = app.getElementById('qa-input') as HTMLInputElement;
-  const qaOut = app.getElementById('qa-output');
+  const qaIn = document.getElementById('qa-input') as HTMLInputElement;
+  const qaOut = document.getElementById('qa-output');
   if (qaIn && qaOut) {
     qaIn.addEventListener('input', () => {
       import('../engines/assistant.engine').then(m => {
@@ -121,7 +125,7 @@ export function renderDashboard(profile: UserProfile) {
     });
   }
 
-  app.getElementById('exp-weekly')!.addEventListener('click', () => {
+  document.getElementById('exp-weekly')!.addEventListener('click', () => {
     import('../engines/weekly-report.engine').then(m => {
       m.triggerPrintReport(m.generateWeeklyReportHTML({
         ctx, labs: [], course: [], weightCurrent: ctx.weight, weightPrev: ctx.weight - 0.5, measurements: {}, goal: ctx.goal, macros: { p: 165, f: 75, c: 280 }, stepsAvg: 0, bpAvg: { sys: 120, dia: 80 }, bpNotes: '', trainingFeel: '', generalFeel: '', meds: '', supplements: '', lastLabDate: '', nextLabDate: '', notes: ''
@@ -129,11 +133,11 @@ export function renderDashboard(profile: UserProfile) {
     });
   });
 
-  app.getElementById('exp-json')!.addEventListener('click', () => {
+  document.getElementById('exp-json')!.addEventListener('click', () => {
     downloadFile(JSON.stringify({ profile, date: new Date().toISOString() }, null, 2), 'backup.json');
   });
 
-  app.getElementById('exp-csv')!.addEventListener('click', async () => {
+  document.getElementById('exp-csv')!.addEventListener('click', async () => {
     const labs = await db.getAll('labs_log') || [];
     downloadFile('date,code,value,unit\n' + labs.map((l: any) => `${l.date},${l.code},${l.value},${l.unit}`).join('\n'), 'labs.csv');
   });

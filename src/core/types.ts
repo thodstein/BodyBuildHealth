@@ -31,6 +31,13 @@ export interface UserProfile {
   email?: string;
 }
 
+export interface UserSettings {
+  age: number;
+  sex: 'male' | 'female';
+  weight: number;
+  goal: string;
+}
+
 export interface ReadinessInput {
   sleepHours: number; sleepQuality: number; nightAwakenings: number; hrvRatio: number;
   doms: number; stress: number; subjFatigue: number; hrIncrease: number;

@@ -1,4 +1,4 @@
-import { Article, ArticleStatus, UserRole } from '../core/types';
+import { Article, ArticleStatus, UserRole, ArticleCategory } from '../core/types';
 
 export function createArticle(data: { title: string; category: ArticleCategory; teaser: string; content: string; tags: string[]; authorId: string; authorName: string; slug?: string; coverImageUrl?: string }): Article {
   const slug = data.slug || data.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
