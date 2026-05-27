@@ -37,8 +37,9 @@ export function calculateHealthScore(
   // 3. Нутритивный adherence (среднее за последние 7 дней)
   const recentLogs = nutritionLog.slice(-7);
   const adherenceScores = recentLogs.map(l => {
-    const target = { kcal: targetKcal, protein: targetProtein, fats: 0, carbs: 0, water: 0, fiber: 0 };
-    return calcAdherence(l.total, target).score;
+    const target = { kcal: targetKcal, protein: targetProtein, fats: 0, carbs: 0, water: 0, fiber: 0, steps: 0 };
+    const logTotal = l.total as any;
+    return calcAdherence({ kcal: logTotal.kcal, p: logTotal.p, f: logTotal.f, c: logTotal.c, water: logTotal.water || 0, fiber: logTotal.fiber || 0, steps: logTotal.steps || 0 }, target).score;
   });
   const nutritionScore = recentLogs.length ? clamp(Math.round(adherenceScores.reduce((a,b)=>a+b,0)/recentLogs.length)) : 50;
 

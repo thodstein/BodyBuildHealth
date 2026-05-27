@@ -32,7 +32,7 @@ export function calcNutritionTargets(weightKg: number, heightCm: number, age: nu
   return { bmr: Math.round(bmr), tdee: Math.round(tdee), kcal: Math.round(kcal), protein, fats, carbs, water: Math.round((0.033*weightKg+0.5)*10)/10, fiber: sex==='male'?35:25, micros };
 }
 
-export function calcAdherence(log: MealLog['total'], target: NutritionTargets): { kcal: number; pro: number; water: number; score: number } {
+export function calcAdherence(log: MealLog['total'], target: { kcal: number; protein: number; fats: number; carbs: number; water: number; fiber: number; steps: number }): { kcal: number; pro: number; water: number; score: number } {
   const kcalD = Math.abs(log.kcal - target.kcal) / target.kcal;
   const proD = Math.abs(log.p - target.protein) / target.protein;
   const waterD = Math.abs(log.water - target.water) / target.water;
@@ -52,7 +52,7 @@ export function getWeeklyAnalytics(logs: MealLog[], today: string): { daysLogged
   });
   const avgKcal = week.length ? Math.round(week.reduce((s,l)=>s+l.total.kcal,0)/week.length) : 0;
   const trend = week.length < 3 ? 'stable' : avgKcal > week[0].total.kcal*1.05 ? 'up' : avgKcal < week[0].total.kcal*0.95 ? 'down' : 'stable';
-  return { daysLogged: week.length, avgKcal, trend, adherenceAvg: week.length ? Math.round(week.reduce((s,l)=>s+calcAdherence(l.total, {kcal:2200,protein:160,fats:70,carbs:250,water:3,fiber:35,bmr:1600,tdee:2200,micros:{}}).score,0)/week.length) : 0 };
+  return { daysLogged: week.length, avgKcal, trend, adherenceAvg: week.length ? Math.round(week.reduce((s,l)=>s+calcAdherence(l.total, {kcal:2200,protein:160,fats:70,carbs:250,water:3,fiber:35,steps:0}).score,0)/week.length) : 0 };
 }
 
 export function getPharmaInteractions(drugs: string[]): string {

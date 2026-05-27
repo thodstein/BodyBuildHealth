@@ -40,8 +40,7 @@ const SYNERGY_MATRIX: Record<string, Record<string, number>> = {
   hydration: { energy:0, focus:0, mood:0, anti_stress:0, sleep:0, fat_loss:0, mitochondria:0, recovery:1, cardio_support:1, hydration:0, gi_healing:1 },
   absorption: { energy:0, focus:0, mood:0, anti_stress:0, sleep:0, fat_loss:0, mitochondria:0, recovery:0, cardio_support:0, insulin_sensitivity:0, gi_healing:1, detox:1, liver_support:1, absorption:0 },
   bone_support: { energy:0, focus:0, mood:0, anti_stress:0, sleep:0, fat_loss:0, mitochondria:0, recovery:0, cardio_support:0, insulin_sensitivity:0, anti_inflammation:1, hormone_balance:1, bone_support:0, thyroid_support:1 },
-  thyroid_support: { energy:1, focus:1, mood:1, anti_stress:0, sleep:0, fat_loss:2, mitochondria:1, recovery:0, cardio_support:1, insulin_sensitivity:1, hormone_balance:1, bone_support:1, thyroid_support:0 },
-  cardio_support: { energy:1, focus:0, mood:0, anti_stress:0, sleep:0, fat_loss:1, mitochondria:1, recovery:1, cardio_support:0, insulin_sensitivity:1, anti_inflammation:1, immune_boost:1, liver_support:1, hydration:1, thyroid_support:1 }
+  thyroid_support: { energy:1, focus:1, mood:1, anti_stress:0, sleep:0, fat_loss:2, mitochondria:1, recovery:0, cardio_support:1, insulin_sensitivity:1, hormone_balance:1, bone_support:1, thyroid_support:0 }
 };
 
 const CONFLICT_MATRIX: Record<string, Record<string, number>> = {

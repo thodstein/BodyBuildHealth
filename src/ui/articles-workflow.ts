@@ -49,11 +49,11 @@ export async function renderArticlesWorkflow(container: HTMLElement, role: UserR
 
   // Табы
   container.querySelectorAll('#articles-tabs .tab').forEach(tab => {
-    tab.onclick = () => {
+    (tab as HTMLElement).onclick = () => {
       container.querySelectorAll('#articles-tabs .tab').forEach(t => t.classList.remove('active'));
       container.querySelectorAll('.art-page').forEach(p => (p as HTMLElement).style.display = 'none');
       tab.classList.add('active');
-      container.getElementById(`art-${tab.dataset.art}`)!.style.display = 'block';
+      (container as any).querySelector(`#art-${(tab as HTMLElement).dataset.art}`)!.style.display = 'block';
     };
   });
 

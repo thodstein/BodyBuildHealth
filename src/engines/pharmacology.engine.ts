@@ -1,5 +1,6 @@
 import { CourseEntry, ConcentrationPoint, LabHysteresis, BayesianState } from '../core/types';
-import { PHARMA_DB, PKPD_DEFAULTS } from '../core/constants';
+import { PKPD_DEFAULTS } from '../core/constants';
+import { PHARMA_DB } from '../core/pharma-database';
 
 // ТЗ §9.3: RK4 шаг для 2-компартментной модели
 function rk4Step(A1:number,A2:number,A3:number, dt:number, ka:number, k10:number, k12:number, k21:number): [number,number,number] {
@@ -33,18 +34,20 @@ export function calculateConcentration(course: CourseEntry[], weeks: number = 52
     });
     if(weekDose > 0) A1 += weekDose;
 
+    let weekCp = 0;
     for(let s=0; s<stepsPerWeek; s++) {
       const [nA1,nA2,nA3] = rk4Step(A1,A2,A3,dt, PKPD_DEFAULTS.ka, PKPD_DEFAULTS.k10, PKPD_DEFAULTS.k12, PKPD_DEFAULTS.k21);
       A1=Math.max(0,nA1); A2=Math.max(0,nA2); A3=Math.max(0,nA3);
       
-      const cp = Math.max(0, (A2/PKPD_DEFAULTS.Vd_liters) * bayesian.clearanceK);
-      tol = Math.min(PKPD_DEFAULTS.maxTol, tol + kTol * cp * dt);
-      integralCp += cp * dt;
+      const cpVal = Math.max(0, (A2/PKPD_DEFAULTS.Vd_liters) * bayesian.clearanceK);
+      weekCp = cpVal;
+      tol = Math.min(PKPD_DEFAULTS.maxTol, tol + kTol * cpVal * dt);
+      integralCp += cpVal * dt;
     }
 
     const ec50 = 400 * bayesian.ec50Shift * (1 + 0.01 * integralCp);
-    const effect = Math.max(0, Math.min(1, (cp ** 2.5) / (ec50 ** 2.5 + cp ** 2.5))) * (1 - tol);
-    result.push({ week: w, cp: parseFloat(cp.toFixed(2)), tol: parseFloat(tol.toFixed(3)), effect: parseFloat((effect*100).toFixed(1)) });
+    const effect = Math.max(0, Math.min(1, (weekCp ** 2.5) / (ec50 ** 2.5 + weekCp ** 2.5))) * (1 - tol);
+    result.push({ week: w, cp: parseFloat(weekCp.toFixed(2)), tol: parseFloat(tol.toFixed(3)), effect: parseFloat((effect*100).toFixed(1)) });
   }
   return result;
 }

@@ -1,5 +1,6 @@
 import { CourseEntry, BayesianState, ConcentrationPoint } from '../core/types';
-import { PHARMA_DB, PKPD_DEFAULTS } from '../core/constants';
+import { PKPD_DEFAULTS } from '../core/constants';
+import { PHARMA_DB } from '../core/pharma-database';
 
 interface SubstanceState {
   A1: number; A2: number; A3: number;

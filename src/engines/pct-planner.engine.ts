@@ -1,5 +1,5 @@
 import { CourseEntry } from '../core/types';
-import { PHARMA_DB } from '../core/constants';
+import { PHARMA_DB } from '../core/pharma-database';
 
 export interface PCTSchedule {
   startDate: string;
