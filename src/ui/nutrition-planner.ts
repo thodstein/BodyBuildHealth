@@ -7,9 +7,9 @@ export async function renderNutritionPlanner(container: HTMLElement, profile: Us
   const base = calcNutritionTargets(profile.settings.weight, profile.settings.height, profile.settings.age, profile.settings.sex, 1.55, profile.settings.goal, profile.settings.bodyFat);
   const trainingDays = [true, false, true, false, true, true, false]; // Пн, Ср, Пт, Сб – тренировочные
   const plan = generateMacroCycle(base, trainingDays, new Date().toISOString());
-  const logs: Record<string, { kcal: number }> = {};
+  const logs: Record<string, { kcal: number; p: number; f: number; c: number }> = {};
   const allLogs = await db.getAll('nutrition_log') || [];
-  allLogs.forEach((l: any) => { logs[l.date] = { kcal: l.total?.kcal || 0 }; });
+  allLogs.forEach((l: any) => { logs[l.date] = { kcal: l.total?.kcal || 0, p: l.total?.p || 0, f: l.total?.f || 0, c: l.total?.c || 0 }; });
   const adherence = calcCycleAdherence(logs, plan);
 
   container.innerHTML = `
@@ -41,13 +41,16 @@ export async function renderNutritionPlanner(container: HTMLElement, profile: Us
     <button class="btn" style="margin-top:12px;" id="nut-export-week">📤 Экспорт недели (CSV)</button>
   `;
 
-  container.getElementById('nut-export-week')!.onclick = () => {
-    const rows = ['Date,Type,Kcal,P,F,C,Actual'];
-    plan.days.forEach(d => {
-      const actual = logs[d.date]?.kcal || '';
-      rows.push(`${d.date},${d.isTrainingDay?'Train':'Rest'},${d.targets.kcal},${d.targets.p},${d.targets.f},${d.targets.c},${actual}`);
+  const exportBtn = container.querySelector('#nut-export-week') as HTMLButtonElement;
+  if (exportBtn) {
+    exportBtn.addEventListener('click', () => {
+      const rows = ['Date,Type,Kcal,P,F,C,Actual'];
+      plan.days.forEach(d => {
+        const actual = logs[d.date]?.kcal || '';
+        rows.push(`${d.date},${d.isTrainingDay?'Train':'Rest'},${d.targets.kcal},${d.targets.p},${d.targets.f},${d.targets.c},${actual}`);
+      });
+      const blob = new Blob([rows.join('\n')], { type: 'text/csv' });
+      const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'weekly-macro-plan.csv'; a.click();
     });
-    const blob = new Blob([rows.join('\n')], { type: 'text/csv' });
-    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'weekly-macro-plan.csv'; a.click();
-  };
+  }
 }

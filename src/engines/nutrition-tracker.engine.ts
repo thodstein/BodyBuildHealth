@@ -32,7 +32,7 @@ export function calcNutritionTargets(weightKg: number, heightCm: number, age: nu
   return { bmr: Math.round(bmr), tdee: Math.round(tdee), kcal: Math.round(kcal), protein, fats, carbs, water: Math.round((0.033*weightKg+0.5)*10)/10, fiber: sex==='male'?35:25, micros };
 }
 
-export function calcAdherence(log: MealLog['total'], target: { kcal: number; protein: number; fats: number; carbs: number; water: number; fiber: number; steps: number }): { kcal: number; pro: number; water: number; score: number } {
+export function calcAdherence(log: MealLog['total'], target: { kcal: number; protein: number; fats: number; carbs: number; water: number; fiber: number; steps?: number }): { kcal: number; pro: number; water: number; score: number } {
   const kcalD = Math.abs(log.kcal - target.kcal) / target.kcal;
   const proD = Math.abs(log.p - target.protein) / target.protein;
   const waterD = Math.abs(log.water - target.water) / target.water;

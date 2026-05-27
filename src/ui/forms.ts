@@ -82,9 +82,12 @@ export function renderForm(config: FormConfig, initialData: Record<string, any> 
     
     config.fields.forEach(f => {
       let v = fd.get(f.key);
-      if (f.type === 'number') v = v ? parseFloat(v as string) : 0;
-      else v = v as string;
-      data[f.key] = v;
+      if (f.type === 'number') {
+        const numVal = v ? parseFloat(v as string) : 0;
+        data[f.key] = numVal;
+      } else {
+        data[f.key] = v as string;
+      }
     });
 
     try {

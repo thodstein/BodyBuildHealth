@@ -83,7 +83,8 @@ export async function renderNutritionModule(container: HTMLElement, profile: Use
   resBox.addEventListener('click', async (e) => {
     const target = (e.target as HTMLElement).closest('[data-id]');
     if (!target) return;
-    const food = getFoodById(target.dataset.id!)!;
+    const foodId = (target as HTMLElement).dataset.id!;
+    const food = getFoodById(foodId)!;
     const entry: MealLog = { ...todayLog, items: [...todayLog.items, { id: food.id, name: food.name, qty: 1, kcal: food.kcal, p: food.protein, f: food.fat, c: food.carbs, fiber: food.fiber }], total: { ...todayLog.total, kcal: todayLog.total.kcal + food.kcal, p: todayLog.total.p + food.protein, f: todayLog.total.f + food.fat, c: todayLog.total.c + food.carbs, fiber: todayLog.total.fiber + food.fiber } };
     await db.put('nutrition_log', entry);
     resBox.style.display = 'none';
@@ -95,7 +96,7 @@ export async function renderNutritionModule(container: HTMLElement, profile: Use
   container.addEventListener('click', async (e) => {
     const btn = (e.target as HTMLElement).closest('.btn-water');
     if (btn) {
-      const val = parseFloat(btn.dataset.val!);
+      const val = parseFloat((btn as HTMLElement).dataset.val!);
       const entry: MealLog = { ...todayLog, total: { ...todayLog.total, water: val } };
       await db.put('nutrition_log', entry);
       renderNutritionModule(container, profile, activeDrugs);

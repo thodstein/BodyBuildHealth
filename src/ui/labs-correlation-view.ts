@@ -32,17 +32,22 @@ export async function renderLabsCorrelation(container: HTMLElement, labs: LabPoi
   `;
 
   container.querySelectorAll('.badge[data-marker]').forEach(badge => {
-    badge.onclick = () => {
-      const m = badge.dataset.marker!;
-      const timeline = container.getElementById('marker-timeline')!;
+    (badge as HTMLElement).addEventListener('click', () => {
+      const m = (badge as HTMLElement).dataset.marker!;
+      const timeline = container.querySelector('#marker-timeline') as HTMLElement;
+      if (!timeline) return;
       const filtered = sorted.filter(l => l.code.toUpperCase() === m);
       timeline.innerHTML = filtered.map(l => `<div class="row" style="padding:4px 0;border-bottom:1px solid #3a3a3c;"><span class="label">${l.date} | <b>${l.code}</b></span><span class="value">${l.value} ${l.unit}</span></div>`).join('') || '<div class="label">Нет записей по маркеру</div>';
-    };
+    });
   });
 
-  container.getElementById('save-note')!.onclick = async () => {
-    const note = (container.getElementById('doctor-note') as HTMLTextAreaElement).value;
-    await db.put('doctor_notes', { id: 'correlation_' + phase, note, date: new Date().toISOString() });
-    alert('✅ Комментарий сохранён');
-  };
+  const saveNoteBtn = container.querySelector('#save-note') as HTMLButtonElement;
+  const doctorNote = container.querySelector('#doctor-note') as HTMLTextAreaElement;
+  if (saveNoteBtn && doctorNote) {
+    saveNoteBtn.addEventListener('click', async () => {
+      const note = doctorNote.value;
+      await db.put('doctor_notes', { id: 'correlation_' + phase, note, date: new Date().toISOString() });
+      alert('✅ Комментарий сохранён');
+    });
+  }
 }

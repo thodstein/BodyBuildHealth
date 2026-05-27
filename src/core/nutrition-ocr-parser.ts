@@ -6,6 +6,8 @@ export interface ParsedMeal {
   calories: number;
   confidence: number;
   raw: string;
+  mealType?: string;
+  items?: string[];
 }
 
 export function parseNutritionScreenshot(text: string): ParsedMeal[] {

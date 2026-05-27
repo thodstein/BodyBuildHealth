@@ -1,6 +1,6 @@
 import { db } from '../core/db';
 import { enqueueSync, processQueue } from '../core/sync-queue';
-import { processLabFile } from '../core/ocr-engine';
+import { processFile } from '../core/ocr-engine';
 import { generateCheckpoints } from '../engines/labs-scheduler.engine';
 import { calculateDynamicPenalty } from '../engines/labs-penalty.engine';
 import { filterLabsByRole, generateRoleInsights, getDynamicRef } from '../engines/role-view.engine';
@@ -9,7 +9,7 @@ import { calculateIndices } from '../engines/clinical-indices.engine';
 import { drawLabTrend } from './charts-labs';
 import { getProfile, setRole } from '../core/profile-manager';
 import { requestPushPermission } from '../core/push-manager';
-import type { LabPoint, DiagnosticEntry, LabCheckpoint, UserRole, ParsedLabResult } from '../core/types';
+import type { LabPoint, DiagnosticEntry, LabCheckpoint, UserRole, ParsedLabResult, LabPhase } from '../core/types';
 
 export async function renderLabsDiagnostics(container: HTMLElement) {
   const ctx = getProfile();
@@ -153,8 +153,8 @@ export async function renderLabsDiagnostics(container: HTMLElement) {
       container.querySelectorAll('#labs-subtabs .tab').forEach(t => t.classList.remove('active'));
       container.querySelectorAll('.sub-page').forEach(p => (p as HTMLElement).style.display = 'none');
       tab.classList.add('active');
-      container.getElementById(`sub-${tab.dataset.sub}`)!.style.display = 'block';
-      if (tab.dataset.sub === 'trends') renderTrends();
+      (container.querySelector(`#sub-${(tab as HTMLElement).dataset.sub}`) as HTMLElement)!.style.display = 'block';
+      if ((tab as HTMLElement).dataset.sub === 'trends') renderTrends();
     });
   });
 
@@ -171,39 +171,47 @@ export async function renderLabsDiagnostics(container: HTMLElement) {
   }
 
   // Роли & Push
-  container.getElementById('role-switcher')!.addEventListener('change', (e) => { setRole((e.target as HTMLSelectElement).value as UserRole); renderLabsDiagnostics(container); });
-  container.getElementById('btn-push-perm')!.addEventListener('click', async () => { const ok = await requestPushPermission(); alert(ok ? '✅ Уведомления включены' : '❌ Разрешение отклонено'); });
+  (container.querySelector('#role-switcher') as HTMLSelectElement)!.addEventListener('change', (e) => { setRole((e.target as HTMLSelectElement).value as UserRole); renderLabsDiagnostics(container); });
+  (container.querySelector('#btn-push-perm') as HTMLElement)!.addEventListener('click', async () => { const ok = await requestPushPermission(); alert(ok ? '✅ Уведомления включены' : '❌ Разрешение отклонено'); });
 
   // Ручной ввод
-  const manualModal = container.getElementById('manual-modal')!;
-  container.getElementById('btn-add-manual')!.addEventListener('click', () => manualModal.style.display = 'flex');
-  container.getElementById('cancel-manual-btn')!.addEventListener('click', () => manualModal.style.display = 'none');
-  container.getElementById('lab-code')!.addEventListener('change', (e) => { (container.getElementById('lab-custom-code') as HTMLInputElement).style.display = (e.target as HTMLSelectElement).value === 'CUSTOM' ? 'block' : 'none'; });
-  container.getElementById('save-manual-btn')!.addEventListener('click', async () => {
-    const code = (container.getElementById('lab-code') as HTMLSelectElement).value === 'CUSTOM' ? (container.getElementById('lab-custom-code') as HTMLInputElement).value.trim().toUpperCase() || 'CUSTOM' : (container.getElementById('lab-code') as HTMLSelectElement).value.toUpperCase();
-    const val = parseFloat((container.getElementById('lab-value') as HTMLInputElement).value);
-    const unit = (container.getElementById('lab-unit') as HTMLInputElement).value.trim() || 'ед.';
+  const manualModal = container.querySelector('#manual-modal') as HTMLElement;
+  if (!manualModal) return;
+  (container.querySelector('#btn-add-manual') as HTMLElement)?.addEventListener('click', () => manualModal.style.display = 'flex');
+  (container.querySelector('#cancel-manual-btn') as HTMLElement)?.addEventListener('click', () => manualModal.style.display = 'none');
+  (container.querySelector('#lab-code') as HTMLSelectElement)?.addEventListener('change', (e) => { const customInput = container.querySelector('#lab-custom-code') as HTMLInputElement; if (customInput) customInput.style.display = (e.target as HTMLSelectElement).value === 'CUSTOM' ? 'block' : 'none'; });
+  (container.querySelector('#save-manual-btn') as HTMLElement)?.addEventListener('click', async () => {
+    const codeSelect = container.querySelector('#lab-code') as HTMLSelectElement;
+    const customCodeInput = container.querySelector('#lab-custom-code') as HTMLInputElement;
+    const valueInput = container.querySelector('#lab-value') as HTMLInputElement;
+    const unitInput = container.querySelector('#lab-unit') as HTMLInputElement;
+    if (!codeSelect || !valueInput || !unitInput) return;
+    const code = codeSelect.value === 'CUSTOM' && customCodeInput ? customCodeInput.value.trim().toUpperCase() || 'CUSTOM' : codeSelect.value.toUpperCase();
+    const val = parseFloat(valueInput.value);
+    const unit = unitInput.value.trim() || 'ед.';
     if (isNaN(val) || val <= 0) return alert('⚠️ Введите значение > 0');
-    const entry: LabPoint = { id: crypto.randomUUID(), code, name: code, value: val, unit, date: new Date().toISOString().slice(0,10), phase: ctx.phase };
+    const entry: LabPoint = { id: crypto.randomUUID(), code, name: code, value: val, unit, date: new Date().toISOString().slice(0,10), phase: ctx.phase as LabPhase };
     await db.put('labs_log', entry);
     await enqueueSync('labs', entry);
     manualModal.style.display = 'none'; renderLabsDiagnostics(container);
   });
 
   // OCR
-  const uploadModal = container.getElementById('upload-modal')!;
-  container.getElementById('btn-upload-file')!.addEventListener('click', () => uploadModal.style.display = 'flex');
-  container.getElementById('cancel-upload-btn')!.addEventListener('click', () => uploadModal.style.display = 'none');
-  const ocrFile = container.getElementById('ocr-file') as HTMLInputElement;
-  const ocrStatus = container.getElementById('ocr-status')!;
-  const ocrPreview = container.getElementById('ocr-preview')!;
-  const ocrSaveBtn = container.getElementById('ocr-save-btn') as HTMLButtonElement;
+  const uploadModal = container.querySelector('#upload-modal') as HTMLElement;
+  if (!uploadModal) return;
+  (container.querySelector('#btn-upload-file') as HTMLElement)?.addEventListener('click', () => uploadModal.style.display = 'flex');
+  (container.querySelector('#cancel-upload-btn') as HTMLElement)?.addEventListener('click', () => uploadModal.style.display = 'none');
+  const ocrFile = container.querySelector('#ocr-file') as HTMLInputElement;
+  const ocrStatus = container.querySelector('#ocr-status') as HTMLElement;
+  const ocrPreview = container.querySelector('#ocr-preview') as HTMLElement;
+  const ocrSaveBtn = container.querySelector('#ocr-save-btn') as HTMLButtonElement;
+  if (!ocrFile || !ocrStatus || !ocrPreview || !ocrSaveBtn) return;
 
   ocrFile.addEventListener('change', async () => {
     if (!ocrFile.files?.length) return;
     ocrStatus.textContent = '⏳ Распознавание...'; ocrPreview.innerHTML = ''; ocrSaveBtn.style.display = 'none'; parsedResults = [];
     try {
-      const { text, labs, meals } = await processLabFile(ocrFile.files[0]);
+      const { text, labs, meals } = await processFile(ocrFile.files[0]);
       parsedResults = labs; 
       ocrSaveBtn.textContent = `✅ Подтвердить (${labs.length} лаб, ${meals.length} приёмов)`;
       if (!labs.length && !meals.length) { ocrStatus.innerHTML = '<div class="cons">⚠️ Данные не распознаны.</div>'; return; }
@@ -219,7 +227,7 @@ export async function renderLabsDiagnostics(container: HTMLElement) {
   ocrSaveBtn.addEventListener('click', async () => {
     if (!parsedResults.length) return;
     ocrStatus.textContent = '💾 Сохранение...';
-    const entries: LabPoint[] = parsedResults.map(p => ({ id: crypto.randomUUID(), code: p.marker, name: p.marker, value: p.value, unit: p.unit, date: new Date().toISOString().slice(0,10), phase: ctx.phase }));
+    const entries: LabPoint[] = parsedResults.map(p => ({ id: crypto.randomUUID(), code: p.marker, name: p.marker, value: p.value, unit: p.unit, date: new Date().toISOString().slice(0,10), phase: ctx.phase as LabPhase }));
     for (const e of entries) await db.put('labs_log', e);
     for (const e of entries) await enqueueSync('labs', e);
     uploadModal.style.display = 'none'; renderLabsDiagnostics(container);

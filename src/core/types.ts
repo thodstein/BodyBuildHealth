@@ -29,13 +29,18 @@ export interface UserProfile {
   sex: 'male' | 'female';
   role: UserRole;
   email?: string;
+  settings?: UserSettings;
+  phase?: LabPhaseType;
+  courseStartDate?: string;
 }
 
 export interface UserSettings {
   age: number;
   sex: 'male' | 'female';
   weight: number;
+  height?: number;
   goal: string;
+  bodyFat?: number;
 }
 
 export interface ReadinessInput {
@@ -59,7 +64,7 @@ export interface TrainingInput { level: 'beginner' | 'intermediate' | 'advanced'
 export interface TrainingOutput { splitName: string; splitDesc: string; volumePerGroup: Record<string, number>; rir: string; isDeload: boolean; deloadReason?: string; weekPlan: string; }
 
 export interface NutritionInput { weightKg: number; heightCm: number; age: number; sex: 'male' | 'female'; pal: number; goal: 'bulk' | 'cut' | 'maintenance' | 'recomp' | 'rehab' | 'strength'; bodyFatPercent?: number; drugs?: string[]; }
-export interface NutritionTargets { bmr: number; tdee: number; kcal: number; protein: number; fats: number; carbs: number; water: number; fiber: number; micros: Record<string, number>; }
+export interface NutritionTargets { bmr: number; tdee: number; kcal: number; protein: number; fats: number; carbs: number; water: number; fiber: number; micros: Record<string, number>; steps?: number; }
 
 export interface LabPoint { id: string; code: string; name: string; value: number; unit: string; date: string; phase: LabPhase; source?: string; custom?: boolean; }
 export interface LabForecast { current: number; w4: number; w8: number; w12: number; alert?: string; }
