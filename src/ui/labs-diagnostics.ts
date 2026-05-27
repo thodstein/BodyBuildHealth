@@ -1,110 +1,227 @@
 import { db } from '../core/db';
-import { calculateLabPenalty, generatePhaseSchedule } from '../engines/labs-penalty.engine';
-import { validateDiagnostics } from '../engines/diagnostics.engine';
-import type { LabPoint, DiagnosticEntry, LabPhase, PenaltyResult } from '../core/types';
+import { enqueueSync, processQueue } from '../core/sync-queue';
+import { processLabFile } from '../core/ocr-engine';
+import { generateCheckpoints } from '../engines/labs-scheduler.engine';
+import { calculateDynamicPenalty } from '../engines/labs-penalty.engine';
+import { filterLabsByRole, generateRoleInsights, getDynamicRef } from '../engines/role-view.engine';
+import { predictLab, isAbnormal } from '../engines/labs.engine';
+import { calculateIndices } from '../engines/clinical-indices.engine';
+import { drawLabTrend } from './charts-labs';
+import { getProfile, setRole } from '../core/profile-manager';
+import { requestPushPermission } from '../core/push-manager';
+import type { LabPoint, DiagnosticEntry, LabCheckpoint, UserRole, ParsedLabResult } from '../core/types';
 
-export async function renderLabsDiagnostics() {
-  const container = document.getElementById('labs-container')!;
+export async function renderLabsDiagnostics(container: HTMLElement) {
+  const ctx = getProfile();
+  const currentDate = new Date();
+  const totalWeeks = 12;
+
+  const allLabs: LabPoint[] = await db.getAll('labs_log') || [];
+  const allDx: DiagnosticEntry[] = await db.getAll('diagnostics_log') || [];
+  if (navigator.onLine) processQueue();
+
+  // 1. Расчёт индексов
+  const indices = calculateIndices(allLabs, ctx.sex, ctx.age);
   
-  // Загрузка данных
-  const labs: LabPoint[] = await db.getAll('labs_log') || [];
-  const diagnostics: DiagnosticEntry[] = validateDiagnostics(await db.getAll('diagnostics_log') || []);
+  // 2. Чек-поинты & Пенальти
+  const checkpoints = generateCheckpoints(ctx.phase, ctx.courseStartDate, totalWeeks, ctx);
+  const penalty = calculateDynamicPenalty(checkpoints, allLabs, currentDate);
+  const visibleLabs = filterLabsByRole(allLabs, ctx.role);
   
-  // Демо-фаза (в реальном приложении берётся из профиля/курса)
-  const currentPhase: LabPhase = 'on_cycle';
-  const phaseStart = '2024-01-15';
-  const phaseDuration = 10; // недель
-  
-  const penalty: PenaltyResult = calculateLabPenalty(currentPhase, phaseDuration, labs, diagnostics);
-  const schedule = generatePhaseSchedule(currentPhase, phaseStart, phaseDuration);
-  
-  // Группировка лаб
+  // 3. Группировка
   const groupedLabs: Record<string, LabPoint[]> = {
-    'Печень': labs.filter(l=>['ALT','AST','GGT','BIL'].includes(l.code.toUpperCase())),
-    'Кровь/Гематология': labs.filter(l=>['HCT','HGB','PLT','WBC','FERRITIN'].includes(l.code.toUpperCase())),
-    'Гормоны': labs.filter(l=>['TT','FT3','FT4','TSH','E2','PRL','LH','FSH','IGF1'].includes(l.code.toUpperCase())),
-    'Метаболизм/Липиды': labs.filter(l=>['GLU','INS','HOMA','LDL','HDL','TG','CRP','HbA1c'].includes(l.code.toUpperCase()))
+    'Печень/ЖКТ': visibleLabs.filter(l => ['ALT','AST','GGT','TBIL','DBIL'].includes(l.code.toUpperCase())),
+    'Кровь/Гематология': visibleLabs.filter(l => ['HCT','HGB','PLT','WBC','RBC','FERRITIN'].includes(l.code.toUpperCase())),
+    'Гормоны/Эндокрин': visibleLabs.filter(l => ['TT','FT3','FT4','TSH','E2','PRL','LH','FSH','IGF1','SHBG'].includes(l.code.toUpperCase())),
+    'Липиды/Метаболизм': visibleLabs.filter(l => ['GLU','INS','HOMA','LDL','HDL','TG','CRP','HbA1c','CREATININE'].includes(l.code.toUpperCase()))
   };
 
   const penaltyColor = penalty.score >= 50 ? 'var(--danger)' : penalty.score >= 25 ? 'var(--warning)' : 'var(--success)';
-  const penaltyBg = penalty.score >= 50 ? '#2a1b1b' : penalty.score >= 25 ? '#2a221b' : '#1b221b';
+  const roleInsight = generateRoleInsights(ctx.role, { risks: { overallRaw: 30, overallNet: 15, systemBreakdown: {} } as any, labs: allLabs, phase: ctx.phase });
 
   container.innerHTML = `
-    <div class="card" style="background:${penaltyBg};border:1px solid ${penaltyColor};">
-      <div class="row"><span class="label">🛡️ Штраф за отсутствие анализов</span><span class="value" style="color:${penaltyColor}">${penalty.score}%</span></div>
-      <div style="font-size:12px;color:#ccc;margin-top:4px;">${penalty.action || '✅ Анализы сданы вовремя'}</div>
-      ${penalty.missingLabs.length ? `<div style="font-size:12px;margin-top:4px;">⚠️ Не сдано: ${penalty.missingLabs.join(', ')}</div>` : ''}
+    <div class="card" style="background:${penalty.score>0?penaltyColor+'22':'transparent'};border:1px solid ${penaltyColor};">
+      <div class="row"><span class="label">🛡️ Штраф за просрочку анализов</span><span class="value" style="color:${penaltyColor}">${penalty.score}%</span></div>
+      <div style="font-size:12px;color:#ccc;margin-top:4px;">${penalty.action || roleInsight}</div>
+      ${penalty.missingLabs.length ? `<div style="font-size:12px;margin-top:4px;">⚠️ Просрочено: ${penalty.missingLabs.join(', ')}</div>` : ''}
     </div>
 
-    <div class="card">
-      <h3>📅 Фаза: <span class="badge" style="background:var(--tab-active)">${currentPhase.toUpperCase()}</span></h3>
-      <div class="row"><span class="label">Следующий чек-ап до</span><span class="value">${schedule.dueDate}</span></div>
-      <div class="row"><span class="label">Обязательные лабы</span><span class="value">${schedule.nextLabs.length}</span></div>
-      <button class="btn" style="margin-top:8px;font-size:13px;" onclick="document.getElementById('add-lab-modal').style.display='flex'">➕ Добавить результат</button>
-    </div>
-
-    <div class="tabs" style="margin:10px 0;">
-      <div class="tab active" data-sub="labs">🩸 Лаборатория</div>
-      <div class="tab" data-sub="dx">🔬 Диагностика</div>
-      <div class="tab" data-sub="schedule">📋 Расписание</div>
-    </div>
-
-    <div id="sub-labs" class="sub-page active">
-      ${Object.entries(groupedLabs).map(([title, items])=>`
-        <div class="card"><h3>${title}</h3>
-          ${items.length ? items.map(l=>`<div class="row"><span class="label">${l.name} (${l.date})</span><span class="value">${l.value} ${l.unit}</span></div>`).join('') : '<div class="label">Нет данных</div>'}
-        </div>
-      `).join('')}
-    </div>
-
-    <div id="sub-dx" class="sub-page">
-      <div class="card"><h3>🫀 ЭхоКГ</h3><div class="label">Нет данных или требуется обновление</div></div>
-      <div class="card"><h3>🦴 УЗИ суставов</h3><div class="label">Нет данных</div></div>
-      <div class="card"><h3>📊 DEXA / Состав тела</h3><div class="label">Нет данных</div></div>
-    </div>
-
-    <div id="sub-schedule" class="sub-page">
-      <div class="card"><h3>📋 Обязательный протокол</h3>
-        ${schedule.nextLabs.map(c=>`<div class="row"><span class="label">${c}</span><span class="value">до ${schedule.dueDate}</span></div>`).join('')}
+    <div class="card"><h3>🩸 Клинические индексы</h3>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;">
+        ${[
+          { l: 'HOMA-IR', v: indices.homaIR.value, s: indices.homaIR.status, a: indices.homaIR.alert },
+          { l: 'FAI', v: indices.fai.value, s: indices.fai.status, a: undefined },
+          { l: 'Free T', v: indices.freeTestosterone.value, u: 'ng/dL', s: indices.freeTestosterone.status, a: undefined },
+          { l: 'eGFR', v: indices.egfr.value, s: indices.egfr.status, a: indices.egfr.alert },
+          { l: 'De Ritis', v: indices.deritis.value, s: indices.deritis.status, a: undefined },
+          { l: 'TG/HDL', v: indices.tgHdlRatio.value, s: indices.tgHdlRatio.status, a: undefined }
+        ].map(idx => `
+          <div style="padding:8px;background:#252527;border-radius:8px;text-align:center;border:1px solid ${idx.s==='normal'||idx.s==='optimal'?'#30d158':'#ff9f0a'};">
+            <div style="font-size:10px;color:#8e8e93;">${idx.l}</div>
+            <div style="font-weight:600;margin:2px 0;">${idx.v} ${idx.u||''}</div>
+            <div class="badge" style="background:${idx.s==='normal'||idx.s==='optimal'?'var(--success)':'var(--warning)'}22;color:${idx.s==='normal'||idx.s==='optimal'?'var(--success)':'var(--warning)'};font-size:9px;">${idx.s.toUpperCase()}</div>
+          </div>
+        `).join('')}
       </div>
     </div>
 
-    <!-- Модалка добавления лабы -->
-    <div id="add-lab-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:50;align-items:center;justify-content:center;">
-      <div class="card" style="max-width:90%;width:320px;">
-        <h3>➕ Добавить анализ</h3>
-        <select id="lab-code" style="width:100%;margin:8px 0;padding:8px;background:#252527;color:#fff;border:1px solid #3a3a3c;border-radius:8px;">
-          <option value="ALT">АЛТ</option><option value="AST">АСТ</option><option value="TT">Тестостерон общий</option>
-          <option value="E2">Эстрадиол</option><option value="HCT">Гематокрит</option><option value="CUSTOM">Свой маркер</option>
+    <div class="card">
+      <div class="row" style="margin-bottom:8px;flex-wrap:wrap;gap:8px;">
+        <select id="role-switcher" style="width:auto;padding:6px 10px;background:#252527;color:#fff;border:1px solid #3a3a3c;border-radius:8px;">
+          <option value="user" ${ctx.role==='user'?'selected':''}>👤 Пользователь</option>
+          <option value="coach" ${ctx.role==='coach'?'selected':''}>🏋️ Тренер</option>
+          <option value="doctor" ${ctx.role==='doctor'?'selected':''}>👨‍⚕️ Врач</option>
         </select>
-        <input id="lab-value" type="number" placeholder="Значение" style="width:100%;margin:4px 0;padding:8px;background:#252527;color:#fff;border:1px solid #3a3a3c;border-radius:8px;">
-        <input id="lab-unit" type="text" placeholder="Ед. (U/L, ng/dL...)" style="width:100%;margin:4px 0;padding:8px;background:#252527;color:#fff;border:1px solid #3a3a3c;border-radius:8px;">
-        <button class="btn" id="save-lab-btn">💾 Сохранить</button>
-        <button class="btn" style="background:#8e8e93" onclick="document.getElementById('add-lab-modal').style.display='none'">Отмена</button>
+        <button id="btn-push-perm" class="btn" style="width:auto;margin:0;padding:6px 10px;font-size:12px;">🔔 Уведомления</button>
+      </div>
+      <h3 style="margin:10px 0 6px;">📅 Таймлайн чек-поинтов</h3>
+      <div style="display:flex;gap:6px;overflow-x:auto;padding-bottom:6px;">
+        ${checkpoints.map(cp => {
+          const sc = cp.status === 'completed' ? 'var(--success)' : cp.status === 'overdue' ? 'var(--danger)' : 'var(--warning)';
+          return `<div style="min-width:100px;padding:8px;background:#252527;border-radius:8px;border:1px solid ${sc};text-align:center;">
+            <div style="font-size:11px;color:#8e8e93;">Неделя ${cp.weekOffset}</div>
+            <div style="font-size:12px;font-weight:600;margin:2px 0;">${cp.type.replace('_',' ')}</div>
+            <div class="badge" style="background:${sc}22;color:${sc};font-size:10px;">${cp.status.toUpperCase()}</div>
+          </div>`;
+        }).join('')}
+      </div>
+      <div style="display:flex;gap:8px;margin-top:10px;">
+        <button class="btn" style="flex:1;" id="btn-add-manual">➕ Ввести вручную</button>
+        <button class="btn" style="flex:1;background:var(--success);color:#000;" id="btn-upload-file">📷 Загрузить скан/PDF</button>
+      </div>
+    </div>
+
+    <div class="tabs" id="labs-subtabs">
+      <div class="tab active" data-sub="labs">🩸 Лаборатория</div>
+      <div class="tab" data-sub="trends">📈 Тренды</div>
+      <div class="tab" data-sub="dx">🔬 Диагностика</div>
+      <div class="tab" data-sub="ocr-history">📜 История OCR</div>
+    </div>
+
+    <div id="sub-labs" class="sub-page active">
+      ${Object.entries(groupedLabs).map(([t,items])=>`<div class="card"><h3>${t}</h3>${items.length?items.map(l=>{const r=getDynamicRef(l.code.toUpperCase(),ctx.age,ctx.sex,ctx.phase);const abn=isAbnormal(l.code,l.value,ctx.phase);return`<div class="row"><span class="label">${l.name} (${l.date}) ${abn?'<span style="color:var(--danger)">⚠️</span>':''}</span><span class="value">${l.value} ${l.unit} <span style="font-size:9px;color:#8e8e93;">[${r.lln}–${r.uln}]</span></span></div>`;}).join(''):'<div class="label">Нет данных</div>'}</div>`).join('')}
+    </div>
+
+    <div id="sub-trends" class="sub-page" style="display:none;">
+      <div class="card"><h3>📈 Динамика маркеров</h3>
+        <canvas id="lab-chart" style="width:100%;height:140px;border-radius:8px;background:#2c2c2e;"></canvas>
+        <div class="label" style="margin-top:4px;">Красные точки = выход за фазовый референс. Линия = линейная регрессия.</div>
+      </div>
+    </div>
+
+    <div id="sub-dx" class="sub-page" style="display:none;">
+      ${allDx.length?allDx.map(dx=>`<div class="card"><h3>${dx.type.toUpperCase().replace('_', ' ')} (${dx.date})</h3><pre style="font-size:12px;margin:0;">${dx.findings || 'Заключение отсутствует'}</pre></div>`).join(''):'<div class="card"><div class="label">Нет данных диагностики</div></div>'}
+    </div>
+
+    <div id="sub-ocr-history" class="sub-page" style="display:none;"><div class="card"><h3>📜 История авто-распознавания</h3><div class="label">Данные сохраняются в очередь синхронизации. При подключении сети автоматически отправляются в облако.</div></div></div>
+
+    <!-- Модалка ввода -->
+    <div id="manual-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:100;align-items:center;justify-content:center;">
+      <div class="card" style="max-width:90%;width:320px;max-height:90vh;overflow-y:auto;">
+        <h3>➕ Ввести анализ</h3>
+        <select id="lab-code" style="width:100%;margin:8px 0;padding:8px;background:#252527;color:#fff;border:1px solid #3a3a3c;border-radius:8px;">
+          <optgroup label="Печень"><option value="ALT">АЛТ</option><option value="AST">АСТ</option><option value="GGT">ГГТ</option></optgroup>
+          <optgroup label="Кровь"><option value="HCT">Гематокрит</option><option value="HGB">Гемоглобин</option><option value="PLT">Тромбоциты</option></optgroup>
+          <optgroup label="Гормоны"><option value="TT">Тестостерон</option><option value="E2">Эстрадиол</option><option value="PRL">Пролактин</option></optgroup>
+          <option value="CUSTOM">Свой маркер</option>
+        </select>
+        <input id="lab-custom-code" type="text" placeholder="Код (если CUSTOM)" style="display:none;width:100%;margin:4px 0;padding:8px;background:#252527;color:#fff;border:1px solid #3a3a3c;border-radius:8px;">
+        <div style="display:flex;gap:8px;"><input id="lab-value" type="number" step="0.01" placeholder="Значение" style="flex:2;padding:8px;background:#252527;color:#fff;border:1px solid #3a3a3c;border-radius:8px;"><input id="lab-unit" type="text" placeholder="Ед." style="flex:1;padding:8px;background:#252527;color:#fff;border:1px solid #3a3a3c;border-radius:8px;"></div>
+        <button class="btn" id="save-manual-btn">💾 Сохранить</button><button class="btn" style="background:#8e8e93" id="cancel-manual-btn">Отмена</button>
+      </div>
+    </div>
+
+    <!-- Модалка OCR -->
+    <div id="upload-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:100;align-items:center;justify-content:center;">
+      <div class="card" style="max-width:90%;width:360px;max-height:90vh;overflow-y:auto;">
+        <h3>📷 Автопарсинг бланков</h3>
+        <input id="ocr-file" type="file" accept="image/*,.pdf,.txt" style="display:none;">
+        <button class="btn" style="width:auto;margin:10px auto;display:block;" onclick="document.getElementById('ocr-file').click()">📤 Выбрать файл</button>
+        <div id="ocr-status" style="text-align:center;margin:10px 0;font-size:13px;color:#8e8e93;"></div>
+        <div id="ocr-preview" style="margin-top:8px;"></div>
+        <button id="ocr-save-btn" class="btn" style="display:none;margin-top:12px;">✅ Подтвердить</button>
+        <button class="btn" style="background:#8e8e93;margin-top:8px;" id="cancel-upload-btn">Отмена</button>
       </div>
     </div>
   `;
 
+  let parsedResults: ParsedLabResult[] = [];
+
   // Табы
-  container.querySelectorAll('.tab').forEach(tab=>{
-    tab.onclick=()=>{
-      container.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
-      container.querySelectorAll('.sub-page').forEach(p=>p.classList.remove('active'));
+  container.querySelectorAll('#labs-subtabs .tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      container.querySelectorAll('#labs-subtabs .tab').forEach(t => t.classList.remove('active'));
+      container.querySelectorAll('.sub-page').forEach(p => (p as HTMLElement).style.display = 'none');
       tab.classList.add('active');
-      container.getElementById(`sub-${tab.dataset.sub}`)?.classList.add('active');
-    };
+      container.getElementById(`sub-${tab.dataset.sub}`)!.style.display = 'block';
+      if (tab.dataset.sub === 'trends') renderTrends();
+    });
   });
 
-  // Сохранение лабы
-  document.getElementById('save-lab-btn')!.onclick = async () => {
-    const code = (document.getElementById('lab-code') as HTMLSelectElement).value;
-    const value = parseFloat((document.getElementById('lab-value') as HTMLInputElement).value) || 0;
-    const unit = (document.getElementById('lab-unit') as HTMLInputElement).value || 'ед.';
-    const entry: LabPoint = {
-      id: crypto.randomUUID(), code, name: code, value, unit, date: new Date().toISOString().slice(0,10), phase: currentPhase
-    };
+  // Тренды
+  function renderTrends() {
+    const canvas = container.querySelector('#lab-chart') as HTMLCanvasElement;
+    if (!canvas) return;
+    const markers = ['ALT', 'HCT', 'TT', 'E2', 'LDL'];
+    const data = markers.map(code => {
+      const pts = allLabs.filter(l => l.code.toUpperCase() === code.toUpperCase()).sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+      return pts.map((p, i) => ({ week: i, value: p.value, isAbnormal: isAbnormal(code, p.value, ctx.phase) }));
+    }).flat();
+    drawLabTrend(canvas, data.length ? data : [{week:0,value:0},{week:1,value:0}], 100, 10, 'ед.', 'Сводный тренд');
+  }
+
+  // Роли & Push
+  container.getElementById('role-switcher')!.addEventListener('change', (e) => { setRole((e.target as HTMLSelectElement).value as UserRole); renderLabsDiagnostics(container); });
+  container.getElementById('btn-push-perm')!.addEventListener('click', async () => { const ok = await requestPushPermission(); alert(ok ? '✅ Уведомления включены' : '❌ Разрешение отклонено'); });
+
+  // Ручной ввод
+  const manualModal = container.getElementById('manual-modal')!;
+  container.getElementById('btn-add-manual')!.addEventListener('click', () => manualModal.style.display = 'flex');
+  container.getElementById('cancel-manual-btn')!.addEventListener('click', () => manualModal.style.display = 'none');
+  container.getElementById('lab-code')!.addEventListener('change', (e) => { (container.getElementById('lab-custom-code') as HTMLInputElement).style.display = (e.target as HTMLSelectElement).value === 'CUSTOM' ? 'block' : 'none'; });
+  container.getElementById('save-manual-btn')!.addEventListener('click', async () => {
+    const code = (container.getElementById('lab-code') as HTMLSelectElement).value === 'CUSTOM' ? (container.getElementById('lab-custom-code') as HTMLInputElement).value.trim().toUpperCase() || 'CUSTOM' : (container.getElementById('lab-code') as HTMLSelectElement).value.toUpperCase();
+    const val = parseFloat((container.getElementById('lab-value') as HTMLInputElement).value);
+    const unit = (container.getElementById('lab-unit') as HTMLInputElement).value.trim() || 'ед.';
+    if (isNaN(val) || val <= 0) return alert('⚠️ Введите значение > 0');
+    const entry: LabPoint = { id: crypto.randomUUID(), code, name: code, value: val, unit, date: new Date().toISOString().slice(0,10), phase: ctx.phase };
     await db.put('labs_log', entry);
-    document.getElementById('add-lab-modal')!.style.display = 'none';
-    renderLabsDiagnostics(); // ре-рендер
-  };
+    await enqueueSync('labs', entry);
+    manualModal.style.display = 'none'; renderLabsDiagnostics(container);
+  });
+
+  // OCR
+  const uploadModal = container.getElementById('upload-modal')!;
+  container.getElementById('btn-upload-file')!.addEventListener('click', () => uploadModal.style.display = 'flex');
+  container.getElementById('cancel-upload-btn')!.addEventListener('click', () => uploadModal.style.display = 'none');
+  const ocrFile = container.getElementById('ocr-file') as HTMLInputElement;
+  const ocrStatus = container.getElementById('ocr-status')!;
+  const ocrPreview = container.getElementById('ocr-preview')!;
+  const ocrSaveBtn = container.getElementById('ocr-save-btn') as HTMLButtonElement;
+
+  ocrFile.addEventListener('change', async () => {
+    if (!ocrFile.files?.length) return;
+    ocrStatus.textContent = '⏳ Распознавание...'; ocrPreview.innerHTML = ''; ocrSaveBtn.style.display = 'none'; parsedResults = [];
+    try {
+      const { text, labs, meals } = await processLabFile(ocrFile.files[0]);
+      parsedResults = labs; 
+      ocrSaveBtn.textContent = `✅ Подтвердить (${labs.length} лаб, ${meals.length} приёмов)`;
+      if (!labs.length && !meals.length) { ocrStatus.innerHTML = '<div class="cons">⚠️ Данные не распознаны.</div>'; return; }
+      ocrPreview.innerHTML = `
+        <h4>🩸 Лаборатория (${labs.length})</h4>
+        ${labs.map(p => `<div class="row"><span class="label"><b>${p.marker}</b></span><span class="value">${p.value} ${p.unit}</span></div>`).join('')}
+        ${meals.length ? `<h4 style="margin-top:8px;">🥗 Питание (${meals.length})</h4>${meals.map(m => `<div style="font-size:12px;color:#8e8e93;">${m.mealType}: ${m.items.length} блюд</div>`).join('')}` : ''}
+      `;
+      ocrSaveBtn.style.display = 'block'; ocrStatus.textContent = '✅ Готово';
+    } catch { ocrStatus.innerHTML = '<div class="cons">❌ Ошибка</div>'; }
+  });
+
+  ocrSaveBtn.addEventListener('click', async () => {
+    if (!parsedResults.length) return;
+    ocrStatus.textContent = '💾 Сохранение...';
+    const entries: LabPoint[] = parsedResults.map(p => ({ id: crypto.randomUUID(), code: p.marker, name: p.marker, value: p.value, unit: p.unit, date: new Date().toISOString().slice(0,10), phase: ctx.phase }));
+    for (const e of entries) await db.put('labs_log', e);
+    for (const e of entries) await enqueueSync('labs', e);
+    uploadModal.style.display = 'none'; renderLabsDiagnostics(container);
+  });
 }

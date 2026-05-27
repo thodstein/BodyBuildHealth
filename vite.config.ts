@@ -1,18 +1,23 @@
 import { defineConfig } from 'vite';
 
 export default defineConfig({
-  base: process.env.VERCEL ? '/' : '/BodyBuildHealth/',
+  base: '/',
   build: {
     target: 'esnext',
     outDir: 'dist',
     sourcemap: false,
-      rollupOptions: {
+    rollupOptions: {
       output: {
-        manualChunks: {
-          engines: ['src/engines/readiness.engine.ts', 'src/engines/risk.engine.ts', 'src/engines/dosage.engine.ts']
-        }
+        manualChunks: undefined
       }
     }
   },
-  server: { port: 5173, host: true }
+  server: {
+    port: 5173,
+    host: true,
+    open: false
+  },
+  optimizeDeps: {
+    exclude: ['@telegram-web-app']
+  }
 });
