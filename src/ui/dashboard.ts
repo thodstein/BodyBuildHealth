@@ -12,22 +12,15 @@ import { generateWeeklyReportHTML, triggerPrintReport } from '../engines/weekly-
 import { setRole } from '../core/profile-manager';
 import { logoutUser } from '../core/auth-manager';
 import { db } from '../core/db';
-import type { UserProfile, ReadinessInput, RiskInput, DoseRequest, TrainingInput, NutritionInput, FertilityInput, GamificationState, CourseEntry, LabPoint } from '../core/types';
+import type { UserProfile } from '../core/types';
 
-let labsRendered = false;
-let pharmaRendered = false;
-let articlesRendered = false;
-let nutritionRendered = false;
+let labsRendered = false, pharmaRendered = false, articlesRendered = false, nutritionRendered = false;
 
 export function renderDashboard(profile: UserProfile) {
   const ctx = {
-    role: profile.role,
-    age: profile.settings.age,
-    sex: profile.settings.sex,
-    weight: profile.settings.weight,
-    goal: profile.settings.goal,
-    phase: 'course',
-    courseStartDate: new Date().toISOString()
+    role: profile.role, age: profile.settings.age, sex: profile.settings.sex,
+    weight: profile.settings.weight, goal: profile.settings.goal,
+    phase: 'course', courseStartDate: new Date().toISOString()
   };
 
   const app = document.getElementById('app');
@@ -38,9 +31,9 @@ export function renderDashboard(profile: UserProfile) {
       <h1>📊 Health Engine TZ v3.1</h1>
       <div style="display:flex;gap:8px;align-items:center;">
         <select id="header-role" style="width:auto;padding:4px 8px;background:transparent;color:#fff;border:1px solid #3a3a3c;border-radius:6px;font-size:12px;">
-          <option value="user" ${ctx.role === 'user' ? 'selected' : ''}>👤 User</option>
-          <option value="coach" ${ctx.role === 'coach' ? 'selected' : ''}>🏋️ Coach</option>
-          <option value="doctor" ${ctx.role === 'doctor' ? 'selected' : ''}>👨‍⚕️ Doctor</option>
+          <option value="user" ${ctx.role==='user'?'selected':''}>👤 User</option>
+          <option value="coach" ${ctx.role==='coach'?'selected':''}>🏋️ Coach</option>
+          <option value="doctor" ${ctx.role==='doctor'?'selected':''}>👨‍⚕️ Doctor</option>
         </select>
         <button id="btn-logout" style="background:transparent;border:1px solid #3a3a3c;color:#ff453a;padding:4px 8px;border-radius:6px;font-size:12px;cursor:pointer;">🚪</button>
       </div>
@@ -64,30 +57,14 @@ export function renderDashboard(profile: UserProfile) {
         <div class="label">Роль: ${ctx.role} | Цель: ${ctx.goal} | Вес: ${ctx.weight}кг</div>
       </div>
     </div>
-    <div id="page-train" class="page">
-      <div class="card"><h3>🏋️ Тренинг</h3><div class="label">Модуль готов к рендеру (используй демо-данные)</div></div>
-    </div>
-    <div id="page-food" class="page">
-      <div id="nutrition-container"></div>
-    </div>
-    <div id="page-labs" class="page">
-      <div id="labs-container"></div>
-    </div>
-    <div id="page-support" class="page">
-      <div class="card"><h3>🛡️ Поддержка</h3><div class="label">Модуль готов к рендеру</div></div>
-    </div>
-    <div id="page-fert" class="page">
-      <div class="card"><h3>🧬 Фертильность</h3><div class="label">Модуль готов к рендеру</div></div>
-    </div>
-    <div id="page-predict" class="page">
-      <div class="card"><h3>📉 Прогноз</h3><div class="label">Модуль готов к рендеру</div></div>
-    </div>
-    <div id="page-pharma" class="page">
-      <div id="pharma-container"></div>
-    </div>
-    <div id="page-articles" class="page">
-      <div id="articles-container"></div>
-    </div>
+    <div id="page-train" class="page"><div class="card"><h3>🏋️ Тренинг</h3><div class="label">Модуль готов к рендеру</div></div></div>
+    <div id="page-food" class="page"><div id="nutrition-container"></div></div>
+    <div id="page-labs" class="page"><div id="labs-container"></div></div>
+    <div id="page-support" class="page"><div class="card"><h3>🛡️ Поддержка</h3><div class="label">Модуль готов к рендеру</div></div></div>
+    <div id="page-fert" class="page"><div class="card"><h3>🧬 Фертильность</h3><div class="label">Модуль готов к рендеру</div></div></div>
+    <div id="page-predict" class="page"><div class="card"><h3>📉 Прогноз</h3><div class="label">Модуль готов к рендеру</div></div></div>
+    <div id="page-pharma" class="page"><div id="pharma-container"></div></div>
+    <div id="page-articles" class="page"><div id="articles-container"></div></div>
     <div id="page-assist" class="page">
       <div class="card"><h3>🤖 Ассистент</h3>
         <input id="qa-input" type="text" placeholder="Спросите про гематокрит, пролактин, ПКТ..." style="width:100%;padding:10px;margin:8px 0;border-radius:8px;border:1px solid #3a3a3c;background:#252527;color:#fff;">
@@ -119,33 +96,17 @@ export function renderDashboard(profile: UserProfile) {
       if (page) (page as HTMLElement).style.display = 'block';
 
       const tabId = tab.dataset.tab;
-
       if (tabId === 'food' && !nutritionRendered) {
-        import('./nutrition-module').then(m => {
-          m.renderNutritionModule(app.getElementById('nutrition-container')!, profile, []);
-          nutritionRendered = true;
-        });
+        import('./nutrition-module').then(m => { m.renderNutritionModule(app.getElementById('nutrition-container')!, profile, []); nutritionRendered = true; });
       }
-
       if (tabId === 'labs' && !labsRendered) {
-        import('./labs-diagnostics').then(m => {
-          m.renderLabsDiagnostics(app.getElementById('labs-container')!);
-          labsRendered = true;
-        });
+        import('./labs-diagnostics').then(m => { m.renderLabsDiagnostics(app.getElementById('labs-container')!); labsRendered = true; });
       }
-
       if (tabId === 'pharma' && !pharmaRendered) {
-        import('./pharma-course').then(m => {
-          m.renderPharmaModule(app.getElementById('pharma-container')!, []);
-          pharmaRendered = true;
-        });
+        import('./pharma-course').then(m => { m.renderPharmaModule(app.getElementById('pharma-container')!, []); pharmaRendered = true; });
       }
-
       if (tabId === 'articles' && !articlesRendered) {
-        import('./articles-workflow').then(m => {
-          m.renderArticlesWorkflow(app.getElementById('articles-container')!, ctx.role, profile.id);
-          articlesRendered = true;
-        });
+        import('./articles-workflow').then(m => { m.renderArticlesWorkflow(app.getElementById('articles-container')!, ctx.role, profile.id); articlesRendered = true; });
       }
     });
   });
@@ -155,9 +116,7 @@ export function renderDashboard(profile: UserProfile) {
   if (qaIn && qaOut) {
     qaIn.addEventListener('input', () => {
       import('../engines/assistant.engine').then(m => {
-        qaOut.innerHTML = m.queryAssistant(qaIn.value).map(a =>
-          `<div style="margin:6px 0;padding:6px;background:#252527;border-radius:6px;white-space:pre-wrap;">${a}</div>`
-        ).join('');
+        qaOut.innerHTML = m.queryAssistant(qaIn.value).map(a => `<div style="margin:6px 0;padding:6px;background:#252527;border-radius:6px;white-space:pre-wrap;">${a}</div>`).join('');
       });
     });
   }
@@ -176,8 +135,7 @@ export function renderDashboard(profile: UserProfile) {
 
   app.getElementById('exp-csv')!.addEventListener('click', async () => {
     const labs = await db.getAll('labs_log') || [];
-    const csv = 'date,code,value,unit\n' + labs.map((l: any) => `${l.date},${l.code},${l.value},${l.unit}`).join('\n');
-    downloadFile(csv, 'labs.csv');
+    downloadFile('date,code,value,unit\n' + labs.map((l: any) => `${l.date},${l.code},${l.value},${l.unit}`).join('\n'), 'labs.csv');
   });
 
   console.log('✅ Dashboard v3.1 loaded | Role:', ctx.role);
