@@ -1,5 +1,6 @@
 import { CourseEntry } from '../core/types';
-import { PHARMA_DB, SUPPORT_BASE_COVERAGE } from '../core/constants';
+import { PHARMA_DB } from '../core/pharma-database';
+import { SUPPORT_BASE_COVERAGE } from '../core/constants';
 
 export interface StackLoad {
   hepatic: number; cardio: number; renal: number; neuro: number; lipid: number; endocrine: number;
@@ -52,9 +53,12 @@ export function renderStackAnalyzer(container: HTMLElement, course: CourseEntry[
     </div>
   `;
 
-  container.getElementById('stack-export')!.onclick = () => {
-    const lines = ['HEALTH ENGINE STACK PROTOCOL', `Date: ${new Date().toISOString().slice(0,10)}`, '', 'Course:', ...course.map(c => `• ${PHARMA_DB[c.substanceId]?.name || c.substanceId}: ${c.doseValue}${c.doseUnit} (${c.frequency}) [Week ${c.startWeek}-${c.endWeek}]`), '', 'System Load:', ...Object.entries(load).map(([k,v]) => `• ${k}: ${v}%`)];
-    const blob = new Blob([lines.join('\n')], { type: 'text/plain' });
-    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'stack-protocol.txt'; a.click();
-  };
+  const exportBtn = container.querySelector('#stack-export') as HTMLElement;
+  if (exportBtn) {
+    exportBtn.onclick = () => {
+      const lines = ['HEALTH ENGINE STACK PROTOCOL', `Date: ${new Date().toISOString().slice(0,10)}`, '', 'Course:', ...course.map(c => `• ${PHARMA_DB[c.substanceId]?.name || c.substanceId}: ${c.doseValue}${c.doseUnit} (${c.frequency}) [Week ${c.startWeek}-${c.endWeek}]`), '', 'System Load:', ...Object.entries(load).map(([k,v]) => `• ${k}: ${v}%`)];
+      const blob = new Blob([lines.join('\n')], { type: 'text/plain' });
+      const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'stack-protocol.txt'; a.click();
+    };
+  }
 }

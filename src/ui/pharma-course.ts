@@ -1,6 +1,7 @@
 import { validateCourse } from '../engines/pharmacology.engine';
 import { generatePCTPlan } from '../engines/pct-planner.engine';
-import { checkDrugInteractions, getInteractionText } from '../engines/interactions-engine';
+import { getInteractionText } from '../engines/interactions-engine';
+import { checkDrugInteractions } from '../engines/pharma-interactions.engine';
 import { calculateStackLoad, renderStackAnalyzer } from './pharma-stack-analyzer';
 import { SUBSTANCES_BY_CLASS } from '../core/pharma-database';
 import type { CourseEntry } from '../core/types';
@@ -83,7 +84,7 @@ export function renderPharmaModule(container: HTMLElement, initialCourse: Course
       </div>
     `).join('');
     listEl.querySelectorAll('button[data-idx]').forEach(btn => {
-      btn.onclick = () => { course.splice(parseInt((btn as HTMLButtonElement).dataset.idx!, 10), 1); runCalc(); };
+      (btn as HTMLElement).addEventListener('click', () => { course.splice(parseInt((btn as HTMLButtonElement).dataset.idx!, 10), 1); runCalc(); });
     });
   }
 
@@ -91,8 +92,8 @@ export function renderPharmaModule(container: HTMLElement, initialCourse: Course
     const val = validateCourse(course);
     warnEl.innerHTML = val.warnings.length ? `<div class="cons">${val.warnings.map(w => `⚠️ ${w}`).join('<br>')}</div>` : `<div style="color:var(--success);font-size:13px;padding:4px 0;">✅ Курс валиден</div>`;
     
-    const interactionResult = checkDrugInteractions(course.map(c => c.substanceId));
-    intEl.innerHTML = getInteractionText(interactionResult).split('\n').map(line => `<div style="font-size:12px;padding:2px 0;">${line}</div>`).join('');
+    const alerts = checkDrugInteractions(course);
+    intEl.innerHTML = alerts.map(a => `<div style="font-size:12px;padding:2px 0;color:${a.type === 'critical' ? 'var(--error)' : a.type === 'warning' ? 'var(--warn)' : 'var(--info)'}">⚠️ ${a.recommendation}</div>`).join('');
 
     renderList();
 
@@ -122,10 +123,10 @@ export function renderPharmaModule(container: HTMLElement, initialCourse: Course
       </div>`;
   };
 
-  stackBtn.onclick = () => {
+  (stackBtn as HTMLElement).addEventListener('click', () => {
     stackOutEl.innerHTML = '<div class="label">Загрузка анализатора...</div>';
-    renderStackAnalyzer(stackOutEl, course);
-  };
+    renderStackAnalyzer(stackOutEl as unknown as HTMLElement, course);
+  });
 
   addBtn.onclick = () => {
     const id = subSel.value;

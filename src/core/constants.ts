@@ -165,19 +165,6 @@ export const DYNAMIC_REFS: Record<string, DynamicRefRange> = {
   E2: { baseULN: 40, baseLLN: 10, ageFactor: () => 1.0, sexFactor: () => 1.0, phaseFactor: (p) => p.includes('pct') ? 0.7 : 1.0 }
 } as const;
 
-// ... (оставь предыдущие экспорты без изменений) ...
-
-// НОВЫЕ: Микронутриенты (расширено)
-export const MICRONUTRIENT_TARGETS_EXTENDED: Record<string, { amount: number; unit: string; upperLimit?: number }> = {
-  Mg: { amount: 400, unit: 'mg', upperLimit: 700 }, Zn: { amount: 15, unit: 'mg', upperLimit: 40 },
-  VitD: { amount: 3000, unit: 'IU', upperLimit: 10000 }, VitC: { amount: 1000, unit: 'mg', upperLimit: 2000 },
-  VitB12: { amount: 2.4, unit: 'mcg', upperLimit: 50 }, Omega3_EPA_DHA: { amount: 2000, unit: 'mg', upperLimit: 5000 },
-  Potassium: { amount: 3500, unit: 'mg', upperLimit: 4700 }, Sodium: { amount: 2300, unit: 'mg', upperLimit: 5000 },
-  Iron: { amount: 8, unit: 'mg', upperLimit: 45 }, Calcium: { amount: 1000, unit: 'mg', upperLimit: 2500 },
-  Iodine: { amount: 150, unit: 'mcg', upperLimit: 1100 }, Selenium: { amount: 55, unit: 'mcg', upperLimit: 400 },
-  Copper: { amount: 0.9, unit: 'mg', upperLimit: 10 }, Chromium: { amount: 35, unit: 'mcg', upperLimit: 1000 }
-} as const;
-
 // НОВЫЕ: Лабораторные маркеры (расширено до 30+)
 export const UCUM_MAP: Record<string, { prefUnit: string; coeff: number; uln: number; lln: number; name: string }> = {
   'ALT': { prefUnit: 'U/L', coeff: 1, uln: 40, lln: 7, name: 'АЛТ' },

@@ -13,6 +13,9 @@ export function navigate(route: Route) {
 
 export function initRouter() {
   document.querySelectorAll('.tab').forEach(t => {
-    t.addEventListener('click', () => navigate(t.dataset.route as Route));
+    t.addEventListener('click', () => {
+      const route = (t as HTMLElement).dataset.route as Route;
+      if (route) navigate(route);
+    });
   });
 }

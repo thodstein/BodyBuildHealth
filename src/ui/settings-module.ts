@@ -46,25 +46,37 @@ export async function renderSettingsModule(container: HTMLElement, profile: User
   `;
 
   document.getElementById('save-profile')!.onclick = async () => {
+    const ageEl = document.getElementById('set-age') as HTMLInputElement;
+    const sexEl = document.getElementById('set-sex') as HTMLInputElement;
+    const weightEl = document.getElementById('set-weight') as HTMLInputElement;
+    const heightEl = document.getElementById('set-height') as HTMLInputElement;
+    const bfEl = document.getElementById('set-bf') as HTMLInputElement;
+    const goalEl = document.getElementById('set-goal') as HTMLInputElement;
+    const nameEl = document.getElementById('set-name') as HTMLInputElement;
+    
     const updates: Partial<UserProfile['settings']> = {
-      age: parseInt(document.getElementById('set-age')!.value),
-      sex: document.getElementById('set-sex')!.value as any,
-      weight: parseFloat(document.getElementById('set-weight')!.value),
-      height: parseFloat(document.getElementById('set-height')!.value),
-      bodyFat: parseFloat(document.getElementById('set-bf')!.value) || undefined,
-      goal: document.getElementById('set-goal')!.value as any
+      age: parseInt(ageEl.value),
+      sex: sexEl.value as 'male' | 'female',
+      weight: parseFloat(weightEl.value),
+      height: parseFloat(heightEl.value),
+      bodyFat: parseFloat(bfEl.value) || undefined,
+      goal: goalEl.value as string
     };
-    const newProf = updateProfile({ ...profile, name: document.getElementById('set-name')!.value, settings: { ...p, ...updates } });
+    const newProf: UserProfile = { ...profile, name: nameEl.value, settings: { ...p, ...updates } };
     onProfileUpdate(newProf);
     alert('✅ Профиль обновлён');
   };
 
   document.getElementById('save-phase')!.onclick = () => {
+    const phaseEl = document.getElementById('set-phase') as HTMLInputElement;
+    const startEl = document.getElementById('set-start') as HTMLInputElement;
+    const roleEl = document.getElementById('set-role') as HTMLInputElement;
+    
     updateProfile({
-      phase: document.getElementById('set-phase')!.value as LabPhaseType,
-      courseStartDate: document.getElementById('set-start')!.value
+      phase: phaseEl.value as LabPhaseType,
+      courseStartDate: startEl.value
     });
-    setRole(document.getElementById('set-role')!.value as UserRole);
+    setRole(roleEl.value as UserRole);
     onProfileUpdate(getProfile() as any);
     alert('🔄 Фаза и роль обновлены. Перезагрузите вкладку.');
   };
