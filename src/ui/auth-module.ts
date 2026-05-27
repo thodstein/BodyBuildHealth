@@ -41,15 +41,15 @@ export async function renderAuthModule(container: HTMLElement, onLogin: (profile
   let mode: 'login' | 'register' = 'login';
 
   tabs.forEach(t => {
-    t.onclick = () => {
+    (t as HTMLElement).addEventListener('click', () => {
       tabs.forEach(x => x.classList.remove('active'));
       t.classList.add('active');
-      mode = t.dataset.auth === 'login' ? 'login' : 'register';
+      mode = t.getAttribute('data-auth') === 'login' ? 'login' : 'register';
       nameIn.style.display = mode === 'register' ? 'block' : 'none';
       roleSel.style.display = mode === 'register' ? 'block' : 'none';
       btn.textContent = mode === 'login' ? 'Войти' : 'Зарегистрироваться';
       errEl.textContent = '';
-    };
+    });
   });
 
   form.onsubmit = async (e) => {

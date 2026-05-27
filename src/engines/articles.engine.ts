@@ -1,9 +1,18 @@
 import { Article, ArticleStatus, UserRole } from '../core/types';
 
-export function createArticle(data: Omit<Article, 'id' | 'createdAt' | 'updatedAt' | 'version' | 'likes' | 'views' | 'isPinned'>): Article {
+export function createArticle(data: { title: string; category: ArticleCategory; teaser: string; content: string; tags: string[]; authorId: string; authorName: string; slug?: string; coverImageUrl?: string }): Article {
+  const slug = data.slug || data.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
   return {
-    ...data,
     id: crypto.randomUUID(),
+    title: data.title,
+    slug,
+    teaser: data.teaser,
+    content: data.content,
+    coverImageUrl: data.coverImageUrl || '',
+    tags: data.tags,
+    category: data.category,
+    authorId: data.authorId,
+    authorName: data.authorName,
     status: 'draft',
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),

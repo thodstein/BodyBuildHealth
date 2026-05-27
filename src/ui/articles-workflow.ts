@@ -1,6 +1,6 @@
 import { db } from '../core/db';
 import { createArticle, submitForReview, processReview, publishArticle, archiveArticle, canEdit, canReview, filterArticles } from '../engines/articles.engine';
-import type { Article, UserRole, ArticleStatus } from '../core/types';
+import type { Article, UserRole, ArticleStatus, ArticleCategory } from '../core/types';
 
 export async function renderArticlesWorkflow(container: HTMLElement, role: UserRole, userId: string = 'user_default') {
   const allArticles: Article[] = await db.getAll('articles') || [];
@@ -58,17 +58,18 @@ export async function renderArticlesWorkflow(container: HTMLElement, role: UserR
   });
 
   // Создание
-  container.getElementById('art-save-btn')!.onclick = async () => {
-    const title = (container.getElementById('art-title') as HTMLInputElement).value.trim();
-    const category = (container.getElementById('art-category') as HTMLSelectElement).value as any;
-    const teaser = (container.getElementById('art-teaser') as HTMLInputElement).value.trim();
-    const content = (container.getElementById('art-content') as HTMLTextAreaElement).value.trim();
-    const tags = (container.getElementById('art-tags') as HTMLInputElement).value.split(',').map(t=>t.trim()).filter(Boolean);
+  const saveBtn = container.querySelector('#art-save-btn') as HTMLButtonElement;
+  saveBtn.onclick = async () => {
+    const title = (container.querySelector('#art-title') as HTMLInputElement).value.trim();
+    const category = (container.querySelector('#art-category') as HTMLSelectElement).value as ArticleCategory;
+    const teaser = (container.querySelector('#art-teaser') as HTMLInputElement).value.trim();
+    const content = (container.querySelector('#art-content') as HTMLTextAreaElement).value.trim();
+    const tags = (container.querySelector('#art-tags') as HTMLInputElement).value.split(',').map(t=>t.trim()).filter(Boolean);
     if (!title || !content) return alert('⚠️ Заголовок и текст обязательны');
 
-    const newArt = createArticle({ title, category, teaser, content, tags, authorId: userId, authorName: role === 'doctor' ? 'Dr. User' : 'User' });
+    const newArt = createArticle({ title, category, teaser, content, tags, authorId: userId, authorName: role === 'doctor' ? 'Dr. User' : 'User', slug: '', coverImageUrl: '' });
     await db.put('articles', newArt);
-    container.getElementById('article-create-modal')!.style.display = 'none';
+    (container.querySelector('#article-create-modal') as HTMLElement).style.display = 'none';
     renderArticlesWorkflow(container, role, userId);
   };
 
