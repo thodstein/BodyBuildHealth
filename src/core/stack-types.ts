@@ -4,6 +4,13 @@ export type Onset = 'fast' | 'medium' | 'slow';
 export type Decay = 'fast' | 'medium' | 'slow' | 'very_slow';
 export type DoseResponse = 'linear' | 'sigmoid';
 
+// Re-export types for clinical-databases.ts compatibility
+export type OrganId = string;
+export type AnalysisId = string;
+export type MechanismId = string;
+export type EffectId = string;
+export type SubstanceId = string;
+
 export interface MechanismWeight { name: string; weight: number; }
 export interface OrganWeight { name: string; weight: number; }
 export interface RiskWeight { name: string; weight: number; }

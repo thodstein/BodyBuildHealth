@@ -3,7 +3,16 @@ export type LabPhaseType = 'course' | 'course-bridge-course' | 'course-pct' | 'p
 export type DrugClass = 'testosterone' | 'trenbolone' | 'nandrolone' | 'boldenone' | 'primobolan' | 'oral_17aa' | 'sarm' | 'peptide_ghrh' | 'peptide_ghrp' | 'igf1' | 'insulin' | 'mgf' | 'pct_serm' | 'pct_aromatase' | 'pct_dopamine' | 'support';
 export type DoseUnit = 'mg/wk' | 'mg/day' | 'IU/wk' | 'IU/day' | 'mcg/day' | 'mcg/wk';
 export type DBStore = 'profile' | 'readiness_log' | 'risk_log' | 'fertility_log' | 'settings' | 'labs_log' | 'diagnostics_log' | 'phase_schedule' | 'diary' | 'articles' | 'gamification' | 'marketplace_cart' | 'food_diary';
-export type UserRole = 'user' | 'coach' | 'doctor';
+export type UserRole = 'user' | 'coach' | 'doctor' | 'admin' | 'editor';
+export type OrganId = string;
+export type AnalysisId = string;
+export type MechanismId = string;
+export type EffectId = string;
+export type SubstanceId = string;
+export type PCTSchedule = any;
+export type Exercise = any;
+export type FoodItem = any;
+export type ParsedLabResult = any;
 
 export interface ReadinessInput {
   sleepHours: number; sleepQuality: number; nightAwakenings: number; hrvRatio: number;

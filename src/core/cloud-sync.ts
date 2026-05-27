@@ -46,3 +46,6 @@ export async function fetchCloudData(userId: string): Promise<{ labs: LabPoint[]
 export function isCloudAvailable(): boolean {
   return !!client && navigator.onLine;
 }
+
+// Re-export processQueue from sync-queue for main.ts compatibility
+export { processQueue } from './sync-queue';

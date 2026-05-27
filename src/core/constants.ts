@@ -156,7 +156,7 @@ export const DYNAMIC_REFS: Record<string, DynamicRefRange> = {
 // ... (оставь предыдущие экспорты без изменений) ...
 
 // НОВЫЕ: Микронутриенты (расширено)
-export const MICRONUTRIENT_TARGETS: Record<string, { amount: number; unit: string; upperLimit?: number }> = {
+export const MICRONUTRIENT_TARGETS_EXTENDED: Record<string, { amount: number; unit: string; upperLimit?: number }> = {
   Mg: { amount: 400, unit: 'mg', upperLimit: 700 }, Zn: { amount: 15, unit: 'mg', upperLimit: 40 },
   VitD: { amount: 3000, unit: 'IU', upperLimit: 10000 }, VitC: { amount: 1000, unit: 'mg', upperLimit: 2000 },
   VitB12: { amount: 2.4, unit: 'mcg', upperLimit: 50 }, Omega3_EPA_DHA: { amount: 2000, unit: 'mg', upperLimit: 5000 },
