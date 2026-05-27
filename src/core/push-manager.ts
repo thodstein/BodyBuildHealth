@@ -25,7 +25,8 @@ function getPendingReminders(): any[] {
 export async function triggerLocalPush(title: string, body: string) {
   if (Notification.permission === 'granted') {
     await navigator.serviceWorker.ready;
-    self?.registration?.showNotification?.(title, { body, icon: '/icon.png', tag: 'health-engine' });
+    const reg = await navigator.serviceWorker.getRegistration();
+    reg?.showNotification?.(title, { body, icon: '/icon.png', tag: 'health-engine' });
   } else {
     console.warn('⚠️ Push permission denied');
   }

@@ -44,8 +44,9 @@ export async function processQueue(): Promise<void> {
 
   for (const [table, batch] of Object.entries(byTable)) {
     try {
+      const payload = batch.map(b => ({ ...b.data, id: b.data.id || b.id }));
       const { error } = await client!.from(table).upsert(
-        batch.map(b => ({ ...b.data, id: b.data.id || b.id })),
+        payload as any,
         { onConflict: 'id' }
       );
       if (error) throw new Error(error.message);

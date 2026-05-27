@@ -17,11 +17,11 @@ export function initRealtime(userId: string = 'user_default') {
     const channel = `public:${store}`;
     subscriptions[store] = client!
       .channel(channel)
-      .on('postgres_changes', { event: '*', schema: 'public', table: store, filter: `user_id=eq.${userId}` }, async (payload) => {
+      .on('postgres_changes', { event: '*', schema: 'public', table: store, filter: `user_id=eq.${userId}` }, async (payload: any) => {
         const record = payload.new || payload.old;
         if (!record) return;
         // Latest-write-wins: если локальная запись новее – игнорируем
-        const local = await db.get(store, record.id);
+        const local: any = await db.get(store, record.id);
         if (local && new Date(local.updatedAt || local.date) > new Date(record.updated_at || record.date)) return;
         try { await securePut(db, store, { id: record.id, ...record }); }
         catch { await db.put(store, { id: record.id, ...record }); }
