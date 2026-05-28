@@ -1,4 +1,4 @@
-import type { OrganId, AnalysisId, MechanismId, EffectId, SubstanceId } from './stack-types';
+import type { OrganEntry, AnalysisEntry, MechanismEntry, EffectEntry, SubstanceEntry } from './types';
 
 export const ORGANS_DB = [
   { id: "BRAIN", name: "Головной мозг", systems: ["NERVOUS","ENDOCRINE","STRESS"], description: "Центральная обработка сигналов, регуляция гормонов, эмоций, сна, боли и мотивации.", key_biomarkers: [], risk_tags: ["когнитивные","настроение","сон","стресс"] },
@@ -17,7 +17,7 @@ export const ORGANS_DB = [
   { id: "THYROID", name: "Щитовидная железа", systems: ["ENDOCRINE"], description: "Регуляция обмена веществ, температуры, энергии.", key_biomarkers: ["TSH","T3","T4"], risk_tags: ["гипо-/гипертиреоз"] },
   { id: "ADRENAL", name: "Надпочечники", systems: ["ENDOCRINE","STRESS"], description: "Кортизол, адреналин, норадреналин, альдостерон.", key_biomarkers: ["CORTISOL","ALDOSTERONE"], risk_tags: ["стресс","АД","усталость"] },
   { id: "GONADS", name: "Гонады (половые железы)", systems: ["ENDOCRINE","REPRODUCTIVE"], description: "Тестостерон, эстрогены, прогестерон.", key_biomarkers: ["TESTOSTERONE","ESTRADIOL","PROGESTERONE","LH","FSH"], risk_tags: ["либидо","фертильность","онко‑риск"] }
-] as const;
+] as const satisfies OrganEntry[];
 
 export const ANALYSES_DB = [
   { id: "ALT", name: "АЛТ", units: "U/L", normal_range: [0,40], organ_targets: ["LIVER"], system_targets: ["DIGESTIVE","METABOLIC"], mechanisms_up: ["ALT_AST_ELEVATION","LIVER_STRESS"], mechanisms_down: [], risk_if_high: ["гепатотоксичность","воспаление печени"], risk_if_low: [] },

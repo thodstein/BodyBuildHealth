@@ -1,3 +1,5 @@
+import type { UserRole, LabPhaseType } from './types';
+
 export const GENETIC_MULTIPLIERS: Record<string, Record<string, number>> = {
   COMT_Val158Met: { 'Met/Met': 2.0, 'Val/Met': 1.5, 'Val/Val': 1.0 },
   MTHFR_C677T:    { TT: 1.7, CT: 1.3, CC: 1.0 },
@@ -153,49 +155,50 @@ export const DYNAMIC_REFS: Record<string, DynamicRefRange> = {
   E2: { baseULN: 40, baseLLN: 10, ageFactor: () => 1.0, sexFactor: () => 1.0, phaseFactor: (p) => p.includes('pct') ? 0.7 : 1.0 }
 } as const;
 
-// ... (оставь предыдущие экспорты без изменений) ...
+} as const;
+interface DynamicRefRange {
+  baseULN: number;
+  baseLLN: number;
+  ageFactor: (age: number) => number;
+  sexFactor: (sex: string) => number;
+  phaseFactor: (phase: string) => number;
+}
 
-// НОВЫЕ: Микронутриенты (расширено)
-export const MICRONUTRIENT_TARGETS: Record<string, { amount: number; unit: string; upperLimit?: number }> = {
-  Mg: { amount: 400, unit: 'mg', upperLimit: 700 }, Zn: { amount: 15, unit: 'mg', upperLimit: 40 },
-  VitD: { amount: 3000, unit: 'IU', upperLimit: 10000 }, VitC: { amount: 1000, unit: 'mg', upperLimit: 2000 },
-  VitB12: { amount: 2.4, unit: 'mcg', upperLimit: 50 }, Omega3_EPA_DHA: { amount: 2000, unit: 'mg', upperLimit: 5000 },
-  Potassium: { amount: 3500, unit: 'mg', upperLimit: 4700 }, Sodium: { amount: 2300, unit: 'mg', upperLimit: 5000 },
-  Iron: { amount: 8, unit: 'mg', upperLimit: 45 }, Calcium: { amount: 1000, unit: 'mg', upperLimit: 2500 },
-  Iodine: { amount: 150, unit: 'mcg', upperLimit: 1100 }, Selenium: { amount: 55, unit: 'mcg', upperLimit: 400 },
-  Copper: { amount: 0.9, unit: 'mg', upperLimit: 10 }, Chromium: { amount: 35, unit: 'mcg', upperLimit: 1000 }
+export const DYNAMIC_REFS: Record<string, DynamicRefRange> = {
+  TT: { baseULN: 1000, baseLLN: 300, ageFactor: (a) => a > 40 ? 0.9 : 1.0, sexFactor: () => 1.0, phaseFactor: (p) => p.includes('pct') ? 0.6 : p.includes('course') ? 1.4 : 1.0 },
+  HCT: { baseULN: 52, baseLLN: 36, ageFactor: () => 1.0, sexFactor: (s) => s === 'female' ? 0.85 : 1.0, phaseFactor: (p) => p.includes('course') ? 1.1 : 1.0 },
+  E2: { baseULN: 40, baseLLN: 10, ageFactor: () => 1.0, sexFactor: () => 1.0, phaseFactor: (p) => p.includes('pct') ? 0.7 : 1.0 }
 } as const;
 
-// НОВЫЕ: Лабораторные маркеры (расширено до 30+)
 export const UCUM_MAP: Record<string, { prefUnit: string; coeff: number; uln: number; lln: number; name: string }> = {
-  'ALT': { prefUnit: 'U/L', coeff: 1, uln: 40, lln: 7, name: 'АЛТ' },
-  'AST': { prefUnit: 'U/L', coeff: 1, uln: 40, lln: 10, name: 'АСТ' },
-  'HCT': { prefUnit: '%', coeff: 1, uln: 52, lln: 36, name: 'Гематокрит' },
-  'TT':  { prefUnit: 'ng/dL', coeff: 1, uln: 1000, lln: 300, name: 'Тестостерон общий' },
-  'E2':  { prefUnit: 'pg/mL', coeff: 1, uln: 40, lln: 10, name: 'Эстрадиол' },
-  'PRL': { prefUnit: 'ng/mL', coeff: 1, uln: 15, lln: 2, name: 'Пролактин' },
-  'LH':  { prefUnit: 'mIU/mL', coeff: 1, uln: 12, lln: 1, name: 'ЛГ' },
-  'FSH': { prefUnit: 'mIU/mL', coeff: 1, uln: 15, lln: 1, name: 'ФСГ' },
-  'TSH': { prefUnit: 'mIU/L', coeff: 1, uln: 4.0, lln: 0.4, name: 'ТТГ' },
-  'FT3': { prefUnit: 'pmol/L', coeff: 1, uln: 6.0, lln: 3.1, name: 'Т3 свободный' },
-  'FT4': { prefUnit: 'pmol/L', coeff: 1, uln: 19.0, lln: 10.0, name: 'Т4 свободный' },
-  'IGF1':{ prefUnit: 'ng/mL', coeff: 1, uln: 250, lln: 100, name: 'ИФР-1' },
-  'HbA1c':{ prefUnit: '%', coeff: 1, uln: 5.7, lln: 4.0, name: 'Гликированный Hb' },
-  'GLU': { prefUnit: 'mmol/L', coeff: 1, uln: 5.6, lln: 3.9, name: 'Глюкоза' },
-  'INS': { prefUnit: 'mIU/L', coeff: 1, uln: 17, lln: 3, name: 'Инсулин' },
+  'ALT': { prefUnit: 'U/L', coeff: 1, uln: 40, lln: 7, name: 'РђР›Рў' },
+  'AST': { prefUnit: 'U/L', coeff: 1, uln: 40, lln: 10, name: 'РђРЎРў' },
+  'HCT': { prefUnit: '%', coeff: 1, uln: 52, lln: 36, name: 'Р“РµРјР°С‚РѕРєСЂРёС‚' },
+  'TT':  { prefUnit: 'ng/dL', coeff: 1, uln: 1000, lln: 300, name: 'РўРµСЃС‚РѕСЃС‚РµСЂРѕРЅ РѕР±С‰РёР№' },
+  'E2':  { prefUnit: 'pg/mL', coeff: 1, uln: 40, lln: 10, name: 'Р­СЃС‚СЂР°РґРёРѕР»' },
+  'PRL': { prefUnit: 'ng/mL', coeff: 1, uln: 15, lln: 2, name: 'РџСЂРѕР»Р°РєС‚РёРЅ' },
+  'LH':  { prefUnit: 'mIU/mL', coeff: 1, uln: 12, lln: 1, name: 'Р›Р“' },
+  'FSH': { prefUnit: 'mIU/mL', coeff: 1, uln: 15, lln: 1, name: 'Р¤РЎР“' },
+  'TSH': { prefUnit: 'mIU/L', coeff: 1, uln: 4.0, lln: 0.4, name: 'РўРўР“' },
+  'FT3': { prefUnit: 'pmol/L', coeff: 1, uln: 6.0, lln: 3.1, name: 'Рў3 СЃРІРѕР±РѕРґРЅС‹Р№' },
+  'FT4': { prefUnit: 'pmol/L', coeff: 1, uln: 19.0, lln: 10.0, name: 'Рў4 СЃРІРѕР±РѕРґРЅС‹Р№' },
+  'IGF1':{ prefUnit: 'ng/mL', coeff: 1, uln: 250, lln: 100, name: 'РР¤Р -1' },
+  'HbA1c':{ prefUnit: '%', coeff: 1, uln: 5.7, lln: 4.0, name: 'Р“Р»РёРєРёСЂРѕРІР°РЅРЅС‹Р№ Hb' },
+  'GLU': { prefUnit: 'mmol/L', coeff: 1, uln: 5.6, lln: 3.9, name: 'Р“Р»СЋРєРѕР·Р°' },
+  'INS': { prefUnit: 'mIU/L', coeff: 1, uln: 17, lln: 3, name: 'РРЅСЃСѓР»РёРЅ' },
   'HOMA':{ prefUnit: '', coeff: 1, uln: 2.7, lln: 1.0, name: 'HOMA-IR' },
-  'LDL': { prefUnit: 'mmol/L', coeff: 1, uln: 3.0, lln: 1.0, name: 'ЛПНП' },
-  'HDL': { prefUnit: 'mmol/L', coeff: 1, uln: 1.5, lln: 0.9, name: 'ЛПВП' },
-  'TG':  { prefUnit: 'mmol/L', coeff: 1, uln: 1.7, lln: 0.4, name: 'Триглицериды' },
-  'CRP': { prefUnit: 'mg/L', coeff: 1, uln: 5, lln: 0.1, name: 'СРБ' },
-  'CREATININE': { prefUnit: '?mol/L', coeff: 88.42, uln: 110, lln: 60, name: 'Креатинин' },
-  'UREA': { prefUnit: 'mmol/L', coeff: 1, uln: 7.1, lln: 2.5, name: 'Мочевина' },
-  'UA': { prefUnit: '?mol/L', coeff: 1, uln: 420, lln: 200, name: 'Мочевая к-та' },
-  'FERRITIN': { prefUnit: '?g/L', coeff: 1, uln: 300, lln: 30, name: 'Ферритин' },
-  'VITD': { prefUnit: 'ng/mL', coeff: 1, uln: 100, lln: 30, name: 'Витамин D' },
-  'HGB': { prefUnit: 'g/L', coeff: 10, uln: 170, lln: 130, name: 'Гемоглобин' },
-  'PLT': { prefUnit: '10^9/L', coeff: 1, uln: 400, lln: 150, name: 'Тромбоциты' },
-  'WBC': { prefUnit: '10^9/L', coeff: 1, uln: 9.0, lln: 4.0, name: 'Лейкоциты' },
-  'SHBG':{ prefUnit: 'nmol/L', coeff: 1, uln: 60, lln: 15, name: 'ГСПГ' },
-  'CORTISOL': { prefUnit: 'nmol/L', coeff: 1, uln: 550, lln: 100, name: 'Кортизол' }
+  'LDL': { prefUnit: 'mmol/L', coeff: 1, uln: 3.0, lln: 1.0, name: 'Р›РџРќРџ' },
+  'HDL': { prefUnit: 'mmol/L', coeff: 1, uln: 1.5, lln: 0.9, name: 'Р›РџР’Рџ' },
+  'TG':  { prefUnit: 'mmol/L', coeff: 1, uln: 1.7, lln: 0.4, name: 'РўСЂРёРіР»РёС†РµСЂРёРґС‹' },
+  'CRP': { prefUnit: 'mg/L', coeff: 1, uln: 5, lln: 0.1, name: 'РЎР Р‘' },
+  'CREATININE': { prefUnit: 'Вµmol/L', coeff: 88.42, uln: 110, lln: 60, name: 'РљСЂРµР°С‚РёРЅРёРЅ' },
+  'UREA': { prefUnit: 'mmol/L', coeff: 1, uln: 7.1, lln: 2.5, name: 'РњРѕС‡РµРІРёРЅР°' },
+  'UA': { prefUnit: 'Вµmol/L', coeff: 1, uln: 420, lln: 200, name: 'РњРѕС‡РµРІР°СЏ Рє-С‚Р°' },
+  'FERRITIN': { prefUnit: 'Вµg/L', coeff: 1, uln: 300, lln: 30, name: 'Р¤РµСЂСЂРёС‚РёРЅ' },
+  'VITD': { prefUnit: 'ng/mL', coeff: 1, uln: 100, lln: 30, name: 'Р’РёС‚Р°РјРёРЅ D' },
+  'HGB': { prefUnit: 'g/L', coeff: 10, uln: 170, lln: 130, name: 'Р“РµРјРѕРіР»РѕР±РёРЅ' },
+  'PLT': { prefUnit: '10^9/L', coeff: 1, uln: 400, lln: 150, name: 'РўСЂРѕРјР±РѕС†РёС‚С‹' },
+  'WBC': { prefUnit: '10^9/L', coeff: 1, uln: 9.0, lln: 4.0, name: 'Р›РµР№РєРѕС†РёС‚С‹' },
+  'SHBG':{ prefUnit: 'nmol/L', coeff: 1, uln: 60, lln: 15, name: 'Р“РЎРџР“' },
+  'CORTISOL': { prefUnit: 'nmol/L', coeff: 1, uln: 550, lln: 100, name: 'РљРѕСЂС‚РёР·РѕР»' }
 } as const;
