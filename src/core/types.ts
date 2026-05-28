@@ -4,6 +4,39 @@ export type Onset = 'fast' | 'medium' | 'slow';
 export type Decay = 'fast' | 'medium' | 'slow' | 'very_slow';
 export type DoseResponse = 'linear' | 'sigmoid';
 export type Route = 'oral' | 'sc' | 'intranasal' | 'im' | 'iv' | 'topical';
+export type LabPhaseType = 'baseline' | 'course' | 'bridge' | 'pct';
+export type UserRole = 'user' | 'coach' | 'doctor' | 'admin' | 'editor';
+
+export type OrganId = string;
+export type AnalysisId = string;
+export type MechanismId = string;
+export type EffectId = string;
+export type SubstanceId = string;
+
+export interface UserProfile {
+  id: string; name: string; email: string; role: UserRole; phase: LabPhaseType; courseStartDate: string;
+  settings: { age: number; sex: 'male' | 'female'; weight: number; goal: string; };
+}
+
+export interface UserContext {
+  role: UserRole; age: number; sex: 'male' | 'female'; weight: number; goal: string; phase: LabPhaseType; courseStartDate: string;
+}
+
+export interface FoodItem {
+  id: string; name: string; category: string; macros: { kcal: number; p: number; f: number; c: number; fiber: number; water: number; steps: number; };
+}
+export interface Exercise { id: string; name: string; type: string; targetMuscles: string[]; }
+export interface PCTSchedule { startWeek: number; drugs: Array<{ name: string; dose: string; durationWeeks: number }>; support: Array<{ name: string; dose: string; durationWeeks: number }>; }
+export interface ParsedLabResult { marker: string; value: number; unit: string; }
+export interface DynamicRefRange { lln: number; uln: number; phase: string; }
+
+export interface Article {
+  id: string; title: string; category: string; teaser: string; content: string; tags: string[];
+  authorId: string; authorName: string; slug: string; coverImageUrl: string; status: string;
+}
+
+export interface LabPoint { id: string; code: string; name: string; value: number; unit: string; date: string; phase: LabPhaseType; }
+export interface CourseEntry { id: string; substanceId: string; doseValue: number; doseUnit: string; frequency: number; startWeek: number; endWeek: number; }
 
 export interface MechanismWeight { name: string; weight: number; }
 export interface OrganWeight { name: string; weight: number; }
@@ -40,10 +73,5 @@ export interface MasterDB {
   recommendations: RecommendationEntry[]; tags: TagEntry[]; brands: BrandEntry[];
   aliases: AliasMap; substanceGroups: GroupMap; effectGroups: GroupMap;
   synergyMatrix: Record<string, Record<string, number>>; conflictMatrix: Record<string, Record<string, number>>;
+  goal_profiles?: any[];
 }
-
-export interface LabPoint { id: string; code: string; name: string; value: number; unit: string; date: string; phase: string; }
-export interface CourseEntry { id: string; substanceId: string; doseValue: number; doseUnit: string; frequency: number | string; startWeek: number; endWeek: number; }
-export type UserRole = 'user' | 'coach' | 'doctor';
-export type LabPhaseType = 'baseline' | 'course' | 'bridge' | 'pct';
-export interface UserProfile { id: string; name: string; role: UserRole; settings: { age: number; sex: 'male' | 'female'; weight: number; goal: string; phase: LabPhaseType; courseStartDate: string; }; }

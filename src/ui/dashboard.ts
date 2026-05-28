@@ -1,68 +1,34 @@
-import { MASTER_DB } from '../core/master-db';
-import { selectBestStack } from '../engines/stack-builder.engine';
-import { assessRisk } from '../engines/risk-assessor.engine';
-import { renderStackCard } from './stack-viewer';
+import { setRole } from '../core/profile-manager';
+import { logoutUser } from '../core/auth-manager';
+import type { UserProfile, LabPhaseType } from '../core/types';
 
-// Типы для пропсов (если используется React/Vue) или просто интерфейс функции
-interface DashboardProps {
-  userId: string;
-  goalId: string;
-  labs: any[]; // LabPoint[]
-}
+export function renderDashboard(profile: UserProfile) {
+  const app = document.getElementById('app');
+  if (!app) return;
 
-/**
- * Главная функция рендера Дашборда.
- * Вызывается при загрузке страницы или смене данных.
- */
-export function renderDashboard(props: DashboardProps): string {
-  // 1. Подбор стека
-  const { stack, score, reason } = selectBestStack(props.goalId);
-  
-  // 2. Оценка рисков (если стек найден)
-  let riskHTML = '<p>Select a goal to analyze risks.</p>';
-  let stackHTML = '<p>No stack selected.</p>';
-  
-  if (stack) {
-    // Считаем риски для веществ стека + лабы пользователя
-    const riskAssessment = assessRisk(stack.substances, props.labs);
-    
-    riskHTML = `
-      <div class="risk-panel ${riskAssessment.totalScore > 30 ? 'high' : 'low'}">
-        <h3>Risk Assessment</h3>
-        <div class="risk-score">Score: ${riskAssessment.totalScore}/100</div>
-        <ul>
-          ${riskAssessment.activeRisks.map(r => `<li>⚠️ ${r.title || r.id} (${r.level || 'Medium'})</li>`).join('')}
-        </ul>
-        <h4>Recommendations:</h4>
-        <ul>
-          ${riskAssessment.recommendations.map(r => `<li>💡 ${r.text}</li>`).join('')}
-        </ul>
-      </div>
-    `;
-
-    stackHTML = renderStackCard(stack);
-  }
-
-  // 3. Сборка HTML
-  return `
-    <div class="dashboard-container">
-      <header>
-        <h1>Health Engine Dashboard</h1>
-        <div class="user-info">User: ${props.userId} | Goal: ${props.goalId}</div>
-      </header>
-      
-      <main>
-        <section class="stack-section">
-          <h2>Your Protocol</h2>
-          <div class="stack-list">
-            ${stackHTML}
-          </div>
-        </section>
-
-        <section class="risk-section">
-          ${riskHTML}
-        </section>
-      </main>
+  app.innerHTML = `
+    <div class="header"><h1>📊 Dashboard</h1><button id="btn-logout">🚪</button></div>
+    <div class="tabs" id="main-tabs">
+      <div class="tab active" data-tab="dash">📈 Ready</div>
+      <div class="tab" data-tab="labs">🧪 Labs</div>
+      <div class="tab" data-tab="pharma">💊 Pharma</div>
     </div>
+    <div id="page-dash" class="page active"><div class="card"><h3>Welcome, ${profile.name}</h3></div></div>
+    <div id="page-labs" class="page" style="display:none"><div id="labs-container"></div></div>
+    <div id="page-pharma" class="page" style="display:none"><div id="pharma-container"></div></div>
   `;
+
+  const logoutBtn = document.getElementById('btn-logout');
+  if (logoutBtn) logoutBtn.onclick = () => logoutUser();
+
+  document.querySelectorAll('#main-tabs .tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('#main-tabs .tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.page').forEach(p => (p as HTMLElement).style.display = 'none');
+      tab.classList.add('active');
+      const tabId = (tab as HTMLElement).dataset.tab;
+      const page = document.getElementById(`page-${tabId}`);
+      if (page) (page as HTMLElement).style.display = 'block';
+    });
+  });
 }

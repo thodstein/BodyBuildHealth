@@ -1,28 +1,38 @@
-import { UserRole, UserContext } from './types';
+import type { UserProfile, UserContext, UserRole, LabPhaseType } from './types';
 
-const STORAGE_KEY = 'he_profile_v2';
+let currentProfile: UserProfile | null = null;
 
-export function getProfile(): UserContext {
-  try {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    return saved ? JSON.parse(saved) : getDefaultProfile();
-  } catch { return getDefaultProfile(); }
-}
-
-export function updateProfile(ctx: Partial<UserContext>): UserContext {
-  const current = getProfile();
-  const updated = { ...current, ...ctx };
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-  return updated;
-}
-
-export function setRole(role: UserRole): void {
-  const current = getProfile();
-  localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...current, role }));
-}
-
-function getDefaultProfile(): UserContext {
+export function getCurrentUserContext(): UserContext | null {
+  if (!currentProfile) return null;
   return {
-    age: 30, sex: 'male', role: 'user', phase: 'course', courseStartDate: new Date().toISOString().slice(0, 10)
+    role: currentProfile.role,
+    age: currentProfile.settings.age,
+    sex: currentProfile.settings.sex,
+    weight: currentProfile.settings.weight,
+    goal: currentProfile.settings.goal,
+    phase: currentProfile.phase,
+    courseStartDate: currentProfile.courseStartDate
+  };
+}
+
+export function setRole(role: UserRole) {
+  if (currentProfile) {
+    currentProfile.role = role;
+  }
+}
+
+export function updateProfile(updates: Partial<UserProfile>) {
+  if (currentProfile) {
+    Object.assign(currentProfile, updates);
+  }
+}
+
+// Заглушка для демо
+export function initProfileManager() {
+  console.log('👤 Profile manager initialized');
+  return {
+    getContext: getCurrentUserContext,
+    setRole,
+    updateProfile
   };
 }
