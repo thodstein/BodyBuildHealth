@@ -1,0 +1,12 @@
+[
+  { "id": "CAFFEINE", "name": "Кофеин", "category": "CAT_SUB_STIMULANTS", "tags": ["energy", "focus"] },
+  { "id": "L_THEANINE", "name": "L-Теанин", "category": "CAT_SUB_AMINO", "tags": ["calm", "focus"] },
+  { "id": "MELATONIN", "name": "Мелатонин", "category": "CAT_SUB_HORMONAL", "tags": ["sleep"] },
+  { "id": "ASHWAGANDHA", "name": "Ашваганда", "category": "CAT_SUB_ADAPTOGENS", "tags": ["stress", "hormones"] },
+  { "id": "RHODIOLA", "name": "Родиола", "category": "CAT_SUB_ADAPTOGENS", "tags": ["energy", "stress"] },
+  { "id": "VITAMIN_D", "name": "Витамин D3", "category": "CAT_SUB_VITAMINS", "tags": ["immunity"] },
+  { "id": "MAGNESIUM", "name": "Магний", "category": "CAT_SUB_MINERALS", "tags": ["calm", "sleep"] },
+  { "id": "OMEGA_3", "name": "Омега-3", "category": "CAT_SUB_FATTYACIDS", "tags": ["heart", "brain"] },
+  { "id": "GINKGO", "name": "Гинкго Билоба", "category": "CAT_SUB_HERBS", "tags": ["brain", "blood"] },
+  { "id": "TYROSINE", "name": "L-Тирозин", "category": "CAT_SUB_AMINO", "tags": ["focus", "dopamine"] }
+]

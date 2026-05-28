@@ -1,0 +1,47 @@
+[
+  {
+    "id": "INT_CAF_THEA",
+    "substanceA": "CAFFEINE",
+    "substanceB": "L_THEANINE",
+    "type": "SYNERGY",
+    "severity": "LOW",
+    "effect": "Усиление фокуса без нервозности",
+    "mechanisms": ["GABA_UP", "ADENOSINE_BLOCK"]
+  },
+  {
+    "id": "INT_CAF_RHOD",
+    "substanceA": "CAFFEINE",
+    "substanceB": "RHODIOLA",
+    "type": "CONFLICT",
+    "severity": "MEDIUM",
+    "effect": "Риск перевозбуждения и тахикардии",
+    "mechanisms": ["CORTISOL_UP", "ADRENALINE_UP"]
+  },
+  {
+    "id": "INT_MEL_CAF",
+    "substanceA": "MELATONIN",
+    "substanceB": "CAFFEINE",
+    "type": "CONFLICT",
+    "severity": "HIGH",
+    "effect": "Подавление эффекта сна",
+    "mechanisms": ["CORTISOL_UP", "MELATONIN_DOWN"]
+  },
+  {
+    "id": "INT_MAG_RHOD",
+    "substanceA": "MAGNESIUM",
+    "substanceB": "RHODIOLA",
+    "type": "SYNERGY",
+    "severity": "LOW",
+    "effect": "Баланс энергии и расслабления",
+    "mechanisms": ["GABA_UP", "ENERGY_UP"]
+  },
+  {
+    "id": "INT_VITD_MAG",
+    "substanceA": "VITAMIN_D",
+    "substanceB": "MAGNESIUM",
+    "type": "SYNERGY",
+    "severity": "LOW",
+    "effect": "Магний улучшает усвоение Витамина D",
+    "mechanisms": ["METABOLISM_UP"]
+  }
+]
