@@ -13,6 +13,7 @@ import { drawLabTrend } from '../../ui/charts-labs';
 import { db } from '../../core/db';
 import { RISK_SYSTEMS } from '../../core/constants';
 import { parseLabText } from '../../core/lab-auto-parser';
+import { parseLabFile, type ParsedLabValue } from '../../engines/pdf-parser.engine';
 import { resolveLabMarker, interpretRatio, normalizedRatio } from '../../core/labs-mapping';
 import { computeLabIndices, interpretLabIndices } from '../../engines/labs-indices.engine';
 import { PHASE_REQUIRED_PANELS, LAB_PANELS, type LabPanelMarker } from '../../data/labs-phase-panels';
@@ -43,6 +44,7 @@ export const LabsScreen: React.FC<LabsProps> = ({ initialTab = 'input' }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [ocrText, setOcrText] = useState('');
   const [ocrResult, setOcrResult] = useState<{ marker: string; value: number; unit: string; name: string }[]>([]);
+  const [fileLoading, setFileLoading] = useState(false);
   const [labIndices, setLabIndices] = useState({ inflammation: 0, metabolism: 0, thyroid: 0, lipids: 0 });
   const [labIndexText, setLabIndexText] = useState({ inflammation: '', metabolism: '', thyroid: '', lipids: '' });
   const [phase, setPhase] = useState<'baseline' | 'on_cycle' | 'pct' | 'bridge' | 'fertility'>('baseline');
@@ -160,6 +162,30 @@ export const LabsScreen: React.FC<LabsProps> = ({ initialTab = 'input' }) => {
       name: UCUM_MAP[p.marker]?.name ?? p.marker
     }));
     setOcrResult(results);
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setFileLoading(true);
+    try {
+      const result = await parseLabFile(file);
+      if (result.values.length > 0) {
+        const results = result.values.map(v => ({
+          marker: v.code,
+          value: v.value,
+          unit: v.unit,
+          name: v.name
+        }));
+        setOcrResult(results);
+        if (result.rawText) setOcrText(result.rawText);
+      }
+    } catch (err) {
+      console.error('File parse error:', err);
+    } finally {
+      setFileLoading(false);
+      e.target.value = '';
+    }
   };
 
   const confirmOcrResults = async () => {
@@ -281,9 +307,14 @@ export const LabsScreen: React.FC<LabsProps> = ({ initialTab = 'input' }) => {
               onChange={e => setOcrText(e.target.value)}
               style={{ width: '100%', marginBottom: 8, fontFamily: 'monospace', fontSize: 13 }}
             />
-            <button className="btn" onClick={importFromText} disabled={!ocrText.trim()}>
-              &#128270; Распознать и добавить
+             <button className="btn" onClick={importFromText} disabled={!ocrText.trim()}>
+               &#128270; Распознать и добавить
             </button>
+            <label style={{ display: 'inline-block', marginLeft: 8, padding: '8px 14px', background: 'var(--accent-blue)', color: '#fff', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+              &#128196; Загрузить PDF/фото
+              <input type="file" accept=".pdf,image/*" onChange={handleFileUpload} style={{ display: 'none' }} disabled={fileLoading} />
+            </label>
+            {fileLoading && <span style={{ marginLeft: 8, fontSize: 12, color: 'var(--accent-blue)' }}>Обработка...</span>}
             {ocrResult.length > 0 && (
               <div style={{ marginTop: 12 }}>
                 <h4>Распознано {ocrResult.length} показателей:</h4>

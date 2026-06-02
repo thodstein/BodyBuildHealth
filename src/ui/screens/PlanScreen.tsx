@@ -4,7 +4,9 @@ import { calcTraining, EXERCISE_DB, selectExercises, getAvailableSplits } from '
 import { generateSupportStack, calculateSupport } from '../../engines/support.engine';
 import { calcReadiness } from '../../engines/readiness.engine';
 import { getProfile } from '../../core/profile-manager';
+import { generateMacrocycle, getAvailableSplits as getPeriodizationSplits, adaptWeekForReadiness, MESOCYCLE_PARAMS } from '../../engines/training-periodization.engine';
 import type { TrainingInput, TrainingOutput, ReadinessInput, ReadinessScores, Exercise } from '../../core/types';
+import type { MacrocyclePlan, Microcycle } from '../../engines/training-periodization.engine';
 
 const GOALS = [
   { value: 'bulk', label: 'Набор массы' },
@@ -75,7 +77,7 @@ function buildDayPlan(result: TrainingOutput, daysPerWeek: number): { day: numbe
 }
 
 export const PlanScreen: React.FC<{ goal: string }> = ({ goal }) => {
-  const [tab, setTab] = useState<'training' | 'support' | 'readiness' | 'exercises'>('training');
+  const [tab, setTab] = useState<'training' | 'support' | 'readiness' | 'exercises' | 'cycles'>('training');
 
   const [goalState, setGoalState] = useState(goal || 'bulk');
   const [level, setLevel] = useState('intermediate');
@@ -84,6 +86,8 @@ export const PlanScreen: React.FC<{ goal: string }> = ({ goal }) => {
   const [recovery, setRecovery] = useState(70);
   const [fatigue, setFatigue] = useState(30);
   const [nutrition, setNutrition] = useState(70);
+  const [macrocycle, setMacrocycle] = useState<MacrocyclePlan | null>(null);
+  const [selectedWeek, setSelectedWeek] = useState(1);
 
   const [sleepHours, setSleepHours] = useState(7.5);
   const [sleepQuality, setSleepQuality] = useState(7);
@@ -179,9 +183,9 @@ export const PlanScreen: React.FC<{ goal: string }> = ({ goal }) => {
   return (
     <div className="screen plan">
       <div className="tab-bar">
-        {(['training', 'support', 'readiness', 'exercises'] as const).map(t => (
+        {(['training', 'support', 'readiness', 'exercises', 'cycles'] as const).map(t => (
           <button key={t} className={`tab-btn ${tab === t ? 'active' : ''}`} onClick={() => setTab(t)}>
-            {t === 'training' ? 'Тренировочный план' : t === 'support' ? 'Стек поддержки' : t === 'readiness' ? 'Готовность' : 'Упражнения'}
+            {t === 'training' ? 'План' : t === 'support' ? 'Поддержка' : t === 'readiness' ? 'Готовность' : t === 'cycles' ? 'Циклы' : 'Упражнения'}
           </button>
         ))}
       </div>
@@ -452,6 +456,138 @@ export const PlanScreen: React.FC<{ goal: string }> = ({ goal }) => {
               </table>
             </div>
           ))}
+        </div>
+      )}
+
+      {tab === 'cycles' && (
+        <div>
+          <div className="card" style={{ marginBottom: 16 }}>
+            <h3 style={{ margin: '0 0 10px 0' }}>Периодизация: макро-/мезо-/микроциклы</h3>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}>
+              <label style={{ fontSize: 12 }}>
+                Цель
+                <select value={goalState} onChange={e => setGoalState(e.target.value)} style={{ width: '100%', padding: '6px 8px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', fontSize: 13, marginTop: 2, boxSizing: 'border-box' }}>
+                  {GOALS.map(g => <option key={g.value} value={g.value}>{g.label}</option>)}
+                </select>
+              </label>
+              <label style={{ fontSize: 12 }}>
+                Уровень
+                <select value={level} onChange={e => setLevel(e.target.value)} style={{ width: '100%', padding: '6px 8px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', fontSize: 13, marginTop: 2, boxSizing: 'border-box' }}>
+                  {LEVELS.map(l => <option key={l.value} value={l.value}>{l.label}</option>)}
+                  <option value="advanced">Продвинутый</option>
+                  <option value="enhanced">Усиленный (на курсе)</option>
+                </select>
+              </label>
+              <label style={{ fontSize: 12 }}>
+                Дней/неделю
+                <select value={daysPerWeek} onChange={e => setDaysPerWeek(+e.target.value)} style={{ width: '100%', padding: '6px 8px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', fontSize: 13, marginTop: 2, boxSizing: 'border-box' }}>
+                  {[3,4,5,6].map(d => <option key={d} value={d}>{d}</option>)}
+                </select>
+              </label>
+              <label style={{ fontSize: 12 }}>
+                Восстановление ({recovery}%)
+                <input type="range" min={10} max={100} value={recovery} onChange={e => setRecovery(+e.target.value)} style={{ width: '100%' }} />
+              </label>
+            </div>
+            <button onClick={() => {
+              const macro = generateMacrocycle({
+                goal: goalState as any, level: level as any, daysPerWeek,
+                readinessScore: recovery, isOnCourse: level === 'enhanced',
+                weakPoints, injuries: [], experience: level as any,
+              });
+              setMacrocycle(macro);
+              setSelectedWeek(1);
+            }} style={{ background: 'var(--accent-blue)', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 20px', fontSize: 14, cursor: 'pointer', width: '100%' }}>
+              Сгенерировать программу
+            </button>
+          </div>
+
+          {macrocycle && (
+            <div>
+              <div className="card" style={{ marginBottom: 12 }}>
+                <h4 style={{ margin: '0 0 8px 0' }}>Обзор макроцикла ({macrocycle.totalWeeks} нед.)</h4>
+                <div style={{ display: 'flex', gap: 4, overflowX: 'auto', paddingBottom: 4 }}>
+                  {macrocycle.mesocycles.map(meso => (
+                    <div key={meso.type + meso.weekStart} style={{ flex: '1 0 auto', minWidth: 80 }}>
+                      {Array.from({ length: meso.weeks }, (_, i) => {
+                        const wk = meso.microcycles[i];
+                        if (!wk) return null;
+                        const mesoColor: Record<string, string> = {
+                          accumulation: '#2196F3', intensification: '#FF9800', peaking: '#f44336', deload: '#4CAF50', recovery: '#9C27B0',
+                        };
+                        return (
+                          <div
+                            key={wk.weekNumber}
+                            onClick={() => setSelectedWeek(wk.weekNumber)}
+                            style={{ padding: '4px 6px', margin: '1px 0', borderRadius: 4, fontSize: 10, cursor: 'pointer', background: selectedWeek === wk.weekNumber ? 'var(--accent-blue)' : 'var(--bg-secondary)', color: selectedWeek === wk.weekNumber ? '#fff' : 'var(--text-primary)', borderLeft: `3px solid ${mesoColor[meso.type] || '#888'}` }}
+                          >
+                            <div style={{ fontWeight: 600 }}>Н{wk.weekNumber}</div>
+                            <div style={{ fontSize: 9 }}>{wk.isDeload ? 'Делоад' : meso.type === 'accumulation' ? 'Накоп' : meso.type === 'intensification' ? 'Интенс' : meso.type === 'peaking' ? 'Пик' : meso.type.slice(0, 4)}</div>
+                            <div style={{ fontSize: 9 }}>RIR {wk.rirRange.join('-')}</div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {(() => {
+                const week = macrocycle.mesocycles.flatMap(m => m.microcycles).find(w => w.weekNumber === selectedWeek);
+                if (!week) return null;
+                const adapted = adaptWeekForReadiness(week, recovery);
+                const mesoInfo = MESOCYCLE_PARAMS[week.mesocycleType];
+                return (
+                  <div className="card" style={{ marginBottom: 12 }}>
+                    <h4 style={{ margin: '0 0 8px 0' }}>
+                      Неделя {week.weekNumber} — {week.mesocycleType === 'accumulation' ? 'Накопление' : week.mesocycleType === 'intensification' ? 'Интенсификация' : week.mesocycleType === 'peaking' ? 'Пик' : week.mesocycleType === 'deload' ? 'Разгрузка' : 'Восстановление'}
+                      {week.isDeload ? ' (Делоад)' : ''}
+                    </h4>
+                    <div style={{ fontSize: 12, color: 'var(--text-light)', marginBottom: 8 }}>{mesoInfo?.description || week.notes}</div>
+                    <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
+                      <div style={{ background: 'var(--bg-secondary)', borderRadius: 6, padding: '4px 10px', fontSize: 11 }}>Объём: ×{adapted.volumeMultiplier.toFixed(2)}</div>
+                      <div style={{ background: 'var(--bg-secondary)', borderRadius: 6, padding: '4px 10px', fontSize: 11 }}>RIR: {adapted.rirRange.join('-')}</div>
+                      <div style={{ background: 'var(--bg-secondary)', borderRadius: 6, padding: '4px 10px', fontSize: 11 }}>RPE: {adapted.rpeTarget}</div>
+                      {recovery < 40 && <div style={{ background: 'rgba(239,68,68,0.15)', borderRadius: 6, padding: '4px 10px', fontSize: 11, color: '#ef4444' }}>⚠️ Автоделоды (Восст. &lt;40%)</div>}
+                    </div>
+
+                    {adapted.days.map(day => (
+                      <div key={day.day} style={{ background: 'var(--bg-secondary)', borderRadius: 8, padding: 10, marginBottom: 6 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                          <span style={{ fontWeight: 700, fontSize: 14 }}>{day.day}</span>
+                          <div style={{ display: 'flex', gap: 6 }}>
+                            <span style={{ fontSize: 11, color: day.isTraining ? 'var(--accent-blue)' : 'var(--text-dim)' }}>{day.isTraining ? day.split : 'Отдых'}</span>
+                            {day.isTraining && <span style={{ fontSize: 11, padding: '1px 6px', borderRadius: 4, background: day.intensity === 'very_high' ? 'rgba(239,68,68,0.2)' : day.intensity === 'high' ? 'rgba(249,115,22,0.2)' : day.intensity === 'medium' ? 'rgba(234,179,8,0.2)' : 'rgba(34,197,94,0.2)', color: day.intensity === 'very_high' ? '#ef4444' : day.intensity === 'high' ? '#f97316' : day.intensity === 'medium' ? '#eab308' : '#22c55e' }}>{day.intensity === 'very_high' ? 'очень высокая' : day.intensity === 'high' ? 'высокая' : day.intensity === 'medium' ? 'средняя' : 'низкая'}</span>}
+                          </div>
+                        </div>
+                        {day.isTraining && day.exercises.length > 0 && (
+                          <div style={{ fontSize: 12 }}>
+                            {day.exercises.map((ex, i) => (
+                              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0', borderBottom: '1px solid var(--border)' }}>
+                                <span>{ex.isCompound ? '💪 ' : ''}{ex.name}</span>
+                                <span style={{ color: 'var(--text-dim)' }}>{ex.sets}×{ex.reps} RIR {ex.rir}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        {!day.isTraining && <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>Восстановление, растяжка, лёгкое кардио</div>}
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
+
+              <div className="card" style={{ marginBottom: 16 }}>
+                <h4 style={{ margin: '0 0 8px 0' }}>Доступные сплиты для вашего уровня</h4>
+                {getPeriodizationSplits(level).map(s => (
+                  <div key={s.key} style={{ padding: '8px 10px', marginBottom: 4, background: 'var(--bg-secondary)', borderRadius: 6 }}>
+                    <div style={{ fontWeight: 600, fontSize: 13 }}>{s.name} ({s.minDays}-{s.maxDays} дн/нед)</div>
+                    <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>{s.desc}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

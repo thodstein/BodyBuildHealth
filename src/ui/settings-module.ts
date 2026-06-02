@@ -103,7 +103,16 @@ export async function renderSettingsModule(container: HTMLElement, profile: User
 
   if (forceSyncBtn) {
     forceSyncBtn.addEventListener('click', async () => {
-      import('../core/cloud-sync').then(async m => { const labs = (await db.getAll('labs_log')) as LabPoint[]; await m.syncLabsToCloud(labs, profile.id); alert('☁️ Синхронизация запущена'); });
+      import('../core/cloud-sync').then(async m => {
+        const client = await m.initCloudSync();
+        if (!client) {
+          alert('⚠️ Облачная синхронизация недоступна. Supabase не настроен — проверьте переменные окружения VITE_SUPABASE_URL и VITE_SUPABASE_ANON_KEY.');
+          return;
+        }
+        const labs = (await db.getAll('labs_log')) as LabPoint[];
+        await m.syncLabsToCloud(labs, profile.id);
+        alert('☁️ Синхронизация выполнена');
+      });
     });
   }
 

@@ -156,6 +156,10 @@ export const SUPPORT_BASE_COVERAGE: Record<string, Record<string, number>> = {
   boswellia:       { musculoskeletal_3: 0.35, musculoskeletal_5: 0.30, immune_1: 0.20, neuro_1: 0.10 },
   vitamin_c:       { musculoskeletal_4: 0.35, immune_1: 0.30, cardio_5: 0.20, neuro_1: 0.15, hematologic_4: 0.15 },
   bromelain:       { musculoskeletal_5: 0.30, musculoskeletal_3: 0.25, immune_1: 0.15, cardio_5: 0.10 },
+  bpc157:          { musculoskeletal_1: 0.70, musculoskeletal_2: 0.60, musculoskeletal_4: 0.55, musculoskeletal_5: 0.50, neuro_1: 0.25, gastro_1: 0.40 },
+  tb500:           { musculoskeletal_4: 0.55, musculoskeletal_5: 0.50, musculoskeletal_6: 0.45, cardio_7: 0.15 },
+  meloxicam:       { musculoskeletal_3: 0.50, musculoskeletal_5: 0.45, renal_1: -0.10, hepatic_3: -0.15, cardio_5: -0.10 },
+  diclofenac:      { musculoskeletal_3: 0.55, musculoskeletal_5: 0.50, renal_1: -0.15, hepatic_3: -0.20, cardio_5: -0.15, hematologic_4: -0.10 },
 } as const;
 
 export const TRUST_WEIGHTS = { diaryFillRate: 20, nutritionAdherence: 30, labMatchRate: 30, trainerFeedback: 20 } as const;

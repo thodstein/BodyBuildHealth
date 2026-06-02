@@ -5,6 +5,12 @@ import { RiskCard } from '../cards/RiskCard';
 import { RecommendationCard } from '../cards/RecommendationCard';
 import { registry } from '../../core/data/registry';
 
+const SYSTEM_LABELS: Record<string, string> = {
+  cardio: 'Сердечно-сосудистая', hepatic: 'Печень', renal: 'Почки',
+  neuro: 'Нервная', endocrine: 'Эндокринная', hematologic: 'Кроветворная',
+  reproductive: 'Репродуктивная', musculoskeletal: 'Суставы и связки',
+};
+
 import type { MasterDB, RiskResult, ReadinessScores, CourseEntry, LabPoint } from '../../core/types';
 import { calculateRisks } from '../../engines/risk.engine';
 import { calculateRiskFromAnalyses } from '../../engines/risk-calculator-v2.engine';
@@ -15,7 +21,7 @@ import { db } from '../../core/db';
 import { getProfile } from '../../core/profile-manager';
 import { PHASE_REQUIRED_PANELS, LAB_PANELS } from '../../data/labs-phase-panels';
 
-type ScreenId = 'dashboard' | 'pharma' | 'course' | 'peptides' | 'nutrition' | 'plan' | 'substances' | 'labs' | 'risks' | 'profile' | 'predictive' | 'marketplace' | 'articles' | 'assistant' | 'gamification' | 'fertility-pct' | 'calculators' | 'reports' | 'integrations' | 'role-management';
+type ScreenId = 'dashboard' | 'pharma' | 'course' | 'peptides' | 'nutrition' | 'plan' | 'substances' | 'labs' | 'risks' | 'profile' | 'predictive' | 'marketplace' | 'articles' | 'assistant' | 'gamification' | 'fertility-pct' | 'calculators' | 'reports' | 'integrations' | 'role-management' | 'support';
 
 interface Props {
   onNavigate?: (screen: ScreenId) => void;
@@ -317,7 +323,7 @@ export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
         {Object.entries(riskResult.systemBreakdown).map(([sys, vals]) => (
           <div key={sys} style={{ background: 'var(--bg-secondary)', borderRadius: 8, padding: '8px 10px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-              <span style={{ fontSize: 12, fontWeight: 600, textTransform: 'capitalize' }}>{sys}</span>
+              <span style={{ fontSize: 12, fontWeight: 600 }}>{SYSTEM_LABELS[sys] ?? sys}</span>
               <span style={{ fontSize: 12, fontWeight: 700, color: riskColor(vals.raw) }}>{vals.raw.toFixed(1)}%</span>
             </div>
             <ProgressBar value={vals.raw} color={riskColor(vals.raw)} />
@@ -334,7 +340,7 @@ export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
         {risks.map(r => <RiskCard key={r.id} risk={r} />)}
       </div>
 
-      <SectionHeader title="Рекомендации" onNavigate={onNavigate} screenId="plan" />
+      <SectionHeader title="Рекомендации" onNavigate={onNavigate} screenId="support" />
       <div className="grid recs">
         {recs.map(r => <RecommendationCard key={r.recId} rec={r} />)}
       </div>

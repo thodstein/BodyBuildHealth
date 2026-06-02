@@ -13,10 +13,11 @@ const SYSTEM_LABELS: Record<string, string> = {
   hepatic: 'Печень',
   cardio: 'Сердечно-сосудистая',
   endocrine: 'Эндокринная',
-  lipid: 'Липидный обмен',
   renal: 'Почки',
-  hematic: 'Кроветворение',
-  immune: 'Иммунная',
+  hematologic: 'Кроветворение',
+  neuro: 'Нервная',
+  reproductive: 'Репродуктивная',
+  musculoskeletal: 'Суставы и связки',
 };
 
 export const PredictiveAnalyticsScreen: React.FC = () => {
@@ -285,7 +286,7 @@ export const PredictiveAnalyticsScreen: React.FC = () => {
                         </span>
                       </div>
                       <div style={{ marginTop: 6, fontSize: 11, color: 'var(--text-dim)' }}>
-                        Снижение риска: {((1 - values.net! / values.raw!) * 100).toFixed(0)}%
+                        Снижение риска: {(values.raw! > 0 ? ((1 - values.net! / values.raw!) * 100) : 0).toFixed(0)}%
                       </div>
                     </div>
                   ))}

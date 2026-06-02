@@ -481,6 +481,49 @@ const SUPPORT_MED_DETAIL: Record<string, {
     risks: ['Усиление антикоагулянтов', 'Аллергия на ананас', 'ЖКТ дискомфорт', 'Меноррагия'],
     contraindications: ['Приём антикоагулянтов', 'Аллергия на ананас', 'Беременность', 'Гемофилия'],
   },
+  bpc157: {
+    description: 'BPC-157 (Body Protection Compound) — пептид 15 а.к. из желудочного сока. Мощнейший регенератор: связки, сухожилия, хрящи, ЖКТ, нервная ткань. Ускоряет заживление в 2-3 раза.',
+    mechanism: '↑VEGF → ангиогенез; ↑NO → вазодилатация; ↑FGF → фибробластная пролиферация; ↑коллаген I/III; активация PI3K/Akt/mTOR; ↑GABA-рецепторы (анкиолитик); цитопротекция ЖКТ',
+    mechanismKeys: ['VEGF_UP', 'ANGIOGENESIS_UP', 'FGF_UP', 'COLLAGEN_UP', 'PI3K_AKT_UP', 'GASTRO_PROTECT'],
+    systems: [
+      { key: 'musculoskeletal', label: 'Суставы и связки', mechanisms: ['Регенерация связок и сухожилий', 'Восстановление хряща', 'Ангиогенез в месте повреждения', 'Ускорение заживления'] },
+      { key: 'neuro', label: 'Нервная', mechanisms: ['Нейропротекция', 'Модуляция GABA'] },
+      { key: 'hepatic', label: 'Печень/ЖКТ', mechanisms: ['Цитопротекция ЖКТ', 'Заживление язв'] },
+    ],
+    risks: ['Экспериментальный (нет RCT на людях)', 'Теоретический риск опухолевого ангиогенеза', 'Редко: тошнота при инъекции'],
+    contraindications: ['Активные опухоли', 'Беременность', 'Возраст <18 (недостаточно данных)'],
+  },
+  tb500: {
+    description: 'TB-500 (тимозин β4) — пептид 43 а.к. Регулирует актин → мобильность клеток → заживление. Восстанавливает связки, сухожилия, кожу, сердечную мышцу. Синергия с BPC-157.',
+    mechanism: 'Связывание G-актина → F-актин → клеточная миграция; ↑VEGF; ↓TGF-β1 (антифиброз); ↑ангиогенез; ↓воспаление через NFkB',
+    mechanismKeys: ['ACTIN_POLYMERIZE', 'CELL_MIGRATION_UP', 'VEGF_UP', 'TGF_B1_DOWN', 'NFkB_DOWN'],
+    systems: [
+      { key: 'musculoskeletal', label: 'Суставы и связки', mechanisms: ['Регенерация сухожилий', 'Восстановление связок', 'Антифиброз', 'Заживление ран'] },
+      { key: 'cardio', label: 'Сердечно-сосудистая', mechanisms: ['Восстановление миокарда (экспериментально)'] },
+    ],
+    risks: ['Экспериментальный (нет RCT на людях)', 'Теоретический риск метастазирования (актин-зависимый)', 'Боль при инъекции'],
+    contraindications: ['Активные опухоли', 'Метастазы', 'Беременность'],
+  },
+  meloxicam: {
+    description: 'Мелоксикам — селективный ингибитор COX-2 (НПВС). Меньше ЖКТ-рисков чем неселективные НПВС. Обезболивание и противовоспалительное при суставных болях на курсе.',
+    mechanism: 'Селективная блокада COX-2 → ↓PGE2/PGI2 в очаге воспаления; сохранение COX-1 → меньше ЖКТ-побочек; ↓простагландины → ↓боль, ↓отёк, ↓T°',
+    mechanismKeys: ['COX2_SELECTIVE', 'PGE2_DOWN', 'ANALGESIC', 'ANTIINFLAMMATORY'],
+    systems: [
+      { key: 'musculoskeletal', label: 'Суставы и связки', mechanisms: ['Противовоспалительное', 'Обезболивание', 'Уменьшение отёка'] },
+    ],
+    risks: ['ЖКТ-кровотечение (реже чем неселективные)', 'Почечная недостаточность при обезвоживании', 'Повышение АД', 'Удлинение QT'],
+    contraindications: ['Язва желудка в фазе обострения', 'Почечная недостаточность ClCr<30', 'Беременность III триместр', 'Приём антикоагулянтов', 'Астма (аспириновая)'],
+  },
+  diclofenac: {
+    description: 'Диклофенак — мощный неселективный НПВС. Быстрое обезболивание и снятие воспаления суставов. Местно (гель) + перорально. Высокий ЖКТ/печёночный/почечный риск.',
+    mechanism: 'Ингибирование COX-1 + COX-2 → мощное ↓PGE2/PGI2/тромбоксан; ↓простагландины → ↓боль, ↓отёк, ↓T°; ингибирование 5-LOX (слабо)',
+    mechanismKeys: ['COX1_2_INHIBIT', 'PGE2_DOWN', 'ANALGESIC', 'ANTIINFLAMMATORY', 'PLATELET_DOWN'],
+    systems: [
+      { key: 'musculoskeletal', label: 'Суставы и связки', mechanisms: ['Мощное противовоспалительное', 'Обезболивание', 'Снижение отёка'] },
+    ],
+    risks: ['ЖКТ-кровотечение (высокий)', 'Гепатотоксичность (контроль АЛТ)', 'Нефротоксичность', 'Повышение АД', 'Удлинение QT', 'Снижение тромбоцитов'],
+    contraindications: ['Язва желудка/12-перстной', 'Печёночная недостаточность', 'ClCr<30', 'Беременность III триместр', 'Приём антикоагулянтов', 'Аспириновая астма', 'Сердечная недостаточность'],
+  },
 };
 
 interface CalcProps {
@@ -562,8 +605,8 @@ export const CalculatorsScreen: React.FC<CalcProps> = ({ initialTab = 'fitness' 
   const SUPPORT_LEVELS: Record<string, { label: string; desc: string; subs: string[] }> = {
     basic: { label: 'Базовый минимум', desc: 'Обязательная защита печени и ССС', subs: ['nac', 'omega3', 'vitamin_d3'] },
     standard: { label: 'Умный среднячок', desc: 'Комплексная защита всех ключевых систем + суставы', subs: ['nac', 'omega3', 'tudca', 'magnesium', 'vitamin_d3', 'coq10', 'zinc', 'vitamin_k2', 'vitamin_b12', 'glucosamine', 'collagen'] },
-    enhanced: { label: 'Усиление', desc: 'Максимальная защита + нейро + почки + кровь + суставы + антиоксиданты', subs: ['nac', 'omega3', 'tudca', 'magnesium', 'vitamin_d3', 'coq10', 'zinc', 'berberine', 'ashwagandha', 'alpha_lipoic', 'celery_extract', 'vitamin_k2', 'selenium', 'milk_thistle', 'vitamin_b12', 'folate', 'taurine', 'glucosamine', 'chondroitin', 'msm', 'collagen', 'vitamin_c'] },
-    maximum: { label: 'Полный максимум', desc: 'Абсолютная защита + рецептурные + ХГЧ + все системы + суставы', subs: ['nac', 'omega3', 'tudca', 'magnesium', 'vitamin_d3', 'coq10', 'zinc', 'berberine', 'ashwagandha', 'alpha_lipoic', 'celery_extract', 'telmisartan', 'nebivolol', 'saw_palmetto', 'hcg', 'vitamin_k2', 'selenium', 'milk_thistle', 'probiotics', 'vitamin_b12', 'vitamin_b6', 'folate', 'iron', 'copper', 'astragalus', 'taurine', 'melatonin', 'ginseng', 'egcg', 'curcumin', 'phosphatidylcholine', 'l_carnitine', 'glucosamine', 'chondroitin', 'msm', 'collagen', 'hyaluronic', 'boswellia', 'vitamin_c', 'bromelain'] },
+    enhanced: { label: 'Усиление', desc: 'Максимальная защита + нейро + почки + кровь + суставы + антиоксиданты', subs: ['nac', 'omega3', 'tudca', 'magnesium', 'vitamin_d3', 'coq10', 'zinc', 'berberine', 'ashwagandha', 'alpha_lipoic', 'celery_extract', 'vitamin_k2', 'selenium', 'milk_thistle', 'vitamin_b12', 'folate', 'taurine', 'glucosamine', 'chondroitin', 'msm', 'collagen', 'vitamin_c', 'bpc157'] },
+    maximum: { label: 'Полный максимум', desc: 'Абсолютная защита + рецептурные + ХГЧ + все системы + суставы + пептиды + НПВС', subs: ['nac', 'omega3', 'tudca', 'magnesium', 'vitamin_d3', 'coq10', 'zinc', 'berberine', 'ashwagandha', 'alpha_lipoic', 'celery_extract', 'telmisartan', 'nebivolol', 'saw_palmetto', 'hcg', 'vitamin_k2', 'selenium', 'milk_thistle', 'probiotics', 'vitamin_b12', 'vitamin_b6', 'folate', 'iron', 'copper', 'astragalus', 'taurine', 'melatonin', 'ginseng', 'egcg', 'curcumin', 'phosphatidylcholine', 'l_carnitine', 'glucosamine', 'chondroitin', 'msm', 'collagen', 'hyaluronic', 'boswellia', 'vitamin_c', 'bromelain', 'bpc157', 'tb500', 'meloxicam', 'diclofenac'] },
   };
 
   useEffect(() => {
@@ -606,10 +649,14 @@ export const CalculatorsScreen: React.FC<CalcProps> = ({ initialTab = 'fitness' 
     const result = calculateSupport({
       substances: supportDrugs,
       goals: [supportGoal],
-      drugDoses: Object.fromEntries(supportDrugs.map(id => [id, PHARMA_DB[id] ? 1 : 1]))
+      drugDoses: Object.fromEntries(supportDrugs.map(id => [id, 100]))
     });
     setSupportResult(result);
   };
+
+  useEffect(() => {
+    if (supportDrugs.length > 0) calcSupport();
+  }, [supportDrugs, supportGoal, supportLevel, prescribedMeds, activeSystems]);
 
   const calcBMI = () => {
     const hm = bmiHeight / 100;
@@ -1063,13 +1110,17 @@ export const CalculatorsScreen: React.FC<CalcProps> = ({ initialTab = 'fitness' 
           boswellia: { name: 'Босвеллия', cat: 'bady', dose: '600 мг/день', purpose: 'Суставы, воспаление, нейро' },
           vitamin_c: { name: 'Витамин C', cat: 'bady', dose: '1000 мг/день', purpose: 'Коллаген, иммунитет, антиоксидант' },
           bromelain: { name: 'Бромелайн', cat: 'bady', dose: '500 мг/день', purpose: 'Суставы, воспаление, пищеварение' },
+          bpc157: { name: 'BPC-157', cat: 'apteka', dose: '500 мкг 2x/день', purpose: 'Суставы, связки, сухожилия, ЖКТ' },
+          tb500: { name: 'TB-500 (тимозин β4)', cat: 'apteka', dose: '10 мг 2x/нед', purpose: 'Связки, сухожилия, регенерация' },
+          meloxicam: { name: 'Мелоксикам', cat: 'apteka', dose: '15 мг/день', purpose: 'Суставы, НПВС, воспаление' },
+          diclofenac: { name: 'Диклофенак', cat: 'apteka', dose: '150 мг/день (мазь+табл)', purpose: 'Суставы, НПВС, боль' },
         };
 
         const LEVELS: Record<string, { label: string; desc: string; subs: string[] }> = {
           basic: { label: 'Базовый минимум', desc: 'Обязательная защита печени и ССС', subs: ['nac', 'omega3', 'vitamin_d3'] },
           standard: { label: 'Умный среднячок', desc: 'Комплексная защита всех ключевых систем + суставы', subs: ['nac', 'omega3', 'tudca', 'magnesium', 'vitamin_d3', 'coq10', 'zinc', 'vitamin_k2', 'vitamin_b12', 'glucosamine', 'collagen'] },
-          enhanced: { label: 'Усиление', desc: 'Максимальная защита + нейро + почки + кровь + суставы + антиоксиданты', subs: ['nac', 'omega3', 'tudca', 'magnesium', 'vitamin_d3', 'coq10', 'zinc', 'berberine', 'ashwagandha', 'alpha_lipoic', 'celery_extract', 'vitamin_k2', 'selenium', 'milk_thistle', 'vitamin_b12', 'folate', 'taurine', 'glucosamine', 'chondroitin', 'msm', 'collagen', 'vitamin_c'] },
-          maximum: { label: 'Полный максимум', desc: 'Абсолютная защита + рецептурные + ХГЧ + все системы + суставы', subs: ['nac', 'omega3', 'tudca', 'magnesium', 'vitamin_d3', 'coq10', 'zinc', 'berberine', 'ashwagandha', 'alpha_lipoic', 'celery_extract', 'telmisartan', 'nebivolol', 'saw_palmetto', 'hcg', 'vitamin_k2', 'selenium', 'milk_thistle', 'probiotics', 'vitamin_b12', 'vitamin_b6', 'folate', 'iron', 'copper', 'astragalus', 'taurine', 'melatonin', 'ginseng', 'egcg', 'curcumin', 'phosphatidylcholine', 'l_carnitine', 'glucosamine', 'chondroitin', 'msm', 'collagen', 'hyaluronic', 'boswellia', 'vitamin_c', 'bromelain'] },
+          enhanced: { label: 'Усиление', desc: 'Максимальная защита + нейро + почки + кровь + суставы + антиоксиданты', subs: ['nac', 'omega3', 'tudca', 'magnesium', 'vitamin_d3', 'coq10', 'zinc', 'berberine', 'ashwagandha', 'alpha_lipoic', 'celery_extract', 'vitamin_k2', 'selenium', 'milk_thistle', 'vitamin_b12', 'folate', 'taurine', 'glucosamine', 'chondroitin', 'msm', 'collagen', 'vitamin_c', 'bpc157'] },
+          maximum: { label: 'Полный максимум', desc: 'Абсолютная защита + рецептурные + ХГЧ + все системы + суставы + пептиды + НПВС', subs: ['nac', 'omega3', 'tudca', 'magnesium', 'vitamin_d3', 'coq10', 'zinc', 'berberine', 'ashwagandha', 'alpha_lipoic', 'celery_extract', 'telmisartan', 'nebivolol', 'saw_palmetto', 'hcg', 'vitamin_k2', 'selenium', 'milk_thistle', 'probiotics', 'vitamin_b12', 'vitamin_b6', 'folate', 'iron', 'copper', 'astragalus', 'taurine', 'melatonin', 'ginseng', 'egcg', 'curcumin', 'phosphatidylcholine', 'l_carnitine', 'glucosamine', 'chondroitin', 'msm', 'collagen', 'hyaluronic', 'boswellia', 'vitamin_c', 'bromelain', 'bpc157', 'tb500', 'meloxicam', 'diclofenac'] },
         };
 
         const SYSTEM_LABELS: Record<string, string> = {
@@ -1280,6 +1331,7 @@ export const CalculatorsScreen: React.FC<CalcProps> = ({ initialTab = 'fitness' 
                   l_carnitine: 'L_CARNITINE', glucosamine: 'GLUCOSAMINE', chondroitin: 'CHONDROITIN',
                   msm: 'MSM', collagen: 'COLLAGEN', hyaluronic: 'HYALURONIC', boswellia: 'BOSWELLIA',
                   vitamin_c: 'VITAMIN_C', bromelain: 'BROMELAIN',
+                  bpc157: 'BPC157', tb500: 'TB500', meloxicam: 'NSAIDS', diclofenac: 'NSAIDS',
                 };
                 const prescribedIds = levelSubs.filter(id => prescribedMeds[id]);
                 const mappedIds = prescribedIds.map(id => SUPPORT_INTERACTION_MAP[id] ?? id.toUpperCase());

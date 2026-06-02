@@ -151,7 +151,7 @@ export const SmartAssistantScreen: React.FC = () => {
     <div className="screen assistant">
       <div className="assistant-header">
         <h2>Умный ассистент</h2>
-        <p>Голосовые команды, чекапы, глоссарий</p>
+        <p>Чекапы и глоссарий</p>
       </div>
       
       <div className="messages-container" ref={messagesEndRef}>
@@ -183,14 +183,14 @@ export const SmartAssistantScreen: React.FC = () => {
       </div>
       
       <div className="assistant-footer">
-        <div className="voice-btn">
-          <button className="voice-icon">🎤</button>
-          <span>Голосовой ввод</span>
+        <div className="voice-btn" style={{ opacity: 0.4 }} title="Голосовой ввод в разработке">
+          <button className="voice-icon" disabled>🎤</button>
+          <span>Голос (скоро)</span>
         </div>
         <div className="quick-actions">
           <button className="quick-action" onClick={() => setCheckupOpen(true)}>📋 Чекап недели</button>
           <button className="quick-action" onClick={() => { setGlossaryOpen(true); setGlossarySearch(''); setExpandedTerm(null); }}>📖 Глоссарий</button>
-          <button className="quick-action" onClick={() => alert('Раздел напоминаний в разработке')}>🔔 Напоминания</button>
+          <button className="quick-action" onClick={() => setMessages(m => [...m, { id: Date.now(), text: 'Раздел напоминаний скоро будет доступен. Следите за обновлениями!', isUser: false }])}>🔔 Напоминания</button>
         </div>
       </div>
 

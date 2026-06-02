@@ -71,7 +71,7 @@ export const ArticlesScreen: React.FC = () => {
   );
 
   if (loading) {
-    return <div className="screen articles">Р—Р°РіСЂСѓР·РєР° Статьи...</div>;
+    return <div className="screen articles">Загрузка статей...</div>;
   }
 
   return (

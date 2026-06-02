@@ -141,6 +141,10 @@ const SUPPORT_EC50: Record<string, number> = {
   boswellia: 200,
   vitamin_c: 250,
   bromelain: 200,
+  bpc157: 250,
+  tb500: 5,
+  meloxicam: 7,
+  diclofenac: 50,
 };
 
 const SUPPORT_DEFAULT_DOSE: Record<string, number> = {
@@ -184,6 +188,10 @@ const SUPPORT_DEFAULT_DOSE: Record<string, number> = {
   boswellia: 600,
   vitamin_c: 1000,
   bromelain: 500,
+  bpc157: 500,
+  tb500: 10,
+  meloxicam: 15,
+  diclofenac: 150,
 };
 
 const COVERAGE_ORGAN_MAP: Record<string, string[]> = {
@@ -206,6 +214,7 @@ function getCoverageSystem(key: string): string | undefined {
   const prefix = key.split('_')[0];
   if (prefix === 'repro') return 'reproductive';
   if (prefix === 'immune') return 'hematologic';
+  if (prefix === 'gastro') return 'hepatic';
   if (RISK_SYSTEMS.includes(prefix as any)) return prefix;
   return undefined;
 }

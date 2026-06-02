@@ -88,7 +88,7 @@ export default function App() {
       predictive: ['training', 'whatif'], marketplace: ['pharma', 'marketplace'],
       articles: ['profile', 'articles'], assistant: ['profile', 'assistant'],
       gamification: ['profile', 'gamification'], fertility: ['risks', 'fertility'], 'fertility-pct': ['risks', 'fertility'],
-      calculators: ['nutrition', 'calc'], reports: ['profile', 'reports'],
+      support: ['risks', 'support'], calculators: ['nutrition', 'calc'], reports: ['profile', 'reports'],
       integrations: ['profile', 'integrations'], 'role-management': ['profile', 'roles'],
     };
     const entry = map[screenId];
@@ -114,7 +114,7 @@ export default function App() {
     const tabs: Tab[] = ['home', 'pharma', 'training', 'nutrition', 'labs', 'risks', 'profile'];
     const idx = tabs.indexOf(tab);
     const next = dx < 0 && idx < tabs.length - 1 ? tabs[idx + 1] : dx > 0 && idx > 0 ? tabs[idx - 1] : null;
-    if (next) { go(next); }
+    if (next) { go(next); setSub(''); }
     touchRef.current = null;
   }, [tab]);
 
@@ -135,7 +135,7 @@ export default function App() {
       case 'nutrition': return [
         { id: 'diary', label: 'Дневник' },
         { id: 'calc', label: 'Калькулятор' },
-        { id: 'support', label: 'Поддержка' },
+        { id: 'advice', label: 'Советы' },
       ];
       case 'labs': return [
         { id: 'results', label: 'Ввод анализов' },
@@ -146,6 +146,7 @@ export default function App() {
       ];
       case 'risks': return [
         { id: 'matrix', label: 'Матрица рисков' },
+        { id: 'support', label: 'Поддержка органов' },
         { id: 'fertility', label: 'Фертильность' },
       ];
       case 'profile': return [
@@ -179,6 +180,7 @@ export default function App() {
         case 'readiness': return <DashboardScreen onNavigate={navToScreen} />;
         case 'whatif': return <PredictiveAnalyticsScreen />;
         case 'diary': return <NutritionScreen />;
+        case 'advice': return <NutritionScreen initialTab="advice" />;
         case 'calc': return <CalculatorsScreen />;
         case 'support': return <CalculatorsScreen initialTab="support" />;
         case 'results': return <LabsScreen initialTab="input" />;
@@ -206,7 +208,7 @@ export default function App() {
       case 'training': return <PlanScreen goal="energy" />;
       case 'nutrition': return <NutritionScreen />;
       case 'labs': return <LabsScreen />;
-      case 'risks': return <RiskScreen />;
+      case 'risks': return sub === 'support' ? <CalculatorsScreen initialTab="support" /> : sub === 'fertility' ? <FertilityPCTScreen /> : <RiskScreen />;
       case 'profile': return <ProfileScreen />;
       default: return <DashboardScreen onNavigate={navToScreen} />;
     }
