@@ -19,7 +19,27 @@ export interface LinkedData {
   avgWeeklyCarbs: number;
   activeDrugs: Record<string, { dosePerWeek: number }>;
   supportCoverage: Record<string, number>;
+  pal: number;
+  trainingLoadRatio: number;
   refetch: () => void;
+}
+
+export function derivePAL(workoutsPerWeek?: number, avgWorkoutMinutes?: number): number {
+  const wpw = workoutsPerWeek ?? 3;
+  const awm = avgWorkoutMinutes ?? 60;
+  let p = 1.2 + wpw * 0.075;
+  if (awm > 60) p += 0.05;
+  if (awm > 90) p += 0.075;
+  if (wpw >= 6) p += 0.05;
+  return Math.max(1.2, Math.min(1.9, Math.round(p * 100) / 100));
+}
+
+export function deriveTrainingLoad(workoutsPerWeek?: number, avgWorkoutMinutes?: number): number {
+  const wpw = workoutsPerWeek ?? 3;
+  const awm = avgWorkoutMinutes ?? 60;
+  const weeklyMinutes = wpw * awm;
+  const ratio = weeklyMinutes / 420;
+  return Math.max(0.2, Math.min(1.5, Math.round(ratio * 100) / 100));
 }
 
 function getLatestLabValue(labs: LabPoint[], code: string): number | undefined {
@@ -109,6 +129,8 @@ export function useDataLink(): LinkedData {
 
   const s = profile.settings;
   const activeDrugs = computeActiveDrugs(course);
+  const pal = derivePAL(s.workoutsPerWeek, s.avgWorkoutMinutes);
+  const trainingLoad = deriveTrainingLoad(s.workoutsPerWeek, s.avgWorkoutMinutes);
 
   const readiness = (() => {
     const altVal = getLatestLabValue(labs, 'ALT');
@@ -133,7 +155,7 @@ export function useDataLink(): LinkedData {
       waterRatio: Math.min(1, (s.dailyWaterLiters ?? 2) / 3),
       fiberRatio: 0.6,
       omega3Flag: (s.currentSupplements ?? []).some(sup => /omega|омега/i.test(sup.name)),
-      trainingLoadRatio: s.trainingFactor ?? 0.6,
+      trainingLoadRatio: trainingLoad,
       subjFatigue: s.fatigueLevel ?? 3,
       hrIncrease: crpNorm > 0.6 ? 0.3 : 0.1,
     });
@@ -162,6 +184,8 @@ export function useDataLink(): LinkedData {
     avgWeeklyFat: avg.fat, avgWeeklyCarbs: avg.carbs,
     activeDrugs,
     supportCoverage: (risk as any)?.coverageMap ?? {},
+    pal,
+    trainingLoadRatio: trainingLoad,
     refetch,
   };
 }

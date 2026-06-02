@@ -313,7 +313,8 @@ export const LabsScreen: React.FC<LabsProps> = ({ initialTab = 'input' }) => {
 
       {tab === 'input' && (
         <>
-          <div className="card" style={{ marginBottom: 12 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+          <div className="card" style={{ marginBottom: 0 }}>
             <h3>&#128221; Вставить текст анализа</h3>
             <p style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 8 }}>Вставьте текст из лабораторного бланка (Инвитро, Гемотест, Хеликс, KDL). Поддерживаются форматы: «Гемоглобин 140 г/л», «АЛТ: 25 U/L (0-40)», «HGB 140 g/L».</p>
             <textarea
@@ -344,11 +345,11 @@ export const LabsScreen: React.FC<LabsProps> = ({ initialTab = 'input' }) => {
                   ))}
                 </div>
                 <button className="btn" style={{ marginTop: 8 }} onClick={confirmOcrResults}>&#10004; Подтвердить и сохранить все</button>
-              </div>
-            )}
-          </div>
+               </div>
+             )}
+           </div>
 
-          <div className="card" style={{ marginBottom: 12 }}>
+           <div className="card" style={{ marginBottom: 0 }}>
             <h3>&#128736; Быстрый ввод по группам</h3>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
               {Object.entries(LAB_PANELS).map(([key, panel]) => {
@@ -414,8 +415,9 @@ export const LabsScreen: React.FC<LabsProps> = ({ initialTab = 'input' }) => {
               </div>
             )}
           </div>
+          </div>
 
-          <div className="card" style={{ marginBottom: 12 }}>
+          <div className="card" style={{ marginTop: 12 }}>
             <h3>&#128203; Ручной ввод</h3>
             <p style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 8 }}>Введите код или название показателя, значение и единицу измерения</p>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 8 }}>

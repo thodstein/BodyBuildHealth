@@ -4,13 +4,13 @@ import { generateMacroCycle } from '../../engines/nutrition-cycling.engine';
 import { generateDayMealPlan, type DayMealPlan, type MealSlot } from '../../engines/nutrition-meal-plan.engine';
 import { getProfile } from '../../core/profile-manager';
 import { useDataLink } from '../../core/data-link';
-import { FOOD_DB, searchFood, RATION_TIERS, getTopByProtein, getTopByCarbs, getTopByFat } from '../../core/nutrition-database';
+import { FOOD_DB, searchFood, RATION_TIERS, getTopByProtein, getTopByCarbs, getTopByFat, getFoodById } from '../../core/nutrition-database';
 import { BarcodeScanner } from '../components/BarcodeScanner';
 import { productToFoodItem, type OFFProduct } from '../../engines/openfoodfacts.engine';
 import { parseNutritionScreenshot, type ParsedMeal } from '../../engines/nutrition-ocr-parser';
 import type { NutritionInput, NutritionTargets, FoodItem } from '../../core/types';
 
-type TabId = 'diary' | 'calc' | 'advice' | 'ration';
+type TabId = 'diary' | 'calc' | 'advice' | 'ration' | 'charts';
 type MealType = 'breakfast' | 'lunch' | 'dinner' | 'snack';
 type ProductSection = 'protein' | 'carbs' | 'fats' | null;
 type RationTier = 'basic' | 'mid' | 'max' | null;
@@ -891,6 +891,280 @@ const RationTab: React.FC<{ plan: DayMealPlan }> = ({ plan }) => {
   );
 };
 
+const MICRO_TARGETS: Record<string, { label: string; unit: string; target: number }> = {
+  Ca: { label: 'Кальций', unit: 'мг', target: 1000 },
+  Fe: { label: 'Железо', unit: 'мг', target: 8 },
+  Mg: { label: 'Магний', unit: 'мг', target: 400 },
+  P: { label: 'Фосфор', unit: 'мг', target: 700 },
+  K: { label: 'Калий', unit: 'мг', target: 2600 },
+  Na: { label: 'Натрий', unit: 'мг', target: 1500 },
+  Zn: { label: 'Цинк', unit: 'мг', target: 11 },
+  Se: { label: 'Селен', unit: 'мкг', target: 55 },
+  Cu: { label: 'Медь', unit: 'мг', target: 0.9 },
+  Mn: { label: 'Марганец', unit: 'мг', target: 2.3 },
+  VitA: { label: 'Витамин A', unit: 'мкг', target: 900 },
+  VitB6: { label: 'Витамин B6', unit: 'мг', target: 1.7 },
+  VitB9: { label: 'Фолат', unit: 'мкг', target: 400 },
+  VitB12: { label: 'Витамин B12', unit: 'мкг', target: 2.4 },
+  VitC: { label: 'Витамин C', unit: 'мг', target: 90 },
+  VitD: { label: 'Витамин D', unit: 'мкг', target: 15 },
+  VitE: { label: 'Витамин E', unit: 'мг', target: 15 },
+  VitK: { label: 'Витамин K', unit: 'мкг', target: 120 },
+  Omega3: { label: 'Омега-3', unit: 'мг', target: 1500 },
+};
+
+function MicroReport({ diary, range }: { diary: Record<string, DayDiary>; range: number }) {
+  const microTotals = useMemo(() => {
+    const totals: Record<string, number> = {};
+    let daysWithData = 0;
+    const now = new Date();
+    for (let i = range - 1; i >= 0; i--) {
+      const d = new Date(now.getTime() - i * 86400000);
+      const key = d.toISOString().slice(0, 10);
+      const day = diary[key];
+      if (!day) continue;
+      daysWithData++;
+      for (const mt of Object.values(day.meals)) {
+        for (const e of mt) {
+          const food = getFoodById(e.foodId);
+          if (food?.micros) {
+            for (const [mk, mv] of Object.entries(food.micros)) {
+              const scaled = (mv / 100) * e.weight;
+              totals[mk] = (totals[mk] || 0) + scaled;
+            }
+          }
+        }
+      }
+    }
+    if (daysWithData > 0) {
+      for (const k of Object.keys(totals)) {
+        totals[k] = Math.round(totals[k] / daysWithData);
+      }
+    }
+    return { totals, daysWithData };
+  }, [diary, range]);
+
+  if (microTotals.daysWithData === 0) return null;
+
+  const entries = Object.entries(MICRO_TARGETS)
+    .map(([key, cfg]) => ({
+      key, label: cfg.label, unit: cfg.unit, target: cfg.target,
+      actual: microTotals.totals[key] || 0,
+    }))
+    .sort((a, b) => (b.actual / b.target) - (a.actual / a.target));
+
+  return (
+    <div className="card">
+      <h4 style={{ margin: '0 0 8px 0' }}>Микронутриенты (среднее/день за {microTotals.daysWithData} дн.)</h4>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+        {entries.map(e => {
+          const pct = Math.min(100, Math.round((e.actual / e.target) * 100));
+          const color = pct >= 80 ? '#22c55e' : pct >= 50 ? '#eab308' : '#ef4444';
+          return (
+            <div key={e.key} style={{ background: 'var(--bg-secondary)', borderRadius: 8, padding: '8px 10px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: 12, fontWeight: 600 }}>{e.label}</span>
+                <span style={{ fontSize: 11, color }}>{e.actual} / {e.target} {e.unit}</span>
+              </div>
+              <div style={{ background: 'var(--bg-tertiary, #1a1a2e)', borderRadius: 3, height: 6, marginTop: 4 }}>
+                <div style={{ width: `${pct}%`, height: '100%', background: color, borderRadius: 3, transition: 'width 0.3s' }} />
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function ChartsTab({ diary, targets }: { diary: Record<string, DayDiary>; targets: NutritionTargets | null }) {
+  const [range, setRange] = useState<7 | 14 | 30>(7);
+  const canvasRef = React.useRef<HTMLCanvasElement>(null);
+
+  const days = useMemo(() => {
+    const result: { date: string; kcal: number; p: number; f: number; c: number }[] = [];
+    const now = new Date();
+    for (let i = range - 1; i >= 0; i--) {
+      const d = new Date(now.getTime() - i * 86400000);
+      const key = d.toISOString().slice(0, 10);
+      const day = diary[key];
+      if (day) {
+        const totals = calcDayTotals(day);
+        result.push({ date: key, kcal: totals.kcal, p: totals.p, f: totals.f, c: totals.c });
+      } else {
+        result.push({ date: key, kcal: 0, p: 0, f: 0, c: 0 });
+      }
+    }
+    return result;
+  }, [diary, range]);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || days.length === 0) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    const dpr = window.devicePixelRatio || 1;
+    const rect = canvas.getBoundingClientRect();
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
+    ctx.scale(dpr, dpr);
+    const w = rect.width;
+    const h = rect.height;
+    const padL = 40;
+    const padR = 12;
+    const padT = 30;
+    const padB = 40;
+    const plotW = w - padL - padR;
+    const plotH = h - padT - padB;
+    ctx.clearRect(0, 0, w, h);
+    const maxKcal = Math.max(targets?.kcal ?? 2500, ...days.map(d => d.kcal), 500);
+    const maxX = Math.max(targets?.protein ?? 160, ...days.map(d => d.p), 50);
+    const toX = (i: number) => padL + (days.length > 1 ? (i / (days.length - 1)) * plotW : plotW / 2);
+    const toY = (v: number, max: number) => padT + plotH - (v / max) * plotH;
+    ctx.strokeStyle = 'rgba(128,128,128,0.15)';
+    ctx.lineWidth = 1;
+    for (let v = 0; v <= maxKcal; v += Math.ceil(maxKcal / 5 / 100) * 100) {
+      const y = toY(v, maxKcal);
+      ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(w - padR, y); ctx.stroke();
+      ctx.fillStyle = 'rgba(128,128,128,0.6)';
+      ctx.font = '10px sans-serif';
+      ctx.textAlign = 'right';
+      ctx.fillText(`${v}`, padL - 4, y + 3);
+    }
+    days.forEach((d, i) => {
+      const x = toX(i);
+      ctx.fillStyle = 'rgba(128,128,128,0.6)';
+      ctx.font = '9px sans-serif';
+      ctx.textAlign = 'center';
+      const dt = new Date(d.date);
+      ctx.fillText(`${dt.getDate()}/${dt.getMonth() + 1}`, x, h - 6);
+    });
+    const drawLine = (values: number[], max: number, color: string, dash?: number[]) => {
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 2;
+      ctx.setLineDash(dash || []);
+      ctx.beginPath();
+      values.forEach((v, i) => {
+        const x = toX(i);
+        const y = toY(v, max);
+        if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      });
+      ctx.stroke();
+      ctx.setLineDash([]);
+      values.forEach((v, i) => {
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.arc(toX(i), toY(v, max), 3, 0, Math.PI * 2);
+        ctx.fill();
+      });
+    };
+    drawLine(days.map(d => d.kcal), maxKcal, 'rgba(0,230,138,0.9)');
+    if (targets?.kcal) {
+      ctx.strokeStyle = 'rgba(0,230,138,0.4)';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([5, 5]);
+      ctx.beginPath();
+      ctx.moveTo(padL, toY(targets.kcal, maxKcal));
+      ctx.lineTo(w - padR, toY(targets.kcal, maxKcal));
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = 'rgba(0,230,138,0.6)';
+      ctx.font = '10px sans-serif';
+      ctx.textAlign = 'left';
+      ctx.fillText(`Цель: ${targets.kcal}`, padL + 4, toY(targets.kcal, maxKcal) - 4);
+    }
+    if (targets?.protein) {
+      drawLine(days.map(d => d.p * 4), maxKcal, 'rgba(100,150,255,0.7)', [3, 3]);
+    }
+    if (targets?.fats) {
+      drawLine(days.map(d => d.f * 9), maxKcal, 'rgba(255,165,0,0.7)', [3, 3]);
+    }
+  }, [days, targets, range]);
+
+  const avgKcal = days.length > 0 ? Math.round(days.reduce((s, d) => s + d.kcal, 0) / days.filter(d => d.kcal > 0).length) : 0;
+  const avgP = days.length > 0 ? Math.round(days.reduce((s, d) => s + d.p, 0) / days.filter(d => d.kcal > 0).length) : 0;
+  const avgF = days.length > 0 ? Math.round(days.reduce((s, d) => s + d.f, 0) / days.filter(d => d.kcal > 0).length) : 0;
+  const avgC = days.length > 0 ? Math.round(days.reduce((s, d) => s + d.c, 0) / days.filter(d => d.kcal > 0).length) : 0;
+  const loggedDays = days.filter(d => d.kcal > 0).length;
+
+  return (
+    <div>
+      <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
+        {([7, 14, 30] as const).map(r => (
+          <button key={r} onClick={() => setRange(r)} style={{
+            flex: 1, padding: '8px 0', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer',
+            background: range === r ? 'var(--accent-blue)' : 'var(--bg-secondary)',
+            color: range === r ? '#fff' : 'var(--text-dim)',
+          }}>{r} дней</button>
+        ))}
+      </div>
+
+      {loggedDays === 0 ? (
+        <div className="card" style={{ textAlign: 'center', padding: 32 }}>
+          <div style={{ fontSize: 32, marginBottom: 8 }}>📊</div>
+          <div style={{ fontWeight: 600, marginBottom: 8, color: 'var(--text-light)' }}>Нет данных за выбранный период</div>
+          <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>Начните заполнять дневник питания — графики появятся автоматически</div>
+        </div>
+      ) : (
+        <>
+          <div className="card" style={{ marginBottom: 12 }}>
+            <h4 style={{ margin: '0 0 8px 0' }}>КБЖУ за {range} дней</h4>
+            <canvas ref={canvasRef} style={{ width: '100%', height: 220 }} />
+            <div style={{ display: 'flex', gap: 12, marginTop: 8, fontSize: 11 }}>
+              <span style={{ color: 'rgba(0,230,138,0.9)' }}>● Ккал</span>
+              <span style={{ color: 'rgba(100,150,255,0.7)' }}>● Белок×4</span>
+              <span style={{ color: 'rgba(255,165,0,0.7)' }}>● Жиры×9</span>
+            </div>
+          </div>
+
+          <div className="card" style={{ marginBottom: 12 }}>
+            <h4 style={{ margin: '0 0 8px 0' }}>Средние значения ({loggedDays}/{range} дней)</h4>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 8 }}>
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: 20, fontWeight: 700, color: targets?.kcal ? (avgKcal >= targets.kcal * 0.9 ? 'var(--success)' : 'var(--warning)') : 'var(--text-primary)' }}>{avgKcal}</div>
+                <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>ккал/день</div>
+                {targets?.kcal && <ProgressBar value={avgKcal} max={targets.kcal} color={avgKcal >= targets.kcal * 0.9 ? '#22c55e' : '#eab308'} />}
+              </div>
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: 20, fontWeight: 700, color: targets?.protein ? (avgP >= targets.protein * 0.9 ? '#6496ff' : '#eab308') : 'var(--text-primary)' }}>{avgP}</div>
+                <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>белок (г)</div>
+                {targets?.protein && <ProgressBar value={avgP} max={targets.protein} color={avgP >= targets.protein * 0.9 ? '#6496ff' : '#eab308'} />}
+              </div>
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: 20, fontWeight: 700, color: targets?.fats ? (avgF >= targets.fats * 0.9 ? '#f97316' : '#eab308') : 'var(--text-primary)' }}>{avgF}</div>
+                <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>жиры (г)</div>
+                {targets?.fats && <ProgressBar value={avgF} max={targets.fats} color={avgF >= targets.fats * 0.9 ? '#f97316' : '#eab308'} />}
+              </div>
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: 20, fontWeight: 700, color: targets?.carbs ? (avgC >= targets.carbs * 0.8 ? '#a855f7' : '#eab308') : 'var(--text-primary)' }}>{avgC}</div>
+                <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>углеводы (г)</div>
+                {targets?.carbs && <ProgressBar value={avgC} max={targets.carbs} color={avgC >= targets.carbs * 0.8 ? '#a855f7' : '#eab308'} />}
+              </div>
+            </div>
+          </div>
+
+          <div className="card">
+            <h4 style={{ margin: '0 0 8px 0' }}>Ежедневный детальный отчёт</h4>
+            <div style={{ maxHeight: 300, overflowY: 'auto' }}>
+              {days.filter(d => d.kcal > 0).reverse().map(d => (
+                <div key={d.date} style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', borderBottom: '1px solid var(--border)', fontSize: 12 }}>
+                  <span style={{ color: 'var(--text-dim)', minWidth: 55 }}>{d.date.slice(5)}</span>
+                  <span>{d.kcal} ккал</span>
+                  <span style={{ color: '#6496ff' }}>Б {d.p}г</span>
+                  <span style={{ color: '#f97316' }}>Ж {d.f}г</span>
+                  <span style={{ color: '#a855f7' }}>У {d.c}г</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <MicroReport diary={diary} range={range} />
+        </>
+      )}
+    </div>
+  );
+}
+
 export const NutritionScreen: React.FC<{ initialTab?: TabId }> = ({ initialTab }) => {
   const [tab, setTab] = useState<TabId>(initialTab || 'diary');
   const [diary, setDiary] = useState<Record<string, DayDiary>>(loadDiary);
@@ -921,6 +1195,7 @@ export const NutritionScreen: React.FC<{ initialTab?: TabId }> = ({ initialTab }
     { id: 'diary', label: 'Дневник' },
     { id: 'calc', label: 'Калькулятор' },
     { id: 'ration', label: 'Рацион' },
+    { id: 'charts', label: 'Графики' },
     { id: 'advice', label: 'Советы' },
   ];
 
@@ -971,6 +1246,7 @@ export const NutritionScreen: React.FC<{ initialTab?: TabId }> = ({ initialTab }
       {tab === 'diary' && <DiaryTab diary={diary} setDiary={setDiary} targets={targets} />}
       {tab === 'calc' && <CalcTab targets={targets} setTargets={setTargets} />}
       {tab === 'ration' && mealPlan && <RationTab plan={mealPlan} />}
+      {tab === 'charts' && <ChartsTab diary={diary} targets={targets} />}
       {tab === 'advice' && <AdviceTab targets={targets} diary={diary} goal={goal} />}
       {showScanner && <BarcodeScanner onProductFound={handleProductFound} onClose={() => setShowScanner(false)} />}
     </div>

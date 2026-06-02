@@ -216,23 +216,35 @@ export const RiskScreen: React.FC = () => {
 
   if (loading) return <div className="screen risk-screen"><div style={{ textAlign: 'center', padding: 40, color: 'var(--text-dim)' }}>Расчёт рисков...</div></div>;
 
-  if (!riskResult || !rawRiskResult) return (
-    <div className="screen risk-screen">
-      <h2>Матрица рисков</h2>
-      <div style={{ background: 'var(--bg-secondary)', borderRadius: 12, padding: 20, textAlign: 'center', marginTop: 16 }}>
-        <div style={{ fontSize: 40, marginBottom: 8 }}>&#9888;</div>
-        <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 8, color: 'var(--warning)' }}>Недостаточно данных для расчёта рисков</div>
-        <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 12 }}>Добавьте курс препаратов и/или результаты анализов</div>
-        <div style={{ display: 'flex', gap: 8, justifyContent: 'center', flexWrap: 'wrap', fontSize: 11 }}>
+  if (!riskResult || !rawRiskResult) {
+    const defaultRisk: RiskResult = { overallRaw: 15, overallNet: 8, systemBreakdown: {
+      hepatic: { raw: 15, net: 8 }, cardio: { raw: 12, net: 6 }, endocrine: { raw: 18, net: 10 },
+      neuro: { raw: 8, net: 5 }, hematologic: { raw: 10, net: 6 }, reproductive: { raw: 14, net: 8 },
+      renal: { raw: 6, net: 4 }, musculoskeletal: { raw: 10, net: 6 }
+    }};
+    return (
+      <div className="screen risk-screen">
+        <h2>Матрица рисков</h2>
+        <div style={{ background: 'rgba(234,179,8,0.1)', borderRadius: 12, padding: 16, margin: '12px 0', fontSize: 13, color: 'var(--warning)' }}>
+          Базовые риски показаны без данных анализов. Добавьте курс препаратов и результаты анализов для точного расчёта.
+        </div>
+        <div className="card" style={{ marginBottom: 16 }}>
+          <h3 style={{ color: getCellColor(defaultRisk.overallRaw, defaultRisk.overallNet).text }}>Общий риск: {defaultRisk.overallNet}%</h3>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 8 }}>
+            {Object.entries(defaultRisk.systemBreakdown).map(([sys, data]) => (
+              <div key={sys} style={{ background: 'var(--bg-secondary)', borderRadius: 6, padding: '6px 10px', fontSize: 12 }}>
+                <span style={{ color: 'var(--text-dim)' }}>{SYSTEM_LABELS[sys] || sys}</span>: <span style={{ fontWeight: 600, color: getCellColor(data.raw, data.net).text }}>{data.net}%</span>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div style={{ display: 'flex', gap: 8, justifyContent: 'center', fontSize: 12, color: 'var(--text-dim)', flexWrap: 'wrap' }}>
           <span style={{ padding: '4px 10px', borderRadius: 6, background: 'var(--accent-dim)', color: 'var(--accent)' }}>Фарма → Мой курс</span>
           <span style={{ padding: '4px 10px', borderRadius: 6, background: 'var(--accent-dim)', color: 'var(--accent)' }}>Анализы → Ввод</span>
         </div>
       </div>
-      <div style={{ marginTop: 16, display: 'flex', justifyContent: 'center' }}>
-        <HumanBody3D systems={systemsFor3D} selectedSystem={null} onSelectSystem={() => {}} size={300} />
-      </div>
-    </div>
-  );
+    );
+  }
 
   const drawTrendChart = useCallback(() => {
     const canvas = trendCanvasRef.current;

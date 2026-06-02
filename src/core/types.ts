@@ -797,3 +797,42 @@ export interface RiskCalculationResult {
   hormones?: number;
   coverageMap?: Record<string, number>;
 }
+
+export interface StrengthLogEntry {
+  id: string;
+  date: string;
+  exerciseId: string;
+  exerciseName: string;
+  sets: { weight: number; reps: number; rir: number; rpe?: number }[];
+  totalVolume: number;
+  estimated1RM: number;
+  isCompound: boolean;
+  weekNumber?: number;
+  mesocycleId?: string;
+  notes?: string;
+}
+
+export interface WorkoutLog {
+  id: string;
+  date: string;
+  duration: number;
+  exercises: StrengthLogEntry[];
+  overallRPE: number;
+  recoveryBefore: number;
+  split: string;
+  weekNumber?: number;
+  mesocycleId?: string;
+  notes?: string;
+}
+
+export interface NutritionDiaryEntry {
+  id: string;
+  date: string;
+  mealType: 'breakfast' | 'lunch' | 'dinner' | 'snack';
+  items: { foodId: string; name: string; weight: number; kcal: number; p: number; f: number; c: number; fiber?: number }[];
+  totalKcal: number;
+  totalProtein: number;
+  totalFat: number;
+  totalCarbs: number;
+  totalFiber: number;
+}
