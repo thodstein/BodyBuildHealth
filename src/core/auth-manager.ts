@@ -3,27 +3,9 @@ import type { UserRole } from './types';
 
 const SESSION_KEY = 'he_session_v2';
 const SESSION_DURATION_MS = 24 * 60 * 60 * 1000;
-const ADMIN_PASSWORD_KEY = 'he_admin_seeded';
+const ADMIN_SEEDED_KEY = 'he_admin_seeded_v1';
 
-export async function ensureAdmin(email: string, password: string, name: string, role: UserRole = 'admin'): Promise<void> {
-  const seeded = localStorage.getItem(ADMIN_PASSWORD_KEY);
-  const users: UserProfile[] = await db.getAll('users') || [];
-  const existing = users.find(u => u.email === email.toLowerCase());
-  if (existing) {
-    if (seeded !== 'v1') {
-      existing.salt = existing.salt || generateSalt();
-      existing.passwordHash = await sha256Hash(password, existing.salt);
-      existing.lastLogin = existing.lastLogin;
-      await db.put('users', existing);
-      localStorage.setItem(ADMIN_PASSWORD_KEY, 'v1');
-    }
-    return;
-  }
-  const res = await registerUser(email, password, name, role);
-  if (res.success) localStorage.setItem(ADMIN_PASSWORD_KEY, 'v1');
-}
-
-export interface UserProfile {
+export interface LocalUserProfile {
   id: string;
   email: string;
   name: string;
@@ -32,7 +14,7 @@ export interface UserProfile {
   role: UserRole;
   createdAt: string;
   lastLogin: string;
-  settings: { age: number; weight: number; height: number; sex: 'male'|'female'; goal: string };
+  settings: { age: number; weight: number; height: number; sex: 'male' | 'female'; goal: string };
 }
 
 function generateSalt(): string {
@@ -44,15 +26,7 @@ function generateSalt(): string {
 async function sha256Hash(password: string, salt: string): Promise<string> {
   const encoded = new TextEncoder().encode(password + salt);
   const buffer = await crypto.subtle.digest('SHA-256', encoded);
-  const arr = new Uint8Array(buffer);
-  return Array.from(arr).map(b => b.toString(16).padStart(2, '0')).join('');
-}
-
-function validatePassword(password: string): { valid: boolean; message: string } {
-  if (password.length < 8) return { valid: false, message: 'Пароль должен содержать минимум 8 символов' };
-  if (!/[A-ZА-Я]/.test(password)) return { valid: false, message: 'Пароль должен содержать хотя бы одну заглавную букву' };
-  if (!/\d/.test(password)) return { valid: false, message: 'Пароль должен содержать хотя бы одну цифру' };
-  return { valid: true, message: '' };
+  return Array.from(new Uint8Array(buffer)).map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
 function simpleHash(str: string): string {
@@ -61,17 +35,47 @@ function simpleHash(str: string): string {
   return hash.toString(36);
 }
 
-export async function registerUser(email: string, password: string, name: string, role: UserRole = 'user'): Promise<{ success: boolean; message: string; userId?: string }> {
-  const validation = validatePassword(password);
-  if (!validation.valid) return { success: false, message: validation.message };
+export async function ensureAdmin(email: string, password: string, name: string, role: UserRole = 'admin'): Promise<void> {
+  try {
+    const users: LocalUserProfile[] = await db.getAll('users') || [];
+    const existing = users.find(u => u.email === email.toLowerCase());
+    if (existing) {
+      if (!existing.salt || localStorage.getItem(ADMIN_SEEDED_KEY) !== 'v2') {
+        existing.salt = generateSalt();
+        existing.passwordHash = await sha256Hash(password, existing.salt);
+        await db.put('users', existing);
+        localStorage.setItem(ADMIN_SEEDED_KEY, 'v2');
+      }
+      return;
+    }
+    const salt = generateSalt();
+    const passwordHash = await sha256Hash(password, salt);
+    const user: LocalUserProfile = {
+      id: crypto.randomUUID(),
+      email: email.toLowerCase(),
+      name,
+      passwordHash,
+      salt,
+      role,
+      createdAt: new Date().toISOString(),
+      lastLogin: new Date().toISOString(),
+      settings: { age: 30, weight: 80, height: 180, sex: 'male', goal: 'bulk' }
+    };
+    await db.put('users', user);
+    localStorage.setItem(ADMIN_SEEDED_KEY, 'v2');
+  } catch (e) {
+    console.warn('ensureAdmin failed:', e);
+  }
+}
 
-  const users: UserProfile[] = await db.getAll('users') || [];
-  if (users.some(u => u.email === email.toLowerCase())) return { success: false, message: 'Пользователь уже существует' };
+export async function registerUser(email: string, password: string, name: string, role: UserRole = 'user'): Promise<{ success: boolean; message: string; userId?: string }> {
+  if (password.length < 4) return { success: false, message: '\u041F\u0430\u0440\u043E\u043B\u044C \u043C\u0438\u043D\u0438\u043C\u0443\u043C 4 \u0441\u0438\u043C\u0432\u043E\u043B\u0430' };
+  const users: LocalUserProfile[] = await db.getAll('users') || [];
+  if (users.some(u => u.email === email.toLowerCase())) return { success: false, message: '\u041F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u044C \u0443\u0436\u0435 \u0441\u0443\u0449\u0435\u0441\u0442\u0432\u0443\u0435\u0442' };
 
   const salt = generateSalt();
   const passwordHash = await sha256Hash(password, salt);
-
-  const user: UserProfile = {
+  const user: LocalUserProfile = {
     id: crypto.randomUUID(),
     email: email.toLowerCase(),
     name,
@@ -85,13 +89,13 @@ export async function registerUser(email: string, password: string, name: string
 
   await db.put('users', user);
   localStorage.setItem(SESSION_KEY, JSON.stringify({ id: user.id, email: user.email, ts: Date.now() }));
-  return { success: true, message: 'Регистрация успешна', userId: user.id };
+  return { success: true, message: '\u0420\u0435\u0433\u0438\u0441\u0442\u0440\u0430\u0446\u0438\u044F \u0443\u0441\u043F\u0435\u0448\u043D\u0430', userId: user.id };
 }
 
-export async function loginUser(email: string, password: string): Promise<{ success: boolean; message: string; profile?: UserProfile }> {
-  const users: UserProfile[] = await db.getAll('users') || [];
+export async function loginUser(email: string, password: string): Promise<{ success: boolean; message: string; profile?: LocalUserProfile }> {
+  const users: LocalUserProfile[] = await db.getAll('users') || [];
   const user = users.find(u => u.email === email.toLowerCase());
-  if (!user) return { success: false, message: 'Неверный email или пароль' };
+  if (!user) return { success: false, message: '\u041D\u0435\u0432\u0435\u0440\u043D\u044B\u0439 email \u0438\u043B\u0438 \u043F\u0430\u0440\u043E\u043B\u044C' };
 
   let match: boolean;
   if (user.salt) {
@@ -106,12 +110,12 @@ export async function loginUser(email: string, password: string): Promise<{ succ
     }
   }
 
-  if (!match) return { success: false, message: 'Неверный email или пароль' };
+  if (!match) return { success: false, message: '\u041D\u0435\u0432\u0435\u0440\u043D\u044B\u0439 email \u0438\u043B\u0438 \u043F\u0430\u0440\u043E\u043B\u044C' };
 
   user.lastLogin = new Date().toISOString();
   await db.put('users', user);
   localStorage.setItem(SESSION_KEY, JSON.stringify({ id: user.id, email: user.email, ts: Date.now() }));
-  return { success: true, message: 'Вход выполнен', profile: user };
+  return { success: true, message: '\u0412\u0445\u043E\u0434 \u0432\u044B\u043F\u043E\u043B\u043D\u0435\u043D', profile: user };
 }
 
 export async function logoutUser(): Promise<void> {
@@ -119,11 +123,7 @@ export async function logoutUser(): Promise<void> {
   window.location.reload();
 }
 
-export async function getCurrentUser(): Promise<UserProfile | null> {
-  return getCurrentProfile();
-}
-
-export async function getCurrentProfile(): Promise<UserProfile | null> {
+export async function getCurrentProfile(): Promise<LocalUserProfile | null> {
   const session = localStorage.getItem(SESSION_KEY);
   if (!session) return null;
   try {
@@ -132,76 +132,24 @@ export async function getCurrentProfile(): Promise<UserProfile | null> {
       localStorage.removeItem(SESSION_KEY);
       return null;
     }
-    const users: UserProfile[] = await db.getAll('users') || [];
+    const users: LocalUserProfile[] = await db.getAll('users') || [];
     return users.find(u => u.id === id) || null;
   } catch { return null; }
 }
 
-export async function telegramLogin(initData: string): Promise<{ success: boolean; message: string; profile?: UserProfile }> {
-  const params = new URLSearchParams(initData);
-  const hash = params.get('hash');
-  if (!hash) return { success: false, message: 'Неверные данные Telegram' };
-
-  const telegramUserId = params.get('id') || '';
-  const userName = params.get('first_name') || params.get('username') || 'Telegram User';
-  const telegramEmail = `tg_${telegramUserId}@telegram.user`;
-
-  const BOT_TOKEN = import.meta.env.VITE_TELEGRAM_BOT_TOKEN || '';
-  if (!BOT_TOKEN) return { success: false, message: 'Telegram авторизация не настроена' };
-
-  const checkString = Array.from(params.entries())
-    .filter(([key]) => key !== 'hash')
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([key, value]) => `${key}=${value}`)
-    .join('\n');
-
-  const encoder = new TextEncoder();
-  const secretKey = await crypto.subtle.digest('SHA-256', encoder.encode(BOT_TOKEN));
-  const key = await crypto.subtle.importKey('raw', secretKey, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
-  const signature = await crypto.subtle.sign('HMAC', key, encoder.encode(checkString));
-  const computedHash = Array.from(new Uint8Array(signature)).map(b => b.toString(16).padStart(2, '0')).join('');
-
-  if (computedHash !== hash) return { success: false, message: 'Ошибка проверки подписи Telegram' };
-
-  const users: UserProfile[] = await db.getAll('users') || [];
-  let user = users.find(u => u.email === telegramEmail);
-
-  if (!user) {
-    user = {
-      id: crypto.randomUUID(),
-      email: telegramEmail,
-      name: userName,
-      passwordHash: '',
-      salt: '',
-      role: 'user',
-      createdAt: new Date().toISOString(),
-      lastLogin: new Date().toISOString(),
-      settings: { age: 30, weight: 80, height: 180, sex: 'male', goal: 'bulk' }
-    };
-    await db.put('users', user);
-  } else {
-    user.lastLogin = new Date().toISOString();
-    await db.put('users', user);
-  }
-
-  localStorage.setItem(SESSION_KEY, JSON.stringify({ id: user.id, email: user.email, ts: Date.now() }));
-  return { success: true, message: 'Вход через Telegram выполнен', profile: user };
+export async function getCurrentUser(): Promise<LocalUserProfile | null> {
+  return getCurrentProfile();
 }
 
 export async function updateUserRole(userId: string, newRole: UserRole): Promise<void> {
-  const users: UserProfile[] = await db.getAll('users') || [];
+  const users: LocalUserProfile[] = await db.getAll('users') || [];
   const user = users.find(u => u.id === userId);
   if (user) {
     user.role = newRole;
     await db.put('users', user);
-    const session = JSON.parse(localStorage.getItem(SESSION_KEY) || '{}');
-    if (session.id === userId) {
-      const prof = await getCurrentProfile();
-      if (prof) localStorage.setItem('he_profile', JSON.stringify(prof));
-    }
   }
 }
 
-export async function getAllProfiles(): Promise<UserProfile[]> {
+export async function getAllProfiles(): Promise<LocalUserProfile[]> {
   return await db.getAll('users') || [];
 }
