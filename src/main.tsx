@@ -43,16 +43,23 @@ async function bootstrap() {
   }
 
   try {
-    await ensureAdmin('thodstein@mail.ru', 'children', 'Admin', 'admin');
+    const adminEmail = import.meta.env.VITE_ADMIN_EMAIL || '';
+    const adminPass = import.meta.env.VITE_ADMIN_PASSWORD || '';
+    if (adminEmail && adminPass) {
+      await ensureAdmin(adminEmail, adminPass, 'Admin', 'admin');
+    }
   } catch (e) {
     console.warn('Admin seed failed:', e);
   }
 
   try {
     await registry.init();
-    const savedKey = localStorage.getItem('he_crypto_key') || btoa('health-engine-secure-key-v3.1');
-    localStorage.setItem('he_crypto_key', savedKey);
-    await initEncryption(atob(savedKey));
+    const cryptoKey = import.meta.env.VITE_CRYPTO_KEY || '';
+    const savedKey = cryptoKey ? btoa(cryptoKey) : localStorage.getItem('he_crypto_key') || '';
+    if (savedKey) {
+      localStorage.setItem('he_crypto_key', savedKey);
+      await initEncryption(atob(savedKey));
+    }
   } catch (e) {
     console.warn('Crypto/Registry init failed:', e);
   }

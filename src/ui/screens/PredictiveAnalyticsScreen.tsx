@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { calculateRisks } from '../../engines/risk.engine';
+import { generateReadinessForecast, predictLabTrend, runWhatIf } from '../../engines/predictive.engine';
 import type { RiskInput, RiskResult } from '../../core/types';
+import type { ForecastResult, LabForecast } from '../../engines/predictive.engine';
+import { useDataLink, getLatestLabValue } from '../../core/data-link';
 
 const SCENARIO_NAMES: Record<string, string> = {
   'Baseline': 'Базовый',
@@ -21,15 +24,16 @@ const SYSTEM_LABELS: Record<string, string> = {
 };
 
 export const PredictiveAnalyticsScreen: React.FC = () => {
+  const { profile, labs, activeDrugs, supportCoverage, readiness } = useDataLink();
   const [riskInput, setRiskInput] = useState<RiskInput>({
-    genetics: {},
-    activeDrugs: {},
+    genetics: profile.settings.genetics ?? {},
+    activeDrugs,
     biomarkerValues: {},
     hgiMarkers: {},
-    nutritionFactor: 1.0,
-    trainingFactor: 1.0,
+    nutritionFactor: profile.settings.nutritionFactor ?? 1.0,
+    trainingFactor: profile.settings.trainingFactor ?? 1.0,
     interventionResponse: 0.5,
-    supportCoverage: {}
+    supportCoverage
   });
 
   const [riskResult, setRiskResult] = useState<RiskResult | null>(null);
@@ -317,6 +321,96 @@ export const PredictiveAnalyticsScreen: React.FC = () => {
           </button>
         </div>
       </div>
+
+      <div className="card">
+        <h3>Прогноз готовности (7 дней)</h3>
+        <p style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 8 }}>Модель Хольта: прогноз на основе последних данных готовности.</p>
+        <ReadinessForecastBlock />
+      </div>
+
+      <div className="card">
+        <h3>Тренд лабораторных показателей</h3>
+        <p style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 8 }}>Прогноз по данным анализов (HCT, АЛТ, и др.).</p>
+        <LabTrendBlock />
+      </div>
+    </div>
+  );
+};
+
+const ReadinessForecastBlock: React.FC = () => {
+  const [history, setHistory] = useState<number[]>([65, 68, 70, 72, 69, 71, 73]);
+  const [forecast, setForecast] = useState<ForecastResult | null>(null);
+
+  const calc = () => {
+    setForecast(generateReadinessForecast(history));
+  };
+
+  return (
+    <div>
+      <div style={{ display: 'flex', gap: 6, marginBottom: 8, flexWrap: 'wrap' }}>
+        {history.map((v, i) => (
+          <input key={i} type="number" value={v} onChange={e => { const h = [...history]; h[i] = +e.target.value; setHistory(h); }} style={{ width: 48, padding: '4px 6px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', fontSize: 12, textAlign: 'center' }} />
+        ))}
+      </div>
+      <button onClick={calc} style={{ background: 'var(--accent-blue)', color: '#fff', border: 'none', borderRadius: 8, padding: '6px 14px', fontSize: 12, cursor: 'pointer' }}>Рассчитать прогноз</button>
+      {forecast && (
+        <div style={{ marginTop: 10 }}>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            {forecast.values.map((v, i) => (
+              <div key={i} style={{ background: 'var(--bg-secondary)', borderRadius: 6, padding: '6px 10px', textAlign: 'center', minWidth: 48 }}>
+                <div style={{ fontSize: 15, fontWeight: 700 }}>{v}</div>
+                <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Д+{i + 1}</div>
+                <div style={{ fontSize: 8, color: 'var(--text-dim)' }}>[{forecast.ci95[i][0]}–{forecast.ci95[i][1]}]</div>
+              </div>
+            ))}
+          </div>
+          {forecast.warnings.length > 0 && forecast.warnings.map((w, i) => <div key={i} style={{ fontSize: 11, color: '#FF9800', marginTop: 6 }}>{w}</div>)}
+        </div>
+      )}
+    </div>
+  );
+};
+
+const LabTrendBlock: React.FC = () => {
+  const [points, setPoints] = useState<number[]>([42, 44, 46, 48]);
+  const [forecast, setForecast] = useState<LabForecast | null>(null);
+
+  const calc = () => {
+    setForecast(predictLabTrend(points));
+  };
+
+  return (
+    <div>
+      <div style={{ display: 'flex', gap: 6, marginBottom: 8, flexWrap: 'wrap' }}>
+        {points.map((v, i) => (
+          <input key={i} type="number" value={v} onChange={e => { const p = [...points]; p[i] = +e.target.value; setPoints(p); }} style={{ width: 48, padding: '4px 6px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', fontSize: 12, textAlign: 'center' }} />
+        ))}
+      </div>
+      <button onClick={calc} style={{ background: 'var(--accent-blue)', color: '#fff', border: 'none', borderRadius: 8, padding: '6px 14px', fontSize: 12, cursor: 'pointer' }}>Спрогнозировать тренд</button>
+      {forecast && (
+        <div style={{ marginTop: 10 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
+            <div style={{ background: 'var(--bg-secondary)', borderRadius: 6, padding: '6px 10px', textAlign: 'center' }}>
+              <div style={{ fontSize: 14, fontWeight: 700 }}>{forecast.current}</div>
+              <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Сейчас</div>
+            </div>
+            <div style={{ background: 'var(--bg-secondary)', borderRadius: 6, padding: '6px 10px', textAlign: 'center' }}>
+              <div style={{ fontSize: 14, fontWeight: 700 }}>{forecast.w4}</div>
+              <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>4 нед</div>
+            </div>
+            <div style={{ background: 'var(--bg-secondary)', borderRadius: 6, padding: '6px 10px', textAlign: 'center' }}>
+              <div style={{ fontSize: 14, fontWeight: 700 }}>{forecast.w8}</div>
+              <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>8 нед</div>
+            </div>
+            <div style={{ background: 'var(--bg-secondary)', borderRadius: 6, padding: '6px 10px', textAlign: 'center' }}>
+              <div style={{ fontSize: 14, fontWeight: 700 }}>{forecast.w12}</div>
+              <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>12 нед</div>
+            </div>
+          </div>
+          {forecast.alert && <div style={{ fontSize: 11, color: '#ef4444', marginTop: 6 }}>{forecast.alert}</div>}
+          <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 4 }}>95% CI через 4 нед: [{forecast.ci95w4[0]}–{forecast.ci95w4[1]}] | 12 нед: [{forecast.ci95w12[0]}–{forecast.ci95w12[1]}]</div>
+        </div>
+      )}
     </div>
   );
 };

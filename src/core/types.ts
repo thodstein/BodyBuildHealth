@@ -242,6 +242,23 @@ export interface FertilityInput {
   marPercent?: number;
   leukocytesMlMln?: number;
   agglutination?: boolean;
+  npPercent?: number;
+  immotilePercent?: number;
+  viabilityPercent?: number;
+  dfi?: number;
+  fructose?: number;
+  zincMmol?: number;
+  lh?: number;
+  fsh?: number;
+  tt?: number;
+  ft?: number;
+  e2?: number;
+  prl?: number;
+  shbg?: number;
+  inhb?: number;
+  amh?: number;
+  prog?: number;
+  varicocele?: 'none' | 'grade1' | 'grade2' | 'grade3';
 }
 
 export interface FertilityResult {
@@ -249,6 +266,49 @@ export interface FertilityResult {
   interpretation: string;
   forecast6w: number;
   forecast12w: number;
+  spermIndex?: number;
+  hormonalIndex?: number;
+  structuralIndex?: number;
+  warnings?: string[];
+}
+
+export interface InjuryRecord {
+  id: string;
+  type: 'joint' | 'muscle' | 'bone' | 'ligament' | 'tendon' | 'nerve';
+  location: string;
+  painLevel: number;
+  movementLimit: 'none' | 'mild' | 'moderate' | 'severe' | 'full_restriction';
+  side: 'left' | 'right' | 'both';
+  chronic: boolean;
+  date?: string;
+  notes?: string;
+}
+
+export interface SupplementEntry {
+  id: string;
+  name: string;
+  doseMg: number;
+  doseUnit: 'mg' | 'mcg' | 'IU' | 'g';
+  notes?: string;
+}
+
+export interface MedicationEntry {
+  id: string;
+  name: string;
+  doseMg: number;
+  doseUnit: 'mg' | 'mcg' | 'ml';
+  frequency: 'daily' | '2x_day' | '1x_week' | 'prn';
+  notes?: string;
+}
+
+export interface ProgressPhoto {
+  id: string;
+  date: string;
+  angle: 'front' | 'side' | 'back';
+  blob?: Blob;
+  supabaseUrl?: string;
+  weightKg?: number;
+  bodyFatPct?: number;
 }
 
 
@@ -291,12 +351,13 @@ export interface PharmaSubstance {
   risks?: string[];
   description?: string;
   class: string;
-     esters?: string[];
+      esters?: string[];
   pk: PK;
   pd: PD;
   ec50: number;
   n_hill: number;
   maxEffect: number;
+  research?: { study: string; conclusion: string; year: number }[];
 }
 export interface UserContext {
   id?: string;
@@ -361,58 +422,70 @@ export interface UserProfile {
    role: UserRole;
    settings: {
      // Demographics
-     dateOfBirth?: string; // YYYY-MM-DD format
-     age?: number; // Calculated from dateOfBirth if provided
-     sex: 'male' | 'female';
-     ethnicity?: string;
-     height?: number; // in cm
-     weight: number; // in kg
-     bodyFat?: number; // percentage
-     
-      // Goals and objectives
-      primaryGoal?: 'bulk' | 'cut' | 'maintenance' | 'strength' | 'endurance' | 'recomposition' | 'fitness' | 'health';
-      goal?: string; // legacy / shorthand
-      phase?: string; // e.g. baseline, course, bridge, pct
-      courseStartDate?: string;
-      secondaryGoals?: ('bulk' | 'cut' | 'maintenance' | 'strength' | 'endurance' | 'recomposition' | 'fitness' | 'health')[];
-     targetWeight?: number; // target weight in kg
-     targetBodyFat?: number; // target body fat percentage
-     goalTimelineWeeks?: number; // weeks to achieve goal
-     
-     // Readiness and recovery baselines (used when current data not available)
-     baselineSleepHours?: number;
-     baselineSleepQuality?: number; // 0-1 scale
-     baselineHrvRatio?: number; // HRV ratio baseline
-     baselineStressLevel?: number; // 0-10 scale
-     
-     // Lab baselines (typical values for user when no data available)
-     typicalLabValues?: Record<string, number>; // lab code -> typical value
-     
-     // Fitness and strength baselines
-     strengthBaselines?: Record<string, number>; // exercise -> weight/reps
-     enduranceBaselines?: Record<string, number>; // activity -> time/distance
-     
-     // Supplementation and medication summary
-     currentSupplements?: string[]; // list of supplement names
-     currentMedications?: string[]; // list of medication names
-     allergies?: string[]; // known allergies
-     medicalConditions?: string[]; // known medical conditions
-     
-      // Genetics / SNP data
-      genetics?: Record<string, string>;
+      dateOfBirth?: string;
+      age?: number;
+      sex: 'male' | 'female';
+      ethnicity?: string;
+      height?: number;
+      weight: number;
+      bodyFat?: number;
+      waistCm?: number;
+      neckCm?: number;
+      chestCm?: number;
+      hipCm?: number;
+      forearmCm?: number;
+      bicepCm?: number;
+      thighCm?: number;
+      
+       // Goals and objectives
+       primaryGoal?: 'bulk' | 'cut' | 'maintenance' | 'strength' | 'endurance' | 'recomposition' | 'fitness' | 'health' | 'hypertrophy' | 'rehab';
+       goal?: string;
+       phase?: string;
+       courseStartDate?: string;
+       secondaryGoals?: ('bulk' | 'cut' | 'maintenance' | 'strength' | 'endurance' | 'recomposition' | 'fitness' | 'health' | 'hypertrophy' | 'rehab')[];
+      targetWeight?: number;
+      targetBodyFat?: number;
+      goalTimelineWeeks?: number;
+      
+      baselineSleepHours?: number;
+      baselineSleepQuality?: number;
+      baselineHrvRatio?: number;
+      baselineStressLevel?: number;
+      fatigueLevel?: number;
+      dailySteps?: number;
+      dailyWaterLiters?: number;
+      nightAwakenings?: number;
+      bedtime?: string;
+      wakeTime?: string;
+      chronotype?: 'lark' | 'owl' | 'mixed';
+      trainingLevel?: 'beginner' | 'intermediate' | 'advanced' | 'enhanced';
+      workoutsPerWeek?: number;
+      avgWorkoutMinutes?: number;
+      pharmaExperience?: 'none' | 'beginner' | 'intermediate' | 'advanced';
+      
+      typicalLabValues?: Record<string, number>;
+      
+      strengthBaselines?: Record<string, number>;
+      enduranceBaselines?: Record<string, number>;
+      
+      currentSupplements?: SupplementEntry[];
+      currentMedications?: MedicationEntry[];
+      allergies?: string[];
+      medicalConditions?: string[];
+      injuries?: InjuryRecord[];
+      weakPoints?: string[];
+      
+       genetics?: Record<string, string>;
 
-      // Contact
-      email?: string;
+       email?: string;
 
-      // Lifestyle factors
-     nutritionFactor?: number; // 0-2 scale (0.5 = poor, 1.0 = average, 1.5 = good)
-     trainingFactor?: number; // 0-2 scale (0.5 = poor, 1.0 = average, 1.5 = good)
-     
-     // Preferences and settings
-     preferredUnits?: 'metric' | 'imperial';
-     notificationsEnabled?: boolean;
-     privacyLevel?: 'private' | 'friends' | 'public';
-   };
+      nutritionFactor?: number;
+      trainingFactor?: number;
+      
+      preferredUnits?: 'metric' | 'imperial';
+      notificationsEnabled?: boolean;
+      privacyLevel?: 'private' | 'friends' | 'public';
+    };
 }
 
 export interface Article {
@@ -575,6 +648,9 @@ export interface ReadinessInput {
   trainingLoadRatio: number;
   subjFatigue: number;
   hrIncrease: number;
+  chronotype?: 'lark' | 'owl' | 'mixed';
+  bedtime?: string;
+  wakeTime?: string;
   recovery?: number;
   nutrition?: number;
   support?: number;
@@ -601,7 +677,7 @@ export interface TrainingInput {
   fatigue: number;
   nutrition: number;
   weakPoints: string[];
-  injuries?: string[];
+  injuries?: InjuryRecord[];
   experience?: string;
   sessionDuration?: number;
   rir?: number;
@@ -701,23 +777,4 @@ export interface RiskCalculationResult {
   lipids?: number;
   hormones?: number;
   coverageMap?: Record<string, number>;
-}
-
-export interface Article {
-  id: string;
-  createdAt: string;
-  updatedAt: string;
-  version: number;
-  likes: number;
-  views: number;
-  isPinned: boolean;
-  status: ArticleStatus;
-  authorId: string;
-  authorName?: string;
-  category?: string;
-  title: string;
-  teaser: string;
-  tags: string[];
-  content: string;
-  publishedAt?: string;
 }

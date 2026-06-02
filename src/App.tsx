@@ -155,6 +155,7 @@ export default function App() {
         { id: 'reports', label: 'Отчёты' },
         { id: 'integrations', label: 'Интеграции' },
         { id: 'assistant', label: 'Ассистент' },
+        { id: 'role-management', label: 'Роли' },
       ];
       default: return [];
     }
@@ -195,6 +196,7 @@ export default function App() {
         case 'reports': return <ReportsScreen />;
         case 'integrations': return <IntegrationsScreen />;
         case 'roles': return <RoleManagementScreen />;
+        case 'role-management': return <RoleManagementScreen />;
         case 'assistant': return <SmartAssistantScreen />;
         case 'marketplace': return <MarketplaceScreen />;
         case 'articles': return <ArticlesScreen />;

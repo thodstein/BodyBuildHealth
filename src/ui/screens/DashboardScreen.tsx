@@ -19,6 +19,7 @@ import { generateSupportStack } from '../../engines/support.engine';
 import { RISK_SYSTEMS } from '../../core/constants';
 import { db } from '../../core/db';
 import { getProfile } from '../../core/profile-manager';
+import { useDataLink } from '../../core/data-link';
 import { PHASE_REQUIRED_PANELS, LAB_PANELS } from '../../data/labs-phase-panels';
 
 type ScreenId = 'dashboard' | 'pharma' | 'course' | 'peptides' | 'nutrition' | 'plan' | 'substances' | 'labs' | 'risks' | 'profile' | 'predictive' | 'marketplace' | 'articles' | 'assistant' | 'gamification' | 'fertility-pct' | 'calculators' | 'reports' | 'integrations' | 'role-management' | 'support';
@@ -73,6 +74,7 @@ function SectionHeader({ title, onNavigate, screenId }: { title: string; onNavig
 }
 
 export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
+  const linked = useDataLink();
   const [masterDb, setMasterDb] = useState<MasterDB | null>(null);
   const [riskResult, setRiskResult] = useState<RiskResult | null>(null);
   const [readiness, setReadiness] = useState<ReadinessScores | null>(null);
@@ -88,18 +90,16 @@ export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
     const data = registry.getDB();
     setMasterDb(data);
 
-    const profile = getProfile();
+    const profile = linked.profile;
     const settings = profile.settings;
 
-    let courseData: CourseEntry[] = [];
-    let labData: (LabPoint & { patientId?: string })[] = [];
+    let courseData: CourseEntry[] = linked.course;
+    let labData: LabPoint[] = linked.labs;
     let missingRequiredLabs: string[] = [];
     try {
       await db.init();
-      courseData = await db.getAll<CourseEntry>('course_log');
       setCourseEntries(courseData);
-      labData = await db.getAll<LabPoint & { patientId?: string }>('labs_log');
-      const userLabs = labData.filter(l => l.patientId === 'current-user');
+      const userLabs = labData;
       setLabCount(userLabs.length);
 
       const phase = settings.phase ?? 'baseline';
@@ -177,7 +177,7 @@ export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
       proteinRatio: 0.8,
       waterRatio: 0.7,
       fiberRatio: 0.6,
-      omega3Flag: settings.currentSupplements?.includes('omega3') ?? false,
+      omega3Flag: (settings.currentSupplements ?? []).some(s => typeof s === 'object' ? /omega|омега/i.test(s.name) : /omega/i.test(s)) ?? false,
       trainingLoadRatio: 0.7,
       subjFatigue: 3,
       hrIncrease: 0.1,

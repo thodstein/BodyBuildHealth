@@ -1,11 +1,11 @@
 const DB_NAME = 'HealthEngineDB_v3';
-const DB_VERSION = 4;
+const DB_VERSION = 5;
 
 const STORES = ['users',
   'profile', 'readiness_log', 'risk_log', 'fertility_log', 'settings',
   'labs_log', 'diagnostics_log', 'phase_schedule', 'diary', 'articles',
   'gamification', 'marketplace_cart', 'food_diary', 'sync_queue',
-  'course_log', 'doctor_notes'
+  'course_log', 'doctor_notes', 'progress_photos', 'injuries_log'
 ] as const;
 
 type StoreNames = typeof STORES[number] | string;

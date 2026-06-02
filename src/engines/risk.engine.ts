@@ -1,5 +1,6 @@
 import { GENETIC_MULTIPLIERS, DRUG_THRESHOLDS, RISK_SYSTEMS, BASE_RISK, MRR_FACTORS, HGI_FACTORS, RIR_FACTORS } from '../core/constants';
 import { RiskInput, RiskResult } from '../core/types';
+import { PHARMA_DB } from '../core/pharma-database';
 
 function geom(arr: number[]) {
    if (!arr.length) return 0;
@@ -52,8 +53,20 @@ function calculateRirAdjustment(interventionResponse: number): number {
    return 0.5 + (interventionResponse * 0.5); // Range: 0.5 to 1.0
 }
 
+const PD_SYSTEM_MAP: Record<string, { pdKey: string; weight: number }> = {
+   cardio:     { pdKey: 'lipid_impact',    weight: 0.6 },
+   hepatic:    { pdKey: 'hepatotoxicity', weight: 1.0 },
+   renal:      { pdKey: 'hct_impact',      weight: 0.15 },
+   neuro:      { pdKey: 'neuro_toxicity',  weight: 1.0 },
+   endocrine:  { pdKey: 'progestogenic',   weight: 0.5 },
+   hematologic:{ pdKey: 'hct_impact',      weight: 0.5 },
+   reproductive:{ pdKey: 'progestogenic',   weight: 0.4 },
+   musculoskeletal: { pdKey: 'lipid_impact', weight: 0.1 },
+};
+
 export function calculateRisks(i: RiskInput): RiskResult {
    const brk: Record<string, { raw: number; net: number }> = {};
+   const mechBrk: Record<string, number> = {};
    const oR: number[] = [];
    const oN: number[] = [];
 
@@ -66,38 +79,42 @@ export function calculateRisks(i: RiskInput): RiskResult {
           const N = Math.max(0.5, Math.min(1.5, i.nutritionFactor ?? 1));
           const T = Math.max(1, Math.min(1.5, i.trainingFactor ?? 1));
          
-         // MRR Adjustment - based on optimal biomarker ranges
           const mrrAdjustment = calculateMrrAdjustment(
              i.biomarkerValues?.[s] ?? 1.0,
             MRR_FACTORS[s]?.optimalMin || 0.8, 
             MRR_FACTORS[s]?.optimalMax || 1.2
-         );
+          );
          
-         // HGI Adjustment - Hemostasis/Immune function
-         const hgiAdjustment = calculateHgiAdjustment(i.hgiMarkers || {});
-         
-         // RIR Adjustment - Response to interventions
+          const hgiAdjustment = calculateHgiAdjustment(i.hgiMarkers || {});
           const rirAdjustment = calculateRirAdjustment(i.interventionResponse ?? 0.5);
+
+         const pdMapping = PD_SYSTEM_MAP[s];
          
-         let prod = 1;
-         for (const [drug, d] of Object.entries(i.activeDrugs || {})) {
-            const cfg = DRUG_THRESHOLDS[drug];
-            if (!cfg) continue;
-            const D = Math.min(2, Math.pow((d.dosePerWeek || 0) / cfg.dosePerWeek, 1.2));
-            prod *= (1 - Math.min(0.99, BASE_RISK * D * G * N * T * mrrAdjustment * hgiAdjustment * rirAdjustment));
-         }
-          const raw = Math.max(7, Math.min(100, (1 - prod) * 100));
-         const cov = (i.supportCoverage || {})[id] || 0;
-         const net = Math.max(0, raw * (1 - cov));
+          let prod = 1;
+         let pdFactor = 0;
+          for (const [drug, d] of Object.entries(i.activeDrugs || {})) {
+             const cfg = DRUG_THRESHOLDS[drug];
+             const pdEntry = Object.values(PHARMA_DB).find(p => p.id === drug || drug.startsWith(p.id.replace(/_/g,'_')));
+             if (pdEntry && pdMapping) {
+                const pdVal = (pdEntry.pd as any)[pdMapping.pdKey] ?? 0;
+                pdFactor += Math.abs(pdVal) * pdMapping.weight * ((d.dosePerWeek || 0) / (pdEntry.ec50 || 300));
+             }
+             if (!cfg) continue;
+             const D = Math.min(2, Math.pow((d.dosePerWeek || 0) / cfg.dosePerWeek, 1.2));
+             prod *= (1 - Math.min(0.99, BASE_RISK * D * G * N * T * mrrAdjustment * hgiAdjustment * rirAdjustment));
+          }
+          const raw = Math.max(7, Math.min(100, (1 - prod) * 100 + pdFactor * 15));
+          const cov = (i.supportCoverage || {})[id] || 0;
+          const net = Math.max(0, raw * (1 - cov));
+         mechBrk[id] = net;
          rM.push(raw / 100);
-         nM.push(net / 100);
+          nM.push(net / 100);
       }
       brk[s] = { raw: geom(rM), net: geom(nM) };
       oR.push(brk[s].raw / 100);
       oN.push(brk[s].net / 100);
    }
    
-   // Calculate overall MRR/HGI/RIR adjustments for final risk score
    const overallMrr = calculateMrrAdjustment(
       i.overallBiomarkerValue ?? 1.0,
       MRR_FACTORS.overall?.optimalMin || 0.8,
@@ -109,6 +126,7 @@ export function calculateRisks(i: RiskInput): RiskResult {
    
    return { 
       systemBreakdown: brk, 
+      mechanismBreakdown: mechBrk,
       overallRaw: Math.min(100, Math.max(0, geom(oR) * overallMrr * overallHgi * (2 - overallRir))),
       overallNet: Math.min(100, Math.max(0, geom(oN) * overallMrr * overallHgi * (2 - overallRir)))
    };

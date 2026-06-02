@@ -3,6 +3,7 @@ import { calcNutrition, generateStructuredAdvice } from '../../engines/nutrition
 import { generateMacroCycle } from '../../engines/nutrition-cycling.engine';
 import { generateDayMealPlan, type DayMealPlan, type MealSlot } from '../../engines/nutrition-meal-plan.engine';
 import { getProfile } from '../../core/profile-manager';
+import { useDataLink } from '../../core/data-link';
 import { FOOD_DB, searchFood, RATION_TIERS, getTopByProtein, getTopByCarbs, getTopByFat } from '../../core/nutrition-database';
 import { BarcodeScanner } from '../components/BarcodeScanner';
 import { productToFoodItem, type OFFProduct } from '../../engines/openfoodfacts.engine';
@@ -569,8 +570,8 @@ function AdviceTab({ targets, diary, goal }: { targets: NutritionTargets | null;
   const totals = calcDayTotals(day);
 
   const drugs = [
-    ...(profile.settings?.currentMedications || []),
-    ...(profile.settings?.currentSupplements || []),
+    ...(profile.settings?.currentMedications || []).map((m: any) => typeof m === 'string' ? m : m.name),
+    ...(profile.settings?.currentSupplements || []).map((s: any) => typeof s === 'string' ? s : s.name),
   ];
 
   const [productSection, setProductSection] = useState<ProductSection>(null);
@@ -895,11 +896,12 @@ export const NutritionScreen: React.FC<{ initialTab?: TabId }> = ({ initialTab }
   const [diary, setDiary] = useState<Record<string, DayDiary>>(loadDiary);
   const [targets, setTargets] = useState<NutritionTargets | null>(null);
 
-  const profile = getProfile();
+  const linked = useDataLink();
+  const profile = linked.profile;
   const goal = profile.settings?.primaryGoal || profile.settings?.goal || 'maintenance';
 
   useEffect(() => {
-    const p = getProfile();
+    const p = linked.profile;
     const g = p.settings?.primaryGoal || p.settings?.goal || 'maintenance';
     if (p.settings?.weight) {
       const result = calcNutrition({
@@ -913,7 +915,7 @@ export const NutritionScreen: React.FC<{ initialTab?: TabId }> = ({ initialTab }
       });
       setTargets(result);
     }
-  }, []);
+  }, [linked.profile]);
 
   const tabs: { id: TabId; label: string }[] = [
     { id: 'diary', label: 'Дневник' },

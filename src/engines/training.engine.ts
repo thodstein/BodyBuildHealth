@@ -21,7 +21,7 @@ const SPLITS: Record<string, { name: string; days: number; desc: string; conditi
   bro_5:        { name: 'Бро-сплит 5x', days: 5, desc: 'Одна группа в день', condition: i => i.daysPerWeek === 5 && i.level !== 'beginner' && i.goal === 'hypertrophy' },
   strength_4:   { name: 'Силовой 4x', days: 4, desc: 'Compound фокус, RIR 2-3', condition: i => i.goal === 'strength' },
   hypertrophy_6:{ name: 'Гипертрофийный 6x', days: 6, desc: 'Высокий объём, акцент ROM', condition: i => i.daysPerWeek === 6 && i.goal === 'hypertrophy' && i.recovery >= 60 },
-  torso_limbs_4:{ name: 'Торс/Конечности 4x', days: 4, desc: 'Торс отдельно, конечности отдельно', condition: i => i.daysPerWeek === 4 && !!(i.injuries?.includes('lower') || i.injuries?.includes('back')) },
+  torso_limbs_4:{ name: 'Торс/Конечности 4x', days: 4, desc: 'Торс отдельно, конечности отдельно', condition: i => i.daysPerWeek === 4 && !!(i.injuries?.some(inj => typeof inj === 'object' ? inj.location === 'Поясница' || inj.location === 'Колено' : inj === 'lower' || inj === 'back')) },
   pushpull_la_5:{ name: 'Push/Pull + Ноги/Руки 5x', days: 5, desc: 'Компромисс PPL/Bro', condition: i => i.daysPerWeek === 5 && i.weakPoints.length === 0 },
   cbs_da_5:     { name: 'Грудь/Спина/Ноги/Дельты/Руки 5x', days: 5, desc: 'Классический раздельный', condition: i => i.daysPerWeek === 5 && i.recovery >= 65 && i.level !== 'beginner' },
   spec_5:       { name: 'Специализация 5x', days: 5, desc: 'Частота на 1-2 отстающих', condition: i => i.daysPerWeek === 5 && i.weakPoints.length === 1 }

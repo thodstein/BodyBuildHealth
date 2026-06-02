@@ -4,6 +4,7 @@ import { calcTraining, EXERCISE_DB, selectExercises, getAvailableSplits } from '
 import { generateSupportStack, calculateSupport } from '../../engines/support.engine';
 import { calcReadiness } from '../../engines/readiness.engine';
 import { getProfile } from '../../core/profile-manager';
+import { useDataLink, getLatestLabValue } from '../../core/data-link';
 import { generateMacrocycle, getAvailableSplits as getPeriodizationSplits, adaptWeekForReadiness, MESOCYCLE_PARAMS } from '../../engines/training-periodization.engine';
 import type { TrainingInput, TrainingOutput, ReadinessInput, ReadinessScores, Exercise } from '../../core/types';
 import type { MacrocyclePlan, Microcycle } from '../../engines/training-periodization.engine';
@@ -77,6 +78,7 @@ function buildDayPlan(result: TrainingOutput, daysPerWeek: number): { day: numbe
 }
 
 export const PlanScreen: React.FC<{ goal: string }> = ({ goal }) => {
+  const { profile, labs, course, readiness: linkedReadiness, activeDrugs } = useDataLink();
   const [tab, setTab] = useState<'training' | 'support' | 'readiness' | 'exercises' | 'cycles'>('training');
 
   const [goalState, setGoalState] = useState(goal || 'bulk');
@@ -103,13 +105,29 @@ export const PlanScreen: React.FC<{ goal: string }> = ({ goal }) => {
   const [subjFatigue, setSubjFatigue] = useState(3);
 
   useEffect(() => {
-    const s = getProfile().settings;
-    if (s.goal) setGoalState(s.goal);
+    const s = profile.settings;
+    if (s.primaryGoal || s.goal) setGoalState(s.primaryGoal ?? s.goal ?? 'bulk');
     if (s.baselineSleepHours) setSleepHours(s.baselineSleepHours);
-    if (s.baselineSleepQuality) setSleepQuality(Math.round(s.baselineSleepQuality * 10));
+    if (s.baselineSleepQuality) setSleepQuality(Math.round(s.baselineSleepQuality));
     if (s.baselineHrvRatio) setHrvRatio(s.baselineHrvRatio);
     if (s.baselineStressLevel) setStress(Math.round(s.baselineStressLevel));
-  }, []);
+    if (s.nightAwakenings !== undefined) setNightAwakenings(s.nightAwakenings);
+    if (s.fatigueLevel) setSubjFatigue(s.fatigueLevel);
+    if (s.trainingLevel) setLevel(s.trainingLevel === 'enhanced' ? 'advanced' : s.trainingLevel);
+    if (s.workoutsPerWeek) setDaysPerWeek(s.workoutsPerWeek);
+    if (s.weakPoints) setWeakPoints(s.weakPoints);
+    if (s.dailyWaterLiters) setWaterRatio(Math.min(1, s.dailyWaterLiters / 3));
+    if (s.nutritionFactor) setCalRatio(s.nutritionFactor);
+    if (s.trainingFactor) setTrainingLoadRatio(s.trainingFactor);
+  }, [profile]);
+
+  useEffect(() => {
+    if (linkedReadiness) {
+      setRecovery(linkedReadiness.recovery);
+      setFatigue(linkedReadiness.fatigue);
+      setNutrition(linkedReadiness.nutrition);
+    }
+  }, [linkedReadiness]);
 
   const trainingResult = useMemo<TrainingOutput | null>(() => {
     const input: TrainingInput = {

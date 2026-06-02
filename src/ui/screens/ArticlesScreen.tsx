@@ -65,10 +65,7 @@ export const ArticlesScreen: React.FC = () => {
     ]);
   }, []);
 
-  const filteredArticles = articles.filter(article => 
-    (category === 'all' || article.category === category) &&
-    article.title.toLowerCase().includes(search.toLowerCase())
-  );
+  const filteredArticles = filterArticles(articles, { category: category === 'all' ? undefined : category, search: search || undefined });
 
   if (loading) {
     return <div className="screen articles">Загрузка статей...</div>;

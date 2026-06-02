@@ -1,6 +1,6 @@
 import React, { useRef, useEffect } from 'react';
 import * as THREE from 'three';
-import { getRiskColor } from '../screens/RiskScreen';
+import { getRiskColor } from '../../core/utils/risk-colors';
 
 interface Organ3DProps {
   organName: string;
