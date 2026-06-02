@@ -21,10 +21,10 @@ import type { LabPoint, UserProfile, RiskResult, CourseEntry } from '../../core/
 const SYSTEM_LABELS: Record<string, string> = {
   hepatic: 'Печень', cardio: 'Сердечно-сосудистая', endocrine: 'Эндокринная',
   lipid: 'Липидный обмен', renal: 'Почки', hematic: 'Кроветворение', immune: 'Иммунная',
-  neuro: 'Нервная', reproductive: 'Репродуктивная'
+  neuro: 'Нервная', reproductive: 'Репродуктивная', musculoskeletal: 'Суставы и связки'
 };
 
-type LabTab = 'input' | 'panels' | 'history' | 'indices' | 'risks';
+type LabTab = 'input' | 'panels' | 'history' | 'indices' | 'risks' | 'investigations';
 
 interface LabsProps {
   initialTab?: LabTab;
@@ -47,6 +47,7 @@ export const LabsScreen: React.FC<LabsProps> = ({ initialTab = 'input' }) => {
   const [labIndexText, setLabIndexText] = useState({ inflammation: '', metabolism: '', thyroid: '', lipids: '' });
   const [phase, setPhase] = useState<'baseline' | 'on_cycle' | 'pct' | 'bridge' | 'fertility'>('baseline');
   const [markerValues, setMarkerValues] = useState<Record<string, { value: string; unit: string }>>({});
+  const [invDone, setInvDone] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     const loadData = async () => {
@@ -238,6 +239,7 @@ export const LabsScreen: React.FC<LabsProps> = ({ initialTab = 'input' }) => {
     { id: 'history', label: 'История' },
     { id: 'indices', label: 'Индексы' },
     { id: 'risks', label: 'Риски' },
+    { id: 'investigations', label: 'Исследования' },
   ];
 
   return (
@@ -654,6 +656,54 @@ export const LabsScreen: React.FC<LabsProps> = ({ initialTab = 'input' }) => {
           ) : (
             <p style={{ color: 'var(--text-dim)' }}>Для расчёта рисков необходимо добавить результаты анализов и данные о курсе.</p>
           )}
+        </div>
+      )}
+
+      {tab === 'investigations' && (
+        <div className="card">
+          <h3>Исследования и обследования</h3>
+          <p style={{ color: 'var(--text-dim)', marginBottom: 12 }}>Инструментальные и аппаратные исследования для мониторинга на курсе и в ПКТ</p>
+
+          <div style={{ display: 'grid', gap: 10 }}>
+            {[
+              { id: 'echo_kg', name: 'ЭХО-КГ (эхокардиография)', system: 'cardio', freq: 'Каждые 8 нед на курсе; перед курсом и после ПКТ', markers: 'Фракция выброса ЛЖ, толщина стенок миокарда, клапаны, диастолическая функция, АДЛА, давление в ЛА', reason: 'ААС вызывают гипертрофию миокарда, диастолическую дисфункцию, изменения клапанов. ЭХО-КГ — золотой стандарт мониторинга.' },
+              { id: 'ekg', name: 'ЭКГ (электрокардиограмма)', system: 'cardio', freq: 'Каждые 4 нед на курсе', markers: 'QTc, гипертрофия ЛЖ, аритмии, ишемия, блокады', reason: 'Ранняя диагностика аритмий (пролонгация QT), признаков гипертрофии и ишемии. Доступно и информативно.' },
+              { id: 'usg_abd', name: 'УЗИ органов брюшной полости', system: 'hepatic', freq: 'Перед курсом, на 4-й нед, после ПКТ', markers: 'Размер и эхогенность печени, жёлчный пузырь, поджелудочная, селезёнка, почки, надпочечники', reason: 'Стеатоз, гепатомегалия, холестаз, кисты, исключение опухолей. Обязательное базовое обследование.' },
+              { id: 'usg_kidney', name: 'УЗИ почек и мочевыводящих путей', system: 'renal', freq: 'Перед курсом, при повышении креатинина', markers: 'Размер почек, кортикальный слой, ЧЛС, конкременты, скорость клубочковой фильтрации (расчёт)', reason: 'Тренболон и другие ААС — нефротоксичность. Ранняя диагностика структурных изменений.' },
+              { id: 'usg_prostate', name: 'УЗИ простаты (ТРУЗИ)', system: 'reproductive', freq: 'Перед курсом и после ПКТ (мужчины)', markers: 'Объём простаты, структура, PSA-зоны, конкременты', reason: 'ААС (особенно тестостерон) вызывают гиперплазию простаты. Мониторинг обязателен при >30 лет.' },
+              { id: 'usg_thyroid', name: 'УЗИ щитовидной железы', system: 'endocrine', freq: 'Перед курсом (базовое), при симптомах', markers: 'Объём, структура, узлы, кровоток, лимфоузлы', reason: 'ААС подавляют HPT-ось. Сверхзаместительные дозы тестостерона снижают TSH. Базовое УЗИ обязательно.' },
+              { id: 'usg_heart_24h', name: 'Холтер-ЭКГ (24ч мониторинг)', system: 'cardio', freq: 'При симптомах аритмии на курсе', markers: 'Суточная ЧСС, эпизоды тахикардии/брадикардии, паузы, желудочковые экстрасистолы, ST-депрессия', reason: 'Тренболон, кленбутерол, Т3 — высокий риск аритмий. Холтер — единственный способ поймать пароксизмальные нарушения.' },
+              { id: 'mri_brain', name: 'МРТ головного мозга', system: 'neuro', freq: 'При стойких головных болях, зрительных нарушениях', markers: 'Гипофиз (макро/микроаденома), белое вещество, сосуды, объём', reason: 'ААС угнетают ось ГГЯ → гиперинсулинемия → риск аденомы гипофиза. МРТ — при упорных симптомах.' },
+              { id: 'densitometry', name: 'Денситометрия (DEXA)', system: 'musculoskeletal', freq: 'Базовое; через 6 мес курса', markers: 'Минеральная плотность кости (T-score, Z-score), композиция тела', reason: 'ААС в ПКТ-периоде (гипогонадизм) → риск остеопении. Дексаметазон, ароматаза-ингибиторы дополнительно снижают BMD.' },
+              { id: 'usg_joints', name: 'УЗИ суставов', system: 'musculoskeletal', freq: 'При боли/хрусте в суставах', markers: 'Синовиальная жидкость, хрящ (толщина), мениски, связки, сухожилия, воспаление', reason: 'Тренболон и Винстрол — риск сухости суставов и повреждения связок. УЗИ позволяет оценить структурные изменения.' },
+              { id: 'spirometry', name: 'Спирометрия', system: 'cardio', freq: 'Базовое; при одышке на курсе', markers: 'FEV1, FVC, FEV1/FVC (индекс Тиффно), PEF', reason: 'Оральный прием ААС (17-альфа-алкилированные) могут вызывать реактивность дыхательных путей. Контроль при симптомах.' },
+              { id: 'abd_ct', name: 'КТ органов брюшной полости', system: 'hepatic', freq: 'При подозрении на опухоль по УЗИ', markers: 'Очаговые образования печени, adrenal incidentaloma, лимфаденопатия', reason: 'Уточняющий метод при находках УЗИ. ААС теоретически повышают риск гепатоцеллюлярной аденомы.' },
+              { id: 'ambp', name: 'СМАД (24ч мониторинг АД)', system: 'cardio', freq: 'Каждые 4 нед на курсе при ААС-индуцированной гипертензии', markers: 'Среднее систолическое/диастолическое, суточный индекс, утренний подъём, нагрузка давлением', reason: 'ААС повышают АД через ренин-ангиотензин, объём, вазоконстрикцию. СМАД точнее разовых измерений.' },
+            ].map(inv => {
+              const isDone = invDone[inv.id] ?? false;
+              return (
+                <div key={inv.id} style={{ background: 'var(--bg-secondary)', borderRadius: 10, padding: 12, border: isDone ? '1px solid var(--success)' : '1px solid var(--border)', transition: 'all .2s' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontWeight: 700, fontSize: 13, color: isDone ? 'var(--success)' : 'var(--text)', marginBottom: 2 }}>{inv.name}</div>
+                      <div style={{ fontSize: 10, padding: '1px 6px', borderRadius: 8, background: 'var(--accent-dim)', color: 'var(--accent)', display: 'inline-block', marginBottom: 4 }}>{SYSTEM_LABELS[inv.system] ?? inv.system}</div>
+                    </div>
+                    <button onClick={() => setInvDone(p => ({ ...p, [inv.id]: !p[inv.id] }))} style={{
+                      padding: '4px 10px', borderRadius: 6, fontSize: 10, fontWeight: 600, cursor: 'pointer',
+                      background: isDone ? 'var(--success-dim)' : 'var(--bg-tertiary)',
+                      color: isDone ? 'var(--success)' : 'var(--text-dim)',
+                      border: isDone ? '1px solid var(--success)' : '1px solid var(--border)',
+                    }}>
+                      {isDone ? 'Пройдено ✓' : 'Не пройдено'}
+                    </button>
+                  </div>
+                  <div style={{ fontSize: 11, color: 'var(--accent)', marginBottom: 3 }}><b>Частота:</b> {inv.freq}</div>
+                  <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 3 }}><b>Параметры:</b> {inv.markers}</div>
+                  <div style={{ fontSize: 11, color: 'var(--text-dim)', fontStyle: 'italic' }}>{inv.reason}</div>
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
     </div>

@@ -58,27 +58,18 @@ const SYSTEM_RISK_WEIGHTS: Record<string, number> = {
   neuro: 1.0,
   endocrine: 1.3,
   hematologic: 1.1,
-  reproductive: 0.8
+  reproductive: 0.8,
+  musculoskeletal: 0.6
 };
 
 const NUTRITION_SYSTEM_REDUCTION: Record<string, number> = {
-  cardio: 0.25,
-  hepatic: 0.40,
-  renal: 0.30,
-  neuro: 0.20,
-  endocrine: 0.20,
-  hematologic: 0.25,
-  reproductive: 0.15
+  cardio: 0.25, hepatic: 0.40, renal: 0.30, neuro: 0.20,
+  endocrine: 0.20, hematologic: 0.25, reproductive: 0.15, musculoskeletal: 0.10
 };
 
 const TRAINING_SYSTEM_REDUCTION: Record<string, number> = {
-  cardio: 0.35,
-  hepatic: 0.10,
-  renal: 0.15,
-  neuro: 0.15,
-  endocrine: 0.10,
-  hematologic: 0.20,
-  reproductive: 0.10
+  cardio: 0.35, hepatic: 0.10, renal: 0.15, neuro: 0.15,
+  endocrine: 0.10, hematologic: 0.20, reproductive: 0.10, musculoskeletal: 0.15
 };
 
 const GENETIC_SYSTEM_MAP: Record<string, string[]> = {
@@ -120,7 +111,36 @@ const SUPPORT_EC50: Record<string, number> = {
   coq10: 100,
   vitamin_d3: 2000,
   zinc: 15,
-  hcg: 250
+  hcg: 250,
+  alpha_lipoic: 300,
+  ashwagandha: 300,
+  saw_palmetto: 320,
+  celery_extract: 500,
+  vitamin_k2: 45,
+  selenium: 50,
+  milk_thistle: 200,
+  probiotics: 5,
+  vitamin_b12: 50,
+  vitamin_b6: 20,
+  folate: 200,
+  iron: 18,
+  copper: 1,
+  astragalus: 500,
+  taurine: 500,
+  melatonin: 1,
+  ginseng: 200,
+  egcg: 200,
+  curcumin: 300,
+  phosphatidylcholine: 500,
+  l_carnitine: 500,
+  glucosamine: 500,
+  chondroitin: 400,
+  msm: 500,
+  collagen: 2500,
+  hyaluronic: 50,
+  boswellia: 200,
+  vitamin_c: 250,
+  bromelain: 200,
 };
 
 const SUPPORT_DEFAULT_DOSE: Record<string, number> = {
@@ -134,7 +154,36 @@ const SUPPORT_DEFAULT_DOSE: Record<string, number> = {
   coq10: 200,
   vitamin_d3: 4000,
   zinc: 30,
-  hcg: 500
+  hcg: 500,
+  alpha_lipoic: 600,
+  ashwagandha: 600,
+  saw_palmetto: 640,
+  celery_extract: 1000,
+  vitamin_k2: 200,
+  selenium: 200,
+  milk_thistle: 600,
+  probiotics: 10,
+  vitamin_b12: 1000,
+  vitamin_b6: 50,
+  folate: 800,
+  iron: 27,
+  copper: 2,
+  astragalus: 1000,
+  taurine: 3000,
+  melatonin: 3,
+  ginseng: 400,
+  egcg: 400,
+  curcumin: 1000,
+  phosphatidylcholine: 1200,
+  l_carnitine: 2000,
+  glucosamine: 1500,
+  chondroitin: 1200,
+  msm: 3000,
+  collagen: 10000,
+  hyaluronic: 200,
+  boswellia: 600,
+  vitamin_c: 1000,
+  bromelain: 500,
 };
 
 const COVERAGE_ORGAN_MAP: Record<string, string[]> = {
@@ -144,7 +193,8 @@ const COVERAGE_ORGAN_MAP: Record<string, string[]> = {
   neuro: ['brain', 'nervous_system'],
   endocrine: ['thyroid', 'adrenals', 'gonads'],
   immune: ['bone_marrow', 'lymphatic'],
-  repro: ['testes', 'prostate']
+  repro: ['testes', 'prostate'],
+  musculoskeletal: ['joints', 'ligaments', 'tendons', 'cartilage', 'bone']
 };
 
 function sigmoidEmax(emax: number, dose: number, ec50: number): number {

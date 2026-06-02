@@ -36,7 +36,7 @@ export const SYRINGE_SPECS: Record<number, { maxVolume: number; divisionsPerMl: 
   5.0: { maxVolume: 5.0, divisionsPerMl: 20 }
 } as const;
 
-export const RISK_SYSTEMS = ['cardio', 'hepatic', 'renal', 'neuro', 'endocrine', 'hematologic', 'reproductive'] as const;
+export const RISK_SYSTEMS = ['cardio', 'hepatic', 'renal', 'neuro', 'endocrine', 'hematologic', 'reproductive', 'musculoskeletal'] as const;
 export const BASE_RISK = 0.12;
 
 export const REQUIRED_LABS_PER_PHASE: Record<string, string[]> = {
@@ -116,17 +116,46 @@ export const FERTILITY_TARGET = 75;
 export const FERTILITY_TAU_WEEKS = 12;
 
 export const SUPPORT_BASE_COVERAGE: Record<string, Record<string, number>> = {
-  telmisartan:    { cardio_2: 0.55, cardio_3: 0.45, renal_1: 0.50 },
-  nebivolol:      { cardio_1: 0.40, cardio_7: 0.35 },
-  nac:            { hepatic_3: 0.45, hepatic_2: 0.50, cardio_5: 0.30 },
-  tudca:          { hepatic_1: 0.65, hepatic_5: 0.50 },
-  omega3:         { cardio_1: 0.40, cardio_4: 0.35, neuro_4: 0.25 },
-  magnesium:      { neuro_2: 0.45, neuro_3: 0.50, cardio_7: 0.30 },
-  berberine:      { endocrine_4: 0.50, cardio_1: 0.20 },
-  coq10:          { cardio_4: 0.40, neuro_5: 0.30 },
-  vitamin_d3:     { endocrine_2: 0.35, immune_1: 0.30 },
-  zinc:           { repro_2: 0.40, immune_1: 0.25 },
-  hcg:            { repro_1: 0.60, repro_2: 0.40 }
+  telmisartan:      { cardio_2: 0.55, cardio_3: 0.45, renal_1: 0.50 },
+  nebivolol:        { cardio_1: 0.40, cardio_7: 0.35 },
+  nac:              { hepatic_3: 0.45, hepatic_2: 0.50, cardio_5: 0.30, neuro_1: 0.25 },
+  tudca:            { hepatic_1: 0.65, hepatic_5: 0.50 },
+  omega3:           { cardio_1: 0.40, cardio_4: 0.35, neuro_4: 0.25, neuro_6: 0.20 },
+  magnesium:        { neuro_2: 0.45, neuro_3: 0.50, neuro_6: 0.35, cardio_7: 0.30 },
+  berberine:        { endocrine_4: 0.50, cardio_1: 0.20, hepatic_4: 0.20 },
+  coq10:            { cardio_4: 0.40, neuro_5: 0.30, cardio_6: 0.25 },
+  vitamin_d3:       { endocrine_2: 0.35, immune_1: 0.30, neuro_7: 0.15 },
+  zinc:             { repro_2: 0.40, immune_1: 0.25, hematologic_4: 0.20 },
+  hcg:              { repro_1: 0.60, repro_2: 0.40 },
+  alpha_lipoic:     { neuro_1: 0.45, neuro_3: 0.40, neuro_7: 0.30, cardio_5: 0.15 },
+  ashwagandha:      { neuro_2: 0.35, neuro_5: 0.40, endocrine_5: 0.25, reproductive_5: 0.20 },
+  saw_palmetto:     { reproductive_1: 0.35, reproductive_7: 0.30, reproductive_4: 0.25 },
+  celery_extract:   { renal_3: 0.30, renal_2: 0.25, cardio_6: 0.20 },
+  vitamin_k2:       { cardio_3: 0.30, endocrine_3: 0.20, hepatic_6: 0.25 },
+  selenium:         { endocrine_6: 0.35, immune_1: 0.25, hematologic_4: 0.20, neuro_7: 0.15 },
+  milk_thistle:     { hepatic_1: 0.55, hepatic_2: 0.45, hepatic_4: 0.30, hepatic_6: 0.20 },
+  probiotics:       { hepatic_6: 0.30, immune_1: 0.25, hematologic_5: 0.20 },
+  vitamin_b12:      { hematologic_1: 0.50, hematologic_2: 0.40, neuro_4: 0.20 },
+  vitamin_b6:       { neuro_4: 0.25, neuro_6: 0.20, hematologic_3: 0.30, hepatic_6: 0.15 },
+  folate:           { hematologic_1: 0.40, hematologic_3: 0.35, cardio_3: 0.20 },
+  iron:             { hematologic_1: 0.55, hematologic_2: 0.45, cardio_6: 0.15 },
+  copper:           { hematologic_3: 0.30, neuro_3: 0.20, immune_1: 0.20 },
+  astragalus:       { renal_1: 0.30, renal_2: 0.25, immune_1: 0.20, cardio_6: 0.15 },
+  taurine:          { cardio_7: 0.30, hepatic_3: 0.25, neuro_2: 0.20, renal_3: 0.20 },
+  melatonin:        { neuro_2: 0.40, neuro_5: 0.35, endocrine_5: 0.15, cardio_7: 0.15 },
+  ginseng:          { endocrine_5: 0.25, neuro_4: 0.20, cardio_6: 0.15, immune_1: 0.15 },
+  egcg:             { cardio_5: 0.25, hepatic_4: 0.20, neuro_7: 0.15, immune_1: 0.20 },
+  curcumin:         { hepatic_4: 0.30, cardio_5: 0.25, neuro_1: 0.15, immune_1: 0.20 },
+  phosphatidylcholine: { hepatic_1: 0.35, hepatic_6: 0.30, neuro_4: 0.20, cardio_3: 0.15 },
+  l_carnitine:      { cardio_4: 0.30, cardio_6: 0.25, hepatic_3: 0.15, neuro_5: 0.15 },
+  glucosamine:     { musculoskeletal_1: 0.50, musculoskeletal_2: 0.40, musculoskeletal_3: 0.30 },
+  chondroitin:     { musculoskeletal_2: 0.45, musculoskeletal_3: 0.35, musculoskeletal_4: 0.25 },
+  msm:             { musculoskeletal_3: 0.40, musculoskeletal_5: 0.30, immune_1: 0.15 },
+  collagen:        { musculoskeletal_1: 0.45, musculoskeletal_4: 0.40, musculoskeletal_5: 0.30, musculoskeletal_6: 0.25 },
+  hyaluronic:      { musculoskeletal_4: 0.35, musculoskeletal_6: 0.30 },
+  boswellia:       { musculoskeletal_3: 0.35, musculoskeletal_5: 0.30, immune_1: 0.20, neuro_1: 0.10 },
+  vitamin_c:       { musculoskeletal_4: 0.35, immune_1: 0.30, cardio_5: 0.20, neuro_1: 0.15, hematologic_4: 0.15 },
+  bromelain:       { musculoskeletal_5: 0.30, musculoskeletal_3: 0.25, immune_1: 0.15, cardio_5: 0.10 },
 } as const;
 
 export const TRUST_WEIGHTS = { diaryFillRate: 20, nutritionAdherence: 30, labMatchRate: 30, trainerFeedback: 20 } as const;
