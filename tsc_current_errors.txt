@@ -1,0 +1,75 @@
+src/App.tsx(23,51): error TS2503: Cannot find namespace 'JSX'.
+src/core/db-encryption.ts(17,29): error TS2345: Argument of type 'Uint8Array<ArrayBufferLike>' is not assignable to parameter of type 'ArrayBufferView<ArrayBuffer>'.
+  Types of property 'buffer' are incompatible.
+    Type 'ArrayBufferLike' is not assignable to type 'ArrayBuffer'.
+      Type 'SharedArrayBuffer' is not assignable to type 'ArrayBuffer'.
+        Types of property '[Symbol.toStringTag]' are incompatible.
+          Type '"SharedArrayBuffer"' is not assignable to type '"ArrayBuffer"'.
+src/core/db-encryption.ts(23,24): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(algorithm: AlgorithmIdentifier | EcdhKeyDeriveParams | HkdfParams | Pbkdf2Params, baseKey: CryptoKey, derivedKeyType: AlgorithmIdentifier | ... 3 more ... | AesDerivedKeyParams, extractable: boolean, keyUsages: Iterable<...>): Promise<...>', gave the following error.
+    Type 'Uint8Array<ArrayBufferLike>' is not assignable to type 'BufferSource'.
+      Type 'Uint8Array<ArrayBufferLike>' is not assignable to type 'ArrayBufferView<ArrayBuffer>'.
+        Types of property 'buffer' are incompatible.
+          Type 'ArrayBufferLike' is not assignable to type 'ArrayBuffer'.
+            Type 'SharedArrayBuffer' is not assignable to type 'ArrayBuffer'.
+              Types of property '[Symbol.toStringTag]' are incompatible.
+                Type '"SharedArrayBuffer"' is not assignable to type '"ArrayBuffer"'.
+  Overload 2 of 2, '(algorithm: AlgorithmIdentifier | EcdhKeyDeriveParams | HkdfParams | Pbkdf2Params, baseKey: CryptoKey, derivedKeyType: AlgorithmIdentifier | ... 3 more ... | AesDerivedKeyParams, extractable: boolean, keyUsages: KeyUsage[]): Promise<...>', gave the following error.
+    Type 'Uint8Array<ArrayBufferLike>' is not assignable to type 'BufferSource'.
+      Type 'Uint8Array<ArrayBufferLike>' is not assignable to type 'ArrayBufferView<ArrayBuffer>'.
+        Types of property 'buffer' are incompatible.
+          Type 'ArrayBufferLike' is not assignable to type 'ArrayBuffer'.
+            Type 'SharedArrayBuffer' is not assignable to type 'ArrayBuffer'.
+              Types of property '[Symbol.toStringTag]' are incompatible.
+                Type '"SharedArrayBuffer"' is not assignable to type '"ArrayBuffer"'.
+src/core/lab-auto-parser.ts(83,33): error TS2454: Variable 'valStr' is used before being assigned.
+src/core/lab-auto-parser.ts(84,40): error TS2454: Variable 'markerRaw' is used before being assigned.
+src/core/lab-auto-parser.ts(95,16): error TS2454: Variable 'unit' is used before being assigned.
+src/engines/labs.engine.ts(184,12): error TS2304: Cannot find name 'resolveLabMarker'.
+src/ui/components/Organ3D.tsx(3,30): error TS2307: Cannot find module './RiskScreen' or its corresponding type declarations.
+src/ui/components/Organ3D.tsx(72,7): error TS18047: 'containerRef.current' is possibly 'null'.
+src/ui/nutrition-module.ts(7,94): error TS2345: Argument of type 'number | undefined' is not assignable to parameter of type 'number'.
+  Type 'undefined' is not assignable to type 'number'.
+src/ui/nutrition-planner.ts(7,92): error TS2345: Argument of type 'number | undefined' is not assignable to parameter of type 'number'.
+  Type 'undefined' is not assignable to type 'number'.
+src/ui/screens/ArticlesScreen.tsx(2,10): error TS2305: Module '"../../engines/articles.engine"' has no exported member 'getArticles'.
+src/ui/screens/ArticlesScreen.tsx(19,9): error TS2561: Object literal may only specify known properties, but 'author' does not exist in type 'Article'. Did you mean to write 'authorId'?
+src/ui/screens/ArticlesScreen.tsx(29,9): error TS2561: Object literal may only specify known properties, but 'author' does not exist in type 'Article'. Did you mean to write 'authorId'?
+src/ui/screens/ArticlesScreen.tsx(39,9): error TS2561: Object literal may only specify known properties, but 'author' does not exist in type 'Article'. Did you mean to write 'authorId'?
+src/ui/screens/ArticlesScreen.tsx(86,22): error TS2339: Property 'isPremium' does not exist on type 'Article'.
+src/ui/screens/ArticlesScreen.tsx(89,30): error TS2551: Property 'author' does not exist on type 'Article'. Did you mean 'authorId'?
+src/ui/screens/ArticlesScreen.tsx(90,39): error TS2339: Property 'date' does not exist on type 'Article'.
+src/ui/screens/CalculatorsScreen.tsx(41,34): error TS2304: Cannot find name 'p'.
+src/ui/screens/CalculatorsScreen.tsx(41,54): error TS2304: Cannot find name 'f'.
+src/ui/screens/CalculatorsScreen.tsx(41,76): error TS2304: Cannot find name 'c'.
+src/ui/screens/CalculatorsScreen.tsx(104,56): error TS2339: Property 'toFixed' does not exist on type 'string | number'.
+  Property 'toFixed' does not exist on type 'string'.
+src/ui/screens/CalculatorsScreen.tsx(106,22): error TS2365: Operator '<' cannot be applied to types 'string | number' and 'number'.
+src/ui/screens/CalculatorsScreen.tsx(107,22): error TS2365: Operator '<' cannot be applied to types 'string | number' and 'number'.
+src/ui/screens/CalculatorsScreen.tsx(108,22): error TS2365: Operator '<' cannot be applied to types 'string | number' and 'number'.
+src/ui/screens/CalculatorsScreen.tsx(256,22): error TS2365: Operator '<' cannot be applied to types 'string | number' and 'number'.
+src/ui/screens/CalculatorsScreen.tsx(257,22): error TS2365: Operator '<' cannot be applied to types 'string | number' and 'number'.
+src/ui/screens/LabsScreen.tsx(49,16): error TS2345: Argument of type 'string' is not assignable to parameter of type 'SetStateAction<"baseline" | "course" | "pct" | "maintenance">'.
+src/ui/screens/LabsScreen.tsx(272,48): error TS2345: Argument of type 'string | undefined' is not assignable to parameter of type 'string'.
+  Type 'undefined' is not assignable to type 'string'.
+src/ui/screens/LabsScreen.tsx(361,7): error TS2322: Type '(e: TouchEvent) => void' is not assignable to type 'TouchEventHandler<HTMLDivElement>'.
+  Types of parameters 'e' and 'event' are incompatible.
+    Type 'TouchEvent<HTMLDivElement>' is missing the following properties from type 'TouchEvent': which, initUIEvent, cancelBubble, composed, and 9 more.
+src/ui/screens/LabsScreen.tsx(362,7): error TS2322: Type '(e: TouchEvent) => void' is not assignable to type 'TouchEventHandler<HTMLDivElement>'.
+  Types of parameters 'e' and 'event' are incompatible.
+    Type 'TouchEvent<HTMLDivElement>' is missing the following properties from type 'TouchEvent': which, initUIEvent, cancelBubble, composed, and 9 more.
+src/ui/screens/PharmaScreen.tsx(117,9): error TS2322: Type '(e: TouchEvent) => void' is not assignable to type 'TouchEventHandler<HTMLDivElement>'.
+  Types of parameters 'e' and 'event' are incompatible.
+    Type 'TouchEvent<HTMLDivElement>' is missing the following properties from type 'TouchEvent': which, initUIEvent, cancelBubble, composed, and 9 more.
+src/ui/screens/PharmaScreen.tsx(118,9): error TS2322: Type '(e: TouchEvent) => void' is not assignable to type 'TouchEventHandler<HTMLDivElement>'.
+  Types of parameters 'e' and 'event' are incompatible.
+    Type 'TouchEvent<HTMLDivElement>' is missing the following properties from type 'TouchEvent': which, initUIEvent, cancelBubble, composed, and 9 more.
+src/ui/screens/RiskScreen.tsx(9,21): error TS2307: Cannot find module '../../components/Organ3D' or its corresponding type declarations.
+src/ui/screens/RiskScreen.tsx(83,50): error TS2345: Argument of type 'string | undefined' is not assignable to parameter of type 'string'.
+  Type 'undefined' is not assignable to type 'string'.
+src/ui/screens/RiskScreen.tsx(210,116): error TS2538: Type 'null' cannot be used as an index type.
+src/ui/screens/RiskScreen.tsx(211,116): error TS2538: Type 'null' cannot be used as an index type.
+src/ui/screens/RiskScreen.tsx(212,116): error TS2538: Type 'null' cannot be used as an index type.
+src/ui/screens/RiskScreen.tsx(213,116): error TS2538: Type 'null' cannot be used as an index type.
+src/ui/screens/SmartAssistantScreen.tsx(2,10): error TS2305: Module '"../../engines/assistant.engine"' has no exported member 'getSmartAssistantResponse'.
+src/ui/screens/SmartAssistantScreen.tsx(3,15): error TS2305: Module '"../../core/types"' has no exported member 'AssistantResponse'.

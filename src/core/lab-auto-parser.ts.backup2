@@ -1,0 +1,85 @@
+export interface ParsedLabResult {
+  marker: string;
+  value: number;
+  unit: string;
+  refRange?: string;
+  confidence: number;
+  raw: string;
+  provider?: 'gemotest' | 'helix' | 'invitro' | 'kdl' | 'unknown';
+}
+
+// ������ > ����������� ��� (�����������)
+const MARKER_ALIASES: Record<string, string> = {'���': 'ALT', 'ALT': 'ALT', '����������������������': 'ALT', '����': 'ALT', 'Alat': 'ALT', 'Gpt': 'ALT', 'AST': 'AST', '������������������������': 'AST', 'Asat': 'AST', 'Got': 'AST', 'GGT': 'GGT', '�����-�������������������': 'GGT', '�����-��': 'GGT', 'Gamma-GT': 'GGT', '��������� �����': 'TBIL', '���������': 'TBIL', '����� ���������': 'TBIL', 'Total Bilirubin': 'TBIL', 'Bil T': 'TBIL', '����������': 'HCT', 'HCT': 'HCT', 'Hematocrit': 'HCT', 'HGB': 'HGB', 'Hemoglobin': 'HGB', 'Hb': 'HGB', 'PLT': 'PLT', 'Thrombocytes': 'PLT', '���������� (PLT)': 'PLT', 'WBC': 'WBC', 'Leukocytes': 'WBC', '����� �������� ������': 'WBC', '�����������': 'TT', '����������� �����': 'TT', 'TT': 'TT', 'Testosterone Total': 'TT', 'Test': 'TT', 'E2': 'E2', 'Estradiol': 'E2', '��������� (E2)': 'E2', 'PRL': 'PRL', 'Prolactin': 'PRL', '��������� �����������������': 'PRL_MACRO', '��': 'LH', 'LH': 'LH', '��������������� ������': 'LH', 'Luteinizing Hormone': 'LH', 'FSH': 'FSH', '���������������������� ������': 'FSH', 'Follicle Stimulating Hormone': 'FSH', '�������': 'GLU', 'GLU': 'GLU', '�����': 'GLU', 'Glucose': 'GLU', 'Gluc': 'GLU', '���������� �����': 'CHOL', 'Total Cholesterol': 'CHOL', 'LDL': 'LDL', '������������ ������ ���������': 'LDL', 'LDL Cholesterol': 'LDL', 'HDL': 'HDL', '������������ ������� ���������': 'HDL', 'HDL Cholesterol': 'HDL', '������������': 'TG', 'TG': 'TG', 'Triglycerides': 'TG', 'CREAT': 'CREATININE', 'CR': 'CREATININE', 'Creatinine': 'CREATININE', '��������': 'UREA', 'Urea': 'UREA', 'BUN': 'UREA', 'TSH': 'TSH', '������������ ������': 'TSH', 'Thyroid Stimulating Hormone': 'TSH', '�3 ���������': 'FT3', 'FT3': 'FT3', 'Free T3': 'FT3', '�3 ����.': 'FT3', '�4 ���������': 'FT4', 'FT4': 'FT4', 'Free T4': 'FT4', '�4 ����.': 'FT4', 'Ferritin': 'FERRITIN', 'Fer': 'FERRITIN', '������� D': 'VITD', '25-OH Vitamin D': 'VITD', '������� D �����': 'VITD', 'Vitamin D Total': 'VITD', 'HbA1c': 'HbA1c', '������������� ����������': 'HbA1c', 'HbA1': 'HbA1c', '���������������': 'HbA1c', '���-1': 'IGF1', 'IGF-1': 'IGF1', 'Insulin-like Growth Factor 1': 'IGF1', 'Ca': 'CA', 'Calcium': 'CA', '������': 'NA', 'Na': 'NA', 'Sodium': 'NA', 'K': 'K', 'Potassium': 'K', 'Cl': 'CL', 'Chloride': 'CL', 'Zn': 'ZN', 'Zinc': 'ZN', 'Cu': 'CU', 'Copper': 'CU', 'Fe': 'FE', 'Iron': 'FE', 'ОЖСС': 'TIBC', 'TIBC': 'TIBC', 'Total Iron Binding Capacity': 'TIBC', 'CRP': 'CRP', 'C-Reactive Protein': 'CRP', '�-���������� �����': 'CRP', 'Homocysteine': 'HOMOCYSTEINE', 'Hcy': 'HOMOCYSTEINE', 'Cortisol': 'CORTISOL', 'Insulin': 'INSULIN', 'Ins': 'INSULIN', 'HOMA-IR': 'HOMA', 'HOMA': 'HOMA', '������ HOMA': 'HOMA', '��������� � ������': 'SPERM_WBC', 'MAR-����': 'MAR', 'MAR-test': 'MAR', 'MAR test': 'MAR', '����������� (PR)': 'PR', 'PR': 'PR', 'Progressive motility': 'PR', 'Morphology': 'MORPHOLOGY'};
+
+const UNIT_ALIASES: Record<string, string> = {'��/�': 'U/L', '��/��': 'U/mL', 'U/L': 'U/L', 'U/l': 'U/L', 'U/ml': 'U/mL', 'ng/ml': 'ng/mL', 'ng/dl': 'ng/dL', 'pg/ml': 'pg/mL', '����/��': 'mIU/mL', '���/��': 'mIU/mL', 'mIU/ml': 'mIU/mL', '�����/�': 'mmol/L', '����/�': 'mol/L', 'mmol/l': 'mmol/L', '�/�': 'g/L', '�/��': 'g/dL', 'g/l': 'g/L', 'g/dl': 'g/dL', '%': '%', '���������': '%', '���/���': 'K/uL', '10^9/�': '10^9/L', '���/�': 'mcg/L'};
+
+function detectProvider(text: string): ParsedLabResult['provider'] {
+  const t = text.toLowerCase();
+  if (t.includes('��������') || t.includes('gemotest')) return 'gemotest';
+  if (t.includes('������') || t.includes('helix')) return 'helix';
+  if (t.includes('�������') || t.includes('invitro')) return 'invitro';
+  if (t.includes('���') || t.includes('kdl') || t.includes('�������-��������������� �����������')) return 'kdl';
+  return 'unknown';
+}
+
+function normalizeMarker(raw: string): string | null {
+  const clean = raw.replace(/[()\[\]{}]/g, '').replace(/\s+/g, ' ').trim();
+  if (MARKER_ALIASES[clean]) return MARKER_ALIASES[clean];
+  // Fuzzy match by first word or abbreviation
+  const parts = clean.split(/\s+/);
+  for (const p of parts) {
+    const upper = p.replace(/[,.:;]/g, '').toUpperCase();
+    if (MARKER_ALIASES[upper]) return MARKER_ALIASES[upper];
+  }
+  return null;
+}
+
+function normalizeUnit(raw: string): string {
+  if (!raw) return '��.';
+  const clean = raw.replace(/[(),.]/g, '').trim().toLowerCase();
+  return UNIT_ALIASES[clean] || raw;
+}
+
+export function parseLabText(text: string): ParsedLabResult[] {
+  const provider = detectProvider(text);
+  const lines = text.split(/\r?\n/).filter(l => l.trim().length > 4);
+  const results: ParsedLabResult[] = [];
+
+  for (const line of lines) {
+    // Skip headers, footers, empty lines
+    if (/^(�����|����|�������|����|�����������|��������|����������|����|���|��������|page|patient|doctor|lab|result|unit|reference)/i.test(line.trim())) continue;
+
+    // Main pattern: Marker Value [Unit] [Ref]
+    const mainMatch = line.match(
+      /([�-�A-Z][�-�a-z\s\-\/\(\)\.\,]{2,30}?)\s+([\d,]+(?:\.[\d]+)?)\s*([�-�A-Za-z\/�%\^~\*]+)?\s*(?:[<>=??]?\s*[\d,]+(?:\.[\d]+)?\s*[-��]?\s*[\d,]+(?:\.[\d]+)?|�����[\w\s:]*[\d,]+(?:\.[\d]+)?\s*[-��]\s*[\d,]+(?:\.[\d]+)?)?/i
+    );
+
+    if (mainMatch) {
+      const valStr = mainMatch[2].replace(',', '.');
+      const value = parseFloat(valStr);
+      if (isNaN(value) || value <= 0 || value > 99999) continue;
+
+      const marker = normalizeMarker(mainMatch[1]);
+      if (!marker) continue;
+
+      const refMatch = line.match(/(?:[<>=??]?\s*[\d,]+(?:\.[\d]+)?\s*[-��]\s*[\d,]+(?:\.[\d]+)?|�����[\w\s:]*[\d,]+(?:\.[\d]+)?\s*[-��]\s*[\d,]+(?:\.[\d]+)?)/i);
+
+      results.push({
+        marker,
+        value,
+        unit: normalizeUnit(mainMatch[3] || ''),
+        refRange: refMatch ? refMatch[0].replace(/\s+/g, ' ').trim() : undefined,
+        confidence: provider !== 'unknown' ? 0.95 : 0.85,
+        raw: line.trim(),
+        provider
+      });
+    }
+  }
+
+  return results;
+}
+
+
+
+
+

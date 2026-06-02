@@ -1,0 +1,197 @@
+﻿ï»¿import { MasterDB } from "./types";
+import { EFFECTS_DB } from "../data/effects";
+import { MECHANISMS_DB } from "../data/mechanisms";
+import { RECOMMENDATIONS_DB } from "../data/recommendations";
+import { RISKS_DB } from "../data/risks";
+// Import JSON data
+const substancesJson = [
+  { "id": "CAFFEINE", "name": "Ð Ñ™Ð Ñ•Ð¡â€žÐ ÂµÐ Ñ‘Ð Ð…", "category": "CAT_SUB_STIMULANTS", "tags": ["energy", "focus"] },
+  { "id": "L_THEANINE", "name": "L-Ð ÑžÐ ÂµÐ Â°Ð Ð…Ð Ñ‘Ð Ð…", "category": "CAT_SUB_AMINO", "tags": ["calm", "focus"] },
+  { "id": "MELATONIN", "name": "Ð ÑšÐ ÂµÐ Â»Ð Â°Ð¡â€šÐ Ñ•Ð Ð…Ð Ñ‘Ð Ð…", "category": "CAT_SUB_HORMONAL", "tags": ["sleep"] },
+  { "id": "ASHWAGANDHA", "name": "Ð Ñ’Ð¡â‚¬Ð Ð†Ð Â°Ð Ñ–Ð Â°Ð Ð…Ð Ò‘Ð Â°", "category": "CAT_SUB_ADAPTOGENS", "tags": ["stress", "hormones"] },
+  { "id": "RHODIOLA", "name": "Ð Â Ð Ñ•Ð Ò‘Ð Ñ‘Ð Ñ•Ð Â»Ð Â°", "category": "CAT_SUB_ADAPTOGENS", "tags": ["energy", "stress"] },
+  { "id": "VITAMIN_D", "name": "Ð â€™Ð Ñ‘Ð¡â€šÐ Â°Ð Ñ˜Ð Ñ‘Ð Ð… D3", "category": "CAT_SUB_VITAMINS", "tags": ["immunity"] },
+  { "id": "MAGNESIUM", "name": "Ð ÑšÐ Â°Ð Ñ–Ð Ð…Ð Ñ‘Ð â„–", "category": "CAT_SUB_MINERALS", "tags": ["calm", "sleep"] },
+  { "id": "OMEGA_3", "name": "Ð Ñ›Ð Ñ˜Ð ÂµÐ Ñ–Ð Â°-3", "category": "CAT_SUB_FATTYACIDS", "tags": ["heart", "brain"] },
+  { "id": "GINKGO", "name": "Ð â€œÐ Ñ‘Ð Ð…Ð Ñ”Ð Ñ–Ð Ñ• Ð â€˜Ð Ñ‘Ð Â»Ð Ñ•Ð Â±Ð Â°", "category": "CAT_SUB_HERBS", "tags": ["brain", "blood"] },
+  { "id": "TYROSINE", "name": "L-Ð ÑžÐ Ñ‘Ð¡Ð‚Ð Ñ•Ð Â·Ð Ñ‘Ð Ð…", "category": "CAT_SUB_AMINO", "tags": ["focus", "dopamine"] }
+];
+const interactionsJson = [
+  {
+    "id": "INT_CAF_THEA",
+    "substanceA": "CAFFEINE",
+    "substanceB": "L_THEANINE",
+    "type": "SYNERGY",
+    "severity": "LOW",
+    "effect": "Ð ÐˆÐ¡ÐƒÐ Ñ‘Ð Â»Ð ÂµÐ Ð…Ð Ñ‘Ð Âµ Ð¡â€žÐ Ñ•Ð Ñ”Ð¡Ñ“Ð¡ÐƒÐ Â° Ð Â±Ð ÂµÐ Â· Ð Ð…Ð ÂµÐ¡Ð‚Ð Ð†Ð Ñ•Ð Â·Ð Ð…Ð Ñ•Ð¡ÐƒÐ¡â€šÐ Ñ‘",
+    "mechanisms": ["GABA_UP", "ADENOSINE_BLOCK"]
+  },
+  {
+    "id": "INT_CAF_RHOD",
+    "substanceA": "CAFFEINE",
+    "substanceB": "RHODIOLA",
+    "type": "CONFLICT",
+    "severity": "MEDIUM",
+    "effect": "Ð Â Ð Ñ‘Ð¡ÐƒÐ Ñ” Ð Ñ—Ð ÂµÐ¡Ð‚Ð ÂµÐ Ð†Ð Ñ•Ð Â·Ð Â±Ð¡Ñ“Ð Â¶Ð Ò‘Ð ÂµÐ Ð…Ð Ñ‘Ð¡Ð Ð Ñ‘ Ð¡â€šÐ Â°Ð¡â€¦Ð Ñ‘Ð Ñ”Ð Â°Ð¡Ð‚Ð Ò‘Ð Ñ‘Ð Ñ‘",
+    "mechanisms": ["CORTISOL_UP", "ADRENALINE_UP"]
+  },
+  {
+    "id": "INT_MEL_CAF",
+    "substanceA": "MELATONIN",
+    "substanceB": "CAFFEINE",
+    "type": "CONFLICT",
+    "severity": "HIGH",
+    "effect": "Ð ÑŸÐ Ñ•Ð Ò‘Ð Â°Ð Ð†Ð Â»Ð ÂµÐ Ð…Ð Ñ‘Ð Âµ Ð¡ÐŒÐ¡â€žÐ¡â€žÐ ÂµÐ Ñ”Ð¡â€šÐ Â° Ð¡ÐƒÐ Ð…Ð Â°",
+    "mechanisms": ["CORTISOL_UP", "MELATONIN_DOWN"]
+  },
+  {
+    "id": "INT_MAG_RHOD",
+    "substanceA": "MAGNESIUM",
+    "substanceB": "RHODIOLA",
+    "type": "SYNERGY",
+    "severity": "LOW",
+    "effect": "Ð â€˜Ð Â°Ð Â»Ð Â°Ð Ð…Ð¡Ðƒ Ð¡ÐŒÐ Ð…Ð ÂµÐ¡Ð‚Ð Ñ–Ð Ñ‘Ð Ñ‘ Ð Ñ‘ Ð¡Ð‚Ð Â°Ð¡ÐƒÐ¡ÐƒÐ Â»Ð Â°Ð Â±Ð Â»Ð ÂµÐ Ð…Ð Ñ‘Ð¡Ð",
+    "mechanisms": ["GABA_UP", "ENERGY_UP"]
+  },
+  {
+    "id": "INT_VITD_MAG",
+    "substanceA": "VITAMIN_D",
+    "substanceB": "MAGNESIUM",
+    "type": "SYNERGY",
+    "severity": "LOW",
+    "effect": "Ð ÑšÐ Â°Ð Ñ–Ð Ð…Ð Ñ‘Ð â„– Ð¡Ñ“Ð Â»Ð¡Ñ“Ð¡â€¡Ð¡â‚¬Ð Â°Ð ÂµÐ¡â€š Ð¡Ñ“Ð¡ÐƒÐ Ð†Ð Ñ•Ð ÂµÐ Ð…Ð Ñ‘Ð Âµ Ð â€™Ð Ñ‘Ð¡â€šÐ Â°Ð Ñ˜Ð Ñ‘Ð Ð…Ð Â° D",
+    "mechanisms": ["METABOLISM_UP"]
+  }
+];
+
+// Helper to map severity string to number
+const severityToNumber = (sev: string): number => {
+  switch (sev.toUpperCase()) {
+    case "HIGH": return 3;
+    case "MEDIUM": return 2;
+    case "LOW": return 1;
+    default: return 1;
+  }
+};
+
+// Map InteractionType string to enum
+const interactionTypeToEnum = (type: string): "synergy" | "conflict" | "danger" | "caution" => {
+  switch (type.toUpperCase()) {
+    case "SYNERGY": return "synergy";
+    case "CONFLICT": return "conflict";
+    case "DANGER": return "danger";
+    default: return "caution";
+  }
+};
+
+export const MASTER_DB: MasterDB = {
+  effects: EFFECTS_DB.map(e => ({
+    id: e.id,
+    effect: e.description,
+    class: e.type,
+    group: "",
+    strengthBase: 1,
+    strengthMax: 1,
+    mechanisms: [],
+    organs: [],
+    risks: [],
+    synergy: [],
+    antagonists: [],
+    duration: { onset: "medium", peak: "2 hours", halfLife: "6 hours", decay: "medium" },
+    pkpd: { emax: 1, ec50: 1, doseResponse: "linear", tissueDistribution: {}, receptorAffinity: {}, metabolism: [], elimination: [] },
+    coverage: {},
+    coverageScore: 0,
+    riskScore: 0,
+  })),
+  substances: substancesJson.map((s: any) => ({
+    id: s.id,
+    name: s.name,
+    category: s.category,
+    route: [],
+    effects: [],
+    tHalfHours: 0,
+    bioavailability: {},
+    mechanisms: [],
+    risks: [],
+    description: s.tags.join(", "),
+  })),
+  interactions: interactionsJson.map((i: any) => ({
+    substanceA: i.substanceA,
+    substanceB: i.substanceB,
+    type: interactionTypeToEnum(i.type),
+    severity: severityToNumber(i.severity),
+    mechanisms: i.mechanisms,
+    description: `${i.effect} (${i.id})`,
+  })),
+  goals: [
+    {
+      id: "energy",
+      effectPriority: { "BRAIN_FOG_DOWN": 1, "ENERGY_UP": 2 },
+      preferredGroups: ["stimulants", "nootropics"],
+      avoidGroups: ["sedatives"],
+      intensity: 2,
+    },
+    {
+      id: "bulk",
+      effectPriority: { "MUSCLE_GROWTH": 2, "RECOVERY": 1 },
+      preferredGroups: ["protein", "creatine", "bcaa"],
+      avoidGroups: ["fat_burners"],
+      intensity: 3,
+    },
+    {
+      id: "focus",
+      effectPriority: { "FOCUS_UP": 2, "ANXIETY_DOWN": 1 },
+      preferredGroups: ["caffeine", "l_theanine", "rhodiola"],
+      avoidGroups: [],
+      intensity: 2,
+    },
+  ],
+  stackTemplates: [],
+  stacks: [],
+  analyses: [],
+  organs: [],
+  systems: [],
+  mechanisms: MECHANISMS_DB.map(m => ({
+    id: m.id,
+    name: m.name,
+    level: 1,
+    category: "",
+    description: "",
+    organs: [],
+    systems: [...m.systemsUp, ...m.systemsDown],
+    biomarkers: [],
+    effectsPositive: m.effectsPositive,
+    effectsNegative: m.effectsNegative,
+    riskWeight: 1,
+  })),
+  axes: [],
+  risks: RISKS_DB.map(r => ({
+    id: r.riskId || r.id || "",
+    name: r.riskId || r.id || "",
+    description: r.description || "",
+    probability: 0.5,
+    severity: 2,
+  })),
+  recommendations: RECOMMENDATIONS_DB.map(rec => ({
+    id: rec.recId,
+    type: rec.type,
+    riskId: rec.riskId,
+    level: rec.level,
+    title: rec.title,
+    text: rec.text,
+  })),
+  tags: [],
+  brands: [],
+  aliases: {},
+  substanceGroups: {},
+  effectGroups: {},
+  synergyMatrix: {},
+  conflictMatrix: {},
+};
+
+export async function initMasterDB(dataDir: string = "./data"): Promise<void> {
+  console.log("MasterDB initialized with imported data");
+  return;
+}
+
+

@@ -1,0 +1,108 @@
+
+> health-engine-tz@3.0.0 build
+> tsc && vite build
+
+src/App.tsx(23,51): error TS2503: Cannot find namespace 'JSX'.
+src/core/db-encryption.ts(17,29): error TS2345: Argument of type 'Uint8Array<ArrayBufferLike>' is not assignable to parameter of type 'ArrayBufferView<ArrayBuffer>'.
+  Types of property 'buffer' are incompatible.
+    Type 'ArrayBufferLike' is not assignable to type 'ArrayBuffer'.
+      Type 'SharedArrayBuffer' is not assignable to type 'ArrayBuffer'.
+        Types of property '[Symbol.toStringTag]' are incompatible.
+          Type '"SharedArrayBuffer"' is not assignable to type '"ArrayBuffer"'.
+src/core/db-encryption.ts(23,24): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(algorithm: AlgorithmIdentifier | EcdhKeyDeriveParams | HkdfParams | Pbkdf2Params, baseKey: CryptoKey, derivedKeyType: AlgorithmIdentifier | ... 3 more ... | AesDerivedKeyParams, extractable: boolean, keyUsages: Iterable<...>): Promise<...>', gave the following error.
+    Type 'Uint8Array<ArrayBufferLike>' is not assignable to type 'BufferSource'.
+      Type 'Uint8Array<ArrayBufferLike>' is not assignable to type 'ArrayBufferView<ArrayBuffer>'.
+        Types of property 'buffer' are incompatible.
+          Type 'ArrayBufferLike' is not assignable to type 'ArrayBuffer'.
+            Type 'SharedArrayBuffer' is not assignable to type 'ArrayBuffer'.
+              Types of property '[Symbol.toStringTag]' are incompatible.
+                Type '"SharedArrayBuffer"' is not assignable to type '"ArrayBuffer"'.
+  Overload 2 of 2, '(algorithm: AlgorithmIdentifier | EcdhKeyDeriveParams | HkdfParams | Pbkdf2Params, baseKey: CryptoKey, derivedKeyType: AlgorithmIdentifier | ... 3 more ... | AesDerivedKeyParams, extractable: boolean, keyUsages: KeyUsage[]): Promise<...>', gave the following error.
+    Type 'Uint8Array<ArrayBufferLike>' is not assignable to type 'BufferSource'.
+      Type 'Uint8Array<ArrayBufferLike>' is not assignable to type 'ArrayBufferView<ArrayBuffer>'.
+        Types of property 'buffer' are incompatible.
+          Type 'ArrayBufferLike' is not assignable to type 'ArrayBuffer'.
+            Type 'SharedArrayBuffer' is not assignable to type 'ArrayBuffer'.
+              Types of property '[Symbol.toStringTag]' are incompatible.
+                Type '"SharedArrayBuffer"' is not assignable to type '"ArrayBuffer"'.
+src/core/lab-auto-parser.ts(83,33): error TS2454: Variable 'valStr' is used before being assigned.
+src/core/lab-auto-parser.ts(84,40): error TS2454: Variable 'markerRaw' is used before being assigned.
+src/core/lab-auto-parser.ts(95,16): error TS2454: Variable 'unit' is used before being assigned.
+src/core/profile-manager.ts(33,7): error TS2353: Object literal may only specify known properties, and 'goal' does not exist in type '{ dateOfBirth?: string | undefined; age?: number | undefined; sex: "male" | "female"; ethnicity?: string | undefined; height?: number | undefined; weight: number; bodyFat?: number | undefined; ... 20 more ...; privacyLevel?: "private" | ... 2 more ... | undefined; }'.
+src/core/utils/data-loader.ts(1,16): error TS2591: Cannot find name 'fs'. Do you need to install type definitions for node? Try `npm i --save-dev @types/node` and then add 'node' to the types field in your tsconfig.
+src/core/utils/data-loader.ts(2,18): error TS2591: Cannot find name 'path'. Do you need to install type definitions for node? Try `npm i --save-dev @types/node` and then add 'node' to the types field in your tsconfig.
+src/core/utils/data-loader.ts(30,40): error TS7006: Parameter 'l' implicitly has an 'any' type.
+src/core/utils/data-loader.ts(30,62): error TS7006: Parameter 'l' implicitly has an 'any' type.
+src/core/utils/data-loader.ts(33,29): error TS7006: Parameter 'line' implicitly has an 'any' type.
+src/engines/labs.engine.ts(184,12): error TS2304: Cannot find name 'resolveLabMarker'.
+src/ui/auth-module.ts(13,7): error TS2353: Object literal may only specify known properties, and 'goal' does not exist in type '{ dateOfBirth?: string | undefined; age?: number | undefined; sex: "male" | "female"; ethnicity?: string | undefined; height?: number | undefined; weight: number; bodyFat?: number | undefined; ... 20 more ...; privacyLevel?: "private" | ... 2 more ... | undefined; }'.
+src/ui/components/Organ3D.tsx(3,30): error TS2307: Cannot find module './RiskScreen' or its corresponding type declarations.
+src/ui/components/Organ3D.tsx(72,7): error TS18047: 'containerRef.current' is possibly 'null'.
+src/ui/nutrition-module.ts(7,94): error TS2345: Argument of type 'number | undefined' is not assignable to parameter of type 'number'.
+  Type 'undefined' is not assignable to type 'number'.
+src/ui/nutrition-module.ts(7,161): error TS2339: Property 'goal' does not exist on type '{ dateOfBirth?: string | undefined; age?: number | undefined; sex: "male" | "female"; ethnicity?: string | undefined; height?: number | undefined; weight: number; bodyFat?: number | undefined; ... 20 more ...; privacyLevel?: "private" | ... 2 more ... | undefined; }'.
+src/ui/nutrition-planner.ts(7,92): error TS2345: Argument of type 'number | undefined' is not assignable to parameter of type 'number'.
+  Type 'undefined' is not assignable to type 'number'.
+src/ui/nutrition-planner.ts(7,159): error TS2339: Property 'goal' does not exist on type '{ dateOfBirth?: string | undefined; age?: number | undefined; sex: "male" | "female"; ethnicity?: string | undefined; height?: number | undefined; weight: number; bodyFat?: number | undefined; ... 20 more ...; privacyLevel?: "private" | ... 2 more ... | undefined; }'.
+src/ui/screens/ArticlesScreen.tsx(2,10): error TS2305: Module '"../../engines/articles.engine"' has no exported member 'getArticles'.
+src/ui/screens/ArticlesScreen.tsx(19,9): error TS2561: Object literal may only specify known properties, but 'author' does not exist in type 'Article'. Did you mean to write 'authorId'?
+src/ui/screens/ArticlesScreen.tsx(29,9): error TS2561: Object literal may only specify known properties, but 'author' does not exist in type 'Article'. Did you mean to write 'authorId'?
+src/ui/screens/ArticlesScreen.tsx(39,9): error TS2561: Object literal may only specify known properties, but 'author' does not exist in type 'Article'. Did you mean to write 'authorId'?
+src/ui/screens/ArticlesScreen.tsx(86,22): error TS2339: Property 'isPremium' does not exist on type 'Article'.
+src/ui/screens/ArticlesScreen.tsx(89,30): error TS2551: Property 'author' does not exist on type 'Article'. Did you mean 'authorId'?
+src/ui/screens/ArticlesScreen.tsx(90,39): error TS2339: Property 'date' does not exist on type 'Article'.
+src/ui/screens/CalculatorsScreen.tsx(41,34): error TS2304: Cannot find name 'p'.
+src/ui/screens/CalculatorsScreen.tsx(41,54): error TS2304: Cannot find name 'f'.
+src/ui/screens/CalculatorsScreen.tsx(41,76): error TS2304: Cannot find name 'c'.
+src/ui/screens/CalculatorsScreen.tsx(104,56): error TS2339: Property 'toFixed' does not exist on type 'string | number'.
+  Property 'toFixed' does not exist on type 'string'.
+src/ui/screens/CalculatorsScreen.tsx(106,22): error TS2365: Operator '<' cannot be applied to types 'string | number' and 'number'.
+src/ui/screens/CalculatorsScreen.tsx(107,22): error TS2365: Operator '<' cannot be applied to types 'string | number' and 'number'.
+src/ui/screens/CalculatorsScreen.tsx(108,22): error TS2365: Operator '<' cannot be applied to types 'string | number' and 'number'.
+src/ui/screens/CalculatorsScreen.tsx(256,22): error TS2365: Operator '<' cannot be applied to types 'string | number' and 'number'.
+src/ui/screens/CalculatorsScreen.tsx(257,22): error TS2365: Operator '<' cannot be applied to types 'string | number' and 'number'.
+src/ui/screens/LabsScreen.tsx(48,28): error TS2339: Property 'phase' does not exist on type '{ dateOfBirth?: string | undefined; age?: number | undefined; sex: "male" | "female"; ethnicity?: string | undefined; height?: number | undefined; weight: number; bodyFat?: number | undefined; ... 20 more ...; privacyLevel?: "private" | ... 2 more ... | undefined; }'.
+src/ui/screens/LabsScreen.tsx(49,33): error TS2339: Property 'phase' does not exist on type '{ dateOfBirth?: string | undefined; age?: number | undefined; sex: "male" | "female"; ethnicity?: string | undefined; height?: number | undefined; weight: number; bodyFat?: number | undefined; ... 20 more ...; privacyLevel?: "private" | ... 2 more ... | undefined; }'.
+src/ui/screens/LabsScreen.tsx(50,64): error TS2339: Property 'phase' does not exist on type '{ dateOfBirth?: string | undefined; age?: number | undefined; sex: "male" | "female"; ethnicity?: string | undefined; height?: number | undefined; weight: number; bodyFat?: number | undefined; ... 20 more ...; privacyLevel?: "private" | ... 2 more ... | undefined; }'.
+src/ui/screens/LabsScreen.tsx(55,26): error TS2339: Property 'phase' does not exist on type '{ dateOfBirth?: string | undefined; age?: number | undefined; sex: "male" | "female"; ethnicity?: string | undefined; height?: number | undefined; weight: number; bodyFat?: number | undefined; ... 20 more ...; privacyLevel?: "private" | ... 2 more ... | undefined; }'.
+src/ui/screens/LabsScreen.tsx(153,15): error TS2345: Argument of type 'UserProfile | { id: string; name: string; role: "user"; settings: { age: number; sex: "male"; weight: number; goal: string; phase: string; courseStartDate: string; height: number; bodyFat: number; }; }' is not assignable to parameter of type 'SetStateAction<UserProfile | null>'.
+  Type '{ id: string; name: string; role: "user"; settings: { age: number; sex: "male"; weight: number; goal: string; phase: string; courseStartDate: string; height: number; bodyFat: number; }; }' is not assignable to type 'SetStateAction<UserProfile | null>'.
+    Types of property 'settings' are incompatible.
+      Object literal may only specify known properties, and 'goal' does not exist in type '{ dateOfBirth?: string | undefined; age?: number | undefined; sex: "male" | "female"; ethnicity?: string | undefined; height?: number | undefined; weight: number; bodyFat?: number | undefined; ... 20 more ...; privacyLevel?: "private" | ... 2 more ... | undefined; }'.
+src/ui/screens/LabsScreen.tsx(229,66): error TS2339: Property 'genetics' does not exist on type '{ dateOfBirth?: string | undefined; age?: number | undefined; sex: "male" | "female"; ethnicity?: string | undefined; height?: number | undefined; weight: number; bodyFat?: number | undefined; ... 20 more ...; privacyLevel?: "private" | ... 2 more ... | undefined; }'.
+src/ui/screens/LabsScreen.tsx(272,65): error TS2339: Property 'goal' does not exist on type '{ dateOfBirth?: string | undefined; age?: number | undefined; sex: "male" | "female"; ethnicity?: string | undefined; height?: number | undefined; weight: number; bodyFat?: number | undefined; ... 20 more ...; privacyLevel?: "private" | ... 2 more ... | undefined; }'.
+src/ui/screens/LabsScreen.tsx(310,33): error TS2339: Property 'phase' does not exist on type '{ dateOfBirth?: string | undefined; age?: number | undefined; sex: "male" | "female"; ethnicity?: string | undefined; height?: number | undefined; weight: number; bodyFat?: number | undefined; ... 20 more ...; privacyLevel?: "private" | ... 2 more ... | undefined; }'.
+src/ui/screens/LabsScreen.tsx(336,35): error TS2339: Property 'phase' does not exist on type '{ dateOfBirth?: string | undefined; age?: number | undefined; sex: "male" | "female"; ethnicity?: string | undefined; height?: number | undefined; weight: number; bodyFat?: number | undefined; ... 20 more ...; privacyLevel?: "private" | ... 2 more ... | undefined; }'.
+src/ui/screens/LabsScreen.tsx(361,7): error TS2322: Type '(e: TouchEvent) => void' is not assignable to type 'TouchEventHandler<HTMLDivElement>'.
+  Types of parameters 'e' and 'event' are incompatible.
+    Type 'TouchEvent<HTMLDivElement>' is missing the following properties from type 'TouchEvent': which, initUIEvent, cancelBubble, composed, and 9 more.
+src/ui/screens/LabsScreen.tsx(362,7): error TS2322: Type '(e: TouchEvent) => void' is not assignable to type 'TouchEventHandler<HTMLDivElement>'.
+  Types of parameters 'e' and 'event' are incompatible.
+    Type 'TouchEvent<HTMLDivElement>' is missing the following properties from type 'TouchEvent': which, initUIEvent, cancelBubble, composed, and 9 more.
+src/ui/screens/PharmaScreen.tsx(117,9): error TS2322: Type '(e: TouchEvent) => void' is not assignable to type 'TouchEventHandler<HTMLDivElement>'.
+  Types of parameters 'e' and 'event' are incompatible.
+    Type 'TouchEvent<HTMLDivElement>' is missing the following properties from type 'TouchEvent': which, initUIEvent, cancelBubble, composed, and 9 more.
+src/ui/screens/PharmaScreen.tsx(118,9): error TS2322: Type '(e: TouchEvent) => void' is not assignable to type 'TouchEventHandler<HTMLDivElement>'.
+  Types of parameters 'e' and 'event' are incompatible.
+    Type 'TouchEvent<HTMLDivElement>' is missing the following properties from type 'TouchEvent': which, initUIEvent, cancelBubble, composed, and 9 more.
+src/ui/screens/ProfileScreen.tsx(69,35): error TS2339: Property 'goal' does not exist on type '{ dateOfBirth?: string | undefined; age?: number | undefined; sex: "male" | "female"; ethnicity?: string | undefined; height?: number | undefined; weight: number; bodyFat?: number | undefined; ... 20 more ...; privacyLevel?: "private" | ... 2 more ... | undefined; }'.
+src/ui/screens/ProfileScreen.tsx(186,69): error TS2339: Property 'goal' does not exist on type '{ dateOfBirth?: string | undefined; age?: number | undefined; sex: "male" | "female"; ethnicity?: string | undefined; height?: number | undefined; weight: number; bodyFat?: number | undefined; ... 20 more ...; privacyLevel?: "private" | ... 2 more ... | undefined; }'.
+src/ui/screens/RiskScreen.tsx(9,21): error TS2307: Cannot find module '../../components/Organ3D' or its corresponding type declarations.
+src/ui/screens/RiskScreen.tsx(36,65): error TS2339: Property 'genetics' does not exist on type '{ dateOfBirth?: string | undefined; age?: number | undefined; sex: "male" | "female"; ethnicity?: string | undefined; height?: number | undefined; weight: number; bodyFat?: number | undefined; ... 20 more ...; privacyLevel?: "private" | ... 2 more ... | undefined; }'.
+src/ui/screens/RiskScreen.tsx(83,64): error TS2339: Property 'goal' does not exist on type '{ dateOfBirth?: string | undefined; age?: number | undefined; sex: "male" | "female"; ethnicity?: string | undefined; height?: number | undefined; weight: number; bodyFat?: number | undefined; ... 20 more ...; privacyLevel?: "private" | ... 2 more ... | undefined; }'.
+src/ui/screens/RiskScreen.tsx(210,116): error TS2538: Type 'null' cannot be used as an index type.
+src/ui/screens/RiskScreen.tsx(211,116): error TS2538: Type 'null' cannot be used as an index type.
+src/ui/screens/RiskScreen.tsx(212,116): error TS2538: Type 'null' cannot be used as an index type.
+src/ui/screens/RiskScreen.tsx(213,116): error TS2538: Type 'null' cannot be used as an index type.
+src/ui/screens/SmartAssistantScreen.tsx(2,10): error TS2305: Module '"../../engines/assistant.engine"' has no exported member 'getSmartAssistantResponse'.
+src/ui/screens/SmartAssistantScreen.tsx(3,15): error TS2305: Module '"../../core/types"' has no exported member 'AssistantResponse'.
+src/ui/settings-module.ts(12,70): error TS2339: Property 'email' does not exist on type '{ dateOfBirth?: string | undefined; age?: number | undefined; sex: "male" | "female"; ethnicity?: string | undefined; height?: number | undefined; weight: number; bodyFat?: number | undefined; ... 20 more ...; privacyLevel?: "private" | ... 2 more ... | undefined; }'.
+src/ui/settings-module.ts(19,35): error TS2339: Property 'goal' does not exist on type '{ dateOfBirth?: string | undefined; age?: number | undefined; sex: "male" | "female"; ethnicity?: string | undefined; height?: number | undefined; weight: number; bodyFat?: number | undefined; ... 20 more ...; privacyLevel?: "private" | ... 2 more ... | undefined; }'.
+src/ui/settings-module.ts(19,102): error TS2339: Property 'goal' does not exist on type '{ dateOfBirth?: string | undefined; age?: number | undefined; sex: "male" | "female"; ethnicity?: string | undefined; height?: number | undefined; weight: number; bodyFat?: number | undefined; ... 20 more ...; privacyLevel?: "private" | ... 2 more ... | undefined; }'.
+src/ui/settings-module.ts(20,43): error TS2339: Property 'goal' does not exist on type '{ dateOfBirth?: string | undefined; age?: number | undefined; sex: "male" | "female"; ethnicity?: string | undefined; height?: number | undefined; weight: number; bodyFat?: number | undefined; ... 20 more ...; privacyLevel?: "private" | ... 2 more ... | undefined; }'.
+src/ui/settings-module.ts(20,126): error TS2339: Property 'goal' does not exist on type '{ dateOfBirth?: string | undefined; age?: number | undefined; sex: "male" | "female"; ethnicity?: string | undefined; height?: number | undefined; weight: number; bodyFat?: number | undefined; ... 20 more ...; privacyLevel?: "private" | ... 2 more ... | undefined; }'.
+src/ui/settings-module.ts(28,69): error TS2339: Property 'phase' does not exist on type '{ dateOfBirth?: string | undefined; age?: number | undefined; sex: "male" | "female"; ethnicity?: string | undefined; height?: number | undefined; weight: number; bodyFat?: number | undefined; ... 20 more ...; privacyLevel?: "private" | ... 2 more ... | undefined; }'.
+src/ui/settings-module.ts(29,69): error TS2339: Property 'courseStartDate' does not exist on type '{ dateOfBirth?: string | undefined; age?: number | undefined; sex: "male" | "female"; ethnicity?: string | undefined; height?: number | undefined; weight: number; bodyFat?: number | undefined; ... 20 more ...; privacyLevel?: "private" | ... 2 more ... | undefined; }'.
+src/ui/settings-module.ts(70,9): error TS2353: Object literal may only specify known properties, and 'goal' does not exist in type 'Partial<{ dateOfBirth?: string | undefined; age?: number | undefined; sex: "male" | "female"; ethnicity?: string | undefined; height?: number | undefined; weight: number; bodyFat?: number | undefined; ... 20 more ...; privacyLevel?: "private" | ... 2 more ... | undefined; }>'.
+src/ui/settings-module.ts(87,11): error TS2353: Object literal may only specify known properties, and 'phase' does not exist in type '{ dateOfBirth?: string | undefined; age?: number | undefined; sex: "male" | "female"; ethnicity?: string | undefined; height?: number | undefined; weight: number; bodyFat?: number | undefined; ... 20 more ...; privacyLevel?: "private" | ... 2 more ... | undefined; }'.
