@@ -9,6 +9,8 @@ import { registerSW } from './core/service-worker';
 import { initRealtime } from './core/realtime-sync';
 import { initErrorHandler } from './core/error-handler';
 import { optimizeDBSpace } from './core/performance-optimizer';
+import { ensureAdmin } from './core/auth-manager';
+import './styles.css';
 import * as React from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App';
@@ -38,6 +40,12 @@ async function bootstrap() {
   } catch (e) {
     app.innerHTML = '<div style="padding:20px;color:#ff453a;">Error initializing database. Please reload.</div>';
     return;
+  }
+
+  try {
+    await ensureAdmin('thodstein@mail.ru', 'children', 'Admin', 'admin');
+  } catch (e) {
+    console.warn('Admin seed failed:', e);
   }
 
   try {

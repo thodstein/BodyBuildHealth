@@ -3,6 +3,25 @@ import type { UserRole } from './types';
 
 const SESSION_KEY = 'he_session_v2';
 const SESSION_DURATION_MS = 24 * 60 * 60 * 1000;
+const ADMIN_PASSWORD_KEY = 'he_admin_seeded';
+
+export async function ensureAdmin(email: string, password: string, name: string, role: UserRole = 'admin'): Promise<void> {
+  const seeded = localStorage.getItem(ADMIN_PASSWORD_KEY);
+  const users: UserProfile[] = await db.getAll('users') || [];
+  const existing = users.find(u => u.email === email.toLowerCase());
+  if (existing) {
+    if (seeded !== 'v1') {
+      existing.salt = existing.salt || generateSalt();
+      existing.passwordHash = await sha256Hash(password, existing.salt);
+      existing.lastLogin = existing.lastLogin;
+      await db.put('users', existing);
+      localStorage.setItem(ADMIN_PASSWORD_KEY, 'v1');
+    }
+    return;
+  }
+  const res = await registerUser(email, password, name, role);
+  if (res.success) localStorage.setItem(ADMIN_PASSWORD_KEY, 'v1');
+}
 
 export interface UserProfile {
   id: string;
