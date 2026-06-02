@@ -82,7 +82,7 @@ export const PharmaScreen: React.FC = () => {
         ] as [Tab, string][]).map(([key, label]) => (
           <button
             key={key}
-            className={`btn${tab === key ? ' btn-primary' : ''}`}
+            className={`btn${tab === key ? ' active' : ''}`}
             style={{ fontSize: 12, padding: '6px 10px', whiteSpace: 'nowrap' }}
             onClick={() => setTab(key)}
           >
@@ -386,7 +386,7 @@ const PKPDSimulationTab: React.FC = () => {
         ))}
       </div>
       <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
-        <button className="btn btn-primary" onClick={runSimulation}>Симуляция</button>
+        <button className="btn" onClick={runSimulation}>Симуляция</button>
         <button className="btn" onClick={addDrug}>+ Препарат</button>
       </div>
 
@@ -457,7 +457,7 @@ const DosageCalculatorTab: React.FC = () => {
           <input type="number" value={weight} onChange={(e) => setWeight(Number(e.target.value))} placeholder="Вес (кг)" />
           <input type="number" value={concentration} onChange={(e) => setConcentration(Number(e.target.value))} placeholder="мг/мл" />
         </div>
-        <button onClick={run} className="btn btn-primary">Рассчитать</button>
+        <button onClick={run} className="btn">Рассчитать</button>
       </div>
       {result && <pre className="output" style={{ whiteSpace: 'pre-wrap', fontSize: 12 }}>{result}</pre>}
     </div>

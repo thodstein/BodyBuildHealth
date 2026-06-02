@@ -71,8 +71,8 @@ export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
   const [riskResult, setRiskResult] = useState<RiskResult | null>(null);
   const [readiness, setReadiness] = useState<ReadinessScores | null>(null);
   const [alerts, setAlerts] = useState<string[]>([]);
-  const [prevRisk, setPrevRisk] = useState<number | undefined>(undefined);
-  const prevRiskRef = useRef<number | undefined>(undefined);
+  const [prevRecovery, setPrevRecovery] = useState<number | undefined>(undefined);
+  const prevRecoveryRef = useRef<number | undefined>(undefined);
   const [courseEntries, setCourseEntries] = useState<CourseEntry[]>([]);
   const [labCount, setLabCount] = useState(0);
   const [missingLabs, setMissingLabs] = useState<string[]>([]);
@@ -197,8 +197,8 @@ export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
     }
 
     setAlerts(newAlerts);
-    setPrevRisk(prevRiskRef.current);
-    prevRiskRef.current = risk.overallRaw;
+    setPrevRecovery(prevRecoveryRef.current);
+    prevRecoveryRef.current = rdy.recovery;
     };
     loadData();
   }, []);
@@ -263,10 +263,10 @@ export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
 
       <AlertBanner messages={alerts} />
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginBottom: 4 }}>
+      <div className="dashboard-stats-4" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginBottom: 4 }}>
         <div style={{ background: 'var(--bg-secondary)', borderRadius: 8, padding: '10px 12px', textAlign: 'center' }}>
           <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 4 }}>Восстановление</div>
-          <div style={{ fontSize: 20, fontWeight: 700, color: scoreColor(readiness.recovery, 40, 70) }}>{readiness.recovery}%<TrendArrow current={readiness.recovery} previous={prevRisk} /></div>
+          <div style={{ fontSize: 20, fontWeight: 700, color: scoreColor(readiness.recovery, 40, 70) }}>{readiness.recovery}%<TrendArrow current={readiness.recovery} previous={prevRecovery} /></div>
           <ProgressBar value={readiness.recovery} color={scoreColor(readiness.recovery, 40, 70)} />
         </div>
         <div style={{ background: 'var(--bg-secondary)', borderRadius: 8, padding: '10px 12px', textAlign: 'center' }}>
@@ -286,7 +286,7 @@ export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 4 }}>
+      <div className="dashboard-stats-3" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 4 }}>
         <div style={{ background: 'var(--bg-secondary)', borderRadius: 8, padding: '10px 12px', textAlign: 'center' }}>
           <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>Препараты</div>
           <div style={{ fontSize: 18, fontWeight: 700 }}>{activeDrugCount}</div>
@@ -337,6 +337,32 @@ export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
       <SectionHeader title="Рекомендации" onNavigate={onNavigate} screenId="plan" />
       <div className="grid recs">
         {recs.map(r => <RecommendationCard key={r.recId} rec={r} />)}
+      </div>
+
+      <div style={{ marginTop: 20 }}>
+        <h2 style={{ marginBottom: 10 }}>Быстрый доступ</h2>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+          <div className="card" style={{ cursor: 'pointer', textAlign: 'center' }} onClick={onNavigate ? () => onNavigate('marketplace') : undefined}>
+            <div style={{ fontSize: 28, marginBottom: 6 }}>&#128722;</div>
+            <div style={{ fontSize: 13, fontWeight: 600 }}>Маркетплейс</div>
+            <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>Препараты и БАДы</div>
+          </div>
+          <div className="card" style={{ cursor: 'pointer', textAlign: 'center' }} onClick={onNavigate ? () => onNavigate('articles') : undefined}>
+            <div style={{ fontSize: 28, marginBottom: 6 }}>&#128218;</div>
+            <div style={{ fontSize: 13, fontWeight: 600 }}>Статьи</div>
+            <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>База знаний</div>
+          </div>
+          <div className="card" style={{ cursor: 'pointer', textAlign: 'center' }} onClick={onNavigate ? () => onNavigate('assistant') : undefined}>
+            <div style={{ fontSize: 28, marginBottom: 6 }}>&#129302;</div>
+            <div style={{ fontSize: 13, fontWeight: 600 }}>Ассистент</div>
+            <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>Чекапы и ответы</div>
+          </div>
+          <div className="card" style={{ cursor: 'pointer', textAlign: 'center' }} onClick={onNavigate ? () => onNavigate('reports') : undefined}>
+            <div style={{ fontSize: 28, marginBottom: 6 }}>&#128202;</div>
+            <div style={{ fontSize: 13, fontWeight: 600 }}>Отчёты</div>
+            <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>Экспорт и печать</div>
+          </div>
+        </div>
       </div>
 
       {readiness.isConservative && (

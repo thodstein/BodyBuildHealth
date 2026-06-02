@@ -45,7 +45,7 @@ export async function extractTextFromFile(file: File): Promise<string> {
   return new Promise((res, rej) => {
     const reader = new FileReader();
     reader.onload = () => res(String(reader.result));
-    reader.onerror = () => rej(new Error('File read failed'));
+    reader.onerror = () => rej(new Error('Ошибка чтения файла'));
     reader.readAsText(file);
   });
 }

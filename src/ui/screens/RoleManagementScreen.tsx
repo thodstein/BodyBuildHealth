@@ -207,7 +207,7 @@ export const RoleManagementScreen: React.FC = () => {
         <h2>Управление ролями и правами доступа</h2>
         <p>Настройка ролей пользователей и их прав доступа к функционалу системы</p>
         <div className="role-management-actions">
-          <button className="btn-primary" onClick={() => { setShowAddForm(true); setSelectedUser(null); }}>
+          <button className="btn" onClick={() => { setShowAddForm(true); setSelectedUser(null); }}>
             Добавить пользователя
           </button>
         </div>
@@ -234,8 +234,8 @@ export const RoleManagementScreen: React.FC = () => {
             </label>
           </div>
           <div className="form-actions">
-            <button className="btn-primary" onClick={handleAddUser}>Добавить</button>
-            <button className="btn-secondary" onClick={() => setShowAddForm(false)}>Отмена</button>
+            <button className="btn" onClick={handleAddUser}>Добавить</button>
+            <button className="btn secondary" onClick={() => setShowAddForm(false)}>Отмена</button>
           </div>
         </div>
       )}
@@ -288,14 +288,14 @@ export const RoleManagementScreen: React.FC = () => {
           <div className="notes-editor">
             <h4>Заметки</h4>
             <textarea value={editNotes} onChange={e => setEditNotes(e.target.value)} rows={3} />
-            <button className="btn-secondary" onClick={() => handleSaveNotes(selectedUser.id)}>Сохранить заметки</button>
+            <button className="btn secondary" onClick={() => handleSaveNotes(selectedUser.id)}>Сохранить заметки</button>
           </div>
 
           <div className="user-actions">
             {selectedUser.id !== currentUserId && (
-              <button className="btn-danger" onClick={() => handleDeleteUser(selectedUser.id)}>Удалить пользователя</button>
+              <button className="btn danger" onClick={() => handleDeleteUser(selectedUser.id)}>Удалить пользователя</button>
             )}
-            <button className="btn-secondary" onClick={() => setSelectedUser(null)}>Закрыть</button>
+            <button className="btn secondary" onClick={() => setSelectedUser(null)}>Закрыть</button>
           </div>
         </div>
       )}

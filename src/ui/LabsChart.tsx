@@ -3,7 +3,7 @@ import { Line } from 'react-chartjs-2';
 
 const LabsChart: React.FC = () => {
   // TODO: Implement chart logic
-  return <div>Labs Chart Placeholder</div>;
+  return <div>График анализов (заглушка)</div>;
 };
 
 export default LabsChart;

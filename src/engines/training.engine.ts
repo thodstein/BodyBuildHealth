@@ -10,21 +10,21 @@ const MV_MR_V: Record<string, { mv: number; mev: number; mav: number; mrv: numbe
 
 // ТЗ §6.1: Дерево выбора сплита (15 вариантов)
 const SPLITS: Record<string, { name: string; days: number; desc: string; condition: (i: TrainingInput) => boolean; volumeModifier?: Record<string, number> }> = {
-  recovery_3:   { name: 'Recovery Split 3x', days: 3, desc: '50% объёма, RIR 4, безопасные движения', condition: i => i.recovery < 50 || i.fatigue > 70 || i.nutrition < 50, volumeModifier: { chest: 0.5, back: 0.5, legs: 0.5, shoulders: 0.5, arms: 0.5, core: 0.5 } },
-  fullbody_3:   { name: 'Full Body 3x', days: 3, desc: 'Все группы на каждой тренировке', condition: i => i.daysPerWeek === 3 && i.recovery >= 50 },
-  upperlower_4: { name: 'Upper/Lower 4x', days: 4, desc: 'Верх/низ чередуются', condition: i => i.daysPerWeek === 4 && i.recovery >= 55 },
-  upperlower_5: { name: 'Upper/Lower 5x', days: 5, desc: '3 верх / 2 низ', condition: i => i.daysPerWeek === 5 && i.level === 'advanced' && i.recovery >= 65 },
-  ppl_accent_5: { name: 'PPL + Accent 5x', days: 5, desc: 'Push/Pull/Legs + 2 акцентных', condition: i => i.daysPerWeek === 5 && i.weakPoints.length > 0 },
+  recovery_3:   { name: 'Восстановительный 3x', days: 3, desc: '50% объёма, RIR 4, безопасные движения', condition: i => i.recovery < 50 || i.fatigue > 70 || i.nutrition < 50, volumeModifier: { chest: 0.5, back: 0.5, legs: 0.5, shoulders: 0.5, arms: 0.5, core: 0.5 } },
+  fullbody_3:   { name: 'Фулбоди 3x', days: 3, desc: 'Все группы на каждой тренировке', condition: i => i.daysPerWeek === 3 && i.recovery >= 50 },
+  upperlower_4: { name: 'Верх/Низ 4x', days: 4, desc: 'Верх/низ чередуются', condition: i => i.daysPerWeek === 4 && i.recovery >= 55 },
+  upperlower_5: { name: 'Верх/Низ 5x', days: 5, desc: '3 верх / 2 низ', condition: i => i.daysPerWeek === 5 && i.level === 'advanced' && i.recovery >= 65 },
+  ppl_accent_5: { name: 'PPL + Акцент 5x', days: 5, desc: 'Push/Pull/Legs + 2 акцентных', condition: i => i.daysPerWeek === 5 && i.weakPoints.length > 0 },
   ppl_2x_6:     { name: 'PPL 2x 6x', days: 6, desc: 'PPL дважды в неделю', condition: i => i.daysPerWeek >= 6 && i.recovery >= 70 && i.fatigue < 60 },
-  ppl_hybrid_4: { name: 'PPL Hybrid 4x', days: 4, desc: 'Push, Pull, Legs, Upper', condition: i => i.daysPerWeek === 4 && i.level === 'intermediate' },
-  arnold_6:     { name: 'Arnold Split 6x', days: 6, desc: 'Грудь+спина, плечи+руки, ноги', condition: i => i.daysPerWeek === 6 && i.goal !== 'strength' && i.recovery >= 65 },
-  bro_5:        { name: 'Bro Split 5x', days: 5, desc: 'Одна группа в день', condition: i => i.daysPerWeek === 5 && i.level !== 'beginner' && i.goal === 'hypertrophy' },
-  strength_4:   { name: 'Strength Bias 4x', days: 4, desc: 'Compound фокус, RIR 2-3', condition: i => i.goal === 'strength' },
-  hypertrophy_6:{ name: 'Hypertrophy Bias 6x', days: 6, desc: 'Высокий объём, ROM bias', condition: i => i.daysPerWeek === 6 && i.goal === 'hypertrophy' && i.recovery >= 60 },
-  torso_limbs_4:{ name: 'Torso/Limbs 4x', days: 4, desc: 'Торс отдельно, конечности отдельно', condition: i => i.daysPerWeek === 4 && !!(i.injuries?.includes('lower') || i.injuries?.includes('back')) },
-  pushpull_la_5:{ name: 'Push/Pull + Legs+Arms 5x', days: 5, desc: 'Компромисс PPL/Bro', condition: i => i.daysPerWeek === 5 && i.weakPoints.length === 0 },
-  cbs_da_5:     { name: 'Chest/Back/Legs/Delts/Arms 5x', days: 5, desc: 'Классический раздельный', condition: i => i.daysPerWeek === 5 && i.recovery >= 65 && i.level !== 'beginner' },
-  spec_5:       { name: 'Specialization 5x', days: 5, desc: 'Частота на 1-2 отстающих', condition: i => i.daysPerWeek === 5 && i.weakPoints.length === 1 }
+  ppl_hybrid_4: { name: 'PPL Гибрид 4x', days: 4, desc: 'Push, Pull, Legs, Upper', condition: i => i.daysPerWeek === 4 && i.level === 'intermediate' },
+  arnold_6:     { name: 'Сплит Арнольда 6x', days: 6, desc: 'Грудь+спина, плечи+руки, ноги', condition: i => i.daysPerWeek === 6 && i.goal !== 'strength' && i.recovery >= 65 },
+  bro_5:        { name: 'Бро-сплит 5x', days: 5, desc: 'Одна группа в день', condition: i => i.daysPerWeek === 5 && i.level !== 'beginner' && i.goal === 'hypertrophy' },
+  strength_4:   { name: 'Силовой 4x', days: 4, desc: 'Compound фокус, RIR 2-3', condition: i => i.goal === 'strength' },
+  hypertrophy_6:{ name: 'Гипертрофийный 6x', days: 6, desc: 'Высокий объём, акцент ROM', condition: i => i.daysPerWeek === 6 && i.goal === 'hypertrophy' && i.recovery >= 60 },
+  torso_limbs_4:{ name: 'Торс/Конечности 4x', days: 4, desc: 'Торс отдельно, конечности отдельно', condition: i => i.daysPerWeek === 4 && !!(i.injuries?.includes('lower') || i.injuries?.includes('back')) },
+  pushpull_la_5:{ name: 'Push/Pull + Ноги/Руки 5x', days: 5, desc: 'Компромисс PPL/Bro', condition: i => i.daysPerWeek === 5 && i.weakPoints.length === 0 },
+  cbs_da_5:     { name: 'Грудь/Спина/Ноги/Дельты/Руки 5x', days: 5, desc: 'Классический раздельный', condition: i => i.daysPerWeek === 5 && i.recovery >= 65 && i.level !== 'beginner' },
+  spec_5:       { name: 'Специализация 5x', days: 5, desc: 'Частота на 1-2 отстающих', condition: i => i.daysPerWeek === 5 && i.weakPoints.length === 1 }
 } as const;
 
 // ТЗ §5.5: RIR по целям

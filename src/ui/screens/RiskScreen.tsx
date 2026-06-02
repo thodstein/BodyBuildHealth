@@ -152,10 +152,7 @@ export const RiskScreen: React.FC = () => {
 
         const labRisks = calculateRiskFromAnalyses(userLabs);
         const labRawRisks: Record<string, number> = {};
-        RISK_SYSTEMS.forEach((s) => { labRawRisks[s] = 0; });
-        if (labRisks.systemContributions.hepatic !== undefined) labRawRisks.hepatic = labRisks.systemContributions.hepatic;
-        if (labRisks.systemContributions.renal !== undefined) labRawRisks.renal = labRisks.systemContributions.renal;
-        labRawRisks.endocrine = Math.max(labRisks.systemContributions.endocrine || 0, labRisks.systemContributions.cardio || 0);
+        RISK_SYSTEMS.forEach((s) => { labRawRisks[s] = labRisks.systemContributions[s] ?? 0; });
 
         const finalResult = calculateRisks({
           genetics, nutritionFactor, trainingFactor,
@@ -165,11 +162,8 @@ export const RiskScreen: React.FC = () => {
         if (finalResult.systemBreakdown) {
           for (const sys of RISK_SYSTEMS) {
             if (finalResult.systemBreakdown[sys]) {
-              finalResult.systemBreakdown[sys].raw = Math.max(finalResult.systemBreakdown[sys].raw, labRawRisks[sys] || 0);
-              finalResult.systemBreakdown[sys].net = Math.min(
-                finalResult.systemBreakdown[sys].net,
-                Math.max(finalResult.systemBreakdown[sys].net, labRawRisks[sys] || 0)
-              );
+              finalResult.systemBreakdown[sys].raw = Math.max(finalResult.systemBreakdown[sys].raw, labRawRisks[sys] ?? 0);
+              finalResult.systemBreakdown[sys].net = Math.max(finalResult.systemBreakdown[sys].net, labRawRisks[sys] ?? 0);
             }
           }
         }

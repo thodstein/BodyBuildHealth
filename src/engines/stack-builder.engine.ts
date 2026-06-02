@@ -68,7 +68,7 @@ export function selectBestStack(goalId: string) {
         synergy_score: 0
       },
       score: 0,
-      reason: 'Goal not found'
+      reason: 'Цель не найдена'
     };
   }
 

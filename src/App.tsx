@@ -80,6 +80,21 @@ export default function App() {
 
   useEffect(() => { registry.init().then(() => setInitialized(true)); }, []);
 
+  const navToScreen = (screenId: string) => {
+    const map: Record<string, [Tab, string]> = {
+      dashboard: ['home', ''], pharma: ['pharma', 'drugs'], course: ['pharma', 'course'],
+      nutrition: ['nutrition', 'diary'], plan: ['training', 'plan'], substances: ['pharma', 'substances'],
+      labs: ['labs', 'results'], risks: ['risks', 'matrix'], profile: ['profile', 'settings'],
+      predictive: ['training', 'whatif'], marketplace: ['pharma', 'marketplace'],
+      articles: ['profile', 'articles'], assistant: ['profile', 'assistant'],
+      gamification: ['profile', 'gamification'], fertility: ['risks', 'fertility'], 'fertility-pct': ['risks', 'fertility'],
+      calculators: ['nutrition', 'calc'], reports: ['profile', 'reports'],
+      integrations: ['profile', 'integrations'], 'role-management': ['profile', 'roles'],
+    };
+    const entry = map[screenId];
+    if (entry) go(entry[0], entry[1]);
+  };
+
   const go = (t: Tab, s?: SubPage) => {
     setTab(t);
     setSub(s || '');
@@ -111,7 +126,6 @@ export default function App() {
         { id: 'calc-pharma', label: 'Калькулятор' },
         { id: 'peptides', label: 'Пептиды' },
         { id: 'substances', label: 'Справочник' },
-        { id: 'marketplace', label: 'Маркетплейс' },
       ];
       case 'training': return [
         { id: 'plan', label: 'План' },
@@ -120,8 +134,8 @@ export default function App() {
       ];
       case 'nutrition': return [
         { id: 'diary', label: 'Дневник' },
-        { id: 'calc', label: 'Калькуляторы' },
-        { id: 'bady', label: 'БАДы' },
+        { id: 'calc', label: 'Калькулятор' },
+        { id: 'support', label: 'Поддержка' },
       ];
       case 'labs': return [
         { id: 'results', label: 'Ввод анализов' },
@@ -140,7 +154,6 @@ export default function App() {
         { id: 'reports', label: 'Отчёты' },
         { id: 'integrations', label: 'Интеграции' },
         { id: 'assistant', label: 'Ассистент' },
-        { id: 'articles', label: 'Статьи' },
       ];
       default: return [];
     }
@@ -162,13 +175,12 @@ export default function App() {
         case 'calc-pharma': return <CalculatorsScreen />;
         case 'peptides': return <PeptidesScreen />;
         case 'substances': return <SubstancesScreen />;
-        case 'marketplace': return <MarketplaceScreen />;
         case 'plan': return <PlanScreen goal="energy" />;
-        case 'readiness': return <DashboardScreen />;
+        case 'readiness': return <DashboardScreen onNavigate={navToScreen} />;
         case 'whatif': return <PredictiveAnalyticsScreen />;
         case 'diary': return <NutritionScreen />;
         case 'calc': return <CalculatorsScreen />;
-        case 'bady': return <CalculatorsScreen initialTab="support" />;
+        case 'support': return <CalculatorsScreen initialTab="support" />;
         case 'results': return <LabsScreen initialTab="input" />;
         case 'panels': return <LabsScreen initialTab="panels" />;
         case 'history': return <LabsScreen initialTab="history" />;
@@ -182,27 +194,28 @@ export default function App() {
         case 'integrations': return <IntegrationsScreen />;
         case 'roles': return <RoleManagementScreen />;
         case 'assistant': return <SmartAssistantScreen />;
+        case 'marketplace': return <MarketplaceScreen />;
         case 'articles': return <ArticlesScreen />;
         default: return <DashboardScreen />;
       }
     }
 
     switch (tab) {
-      case 'home': return <DashboardScreen />;
+      case 'home': return <DashboardScreen onNavigate={navToScreen} />;
       case 'pharma': return <PharmaScreen />;
       case 'training': return <PlanScreen goal="energy" />;
       case 'nutrition': return <NutritionScreen />;
       case 'labs': return <LabsScreen />;
       case 'risks': return <RiskScreen />;
       case 'profile': return <ProfileScreen />;
-      default: return <DashboardScreen />;
+      default: return <DashboardScreen onNavigate={navToScreen} />;
     }
   };
 
   return (
     <div className="app" onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
       <HulkBg />
-      <main ref={mainRef} style={{ position: 'relative', zIndex: 1 }}>
+      <main ref={mainRef} className={subItems.length > 0 ? 'has-sub-nav' : ''} style={{ position: 'relative', zIndex: 1 }}>
         {renderContent()}
       </main>
       <ToastContainer />

@@ -1,10 +1,12 @@
-﻿import React, { useState } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { calculateDose } from '../../engines/dosage.engine';
 import { SYRINGE_SPECS, DRUG_THRESHOLDS } from '../../core/constants';
 import { calcNutrition } from '../../engines/nutrition.engine';
 import { calculateSupport, generateSupportStack } from '../../engines/support.engine';
 import { PHARMA_DB, SUBSTANCES_BY_CLASS } from '../../core/pharma-database';
-import type { DoseRequest, NutritionInput } from '../../core/types';
+import { getProfile } from '../../core/profile-manager';
+import { db } from '../../core/db';
+import type { DoseRequest, NutritionInput, CourseEntry } from '../../core/types';
 
 const PAL_OPTIONS = [
   { value: 1.2, label: 'Минимальная (сидячий образ жизни)' },
@@ -84,6 +86,26 @@ export const CalculatorsScreen: React.FC<CalcProps> = ({ initialTab = 'fitness' 
   const [supportDrugs, setSupportDrugs] = useState<string[]>([]);
   const [supportGoal, setSupportGoal] = useState('muscle_gain');
   const [supportResult, setSupportResult] = useState<ReturnType<typeof calculateSupport> | null>(null);
+
+  useEffect(() => {
+    const s = getProfile().settings;
+    if (!s) return;
+    const w = s.weight || 70;
+    const h = s.height || 175;
+    const a = s.age || 25;
+    const sex = s.sex || 'male';
+    const goal = s.goal || s.primaryGoal || 'maintenance';
+    setBmiWeight(w); setBmiHeight(h);
+    setBmrWeight(w); setBmrHeight(h); setBmrAge(a); setBmrSex(sex);
+    setBmrKmWeight(w); if (s.bodyFat) setBmrKmBodyFat(s.bodyFat);
+    setMacroWeight(w); setMacroHeight(h); setMacroAge(a); setMacroSex(sex); setMacroGoal(goal);
+    setGripSex(sex); setGripAge(a);
+    const goalMap: Record<string, string> = { bulk: 'muscle_gain', cut: 'fat_loss', strength: 'strength', endurance: 'endurance', recomp: 'recomp', maintenance: 'maintenance' };
+    if (goalMap[goal]) setSupportGoal(goalMap[goal]);
+    db.init().then(() => db.getAll<CourseEntry>('course_log')).then(entries => {
+      if (entries.length > 0) setSupportDrugs(entries.map(e => e.substanceId));
+    }).catch(() => {});
+  }, []);
 
   const calcSupport = () => {
     const result = calculateSupport({
@@ -202,11 +224,11 @@ export const CalculatorsScreen: React.FC<CalcProps> = ({ initialTab = 'fitness' 
         <p>Инструменты для расчёта показателей здоровья и производительности</p>
       </div>
 
-      <div className="tabs">
-        <button className={activeTab === 'fitness' ? 'active' : ''} onClick={() => setActiveTab('fitness')}>Фитнес</button>
-        <button className={activeTab === 'nutrition' ? 'active' : ''} onClick={() => setActiveTab('nutrition')}>Питание</button>
-        <button className={activeTab === 'health' ? 'active' : ''} onClick={() => setActiveTab('health')}>Здоровье</button>
-        <button className={activeTab === 'support' ? 'active' : ''} onClick={() => setActiveTab('support')}>Поддержка</button>
+      <div className="calc-tabs">
+        <button className={'calc-tab-btn' + (activeTab === 'fitness' ? ' active' : '')} onClick={() => setActiveTab('fitness')}>Фитнес</button>
+        <button className={'calc-tab-btn' + (activeTab === 'nutrition' ? ' active' : '')} onClick={() => setActiveTab('nutrition')}>Питание</button>
+        <button className={'calc-tab-btn' + (activeTab === 'health' ? ' active' : '')} onClick={() => setActiveTab('health')}>Здоровье</button>
+        <button className={'calc-tab-btn' + (activeTab === 'support' ? ' active' : '')} onClick={() => setActiveTab('support')}>Поддержка</button>
       </div>
 
       {activeTab === 'fitness' && (
@@ -231,7 +253,7 @@ export const CalculatorsScreen: React.FC<CalcProps> = ({ initialTab = 'fitness' 
             </div>
 
             <div className="calculator-item">
-              <h4>BMR (Mifflin-St Jeor)</h4>
+              <h4>BMR (Миффлин-Сан Жеор)</h4>
               <p className="description">Базовый метаболизм: 10×вес + 6.25×рост − 5×возраст ± 161</p>
               <div className="input-group">
                 <label>Вес (кг): <input type="number" value={bmrWeight} onChange={e => setBmrWeight(Number(e.target.value))} /></label>
@@ -253,7 +275,7 @@ export const CalculatorsScreen: React.FC<CalcProps> = ({ initialTab = 'fitness' 
             </div>
 
             <div className="calculator-item">
-              <h4>BMR (Katch-McArdle)</h4>
+              <h4>BMR (Кэтч-Мкардл)</h4>
               <p className="description">370 + 21.6 × LBM — для людей с известным % жира</p>
               <div className="input-group">
                 <label>Вес (кг): <input type="number" value={bmrKmWeight} onChange={e => setBmrKmWeight(Number(e.target.value))} /></label>
@@ -366,7 +388,7 @@ export const CalculatorsScreen: React.FC<CalcProps> = ({ initialTab = 'fitness' 
             </div>
 
             <div className="calculator-item">
-              <h4>Макросы (calcNutrition)</h4>
+              <h4>Макросы (расчёт БЖУ)</h4>
               <p className="description">Полный расчёт БЖУ и микроэлементов по двигу nutrition</p>
               <div className="input-group">
                 <label>Вес (кг): <input type="number" value={macroWeight} onChange={e => setMacroWeight(Number(e.target.value))} /></label>

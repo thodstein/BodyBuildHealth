@@ -26,9 +26,9 @@ export function calcReadiness(i: ReadinessInput): ReadinessScores {
   const fat = Math.max(0, Math.min(100, (tl * 0.5 + sf * 0.3 + hr * 0.2) * 100));
 
   let cons = false, reason = '';
-  if (rec < 40) { cons = true; reason = 'Recovery < 40'; }
-  else if (fat > 70) { cons = true; reason = 'Fatigue > 70'; }
-  else if (nut < 50) { cons = true; reason = 'Nutrition < 50'; }
+  if (rec < 40) { cons = true; reason = 'Восстановление < 40'; }
+  else if (fat > 70) { cons = true; reason = 'Усталость > 70'; }
+  else if (nut < 50) { cons = true; reason = 'Питание < 50'; }
 
   return { recovery: Math.round(rec), nutrition: Math.round(nut), support: Math.round(sup), fatigue: Math.round(fat), isConservative: cons, conservativeReason: reason };
 }

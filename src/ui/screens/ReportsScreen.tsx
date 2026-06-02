@@ -409,11 +409,11 @@ export const ReportsScreen: React.FC = () => {
       </div>
 
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 16 }}>
-        <button className="btn-primary" onClick={handleExportJSON}>Экспорт всех данных (JSON)</button>
-        <button className="btn-secondary" onClick={handleExportDiaryCSV}>Экспорт дневника (CSV)</button>
-        <button className="btn-secondary" onClick={handleExportLabsCSV}>Экспорт анализов (CSV)</button>
-        <button className="btn-secondary" onClick={() => window.print()}>Печать отчёта (PDF)</button>
-        <button className="btn-secondary" onClick={() => fileInputRef.current?.click()}>Импорт JSON</button>
+        <button className="btn" onClick={handleExportJSON}>Экспорт всех данных (JSON)</button>
+        <button className="btn secondary" onClick={handleExportDiaryCSV}>Экспорт дневника (CSV)</button>
+        <button className="btn secondary" onClick={handleExportLabsCSV}>Экспорт анализов (CSV)</button>
+        <button className="btn secondary" onClick={() => window.print()}>Печать отчёта (PDF)</button>
+        <button className="btn secondary" onClick={() => fileInputRef.current?.click()}>Импорт JSON</button>
         <input ref={fileInputRef} type="file" accept=".json" style={{ display: 'none' }} onChange={handleImportJSON} />
       </div>
 

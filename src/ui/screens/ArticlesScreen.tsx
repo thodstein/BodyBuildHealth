@@ -104,7 +104,7 @@ export const ArticlesScreen: React.FC = () => {
       <div className="articles-grid">
         {filteredArticles.map(article => (
           <div key={article.id} className="article-card">
-            {article.isPinned && <span className="premium-badge">PREMIUM</span>}
+            {article.isPinned && <span className="premium-badge">ПРЕМИУМ</span>}
             <h3>{article.title}</h3>
             <p className="article-meta">
               <span>{article.authorId}</span> ·

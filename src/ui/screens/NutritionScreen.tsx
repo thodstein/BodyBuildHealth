@@ -109,6 +109,16 @@ function FoodSearchModal({ onSelect, onClose }: { onSelect: (food: typeof FOOD_D
           autoFocus
           style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', fontSize: 14, marginBottom: 8, boxSizing: 'border-box' }}
         />
+        <div style={{ display:'flex', gap:8, alignItems:'center', marginBottom:8 }}>
+          <label style={{ fontSize:12, color:'var(--text-light)', whiteSpace:'nowrap' }}>Порция (г):</label>
+          <input
+            type="number"
+            value={weight}
+            onChange={e => setWeight(Number(e.target.value))}
+            min={1}
+            style={{ width:70, padding:'4px 8px', borderRadius:6, border:'1px solid var(--border)', background:'var(--bg-secondary)', color:'var(--text-primary)', fontSize:13, boxSizing:'border-box' }}
+          />
+        </div>
         <div style={{ overflowY: 'auto', flex: 1 }}>
           {results.map(food => (
             <div
@@ -240,7 +250,8 @@ function DiaryTab({ diary, setDiary, targets }: { diary: Record<string, DayDiary
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16, padding: '10px 12px', background: 'var(--bg-secondary)', borderRadius: 10 }}>
         <span style={{ fontSize: 14, fontWeight: 600 }}>Вода</span>
         <span style={{ fontSize: 14 }}>{day.water.toFixed(1)} / {targets?.water || 3} л</span>
-        <button onClick={addWater} style={{ background: 'var(--accent-blue)', color: '#fff', border: 'none', borderRadius: 6, padding: '4px 10px', fontSize: 12, cursor: 'pointer' }}>+ 250 мл</button>
+        <button onClick={addWater} style={{ background: 'var(--accent-blue)', color: '#fff', border: 'none', borderRadius: 6, padding: '4px 10px', fontSize: 12, cursor: 'pointer' }}>+250</button>
+        <button onClick={() => { const updated = { ...diary }; if (!updated[d]) updated[d] = emptyDay(d); updated[d] = { ...updated[d], water: (updated[d].water || 0) + 0.5 }; setDiary(updated); saveDiary(updated); }} style={{ background: 'var(--accent-blue)', color: '#fff', border: 'none', borderRadius: 6, padding: '4px 10px', fontSize: 12, cursor: 'pointer' }}>+500</button>
       </div>
 
       {targets && (
@@ -397,7 +408,7 @@ function AdviceTab({ targets, diary }: { targets: NutritionTargets | null; diary
 
   const adviceText = useMemo(() => {
     if (!targets) return 'Сначала рассчитайте цели в калькуляторе.';
-    return generateNutritionAdvice(targets, { kcal: totals.kcal, pro: totals.p, fiber: totals.fiber, water: totals.water } as any, drugs);
+    return generateNutritionAdvice(targets, { kcal: totals.kcal, pro: totals.p, fiber: totals.fiber, water: totals.water }, drugs);
   }, [targets, totals, drugs]);
 
   return (
