@@ -144,7 +144,7 @@ export const SmartAssistantScreen: React.FC = () => {
   );
 
   if (loading && messages.length === 1) {
-    return <div className="screen assistant">Загрузка Умный ассистент...</div>;
+    return <div className="screen assistant">Загрузка умного ассистента...</div>;
   }
 
   return (
@@ -190,7 +190,7 @@ export const SmartAssistantScreen: React.FC = () => {
         <div className="quick-actions">
           <button className="quick-action" onClick={() => setCheckupOpen(true)}>📋 Чекап недели</button>
           <button className="quick-action" onClick={() => { setGlossaryOpen(true); setGlossarySearch(''); setExpandedTerm(null); }}>📖 Глоссарий</button>
-          <button className="quick-action">Напоминания</button>
+          <button className="quick-action" onClick={() => alert('Раздел напоминаний в разработке')}>🔔 Напоминания</button>
         </div>
       </div>
 

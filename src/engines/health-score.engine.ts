@@ -22,9 +22,9 @@ export function calculateHealthScore(
 ): HealthScoreResult {
   // 1. Р¤Р°СЂРјР°-РЅР°РіСЂСѓР·РєР° (РѕР±СЂР°С‚РЅРѕ РїСЂРѕРїРѕСЂС†РёРѕРЅР°Р»СЊРЅР°: РјРµРЅСЊС€Рµ С‚РѕРєСЃРёС‡РЅРѕСЃС‚СЊ = РІС‹С€Рµ СЃРєРѕСЂ)
   const pkpd = calculateMultiSubstancePKPD(course, 4);
-  const avgCp = pkpd.reduce((s, w) => s + w.cp, 0) / pkpd.length;
-  const avgTol = pkpd.reduce((s, w) => s + w.tol, 0) / pkpd.length;
-  const pharmaScore = clamp(100 - (avgCp / 500 * 60) - (avgTol * 40));
+  const avgCp = pkpd.length ? pkpd.reduce((s, w) => s + w.cp, 0) / pkpd.length : 0;
+  const avgTol = pkpd.length ? pkpd.reduce((s, w) => s + w.tol, 0) / pkpd.length : 0;
+  const pharmaScore = pkpd.length ? clamp(100 - (avgCp / 500 * 60) - (avgTol * 40)) : 50;
 
   // 2. Р›Р°Р±РѕСЂР°С‚РѕСЂРЅС‹Р№ СЃС‚Р°С‚СѓСЃ (РЅР° Р±Р°Р·Рµ РёРЅРґРµРєСЃРѕРІ Рё РѕС‚РєР»РѕРЅРµРЅРёР№)
   const indices = calculateIndices(labs);

@@ -1,14 +1,19 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { SummaryCard } from '../cards/SummaryCard';
 import { SystemCard } from '../cards/SystemCard';
 import { RiskCard } from '../cards/RiskCard';
 import { RecommendationCard } from '../cards/RecommendationCard';
 import { registry } from '../../core/data/registry';
-import { HulkHero } from '../../App';
-import type { MasterDB, RiskResult, ReadinessScores } from '../../core/types';
+
+import type { MasterDB, RiskResult, ReadinessScores, CourseEntry, LabPoint } from '../../core/types';
 import { calculateRisks } from '../../engines/risk.engine';
+import { calculateRiskFromAnalyses } from '../../engines/risk-calculator-v2.engine';
 import { calcReadiness } from '../../engines/readiness.engine';
+import { generateSupportStack } from '../../engines/support.engine';
+import { RISK_SYSTEMS } from '../../core/constants';
+import { db } from '../../core/db';
 import { getProfile } from '../../core/profile-manager';
+import { PHASE_REQUIRED_PANELS, LAB_PANELS } from '../../data/labs-phase-panels';
 
 type ScreenId = 'dashboard' | 'pharma' | 'course' | 'peptides' | 'nutrition' | 'plan' | 'substances' | 'labs' | 'risks' | 'profile' | 'predictive' | 'marketplace' | 'articles' | 'assistant' | 'gamification' | 'fertility-pct' | 'calculators' | 'reports' | 'integrations' | 'role-management';
 
@@ -62,31 +67,59 @@ function SectionHeader({ title, onNavigate, screenId }: { title: string; onNavig
 }
 
 export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
-  const [db, setDb] = useState<MasterDB | null>(null);
+  const [masterDb, setMasterDb] = useState<MasterDB | null>(null);
   const [riskResult, setRiskResult] = useState<RiskResult | null>(null);
   const [readiness, setReadiness] = useState<ReadinessScores | null>(null);
   const [alerts, setAlerts] = useState<string[]>([]);
   const [prevRisk, setPrevRisk] = useState<number | undefined>(undefined);
+  const prevRiskRef = useRef<number | undefined>(undefined);
+  const [courseEntries, setCourseEntries] = useState<CourseEntry[]>([]);
+  const [labCount, setLabCount] = useState(0);
+  const [missingLabs, setMissingLabs] = useState<string[]>([]);
 
   useEffect(() => {
+    const loadData = async () => {
     const data = registry.getDB();
-    setDb(data);
+    setMasterDb(data);
 
     const profile = getProfile();
     const settings = profile.settings;
 
+    let courseData: CourseEntry[] = [];
+    let labData: (LabPoint & { patientId?: string })[] = [];
+    let missingRequiredLabs: string[] = [];
+    try {
+      await db.init();
+      courseData = await db.getAll<CourseEntry>('course_log');
+      setCourseEntries(courseData);
+      labData = await db.getAll<LabPoint & { patientId?: string }>('labs_log');
+      const userLabs = labData.filter(l => l.patientId === 'current-user');
+      setLabCount(userLabs.length);
+
+      const phase = settings.phase ?? 'baseline';
+      const requiredPanels = PHASE_REQUIRED_PANELS[phase] ?? PHASE_REQUIRED_PANELS.baseline;
+      const requiredCodes = requiredPanels.flatMap(pid => (LAB_PANELS[pid]?.markers ?? []).map(m => m.ucumCode ?? m.id));
+      const enteredCodes = new Set(userLabs.map(l => l.code.toUpperCase()));
+      missingRequiredLabs = requiredCodes.filter(code => !enteredCodes.has(code.toUpperCase()));
+      setMissingLabs(missingRequiredLabs);
+    } catch {}
+
     const activeDrugs: Record<string, { dosePerWeek: number }> = {};
-    const drugCount = Math.min(Object.keys(data.substances).length, 3);
-    const substanceIds = data.substances.slice(0, drugCount).map(s => s.id);
-    substanceIds.forEach(id => {
-      const threshold = (window as any).__DRUG_THRESHOLDS__?.[id];
-      if (threshold) activeDrugs[id] = { dosePerWeek: threshold.dosePerWeek };
+    courseData.forEach(entry => {
+      const freq = typeof entry.frequency === 'number' ? entry.frequency : entry.frequency === 'daily' ? 7 : entry.frequency === 'eod' ? 3.5 : 1;
+      activeDrugs[entry.substanceId] = { dosePerWeek: entry.doseValue * freq };
     });
 
+    const goal = settings.goal ?? settings.primaryGoal ?? 'maintenance';
+    const supportSubs = generateSupportStack(goal);
     const supportCoverage: Record<string, number> = {};
-    data.recommendations.slice(0, 8).forEach(r => {
-      if (r.riskId) supportCoverage[r.riskId] = 0.3;
-    });
+    for (const sub of supportSubs) {
+      if (sub.effects) {
+        for (const eff of sub.effects) {
+          supportCoverage[eff.effect] = (supportCoverage[eff.effect] || 0) + eff.strength;
+        }
+      }
+    }
 
     const riskInput = {
       genetics: settings.genetics,
@@ -102,7 +135,29 @@ export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
       overallInterventionResponse: undefined,
     };
     const risk = calculateRisks(riskInput);
+
+    const userLabs = labData.filter(l => l.patientId === 'current-user');
+    if (userLabs.length > 0) {
+      const labRisks = calculateRiskFromAnalyses(userLabs);
+      if (risk.systemBreakdown) {
+        for (const sys of RISK_SYSTEMS) {
+          if (risk.systemBreakdown[sys]) {
+            const labVal = labRisks.systemContributions?.[sys as keyof typeof labRisks.systemContributions] ?? 0;
+            risk.systemBreakdown[sys].raw = Math.max(risk.systemBreakdown[sys].raw, labVal);
+          }
+        }
+      }
+    }
     setRiskResult(risk);
+
+    const daysOnCourse = (() => {
+      if (settings.courseStartDate) {
+        const start = new Date(settings.courseStartDate);
+        const now = new Date();
+        return Math.max(0, Math.floor((now.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)));
+      }
+      return 0;
+    })();
 
     const readinessInput = {
       sleepHours: settings.baselineSleepHours ?? 7,
@@ -132,19 +187,29 @@ export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
     if (rdy.isConservative && rdy.conservativeReason) newAlerts.push(`Консервативный режим: ${rdy.conservativeReason}`);
 
     const highRisks = data.risks.filter(r => r.level === 'HIGH' || r.level === 'CRITICAL');
-    if (highRisks.length > 0) newAlerts.push(`${highRisks.length} риск(ов) высокого уровня`);
+    if (highRisks.length > 0)     newAlerts.push(`${highRisks.length} риск(ов) высокого уровня`);
+
+    const userLabCount = labData.filter(l => l.patientId === 'current-user').length;
+    if (userLabCount === 0) {
+      newAlerts.push('Анализы не введены — введите результаты на вкладке «Анализы» для точного расчёта рисков');
+    } else if (missingRequiredLabs.length > 0) {
+      newAlerts.push(`Не хватает ${missingRequiredLabs.length} обязательных анализов для фазы «${settings.phase ?? 'baseline'}»`);
+    }
 
     setAlerts(newAlerts);
-    setPrevRisk(undefined);
+    setPrevRisk(prevRiskRef.current);
+    prevRiskRef.current = risk.overallRaw;
+    };
+    loadData();
   }, []);
 
-  if (!db || !riskResult || !readiness) return <div className="screen dashboard"><div className="loading-spinner" /></div>;
+  if (!masterDb || !riskResult || !readiness) return <div className="screen dashboard"><div className="loading-spinner" /></div>;
 
   const totalRisk = Math.round(riskResult.overallRaw);
   const riskAfterSupport = Math.round(riskResult.overallNet);
   const riskLevel = totalRisk > 60 ? 'HIGH' : totalRisk > 30 ? 'MEDIUM' : 'LOW';
 
-  const activeDrugCount = Object.keys(riskResult.systemBreakdown).length > 0 ? Math.min(db.substances.length, 5) : 0;
+  const activeDrugCount = courseEntries.length || (Object.keys(riskResult.systemBreakdown).length > 0 ? Math.min(masterDb.substances.length, 5) : 0);
   const daysOnCourse = (() => {
     try {
       const profile = getProfile();
@@ -157,9 +222,9 @@ export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
     return 0;
   })();
 
-  const systems = db.systems.slice(0, 6);
-  const risks = db.risks.slice(0, 4);
-  const recs = db.recommendations.slice(0, 5);
+  const systems = masterDb.systems.slice(0, 6);
+  const risks = masterDb.risks.slice(0, 4);
+  const recs = masterDb.recommendations.slice(0, 5);
 
   const scoreColor = (val: number, lowThreshold: number, highThreshold: number) => {
     if (val >= highThreshold) return 'var(--success)';
@@ -175,7 +240,25 @@ export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
 
   return (
     <div className="screen dashboard">
-      <HulkHero />
+      <div className="dashboard-hero">
+        <div className="dashboard-hero-content">
+          <h1>Health Engine</h1>
+          <p>Панель состояния здоровья</p>
+        </div>
+      </div>
+
+      {labCount === 0 && (
+        <div style={{ background: 'var(--danger-dim)', border: '1px solid var(--danger)', borderRadius: 12, padding: 14, marginBottom: 12 }}>
+          <div style={{ fontWeight: 700, color: 'var(--danger)', fontSize: 14, marginBottom: 4 }}>&#9888; Анализы не введены</div>
+          <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>Для расчёта рисков и рекомендаций необходимо ввести результаты анализов. Перейдите на вкладку «Анализы».</div>
+        </div>
+      )}
+      {labCount > 0 && missingLabs.length > 0 && (
+        <div style={{ background: 'var(--warning-dim)', border: '1px solid var(--warning)', borderRadius: 12, padding: 14, marginBottom: 12 }}>
+          <div style={{ fontWeight: 700, color: 'var(--warning)', fontSize: 14, marginBottom: 4 }}>&#9888; Не хватает {missingLabs.length} анализов</div>
+          <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>Для полной оценки введите недостающие показатели: {missingLabs.slice(0, 5).join(', ')}{missingLabs.length > 5 ? '...' : ''}</div>
+        </div>
+      )}
       <SummaryCard totalRisk={totalRisk} riskAfterSupport={riskAfterSupport} riskLevel={riskLevel} />
 
       <AlertBanner messages={alerts} />
@@ -214,7 +297,7 @@ export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
         </div>
         <div style={{ background: 'var(--bg-secondary)', borderRadius: 8, padding: '10px 12px', textAlign: 'center' }}>
           <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>Лабы</div>
-          <div style={{ fontSize: 18, fontWeight: 700 }}>{db.analyses.length}</div>
+          <div style={{ fontSize: 18, fontWeight: 700 }}>{labCount}</div>
         </div>
       </div>
 

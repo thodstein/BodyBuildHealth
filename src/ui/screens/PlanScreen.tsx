@@ -1,8 +1,9 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { SubstanceCard } from '../cards/SubstanceCard';
 import { calcTraining, EXERCISE_DB, selectExercises, getAvailableSplits } from '../../engines/training.engine';
 import { generateSupportStack, calculateSupport } from '../../engines/support.engine';
 import { calcReadiness } from '../../engines/readiness.engine';
+import { getProfile } from '../../core/profile-manager';
 import type { TrainingInput, TrainingOutput, ReadinessInput, ReadinessScores, Exercise } from '../../core/types';
 
 const GOALS = [
@@ -96,6 +97,15 @@ export const PlanScreen: React.FC<{ goal: string }> = ({ goal }) => {
   const [fiberRatio, setFiberRatio] = useState(0.8);
   const [trainingLoadRatio, setTrainingLoadRatio] = useState(0.5);
   const [subjFatigue, setSubjFatigue] = useState(3);
+
+  useEffect(() => {
+    const s = getProfile().settings;
+    if (s.goal) setGoalState(s.goal);
+    if (s.baselineSleepHours) setSleepHours(s.baselineSleepHours);
+    if (s.baselineSleepQuality) setSleepQuality(Math.round(s.baselineSleepQuality * 10));
+    if (s.baselineHrvRatio) setHrvRatio(s.baselineHrvRatio);
+    if (s.baselineStressLevel) setStress(Math.round(s.baselineStressLevel));
+  }, []);
 
   const trainingResult = useMemo<TrainingOutput | null>(() => {
     const input: TrainingInput = {
@@ -227,12 +237,12 @@ export const PlanScreen: React.FC<{ goal: string }> = ({ goal }) => {
                 <h3>{trainingResult.splitName}</h3>
                 <p>{trainingResult.splitDesc}</p>
                 <div className="row">
-                  <span className="label">RIR</span>
+                    <span className="label">RIR</span>
                   <span className="value">{trainingResult.rir}</span>
                 </div>
                 {trainingResult.isDeload && (
                   <div className="deload-badge" style={{ background: 'var(--warning, #f90)', padding: '4px 8px', borderRadius: 4, marginTop: 8 }}>
-                    Делод: {trainingResult.deloadReason}
+                    Разгрузка: {trainingResult.deloadReason}
                   </div>
                 )}
               </div>
@@ -344,11 +354,11 @@ export const PlanScreen: React.FC<{ goal: string }> = ({ goal }) => {
               <input type="range" min={0} max={5} value={nightAwakenings} onChange={e => setNightAwakenings(Number(e.target.value))} />
             </div>
             <div className="form-group">
-              <label>HRV Ratio: {hrvRatio}</label>
+              <label>Коэффициент HRV: {hrvRatio}</label>
               <input type="range" min={0.5} max={1.5} step={0.05} value={hrvRatio} onChange={e => setHrvRatio(Number(e.target.value))} />
             </div>
             <div className="form-group">
-              <label>DOMS: {doms}/10</label>
+              <label>DOMS (мышечная боль): {doms}/10</label>
               <input type="range" min={0} max={10} value={doms} onChange={e => setDoms(Number(e.target.value))} />
             </div>
             <div className="form-group">

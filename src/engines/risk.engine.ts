@@ -63,12 +63,12 @@ export function calculateRisks(i: RiskInput): RiskResult {
       for (let m = 1; m <= 7; m++) {
          const id = `${s}_${m}`;
          const G = GENETIC_MULTIPLIERS[s]?.[i.genetics?.[s] || 'Val/Val'] || 1.0;
-         const N = Math.max(0.5, Math.min(1.5, i.nutritionFactor || 1));
-         const T = Math.max(1, Math.min(1.5, i.trainingFactor || 1));
+          const N = Math.max(0.5, Math.min(1.5, i.nutritionFactor ?? 1));
+          const T = Math.max(1, Math.min(1.5, i.trainingFactor ?? 1));
          
          // MRR Adjustment - based on optimal biomarker ranges
-         const mrrAdjustment = calculateMrrAdjustment(
-            i.biomarkerValues?.[s] || 1.0, 
+          const mrrAdjustment = calculateMrrAdjustment(
+             i.biomarkerValues?.[s] ?? 1.0,
             MRR_FACTORS[s]?.optimalMin || 0.8, 
             MRR_FACTORS[s]?.optimalMax || 1.2
          );
@@ -77,7 +77,7 @@ export function calculateRisks(i: RiskInput): RiskResult {
          const hgiAdjustment = calculateHgiAdjustment(i.hgiMarkers || {});
          
          // RIR Adjustment - Response to interventions
-         const rirAdjustment = calculateRirAdjustment(i.interventionResponse || 0.5);
+          const rirAdjustment = calculateRirAdjustment(i.interventionResponse ?? 0.5);
          
          let prod = 1;
          for (const [drug, d] of Object.entries(i.activeDrugs || {})) {
@@ -86,7 +86,7 @@ export function calculateRisks(i: RiskInput): RiskResult {
             const D = Math.min(2, Math.pow((d.dosePerWeek || 0) / cfg.dosePerWeek, 1.2));
             prod *= (1 - Math.min(0.99, BASE_RISK * D * G * N * T * mrrAdjustment * hgiAdjustment * rirAdjustment));
          }
-         const raw = Math.max(0, Math.min(100, (1 - prod) * 100));
+          const raw = Math.max(7, Math.min(100, (1 - prod) * 100));
          const cov = (i.supportCoverage || {})[id] || 0;
          const net = Math.max(0, raw * (1 - cov));
          rM.push(raw / 100);
@@ -99,17 +99,17 @@ export function calculateRisks(i: RiskInput): RiskResult {
    
    // Calculate overall MRR/HGI/RIR adjustments for final risk score
    const overallMrr = calculateMrrAdjustment(
-      i.overallBiomarkerValue || 1.0,
+      i.overallBiomarkerValue ?? 1.0,
       MRR_FACTORS.overall?.optimalMin || 0.8,
       MRR_FACTORS.overall?.optimalMax || 1.2
    );
    
    const overallHgi = calculateHgiAdjustment(i.overallHgiMarkers || {});
-   const overallRir = calculateRirAdjustment(i.overallInterventionResponse || 0.5);
+   const overallRir = calculateRirAdjustment(i.overallInterventionResponse ?? 0.5);
    
    return { 
       systemBreakdown: brk, 
-      overallRaw: geom(oR) * overallMrr * overallHgi * (2 - overallRir), // RIR reduces risk
-      overallNet: geom(oN) * overallMrr * overallHgi * (2 - overallRir)
+      overallRaw: Math.min(100, Math.max(0, geom(oR) * overallMrr * overallHgi * (2 - overallRir))),
+      overallNet: Math.min(100, Math.max(0, geom(oN) * overallMrr * overallHgi * (2 - overallRir)))
    };
 }

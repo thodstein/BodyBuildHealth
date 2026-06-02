@@ -316,7 +316,7 @@ export const ReportsScreen: React.FC = () => {
         <div style={{ marginBottom: 20 }}>
           <h2 style={{ fontSize: 16, borderLeft: '3px solid #ef4444', paddingLeft: 8, margin: '0 0 8px' }}>Риски</h2>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-            <thead><tr style={{ background: '#f3f4f6' }}><th style={{ padding: 6, textAlign: 'left', borderBottom: '1px solid #ccc' }}>Система</th><th style={{ padding: 6, textAlign: 'right', borderBottom: '1px solid #ccc' }}>Raw</th><th style={{ padding: 6, textAlign: 'right', borderBottom: '1px solid #ccc' }}>Net</th></tr></thead>
+            <thead><tr style={{ background: '#f3f4f6' }}><th style={{ padding: 6, textAlign: 'left', borderBottom: '1px solid #ccc' }}>Система</th><th style={{ padding: 6, textAlign: 'right', borderBottom: '1px solid #ccc' }}>Сырой</th><th style={{ padding: 6, textAlign: 'right', borderBottom: '1px solid #ccc' }}>Чистый</th></tr></thead>
             <tbody>
               {riskResult.systemBreakdown && Object.entries(riskResult.systemBreakdown).map(([sys, data]) => (
                 <tr key={sys}><td style={{ padding: 6, borderBottom: '1px solid #eee' }}>{systemLabels[sys] || sys}</td><td style={{ padding: 6, textAlign: 'right', borderBottom: '1px solid #eee' }}>{data.raw.toFixed(1)}%</td><td style={{ padding: 6, textAlign: 'right', borderBottom: '1px solid #eee' }}>{data.net.toFixed(1)}%</td></tr>
@@ -442,8 +442,8 @@ export const ReportsScreen: React.FC = () => {
             <div style={{ marginBottom: 20 }}>
               <h4>Риски</h4>
               <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
-                <div className="metric-item" style={{ background: '#1e1e2e', padding: 12, borderRadius: 8 }}><h4 style={{ margin: '0 0 4px', fontSize: 13 }}>Общий Raw</h4><p style={{ margin: 0, fontSize: 18, color: riskResult.overallRaw > 50 ? '#ef4444' : riskResult.overallRaw > 25 ? '#eab308' : '#22c55e' }}>{riskResult.overallRaw.toFixed(1)}%</p></div>
-                <div className="metric-item" style={{ background: '#1e1e2e', padding: 12, borderRadius: 8 }}><h4 style={{ margin: '0 0 4px', fontSize: 13 }}>Общий Net</h4><p style={{ margin: 0, fontSize: 18, color: riskResult.overallNet > 50 ? '#ef4444' : riskResult.overallNet > 25 ? '#eab308' : '#22c55e' }}>{riskResult.overallNet.toFixed(1)}%</p></div>
+                <div className="metric-item" style={{ background: '#1e1e2e', padding: 12, borderRadius: 8 }}><h4 style={{ margin: '0 0 4px', fontSize: 13 }}>Общий сырой</h4><p style={{ margin: 0, fontSize: 18, color: riskResult.overallRaw > 50 ? '#ef4444' : riskResult.overallRaw > 25 ? '#eab308' : '#22c55e' }}>{riskResult.overallRaw.toFixed(1)}%</p></div>
+                <div className="metric-item" style={{ background: '#1e1e2e', padding: 12, borderRadius: 8 }}><h4 style={{ margin: '0 0 4px', fontSize: 13 }}>Общий чистый</h4><p style={{ margin: 0, fontSize: 18, color: riskResult.overallNet > 50 ? '#ef4444' : riskResult.overallNet > 25 ? '#eab308' : '#22c55e' }}>{riskResult.overallNet.toFixed(1)}%</p></div>
               </div>
             </div>
           )}
@@ -593,9 +593,7 @@ export const ReportsScreen: React.FC = () => {
         </div>
       )}
 
-      <div id="printable-report-wrap-print" style={{ display: 'none' }}>
-        {printSection}
-      </div>
+
     </div>
   );
 };

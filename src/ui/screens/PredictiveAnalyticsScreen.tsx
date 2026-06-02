@@ -2,6 +2,23 @@ import React, { useState, useEffect } from 'react';
 import { calculateRisks } from '../../engines/risk.engine';
 import type { RiskInput, RiskResult } from '../../core/types';
 
+const SCENARIO_NAMES: Record<string, string> = {
+  'Baseline': 'Базовый',
+  'High Risk Cycle': 'Высокорисковый курс',
+  'Optimized Protocol': 'Оптимизированный протокол',
+  'Post Cycle Therapy': 'ПКТ (послекурсовая терапия)',
+};
+
+const SYSTEM_LABELS: Record<string, string> = {
+  hepatic: 'Печень',
+  cardio: 'Сердечно-сосудистая',
+  endocrine: 'Эндокринная',
+  lipid: 'Липидный обмен',
+  renal: 'Почки',
+  hematic: 'Кроветворение',
+  immune: 'Иммунная',
+};
+
 export const PredictiveAnalyticsScreen: React.FC = () => {
   const [riskInput, setRiskInput] = useState<RiskInput>({
     genetics: {},
@@ -18,7 +35,6 @@ export const PredictiveAnalyticsScreen: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [scenarioName, setScenarioName] = useState('Baseline');
 
-  // Predefined scenarios for quick testing
   const predefinedScenarios = {
     'Baseline': {
       genetics: {},
@@ -38,49 +54,49 @@ export const PredictiveAnalyticsScreen: React.FC = () => {
         'oral-stanozolol': { dosePerWeek: 50 }
       },
       biomarkerValues: {
-        hepatic: 2.5, // Elevated liver enzymes
-        lipid: 2.8,   // Elevated lipids
-        cardio: 1.4   // Elevated cardiac markers
+        hepatic: 2.5,
+        lipid: 2.8,
+        cardio: 1.4
       },
       hgiMarkers: { inflammation: 1.8, immune: 1.6 },
-      nutritionFactor: 0.8, // Poor nutrition
-      trainingFactor: 1.3,  // Intense training
-      interventionResponse: 0.3, // Poor response to interventions
+      nutritionFactor: 0.8,
+      trainingFactor: 1.3,
+      interventionResponse: 0.3,
       supportCoverage: {}
     },
     'Optimized Protocol': {
       genetics: { hepatic: 'Val/Val', cardio: 'Val/Val' },
       activeDrugs: {
         'testosterone-enanthate': { dosePerWeek: 250 },
-        'support-samarin': { dosePerWeek: 0 } // Milk thistle
+        'support-samarin': { dosePerWeek: 0 }
       },
       biomarkerValues: {
-        hepatic: 0.9, // Normal liver enzymes
-        lipid: 1.0,   // Normal lipids
-        cardio: 0.9   // Normal cardiac markers
+        hepatic: 0.9,
+        lipid: 1.0,
+        cardio: 0.9
       },
       hgiMarkers: { inflammation: 0.7, immune: 0.8 },
-      nutritionFactor: 1.2, // Good nutrition
-      trainingFactor: 1.0,  // Moderate training
-      interventionResponse: 0.8, // Good response to interventions
+      nutritionFactor: 1.2,
+      trainingFactor: 1.0,
+      interventionResponse: 0.8,
       supportCoverage: {
-        'hepatic_1': 0.3, // 30% risk reduction from liver support
-        'lipid_1': 0.2    // 20% risk reduction from lipid support
+        'hepatic_1': 0.3,
+        'lipid_1': 0.2
       }
     },
     'Post Cycle Therapy': {
       genetics: {},
       activeDrugs: {
-        'pct-clomiphene': { dosePerWeek: 100 }, // Clomid
-        'pct-tamoxifen': { dosePerWeek: 40 }    // Nolvadex
+        'pct-clomiphene': { dosePerWeek: 100 },
+        'pct-tamoxifen': { dosePerWeek: 40 }
       },
       biomarkerValues: {
-        endocrine: 1.2, // Slightly elevated (recovering)
-        hepatic: 1.1    // Slightly elevated
+        endocrine: 1.2,
+        hepatic: 1.1
       },
       hgiMarkers: { inflammation: 0.9, immune: 0.9 },
       nutritionFactor: 1.1,
-      trainingFactor: 0.8, // Reduced training during PCT
+      trainingFactor: 0.8,
       interventionResponse: 0.7,
       supportCoverage: {}
     }
@@ -92,7 +108,7 @@ export const PredictiveAnalyticsScreen: React.FC = () => {
       const result = calculateRisks(riskInput);
       setRiskResult(result);
     } catch (error) {
-      console.error('Error calculating risks:', error);
+      console.error('Ошибка расчёта рисков:', error);
     } finally {
       setLoading(false);
     }
@@ -120,10 +136,10 @@ export const PredictiveAnalyticsScreen: React.FC = () => {
 
   return (
     <div className="screen predictive-analytics">
-      <h2>Predictive Analytics - What-If Scenarios</h2>
-      
+      <h2>Предиктивная аналитика — Сценарии «Что если»</h2>
+
       <div className="card" style={{ marginBottom: 16 }}>
-        <h3>Scenario Selector</h3>
+        <h3>Выбор сценария</h3>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
           {Object.keys(predefinedScenarios).map((scenario) => (
             <button
@@ -132,21 +148,20 @@ export const PredictiveAnalyticsScreen: React.FC = () => {
               className={scenarioName === scenario ? 'btn' : 'btn secondary'}
               style={{ flex: 1, minWidth: 120 }}
             >
-              {scenario}
+              {SCENARIO_NAMES[scenario] || scenario}
             </button>
           ))}
         </div>
       </div>
 
       <div className="card" style={{ marginBottom: 16 }}>
-        <h3>Risk Input Parameters</h3>
+        <h3>Входные параметры рисков</h3>
         <div className="grid">
-          {/* Genetics */}
           <div>
-            <h4>Genetic Factors</h4>
+            <h4>Генетические факторы</h4>
             <div style={{ display: 'grid', gap: 4 }}>
               <div>
-                <label>Hepatic:</label>
+                <label>Печень:</label>
                 <select
                   onChange={(e) => handleInputChange('genetics', (prev) => ({
                     ...prev,
@@ -154,13 +169,13 @@ export const PredictiveAnalyticsScreen: React.FC = () => {
                   }))}
                   style={{ width: '100%' }}
                 >
-                  <option value="Val/Val">Val/Val (Normal)</option>
-                  <option value="Val/Mut">Val/Mut (Moderate)</option>
-                  <option value="Mut/Mut">Mut/Mut (High Risk)</option>
+                  <option value="Val/Val">Val/Val (Норма)</option>
+                  <option value="Val/Mut">Val/Mut (Умеренный)</option>
+                  <option value="Mut/Mut">Mut/Mut (Высокий риск)</option>
                 </select>
               </div>
               <div>
-                <label>Cardio:</label>
+                <label>Сердечно-сосудистая:</label>
                 <select
                   onChange={(e) => handleInputChange('genetics', (prev) => ({
                     ...prev,
@@ -168,20 +183,19 @@ export const PredictiveAnalyticsScreen: React.FC = () => {
                   }))}
                   style={{ width: '100%' }}
                 >
-                  <option value="Val/Val">Val/Val (Normal)</option>
-                  <option value="Val/Mut">Val/Mut (Moderate)</option>
-                  <option value="Mut/Mut">Mut/Mut (High Risk)</option>
+                  <option value="Val/Val">Val/Val (Норма)</option>
+                  <option value="Val/Mut">Val/Mut (Умеренный)</option>
+                  <option value="Mut/Mut">Mut/Mut (Высокий риск)</option>
                 </select>
               </div>
             </div>
           </div>
 
-          {/* Nutrition & Training */}
           <div>
-            <h4>Lifestyle Factors</h4>
+            <h4>Факторы образа жизни</h4>
             <div style={{ display: 'grid', gap: 4 }}>
               <div>
-                <label>Nutrition Quality:</label>
+                <label>Качество питания:</label>
                 <input
                   type="number"
                   min="0.5"
@@ -192,11 +206,11 @@ export const PredictiveAnalyticsScreen: React.FC = () => {
                   style={{ width: '100%' }}
                 />
                 <p style={{ fontSize: 11, color: 'var(--text-dim)' }}>
-                  1.0 = average, {'>'}1.0 = good, {'<'}1.0 = poor
+                  1.0 = среднее, {'>'}1.0 = хорошее, {'<'}1.0 = плохое
                 </p>
               </div>
               <div>
-                <label>Training Intensity:</label>
+                <label>Интенсивность тренировок:</label>
                 <input
                   type="number"
                   min="0.5"
@@ -207,11 +221,11 @@ export const PredictiveAnalyticsScreen: React.FC = () => {
                   style={{ width: '100%' }}
                 />
                 <p style={{ fontSize: 11, color: 'var(--text-dim)' }}>
-                  1.0 = average, {'>'}1.0 = intense, {'<'}1.0 = light
+                  1.0 = средняя, {'>'}1.0 = высокая, {'<'}1.0 = низкая
                 </p>
               </div>
               <div>
-                <label>Intervention Response:</label>
+                <label>Ответ на вмешательства:</label>
                 <input
                   type="number"
                   min="0"
@@ -222,7 +236,7 @@ export const PredictiveAnalyticsScreen: React.FC = () => {
                   style={{ width: '100%' }}
                 />
                 <p style={{ fontSize: 11, color: 'var(--text-dim)' }}>
-                  How well body responds to interventions (0-1)
+                  Насколько хорошо организм реагирует на вмешательства (0–1)
                 </p>
               </div>
             </div>
@@ -233,45 +247,45 @@ export const PredictiveAnalyticsScreen: React.FC = () => {
       {loading ? (
         <div className="loading-screen">
           <div className="loading-spinner"></div>
-          <p>Calculating risks...</p>
+          <p>Расчёт рисков...</p>
         </div>
       ) : (
         <div className="card" style={{ marginBottom: 16 }}>
-          <h3>Risk Analysis Results</h3>
+          <h3>Результаты анализа рисков</h3>
           {riskResult ? (
             <>
               <div className="row">
-                <span className="label">Overall Raw Risk:</span>
+                <span className="label">Общий базовый риск:</span>
                 <span className="value">
                   {riskResult.overallRaw?.toFixed(1)}%
                 </span>
               </div>
               <div className="row">
-                <span className="label">Overall Net Risk:</span>
+                <span className="label">Общий скорректированный риск:</span>
                 <span className="value">
                   {riskResult.overallNet?.toFixed(1)}%
                 </span>
               </div>
               <div style={{ marginTop: 12 }}>
-                <h4>System Breakdown:</h4>
+                <h4>Разбивка по системам:</h4>
                 <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 8 }}>
                   {Object.entries(riskResult.systemBreakdown || {}).map(([system, values]) => (
                     <div key={system} className="card" style={{ padding: 12, margin: 0 }}>
-                      <h4 style={{ margin: '0 0 8px 0', fontSize: 14 }}>{system}</h4>
+                      <h4 style={{ margin: '0 0 8px 0', fontSize: 14 }}>{SYSTEM_LABELS[system] || system}</h4>
                       <div className="row">
-                        <span className="label">Raw:</span>
+                        <span className="label">Базовый:</span>
                         <span className="value">
                           {values.raw?.toFixed(1)}%
                         </span>
                       </div>
                       <div className="row">
-                        <span className="label">Net:</span>
+                        <span className="label">Скорректированный:</span>
                         <span className="value">
                           {values.net?.toFixed(1)}%
                         </span>
                       </div>
                       <div style={{ marginTop: 6, fontSize: 11, color: 'var(--text-dim)' }}>
-                        Risk reduction: {((1 - values.net! / values.raw!) * 100).toFixed(0)}%
+                        Снижение риска: {((1 - values.net! / values.raw!) * 100).toFixed(0)}%
                       </div>
                     </div>
                   ))}
@@ -279,27 +293,26 @@ export const PredictiveAnalyticsScreen: React.FC = () => {
               </div>
             </>
           ) : (
-            <p>No risk data available</p>
+            <p>Данные о рисках отсутствуют</p>
           )}
         </div>
       )}
 
       <div className="card">
-        <h3>What-If Analysis</h3>
+        <h3>Анализ «Что если»</h3>
         <p style={{ marginBottom: 12 }}>
-          Adjust any parameter above to see how it affects your risk profile in real-time.
-          This allows you to experiment with different protocols, supplements, or lifestyle
-          changes before implementing them.
+          Измените любой параметр выше, чтобы увидеть, как это влияет на ваш профиль рисков в реальном времени.
+          Это позволяет тестировать различные протоколы, добавки или изменения образа жизни до их реализации.
         </p>
         <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
           <button onClick={handleCalculateRisks} className="btn">
-            Recalculate Risks
+            Пересчитать риски
           </button>
           <button
             onClick={() => handleScenarioChange('Baseline')}
             className="btn secondary"
           >
-            Reset to Baseline
+            Сбросить к базовому
           </button>
         </div>
       </div>

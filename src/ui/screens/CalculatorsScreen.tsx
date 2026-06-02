@@ -2,6 +2,8 @@
 import { calculateDose } from '../../engines/dosage.engine';
 import { SYRINGE_SPECS, DRUG_THRESHOLDS } from '../../core/constants';
 import { calcNutrition } from '../../engines/nutrition.engine';
+import { calculateSupport, generateSupportStack } from '../../engines/support.engine';
+import { PHARMA_DB, SUBSTANCES_BY_CLASS } from '../../core/pharma-database';
 import type { DoseRequest, NutritionInput } from '../../core/types';
 
 const PAL_OPTIONS = [
@@ -14,8 +16,12 @@ const PAL_OPTIONS = [
 
 const DRUG_OPTIONS = Object.keys(DRUG_THRESHOLDS);
 
-export const CalculatorsScreen: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'fitness' | 'nutrition' | 'health'>('fitness');
+interface CalcProps {
+  initialTab?: 'fitness' | 'nutrition' | 'health' | 'support';
+}
+
+export const CalculatorsScreen: React.FC<CalcProps> = ({ initialTab = 'fitness' }) => {
+  const [activeTab, setActiveTab] = useState<'fitness' | 'nutrition' | 'health' | 'support'>(initialTab);
 
   const [bmiWeight, setBmiWeight] = useState(70);
   const [bmiHeight, setBmiHeight] = useState(175);
@@ -74,6 +80,19 @@ export const CalculatorsScreen: React.FC = () => {
 
   const [hrvValue, setHrvValue] = useState(50);
   const [stressResult, setStressResult] = useState<{ stress: number; level: string } | null>(null);
+
+  const [supportDrugs, setSupportDrugs] = useState<string[]>([]);
+  const [supportGoal, setSupportGoal] = useState('muscle_gain');
+  const [supportResult, setSupportResult] = useState<ReturnType<typeof calculateSupport> | null>(null);
+
+  const calcSupport = () => {
+    const result = calculateSupport({
+      substances: supportDrugs,
+      goals: [supportGoal],
+      drugDoses: Object.fromEntries(supportDrugs.map(id => [id, PHARMA_DB[id] ? 1 : 1]))
+    });
+    setSupportResult(result);
+  };
 
   const calcBMI = () => {
     const hm = bmiHeight / 100;
@@ -187,6 +206,7 @@ export const CalculatorsScreen: React.FC = () => {
         <button className={activeTab === 'fitness' ? 'active' : ''} onClick={() => setActiveTab('fitness')}>Фитнес</button>
         <button className={activeTab === 'nutrition' ? 'active' : ''} onClick={() => setActiveTab('nutrition')}>Питание</button>
         <button className={activeTab === 'health' ? 'active' : ''} onClick={() => setActiveTab('health')}>Здоровье</button>
+        <button className={activeTab === 'support' ? 'active' : ''} onClick={() => setActiveTab('support')}>Поддержка</button>
       </div>
 
       {activeTab === 'fitness' && (
@@ -481,6 +501,95 @@ export const CalculatorsScreen: React.FC = () => {
             </div>
 
           </div>
+        </div>
+      )}
+
+      {activeTab === 'support' && (
+        <div className="calculator-panel">
+          <h3>Калькулятор поддержки органов</h3>
+          <p style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 12 }}>Рассчитайте уровень защиты органов при текущем курсе и получите рекомендации по поддержке</p>
+
+          <div className="calculator-item">
+            <h4>Цель</h4>
+            <select className="input" value={supportGoal} onChange={e => setSupportGoal(e.target.value)} style={{ marginBottom: 8 }}>
+              <option value="muscle_gain">Набор мышечной массы</option>
+              <option value="fat_loss">Сжигание жира</option>
+              <option value="strength">Сила</option>
+              <option value="endurance">Выносливость</option>
+              <option value="recomp">Рекомпозиция</option>
+              <option value="maintenance">Поддержание</option>
+              <option value="pct">ПКТ / восстановление</option>
+            </select>
+
+            <h4>Препараты на курсе</h4>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, maxHeight: 200, overflowY: 'auto', marginBottom: 8 }}>
+              {Object.entries(SUBSTANCES_BY_CLASS).map(([cls, subs]) => subs.map(s => (
+                <button key={s.id} style={{
+                  fontSize: 11, padding: '3px 8px', borderRadius: 6, border: `1px solid ${supportDrugs.includes(s.id) ? 'var(--accent)' : 'var(--border)'}`,
+                  background: supportDrugs.includes(s.id) ? 'var(--accent-dim)' : 'var(--bg-secondary)', color: supportDrugs.includes(s.id) ? 'var(--accent)' : 'var(--text-dim)', cursor: 'pointer'
+                }} onClick={() => setSupportDrugs(prev => prev.includes(s.id) ? prev.filter(x => x !== s.id) : [...prev, s.id])}>
+                  {s.name}
+                </button>
+              )))}
+            </div>
+            <p style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 8 }}>Выбрано: {supportDrugs.length}</p>
+
+            <button className="btn" onClick={calcSupport} disabled={supportDrugs.length === 0}>Рассчитать поддержку</button>
+          </div>
+
+          {supportResult && (
+            <div className="calculator-item" style={{ marginTop: 12 }}>
+              <h4>Результаты расчёта поддержки</h4>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 12 }}>
+                <div style={{ background: 'var(--bg-secondary)', borderRadius: 10, padding: 14, textAlign: 'center' }}>
+                  <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>Базовый риск</div>
+                  <div style={{ fontSize: 26, fontWeight: 800, color: 'var(--danger)' }}>{supportResult.riskBeforeSupport.toFixed(1)}%</div>
+                </div>
+                <div style={{ background: 'var(--bg-secondary)', borderRadius: 10, padding: 14, textAlign: 'center' }}>
+                  <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>Риск с поддержкой</div>
+                  <div style={{ fontSize: 26, fontWeight: 800, color: 'var(--success)' }}>{supportResult.riskAfterSupport.toFixed(1)}%</div>
+                </div>
+              </div>
+
+              <h4 style={{ marginBottom: 8 }}>Защита по системам органов:</h4>
+              <div style={{ display: 'grid', gap: 6 }}>
+                {Object.entries(supportResult.organSupport).map(([organ, score]) => {
+                  const pct = Math.min(100, Math.max(0, score * 100));
+                  const color = pct < 30 ? 'var(--danger)' : pct < 60 ? 'var(--warning)' : 'var(--success)';
+                  const labels: Record<string, string> = {
+                    cardio: 'Сердечно-сосудистая', hepatic: 'Печень', renal: 'Почки',
+                    neuro: 'Нервная система', endocrine: 'Эндокринная',
+                    hematologic: 'Кроветворение', reproductive: 'Репродуктивная'
+                  };
+                  return (
+                    <div key={organ}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
+                        <span>{labels[organ] ?? organ}</span>
+                        <span style={{ color, fontWeight: 600 }}>{pct.toFixed(0)}%</span>
+                      </div>
+                      <div style={{ background: 'var(--bg-tertiary)', borderRadius: 3, height: 6 }}>
+                        <div style={{ width: `${pct}%`, height: '100%', background: color, borderRadius: 3, transition: 'width 0.3s' }} />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {supportResult.recommendations.length > 0 && (
+                <>
+                  <h4 style={{ margin: '12px 0 8px' }}>Рекомендации по поддержке:</h4>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    {supportResult.recommendations.map((r, i) => (
+                      <div key={i} style={{ background: 'var(--bg-secondary)', borderRadius: 8, padding: 10, fontSize: 12 }}>
+                        <div style={{ fontWeight: 600 }}>{r.title}</div>
+                        <div style={{ color: 'var(--text-dim)' }}>{r.text}</div>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+          )}
         </div>
       )}
     </div>

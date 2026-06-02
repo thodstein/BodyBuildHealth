@@ -42,100 +42,112 @@ export const GamificationScreen: React.FC = () => {
     <div className="screen gamification">
       <h2>Геймификация</h2>
 
-      <div className="gamification-stats">
-        <div className="stat-card">
-          <h3>Trust Score</h3>
-          <div className="trust-score">{trust.score}</div>
-          <p>{levelLabel}</p>
-          <p className="vol-multiplier">×{trust.volumeMultiplier} объём</p>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
+        <div className="card" style={{ textAlign: 'center' }}>
+          <h3 style={{ margin: '0 0 4px' }}>Оценка доверия</h3>
+          <div style={{ fontSize: 36, fontWeight: 800, background: 'var(--accent-gradient)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>{trust.score}</div>
+          <p style={{ margin: '4px 0', color: 'var(--text-dim)', fontSize: 13 }}>{levelLabel}</p>
+          <p style={{ margin: 0, fontSize: 12, color: 'var(--accent)' }}>×{trust.volumeMultiplier} объём</p>
         </div>
-        <div className="stat-card">
-          <h3>XP</h3>
-          <div className="xp-score">{totalXP}</div>
-          <p>Очки опыта</p>
+        <div className="card" style={{ textAlign: 'center' }}>
+          <h3 style={{ margin: '0 0 4px' }}>Опыт (XP)</h3>
+          <div style={{ fontSize: 36, fontWeight: 800, color: 'var(--info)' }}>{totalXP}</div>
+          <p style={{ margin: '4px 0', color: 'var(--text-dim)', fontSize: 13 }}>Очки опыта</p>
         </div>
       </div>
 
-      <h3>Ачивки</h3>
-      <div className="achievements-grid">
-        {ACHIEVEMENTS.map(a => (
-          <div key={a.id} className={`achievement-card ${unlockedIds.has(a.id) ? 'unlocked' : 'locked'}`}>
-            <div className="achievement-icon">{a.icon}</div>
-            <div className="achievement-info">
-              <h4>{a.name}</h4>
-              <span className="xp-tag">+{a.xp} XP</span>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      <h3>Челленджи</h3>
-      <div className="challenges-list">
-        {CHALLENGES.map(c => {
-          const progress = challengeProgress[c.id] || 0;
-          const total = c.daysTotal ?? c.articlesTotal ?? 1;
-          const pct = Math.min(100, Math.round((progress / total) * 100));
-          return (
-            <div key={c.id} className="challenge-card">
-              <h4>{c.name}</h4>
-              <div className="challenge-progress-bar">
-                <div className="challenge-progress-fill" style={{ width: `${pct}%` }} />
+      <div className="card" style={{ marginBottom: 12 }}>
+        <h3 style={{ margin: '0 0 12px' }}>Достижения</h3>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+          {ACHIEVEMENTS.map(a => {
+            const isUnlocked = unlockedIds.has(a.id);
+            return (
+              <div key={a.id} style={{
+                background: isUnlocked ? 'var(--accent-dim)' : 'var(--bg-secondary)',
+                border: `1px solid ${isUnlocked ? 'var(--accent)' : 'var(--border)'}`,
+                borderRadius: 10, padding: 10, opacity: isUnlocked ? 1 : 0.5
+              }}>
+                <div style={{ fontSize: 20, marginBottom: 4 }}>{a.icon}</div>
+                <div style={{ fontWeight: 600, fontSize: 12 }}>{a.name}</div>
+                <div style={{ fontSize: 11, color: isUnlocked ? 'var(--accent)' : 'var(--text-dim)' }}>+{a.xp} XP</div>
               </div>
-              <p>{progress}/{total} — +{c.xp} XP</p>
-            </div>
-          );
-        })}
+            );
+          })}
+        </div>
       </div>
 
-      <h3>Trust Score — формула</h3>
-      <div className="trust-breakdown">
-        <div className="trust-formula-row">
-          <span>diaryFillRate × 20</span>
-          <span>{(state.diaryFillRate * 20).toFixed(1)}</span>
+      <div className="card" style={{ marginBottom: 12 }}>
+        <h3 style={{ margin: '0 0 12px' }}>Челленджи</h3>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {CHALLENGES.map(c => {
+            const progress = challengeProgress[c.id] || 0;
+            const total = c.daysTotal ?? c.articlesTotal ?? 1;
+            const pct = Math.min(100, Math.round((progress / total) * 100));
+            return (
+              <div key={c.id} style={{ background: 'var(--bg-secondary)', borderRadius: 10, padding: 12 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                  <span style={{ fontWeight: 600, fontSize: 13 }}>{c.name}</span>
+                  <span style={{ fontSize: 12, color: 'var(--accent)' }}>+{c.xp} XP</span>
+                </div>
+                <div style={{ background: 'var(--bg-tertiary)', borderRadius: 4, height: 6 }}>
+                  <div style={{ width: `${pct}%`, height: '100%', background: 'var(--accent)', borderRadius: 4, transition: 'width 0.3s' }} />
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 4 }}>{progress}/{total}</div>
+              </div>
+            );
+          })}
         </div>
-        <div className="trust-formula-row">
-          <span>nutritionAdherence × 30</span>
-          <span>{(state.nutritionAdherence * 30).toFixed(1)}</span>
+      </div>
+
+      <div className="card" style={{ marginBottom: 12 }}>
+        <h3 style={{ margin: '0 0 12px' }}>Формула доверия</h3>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
+            <span style={{ color: 'var(--text-dim)' }}>Заполнение дневника × 20</span>
+            <span style={{ fontWeight: 600 }}>{(state.diaryFillRate * 20).toFixed(1)}</span>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
+            <span style={{ color: 'var(--text-dim)' }}>Соблюдение питания × 30</span>
+            <span style={{ fontWeight: 600 }}>{(state.nutritionAdherence * 30).toFixed(1)}</span>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
+            <span style={{ color: 'var(--text-dim)' }}>Соответствие анализов × 30</span>
+            <span style={{ fontWeight: 600 }}>{(state.labMatchRate * 30).toFixed(1)}</span>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
+            <span style={{ color: 'var(--text-dim)' }}>Обратная связь тренера × 20</span>
+            <span style={{ fontWeight: 600 }}>{(state.trainerFeedback * 20).toFixed(1)}</span>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14, fontWeight: 700, borderTop: '1px solid var(--border)', paddingTop: 8 }}>
+            <span>Итого</span>
+            <span style={{ color: 'var(--accent)' }}>{trust.score} — {levelLabel}</span>
+          </div>
         </div>
-        <div className="trust-formula-row">
-          <span>labMatchRate × 30</span>
-          <span>{(state.labMatchRate * 30).toFixed(1)}</span>
-        </div>
-        <div className="trust-formula-row">
-          <span>trainerFeedback × 20</span>
-          <span>{(state.trainerFeedback * 20).toFixed(1)}</span>
-        </div>
-        <div className="trust-formula-row total">
-          <span>Итого</span>
-          <span>{trust.score} — {levelLabel}</span>
-        </div>
-        <p className="trust-note">
-          Уровень: консервативный &lt;40, стандартный 40–79, агрессивный ≥80. Множитель объёма {trust.volumeMultiplier} влияет на персонализацию дозировок.
+        <p style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 8 }}>
+          Консервативный &lt;40, Стандартный 40–79, Агрессивный ≥80. Множитель объёма {trust.volumeMultiplier} влияет на персонализацию дозировок.
         </p>
       </div>
 
-      <h3>Настройка параметров</h3>
-      <div className="sliders">
-        <label>
-          diaryFillRate: {state.diaryFillRate.toFixed(2)}
-          <input type="range" min="0" max="1" step="0.01" value={state.diaryFillRate}
-            onChange={e => setDiaryFillRate(parseFloat(e.target.value))} />
-        </label>
-        <label>
-          nutritionAdherence: {state.nutritionAdherence.toFixed(2)}
-          <input type="range" min="0" max="1" step="0.01" value={state.nutritionAdherence}
-            onChange={e => setNutritionAdherence(parseFloat(e.target.value))} />
-        </label>
-        <label>
-          labMatchRate: {state.labMatchRate.toFixed(2)}
-          <input type="range" min="0" max="1" step="0.01" value={state.labMatchRate}
-            onChange={e => setLabMatchRate(parseFloat(e.target.value))} />
-        </label>
-        <label>
-          trainerFeedback: {state.trainerFeedback.toFixed(2)}
-          <input type="range" min="0" max="1" step="0.01" value={state.trainerFeedback}
-            onChange={e => setTrainerFeedback(parseFloat(e.target.value))} />
-        </label>
+      <div className="card">
+        <h3 style={{ margin: '0 0 12px' }}>Настройка параметров</h3>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <span style={{ fontSize: 13 }}>Заполнение дневника: {(state.diaryFillRate * 100).toFixed(0)}%</span>
+            <input type="range" min="0" max="1" step="0.01" value={state.diaryFillRate} onChange={e => setDiaryFillRate(parseFloat(e.target.value))} />
+          </label>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <span style={{ fontSize: 13 }}>Соблюдение питания: {(state.nutritionAdherence * 100).toFixed(0)}%</span>
+            <input type="range" min="0" max="1" step="0.01" value={state.nutritionAdherence} onChange={e => setNutritionAdherence(parseFloat(e.target.value))} />
+          </label>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <span style={{ fontSize: 13 }}>Соответствие анализов: {(state.labMatchRate * 100).toFixed(0)}%</span>
+            <input type="range" min="0" max="1" step="0.01" value={state.labMatchRate} onChange={e => setLabMatchRate(parseFloat(e.target.value))} />
+          </label>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <span style={{ fontSize: 13 }}>Обратная связь тренера: {(state.trainerFeedback * 100).toFixed(0)}%</span>
+            <input type="range" min="0" max="1" step="0.01" value={state.trainerFeedback} onChange={e => setTrainerFeedback(parseFloat(e.target.value))} />
+          </label>
+        </div>
       </div>
     </div>
   );

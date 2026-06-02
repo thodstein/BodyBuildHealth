@@ -353,8 +353,8 @@ function CalcTab({ targets, setTargets }: { targets: NutritionTargets | null; se
           <h3 style={{ margin: '0 0 10px 0', fontSize: 15 }}>Результаты</h3>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
             {[
-              { label: 'BMR', value: `${targets.bmr} ккал` },
-              { label: 'TDEE', value: `${targets.tdee} ккал` },
+              { label: 'Базовый метаболизм (BMR)', value: `${targets.bmr} ккал` },
+              { label: 'Суточный расход (TDEE)', value: `${targets.tdee} ккал` },
               { label: 'Целевые ккал', value: `${targets.kcal}` },
               { label: 'Белки', value: `${targets.protein} г` },
               { label: 'Жиры', value: `${targets.fats} г` },

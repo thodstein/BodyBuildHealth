@@ -1,240 +1,237 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { registry } from './core/data/registry';
 import { DashboardScreen } from './ui/screens/DashboardScreen';
 import { PharmaScreen } from './ui/screens/PharmaScreen';
 import { PeptidesScreen } from './ui/screens/PeptidesScreen';
-import { PlanScreen } from './ui/screens/PlanScreen';
-import { SubstancesScreen } from './ui/screens/SubstancesScreen';
-import { LabsScreen } from './ui/screens/LabsScreen';
-import { ProfileScreen } from './ui/screens/ProfileScreen';
 import { PharmaCourseScreen } from './ui/screens/PharmaCourseScreen';
+import { SubstancesScreen } from './ui/screens/SubstancesScreen';
 import { NutritionScreen } from './ui/screens/NutritionScreen';
+import { LabsScreen } from './ui/screens/LabsScreen';
 import { RiskScreen } from './ui/screens/RiskScreen';
+import { PlanScreen } from './ui/screens/PlanScreen';
+import { ProfileScreen } from './ui/screens/ProfileScreen';
 import { PredictiveAnalyticsScreen } from './ui/screens/PredictiveAnalyticsScreen';
+import { CalculatorsScreen } from './ui/screens/CalculatorsScreen';
+import { MarketplaceScreen } from './ui/screens/MarketplaceScreen';
 import { ArticlesScreen } from './ui/screens/ArticlesScreen';
 import { SmartAssistantScreen } from './ui/screens/SmartAssistantScreen';
 import { GamificationScreen } from './ui/screens/GamificationScreen';
 import { FertilityPCTScreen } from './ui/screens/FertilityPCTScreen';
-import { MarketplaceScreen } from './ui/screens/MarketplaceScreen';
-import { CalculatorsScreen } from './ui/screens/CalculatorsScreen';
 import { ReportsScreen } from './ui/screens/ReportsScreen';
 import { IntegrationsScreen } from './ui/screens/IntegrationsScreen';
 import { RoleManagementScreen } from './ui/screens/RoleManagementScreen';
 import { ToastContainer } from './ui/ToastContainer';
 
-type Tab = 'dashboard' | 'pharma' | 'course' | 'peptides' | 'nutrition' | 'plan' | 'substances' | 'labs' | 'risks' | 'profile' | 'predictive' | 'marketplace' | 'articles' | 'assistant' | 'gamification' | 'fertility-pct' | 'calculators' | 'reports' | 'integrations' | 'role-management';
+type Tab = 'home' | 'pharma' | 'training' | 'nutrition' | 'labs' | 'risks' | 'profile';
+type SubPage = string;
 
-const TAB_CONFIG: { id: Tab; label: string; icon: React.ReactNode }[] = [
-    { id: 'dashboard', label: 'Главная', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg> },
-   { id: 'pharma', label: 'Фарма', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg> },
-   { id: 'course', label: 'Курс', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg> },
-   { id: 'peptides', label: 'Пептиды', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="M7 12h10"/><path d="M12 7v10"/></svg> },
-   { id: 'nutrition', label: 'Нутриции', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg> },
-   { id: 'plan', label: 'План', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg> },
-   { id: 'substances', label: 'Вещества', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0 1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0 1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg> },
-   { id: 'labs', label: 'Лабы', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 3h6v7l5 8H4l5-8V3z"/><line x1="9" y1="3" x2="15" y2="3"/></svg> },
-   { id: 'risks', label: 'Риски', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22c2.669 0 5 1.343 5 3v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-5c0-1.657 2.331-3 5-3z"/></svg> },
-    { id: 'profile', label: 'Профиль', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg> },
-     { id: 'predictive', label: 'Прогноз', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2L15 8l9 1-7 3 3 8-9-2-7 2 3-8 3-1-9-1z"/><line x1="12" y1="14" x2="12" y2="20"/></svg> },
-    { id: 'calculators', label: 'Калькуляторы', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="2" width="16" height="20" rx="2"/><line x1="8" y1="6" x2="16" y2="6"/><line x1="8" y1="10" x2="10" y2="10"/><line x1="14" y1="10" x2="16" y2="10"/><line x1="8" y1="14" x2="10" y2="14"/><line x1="14" y1="14" x2="16" y2="14"/><line x1="8" y1="18" x2="16" y2="18"/></svg> },
-    { id: 'reports', label: 'Отчёты', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/></svg> },
-    { id: 'integrations', label: 'Интеграции', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg> },
-    { id: 'role-management', label: 'Роли', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg> },
+const NAV: { id: Tab; label: string; icon: React.ReactNode }[] = [
+  { id: 'home', label: 'Главная', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg> },
+  { id: 'pharma', label: 'Фарма', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg> },
+  { id: 'training', label: 'Тренировки', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6.5 6.5h11v11h-11z"/><path d="M3 12h3M18 12h3M12 3v3M12 18v3"/><circle cx="12" cy="12" r="2"/></svg> },
+  { id: 'nutrition', label: 'Питание', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg> },
+  { id: 'labs', label: 'Анализы', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 3h6v7l5 8H4l5-8V3z"/><line x1="9" y1="3" x2="15" y2="3"/></svg> },
+  { id: 'risks', label: 'Риски', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg> },
+  { id: 'profile', label: 'Профиль', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg> },
 ];
 
-function HulkHero() {
+function HulkBg() {
   return (
-    <div className="dashboard-hero">
-      <div className="dashboard-hero-bg">
-        <svg viewBox="0 0 400 220" xmlns="http://www.w3.org/2000/svg">
-          <defs>
-            <linearGradient id="hulkBg" x1="0" y1="0" x2="400" y2="220" gradientUnits="userSpaceOnUse">
-              <stop offset="0%" stopColor="#0a1628"/>
-              <stop offset="50%" stopColor="#0d2818"/>
-              <stop offset="100%" stopColor="#0a0a0f"/>
-            </linearGradient>
-            <linearGradient id="hulkGreen" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#2ed573"/>
-              <stop offset="100%" stopColor="#00b894"/>
-            </linearGradient>
-            <linearGradient id="vialGrad" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#ffa502" stopOpacity="0.4"/>
-              <stop offset="50%" stopColor="#ff6348" stopOpacity="0.6"/>
-              <stop offset="100%" stopColor="#ff4757" stopOpacity="0.8"/>
-            </linearGradient>
-            <linearGradient id="vialGrad2" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#00e68a" stopOpacity="0.3"/>
-              <stop offset="100%" stopColor="#2ed573" stopOpacity="0.7"/>
-            </linearGradient>
-            <radialGradient id="glow" cx="50%" cy="60%" r="45%">
-              <stop offset="0%" stopColor="#00e68a" stopOpacity="0.12"/>
-              <stop offset="100%" stopColor="#00e68a" stopOpacity="0"/>
-            </radialGradient>
-            <filter id="hulkGlow">
-              <feGaussianBlur stdDeviation="3" result="blur"/>
-              <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
-            </filter>
-          </defs>
-          <rect width="400" height="220" fill="url(#hulkBg)"/>
-          <ellipse cx="200" cy="130" rx="160" ry="90" fill="url(#glow)"/>
-          <g filter="url(#hulkGlow)" opacity="0.85">
-            {/* Hulk body - massive torso */}
-            <path d="M155 70 Q140 72 130 85 Q120 100 118 120 Q115 145 120 165 Q125 180 140 190 L150 195 Q165 200 180 200 L220 200 Q235 200 250 195 L260 190 Q275 180 280 165 Q285 145 282 120 Q280 100 270 85 Q260 72 245 70 Z" fill="url(#hulkGreen)" opacity="0.9"/>
-            {/* Left shoulder */}
-            <ellipse cx="118" cy="90" rx="28" ry="22" fill="url(#hulkGreen)" opacity="0.85" transform="rotate(-15 118 90)"/>
-            {/* Right shoulder */}
-            <ellipse cx="282" cy="90" rx="28" ry="22" fill="url(#hulkGreen)" opacity="0.85" transform="rotate(15 282 90)"/>
-            {/* Left arm (flexed) */}
-            <path d="M95 85 Q70 100 60 120 Q55 135 65 145 Q72 150 82 142 Q88 130 95 115" fill="url(#hulkGreen)" opacity="0.8"/>
-            {/* Right arm (flexed) */}
-            <path d="M305 85 Q330 100 340 120 Q345 135 335 145 Q328 150 318 142 Q312 130 305 115" fill="url(#hulkGreen)" opacity="0.8"/>
-            {/* Left bicep bulge */}
-            <ellipse cx="72" cy="115" rx="18" ry="14" fill="#3ae374" opacity="0.7" transform="rotate(-20 72 115)"/>
-            {/* Right bicep bulge */}
-            <ellipse cx="328" cy="115" rx="18" ry="14" fill="#3ae374" opacity="0.7" transform="rotate(20 328 115)"/>
-            {/* Neck */}
-            <rect x="175" y="45" width="50" height="30" rx="10" fill="url(#hulkGreen)" opacity="0.85"/>
-            {/* Head */}
-            <ellipse cx="200" cy="32" rx="30" ry="26" fill="url(#hulkGreen)" opacity="0.9"/>
-            {/* Jaw */}
-            <path d="M180 38 Q185 50 200 52 Q215 50 220 38" fill="#26ab5f" opacity="0.6"/>
-            {/* Angry brow left */}
-            <path d="M182 25 L192 23 L194 28 L184 29 Z" fill="#1a7a42" opacity="0.8"/>
-            {/* Angry brow right */}
-            <path d="M218 25 L208 23 L206 28 L216 29 Z" fill="#1a7a42" opacity="0.8"/>
-            {/* Eyes */}
-            <ellipse cx="188" cy="33" rx="5" ry="3.5" fill="#fff" opacity="0.9"/>
-            <ellipse cx="212" cy="33" rx="5" ry="3.5" fill="#fff" opacity="0.9"/>
-            <ellipse cx="188" cy="33" rx="2.5" ry="2.5" fill="#2d3436"/>
-            <ellipse cx="212" cy="33" rx="2.5" ry="2.5" fill="#2d3436"/>
-            {/* Mouth */}
-            <path d="M190 43 Q200 47 210 43" fill="none" stroke="#1a7a42" strokeWidth="2" opacity="0.7"/>
-            {/* Chest muscles hint */}
-            <path d="M180 100 Q195 115 200 130 Q205 115 220 100" fill="none" stroke="#26ab5f" strokeWidth="1.5" opacity="0.4"/>
-            <line x1="200" y1="100" x2="200" y2="155" stroke="#26ab5f" strokeWidth="0.8" opacity="0.3"/>
-            {/* Abs hint */}
-            <path d="M185 135 Q200 140 215 135" fill="none" stroke="#26ab5f" strokeWidth="0.8" opacity="0.3"/>
-            <path d="M187 150 Q200 155 213 150" fill="none" stroke="#26ab5f" strokeWidth="0.8" opacity="0.3"/>
-            {/* Veins */}
-            <path d="M135 95 Q140 85 145 80" fill="none" stroke="#3ae374" strokeWidth="1" opacity="0.4"/>
-            <path d="M265 95 Q260 85 255 80" fill="none" stroke="#3ae374" strokeWidth="1" opacity="0.4"/>
-            <path d="M78 105 Q82 95 90 88" fill="none" stroke="#3ae374" strokeWidth="1" opacity="0.3"/>
-            <path d="M322 105 Q318 95 310 88" fill="none" stroke="#3ae374" strokeWidth="1" opacity="0.3"/>
-          </g>
-          {/* Vial 1 - Trenbolone (amber) */}
-          <g transform="translate(38,130) rotate(-20)">
-            <rect x="0" y="10" width="14" height="38" rx="3" fill="#1e1e2a" stroke="#ffa502" strokeWidth="0.8" opacity="0.9"/>
-            <rect x="1" y="20" width="12" height="27" rx="2" fill="url(#vialGrad)" opacity="0.9"/>
-            <rect x="3" y="4" width="8" height="8" rx="4" fill="#ffa502" opacity="0.6"/>
-            <text x="7" y="36" textAnchor="middle" fill="#ffa502" fontSize="4" fontWeight="bold" opacity="0.8">TREN</text>
-          </g>
-          {/* Vial 2 - Nandrolone (green) */}
-          <g transform="translate(350,140) rotate(15)">
-            <rect x="0" y="10" width="14" height="38" rx="3" fill="#1e1e2a" stroke="#00e68a" strokeWidth="0.8" opacity="0.9"/>
-            <rect x="1" y="22" width="12" height="25" rx="2" fill="url(#vialGrad2)" opacity="0.9"/>
-            <rect x="3" y="4" width="8" height="8" rx="4" fill="#00e68a" opacity="0.6"/>
-            <text x="7" y="39" textAnchor="middle" fill="#00e68a" fontSize="3.5" fontWeight="bold" opacity="0.8">NAND</text>
-          </g>
-          {/* Vial 3 - Testosterone (amber) */}
-          <g transform="translate(55,160) rotate(-10)">
-            <rect x="0" y="8" width="12" height="32" rx="3" fill="#1e1e2a" stroke="#ff9f43" strokeWidth="0.8" opacity="0.85"/>
-            <rect x="1" y="16" width="10" height="23" rx="2" fill="url(#vialGrad)" opacity="0.85"/>
-            <rect x="2" y="2" width="8" height="8" rx="4" fill="#ff9f43" opacity="0.5"/>
-            <text x="6" y="31" textAnchor="middle" fill="#ff9f43" fontSize="3" fontWeight="bold" opacity="0.7">TEST</text>
-          </g>
-          {/* Syringe */}
-          <g transform="translate(308,155) rotate(30)" opacity="0.7">
-            <rect x="0" y="10" width="40" height="5" rx="2" fill="#ccc" opacity="0.5"/>
-            <rect x="0" y="9" width="8" height="7" rx="1" fill="#ddd" opacity="0.6"/>
-            <polygon points="40,11 40,14 48,12.5" fill="#ccc" opacity="0.5"/>
-            <rect x="-6" y="9" width="8" height="7" rx="2" fill="#aaa" opacity="0.4"/>
-            <line x1="0" y1="15" x2="0" y2="20" stroke="#999" strokeWidth="0.8" opacity="0.4"/>
-            <line x1="5" y1="15" x2="5" y2="22" stroke="#999" strokeWidth="0.8" opacity="0.4"/>
-            <line x1="10" y1="15" x2="10" y2="20" stroke="#999" strokeWidth="0.8" opacity="0.4"/>
-          </g>
-          {/* Particle effects */}
-          <circle cx="50" cy="60" r="1.5" fill="#00e68a" opacity="0.5"/>
-          <circle cx="340" cy="50" r="1" fill="#00e68a" opacity="0.4"/>
-          <circle cx="80" cy="45" r="0.8" fill="#3ae374" opacity="0.3"/>
-          <circle cx="320" cy="80" r="1.2" fill="#3ae374" opacity="0.35"/>
-          <circle cx="370" cy="100" r="0.8" fill="#2ed573" opacity="0.25"/>
-          <circle cx="30" cy="110" r="1" fill="#00e68a" opacity="0.3"/>
-          {/* Health Engine logo text */}
-          <text x="200" y="215" textAnchor="middle" fill="#00e68a" fontSize="8" fontWeight="700" opacity="0.4" letterSpacing="3">HEALTH ENGINE</text>
-        </svg>
-      </div>
-      <div className="dashboard-hero-overlay"/>
-      <div className="dashboard-hero-content">
-        <h1>Health Engine</h1>
-        <p>Фармакология • Нутриции • Лабы • Риски</p>
-      </div>
+    <div style={{ position: 'fixed', inset: 0, zIndex: 0, overflow: 'hidden', pointerEvents: 'none' }}>
+      <svg viewBox="0 0 400 800" style={{ position: 'absolute', right: '-60px', bottom: '60px', width: '420px', height: '840px', opacity: 0.07 }}>
+        <defs>
+          <linearGradient id="hg" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#00e68a" stopOpacity="0.8"/>
+            <stop offset="50%" stopColor="#00cc7a" stopOpacity="0.5"/>
+            <stop offset="100%" stopColor="#009960" stopOpacity="0.2"/>
+          </linearGradient>
+          <filter id="hglow"><feGaussianBlur stdDeviation="12" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+          <radialGradient id="hchest" cx="50%" cy="40%" r="50%">
+            <stop offset="0%" stopColor="#00ff99" stopOpacity="0.6"/>
+            <stop offset="100%" stopColor="#00994d" stopOpacity="0.1"/>
+          </radialGradient>
+        </defs>
+        <g transform="translate(200,420) scale(1.8)" filter="url(#hglow)">
+          <ellipse cx="0" cy="-40" rx="55" ry="70" fill="url(#hg)"/>
+          <path d="M-55,-70 C-65,-30 -80,20 -75,60 L-50,70 C-40,30 -20,0 -15,-40 Z" fill="#00cc7a" opacity="0.5"/>
+          <path d="M55,-70 C65,-30 80,20 75,60 L50,70 C40,30 20,0 15,-40 Z" fill="#00cc7a" opacity="0.5"/>
+          <ellipse cx="-42" cy="-80" rx="22" ry="16" fill="#00e68a" opacity="0.4"/>
+          <ellipse cx="42" cy="-80" rx="22" ry="16" fill="#00e68a" opacity="0.4"/>
+          <path d="M-30,-90 Q-10,-110 10,-90" fill="none" stroke="#00ff99" strokeWidth="4" opacity="0.3"/>
+          <path d="M0,-50 L-15,20 M0,-50 L15,20 M-15,20 L-40,50 M-15,20 L0,80 M15,20 L40,50 M15,20 L0,80" stroke="#00e68a" strokeWidth="6" opacity="0.35" strokeLinecap="round"/>
+          <rect x="-20" y="-100" width="40" height="10" rx="5" fill="#00ff99" opacity="0.3"/>
+          <ellipse cx="0" cy="-10" rx="30" ry="45" fill="url(#hchest)"/>
+          <path d="M-30,-30 Q-60,-60 -55,-100" fill="none" stroke="#00e68a" strokeWidth="10" opacity="0.25" strokeLinecap="round"/>
+          <path d="M30,-30 Q60,-60 55,-100" fill="none" stroke="#00e68a" strokeWidth="10" opacity="0.25" strokeLinecap="round"/>
+          <path d="M0,70 Q0,120 -20,180 M0,70 Q0,120 20,180" fill="none" stroke="#00cc7a" strokeWidth="14" opacity="0.2" strokeLinecap="round"/>
+        </g>
+      </svg>
+      <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse at 70% 50%, rgba(0,230,138,0.06) 0%, transparent 60%)' }} />
     </div>
   );
 }
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<Tab>('dashboard');
+  const [tab, setTab] = useState<Tab>('home');
+  const [sub, setSub] = useState<SubPage>('');
   const [initialized, setInitialized] = useState(false);
+  const touchRef = useRef<{ x: number; y: number } | null>(null);
+  const mainRef = useRef<HTMLElement>(null);
 
-  useEffect(() => {
-    const initRegistry = async () => {
-      await registry.init();
-      setInitialized(true);
-    };
-    initRegistry();
+  useEffect(() => { registry.init().then(() => setInitialized(true)); }, []);
+
+  const go = (t: Tab, s?: SubPage) => {
+    setTab(t);
+    setSub(s || '');
+    if (mainRef.current) mainRef.current.scrollTop = 0;
+    window.scrollTo(0, 0);
+  };
+
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    if (e.touches.length === 1) touchRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
   }, []);
 
-   const renderScreen = () => {
-     switch (activeTab) {
-       case 'dashboard': return <DashboardScreen />;
-       case 'pharma': return <PharmaScreen />;
-       case 'course': return <PharmaCourseScreen />;
-       case 'peptides': return <PeptidesScreen />;
-       case 'nutrition': return <NutritionScreen />;
-       case 'plan': return <PlanScreen goal="energy" />;
-       case 'substances': return <SubstancesScreen />;
-       case 'labs': return <LabsScreen />;
-       case 'risks': return <RiskScreen />;
-       case 'profile': return <ProfileScreen />;
-       case 'predictive': return <PredictiveAnalyticsScreen />;
-      case 'marketplace': return <MarketplaceScreen />;
-      case 'articles': return <ArticlesScreen />;
-      case 'assistant': return <SmartAssistantScreen />;
-      case 'gamification': return <GamificationScreen />;
-      case 'fertility-pct': return <FertilityPCTScreen />;
-      case 'calculators': return <CalculatorsScreen />;
-      case 'reports': return <ReportsScreen />;
-      case 'integrations': return <IntegrationsScreen />;
-      case 'role-management': return <RoleManagementScreen />;
-       default: return <div>Unknown tab</div>;
-     }
-   };
+  const handleTouchEnd = useCallback((e: React.TouchEvent) => {
+    if (!touchRef.current || e.changedTouches.length !== 1) return;
+    const dx = e.changedTouches[0].clientX - touchRef.current.x;
+    const dy = e.changedTouches[0].clientY - touchRef.current.y;
+    if (Math.abs(dx) < 80 || Math.abs(dy) > Math.abs(dx)) return;
+    const tabs: Tab[] = ['home', 'pharma', 'training', 'nutrition', 'labs', 'risks', 'profile'];
+    const idx = tabs.indexOf(tab);
+    const next = dx < 0 && idx < tabs.length - 1 ? tabs[idx + 1] : dx > 0 && idx > 0 ? tabs[idx - 1] : null;
+    if (next) { go(next); }
+    touchRef.current = null;
+  }, [tab]);
+
+  const subItems = (() => {
+    switch (tab) {
+      case 'pharma': return [
+        { id: 'drugs', label: 'Препараты' },
+        { id: 'course', label: 'Мой курс' },
+        { id: 'calc-pharma', label: 'Калькулятор' },
+        { id: 'peptides', label: 'Пептиды' },
+        { id: 'substances', label: 'Справочник' },
+        { id: 'marketplace', label: 'Маркетплейс' },
+      ];
+      case 'training': return [
+        { id: 'plan', label: 'План' },
+        { id: 'readiness', label: 'Восстановление' },
+        { id: 'whatif', label: 'What-If анализ' },
+      ];
+      case 'nutrition': return [
+        { id: 'diary', label: 'Дневник' },
+        { id: 'calc', label: 'Калькуляторы' },
+        { id: 'bady', label: 'БАДы' },
+      ];
+      case 'labs': return [
+        { id: 'results', label: 'Ввод анализов' },
+        { id: 'panels', label: 'Панели' },
+        { id: 'history', label: 'История' },
+        { id: 'indices', label: 'Индексы' },
+        { id: 'risks-labs', label: 'Риски' },
+      ];
+      case 'risks': return [
+        { id: 'matrix', label: 'Матрица рисков' },
+        { id: 'fertility', label: 'Фертильность' },
+      ];
+      case 'profile': return [
+        { id: 'settings', label: 'Настройки' },
+        { id: 'gamification', label: 'Достижения' },
+        { id: 'reports', label: 'Отчёты' },
+        { id: 'integrations', label: 'Интеграции' },
+        { id: 'assistant', label: 'Ассистент' },
+        { id: 'articles', label: 'Статьи' },
+      ];
+      default: return [];
+    }
+  })();
+
+  const renderContent = () => {
+    if (!initialized) return (
+      <div className="loading-screen">
+        <HulkBg />
+        <div className="loading-spinner"/>
+        <span style={{ position: 'relative', zIndex: 1 }}>Загрузка Health Engine...</span>
+      </div>
+    );
+
+    if (sub) {
+      switch (sub) {
+        case 'drugs': return <PharmaScreen />;
+        case 'course': return <PharmaCourseScreen />;
+        case 'calc-pharma': return <CalculatorsScreen />;
+        case 'peptides': return <PeptidesScreen />;
+        case 'substances': return <SubstancesScreen />;
+        case 'marketplace': return <MarketplaceScreen />;
+        case 'plan': return <PlanScreen goal="energy" />;
+        case 'readiness': return <DashboardScreen />;
+        case 'whatif': return <PredictiveAnalyticsScreen />;
+        case 'diary': return <NutritionScreen />;
+        case 'calc': return <CalculatorsScreen />;
+        case 'bady': return <CalculatorsScreen initialTab="support" />;
+        case 'results': return <LabsScreen initialTab="input" />;
+        case 'panels': return <LabsScreen initialTab="panels" />;
+        case 'history': return <LabsScreen initialTab="history" />;
+        case 'indices': return <LabsScreen initialTab="indices" />;
+        case 'risks-labs': return <LabsScreen initialTab="risks" />;
+        case 'matrix': return <RiskScreen />;
+        case 'fertility': return <FertilityPCTScreen />;
+        case 'settings': return <ProfileScreen />;
+        case 'gamification': return <GamificationScreen />;
+        case 'reports': return <ReportsScreen />;
+        case 'integrations': return <IntegrationsScreen />;
+        case 'roles': return <RoleManagementScreen />;
+        case 'assistant': return <SmartAssistantScreen />;
+        case 'articles': return <ArticlesScreen />;
+        default: return <DashboardScreen />;
+      }
+    }
+
+    switch (tab) {
+      case 'home': return <DashboardScreen />;
+      case 'pharma': return <PharmaScreen />;
+      case 'training': return <PlanScreen goal="energy" />;
+      case 'nutrition': return <NutritionScreen />;
+      case 'labs': return <LabsScreen />;
+      case 'risks': return <RiskScreen />;
+      case 'profile': return <ProfileScreen />;
+      default: return <DashboardScreen />;
+    }
+  };
 
   return (
-    <div className="app">
-      <main>
-        {initialized ? renderScreen() : (
-          <div className="loading-screen">
-            <div className="loading-spinner"/>
-            <span>Загрузка ядра системы...</span>
-          </div>
-        )}
+    <div className="app" onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
+      <HulkBg />
+      <main ref={mainRef} style={{ position: 'relative', zIndex: 1 }}>
+        {renderContent()}
       </main>
       <ToastContainer />
+      {subItems.length > 0 && (
+        <div className="sub-nav">
+          {subItems.map(item => (
+            <button
+              key={item.id}
+              className={'sub-nav-btn' + (sub === item.id ? ' active' : '')}
+              onClick={() => { setSub(item.id); if (mainRef.current) mainRef.current.scrollTop = 0; window.scrollTo(0, 0); }}
+            >
+              {item.label}
+            </button>
+          ))}
+          <button className="sub-nav-btn back" onClick={() => setSub('')}>&#8592; Назад</button>
+        </div>
+      )}
       <nav className="tabs">
-        {TAB_CONFIG.map(tab => (
+        {NAV.map(item => (
           <button
-            key={tab.id}
-            className={'nav-btn' + (activeTab === tab.id ? ' active' : '')}
-            onClick={() => setActiveTab(tab.id)}
+            key={item.id}
+            className={'nav-btn' + (tab === item.id && !sub ? ' active' : (subItems.length > 0 && tab === item.id ? ' active-parent' : ''))}
+            onClick={() => go(item.id)}
           >
-            {tab.icon}
-            <span>{tab.label}</span>
+            {item.icon}
+            <span>{item.label}</span>
           </button>
         ))}
       </nav>
     </div>
   );
 }
-
-export { HulkHero };

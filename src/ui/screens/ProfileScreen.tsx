@@ -89,12 +89,10 @@ export const ProfileScreen: React.FC = () => {
     if (!profile || !profile.settings) return 0;
     const { weight } = profile.settings;
     const goal = profile.settings.goal;
-    let targetWeight = weight;
-    if (goal === 'bulk') targetWeight = weight + 10;
-    else if (goal === 'cut') targetWeight = weight - 10;
-    else if (goal === 'recomposition') targetWeight = weight; // Maintain weight, change composition
-    if (targetWeight === 0) return 0;
-    return Math.min(100, Math.max(0, (weight / targetWeight) * 100));
+    const target = profile.settings.targetWeight ?? (goal === 'cut' ? weight - 10 : goal === 'bulk' ? weight + 10 : weight);
+    if (target === weight) return 50;
+    const progress = ((weight - target) / (weight > target ? weight - target : target - weight)) * 100;
+    return Math.min(100, Math.max(0, Math.round(progress)));
   };
 
   if (loading) return <div className="screen profile">Загрузка профиля...</div>;
@@ -284,7 +282,7 @@ export const ProfileScreen: React.FC = () => {
                 </div>
               </div>
               <div className="metric-item">
-                <span className="metric-label">HRV ratio:</span>
+                <span className="metric-label">Коэффициент HRV:</span>
                 <div className="metric-value">
                   {profile.settings.baselineHrvRatio !== undefined
                     ? `${profile.settings.baselineHrvRatio.toFixed(2)}`
@@ -476,14 +474,4 @@ function getLabIndexColor(value: number): string {
   return 'var(--danger)';
 }
 
-// Helper function to calculate age from date of birth
-function calculateAgeFromDob(dateOfBirth: string): number {
-  const birthDate = new Date(dateOfBirth);
-  const today = new Date();
-  let age = today.getFullYear() - birthDate.getFullYear();
-  const monthDiff = today.getMonth() - birthDate.getMonth();
-  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
-    age--;
-  }
-  return age;
-}
+

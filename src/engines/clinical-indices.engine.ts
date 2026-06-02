@@ -38,8 +38,8 @@ export function calculateIndices(labs: LabPoint[], sex: 'male'|'female' = 'male'
     alert: homaVal > 2.7 ? '⚠️ Инсулинорезистентность. Рассмотреть метформин/берберин.' : undefined
   };
 
-  // FAI = (ТТ / ГСПГ) * 100
-  const faiVal = (tt / shbg) * 100;
+  // FAI = (TT_nmL / SHBG) * 100, TT converted from ng/dL to nmol/L
+  const faiVal = (tt * 0.0347 / shbg) * 100;
   const faiRef = sex === 'male' ? [35, 75] : [20, 55];
   const fai: ClinicalIndices['fai'] = {
     value: parseFloat(faiVal.toFixed(1)),
@@ -48,9 +48,10 @@ export function calculateIndices(labs: LabPoint[], sex: 'male'|'female' = 'male'
   };
 
   // Free Testosterone (Vermeulen approximation)
-  // T_free ≈ T_total / (1 + (K_SHBG * SHBG) + (K_Alb * Alb))
-  const K_SHBG = 0.01, K_Alb = 0.000004; // упрощенные аффинитеты
-  const ft4Val = tt / (1 + (K_SHBG * shbg) + (K_Alb * alb));
+  // TT in nmol/L, SHBG in nmol/L, ALB in g/dL
+  const tt_nmol_L = tt * 0.0347;
+  const alb_g_dL = alb / 10;
+  const ft4Val = tt_nmol_L / (1 + 0.81 * shbg + 0.026 * alb_g_dL);
   const ftRef = sex === 'male' ? [170, 450] : [50, 180];
   const freeTestosterone: ClinicalIndices['freeTestosterone'] = {
     value: parseFloat(ft4Val.toFixed(1)),
@@ -59,10 +60,11 @@ export function calculateIndices(labs: LabPoint[], sex: 'male'|'female' = 'male'
     ref: ftRef as [number, number]
   };
 
-  // eGFR (CKD-EPI 2021)
+  // eGFR (CKD-EPI 2021) — convert creatinine from µmol/L to mg/dL
+  const creat_mg_dL = creat / 88.42;
   const k = sex === 'female' ? 0.7 : 0.9;
   const a = sex === 'female' ? -0.329 : -0.411;
-  const egfrVal = 142 * Math.pow(Math.min(creat/k, 1), a) * Math.pow(Math.max(creat/k, 1), -1.2) * 0.9938 ** age * (sex === 'female' ? 1.012 : 1);
+  const egfrVal = 142 * Math.pow(Math.min(creat_mg_dL/k, 1), a) * Math.pow(Math.max(creat_mg_dL/k, 1), -1.2) * 0.9938 ** age * (sex === 'female' ? 1.012 : 1);
   const egfrStatus = egfrVal >= 90 ? 'normal' : egfrVal >= 60 ? 'g2' : egfrVal >= 45 ? 'g3a' : egfrVal >= 30 ? 'g3b' : egfrVal >= 15 ? 'g4' : 'g5';
   const egfr: ClinicalIndices['egfr'] = {
     value: parseFloat(egfrVal.toFixed(1)),
