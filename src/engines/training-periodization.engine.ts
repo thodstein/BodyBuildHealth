@@ -1,5 +1,6 @@
-import { EXERCISE_DB, selectExercises } from './training.engine';
+import { EXERCISE_DB, canReplace, getSubstitutes, getExerciseById, calcExercisePrescription } from './training.engine';
 import type { Exercise } from '../core/types';
+import { EXERCISE_CATALOG, getExercisesByGroup } from '../core/exercise-catalog';
 
 export type MesocycleType = 'accumulation' | 'intensification' | 'peaking' | 'deload' | 'recovery';
 
@@ -35,6 +36,18 @@ export interface PlannedExercise {
   restSeconds: number;
   isCompound: boolean;
   notes?: string;
+  targetMuscle?: string;
+  technique?: string;
+  pauseSeconds?: number;
+  peakContraction?: boolean;
+  stretchPhase?: boolean;
+  dropSet?: boolean;
+  dropSetReps?: string;
+  backoffSet?: boolean;
+  substitutionGroup?: string;
+  canReplace?: string[];
+  cannotReplace?: string[];
+  comments?: string;
 }
 
 export interface MacrocyclePlan {
@@ -221,37 +234,47 @@ function generateWeekDays(
     const exercises: PlannedExercise[] = [];
     const avoidHighJoint = injuries.length > 0;
 
-    for (const group of dayPattern) {
-      const groupExercises = selectExercises(group, {
-        avoidHighJointStress: avoidHighJoint,
-        maxFatigueCost: isDeload ? 4 : level === 'beginner' ? 6 : 8,
-      });
+      for (const group of dayPattern) {
+        const groupExercises = getExercisesByGroup(group);
 
-      const isWeak = weakPoints.includes(group);
-      const setsBase = Math.round((level === 'beginner' ? 3 : level === 'intermediate' ? 3 : 4) * volumeMultiplier * (isWeak ? 1.2 : 1.0));
-      const sets = isDeload ? Math.max(2, Math.round(setsBase * 0.6)) : setsBase;
-      const reps = repsRange[0] + '-' + repsRange[1];
-      const rpeVal = isDeload ? 6 : rpe;
+        const isWeak = weakPoints.includes(group);
+        const compounds = groupExercises
+          .filter(e => e.type === 'compound' && (!avoidHighJoint || e.jointStress !== 'high') && (!isDeload || e.fatigueCost <= 6) && (level === 'beginner' ? e.difficulty !== 'advanced' : true))
+          .sort((a, b) => (a.order ?? 2) - (b.order ?? 2))
+          .slice(0, isDeload ? 1 : 2);
+        const isolations = groupExercises
+          .filter(e => e.type === 'isolation' && (!avoidHighJoint || e.jointStress !== 'high') && (!isDeload || e.fatigueCost <= 4))
+          .sort((a, b) => (a.order ?? 3) - (b.order ?? 3))
+          .slice(0, isWeak && !isDeload ? 2 : 1);
 
-      const compounds = groupExercises.filter(e => e.type === 'compound').slice(0, isDeload ? 1 : 2);
-      const isolations = groupExercises.filter(e => e.type === 'isolation').slice(0, isWeak && !isDeload ? 2 : 1);
-
-      for (const ex of [...compounds, ...isolations]) {
-        const exSets = ex.type === 'compound' ? sets : Math.max(2, sets - 1);
-        exercises.push({
-          exerciseId: ex.id,
-          name: ex.name,
-          group: ex.group,
-          sets: exSets,
-          reps,
-          rir: rir,
-          rpe: rpeVal,
-          restSeconds: ex.type === 'compound' ? restSeconds : Math.max(45, restSeconds - 30),
-          isCompound: ex.type === 'compound',
-          notes: isWeak ? 'Акцент на отстающую группу' : undefined,
-        });
+        for (const ex of [...compounds, ...isolations]) {
+          const prescription = calcExercisePrescription(ex, goal, level, isWeak, isDeload, volumeMultiplier);
+          exercises.push({
+            exerciseId: ex.id,
+            name: ex.name,
+            group: ex.group,
+            sets: prescription.sets,
+            reps: prescription.reps,
+            rir: prescription.rir,
+            rpe: isDeload ? 6 : rpe,
+            restSeconds: (ex.type === 'compound' ? restSeconds : Math.max(45, restSeconds - 30)),
+            isCompound: ex.type === 'compound',
+            notes: isWeak ? 'Акцент на отстающую группу' : undefined,
+            targetMuscle: ex.targetMuscle,
+            technique: ex.technique,
+            pauseSeconds: ex.pauseSeconds,
+            peakContraction: ex.peakContraction,
+            stretchPhase: ex.stretchPhase,
+            dropSet: prescription.dropSet,
+            dropSetReps: prescription.dropSetReps,
+            backoffSet: prescription.backoffSet,
+            substitutionGroup: ex.substitutionGroup,
+            canReplace: ex.canReplace,
+            cannotReplace: ex.cannotReplace,
+            comments: ex.comments,
+          });
+        }
       }
-    }
 
     const intensity: 'low' | 'medium' | 'high' | 'very_high' = isDeload ? 'low' : rpe >= 9 ? 'very_high' : rpe >= 8 ? 'high' : rpe >= 7 ? 'medium' : 'low';
 
@@ -351,4 +374,4 @@ export function adaptWeekForReadiness(micro: Microcycle, readinessScore: number)
   return micro;
 }
 
-export const EXTENDED_EXERCISE_DB = EXERCISE_DB;
+export const EXTENDED_EXERCISE_DB = EXERCISE_CATALOG;

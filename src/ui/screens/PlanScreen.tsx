@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { SubstanceCard } from '../cards/SubstanceCard';
-import { calcTraining, EXERCISE_DB, selectExercises, getAvailableSplits } from '../../engines/training.engine';
+import { calcTraining, EXERCISE_DB, getAvailableSplits, replaceExercise, calcExercisePrescription, canReplace, getSubstitutes } from '../../engines/training.engine';
+import { EXERCISE_CATALOG, getExercisesByGroup, getExerciseById } from '../../core/exercise-catalog';
 import { generateSupportStack, calculateSupport } from '../../engines/support.engine';
 import { calcReadiness } from '../../engines/readiness.engine';
 import { getProfile } from '../../core/profile-manager';
@@ -36,7 +37,7 @@ const GROUP_LABELS: Record<string, string> = {
 
 const DAYS_LABELS = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
 
-function buildDayPlan(result: TrainingOutput, daysPerWeek: number): { day: number; name: string; exercises: Exercise[] }[] {
+function buildDayPlan(result: TrainingOutput, daysPerWeek: number, weakPoints: string[] = []): { day: number; name: string; exercises: Exercise[] }[] {
   const days: { day: number; name: string; exercises: Exercise[] }[] = [];
   const groups = Object.keys(result.volumePerGroup);
   const exercisesPerDay = Math.max(4, Math.min(8, Math.round(groups.length * 2 / daysPerWeek)));
@@ -61,15 +62,13 @@ function buildDayPlan(result: TrainingOutput, daysPerWeek: number): { day: numbe
       if (vol <= 0) continue;
       const sets = Math.max(2, Math.round(vol / 3));
       const reps = result.rir === '4' ? 12 : result.rir === '1-2' ? 10 : 8;
-      const avail = selectExercises(g, {
-        avoidHighJointStress: result.isDeload,
-        maxFatigueCost: result.isDeload ? 5 : undefined,
-      });
-      const picked = avail.slice(0, Math.min(2, Math.ceil(sets / 3)));
+      const avail = getExercisesByGroup(g);
+      const picked = avail.filter(e => !(result.isDeload && e.fatigueCost > 5)).slice(0, Math.min(2, Math.ceil(sets / 3))).sort((a, b) => (a.order ?? 2) - (b.order ?? 2));
       for (const ex of picked) {
         const setsForEx = picked.length === 1 ? sets : Math.max(2, Math.round(sets / picked.length));
         const rirVal = parseInt(result.rir.split('-')[0], 10) || 2;
-        exercises.push({ ...ex, sets: setsForEx, reps, rir: rirVal, rest: ex.type === 'compound' ? 120 : 60 });
+        const presc = calcExercisePrescription(ex, result.splitName.includes('Силовой') ? 'strength' : 'hypertrophy', 'intermediate', weakPoints.includes(g), result.isDeload, 1.0);
+        exercises.push({ ...ex, sets: setsForEx, reps: parseInt(presc.reps.split('-')[0], 10) || 10, rir: rirVal, rest: ex.type === 'compound' ? 120 : 60, targetMuscle: ex.targetMuscle, technique: ex.technique, comments: ex.comments, dropSet: presc.dropSet, backoffSet: presc.backoffSet, canReplace: ex.canReplace, cannotReplace: ex.cannotReplace });
       }
     }
     days.push({ day: d + 1, name: DAYS_LABELS[d] || `День ${d + 1}`, exercises });
@@ -145,7 +144,7 @@ export const PlanScreen: React.FC<{ goal: string }> = ({ goal }) => {
 
   const dayPlan = useMemo(() => {
     if (!trainingResult) return [];
-    return buildDayPlan(trainingResult, daysPerWeek);
+    return buildDayPlan(trainingResult, daysPerWeek, weakPoints);
   }, [trainingResult, daysPerWeek]);
 
   const readinessResult = useMemo<ReadinessScores | null>(() => {
@@ -183,7 +182,7 @@ export const PlanScreen: React.FC<{ goal: string }> = ({ goal }) => {
 
   const exerciseGroups = useMemo(() => {
     const groups: Record<string, Exercise[]> = {};
-    for (const ex of EXERCISE_DB) {
+    for (const ex of EXERCISE_CATALOG) {
       if (!groups[ex.group]) groups[ex.group] = [];
       groups[ex.group].push(ex);
     }
@@ -304,9 +303,14 @@ export const PlanScreen: React.FC<{ goal: string }> = ({ goal }) => {
                           <tr><th>Упражнение</th><th>Сеты</th><th>Повторы</th><th>RIR</th><th>Отдых (с)</th></tr>
                         </thead>
                         <tbody>
-                          {day.exercises.map(ex => (
-                            <tr key={ex.id}>
-                              <td>{ex.name}</td>
+                          {day.exercises.map((ex, i) => (
+                            <tr key={ex.id || i}>
+                              <td style={{maxWidth:180}}>
+                                <div style={{fontWeight:600,fontSize:12}}>{ex.name}</div>
+                                {ex.targetMuscle && <div style={{fontSize:10,color:'var(--text-dim)',marginTop:1}}>{ex.targetMuscle}</div>}
+                                {ex.dropSet && <span style={{fontSize:9,padding:'1px 4px',borderRadius:3,background:'rgba(249,115,22,0.15)',color:'#f97316',marginLeft:4}}>Дроп</span>}
+                                {ex.backoffSet && <span style={{fontSize:9,padding:'1px 4px',borderRadius:3,background:'rgba(34,197,94,0.12)',color:'#22c55e',marginLeft:4 }}>Бэк</span>}
+                              </td>
                               <td>{ex.sets}</td>
                               <td>{ex.reps}</td>
                               <td>{ex.rir}</td>
@@ -455,23 +459,40 @@ export const PlanScreen: React.FC<{ goal: string }> = ({ goal }) => {
           {Object.entries(exerciseGroups).map(([group, exercises]) => (
             <div key={group} className="card exercise-group">
               <h3>{GROUP_LABELS[group] || group}</h3>
-              <table className="exercise-table">
-                <thead>
-                  <tr><th>Название</th><th>Тип</th><th>Оборудование</th><th>Сложность</th><th>Нагрузка на суставы</th><th>Усталость</th></tr>
-                </thead>
-                <tbody>
-                  {exercises.map(ex => (
-                    <tr key={ex.id}>
-                      <td>{ex.name}</td>
-                      <td>{ex.type}</td>
-                      <td>{ex.equipment}</td>
-                      <td>{ex.difficulty}</td>
-                      <td>{ex.jointStress}</td>
-                      <td>{ex.fatigueCost}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              {exercises.map(ex => {
+                const subInfo = getSubstitutes(ex.id);
+                return (
+                  <div key={ex.id} style={{padding:'8px 10px',marginBottom:4,background:'var(--bg-secondary)',borderRadius:6}}>
+                    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                      <div>
+                        <span style={{fontWeight:600,fontSize:13}}>{ex.name}</span>
+                        <span style={{fontSize:10,marginLeft:6,padding:'1px 5px',borderRadius:3,background:ex.type==='compound'?'rgba(0,230,138,0.12)':'rgba(100,150,255,0.12)',color:ex.type==='compound'?'#00e68a':'#6496ff'}}>{ex.type==='compound'?'Компаунд':'Изоляция'}</span>
+                      </div>
+                      <span style={{fontSize:10,color:'var(--text-dim)'}}>{ex.equipment} | {ex.difficulty} | суставы: {ex.jointStress}</span>
+                    </div>
+                    {ex.targetMuscle && <div style={{fontSize:11,color:'var(--accent)',marginTop:2}}>Целевая мышца: {ex.targetMuscle}</div>}
+                    {ex.technique && <div style={{fontSize:11,color:'var(--text-light)',marginTop:2,lineHeight:1.5}}>{ex.technique}</div>}
+                    {ex.comments && <div style={{fontSize:10,color:'var(--text-dim)',marginTop:2,lineHeight:1.4}}>{ex.comments}</div>}
+                    <div style={{display:'flex',gap:4,flexWrap:'wrap',marginTop:4}}>
+                      {ex.pauseSeconds ? <span style={{fontSize:9,padding:'1px 5px',borderRadius:3,background:'rgba(234,179,8,0.12)',color:'#eab308'}}>Пауза {ex.pauseSeconds}с</span> : null}
+                      {ex.peakContraction && <span style={{fontSize:9,padding:'1px 5px',borderRadius:3,background:'rgba(249,115,22,0.12)',color:'#f97316'}}>Пиковое сокращение</span>}
+                      {ex.stretchPhase && <span style={{fontSize:9,padding:'1px 5px',borderRadius:3,background:'rgba(34,197,94,0.12)',color:'#22c55e'}}>Растяжение</span>}
+                    </div>
+                    {subInfo && subInfo.substitutes.length > 0 && (
+                      <div style={{marginTop:4,fontSize:10}}>
+                        <span style={{color:'var(--text-dim)'}}>Заменители: </span>
+                        {subInfo.substitutes.map(s => <span key={s.id} style={{padding:'1px 5px',borderRadius:3,background:'rgba(0,230,138,0.08)',margin:'0 2px'}}>{getExerciseById(s.id)?.name || s.id} ({s.reason})</span>)}
+                      </div>
+                    )}
+                    {subInfo && subInfo.forbidden && subInfo.forbidden.length > 0 && (
+                      <div style={{marginTop:2,fontSize:10}}>
+                        <span style={{color:'#ef4444'}}>Запрещено заменять: </span>
+                        {subInfo.forbidden.map(f => <span key={f.id} style={{padding:'1px 5px',borderRadius:3,background:'rgba(239,68,68,0.08)',margin:'0 2px'}}>{getExerciseById(f.id)?.name || f.id} ({f.reason})</span>)}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           ))}
         </div>
@@ -581,9 +602,25 @@ export const PlanScreen: React.FC<{ goal: string }> = ({ goal }) => {
                         {day.isTraining && day.exercises.length > 0 && (
                           <div style={{ fontSize: 12 }}>
                             {day.exercises.map((ex, i) => (
-                              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0', borderBottom: '1px solid var(--border)' }}>
-                                <span>{ex.isCompound ? '💪 ' : ''}{ex.name}</span>
-                                <span style={{ color: 'var(--text-dim)' }}>{ex.sets}×{ex.reps} RIR {ex.rir}</span>
+                              <div key={i} style={{ padding: '4px 0', borderBottom: '1px solid var(--border)' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                  <div>
+                                    <span>{ex.isCompound ? '💪 ' : ''}{ex.name}</span>
+                                    {ex.targetMuscle && <span style={{ fontSize: 9, marginLeft: 4, color: 'var(--accent)' }}>{ex.targetMuscle}</span>}
+                                  </div>
+                                  <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                                    <span style={{ color: 'var(--text-dim)' }}>{ex.sets}×{ex.reps} RIR {ex.rir}</span>
+                                    {ex.dropSet && <span style={{ fontSize: 9, padding: '0 3px', borderRadius: 3, background: 'rgba(249,115,22,0.15)', color: '#f97316' }}>Дроп</span>}
+                                    {ex.backoffSet && <span style={{ fontSize: 9, padding: '0 3px', borderRadius: 3, background: 'rgba(34,197,94,0.12)', color: '#22c55e' }}>Бэк</span>}
+                                  </div>
+                                </div>
+                                {ex.technique && <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 2, lineHeight: 1.4 }}>{ex.technique}</div>}
+                                {ex.comments && <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 1, fontStyle: 'italic' }}>{ex.comments}</div>}
+                                {ex.canReplace && ex.canReplace.length > 0 && (
+                                  <div style={{ fontSize: 9, marginTop: 2, color: 'var(--text-dim)' }}>
+                                    Замены: {ex.canReplace.map(rId => getExerciseById(rId)?.name || rId).join(', ')}
+                                  </div>
+                                )}
                               </div>
                             ))}
                           </div>

@@ -17,6 +17,7 @@ import { parseLabFile, type ParsedLabValue } from '../../engines/pdf-parser.engi
 import { resolveLabMarker, interpretRatio, normalizedRatio } from '../../core/labs-mapping';
 import { computeLabIndices, interpretLabIndices } from '../../engines/labs-indices.engine';
 import { PHASE_REQUIRED_PANELS, LAB_PANELS, type LabPanelMarker } from '../../data/labs-phase-panels';
+import { generateLabSchedule, getCurrentLabStatus, getDrugSpecificLabs, getWeeksSinceStart, type LabScheduleItem } from '../../engines/labs-schedule.engine';
 import type { LabPoint, UserProfile, RiskResult, CourseEntry } from '../../core/types';
 
 const SYSTEM_LABELS: Record<string, string> = {
@@ -25,7 +26,7 @@ const SYSTEM_LABELS: Record<string, string> = {
   neuro: 'Нервная', reproductive: 'Репродуктивная', musculoskeletal: 'Суставы и связки'
 };
 
-type LabTab = 'input' | 'panels' | 'history' | 'indices' | 'risks' | 'investigations';
+type LabTab = 'input' | 'panels' | 'schedule' | 'history' | 'indices' | 'risks' | 'investigations';
 
 interface LabsProps {
   initialTab?: LabTab;
@@ -50,6 +51,8 @@ export const LabsScreen: React.FC<LabsProps> = ({ initialTab = 'input' }) => {
   const [phase, setPhase] = useState<'baseline' | 'on_cycle' | 'pct' | 'bridge' | 'fertility'>('baseline');
   const [markerValues, setMarkerValues] = useState<Record<string, { value: string; unit: string }>>({});
   const [invDone, setInvDone] = useState<Record<string, boolean>>({});
+  const [labSchedule, setLabSchedule] = useState<LabScheduleItem[]>([]);
+  const [currentWeek, setCurrentWeek] = useState(0);
 
   useEffect(() => {
     const loadData = async () => {
@@ -91,6 +94,19 @@ export const LabsScreen: React.FC<LabsProps> = ({ initialTab = 'input' }) => {
   useEffect(() => {
     recalcRisks();
   }, [entries, profile, course]);
+
+  useEffect(() => {
+    if (!profile?.settings?.courseStartDate) return;
+    const w = getWeeksSinceStart(profile.settings.courseStartDate);
+    setCurrentWeek(w);
+    const schedule = generateLabSchedule({
+      phase: profile.settings.phase ?? 'baseline',
+      courseStartDate: profile.settings.courseStartDate,
+      courseEntries: course,
+      currentWeek: w
+    });
+    setLabSchedule(schedule);
+  }, [profile?.settings?.phase, profile?.settings?.courseStartDate, course]);
 
   const recalcRisks = async () => {
     if (!profile) return;
@@ -259,13 +275,14 @@ export const LabsScreen: React.FC<LabsProps> = ({ initialTab = 'input' }) => {
 
   if (loading) return <div className="loading-screen"><div className="loading-spinner"/><span>Загрузка...</span></div>;
 
-  const TABS: { id: LabTab; label: string }[] = [
-    { id: 'input', label: 'Ввод анализов' },
-    { id: 'panels', label: 'Панели' },
-    { id: 'history', label: 'История' },
-    { id: 'indices', label: 'Индексы' },
-    { id: 'risks', label: 'Риски' },
-    { id: 'investigations', label: 'Исследования' },
+  const TABS: { id: LabTab; label: string; icon?: string }[] = [
+    { id: 'input', label: 'Ввод', icon: '📝' },
+    { id: 'panels', label: 'Панели', icon: '🧪' },
+    { id: 'schedule', label: 'Расписание', icon: '📅' },
+    { id: 'history', label: 'История', icon: '📊' },
+    { id: 'indices', label: 'Индексы', icon: '📈' },
+    { id: 'risks', label: 'Риски', icon: '⚠️' },
+    { id: 'investigations', label: 'Исследования', icon: '🔬' },
   ];
 
   return (
@@ -288,8 +305,8 @@ export const LabsScreen: React.FC<LabsProps> = ({ initialTab = 'input' }) => {
 
       <div style={{ display: 'flex', gap: 6, marginBottom: 16, overflowX: 'auto' }}>
         {TABS.map(t => (
-          <button key={t.id} className={'btn secondary' + (tab === t.id ? ' active' : '')} style={{ flex: '0 0 auto', whiteSpace: 'nowrap' }} onClick={() => setTab(t.id)}>
-            {t.label}
+          <button key={t.id} className={'btn secondary' + (tab === t.id ? ' active' : '')} style={{ flex: '0 0 auto', whiteSpace: 'nowrap', fontSize: 12, padding: '6px 10px' }} onClick={() => setTab(t.id)}>
+            {t.icon} {t.label}
           </button>
         ))}
       </div>
@@ -501,6 +518,105 @@ export const LabsScreen: React.FC<LabsProps> = ({ initialTab = 'input' }) => {
               );
             })}
           </div>
+        </>
+      )}
+
+      {tab === 'schedule' && (
+        <>
+          <div className="card" style={{ marginBottom: 12 }}>
+            <h3>Расписание анализов</h3>
+            <p style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 8 }}>
+              Неделя {currentWeek} с начала курса · Фаза: {phase === 'on_cycle' ? 'Курс' : phase === 'pct' ? 'ПКТ' : phase === 'bridge' ? 'Мост' : phase === 'fertility' ? 'Фертильность' : 'Базовая'}
+            </p>
+            {labSchedule.length === 0 ? (
+              <p style={{ color: 'var(--text-dim)', fontSize: 13 }}>Укажите дату начала курса в профиле для генерации расписания.</p>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {labSchedule.map((item, idx) => {
+                  const labCodes = new Set(entries.map(e => e.code.toUpperCase()));
+                  const filledCount = item.labs.filter(l => labCodes.has(l.toUpperCase())).length;
+                  const totalLabs = item.labs.length;
+                  const isOverdue = item.week <= currentWeek && filledCount < totalLabs * 0.8;
+                  const isCompleted = filledCount >= totalLabs * 0.8;
+                  const isUpcoming = item.week > currentWeek;
+                  const borderColor = isCompleted ? 'var(--success)' : isOverdue ? 'var(--danger)' : isUpcoming && item.week <= currentWeek + 2 ? 'var(--warning)' : 'var(--border)';
+                  const statusLabel = isCompleted ? 'Пройдено' : isOverdue ? 'Просрочено' : isUpcoming ? 'Предстоит' : '';
+                  const statusColor = isCompleted ? 'var(--success)' : isOverdue ? 'var(--danger)' : 'var(--accent)';
+                  return (
+                    <div key={idx} style={{ background: 'var(--bg-secondary)', borderRadius: 10, padding: 12, borderLeft: `3px solid ${borderColor}` }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                        <div>
+                          <span style={{ fontWeight: 700, fontSize: 14 }}>{item.label}</span>
+                          <span style={{ fontSize: 11, color: 'var(--text-dim)', marginLeft: 8 }}>Неделя {item.week}</span>
+                        </div>
+                        <span style={{ fontSize: 11, fontWeight: 600, color: statusColor, padding: '2px 8px', borderRadius: 6, background: isCompleted ? 'var(--success-dim)' : isOverdue ? 'var(--danger-dim)' : 'var(--accent-dim)' }}>{statusLabel}</span>
+                      </div>
+                      <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 4 }}>{item.reason}</div>
+                      <div style={{ fontSize: 12, marginBottom: item.diagnostics.length > 0 ? 6 : 0 }}>
+                        <span style={{ fontWeight: 600 }}>Анализы:</span>{' '}
+                        {item.labs.map(l => {
+                          const filled = labCodes.has(l.toUpperCase());
+                          return <span key={l} style={{ display: 'inline-block', margin: '1px 2px', padding: '1px 6px', borderRadius: 4, fontSize: 11, background: filled ? 'var(--success-dim)' : 'var(--bg-tertiary)', color: filled ? 'var(--success)' : 'var(--text-dim)', border: `1px solid ${filled ? 'var(--success)' : 'var(--border)'}` }}>{l}</span>;
+                        })}
+                        <span style={{ fontSize: 11, color: 'var(--text-dim)', marginLeft: 6 }}>({filledCount}/{totalLabs})</span>
+                      </div>
+                      {item.diagnostics.length > 0 && (
+                        <div style={{ fontSize: 12 }}>
+                          <span style={{ fontWeight: 600 }}>Исследования:</span>{' '}
+                          {item.diagnostics.map(d => <span key={d} style={{ display: 'inline-block', margin: '1px 2px', padding: '1px 6px', borderRadius: 4, fontSize: 11, background: 'var(--accent-dim)', color: 'var(--accent)', border: '1px solid var(--accent)' }}>{d}</span>)}
+                        </div>
+                      )}
+                      {item.urgency === 'critical' && !isCompleted && <div style={{ marginTop: 4, fontSize: 10, color: 'var(--danger)', fontWeight: 700 }}>&#9888; Критически важно!</div>}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {(() => {
+            const { labs: drugLabs, diagnostics: drugDiags, reasons } = getDrugSpecificLabs(course);
+            if (drugLabs.length === 0 && drugDiags.length === 0) return null;
+            return (
+              <div className="card" style={{ marginBottom: 12 }}>
+                <h3>Препарат-специфичные анализы</h3>
+                <p style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 8 }}>Дополнительные анализы, обусловленные текущими препаратами на курсе:</p>
+                {drugLabs.length > 0 && (
+                  <div style={{ marginBottom: 8 }}>
+                    <span style={{ fontWeight: 600, fontSize: 13 }}>Маркеры:</span>{' '}
+                    {drugLabs.map(l => <span key={l} style={{ display: 'inline-block', margin: '1px 2px', padding: '2px 8px', borderRadius: 6, fontSize: 11, background: 'var(--warning-dim)', color: 'var(--warning)', border: '1px solid var(--warning)' }}>{l}</span>)}
+                  </div>
+                )}
+                {drugDiags.length > 0 && (
+                  <div style={{ marginBottom: 8 }}>
+                    <span style={{ fontWeight: 600, fontSize: 13 }}>Исследования:</span>{' '}
+                    {drugDiags.map(d => <span key={d} style={{ display: 'inline-block', margin: '1px 2px', padding: '2px 8px', borderRadius: 6, fontSize: 11, background: 'var(--accent-dim)', color: 'var(--accent)', border: '1px solid var(--accent)' }}>{d}</span>)}
+                  </div>
+                )}
+                <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>
+                  {reasons.map((r, i) => <div key={i} style={{ marginTop: 2 }}>&#8226; {r}</div>)}
+                </div>
+              </div>
+            );
+          })()}
+
+          {(() => {
+            const status = getCurrentLabStatus(labSchedule, entries.map(e => ({ code: e.code, date: e.date })), currentWeek);
+            return (
+              <div style={{ display: 'grid', gap: 8, gridTemplateColumns: 'repeat(3, 1fr)', marginBottom: 12 }}>
+                {[
+                  { label: 'Просрочено', count: status.overdue.length, color: 'var(--danger)' },
+                  { label: 'Предстоит', count: status.upcoming.length, color: 'var(--warning)' },
+                  { label: 'Пройдено', count: status.completed.length, color: 'var(--success)' },
+                ].map(s => (
+                  <div key={s.label} style={{ background: 'var(--bg-secondary)', borderRadius: 10, padding: 10, textAlign: 'center' }}>
+                    <div style={{ fontSize: 22, fontWeight: 800, color: s.color }}>{s.count}</div>
+                    <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>{s.label}</div>
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
         </>
       )}
 

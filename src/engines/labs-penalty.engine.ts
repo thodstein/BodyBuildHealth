@@ -1,5 +1,6 @@
 import { LabCheckpoint, LabPoint, PenaltyResult } from '../core/types';
 import { PENALTY_THRESHOLDS, REQUIRED_LABS_PER_PHASE, REQUIRED_DIAGNOSTICS_PER_PHASE } from '../core/constants';
+import { getDrugSpecificLabs } from './labs-schedule.engine';
 
 export interface PenaltyCoefficients {
   labPenalty: number;
@@ -63,11 +64,18 @@ export function calculatePenaltyCoefficients(
   phase: string,
   submittedLabs: LabPoint[],
   submittedDiagnostics: string[],
-  courseWeek: number
+  courseWeek: number,
+  courseEntries?: import('../core/types').CourseEntry[]
 ): PenaltyCoefficients {
   const phaseKey = resolvePhaseKey(phase);
-  const requiredLabs = REQUIRED_LABS_PER_PHASE[phaseKey] ?? [];
-  const requiredDiags = REQUIRED_DIAGNOSTICS_PER_PHASE[phaseKey] ?? [];
+  let requiredLabs = [...(REQUIRED_LABS_PER_PHASE[phaseKey] ?? [])];
+  const requiredDiags = [...(REQUIRED_DIAGNOSTICS_PER_PHASE[phaseKey] ?? [])];
+
+  if (courseEntries && courseEntries.length > 0) {
+    const drugSpecific = getDrugSpecificLabs(courseEntries);
+    drugSpecific.labs.forEach(l => { if (!requiredLabs.includes(l)) requiredLabs.push(l); });
+    drugSpecific.diagnostics.forEach(d => { if (!requiredDiags.includes(d)) requiredDiags.push(d); });
+  }
 
   const now = new Date();
   const recentLabs = submittedLabs.filter(l => {

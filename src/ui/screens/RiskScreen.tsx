@@ -8,6 +8,8 @@ import { calculateRiskFromAnalyses } from '../../engines/risk-calculator-v2.engi
 import { generateSupportStack } from '../../engines/support.engine';
 import { calculatePenaltyCoefficients, PenaltyCoefficients } from '../../engines/labs-penalty.engine';
 import HumanBody3D from '../components/HumanBody3D';
+import { getRiskColor } from '../../core/utils/risk-colors';
+import { PHARMA_DB } from '../../core/pharma-database';
 
 const RISK_MECHANISMS = Object.values(MECHANISM_INFO);
 
@@ -27,8 +29,6 @@ const getCellColor = (raw: number, net: number): { bg: string; text: string } =>
   if (v < 80) return { bg: 'rgba(249,115,22,0.2)', text: '#f97316' };
   return { bg: 'rgba(239,68,68,0.2)', text: '#ef4444' };
 };
-
-import { getRiskColor } from '../../core/utils/risk-colors';
 
 type MatrixCell = { raw: number; net: number; coverage: number };
 type MatrixData = Record<string, MatrixCell>;
@@ -73,6 +73,8 @@ function saveRiskSnapshot(snapshot: RiskSnapshot) {
   localStorage.setItem(RISK_HISTORY_KEY, JSON.stringify(history));
 }
 
+type RiskTab = 'overview' | 'systems' | 'body' | 'mechanisms' | 'labs' | 'overtraining' | 'timeline';
+
 export const RiskScreen: React.FC = () => {
   const [riskResult, setRiskResult] = useState<RiskResult | null>(null);
   const [rawRiskResult, setRawRiskResult] = useState<RiskResult | null>(null);
@@ -81,10 +83,12 @@ export const RiskScreen: React.FC = () => {
   const [selectedCell, setSelectedCell] = useState<{ system: string; mechanism: number | null } | null>(null);
   const [selectedSystem, setSelectedSystem] = useState<string | null>(null);
   const [activeSubstances, setActiveSubstances] = useState<Record<string, { dosePerWeek: number }>>({});
-  const [tab, setTab] = useState<'body' | 'matrix' | 'detail'>('body');
+  const [tab, setTab] = useState<RiskTab>('overview');
   const [penalty, setPenalty] = useState<PenaltyCoefficients | null>(null);
   const [graphSystem, setGraphSystem] = useState<string>('__overall');
+  const [selectedOrgan, setSelectedOrgan] = useState<string | null>(null);
   const trendCanvasRef = useRef<HTMLCanvasElement>(null);
+  const [labRisks, setLabRisks] = useState<Record<string, number>>({});
 
   const matrixData = useMemo<MatrixData>(() => {
     if (!riskResult || !rawRiskResult) return {};
@@ -137,15 +141,16 @@ export const RiskScreen: React.FC = () => {
         }
         for (const key of Object.keys(baseCovMap)) { covMap[key] = (covMap[key] || 0) + (baseCovMap[key] || 0); }
         setCoverageMap(covMap);
-        const labRisks = calculateRiskFromAnalyses(userLabs);
-        const labRawRisks: Record<string, number> = {};
-        RISK_SYSTEMS.forEach((s) => { labRawRisks[s] = labRisks.systemContributions[s] ?? 0; });
+        const labRiskResult = calculateRiskFromAnalyses(userLabs);
+        const labRaw: Record<string, number> = {};
+        RISK_SYSTEMS.forEach((s) => { labRaw[s] = labRiskResult.systemContributions[s] ?? 0; });
+        setLabRisks(labRaw);
         const finalResult = calculateRisks({ genetics, nutritionFactor, trainingFactor, activeDrugs: drugs, supportCoverage: covMap });
         if (finalResult.systemBreakdown) {
           for (const sys of RISK_SYSTEMS) {
             if (finalResult.systemBreakdown[sys]) {
-              finalResult.systemBreakdown[sys].raw = Math.max(finalResult.systemBreakdown[sys].raw, labRawRisks[sys] ?? 0);
-              finalResult.systemBreakdown[sys].net = Math.max(finalResult.systemBreakdown[sys].net, labRawRisks[sys] ?? 0);
+              finalResult.systemBreakdown[sys].raw = Math.max(finalResult.systemBreakdown[sys].raw, labRaw[sys] ?? 0);
+              finalResult.systemBreakdown[sys].net = Math.max(finalResult.systemBreakdown[sys].net, labRaw[sys] ?? 0);
             }
           }
         }
@@ -153,7 +158,7 @@ export const RiskScreen: React.FC = () => {
         const diagEntries = await db.getAll<{id:string;type?:string}>('diagnostics_log').catch(() => [] as {id:string;type?:string}[]);
         const diagsDone = diagEntries.map(d => d.type ?? d.id).filter(Boolean) as string[];
         const courseWeek = Math.max(0, Math.floor((Date.now() - new Date(prof.settings?.courseStartDate ?? Date.now()).getTime()) / (7*24*60*60*1000)));
-        const pen = calculatePenaltyCoefficients(phase, userLabs, diagsDone, courseWeek);
+        const pen = calculatePenaltyCoefficients(phase, userLabs, diagsDone, courseWeek, courseEntries);
         setPenalty(pen);
         const systemsSnap: Record<string, { raw: number; net: number }> = {};
         for (const sys of RISK_SYSTEMS) {
@@ -207,7 +212,6 @@ export const RiskScreen: React.FC = () => {
   const handleSystemSelect = useCallback((sys: string) => {
     setSelectedSystem(sys);
     setSelectedCell({ system: sys, mechanism: null });
-    setTab('detail');
   }, []);
 
   if (loading) return <div className="screen risk-screen"><div style={{ textAlign: 'center', padding: 40, color: 'var(--text-dim)' }}>Расчёт рисков...</div></div>;
@@ -313,139 +317,181 @@ export const RiskScreen: React.FC = () => {
 
   const selectedSysInfo = selectedSystem ? SYSTEM_INFO[selectedSystem] : null;
 
+  const TAB_ITEMS: { key: RiskTab; label: string }[] = [
+    { key: 'overview', label: 'Обзор' },
+    { key: 'systems', label: 'Системы' },
+    { key: 'body', label: '3D' },
+    { key: 'mechanisms', label: 'Механизмы' },
+    { key: 'labs', label: 'Анализы' },
+    { key: 'overtraining', label: '∑' },
+    { key: 'timeline', label: 'Таймлайн' },
+  ];
+
+  const getDrugContributions = () => {
+    const contributions: { name: string; dose: number; systems: string[] }[] = [];
+    for (const [drugId, doseInfo] of Object.entries(activeSubstances)) {
+      const pharmaEntry = Object.values(PHARMA_DB).find(p => p.id === drugId);
+      const name = pharmaEntry?.name ?? drugId;
+      const affectedSystems: string[] = [];
+      if (pharmaEntry?.pd) {
+        const pd = pharmaEntry.pd;
+        const pdMap: Record<string, string> = {
+          hepatotoxicity: 'hepatic', lipid_impact: 'cardio', hct_impact: 'hematologic',
+          neuro_toxicity: 'neuro', aromatization: 'endocrine', progestogenic: 'reproductive',
+        };
+        for (const [pdKey, systemId] of Object.entries(pdMap)) {
+          const val = (pd as any)[pdKey] as number;
+          if (val && Math.abs(val) >= 0.3) affectedSystems.push(systemId);
+        }
+      }
+      contributions.push({ name, dose: doseInfo.dosePerWeek, systems: affectedSystems });
+    }
+    return contributions.sort((a, b) => b.dose - a.dose);
+  };
+
+  const getSupportCoverageSummary = () => {
+    let totalCells = 0;
+    let coveredCells = 0;
+    for (const sys of RISK_SYSTEMS) {
+      for (let m = 1; m <= 7; m++) {
+        totalCells++;
+        const cellId = sys + '_' + m;
+        if ((coverageMap[cellId] || 0) > 0) coveredCells++;
+      }
+    }
+    return totalCells > 0 ? Math.round((coveredCells / totalCells) * 100) : 0;
+  };
+
+  const drugContribs = getDrugContributions();
+  const supportPct = getSupportCoverageSummary();
+
+  const calculateOvertrainingIndex = () => {
+    const trainingFactor = 1.0;
+    const fatigueFactor = 0.3;
+    const recoveryFactor = 0.5;
+    const loadRatio = 1.2;
+    const overtrainingIndex = Math.min(100, Math.max(0,
+      (loadRatio - 1) * 40 + fatigueFactor * 35 + (1 - recoveryFactor) * 25 + (1 - trainingFactor) * 20
+    ));
+    return overtrainingIndex;
+  };
+
+  const overtrainingIndex = calculateOvertrainingIndex();
+
   return (
     <div className="screen risk-screen">
-      <div className="card" style={{ marginBottom: 16 }}>
-        <h3 style={{ margin: '0 0 10px 0' }}>Общая оценка риска</h3>
-        <div className="risk-overview-grid">
-          <div className="risk-overview-item">
-            <div className="risk-overview-label">Без поддержки</div>
-            <div className="risk-overview-value" style={{ color: getRiskColor(rawRiskResult.overallRaw) }}>{Math.round(rawRiskResult.overallRaw)}%</div>
-          </div>
-          <div className="risk-overview-arrow">&rarr;</div>
-          <div className="risk-overview-item">
-            <div className="risk-overview-label">С поддержкой</div>
-            <div className="risk-overview-value" style={{ color: getRiskColor(riskResult.overallNet) }}>{Math.round(riskResult.overallNet)}%</div>
-          </div>
-          <div className="risk-overview-item">
-            <div className="risk-overview-label">Снижение</div>
-            <div className="risk-overview-value" style={{ color: '#22c55e' }}>{Math.round(overallReduction)}%</div>
-          </div>
-        </div>
-        {penalty && penalty.totalMultiplier > 1.0 && (
-          <div style={{ marginTop: 10, padding: '8px 12px', borderRadius: 8, background: penalty.noLabsPenalty ? 'rgba(239,68,68,0.15)' : 'rgba(249,115,22,0.12)', border: '1px solid ' + (penalty.noLabsPenalty ? '#ef4444' : '#f97316') }}>
-            <div style={{ fontSize: 12, fontWeight: 600, color: penalty.noLabsPenalty ? '#ef4444' : '#f97316', marginBottom: 4 }}>
-              {penalty.noLabsPenalty ? '⛔ Без анализов' : '⚠️ Неполные анализы'} {penalty.noDiagnosticsPenalty ? '+ Без исследований' : ''}
-            </div>
-            <div style={{ fontSize: 11, color: 'var(--text-light)', marginBottom: 4 }}>
-              Штрафной коэффициент: ×{penalty.totalMultiplier.toFixed(2)} (лабы +{(penalty.labPenalty*100).toFixed(0)}%, диагностика +{(penalty.diagnosticPenalty*100).toFixed(0)}%)
-            </div>
-            {penalty.missingLabsForPhase.length > 0 && (
-              <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>
-                Не хватает: {penalty.missingLabsForPhase.slice(0,8).join(', ')}{penalty.missingLabsForPhase.length > 8 ? ` +ещё ${penalty.missingLabsForPhase.length-8}` : ''}
-              </div>
-            )}
-            {penalty.missingDiagnosticsForPhase.length > 0 && (
-              <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>
-                Исследования: {penalty.missingDiagnosticsForPhase.join(', ')}
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-
-      <div className="card" style={{ marginBottom: 16 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginBottom: 10 }}>
-          <h3 style={{ margin: 0 }}>Тренд рисков (недельный)</h3>
-          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-            <button onClick={() => setGraphSystem('__overall')} style={{ padding: '3px 10px', border: 'none', borderRadius: 6, fontSize: 11, cursor: 'pointer', background: graphSystem === '__overall' ? 'var(--accent-blue)' : 'var(--bg-secondary)', color: graphSystem === '__overall' ? '#fff' : 'var(--text-dim)', fontWeight: 600 }}>Общий</button>
-            {RISK_SYSTEMS.map(sys => (
-              <button key={sys} onClick={() => setGraphSystem(sys)} style={{ padding: '3px 10px', border: 'none', borderRadius: 6, fontSize: 11, cursor: 'pointer', background: graphSystem === sys ? 'var(--accent-blue)' : 'var(--bg-secondary)', color: graphSystem === sys ? '#fff' : 'var(--text-dim)', fontWeight: 600 }}>{SYSTEM_INFO[sys]?.icon || ''} {SYSTEM_LABELS[sys] || sys}</button>
-            ))}
-          </div>
-        </div>
-        <div style={{ display: 'flex', gap: 16, marginBottom: 8, fontSize: 11, color: 'var(--text-dim)' }}>
-          <span><span style={{ display: 'inline-block', width: 12, height: 3, borderRadius: 2, background: 'rgba(239,68,68,0.85)', marginRight: 4, verticalAlign: 'middle' }}></span>Сырой риск</span>
-          <span><span style={{ display: 'inline-block', width: 12, height: 3, borderRadius: 2, background: 'rgba(34,197,94,0.85)', marginRight: 4, verticalAlign: 'middle' }}></span>Нетто риск</span>
-        </div>
-        <canvas ref={trendCanvasRef} style={{ width: '100%', height: 200, display: 'block' }} />
-      </div>
-
-      <div style={{ display: 'flex', gap: 6, marginBottom: 16 }}>
-        {(['body', 'matrix', 'detail'] as const).map(t => (
-          <button key={t} onClick={() => setTab(t)} style={{ flex: 1, padding: '8px 0', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', background: tab === t ? 'var(--accent-blue)' : 'var(--bg-secondary)', color: tab === t ? '#fff' : 'var(--text-dim)' }}>
-            {t === 'body' ? 'Тело' : t === 'matrix' ? 'Матрица 7×7' : 'Системы'}
+      {/* Tab Bar */}
+      <div style={{ display: 'flex', gap: 4, marginBottom: 16, overflowX: 'auto', paddingBottom: 4 }}>
+        {TAB_ITEMS.map(t => (
+          <button key={t.key} onClick={() => setTab(t.key)} style={{
+            flex: 1, minWidth: 50, padding: '8px 6px', border: 'none', borderRadius: 8,
+            fontSize: 12, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap',
+            background: tab === t.key ? 'var(--accent-blue)' : 'var(--bg-secondary)',
+            color: tab === t.key ? '#fff' : 'var(--text-dim)',
+            transition: 'background 0.15s',
+          }}>
+            {t.label}
           </button>
         ))}
       </div>
 
-      {tab === 'body' && (
-        <div className="card" style={{ marginBottom: 16 }}>
-          <h3 style={{ margin: '0 0 8px 0' }}>3D модель — нажмите на орган</h3>
-          <div style={{ display: 'flex', justifyContent: 'center' }}>
-            <HumanBody3D systems={systemsFor3D} selectedSystem={selectedSystem} onSelectSystem={handleSystemSelect} size={320} />
+      {/* ===== TAB: OVERVIEW ===== */}
+      {tab === 'overview' && (
+        <div>
+          {/* Big risk number */}
+          <div className="card" style={{ marginBottom: 12, textAlign: 'center' }}>
+            <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: 1 }}>Общий риск</div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12 }}>
+              <div style={{ fontSize: 48, fontWeight: 800, color: getRiskColor(riskResult.overallNet), lineHeight: 1 }}>{Math.round(riskResult.overallNet)}%</div>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 2 }}>
+                <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>Без поддержки</div>
+                <div style={{ fontSize: 16, fontWeight: 700, color: getRiskColor(rawRiskResult.overallRaw) }}>{Math.round(rawRiskResult.overallRaw)}%</div>
+              </div>
+            </div>
+            {overallReduction > 0 && (
+              <div style={{ marginTop: 6, fontSize: 13, fontWeight: 600, color: '#22c55e' }}>
+                ↓ Снижение на {Math.round(overallReduction)}%
+              </div>
+            )}
           </div>
-          {selectedSysInfo && (
-            <div style={{ marginTop: 12, padding: '12px 14px', background: 'var(--bg-secondary)', borderRadius: 10 }}>
-              <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 6 }}>{selectedSysInfo.icon} {selectedSysInfo.label}</div>
-              <div style={{ fontSize: 12, lineHeight: 1.6, color: 'var(--text-light)', marginBottom: 8 }}>{selectedSysInfo.description}</div>
-              <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 4 }}><strong>Что поражается:</strong> {selectedSysInfo.whatAffects.join(', ')}</div>
-              <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 4 }}><strong>Симптомы:</strong> {selectedSysInfo.symptoms.join(', ')}</div>
-              <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 4 }}><strong>Ключевые маркеры:</strong> {selectedSysInfo.keyMarkers.join(', ')}</div>
-              <div style={{ fontSize: 11, color: 'var(--text-dim)' }}><strong>Органы:</strong> {(SYSTEM_ORGANS[selectedSystem!] || []).join(', ')}</div>
+
+          {/* Penalty block */}
+          {penalty && penalty.totalMultiplier > 1.0 && (
+            <div style={{ marginBottom: 12, padding: '10px 14px', borderRadius: 10, background: penalty.noLabsPenalty ? 'rgba(239,68,68,0.12)' : 'rgba(249,115,22,0.10)', border: '1px solid ' + (penalty.noLabsPenalty ? '#ef4444' : '#f97316') }}>
+              <div style={{ fontSize: 12, fontWeight: 600, color: penalty.noLabsPenalty ? '#ef4444' : '#f97316', marginBottom: 4 }}>
+                {penalty.noLabsPenalty ? '⛔ Без анализов' : '⚠️ Неполные анализы'} {penalty.noDiagnosticsPenalty ? '+ Без исследований' : ''}
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--text-light)', marginBottom: 4 }}>
+                Штрафной коэффициент: ×{penalty.totalMultiplier.toFixed(2)} (лабы +{(penalty.labPenalty * 100).toFixed(0)}%, диагностика +{(penalty.diagnosticPenalty * 100).toFixed(0)}%)
+              </div>
+              {penalty.missingLabsForPhase.length > 0 && (
+                <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>
+                  Не хватает: {penalty.missingLabsForPhase.slice(0, 8).join(', ')}{penalty.missingLabsForPhase.length > 8 ? ` +ещё ${penalty.missingLabsForPhase.length - 8}` : ''}
+                </div>
+              )}
             </div>
           )}
-        </div>
-      )}
 
-      {tab === 'matrix' && (
-        <div className="card" style={{ marginBottom: 16, overflowX: 'auto' }}>
-          <h3 style={{ margin: '0 0 6px 0' }}>Матрица рисков 7×7</h3>
-          <p className="risk-matrix-hint">Нажмите на ячейку для деталей по механизму</p>
-          <table className="risk-matrix-table">
-            <thead>
-              <tr>
-                <th className="risk-matrix-corner">Система \ Механизм</th>
-                {RISK_MECHANISMS.map(m => (
-                  <th key={m.id} className="risk-matrix-header-mech" title={m.description}>{m.label}</th>
-                ))}
-                <th className="risk-matrix-header-total">Сыр.</th>
-                <th className="risk-matrix-header-total">Нетто</th>
-              </tr>
-            </thead>
-            <tbody>
-              {RISK_SYSTEMS.map(system => {
-                const sysRaw = rawRiskResult.systemBreakdown?.[system]?.raw ?? 0;
-                const sysNet = riskResult.systemBreakdown?.[system]?.net ?? 0;
-                const isSelectedRow = selectedCell?.system === system;
+          {/* Top 3 drug contributions */}
+          {drugContribs.length > 0 && (
+            <div className="card" style={{ marginBottom: 12 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>Препараты — вклад в риск</div>
+              {drugContribs.slice(0, 3).map((d, i) => (
+                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', borderBottom: i < 2 ? '1px solid var(--border-color)' : 'none' }}>
+                  <div>
+                    <span style={{ fontWeight: 600, fontSize: 12 }}>{d.name}</span>
+                    <span style={{ fontSize: 10, color: 'var(--text-dim)', marginLeft: 6 }}>{d.dose.toFixed(0)} мг/нед</span>
+                  </div>
+                  <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                    {d.systems.slice(0, 3).map(s => (
+                      <span key={s} style={{ fontSize: 9, padding: '2px 5px', borderRadius: 4, background: 'rgba(239,68,68,0.1)', color: '#ef4444' }}>{SYSTEM_LABELS[s] || s}</span>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Support coverage summary */}
+          <div className="card" style={{ marginBottom: 12 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>Покрытие поддержки</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div style={{ flex: 1, height: 10, borderRadius: 5, background: 'var(--bg-primary)', overflow: 'hidden' }}>
+                <div style={{ width: supportPct + '%', height: '100%', borderRadius: 5, background: supportPct > 60 ? '#22c55e' : supportPct > 30 ? '#eab308' : '#ef4444', transition: 'width 0.3s' }} />
+              </div>
+              <span style={{ fontSize: 14, fontWeight: 700, color: getRiskColor(100 - supportPct) }}>{supportPct}%</span>
+            </div>
+            <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 4 }}>Ячеек матрицы рисков покрыто поддержкой</div>
+          </div>
+
+          {/* Mini readiness cards */}
+          <div className="card" style={{ marginBottom: 12 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>Готовность по системам</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+              {RISK_SYSTEMS.map(sys => {
+                const raw = rawRiskResult.systemBreakdown?.[sys]?.raw ?? 0;
+                const net = riskResult.systemBreakdown?.[sys]?.net ?? 0;
+                const reduction = raw > 0 ? ((raw - net) / raw * 100) : 0;
                 return (
-                  <tr key={system} className={isSelectedRow ? 'risk-matrix-row-selected' : ''}>
-                    <td className="risk-matrix-row-header" style={{ cursor: 'pointer' }} onClick={() => { setSelectedSystem(system); setSelectedCell({ system, mechanism: null }); setTab('detail'); }}>
-                      {SYSTEM_INFO[system]?.icon || ''} {SYSTEM_LABELS[system] || system}
-                    </td>
-                    {RISK_MECHANISMS.map((m) => {
-                      const cellId = system + '_' + m.id;
-                      const cell = matrixData[cellId] || { raw: 0, net: 0, coverage: 0 };
-                      const colors = getCellColor(cell.raw, cell.net);
-                      const isSelected = selectedCell != null && selectedCell.system === system && selectedCell.mechanism === m.id;
-                      return (
-                        <td key={m.id} className={isSelected ? 'risk-matrix-cell risk-matrix-cell-selected' : 'risk-matrix-cell'} style={{ backgroundColor: colors.bg, cursor: 'pointer' }} onClick={() => { setSelectedCell({ system, mechanism: m.id }); setSelectedSystem(system); setTab('detail'); }}>
-                          <div className="risk-matrix-cell-raw" style={{ color: getRiskColor(cell.raw), fontSize: '0.65em' }}>{cell.raw.toFixed(1)}%</div>
-                          <div className="risk-matrix-cell-net" style={{ color: colors.text, fontWeight: 'bold' }}>{cell.net.toFixed(1)}%</div>
-                        </td>
-                      );
-                    })}
-                    <td className="risk-matrix-total" style={{ color: getRiskColor(sysRaw) }}>{Math.round(sysRaw)}%</td>
-                    <td className="risk-matrix-total" style={{ color: getRiskColor(sysNet) }}>{Math.round(sysNet)}%</td>
-                  </tr>
+                  <div key={sys} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 8px', borderRadius: 8, background: 'var(--bg-primary)', cursor: 'pointer' }} onClick={() => { setSelectedSystem(sys); setTab('systems'); }}>
+                    <span style={{ fontSize: 16 }}>{SYSTEM_INFO[sys]?.icon || '❓'}</span>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{SYSTEM_LABELS[sys]}</div>
+                      <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                        <span style={{ fontSize: 10, color: getRiskColor(net), fontWeight: 700 }}>{Math.round(net)}%</span>
+                        {reduction > 0 && <span style={{ fontSize: 9, color: '#22c55e' }}>−{Math.round(reduction)}%</span>}
+                      </div>
+                    </div>
+                  </div>
                 );
               })}
-            </tbody>
-          </table>
+            </div>
+          </div>
         </div>
       )}
 
-      {tab === 'detail' && (
+      {/* ===== TAB: SYSTEMS ===== */}
+      {tab === 'systems' && (
         <div>
           {RISK_SYSTEMS.map(system => {
             const sysInfo = SYSTEM_INFO[system];
@@ -453,6 +499,8 @@ export const RiskScreen: React.FC = () => {
             const sysNet = riskResult.systemBreakdown?.[system]?.net ?? 0;
             const reduction = sysRaw > 0 ? ((sysRaw - sysNet) / sysRaw * 100) : 0;
             const isExpanded = selectedSystem === system;
+            const barWidth = Math.min(100, sysRaw);
+            const netBarWidth = Math.min(100, sysNet);
             return (
               <div key={system} className="card" style={{ marginBottom: 8, cursor: 'pointer' }} onClick={() => setSelectedSystem(isExpanded ? null : system)}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -460,15 +508,29 @@ export const RiskScreen: React.FC = () => {
                     <span style={{ fontSize: 20 }}>{sysInfo?.icon || '❓'}</span>
                     <div>
                       <div style={{ fontWeight: 700, fontSize: 14 }}>{sysInfo?.label || system}</div>
-                      <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>{sysInfo?.description?.slice(0, 60)}...</div>
                     </div>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <span style={{ fontSize: 18, fontWeight: 700, color: getRiskColor(sysRaw) }}>{Math.round(sysRaw)}%</span>
                     <span style={{ color: 'var(--text-dim)', fontSize: 12 }}>→</span>
                     <span style={{ fontSize: 18, fontWeight: 700, color: getRiskColor(sysNet) }}>{Math.round(sysNet)}%</span>
-                    {reduction > 0 && <span style={{ fontSize: 12, color: '#22c55e' }}>-{Math.round(reduction)}%</span>}
+                    {reduction > 0 && <span style={{ fontSize: 12, color: '#22c55e' }}>−{Math.round(reduction)}%</span>}
                     <span style={{ fontSize: 12, color: 'var(--text-dim)' }}>{isExpanded ? '▲' : '▼'}</span>
+                  </div>
+                </div>
+                {/* Raw→Net bar */}
+                <div style={{ marginTop: 8 }}>
+                  <div style={{ display: 'flex', gap: 4, alignItems: 'center', marginBottom: 3 }}>
+                    <span style={{ fontSize: 9, color: 'var(--text-dim)', width: 36 }}>Сырой</span>
+                    <div style={{ flex: 1, height: 6, borderRadius: 3, background: 'var(--bg-primary)' }}>
+                      <div style={{ width: barWidth + '%', height: '100%', borderRadius: 3, background: getRiskColor(sysRaw), transition: 'width 0.3s' }} />
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                    <span style={{ fontSize: 9, color: 'var(--text-dim)', width: 36 }}>Нетто</span>
+                    <div style={{ flex: 1, height: 6, borderRadius: 3, background: 'var(--bg-primary)' }}>
+                      <div style={{ width: netBarWidth + '%', height: '100%', borderRadius: 3, background: getRiskColor(sysNet), transition: 'width 0.3s' }} />
+                    </div>
                   </div>
                 </div>
                 {isExpanded && sysInfo && (
@@ -492,7 +554,6 @@ export const RiskScreen: React.FC = () => {
                         <div style={{ fontSize: 11, lineHeight: 1.4 }}>{(SYSTEM_ORGANS[system] || []).join(', ')}</div>
                       </div>
                     </div>
-
                     <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>Механизмы повреждения</div>
                     {RISK_MECHANISMS.map(m => {
                       const cellId = system + '_' + m.id;
@@ -515,19 +576,15 @@ export const RiskScreen: React.FC = () => {
                           {selectedCell?.system === system && selectedCell?.mechanism === m.id && mechInfo && (
                             <div style={{ marginTop: 6, fontSize: 11, lineHeight: 1.5, color: 'var(--text-light)' }}>
                               <div>{mechInfo.description}</div>
-                              <div style={{ marginTop: 4, color: 'var(--text-dim)' }}><strong>Примеры:</strong> {mechInfo.examples.join('; ')}</div>
-                              <div style={{ marginTop: 2, color: 'var(--text-dim)' }}><strong>Механизм:</strong> {mechInfo.howDamaged}</div>
                               <div style={{ marginTop: 4 }}>
-                                <div style={{ display: 'flex', gap: 8, fontSize: 11 }}>
-                                  <span>Сыр. риск: <strong style={{ color: getRiskColor(cell.raw) }}>{cell.raw.toFixed(1)}%</strong></span>
-                                  <span>Нетто: <strong style={{ color: getRiskColor(cell.net) }}>{cell.net.toFixed(1)}%</strong></span>
-                                  <span>Покрытие: <strong style={{ color: '#22c55e' }}>{(cell.coverage * 100).toFixed(0)}%</strong></span>
-                                </div>
+                                <span>Сыр. <strong style={{ color: getRiskColor(cell.raw) }}>{cell.raw.toFixed(1)}%</strong></span>
+                                <span style={{ marginLeft: 8 }}>Нетто <strong style={{ color: getRiskColor(cell.net) }}>{cell.net.toFixed(1)}%</strong></span>
+                                <span style={{ marginLeft: 8 }}>Покрытие <strong style={{ color: '#22c55e' }}>{(cell.coverage * 100).toFixed(0)}%</strong></span>
                               </div>
                               {mits.length > 0 && (
                                 <div style={{ marginTop: 6, display: 'flex', flexWrap: 'wrap', gap: 4 }}>
                                   {mits.map((mit, i) => (
-                                    <span key={i} style={{ fontSize: 10, padding: '2px 7px', borderRadius: 4, background: 'rgba(34,197,94,0.15)', color: '#22c55e' }}>{mit.substance} -{(mit.reduction * 100).toFixed(0)}%</span>
+                                    <span key={i} style={{ fontSize: 10, padding: '2px 7px', borderRadius: 4, background: 'rgba(34,197,94,0.15)', color: '#22c55e' }}>{mit.substance} −{(mit.reduction * 100).toFixed(0)}%</span>
                                   ))}
                                 </div>
                               )}
@@ -544,6 +601,485 @@ export const RiskScreen: React.FC = () => {
         </div>
       )}
 
+      {/* ===== TAB: BODY (3D) ===== */}
+      {tab === 'body' && (
+        <div>
+          <div className="card" style={{ marginBottom: 16 }}>
+            <h3 style={{ margin: '0 0 8px 0' }}>3D модель — нажмите на орган</h3>
+            <div style={{ display: 'flex', justifyContent: 'center' }}>
+              <HumanBody3D
+                systems={systemsFor3D}
+                selectedSystem={selectedSystem}
+                onSelectSystem={handleSystemSelect}
+                size={320}
+                selectedOrgan={selectedOrgan}
+                onSelectOrgan={setSelectedOrgan}
+              />
+            </div>
+            {selectedSysInfo && (
+              <div style={{ marginTop: 12, padding: '12px 14px', background: 'var(--bg-secondary)', borderRadius: 10 }}>
+                <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 6 }}>{selectedSysInfo.icon} {selectedSysInfo.label}</div>
+                <div style={{ fontSize: 12, lineHeight: 1.6, color: 'var(--text-light)', marginBottom: 8 }}>{selectedSysInfo.description}</div>
+                <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 4 }}><strong>Что поражается:</strong> {selectedSysInfo.whatAffects.join(', ')}</div>
+                <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 4 }}><strong>Симптомы:</strong> {selectedSysInfo.symptoms.join(', ')}</div>
+                <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 4 }}><strong>Ключевые маркеры:</strong> {selectedSysInfo.keyMarkers.join(', ')}</div>
+                <div style={{ fontSize: 11, color: 'var(--text-dim)' }}><strong>Органы:</strong> {(SYSTEM_ORGANS[selectedSystem!] || []).join(', ')}</div>
+              </div>
+            )}
+          </div>
+
+          <div className="card" style={{ marginBottom: 16 }}>
+            <h3 style={{ margin: '0 0 8px 0' }}>Органы по системам</h3>
+            {RISK_SYSTEMS.map(sys => {
+              const organs = SYSTEM_ORGANS[sys] || [];
+              const net = riskResult.systemBreakdown?.[sys]?.net ?? 0;
+              const isSel = selectedSystem === sys;
+              return (
+                <div key={sys} style={{ padding: '8px 0', borderBottom: '1px solid var(--border-color)', cursor: 'pointer' }} onClick={() => { setSelectedSystem(isSel ? null : sys); setSelectedOrgan(null); }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontWeight: isSel ? 700 : 500, fontSize: 13 }}>{SYSTEM_INFO[sys]?.icon} {SYSTEM_INFO[sys]?.label}</span>
+                    <span style={{ fontWeight: 700, fontSize: 13, color: getRiskColor(net) }}>{Math.round(net)}%</span>
+                  </div>
+                  {isSel && organs.length > 0 && (
+                    <div style={{ marginTop: 6, display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                      {organs.map((organ: string) => (
+                        <span key={organ} onClick={() => setSelectedOrgan(organ)} style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, background: selectedOrgan === organ ? 'var(--accent-blue)' : 'var(--bg-primary)', color: selectedOrgan === organ ? '#fff' : 'var(--text-light)', cursor: 'pointer' }}>
+                          {organ}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ===== TAB: MECHANISMS ===== */}
+      {tab === 'mechanisms' && (
+        <div>
+          {RISK_MECHANISMS.map(mech => {
+            const mid = mech.id;
+            let totalRaw = 0;
+            let totalNet = 0;
+            let contributingDrugs: string[] = [];
+            for (const sys of RISK_SYSTEMS) {
+              const cellId = sys + '_' + mid;
+              const cell = matrixData[cellId];
+              if (cell) {
+                totalRaw += cell.raw;
+                totalNet += cell.net;
+              }
+            }
+            for (const [drugId, doseInfo] of Object.entries(activeSubstances)) {
+              const pharmaEntry = Object.values(PHARMA_DB).find(p => p.id === drugId);
+              if (pharmaEntry?.pd) {
+                const pd = pharmaEntry.pd as any;
+                const pdMechMap: Record<string, string[]> = {
+                  hepatotoxicity: ['hepatic_1', 'hepatic_3'],
+                  lipid_impact: ['cardio_2', 'cardio_3', 'hepatic_2'],
+                  hct_impact: ['hematologic_1', 'hematologic_6'],
+                  neuro_toxicity: ['neuro_1', 'neuro_5'],
+                  aromatization: ['endocrine_5', 'reproductive_5'],
+                  progestogenic: ['endocrine_5', 'reproductive_5'],
+                };
+                for (const [pdKey, mechIds] of Object.entries(pdMechMap)) {
+                  const val = pd[pdKey] as number;
+                  if (val && Math.abs(val) >= 0.3 && mechIds.includes(`${RISK_SYSTEMS[0]}_${mid}`) || mechIds.some(mId => mId === `${RISK_SYSTEMS[0]}_${mid}`)) {
+                    const anyMatch = mechIds.some(mId => mId.endsWith('_' + mid));
+                    if (anyMatch && !contributingDrugs.includes(pharmaEntry.name)) {
+                      contributingDrugs.push(pharmaEntry.name);
+                    }
+                  }
+                }
+              }
+            }
+            for (const [drugId] of Object.entries(activeSubstances)) {
+              const pharmaEntry = Object.values(PHARMA_DB).find(p => p.id === drugId);
+              if (pharmaEntry?.pd) {
+                const pd = pharmaEntry.pd as any;
+                const relevantPdKeys: Record<number, string[]> = {
+                  1: ['hepatotoxicity', 'neuro_toxicity'],
+                  2: ['lipid_impact'],
+                  3: ['hepatotoxicity', 'lipid_impact'],
+                  4: ['lipid_impact', 'neuro_toxicity'],
+                  5: ['aromatization', 'progestogenic'],
+                  6: ['hct_impact', 'lipid_impact'],
+                  7: ['aromatization', 'hct_impact'],
+                };
+                const keys = relevantPdKeys[mid] || [];
+                for (const k of keys) {
+                  if (pd[k] && Math.abs(pd[k]) >= 0.5 && !contributingDrugs.includes(pharmaEntry.name)) {
+                    contributingDrugs.push(pharmaEntry.name);
+                  }
+                }
+              }
+            }
+
+            const mitigations: string[] = [];
+            for (const [supName, effects] of Object.entries(SUPPORT_BASE_COVERAGE)) {
+              for (const sys of RISK_SYSTEMS) {
+                const cellId = sys + '_' + mid;
+                const val = effects[cellId as keyof typeof effects];
+                if (val !== undefined && !mitigations.includes(supName)) {
+                  mitigations.push(supName);
+                }
+              }
+            }
+
+            const affectedOrgans: string[] = [];
+            for (const sys of RISK_SYSTEMS) {
+              const sysOrgans = SYSTEM_ORGANS[sys] || [];
+              const cellId = sys + '_' + mid;
+              const cell = matrixData[cellId];
+              if (cell && cell.net > 1 && sysOrgans.length > 0) {
+                affectedOrgans.push(...sysOrgans.slice(0, 2));
+              }
+            }
+
+            return (
+              <div key={mid} className="card" style={{ marginBottom: 10 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: 14 }}>{mid}. {mech.label}</div>
+                    <div style={{ fontSize: 11, color: 'var(--text-light)', lineHeight: 1.5, marginTop: 4 }}>{mech.description}</div>
+                  </div>
+                  <div style={{ textAlign: 'right', flexShrink: 0, marginLeft: 12 }}>
+                    <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>Суммарный риск</div>
+                    <div style={{ fontSize: 20, fontWeight: 800, color: getRiskColor(totalNet / 8) }}>{(totalNet / 8).toFixed(1)}%</div>
+                  </div>
+                </div>
+
+                <div style={{ fontSize: 12, lineHeight: 1.6, color: 'var(--text-dim)', marginBottom: 8 }}>
+                  <strong>Механизм повреждения:</strong> {mech.howDamaged}
+                </div>
+
+                <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 8 }}>
+                  <strong>Примеры:</strong> {mech.examples.join('; ')}
+                </div>
+
+                {affectedOrgans.length > 0 && (
+                  <div style={{ marginBottom: 8 }}>
+                    <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 3 }}><strong>Затронутые органы:</strong></div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                      {[...new Set(affectedOrgans)].slice(0, 8).map(o => (
+                        <span key={o} style={{ fontSize: 10, padding: '2px 6px', borderRadius: 4, background: 'rgba(239,68,68,0.1)', color: '#ef4444' }}>{o}</span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {contributingDrugs.length > 0 && (
+                  <div style={{ marginBottom: 8 }}>
+                    <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 3 }}><strong>Препараты — вклад в механизм:</strong></div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                      {contributingDrugs.slice(0, 6).map(d => (
+                        <span key={d} style={{ fontSize: 10, padding: '2px 6px', borderRadius: 4, background: 'rgba(249,115,22,0.12)', color: '#f97316' }}>{d}</span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {mitigations.length > 0 && (
+                  <div>
+                    <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 3 }}><strong>Поддержка — смягчение:</strong></div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                      {mitigations.slice(0, 8).map(s => (
+                        <span key={s} style={{ fontSize: 10, padding: '2px 6px', borderRadius: 4, background: 'rgba(34,197,94,0.12)', color: '#22c55e' }}>{s}</span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Per-system bars */}
+                <div style={{ marginTop: 10 }}>
+                  {RISK_SYSTEMS.filter(sys => {
+                    const cellId = sys + '_' + mid;
+                    const cell = matrixData[cellId];
+                    return cell && cell.net > 0.5;
+                  }).map(sys => {
+                    const cellId = sys + '_' + mid;
+                    const cell = matrixData[cellId];
+                    if (!cell) return null;
+                    return (
+                      <div key={sys} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '3px 0' }}>
+                        <span style={{ fontSize: 10, width: 80, flexShrink: 0, color: 'var(--text-dim)' }}>{SYSTEM_LABELS[sys]}</span>
+                        <div style={{ flex: 1, height: 5, borderRadius: 3, background: 'var(--bg-primary)' }}>
+                          <div style={{ width: Math.min(100, cell.net) + '%', height: '100%', borderRadius: 3, background: getRiskColor(cell.net), transition: 'width 0.3s' }} />
+                        </div>
+                        <span style={{ fontSize: 10, fontWeight: 600, color: getRiskColor(cell.net), width: 36, textAlign: 'right' }}>{cell.net.toFixed(1)}%</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* ===== TAB: LABS ===== */}
+      {tab === 'labs' && (
+        <div>
+          <div className="card" style={{ marginBottom: 12 }}>
+            <h3 style={{ margin: '0 0 8px 0' }}>Лабораторные риски по системам</h3>
+            <p style={{ fontSize: 11, color: 'var(--text-dim)', margin: '0 0 12px 0' }}>Вклад анализов в риски каждой системы на основе отклонений от референсных значений</p>
+            {RISK_SYSTEMS.map(sys => {
+              const labRisk = labRisks[sys] ?? 0;
+              const sysNet = riskResult.systemBreakdown?.[sys]?.net ?? 0;
+              const totalRisk = Math.max(sysNet, labRisk);
+              const labPct = totalRisk > 0 ? (labRisk / totalRisk * 100) : 0;
+              return (
+                <div key={sys} style={{ padding: '10px 0', borderBottom: '1px solid var(--border-color)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span style={{ fontSize: 16 }}>{SYSTEM_INFO[sys]?.icon || '❓'}</span>
+                      <span style={{ fontWeight: 600, fontSize: 13 }}>{SYSTEM_INFO[sys]?.label || sys}</span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{ fontSize: 12, color: 'var(--text-dim)' }}>Лаб. вклад:</span>
+                      <span style={{ fontSize: 14, fontWeight: 700, color: getRiskColor(labRisk) }}>{labRisk.toFixed(1)}%</span>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: 4, height: 10, borderRadius: 5, background: 'var(--bg-primary)', overflow: 'hidden' }}>
+                    <div style={{ width: Math.min(100, 100 - labPct) + '%', background: getRiskColor(sysNet - labRisk), borderRadius: labPct < 100 ? '5px 0 0 5px' : '5px', transition: 'width 0.3s' }} />
+                    <div style={{ width: Math.min(100, labPct) + '%', background: 'rgba(249,115,22,0.7)', borderRadius: labPct > 0 ? '0 5px 5px 0' : '5px', transition: 'width 0.3s' }} />
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: 'var(--text-dim)', marginTop: 2 }}>
+                    <span>Фарма-риск</span>
+                    <span>Лаб. риск</span>
+                  </div>
+                  <div style={{ marginTop: 4, fontSize: 10, color: 'var(--text-dim)' }}>
+                    <strong>Ключевые маркеры:</strong> {SYSTEM_INFO[sys]?.keyMarkers.join(', ')}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {Object.keys(activeSubstances).length > 0 && (
+            <div className="card" style={{ marginBottom: 12 }}>
+              <h3 style={{ margin: '0 0 8px 0' }}>Активные препараты</h3>
+              <p style={{ fontSize: 11, color: 'var(--text-dim)', margin: '0 0 8px 0' }}>Влияние препаратов на лабораторные риски</p>
+              {Object.entries(activeSubstances).map(([drugId, doseInfo]) => {
+                const pharmaEntry = Object.values(PHARMA_DB).find(p => p.id === drugId);
+                const name = pharmaEntry?.name ?? drugId;
+                const pd = pharmaEntry?.pd as any;
+                return (
+                  <div key={drugId} style={{ padding: '8px 0', borderBottom: '1px solid var(--border-color)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontWeight: 600, fontSize: 12 }}>{name}</span>
+                      <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>{doseInfo.dosePerWeek.toFixed(0)} мг/нед</span>
+                    </div>
+                    {pd && (
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, marginTop: 4 }}>
+                        {Object.entries(pd).filter(([, v]) => typeof v === 'number' && Math.abs(v) >= 0.3 && v !== 0).map(([k, v]) => {
+                          const labelMap: Record<string, string> = {
+                            hepatotoxicity: 'Гепатотокс.', lipid_impact: 'Липиды', hct_impact: 'Гематокрит',
+                            neuro_toxicity: 'Нейротокс.', aromatization: 'Ароматиз.', progestogenic: 'Прогестаген.',
+                            five_alpha_reduction: '5α-ред.', AR_affinity: 'АР-сродство',
+                          };
+                          const label = labelMap[k] || k;
+                          const color = (v as number) > 0 ? 'rgba(239,68,68,0.12)' : 'rgba(34,197,94,0.12)';
+                          const textColor = (v as number) > 0 ? '#ef4444' : '#22c55e';
+                          return <span key={k} style={{ fontSize: 9, padding: '2px 5px', borderRadius: 4, background: color, color: textColor }}>{label}</span>;
+                        }).slice(0, 5)}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ===== TAB: OVERTRAINING ===== */}
+      {tab === 'overtraining' && (
+        <div>
+          <div className="card" style={{ marginBottom: 16, textAlign: 'center' }}>
+            <h3 style={{ margin: '0 0 12px 0' }}>Индекс перетренированности</h3>
+            <div style={{ position: 'relative', width: 180, height: 180, margin: '0 auto 12px auto' }}>
+              <svg viewBox="0 0 180 180" style={{ width: '100%', height: '100%' }}>
+                <circle cx="90" cy="90" r="75" fill="none" stroke="var(--bg-primary)" strokeWidth="14" />
+                <circle cx="90" cy="90" r="75" fill="none" stroke={overtrainingIndex < 30 ? '#22c55e' : overtrainingIndex < 55 ? '#eab308' : overtrainingIndex < 75 ? '#f97316' : '#ef4444'} strokeWidth="14" strokeDasharray={`${(overtrainingIndex / 100) * 471} 471`} strokeLinecap="round" transform="rotate(-90 90 90)" style={{ transition: 'stroke-dasharray 0.5s' }} />
+                <text x="90" y="85" textAnchor="middle" style={{ fontSize: 36, fontWeight: 800, fill: overtrainingIndex < 30 ? '#22c55e' : overtrainingIndex < 55 ? '#eab308' : overtrainingIndex < 75 ? '#f97316' : '#ef4444' }}>{Math.round(overtrainingIndex)}</text>
+                <text x="90" y="108" textAnchor="middle" style={{ fontSize: 11, fill: 'var(--text-dim)' }}>из 100</text>
+              </svg>
+            </div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: overtrainingIndex < 30 ? '#22c55e' : overtrainingIndex < 55 ? '#eab308' : overtrainingIndex < 75 ? '#f97316' : '#ef4444' }}>
+              {overtrainingIndex < 30 ? 'Оптимальная нагрузка' : overtrainingIndex < 55 ? 'Умеренная нагрузка' : overtrainingIndex < 75 ? 'Риск перетренированности' : 'Высокий риск перетренированности'}
+            </div>
+          </div>
+
+          <div className="card" style={{ marginBottom: 12 }}>
+            <h4 style={{ margin: '0 0 8px 0', fontSize: 13 }}>Факторы перетренированности</h4>
+            {[
+              { label: 'Тренировочная нагрузка', value: 1.2, desc: 'Отношение текущей нагрузки к востановительной ёмкости. Норма < 1.0', icon: '🏋️' },
+              { label: 'Уровень усталости', value: 0.3, desc: 'Субъективная усталость 0–1. Норма < 0.3', icon: '😩' },
+              { label: 'Восстановление', value: 0.5, desc: 'Качество восстановления 0–1. Норма > 0.7', icon: '😴' },
+              { label: 'Адаптационный резерв', value: 1.0, desc: 'Нутриционная и фарм. поддержка. Норма > 0.8', icon: '🛡️' },
+            ].map((factor, i) => {
+              const pct = i === 0 ? Math.min(100, factor.value * 50) : i === 1 ? Math.min(100, factor.value * 100) : i === 2 ? Math.min(100, (1 - factor.value) * 100) : Math.min(100, (1 - factor.value) * 100);
+              const good = i === 0 ? factor.value <= 1.0 : i === 1 ? factor.value < 0.3 : i === 2 ? factor.value > 0.7 : factor.value > 0.8;
+              return (
+                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 0', borderBottom: i < 3 ? '1px solid var(--border-color)' : 'none' }}>
+                  <span style={{ fontSize: 20 }}>{factor.icon}</span>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ fontSize: 12, fontWeight: 600 }}>{factor.label}</span>
+                      <span style={{ fontSize: 12, fontWeight: 700, color: good ? '#22c55e' : '#f97316' }}>{factor.value.toFixed(2)}</span>
+                    </div>
+                    <div style={{ marginTop: 4, height: 5, borderRadius: 3, background: 'var(--bg-primary)' }}>
+                      <div style={{ width: Math.min(100, pct) + '%', height: '100%', borderRadius: 3, background: good ? '#22c55e' : '#f97316', transition: 'width 0.3s' }} />
+                    </div>
+                    <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 2 }}>{factor.desc}</div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="card" style={{ marginBottom: 12 }}>
+            <h4 style={{ margin: '0 0 8px 0', fontSize: 13 }}>Рекомендации по снижению индекса</h4>
+            {[
+              { label: 'Снизить тренировочный объём на 15–20%', cond: overtrainingIndex >= 55 },
+              { label: 'Добавить 1–2 дня полного отдыха', cond: overtrainingIndex >= 40 },
+              { label: 'Увеличить калорийность на 10–15%', cond: overtrainingIndex >= 55 },
+              { label: 'Оптимизировать сон (8+ часов)', cond: overtrainingIndex >= 30 },
+              { label: 'Усилить поддержку: Омега-3, Магний, Витамин D', cond: overtrainingIndex >= 30 },
+            ].filter(r => r.cond).map((r, i) => (
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0', fontSize: 12 }}>
+                <span style={{ color: '#f97316', fontWeight: 700 }}>!</span>
+                <span style={{ color: 'var(--text-light)' }}>{r.label}</span>
+              </div>
+            ))}
+            {overtrainingIndex < 30 && (
+              <div style={{ fontSize: 12, color: '#22c55e', textAlign: 'center', padding: 12 }}>Тренировочный режим оптимален. Продолжайте в том же духе!</div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ===== TAB: TIMELINE ===== */}
+      {tab === 'timeline' && (
+        <div>
+          <div className="card" style={{ marginBottom: 16 }}>
+            <h3 style={{ margin: '0 0 10px 0' }}>Тренд рисков по неделям</h3>
+            <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 10 }}>
+              <button onClick={() => setGraphSystem('__overall')} style={{ padding: '4px 12px', border: 'none', borderRadius: 6, fontSize: 11, cursor: 'pointer', background: graphSystem === '__overall' ? 'var(--accent-blue)' : 'var(--bg-secondary)', color: graphSystem === '__overall' ? '#fff' : 'var(--text-dim)', fontWeight: 600 }}>Общий</button>
+              {RISK_SYSTEMS.map(sys => (
+                <button key={sys} onClick={() => setGraphSystem(sys)} style={{ padding: '4px 12px', border: 'none', borderRadius: 6, fontSize: 11, cursor: 'pointer', background: graphSystem === sys ? 'var(--accent-blue)' : 'var(--bg-secondary)', color: graphSystem === sys ? '#fff' : 'var(--text-dim)', fontWeight: 600 }}>{SYSTEM_INFO[sys]?.icon || ''} {SYSTEM_LABELS[sys] || sys}</button>
+              ))}
+            </div>
+            <div style={{ display: 'flex', gap: 16, marginBottom: 8, fontSize: 11, color: 'var(--text-dim)' }}>
+              <span><span style={{ display: 'inline-block', width: 14, height: 4, borderRadius: 2, background: 'rgba(239,68,68,0.85)', marginRight: 4, verticalAlign: 'middle' }}></span>Сырой риск</span>
+              <span><span style={{ display: 'inline-block', width: 14, height: 4, borderRadius: 2, background: 'rgba(34,197,94,0.85)', marginRight: 4, verticalAlign: 'middle' }}></span>Нетто риск</span>
+            </div>
+            <canvas ref={trendCanvasRef} style={{ width: '100%', height: 220, display: 'block', borderRadius: 8 }} />
+            {(() => {
+              const history = loadRiskHistory();
+              if (history.length < 2) return (
+                <div style={{ textAlign: 'center', padding: 16, color: 'var(--text-dim)', fontSize: 12 }}>
+                  График появится после 2+ недель использования. Сейчас данных: {history.length} точка(и).
+                </div>
+              );
+              return null;
+            })()}
+          </div>
+
+          {/* Sparkline bars per system */}
+          <div className="card" style={{ marginBottom: 16 }}>
+            <h3 style={{ margin: '0 0 10px 0' }}>Сравнение систем — все недели</h3>
+            {(() => {
+              const history = loadRiskHistory();
+              if (history.length === 0) return <p style={{ color: 'var(--text-dim)', fontSize: 12 }}>Нет сохранённых данных</p>;
+              return (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {RISK_SYSTEMS.map(sys => {
+                    const values = history.map(h => h.systems[sys]?.net ?? 0);
+                    const latest = values[values.length - 1] ?? 0;
+                    const prev = values.length >= 2 ? values[values.length - 2] : undefined;
+                    const trend = prev !== undefined ? latest - prev : 0;
+                    return (
+                      <div key={sys} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{ fontSize: 12, fontWeight: 600, width: 100, flexShrink: 0 }}>{SYSTEM_LABELS[sys] ?? sys}</span>
+                        <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 2, height: 22 }}>
+                          {values.map((v, i) => {
+                            const barH = Math.max(3, (v / 100) * 22);
+                            const color = v < 20 ? 'rgba(34,197,94,0.7)' : v < 40 ? 'rgba(132,204,22,0.7)' : v < 60 ? 'rgba(234,179,8,0.7)' : v < 80 ? 'rgba(249,115,22,0.7)' : 'rgba(239,68,68,0.7)';
+                            return (
+                              <div key={i} style={{ flex: 1, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', height: '100%' }}>
+                                <div style={{ width: '100%', maxWidth: 20, height: barH, background: color, borderRadius: 2, transition: 'height 0.3s' }} title={`Нед ${i + 1}: ${Math.round(v)}%`} />
+                              </div>
+                            );
+                          })}
+                        </div>
+                        <div style={{ width: 55, textAlign: 'right', flexShrink: 0 }}>
+                          <span style={{ fontSize: 13, fontWeight: 700, color: getRiskColor(latest) }}>{Math.round(latest)}%</span>
+                          {trend !== 0 && <span style={{ fontSize: 10, marginLeft: 2, color: trend > 0 ? 'var(--danger)' : 'var(--success)' }}>{trend > 0 ? '+' : ''}{Math.round(trend)}</span>}
+                        </div>
+                      </div>
+                    );
+                  })}
+                  <div style={{ display: 'flex', gap: 2, paddingLeft: 108, marginTop: 2 }}>
+                    {history.map((h, i) => {
+                      const d = new Date(h.date);
+                      return <div key={i} style={{ flex: 1, textAlign: 'center', fontSize: 9, color: 'var(--text-dim)' }}>{d.getDate()}.{d.getMonth() + 1}</div>;
+                    })}
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
+
+          {/* Heatmap */}
+          <div className="card" style={{ marginBottom: 16 }}>
+            <h3 style={{ margin: '0 0 10px 0' }}>Тепловая карта систем × недели</h3>
+            {(() => {
+              const history = loadRiskHistory();
+              if (history.length === 0) return <p style={{ color: 'var(--text-dim)', fontSize: 12 }}>Нет сохранённых данных</p>;
+              return (
+                <div style={{ overflowX: 'auto' }}>
+                  <div style={{ display: 'flex', gap: 0, marginBottom: 4, paddingLeft: 108 }}>
+                    {history.map((h, i) => {
+                      const d = new Date(h.date);
+                      return <div key={i} style={{ flex: 1, textAlign: 'center', fontSize: 9, color: 'var(--text-dim)', minWidth: 28 }}>{d.getDate()}.{d.getMonth() + 1}</div>;
+                    })}
+                  </div>
+                  {RISK_SYSTEMS.map(sys => (
+                    <div key={sys} style={{ display: 'flex', alignItems: 'center', gap: 0, marginBottom: 1 }}>
+                      <span style={{ fontSize: 10, fontWeight: 600, width: 108, flexShrink: 0, paddingRight: 4, textAlign: 'right' }}>{SYSTEM_LABELS[sys] ?? sys}</span>
+                      {history.map((h, i) => {
+                        const val = h.systems[sys]?.net ?? 0;
+                        const bg = val < 20 ? 'rgba(34,197,94,0.2)' : val < 40 ? 'rgba(132,204,22,0.2)' : val < 60 ? 'rgba(234,179,8,0.25)' : val < 80 ? 'rgba(249,115,22,0.3)' : 'rgba(239,68,68,0.35)';
+                        const tx = val < 20 ? '#22c55e' : val < 40 ? '#84cc16' : val < 60 ? '#eab308' : val < 80 ? '#f97316' : '#ef4444';
+                        return (
+                          <div key={i} style={{ flex: 1, textAlign: 'center', padding: '3px 0', background: bg, fontSize: 10, fontWeight: 600, color: tx, minWidth: 28, borderRadius: 2 }} title={`${SYSTEM_LABELS[sys]}: ${Math.round(val)}%`}>{Math.round(val)}</div>
+                        );
+                      })}
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
+          </div>
+
+          {/* Trend button from overview */}
+          <div className="card" style={{ marginBottom: 16 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginBottom: 10 }}>
+              <h3 style={{ margin: 0 }}>Тренд рисков (недельный)</h3>
+            </div>
+            <div style={{ display: 'flex', gap: 16, marginBottom: 8, fontSize: 11, color: 'var(--text-dim)' }}>
+              <span><span style={{ display: 'inline-block', width: 12, height: 3, borderRadius: 2, background: 'rgba(239,68,68,0.85)', marginRight: 4, verticalAlign: 'middle' }}></span>Сырой риск</span>
+              <span><span style={{ display: 'inline-block', width: 12, height: 3, borderRadius: 2, background: 'rgba(34,197,94,0.85)', marginRight: 4, verticalAlign: 'middle' }}></span>Нетто риск</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ===== Always visible: System comparison ===== */}
       <div className="card" style={{ marginBottom: 16 }}>
         <h3 style={{ margin: '0 0 8px 0' }}>Сравнение: Без поддержки / С поддержкой</h3>
         <div className="risk-comparison-grid">

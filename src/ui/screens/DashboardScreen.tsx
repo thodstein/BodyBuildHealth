@@ -228,7 +228,7 @@ export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
     return 0;
   })();
 
-  const systems = masterDb.systems.slice(0, 6);
+  const systems = masterDb.systems;
   const risks = masterDb.risks.slice(0, 4);
   const recs = masterDb.recommendations.slice(0, 5);
 
@@ -308,14 +308,28 @@ export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
       </div>
 
       <SectionHeader title="Системы организма" onNavigate={onNavigate} screenId="risks" />
-      <div className="grid systems">
-        {systems.map(s => (
-          <SystemCard
-            key={s.id}
-            system={s}
-            onClick={onNavigate ? () => onNavigate('risks') : undefined}
-          />
-        ))}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 6, marginBottom: 8 }}>
+        {RISK_SYSTEMS.map(sys => {
+          const raw = riskResult.systemBreakdown?.[sys]?.raw ?? 0;
+          const net = riskResult.systemBreakdown?.[sys]?.net ?? 0;
+          const reduction = raw > 0 ? ((raw - net) / raw * 100) : 0;
+          return (
+            <div key={sys} style={{ background: 'var(--bg-secondary)', borderRadius: 10, padding: '10px 12px', cursor: 'pointer' }} onClick={onNavigate ? () => onNavigate('risks') : undefined}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                <span style={{ fontSize: 13, fontWeight: 600 }}>{SYSTEM_LABELS[sys] ?? sys}</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                  {reduction > 0 && <span style={{ fontSize: 10, color: 'var(--success)' }}>-{Math.round(reduction)}%</span>}
+                  <span style={{ fontSize: 13, fontWeight: 700, color: riskColor(net) }}>{Math.round(net)}%</span>
+                </div>
+              </div>
+              <ProgressBar value={raw} color={riskColor(raw)} />
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 2 }}>
+                <span style={{ fontSize: 9, color: 'var(--text-dim)' }}>Без поддержки: {Math.round(raw)}%</span>
+                <span style={{ fontSize: 9, color: 'var(--success)' }}>С под.: {Math.round(net)}%</span>
+              </div>
+            </div>
+          );
+        })}
       </div>
 
       <SectionHeader title="Системные риски" onNavigate={onNavigate} screenId="risks" />

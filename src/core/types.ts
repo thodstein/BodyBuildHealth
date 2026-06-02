@@ -711,6 +711,25 @@ export interface Exercise {
   rest?: number;
   weight?: number;
   rir?: number;
+  targetMuscle?: string;
+  order?: number;
+  substitutionGroup?: string;
+  canReplace?: string[];
+  cannotReplace?: string[];
+  technique?: string;
+  pauseSeconds?: number;
+  peakContraction?: boolean;
+  stretchPhase?: boolean;
+  dropSet?: boolean;
+  dropSetReps?: string;
+  backoffSet?: boolean;
+  comments?: string;
+}
+
+export interface ExerciseSubstitution {
+  exerciseId: string;
+  substitutes: { id: string; reason: string; priority: number }[];
+  forbidden?: { id: string; reason: string }[];
 }
 
 export interface TrainingDay {
