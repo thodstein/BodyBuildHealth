@@ -18,6 +18,8 @@ import { resolveLabMarker, interpretRatio, normalizedRatio } from '../../core/la
 import { computeLabIndices, interpretLabIndices } from '../../engines/labs-indices.engine';
 import { PHASE_REQUIRED_PANELS, LAB_PANELS, type LabPanelMarker } from '../../data/labs-phase-panels';
 import { generateLabSchedule, getCurrentLabStatus, getDrugSpecificLabs, getWeeksSinceStart, type LabScheduleItem } from '../../engines/labs-schedule.engine';
+import { analyzeLabDrugCorrelation, type LabDrugAlert } from '../../engines/lab-pharma-correlation.engine';
+import { generateCheckpoints } from '../../engines/labs-scheduler.engine';
 import type { LabPoint, UserProfile, RiskResult, CourseEntry } from '../../core/types';
 
 const SYSTEM_LABELS: Record<string, string> = {
@@ -616,6 +618,61 @@ export const LabsScreen: React.FC<LabsProps> = ({ initialTab = 'input' }) => {
                     <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>{s.label}</div>
                   </div>
                 ))}
+              </div>
+            );
+          })()}
+
+          {(() => {
+            const drugCorrelationAlerts = analyzeLabDrugCorrelation(entries, course, phase === 'on_cycle' ? 'on_cycle' : phase === 'pct' ? 'pct' : 'baseline');
+            if (drugCorrelationAlerts.length === 0) return null;
+            return (
+              <div className="card" style={{ marginBottom: 12, borderLeft: '3px solid #ef4444' }}>
+                <h3 style={{ color: '#ef4444', marginBottom: 8 }}>Взаимодействия препаратов с анализами</h3>
+                {drugCorrelationAlerts.map((a, i) => (
+                  <div key={i} style={{ background: 'var(--bg-secondary)', borderRadius: 8, padding: '8px 10px', marginBottom: 6 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontWeight: 600 }}>{a.marker} {a.actualStatus === 'high' ? '↑' : '↓'} {a.value.toFixed(1)} {a.unit}</span>
+                      <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 6px', borderRadius: 4, background: a.severity === 'critical' ? 'rgba(239,68,68,0.15)' : a.severity === 'high' ? 'rgba(249,115,22,0.15)' : 'rgba(234,179,8,0.15)', color: a.severity === 'critical' ? '#ef4444' : a.severity === 'high' ? '#f97316' : '#eab308' }}>
+                        {a.severity === 'critical' ? 'КРИТИЧ.' : a.severity === 'high' ? 'ВЫСОКИЙ' : a.severity === 'med' ? 'СРЕДНИЙ' : 'НИЗКИЙ'}
+                      </span>
+                    </div>
+                    <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 2 }}>Препараты: {a.drugCause.join(', ')}</div>
+                    <div style={{ fontSize: 11, color: 'var(--warning)', marginTop: 2 }}>{a.recommendation}</div>
+                    <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>Ожидаемый диапазон: {a.expectedRange[0]}–{a.expectedRange[1]}</div>
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
+
+          {(() => {
+            const courseStart = profile?.settings?.courseStartDate;
+            if (!courseStart) return null;
+            const weeksSinceStart = Math.max(1, Math.ceil((Date.now() - new Date(courseStart).getTime()) / (7 * 24 * 60 * 60 * 1000)));
+            const totalWeeks = Math.max(weeksSinceStart + 4, 12);
+            const checkpoints = generateCheckpoints(phase as any, courseStart, totalWeeks, { role: 'user' });
+            if (checkpoints.length === 0) return null;
+            return (
+              <div className="card" style={{ marginBottom: 12 }}>
+                <h3>Контрольные точки</h3>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {checkpoints.map(cp => {
+                    const cpDate = new Date(cp.dueDate);
+                    const isPast = cpDate < new Date();
+                    return (
+                      <div key={cp.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 10px', borderRadius: 6, background: 'var(--bg-secondary)' }}>
+                        <div>
+                          <span style={{ fontWeight: 600, fontSize: 12 }}>{cp.type === 'baseline' ? 'Базовый' : cp.type === 'mid_course' ? 'Середина курса' : cp.type === 'end_of_cycle' ? 'Конец курса' : cp.type === 'pct_start' ? 'Начало ПКТ' : 'Контроль'}</span>
+                          <span style={{ fontSize: 11, color: 'var(--text-dim)', marginLeft: 8 }}>Неделя {cp.weekOffset}</span>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>{cp.dueDate}</span>
+                          <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 4, background: isPast ? 'var(--success-dim)' : 'var(--warning-dim)', color: isPast ? 'var(--success)' : 'var(--warning)' }}>{isPast ? 'Пройдено' : cp.status}</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             );
           })()}

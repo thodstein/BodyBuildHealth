@@ -44,17 +44,72 @@ function tfidf(query: string, db: QAPair[]): { q: string; a: string; score: numb
   }).filter(r => r.score > 0).sort((a, b) => b.score - a.score).slice(0, 3);
 }
 
-export function queryAssistant(text: string): string[] {
-  const res = tfidf(text, QA_DB);
-  if (!res.length) return ['🤖 Ответ не найдено. Попробуйте переформулировать или обратитесь к разделу "Статьи".'];
-  return res.map(r => `❓ ${r.q}\n✅ ${r.a}`);
+export interface UserContext {
+  risks?: { overall: number; systems?: Record<string, number> };
+  readiness?: { recovery: number; fatigue: number; nutrition: number };
+  courseSubstances?: string[];
+  labAlerts?: { marker: string; status: string }[];
+  goal?: string;
 }
 
 export interface AssistantResponse {
   text: string;
 }
 
-export async function getSmartAssistantResponse(input: string): Promise<AssistantResponse> {
+function buildContextualAdvice(ctx: UserContext): string[] {
+  const advice: string[] = [];
+  if (ctx.risks) {
+    if (ctx.risks.overall > 60) advice.push('⚠️ Общий риск высокий (' + Math.round(ctx.risks.overall) + '%). Рекомендуется пересмотреть дозировки и усилить поддержку.');
+    if (ctx.risks.systems) {
+      const topSystem = Object.entries(ctx.risks.systems).sort(([,a],[,b]) => b - a)[0];
+      if (topSystem && topSystem[1] > 50) advice.push(`🔴 Наибольший риск: ${SYSTEM_LABELS[topSystem[0]] ?? topSystem[0]} (${Math.round(topSystem[1])}%). Уделите внимание профилактике.`);
+    }
+  }
+  if (ctx.readiness) {
+    if (ctx.readiness.recovery < 40) advice.push('🛑 Восстановление критически низкое (<40%). Рекомендуется делоад и снижение объёма тренировок.');
+    if (ctx.readiness.fatigue > 70) advice.push('💤 Усталость высокая (>70%). Проверьте сон, питание и при необходимости снизьте интенсивность.');
+    if (ctx.readiness.nutrition < 50) advice.push('🥗 Питание недостаточное (<50%). Проверьте калорийность и белок.');
+  }
+  if (ctx.courseSubstances && ctx.courseSubstances.length > 0) {
+    const orals = ctx.courseSubstances.filter(s => s.includes('methand') || s.includes('oxan') || s.includes('stan') || s.includes('superdrol') || s.includes('anadrol') || s.includes('halo') || s.includes('trena'));
+    if (orals.length > 0) advice.push(`💊 Оральные ААС на курсе: ${orals.join(', ')}. Обязательно: NAC 1200мг + TUDCA 1000мг/день. Контроль ALT/AST каждые 2 нед.`);
+    const needsCaberg = ctx.courseSubstances.some(s => s.includes('tren') || s.includes('deca') || s.includes('npp'));
+    if (needsCaberg) advice.push('🔬 19-нор препарат на курсе. Контроль пролактина каждые 2-4 нед. При PRL>25 — каберголин 0.25мг 2р/нед.');
+  }
+  if (ctx.labAlerts && ctx.labAlerts.length > 0) {
+    const highs = ctx.labAlerts.filter(l => l.status === 'high');
+    const lows = ctx.labAlerts.filter(l => l.status === 'low');
+    if (highs.length > 0) advice.push(`📈 Повышены: ${highs.map(l => l.marker).join(', ')}. Проверьте причины и при необходимости скорректируйте поддержку.`);
+    if (lows.length > 0) advice.push(`📉 Понижены: ${lows.map(l => l.marker).join(', ')}. Возможен дефицит — обсудите с врачом.`);
+  }
+  return advice;
+}
+
+const SYSTEM_LABELS: Record<string, string> = {
+  cardio: 'Сердечно-сосудистая', hepatic: 'Печень', renal: 'Почки',
+  neuro: 'Нервная', endocrine: 'Эндокринная', hematologic: 'Кроветворная',
+  reproductive: 'Репродуктивная', musculoskeletal: 'Суставы и связки',
+};
+
+export function queryAssistant(text: string): string[] {
+  const res = tfidf(text, QA_DB);
+  if (!res.length) return ['🤖 Ответ не найдено. Попробуйте переформулировать или обратитесь к разделу "Статьи".'];
+  return res.map(r => `❓ ${r.q}\n✅ ${r.a}`);
+}
+
+export async function getSmartAssistantResponse(input: string, context?: UserContext): Promise<AssistantResponse> {
   const results = queryAssistant(input);
-  return { text: results.join('\n\n') };
+  const parts: string[] = [];
+
+  if (context) {
+    const ctxAdvice = buildContextualAdvice(context);
+    if (ctxAdvice.length > 0) {
+      parts.push('📋 **Ваш профиль:**');
+      parts.push(...ctxAdvice);
+      parts.push('');
+    }
+  }
+
+  parts.push(...results);
+  return { text: parts.join('\n\n') };
 }

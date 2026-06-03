@@ -2,8 +2,10 @@
 import { useDataLink } from '../../core/data-link';
 import { db } from '../../core/db';
 import { calculateIndices } from '../../engines/clinical-indices.engine';
+import { generateWeeklyReportHTML, type WeeklyReportData } from '../../engines/weekly-report.engine';
+import { generateMedicalReportHTML } from '../../engines/pdf-report.engine';
 import { UCUM_MAP } from '../../core/constants';
-import type { LabPoint, CourseEntry, GamificationState } from '../../core/types';
+import type { LabPoint, CourseEntry, GamificationState, UserContext } from '../../core/types';
 
 const EXPORT_VERSION = '1.1';
 
@@ -233,6 +235,33 @@ export const ReportsScreen: React.FC = () => {
         <button style={btn} onClick={handleExportJSON}>Экспорт JSON</button>
         <button style={btn} onClick={handleExportDiaryCSV}>Дневник CSV</button>
         <button style={btn} onClick={handleExportLabsCSV}>Анализы CSV</button>
+        <button style={btn} onClick={() => {
+          const reportData: WeeklyReportData = {
+            ctx: { role: 'user', phase: profile?.settings?.phase ?? 'baseline', courseStartDate: profile?.settings?.courseStartDate },
+            labs: linked.labs, course,
+            weightCurrent: profile?.settings?.weight ?? 0, weightPrev: profile?.settings?.weight ?? 0,
+            measurements: {}, goal: profile?.settings?.primaryGoal ?? 'maintenance',
+            macros: { p: linked.avgWeeklyProtein, f: linked.avgWeeklyFat, c: linked.avgWeeklyCarbs },
+            stepsAvg: 0, bpAvg: { sys: 120, dia: 80 }, bpNotes: '',
+            trainingFeel: readiness ? `Восстановление: ${readiness.recovery}%, Усталость: ${readiness.fatigue}%` : '—',
+            generalFeel: readiness && readiness.recovery > 60 ? 'Хорошее' : readiness && readiness.recovery > 40 ? 'Умеренное' : 'Плохое',
+            meds: course.map(c => c.substanceId).join(', '),
+            supplements: (profile?.settings?.currentSupplements as any[] ?? []).map((s: any) => s.name ?? s).join(', '),
+            lastLabDate: linked.labs.length > 0 ? linked.labs.sort((a, b) => b.date.localeCompare(a.date))[0].date : '',
+            nextLabDate: '', notes: ''
+          };
+          const html = generateWeeklyReportHTML(reportData);
+          const w = window.open('', '_blank');
+          if (w) { w.document.write(html); w.document.close(); }
+        }}>Недельный отчёт</button>
+        <button style={btn} onClick={() => {
+          const ctx: UserContext = { role: 'doctor', phase: profile?.settings?.phase ?? 'baseline' };
+          const risks: any = { overallRaw: risk?.overallRaw ?? 0, overallNet: risk?.overallNet ?? 0, systemBreakdown: risk?.systemBreakdown ?? {} };
+          const pct: any = course.length > 0 ? { pctProtocol: [], pctStartWeek: 0, pctEndDate: '', supportStack: [], warnings: [], startDate: new Date().toISOString().slice(0, 10), endDate: '', totalWeeks: Math.max(...course.map(c => c.endWeek)), substances: course } : null;
+          const html = generateMedicalReportHTML(ctx, linked.labs, risks, pct, '');
+          const w = window.open('', '_blank');
+          if (w) { w.document.write(html); w.document.close(); }
+        }}>Медицинский отчёт</button>
         <button style={btn} onClick={() => window.print()}>Печать PDF</button>
         <button style={btn} onClick={() => fileInputRef.current?.click()}>Импорт</button>
         <input ref={fileInputRef} type="file" accept=".json" style={{ display: 'none' }} onChange={handleImportJSON} />

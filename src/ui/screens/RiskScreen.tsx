@@ -7,6 +7,7 @@ import { calculateRisks } from '../../engines/risk.engine';
 import { calculateRiskFromAnalyses } from '../../engines/risk-calculator-v2.engine';
 import { generateSupportStack } from '../../engines/support.engine';
 import { calculatePenaltyCoefficients, PenaltyCoefficients } from '../../engines/labs-penalty.engine';
+import { computeLabIndexDetails, type LabIndexDetail } from '../../engines/labs-indices.engine';
 import HumanBody3D from '../components/HumanBody3D';
 import { getRiskColor } from '../../core/utils/risk-colors';
 import { PHARMA_DB } from '../../core/pharma-database';
@@ -89,6 +90,7 @@ export const RiskScreen: React.FC = () => {
   const [selectedOrgan, setSelectedOrgan] = useState<string | null>(null);
   const trendCanvasRef = useRef<HTMLCanvasElement>(null);
   const [labRisks, setLabRisks] = useState<Record<string, number>>({});
+  const [labIndexDetails, setLabIndexDetails] = useState<Record<string, LabIndexDetail> | null>(null);
 
   const matrixData = useMemo<MatrixData>(() => {
     if (!riskResult || !rawRiskResult) return {};
@@ -145,6 +147,9 @@ export const RiskScreen: React.FC = () => {
         const labRaw: Record<string, number> = {};
         RISK_SYSTEMS.forEach((s) => { labRaw[s] = labRiskResult.systemContributions[s] ?? 0; });
         setLabRisks(labRaw);
+        if (userLabs.length > 0) {
+          setLabIndexDetails(computeLabIndexDetails(userLabs));
+        }
         const finalResult = calculateRisks({ genetics, nutritionFactor, trainingFactor, activeDrugs: drugs, supportCoverage: covMap });
         if (finalResult.systemBreakdown) {
           for (const sys of RISK_SYSTEMS) {
@@ -498,6 +503,39 @@ export const RiskScreen: React.FC = () => {
                 );
               })}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ===== INDICES ON OVERVIEW ===== */}
+      {tab === 'overview' && labIndexDetails && (
+        <div style={{ marginTop: 16 }}>
+          <h3 style={{ fontSize: 16, margin: '0 0 10px 0' }}>Лабораторные индексы</h3>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
+            {Object.entries(labIndexDetails).map(([key, idx]) => {
+              const pct = Math.round(idx.value * 100);
+              const color = idx.value < 0.2 ? '#22c55e' : idx.value < 0.4 ? '#86efac' : idx.value < 0.6 ? '#eab308' : idx.value < 0.8 ? '#f97316' : '#ef4444';
+              return (
+                <div key={key} style={{ background: 'var(--bg-secondary)', borderRadius: 10, padding: 12 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                    <span style={{ fontSize: 13, fontWeight: 700 }}>{idx.label}</span>
+                    <span style={{ fontSize: 16, fontWeight: 700, color }}>{pct}%</span>
+                  </div>
+                  <div style={{ background: 'var(--bg-tertiary, #1a1a2e)', borderRadius: 4, height: 8, overflow: 'hidden' }}>
+                    <div style={{ width: `${pct}%`, height: '100%', background: color, borderRadius: 4, transition: 'width 0.3s' }} />
+                  </div>
+                  <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 4 }}>{idx.interpretation}</div>
+                  <div style={{ fontSize: 10, color: 'var(--text-light)', marginTop: 4, lineHeight: 1.4 }}>{idx.mechanism.slice(0, 120)}{idx.mechanism.length > 120 ? '...' : ''}</div>
+                  {idx.markers.filter(m => m.ratio > 0).length > 0 && (
+                    <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 4 }}>
+                      {idx.markers.filter(m => m.ratio > 0).map(m => (
+                        <span key={m.code} style={{ fontSize: 9, padding: '2px 5px', borderRadius: 3, background: 'var(--bg-tertiary, #1a1a2e)' }}>{m.code}: {m.value.toFixed(1)} ({Math.round(m.weight * 100)}%)</span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
       )}

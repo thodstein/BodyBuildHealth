@@ -339,6 +339,17 @@ export interface ExportData {
   readiness: any[];
   labs: LabPoint[];
 }
+export interface PharmaSynergy {
+  with: string;
+  type: 'synergistic' | 'antagonistic' | 'complementary';
+  desc: string;
+}
+
+export interface SideEffect {
+  effect: string;
+  frequency: 'common' | 'rare' | 'very_rare';
+}
+
 export interface PharmaSubstance {
   id: string;
   name: string;
@@ -358,6 +369,10 @@ export interface PharmaSubstance {
   n_hill: number;
   maxEffect: number;
   research?: { study: string; conclusion: string; year: number }[];
+  synergies?: PharmaSynergy[];
+  contraindications?: string[];
+  sideEffects?: SideEffect[];
+  dosageRange?: { min: number; max: number; unit: string; frequency: string };
 }
 export interface UserContext {
   id?: string;

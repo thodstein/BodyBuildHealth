@@ -4,6 +4,7 @@ import { calculateDose } from '../../engines/dosage.engine';
 import { simulateCourse, steadyStatePeak, steadyStateTrough, eliminationConstant } from '../../engines/pk-pd.engine';
 import { calculateMultiSubstancePKPD } from '../../engines/pkpd-superposition.engine';
 import { checkDrugInteractions } from '../../engines/pharma-interactions.engine';
+import { PHARMA_DETAILS, type PharmaDetail } from '../../data/pharma-details';
 import type { PharmaSubstance, CourseEntry, PD } from '../../core/types';
 
 type Tab = 'catalog' | 'pkpd' | 'dosage' | 'interactions';
@@ -100,62 +101,55 @@ export const PharmaScreen: React.FC = () => {
 
 const CatalogTab: React.FC = () => {
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [expandedClass, setExpandedClass] = useState<string | null>(null);
+  const [filterClass, setFilterClass] = useState<string>('all');
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const filteredList = useMemo(() => {
+    let list = filterClass === 'all' ? Object.values(PHARMA_DB) : SUBSTANCES_BY_CLASS[filterClass] || [];
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      list = list.filter(s => s.name.toLowerCase().includes(q) || s.id.toLowerCase().includes(q) || (s.class && s.class.toLowerCase().includes(q)));
+    }
+    return list;
+  }, [filterClass, searchQuery]);
 
   const selected = selectedId ? PHARMA_DB[selectedId] : null;
+  const detail = selectedId ? PHARMA_DETAILS[selectedId] : undefined;
 
   return (
-    <div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 12 }}>
-        {Object.entries(SUBSTANCES_BY_CLASS).map(([cls, list]) => (
-          <div key={cls}>
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                padding: '8px 10px',
-                background: 'var(--card-bg, #1a1a2e)',
-                borderRadius: 6,
-                cursor: 'pointer',
-                borderBottom: expandedClass === cls ? 'none' : '1px solid var(--border)',
-              }}
-              onClick={() => setExpandedClass(expandedClass === cls ? null : cls)}
-            >
-              <span style={{ fontWeight: 600, fontSize: 13 }}>
-                {CLASS_LABELS[cls] || cls}
-              </span>
-              <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>{list.length}</span>
-            </div>
-            {expandedClass === cls && (
-              <div style={{ paddingLeft: 8, paddingTop: 4 }}>
-                {list.map((s) => (
-                  <div
-                    key={s.id}
-                    onClick={() => setSelectedId(selectedId === s.id ? null : s.id)}
-                    style={{
-                      padding: '5px 10px',
-                      fontSize: 12,
-                      cursor: 'pointer',
-                      background: selectedId === s.id ? 'var(--accent, #7c4dff)' : 'transparent',
-                      borderRadius: 4,
-                      color: selectedId === s.id ? '#fff' : 'var(--text)',
-                    }}
-                  >
-                    {s.name}
-                  </div>
-                ))}
-              </div>
-            )}
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.2fr', gap: 12 }}>
+      <div style={{ maxHeight: 'calc(100vh - 160px)', overflowY: 'auto', paddingRight: 4 }}>
+        <input type="text" placeholder="Поиск препарата..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', fontSize: 13, marginBottom: 8, boxSizing: 'border-box' }} />
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 8 }}>
+          <button onClick={() => setFilterClass('all')} style={{ padding: '3px 8px', borderRadius: 4, fontSize: 11, border: filterClass === 'all' ? '1px solid var(--accent)' : '1px solid var(--border)', background: filterClass === 'all' ? 'rgba(0,230,138,0.15)' : 'transparent', color: 'var(--text-primary)', cursor: 'pointer' }}>Все</button>
+          {Object.entries(SUBSTANCES_BY_CLASS).map(([cls, list]) => (
+            <button key={cls} onClick={() => setFilterClass(cls)} style={{ padding: '3px 8px', borderRadius: 4, fontSize: 11, border: filterClass === cls ? '1px solid var(--accent)' : '1px solid var(--border)', background: filterClass === cls ? 'rgba(0,230,138,0.15)' : 'transparent', color: 'var(--text-primary)', cursor: 'pointer' }}>{CLASS_LABELS[cls] || cls} ({list.length})</button>
+          ))}
+        </div>
+        {filteredList.map(s => (
+          <div key={s.id} onClick={() => setSelectedId(s.id)} style={{
+            padding: '8px 10px', borderRadius: 6, cursor: 'pointer', marginBottom: 4,
+            background: selectedId === s.id ? 'rgba(0,230,138,0.12)' : 'var(--bg-secondary)',
+            border: selectedId === s.id ? '1px solid var(--accent)' : '1px solid transparent',
+          }}>
+            <div style={{ fontWeight: 600, fontSize: 13 }}>{s.name}</div>
+            <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>{CLASS_LABELS[s.class] || s.class}</div>
           </div>
         ))}
       </div>
-      {selected && <DrugDetailCard sub={selected} />}
+      <div style={{ maxHeight: 'calc(100vh - 160px)', overflowY: 'auto' }}>
+        {selected ? <DrugDetailCard sub={selected} detail={detail} /> : (
+          <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-dim)' }}>
+            <div style={{ fontSize: 40, marginBottom: 12 }}>💊</div>
+            <div>Выберите препарат из списка</div>
+          </div>
+        )}
+      </div>
     </div>
   );
 };
 
-const DrugDetailCard: React.FC<{ sub: PharmaSubstance }> = ({ sub }) => {
+const DrugDetailCard: React.FC<{ sub: PharmaSubstance; detail?: PharmaDetail }> = ({ sub, detail }) => {
   const pd = sub.pd;
   const pdEntries = Object.entries(pd) as [keyof PD, number][];
 
@@ -216,6 +210,59 @@ const DrugDetailCard: React.FC<{ sub: PharmaSubstance }> = ({ sub }) => {
           <span style={{ fontWeight: 600 }}>Риски: </span>
           <span style={{ color: '#ff5252' }}>{riskLabels.join(' · ')}</span>
         </div>
+      )}
+
+      {detail && (
+        <>
+          {detail.description && (
+            <div style={{ borderTop: '1px solid var(--border)', paddingTop: 8, marginBottom: 8 }}>
+              <div style={{ fontWeight: 600, marginBottom: 4 }}>Описание</div>
+              <div style={{ color: 'var(--text-dim)', lineHeight: 1.5 }}>{detail.description}</div>
+            </div>
+          )}
+          {detail.mechanism && (
+            <div style={{ borderTop: '1px solid var(--border)', paddingTop: 8, marginBottom: 8 }}>
+              <div style={{ fontWeight: 600, marginBottom: 4 }}>Механизм действия</div>
+              <div style={{ color: 'var(--text-dim)', lineHeight: 1.5 }}>{detail.mechanism}</div>
+            </div>
+          )}
+          {detail.dosageRange && (
+            <div style={{ borderTop: '1px solid var(--border)', paddingTop: 8, marginBottom: 8 }}>
+              <div style={{ fontWeight: 600, marginBottom: 4 }}>Диапазон дозировок</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2px 12px' }}>
+                <span>Минимум:</span><span>{detail.dosageRange.min} {detail.dosageRange.unit}</span>
+                <span>Максимум:</span><span style={{ color: '#ff9100' }}>{detail.dosageRange.max} {detail.dosageRange.unit}</span>
+                <span>Частота:</span><span>{detail.dosageRange.frequency}</span>
+              </div>
+            </div>
+          )}
+          {detail.synergies && detail.synergies.length > 0 && (
+            <div style={{ borderTop: '1px solid var(--border)', paddingTop: 8, marginBottom: 8 }}>
+              <div style={{ fontWeight: 600, marginBottom: 4 }}>Синергия и комбинации</div>
+              {detail.synergies.map((s, i) => (
+                <div key={i} style={{ marginBottom: 4, padding: '4px 8px', borderRadius: 4, background: s.type === 'synergistic' ? 'rgba(0,230,138,0.08)' : s.type === 'antagonistic' ? 'rgba(255,23,68,0.08)' : 'rgba(41,121,255,0.08)' }}>
+                  <span style={{ fontWeight: 600, color: s.type === 'synergistic' ? '#00e68a' : s.type === 'antagonistic' ? '#ff1744' : '#2979ff' }}>
+                    {s.type === 'synergistic' ? '⊕' : s.type === 'antagonistic' ? '⊖' : '→'} {PHARMA_DB[s.with]?.name || s.with}
+                  </span>
+                  <span style={{ color: 'var(--text-dim)', marginLeft: 6 }}>{s.desc}</span>
+                </div>
+              ))}
+            </div>
+          )}
+          {detail.sideEffects && detail.sideEffects.length > 0 && (
+            <div style={{ borderTop: '1px solid var(--border)', paddingTop: 8, marginBottom: 8 }}>
+              <div style={{ fontWeight: 600, marginBottom: 4 }}>Побочные эффекты</div>
+              {detail.sideEffects.map((se, i) => (
+                <div key={i} style={{ marginBottom: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span>{se.effect}</span>
+                  <span style={{ color: se.frequency === 'common' ? '#ff9100' : se.frequency === 'rare' ? '#2979ff' : '#ff1744', fontWeight: 600, fontSize: 11 }}>
+                    {se.frequency === 'common' ? 'Часто' : se.frequency === 'rare' ? 'Редко' : 'Очень редко'}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </>
       )}
     </div>
   );

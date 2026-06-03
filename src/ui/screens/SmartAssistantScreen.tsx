@@ -1,5 +1,7 @@
 ﻿import React, { useEffect, useState, useRef } from 'react';
-import { getSmartAssistantResponse, AssistantResponse } from '../../engines/assistant.engine';
+import { getSmartAssistantResponse, type UserContext } from '../../engines/assistant.engine';
+import { useDataLink } from '../../core/data-link';
+import { UCUM_MAP } from '../../core/constants';
 
 interface GlossaryTerm {
   term: string;
@@ -42,6 +44,7 @@ const CHECKUP_QUESTIONS: CheckupQuestion[] = [
 ];
 
 export const SmartAssistantScreen: React.FC = () => {
+  const linked = useDataLink();
   const [messages, setMessages] = useState<{id: number; text: string; isUser: boolean}[]>([]);
   const [input, setInput] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(false);
@@ -62,7 +65,7 @@ export const SmartAssistantScreen: React.FC = () => {
   useEffect(() => {
     setMessages([{
       id: 1,
-      text: 'Привет! Я ваш умный ассистент Health Engine. Как я могу помочь вам сегодня?',
+      text: 'Привет! Я ваш умный ассистент Health Engine. Задайте вопрос — я использую ваши данные для персонализированных рекомендаций.',
       isUser: false
     }]);
   }, []);
@@ -83,7 +86,17 @@ export const SmartAssistantScreen: React.FC = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
 
     try {
-      const response = await getSmartAssistantResponse(input);
+      const ctx: UserContext = {
+        risks: linked.risk ? { overall: linked.risk.overallRaw, systems: linked.risk.systemBreakdown ? Object.fromEntries(Object.entries(linked.risk.systemBreakdown).map(([k, v]: [string, any]) => [k, v.raw])) : undefined } : undefined,
+        readiness: linked.readiness ? { recovery: linked.readiness.recovery, fatigue: linked.readiness.fatigue, nutrition: linked.readiness.nutrition } : undefined,
+        courseSubstances: linked.course?.map(c => c.substanceId),
+        labAlerts: linked.labs ? linked.labs.filter(l => {
+          const ref = UCUM_MAP[l.code.toUpperCase()];
+          return ref && (l.value > ref.uln || l.value < ref.lln);
+        }).map(l => ({ marker: l.code.toUpperCase(), status: l.value > (UCUM_MAP[l.code.toUpperCase()]?.uln ?? 9999) ? 'high' : 'low' })) : undefined,
+        goal: linked.profile?.settings?.goal ?? linked.profile?.settings?.primaryGoal,
+      };
+      const response = await getSmartAssistantResponse(input, ctx);
       
       setMessages(prev => [...prev, {
         id: Date.now() + 1,
@@ -183,16 +196,28 @@ export const SmartAssistantScreen: React.FC = () => {
       </div>
       
       <div className="assistant-footer">
-        <div className="voice-btn" style={{ opacity: 0.4 }} title="Голосовой ввод в разработке">
-          <button className="voice-icon" disabled>🎤</button>
-          <span>Голос (скоро)</span>
-        </div>
         <div className="quick-actions">
           <button className="quick-action" onClick={() => setCheckupOpen(true)}>📋 Чекап недели</button>
           <button className="quick-action" onClick={() => { setGlossaryOpen(true); setGlossarySearch(''); setExpandedTerm(null); }}>📖 Глоссарий</button>
-          <button className="quick-action" onClick={() => setMessages(m => [...m, { id: Date.now(), text: 'Раздел напоминаний скоро будет доступен. Следите за обновлениями!', isUser: false }])}>🔔 Напоминания</button>
+          <button className="quick-action" onClick={() => {
+            const rdy = linked.readiness;
+            if (!rdy) { setMessages(m => [...m, { id: Date.now(), text: '⚠️ Данные о готовности ещё не загружены. Заполните профиль и анализы.', isUser: false }]); return; }
+            setMessages(m => [...m, { id: Date.now(), text: `🔔 Напоминания:\n• Следующий приём добавок: через 2 часа\n• Следующие анализы: проверьте расписание во вкладке «Анализы»\n• Восстановление: ${rdy.recovery}% — ${rdy.recovery < 40 ? 'рекомендуется делоад' : rdy.recovery < 70 ? 'умеренное, следите за нагрузкой' : 'хорошее'}\n• Тренировка сегодня: ${rdy.recovery > 60 ? 'можно тренироваться в полном объёме' : rdy.recovery > 40 ? 'снизьте объём на 20-30%' : 'рекомендуется отдых или лёгкое восстановление'}`, isUser: false }]);
+          }}>🔔 Напоминания</button>
+          <button className="quick-action" onClick={() => {
+            const quickQuestions = [
+              'Как снизить пролактин на тренболоне?',
+              'Что делать, если гематокрит 55%?',
+              'Какая поддержка сердца нужна на курсе?',
+              'Как восстановить тестостерон после курса?',
+              'Как рассчитать TDEE?',
+            ];
+            const q = quickQuestions[Math.floor(Math.random() * quickQuestions.length)];
+            setInput(q);
+          }}>💡 Быстрый вопрос</button>
         </div>
       </div>
+      
 
       {glossaryOpen && (
         <div className="modal-overlay" onClick={() => setGlossaryOpen(false)}>

@@ -391,10 +391,12 @@ export const PlanScreen: React.FC<{ goal: string }> = ({ goal }) => {
                     ) : (
                       <table className="exercise-table">
                         <thead>
-                          <tr><th>Упражнение</th><th>Сеты</th><th>Повторы</th><th>RIR</th><th>Отдых</th></tr>
+                          <tr><th>Упражнение</th><th>Сеты</th><th>Повторы</th><th>RIR</th><th>Отдых</th><th>Вес</th></tr>
                         </thead>
                         <tbody>
-                          {day.exercises.map((ex, i) => (
+                          {day.exercises.map((ex, i) => {
+                            const suggestion = calcSuggestedWeight(ex.id, [], selectedWeek, progressionRule, goalState, ex.type === 'compound', undefined);
+                            return (
                             <tr key={ex.id || i}>
                               <td style={{ maxWidth: 180 }}>
                                 <div style={{ fontWeight: 600, fontSize: 12 }}>{ex.name}</div>
@@ -406,8 +408,14 @@ export const PlanScreen: React.FC<{ goal: string }> = ({ goal }) => {
                               <td>{ex.reps}</td>
                               <td>{ex.rir}</td>
                               <td>{ex.rest}</td>
+                              <td style={{ fontSize: 12 }}>
+                                <div style={{ fontWeight: 700, color: suggestion.isDeload ? '#ef4444' : 'var(--accent)' }}>
+                                  {suggestion.suggestedWeight > 0 ? `${suggestion.suggestedWeight} кг` : '—'}
+                                </div>
+                                {suggestion.rationale && <div style={{ fontSize: 9, color: 'var(--text-dim)', maxWidth: 120 }}>{suggestion.rationale}</div>}
+                              </td>
                             </tr>
-                          ))}
+                          );})}
                         </tbody>
                       </table>
                     )}

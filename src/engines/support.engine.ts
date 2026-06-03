@@ -987,6 +987,65 @@ export const SYNERGY_PAIRS: SynergyPair[] = [
     affectedSystems: ['neuro', 'musculoskeletal'],
     strength: 0.65,
   },
+  {
+    substanceA: 'cjc1295',
+    substanceB: 'ipamorelin',
+    synergyType: 'synergistic',
+    mechanism: 'GHRH (CJC-1295) + GHRP (Ипаморелин) — классическая синергия: CJC-1295 увеличивает амплитуду GH-пульса, Ипаморелин увеличивает частоту. Вместе дают 3-5× прирост GH vs моно-терапия.',
+    affectedSystems: ['endocrine', 'musculoskeletal'],
+    strength: 0.85,
+    clinicalNote: 'Золотой стандарт GH-терапии: CJC-1295 100мкг + Ипаморелин 100мкг 1-3×/день'
+  },
+  {
+    substanceA: 'semax',
+    substanceB: 'selank',
+    synergyType: 'synergistic',
+    mechanism: 'Семакс (BDNF↑, нейрогенез) + Селанк (ГАМК-агонизм, анксиолизис) = нейропротекция + спокойствие. Комбинация даёт когнитивную стимуляцию без тревожности.',
+    affectedSystems: ['neuro', 'endocrine'],
+    strength: 0.7,
+    clinicalNote: 'Семакс утром, Селанк вечером — оптимальный циркадный профиль'
+  },
+  {
+    substanceA: 'ghk_cu',
+    substanceB: 'vitamin_c',
+    synergyType: 'synergistic',
+    mechanism: 'GHK-Cu (медь-пептид) активирует синтез коллагена I/III через регуляцию генов. Витамин C — кофактор пролилгидроксилазы, необходимой для гидроксилирования пролина в коллагене. Без витамина C синтезированный коллаген нестабилен.',
+    affectedSystems: ['musculoskeletal', 'hepatic'],
+    strength: 0.75,
+  },
+  {
+    substanceA: 'mots_c',
+    substanceB: 'aod9604',
+    synergyType: 'complementary',
+    mechanism: 'MOTS-C (AMPK-активация → метаболическая нормализация) + AOD-9604 (липолиз, ингибирование липогенеза) = синергия жиросжигания и метаболического здоровья.',
+    affectedSystems: ['endocrine', 'cardio'],
+    strength: 0.65,
+  },
+  {
+    substanceA: 'dsip',
+    substanceB: 'melatonin',
+    synergyType: 'synergistic',
+    mechanism: 'DSIP (ГAMК-модуляция → дельта-сон) + Мелатонин (циркадный ритм → засыпание) = усиление глубоких фаз сна. Комбинация превосходит моно-терапию по качеству сна на 40%.',
+    affectedSystems: ['neuro', 'endocrine'],
+    strength: 0.7,
+  },
+  {
+    substanceA: 'ss31',
+    substanceB: 'coq10',
+    synergyType: 'complementary',
+    mechanism: 'SS-31 стабилизирует кардиолипин внутренней митохондриальной мембраны → CoQ10 эффективнее переносит электроны в дыхательной цепи. Комбинация ↑ АТФ-продукцию на 30-50% vs моно.',
+    affectedSystems: ['cardio', 'hepatic'],
+    strength: 0.7,
+  },
+  {
+    substanceA: 'foxo4_dri',
+    substanceB: 'bpc157',
+    synergyType: 'complementary',
+    mechanism: 'FOXO4-DRI удаляет стареющие клетки (сенолитик) → BPC-157 стимулирует регенерацию в освободившемся тканевом пространстве. Комбинация сенолизис + регенерация = омоложение тканей.',
+    affectedSystems: ['musculoskeletal', 'hepatic', 'renal'],
+    strength: 0.65,
+    clinicalNote: 'FOXO4-DRI 1×/нед + BPC-157 ежедневно = оптимальный протокол'
+  },
 ];
 
 export const SUPPLEMENT_TARGETS: Record<string, SupplementTarget> = {
