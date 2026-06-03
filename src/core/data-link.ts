@@ -4,8 +4,16 @@ import { getProfile, updateProfile, onProfileChange } from './profile-manager';
 import { db } from './db';
 import { calcReadiness } from '../engines/readiness.engine';
 import { calculateRisks } from '../engines/risk.engine';
-import { generateSupportStack } from '../engines/support.engine';
+import { calculateSupport, generateSupportStack, type SupportInput } from '../engines/support.engine';
 import type { ReadinessScores, RiskCalculationResult } from './types';
+
+let globalTick = 0;
+const listeners = new Set<() => void>();
+
+export function notifyDataChange() {
+  globalTick++;
+  listeners.forEach(fn => fn());
+}
 
 export interface LinkedData {
   profile: UserProfile;
@@ -99,6 +107,11 @@ export function useDataLink(): LinkedData {
   }, []);
 
   useEffect(() => {
+    listeners.add(refetch);
+    return () => { listeners.delete(refetch); };
+  }, [refetch]);
+
+  useEffect(() => {
     const load = async () => {
       try {
         await db.init();
@@ -166,12 +179,18 @@ export function useDataLink(): LinkedData {
       const genetics = s.genetics ?? {};
       const riskResult = calculateRisks(genetics);
       const goal = s.primaryGoal ?? s.goal ?? 'health';
-      const stack = generateSupportStack(goal);
+      const supportInput: SupportInput = {
+        substances: Object.keys(activeDrugs),
+        labs: labs.slice(-10).map(l => ({ code: l.code, value: l.value })),
+        demographics: { age: s.age ?? 30, weight: s.weight ?? 80, sex: s.sex ?? 'male' },
+        genetics,
+        nutritionFactor: s.nutritionFactor ?? 0.8,
+        trainingFactor: s.trainingFactor ?? 0.7,
+        drugDoses: Object.fromEntries(Object.entries(activeDrugs).map(([k, v]) => [k, v.dosePerWeek])),
+      };
+      const result = calculateSupport(supportInput);
       const coverage: Record<string, number> = {};
-      stack.forEach(su => {
-        const cov = (su as any).coverage as Record<string, number> | undefined;
-        if (cov) Object.entries(cov).forEach(([k, v]) => { coverage[k] = (coverage[k] ?? 0) + v; });
-      });
+      if (result.systemSupport) Object.entries(result.systemSupport).forEach(([k, v]) => { coverage[k] = v; });
       return { ...riskResult, coverageMap: coverage } as RiskCalculationResult;
     } catch { return null; }
   })();

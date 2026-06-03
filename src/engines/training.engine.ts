@@ -72,6 +72,47 @@ export function calcExercisePrescription(
   return { sets, reps, rir, dropSet, dropSetReps: dropSet ? `${Math.max(4, range[0] - 2)}-${range[1]}` : '', backoffSet, rest };
 }
 
+export function assignIntensityTechnique(
+  exercise: Exercise,
+  goal: string,
+  level: string,
+  dayIndex: number,
+  weekNum: number,
+): import('../core/types').SetFormat | undefined {
+  const isCompound = exercise.type === 'compound';
+  const isIsolation = exercise.type === 'isolation';
+  const isAdvancedLevel = level === 'advanced' || level === 'enhanced';
+  const isStrengthGoal = goal === 'strength';
+  const isHypGoal = goal === 'hypertrophy' || goal === 'bulk';
+
+  if (isStrengthGoal && isCompound) {
+    if (weekNum > 2 && dayIndex % 2 === 0) {
+      return { technique: 'cluster', exercises: [exercise.id], clusterReps: '1.1.1', intraSetRest: 20 };
+    }
+    if (weekNum > 3 && isAdvancedLevel) {
+      return { technique: 'rest_pause', exercises: [exercise.id], intraSetRest: 15, activationReps: undefined };
+    }
+  }
+
+  if (isHypGoal && isIsolation && isAdvancedLevel) {
+    const variant = dayIndex % 3;
+    if (variant === 0) return { technique: 'myo_rep', exercises: [exercise.id], activationReps: 15, miniSetReps: 3, miniSetRestSeconds: 5 };
+    if (variant === 1) return { technique: 'rest_pause', exercises: [exercise.id], intraSetRest: 15 };
+    if (variant === 2) return { technique: 'drop_set', exercises: [exercise.id], dropWeightPct: 25 };
+  }
+
+  if ((goal === 'recomp' || goal === 'cut') && isIsolation && dayIndex % 2 === 1) {
+    const pairGroup = exercise.group === 'chest' ? 'back' : exercise.group === 'back' ? 'chest' : exercise.group === 'arms' ? 'shoulders' : 'arms';
+    return { technique: 'superset', exercises: [exercise.id], restBetweenExercises: 0 };
+  }
+
+  if (isHypGoal && isCompound && weekNum >= 2 && isAdvancedLevel) {
+    return { technique: 'backoff_set', exercises: [exercise.id] };
+  }
+
+  return undefined;
+}
+
 export function calcTraining(i: TrainingInput): TrainingOutput {
   const base = MV_MR_V[i.level];
   let volume = base.mav;

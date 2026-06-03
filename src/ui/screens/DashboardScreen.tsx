@@ -1,6 +1,5 @@
-import React, { useEffect, useState, useCallback, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
 import { SummaryCard } from '../cards/SummaryCard';
-import { SystemCard } from '../cards/SystemCard';
 import { RiskCard } from '../cards/RiskCard';
 import { RecommendationCard } from '../cards/RecommendationCard';
 import { registry } from '../../core/data/registry';
@@ -11,18 +10,11 @@ const SYSTEM_LABELS: Record<string, string> = {
   reproductive: 'Репродуктивная', musculoskeletal: 'Суставы и связки',
 };
 
-import type { MasterDB, RiskResult, ReadinessScores, CourseEntry, LabPoint } from '../../core/types';
-import { calculateRisks } from '../../engines/risk.engine';
-import { calculateRiskFromAnalyses } from '../../engines/risk-calculator-v2.engine';
-import { calcReadiness } from '../../engines/readiness.engine';
-import { generateSupportStack } from '../../engines/support.engine';
-import { computeLabIndices, computeLabIndexDetails, type LabIndices, type LabIndexDetail } from '../../engines/labs-indices.engine';
+import type { LabDrugAlert } from '../../engines/lab-pharma-correlation.engine';
 import { calculateHealthScore } from '../../engines/health-score.engine';
-import { analyzeLabDrugCorrelation, type LabDrugAlert } from '../../engines/lab-pharma-correlation.engine';
-import { generateCheckpoints } from '../../engines/labs-scheduler.engine';
+import { analyzeLabDrugCorrelation } from '../../engines/lab-pharma-correlation.engine';
+import { computeLabIndexDetails, type LabIndexDetail } from '../../engines/labs-indices.engine';
 import { RISK_SYSTEMS } from '../../core/constants';
-import { db } from '../../core/db';
-import { getProfile } from '../../core/profile-manager';
 import { useDataLink } from '../../core/data-link';
 import { PHASE_REQUIRED_PANELS, LAB_PANELS } from '../../data/labs-phase-panels';
 
@@ -79,172 +71,79 @@ function SectionHeader({ title, onNavigate, screenId }: { title: string; onNavig
 
 export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
   const linked = useDataLink();
-  const [masterDb, setMasterDb] = useState<MasterDB | null>(null);
-  const [riskResult, setRiskResult] = useState<RiskResult | null>(null);
-  const [readiness, setReadiness] = useState<ReadinessScores | null>(null);
-  const [alerts, setAlerts] = useState<string[]>([]);
-  const [prevRecovery, setPrevRecovery] = useState<number | undefined>(undefined);
-  const prevRecoveryRef = useRef<number | undefined>(undefined);
-  const [courseEntries, setCourseEntries] = useState<CourseEntry[]>([]);
-  const [labCount, setLabCount] = useState(0);
   const [labIndices, setLabIndices] = useState<Record<string, LabIndexDetail> | null>(null);
-  const [missingLabs, setMissingLabs] = useState<string[]>([]);
   const [healthScore, setHealthScore] = useState<{ score: number; trend: string; breakdown: { pharma: number; labs: number; nutrition: number }; recommendations: string[] } | null>(null);
   const [drugAlerts, setDrugAlerts] = useState<LabDrugAlert[]>([]);
+  const [alerts, setAlerts] = useState<string[]>([]);
+  const [missingLabs, setMissingLabs] = useState<string[]>([]);
 
   useEffect(() => {
-    const loadData = async () => {
-    const data = registry.getDB();
-    setMasterDb(data);
+    const computeDerived = async () => {
+      const { labs, course, profile, readiness, risk } = linked;
+      const settings = profile.settings;
 
-    const profile = linked.profile;
-    const settings = profile.settings;
-
-    let courseData: CourseEntry[] = linked.course;
-    let labData: LabPoint[] = linked.labs;
-    let missingRequiredLabs: string[] = [];
-    try {
-      await db.init();
-      setCourseEntries(courseData);
-      const userLabs = labData;
-      setLabCount(userLabs.length);
-      if (userLabs.length > 0) {
-        setLabIndices(computeLabIndexDetails(userLabs));
+      if (labs.length > 0) {
+        setLabIndices(computeLabIndexDetails(labs));
       }
+
+      try {
+        const avg = { avgWeeklyKcal: linked.avgWeeklyKcal, avgWeeklyProtein: linked.avgWeeklyProtein };
+        const nutritionLog = linked.avgWeeklyKcal > 0 ? [{ date: new Date().toISOString().slice(0, 10), total: { kcal: avg.avgWeeklyKcal, p: avg.avgWeeklyProtein, f: linked.avgWeeklyFat, c: linked.avgWeeklyCarbs, fiber: 0, water: 0, steps: 0 } }] : [];
+        const hs = calculateHealthScore(labs, course, nutritionLog, avg.avgWeeklyKcal || 2500, avg.avgWeeklyProtein || 160);
+        setHealthScore(hs);
+      } catch {}
+
+      try {
+        const phase = settings.phase ?? 'baseline';
+        const alerts = analyzeLabDrugCorrelation(labs, course, phase === 'on_cycle' ? 'on_cycle' : phase === 'pct' ? 'pct' : 'baseline');
+        setDrugAlerts(alerts);
+      } catch {}
 
       const phase = settings.phase ?? 'baseline';
       const requiredPanels = PHASE_REQUIRED_PANELS[phase] ?? PHASE_REQUIRED_PANELS.baseline;
       const requiredCodes = requiredPanels.flatMap(pid => (LAB_PANELS[pid]?.markers ?? []).map(m => m.ucumCode ?? m.id));
-      const enteredCodes = new Set(userLabs.map(l => l.code.toUpperCase()));
-      missingRequiredLabs = requiredCodes.filter(code => !enteredCodes.has(code.toUpperCase()));
-      setMissingLabs(missingRequiredLabs);
-    } catch {}
+      const enteredCodes = new Set(labs.map(l => l.code.toUpperCase()));
+      const missing = requiredCodes.filter(code => !enteredCodes.has(code.toUpperCase()));
+      setMissingLabs(missing);
 
-    const activeDrugs: Record<string, { dosePerWeek: number }> = {};
-    courseData.forEach(entry => {
-      const freq = typeof entry.frequency === 'number' ? entry.frequency : entry.frequency === 'daily' ? 7 : entry.frequency === 'eod' ? 3.5 : 1;
-      activeDrugs[entry.substanceId] = { dosePerWeek: entry.doseValue * freq };
-    });
-
-    const goal = settings.goal ?? settings.primaryGoal ?? 'maintenance';
-    const supportSubs = generateSupportStack(goal);
-    const supportCoverage: Record<string, number> = {};
-    for (const sub of supportSubs) {
-      if (sub.effects) {
-        for (const eff of sub.effects) {
-          supportCoverage[eff.effect] = (supportCoverage[eff.effect] || 0) + eff.strength;
-        }
+      const newAlerts: string[] = [];
+      if (risk) {
+        if (risk.overallRaw > 50) newAlerts.push(`Общий риск высокий: ${risk.overallRaw.toFixed(1)}% — рассмотрите снижение дозировок`);
       }
-    }
-
-    const riskInput = {
-      genetics: settings.genetics,
-      nutritionFactor: settings.nutritionFactor,
-      trainingFactor: settings.trainingFactor,
-      activeDrugs: Object.keys(activeDrugs).length > 0 ? activeDrugs : undefined,
-      supportCoverage,
-      biomarkerValues: undefined,
-      hgiMarkers: undefined,
-      interventionResponse: undefined,
-      overallBiomarkerValue: undefined,
-      overallHgiMarkers: undefined,
-      overallInterventionResponse: undefined,
+      if (readiness) {
+        if (readiness.recovery < 40) newAlerts.push(`Восстановление критически низкое: ${readiness.recovery}%`);
+        if (readiness.fatigue > 70) newAlerts.push(`Уровень усталости высокий: ${readiness.fatigue}%`);
+        if (readiness.isConservative && readiness.conservativeReason) newAlerts.push(`Консервативный режим: ${readiness.conservativeReason}`);
+      }
+      if (drugAlerts.some(a => a.severity === 'critical' || a.severity === 'high')) {
+        newAlerts.push(`${drugAlerts.filter(a => a.severity === 'critical' || a.severity === 'high').length} критическое(х) взаимодействие(й) препарата с анализами`);
+      }
+      if (labs.length === 0) {
+        newAlerts.push('Анализы не введены — введите результаты на вкладке «Анализы»');
+      } else if (missing.length > 0) {
+        newAlerts.push(`Не хватает ${missing.length} обязательных анализов для фазы «${phase}»`);
+      }
+      setAlerts(newAlerts);
     };
-    const risk = calculateRisks(riskInput);
+    computeDerived();
+  }, [linked.labs.length, linked.course.length, linked.readiness?.recovery]);
 
-    const userLabs = labData.filter(l => l.patientId === 'current-user');
-    if (userLabs.length > 0) {
-      const labRisks = calculateRiskFromAnalyses(userLabs);
-      if (risk.systemBreakdown) {
-        for (const sys of RISK_SYSTEMS) {
-          if (risk.systemBreakdown[sys]) {
-            const labVal = labRisks.systemContributions?.[sys as keyof typeof labRisks.systemContributions] ?? 0;
-            risk.systemBreakdown[sys].raw = Math.max(risk.systemBreakdown[sys].raw, labVal);
-          }
-        }
-      }
-    }
-    setRiskResult(risk);
+  if (!linked.risk || !linked.readiness) return <div className="screen dashboard"><div className="loading-spinner" /></div>;
 
-    const daysOnCourse = (() => {
-      if (settings.courseStartDate) {
-        const start = new Date(settings.courseStartDate);
-        const now = new Date();
-        return Math.max(0, Math.floor((now.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)));
-      }
-      return 0;
-    })();
-
-    const readinessInput = {
-      sleepHours: settings.baselineSleepHours ?? 7,
-      sleepQuality: settings.baselineSleepQuality ?? 0.7,
-      nightAwakenings: 1,
-      hrvRatio: settings.baselineHrvRatio ?? 1.2,
-      doms: 2,
-      stress: settings.baselineStressLevel ?? 3,
-      riskCoverageMap: supportCoverage,
-      calRatio: 0.85,
-      proteinRatio: 0.8,
-      waterRatio: 0.7,
-      fiberRatio: 0.6,
-      omega3Flag: (settings.currentSupplements ?? []).some(s => typeof s === 'object' ? /omega|омега/i.test(s.name) : /omega/i.test(s)) ?? false,
-      trainingLoadRatio: 0.7,
-      subjFatigue: 3,
-      hrIncrease: 0.1,
-    };
-    const rdy = calcReadiness(readinessInput);
-    setReadiness(rdy);
-
-    const newAlerts: string[] = [];
-    const totalRiskPct = risk.overallRaw;
-    if (totalRiskPct > 50) newAlerts.push(`Общий риск высокий: ${totalRiskPct.toFixed(1)}% — рассмотрите снижение дозировок`);
-    if (rdy.recovery < 40) newAlerts.push(`Восстановление критически низкое: ${rdy.recovery}%`);
-    if (rdy.fatigue > 70) newAlerts.push(`Уровень усталости высокий: ${rdy.fatigue}%`);
-    if (rdy.isConservative && rdy.conservativeReason) newAlerts.push(`Консервативный режим: ${rdy.conservativeReason}`);
-
-    const highRisks = data.risks.filter(r => r.level === 'HIGH' || r.level === 'CRITICAL');
-    if (highRisks.length > 0)     newAlerts.push(`${highRisks.length} риск(ов) высокого уровня`);
-
-    const userLabCount = labData.filter(l => l.patientId === 'current-user').length;
-    if (userLabCount === 0) {
-      newAlerts.push('Анализы не введены — введите результаты на вкладке «Анализы» для точного расчёта рисков');
-    } else if (missingRequiredLabs.length > 0) {
-      newAlerts.push(`Не хватает ${missingRequiredLabs.length} обязательных анализов для фазы «${settings.phase ?? 'baseline'}»`);
-    }
-
-    setAlerts(newAlerts);
-    setPrevRecovery(prevRecoveryRef.current);
-    prevRecoveryRef.current = rdy.recovery;
-
-    try {
-      const hs = calculateHealthScore(labData, courseData, [], 2500, 160);
-      setHealthScore(hs);
-    } catch {}
-
-    try {
-      const phase = settings.phase ?? 'baseline';
-      const alerts = analyzeLabDrugCorrelation(labData, courseData, phase === 'baseline' ? 'baseline' : phase === 'on_cycle' ? 'on_cycle' : 'pct');
-      setDrugAlerts(alerts);
-      if (alerts.some(a => a.severity === 'critical' || a.severity === 'high')) {
-        newAlerts.push(`${alerts.filter(a => a.severity === 'critical' || a.severity === 'high').length} критическое(х) взаимодействие(й) препарата с анализами`);
-      }
-    } catch {}
-    };
-    loadData();
-  }, []);
-
-  if (!masterDb || !riskResult || !readiness) return <div className="screen dashboard"><div className="loading-spinner" /></div>;
+  const riskResult = linked.risk;
+  const readiness = linked.readiness;
+  const labCount = linked.labs.length;
+  const courseEntries = linked.course;
 
   const totalRisk = Math.round(riskResult.overallRaw);
   const riskAfterSupport = Math.round(riskResult.overallNet);
   const riskLevel = totalRisk > 60 ? 'HIGH' : totalRisk > 30 ? 'MEDIUM' : 'LOW';
 
-  const activeDrugCount = courseEntries.length || (Object.keys(riskResult.systemBreakdown).length > 0 ? Math.min(masterDb.substances.length, 5) : 0);
+  const activeDrugCount = courseEntries.length;
   const daysOnCourse = (() => {
     try {
-      const profile = getProfile();
-      if (profile.settings.courseStartDate) {
-        const start = new Date(profile.settings.courseStartDate);
+      if (linked.profile.settings.courseStartDate) {
+        const start = new Date(linked.profile.settings.courseStartDate);
         const now = new Date();
         return Math.max(0, Math.floor((now.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)));
       }
@@ -252,6 +151,7 @@ export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
     return 0;
   })();
 
+  const masterDb = registry.getDB();
   const systems = masterDb.systems;
   const risks = masterDb.risks.slice(0, 4);
   const recs = masterDb.recommendations.slice(0, 5);
@@ -342,7 +242,7 @@ export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
       <div className="dashboard-stats-4" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginBottom: 4 }}>
         <div style={{ background: 'var(--bg-secondary)', borderRadius: 8, padding: '10px 12px', textAlign: 'center' }}>
           <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 4 }}>Восстановление</div>
-          <div style={{ fontSize: 20, fontWeight: 700, color: scoreColor(readiness.recovery, 40, 70) }}>{readiness.recovery}%<TrendArrow current={readiness.recovery} previous={prevRecovery} /></div>
+          <div style={{ fontSize: 20, fontWeight: 700, color: scoreColor(readiness.recovery, 40, 70) }}>{readiness.recovery}%</div>
           <ProgressBar value={readiness.recovery} color={scoreColor(readiness.recovery, 40, 70)} />
         </div>
         <div style={{ background: 'var(--bg-secondary)', borderRadius: 8, padding: '10px 12px', textAlign: 'center' }}>

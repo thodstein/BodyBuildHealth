@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   addLabPoint,
   getLabHistory,
@@ -6,8 +6,6 @@ import {
   normalizeLab,
   UCUM_MAP
 } from '../../engines/labs.engine';
-import { calculateRisks } from '../../engines/risk.engine';
-import { generateSupportStack } from '../../engines/support.engine';
 import { calculateRiskFromAnalyses } from '../../engines/risk-calculator-v2.engine';
 import { drawLabTrend } from '../../ui/charts-labs';
 import { db } from '../../core/db';
@@ -20,7 +18,8 @@ import { PHASE_REQUIRED_PANELS, LAB_PANELS, type LabPanelMarker } from '../../da
 import { generateLabSchedule, getCurrentLabStatus, getDrugSpecificLabs, getWeeksSinceStart, type LabScheduleItem } from '../../engines/labs-schedule.engine';
 import { analyzeLabDrugCorrelation, type LabDrugAlert } from '../../engines/lab-pharma-correlation.engine';
 import { generateCheckpoints } from '../../engines/labs-scheduler.engine';
-import type { LabPoint, UserProfile, RiskResult, CourseEntry } from '../../core/types';
+import type { LabPoint, RiskResult, CourseEntry } from '../../core/types';
+import { useDataLink, notifyDataChange } from '../../core/data-link';
 
 const SYSTEM_LABELS: Record<string, string> = {
   hepatic: 'Печень', cardio: 'Сердечно-сосудистая', endocrine: 'Эндокринная',
@@ -36,11 +35,12 @@ interface LabsProps {
 
 export const LabsScreen: React.FC<LabsProps> = ({ initialTab = 'input' }) => {
   const [tab, setTab] = useState<LabTab>(initialTab);
-  const [entries, setEntries] = useState<LabPoint[]>([]);
-  const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [course, setCourse] = useState<CourseEntry[]>([]);
-  const [risk, setRisk] = useState<RiskResult | null>(null);
-  const [loading, setLoading] = useState(true);
+  const linked = useDataLink();
+  const profile = linked.profile;
+  const course = linked.course;
+  const entries = linked.labs;
+  const risk = linked.risk;
+  const activeDrugs = linked.activeDrugs;
   const [selectedPanel, setSelectedPanel] = useState<string>('cbc');
   const [selectedMarker, setSelectedMarker] = useState<string | null>(null);
   const [canvasKey, setCanvasKey] = useState(0);
@@ -57,29 +57,6 @@ export const LabsScreen: React.FC<LabsProps> = ({ initialTab = 'input' }) => {
   const [currentWeek, setCurrentWeek] = useState(0);
 
   useEffect(() => {
-    const loadData = async () => {
-      try {
-        await db.init();
-        const prof = await db.get<UserProfile>('profile', 'current-user');
-        setProfile(prof ?? {
-          id: 'current-user', name: 'Текущий пользователь', role: 'user',
-          settings: { age: 30, sex: 'male', weight: 70, goal: 'muscle gain', phase: 'baseline', courseStartDate: new Date().toISOString().slice(0, 10), height: 180, bodyFat: 15 }
-        });
-        const courseEntries = await db.getAll<CourseEntry>('course_log');
-        setCourse(courseEntries);
-        const labEntries = await db.getAll<LabPoint & { patientId?: string }>('labs_log');
-        const userLabs = labEntries.filter(l => l.patientId === 'current-user');
-        setEntries(userLabs);
-      } catch (e) {
-        console.error('Failed to load data:', e);
-      } finally {
-        setLoading(false);
-      }
-    };
-    loadData();
-  }, []);
-
-  useEffect(() => {
     if (profile?.settings?.phase) {
       setPhase(profile.settings.phase as any);
     }
@@ -94,10 +71,6 @@ export const LabsScreen: React.FC<LabsProps> = ({ initialTab = 'input' }) => {
   }, [entries]);
 
   useEffect(() => {
-    recalcRisks();
-  }, [entries, profile, course]);
-
-  useEffect(() => {
     if (!profile?.settings?.courseStartDate) return;
     const w = getWeeksSinceStart(profile.settings.courseStartDate);
     setCurrentWeek(w);
@@ -109,42 +82,6 @@ export const LabsScreen: React.FC<LabsProps> = ({ initialTab = 'input' }) => {
     });
     setLabSchedule(schedule);
   }, [profile?.settings?.phase, profile?.settings?.courseStartDate, course]);
-
-  const recalcRisks = async () => {
-    if (!profile) return;
-    try {
-      const genetics: Record<string, string> = profile.settings?.genetics ?? {};
-      const nutritionFactor = profile.settings?.nutritionFactor ?? 1.0;
-      const trainingFactor = profile.settings?.trainingFactor ?? 1.0;
-      const activeDrugs: Record<string, { dosePerWeek: number }> = {};
-      course.forEach(entry => {
-        const freq = typeof entry.frequency === 'number' ? entry.frequency : entry.frequency === 'daily' ? 7 : entry.frequency === 'eod' ? 3.5 : 1;
-        activeDrugs[entry.substanceId] = { dosePerWeek: entry.doseValue * freq };
-      });
-      const result = calculateRisks({ genetics, nutritionFactor, trainingFactor, activeDrugs, supportCoverage: {} });
-      const labRisks = calculateRiskFromAnalyses(entries);
-      const combinedRaw: Record<string, number> = {};
-      RISK_SYSTEMS.forEach(s => {
-        combinedRaw[s] = Math.max(
-          result.systemBreakdown?.[s]?.raw ?? 0,
-          labRisks.systemContributions?.[s as keyof typeof labRisks.systemContributions] ?? 0
-        );
-      });
-      const supportSubs = generateSupportStack(profile.settings.goal ?? 'maintenance');
-      const coverageMap: Record<string, number> = {};
-      for (const sub of supportSubs) {
-        if (sub.effects) {
-          for (const eff of sub.effects) {
-            coverageMap[eff.effect] = (coverageMap[eff.effect] || 0) + eff.strength;
-          }
-        }
-      }
-      const finalRisks = calculateRisks({ genetics, nutritionFactor, trainingFactor, activeDrugs, supportCoverage: coverageMap });
-      setRisk(finalRisks);
-    } catch (e) {
-      console.error('Risk calc error:', e);
-    }
-  };
 
   const saveMarker = async (code: string, marker: LabPanelMarker) => {
     const val = markerValues[code];
@@ -163,8 +100,8 @@ export const LabsScreen: React.FC<LabsProps> = ({ initialTab = 'input' }) => {
     };
     try {
       await addLabPoint('current-user', point);
-      setEntries(prev => [...prev, point]);
       setMarkerValues(prev => ({ ...prev, [code]: { value: '', unit: val.unit || marker.unit } }));
+      notifyDataChange();
     } catch (e) {
       console.error('Failed to add lab point:', e);
     }
@@ -220,15 +157,14 @@ export const LabsScreen: React.FC<LabsProps> = ({ initialTab = 'input' }) => {
       };
       await addLabPoint('current-user', point);
     }
-    const labEntries = await db.getAll<LabPoint & { patientId?: string }>('labs_log');
-    setEntries(labEntries.filter(l => l.patientId === 'current-user'));
+    notifyDataChange();
     setOcrText('');
     setOcrResult([]);
   };
 
   const deleteEntry = async (id: string) => {
     await db.delete('labs_log', id);
-    setEntries(prev => prev.filter(e => e.id !== id));
+    notifyDataChange();
   };
 
   const getLatestEntry = (codes: string[]) => {
@@ -274,8 +210,6 @@ export const LabsScreen: React.FC<LabsProps> = ({ initialTab = 'input' }) => {
     .flatMap(pid => (LAB_PANELS[pid]?.markers ?? []).map(m => m.ucumCode ?? m.id))
     .filter(code => !entries.some(e => e.code.toUpperCase() === code.toUpperCase()));
   const hasNoLabs = entries.length === 0;
-
-  if (loading) return <div className="loading-screen"><div className="loading-spinner"/><span>Загрузка...</span></div>;
 
   const TABS: { id: LabTab; label: string; icon?: string }[] = [
     { id: 'input', label: 'Ввод', icon: '📝' },

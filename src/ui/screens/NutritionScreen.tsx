@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { calcNutrition, generateStructuredAdvice } from '../../engines/nutrition.engine';
 import { generateMacroCycle } from '../../engines/nutrition-cycling.engine';
-import { generateDayMealPlan, type DayMealPlan, type MealSlot } from '../../engines/nutrition-meal-plan.engine';
+import { generateDayMealPlan, type DayMealPlan, type MealSlot, type MealPlanOptions } from '../../engines/nutrition-meal-plan.engine';
 import { getProfile } from '../../core/profile-manager';
 import { useDataLink } from '../../core/data-link';
 import { FOOD_DB, searchFood, RATION_TIERS, getTopByProtein, getTopByCarbs, getTopByFat, getFoodById } from '../../core/nutrition-database';
@@ -590,9 +590,17 @@ function AdviceTab({ targets, diary, goal }: { targets: NutritionTargets | null;
 
   const macroCycle = useMemo(() => {
     if (!targets) return null;
-    const trainingDays: boolean[] = (profile as any).settings?.trainingSchedule?.map((d: number) => [1,0,1,0,1,1,0][d] === 1) || [true, false, true, false, true, true, false];
+    const wpw = profile.settings.workoutsPerWeek ?? 3;
+    const days = ['Пн','Вт','Ср','Чт','Пт','Сб','Вс'];
+    const schedule = (profile.settings as any).trainingSchedule;
+    let trainingDays: boolean[];
+    if (schedule && schedule.length === 7) {
+      trainingDays = schedule.map((d: number) => d === 1);
+    } else {
+      trainingDays = days.map((_, i) => i < wpw);
+    }
     return generateMacroCycle(targets, trainingDays, today());
-  }, [targets]);
+  }, [targets, profile.settings.workoutsPerWeek, (profile.settings as any).trainingSchedule]);
 
   if (!targets || !advice) {
     return (
@@ -843,6 +851,11 @@ const RationTab: React.FC<{ plan: DayMealPlan }> = ({ plan }) => {
               <div style={{ width: 10, height: 10, borderRadius: '50%', background: mealColors[meal.label] || '#888' }} />
               <span style={{ fontWeight: 600, fontSize: 14 }}>{meal.label}</span>
               <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>{meal.time}</span>
+              {meal.isTrainingDay !== undefined && (
+                <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 4, background: meal.isTrainingDay ? 'rgba(0,230,138,0.15)' : 'rgba(255,152,0,0.15)', color: meal.isTrainingDay ? 'var(--accent-green)' : '#FF9800' }}>
+                  {meal.isTrainingDay ? 'Тренировка' : 'Отдых'}
+                </span>
+              )}
             </div>
             <div style={{ display: 'flex', gap: 8, fontSize: 11, color: 'var(--text-light)' }}>
               <span>{meal.totalKcal} ккал</span>
@@ -1183,7 +1196,7 @@ export const NutritionScreen: React.FC<{ initialTab?: TabId }> = ({ initialTab }
         heightCm: p.settings.height || 178,
         age: p.settings.age || 30,
         sex: p.settings.sex || 'male',
-        pal: 1.55,
+        pal: linked.pal,
         goal: g,
         bodyFatPercent: p.settings.bodyFat,
       });
@@ -1208,17 +1221,40 @@ export const NutritionScreen: React.FC<{ initialTab?: TabId }> = ({ initialTab }
 
   useEffect(() => {
     if (tab === 'ration' && !mealPlan) {
-      const p = getProfile();
-      const g = p.settings?.primaryGoal || p.settings?.goal || 'maintenance';
+      const s = profile.settings;
+      const wpw = s.workoutsPerWeek ?? 3;
+      const todayIdx = (new Date().getDay() + 6) % 7;
+      const restDayDefault = [true, false, true, false, true, true, false];
+      const schedule = (s as any).trainingSchedule
+        ? (s as any).trainingSchedule.map((d: number) => d === todayIdx % 7)
+        : restDayDefault;
+      const isTrainingDay = schedule[todayIdx] ?? true;
+      const courseEntries = linked.course.map(c => ({
+        substanceId: c.substanceId,
+        substanceName: c.substanceId,
+        doseValue: c.doseValue,
+        frequency: c.frequency,
+      }));
+      const mealOpts: MealPlanOptions = {
+        isTrainingDay,
+        trainingTime: s.avgWorkoutMinutes && s.avgWorkoutMinutes > 60 ? 'afternoon' : 'morning',
+        dietType: s.dietType,
+        foodAllergies: s.foodAllergies,
+        foodIntolerances: s.foodIntolerances,
+        excludedFoods: s.excludedFoods,
+        mealsPerDay: s.mealsPerDay,
+      };
       const plan = generateDayMealPlan(
         targets || { bmr: 1800, tdee: 2800, kcal: 2500, protein: 150, fats: 80, carbs: 280, water: 2.5, fiber: 30, micros: {} },
-        g,
-        [],
-        null,
+        goal,
+        courseEntries,
+        mealOpts.trainingTime ?? null,
+        Object.keys(linked.activeDrugs),
+        mealOpts,
       );
       setMealPlan(plan);
     }
-  }, [tab, mealPlan]);
+  }, [tab, mealPlan, targets, goal, profile, linked]);
 
   return (
     <div className="screen nutrition" style={{ maxWidth: 600, margin: '0 auto', padding: '0 12px 20px' }}>

@@ -1,5 +1,6 @@
-import React, { useRef, useEffect, useCallback } from 'react';
+import React, { useRef, useEffect, useCallback, useState } from 'react';
 import * as THREE from 'three';
+import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { getRiskColor } from '../../core/utils/risk-colors';
 
 interface HumanBody3DProps {
@@ -9,6 +10,7 @@ interface HumanBody3DProps {
   size?: number;
   selectedOrgan?: string | null;
   onSelectOrgan?: (organ: string) => void;
+  xray?: boolean;
 }
 
 function createHeartShape(): THREE.Shape {
@@ -59,7 +61,7 @@ const ORGAN_DESCS: Record<string, string> = {
   vertebra_c: 'Шейный позвонок',
 };
 
-const HumanBody3D: React.FC<HumanBody3DProps> = ({ systems, selectedSystem, onSelectSystem, size = 340, selectedOrgan, onSelectOrgan }) => {
+const HumanBody3D: React.FC<HumanBody3DProps> = ({ systems, selectedSystem, onSelectSystem, size = 340, selectedOrgan, onSelectOrgan, xray = false }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
@@ -69,7 +71,10 @@ const HumanBody3D: React.FC<HumanBody3DProps> = ({ systems, selectedSystem, onSe
   const organSystemMapRef = useRef<Record<string, string>>({});
   const organLabelsRef = useRef<Record<string, string>>({});
   const animMeshesRef = useRef<Record<string, THREE.Mesh>>({});
+  const bodyMeshesRef = useRef<THREE.Mesh[]>([]);
   const [hoveredOrgan, setHoveredOrgan] = React.useState<string | null>(null);
+  const [xrayInternal, setXrayInternal] = useState(false);
+  const effectiveXray = xray || xrayInternal;
   const animIdRef = useRef<number>(0);
 
   useEffect(() => {
@@ -93,6 +98,16 @@ const HumanBody3D: React.FC<HumanBody3DProps> = ({ systems, selectedSystem, onSe
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     container.appendChild(renderer.domElement);
     rendererRef.current = renderer;
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.08;
+    controls.enablePan = false;
+    controls.minDistance = 3;
+    controls.maxDistance = 14;
+    controls.target.set(0, 0.5, 0);
+    controls.maxPolarAngle = Math.PI * 0.85;
+    controls.minPolarAngle = Math.PI * 0.15;
 
     const ambient = new THREE.AmbientLight(0xffffff, 0.4);
     scene.add(ambient);
@@ -168,6 +183,7 @@ const HumanBody3D: React.FC<HumanBody3DProps> = ({ systems, selectedSystem, onSe
     bodyGroup.add(rightCalf);
 
     scene.add(bodyGroup);
+    bodyMeshesRef.current = [head, neck, torso, pelvis, leftArm, rightArm, leftForearm, rightForearm, leftLeg, rightLeg, leftCalf, rightCalf];
 
     const organMat = (color: number, emissive: number, opacity = 0.92) => new THREE.MeshPhongMaterial({
       color, emissive, shininess: 90, transparent: true, opacity, specular: 0x444444,
@@ -402,11 +418,7 @@ const HumanBody3D: React.FC<HumanBody3DProps> = ({ systems, selectedSystem, onSe
       animIdRef.current = requestAnimationFrame(animate);
       const t = (Date.now() - startTime) * 0.001;
 
-      bodyGroup.rotation.y += 0.002;
-
-      for (const mesh of organMeshes) {
-        mesh.rotation.y += 0.002;
-      }
+      controls.update();
 
       const heartBeat = 0.04 * Math.sin(t * 4.5);
       if (animMeshes['heart']) {
@@ -435,6 +447,7 @@ const HumanBody3D: React.FC<HumanBody3DProps> = ({ systems, selectedSystem, onSe
 
     return () => {
       cancelAnimationFrame(animIdRef.current);
+      controls.dispose();
       container.removeEventListener('click', handleClick);
       container.removeEventListener('mousemove', handleHover);
       if (container.contains(renderer.domElement)) {
@@ -468,6 +481,13 @@ const HumanBody3D: React.FC<HumanBody3DProps> = ({ systems, selectedSystem, onSe
         mat.color.set(getRiskColor(riskLevel));
         mat.opacity = riskLevel > 0 ? 0.92 : 0.45;
       }
+      if (effectiveXray) {
+        mat.opacity = isSelected ? 1.0 : 0.85;
+        mat.wireframe = false;
+        mat.transparent = true;
+      } else {
+        mat.wireframe = false;
+      }
       mat.needsUpdate = true;
     }
 
@@ -496,13 +516,34 @@ const HumanBody3D: React.FC<HumanBody3DProps> = ({ systems, selectedSystem, onSe
       } else {
         mat.opacity = riskLevel > 0 ? 0.9 : 0.45;
       }
+      if (effectiveXray) {
+        mat.opacity = sys === selectedSystem ? 1.0 : 0.92;
+      }
       mat.needsUpdate = true;
     }
-  }, [systems, selectedSystem, hoveredOrgan]);
+
+    for (const bm of bodyMeshesRef.current) {
+      const mat = bm.material as THREE.MeshPhongMaterial;
+      if (effectiveXray) {
+        mat.opacity = 0.08;
+        mat.wireframe = true;
+      } else {
+        mat.opacity = 0.45;
+        mat.wireframe = false;
+      }
+      mat.needsUpdate = true;
+    }
+  }, [systems, selectedSystem, hoveredOrgan, effectiveXray]);
 
   return (
     <div style={{ position: 'relative', display: 'inline-block' }}>
       <div ref={containerRef} style={{ width: size, height: Math.round(size * 1.35), borderRadius: 12, overflow: 'hidden' }} />
+      <button
+        onClick={() => setXrayInternal(x => !x)}
+        style={{ position: 'absolute', top: 8, right: 8, background: effectiveXray ? 'rgba(0,230,138,0.25)' : 'rgba(0,0,0,0.5)', border: effectiveXray ? '1px solid #00e68a' : '1px solid rgba(255,255,255,0.2)', color: effectiveXray ? '#00e68a' : '#aaa', borderRadius: 6, padding: '4px 8px', fontSize: 10, cursor: 'pointer', zIndex: 10 }}
+      >
+        {effectiveXray ? 'Рентген ВКЛ' : 'Рентген'}
+      </button>
       {hoveredOrgan && ORGAN_DESCS[hoveredOrgan] && (
         <div style={{
           position: 'absolute', top: 8, left: 8, background: 'rgba(0,0,0,0.85)', color: '#fff', padding: '6px 10px',

@@ -14,6 +14,12 @@
   timing?: string;
   pharmaNote?: string;
   tier?: 'basic' | 'mid' | 'max';
+  allergens?: string[];
+  isVegetarian?: boolean;
+  isVegan?: boolean;
+  isGlutenFree?: boolean;
+  isDairyFree?: boolean;
+  dietTags?: string[];
   micros?: {
     Ca?: number; Fe?: number; Mg?: number; P?: number; K?: number; Na?: number;
     Zn?: number; Se?: number; Cu?: number; Mn?: number;
@@ -361,6 +367,109 @@ export const FOOD_DB: FoodItem[] = [
     micros: { VitA: 900, VitC: 90, VitD: 15, VitE: 15, VitK: 120, VitB1: 1.2, VitB6: 1.7, VitB12: 2.4, VitB9: 400, Fe: 14, Mg: 40, Zn: 11, Cu: 0.9, Se: 55 } },
 ];
 
+export const FOOD_ALLERGEN_DIET: Record<string, { allergens: string[]; isVegetarian: boolean; isVegan: boolean; isGlutenFree: boolean; isDairyFree: boolean; dietTags: string[] }> = {
+  chicken_breast: { allergens: [], isVegetarian: false, isVegan: false, isGlutenFree: true, isDairyFree: true, dietTags: ['keto', 'paleo'] },
+  turkey_breast: { allergens: [], isVegetarian: false, isVegan: false, isGlutenFree: true, isDairyFree: true, dietTags: ['keto', 'paleo'] },
+  beef_lean: { allergens: [], isVegetarian: false, isVegan: false, isGlutenFree: true, isDairyFree: true, dietTags: ['keto', 'paleo'] },
+  salmon: { allergens: ['fish'], isVegetarian: false, isVegan: false, isGlutenFree: true, isDairyFree: true, dietTags: ['keto', 'paleo', 'mediterranean'] },
+  tuna_canned: { allergens: ['fish'], isVegetarian: false, isVegan: false, isGlutenFree: true, isDairyFree: true, dietTags: ['keto', 'paleo'] },
+  egg_whole: { allergens: ['eggs'], isVegetarian: true, isVegan: false, isGlutenFree: true, isDairyFree: true, dietTags: ['keto', 'paleo'] },
+  egg_white: { allergens: ['eggs'], isVegetarian: true, isVegan: false, isGlutenFree: true, isDairyFree: true, dietTags: ['keto'] },
+  pork_tenderloin: { allergens: [], isVegetarian: false, isVegan: false, isGlutenFree: true, isDairyFree: true, dietTags: ['keto', 'paleo'] },
+  whey_protein: { allergens: ['dairy'], isVegetarian: true, isVegan: false, isGlutenFree: true, isDairyFree: false, dietTags: ['keto'] },
+  casein: { allergens: ['dairy'], isVegetarian: true, isVegan: false, isGlutenFree: true, isDairyFree: false, dietTags: ['keto'] },
+  chicken_thigh: { allergens: [], isVegetarian: false, isVegan: false, isGlutenFree: true, isDairyFree: true, dietTags: ['keto', 'paleo'] },
+  shrimp: { allergens: ['shellfish'], isVegetarian: false, isVegan: false, isGlutenFree: true, isDairyFree: true, dietTags: ['keto', 'paleo'] },
+  tuna_steak: { allergens: ['fish'], isVegetarian: false, isVegan: false, isGlutenFree: true, isDairyFree: true, dietTags: ['keto', 'paleo', 'mediterranean'] },
+  sardines: { allergens: ['fish'], isVegetarian: false, isVegan: false, isGlutenFree: true, isDairyFree: true, dietTags: ['keto', 'paleo', 'mediterranean'] },
+  mackerel: { allergens: ['fish'], isVegetarian: false, isVegan: false, isGlutenFree: true, isDairyFree: true, dietTags: ['keto', 'paleo', 'mediterranean'] },
+  tofu: { allergens: ['soy'], isVegetarian: true, isVegan: true, isGlutenFree: true, isDairyFree: true, dietTags: ['mediterranean'] },
+  tempeh: { allergens: ['soy'], isVegetarian: true, isVegan: true, isGlutenFree: true, isDairyFree: true, dietTags: ['mediterranean'] },
+  seitan: { allergens: ['gluten'], isVegetarian: true, isVegan: true, isGlutenFree: false, isDairyFree: true, dietTags: [] },
+  rice_white: { allergens: [], isVegetarian: true, isVegan: true, isGlutenFree: true, isDairyFree: true, dietTags: [] },
+  rice_brown: { allergens: [], isVegetarian: true, isVegan: true, isGlutenFree: true, isDairyFree: true, dietTags: ['mediterranean'] },
+  oats: { allergens: [], isVegetarian: true, isVegan: true, isGlutenFree: true, isDairyFree: true, dietTags: ['mediterranean'] },
+  buckwheat: { allergens: [], isVegetarian: true, isVegan: true, isGlutenFree: true, isDairyFree: true, dietTags: ['mediterranean'] },
+  quinoa: { allergens: [], isVegetarian: true, isVegan: true, isGlutenFree: true, isDairyFree: true, dietTags: ['mediterranean'] },
+  bread_rye: { allergens: ['gluten'], isVegetarian: true, isVegan: true, isGlutenFree: false, isDairyFree: true, dietTags: [] },
+  pasta_durum: { allergens: ['gluten'], isVegetarian: true, isVegan: true, isGlutenFree: false, isDairyFree: true, dietTags: ['mediterranean'] },
+  potato_boiled: { allergens: [], isVegetarian: true, isVegan: true, isGlutenFree: true, isDairyFree: true, dietTags: ['paleo'] },
+  sweet_potato: { allergens: [], isVegetarian: true, isVegan: true, isGlutenFree: true, isDairyFree: true, dietTags: ['paleo', 'mediterranean'] },
+  lentils: { allergens: [], isVegetarian: true, isVegan: true, isGlutenFree: true, isDairyFree: true, dietTags: ['mediterranean'] },
+  chickpeas: { allergens: [], isVegetarian: true, isVegan: true, isGlutenFree: true, isDairyFree: true, dietTags: ['mediterranean'] },
+  corn: { allergens: [], isVegetarian: true, isVegan: true, isGlutenFree: true, isDairyFree: true, dietTags: [] },
+  rice_noodles: { allergens: [], isVegetarian: true, isVegan: true, isGlutenFree: true, isDairyFree: true, dietTags: [] },
+  tortilla_wheat: { allergens: ['gluten'], isVegetarian: true, isVegan: true, isGlutenFree: false, isDairyFree: true, dietTags: [] },
+  granola: { allergens: ['gluten', 'tree_nuts'], isVegetarian: true, isVegan: true, isGlutenFree: false, isDairyFree: true, dietTags: [] },
+  dried_apricots: { allergens: [], isVegetarian: true, isVegan: true, isGlutenFree: true, isDairyFree: true, dietTags: ['paleo'] },
+  banana: { allergens: [], isVegetarian: true, isVegan: true, isGlutenFree: true, isDairyFree: true, dietTags: ['paleo'] },
+  apple: { allergens: [], isVegetarian: true, isVegan: true, isGlutenFree: true, isDairyFree: true, dietTags: ['paleo', 'mediterranean'] },
+  berries: { allergens: [], isVegetarian: true, isVegan: true, isGlutenFree: true, isDairyFree: true, dietTags: ['keto', 'paleo', 'mediterranean'] },
+  broccoli: { allergens: [], isVegetarian: true, isVegan: true, isGlutenFree: true, isDairyFree: true, dietTags: ['keto', 'paleo', 'mediterranean'] },
+  spinach: { allergens: [], isVegetarian: true, isVegan: true, isGlutenFree: true, isDairyFree: true, dietTags: ['keto', 'paleo', 'mediterranean'] },
+  cucumber: { allergens: [], isVegetarian: true, isVegan: true, isGlutenFree: true, isDairyFree: true, dietTags: ['keto', 'paleo', 'mediterranean'] },
+  tomato: { allergens: [], isVegetarian: true, isVegan: true, isGlutenFree: true, isDairyFree: true, dietTags: ['keto', 'paleo', 'mediterranean'] },
+  pepper: { allergens: [], isVegetarian: true, isVegan: true, isGlutenFree: true, isDairyFree: true, dietTags: ['keto', 'paleo', 'mediterranean'] },
+  cabbage: { allergens: [], isVegetarian: true, isVegan: true, isGlutenFree: true, isDairyFree: true, dietTags: ['keto', 'paleo'] },
+  carrot: { allergens: [], isVegetarian: true, isVegan: true, isGlutenFree: true, isDairyFree: true, dietTags: ['paleo', 'mediterranean'] },
+  zucchini: { allergens: [], isVegetarian: true, isVegan: true, isGlutenFree: true, isDairyFree: true, dietTags: ['keto', 'paleo', 'mediterranean'] },
+  eggplant: { allergens: [], isVegetarian: true, isVegan: true, isGlutenFree: true, isDairyFree: true, dietTags: ['keto', 'mediterranean'] },
+  peas_green: { allergens: [], isVegetarian: true, isVegan: true, isGlutenFree: true, isDairyFree: true, dietTags: ['mediterranean'] },
+  grapefruit: { allergens: [], isVegetarian: true, isVegan: true, isGlutenFree: true, isDairyFree: true, dietTags: ['paleo'] },
+  pear: { allergens: [], isVegetarian: true, isVegan: true, isGlutenFree: true, isDairyFree: true, dietTags: ['paleo'] },
+  beetroot: { allergens: [], isVegetarian: true, isVegan: true, isGlutenFree: true, isDairyFree: true, dietTags: ['paleo'] },
+  celery: { allergens: [], isVegetarian: true, isVegan: true, isGlutenFree: true, isDairyFree: true, dietTags: ['keto', 'paleo'] },
+  green_bean: { allergens: [], isVegetarian: true, isVegan: true, isGlutenFree: true, isDairyFree: true, dietTags: ['keto', 'mediterranean'] },
+  asparagus: { allergens: [], isVegetarian: true, isVegan: true, isGlutenFree: true, isDairyFree: true, dietTags: ['keto', 'paleo', 'mediterranean'] },
+  mushrooms: { allergens: [], isVegetarian: true, isVegan: true, isGlutenFree: true, isDairyFree: true, dietTags: ['keto', 'paleo', 'mediterranean'] },
+  seaweed_nori: { allergens: [], isVegetarian: true, isVegan: true, isGlutenFree: true, isDairyFree: true, dietTags: ['keto', 'paleo'] },
+  watermelon: { allergens: [], isVegetarian: true, isVegan: true, isGlutenFree: true, isDairyFree: true, dietTags: ['paleo'] },
+  pineapple: { allergens: [], isVegetarian: true, isVegan: true, isGlutenFree: true, isDairyFree: true, dietTags: ['paleo'] },
+  kiwi: { allergens: [], isVegetarian: true, isVegan: true, isGlutenFree: true, isDairyFree: true, dietTags: ['paleo'] },
+  pomegranate: { allergens: [], isVegetarian: true, isVegan: true, isGlutenFree: true, isDairyFree: true, dietTags: ['paleo', 'mediterranean'] },
+  olive_oil: { allergens: [], isVegetarian: true, isVegan: true, isGlutenFree: true, isDairyFree: true, dietTags: ['keto', 'paleo', 'mediterranean'] },
+  avocado: { allergens: [], isVegetarian: true, isVegan: true, isGlutenFree: true, isDairyFree: true, dietTags: ['keto', 'paleo', 'mediterranean'] },
+  nuts_mix: { allergens: ['tree_nuts'], isVegetarian: true, isVegan: true, isGlutenFree: true, isDairyFree: true, dietTags: ['keto', 'paleo', 'mediterranean'] },
+  seeds: { allergens: [], isVegetarian: true, isVegan: true, isGlutenFree: true, isDairyFree: true, dietTags: ['keto', 'paleo', 'mediterranean'] },
+  butter: { allergens: ['dairy'], isVegetarian: true, isVegan: false, isGlutenFree: true, isDairyFree: false, dietTags: ['keto'] },
+  fish_oil_food: { allergens: ['fish'], isVegetarian: false, isVegan: false, isGlutenFree: true, isDairyFree: true, dietTags: ['keto', 'paleo', 'mediterranean'] },
+  almonds: { allergens: ['tree_nuts'], isVegetarian: true, isVegan: true, isGlutenFree: true, isDairyFree: true, dietTags: ['keto', 'paleo', 'mediterranean'] },
+  walnuts: { allergens: ['tree_nuts'], isVegetarian: true, isVegan: true, isGlutenFree: true, isDairyFree: true, dietTags: ['keto', 'paleo', 'mediterranean'] },
+  peanut_butter: { allergens: ['peanuts'], isVegetarian: true, isVegan: true, isGlutenFree: true, isDairyFree: true, dietTags: ['keto'] },
+  sunflower_seeds: { allergens: [], isVegetarian: true, isVegan: true, isGlutenFree: true, isDairyFree: true, dietTags: ['keto', 'paleo'] },
+  flaxseed: { allergens: [], isVegetarian: true, isVegan: true, isGlutenFree: true, isDairyFree: true, dietTags: ['keto', 'paleo'] },
+  dark_chocolate: { allergens: [], isVegetarian: true, isVegan: true, isGlutenFree: true, isDairyFree: true, dietTags: ['keto'] },
+  cottage_cheese_5: { allergens: ['dairy'], isVegetarian: true, isVegan: false, isGlutenFree: true, isDairyFree: false, dietTags: ['keto', 'mediterranean'] },
+  kefir: { allergens: ['dairy'], isVegetarian: true, isVegan: false, isGlutenFree: true, isDairyFree: false, dietTags: ['mediterranean'] },
+  yogurt_greek: { allergens: ['dairy'], isVegetarian: true, isVegan: false, isGlutenFree: true, isDairyFree: false, dietTags: ['keto', 'mediterranean'] },
+  milk: { allergens: ['dairy'], isVegetarian: true, isVegan: false, isGlutenFree: true, isDairyFree: false, dietTags: ['mediterranean'] },
+  cheese_hard: { allergens: ['dairy'], isVegetarian: true, isVegan: false, isGlutenFree: true, isDairyFree: false, dietTags: ['keto', 'mediterranean'] },
+  kefir_2: { allergens: ['dairy'], isVegetarian: true, isVegan: false, isGlutenFree: true, isDairyFree: false, dietTags: ['mediterranean'] },
+  yogurt_natural: { allergens: ['dairy'], isVegetarian: true, isVegan: false, isGlutenFree: true, isDairyFree: false, dietTags: ['mediterranean'] },
+  ryazhenka: { allergens: ['dairy'], isVegetarian: true, isVegan: false, isGlutenFree: true, isDairyFree: false, dietTags: ['mediterranean'] },
+  sour_cream_15: { allergens: ['dairy'], isVegetarian: true, isVegan: false, isGlutenFree: true, isDairyFree: false, dietTags: ['mediterranean'] },
+  shawarma: { allergens: ['gluten', 'dairy'], isVegetarian: false, isVegan: false, isGlutenFree: false, isDairyFree: false, dietTags: [] },
+  pizza_margherita: { allergens: ['dairy', 'gluten'], isVegetarian: true, isVegan: false, isGlutenFree: false, isDairyFree: false, dietTags: ['mediterranean'] },
+  burger: { allergens: ['gluten', 'dairy'], isVegetarian: false, isVegan: false, isGlutenFree: false, isDairyFree: false, dietTags: [] },
+  creatine: { allergens: [], isVegetarian: true, isVegan: true, isGlutenFree: true, isDairyFree: true, dietTags: ['keto'] },
+  bcaa: { allergens: [], isVegetarian: true, isVegan: true, isGlutenFree: true, isDairyFree: true, dietTags: ['keto'] },
+  glutamine: { allergens: [], isVegetarian: true, isVegan: true, isGlutenFree: true, isDairyFree: true, dietTags: ['keto'] },
+  vitamin_complex: { allergens: [], isVegetarian: true, isVegan: true, isGlutenFree: true, isDairyFree: true, dietTags: [] },
+  fish_oil: { allergens: ['fish'], isVegetarian: false, isVegan: false, isGlutenFree: true, isDairyFree: true, dietTags: ['keto', 'mediterranean'] },
+  whey_isolate: { allergens: ['dairy'], isVegetarian: true, isVegan: false, isGlutenFree: true, isDairyFree: false, dietTags: ['keto'] },
+  protein_bar: { allergens: ['dairy', 'gluten'], isVegetarian: true, isVegan: false, isGlutenFree: false, isDairyFree: false, dietTags: [] },
+};
+
+function applyDietTags(foods: FoodItem[]): FoodItem[] {
+  return foods.map(f => {
+    const tags = FOOD_ALLERGEN_DIET[f.id];
+    if (tags) {
+      return { ...f, allergens: tags.allergens, isVegetarian: tags.isVegetarian, isVegan: tags.isVegan, isGlutenFree: tags.isGlutenFree, isDairyFree: tags.isDairyFree, dietTags: tags.dietTags };
+    }
+    return f;
+  });
+}
+
 const RATION_TIERS: Record<string, { basic: string[]; mid: string[]; max: string[] }> = {
   protein: { basic: [' chicken_breast', 'egg_whole', 'egg_white', 'whey_protein'], mid: ['turkey_breast', 'tuna_canned', 'pork_tenderloin', 'casein'], max: ['beef_lean', 'salmon'] },
   carb: { basic: ['rice_white', 'oats', 'potato_boiled', 'banana'], mid: ['rice_brown', 'buckwheat', 'pasta_durum', 'sweet_potato'], max: ['quinoa', 'berries'] },
@@ -370,47 +479,74 @@ const RATION_TIERS: Record<string, { basic: string[]; mid: string[]; max: string
   supplement: { basic: ['creatine', 'fish_oil', 'vitamin_complex'], mid: ['bcaa', 'glutamine', 'casein'], max: [] },
 };
 
-export function searchFood(query: string): FoodItem[] {
+export interface FoodFilter {
+  dietType?: 'omnivore' | 'vegetarian' | 'vegan' | 'pescatarian' | 'keto' | 'paleo' | 'mediterranean';
+  excludeAllergens?: string[];
+  excludedIds?: string[];
+}
+
+function matchesFilter(food: FoodItem, filter?: FoodFilter): boolean {
+  if (!filter) return true;
+  const tags = FOOD_ALLERGEN_DIET[food.id];
+  if (filter.dietType === 'vegan' && tags && !tags.isVegan) return false;
+  if (filter.dietType === 'vegetarian' && tags && !tags.isVegetarian) return false;
+  if (filter.dietType === 'pescatarian' && tags && !tags.isVegetarian && !tags.allergens.includes('fish')) return false;
+  if (filter.dietType === 'keto' && tags && !tags.dietTags.includes('keto') && food.carbs > 15) return false;
+  if (filter.dietType === 'paleo' && tags && !tags.dietTags.includes('paleo') && food.category === 'dairy') return false;
+  if (filter.dietType === 'mediterranean' && tags && !tags.dietTags.includes('mediterranean') && food.category === 'fast_food') return false;
+  if (filter.excludeAllergens?.length && tags) {
+    for (const a of filter.excludeAllergens) {
+      if (tags.allergens.includes(a)) return false;
+    }
+  }
+  if (filter.excludedIds?.includes(food.id)) return false;
+  return true;
+}
+
+export function searchFood(query: string, filter?: FoodFilter): FoodItem[] {
   const q = query.toLowerCase().trim();
   if (!q) return [];
-  return FOOD_DB.filter(f =>
-    f.name.toLowerCase().includes(q) ||
-    f.category.includes(q)
-  ).slice(0, 12);
+  return applyDietTags(FOOD_DB.filter(f =>
+    (f.name.toLowerCase().includes(q) || f.category.includes(q)) && matchesFilter(f, filter)
+  )).slice(0, 12);
 }
 
 export function getFoodById(id: string): FoodItem | undefined {
-  return FOOD_DB.find(f => f.id === id);
+  const f = FOOD_DB.find(f => f.id === id);
+  if (!f) return undefined;
+  const tags = FOOD_ALLERGEN_DIET[id];
+  if (tags) return { ...f, allergens: tags.allergens, isVegetarian: tags.isVegetarian, isVegan: tags.isVegan, isGlutenFree: tags.isGlutenFree, isDairyFree: tags.isDairyFree, dietTags: tags.dietTags };
+  return f;
 }
 
-export function getFoodByCategory(cat: FoodItem['category']): FoodItem[] {
-  return FOOD_DB.filter(f => f.category === cat);
+export function getFoodByCategory(cat: FoodItem['category'], filter?: FoodFilter): FoodItem[] {
+  return applyDietTags(FOOD_DB.filter(f => f.category === cat && matchesFilter(f, filter)));
 }
 
-export function getFoodsByTier(cat: string, tier: 'basic' | 'mid' | 'max'): FoodItem[] {
+export function getFoodsByTier(cat: string, tier: 'basic' | 'mid' | 'max', filter?: FoodFilter): FoodItem[] {
   const ids = RATION_TIERS[cat]?.[tier] || [];
-  return ids.map(id => FOOD_DB.find(f => f.id === id.trim())).filter((f): f is FoodItem => !!f);
+  return applyDietTags(ids.map(id => FOOD_DB.find(f => f.id === id.trim())).filter((f): f is FoodItem => !!f && matchesFilter(f, filter)));
 }
 
-export function getTopByProtein(limit: number): FoodItem[] {
-  return [...FOOD_DB]
-    .filter(f => f.protein > 5 && f.category !== 'supplement')
+export function getTopByProtein(limit: number, filter?: FoodFilter): FoodItem[] {
+  return applyDietTags([...FOOD_DB]
+    .filter(f => f.protein > 5 && f.category !== 'supplement' && matchesFilter(f, filter))
     .sort((a, b) => (b.protein / Math.max(b.kcal, 1)) - (a.protein / Math.max(a.kcal, 1)))
-    .slice(0, limit);
+    .slice(0, limit));
 }
 
-export function getTopByCarbs(limit: number): FoodItem[] {
-  return [...FOOD_DB]
-    .filter(f => f.carbs > 5 && f.gi <= 70 && f.category !== 'supplement')
+export function getTopByCarbs(limit: number, filter?: FoodFilter): FoodItem[] {
+  return applyDietTags([...FOOD_DB]
+    .filter(f => f.carbs > 5 && f.gi <= 70 && f.category !== 'supplement' && matchesFilter(f, filter))
     .sort((a, b) => b.carbs - a.carbs)
-    .slice(0, limit);
+    .slice(0, limit));
 }
 
-export function getTopByFat(limit: number): FoodItem[] {
-  return [...FOOD_DB]
-    .filter(f => f.fat > 5 && f.category !== 'supplement')
+export function getTopByFat(limit: number, filter?: FoodFilter): FoodItem[] {
+  return applyDietTags([...FOOD_DB]
+    .filter(f => f.fat > 5 && f.category !== 'supplement' && matchesFilter(f, filter))
     .sort((a, b) => (b.fat / Math.max(b.kcal, 1)) - (a.fat / Math.max(a.kcal, 1)))
-    .slice(0, limit);
+    .slice(0, limit));
 }
 
 export { RATION_TIERS };

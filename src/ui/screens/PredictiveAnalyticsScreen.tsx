@@ -325,20 +325,20 @@ export const PredictiveAnalyticsScreen: React.FC = () => {
       <div className="card">
         <h3>Прогноз готовности (7 дней)</h3>
         <p style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 8 }}>Модель Хольта: прогноз на основе последних данных готовности.</p>
-        <ReadinessForecastBlock />
+        <ReadinessForecastBlock initialHistory={readiness ? [readiness.recovery] : undefined} />
       </div>
 
       <div className="card">
         <h3>Тренд лабораторных показателей</h3>
         <p style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 8 }}>Прогноз по данным анализов (HCT, АЛТ, и др.).</p>
-        <LabTrendBlock />
+        <LabTrendBlock initialPoints={labs.length > 0 ? labs.slice(-7).map(l => l.value) : undefined} />
       </div>
     </div>
   );
 };
 
-const ReadinessForecastBlock: React.FC = () => {
-  const [history, setHistory] = useState<number[]>([65, 68, 70, 72, 69, 71, 73]);
+const ReadinessForecastBlock: React.FC<{ initialHistory?: number[] }> = ({ initialHistory }) => {
+  const [history, setHistory] = useState<number[]>(initialHistory ?? [65, 68, 70, 72, 69, 71, 73]);
   const [forecast, setForecast] = useState<ForecastResult | null>(null);
 
   const calc = () => {
@@ -371,8 +371,8 @@ const ReadinessForecastBlock: React.FC = () => {
   );
 };
 
-const LabTrendBlock: React.FC = () => {
-  const [points, setPoints] = useState<number[]>([42, 44, 46, 48]);
+const LabTrendBlock: React.FC<{ initialPoints?: number[] }> = ({ initialPoints }) => {
+  const [points, setPoints] = useState<number[]>(initialPoints ?? [42, 44, 46, 48]);
   const [forecast, setForecast] = useState<LabForecast | null>(null);
 
   const calc = () => {

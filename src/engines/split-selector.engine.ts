@@ -112,6 +112,48 @@ const SPLIT_CATALOG: Record<string, {
     minDays: 5, maxDays: 5, levels: ['intermediate', 'advanced'], goals: ['hypertrophy', 'bulk', 'maintenance'],
     minRecovery: 60, weakGroupFreq: 1, injurySafe: false,
   },
+  powerlifting_4: {
+    name: 'Пауэрлифтинг 4 дня',
+    desc: 'Присед/Жим/Тяга/ОФП. Силовой пикинг с ME/DE днями. Конjugate-подход.',
+    groupsPerDay: [['legs', 'core'], ['chest', 'shoulders', 'arms'], ['back', 'arms', 'core'], ['legs', 'shoulders']],
+    minDays: 4, maxDays: 4, levels: ['intermediate', 'advanced', 'enhanced'], goals: ['strength', 'maintenance'],
+    minRecovery: 55, weakGroupFreq: 2, injurySafe: false,
+  },
+  powerlifting_5: {
+    name: 'Пауэрлифтинг 5 дней',
+    desc: 'С/Ж/Т + 2 дня слабых мест. Динамические и максимальные усилия.',
+    groupsPerDay: [['legs'], ['chest', 'shoulders'], ['back', 'core'], ['legs'], ['chest', 'back', 'arms']],
+    minDays: 5, maxDays: 5, levels: ['advanced', 'enhanced'], goals: ['strength'],
+    minRecovery: 60, weakGroupFreq: 3, injurySafe: false,
+  },
+  armwrestling_4: {
+    name: 'Армрестлинг 4 дня',
+    desc: 'Специализация хвата, пронации, сгибания кисти. 2 дня рука/предплечье + 2 дня ОФП.',
+    groupsPerDay: [['arms', 'shoulders'], ['back', 'core'], ['arms', 'legs'], ['chest', 'shoulders', 'core']],
+    minDays: 4, maxDays: 4, levels: ['intermediate', 'advanced', 'enhanced'], goals: ['strength', 'bulk', 'maintenance'],
+    minRecovery: 55, weakGroupFreq: 2, injurySafe: false,
+  },
+  armwrestling_5: {
+    name: 'Армрестлинг 5 дней',
+    desc: '3 дня специализация (хват, пронация, рычаг) + 2 дня ОФП.',
+    groupsPerDay: [['arms', 'shoulders'], ['back', 'core'], ['arms'], ['chest', 'legs'], ['shoulders', 'arms', 'core']],
+    minDays: 5, maxDays: 5, levels: ['advanced', 'enhanced'], goals: ['strength', 'bulk'],
+    minRecovery: 60, weakGroupFreq: 3, injurySafe: false,
+  },
+  olympic_5: {
+    name: 'Тяжёлая атлетика 5 дней',
+    desc: 'Рывок/Толчок/Присед/Тяга/ОФП. Техника + позиции + сила.',
+    groupsPerDay: [['legs', 'shoulders'], ['back', 'core'], ['legs', 'shoulders'], ['chest', 'back', 'arms'], ['legs', 'core']],
+    minDays: 5, maxDays: 5, levels: ['advanced', 'enhanced'], goals: ['strength', 'bulk'],
+    minRecovery: 65, weakGroupFreq: 3, injurySafe: false,
+  },
+  olympic_6: {
+    name: 'Тяжёлая атлетика 6 дней',
+    desc: 'Рывок/Толчок/Присед/Тяга+Жим/ОФП/Повтор. Максимальная частота для элиты.',
+    groupsPerDay: [['legs', 'shoulders'], ['back', 'arms'], ['legs', 'core'], ['chest', 'shoulders'], ['back', 'core'], ['legs', 'arms']],
+    minDays: 6, maxDays: 6, levels: ['enhanced'], goals: ['strength', 'bulk'],
+    minRecovery: 70, weakGroupFreq: 4, injurySafe: false,
+  },
 };
 
 export function selectSplit(input: TrainingInput): SplitCandidate[] {

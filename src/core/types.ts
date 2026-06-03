@@ -388,11 +388,20 @@ export interface BayesianState {
   ec50Shift?: number;
   lastUpdateWeek?: number;
 }
+export interface MechanismCell {
+  raw: number;
+  net: number;
+  coverage: number;
+  contributors: string[];
+  mitigations: { substance: string; reduction: number }[];
+}
+
 export interface RiskResult {
   overallRaw: number;
   overallNet: number;
   systemBreakdown: Record<string, { raw: number; net: number }>;
   mechanismBreakdown?: Record<string, number>;
+  mechanismDetail?: Record<string, MechanismCell>;
 }
 
 export interface RiskInput {
@@ -489,7 +498,16 @@ export interface UserProfile {
       medicalConditions?: string[];
       injuries?: InjuryRecord[];
       weakPoints?: string[];
-      
+
+      dietType?: 'omnivore' | 'vegetarian' | 'vegan' | 'pescatarian' | 'keto' | 'paleo' | 'mediterranean';
+      foodAllergies?: string[];
+      foodIntolerances?: string[];
+      excludedFoods?: string[];
+      preferredFoods?: string[];
+      dietRestrictions?: string[];
+      mealsPerDay?: number;
+      cookingSkill?: 'none' | 'basic' | 'intermediate' | 'advanced';
+
        genetics?: Record<string, string>;
 
        email?: string;
@@ -712,6 +730,34 @@ export interface TrainingOutput {
   estimatedProgress?: number;
 }
 
+export type IntensityTechnique =
+  | 'straight_set'
+  | 'superset'
+  | 'rest_pause'
+  | 'cluster'
+  | 'myo_rep'
+  | 'drop_set'
+  | 'backoff_set'
+  | 'forced_rep'
+  | 'negative'
+  | 'pre_exhaust'
+  | 'post_exhaust'
+  | 'giant_set'
+  | 'pyramid';
+
+export interface SetFormat {
+  technique: IntensityTechnique;
+  exercises: string[];
+  restBetweenExercises?: number;
+  intraSetRest?: number;
+  activationReps?: number;
+  miniSetReps?: number;
+  miniSetRestSeconds?: number;
+  clusterReps?: string;
+  dropWeightPct?: number;
+  negativeTempo?: string;
+}
+
 export interface Exercise {
   id: string;
   name: string;
@@ -738,6 +784,7 @@ export interface Exercise {
   dropSet?: boolean;
   dropSetReps?: string;
   backoffSet?: boolean;
+  setFormat?: SetFormat;
   comments?: string;
 }
 

@@ -71,14 +71,16 @@ function formatSplitGroups(groupsPerDay: string[][]): string {
   return groupsPerDay.map(day => day.map(g => SPLIT_LABELS[g] || g).join('+')).join(' / ');
 }
 
-function buildDayPlan(result: TrainingOutput, daysPerWeek: number, weakPoints: string[] = []): { day: number; name: string; exercises: Exercise[] }[] {
+function buildDayPlan(result: TrainingOutput, daysPerWeek: number, weakPoints: string[] = [], splitGroups?: string[][], weekNum: number = 0): { day: number; name: string; exercises: Exercise[] }[] {
   const days: { day: number; name: string; exercises: Exercise[] }[] = [];
   const groups = Object.keys(result.volumePerGroup);
   const isDeload = result.isDeload;
 
   for (let d = 0; d < daysPerWeek; d++) {
     const dayGroups: string[] = [];
-    if (daysPerWeek <= 3) {
+    if (splitGroups && splitGroups[d]) {
+      dayGroups.push(...splitGroups[d]);
+    } else if (daysPerWeek <= 3) {
       dayGroups.push(...groups);
     } else if (daysPerWeek === 4) {
       dayGroups.push(...(d % 2 === 0 ? ['chest', 'shoulders', 'arms'] : ['back', 'legs', 'core']));
@@ -96,12 +98,17 @@ function buildDayPlan(result: TrainingOutput, daysPerWeek: number, weakPoints: s
       if (vol <= 0) continue;
       const sets = Math.max(2, Math.round(vol / 3));
       const avail = getExercisesByGroup(g);
-      const picked = avail.filter(e => !(isDeload && e.fatigueCost > 5)).slice(0, Math.min(2, Math.ceil(sets / 3))).sort((a, b) => (a.order ?? 2) - (b.order ?? 2));
+      const filtered = avail.filter(e => !(isDeload && e.fatigueCost > 5));
+      const maxPicks = Math.min(3, Math.ceil(sets / 3));
+      const rotationOffset = (weekNum * 2 + d) % Math.max(1, filtered.length - maxPicks + 1);
+      const picked = filtered.slice(rotationOffset, rotationOffset + maxPicks).sort((a, b) => (a.order ?? 2) - (b.order ?? 2));
       for (const ex of picked) {
         const setsForEx = picked.length === 1 ? sets : Math.max(2, Math.round(sets / picked.length));
         const rirStr = result.rir;
         const rirVal = parseInt(rirStr.split('-')[0], 10) || 2;
         const presc = calcExercisePrescription(ex, result.splitName.includes('Силовой') ? 'strength' : 'hypertrophy', 'intermediate', weakPoints.includes(g), isDeload, 1.0);
+        const dropPct = presc.dropSet ? '−20%' : undefined;
+        const backoffReps = presc.backoffSet ? '+2пов' : undefined;
         exercises.push({ ...ex, sets: setsForEx, reps: parseInt(presc.reps.split('-')[0], 10) || 10, rir: rirVal, rest: ex.type === 'compound' ? 120 : 60, targetMuscle: ex.targetMuscle, technique: ex.technique, comments: ex.comments, dropSet: presc.dropSet, backoffSet: presc.backoffSet, canReplace: ex.canReplace, cannotReplace: ex.cannotReplace });
       }
     }
@@ -178,11 +185,6 @@ export const PlanScreen: React.FC<{ goal: string }> = ({ goal }) => {
     return calcTraining(input);
   }, [goalState, level, daysPerWeek, recovery, fatigue, nutrition, weakPoints]);
 
-  const dayPlan = useMemo(() => {
-    if (!trainingResult) return [];
-    return buildDayPlan(trainingResult, daysPerWeek, weakPoints);
-  }, [trainingResult, daysPerWeek]);
-
   const readinessResult = useMemo<ReadinessScores | null>(() => {
     const input: ReadinessInput = {
       sleepHours, sleepQuality: sleepQuality / 10, nightAwakenings, hrvRatio, doms, stress,
@@ -217,6 +219,12 @@ export const PlanScreen: React.FC<{ goal: string }> = ({ goal }) => {
     const input: TrainingInput = { goal: goalState, level, daysPerWeek, recovery, fatigue, nutrition, weakPoints, injuries: [] };
     return selectSplit(input)[0] || null;
   }, [goalState, level, daysPerWeek, recovery, fatigue, nutrition, weakPoints]);
+
+  const dayPlan = useMemo(() => {
+    if (!trainingResult) return [];
+    const splitGroups = bestSplit?.groupsPerDay;
+    return buildDayPlan(trainingResult, daysPerWeek, weakPoints, splitGroups, macrocycle ? (selectedWeek || 1) : 0);
+  }, [trainingResult, daysPerWeek, bestSplit, macrocycle, selectedWeek]);
 
   const progressionRule = useMemo(() => selectProgressionRule(level), [level]);
 

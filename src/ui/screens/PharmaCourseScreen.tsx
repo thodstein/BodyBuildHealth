@@ -5,6 +5,7 @@ import { checkDrugInteractions } from '../../engines/pharma-interactions.engine'
 import { generatePCTPlan } from '../../engines/pct-planner.engine';
 import { generateWeeklyProtocol } from '../../engines/auto-plan.engine';
 import { db } from '../../core/db';
+import { notifyDataChange } from '../../core/data-link';
 import type { CourseEntry } from '../../core/types';
 
 const CLASS_LABELS: Record<string, string> = {
@@ -79,6 +80,7 @@ export const PharmaCourseScreen: React.FC = () => {
       await db.put('course_log', entry);
       setCourse(prev => [...prev, entry]);
       setDose('');
+      notifyDataChange();
     } catch (e) { console.error(e); }
   };
 
@@ -86,6 +88,7 @@ export const PharmaCourseScreen: React.FC = () => {
     try {
       await db.delete('course_log', id);
       setCourse(prev => prev.filter(e => e.id !== id));
+      notifyDataChange();
     } catch (e) { console.error(e); }
   };
 

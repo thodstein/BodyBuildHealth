@@ -7,13 +7,48 @@ import { computeLabIndices, interpretLabIndices } from '../../engines/labs-indic
 import { calculateIndices } from '../../engines/clinical-indices.engine';
 import { NAVY_BF_FORMULAS, MUSCLE_GROUPS_FULL, INJURY_LOCATIONS } from '../../core/constants';
 
-type ProfileTab = 'overview' | 'anthropometry' | 'sleep' | 'lifestyle' | 'injuries' | 'progress';
+type ProfileTab = 'overview' | 'anthropometry' | 'sleep' | 'lifestyle' | 'diet' | 'injuries' | 'progress';
 
 const GOALS = [
   { id: 'bulk', label: 'Набор массы' }, { id: 'cut', label: 'Сушка' },
   { id: 'maintenance', label: 'Поддержание' }, { id: 'strength', label: 'Сила' },
   { id: 'hypertrophy', label: 'Гипертрофия' }, { id: 'rehab', label: 'Реабилитация' },
   { id: 'recomposition', label: 'Рекомпозиция' }, { id: 'health', label: 'Здоровье' }
+] as const;
+
+const DIET_TYPES = [
+  { id: 'omnivore', label: 'Всеядное', icon: '🍽️' },
+  { id: 'vegetarian', label: 'Вегетарианское', icon: '🥬' },
+  { id: 'vegan', label: 'Веганское', icon: '🌱' },
+  { id: 'pescatarian', label: 'Пескетарианское', icon: '🐟' },
+  { id: 'keto', label: 'Кето', icon: '🥑' },
+  { id: 'paleo', label: 'Палео', icon: '🥩' },
+  { id: 'mediterranean', label: 'Средиземноморское', icon: '🫒' },
+] as const;
+
+const ALLERGEN_OPTIONS = [
+  { id: 'dairy', label: 'Молочные продукты' },
+  { id: 'gluten', label: 'Глютен' },
+  { id: 'soy', label: 'Соя' },
+  { id: 'eggs', label: 'Яйца' },
+  { id: 'fish', label: 'Рыба' },
+  { id: 'shellfish', label: 'Моллюски' },
+  { id: 'tree_nuts', label: 'Орехи' },
+  { id: 'peanuts', label: 'Арахис' },
+];
+
+const INTOLERANCE_OPTIONS = [
+  { id: 'lactose', label: 'Лактоза' },
+  { id: 'fructose', label: 'Фруктоза' },
+  { id: 'histamine', label: 'Гистамин' },
+  { id: 'sorbitol', label: 'Сорбитол' },
+];
+
+const COOKING_SKILLS = [
+  { id: 'none', label: 'Не готовлю' },
+  { id: 'basic', label: 'Базовые навыки' },
+  { id: 'intermediate', label: 'Средний уровень' },
+  { id: 'advanced', label: 'Продвинутый' },
 ] as const;
 
 const TRAINING_LEVELS = [
@@ -144,7 +179,7 @@ export const ProfileScreen: React.FC = () => {
   const tabs: { id: ProfileTab; label: string }[] = [
     { id: 'overview', label: 'Обзор' }, { id: 'anthropometry', label: 'Антропометрия' },
     { id: 'sleep', label: 'Сон' }, { id: 'lifestyle', label: 'Образ жизни' },
-    { id: 'injuries', label: 'Травмы' }, { id: 'progress', label: 'Прогресс' }
+    { id: 'diet', label: 'Питание' }, { id: 'injuries', label: 'Травмы' }, { id: 'progress', label: 'Прогресс' }
   ];
 
   return (
@@ -372,7 +407,117 @@ export const ProfileScreen: React.FC = () => {
               save({ currentMedications: [...(s_.currentMedications ?? []), nm] });
             }}>+ Добавить препарат</button>
           </div>
-        </>
+         </>
+      )}
+
+      {tab === 'diet' && (
+        <div>
+          <div className="card" style={{ marginBottom: 12 }}>
+            <h3 style={{ margin: '0 0 12px 0' }}>Тип питания</h3>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: 8 }}>
+              {DIET_TYPES.map(dt => (
+                <button key={dt.id} onClick={() => save({ dietType: dt.id as any })} style={{
+                  padding: '10px 8px', borderRadius: 10, border: s_.dietType === dt.id ? '2px solid var(--accent-green, #00e68a)' : '2px solid var(--border-color)',
+                  background: s_.dietType === dt.id ? 'rgba(0,230,138,0.1)' : 'var(--bg-primary)', cursor: 'pointer', textAlign: 'center',
+                }}>
+                  <div style={{ fontSize: 20 }}>{dt.icon}</div>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: s_.dietType === dt.id ? 'var(--accent-green, #00e68a)' : 'var(--text-light)' }}>{dt.label}</div>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="card" style={{ marginBottom: 12 }}>
+            <h3 style={{ margin: '0 0 12px 0' }}>Пищевые аллергии</h3>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              {ALLERGEN_OPTIONS.map(a => {
+                const active = (s_.foodAllergies ?? []).includes(a.id);
+                return (
+                  <button key={a.id} onClick={() => {
+                    const current = s_.foodAllergies ?? [];
+                    save({ foodAllergies: active ? current.filter(x => x !== a.id) : [...current, a.id] });
+                  }} style={{
+                    padding: '6px 12px', borderRadius: 8, fontSize: 12, cursor: 'pointer',
+                    background: active ? 'rgba(239,68,68,0.15)' : 'var(--bg-primary)',
+                    border: active ? '1px solid #ef4444' : '1px solid var(--border-color)',
+                    color: active ? '#ef4444' : 'var(--text-light)', fontWeight: active ? 600 : 400,
+                  }}>
+                    {a.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="card" style={{ marginBottom: 12 }}>
+            <h3 style={{ margin: '0 0 12px 0' }}>Непереносимости</h3>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              {INTOLERANCE_OPTIONS.map(it => {
+                const active = (s_.foodIntolerances ?? []).includes(it.id);
+                return (
+                  <button key={it.id} onClick={() => {
+                    const current = s_.foodIntolerances ?? [];
+                    save({ foodIntolerances: active ? current.filter(x => x !== it.id) : [...current, it.id] });
+                  }} style={{
+                    padding: '6px 12px', borderRadius: 8, fontSize: 12, cursor: 'pointer',
+                    background: active ? 'rgba(249,115,22,0.15)' : 'var(--bg-primary)',
+                    border: active ? '1px solid #f97316' : '1px solid var(--border-color)',
+                    color: active ? '#f97316' : 'var(--text-light)', fontWeight: active ? 600 : 400,
+                  }}>
+                    {it.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="card" style={{ marginBottom: 12 }}>
+            <h3 style={{ margin: '0 0 12px 0' }}>Навыки готовки</h3>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+              {COOKING_SKILLS.map(cs => (
+                <button key={cs.id} onClick={() => save({ cookingSkill: cs.id as any })} style={{
+                  padding: '8px 12px', borderRadius: 8, fontSize: 12, cursor: 'pointer',
+                  background: s_.cookingSkill === cs.id ? 'rgba(0,230,138,0.1)' : 'var(--bg-primary)',
+                  border: s_.cookingSkill === cs.id ? '1px solid var(--accent-green, #00e68a)' : '1px solid var(--border-color)',
+                  color: s_.cookingSkill === cs.id ? 'var(--accent-green, #00e68a)' : 'var(--text-light)', fontWeight: 500,
+                }}>
+                  {cs.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="card" style={{ marginBottom: 12 }}>
+            <h3 style={{ margin: '0 0 12px 0' }}>Приёмов пищи в день</h3>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <input type="range" min={2} max={7} value={s_.mealsPerDay ?? 4} onChange={e => save({ mealsPerDay: parseInt(e.target.value) })} style={{ flex: 1, accentColor: '#00e68a' }} />
+              <span style={{ fontSize: 18, fontWeight: 700, minWidth: 24, textAlign: 'center' }}>{s_.mealsPerDay ?? 4}</span>
+            </div>
+          </div>
+
+          {((s_.foodAllergies ?? []).length + (s_.foodIntolerances ?? []).length > 0 || s_.dietType) && (
+            <div className="card" style={{ marginBottom: 12, borderColor: 'var(--accent-green, #00e68a)', borderWidth: 1 }}>
+              <div style={{ fontSize: 12, color: 'var(--accent-green, #00e68a)', fontWeight: 600, marginBottom: 4 }}>
+                Активные ограничения
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                {s_.dietType && <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 4, background: 'rgba(0,230,138,0.1)', color: 'var(--accent-green, #00e68a)' }}>
+                  {DIET_TYPES.find(d => d.id === s_.dietType)?.label}
+                </span>}
+                {(s_.foodAllergies ?? []).map(a => (
+                  <span key={a} style={{ fontSize: 10, padding: '2px 6px', borderRadius: 4, background: 'rgba(239,68,68,0.1)', color: '#ef4444' }}>
+                    {ALLERGEN_OPTIONS.find(o => o.id === a)?.label || a}
+                  </span>
+                ))}
+                {(s_.foodIntolerances ?? []).map(it => (
+                  <span key={it} style={{ fontSize: 10, padding: '2px 6px', borderRadius: 4, background: 'rgba(249,115,22,0.1)', color: '#f97316' }}>
+                    {INTOLERANCE_OPTIONS.find(o => o.id === it)?.label || it}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
       )}
 
       {tab === 'injuries' && (

@@ -20,6 +20,7 @@ import { FertilityPCTScreen } from './ui/screens/FertilityPCTScreen';
 import { ReportsScreen } from './ui/screens/ReportsScreen';
 import { IntegrationsScreen } from './ui/screens/IntegrationsScreen';
 import { RoleManagementScreen } from './ui/screens/RoleManagementScreen';
+import { SupportScreen } from './ui/screens/SupportScreen';
 import { ToastContainer } from './ui/ToastContainer';
 
 type Tab = 'home' | 'pharma' | 'training' | 'nutrition' | 'labs' | 'risks' | 'support' | 'profile';
@@ -150,9 +151,9 @@ export default function App() {
         { id: 'fertility', label: 'Фертильность' },
       ];
       case 'support': return [
-        { id: 'organs', label: 'Органы' },
-        { id: 'supps', label: 'Добавки' },
-        { id: 'calcs', label: 'Калькуляторы' },
+        { id: 'catalog', label: 'Каталог' },
+        { id: 'synergies', label: 'Синергии' },
+        { id: 'recommendations', label: 'Рекомендации' },
       ];
       case 'profile': return [
         { id: 'settings', label: 'Настройки' },
@@ -188,10 +189,9 @@ export default function App() {
         case 'diary': return <NutritionScreen />;
         case 'advice': return <NutritionScreen initialTab="advice" />;
         case 'calc': return <CalculatorsScreen />;
-        case 'support': return <CalculatorsScreen initialTab="support" />;
-        case 'organs': return <CalculatorsScreen initialTab="support" />;
-        case 'supps': return <CalculatorsScreen initialTab="health" />;
-        case 'calcs': return <CalculatorsScreen />;
+        case 'catalog': return <SupportScreen />;
+        case 'synergies': return <SupportScreen initialTab="synergies" />;
+        case 'recommendations': return <SupportScreen initialTab="recommendations" />;
         case 'results': return <LabsScreen initialTab="input" />;
         case 'panels': return <LabsScreen initialTab="panels" />;
         case 'history': return <LabsScreen initialTab="history" />;

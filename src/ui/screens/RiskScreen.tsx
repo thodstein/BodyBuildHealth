@@ -1,16 +1,15 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { db } from '../../core/db';
 import { RISK_SYSTEMS, DRUG_THRESHOLDS, SUPPORT_BASE_COVERAGE } from '../../core/constants';
 import { SYSTEM_INFO, MECHANISM_INFO, SYSTEM_ORGANS } from '../../core/risk-info';
-import type { RiskResult, LabPoint, CourseEntry, UserProfile } from '../../core/types';
+import type { RiskResult, MechanismCell } from '../../core/types';
 import { calculateRisks } from '../../engines/risk.engine';
 import { calculateRiskFromAnalyses } from '../../engines/risk-calculator-v2.engine';
-import { generateSupportStack } from '../../engines/support.engine';
 import { calculatePenaltyCoefficients, PenaltyCoefficients } from '../../engines/labs-penalty.engine';
 import { computeLabIndexDetails, type LabIndexDetail } from '../../engines/labs-indices.engine';
 import HumanBody3D from '../components/HumanBody3D';
 import { getRiskColor } from '../../core/utils/risk-colors';
 import { PHARMA_DB } from '../../core/pharma-database';
+import { useDataLink } from '../../core/data-link';
 
 const RISK_MECHANISMS = Object.values(MECHANISM_INFO);
 
@@ -31,17 +30,7 @@ const getCellColor = (raw: number, net: number): { bg: string; text: string } =>
   return { bg: 'rgba(239,68,68,0.2)', text: '#ef4444' };
 };
 
-type MatrixCell = { raw: number; net: number; coverage: number };
-type MatrixData = Record<string, MatrixCell>;
-type DetailInfo = {
-  system: string;
-  mechanism: number | null;
-  raw: number;
-  net: number;
-  coverage: number;
-  contributors: string[];
-  mitigations: { substance: string; effect: string; reduction: number }[];
-};
+type MatrixData = Record<string, MechanismCell>;
 
 interface RiskSnapshot {
   date: string;
@@ -77,6 +66,7 @@ function saveRiskSnapshot(snapshot: RiskSnapshot) {
 type RiskTab = 'overview' | 'systems' | 'body' | 'mechanisms' | 'labs' | 'overtraining' | 'timeline';
 
 export const RiskScreen: React.FC = () => {
+  const linked = useDataLink();
   const [riskResult, setRiskResult] = useState<RiskResult | null>(null);
   const [rawRiskResult, setRawRiskResult] = useState<RiskResult | null>(null);
   const [coverageMap, setCoverageMap] = useState<Record<string, number>>({});
@@ -93,62 +83,31 @@ export const RiskScreen: React.FC = () => {
   const [labIndexDetails, setLabIndexDetails] = useState<Record<string, LabIndexDetail> | null>(null);
 
   const matrixData = useMemo<MatrixData>(() => {
-    if (!riskResult || !rawRiskResult) return {};
-    const data: MatrixData = {};
-    for (const system of RISK_SYSTEMS) {
-      const sysRaw = rawRiskResult.systemBreakdown?.[system]?.raw ?? 0;
-      const sysNet = riskResult.systemBreakdown?.[system]?.net ?? 0;
-      for (let m = 1; m <= 7; m++) {
-        const cellId = system + '_' + m;
-        const coverage = coverageMap[cellId] || 0;
-        const rawCellRaw = sysRaw / 7;
-        const netCellNet = Math.max(0, rawCellRaw * (1 - coverage));
-        data[cellId] = { raw: rawCellRaw, net: netCellNet, coverage };
-      }
-    }
-    return data;
-  }, [riskResult, rawRiskResult, coverageMap]);
+    if (!riskResult) return {};
+    return riskResult.mechanismDetail || {};
+  }, [riskResult]);
 
   useEffect(() => {
-    const loadAndComputeRisk = async () => {
+    const computeRisk = async () => {
       try {
-        await db.init();
-        const prof = await db.get<UserProfile>('profile', 'current-user');
-        if (!prof) { setLoading(false); return; }
-        const courseEntries = await db.getAll<CourseEntry>('course_log');
-        const labEntries = await db.getAll<LabPoint & { patientId?: string }>('labs_log');
-        const userLabs = labEntries.filter((l) => l.patientId === 'current-user');
+        const prof = linked.profile;
+        if (!prof || !prof.id) { setLoading(false); return; }
         const genetics: Record<string, string> = prof.settings?.genetics ?? {};
         const nutritionFactor = prof.settings?.nutritionFactor ?? 1.0;
         const trainingFactor = prof.settings?.trainingFactor ?? 1.0;
         const phase = prof.settings?.phase ?? 'baseline';
-        const drugs: Record<string, { dosePerWeek: number }> = {};
-        courseEntries.forEach((entry) => {
-          const freq = typeof entry.frequency === 'number' ? entry.frequency : entry.frequency === 'daily' ? 7 : entry.frequency === 'eod' ? 3.5 : 1;
-          drugs[entry.substanceId] = { dosePerWeek: entry.doseValue * freq };
-        });
+        const drugs = linked.activeDrugs;
         setActiveSubstances(drugs);
         const rawResult = calculateRisks({ genetics, nutritionFactor, trainingFactor, activeDrugs: drugs, supportCoverage: {} });
         setRawRiskResult(rawResult);
-        const supportSubs = generateSupportStack(prof.settings?.goal ?? 'maintenance');
-        const covMap: Record<string, number> = {};
-        for (const sub of supportSubs) {
-          if (sub.effects) { for (const eff of sub.effects) { covMap[eff.effect] = (covMap[eff.effect] || 0) + eff.strength; } }
-        }
-        const baseCovMap: Record<string, number> = {};
-        for (const [, effects] of Object.entries(SUPPORT_BASE_COVERAGE)) {
-          for (const [effectKey, strength] of Object.entries(effects)) {
-            baseCovMap[effectKey] = (baseCovMap[effectKey] || 0) + strength;
-          }
-        }
-        for (const key of Object.keys(baseCovMap)) { covMap[key] = (covMap[key] || 0) + (baseCovMap[key] || 0); }
+        const covMap = linked.supportCoverage;
         setCoverageMap(covMap);
-        const labRiskResult = calculateRiskFromAnalyses(userLabs);
+        const labRiskResult = calculateRiskFromAnalyses(linked.labs);
         const labRaw: Record<string, number> = {};
         RISK_SYSTEMS.forEach((s) => { labRaw[s] = labRiskResult.systemContributions[s] ?? 0; });
         setLabRisks(labRaw);
-        if (userLabs.length > 0) {
-          setLabIndexDetails(computeLabIndexDetails(userLabs));
+        if (linked.labs.length > 0) {
+          setLabIndexDetails(computeLabIndexDetails(linked.labs));
         }
         const finalResult = calculateRisks({ genetics, nutritionFactor, trainingFactor, activeDrugs: drugs, supportCoverage: covMap });
         if (finalResult.systemBreakdown) {
@@ -158,12 +117,24 @@ export const RiskScreen: React.FC = () => {
               finalResult.systemBreakdown[sys].net = Math.max(finalResult.systemBreakdown[sys].net, labRaw[sys] ?? 0);
             }
           }
+          if (finalResult.mechanismDetail) {
+            for (const key of Object.keys(finalResult.mechanismDetail)) {
+              if (finalResult.mechanismDetail[key]) {
+                const sys = key.split('_')[0];
+                const labVal = labRaw[sys] ?? 0;
+                if (labVal > 0) {
+                  finalResult.mechanismDetail[key].net = Math.max(finalResult.mechanismDetail[key].net, labVal / 7);
+                }
+              }
+            }
+          }
         }
-        setRiskResult(finalResult);
+        const courseWeek = Math.max(0, Math.floor((Date.now() - new Date(prof.settings?.courseStartDate ?? Date.now()).getTime()) / (7*24*60*60*1000)));
+        const { db } = await import('../../core/db');
+        await db.init();
         const diagEntries = await db.getAll<{id:string;type?:string}>('diagnostics_log').catch(() => [] as {id:string;type?:string}[]);
         const diagsDone = diagEntries.map(d => d.type ?? d.id).filter(Boolean) as string[];
-        const courseWeek = Math.max(0, Math.floor((Date.now() - new Date(prof.settings?.courseStartDate ?? Date.now()).getTime()) / (7*24*60*60*1000)));
-        const pen = calculatePenaltyCoefficients(phase, userLabs, diagsDone, courseWeek, courseEntries);
+        const pen = calculatePenaltyCoefficients(phase, linked.labs, diagsDone, courseWeek, linked.course);
         setPenalty(pen);
         const systemsSnap: Record<string, { raw: number; net: number }> = {};
         for (const sys of RISK_SYSTEMS) {
@@ -188,10 +159,11 @@ export const RiskScreen: React.FC = () => {
           finalResult.overallRaw = Math.min(100, finalResult.overallRaw * pen.totalMultiplier);
           finalResult.overallNet = Math.min(100, finalResult.overallNet * pen.totalMultiplier);
         }
+        setRiskResult(finalResult);
       } catch (e) { console.error('Failed to calculate risk:', e); } finally { setLoading(false); }
     };
-    loadAndComputeRisk();
-  }, []);
+    computeRisk();
+  }, [linked.profile, linked.labs, linked.course, linked.activeDrugs, linked.supportCoverage]);
 
   const getCellMitigations = useCallback((system: string, mechanism: number) => {
     const mechId = system + '_' + mechanism;
@@ -383,17 +355,22 @@ export const RiskScreen: React.FC = () => {
   const supportPct = getSupportCoverageSummary();
 
   const calculateOvertrainingIndex = () => {
-    const trainingFactor = 1.0;
-    const fatigueFactor = 0.3;
-    const recoveryFactor = 0.5;
-    const loadRatio = 1.2;
+    const r = linked.readiness;
+    const trainingFactor = r ? (r.recovery ?? 50) / 50 : 1.0;
+    const fatigueFactor = r ? (1 - (r.recovery ?? 50) / 100) : 0.3;
+    const recoveryFactor = r ? (r.recovery ?? 50) / 100 : 0.5;
+    const loadRatio = linked.trainingLoadRatio > 0 ? linked.trainingLoadRatio : 1.0;
     const overtrainingIndex = Math.min(100, Math.max(0,
-      (loadRatio - 1) * 40 + fatigueFactor * 35 + (1 - recoveryFactor) * 25 + (1 - trainingFactor) * 20
+      Math.max(0, (loadRatio - 1)) * 40 + fatigueFactor * 35 + (1 - recoveryFactor) * 25 + (1 - Math.min(1.5, trainingFactor)) * 20
     ));
     return overtrainingIndex;
   };
 
   const overtrainingIndex = calculateOvertrainingIndex();
+  const otTrainingLoad = linked.trainingLoadRatio > 0 ? linked.trainingLoadRatio : 1.0;
+  const otFatigue = linked.readiness ? (1 - (linked.readiness.recovery ?? 50) / 100) : 0.3;
+  const otRecovery = linked.readiness ? (linked.readiness.recovery ?? 50) / 100 : 0.5;
+  const otAdaptation = linked.readiness ? (linked.readiness.nutrition ?? 50) / 50 : 1.0;
 
   return (
     <div className="screen risk-screen">
@@ -966,10 +943,10 @@ export const RiskScreen: React.FC = () => {
           <div className="card" style={{ marginBottom: 12 }}>
             <h4 style={{ margin: '0 0 8px 0', fontSize: 13 }}>Факторы перетренированности</h4>
             {[
-              { label: 'Тренировочная нагрузка', value: 1.2, desc: 'Отношение текущей нагрузки к востановительной ёмкости. Норма < 1.0', icon: '🏋️' },
-              { label: 'Уровень усталости', value: 0.3, desc: 'Субъективная усталость 0–1. Норма < 0.3', icon: '😩' },
-              { label: 'Восстановление', value: 0.5, desc: 'Качество восстановления 0–1. Норма > 0.7', icon: '😴' },
-              { label: 'Адаптационный резерв', value: 1.0, desc: 'Нутриционная и фарм. поддержка. Норма > 0.8', icon: '🛡️' },
+               { label: 'Тренировочная нагрузка', value: otTrainingLoad, desc: `Отношение текущей нагрузки к восстановительной ёмкости (${otTrainingLoad.toFixed(2)}). Норма < 1.0`, icon: '🏋️' },
+               { label: 'Уровень усталости', value: otFatigue, desc: `Субъективная усталость (${(otFatigue*100).toFixed(0)}%). Норма < 30%`, icon: '😩' },
+               { label: 'Восстановление', value: otRecovery, desc: `Качество восстановления (${(otRecovery*100).toFixed(0)}%). Норма > 70%`, icon: '😴' },
+               { label: 'Адаптационный резерв', value: otAdaptation, desc: `Нутриционная и фарм. поддержка (${otAdaptation.toFixed(2)}). Норма > 0.8`, icon: '🛡️' },
             ].map((factor, i) => {
               const pct = i === 0 ? Math.min(100, factor.value * 50) : i === 1 ? Math.min(100, factor.value * 100) : i === 2 ? Math.min(100, (1 - factor.value) * 100) : Math.min(100, (1 - factor.value) * 100);
               const good = i === 0 ? factor.value <= 1.0 : i === 1 ? factor.value < 0.3 : i === 2 ? factor.value > 0.7 : factor.value > 0.8;
