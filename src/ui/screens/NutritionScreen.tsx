@@ -7,7 +7,7 @@ import { FOOD_DB, searchFood, RATION_TIERS, getTopByProtein, getTopByCarbs, getT
 import { BarcodeScanner } from '../components/BarcodeScanner';
 import { productToFoodItem, type OFFProduct } from '../../engines/openfoodfacts.engine';
 import { parseNutritionScreenshot, type ParsedMeal } from '../../engines/nutrition-ocr-parser';
-import type { NutritionInput, NutritionTargets, FoodItem } from '../../core/types';
+import type { NutritionInput, NutritionTargets, FoodItem, SupplementEntry, MedicationEntry } from '../../core/types';
 
 type TabId = 'diary' | 'calc' | 'advice' | 'ration';
 type MealType = 'breakfast' | 'lunch' | 'dinner' | 'snack';
@@ -573,8 +573,8 @@ function AdviceTab({ targets, diary, goal }: { targets: NutritionTargets | null;
     ...(profile.settings?.currentSupplements || []),
   ];
 
-  const [productSection, setProductSection] = useState<ProductSection>(null);
   const [rationTier, setRationTier] = useState<RationTier>(null);
+  const [productSection, setProductSection] = useState<ProductSection>(null);
   const [showMacroCycle, setShowMacroCycle] = useState(false);
 
   const advice = useMemo(() => {
@@ -583,7 +583,7 @@ function AdviceTab({ targets, diary, goal }: { targets: NutritionTargets | null;
       targets,
       goal,
       { kcal: totals.kcal, pro: totals.p, fiber: totals.fiber, water: totals.water },
-      drugs
+      drugs.map(d => d.name)
     );
   }, [targets, goal, totals, drugs]);
 
@@ -756,8 +756,8 @@ function AdviceTab({ targets, diary, goal }: { targets: NutritionTargets | null;
       {drugs.length > 0 && (
         <div style={{ background: 'var(--bg-secondary)', borderRadius: 10, padding: 14, marginBottom: 12 }}>
           <h3 style={{ margin: '0 0 10px 0', fontSize: 15 }}>Активные препараты</h3>
-          {drugs.map((d: string, i: number) => (
-            <div key={i} style={{ fontSize: 13, marginBottom: 4, padding: '4px 8px', background: 'var(--bg-primary)', borderRadius: 6 }}>{d}</div>
+          {drugs.map((d: SupplementEntry | MedicationEntry, i: number) => (
+            <div key={i} style={{ fontSize: 13, marginBottom: 4, padding: '4px 8px', background: 'var(--bg-primary)', borderRadius: 6 }}>{d.name}</div>
           ))}
         </div>
       )}

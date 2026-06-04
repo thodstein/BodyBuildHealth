@@ -177,7 +177,7 @@ export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
       proteinRatio: 0.8,
       waterRatio: 0.7,
       fiberRatio: 0.6,
-      omega3Flag: settings.currentSupplements?.includes('omega3') ?? false,
+      omega3Flag: settings.currentSupplements?.some(s => s.name.includes('omega3')) ?? false,
       trainingLoadRatio: 0.7,
       subjFatigue: 3,
       hrIncrease: 0.1,
