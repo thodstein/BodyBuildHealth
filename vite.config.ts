@@ -32,6 +32,7 @@ export default defineConfig({
             },
           },
         ],
+        maximumFileSizeToCacheInBytes: 5000000,
       },
       manifest: {
         name: 'Health Engine',

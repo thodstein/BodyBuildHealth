@@ -18,6 +18,61 @@ import { resolveLabMarker, interpretRatio, normalizedRatio } from '../../core/la
 import { computeLabIndices, interpretLabIndices } from '../../engines/labs-indices.engine';
 import { PHASE_REQUIRED_PANELS, LAB_PANELS, type LabPanelMarker } from '../../data/labs-phase-panels';
 import type { LabPoint, UserProfile, RiskResult, CourseEntry } from '../../core/types';
+import { SYSTEM_INFO } from '../../core/risk-info';
+
+// Маппинг UCUM кодов на системы на основе SYSTEM_INFO.keyMarkers
+const MARKER_SYSTEM_MAP: Record<string, string[]> = {};
+Object.entries(SYSTEM_INFO).forEach(([sysKey, sysInfo]) => {
+  sysInfo.keyMarkers.forEach(marker => {
+    // Пытаемся найти UCUM код по имени маркера
+    Object.entries(UCUM_MAP).forEach(([code, ucum]) => {
+      if (ucum.name.toLowerCase().includes(marker.toLowerCase()) || 
+          code.toLowerCase().includes(marker.toLowerCase())) {
+        if (!MARKER_SYSTEM_MAP[code]) MARKER_SYSTEM_MAP[code] = [];
+        if (!MARKER_SYSTEM_MAP[code].includes(sysKey)) {
+          MARKER_SYSTEM_MAP[code].push(sysKey);
+        }
+      }
+    });
+  });
+});
+
+// Для показателей без точного совпадения - добавляем вручную
+const MANUAL_MARKER_SYSTEMS: Record<string, string> = {
+  'ALT': 'hepatic', 'AST': 'hepatic', 'GGT': 'hepatic', 'BIL': 'hepatic', 'ALB': 'hepatic',
+  'CREATININE': 'renal', 'UREA': 'renal', 'UA': 'renal',
+  'HGB': 'hematic', 'HCT': 'hematic', 'PLT': 'hematic', 'WBC': 'hematic',
+  'TT': 'endocrine', 'E2': 'endocrine', 'LH': 'endocrine', 'FSH': 'endocrine', 'PRL': 'endocrine', 'TSH': 'endocrine',
+  'LDL': 'cardio', 'HDL': 'cardio', 'TG': 'cardio', 'CRP': 'cardio',
+  'GLU': 'endocrine', 'INS': 'endocrine', 'HOMA': 'endocrine',
+  'FT': 'endocrine', 'DHT': 'endocrine', 'PROG': 'endocrine',
+  'SHBG': 'endocrine', 'CORTISOL': 'endocrine', 'IGF1': 'endocrine',
+  'CA': 'musculoskeletal', 'P': 'musculoskeletal', 'MG': 'musculoskeletal', 'VITD': 'musculoskeletal', 'ALP': 'musculoskeletal',
+  'K': 'cardio', 'NA': 'cardio',
+  'FERRITIN': 'hematic', 'B12': 'hematic', 'FOL': 'hematic', 'TIBC': 'hematic',
+  'DHEA_S': 'endocrine', 'AMH': 'reproductive', 'INHB': 'reproductive', 'PSA': 'reproductive'
+};
+
+Object.entries(MANUAL_MARKER_SYSTEMS).forEach(([code, sys]) => {
+  if (!MARKER_SYSTEM_MAP[code]) MARKER_SYSTEM_MAP[code] = [];
+  if (!MARKER_SYSTEM_MAP[code].includes(sys)) MARKER_SYSTEM_MAP[code].push(sys);
+});
+
+// Для маркеров из UCUM_MAP, которые не попали в маппинг - добавляем по умолчанию
+Object.keys(UCUM_MAP).forEach(code => {
+  if (!MARKER_SYSTEM_MAP[code]) {
+    // По умолчанию распределяем по системам на основе названия
+    const codeLower = code.toLowerCase();
+    if (['alt', 'ast', 'ggt', 'bil', 'alb', 'tp'].some(k => codeLower.includes(k))) MARKER_SYSTEM_MAP[code] = ['hepatic'];
+    else if (['creatinine', 'urea', 'ua'].some(k => codeLower.includes(k))) MARKER_SYSTEM_MAP[code] = ['renal'];
+    else if (['hgb', 'hct', 'plt', 'wbc', 'ferritin', 'b12', 'fol', 'tibc'].some(k => codeLower.includes(k))) MARKER_SYSTEM_MAP[code] = ['hematic'];
+    else if (['tt', 'e2', 'lh', 'fsh', 'prl', 'tsh', 'ft3', 'ft4', 'igf1', 'ins', 'glu', 'hom a', 'ft', 'dht', 'prog', 'shbg', 'cortisol', 'dhea'].some(k => codeLower.includes(k))) MARKER_SYSTEM_MAP[code] = ['endocrine'];
+    else if (['ldl', 'hdl', 'tg', 'crp'].some(k => codeLower.includes(k))) MARKER_SYSTEM_MAP[code] = ['cardio'];
+    else if (['ca', 'p', 'mg', 'vitd', 'alp'].some(k => codeLower.includes(k))) MARKER_SYSTEM_MAP[code] = ['musculoskeletal'];
+    else if (['k', 'na'].some(k => codeLower.includes(k))) MARKER_SYSTEM_MAP[code] = ['cardio'];
+    else MARKER_SYSTEM_MAP[code] = ['hepatic']; // по умолчанию в печень
+  }
+});
 
 const SYSTEM_LABELS: Record<string, string> = {
   hepatic: 'Печень', cardio: 'Сердечно-сосудистая', endocrine: 'Эндокринная',
@@ -25,7 +80,7 @@ const SYSTEM_LABELS: Record<string, string> = {
   neuro: 'Нервная', reproductive: 'Репродуктивная', musculoskeletal: 'Суставы и связки'
 };
 
-type LabTab = 'input' | 'panels' | 'history' | 'indices' | 'risks' | 'investigations';
+type LabTab = 'input' | 'panels' | 'history' | 'indices';
 
 interface LabsProps {
   initialTab?: LabTab;
@@ -49,8 +104,8 @@ export const LabsScreen: React.FC<LabsProps> = ({ initialTab = 'input' }) => {
   const [labIndexText, setLabIndexText] = useState({ inflammation: '', metabolism: '', thyroid: '', lipids: '' });
   const [phase, setPhase] = useState<'baseline' | 'on_cycle' | 'pct' | 'bridge' | 'fertility'>('baseline');
   const [markerValues, setMarkerValues] = useState<Record<string, { value: string; unit: string }>>({});
-  const [invDone, setInvDone] = useState<Record<string, boolean>>({});
-  const [noLabs, setNoLabs] = useState<Record<string, boolean>>({}); // Для кнопок "Без анализов"
+  const [selectedSystem, setSelectedSystem] = useState<string>('hepatic');
+  const [collapsedSystems, setCollapsedSystems] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     const loadData = async () => {
@@ -148,6 +203,30 @@ export const LabsScreen: React.FC<LabsProps> = ({ initialTab = 'input' }) => {
       await addLabPoint('current-user', point);
       setEntries(prev => [...prev, point]);
       setMarkerValues(prev => ({ ...prev, [code]: { value: '', unit: val.unit || marker.unit } }));
+    } catch (e) {
+      console.error('Failed to add lab point:', e);
+    }
+  };
+
+  const saveMarkerFromUCUM = async (code: string, ucum: any) => {
+    const val = markerValues[code];
+    if (!val?.value) return;
+    const numVal = parseFloat(val.value);
+    if (isNaN(numVal)) return;
+    const point: LabPoint = {
+      id: Math.random().toString(36).slice(2, 11),
+      code,
+      name: ucum.name,
+      value: numVal,
+      unit: val.unit || ucum.prefUnit,
+      date: new Date().toISOString().slice(0, 10),
+      phase,
+      patientId: 'current-user'
+    };
+    try {
+      await addLabPoint('current-user', point);
+      setEntries(prev => [...prev, point]);
+      setMarkerValues(prev => ({ ...prev, [code]: { value: '', unit: val.unit || ucum.prefUnit } }));
     } catch (e) {
       console.error('Failed to add lab point:', e);
     }
@@ -257,8 +336,7 @@ export const LabsScreen: React.FC<LabsProps> = ({ initialTab = 'input' }) => {
     .flatMap(pid => (LAB_PANELS[pid]?.markers ?? []).map(m => m.ucumCode ?? m.id))
     .filter(code => !entries.some(e => e.code.toUpperCase() === code.toUpperCase()));
   const hasNoLabs = entries.length === 0;
-  // Проверка: есть ли хоть какие-то данные анализов (не просто кнопка "Без анализов")
-  const hasAnyLabs = entries.length > 0 && Object.values(noLabs).every(v => !v);
+  const hasAnyLabs = entries.length > 0;
 
   if (loading) return <div className="loading-screen"><div className="loading-spinner"/><span>Загрузка...</span></div>;
 
@@ -267,23 +345,11 @@ export const LabsScreen: React.FC<LabsProps> = ({ initialTab = 'input' }) => {
     { id: 'panels', label: 'Панели' },
     { id: 'history', label: 'История' },
     { id: 'indices', label: 'Индексы' },
-    { id: 'risks', label: 'Риски' },
-    { id: 'investigations', label: 'Исследования' },
   ];
 
   return (
     <div className="screen labs">
       <h2>Лабораторные анализы</h2>
-
-      {!hasAnyLabs && (
-        <div style={{ background: 'var(--warning-dim)', border: '1px solid var(--warning)', borderRadius: 12, padding: 14, marginBottom: 16 }}>
-          <div style={{ fontWeight: 700, color: 'var(--warning)', fontSize: 15, marginBottom: 4 }}>&#9888; Внимание: анализов нет!</div>
-          <div style={{ fontSize: 13, color: 'var(--text-dim)', marginBottom: 8 }}>Кнопка "Без анализов" активирована. Это приведёт к штрафам в расчётах рисков.</div>
-          <button className="btn" onClick={() => setNoLabs({})} style={{ background: 'var(--success)', borderColor: 'var(--success)' }}>
-            &#10004; Включить анализы
-          </button>
-        </div>
-      )}
 
       {!hasAnyLabs && missingMarkers.length > 0 && (
         <div style={{ background: 'var(--warning-dim)', border: '1px solid var(--warning)', borderRadius: 12, padding: 14, marginBottom: 16 }}>
@@ -292,9 +358,9 @@ export const LabsScreen: React.FC<LabsProps> = ({ initialTab = 'input' }) => {
         </div>
       )}
 
-      <div style={{ display: 'flex', gap: 6, marginBottom: 16, overflowX: 'auto' }}>
+      <div style={{ display: 'flex', gap: 6, marginBottom: 16 }}>
         {TABS.map(t => (
-          <button key={t.id} className={'btn secondary' + (tab === t.id ? ' active' : '')} style={{ flex: '0 0 auto', whiteSpace: 'nowrap' }} onClick={() => setTab(t.id)}>
+          <button key={t.id} className={'btn secondary' + (tab === t.id ? ' active' : '')} style={{ padding: '10px 14px', whiteSpace: 'nowrap' }} onClick={() => setTab(t.id)}>
             {t.label}
           </button>
         ))}
@@ -338,76 +404,64 @@ export const LabsScreen: React.FC<LabsProps> = ({ initialTab = 'input' }) => {
           </div>
 
           <div className="card" style={{ marginBottom: 12 }}>
-            <h3>&#128736; Быстрый ввод по группам</h3>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
-              {Object.entries(LAB_PANELS).map(([key, panel]) => {
-                const allFilled = panel.markers.every(m => entries.some(e => e.code === (m.ucumCode ?? m.id)));
-                const noLabsForPanel = noLabs[key];
-                return (
-                  <button
-                    key={key}
-                    className={'btn secondary' + (selectedPanel === key ? ' active' : '')}
-                    style={{
-                      background: allFilled ? 'var(--success-dim)' : noLabsForPanel ? 'var(--warning-dim)' : undefined,
-                      borderColor: allFilled ? 'var(--success)' : noLabsForPanel ? 'var(--warning)' : undefined
-                    }}
-                    onClick={() => {
-                      if (noLabsForPanel) {
-                        setNoLabs(prev => ({ ...prev, [key]: false }));
-                      } else {
-                        setSelectedPanel(key);
-                      }
-                    }}
-                  >
-                    {allFilled ? '&#10003; ' : noLabsForPanel ? '&#10005; ' : ''}{panel.label}
-                  </button>
-                );
-              })}
-              {/* Общая кнопка "Без анализов" */}
-              <button
-                className="btn secondary"
-                style={{ background: 'var(--warning-dim)', borderColor: 'var(--warning)' }}
-                onClick={() => {
-                  const allNoLabs = Object.keys(LAB_PANELS).reduce((acc, key) => ({ ...acc, [key]: true }), {});
-                  setNoLabs(allNoLabs);
-                }}
-              >
-                &#10005; Без анализов (все)
-              </button>
+            <h3>&#128736; Ввод анализов по системам</h3>
+            
+            {/* Выбор системы */}
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 16 }}>
+              {Object.entries(SYSTEM_LABELS).map(([sysKey, sysLabel]) => (
+                <button
+                  key={sysKey}
+                  className={`btn${selectedSystem === sysKey ? ' active' : ''}`}
+                  style={{ fontSize: 12, padding: '8px 12px', whiteSpace: 'nowrap' }}
+                  onClick={() => setSelectedSystem(sysKey)}
+                >
+                  {sysLabel}
+                </button>
+              ))}
             </div>
-            {LAB_PANELS[selectedPanel] && !noLabs[selectedPanel] && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                {LAB_PANELS[selectedPanel].markers.map(marker => {
-                  const code = marker.ucumCode ?? marker.id;
+            
+            {/* Показатели выбранной системы */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {(() => {
+                // Получаем все коды для выбранной системы
+                const systemCodes = Object.entries(UCUM_MAP).filter(([code]) => {
+                  const systems = MARKER_SYSTEM_MAP[code] || [];
+                  return systems.includes(selectedSystem);
+                });
+                
+                if (systemCodes.length === 0) {
+                  return <p style={{ color: 'var(--text-dim)', textAlign: 'center', padding: 20 }}>Нет показателей для этой системы</p>;
+                }
+                
+                return systemCodes.map(([code, ucum]) => {
                   const existing = getLatestEntry([code]);
                   const val = markerValues[code]?.value ?? '';
-                  const unit = markerValues[code]?.unit ?? marker.unit;
+                  const unit = markerValues[code]?.unit ?? ucum.prefUnit;
                   const existingRatio = existing ? ratioForPoint(existing) : null;
                   const statusColor = existingRatio === null ? 'var(--text-dim)' : existingRatio < 0.2 ? 'var(--danger)' : existingRatio < 0.4 ? 'var(--warning)' : existingRatio < 0.8 ? 'var(--success)' : 'var(--danger)';
+                  
                   return (
-                    <div key={code} style={{ background: 'var(--bg-secondary)', borderRadius: 10, padding: 12 }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                    <div key={code} style={{ background: 'var(--bg-tertiary)', borderRadius: 8, padding: 10 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
                         <div>
-                          <span style={{ fontWeight: 700, fontSize: 14 }}>{marker.label}</span>
-                          <span style={{ fontSize: 11, color: 'var(--text-dim)', marginLeft: 6 }}>({code})</span>
-                          {marker.importance === 'critical' && <span style={{ background: 'var(--danger-dim)', color: 'var(--danger)', fontSize: 10, padding: '1px 6px', borderRadius: 4, marginLeft: 6 }}>Критический</span>}
-                          {marker.importance === 'important' && <span style={{ background: 'var(--warning-dim)', color: 'var(--warning)', fontSize: 10, padding: '1px 6px', borderRadius: 4, marginLeft: 6 }}>Важный</span>}
+                          <span style={{ fontWeight: 700, fontSize: 13 }}>{ucum.name}</span>
+                          <span style={{ fontSize: 10, color: 'var(--text-dim)', marginLeft: 6 }}>({code})</span>
                         </div>
                         {existing && (
-                          <span style={{ fontSize: 12, color: statusColor }}>
-                            {existing.value} {existing.unit} — {interpretRatio(existingRatio)}
+                          <span style={{ fontSize: 11, color: statusColor }}>
+                            {existing.value} {existing.unit}
                           </span>
                         )}
                       </div>
-                      <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 6 }}>
-                        Референтные значения: {marker.ref[0]}–{marker.ref[1]} {marker.unit}
+                      <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 6 }}>
+                        Норма: {ucum.lln}–{ucum.uln} {ucum.prefUnit}
                       </div>
-                      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                      <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                         <input
                           type="number"
                           placeholder="Значение"
                           className="input"
-                          style={{ flex: 1, fontSize: 14 }}
+                          style={{ flex: 1, fontSize: 13 }}
                           value={val}
                           onChange={e => setMarkerValues(prev => ({ ...prev, [code]: { value: e.target.value, unit } }))}
                         />
@@ -415,33 +469,19 @@ export const LabsScreen: React.FC<LabsProps> = ({ initialTab = 'input' }) => {
                           type="text"
                           placeholder="Ед."
                           className="input"
-                          style={{ width: 70, fontSize: 14 }}
+                          style={{ width: 70, fontSize: 13 }}
                           value={unit}
                           onChange={e => setMarkerValues(prev => ({ ...prev, [code]: { value: val, unit: e.target.value } }))}
                         />
-                        <button className="btn" style={{ whiteSpace: 'nowrap' }} onClick={() => saveMarker(code, marker)} disabled={!val}>
-                          Сохранить
-                        </button>
-                        <button
-                          className="btn secondary"
-                          style={{ whiteSpace: 'nowrap', background: 'var(--warning-dim)', borderColor: 'var(--warning)' }}
-                          onClick={() => {
-                            setNoLabs(prev => ({ ...prev, [selectedPanel]: true }));
-                            setMarkerValues(prev => {
-                              const newPrev = { ...prev };
-                              delete newPrev[code];
-                              return newPrev;
-                            });
-                          }}
-                        >
-                          &#10005; Без анализов
+                        <button className="btn" style={{ whiteSpace: 'nowrap', padding: '4px 10px' }} onClick={() => saveMarkerFromUCUM(code, ucum)} disabled={!val}>
+                          &#10004;
                         </button>
                       </div>
                     </div>
                   );
-                })}
-              </div>
-            )}
+                });
+              })()}
+            </div>
           </div>
         </>
       )}
@@ -659,105 +699,6 @@ export const LabsScreen: React.FC<LabsProps> = ({ initialTab = 'input' }) => {
         </div>
       )}
 
-      {tab === 'risks' && (
-        <div className="card">
-          <h3>Оценка рисков на основе анализов</h3>
-          {risk ? (
-            <div>
-              <div style={{ display: 'flex', gap: 12, marginBottom: 16 }}>
-                <div style={{ flex: 1, background: 'var(--bg-secondary)', borderRadius: 10, padding: 14, textAlign: 'center' }}>
-                  <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>Базовый риск</div>
-                  <div style={{ fontSize: 28, fontWeight: 800, color: 'var(--warning)' }}>{risk.overallRaw?.toFixed(1) ?? '\u2014'}%</div>
-                </div>
-                <div style={{ flex: 1, background: 'var(--bg-secondary)', borderRadius: 10, padding: 14, textAlign: 'center' }}>
-                  <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>Скорректированный</div>
-                  <div style={{ fontSize: 28, fontWeight: 800, color: 'var(--success)' }}>{risk.overallNet?.toFixed(1) ?? '\u2014'}%</div>
-                </div>
-              </div>
-              <h4>Разбивка по системам:</h4>
-              <div style={{ display: 'grid', gap: 8 }}>
-                {Object.entries(risk.systemBreakdown || {}).map(([sys, vals]) => (
-                  <div key={sys} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span style={{ fontSize: 13, width: 140 }}>{SYSTEM_LABELS[sys] ?? sys}</span>
-                    <div style={{ flex: 1, background: 'var(--bg-tertiary)', borderRadius: 3, height: 8 }}>
-                      <div style={{ width: `${Math.min(100, vals.raw ?? 0)}%`, height: '100%', background: 'var(--warning)', borderRadius: 3 }} />
-                    </div>
-                    <span style={{ fontSize: 12, color: 'var(--warning)', width: 40, textAlign: 'right' }}>{vals.raw?.toFixed(0) ?? '\u2014'}%</span>
-                    <div style={{ flex: 1, background: 'var(--bg-tertiary)', borderRadius: 3, height: 8 }}>
-                      <div style={{ width: `${Math.min(100, vals.net ?? 0)}%`, height: '100%', background: 'var(--success)', borderRadius: 3 }} />
-                    </div>
-                    <span style={{ fontSize: 12, color: 'var(--success)', width: 40, textAlign: 'right' }}>{vals.net?.toFixed(0) ?? '\u2014'}%</span>
-                  </div>
-                ))}
-              </div>
-              {entries.length > 0 && (() => {
-                const labRisks = calculateRiskFromAnalyses(entries);
-                return (
-                  <div style={{ marginTop: 16, padding: 12, background: 'var(--bg-secondary)', borderRadius: 10 }}>
-                    <h4 style={{ margin: '0 0 8px' }}>Вклад анализов в риск:</h4>
-                    {Object.entries(labRisks.systemContributions || {}).map(([sys, val]) => (
-                      <div key={sys} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
-                        <span>{SYSTEM_LABELS[sys] ?? sys}</span>
-                        <span style={{ color: (val as number) > 30 ? 'var(--danger)' : 'var(--success)' }}>{(val as number).toFixed(1)}%</span>
-                      </div>
-                    ))}
-                  </div>
-                );
-              })()}
-            </div>
-          ) : (
-            <p style={{ color: 'var(--text-dim)' }}>Для расчёта рисков необходимо добавить результаты анализов и данные о курсе.</p>
-          )}
-        </div>
-      )}
-
-      {tab === 'investigations' && (
-        <div className="card">
-          <h3>Исследования и обследования</h3>
-          <p style={{ color: 'var(--text-dim)', marginBottom: 12 }}>Инструментальные и аппаратные исследования для мониторинга на курсе и в ПКТ</p>
-
-          <div style={{ display: 'grid', gap: 10 }}>
-            {[
-              { id: 'echo_kg', name: 'ЭХО-КГ (эхокардиография)', system: 'cardio', freq: 'Каждые 8 нед на курсе; перед курсом и после ПКТ', markers: 'Фракция выброса ЛЖ, толщина стенок миокарда, клапаны, диастолическая функция, АДЛА, давление в ЛА', reason: 'ААС вызывают гипертрофию миокарда, диастолическую дисфункцию, изменения клапанов. ЭХО-КГ — золотой стандарт мониторинга.' },
-              { id: 'ekg', name: 'ЭКГ (электрокардиограмма)', system: 'cardio', freq: 'Каждые 4 нед на курсе', markers: 'QTc, гипертрофия ЛЖ, аритмии, ишемия, блокады', reason: 'Ранняя диагностика аритмий (пролонгация QT), признаков гипертрофии и ишемии. Доступно и информативно.' },
-              { id: 'usg_abd', name: 'УЗИ органов брюшной полости', system: 'hepatic', freq: 'Перед курсом, на 4-й нед, после ПКТ', markers: 'Размер и эхогенность печени, жёлчный пузырь, поджелудочная, селезёнка, почки, надпочечники', reason: 'Стеатоз, гепатомегалия, холестаз, кисты, исключение опухолей. Обязательное базовое обследование.' },
-              { id: 'usg_kidney', name: 'УЗИ почек и мочевыводящих путей', system: 'renal', freq: 'Перед курсом, при повышении креатинина', markers: 'Размер почек, кортикальный слой, ЧЛС, конкременты, скорость клубочковой фильтрации (расчёт)', reason: 'Тренболон и другие ААС — нефротоксичность. Ранняя диагностика структурных изменений.' },
-              { id: 'usg_prostate', name: 'УЗИ простаты (ТРУЗИ)', system: 'reproductive', freq: 'Перед курсом и после ПКТ (мужчины)', markers: 'Объём простаты, структура, PSA-зоны, конкременты', reason: 'ААС (особенно тестостерон) вызывают гиперплазию простаты. Мониторинг обязателен при >30 лет.' },
-              { id: 'usg_thyroid', name: 'УЗИ щитовидной железы', system: 'endocrine', freq: 'Перед курсом (базовое), при симптомах', markers: 'Объём, структура, узлы, кровоток, лимфоузлы', reason: 'ААС подавляют HPT-ось. Сверхзаместительные дозы тестостерона снижают TSH. Базовое УЗИ обязательно.' },
-              { id: 'usg_heart_24h', name: 'Холтер-ЭКГ (24ч мониторинг)', system: 'cardio', freq: 'При симптомах аритмии на курсе', markers: 'Суточная ЧСС, эпизоды тахикардии/брадикардии, паузы, желудочковые экстрасистолы, ST-депрессия', reason: 'Тренболон, кленбутерол, Т3 — высокий риск аритмий. Холтер — единственный способ поймать пароксизмальные нарушения.' },
-              { id: 'mri_brain', name: 'МРТ головного мозга', system: 'neuro', freq: 'При стойких головных болях, зрительных нарушениях', markers: 'Гипофиз (макро/микроаденома), белое вещество, сосуды, объём', reason: 'ААС угнетают ось ГГЯ → гиперинсулинемия → риск аденомы гипофиза. МРТ — при упорных симптомах.' },
-              { id: 'densitometry', name: 'Денситометрия (DEXA)', system: 'musculoskeletal', freq: 'Базовое; через 6 мес курса', markers: 'Минеральная плотность кости (T-score, Z-score), композиция тела', reason: 'ААС в ПКТ-периоде (гипогонадизм) → риск остеопении. Дексаметазон, ароматаза-ингибиторы дополнительно снижают BMD.' },
-              { id: 'usg_joints', name: 'УЗИ суставов', system: 'musculoskeletal', freq: 'При боли/хрусте в суставах', markers: 'Синовиальная жидкость, хрящ (толщина), мениски, связки, сухожилия, воспаление', reason: 'Тренболон и Винстрол — риск сухости суставов и повреждения связок. УЗИ позволяет оценить структурные изменения.' },
-              { id: 'spirometry', name: 'Спирометрия', system: 'cardio', freq: 'Базовое; при одышке на курсе', markers: 'FEV1, FVC, FEV1/FVC (индекс Тиффно), PEF', reason: 'Оральный прием ААС (17-альфа-алкилированные) могут вызывать реактивность дыхательных путей. Контроль при симптомах.' },
-              { id: 'abd_ct', name: 'КТ органов брюшной полости', system: 'hepatic', freq: 'При подозрении на опухоль по УЗИ', markers: 'Очаговые образования печени, adrenal incidentaloma, лимфаденопатия', reason: 'Уточняющий метод при находках УЗИ. ААС теоретически повышают риск гепатоцеллюлярной аденомы.' },
-              { id: 'ambp', name: 'СМАД (24ч мониторинг АД)', system: 'cardio', freq: 'Каждые 4 нед на курсе при ААС-индуцированной гипертензии', markers: 'Среднее систолическое/диастолическое, суточный индекс, утренний подъём, нагрузка давлением', reason: 'ААС повышают АД через ренин-ангиотензин, объём, вазоконстрикцию. СМАД точнее разовых измерений.' },
-            ].map(inv => {
-              const isDone = invDone[inv.id] ?? false;
-              return (
-                <div key={inv.id} style={{ background: 'var(--bg-secondary)', borderRadius: 10, padding: 12, border: isDone ? '1px solid var(--success)' : '1px solid var(--border)', transition: 'all .2s' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontWeight: 700, fontSize: 13, color: isDone ? 'var(--success)' : 'var(--text)', marginBottom: 2 }}>{inv.name}</div>
-                      <div style={{ fontSize: 10, padding: '1px 6px', borderRadius: 8, background: 'var(--accent-dim)', color: 'var(--accent)', display: 'inline-block', marginBottom: 4 }}>{SYSTEM_LABELS[inv.system] ?? inv.system}</div>
-                    </div>
-                    <button onClick={() => setInvDone(p => ({ ...p, [inv.id]: !p[inv.id] }))} style={{
-                      padding: '4px 10px', borderRadius: 6, fontSize: 10, fontWeight: 600, cursor: 'pointer',
-                      background: isDone ? 'var(--success-dim)' : 'var(--bg-tertiary)',
-                      color: isDone ? 'var(--success)' : 'var(--text-dim)',
-                      border: isDone ? '1px solid var(--success)' : '1px solid var(--border)',
-                    }}>
-                      {isDone ? 'Пройдено ✓' : 'Не пройдено'}
-                    </button>
-                  </div>
-                  <div style={{ fontSize: 11, color: 'var(--accent)', marginBottom: 3 }}><b>Частота:</b> {inv.freq}</div>
-                  <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 3 }}><b>Параметры:</b> {inv.markers}</div>
-                  <div style={{ fontSize: 11, color: 'var(--text-dim)', fontStyle: 'italic' }}>{inv.reason}</div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
     </div>
   );
 };

@@ -96,6 +96,168 @@ function ProgressBar({ value, max, color }: { value: number; max: number; color:
   );
 }
 
+function KBJUChart({ diary, days = 7 }: { diary: Record<string, DayDiary>, days?: number }) {
+  const [selectedRange, setSelectedRange] = useState<number>(7);
+  
+  const getRecentDays = (days: number) => {
+    const daysArray = [];
+    const today = new Date();
+    for (let i = days - 1; i >= 0; i--) {
+      const d = new Date(today);
+      d.setDate(today.getDate() - i);
+      daysArray.push(d.toISOString().slice(0, 10));
+    }
+    return daysArray;
+  };
+  
+  const recentDays = getRecentDays(selectedRange);
+  const data = recentDays.map(date => {
+    const day = diary[date] || emptyDay(date);
+    return calcDayTotals(day);
+  });
+  
+  if (data.length === 0) return null;
+  
+  const maxKcal = Math.max(...data.map(d => d.kcal), 1) * 1.2;
+  const maxP = Math.max(...data.map(d => d.p), 1) * 1.2;
+  const maxF = Math.max(...data.map(d => d.f), 1) * 1.2;
+  const maxC = Math.max(...data.map(d => d.c), 1) * 1.2;
+  
+  return (
+    <div style={{ background: 'var(--bg-secondary)', borderRadius: 10, padding: 12, marginTop: 16 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+        <h4 style={{ margin: 0, fontSize: 14, fontWeight: 600 }}>Динамика КБЖУ за {selectedRange} дней</h4>
+        <div style={{ display: 'flex', gap: 4 }}>
+          {[7, 14, 30].map(d => (
+            <button
+              key={d}
+              onClick={() => setSelectedRange(d)}
+              style={{
+                padding: '4px 10px',
+                borderRadius: 6,
+                border: selectedRange === d ? '2px solid #00e68a' : '1px solid var(--border)',
+                background: selectedRange === d ? 'rgba(0,230,138,0.1)' : 'var(--bg-primary)',
+                color: selectedRange === d ? '#00e68a' : 'var(--text-light)',
+                fontSize: 11,
+                fontWeight: 600,
+                cursor: 'pointer',
+              }}
+            >
+              {d} дн
+            </button>
+          ))}
+        </div>
+      </div>
+      
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+        {/* Ккалории */}
+        <div style={{ background: 'var(--bg-primary)', borderRadius: 8, padding: 8 }}>
+          <div style={{ fontSize: 11, fontWeight: 600, color: '#2196F3', marginBottom: 6 }}>Ккалории</div>
+          <div style={{ display: 'flex', alignItems: 'flex-end', gap: 2, height: 80 }}>
+            {data.map((d, i) => (
+              <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+                <div style={{
+                  width: '100%',
+                  height: `${Math.max(5, (d.kcal / maxKcal) * 100)}%`,
+                  background: '#2196F3',
+                  borderRadius: '2px 2px 0 0',
+                  transition: 'height 0.3s',
+                }} />
+                <span style={{ fontSize: 9, color: 'var(--text-dim)' }}>{new Date(recentDays[i]).getDate()}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+        
+        {/* Белки */}
+        <div style={{ background: 'var(--bg-primary)', borderRadius: 8, padding: 8 }}>
+          <div style={{ fontSize: 11, fontWeight: 600, color: '#2196F3', marginBottom: 6 }}>Белки</div>
+          <div style={{ display: 'flex', alignItems: 'flex-end', gap: 2, height: 80 }}>
+            {data.map((d, i) => (
+              <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+                <div style={{
+                  width: '100%',
+                  height: `${Math.max(5, (d.p / maxP) * 100)}%`,
+                  background: '#2196F3',
+                  borderRadius: '2px 2px 0 0',
+                  transition: 'height 0.3s',
+                }} />
+                <span style={{ fontSize: 9, color: 'var(--text-dim)' }}>{new Date(recentDays[i]).getDate()}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+        
+        {/* Жиры */}
+        <div style={{ background: 'var(--bg-primary)', borderRadius: 8, padding: 8 }}>
+          <div style={{ fontSize: 11, fontWeight: 600, color: '#FF9800', marginBottom: 6 }}>Жиры</div>
+          <div style={{ display: 'flex', alignItems: 'flex-end', gap: 2, height: 80 }}>
+            {data.map((d, i) => (
+              <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+                <div style={{
+                  width: '100%',
+                  height: `${Math.max(5, (d.f / maxF) * 100)}%`,
+                  background: '#FF9800',
+                  borderRadius: '2px 2px 0 0',
+                  transition: 'height 0.3s',
+                }} />
+                <span style={{ fontSize: 9, color: 'var(--text-dim)' }}>{new Date(recentDays[i]).getDate()}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+        
+        {/* Углеводы */}
+        <div style={{ background: 'var(--bg-primary)', borderRadius: 8, padding: 8 }}>
+          <div style={{ fontSize: 11, fontWeight: 600, color: '#4CAF50', marginBottom: 6 }}>Углеводы</div>
+          <div style={{ display: 'flex', alignItems: 'flex-end', gap: 2, height: 80 }}>
+            {data.map((d, i) => (
+              <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+                <div style={{
+                  width: '100%',
+                  height: `${Math.max(5, (d.c / maxC) * 100)}%`,
+                  background: '#4CAF50',
+                  borderRadius: '2px 2px 0 0',
+                  transition: 'height 0.3s',
+                }} />
+                <span style={{ fontSize: 9, color: 'var(--text-dim)' }}>{new Date(recentDays[i]).getDate()}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+      
+      {/* Summary values */}
+      <div style={{ display: 'flex', justifyContent: 'space-around', marginTop: 12, padding: '8px 0', borderTop: '1px solid var(--border)' }}>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>Среднее ккал</div>
+          <div style={{ fontSize: 14, fontWeight: 700, color: '#2196F3' }}>
+            {Math.round(data.reduce((sum, d) => sum + d.kcal, 0) / data.length)}
+          </div>
+        </div>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>Среднее белки</div>
+          <div style={{ fontSize: 14, fontWeight: 700, color: '#2196F3' }}>
+            {Math.round(data.reduce((sum, d) => sum + d.p, 0) / data.length)}
+          </div>
+        </div>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>Среднее жиры</div>
+          <div style={{ fontSize: 14, fontWeight: 700, color: '#FF9800' }}>
+            {Math.round(data.reduce((sum, d) => sum + d.f, 0) / data.length)}
+          </div>
+        </div>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>Среднее углеводы</div>
+          <div style={{ fontSize: 14, fontWeight: 700, color: '#4CAF50' }}>
+            {Math.round(data.reduce((sum, d) => sum + d.c, 0) / data.length)}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function FoodSearchModal({ onSelect, onClose }: { onSelect: (food: typeof FOOD_DB[number], weight: number) => void; onClose: () => void }) {
   const [query, setQuery] = useState('');
   const [weight, setWeight] = useState(100);
@@ -366,6 +528,9 @@ function DiaryTab({ diary, setDiary, targets }: { diary: Record<string, DayDiary
           ))}
         </div>
       )}
+      
+      {/* КБЖУ график за 7/14/30 дней */}
+      <KBJUChart diary={diary} />
 
       {addingMeal && (
         <FoodSearchModal

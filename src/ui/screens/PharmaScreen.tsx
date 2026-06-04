@@ -9,7 +9,7 @@ import type { PharmaSubstance, CourseEntry, PD } from '../../core/types';
 import { SYNERGY_PAIRS, type SynergyPair } from '../../engines/support.engine';
 import { SYSTEM_INFO } from '../../core/risk-info';
 
-type Tab = 'catalog' | 'pkpd' | 'dosage' | 'interactions' | 'research';
+type Tab = 'catalog' | 'pkpd' | 'dosage' | 'interactions' | 'investigations';
 
 const SYSTEM_LABELS: Record<string, string> = Object.fromEntries(
   Object.entries(SYSTEM_INFO).map(([k, v]) => [k, v.label.split(' ').slice(0, 2).join(' ')])
@@ -100,18 +100,18 @@ export const PharmaScreen: React.FC = () => {
   return (
     <div className="screen pharma">
       <h2>Фармакология</h2>
-      <div style={{ display: 'flex', gap: 4, marginBottom: 12, overflowX: 'auto' }}>
+      <div style={{ display: 'flex', gap: 4, marginBottom: 12 }}>
         {([
           ['catalog', 'Каталог'],
           ['pkpd', 'PK/PD'],
           ['dosage', 'Дозировка'],
           ['interactions', 'Взаимодействия'],
-          ['research', 'Исследования'],
+          ['investigations', 'Исследования'],
         ] as [Tab, string][]).map(([key, label]) => (
           <button
             key={key}
             className={`btn${tab === key ? ' active' : ''}`}
-            style={{ fontSize: 12, padding: '6px 10px', whiteSpace: 'nowrap' }}
+            style={{ fontSize: 12, padding: '10px 14px', whiteSpace: 'nowrap' }}
             onClick={() => setTab(key)}
           >
             {label}
@@ -122,7 +122,128 @@ export const PharmaScreen: React.FC = () => {
       {tab === 'pkpd' && <PKPDSimulationTab />}
       {tab === 'dosage' && <DosageCalculatorTab />}
       {tab === 'interactions' && <InteractionCheckerTab />}
-      {tab === 'research' && <ResearchTab />}
+      {tab === 'investigations' && <InvestigationsTab />}
+    </div>
+  );
+};
+
+const SYSTEM_LABELS_INVEST: Record<string, string> = {
+  hepatic: 'Печень', cardio: 'Сердечно-сосудистая', endocrine: 'Эндокринная',
+  lipid: 'Липидный обмен', renal: 'Почки', hematic: 'Кроветворение', immune: 'Иммунная',
+  neuro: 'Нервная', reproductive: 'Репродуктивная', musculoskeletal: 'Суставы и связки'
+};
+
+interface Investigation {
+  id: string;
+  name: string;
+  system: string;
+  freq: string;
+  markers: string;
+  reason: string;
+}
+
+const INVESTIGATIONS_DATA: Investigation[] = [
+  { id: 'echo_kg', name: 'ЭХО-КГ (Эхокардиография)', system: 'cardio', freq: 'Каждые 8 нед на курсе; перед курсом и после ПКТ', markers: 'Фракция выброса ЛЖ, толщина стенок ЖКЛ, клапаны, диастолическая функция, ФС, доля выброса', reason: 'ААБ вызывают гипертрофию ЛЖ, диастолическую дисфункцию, изменения клапанов. ЭХО-КГ — золотой стандарт мониторинга.' },
+  { id: 'ekg', name: 'ЭКГ (Электрокардиография)', system: 'cardio', freq: 'Каждые 4 нед на курсе', markers: 'QTc, гипертрофия ЛЖ, аритмии, ишемия, блокады', reason: 'Ранняя диагностика аритмий (пролонгация QT), признаков гипертрофии и ишемии. Доступен и информативен.' },
+  { id: 'usg_abd', name: 'УЗИ органов брюшной полости', system: 'hepatic', freq: 'Перед курсом, на 4-й неделе, после ПКТ', markers: 'Размеры печени, эхогенность, циррозный пучок, поджелудочная, селезёнка, почки, надпочечники', reason: 'Стеатоз, гепатомегалия, холестаз, кисты, инфекции. Обязательное базовое обследование.' },
+  { id: 'usg_kidney', name: 'УЗИ почек и мочевыводящих путей', system: 'renal', freq: 'Перед курсом, при повышении креатинина', markers: 'Размеры почек, корковый слой, КЩФ, конкременты, скорость фильтрации (расчёт)', reason: 'Тренболон и другие ААБ — нефротоксичны. Ранняя диагностика структурных изменений.' },
+  { id: 'usg_prostate', name: 'УЗИ предстательной железы (ТРУЗИ)', system: 'reproductive', freq: 'Перед курсом и после ПКТ (у мужчин)', markers: 'Объём предстательной железы, структура, PSA-зоны, конкременты', reason: 'ААБ (особенно тестостерон) вызывают гиперплазию предстательной железы. Мониторинг обязательный при >30 лет.' },
+  { id: 'usg_thyroid', name: 'УЗИ щитовидной железы', system: 'endocrine', freq: 'Перед курсом (базовое), при симптомах', markers: 'Объём, структура, узлы, кровоток, лимфоузлы', reason: 'ААБ подавляют HPT-ось. Сверхфизиологические дозы тестостерона снижают TSH. Базовое УЗИ обязательно.' },
+  { id: 'usg_heart_24h', name: 'Холтер-ЭКГ (24ч мониторинг)', system: 'cardio', freq: 'При симптомах аритмии на курсе', markers: 'Суточная ЧСС, эпизоды тахикардии/брадикардии, паузы, ST-депрессия', reason: 'Тренболон, кленбутерол, Т3 — высокий риск аритмий. Холтер — единственный способ выявить паразитарные нарушения.' },
+  { id: 'mri_brain', name: 'МРТ головного мозга', system: 'neuro', freq: 'При стойких головных болях, нарушениях зрения', markers: 'Гипофиз (как/какоразмер), белое вещество, сосуды, объёмные образования', reason: 'ААБ могут вызывать гипофизарную недостаточность через подавление HPT. МРТ — при подозрении.' },
+  { id: 'densitometry', name: 'Денситометрия (DEXA)', system: 'musculoskeletal', freq: 'Базовое; через 6 месяцев курса', markers: 'Минеральная плотность костей (T-score, Z-score), композиция тела', reason: 'ААБ в ПКТ-периоде (гипогонадизм) → риск остеопороза. Декса-зона, ароматазы-ингибиторы дополняют BMD.' },
+  { id: 'usg_joints', name: 'УЗИ суставов', system: 'musculoskeletal', freq: 'При болях/хрусте в суставах', markers: 'Синовиальная жидкость, хрящ (толщина), кости, связки, сухожилия, сухожилия, воспаление', reason: 'Тренболон и Винстрол — риск сухожилий и повреждений. УЗИ позволяет объективно оценить состояние.' },
+  { id: 'spirometry', name: 'Спирометрия', system: 'cardio', freq: 'Базовое; при одышке на курсе', markers: 'FEV1, FVC, FEV1/FVC (индекс Тиффно), PEF', reason: 'Оральные ААБ (17-α алкилированные) могут вызывать бронхоспазм. Контроль при жалобах.' },
+  { id: 'abd_ct', name: 'КТ органов брюшной полости', system: 'hepatic', freq: 'При подозрении на гепатоцеллюлярную аденому', markers: 'Очаговые образования печени, adrenal incidentaloma, липаденома', reason: 'Уточняющий метод при нахождениях УЗИ. ААБ теоретически повышают риск гепатоцеллюлярной аденомы.' },
+  { id: 'ambp', name: 'СМАД (24ч мониторинг АД)', system: 'cardio', freq: 'Каждые 4 нед на курсе при ААБ-индуцированной гипертензии', markers: 'Среднее систолическое/диастолическое, суточный индекс, утренний подъём, нарушения ритма', reason: 'ААБ повышают АД через ренин-ангиотензин, объём, сосудистый тонус. СМАД — точнее измерений.' },
+];
+
+const InvestigationsTab: React.FC = () => {
+  const [collapsedSystems, setCollapsedSystems] = useState<Record<string, boolean>>({});
+  const [invDone, setInvDone] = useState<Record<string, boolean>>({});
+
+  const toggleSystem = (system: string) => {
+    setCollapsedSystems(prev => ({ ...prev, [system]: !prev[system] }));
+  };
+
+  const toggleInv = (id: string) => {
+    setInvDone(prev => ({ ...prev, [id]: !prev[id] }));
+  };
+
+  const groupedBySystem = INVESTIGATIONS_DATA.reduce((acc, inv) => {
+    if (!acc[inv.system]) acc[inv.system] = [];
+    acc[inv.system].push(inv);
+    return acc;
+  }, {} as Record<string, Investigation[]>);
+
+  return (
+    <div className="card" style={{ fontSize: 12 }}>
+      <h3 style={{ margin: '0 0 12px', color: 'var(--accent)' }}>Исследования и обследования</h3>
+      <p style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 12 }}>Инструктивные и аппаратные исследования для мониторинга на курсе и в ПКТ</p>
+
+      <div style={{ display: 'grid', gap: 8 }}>
+        {Object.entries(groupedBySystem).map(([system, investigations]) => {
+          const isCollapsed = collapsedSystems[system] || false;
+          return (
+            <div key={system} style={{ border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden', background: 'var(--bg-secondary)' }}>
+              <div 
+                style={{ 
+                  padding: '10px 12px', 
+                  cursor: 'pointer',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  background: 'var(--bg-tertiary)',
+                }}
+                onClick={() => toggleSystem(system)}
+              >
+                <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--text)' }}>
+                  {SYSTEM_LABELS_INVEST[system] || system} 
+                  <span style={{ marginLeft: 8, fontSize: 11, color: 'var(--text-dim)' }}>({investigations.length} исслед.)</span>
+                </div>
+                <span style={{ fontSize: 12, color: 'var(--text-dim)' }}>
+                  {isCollapsed ? '▼' : '▲'}
+                </span>
+              </div>
+              {!isCollapsed && (
+                <div style={{ padding: '8px 12px' }}>
+                  {investigations.map(inv => {
+                    const isDone = invDone[inv.id] ?? false;
+                    return (
+                      <div key={inv.id} style={{ 
+                        background: isDone ? 'rgba(0,230,138,0.08)' : 'var(--bg-secondary)',
+                        borderRadius: 8, 
+                        padding: '10px 12px', 
+                        border: isDone ? '1px solid var(--success)' : '1px solid var(--border)',
+                        marginBottom: 8,
+                        transition: 'all .2s'
+                      }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ fontWeight: 600, fontSize: 12, color: isDone ? 'var(--success)' : 'var(--text)', marginBottom: 2 }}>{inv.name}</div>
+                            <div style={{ fontSize: 10, padding: '1px 6px', borderRadius: 8, background: 'var(--accent-dim)', color: 'var(--accent)', display: 'inline-block' }}>{SYSTEM_LABELS_INVEST[inv.system] || inv.system}</div>
+                          </div>
+                          <button onClick={() => toggleInv(inv.id)} style={{
+                            padding: '3px 8px', borderRadius: 6, fontSize: 10, fontWeight: 600, cursor: 'pointer',
+                            background: isDone ? 'var(--success-dim)' : 'var(--bg-tertiary)',
+                            color: isDone ? 'var(--success)' : 'var(--text-dim)',
+                            border: isDone ? '1px solid var(--success)' : '1px solid var(--border)',
+                          }}>
+                            {isDone ? 'Пройдено ✓' : 'Не пройдено'}
+                          </button>
+                        </div>
+                        <div style={{ fontSize: 10, color: 'var(--accent)', marginBottom: 2, fontWeight: 500 }}>Зачастота: {inv.freq}</div>
+                        <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 3 }}><b>Параметры:</b> {inv.markers}</div>
+                        <div style={{ fontSize: 10, color: 'var(--text-dim)', fontStyle: 'italic', lineHeight: 1.4 }}>{inv.reason}</div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 };
@@ -763,96 +884,6 @@ const InteractionCheckerTab: React.FC = () => {
           </div>
         </div>
       )}
-    </div>
-  );
-};
-
-const ResearchTab: React.FC = () => {
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [filterClass, setFilterClass] = useState<string>('all');
-  const [searchQuery, setSearchQuery] = useState('');
-
-  // Filter to show only pharma substances
-  const pharmaSubstances = useMemo(() => {
-    return Object.values(PHARMA_DB).filter(s => 
-      PHARMA_CLASSES.includes(s.class as PharmaClass)
-    );
-  }, []);
-
-  const filteredList = useMemo(() => {
-    let list = filterClass === 'all' ? pharmaSubstances : pharmaSubstances.filter(s => s.class === filterClass);
-    if (searchQuery) {
-      const q = searchQuery.toLowerCase();
-      list = list.filter(s => s.name.toLowerCase().includes(q) || s.id.toLowerCase().includes(q));
-    }
-    return list;
-  }, [filterClass, searchQuery, pharmaSubstances]);
-
-  const selected = selectedId ? PHARMA_DB[selectedId] : null;
-
-  return (
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.2fr', gap: 12 }}>
-      <div style={{ maxHeight: 'calc(100vh - 160px)', overflowY: 'auto', paddingRight: 4 }}>
-        <input type="text" placeholder="Поиск препарата..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', fontSize: 13, marginBottom: 8, boxSizing: 'border-box' }} />
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 8 }}>
-          <button onClick={() => setFilterClass('all')} style={{ padding: '3px 8px', borderRadius: 4, fontSize: 11, border: filterClass === 'all' ? '1px solid var(--accent)' : '1px solid var(--border)', background: filterClass === 'all' ? 'rgba(0,230,138,0.15)' : 'transparent', color: 'var(--text-primary)', cursor: 'pointer' }}>Все</button>
-          {PHARMA_CLASSES.map(cls => (
-            <button key={cls} onClick={() => setFilterClass(cls)} style={{ padding: '3px 8px', borderRadius: 4, fontSize: 11, border: filterClass === cls ? '1px solid var(--accent)' : '1px solid var(--border)', background: filterClass === cls ? 'rgba(0,230,138,0.15)' : 'transparent', color: 'var(--text-primary)', cursor: 'pointer' }}>{CLASS_LABELS[cls] || cls}</button>
-          ))}
-        </div>
-        {filteredList.map(s => (
-          <div key={s.id} onClick={() => setSelectedId(s.id)} style={{
-            padding: '8px 10px', borderRadius: 6, cursor: 'pointer', marginBottom: 4,
-            background: selectedId === s.id ? 'rgba(0,230,138,0.12)' : 'var(--bg-secondary)',
-            border: selectedId === s.id ? '1px solid var(--accent)' : '1px solid transparent',
-          }}>
-            <div style={{ fontWeight: 600, fontSize: 13 }}>{s.name}</div>
-            <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>{CLASS_LABELS[s.class] || s.class}</div>
-          </div>
-        ))}
-        {filteredList.length === 0 && (
-          <div style={{ padding: 20, textAlign: 'center', color: 'var(--text-dim)' }}>
-            {searchQuery ? 'Ничего не найдено' : 'Нет фарма препаратов'}
-          </div>
-        )}
-      </div>
-      <div style={{ maxHeight: 'calc(100vh - 160px)', overflowY: 'auto' }}>
-        {selected ? (
-          <div>
-            <div className="card" style={{ fontSize: 12 }}>
-              <h3 style={{ margin: '0 0 8px', color: 'var(--accent)' }}>{selected.name}</h3>
-              <div style={{ fontWeight: 600, marginBottom: 6, fontSize: 13 }}>📚 Исследования</div>
-              {selected.research && selected.research.length > 0 ? (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  {selected.research.map((r, i) => (
-                    <div key={i} style={{
-                      padding: '10px 12px',
-                      borderRadius: 6,
-                      background: 'var(--bg-primary)',
-                      border: '1px solid var(--border)',
-                    }}>
-                      <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 4 }}>
-                        • {r.study} — <span style={{ color: 'var(--accent)' }}>{r.conclusion}</span>
-                      </div>
-                      <div style={{ fontSize: 10, color: 'var(--text-dim)', textAlign: 'right' }}>{r.year}</div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div style={{ textAlign: 'center', padding: 20, color: 'var(--text-dim)' }}>
-                  <div style={{ fontSize: 32, marginBottom: 8 }}>📚</div>
-                  <div>Исследования отсутствуют</div>
-                </div>
-              )}
-            </div>
-          </div>
-        ) : (
-          <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-dim)' }}>
-            <div style={{ fontSize: 40, marginBottom: 12 }}>📚</div>
-            <div>Выберите препарат для просмотра исследований</div>
-          </div>
-        )}
-      </div>
     </div>
   );
 };

@@ -129,6 +129,7 @@ export const ProfileScreen: React.FC = () => {
   const labIndexText = labIndices ? interpretLabIndices(labIndices) : null;
 
   const bmi = s_.height && s_.weight ? (s_.weight / Math.pow(s_.height / 100, 2)).toFixed(1) : null;
+  const bmiText = bmi ? `${bmi} кг/м²` : 'Нет данных';
   const lbm = s_.weight && s_.bodyFat ? (s_.weight * (1 - s_.bodyFat / 100)).toFixed(1) : null;
   const navyBf = (() => {
     if (!s_.waistCm || !s_.neckCm || !s_.height) return null;
@@ -142,6 +143,7 @@ export const ProfileScreen: React.FC = () => {
     }
     return null;
   })();
+  const navyBfText = navyBf ? `${navyBf}%` : 'Нет данных';
 
   useEffect(() => {
     const load = async () => {
@@ -274,9 +276,9 @@ export const ProfileScreen: React.FC = () => {
                 </div>
               </div>
             </div>
-            {bmi && <div style={s.computed}>BMI: {bmi}</div>}
+            {bmi && <div style={s.computed}>BMI: {bmiText} - {parseFloat(bmi) < 18.5 ? 'Недостаток' : parseFloat(bmi) < 25 ? 'Норма' : parseFloat(bmi) < 30 ? 'Избыток' : 'Ожирение'}</div>}
             {lbm && <div style={s.computed}>LBM (сухая масса): {lbm} кг</div>}
-            {navyBf && <div style={s.computed}>Navy BF%: {navyBf}%</div>}
+            {navyBf && <div style={s.computed}>Navy BF%: {navyBfText} - {parseFloat(navyBf) < 6 ? 'Слишком низко' : parseFloat(navyBf) < 18 ? 'Норма' : parseFloat(navyBf) < 25 ? 'Высоко' : 'Очень высоко'}</div>}
           </div>
           <div style={s.card}>
             <h4 style={{ margin: '0 0 8px' }}>Обхваты (см)</h4>
