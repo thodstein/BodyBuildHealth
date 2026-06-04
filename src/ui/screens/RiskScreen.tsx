@@ -10,6 +10,7 @@ import HumanBody3D from '../components/HumanBody3D';
 import { getRiskColor } from '../../core/utils/risk-colors';
 import { PHARMA_DB } from '../../core/pharma-database';
 import { useDataLink } from '../../core/data-link';
+import { SYNERGY_PAIRS, type SynergyPair } from '../../engines/support.engine';
 
 const RISK_MECHANISMS = Object.values(MECHANISM_INFO);
 
@@ -1354,6 +1355,171 @@ export const RiskScreen: React.FC = () => {
               </div>
             </div>
           </div>
+        </>
+      )}
+
+      {/* ===== TAB: DETAILS ===== */}
+      {tab === 'details' && aggregatedRisks && (
+        <>
+          <div className="card" style={{ marginBottom: 16 }}>
+            <h3 style={{ margin: '0 0 8px 0', fontSize: 16 }}>Источники рисков по системам</h3>
+            <p style={{ fontSize: 11, color: 'var(--text-dim)', margin: '0 0 12px 0' }}>
+              Подробный разбор источников риска для каждой системы (сырые и нетто значения)
+            </p>
+            
+            {RISK_SYSTEMS.map(sys => {
+              const sysInfo = SYSTEM_INFO[sys];
+              const breakdown = aggregatedRisks.systemBreakdown?.[sys];
+              const sources = breakdown?.sources;
+              if (!sources) return null;
+              return (
+                <div key={sys} style={{ background: 'var(--bg-primary)', borderRadius: 8, padding: 12, marginBottom: 8 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                    <span style={{ fontSize: 20 }}>{sysInfo?.icon || '❓'}</span>
+                    <div>
+                      <div style={{ fontSize: 14, fontWeight: 700 }}>{sysInfo?.label || sys}</div>
+                      <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>
+                        Риск: <strong style={{ color: getRiskColor(breakdown?.net ?? 0) }}>{(breakdown?.net ?? 0).toFixed(0)}%</strong>
+                      </div>
+                    </div>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 6 }}>
+                    {/* Pharma source */}
+                    <div style={{ background: 'rgba(239,68,68,0.08)', padding: '8px', borderRadius: 6 }}>
+                      <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 2 }}>💊 Препараты</div>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: '#ef4444' }}>{sources.pharma.net.toFixed(0)}%</div>
+                      <div style={{ fontSize: 8, color: 'var(--text-dim)' }}>сырое: {sources.pharma.raw.toFixed(0)}%</div>
+                    </div>
+                    {/* Labs source */}
+                    <div style={{ background: 'rgba(249,115,22,0.08)', padding: '8px', borderRadius: 6 }}>
+                      <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 2 }}>🧪 Анализы</div>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: '#f97316' }}>{sources.labs.net.toFixed(0)}%</div>
+                      <div style={{ fontSize: 8, color: 'var(--text-dim)' }}>сырое: {sources.labs.raw.toFixed(0)}%</div>
+                    </div>
+                    {/* Training source */}
+                    <div style={{ background: 'rgba(132,204,22,0.08)', padding: '8px', borderRadius: 6 }}>
+                      <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 2 }}>🏋️ Тренировки</div>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: '#84cc16' }}>{sources.training.net.toFixed(0)}%</div>
+                      <div style={{ fontSize: 8, color: 'var(--text-dim)' }}>сырое: {sources.training.raw.toFixed(0)}%</div>
+                    </div>
+                    {/* Nutrition source */}
+                    <div style={{ background: 'rgba(59,130,246,0.08)', padding: '8px', borderRadius: 6 }}>
+                      <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 2 }}>🍎 Питание</div>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: '#3b82f6' }}>{sources.nutrition.net.toFixed(0)}%</div>
+                      <div style={{ fontSize: 8, color: 'var(--text-dim)' }}>сырое: {sources.nutrition.raw.toFixed(0)}%</div>
+                    </div>
+                    {/* Diagnostics source */}
+                    <div style={{ background: 'rgba(168,85,247,0.08)', padding: '8px', borderRadius: 6 }}>
+                      <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 2 }}>🔍 Исследования</div>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: '#a855f7' }}>{sources.diagnostics.net.toFixed(0)}%</div>
+                      <div style={{ fontSize: 8, color: 'var(--text-dim)' }}>сырое: {sources.diagnostics.raw.toFixed(0)}%</div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Synergies Section */}
+          {SYNERGY_PAIRS.length > 0 && (
+            <div className="card" style={{ marginBottom: 16 }}>
+              <h3 style={{ margin: '0 0 8px 0', fontSize: 16 }}>💥 Синергии и комбинации</h3>
+              <p style={{ fontSize: 11, color: 'var(--text-dim)', margin: '0 0 12px 0' }}>
+                Ключевые синергетические пары между препаратами и поддержкой
+              </p>
+              
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 8 }}>
+                {SYNERGY_PAIRS.map((pair, i) => {
+                  const synergyColors: Record<string, string> = {
+                    synergistic: 'rgba(0,230,138,0.1)',
+                    additive: 'rgba(59,130,246,0.1)',
+                    potentiative: 'rgba(249,115,22,0.1)',
+                    complementary: 'rgba(168,85,247,0.1)',
+                  };
+                  const synergyColorsText: Record<string, string> = {
+                    synergistic: '#00e68a',
+                    additive: '#3b82f6',
+                    potentiative: '#f97316',
+                    complementary: '#a855f7',
+                  };
+                  
+                  return (
+                    <div key={i} style={{
+                      background: synergyColors[pair.synergyType] || 'rgba(255,255,255,0.03)',
+                      borderRadius: 6,
+                      padding: '10px 12px',
+                      border: '1px solid ' + (synergyColorsText[pair.synergyType] || '#888') + '40',
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+                        <span style={{
+                          fontSize: 10,
+                          fontWeight: 700,
+                          padding: '2px 6px',
+                          borderRadius: 4,
+                          background: synergyColorsText[pair.synergyType] + '20',
+                          color: synergyColorsText[pair.synergyType],
+                          textTransform: 'uppercase',
+                        }}>
+                          {(() => {
+                            switch (pair.synergyType) {
+                              case 'synergistic': return '⊕ Синергия';
+                              case 'additive': return '+ Аддитивно';
+                              case 'potentiative': return '↗ Усиление';
+                              case 'complementary': return '↔ Дополнение';
+                              default: return '↔ Дополнение';
+                            }
+                          })()}
+                        </span>
+                        <span style={{
+                          fontSize: 11,
+                          fontWeight: 700,
+                          color: synergyColorsText[pair.synergyType],
+                        }}>
+                          Сила: {Math.round(pair.strength * 100)}%
+                        </span>
+                      </div>
+                      
+                      <div style={{ fontSize: 12, lineHeight: 1.5, color: 'var(--text-light)' }}>
+                        {pair.mechanism}
+                      </div>
+                      
+                      {pair.clinicalNote && (
+                        <div style={{
+                          marginTop: 6,
+                          fontSize: 10,
+                          color: '#22c55e',
+                          fontStyle: 'italic',
+                        }}>
+                          💡 {pair.clinicalNote}
+                        </div>
+                      )}
+                      
+                      {pair.affectedSystems && pair.affectedSystems.length > 0 && (
+                        <div style={{
+                          marginTop: 6,
+                          display: 'flex',
+                          flexWrap: 'wrap',
+                          gap: 3,
+                        }}>
+                          {pair.affectedSystems.map(sys => (
+                            <span key={sys} style={{
+                              fontSize: 8,
+                              padding: '1px 4px',
+                              borderRadius: 3,
+                              background: 'rgba(255,255,255,0.1)',
+                              color: 'var(--text-dim)',
+                            }}>
+                              {SYSTEM_LABELS[sys] || sys}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </>
       )}
 

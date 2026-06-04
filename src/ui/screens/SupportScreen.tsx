@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { SYNERGY_PAIRS, SUPPLEMENT_DESCRIPTIONS, SUPPLEMENT_TARGETS, SUPPORT_RESEARCH, calculateSupport, type SupportInput, type SynergyPair, type SupplementTarget } from '../../engines/support.engine';
 import { RISK_SYSTEMS } from '../../core/constants';
+import { PHARMA_DB, PHARMA_CLASSES } from '../../core/pharma-database';
 import { useDataLink } from '../../core/data-link';
 import { SYSTEM_INFO } from '../../core/risk-info';
 import { getRiskColor } from '../../core/utils/risk-colors';
@@ -22,16 +23,37 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   const [selectedSub, setSelectedSub] = useState<string | null>(null);
   const [synergyFilter, setSynergyFilter] = useState<string>('all');
   const [systemFilter, setSystemFilter] = useState<string>('all');
+  const [supportClassFilter, setSupportClassFilter] = useState<string>('all');
   const [supportResult, setSupportResult] = useState<{ riskBefore: Record<string, number>; riskAfter: Record<string, number>; score: number } | null>(null);
 
+  // Combine SUPPLEMENT_DESCRIPTIONS with support substances from PHARMA_DB
   const supplementList = useMemo(() => {
-    return Object.entries(SUPPLEMENT_DESCRIPTIONS).map(([id, desc]) => ({
+    // First add supplements from SUPPLEMENT_DESCRIPTIONS
+    const supplements = Object.entries(SUPPLEMENT_DESCRIPTIONS).map(([id, desc]) => ({
       id,
       name: id.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' '),
       description: desc,
       targets: SUPPLEMENT_TARGETS[id] as SupplementTarget | undefined,
       research: SUPPORT_RESEARCH[id],
+      isSupportSubstance: false,
     }));
+    
+    // Add support substances from PHARMA_DB (classes: support, peptide_regenerative, peptide_nootropic, peptide_immune)
+    const supportClasses = ['support', 'peptide_regenerative', 'peptide_nootropic', 'peptide_immune'] as const;
+    const supportSubstances = Object.values(PHARMA_DB).filter(s => 
+      supportClasses.includes(s.class as typeof supportClasses[number])
+    );
+    
+    const supportSupplements = supportSubstances.map(s => ({
+      id: s.id,
+      name: s.name,
+      description: s.description || `Поддерживающий препарат класса ${s.class}`,
+      targets: undefined,
+      research: s.research || [],
+      isSupportSubstance: true,
+    }));
+    
+    return [...supplements, ...supportSupplements];
   }, []);
 
   const filteredSupplements = useMemo(() => {
@@ -43,8 +65,20 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
     if (systemFilter !== 'all') {
       list = list.filter(s => s.targets?.systems?.includes(systemFilter));
     }
+    if (supportClassFilter !== 'all') {
+      list = list.filter(s => {
+        if (s.isSupportSubstance) {
+          // Check the class from PHARMA_DB
+          const substance = Object.values(PHARMA_DB).find(sub => sub.id === s.id);
+          return substance?.class === supportClassFilter;
+        } else {
+          // Supplements from SUPPLEMENT_DESCRIPTIONS don't have a class, so show all
+          return true;
+        }
+      });
+    }
     return list;
-  }, [supplementList, searchQuery, systemFilter]);
+  }, [supplementList, searchQuery, systemFilter, supportClassFilter]);
 
   const filteredSynergies = useMemo(() => {
     let pairs = SYNERGY_PAIRS;
@@ -105,6 +139,14 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
               <option value="all">Все системы</option>
               {RISK_SYSTEMS.map(s => <option key={s} value={s}>{systemLabels[s]}</option>)}
             </select>
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 8 }}>
+            <span style={{ fontSize: 12, color: 'var(--text-dim)', padding: '4px 8px' }}>Классы:</span>
+            <button onClick={() => setSupportClassFilter('all')} style={{ padding: '3px 8px', borderRadius: 4, fontSize: 10, border: supportClassFilter === 'all' ? '1px solid var(--accent-green)' : '1px solid var(--border)', background: supportClassFilter === 'all' ? 'rgba(0,230,138,0.1)' : 'transparent', color: 'var(--text-light)', cursor: 'pointer' }}>Все</button>
+            <button onClick={() => setSupportClassFilter('support')} style={{ padding: '3px 8px', borderRadius: 4, fontSize: 10, border: supportClassFilter === 'support' ? '1px solid var(--accent-green)' : '1px solid var(--border)', background: supportClassFilter === 'support' ? 'rgba(0,230,138,0.1)' : 'transparent', color: 'var(--text-light)', cursor: 'pointer' }}>Поддержка</button>
+            <button onClick={() => setSupportClassFilter('peptide_regenerative')} style={{ padding: '3px 8px', borderRadius: 4, fontSize: 10, border: supportClassFilter === 'peptide_regenerative' ? '1px solid var(--accent-green)' : '1px solid var(--border)', background: supportClassFilter === 'peptide_regenerative' ? 'rgba(0,230,138,0.1)' : 'transparent', color: 'var(--text-light)', cursor: 'pointer' }}>Регенерация</button>
+            <button onClick={() => setSupportClassFilter('peptide_nootropic')} style={{ padding: '3px 8px', borderRadius: 4, fontSize: 10, border: supportClassFilter === 'peptide_nootropic' ? '1px solid var(--accent-green)' : '1px solid var(--border)', background: supportClassFilter === 'peptide_nootropic' ? 'rgba(0,230,138,0.1)' : 'transparent', color: 'var(--text-light)', cursor: 'pointer' }}>Ноотропы</button>
+            <button onClick={() => setSupportClassFilter('peptide_immune')} style={{ padding: '3px 8px', borderRadius: 4, fontSize: 10, border: supportClassFilter === 'peptide_immune' ? '1px solid var(--accent-green)' : '1px solid var(--border)', background: supportClassFilter === 'peptide_immune' ? 'rgba(0,230,138,0.1)' : 'transparent', color: 'var(--text-light)', cursor: 'pointer' }}>Иммунная</button>
           </div>
           <div style={{ display: 'flex', gap: 12 }}>
             <div style={{ flex: selectedDetail ? '0 0 280px' : 1, maxHeight: '70vh', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 6 }}>

@@ -6,8 +6,14 @@ import { calculateMultiSubstancePKPD } from '../../engines/pkpd-superposition.en
 import { checkDrugInteractions } from '../../engines/pharma-interactions.engine';
 import { PHARMA_DETAILS, type PharmaDetail } from '../../data/pharma-details';
 import type { PharmaSubstance, CourseEntry, PD } from '../../core/types';
+import { SYNERGY_PAIRS, type SynergyPair } from '../../engines/support.engine';
+import { SYSTEM_INFO } from '../../core/risk-info';
 
 type Tab = 'catalog' | 'pkpd' | 'dosage' | 'interactions' | 'research';
+
+const SYSTEM_LABELS: Record<string, string> = Object.fromEntries(
+  Object.entries(SYSTEM_INFO).map(([k, v]) => [k, v.label.split(' ').slice(0, 2).join(' ')])
+);
 
 const CLASS_LABELS: Record<string, string> = {
   testosterone: 'Тестостерон',
@@ -25,7 +31,11 @@ const CLASS_LABELS: Record<string, string> = {
   pct_serm: 'СЕРМ (ПКТ)',
   pct_aromatase: 'Ингибиторы ароматазы',
   pct_dopamine: 'Допаминовые агонисты',
-  support: 'Поддержка',
+  pct_gonadotropin: 'Гонадотропины (ХГЧ)',
+  drostanolone: 'Дростанолон (Мастерон)',
+  peptide_gnrh: 'Пептиды GNRH',
+  peptide_fat_loss: 'Пептиды для жироудаления',
+  peptide_other: 'Другие пептиды',
 };
 
 const PD_LABELS: Record<keyof PD, string> = {
@@ -68,8 +78,24 @@ const formatHalfLife = (hours: number): string => {
   return `${hours.toFixed(1)} ч`;
 };
 
+const PHARMA_CLASSES = [
+  'testosterone', 'trenbolone', 'nandrolone', 'boldenone', 'primobolan', 'oral_17aa',
+  'sarm', 'peptide_ghrh', 'peptide_ghrp', 'igf1', 'mgf', 'insulin', 'pct_serm',
+  'pct_aromatase', 'pct_dopamine', 'pct_gonadotropin', 'drostanolone', 'peptide_gnrh',
+  'peptide_fat_loss', 'peptide_other'
+] as const;
+
+type PharmaClass = typeof PHARMA_CLASSES[number];
+
 export const PharmaScreen: React.FC = () => {
   const [tab, setTab] = useState<Tab>('catalog');
+
+  // Filter to show only pharma substances (exclude support classes)
+  const pharmaSubstances = useMemo(() => {
+    return Object.values(PHARMA_DB).filter(s => 
+      PHARMA_CLASSES.includes(s.class as PharmaClass)
+    );
+  }, []);
 
   return (
     <div className="screen pharma">
@@ -106,14 +132,21 @@ const CatalogTab: React.FC = () => {
   const [filterClass, setFilterClass] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
 
+  // Filter to show only pharma substances
+  const pharmaSubstances = useMemo(() => {
+    return Object.values(PHARMA_DB).filter(s => 
+      PHARMA_CLASSES.includes(s.class as PharmaClass)
+    );
+  }, []);
+
   const filteredList = useMemo(() => {
-    let list = filterClass === 'all' ? Object.values(PHARMA_DB) : SUBSTANCES_BY_CLASS[filterClass] || [];
+    let list = filterClass === 'all' ? pharmaSubstances : pharmaSubstances.filter(s => s.class === filterClass);
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
       list = list.filter(s => s.name.toLowerCase().includes(q) || s.id.toLowerCase().includes(q) || (s.class && s.class.toLowerCase().includes(q)));
     }
     return list;
-  }, [filterClass, searchQuery]);
+  }, [filterClass, searchQuery, pharmaSubstances]);
 
   const selected = selectedId ? PHARMA_DB[selectedId] : null;
   const detail = selectedId ? PHARMA_DETAILS[selectedId] : undefined;
@@ -124,8 +157,8 @@ const CatalogTab: React.FC = () => {
         <input type="text" placeholder="Поиск препарата..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', fontSize: 13, marginBottom: 8, boxSizing: 'border-box' }} />
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 8 }}>
           <button onClick={() => setFilterClass('all')} style={{ padding: '3px 8px', borderRadius: 4, fontSize: 11, border: filterClass === 'all' ? '1px solid var(--accent)' : '1px solid var(--border)', background: filterClass === 'all' ? 'rgba(0,230,138,0.15)' : 'transparent', color: 'var(--text-primary)', cursor: 'pointer' }}>Все</button>
-          {Object.entries(SUBSTANCES_BY_CLASS).map(([cls, list]) => (
-            <button key={cls} onClick={() => setFilterClass(cls)} style={{ padding: '3px 8px', borderRadius: 4, fontSize: 11, border: filterClass === cls ? '1px solid var(--accent)' : '1px solid var(--border)', background: filterClass === cls ? 'rgba(0,230,138,0.15)' : 'transparent', color: 'var(--text-primary)', cursor: 'pointer' }}>{CLASS_LABELS[cls] || cls} ({list.length})</button>
+          {PHARMA_CLASSES.map(cls => (
+            <button key={cls} onClick={() => setFilterClass(cls)} style={{ padding: '3px 8px', borderRadius: 4, fontSize: 11, border: filterClass === cls ? '1px solid var(--accent)' : '1px solid var(--border)', background: filterClass === cls ? 'rgba(0,230,138,0.15)' : 'transparent', color: 'var(--text-primary)', cursor: 'pointer' }}>{CLASS_LABELS[cls] || cls}</button>
           ))}
         </div>
         {filteredList.map(s => (
@@ -138,6 +171,11 @@ const CatalogTab: React.FC = () => {
             <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>{CLASS_LABELS[s.class] || s.class}</div>
           </div>
         ))}
+        {filteredList.length === 0 && (
+          <div style={{ padding: 20, textAlign: 'center', color: 'var(--text-dim)' }}>
+            {searchQuery ? 'Ничего не найдено' : 'Нет фарма препаратов'}
+          </div>
+        )}
       </div>
       <div style={{ maxHeight: 'calc(100vh - 160px)', overflowY: 'auto' }}>
         {selected ? <DrugDetailCard sub={selected} detail={detail} /> : (
@@ -283,7 +321,12 @@ const PKPDSimulationTab: React.FC = () => {
   ]);
   const [simResult, setSimResult] = useState<{ points: { week: number; cp: number; effect: number; tol: number }[]; peak: number; trough: number; ssDays: number } | null>(null);
 
-  const allSubstances = Object.values(PHARMA_DB);
+  // Filter to show only pharma substances
+  const allSubstances = useMemo(() => {
+    return Object.values(PHARMA_DB).filter(s => 
+      PHARMA_CLASSES.includes(s.class as PharmaClass)
+    );
+  }, []);
 
   const addDrug = () => {
     setDrugDoses([...drugDoses, { substanceId: 'test_enan', doseMg: 250, frequencyDays: [1, 4], totalWeeks: 12 }]);
@@ -464,7 +507,7 @@ const PKPDSimulationTab: React.FC = () => {
 };
 
 const DosageCalculatorTab: React.FC = () => {
-  const allPharma = Object.values(PHARMA_DB).filter((s) => s.class !== 'support' && s.class !== 'pct_serm' && s.class !== 'pct_aromatase' && s.class !== 'pct_dopamine');
+  const allPharma = Object.values(PHARMA_DB).filter((s) => PHARMA_CLASSES.includes(s.class as PharmaClass));
   const [drug, setDrug] = useState('');
   const [mgKg, setMgKg] = useState(2);
   const [weight, setWeight] = useState(90);
@@ -514,7 +557,12 @@ const DosageCalculatorTab: React.FC = () => {
 };
 
 const InteractionCheckerTab: React.FC = () => {
-  const allSubstances = Object.values(PHARMA_DB);
+  // Filter to show only pharma substances
+  const allSubstances = useMemo(() => {
+    return Object.values(PHARMA_DB).filter(s => 
+      PHARMA_CLASSES.includes(s.class as PharmaClass)
+    );
+  }, []);
   const [selectedIds, setSelectedIds] = useState<string[]>(['', '']);
 
   const addDrug = () => setSelectedIds([...selectedIds, '']);
@@ -614,6 +662,107 @@ const InteractionCheckerTab: React.FC = () => {
           ))}
         </div>
       )}
+
+      {/* Synergies Section */}
+      {SYNERGY_PAIRS.length > 0 && (
+        <div className="card" style={{ marginTop: 12 }}>
+          <h3 style={{ margin: '0 0 8px 0', fontSize: 16 }}>💥 Синергии и комбинации</h3>
+          <p style={{ fontSize: 11, color: 'var(--text-dim)', margin: '0 0 12px 0' }}>
+            Ключевые синергетические пары между препаратами
+          </p>
+          
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 8 }}>
+            {SYNERGY_PAIRS.map((pair, i) => {
+              const synergyColors: Record<string, string> = {
+                synergistic: 'rgba(0,230,138,0.1)',
+                additive: 'rgba(59,130,246,0.1)',
+                potentiative: 'rgba(249,115,22,0.1)',
+                complementary: 'rgba(168,85,247,0.1)',
+              };
+              const synergyColorsText: Record<string, string> = {
+                synergistic: '#00e68a',
+                additive: '#3b82f6',
+                potentiative: '#f97316',
+                complementary: '#a855f7',
+              };
+              
+              return (
+                <div key={i} style={{
+                  background: synergyColors[pair.synergyType] || 'rgba(255,255,255,0.03)',
+                  borderRadius: 6,
+                  padding: '10px 12px',
+                  border: '1px solid ' + (synergyColorsText[pair.synergyType] || '#888') + '40',
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+                    <span style={{
+                      fontSize: 10,
+                      fontWeight: 700,
+                      padding: '2px 6px',
+                      borderRadius: 4,
+                      background: synergyColorsText[pair.synergyType] + '20',
+                      color: synergyColorsText[pair.synergyType],
+                      textTransform: 'uppercase',
+                    }}>
+                      {(() => {
+                        switch (pair.synergyType) {
+                          case 'synergistic': return '⊕ Синергия';
+                          case 'additive': return '+ Аддитивно';
+                          case 'potentiative': return '↗ Усиление';
+                          case 'complementary': return '↔ Дополнение';
+                          default: return '↔ Дополнение';
+                        }
+                      })()}
+                    </span>
+                    <span style={{
+                      fontSize: 11,
+                      fontWeight: 700,
+                      color: synergyColorsText[pair.synergyType],
+                    }}>
+                      Сила: {Math.round(pair.strength * 100)}%
+                    </span>
+                  </div>
+                  
+                  <div style={{ fontSize: 12, lineHeight: 1.5, color: 'var(--text-light)' }}>
+                    {pair.mechanism}
+                  </div>
+                  
+                  {pair.clinicalNote && (
+                    <div style={{
+                      marginTop: 6,
+                      fontSize: 10,
+                      color: '#22c55e',
+                      fontStyle: 'italic',
+                    }}>
+                      💡 {pair.clinicalNote}
+                    </div>
+                  )}
+                  
+                  {pair.affectedSystems && pair.affectedSystems.length > 0 && (
+                    <div style={{
+                      marginTop: 6,
+                      display: 'flex',
+                      flexWrap: 'wrap',
+                      gap: 3,
+                    }}>
+                      {pair.affectedSystems.map(sys => (
+                        <span key={sys} style={{
+                          fontSize: 8,
+                          padding: '1px 4px',
+                          borderRadius: 3,
+                          background: 'rgba(255,255,255,0.1)',
+                          color: 'var(--text-dim)',
+                        }}>
+                          {SYSTEM_LABELS[sys] || sys}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 };
@@ -623,16 +772,21 @@ const ResearchTab: React.FC = () => {
   const [filterClass, setFilterClass] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
 
-  const allSubstances = Object.values(PHARMA_DB);
+  // Filter to show only pharma substances
+  const pharmaSubstances = useMemo(() => {
+    return Object.values(PHARMA_DB).filter(s => 
+      PHARMA_CLASSES.includes(s.class as PharmaClass)
+    );
+  }, []);
 
   const filteredList = useMemo(() => {
-    let list = filterClass === 'all' ? allSubstances : SUBSTANCES_BY_CLASS[filterClass] || [];
+    let list = filterClass === 'all' ? pharmaSubstances : pharmaSubstances.filter(s => s.class === filterClass);
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
       list = list.filter(s => s.name.toLowerCase().includes(q) || s.id.toLowerCase().includes(q));
     }
     return list;
-  }, [filterClass, searchQuery]);
+  }, [filterClass, searchQuery, pharmaSubstances]);
 
   const selected = selectedId ? PHARMA_DB[selectedId] : null;
 
@@ -642,8 +796,8 @@ const ResearchTab: React.FC = () => {
         <input type="text" placeholder="Поиск препарата..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', fontSize: 13, marginBottom: 8, boxSizing: 'border-box' }} />
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 8 }}>
           <button onClick={() => setFilterClass('all')} style={{ padding: '3px 8px', borderRadius: 4, fontSize: 11, border: filterClass === 'all' ? '1px solid var(--accent)' : '1px solid var(--border)', background: filterClass === 'all' ? 'rgba(0,230,138,0.15)' : 'transparent', color: 'var(--text-primary)', cursor: 'pointer' }}>Все</button>
-          {Object.entries(SUBSTANCES_BY_CLASS).map(([cls, list]) => (
-            <button key={cls} onClick={() => setFilterClass(cls)} style={{ padding: '3px 8px', borderRadius: 4, fontSize: 11, border: filterClass === cls ? '1px solid var(--accent)' : '1px solid var(--border)', background: filterClass === cls ? 'rgba(0,230,138,0.15)' : 'transparent', color: 'var(--text-primary)', cursor: 'pointer' }}>{CLASS_LABELS[cls] || cls} ({list.length})</button>
+          {PHARMA_CLASSES.map(cls => (
+            <button key={cls} onClick={() => setFilterClass(cls)} style={{ padding: '3px 8px', borderRadius: 4, fontSize: 11, border: filterClass === cls ? '1px solid var(--accent)' : '1px solid var(--border)', background: filterClass === cls ? 'rgba(0,230,138,0.15)' : 'transparent', color: 'var(--text-primary)', cursor: 'pointer' }}>{CLASS_LABELS[cls] || cls}</button>
           ))}
         </div>
         {filteredList.map(s => (
@@ -656,6 +810,11 @@ const ResearchTab: React.FC = () => {
             <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>{CLASS_LABELS[s.class] || s.class}</div>
           </div>
         ))}
+        {filteredList.length === 0 && (
+          <div style={{ padding: 20, textAlign: 'center', color: 'var(--text-dim)' }}>
+            {searchQuery ? 'Ничего не найдено' : 'Нет фарма препаратов'}
+          </div>
+        )}
       </div>
       <div style={{ maxHeight: 'calc(100vh - 160px)', overflowY: 'auto' }}>
         {selected ? (

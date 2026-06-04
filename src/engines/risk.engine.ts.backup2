@@ -172,7 +172,7 @@ export function calculateRisks(i: RiskInput): RiskResult {
    };
 }
 
-// Aggregated risk from all sources (pharma, labs, training, nutrition, diagnostics) - UPDATED with weighted aggregation
+// Aggregated risk from all sources (pharma, labs, training, nutrition, diagnostics)
 export interface AggregatedRisk {
   pharma: RiskResult;
   labs: { overallRaw: number; overallNet: number; systemBreakdown: Record<string, number> };
@@ -181,7 +181,7 @@ export interface AggregatedRisk {
   diagnostics: { overallRaw: number; overallNet: number; systemBreakdown?: Record<string, { raw: number; net: number }> };
   overallRaw: number;
   overallNet: number;
-  systemBreakdown: Record<string, { raw: number; net: number; sources?: Record<string, { raw: number; net: number }> }>;
+  systemBreakdown: Record<string, { raw: number; net: number }>;
 }
 
 export function calculateAggregatedRisks(
@@ -191,50 +191,20 @@ export function calculateAggregatedRisks(
   nutritionResult: { overallRaw: number; overallNet: number; systemBreakdown?: Record<string, { raw: number; net: number }> },
   diagnosticsResult: { overallRaw: number; overallNet: number; systemBreakdown?: Record<string, { raw: number; net: number }> }
 ): AggregatedRisk {
-  // Веса для каждого источника риска (сумма = 1.0)
-  const WEIGHTS = {
-    pharma: 0.35,     // Препараты - основной источник риска
-    labs: 0.25,       // Анализы - важная проверка состояния
-    training: 0.20,   // Тренировки - значительная физическая нагрузка
-    nutrition: 0.15,  // Питание - базовая поддержка организма
-    diagnostics: 0.05 // Исследования - дополнительная информация
-  };
-  
-  const TOTAL_WEIGHT = WEIGHTS.pharma + WEIGHTS.labs + WEIGHTS.training + WEIGHTS.nutrition + WEIGHTS.diagnostics;
-  
-  const aggregateSystem = (system: string): { raw: number; net: number; sources?: Record<string, { raw: number; net: number }> } => {
+  const aggregateSystem = (system: string): { raw: number; net: number } => {
     const pharmaSys = pharmaResult.systemBreakdown?.[system];
     const labSys = labResult.systemContributions[system] ?? 0;
     const trainSys = trainingResult.systemBreakdown?.[system]?.net ?? trainingResult.systemBreakdown?.[system]?.raw ?? 0;
     const nutriSys = nutritionResult.systemBreakdown?.[system]?.net ?? nutritionResult.systemBreakdown?.[system]?.raw ?? 0;
     const diagSys = diagnosticsResult.systemBreakdown?.[system]?.net ?? diagnosticsResult.systemBreakdown?.[system]?.raw ?? 0;
     
-    // Для сырых значений используем максимум (консервативный подход)
     const raw = Math.max(pharmaSys?.raw ?? 0, labSys, trainSys, nutriSys, diagSys);
+    const net = Math.max(pharmaSys?.net ?? 0, labSys, trainSys, nutriSys, diagSys);
     
-    // Для нетто значений используем взвешенную сумму
-    let net = 0;
-    net += (pharmaSys?.net ?? 0) * (WEIGHTS.pharma / TOTAL_WEIGHT);
-    net += labSys * (WEIGHTS.labs / TOTAL_WEIGHT);
-    net += trainSys * (WEIGHTS.training / TOTAL_WEIGHT);
-    net += nutriSys * (WEIGHTS.nutrition / TOTAL_WEIGHT);
-    net += diagSys * (WEIGHTS.diagnostics / TOTAL_WEIGHT);
-    net = Math.min(100, net);
-    
-    return { 
-      raw, 
-      net, 
-      sources: {
-        pharma: { raw: pharmaSys?.raw ?? 0, net: pharmaSys?.net ?? 0 },
-        labs: { raw: labSys, net: labSys },
-        training: { raw: trainSys, net: trainSys },
-        nutrition: { raw: nutriSys, net: nutriSys },
-        diagnostics: { raw: diagSys, net: diagSys }
-      }
-    };
+    return { raw, net };
   };
   
-  const systemBreakdown: Record<string, { raw: number; net: number; sources?: Record<string, { raw: number; net: number }> }> = {};
+  const systemBreakdown: Record<string, { raw: number; net: number }> = {};
   for (const sys of RISK_SYSTEMS) {
     systemBreakdown[sys] = aggregateSystem(sys);
   }

@@ -50,6 +50,7 @@ export const LabsScreen: React.FC<LabsProps> = ({ initialTab = 'input' }) => {
   const [phase, setPhase] = useState<'baseline' | 'on_cycle' | 'pct' | 'bridge' | 'fertility'>('baseline');
   const [markerValues, setMarkerValues] = useState<Record<string, { value: string; unit: string }>>({});
   const [invDone, setInvDone] = useState<Record<string, boolean>>({});
+  const [noLabs, setNoLabs] = useState<Record<string, boolean>>({}); // Для кнопок "Без анализов"
 
   useEffect(() => {
     const loadData = async () => {
@@ -256,6 +257,8 @@ export const LabsScreen: React.FC<LabsProps> = ({ initialTab = 'input' }) => {
     .flatMap(pid => (LAB_PANELS[pid]?.markers ?? []).map(m => m.ucumCode ?? m.id))
     .filter(code => !entries.some(e => e.code.toUpperCase() === code.toUpperCase()));
   const hasNoLabs = entries.length === 0;
+  // Проверка: есть ли хоть какие-то данные анализов (не просто кнопка "Без анализов")
+  const hasAnyLabs = entries.length > 0 && Object.values(noLabs).every(v => !v);
 
   if (loading) return <div className="loading-screen"><div className="loading-spinner"/><span>Загрузка...</span></div>;
 
@@ -272,14 +275,17 @@ export const LabsScreen: React.FC<LabsProps> = ({ initialTab = 'input' }) => {
     <div className="screen labs">
       <h2>Лабораторные анализы</h2>
 
-      {hasNoLabs && (
-        <div style={{ background: 'var(--danger-dim)', border: '1px solid var(--danger)', borderRadius: 12, padding: 14, marginBottom: 16 }}>
-          <div style={{ fontWeight: 700, color: 'var(--danger)', fontSize: 15, marginBottom: 4 }}>&#9888; Анализы обязательны!</div>
-          <div style={{ fontSize: 13, color: 'var(--text-dim)' }}>Для расчёта рисков и рекомендаций необходимо ввести результаты анализов. Введите данные вручную или вставьте текст из лабораторного бланка.</div>
+      {!hasAnyLabs && (
+        <div style={{ background: 'var(--warning-dim)', border: '1px solid var(--warning)', borderRadius: 12, padding: 14, marginBottom: 16 }}>
+          <div style={{ fontWeight: 700, color: 'var(--warning)', fontSize: 15, marginBottom: 4 }}>&#9888; Внимание: анализов нет!</div>
+          <div style={{ fontSize: 13, color: 'var(--text-dim)', marginBottom: 8 }}>Кнопка "Без анализов" активирована. Это приведёт к штрафам в расчётах рисков.</div>
+          <button className="btn" onClick={() => setNoLabs({})} style={{ background: 'var(--success)', borderColor: 'var(--success)' }}>
+            &#10004; Включить анализы
+          </button>
         </div>
       )}
 
-      {!hasNoLabs && missingMarkers.length > 0 && (
+      {!hasAnyLabs && missingMarkers.length > 0 && (
         <div style={{ background: 'var(--warning-dim)', border: '1px solid var(--warning)', borderRadius: 12, padding: 14, marginBottom: 16 }}>
           <div style={{ fontWeight: 700, color: 'var(--warning)', fontSize: 14, marginBottom: 4 }}>&#9888; Не хватает показателей для фазы «{phase === 'on_cycle' ? 'Курс' : phase === 'pct' ? 'ПКТ' : phase === 'bridge' ? 'Мост' : phase === 'fertility' ? 'Фертильность' : 'Базовая'}»</div>
           <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>Рекомендуется ввести: {missingMarkers.join(', ')}</div>
@@ -336,14 +342,40 @@ export const LabsScreen: React.FC<LabsProps> = ({ initialTab = 'input' }) => {
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
               {Object.entries(LAB_PANELS).map(([key, panel]) => {
                 const allFilled = panel.markers.every(m => entries.some(e => e.code === (m.ucumCode ?? m.id)));
+                const noLabsForPanel = noLabs[key];
                 return (
-                  <button key={key} className={'btn secondary' + (selectedPanel === key ? ' active' : '')} style={{ background: allFilled ? 'var(--success-dim)' : undefined, borderColor: allFilled ? 'var(--success)' : undefined }} onClick={() => setSelectedPanel(key)}>
-                    {allFilled ? '&#10003; ' : ''}{panel.label}
+                  <button
+                    key={key}
+                    className={'btn secondary' + (selectedPanel === key ? ' active' : '')}
+                    style={{
+                      background: allFilled ? 'var(--success-dim)' : noLabsForPanel ? 'var(--warning-dim)' : undefined,
+                      borderColor: allFilled ? 'var(--success)' : noLabsForPanel ? 'var(--warning)' : undefined
+                    }}
+                    onClick={() => {
+                      if (noLabsForPanel) {
+                        setNoLabs(prev => ({ ...prev, [key]: false }));
+                      } else {
+                        setSelectedPanel(key);
+                      }
+                    }}
+                  >
+                    {allFilled ? '&#10003; ' : noLabsForPanel ? '&#10005; ' : ''}{panel.label}
                   </button>
                 );
               })}
+              {/* Общая кнопка "Без анализов" */}
+              <button
+                className="btn secondary"
+                style={{ background: 'var(--warning-dim)', borderColor: 'var(--warning)' }}
+                onClick={() => {
+                  const allNoLabs = Object.keys(LAB_PANELS).reduce((acc, key) => ({ ...acc, [key]: true }), {});
+                  setNoLabs(allNoLabs);
+                }}
+              >
+                &#10005; Без анализов (все)
+              </button>
             </div>
-            {LAB_PANELS[selectedPanel] && (
+            {LAB_PANELS[selectedPanel] && !noLabs[selectedPanel] && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                 {LAB_PANELS[selectedPanel].markers.map(marker => {
                   const code = marker.ucumCode ?? marker.id;
@@ -390,37 +422,26 @@ export const LabsScreen: React.FC<LabsProps> = ({ initialTab = 'input' }) => {
                         <button className="btn" style={{ whiteSpace: 'nowrap' }} onClick={() => saveMarker(code, marker)} disabled={!val}>
                           Сохранить
                         </button>
+                        <button
+                          className="btn secondary"
+                          style={{ whiteSpace: 'nowrap', background: 'var(--warning-dim)', borderColor: 'var(--warning)' }}
+                          onClick={() => {
+                            setNoLabs(prev => ({ ...prev, [selectedPanel]: true }));
+                            setMarkerValues(prev => {
+                              const newPrev = { ...prev };
+                              delete newPrev[code];
+                              return newPrev;
+                            });
+                          }}
+                        >
+                          &#10005; Без анализов
+                        </button>
                       </div>
                     </div>
                   );
                 })}
               </div>
             )}
-          </div>
-
-          <div className="card" style={{ marginBottom: 12 }}>
-            <h3>&#128203; Ручной ввод</h3>
-            <p style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 8 }}>Введите код или название показателя, значение и единицу измерения</p>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 8 }}>
-              {Object.entries(UCUM_MAP).map(([code, info]) => (
-                <button key={code} className="btn secondary" style={{ fontSize: 11, padding: '4px 10px' }} onClick={() => {
-                  setMarkerValues(prev => ({ ...prev, [code]: { value: prev[code]?.value ?? '', unit: info.prefUnit } }));
-                }}>
-                  {info.name} ({code})
-                </button>
-              ))}
-            </div>
-            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-              <input type="text" className="input" placeholder="Код (напр. ALT, HGB)" style={{ flex: 1 }} value={(() => {
-                const freeEntry = Object.entries(markerValues).find(([k]) => !UCUM_MAP[k] && k.startsWith('_custom_'));
-                return freeEntry ? freeEntry[0].replace('_custom_', '') : '';
-              })()} onChange={e => {
-                const code = resolveLabMarker(e.target.value);
-                setMarkerValues(prev => ({ ...prev, [code]: { value: prev[code]?.value ?? '', unit: prev[code]?.unit ?? '' } }));
-              }} />
-              <input type="number" className="input" placeholder="Значение" style={{ width: 100 }} />
-              <input type="text" className="input" placeholder="Ед." style={{ width: 70 }} />
-            </div>
           </div>
         </>
       )}

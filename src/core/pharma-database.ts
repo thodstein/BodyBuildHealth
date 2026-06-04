@@ -121,3 +121,12 @@ SUBSTANCE_LIST.forEach(s => {
   if(!SUBSTANCES_BY_CLASS[s.class]) SUBSTANCES_BY_CLASS[s.class] = [];
   SUBSTANCES_BY_CLASS[s.class].push(s);
 });
+
+export const PHARMA_CLASSES = [
+  'testosterone', 'trenbolone', 'nandrolone', 'boldenone', 'primobolan', 'oral_17aa',
+  'sarm', 'peptide_ghrh', 'peptide_ghrp', 'igf1', 'mgf', 'insulin', 'pct_serm',
+  'pct_aromatase', 'pct_dopamine', 'pct_gonadotropin', 'drostanolone', 'peptide_gnrh',
+  'peptide_fat_loss', 'peptide_other'
+] as const;
+
+type PharmaClass = typeof PHARMA_CLASSES[number];
