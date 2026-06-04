@@ -205,7 +205,7 @@ export const RiskScreen: React.FC = () => {
       if (entry !== undefined) { mitigations.push({ substance: subName, effect: mechId, reduction: entry }); }
     }
     return mitigations;
-  }, []);
+  }, [SUPPORT_BASE_COVERAGE]);
 
   const systemsFor3D = useMemo(() => {
     const result: Record<string, { raw: number; net: number }> = {};
