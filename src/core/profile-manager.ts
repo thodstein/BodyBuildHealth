@@ -48,7 +48,22 @@ function getDefaultProfile(): UserProfile {
       height: 175,
       goal: "",
       phase: "course",
-      courseStartDate: new Date().toISOString().slice(0, 10)
+      courseStartDate: new Date().toISOString().slice(0, 10),
+      baselineSleepQuality: 5,
+      baselineStressLevel: 3,
+      fatigueLevel: 3,
+      dailySteps: 6000,
+      dailyWaterLiters: 2,
+      nightAwakenings: 1,
+      chronotype: 'mixed',
+      trainingLevel: 'intermediate',
+      workoutsPerWeek: 3,
+      avgWorkoutMinutes: 60,
+      pharmaExperience: 'none',
+      currentSupplements: [],
+      currentMedications: [],
+      injuries: [],
+      weakPoints: []
     },
   };
 }

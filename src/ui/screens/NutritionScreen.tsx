@@ -573,8 +573,8 @@ function AdviceTab({ targets, diary, goal }: { targets: NutritionTargets | null;
     ...(profile.settings?.currentSupplements || []),
   ];
 
-  const [rationTier, setRationTier] = useState<RationTier>(null);
   const [productSection, setProductSection] = useState<ProductSection>(null);
+  const [rationTier, setRationTier] = useState<RationTier>(null);
   const [showMacroCycle, setShowMacroCycle] = useState(false);
 
   const advice = useMemo(() => {
@@ -583,7 +583,7 @@ function AdviceTab({ targets, diary, goal }: { targets: NutritionTargets | null;
       targets,
       goal,
       { kcal: totals.kcal, pro: totals.p, fiber: totals.fiber, water: totals.water },
-      drugs.map(d => d.name)
+      drugs.map((d: SupplementEntry | MedicationEntry) => d.name) as string[]
     );
   }, [targets, goal, totals, drugs]);
 

@@ -20,9 +20,10 @@ import { FertilityPCTScreen } from './ui/screens/FertilityPCTScreen';
 import { ReportsScreen } from './ui/screens/ReportsScreen';
 import { IntegrationsScreen } from './ui/screens/IntegrationsScreen';
 import { RoleManagementScreen } from './ui/screens/RoleManagementScreen';
+import { SupportScreen } from './ui/screens/SupportScreen';
 import { ToastContainer } from './ui/ToastContainer';
 
-type Tab = 'home' | 'pharma' | 'training' | 'nutrition' | 'labs' | 'risks' | 'profile';
+type Tab = 'home' | 'pharma' | 'training' | 'nutrition' | 'labs' | 'risks' | 'support' | 'profile';
 type SubPage = string;
 
 const NAV: { id: Tab; label: string; icon: React.ReactNode }[] = [
@@ -32,6 +33,7 @@ const NAV: { id: Tab; label: string; icon: React.ReactNode }[] = [
   { id: 'nutrition', label: 'Питание', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg> },
   { id: 'labs', label: 'Анализы', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 3h6v7l5 8H4l5-8V3z"/><line x1="9" y1="3" x2="15" y2="3"/></svg> },
   { id: 'risks', label: 'Риски', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg> },
+  { id: 'support', label: 'Поддержка', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg> },
   { id: 'profile', label: 'Профиль', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg> },
 ];
 
@@ -88,7 +90,7 @@ export default function App() {
       predictive: ['training', 'whatif'], marketplace: ['pharma', 'marketplace'],
       articles: ['profile', 'articles'], assistant: ['profile', 'assistant'],
       gamification: ['profile', 'gamification'], fertility: ['risks', 'fertility'], 'fertility-pct': ['risks', 'fertility'],
-      support: ['risks', 'support'], calculators: ['nutrition', 'calc'], reports: ['profile', 'reports'],
+      support: ['support', ''], calculators: ['nutrition', 'calc'], reports: ['profile', 'reports'],
       integrations: ['profile', 'integrations'], 'role-management': ['profile', 'roles'],
     };
     const entry = map[screenId];
@@ -146,8 +148,12 @@ export default function App() {
       ];
       case 'risks': return [
         { id: 'matrix', label: 'Матрица рисков' },
-        { id: 'support', label: 'Поддержка органов' },
         { id: 'fertility', label: 'Фертильность' },
+      ];
+      case 'support': return [
+        { id: 'catalog', label: 'Каталог' },
+        { id: 'synergies', label: 'Синергии' },
+        { id: 'recommendations', label: 'Рекомендации' },
       ];
       case 'profile': return [
         { id: 'settings', label: 'Настройки' },
@@ -183,7 +189,9 @@ export default function App() {
         case 'diary': return <NutritionScreen />;
         case 'advice': return <NutritionScreen initialTab="advice" />;
         case 'calc': return <CalculatorsScreen />;
-        case 'support': return <CalculatorsScreen initialTab="support" />;
+        case 'catalog': return <SupportScreen />;
+        case 'synergies': return <SupportScreen initialTab="synergies" />;
+        case 'recommendations': return <SupportScreen initialTab="recommendations" />;
         case 'results': return <LabsScreen initialTab="input" />;
         case 'panels': return <LabsScreen initialTab="panels" />;
         case 'history': return <LabsScreen initialTab="history" />;
@@ -210,7 +218,8 @@ export default function App() {
       case 'training': return <PlanScreen goal="energy" />;
       case 'nutrition': return <NutritionScreen />;
       case 'labs': return <LabsScreen />;
-      case 'risks': return sub === 'support' ? <CalculatorsScreen initialTab="support" /> : sub === 'fertility' ? <FertilityPCTScreen /> : <RiskScreen />;
+      case 'risks': return sub === 'fertility' ? <FertilityPCTScreen /> : <RiskScreen />;
+      case 'support': return <SupportScreen />;
       case 'profile': return <ProfileScreen />;
       default: return <DashboardScreen onNavigate={navToScreen} />;
     }

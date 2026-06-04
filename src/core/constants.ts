@@ -107,13 +107,54 @@ export const NUTRITION_MACRO_RANGES: Record<string, { protein: [number, number];
    maintenance:{ protein: [1.6, 2.0], fats: [0.8, 1.0], carbs_mod: 'mod' },
    recomp:     { protein: [1.8, 2.2], fats: [0.8, 1.0], carbs_mod: 'mod' },
    rehab:      { protein: [2.0, 2.4], fats: [0.9, 1.1], carbs_mod: 'mod' },
+   hypertrophy:{ protein: [2.0, 2.4], fats: [0.9, 1.1], carbs_mod: 'high' },
    strength:   { protein: [2.0, 2.4], fats: [1.0, 1.2], carbs_mod: 'high' }
-} as const;
+ } as const;
 
 export const FERTILITY_WEIGHTS = { volume: 0.15, concentration: 0.20, totalCount: 0.10, PR: 0.25, morphology: 0.20, pH: 0.10 } as const;
 export const FERTILITY_PENALTIES = { viscosity: 0.95, mar_gt_50: 0.90, leukocytes_gt_1: 0.85, agglutination: 0.80 } as const;
 export const FERTILITY_TARGET = 75;
 export const FERTILITY_TAU_WEEKS = 12;
+
+export const FERTILITY_WEIGHTS_V2 = { sperm: 0.55, hormonal: 0.30, structural: 0.15 } as const;
+
+export const SPERM_WEIGHTS = {
+  volume: 0.12, concentration: 0.18, totalCount: 0.08,
+  pr: 0.22, morphology: 0.18, pH: 0.06,
+  np: 0.05, viability: 0.06, fructose: 0.03, zinc: 0.02
+} as const;
+
+export const HORMONAL_WEIGHTS = {
+  tt: 0.15, ft: 0.15, e2: 0.12, lh: 0.12, fsh: 0.12,
+  shbg: 0.08, prl: 0.08, inhb: 0.12, amh: 0.06
+} as const;
+
+export const NAVY_BF_FORMULAS = {
+  male:   { a: 86.010, b: 70.041, c: 36.76 },
+  female: { a: 163.205, b: 97.684, c: -78.387 }
+} as const;
+
+export const INJURY_LOCATIONS = [
+  'Плечо', 'Локоть', 'Запястье', 'Кисть', 'Грудной отдел',
+  'Поясница', 'Тазобедренный', 'Колено', 'Голеностоп', 'Стопа',
+  'Шея', 'Предплечье', 'Бицепс', 'Трицепс', 'Дельта',
+  'Трапеция', 'Широчайшие', 'Пресс', 'Квадрицепс', 'Бицепс бедра'
+] as const;
+
+export const MUSCLE_GROUPS_FULL = [
+  { id: 'chest', label: 'Грудь' },
+  { id: 'upper_back', label: 'Верх спины' },
+  { id: 'lats', label: 'Широчайшие' },
+  { id: 'lower_back', label: 'Поясница' },
+  { id: 'front_delts', label: 'Передняя дельта' },
+  { id: 'rear_delts', label: 'Задняя дельта' },
+  { id: 'biceps', label: 'Бицепс' },
+  { id: 'triceps', label: 'Трицепс' },
+  { id: 'forearms', label: 'Предплечья' },
+  { id: 'quads', label: 'Квадрицепсы' },
+  { id: 'hamstrings', label: 'Бицепс бедра' },
+  { id: 'calves', label: 'Икры' }
+] as const;
 
 export const SUPPORT_BASE_COVERAGE: Record<string, Record<string, number>> = {
   telmisartan:      { cardio_2: 0.55, cardio_3: 0.45, renal_1: 0.50 },
@@ -274,5 +315,25 @@ export const UCUM_MAP: Record<string, { prefUnit: string; coeff: number; uln: nu
   'PLT': { prefUnit: '10^9/L', coeff: 1, uln: 400, lln: 150, name: 'Тромбоциты' },
   'WBC': { prefUnit: '10^9/L', coeff: 1, uln: 9.0, lln: 4.0, name: 'Лейкоциты' },
   'SHBG':{ prefUnit: 'nmol/L', coeff: 1, uln: 60, lln: 15, name: 'ГСПГ' },
-  'CORTISOL': { prefUnit: 'nmol/L', coeff: 1, uln: 550, lln: 100, name: 'Кортизол' }
+  'CORTISOL': { prefUnit: 'nmol/L', coeff: 1, uln: 550, lln: 100, name: 'Кортизол' },
+  'INHB': { prefUnit: 'pg/mL', coeff: 1, uln: 340, lln: 80, name: 'Ингибин Б' },
+  'AMH':  { prefUnit: 'ng/mL', coeff: 1, uln: 15, lln: 1.0, name: 'АМГ' },
+  'FT':   { prefUnit: 'pg/mL', coeff: 1, uln: 30, lln: 8.0, name: 'Тестостерон свободный' },
+  'DHT':  { prefUnit: 'pg/mL', coeff: 1, uln: 870, lln: 130, name: 'Дигидротестостерон' },
+  'PROG': { prefUnit: 'ng/mL', coeff: 1, uln: 1.2, lln: 0.1, name: 'Прогестерон' },
+  'ALB':  { prefUnit: 'g/L', coeff: 1, uln: 50, lln: 35, name: 'Альбумин' },
+  'TP':   { prefUnit: 'g/L', coeff: 1, uln: 80, lln: 60, name: 'Общий белок' },
+  'BIL':  { prefUnit: 'umol/L', coeff: 1, uln: 17.1, lln: 3.4, name: 'Билирубин общий' },
+  'DBIL': { prefUnit: 'umol/L', coeff: 1, uln: 5, lln: 0, name: 'Билирубин прямой' },
+  'ALP':  { prefUnit: 'U/L', coeff: 1, uln: 130, lln: 40, name: 'Щёлочная фосфатаза' },
+  'K':    { prefUnit: 'mmol/L', coeff: 1, uln: 5.1, lln: 3.5, name: 'Калий' },
+  'NA':   { prefUnit: 'mmol/L', coeff: 1, uln: 145, lln: 135, name: 'Натрий' },
+  'CA':   { prefUnit: 'mmol/L', coeff: 1, uln: 2.6, lln: 2.1, name: 'Кальций' },
+  'P':    { prefUnit: 'mmol/L', coeff: 1, uln: 1.5, lln: 0.8, name: 'Фосфор' },
+  'MG':   { prefUnit: 'mmol/L', coeff: 1, uln: 1.1, lln: 0.7, name: 'Магний' },
+  'B12':  { prefUnit: 'pg/mL', coeff: 1, uln: 900, lln: 200, name: 'Витамин B12' },
+  'FOL':  { prefUnit: 'ng/mL', coeff: 1, uln: 20, lln: 3, name: 'Фолат' },
+  'TIBC': { prefUnit: 'umol/L', coeff: 1, uln: 70, lln: 45, name: 'ОЖСС' },
+  'PSA':  { prefUnit: 'ng/mL', coeff: 1, uln: 4, lln: 0, name: 'ПСА' },
+  'DHEA_S': { prefUnit: 'ug/dL', coeff: 1, uln: 560, lln: 80, name: 'ДГЭА-С' }
 } as const;
