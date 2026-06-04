@@ -1,8 +1,0 @@
-import { MasterDB } from "./types";
-import { EFFECTS_DB } from "../data/effects";
-import { MECHANISMS_DB } from "../data/mechanisms";
-import { RECOMMENDATIONS_DB } from "../data/recommendations";
-import { RISKS_DB } from "../data/risks";
-// Import JSON data
-import substancesJson from "../substances.json";
-import interactionsJson from "../interactions.json";

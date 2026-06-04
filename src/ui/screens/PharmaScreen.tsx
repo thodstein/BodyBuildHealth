@@ -635,7 +635,6 @@ const ResearchTab: React.FC = () => {
   }, [filterClass, searchQuery]);
 
   const selected = selectedId ? PHARMA_DB[selectedId] : null;
-  const detail = selectedId ? PHARMA_DETAILS[selectedId] : undefined;
 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.2fr', gap: 12 }}>
@@ -663,40 +662,30 @@ const ResearchTab: React.FC = () => {
           <div>
             <div className="card" style={{ fontSize: 12 }}>
               <h3 style={{ margin: '0 0 8px', color: 'var(--accent)' }}>{selected.name}</h3>
-              {detail?.researchLinks && detail.researchLinks.length > 0 ? (
+              <div style={{ fontWeight: 600, marginBottom: 6, fontSize: 13 }}>📚 Исследования</div>
+              {selected.research && selected.research.length > 0 ? (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  {detail.researchLinks.map((link, i) => (
-                    <a key={i} href={link.url} target="_blank" rel="noopener noreferrer" style={{
-                      display: 'block',
+                  {selected.research.map((r, i) => (
+                    <div key={i} style={{
                       padding: '10px 12px',
                       borderRadius: 6,
                       background: 'var(--bg-primary)',
-                      textDecoration: 'none',
-                      color: 'var(--text-primary)',
                       border: '1px solid var(--border)',
-                      transition: 'all 0.2s'
                     }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                        <span style={{ fontWeight: 600, fontSize: 13 }}>{link.title}</span>
-                        <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 4, background: 'rgba(34,197,94,0.1)', color: '#22c55e' }}>{link.source}</span>
+                      <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 4 }}>
+                        • {r.study} — <span style={{ color: 'var(--accent)' }}>{r.conclusion}</span>
                       </div>
-                      <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>{link.url}</div>
-                    </a>
+                      <div style={{ fontSize: 10, color: 'var(--text-dim)', textAlign: 'right' }}>{r.year}</div>
+                    </div>
                   ))}
                 </div>
               ) : (
                 <div style={{ textAlign: 'center', padding: 20, color: 'var(--text-dim)' }}>
                   <div style={{ fontSize: 32, marginBottom: 8 }}>📚</div>
-                  <div>Исследования будут добавлены</div>
+                  <div>Исследования отсутствуют</div>
                 </div>
               )}
             </div>
-            {detail && (
-              <div className="card" style={{ marginTop: 8, fontSize: 12 }}>
-                <h3 style={{ margin: '0 0 6px', fontSize: 14 }}>Механизм действия</h3>
-                <p style={{ margin: 0, color: 'var(--text-dim)', lineHeight: 1.6 }}>{detail.mechanism}</p>
-              </div>
-            )}
           </div>
         ) : (
           <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-dim)' }}>

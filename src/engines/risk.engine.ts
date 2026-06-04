@@ -171,3 +171,59 @@ export function calculateRisks(i: RiskInput): RiskResult {
       overallNet: Math.min(100, Math.max(0, geom(oN) * overallMrr * overallHgi * (2 - overallRir)))
    };
 }
+
+// Aggregated risk from all sources (pharma, labs, training, nutrition, diagnostics)
+export interface AggregatedRisk {
+  pharma: RiskResult;
+  labs: { overallRaw: number; overallNet: number; systemBreakdown: Record<string, number> };
+  training: { overallRaw: number; overallNet: number; systemBreakdown: Record<string, number> };
+  nutrition: { overallRaw: number; overallNet: number; systemBreakdown: Record<string, number> };
+  diagnostics: { overallRaw: number; overallNet: number; systemBreakdown: Record<string, number> };
+  overallRaw: number;
+  overallNet: number;
+  systemBreakdown: Record<string, { raw: number; net: number }>;
+}
+
+export function calculateAggregatedRisks(
+  pharmaResult: RiskResult,
+  labResult: { systemContributions: Record<string, number> },
+  trainingResult: { overallRaw: number; overallNet: number; systemBreakdown?: Record<string, { raw: number; net: number }> },
+  nutritionResult: { overallRaw: number; overallNet: number; systemBreakdown?: Record<string, { raw: number; net: number }> },
+  diagnosticsResult: { overallRaw: number; overallNet: number; systemBreakdown?: Record<string, { raw: number; net: number }> }
+): AggregatedRisk {
+  const aggregateSystem = (system: string): { raw: number; net: number } => {
+    const pharmaSys = pharmaResult.systemBreakdown?.[system];
+    const labSys = labResult.systemContributions[system] ?? 0;
+    const trainSys = trainingResult.systemBreakdown?.[system]?.net ?? trainingResult.systemBreakdown?.[system]?.raw ?? 0;
+    const nutriSys = nutritionResult.systemBreakdown?.[system]?.net ?? nutritionResult.systemBreakdown?.[system]?.raw ?? 0;
+    const diagSys = diagnosticsResult.systemBreakdown?.[system]?.net ?? diagnosticsResult.systemBreakdown?.[system]?.raw ?? 0;
+    
+    const raw = Math.max(pharmaSys?.raw ?? 0, labSys, trainSys, nutriSys, diagSys);
+    const net = Math.max(pharmaSys?.net ?? 0, labSys, trainSys, nutriSys, diagSys);
+    
+    return { raw, net };
+  };
+  
+  const systemBreakdown: Record<string, { raw: number; net: number }> = {};
+  for (const sys of RISK_SYSTEMS) {
+    systemBreakdown[sys] = aggregateSystem(sys);
+  }
+  
+  const allRaw = Object.values(systemBreakdown).map(s => s.raw);
+  const allNet = Object.values(systemBreakdown).map(s => s.net);
+  
+  return {
+    pharma: pharmaResult,
+    labs: {
+      overallRaw: labResult.systemContributions.overall ?? 0,
+      overallNet: labResult.systemContributions.overall ?? 0,
+      systemBreakdown: labResult.systemContributions
+    },
+    training: trainingResult,
+    nutrition: nutritionResult,
+    diagnostics: diagnosticsResult,
+    overallRaw: Math.min(100, geom(allRaw)),
+    overallNet: Math.min(100, geom(allNet)),
+    systemBreakdown
+  };
+}

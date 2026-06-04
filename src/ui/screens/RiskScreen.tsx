@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { RISK_SYSTEMS, DRUG_THRESHOLDS, SUPPORT_BASE_COVERAGE } from '../../core/constants';
 import { SYSTEM_INFO, MECHANISM_INFO, SYSTEM_ORGANS } from '../../core/risk-info';
 import type { RiskResult, MechanismCell } from '../../core/types';
-import { calculateRisks } from '../../engines/risk.engine';
+import { calculateRisks, calculateAggregatedRisks, type AggregatedRisk } from '../../engines/risk.engine';
 import { calculateRiskFromAnalyses } from '../../engines/risk-calculator-v2.engine';
 import { calculatePenaltyCoefficients, PenaltyCoefficients } from '../../engines/labs-penalty.engine';
 import { computeLabIndexDetails, type LabIndexDetail } from '../../engines/labs-indices.engine';
@@ -81,6 +81,7 @@ export const RiskScreen: React.FC = () => {
   const trendCanvasRef = useRef<HTMLCanvasElement>(null);
   const [labRisks, setLabRisks] = useState<Record<string, number>>({});
   const [labIndexDetails, setLabIndexDetails] = useState<Record<string, LabIndexDetail> | null>(null);
+  const [aggregatedRisks, setAggregatedRisks] = useState<AggregatedRisk | null>(null);
 
   const matrixData = useMemo<MatrixData>(() => {
     if (!riskResult) return {};
@@ -134,7 +135,7 @@ export const RiskScreen: React.FC = () => {
         await db.init();
         const diagEntries = await db.getAll<{id:string;type?:string}>('diagnostics_log').catch(() => [] as {id:string;type?:string}[]);
         const diagsDone = diagEntries.map(d => d.type ?? d.id).filter(Boolean) as string[];
-        const pen = calculatePenaltyCoefficients(phase, linked.labs, diagsDone, courseWeek, linked.course);
+        const pen = calculatePenaltyCoefficients(phase, linked.labs, diagsDone, courseWeek, linked.course, prof.settings?.forceNoLabsPenalty);
         setPenalty(pen);
         const systemsSnap: Record<string, { raw: number; net: number }> = {};
         for (const sys of RISK_SYSTEMS) {
@@ -160,6 +161,36 @@ export const RiskScreen: React.FC = () => {
           finalResult.overallNet = Math.min(100, finalResult.overallNet * pen.totalMultiplier);
         }
         setRiskResult(finalResult);
+        
+        // Calculate aggregated risks from all sources
+        // Use already computed values from above (trainingFactor, nutritionFactor, genetics are already defined)
+        const trainingResult = calculateRisks({ genetics, nutritionFactor, trainingFactor, activeDrugs: {}, supportCoverage: {} });
+        const nutritionResult = calculateRisks({ genetics, nutritionFactor, trainingFactor: 1.0, activeDrugs: {}, supportCoverage: {} });
+        
+        // Calculate diagnostics risk (based on completed diagnostics)
+        let diagnosticsResult: { overallRaw: number; overallNet: number; systemBreakdown?: Record<string, { raw: number; net: number }> } = {
+          overallRaw: 0,
+          overallNet: 0,
+          systemBreakdown: {}
+        };
+        if (diagsDone.length > 0) {
+          // Simple approximation: diagnostics reduce risk by showing awareness
+          const reduction = Math.min(0.3, diagsDone.length * 0.05);
+          diagnosticsResult = {
+            overallRaw: finalResult.overallRaw * (1 - reduction),
+            overallNet: finalResult.overallNet * (1 - reduction),
+            systemBreakdown: {}
+          };
+        }
+        
+        const aggRisks = calculateAggregatedRisks(
+          finalResult,
+          labRiskResult,
+          trainingResult,
+          nutritionResult,
+          diagnosticsResult
+        );
+        setAggregatedRisks(aggRisks);
       } catch (e) { console.error('Failed to calculate risk:', e); } finally { setLoading(false); }
     };
     computeRisk();
@@ -409,6 +440,63 @@ export const RiskScreen: React.FC = () => {
               </div>
             )}
           </div>
+
+          {/* Aggregated Risks Block - from all sources */}
+          {aggregatedRisks && (
+            <div className="card" style={{ marginBottom: 12 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8, color: 'var(--text)' }}>⚠️ Все источники риска (агрегация)</div>
+              <div style={{ display: 'grid', gap: 10 }}>
+                {/* Pharma Risk */}
+                <div style={{ padding: '10px', background: 'rgba(239,68,68,0.1)', borderRadius: 8 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#ef4444', marginBottom: 4 }}>💊 Препараты</div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: 12, color: 'var(--text-dim)' }}>Базовый: {Math.round(aggregatedRisks.pharma.overallRaw)}%</span>
+                    <span style={{ fontSize: 14, fontWeight: 700, color: '#ef4444' }}>{Math.round(aggregatedRisks.pharma.overallNet)}%</span>
+                  </div>
+                </div>
+                {/* Labs Risk */}
+                <div style={{ padding: '10px', background: 'rgba(249,115,22,0.1)', borderRadius: 8 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#f97316', marginBottom: 4 }}>🧪 Анализы</div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: 12, color: 'var(--text-dim)' }}>Отклонения: {Math.round(aggregatedRisks.labs.overallRaw)}%</span>
+                    <span style={{ fontSize: 14, fontWeight: 700, color: '#f97316' }}>{Math.round(aggregatedRisks.labs.overallNet)}%</span>
+                  </div>
+                </div>
+                {/* Training Risk */}
+                <div style={{ padding: '10px', background: 'rgba(132,204,22,0.1)', borderRadius: 8 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#84cc16', marginBottom: 4 }}>🏋️ Тренировки</div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: 12, color: 'var(--text-dim)' }}>Перегрузка: {Math.round(aggregatedRisks.training.overallRaw)}%</span>
+                    <span style={{ fontSize: 14, fontWeight: 700, color: '#84cc16' }}>{Math.round(aggregatedRisks.training.overallNet)}%</span>
+                  </div>
+                </div>
+                {/* Nutrition Risk */}
+                <div style={{ padding: '10px', background: 'rgba(59,130,246,0.1)', borderRadius: 8 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#3b82f6', marginBottom: 4 }}>🍎 Питание</div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: 12, color: 'var(--text-dim)' }}>Дефициты: {Math.round(aggregatedRisks.nutrition.overallRaw)}%</span>
+                    <span style={{ fontSize: 14, fontWeight: 700, color: '#3b82f6' }}>{Math.round(aggregatedRisks.nutrition.overallNet)}%</span>
+                  </div>
+                </div>
+                {/* Diagnostics Risk */}
+                <div style={{ padding: '10px', background: 'rgba(168,85,247,0.1)', borderRadius: 8 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#a855f7', marginBottom: 4 }}>🔍 Исследования</div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: 12, color: 'var(--text-dim)' }}>Мониторинг: {Math.round(aggregatedRisks.diagnostics.overallRaw)}%</span>
+                    <span style={{ fontSize: 14, fontWeight: 700, color: '#a855f7' }}>{Math.round(aggregatedRisks.diagnostics.overallNet)}%</span>
+                  </div>
+                </div>
+                {/* Overall Aggregated Risk */}
+                <div style={{ padding: '12px', background: 'var(--bg-secondary)', borderRadius: 8, marginTop: 4 }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 4 }}>📊 Агрегированный риск (максимум из всех источников)</div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: 13, color: 'var(--text-dim)' }}>Базовый: {Math.round(aggregatedRisks.overallRaw)}%</span>
+                    <span style={{ fontSize: 20, fontWeight: 800, color: getRiskColor(aggregatedRisks.overallNet) }}>{Math.round(aggregatedRisks.overallNet)}%</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Penalty block */}
           {penalty && penalty.totalMultiplier > 1.0 && (

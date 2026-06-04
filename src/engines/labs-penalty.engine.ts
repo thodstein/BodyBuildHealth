@@ -65,7 +65,8 @@ export function calculatePenaltyCoefficients(
   submittedLabs: LabPoint[],
   submittedDiagnostics: string[],
   courseWeek: number,
-  courseEntries?: import('../core/types').CourseEntry[]
+  courseEntries?: import('../core/types').CourseEntry[],
+  forceNoLabsPenalty?: boolean
 ): PenaltyCoefficients {
   const phaseKey = resolvePhaseKey(phase);
   let requiredLabs = [...(REQUIRED_LABS_PER_PHASE[phaseKey] ?? [])];
@@ -91,7 +92,7 @@ export function calculatePenaltyCoefficients(
   const labRatio = requiredLabs.length > 0 ? missingLabs.length / requiredLabs.length : 0;
   const diagRatio = requiredDiags.length > 0 ? missingDiags.length / requiredDiags.length : 0;
 
-  const noLabs = labRatio >= 0.9;
+  const noLabs = forceNoLabsPenalty || labRatio >= 0.9;
   const noDiags = diagRatio >= 0.9;
 
   const labPenalty = noLabs ? 0.50 : labRatio * 0.40;

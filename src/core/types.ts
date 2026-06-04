@@ -518,6 +518,9 @@ export interface UserProfile {
       preferredUnits?: 'metric' | 'imperial';
       notificationsEnabled?: boolean;
       privacyLevel?: 'private' | 'friends' | 'public';
+      
+      // Penalty override flags (manual user choice)
+      forceNoLabsPenalty?: boolean; // Force apply penalty when no labs are entered
     };
 }
 

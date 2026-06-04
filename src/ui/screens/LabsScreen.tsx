@@ -280,6 +280,43 @@ export const LabsScreen: React.FC<LabsProps> = ({ initialTab = 'input' }) => {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
           {/* Left column: Lab input */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {/* Penalty toggle button - без анализов */}
+            <div style={{ padding: 12, background: 'rgba(239,68,68,0.1)', border: '1px solid var(--danger)', borderRadius: 8 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <div style={{ fontWeight: 700, color: 'var(--danger)', fontSize: 13 }}>⚠️ Штраф за отсутствие анализов</div>
+                  <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 2 }}>
+                    {profile?.settings?.forceNoLabsPenalty 
+                      ? 'Штрафные коэффициенты применены к рискам.' 
+                      : 'Нажмите, чтобы применить штрафные коэффициенты при отсутствии анализов.'}
+                  </div>
+                </div>
+                <button 
+                  className="btn"
+                  style={{ 
+                    background: profile?.settings?.forceNoLabsPenalty ? 'rgba(239,68,68,0.3)' : 'var(--danger)', 
+                    color: profile?.settings?.forceNoLabsPenalty ? '#fff' : '#fff',
+                    borderColor: 'var(--danger)',
+                    fontWeight: 700 
+                  }} 
+                  onClick={async () => {
+                    if (!profile?.id) return;
+                    const { updateProfile } = await import('../../core/profile-manager');
+                    await updateProfile(profile.id, {
+                      ...profile,
+                      settings: {
+                        ...profile.settings,
+                        forceNoLabsPenalty: !profile.settings?.forceNoLabsPenalty
+                      }
+                    });
+                    notifyDataChange();
+                  }}
+                >
+                  {profile?.settings?.forceNoLabsPenalty ? '✅ Применён' : '🚫 БЕЗ АНАЛИЗОВ'}
+                </button>
+              </div>
+            </div>
+            
             <div className="card">
               <h3>&#128221; Вставить текст анализа</h3>
                 <p style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 8 }}>
@@ -823,12 +860,27 @@ export const LabsScreen: React.FC<LabsProps> = ({ initialTab = 'input' }) => {
                 <p style={{ fontSize: 11, color: 'var(--text-dim)', margin: '0 0 12px 0', lineHeight: 1.5 }}>
                   Если вы не планируете вводить анализы, нажмите кнопку ниже, чтобы применить штрафные коэффициенты к рискам.
                 </p>
-                <button className="btn" style={{ background: 'rgba(239,68,68,0.15)', color: '#ef4444', border: '1px solid #ef4444' }} onClick={() => {
-                  // Переход на RiskScreen должен быть через роутинг
-                  alert('Перейдите во вкладку «Обзор» рисков и нажмите кнопку «🚫 БЕЗ АНАЛИЗОВ (Штраф)» для применения штрафа.');
+                <button className="btn" style={{ 
+                  background: profile?.settings?.forceNoLabsPenalty ? 'rgba(239,68,68,0.25)' : 'rgba(239,68,68,0.15)', 
+                  color: profile?.settings?.forceNoLabsPenalty ? '#fca5a5' : '#ef4444', 
+                  border: '1px solid #ef4444' 
+                }} onClick={async () => {
+                  if (!profile?.id) return;
+                  const { updateProfile } = await import('../../core/profile-manager');
+                  await updateProfile(profile.id, {
+                    ...profile,
+                    settings: {
+                      ...profile.settings,
+                      forceNoLabsPenalty: !profile.settings?.forceNoLabsPenalty
+                    }
+                  });
+                  notifyDataChange();
                 }}>
-                  🚫 Применить штраф за отсутствие анализов
+                  {profile?.settings?.forceNoLabsPenalty ? '✅ Применён штраф (отмена)' : '🚫 БЕЗ АНАЛИЗОВ (Штраф)'}
                 </button>
+                <p style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 8 }}>
+                  {profile?.settings?.forceNoLabsPenalty ? 'Штрафные коэффициенты применены. Нажмите, чтобы отменить.' : 'Нажмите, чтобы применить штрафные коэффициенты.'}
+                </p>
               </div>
             </div>
           ) : risk ? (
