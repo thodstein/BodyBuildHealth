@@ -3,9 +3,7 @@ import { PHARMA_DB, SUBSTANCES_BY_CLASS } from '../../core/pharma-database';
 import { validateCourse } from '../../engines/pharmacology.engine';
 import { checkDrugInteractions } from '../../engines/pharma-interactions.engine';
 import { generatePCTPlan } from '../../engines/pct-planner.engine';
-import { generateWeeklyProtocol } from '../../engines/auto-plan.engine';
 import { db } from '../../core/db';
-import { notifyDataChange } from '../../core/data-link';
 import type { CourseEntry } from '../../core/types';
 
 const CLASS_LABELS: Record<string, string> = {
@@ -34,7 +32,6 @@ export const PharmaCourseScreen: React.FC = () => {
   const [pctPlan, setPctPlan] = useState<ReturnType<typeof generatePCTPlan> | null>(null);
   const [interactions, setInteractions] = useState<ReturnType<typeof checkDrugInteractions>>([]);
   const [validation, setValidation] = useState<{ valid: boolean; warnings: string[] }>({ valid: true, warnings: [] });
-  const [autoProtocol, setAutoProtocol] = useState<ReturnType<typeof generateWeeklyProtocol> | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -80,7 +77,6 @@ export const PharmaCourseScreen: React.FC = () => {
       await db.put('course_log', entry);
       setCourse(prev => [...prev, entry]);
       setDose('');
-      notifyDataChange();
     } catch (e) { console.error(e); }
   };
 
@@ -88,7 +84,6 @@ export const PharmaCourseScreen: React.FC = () => {
     try {
       await db.delete('course_log', id);
       setCourse(prev => prev.filter(e => e.id !== id));
-      notifyDataChange();
     } catch (e) { console.error(e); }
   };
 
@@ -230,49 +225,6 @@ export const PharmaCourseScreen: React.FC = () => {
               <span style={{ color: 'var(--text-dim)' }}>{s.dose} · {s.durationWeeks} нед.</span>
             </div>
           ))}
-        </div>
-      )}
-
-      {course.length > 0 && !autoProtocol && (
-        <div className="card" style={{ marginBottom: 12 }}>
-          <h3>&#128197; Авто-протокол</h3>
-          <p style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 8 }}>Генерация расписания приёмов на неделю с учётом лаб-корректировок и взаимодействий</p>
-          <button onClick={() => {
-            const goalId = course.some(c => c.substanceId.includes('test')) ? 'mass_gain' : 'health';
-            const protocol = generateWeeklyProtocol(goalId, [], [], undefined, course.some(c => c.substanceId.includes('test')) ? 'course' : 'baseline', []);
-            setAutoProtocol(protocol);
-          }} style={{ background: 'var(--accent)', color: '#000', border: 'none', borderRadius: 8, padding: '8px 20px', fontSize: 14, fontWeight: 700, cursor: 'pointer', width: '100%' }}>
-            Сгенерировать недельный протокол
-          </button>
-        </div>
-      )}
-
-      {autoProtocol && (
-        <div className="card" style={{ marginBottom: 12 }}>
-          <h3>&#128197; Недельный протокол</h3>
-          <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 8 }}>Оценка соблюдения: {autoProtocol.overallAdherenceScore}%</div>
-          {autoProtocol.warnings.length > 0 && (
-            <div style={{ background: 'var(--warning-dim)', borderRadius: 8, padding: 8, marginBottom: 8 }}>
-              {autoProtocol.warnings.map((w, i) => <div key={i} style={{ fontSize: 12, color: 'var(--warning)' }}>{w}</div>)}
-            </div>
-          )}
-          {autoProtocol.days.map((day, i) => (
-            <div key={i} style={{ background: 'var(--bg-secondary)', borderRadius: 8, padding: 10, marginBottom: 6 }}>
-              <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 4 }}>{day.date}</div>
-              {day.slots.map((slot, j) => (
-                <div key={j} style={{ marginLeft: 8, marginBottom: 4 }}>
-                  <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>{slot.time === 'morning' ? 'Утро' : slot.time === 'day' ? 'День' : slot.time === 'evening' ? 'Вечер' : 'Ночь'}</div>
-                  {slot.substances.map((s, k) => (
-                    <div key={k} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, padding: '2px 0' }}>
-                      <span>{s.name}</span>
-                      <span style={{ color: 'var(--accent)' }}>{s.dose}</span>
-                    </div>
-                  ))}
-                </div>
-              ))}
-            </div>
-          ))}
-          <button onClick={() => setAutoProtocol(null)} style={{ background: 'var(--bg-tertiary)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: 8, padding: '6px 14px', fontSize: 12, cursor: 'pointer', marginTop: 8 }}>Закрыть протокол</button>
         </div>
       )}
 

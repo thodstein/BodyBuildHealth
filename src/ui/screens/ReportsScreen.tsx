@@ -1,16 +1,15 @@
-﻿import React, { useState, useRef } from 'react';
-import { useDataLink } from '../../core/data-link';
+﻿import React, { useState, useEffect, useRef } from 'react';
 import { db } from '../../core/db';
+import { getProfile } from '../../core/profile-manager';
+import { calculateRisks } from '../../engines/risk.engine';
+import { calcReadiness } from '../../engines/readiness.engine';
 import { calculateIndices } from '../../engines/clinical-indices.engine';
-import { generateWeeklyReportHTML, type WeeklyReportData } from '../../engines/weekly-report.engine';
-import { generateMedicalReportHTML } from '../../engines/pdf-report.engine';
 import { UCUM_MAP } from '../../core/constants';
-import type { LabPoint, CourseEntry, GamificationState, UserContext } from '../../core/types';
+import type { UserProfile, LabPoint, CourseEntry, GamificationState, RiskResult, ReadinessInput, ReadinessScores } from '../../core/types';
 
-const EXPORT_VERSION = '1.1';
+const EXPORT_VERSION = '1.0';
 
 type ReportTab = 'summary' | 'labs' | 'nutrition' | 'pharma' | 'print';
-type ReportPeriod = 'day' | 'week' | 'month';
 
 interface DayDiary {
   date: string;
@@ -19,71 +18,198 @@ interface DayDiary {
 }
 
 function loadFromLS<T>(key: string, fallback: T): T {
-  try { const raw = localStorage.getItem(key); return raw ? JSON.parse(raw) : fallback; } catch { return fallback; }
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? JSON.parse(raw) : fallback;
+  } catch {
+    return fallback;
+  }
 }
 
 function escapeCSV(val: unknown): string {
   const s = String(val ?? '');
-  return (s.includes(',') || s.includes('"') || s.includes('\n')) ? '"' + s.replace(/"/g, '""') + '"' : s;
+  if (s.includes(',') || s.includes('"') || s.includes('\n')) {
+    return '"' + s.replace(/"/g, '""') + '"';
+  }
+  return s;
 }
 
 function triggerDownload(content: string, filename: string, mime: string) {
   const blob = new Blob([content], { type: `${mime};charset=utf-8` });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
-  a.href = url; a.download = filename;
-  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
   URL.revokeObjectURL(url);
+}
+
+function statusLabel(status: string): string {
+  const map: Record<string, string> = {
+    normal: 'Норма', high: 'Повышено', low: 'Понижено',
+    slightlyHigh: 'Небольшое повышение', slightlyLow: 'Небольшое понижение',
+    deficient: 'Дефицит', optimal: 'Оптимально', moderate: 'Умеренное',
+    ir: 'Инсулинорезистентность', severe_ir: 'Выраженная ИР',
+    g2: 'Стадия G2', g3a: 'Стадия G3a', g3b: 'Стадия G3b', g4: 'Стадия G4', g5: 'Стадия G5',
+    alcohol: 'Алкогольный', viral: 'Вирусный',
+  };
+  return map[status] || status;
+}
+
+function MiniSVGLineChart({ data, width = 320, height = 120 }: { data: Array<{ label: string; value: number }>; width?: number; height?: number }) {
+  if (data.length < 2) return <div style={{ color: '#888', fontSize: 12 }}>Недостаточно данных для графика</div>;
+  const values = data.map(d => d.value);
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const range = max - min || 1;
+  const padY = 8;
+  const padX = 40;
+  const chartW = width - padX * 2;
+  const chartH = height - padY * 2;
+  const points = data.map((d, i) => ({
+    x: padX + (i / (data.length - 1)) * chartW,
+    y: padY + chartH - ((d.value - min) / range) * chartH,
+  }));
+  const pathD = points.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x},${p.y}`).join(' ');
+  return (
+    <svg width={width} height={height} style={{ background: '#1a1a2e', borderRadius: 8, display: 'block' }}>
+      {(() => {
+        const lines: React.ReactElement[] = [];
+        for (let i = 0; i <= 4; i++) {
+          const y = padY + (chartH * i) / 4;
+          const val = max - (range * i) / 4;
+          lines.push(<line key={`l${i}`} x1={padX} y1={y} x2={width - padX} y2={y} stroke="#333" strokeWidth={0.5} />);
+          lines.push(<text key={`t${i}`} x={padX - 4} y={y + 3} textAnchor="end" fill="#888" fontSize={9}>{val.toFixed(1)}</text>);
+        }
+        return lines;
+      })()}
+      <path d={pathD} fill="none" stroke="#4fc3f7" strokeWidth={2} />
+      {points.map((p, i) => <circle key={i} cx={p.x} cy={p.y} r={3} fill="#4fc3f7" />)}
+      {data.filter((_, i) => data.length <= 8 || i % Math.ceil(data.length / 8) === 0).map((d, idx) => {
+        const p = points[data.indexOf(d)];
+        return <text key={`lb${idx}`} x={p.x} y={height - 2} textAnchor="middle" fill="#888" fontSize={8}>{d.label.slice(5)}</text>;
+      })}
+    </svg>
+  );
 }
 
 export const ReportsScreen: React.FC = () => {
   const [tab, setTab] = useState<ReportTab>('summary');
-  const [period, setPeriod] = useState<ReportPeriod>('week');
-  const linked = useDataLink();
-  const { profile, labs, course, readiness, risk, avgWeeklyKcal, avgWeeklyProtein, avgWeeklyFat, avgWeeklyCarbs } = linked;
-  const [diary] = useState<Record<string, DayDiary>>(loadFromLS('nutrition_diary', {}));
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [labs, setLabs] = useState<LabPoint[]>([]);
+  const [course, setCourse] = useState<CourseEntry[]>([]);
+  const [diary, setDiary] = useState<Record<string, DayDiary>>({});
+  const [gamState, setGamState] = useState<GamificationState | null>(null);
+  const [riskResult, setRiskResult] = useState<RiskResult | null>(null);
+  const [readiness, setReadiness] = useState<ReadinessScores | null>(null);
+  const [indices, setIndices] = useState<ReturnType<typeof calculateIndices> | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [importMsg, setImportMsg] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const indices = labs.length > 0 ? calculateIndices(labs, profile.settings.sex, profile.settings.age ?? 30) : null;
 
-  const getPeriodDays = () => period === 'day' ? 1 : period === 'week' ? 7 : 30;
-  const filterByPeriod = <T extends { date?: string }>(items: T[]): T[] => {
-    const days = getPeriodDays();
-    const cutoff = new Date(Date.now() - days * 86400000).toISOString().slice(0, 10);
-    return items.filter(i => !i.date || i.date >= cutoff);
+  useEffect(() => {
+    (async () => {
+      try {
+        await db.init();
+        const prof = getProfile();
+        setProfile(prof);
+        const labEntries = await db.getAll<LabPoint & { patientId?: string }>('labs_log');
+        setLabs(labEntries.map(l => { const { patientId, ...rest } = l; return rest; }));
+        const courseEntries = await db.getAll<CourseEntry>('course_log');
+        setCourse(courseEntries);
+        const diaryData = loadFromLS<Record<string, DayDiary>>('nutrition_diary', {});
+        setDiary(diaryData);
+        const gam = loadFromLS<GamificationState | null>('he_gamification', null);
+        setGamState(gam);
+        if (prof) {
+          const genetics: Record<string, string> = prof.settings?.genetics ?? {};
+          const nutritionFactor = prof.settings?.nutritionFactor ?? 1.0;
+          const trainingFactor = prof.settings?.trainingFactor ?? 1.0;
+          const drugs: Record<string, { dosePerWeek: number }> = {};
+          courseEntries.forEach(entry => {
+            const freq = typeof entry.frequency === 'number' ? entry.frequency : entry.frequency === 'daily' ? 7 : entry.frequency === 'eod' ? 3.5 : 1;
+            drugs[entry.substanceId] = { dosePerWeek: entry.doseValue * freq };
+          });
+          const risk = calculateRisks({ genetics, nutritionFactor, trainingFactor, activeDrugs: drugs, supportCoverage: {} });
+          setRiskResult(risk);
+          const ri: ReadinessInput = {
+            sleepHours: prof.settings?.baselineSleepHours ?? 7,
+            sleepQuality: prof.settings?.baselineSleepQuality ?? 0.7,
+            nightAwakenings: 1,
+            hrvRatio: prof.settings?.baselineHrvRatio ?? 1.0,
+            doms: 3,
+            stress: prof.settings?.baselineStressLevel ?? 3,
+            riskCoverageMap: {},
+            calRatio: 0.9,
+            proteinRatio: 0.85,
+            waterRatio: 0.8,
+            fiberRatio: 0.7,
+            omega3Flag: false,
+            trainingLoadRatio: 0.8,
+            subjFatigue: 3,
+            hrIncrease: 0.1,
+          };
+          setReadiness(calcReadiness(ri));
+          const sex = prof.settings?.sex ?? 'male';
+          const age = prof.settings?.age ?? 30;
+          setIndices(calculateIndices(labEntries.map(l => { const { patientId, ...rest } = l; return rest; }), sex, age));
+        }
+      } catch (e) {
+        setError('Не удалось загрузить данные');
+        console.error(e);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
+
+  const collectAllData = () => {
+    return {
+      version: EXPORT_VERSION,
+      exportedAt: new Date().toISOString(),
+      profile,
+      labs,
+      course,
+      nutritionDiary: diary,
+      gamification: gamState,
+      riskSummary: riskResult ? { overallRaw: riskResult.overallRaw, overallNet: riskResult.overallNet } : null,
+      readiness: readiness,
+      clinicalIndices: indices,
+    };
   };
-  const periodLabs = filterByPeriod(labs);
-
-  const collectAllData = () => ({
-    version: EXPORT_VERSION, period,
-    exportedAt: new Date().toISOString(),
-    profile, labs: periodLabs, course, nutritionDiary: diary,
-    avgWeeklyKcal, avgWeeklyProtein, avgWeeklyFat, avgWeeklyCarbs,
-    readiness,
-    riskSummary: risk ? { overallRaw: risk.overallRaw, overallNet: risk.overallNet } : null,
-    clinicalIndices: indices,
-  });
 
   const handleExportJSON = () => {
-    triggerDownload(JSON.stringify(collectAllData(), null, 2), `health-engine-export-${new Date().toISOString().slice(0, 10)}.json`, 'application/json');
+    const data = collectAllData();
+    triggerDownload(JSON.stringify(data, null, 2), `health-engine-export-${new Date().toISOString().slice(0, 10)}.json`, 'application/json');
   };
 
   const handleExportDiaryCSV = () => {
-    const entries: any[] = [];
-    for (const [date, day] of Object.entries(diary))
-      for (const [meal, items] of Object.entries(day.meals))
-        for (const item of items)
+    const entries: Array<{ date: string; meal: string; food: string; weight_g: number; kcal: number; protein_g: number; fat_g: number; carbs_g: number; fiber_g: number }> = [];
+    for (const [date, day] of Object.entries(diary)) {
+      for (const [meal, items] of Object.entries(day.meals)) {
+        for (const item of items) {
           entries.push({ date, meal, food: item.name, weight_g: item.weight, kcal: item.kcal, protein_g: item.p, fat_g: item.f, carbs_g: item.c, fiber_g: item.fiber });
-    if (!entries.length) { setImportMsg('Нет данных дневника'); return; }
+        }
+      }
+    }
+    if (!entries.length) { setError('Нет данных дневника питания'); return; }
     const headers = ['date', 'meal', 'food', 'weight_g', 'kcal', 'protein_g', 'fat_g', 'carbs_g', 'fiber_g'];
-    triggerDownload([headers.join(','), ...entries.map(e => headers.map(h => escapeCSV(e[h])).join(','))].join('\n'), `nutrition-diary-${new Date().toISOString().slice(0, 10)}.csv`, 'text/csv');
+    const csv = [headers.join(','), ...entries.map(e => headers.map(h => escapeCSV(e[h as keyof typeof e])).join(','))].join('\n');
+    triggerDownload(csv, `nutrition-diary-${new Date().toISOString().slice(0, 10)}.csv`, 'text/csv');
   };
 
   const handleExportLabsCSV = () => {
-    if (!labs.length) { setImportMsg('Нет данных анализов'); return; }
+    if (!labs.length) { setError('Нет данных анализов'); return; }
     const headers = ['date', 'code', 'name', 'value', 'unit', 'phase', 'ref_low', 'ref_high'];
-    const rows = labs.map(l => { const ref = UCUM_MAP[l.code]; return [l.date, l.code, l.name || '', l.value, l.unit, l.phase, ref?.lln ?? '', ref?.uln ?? ''].map(escapeCSV).join(','); });
-    triggerDownload([headers.join(','), ...rows].join('\n'), `labs-export-${new Date().toISOString().slice(0, 10)}.csv`, 'text/csv');
+    const rows = labs.map(l => {
+      const ref = UCUM_MAP[l.code];
+      return [l.date, l.code, l.name || '', l.value, l.unit, l.phase, ref?.lln ?? '', ref?.uln ?? ''].map(escapeCSV).join(',');
+    });
+    const csv = [headers.join(','), ...rows].join('\n');
+    triggerDownload(csv, `labs-export-${new Date().toISOString().slice(0, 10)}.csv`, 'text/csv');
   };
 
   const handleImportJSON = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -93,180 +219,381 @@ export const ReportsScreen: React.FC = () => {
     reader.onload = async (evt) => {
       try {
         const data = JSON.parse(evt.target?.result as string);
-        if (data.profile) localStorage.setItem('he_profile_v2', JSON.stringify(data.profile));
-        if (data.labs && Array.isArray(data.labs)) { await db.init(); for (const lab of data.labs) await db.put('labs_log', { ...lab, patientId: 'current-user' }); }
-        if (data.course && Array.isArray(data.course)) { await db.init(); for (const entry of data.course) await db.put('course_log', entry); }
-        if (data.nutritionDiary) localStorage.setItem('nutrition_diary', JSON.stringify(data.nutritionDiary));
-        setImportMsg('Импорт выполнен. Перезагрузите страницу.');
-      } catch { setImportMsg('Ошибка импорта: файл повреждён.'); }
+        if (data.version !== EXPORT_VERSION) {
+          setImportMsg('Версия файла не совпадает. Возможны проблемы совместимости.');
+        }
+        if (data.profile) {
+          localStorage.setItem('he_profile_v2', JSON.stringify(data.profile));
+        }
+        if (data.labs && Array.isArray(data.labs)) {
+          await db.init();
+          for (const lab of data.labs) {
+            await db.put('labs_log', { ...lab, patientId: 'current-user' });
+          }
+        }
+        if (data.course && Array.isArray(data.course)) {
+          await db.init();
+          for (const entry of data.course) {
+            await db.put('course_log', entry);
+          }
+        }
+        if (data.nutritionDiary) {
+          localStorage.setItem('nutrition_diary', JSON.stringify(data.nutritionDiary));
+        }
+        if (data.gamification) {
+          localStorage.setItem('he_gamification', JSON.stringify(data.gamification));
+        }
+        setImportMsg('Импорт выполнен успешно. Перезагрузите страницу для применения.');
+      } catch (err) {
+        setImportMsg('Ошибка импорта: файл повреждён или неверный формат.');
+        console.error(err);
+      }
     };
     reader.readAsText(file);
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
+
+  const labTrendData = (() => {
+    const grouped: Record<string, Array<{ label: string; value: number }>> = {};
+    for (const l of labs) {
+      if (!grouped[l.code]) grouped[l.code] = [];
+      grouped[l.code].push({ label: l.date, value: l.value });
+    }
+    for (const code of Object.keys(grouped)) {
+      grouped[code].sort((a, b) => a.label.localeCompare(b.label));
+    }
+    return grouped;
+  })();
+
+  const diaryDates = Object.keys(diary).sort();
+  const latestDiaryDay = diaryDates.length > 0 ? diary[diaryDates[diaryDates.length - 1]] : null;
+  const latestDiaryTotals = latestDiaryDay ? (() => {
+    let kcal = 0, p = 0, f = 0, c = 0;
+    for (const items of Object.values(latestDiaryDay.meals)) {
+      for (const item of items) { kcal += item.kcal; p += item.p; f += item.f; c += item.c; }
+    }
+    return { kcal: Math.round(kcal), p: Math.round(p), f: Math.round(f), c: Math.round(c) };
+  })() : null;
+
+  const latestLabsByCode: Record<string, LabPoint> = {};
+  for (const l of labs) {
+    if (!latestLabsByCode[l.code] || l.date > latestLabsByCode[l.code].date) {
+      latestLabsByCode[l.code] = l;
+    }
+  }
 
   const systemLabels: Record<string, string> = {
     cardio: 'Сердечно-сосудистая', hepatic: 'Печень', renal: 'Почки',
     neuro: 'Нервная', endocrine: 'Эндокринная', hematologic: 'Кроветворная', reproductive: 'Репродуктивная'
   };
 
-  const btn: React.CSSProperties = { padding: '6px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg-primary)', color: 'inherit', fontSize: 12, cursor: 'pointer' };
+  if (loading) return <div className="screen reports">Загрузка данных...</div>;
+
+  const printSection = (
+    <div id="printable-report" style={{ fontSize: 13, lineHeight: 1.5, maxWidth: 800, margin: '0 auto' }}>
+      <div style={{ borderBottom: '2px solid #007aff', paddingBottom: 12, marginBottom: 16 }}>
+        <h1 style={{ margin: 0, fontSize: 20 }}>Health Engine — Отчёт</h1>
+        <span style={{ color: '#888', fontSize: 12 }}>Дата: {new Date().toISOString().slice(0, 10)}</span>
+      </div>
+
+      {profile && (
+        <div style={{ marginBottom: 20 }}>
+          <h2 style={{ fontSize: 16, borderLeft: '3px solid #007aff', paddingLeft: 8, margin: '0 0 8px' }}>Профиль</h2>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+            <tbody>
+              <tr><td style={{ padding: 4, borderBottom: '1px solid #eee', fontWeight: 600, width: 160 }}>Имя</td><td style={{ padding: 4, borderBottom: '1px solid #eee' }}>{profile.name || '—'}</td></tr>
+              <tr><td style={{ padding: 4, borderBottom: '1px solid #eee', fontWeight: 600 }}>Возраст</td><td style={{ padding: 4, borderBottom: '1px solid #eee' }}>{profile.settings?.age ?? '—'}</td></tr>
+              <tr><td style={{ padding: 4, borderBottom: '1px solid #eee', fontWeight: 600 }}>Пол</td><td style={{ padding: 4, borderBottom: '1px solid #eee' }}>{profile.settings?.sex === 'male' ? 'Мужской' : 'Женский'}</td></tr>
+              <tr><td style={{ padding: 4, borderBottom: '1px solid #eee', fontWeight: 600 }}>Вес</td><td style={{ padding: 4, borderBottom: '1px solid #eee' }}>{profile.settings?.weight ?? '—'} кг</td></tr>
+              <tr><td style={{ padding: 4, borderBottom: '1px solid #eee', fontWeight: 600 }}>Цель</td><td style={{ padding: 4, borderBottom: '1px solid #eee' }}>{profile.settings?.primaryGoal || profile.settings?.goal || '—'}</td></tr>
+              <tr><td style={{ padding: 4, borderBottom: '1px solid #eee', fontWeight: 600 }}>Фаза</td><td style={{ padding: 4, borderBottom: '1px solid #eee' }}>{profile.settings?.phase || '—'}</td></tr>
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {riskResult && (
+        <div style={{ marginBottom: 20 }}>
+          <h2 style={{ fontSize: 16, borderLeft: '3px solid #ef4444', paddingLeft: 8, margin: '0 0 8px' }}>Риски</h2>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+            <thead><tr style={{ background: '#f3f4f6' }}><th style={{ padding: 6, textAlign: 'left', borderBottom: '1px solid #ccc' }}>Система</th><th style={{ padding: 6, textAlign: 'right', borderBottom: '1px solid #ccc' }}>Сырой</th><th style={{ padding: 6, textAlign: 'right', borderBottom: '1px solid #ccc' }}>Чистый</th></tr></thead>
+            <tbody>
+              {riskResult.systemBreakdown && Object.entries(riskResult.systemBreakdown).map(([sys, data]) => (
+                <tr key={sys}><td style={{ padding: 6, borderBottom: '1px solid #eee' }}>{systemLabels[sys] || sys}</td><td style={{ padding: 6, textAlign: 'right', borderBottom: '1px solid #eee' }}>{data.raw.toFixed(1)}%</td><td style={{ padding: 6, textAlign: 'right', borderBottom: '1px solid #eee' }}>{data.net.toFixed(1)}%</td></tr>
+              ))}
+              <tr style={{ fontWeight: 700 }}><td style={{ padding: 6 }}>Общий</td><td style={{ padding: 6, textAlign: 'right' }}>{riskResult.overallRaw.toFixed(1)}%</td><td style={{ padding: 6, textAlign: 'right' }}>{riskResult.overallNet.toFixed(1)}%</td></tr>
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {readiness && (
+        <div style={{ marginBottom: 20 }}>
+          <h2 style={{ fontSize: 16, borderLeft: '3px solid #30d158', paddingLeft: 8, margin: '0 0 8px' }}>Готовность</h2>
+          <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+            <div><strong>Восстановление:</strong> {readiness.recovery}%</div>
+            <div><strong>Питание:</strong> {readiness.nutrition}%</div>
+            <div><strong>Поддержка:</strong> {readiness.support}%</div>
+            <div><strong>Усталость:</strong> {readiness.fatigue}%</div>
+            {readiness.isConservative && <div style={{ color: '#ef4444' }}>Консервативный режим: {readiness.conservativeReason}</div>}
+          </div>
+        </div>
+      )}
+
+      {labs.length > 0 && (
+        <div style={{ marginBottom: 20 }}>
+          <h2 style={{ fontSize: 16, borderLeft: '3px solid #f59e0b', paddingLeft: 8, margin: '0 0 8px' }}>Лабораторные анализы</h2>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+            <thead><tr style={{ background: '#f3f4f6' }}><th style={{ padding: 4, textAlign: 'left', borderBottom: '1px solid #ccc' }}>Показатель</th><th style={{ padding: 4, textAlign: 'right', borderBottom: '1px solid #ccc' }}>Значение</th><th style={{ padding: 4, textAlign: 'left', borderBottom: '1px solid #ccc' }}>Ед.</th><th style={{ padding: 4, textAlign: 'center', borderBottom: '1px solid #ccc' }}>Реф.</th><th style={{ padding: 4, textAlign: 'center', borderBottom: '1px solid #ccc' }}>Дата</th></tr></thead>
+            <tbody>
+              {Object.entries(latestLabsByCode).sort((a, b) => a[0].localeCompare(b[0])).map(([, l]) => {
+                const ref = UCUM_MAP[l.code];
+                return (
+                  <tr key={l.code}>
+                    <td style={{ padding: 4, borderBottom: '1px solid #eee' }}>{l.name || l.code}</td>
+                    <td style={{ padding: 4, textAlign: 'right', borderBottom: '1px solid #eee' }}>{l.value}</td>
+                    <td style={{ padding: 4, borderBottom: '1px solid #eee' }}>{l.unit}</td>
+                    <td style={{ padding: 4, textAlign: 'center', borderBottom: '1px solid #eee' }}>{ref ? `${ref.lln}–${ref.uln}` : '—'}</td>
+                    <td style={{ padding: 4, textAlign: 'center', borderBottom: '1px solid #eee' }}>{l.date}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {indices && (
+        <div style={{ marginBottom: 20 }}>
+          <h2 style={{ fontSize: 16, borderLeft: '3px solid #8b5cf6', paddingLeft: 8, margin: '0 0 8px' }}>Клинические индексы</h2>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+            <thead><tr style={{ background: '#f3f4f6' }}><th style={{ padding: 6, textAlign: 'left', borderBottom: '1px solid #ccc' }}>Индекс</th><th style={{ padding: 6, textAlign: 'right', borderBottom: '1px solid #ccc' }}>Значение</th><th style={{ padding: 6, textAlign: 'center', borderBottom: '1px solid #ccc' }}>Реф.</th><th style={{ padding: 6, textAlign: 'center', borderBottom: '1px solid #ccc' }}>Статус</th></tr></thead>
+            <tbody>
+              <tr><td style={{ padding: 6, borderBottom: '1px solid #eee' }}>HOMA-IR</td><td style={{ padding: 6, textAlign: 'right', borderBottom: '1px solid #eee' }}>{indices.homaIR.value}</td><td style={{ padding: 6, textAlign: 'center', borderBottom: '1px solid #eee' }}>{indices.homaIR.ref[0]}–{indices.homaIR.ref[1]}</td><td style={{ padding: 6, textAlign: 'center', borderBottom: '1px solid #eee' }}>{statusLabel(indices.homaIR.status)}</td></tr>
+              <tr><td style={{ padding: 6, borderBottom: '1px solid #eee' }}>FAI</td><td style={{ padding: 6, textAlign: 'right', borderBottom: '1px solid #eee' }}>{indices.fai.value}</td><td style={{ padding: 6, textAlign: 'center', borderBottom: '1px solid #eee' }}>{indices.fai.ref[0]}–{indices.fai.ref[1]}</td><td style={{ padding: 6, textAlign: 'center', borderBottom: '1px solid #eee' }}>{statusLabel(indices.fai.status)}</td></tr>
+              <tr><td style={{ padding: 6, borderBottom: '1px solid #eee' }}>Своб. тестостерон</td><td style={{ padding: 6, textAlign: 'right', borderBottom: '1px solid #eee' }}>{indices.freeTestosterone.value} {indices.freeTestosterone.unit}</td><td style={{ padding: 6, textAlign: 'center', borderBottom: '1px solid #eee' }}>{indices.freeTestosterone.ref[0]}–{indices.freeTestosterone.ref[1]}</td><td style={{ padding: 6, textAlign: 'center', borderBottom: '1px solid #eee' }}>{statusLabel(indices.freeTestosterone.status)}</td></tr>
+              <tr><td style={{ padding: 6, borderBottom: '1px solid #eee' }}>eGFR</td><td style={{ padding: 6, textAlign: 'right', borderBottom: '1px solid #eee' }}>{indices.egfr.value}</td><td style={{ padding: 6, textAlign: 'center', borderBottom: '1px solid #eee' }}>{indices.egfr.ref[0]}–{indices.egfr.ref[1]}</td><td style={{ padding: 6, textAlign: 'center', borderBottom: '1px solid #eee' }}>{statusLabel(indices.egfr.status)}</td></tr>
+              <tr><td style={{ padding: 6, borderBottom: '1px solid #eee' }}>De Ritis (АСТ/АЛТ)</td><td style={{ padding: 6, textAlign: 'right', borderBottom: '1px solid #eee' }}>{indices.deritis.value}</td><td style={{ padding: 6, textAlign: 'center', borderBottom: '1px solid #eee' }}>{indices.deritis.ref[0]}–{indices.deritis.ref[1]}</td><td style={{ padding: 6, textAlign: 'center', borderBottom: '1px solid #eee' }}>{statusLabel(indices.deritis.status)}</td></tr>
+              <tr><td style={{ padding: 6, borderBottom: '1px solid #eee' }}>LDL/HDL</td><td style={{ padding: 6, textAlign: 'right', borderBottom: '1px solid #eee' }}>{indices.ldlHdlRatio.value}</td><td style={{ padding: 6, textAlign: 'center', borderBottom: '1px solid #eee' }}>{indices.ldlHdlRatio.ref[0]}–{indices.ldlHdlRatio.ref[1]}</td><td style={{ padding: 6, textAlign: 'center', borderBottom: '1px solid #eee' }}>{statusLabel(indices.ldlHdlRatio.status)}</td></tr>
+              <tr><td style={{ padding: 6, borderBottom: '1px solid #eee' }}>TG/HDL</td><td style={{ padding: 6, textAlign: 'right', borderBottom: '1px solid #eee' }}>{indices.tgHdlRatio.value}</td><td style={{ padding: 6, textAlign: 'center', borderBottom: '1px solid #eee' }}>{indices.tgHdlRatio.ref[0]}–{indices.tgHdlRatio.ref[1]}</td><td style={{ padding: 6, textAlign: 'center', borderBottom: '1px solid #eee' }}>{statusLabel(indices.tgHdlRatio.status)}</td></tr>
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      <div style={{ marginTop: 32, paddingTop: 12, borderTop: '1px solid #000', fontSize: 11, color: '#666', textAlign: 'center' }}>
+        Отчёт сформирован автоматически. Информация носит справочный характер и не является медицинской рекомендацией.
+      </div>
+    </div>
+  );
 
   return (
     <div className="screen reports">
-      <h2>Отчёты</h2>
-      <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 8 }}>
-        {(['summary', 'labs', 'nutrition', 'pharma', 'print'] as ReportTab[]).map(t => (
-          <button key={t} className={`tab-button ${tab === t ? 'active' : ''}`} onClick={() => setTab(t)}>
-            {t === 'summary' ? 'Сводка' : t === 'labs' ? 'Анализы' : t === 'nutrition' ? 'Питание' : t === 'pharma' ? 'Фарма' : 'Печать'}
-          </button>
-        ))}
+      <style>{`
+        @media print {
+          body > *:not(#printable-report-wrap) { display: none !important; }
+          #printable-report-wrap { display: block !important; }
+        }
+      `}</style>
+      <div className="reports-header">
+        <h2>Отчёты и аналитика</h2>
+        <p>Детальная аналитика показателей здоровья, тренировок и питания</p>
       </div>
-      <div style={{ display: 'flex', gap: 4, marginBottom: 12 }}>
-        {(['day', 'week', 'month'] as ReportPeriod[]).map(p => (
-          <button key={p} className={`tab-button ${period === p ? 'active' : ''}`} onClick={() => setPeriod(p)} style={{ fontSize: 11, padding: '4px 10px' }}>
-            {p === 'day' ? 'День' : p === 'week' ? 'Неделя' : 'Месяц'}
+
+      <div className="reports-controls" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 16 }}>
+        {(['summary', 'labs', 'nutrition', 'pharma', 'print'] as ReportTab[]).map(t => (
+          <button key={t} className={`btn${tab === t ? '-primary' : '-secondary'}`} onClick={() => setTab(t)} style={{ fontSize: 13 }}>
+            {t === 'summary' ? 'Обзор' : t === 'labs' ? 'Анализы' : t === 'nutrition' ? 'Питание' : t === 'pharma' ? 'Курс' : 'Печать'}
           </button>
         ))}
       </div>
 
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 16 }}>
+        <button className="btn" onClick={handleExportJSON}>Экспорт всех данных (JSON)</button>
+        <button className="btn secondary" onClick={handleExportDiaryCSV}>Экспорт дневника (CSV)</button>
+        <button className="btn secondary" onClick={handleExportLabsCSV}>Экспорт анализов (CSV)</button>
+        <button className="btn secondary" onClick={() => window.print()}>Печать отчёта (PDF)</button>
+        <button className="btn secondary" onClick={() => fileInputRef.current?.click()}>Импорт JSON</button>
+        <input ref={fileInputRef} type="file" accept=".json" style={{ display: 'none' }} onChange={handleImportJSON} />
+      </div>
+
+      {error && <div className="alert alert-error" style={{ marginBottom: 12 }}>{error}</div>}
+      {importMsg && <div className="alert alert-info" style={{ marginBottom: 12, background: '#e0f2fe', padding: 8, borderRadius: 6 }}>{importMsg}</div>}
+
+      <div id="printable-report-wrap" style={tab === 'print' ? {} : { display: 'none' }}>
+        {printSection}
+      </div>
+
       {tab === 'summary' && (
-        <div style={{ background: 'var(--bg-secondary)', borderRadius: 12, padding: 16, marginBottom: 12 }}>
-          <h4 style={{ margin: '0 0 8px' }}>Сводка — {period === 'day' ? 'день' : period === 'week' ? 'неделя' : 'месяц'}</h4>
-          {readiness && (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 8, textAlign: 'center', marginBottom: 12 }}>
-              {[{ l: 'Восст.', v: readiness.recovery, g: 60 }, { l: 'Питание', v: readiness.nutrition, g: 60 }, { l: 'Поддержка', v: readiness.support, g: 60 }, { l: 'Усталость', v: readiness.fatigue, g: 40, inv: true }].map(m => (
-                <div key={m.l}><div style={{ fontSize: 20, fontWeight: 700, color: m.inv ? (m.v <= m.g ? '#00e68a' : '#ff9800') : (m.v >= m.g ? '#00e68a' : '#ff9800') }}>{m.v}</div><div style={{ fontSize: 11 }}>{m.l}</div></div>
-              ))}
+        <div className="report-content">
+          <h3>Общий обзор</h3>
+
+          {profile && (
+            <div className="metrics-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 12, marginBottom: 20 }}>
+              <div className="metric-item" style={{ background: '#1e1e2e', padding: 12, borderRadius: 8 }}><h4 style={{ margin: '0 0 4px', fontSize: 13 }}>Имя</h4><p className="value" style={{ margin: 0, fontSize: 18 }}>{profile.name || '—'}</p></div>
+              <div className="metric-item" style={{ background: '#1e1e2e', padding: 12, borderRadius: 8 }}><h4 style={{ margin: '0 0 4px', fontSize: 13 }}>Возраст</h4><p className="value" style={{ margin: 0, fontSize: 18 }}>{profile.settings?.age ?? '—'}</p></div>
+              <div className="metric-item" style={{ background: '#1e1e2e', padding: 12, borderRadius: 8 }}><h4 style={{ margin: '0 0 4px', fontSize: 13 }}>Пол</h4><p className="value" style={{ margin: 0, fontSize: 18 }}>{profile.settings?.sex === 'male' ? 'Мужской' : 'Женский'}</p></div>
+              <div className="metric-item" style={{ background: '#1e1e2e', padding: 12, borderRadius: 8 }}><h4 style={{ margin: '0 0 4px', fontSize: 13 }}>Вес</h4><p className="value" style={{ margin: 0, fontSize: 18 }}>{profile.settings?.weight ?? '—'} кг</p></div>
+              <div className="metric-item" style={{ background: '#1e1e2e', padding: 12, borderRadius: 8 }}><h4 style={{ margin: '0 0 4px', fontSize: 13 }}>Цель</h4><p className="value" style={{ margin: 0, fontSize: 18 }}>{profile.settings?.primaryGoal || profile.settings?.goal || '—'}</p></div>
             </div>
           )}
-          {risk && <div style={{ marginBottom: 12 }}><h5 style={{ margin: '0 0 4px' }}>Риск</h5><div style={{ fontSize: 18, fontWeight: 700, color: risk.overallNet > 50 ? '#f44336' : risk.overallNet > 25 ? '#ff9800' : '#00e68a' }}>{risk.overallNet.toFixed(1)}% чистый</div></div>}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-            <div style={{ padding: 8, borderRadius: 8, background: 'rgba(0,230,138,0.08)' }}><div style={{ fontSize: 11, opacity: 0.6 }}>Ср. ккал/{period === 'day' ? 'день' : 'нед'}</div><div style={{ fontSize: 18, fontWeight: 700 }}>{avgWeeklyKcal}</div></div>
-            <div style={{ padding: 8, borderRadius: 8, background: 'rgba(0,230,138,0.08)' }}><div style={{ fontSize: 11, opacity: 0.6 }}>Ср. белок/{period === 'day' ? 'день' : 'нед'}</div><div style={{ fontSize: 18, fontWeight: 700 }}>{avgWeeklyProtein}г</div></div>
-          </div>
-          <div style={{ marginTop: 8, fontSize: 12, opacity: 0.7 }}>Анализов: {periodLabs.length} | Препаратов: {course.length} | Травм: {profile.settings.injuries?.length ?? 0}</div>
+
+          {riskResult && (
+            <div style={{ marginBottom: 20 }}>
+              <h4>Риски</h4>
+              <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+                <div className="metric-item" style={{ background: '#1e1e2e', padding: 12, borderRadius: 8 }}><h4 style={{ margin: '0 0 4px', fontSize: 13 }}>Общий сырой</h4><p style={{ margin: 0, fontSize: 18, color: riskResult.overallRaw > 50 ? '#ef4444' : riskResult.overallRaw > 25 ? '#eab308' : '#22c55e' }}>{riskResult.overallRaw.toFixed(1)}%</p></div>
+                <div className="metric-item" style={{ background: '#1e1e2e', padding: 12, borderRadius: 8 }}><h4 style={{ margin: '0 0 4px', fontSize: 13 }}>Общий чистый</h4><p style={{ margin: 0, fontSize: 18, color: riskResult.overallNet > 50 ? '#ef4444' : riskResult.overallNet > 25 ? '#eab308' : '#22c55e' }}>{riskResult.overallNet.toFixed(1)}%</p></div>
+              </div>
+            </div>
+          )}
+
+          {readiness && (
+            <div style={{ marginBottom: 20 }}>
+              <h4>Готовность</h4>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 12 }}>
+                <div style={{ background: '#1e1e2e', padding: 12, borderRadius: 8 }}><div style={{ fontSize: 11, color: '#888' }}>Восстановление</div><div style={{ fontSize: 22, fontWeight: 700 }}>{readiness.recovery}%</div></div>
+                <div style={{ background: '#1e1e2e', padding: 12, borderRadius: 8 }}><div style={{ fontSize: 11, color: '#888' }}>Питание</div><div style={{ fontSize: 22, fontWeight: 700 }}>{readiness.nutrition}%</div></div>
+                <div style={{ background: '#1e1e2e', padding: 12, borderRadius: 8 }}><div style={{ fontSize: 11, color: '#888' }}>Поддержка</div><div style={{ fontSize: 22, fontWeight: 700 }}>{readiness.support}%</div></div>
+                <div style={{ background: '#1e1e2e', padding: 12, borderRadius: 8 }}><div style={{ fontSize: 11, color: '#888' }}>Усталость</div><div style={{ fontSize: 22, fontWeight: 700 }}>{readiness.fatigue}%</div></div>
+              </div>
+              {readiness.isConservative && <div style={{ color: '#ef4444', marginTop: 8, fontSize: 13 }}>Консервативный режим: {readiness.conservativeReason}</div>}
+            </div>
+          )}
+
+          {indices && (
+            <div style={{ marginBottom: 20 }}>
+              <h4>Клинические индексы</h4>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 8 }}>
+                {([
+                  { key: 'homaIR', label: 'HOMA-IR', data: indices.homaIR },
+                  { key: 'fai', label: 'FAI', data: indices.fai },
+                  { key: 'ft', label: 'Своб. тестостерон', data: indices.freeTestosterone },
+                  { key: 'egfr', label: 'eGFR', data: indices.egfr },
+                  { key: 'deritis', label: 'De Ritis', data: indices.deritis },
+                  { key: 'ldlHdl', label: 'LDL/HDL', data: indices.ldlHdlRatio },
+                  { key: 'tgHdl', label: 'TG/HDL', data: indices.tgHdlRatio },
+                ] as const).map(item => {
+                  const statusColor = item.data.status === 'normal' || item.data.status === 'optimal' ? '#22c55e' : item.data.status === 'high' || item.data.status === 'severe_ir' ? '#ef4444' : '#eab308';
+                  return (
+                    <div key={item.key} style={{ background: '#1e1e2e', padding: 10, borderRadius: 8 }}>
+                      <div style={{ fontSize: 11, color: '#888' }}>{item.label}</div>
+                      <div style={{ fontSize: 18, fontWeight: 700 }}>{item.data.value} <span style={{ fontSize: 11 }}>{item.key === 'ft' ? indices.freeTestosterone.unit : ''}</span></div>
+                      <div style={{ fontSize: 11, color: statusColor }}>{statusLabel(item.data.status)}</div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
       {tab === 'labs' && (
-        <div style={{ background: 'var(--bg-secondary)', borderRadius: 12, padding: 16, marginBottom: 12 }}>
-          <h4 style={{ margin: '0 0 8px' }}>Анализы за период</h4>
-          {periodLabs.length === 0 ? <p style={{ fontSize: 13, opacity: 0.6 }}>Нет данных</p> : (
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
-              <thead><tr><th style={{ padding: 6, textAlign: 'left', borderBottom: '1px solid var(--border)' }}>Показатель</th><th style={{ padding: 6, textAlign: 'right', borderBottom: '1px solid var(--border)' }}>Значение</th><th style={{ padding: 6, borderBottom: '1px solid var(--border)' }}>Ед.</th><th style={{ padding: 6, textAlign: 'center', borderBottom: '1px solid var(--border)' }}>Дата</th></tr></thead>
-              <tbody>{periodLabs.sort((a, b) => (b.date || '').localeCompare(a.date || '')).map(l => {
-                const ref = UCUM_MAP[l.code]; const abn = ref && (l.value < ref.lln || l.value > ref.uln);
-                return <tr key={l.id} style={{ color: abn ? '#ff9800' : 'inherit' }}><td style={{ padding: 6, borderBottom: '1px solid var(--border)' }}>{l.name || l.code}</td><td style={{ padding: 6, textAlign: 'right', borderBottom: '1px solid var(--border)' }}>{l.value}</td><td style={{ padding: 6, borderBottom: '1px solid var(--border)' }}>{l.unit}</td><td style={{ padding: 6, textAlign: 'center', borderBottom: '1px solid var(--border)' }}>{l.date}</td></tr>;
-              })}</tbody>
-            </table>
+        <div className="report-content">
+          <h3>Лабораторные анализы</h3>
+          {labs.length === 0 ? (
+            <p style={{ color: '#888' }}>Нет данных анализов. Добавьте анализы на экране лабораторий.</p>
+          ) : (
+            <>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, marginBottom: 20 }}>
+                <thead><tr style={{ background: '#1e1e2e' }}>
+                  <th style={{ padding: 8, textAlign: 'left', borderBottom: '2px solid #333' }}>Показатель</th>
+                  <th style={{ padding: 8, textAlign: 'right', borderBottom: '2px solid #333' }}>Значение</th>
+                  <th style={{ padding: 8, textAlign: 'left', borderBottom: '2px solid #333' }}>Ед.</th>
+                  <th style={{ padding: 8, textAlign: 'center', borderBottom: '2px solid #333' }}>Референс</th>
+                  <th style={{ padding: 8, textAlign: 'center', borderBottom: '2px solid #333' }}>Дата</th>
+                  <th style={{ padding: 8, textAlign: 'center', borderBottom: '2px solid #333' }}>Фаза</th>
+                </tr></thead>
+                <tbody>
+                  {Object.entries(latestLabsByCode).sort((a, b) => a[0].localeCompare(b[0])).map(([, l]) => {
+                    const ref = UCUM_MAP[l.code];
+                    const isAbnormal = ref && (l.value < ref.lln || l.value > ref.uln);
+                    return (
+                      <tr key={l.code} style={{ background: isAbnormal ? 'rgba(239,68,68,0.1)' : 'transparent' }}>
+                        <td style={{ padding: 8, borderBottom: '1px solid #222' }}>{l.name || l.code}</td>
+                        <td style={{ padding: 8, borderBottom: '1px solid #222', textAlign: 'right', fontWeight: isAbnormal ? 700 : 400, color: isAbnormal ? '#ef4444' : 'inherit' }}>{l.value}</td>
+                        <td style={{ padding: 8, borderBottom: '1px solid #222' }}>{l.unit}</td>
+                        <td style={{ padding: 8, borderBottom: '1px solid #222', textAlign: 'center' }}>{ref ? `${ref.lln}–${ref.uln}` : '—'}</td>
+                        <td style={{ padding: 8, borderBottom: '1px solid #222', textAlign: 'center' }}>{l.date}</td>
+                        <td style={{ padding: 8, borderBottom: '1px solid #222', textAlign: 'center' }}>{l.phase || '—'}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+
+              <h4>Тренды анализов</h4>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: 16 }}>
+                {Object.entries(labTrendData).filter(([, pts]) => pts.length >= 2).sort((a, b) => a[0].localeCompare(b[0])).map(([code, pts]) => {
+                  const ref = UCUM_MAP[code];
+                  return (
+                    <div key={code} style={{ background: '#1e1e2e', padding: 12, borderRadius: 8 }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 4 }}>{ref?.name || code} {ref ? `(${ref.lln}–${ref.uln} ${ref.prefUnit})` : ''}</div>
+                      <MiniSVGLineChart data={pts} />
+                    </div>
+                  );
+                })}
+              </div>
+            </>
           )}
-          <button style={{ ...btn, marginTop: 8 }} onClick={handleExportLabsCSV}>Экспорт CSV</button>
         </div>
       )}
 
       {tab === 'nutrition' && (
-        <div style={{ background: 'var(--bg-secondary)', borderRadius: 12, padding: 16, marginBottom: 12 }}>
-          <h4 style={{ margin: '0 0 8px' }}>Питание</h4>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 8, textAlign: 'center', marginBottom: 12 }}>
-            <div><div style={{ fontSize: 18, fontWeight: 700 }}>{avgWeeklyKcal}</div><div style={{ fontSize: 11, opacity: 0.6 }}>ккал</div></div>
-            <div><div style={{ fontSize: 18, fontWeight: 700 }}>{avgWeeklyProtein}г</div><div style={{ fontSize: 11, opacity: 0.6 }}>Белок</div></div>
-            <div><div style={{ fontSize: 18, fontWeight: 700 }}>{avgWeeklyFat}г</div><div style={{ fontSize: 11, opacity: 0.6 }}>Жиры</div></div>
-            <div><div style={{ fontSize: 18, fontWeight: 700 }}>{avgWeeklyCarbs}г</div><div style={{ fontSize: 11, opacity: 0.6 }}>Углеводы</div></div>
-          </div>
-          <button style={btn} onClick={handleExportDiaryCSV}>Экспорт дневника CSV</button>
+        <div className="report-content">
+          <h3>Питание</h3>
+          {Object.keys(diary).length === 0 ? (
+            <p style={{ color: '#888' }}>Нет данных дневника питания. Заполняйте дневник на экране питания.</p>
+          ) : (
+            <>
+              <div style={{ marginBottom: 16 }}>
+                <h4>Последний день ({diaryDates[diaryDates.length - 1]})</h4>
+                {latestDiaryTotals ? (
+                  <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+                    <div style={{ background: '#1e1e2e', padding: 12, borderRadius: 8 }}><div style={{ fontSize: 11, color: '#888' }}>Калории</div><div style={{ fontSize: 20, fontWeight: 700 }}>{latestDiaryTotals.kcal} ккал</div></div>
+                    <div style={{ background: '#1e1e2e', padding: 12, borderRadius: 8 }}><div style={{ fontSize: 11, color: '#888' }}>Белки</div><div style={{ fontSize: 20, fontWeight: 700 }}>{latestDiaryTotals.p} г</div></div>
+                    <div style={{ background: '#1e1e2e', padding: 12, borderRadius: 8 }}><div style={{ fontSize: 11, color: '#888' }}>Жиры</div><div style={{ fontSize: 20, fontWeight: 700 }}>{latestDiaryTotals.f} г</div></div>
+                    <div style={{ background: '#1e1e2e', padding: 12, borderRadius: 8 }}><div style={{ fontSize: 11, color: '#888' }}>Углеводы</div><div style={{ fontSize: 20, fontWeight: 700 }}>{latestDiaryTotals.c} г</div></div>
+                  </div>
+                ) : <p>Нет данных</p>}
+              </div>
+              <h4>Записей в дневнике: {Object.keys(diary).length}</h4>
+              <p style={{ color: '#888', fontSize: 13 }}>Детальные данные доступны через экспорт CSV</p>
+            </>
+          )}
         </div>
       )}
 
       {tab === 'pharma' && (
-        <div style={{ background: 'var(--bg-secondary)', borderRadius: 12, padding: 16, marginBottom: 12 }}>
-          <h4 style={{ margin: '0 0 8px' }}>Курс</h4>
-          {course.length === 0 ? <p style={{ fontSize: 13, opacity: 0.6 }}>Нет записей</p> : (
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
-              <thead><tr><th style={{ padding: 6, textAlign: 'left', borderBottom: '1px solid var(--border)' }}>Препарат</th><th style={{ padding: 6, textAlign: 'right', borderBottom: '1px solid var(--border)' }}>Доза</th><th style={{ padding: 6, textAlign: 'center', borderBottom: '1px solid var(--border)' }}>Частота</th><th style={{ padding: 6, textAlign: 'center', borderBottom: '1px solid var(--border)' }}>Недели</th></tr></thead>
-              <tbody>{course.map(c => <tr key={c.id}><td style={{ padding: 6, borderBottom: '1px solid var(--border)' }}>{c.substanceId}</td><td style={{ padding: 6, textAlign: 'right', borderBottom: '1px solid var(--border)' }}>{c.doseValue} {c.doseUnit}</td><td style={{ padding: 6, textAlign: 'center', borderBottom: '1px solid var(--border)' }}>{c.frequency}</td><td style={{ padding: 6, textAlign: 'center', borderBottom: '1px solid var(--border)' }}>{c.startWeek}–{c.endWeek}</td></tr>)}</tbody>
+        <div className="report-content">
+          <h3>Фармакологический курс</h3>
+          {course.length === 0 ? (
+            <p style={{ color: '#888' }}>Нет данных о курсе. Настройте курс на экране фармакологии.</p>
+          ) : (
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+              <thead><tr style={{ background: '#1e1e2e' }}>
+                <th style={{ padding: 8, textAlign: 'left', borderBottom: '2px solid #333' }}>Вещество</th>
+                <th style={{ padding: 8, textAlign: 'right', borderBottom: '2px solid #333' }}>Доза</th>
+                <th style={{ padding: 8, textAlign: 'center', borderBottom: '2px solid #333' }}>Частота</th>
+                <th style={{ padding: 8, textAlign: 'center', borderBottom: '2px solid #333' }}>Недели</th>
+              </tr></thead>
+              <tbody>
+                {course.map((c, i) => (
+                  <tr key={c.id || i}>
+                    <td style={{ padding: 8, borderBottom: '1px solid #222' }}>{c.substanceId}</td>
+                    <td style={{ padding: 8, textAlign: 'right', borderBottom: '1px solid #222' }}>{c.doseValue} {c.doseUnit}</td>
+                    <td style={{ padding: 8, textAlign: 'center', borderBottom: '1px solid #222' }}>{c.frequency}</td>
+                    <td style={{ padding: 8, textAlign: 'center', borderBottom: '1px solid #222' }}>{c.startWeek}–{c.endWeek}</td>
+                  </tr>
+                ))}
+              </tbody>
             </table>
           )}
         </div>
       )}
 
-      {tab === 'print' && (
-        <div id="printable-report" style={{ fontSize: 13, lineHeight: 1.5 }}>
-          <div style={{ borderBottom: '2px solid #00e68a', paddingBottom: 12, marginBottom: 16 }}>
-            <h1 style={{ margin: 0, fontSize: 20 }}>Health Engine — Отчёт</h1>
-            <span style={{ opacity: 0.6, fontSize: 12 }}>Дата: {new Date().toISOString().slice(0, 10)} | Период: {period === 'day' ? 'День' : period === 'week' ? 'Неделя' : 'Месяц'}</span>
-          </div>
-          {profile && (
-            <div style={{ marginBottom: 20 }}>
-              <h2 style={{ fontSize: 16, borderLeft: '3px solid #00e68a', paddingLeft: 8, margin: '0 0 8px' }}>Профиль</h2>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-                <tbody>
-                  <tr><td style={{ padding: 4, borderBottom: '1px solid var(--border)', fontWeight: 600 }}>Имя</td><td style={{ padding: 4, borderBottom: '1px solid var(--border)' }}>{profile.name || '—'}</td></tr>
-                  <tr><td style={{ padding: 4, borderBottom: '1px solid var(--border)', fontWeight: 600 }}>Возраст/Пол</td><td style={{ padding: 4, borderBottom: '1px solid var(--border)' }}>{profile.settings?.age ?? '—'} / {profile.settings?.sex === 'male' ? 'М' : 'Ж'}</td></tr>
-                  <tr><td style={{ padding: 4, borderBottom: '1px solid var(--border)', fontWeight: 600 }}>Вес/Цель</td><td style={{ padding: 4, borderBottom: '1px solid var(--border)' }}>{profile.settings?.weight ?? '—'} кг / {profile.settings?.primaryGoal || profile.settings?.goal || '—'}</td></tr>
-                </tbody>
-              </table>
-            </div>
-          )}
-          {risk && (
-            <div style={{ marginBottom: 20 }}>
-              <h2 style={{ fontSize: 16, borderLeft: '3px solid #f44336', paddingLeft: 8, margin: '0 0 8px' }}>Риски</h2>
-              <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 8 }}>Общий чистый: {risk.overallNet.toFixed(1)}%</div>
-              {risk.systemBreakdown && <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}><tbody>{Object.entries(risk.systemBreakdown).map(([sys, data]) => <tr key={sys}><td style={{ padding: 4, borderBottom: '1px solid var(--border)' }}>{systemLabels[sys] || sys}</td><td style={{ padding: 4, textAlign: 'right', borderBottom: '1px solid var(--border)' }}>{data.net.toFixed(1)}%</td></tr>)}</tbody></table>}
-            </div>
-          )}
-          {readiness && (
-            <div style={{ marginBottom: 20 }}>
-              <h2 style={{ fontSize: 16, borderLeft: '3px solid #00e68a', paddingLeft: 8, margin: '0 0 8px' }}>Готовность</h2>
-              <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
-                <div><strong>Восстановление:</strong> {readiness.recovery}%</div>
-                <div><strong>Питание:</strong> {readiness.nutrition}%</div>
-                <div><strong>Поддержка:</strong> {readiness.support}%</div>
-                <div><strong>Усталость:</strong> {readiness.fatigue}%</div>
-              </div>
-            </div>
-          )}
-          <div style={{ marginTop: 32, borderTop: '1px solid var(--border)', fontSize: 11, opacity: 0.5, textAlign: 'center', paddingTop: 8 }}>
-            Отчёт сформирован автоматически. Информация носит справочный характер.
-          </div>
-        </div>
-      )}
 
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12, marginBottom: 12 }}>
-        <button style={btn} onClick={handleExportJSON}>Экспорт JSON</button>
-        <button style={btn} onClick={handleExportDiaryCSV}>Дневник CSV</button>
-        <button style={btn} onClick={handleExportLabsCSV}>Анализы CSV</button>
-        <button style={btn} onClick={() => {
-          const reportData: WeeklyReportData = {
-            ctx: { role: 'user', phase: profile?.settings?.phase ?? 'baseline', courseStartDate: profile?.settings?.courseStartDate },
-            labs: linked.labs, course,
-            weightCurrent: profile?.settings?.weight ?? 0, weightPrev: profile?.settings?.weight ?? 0,
-            measurements: {}, goal: profile?.settings?.primaryGoal ?? 'maintenance',
-            macros: { p: linked.avgWeeklyProtein, f: linked.avgWeeklyFat, c: linked.avgWeeklyCarbs },
-            stepsAvg: 0, bpAvg: { sys: 120, dia: 80 }, bpNotes: '',
-            trainingFeel: readiness ? `Восстановление: ${readiness.recovery}%, Усталость: ${readiness.fatigue}%` : '—',
-            generalFeel: readiness && readiness.recovery > 60 ? 'Хорошее' : readiness && readiness.recovery > 40 ? 'Умеренное' : 'Плохое',
-            meds: course.map(c => c.substanceId).join(', '),
-            supplements: (profile?.settings?.currentSupplements as any[] ?? []).map((s: any) => s.name ?? s).join(', '),
-            lastLabDate: linked.labs.length > 0 ? linked.labs.sort((a, b) => b.date.localeCompare(a.date))[0].date : '',
-            nextLabDate: '', notes: ''
-          };
-          const html = generateWeeklyReportHTML(reportData);
-          const w = window.open('', '_blank');
-          if (w) { w.document.write(html); w.document.close(); }
-        }}>Недельный отчёт</button>
-        <button style={btn} onClick={() => {
-          const ctx: UserContext = { role: 'doctor', phase: profile?.settings?.phase ?? 'baseline' };
-          const risks: any = { overallRaw: risk?.overallRaw ?? 0, overallNet: risk?.overallNet ?? 0, systemBreakdown: risk?.systemBreakdown ?? {} };
-          const pct: any = course.length > 0 ? { pctProtocol: [], pctStartWeek: 0, pctEndDate: '', supportStack: [], warnings: [], startDate: new Date().toISOString().slice(0, 10), endDate: '', totalWeeks: Math.max(...course.map(c => c.endWeek)), substances: course } : null;
-          const html = generateMedicalReportHTML(ctx, linked.labs, risks, pct, '');
-          const w = window.open('', '_blank');
-          if (w) { w.document.write(html); w.document.close(); }
-        }}>Медицинский отчёт</button>
-        <button style={btn} onClick={() => window.print()}>Печать PDF</button>
-        <button style={btn} onClick={() => fileInputRef.current?.click()}>Импорт</button>
-        <input ref={fileInputRef} type="file" accept=".json" style={{ display: 'none' }} onChange={handleImportJSON} />
-      </div>
-      {importMsg && <div style={{ background: 'rgba(0,230,138,0.12)', padding: 8, borderRadius: 8, fontSize: 12 }}>{importMsg}</div>}
     </div>
   );
 };

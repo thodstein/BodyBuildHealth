@@ -2,20 +2,9 @@ import { ReadinessInput, ReadinessScores } from '../core/types';
 
 export function calcReadiness(i: ReadinessInput): ReadinessScores {
   const sleepH = Math.min(i.sleepHours, 9);
-  const durScore = (sleepH / 8) * 40;
-
-  const q = Math.min(10, Math.max(1, i.sleepQuality));
-  const qualScore = (q / 10) * 30;
-
-  const awak = Math.min(i.nightAwakenings, 10);
-  const contScore = Math.max(0, 20 - awak * 4);
-
-  let chronoScore = 10;
-  if (i.chronotype === 'lark' && i.bedtime && i.bedtime > '23:00') chronoScore = 5;
-  if (i.chronotype === 'owl' && i.wakeTime && i.wakeTime < '07:00') chronoScore = 5;
-
-  const sleepScore = durScore + qualScore + contScore + chronoScore;
-
+  const awak = Math.min(i.nightAwakenings, 5);
+  const sleepScore = Math.min(100, (sleepH / 8 * 50) + (i.sleepQuality * 5) - (awak * 10));
+  
   const hrv = Math.max(0.5, Math.min(1.5, i.hrvRatio));
   let rec = (sleepScore * 0.4) + (hrv * 100 * 0.3) - (i.doms * 2) - i.stress;
   if (i.doms > 8) rec *= 0.9;

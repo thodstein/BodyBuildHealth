@@ -1,4 +1,4 @@
-import { FOOD_DB, getTopByProtein, getTopByCarbs, getTopByFat, type FoodFilter } from '../core/nutrition-database';
+import { FOOD_DB, getTopByProtein, getTopByCarbs, getTopByFat } from '../core/nutrition-database';
 import type { NutritionTargets } from '../core/types';
 
 export interface MealSlot {
@@ -11,7 +11,6 @@ export interface MealSlot {
   totalC: number;
   pharmaNotes: string[];
   timingNote: string;
-  isTrainingDay?: boolean;
 }
 
 export interface MealFood {
@@ -37,16 +36,6 @@ export interface PharmaRule {
   rule: 'with_food' | 'empty_stomach' | 'carbs_required' | 'limit_potassium' | 'extra_water' | 'extra_magnesium' | 'avoid_sun' | 'with_fats';
   gramsCarbs?: number;
   details: string;
-}
-
-export interface MealPlanOptions {
-  dietType?: 'omnivore' | 'vegetarian' | 'vegan' | 'pescatarian' | 'keto' | 'paleo' | 'mediterranean';
-  foodAllergies?: string[];
-  foodIntolerances?: string[];
-  excludedFoods?: string[];
-  isTrainingDay?: boolean;
-  trainingTime?: 'morning' | 'afternoon' | 'evening' | null;
-  mealsPerDay?: number;
 }
 
 const FOOD_REQUIREMENTS: Record<string, 'with_food' | 'empty_stomach' | 'any' | 'carbs_required'> = {
@@ -127,43 +116,17 @@ const MEAL_TEMPLATES: Record<string, { time: string; label: string; timingNote: 
   ],
 };
 
-function buildFoodFilter(opts?: MealPlanOptions): FoodFilter | undefined {
-  if (!opts) return undefined;
-  const excludeIds: string[] = [...(opts.excludedFoods ?? [])];
-  return {
-    dietType: opts.dietType,
-    excludeAllergens: opts.foodAllergies,
-    excludedIds: excludeIds.length > 0 ? excludeIds : undefined,
-  };
-}
-
-const REST_DAY_LABEL_MAP: Record<string, string> = {
-  'Предтренировочный': 'Лёгкий перекус',
-  'После тренировки': 'Полдник',
-};
-
 export function generateDayMealPlan(
   targets: NutritionTargets,
   goal: string,
   courseEntries: Array<{ substanceId: string; substanceName: string; doseValue: number; frequency: string | number }>,
   trainingTime: 'morning' | 'afternoon' | 'evening' | null,
-  drugs?: string[],
-  options?: MealPlanOptions,
+  drugs?: string[]
 ): DayMealPlan {
-  const isTrainDay = options?.isTrainingDay ?? true;
-  const filter = buildFoodFilter(options);
   const template = MEAL_TEMPLATES[goal] || MEAL_TEMPLATES.maintenance;
-  const desiredMeals = options?.mealsPerDay ?? template.length;
   const meals: MealSlot[] = [];
   const warnings: string[] = [];
   const pharmaRules: PharmaRule[] = [];
-
-  if (options?.dietType && options.dietType !== 'omnivore') {
-    warnings.push(`Диета: ${options.dietType}. Продукты отфильтрованы.`);
-  }
-  if (options?.foodAllergies && options.foodAllergies.length > 0) {
-    warnings.push(`Аллергены исключены: ${options.foodAllergies.join(', ')}`);
-  }
 
   if (courseEntries) {
     for (const entry of courseEntries) {
@@ -192,52 +155,27 @@ export function generateDayMealPlan(
   if (needsExtraWater) warnings.push('Тренболон: пейте минимум 4 л воды в день.');
   if (needsExtraMg) warnings.push('Кленбутерол: дополнительно Mg 400 мг + таурин 2 г.');
 
-  let macroMultiplier = { p: 1, f: 1, c: 1, kcal: 1 };
-  if (!isTrainDay) {
-    macroMultiplier = { p: 1, f: 1.05, c: 0.85, kcal: 0.95 };
-  }
-
-  let slots = template;
-  if (!isTrainDay) {
-    slots = template.map(s => {
-      const newLabel = REST_DAY_LABEL_MAP[s.label] || s.label;
-      return { ...s, label: s.label === 'Предтренировочный' ? 'Лёгкий перекус' : s.label === 'После тренировки' ? 'Полдник' : s.label, macroPct: { ...s.macroPct } };
-    });
-  }
-
-  if (desiredMeals < slots.length) {
-    slots = slots.slice(0, desiredMeals);
-  }
-
-  for (let mi = 0; mi < slots.length; mi++) {
-    const slot = slots[mi];
+  const isTrainDay = true;
+  for (const slot of template) {
     let slotKcal = targets.kcal * slot.macroPct.c + targets.protein * 4 * slot.macroPct.p + targets.fats * 9 * slot.macroPct.f;
-    slotKcal = Math.round((slotKcal || targets.kcal * (Object.values(slot.macroPct).reduce((a, b) => a + b, 0))) * macroMultiplier.kcal);
-    const slotP = Math.round(targets.protein * slot.macroPct.p * macroMultiplier.p);
-    const slotF = Math.round(targets.fats * slot.macroPct.f * macroMultiplier.f);
-    const slotC = Math.round(targets.carbs * slot.macroPct.c * macroMultiplier.c);
+    slotKcal = Math.round(slotKcal || targets.kcal * (Object.values(slot.macroPct).reduce((a, b) => a + b, 0)));
+    const slotP = Math.round(targets.protein * slot.macroPct.p);
+    const slotF = Math.round(targets.fats * slot.macroPct.f);
+    const slotC = Math.round(targets.carbs * slot.macroPct.c);
     const slotFoods: MealFood[] = [];
     const mealNotes: string[] = [];
-    let timingNote = slot.timingNote;
+    const timingNote = slot.timingNote;
 
-    if (!isTrainDay && (slot.label === 'Лёгкий перекус' || slot.label === 'Полдник')) {
-      timingNote = 'День отдыха — лёгкий белок + клетчатка. Углеводы минимальны.';
-    }
-
-    const proteinFoods = getTopByProtein(8, filter).filter(f => !potassiumLimit || (f.name !== 'Банан' && f.name !== 'Картофель отварной'));
-    const carbFoods = getTopByCarbs(8, filter).filter(f => !potassiumLimit || !['Банан', 'Картофель отварной'].includes(f.name));
-    const fatFoods = getTopByFat(6, filter).filter(f => !potassiumLimit || !['Авокадо'].includes(f.name));
+    const proteinFoods = getTopByProtein(5).filter(f => !potassiumLimit || (f.name !== 'Банан' && f.name !== 'Картофель отварной'));
+    const carbFoods = getTopByCarbs(5).filter(f => !potassiumLimit || !['Банан', 'Картофель отварной'].includes(f.name));
+    const fatFoods = getTopByFat(4).filter(f => !potassiumLimit || !['Авокадо'].includes(f.name));
 
     let remainingP = slotP;
     let remainingC = slotC;
     let remainingF = slotF;
 
-    const isMainMeal = slot.label === 'Завтрак' || slot.label === 'Обед' || slot.label === 'Ужин';
-    const isWorkoutSlot = slot.label === 'После тренировки' || slot.label === 'Предтренировочный';
-    const isSnack = slot.label === 'Перед сном' || slot.label === 'Перекус' || slot.label === 'Лёгкий перекус' || slot.label === 'Полдник';
-
-    if (isMainMeal) {
-      const mainProtein = proteinFoods[mi % proteinFoods.length];
+    if (slot.label === 'Завтрак' || slot.label === 'Обед' || slot.label === 'Ужин') {
+      const mainProtein = proteinFoods[Math.min(meals.length % proteinFoods.length, proteinFoods.length - 1)];
       if (mainProtein) {
         const grams = Math.round((remainingP / mainProtein.protein) * 100);
         slotFoods.push({ id: mainProtein.id, name: mainProtein.name, grams, kcal: Math.round(mainProtein.kcal * grams / 100), protein: Math.round(mainProtein.protein * grams / 100), fat: Math.round(mainProtein.fat * grams / 100), carbs: Math.round(mainProtein.carbs * grams / 100), reason: mainProtein.description?.split('.')[0] || 'Основной белок' });
@@ -245,23 +183,17 @@ export function generateDayMealPlan(
       }
     }
 
-    if (isWorkoutSlot && isTrainDay) {
-      const fastIds = options?.dietType === 'vegan' ? ['soy_protein'] : ['whey_protein'];
-      const fastProtein = FOOD_DB.find(f => fastIds.includes(f.id) && (!filter || passesFilter(f, filter)));
+    if (slot.label === 'После тренировки' || slot.label === 'Предтренировочный') {
+      const fastProtein = FOOD_DB.find(f => f.id === 'whey_protein');
       if (fastProtein && remainingP > 0) {
         const grams = Math.max(30, Math.round(remainingP / fastProtein.protein * 100));
-        slotFoods.push({ id: fastProtein.id, name: fastProtein.name, grams, kcal: Math.round(fastProtein.kcal * grams / 100), protein: Math.round(fastProtein.protein * grams / 100), fat: Math.round(fastProtein.fat * grams / 100), carbs: Math.round(fastProtein.carbs * grams / 100), reason: 'Быстрый белок для mTOR' });
+        slotFoods.push({ id: fastProtein.id, name: fastProtein.name, grams, kcal: Math.round(fastProtein.kcal * grams / 100), protein: Math.round(fastProtein.protein * grams / 100), fat: Math.round(fastProtein.fat * grams / 100), carbs: Math.round(fastProtein.carbs * grams / 100), reason: 'Быстрый белок для mTR' });
         remainingP -= Math.round(fastProtein.protein * grams / 100);
       }
     }
 
-    if (isSnack) {
-      const caseinIds = options?.dietType === 'vegan' ? ['soy_protein'] : ['cottage_cheese_5', 'casein'];
-      let caseinFood: typeof FOOD_DB[number] | undefined;
-      for (const cid of caseinIds) {
-        const found = FOOD_DB.find(f => f.id === cid && (!filter || passesFilter(f, filter)));
-        if (found) { caseinFood = found; break; }
-      }
+    if (slot.label === 'Перед сном' || slot.label === 'Перекус') {
+      const caseinFood = FOOD_DB.find(f => f.id === 'cottage_cheese_5') || FOOD_DB.find(f => f.id === 'casein');
       if (caseinFood && remainingP > 0) {
         const grams = Math.min(200, Math.round(remainingP / caseinFood.protein * 100));
         slotFoods.push({ id: caseinFood.id, name: caseinFood.name, grams, kcal: Math.round(caseinFood.kcal * grams / 100), protein: Math.round(caseinFood.protein * grams / 100), fat: Math.round(caseinFood.fat * grams / 100), carbs: Math.round(caseinFood.carbs * grams / 100), reason: caseinFood.description?.split('.')[0] || 'Медленный белок' });
@@ -270,21 +202,21 @@ export function generateDayMealPlan(
     }
 
     if (remainingC > 20 && carbFoods.length > 0) {
-      const carbFood = carbFoods[mi % carbFoods.length];
+      const carbFood = carbFoods[meals.length % carbFoods.length];
       const grams = Math.min(300, Math.round(remainingC / carbFood.carbs * 100));
       slotFoods.push({ id: carbFood.id, name: carbFood.name, grams, kcal: Math.round(carbFood.kcal * grams / 100), protein: Math.round(carbFood.protein * grams / 100), fat: Math.round(carbFood.fat * grams / 100), carbs: Math.round(carbFood.carbs * grams / 100), reason: carbFood.description?.split('.')[0] || 'Углеводы' });
     }
 
-    if (needsFats && isMainMeal && remainingF > 5) {
+    if (needsFats && (slot.label === 'Завтрак' || slot.label === 'Обед') && remainingF > 5) {
       mealNotes.push('17α-оральники: принимайте с этим приёмом (с жирами 10-15 г)');
     }
 
-    if (carbsRequiredMeal && isWorkoutSlot && isTrainDay) {
+    if (carbsRequiredMeal && (slot.label === 'После тренировки' || slot.label === 'Предтренировочный')) {
       mealNotes.push(`Инсулин: обязательные ${carbsRequiredMeal.gramsCarbs} г углеводов в этом приёме`);
     }
 
     for (const rule of pharmaRules) {
-      if (rule.rule === 'empty_stomach' && (slot.label === 'Перед сном' || slot.label === 'Перекус' || slot.label === 'Лёгкий перекус' || slot.label === 'Завтрак')) {
+      if (rule.rule === 'empty_stomach' && (slot.label === 'Перед сном' || slot.label === 'Перекус' || slot.label === 'Завтрак')) {
         mealNotes.push(`${rule.drug}: ${rule.details}`);
       }
     }
@@ -294,7 +226,7 @@ export function generateDayMealPlan(
     const totalF = slotFoods.reduce((s, f) => s + f.fat, 0);
     const totalC = slotFoods.reduce((s, f) => s + f.carbs, 0);
 
-    meals.push({ time: slot.time, label: slot.label, foods: slotFoods, totalKcal: totalKcal || Math.round(slotKcal), totalP: totalP || slotP, totalF: totalF || slotF, totalC: totalC || slotC, pharmaNotes: mealNotes, timingNote, isTrainingDay: isTrainDay });
+    meals.push({ time: slot.time, label: slot.label, foods: slotFoods, totalKcal: totalKcal || Math.round(slotKcal), totalP: totalP || slotP, totalF: totalF || slotF, totalC: totalC || slotC, pharmaNotes: mealNotes, timingNote });
   }
 
   const totals = {
@@ -307,21 +239,4 @@ export function generateDayMealPlan(
   };
 
   return { meals, totals, warnings, pharmaRules };
-}
-
-function passesFilter(food: typeof FOOD_DB[number], filter: FoodFilter): boolean {
-  if (filter.dietType) {
-    const dt = filter.dietType;
-    if (dt === 'vegan' && !(food.isVegan ?? food.dietTags?.includes('vegan'))) return false;
-    if (dt === 'vegetarian' && !(food.isVegetarian ?? food.dietTags?.includes('vegetarian'))) return false;
-    if (dt === 'pescatarian' && !((food.isVegetarian ?? food.dietTags?.includes('vegetarian')) || (food.dietTags?.includes('pescatarian')))) return false;
-    if (dt === 'keto' && (food.carbs > 15) && food.id !== 'whey_protein') return false;
-    if (dt === 'paleo' && food.dietTags && !food.dietTags.includes('paleo') && !food.dietTags.includes('whole30')) return false;
-    if (dt === 'mediterranean' && food.dietTags && !food.dietTags.includes('mediterranean')) return false;
-  }
-  if (filter.excludeAllergens && filter.excludeAllergens.length > 0 && food.allergens) {
-    if (filter.excludeAllergens.some(a => food.allergens!.includes(a))) return false;
-  }
-  if (filter.excludedIds && filter.excludedIds.includes(food.id)) return false;
-  return true;
 }

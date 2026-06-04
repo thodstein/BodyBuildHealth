@@ -242,23 +242,6 @@ export interface FertilityInput {
   marPercent?: number;
   leukocytesMlMln?: number;
   agglutination?: boolean;
-  npPercent?: number;
-  immotilePercent?: number;
-  viabilityPercent?: number;
-  dfi?: number;
-  fructose?: number;
-  zincMmol?: number;
-  lh?: number;
-  fsh?: number;
-  tt?: number;
-  ft?: number;
-  e2?: number;
-  prl?: number;
-  shbg?: number;
-  inhb?: number;
-  amh?: number;
-  prog?: number;
-  varicocele?: 'none' | 'grade1' | 'grade2' | 'grade3';
 }
 
 export interface FertilityResult {
@@ -266,49 +249,6 @@ export interface FertilityResult {
   interpretation: string;
   forecast6w: number;
   forecast12w: number;
-  spermIndex?: number;
-  hormonalIndex?: number;
-  structuralIndex?: number;
-  warnings?: string[];
-}
-
-export interface InjuryRecord {
-  id: string;
-  type: 'joint' | 'muscle' | 'bone' | 'ligament' | 'tendon' | 'nerve';
-  location: string;
-  painLevel: number;
-  movementLimit: 'none' | 'mild' | 'moderate' | 'severe' | 'full_restriction';
-  side: 'left' | 'right' | 'both';
-  chronic: boolean;
-  date?: string;
-  notes?: string;
-}
-
-export interface SupplementEntry {
-  id: string;
-  name: string;
-  doseMg: number;
-  doseUnit: 'mg' | 'mcg' | 'IU' | 'g';
-  notes?: string;
-}
-
-export interface MedicationEntry {
-  id: string;
-  name: string;
-  doseMg: number;
-  doseUnit: 'mg' | 'mcg' | 'ml';
-  frequency: 'daily' | '2x_day' | '1x_week' | 'prn';
-  notes?: string;
-}
-
-export interface ProgressPhoto {
-  id: string;
-  date: string;
-  angle: 'front' | 'side' | 'back';
-  blob?: Blob;
-  supabaseUrl?: string;
-  weightKg?: number;
-  bodyFatPct?: number;
 }
 
 
@@ -339,17 +279,6 @@ export interface ExportData {
   readiness: any[];
   labs: LabPoint[];
 }
-export interface PharmaSynergy {
-  with: string;
-  type: 'synergistic' | 'antagonistic' | 'complementary';
-  desc: string;
-}
-
-export interface SideEffect {
-  effect: string;
-  frequency: 'common' | 'rare' | 'very_rare';
-}
-
 export interface PharmaSubstance {
   id: string;
   name: string;
@@ -362,17 +291,12 @@ export interface PharmaSubstance {
   risks?: string[];
   description?: string;
   class: string;
-      esters?: string[];
+     esters?: string[];
   pk: PK;
   pd: PD;
   ec50: number;
   n_hill: number;
   maxEffect: number;
-  research?: { study: string; conclusion: string; year: number }[];
-  synergies?: PharmaSynergy[];
-  contraindications?: string[];
-  sideEffects?: SideEffect[];
-  dosageRange?: { min: number; max: number; unit: string; frequency: string };
 }
 export interface UserContext {
   id?: string;
@@ -388,20 +312,11 @@ export interface BayesianState {
   ec50Shift?: number;
   lastUpdateWeek?: number;
 }
-export interface MechanismCell {
-  raw: number;
-  net: number;
-  coverage: number;
-  contributors: string[];
-  mitigations: { substance: string; reduction: number }[];
-}
-
 export interface RiskResult {
   overallRaw: number;
   overallNet: number;
   systemBreakdown: Record<string, { raw: number; net: number }>;
   mechanismBreakdown?: Record<string, number>;
-  mechanismDetail?: Record<string, MechanismCell>;
 }
 
 export interface RiskInput {
@@ -446,82 +361,58 @@ export interface UserProfile {
    role: UserRole;
    settings: {
      // Demographics
-      dateOfBirth?: string;
-      age?: number;
-      sex: 'male' | 'female';
-      ethnicity?: string;
-      height?: number;
-      weight: number;
-      bodyFat?: number;
-      waistCm?: number;
-      neckCm?: number;
-      chestCm?: number;
-      hipCm?: number;
-      forearmCm?: number;
-      bicepCm?: number;
-      thighCm?: number;
-      
-       // Goals and objectives
-       primaryGoal?: 'bulk' | 'cut' | 'maintenance' | 'strength' | 'endurance' | 'recomposition' | 'fitness' | 'health' | 'hypertrophy' | 'rehab';
-       goal?: string;
-       phase?: string;
-       courseStartDate?: string;
-       secondaryGoals?: ('bulk' | 'cut' | 'maintenance' | 'strength' | 'endurance' | 'recomposition' | 'fitness' | 'health' | 'hypertrophy' | 'rehab')[];
-      targetWeight?: number;
-      targetBodyFat?: number;
-      goalTimelineWeeks?: number;
-      
-      baselineSleepHours?: number;
-      baselineSleepQuality?: number;
-      baselineHrvRatio?: number;
-      baselineStressLevel?: number;
-      fatigueLevel?: number;
-      dailySteps?: number;
-      dailyWaterLiters?: number;
-      nightAwakenings?: number;
-      bedtime?: string;
-      wakeTime?: string;
-      chronotype?: 'lark' | 'owl' | 'mixed';
-      trainingLevel?: 'beginner' | 'intermediate' | 'advanced' | 'enhanced';
-      workoutsPerWeek?: number;
-      avgWorkoutMinutes?: number;
-      pharmaExperience?: 'none' | 'beginner' | 'intermediate' | 'advanced';
-      
-      typicalLabValues?: Record<string, number>;
-      
-      strengthBaselines?: Record<string, number>;
-      enduranceBaselines?: Record<string, number>;
-      
-      currentSupplements?: SupplementEntry[];
-      currentMedications?: MedicationEntry[];
-      allergies?: string[];
-      medicalConditions?: string[];
-      injuries?: InjuryRecord[];
-      weakPoints?: string[];
+     dateOfBirth?: string; // YYYY-MM-DD format
+     age?: number; // Calculated from dateOfBirth if provided
+     sex: 'male' | 'female';
+     ethnicity?: string;
+     height?: number; // in cm
+     weight: number; // in kg
+     bodyFat?: number; // percentage
+     
+      // Goals and objectives
+      primaryGoal?: 'bulk' | 'cut' | 'maintenance' | 'strength' | 'endurance' | 'recomposition' | 'fitness' | 'health';
+      goal?: string; // legacy / shorthand
+      phase?: string; // e.g. baseline, course, bridge, pct
+      courseStartDate?: string;
+      secondaryGoals?: ('bulk' | 'cut' | 'maintenance' | 'strength' | 'endurance' | 'recomposition' | 'fitness' | 'health')[];
+     targetWeight?: number; // target weight in kg
+     targetBodyFat?: number; // target body fat percentage
+     goalTimelineWeeks?: number; // weeks to achieve goal
+     
+     // Readiness and recovery baselines (used when current data not available)
+     baselineSleepHours?: number;
+     baselineSleepQuality?: number; // 0-1 scale
+     baselineHrvRatio?: number; // HRV ratio baseline
+     baselineStressLevel?: number; // 0-10 scale
+     
+     // Lab baselines (typical values for user when no data available)
+     typicalLabValues?: Record<string, number>; // lab code -> typical value
+     
+     // Fitness and strength baselines
+     strengthBaselines?: Record<string, number>; // exercise -> weight/reps
+     enduranceBaselines?: Record<string, number>; // activity -> time/distance
+     
+     // Supplementation and medication summary
+     currentSupplements?: string[]; // list of supplement names
+     currentMedications?: string[]; // list of medication names
+     allergies?: string[]; // known allergies
+     medicalConditions?: string[]; // known medical conditions
+     
+      // Genetics / SNP data
+      genetics?: Record<string, string>;
 
-      dietType?: 'omnivore' | 'vegetarian' | 'vegan' | 'pescatarian' | 'keto' | 'paleo' | 'mediterranean';
-      foodAllergies?: string[];
-      foodIntolerances?: string[];
-      excludedFoods?: string[];
-      preferredFoods?: string[];
-      dietRestrictions?: string[];
-      mealsPerDay?: number;
-      cookingSkill?: 'none' | 'basic' | 'intermediate' | 'advanced';
+      // Contact
+      email?: string;
 
-       genetics?: Record<string, string>;
-
-       email?: string;
-
-      nutritionFactor?: number;
-      trainingFactor?: number;
-      
-      preferredUnits?: 'metric' | 'imperial';
-      notificationsEnabled?: boolean;
-      privacyLevel?: 'private' | 'friends' | 'public';
-      
-      // Penalty override flags (manual user choice)
-      forceNoLabsPenalty?: boolean; // Force apply penalty when no labs are entered
-    };
+      // Lifestyle factors
+     nutritionFactor?: number; // 0-2 scale (0.5 = poor, 1.0 = average, 1.5 = good)
+     trainingFactor?: number; // 0-2 scale (0.5 = poor, 1.0 = average, 1.5 = good)
+     
+     // Preferences and settings
+     preferredUnits?: 'metric' | 'imperial';
+     notificationsEnabled?: boolean;
+     privacyLevel?: 'private' | 'friends' | 'public';
+   };
 }
 
 export interface Article {
@@ -684,9 +575,6 @@ export interface ReadinessInput {
   trainingLoadRatio: number;
   subjFatigue: number;
   hrIncrease: number;
-  chronotype?: 'lark' | 'owl' | 'mixed';
-  bedtime?: string;
-  wakeTime?: string;
   recovery?: number;
   nutrition?: number;
   support?: number;
@@ -713,7 +601,7 @@ export interface TrainingInput {
   fatigue: number;
   nutrition: number;
   weakPoints: string[];
-  injuries?: InjuryRecord[];
+  injuries?: string[];
   experience?: string;
   sessionDuration?: number;
   rir?: number;
@@ -733,34 +621,6 @@ export interface TrainingOutput {
   estimatedProgress?: number;
 }
 
-export type IntensityTechnique =
-  | 'straight_set'
-  | 'superset'
-  | 'rest_pause'
-  | 'cluster'
-  | 'myo_rep'
-  | 'drop_set'
-  | 'backoff_set'
-  | 'forced_rep'
-  | 'negative'
-  | 'pre_exhaust'
-  | 'post_exhaust'
-  | 'giant_set'
-  | 'pyramid';
-
-export interface SetFormat {
-  technique: IntensityTechnique;
-  exercises: string[];
-  restBetweenExercises?: number;
-  intraSetRest?: number;
-  activationReps?: number;
-  miniSetReps?: number;
-  miniSetRestSeconds?: number;
-  clusterReps?: string;
-  dropWeightPct?: number;
-  negativeTempo?: string;
-}
-
 export interface Exercise {
   id: string;
   name: string;
@@ -775,26 +635,6 @@ export interface Exercise {
   rest?: number;
   weight?: number;
   rir?: number;
-  targetMuscle?: string;
-  order?: number;
-  substitutionGroup?: string;
-  canReplace?: string[];
-  cannotReplace?: string[];
-  technique?: string;
-  pauseSeconds?: number;
-  peakContraction?: boolean;
-  stretchPhase?: boolean;
-  dropSet?: boolean;
-  dropSetReps?: string;
-  backoffSet?: boolean;
-  setFormat?: SetFormat;
-  comments?: string;
-}
-
-export interface ExerciseSubstitution {
-  exerciseId: string;
-  substitutes: { id: string; reason: string; priority: number }[];
-  forbidden?: { id: string; reason: string }[];
 }
 
 export interface TrainingDay {
@@ -861,43 +701,4 @@ export interface RiskCalculationResult {
   lipids?: number;
   hormones?: number;
   coverageMap?: Record<string, number>;
-}
-
-export interface StrengthLogEntry {
-  id: string;
-  date: string;
-  exerciseId: string;
-  exerciseName: string;
-  sets: { weight: number; reps: number; rir: number; rpe?: number }[];
-  totalVolume: number;
-  estimated1RM: number;
-  isCompound: boolean;
-  weekNumber?: number;
-  mesocycleId?: string;
-  notes?: string;
-}
-
-export interface WorkoutLog {
-  id: string;
-  date: string;
-  duration: number;
-  exercises: StrengthLogEntry[];
-  overallRPE: number;
-  recoveryBefore: number;
-  split: string;
-  weekNumber?: number;
-  mesocycleId?: string;
-  notes?: string;
-}
-
-export interface NutritionDiaryEntry {
-  id: string;
-  date: string;
-  mealType: 'breakfast' | 'lunch' | 'dinner' | 'snack';
-  items: { foodId: string; name: string; weight: number; kcal: number; p: number; f: number; c: number; fiber?: number }[];
-  totalKcal: number;
-  totalProtein: number;
-  totalFat: number;
-  totalCarbs: number;
-  totalFiber: number;
 }

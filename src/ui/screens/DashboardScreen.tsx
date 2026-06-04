@@ -1,5 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { SummaryCard } from '../cards/SummaryCard';
+import { SystemCard } from '../cards/SystemCard';
 import { RiskCard } from '../cards/RiskCard';
 import { RecommendationCard } from '../cards/RecommendationCard';
 import { registry } from '../../core/data/registry';
@@ -10,12 +11,14 @@ const SYSTEM_LABELS: Record<string, string> = {
   reproductive: 'Репродуктивная', musculoskeletal: 'Суставы и связки',
 };
 
-import type { LabDrugAlert } from '../../engines/lab-pharma-correlation.engine';
-import { calculateHealthScore } from '../../engines/health-score.engine';
-import { analyzeLabDrugCorrelation } from '../../engines/lab-pharma-correlation.engine';
-import { computeLabIndexDetails, type LabIndexDetail } from '../../engines/labs-indices.engine';
+import type { MasterDB, RiskResult, ReadinessScores, CourseEntry, LabPoint } from '../../core/types';
+import { calculateRisks } from '../../engines/risk.engine';
+import { calculateRiskFromAnalyses } from '../../engines/risk-calculator-v2.engine';
+import { calcReadiness } from '../../engines/readiness.engine';
+import { generateSupportStack } from '../../engines/support.engine';
 import { RISK_SYSTEMS } from '../../core/constants';
-import { useDataLink } from '../../core/data-link';
+import { db } from '../../core/db';
+import { getProfile } from '../../core/profile-manager';
 import { PHASE_REQUIRED_PANELS, LAB_PANELS } from '../../data/labs-phase-panels';
 
 type ScreenId = 'dashboard' | 'pharma' | 'course' | 'peptides' | 'nutrition' | 'plan' | 'substances' | 'labs' | 'risks' | 'profile' | 'predictive' | 'marketplace' | 'articles' | 'assistant' | 'gamification' | 'fertility-pct' | 'calculators' | 'reports' | 'integrations' | 'role-management' | 'support';
@@ -70,80 +73,154 @@ function SectionHeader({ title, onNavigate, screenId }: { title: string; onNavig
 }
 
 export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
-  const linked = useDataLink();
-  const [labIndices, setLabIndices] = useState<Record<string, LabIndexDetail> | null>(null);
-  const [healthScore, setHealthScore] = useState<{ score: number; trend: string; breakdown: { pharma: number; labs: number; nutrition: number }; recommendations: string[] } | null>(null);
-  const [drugAlerts, setDrugAlerts] = useState<LabDrugAlert[]>([]);
+  const [masterDb, setMasterDb] = useState<MasterDB | null>(null);
+  const [riskResult, setRiskResult] = useState<RiskResult | null>(null);
+  const [readiness, setReadiness] = useState<ReadinessScores | null>(null);
   const [alerts, setAlerts] = useState<string[]>([]);
+  const [prevRecovery, setPrevRecovery] = useState<number | undefined>(undefined);
+  const prevRecoveryRef = useRef<number | undefined>(undefined);
+  const [courseEntries, setCourseEntries] = useState<CourseEntry[]>([]);
+  const [labCount, setLabCount] = useState(0);
   const [missingLabs, setMissingLabs] = useState<string[]>([]);
 
   useEffect(() => {
-    const computeDerived = async () => {
-      const { labs, course, profile, readiness, risk } = linked;
-      const settings = profile.settings;
+    const loadData = async () => {
+    const data = registry.getDB();
+    setMasterDb(data);
 
-      if (labs.length > 0) {
-        setLabIndices(computeLabIndexDetails(labs));
-      }
+    const profile = getProfile();
+    const settings = profile.settings;
 
-      try {
-        const avg = { avgWeeklyKcal: linked.avgWeeklyKcal, avgWeeklyProtein: linked.avgWeeklyProtein };
-        const nutritionLog = linked.avgWeeklyKcal > 0 ? [{ date: new Date().toISOString().slice(0, 10), total: { kcal: avg.avgWeeklyKcal, p: avg.avgWeeklyProtein, f: linked.avgWeeklyFat, c: linked.avgWeeklyCarbs, fiber: 0, water: 0, steps: 0 } }] : [];
-        const hs = calculateHealthScore(labs, course, nutritionLog, avg.avgWeeklyKcal || 2500, avg.avgWeeklyProtein || 160);
-        setHealthScore(hs);
-      } catch {}
-
-      try {
-        const phase = settings.phase ?? 'baseline';
-        const alerts = analyzeLabDrugCorrelation(labs, course, phase === 'on_cycle' ? 'on_cycle' : phase === 'pct' ? 'pct' : 'baseline');
-        setDrugAlerts(alerts);
-      } catch {}
+    let courseData: CourseEntry[] = [];
+    let labData: (LabPoint & { patientId?: string })[] = [];
+    let missingRequiredLabs: string[] = [];
+    try {
+      await db.init();
+      courseData = await db.getAll<CourseEntry>('course_log');
+      setCourseEntries(courseData);
+      labData = await db.getAll<LabPoint & { patientId?: string }>('labs_log');
+      const userLabs = labData.filter(l => l.patientId === 'current-user');
+      setLabCount(userLabs.length);
 
       const phase = settings.phase ?? 'baseline';
       const requiredPanels = PHASE_REQUIRED_PANELS[phase] ?? PHASE_REQUIRED_PANELS.baseline;
       const requiredCodes = requiredPanels.flatMap(pid => (LAB_PANELS[pid]?.markers ?? []).map(m => m.ucumCode ?? m.id));
-      const enteredCodes = new Set(labs.map(l => l.code.toUpperCase()));
-      const missing = requiredCodes.filter(code => !enteredCodes.has(code.toUpperCase()));
-      setMissingLabs(missing);
+      const enteredCodes = new Set(userLabs.map(l => l.code.toUpperCase()));
+      missingRequiredLabs = requiredCodes.filter(code => !enteredCodes.has(code.toUpperCase()));
+      setMissingLabs(missingRequiredLabs);
+    } catch {}
 
-      const newAlerts: string[] = [];
-      if (risk) {
-        if (risk.overallRaw > 50) newAlerts.push(`Общий риск высокий: ${risk.overallRaw.toFixed(1)}% — рассмотрите снижение дозировок`);
+    const activeDrugs: Record<string, { dosePerWeek: number }> = {};
+    courseData.forEach(entry => {
+      const freq = typeof entry.frequency === 'number' ? entry.frequency : entry.frequency === 'daily' ? 7 : entry.frequency === 'eod' ? 3.5 : 1;
+      activeDrugs[entry.substanceId] = { dosePerWeek: entry.doseValue * freq };
+    });
+
+    const goal = settings.goal ?? settings.primaryGoal ?? 'maintenance';
+    const supportSubs = generateSupportStack(goal);
+    const supportCoverage: Record<string, number> = {};
+    for (const sub of supportSubs) {
+      if (sub.effects) {
+        for (const eff of sub.effects) {
+          supportCoverage[eff.effect] = (supportCoverage[eff.effect] || 0) + eff.strength;
+        }
       }
-      if (readiness) {
-        if (readiness.recovery < 40) newAlerts.push(`Восстановление критически низкое: ${readiness.recovery}%`);
-        if (readiness.fatigue > 70) newAlerts.push(`Уровень усталости высокий: ${readiness.fatigue}%`);
-        if (readiness.isConservative && readiness.conservativeReason) newAlerts.push(`Консервативный режим: ${readiness.conservativeReason}`);
-      }
-      if (drugAlerts.some(a => a.severity === 'critical' || a.severity === 'high')) {
-        newAlerts.push(`${drugAlerts.filter(a => a.severity === 'critical' || a.severity === 'high').length} критическое(х) взаимодействие(й) препарата с анализами`);
-      }
-      if (labs.length === 0) {
-        newAlerts.push('Анализы не введены — введите результаты на вкладке «Анализы»');
-      } else if (missing.length > 0) {
-        newAlerts.push(`Не хватает ${missing.length} обязательных анализов для фазы «${phase}»`);
-      }
-      setAlerts(newAlerts);
+    }
+
+    const riskInput = {
+      genetics: settings.genetics,
+      nutritionFactor: settings.nutritionFactor,
+      trainingFactor: settings.trainingFactor,
+      activeDrugs: Object.keys(activeDrugs).length > 0 ? activeDrugs : undefined,
+      supportCoverage,
+      biomarkerValues: undefined,
+      hgiMarkers: undefined,
+      interventionResponse: undefined,
+      overallBiomarkerValue: undefined,
+      overallHgiMarkers: undefined,
+      overallInterventionResponse: undefined,
     };
-    computeDerived();
-  }, [linked.labs.length, linked.course.length, linked.readiness?.recovery]);
+    const risk = calculateRisks(riskInput);
 
-  if (!linked.risk || !linked.readiness) return <div className="screen dashboard"><div className="loading-spinner" /></div>;
+    const userLabs = labData.filter(l => l.patientId === 'current-user');
+    if (userLabs.length > 0) {
+      const labRisks = calculateRiskFromAnalyses(userLabs);
+      if (risk.systemBreakdown) {
+        for (const sys of RISK_SYSTEMS) {
+          if (risk.systemBreakdown[sys]) {
+            const labVal = labRisks.systemContributions?.[sys as keyof typeof labRisks.systemContributions] ?? 0;
+            risk.systemBreakdown[sys].raw = Math.max(risk.systemBreakdown[sys].raw, labVal);
+          }
+        }
+      }
+    }
+    setRiskResult(risk);
 
-  const riskResult = linked.risk;
-  const readiness = linked.readiness;
-  const labCount = linked.labs.length;
-  const courseEntries = linked.course;
+    const daysOnCourse = (() => {
+      if (settings.courseStartDate) {
+        const start = new Date(settings.courseStartDate);
+        const now = new Date();
+        return Math.max(0, Math.floor((now.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)));
+      }
+      return 0;
+    })();
+
+    const readinessInput = {
+      sleepHours: settings.baselineSleepHours ?? 7,
+      sleepQuality: settings.baselineSleepQuality ?? 0.7,
+      nightAwakenings: 1,
+      hrvRatio: settings.baselineHrvRatio ?? 1.2,
+      doms: 2,
+      stress: settings.baselineStressLevel ?? 3,
+      riskCoverageMap: supportCoverage,
+      calRatio: 0.85,
+      proteinRatio: 0.8,
+      waterRatio: 0.7,
+      fiberRatio: 0.6,
+      omega3Flag: settings.currentSupplements?.includes('omega3') ?? false,
+      trainingLoadRatio: 0.7,
+      subjFatigue: 3,
+      hrIncrease: 0.1,
+    };
+    const rdy = calcReadiness(readinessInput);
+    setReadiness(rdy);
+
+    const newAlerts: string[] = [];
+    const totalRiskPct = risk.overallRaw;
+    if (totalRiskPct > 50) newAlerts.push(`Общий риск высокий: ${totalRiskPct.toFixed(1)}% — рассмотрите снижение дозировок`);
+    if (rdy.recovery < 40) newAlerts.push(`Восстановление критически низкое: ${rdy.recovery}%`);
+    if (rdy.fatigue > 70) newAlerts.push(`Уровень усталости высокий: ${rdy.fatigue}%`);
+    if (rdy.isConservative && rdy.conservativeReason) newAlerts.push(`Консервативный режим: ${rdy.conservativeReason}`);
+
+    const highRisks = data.risks.filter(r => r.level === 'HIGH' || r.level === 'CRITICAL');
+    if (highRisks.length > 0)     newAlerts.push(`${highRisks.length} риск(ов) высокого уровня`);
+
+    const userLabCount = labData.filter(l => l.patientId === 'current-user').length;
+    if (userLabCount === 0) {
+      newAlerts.push('Анализы не введены — введите результаты на вкладке «Анализы» для точного расчёта рисков');
+    } else if (missingRequiredLabs.length > 0) {
+      newAlerts.push(`Не хватает ${missingRequiredLabs.length} обязательных анализов для фазы «${settings.phase ?? 'baseline'}»`);
+    }
+
+    setAlerts(newAlerts);
+    setPrevRecovery(prevRecoveryRef.current);
+    prevRecoveryRef.current = rdy.recovery;
+    };
+    loadData();
+  }, []);
+
+  if (!masterDb || !riskResult || !readiness) return <div className="screen dashboard"><div className="loading-spinner" /></div>;
 
   const totalRisk = Math.round(riskResult.overallRaw);
   const riskAfterSupport = Math.round(riskResult.overallNet);
   const riskLevel = totalRisk > 60 ? 'HIGH' : totalRisk > 30 ? 'MEDIUM' : 'LOW';
 
-  const activeDrugCount = courseEntries.length;
+  const activeDrugCount = courseEntries.length || (Object.keys(riskResult.systemBreakdown).length > 0 ? Math.min(masterDb.substances.length, 5) : 0);
   const daysOnCourse = (() => {
     try {
-      if (linked.profile.settings.courseStartDate) {
-        const start = new Date(linked.profile.settings.courseStartDate);
+      const profile = getProfile();
+      if (profile.settings.courseStartDate) {
+        const start = new Date(profile.settings.courseStartDate);
         const now = new Date();
         return Math.max(0, Math.floor((now.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)));
       }
@@ -151,8 +228,7 @@ export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
     return 0;
   })();
 
-  const masterDb = registry.getDB();
-  const systems = RISK_SYSTEMS;
+  const systems = masterDb.systems.slice(0, 6);
   const risks = masterDb.risks.slice(0, 4);
   const recs = masterDb.recommendations.slice(0, 5);
 
@@ -191,145 +267,72 @@ export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
       )}
       <SummaryCard totalRisk={totalRisk} riskAfterSupport={riskAfterSupport} riskLevel={riskLevel} />
 
-      {healthScore && (
-        <div style={{ background: 'var(--bg-secondary)', borderRadius: 12, padding: '14px 16px', marginBottom: 12 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-            <h3 style={{ margin: 0 }}>Индекс здоровья</h3>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ fontSize: 28, fontWeight: 700, color: healthScore.score > 70 ? 'var(--success)' : healthScore.score > 45 ? 'var(--warning)' : 'var(--danger)' }}>{healthScore.score}</span>
-              <span style={{ fontSize: 12, color: healthScore.trend === 'improving' ? 'var(--success)' : healthScore.trend === 'declining' ? 'var(--danger)' : 'var(--text-dim)' }}>
-                {healthScore.trend === 'improving' ? '↗ улучшается' : healthScore.trend === 'declining' ? '↘ ухудшается' : '→ стабильно'}
-              </span>
-            </div>
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>Фарма-нагрузка</div>
-              <div style={{ fontWeight: 700, color: healthScore.breakdown.pharma > 70 ? 'var(--danger)' : 'var(--success)' }}>{healthScore.breakdown.pharma}%</div>
-            </div>
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>Лабы</div>
-              <div style={{ fontWeight: 700, color: healthScore.breakdown.labs > 70 ? 'var(--success)' : 'var(--warning)' }}>{healthScore.breakdown.labs}%</div>
-            </div>
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>Питание</div>
-              <div style={{ fontWeight: 700, color: healthScore.breakdown.nutrition > 70 ? 'var(--success)' : 'var(--warning)' }}>{healthScore.breakdown.nutrition}%</div>
-            </div>
-          </div>
-          {healthScore.recommendations.length > 0 && (
-            <div style={{ marginTop: 8, fontSize: 11, color: 'var(--text-dim)' }}>
-              {healthScore.recommendations.map((r, i) => <div key={i}>{r}</div>)}
-            </div>
-          )}
-        </div>
-      )}
-
-      {drugAlerts.length > 0 && (
-        <div style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 12, padding: '12px 16px', marginBottom: 12 }}>
-          <div style={{ fontWeight: 700, color: '#ef4444', fontSize: 13, marginBottom: 6 }}>Взаимодействия препаратов с анализами</div>
-          {drugAlerts.slice(0, 4).map((a, i) => (
-            <div key={i} style={{ fontSize: 12, marginBottom: 4, display: 'flex', justifyContent: 'space-between' }}>
-              <span><strong>{a.marker}</strong> {a.actualStatus === 'high' ? '↑' : '↓'} {a.value.toFixed(1)} — {a.drugCause.join(', ')}</span>
-              <span style={{ color: a.severity === 'critical' ? '#ef4444' : a.severity === 'high' ? '#f97316' : '#eab308', fontWeight: 600, fontSize: 11 }}>{a.severity === 'critical' ? 'КРИТИЧ.' : a.severity === 'high' ? 'ВЫСОКИЙ' : a.severity === 'med' ? 'СРЕДНИЙ' : 'НИЗКИЙ'}</span>
-            </div>
-          ))}
-          {drugAlerts.length > 4 && <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>ещё {drugAlerts.length - 4}...</div>}
-        </div>
-      )}
-
       <AlertBanner messages={alerts} />
 
-      <div className="dashboard-stats-4" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6, marginBottom: 4 }}>
-        <div style={{ background: 'var(--bg-secondary)', borderRadius: 8, padding: '8px 10px', textAlign: 'center' }}>
-          <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 2 }}>Восстановление</div>
-          <div style={{ fontSize: 18, fontWeight: 700, color: scoreColor(readiness.recovery, 40, 70) }}>{readiness.recovery}%</div>
+      <div className="dashboard-stats-4" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginBottom: 4 }}>
+        <div style={{ background: 'var(--bg-secondary)', borderRadius: 8, padding: '10px 12px', textAlign: 'center' }}>
+          <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 4 }}>Восстановление</div>
+          <div style={{ fontSize: 20, fontWeight: 700, color: scoreColor(readiness.recovery, 40, 70) }}>{readiness.recovery}%<TrendArrow current={readiness.recovery} previous={prevRecovery} /></div>
           <ProgressBar value={readiness.recovery} color={scoreColor(readiness.recovery, 40, 70)} />
         </div>
-        <div style={{ background: 'var(--bg-secondary)', borderRadius: 8, padding: '8px 10px', textAlign: 'center' }}>
-          <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 2 }}>Питание</div>
-          <div style={{ fontSize: 18, fontWeight: 700, color: scoreColor(readiness.nutrition, 50, 75) }}>{readiness.nutrition}%</div>
+        <div style={{ background: 'var(--bg-secondary)', borderRadius: 8, padding: '10px 12px', textAlign: 'center' }}>
+          <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 4 }}>Питание</div>
+          <div style={{ fontSize: 20, fontWeight: 700, color: scoreColor(readiness.nutrition, 50, 75) }}>{readiness.nutrition}%</div>
           <ProgressBar value={readiness.nutrition} color={scoreColor(readiness.nutrition, 50, 75)} />
         </div>
-        <div style={{ background: 'var(--bg-secondary)', borderRadius: 8, padding: '8px 10px', textAlign: 'center' }}>
-          <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 2 }}>Поддержка</div>
-          <div style={{ fontSize: 18, fontWeight: 700, color: scoreColor(readiness.support, 40, 70) }}>{readiness.support}%</div>
+        <div style={{ background: 'var(--bg-secondary)', borderRadius: 8, padding: '10px 12px', textAlign: 'center' }}>
+          <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 4 }}>Поддержка</div>
+          <div style={{ fontSize: 20, fontWeight: 700, color: scoreColor(readiness.support, 40, 70) }}>{readiness.support}%</div>
           <ProgressBar value={readiness.support} color={scoreColor(readiness.support, 40, 70)} />
         </div>
-        <div style={{ background: 'var(--bg-secondary)', borderRadius: 8, padding: '8px 10px', textAlign: 'center' }}>
-          <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 2 }}>Усталость</div>
-          <div style={{ fontSize: 18, fontWeight: 700, color: readiness.fatigue > 70 ? 'var(--danger)' : readiness.fatigue > 40 ? 'var(--warning)' : 'var(--success)' }}>{readiness.fatigue}%</div>
+        <div style={{ background: 'var(--bg-secondary)', borderRadius: 8, padding: '10px 12px', textAlign: 'center' }}>
+          <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 4 }}>Усталость</div>
+          <div style={{ fontSize: 20, fontWeight: 700, color: readiness.fatigue > 70 ? 'var(--danger)' : readiness.fatigue > 40 ? 'var(--warning)' : 'var(--success)' }}>{readiness.fatigue}%</div>
           <ProgressBar value={readiness.fatigue} color={readiness.fatigue > 70 ? 'var(--danger)' : readiness.fatigue > 40 ? 'var(--warning)' : 'var(--success)'} />
         </div>
       </div>
 
-      <div className="dashboard-stats-3" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6, marginBottom: 4 }}>
-        <div style={{ background: 'var(--bg-secondary)', borderRadius: 8, padding: '8px 10px', textAlign: 'center' }}>
-          <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>Препараты</div>
-          <div style={{ fontSize: 16, fontWeight: 700 }}>{activeDrugCount}</div>
+      <div className="dashboard-stats-3" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 4 }}>
+        <div style={{ background: 'var(--bg-secondary)', borderRadius: 8, padding: '10px 12px', textAlign: 'center' }}>
+          <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>Препараты</div>
+          <div style={{ fontSize: 18, fontWeight: 700 }}>{activeDrugCount}</div>
         </div>
-        <div style={{ background: 'var(--bg-secondary)', borderRadius: 8, padding: '8px 10px', textAlign: 'center' }}>
-          <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>Дней на курсе</div>
-          <div style={{ fontSize: 16, fontWeight: 700 }}>{daysOnCourse}</div>
+        <div style={{ background: 'var(--bg-secondary)', borderRadius: 8, padding: '10px 12px', textAlign: 'center' }}>
+          <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>Дней на курсе</div>
+          <div style={{ fontSize: 18, fontWeight: 700 }}>{daysOnCourse}</div>
         </div>
-        <div style={{ background: 'var(--bg-secondary)', borderRadius: 8, padding: '8px 10px', textAlign: 'center' }}>
-          <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>Лабы</div>
-          <div style={{ fontSize: 16, fontWeight: 700 }}>{labCount}</div>
+        <div style={{ background: 'var(--bg-secondary)', borderRadius: 8, padding: '10px 12px', textAlign: 'center' }}>
+          <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>Лабы</div>
+          <div style={{ fontSize: 18, fontWeight: 700 }}>{labCount}</div>
         </div>
       </div>
 
       <SectionHeader title="Системы организма" onNavigate={onNavigate} screenId="risks" />
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 4, marginBottom: 8 }}>
-        {systems.map(sys => {
-          const raw = riskResult.systemBreakdown?.[sys]?.raw ?? 0;
-          const net = riskResult.systemBreakdown?.[sys]?.net ?? 0;
-          const reduction = raw > 0 ? ((raw - net) / raw * 100) : 0;
-          return (
-            <div key={sys} style={{ background: 'var(--bg-secondary)', borderRadius: 8, padding: '8px 10px', cursor: 'pointer' }} onClick={onNavigate ? () => onNavigate('risks') : undefined}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 3 }}>
-                <span style={{ fontSize: 12, fontWeight: 600 }}>{SYSTEM_LABELS[sys] ?? sys}</span>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-                  {reduction > 0 && <span style={{ fontSize: 9, color: 'var(--success)' }}>-{Math.round(reduction)}%</span>}
-                  <span style={{ fontSize: 12, fontWeight: 700, color: riskColor(net) }}>{Math.round(net)}%</span>
-                </div>
-              </div>
-              <ProgressBar value={raw} color={riskColor(raw)} />
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 2 }}>
-                <span style={{ fontSize: 8, color: 'var(--text-dim)' }}>Без поддержки: {Math.round(raw)}%</span>
-                <span style={{ fontSize: 8, color: 'var(--success)' }}>С под.: {Math.round(net)}%</span>
-              </div>
-            </div>
-          );
-        })}
+      <div className="grid systems">
+        {systems.map(s => (
+          <SystemCard
+            key={s.id}
+            system={s}
+            onClick={onNavigate ? () => onNavigate('risks') : undefined}
+          />
+        ))}
       </div>
 
-      <SectionHeader title="Лабораторные индексы" onNavigate={onNavigate} screenId="labs" />
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 4, marginBottom: 8 }}>
-        {labIndices && Object.entries(labIndices).map(([key, idx]) => {
-          const pct = Math.round(idx.value * 100);
-          const color = idx.value < 0.2 ? '#22c55e' : idx.value < 0.4 ? '#86efac' : idx.value < 0.6 ? '#eab308' : idx.value < 0.8 ? '#f97316' : '#ef4444';
-          return (
-            <div key={key} style={{ background: 'var(--bg-secondary)', borderRadius: 8, padding: '8px 10px', cursor: 'pointer' }} onClick={onNavigate ? () => onNavigate('risks') : undefined}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 3 }}>
-                <span style={{ fontSize: 12, fontWeight: 600 }}>{idx.label}</span>
-                <span style={{ fontSize: 13, fontWeight: 700, color }}>{pct}%</span>
-              </div>
-              <ProgressBar value={pct} color={color} />
-              <div style={{ fontSize: 9, color: 'var(--text-dim)', marginTop: 2 }}>{idx.interpretation}</div>
-              {idx.markers.length > 0 && idx.markers.some(m => m.ratio > 0) && (
-                <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap', marginTop: 3 }}>
-                  {idx.markers.filter(m => m.ratio > 0).map(m => (
-                    <span key={m.code} style={{ fontSize: 8, padding: '1px 4px', borderRadius: 3, background: 'var(--bg-tertiary, #1a1a2e)' }}>{m.code}: {m.value.toFixed(1)} ({Math.round(m.weight * 100)}%)</span>
-                  ))}
-                </div>
-              )}
+      <SectionHeader title="Системные риски" onNavigate={onNavigate} screenId="risks" />
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 6, marginBottom: 8 }}>
+        {Object.entries(riskResult.systemBreakdown).map(([sys, vals]) => (
+          <div key={sys} style={{ background: 'var(--bg-secondary)', borderRadius: 8, padding: '8px 10px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+              <span style={{ fontSize: 12, fontWeight: 600 }}>{SYSTEM_LABELS[sys] ?? sys}</span>
+              <span style={{ fontSize: 12, fontWeight: 700, color: riskColor(vals.raw) }}>{vals.raw.toFixed(1)}%</span>
             </div>
-          );
-        })}
-        {(!labIndices || Object.keys(labIndices).length === 0) && (
-          <div style={{ gridColumn: 'span 2', textAlign: 'center', color: 'var(--text-dim)', fontSize: 11, padding: 12 }}>
-            Введите анализы для расчёта индексов
+            <ProgressBar value={vals.raw} color={riskColor(vals.raw)} />
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 2 }}>
+              <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>С поддержкой</span>
+              <span style={{ fontSize: 10, color: 'var(--success)' }}>{vals.net.toFixed(1)}%</span>
+            </div>
           </div>
-        )}
+        ))}
       </div>
 
       <SectionHeader title="Ключевые риски" onNavigate={onNavigate} screenId="risks" />
@@ -342,28 +345,28 @@ export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
         {recs.map(r => <RecommendationCard key={r.recId} rec={r} />)}
       </div>
 
-      <div style={{ marginTop: 16 }}>
-        <h2 style={{ marginBottom: 8, fontSize: 14 }}>Быстрый доступ</h2>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
+      <div style={{ marginTop: 20 }}>
+        <h2 style={{ marginBottom: 10 }}>Быстрый доступ</h2>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
           <div className="card" style={{ cursor: 'pointer', textAlign: 'center' }} onClick={onNavigate ? () => onNavigate('marketplace') : undefined}>
-            <div style={{ fontSize: 24, marginBottom: 4 }}>&#128722;</div>
-            <div style={{ fontSize: 12, fontWeight: 600 }}>Маркетплейс</div>
-            <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>Препараты и БАДы</div>
+            <div style={{ fontSize: 28, marginBottom: 6 }}>&#128722;</div>
+            <div style={{ fontSize: 13, fontWeight: 600 }}>Маркетплейс</div>
+            <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>Препараты и БАДы</div>
           </div>
           <div className="card" style={{ cursor: 'pointer', textAlign: 'center' }} onClick={onNavigate ? () => onNavigate('articles') : undefined}>
-            <div style={{ fontSize: 24, marginBottom: 4 }}>&#128218;</div>
-            <div style={{ fontSize: 12, fontWeight: 600 }}>Статьи</div>
-            <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>База знаний</div>
+            <div style={{ fontSize: 28, marginBottom: 6 }}>&#128218;</div>
+            <div style={{ fontSize: 13, fontWeight: 600 }}>Статьи</div>
+            <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>База знаний</div>
           </div>
           <div className="card" style={{ cursor: 'pointer', textAlign: 'center' }} onClick={onNavigate ? () => onNavigate('assistant') : undefined}>
-            <div style={{ fontSize: 24, marginBottom: 4 }}>&#129302;</div>
-            <div style={{ fontSize: 12, fontWeight: 600 }}>Ассистент</div>
-            <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>Чекапы и ответы</div>
+            <div style={{ fontSize: 28, marginBottom: 6 }}>&#129302;</div>
+            <div style={{ fontSize: 13, fontWeight: 600 }}>Ассистент</div>
+            <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>Чекапы и ответы</div>
           </div>
           <div className="card" style={{ cursor: 'pointer', textAlign: 'center' }} onClick={onNavigate ? () => onNavigate('reports') : undefined}>
-            <div style={{ fontSize: 24, marginBottom: 4 }}>&#128202;</div>
-            <div style={{ fontSize: 12, fontWeight: 600 }}>Отчёты</div>
-            <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>Экспорт и печать</div>
+            <div style={{ fontSize: 28, marginBottom: 6 }}>&#128202;</div>
+            <div style={{ fontSize: 13, fontWeight: 600 }}>Отчёты</div>
+            <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>Экспорт и печать</div>
           </div>
         </div>
       </div>

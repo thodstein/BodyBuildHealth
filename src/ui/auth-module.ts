@@ -14,8 +14,8 @@ function toAppProfile(p: LocalUserProfile): UserProfile {
       goal: p.settings.goal,
       phase: 'baseline',
       courseStartDate: new Date().toISOString().slice(0, 10),
-      height: p.settings.height,
-    },
+      height: p.settings.height
+    }
   };
 }
 
@@ -35,12 +35,12 @@ export async function renderAuthModule(container: HTMLElement, onLogin: (profile
       </div>
       <form id="auth-form">
         <input id="auth-email" type="email" placeholder="Email" autocomplete="email" style="margin-bottom:8px;">
-        <input id="auth-pass" type="password" placeholder="\u041F\u0430\u0440\u043E\u043B\u044C (\u043C\u0438\u043D\u0438\u043C\u0443\u043C 8 \u0441\u0438\u043C\u0432\u043E\u043B\u043E\u0432)" autocomplete="current-password" style="margin-bottom:8px;">
+        <input id="auth-pass" type="password" placeholder="\u041F\u0430\u0440\u043E\u043B\u044C" autocomplete="current-password" style="margin-bottom:8px;">
         <input id="auth-name" type="text" placeholder="\u0418\u043C\u044F" style="display:${mode === 'register' ? 'block' : 'none'};margin-bottom:8px;">
         <div id="auth-error" style="color:var(--danger);font-size:13px;text-align:center;min-height:20px;"></div>
         <button type="submit" class="btn" id="auth-submit">${mode === 'login' ? '\u0412\u043E\u0439\u0442\u0438' : '\u0417\u0430\u0440\u0435\u0433\u0438\u0441\u0442\u0440\u0438\u0440\u043E\u0432\u0430\u0442\u044C\u0441\u044F'}</button>
       </form>
-      <div style="font-size:11px;color:var(--text-dim);margin-top:16px;text-align:center;">\u0414\u0430\u043D\u043D\u044B\u0435 \u0445\u0440\u0430\u043D\u044F\u0442\u0441\u044F \u043B\u043E\u043A\u0430\u043B\u044C\u043D\u043E \u043D\u0430 \u0432\u0430\u0448\u0435\u043C \u0443\u0441\u0442\u0440\u043E\u0439\u0441\u0442\u0432\u0435<br>\u041F\u0440\u0438 \u043F\u043E\u0434\u043A\u043B\u044E\u0447\u0451\u043D\u043D\u043E\u043C Supabase \u0434\u0430\u043D\u043D\u044B\u0435 \u0441\u0438\u043D\u0445\u0440\u043E\u043D\u0438\u0437\u0438\u0440\u0443\u044E\u0442\u0441\u044F \u0432 \u043E\u0431\u043B\u0430\u043A\u043E</div>
+      <div style="font-size:11px;color:var(--text-dim);margin-top:16px;text-align:center;">\u0414\u0430\u043D\u043D\u044B\u0435 \u0445\u0440\u0430\u043D\u044F\u0442\u0441\u044F \u043B\u043E\u043A\u0430\u043B\u044C\u043D\u043E<br>\u0410\u0434\u043C\u0438\u043D: thodstein@mail.ru / children</div>
     `;
     container.appendChild(card);
 
@@ -65,11 +65,6 @@ export async function renderAuthModule(container: HTMLElement, onLogin: (profile
 
       if (!email || !pass) {
         errEl.textContent = '\u0417\u0430\u043F\u043E\u043B\u043D\u0438\u0442\u0435 email \u0438 \u043F\u0430\u0440\u043E\u043B\u044C';
-        return;
-      }
-
-      if (pass.length < 8) {
-        errEl.textContent = '\u041F\u0430\u0440\u043E\u043B\u044C \u043C\u0438\u043D\u0438\u043C\u0443\u043C 8 \u0441\u0438\u043C\u0432\u043E\u043B\u043E\u0432';
         return;
       }
 

@@ -3,7 +3,6 @@ import { calculateRisks } from '../../engines/risk.engine';
 import { generateReadinessForecast, predictLabTrend, runWhatIf } from '../../engines/predictive.engine';
 import type { RiskInput, RiskResult } from '../../core/types';
 import type { ForecastResult, LabForecast } from '../../engines/predictive.engine';
-import { useDataLink, getLatestLabValue } from '../../core/data-link';
 
 const SCENARIO_NAMES: Record<string, string> = {
   'Baseline': 'Базовый',
@@ -24,16 +23,15 @@ const SYSTEM_LABELS: Record<string, string> = {
 };
 
 export const PredictiveAnalyticsScreen: React.FC = () => {
-  const { profile, labs, activeDrugs, supportCoverage, readiness } = useDataLink();
   const [riskInput, setRiskInput] = useState<RiskInput>({
-    genetics: profile.settings.genetics ?? {},
-    activeDrugs,
+    genetics: {},
+    activeDrugs: {},
     biomarkerValues: {},
     hgiMarkers: {},
-    nutritionFactor: profile.settings.nutritionFactor ?? 1.0,
-    trainingFactor: profile.settings.trainingFactor ?? 1.0,
+    nutritionFactor: 1.0,
+    trainingFactor: 1.0,
     interventionResponse: 0.5,
-    supportCoverage
+    supportCoverage: {}
   });
 
   const [riskResult, setRiskResult] = useState<RiskResult | null>(null);
@@ -325,20 +323,20 @@ export const PredictiveAnalyticsScreen: React.FC = () => {
       <div className="card">
         <h3>Прогноз готовности (7 дней)</h3>
         <p style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 8 }}>Модель Хольта: прогноз на основе последних данных готовности.</p>
-        <ReadinessForecastBlock initialHistory={readiness ? [readiness.recovery] : undefined} />
+        <ReadinessForecastBlock />
       </div>
 
       <div className="card">
         <h3>Тренд лабораторных показателей</h3>
         <p style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 8 }}>Прогноз по данным анализов (HCT, АЛТ, и др.).</p>
-        <LabTrendBlock initialPoints={labs.length > 0 ? labs.slice(-7).map(l => l.value) : undefined} />
+        <LabTrendBlock />
       </div>
     </div>
   );
 };
 
-const ReadinessForecastBlock: React.FC<{ initialHistory?: number[] }> = ({ initialHistory }) => {
-  const [history, setHistory] = useState<number[]>(initialHistory ?? [65, 68, 70, 72, 69, 71, 73]);
+const ReadinessForecastBlock: React.FC = () => {
+  const [history, setHistory] = useState<number[]>([65, 68, 70, 72, 69, 71, 73]);
   const [forecast, setForecast] = useState<ForecastResult | null>(null);
 
   const calc = () => {
@@ -371,8 +369,8 @@ const ReadinessForecastBlock: React.FC<{ initialHistory?: number[] }> = ({ initi
   );
 };
 
-const LabTrendBlock: React.FC<{ initialPoints?: number[] }> = ({ initialPoints }) => {
-  const [points, setPoints] = useState<number[]>(initialPoints ?? [42, 44, 46, 48]);
+const LabTrendBlock: React.FC = () => {
+  const [points, setPoints] = useState<number[]>([42, 44, 46, 48]);
   const [forecast, setForecast] = useState<LabForecast | null>(null);
 
   const calc = () => {

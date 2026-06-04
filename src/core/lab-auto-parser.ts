@@ -1,5 +1,4 @@
-import { resolveLabMarker, normalizedRatio } from './labs-mapping';
-import { UCUM_MAP } from './constants';
+import { resolveLabMarker } from './labs-mapping';
 
 export interface ParsedLabResult {
   marker: string;
@@ -9,30 +8,19 @@ export interface ParsedLabResult {
   confidence: number;
   raw: string;
   provider?: 'gemotest' | 'helix' | 'invitro' | 'kdl' | 'unknown';
-  isAbnormal?: boolean;
-  deviation?: 'low' | 'high' | 'normal';
-  labName?: string;
 }
-
-// Normal ranges by lab provider (common variations)
-const LAB_REFERENCE_RANGES: Record<string, Partial<Record<string, { low: number; high: number }>>> = {
-  gemotest: {},
-  helix: {},
-  invitro: {},
-  kdl: {}
-};
 
 const LINE_PATTERNS = [
    // Pattern 1: Marker: Value Unit (most common)
-   /([A-Za-z0-9().\/-]{2,40})[\s:]+([\d,.]+)\s*([A-Za-z%\/0-9.-]{1,20})/i,
+   /([A-Za-z0-9().\-/]{2,40})[\s:]+([\d,.]+)\s*([A-Za-z%/0-9.-]{1,20})/i,
    // Pattern 2: Value Unit Marker
-   /([\d,.]+)\s*([A-Za-z%\/0-9.-]{1,20})\s+([A-Za-z0-9().\/-]{2,40})/i,
+   /([\d,.]+)\s*([A-Za-z%/0-9.-]{1,20})\s+([A-Za-z0-9().\-/]{2,40})/i,
    // Pattern 3: Marker Value Unit (no separator)
-   /([A-Za-z0-9().\/-]{2,40})\s+([\d,.]+)\s*([A-Za-z%\/0-9.-]{1,20})/i,
+   /([A-Za-z0-9().\-/]{2,40})\s+([\d,.]+)\s*([A-Za-z%/0-9.-]{1,20})/i,
    // Pattern 4: With reference ranges: Marker Value Unit (Low-High)
-   /([A-Za-z0-9().\/-]{2,40})[\s:]+([\d,.]+)\s*([A-Za-z%\/0-9.-]{1,20})\s*[\(\[\{]\s*([\d,.]+)\s*[-–]\s*([\d,.]+)\s*[\)\]\}]/i,
-   // Pattern 5: Marker Value Unit Low-High
-   /([A-Za-z0-9().\/-]{2,40})[\s:]+([\d,.]+)\s*([A-Za-z%\/0-9.-]{1,20})\s*([\d,.]+)\s*[-–]\s*([\d,.]+)/i
+   /([A-Za-z0-9().\-/]{2,40})[\s:]+([\d,.]+)\s*([A-Za-z%/0-9.-]{1,20})\s*[\(\[\{]\s*([\d,.]+)\s*[-–]\s*([\d,.]+)\s*[\)\]\}]/i,
+   // Pattern 5: Marker Value Unit RefLow-RefHigh
+   /([A-Za-z0-9().\-/]{2,40})[\s:]+([\d,.]+)\s*([A-Za-z%/0-9.-]{1,20})\s*([\d,.]+)\s*[-–]\s*([\d,.]+)/i
 ];
 
 function detectProvider(text: string): ParsedLabResult['provider'] {
@@ -97,25 +85,8 @@ export function parseLabText(text: string): ParsedLabResult[] {
        if (!marker || Number.isNaN(value) || value <= 0) continue;
 
        let refRange: string | undefined;
-       let isAbnormal: boolean | undefined;
-       let deviation: 'low' | 'high' | 'normal' | undefined;
-       
        if (refLow !== undefined && refHigh !== undefined) {
          refRange = `${refLow}-${refHigh}`;
-         isAbnormal = value < parseFloat(refLow) || value > parseFloat(refHigh);
-         if (isAbnormal) {
-           deviation = value < parseFloat(refLow) ? 'low' : 'high';
-         }
-       } else {
-         // Check against UCUM_MAP norms if available
-         const ucum = UCUM_MAP[marker];
-         if (ucum) {
-           const ratio = normalizedRatio(marker, value, unit);
-           isAbnormal = ratio !== null && (ratio < 0.2 || ratio > 0.8);
-           if (isAbnormal && ratio !== null) {
-             deviation = ratio < 0.2 ? 'low' : 'high';
-           }
-         }
        }
 
        results.push({
@@ -125,9 +96,7 @@ export function parseLabText(text: string): ParsedLabResult[] {
          refRange,
          confidence: 0.85,
          raw: line,
-         provider,
-         isAbnormal,
-         deviation
+         provider
        });
        break;
      }

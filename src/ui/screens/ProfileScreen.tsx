@@ -1,627 +1,477 @@
-import React, { useEffect, useState } from 'react';
-import type { UserProfile, InjuryRecord, SupplementEntry, MedicationEntry, LabPoint } from '../../core/types';
-import { getProfile, updateProfile, useProfileRefresh } from '../../core/profile-manager';
+import React, { useEffect, useRef, useState } from 'react';
+import { renderSettingsModule } from '../settings-module';
+import type { UserProfile, ReadinessInput } from '../../core/types';
+import { getProfile, updateProfile } from '../../core/profile-manager';
+import { formatDate, calculateAge } from '../../core/utils/date-utils';
 import { db } from '../../core/db';
+import type { LabPoint } from '../../core/types';
+import { computeLabIndices, LabIndicesInterpretation, interpretLabIndices } from '../../engines/labs-indices.engine';
 import { calcReadiness } from '../../engines/readiness.engine';
-import { computeLabIndices, interpretLabIndices } from '../../engines/labs-indices.engine';
 import { calculateIndices } from '../../engines/clinical-indices.engine';
-import { NAVY_BF_FORMULAS, MUSCLE_GROUPS_FULL, INJURY_LOCATIONS } from '../../core/constants';
-
-type ProfileTab = 'overview' | 'anthropometry' | 'sleep' | 'lifestyle' | 'diet' | 'injuries' | 'progress';
-
-const GOALS = [
-  { id: 'bulk', label: 'Набор массы' }, { id: 'cut', label: 'Сушка' },
-  { id: 'maintenance', label: 'Поддержание' }, { id: 'strength', label: 'Сила' },
-  { id: 'hypertrophy', label: 'Гипертрофия' }, { id: 'rehab', label: 'Реабилитация' },
-  { id: 'recomposition', label: 'Рекомпозиция' }, { id: 'health', label: 'Здоровье' }
-] as const;
-
-const DIET_TYPES = [
-  { id: 'omnivore', label: 'Всеядное', icon: '🍽️' },
-  { id: 'vegetarian', label: 'Вегетарианское', icon: '🥬' },
-  { id: 'vegan', label: 'Веганское', icon: '🌱' },
-  { id: 'pescatarian', label: 'Пескетарианское', icon: '🐟' },
-  { id: 'keto', label: 'Кето', icon: '🥑' },
-  { id: 'paleo', label: 'Палео', icon: '🥩' },
-  { id: 'mediterranean', label: 'Средиземноморское', icon: '🫒' },
-] as const;
-
-const ALLERGEN_OPTIONS = [
-  { id: 'dairy', label: 'Молочные продукты' },
-  { id: 'gluten', label: 'Глютен' },
-  { id: 'soy', label: 'Соя' },
-  { id: 'eggs', label: 'Яйца' },
-  { id: 'fish', label: 'Рыба' },
-  { id: 'shellfish', label: 'Моллюски' },
-  { id: 'tree_nuts', label: 'Орехи' },
-  { id: 'peanuts', label: 'Арахис' },
-];
-
-const INTOLERANCE_OPTIONS = [
-  { id: 'lactose', label: 'Лактоза' },
-  { id: 'fructose', label: 'Фруктоза' },
-  { id: 'histamine', label: 'Гистамин' },
-  { id: 'sorbitol', label: 'Сорбитол' },
-];
-
-const COOKING_SKILLS = [
-  { id: 'none', label: 'Не готовлю' },
-  { id: 'basic', label: 'Базовые навыки' },
-  { id: 'intermediate', label: 'Средний уровень' },
-  { id: 'advanced', label: 'Продвинутый' },
-] as const;
-
-const TRAINING_LEVELS = [
-  { id: 'beginner', label: 'Новичок' }, { id: 'intermediate', label: 'Средний' },
-  { id: 'advanced', label: 'Продвинутый' }, { id: 'enhanced', label: 'Усиленный' }
-] as const;
-
-const PHARMA_EXPERIENCE = [
-  { id: 'none', label: 'Нет' }, { id: 'beginner', label: 'Новичок' },
-  { id: 'intermediate', label: 'Средний' }, { id: 'advanced', label: 'Опытный' }
-] as const;
-
-const CHRONOTYPES = [
-  { id: 'lark', label: 'Жаворонок' }, { id: 'owl', label: 'Сова' }, { id: 'mixed', label: 'Смешанный' }
-] as const;
-
-const COURSE_PHASES = [
-  { id: 'baseline', label: 'Базовый' },
-  { id: 'course', label: 'Курс' },
-  { id: 'course-bridge-course', label: 'Курс-Мост-Курс' },
-  { id: 'bridge', label: 'Мост' },
-  { id: 'pct', label: 'ПКТ' },
-  { id: 'post_pct', label: 'После ПКТ' },
-  { id: 'fertility', label: 'Фертильность' },
-] as const;
-
-const INJURY_TYPES: { id: InjuryRecord['type']; label: string }[] = [
-  { id: 'joint', label: 'Сустав' }, { id: 'muscle', label: 'Мышца' }, { id: 'bone', label: 'Кость' },
-  { id: 'ligament', label: 'Связка' }, { id: 'tendon', label: 'Сухожилие' }, { id: 'nerve', label: 'Нерв' }
-];
-
-const MOVEMENT_LIMITS: { id: InjuryRecord['movementLimit']; label: string }[] = [
-  { id: 'none', label: 'Нет' }, { id: 'mild', label: 'Лёгкое' },
-  { id: 'moderate', label: 'Умеренное' }, { id: 'severe', label: 'Сильное' },
-  { id: 'full_restriction', label: 'Полное ограничение' }
-];
-
-const s: Record<string, React.CSSProperties> = {
-  card: { background: 'var(--bg-secondary)', borderRadius: 12, padding: 16, marginBottom: 12 },
-  row: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 8 },
-  row3: { display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginBottom: 8 },
-  label: { fontSize: 12, opacity: 0.7, marginBottom: 4 },
-  slider: { width: '100%', accentColor: '#00e68a' },
-  input: { width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg-primary)', color: 'inherit', fontSize: 14, boxSizing: 'border-box' as const },
-  btnGroup: { display: 'flex', flexWrap: 'wrap' as const, gap: 6, marginBottom: 8 },
-  btn: { padding: '6px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg-primary)', color: 'inherit', fontSize: 12, cursor: 'pointer' },
-  btnActive: { padding: '6px 12px', borderRadius: 8, border: '1px solid #00e68a', background: 'rgba(0,230,138,0.15)', color: '#00e68a', fontSize: 12, cursor: 'pointer' },
-  chipActive: { padding: '4px 10px', borderRadius: 16, border: '1px solid #00e68a', background: 'rgba(0,230,138,0.15)', color: '#00e68a', fontSize: 11, cursor: 'pointer' },
-  chip: { padding: '4px 10px', borderRadius: 16, border: '1px solid var(--border)', background: 'var(--bg-primary)', color: 'inherit', fontSize: 11, cursor: 'pointer' },
-  saveBtn: { padding: '10px 20px', borderRadius: 8, border: 'none', background: '#00e68a', color: '#000', fontWeight: 600, fontSize: 14, cursor: 'pointer', width: '100%', marginTop: 8 },
-  delBtn: { padding: '4px 8px', borderRadius: 6, border: '1px solid #f44336', background: 'transparent', color: '#f44336', fontSize: 11, cursor: 'pointer' },
-  section: { fontSize: 13, fontWeight: 600, marginBottom: 8, marginTop: 4, opacity: 0.8 },
-  computed: { fontSize: 13, padding: '8px 12px', borderRadius: 8, background: 'rgba(0,230,138,0.08)', marginBottom: 6 },
-};
 
 export const ProfileScreen: React.FC = () => {
-  const profile = useProfileRefresh();
-  const [tab, setTab] = useState<ProfileTab>('overview');
+  const containerRef = useRef<HTMLDivElement>(null);
+  const settingsHostRef = useRef<HTMLDivElement>(null);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [loading, setLoading] = useState(true);
   const [labs, setLabs] = useState<LabPoint[]>([]);
-  const [editInjury, setEditInjury] = useState<InjuryRecord | null>(null);
+  const [labIndices, setLabIndices] = useState<{ inflammation: number; metabolism: number; thyroid: number; lipids: number } | null>(null);
+  const [labIndexText, setLabIndexText] = useState<{ inflammation: string; metabolism: string; thyroid: string; lipids: string } | null>(null);
+  const [activeTab, setActiveTab] = useState<'overview' | 'settings' | 'metrics' | 'progress'>('overview');
 
-  const s_ = profile.settings;
-  const readinessScores = calcReadiness({
-    sleepHours: s_.baselineSleepHours ?? 7,
-    sleepQuality: s_.baselineSleepQuality ?? 5,
-    nightAwakenings: s_.nightAwakenings ?? 1,
-    hrvRatio: s_.baselineHrvRatio ?? 1.0,
-    doms: 2, stress: s_.baselineStressLevel ?? 3,
-    calRatio: s_.nutritionFactor ?? 0.8, proteinRatio: 0.8,
-    waterRatio: 0.7, fiberRatio: 0.6, omega3Flag: false,
-    trainingLoadRatio: s_.trainingFactor ?? 0.6,
-    subjFatigue: s_.fatigueLevel ?? 3, hrIncrease: 0.1,
-    chronotype: s_.chronotype, bedtime: s_.bedtime, wakeTime: s_.wakeTime,
-  });
+  const readinessScores = profile ? calcReadiness({
+    sleepHours: profile.settings.baselineSleepHours ?? 7,
+    sleepQuality: profile.settings.baselineSleepQuality ?? 0.7,
+    nightAwakenings: 1,
+    hrvRatio: profile.settings.baselineHrvRatio ?? 1.0,
+    doms: 2,
+    stress: profile.settings.baselineStressLevel ?? 3,
+    calRatio: profile.settings.nutritionFactor ?? 0.8,
+    proteinRatio: 0.8,
+    waterRatio: 0.7,
+    fiberRatio: 0.6,
+    omega3Flag: false,
+    trainingLoadRatio: profile.settings.trainingFactor ?? 0.6,
+    subjFatigue: 3,
+    hrIncrease: 0.1,
+  }) : null;
 
-  const clinicalIndices = labs.length > 0 ? calculateIndices(labs, s_.sex, s_.age ?? 30) : null;
-  const labIndices = labs.length > 0 ? computeLabIndices(labs) : null;
-  const labIndexText = labIndices ? interpretLabIndices(labIndices) : null;
-
-  const bmi = s_.height && s_.weight ? (s_.weight / Math.pow(s_.height / 100, 2)).toFixed(1) : null;
-  const lbm = s_.weight && s_.bodyFat ? (s_.weight * (1 - s_.bodyFat / 100)).toFixed(1) : null;
-  const navyBf = (() => {
-    if (!s_.waistCm || !s_.neckCm || !s_.height) return null;
-    const f = NAVY_BF_FORMULAS[s_.sex] ?? NAVY_BF_FORMULAS.male;
-    if (s_.sex === 'male') {
-      return Math.max(0, f.a * Math.log10(s_.waistCm - s_.neckCm) - f.b * Math.log10(s_.height) + f.c).toFixed(1);
-    }
-    if (s_.hipCm) {
-      const ff = NAVY_BF_FORMULAS.female;
-      return Math.max(0, ff.a * Math.log10(s_.waistCm + s_.hipCm - s_.neckCm) - ff.b * Math.log10(s_.height) + ff.c).toFixed(1);
-    }
-    return null;
-  })();
+  const clinicalIndices = labs.length > 0 && profile ? calculateIndices(labs, profile.settings.sex === 'male' ? 'male' : 'female', profile.settings.age ?? 30) : null;
 
   useEffect(() => {
-    const load = async () => {
-      try { setLabs(await db.getAll<LabPoint>('labs_log')); } catch {}
+    const loadProfile = async () => {
+      try {
+        const p = await getProfile();
+        setProfile(p as UserProfile);
+      } catch (error) {
+        console.error('Failed to load profile:', error);
+      } finally {
+        setLoading(false);
+      }
     };
-    load();
+    loadProfile();
   }, []);
 
-  const save = (partial: Partial<UserProfile['settings']>) => {
-    updateProfile({ settings: { ...s_, ...partial } });
+  useEffect(() => {
+    if (!settingsHostRef.current || !profile) return;
+    renderSettingsModule(settingsHostRef.current, profile, (updated: any) => {
+      setProfile(updated);
+    });
+  }, [profile]);
+
+  useEffect(() => {
+    const loadLabs = async () => {
+      if (!profile) return;
+      try {
+        const patientId = profile.id || 'current-user';
+        const labEntries = await db.getAll<LabPoint & { patientId?: string }>('labs_log');
+        const userLabs = labEntries.filter((l) => l.patientId === patientId);
+        setLabs(userLabs);
+      } catch (e) {
+        console.error('Failed to load labs for profile:', e);
+      }
+    };
+    loadLabs();
+  }, [profile]);
+
+  useEffect(() => {
+    if (labs.length > 0) {
+      const indices = computeLabIndices(labs);
+      setLabIndices(indices);
+      setLabIndexText(interpretLabIndices(indices));
+    } else {
+      setLabIndices(null);
+      setLabIndexText(null);
+    }
+  }, [labs]);
+
+  const getProgressPercent = () => {
+    if (!profile || !profile.settings) return 0;
+    const { weight } = profile.settings;
+    const goal = profile.settings.goal;
+    const target = profile.settings.targetWeight ?? (goal === 'cut' ? weight - 10 : goal === 'bulk' ? weight + 10 : weight);
+    if (target === weight) return 50;
+    const progress = ((weight - target) / (weight > target ? weight - target : target - weight)) * 100;
+    return Math.min(100, Math.max(0, Math.round(progress)));
   };
 
-  const addInjury = () => {
-    const newInj: InjuryRecord = { id: crypto.randomUUID(), type: 'muscle', location: 'Колено', painLevel: 3, movementLimit: 'none', side: 'left', chronic: false, date: new Date().toISOString().slice(0, 10) };
-    setEditInjury(newInj);
-  };
+  if (loading) return <div className="screen profile">Загрузка профиля...</div>;
 
-  const saveInjury = (inj: InjuryRecord) => {
-    const existing = s_.injuries ?? [];
-    const idx = existing.findIndex(i => i.id === inj.id);
-    const updated = idx >= 0 ? existing.map(i => i.id === inj.id ? inj : i) : [...existing, inj];
-    save({ injuries: updated });
-    setEditInjury(null);
-  };
-
-  const deleteInjury = (id: string) => {
-    save({ injuries: (s_.injuries ?? []).filter(i => i.id !== id) });
-  };
-
-  const toggleWeakPoint = (id: string) => {
-    const wp = s_.weakPoints ?? [];
-    save({ weakPoints: wp.includes(id) ? wp.filter(x => x !== id) : [...wp, id] });
-  };
-
-  const tabs: { id: ProfileTab; label: string }[] = [
-    { id: 'overview', label: 'Обзор' }, { id: 'anthropometry', label: 'Антропометрия' },
-    { id: 'sleep', label: 'Сон' }, { id: 'lifestyle', label: 'Образ жизни' },
-    { id: 'diet', label: 'Питание' }, { id: 'injuries', label: 'Травмы' }, { id: 'progress', label: 'Прогресс' }
-  ];
+  if (!profile) return <div className="screen profile">Профиль не найден</div>;
 
   return (
-    <div className="screen profile">
-      <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 12 }}>
-        {tabs.map(t => (
-          <button key={t.id} className={`tab-button ${tab === t.id ? 'active' : ''}`} onClick={() => setTab(t.id)}>{t.label}</button>
-        ))}
+    <div className="screen profile" ref={containerRef}>
+      <div className="profile-header">
+        <div className="profile-avatar">
+          <div className="avatar-initials">
+            {(profile.name ? profile.name.charAt(0) : '?').toUpperCase()}
+          </div>
+        </div>
+        <div className="profile-info">
+          <h2>{profile.name || 'Анонимный пользователь'}</h2>
+          <p className="profile-role">
+            {profile.role === 'admin' ? 'Администратор' :
+             profile.role === 'coach' ? 'Тренер' :
+             profile.role === 'doctor' ? 'Врач' :
+             profile.role === 'editor' ? 'Редактор' :
+             'Пользователь'}
+          </p>
+        </div>
       </div>
 
-      {tab === 'overview' && (
-        <>
+      <div className="profile-tabs">
+        <button className={`tab-button ${activeTab === 'overview' ? 'active' : ''}`} onClick={() => setActiveTab('overview')}>
+          Обзор
+        </button>
+        <button className={`tab-button ${activeTab === 'settings' ? 'active' : ''}`} onClick={() => setActiveTab('settings')}>
+          Настройки
+        </button>
+        <button className={`tab-button ${activeTab === 'metrics' ? 'active' : ''}`} onClick={() => setActiveTab('metrics')}>
+          Метрики
+        </button>
+        <button className={`tab-button ${activeTab === 'progress' ? 'active' : ''}`} onClick={() => setActiveTab('progress')}>
+          Прогресс
+        </button>
+      </div>
+
+      <div className="profile-content">
+        {/* Overview Tab - Default */}
+        <div className="profile-section" style={{ display: activeTab === 'overview' ? undefined : 'none' }}>
           {readinessScores && (
-            <div style={s.card}>
-              <h4 style={{ margin: '0 0 8px' }}>Оценка готовности</h4>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 8, textAlign: 'center' }}>
-                {[
-                  { label: 'Восстановление', value: readinessScores.recovery, good: 60 },
-                  { label: 'Питание', value: readinessScores.nutrition, good: 60 },
-                  { label: 'Поддержка', value: readinessScores.support, good: 60 },
-                  { label: 'Усталость', value: readinessScores.fatigue, good: 40, invert: true },
-                ].map(m => (
-                  <div key={m.label}>
-                    <div style={{ fontSize: 20, fontWeight: 700, color: m.invert ? (m.value <= m.good ? '#00e68a' : m.value <= 60 ? '#ff9800' : '#f44336') : (m.value >= m.good ? '#00e68a' : m.value >= 40 ? '#ff9800' : '#f44336') }}>{m.value}</div>
-                    <div style={{ fontSize: 11, opacity: 0.7 }}>{m.label}</div>
-                  </div>
-                ))}
+            <div className="profile-card readiness-card" style={{ marginBottom: '1rem' }}>
+              <h4>Оценка готовности</h4>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.75rem', textAlign: 'center' }}>
+                <div>
+                  <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: readinessScores.recovery >= 60 ? 'var(--success)' : readinessScores.recovery >= 40 ? 'var(--warning)' : 'var(--danger)' }}>{readinessScores.recovery}</div>
+                  <div style={{ fontSize: '0.85rem', opacity: 0.8 }}>Восстановление</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: readinessScores.nutrition >= 60 ? 'var(--success)' : readinessScores.nutrition >= 40 ? 'var(--warning)' : 'var(--danger)' }}>{readinessScores.nutrition}</div>
+                  <div style={{ fontSize: '0.85rem', opacity: 0.8 }}>Питание</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: readinessScores.support >= 60 ? 'var(--success)' : readinessScores.support >= 40 ? 'var(--warning)' : 'var(--danger)' }}>{readinessScores.support}</div>
+                  <div style={{ fontSize: '0.85rem', opacity: 0.8 }}>Поддержка</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: readinessScores.fatigue <= 40 ? 'var(--success)' : readinessScores.fatigue <= 60 ? 'var(--warning)' : 'var(--danger)' }}>{readinessScores.fatigue}</div>
+                  <div style={{ fontSize: '0.85rem', opacity: 0.8 }}>Усталость</div>
+                </div>
               </div>
+              {readinessScores.isConservative && (
+                <p style={{ color: 'var(--warning)', marginTop: '0.5rem', fontSize: '0.85rem' }}>⚠️ {readinessScores.conservativeReason}</p>
+              )}
             </div>
           )}
-          <div style={s.card}>
-            <h4 style={{ margin: '0 0 8px' }}>Фаза курса</h4>
-            <div style={s.btnGroup}>
-              {COURSE_PHASES.map(p => <button key={p.id} style={(s_.phase ?? 'baseline') === p.id ? s.btnActive : s.btn} onClick={() => save({ phase: p.id })}>{p.label}</button>)}
-            </div>
-            {s_.courseStartDate && (
-              <div style={{ marginTop: 6 }}>
-                <span style={s.label}>Дата начала курса</span>
-                <input style={s.input} type="date" value={s_.courseStartDate} onChange={e => save({ courseStartDate: e.target.value })} />
+          <div className="profile-grid">
+            <div className="profile-card">
+              <h4>Основная информация</h4>
+              <div className="info-item">
+                <span className="info-label">Возраст:</span>
+                <span className="info-value">
+                  {profile.settings.age !== undefined 
+                    ? `${profile.settings.age} лет` 
+                    : profile.settings.dateOfBirth
+                      ? `${calculateAge(profile.settings.dateOfBirth)} лет`
+                      : 'Не указано'}
+                </span>
               </div>
-            )}
-            {!s_.courseStartDate && s_.phase && s_.phase !== 'baseline' && (
-              <button style={{ ...s.btn, marginTop: 6 }} onClick={() => save({ courseStartDate: new Date().toISOString().slice(0, 10) })}>Указать дату начала</button>
-            )}
-          </div>
-          <div style={s.card}>
-            <h4 style={{ margin: '0 0 8px' }}>Основная информация</h4>
-            <div style={s.row}>
-              <div><span style={s.label}>Имя</span><input style={s.input} value={profile.name} onChange={e => updateProfile({ name: e.target.value })} placeholder="Имя" /></div>
-              <div><span style={s.label}>Email</span><input style={s.input} value={s_.email ?? ''} disabled placeholder="Email" /></div>
-            </div>
-            <div style={s.row}>
-              <div><span style={s.label}>Возраст</span><input style={s.input} type="number" value={s_.age ?? ''} onChange={e => save({ age: +e.target.value })} placeholder="30" /></div>
-              <div><span style={s.label}>Пол</span>
-                <div style={s.btnGroup}>
-                  <button style={s_.sex === 'male' ? s.btnActive : s.btn} onClick={() => save({ sex: 'male' })}>Муж</button>
-                  <button style={s_.sex === 'female' ? s.btnActive : s.btn} onClick={() => save({ sex: 'female' })}>Жен</button>
-                </div>
+              <div className="info-item">
+                <span className="info-label">Пол:</span>
+                <span className="info-value">
+                  {profile.settings.sex === 'male' ? 'Мужской' : 'Женский'}
+                </span>
+              </div>
+              <div className="info-item">
+                <span className="info-label">Этническая принадлежность:</span>
+                <span className="info-value">
+                  {profile.settings.ethnicity || 'Не указано'}
+                </span>
               </div>
             </div>
-          </div>
-          {clinicalIndices && (
-            <div style={s.card}>
-              <h4 style={{ margin: '0 0 8px' }}>Клинические индексы</h4>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, textAlign: 'center' }}>
-                {[
-                  { n: 'HOMA-IR', v: clinicalIndices.homaIR.value, l: clinicalIndices.homaIR.status === 'normal' ? 'Норма' : 'ИР' },
-                  { n: 'eGFR', v: clinicalIndices.egfr.value, l: clinicalIndices.egfr.status === 'normal' ? 'Норма' : `Ст.${clinicalIndices.egfr.status.toUpperCase()}` },
-                  { n: 'LDL/HDL', v: clinicalIndices.ldlHdlRatio.value, l: clinicalIndices.ldlHdlRatio.status === 'optimal' ? 'Оптим.' : 'Повышен' },
-                  { n: 'De Ritis', v: clinicalIndices.deritis.value, l: clinicalIndices.deritis.status === 'normal' ? 'Норма' : 'Патология' },
-                ].map(i => <div key={i.n}><div style={{ fontSize: 18, fontWeight: 700 }}>{i.v}</div><div style={{ fontSize: 11 }}>{i.n}</div><div style={{ fontSize: 10, opacity: 0.6 }}>{i.l}</div></div>)}
-              </div>
-            </div>
-          )}
-        </>
-      )}
 
-      {tab === 'anthropometry' && (
-        <>
-          <div style={s.card}>
-            <h4 style={{ margin: '0 0 8px' }}>Основные параметры</h4>
-            <div style={s.row}>
-              <div><span style={s.label}>Рост (см)</span><input style={s.input} type="number" value={s_.height ?? ''} onChange={e => save({ height: +e.target.value })} /></div>
-              <div><span style={s.label}>Вес (кг)</span><input style={s.input} type="number" step="0.1" value={s_.weight} onChange={e => save({ weight: +e.target.value })} /></div>
-            </div>
-            <div style={s.row}>
-              <div><span style={s.label}>% жира (ручной)</span><input style={s.input} type="number" step="0.1" value={s_.bodyFat ?? ''} onChange={e => save({ bodyFat: e.target.value ? +e.target.value : undefined })} placeholder="Optional" /></div>
-              <div><span style={s.label}>Пол</span>
-                <div style={s.btnGroup}>
-                  <button style={s_.sex === 'male' ? s.btnActive : s.btn} onClick={() => save({ sex: 'male' })}>М</button>
-                  <button style={s_.sex === 'female' ? s.btnActive : s.btn} onClick={() => save({ sex: 'female' })}>Ж</button>
-                </div>
+            <div className="profile-card">
+              <h4>Физические параметры</h4>
+              <div className="info-item">
+                <span className="info-label">Рост:</span>
+                <span className="info-value">
+                  {profile.settings.height !== undefined 
+                    ? `${profile.settings.height} см` 
+                    : 'Не указано'}
+                </span>
+              </div>
+              <div className="info-item">
+                <span className="info-label">Вес:</span>
+                <span className="info-value">
+                  {profile.settings.weight} кг
+                </span>
+              </div>
+              <div className="info-item">
+                <span className="info-label">Процент жира:</span>
+                <span className="info-value">
+                  {profile.settings.bodyFat !== undefined 
+                    ? `${profile.settings.bodyFat}%` 
+                    : 'Не измерено'}
+                </span>
+              </div>
+              <div className="info-item">
+                <span className="info-label">Индекс массы тела (ИМТ):</span>
+                <span className="info-value">
+                  {profile.settings.height && profile.settings.weight
+                    ? `${(profile.settings.weight / Math.pow(profile.settings.height / 100, 2)).toFixed(1)}`
+                    : 'Не рассчитан'}
+                </span>
               </div>
             </div>
-            {bmi && <div style={s.computed}>BMI: {bmi}</div>}
-            {lbm && <div style={s.computed}>LBM (сухая масса): {lbm} кг</div>}
-            {navyBf && <div style={s.computed}>Navy BF%: {navyBf}%</div>}
-          </div>
-          <div style={s.card}>
-            <h4 style={{ margin: '0 0 8px' }}>Обхваты (см)</h4>
-            <div style={s.row3}>
-              {[
-                { k: 'waistCm', l: 'Талия' }, { k: 'neckCm', l: 'Шея' }, { k: 'chestCm', l: 'Грудь' },
-                { k: 'hipCm', l: 'Бедро (таз)' }, { k: 'forearmCm', l: 'Предплечье' }, { k: 'bicepCm', l: 'Бицепс' },
-                { k: 'thighCm', l: 'Бедро верх' }
-              ].map(c => (
-                <div key={c.k}>
-                  <span style={s.label}>{c.l}</span>
-                  <input style={s.input} type="number" step="0.5" value={(s_ as any)[c.k] ?? ''} onChange={e => save({ [c.k]: e.target.value ? +e.target.value : undefined } as any)} />
-                </div>
-              ))}
-            </div>
-          </div>
-        </>
-      )}
 
-      {tab === 'sleep' && (
-        <div style={s.card}>
-          <h4 style={{ margin: '0 0 8px' }}>Параметры сна</h4>
-          <div>
-            <span style={s.label}>Длительность сна: {s_.baselineSleepHours ?? 7} ч</span>
-            <input style={s.slider} type="range" min="0" max="12" step="0.5" value={s_.baselineSleepHours ?? 7} onChange={e => save({ baselineSleepHours: +e.target.value })} />
-          </div>
-          <div>
-            <span style={s.label}>Качество сна: {s_.baselineSleepQuality ?? 5}/10</span>
-            <input style={s.slider} type="range" min="1" max="10" step="1" value={s_.baselineSleepQuality ?? 5} onChange={e => save({ baselineSleepQuality: +e.target.value })} />
-          </div>
-          <div>
-            <span style={s.label}>Пробуждения ночью: {s_.nightAwakenings ?? 1}</span>
-            <input style={s.slider} type="range" min="0" max="10" step="1" value={s_.nightAwakenings ?? 1} onChange={e => save({ nightAwakenings: +e.target.value })} />
-          </div>
-          <div style={s.row}>
-            <div><span style={s.label}>Время засыпания</span><input style={s.input} type="time" value={s_.bedtime ?? '23:00'} onChange={e => save({ bedtime: e.target.value })} /></div>
-            <div><span style={s.label}>Время подъёма</span><input style={s.input} type="time" value={s_.wakeTime ?? '07:00'} onChange={e => save({ wakeTime: e.target.value })} /></div>
-          </div>
-          <div>
-            <span style={s.label}>Хронотип</span>
-            <div style={s.btnGroup}>
-              {CHRONOTYPES.map(c => <button key={c.id} style={(s_.chronotype ?? 'mixed') === c.id ? s.btnActive : s.btn} onClick={() => save({ chronotype: c.id })}>{c.label}</button>)}
+            <div className="profile-card">
+              <h4>Цели и предпочтения</h4>
+              <div className="info-item">
+                <span className="info-label">Основная цель:</span>
+                <span className="info-value">
+                  {profile.settings.primaryGoal || profile.settings.goal || 'Не указана'}
+                </span>
+              </div>
+              <div className="info-item">
+                <span className="info-label">Целевой вес:</span>
+                <span className="info-value">
+                  {profile.settings.targetWeight !== undefined 
+                    ? `${profile.settings.targetWeight} кг` 
+                    : 'Не установлен'}
+                </span>
+              </div>
+              <div className="info-item">
+                <span className="info-label">Целевой % жира:</span>
+                <span className="info-value">
+                  {profile.settings.targetBodyFat !== undefined 
+                    ? `${profile.settings.targetBodyFat}%` 
+                    : 'Не установлен'}
+                </span>
+              </div>
+              <div className="info-item">
+                <span className="info-label">Срок достижения цели:</span>
+                <span className="info-value">
+                  {profile.settings.goalTimelineWeeks !== undefined 
+                    ? `${profile.settings.goalTimelineWeeks} недель` 
+                    : 'Не указан'}
+                </span>
+              </div>
             </div>
           </div>
         </div>
-      )}
 
-      {tab === 'lifestyle' && (
-        <>
-          <div style={s.card}>
-            <h4 style={{ margin: '0 0 8px' }}>Стресс и усталость</h4>
-            <div>
-              <span style={s.label}>Стресс: {s_.baselineStressLevel ?? 3}/10</span>
-              <input style={s.slider} type="range" min="1" max="10" value={s_.baselineStressLevel ?? 3} onChange={e => save({ baselineStressLevel: +e.target.value })} />
-            </div>
-            <div>
-              <span style={s.label}>Усталость: {s_.fatigueLevel ?? 3}/10</span>
-              <input style={s.slider} type="range" min="1" max="10" value={s_.fatigueLevel ?? 3} onChange={e => save({ fatigueLevel: +e.target.value })} />
-            </div>
-          </div>
-          <div style={s.card}>
-            <h4 style={{ margin: '0 0 8px' }}>Активность</h4>
-            <div>
-              <span style={s.label}>Шаги/день: {s_.dailySteps ?? 6000}</span>
-              <input style={s.slider} type="range" min="0" max="30000" step="500" value={s_.dailySteps ?? 6000} onChange={e => save({ dailySteps: +e.target.value })} />
-            </div>
-            <div>
-              <span style={s.label}>Вода/день (л): {s_.dailyWaterLiters ?? 2}</span>
-              <input style={s.slider} type="range" min="0" max="6" step="0.1" value={s_.dailyWaterLiters ?? 2} onChange={e => save({ dailyWaterLiters: +e.target.value })} />
-            </div>
-            <div style={s.row}>
-              <div><span style={s.label}>Тренировок/нед</span><input style={s.input} type="number" min="0" max="7" value={s_.workoutsPerWeek ?? 3} onChange={e => save({ workoutsPerWeek: +e.target.value })} /></div>
-              <div><span style={s.label}>Мин/тренировку</span><input style={s.input} type="number" min="15" max="180" value={s_.avgWorkoutMinutes ?? 60} onChange={e => save({ avgWorkoutMinutes: +e.target.value })} /></div>
-            </div>
-          </div>
-          <div style={s.card}>
-            <h4 style={{ margin: '0 0 8px' }}>Уровни и опыт</h4>
-            <div>
-              <span style={s.label}>Тренировочный уровень</span>
-              <div style={s.btnGroup}>
-                {TRAINING_LEVELS.map(l => <button key={l.id} style={(s_.trainingLevel ?? 'intermediate') === l.id ? s.btnActive : s.btn} onClick={() => save({ trainingLevel: l.id as any })}>{l.label}</button>)}
-              </div>
-            </div>
-            <div>
-              <span style={s.label}>Фармакологический опыт</span>
-              <div style={s.btnGroup}>
-                {PHARMA_EXPERIENCE.map(e => <button key={e.id} style={(s_.pharmaExperience ?? 'none') === e.id ? s.btnActive : s.btn} onClick={() => save({ pharmaExperience: e.id as any })}>{e.label}</button>)}
-              </div>
-            </div>
-          </div>
-          <div style={s.card}>
-            <h4 style={{ margin: '0 0 8px' }}>Цель</h4>
-            <div style={s.btnGroup}>
-              {GOALS.map(g => <button key={g.id} style={(s_.primaryGoal ?? s_.goal ?? '') === g.id ? s.btnActive : s.btn} onClick={() => save({ primaryGoal: g.id as any, goal: g.id })}>{g.label}</button>)}
-            </div>
-          </div>
-          <div style={s.card}>
-            <h4 style={{ margin: '0 0 8px' }}>Отстающие группы</h4>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-              {MUSCLE_GROUPS_FULL.map(m => (
-                <button key={m.id} style={(s_.weakPoints ?? []).includes(m.id) ? s.chipActive : s.chip} onClick={() => toggleWeakPoint(m.id)}>{m.label}</button>
-              ))}
-            </div>
-          </div>
-          <div style={s.card}>
-            <h4 style={{ margin: '0 0 8px' }}>Принимаю: БАДы</h4>
-            {(s_.currentSupplements ?? []).map((sup, i) => (
-              <div key={sup.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0', borderBottom: '1px solid var(--border)' }}>
-                <span style={{ flex: 1, fontSize: 13 }}>{sup.name} — {sup.doseMg} {sup.doseUnit}</span>
-                <button style={s.delBtn} onClick={() => save({ currentSupplements: (s_.currentSupplements ?? []).filter((_, j) => j !== i) })}>Удалить</button>
-              </div>
-            ))}
-            <button style={{ ...s.btn, marginTop: 8 }} onClick={() => {
-              const ns: SupplementEntry = { id: crypto.randomUUID(), name: 'Новый БАД', doseMg: 0, doseUnit: 'mg' };
-              save({ currentSupplements: [...(s_.currentSupplements ?? []), ns] });
-            }}>+ Добавить БАД</button>
-          </div>
-          <div style={s.card}>
-            <h4 style={{ margin: '0 0 8px' }}>Принимаю: Аптека</h4>
-            {(s_.currentMedications ?? []).map((med, i) => (
-              <div key={med.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0', borderBottom: '1px solid var(--border)' }}>
-                <span style={{ flex: 1, fontSize: 13 }}>{med.name} — {med.doseMg} {med.doseUnit} ({med.frequency})</span>
-                <button style={s.delBtn} onClick={() => save({ currentMedications: (s_.currentMedications ?? []).filter((_, j) => j !== i) })}>Удалить</button>
-              </div>
-            ))}
-            <button style={{ ...s.btn, marginTop: 8 }} onClick={() => {
-              const nm: MedicationEntry = { id: crypto.randomUUID(), name: 'Новый препарат', doseMg: 0, doseUnit: 'mg', frequency: 'daily' };
-              save({ currentMedications: [...(s_.currentMedications ?? []), nm] });
-            }}>+ Добавить препарат</button>
-          </div>
-         </>
-      )}
-
-      {tab === 'diet' && (
-        <div>
-          <div className="card" style={{ marginBottom: 12 }}>
-            <h3 style={{ margin: '0 0 12px 0' }}>Тип питания</h3>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: 8 }}>
-              {DIET_TYPES.map(dt => (
-                <button key={dt.id} onClick={() => save({ dietType: dt.id as any })} style={{
-                  padding: '10px 8px', borderRadius: 10, border: s_.dietType === dt.id ? '2px solid var(--accent-green, #00e68a)' : '2px solid var(--border-color)',
-                  background: s_.dietType === dt.id ? 'rgba(0,230,138,0.1)' : 'var(--bg-primary)', cursor: 'pointer', textAlign: 'center',
-                }}>
-                  <div style={{ fontSize: 20 }}>{dt.icon}</div>
-                  <div style={{ fontSize: 11, fontWeight: 600, color: s_.dietType === dt.id ? 'var(--accent-green, #00e68a)' : 'var(--text-light)' }}>{dt.label}</div>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="card" style={{ marginBottom: 12 }}>
-            <h3 style={{ margin: '0 0 12px 0' }}>Пищевые аллергии</h3>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-              {ALLERGEN_OPTIONS.map(a => {
-                const active = (s_.foodAllergies ?? []).includes(a.id);
-                return (
-                  <button key={a.id} onClick={() => {
-                    const current = s_.foodAllergies ?? [];
-                    save({ foodAllergies: active ? current.filter(x => x !== a.id) : [...current, a.id] });
-                  }} style={{
-                    padding: '6px 12px', borderRadius: 8, fontSize: 12, cursor: 'pointer',
-                    background: active ? 'rgba(239,68,68,0.15)' : 'var(--bg-primary)',
-                    border: active ? '1px solid #ef4444' : '1px solid var(--border-color)',
-                    color: active ? '#ef4444' : 'var(--text-light)', fontWeight: active ? 600 : 400,
-                  }}>
-                    {a.label}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          <div className="card" style={{ marginBottom: 12 }}>
-            <h3 style={{ margin: '0 0 12px 0' }}>Непереносимости</h3>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-              {INTOLERANCE_OPTIONS.map(it => {
-                const active = (s_.foodIntolerances ?? []).includes(it.id);
-                return (
-                  <button key={it.id} onClick={() => {
-                    const current = s_.foodIntolerances ?? [];
-                    save({ foodIntolerances: active ? current.filter(x => x !== it.id) : [...current, it.id] });
-                  }} style={{
-                    padding: '6px 12px', borderRadius: 8, fontSize: 12, cursor: 'pointer',
-                    background: active ? 'rgba(249,115,22,0.15)' : 'var(--bg-primary)',
-                    border: active ? '1px solid #f97316' : '1px solid var(--border-color)',
-                    color: active ? '#f97316' : 'var(--text-light)', fontWeight: active ? 600 : 400,
-                  }}>
-                    {it.label}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          <div className="card" style={{ marginBottom: 12 }}>
-            <h3 style={{ margin: '0 0 12px 0' }}>Навыки готовки</h3>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-              {COOKING_SKILLS.map(cs => (
-                <button key={cs.id} onClick={() => save({ cookingSkill: cs.id as any })} style={{
-                  padding: '8px 12px', borderRadius: 8, fontSize: 12, cursor: 'pointer',
-                  background: s_.cookingSkill === cs.id ? 'rgba(0,230,138,0.1)' : 'var(--bg-primary)',
-                  border: s_.cookingSkill === cs.id ? '1px solid var(--accent-green, #00e68a)' : '1px solid var(--border-color)',
-                  color: s_.cookingSkill === cs.id ? 'var(--accent-green, #00e68a)' : 'var(--text-light)', fontWeight: 500,
-                }}>
-                  {cs.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="card" style={{ marginBottom: 12 }}>
-            <h3 style={{ margin: '0 0 12px 0' }}>Приёмов пищи в день</h3>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <input type="range" min={2} max={7} value={s_.mealsPerDay ?? 4} onChange={e => save({ mealsPerDay: parseInt(e.target.value) })} style={{ flex: 1, accentColor: '#00e68a' }} />
-              <span style={{ fontSize: 18, fontWeight: 700, minWidth: 24, textAlign: 'center' }}>{s_.mealsPerDay ?? 4}</span>
-            </div>
-          </div>
-
-          {((s_.foodAllergies ?? []).length + (s_.foodIntolerances ?? []).length > 0 || s_.dietType) && (
-            <div className="card" style={{ marginBottom: 12, borderColor: 'var(--accent-green, #00e68a)', borderWidth: 1 }}>
-              <div style={{ fontSize: 12, color: 'var(--accent-green, #00e68a)', fontWeight: 600, marginBottom: 4 }}>
-                Активные ограничения
-              </div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-                {s_.dietType && <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 4, background: 'rgba(0,230,138,0.1)', color: 'var(--accent-green, #00e68a)' }}>
-                  {DIET_TYPES.find(d => d.id === s_.dietType)?.label}
-                </span>}
-                {(s_.foodAllergies ?? []).map(a => (
-                  <span key={a} style={{ fontSize: 10, padding: '2px 6px', borderRadius: 4, background: 'rgba(239,68,68,0.1)', color: '#ef4444' }}>
-                    {ALLERGEN_OPTIONS.find(o => o.id === a)?.label || a}
-                  </span>
-                ))}
-                {(s_.foodIntolerances ?? []).map(it => (
-                  <span key={it} style={{ fontSize: 10, padding: '2px 6px', borderRadius: 4, background: 'rgba(249,115,22,0.1)', color: '#f97316' }}>
-                    {INTOLERANCE_OPTIONS.find(o => o.id === it)?.label || it}
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {tab === 'injuries' && (
-        <>
-          <div style={s.card}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h4 style={{ margin: 0 }}>Травмы</h4>
-              <button style={s.btnActive} onClick={addInjury}>+ Добавить</button>
-            </div>
-          </div>
-          {(s_.injuries ?? []).map(inj => (
-            <div key={inj.id} style={s.card}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                <strong>{inj.location} — {INJURY_TYPES.find(t => t.id === inj.type)?.label ?? inj.type}</strong>
-                <div style={{ display: 'flex', gap: 4 }}>
-                  <button style={s.btn} onClick={() => setEditInjury(inj)}>Ред.</button>
-                  <button style={s.delBtn} onClick={() => deleteInjury(inj.id)}>Удалить</button>
+        {/* Metrics Tab */}
+        <div className="profile-section" style={{ display: activeTab === 'metrics' ? undefined : 'none' }} id="metrics-tab">
+          <div className="profile-grid">
+            <div className="profile-card">
+              <h4>Показатели готовности</h4>
+              <div className="metric-item">
+                <span className="metric-label">Сон:</span>
+                <div className="metric-value">
+                  {profile.settings.baselineSleepHours !== undefined
+                    ? `${profile.settings.baselineSleepHours} ч`
+                    : 'Не указано'}
                 </div>
               </div>
-              <div style={{ fontSize: 12, opacity: 0.8 }}>
-                Боль: {inj.painLevel}/10 | Ограничение: {MOVEMENT_LIMITS.find(m => m.id === inj.movementLimit)?.label} | Сторона: {inj.side === 'left' ? 'Левая' : inj.side === 'right' ? 'Правая' : 'Обе'} | {inj.chronic ? 'Хроническая' : 'Острая'}
-              </div>
-              {inj.notes && <div style={{ fontSize: 11, opacity: 0.6, marginTop: 4 }}>{inj.notes}</div>}
-            </div>
-          ))}
-          {editInjury && (
-            <div style={{ ...s.card, border: '1px solid #00e68a' }}>
-              <h4 style={{ margin: '0 0 8px' }}>{editInjury.id && (s_.injuries ?? []).find(i => i.id === editInjury.id) ? 'Редактирование' : 'Новая травма'}</h4>
-              <div>
-                <span style={s.label}>Тип</span>
-                <div style={s.btnGroup}>{INJURY_TYPES.map(t => <button key={t.id} style={editInjury.type === t.id ? s.btnActive : s.btn} onClick={() => setEditInjury({ ...editInjury, type: t.id })}>{t.label}</button>)}</div>
-              </div>
-              <div>
-                <span style={s.label}>Локализация</span>
-                <select style={s.input} value={editInjury.location} onChange={e => setEditInjury({ ...editInjury, location: e.target.value })}>
-                  {INJURY_LOCATIONS.map(l => <option key={l} value={l}>{l}</option>)}
-                </select>
-              </div>
-              <div>
-                <span style={s.label}>Боль: {editInjury.painLevel}/10</span>
-                <input style={s.slider} type="range" min="1" max="10" value={editInjury.painLevel} onChange={e => setEditInjury({ ...editInjury, painLevel: +e.target.value })} />
-              </div>
-              <div>
-                <span style={s.label}>Ограничение движений</span>
-                <div style={s.btnGroup}>{MOVEMENT_LIMITS.map(m => <button key={m.id} style={editInjury.movementLimit === m.id ? s.btnActive : s.btn} onClick={() => setEditInjury({ ...editInjury, movementLimit: m.id })}>{m.label}</button>)}</div>
-              </div>
-              <div>
-                <span style={s.label}>Сторона</span>
-                <div style={s.btnGroup}>
-                  {[{ id: 'left', label: 'Левая' }, { id: 'right', label: 'Правая' }, { id: 'both', label: 'Обе' }].map(x => <button key={x.id} style={editInjury.side === x.id ? s.btnActive : s.btn} onClick={() => setEditInjury({ ...editInjury, side: x.id as any })}>{x.label}</button>)}
+              <div className="metric-item">
+                <span className="metric-label">Качество сна:</span>
+                <div className="metric-value">
+                  {profile.settings.baselineSleepQuality !== undefined
+                    ? `${(profile.settings.baselineSleepQuality * 100).toFixed(0)}%`
+                    : 'Не указано'}
                 </div>
               </div>
-              <div style={s.row}>
-                <div><span style={s.label}>Дата</span><input style={s.input} type="date" value={editInjury.date ?? ''} onChange={e => setEditInjury({ ...editInjury, date: e.target.value })} /></div>
-                <div><span style={s.label}>Хроническая</span>
-                  <div style={s.btnGroup}>
-                    <button style={editInjury.chronic ? s.btnActive : s.btn} onClick={() => setEditInjury({ ...editInjury, chronic: true })}>Да</button>
-                    <button style={!editInjury.chronic ? s.btnActive : s.btn} onClick={() => setEditInjury({ ...editInjury, chronic: false })}>Нет</button>
+              <div className="metric-item">
+                <span className="metric-label">Коэффициент HRV:</span>
+                <div className="metric-value">
+                  {profile.settings.baselineHrvRatio !== undefined
+                    ? `${profile.settings.baselineHrvRatio.toFixed(2)}`
+                    : 'Не указано'}
+                </div>
+              </div>
+              <div className="metric-item">
+                <span className="metric-label">Уровень стресса:</span>
+                <div className="metric-value">
+                  {profile.settings.baselineStressLevel !== undefined
+                    ? `${profile.settings.baselineStressLevel}/10`
+                    : 'Не указано'}
+                </div>
+              </div>
+            </div>
+
+            <div className="profile-card">
+              <h4>Физическая подготовка</h4>
+              <div className="metric-item">
+                <span className="metric-label">Уровень тренировок:</span>
+                <div className="metric-value">
+                  {profile.settings.trainingFactor !== undefined
+                    ? `${(profile.settings.trainingFactor * 50).toFixed(0)}%`
+                    : 'Не указано'}
+                </div>
+              </div>
+              <div className="metric-item">
+                <span className="metric-label">Питание:</span>
+                <div className="metric-value">
+                  {profile.settings.nutritionFactor !== undefined
+                    ? `${(profile.settings.nutritionFactor * 50).toFixed(0)}%`
+                    : 'Не указано'}
+                </div>
+              </div>
+            </div>
+
+            <div className="profile-card">
+              <h4>Клинические индексы</h4>
+              {clinicalIndices ? (
+                <div className="lab-indices-grid">
+                  <div className="lab-index-item">
+                    <h5>HOMA-IR</h5>
+                    <div className="lab-index-value">{clinicalIndices.homaIR.value}</div>
+                    <p className="lab-index-label">{clinicalIndices.homaIR.status === 'normal' ? 'Норма' : clinicalIndices.homaIR.status === 'ir' ? 'ИР' : 'Выраженная ИР'}</p>
+                  </div>
+                  <div className="lab-index-item">
+                    <h5>eGFR</h5>
+                    <div className="lab-index-value">{clinicalIndices.egfr.value}</div>
+                    <p className="lab-index-label">{clinicalIndices.egfr.status === 'normal' ? 'Норма' : `Стадия ${clinicalIndices.egfr.status.toUpperCase()}`}</p>
+                  </div>
+                  <div className="lab-index-item">
+                    <h5>LDL/HDL</h5>
+                    <div className="lab-index-value">{clinicalIndices.ldlHdlRatio.value}</div>
+                    <p className="lab-index-label">{clinicalIndices.ldlHdlRatio.status === 'optimal' ? 'Оптимально' : clinicalIndices.ldlHdlRatio.status === 'moderate' ? 'Умеренно' : 'Высокий'}</p>
+                  </div>
+                  <div className="lab-index-item">
+                    <h5>De Ritis</h5>
+                    <div className="lab-index-value">{clinicalIndices.deritis.value}</div>
+                    <p className="lab-index-label">{clinicalIndices.deritis.status === 'normal' ? 'Норма' : clinicalIndices.deritis.status === 'alcohol' ? 'Алкогольная' : 'Вирусная'}</p>
                   </div>
                 </div>
-              </div>
-              <div><span style={s.label}>Заметки</span><textarea style={{ ...s.input, minHeight: 50 }} value={editInjury.notes ?? ''} onChange={e => setEditInjury({ ...editInjury, notes: e.target.value })} /></div>
-              <button style={s.saveBtn} onClick={() => saveInjury(editInjury)}>Сохранить</button>
-              <button style={{ ...s.btn, width: '100%', marginTop: 4 }} onClick={() => setEditInjury(null)}>Отмена</button>
+              ) : (
+                <p className="empty-state">Нет данных лаборатории</p>
+              )}
             </div>
-          )}
-        </>
-      )}
 
-      {tab === 'progress' && (
-        <div style={s.card}>
-          <h4 style={{ margin: '0 0 8px' }}>Прогресс к цели</h4>
-          <div style={s.row}>
-            <div><span style={s.label}>Текущий вес</span><div style={{ fontSize: 20, fontWeight: 700 }}>{s_.weight} кг</div></div>
-            <div><span style={s.label}>Целевой вес</span><input style={s.input} type="number" value={s_.targetWeight ?? ''} onChange={e => save({ targetWeight: e.target.value ? +e.target.value : undefined })} placeholder="Цель (кг)" /></div>
-          </div>
-          {s_.targetWeight && (
-            <div>
-              <div style={{ height: 8, borderRadius: 4, background: 'var(--border)', overflow: 'hidden', margin: '8px 0' }}>
-                <div style={{ height: '100%', borderRadius: 4, background: '#00e68a', width: `${Math.min(100, Math.max(0, Math.round((1 - Math.abs(s_.weight - s_.targetWeight) / Math.max(1, Math.abs(s_.targetWeight)))) * 100))}%` }} />
-              </div>
-              <div style={{ fontSize: 12, opacity: 0.7, textAlign: 'center' }}>{Math.round((1 - Math.abs(s_.weight - s_.targetWeight) / Math.max(1, Math.abs(s_.targetWeight))) * 100)}% к цели</div>
-            </div>
-          )}
-          <div style={{ marginTop: 12 }}>
-            <span style={s.label}>Целевой % жира</span>
-            <input style={s.input} type="number" step="0.1" value={s_.targetBodyFat ?? ''} onChange={e => save({ targetBodyFat: e.target.value ? +e.target.value : undefined })} placeholder="Цель (% жира)" />
-          </div>
-          {labIndices && labIndexText && (
-            <div style={{ marginTop: 12 }}>
-              <h5>Индексы лабораторий</h5>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                {(['inflammation', 'metabolism', 'thyroid', 'lipids'] as const).map(k => (
-                  <div key={k} style={s.computed}>
-                    <div style={{ fontSize: 11, opacity: 0.6 }}>{k === 'inflammation' ? 'Воспаление' : k === 'metabolism' ? 'Метаболизм' : k === 'thyroid' ? 'Щитовидная' : 'Липиды'}</div>
-                    <div style={{ fontWeight: 600 }}>{(labIndices[k] * 100).toFixed(0)}%</div>
-                    <div style={{ fontSize: 10, opacity: 0.5 }}>{labIndexText[k]}</div>
+            {/* Lab Indices Card */}
+            <div className="profile-card">
+              <h4>Индексы лабораторных исследований</h4>
+              {labIndices && labIndexText ? (
+                <>
+                  <div className="lab-indices-grid">
+                    <div className="lab-index-item">
+                      <h5>Воспаление</h5>
+                      <div className="lab-index-value" style={{ color: getLabIndexColor(labIndices.inflammation) }}>
+                        {(labIndices.inflammation * 100).toFixed(0)}%
+                      </div>
+                      <p className="lab-index-label">{labIndexText.inflammation}</p>
+                    </div>
+                    <div className="lab-index-item">
+                      <h5>Метаболизм</h5>
+                      <div className="lab-index-value" style={{ color: getLabIndexColor(labIndices.metabolism) }}>
+                        {(labIndices.metabolism * 100).toFixed(0)}%
+                      </div>
+                      <p className="lab-index-label">{labIndexText.metabolism}</p>
+                    </div>
+                    <div className="lab-index-item">
+                      <h5>Щитовидная железа</h5>
+                      <div className="lab-index-value" style={{ color: getLabIndexColor(labIndices.thyroid) }}>
+                        {(labIndices.thyroid * 100).toFixed(0)}%
+                      </div>
+                      <p className="lab-index-label">{labIndexText.thyroid}</p>
+                    </div>
+                    <div className="lab-index-item">
+                      <h5>Липидный профиль</h5>
+                      <div className="lab-index-value" style={{ color: getLabIndexColor(labIndices.lipids) }}>
+                        {(labIndices.lipids * 100).toFixed(0)}%
+                      </div>
+                      <p className="lab-index-label">{labIndexText.lipids}</p>
+                    </div>
                   </div>
-                ))}
+                  <div className="lab-indices-explanation">
+                    <p>Индексы рассчитываются на основе последних результатов лабораторных анализов и показывают относительное отклонение от нормы (0% - идеально, 100% - критические отклонения).</p>
+                  </div>
+                </>
+              ) : labs.length === 0 ? (
+                <p className="empty-state">Добавьте результаты лабораторных анализов, чтобы увидеть индексы.</p>
+              ) : (
+                <p>Вычисление индексов...</p>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Progress Tab */}
+        <div className="profile-section" style={{ display: activeTab === 'progress' ? undefined : 'none' }} id="progress-tab">
+          <div className="progress-section">
+            <h4>Прогресс к цели</h4>
+            <div className="progress-overview">
+              <div className="progress-item">
+                <h5>Вес</h5>
+                <div className="progress-bar">
+                  <div className="progress-bar-fill" style={{ width: `${getProgressPercent()}%` }}/>
+                </div>
+                <p className="progress-text">
+                  {Math.round(getProgressPercent())}% целевого веса
+                </p>
               </div>
             </div>
-          )}
+          </div>
+          
+          <div className="recommendations">
+            <h4>Рекомендации</h4>
+            <ul className="recommendation-list">
+              {profile.settings.goal === 'bulk' ? (
+                <>
+                  <li className="recommendation-item">
+                    Увеличьте калорийность рациона на 300-500 ккал выше уровня поддержки
+                  </li>
+                  <li className="recommendation-item">
+                    Потребляйте 1.8-2.2 г белка на кг массы тела ежедневно
+                  </li>
+                  <li className="recommendation-item">
+                    Сделайте приоритетом прогрессию нагрузок в базовых упражнениях
+                  </li>
+                </>
+              ) : profile.settings.goal === 'cut' ? (
+                <>
+                  <li className="recommendation-item">
+                    Снизьте калорийность на 300-500 ккал ниже уровня поддержки
+                  </li>
+                  <li className="recommendation-item">
+                    Сохраните высокое потребление белка (2.0-2.4 г/кг) для защиты мышц
+                  </li>
+                  <li className="recommendation-item">
+                    Добавьте кардио-нагрузки низкой интенсивности для ускорения жиросжигания
+                  </li>
+                </>
+              ) : (
+                <>
+                  <li className="recommendation-item">
+                    Поддерживайте текущий режим тренировок и питания
+                  </li>
+                  <li className="recommendation-item">
+                    Рассмотрите увеличение потребления протеина на 10-20%
+                  </li>
+                  <li className="recommendation-item">
+                    Оптимизируйте режим сна для лучшего восстановления
+                  </li>
+                </>
+              )}
+            </ul>
+          </div>
         </div>
-      )}
+
+        {/* Settings Tab - handled by settings-module */}
+        <div className="profile-section" style={{ display: activeTab === 'settings' ? undefined : 'none' }} id="settings-tab">
+          <div ref={settingsHostRef} />
+        </div>
+      </div>
     </div>
   );
 };
+
+// Helper function to get color for lab index value (0-1 scale)
+function getLabIndexColor(value: number): string {
+  if (value < 0.3) return 'var(--success)';
+  if (value < 0.7) return 'var(--warning)';
+  return 'var(--danger)';
+}
+
+

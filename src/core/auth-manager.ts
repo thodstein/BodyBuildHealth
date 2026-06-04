@@ -69,7 +69,7 @@ export async function ensureAdmin(email: string, password: string, name: string,
 }
 
 export async function registerUser(email: string, password: string, name: string, role: UserRole = 'user'): Promise<{ success: boolean; message: string; userId?: string }> {
-  if (password.length < 8) return { success: false, message: '\u041F\u0430\u0440\u043E\u043B\u044C \u043C\u0438\u043D\u0438\u043C\u0443\u043C 8 \u0441\u0438\u043C\u0432\u043E\u043B\u043E\u0432' };
+  if (password.length < 4) return { success: false, message: '\u041F\u0430\u0440\u043E\u043B\u044C \u043C\u0438\u043D\u0438\u043C\u0443\u043C 4 \u0441\u0438\u043C\u0432\u043E\u043B\u0430' };
   const users: LocalUserProfile[] = await db.getAll('users') || [];
   if (users.some(u => u.email === email.toLowerCase())) return { success: false, message: '\u041F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u044C \u0443\u0436\u0435 \u0441\u0443\u0449\u0435\u0441\u0442\u0432\u0443\u0435\u0442' };
 
@@ -120,6 +120,7 @@ export async function loginUser(email: string, password: string): Promise<{ succ
 
 export async function logoutUser(): Promise<void> {
   localStorage.removeItem(SESSION_KEY);
+  window.location.reload();
 }
 
 export async function getCurrentProfile(): Promise<LocalUserProfile | null> {
