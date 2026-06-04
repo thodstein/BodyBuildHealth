@@ -200,12 +200,14 @@ export const RiskScreen: React.FC = () => {
   const getCellMitigations = useCallback((system: string, mechanism: number) => {
     const mechId = system + '_' + mechanism;
     const mitigations: { substance: string; effect: string; reduction: number }[] = [];
-    for (const [subName, effects] of Object.entries(SUPPORT_BASE_COVERAGE)) {
-      const entry = effects[mechId as keyof typeof effects];
-      if (entry !== undefined) { mitigations.push({ substance: subName, effect: mechId, reduction: entry }); }
+    if (SUPPORT_BASE_COVERAGE) {
+      for (const [subName, effects] of Object.entries(SUPPORT_BASE_COVERAGE)) {
+        const entry = effects[mechId as keyof typeof effects];
+        if (entry !== undefined) { mitigations.push({ substance: subName, effect: mechId, reduction: entry }); }
+      }
     }
     return mitigations;
-  }, [SUPPORT_BASE_COVERAGE]);
+  }, []);
 
   const systemsFor3D = useMemo(() => {
     const result: Record<string, { raw: number; net: number }> = {};
