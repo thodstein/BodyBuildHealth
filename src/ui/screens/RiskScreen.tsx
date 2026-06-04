@@ -441,6 +441,40 @@ export const RiskScreen: React.FC = () => {
             )}
           </div>
 
+          {/* Absolute Risks Block - raw values from all sources */}
+          {aggregatedRisks && (
+            <div className="card" style={{ marginBottom: 12 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8, color: 'var(--text)' }}>⚠️ Абсолютные риски (сырые значения)</div>
+              <div style={{ display: 'grid', gap: 10 }}>
+                {/* Pharma Absolute Risk */}
+                <div style={{ padding: '10px', background: 'rgba(239,68,68,0.1)', borderRadius: 8 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#ef4444', marginBottom: 4 }}>💊 Препараты (сырое)</div>
+                  <div style={{ fontSize: 16, fontWeight: 800, color: '#ef4444' }}>{Math.round(rawRiskResult.overallRaw)}%</div>
+                </div>
+                {/* Labs Absolute Risk */}
+                <div style={{ padding: '10px', background: 'rgba(249,115,22,0.1)', borderRadius: 8 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#f97316', marginBottom: 4 }}>🧪 Анализы (сырое)</div>
+                  <div style={{ fontSize: 16, fontWeight: 800, color: '#f97316' }}>{Math.round(aggregatedRisks.labs.overallRaw)}%</div>
+                </div>
+                {/* Training Absolute Risk */}
+                <div style={{ padding: '10px', background: 'rgba(132,204,22,0.1)', borderRadius: 8 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#84cc16', marginBottom: 4 }}>🏋️ Тренировки (сырое)</div>
+                  <div style={{ fontSize: 16, fontWeight: 800, color: '#84cc16' }}>{Math.round(aggregatedRisks.training.overallRaw)}%</div>
+                </div>
+                {/* Nutrition Absolute Risk */}
+                <div style={{ padding: '10px', background: 'rgba(59,130,246,0.1)', borderRadius: 8 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#3b82f6', marginBottom: 4 }}>🍎 Питание (сырое)</div>
+                  <div style={{ fontSize: 16, fontWeight: 800, color: '#3b82f6' }}>{Math.round(aggregatedRisks.nutrition.overallRaw)}%</div>
+                </div>
+                {/* Diagnostics Absolute Risk */}
+                <div style={{ padding: '10px', background: 'rgba(168,85,247,0.1)', borderRadius: 8 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#a855f7', marginBottom: 4 }}>🔍 Исследования (сырое)</div>
+                  <div style={{ fontSize: 16, fontWeight: 800, color: '#a855f7' }}>{Math.round(aggregatedRisks.diagnostics.overallRaw)}%</div>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Aggregated Risks Block - from all sources */}
           {aggregatedRisks && (
             <div className="card" style={{ marginBottom: 12 }}>

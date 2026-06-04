@@ -17,6 +17,7 @@ import { parseLabFile, type ParsedLabValue } from '../../engines/pdf-parser.engi
 import { resolveLabMarker, interpretRatio, normalizedRatio } from '../../core/labs-mapping';
 import { computeLabIndices, interpretLabIndices } from '../../engines/labs-indices.engine';
 import { PHASE_REQUIRED_PANELS, LAB_PANELS, type LabPanelMarker } from '../../data/labs-phase-panels';
+import { notifyDataChange } from '../../core/data-link';
 import type { LabPoint, UserProfile, RiskResult, CourseEntry } from '../../core/types';
 
 const SYSTEM_LABELS: Record<string, string> = {
@@ -50,6 +51,19 @@ export const LabsScreen: React.FC<LabsProps> = ({ initialTab = 'input' }) => {
   const [phase, setPhase] = useState<'baseline' | 'on_cycle' | 'pct' | 'bridge' | 'fertility'>('baseline');
   const [markerValues, setMarkerValues] = useState<Record<string, { value: string; unit: string }>>({});
   const [invDone, setInvDone] = useState<Record<string, boolean>>({});
+  const [forceNoLabs, setForceNoLabs] = useState<boolean>(profile?.settings?.forceNoLabsPenalty ?? false);
+
+  useEffect(() => {
+    if (profile?.settings?.forceNoLabsPenalty !== undefined) {
+      setForceNoLabs(profile.settings.forceNoLabsPenalty);
+    }
+  }, [profile?.settings?.forceNoLabsPenalty]);
+
+  useEffect(() => {
+    if (profile?.settings?.forceNoLabsPenalty === undefined) {
+      setForceNoLabs(false);
+    }
+  }, [profile?.id]);
 
   useEffect(() => {
     const loadData = async () => {
@@ -329,6 +343,43 @@ export const LabsScreen: React.FC<LabsProps> = ({ initialTab = 'input' }) => {
                 <button className="btn" style={{ marginTop: 8 }} onClick={confirmOcrResults}>&#10004; Подтвердить и сохранить все</button>
               </div>
             )}
+          </div>
+
+          {/* Penalty toggle button - без анализов */}
+          <div style={{ padding: 12, background: 'rgba(239,68,68,0.1)', border: '1px solid var(--danger)', borderRadius: 8, marginBottom: 12 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <div style={{ fontWeight: 700, color: 'var(--danger)', fontSize: 13 }}>⚠️ Штраф за отсутствие анализов</div>
+                <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 2 }}>
+                  {forceNoLabs ? 'Штрафные коэффициенты применены к рискам.' : 'Нажмите, чтобы применить штрафные коэффициенты при отсутствии анализов.'}
+                </div>
+              </div>
+              <button 
+                className="btn"
+                style={{ 
+                  background: forceNoLabs ? 'rgba(239,68,68,0.3)' : 'var(--danger)', 
+                  color: forceNoLabs ? '#fff' : '#fff',
+                  borderColor: 'var(--danger)',
+                  fontWeight: 700 
+                }} 
+                onClick={async () => {
+                  setForceNoLabs(!forceNoLabs);
+                  if (profile?.id) {
+                    const { updateProfile } = await import('../../core/profile-manager');
+                    updateProfile({
+                      ...profile,
+                      settings: {
+                        ...profile.settings,
+                        forceNoLabsPenalty: !forceNoLabs
+                      }
+                    });
+                    notifyDataChange();
+                  }
+                }}
+              >
+                {forceNoLabs ? '✅ Применён' : '🚫 БЕЗ АНАЛИЗОВ'}
+              </button>
+            </div>
           </div>
 
           <div className="card" style={{ marginBottom: 12 }}>
