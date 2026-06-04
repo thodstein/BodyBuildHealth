@@ -2,38 +2,24 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { registry } from './core/data/registry';
 import { DashboardScreen } from './ui/screens/DashboardScreen';
 import { PharmaScreen } from './ui/screens/PharmaScreen';
-import { PeptidesScreen } from './ui/screens/PeptidesScreen';
-import { PharmaCourseScreen } from './ui/screens/PharmaCourseScreen';
-import { SubstancesScreen } from './ui/screens/SubstancesScreen';
-import { NutritionScreen } from './ui/screens/NutritionScreen';
+import { SupportScreen } from './ui/screens/SupportScreen';
+import { PlanScreen } from './ui/screens/PlanScreen';
 import { LabsScreen } from './ui/screens/LabsScreen';
 import { RiskScreen } from './ui/screens/RiskScreen';
-import { PlanScreen } from './ui/screens/PlanScreen';
+import { NutritionScreen } from './ui/screens/NutritionScreen';
 import { ProfileScreen } from './ui/screens/ProfileScreen';
-import { PredictiveAnalyticsScreen } from './ui/screens/PredictiveAnalyticsScreen';
-import { CalculatorsScreen } from './ui/screens/CalculatorsScreen';
-import { MarketplaceScreen } from './ui/screens/MarketplaceScreen';
-import { ArticlesScreen } from './ui/screens/ArticlesScreen';
-import { SmartAssistantScreen } from './ui/screens/SmartAssistantScreen';
-import { GamificationScreen } from './ui/screens/GamificationScreen';
-import { FertilityPCTScreen } from './ui/screens/FertilityPCTScreen';
-import { ReportsScreen } from './ui/screens/ReportsScreen';
-import { IntegrationsScreen } from './ui/screens/IntegrationsScreen';
-import { RoleManagementScreen } from './ui/screens/RoleManagementScreen';
-import { SupportScreen } from './ui/screens/SupportScreen';
 import { ToastContainer } from './ui/ToastContainer';
 
-type Tab = 'home' | 'pharma' | 'training' | 'nutrition' | 'labs' | 'risks' | 'support' | 'profile';
-type SubPage = string;
+type Tab = 'home' | 'pharma' | 'support' | 'training' | 'labs' | 'risks' | 'nutrition' | 'profile';
 
 const NAV: { id: Tab; label: string; icon: React.ReactNode }[] = [
   { id: 'home', label: 'Главная', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg> },
   { id: 'pharma', label: 'Фарма', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg> },
+  { id: 'support', label: 'Поддержка', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg> },
   { id: 'training', label: 'Тренировки', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6.5 6.5h11v11h-11z"/><path d="M3 12h3M18 12h3M12 3v3M12 18v3"/><circle cx="12" cy="12" r="2"/></svg> },
-  { id: 'nutrition', label: 'Питание', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg> },
   { id: 'labs', label: 'Анализы', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 3h6v7l5 8H4l5-8V3z"/><line x1="9" y1="3" x2="15" y2="3"/></svg> },
   { id: 'risks', label: 'Риски', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg> },
-  { id: 'support', label: 'Поддержка', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg> },
+  { id: 'nutrition', label: 'Питание', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg> },
   { id: 'profile', label: 'Профиль', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg> },
 ];
 
@@ -75,31 +61,14 @@ function HulkBg() {
 
 export default function App() {
   const [tab, setTab] = useState<Tab>('home');
-  const [sub, setSub] = useState<SubPage>('');
   const [initialized, setInitialized] = useState(false);
   const touchRef = useRef<{ x: number; y: number } | null>(null);
   const mainRef = useRef<HTMLElement>(null);
 
   useEffect(() => { registry.init().then(() => setInitialized(true)); }, []);
 
-  const navToScreen = (screenId: string) => {
-    const map: Record<string, [Tab, string]> = {
-      dashboard: ['home', ''], pharma: ['pharma', 'drugs'], course: ['pharma', 'course'],
-      nutrition: ['nutrition', 'diary'], plan: ['training', 'plan'], substances: ['pharma', 'substances'],
-      labs: ['labs', 'results'], risks: ['risks', 'matrix'], profile: ['profile', 'settings'],
-      predictive: ['training', 'whatif'], marketplace: ['pharma', 'marketplace'],
-      articles: ['profile', 'articles'], assistant: ['profile', 'assistant'],
-      gamification: ['profile', 'gamification'], fertility: ['risks', 'fertility'], 'fertility-pct': ['risks', 'fertility'],
-      support: ['support', ''], calculators: ['nutrition', 'calc'], reports: ['profile', 'reports'],
-      integrations: ['profile', 'integrations'], 'role-management': ['profile', 'roles'],
-    };
-    const entry = map[screenId];
-    if (entry) go(entry[0], entry[1]);
-  };
-
-  const go = (t: Tab, s?: SubPage) => {
+  const go = (t: Tab) => {
     setTab(t);
-    setSub(s || '');
     if (mainRef.current) mainRef.current.scrollTop = 0;
     window.scrollTo(0, 0);
   };
@@ -113,59 +82,12 @@ export default function App() {
     const dx = e.changedTouches[0].clientX - touchRef.current.x;
     const dy = e.changedTouches[0].clientY - touchRef.current.y;
     if (Math.abs(dx) < 80 || Math.abs(dy) > Math.abs(dx)) return;
-    const tabs: Tab[] = ['home', 'pharma', 'training', 'nutrition', 'labs', 'risks', 'profile'];
+    const tabs: Tab[] = ['home', 'pharma', 'support', 'training', 'labs', 'risks', 'nutrition', 'profile'];
     const idx = tabs.indexOf(tab);
     const next = dx < 0 && idx < tabs.length - 1 ? tabs[idx + 1] : dx > 0 && idx > 0 ? tabs[idx - 1] : null;
-    if (next) { go(next); setSub(''); }
+    if (next) { go(next); }
     touchRef.current = null;
   }, [tab]);
-
-  const subItems = (() => {
-    switch (tab) {
-      case 'pharma': return [
-        { id: 'drugs', label: 'Препараты' },
-        { id: 'course', label: 'Мой курс' },
-        { id: 'calc-pharma', label: 'Калькулятор' },
-        { id: 'peptides', label: 'Пептиды' },
-        { id: 'substances', label: 'Справочник' },
-      ];
-      case 'training': return [
-        { id: 'plan', label: 'План' },
-        { id: 'readiness', label: 'Восстановление' },
-        { id: 'whatif', label: 'What-If анализ' },
-      ];
-      case 'nutrition': return [
-        { id: 'diary', label: 'Дневник' },
-        { id: 'calc', label: 'Калькулятор' },
-        { id: 'advice', label: 'Советы' },
-      ];
-      case 'labs': return [
-        { id: 'results', label: 'Ввод анализов' },
-        { id: 'panels', label: 'Панели' },
-        { id: 'history', label: 'История' },
-        { id: 'indices', label: 'Индексы' },
-        { id: 'risks-labs', label: 'Риски' },
-      ];
-      case 'risks': return [
-        { id: 'matrix', label: 'Матрица рисков' },
-        { id: 'fertility', label: 'Фертильность' },
-      ];
-      case 'support': return [
-        { id: 'catalog', label: 'Каталог' },
-        { id: 'synergies', label: 'Синергии' },
-        { id: 'recommendations', label: 'Рекомендации' },
-      ];
-      case 'profile': return [
-        { id: 'settings', label: 'Настройки' },
-        { id: 'gamification', label: 'Достижения' },
-        { id: 'reports', label: 'Отчёты' },
-        { id: 'integrations', label: 'Интеграции' },
-        { id: 'assistant', label: 'Ассистент' },
-        { id: 'role-management', label: 'Роли' },
-      ];
-      default: return [];
-    }
-  })();
 
   const renderContent = () => {
     if (!initialized) return (
@@ -176,81 +98,31 @@ export default function App() {
       </div>
     );
 
-    if (sub) {
-      switch (sub) {
-        case 'drugs': return <PharmaScreen />;
-        case 'course': return <PharmaCourseScreen />;
-        case 'calc-pharma': return <CalculatorsScreen />;
-        case 'peptides': return <PeptidesScreen />;
-        case 'substances': return <SubstancesScreen />;
-        case 'plan': return <PlanScreen goal="energy" />;
-        case 'readiness': return <DashboardScreen onNavigate={navToScreen} />;
-        case 'whatif': return <PredictiveAnalyticsScreen />;
-        case 'diary': return <NutritionScreen />;
-        case 'advice': return <NutritionScreen initialTab="advice" />;
-        case 'calc': return <CalculatorsScreen />;
-        case 'catalog': return <SupportScreen />;
-        case 'synergies': return <SupportScreen initialTab="synergies" />;
-        case 'recommendations': return <SupportScreen initialTab="recommendations" />;
-        case 'results': return <LabsScreen initialTab="input" />;
-        case 'panels': return <LabsScreen initialTab="panels" />;
-        case 'history': return <LabsScreen initialTab="history" />;
-        case 'indices': return <LabsScreen initialTab="indices" />;
-        case 'risks-labs': return <LabsScreen initialTab="risks" />;
-        case 'matrix': return <RiskScreen />;
-        case 'fertility': return <FertilityPCTScreen />;
-        case 'settings': return <ProfileScreen />;
-        case 'gamification': return <GamificationScreen />;
-        case 'reports': return <ReportsScreen />;
-        case 'integrations': return <IntegrationsScreen />;
-        case 'roles': return <RoleManagementScreen />;
-        case 'role-management': return <RoleManagementScreen />;
-        case 'assistant': return <SmartAssistantScreen />;
-        case 'marketplace': return <MarketplaceScreen />;
-        case 'articles': return <ArticlesScreen />;
-        default: return <DashboardScreen />;
-      }
-    }
-
     switch (tab) {
-      case 'home': return <DashboardScreen onNavigate={navToScreen} />;
+      case 'home': return <DashboardScreen />;
       case 'pharma': return <PharmaScreen />;
-      case 'training': return <PlanScreen goal="energy" />;
-      case 'nutrition': return <NutritionScreen />;
-      case 'labs': return <LabsScreen />;
-      case 'risks': return sub === 'fertility' ? <FertilityPCTScreen /> : <RiskScreen />;
       case 'support': return <SupportScreen />;
+      case 'training': return <PlanScreen goal="energy" />;
+      case 'labs': return <LabsScreen />;
+      case 'risks': return <RiskScreen />;
+      case 'nutrition': return <NutritionScreen />;
       case 'profile': return <ProfileScreen />;
-      default: return <DashboardScreen onNavigate={navToScreen} />;
+      default: return <DashboardScreen />;
     }
   };
 
   return (
     <div className="app" onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
       <HulkBg />
-      <main ref={mainRef} className={subItems.length > 0 ? 'has-sub-nav' : ''} style={{ position: 'relative', zIndex: 1 }}>
+      <main ref={mainRef} style={{ position: 'relative', zIndex: 1 }}>
         {renderContent()}
       </main>
       <ToastContainer />
-      {subItems.length > 0 && (
-        <div className="sub-nav">
-          {subItems.map(item => (
-            <button
-              key={item.id}
-              className={'sub-nav-btn' + (sub === item.id ? ' active' : '')}
-              onClick={() => { setSub(item.id); if (mainRef.current) mainRef.current.scrollTop = 0; window.scrollTo(0, 0); }}
-            >
-              {item.label}
-            </button>
-          ))}
-          <button className="sub-nav-btn back" onClick={() => setSub('')}>&#8592; Назад</button>
-        </div>
-      )}
       <nav className="tabs">
         {NAV.map(item => (
           <button
             key={item.id}
-            className={'nav-btn' + (tab === item.id && !sub ? ' active' : (subItems.length > 0 && tab === item.id ? ' active-parent' : ''))}
+            className={'nav-btn' + (tab === item.id ? ' active' : '')}
             onClick={() => go(item.id)}
           >
             {item.icon}
