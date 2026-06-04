@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   addLabPoint,
   getLabHistory,
@@ -6,6 +6,8 @@ import {
   normalizeLab,
   UCUM_MAP
 } from '../../engines/labs.engine';
+import { calculateRisks } from '../../engines/risk.engine';
+import { generateSupportStack } from '../../engines/support.engine';
 import { calculateRiskFromAnalyses } from '../../engines/risk-calculator-v2.engine';
 import { drawLabTrend } from '../../ui/charts-labs';
 import { db } from '../../core/db';
@@ -15,11 +17,7 @@ import { parseLabFile, type ParsedLabValue } from '../../engines/pdf-parser.engi
 import { resolveLabMarker, interpretRatio, normalizedRatio } from '../../core/labs-mapping';
 import { computeLabIndices, interpretLabIndices } from '../../engines/labs-indices.engine';
 import { PHASE_REQUIRED_PANELS, LAB_PANELS, type LabPanelMarker } from '../../data/labs-phase-panels';
-import { generateLabSchedule, getCurrentLabStatus, getDrugSpecificLabs, getWeeksSinceStart, type LabScheduleItem } from '../../engines/labs-schedule.engine';
-import { analyzeLabDrugCorrelation, type LabDrugAlert } from '../../engines/lab-pharma-correlation.engine';
-import { generateCheckpoints } from '../../engines/labs-scheduler.engine';
-import type { LabPoint, RiskResult, CourseEntry } from '../../core/types';
-import { useDataLink, notifyDataChange } from '../../core/data-link';
+import type { LabPoint, UserProfile, RiskResult, CourseEntry } from '../../core/types';
 
 const SYSTEM_LABELS: Record<string, string> = {
   hepatic: 'Печень', cardio: 'Сердечно-сосудистая', endocrine: 'Эндокринная',
@@ -27,7 +25,7 @@ const SYSTEM_LABELS: Record<string, string> = {
   neuro: 'Нервная', reproductive: 'Репродуктивная', musculoskeletal: 'Суставы и связки'
 };
 
-type LabTab = 'input' | 'panels' | 'schedule' | 'history' | 'indices' | 'risks' | 'investigations';
+type LabTab = 'input' | 'panels' | 'history' | 'indices' | 'risks' | 'investigations';
 
 interface LabsProps {
   initialTab?: LabTab;
@@ -35,37 +33,46 @@ interface LabsProps {
 
 export const LabsScreen: React.FC<LabsProps> = ({ initialTab = 'input' }) => {
   const [tab, setTab] = useState<LabTab>(initialTab);
-  const linked = useDataLink();
-  const profile = linked.profile;
-  const course = linked.course;
-  const entries = linked.labs;
-  const risk = linked.risk;
-  const activeDrugs = linked.activeDrugs;
+  const [entries, setEntries] = useState<LabPoint[]>([]);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [course, setCourse] = useState<CourseEntry[]>([]);
+  const [risk, setRisk] = useState<RiskResult | null>(null);
+  const [loading, setLoading] = useState(true);
   const [selectedPanel, setSelectedPanel] = useState<string>('cbc');
   const [selectedMarker, setSelectedMarker] = useState<string | null>(null);
   const [canvasKey, setCanvasKey] = useState(0);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [ocrText, setOcrText] = useState('');
-  const [ocrResult, setOcrResult] = useState<{ marker: string; value: number; unit: string; name: string; isAbnormal?: boolean; deviation?: 'low' | 'high' }[]>([]);
+  const [ocrResult, setOcrResult] = useState<{ marker: string; value: number; unit: string; name: string }[]>([]);
   const [fileLoading, setFileLoading] = useState(false);
   const [labIndices, setLabIndices] = useState({ inflammation: 0, metabolism: 0, thyroid: 0, lipids: 0 });
   const [labIndexText, setLabIndexText] = useState({ inflammation: '', metabolism: '', thyroid: '', lipids: '' });
   const [phase, setPhase] = useState<'baseline' | 'on_cycle' | 'pct' | 'bridge' | 'fertility'>('baseline');
   const [markerValues, setMarkerValues] = useState<Record<string, { value: string; unit: string }>>({});
   const [invDone, setInvDone] = useState<Record<string, boolean>>({});
-  const [labSchedule, setLabSchedule] = useState<LabScheduleItem[]>([]);
-  const [currentWeek, setCurrentWeek] = useState(0);
-  const [manualMarker, setManualMarker] = useState('');
-  const [labRisks, setLabRisks] = useState<Record<string, number>>({});
-
-  const hasLabs = entries.length > 0;
 
   useEffect(() => {
-    if (hasLabs) {
-      const labRisksResult = calculateRiskFromAnalyses(entries);
-      setLabRisks(labRisksResult.systemContributions);
-    }
-  }, [entries, hasLabs]);
+    const loadData = async () => {
+      try {
+        await db.init();
+        const prof = await db.get<UserProfile>('profile', 'current-user');
+        setProfile(prof ?? {
+          id: 'current-user', name: 'Текущий пользователь', role: 'user',
+          settings: { age: 30, sex: 'male', weight: 70, goal: 'muscle gain', phase: 'baseline', courseStartDate: new Date().toISOString().slice(0, 10), height: 180, bodyFat: 15 }
+        });
+        const courseEntries = await db.getAll<CourseEntry>('course_log');
+        setCourse(courseEntries);
+        const labEntries = await db.getAll<LabPoint & { patientId?: string }>('labs_log');
+        const userLabs = labEntries.filter(l => l.patientId === 'current-user');
+        setEntries(userLabs);
+      } catch (e) {
+        console.error('Failed to load data:', e);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadData();
+  }, []);
 
   useEffect(() => {
     if (profile?.settings?.phase) {
@@ -82,17 +89,44 @@ export const LabsScreen: React.FC<LabsProps> = ({ initialTab = 'input' }) => {
   }, [entries]);
 
   useEffect(() => {
-    if (!profile?.settings?.courseStartDate) return;
-    const w = getWeeksSinceStart(profile.settings.courseStartDate);
-    setCurrentWeek(w);
-    const schedule = generateLabSchedule({
-      phase: profile.settings.phase ?? 'baseline',
-      courseStartDate: profile.settings.courseStartDate,
-      courseEntries: course,
-      currentWeek: w
-    });
-    setLabSchedule(schedule);
-  }, [profile?.settings?.phase, profile?.settings?.courseStartDate, course]);
+    recalcRisks();
+  }, [entries, profile, course]);
+
+  const recalcRisks = async () => {
+    if (!profile) return;
+    try {
+      const genetics: Record<string, string> = profile.settings?.genetics ?? {};
+      const nutritionFactor = profile.settings?.nutritionFactor ?? 1.0;
+      const trainingFactor = profile.settings?.trainingFactor ?? 1.0;
+      const activeDrugs: Record<string, { dosePerWeek: number }> = {};
+      course.forEach(entry => {
+        const freq = typeof entry.frequency === 'number' ? entry.frequency : entry.frequency === 'daily' ? 7 : entry.frequency === 'eod' ? 3.5 : 1;
+        activeDrugs[entry.substanceId] = { dosePerWeek: entry.doseValue * freq };
+      });
+      const result = calculateRisks({ genetics, nutritionFactor, trainingFactor, activeDrugs, supportCoverage: {} });
+      const labRisks = calculateRiskFromAnalyses(entries);
+      const combinedRaw: Record<string, number> = {};
+      RISK_SYSTEMS.forEach(s => {
+        combinedRaw[s] = Math.max(
+          result.systemBreakdown?.[s]?.raw ?? 0,
+          labRisks.systemContributions?.[s as keyof typeof labRisks.systemContributions] ?? 0
+        );
+      });
+      const supportSubs = generateSupportStack(profile.settings.goal ?? 'maintenance');
+      const coverageMap: Record<string, number> = {};
+      for (const sub of supportSubs) {
+        if (sub.effects) {
+          for (const eff of sub.effects) {
+            coverageMap[eff.effect] = (coverageMap[eff.effect] || 0) + eff.strength;
+          }
+        }
+      }
+      const finalRisks = calculateRisks({ genetics, nutritionFactor, trainingFactor, activeDrugs, supportCoverage: coverageMap });
+      setRisk(finalRisks);
+    } catch (e) {
+      console.error('Risk calc error:', e);
+    }
+  };
 
   const saveMarker = async (code: string, marker: LabPanelMarker) => {
     const val = markerValues[code];
@@ -111,8 +145,8 @@ export const LabsScreen: React.FC<LabsProps> = ({ initialTab = 'input' }) => {
     };
     try {
       await addLabPoint('current-user', point);
+      setEntries(prev => [...prev, point]);
       setMarkerValues(prev => ({ ...prev, [code]: { value: '', unit: val.unit || marker.unit } }));
-      notifyDataChange();
     } catch (e) {
       console.error('Failed to add lab point:', e);
     }
@@ -125,8 +159,7 @@ export const LabsScreen: React.FC<LabsProps> = ({ initialTab = 'input' }) => {
       marker: p.marker,
       value: p.value,
       unit: p.unit,
-      name: UCUM_MAP[p.marker]?.name ?? p.marker,
-      isAbnormal: p.isAbnormal
+      name: UCUM_MAP[p.marker]?.name ?? p.marker
     }));
     setOcrResult(results);
   };
@@ -142,14 +175,10 @@ export const LabsScreen: React.FC<LabsProps> = ({ initialTab = 'input' }) => {
           marker: v.code,
           value: v.value,
           unit: v.unit,
-          name: v.name,
-          isAbnormal: v.isAbnormal
+          name: v.name
         }));
         setOcrResult(results);
         if (result.rawText) setOcrText(result.rawText);
-        if (result.warnings?.length) {
-          console.warn('OCR Warnings:', result.warnings);
-        }
       }
     } catch (err) {
       console.error('File parse error:', err);
@@ -173,14 +202,15 @@ export const LabsScreen: React.FC<LabsProps> = ({ initialTab = 'input' }) => {
       };
       await addLabPoint('current-user', point);
     }
-    notifyDataChange();
+    const labEntries = await db.getAll<LabPoint & { patientId?: string }>('labs_log');
+    setEntries(labEntries.filter(l => l.patientId === 'current-user'));
     setOcrText('');
     setOcrResult([]);
   };
 
   const deleteEntry = async (id: string) => {
     await db.delete('labs_log', id);
-    notifyDataChange();
+    setEntries(prev => prev.filter(e => e.id !== id));
   };
 
   const getLatestEntry = (codes: string[]) => {
@@ -227,14 +257,15 @@ export const LabsScreen: React.FC<LabsProps> = ({ initialTab = 'input' }) => {
     .filter(code => !entries.some(e => e.code.toUpperCase() === code.toUpperCase()));
   const hasNoLabs = entries.length === 0;
 
-  const TABS: { id: LabTab; label: string; icon?: string; col: 'results' | 'catalog' }[] = [
-    { id: 'input', label: 'Ввод', icon: '📝', col: 'results' },
-    { id: 'panels', label: 'Панели', icon: '🧪', col: 'catalog' },
-    { id: 'schedule', label: 'Расписание', icon: '📅', col: 'catalog' },
-    { id: 'history', label: 'История', icon: '📊', col: 'results' },
-    { id: 'indices', label: 'Индексы', icon: '📈', col: 'results' },
-    { id: 'risks', label: 'Риски', icon: '⚠️', col: 'results' },
-    { id: 'investigations', label: 'Исследования', icon: '🔬', col: 'catalog' },
+  if (loading) return <div className="loading-screen"><div className="loading-spinner"/><span>Загрузка...</span></div>;
+
+  const TABS: { id: LabTab; label: string }[] = [
+    { id: 'input', label: 'Ввод анализов' },
+    { id: 'panels', label: 'Панели' },
+    { id: 'history', label: 'История' },
+    { id: 'indices', label: 'Индексы' },
+    { id: 'risks', label: 'Риски' },
+    { id: 'investigations', label: 'Исследования' },
   ];
 
   return (
@@ -255,129 +286,55 @@ export const LabsScreen: React.FC<LabsProps> = ({ initialTab = 'input' }) => {
         </div>
       )}
 
-      <div style={{ marginBottom: 16 }}>
-        {/* Results column tabs */}
-        <div style={{ display: 'flex', gap: 6, marginBottom: 8, overflowX: 'auto' }}>
-          <span style={{ fontSize: 11, fontWeight: 700, padding: '6px 8px', color: 'var(--text-dim)' }}>📊 Результаты:</span>
-          {TABS.filter(t => t.col === 'results').map(t => (
-            <button key={t.id} className={'btn secondary' + (tab === t.id ? ' active' : '')} style={{ flex: '0 0 auto', whiteSpace: 'nowrap', fontSize: 12, padding: '6px 10px' }} onClick={() => setTab(t.id)}>
-              {t.icon} {t.label}
-            </button>
-          ))}
-        </div>
-        {/* Catalog column tabs */}
-        <div style={{ display: 'flex', gap: 6, overflowX: 'auto' }}>
-          <span style={{ fontSize: 11, fontWeight: 700, padding: '6px 8px', color: 'var(--text-dim)' }}>🗂️ Каталоги:</span>
-          {TABS.filter(t => t.col === 'catalog').map(t => (
-            <button key={t.id} className={'btn secondary' + (tab === t.id ? ' active' : '')} style={{ flex: '0 0 auto', whiteSpace: 'nowrap', fontSize: 12, padding: '6px 10px' }} onClick={() => setTab(t.id)}>
-              {t.icon} {t.label}
-            </button>
-          ))}
-        </div>
+      <div style={{ display: 'flex', gap: 6, marginBottom: 16, overflowX: 'auto' }}>
+        {TABS.map(t => (
+          <button key={t.id} className={'btn secondary' + (tab === t.id ? ' active' : '')} style={{ flex: '0 0 auto', whiteSpace: 'nowrap' }} onClick={() => setTab(t.id)}>
+            {t.label}
+          </button>
+        ))}
       </div>
 
       {tab === 'input' && (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-          {/* Left column: Lab input */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {/* Penalty toggle button - без анализов */}
-            <div style={{ padding: 12, background: 'rgba(239,68,68,0.1)', border: '1px solid var(--danger)', borderRadius: 8 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div>
-                  <div style={{ fontWeight: 700, color: 'var(--danger)', fontSize: 13 }}>⚠️ Штраф за отсутствие анализов</div>
-                  <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 2 }}>
-                    {profile?.settings?.forceNoLabsPenalty 
-                      ? 'Штрафные коэффициенты применены к рискам.' 
-                      : 'Нажмите, чтобы применить штрафные коэффициенты при отсутствии анализов.'}
-                  </div>
-                </div>
-                <button 
-                  className="btn"
-                  style={{ 
-                    background: profile?.settings?.forceNoLabsPenalty ? 'rgba(239,68,68,0.3)' : 'var(--danger)', 
-                    color: profile?.settings?.forceNoLabsPenalty ? '#fff' : '#fff',
-                    borderColor: 'var(--danger)',
-                    fontWeight: 700 
-                  }} 
-                  onClick={async () => {
-                    if (!profile?.id) return;
-                    const { updateProfile } = await import('../../core/profile-manager');
-                    updateProfile({
-                      ...profile,
-                      settings: {
-                        ...profile.settings,
-                        forceNoLabsPenalty: !profile.settings?.forceNoLabsPenalty
-                      }
-                    });
-                    notifyDataChange();
-                  }}
-                >
-                  {profile?.settings?.forceNoLabsPenalty ? '✅ Применён' : '🚫 БЕЗ АНАЛИЗОВ'}
-                </button>
-              </div>
-            </div>
-            
-            <div className="card">
-              <h3>&#128221; Вставить текст анализа</h3>
-                <p style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 8 }}>
-                  Вставьте текст из лабораторного бланка (Инвитро, Гемотест, Хеликс, KDL). 
-                  Поддерживаются форматы: «Гемоглобин 140 г/л», «АЛТ: 25 U/L (0-40)», «HGB 140 g/L».
-                </p>
-                <textarea
-                  className="input"
-                  rows={5}
-                  placeholder={"Гемоглобин 140 г/л\nАЛТ 25 U/L\nКреатинин 85 мкмоль/л\nХолестерин общий 5.2 ммоль/л"}
-                  value={ocrText}
-                  onChange={e => setOcrText(e.target.value)}
-                  style={{ width: '100%', marginBottom: 8, fontFamily: 'monospace', fontSize: 13 }}
-                />
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
-                  <button className="btn" onClick={importFromText} disabled={!ocrText.trim()}>
-                    &#128270; Распознать и добавить
-                  </button>
-                  <label style={{ padding: '8px 14px', background: 'var(--accent-blue)', color: '#fff', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}>
-                    &#128196; Загрузить PDF/фото
-                    <input type="file" accept=".pdf,image/*" onChange={handleFileUpload} style={{ display: 'none' }} disabled={fileLoading} />
-                  </label>
-                  {fileLoading && <span style={{ fontSize: 12, color: 'var(--accent-blue)' }}>Обработка...</span>}
-                </div>
-                {ocrResult.length > 0 && (
-                  <div style={{ marginTop: 12 }}>
-                    <h4 style={{ margin: '0 0 8px' }}>Распознано {ocrResult.length} показателей:</h4>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 8 }}>
-                      {ocrResult.map((r, i) => (
-                        <div key={i} style={{
-                          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                          background: r.isAbnormal ? 'rgba(239,68,68,0.1)' : 'var(--bg-secondary)',
-                          border: r.isAbnormal ? '1px solid rgba(239,68,68,0.2)' : 'none',
-                          padding: '8px 12px', borderRadius: 8, fontSize: 13
-                        }}>
-                          <span>{r.name} ({r.marker})</span>
-                          <span style={{ fontWeight: 600, color: r.isAbnormal ? 'var(--danger)' : 'var(--text)' }}>
-                            {r.value} {r.unit}
-                            {r.isAbnormal && r.deviation === 'low' && <span style={{ marginLeft: 6, color: 'var(--danger)' }}>↓</span>}
-                            {r.isAbnormal && r.deviation === 'high' && <span style={{ marginLeft: 6, color: 'var(--danger)' }}>↑</span>}
-                          </span>
-                        </div>
-                      ))}
+        <>
+          <div className="card" style={{ marginBottom: 12 }}>
+            <h3>&#128221; Вставить текст анализа</h3>
+            <p style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 8 }}>Вставьте текст из лабораторного бланка (Инвитро, Гемотест, Хеликс, KDL). Поддерживаются форматы: «Гемоглобин 140 г/л», «АЛТ: 25 U/L (0-40)», «HGB 140 g/L».</p>
+            <textarea
+              className="input"
+              rows={5}
+              placeholder={"Гемоглобин 140 г/л\nАЛТ 25 U/L\nКреатинин 85 мкмоль/л\nХолестерин общий 5.2 ммоль/л"}
+              value={ocrText}
+              onChange={e => setOcrText(e.target.value)}
+              style={{ width: '100%', marginBottom: 8, fontFamily: 'monospace', fontSize: 13 }}
+            />
+             <button className="btn" onClick={importFromText} disabled={!ocrText.trim()}>
+               &#128270; Распознать и добавить
+            </button>
+            <label style={{ display: 'inline-block', marginLeft: 8, padding: '8px 14px', background: 'var(--accent-blue)', color: '#fff', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+              &#128196; Загрузить PDF/фото
+              <input type="file" accept=".pdf,image/*" onChange={handleFileUpload} style={{ display: 'none' }} disabled={fileLoading} />
+            </label>
+            {fileLoading && <span style={{ marginLeft: 8, fontSize: 12, color: 'var(--accent-blue)' }}>Обработка...</span>}
+            {ocrResult.length > 0 && (
+              <div style={{ marginTop: 12 }}>
+                <h4>Распознано {ocrResult.length} показателей:</h4>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 8 }}>
+                  {ocrResult.map((r, i) => (
+                    <div key={i} style={{ display: 'flex', justifyContent: 'space-between', background: 'var(--bg-secondary)', padding: '8px 12px', borderRadius: 8, fontSize: 13 }}>
+                      <span>{r.name} ({r.marker})</span>
+                      <span style={{ fontWeight: 600 }}>{r.value} {r.unit}</span>
                     </div>
-                    {ocrResult.some(r => r.isAbnormal) && (
-                      <div style={{
-                        marginBottom: 8, padding: '8px 12px', background: 'var(--danger-dim)',
-                        border: '1px solid var(--danger)', borderRadius: 8, fontSize: 11, color: 'var(--danger)'
-                      }}>
-                        ⚠️ Обнаружены отклонения от нормы. Проверьте значения и при необходимости скорректируйте.
-                      </div>
-                    )}
-                    <button className="btn" style={{ marginTop: 8 }} onClick={confirmOcrResults}>&#10004; Подтвердить и сохранить все</button>
-                  </div>
-                )}
+                  ))}
+                </div>
+                <button className="btn" style={{ marginTop: 8 }} onClick={confirmOcrResults}>&#10004; Подтвердить и сохранить все</button>
               </div>
+            )}
+          </div>
 
-              <div className="card" style={{ marginBottom: 0 }}>
-                <h3>&#128736; Быстрый ввод по группам</h3>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
-                  {Object.entries(LAB_PANELS).map(([key, panel]) => {
+          <div className="card" style={{ marginBottom: 12 }}>
+            <h3>&#128736; Быстрый ввод по группам</h3>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
+              {Object.entries(LAB_PANELS).map(([key, panel]) => {
                 const allFilled = panel.markers.every(m => entries.some(e => e.code === (m.ucumCode ?? m.id)));
                 return (
                   <button key={key} className={'btn secondary' + (selectedPanel === key ? ' active' : '')} style={{ background: allFilled ? 'var(--success-dim)' : undefined, borderColor: allFilled ? 'var(--success)' : undefined }} onClick={() => setSelectedPanel(key)}>
@@ -439,11 +396,9 @@ export const LabsScreen: React.FC<LabsProps> = ({ initialTab = 'input' }) => {
                 })}
               </div>
             )}
-              </div>
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            <div className="card" style={{ marginTop: 12 }}>
+          <div className="card" style={{ marginBottom: 12 }}>
             <h3>&#128203; Ручной ввод</h3>
             <p style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 8 }}>Введите код или название показателя, значение и единицу измерения</p>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 8 }}>
@@ -466,9 +421,8 @@ export const LabsScreen: React.FC<LabsProps> = ({ initialTab = 'input' }) => {
               <input type="number" className="input" placeholder="Значение" style={{ width: 100 }} />
               <input type="text" className="input" placeholder="Ед." style={{ width: 70 }} />
             </div>
-              </div>
           </div>
-        </div>
+        </>
       )}
 
       {tab === 'panels' && (
@@ -547,160 +501,6 @@ export const LabsScreen: React.FC<LabsProps> = ({ initialTab = 'input' }) => {
               );
             })}
           </div>
-        </>
-      )}
-
-      {tab === 'schedule' && (
-        <>
-          <div className="card" style={{ marginBottom: 12 }}>
-            <h3>Расписание анализов</h3>
-            <p style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 8 }}>
-              Неделя {currentWeek} с начала курса · Фаза: {phase === 'on_cycle' ? 'Курс' : phase === 'pct' ? 'ПКТ' : phase === 'bridge' ? 'Мост' : phase === 'fertility' ? 'Фертильность' : 'Базовая'}
-            </p>
-            {labSchedule.length === 0 ? (
-              <p style={{ color: 'var(--text-dim)', fontSize: 13 }}>Укажите дату начала курса в профиле для генерации расписания.</p>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {labSchedule.map((item, idx) => {
-                  const labCodes = new Set(entries.map(e => e.code.toUpperCase()));
-                  const filledCount = item.labs.filter(l => labCodes.has(l.toUpperCase())).length;
-                  const totalLabs = item.labs.length;
-                  const isOverdue = item.week <= currentWeek && filledCount < totalLabs * 0.8;
-                  const isCompleted = filledCount >= totalLabs * 0.8;
-                  const isUpcoming = item.week > currentWeek;
-                  const borderColor = isCompleted ? 'var(--success)' : isOverdue ? 'var(--danger)' : isUpcoming && item.week <= currentWeek + 2 ? 'var(--warning)' : 'var(--border)';
-                  const statusLabel = isCompleted ? 'Пройдено' : isOverdue ? 'Просрочено' : isUpcoming ? 'Предстоит' : '';
-                  const statusColor = isCompleted ? 'var(--success)' : isOverdue ? 'var(--danger)' : 'var(--accent)';
-                  return (
-                    <div key={idx} style={{ background: 'var(--bg-secondary)', borderRadius: 10, padding: 12, borderLeft: `3px solid ${borderColor}` }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                        <div>
-                          <span style={{ fontWeight: 700, fontSize: 14 }}>{item.label}</span>
-                          <span style={{ fontSize: 11, color: 'var(--text-dim)', marginLeft: 8 }}>Неделя {item.week}</span>
-                        </div>
-                        <span style={{ fontSize: 11, fontWeight: 600, color: statusColor, padding: '2px 8px', borderRadius: 6, background: isCompleted ? 'var(--success-dim)' : isOverdue ? 'var(--danger-dim)' : 'var(--accent-dim)' }}>{statusLabel}</span>
-                      </div>
-                      <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 4 }}>{item.reason}</div>
-                      <div style={{ fontSize: 12, marginBottom: item.diagnostics.length > 0 ? 6 : 0 }}>
-                        <span style={{ fontWeight: 600 }}>Анализы:</span>{' '}
-                        {item.labs.map(l => {
-                          const filled = labCodes.has(l.toUpperCase());
-                          return <span key={l} style={{ display: 'inline-block', margin: '1px 2px', padding: '1px 6px', borderRadius: 4, fontSize: 11, background: filled ? 'var(--success-dim)' : 'var(--bg-tertiary)', color: filled ? 'var(--success)' : 'var(--text-dim)', border: `1px solid ${filled ? 'var(--success)' : 'var(--border)'}` }}>{l}</span>;
-                        })}
-                        <span style={{ fontSize: 11, color: 'var(--text-dim)', marginLeft: 6 }}>({filledCount}/{totalLabs})</span>
-                      </div>
-                      {item.diagnostics.length > 0 && (
-                        <div style={{ fontSize: 12 }}>
-                          <span style={{ fontWeight: 600 }}>Исследования:</span>{' '}
-                          {item.diagnostics.map(d => <span key={d} style={{ display: 'inline-block', margin: '1px 2px', padding: '1px 6px', borderRadius: 4, fontSize: 11, background: 'var(--accent-dim)', color: 'var(--accent)', border: '1px solid var(--accent)' }}>{d}</span>)}
-                        </div>
-                      )}
-                      {item.urgency === 'critical' && !isCompleted && <div style={{ marginTop: 4, fontSize: 10, color: 'var(--danger)', fontWeight: 700 }}>&#9888; Критически важно!</div>}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-
-          {(() => {
-            const { labs: drugLabs, diagnostics: drugDiags, reasons } = getDrugSpecificLabs(course);
-            if (drugLabs.length === 0 && drugDiags.length === 0) return null;
-            return (
-              <div className="card" style={{ marginBottom: 12 }}>
-                <h3>Препарат-специфичные анализы</h3>
-                <p style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 8 }}>Дополнительные анализы, обусловленные текущими препаратами на курсе:</p>
-                {drugLabs.length > 0 && (
-                  <div style={{ marginBottom: 8 }}>
-                    <span style={{ fontWeight: 600, fontSize: 13 }}>Маркеры:</span>{' '}
-                    {drugLabs.map(l => <span key={l} style={{ display: 'inline-block', margin: '1px 2px', padding: '2px 8px', borderRadius: 6, fontSize: 11, background: 'var(--warning-dim)', color: 'var(--warning)', border: '1px solid var(--warning)' }}>{l}</span>)}
-                  </div>
-                )}
-                {drugDiags.length > 0 && (
-                  <div style={{ marginBottom: 8 }}>
-                    <span style={{ fontWeight: 600, fontSize: 13 }}>Исследования:</span>{' '}
-                    {drugDiags.map(d => <span key={d} style={{ display: 'inline-block', margin: '1px 2px', padding: '2px 8px', borderRadius: 6, fontSize: 11, background: 'var(--accent-dim)', color: 'var(--accent)', border: '1px solid var(--accent)' }}>{d}</span>)}
-                  </div>
-                )}
-                <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>
-                  {reasons.map((r, i) => <div key={i} style={{ marginTop: 2 }}>&#8226; {r}</div>)}
-                </div>
-              </div>
-            );
-          })()}
-
-          {(() => {
-            const status = getCurrentLabStatus(labSchedule, entries.map(e => ({ code: e.code, date: e.date })), currentWeek);
-            return (
-              <div style={{ display: 'grid', gap: 8, gridTemplateColumns: 'repeat(3, 1fr)', marginBottom: 12 }}>
-                {[
-                  { label: 'Просрочено', count: status.overdue.length, color: 'var(--danger)' },
-                  { label: 'Предстоит', count: status.upcoming.length, color: 'var(--warning)' },
-                  { label: 'Пройдено', count: status.completed.length, color: 'var(--success)' },
-                ].map(s => (
-                  <div key={s.label} style={{ background: 'var(--bg-secondary)', borderRadius: 10, padding: 10, textAlign: 'center' }}>
-                    <div style={{ fontSize: 22, fontWeight: 800, color: s.color }}>{s.count}</div>
-                    <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>{s.label}</div>
-                  </div>
-                ))}
-              </div>
-            );
-          })()}
-
-          {(() => {
-            const drugCorrelationAlerts = analyzeLabDrugCorrelation(entries, course, phase === 'on_cycle' ? 'on_cycle' : phase === 'pct' ? 'pct' : 'baseline');
-            if (drugCorrelationAlerts.length === 0) return null;
-            return (
-              <div className="card" style={{ marginBottom: 12, borderLeft: '3px solid #ef4444' }}>
-                <h3 style={{ color: '#ef4444', marginBottom: 8 }}>Взаимодействия препаратов с анализами</h3>
-                {drugCorrelationAlerts.map((a, i) => (
-                  <div key={i} style={{ background: 'var(--bg-secondary)', borderRadius: 8, padding: '8px 10px', marginBottom: 6 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ fontWeight: 600 }}>{a.marker} {a.actualStatus === 'high' ? '↑' : '↓'} {a.value.toFixed(1)} {a.unit}</span>
-                      <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 6px', borderRadius: 4, background: a.severity === 'critical' ? 'rgba(239,68,68,0.15)' : a.severity === 'high' ? 'rgba(249,115,22,0.15)' : 'rgba(234,179,8,0.15)', color: a.severity === 'critical' ? '#ef4444' : a.severity === 'high' ? '#f97316' : '#eab308' }}>
-                        {a.severity === 'critical' ? 'КРИТИЧ.' : a.severity === 'high' ? 'ВЫСОКИЙ' : a.severity === 'med' ? 'СРЕДНИЙ' : 'НИЗКИЙ'}
-                      </span>
-                    </div>
-                    <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 2 }}>Препараты: {a.drugCause.join(', ')}</div>
-                    <div style={{ fontSize: 11, color: 'var(--warning)', marginTop: 2 }}>{a.recommendation}</div>
-                    <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>Ожидаемый диапазон: {a.expectedRange[0]}–{a.expectedRange[1]}</div>
-                  </div>
-                ))}
-              </div>
-            );
-          })()}
-
-          {(() => {
-            const courseStart = profile?.settings?.courseStartDate;
-            if (!courseStart) return null;
-            const weeksSinceStart = Math.max(1, Math.ceil((Date.now() - new Date(courseStart).getTime()) / (7 * 24 * 60 * 60 * 1000)));
-            const totalWeeks = Math.max(weeksSinceStart + 4, 12);
-            const checkpoints = generateCheckpoints(phase as any, courseStart, totalWeeks, { role: 'user' });
-            if (checkpoints.length === 0) return null;
-            return (
-              <div className="card" style={{ marginBottom: 12 }}>
-                <h3>Контрольные точки</h3>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  {checkpoints.map(cp => {
-                    const cpDate = new Date(cp.dueDate);
-                    const isPast = cpDate < new Date();
-                    return (
-                      <div key={cp.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 10px', borderRadius: 6, background: 'var(--bg-secondary)' }}>
-                        <div>
-                          <span style={{ fontWeight: 600, fontSize: 12 }}>{cp.type === 'baseline' ? 'Базовый' : cp.type === 'mid_course' ? 'Середина курса' : cp.type === 'end_of_cycle' ? 'Конец курса' : cp.type === 'pct_start' ? 'Начало ПКТ' : 'Контроль'}</span>
-                          <span style={{ fontSize: 11, color: 'var(--text-dim)', marginLeft: 8 }}>Неделя {cp.weekOffset}</span>
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                          <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>{cp.dueDate}</span>
-                          <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 4, background: isPast ? 'var(--success-dim)' : 'var(--warning-dim)', color: isPast ? 'var(--success)' : 'var(--warning)' }}>{isPast ? 'Пройдено' : cp.status}</span>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            );
-          })()}
         </>
       )}
 
@@ -841,49 +641,7 @@ export const LabsScreen: React.FC<LabsProps> = ({ initialTab = 'input' }) => {
       {tab === 'risks' && (
         <div className="card">
           <h3>Оценка рисков на основе анализов</h3>
-          {entries.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '24px 16px' }}>
-              <div style={{ fontSize: 28, marginBottom: 12 }}>
-                📊
-              </div>
-              <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>Нет данных анализов</div>
-              <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 8 }}>
-                Для расчета лабораторных рисков необходимо ввести результаты анализов.
-              </div>
-              <button className="btn" style={{ marginTop: 16, background: 'rgba(239,68,68,0.15)', color: '#ef4444', border: '1px solid #ef4444' }} onClick={() => setTab('input')}>
-                ➕ Ввести анализы
-              </button>
-              <div style={{ marginTop: 20, padding: '12px 16px', background: 'rgba(234,179,8,0.1)', borderRadius: 8 }}>
-                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--warning)', marginBottom: 8 }}>
-                  ⚠️ Базовые риски показаны без данных анализов
-                </div>
-                <p style={{ fontSize: 11, color: 'var(--text-dim)', margin: '0 0 12px 0', lineHeight: 1.5 }}>
-                  Если вы не планируете вводить анализы, нажмите кнопку ниже, чтобы применить штрафные коэффициенты к рискам.
-                </p>
-                <button className="btn" style={{ 
-                  background: profile?.settings?.forceNoLabsPenalty ? 'rgba(239,68,68,0.25)' : 'rgba(239,68,68,0.15)', 
-                  color: profile?.settings?.forceNoLabsPenalty ? '#fca5a5' : '#ef4444', 
-                  border: '1px solid #ef4444' 
-                }} onClick={async () => {
-                  if (!profile?.id) return;
-                  const { updateProfile } = await import('../../core/profile-manager');
-                  updateProfile({
-                    ...profile,
-                    settings: {
-                      ...profile.settings,
-                      forceNoLabsPenalty: !profile.settings?.forceNoLabsPenalty
-                    }
-                  });
-                  notifyDataChange();
-                }}>
-                  {profile?.settings?.forceNoLabsPenalty ? '✅ Применён штраф (отмена)' : '🚫 БЕЗ АНАЛИЗОВ (Штраф)'}
-                </button>
-                <p style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 8 }}>
-                  {profile?.settings?.forceNoLabsPenalty ? 'Штрафные коэффициенты применены. Нажмите, чтобы отменить.' : 'Нажмите, чтобы применить штрафные коэффициенты.'}
-                </p>
-              </div>
-            </div>
-          ) : risk ? (
+          {risk ? (
             <div>
               <div style={{ display: 'flex', gap: 12, marginBottom: 16 }}>
                 <div style={{ flex: 1, background: 'var(--bg-secondary)', borderRadius: 10, padding: 14, textAlign: 'center' }}>
@@ -911,15 +669,20 @@ export const LabsScreen: React.FC<LabsProps> = ({ initialTab = 'input' }) => {
                   </div>
                 ))}
               </div>
-              <div style={{ marginTop: 16, padding: 12, background: 'var(--bg-secondary)', borderRadius: 10 }}>
-                <h4 style={{ margin: '0 0 8px' }}>Вклад анализов в риск:</h4>
-                {Object.entries(labRisks || {}).map(([sys, val]) => (
-                  <div key={sys} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
-                    <span>{SYSTEM_LABELS[sys] ?? sys}</span>
-                    <span style={{ color: (val as number) > 30 ? 'var(--danger)' : 'var(--success)' }}>{(val as number).toFixed(1)}%</span>
+              {entries.length > 0 && (() => {
+                const labRisks = calculateRiskFromAnalyses(entries);
+                return (
+                  <div style={{ marginTop: 16, padding: 12, background: 'var(--bg-secondary)', borderRadius: 10 }}>
+                    <h4 style={{ margin: '0 0 8px' }}>Вклад анализов в риск:</h4>
+                    {Object.entries(labRisks.systemContributions || {}).map(([sys, val]) => (
+                      <div key={sys} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
+                        <span>{SYSTEM_LABELS[sys] ?? sys}</span>
+                        <span style={{ color: (val as number) > 30 ? 'var(--danger)' : 'var(--success)' }}>{(val as number).toFixed(1)}%</span>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
+                );
+              })()}
             </div>
           ) : (
             <p style={{ color: 'var(--text-dim)' }}>Для расчёта рисков необходимо добавить результаты анализов и данные о курсе.</p>
