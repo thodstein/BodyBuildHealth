@@ -230,19 +230,52 @@ UI: выбор техники в настройках, отображение п
 
 ---
 
+### Фаза 5: Полноценная детализация рисков
+
+#### 5.1 Details tab в RiskScreen
+**Файлы**: `RiskScreen.tsx`
+
+- Добавить вкладку "Детализация" для демонстрации прозрачности расчета рисков
+- Показать как числа рассчитываются, какие штрафные коэффициенты применяются и как агрегируются все источники рисков
+- Использовать только существующие state variables (без helper functions)
+- Все UI тексты на русском языке
+- Темная тема с зеленым акцентом (#00e68a)
+
+**Структура:**
+1. **Общий риск** - сравнение сырого и нетто риска с показателем снижения
+2. **Штрафные коэффициенты** - детализация лабораторных анализов и исследований
+3. **Вклад анализов** - 4x4 grid с рисками по системам
+4. **Вклад препаратов** - топ-4 препаратов по вкладу в риск
+5. **Покрытие поддержкой** - прогресс-бар и процент покрытия
+
+**Технические детали:**
+- Использован React Fragment для обертки JSX элементов
+- Исправлены типы: RiskTab расширен для 'details'
+- Исправлена ошибка с type coercion (labPct: number вместо string)
+- Исправлен символ × (использован {\'×\'})
+
+**Валидация:**
+- ✅ TypeScript проверка: `npx tsc --noEmit` (ошибки только в других файлах)
+- ✅ Vite сборка: `npx vite build` (успешно)
+- ✅ Локальный сервер: `http://localhost:3000` (работает)
+
+---
+
 ## Порядок выполнения
 
 | # | Задача | Приоритет | Файлов |
 |---|--------|-----------|--------|
-| 1 | RiskScreen: реальные механизмы + useDataLink | P0 | RiskScreen, risk.engine, data-link |
-| 2 | PlanScreen: selectSplit + rotation + macrocycle sync | P0 | PlanScreen, training.engine, exercise-catalog |
-| 3 | Auth: убрать хардкод, Supabase auth | P0 | auth-manager, auth-module, main |
-| 4 | SupportScreen: каталог + синергии + рекомендах | P0 | SupportScreen (new), data-link, App |
-| 5 | Diet preferences: типы + UI + движок | P1 | types, profile-manager, ProfileScreen, nutrition |
-| 6 | FOOD_DB: расширение + аллергены | P1 | nutrition-database |
-| 7 | Nutrition: preference-aware selection + cycling | P1 | nutrition.engine, nutrition-meal-plan |
-| 8 | Нейротоксичность: маппинг + данные | P1 | risk.engine, pharma-database, constants |
-| 9 | Устранение дубляжей | P2 | все экраны |
-| 10 | 3D модель: OrbitControls + x-ray | P2 | HumanBody3D |
-| 11 | Sport splits + exercise catalog | P2 | split-selector, exercise-catalog |
-| 12 | Advanced training techniques | P2 | types, exercise-catalog, PlanScreen |
+| 1 | **RIR Matrix Engine + Weekly Progression** | **P0** | **rir-matrix.engine, training.engine** |
+| 2 | RiskScreen: реальные механизмы + useDataLink | P0 | RiskScreen, risk.engine, data-link |
+| 3 | PlanScreen: selectSplit + rotation + macrocycle sync | P0 | PlanScreen, training.engine, exercise-catalog |
+| 4 | Auth: убрать хардкод, Supabase auth | P0 | auth-manager, auth-module, main |
+| 5 | SupportScreen: каталог + синергии + рекомендах | P0 | SupportScreen (new), data-link, App |
+| 6 | Diet preferences: типы + UI + движок | P1 | types, profile-manager, ProfileScreen, nutrition |
+| 7 | FOOD_DB: расширение + аллергены | P1 | nutrition-database |
+| 8 | Nutrition: preference-aware selection + cycling | P1 | nutrition.engine, nutrition-meal-plan |
+| 9 | Нейротоксичность: маппинг + данные | P1 | risk.engine, pharma-database, constants |
+| 10 | Устранение дубляжей | P2 | все экраны |
+| 11 | 3D модель: OrbitControls + x-ray | P2 | HumanBody3D |
+| 12 | Sport splits + exercise catalog | P2 | split-selector, exercise-catalog |
+| 13 | Advanced training techniques | P2 | types, exercise-catalog, PlanScreen |
+| 14 | **RiskScreen: Details tab** | **P0** | **RiskScreen** |

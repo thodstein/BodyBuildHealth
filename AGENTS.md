@@ -32,7 +32,8 @@ Profile → useDataLink → { profile, labs, course, readiness, risk, avgWeeklyK
 7. **Профиль** — Settings, measurements, support stack separate
 
 ### Key Engines & Files
-- `src/engines/training.engine.ts` — RIR matrix, volume, splits → REWRITE RIR
+- `src/engines/rir-matrix.engine.ts` — **NEW**: RIR matrix + weekly progression
+- `src/engines/training.engine.ts` — **UPDATED**: uses RIR matrix, generates weekly plan
 - `src/engines/split-selector.engine.ts` — NEW: scoring splits with rationale
 - `src/engines/progression.engine.ts` — NEW: load progression, deload triggers
 - `src/engines/risk.engine.ts` — MUST aggregate from ALL sources
@@ -50,13 +51,13 @@ Profile → useDataLink → { profile, labs, course, readiness, risk, avgWeeklyK
 ## Build Order (Priority)
 
 ### Phase 1: Critical UI Fixes (dedup, layout, buttons)
-1. [ ] Merge training + cycles tabs in PlanScreen → single unified tab
-2. [ ] Remove duplicate volume/split displays across screens
-3. [ ] Split LabsScreen into 2-column layout (results | catalog)
+1. [x] Merge training + cycles tabs in PlanScreen → single unified tab
+2. [x] Remove duplicate volume/split displays across screens
+3. [x] Split LabsScreen into 2-column layout (results | catalog)
 4. [ ] Add synergy descriptions to RiskScreen/PharmaScreen
-5. [ ] Aggregate all risks in RiskScreen (pharma + labs + training + nutrition)
+5. [x] Aggregate all risks in RiskScreen (pharma + labs + training + nutrition)
 6. [ ] Separate Support into standalone section
-7. [ ] Fix buttons to work without lab data (default values)
+7. [x] Fix buttons to work without lab data (default values)
 
 ### Phase 2: Data & Calculations
 8. [ ] PAL auto-derivation: workoutsPerWeek + avgWorkoutMinutes → PAL
@@ -73,16 +74,73 @@ Profile → useDataLink → { profile, labs, course, readiness, risk, avgWeeklyK
 17. [ ] Add barcode search improvements (Open Food Facts cache)
 
 ### Phase 4: Training Overhaul
-18. [ ] RIR matrix: goal×level×mesocyclePhase with weekly progression
-19. [ ] Split selector engine: scoring system with rationale
-20. [ ] Progression engine: linear/double/undulating, deload triggers
-21. [ ] Strength diary: StrengthLogEntry/WorkoutLog types + IndexedDB stores
+18. [x] **RIR matrix: goal×level×mesocyclePhase with weekly progression**
+19. [x] **Split selector engine: scoring system with rationale**
+20. [x] **Progression engine: linear/double/undulating, deload triggers**
+21. [x] **Strength diary v6: StrengthLogEntry/WorkoutLog + IndexedDB stores**
 22. [ ] PlanScreen: rationale blocks, exercise commentary, volume justification
 
 ### Phase 5: Research & Content
 23. [ ] Add 3-5 research links per substance to pharma-database.ts
 24. [ ] Add 3-5 research links per supplement to support.engine.ts
 25. [ ] Enhance mechanism descriptions for all PD systems
+
+## Phase 5.8: Buttons Without Lab Data - **COMPLETED**
+
+### Day 73: Default Values for Buttons
+- ✅ `src/ui/screens/LabsScreen.tsx` - Added `labRisks` state, `hasLabs` variable
+- ✅ `src/ui/screens/LabsScreen.tsx` - Risks tab shows fallback when no labs with warning message
+- ✅ `src/ui/screens/LabsScreen.tsx` - Risk display uses `calculateRiskFromAnalyses()` when labs exist
+- ✅ TypeScript check: `npx tsc --noEmit` ✓
+- ✅ Vite build: `npx vite build` ✓
+
+**Result:**
+- Users can now access LabsScreen without entering any lab data
+- "Risks" tab shows "Базовые риски показаны без данных анализов" message
+- Link to "Input" tab for entering lab data
+
+## Phase 5.9: Penalty per System - **COMPLETED**
+
+### Day 74: "Без анализов" Button with Penalty Application
+
+**User Clarification:**
+- Кнопка без анализов должна назначать штраф, а не сбрасывать его
+- All risks must be aggregated from all sources
+- Buttons must work without lab data
+
+**Implementation:**
+- ✅ `src/ui/screens/RiskScreen.tsx` - Added `forceNoLabs` state for manual penalty toggle
+- ✅ `src/ui/screens/RiskScreen.tsx` - Added "🚫 БЕЗ АНАЛИЗОВ (Штраф)" button in overview tab
+- ✅ `src/ui/screens/RiskScreen.tsx` - Penalty applied when `forceNoLabs=true` OR `penalty.noLabsPenalty=true`
+- ✅ `src/ui/screens/RiskScreen.tsx` - Button shows current state: "✅ Применён штраф" or "🚫 БЕЗ АНАЛИЗОВ (Штраф)"
+- ✅ `src/ui/screens/RabsScreen.tsx` - Updated risks tab fallback with manual penalty application hint
+- ✅ TypeScript check: `npx tsc --noEmit` ✓
+- ✅ Vite build: `npx vite build` ✓
+
+**Penalty Logic:**
+```typescript
+const shouldApplyPenalty = forceNoLabs || pen.noLabsPenalty;
+if (shouldApplyPenalty && finalResult.systemBreakdown) {
+  for (const sys of RISK_SYSTEMS) {
+    finalResult.systemBreakdown[sys].raw = Math.min(100, raw * pen.totalMultiplier);
+    finalResult.systemBreakdown[sys].net = Math.min(100, net * pen.totalMultiplier);
+  }
+  finalResult.overallRaw = Math.min(100, overallRaw * pen.totalMultiplier);
+  finalResult.overallNet = Math.min(100, overallNet * pen.totalMultiplier);
+}
+```
+
+**Penalty Coefficients:**
+- `labPenalty = labRatio * 0.40` (or 0.50 if >=90% missing)
+- `diagnosticPenalty = diagRatio * 0.25` (or 0.35 if >=90% missing)
+- `totalMultiplier = 1.0 + labPenalty + diagnosticPenalty` (max 2.0)
+
+**Result:**
+- Users can now apply penalty manually via "Без анализов" button
+- Penalty is applied to ALL systems (hepatic, cardio, endocrine, neuro, etc.)
+- Per-system breakdown shown in penalty block with missing labs list
+- Works without any lab data being entered
+- RiskScreen already aggregates from all sources (pharma, support, labs, training, nutrition)
 
 ## Build Commands
 ```bash

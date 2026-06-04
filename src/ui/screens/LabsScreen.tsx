@@ -56,6 +56,16 @@ export const LabsScreen: React.FC<LabsProps> = ({ initialTab = 'input' }) => {
   const [labSchedule, setLabSchedule] = useState<LabScheduleItem[]>([]);
   const [currentWeek, setCurrentWeek] = useState(0);
   const [manualMarker, setManualMarker] = useState('');
+  const [labRisks, setLabRisks] = useState<Record<string, number>>({});
+
+  const hasLabs = entries.length > 0;
+
+  useEffect(() => {
+    if (hasLabs) {
+      const labRisksResult = calculateRiskFromAnalyses(entries);
+      setLabRisks(labRisksResult.systemContributions);
+    }
+  }, [entries, hasLabs]);
 
   useEffect(() => {
     if (profile?.settings?.phase) {
@@ -217,14 +227,14 @@ export const LabsScreen: React.FC<LabsProps> = ({ initialTab = 'input' }) => {
     .filter(code => !entries.some(e => e.code.toUpperCase() === code.toUpperCase()));
   const hasNoLabs = entries.length === 0;
 
-  const TABS: { id: LabTab; label: string; icon?: string }[] = [
-    { id: 'input', label: 'Ввод', icon: '📝' },
-    { id: 'panels', label: 'Панели', icon: '🧪' },
-    { id: 'schedule', label: 'Расписание', icon: '📅' },
-    { id: 'history', label: 'История', icon: '📊' },
-    { id: 'indices', label: 'Индексы', icon: '📈' },
-    { id: 'risks', label: 'Риски', icon: '⚠️' },
-    { id: 'investigations', label: 'Исследования', icon: '🔬' },
+  const TABS: { id: LabTab; label: string; icon?: string; col: 'results' | 'catalog' }[] = [
+    { id: 'input', label: 'Ввод', icon: '📝', col: 'results' },
+    { id: 'panels', label: 'Панели', icon: '🧪', col: 'catalog' },
+    { id: 'schedule', label: 'Расписание', icon: '📅', col: 'catalog' },
+    { id: 'history', label: 'История', icon: '📊', col: 'results' },
+    { id: 'indices', label: 'Индексы', icon: '📈', col: 'results' },
+    { id: 'risks', label: 'Риски', icon: '⚠️', col: 'results' },
+    { id: 'investigations', label: 'Исследования', icon: '🔬', col: 'catalog' },
   ];
 
   return (
@@ -245,19 +255,33 @@ export const LabsScreen: React.FC<LabsProps> = ({ initialTab = 'input' }) => {
         </div>
       )}
 
-      <div style={{ display: 'flex', gap: 6, marginBottom: 16, overflowX: 'auto' }}>
-        {TABS.map(t => (
-          <button key={t.id} className={'btn secondary' + (tab === t.id ? ' active' : '')} style={{ flex: '0 0 auto', whiteSpace: 'nowrap', fontSize: 12, padding: '6px 10px' }} onClick={() => setTab(t.id)}>
-            {t.icon} {t.label}
-          </button>
-        ))}
+      <div style={{ marginBottom: 16 }}>
+        {/* Results column tabs */}
+        <div style={{ display: 'flex', gap: 6, marginBottom: 8, overflowX: 'auto' }}>
+          <span style={{ fontSize: 11, fontWeight: 700, padding: '6px 8px', color: 'var(--text-dim)' }}>📊 Результаты:</span>
+          {TABS.filter(t => t.col === 'results').map(t => (
+            <button key={t.id} className={'btn secondary' + (tab === t.id ? ' active' : '')} style={{ flex: '0 0 auto', whiteSpace: 'nowrap', fontSize: 12, padding: '6px 10px' }} onClick={() => setTab(t.id)}>
+              {t.icon} {t.label}
+            </button>
+          ))}
+        </div>
+        {/* Catalog column tabs */}
+        <div style={{ display: 'flex', gap: 6, overflowX: 'auto' }}>
+          <span style={{ fontSize: 11, fontWeight: 700, padding: '6px 8px', color: 'var(--text-dim)' }}>🗂️ Каталоги:</span>
+          {TABS.filter(t => t.col === 'catalog').map(t => (
+            <button key={t.id} className={'btn secondary' + (tab === t.id ? ' active' : '')} style={{ flex: '0 0 auto', whiteSpace: 'nowrap', fontSize: 12, padding: '6px 10px' }} onClick={() => setTab(t.id)}>
+              {t.icon} {t.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {tab === 'input' && (
-        <>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-              <div className="card" style={{ marginBottom: 12 }}>
-                <h3>&#128221; Вставить текст анализа</h3>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+          {/* Left column: Lab input */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div className="card">
+              <h3>&#128221; Вставить текст анализа</h3>
                 <p style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 8 }}>
                   Вставьте текст из лабораторного бланка (Инвитро, Гемотест, Хеликс, KDL). 
                   Поддерживаются форматы: «Гемоглобин 140 г/л», «АЛТ: 25 U/L (0-40)», «HGB 140 g/L».
@@ -313,10 +337,10 @@ export const LabsScreen: React.FC<LabsProps> = ({ initialTab = 'input' }) => {
                 )}
               </div>
 
-           <div className="card" style={{ marginBottom: 0 }}>
-            <h3>&#128736; Быстрый ввод по группам</h3>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
-              {Object.entries(LAB_PANELS).map(([key, panel]) => {
+              <div className="card" style={{ marginBottom: 0 }}>
+                <h3>&#128736; Быстрый ввод по группам</h3>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
+                  {Object.entries(LAB_PANELS).map(([key, panel]) => {
                 const allFilled = panel.markers.every(m => entries.some(e => e.code === (m.ucumCode ?? m.id)));
                 return (
                   <button key={key} className={'btn secondary' + (selectedPanel === key ? ' active' : '')} style={{ background: allFilled ? 'var(--success-dim)' : undefined, borderColor: allFilled ? 'var(--success)' : undefined }} onClick={() => setSelectedPanel(key)}>
@@ -378,10 +402,11 @@ export const LabsScreen: React.FC<LabsProps> = ({ initialTab = 'input' }) => {
                 })}
               </div>
             )}
-          </div>
+              </div>
           </div>
 
-          <div className="card" style={{ marginTop: 12 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div className="card" style={{ marginTop: 12 }}>
             <h3>&#128203; Ручной ввод</h3>
             <p style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 8 }}>Введите код или название показателя, значение и единицу измерения</p>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 8 }}>
@@ -404,8 +429,9 @@ export const LabsScreen: React.FC<LabsProps> = ({ initialTab = 'input' }) => {
               <input type="number" className="input" placeholder="Значение" style={{ width: 100 }} />
               <input type="text" className="input" placeholder="Ед." style={{ width: 70 }} />
             </div>
+              </div>
           </div>
-        </>
+        </div>
       )}
 
       {tab === 'panels' && (
@@ -778,7 +804,34 @@ export const LabsScreen: React.FC<LabsProps> = ({ initialTab = 'input' }) => {
       {tab === 'risks' && (
         <div className="card">
           <h3>Оценка рисков на основе анализов</h3>
-          {risk ? (
+          {entries.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '24px 16px' }}>
+              <div style={{ fontSize: 28, marginBottom: 12 }}>
+                📊
+              </div>
+              <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>Нет данных анализов</div>
+              <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 8 }}>
+                Для расчета лабораторных рисков необходимо ввести результаты анализов.
+              </div>
+              <button className="btn" style={{ marginTop: 16, background: 'rgba(239,68,68,0.15)', color: '#ef4444', border: '1px solid #ef4444' }} onClick={() => setTab('input')}>
+                ➕ Ввести анализы
+              </button>
+              <div style={{ marginTop: 20, padding: '12px 16px', background: 'rgba(234,179,8,0.1)', borderRadius: 8 }}>
+                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--warning)', marginBottom: 8 }}>
+                  ⚠️ Базовые риски показаны без данных анализов
+                </div>
+                <p style={{ fontSize: 11, color: 'var(--text-dim)', margin: '0 0 12px 0', lineHeight: 1.5 }}>
+                  Если вы не планируете вводить анализы, нажмите кнопку ниже, чтобы применить штрафные коэффициенты к рискам.
+                </p>
+                <button className="btn" style={{ background: 'rgba(239,68,68,0.15)', color: '#ef4444', border: '1px solid #ef4444' }} onClick={() => {
+                  // Переход на RiskScreen должен быть через роутинг
+                  alert('Перейдите во вкладку «Обзор» рисков и нажмите кнопку «🚫 БЕЗ АНАЛИЗОВ (Штраф)» для применения штрафа.');
+                }}>
+                  🚫 Применить штраф за отсутствие анализов
+                </button>
+              </div>
+            </div>
+          ) : risk ? (
             <div>
               <div style={{ display: 'flex', gap: 12, marginBottom: 16 }}>
                 <div style={{ flex: 1, background: 'var(--bg-secondary)', borderRadius: 10, padding: 14, textAlign: 'center' }}>
@@ -806,20 +859,15 @@ export const LabsScreen: React.FC<LabsProps> = ({ initialTab = 'input' }) => {
                   </div>
                 ))}
               </div>
-              {entries.length > 0 && (() => {
-                const labRisks = calculateRiskFromAnalyses(entries);
-                return (
-                  <div style={{ marginTop: 16, padding: 12, background: 'var(--bg-secondary)', borderRadius: 10 }}>
-                    <h4 style={{ margin: '0 0 8px' }}>Вклад анализов в риск:</h4>
-                    {Object.entries(labRisks.systemContributions || {}).map(([sys, val]) => (
-                      <div key={sys} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
-                        <span>{SYSTEM_LABELS[sys] ?? sys}</span>
-                        <span style={{ color: (val as number) > 30 ? 'var(--danger)' : 'var(--success)' }}>{(val as number).toFixed(1)}%</span>
-                      </div>
-                    ))}
+              <div style={{ marginTop: 16, padding: 12, background: 'var(--bg-secondary)', borderRadius: 10 }}>
+                <h4 style={{ margin: '0 0 8px' }}>Вклад анализов в риск:</h4>
+                {Object.entries(labRisks || {}).map(([sys, val]) => (
+                  <div key={sys} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
+                    <span>{SYSTEM_LABELS[sys] ?? sys}</span>
+                    <span style={{ color: (val as number) > 30 ? 'var(--danger)' : 'var(--success)' }}>{(val as number).toFixed(1)}%</span>
                   </div>
-                );
-              })()}
+                ))}
+              </div>
             </div>
           ) : (
             <p style={{ color: 'var(--text-dim)' }}>Для расчёта рисков необходимо добавить результаты анализов и данные о курсе.</p>

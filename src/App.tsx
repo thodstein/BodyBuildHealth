@@ -90,7 +90,7 @@ export default function App() {
       predictive: ['training', 'whatif'], marketplace: ['pharma', 'marketplace'],
       articles: ['profile', 'articles'], assistant: ['profile', 'assistant'],
       gamification: ['profile', 'gamification'], fertility: ['risks', 'fertility'], 'fertility-pct': ['risks', 'fertility'],
-      support: ['risks', 'support'], calculators: ['nutrition', 'calc'], reports: ['profile', 'reports'],
+      support: ['support', ''], calculators: ['nutrition', 'calc'], reports: ['profile', 'reports'],
       integrations: ['profile', 'integrations'], 'role-management': ['profile', 'roles'],
     };
     const entry = map[screenId];
@@ -219,7 +219,7 @@ export default function App() {
       case 'nutrition': return <NutritionScreen />;
       case 'labs': return <LabsScreen />;
       case 'risks': return sub === 'fertility' ? <FertilityPCTScreen /> : <RiskScreen />;
-      case 'support': return <CalculatorsScreen initialTab="support" />;
+      case 'support': return <SupportScreen />;
       case 'profile': return <ProfileScreen />;
       default: return <DashboardScreen onNavigate={navToScreen} />;
     }

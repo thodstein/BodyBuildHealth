@@ -63,7 +63,7 @@ function saveRiskSnapshot(snapshot: RiskSnapshot) {
   localStorage.setItem(RISK_HISTORY_KEY, JSON.stringify(history));
 }
 
-type RiskTab = 'overview' | 'systems' | 'body' | 'mechanisms' | 'labs' | 'overtraining' | 'timeline';
+type RiskTab = 'overview' | 'systems' | 'body' | 'mechanisms' | 'labs' | 'overtraining' | 'timeline' | 'details';
 
 export const RiskScreen: React.FC = () => {
   const linked = useDataLink();
@@ -314,6 +314,7 @@ export const RiskScreen: React.FC = () => {
     { key: 'labs', label: 'Анализы' },
     { key: 'overtraining', label: '∑' },
     { key: 'timeline', label: 'Таймлайн' },
+    { key: 'details', label: 'Детализация' },
   ];
 
   const getDrugContributions = () => {
@@ -1104,6 +1105,134 @@ export const RiskScreen: React.FC = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* ===== TAB: DETAILS ===== */}
+      {tab === 'details' && (
+        <>
+          <div className="card" style={{ marginBottom: 16 }}>
+            <h3 style={{ margin: '0 0 8px 0', fontSize: 16 }}>Детализация расчета рисков</h3>
+            <p style={{ fontSize: 11, color: 'var(--text-dim)', margin: '0 0 12px 0' }}>
+              Здесь показано, как складываются все источники рисков: фарма, анализы, поддержка, тренировки и питание
+            </p>
+            
+            {/* Overall Risk Breakdown */}
+            <div style={{ background: 'var(--bg-primary)', borderRadius: 8, padding: 12, marginBottom: 12 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 8 }}>Общий риск</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
+                <div style={{ background: 'rgba(239,68,68,0.1)', padding: 8, borderRadius: 6 }}>
+                  <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 2 }}>Сырой риск (без поддержки)</div>
+                  <div style={{ fontSize: 20, fontWeight: 800, color: '#ef4444' }}>{Math.round(rawRiskResult.overallRaw)}%</div>
+                </div>
+                <div style={{ background: 'rgba(34,197,94,0.1)', padding: 8, borderRadius: 6 }}>
+                  <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 2 }}>Нетто риск (с поддержкой)</div>
+                  <div style={{ fontSize: 20, fontWeight: 800, color: '#22c55e' }}>{Math.round(riskResult.overallNet)}%</div>
+                </div>
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--text-light)', padding: '8px 12', background: 'rgba(255,255,255,0.03)', borderRadius: 4 }}>
+                <span style={{ marginRight: 8 }}>Снижение:</span>
+                <span style={{ color: '#22c55e', fontWeight: 700 }}>-{Math.round(overallReduction)}%</span>
+                <span style={{ marginLeft: 8, color: 'var(--text-dim)' }}>
+                  ({rawRiskResult.overallRaw} → {riskResult.overallNet})
+                </span>
+              </div>
+            </div>
+
+            {/* Penalty Details */}
+            {penalty && penalty.totalMultiplier > 1.0 && (
+              <div style={{ background: 'var(--bg-primary)', borderRadius: 8, padding: 12, marginBottom: 12 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 8 }}>Штрафные коэффициенты</div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                  <div>
+                    <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 2 }}>Лабораторные анализы</div>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: penalty.noLabsPenalty ? '#ef4444' : '#f97316' }}>
+                      {penalty.noLabsPenalty ? '⛔ БЕЗ АНАЛИЗОВ' : '⚠️ НЕПОЛНЫЕ АНАЛИЗЫ'}
+                    </div>
+                    <div style={{ fontSize: 11, color: 'var(--text-light)' }}>+{(penalty.labPenalty * 100).toFixed(0)}%</div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 2 }}>Исследования</div>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: penalty.noDiagnosticsPenalty ? '#ef4444' : '#f97316' }}>
+                      {penalty.noDiagnosticsPenalty ? '⛔ БЕЗ ИССЛЕДОВАНИЙ' : '✅ ДОСТУПНО'}
+                    </div>
+                    <div style={{ fontSize: 11, color: 'var(--text-light)' }}>+{(penalty.diagnosticPenalty * 100).toFixed(0)}%</div>
+                  </div>
+                </div>
+                <div style={{ marginTop: 8, padding: '8px 12', background: 'rgba(255,255,255,0.03)', borderRadius: 4 }}>
+                  <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 2 }}>Итоговый множитель</div>
+                  <div style={{ fontSize: 16, fontWeight: 800, color: '#f97316' }}>{'×'} {penalty.totalMultiplier.toFixed(2)}</div>
+                  <div style={{ fontSize: 11, color: 'var(--text-light)' }}>
+                    <span style={{ marginRight: 4 }}>Итоговый штраф:</span>
+                    <span style={{ color: '#ef4444', fontWeight: 700 }}>+{((penalty.totalMultiplier - 1) * 100).toFixed(0)}%</span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Lab Risk Breakdown */}
+            <div style={{ background: 'var(--bg-primary)', borderRadius: 8, padding: 12, marginBottom: 12 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 8 }}>Вклад анализов</div>
+              <p style={{ fontSize: 10, color: 'var(--text-dim)', margin: '0 0 8px 0' }}>Риски отклонений лабораторных показателей от референсов</p>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6 }}>
+                {RISK_SYSTEMS.map(sys => {
+                  const labRisk = labRisks[sys] ?? 0;
+                  const net = riskResult.systemBreakdown?.[sys]?.net ?? 0;
+                  const total = Math.max(net, labRisk);
+                  const labPct = total > 0 ? Math.round((labRisk / total) * 100) : 0;
+                  const color = labPct > 50 ? '#ef4444' : labPct > 25 ? '#f97316' : labPct > 0 ? '#eab308' : '#6b7280';
+                  return (
+                    <div key={sys} style={{ background: 'rgba(255,255,255,0.03)', padding: '8px 6', borderRadius: 6, textAlign: 'center' }}>
+                      <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 2 }}>{SYSTEM_LABELS[sys]}</div>
+                      <div style={{ fontSize: 14, fontWeight: 700, color }}>
+                        {labRisk.toFixed(1)}%
+                        <span style={{ fontSize: 9, color: 'var(--text-dim)', marginLeft: 2 }}>лаб</span>
+                      </div>
+                      <div style={{ fontSize: 8, color: 'var(--text-dim)' }}>
+                        ({labPct}% от {total.toFixed(0)}%)
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Drug Contributions Summary */}
+            {drugContribs.length > 0 && (
+              <div style={{ background: 'var(--bg-primary)', borderRadius: 8, padding: 12, marginBottom: 12 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 8 }}>Вклад препаратов</div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
+                  {drugContribs.slice(0, 4).map((d, i) => (
+                    <div key={i} style={{ background: 'rgba(255,255,255,0.03)', padding: 8, borderRadius: 6 }}>
+                      <div style={{ fontSize: 12, fontWeight: 700 }}>{d.name}</div>
+                      <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 4 }}>{d.dose.toFixed(0)} мг/нед</div>
+                      <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>
+                        Влияет на: {d.systems.map(s => SYSTEM_LABELS[s] || s).join(', ')}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Support Coverage Summary */}
+            <div style={{ background: 'var(--bg-primary)', borderRadius: 8, padding: 12 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 8 }}>Покрытие поддержкой</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
+                <div style={{ flex: 1, height: 12, borderRadius: 6, background: 'var(--bg-primary)', overflow: 'hidden' }}>
+                  <div style={{ width: supportPct + '%', height: '100%', borderRadius: 6, background: supportPct > 60 ? '#22c55e' : supportPct > 30 ? '#eab308' : '#ef4444', transition: 'width 0.3s' }} />
+                </div>
+                <span style={{ fontSize: 14, fontWeight: 700, color: getRiskColor(100 - supportPct) }}>{supportPct}%</span>
+              </div>
+              <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>
+                Ячеек матрицы рисков покрыто поддержкой из раздела «Поддержка»
+              </div>
+              <div style={{ marginTop: 8, fontSize: 11, color: 'var(--text-light)' }}>
+                <span style={{ marginRight: 8 }}>Механизмы защиты:</span>
+                <span style={{ color: '#22c55e' }}>{supportPct > 50 ? 'Хорошее' : supportPct > 25 ? 'Умеренное' : 'Слабое'}</span>
+              </div>
+            </div>
+          </div>
+        </>
       )}
 
       {/* ===== Always visible: System comparison ===== */}

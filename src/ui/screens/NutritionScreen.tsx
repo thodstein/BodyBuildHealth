@@ -10,7 +10,7 @@ import { productToFoodItem, type OFFProduct } from '../../engines/openfoodfacts.
 import { parseNutritionScreenshot, type ParsedMeal } from '../../engines/nutrition-ocr-parser';
 import type { NutritionInput, NutritionTargets, FoodItem } from '../../core/types';
 
-type TabId = 'diary' | 'calc' | 'advice' | 'ration' | 'charts';
+type TabId = 'diary' | 'calc' | 'ration' | 'advice' | 'charts';
 type MealType = 'breakfast' | 'lunch' | 'dinner' | 'snack';
 type ProductSection = 'protein' | 'carbs' | 'fats' | null;
 type RationTier = 'basic' | 'mid' | 'max' | null;
@@ -1206,10 +1206,10 @@ export const NutritionScreen: React.FC<{ initialTab?: TabId }> = ({ initialTab }
 
   const tabs: { id: TabId; label: string }[] = [
     { id: 'diary', label: 'Дневник' },
-    { id: 'calc', label: 'Калькулятор' },
+    { id: 'calc', label: 'Расчёт' },
     { id: 'ration', label: 'Рацион' },
-    { id: 'charts', label: 'Графики' },
     { id: 'advice', label: 'Советы' },
+    { id: 'charts', label: 'Графики' },
   ];
 
   const [showScanner, setShowScanner] = useState(false);
@@ -1268,16 +1268,20 @@ export const NutritionScreen: React.FC<{ initialTab?: TabId }> = ({ initialTab }
               flex: 1, padding: '8px 0', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer',
               background: tab === t.id ? 'var(--accent-blue)' : 'var(--bg-secondary)',
               color: tab === t.id ? '#fff' : 'var(--text-dim)',
+              transition: 'all 0.2s ease',
             }}
           >
             {t.label}
           </button>
         ))}
       </div>
-      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 8 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
         <button onClick={() => setShowScanner(true)} style={{ background: 'none', border: '1px solid var(--border)', borderRadius: 8, padding: '6px 12px', fontSize: 12, cursor: 'pointer', color: 'var(--text-dim)' }}>
           📷 Сканировать штрихкод
         </button>
+        <span style={{ fontSize: 12, color: 'var(--text-dim)' }}>
+          {targets?.kcal ? `Цель: ${targets.kcal} ккал | Б:${targets.protein} Ж:${targets.fats} У:${targets.carbs}` : 'Введите параметры для расчёта'}
+        </span>
       </div>
       {tab === 'diary' && <DiaryTab diary={diary} setDiary={setDiary} targets={targets} />}
       {tab === 'calc' && <CalcTab targets={targets} setTargets={setTargets} />}

@@ -220,12 +220,6 @@ export const PlanScreen: React.FC<{ goal: string }> = ({ goal }) => {
     return selectSplit(input)[0] || null;
   }, [goalState, level, daysPerWeek, recovery, fatigue, nutrition, weakPoints]);
 
-  const dayPlan = useMemo(() => {
-    if (!trainingResult) return [];
-    const splitGroups = bestSplit?.groupsPerDay;
-    return buildDayPlan(trainingResult, daysPerWeek, weakPoints, splitGroups, macrocycle ? (selectedWeek || 1) : 0);
-  }, [trainingResult, daysPerWeek, bestSplit, macrocycle, selectedWeek]);
-
   const progressionRule = useMemo(() => selectProgressionRule(level), [level]);
 
   const deloadRec = useMemo(() => {
@@ -387,52 +381,54 @@ export const PlanScreen: React.FC<{ goal: string }> = ({ goal }) => {
                 </div>
               </div>
 
-              {/* Weekly plan */}
-              <div className="card week-plan">
-                <h3>Недельный план</h3>
+              {/* Weekly plan - use macrocycle if available, otherwise old logic */}
+              <div className="card week-plan" style={{ display: !macrocycle ? 'block' : 'none' }}>
                 <p className="week-note">{trainingResult.weekPlan}</p>
-                {dayPlan.map(day => (
-                  <div key={day.day} className="day-block">
-                    <h4>{day.day} — {day.name}</h4>
-                    {day.exercises.length === 0 ? (
-                      <p className="rest-day">Отдых — восстановление, растяжка, лёгкое кардио</p>
-                    ) : (
-                      <table className="exercise-table">
-                        <thead>
-                          <tr><th>Упражнение</th><th>Сеты</th><th>Повторы</th><th>RIR</th><th>Отдых</th><th>Вес</th></tr>
-                        </thead>
-                        <tbody>
-                          {day.exercises.map((ex, i) => {
-                            const suggestion = calcSuggestedWeight(ex.id, [], selectedWeek, progressionRule, goalState, ex.type === 'compound', undefined);
-                            return (
-                            <tr key={ex.id || i}>
-                              <td style={{ maxWidth: 180 }}>
-                                <div style={{ fontWeight: 600, fontSize: 12 }}>{ex.name}</div>
-                                {ex.targetMuscle && <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 1 }}>{ex.targetMuscle}</div>}
-                                {ex.dropSet && <span style={{ fontSize: 9, padding: '1px 4px', borderRadius: 3, background: 'rgba(249,115,22,0.15)', color: '#f97316', marginLeft: 4 }}>Дроп</span>}
-                                {ex.backoffSet && <span style={{ fontSize: 9, padding: '1px 4px', borderRadius: 3, background: 'rgba(34,197,94,0.12)', color: '#22c55e', marginLeft: 4 }}>Бэк</span>}
-                              </td>
-                              <td>{ex.sets}</td>
-                              <td>{ex.reps}</td>
-                              <td>{ex.rir}</td>
-                              <td>{ex.rest}</td>
-                              <td style={{ fontSize: 12 }}>
-                                <div style={{ fontWeight: 700, color: suggestion.isDeload ? '#ef4444' : 'var(--accent)' }}>
-                                  {suggestion.suggestedWeight > 0 ? `${suggestion.suggestedWeight} кг` : '—'}
-                                </div>
-                                {suggestion.rationale && <div style={{ fontSize: 9, color: 'var(--text-dim)', maxWidth: 120 }}>{suggestion.rationale}</div>}
-                              </td>
-                            </tr>
-                          );})}
-                        </tbody>
-                      </table>
-                    )}
-                  </div>
-                ))}
+                {(() => {
+                  const days = buildDayPlan(trainingResult, daysPerWeek, weakPoints, bestSplit?.groupsPerDay);
+                  return days.map((day) => (
+                    <div key={day.day} className="day-block">
+                      <h4>{day.day} — {day.name}</h4>
+                      {day.exercises.length === 0 ? (
+                        <p className="rest-day">Отдых — восстановление, растяжка, лёгкое кардио</p>
+                      ) : (
+                        <table className="exercise-table">
+                          <thead>
+                            <tr><th>Упражнение</th><th>Сеты</th><th>Повторы</th><th>RIR</th><th>Отдых</th><th>Вес</th></tr>
+                          </thead>
+                          <tbody>
+                            {day.exercises.map((ex, i) => {
+                              const suggestion = calcSuggestedWeight(ex.id, [], selectedWeek, progressionRule, goalState, ex.type === 'compound', undefined);
+                              return (
+                              <tr key={ex.id || i}>
+                                <td style={{ maxWidth: 180 }}>
+                                  <div style={{ fontWeight: 600, fontSize: 12 }}>{ex.name}</div>
+                                  {ex.targetMuscle && <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 1 }}>{ex.targetMuscle}</div>}
+                                  {ex.dropSet && <span style={{ fontSize: 9, padding: '1px 4px', borderRadius: 3, background: 'rgba(249,115,22,0.15)', color: '#f97316', marginLeft: 4 }}>Дроп</span>}
+                                  {ex.backoffSet && <span style={{ fontSize: 9, padding: '1px 4px', borderRadius: 3, background: 'rgba(34,197,94,0.12)', color: '#22c55e', marginLeft: 4 }}>Бэк</span>}
+                                </td>
+                                <td>{ex.sets}</td>
+                                <td>{ex.reps}</td>
+                                <td>{ex.rir}</td>
+                                <td>{ex.rest}</td>
+                                <td style={{ fontSize: 12 }}>
+                                  <div style={{ fontWeight: 700, color: suggestion.isDeload ? '#ef4444' : 'var(--accent)' }}>
+                                    {suggestion.suggestedWeight > 0 ? `${suggestion.suggestedWeight} кг` : '—'}
+                                  </div>
+                                  {suggestion.rationale && <div style={{ fontSize: 9, color: 'var(--text-dim)', maxWidth: 120 }}>{suggestion.rationale}</div>}
+                                </td>
+                              </tr>
+                            );})}
+                          </tbody>
+                        </table>
+                      )}
+                    </div>
+                  ));
+                })()}
               </div>
 
               {/* Macrocycle generation */}
-              <div className="card" style={{ marginTop: 16 }}>
+              <div className="card" style={{ marginTop: 16, display: macrocycle ? 'none' : 'block' }}>
                 <h3 style={{ margin: '0 0 10px 0' }}>Периодизация (макроцикл)</h3>
                 <button onClick={() => {
                   const macro = generateMacrocycle({
@@ -449,6 +445,11 @@ export const PlanScreen: React.FC<{ goal: string }> = ({ goal }) => {
 
               {macrocycle && (
                 <>
+                  <button onClick={() => {
+                    setMacrocycle(null);
+                  }} style={{ background: 'var(--danger)', color: '#fff', border: 'none', borderRadius: 8, padding: '6px 12px', fontSize: 13, cursor: 'pointer', marginBottom: 12, fontWeight: 600 }}>
+                    ⬅️ Скрыть макроцикл
+                  </button>
                   <div className="card" style={{ marginTop: 12 }}>
                     <h4 style={{ margin: '0 0 8px 0' }}>Обзор ({macrocycle.totalWeeks} нед.)</h4>
                     <div style={{ display: 'flex', gap: 4, overflowX: 'auto', paddingBottom: 4 }}>
