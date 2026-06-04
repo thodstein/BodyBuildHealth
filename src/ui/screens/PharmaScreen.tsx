@@ -7,7 +7,7 @@ import { checkDrugInteractions } from '../../engines/pharma-interactions.engine'
 import { PHARMA_DETAILS, type PharmaDetail } from '../../data/pharma-details';
 import type { PharmaSubstance, CourseEntry, PD } from '../../core/types';
 
-type Tab = 'catalog' | 'pkpd' | 'dosage' | 'interactions';
+type Tab = 'catalog' | 'pkpd' | 'dosage' | 'interactions' | 'research';
 
 const CLASS_LABELS: Record<string, string> = {
   testosterone: 'Тестостерон',
@@ -80,6 +80,7 @@ export const PharmaScreen: React.FC = () => {
           ['pkpd', 'PK/PD'],
           ['dosage', 'Дозировка'],
           ['interactions', 'Взаимодействия'],
+          ['research', 'Исследования'],
         ] as [Tab, string][]).map(([key, label]) => (
           <button
             key={key}
@@ -95,6 +96,7 @@ export const PharmaScreen: React.FC = () => {
       {tab === 'pkpd' && <PKPDSimulationTab />}
       {tab === 'dosage' && <DosageCalculatorTab />}
       {tab === 'interactions' && <InteractionCheckerTab />}
+      {tab === 'research' && <ResearchTab />}
     </div>
   );
 };
@@ -612,6 +614,97 @@ const InteractionCheckerTab: React.FC = () => {
           ))}
         </div>
       )}
+    </div>
+  );
+};
+
+const ResearchTab: React.FC = () => {
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [filterClass, setFilterClass] = useState<string>('all');
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const allSubstances = Object.values(PHARMA_DB);
+
+  const filteredList = useMemo(() => {
+    let list = filterClass === 'all' ? allSubstances : SUBSTANCES_BY_CLASS[filterClass] || [];
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      list = list.filter(s => s.name.toLowerCase().includes(q) || s.id.toLowerCase().includes(q));
+    }
+    return list;
+  }, [filterClass, searchQuery]);
+
+  const selected = selectedId ? PHARMA_DB[selectedId] : null;
+  const detail = selectedId ? PHARMA_DETAILS[selectedId] : undefined;
+
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.2fr', gap: 12 }}>
+      <div style={{ maxHeight: 'calc(100vh - 160px)', overflowY: 'auto', paddingRight: 4 }}>
+        <input type="text" placeholder="Поиск препарата..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', fontSize: 13, marginBottom: 8, boxSizing: 'border-box' }} />
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 8 }}>
+          <button onClick={() => setFilterClass('all')} style={{ padding: '3px 8px', borderRadius: 4, fontSize: 11, border: filterClass === 'all' ? '1px solid var(--accent)' : '1px solid var(--border)', background: filterClass === 'all' ? 'rgba(0,230,138,0.15)' : 'transparent', color: 'var(--text-primary)', cursor: 'pointer' }}>Все</button>
+          {Object.entries(SUBSTANCES_BY_CLASS).map(([cls, list]) => (
+            <button key={cls} onClick={() => setFilterClass(cls)} style={{ padding: '3px 8px', borderRadius: 4, fontSize: 11, border: filterClass === cls ? '1px solid var(--accent)' : '1px solid var(--border)', background: filterClass === cls ? 'rgba(0,230,138,0.15)' : 'transparent', color: 'var(--text-primary)', cursor: 'pointer' }}>{CLASS_LABELS[cls] || cls} ({list.length})</button>
+          ))}
+        </div>
+        {filteredList.map(s => (
+          <div key={s.id} onClick={() => setSelectedId(s.id)} style={{
+            padding: '8px 10px', borderRadius: 6, cursor: 'pointer', marginBottom: 4,
+            background: selectedId === s.id ? 'rgba(0,230,138,0.12)' : 'var(--bg-secondary)',
+            border: selectedId === s.id ? '1px solid var(--accent)' : '1px solid transparent',
+          }}>
+            <div style={{ fontWeight: 600, fontSize: 13 }}>{s.name}</div>
+            <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>{CLASS_LABELS[s.class] || s.class}</div>
+          </div>
+        ))}
+      </div>
+      <div style={{ maxHeight: 'calc(100vh - 160px)', overflowY: 'auto' }}>
+        {selected ? (
+          <div>
+            <div className="card" style={{ fontSize: 12 }}>
+              <h3 style={{ margin: '0 0 8px', color: 'var(--accent)' }}>{selected.name}</h3>
+              {detail?.researchLinks && detail.researchLinks.length > 0 ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {detail.researchLinks.map((link, i) => (
+                    <a key={i} href={link.url} target="_blank" rel="noopener noreferrer" style={{
+                      display: 'block',
+                      padding: '10px 12px',
+                      borderRadius: 6,
+                      background: 'var(--bg-primary)',
+                      textDecoration: 'none',
+                      color: 'var(--text-primary)',
+                      border: '1px solid var(--border)',
+                      transition: 'all 0.2s'
+                    }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                        <span style={{ fontWeight: 600, fontSize: 13 }}>{link.title}</span>
+                        <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 4, background: 'rgba(34,197,94,0.1)', color: '#22c55e' }}>{link.source}</span>
+                      </div>
+                      <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>{link.url}</div>
+                    </a>
+                  ))}
+                </div>
+              ) : (
+                <div style={{ textAlign: 'center', padding: 20, color: 'var(--text-dim)' }}>
+                  <div style={{ fontSize: 32, marginBottom: 8 }}>📚</div>
+                  <div>Исследования будут добавлены</div>
+                </div>
+              )}
+            </div>
+            {detail && (
+              <div className="card" style={{ marginTop: 8, fontSize: 12 }}>
+                <h3 style={{ margin: '0 0 6px', fontSize: 14 }}>Механизм действия</h3>
+                <p style={{ margin: 0, color: 'var(--text-dim)', lineHeight: 1.6 }}>{detail.mechanism}</p>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-dim)' }}>
+            <div style={{ fontSize: 40, marginBottom: 12 }}>📚</div>
+            <div>Выберите препарат для просмотра исследований</div>
+          </div>
+        )}
+      </div>
     </div>
   );
 };

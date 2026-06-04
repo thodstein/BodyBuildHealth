@@ -46,7 +46,7 @@ export const LabsScreen: React.FC<LabsProps> = ({ initialTab = 'input' }) => {
   const [canvasKey, setCanvasKey] = useState(0);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [ocrText, setOcrText] = useState('');
-  const [ocrResult, setOcrResult] = useState<{ marker: string; value: number; unit: string; name: string }[]>([]);
+  const [ocrResult, setOcrResult] = useState<{ marker: string; value: number; unit: string; name: string; isAbnormal?: boolean; deviation?: 'low' | 'high' }[]>([]);
   const [fileLoading, setFileLoading] = useState(false);
   const [labIndices, setLabIndices] = useState({ inflammation: 0, metabolism: 0, thyroid: 0, lipids: 0 });
   const [labIndexText, setLabIndexText] = useState({ inflammation: '', metabolism: '', thyroid: '', lipids: '' });
@@ -55,6 +55,7 @@ export const LabsScreen: React.FC<LabsProps> = ({ initialTab = 'input' }) => {
   const [invDone, setInvDone] = useState<Record<string, boolean>>({});
   const [labSchedule, setLabSchedule] = useState<LabScheduleItem[]>([]);
   const [currentWeek, setCurrentWeek] = useState(0);
+  const [manualMarker, setManualMarker] = useState('');
 
   useEffect(() => {
     if (profile?.settings?.phase) {
@@ -114,7 +115,8 @@ export const LabsScreen: React.FC<LabsProps> = ({ initialTab = 'input' }) => {
       marker: p.marker,
       value: p.value,
       unit: p.unit,
-      name: UCUM_MAP[p.marker]?.name ?? p.marker
+      name: UCUM_MAP[p.marker]?.name ?? p.marker,
+      isAbnormal: p.isAbnormal
     }));
     setOcrResult(results);
   };
@@ -130,10 +132,14 @@ export const LabsScreen: React.FC<LabsProps> = ({ initialTab = 'input' }) => {
           marker: v.code,
           value: v.value,
           unit: v.unit,
-          name: v.name
+          name: v.name,
+          isAbnormal: v.isAbnormal
         }));
         setOcrResult(results);
         if (result.rawText) setOcrText(result.rawText);
+        if (result.warnings?.length) {
+          console.warn('OCR Warnings:', result.warnings);
+        }
       }
     } catch (err) {
       console.error('File parse error:', err);
@@ -250,40 +256,62 @@ export const LabsScreen: React.FC<LabsProps> = ({ initialTab = 'input' }) => {
       {tab === 'input' && (
         <>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-          <div className="card" style={{ marginBottom: 0 }}>
-            <h3>&#128221; Вставить текст анализа</h3>
-            <p style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 8 }}>Вставьте текст из лабораторного бланка (Инвитро, Гемотест, Хеликс, KDL). Поддерживаются форматы: «Гемоглобин 140 г/л», «АЛТ: 25 U/L (0-40)», «HGB 140 g/L».</p>
-            <textarea
-              className="input"
-              rows={5}
-              placeholder={"Гемоглобин 140 г/л\nАЛТ 25 U/L\nКреатинин 85 мкмоль/л\nХолестерин общий 5.2 ммоль/л"}
-              value={ocrText}
-              onChange={e => setOcrText(e.target.value)}
-              style={{ width: '100%', marginBottom: 8, fontFamily: 'monospace', fontSize: 13 }}
-            />
-             <button className="btn" onClick={importFromText} disabled={!ocrText.trim()}>
-               &#128270; Распознать и добавить
-            </button>
-            <label style={{ display: 'inline-block', marginLeft: 8, padding: '8px 14px', background: 'var(--accent-blue)', color: '#fff', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
-              &#128196; Загрузить PDF/фото
-              <input type="file" accept=".pdf,image/*" onChange={handleFileUpload} style={{ display: 'none' }} disabled={fileLoading} />
-            </label>
-            {fileLoading && <span style={{ marginLeft: 8, fontSize: 12, color: 'var(--accent-blue)' }}>Обработка...</span>}
-            {ocrResult.length > 0 && (
-              <div style={{ marginTop: 12 }}>
-                <h4>Распознано {ocrResult.length} показателей:</h4>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 8 }}>
-                  {ocrResult.map((r, i) => (
-                    <div key={i} style={{ display: 'flex', justifyContent: 'space-between', background: 'var(--bg-secondary)', padding: '8px 12px', borderRadius: 8, fontSize: 13 }}>
-                      <span>{r.name} ({r.marker})</span>
-                      <span style={{ fontWeight: 600 }}>{r.value} {r.unit}</span>
-                    </div>
-                  ))}
+              <div className="card" style={{ marginBottom: 12 }}>
+                <h3>&#128221; Вставить текст анализа</h3>
+                <p style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 8 }}>
+                  Вставьте текст из лабораторного бланка (Инвитро, Гемотест, Хеликс, KDL). 
+                  Поддерживаются форматы: «Гемоглобин 140 г/л», «АЛТ: 25 U/L (0-40)», «HGB 140 g/L».
+                </p>
+                <textarea
+                  className="input"
+                  rows={5}
+                  placeholder={"Гемоглобин 140 г/л\nАЛТ 25 U/L\nКреатинин 85 мкмоль/л\nХолестерин общий 5.2 ммоль/л"}
+                  value={ocrText}
+                  onChange={e => setOcrText(e.target.value)}
+                  style={{ width: '100%', marginBottom: 8, fontFamily: 'monospace', fontSize: 13 }}
+                />
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
+                  <button className="btn" onClick={importFromText} disabled={!ocrText.trim()}>
+                    &#128270; Распознать и добавить
+                  </button>
+                  <label style={{ padding: '8px 14px', background: 'var(--accent-blue)', color: '#fff', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                    &#128196; Загрузить PDF/фото
+                    <input type="file" accept=".pdf,image/*" onChange={handleFileUpload} style={{ display: 'none' }} disabled={fileLoading} />
+                  </label>
+                  {fileLoading && <span style={{ fontSize: 12, color: 'var(--accent-blue)' }}>Обработка...</span>}
                 </div>
-                <button className="btn" style={{ marginTop: 8 }} onClick={confirmOcrResults}>&#10004; Подтвердить и сохранить все</button>
-               </div>
-             )}
-           </div>
+                {ocrResult.length > 0 && (
+                  <div style={{ marginTop: 12 }}>
+                    <h4 style={{ margin: '0 0 8px' }}>Распознано {ocrResult.length} показателей:</h4>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 8 }}>
+                      {ocrResult.map((r, i) => (
+                        <div key={i} style={{
+                          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                          background: r.isAbnormal ? 'rgba(239,68,68,0.1)' : 'var(--bg-secondary)',
+                          border: r.isAbnormal ? '1px solid rgba(239,68,68,0.2)' : 'none',
+                          padding: '8px 12px', borderRadius: 8, fontSize: 13
+                        }}>
+                          <span>{r.name} ({r.marker})</span>
+                          <span style={{ fontWeight: 600, color: r.isAbnormal ? 'var(--danger)' : 'var(--text)' }}>
+                            {r.value} {r.unit}
+                            {r.isAbnormal && r.deviation === 'low' && <span style={{ marginLeft: 6, color: 'var(--danger)' }}>↓</span>}
+                            {r.isAbnormal && r.deviation === 'high' && <span style={{ marginLeft: 6, color: 'var(--danger)' }}>↑</span>}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                    {ocrResult.some(r => r.isAbnormal) && (
+                      <div style={{
+                        marginBottom: 8, padding: '8px 12px', background: 'var(--danger-dim)',
+                        border: '1px solid var(--danger)', borderRadius: 8, fontSize: 11, color: 'var(--danger)'
+                      }}>
+                        ⚠️ Обнаружены отклонения от нормы. Проверьте значения и при необходимости скорректируйте.
+                      </div>
+                    )}
+                    <button className="btn" style={{ marginTop: 8 }} onClick={confirmOcrResults}>&#10004; Подтвердить и сохранить все</button>
+                  </div>
+                )}
+              </div>
 
            <div className="card" style={{ marginBottom: 0 }}>
             <h3>&#128736; Быстрый ввод по группам</h3>

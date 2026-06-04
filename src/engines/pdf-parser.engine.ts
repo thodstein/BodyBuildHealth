@@ -13,6 +13,7 @@ export interface ParsedLabResult {
   rawText: string;
   source: 'pdf' | 'image' | 'text';
   date?: string;
+  warnings?: string[];
 }
 
 const LAB_PATTERNS: { code: string; names: string[]; unitPatterns: string[]; refPattern?: RegExp }[] = [
@@ -127,9 +128,13 @@ export async function parsePDF(file: File): Promise<ParsedLabResult> {
       const strings = content.items.map((item: any) => item.str).filter(Boolean);
       fullText += strings.join(' ') + '\n';
     }
-    return parseLabText(fullText);
+    const result = parseLabText(fullText);
+    if (result.values.length === 0 && fullText.length > 50) {
+      result.warnings = ['Предупреждение: PDF распознан, но показатели не найдены. Попробуйте ввести данные вручную.'];
+    }
+    return result;
   } catch (err: any) {
-    return { values: [], rawText: err?.message || String(err), source: 'pdf' };
+    return { values: [], rawText: err?.message || String(err), source: 'pdf', warnings: ['Ошибка PDF parsing. Используйте вручную.'] };
   }
 }
 

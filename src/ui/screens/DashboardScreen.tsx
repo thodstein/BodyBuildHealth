@@ -152,7 +152,7 @@ export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
   })();
 
   const masterDb = registry.getDB();
-  const systems = masterDb.systems;
+  const systems = RISK_SYSTEMS;
   const risks = masterDb.risks.slice(0, 4);
   const recs = masterDb.recommendations.slice(0, 5);
 
@@ -239,63 +239,63 @@ export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
 
       <AlertBanner messages={alerts} />
 
-      <div className="dashboard-stats-4" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginBottom: 4 }}>
-        <div style={{ background: 'var(--bg-secondary)', borderRadius: 8, padding: '10px 12px', textAlign: 'center' }}>
-          <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 4 }}>Восстановление</div>
-          <div style={{ fontSize: 20, fontWeight: 700, color: scoreColor(readiness.recovery, 40, 70) }}>{readiness.recovery}%</div>
+      <div className="dashboard-stats-4" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6, marginBottom: 4 }}>
+        <div style={{ background: 'var(--bg-secondary)', borderRadius: 8, padding: '8px 10px', textAlign: 'center' }}>
+          <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 2 }}>Восстановление</div>
+          <div style={{ fontSize: 18, fontWeight: 700, color: scoreColor(readiness.recovery, 40, 70) }}>{readiness.recovery}%</div>
           <ProgressBar value={readiness.recovery} color={scoreColor(readiness.recovery, 40, 70)} />
         </div>
-        <div style={{ background: 'var(--bg-secondary)', borderRadius: 8, padding: '10px 12px', textAlign: 'center' }}>
-          <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 4 }}>Питание</div>
-          <div style={{ fontSize: 20, fontWeight: 700, color: scoreColor(readiness.nutrition, 50, 75) }}>{readiness.nutrition}%</div>
+        <div style={{ background: 'var(--bg-secondary)', borderRadius: 8, padding: '8px 10px', textAlign: 'center' }}>
+          <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 2 }}>Питание</div>
+          <div style={{ fontSize: 18, fontWeight: 700, color: scoreColor(readiness.nutrition, 50, 75) }}>{readiness.nutrition}%</div>
           <ProgressBar value={readiness.nutrition} color={scoreColor(readiness.nutrition, 50, 75)} />
         </div>
-        <div style={{ background: 'var(--bg-secondary)', borderRadius: 8, padding: '10px 12px', textAlign: 'center' }}>
-          <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 4 }}>Поддержка</div>
-          <div style={{ fontSize: 20, fontWeight: 700, color: scoreColor(readiness.support, 40, 70) }}>{readiness.support}%</div>
+        <div style={{ background: 'var(--bg-secondary)', borderRadius: 8, padding: '8px 10px', textAlign: 'center' }}>
+          <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 2 }}>Поддержка</div>
+          <div style={{ fontSize: 18, fontWeight: 700, color: scoreColor(readiness.support, 40, 70) }}>{readiness.support}%</div>
           <ProgressBar value={readiness.support} color={scoreColor(readiness.support, 40, 70)} />
         </div>
-        <div style={{ background: 'var(--bg-secondary)', borderRadius: 8, padding: '10px 12px', textAlign: 'center' }}>
-          <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 4 }}>Усталость</div>
-          <div style={{ fontSize: 20, fontWeight: 700, color: readiness.fatigue > 70 ? 'var(--danger)' : readiness.fatigue > 40 ? 'var(--warning)' : 'var(--success)' }}>{readiness.fatigue}%</div>
+        <div style={{ background: 'var(--bg-secondary)', borderRadius: 8, padding: '8px 10px', textAlign: 'center' }}>
+          <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 2 }}>Усталость</div>
+          <div style={{ fontSize: 18, fontWeight: 700, color: readiness.fatigue > 70 ? 'var(--danger)' : readiness.fatigue > 40 ? 'var(--warning)' : 'var(--success)' }}>{readiness.fatigue}%</div>
           <ProgressBar value={readiness.fatigue} color={readiness.fatigue > 70 ? 'var(--danger)' : readiness.fatigue > 40 ? 'var(--warning)' : 'var(--success)'} />
         </div>
       </div>
 
-      <div className="dashboard-stats-3" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 4 }}>
-        <div style={{ background: 'var(--bg-secondary)', borderRadius: 8, padding: '10px 12px', textAlign: 'center' }}>
-          <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>Препараты</div>
-          <div style={{ fontSize: 18, fontWeight: 700 }}>{activeDrugCount}</div>
+      <div className="dashboard-stats-3" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6, marginBottom: 4 }}>
+        <div style={{ background: 'var(--bg-secondary)', borderRadius: 8, padding: '8px 10px', textAlign: 'center' }}>
+          <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>Препараты</div>
+          <div style={{ fontSize: 16, fontWeight: 700 }}>{activeDrugCount}</div>
         </div>
-        <div style={{ background: 'var(--bg-secondary)', borderRadius: 8, padding: '10px 12px', textAlign: 'center' }}>
-          <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>Дней на курсе</div>
-          <div style={{ fontSize: 18, fontWeight: 700 }}>{daysOnCourse}</div>
+        <div style={{ background: 'var(--bg-secondary)', borderRadius: 8, padding: '8px 10px', textAlign: 'center' }}>
+          <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>Дней на курсе</div>
+          <div style={{ fontSize: 16, fontWeight: 700 }}>{daysOnCourse}</div>
         </div>
-        <div style={{ background: 'var(--bg-secondary)', borderRadius: 8, padding: '10px 12px', textAlign: 'center' }}>
-          <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>Лабы</div>
-          <div style={{ fontSize: 18, fontWeight: 700 }}>{labCount}</div>
+        <div style={{ background: 'var(--bg-secondary)', borderRadius: 8, padding: '8px 10px', textAlign: 'center' }}>
+          <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>Лабы</div>
+          <div style={{ fontSize: 16, fontWeight: 700 }}>{labCount}</div>
         </div>
       </div>
 
       <SectionHeader title="Системы организма" onNavigate={onNavigate} screenId="risks" />
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 6, marginBottom: 8 }}>
-        {RISK_SYSTEMS.map(sys => {
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 4, marginBottom: 8 }}>
+        {systems.map(sys => {
           const raw = riskResult.systemBreakdown?.[sys]?.raw ?? 0;
           const net = riskResult.systemBreakdown?.[sys]?.net ?? 0;
           const reduction = raw > 0 ? ((raw - net) / raw * 100) : 0;
           return (
-            <div key={sys} style={{ background: 'var(--bg-secondary)', borderRadius: 10, padding: '10px 12px', cursor: 'pointer' }} onClick={onNavigate ? () => onNavigate('risks') : undefined}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                <span style={{ fontSize: 13, fontWeight: 600 }}>{SYSTEM_LABELS[sys] ?? sys}</span>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                  {reduction > 0 && <span style={{ fontSize: 10, color: 'var(--success)' }}>-{Math.round(reduction)}%</span>}
-                  <span style={{ fontSize: 13, fontWeight: 700, color: riskColor(net) }}>{Math.round(net)}%</span>
+            <div key={sys} style={{ background: 'var(--bg-secondary)', borderRadius: 8, padding: '8px 10px', cursor: 'pointer' }} onClick={onNavigate ? () => onNavigate('risks') : undefined}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 3 }}>
+                <span style={{ fontSize: 12, fontWeight: 600 }}>{SYSTEM_LABELS[sys] ?? sys}</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+                  {reduction > 0 && <span style={{ fontSize: 9, color: 'var(--success)' }}>-{Math.round(reduction)}%</span>}
+                  <span style={{ fontSize: 12, fontWeight: 700, color: riskColor(net) }}>{Math.round(net)}%</span>
                 </div>
               </div>
               <ProgressBar value={raw} color={riskColor(raw)} />
               <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 2 }}>
-                <span style={{ fontSize: 9, color: 'var(--text-dim)' }}>Без поддержки: {Math.round(raw)}%</span>
-                <span style={{ fontSize: 9, color: 'var(--success)' }}>С под.: {Math.round(net)}%</span>
+                <span style={{ fontSize: 8, color: 'var(--text-dim)' }}>Без поддержки: {Math.round(raw)}%</span>
+                <span style={{ fontSize: 8, color: 'var(--success)' }}>С под.: {Math.round(net)}%</span>
               </div>
             </div>
           );
@@ -303,22 +303,22 @@ export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
       </div>
 
       <SectionHeader title="Лабораторные индексы" onNavigate={onNavigate} screenId="labs" />
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 6, marginBottom: 8 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 4, marginBottom: 8 }}>
         {labIndices && Object.entries(labIndices).map(([key, idx]) => {
           const pct = Math.round(idx.value * 100);
           const color = idx.value < 0.2 ? '#22c55e' : idx.value < 0.4 ? '#86efac' : idx.value < 0.6 ? '#eab308' : idx.value < 0.8 ? '#f97316' : '#ef4444';
           return (
-            <div key={key} style={{ background: 'var(--bg-secondary)', borderRadius: 10, padding: '10px 12px', cursor: 'pointer' }} onClick={onNavigate ? () => onNavigate('risks') : undefined}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                <span style={{ fontSize: 13, fontWeight: 600 }}>{idx.label}</span>
-                <span style={{ fontSize: 14, fontWeight: 700, color }}>{pct}%</span>
+            <div key={key} style={{ background: 'var(--bg-secondary)', borderRadius: 8, padding: '8px 10px', cursor: 'pointer' }} onClick={onNavigate ? () => onNavigate('risks') : undefined}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 3 }}>
+                <span style={{ fontSize: 12, fontWeight: 600 }}>{idx.label}</span>
+                <span style={{ fontSize: 13, fontWeight: 700, color }}>{pct}%</span>
               </div>
               <ProgressBar value={pct} color={color} />
-              <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 2 }}>{idx.interpretation}</div>
+              <div style={{ fontSize: 9, color: 'var(--text-dim)', marginTop: 2 }}>{idx.interpretation}</div>
               {idx.markers.length > 0 && idx.markers.some(m => m.ratio > 0) && (
-                <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 4 }}>
+                <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap', marginTop: 3 }}>
                   {idx.markers.filter(m => m.ratio > 0).map(m => (
-                    <span key={m.code} style={{ fontSize: 9, padding: '1px 4px', borderRadius: 3, background: 'var(--bg-tertiary, #1a1a2e)' }}>{m.code}: {m.value.toFixed(1)} ({Math.round(m.weight * 100)}%)</span>
+                    <span key={m.code} style={{ fontSize: 8, padding: '1px 4px', borderRadius: 3, background: 'var(--bg-tertiary, #1a1a2e)' }}>{m.code}: {m.value.toFixed(1)} ({Math.round(m.weight * 100)}%)</span>
                   ))}
                 </div>
               )}
@@ -326,7 +326,7 @@ export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
           );
         })}
         {(!labIndices || Object.keys(labIndices).length === 0) && (
-          <div style={{ gridColumn: 'span 2', textAlign: 'center', color: 'var(--text-dim)', fontSize: 12, padding: 16 }}>
+          <div style={{ gridColumn: 'span 2', textAlign: 'center', color: 'var(--text-dim)', fontSize: 11, padding: 12 }}>
             Введите анализы для расчёта индексов
           </div>
         )}
@@ -342,28 +342,28 @@ export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
         {recs.map(r => <RecommendationCard key={r.recId} rec={r} />)}
       </div>
 
-      <div style={{ marginTop: 20 }}>
-        <h2 style={{ marginBottom: 10 }}>Быстрый доступ</h2>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+      <div style={{ marginTop: 16 }}>
+        <h2 style={{ marginBottom: 8, fontSize: 14 }}>Быстрый доступ</h2>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
           <div className="card" style={{ cursor: 'pointer', textAlign: 'center' }} onClick={onNavigate ? () => onNavigate('marketplace') : undefined}>
-            <div style={{ fontSize: 28, marginBottom: 6 }}>&#128722;</div>
-            <div style={{ fontSize: 13, fontWeight: 600 }}>Маркетплейс</div>
-            <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>Препараты и БАДы</div>
+            <div style={{ fontSize: 24, marginBottom: 4 }}>&#128722;</div>
+            <div style={{ fontSize: 12, fontWeight: 600 }}>Маркетплейс</div>
+            <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>Препараты и БАДы</div>
           </div>
           <div className="card" style={{ cursor: 'pointer', textAlign: 'center' }} onClick={onNavigate ? () => onNavigate('articles') : undefined}>
-            <div style={{ fontSize: 28, marginBottom: 6 }}>&#128218;</div>
-            <div style={{ fontSize: 13, fontWeight: 600 }}>Статьи</div>
-            <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>База знаний</div>
+            <div style={{ fontSize: 24, marginBottom: 4 }}>&#128218;</div>
+            <div style={{ fontSize: 12, fontWeight: 600 }}>Статьи</div>
+            <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>База знаний</div>
           </div>
           <div className="card" style={{ cursor: 'pointer', textAlign: 'center' }} onClick={onNavigate ? () => onNavigate('assistant') : undefined}>
-            <div style={{ fontSize: 28, marginBottom: 6 }}>&#129302;</div>
-            <div style={{ fontSize: 13, fontWeight: 600 }}>Ассистент</div>
-            <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>Чекапы и ответы</div>
+            <div style={{ fontSize: 24, marginBottom: 4 }}>&#129302;</div>
+            <div style={{ fontSize: 12, fontWeight: 600 }}>Ассистент</div>
+            <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>Чекапы и ответы</div>
           </div>
           <div className="card" style={{ cursor: 'pointer', textAlign: 'center' }} onClick={onNavigate ? () => onNavigate('reports') : undefined}>
-            <div style={{ fontSize: 28, marginBottom: 6 }}>&#128202;</div>
-            <div style={{ fontSize: 13, fontWeight: 600 }}>Отчёты</div>
-            <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>Экспорт и печать</div>
+            <div style={{ fontSize: 24, marginBottom: 4 }}>&#128202;</div>
+            <div style={{ fontSize: 12, fontWeight: 600 }}>Отчёты</div>
+            <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>Экспорт и печать</div>
           </div>
         </div>
       </div>
