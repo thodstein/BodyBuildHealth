@@ -302,7 +302,7 @@ export const LabsScreen: React.FC<LabsProps> = ({ initialTab = 'input' }) => {
                   onClick={async () => {
                     if (!profile?.id) return;
                     const { updateProfile } = await import('../../core/profile-manager');
-                    await updateProfile(profile.id, {
+                    updateProfile({
                       ...profile,
                       settings: {
                         ...profile.settings,
@@ -867,7 +867,7 @@ export const LabsScreen: React.FC<LabsProps> = ({ initialTab = 'input' }) => {
                 }} onClick={async () => {
                   if (!profile?.id) return;
                   const { updateProfile } = await import('../../core/profile-manager');
-                  await updateProfile(profile.id, {
+                  updateProfile({
                     ...profile,
                     settings: {
                       ...profile.settings,

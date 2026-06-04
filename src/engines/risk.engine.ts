@@ -176,9 +176,9 @@ export function calculateRisks(i: RiskInput): RiskResult {
 export interface AggregatedRisk {
   pharma: RiskResult;
   labs: { overallRaw: number; overallNet: number; systemBreakdown: Record<string, number> };
-  training: { overallRaw: number; overallNet: number; systemBreakdown: Record<string, number> };
-  nutrition: { overallRaw: number; overallNet: number; systemBreakdown: Record<string, number> };
-  diagnostics: { overallRaw: number; overallNet: number; systemBreakdown: Record<string, number> };
+  training: { overallRaw: number; overallNet: number; systemBreakdown?: Record<string, { raw: number; net: number }> };
+  nutrition: { overallRaw: number; overallNet: number; systemBreakdown?: Record<string, { raw: number; net: number }> };
+  diagnostics: { overallRaw: number; overallNet: number; systemBreakdown?: Record<string, { raw: number; net: number }> };
   overallRaw: number;
   overallNet: number;
   systemBreakdown: Record<string, { raw: number; net: number }>;
