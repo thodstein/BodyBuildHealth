@@ -1,4 +1,4 @@
-﻿import { db } from '../core/db';
+import { db } from '../core/db';
 import { getProfile, updateProfile } from '../core/profile-manager';
 import { setRole } from '../core/profile-manager';
 import type { UserProfile, LabPhaseType, UserRole, LabPoint } from '../core/types';

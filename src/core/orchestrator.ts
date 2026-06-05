@@ -1,4 +1,4 @@
-﻿import { InputController } from './utils/input-controller';
+import { InputController } from './utils/input-controller';
 import { registry } from './data/registry';
 import { ReportEngine } from '../engines/report-engine';
 import type { RawInput } from './utils/input-controller';

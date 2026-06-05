@@ -1,4 +1,4 @@
-﻿import { UserRole, UserProfile } from "./types";
+import { UserRole, UserProfile } from "./types";
 import { useState, useEffect } from "react";
 
 const STORAGE_KEY = "he_profile_v2";

@@ -1,4 +1,4 @@
-﻿export async function requestPushPermission(): Promise<boolean> {
+export async function requestPushPermission(): Promise<boolean> {
   if (!('Notification' in window)) return false;
   if (Notification.permission === 'granted') return true;
   if (Notification.permission === 'denied') return false;

@@ -1,4 +1,4 @@
-﻿export interface FoodItem {
+export interface FoodItem {
   id: string;
   name: string;
   category: 'protein' | 'carb' | 'fat' | 'dairy' | 'veg_fruit' | 'grain' | 'supplement' | 'fast_food' | 'other';

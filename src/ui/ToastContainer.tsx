@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { toastStore } from "../core/toast";
 
 export const ToastContainer: React.FC = () => {

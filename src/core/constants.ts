@@ -1,4 +1,4 @@
-﻿import { UserRole } from './types';
+import { UserRole } from './types';
 
 export const GENETIC_MULTIPLIERS: Record<string, Record<string, number>> = {
   COMT_Val158Met: { 'Met/Met': 2.0, 'Val/Met': 1.5, 'Val/Val': 1.0 },

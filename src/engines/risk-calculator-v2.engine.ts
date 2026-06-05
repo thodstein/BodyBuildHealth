@@ -1,4 +1,4 @@
-﻿import { UCUM_MAP } from '../core/constants';
+import { UCUM_MAP } from '../core/constants';
 import type { LabPoint } from '../core/types';
 import { RISK_SYSTEMS } from '../core/constants';
 

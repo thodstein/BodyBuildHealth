@@ -1,4 +1,4 @@
-﻿import React, { useState, useRef } from 'react';
+import React, { useState, useRef } from 'react';
 import { useDataLink } from '../../core/data-link';
 import { db } from '../../core/db';
 import { calculateIndices } from '../../engines/clinical-indices.engine';

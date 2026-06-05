@@ -1,4 +1,4 @@
-﻿import { MASTER_DB } from '../core/master-db';
+import { MASTER_DB } from '../core/master-db';
 import { analyzeInteractions } from './interaction-checker.engine';
 import type { SubstanceEntry } from '../core/types';
 

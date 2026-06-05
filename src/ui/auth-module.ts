@@ -1,4 +1,4 @@
-﻿import { loginUser, registerUser } from '../core/auth-manager';
+import { loginUser, registerUser } from '../core/auth-manager';
 import type { LocalUserProfile } from '../core/auth-manager';
 import type { UserProfile, UserRole } from '../core/types';
 

@@ -1,4 +1,4 @@
-﻿import { LabPoint } from '../core/types';
+import { LabPoint } from '../core/types';
 import { resolveLabMarker } from '../core/labs-mapping';
 import { UCUM_MAP } from '../core/constants';
 import { db } from '../core/db';

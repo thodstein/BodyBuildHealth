@@ -1,4 +1,4 @@
-﻿import { DiagnosticEntry } from '../core/types';
+import { DiagnosticEntry } from '../core/types';
 import { DIAGNOSTIC_TEMPLATES } from '../core/constants';
 
 export function validateDiagnostics(entries: DiagnosticEntry[]): DiagnosticEntry[] {

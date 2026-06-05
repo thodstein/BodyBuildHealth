@@ -1,4 +1,4 @@
-﻿import { registry } from '../core/data/registry';
+import { registry } from '../core/data/registry';
 import { generateStack } from './stack-builder.engine';
 import { PHARMA_DB } from '../core/pharma-database';
 import { UCUM_MAP, DRUG_THRESHOLDS } from '../core/constants';

@@ -1,4 +1,4 @@
-﻿import { LabPoint, CourseEntry } from '../core/types';
+import { LabPoint, CourseEntry } from '../core/types';
 import { calculateMultiSubstancePKPD } from './pkpd-superposition.engine';
 import { calculateIndices } from './clinical-indices.engine';
 import { calcAdherence } from './nutrition-tracker.engine';

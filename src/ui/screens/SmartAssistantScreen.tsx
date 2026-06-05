@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { getSmartAssistantResponse, type UserContext } from '../../engines/assistant.engine';
 import { useDataLink } from '../../core/data-link';
 import { UCUM_MAP } from '../../core/constants';

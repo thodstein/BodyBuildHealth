@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { createArticle, updateArticle, submitForReview, processReview, publishArticle, filterArticles } from '../../engines/articles.engine';
 import { db } from '../../core/db';
 import { getCurrentProfile, type LocalUserProfile } from '../../core/auth-manager';

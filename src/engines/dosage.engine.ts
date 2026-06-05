@@ -1,4 +1,4 @@
-﻿import { SYRINGE_SPECS } from '../core/constants';
+import { SYRINGE_SPECS } from '../core/constants';
 import { DoseRequest, DoseResult } from '../core/types';
 
 export function calculateDose(req: DoseRequest): DoseResult {

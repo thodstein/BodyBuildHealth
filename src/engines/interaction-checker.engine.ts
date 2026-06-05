@@ -1,4 +1,4 @@
-﻿import { MASTER_DB } from '../core/master-db';
+import { MASTER_DB } from '../core/master-db';
 import type { InteractionEntry, InteractionType } from '../core/types';
 
 export interface InteractionResult {
