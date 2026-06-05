@@ -31,8 +31,11 @@ def fix_file(filepath):
                 box_chars.append((i, c, hex(ord(c))))
         
         print(f"Found {len(box_chars)} box drawing chars")
-        if box_chars:
-            print(f"First 10: {box_chars[:10]}")
+        # Skip printing box chars to avoid console encoding issues
+        if len(box_chars) >= 10:
+            print(f"First 10 positions: {[p for p,_,_ in box_chars[:10]]}")
+        else:
+            print(f"Positions: {[p for p,_,_ in box_chars]}")
         
         # Try to replace U+2568 (╚) with something else
         # U+2568 is BOX DRAWINGS LIGHT ARC UP

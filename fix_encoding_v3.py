@@ -34,8 +34,8 @@ def fix_box_cyrillic(bytes_data):
                 # This is a box char before Cyrillic - skip the 3-byte box char
                 i += 3
                 continue
-            elif byte3 == 0x90:
-                # U+2550 horizontal line - decorative separator, always remove
+            elif byte3 == 0x90 or byte3 == 0x91:
+                # U+2550 (horizontal line) or U+2551 (vertical line) - decorative separators, always remove
                 i += 3
                 continue
         elif bytes_data[i:i+2] == b'\xe2\x96':
