@@ -1,0 +1,27 @@
+import { TrainingInput, TrainingOutput, Exercise } from '../core/types';਍ഀ
+import { EXERCISE_CATALOG, getExercisesByGroup, canReplace, getSubstitutes, getExerciseById } from '../core/exercise-catalog';਍ഀ
+import { RIR_MATRIX, MesocyclePhase, calculateWeeklyProgression, generateWeeklyPlan, getProgressionRationale } from './rir-matrix.engine';਍ഀ
+਍ഀ
+export { EXERCISE_CATALOG as EXERCISE_DB, getExercisesByGroup as selectExercises, canReplace, getSubstitutes, getExerciseById };਍ഀ
+਍ഀ
+// ╨в╨Ч ┬з5.1: ╨Ь╨ꇐ搥ሥ搄ဥ栄唥搥ᘥ栄퀥□ MV-MRV ╨┐╨╛ ╤Г╤А╨╛╨ꏐ栥尥搥ἥ栄崥‥⠀搀ጥ栄尥栥唥搥ᐥ栄唥搥ᘥ栄唥搥ဥ栄嬥栥퀥▣╨ꇐ栥尥栥嬥‥搀ᄥ 䰀䔀嘀䔀䰀开䌀伀一䘀䤀䜀匀⤀ഀ
+਍挀漀渀猀琀 䰀䔀嘀䔀䰀开嘀伀䰀唀䴀䔀匀㨀 刀攀挀漀爀搀㰀猀琀爀椀渀最Ⰰ 笀 洀瘀㨀 渀甀洀戀攀爀㬀 洀攀瘀㨀 渀甀洀戀攀爀㬀 洀愀瘀㨀 渀甀洀戀攀爀㬀 洀爀瘀㨀 渀甀洀戀攀爀 紀㸀 㴀 笀ഀ
+਍  戀攀最椀渀渀攀爀㨀    笀 洀瘀㨀 㐀Ⰰ  洀攀瘀㨀 㠀Ⰰ  洀愀瘀㨀 ㄀㈀Ⰰ 洀爀瘀㨀 ㄀㘀 紀Ⰰഀ
+਍  椀渀琀攀爀洀攀搀椀愀琀攀㨀笀 洀瘀㨀 㘀Ⰰ  洀攀瘀㨀 ㄀　Ⰰ 洀愀瘀㨀 ㄀㘀Ⰰ 洀爀瘀㨀 ㈀　 紀Ⰰഀ
+਍  愀搀瘀愀渀挀攀搀㨀    笀 洀瘀㨀 㠀Ⰰ  洀攀瘀㨀 ㄀㈀Ⰰ 洀愀瘀㨀 ㄀㠀Ⰰ 洀爀瘀㨀 ㈀㐀 紀Ⰰഀ
+਍  攀渀栀愀渀挀攀搀㨀    笀 洀瘀㨀 ㄀　Ⰰ 洀攀瘀㨀 ㄀㐀Ⰰ 洀愀瘀㨀 ㈀㈀Ⰰ 洀爀瘀㨀 ㈀㠀 紀ഀ
+਍紀 愀猀 挀漀渀猀琀㬀ഀ
+਍ഀ
+਍⼀⼀ 栀㌥栄尥栥唥搥ᐥ栄唥搥ᘥ栄唥搥ဥ栄嬥栥퀥▣╨ꇐ栥尥栥尥搥ᬥ栄愥‥栀儥栥嬥栥尥搥ᐥ栄唥栥ȥ栥唥‥搀ጥ搄ဥ栄嬥栥퀥▣╨╜╨╡╨╣ (╨┤╨╗╤П calcTraining ╨╕ ╨╝╨ꇐ栥儥搥ဥ栄嬥搥ᘥ栄唥栥儥栥圥栥퀥□)਍ഀ
+export const TRAINING_LEVEL_CONFIGS: Record<string, { volumeBase: number; rirBase: number; deloadFreq: number; progressionPct: number }> = {਍ഀ
+  beginner: { volumeBase: 12, rirBase: 3, deloadFreq: 8, progressionPct: 5 },਍ഀ
+  intermediate: { volumeBase: 16, rirBase: 2, deloadFreq: 6, progressionPct: 3.75 },਍ഀ
+  advanced: { volumeBase: 20, rirBase: 1, deloadFreq: 5, progressionPct: 2.5 },਍ഀ
+  enhanced: { volumeBase: 24, rirBase: 1, deloadFreq: 4, progressionPct: 2 },਍ഀ
+};਍ഀ
+਍ഀ
+// ╨г╨╜╨╕╤Д╨╕╤Ж╨╕╤А╨╛╨ꏐ栥퀥□╨╜╨╜╤Л╨╡ ╨║╨╛╨╜╤Д╨╕╨│╨╕ ╤Ж╨╡╨╗╨╡╨╣਍ഀ
+export const TRAINING_GOAL_CONFIGS: Record<string, { volumeMod: number; intensityMod: number; repsRange: [number, number]; restSeconds: number }> = {਍ഀ
+  bulk: { volumeMod: 1.1, intensityMod: 0.9, repsRange: [8, 12], restSeconds: 90 },਍ഀ
+  cut: { volumeMod: 0.85, intensityMod: 1.0, repsRange: [10, 15], restSeconds: 60 },਍ഀ
+  strength: { volumeMod: 0.9, intensityMod: 1.15, repsRange: [3, 6], restSeconds: 180 },਍ഀ

@@ -1,0 +1,1 @@
+const GOALS = [  { value: 'bulk', label: 'Набор массы' },  { value: 'cut', label: 'Сушка' },  { value: 'maintenance', label: 'Поддержание' },  { value: 'strength', label: 'Сила' },  { value: 'recomp', label: 'Рекомпозиция' },  { value: 'rehab', label: 'Реабилитация' },] as const;co
