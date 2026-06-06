@@ -488,64 +488,80 @@ export const LabsScreen: React.FC<LabsProps> = ({ initialTab = 'input' }) => {
 
       {tab === 'panels' && (
         <>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
-            {Object.entries(LAB_PANELS).map(([key, panel]) => {
-              const filled = panel.markers.filter(m => entries.some(e => e.code === (m.ucumCode ?? m.id))).length;
-              const total = panel.markers.length;
-              const pct = total > 0 ? Math.round((filled / total) * 100) : 0;
-              return (
-                <button key={key} className={'btn secondary' + (selectedPanel === key ? ' active' : '')} onClick={() => setSelectedPanel(key)}>
-                  {panel.label} ({filled}/{total})
-                </button>
-              );
-            })}
-          </div>
+          {/* Panel Selection with Direct Input */}
+          <div className="card" style={{ marginBottom: 12 }}>
+            <h3>&#128736; Панели анализов</h3>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 16 }}>
+              {Object.entries(LAB_PANELS).map(([key, panel]) => {
+                const filled = panel.markers.filter(m => entries.some(e => e.code === (m.ucumCode ?? m.id))).length;
+                const total = panel.markers.length;
+                const pct = total > 0 ? Math.round((filled / total) * 100) : 0;
+                return (
+                  <button key={key} className={'btn secondary' + (selectedPanel === key ? ' active' : '')} onClick={() => setSelectedPanel(key)}>
+                    {panel.label} ({filled}/{total})
+                  </button>
+                );
+              })}
+            </div>
 
-          {LAB_PANELS[selectedPanel] && (
-            <div className="card">
-              <h3>{LAB_PANELS[selectedPanel].label}</h3>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {LAB_PANELS[selectedPanel].markers.map(marker => {
-                  const code = marker.ucumCode ?? marker.id;
-                  const markerEntries = entries.filter(e => e.code === code).sort((a, b) => b.date.localeCompare(a.date));
-                  const latest = markerEntries[0];
-                  const ucum = UCUM_MAP[code];
-                  const ratio = latest ? ratioForPoint(latest) : null;
-                  const barPct = ratio !== null ? Math.max(0, Math.min(100, ratio * 100)) : 0;
-                  const barColor = ratio === null ? 'var(--border)' : ratio < 0.2 ? 'var(--danger)' : ratio < 0.4 ? 'var(--warning)' : ratio < 0.8 ? 'var(--success)' : ratio < 0.9 ? 'var(--warning)' : 'var(--danger)';
-                  return (
-                    <div key={code} style={{ background: 'var(--bg-tertiary)', borderRadius: 10, padding: 12, cursor: 'pointer' }} onClick={() => { setSelectedMarker(code); setTab('history'); }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <div>
-                          <span style={{ fontWeight: 600, fontSize: 14 }}>{marker.label}</span>
-                          <span style={{ fontSize: 11, color: 'var(--text-dim)', marginLeft: 6 }}>{code}</span>
-                        </div>
-                        <div style={{ textAlign: 'right' }}>
-                          {latest ? (
-                            <span style={{ fontSize: 16, fontWeight: 700, color: barColor }}>{latest.value} {latest.unit}</span>
-                          ) : (
-                            <span style={{ fontSize: 13, color: 'var(--text-dim)' }}>Не введено</span>
+            {/* Direct Input Under Panel Selection */}
+            {LAB_PANELS[selectedPanel] && (
+              <div style={{ marginTop: 12 }}>
+                <h4 style={{ margin: '0 0 10px' }}>{LAB_PANELS[selectedPanel].label}</h4>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {LAB_PANELS[selectedPanel].markers.map(marker => {
+                    const code = marker.ucumCode ?? marker.id;
+                    const ucum = UCUM_MAP[code];
+                    const existing = getLatestEntry([code]);
+                    const val = markerValues[code]?.value ?? '';
+                    const unit = markerValues[code]?.unit ?? ucum?.prefUnit ?? '';
+                    const ratio = existing ? ratioForPoint(existing) : null;
+                    const statusColor = ratio === null ? 'var(--text-dim)' : ratio < 0.2 ? 'var(--danger)' : ratio < 0.4 ? 'var(--warning)' : ratio < 0.8 ? 'var(--success)' : 'var(--danger)';
+
+                    return (
+                      <div key={code} style={{ background: 'var(--bg-tertiary)', borderRadius: 8, padding: 10 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                          <div>
+                            <span style={{ fontWeight: 700, fontSize: 13 }}>{marker.label}</span>
+                            <span style={{ fontSize: 10, color: 'var(--text-dim)', marginLeft: 6 }}>({code})</span>
+                          </div>
+                          {existing && (
+                            <span style={{ fontSize: 11, color: statusColor }}>
+                              {existing.value} {existing.unit}
+                            </span>
                           )}
                         </div>
-                      </div>
-                      <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 4 }}>
-                        Норма: {marker.ref[0]}–{marker.ref[1]} {marker.unit}
-                        {latest && <span style={{ marginLeft: 8, color: barColor }}>{interpretRatio(ratio)}</span>}
-                      </div>
-                      <div style={{ background: 'var(--bg-secondary)', borderRadius: 3, height: 4, marginTop: 6 }}>
-                        <div style={{ width: `${barPct}%`, height: '100%', background: barColor, borderRadius: 3, transition: 'width 0.3s' }} />
-                      </div>
-                      {markerEntries.length > 1 && (
-                        <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 4 }}>
-                          {markerEntries.length} замеров · Последний: {latest?.date}
+                        <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 6 }}>
+                          Норма: {marker.ref[0]}–{marker.ref[1]} {marker.unit}
                         </div>
-                      )}
-                    </div>
-                  );
-                })}
+                        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                          <input
+                            type="number"
+                            placeholder="Значение"
+                            className="input"
+                            style={{ flex: 1, fontSize: 13 }}
+                            value={val}
+                            onChange={e => setMarkerValues(prev => ({ ...prev, [code]: { value: e.target.value, unit } }))}
+                          />
+                          <input
+                            type="text"
+                            placeholder="Ед."
+                            className="input"
+                            style={{ width: 70, fontSize: 13 }}
+                            value={unit}
+                            onChange={e => setMarkerValues(prev => ({ ...prev, [code]: { value: val, unit: e.target.value } }))}
+                          />
+                          <button className="btn" style={{ whiteSpace: 'nowrap', padding: '4px 10px' }} onClick={() => saveMarkerFromUCUM(code, ucum)} disabled={!val}>
+                            &#10004;
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
-            </div>
-          )}
+            )}
+          </div>
 
           <div style={{ background: 'var(--bg-secondary)', borderRadius: 12, padding: 14, marginTop: 12 }}>
             <h3 style={{ margin: '0 0 8px' }}>&#128203; Рекомендуемые панели для фазы «{phase === 'on_cycle' ? 'Курс' : phase === 'pct' ? 'ПКТ' : phase === 'bridge' ? 'Мост' : phase === 'fertility' ? 'Фертильность' : 'Базовая'}»</h3>

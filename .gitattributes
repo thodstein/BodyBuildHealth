@@ -1,0 +1,24 @@
+# Force UTF-8 encoding for all text files
+* text=auto eol=lf
+
+# Explicitly set UTF-8 for specific file types
+*.ts text diff=typescript
+*.tsx text diff=typescript
+*.js text
+*.jsx text
+*.json text
+*.css text
+*.html text
+*.md text
+
+# Exclude binary files from line ending conversion
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.svg binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.eot binary

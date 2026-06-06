@@ -410,15 +410,13 @@ export const RiskScreen: React.FC = () => {
   return (
     <div className="screen risk-screen">
       {/* Tab Bar - Button Navigation */}
-      <div style={{ display: 'flex', gap: 4, marginBottom: 16 }}>
+      <div className="sub-tab-bar">
         {TAB_ITEMS.map(t => (
-          <button key={t.key} onClick={() => setTab(t.key)} style={{
-            padding: '10px 14px', borderRadius: 8, border: 'none',
-            fontSize: 12, fontWeight: 600, cursor: 'pointer',
-            background: tab === t.key ? 'var(--accent)' : 'var(--bg-secondary)',
-            color: tab === t.key ? '#fff' : 'var(--text-dim)',
-            transition: 'background 0.15s',
-          }}>
+          <button
+            key={t.key}
+            onClick={() => setTab(t.key)}
+            className={`sub-tab-btn ${tab === t.key ? 'active' : ''}`}
+          >
             {t.label}
           </button>
         ))}

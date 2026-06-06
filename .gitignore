@@ -14,7 +14,7 @@ dist
 
 # IDE
 .idea/
-.vscode/
+# .vscode/ - enable .vscode/settings.json for encoding
 *.swp
 *.swo
 
