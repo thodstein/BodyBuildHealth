@@ -8,8 +8,9 @@ import { PHARMA_DETAILS, type PharmaDetail } from '../../data/pharma-details';
 import type { PharmaSubstance, CourseEntry, PD } from '../../core/types';
 import { SYNERGY_PAIRS, type SynergyPair } from '../../engines/support.engine';
 import { SYSTEM_INFO } from '../../core/risk-info';
+import { PharmaCourseScreen } from './PharmaCourseScreen';
 
-type Tab = 'catalog' | 'pkpd' | 'dosage' | 'interactions' | 'investigations';
+type Tab = 'catalog' | 'pkpd' | 'dosage' | 'interactions' | 'investigations' | 'course';
 
 const SYSTEM_LABELS: Record<string, string> = Object.fromEntries(
   Object.entries(SYSTEM_INFO).map(([k, v]) => [k, v.label.split(' ').slice(0, 2).join(' ')])
@@ -107,6 +108,7 @@ export const PharmaScreen: React.FC = () => {
           ['dosage', 'Дозировка'],
           ['interactions', 'Взаимодействия'],
           ['investigations', 'Исследования'],
+          ['course', 'Мой курс'],
         ] as [Tab, string][]).map(([key, label]) => (
           <button
             key={key}
@@ -123,6 +125,7 @@ export const PharmaScreen: React.FC = () => {
       {tab === 'dosage' && <DosageCalculatorTab />}
       {tab === 'interactions' && <InteractionCheckerTab />}
       {tab === 'investigations' && <InvestigationsTab />}
+      {tab === 'course' && <PharmaCourseScreen />}
     </div>
   );
 };
