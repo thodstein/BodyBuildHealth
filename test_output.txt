@@ -1,8 +1,0 @@
-Line 12: const GOALS = [
-Line 13:   { value: 'bulk', label: '╨Э╨░╨▒╨╛╤А ╨╝╨░╤Б╤Б╤Л' },
-Line 14:   { value: 'cut', label: '╨б╤Г╤И╨║╨░' },
-Line 15:   { value: 'maintenance', label: '╨Я╨╛╨┤╨┤╨╡╤А╨╢╨░╨╜╨╕╨╡' },
-Line 16:   { value: 'strength', label: '╨б╨╕╨╗╨░' },
-Line 17:   { value: 'recomp', label: '╨а╨╡╨║╨╛╨╝╨┐╨╛╨╖╨╕╤Ж╨╕╤П' },
-Line 18:   { value: 'rehab', label: '╨а╨╡╨░╨▒╨╕╨╗╨╕╤В╨░╤Ж╨╕╤П' },
-Line 19: ] as const;
