@@ -1,5 +1,5 @@
 import React from 'react';
-import type { LabResult } from '../../core/types';
+{"text": "import type { LabResult } from '../core/types';"}
 
 export const LabsOverview: React.FC<{
   labs: LabResult[];

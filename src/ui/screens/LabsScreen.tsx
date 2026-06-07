@@ -21,9 +21,17 @@ export const LabsScreen: React.FC = () => {
   const hasLabs = linked.labs && linked.labs.length > 0;
 
   const labRisks = useMemo(() => {
-    if (!hasLabs || !linked.labs) return [];
+    if (!hasLabs || !linked.labs) return null;
     const labs = linked.labs.map(l => ({ ...l, date: l.date || new Date().toISOString().split('T')[0] }));
-    return calculateRiskFromAnalyses({ overallRaw: 0, overallNet: 0, systemBreakdown: {}, mechanisms: {} } as RiskResult, labs);
+    const emptyResult: RiskResult = {
+      overallRaw: 0,
+      overallNet: 0,
+      systemBreakdown: {}
+    };
+    for (const sys of RISK_SYSTEMS) {
+      emptyResult.systemBreakdown[sys] = { raw: 0, net: 0 };
+    }
+    return calculateRiskFromAnalyses(emptyResult, labs);
   }, [hasLabs, linked.labs]);
 
   const labIndexDetails = useMemo<LabIndexDetail[]>(() => {
@@ -61,7 +69,7 @@ export const LabsScreen: React.FC = () => {
               </div>
               <div style={{ background: 'var(--bg-secondary)', padding: 8, borderRadius: 6 }}>
                 <div className="label">Источников</div>
-                <div className="value">{labRisks.sources.labs?.length || 0}</div>
+                <div className="value">{labRisks.systemBreakdown && Object.keys(labRisks.systemBreakdown).filter(k => labRisks.systemBreakdown[k].raw > 0).length || 0}</div>
               </div>
             </div>
           ) : (

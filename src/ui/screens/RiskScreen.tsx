@@ -100,7 +100,14 @@ export const RiskScreen: React.FC = () => {
   }, [linked, hasLabs, forceNoLabs]);
 
   function applyPenaltyToResult(result: RiskResult): RiskResult {
-    const penalty = calculatePenaltyCoefficients(linked.labs, linked.course);
+    const penalty = calculatePenaltyCoefficients(
+      linked.profile.phase || 'baseline',
+      linked.labs || [],
+      [], // submittedDiagnostics
+      1, // courseWeek
+      linked.course,
+      forceNoLabs
+    );
     const totalMultiplier = 1.0 + penalty.labPenalty + penalty.diagnosticPenalty;
     
     const finalResult = { ...result };
