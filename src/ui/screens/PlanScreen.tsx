@@ -24,17 +24,17 @@ import type { MacrocyclePlan, Microcycle } from '../../engines/training-periodiz
 
 const GOALS = [
 
-  { value: 'bulk', label: '╨Э╨░╨▒╨╛╤А ╨╝╨░╤Б╤Б╤Л' },
+  { value: 'bulk', label: 'Набор массы' },
 
-  { value: 'cut', label: '╨б╤Г╤И╨║╨░' },
+  { value: 'cut', label: 'Сушка' },
 
-  { value: 'maintenance', label: '╨Я╨╛╨┤╨┤╨╡╤А╨╢╨░╨╜╨╕╨╡' },
+  { value: 'maintenance', label: 'Поддержание' },
 
-  { value: 'strength', label: '╨б╨╕╨╗╨░' },
+  { value: 'strength', label: 'Сила' },
 
-  { value: 'recomp', label: '╨а╨╡╨║╨╛╨╝╨┐╨╛╨╖╨╕╤Ж╨╕╤П' },
+  { value: 'recomp', label: 'Рекомпозиция' },
 
-  { value: 'rehab', label: '╨а╨╡╨░╨▒╨╕╨╗╨╕╤В╨░╤Ж╨╕╤П' },
+  { value: 'rehab', label: 'Реабилитация' },
 
 ] as const;
 
@@ -42,13 +42,13 @@ const GOALS = [
 
 const LEVELS = [
 
-  { value: 'beginner', label: '╨Э╨╛╨▓╨╕╤З╨╛╨║' },
+  { value: 'beginner', label: 'Новичок' },
 
-  { value: 'intermediate', label: '╨б╤А╨╡╨┤╨╜╨╕╨╣' },
+  { value: 'intermediate', label: 'Средний' },
 
-  { value: 'advanced', label: '╨Я╤А╨╛╨┤╨▓╨╕╨╜╤Г╤В╤Л╨╣' },
+  { value: 'advanced', label: 'Продвинутый' },
 
-  { value: 'enhanced', label: '╨г╤Б╨╕╨╗╨╡╨╜╨╜╤Л╨╣ (╨╜╨░ ╨║╤Г╤А╤Б╨╡)' },
+  { value: 'enhanced', label: 'Усиленный (на курсе)' },
 
 ] as const;
 
@@ -60,7 +60,7 @@ const MUSCLE_GROUPS = ['chest', 'back', 'legs', 'shoulders', 'arms', 'core'] as 
 
 const GROUP_LABELS: Record<string, string> = {
 
-  chest: '╨У╤А╤Г╨┤╤М', back: '╨б╨┐╨╕╨╜╨░', legs: '╨Э╨╛╨│╨╕', shoulders: '╨Я╨╗╨╡╤З╨╕', arms: '╨а╤Г╨║╨╕', core: '╨Ъ╨╛╤А',
+  chest: 'Грудь', back: 'Спина', legs: 'Ноги', shoulders: 'Плечи', arms: 'Руки', core: 'Кор',
 
 };
 
@@ -106,25 +106,25 @@ function getSplitRationale(goal: string, level: string, daysPerWeek: number, rec
 
   const reasons: string[] = [];
 
-  if (daysPerWeek <= 3) reasons.push(`${daysPerWeek} ╨┤╨╜╨╡╨╣/╨╜╨╡╨┤ тЖТ ╤Д╤Г╨╗╨╗╨▒╨╛╨┤╨╕ ╨╕╨╗╨╕ ╨╜╨╡╨┤╨╡╨╗╤М/╨Э ╤Б╨┐╨╗╨╕╤В ╨┤╨╗╤П ╤З╨░╤Б╤В╨╛╤В╤Л ╨║╨░╨╢╨┤╨╛╨╣ ╨│╤А╤Г╨┐╨┐╤Л тЙе2├Ч`);
+  if (daysPerWeek <= 3) reasons.push(`${daysPerWeek} дней/нед → фуллбоди или недель/Н сплит для частоты каждой группы ≥2×`);
 
-  else if (daysPerWeek === 4) reasons.push(`${daysPerWeek} ╨┤╨╜╤П тЖТ ╨╛╨┐╤В╨╕╨╝╨░╨╗╤М╨╜╨╛ ╨╜╨╡╨┤╨╡╨╗╤М╨╡╤А╤Е/╨Э╨╕╨╖ ╨┤╨╗╤П ╨│╨╕╨┐╨╡╤А╤В╤А╨╛╤Д╨╕╨╕ (╨║╨░╨╢╨┤╨░╤П ╨│╤А╤Г╨┐╨┐╨░ 2├Ч/╨╜╨╡╨┤)`);
+  else if (daysPerWeek === 4) reasons.push(`${daysPerWeek} дня → оптимально недельерх/Низ для гипертрофии (каждая группа 2×/нед)`);
 
-  else if (daysPerWeek === 5) reasons.push(`${daysPerWeek} ╨┤╨╜╨╡╨╣ тЖТ PPL + ╨░╨║╤Ж╨╡╨╜╤В ╨╕╨╗╨╕ ╨▒╤А╨╛-╤Б╨┐╨╗╨╕╤В ╨┤╨╗╤П ╤Б╨┐╨╡╤Ж╨╕╨░╨╗╨╕╨╖╨░╤Ж╨╕╨╕`);
+  else if (daysPerWeek === 5) reasons.push(`${daysPerWeek} дней → PPL + акцент или бро-сплит для специализации`);
 
-  else reasons.push(`${daysPerWeek} ╨┤╨╜╨╡╨╣ тЖТ PPL ╨┤╨▓╨░╨╢╨┤╤Л ╨┤╨╗╤П ╨╝╨░╨║╤Б╨╕╨╝╨░╨╗╤М╨╜╨╛╨│╨╛ ╨╛╨▒╤К╤С╨╝╨░ ╨╕ ╤З╨░╤Б╤В╨╛╤В╤Л`);
+  else reasons.push(`${daysPerWeek} дней → PPL дважды для максимального объёма и частоты`);
 
 
 
-  if (weakPoints.length > 0) reasons.push(`╨Ю╤В╤Б╤В╨░╤О╤Й╨╕╨╡ ╨│╤А╤Г╨┐╨┐╤Л (${weakPoints.map(g => GROUP_LABELS[g] || g).join(', ')}): +20% ╨╛╨▒╤К╤С╨╝╨░, ╨┐╤А╨╕╨╛╤А╨╕╤В╨╡╤В ╨▓ ╨╜╨░╤З╨░╨╗╨╡ ╤В╤А╨╡╨╜╨╕╤А╨╛╨▓╨║╨╕`);
+  if (weakPoints.length > 0) reasons.push(`Отстающие группы (${weakPoints.map(g => GROUP_LABELS[g] || g).join(', ')}): +20% объёма, приоритет в начале тренировки`);
 
-  if (recovery < 55) reasons.push(`╨Т╨╛╤Б╤Б╤В╨░╨╜╨╛╨▓╨╗╨╡╨╜╨╕╨╡ ${recovery}% < 55 тЖТ ╤А╨╡╨║╨╛╨╝╨╡╨╜╨┤╤Г╨╡╤В╤Б╤П ╨┤╨╡╨╗╨╛╨░╨┤ ╨╕╨╗╨╕ ╤Б╨╜╨╕╨╢╨╡╨╜╨╕╨╡ ╨╛╨▒╤К╤С╨╝╨░ ╨╜╨░ 30-50%`);
+  if (recovery < 55) reasons.push(`недельосстановление ${recovery}% < 55 → рекомендуется делоад или снижение объёма на 30-50%`);
 
-  if (goal === 'strength') reasons.push('╨б╨╕╨╗╨╛╨▓╨╛╨╣ ╨┐╨╡╤А╨╕╨╛╨┤ тЖТ RIR 1-3, ╨▒╨░╨╖╨╛╨▓╤Л╨╡ ╨┤╨▓╨╕╨╢╨╡╨╜╨╕╤П, ╨┐╤А╨╛╨│╤А╨╡╤Б╤Б╨╕╤П ╨▓╨╡╤Б╨╛╨▓ 2.5-5%/╨╜╨╡╨┤');
+  if (goal === 'strength') reasons.push('Силовой период → RIR 1-3, базовые движения, прогрессия весов 2.5-5%/нед');
 
-  if (goal === 'cut') reasons.push('╨б╤Г╤И╨║╨░ тЖТ ╨┐╨╛╨┤╨┤╨╡╤А╨╢╨░╨╜╨╕╨╡ ╨╛╨▒╤К╤С╨╝╨░ (MV-MEV), ╤Б╨╜╨╕╨╢╨╡╨╜╨╕╨╡ RIR ╨╜╨╡ ╨╜╨╕╨╢╨╡ 2, ╨▒╨╡╨╗╨╛╨║ тЙе2.2 ╨│/╨║╨│');
+  if (goal === 'cut') reasons.push('Сушка → поддержание объёма (MV-MEV), снижение RIR не ниже 2, белок ≥2.2 г/кг');
 
-  if (level === 'enhanced') reasons.push('╨г╤Б╨╕╨╗╨╡╨╜╨╜╤Л╨╣ ╤Г╤А╨╛╨▓╨╡╨╜╤М тЖТ ╨┐╨╛╨▓╤Л╤И╨╡╨╜╨╜╤Л╨╣ ╨╛╨▒╤К╤С╨╝ (MAV-MRV), ╤Г╤Б╨║╨╛╤А╨╡╨╜╨╜╨╛╨╡ ╨▓╨╛╤Б╤Б╤В╨░╨╜╨╛╨▓╨╗╨╡╨╜╨╕╨╡');
+  if (level === 'enhanced') reasons.push('Усиленный уровень → повышенный объём (MAV-MRV), ускоренное восстановление');
 
   return reasons;
 
@@ -132,7 +132,7 @@ function getSplitRationale(goal: string, level: string, daysPerWeek: number, rec
 
 
 
-const SPLIT_LABELS: Record<string, string> = { chest: '╨У╤А╤Г╨┤╤М', back: '╨б╨┐╨╕╨╜╨░', legs: '╨Э╨╛╨│╨╕', shoulders: '╨Я╨╗╨╡╤З╨╕', arms: '╨а╤Г╨║╨╕', core: '╨Ъ╨╛╤А' };
+const SPLIT_LABELS: Record<string, string> = { chest: 'Грудь', back: 'Спина', legs: 'Ноги', shoulders: 'Плечи', arms: 'Руки', core: 'Кор' };
 
 
 
@@ -214,11 +214,11 @@ function buildDayPlan(result: TrainingOutput, daysPerWeek: number, weakPoints: s
 
         const rirVal = parseInt(rirStr.split('-')[0], 10) || 2;
 
-        const presc = calcExercisePrescription(ex, result.splitName.includes('╨б╨╕╨╗╨╛╨▓╨╛╨╣') ? 'strength' : 'hypertrophy', 'intermediate', weakPoints.includes(g), isDeload, 1.0);
+        const presc = calcExercisePrescription(ex, result.splitName.includes('Силовой') ? 'strength' : 'hypertrophy', 'intermediate', weakPoints.includes(g), isDeload, 1.0);
 
-        const dropPct = presc.dropSet ? 'тИТ20%' : undefined;
+        const dropPct = presc.dropSet ? '−20%' : undefined;
 
-        const backoffReps = presc.backoffSet ? '+2 ╨┐╨╛╨▓╤В╨╛╤А╨╡╨╜╨╕╤П' : undefined;
+        const backoffReps = presc.backoffSet ? '+2пов' : undefined;
 
         exercises.push({ ...ex, sets: setsForEx, reps: parseInt(presc.reps.split('-')[0], 10) || 10, rir: rirVal, rest: ex.type === 'compound' ? 120 : 60, targetMuscle: ex.targetMuscle, technique: ex.technique, comments: ex.comments, dropSet: presc.dropSet, backoffSet: presc.backoffSet, canReplace: ex.canReplace, cannotReplace: ex.cannotReplace });
 
@@ -228,9 +228,9 @@ function buildDayPlan(result: TrainingOutput, daysPerWeek: number, weakPoints: s
 
 
 
-    const dayNames = ['╨Я╨╜', '╨Т╤В', '╨б╤А', '╨з╤В', '╨Я╤В', '╨б╨▒', '╨Т╤Б'];
+    const dayNames = ['Пн', 'недельт', 'Ср', 'Чт', 'Пт', 'Сб', 'недельс'];
 
-    days.push({ day: d + 1, name: dayNames[d] || `╨Ф╨╡╨╜╤М ${d + 1}`, exercises });
+    days.push({ day: d + 1, name: dayNames[d] || `День ${d + 1}`, exercises });
 
   }
 
@@ -242,7 +242,7 @@ function buildDayPlan(result: TrainingOutput, daysPerWeek: number, weakPoints: s
 
     if (!days.find(dd => dd.day === daysPerWeek + r + 1)) {
 
-      days.push({ day: daysPerWeek + r + 1, name: '╨Ю╤В╨┤╤Л╤Е', exercises: [] });
+      days.push({ day: daysPerWeek + r + 1, name: 'Отдых', exercises: [] });
 
     }
 
@@ -472,7 +472,7 @@ export const PlanScreen: React.FC<{ goal: string }> = ({ goal }) => {
 
             <button key={t} className={`tab-btn ${tab === t ? 'active' : ''}`} onClick={() => setTab(t)}>
 
-              {t === 'plan' ? '╨Я╨╗╨░╨╜ ╨╕ ╤Ж╨╕╨║╨╗╤Л' : t === 'readiness' ? '╨У╨╛╤В╨╛╨▓╨╜╨╛╤Б╤В╤М' : '╨г╨┐╤А╨░╨╢╨╜╨╡╨╜╨╕╤П'}
+              {t === 'plan' ? 'План и циклы' : t === 'readiness' ? 'Готовность' : 'Упражнения'}
 
           </button>
 
@@ -490,13 +490,13 @@ export const PlanScreen: React.FC<{ goal: string }> = ({ goal }) => {
 
           <div className="card input-form">
 
-            <h3>╨Я╨░╤А╨░╨╝╨╡╤В╤А╤Л ╨┐╤А╨╛╨│╤А╨░╨╝╨╝╤Л</h3>
+            <h3>Параметры программы</h3>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
 
               <div className="form-group">
 
-                <label>╨ж╨╡╨╗╤М</label>
+                <label>Цель</label>
 
                 <select value={goalState} onChange={e => setGoalState(e.target.value)}>
 
@@ -508,7 +508,7 @@ export const PlanScreen: React.FC<{ goal: string }> = ({ goal }) => {
 
               <div className="form-group">
 
-                <label>╨г╤А╨╛╨▓╨╡╨╜╤М</label>
+                <label>Уровень</label>
 
                 <select value={level} onChange={e => setLevel(e.target.value)}>
 
@@ -520,7 +520,7 @@ export const PlanScreen: React.FC<{ goal: string }> = ({ goal }) => {
 
               <div className="form-group">
 
-                <label>╨Ф╨╜╨╡╨╣/╨╜╨╡╨┤╨╡╨╗╤О: {daysPerWeek}</label>
+                <label>Дней/неделю: {daysPerWeek}</label>
 
                 <input type="range" min={2} max={6} value={daysPerWeek} onChange={e => setDaysPerWeek(Number(e.target.value))} />
 
@@ -528,7 +528,7 @@ export const PlanScreen: React.FC<{ goal: string }> = ({ goal }) => {
 
               <div className="form-group">
 
-                <label>╨Т╨╛╤Б╤Б╤В╨░╨╜╨╛╨▓╨╗╨╡╨╜╨╕╨╡: {recovery}%</label>
+                <label>недельосстановление: {recovery}%</label>
 
                 <input type="range" min={0} max={100} value={recovery} onChange={e => setRecovery(Number(e.target.value))} />
 
@@ -536,7 +536,7 @@ export const PlanScreen: React.FC<{ goal: string }> = ({ goal }) => {
 
               <div className="form-group">
 
-                <label>╨г╤В╨╛╨╝╨╗╤С╨╜╨╜╨╛╤Б╤В╤М: {fatigue}%</label>
+                <label>Утомлённость: {fatigue}%</label>
 
                 <input type="range" min={0} max={100} value={fatigue} onChange={e => setFatigue(Number(e.target.value))} />
 
@@ -544,7 +544,7 @@ export const PlanScreen: React.FC<{ goal: string }> = ({ goal }) => {
 
               <div className="form-group">
 
-                <label>╨Я╨╕╤В╨░╨╜╨╕╨╡: {nutrition}%</label>
+                <label>Питание: {nutrition}%</label>
 
                 <input type="range" min={0} max={100} value={nutrition} onChange={e => setNutrition(Number(e.target.value))} />
 
@@ -554,7 +554,7 @@ export const PlanScreen: React.FC<{ goal: string }> = ({ goal }) => {
 
             <div className="form-group" style={{ marginTop: 8 }}>
 
-              <label>╨б╨╗╨░╨▒╤Л╨╡ ╤В╨╛╤З╨║╨╕</label>
+              <label>Слабые точки</label>
 
               <div className="checkbox-group">
 
@@ -576,7 +576,7 @@ export const PlanScreen: React.FC<{ goal: string }> = ({ goal }) => {
 
             <div style={{ marginTop: 8, fontSize: 12, color: 'var(--text-dim)' }}>
 
-              PAL (╨║╨╛╤Н╤Д╤Д╨╕╤Ж╨╕╨╡╨╜╤В ╨░╨║╤В╨╕╨▓╨╜╨╛╤Б╤В╨╕): {palForDisplay} | ╨в╤А╨╡╨╜╨╕╤А╨╛╨▓╨╛╨║: {profile.settings.workoutsPerWeek ?? 3}/╨╜╨╡╨┤ ├Ч {profile.settings.avgWorkoutMinutes ?? 60} ╨╝╨╕╨╜
+              PAL (коэффициент активности): {palForDisplay} | Тренировок: {profile.settings.workoutsPerWeek ?? 3}/нед × {profile.settings.avgWorkoutMinutes ?? 60} мин
 
             </div>
 
@@ -614,7 +614,7 @@ export const PlanScreen: React.FC<{ goal: string }> = ({ goal }) => {
 
                 <div className="row">
 
-                  <span className="label">╨Я╤А╨╛╨│╤А╨╡╤Б╤Б╨╕╤П</span>
+                  <span className="label">Прогрессия</span>
 
                   <span style={{ fontSize: 13 }}>{progressionRule.name}</span>
 
@@ -624,7 +624,7 @@ export const PlanScreen: React.FC<{ goal: string }> = ({ goal }) => {
 
                   <div className="deload-badge" style={{ background: 'var(--warning, #f90)', padding: '4px 8px', borderRadius: 4, marginTop: 8 }}>
 
-                    ╨а╨░╨╖╨│╤А╤Г╨╖╨║╨░: {trainingResult.deloadReason}
+                    Разгрузка: {trainingResult.deloadReason}
 
                   </div>
 
@@ -634,7 +634,7 @@ export const PlanScreen: React.FC<{ goal: string }> = ({ goal }) => {
 
                   <div style={{ background: 'rgba(239,68,68,0.12)', padding: '6px 10px', borderRadius: 6, marginTop: 8, fontSize: 12, color: '#ef4444' }}>
 
-                    тЪая╕П {deloadRec.reason}
+                    ⚠️ {deloadRec.reason}
 
                   </div>
 
@@ -642,9 +642,9 @@ export const PlanScreen: React.FC<{ goal: string }> = ({ goal }) => {
 
                 <div style={{ marginTop: 8, fontSize: 12, color: 'var(--text-light)', lineHeight: 1.5 }}>
 
-                  <strong style={{ color: 'var(--accent)' }}>╨Ю╨▒╨╛╤Б╨╜╨╛╨▓╨░╨╜╨╕╨╡:</strong>
+                  <strong style={{ color: 'var(--accent)' }}>Обоснование:</strong>
 
-                  {bestSplit ? bestSplit.rationale.map((r, i) => <div key={i}>тАв {r}</div>) : splitRationale.map((r, i) => <div key={i}>тАв {r}</div>)}
+                  {bestSplit ? bestSplit.rationale.map((r, i) => <div key={i}>• {r}</div>) : splitRationale.map((r, i) => <div key={i}>• {r}</div>)}
 
                 </div>
 
@@ -658,7 +658,7 @@ export const PlanScreen: React.FC<{ goal: string }> = ({ goal }) => {
 
                 <div className="card" style={{ marginTop: 12 }}>
 
-                  <h3 style={{ margin: '0 0 8px 0' }}>╨Р╨╗╤М╤В╨╡╤А╨╜╨░╤В╨╕╨▓╨╜╤Л╨╡ ╤Б╨┐╨╗╨╕╤В╤Л</h3>
+                  <h3 style={{ margin: '0 0 8px 0' }}>Альтернативные сплиты</h3>
 
                   {splitOptions.slice(0, 4).map((opt, i) => (
 
@@ -666,7 +666,7 @@ export const PlanScreen: React.FC<{ goal: string }> = ({ goal }) => {
 
                       <div>
 
-                        <div style={{ fontWeight: 600, fontSize: 13 }}>{opt.name} <span style={{ fontSize: 11, color: i === 0 ? 'var(--accent)' : 'var(--text-dim)' }}>{i === 0 ? 'тШЕ ╨Ы╤Г╤З╤И╨╕╨╣' : `#${i + 1}`}</span></div>
+                        <div style={{ fontWeight: 600, fontSize: 13 }}>{opt.name} <span style={{ fontSize: 11, color: i === 0 ? 'var(--accent)' : 'var(--text-dim)' }}>{i === 0 ? '★ Лучший' : `#${i + 1}`}</span></div>
 
                         <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 2 }}>{formatSplitGroups(opt.groupsPerDay)}</div>
 
@@ -676,7 +676,7 @@ export const PlanScreen: React.FC<{ goal: string }> = ({ goal }) => {
 
                         <div style={{ fontWeight: 700, fontSize: 14, color: opt.score >= 60 ? 'var(--accent)' : opt.score >= 30 ? '#eab308' : '#ef4444' }}>{opt.score}</div>
 
-                        <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>╨▒╨░╨╗╨╗╨╛╨▓</div>
+                        <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>баллов</div>
 
                       </div>
 
@@ -694,7 +694,7 @@ export const PlanScreen: React.FC<{ goal: string }> = ({ goal }) => {
 
               <div className="card" style={{ marginTop: 12 }}>
 
-                <h3 style={{ margin: '0 0 8px 0' }}>╨Я╤А╨╛╨│╤А╨╡╤Б╤Б╨╕╤П: {progressionRule.name}</h3>
+                <h3 style={{ margin: '0 0 8px 0' }}>Прогрессия: {progressionRule.name}</h3>
 
                 <div style={{ fontSize: 12, color: 'var(--text-light)', marginBottom: 8 }}>{progressionRule.description}</div>
 
@@ -702,23 +702,23 @@ export const PlanScreen: React.FC<{ goal: string }> = ({ goal }) => {
 
                   <div style={{ background: 'var(--bg-secondary)', borderRadius: 6, padding: '6px 10px' }}>
 
-                    <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>╨Я╤А╨╕╤А╨╛╤Б╤В ╨▓╨╡╤Б╨░/╨╜╨╡╨┤</div>
+                    <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>Прирост веса/нед</div>
 
-                    <div style={{ fontWeight: 700 }}>{progressionRule.weeklyWeightIncrement} ╨║╨│</div>
-
-                  </div>
-
-                  <div style={{ background: 'var(--bg-secondary)', borderRadius: 6, padding: '6px 10px' }}>
-
-                    <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>╨Ф╨╡╨╗╨╛╨░╨┤ ╤З╨╡╤А╨╡╨╖</div>
-
-                    <div style={{ fontWeight: 700 }}>{progressionRule.deloadTrigger.plateauWeeks} ╨╜╨╡╨┤ ╨┐╨╗╨░╤В╨╛</div>
+                    <div style={{ fontWeight: 700 }}>{progressionRule.weeklyWeightIncrement} кг</div>
 
                   </div>
 
                   <div style={{ background: 'var(--bg-secondary)', borderRadius: 6, padding: '6px 10px' }}>
 
-                    <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>╨Ю╨▒╤К╤С╨╝ ╨┤╨╡╨╗╨╛╨░╨┤╨░</div>
+                    <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>Делоад через</div>
+
+                    <div style={{ fontWeight: 700 }}>{progressionRule.deloadTrigger.plateauWeeks} нед плато</div>
+
+                  </div>
+
+                  <div style={{ background: 'var(--bg-secondary)', borderRadius: 6, padding: '6px 10px' }}>
+
+                    <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>Объём делоада</div>
 
                     <div style={{ fontWeight: 700 }}>{Math.round(progressionRule.deloadProtocol.volumeMultiplier * 100)}%</div>
 
@@ -726,7 +726,7 @@ export const PlanScreen: React.FC<{ goal: string }> = ({ goal }) => {
 
                   <div style={{ background: 'var(--bg-secondary)', borderRadius: 6, padding: '6px 10px' }}>
 
-                    <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>RIR+ ╨┤╨╡╨╗╨╛╨░╨┤╨░</div>
+                    <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>RIR+ делоада</div>
 
                     <div style={{ fontWeight: 700 }}>+{progressionRule.deloadProtocol.rirAdd}</div>
 
@@ -742,7 +742,7 @@ export const PlanScreen: React.FC<{ goal: string }> = ({ goal }) => {
 
               <div className="card volume-table">
 
-                <h3>╨Ю╨▒╤К╤С╨╝ (╤Б╨╡╤В╨╛╨▓/╨╜╨╡╨┤) тАФ MV-MRV</h3>
+                <h3>Объём (сетов/нед) — MV-MRV</h3>
 
                 <div className="grid volume-grid">
 
@@ -778,11 +778,11 @@ export const PlanScreen: React.FC<{ goal: string }> = ({ goal }) => {
 
                     <div key={day.day} className="day-block">
 
-                      <h4>{day.day} тАФ {day.name}</h4>
+                      <h4>{day.day} — {day.name}</h4>
 
                       {day.exercises.length === 0 ? (
 
-                        <p className="rest-day">╨Ю╤В╨┤╤Л╤Е тАФ ╨▓╨╛╤Б╤Б╤В╨░╨╜╨╛╨▓╨╗╨╡╨╜╨╕╨╡, ╤А╨░╤Б╤В╤П╨╢╨║╨░, ╨╗╤С╨│╨║╨╛╨╡ ╨║╨░╤А╨┤╨╕╨╛</p>
+                        <p className="rest-day">Отдых — восстановление, растяжка, лёгкое кардио</p>
 
                       ) : (
 
@@ -790,7 +790,7 @@ export const PlanScreen: React.FC<{ goal: string }> = ({ goal }) => {
 
                           <thead>
 
-                            <tr><th>╨г╨┐╤А╨░╨╢╨╜╨╡╨╜╨╕╨╡</th><th>╨б╨╡╤В╤Л</th><th>╨Я╨╛╨▓╤В╨╛╤А╤Л</th><th>RIR</th><th>╨Ю╤В╨┤╤Л╤Е</th><th>╨╜╨╡╨┤╨╡╨╗╤М╨╡╤Б</th></tr>
+                            <tr><th>Упражнение</th><th>Сеты</th><th>Повторы</th><th>RIR</th><th>Отдых</th><th>недельес</th></tr>
 
                           </thead>
 
@@ -810,9 +810,9 @@ export const PlanScreen: React.FC<{ goal: string }> = ({ goal }) => {
 
                                   {ex.targetMuscle && <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 1 }}>{ex.targetMuscle}</div>}
 
-                                  {ex.dropSet && <span style={{ fontSize: 9, padding: '1px 4px', borderRadius: 3, background: 'rgba(249,115,22,0.15)', color: '#f97316', marginLeft: 4 }}>╨Ф╤А╨╛╨┐</span>}
+                                  {ex.dropSet && <span style={{ fontSize: 9, padding: '1px 4px', borderRadius: 3, background: 'rgba(249,115,22,0.15)', color: '#f97316', marginLeft: 4 }}>Дроп</span>}
 
-                                  {ex.backoffSet && <span style={{ fontSize: 9, padding: '1px 4px', borderRadius: 3, background: 'rgba(34,197,94,0.12)', color: '#22c55e', marginLeft: 4 }}>╨С╤Н╨║</span>}
+                                  {ex.backoffSet && <span style={{ fontSize: 9, padding: '1px 4px', borderRadius: 3, background: 'rgba(34,197,94,0.12)', color: '#22c55e', marginLeft: 4 }}>Бэк</span>}
 
                                 </td>
 
@@ -828,7 +828,7 @@ export const PlanScreen: React.FC<{ goal: string }> = ({ goal }) => {
 
                                   <div style={{ fontWeight: 700, color: suggestion.isDeload ? '#ef4444' : 'var(--accent)' }}>
 
-                                    {suggestion.suggestedWeight > 0 ? `${suggestion.suggestedWeight} ╨║╨│` : 'тАФ'}
+                                    {suggestion.suggestedWeight > 0 ? `${suggestion.suggestedWeight} кг` : '—'}
 
                                   </div>
 
@@ -860,7 +860,7 @@ export const PlanScreen: React.FC<{ goal: string }> = ({ goal }) => {
 
               <div className="card" style={{ marginTop: 16, display: macrocycle ? 'none' : 'block' }}>
 
-                <h3 style={{ margin: '0 0 10px 0' }}>╨Я╨╡╤А╨╕╨╛╨┤╨╕╨╖╨░╤Ж╨╕╤П (╨╝╨░╨║╤А╨╛╤Ж╨╕╨║╨╗)</h3>
+                <h3 style={{ margin: '0 0 10px 0' }}>Периодизация (макроцикл)</h3>
 
                 <button onClick={() => {
 
@@ -880,7 +880,7 @@ export const PlanScreen: React.FC<{ goal: string }> = ({ goal }) => {
 
                 }} style={{ background: 'var(--accent)', color: '#000', border: 'none', borderRadius: 8, padding: '8px 20px', fontSize: 14, cursor: 'pointer', width: '100%', fontWeight: 700 }}>
 
-                  ╨б╨│╨╡╨╜╨╡╤А╨╕╤А╨╛╨▓╨░╤В╤М ╨╝╨░╨║╤А╨╛╤Ж╨╕╨║╨╗
+                  Сгенерировать макроцикл
 
                 </button>
 
@@ -898,13 +898,13 @@ export const PlanScreen: React.FC<{ goal: string }> = ({ goal }) => {
 
                   }} style={{ background: 'var(--danger)', color: '#fff', border: 'none', borderRadius: 8, padding: '6px 12px', fontSize: 13, cursor: 'pointer', marginBottom: 12, fontWeight: 600 }}>
 
-                    тмЕя╕П ╨б╨║╤А╤Л╤В╤М ╨╝╨░╨║╤А╨╛╤Ж╨╕╨║╨╗
+                    ⬅️ Скрыть макроцикл
 
                   </button>
 
                   <div className="card" style={{ marginTop: 12 }}>
 
-                    <h4 style={{ margin: '0 0 8px 0' }}>╨Ю╨▒╨╖╨╛╤А ({macrocycle.totalWeeks} ╨╜╨╡╨┤.)</h4>
+                    <h4 style={{ margin: '0 0 8px 0' }}>Обзор ({macrocycle.totalWeeks} нед.)</h4>
 
                     <div style={{ display: 'flex', gap: 4, overflowX: 'auto', paddingBottom: 4 }}>
 
@@ -930,9 +930,9 @@ export const PlanScreen: React.FC<{ goal: string }> = ({ goal }) => {
 
                                 style={{ padding: '4px 6px', margin: '1px 0', borderRadius: 4, fontSize: 10, cursor: 'pointer', background: selectedWeek === wk.weekNumber ? 'var(--accent-blue)' : 'var(--bg-secondary)', color: selectedWeek === wk.weekNumber ? '#fff' : 'var(--text-primary)', borderLeft: `3px solid ${mesoColor[meso.type] || '#888'}` }}>
 
-                                <div style={{ fontWeight: 600 }}>╨Э{wk.weekNumber}</div>
+                                <div style={{ fontWeight: 600 }}>Н{wk.weekNumber}</div>
 
-                                <div style={{ fontSize: 9 }}>{wk.isDeload ? '╨Ф╨╡╨╗╨╛╨░╨┤' : meso.type === 'accumulation' ? '╨Э╨░╨║╨╛╨┐' : meso.type === 'intensification' ? '╨Ш╨╜╤В╨╡╨╜╤Б' : meso.type === 'peaking' ? '╨Я╨╕╨║' : meso.type.slice(0, 4)}</div>
+                                <div style={{ fontSize: 9 }}>{wk.isDeload ? 'Делоад' : meso.type === 'accumulation' ? 'Накоп' : meso.type === 'intensification' ? 'Интенс' : meso.type === 'peaking' ? 'Пик' : meso.type.slice(0, 4)}</div>
 
                                 <div style={{ fontSize: 9 }}>RIR {wk.rirRange.join('-')}</div>
 
@@ -966,21 +966,21 @@ export const PlanScreen: React.FC<{ goal: string }> = ({ goal }) => {
 
                       <div className="card" style={{ marginBottom: 12 }}>
 
-                        <h4>╨Э╨╡╨┤╨╡╨╗╤П {week.weekNumber} тАФ {week.mesocycleType === 'accumulation' ? '╨Э╨░╨║╨╛╨┐╨╗╨╡╨╜╨╕╨╡' : week.mesocycleType === 'intensification' ? '╨Ш╨╜╤В╨╡╨╜╤Б╨╕╤Д╨╕╨║╨░╤Ж╨╕╤П' : week.mesocycleType === 'peaking' ? '╨Я╨╕╨║' : week.mesocycleType === 'deload' ? '╨а╨░╨╖╨│╤А╤Г╨╖╨║╨░' : '╨Т╨╛╤Б╤Б╤В╨░╨╜╨╛╨▓╨╗╨╡╨╜╨╕╨╡'}
+                        <h4>Неделя {week.weekNumber} — {week.mesocycleType === 'accumulation' ? 'Накопление' : week.mesocycleType === 'intensification' ? 'Интенсификация' : week.mesocycleType === 'peaking' ? 'Пик' : week.mesocycleType === 'deload' ? 'Разгрузка' : 'недельосстановление'}
 
-                          {week.isDeload ? ' (╨Ф╨╡╨╗╨╛╨░╨┤)' : ''}</h4>
+                          {week.isDeload ? ' (Делоад)' : ''}</h4>
 
                         <div style={{ fontSize: 12, color: 'var(--text-light)', marginBottom: 8 }}>{mesoInfo?.description}</div>
 
                         <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
 
-                          <div style={{ background: 'var(--bg-secondary)', borderRadius: 6, padding: '4px 10px', fontSize: 11 }}>╨Ю╨▒╤К╤С╨╝: ├Ч{adapted.volumeMultiplier.toFixed(2)}</div>
+                          <div style={{ background: 'var(--bg-secondary)', borderRadius: 6, padding: '4px 10px', fontSize: 11 }}>Объём: ×{adapted.volumeMultiplier.toFixed(2)}</div>
 
                           <div style={{ background: 'var(--bg-secondary)', borderRadius: 6, padding: '4px 10px', fontSize: 11 }}>RIR: {adapted.rirRange.join('-')}</div>
 
                           <div style={{ background: 'var(--bg-secondary)', borderRadius: 6, padding: '4px 10px', fontSize: 11 }}>RPE: {adapted.rpeTarget}</div>
 
-                          {recovery < 40 && <div style={{ background: 'rgba(239,68,68,0.15)', borderRadius: 6, padding: '4px 10px', fontSize: 11, color: '#ef4444' }}>тЪая╕П ╨Р╨▓╤В╨╛╨┤╨╡╨╗╨╛╨┤╤Л</div>}
+                          {recovery < 40 && <div style={{ background: 'rgba(239,68,68,0.15)', borderRadius: 6, padding: '4px 10px', fontSize: 11, color: '#ef4444' }}>⚠️ Автоделоды</div>}
 
                         </div>
 
@@ -994,9 +994,9 @@ export const PlanScreen: React.FC<{ goal: string }> = ({ goal }) => {
 
                               <div style={{ display: 'flex', gap: 6 }}>
 
-                                <span style={{ fontSize: 11, color: day.isTraining ? 'var(--accent-blue)' : 'var(--text-dim)' }}>{day.isTraining ? day.split : '╨Ю╤В╨┤╤Л╤Е'}</span>
+                                <span style={{ fontSize: 11, color: day.isTraining ? 'var(--accent-blue)' : 'var(--text-dim)' }}>{day.isTraining ? day.split : 'Отдых'}</span>
 
-                                {day.isTraining && <span style={{ fontSize: 11, padding: '1px 6px', borderRadius: 4, background: day.intensity === 'very_high' ? 'rgba(239,68,68,0.2)' : day.intensity === 'high' ? 'rgba(249,115,22,0.2)' : day.intensity === 'medium' ? 'rgba(234,179,8,0.2)' : 'rgba(34,197,94,0.2)', color: day.intensity === 'very_high' ? '#ef4444' : day.intensity === 'high' ? '#f97316' : day.intensity === 'medium' ? '#eab308' : '#22c55e' }}>{day.intensity === 'very_high' ? '╨╛╤З╨╡╨╜╤М ╨▓╤Л╤Б╨╛╨║╨░╤П' : day.intensity === 'high' ? '╨▓╤Л╤Б╨╛╨║╨░╤П' : day.intensity === 'medium' ? '╤Б╤А╨╡╨┤╨╜╤П╤П' : '╨╜╨╕╨╖╨║╨░╤П'}</span>}
+                                {day.isTraining && <span style={{ fontSize: 11, padding: '1px 6px', borderRadius: 4, background: day.intensity === 'very_high' ? 'rgba(239,68,68,0.2)' : day.intensity === 'high' ? 'rgba(249,115,22,0.2)' : day.intensity === 'medium' ? 'rgba(234,179,8,0.2)' : 'rgba(34,197,94,0.2)', color: day.intensity === 'very_high' ? '#ef4444' : day.intensity === 'high' ? '#f97316' : day.intensity === 'medium' ? '#eab308' : '#22c55e' }}>{day.intensity === 'very_high' ? 'очень высокая' : day.intensity === 'high' ? 'высокая' : day.intensity === 'medium' ? 'средняя' : 'низкая'}</span>}
 
                               </div>
 
@@ -1012,15 +1012,15 @@ export const PlanScreen: React.FC<{ goal: string }> = ({ goal }) => {
 
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
 
-                                      <div><span>{ex.isCompound ? 'ЁЯТк ' : ''}{ex.name}</span>{ex.targetMuscle && <span style={{ fontSize: 9, marginLeft: 4, color: 'var(--accent)' }}>{ex.targetMuscle}</span>}</div>
+                                      <div><span>{ex.isCompound ? '💪 ' : ''}{ex.name}</span>{ex.targetMuscle && <span style={{ fontSize: 9, marginLeft: 4, color: 'var(--accent)' }}>{ex.targetMuscle}</span>}</div>
 
                                       <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
 
-                                        <span style={{ color: 'var(--text-dim)' }}>{ex.sets}├Ч{ex.reps} RIR {ex.rir}</span>
+                                        <span style={{ color: 'var(--text-dim)' }}>{ex.sets}×{ex.reps} RIR {ex.rir}</span>
 
-                                        {ex.dropSet && <span style={{ fontSize: 9, padding: '0 3px', borderRadius: 3, background: 'rgba(249,115,22,0.15)', color: '#f97316' }}>╨Ф╤А╨╛╨┐</span>}
+                                        {ex.dropSet && <span style={{ fontSize: 9, padding: '0 3px', borderRadius: 3, background: 'rgba(249,115,22,0.15)', color: '#f97316' }}>Дроп</span>}
 
-                                        {ex.backoffSet && <span style={{ fontSize: 9, padding: '0 3px', borderRadius: 3, background: 'rgba(34,197,94,0.12)', color: '#22c55e' }}>╨С╤Н╨║</span>}
+                                        {ex.backoffSet && <span style={{ fontSize: 9, padding: '0 3px', borderRadius: 3, background: 'rgba(34,197,94,0.12)', color: '#22c55e' }}>Бэк</span>}
 
                                       </div>
 
@@ -1028,7 +1028,7 @@ export const PlanScreen: React.FC<{ goal: string }> = ({ goal }) => {
 
                                     {ex.technique && <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 2, lineHeight: 1.4 }}>{ex.technique}</div>}
 
-                                    {ex.canReplace && ex.canReplace.length > 0 && <div style={{ fontSize: 9, marginTop: 2, color: 'var(--text-dim)' }}>╨Ч╨░╨╝╨╡╨╜╤Л: {ex.canReplace.map(rId => getExerciseById(rId)?.name || rId).join(', ')}</div>}
+                                    {ex.canReplace && ex.canReplace.length > 0 && <div style={{ fontSize: 9, marginTop: 2, color: 'var(--text-dim)' }}>чамены: {ex.canReplace.map(rId => getExerciseById(rId)?.name || rId).join(', ')}</div>}
 
                                   </div>
 
@@ -1038,7 +1038,7 @@ export const PlanScreen: React.FC<{ goal: string }> = ({ goal }) => {
 
                             )}
 
-                            {!day.isTraining && <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>╨Т╨╛╤Б╤Б╤В╨░╨╜╨╛╨▓╨╗╨╡╨╜╨╕╨╡, ╤А╨░╤Б╤В╤П╨╢╨║╨░, ╨╗╤С╨│╨║╨╛╨╡ ╨║╨░╤А╨┤╨╕╨╛</div>}
+                            {!day.isTraining && <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>недельосстановление, растяжка, лёгкое кардио</div>}
 
                           </div>
 
@@ -1070,29 +1070,29 @@ export const PlanScreen: React.FC<{ goal: string }> = ({ goal }) => {
 
           <div className="card readiness-inputs">
 
-            <h3>╨У╨╛╤В╨╛╨▓╨╜╨╛╤Б╤В╤М ╨║ ╤В╤А╨╡╨╜╨╕╤А╨╛╨▓╨║╨╡</h3>
+            <h3>Готовность к тренировке</h3>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
 
-              <div className="form-group"><label>╨б╨╛╨╜: {sleepHours}╤З</label><input type="range" min={0} max={12} step={0.5} value={sleepHours} onChange={e => setSleepHours(Number(e.target.value))} /></div>
+              <div className="form-group"><label>Сон: {sleepHours}ч</label><input type="range" min={0} max={12} step={0.5} value={sleepHours} onChange={e => setSleepHours(Number(e.target.value))} /></div>
 
-              <div className="form-group"><label>╨Ъ╨░╤З╨╡╤Б╤В╨▓╨╛: {sleepQuality}/10</label><input type="range" min={1} max={10} value={sleepQuality} onChange={e => setSleepQuality(Number(e.target.value))} /></div>
+              <div className="form-group"><label>Качество: {sleepQuality}/10</label><input type="range" min={1} max={10} value={sleepQuality} onChange={e => setSleepQuality(Number(e.target.value))} /></div>
 
-              <div className="form-group"><label>╨Я╤А╨╛╨▒╤Г╨╢╨┤╨╡╨╜╨╕╤П: {nightAwakenings}</label><input type="range" min={0} max={5} value={nightAwakenings} onChange={e => setNightAwakenings(Number(e.target.value))} /></div>
+              <div className="form-group"><label>Пробуждения: {nightAwakenings}</label><input type="range" min={0} max={5} value={nightAwakenings} onChange={e => setNightAwakenings(Number(e.target.value))} /></div>
 
               <div className="form-group"><label>HRV: {hrvRatio}</label><input type="range" min={0.5} max={1.5} step={0.05} value={hrvRatio} onChange={e => setHrvRatio(Number(e.target.value))} /></div>
 
               <div className="form-group"><label>DOMS: {doms}/10</label><input type="range" min={0} max={10} value={doms} onChange={e => setDoms(Number(e.target.value))} /></div>
 
-              <div className="form-group"><label>╨б╤В╤А╨╡╤Б╤Б: {stress}/10</label><input type="range" min={0} max={10} value={stress} onChange={e => setStress(Number(e.target.value))} /></div>
+              <div className="form-group"><label>Стресс: {stress}/10</label><input type="range" min={0} max={10} value={stress} onChange={e => setStress(Number(e.target.value))} /></div>
 
-              <div className="form-group"><label>╨Ъ╨░╨╗╨╛╤А╨╕╨╕: {calRatio}</label><input type="range" min={0.5} max={1.5} step={0.05} value={calRatio} onChange={e => setCalRatio(Number(e.target.value))} /></div>
+              <div className="form-group"><label>Калории: {calRatio}</label><input type="range" min={0.5} max={1.5} step={0.05} value={calRatio} onChange={e => setCalRatio(Number(e.target.value))} /></div>
 
-              <div className="form-group"><label>╨С╨╡╨╗╨╛╨║: {proteinRatio}</label><input type="range" min={0.5} max={1.5} step={0.05} value={proteinRatio} onChange={e => setProteinRatio(Number(e.target.value))} /></div>
+              <div className="form-group"><label>Белок: {proteinRatio}</label><input type="range" min={0.5} max={1.5} step={0.05} value={proteinRatio} onChange={e => setProteinRatio(Number(e.target.value))} /></div>
 
-              <div className="form-group"><label>╨Э╨░╨│╤А╤Г╨╖╨║╨░: {trainingLoadRatio}</label><input type="range" min={0} max={2} step={0.05} value={trainingLoadRatio} onChange={e => setTrainingLoadRatio(Number(e.target.value))} /></div>
+              <div className="form-group"><label>Нагрузка: {trainingLoadRatio}</label><input type="range" min={0} max={2} step={0.05} value={trainingLoadRatio} onChange={e => setTrainingLoadRatio(Number(e.target.value))} /></div>
 
-              <div className="form-group"><label>╨г╤Б╤В╨░╨╗╨╛╤Б╤В╤М: {subjFatigue}/10</label><input type="range" min={0} max={10} value={subjFatigue} onChange={e => setSubjFatigue(Number(e.target.value))} /></div>
+              <div className="form-group"><label>Усталость: {subjFatigue}/10</label><input type="range" min={0} max={10} value={subjFatigue} onChange={e => setSubjFatigue(Number(e.target.value))} /></div>
 
             </div>
 
@@ -1102,29 +1102,29 @@ export const PlanScreen: React.FC<{ goal: string }> = ({ goal }) => {
 
             <div className="card readiness-scores">
 
-              <h3>╨Ю╤Ж╨╡╨╜╨║╨╕ ╨│╨╛╤В╨╛╨▓╨╜╨╛╤Б╤В╨╕</h3>
+              <h3>Оценки готовности</h3>
 
               <div className="score-grid">
 
-                <div className="score-item"><span className="label">╨Т╨╛╤Б╤Б╤В╨░╨╜╨╛╨▓╨╗╨╡╨╜╨╕╨╡</span><span className="value" style={{ color: readinessResult.recovery > 60 ? 'var(--success)' : 'var(--danger)' }}>{readinessResult.recovery}</span></div>
+                <div className="score-item"><span className="label">недельосстановление</span><span className="value" style={{ color: readinessResult.recovery > 60 ? 'var(--success)' : 'var(--danger)' }}>{readinessResult.recovery}</span></div>
 
-                <div className="score-item"><span className="label">╨Я╨╕╤В╨░╨╜╨╕╨╡</span><span className="value" style={{ color: readinessResult.nutrition > 60 ? 'var(--success)' : 'var(--danger)' }}>{readinessResult.nutrition}</span></div>
+                <div className="score-item"><span className="label">Питание</span><span className="value" style={{ color: readinessResult.nutrition > 60 ? 'var(--success)' : 'var(--danger)' }}>{readinessResult.nutrition}</span></div>
 
-                <div className="score-item"><span className="label">╨Я╨╛╨┤╨┤╨╡╤А╨╢╨║╨░</span><span className="value">{readinessResult.support}</span></div>
+                <div className="score-item"><span className="label">Поддержка</span><span className="value">{readinessResult.support}</span></div>
 
-                <div className="score-item"><span className="label">╨г╤В╨╛╨╝╨╗╤С╨╜╨╜╨╛╤Б╤В╤М</span><span className="value" style={{ color: readinessResult.fatigue < 50 ? 'var(--success)' : 'var(--danger)' }}>{readinessResult.fatigue}</span></div>
+                <div className="score-item"><span className="label">Утомлённость</span><span className="value" style={{ color: readinessResult.fatigue < 50 ? 'var(--success)' : 'var(--danger)' }}>{readinessResult.fatigue}</span></div>
 
               </div>
 
-              {readinessResult.isConservative && <div style={{ background: 'var(--warning)', padding: 8, borderRadius: 4, marginTop: 8, fontSize: 13 }}>╨Ъ╨╛╨╜╤Б╨╡╤А╨▓╨░╤В╨╕╨▓╨╜╤Л╨╣ ╤А╨╡╨╢╨╕╨╝: {readinessResult.conservativeReason}</div>}
+              {readinessResult.isConservative && <div style={{ background: 'var(--warning)', padding: 8, borderRadius: 4, marginTop: 8, fontSize: 13 }}>Консервативный режим: {readinessResult.conservativeReason}</div>}
 
               <div className="card volume-adjustment" style={{ marginTop: 12 }}>
 
-                <h4>╨Я╨╛╨┐╤А╨░╨▓╨║╨░ ╨╜╨░ ╨╛╨▒╤К╤С╨╝</h4>
+                <h4>недельлияние на объём</h4>
 
-                <div style={{ fontSize: 13 }}>{readinessResult.recovery < 50 ? '╨Ю╨▒╤К╤С╨╝ ╤Б╨╜╨╕╨╢╨╡╨╜ ╨╜╨░ 20% (╨▓╨╛╤Б╤Б╤В╨░╨╜╨╛╨▓╨╗╨╡╨╜╨╕╨╡ < 50)' : readinessResult.recovery < 65 ? '╨Ю╨▒╤К╤С╨╝ ╤Б╨╜╨╕╨╢╨╡╨╜ ╨╜╨░ 10%' : '╨Я╨╛╨╗╨╜╤Л╨╣ ╨╛╨▒╤К╤С╨╝'}</div>
+                <div style={{ fontSize: 13 }}>{readinessResult.recovery < 50 ? 'Объём снижен на 20% (восстановление < 50)' : readinessResult.recovery < 65 ? 'Объём снижен на 10%' : 'Полный объём'}</div>
 
-                <div style={{ fontSize: 13 }}>{readinessResult.fatigue > 70 ? '╨Ю╨▒╤К╤С╨╝ ╤Б╨╜╨╕╨╢╨╡╨╜ ╨╜╨░ 10% (╤Г╤В╨╛╨╝╨╗╤С╨╜╨╜╨╛╤Б╤В╤М > 70)' : readinessResult.fatigue > 50 ? '╨Ю╨▒╤К╤С╨╝ ╤Б╨╜╨╕╨╢╨╡╨╜ ╨╜╨░ 5%' : '╨С╨╡╨╖ ╨┐╨╛╨┐╤А╨░╨▓╨╛╨║ ╨╜╨░ ╤Г╤Б╤В╨░╨╗╨╛╤Б╤В╤М'}</div>
+                <div style={{ fontSize: 13 }}>{readinessResult.fatigue > 70 ? 'Объём снижен на 10% (утомлённость > 70)' : readinessResult.fatigue > 50 ? 'Объём снижен на 5%' : 'Без поправок на усталость'}</div>
 
               </div>
 
@@ -1160,11 +1160,11 @@ export const PlanScreen: React.FC<{ goal: string }> = ({ goal }) => {
 
                       <div><span style={{ fontWeight: 600, fontSize: 13 }}>{ex.name}</span>
 
-                        <span style={{ fontSize: 10, marginLeft: 6, padding: '1px 5px', borderRadius: 3, background: ex.type === 'compound' ? 'rgba(0,230,138,0.12)' : 'rgba(100,150,255,0.12)', color: ex.type === 'compound' ? '#00e68a' : '#6496ff' }}>{ex.type === 'compound' ? '╨Ъ╨╛╨╝╨┐╨░╤Г╨╜╨┤' : '╨Ш╨╖╨╛╨╗╤П╤Ж╨╕╤П'}</span>
+                        <span style={{ fontSize: 10, marginLeft: 6, padding: '1px 5px', borderRadius: 3, background: ex.type === 'compound' ? 'rgba(0,230,138,0.12)' : 'rgba(100,150,255,0.12)', color: ex.type === 'compound' ? '#00e68a' : '#6496ff' }}>{ex.type === 'compound' ? 'Компаунд' : 'Изоляция'}</span>
 
                       </div>
 
-                      <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>{ex.equipment} | {ex.difficulty} | ╤Б╤Г╤Б╤В╨░╨▓╤Л: {ex.jointStress}</span>
+                      <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>{ex.equipment} | {ex.difficulty} | суставы: {ex.jointStress}</span>
 
                     </div>
 
@@ -1176,17 +1176,17 @@ export const PlanScreen: React.FC<{ goal: string }> = ({ goal }) => {
 
                     <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 4 }}>
 
-                      {ex.pauseSeconds ? <span style={{ fontSize: 9, padding: '1px 5px', borderRadius: 3, background: 'rgba(234,179,8,0.12)', color: '#eab308' }}>╨Я╨░╤Г╨╖╨░ {ex.pauseSeconds}╤Б</span> : null}
+                      {ex.pauseSeconds ? <span style={{ fontSize: 9, padding: '1px 5px', borderRadius: 3, background: 'rgba(234,179,8,0.12)', color: '#eab308' }}>Пауза {ex.pauseSeconds}с</span> : null}
 
-                      {ex.peakContraction && <span style={{ fontSize: 9, padding: '1px 5px', borderRadius: 3, background: 'rgba(249,115,22,0.12)', color: '#f97316' }}>╨Я╨╕╨║╨╛╨▓╨╛╨╡ ╤Б╨╛╨║╤А╨░╤Й╨╡╨╜╨╕╨╡</span>}
+                      {ex.peakContraction && <span style={{ fontSize: 9, padding: '1px 5px', borderRadius: 3, background: 'rgba(249,115,22,0.12)', color: '#f97316' }}>Пиковое сокращение</span>}
 
-                      {ex.stretchPhase && <span style={{ fontSize: 9, padding: '1px 5px', borderRadius: 3, background: 'rgba(34,197,94,0.12)', color: '#22c55e' }}>╨а╨░╤Б╤В╤П╨╢╨╡╨╜╨╕╨╡</span>}
+                      {ex.stretchPhase && <span style={{ fontSize: 9, padding: '1px 5px', borderRadius: 3, background: 'rgba(34,197,94,0.12)', color: '#22c55e' }}>Растяжение</span>}
 
                     </div>
 
                     {subInfo && subInfo.substitutes.length > 0 && (
 
-                      <div style={{ marginTop: 4, fontSize: 10 }}><span style={{ color: 'var(--text-dim)' }}>╨Ч╨░╨╝╨╡╨╜╨╕╤В╨╡╨╗╨╕: </span>
+                      <div style={{ marginTop: 4, fontSize: 10 }}><span style={{ color: 'var(--text-dim)' }}>чаменители: </span>
 
                         {subInfo.substitutes.map(s => <span key={s.id} style={{ padding: '1px 5px', borderRadius: 3, background: 'rgba(0,230,138,0.08)', margin: '0 2px' }}>{getExerciseById(s.id)?.name || s.id} ({s.reason})</span>)}
 

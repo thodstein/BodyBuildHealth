@@ -4,7 +4,7 @@ import { RIR_MATRIX, MesocyclePhase, calculateWeeklyProgression, generateWeeklyP
 
 export { EXERCISE_CATALOG as EXERCISE_DB, getExercisesByGroup as selectExercises, canReplace, getSubstitutes, getExerciseById };
 
-// ╨в╨Ч ┬з5.1: ╨Ь╨░╤В╤А╨╕╤Ж╨░ MV-MRV ╨┐╨╛ ╤Г╤А╨╛╨▓╨╜╤П╨╝ (╤Г╨╜╨╕╤Д╨╕╤Ж╨╕╤А╨╛╨▓╨░╨╜╨╛ ╤Б LEVEL_CONFIGS)
+// вЧ §5.1: Ьатрица MV-MRV по уровням (унифицировано с LEVEL_CONFIGS)
 const LEVEL_VOLUMES: Record<string, { mv: number; mev: number; mav: number; mrv: number }> = {
   beginner:    { mv: 4,  mev: 8,  mav: 12, mrv: 16 },
   intermediate:{ mv: 6,  mev: 10, mav: 16, mrv: 20 },
@@ -12,7 +12,7 @@ const LEVEL_VOLUMES: Record<string, { mv: number; mev: number; mav: number; mrv:
   enhanced:    { mv: 10, mev: 14, mav: 22, mrv: 28 }
 } as const;
 
-// ╨г╨╜╨╕╤Д╨╕╤Ж╨╕╤А╨╛╨▓╨░╨╜╨╜╤Л╨╡ ╨║╨╛╨╜╤Д╨╕╨│╨╕ ╤Г╤А╨╛╨▓╨╜╨╡╨╣ (╨┤╨╗╤П calcTraining ╨╕ ╨╝╨░╨║╤А╨╛╤Ж╨╕╨║╨╗╨░)
+// гнифицированные конфиги уровней (для calcTraining и макроцикла)
 export const TRAINING_LEVEL_CONFIGS: Record<string, { volumeBase: number; rirBase: number; deloadFreq: number; progressionPct: number }> = {
   beginner: { volumeBase: 12, rirBase: 3, deloadFreq: 8, progressionPct: 5 },
   intermediate: { volumeBase: 16, rirBase: 2, deloadFreq: 6, progressionPct: 3.75 },
@@ -20,7 +20,7 @@ export const TRAINING_LEVEL_CONFIGS: Record<string, { volumeBase: number; rirBas
   enhanced: { volumeBase: 24, rirBase: 1, deloadFreq: 4, progressionPct: 2 },
 };
 
-// ╨г╨╜╨╕╤Д╨╕╤Ж╨╕╤А╨╛╨▓╨░╨╜╨╜╤Л╨╡ ╨║╨╛╨╜╤Д╨╕╨│╨╕ ╤Ж╨╡╨╗╨╡╨╣
+// гнифицированные конфиги целей
 export const TRAINING_GOAL_CONFIGS: Record<string, { volumeMod: number; intensityMod: number; repsRange: [number, number]; restSeconds: number }> = {
   bulk: { volumeMod: 1.1, intensityMod: 0.9, repsRange: [8, 12], restSeconds: 90 },
   cut: { volumeMod: 0.85, intensityMod: 1.0, repsRange: [10, 15], restSeconds: 60 },
@@ -30,29 +30,29 @@ export const TRAINING_GOAL_CONFIGS: Record<string, { volumeMod: number; intensit
   rehab: { volumeMod: 0.7, intensityMod: 0.7, repsRange: [12, 20], restSeconds: 60 },
 };
 
-// ╨г╨╜╨╕╤Д╨╕╤Ж╨╕╤А╨╛╨▓╨░╨╜╨╜╤Л╨╣ ╨║╨░╤В╨░╨╗╨╛╨│ ╤Б╨┐╨╗╨╕╤В╨╛╨▓ (EXTENDED_SPLITS)
+// гнифицированный каталог сплитов (EXTENDED_SPLITS)
 export const TRAINING_SPLITS: Record<string, { name: string; desc: string; groupsPerDay: string[][]; minDays: number; maxDays: number; level: string[] }> = {
-  fullbody_3: { name: '╨д╤Г╨╗╨▒╨╛╨┤╨╕ 3 ╨┤╨╜╤П', desc: '3 ╨┤╨╜╤П ╨▓ ╨╜╨╡╨┤╨╡╨╗╤О, ╨▓╤Б╤С ╤В╨╡╨╗╨╛ ╨╜╨░ ╨║╨░╨╢╨┤╨╛╨╣ ╤В╤А╨╡╨╜╨╕╤А╨╛╨▓╨║╨╡. ╨Ш╨┤╨╡╨░╨╗╤М╨╜╨╛ ╨┤╨╗╤П ╨╜╨╛╨▓╨╕╤З╨║╨╛╨▓.', groupsPerDay: [['chest','back','legs','shoulders','arms','core']], minDays: 3, maxDays: 3, level: ['beginner'] },
-  fullbody_3alt: { name: '╨д╤Г╨╗╨▒╨╛╨┤╨╕ ╨Р╨╗╤М╤В╨╡╤А╨╜╨░╤В╨╕╨▓╨╜╨░╤П', desc: '3 ╨┤╨╜╤П ╤Б ╤З╨╡╤А╨╡╨┤╨╛╨▓╨░╨╜╨╕╨╡╨╝ ╨░╨║╤Ж╨╡╨╜╤В╨╛╨▓: A тАФ ╨│╤А╤Г╨┤╤М/╤Б╨┐╨╕╨╜╨░/╨║╨▓╨░╨┤╤А╨╕╤Ж╨╡╨┐╤Б, B тАФ ╨┐╨╗╨╡╤З╨╕/╤А╤Г╨║╨╕/╨╖╨░╨┤╨╜╤П╤П ╨┐╨╛╨▓╨╡╤А╤Е╨╜╨╛╤Б╤В╤М.', groupsPerDay: [['chest','back','legs'],['shoulders','arms','core']], minDays: 3, maxDays: 3, level: ['beginner','intermediate'] },
-  upper_lower_4: { name: '╨Т╨╡╤А╤Е/╨Э╨╕╨╖ 4 ╨┤╨╜╤П', desc: '╨з╨╡╤А╨╡╨┤╨╛╨▓╨░╨╜╨╕╨╡ ╨▓╨╡╤А╤Е╨╜╨╕╤Е ╨╕ ╨╜╨╕╨╢╨╜╨╕╤Е ╨┤╨╜╨╡╨╣. ╨С╨░╨╖╨╛╨▓╤Л╨╣ ╤Б╨┐╨╗╨╕╤В ╨┤╨╗╤П ╤Б╤А╨╡╨┤╨╜╨╡╨│╨╛ ╤Г╤А╨╛╨▓╨╜╤П.', groupsPerDay: [['chest','back','shoulders','arms'],['legs','core']], minDays: 4, maxDays: 4, level: ['beginner','intermediate'] },
-  push_pull_legs_5: { name: 'PPL 5 ╨┤╨╜╨╡╨╣', desc: '╨Ц╨╕╨╝/╨в╤П╨│╨░/╨Э╨╛╨│╨╕ ╤Б ╨╛╨┤╨╜╨╕╨╝ ╨┐╨╛╨▓╤В╨╛╤А╨╜╤Л╨╝ ╨┤╨╜╤С╨╝. ╨Я╨╛╨┐╤Г╨╗╤П╤А╨╜╤Л╨╣ ╤Б╨┐╨╗╨╕╤В.', groupsPerDay: [['chest','shoulders','arms'],['back','arms'],['legs','core']], minDays: 5, maxDays: 5, level: ['intermediate','advanced'] },
-  push_pull_legs_6: { name: 'PPL 6 ╨┤╨╜╨╡╨╣', desc: '╨Ц╨╕╨╝/╨в╤П╨│╨░/╨Э╨╛╨│╨╕ ├Ч 2. ╨Ь╨░╨║╤Б╨╕╨╝╨░╨╗╤М╨╜╤Л╨╣ ╨╛╨▒╤К╤С╨╝ ╨┤╨╗╤П ╨┐╤А╨╛╨┤╨▓╨╕╨╜╤Г╤В╤Л╤Е.', groupsPerDay: [['chest','shoulders'],['back','arms'],['legs','core']], minDays: 6, maxDays: 6, level: ['advanced','enhanced'] },
-  bro_5: { name: '╨С╤А╨╛-╤Б╨┐╨╗╨╕╤В 5 ╨┤╨╜╨╡╨╣', desc: '╨У╤А╤Г╨┤╤М/╨б╨┐╨╕╨╜╨░/╨Э╨╛╨│╨╕/╨Я╨╗╨╡╤З╨╕/╨а╤Г╨║╨╕. ╨Ъ╨╗╨░╤Б╤Б╨╕╤З╨╡╤Б╨║╨╕╨╣ ╨▒╨╛╨┤╨╕╨▒╨╕╨╗╨┤╨╕╨╜╨│.', groupsPerDay: [['chest'],['back'],['legs'],['shoulders','arms'],['arms','core']], minDays: 5, maxDays: 5, level: ['intermediate','advanced'] },
-  strength_4: { name: '╨б╨╕╨╗╨╛╨▓╨╛╨╣ 4 ╨┤╨╜╤П', desc: '╨Я╤А╨╕╤Б╨╡╨┤/╨Ц╨╕╨╝/╨в╤П╨│╨░/╨Ю╨д╨Я. ╨Ф╨╗╤П ╨┐╨░╤Г╤Н╤А╨╗╨╕╤Д╤В╨╡╤А╨╛╨▓.', groupsPerDay: [['legs','core'],['chest','shoulders'],['back','arms'],['legs','shoulders']], minDays: 4, maxDays: 4, level: ['intermediate','advanced','enhanced'] },
-  hypertrophy_5: { name: '╨У╨╕╨┐╨╡╤А╤В╤А╨╛╤Д╨╕╤П 5 ╨┤╨╜╨╡╨╣', desc: '╨У╤А╤Г╨┤╤М+╤В╤А╨╕╤Ж╨╡╨┐╤Б/╨б╨┐╨╕╨╜╨░+╨▒╨╕╤Ж╨╡╨┐╤Б/╨Э╨╛╨│╨╕/╨Я╨╗╨╡╤З╨╕+╤А╤Г╨║╨╕/╨Э╨╛╨│╨╕ ╨┐╨╛╨▓╤В╨╛╤А. ╨Ь╨░╨║╤Б╨╕╨╝╤Г╨╝ ╨╛╨▒╤К╤С╨╝╨░.', groupsPerDay: [['chest','arms'],['back','arms'],['legs','core'],['shoulders','arms'],['legs','core']], minDays: 5, maxDays: 5, level: ['advanced','enhanced'] },
-  torso_limbs_4: { name: '╨в╨╛╤А╤Б╨╛/╨Ъ╨╛╨╜╨╡╤З╨╜╨╛╤Б╤В╨╕ 4 ╨┤╨╜╤П', desc: '╨Т╨╡╤А╤Е╨╜╤П╤П/╨╜╨╕╨╢╨╜╤П╤П ╤З╨░╤Б╤В╨╕ ╤Б ╨░╨║╤Ж╨╡╨╜╤В╨╛╨╝ ╨╜╨░ ╤Б╨╗╨░╨▒╤Л╨╡ ╨│╤А╤Г╨┐╨┐╤Л.', groupsPerDay: [['chest','back','shoulders'],['legs','core'],['chest','shoulders','arms'],['legs','core']], minDays: 4, maxDays: 4, level: ['intermediate'] },
-  powerbuilding_4: { name: '╨Я╨░╤Г╤Н╤А╨▒╨╕╨╗╨┤╨╕╨╜╨│ 4 ╨┤╨╜╤П', desc: '╨б╨╕╨╗╨╛╨▓╨╛╨╡ + ╨│╨╕╨┐╨╡╤А╤В╤А╨╛╤Д╨╕╨╣╨╜╨╛╨╡. ╨Ф╨╡╨╜╤М 1: ╨б╨╕╨╗╨╛╨▓╨╛╨╡ ╨┐╤А╨╕╤Б╨╡╨┤/╨╢╨╕╨╝. ╨Ф╨╡╨╜╤М 3: ╨б╨╕╨╗╨╛╨▓╨░╤П ╤В╤П╨│╨░.', groupsPerDay: [['chest','shoulders','arms'],['legs','core'],['back','arms'],['legs','shoulders','core']], minDays: 4, maxDays: 4, level: ['intermediate','advanced'] },
-  recovery_3: { name: '╨Т╨╛╤Б╤Б╤В╨░╨╜╨╛╨▓╨╕╤В╨╡╨╗╤М╨╜╤Л╨╣ 3 ╨┤╨╜╤П', desc: '╨Ы╤С╨│╨║╨╕╨╡ ╨╜╨░╨│╤А╤Г╨╖╨║╨╕, ╨┐╨╛╨╗╨╜╤Л╨╣ ╨┤╨╕╨░╨┐╨░╨╖╨╛╨╜, ╨╜╨╕╨╖╨║╨╕╨╣ RIR. ╨Ф╨╗╤П ╤А╨╡╨░╨▒╨╕╨╗╨╕╤В╨░╤Ж╨╕╨╕ ╨╕ ╨┤╨╡╨╗╨╛╨┤╨╛╨▓.', groupsPerDay: [['chest','back','shoulders'],['legs','core'],['full_body_light']], minDays: 3, maxDays: 3, level: ['beginner'] },
-  arnold_6: { name: '╨Р╤А╨╜╨╛╨╗╤М╨┤-╤Б╨┐╨╗╨╕╤В 6 ╨┤╨╜╨╡╨╣', desc: '╨У╤А╤Г╨┤╤М+╤Б╨┐╨╕╨╜╨░ / ╨Я╨╗╨╡╤З╨╕+╤А╤Г╨║╨╕ / ╨Э╨╛╨│╨╕ ├Ч 2. ╨Ф╨╗╤П ╨┐╤А╨╛╨┤╨▓╨╕╨╜╤Г╤В╤Л╤Е ╨╜╨░ ╨║╤Г╤А╤Б╨╡.', groupsPerDay: [['chest','back'],['shoulders','arms'],['legs','core']], minDays: 6, maxDays: 6, level: ['advanced','enhanced'] },
+  fullbody_3: { name: 'Фулбоди 3 дня', desc: 'Все группы на каждой тренировке. Частота 3×/нед на каждую группу.', groupsPerDay: [['chest','back','legs','shoulders','arms','core']], minDays: 3, maxDays: 3, level: ['beginner'] },
+  fullbody_3alt: { name: 'дулбоди Рльтернативная', desc: '3 дня с чередованием акцентов: A — грудь/спина/квадрицепс, B — плечи/руки/задняя поверхность.', groupsPerDay: [['chest','back','legs'],['shoulders','arms','core']], minDays: 3, maxDays: 3, level: ['beginner','intermediate'] },
+  upper_lower_4: { name: 'Верх/Низ 4 дня', desc: 'Чередование верхних и нижних дней. Каждая группа 2×/нед, оптимальный баланс.', groupsPerDay: [['chest','back','shoulders','arms'],['legs','core']], minDays: 4, maxDays: 4, level: ['beginner','intermediate'] },
+  push_pull_legs_5: { name: 'PPL 5 дней', desc: 'Цим/вяга/Эоги с одним повторным днём. Яопулярный сплит.', groupsPerDay: [['chest','shoulders','arms'],['back','arms'],['legs','core']], minDays: 5, maxDays: 5, level: ['intermediate','advanced'] },
+  push_pull_legs_6: { name: 'Push/Pull/Legs 6x', desc: 'PPL × 2 с вариациями упражнений. Максимальный объём.', groupsPerDay: [['chest','shoulders'],['back','arms'],['legs','core']], minDays: 6, maxDays: 6, level: ['advanced','enhanced'] },
+  bro_5: { name: 'Бро-сплит 5 дней', desc: 'Одна группа в день. Максимальный объём на группу, но частота 1×/нед.', groupsPerDay: [['chest'],['back'],['legs'],['shoulders','arms'],['arms','core']], minDays: 5, maxDays: 5, level: ['intermediate','advanced'] },
+  strength_4: { name: 'Силовой 4 дня', desc: 'Compound фокус, RIR 2-3, длинный отдых. Присед/Жим/Тяга/ОФП.', groupsPerDay: [['legs','core'],['chest','shoulders'],['back','arms'],['legs','shoulders']], minDays: 4, maxDays: 4, level: ['intermediate','advanced','enhanced'] },
+  hypertrophy_5: { name: 'Гипертрофия 5 дней', desc: 'Грудь+трицепс/Спина+бицепс/Ноги/Плечи+руки/Повтор ног. Макс. объём.', groupsPerDay: [['chest','arms'],['back','arms'],['legs','core'],['shoulders','arms'],['legs','core']], minDays: 5, maxDays: 5, level: ['advanced','enhanced'] },
+  torso_limbs_4: { name: 'Торс/Конечности 4 дня', desc: 'Для травм поясницы и коленей. Минимум нагрузки на суставы.', groupsPerDay: [['chest','back','shoulders'],['legs','core'],['chest','shoulders','arms'],['legs','core']], minDays: 4, maxDays: 4, level: ['intermediate'] },
+  powerbuilding_4: { name: 'Пауэрбилдинг 4 дня', desc: 'Силовое + гипертрофийное. День 1,3: сила. День 2,4: объём.', groupsPerDay: [['chest','shoulders','arms'],['legs','core'],['back','arms'],['legs','shoulders','core']], minDays: 4, maxDays: 4, level: ['intermediate','advanced'] },
+  recovery_3: { name: 'Восстановительный 3x', desc: '50% объёма, RIR 4, безопасные движения. Для делеода и реабилитации.', groupsPerDay: [['chest','back','shoulders'],['legs','core'],['full_body_light']], minDays: 3, maxDays: 3, level: ['beginner'] },
+  arnold_6: { name: 'Сплит Арнольда 6x', desc: 'Грудь+Спина / Плечи+Руки / Ноги × 2. Высокочастотный для продвинутых.', groupsPerDay: [['chest','back'],['shoulders','arms'],['legs','core']], minDays: 6, maxDays: 6, level: ['advanced','enhanced'] },
 };
 
-// ╨в╨Ч ┬з5.5: RIR ╨┐╨╛ ╤Ж╨╡╨╗╤П╨╝
+// вЧ §5.5: RIR по целям
 const RIR_MAP: Record<string, string> = {
   strength: '2-3', hypertrophy: '1-2', endurance: '3-4', recovery: '4',
   maintenance: '2-3', bulk: '2-3', cut: '1-2', rehab: '3-4'
 } as const;
 
-// ╨а╨░╤Б╤З╤С╤В ╨┐╨╛╨┤╤Е╨╛╨┤╨╛╨▓, ╨┐╨╛╨▓╤В╨╛╤А╨╡╨╜╨╕╨╣, RIR, ╨┤╤А╨╛╨┐-╤Б╨╡╤В╨╛╨▓
+// аасчёт подходов, повторений, RIR, дроп-сетов
 export function calcExercisePrescription(
   exercise: Exercise,
   goal: string,
@@ -63,13 +63,13 @@ export function calcExercisePrescription(
   weekNumber: number = 1,
   totalWeeks: number = 12
 ): { sets: number; reps: string; rir: number; dropSet: boolean; dropSetReps: string; backoffSet: boolean; rest: number; progressionNote: string } {
-  // ╨Ю╨┐╤А╨╡╨┤╨╡╨╗╨╡╨╜╨╕╨╡ ╤В╨╡╨║╤Г╤Й╨╡╨╣ ╤Д╨░╨╖╤Л
+  // Юпределение текущей фазы
   let phase: MesocyclePhase = 'base';
   if (weekNumber >= totalWeeks - 2) phase = 'peak';
   else if (weekNumber >= totalWeeks - 5) phase = 'build';
   else if (weekNumber % 4 === 0 && weekNumber > 0) phase = 'deload';
   
-  // RIR ╨╕╨╖ ╨╝╨░╤В╤А╨╕╤Ж╤Л
+  // RIR из матрицы
   const goalRir = RIR_MATRIX[goal]?.[level]?.[phase] ?? 2;
   const baseSets = level === 'beginner' ? 3 : level === 'intermediate' ? 3 : 4;
   let sets = Math.max(2, Math.round(baseSets * volumeMultiplier * (isWeakGroup ? 1.2 : 1.0)));
@@ -94,7 +94,7 @@ export function calcExercisePrescription(
     ? (goal === 'strength' ? 180 : 120)
     : (goal === 'cut' ? 45 : 60);
 
-  const progressionNote = !isDeload ? ` | ╨Э╨╡╨┤ ${weekNumber}: +2.5-5% ╨▓╨╡╤Б╨╛╨▓ ╨╕╨╗╨╕ +1 ╤Б╨╡╤В ╨╜╨░ ╨│╤А╤Г╨┐╨┐╤Г` : '';
+  const progressionNote = !isDeload ? ` | Эед ${weekNumber}: +2.5-5% весов или +1 сет на группу` : '';
 
   return { sets, reps, rir, dropSet, dropSetReps: dropSet ? `${Math.max(4, range[0] - 2)}-${range[1]}` : '', backoffSet, rest, progressionNote };
 }
@@ -176,7 +176,7 @@ export function calcTraining(i: TrainingInput): TrainingOutput {
   let splitName = selected.name;
   let splitDesc = selected.desc;
 
-  // ╨Ю╨┐╤А╨╡╨┤╨╡╨╗╨╡╨╜╨╕╨╡ ╤Д╨░╨╖╤Л
+  // Юпределение фазы
   let phase: MesocyclePhase = 'base';
   let isDeload = false;
   let deloadReason = '';
@@ -185,7 +185,7 @@ export function calcTraining(i: TrainingInput): TrainingOutput {
   else if (i.fatigue > 70) { isDeload = true; deloadReason = 'Fatigue > 70'; phase = 'deload'; Object.keys(volMap).forEach(k => { volMap[k] *= 0.6; }); }
   else if (i.nutrition < 55) { isDeload = true; deloadReason = 'Nutrition < 55'; phase = 'deload'; Object.keys(volMap).forEach(k => { volMap[k] *= 0.7; }); }
 
-  // RIR ╨╕╨╖ ╨╝╨░╤В╤А╨╕╤Ж╤Л
+  // RIR из матрицы
   const levelConfigRir = levelConfig.rirBase;
   const goalConfigRir = goalConfig.intensityMod > 1.1 ? 2 : goalConfig.intensityMod < 0.9 ? 3 : 2;
   let rir = isDeload ? 4 : RIR_MATRIX[i.goal]?.[i.level]?.[phase] ?? 2;
@@ -195,18 +195,18 @@ export function calcTraining(i: TrainingInput): TrainingOutput {
   const roundedVol: Record<string, number> = {};
   Object.entries(volMap).forEach(([k, v]) => { roundedVol[k] = Math.round(v); });
 
-  // ╨У╨╡╨╜╨╡╤А╨░╤Ж╨╕╤П ╨╜╨╡╨┤╨╡╨╗╤М╨╜╨╛╨│╨╛ ╨┐╨╗╨░╨╜╨░
+  // Уенерация недельного плана
   const weeklyProgression = generateWeeklyPlan(i, 6);
   
-  // ╨д╨╛╤А╨╝╨╕╤А╨╛╨▓╨░╨╜╨╕╨╡ ╨┐╨╗╨░╨╜╨░ ╨╜╨░ ╨╜╨╡╨┤╨╡╨╗╤О
+  // дормирование плана на неделю
   const weekNum = 1; // Base week
   const weekPlan = isDeload
-    ? `╨Э╨Х╨Ф╨Х╨Ы╨п ${weekNum} (╨Ф╨Х╨Ы╨Ю╨Ф): 50% ╨╛╨▒╤К╤С╨╝╨░, RIR 4, ╨▒╨╡╨╖ ╨╛╤В╨║╨░╨╖╨╛╨▓, ╨░╨║╤Ж╨╡╨╜╤В ╨╜╨░ ╤В╨╡╤Е╨╜╨╕╨║╤Г ╨╕ ╨╝╨╛╨▒╨╕╨╗╤М╨╜╨╛╤Б╤В╤М`
-    : `╨Э╨Х╨Ф╨Х╨Ы╨п ${weekNum} (${phase.toUpperCase()}): ${Math.round(weeklyProgression[0].volumeTotal)} ╨╛╨▒╤Й╨╕╤Е ╨┐╨╛╨┤╤Е╨╛╨┤╨╛╨▓, RIR ${rir}, ╨┐╤А╨╛╨│╤А╨╡╤Б╤Б╨╕╤П ${weeklyProgression[0].progressionType}`;
+    ? `ЭХФХЫп ${weekNum} (ФХЫЮФ): 50% объёма, RIR 4, без отказов, акцент на технику и мобильность`
+    : `ЭХФХЫп ${weekNum} (${phase.toUpperCase()}): ${Math.round(weeklyProgression[0].volumeTotal)} общих подходов, RIR ${rir}, прогрессия ${weeklyProgression[0].progressionType}`;
 
-  const progressionNote = !isDeload ? ` | ╨Э╨╡╨┤ 2-6: +2.5-5% ╨▓╨╡╤Б╨╛╨▓ ╨╕╨╗╨╕ +1 ╤Б╨╡╤В ╨╜╨░ ╨│╤А╤Г╨┐╨┐╤Г` : '';
+  const progressionNote = !isDeload ? ` | Эед 2-6: +2.5-5% весов или +1 сет на группу` : '';
 
-  // ╨Ф╨╛╨▒╨░╨▓╨╗╨╡╨╜╨╕╨╡ ╨┐╤А╨╛╨│╤А╨╡╤Б╤Б╨╕╨╕ ╨▓ ╨╛╨┐╨╕╤Б╨░╨╜╨╕╨╡
+  // Фобавление прогрессии в описание
   splitDesc += ` (${weeklyProgression[0].progressionType})`;
 
   return {
