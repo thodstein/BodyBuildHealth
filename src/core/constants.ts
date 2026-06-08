@@ -1,4 +1,4 @@
-import { UserRole } from './types';
+﻿import { UserRole } from './types';
 
 export const GENETIC_MULTIPLIERS: Record<string, Record<string, number>> = {
   COMT_Val158Met: { 'Met/Met': 2.0, 'Val/Met': 1.5, 'Val/Val': 1.0 },
@@ -36,7 +36,7 @@ export const SYRINGE_SPECS: Record<number, { maxVolume: number; divisionsPerMl: 
   5.0: { maxVolume: 5.0, divisionsPerMl: 20 }
 } as const;
 
-export const RISK_SYSTEMS = ['cardio', 'hepatic', 'renal', 'neuro', 'endocrine', 'hematologic', 'reproductive', 'musculoskeletal'] as const;
+export const RISK_SYSTEMS = ['cardio', 'hepatic', 'renal', 'neuro', 'endocrine', 'hematologic', 'reproductive', 'musculoskeletal', 'metabolic', 'ghigf', 'ins_axis', 'neuro_toxicity', 'blood', 'vessels'] as const;
 export const BASE_RISK = 0.12;
 
 export const REQUIRED_LABS_PER_PHASE: Record<string, string[]> = {

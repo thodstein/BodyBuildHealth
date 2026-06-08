@@ -227,7 +227,7 @@ export const LabsScreen: React.FC = () => {
       <div className="tab-bar">
         {(['results', 'schedule', 'catalog', 'investigations'] as const).map(t => (
           <button key={t} className={`tab-btn ${tab === t ? 'active' : ''}`} onClick={() => setTab(t)}>
-            {t === 'results' ? 'Результаты' : t === 'schedule' ? 'График' : t === 'investigations' ? 'Исследования' : 'Каталог'}
+            {t === 'results' ? '📊 Результаты' : t === 'schedule' ? '📅 График' : t === 'investigations' ? '🔬 Исследования' : '📋 Каталог'}
           </button>
         ))}
       </div>

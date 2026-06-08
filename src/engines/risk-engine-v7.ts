@@ -173,14 +173,39 @@ function buildOrganInput(input: V7RiskInput): OrganInput {
     if (ref) labRefs[l.code] = { mean: ref.mean, sd: ref.sd };
   }
 
+  // Compute additional drug-derived indices
+  let Neurotox_chem = 0;
+  let Lipid_met = TGz - lastLabZ('HDL') + 0; // Waist_z computed below
+  for (const entry of input.course) {
+    const sub = PHARMA_DB[entry.substanceId];
+    if (!sub) continue;
+    const pd = sub.pd as unknown as Record<string, number>;
+    if (!pd) continue;
+    const doseRatio = (entry.doseValue ?? 0) / (sub.ec50 ?? 400);
+    Neurotox_chem += (pd.neuro_toxicity ?? 0) * doseRatio;
+  }
+  Neurotox_chem = Math.min(3, Neurotox_chem);
+
+  const STAT = 0.5 * C_GH;
+  const Waist_z = lastLabZ('Waist');
+  const HOMAIR_z = lastLabZ('HOMA_IR');
+  const TSH_z = lastLabZ('TSH');
+  const Cortisol_z = lastLabZ('Cortisol');
+  const eGFRz_abs = lastLab('eGFR');
+  const Creatz_abs = lastLab('Creatinine');
+  const Proteinuria_z = lastLabZ('Proteinuria');
+  const Lipid_met_val = TGz - lastLabZ('HDL') + Waist_z;
+
   return {
     BPz, Hctz, Viscz, LVHz, NaH2O, Athero, IRz, TGz,
     HDLz: lastLabZ('HDL'), Proteinz: 0,
     GHIGFcore: IGF1R_eff + C_GH, C_AAS_oral,
     Alcohol_core: (input.alcoholPerWeek ?? 0) * 0.05,
     ALTz: lastLabZ('ALT'), ASTz: lastLabZ('AST'),
+    GGTz: lastLabZ('GGT'), ALPz: lastLabZ('ALP'), Bilirubinz: lastLabZ('Bilirubin'),
     eGFRz: lastLabZ('eGFR'), Creatininez: lastLabZ('Creatinine'),
-    AR_eff, ER_eff, IGF1R_eff, GHSR_eff: 0, IR_eff, mTOR, C_GH,
+    Proteinuria_z: Proteinuria_z,
+    AR_eff, ER_eff, IGF1R_eff, GHSR_eff: 0, IR_eff, mTOR, C_GH, STAT,
     Inflamm_core: Inflamm_core || 0, Oxid_core: Oxid_core || 0,
     Stim_core, Dep_core, Psycho_core: Psycho_core || 0,
     Smoke_core: input.smoke ? 0.5 : 0, Coag_core: Coag_core || 0,
@@ -192,7 +217,11 @@ function buildOrganInput(input: V7RiskInput): OrganInput {
     Alcoholz: (input.alcoholPerWeek ?? 0) / 7,
     DA_z: DA_z, Glu_z: Glu_z, GABA_z: GABA_z,
     Serotonin_z, S100b_z, PRL_z: PRLz,
+    LH_z: lastLabZ('LH'), FSH_z: lastLabZ('FSH'),
+    Waist_z: Waist_z, HOMAIR_z: HOMAIR_z, TSH_z: TSH_z, Cortisol_z: Cortisol_z,
+    eGFRz_abs: eGFRz_abs, Creatz_abs: Creatz_abs,
     labValues, labRefs, mode: input.mode, concentrations: {},
+    Neurotox_chem: Neurotox_chem, Lipid_met: Lipid_met_val,
   };
 }
 
@@ -309,8 +338,9 @@ export function runV7Simulation(input: V7RiskInput): V7RiskResult {
   // Add mechanism details from matrix
   const organSystemMap: Record<string, string> = {
     heart: 'cardio', vessels: 'cardio', liver: 'hepatic', kidney: 'renal',
-    neuro_toxicity: 'neuro', endocrine: 'endocrine', hematologic: 'hematologic',
-    reproductive: 'reproductive', metabolic: 'endocrine', ghigf: 'endocrine', ins_axis: 'endocrine',
+    blood: 'hematologic', endocrine: 'endocrine', metabolic: 'endocrine', ghigf: 'endocrine',
+    ins_axis: 'endocrine', musculoskeletal: 'hematologic', neuro_toxicity: 'neuro',
+    reproductive: 'reproductive',
   };
   for (const key of organKeys) {
     const sysName = organSystemMap[key];
@@ -323,9 +353,9 @@ export function runV7Simulation(input: V7RiskInput): V7RiskResult {
   const organCumRisks: Record<string, number> = {};
   const organPEvents: Record<string, number> = {};
   const organWeights: Record<string, number> = {
-    heart: 0.15, vessels: 0.10, liver: 0.15, kidney: 0.10,
-    metabolic: 0.08, ghigf: 0.05, ins_axis: 0.07, neuro_toxicity: 0.12,
-    endocrine: 0.08, hematologic: 0.05, reproductive: 0.05,
+    heart: 0.14, vessels: 0.09, liver: 0.14, kidney: 0.09,
+    blood: 0.05, endocrine: 0.08, metabolic: 0.07, ghigf: 0.04,
+    ins_axis: 0.06, musculoskeletal: 0.05, neuro_toxicity: 0.12, reproductive: 0.05,
   };
   for (const key of organKeys) {
     organCumRisks[key] = organSummary[key].meanCumRisk;
@@ -357,6 +387,8 @@ export function runV7Simulation(input: V7RiskInput): V7RiskResult {
   systemBreakdown.ghigf = systemBreakdown.ghigf ?? { raw: organs.ghigf.totalDamage * 100, net: organs.ghigf.totalDamage * 80 };
   systemBreakdown.ins_axis = systemBreakdown.ins_axis ?? { raw: organs.ins_axis.totalDamage * 100, net: organs.ins_axis.totalDamage * 80 };
   systemBreakdown.neuro_toxicity = { raw: organs.neuro_toxicity.totalDamage * 100, net: organs.neuro_toxicity.totalDamage * 80 };
+  systemBreakdown.blood = { raw: organs.blood.totalDamage * 100, net: organs.blood.totalDamage * 80 };
+  systemBreakdown.musculoskeletal = { raw: organs.musculoskeletal.totalDamage * 100, net: organs.musculoskeletal.totalDamage * 80 };
 
   for (const key of Object.keys(systemBreakdown)) {
     systemBreakdown[key].raw = Math.min(100, systemBreakdown[key].raw * penaltyMultiplier);

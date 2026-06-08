@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+﻿import React, { useEffect, useState } from 'react';
 import type { UserProfile, InjuryRecord, SupplementEntry, MedicationEntry, LabPoint } from '../../core/types';
 import { getProfile, updateProfile, useProfileRefresh } from '../../core/profile-manager';
 import { db } from '../../core/db';
@@ -7,7 +7,7 @@ import { computeLabIndices, interpretLabIndices } from '../../engines/labs-indic
 import { calculateIndices } from '../../engines/clinical-indices.engine';
 import { NAVY_BF_FORMULAS, MUSCLE_GROUPS_FULL, INJURY_LOCATIONS } from '../../core/constants';
 
-type ProfileTab = 'overview' | 'anthropometry' | 'sleep' | 'lifestyle' | 'diet' | 'injuries' | 'progress';
+type ProfileTab = 'overview' | 'anthropometry' | 'sleep' | 'lifestyle' | 'diet' | 'nutrition_v7' | 'genetics' | 'injuries' | 'progress';
 
 const GOALS = [
   { id: 'bulk', label: 'Набор массы' }, { id: 'cut', label: 'Сушка' },
@@ -522,6 +522,145 @@ export const ProfileScreen: React.FC = () => {
         </div>
       )}
 
+      {tab === 'nutrition_v7' && (
+        <div>
+          <div className="card" style={{ marginBottom: 12 }}>
+            <h3 style={{ margin: '0 0 12px 0' }}>🥩 Параметры питания V7</h3>
+            <p style={{ fontSize: 11, color: 'var(--text-dim)', margin: '0 0 12px 0' }}>Эти параметры используются V7 риск-движком для расчёта рисков. Укажите ваши реальные значения для точных расчётов.</p>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}>
+              <div>
+                <label style={{ fontSize: 12, opacity: 0.7, display: 'block', marginBottom: 4 }}>Белок, г/кг</label>
+                <input style={s.input} type="number" step="0.1" min="0.5" max="4" value={s_.proteinPerKg ?? 1.8} onChange={e => save({ proteinPerKg: e.target.value ? +e.target.value : undefined })} placeholder="1.8" />
+                <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>Рекомендация: 1.6–2.2 г/кг</div>
+              </div>
+              <div>
+                <label style={{ fontSize: 12, opacity: 0.7, display: 'block', marginBottom: 4 }}>Клетчатка, г/день</label>
+                <input style={s.input} type="number" step="1" min="10" max="60" value={s_.fiberG ?? 25} onChange={e => save({ fiberG: e.target.value ? +e.target.value : undefined })} placeholder="25" />
+                <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>Рекомендация: 25–35 г/день</div>
+              </div>
+              <div>
+                <label style={{ fontSize: 12, opacity: 0.7, display: 'block', marginBottom: 4 }}>Омега-3, г/день</label>
+                <input style={s.input} type="number" step="0.1" min="0" max="5" value={s_.omega3G ?? 1.5} onChange={e => save({ omega3G: e.target.value ? +e.target.value : undefined })} placeholder="1.5" />
+                <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>Рекомендация: 1.5–3 г EPA+DHA</div>
+              </div>
+              <div>
+                <label style={{ fontSize: 12, opacity: 0.7, display: 'block', marginBottom: 4 }}>Натрий, г/день</label>
+                <input style={s.input} type="number" step="0.1" min="0.5" max="8" value={s_.sodiumG ?? 3.5} onChange={e => save({ sodiumG: e.target.value ? +e.target.value : undefined })} placeholder="3.5" />
+                <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>Норма: 2.3–4 г/день</div>
+              </div>
+              <div>
+                <label style={{ fontSize: 12, opacity: 0.7, display: 'block', marginBottom: 4 }}>Калий, г/день</label>
+                <input style={s.input} type="number" step="0.1" min="1" max="6" value={s_.potassiumG ?? 3.0} onChange={e => save({ potassiumG: e.target.value ? +e.target.value : undefined })} placeholder="3.0" />
+                <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>Норма: 2.6–3.4 г/день</div>
+              </div>
+            </div>
+          </div>
+
+          <div className="card" style={{ marginBottom: 12 }}>
+            <h3 style={{ margin: '0 0 12px 0' }}>🍷 Образ жизни (V7)</h3>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}>
+              <div>
+                <label style={{ fontSize: 12, opacity: 0.7, display: 'block', marginBottom: 4 }}>Алкоголь, доз/неделю</label>
+                <input style={s.input} type="number" step="1" min="0" max="30" value={s_.alcoholPerWeek ?? 0} onChange={e => save({ alcoholPerWeek: e.target.value ? +e.target.value : undefined })} placeholder="0" />
+              </div>
+              <div>
+                <label style={{ fontSize: 12, opacity: 0.7, display: 'block', marginBottom: 4 }}>Уровень стресса (1-10)</label>
+                <input style={s.input} type="number" step="1" min="1" max="10" value={s_.stressLevel ?? 5} onChange={e => save({ stressLevel: e.target.value ? +e.target.value : undefined })} placeholder="5" />
+              </div>
+              <div>
+                <label style={{ fontSize: 12, opacity: 0.7, display: 'block', marginBottom: 4 }}>Уровень активности (1-10)</label>
+                <input style={s.input} type="number" step="1" min="1" max="10" value={s_.activityLevel ?? 5} onChange={e => save({ activityLevel: e.target.value ? +e.target.value : undefined })} placeholder="5" />
+              </div>
+              <div>
+                <label style={{ fontSize: 12, opacity: 0.7, display: 'block', marginBottom: 4 }}>Сон, часов/ночь</label>
+                <input style={s.input} type="number" step="0.5" min="3" max="12" value={s_.sleepHours ?? s_.baselineSleepHours ?? 7} onChange={e => save({ sleepHours: e.target.value ? +e.target.value : undefined })} placeholder="7" />
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
+              <label style={{ fontSize: 12, opacity: 0.7 }}>Курение</label>
+              <button onClick={() => save({ smoke: !s_.smoke })} style={{
+                padding: '6px 14px', borderRadius: 8, fontSize: 12, cursor: 'pointer',
+                background: s_.smoke ? 'rgba(239,68,68,0.15)' : 'rgba(0,230,138,0.1)',
+                border: s_.smoke ? '1px solid #ef4444' : '1px solid #00e68a',
+                color: s_.smoke ? '#ef4444' : '#00e68a', fontWeight: 600,
+              }}>
+                {s_.smoke ? '🚬 Да, курю' : '✅ Не курю'}
+              </button>
+            </div>
+          </div>
+
+          <div className="card" style={{ marginBottom: 12 }}>
+            <h3 style={{ margin: '0 0 12px 0' }}>🏋️ Тренировочные параметры (V7)</h3>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}>
+              <div>
+                <label style={{ fontSize: 12, opacity: 0.7, display: 'block', marginBottom: 4 }}>Включает HIIT</label>
+                <button onClick={() => save({ hasHIIT: !s_.hasHIIT })} style={{
+                  padding: '6px 14px', borderRadius: 8, fontSize: 12, cursor: 'pointer',
+                  background: s_.hasHIIT ? 'rgba(0,230,138,0.15)' : 'var(--bg-primary)',
+                  border: s_.hasHIIT ? '1px solid #00e68a' : '1px solid var(--border)',
+                  color: s_.hasHIIT ? '#00e68a' : 'var(--text-dim)', fontWeight: 600,
+                }}>
+                  {s_.hasHIIT ? '✅ Да' : '❌ Нет'}
+                </button>
+              </div>
+              <div>
+                <label style={{ fontSize: 12, opacity: 0.7, display: 'block', marginBottom: 4 }}>Объём, тонн/нед</label>
+                <input style={s.input} type="number" step="500" min="0" max="30000" value={s_.volumeTonnes ?? 8000} onChange={e => save({ volumeTonnes: e.target.value ? +e.target.value : undefined })} placeholder="8000" />
+              </div>
+              <div>
+                <label style={{ fontSize: 12, opacity: 0.7, display: 'block', marginBottom: 4 }}>LISS, мин/неделю</label>
+                <input style={s.input} type="number" step="10" min="0" max="300" value={s_.lissMinutesPerWeek ?? 90} onChange={e => save({ lissMinutesPerWeek: e.target.value ? +e.target.value : undefined })} placeholder="90" />
+              </div>
+              <div>
+                <label style={{ fontSize: 12, opacity: 0.7, display: 'block', marginBottom: 4 }}>Завершённых курсов ААС</label>
+                <input style={s.input} type="number" step="1" min="0" max="50" value={s_.totalCycles ?? 0} onChange={e => save({ totalCycles: e.target.value ? +e.target.value : undefined })} placeholder="0" />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {tab === 'genetics' && (
+        <div>
+          <div className="card" style={{ marginBottom: 12 }}>
+            <h3 style={{ margin: '0 0 12px 0' }}>🧬 Генетические полиморфизмы</h3>
+            <p style={{ fontSize: 11, color: 'var(--text-dim)', margin: '0 0 12px 0' }}>Укажите ваши генетические варианты, если известны. Они влияют на расчёт рисков в V7 движке через генетические множители.</p>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+              {([
+                { key: 'COMT', label: 'COMT', desc: 'Катехол-О-метилтрансфераза. Влияет на метаболизм дофамина и стресс-устойчивость.', options: ['Met/Met', 'Val/Met', 'Val/Val'] },
+                { key: 'MTHFR', label: 'MTHFR', desc: 'Метилентетрагидрофолатредуктаза. Влияет на гомоцистеин и фолатный цикл.', options: ['C677T/C677T', 'C677T/A1298C', 'A1298C/A1298C', 'C677T/+', 'A1298C/+', '+/+' ] },
+                { key: 'ESR1', label: 'ESR1', desc: 'Эстрогеновый рецептор α. Влияет на чувствительность к эстрадиолу.', options: ['PvuII TT', 'PvuII TC', 'PvuII CC'] },
+                { key: 'AGTR1', label: 'AGTR1', desc: 'Рецептор ангиотензина II. Влияет на АД и гипертрофию сердца.', options: ['1166CC', '1166AC', '1166AA'] },
+                { key: 'NOS3', label: 'NOS3', desc: 'Эндотелиальная NO-синтаза. Влияет на вазодилатацию и эндотелий.', options: ['Glu298Glu', 'Glu298Asp', 'Asp298Asp'] },
+                { key: 'SRD5A2', label: 'SRD5A2', desc: '5α-редуктаза. Влияет на конверсию тестостерона → DHT.', options: ['V89L V/V', 'V89L V/L', 'V89L L/L'] },
+                { key: 'CYP3A4', label: 'CYP3A4', desc: 'Цитохром P450 3A4. Влияет на метаболизм большинства ААС.', options: ['*1/*1 (WT)', '*1/*22', '*22/*22'] },
+              ] as const).map(gene => (
+                <div key={gene.key} style={{ background: 'var(--bg-secondary)', padding: 10, borderRadius: 8 }}>
+                  <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 2 }}>{gene.label}</div>
+                  <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 6, lineHeight: 1.4 }}>{gene.desc}</div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                    <button onClick={() => { const g = {...(s_.genetics ?? {})}; delete g[gene.key]; save({ genetics: g }); }} style={{
+                      padding: '4px 8px', borderRadius: 6, fontSize: 10, cursor: 'pointer',
+                      background: !(s_.genetics ?? {})[gene.key] ? 'rgba(0,230,138,0.1)' : 'var(--bg-primary)',
+                      border: !(s_.genetics ?? {})[gene.key] ? '1px solid #00e68a' : '1px solid var(--border)',
+                      color: !(s_.genetics ?? {})[gene.key] ? '#00e68a' : 'var(--text-dim)', fontWeight: 500,
+                    }}>Не знаю</button>
+                    {gene.options.map(opt => (
+                      <button key={opt} onClick={() => { const g = {...(s_.genetics ?? {})}; g[gene.key] = opt; save({ genetics: g }); }} style={{
+                        padding: '4px 8px', borderRadius: 6, fontSize: 10, cursor: 'pointer',
+                        background: (s_.genetics ?? {})[gene.key] === opt ? 'rgba(0,230,138,0.15)' : 'var(--bg-primary)',
+                        border: (s_.genetics ?? {})[gene.key] === opt ? '1px solid #00e68a' : '1px solid var(--border)',
+                        color: (s_.genetics ?? {})[gene.key] === opt ? '#00e68a' : 'var(--text-dim)', fontWeight: 500,
+                      }}>{opt}</button>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
       {tab === 'injuries' && (
         <>
           <div style={s.card}>

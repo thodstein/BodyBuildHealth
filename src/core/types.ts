@@ -1,4 +1,4 @@
-export type Severity = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+﻿export type Severity = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
 export type InteractionType = 'synergy' | 'conflict' | 'danger' | 'caution';
 export type Onset = 'fast' | 'medium' | 'slow';
 export type Decay = 'fast' | 'medium' | 'slow' | 'very_slow';
@@ -515,6 +515,22 @@ export interface UserProfile {
       nutritionFactor?: number;
       trainingFactor?: number;
       
+
+      // Nutrition inputs for V7 risk engine
+      proteinPerKg?: number;      // g/kg bodyweight (default 1.8)
+      fiberG?: number;             // g/day (default 25)
+      omega3G?: number;            // g/day (default 1.5)
+      sodiumG?: number;            // g/day (default 3.5)
+      potassiumG?: number;         // g/day (default 3.0)
+      alcoholPerWeek?: number;     // standard drinks/week (default 0)
+      smoke?: boolean;             // smoking status (default false)
+      totalCycles?: number;        // number of completed AAS cycles
+      hasHIIT?: boolean;          // includes HIIT in training
+      volumeTonnes?: number;      // weekly training volume in tonnes
+      lissMinutesPerWeek?: number;// low-intensity steady state min/week
+      sleepHours?: number;        // actual sleep hours
+      stressLevel?: number;       // 1-10 stress level
+      activityLevel?: number;     // 1-10 activity level
       preferredUnits?: 'metric' | 'imperial';
       notificationsEnabled?: boolean;
       privacyLevel?: 'private' | 'friends' | 'public';

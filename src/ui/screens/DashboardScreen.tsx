@@ -6,11 +6,14 @@ import { registry } from '../../core/data/registry';
 const SYSTEM_LABELS: Record<string, string> = {
   cardio: 'Сердечно-сосудистая', hepatic: 'Печень', renal: 'Почки',
   neuro: 'Нервная', endocrine: 'Эндокринная', hematologic: 'Кроветворная',
-  reproductive: 'Репродуктивная', musculoskeletal: 'Суставы и связки',
+  reproductive: 'Репродуктивная', musculoskeletal: 'ОДА/Мышцы',
+  metabolic: 'Метаболизм', ghigf: 'GH/IGF', ins_axis: 'Инсулиновая ось',
+  neuro_toxicity: 'Нейротоксичность', blood: 'Кровь', vessels: 'Сосуды',
 };
 
 import type { MasterDB, RiskResult, ReadinessScores, CourseEntry, LabPoint } from '../../core/types';
 import { calculateRisks } from '../../engines/risk.engine';
+import { useV7Risk } from '../hooks/useV7Risk';
 import { calcReadiness } from '../../engines/readiness.engine';
 import { RISK_SYSTEMS } from '../../core/constants';
 import { db } from '../../core/db';
@@ -71,6 +74,7 @@ export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
   const [alerts, setAlerts] = useState<string[]>([]);
   const [courseEntries, setCourseEntries] = useState<CourseEntry[]>([]);
   const [labCount, setLabCount] = useState(0);
+  const { v7Result } = useV7Risk();
 
   useEffect(() => {
     const loadData = async () => {

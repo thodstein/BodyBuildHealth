@@ -14,7 +14,9 @@ function getSystemLabel(sys: string): string { return SYSTEM_INFO[sys]?.label ||
 const SYSTEM_LABELS_SHORT: Record<string, string> = {
   cardio: '❤️ Сердце', hepatic: '🫁 Печень', renal: '🫘 Почки',
   neuro: '🧠 Нервная', endocrine: '🦋 Эндокр.', hematologic: '🩸 Кровь',
-  reproductive: '🔬 Репрод.', musculoskeletal: '🦴 Кости',
+  reproductive: '🔬 Репрод.', musculoskeletal: '💪 ОДА',
+  metabolic: '⚡ Метаб.', ghigf: '📈 GH/IGF', ins_axis: '🍬 Инсулин',
+  neuro_toxicity: '🧠 Нейротокс.', blood: '🩸 Кровь', vessels: '🫀 Сосуды',
 };
 
 export const RiskOverview: React.FC<{

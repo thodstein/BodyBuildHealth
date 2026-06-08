@@ -421,6 +421,61 @@ export function confidenceIntervalWidth(baseCI: number, dq: number, gamma: numbe
   return baseCI * (1 + gamma * (1 - dq));
 }
 
+// --- 14.5 Sensitivity Analysis ---
+export interface SensitivityResult {
+  parameter: string;
+  baseValue: number;
+  perturbedResults: { delta: number; globalRisk: number }[];
+  elasticity: number; // (delta_risk / risk) / (delta_param / param)
+  rank: number;
+}
+
+export function sensitivityAnalysis(
+  baseComputeFn: (params: Record<string, number>) => number, // returns globalRisk
+  baseParams: Record<string, number>,
+  perturbations: number[] = [-0.2, -0.1, 0.1, 0.2] // ±10%, ±20%
+): SensitivityResult[] {
+  const baseRisk = baseComputeFn(baseParams);
+  const results: SensitivityResult[] = [];
+
+  for (const [paramName, baseVal] of Object.entries(baseParams)) {
+    if (baseVal === 0) continue; // skip zero params
+    const perturbedResults: { delta: number; globalRisk: number }[] = [];
+
+    for (const delta of perturbations) {
+      const perturbed = { ...baseParams };
+      perturbed[paramName] = baseVal * (1 + delta);
+      const risk = baseComputeFn(perturbed);
+      perturbedResults.push({ delta, globalRisk: risk });
+    }
+
+    // Elasticity: average absolute % change in risk / % change in parameter
+    let totalElasticity = 0;
+    let count = 0;
+    for (const pr of perturbedResults) {
+      if (Math.abs(pr.delta) > 0 && baseRisk > 0) {
+        const riskChange = (pr.globalRisk - baseRisk) / baseRisk;
+        totalElasticity += Math.abs(riskChange / pr.delta);
+        count++;
+      }
+    }
+    const elasticity = count > 0 ? totalElasticity / count : 0;
+
+    results.push({
+      parameter: paramName,
+      baseValue: baseVal,
+      perturbedResults,
+      elasticity,
+      rank: 0,
+    });
+  }
+
+  // Rank by elasticity (highest first)
+  results.sort((a, b) => b.elasticity - a.elasticity);
+  results.forEach((r, i) => r.rank = i + 1);
+  return results;
+}
+
 // --- 15. Mode multipliers ---
 
 export type ProtocolMode = 'bulk' | 'cut' | 'recomp' | 'cruise' | 'blast';
