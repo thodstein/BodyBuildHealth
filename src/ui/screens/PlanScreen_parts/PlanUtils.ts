@@ -1,7 +1,7 @@
-import { RIR_TABLE, SPLIT_LABELS, GROUP_LABELS } from './PlanConstants';
-import { EXERCISE_CATALOG, getExercisesByGroup, getExerciseById } from '../../core/exercise-catalog';
-import { calcExercisePrescription } from '../../engines/training.engine';
-import type { TrainingOutput, Exercise } from '../../core/types';
+﻿import { RIR_TABLE, SPLIT_LABELS, GROUP_LABELS } from './PlanConstants';
+import { EXERCISE_CATALOG, getExercisesByGroup, getExerciseById } from '../../../core/exercise-catalog';
+import { calcExercisePrescription } from '../../../engines/training.engine';
+import type { TrainingOutput, Exercise } from '../../../core/types';
 
 export function getRIR(goal: string, level: string, isDeload: boolean): string {
   if (isDeload) return '3-5';
@@ -56,10 +56,10 @@ export function buildDayPlan(result: TrainingOutput, daysPerWeek: number, weakPo
       if (vol <= 0) continue;
       const sets = Math.max(2, Math.round(vol / 3));
       const avail = getExercisesByGroup(g);
-      const filtered = avail.filter(e => !(isDeload && e.fatigueCost > 5));
+      const filtered = avail.filter((e: any) => !(isDeload && e.fatigueCost > 5));
       const maxPicks = Math.min(3, Math.ceil(sets / 3));
       const rotationOffset = (weekNum * 2 + d) % Math.max(1, filtered.length - maxPicks + 1);
-      const picked = filtered.slice(rotationOffset, rotationOffset + maxPicks).sort((a, b) => (a.order ?? 2) - (b.order ?? 2));
+      const picked = filtered.slice(rotationOffset, rotationOffset + maxPicks).sort((a: any, b: any) => (a.order ?? 2) - (b.order ?? 2));
       for (const ex of picked) {
         const setsForEx = picked.length === 1 ? sets : Math.max(2, Math.round(sets / picked.length));
         const rirStr = result.rir;

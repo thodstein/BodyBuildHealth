@@ -1,10 +1,10 @@
-import React from 'react';
-import type { TrainingOutput, Exercise } from '../../core/types';
-import type { MacrocyclePlan } from '../../engines/training-periodization.engine';
-import type { SplitCandidate } from '../../engines/split-selector.engine';
-import type { ProgressionRule } from '../../engines/progression.engine';
-import { calcSuggestedWeight } from '../../engines/progression.engine';
-import { getExerciseById } from '../../core/exercise-catalog';
+﻿import React from 'react';
+import type { TrainingOutput, Exercise } from '../../../core/types';
+import type { MacrocyclePlan } from '../../../engines/training-periodization.engine';
+import type { SplitCandidate } from '../../../engines/split-selector.engine';
+import type { ProgressionRule } from '../../../engines/progression.engine';
+import { calcSuggestedWeight } from '../../../engines/progression.engine';
+import { getExerciseById } from '../../../core/exercise-catalog';
 import { getRIR, formatSplitGroups, buildDayPlan } from './PlanUtils';
 
 export const PlanTraining: React.FC<{
@@ -23,10 +23,14 @@ export const PlanTraining: React.FC<{
   selectedWeek: number;
   setMacrocycle: (m: MacrocyclePlan | null) => void;
   setSelectedWeek: (w: number) => void;
+  fatigue?: number;
+  nutritionScore?: number;
+  avgWorkoutMinutes?: number;
 }> = ({
   goalState, level, daysPerWeek, weakPoints, recovery,
   trainingResult, bestSplit, splitOptions, progressionRule, deloadRec,
-  palForDisplay, macrocycle, selectedWeek, setMacrocycle, setSelectedWeek
+  palForDisplay, macrocycle, selectedWeek, setMacrocycle, setSelectedWeek,
+  fatigue, nutritionScore, avgWorkoutMinutes
 }) => {
   if (!trainingResult) return <div>Загрузка...</div>;
 
@@ -65,19 +69,19 @@ export const PlanTraining: React.FC<{
             <input type="range" min={0} max={100} value={recovery} onChange={(e) => {}} disabled />
           </div>
           <div className="form-group">
-            <label>Усталость: {trainingResult.fatigue}%</label>
-            <input type="range" min={0} max={100} value={trainingResult.fatigue} onChange={(e) => {}} disabled />
+            <label>Усталость: {fatigue ?? 0}%</label>
+            <input type="range" min={0} max={100} value={fatigue ?? 0} onChange={(e) => {}} disabled />
           </div>
           <div className="form-group">
-            <label>Питание: {trainingResult.nutrition}%</label>
-            <input type="range" min={0} max={100} value={trainingResult.nutrition} onChange={(e) => {}} disabled />
+            <label>Питание: {nutritionScore ?? 0}%</label>
+            <input type="range" min={0} max={100} value={nutritionScore ?? 0} onChange={(e) => {}} disabled />
           </div>
         </div>
         <div style={{ marginTop: 8, fontSize: 12 }}>
           Дни слабых мест: {weakPoints.map(g => g).join(', ') || 'нет'}
         </div>
         <div style={{ marginTop: 8, fontSize: 12 }}>
-          PAL: {palForDisplay} | Тренировки: {daysPerWeek}/нед | Время: {trainingResult.avgWorkoutMinutes} мин
+          PAL: {palForDisplay} | Тренировки: {daysPerWeek}/нед | Время: {avgWorkoutMinutes ?? 60} мин
         </div>
       </div>
 
@@ -97,27 +101,23 @@ export const PlanTraining: React.FC<{
             Рекомендация: {deloadRec.reason}
           </div>
         )}
-        <div style={{ marginTop: 8, fontSize: 12 }}>
-          <strong>Обоснование:</strong>
-          {bestSplit ? bestSplit.rationale.map((r, i) => <div key={i}>{i + 1}. {r}</div>) : null}
-        </div>
       </div>
 
-      {splitOptions.length > 1 && (
+      {splitOptions && splitOptions.length > 0 && (
         <div className="card" style={{ marginTop: 12 }}>
-          <h3>Альтернативные варианты</h3>
-          {splitOptions.slice(0, 4).map((opt, i) => (
-            <div key={opt.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 8px', borderRadius: 6, marginBottom: 4 }}>
-              <div>
-                <div style={{ fontWeight: 600, fontSize: 13 }}>{opt.name} {i === 0 ? 'лучший' : `#${i + 1}`}</div>
-                <div style={{ fontSize: 10 }}>{formatSplitGroups(opt.groupsPerDay)}</div>
+          <h3>Варианты сплита</h3>
+          <div style={{ display: 'grid', gap: 8 }}>
+            {splitOptions.map((split: SplitCandidate, idx: number) => (
+              <div key={idx} style={{ padding: '8px 10px', background: 'var(--bg-secondary)', borderRadius: 6, border: bestSplit && split.id === bestSplit.id ? '1px solid var(--accent)' : 'none' }}>
+                <div style={{ fontWeight: 600 }}>{split.name}</div>
+                <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>{formatSplitGroups(split.groupsPerDay)}</div>
+                <div style={{ display: 'flex', gap: 8, marginTop: 4, fontSize: 11 }}>
+                  <span>Совместимость: {Math.round(split.score * 100)}%</span>
+                  <span>Восст.: {Math.round(split.score * 100)}%</span>
+                </div>
               </div>
-              <div style={{ textAlign: 'right' }}>
-                <div style={{ fontWeight: 700 }}>{opt.score}</div>
-                <div style={{ fontSize: 9 }}>оценка</div>
-              </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       )}
 
@@ -170,7 +170,7 @@ export const PlanTraining: React.FC<{
                     <tr><th>Упражнение</th><th>Подходы</th><th>Повторения</th><th>RIR</th><th>Отдых</th><th>Вес</th></tr>
                   </thead>
                   <tbody>
-                    {day.exercises.map((ex, i) => (
+                    {day.exercises.map((ex: Exercise, i: number) => (
                       <tr key={i}>
                         <td style={{ maxWidth: 180 }}>
                           <div style={{ fontWeight: 600 }}>{ex.name}</div>
@@ -195,22 +195,22 @@ export const PlanTraining: React.FC<{
 
       {!macrocycle && (
         <div className="card" style={{ marginTop: 16 }}>
-          <h3>Генерация макrocикла (опционально)</h3>
+          <h3>Генерация макроцикла (опционально)</h3>
           <button onClick={() => setMacrocycle(null as any)} style={{ width: '100%', padding: 8 }}>
-            Создать макrocикл
+            Создать макроцикл
           </button>
         </div>
       )}
 
       {macrocycle && (
         <>
-          <button onClick={() => setMacrocycle(null)} style={{ background: 'var(--danger)', color: '#fff', marginBottom: 12 }}>Отмена макrocикла</button>
+          <button onClick={() => setMacrocycle(null)} style={{ background: 'var(--danger)', color: '#fff', marginBottom: 12 }}>Отмена макроцикла</button>
           <div className="card">
-            <h4>Макrocикл ({macrocycle.totalWeeks} нед.)</h4>
+            <h4>Макроцикл ({macrocycle.totalWeeks} нед.)</h4>
             <div style={{ display: 'flex', gap: 4, overflowX: 'auto' }}>
-              {macrocycle.mesocycles.map(meso => (
+              {macrocycle.mesocycles.map((meso: any) => (
                 <div key={meso.type}>
-                  {Array.from({ length: meso.weeks }, (_, i) => {
+                  {Array.from({ length: meso.weeks }, (_: any, i: number) => {
                     const wk = meso.microcycles[i];
                     return (
                       <div key={wk.weekNumber} onClick={() => setSelectedWeek(wk.weekNumber)} style={{ padding: 4, borderRadius: 4, fontSize: 10 }}>

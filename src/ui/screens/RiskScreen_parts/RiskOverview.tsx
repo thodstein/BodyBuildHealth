@@ -1,6 +1,6 @@
-import React from 'react';
-import type { RiskResult } from '../../core/types';
-import { RISK_SYSTEMS } from '../../core/constants';
+﻿import React from 'react';
+import type { RiskResult } from '../../../core/types';
+import { RISK_SYSTEMS } from '../../../core/constants';
 
 export const RiskOverview: React.FC<{
   riskResult: RiskResult;
@@ -15,25 +15,19 @@ export const RiskOverview: React.FC<{
           <div className="score-item">
             <span className="label">Общий риск (raw)</span>
             <span className="value" style={{ color: riskResult.overallRaw > 80 ? 'var(--danger)' : riskResult.overallRaw > 60 ? 'var(--warning)' : 'var(--success)' }}>
-              {riskResult.overallRaw}%
+              {Math.round(riskResult.overallRaw)}%
             </span>
           </div>
           <div className="score-item">
             <span className="label">Общий риск (net)</span>
             <span className="value" style={{ color: riskResult.overallNet > 80 ? 'var(--danger)' : riskResult.overallNet > 60 ? 'var(--warning)' : 'var(--success)' }}>
-              {riskResult.overallNet}%
+              {Math.round(riskResult.overallNet)}%
             </span>
           </div>
           <div className="score-item">
             <span className="label">Статус</span>
             <span className="value">
               {riskResult.overallNet < 50 ? 'Критический' : riskResult.overallNet < 70 ? 'Тревожный' : 'Удовлетворительный'}
-            </span>
-          </div>
-          <div className="score-item">
-            <span className="label">Источники</span>
-            <span className="value">
-              {Object.keys(riskResult.sources).length} источника(ов)
             </span>
           </div>
         </div>
@@ -50,15 +44,19 @@ export const RiskOverview: React.FC<{
       <div className="card">
         <h3>Системы</h3>
         <div className="grid risk-grid">
-          {RISK_SYSTEMS.map(sys => (
-            <div key={sys} className="risk-system">
-              <div className="risk-bar">
-                <div className="risk-fill" style={{ width: `${riskResult.systemBreakdown[sys].net}%`, background: getRiskColor(riskResult.systemBreakdown[sys].net) }}></div>
+          {RISK_SYSTEMS.map((sys: string) => {
+            const bd = riskResult.systemBreakdown[sys];
+            if (!bd) return null;
+            return (
+              <div key={sys} className="risk-system">
+                <div className="risk-bar">
+                  <div className="risk-fill" style={{ width: `${Math.min(100, bd.net)}%`, background: getRiskColor(bd.net) }}></div>
+                </div>
+                <div className="risk-label">{sys}</div>
+                <div className="risk-value">{Math.round(bd.net)}%</div>
               </div>
-              <div className="risk-label">{sys}</div>
-              <div className="risk-value">{riskResult.systemBreakdown[sys].net}%</div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     </div>

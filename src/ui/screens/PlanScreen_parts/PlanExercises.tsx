@@ -1,5 +1,5 @@
-import React from 'react';
-import { EXERCISE_CATALOG } from '../../core/exercise-catalog';
+﻿import React from 'react';
+import { EXERCISE_CATALOG } from '../../../core/exercise-catalog';
 import { GROUP_LABELS, MUSCLE_GROUPS } from './PlanConstants';
 
 export const PlanExercises: React.FC = () => {
@@ -17,7 +17,7 @@ export const PlanExercises: React.FC = () => {
       {Object.entries(exerciseGroups).map(([group, exercises]) => (
         <div key={group} className="card exercise-group">
           <h3>{GROUP_LABELS[group] || group}</h3>
-          {exercises.map((ex, i) => (
+          {exercises.map((ex: any, i: number) => (
             <div key={i} style={{ padding: '8px 10px', marginBottom: 4, background: 'var(--bg-secondary)', borderRadius: 6 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>

@@ -1,8 +1,8 @@
-import React from 'react';
-{"text": "import type { LabResult } from '../core/types';"}
+﻿import React from 'react';
+import type { LabPoint } from '../../../core/types';
 
 export const LabsOverview: React.FC<{
-  labs: LabResult[];
+  labs: LabPoint[];
   hasLabs: boolean;
   forceNoLabs: boolean;
   setForceNoLabs: (v: boolean) => void;
@@ -31,18 +31,6 @@ export const LabsOverview: React.FC<{
           <div className="stat-item">
             <div className="stat-label">Последний анализ</div>
             <div className="stat-value">{labs.length > 0 ? labs[labs.length - 1].date : 'нет'}</div>
-          </div>
-          <div className="stat-item">
-            <div className="stat-label">Норма</div>
-            <div className="stat-value" style={{ color: '#22c55e' }}>
-              {labs.filter(l => l.status === 'normal').length}
-            </div>
-          </div>
-          <div className="stat-item">
-            <div className="stat-label">Отклонения</div>
-            <div className="stat-value" style={{ color: labs.some(l => l.status === 'high') ? '#ef4444' : '#eab308' }}>
-              {labs.filter(l => l.status !== 'normal').length}
-            </div>
           </div>
         </div>
       </div>

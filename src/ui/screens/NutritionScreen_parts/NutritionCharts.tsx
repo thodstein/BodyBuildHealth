@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 import { Line } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
@@ -45,7 +45,7 @@ export const NutritionCharts: React.FC<{
     responsive: true,
     maintainAspectRatio: false,
     plugins: {
-      legend: { display: true, position: 'top' },
+      legend: { display: true, position: 'top' as const },
       title: { display: true, text: 'КБЖУ за 7-30 дней' },
     },
     scales: {

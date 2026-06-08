@@ -1,40 +1,15 @@
-import React, { useState, useMemo, useEffect } from 'react';
-import { RISK_SYSTEMS, DRUG_THRESHOLDS, SUPPORT_BASE_COVERAGE } from '../../core/constants';
-import { SYSTEM_INFO, MECHANISM_INFO, SYSTEM_ORGANS } from '../../core/risk-info';
+﻿import React, { useState, useMemo, useEffect } from 'react';
+import { RISK_SYSTEMS } from '../../core/constants';
+import { SYSTEM_INFO, MECHANISM_INFO } from '../../core/risk-info';
 import type { RiskResult, MechanismCell } from '../../core/types';
-import { calculateRisks, type AggregatedRisk } from '../../engines/risk.engine';
+import { calculateRisks } from '../../engines/risk.engine';
 import { calculateRiskFromAnalyses } from '../../engines/risk-calculator-v2.engine';
-import { calculatePenaltyCoefficients, PenaltyCoefficients } from '../../engines/labs-penalty.engine';
-import { computeLabIndexDetails, type LabIndexDetail } from '../../engines/labs-indices.engine';
-import HumanBody3D from '../components/HumanBody3D';
+import { calculatePenaltyCoefficients } from '../../engines/labs-penalty.engine';
 import { getRiskColor } from '../../core/utils/risk-colors';
-import { PHARMA_DB } from '../../core/pharma-database';
 import { useDataLink } from '../../core/data-link';
-import { SYNERGY_PAIRS, type SynergyPair } from '../../engines/support.engine';
 import { RiskOverview } from './RiskScreen_parts/RiskOverview';
 import { RiskMatrix } from './RiskScreen_parts/RiskMatrix';
 import { RiskDetails } from './RiskScreen_parts/RiskDetails';
-
-const RISK_MECHANISMS = Object.values(MECHANISM_INFO);
-
-const SYSTEM_LABELS: Record<string, string> = Object.fromEntries(
-  Object.entries(SYSTEM_INFO).map(([k, v]) => [k, v.label.split(' ').slice(0, 2).join(' ')])
-);
-
-const SYSTEM_FULL_LABELS: Record<string, string> = Object.fromEntries(
-  Object.entries(SYSTEM_INFO).map(([k, v]) => [k, v.label])
-);
-
-const getCellColor = (raw: number, net: number): { bg: string; text: string } => {
-  const v = net > 0 ? net : raw;
-  if (v < 20) return { bg: 'rgba(34,197,94,0.15)', text: '#22c55e' };
-  if (v < 40) return { bg: 'rgba(132,204,22,0.15)', text: '#84cc16' };
-  if (v < 60) return { bg: 'rgba(234,179,8,0.15)', text: '#eab308' };
-  if (v < 80) return { bg: 'rgba(249,115,22,0.2)', text: '#f97316' };
-  return { bg: 'rgba(239,68,68,0.2)', text: '#ef4444' };
-};
-
-type MatrixData = Record<string, MechanismCell>;
 
 const RISK_HISTORY_KEY = 'risk_history';
 const MAX_HISTORY = 12;
@@ -60,29 +35,18 @@ export const RiskScreen: React.FC = () => {
   const [tab, setTab] = useState<'overview' | 'matrix' | 'details'>('overview');
   const [forceNoLabs, setForceNoLabs] = useState(false);
 
-  useEffect(() => {
-    const history = loadRiskHistory();
-    if (history.length > 0) {
-      console.log('Risk history loaded:', history.length, 'entries');
-    }
-  }, []);
-
   const hasLabs = linked.labs && linked.labs.length > 0;
 
   const riskResult = useMemo<RiskResult | null>(() => {
     if (!linked.profile) return null;
     
+    const genetics = linked.profile.settings.genetics ?? {};
     const riskInput = {
-      profile: linked.profile,
-      labs: linked.labs,
-      course: linked.course,
-      readiness: linked.readiness,
+      genetics,
+      nutritionFactor: linked.profile.settings.nutritionFactor ?? 0.8,
+      trainingFactor: linked.profile.settings.trainingFactor ?? 0.7,
       activeDrugs: linked.activeDrugs,
       supportCoverage: linked.supportCoverage,
-      pharmaRisks: linked.pharmaRisks,
-      supportRisks: linked.supportRisks,
-      trainingRisks: linked.trainingRisks,
-      nutritionRisks: linked.nutritionRisks,
     };
     
     const rawResult = calculateRisks(riskInput);
@@ -100,22 +64,28 @@ export const RiskScreen: React.FC = () => {
   }, [linked, hasLabs, forceNoLabs]);
 
   function applyPenaltyToResult(result: RiskResult): RiskResult {
+    const phase = linked.profile?.settings.phase || 'baseline';
     const penalty = calculatePenaltyCoefficients(
-      linked.profile.phase || 'baseline',
+      phase,
       linked.labs || [],
-      [], // submittedDiagnostics
-      1, // courseWeek
+      [],
+      1,
       linked.course,
       forceNoLabs
     );
     const totalMultiplier = 1.0 + penalty.labPenalty + penalty.diagnosticPenalty;
     
-    const finalResult = { ...result };
+    const finalResult: RiskResult = { ...result, systemBreakdown: { ...result.systemBreakdown } };
     
     if (finalResult.systemBreakdown) {
       for (const sys of RISK_SYSTEMS) {
-        finalResult.systemBreakdown[sys].raw = Math.min(100, result.systemBreakdown[sys].raw * totalMultiplier);
-        finalResult.systemBreakdown[sys].net = Math.min(100, result.systemBreakdown[sys].net * totalMultiplier);
+        const sb = finalResult.systemBreakdown[sys];
+        if (sb) {
+          finalResult.systemBreakdown[sys] = {
+            raw: Math.min(100, sb.raw * totalMultiplier),
+            net: Math.min(100, sb.net * totalMultiplier),
+          };
+        }
       }
     }
     

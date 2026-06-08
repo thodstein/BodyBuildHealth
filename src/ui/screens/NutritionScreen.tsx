@@ -1,29 +1,38 @@
-import React, { useState, useEffect, useMemo } from 'react';
+﻿import React, { useState, useEffect, useMemo } from 'react';
 import { calcNutrition, generateStructuredAdvice } from '../../engines/nutrition.engine';
 import { getProfile } from '../../core/profile-manager';
 import { FOOD_DB } from '../../core/nutrition-database';
 import { useDataLink, derivePAL } from '../../core/data-link';
+import type { FoodItem } from '../../core/types';
 import { NutritionOverview } from './NutritionScreen_parts/NutritionOverview';
 import { NutritionDiary } from './NutritionScreen_parts/NutritionDiary';
 import { NutritionCharts } from './NutritionScreen_parts/NutritionCharts';
 
+interface DiaryEntry {
+  name: string;
+  kcal: number;
+  p: number;
+  f: number;
+  c: number;
+}
+
 export const NutritionScreen: React.FC = () => {
   const linked = useDataLink();
   const [tab, setTab] = useState<'overview' | 'diary' | 'charts'>('overview');
-  const [foodEntries, setFoodEntries] = useState([]);
+  const [foodEntries, setFoodEntries] = useState<DiaryEntry[]>([]);
 
   useEffect(() => {
     try {
       const raw = localStorage.getItem('nutrition_diary');
       if (raw) {
         const diary = JSON.parse(raw);
-        const entries = Object.values(diary).flatMap((d: any) =>
-          (Object.values(d.meals) as any[][]).flat().map((m: any) => ({
+        const entries: DiaryEntry[] = Object.values(diary).flatMap((d: any) =>
+          (Object.values((d as any).meals) as any[][]).flat().map((m: any) => ({
             name: m.name,
-            calories: m.kcal,
-            protein: m.p,
-            fat: m.f,
-            carbs: m.c,
+            kcal: m.kcal,
+            p: m.p,
+            f: m.f,
+            c: m.c,
           }))
         );
         setFoodEntries(entries);
@@ -32,19 +41,19 @@ export const NutritionScreen: React.FC = () => {
   }, []);
 
   const avgWeeklyKcal = useMemo(() => {
-    return foodEntries.reduce((sum, e) => sum + e.calories, 0) / Math.max(1, foodEntries.length / 7);
+    return foodEntries.reduce((sum, e) => sum + e.kcal, 0) / Math.max(1, foodEntries.length / 7);
   }, [foodEntries]);
 
   const avgWeeklyProtein = useMemo(() => {
-    return foodEntries.reduce((sum, e) => sum + e.protein, 0) / Math.max(1, foodEntries.length / 7);
+    return foodEntries.reduce((sum, e) => sum + e.p, 0) / Math.max(1, foodEntries.length / 7);
   }, [foodEntries]);
 
   const avgWeeklyFat = useMemo(() => {
-    return foodEntries.reduce((sum, e) => sum + e.fat, 0) / Math.max(1, foodEntries.length / 7);
+    return foodEntries.reduce((sum, e) => sum + e.f, 0) / Math.max(1, foodEntries.length / 7);
   }, [foodEntries]);
 
   const avgWeeklyCarbs = useMemo(() => {
-    return foodEntries.reduce((sum, e) => sum + e.carbs, 0) / Math.max(1, foodEntries.length / 7);
+    return foodEntries.reduce((sum, e) => sum + e.c, 0) / Math.max(1, foodEntries.length / 7);
   }, [foodEntries]);
 
   const renderContent = () => {

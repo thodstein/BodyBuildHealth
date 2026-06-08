@@ -1,8 +1,8 @@
-import React from 'react';
-import type { FoodItem } from '../../core/types';
+﻿import React from 'react';
+import type { FoodItem } from '../../../core/types';
 
 export const NutritionDiary: React.FC<{
-  foodEntries: FoodItem[];
+  foodEntries: { name: string; kcal: number; p: number; f: number; c: number }[];
 }> = ({ foodEntries }) => {
   return (
     <div className="nutrition-diary">
@@ -18,7 +18,7 @@ export const NutritionDiary: React.FC<{
               <div key={i} style={{ padding: 8, borderBottom: '1px solid var(--border)' }}>
                 <div style={{ fontWeight: 600 }}>{entry.name}</div>
                 <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>
-                  {entry.calories} ккал | {entry.protein}г белки | {entry.fat}г жиры | {entry.carbs}г углеводы
+                  {entry.kcal} ккал | {entry.p}г белки | {entry.f}г жиры | {entry.c}г углеводы
                 </div>
               </div>
             ))}
