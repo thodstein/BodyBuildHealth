@@ -1,4 +1,4 @@
-﻿import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useRef } from 'react';
 import { RISK_SYSTEMS, REQUIRED_LABS_PER_PHASE, UCUM_MAP } from '../../core/constants';
 import type { RiskResult, LabPoint } from '../../core/types';
 import { calculateRiskFromAnalyses } from '../../engines/risk-calculator-v2.engine';
@@ -11,6 +11,7 @@ import { LabsResults } from './LabsScreen_parts/LabsResults';
 import { LabsSchedule } from './LabsScreen_parts/LabsSchedule';
 import { LabsCatalog } from './LabsScreen_parts/LabsCatalog';
 import { LabsInvestigations } from './LabsScreen_parts/LabsInvestigations';
+import { processUploadedFile, saveParsedLabs, type ParsedLabValue, type OCRResult } from '../../core/ocr-engine';
 
 // Global penalty state shared with RiskScreen via localStorage
 const NO_LABS_KEY = 'he_force_no_labs';
@@ -60,6 +61,12 @@ export const LabsScreen: React.FC = () => {
   const [inputUnit, setInputUnit] = useState('');
   const [inputDate, setInputDate] = useState(new Date().toISOString().split('T')[0]);
   const [, setTick] = useState(0);
+  const [showImport, setShowImport] = useState(false);
+  const [ocrResult, setOcrResult] = useState<OCRResult | null>(null);
+  const [ocrLoading, setOcrLoading] = useState(false);
+  const [selectedLabs, setSelectedLabs] = useState<Set<string>>(new Set());
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
 
   const hasLabs = linked.labs && linked.labs.length > 0;
   const labs: LabPoint[] = linked.labs || [];
@@ -197,6 +204,37 @@ export const LabsScreen: React.FC = () => {
       setTick(t => t + 1);
     } catch (e) { console.error(e); }
   }, [inputCode, inputValue, inputUnit, inputDate, selectedPhase]);
+  // Handle file upload for OCR
+  const handleFileUpload = useCallback(async (file: File) => {
+    setOcrLoading(true);
+    setOcrResult(null);
+    setSelectedLabs(new Set());
+    try {
+      const result = await processUploadedFile(file);
+      setOcrResult(result);
+      if (result.labs.length > 0) {
+        setSelectedLabs(new Set(result.labs.map(l => l.code)));
+      }
+    } catch (e: any) {
+      setOcrResult({ text: '', labs: [], meals: [], source: 'text', confidence: 0, warnings: ['Ошибка: ' + (e?.message || String(e))] });
+    }
+    setOcrLoading(false);
+  }, []);
+
+  const confirmOcrLabs = useCallback(async () => {
+    if (!ocrResult) return;
+    const labsToSave = ocrResult.labs.filter(l => selectedLabs.has(l.code));
+    if (labsToSave.length === 0) return;
+    const saved = await saveParsedLabs(labsToSave, selectedPhase);
+    if (saved > 0) { notifyDataChange(); setTick(t => t + 1); }
+    setShowImport(false);
+    setOcrResult(null);
+    setSelectedLabs(new Set());
+  }, [ocrResult, selectedLabs, selectedPhase]);
+
+  const toggleLabSelection = useCallback((code: string) => {
+    setSelectedLabs(prev => { const next = new Set(prev); if (next.has(code)) next.delete(code); else next.add(code); return next; });
+  }, []);
 
   const renderContent = () => {
     switch (tab) {
@@ -244,6 +282,30 @@ export const LabsScreen: React.FC = () => {
           </button>
         ))}
       </div>
+
+      
+{/* IMPORT BUTTONS */}
+      <div style={{ display: 'flex', gap: 4, marginTop: 8 }}>
+        <button onClick={() => { setShowImport(true); setTimeout(() => fileInputRef.current?.click(), 100); }} style={{
+          flex: 1, padding: 9, borderRadius: 8, border: '1px solid var(--border)',
+          background: 'var(--bg-secondary)', color: 'var(--accent)', fontWeight: 600, fontSize: 12, cursor: 'pointer',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
+        }}>📄 PDF</button>
+        <button onClick={() => { setShowImport(true); setTimeout(() => { if (cameraInputRef.current) cameraInputRef.current.click(); }, 100); }} style={{
+          flex: 1, padding: 9, borderRadius: 8, border: '1px solid var(--border)',
+          background: 'var(--bg-secondary)', color: 'var(--accent)', fontWeight: 600, fontSize: 12, cursor: 'pointer',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
+        }}>📸 Фото</button>
+        <button onClick={() => setShowLabInput(true)} style={{
+          flex: 1, padding: 9, borderRadius: 8, border: '1px solid var(--border)',
+          background: 'var(--bg-secondary)', color: 'var(--text-dim)', fontWeight: 600, fontSize: 12, cursor: 'pointer',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
+        }}>✏️ Ручной</button>
+      </div>
+      <input ref={fileInputRef} type="file" accept=".pdf,.png,.jpg,.jpeg,.webp,.txt" style={{ display: 'none' }}
+        onChange={e => { const f = e.target.files?.[0]; if (f) handleFileUpload(f); }} />
+      <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" style={{ display: 'none' }}
+        onChange={e => { const f = e.target.files?.[0]; if (f) handleFileUpload(f); }} />
 
       {/* Required labs progress for phase */}
       <div className="card" style={{ marginTop: 8 }}>
@@ -384,7 +446,105 @@ export const LabsScreen: React.FC = () => {
         )}
       </div>
 
-      {/* Lab Input Modal */}
+      
+      {/* OCR Import Modal */}
+      {showImport && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' }} onClick={() => { setShowImport(false); setOcrResult(null); }}>
+          <div style={{ position: 'fixed', top: '8%', left: '4%', right: '4%', zIndex: 201, background: 'var(--bg)', borderRadius: 20, maxHeight: '84vh', overflow: 'hidden', display: 'flex', flexDirection: 'column' }} onClick={e => e.stopPropagation()}>
+            <div style={{ padding: '12px 16px 8px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontWeight: 700, fontSize: 15 }}>📄 Импорт анализов</span>
+              <button onClick={() => { setShowImport(false); setOcrResult(null); }} style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text-dim)', borderRadius: 8, padding: '4px 10px', fontSize: 12, cursor: 'pointer' }}>✕</button>
+            </div>
+            <div style={{ flex: 1, overflowY: 'auto', padding: '12px 16px' }}>
+              {ocrLoading && (
+                <div style={{ textAlign: 'center', padding: 40 }}>
+                  <div className="loading-spinner" style={{ margin: '0 auto 16px' }} />
+                  <div style={{ fontSize: 13, color: 'var(--text-dim)' }}>Распознаю документ...</div>
+                  <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 4 }}>OCR обработка (10-30 сек)</div>
+                </div>
+              )}
+              {!ocrLoading && !ocrResult && (
+                <div>
+                  <p style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 12 }}>Загрузите PDF или фото результатов анализов для автоматического распознавания.</p>
+                  <div style={{ display: 'grid', gap: 8 }}>
+                    <button onClick={() => fileInputRef.current?.click()} style={{ padding: 16, borderRadius: 12, border: '2px dashed var(--border)', background: 'var(--bg-secondary)', color: 'var(--accent)', fontWeight: 600, fontSize: 14, cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
+                      <span style={{ fontSize: 28 }}>📄</span><span>Выбрать PDF или фото</span>
+                      <span style={{ fontSize: 10, color: 'var(--text-dim)', fontWeight: 400 }}>PDF, PNG, JPG, WEBP</span>
+                    </button>
+                    <button onClick={() => { if (cameraInputRef.current) cameraInputRef.current.click(); }} style={{ padding: 16, borderRadius: 12, border: '2px dashed var(--border)', background: 'var(--bg-secondary)', color: 'var(--accent)', fontWeight: 600, fontSize: 14, cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
+                      <span style={{ fontSize: 28 }}>📸</span><span>Сфотографировать</span>
+                      <span style={{ fontSize: 10, color: 'var(--text-dim)', fontWeight: 400 }}>Камера устройства</span>
+                    </button>
+                  </div>
+                  <div style={{ marginTop: 12, padding: '8px 10px', background: 'rgba(0,230,138,0.08)', borderRadius: 8, fontSize: 10, color: 'var(--text-dim)' }}>
+                    💡 <strong>Совет:</strong> PDF от лабораторий (Гемотест, Инвитро, Хеликс, KDL) распознаются лучше всего. Чёткие фото без бликов.
+                  </div>
+                </div>
+              )}
+              {ocrResult && !ocrLoading && (
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span style={{ fontSize: 18 }}>{ocrResult.labs.length > 0 ? '✅' : '⚠️'}</span>
+                      <span style={{ fontWeight: 700, fontSize: 13 }}>{ocrResult.labs.length > 0 ? `Найдено: ${ocrResult.labs.length} показателей` : 'Показатели не найдены'}</span>
+                    </div>
+                    <span style={{ fontSize: 10, background: 'var(--bg-secondary)', padding: '2px 8px', borderRadius: 4, color: 'var(--text-dim)' }}>
+                      {ocrResult.source === 'pdf' ? 'PDF' : ocrResult.source === 'image' ? 'Фото' : 'Текст'} • {Math.round(ocrResult.confidence * 100)}%
+                    </span>
+                  </div>
+                  {ocrResult.warnings.length > 0 && (
+                    <div style={{ background: 'rgba(234,179,8,0.12)', border: '1px solid rgba(234,179,8,0.2)', borderRadius: 8, padding: '8px 10px', marginBottom: 8 }}>
+                      {ocrResult.warnings.map((w, i) => <div key={i} style={{ fontSize: 10, color: '#eab308' }}>⚠️ {w}</div>)}
+                    </div>
+                  )}
+                  {ocrResult.labs.length > 0 && (
+                    <div>
+                      <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 6 }}>Выберите показатели для сохранения в фазу «{PHASE_LABELS[selectedPhase]}»:</div>
+                      <div style={{ display: 'grid', gap: 4 }}>
+                        {ocrResult.labs.map(lab => {
+                          const isSelected = selectedLabs.has(lab.code);
+                          const ucumInfo = UCUM_MAP[lab.code.toUpperCase()];
+                          return (
+                            <button key={lab.code} onClick={() => toggleLabSelection(lab.code)} style={{
+                              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                              padding: '8px 10px', borderRadius: 8, cursor: 'pointer', textAlign: 'left',
+                              background: isSelected ? 'rgba(0,230,138,0.1)' : 'var(--bg-secondary)',
+                              border: `1px solid ${isSelected ? 'var(--accent)' : 'var(--border)'}`,
+                              transition: 'all 0.15s',
+                            }}>
+                              <div style={{ flex: 1 }}>
+                                <div style={{ fontWeight: 600, fontSize: 12, color: isSelected ? 'var(--accent)' : 'var(--text)' }}>{isSelected ? '✓ ' : '○ '}{lab.name || lab.code}</div>
+                                {ucumInfo && <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Норма: {ucumInfo.lln}–{ucumInfo.uln} {ucumInfo.prefUnit}</div>}
+                              </div>
+                              <div style={{ textAlign: 'right' }}>
+                                <span style={{ fontWeight: 700, fontSize: 14, color: lab.isAbnormal ? '#ef4444' : 'var(--accent)' }}>{lab.value}</span>
+                                <span style={{ fontSize: 10, color: 'var(--text-dim)', marginLeft: 3 }}>{lab.unit}</span>
+                                {lab.isAbnormal && <span style={{ marginLeft: 4, color: '#ef4444', fontSize: 11 }}>⚠️</span>}
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                      <button onClick={confirmOcrLabs} disabled={selectedLabs.size === 0} style={{
+                        width: '100%', marginTop: 12, padding: 12,
+                        background: selectedLabs.size > 0 ? 'var(--accent)' : 'var(--bg-secondary)',
+                        color: selectedLabs.size > 0 ? '#000' : 'var(--text-dim)',
+                        border: 'none', borderRadius: 10, fontWeight: 700, fontSize: 14, cursor: selectedLabs.size > 0 ? 'pointer' : 'not-allowed',
+                      }}>✓ Сохранить {selectedLabs.size} показателей</button>
+                    </div>
+                  )}
+                  {ocrResult.text.length > 0 && (
+                    <details style={{ marginTop: 12 }}>
+                      <summary style={{ fontSize: 11, color: 'var(--text-dim)', cursor: 'pointer' }}>📄 Распознанный текст ({ocrResult.text.length} симв.)</summary>
+                      <pre style={{ fontSize: 9, color: 'var(--text-dim)', background: 'var(--bg-secondary)', padding: 8, borderRadius: 6, maxHeight: 120, overflow: 'auto', whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>{ocrResult.text.slice(0, 2000)}</pre>
+                    </details>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}{/* Lab Input Modal */}
       {showLabInput && (
         <div style={{
           position: 'fixed', inset: 0, zIndex: 200,
@@ -442,3 +602,7 @@ export const LabsScreen: React.FC = () => {
     </div>
   );
 };
+
+
+
+

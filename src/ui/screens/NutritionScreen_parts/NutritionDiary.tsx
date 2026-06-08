@@ -1,7 +1,8 @@
-﻿import React, { useState } from 'react';
+﻿import React, { useState, useRef } from 'react';
 import { BarcodeScanner } from '../../components/BarcodeScanner';
 import { type OFFProduct } from '../../../engines/openfoodfacts.engine';
 import { parseFatSecretText, parseNutritionScreenshot } from '../../../engines/nutrition-ocr-parser';
+import { processUploadedFile, saveParsedMeals } from '../../../core/ocr-engine';
 
 export const NutritionDiary: React.FC<{
   foodEntries: { name: string; kcal: number; p: number; f: number; c: number }[];
@@ -11,6 +12,9 @@ export const NutritionDiary: React.FC<{
   const [ocrText, setOcrText] = useState('');
   const [parsedItems, setParsedItems] = useState<{ name: string; kcal: number; p: number; f: number; c: number }[]>([]);
   const [ocrError, setOcrError] = useState('');
+  const [ocrFileLoading, setOcrFileLoading] = useState(false);
+  const ocrFileRef = useRef<HTMLInputElement>(null);
+  const ocrCameraRef = useRef<HTMLInputElement>(null);
 
   const handleBarcodeProduct = (product: OFFProduct) => {
     setShowBarcode(false);
@@ -21,7 +25,33 @@ export const NutritionDiary: React.FC<{
       f: product.fat,
       c: product.carbs,
     }]);
-  };  const handleOCR = () => {
+  };  const handleOcrFileUpload = async (file: File) => {
+    setOcrFileLoading(true);
+    setOcrError('');
+    try {
+      const result = await processUploadedFile(file);
+      if (result.meals.length > 0) {
+        const converted = result.meals.flatMap(m =>
+          m.items.map(item => ({
+            name: item.name || m.mealType || '\u0411\u043B\u044E\u0434\u043E',
+            kcal: Math.round(item.kcal) || 0,
+            p: Math.round((item.p || 0) * 10) / 10,
+            f: Math.round((item.f || 0) * 10) / 10,
+            c: Math.round((item.c || 0) * 10) / 10,
+          }))
+        );
+        setParsedItems(prev => [...prev, ...converted]);
+      }
+      if (result.meals.length === 0 && result.labs.length === 0) {
+        setOcrError('\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u0440\u0430\u0441\u043F\u043E\u0437\u043D\u0430\u0442\u044C \u0434\u0430\u043D\u043D\u044B\u0435 \u043F\u0438\u0442\u0430\u043D\u0438\u044F.');
+      }
+    } catch (e) {
+      setOcrError('\u041E\u0448\u0438\u0431\u043A\u0430: ' + (e instanceof Error ? e.message : String(e)));
+    }
+    setOcrFileLoading(false);
+  };
+
+  const handleOCR = () => {
     if (!ocrText.trim()) return;
     setOcrError('');
     try {
@@ -63,9 +93,22 @@ export const NutritionDiary: React.FC<{
           {showBarcode ? '📷 Сканер штрих-кода (открыто) ▲' : '📷 Сканер штрих-кода — найти продукт ▼'}
         </button>
         {showBarcode && (
-          <BarcodeScanner onProductFound={handleBarcodeProduct} onClose={() => setShowBarcode(false)} />
+                    <BarcodeScanner onProductFound={handleBarcodeProduct} onClose={() => setShowBarcode(false)} />
         )}
-                {/* OCR Paste Section */}
+
+        {/* File/Camera upload for nutrition OCR */}
+        <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
+          <button onClick={() => ocrFileRef.current?.click()} disabled={ocrFileLoading} style={{ flex: 1, padding: 10, borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg-secondary)', color: 'var(--accent)', fontWeight: 600, fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, opacity: ocrFileLoading ? 0.5 : 1 }}>
+            {ocrFileLoading ? '⏳' : '📄'} {ocrFileLoading ? 'Загрузка...' : 'Файл PDF/фото'}
+          </button>
+          <button onClick={() => { if (ocrCameraRef.current) ocrCameraRef.current.click(); }} disabled={ocrFileLoading} style={{ flex: 1, padding: 10, borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg-secondary)', color: 'var(--accent)', fontWeight: 600, fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, opacity: ocrFileLoading ? 0.5 : 1 }}>
+            📸 Снимок
+          </button>
+        </div>
+        <input ref={ocrFileRef} type="file" accept=".pdf,.png,.jpg,.jpeg,.webp,.txt" style={{ display: 'none' }} onChange={e => { const f = e.target.files?.[0]; if (f) handleOcrFileUpload(f); }} />
+        <input ref={ocrCameraRef} type="file" accept="image/*" capture="environment" style={{ display: 'none' }} onChange={e => { const f = e.target.files?.[0]; if (f) handleOcrFileUpload(f); }} />
+
+        {/* OCR Paste Section */}
         <button onClick={() => setShowOCR(!showOCR)} style={{
           width: '100%', padding: '10px', borderRadius: 8, border: '1px solid var(--border)',
           background: showOCR ? 'rgba(0,230,138,0.15)' : 'var(--bg-secondary)',
