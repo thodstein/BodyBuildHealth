@@ -45,8 +45,9 @@ export const RiskDetails: React.FC<{
   riskResult: RiskResult;
   labRiskContributions: LabRiskContribution | null;
 }> = ({ riskResult, labRiskContributions }) => {
+  const [expandedSys, setExpandedSys] = React.useState<string | null>(null);
+  const [showAllRecs, setShowAllRecs] = React.useState(false);
 
-  // Generate recommendations from risk data
   const recommendations: { text: string; priority: 'high' | 'medium' | 'low' }[] = [];
   if (riskResult.overallNet > 60) {
     recommendations.push({ text: '⚠️ Общий риск ВЫСОКИЙ — обязательная консультация врача', priority: 'high' });
@@ -74,7 +75,6 @@ export const RiskDetails: React.FC<{
     recommendations.push({ text: '✅ Общий риск низкий — продолжайте текущую стратегию защиты', priority: 'low' });
   }
 
-  // Collect contributors from mechanism detail
   const contributorMap: Record<string, string[]> = {};
   const mitigationMap: Record<string, { substance: string; reduction: number }[]> = {};
   if (riskResult.mechanismDetail) {
@@ -91,16 +91,14 @@ export const RiskDetails: React.FC<{
     }
   }
 
-  // Deduplicate contributors
   for (const sys of Object.keys(contributorMap)) {
     contributorMap[sys] = [...new Set(contributorMap[sys])];
   }
 
   return (
     <div className="risk-details">
-      {/* Per-system detailed breakdown */}
       <div className="card">
-        <h3>📋 Детали по системам</h3>
+        <h3 style={{ margin: '0 0 10px', fontSize: 15 }}>📋 Детали по системам</h3>
 
         {RISK_SYSTEMS.map((sys: string) => {
           const bd = riskResult.systemBreakdown[sys];
@@ -111,8 +109,8 @@ export const RiskDetails: React.FC<{
           const whatAffects = getSystemWhatAffects(sys);
           const symptoms = getSystemSymptoms(sys);
           const labContrib = labRiskContributions?.systemContributions?.[sys] || 0;
+          const isExpanded = expandedSys === sys;
 
-          // Get mechanisms for this system
           const sysMechanisms: { mechNum: number; cell: MechanismCell }[] = [];
           if (riskResult.mechanismDetail) {
             for (const [key, cell] of Object.entries(riskResult.mechanismDetail)) {
@@ -124,101 +122,132 @@ export const RiskDetails: React.FC<{
           }
 
           return (
-            <div key={sys} style={{ marginBottom: 16, background: 'var(--bg-secondary)', padding: 12, borderRadius: 8 }}>
-              {/* Header */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <span style={{ fontSize: 22 }}>{icon}</span>
-                  <div>
-                    <div style={{ fontWeight: 700, fontSize: 14 }}>{label}</div>
-                    {description && <div style={{ fontSize: 10, color: 'var(--text-dim)', maxWidth: 300 }}>{description.substring(0, 100)}...</div>}
+            <div key={sys} className="risk-system-detail" style={{ marginBottom: 8, background: 'var(--bg-secondary)', padding: 10, borderRadius: 8, borderLeft: `3px solid ${getRiskColor(bd.net)}` }}>
+              <div
+                style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}
+                onClick={() => setExpandedSys(isExpanded ? null : sys)}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 1, minWidth: 0 }}>
+                  <span style={{ fontSize: 18, flexShrink: 0 }}>{icon}</span>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontWeight: 700, fontSize: 13 }}>{label}</div>
+                    {!isExpanded && description && (
+                      <div style={{ fontSize: 10, color: 'var(--text-dim)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {description.substring(0, 60)}...
+                      </div>
+                    )}
                   </div>
                 </div>
-                <div style={{ textAlign: 'right' }}>
-                  <div style={{ fontSize: 22, fontWeight: 700, color: getRiskColor(bd.net) }}>{Math.round(bd.net)}%</div>
-                  <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>Raw: {Math.round(bd.raw)}%</div>
-                  {labContrib > 0 && <div style={{ fontSize: 10, color: '#f97316' }}>Лабы: +{Math.round(labContrib)}%</div>}
+                <div style={{ textAlign: 'right', flexShrink: 0, marginLeft: 8 }}>
+                  <div style={{ fontSize: 18, fontWeight: 700, color: getRiskColor(bd.net) }}>{Math.round(bd.net)}%</div>
+                  <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Raw: {Math.round(bd.raw)}%</div>
                 </div>
               </div>
 
-              {/* Risk bar */}
-              <div style={{ background: 'rgba(255,255,255,0.1)', borderRadius: 4, height: 10, overflow: 'hidden', marginBottom: 8 }}>
-                <div style={{ width: `${Math.min(100, bd.net)}%`, height: '100%', background: getRiskColor(bd.net), borderRadius: 4, transition: 'width 0.3s' }} />
+              {/* Always-visible risk bar */}
+              <div style={{ background: 'rgba(255,255,255,0.1)', borderRadius: 3, height: 6, overflow: 'hidden', marginTop: 6 }}>
+                <div style={{ width: `${Math.min(100, bd.net)}%`, height: '100%', background: getRiskColor(bd.net), borderRadius: 3, transition: 'width 0.3s' }} />
               </div>
 
               {/* Status badge */}
-              <div style={{ marginBottom: 8 }}>
+              <div style={{ marginTop: 4 }}>
                 <span style={{
-                  padding: '3px 10px',
+                  padding: '2px 8px',
                   borderRadius: 4,
-                  fontSize: 11,
+                  fontSize: 10,
                   fontWeight: 600,
                   background: bd.net > 80 ? 'rgba(239,68,68,0.2)' : bd.net > 60 ? 'rgba(249,115,22,0.2)' : bd.net > 40 ? 'rgba(234,179,8,0.2)' : 'rgba(34,197,94,0.2)',
                   color: bd.net > 80 ? '#ef4444' : bd.net > 60 ? '#f97316' : bd.net > 40 ? '#eab308' : '#22c55e',
                 }}>
                   {bd.net > 80 ? '⛔ Критично' : bd.net > 60 ? '🔴 Тревожно' : bd.net > 40 ? '⚡ Умеренно' : '✅ Норма'}
                 </span>
+                {labContrib > 0 && <span style={{ marginLeft: 6, fontSize: 10, color: '#f97316' }}>Лабы: +{Math.round(labContrib)}%</span>}
               </div>
 
-              {/* Mechanisms breakdown */}
-              {sysMechanisms.length > 0 && (
-                <div style={{ marginBottom: 8 }}>
-                  <div style={{ fontSize: 11, fontWeight: 600, marginBottom: 4 }}>Механизмы:</div>
-                  {sysMechanisms.map(({ mechNum, cell }) => {
-                    const mechInfo = getMechanismInfo(mechNum);
-                    return (
-                      <div key={mechNum} style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 0', fontSize: 10 }}>
-                        <span>{mechInfo?.label || `Механизм ${mechNum}`}</span>
-                        <span style={{ color: getRiskColor(cell.net) }}>{Math.round(cell.net)}%</span>
+              {/* Expanded details */}
+              {isExpanded && (
+                <div style={{ marginTop: 8 }}>
+                  {description && (
+                    <div style={{ fontSize: 11, color: 'var(--text-dim)', lineHeight: 1.4, marginBottom: 8 }}>
+                      {description}
+                    </div>
+                  )}
+
+                  {/* Mechanisms breakdown */}
+                  {sysMechanisms.length > 0 && (
+                    <div style={{ marginBottom: 8 }}>
+                      <div style={{ fontSize: 11, fontWeight: 600, marginBottom: 4 }}>Механизмы:</div>
+                      {sysMechanisms.map(({ mechNum, cell }) => {
+                        const mechInfo = getMechanismInfo(mechNum);
+                        return (
+                          <div key={mechNum} style={{ marginBottom: 4 }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11 }}>
+                              <span>{mechInfo?.label || `Механизм ${mechNum}`}</span>
+                              <span style={{ color: getRiskColor(cell.net) }}>{Math.round(cell.net)}%</span>
+                            </div>
+                            <div style={{ background: 'rgba(255,255,255,0.1)', borderRadius: 3, height: 4, overflow: 'hidden' }}>
+                              <div style={{ width: `${Math.min(100, cell.net)}%`, height: '100%', background: getRiskColor(cell.net), borderRadius: 3 }} />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {/* Contributors (drugs) */}
+                  {contributorMap[sys] && contributorMap[sys].length > 0 && (
+                    <div style={{ marginBottom: 8 }}>
+                      <div style={{ fontSize: 11, fontWeight: 600, marginBottom: 4 }}>Факторы риска:</div>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
+                        {[...new Set(contributorMap[sys])].map((id: string) => (
+                          <span key={id} style={{ background: 'rgba(239,68,68,0.1)', padding: '1px 6px', borderRadius: 4, fontSize: 10, color: '#f97316' }}>
+                            {(PHARMA_DB as any)[id]?.name || id}
+                          </span>
+                        ))}
                       </div>
-                    );
-                  })}
-                </div>
-              )}
+                    </div>
+                  )}
 
-              {/* Contributors (drugs) */}
-              {contributorMap[sys] && contributorMap[sys].length > 0 && (
-                <div style={{ marginBottom: 8 }}>
-                  <div style={{ fontSize: 11, fontWeight: 600, marginBottom: 4 }}>Факторы риска:</div>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-                    {[...new Set(contributorMap[sys])].map((id: string) => (
-                      <span key={id} style={{ background: 'rgba(239,68,68,0.1)', padding: '2px 8px', borderRadius: 4, fontSize: 10, color: '#f97316' }}>
-                        {(PHARMA_DB as any)[id]?.name || id}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
+                  {/* Mitigations (support) */}
+                  {mitigationMap[sys] && mitigationMap[sys].length > 0 && (
+                    <div style={{ marginBottom: 8 }}>
+                      <div style={{ fontSize: 11, fontWeight: 600, marginBottom: 4 }}>Защита:</div>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
+                        {[...new Map(mitigationMap[sys].map(m => [m.substance, m])).values()].map((m) => (
+                          <span key={m.substance} style={{ background: 'rgba(0,230,138,0.1)', padding: '1px 6px', borderRadius: 4, fontSize: 10, color: 'var(--accent)' }}>
+                            {m.substance} (−{Math.round(m.reduction * 100)}%)
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
-              {/* Mitigations (support) */}
-              {mitigationMap[sys] && mitigationMap[sys].length > 0 && (
-                <div style={{ marginBottom: 8 }}>
-                  <div style={{ fontSize: 11, fontWeight: 600, marginBottom: 4 }}>Защита:</div>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-                    {[...new Map(mitigationMap[sys].map(m => [m.substance, m])).values()].map((m) => (
-                      <span key={m.substance} style={{ background: 'rgba(0,230,138,0.1)', padding: '2px 8px', borderRadius: 4, fontSize: 10, color: 'var(--accent)' }}>
-                        {m.substance} (−{Math.round(m.reduction * 100)}%)
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
+                  {/* What affects */}
+                  {whatAffects.length > 0 && (
+                    <div style={{ marginBottom: 4 }}>
+                      <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>
+                        <strong>Влияет на:</strong> {whatAffects.join(', ')}
+                      </div>
+                    </div>
+                  )}
 
-              {/* What affects */}
-              {whatAffects.length > 0 && (
-                <div style={{ marginBottom: 4 }}>
-                  <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>
-                    <strong>Влияет на:</strong> {whatAffects.join(', ')}
-                  </div>
-                </div>
-              )}
+                  {/* Symptoms */}
+                  {symptoms.length > 0 && bd.net > 40 && (
+                    <div>
+                      <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>
+                        <strong>Симптомы:</strong> {symptoms.join(', ')}
+                      </div>
+                    </div>
+                  )}
 
-              {/* Symptoms */}
-              {symptoms.length > 0 && bd.net > 40 && (
-                <div>
-                  <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>
-                    <strong>Симптомы:</strong> {symptoms.join(', ')}
-                  </div>
+                  {/* Organs */}
+                  {SYSTEM_ORGANS[sys] && (
+                    <div style={{ marginTop: 4 }}>
+                      <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>
+                        <strong>Органы:</strong> {SYSTEM_ORGANS[sys].join(', ')}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -227,36 +256,41 @@ export const RiskDetails: React.FC<{
       </div>
 
       {/* Recommendations */}
-      <div className="card" style={{ marginTop: 12 }}>
-        <h3>💡 Рекомендации</h3>
+      <div className="card" style={{ marginTop: 8 }}>
+        <h3 style={{ margin: '0 0 8px', fontSize: 14 }}>💡 Рекомендации</h3>
         {recommendations.length > 0 ? (
-          <div style={{ display: 'grid', gap: 6 }}>
-            {recommendations.map((rec, i) => (
+          <div style={{ display: 'grid', gap: 4 }}>
+            {(showAllRecs ? recommendations : recommendations.slice(0, 5)).map((rec, i) => (
               <div key={i} style={{
-                padding: 8,
+                padding: 6,
                 borderRadius: 6,
                 background: rec.priority === 'high' ? 'rgba(239,68,68,0.15)' : rec.priority === 'medium' ? 'rgba(234,179,8,0.15)' : 'rgba(34,197,94,0.15)',
-                fontSize: 12,
+                fontSize: 11,
               }}>
                 {rec.text}
               </div>
             ))}
+            {recommendations.length > 5 && (
+              <button onClick={() => setShowAllRecs(!showAllRecs)} style={{ background: 'none', border: 'none', color: 'var(--accent)', fontSize: 11, cursor: 'pointer', padding: 4 }}>
+                {showAllRecs ? 'Скрыть' : `Показать ещё (${recommendations.length - 5})`}
+              </button>
+            )}
           </div>
         ) : (
-          <div style={{ color: 'var(--text-dim)', textAlign: 'center', padding: 16 }}>
+          <div style={{ color: 'var(--text-dim)', textAlign: 'center', padding: 12, fontSize: 12 }}>
             Нет специфических рекомендаций — риски в пределах нормы
           </div>
         )}
       </div>
 
-      {/* Risk history note */}
-      <div className="card" style={{ marginTop: 12 }}>
-        <h3>ℹ️ Оценка рисков</h3>
-        <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>
-          <p><strong>Raw</strong> — риск без учёта поддержки (препараты + тренировки + генетика).</p>
-          <p><strong>Net</strong> — итоговый риск с учётом поддержки (БАДы, препараты поддержки, образ жизни).</p>
-          <p>Риск рассчитывается по 8 системам и 7 механизмам повреждения для каждого препарата.</p>
-          <p style={{ marginTop: 8, fontSize: 11 }}><em>Данные носят информационный характер и не заменяют консультацию врача.</em></p>
+      {/* Risk explanation */}
+      <div className="card" style={{ marginTop: 8 }}>
+        <h3 style={{ margin: '0 0 8px', fontSize: 14 }}>ℹ️ Оценка рисков</h3>
+        <div style={{ fontSize: 11, color: 'var(--text-dim)', lineHeight: 1.5 }}>
+          <p style={{ margin: '0 0 4px' }}><strong>Raw</strong> — риск без учёта поддержки (препараты + тренировки + генетика).</p>
+          <p style={{ margin: '0 0 4px' }}><strong>Net</strong> — итоговый риск с учётом поддержки (БАДы, препараты поддержки, образ жизни).</p>
+          <p style={{ margin: '0 0 4px' }}>Риск рассчитывается по {RISK_SYSTEMS.length} системам и 7 механизмам повреждения.</p>
+          <p style={{ margin: '4px 0 0', fontSize: 10, fontStyle: 'italic' }}>Данные носят информационный характер и не заменяют консультацию врача.</p>
         </div>
       </div>
     </div>

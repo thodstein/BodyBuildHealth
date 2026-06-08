@@ -72,9 +72,7 @@ export async function processUploadedFile(file: File): Promise<OCRResult> {
       rawText = result.data.text || '';
       
       if (rawText.length > 20) {
-        // Try to parse as lab results
-        const labResult = parseLabFile(file);
-        // Since parseLabFile is async and we already have text, parse directly
+        // Parse the OCR text directly (parseLabText is sync)
         const { parseLabText } = await import('../engines/pdf-parser.engine');
         const parsed = parseLabText(rawText);
         labs = parsed.values.map(v => ({

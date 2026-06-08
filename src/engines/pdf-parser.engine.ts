@@ -1,4 +1,4 @@
-export interface ParsedLabValue {
+﻿export interface ParsedLabValue {
   code: string;
   name: string;
   value: number;

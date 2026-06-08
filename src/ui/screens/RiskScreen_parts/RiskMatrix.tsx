@@ -17,18 +17,6 @@ interface MatrixRow {
   mitigations: { substance: string; reduction: number }[];
 }
 
-const SYSTEM_LABELS: Record<string, string> = Object.fromEntries(
-  Object.entries(SYSTEM_INFO).map(([k, v]) => [k, v.label])
-);
-
-function getCellColor(value: number): string {
-  if (value < 20) return 'rgba(34,197,94,0.15)';
-  if (value < 40) return 'rgba(132,204,22,0.15)';
-  if (value < 60) return 'rgba(234,179,8,0.15)';
-  if (value < 80) return 'rgba(249,115,22,0.2)';
-  return 'rgba(239,68,68,0.2)';
-}
-
 function getTextColor(value: number): string {
   if (value < 20) return '#22c55e';
   if (value < 40) return '#84cc16';
@@ -65,11 +53,9 @@ export const RiskMatrix: React.FC<{
       });
     }
 
-    // Sort by net risk descending
     return result.sort((a, b) => b.net - a.net);
   }, [riskResult.mechanismDetail]);
 
-  // Group by system for system view
   const systemGroups = React.useMemo(() => {
     const groups: Record<string, MatrixRow[]> = {};
     for (const row of rows) {
@@ -104,7 +90,6 @@ export const RiskMatrix: React.FC<{
 
         {view === 'matrix' ? (
           <div>
-            {/* Legend */}
             <div style={{ display: 'flex', gap: 8, marginBottom: 8, fontSize: 10, color: 'var(--text-dim)' }}>
               <span>🟢 &lt;20%</span>
               <span>🟡 20-40%</span>
@@ -113,49 +98,35 @@ export const RiskMatrix: React.FC<{
               <span>⛔ &gt;80%</span>
             </div>
 
-            {/* Table header */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr 0.5fr 0.5fr 0.5fr 0.8fr', gap: 4, marginBottom: 4, fontSize: 10, fontWeight: 600, color: 'var(--text-dim)' }}>
-              <div>Механизм</div>
-              <div>Система</div>
-              <div>Raw</div>
-              <div>Net</div>
-              <div>Защита</div>
-              <div>Статус</div>
-            </div>
-
-            {/* Table rows */}
             {rows.map((row) => (
-              <div key={row.mechanismKey} style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr 0.5fr 0.5fr 0.5fr 0.8fr', gap: 4, padding: '4px 0', borderBottom: '1px solid var(--border)', fontSize: 11 }}>
-                <div>
-                  <div style={{ fontWeight: 500 }}>{row.mechanismLabel}</div>
-                  {row.mechanismDescription && (
-                    <div style={{ fontSize: 9, color: 'var(--text-dim)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {row.mechanismDescription.substring(0, 60)}...
-                    </div>
-                  )}
+              <div key={row.mechanismKey} style={{ background: 'var(--bg-secondary)', borderRadius: 8, padding: '8px 10px', marginBottom: 6, borderLeft: `3px solid ${getTextColor(row.net)}` }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                  <div style={{ fontWeight: 600, fontSize: 12, color: getTextColor(row.net) }}>{row.mechanismLabel}</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>{row.systemLabel}</span>
+                    <span style={{ padding: '2px 6px', borderRadius: 4, fontSize: 9, fontWeight: 600, background: row.net > 60 ? 'rgba(239,68,68,0.2)' : row.net > 30 ? 'rgba(234,179,8,0.2)' : 'rgba(34,197,94,0.2)', color: row.net > 60 ? '#ef4444' : row.net > 30 ? '#eab308' : '#22c55e' }}>
+                      {row.net > 60 ? '❗ Высокий' : row.net > 30 ? '⚡ Умеренный' : '✓ Низкий'}
+                    </span>
+                  </div>
                 </div>
-                <div style={{ fontSize: 11 }}>{row.systemLabel}</div>
-                <div style={{ background: getCellColor(row.raw), borderRadius: 4, padding: '2px 4px', textAlign: 'center', fontWeight: 600 }}>{Math.round(row.raw)}%</div>
-                <div style={{ background: getCellColor(row.net), borderRadius: 4, padding: '2px 4px', textAlign: 'center', fontWeight: 600, color: getTextColor(row.net) }}>{Math.round(row.net)}%</div>
-                <div style={{ textAlign: 'center', color: row.coverage > 0.5 ? '#22c55e' : 'var(--text-dim)' }}>
-                  {Math.round(row.coverage * 100)}%
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <div style={{ flex: 1, background: 'rgba(255,255,255,0.05)', borderRadius: 3, height: 6, overflow: 'hidden' }}>
+                    <div style={{ width: `${Math.min(100, row.net)}%`, height: '100%', background: getRiskColor(row.net), borderRadius: 3, transition: 'width 0.3s' }} />
+                  </div>
+                  <span style={{ fontWeight: 700, fontSize: 13, color: getTextColor(row.net), minWidth: 32 }}>{Math.round(row.net)}%</span>
                 </div>
-                <div>
-                  <span style={{
-                    padding: '2px 6px',
-                    borderRadius: 4,
-                    fontSize: 10,
-                    background: row.net > 60 ? 'rgba(239,68,68,0.2)' : row.net > 30 ? 'rgba(234,179,8,0.2)' : 'rgba(34,197,94,0.2)',
-                    color: row.net > 60 ? '#ef4444' : row.net > 30 ? '#eab308' : '#22c55e',
-                  }}>
-                    {row.net > 60 ? '❗ Высокий' : row.net > 30 ? '⚡ Умеренный' : '✓ Низкий'}
-                  </span>
-                </div>
+                {row.mechanismDescription && row.mechanismDescription.length > 0 && (
+                  <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 4, lineHeight: 1.3 }}>{row.mechanismDescription.substring(0, 120)}{row.mechanismDescription.length > 120 ? '...' : ''}</div>
+                )}
+                {row.coverage > 0 && (
+                  <div style={{ fontSize: 9, color: row.coverage > 0.5 ? '#22c55e' : 'var(--text-dim)', marginTop: 2 }}>
+                    🛡️ Защита: {Math.round(row.coverage * 100)}%
+                  </div>
+                )}
               </div>
             ))}
           </div>
         ) : (
-          /* Systems view */
           <div>
             {Object.entries(systemGroups).sort(([a], [b]) => a.localeCompare(b)).map(([sysKey, sysRows]) => {
               const sysInfo = SYSTEM_INFO[sysKey];
@@ -171,7 +142,6 @@ export const RiskMatrix: React.FC<{
                     <span style={{ fontWeight: 700, color: getRiskColor(avgNet), fontSize: 16 }}>{Math.round(avgNet)}%</span>
                   </div>
 
-                  {/* Mechanism bars */}
                   {sysRows.map((row) => (
                     <div key={row.mechanismKey} style={{ marginBottom: 4 }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11 }}>
@@ -184,7 +154,6 @@ export const RiskMatrix: React.FC<{
                     </div>
                   ))}
 
-                  {/* Key markers */}
                   {sysInfo?.keyMarkers && (
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 6 }}>
                       {sysInfo.keyMarkers.map((m, i) => (

@@ -101,18 +101,17 @@ export const PharmaScreen: React.FC = () => {
   return (
     <div className="screen pharma">
       <h2>Фармакология</h2>
-      <div style={{ display: 'flex', gap: 4, marginBottom: 12 }}>
+      <div className="tab-bar" style={{ marginBottom: 8 }}>
         {([
-          ['catalog', 'Каталог'],
-          ['pkpd', 'PK/PD'],
-          ['dosage', 'Дозировка'],
-          ['interactions', 'Взаимодействия'],
-          ['course', 'Мой курс'],
+          ['catalog', '📖 Каталог'],
+          ['pkpd', '⚙️ PK/PD'],
+          ['dosage', '📊 Доза'],
+          ['interactions', '⚡ Взаимод.'],
+          ['course', '💊 Курс'],
         ] as [Tab, string][]).map(([key, label]) => (
           <button
             key={key}
-            className={`btn${tab === key ? ' active' : ''}`}
-            style={{ fontSize: 12, padding: '10px 14px', whiteSpace: 'nowrap' }}
+            className={`tab-btn ${tab === key ? 'active' : ''}`}
             onClick={() => setTab(key)}
           >
             {label}
@@ -274,10 +273,10 @@ const CatalogTab: React.FC = () => {
   const detail = selectedId ? PHARMA_DETAILS[selectedId] : undefined;
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.2fr', gap: 12 }}>
+    <div className="catalog-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1.2fr', gap: 12 }}>
       <div style={{ maxHeight: 'calc(100vh - 160px)', overflowY: 'auto', paddingRight: 4 }}>
         <input type="text" placeholder="Поиск препарата..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', fontSize: 13, marginBottom: 8, boxSizing: 'border-box' }} />
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 8 }}>
+        <div className="pharma-class-filters" style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 8 }}>
           <button onClick={() => setFilterClass('all')} style={{ padding: '3px 8px', borderRadius: 4, fontSize: 11, border: filterClass === 'all' ? '1px solid var(--accent)' : '1px solid var(--border)', background: filterClass === 'all' ? 'rgba(0,230,138,0.15)' : 'transparent', color: 'var(--text-primary)', cursor: 'pointer' }}>Все</button>
           {PHARMA_CLASSES.map(cls => (
             <button key={cls} onClick={() => setFilterClass(cls)} style={{ padding: '3px 8px', borderRadius: 4, fontSize: 11, border: filterClass === cls ? '1px solid var(--accent)' : '1px solid var(--border)', background: filterClass === cls ? 'rgba(0,230,138,0.15)' : 'transparent', color: 'var(--text-primary)', cursor: 'pointer' }}>{CLASS_LABELS[cls] || cls}</button>
@@ -333,7 +332,7 @@ const DrugDetailCard: React.FC<{ sub: PharmaSubstance; detail?: PharmaDetail }> 
   return (
     <div className="card" style={{ fontSize: 12, lineHeight: 1.6 }}>
       <h3 style={{ margin: '0 0 8px', color: 'var(--accent)' }}>{sub.name}</h3>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 16px', marginBottom: 8 }}>
+      <div className="pharma-detail-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 16px', marginBottom: 8 }}>
         <span>Класс:</span><span style={{ fontWeight: 600 }}>{CLASS_LABELS[sub.class] || sub.class}</span>
         <span>T½:</span><span style={{ fontWeight: 600 }}>{formatHalfLife(sub.pk.halfLifeHours)}</span>
         <span>Биодоступность:</span><span style={{ fontWeight: 600 }}>{(sub.pk.bioavailability * 100).toFixed(0)}%</span>
@@ -391,7 +390,7 @@ const DrugDetailCard: React.FC<{ sub: PharmaSubstance; detail?: PharmaDetail }> 
           {detail.dosageRange && (
             <div style={{ borderTop: '1px solid var(--border)', paddingTop: 8, marginBottom: 8 }}>
               <div style={{ fontWeight: 600, marginBottom: 4 }}>Диапазон дозировок</div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2px 12px' }}>
+              <div className="pharma-detail-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2px 12px' }}>
                 <span>Минимум:</span><span>{detail.dosageRange.min} {detail.dosageRange.unit}</span>
                 <span>Максимум:</span><span style={{ color: '#ff9100' }}>{detail.dosageRange.max} {detail.dosageRange.unit}</span>
                 <span>Частота:</span><span>{detail.dosageRange.frequency}</span>
@@ -598,7 +597,7 @@ const PKPDSimulationTab: React.FC = () => {
                 <button className="btn" style={{ fontSize: 10, padding: '2px 8px' }} onClick={() => removeDrug(idx)}>✕</button>
               )}
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
+            <div className="pharma-dosage-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
               <div>
                 <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Доза (мг)</label>
                 <input type="number" value={dd.doseMg} onChange={(e) => updateDrug(idx, 'doseMg', Number(e.target.value))} style={{ width: '100%', fontSize: 12 }} />
@@ -809,7 +808,7 @@ const InteractionCheckerTab: React.FC = () => {
             Ключевые синергетические пары между препаратами
           </p>
           
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 8 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 8 }}>
             {SYNERGY_PAIRS.map((pair, i) => {
               const synergyColors: Record<string, string> = {
                 synergistic: 'rgba(0,230,138,0.1)',

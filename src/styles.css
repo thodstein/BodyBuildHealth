@@ -1433,3 +1433,64 @@ input[type="text"], input[type="number"], input[type="date"], select, textarea {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
+
+/* === PharmaScreen mobile responsive === */
+@media (max-width: 600px) {
+  .catalog-grid {
+    grid-template-columns: 1fr !important;
+  }
+  .catalog-grid > div:first-child {
+    max-height: none !important;
+  }
+  .catalog-grid > div:last-child {
+    max-height: none !important;
+  }
+  .pharma-pkpd-grid {
+    grid-template-columns: 1fr !important;
+  }
+  .pharma-dosage-grid {
+    grid-template-columns: 1fr !important;
+  }
+  .pharma-detail-grid {
+    grid-template-columns: 1fr !important;
+  }
+  .pharma-synergy-grid {
+    grid-template-columns: 1fr !important;
+  }
+  .pharma-interaction-card {
+    font-size: 11px !important;
+    padding: 8px !important;
+  }
+  .pharma-class-filters {
+    flex-wrap: wrap !important;
+    gap: 3px !important;
+  }
+  .pharma-class-filters button {
+    font-size: 10px !important;
+    padding: 3px 6px !important;
+  }
+}
+@media (max-width: 380px) {
+  .pharma-class-filters button {
+    font-size: 9px !important;
+    padding: 2px 4px !important;
+  }
+}
+
+/* Risk details mobile compact */
+@media (max-width: 480px) {
+  .risk-details .card {
+    padding: 8px !important;
+  }
+  .risk-details h3 {
+    font-size: 14px !important;
+  }
+  .risk-system-detail {
+    padding: 8px !important;
+    margin-bottom: 10px !important;
+  }
+  .risk-system-detail > div:first-child {
+    flex-wrap: wrap !important;
+    gap: 4px !important;
+  }
+}

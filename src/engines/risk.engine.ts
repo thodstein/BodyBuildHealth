@@ -1,4 +1,4 @@
-import { GENETIC_MULTIPLIERS, DRUG_THRESHOLDS, RISK_SYSTEMS, BASE_RISK, MRR_FACTORS, HGI_FACTORS, RIR_FACTORS, SUPPORT_BASE_COVERAGE } from '../core/constants';
+﻿import { GENETIC_MULTIPLIERS, DRUG_THRESHOLDS, RISK_SYSTEMS, BASE_RISK, MRR_FACTORS, HGI_FACTORS, RIR_FACTORS, SUPPORT_BASE_COVERAGE } from '../core/constants';
 import { RiskInput, RiskResult, MechanismCell } from '../core/types';
 import { PHARMA_DB } from '../core/pharma-database';
 
