@@ -95,18 +95,18 @@ const GOAL_CONFIGS: Record<string, { volumeMod: number; intensityMod: number; re
 };
 
 const EXTENDED_SPLITS: Record<string, { name: string; desc: string; groupsPerDay: string[][]; minDays: number; maxDays: number; level: string[] }> = {
-  fullbody_3: { name: 'дулбоди 3 дня', desc: '3 дня в неделю, всё тело на каждой тренировке. Шдеально для новичков.', groupsPerDay: [['chest','back','legs','shoulders','arms','core']], minDays: 3, maxDays: 3, level: ['beginner'] },
-  fullbody_3alt: { name: 'дулбоди Рльтернативная', desc: '3 дня с чередованием акцентов: A — грудь/спина/квадрицепс, B — плечи/руки/задняя поверхность.', groupsPerDay: [['chest','back','legs'],['shoulders','arms','core']], minDays: 3, maxDays: 3, level: ['beginner','intermediate'] },
-  upper_lower_4: { name: 'Терх/Эиз 4 дня', desc: 'зередование верхних и нижних дней. Сазовый сплит для среднего уровня.', groupsPerDay: [['chest','back','shoulders','arms'],['legs','core']], minDays: 4, maxDays: 4, level: ['beginner','intermediate'] },
-  push_pull_legs_5: { name: 'PPL 5 дней', desc: 'Цим/вяга/Эоги с одним повторным днём. Яопулярный сплит.', groupsPerDay: [['chest','shoulders','arms'],['back','arms'],['legs','core']], minDays: 5, maxDays: 5, level: ['intermediate','advanced'] },
-  push_pull_legs_6: { name: 'PPL 6 дней', desc: 'Цим/вяга/Эоги × 2. Ьаксимальный объём для продвинутых.', groupsPerDay: [['chest','shoulders'],['back','arms'],['legs','core']], minDays: 6, maxDays: 6, level: ['advanced','enhanced'] },
-  bro_5: { name: 'Сро-сплит 5 дней', desc: 'Урудь/бпина/Эоги/Ялечи/ауки. Ълассический бодибилдинг.', groupsPerDay: [['chest'],['back'],['legs'],['shoulders','arms'],['arms','core']], minDays: 5, maxDays: 5, level: ['intermediate','advanced'] },
-  strength_4: { name: 'биловой 4 дня', desc: 'Ярисед/Цим/вяга/ЮдЯ. Фля пауэрлифтеров.', groupsPerDay: [['legs','core'],['chest','shoulders'],['back','arms'],['legs','shoulders']], minDays: 4, maxDays: 4, level: ['intermediate','advanced','enhanced'] },
-  hypertrophy_5: { name: 'Уипертрофия 5 дней', desc: 'Урудь+трицепс/бпина+бицепс/Эоги/Ялечи+руки/Эоги повтор. Ьаксимум объёма.', groupsPerDay: [['chest','arms'],['back','arms'],['legs','core'],['shoulders','arms'],['legs','core']], minDays: 5, maxDays: 5, level: ['advanced','enhanced'] },
-  torso_limbs_4: { name: 'ворсо/Ъонечности 4 дня', desc: 'Терхняя/нижняя части с акцентом на слабые группы.', groupsPerDay: [['chest','back','shoulders'],['legs','core'],['chest','shoulders','arms'],['legs','core']], minDays: 4, maxDays: 4, level: ['intermediate'] },
-  powerbuilding_4: { name: 'Яауэрбилдинг 4 дня', desc: 'биловое + гипертрофийное. Фень 1: биловое присед/жим. Фень 3: биловая тяга.', groupsPerDay: [['chest','shoulders','arms'],['legs','core'],['back','arms'],['legs','shoulders','core']], minDays: 4, maxDays: 4, level: ['intermediate','advanced'] },
-  recovery_3: { name: 'Тосстановительный 3 дня', desc: 'Ыёгкие нагрузки, полный диапазон, низкий RIR. Фля реабилитации и делодов.', groupsPerDay: [['chest','back','shoulders'],['legs','core'],['full_body_light']], minDays: 3, maxDays: 3, level: ['beginner'] },
-  arnold_6: { name: 'Ррнольд-сплит 6 дней', desc: 'Урудь+спина / Ялечи+руки / Эоги × 2. Фля продвинутых на курсе.', groupsPerDay: [['chest','back'],['shoulders','arms'],['legs','core']], minDays: 6, maxDays: 6, level: ['advanced','enhanced'] },
+  fullbody_3: { name: 'Фулбоди 3 дня', desc: '3 дня в неделю, всё тело на каждой тренировке. Идеально для новичков.', groupsPerDay: [['chest','back','legs','shoulders','arms','core']], minDays: 3, maxDays: 3, level: ['beginner'] },
+  fullbody_3alt: { name: 'Фулбоди Альтернативная', desc: '3 дня с чередованием акцентов: A — грудь/спина/квадрицепс, B — плечи/руки/задняя поверхность.', groupsPerDay: [['chest','back','legs'],['shoulders','arms','core']], minDays: 3, maxDays: 3, level: ['beginner','intermediate'] },
+  upper_lower_4: { name: 'Верх/Эиз 4 дня', desc: 'Чередование верхних и нижних дней. Базовый сплит для среднего уровня.', groupsPerDay: [['chest','back','shoulders','arms'],['legs','core']], minDays: 4, maxDays: 4, level: ['beginner','intermediate'] },
+  push_pull_legs_5: { name: 'PPL 5 дней', desc: 'Жим/тяга/Ноги с одним повторным днём. Популярный сплит.', groupsPerDay: [['chest','shoulders','arms'],['back','arms'],['legs','core']], minDays: 5, maxDays: 5, level: ['intermediate','advanced'] },
+  push_pull_legs_6: { name: 'PPL 6 дней', desc: 'Жим/тяга/Ноги × 2. Максимальный объём для продвинутых.', groupsPerDay: [['chest','shoulders'],['back','arms'],['legs','core']], minDays: 6, maxDays: 6, level: ['advanced','enhanced'] },
+  bro_5: { name: 'Сро-сплит 5 дней', desc: 'Грудь/спина/Ноги/Плечи/ауки. Классический бодибилдинг.', groupsPerDay: [['chest'],['back'],['legs'],['shoulders','arms'],['arms','core']], minDays: 5, maxDays: 5, level: ['intermediate','advanced'] },
+  strength_4: { name: 'силовой 4 дня', desc: 'Присед/Жим/тяга/ЮдЯ. Фля пауэрлифтеров.', groupsPerDay: [['legs','core'],['chest','shoulders'],['back','arms'],['legs','shoulders']], minDays: 4, maxDays: 4, level: ['intermediate','advanced','enhanced'] },
+  hypertrophy_5: { name: 'Гипертрофия 5 дней', desc: 'Грудь+трицепс/спина+бицепс/Ноги/Плечи+руки/Ноги повтор. Максимум объёма.', groupsPerDay: [['chest','arms'],['back','arms'],['legs','core'],['shoulders','arms'],['legs','core']], minDays: 5, maxDays: 5, level: ['advanced','enhanced'] },
+  torso_limbs_4: { name: 'торсо/Конечности 4 дня', desc: 'Верхняя/нижняя части с акцентом на слабые группы.', groupsPerDay: [['chest','back','shoulders'],['legs','core'],['chest','shoulders','arms'],['legs','core']], minDays: 4, maxDays: 4, level: ['intermediate'] },
+  powerbuilding_4: { name: 'Пауэрбилдинг 4 дня', desc: 'силовое + гипертрофийное. День 1: силовое присед/жим. День 3: силовая тяга.', groupsPerDay: [['chest','shoulders','arms'],['legs','core'],['back','arms'],['legs','shoulders','core']], minDays: 4, maxDays: 4, level: ['intermediate','advanced'] },
+  recovery_3: { name: 'Восстановительный 3 дня', desc: 'Лёгкие нагрузки, полный диапазон, низкий RIR. Фля реабилитации и делодов.', groupsPerDay: [['chest','back','shoulders'],['legs','core'],['full_body_light']], minDays: 3, maxDays: 3, level: ['beginner'] },
+  arnold_6: { name: 'Арнольд-сплит 6 дней', desc: 'Грудь+спина / Плечи+руки / Ноги × 2. Фля продвинутых на курсе.', groupsPerDay: [['chest','back'],['shoulders','arms'],['legs','core']], minDays: 6, maxDays: 6, level: ['advanced','enhanced'] },
 };
 
 const REST_DAY_NAME = { 0: 'Ян', 1: 'Тт', 2: 'бр', 3: 'зт', 4: 'Ят', 5: 'бб', 6: 'Тс' };
@@ -131,11 +131,11 @@ const MESOCYCLE_SEQUENCES: Record<string, MesocycleType[][]> = {
 };
 
 export const MESOCYCLE_PARAMS: Record<MesocycleType, { volumeMultiplier: number; rirRange: [number, number]; rpeTarget: number; description: string }> = {
-  accumulation: { volumeMultiplier: 1.0, rirRange: [2, 4], rpeTarget: 7, description: 'Эакопительный объём. Тысокий тоннаж, умеренная интенсивность. дорма работы: 3-4 подхода, 8-12 повторений.' },
-  intensification: { volumeMultiplier: 0.85, rirRange: [1, 2], rpeTarget: 8.5, description: 'Шнтенсификация. Объём снижается, интенсивность растёт. аабочие веса тЖС, повторения тЖУ.' },
-  peaking: { volumeMultiplier: 0.7, rirRange: [0, 1], rpeTarget: 9.5, description: 'Яиковый блок. Ьаксимальные веса, минимальный объём. Яодход к 1-3 ЯЬ.' },
-  deload: { volumeMultiplier: 0.5, rirRange: [3, 5], rpeTarget: 6, description: 'аазгрузка. 50-60% объёма, RIR 3-5. Тосстановление бЭб, сверхкомпенсация.' },
-  recovery: { volumeMultiplier: 0.4, rirRange: [4, 6], rpeTarget: 5, description: 'Тосстановительный блок. Ыёгкая активность, полный диапазон. Фля реабилитации и делодов.' },
+  accumulation: { volumeMultiplier: 1.0, rirRange: [2, 4], rpeTarget: 7, description: 'Накопительный объём. Высокий тоннаж, умеренная интенсивность. форма работы: 3-4 подхода, 8-12 повторений.' },
+  intensification: { volumeMultiplier: 0.85, rirRange: [1, 2], rpeTarget: 8.5, description: 'Интенсификация. Объём снижается, интенсивность растёт. рабочие веса тЖС, повторения тЖУ.' },
+  peaking: { volumeMultiplier: 0.7, rirRange: [0, 1], rpeTarget: 9.5, description: 'Пиковый блок. Максимальные веса, минимальный объём. Подход к 1-3 ЯЬ.' },
+  deload: { volumeMultiplier: 0.5, rirRange: [3, 5], rpeTarget: 6, description: 'разгрузка. 50-60% объёма, RIR 3-5. Восстановление бЭб, сверхкомпенсация.' },
+  recovery: { volumeMultiplier: 0.4, rirRange: [4, 6], rpeTarget: 5, description: 'Восстановительный блок. Лёгкая активность, полный диапазон. Фля реабилитации и делодов.' },
 };
 
 export function generateMacrocycle(input: MacrocycleInput): MacrocyclePlan {
@@ -181,7 +181,7 @@ export function generateMacrocycle(input: MacrocycleInput): MacrocyclePlan {
         volumeMultiplier: isDeload ? 0.5 : adjustedVolume,
         rirRange: [Math.max(0, weekRir - 1), weekRir + 1],
         rpeTarget: isDeload ? 6 : params.rpeTarget,
-        notes: isDeload ? 'аазгрузочная неделя — сниженный объём и интенсивность' : params.description,
+        notes: isDeload ? 'разгрузочная неделя — сниженный объём и интенсивность' : params.description,
       });
     }
 
@@ -227,7 +227,7 @@ function generateWeekDays(
   return dayNames.map((day, i) => {
     const isTraining = trainingDays[i];
     if (!isTraining) {
-      return { day, isTraining: false, split: 'Ютдых', exercises: [], duration: 0, intensity: 'low' as const };
+      return { day, isTraining: false, split: 'Отдых', exercises: [], duration: 0, intensity: 'low' as const };
     }
 
     const dayPattern = splitData.groupsPerDay[i % splitData.groupsPerDay.length];
@@ -259,7 +259,7 @@ function generateWeekDays(
             rpe: isDeload ? 6 : rpe,
             restSeconds: (ex.type === 'compound' ? restSeconds : Math.max(45, restSeconds - 30)),
             isCompound: ex.type === 'compound',
-            notes: isWeak ? 'Ркцент на отстающую группу' : undefined,
+            notes: isWeak ? 'Акцент на отстающую группу' : undefined,
             targetMuscle: ex.targetMuscle,
             technique: ex.technique,
             pauseSeconds: ex.pauseSeconds,
@@ -321,8 +321,8 @@ function selectSplit(daysPerWeek: number, level: string, goal: string): string {
 
 function getGroupLabel(group: string): string {
   const labels: Record<string, string> = {
-    chest: 'Урудь', back: 'бпина', legs: 'Эоги', shoulders: 'Ялечи',
-    arms: 'ауки', core: 'Ъор', full_body_light: 'Ыёгкое дв',
+    chest: 'Грудь', back: 'спина', legs: 'Ноги', shoulders: 'Плечи',
+    arms: 'ауки', core: 'Ъор', full_body_light: 'Лёгкое дв',
   };
   return labels[group] || group;
 }
