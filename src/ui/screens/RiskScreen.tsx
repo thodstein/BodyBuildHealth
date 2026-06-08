@@ -158,8 +158,8 @@ export const RiskScreen: React.FC = () => {
 
   return (
     <div className="screen risk">
-      <h2 style={{ margin: '0 0 6px', fontSize: 18 }}>⚠️ Риски</h2>
-      <div className="tab-bar" style={{ gap: 2 }}>
+      <h2 style={{ margin: '0 0 6px', fontSize: 'clamp(16, 4.5vw, 18)' }}>⚠️ Риски</h2>
+      <div className="tab-bar" style={{ gap: 2, overflowX: "auto", WebkitOverflowScrolling: "touch", scrollbarWidth: "none" }}>
         {(['overview', 'dynamics', 'matrix', 'details', 'v7', 'info'] as const).map(t => (
           <button key={t} className={`tab-btn ${tab === t ? 'active' : ''}`} onClick={() => setTab(t)}>
             {TAB_LABELS[t]}

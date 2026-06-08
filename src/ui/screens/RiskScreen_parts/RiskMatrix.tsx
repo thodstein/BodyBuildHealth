@@ -3,6 +3,7 @@ import type { RiskResult, MechanismCell } from '../../../core/types';
 import { RISK_SYSTEMS } from '../../../core/constants';
 import { MECHANISM_INFO, SYSTEM_INFO } from '../../../core/risk-info';
 import { getRiskColor } from '../../../core/utils/risk-colors';
+import { SYSTEM_MECHANISMS } from '../../../core/system-mechanisms';
 
 interface MatrixRow {
   mechanismKey: string;
@@ -142,17 +143,26 @@ export const RiskMatrix: React.FC<{
                     <span style={{ fontWeight: 700, color: getRiskColor(avgNet), fontSize: 16 }}>{Math.round(avgNet)}%</span>
                   </div>
 
-                  {sysRows.map((row) => (
-                    <div key={row.mechanismKey} style={{ marginBottom: 4 }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11 }}>
-                        <span>{row.mechanismLabel}</span>
-                        <span style={{ color: getTextColor(row.net) }}>{Math.round(row.net)}%</span>
+                  {sysRows.map((row) => {
+                    const sysKey = row.systemKey;
+                    const mechNum = parseInt(row.mechanismKey.split('_')[1], 10);
+                    const specificMechs = SYSTEM_MECHANISMS[sysKey] || [];
+                    const specMech = specificMechs.find(m => m.num === mechNum);
+                    return (
+                      <div key={row.mechanismKey} style={{ marginBottom: 4 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11 }}>
+                          <div>
+                            <span style={{ fontWeight: 600 }}>{row.mechanismLabel}</span>
+                            {specMech && <div style={{ fontSize: 9, color: 'var(--text-dim)', marginTop: 1 }}>{specMech.description.substring(0, 60)}…</div>}
+                          </div>
+                          <span style={{ color: getTextColor(row.net), fontWeight: 700 }}>{Math.round(row.net)}%</span>
+                        </div>
+                        <div style={{ background: 'rgba(255,255,255,0.1)', borderRadius: 3, height: 6, overflow: 'hidden' }}>
+                          <div style={{ width: `${Math.min(100, row.net)}%`, height: '100%', background: getRiskColor(row.net), borderRadius: 3 }} />
+                        </div>
                       </div>
-                      <div style={{ background: 'rgba(255,255,255,0.1)', borderRadius: 3, height: 6, overflow: 'hidden' }}>
-                        <div style={{ width: `${Math.min(100, row.net)}%`, height: '100%', background: getRiskColor(row.net), borderRadius: 3 }} />
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
 
                   {sysInfo?.keyMarkers && (
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 6 }}>

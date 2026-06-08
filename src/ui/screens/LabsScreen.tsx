@@ -12,6 +12,8 @@ import { LabsSchedule } from './LabsScreen_parts/LabsSchedule';
 import { LabsCatalog } from './LabsScreen_parts/LabsCatalog';
 import { LabsInvestigations } from './LabsScreen_parts/LabsInvestigations';
 import { processUploadedFile, saveParsedLabs, type ParsedLabValue, type OCRResult } from '../../core/ocr-engine';
+import { SYSTEM_MECHANISMS } from '../../core/system-mechanisms';
+import { SYSTEM_ORGANS } from '../../core/risk-info';
 
 // Global penalty state shared with RiskScreen via localStorage
 const NO_LABS_KEY = 'he_force_no_labs';
@@ -275,7 +277,7 @@ export const LabsScreen: React.FC = () => {
       </div>
 
       {/* Tab bar */}
-      <div className="tab-bar" style={{ gap: 2 }}>
+      <div className="tab-bar" style={{ gap: 2, overflowX: "auto", WebkitOverflowScrolling: "touch", scrollbarWidth: "none" }}>
         {(['results', 'schedule', 'investigations', 'catalog'] as const).map(t => (
           <button key={t} className={`tab-btn ${tab === t ? 'active' : ''}`} onClick={() => setTab(t)}>
             {t === 'results' ? '📊 Рез-ты' : t === 'schedule' ? '📅 График' : t === 'investigations' ? '🔬 Исслед.' : '📖 Каталог'}
@@ -378,6 +380,40 @@ export const LabsScreen: React.FC = () => {
                 </div>
               </div>
             </div>
+            {/* System breakdown with mechanism markers */}
+            {labRisks.systemBreakdown && (
+              <div style={{ marginTop: 6 }}>
+                <div style={{ fontSize: 10, fontWeight: 600, marginBottom: 4, color: 'var(--text-dim)' }}>По системам:</div>
+                <div style={{ display: 'grid', gap: 3 }}>
+                  {Object.entries(labRisks.systemBreakdown)
+                    .filter(([_, v]) => (v as any).net > 0)
+                    .sort(([_, a], [__, b]) => (b as any).net - (a as any).net)
+                    .slice(0, 8)
+                    .map(([sys, val]) => {
+                      const bd = val as { raw: number; net: number };
+                      const mechCount = (SYSTEM_MECHANISMS[sys] || []).length;
+                      const markers = (SYSTEM_MECHANISMS[sys] || []).flatMap(m => m.markers || []).slice(0, 3);
+                      return (
+                        <div key={sys} style={{ background: 'var(--bg-secondary)', padding: '4px 8px', borderRadius: 4 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <span style={{ fontSize: 9, minWidth: 70, color: 'var(--text-dim)' }}>{sysLabels[sys] || sys}</span>
+                            <div style={{ flex: 1, background: 'rgba(255,255,255,0.1)', borderRadius: 3, height: 5, overflow: 'hidden' }}>
+                              <div style={{ width: Math.min(100, bd.net) + '%', height: '100%', background: getRiskColor(bd.net), borderRadius: 3 }} />
+                            </div>
+                            <span style={{ fontSize: 10, fontWeight: 700, color: getRiskColor(bd.net), minWidth: 24, textAlign: 'right' }}>{Math.round(bd.net)}%</span>
+                            {mechCount > 0 && <span style={{ fontSize: 8, color: 'var(--text-dim)' }}>{mechCount}м</span>}
+                          </div>
+                          {markers.length > 0 && (
+                            <div style={{ fontSize: 8, color: 'var(--text-dim)', marginTop: 2, lineHeight: 1.3 }}>
+                              📊 {markers.join(', ')}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                </div>
+              </div>
+            )}
           </div>
         ) : (
           <div style={{ color: 'var(--text-dim)', fontSize: 11 }}>Введите данные анализов для оценки рисков</div>

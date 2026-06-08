@@ -1,6 +1,7 @@
 ﻿import React, { useState } from 'react';
 import { RISK_SYSTEMS, DRUG_THRESHOLDS, GENETIC_MULTIPLIERS, MRR_FACTORS, HGI_FACTORS, RIR_FACTORS, SUPPORT_BASE_COVERAGE, BASE_RISK } from '../../../core/constants';
-import { MECHANISM_INFO, SYSTEM_INFO } from '../../../core/risk-info';
+import { MECHANISM_INFO, SYSTEM_INFO, SYSTEM_ORGANS } from '../../../core/risk-info';
+import { SYSTEM_MECHANISMS } from '../../../core/system-mechanisms';
 
 export const RiskInfo: React.FC = () => {
   const [expanded, setExpanded] = useState<string | null>(null);
@@ -380,7 +381,53 @@ net = Σ(sourceRaw × weight / totalWeight)`}
         )}
       </div>
 
-      {/* Disclaimer */}
+            {/* Специфичные механизмы по системам */}
+      <div className="card" style={{ marginBottom: 8 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }} onClick={() => toggle('sysmechs')}>
+          <h4 style={{ margin: 0, fontSize: 13 }}>🔬 Специфичные механизмы по системам</h4>
+          <span style={{ fontSize: 12 }}>{expanded === 'sysmechs' ? '▲' : '▼'}</span>
+        </div>
+        {expanded === 'sysmechs' && (
+          <div style={{ marginTop: 8, fontSize: 11 }}>
+            <p style={{ margin: '0 0 8px', color: 'var(--text-dim)' }}>Каждая система органов имеет 7–8 специфичных механизмов повреждения, которые рассчитываются независимо и затем агрегируются.</p>
+            <div style={{ background: 'var(--bg-secondary)', padding: 10, borderRadius: 8, fontFamily: 'monospace', fontSize: 10, marginBottom: 8, overflowX: 'auto', whiteSpace: 'pre-wrap' }}>
+{`specificRisk(sys, mech) = max(0, baseRisk × doseRatio × G × N × T × (1 + mechWeight × 3))
+
+systemRisk(sys) = geom(allSpecificMechs(sys))
+
+overallRisk = geom(allSystems) × overallMRR × overallHGI × (2 - overallRIR)`}
+            </div>
+            <p style={{ margin: '0 0 6px', color: 'var(--text-dim)', fontSize: 10 }}>Механизмы привязаны к препаратам и маркерам анализов:</p>
+            {RISK_SYSTEMS.map(sys => {
+              const info = SYSTEM_INFO[sys];
+              const mechs = SYSTEM_MECHANISMS[sys] || [];
+              if (mechs.length === 0) return null;
+              return (
+                <div key={sys} style={{ background: 'var(--bg-secondary)', padding: '6px 10px', borderRadius: 6, marginBottom: 4 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontWeight: 600 }}>{info?.icon || '⚠'} {info?.label || sys}</span>
+                    <span style={{ fontSize: 9, color: 'var(--text-dim)' }}>{mechs.length} мех.</span>
+                  </div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 2, marginTop: 3 }}>
+                    {mechs.map(m => (
+                      <span key={m.id} style={{ background: 'rgba(0,230,138,0.08)', padding: '1px 5px', borderRadius: 3, fontSize: 9 }}>
+                        {m.num}. {m.label}
+                      </span>
+                    ))}
+                  </div>
+                  {SYSTEM_ORGANS[sys] && (
+                    <div style={{ fontSize: 9, color: 'var(--text-dim)', marginTop: 2 }}>
+                      Органы: {SYSTEM_ORGANS[sys].slice(0, 3).join(', ')}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+{/* Disclaimer */}
       <div style={{ fontSize: 10, color: 'var(--text-dim)', textAlign: 'center', marginTop: 8, fontStyle: 'italic', lineHeight: 1.4 }}>
         Данные расчёты носят информационный характер и не заменяют консультацию врача.<br/>
         Модель Health Engine v9 — математическая аппроксимация на основе опубликованных данных.

@@ -64,8 +64,8 @@ export const RiskOverview: React.FC<{
     <div className="risk-overview">
       {/* Общий риск */}
       <div className="card" style={{ marginBottom: 8 }}>
-        <h3 style={{ margin: '0 0 8px', fontSize: 15 }}>📊 Общий риск</h3>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
+        <h3 style={{ margin: '0 0 8px', fontSize: 'clamp(13, 4vw, 15)' }}>📊 Общий риск</h3>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(80px, 1fr))', gap: 4 }}>
           <div style={{ background: 'var(--bg-secondary)', padding: '8px 6px', borderRadius: 8, textAlign: 'center' }}>
             <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Raw</div>
             <div style={{ fontSize: 20, fontWeight: 700, color: getRiskColor(riskResult.overallRaw) }}>{Math.round(riskResult.overallRaw)}%</div>
@@ -109,7 +109,7 @@ export const RiskOverview: React.FC<{
             const label = SYSTEM_LABELS_SHORT[sys] || getSystemLabel(sys);
             return (
               <div key={sys} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{ fontSize: 11, minWidth: 100, color: 'var(--text-dim)' }}>{label}</span>
+                <span style={{ fontSize: 11, minWidth: 70, color: 'var(--text-dim)' }}>{label}</span>
                 <div style={{ flex: 1, background: 'var(--bg-secondary)', borderRadius: 3, height: 8, overflow: 'hidden' }}>
                   <div style={{ width: `${Math.min(100, bd.net)}%`, height: '100%', background: getRiskColor(bd.net), borderRadius: 3 }} />
                 </div>
