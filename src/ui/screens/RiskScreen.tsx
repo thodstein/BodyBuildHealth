@@ -13,6 +13,8 @@ import { RiskOverview } from './RiskScreen_parts/RiskOverview';
 import { RiskMatrix } from './RiskScreen_parts/RiskMatrix';
 import { RiskDetails } from './RiskScreen_parts/RiskDetails';
 import { V7RiskDisplay } from './RiskScreen_parts/V7RiskDisplay';
+import { WeeklyRiskChart } from './RiskScreen_parts/WeeklyRiskChart';
+import { calculateWeeklyRiskDynamics, type WeeklyRiskDynamics } from '../../engines/weekly-risk-dynamics.engine';
 import { useV7Risk } from '../hooks/useV7Risk';
 
 const RISK_HISTORY_KEY = 'risk_history';
@@ -28,6 +30,7 @@ function saveRiskHistory(entry: { date: string; overallRaw: number; overallNet: 
 
 const TAB_LABELS: Record<string, string> = {
   overview: '📊 Обзор',
+  dynamics: '📈 Динамика',
   matrix: '🔬 Матрица',
   details: '📋 Детали',
   v7: '⚡ V7',
@@ -35,9 +38,27 @@ const TAB_LABELS: Record<string, string> = {
 
 export const RiskScreen: React.FC = () => {
   const linked = useDataLink();
-  const [tab, setTab] = useState<'overview' | 'matrix' | 'details' | 'v7'>('overview');
+  const [tab, setTab] = useState<'overview' | 'matrix' | 'details' | 'v7' | 'dynamics'>('overview');
   const [tick, setTick] = useState(0);
+  const [selectedWeek, setSelectedWeek] = useState<number | null>(null);
+  const [weekMode, setWeekMode] = useState<'week' | 'average'>('average');
   const { v7Result, legacyResult: v7Legacy } = useV7Risk();
+
+  // Calculate weekly risk dynamics from course
+  const weeklyDynamics = useMemo<WeeklyRiskDynamics | null>(() => {
+    if (!linked.profile || !linked.activeDrugs) return null;
+    const genetics = linked.profile.settings.genetics ?? {};
+    return calculateWeeklyRiskDynamics(
+      {
+        genetics,
+        nutritionFactor: linked.profile.settings.nutritionFactor ?? 0.8,
+        trainingFactor: linked.profile.settings.trainingFactor ?? 0.7,
+        activeDrugs: linked.activeDrugs,
+        supportCoverage: linked.supportCoverage,
+      },
+      linked.course || [],
+    );
+  }, [linked.profile, linked.activeDrugs, linked.supportCoverage, linked.course]);
 
   // Read penalty state from LabsScreen's global storage
   const globalNoLabs = getGlobalNoLabs();
@@ -127,6 +148,7 @@ export const RiskScreen: React.FC = () => {
       case 'matrix': return <RiskMatrix riskResult={riskResult} />;
       case 'details': return <RiskDetails riskResult={riskResult} labRiskContributions={labRiskContributions} />;
       case 'v7': return v7Result ? <V7RiskDisplay result={v7Result} /> : <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-dim)' }}>Загрузка V7...</div>;
+      case 'dynamics': return <WeeklyRiskChart dynamics={weeklyDynamics} selectedWeek={selectedWeek} onWeekSelect={setSelectedWeek} mode={weekMode} onModeChange={setWeekMode} />;
       default: return <RiskOverview riskResult={riskResult} globalNoLabs={globalNoLabs} noLabsSystems={noLabsSystems} labRiskContributions={labRiskContributions} riskHistory={riskHistory} />;
     }
   };
@@ -135,7 +157,7 @@ export const RiskScreen: React.FC = () => {
     <div className="screen risk">
       <h2 style={{ margin: '0 0 6px', fontSize: 18 }}>⚠️ Риски</h2>
       <div className="tab-bar" style={{ gap: 2 }}>
-        {(['overview', 'matrix', 'details', 'v7'] as const).map(t => (
+        {(['overview', 'dynamics', 'matrix', 'details', 'v7'] as const).map(t => (
           <button key={t} className={`tab-btn ${tab === t ? 'active' : ''}`} onClick={() => setTab(t)}>
             {TAB_LABELS[t]}
           </button>
