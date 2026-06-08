@@ -2,7 +2,7 @@
 import { RISK_SYSTEMS, DRUG_THRESHOLDS, SUPPORT_BASE_COVERAGE } from '../../core/constants';
 import { SYSTEM_INFO, MECHANISM_INFO, SYSTEM_ORGANS } from '../../core/risk-info';
 import type { RiskResult, MechanismCell, LabPoint } from '../../core/types';
-import { calculateRisks, type AggregatedRisk } from '../../engines/risk.engine';
+import { calculateRisks, calculateAggregatedRisks, type AggregatedRisk } from '../../engines/risk.engine';
 import { calculateRiskFromAnalyses } from '../../engines/risk-calculator-v2.engine';
 import { calculatePenaltyCoefficients } from '../../engines/labs-penalty.engine';
 import { computeLabIndexDetails } from '../../engines/labs-indices.engine';
@@ -63,8 +63,30 @@ export const RiskScreen: React.FC = () => {
   }, [linked.profile, linked.activeDrugs, linked.supportCoverage, linked.course]);
 
   // Read penalty state from LabsScreen's global storage
-  const globalNoLabs = getGlobalNoLabs();
-  const noLabsSystems = getNoLabsSystems();
+  const [globalNoLabsState, setGlobalNoLabsState] = useState(getGlobalNoLabs());
+  const [noLabsSystemsState, setNoLabsSystemsState] = useState(getNoLabsSystems());
+  const [forceNoLabs, setForceNoLabs] = useState<boolean>(getGlobalNoLabs());
+  const globalNoLabs = forceNoLabs || globalNoLabsState;
+  const noLabsSystems = noLabsSystemsState;
+
+  // Toggle forceNoLabs
+  const toggleForceNoLabs = () => {
+    const next = !forceNoLabs;
+    setForceNoLabs(next);
+    setGlobalNoLabsState(next);
+    setGlobalNoLabsState(next);
+    if (next) setNoLabsSystemsState([]);
+    notifyDataChange();
+  };
+
+  // Listen for labs screen changes
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setGlobalNoLabsState(getGlobalNoLabs());
+      setNoLabsSystemsState(getNoLabsSystems());
+    }, 2000);
+    return () => clearInterval(interval);
+  }, []);
   const hasLabs = linked.labs && linked.labs.length > 0;
 
   // Listen for changes from LabsScreen
@@ -95,6 +117,47 @@ export const RiskScreen: React.FC = () => {
     const labData = linked.labs.map(l => ({ ...l, date: l.date || new Date().toISOString().split('T')[0] }));
     return calculateRiskFromAnalyses(labData);
   }, [hasLabs, linked.labs]);
+
+  // Training risk (from workouts per week)
+  const trainingRisk = useMemo(() => {
+    const workoutsPerWeek = linked.profile?.settings?.workoutsPerWeek ?? 3;
+    const avgWorkoutMinutes = linked.profile?.settings?.avgWorkoutMinutes ?? 60;
+    const trainingLoadRatio = Math.min(1.5, (workoutsPerWeek * avgWorkoutMinutes) / 420);
+    const risk = Math.min(100, trainingLoadRatio * 25);
+    const systemBreakdown: Record<string, { raw: number; net: number }> = {};
+    for (const sys of RISK_SYSTEMS) {
+      const sysRisk = ['cardio', 'musculoskeletal', 'neuro'].includes(sys) ? risk * 1.2 :
+                      ['endocrine', 'metabolic'].includes(sys) ? risk * 0.8 : risk * 0.5;
+      systemBreakdown[sys] = { raw: sysRisk, net: sysRisk * 0.7 };
+    }
+    return { overallRaw: risk, overallNet: risk * 0.7, systemBreakdown };
+  }, [linked.profile]);
+
+  // Nutrition risk (from nutrition factor)
+  const nutritionRisk = useMemo(() => {
+    const nutritionFactor = linked.profile?.settings?.nutritionFactor ?? 0.8;
+    const risk = Math.min(100, (1 - nutritionFactor) * 30);
+    const systemBreakdown: Record<string, { raw: number; net: number }> = {};
+    for (const sys of RISK_SYSTEMS) {
+      const sysRisk = ['hepatic', 'metabolic', 'endocrine', 'ins_axis'].includes(sys) ? risk * 1.3 : risk * 0.6;
+      systemBreakdown[sys] = { raw: sysRisk, net: sysRisk * 0.8 };
+    }
+    return { overallRaw: risk, overallNet: risk * 0.8, systemBreakdown };
+  }, [linked.profile]);
+
+  // Aggregated risk (pharma + labs + training + nutrition + diagnostics)
+  const aggregatedRisk = useMemo<AggregatedRisk | null>(() => {
+    if (!pharmaRisk || !labRiskContributions) return null;
+    const emptyLabContrib = { systemContributions: Object.fromEntries(RISK_SYSTEMS.map(s => [s, 0])), totalRisk: 0 };
+    const emptyDiag = { overallRaw: 0, overallNet: 0, systemBreakdown: {} as Record<string, { raw: number; net: number }> };
+    return calculateAggregatedRisks(
+      pharmaRisk,
+      labRiskContributions || emptyLabContrib,
+      trainingRisk,
+      nutritionRisk,
+      emptyDiag
+    );
+  }, [pharmaRisk, labRiskContributions, trainingRisk, nutritionRisk]);
 
   // Merge pharma + lab + penalty
   const riskResult = useMemo<RiskResult | null>(() => {
@@ -146,13 +209,13 @@ export const RiskScreen: React.FC = () => {
   const renderContent = () => {
     if (!riskResult) return <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-dim)' }}>Загрузка...</div>;
     switch (tab) {
-      case 'overview': return <RiskOverview riskResult={riskResult} globalNoLabs={globalNoLabs} noLabsSystems={noLabsSystems} labRiskContributions={labRiskContributions} riskHistory={riskHistory} />;
+      case 'overview': return <RiskOverview riskResult={riskResult} globalNoLabs={globalNoLabs} noLabsSystems={noLabsSystems} labRiskContributions={labRiskContributions} riskHistory={riskHistory} aggregatedRisk={aggregatedRisk} />;
       case 'matrix': return <RiskMatrix riskResult={riskResult} />;
       case 'details': return <RiskDetails riskResult={riskResult} labRiskContributions={labRiskContributions} />;
       case 'v7': return v7Result ? <V7RiskDisplay result={v7Result} /> : <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-dim)' }}>Загрузка V7...</div>;
       case 'dynamics': return <WeeklyRiskChart dynamics={weeklyDynamics} selectedWeek={selectedWeek} onWeekSelect={setSelectedWeek} mode={weekMode} onModeChange={setWeekMode} />;
       case 'info': return <RiskInfo />;
-      default: return <RiskOverview riskResult={riskResult} globalNoLabs={globalNoLabs} noLabsSystems={noLabsSystems} labRiskContributions={labRiskContributions} riskHistory={riskHistory} />;
+      default: return <RiskOverview riskResult={riskResult} globalNoLabs={globalNoLabs} noLabsSystems={noLabsSystems} labRiskContributions={labRiskContributions} riskHistory={riskHistory} aggregatedRisk={aggregatedRisk} />;
     }
   };
 

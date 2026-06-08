@@ -5,6 +5,7 @@ import { RISKS_DB, RISK_SYSTEM_MAP } from '../../../data/risks';
 import { RECOMMENDATIONS_DB } from '../../../data/recommendations';
 import type { RiskResult } from '../../../core/types';
 import { getRiskColor } from '../../../core/utils/risk-colors';
+import type { AggregatedRisk } from '../../../engines/risk.engine';
 
 interface LabRiskContribution { systemContributions: Record<string, number>; totalRisk: number; }
 
@@ -29,7 +30,8 @@ export const RiskOverview: React.FC<{
   noLabsSystems: string[];
   riskHistory?: { date: string; overallRaw: number; overallNet: number }[];
   labRiskContributions: LabRiskContribution | null;
-}> = ({ riskResult, globalNoLabs, noLabsSystems, riskHistory, labRiskContributions }) => {
+  aggregatedRisk?: AggregatedRisk | null;
+}> = ({ riskResult, globalNoLabs, noLabsSystems, riskHistory, labRiskContributions, aggregatedRisk }) => {
 
   const overallStatus = riskResult.overallNet < 30 ? 'Низкий' : riskResult.overallNet < 50 ? 'Умеренный' : riskResult.overallNet < 70 ? 'Повышенный' : riskResult.overallNet < 85 ? 'Высокий' : 'Критический';
   const overallColor = getRiskColor(riskResult.overallNet);
@@ -137,6 +139,32 @@ export const RiskOverview: React.FC<{
                 </div>
               );
             })}
+          </div>
+        </div>
+      )}
+
+
+      {/* Источники рисков */}
+      {aggregatedRisk && (
+        <div className="card" style={{ marginBottom: 8 }}>
+          <h3 style={{ margin: '0 0 8px', fontSize: 15 }}>📊 Источники рисков</h3>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, fontSize: 11 }}>
+            <div style={{ background: 'var(--bg-secondary)', padding: '6px 8px', borderRadius: 6 }}>
+              <div style={{ color: 'var(--text-dim)', fontSize: 9 }}>💊 Фарма</div>
+              <div style={{ fontWeight: 700, color: getRiskColor(aggregatedRisk.pharma.overallNet) }}>{Math.round(aggregatedRisk.pharma.overallNet)}%</div>
+            </div>
+            <div style={{ background: 'var(--bg-secondary)', padding: '6px 8px', borderRadius: 6 }}>
+              <div style={{ color: 'var(--text-dim)', fontSize: 9 }}>📊 Анализы</div>
+              <div style={{ fontWeight: 700, color: getRiskColor(aggregatedRisk.labs.overallNet) }}>{Math.round(aggregatedRisk.labs.overallNet)}%</div>
+            </div>
+            <div style={{ background: 'var(--bg-secondary)', padding: '6px 8px', borderRadius: 6 }}>
+              <div style={{ color: 'var(--text-dim)', fontSize: 9 }}>🏋️ Тренировки</div>
+              <div style={{ fontWeight: 700, color: getRiskColor(aggregatedRisk.training.overallNet) }}>{Math.round(aggregatedRisk.training.overallNet)}%</div>
+            </div>
+            <div style={{ background: 'var(--bg-secondary)', padding: '6px 8px', borderRadius: 6 }}>
+              <div style={{ color: 'var(--text-dim)', fontSize: 9 }}>🥗 Питание</div>
+              <div style={{ fontWeight: 700, color: getRiskColor(aggregatedRisk.nutrition.overallNet) }}>{Math.round(aggregatedRisk.nutrition.overallNet)}%</div>
+            </div>
           </div>
         </div>
       )}
