@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+﻿import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { registry } from './core/data/registry';
 import { DashboardScreen } from './ui/screens/DashboardScreen';
 import { PharmaScreen } from './ui/screens/PharmaScreen';
@@ -11,66 +11,55 @@ import { ProfileScreen } from './ui/screens/ProfileScreen';
 import { CalculatorsScreen } from './ui/screens/CalculatorsScreen';
 import { ToastContainer } from './ui/ToastContainer';
 
-type Tab = 'home' | 'pharma' | 'support' | 'training' | 'labs' | 'risks' | 'nutrition' | 'profile' | 'calculators';
+type Tab = 'home' | 'pharma' | 'training' | 'labs' | 'risks' | 'support' | 'nutrition' | 'profile' | 'calculators';
 
-const NAV: { id: Tab; label: string; icon: React.ReactNode }[] = [
+// Primary tabs shown in bottom nav (5 max for mobile)
+const PRIMARY_NAV: { id: Tab; label: string; icon: React.ReactNode }[] = [
   { id: 'home', label: 'Главная', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg> },
-  { id: 'pharma', label: 'Фарма', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg> },
-  { id: 'support', label: 'Поддержка', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg> },
-  { id: 'training', label: 'Тренировки', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6.5 6.5h11v11h-11z"/><path d="M3 12h3M18 12h3M12 3v3M12 18v3"/><circle cx="12" cy="12" r="2"/></svg> },
   { id: 'labs', label: 'Анализы', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 3h6v7l5 8H4l5-8V3z"/><line x1="9" y1="3" x2="15" y2="3"/></svg> },
   { id: 'risks', label: 'Риски', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg> },
-  { id: 'nutrition', label: 'Питание', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg> },
-  { id: 'profile', label: 'Профиль', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg> },
-  { id: 'calculators', label: 'Калькуляторы', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="2" width="16" height="20" rx="2"/><line x1="8" y1="6" x2="16" y2="6"/><line x1="16" y1="14" x2="16" y2="18"/><path d="M16 10h.01"/><path d="M12 10h.01"/><path d="M8 10h.01"/><path d="M12 14h.01"/><path d="M8 14h.01"/><path d="M12 18h.01"/><path d="M8 18h.01"/></svg> },
+  { id: 'training', label: 'Тренировки', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6.5 6.5h11v11h-11z"/><path d="M3 12h3M18 12h3M12 3v3M12 18v3"/><circle cx="12" cy="12" r="2"/></svg> },
+  { id: 'profile', label: 'Ещё', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg> },
 ];
 
 function HulkBg() {
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 0, overflow: 'hidden', pointerEvents: 'none' }}>
-      <svg viewBox="0 0 400 800" style={{ position: 'absolute', right: '-60px', bottom: '60px', width: '420px', height: '840px', opacity: 0.07 }}>
-        <defs>
-          <linearGradient id="hg" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="#00e68a" stopOpacity="0.8"/>
-            <stop offset="50%" stopColor="#00cc7a" stopOpacity="0.5"/>
-            <stop offset="100%" stopColor="#009960" stopOpacity="0.2"/>
-          </linearGradient>
-          <filter id="hglow"><feGaussianBlur stdDeviation="12" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
-          <radialGradient id="hchest" cx="50%" cy="40%" r="50%">
-            <stop offset="0%" stopColor="#00ff99" stopOpacity="0.6"/>
-            <stop offset="100%" stopColor="#00994d" stopOpacity="0.1"/>
-          </radialGradient>
-        </defs>
-        <g transform="translate(200,420) scale(1.8)" filter="url(#hglow)">
-          <ellipse cx="0" cy="-40" rx="55" ry="70" fill="url(#hg)"/>
-          <path d="M-55,-70 C-65,-30 -80,20 -75,60 L-50,70 C-40,30 -20,0 -15,-40 Z" fill="#00cc7a" opacity="0.5"/>
-          <path d="M55,-70 C65,-30 80,20 75,60 L50,70 C40,30 20,0 15,-40 Z" fill="#00cc7a" opacity="0.5"/>
-          <ellipse cx="-42" cy="-80" rx="22" ry="16" fill="#00e68a" opacity="0.4"/>
-          <ellipse cx="42" cy="-80" rx="22" ry="16" fill="#00e68a" opacity="0.4"/>
-          <path d="M-30,-90 Q-10,-110 10,-90" fill="none" stroke="#00ff99" strokeWidth="4" opacity="0.3"/>
-          <path d="M0,-50 L-15,20 M0,-50 L15,20 M-15,20 L-40,50 M-15,20 L0,80 M15,20 L40,50 M15,20 L0,80" stroke="#00e68a" strokeWidth="6" opacity="0.35" strokeLinecap="round"/>
-          <rect x="-20" y="-100" width="40" height="10" rx="5" fill="#00ff99" opacity="0.3"/>
-          <ellipse cx="0" cy="-10" rx="30" ry="45" fill="url(#hchest)"/>
-          <path d="M-30,-30 Q-60,-60 -55,-100" fill="none" stroke="#00e68a" strokeWidth="10" opacity="0.25" strokeLinecap="round"/>
-          <path d="M30,-30 Q60,-60 55,-100" fill="none" stroke="#00e68a" strokeWidth="10" opacity="0.25" strokeLinecap="round"/>
-          <path d="M0,70 Q0,120 -20,180 M0,70 Q0,120 20,180" fill="none" stroke="#00cc7a" strokeWidth="14" opacity="0.2" strokeLinecap="round"/>
-        </g>
-      </svg>
-      <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse at 70% 50%, rgba(0,230,138,0.06) 0%, transparent 60%)' }} />
+      <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse at 70% 50%, rgba(0,230,138,0.04) 0%, transparent 60%)' }} />
     </div>
   );
 }
 
 export default function App() {
   const [tab, setTab] = useState<Tab>('home');
+  const [showMore, setShowMore] = useState(false);
   const [initialized, setInitialized] = useState(false);
   const touchRef = useRef<{ x: number; y: number } | null>(null);
   const mainRef = useRef<HTMLElement>(null);
 
   useEffect(() => { registry.init().then(() => setInitialized(true)); }, []);
 
+  // Telegram back button integration
+  useEffect(() => {
+    const tg = (window as any).Telegram?.WebApp;
+    if (tg?.BackButton) {
+      tg.BackButton.show();
+      const handler = () => {
+        if (tab !== 'home') {
+          setTab('home');
+          setShowMore(false);
+        } else {
+          tg.close();
+        }
+      };
+      tg.BackButton.onClick(handler);
+      return () => tg.BackButton.offClick(handler);
+    }
+  }, [tab]);
+
   const go = (t: Tab) => {
     setTab(t);
+    setShowMore(false);
     if (mainRef.current) mainRef.current.scrollTop = 0;
     window.scrollTo(0, 0);
   };
@@ -93,10 +82,9 @@ export default function App() {
 
   const renderContent = () => {
     if (!initialized) return (
-      <div className="loading-screen">
-        <HulkBg />
+      <div className="screen-loading">
         <div className="loading-spinner"/>
-        <span style={{ position: 'relative', zIndex: 1 }}>Загрузка Health Engine...</span>
+        <span>Загрузка...</span>
       </div>
     );
 
@@ -122,17 +110,67 @@ export default function App() {
       </main>
       <ToastContainer />
       <nav className="tabs">
-        {NAV.map(item => (
+        {PRIMARY_NAV.map(item => (
           <button
             key={item.id}
-            className={'nav-btn' + (tab === item.id ? ' active' : '')}
-            onClick={() => go(item.id)}
+            className={'nav-btn' + (tab === item.id || (item.id === 'profile' && ['pharma', 'support', 'nutrition', 'calculators', 'profile'].includes(tab)) ? ' active' : '')}
+            onClick={() => {
+              if (item.id === 'profile') {
+                if (tab !== 'profile' && !['pharma', 'support', 'nutrition', 'calculators'].includes(tab)) {
+                  setShowMore(!showMore);
+                }
+                go('profile');
+              } else {
+                go(item.id);
+              }
+            }}
           >
             {item.icon}
             <span>{item.label}</span>
           </button>
         ))}
       </nav>
+      {/* More menu overlay */}
+      {showMore && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 150,
+          background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(8px)',
+          WebkitBackdropFilter: 'blur(8px)',
+        }} onClick={() => setShowMore(false)}>
+          <div style={{
+            position: 'fixed', bottom: 'calc(var(--bottom-nav-h, 64px) + env(safe-area-inset-bottom, 0px) + 8px)',
+            left: '8px', right: '8px', zIndex: 151,
+            background: 'var(--bg-secondary, #0d0d14)',
+            borderRadius: '16px', padding: '12px',
+            border: '1px solid var(--border, rgba(0,230,138,0.08))',
+            boxShadow: '0 -4px 24px rgba(0,0,0,0.5)',
+            display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px',
+          }} onClick={e => e.stopPropagation()}>
+            {[
+              { id: 'pharma' as Tab, label: '💊 Фарма', icon: '💊' },
+              { id: 'support' as Tab, label: '🛡 Поддержка', icon: '🛡' },
+              { id: 'nutrition' as Tab, label: '🍽 Питание', icon: '🍽' },
+              { id: 'calculators' as Tab, label: '🔢 Калькуляторы', icon: '🔢' },
+              { id: 'profile' as Tab, label: '👤 Профиль', icon: '👤' },
+            ].map(item => (
+              <button
+                key={item.id}
+                onClick={() => { go(item.id); setShowMore(false); }}
+                style={{
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                  padding: '14px 8px', background: 'var(--bg-tertiary, #14141f)',
+                  border: '1px solid var(--border, rgba(0,230,138,0.08))',
+                  borderRadius: '12px', cursor: 'pointer', color: 'var(--text, #e8e8f0)',
+                  fontSize: '11px', fontWeight: 600, gap: '4px',
+                }}
+              >
+                <span style={{ fontSize: 22 }}>{item.icon}</span>
+                <span>{item.label.replace(/^./, '')}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import { renderAuthModule } from './ui/auth-module';
+﻿import { renderAuthModule } from './ui/auth-module';
 import { db } from './core/db';
 import { registry } from './core/data/registry';
 import { initPWA } from './core/pwa-manager';
@@ -15,6 +15,60 @@ import * as React from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App';
 
+function initTelegramWebApp() {
+  const tg = (window as any).Telegram?.WebApp;
+  if (!tg) return false;
+
+  try {
+    tg.ready();
+    tg.expand();
+
+    // Apply Telegram theme colors as CSS variables
+    const root = document.documentElement;
+    const params = tg.themeParams || {};
+    
+    if (params.bg_color) root.style.setProperty('--tg-bg', params.bg_color);
+    if (params.secondary_bg_color) root.style.setProperty('--tg-secondary-bg', params.secondary_bg_color);
+    if (params.text_color) root.style.setProperty('--tg-text', params.text_color);
+    if (params.hint_color) root.style.setProperty('--tg-hint', params.hint_color);
+    if (params.button_color) root.style.setProperty('--tg-button', params.button_color);
+    if (params.button_text_color) root.style.setProperty('--tg-button-text', params.button_text_color);
+    if (params.destructive_text_color) root.style.setProperty('--tg-destructive', params.destructive_text_color);
+    if (params.outline_color) root.style.setProperty('--tg-outline', params.outline_color);
+
+    // Add tg-theme class for CSS variable mapping
+    root.classList.add('tg-theme');
+
+    // Set safe area insets from Telegram
+    const safeTop = tg.safeAreaInsetTop || 0;
+    const safeBottom = tg.safeAreaInsetBottom || 0;
+    root.style.setProperty('--tg-safe-top', `${safeTop}px`);
+    root.style.setProperty('--tg-safe-bottom', `${safeBottom}px`);
+
+    // Handle Telegram back button
+    tg.BackButton.onClick(() => {
+      // Can be used for navigation back
+    });
+
+    console.log('Telegram WebApp initialized successfully');
+    return true;
+  } catch (e) {
+    console.warn('Telegram WebApp init failed:', e);
+    return false;
+  }
+}
+
+function fixMobileViewport() {
+  const setVH = () => {
+    const vh = window.innerHeight * 0.01;
+    document.documentElement.style.setProperty('--vh', `${vh}px`);
+    document.documentElement.style.setProperty('--app-height', `${window.innerHeight}px`);
+  };
+  setVH();
+  window.addEventListener('resize', setVH);
+  window.addEventListener('orientationchange', () => setTimeout(setVH, 100));
+}
+
 async function bootstrap() {
   const app = document.getElementById('app');
   if (!app) {
@@ -22,17 +76,15 @@ async function bootstrap() {
     return;
   }
 
-  if (typeof window !== 'undefined') {
-    const tg = (window as any).Telegram?.WebApp;
-    if (tg) {
-      try {
-        tg.ready?.();
-        tg.expand?.();
-        (window as any).__TELEGRAM_THEME__ = tg.themeParams || {};
-      } catch (e) { console.warn('Telegram SDK init failed:', e); }
-    } else {
-      initPWA();
-    }
+  // Fix mobile viewport
+  fixMobileViewport();
+
+  // Initialize Telegram WebApp if available
+  const isTg = initTelegramWebApp();
+
+  if (!isTg) {
+    // Not in Telegram — use PWA
+    initPWA();
   }
 
   try {
@@ -67,7 +119,7 @@ async function bootstrap() {
   initErrorHandler('app');
   optimizeDBSpace(db, 50);
 
-  if (!(window as any).Telegram?.WebApp) {
+  if (!isTg) {
     registerSW();
   }
 

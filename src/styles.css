@@ -1182,3 +1182,207 @@ input[type="range"]::-moz-range-thumb {
   min-height:200px; gap:8px; color:var(--text-dim); font-size:14px; text-align:center;
 }
 .screen-empty .btn { width:auto; margin-top:8px; }
+/* ============================================================
+   MOBILE + TELEGRAM MINI APP OPTIMIZATIONS
+   ============================================================ */
+
+/* --- Dynamic viewport height for mobile --- */
+:root {
+  --app-height: 100vh;
+  --tg-safe-top: 0px;
+  --tg-safe-bottom: 0px;
+  --bottom-nav-h: 64px;
+}
+
+@supports (height: 100dvh) {
+  :root { --app-height: 100dvh; }
+}
+
+/* --- Telegram WebApp safe areas --- */
+.tg-safe-top { padding-top: var(--tg-safe-top); }
+.tg-safe-bottom { padding-bottom: var(--tg-safe-bottom); }
+
+/* --- Compact mobile cards --- */
+@media (max-width: 480px) {
+  .screen { padding: 12px 12px 20px; }
+  .card { padding: 12px; margin: 8px 0; border-radius: 14px; }
+  .card h3, .card .title { font-size: 14px; margin-bottom: 8px; }
+  .card .desc, .card .text { font-size: 12px; }
+
+  /* Compact tab bars */
+  .tab-bar { gap: 4px; margin-bottom: 12px; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .tab-btn { font-size: 11px; padding: 5px 10px; border-radius: 16px; white-space: nowrap; }
+  .sub-tab-bar { gap: 4px; margin-bottom: 10px; }
+  .sub-tab-btn { font-size: 11px; padding: 5px 12px; border-radius: 16px; }
+
+  /* Compact buttons */
+  .btn { padding: 10px 14px; font-size: 13px; border-radius: 12px; }
+  button { min-height: 40px; }
+
+  /* Compact grids */
+  .grid { gap: 6px; }
+  .grid.systems { grid-template-columns: 1fr 1fr; }
+  .index-grid { grid-template-columns: 1fr 1fr; }
+
+  /* Compact inputs */
+  input, select, textarea { padding: 10px 12px; font-size: 14px; border-radius: 10px; }
+
+  /* Bottom nav optimization */
+  .tabs {
+    height: var(--bottom-nav-h);
+    padding-bottom: max(env(safe-area-inset-bottom), 4px);
+  }
+  .nav-btn { min-width: 0; font-size: 9px; padding: 2px 0; gap: 1px; }
+  .nav-btn svg { width: 20px; height: 20px; }
+
+  /* Compact risk overview */
+  .risk-overview .card { padding: 10px; }
+  .risk-system { padding: 6px 0; }
+
+  /* Compact lab results */
+  .labs-grid { grid-template-columns: 1fr 1fr; gap: 4px; }
+  .lab-card { padding: 6px; border-radius: 8px; }
+
+  /* Smaller headings */
+  .screen h2 { font-size: 18px; margin: 4px 0 12px; }
+
+  /* Compact stats */
+  .stats-grid { grid-template-columns: 1fr 1fr; gap: 6px; }
+  .stat-item { padding: 8px; border-radius: 10px; }
+  .stat-value { font-size: 18px; }
+  .stat-label { font-size: 10px; }
+
+  /* Compact risk matrix */
+  .risk-matrix-grid { font-size: 10px; }
+  .risk-header, .risk-cell { padding: 4px 6px; }
+
+  /* Compact risk details */
+  .risk-details .card { padding: 10px; }
+
+  /* Compact labs overview */
+  .labs-overview .card { padding: 10px; }
+
+  /* Horizontal scroll for filters */
+  .tab-bar, .nutrition-tabs { overflow-x: auto; flex-wrap: nowrap; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+  .tab-bar::-webkit-scrollbar, .nutrition-tabs::-webkit-scrollbar { display: none; }
+
+  /* Compact score grids */
+  .score-grid { grid-template-columns: 1fr 1fr 1fr; gap: 6px; }
+  .score-item { padding: 8px; border-radius: 10px; }
+
+  /* Touch-friendly chips */
+  .chip { min-height: 32px; padding: 4px 10px; font-size: 11px; }
+
+  /* Telegram header bar fix */
+  .tg-header-fix { padding-top: max(var(--tg-safe-top), env(safe-area-inset-top)); }
+}
+
+/* --- Tablet (481-768px) --- */
+@media (min-width: 481px) and (max-width: 768px) {
+  .screen { padding: 14px 14px 24px; }
+  .card { padding: 14px; }
+  .grid { gap: 8px; }
+  .tabs { height: var(--bottom-nav-h); }
+}
+
+/* --- Telegram Mini App specific overrides --- */
+@media all and (display-mode: standalone), all and (display-mode: fullscreen) {
+  .tabs { padding-bottom: max(env(safe-area-inset-bottom), 4px); }
+  main { padding-bottom: calc(var(--bottom-nav-h) + max(env(safe-area-inset-bottom), 4px) + 12px); }
+}
+
+/* --- PWA standalone mode --- */
+@media (display-mode: standalone) {
+  body { padding-top: env(safe-area-inset-top); }
+  .tabs { padding-bottom: env(safe-area-inset-bottom); }
+}
+
+/* --- iPhone notch fix --- */
+@supports (padding: max(0px)) {
+  .tabs { padding-bottom: max(4px, env(safe-area-inset-bottom)); }
+  main { padding-bottom: calc(var(--bottom-nav-h) + max(env(safe-area-inset-bottom), 4px) + 12px); }
+  .screen { padding-bottom: calc(var(--bottom-nav-h) + max(env(safe-area-inset-bottom), 4px) + 16px); }
+}
+
+/* --- Improved mobile touch targets --- */
+@media (hover: none) and (pointer: coarse) {
+  .nav-btn { min-width: 44px; min-height: 48px; }
+  .tab-btn { min-height: 36px; }
+  .btn { min-height: 44px; }
+  .chip { min-height: 34px; }
+  input, select, textarea { min-height: 44px; font-size: 16px; /* Prevent iOS zoom */ }
+}
+
+/* --- Prevent pull-to-refresh in Telegram --- */
+html { overscroll-behavior: none; }
+body { overscroll-behavior: none; position: fixed; width: 100%; height: 100%; overflow: hidden; }
+#app { height: 100%; }
+
+/* --- Telegram theme color integration --- */
+.tg-theme {
+  --bg: var(--tg-theme-bg-color, #050508);
+  --bg-secondary: var(--tg-theme-secondary-bg-color, #0d0d14);
+  --text: var(--tg-theme-text-color, #e8e8f0);
+  --text-dim: var(--tg-theme-hint-color, #6a6a80);
+  --accent: var(--tg-theme-button-color, #00e68a);
+  --danger: var(--tg-theme-destructive-text-color, #ff4757);
+  --border: var(--tg-theme-outline-color, rgba(0,230,138,0.08));
+}
+
+/* --- Smooth animations for reduced motion --- */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* --- Compact mode for small phones (iPhone SE etc.) --- */
+@media (max-width: 360px) {
+  .screen { padding: 10px 10px 16px; }
+  .card { padding: 10px; margin: 6px 0; border-radius: 12px; }
+  .card h3 { font-size: 13px; }
+  .screen h2 { font-size: 16px; }
+  .score-grid { grid-template-columns: 1fr 1fr; }
+  .stat-value { font-size: 16px; }
+  .tab-btn { font-size: 10px; padding: 4px 8px; }
+  .nav-btn { font-size: 8px; }
+  .nav-btn svg { width: 18px; height: 18px; }
+}
+
+/* --- Fix iOS Safari 100vh issue --- */
+.app {
+  height: 100vh;
+  height: 100dvh;
+  height: calc(var(--app-height, 100vh));
+}
+
+/* --- Prevent iOS bounce scroll --- */
+html { position: fixed; width: 100%; height: 100%; overflow: hidden; }
+body { position: fixed; width: 100%; height: 100%; overflow: hidden; }
+
+/* --- Improve main scroll container --- */
+main {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
+  position: relative;
+  z-index: 1;
+}
+
+/* --- Better scrollbar on desktop --- */
+@media (hover: hover) and (pointer: fine) {
+  main::-webkit-scrollbar { width: 6px; }
+  main::-webkit-scrollbar-track { background: transparent; }
+  main::-webkit-scrollbar-thumb { background: rgba(0,230,138,0.2); border-radius: 3px; }
+  main::-webkit-scrollbar-thumb:hover { background: rgba(0,230,138,0.4); }
+}
+
+/* --- Dark scroll indicator for mobile --- */
+@media (hover: none) {
+  main::-webkit-scrollbar { display: none; }
+  main { scrollbar-width: none; }
+}
