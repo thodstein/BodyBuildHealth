@@ -12,6 +12,8 @@ import { getGlobalNoLabs, getNoLabsSystems } from './LabsScreen';
 import { RiskOverview } from './RiskScreen_parts/RiskOverview';
 import { RiskMatrix } from './RiskScreen_parts/RiskMatrix';
 import { RiskDetails } from './RiskScreen_parts/RiskDetails';
+import { V7RiskDisplay } from './RiskScreen_parts/V7RiskDisplay';
+import { useV7Risk } from '../hooks/useV7Risk';
 
 const RISK_HISTORY_KEY = 'risk_history';
 const MAX_HISTORY = 12;
@@ -26,8 +28,9 @@ function saveRiskHistory(entry: { date: string; overallRaw: number; overallNet: 
 
 export const RiskScreen: React.FC = () => {
   const linked = useDataLink();
-  const [tab, setTab] = useState<'overview' | 'matrix' | 'details'>('overview');
+  const [tab, setTab] = useState<'overview' | 'matrix' | 'details' | 'v7'>('overview');
   const [tick, setTick] = useState(0);
+  const { v7Result, legacyResult: v7Legacy } = useV7Risk();
 
   // Read penalty state from LabsScreen's global storage
   const globalNoLabs = getGlobalNoLabs();
@@ -116,6 +119,7 @@ export const RiskScreen: React.FC = () => {
       case 'overview': return <RiskOverview riskResult={riskResult} globalNoLabs={globalNoLabs} noLabsSystems={noLabsSystems} labRiskContributions={labRiskContributions} />;
       case 'matrix': return <RiskMatrix riskResult={riskResult} />;
       case 'details': return <RiskDetails riskResult={riskResult} labRiskContributions={labRiskContributions} />;
+      case 'v7': return v7Result ? <V7RiskDisplay result={v7Result} /> : <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-dim)' }}>Загрузка V7...</div>;
       default: return <RiskOverview riskResult={riskResult} globalNoLabs={globalNoLabs} noLabsSystems={noLabsSystems} labRiskContributions={labRiskContributions} />;
     }
   };
@@ -123,7 +127,7 @@ export const RiskScreen: React.FC = () => {
   return (
     <div className="screen risk">
       <div className="tab-bar">
-        {(['overview', 'matrix', 'details'] as const).map(t => (
+        {(['overview', 'matrix', 'details', 'v7'] as const).map(t => (
           <button key={t} className={`tab-btn ${tab === t ? 'active' : ''}`} onClick={() => setTab(t)}>
             {t === 'overview' ? '📊 Обзор' : t === 'matrix' ? '🔬 Матрица' : '📋 Детали'}
           </button>
@@ -133,3 +137,7 @@ export const RiskScreen: React.FC = () => {
     </div>
   );
 };
+
+
+
+
