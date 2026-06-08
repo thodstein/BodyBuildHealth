@@ -7,7 +7,8 @@ import { calculateRiskFromAnalyses } from '../../engines/risk-calculator-v2.engi
 import { calculatePenaltyCoefficients } from '../../engines/labs-penalty.engine';
 import { computeLabIndexDetails } from '../../engines/labs-indices.engine';
 import { getRiskColor } from '../../core/utils/risk-colors';
-import { useDataLink } from '../../core/data-link';
+import { useDataLink, notifyDataChange } from '../../core/data-link';
+import { getGlobalNoLabs, getNoLabsSystems } from './LabsScreen';
 import { RiskOverview } from './RiskScreen_parts/RiskOverview';
 import { RiskMatrix } from './RiskScreen_parts/RiskMatrix';
 import { RiskDetails } from './RiskScreen_parts/RiskDetails';
@@ -16,42 +17,43 @@ const RISK_HISTORY_KEY = 'risk_history';
 const MAX_HISTORY = 12;
 
 function loadRiskHistory(): { date: string; overallRaw: number; overallNet: number }[] {
-  try {
-    const raw = localStorage.getItem(RISK_HISTORY_KEY);
-    if (!raw) return [];
-    return JSON.parse(raw);
-  } catch {
-    return [];
-  }
+  try { const raw = localStorage.getItem(RISK_HISTORY_KEY); if (!raw) return []; return JSON.parse(raw); } catch { return []; }
 }
 
 function saveRiskHistory(entry: { date: string; overallRaw: number; overallNet: number }) {
-  try {
-    const history = loadRiskHistory();
-    history.push(entry);
-    localStorage.setItem(RISK_HISTORY_KEY, JSON.stringify(history.slice(-MAX_HISTORY)));
-  } catch {}
+  try { const history = loadRiskHistory(); history.push(entry); localStorage.setItem(RISK_HISTORY_KEY, JSON.stringify(history.slice(-MAX_HISTORY))); } catch {}
 }
 
 export const RiskScreen: React.FC = () => {
   const linked = useDataLink();
   const [tab, setTab] = useState<'overview' | 'matrix' | 'details'>('overview');
-  const [forceNoLabs, setForceNoLabs] = useState(false);
+  const [tick, setTick] = useState(0);
 
+  // Read penalty state from LabsScreen's global storage
+  const globalNoLabs = getGlobalNoLabs();
+  const noLabsSystems = getNoLabsSystems();
   const hasLabs = linked.labs && linked.labs.length > 0;
 
-  // Compute pharma risk from the main engine
+  // Listen for changes from LabsScreen
+  useEffect(() => {
+    const interval = setInterval(() => setTick(t => t + 1), 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Determine if penalty should be applied
+  const shouldApplyPenalty = globalNoLabs || noLabsSystems.length > 0;
+
+  // Compute pharma risk
   const pharmaRisk = useMemo<RiskResult | null>(() => {
     if (!linked.profile) return null;
     const genetics = linked.profile.settings.genetics ?? {};
-    const riskInput = {
+    return calculateRisks({
       genetics,
       nutritionFactor: linked.profile.settings.nutritionFactor ?? 0.8,
       trainingFactor: linked.profile.settings.trainingFactor ?? 0.7,
       activeDrugs: linked.activeDrugs,
       supportCoverage: linked.supportCoverage,
-    };
-    return calculateRisks(riskInput);
+    });
   }, [linked.profile, linked.activeDrugs, linked.supportCoverage]);
 
   // Compute lab risk contributions
@@ -61,60 +63,41 @@ export const RiskScreen: React.FC = () => {
     return calculateRiskFromAnalyses(labData);
   }, [hasLabs, linked.labs]);
 
-  // Merge pharma risk with lab contributions
+  // Merge pharma + lab + penalty
   const riskResult = useMemo<RiskResult | null>(() => {
     if (!pharmaRisk) return null;
-
     let result = pharmaRisk;
-
-    // Merge lab contributions if available
-    if (hasLabs && labRiskContributions) {
+    if (hasLabs) {
       result = calculateRiskFromAnalyses(result, linked.labs);
     }
-
-    // Apply penalty if needed
-    if (forceNoLabs || (!hasLabs && forceNoLabs)) {
+    if (shouldApplyPenalty) {
       result = applyPenaltyToResult(result);
     }
-
     return result;
-  }, [pharmaRisk, hasLabs, labRiskContributions, forceNoLabs, linked.labs]);
+  }, [pharmaRisk, hasLabs, labRiskContributions, shouldApplyPenalty, tick, noLabsSystems]);
 
-  // Save risk history
   useEffect(() => {
     if (riskResult) {
-      saveRiskHistory({
-        date: new Date().toISOString().split('T')[0],
-        overallRaw: riskResult.overallRaw,
-        overallNet: riskResult.overallNet,
-      });
+      saveRiskHistory({ date: new Date().toISOString().split('T')[0], overallRaw: riskResult.overallRaw, overallNet: riskResult.overallNet });
     }
   }, [riskResult?.overallRaw, riskResult?.overallNet]);
 
   function applyPenaltyToResult(result: RiskResult): RiskResult {
     const phase = linked.profile?.settings?.phase || 'baseline';
-    const penalty = calculatePenaltyCoefficients(
-      phase,
-      linked.labs || [],
-      [],
-      1,
-      linked.course,
-      forceNoLabs
-    );
+    const penalty = calculatePenaltyCoefficients(phase, linked.labs || [], [], 1, linked.course, globalNoLabs);
     const totalMultiplier = 1.0 + penalty.labPenalty + penalty.diagnosticPenalty;
 
-    const finalResult: RiskResult = {
-      ...result,
-      systemBreakdown: { ...result.systemBreakdown },
-    };
+    const finalResult: RiskResult = { ...result, systemBreakdown: { ...result.systemBreakdown } };
 
     if (finalResult.systemBreakdown) {
       for (const sys of RISK_SYSTEMS) {
         const sb = finalResult.systemBreakdown[sys];
         if (sb) {
+          // If per-system penalty, only apply to selected systems
+          const sysMultiplier = (noLabsSystems.includes(sys) || globalNoLabs) ? totalMultiplier : 1.0;
           finalResult.systemBreakdown[sys] = {
-            raw: Math.min(100, sb.raw * totalMultiplier),
-            net: Math.min(100, sb.net * totalMultiplier),
+            raw: Math.min(100, sb.raw * sysMultiplier),
+            net: Math.min(100, sb.net * sysMultiplier),
           };
         }
       }
@@ -122,21 +105,18 @@ export const RiskScreen: React.FC = () => {
 
     finalResult.overallRaw = Math.min(100, result.overallRaw * totalMultiplier);
     finalResult.overallNet = Math.min(100, result.overallNet * totalMultiplier);
-
     return finalResult;
   }
 
-  // Load history for display
   const riskHistory = useMemo(() => loadRiskHistory(), []);
 
   const renderContent = () => {
-    if (!riskResult) return <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-dim)' }}>Загрузка данных...</div>;
-
+    if (!riskResult) return <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-dim)' }}>Загрузка...</div>;
     switch (tab) {
-      case 'overview': return <RiskOverview riskResult={riskResult} forceNoLabs={forceNoLabs} setForceNoLabs={setForceNoLabs} penalty={forceNoLabs ? applyPenaltyToResult(riskResult) : null} riskHistory={riskHistory} labRiskContributions={labRiskContributions} />;
+      case 'overview': return <RiskOverview riskResult={riskResult} globalNoLabs={globalNoLabs} noLabsSystems={noLabsSystems} labRiskContributions={labRiskContributions} />;
       case 'matrix': return <RiskMatrix riskResult={riskResult} />;
       case 'details': return <RiskDetails riskResult={riskResult} labRiskContributions={labRiskContributions} />;
-      default: return <RiskOverview riskResult={riskResult} forceNoLabs={forceNoLabs} setForceNoLabs={setForceNoLabs} penalty={null} riskHistory={riskHistory} labRiskContributions={labRiskContributions} />;
+      default: return <RiskOverview riskResult={riskResult} globalNoLabs={globalNoLabs} noLabsSystems={noLabsSystems} labRiskContributions={labRiskContributions} />;
     }
   };
 

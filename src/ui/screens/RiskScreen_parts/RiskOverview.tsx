@@ -6,34 +6,31 @@ import { RECOMMENDATIONS_DB } from '../../../data/recommendations';
 import type { RiskResult } from '../../../core/types';
 import { getRiskColor } from '../../../core/utils/risk-colors';
 
-interface LabRiskContribution {
-  systemContributions: Record<string, number>;
-  totalRisk: number;
-}
+interface LabRiskContribution { systemContributions: Record<string, number>; totalRisk: number; }
 
-function getSystemIcon(sys: string): string {
-  return SYSTEM_INFO[sys]?.icon || '⚠️';
-}
+function getSystemIcon(sys: string): string { return SYSTEM_INFO[sys]?.icon || '⚠️'; }
+function getSystemLabel(sys: string): string { return SYSTEM_INFO[sys]?.label || sys; }
 
-function getSystemLabel(sys: string): string {
-  return SYSTEM_INFO[sys]?.label || sys;
-}
+const SYSTEM_LABELS_SHORT: Record<string, string> = {
+  cardio: '❤️ Сердце', hepatic: '🫁 Печень', renal: '🫘 Почки',
+  neuro: '🧠 Нервная', endocrine: '🦋 Эндокр.', hematologic: '🩸 Кровь',
+  reproductive: '🔬 Репрод.', musculoskeletal: '🦴 Кости',
+};
 
 export const RiskOverview: React.FC<{
   riskResult: RiskResult;
-  forceNoLabs: boolean;
-  setForceNoLabs: (v: boolean) => void;
-  penalty: RiskResult | null;
-  riskHistory: { date: string; overallRaw: number; overallNet: number }[];
+  globalNoLabs: boolean;
+  noLabsSystems: string[];
+  riskHistory?: { date: string; overallRaw: number; overallNet: number }[];
   labRiskContributions: LabRiskContribution | null;
-}> = ({ riskResult, forceNoLabs, setForceNoLabs, penalty, riskHistory, labRiskContributions }) => {
+}> = ({ riskResult, globalNoLabs, noLabsSystems, riskHistory, labRiskContributions }) => {
 
   const overallStatus = riskResult.overallNet < 30 ? 'Низкий' : riskResult.overallNet < 50 ? 'Умеренный' : riskResult.overallNet < 70 ? 'Повышенный' : riskResult.overallNet < 85 ? 'Высокий' : 'Критический';
   const overallColor = getRiskColor(riskResult.overallNet);
 
-  // Get top risks based on overall risk level
   const topRisks = RISKS_DB.slice(0, 8);
   const relevantRecs = RECOMMENDATIONS_DB.slice(0, 6);
+  const anyNoLabs = globalNoLabs || noLabsSystems.length > 0;
 
   return (
     <div className="risk-overview">
@@ -54,7 +51,6 @@ export const RiskOverview: React.FC<{
             <div style={{ fontSize: 13, fontWeight: 700, color: overallColor }}>{overallStatus}</div>
           </div>
         </div>
-        {/* Risk bar */}
         <div style={{ marginTop: 8, background: 'var(--bg-secondary)', borderRadius: 6, height: 18, position: 'relative', overflow: 'hidden' }}>
           <div style={{ position: 'absolute', left: 0, top: 0, height: '100%', width: `${Math.min(100, riskResult.overallRaw)}%`, background: getRiskColor(riskResult.overallRaw), borderRadius: 6, opacity: 0.35 }} />
           <div style={{ position: 'absolute', left: 0, top: 0, height: '100%', width: `${Math.min(100, riskResult.overallNet)}%`, background: overallColor, borderRadius: 6 }} />
@@ -64,17 +60,27 @@ export const RiskOverview: React.FC<{
         </div>
       </div>
 
-      {/* Penalty warning */}
-      {forceNoLabs && (
-        <div style={{ background: 'rgba(239,68,68,0.15)', padding: 10, borderRadius: 8, margin: '6px 0' }}>
-          <strong>🚫 Штраф за отсутствие анализов</strong>
-          <div style={{ fontSize: 11, marginTop: 2, color: 'var(--text-dim)' }}>Множитель увеличен. Сдайте анализы.</div>
+      {/* Penalty info (read-only — managed from LabsScreen) */}
+      {anyNoLabs && (
+        <div style={{ background: 'rgba(239,68,68,0.12)', padding: 10, borderRadius: 8, margin: '6px 0', border: '1px solid rgba(239,68,68,0.2)' }}>
+          <div style={{ fontWeight: 700, fontSize: 12, color: '#ef4444', marginBottom: 4 }}>🚫 Штраф за отсутствие анализов</div>
+          {globalNoLabs ? (
+            <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>Глобальный штраф на все системы. Управление — вкладка «Анализы».</div>
+          ) : (
+            <div>
+              <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 4 }}>Штраф по системам:</div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
+                {noLabsSystems.map(sys => (
+                  <span key={sys} style={{ background: 'rgba(239,68,68,0.15)', padding: '2px 6px', borderRadius: 4, fontSize: 9, color: '#ef4444' }}>
+                    {SYSTEM_LABELS_SHORT[sys] || sys}
+                  </span>
+                ))}
+              </div>
+              <div style={{ fontSize: 9, color: 'var(--text-dim)', marginTop: 4 }}>Управление — вкладка «Анализы»</div>
+            </div>
+          )}
         </div>
       )}
-
-      <button onClick={() => setForceNoLabs(!forceNoLabs)} style={{ width: '100%', padding: 8, background: forceNoLabs ? 'var(--accent)' : '#ef4444', color: forceNoLabs ? '#000' : '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontWeight: 600, fontSize: 12 }}>
-        {forceNoLabs ? '✅ Штраф применён' : '🚫 БЕЗ АНАЛИЗОВ (Штраф)'}
-      </button>
 
       {/* Systems overview - compact */}
       <div className="card" style={{ marginTop: 8 }}>
@@ -83,17 +89,19 @@ export const RiskOverview: React.FC<{
           {RISK_SYSTEMS.map((sys: string) => {
             const bd = riskResult.systemBreakdown[sys];
             if (!bd) return null;
+            const isPenalized = globalNoLabs || noLabsSystems.includes(sys);
             return (
               <div key={sys} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-secondary)', padding: '6px 10px', borderRadius: 6 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                   <span style={{ fontSize: 14 }}>{getSystemIcon(sys)}</span>
                   <span style={{ fontSize: 12, fontWeight: 500 }}>{getSystemLabel(sys)}</span>
+                  {isPenalized && <span style={{ fontSize: 8, color: '#ef4444', background: 'rgba(239,68,68,0.15)', padding: '1px 4px', borderRadius: 3 }}>штраф</span>}
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <div style={{ width: 60, background: 'rgba(255,255,255,0.1)', borderRadius: 3, height: 6, overflow: 'hidden' }}>
+                  <div style={{ width: 50, background: 'rgba(255,255,255,0.1)', borderRadius: 3, height: 5, overflow: 'hidden' }}>
                     <div style={{ width: `${Math.min(100, bd.net)}%`, height: '100%', background: getRiskColor(bd.net), borderRadius: 3 }} />
                   </div>
-                  <span style={{ fontWeight: 700, fontSize: 12, color: getRiskColor(bd.net), minWidth: 32, textAlign: 'right' }}>{Math.round(bd.net)}%</span>
+                  <span style={{ fontWeight: 700, fontSize: 12, color: getRiskColor(bd.net), minWidth: 28, textAlign: 'right' }}>{Math.round(bd.net)}%</span>
                 </div>
               </div>
             );
@@ -144,7 +152,7 @@ export const RiskOverview: React.FC<{
       )}
 
       {/* Risk History */}
-      {riskHistory.length > 1 && (
+      {riskHistory && riskHistory.length > 1 && (
         <div className="card" style={{ marginTop: 8 }}>
           <h3>📈 История</h3>
           <div style={{ display: 'flex', gap: 3, alignItems: 'flex-end', height: 50 }}>
@@ -160,9 +168,9 @@ export const RiskOverview: React.FC<{
         </div>
       )}
 
-      {/* Drug Thresholds - compact */}
+      {/* Drug Thresholds */}
       <div className="card" style={{ marginTop: 8 }}>
-        <h3>💊 Пороги препаратов</h3>
+        <h3>💊 Пороги</h3>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, fontSize: 10 }}>
           {Object.entries(DRUG_THRESHOLDS).slice(0, 6).map(([id, thresh]) => (
             <div key={id} style={{ background: 'var(--bg-secondary)', padding: '4px 8px', borderRadius: 4 }}>
