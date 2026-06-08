@@ -272,11 +272,11 @@ export const PharmaCourseScreen: React.FC = () => {
           display: 'flex', flexDirection: 'column',
         }} onClick={() => setShowPicker(false)}>
           <div style={{
-            position: 'fixed', bottom: '50%', left: '5%', right: '5%', zIndex: 201, transform: 'translateY(50%)',
+            position: 'fixed', top: '8%', left: '4%', right: '4%', zIndex: 201,
             background: 'var(--bg, #050508)',
             borderTop: '1px solid var(--border)',
-            borderRadius: '20px 20px 0 0',
-            maxHeight: '70vh',
+            borderRadius: '20px',
+            maxHeight: '82vh',
             overflow: 'hidden',
             display: 'flex', flexDirection: 'column',
           }} onClick={e => e.stopPropagation()}>

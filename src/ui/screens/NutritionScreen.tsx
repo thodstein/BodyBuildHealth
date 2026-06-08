@@ -14,28 +14,33 @@ interface DiaryEntry {
   p: number;
   f: number;
   c: number;
+  date?: string;
 }
 
 export const NutritionScreen: React.FC = () => {
   const linked = useDataLink();
   const [tab, setTab] = useState<'overview' | 'diary' | 'charts'>('overview');
   const [foodEntries, setFoodEntries] = useState<DiaryEntry[]>([]);
+  const [dailyLogs, setDailyLogs] = useState<Record<string, DiaryEntry[]>>({});
 
   useEffect(() => {
     try {
       const raw = localStorage.getItem('nutrition_diary');
       if (raw) {
         const diary = JSON.parse(raw);
-        const entries: DiaryEntry[] = Object.values(diary).flatMap((d: any) =>
-          (Object.values((d as any).meals) as any[][]).flat().map((m: any) => ({
-            name: m.name,
-            kcal: m.kcal,
-            p: m.p,
-            f: m.f,
-            c: m.c,
-          }))
-        );
-        setFoodEntries(entries);
+        const allEntries: DiaryEntry[] = [];
+        const logs: Record<string, DiaryEntry[]> = {};
+        Object.entries(diary).forEach(([date, d]: [string, any]) => {
+          const dayEntries: DiaryEntry[] = [];
+          Object.values(d.meals || {}).flat().forEach((m: any) => {
+            const entry = { name: m.name, kcal: m.kcal, p: m.p, f: m.f, c: m.c, date };
+            allEntries.push(entry);
+            dayEntries.push(entry);
+          });
+          logs[date] = dayEntries;
+        });
+        setFoodEntries(allEntries);
+        setDailyLogs(logs);
       }
     } catch {}
   }, []);
@@ -70,7 +75,7 @@ export const NutritionScreen: React.FC = () => {
       <div className="tab-bar">
         {(['overview', 'diary', 'charts'] as const).map(t => (
           <button key={t} className={`tab-btn ${tab === t ? 'active' : ''}`} onClick={() => setTab(t)}>
-            {t === 'overview' ? 'Обзор' : t === 'diary' ? 'Дневник' : 'Графики'}
+            {t === 'overview' ? '📊 Обзор' : t === 'diary' ? '📝 Дневник' : '📈 Графики'}
           </button>
         ))}
       </div>

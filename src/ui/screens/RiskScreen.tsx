@@ -26,6 +26,13 @@ function saveRiskHistory(entry: { date: string; overallRaw: number; overallNet: 
   try { const history = loadRiskHistory(); history.push(entry); localStorage.setItem(RISK_HISTORY_KEY, JSON.stringify(history.slice(-MAX_HISTORY))); } catch {}
 }
 
+const TAB_LABELS: Record<string, string> = {
+  overview: '📊 Обзор',
+  matrix: '🔬 Матрица',
+  details: '📋 Детали',
+  v7: '⚡ V7',
+};
+
 export const RiskScreen: React.FC = () => {
   const linked = useDataLink();
   const [tab, setTab] = useState<'overview' | 'matrix' | 'details' | 'v7'>('overview');
@@ -116,20 +123,21 @@ export const RiskScreen: React.FC = () => {
   const renderContent = () => {
     if (!riskResult) return <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-dim)' }}>Загрузка...</div>;
     switch (tab) {
-      case 'overview': return <RiskOverview riskResult={riskResult} globalNoLabs={globalNoLabs} noLabsSystems={noLabsSystems} labRiskContributions={labRiskContributions} />;
+      case 'overview': return <RiskOverview riskResult={riskResult} globalNoLabs={globalNoLabs} noLabsSystems={noLabsSystems} labRiskContributions={labRiskContributions} riskHistory={riskHistory} />;
       case 'matrix': return <RiskMatrix riskResult={riskResult} />;
       case 'details': return <RiskDetails riskResult={riskResult} labRiskContributions={labRiskContributions} />;
       case 'v7': return v7Result ? <V7RiskDisplay result={v7Result} /> : <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-dim)' }}>Загрузка V7...</div>;
-      default: return <RiskOverview riskResult={riskResult} globalNoLabs={globalNoLabs} noLabsSystems={noLabsSystems} labRiskContributions={labRiskContributions} />;
+      default: return <RiskOverview riskResult={riskResult} globalNoLabs={globalNoLabs} noLabsSystems={noLabsSystems} labRiskContributions={labRiskContributions} riskHistory={riskHistory} />;
     }
   };
 
   return (
     <div className="screen risk">
-      <div className="tab-bar">
+      <h2 style={{ margin: '0 0 6px', fontSize: 18 }}>⚠️ Риски</h2>
+      <div className="tab-bar" style={{ gap: 2 }}>
         {(['overview', 'matrix', 'details', 'v7'] as const).map(t => (
           <button key={t} className={`tab-btn ${tab === t ? 'active' : ''}`} onClick={() => setTab(t)}>
-            {t === 'overview' ? '📊 Обзор' : t === 'matrix' ? '🔬 Матрица' : '📋 Детали'}
+            {TAB_LABELS[t]}
           </button>
         ))}
       </div>
@@ -137,7 +145,3 @@ export const RiskScreen: React.FC = () => {
     </div>
   );
 };
-
-
-
-

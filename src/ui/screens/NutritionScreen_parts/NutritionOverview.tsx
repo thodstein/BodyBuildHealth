@@ -1,6 +1,7 @@
 ﻿import React, { useMemo } from 'react';
 import { derivePAL } from '../../../core/data-link';
 import { calcNutrition } from '../../../engines/nutrition.engine';
+import { MICRONUTRIENT_TARGETS } from '../../../core/constants';
 import { nutritionMultipliers } from '../../../engines/risk-engine-v7-core';
 import type { UserProfile } from '../../../core/types';
 

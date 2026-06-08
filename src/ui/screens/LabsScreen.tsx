@@ -30,16 +30,22 @@ export function setNoLabsSystems(systems: string[]) {
 }
 
 const PHASE_LABELS: Record<string, string> = {
-  baseline: '📋 Базовые (до курса)',
+  baseline: '📋 Базовые',
   on_cycle: '💊 На курсе',
   bridge: '🌉 Мост',
   pct: '🔄 ПКТ',
   post_pct: '✅ После ПКТ',
-  course_bridge_course: '🔁 Курс→Мост→Курс',
+  course_bridge_course: '🔁 К-М-К',
 };
 
 const PHASE_ICONS: Record<string, string> = {
   baseline: '📋', on_cycle: '💊', bridge: '🌉', pct: '🔄', post_pct: '✅', course_bridge_course: '🔁',
+};
+
+const SYSTEM_LABELS: Record<string, string> = {
+  'Печень': '🫁', 'Почки': '🫘', 'Эндокринная': '🦋', 'Кроветворение': '🩸',
+  'Липиды': '🫀', 'Воспаление': '🔥', 'Витамины': '☀️', 'Репродуктивная': '🔬',
+  'Углеводный обмен': '🍬', 'Сосуды': '🩸', 'Железо': '⚙️', 'Другие': '📋',
 };
 
 export const LabsScreen: React.FC = () => {
@@ -204,19 +210,26 @@ export const LabsScreen: React.FC = () => {
 
   const anyNoLabs = globalNoLabs || noLabsSystems.length > 0;
 
+  const sysLabels: Record<string, string> = {
+    cardio: '❤️ Сердце', hepatic: '🫁 Печень', renal: '🫘 Почки',
+    neuro: '🧠 Нервная', endocrine: '🦋 Эндокр.', hematologic: '🩸 Кровь',
+    reproductive: '🔬 Репрод.', musculoskeletal: '🦴 Кости',
+  };
+
   return (
     <div className="screen labs">
-      <h2>🧪 Анализы</h2>
+      <h2 style={{ margin: '0 0 6px', fontSize: 18 }}>🧪 Анализы</h2>
 
-      {/* Phase selector */}
-      <div style={{ display: 'flex', gap: 4, overflowX: 'auto', marginBottom: 10, scrollbarWidth: 'none' }}>
+      {/* Phase selector - compact pills */}
+      <div style={{ display: 'flex', gap: 3, overflowX: 'auto', marginBottom: 8, scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' }}>
         {Object.entries(PHASE_LABELS).map(([key, label]) => (
           <button key={key} onClick={() => setSelectedPhase(key)} style={{
-            padding: '5px 10px', borderRadius: 16, fontSize: 11, fontWeight: 600,
+            padding: '5px 9px', borderRadius: 14, fontSize: 11, fontWeight: 600,
             whiteSpace: 'nowrap', cursor: 'pointer', transition: 'all 0.15s',
             background: selectedPhase === key ? 'var(--accent)' : 'var(--bg-secondary)',
             color: selectedPhase === key ? '#000' : 'var(--text-dim)',
             border: `1px solid ${selectedPhase === key ? 'var(--accent)' : 'var(--border)'}`,
+            flexShrink: 0,
           }}>
             {label}
           </button>
@@ -224,10 +237,10 @@ export const LabsScreen: React.FC = () => {
       </div>
 
       {/* Tab bar */}
-      <div className="tab-bar">
-        {(['results', 'schedule', 'catalog', 'investigations'] as const).map(t => (
+      <div className="tab-bar" style={{ gap: 2 }}>
+        {(['results', 'schedule', 'investigations', 'catalog'] as const).map(t => (
           <button key={t} className={`tab-btn ${tab === t ? 'active' : ''}`} onClick={() => setTab(t)}>
-            {t === 'results' ? '📊 Результаты' : t === 'schedule' ? '📅 График' : t === 'investigations' ? '🔬 Исследования' : '📋 Каталог'}
+            {t === 'results' ? '📊 Рез-ты' : t === 'schedule' ? '📅 График' : t === 'investigations' ? '🔬 Исслед.' : '📖 Каталог'}
           </button>
         ))}
       </div>
@@ -235,21 +248,21 @@ export const LabsScreen: React.FC = () => {
       {/* Required labs progress for phase */}
       <div className="card" style={{ marginTop: 8 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-          <h3 style={{ margin: 0 }}>{PHASE_ICONS[selectedPhase]} {PHASE_LABELS[selectedPhase]}</h3>
-          <span style={{ fontSize: 12, fontWeight: 700, color: completionPct === 100 ? 'var(--accent)' : completionPct > 50 ? '#eab308' : '#ef4444' }}>
+          <h3 style={{ margin: 0, fontSize: 14 }}>{PHASE_ICONS[selectedPhase]} {PHASE_LABELS[selectedPhase]}</h3>
+          <span style={{ fontSize: 11, fontWeight: 700, color: completionPct === 100 ? 'var(--accent)' : completionPct > 50 ? '#eab308' : '#ef4444' }}>
             {submittedCount}/{requiredLabs.length}
           </span>
         </div>
         {/* Progress bar */}
-        <div style={{ background: 'var(--bg-secondary)', borderRadius: 4, height: 8, overflow: 'hidden', marginBottom: 8 }}>
+        <div style={{ background: 'var(--bg-secondary)', borderRadius: 4, height: 6, overflow: 'hidden', marginBottom: 8 }}>
           <div style={{ width: `${completionPct}%`, height: '100%', background: completionPct === 100 ? 'var(--accent)' : '#eab308', borderRadius: 4, transition: 'width 0.3s' }} />
         </div>
 
         {/* Labs by system */}
-        <div style={{ display: 'grid', gap: 6 }}>
+        <div style={{ display: 'grid', gap: 5 }}>
           {Object.entries(labsBySystem).map(([system, codes]) => (
             <div key={system}>
-              <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--accent)', marginBottom: 3 }}>{system}</div>
+              <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--accent)', marginBottom: 2 }}>{system}</div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
                 {codes.map(code => {
                   const info = UCUM_MAP[code.toUpperCase()];
@@ -259,14 +272,14 @@ export const LabsScreen: React.FC = () => {
                   const isLow = latest && info ? latest.value < info.lln : false;
                   return (
                     <button key={code} onClick={() => { setInputCode(code); setInputUnit(info?.prefUnit || ''); setShowLabInput(true); }} style={{
-                      padding: '3px 8px', borderRadius: 6, fontSize: 10, cursor: 'pointer',
+                      padding: '2px 7px', borderRadius: 5, fontSize: 10, cursor: 'pointer',
                       background: isSubmitted ? (isHigh ? 'rgba(239,68,68,0.15)' : isLow ? 'rgba(249,115,22,0.15)' : 'rgba(0,230,138,0.1)') : 'var(--bg-secondary)',
                       border: `1px solid ${isSubmitted ? (isHigh ? 'rgba(239,68,68,0.3)' : isLow ? 'rgba(249,115,22,0.3)' : 'rgba(0,230,138,0.2)') : 'var(--border)'}`,
                       color: isSubmitted ? (isHigh ? '#ef4444' : isLow ? '#f97316' : 'var(--accent)') : 'var(--text-dim)',
                       fontWeight: isSubmitted ? 600 : 400,
                     }}>
                       {isSubmitted ? (isHigh ? '↑' : isLow ? '↓' : '✓') : '○'} {info?.name || code}
-                      {latest && <span style={{ marginLeft: 3, fontWeight: 700 }}>{latest.value}</span>}
+                      {latest && <span style={{ marginLeft: 2, fontWeight: 700 }}>{latest.value}</span>}
                     </button>
                   );
                 })}
@@ -277,8 +290,8 @@ export const LabsScreen: React.FC = () => {
 
         {/* Missing labs */}
         {missingLabs.length > 0 && missingLabs.length < requiredLabs.length && (
-          <div style={{ marginTop: 8, padding: '6px 8px', background: 'rgba(239,68,68,0.1)', borderRadius: 6, fontSize: 10, color: 'var(--text-dim)' }}>
-            Не сдано: {missingLabs.slice(0, 10).join(', ')}{missingLabs.length > 10 ? ` +${missingLabs.length - 10}` : ''}
+          <div style={{ marginTop: 6, padding: '5px 8px', background: 'rgba(239,68,68,0.1)', borderRadius: 5, fontSize: 10, color: 'var(--text-dim)' }}>
+            Не сдано: {missingLabs.slice(0, 8).join(', ')}{missingLabs.length > 8 ? ` +${missingLabs.length - 8}` : ''}
           </div>
         )}
       </div>
@@ -288,17 +301,17 @@ export const LabsScreen: React.FC = () => {
 
       {/* Lab Risks + Indices */}
       <div className="card" style={{ marginTop: 8 }}>
-        <h3>🔬 Риски из анализов</h3>
+        <h3 style={{ fontSize: 14 }}>🔬 Риски из анализов</h3>
         {labRisks && labRisks.overallNet > 0 ? (
           <div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 8 }}>
-              <div style={{ background: 'var(--bg-secondary)', padding: 8, borderRadius: 6, textAlign: 'center' }}>
-                <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>Общий риск</div>
-                <div style={{ fontSize: 18, fontWeight: 700, color: getRiskColor(labRisks.overallNet) }}>{Math.round(labRisks.overallNet)}%</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 5, marginBottom: 6 }}>
+              <div style={{ background: 'var(--bg-secondary)', padding: 7, borderRadius: 6, textAlign: 'center' }}>
+                <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Общий риск</div>
+                <div style={{ fontSize: 17, fontWeight: 700, color: getRiskColor(labRisks.overallNet) }}>{Math.round(labRisks.overallNet)}%</div>
               </div>
-              <div style={{ background: 'var(--bg-secondary)', padding: 8, borderRadius: 6, textAlign: 'center' }}>
-                <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>Отклонения</div>
-                <div style={{ fontSize: 18, fontWeight: 700 }}>
+              <div style={{ background: 'var(--bg-secondary)', padding: 7, borderRadius: 6, textAlign: 'center' }}>
+                <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Отклонения</div>
+                <div style={{ fontSize: 17, fontWeight: 700 }}>
                   {labRisks.systemBreakdown ? Object.keys(labRisks.systemBreakdown).filter(k => labRisks.systemBreakdown[k].net > 0).length : 0}
                 </div>
               </div>
@@ -310,13 +323,13 @@ export const LabsScreen: React.FC = () => {
       </div>
 
       <div className="card" style={{ marginTop: 8 }}>
-        <h3>📊 Индексы</h3>
+        <h3 style={{ fontSize: 14 }}>📊 Индексы</h3>
         {indexEntries.length > 0 ? (
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4 }}>
             {indexEntries.map(d => (
-              <div key={d.key} style={{ background: 'var(--bg-secondary)', padding: 6, borderRadius: 6, display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ fontSize: 11 }}>{d.label}</span>
-                <span style={{ fontWeight: 700, fontSize: 12, color: getRiskColor(d.value) }}>{d.value}%</span>
+              <div key={d.key} style={{ background: 'var(--bg-secondary)', padding: 5, borderRadius: 5, display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ fontSize: 10 }}>{d.label}</span>
+                <span style={{ fontWeight: 700, fontSize: 11, color: getRiskColor(d.value) }}>{d.value}%</span>
               </div>
             ))}
           </div>
@@ -325,10 +338,10 @@ export const LabsScreen: React.FC = () => {
         )}
       </div>
 
-      {/* PENALTY SECTION - unified */}
+      {/* PENALTY SECTION */}
       <div className="card" style={{ marginTop: 8, background: anyNoLabs ? 'rgba(239,68,68,0.08)' : 'var(--glass-bg)', borderColor: anyNoLabs ? 'rgba(239,68,68,0.3)' : 'var(--glass-border)' }}>
-        <h3>⚠️ Штраф за отсутствие анализов</h3>
-        <div style={{ fontSize: 11, marginBottom: 8 }}>
+        <h3 style={{ fontSize: 14 }}>⚠️ Штраф за отсутствие анализов</h3>
+        <div style={{ fontSize: 10, marginBottom: 6 }}>
           {anyNoLabs ? (
             <div>
               <div>Множитель: <strong style={{ color: '#ef4444' }}>×{penalty.totalMultiplier.toFixed(2)}</strong></div>
@@ -341,28 +354,23 @@ export const LabsScreen: React.FC = () => {
 
         {/* Global no-labs button */}
         <button onClick={toggleGlobalNoLabs} style={{
-          width: '100%', padding: 10, borderRadius: 8, cursor: 'pointer', fontWeight: 700, fontSize: 13,
+          width: '100%', padding: 9, borderRadius: 7, cursor: 'pointer', fontWeight: 700, fontSize: 12,
           background: globalNoLabs ? 'var(--accent)' : '#ef4444', color: globalNoLabs ? '#000' : '#fff',
-          border: 'none', marginBottom: 6,
+          border: 'none', marginBottom: 5,
         }}>
-          {globalNoLabs ? '✅ Глобальный штраф применён — отменить' : '🚫 БЕЗ ВСЕХ АНАЛИЗОВ (Штраф на всё)'}
+          {globalNoLabs ? '✅ Глобальный штраф применён — отменить' : '🚫 БЕЗ ВСЕХ АНАЛИЗОВ (Штраф)'}
         </button>
 
         {/* Per-system penalty buttons */}
         {!globalNoLabs && (
           <div>
-            <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 4 }}>Или штраф по отдельной системе:</div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+            <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 3 }}>Или штраф по отдельной системе:</div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
               {RISK_SYSTEMS.map(sys => {
                 const isActive = noLabsSystems.includes(sys);
-                const sysLabels: Record<string, string> = {
-                  cardio: '❤️ Сердце', hepatic: '🫁 Печень', renal: '🫘 Почки',
-                  neuro: '🧠 Нервная', endocrine: '🦋 Эндокр.', hematologic: '🩸 Кровь',
-                  reproductive: '🔬 Репрод.', musculoskeletal: '🦴 Кости',
-                };
                 return (
                   <button key={sys} onClick={() => toggleSystemNoLabs(sys)} style={{
-                    padding: '3px 8px', borderRadius: 12, fontSize: 9, cursor: 'pointer',
+                    padding: '2px 7px', borderRadius: 10, fontSize: 9, cursor: 'pointer',
                     background: isActive ? 'rgba(239,68,68,0.2)' : 'var(--bg-secondary)',
                     border: `1px solid ${isActive ? 'rgba(239,68,68,0.4)' : 'var(--border)'}`,
                     color: isActive ? '#ef4444' : 'var(--text-dim)', fontWeight: isActive ? 700 : 400,
@@ -383,9 +391,10 @@ export const LabsScreen: React.FC = () => {
           background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)',
         }} onClick={() => setShowLabInput(false)}>
           <div style={{
-            position: 'fixed', bottom: '72px', left: 0, right: 0, zIndex: 201,
+            position: 'fixed', bottom: '76px', left: 0, right: 0, zIndex: 201,
             background: 'var(--bg)', borderTop: '1px solid var(--border)',
             borderRadius: '16px 16px 0 0', padding: '12px 14px',
+            maxHeight: '50vh', overflowY: 'auto',
           }} onClick={e => e.stopPropagation()}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
               <span style={{ fontWeight: 700, fontSize: 14 }}>🧪 Ввести результат</span>
