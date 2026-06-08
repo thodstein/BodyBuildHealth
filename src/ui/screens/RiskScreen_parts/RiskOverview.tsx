@@ -1,7 +1,7 @@
 ﻿import React from 'react';
 import { RISK_SYSTEMS, DRUG_THRESHOLDS } from '../../../core/constants';
 import { SYSTEM_INFO, MECHANISM_INFO, SYSTEM_ORGANS } from '../../../core/risk-info';
-import { RISKS_DB } from '../../../data/risks';
+import { RISKS_DB, RISK_SYSTEM_MAP } from '../../../data/risks';
 import { RECOMMENDATIONS_DB } from '../../../data/recommendations';
 import type { RiskResult } from '../../../core/types';
 import { getRiskColor } from '../../../core/utils/risk-colors';
@@ -16,8 +16,12 @@ const SYSTEM_LABELS_SHORT: Record<string, string> = {
   neuro: '🧠 Нервная', endocrine: '🦋 Эндокр.', hematologic: '🩸 Кровь',
   reproductive: '🔬 Репрод.', musculoskeletal: '💪 ОДА',
   metabolic: '⚡ Метаб.', ghigf: '📈 GH/IGF', ins_axis: '🍬 Инсулин',
-  neuro_toxicity: '🧠 Нейротокс.', blood: '🩸 Кровь', vessels: '🫀 Сосуды',
+  neuro_toxicity: '⚠️ Нейротокс.', blood: '🩸 Кровь', vessels: '🫀 Сосуды',
 };
+
+function mapRiskSystem(riskSystem: string): string {
+  return RISK_SYSTEM_MAP[riskSystem] || riskSystem;
+}
 
 export const RiskOverview: React.FC<{
   riskResult: RiskResult;
@@ -30,24 +34,35 @@ export const RiskOverview: React.FC<{
   const overallStatus = riskResult.overallNet < 30 ? 'Низкий' : riskResult.overallNet < 50 ? 'Умеренный' : riskResult.overallNet < 70 ? 'Повышенный' : riskResult.overallNet < 85 ? 'Высокий' : 'Критический';
   const overallColor = getRiskColor(riskResult.overallNet);
 
-  // Get relevant risks for current risk level
-  const relevantRisks = RISKS_DB.filter(r => {
-    const sysBd = riskResult.systemBreakdown[r.system] || riskResult.systemBreakdown[mapRiskSystem(r.system)];
-    if (!sysBd) return false;
-    return sysBd.net > 20;
-  }).slice(0, 8);
+  // Filter risks that belong to systems with elevated risk (>20%), deduplicate by system
+  const relevantRisks = React.useMemo(() => {
+    const seenSystems = new Set<string>();
+    return RISKS_DB.filter(r => {
+      const mappedSystem = mapRiskSystem(r.system);
+      const sysBd = riskResult.systemBreakdown[mappedSystem];
+      if (!sysBd || sysBd.net <= 20) return false;
+      if (seenSystems.has(mappedSystem)) return false;
+      seenSystems.add(mappedSystem);
+      return true;
+    }).slice(0, 8);
+  }, [riskResult.systemBreakdown]);
 
-  // Get relevant recommendations
-  const relevantRecs = RECOMMENDATIONS_DB.filter(rec => {
-    const sysBd = riskResult.systemBreakdown[mapRiskSystem(rec.riskId.split('_')[0].toLowerCase())];
-    return true; // show top recs
-  }).slice(0, 6);
+  // Get recommendations for top-risk systems, deduplicated
+  const relevantRecs = React.useMemo(() => {
+    const seenSystems = new Set<string>();
+    return RECOMMENDATIONS_DB.filter(rec => {
+      const mappedSystem = mapRiskSystem(rec.riskId.split('_')[0].toLowerCase());
+      if (seenSystems.has(mappedSystem) && rec.type === 'RISK') return false;
+      seenSystems.add(mappedSystem);
+      return true;
+    }).slice(0, 6);
+  }, []);
 
   const anyNoLabs = globalNoLabs || noLabsSystems.length > 0;
 
   return (
     <div className="risk-overview">
-      {/* Overall Score */}
+      {/* Общий риск */}
       <div className="card" style={{ marginBottom: 8 }}>
         <h3 style={{ margin: '0 0 8px', fontSize: 15 }}>📊 Общий риск</h3>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
@@ -74,55 +89,38 @@ export const RiskOverview: React.FC<{
         </div>
       </div>
 
-      {/* Penalty info (read-only — managed from LabsScreen) */}
+      {/* Penalty info */}
       {anyNoLabs && (
         <div style={{ background: 'rgba(239,68,68,0.12)', padding: 10, borderRadius: 8, marginBottom: 8, border: '1px solid rgba(239,68,68,0.2)' }}>
-          <div style={{ fontWeight: 700, fontSize: 12, color: '#ef4444', marginBottom: 4 }}>🚫 Штраф за отсутствие анализов</div>
-          {globalNoLabs ? (
-            <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>Глобальный штраф на все системы. Управление — вкладка «Анализы».</div>
-          ) : (
-            <div>
-              <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 4 }}>Штраф по системам:</div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
-                {noLabsSystems.map(sys => (
-                  <span key={sys} style={{ background: 'rgba(239,68,68,0.15)', padding: '2px 6px', borderRadius: 4, fontSize: 9, color: '#f97316' }}>
-                    {getSystemLabel(sys)}
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
+          <div style={{ fontWeight: 700, fontSize: 12, color: '#ef4444' }}>🚫 Штраф за отсутствие анализов</div>
+          <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 4 }}>
+            {globalNoLabs ? 'Штраф применён ко всем системам' : `Штраф применён к: ${noLabsSystems.map(s => getSystemLabel(s)).join(', ')}`}
+          </div>
         </div>
       )}
 
-      {/* System breakdown */}
+      {/* Системные риски */}
       <div className="card" style={{ marginBottom: 8 }}>
-        <h3 style={{ margin: '0 0 8px', fontSize: 15 }}>🫀 Системные риски</h3>
-        <div style={{ display: 'grid', gap: 4 }}>
-          {RISK_SYSTEMS.filter(sys => riskResult.systemBreakdown[sys]).map((sys) => {
+        <h3 style={{ margin: '0 0 8px', fontSize: 15 }}>🫀 Риски по системам</h3>
+        <div style={{ display: 'grid', gap: 6 }}>
+          {RISK_SYSTEMS.map((sys: string) => {
             const bd = riskResult.systemBreakdown[sys];
             if (!bd) return null;
-            const isPenalized = noLabsSystems.includes(sys) || globalNoLabs;
+            const label = SYSTEM_LABELS_SHORT[sys] || getSystemLabel(sys);
             return (
-              <div key={sys} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '5px 8px', background: 'var(--bg-secondary)', borderRadius: 6 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <span style={{ fontSize: 13 }}>{getSystemIcon(sys)}</span>
-                  <span style={{ fontSize: 11, fontWeight: 500 }}>{getSystemLabel(sys)}</span>
-                  {isPenalized && <span style={{ fontSize: 8, color: '#ef4444', background: 'rgba(239,68,68,0.15)', padding: '1px 4px', borderRadius: 3 }}>штраф</span>}
+              <div key={sys} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 11, minWidth: 100, color: 'var(--text-dim)' }}>{label}</span>
+                <div style={{ flex: 1, background: 'var(--bg-secondary)', borderRadius: 3, height: 8, overflow: 'hidden' }}>
+                  <div style={{ width: `${Math.min(100, bd.net)}%`, height: '100%', background: getRiskColor(bd.net), borderRadius: 3 }} />
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <div style={{ width: 45, background: 'rgba(255,255,255,0.1)', borderRadius: 3, height: 5, overflow: 'hidden' }}>
-                    <div style={{ width: `${Math.min(100, bd.net)}%`, height: '100%', background: getRiskColor(bd.net), borderRadius: 3 }} />
-                  </div>
-                  <span style={{ fontWeight: 700, fontSize: 11, color: getRiskColor(bd.net), minWidth: 28, textAlign: 'right' }}>{Math.round(bd.net)}%</span>
-                </div>
+                <span style={{ fontWeight: 700, fontSize: 11, color: getRiskColor(bd.net), minWidth: 28, textAlign: 'right' }}>{Math.round(bd.net)}%</span>
               </div>
             );
           })}
         </div>
       </div>
 
-      {/* Key Risks */}
+      {/* Ключевые риски */}
       {relevantRisks.length > 0 && (
         <div className="card" style={{ marginBottom: 8 }}>
           <h3 style={{ margin: '0 0 8px', fontSize: 15 }}>⚠️ Ключевые риски</h3>
@@ -143,7 +141,7 @@ export const RiskOverview: React.FC<{
         </div>
       )}
 
-      {/* Recommendations */}
+      {/* Рекомендации */}
       {relevantRecs.length > 0 && (
         <div className="card" style={{ marginBottom: 8 }}>
           <h3 style={{ margin: '0 0 8px', fontSize: 15 }}>💡 Рекомендации</h3>
@@ -164,7 +162,7 @@ export const RiskOverview: React.FC<{
         </div>
       )}
 
-      {/* Risk History */}
+      {/* История */}
       {riskHistory && riskHistory.length > 1 && (
         <div className="card" style={{ marginBottom: 8 }}>
           <h3 style={{ margin: '0 0 8px', fontSize: 15 }}>📈 История</h3>
@@ -181,7 +179,7 @@ export const RiskOverview: React.FC<{
         </div>
       )}
 
-      {/* Drug Thresholds */}
+      {/* Пороги */}
       <div className="card" style={{ marginBottom: 8 }}>
         <h3 style={{ margin: '0 0 8px', fontSize: 15 }}>💊 Пороги</h3>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, fontSize: 10 }}>
@@ -196,14 +194,3 @@ export const RiskOverview: React.FC<{
     </div>
   );
 };
-
-function mapRiskSystem(riskSystem: string): string {
-  const map: Record<string, string> = {
-    structural: 'hepatic', bile: 'hepatic', lab: 'hepatic', toxic: 'hepatic',
-    infectious: 'hepatic', autoimmune: 'hepatic', functional: 'hepatic',
-    inflammatory: 'musculoskeletal', degenerative: 'musculoskeletal',
-    vascular: 'cardio', skin: 'hematologic', vision: 'neuro',
-    hormonal: 'endocrine', psychological: 'neuro',
-  };
-  return map[riskSystem] || riskSystem;
-}

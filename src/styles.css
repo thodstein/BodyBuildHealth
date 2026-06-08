@@ -1494,3 +1494,30 @@ input[type="text"], input[type="number"], input[type="date"], select, textarea {
     gap: 4px !important;
   }
 }
+/* === RiskInfo mobile-friendly === */
+.risk-info .card h4 {
+  font-size: 13px;
+  margin: 0;
+}
+.risk-info .card {
+  font-size: 11px;
+  line-height: 1.5;
+}
+@media (max-width: 480px) {
+  .risk-info .card {
+    padding: 10px;
+    font-size: 10px;
+  }
+  .risk-info .card h4 {
+    font-size: 12px;
+  }
+  .risk-info .card h3 {
+    font-size: 14px;
+  }
+  .risk-info .card div[style*="grid-template-columns: 1fr 1fr 1fr"] {
+    grid-template-columns: 1fr 1fr !important;
+  }
+  .risk-info .card div[style*="grid-template-columns: 1fr 1fr"] {
+    grid-template-columns: 1fr !important;
+  }
+}

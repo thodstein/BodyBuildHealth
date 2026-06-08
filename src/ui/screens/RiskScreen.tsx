@@ -14,6 +14,7 @@ import { RiskMatrix } from './RiskScreen_parts/RiskMatrix';
 import { RiskDetails } from './RiskScreen_parts/RiskDetails';
 import { V7RiskDisplay } from './RiskScreen_parts/V7RiskDisplay';
 import { WeeklyRiskChart } from './RiskScreen_parts/WeeklyRiskChart';
+import { RiskInfo } from './RiskScreen_parts/RiskInfo';
 import { calculateWeeklyRiskDynamics, type WeeklyRiskDynamics } from '../../engines/weekly-risk-dynamics.engine';
 import { useV7Risk } from '../hooks/useV7Risk';
 
@@ -34,11 +35,12 @@ const TAB_LABELS: Record<string, string> = {
   matrix: '🔬 Матрица',
   details: '📋 Детали',
   v7: '⚡ V7',
+  info: '📐 Инфо',
 };
 
 export const RiskScreen: React.FC = () => {
   const linked = useDataLink();
-  const [tab, setTab] = useState<'overview' | 'matrix' | 'details' | 'v7' | 'dynamics'>('overview');
+  const [tab, setTab] = useState<'overview' | 'dynamics' | 'matrix' | 'details' | 'v7' | 'info'>('overview');
   const [tick, setTick] = useState(0);
   const [selectedWeek, setSelectedWeek] = useState<number | null>(null);
   const [weekMode, setWeekMode] = useState<'week' | 'average'>('average');
@@ -149,6 +151,7 @@ export const RiskScreen: React.FC = () => {
       case 'details': return <RiskDetails riskResult={riskResult} labRiskContributions={labRiskContributions} />;
       case 'v7': return v7Result ? <V7RiskDisplay result={v7Result} /> : <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-dim)' }}>Загрузка V7...</div>;
       case 'dynamics': return <WeeklyRiskChart dynamics={weeklyDynamics} selectedWeek={selectedWeek} onWeekSelect={setSelectedWeek} mode={weekMode} onModeChange={setWeekMode} />;
+      case 'info': return <RiskInfo />;
       default: return <RiskOverview riskResult={riskResult} globalNoLabs={globalNoLabs} noLabsSystems={noLabsSystems} labRiskContributions={labRiskContributions} riskHistory={riskHistory} />;
     }
   };
@@ -157,7 +160,7 @@ export const RiskScreen: React.FC = () => {
     <div className="screen risk">
       <h2 style={{ margin: '0 0 6px', fontSize: 18 }}>⚠️ Риски</h2>
       <div className="tab-bar" style={{ gap: 2 }}>
-        {(['overview', 'dynamics', 'matrix', 'details', 'v7'] as const).map(t => (
+        {(['overview', 'dynamics', 'matrix', 'details', 'v7', 'info'] as const).map(t => (
           <button key={t} className={`tab-btn ${tab === t ? 'active' : ''}`} onClick={() => setTab(t)}>
             {TAB_LABELS[t]}
           </button>
