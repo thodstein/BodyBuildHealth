@@ -89,13 +89,13 @@ export const RiskMatrix: React.FC<{
           <div style={{ display: 'flex', gap: 4 }}>
             <button
               onClick={() => setView('matrix')}
-              style={{ padding: '4px 10px', borderRadius: 4, border: '1px solid var(--border)', background: view === 'matrix' ? 'var(--accent)' : 'transparent', color: view === 'matrix' ? '#000' : 'var(--text)', fontSize: 11, cursor: 'pointer' }}
+              style={{ padding: '4px 10px', borderRadius: 4, border: '1px solid var(--border)', background: view === 'matrix' ? 'var(--accent)' : 'transparent', color: view === 'matrix' ? '#000' : 'var(--text)', fontSize: 10, cursor: 'pointer' }}
             >
               Механизмы
             </button>
             <button
               onClick={() => setView('systems')}
-              style={{ padding: '4px 10px', borderRadius: 4, border: '1px solid var(--border)', background: view === 'systems' ? 'var(--accent)' : 'transparent', color: view === 'systems' ? '#000' : 'var(--text)', fontSize: 11, cursor: 'pointer' }}
+              style={{ padding: '4px 10px', borderRadius: 4, border: '1px solid var(--border)', background: view === 'systems' ? 'var(--accent)' : 'transparent', color: view === 'systems' ? '#000' : 'var(--text)', fontSize: 10, cursor: 'pointer' }}
             >
               По системам
             </button>
@@ -114,7 +114,7 @@ export const RiskMatrix: React.FC<{
             </div>
 
             {/* Table header */}
-            <div style={{ display: 'grid', gridTemplateColumns: '2fr 1.5fr 0.7fr 0.7fr 0.7fr 1fr', gap: 4, marginBottom: 4, fontSize: 10, fontWeight: 600, color: 'var(--text-dim)' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr 0.5fr 0.5fr 0.5fr 0.8fr', gap: 4, marginBottom: 4, fontSize: 10, fontWeight: 600, color: 'var(--text-dim)' }}>
               <div>Механизм</div>
               <div>Система</div>
               <div>Raw</div>
@@ -125,7 +125,7 @@ export const RiskMatrix: React.FC<{
 
             {/* Table rows */}
             {rows.map((row) => (
-              <div key={row.mechanismKey} style={{ display: 'grid', gridTemplateColumns: '2fr 1.5fr 0.7fr 0.7fr 0.7fr 1fr', gap: 4, padding: '4px 0', borderBottom: '1px solid var(--border)', fontSize: 11 }}>
+              <div key={row.mechanismKey} style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr 0.5fr 0.5fr 0.5fr 0.8fr', gap: 4, padding: '4px 0', borderBottom: '1px solid var(--border)', fontSize: 11 }}>
                 <div>
                   <div style={{ fontWeight: 500 }}>{row.mechanismLabel}</div>
                   {row.mechanismDescription && (

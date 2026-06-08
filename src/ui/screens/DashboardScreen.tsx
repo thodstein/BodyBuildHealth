@@ -53,11 +53,15 @@ function AlertBanner({ messages }: { messages: string[] }) {
 
 // Navigation cards for the Dashboard
 const NAV_CARDS: { id: ScreenId; icon: string; label: string; desc: string; color: string }[] = [
-  { id: 'training', icon: '🏋️', label: 'Тренировки', desc: 'Планы, RIR, сплиты', color: '#00e68a' },
-  { id: 'support', icon: '🛡️', label: 'Поддержка', desc: 'БАДы и протоколы', color: '#1e90ff' },
-  { id: 'nutrition', icon: '🍽️', label: 'Питание', desc: 'КБЖУ, дневник, OCR', color: '#ffa502' },
-  { id: 'calculators', icon: '🔢', label: 'Калькуляторы', desc: 'Дозировки, дозы', color: '#a855f7' },
-  { id: 'profile', icon: '👤', label: 'Профиль', desc: 'Настройки, данные', color: '#6b7280' },
+  { id: 'training', icon: '🏋️', label: 'Тренировки', desc: 'Планы, RIR', color: '#00e68a' },
+  { id: 'support', icon: '🛡️', label: 'Поддержка', desc: 'БАДы, протоколы', color: '#1e90ff' },
+  { id: 'nutrition', icon: '🍽️', label: 'Питание', desc: 'КБЖУ, дневник', color: '#ffa502' },
+  { id: 'calculators', icon: '🔢', label: 'Калькуляторы', desc: 'Дозировки', color: '#a855f7' },
+  { id: 'profile', icon: '👤', label: 'Профиль', desc: 'Настройки', color: '#6b7280' },
+  { id: 'marketplace', icon: '🛒', label: 'Маркетплейс', desc: 'Препараты и БАДы', color: '#f97316' },
+  { id: 'articles', icon: '📚', label: 'Статьи', desc: 'База знаний', color: '#06b6d4' },
+  { id: 'assistant', icon: '🤖', label: 'Ассистент', desc: 'Чекапы и ответы', color: '#8b5cf6' },
+  { id: 'reports', icon: '📊', label: 'Отчёты', desc: 'Экспорт и печать', color: '#ec4899' },
 ];
 
 export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
@@ -156,20 +160,20 @@ export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
       <AlertBanner messages={alerts} />
 
       {/* Quick stats */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 6, marginBottom: 12 }}>
-        <div style={{ background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', borderRadius: 10, padding: '8px 10px', textAlign: 'center' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 12 }}>
+        <div style={{ background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', borderRadius: 10, padding: '6px 8px', textAlign: 'center' }}>
           <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>Готовность</div>
           <div style={{ fontSize: 18, fontWeight: 700, color: readiness.recovery >= 70 ? '#22c55e' : readiness.recovery >= 50 ? '#eab308' : '#ef4444' }}>{Math.round(readiness.recovery)}%</div>
         </div>
-        <div style={{ background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', borderRadius: 10, padding: '8px 10px', textAlign: 'center' }}>
+        <div style={{ background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', borderRadius: 10, padding: '6px 8px', textAlign: 'center' }}>
           <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>Риск</div>
           <div style={{ fontSize: 18, fontWeight: 700, color: riskResult ? riskColor(riskResult.overallNet) : 'var(--text-dim)' }}>{riskResult ? Math.round(riskResult.overallNet) : '—'}%</div>
         </div>
-        <div style={{ background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', borderRadius: 10, padding: '8px 10px', textAlign: 'center' }}>
+        <div style={{ background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', borderRadius: 10, padding: '6px 8px', textAlign: 'center' }}>
           <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>Курс</div>
           <div style={{ fontSize: 18, fontWeight: 700 }}>{daysOnCourse} дн</div>
         </div>
-        <div style={{ background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', borderRadius: 10, padding: '8px 10px', textAlign: 'center' }}>
+        <div style={{ background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', borderRadius: 10, padding: '6px 8px', textAlign: 'center' }}>
           <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>Лабы</div>
           <div style={{ fontSize: 18, fontWeight: 700 }}>{labCount}</div>
         </div>
@@ -185,7 +189,7 @@ export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
             { label: 'Сон', value: (readiness.sleep ?? 0), color: (readiness.sleep ?? 0) >= 70 ? '#22c55e' : '#eab308' },
             { label: 'Стресс', value: 100 - (readiness.stress ?? 50), color: (readiness.stress ?? 0) < 30 ? '#22c55e' : '#ef4444' },
           ].map(item => (
-            <div key={item.label} style={{ background: 'var(--bg-secondary)', borderRadius: 8, padding: '8px 10px' }}>
+            <div key={item.label} style={{ background: 'var(--bg-secondary)', borderRadius: 8, padding: '6px 8px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
                 <span style={{ fontSize: 12, color: 'var(--text-dim)' }}>{item.label}</span>
                 <span style={{ fontSize: 13, fontWeight: 700, color: item.color }}>{Math.round(item.value)}%</span>
