@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+﻿import React, { useState, useMemo } from 'react';
 import { PHARMA_DB, SUBSTANCES_BY_CLASS } from '../../core/pharma-database';
 import { calculateDose } from '../../engines/dosage.engine';
 import { simulateCourse, steadyStatePeak, steadyStateTrough, eliminationConstant } from '../../engines/pk-pd.engine';
@@ -10,7 +10,7 @@ import { SYNERGY_PAIRS, type SynergyPair } from '../../engines/support.engine';
 import { SYSTEM_INFO } from '../../core/risk-info';
 import { PharmaCourseScreen } from './PharmaCourseScreen';
 
-type Tab = 'catalog' | 'pkpd' | 'dosage' | 'interactions' | 'investigations' | 'course';
+type Tab = 'catalog' | 'pkpd' | 'dosage' | 'interactions' | 'course';
 
 const SYSTEM_LABELS: Record<string, string> = Object.fromEntries(
   Object.entries(SYSTEM_INFO).map(([k, v]) => [k, v.label.split(' ').slice(0, 2).join(' ')])
@@ -107,7 +107,6 @@ export const PharmaScreen: React.FC = () => {
           ['pkpd', 'PK/PD'],
           ['dosage', 'Дозировка'],
           ['interactions', 'Взаимодействия'],
-          ['investigations', 'Исследования'],
           ['course', 'Мой курс'],
         ] as [Tab, string][]).map(([key, label]) => (
           <button
@@ -124,7 +123,6 @@ export const PharmaScreen: React.FC = () => {
       {tab === 'pkpd' && <PKPDSimulationTab />}
       {tab === 'dosage' && <DosageCalculatorTab />}
       {tab === 'interactions' && <InteractionCheckerTab />}
-      {tab === 'investigations' && <InvestigationsTab />}
       {tab === 'course' && <PharmaCourseScreen />}
     </div>
   );

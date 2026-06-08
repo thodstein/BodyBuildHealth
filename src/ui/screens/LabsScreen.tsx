@@ -10,10 +10,11 @@ import { LabsOverview } from './LabsScreen_parts/LabsOverview';
 import { LabsResults } from './LabsScreen_parts/LabsResults';
 import { LabsSchedule } from './LabsScreen_parts/LabsSchedule';
 import { LabsCatalog } from './LabsScreen_parts/LabsCatalog';
+import { LabsInvestigations } from './LabsScreen_parts/LabsInvestigations';
 
 export const LabsScreen: React.FC = () => {
   const linked = useDataLink();
-  const [tab, setTab] = useState<'results' | 'schedule' | 'catalog'>('results');
+  const [tab, setTab] = useState<'results' | 'schedule' | 'catalog' | 'investigations'>('results');
   const [forceNoLabs, setForceNoLabs] = useState(false);
 
   const hasLabs = linked.labs && linked.labs.length > 0;
@@ -68,6 +69,7 @@ export const LabsScreen: React.FC = () => {
       case 'results': return <LabsResults labs={labs} />;
       case 'schedule': return <LabsSchedule />;
       case 'catalog': return <LabsCatalog />;
+      case 'investigations': return <LabsInvestigations />;
       default: return <LabsResults labs={labs} />;
     }
   };
@@ -75,9 +77,9 @@ export const LabsScreen: React.FC = () => {
   return (
     <div className="screen labs">
       <div className="tab-bar">
-        {(['results', 'schedule', 'catalog'] as const).map(t => (
+        {(['results', 'schedule', 'catalog', 'investigations'] as const).map(t => (
           <button key={t} className={`tab-btn ${tab === t ? 'active' : ''}`} onClick={() => setTab(t)}>
-            {t === 'results' ? 'Результаты' : t === 'schedule' ? 'График' : 'Каталог'}
+            {t === 'results' ? 'Результаты' : t === 'schedule' ? 'График' : t === 'investigations' ? 'Исследования' : 'Каталог'}
           </button>
         ))}
       </div>
