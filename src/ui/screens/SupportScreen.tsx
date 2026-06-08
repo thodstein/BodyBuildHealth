@@ -5,8 +5,10 @@ import { PHARMA_DB, PHARMA_CLASSES } from '../../core/pharma-database';
 import { useDataLink } from '../../core/data-link';
 import { SYSTEM_INFO } from '../../core/risk-info';
 import { getRiskColor } from '../../core/utils/risk-colors';
+import { SUPPORT_BASE_COVERAGE } from '../../core/constants';
+import { SUBSTANCES_BY_CLASS } from '../../core/pharma-database';
 
-type SupportTab = 'catalog' | 'synergies' | 'recommendations';
+type SupportTab = 'catalog' | 'synergies' | 'recommendations' | 'calculator';
 
 const SYNERGY_COLORS: Record<string, string> = {
   synergistic: '#22c55e',
@@ -24,6 +26,8 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   const [synergyFilter, setSynergyFilter] = useState<string>('all');
   const [systemFilter, setSystemFilter] = useState<string>('all');
   const [supportClassFilter, setSupportClassFilter] = useState<string>('all');
+  const [supportLevel, setSupportLevel] = useState<'basic' | 'standard' | 'enhanced' | 'maximum'>('standard');
+  const [prescribedMeds, setPrescribedMeds] = useState<Record<string, boolean>>({});
   const [supportResult, setSupportResult] = useState<{ riskBefore: Record<string, number>; riskAfter: Record<string, number>; score: number } | null>(null);
 
   // Combine SUPPLEMENT_DESCRIPTIONS with support substances from PHARMA_DB
@@ -126,7 +130,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
             background: tab === t ? 'var(--accent-green, #00e68a)' : 'var(--bg-secondary)',
             color: tab === t ? '#000' : 'var(--text-dim)', cursor: 'pointer', transition: 'background 0.15s',
           }}>
-            {t === 'catalog' ? 'Каталог' : t === 'synergies' ? 'Синергии' : 'Рекомендации'}
+            {t === 'catalog' ? 'Каталог' : t === 'synergies' ? 'Синергии' : t === 'recommendations' ? 'Рекомендации' : 'Калькулятор'}
           </button>
         ))}
       </div>

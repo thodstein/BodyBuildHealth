@@ -32,7 +32,7 @@ function HulkBg() {
 export default function App() {
   const [tab, setTab] = useState<Tab>('home');
   const [initialized, setInitialized] = useState(false);
-  const touchRef = useRef<{ x: number; y: number } | null>(null);
+  // touchRef removed
   const mainRef = useRef<HTMLElement>(null);
 
   useEffect(() => { registry.init().then(() => setInitialized(true)); }, []);
@@ -90,21 +90,9 @@ export default function App() {
     go(target);
   }, []);
 
-  const handleTouchStart = useCallback((e: React.TouchEvent) => {
-    if (e.touches.length === 1) touchRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
-  }, []);
+  // Swipe removed — only within-tab swiping allowed
 
-  const handleTouchEnd = useCallback((e: React.TouchEvent) => {
-    if (!touchRef.current || e.changedTouches.length !== 1) return;
-    const dx = e.changedTouches[0].clientX - touchRef.current.x;
-    const dy = e.changedTouches[0].clientY - touchRef.current.y;
-    if (Math.abs(dx) < 80 || Math.abs(dy) > Math.abs(dx)) return;
-    const tabs: Tab[] = ['home', 'labs', 'risks', 'pharma'];
-    const idx = tabs.indexOf(tab);
-    const next = dx < 0 && idx < tabs.length - 1 ? tabs[idx + 1] : dx > 0 && idx > 0 ? tabs[idx - 1] : null;
-    if (next) { go(next); }
-    touchRef.current = null;
-  }, [tab]);
+  // Swipe removed
 
   const renderContent = () => {
     if (!initialized) return (
@@ -129,7 +117,7 @@ export default function App() {
   };
 
   return (
-    <div className="app" onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
+    <div className="app" >
       <HulkBg />
       <main ref={mainRef} style={{ position: 'relative', zIndex: 1 }}>
         {renderContent()}

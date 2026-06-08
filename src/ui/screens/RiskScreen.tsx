@@ -34,7 +34,7 @@ const TAB_LABELS: Record<string, string> = {
   dynamics: '📈 Динамика',
   matrix: '🔬 Матрица',
   details: '📋 Детали',
-  v7: '⚡ V7',
+  v7: '⚡ Расчёт V7',
   info: '📐 Инфо',
 };
 
