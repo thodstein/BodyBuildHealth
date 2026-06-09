@@ -71,6 +71,7 @@ export function useV7Risk(): { v7Result: V7RiskResult | null; legacyResult: Risk
       forceNoLabs: globalNoLabs,
       noLabSystems,
       supportIds: Object.keys(linked.supportCoverage || {}),
+      mcRuns: settings.mcRuns ?? 0,
     };
 
     try {

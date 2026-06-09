@@ -8,6 +8,7 @@ import { useDataLink } from '../../../core/data-link';
 import { getGlobalNoLabs, getNoLabsSystems } from '../LabsScreen';
 import { SYSTEM_MECHANISMS } from '../../../core/system-mechanisms';
 import { PHARMA_DB } from '../../../core/pharma-database';
+import { notifyDataChange } from '../../../core/data-link';
 
 function getSubstanceName(id: string): string {
   const entry = PHARMA_DB[id];
@@ -66,7 +67,16 @@ export const V7RiskDisplay: React.FC<{ result: V7RiskResult }> = ({ result }) =>
   const [selectedDay, setSelectedDay] = useState<number>(42);
   const [pkDay, setPkDay] = useState(42);
   const [selectedOrgan3D, setSelectedOrgan3D] = useState<string | null>(null);
+  const [mcEnabled, setMcEnabled] = useState<boolean>(false);
   const linked = useDataLink();
+
+  const toggleMC = () => {
+    if (!linked.profile) return;
+    const next = !mcEnabled;
+    setMcEnabled(next);
+    linked.profile.settings.mcRuns = next ? 50 : 0;
+    notifyDataChange();
+  };
 
   const { matrix, organSummary, globalRiskRaw, globalRiskNet, globalPEvent, dataQuality, organs, mcResult, pkTimeSeries } = result;
 
@@ -149,6 +159,19 @@ export const V7RiskDisplay: React.FC<{ result: V7RiskResult }> = ({ result }) =>
             <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>Качество данных</div>
             <div style={{ fontSize: 22, fontWeight: 700, color: dataQuality > 0.7 ? '#22c55e' : dataQuality > 0.4 ? '#eab308' : '#ef4444' }}>{(dataQuality * 100).toFixed(0)}%</div>
           </div>
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'center', marginTop: 8 }}>
+          <button
+            onClick={toggleMC}
+            style={{
+              padding: '6px 16px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer',
+              background: mcEnabled ? 'rgba(139,92,246,0.2)' : 'var(--bg-secondary)',
+              border: mcEnabled ? '1px solid #8b5cf6' : '1px solid var(--border)',
+              color: mcEnabled ? '#8b5cf6' : 'var(--text-dim)',
+            }}
+          >
+            {mcEnabled ? '🎲 Monte Carlo: 50 сценариев' : '🎲 Monte Carlo: выкл'}
+          </button>
         </div>
       </div>
 
@@ -612,7 +635,7 @@ export const V7RiskDisplay: React.FC<{ result: V7RiskResult }> = ({ result }) =>
         <div style={{ fontSize: 10, color: 'var(--text-dim)', textAlign: 'center', lineHeight: 1.5 }}>
           🔬 Health Engine v7.0 — PK → Hill → Signaling → 7мех → Damage/Recovery → MC → Risk<br />
           12 органов × 7 механизмов | Нейротоксичность | Межорганные связи | Стаж | Monte Carlo<br />
-          {mcResult ? `🎯 MC: ${(mcResult as any).meanGlobalRisk?.toFixed(1) || '—'}% сценариев` : '⚙️ Детерминированный режим'}
+          {mcResult ? `🎯 MC: сред. ${((mcResult as any).meanGlobalRisk * 100 || 0).toFixed(1)}% [P5: ${((mcResult as any).p5GlobalRisk * 100 || 0).toFixed(1)}% — P95: ${((mcResult as any).p95GlobalRisk * 100 || 0).toFixed(1)}%]` : mcEnabled ? '🔄 MC запускается...' : '⚙️ Детерминированный режим'}
           {pkTimeSeries && Object.keys(pkTimeSeries).length > 0 ? ` | 💉 PK: ${Object.keys(pkTimeSeries).length} препаратов` : ''}
         </div>
       </div>

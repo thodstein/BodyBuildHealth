@@ -537,6 +537,7 @@ export interface UserProfile {
       
       // Penalty override flags (manual user choice)
       forceNoLabsPenalty?: boolean; // Force apply penalty when no labs are entered
+      mcRuns?: number; // Monte Carlo simulation runs (0 = disabled, 50+ = enabled)
     };
 }
 
