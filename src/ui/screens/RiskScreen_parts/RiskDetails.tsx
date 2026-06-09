@@ -125,7 +125,7 @@ export const RiskDetails: React.FC<{
                         <div style={{ marginTop: 4 }}>
                           <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--accent)', marginBottom: 3 }}>Специфичные механизмы ({mechanisms.length}):</div>
                           {mechanisms.map(m => {
-                            const mechKey = `${sys}_m${m.num}`;
+                            const mechKey = `${sys}_${m.num}`;
                             const mechDetail = riskResult.mechanismDetail?.[mechKey];
                             const mechNet = mechDetail?.net ?? 0;
                             return (
@@ -189,7 +189,7 @@ export const RiskDetails: React.FC<{
 
       <div style={{ fontSize: 10, color: 'var(--text-dim)', textAlign: 'center', marginTop: 8, fontStyle: 'italic', lineHeight: 1.4 }}>
         Данные расчёты носят информационный характер и не заменяют консультацию врача.<br/>
-        {RISK_SYSTEMS.length} систем органов ? 7-9 специфичных механизмов каждая.
+        {RISK_SYSTEMS.length} систем органов × 7-9 специфичных механизмов каждая.
       </div>
     </div>
   );
