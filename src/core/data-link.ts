@@ -196,8 +196,9 @@ export function useDataLink(): LinkedData {
         activeDrugs,
         supportCoverage: {},
       });
+      const supportIds = (s.currentSupplements ?? []).map(sup => sup.id).filter(Boolean);
       const result = calculateSupport({
-        substances: Object.keys(activeDrugs),
+        substances: supportIds,
         labs: labs.slice(-10).map(l => ({ code: l.code, value: l.value })),
         demographics: { age: s.age ?? 30, weight: s.weight ?? 80, sex: s.sex ?? 'male' },
         genetics,

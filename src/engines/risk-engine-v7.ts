@@ -463,12 +463,12 @@ export function runV7Simulation(input: V7RiskInput): V7RiskResult {
   const osNeuro = organSummary.neuro_toxicity?.meanS ?? 0;
   const osBlood = organSummary.blood?.meanS ?? 0;
   const osMusculo = organSummary.musculoskeletal?.meanS ?? 0;
-  systemBreakdown.metabolic = systemBreakdown.metabolic ?? { raw: osMetabolic * 100, net: osMetabolic * 80 };
-  systemBreakdown.ghigf = systemBreakdown.ghigf ?? { raw: osGhigf * 100, net: osGhigf * 80 };
-  systemBreakdown.ins_axis = systemBreakdown.ins_axis ?? { raw: osIns * 100, net: osIns * 80 };
-  systemBreakdown.neuro_toxicity = { raw: osNeuro * 100, net: osNeuro * 80 };
-  systemBreakdown.blood = { raw: osBlood * 100, net: osBlood * 80 };
-  systemBreakdown.musculoskeletal = { raw: osMusculo * 100, net: osMusculo * 80 };
+  systemBreakdown.metabolic = systemBreakdown.metabolic ?? { raw: osMetabolic * 100, net: osMetabolic * 100 };
+  systemBreakdown.ghigf = systemBreakdown.ghigf ?? { raw: osGhigf * 100, net: osGhigf * 100 };
+  systemBreakdown.ins_axis = systemBreakdown.ins_axis ?? { raw: osIns * 100, net: osIns * 100 };
+  systemBreakdown.neuro_toxicity = { raw: osNeuro * 100, net: osNeuro * 100 };
+  systemBreakdown.blood = { raw: osBlood * 100, net: osBlood * 100 };
+  systemBreakdown.musculoskeletal = { raw: osMusculo * 100, net: osMusculo * 100 };
 
   for (const key of Object.keys(systemBreakdown)) {
     systemBreakdown[key].raw = Math.min(100, systemBreakdown[key].raw * penaltyMultiplier * V7_CALIBRATION_FACTOR);

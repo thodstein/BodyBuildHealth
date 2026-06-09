@@ -63,11 +63,11 @@ const SENSITIVITY_LABELS: Record<string, string> = {
   age: 'Возраст', weight: 'Вес (кг)', waterL: 'Вода (л/день)',
 };
 
-type V7Tab = 'organs' | 'matrix' | 'timeseries' | 'sensitivity' | 'pk' | '3d';
+
 
 export const V7RiskDisplay: React.FC<{ result: V7RiskResult }> = ({ result }) => {
   const [expandedOrgan, setExpandedOrgan] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<V7Tab>('organs');
+  const [activeTab, setActiveTab] = useState<string>('organs');
   const [selectedDay, setSelectedDay] = useState<number>(42);
   const [pkDay, setPkDay] = useState(42);
   const [selectedOrgan3D, setSelectedOrgan3D] = useState<string | null>(null);
@@ -837,10 +837,10 @@ export const V7RiskDisplay: React.FC<{ result: V7RiskResult }> = ({ result }) =>
     );
   };
 
-  const tabs: { id: V7Tab; label: string }[] = [
+  const tabs: { id: string; label: string }[] = [
     { id: 'organs', label: '🫀 Органы' }, { id: 'matrix', label: '🔲 Матрица' },
     { id: 'timeseries', label: '📈 Временной ряд' }, { id: 'sensitivity', label: '📊 Чувствит.' },
-    { id: 'pk', label: '💉 PK' }, { id: '3d', label: '🧍 3D Модель' },
+    { id: 'pk', label: '💉 PK' },
   ];
 
   const pkContent = pkTimeSeries && Object.keys(pkTimeSeries).length > 0 ? (
@@ -893,13 +893,14 @@ export const V7RiskDisplay: React.FC<{ result: V7RiskResult }> = ({ result }) =>
 
   return (
     <div style={{ padding: '0 0 80px 0' }}>
-      <div style={{ display: 'flex', gap: 4, marginBottom: 12, overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+      <div className="card" style={{ marginBottom: 12, padding: '8px 10px', display: 'flex', gap: 4, overflowX: 'auto', WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none' }}>
         {tabs.map(t => (
           <button key={t.id} onClick={() => setActiveTab(t.id)} style={{
-            padding: '8px 12px', borderRadius: 8, fontSize: 11, fontWeight: activeTab === t.id ? 700 : 400,
-            background: activeTab === t.id ? 'rgba(0,230,138,0.15)' : 'var(--bg-secondary)',
-            border: activeTab === t.id ? '1px solid #00e68a' : '1px solid var(--border)',
-            color: activeTab === t.id ? '#00e68a' : 'var(--text-dim)', cursor: 'pointer', whiteSpace: 'nowrap',
+            padding: '7px 12px', borderRadius: 6, fontSize: 11, fontWeight: activeTab === t.id ? 700 : 400,
+            background: activeTab === t.id ? '#00e68a' : 'var(--bg-secondary)',
+            border: 'none',
+            color: activeTab === t.id ? '#000' : 'var(--text-dim)', cursor: 'pointer', whiteSpace: 'nowrap',
+            transition: 'all 0.15s',
           }}>
             {t.label}
           </button>
@@ -910,7 +911,6 @@ export const V7RiskDisplay: React.FC<{ result: V7RiskResult }> = ({ result }) =>
       {activeTab === 'timeseries' && renderTimeSeries()}
       {activeTab === 'sensitivity' && renderSensitivity()}
       {activeTab === 'pk' && pkContent}
-      {activeTab === '3d' && render3DModel()}
       <div className="card" style={{ marginBottom: 12 }}>
         <div style={{ fontSize: 10, color: 'var(--text-dim)', textAlign: 'center', lineHeight: 1.5 }}>
           🔬 Health Engine v7.0 — PK → Hill → Signaling → 7мех → Damage/Recovery → MC → Risk<br />

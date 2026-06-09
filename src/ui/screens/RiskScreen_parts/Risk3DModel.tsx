@@ -76,6 +76,7 @@ interface Props {
 
 export const Risk3DModel: React.FC<Props> = ({ result, mcEnabled, onToggleMC, organWeek, onWeekChange }) => {
   const [selectedOrgan, setSelectedOrgan] = useState<string | null>(null);
+  const [riskMode, setRiskMode] = useState<'net' | 'raw' | 'delta'>('net');
   const { organSummary, globalRiskRaw, globalRiskNet, globalPEvent, weeklyOrganData = {}, weeklyGlobalData = [] } = result;
 
   const weekOptions = [1,2,3,4,5,6,7,8,9,10,11,12];
@@ -88,8 +89,9 @@ export const Risk3DModel: React.FC<Props> = ({ result, mcEnabled, onToggleMC, or
   };
   const riskOpacity = (pct: number) => Math.max(0.4, Math.min(0.95, 0.4 + pct / 100 * 0.55));
 
-  const overallColor = getRiskColor(globalRiskNet);
-  const overallLabel = globalRiskNet < 20 ? 'Низкий' : globalRiskNet < 40 ? 'Умеренный' : globalRiskNet < 60 ? 'Повышенный' : globalRiskNet < 80 ? 'Высокий' : 'Критический';
+  const displayRisk = riskMode === 'raw' ? globalRiskRaw : riskMode === 'delta' ? Math.max(0, globalRiskRaw - globalRiskNet) : globalRiskNet;
+  const overallColor = getRiskColor(displayRisk);
+  const overallLabel = displayRisk < 20 ? 'Низкий' : displayRisk < 40 ? 'Умеренный' : displayRisk < 60 ? 'Повышенный' : displayRisk < 80 ? 'Высокий' : 'Критический';
 
   const renderLabel = () => {
     if (!selectedOrgan) return null;
@@ -135,6 +137,19 @@ export const Risk3DModel: React.FC<Props> = ({ result, mcEnabled, onToggleMC, or
             border: mcEnabled ? '1px solid #8b5cf6' : '1px solid var(--border)',
             color: mcEnabled ? '#8b5cf6' : 'var(--text-dim)',
           }}>{mcEnabled ? '🎲 MC' : '🎲 Детерм'}</button>
+        </div>
+        {/* Risk display method selector */}
+        <div style={{ display: 'flex', gap: 4, marginBottom: 8 }}>
+          {(['net', 'raw', 'delta'] as const).map(m => (
+            <button key={m} onClick={() => setRiskMode(m)} style={{
+              padding: '4px 10px', borderRadius: 6, fontSize: 10, fontWeight: riskMode === m ? 700 : 400,
+              cursor: 'pointer', border: riskMode === m ? '1px solid #00e68a' : '1px solid var(--border)',
+              background: riskMode === m ? 'rgba(0,230,138,0.15)' : 'var(--bg-secondary)',
+              color: riskMode === m ? '#00e68a' : 'var(--text-dim)',
+            }}>
+              {m === 'net' ? 'Net (с поддержкой)' : m === 'raw' ? 'Raw (без поддержки)' : 'Δ Разница'}
+            </button>
+          ))}
         </div>
         {/* Week slider — visual pill buttons */}
         <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 4 }}>Неделя: {organWeek === 0 ? 'Среднее за 12 нед' : `Нед ${organWeek}`}</div>
@@ -252,11 +267,16 @@ export const Risk3DModel: React.FC<Props> = ({ result, mcEnabled, onToggleMC, or
       {/* Overall risk bar */}
       <div className="card" style={{ marginBottom: 12 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-          <span style={{ fontSize: 12, fontWeight: 600 }}>Общий риск: <span style={{ color: overallColor }}>{Math.round(globalRiskNet)}%</span></span>
+          <span style={{ fontSize: 12, fontWeight: 600 }}>Общий риск: <span style={{ color: overallColor }}>{Math.round(displayRisk)}%</span></span>
           <span style={{ fontSize: 9, color: 'var(--text-dim)' }}>{overallLabel}</span>
         </div>
+        <div style={{ display: 'flex', gap: 12, marginBottom: 6, fontSize: 10 }}>
+          <span>Raw: <b>{Math.round(globalRiskRaw)}%</b></span>
+          <span>Net: <b style={{ color: getRiskColor(globalRiskNet) }}>{Math.round(globalRiskNet)}%</b></span>
+          <span>Δ: <b>{Math.round(Math.max(0, globalRiskRaw - globalRiskNet))}%</b></span>
+        </div>
         <div style={{ background: 'rgba(255,255,255,0.08)', borderRadius: 6, height: 14, overflow: 'hidden' }}>
-          <div style={{ width: `${Math.min(100, globalRiskNet)}%`, height: '100%', background: `linear-gradient(90deg, #22c55e, ${overallColor})`, borderRadius: 6, transition: 'width 0.5s' }} />
+          <div style={{ width: `${Math.min(100, displayRisk)}%`, height: '100%', background: `linear-gradient(90deg, #22c55e, ${overallColor})`, borderRadius: 6, transition: 'width 0.5s' }} />
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 3, fontSize: 8, color: 'var(--text-dim)' }}>
           <span>0%</span><span>25</span><span>50</span><span>75</span><span>100%</span>

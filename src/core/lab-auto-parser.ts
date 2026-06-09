@@ -35,7 +35,7 @@ const LINE_PATTERNS = [
    /([A-Za-z0-9().\/-]{2,40})[\s:]+([\d,.]+)\s*([A-Za-z%\/0-9.-]{1,20})\s*([\d,.]+)\s*[-–]\s*([\d,.]+)/i
 ];
 
-function detectProvider(text: string): ParsedLabResult['provider'] {
+export function detectProvider(text: string): ParsedLabResult['provider'] {
   const lower = text.toLowerCase();
   if (lower.includes('gemotest')) return 'gemotest';
   if (lower.includes('invitro')) return 'invitro';
