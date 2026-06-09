@@ -196,7 +196,7 @@ export const V7RiskDisplay: React.FC<{ result: V7RiskResult }> = ({ result }) =>
 
       {/* Organ Systems */}
       <div className="card" style={{ marginBottom: 12 }}>
-        <h3 style={{ margin: '0 0 10px 0' }}>🫀 Органные системы (12)</h3>
+        <h3 style={{ margin: '0 0 10px 0' }}>🫀 Органные системы</h3>
         {Object.entries(organSummary).map(([sysKey, sysData]: [string, any]) => {
           const label = ORGAN_LABELS[sysKey] || sysKey;
           const isExpanded = expandedOrgan === sysKey;
@@ -212,7 +212,7 @@ export const V7RiskDisplay: React.FC<{ result: V7RiskResult }> = ({ result }) =>
                     <div style={{ width: `${Math.min(100, (sysData.meanS ?? 0) * 100)}%`, height: '100%', background: getRiskColor((sysData.meanS ?? 0) * 100), borderRadius: 3 }} />
                   </div>
                   <span style={{ fontWeight: 700, fontSize: 12, color: getRiskColor((sysData.meanS ?? 0) * 100), minWidth: 36, textAlign: 'right' }}>{fmtPct((sysData.meanS ?? 0) * 100)}%</span>
-                  <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>{isExpanded ? '^' : 'Ў'}</span>
+                  <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>{isExpanded ? '▸' : '▾'}</span>
                 </div>
               </div>
               {isExpanded && sysData.mechanisms && sysData.mechanisms.length > 0 && (
