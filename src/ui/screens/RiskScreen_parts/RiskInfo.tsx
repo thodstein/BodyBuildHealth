@@ -14,7 +14,7 @@ export const RiskInfo: React.FC = () => {
       <div className="card" style={{ marginBottom: 8 }}>
         <h3 style={{ margin: '0 0 8px', fontSize: 15 }}>📐 Формулы расчёта рисков</h3>
         <p style={{ fontSize: 11, color: 'var(--text-dim)', lineHeight: 1.5, margin: '0 0 8px' }}>
-          Движок Health Engine v9 рассчитывает риски по <strong>14 системам органов</strong> и <strong>7 механизмам повреждения</strong> для каждого препарата.
+          Движок Health Engine v9 рассчитывает риски по <strong>14 системам органов</strong> с <strong>7–9 специфичными механизмами</strong> для каждой (105 всего) + <strong>7 общих механизмов</strong> повреждения.
           Результат — значение от 0% (нет риска) до 100% (критический риск).
         </p>
         <div style={{ background: 'rgba(0,230,138,0.08)', padding: 8, borderRadius: 8, fontSize: 10, color: 'var(--text-dim)' }}>
@@ -193,7 +193,7 @@ if mechContribution > 0.005:
       {/* 7 механизмов повреждения */}
       <div className="card" style={{ marginBottom: 8 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }} onClick={() => toggle('mechs')}>
-          <h4 style={{ margin: 0, fontSize: 13 }}>⚙️ 7 механизмов повреждения</h4>
+          <h4 style={{ margin: 0, fontSize: 13 }}>⚙️ 7 общих механизмов повреждения</h4>
           <span style={{ fontSize: 12 }}>{expanded === 'mechs' ? '▲' : '▼'}</span>
         </div>
         {expanded === 'mechs' && (
@@ -320,7 +320,7 @@ OverallNet = min(100, overallNet × totalMultiplier)`}
         {expanded === 'agg' && (
           <div style={{ marginTop: 8, fontSize: 11, lineHeight: 1.6 }}>
             <div style={{ background: 'var(--bg-secondary)', padding: 10, borderRadius: 8, fontFamily: 'monospace', fontSize: 11, marginBottom: 8 }}>
-{`systemRisk = geom(allMechanisms)  // Геометрическое среднее по 7 механизмам
+{`systemRisk = geom(allMechanisms) // Геометрическое среднее по 7-9 специфичным механизмам
 
 overallRisk = geom(allSystems) × overallMRR × overallHGI × (2 - overallRIR)
 

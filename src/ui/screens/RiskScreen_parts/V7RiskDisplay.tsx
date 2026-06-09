@@ -34,6 +34,40 @@ const ORGAN_DETAIL: Record<string, Record<number, string>> = {
   vessels: { 1: 'Эндотелиальная дисфункция', 2: 'Вазоконстрикция', 3: 'Атеросклероз', 4: 'Пролиферация интимы', 5: 'Воспаление сосудистой стенки', 6: 'Микроангиопатия', 7: 'Аневризма / расслоение' },
 };
 
+// Mapping from V7 organ keys to RISK_SYSTEMS keys (for unified display)
+const V7_TO_RISK_SYSTEM: Record<string, string> = {
+  heart: 'cardio',
+  liver: 'hepatic',
+  kidney: 'renal',
+  vessels: 'vessels',
+  blood: 'blood',
+  endocrine: 'endocrine',
+  metabolic: 'metabolic',
+  ghigf: 'ghigf',
+  ins_axis: 'ins_axis',
+  musculoskeletal: 'musculoskeletal',
+  neuro_toxicity: 'neuro_toxicity',
+  reproductive: 'reproductive',
+};
+
+const RISK_TO_V7: Record<string, string> = {
+  cardio: 'heart',
+  hepatic: 'liver',
+  renal: 'kidney',
+  neuro: 'neuro_toxicity',
+  hematologic: 'blood',
+  endocrine: 'endocrine',
+  reproductive: 'reproductive',
+  musculoskeletal: 'musculoskeletal',
+  metabolic: 'metabolic',
+  ghigf: 'ghigf',
+  ins_axis: 'ins_axis',
+  neuro_toxicity: 'neuro_toxicity',
+  blood: 'blood',
+  vessels: 'vessels',
+};
+
+
 
 
 const SENSITIVITY_LABELS: Record<string, string> = {
