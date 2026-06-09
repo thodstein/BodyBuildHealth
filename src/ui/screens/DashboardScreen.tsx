@@ -15,7 +15,7 @@ import type { MasterDB, RiskResult, ReadinessScores, CourseEntry, LabPoint } fro
 import { calculateRisks } from '../../engines/risk.engine';
 import { useV7Risk } from '../hooks/useV7Risk';
 import { calcReadiness } from '../../engines/readiness.engine';
-import { RISK_SYSTEMS } from '../../core/constants';
+import { RISK_SYSTEMS, ALL_RISK_SYSTEMS } from '../../core/constants';
 import { db } from '../../core/db';
 import { getProfile } from '../../core/profile-manager';
 
@@ -46,7 +46,7 @@ function AlertBanner({ messages }: { messages: string[] }) {
   if (!messages.length) return null;
   return (
     <div style={{ background: 'var(--danger-dim)', border: '1px solid var(--danger)', borderRadius: 8, padding: '10px 14px', marginBottom: 12 }}>
-      <div style={{ fontWeight: 700, color: 'var(--danger)', fontSize: 13, marginBottom: 4 }}>⚠️ Внимание</div>
+      <div style={{ fontWeight: 700, color: 'var(--danger)', fontSize: 13, marginBottom: 4 }}>?? Внимание</div>
       {messages.map((m, i) => (
         <div key={i} style={{ fontSize: 12, color: 'var(--danger)', lineHeight: 1.6 }}>{m}</div>
       ))}
@@ -56,15 +56,15 @@ function AlertBanner({ messages }: { messages: string[] }) {
 
 // Navigation cards for the Dashboard
 const NAV_CARDS: { id: ScreenId; icon: string; label: string; desc: string; color: string }[] = [
-  { id: 'training', icon: '🏋️', label: 'Тренировки', desc: 'Планы, RIR', color: '#00e68a' },
-  { id: 'support', icon: '🛡️', label: 'Поддержка', desc: 'БАДы, протоколы', color: '#1e90ff' },
-  { id: 'nutrition', icon: '🍽️', label: 'Питание', desc: 'КБЖУ, дневник', color: '#ffa502' },
-  { id: 'calculators', icon: '🔢', label: 'Калькуляторы', desc: 'Дозировки', color: '#a855f7' },
-  { id: 'profile', icon: '👤', label: 'Профиль', desc: 'Настройки', color: '#6b7280' },
-  { id: 'marketplace', icon: '🛒', label: 'Маркетплейс', desc: 'Препараты и БАДы', color: '#f97316' },
-  { id: 'articles', icon: '📚', label: 'Статьи', desc: 'База знаний', color: '#06b6d4' },
-  { id: 'assistant', icon: '🤖', label: 'Ассистент', desc: 'Чекапы и ответы', color: '#8b5cf6' },
-  { id: 'reports', icon: '📊', label: 'Отчёты', desc: 'Экспорт и печать', color: '#ec4899' },
+  { id: 'training', icon: '???', label: 'Тренировки', desc: 'Планы, RIR', color: '#00e68a' },
+  { id: 'support', icon: '???', label: 'Поддержка', desc: 'БАДы, протоколы', color: '#1e90ff' },
+  { id: 'nutrition', icon: '???', label: 'Питание', desc: 'КБЖУ, дневник', color: '#ffa502' },
+  { id: 'calculators', icon: '??', label: 'Калькуляторы', desc: 'Дозировки', color: '#a855f7' },
+  { id: 'profile', icon: '??', label: 'Профиль', desc: 'Настройки', color: '#6b7280' },
+  { id: 'marketplace', icon: '??', label: 'Маркетплейс', desc: 'Препараты и БАДы', color: '#f97316' },
+  { id: 'articles', icon: '??', label: 'Статьи', desc: 'База знаний', color: '#06b6d4' },
+  { id: 'assistant', icon: '??', label: 'Ассистент', desc: 'Чекапы и ответы', color: '#8b5cf6' },
+  { id: 'reports', icon: '??', label: 'Отчёты', desc: 'Экспорт и печать', color: '#ec4899' },
 ];
 
 export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
@@ -132,7 +132,7 @@ export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
 
       // Alerts
       const newAlerts: string[] = [];
-      if (settings.age && settings.age > 40) newAlerts.push('Возраст >40: рекомендуется расширенный чекап');
+      if (settings.age && settings.age > 40) newAlerts.push('Возраст > 40: рекомендуется расширенный чекап');
       if (courseData.length > 0) {
         const hasAi = courseData.some(c => /oxandrolone|stanozolol|methandienone|oxymetholone|halotestin/i.test(c.substanceId));
         if (hasAi) newAlerts.push('Оральные ААС: обязательный мониторинг печени (АЛТ, АСТ, ГГТ)');
@@ -159,7 +159,7 @@ export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
 
   return (
     <div className="screen">
-      <h2>🏠 Главная</h2>
+      <h2>?? Главная</h2>
 
       <AlertBanner messages={alerts} />
 
@@ -185,7 +185,7 @@ export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
 
       {/* Readiness details */}
       <div className="card">
-        <h3>⚡ Готовность к тренировке</h3>
+        <h3>? Готовность к тренировке</h3>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
           {[
             { label: 'Восстановление', value: readiness.recovery, color: readiness.recovery >= 70 ? '#22c55e' : '#eab308' },
@@ -207,8 +207,8 @@ export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
       {/* System summary */}
       <div className="card" style={{ cursor: 'pointer' }} onClick={onNavigate ? () => onNavigate('risks') : undefined}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <h3 style={{ margin: 0 }}>🫀 Системы организма</h3>
-          <span style={{ fontSize: 11, color: 'var(--accent)' }}>Подробнее →</span>
+          <h3 style={{ margin: 0 }}>?? Системы организма</h3>
+          <span style={{ fontSize: 11, color: 'var(--accent)' }}>{'Подробнее >'}</span>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, marginTop: 8 }}>
           {riskResult && Object.entries(riskResult.systemBreakdown).map(([sys, vals]) => (
@@ -222,7 +222,7 @@ export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
 
       {/* Navigation cards */}
       <div className="card">
-        <h3>📱 Разделы</h3>
+        <h3>?? Разделы</h3>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
           {NAV_CARDS.map(card => (
             <div
@@ -249,7 +249,7 @@ export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
       {/* Active course info */}
       {courseEntries.length > 0 && (
         <div className="card">
-          <h3>💊 Активный курс</h3>
+          <h3>?? Активный курс</h3>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
             {courseEntries.slice(0, 4).map((c, i) => (
               <span key={i} style={{ background: 'var(--accent-dim)', color: 'var(--accent)', padding: '3px 10px', borderRadius: 16, fontSize: 11, fontWeight: 600 }}>
@@ -267,7 +267,7 @@ export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
 
       {readiness.isConservative && (
         <div style={{ background: 'var(--warning-dim)', border: '1px solid var(--warning)', borderRadius: 8, padding: '10px 14px', marginTop: 8 }}>
-          <div style={{ fontWeight: 700, color: 'var(--warning)', fontSize: 13 }}>⚠️ Консервативный режим</div>
+          <div style={{ fontWeight: 700, color: 'var(--warning)', fontSize: 13 }}>?? Консервативный режим</div>
           <div style={{ fontSize: 12, color: 'var(--warning)', marginTop: 4 }}>{readiness.conservativeReason}</div>
         </div>
       )}

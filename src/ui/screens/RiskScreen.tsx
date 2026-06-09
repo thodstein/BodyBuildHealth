@@ -1,5 +1,5 @@
 ﻿import React, { useState, useMemo, useEffect } from 'react';
-import { RISK_SYSTEMS, DRUG_THRESHOLDS, SUPPORT_BASE_COVERAGE } from '../../core/constants';
+import { RISK_SYSTEMS, ALL_RISK_SYSTEMS, SUBSYSTEM_MAP, SUBSYSTEM_PARENT, DRUG_THRESHOLDS, SUPPORT_BASE_COVERAGE } from '../../core/constants';
 import { SYSTEM_INFO, MECHANISM_INFO, SYSTEM_ORGANS } from '../../core/risk-info';
 import type { RiskResult, MechanismCell, LabPoint } from '../../core/types';
 import { calculateRisks, calculateAggregatedRisks, type AggregatedRisk } from '../../engines/risk.engine';
@@ -30,12 +30,12 @@ function saveRiskHistory(entry: { date: string; overallRaw: number; overallNet: 
 }
 
 const TAB_LABELS: Record<string, string> = {
-  overview: '📊 Обзор',
-  dynamics: '📈 Динамика',
-  matrix: '🔬 Матрица',
-  details: '📋 Детали',
-  v7: '⚡ Расчёт V7',
-  info: '📐 Инфо',
+  overview: '?? Обзор',
+  dynamics: '?? Динамика',
+  matrix: '?? Матрица',
+  details: '?? Детали',
+  v7: '? Расчёт V7',
+  info: '?? Инфо',
 };
 
 export const RiskScreen: React.FC = () => {
@@ -125,7 +125,7 @@ export const RiskScreen: React.FC = () => {
     const trainingLoadRatio = Math.min(1.5, (workoutsPerWeek * avgWorkoutMinutes) / 420);
     const risk = Math.min(100, trainingLoadRatio * 25);
     const systemBreakdown: Record<string, { raw: number; net: number }> = {};
-    for (const sys of RISK_SYSTEMS) {
+    for (const sys of ALL_RISK_SYSTEMS) {
       const sysRisk = ['cardio', 'musculoskeletal', 'neuro'].includes(sys) ? risk * 1.2 :
                       ['endocrine', 'metabolic'].includes(sys) ? risk * 0.8 : risk * 0.5;
       systemBreakdown[sys] = { raw: sysRisk, net: sysRisk * 0.7 };
@@ -138,7 +138,7 @@ export const RiskScreen: React.FC = () => {
     const nutritionFactor = linked.profile?.settings?.nutritionFactor ?? 0.8;
     const risk = Math.min(100, (1 - nutritionFactor) * 30);
     const systemBreakdown: Record<string, { raw: number; net: number }> = {};
-    for (const sys of RISK_SYSTEMS) {
+    for (const sys of ALL_RISK_SYSTEMS) {
       const sysRisk = ['hepatic', 'metabolic', 'endocrine', 'ins_axis'].includes(sys) ? risk * 1.3 : risk * 0.6;
       systemBreakdown[sys] = { raw: sysRisk, net: sysRisk * 0.8 };
     }
@@ -148,7 +148,7 @@ export const RiskScreen: React.FC = () => {
   // Aggregated risk (pharma + labs + training + nutrition + diagnostics)
   const aggregatedRisk = useMemo<AggregatedRisk | null>(() => {
     if (!pharmaRisk || !labRiskContributions) return null;
-    const emptyLabContrib = { systemContributions: Object.fromEntries(RISK_SYSTEMS.map(s => [s, 0])), totalRisk: 0 };
+    const emptyLabContrib = { systemContributions: Object.fromEntries(ALL_RISK_SYSTEMS.map(s => [s, 0])), totalRisk: 0 };
     const emptyDiag = { overallRaw: 0, overallNet: 0, systemBreakdown: {} as Record<string, { raw: number; net: number }> };
     return calculateAggregatedRisks(
       pharmaRisk,
@@ -186,7 +186,7 @@ export const RiskScreen: React.FC = () => {
     const finalResult: RiskResult = { ...result, systemBreakdown: { ...result.systemBreakdown } };
 
     if (finalResult.systemBreakdown) {
-      for (const sys of RISK_SYSTEMS) {
+      for (const sys of ALL_RISK_SYSTEMS) {
         const sb = finalResult.systemBreakdown[sys];
         if (sb) {
           // If per-system penalty, only apply to selected systems
@@ -221,7 +221,7 @@ export const RiskScreen: React.FC = () => {
 
   return (
     <div className="screen risk">
-      <h2 style={{ margin: '0 0 6px', fontSize: 'clamp(16, 4.5vw, 18)' }}>⚠️ Риски</h2>
+      <h2 style={{ margin: '0 0 6px', fontSize: 'clamp(16, 4.5vw, 18)' }}>?? Риски</h2>
       <div className="tab-bar" style={{ gap: 2, overflowX: "auto", WebkitOverflowScrolling: "touch", scrollbarWidth: "none" }}>
         {(['overview', 'dynamics', 'matrix', 'details', 'v7', 'info'] as const).map(t => (
           <button key={t} className={`tab-btn ${tab === t ? 'active' : ''}`} onClick={() => setTab(t)}>

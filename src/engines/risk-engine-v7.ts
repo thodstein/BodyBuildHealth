@@ -1,5 +1,8 @@
 ﻿// ============================================================
 // Health Engine v7.0 — Full Time-Series Simulation with PK Integration
+// Calibration: V7 results are scaled to be comparable with regular engine output
+// V7_CALIBRATION_FACTOR = 0.65 brings V7 geometric mean closer to regular engine range
+export const V7_CALIBRATION_FACTOR = 0.65;
 // Runs organ simulation over T days with actual drug concentrations
 // ============================================================
 
@@ -391,8 +394,8 @@ export function runV7Simulation(input: V7RiskInput): V7RiskResult {
   systemBreakdown.musculoskeletal = { raw: organs.musculoskeletal.totalDamage * 100, net: organs.musculoskeletal.totalDamage * 80 };
 
   for (const key of Object.keys(systemBreakdown)) {
-    systemBreakdown[key].raw = Math.min(100, systemBreakdown[key].raw * penaltyMultiplier);
-    systemBreakdown[key].net = Math.min(100, systemBreakdown[key].net * penaltyMultiplier);
+    systemBreakdown[key].raw = Math.min(100, systemBreakdown[key].raw * penaltyMultiplier * V7_CALIBRATION_FACTOR);
+    systemBreakdown[key].net = Math.min(100, systemBreakdown[key].net * penaltyMultiplier * V7_CALIBRATION_FACTOR);
   }
 
   const mechanismBreakdown: Record<string, number> = {};

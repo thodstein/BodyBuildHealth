@@ -1,5 +1,5 @@
 ﻿import React from 'react';
-import { RISK_SYSTEMS, DRUG_THRESHOLDS } from '../../../core/constants';
+import { RISK_SYSTEMS, ALL_RISK_SYSTEMS, DRUG_THRESHOLDS } from '../../../core/constants';
 import { SYSTEM_INFO, MECHANISM_INFO, SYSTEM_ORGANS } from '../../../core/risk-info';
 import { RISKS_DB, RISK_SYSTEM_MAP } from '../../../data/risks';
 import { RECOMMENDATIONS_DB } from '../../../data/recommendations';
@@ -9,15 +9,15 @@ import type { AggregatedRisk } from '../../../engines/risk.engine';
 
 interface LabRiskContribution { systemContributions: Record<string, number>; totalRisk: number; }
 
-function getSystemIcon(sys: string): string { return SYSTEM_INFO[sys]?.icon || '⚠️'; }
+function getSystemIcon(sys: string): string { return SYSTEM_INFO[sys]?.icon || '??'; }
 function getSystemLabel(sys: string): string { return SYSTEM_INFO[sys]?.label || sys; }
 
 const SYSTEM_LABELS_SHORT: Record<string, string> = {
-  cardio: '❤️ Сердце', hepatic: '🫁 Печень', renal: '🫘 Почки',
-  neuro: '🧠 Нервная', endocrine: '🦋 Эндокр.', hematologic: '🩸 Кровь',
-  reproductive: '🔬 Репрод.', musculoskeletal: '💪 ОДА',
-  metabolic: '⚡ Метаб.', ghigf: '📈 GH/IGF', ins_axis: '🍬 Инсулин',
-  neuro_toxicity: '⚠️ Нейротокс.', blood: '🩸 Кровь', vessels: '🫀 Сосуды',
+  cardio: '?? Сердце', hepatic: '?? Печень', renal: '?? Почки',
+  neuro: '?? Нервная', endocrine: '?? Эндокр.', hematologic: '?? Кровь',
+  reproductive: '?? Репрод.', musculoskeletal: '?? ОДА',
+  metabolic: '? Метаб.', ghigf: '?? GH/IGF', ins_axis: '?? Инсулин',
+  neuro_toxicity: '?? Нейротокс.', blood: '?? Кровь', vessels: '?? Сосуды',
 };
 
 function mapRiskSystem(riskSystem: string): string {
@@ -66,7 +66,7 @@ export const RiskOverview: React.FC<{
     <div className="risk-overview">
       {/* Общий риск */}
       <div className="card" style={{ marginBottom: 8 }}>
-        <h3 style={{ margin: '0 0 8px', fontSize: 'clamp(13, 4vw, 15)' }}>📊 Общий риск</h3>
+        <h3 style={{ margin: '0 0 8px', fontSize: 'clamp(13, 4vw, 15)' }}>?? Общий риск</h3>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(80px, 1fr))', gap: 4 }}>
           <div style={{ background: 'var(--bg-secondary)', padding: '8px 6px', borderRadius: 8, textAlign: 'center' }}>
             <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Raw</div>
@@ -94,7 +94,7 @@ export const RiskOverview: React.FC<{
       {/* Penalty info */}
       {anyNoLabs && (
         <div style={{ background: 'rgba(239,68,68,0.12)', padding: 10, borderRadius: 8, marginBottom: 8, border: '1px solid rgba(239,68,68,0.2)' }}>
-          <div style={{ fontWeight: 700, fontSize: 12, color: '#ef4444' }}>🚫 Штраф за отсутствие анализов</div>
+          <div style={{ fontWeight: 700, fontSize: 12, color: '#ef4444' }}>?? Штраф за отсутствие анализов</div>
           <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 4 }}>
             {globalNoLabs ? 'Штраф применён ко всем системам' : `Штраф применён к: ${noLabsSystems.map(s => getSystemLabel(s)).join(', ')}`}
           </div>
@@ -103,9 +103,9 @@ export const RiskOverview: React.FC<{
 
       {/* Системные риски */}
       <div className="card" style={{ marginBottom: 8 }}>
-        <h3 style={{ margin: '0 0 8px', fontSize: 15 }}>🫀 Риски по системам</h3>
+        <h3 style={{ margin: '0 0 8px', fontSize: 15 }}>?? Риски по системам</h3>
         <div style={{ display: 'grid', gap: 6 }}>
-          {RISK_SYSTEMS.map((sys: string) => {
+          {ALL_RISK_SYSTEMS.map((sys: string) => {
             const bd = riskResult.systemBreakdown[sys];
             if (!bd) return null;
             const label = SYSTEM_LABELS_SHORT[sys] || getSystemLabel(sys);
@@ -125,7 +125,7 @@ export const RiskOverview: React.FC<{
       {/* Ключевые риски */}
       {relevantRisks.length > 0 && (
         <div className="card" style={{ marginBottom: 8 }}>
-          <h3 style={{ margin: '0 0 8px', fontSize: 15 }}>⚠️ Ключевые риски</h3>
+          <h3 style={{ margin: '0 0 8px', fontSize: 15 }}>?? Ключевые риски</h3>
           <div style={{ display: 'grid', gap: 5 }}>
             {relevantRisks.map(risk => {
               const levelColor = risk.levels.includes('HIGH') ? '#ef4444' : risk.levels.includes('MEDIUM') ? '#eab308' : '#22c55e';
@@ -147,22 +147,22 @@ export const RiskOverview: React.FC<{
       {/* Источники рисков */}
       {aggregatedRisk && (
         <div className="card" style={{ marginBottom: 8 }}>
-          <h3 style={{ margin: '0 0 8px', fontSize: 15 }}>📊 Источники рисков</h3>
+          <h3 style={{ margin: '0 0 8px', fontSize: 15 }}>?? Источники рисков</h3>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, fontSize: 11 }}>
             <div style={{ background: 'var(--bg-secondary)', padding: '6px 8px', borderRadius: 6 }}>
-              <div style={{ color: 'var(--text-dim)', fontSize: 9 }}>💊 Фарма</div>
+              <div style={{ color: 'var(--text-dim)', fontSize: 9 }}>?? Фарма</div>
               <div style={{ fontWeight: 700, color: getRiskColor(aggregatedRisk.pharma.overallNet) }}>{Math.round(aggregatedRisk.pharma.overallNet)}%</div>
             </div>
             <div style={{ background: 'var(--bg-secondary)', padding: '6px 8px', borderRadius: 6 }}>
-              <div style={{ color: 'var(--text-dim)', fontSize: 9 }}>📊 Анализы</div>
+              <div style={{ color: 'var(--text-dim)', fontSize: 9 }}>?? Анализы</div>
               <div style={{ fontWeight: 700, color: getRiskColor(aggregatedRisk.labs.overallNet) }}>{Math.round(aggregatedRisk.labs.overallNet)}%</div>
             </div>
             <div style={{ background: 'var(--bg-secondary)', padding: '6px 8px', borderRadius: 6 }}>
-              <div style={{ color: 'var(--text-dim)', fontSize: 9 }}>🏋️ Тренировки</div>
+              <div style={{ color: 'var(--text-dim)', fontSize: 9 }}>??? Тренировки</div>
               <div style={{ fontWeight: 700, color: getRiskColor(aggregatedRisk.training.overallNet) }}>{Math.round(aggregatedRisk.training.overallNet)}%</div>
             </div>
             <div style={{ background: 'var(--bg-secondary)', padding: '6px 8px', borderRadius: 6 }}>
-              <div style={{ color: 'var(--text-dim)', fontSize: 9 }}>🥗 Питание</div>
+              <div style={{ color: 'var(--text-dim)', fontSize: 9 }}>?? Питание</div>
               <div style={{ fontWeight: 700, color: getRiskColor(aggregatedRisk.nutrition.overallNet) }}>{Math.round(aggregatedRisk.nutrition.overallNet)}%</div>
             </div>
           </div>
@@ -172,7 +172,7 @@ export const RiskOverview: React.FC<{
       {/* Рекомендации */}
       {relevantRecs.length > 0 && (
         <div className="card" style={{ marginBottom: 8 }}>
-          <h3 style={{ margin: '0 0 8px', fontSize: 15 }}>💡 Рекомендации</h3>
+          <h3 style={{ margin: '0 0 8px', fontSize: 15 }}>?? Рекомендации</h3>
           <div style={{ display: 'grid', gap: 5 }}>
             {relevantRecs.map(rec => {
               const levelColor = rec.level === 'HIGH' || rec.level === 'CRITICAL' ? '#ef4444' : rec.level === 'MEDIUM' ? '#eab308' : '#22c55e';
@@ -193,7 +193,7 @@ export const RiskOverview: React.FC<{
       {/* История */}
       {riskHistory && riskHistory.length > 1 && (
         <div className="card" style={{ marginBottom: 8 }}>
-          <h3 style={{ margin: '0 0 8px', fontSize: 15 }}>📈 История</h3>
+          <h3 style={{ margin: '0 0 8px', fontSize: 15 }}>?? История</h3>
           <div style={{ display: 'flex', gap: 3, alignItems: 'flex-end', height: 50 }}>
             {riskHistory.slice(-8).map((entry, i) => (
               <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
@@ -209,7 +209,7 @@ export const RiskOverview: React.FC<{
 
       {/* Пороги */}
       <div className="card" style={{ marginBottom: 8 }}>
-        <h3 style={{ margin: '0 0 8px', fontSize: 15 }}>💊 Пороги</h3>
+        <h3 style={{ margin: '0 0 8px', fontSize: 15 }}>?? Пороги</h3>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, fontSize: 10 }}>
           {Object.entries(DRUG_THRESHOLDS).slice(0, 6).map(([id, thresh]) => (
             <div key={id} style={{ background: 'var(--bg-secondary)', padding: '4px 8px', borderRadius: 4 }}>

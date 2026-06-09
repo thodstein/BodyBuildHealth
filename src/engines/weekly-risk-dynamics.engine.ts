@@ -3,7 +3,7 @@
 // Calculates risk per week considering PK accumulation/washout
 // ============================================================
 
-import { RISK_SYSTEMS, BASE_RISK, DRUG_THRESHOLDS, SUPPORT_BASE_COVERAGE, GENETIC_MULTIPLIERS, MRR_FACTORS } from '../core/constants';
+import { RISK_SYSTEMS, ALL_RISK_SYSTEMS, BASE_RISK, DRUG_THRESHOLDS, SUPPORT_BASE_COVERAGE, GENETIC_MULTIPLIERS, MRR_FACTORS } from '../core/constants';
 import { PHARMA_DB } from '../core/pharma-database';
 import type { RiskResult, MechanismCell, CourseEntry } from '../core/types';
 import { eliminationConstant } from './pk-pd.engine';
@@ -90,7 +90,7 @@ export function calculateWeeklyRiskDynamics(
     const emptyRisk: RiskResult = {
       overallRaw: 7,
       overallNet: 5,
-      systemBreakdown: Object.fromEntries(RISK_SYSTEMS.map(s => [s, { raw: 7, net: 5 }])),
+      systemBreakdown: Object.fromEntries(ALL_RISK_SYSTEMS.map(s => [s, { raw: 7, net: 5 }])),
     };
     return {
       weeks: [],
@@ -153,7 +153,7 @@ export function calculateWeeklyRiskDynamics(
     const T = Math.max(1, Math.min(1.5, baseInput.trainingFactor ?? 0.7));
     const cov = baseInput.supportCoverage || {};
 
-    for (const s of RISK_SYSTEMS) {
+    for (const s of ALL_RISK_SYSTEMS) {
       const rM: number[] = [];
       const nM: number[] = [];
 
@@ -218,7 +218,7 @@ export function calculateWeeklyRiskDynamics(
     overallRaw: avgRaw,
     overallNet: avgNet,
     systemBreakdown: Object.fromEntries(
-      RISK_SYSTEMS.map(s => {
+      ALL_RISK_SYSTEMS.map(s => {
         const raws = weeklyPoints.filter(p => p.accumulationPhase !== 'none' && p.accumulationPhase !== 'washout').map(p => p.systemBreakdown[s]?.raw || 0);
         const nets = weeklyPoints.filter(p => p.accumulationPhase !== 'none' && p.accumulationPhase !== 'washout').map(p => p.systemBreakdown[s]?.net || 0);
         return [s, { raw: raws.length > 0 ? raws.reduce((a, b) => a + b, 0) / raws.length : 7, net: nets.length > 0 ? nets.reduce((a, b) => a + b, 0) / nets.length : 5 }];

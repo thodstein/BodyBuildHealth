@@ -130,7 +130,28 @@ export const SYRINGE_SPECS: Record<number, { maxVolume: number; divisionsPerMl: 
   5.0: { maxVolume: 5.0, divisionsPerMl: 20 }
 } as const;
 
-export const RISK_SYSTEMS = ['cardio', 'hepatic', 'renal', 'neuro', 'endocrine', 'hematologic', 'reproductive', 'musculoskeletal', 'metabolic', 'ghigf', 'ins_axis', 'neuro_toxicity', 'blood', 'vessels'] as const;
+export const RISK_SYSTEMS = ['cardio', 'hepatic', 'renal', 'neuro', 'endocrine', 'hematologic', 'reproductive', 'musculoskeletal'] as const;
+
+// Subsystem mapping: displays subsystems within main systems
+export const SUBSYSTEM_MAP: Record<string, string[]> = {
+  cardio: ['vessels'],
+  endocrine: ['metabolic', 'ghigf', 'ins_axis'],
+  neuro: ['neuro_toxicity'],
+  hematologic: ['blood'],
+};
+
+// Reverse mapping: subsystem -> parent system
+export const SUBSYSTEM_PARENT: Record<string, string> = {
+  vessels: 'cardio',
+  metabolic: 'endocrine',
+  ghigf: 'endocrine',
+  ins_axis: 'endocrine',
+  neuro_toxicity: 'neuro',
+  blood: 'hematologic',
+};
+
+// All systems including subsystems (for backward compat)
+export const ALL_RISK_SYSTEMS = ['cardio', 'hepatic', 'renal', 'neuro', 'endocrine', 'hematologic', 'reproductive', 'musculoskeletal', 'metabolic', 'ghigf', 'ins_axis', 'neuro_toxicity', 'blood', 'vessels'] as const;
 export const BASE_RISK = 0.12;
 
 export const REQUIRED_LABS_PER_PHASE: Record<string, string[]> = {
@@ -449,7 +470,7 @@ export const UCUM_MAP: Record<string, { prefUnit: string; coeff: number; uln: nu
   'BP_DIASTOLIC': { prefUnit: 'mmHg', coeff: 1, uln: 85, lln: 60, name: 'АД диаст.' },
   'HR': { prefUnit: 'bpm', coeff: 1, uln: 90, lln: 60, name: 'ЧСС' },
   'ENDOTHELIN1': { prefUnit: 'pg/mL', coeff: 1, uln: 3.0, lln: 0, name: 'Эндотелин-1' },
-  'NO_MARKER': { prefUnit: 'μmol/L', coeff: 1, uln: 50, lln: 10, name: 'Оксид азота' },
+  'NO_MARKER': { prefUnit: '?mol/L', coeff: 1, uln: 50, lln: 10, name: 'Оксид азота' },
 
 }
 } as const;

@@ -1,6 +1,6 @@
-import { UCUM_MAP } from '../core/constants';
+﻿import { UCUM_MAP } from '../core/constants';
 import type { LabPoint, RiskResult } from '../core/types';
-import { RISK_SYSTEMS } from '../core/constants';
+import { RISK_SYSTEMS, ALL_RISK_SYSTEMS } from '../core/constants';
 
 interface RiskSystemContribution {
   [key: string]: number;
@@ -33,7 +33,7 @@ export function calculateRiskFromAnalyses(arg1: RiskResult | LabPoint[], labs?: 
 
   // Initialize contributions for all risk systems
   const systemContributions: RiskSystemContribution = {};
-  RISK_SYSTEMS.forEach(system => {
+  ALL_RISK_SYSTEMS.forEach(system => {
     systemContributions[system] = 0;
   });
 
@@ -151,7 +151,7 @@ export function calculateRiskFromAnalyses(arg1: RiskResult | LabPoint[], labs?: 
 
     // Apply deviation to each mapped system
     Object.entries(systemMap).forEach(([system, weight]) => {
-      if (RISK_SYSTEMS.includes(system as any)) {
+      if (ALL_RISK_SYSTEMS.includes(system as any)) {
         // Contribution is deviation * weight * 10 (as per spec)
         // Clamp to reasonable range
         const contribution = Math.min(100, Math.max(0, deviation * weight * 10));
@@ -161,18 +161,18 @@ export function calculateRiskFromAnalyses(arg1: RiskResult | LabPoint[], labs?: 
   });
 
   // Cap each system's contribution at 100
-  RISK_SYSTEMS.forEach(system => {
+  ALL_RISK_SYSTEMS.forEach(system => {
     systemContributions[system] = Math.min(100, systemContributions[system]);
   });
 
   // Calculate total risk as average of all system contributions
-  const totalRisk = Object.values(systemContributions).reduce((sum, val) => sum + val, 0) / RISK_SYSTEMS.length;
+  const totalRisk = Object.values(systemContributions).reduce((sum, val) => sum + val, 0) / ALL_RISK_SYSTEMS.length;
 
   // If riskResult is provided, return RiskResult format
   if (riskResult) {
     // Convert systemContributions to systemBreakdown format
     const systemBreakdown: Record<string, { raw: number; net: number }> = {};
-    for (const sys of RISK_SYSTEMS) {
+    for (const sys of ALL_RISK_SYSTEMS) {
       const contribution = systemContributions[sys] || 0;
       // Combine with existing riskResult values
       const baseRaw = riskResult.systemBreakdown[sys]?.raw || 0;
@@ -185,8 +185,8 @@ export function calculateRiskFromAnalyses(arg1: RiskResult | LabPoint[], labs?: 
     }
 
     // Calculate overall risk
-    const rawValues = RISK_SYSTEMS.map(sys => systemBreakdown[sys].raw);
-    const netValues = RISK_SYSTEMS.map(sys => systemBreakdown[sys].net);
+    const rawValues = ALL_RISK_SYSTEMS.map(sys => systemBreakdown[sys].raw);
+    const netValues = ALL_RISK_SYSTEMS.map(sys => systemBreakdown[sys].net);
 
     const geom = (arr: number[]) => {
       if (!arr.length) return 0;

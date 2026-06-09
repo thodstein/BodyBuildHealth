@@ -1,6 +1,6 @@
-import React, { useState, useMemo } from 'react';
+﻿import React, { useState, useMemo } from 'react';
 import { SYNERGY_PAIRS, SUPPLEMENT_DESCRIPTIONS, SUPPLEMENT_TARGETS, SUPPORT_RESEARCH, calculateSupport, type SupportInput, type SynergyPair, type SupplementTarget } from '../../engines/support.engine';
-import { RISK_SYSTEMS } from '../../core/constants';
+import { RISK_SYSTEMS, ALL_RISK_SYSTEMS } from '../../core/constants';
 import { PHARMA_DB, PHARMA_CLASSES } from '../../core/pharma-database';
 import { useDataLink } from '../../core/data-link';
 import { SYSTEM_INFO } from '../../core/risk-info';
@@ -51,7 +51,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
     const supportSupplements = supportSubstances.map(s => ({
       id: s.id,
       name: s.name,
-      description: s.description || `Поддерживающий препарат класса ${s.class}`,
+      description: s.description || `РџРѕРґРґРµСЂР¶РёРІР°СЋС‰РёР№ РїСЂРµРїР°СЂР°С‚ РєР»Р°СЃСЃР° ${s.class}`,
       targets: undefined,
       research: s.research || [],
       isSupportSubstance: true,
@@ -110,14 +110,14 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
     const result = calculateSupport(input);
     const riskBefore: Record<string, number> = {};
     const riskAfter: Record<string, number> = {};
-    for (const sys of RISK_SYSTEMS) {
+    for (const sys of ALL_RISK_SYSTEMS) {
       riskBefore[sys] = result.riskAssessment?.systemBreakdown?.[sys]?.raw ?? 0;
       riskAfter[sys] = result.riskAssessment?.systemBreakdown?.[sys]?.net ?? 0;
     }
     setSupportResult({ riskBefore, riskAfter, score: result.supportScore ?? 0 });
   };
 
-  const systemLabels: Record<string, string> = Object.fromEntries(RISK_SYSTEMS.map(k => [k, SYSTEM_INFO[k]?.label ?? k]));
+  const systemLabels: Record<string, string> = Object.fromEntries(ALL_RISK_SYSTEMS.map(k => [k, SYSTEM_INFO[k]?.label ?? k]));
 
   const selectedDetail = selectedSub ? supplementList.find(s => s.id === selectedSub) : null;
 
@@ -130,7 +130,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
             background: tab === t ? 'var(--accent-green, #00e68a)' : 'var(--bg-secondary)',
             color: tab === t ? '#000' : 'var(--text-dim)', cursor: 'pointer', transition: 'background 0.15s',
           }}>
-            {t === 'catalog' ? 'Каталог' : t === 'synergies' ? 'Синергии' : t === 'recommendations' ? 'Рекомендации' : 'Калькулятор'}
+            {t === 'catalog' ? 'РљР°С‚Р°Р»РѕРі' : t === 'synergies' ? 'РЎРёРЅРµСЂРіРёРё' : t === 'recommendations' ? 'Р РµРєРѕРјРµРЅРґР°С†РёРё' : 'РљР°Р»СЊРєСѓР»СЏС‚РѕСЂ'}
           </button>
         ))}
       </div>
@@ -138,19 +138,19 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
       {tab === 'catalog' && (
         <div>
           <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
-            <input value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Поиск добавки..." style={{ flex: 1, padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border-color)', background: 'var(--bg-secondary)', color: 'var(--text-light)', fontSize: 13 }} />
+            <input value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="РџРѕРёСЃРє РґРѕР±Р°РІРєРё..." style={{ flex: 1, padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border-color)', background: 'var(--bg-secondary)', color: 'var(--text-light)', fontSize: 13 }} />
             <select value={systemFilter} onChange={e => setSystemFilter(e.target.value)} style={{ padding: '8px', borderRadius: 8, border: '1px solid var(--border-color)', background: 'var(--bg-secondary)', color: 'var(--text-light)', fontSize: 12 }}>
-              <option value="all">Все системы</option>
-              {RISK_SYSTEMS.map(s => <option key={s} value={s}>{systemLabels[s]}</option>)}
+              <option value="all">Р’СЃРµ СЃРёСЃС‚РµРјС‹</option>
+              {ALL_RISK_SYSTEMS.map(s => <option key={s} value={s}>{systemLabels[s]}</option>)}
             </select>
           </div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 8 }}>
-            <span style={{ fontSize: 12, color: 'var(--text-dim)', padding: '4px 8px' }}>Классы:</span>
-            <button onClick={() => setSupportClassFilter('all')} style={{ padding: '3px 8px', borderRadius: 4, fontSize: 10, border: supportClassFilter === 'all' ? '1px solid var(--accent-green)' : '1px solid var(--border)', background: supportClassFilter === 'all' ? 'rgba(0,230,138,0.1)' : 'transparent', color: 'var(--text-light)', cursor: 'pointer' }}>Все</button>
-            <button onClick={() => setSupportClassFilter('support')} style={{ padding: '3px 8px', borderRadius: 4, fontSize: 10, border: supportClassFilter === 'support' ? '1px solid var(--accent-green)' : '1px solid var(--border)', background: supportClassFilter === 'support' ? 'rgba(0,230,138,0.1)' : 'transparent', color: 'var(--text-light)', cursor: 'pointer' }}>Поддержка</button>
-            <button onClick={() => setSupportClassFilter('peptide_regenerative')} style={{ padding: '3px 8px', borderRadius: 4, fontSize: 10, border: supportClassFilter === 'peptide_regenerative' ? '1px solid var(--accent-green)' : '1px solid var(--border)', background: supportClassFilter === 'peptide_regenerative' ? 'rgba(0,230,138,0.1)' : 'transparent', color: 'var(--text-light)', cursor: 'pointer' }}>Регенерация</button>
-            <button onClick={() => setSupportClassFilter('peptide_nootropic')} style={{ padding: '3px 8px', borderRadius: 4, fontSize: 10, border: supportClassFilter === 'peptide_nootropic' ? '1px solid var(--accent-green)' : '1px solid var(--border)', background: supportClassFilter === 'peptide_nootropic' ? 'rgba(0,230,138,0.1)' : 'transparent', color: 'var(--text-light)', cursor: 'pointer' }}>Ноотропы</button>
-            <button onClick={() => setSupportClassFilter('peptide_immune')} style={{ padding: '3px 8px', borderRadius: 4, fontSize: 10, border: supportClassFilter === 'peptide_immune' ? '1px solid var(--accent-green)' : '1px solid var(--border)', background: supportClassFilter === 'peptide_immune' ? 'rgba(0,230,138,0.1)' : 'transparent', color: 'var(--text-light)', cursor: 'pointer' }}>Иммунная</button>
+            <span style={{ fontSize: 12, color: 'var(--text-dim)', padding: '4px 8px' }}>РљР»Р°СЃСЃС‹:</span>
+            <button onClick={() => setSupportClassFilter('all')} style={{ padding: '3px 8px', borderRadius: 4, fontSize: 10, border: supportClassFilter === 'all' ? '1px solid var(--accent-green)' : '1px solid var(--border)', background: supportClassFilter === 'all' ? 'rgba(0,230,138,0.1)' : 'transparent', color: 'var(--text-light)', cursor: 'pointer' }}>Р’СЃРµ</button>
+            <button onClick={() => setSupportClassFilter('support')} style={{ padding: '3px 8px', borderRadius: 4, fontSize: 10, border: supportClassFilter === 'support' ? '1px solid var(--accent-green)' : '1px solid var(--border)', background: supportClassFilter === 'support' ? 'rgba(0,230,138,0.1)' : 'transparent', color: 'var(--text-light)', cursor: 'pointer' }}>РџРѕРґРґРµСЂР¶РєР°</button>
+            <button onClick={() => setSupportClassFilter('peptide_regenerative')} style={{ padding: '3px 8px', borderRadius: 4, fontSize: 10, border: supportClassFilter === 'peptide_regenerative' ? '1px solid var(--accent-green)' : '1px solid var(--border)', background: supportClassFilter === 'peptide_regenerative' ? 'rgba(0,230,138,0.1)' : 'transparent', color: 'var(--text-light)', cursor: 'pointer' }}>Р РµРіРµРЅРµСЂР°С†РёСЏ</button>
+            <button onClick={() => setSupportClassFilter('peptide_nootropic')} style={{ padding: '3px 8px', borderRadius: 4, fontSize: 10, border: supportClassFilter === 'peptide_nootropic' ? '1px solid var(--accent-green)' : '1px solid var(--border)', background: supportClassFilter === 'peptide_nootropic' ? 'rgba(0,230,138,0.1)' : 'transparent', color: 'var(--text-light)', cursor: 'pointer' }}>РќРѕРѕС‚СЂРѕРїС‹</button>
+            <button onClick={() => setSupportClassFilter('peptide_immune')} style={{ padding: '3px 8px', borderRadius: 4, fontSize: 10, border: supportClassFilter === 'peptide_immune' ? '1px solid var(--accent-green)' : '1px solid var(--border)', background: supportClassFilter === 'peptide_immune' ? 'rgba(0,230,138,0.1)' : 'transparent', color: 'var(--text-light)', cursor: 'pointer' }}>РРјРјСѓРЅРЅР°СЏ</button>
           </div>
           <div style={{ display: 'flex', gap: 12 }}>
             <div style={{ flex: selectedDetail ? '0 0 280px' : 1, maxHeight: '70vh', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -166,7 +166,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
                   </div>
                 </div>
               ))}
-              {filteredSupplements.length === 0 && <div style={{ padding: 20, textAlign: 'center', color: 'var(--text-dim)' }}>Ничего не найдено</div>}
+              {filteredSupplements.length === 0 && <div style={{ padding: 20, textAlign: 'center', color: 'var(--text-dim)' }}>РќРёС‡РµРіРѕ РЅРµ РЅР°Р№РґРµРЅРѕ</div>}
             </div>
             {selectedDetail && (
               <div style={{ flex: 1, background: 'var(--bg-secondary)', borderRadius: 12, padding: 16, maxHeight: '70vh', overflowY: 'auto' }}>
@@ -174,19 +174,19 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
                 <p style={{ fontSize: 13, color: 'var(--text-light)', margin: '0 0 12px 0' }}>{selectedDetail.description}</p>
                 {selectedDetail.targets && (
                   <div style={{ marginBottom: 12 }}>
-                    <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 4 }}>Системы:</div>
+                    <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 4 }}>РЎРёСЃС‚РµРјС‹:</div>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
                       {selectedDetail.targets.systems?.map(s => (
                         <span key={s} style={{ fontSize: 10, padding: '2px 6px', borderRadius: 4, background: 'rgba(0,230,138,0.1)', color: 'var(--accent-green, #00e68a)' }}>{systemLabels[s] || s}</span>
                       ))}
                     </div>
-                    {selectedDetail.targets.biomarkers && <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 4 }}>Биомаркеры: {selectedDetail.targets.biomarkers.join(', ')}</div>}
-                    {selectedDetail.targets.mechanisms && <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 2 }}>Механизмы: {selectedDetail.targets.mechanisms.join(', ')}</div>}
+                    {selectedDetail.targets.biomarkers && <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 4 }}>Р‘РёРѕРјР°СЂРєРµСЂС‹: {selectedDetail.targets.biomarkers.join(', ')}</div>}
+                    {selectedDetail.targets.mechanisms && <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 2 }}>РњРµС…Р°РЅРёР·РјС‹: {selectedDetail.targets.mechanisms.join(', ')}</div>}
                   </div>
                 )}
                 {selectedDetail.research && selectedDetail.research.length > 0 && (
                   <div style={{ marginTop: 8 }}>
-                    <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 4 }}>Исследования:</div>
+                    <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 4 }}>РСЃСЃР»РµРґРѕРІР°РЅРёСЏ:</div>
                     {selectedDetail.research.map((r, ri) => (
                       <div key={ri} style={{ marginBottom: 4 }}>
                         <div style={{ fontSize: 11, color: 'var(--text-light)' }}>{r.conclusion}</div>
@@ -197,7 +197,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
                 )}
                 {SYNERGY_PAIRS.filter(p => p.substanceA === selectedDetail.id || p.substanceB === selectedDetail.id).length > 0 && (
                   <div style={{ marginTop: 12 }}>
-                    <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 4 }}>Синергии:</div>
+                    <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 4 }}>РЎРёРЅРµСЂРіРёРё:</div>
                 {SYNERGY_PAIRS.filter(p => p.substanceA === selectedDetail.id || p.substanceB === selectedDetail.id).map((pair, i) => {
                   const partner = pair.substanceA === selectedDetail.id ? pair.substanceB : pair.substanceA;
                   const partnerName = SUPPLEMENT_DESCRIPTIONS[partner] || (partner as string).split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
@@ -205,7 +205,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
                     <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 0', fontSize: 12 }}>
                       <span style={{ width: 8, height: 8, borderRadius: 4, background: SYNERGY_COLORS[pair.synergyType] || '#888' }} />
                       <span style={{ fontWeight: 500 }}>{partnerName}</span>
-                      <span style={{ color: SYNERGY_COLORS[pair.synergyType] || 'var(--text-dim)', fontSize: 10 }}>{pair.synergyType === 'synergistic' ? 'синергия' : pair.synergyType === 'additive' ? 'аддитивный' : pair.synergyType === 'potentiative' ? 'потенцирование' : 'комплементарный'}</span>
+                      <span style={{ color: SYNERGY_COLORS[pair.synergyType] || 'var(--text-dim)', fontSize: 10 }}>{pair.synergyType === 'synergistic' ? 'СЃРёРЅРµСЂРіРёСЏ' : pair.synergyType === 'additive' ? 'Р°РґРґРёС‚РёРІРЅС‹Р№' : pair.synergyType === 'potentiative' ? 'РїРѕС‚РµРЅС†РёСЂРѕРІР°РЅРёРµ' : 'РєРѕРјРїР»РµРјРµРЅС‚Р°СЂРЅС‹Р№'}</span>
                       <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>{(pair.strength * 100).toFixed(0)}%</span>
                         </div>
                       );
@@ -222,18 +222,18 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
         <div>
           <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
             <select value={synergyFilter} onChange={e => setSynergyFilter(e.target.value)} style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid var(--border-color)', background: 'var(--bg-secondary)', color: 'var(--text-light)', fontSize: 12 }}>
-              <option value="all">Все типы</option>
-              <option value="synergistic">Синергия</option>
-              <option value="additive">Аддитивный</option>
-              <option value="potentiative">Потенцирование</option>
-              <option value="complementary">Комплементарный</option>
+              <option value="all">Р’СЃРµ С‚РёРїС‹</option>
+              <option value="synergistic">РЎРёРЅРµСЂРіРёСЏ</option>
+              <option value="additive">РђРґРґРёС‚РёРІРЅС‹Р№</option>
+              <option value="potentiative">РџРѕС‚РµРЅС†РёСЂРѕРІР°РЅРёРµ</option>
+              <option value="complementary">РљРѕРјРїР»РµРјРµРЅС‚Р°СЂРЅС‹Р№</option>
             </select>
             <select value={systemFilter} onChange={e => setSystemFilter(e.target.value)} style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid var(--border-color)', background: 'var(--bg-secondary)', color: 'var(--text-light)', fontSize: 12 }}>
-              <option value="all">Все системы</option>
-              {RISK_SYSTEMS.map(s => <option key={s} value={s}>{systemLabels[s]}</option>)}
+              <option value="all">Р’СЃРµ СЃРёСЃС‚РµРјС‹</option>
+              {ALL_RISK_SYSTEMS.map(s => <option key={s} value={s}>{systemLabels[s]}</option>)}
             </select>
             <div style={{ fontSize: 12, color: 'var(--text-dim)', display: 'flex', alignItems: 'center' }}>
-              {filteredSynergies.length} пар
+              {filteredSynergies.length} РїР°СЂ
             </div>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: '70vh', overflowY: 'auto' }}>
@@ -243,13 +243,13 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <span style={{ fontWeight: 600, fontSize: 13 }}>{(SUPPLEMENT_DESCRIPTIONS[pair.substanceA] || pair.substanceA.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')).split(' ').length > 5 ? pair.substanceA.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ') : SUPPLEMENT_DESCRIPTIONS[pair.substanceA] || pair.substanceA}</span>
                     <span style={{ fontSize: 16, color: SYNERGY_COLORS[pair.synergyType] || '#888' }}>
-                      {pair.synergyType === 'synergistic' ? '⊕' : pair.synergyType === 'additive' ? '+' : pair.synergyType === 'potentiative' ? '⇑' : '→'}
+                      {pair.synergyType === 'synergistic' ? 'вЉ•' : pair.synergyType === 'additive' ? '+' : pair.synergyType === 'potentiative' ? 'в‡‘' : 'в†’'}
                     </span>
                     <span style={{ fontWeight: 600, fontSize: 13 }}>{(SUPPLEMENT_DESCRIPTIONS[pair.substanceB] || pair.substanceB.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')).split(' ').length > 5 ? pair.substanceB.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ') : SUPPLEMENT_DESCRIPTIONS[pair.substanceB] || pair.substanceB}</span>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                     <span style={{ fontSize: 11, padding: '2px 6px', borderRadius: 4, background: `${SYNERGY_COLORS[pair.synergyType]}22`, color: SYNERGY_COLORS[pair.synergyType] }}>
-                      {pair.synergyType === 'synergistic' ? 'Синергия' : pair.synergyType === 'additive' ? 'Аддитивный' : pair.synergyType === 'potentiative' ? 'Потенцирование' : 'Комплементарный'}
+                      {pair.synergyType === 'synergistic' ? 'РЎРёРЅРµСЂРіРёСЏ' : pair.synergyType === 'additive' ? 'РђРґРґРёС‚РёРІРЅС‹Р№' : pair.synergyType === 'potentiative' ? 'РџРѕС‚РµРЅС†РёСЂРѕРІР°РЅРёРµ' : 'РљРѕРјРїР»РµРјРµРЅС‚Р°СЂРЅС‹Р№'}
                     </span>
                     <span style={{ fontSize: 12, fontWeight: 700, color: SYNERGY_COLORS[pair.synergyType] }}>{(pair.strength * 100).toFixed(0)}%</span>
                   </div>
@@ -273,26 +273,26 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
         <div>
           <div className="card" style={{ marginBottom: 12, textAlign: 'center' }}>
             <p style={{ fontSize: 13, color: 'var(--text-light)', margin: '0 0 12px 0' }}>
-              Автоматический подбор поддержки на основе текущего курса, анализов и рисков
+              РђРІС‚РѕРјР°С‚РёС‡РµСЃРєРёР№ РїРѕРґР±РѕСЂ РїРѕРґРґРµСЂР¶РєРё РЅР° РѕСЃРЅРѕРІРµ С‚РµРєСѓС‰РµРіРѕ РєСѓСЂСЃР°, Р°РЅР°Р»РёР·РѕРІ Рё СЂРёСЃРєРѕРІ
             </p>
             <button onClick={handleCalculateSupport} style={{
               padding: '10px 24px', borderRadius: 8, border: 'none', cursor: 'pointer',
               background: 'var(--accent-green, #00e68a)', color: '#000', fontWeight: 700, fontSize: 14,
             }}>
-              Рассчитать оптимальную поддержку
+              Р Р°СЃСЃС‡РёС‚Р°С‚СЊ РѕРїС‚РёРјР°Р»СЊРЅСѓСЋ РїРѕРґРґРµСЂР¶РєСѓ
             </button>
           </div>
 
           {supportResult && (
             <div>
               <div className="card" style={{ marginBottom: 12, textAlign: 'center' }}>
-                <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 4 }}>Индекс поддержки</div>
+                <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 4 }}>РРЅРґРµРєСЃ РїРѕРґРґРµСЂР¶РєРё</div>
                 <div style={{ fontSize: 36, fontWeight: 800, color: getRiskColor(100 - supportResult.score), lineHeight: 1 }}>
                   {Math.round(supportResult.score)}%
                 </div>
               </div>
               <div className="card" style={{ marginBottom: 12 }}>
-                <h4 style={{ margin: '0 0 8px 0', fontSize: 13 }}>Риски по системам — до и после поддержки</h4>
+                <h4 style={{ margin: '0 0 8px 0', fontSize: 13 }}>Р РёСЃРєРё РїРѕ СЃРёСЃС‚РµРјР°Рј вЂ” РґРѕ Рё РїРѕСЃР»Рµ РїРѕРґРґРµСЂР¶РєРё</h4>
                 {RISK_SYSTEMS.map(sys => {
                   const before = supportResult.riskBefore[sys] ?? 0;
                   const after = supportResult.riskAfter[sys] ?? 0;
@@ -302,9 +302,9 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
                       <span style={{ fontSize: 14 }}>{SYSTEM_INFO[sys]?.icon || ''}</span>
                       <span style={{ flex: 1, fontSize: 12, fontWeight: 500 }}>{systemLabels[sys]}</span>
                       <span style={{ fontSize: 12, color: getRiskColor(before), fontWeight: 600 }}>{Math.round(before)}%</span>
-                      <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>→</span>
+                      <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>в†’</span>
                       <span style={{ fontSize: 12, color: getRiskColor(after), fontWeight: 600 }}>{Math.round(after)}%</span>
-                      {reduction > 0 && <span style={{ fontSize: 10, color: '#22c55e', fontWeight: 600 }}>↓{reduction.toFixed(0)}%</span>}
+                      {reduction > 0 && <span style={{ fontSize: 10, color: '#22c55e', fontWeight: 600 }}>в†“{reduction.toFixed(0)}%</span>}
                     </div>
                   );
                 })}

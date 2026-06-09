@@ -4,7 +4,7 @@
 // with drug matching, lab marker adjustment, and PD factors
 // ============================================================
 
-import { GENETIC_MULTIPLIERS, DRUG_THRESHOLDS, RISK_SYSTEMS, BASE_RISK, MRR_FACTORS, HGI_FACTORS, RIR_FACTORS, SUPPORT_BASE_COVERAGE } from '../core/constants';
+import { GENETIC_MULTIPLIERS, DRUG_THRESHOLDS, RISK_SYSTEMS, ALL_RISK_SYSTEMS, SUBSYSTEM_MAP, SUBSYSTEM_PARENT, BASE_RISK, MRR_FACTORS, HGI_FACTORS, RIR_FACTORS, SUPPORT_BASE_COVERAGE } from '../core/constants';
 import { RiskInput, RiskResult, MechanismCell } from '../core/types';
 import { PHARMA_DB } from '../core/pharma-database';
 import { PD_SYSTEM_MAP, DRUG_MECH_WEIGHTS, getDrugMechWeight } from '../core/risk-shared';
@@ -64,8 +64,8 @@ const DRUG_NAME_MAP: Record<string, string[]> = {
   epitalon: ['Эпиталон'],
   gonadorelin: ['Гонадорелин'],
   bpc157: ['BPC-157'],
-  tb500: ['TB-500', 'Тимозин β-4'],
-  thymosin_a1: ['Тимозин α-1'],
+  tb500: ['TB-500', 'Тимозин ?-4'],
+  thymosin_a1: ['Тимозин ?-1'],
   melatonin: ['Мелатонин'],
   vitamin_d3: ['Витамин D3', 'Витамин D'],
   vitamin_k2: ['Витамин K2', 'Витамин К2'],
@@ -203,7 +203,7 @@ function doesDrugMatchMechanism(drugId: string, mechanismDrugs: string[]): boole
          return true;
        }
      }
-     // Class-based match for generic entries like "Все ААС", "17α-оральники"
+     // Class-based match for generic entries like "Все ААС", "17?-оральники"
      if (mechDrug.includes('ААС') || mechDrug.includes('AAC')) {
        const aasClasses = ['testosterone', 'trenbolone', 'nandrolone', 'boldenone', 'methenolone', 'dht_derivative', 'oral_aas'];
        if (aasClasses.some(c => drugClass.toLowerCase().includes(c))) return true;
@@ -236,7 +236,7 @@ export function calculateRisks(i: RiskInput): RiskResult {
    // Get available lab markers
    const availableLabKeys = Object.keys(i.biomarkerValues || {});
 
-   for (const s of RISK_SYSTEMS) {
+   for (const s of ALL_RISK_SYSTEMS) {
       const rM: number[] = [];
       const nM: number[] = [];
       
@@ -464,7 +464,7 @@ export function calculateAggregatedRisks(
   };
   
   const systemBreakdown: Record<string, { raw: number; net: number; sources?: Record<string, { raw: number; net: number }> }> = {};
-  for (const sys of RISK_SYSTEMS) {
+  for (const sys of ALL_RISK_SYSTEMS) {
     systemBreakdown[sys] = aggregateSystem(sys);
   }
   

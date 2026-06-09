@@ -1,5 +1,5 @@
-import React, { useState, useMemo, useCallback, useRef } from 'react';
-import { RISK_SYSTEMS, REQUIRED_LABS_PER_PHASE, UCUM_MAP } from '../../core/constants';
+﻿import React, { useState, useMemo, useCallback, useRef } from 'react';
+import { RISK_SYSTEMS, ALL_RISK_SYSTEMS, REQUIRED_LABS_PER_PHASE, UCUM_MAP } from '../../core/constants';
 import type { RiskResult, LabPoint } from '../../core/types';
 import { calculateRiskFromAnalyses } from '../../engines/risk-calculator-v2.engine';
 import { calculatePenaltyCoefficients } from '../../engines/labs-penalty.engine';
@@ -33,22 +33,22 @@ export function setNoLabsSystems(systems: string[]) {
 }
 
 const PHASE_LABELS: Record<string, string> = {
-  baseline: '📋 Базовые',
-  on_cycle: '💊 На курсе',
-  bridge: '🌉 Мост',
-  pct: '🔄 ПКТ',
-  post_pct: '✅ После ПКТ',
-  course_bridge_course: '🔁 К-М-К',
+  baseline: 'рџ“‹ Р‘Р°Р·РѕРІС‹Рµ',
+  on_cycle: 'рџ’Љ РќР° РєСѓСЂСЃРµ',
+  bridge: 'рџЊ‰ РњРѕСЃС‚',
+  pct: 'рџ”„ РџРљРў',
+  post_pct: 'вњ… РџРѕСЃР»Рµ РџРљРў',
+  course_bridge_course: 'рџ”Ѓ Рљ-Рњ-Рљ',
 };
 
 const PHASE_ICONS: Record<string, string> = {
-  baseline: '📋', on_cycle: '💊', bridge: '🌉', pct: '🔄', post_pct: '✅', course_bridge_course: '🔁',
+  baseline: 'рџ“‹', on_cycle: 'рџ’Љ', bridge: 'рџЊ‰', pct: 'рџ”„', post_pct: 'вњ…', course_bridge_course: 'рџ”Ѓ',
 };
 
 const SYSTEM_LABELS: Record<string, string> = {
-  'Печень': '🫁', 'Почки': '🫘', 'Эндокринная': '🦋', 'Кроветворение': '🩸',
-  'Липиды': '🫀', 'Воспаление': '🔥', 'Витамины': '☀️', 'Репродуктивная': '🔬',
-  'Углеводный обмен': '🍬', 'Сосуды': '🩸', 'Железо': '⚙️', 'Другие': '📋',
+  'РџРµС‡РµРЅСЊ': 'рџ«Ѓ', 'РџРѕС‡РєРё': 'рџ«', 'Р­РЅРґРѕРєСЂРёРЅРЅР°СЏ': 'рџ¦‹', 'РљСЂРѕРІРµС‚РІРѕСЂРµРЅРёРµ': 'рџ©ё',
+  'Р›РёРїРёРґС‹': 'рџ«Ђ', 'Р’РѕСЃРїР°Р»РµРЅРёРµ': 'рџ”Ґ', 'Р’РёС‚Р°РјРёРЅС‹': 'вЂпёЏ', 'Р РµРїСЂРѕРґСѓРєС‚РёРІРЅР°СЏ': 'рџ”¬',
+  'РЈРіР»РµРІРѕРґРЅС‹Р№ РѕР±РјРµРЅ': 'рџЌ¬', 'РЎРѕСЃСѓРґС‹': 'рџ©ё', 'Р–РµР»РµР·Рѕ': 'вљ™пёЏ', 'Р”СЂСѓРіРёРµ': 'рџ“‹',
 };
 
 export const LabsScreen: React.FC = () => {
@@ -81,14 +81,14 @@ export const LabsScreen: React.FC = () => {
   // Group required labs by system
   const labsBySystem = useMemo(() => {
     const systemMap: Record<string, string[]> = {
-      'Печень': ['ALT','AST','GGT','ALP','BILIRUBIN_TOTAL','BIL','ALB'],
-      'Почки': ['CREATININE','BUN','EGFR','PROTEIN_TOTAL','TP','UA'],
-      'Эндокринная': ['TT','TSH','FT3','FT4','E2','PRL','LH','FSH','SHBG','CORTISOL','INS','HOMA','IGF1'],
-      'Кроветворение': ['HGB','HCT','PLT','WBC','RBC','MCV'],
-      'Липиды': ['LDL','HDL','TG','GLU','HBA1C'],
-      'Воспаление': ['CRP','FERRITIN','HOMOCYSTEINE'],
-      'Витамины': ['VITD','CALCIDIOL','B12'],
-      'Репродуктивная': ['PSA','DHEA_S','AMH','INHB','PROGESTERONE','DHT','FT'],
+      'РџРµС‡РµРЅСЊ': ['ALT','AST','GGT','ALP','BILIRUBIN_TOTAL','BIL','ALB'],
+      'РџРѕС‡РєРё': ['CREATININE','BUN','EGFR','PROTEIN_TOTAL','TP','UA'],
+      'Р­РЅРґРѕРєСЂРёРЅРЅР°СЏ': ['TT','TSH','FT3','FT4','E2','PRL','LH','FSH','SHBG','CORTISOL','INS','HOMA','IGF1'],
+      'РљСЂРѕРІРµС‚РІРѕСЂРµРЅРёРµ': ['HGB','HCT','PLT','WBC','RBC','MCV'],
+      'Р›РёРїРёРґС‹': ['LDL','HDL','TG','GLU','HBA1C'],
+      'Р’РѕСЃРїР°Р»РµРЅРёРµ': ['CRP','FERRITIN','HOMOCYSTEINE'],
+      'Р’РёС‚Р°РјРёРЅС‹': ['VITD','CALCIDIOL','B12'],
+      'Р РµРїСЂРѕРґСѓРєС‚РёРІРЅР°СЏ': ['PSA','DHEA_S','AMH','INHB','PROGESTERONE','DHT','FT'],
     };
     const groups: Record<string, string[]> = {};
     for (const code of requiredLabs) {
@@ -102,8 +102,8 @@ export const LabsScreen: React.FC = () => {
         }
       }
       if (!found) {
-        if (!groups['Другие']) groups['Другие'] = [];
-        groups['Другие'].push(code);
+        if (!groups['Р”СЂСѓРіРёРµ']) groups['Р”СЂСѓРіРёРµ'] = [];
+        groups['Р”СЂСѓРіРёРµ'].push(code);
       }
     }
     return groups;
@@ -218,7 +218,7 @@ export const LabsScreen: React.FC = () => {
         setSelectedLabs(new Set(result.labs.map(l => l.code)));
       }
     } catch (e: any) {
-      setOcrResult({ text: '', labs: [], meals: [], source: 'text', confidence: 0, warnings: ['Ошибка: ' + (e?.message || String(e))] });
+      setOcrResult({ text: '', labs: [], meals: [], source: 'text', confidence: 0, warnings: ['РћС€РёР±РєР°: ' + (e?.message || String(e))] });
     }
     setOcrLoading(false);
   }, []);
@@ -251,14 +251,14 @@ export const LabsScreen: React.FC = () => {
   const anyNoLabs = globalNoLabs || noLabsSystems.length > 0;
 
   const sysLabels: Record<string, string> = {
-    cardio: '❤️ Сердце', hepatic: '🫁 Печень', renal: '🫘 Почки',
-    neuro: '🧠 Нервная', endocrine: '🦋 Эндокр.', hematologic: '🩸 Кровь',
-    reproductive: '🔬 Репрод.', musculoskeletal: '🦴 Кости',
+    cardio: 'вќ¤пёЏ РЎРµСЂРґС†Рµ', hepatic: 'рџ«Ѓ РџРµС‡РµРЅСЊ', renal: 'рџ« РџРѕС‡РєРё',
+    neuro: 'рџ§  РќРµСЂРІРЅР°СЏ', endocrine: 'рџ¦‹ Р­РЅРґРѕРєСЂ.', hematologic: 'рџ©ё РљСЂРѕРІСЊ',
+    reproductive: 'рџ”¬ Р РµРїСЂРѕРґ.', musculoskeletal: 'рџ¦ґ РљРѕСЃС‚Рё',
   };
 
   return (
     <div className="screen labs">
-      <h2 style={{ margin: '0 0 6px', fontSize: 18 }}>🧪 Анализы</h2>
+      <h2 style={{ margin: '0 0 6px', fontSize: 18 }}>рџ§Є РђРЅР°Р»РёР·С‹</h2>
 
       {/* Phase selector - compact pills */}
       <div style={{ display: 'flex', gap: 3, overflowX: 'auto', marginBottom: 8, scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' }}>
@@ -280,7 +280,7 @@ export const LabsScreen: React.FC = () => {
       <div className="tab-bar" style={{ gap: 2, overflowX: "auto", WebkitOverflowScrolling: "touch", scrollbarWidth: "none" }}>
         {(['results', 'schedule', 'investigations', 'catalog'] as const).map(t => (
           <button key={t} className={`tab-btn ${tab === t ? 'active' : ''}`} onClick={() => setTab(t)}>
-            {t === 'results' ? '📊 Рез-ты' : t === 'schedule' ? '📅 График' : t === 'investigations' ? '🔬 Исслед.' : '📖 Каталог'}
+            {t === 'results' ? 'рџ“Љ Р РµР·-С‚С‹' : t === 'schedule' ? 'рџ“… Р“СЂР°С„РёРє' : t === 'investigations' ? 'рџ”¬ РСЃСЃР»РµРґ.' : 'рџ“– РљР°С‚Р°Р»РѕРі'}
           </button>
         ))}
       </div>
@@ -292,17 +292,17 @@ export const LabsScreen: React.FC = () => {
           flex: 1, padding: 9, borderRadius: 8, border: '1px solid var(--border)',
           background: 'var(--bg-secondary)', color: 'var(--accent)', fontWeight: 600, fontSize: 12, cursor: 'pointer',
           display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
-        }}>📄 PDF</button>
+        }}>рџ“„ PDF</button>
         <button onClick={() => { setShowImport(true); setTimeout(() => { if (cameraInputRef.current) cameraInputRef.current.click(); }, 100); }} style={{
           flex: 1, padding: 9, borderRadius: 8, border: '1px solid var(--border)',
           background: 'var(--bg-secondary)', color: 'var(--accent)', fontWeight: 600, fontSize: 12, cursor: 'pointer',
           display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
-        }}>📸 Фото</button>
+        }}>рџ“ё Р¤РѕС‚Рѕ</button>
         <button onClick={() => setShowLabInput(true)} style={{
           flex: 1, padding: 9, borderRadius: 8, border: '1px solid var(--border)',
           background: 'var(--bg-secondary)', color: 'var(--text-dim)', fontWeight: 600, fontSize: 12, cursor: 'pointer',
           display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
-        }}>✏️ Ручной</button>
+        }}>вњЏпёЏ Р СѓС‡РЅРѕР№</button>
       </div>
       <input ref={fileInputRef} type="file" accept=".pdf,.png,.jpg,.jpeg,.webp,.txt" style={{ display: 'none' }}
         onChange={e => { const f = e.target.files?.[0]; if (f) handleFileUpload(f); }} />
@@ -342,7 +342,7 @@ export const LabsScreen: React.FC = () => {
                       color: isSubmitted ? (isHigh ? '#ef4444' : isLow ? '#f97316' : 'var(--accent)') : 'var(--text-dim)',
                       fontWeight: isSubmitted ? 600 : 400,
                     }}>
-                      {isSubmitted ? (isHigh ? '↑' : isLow ? '↓' : '✓') : '○'} {info?.name || code}
+                      {isSubmitted ? (isHigh ? 'в†‘' : isLow ? 'в†“' : 'вњ“') : 'в—‹'} {info?.name || code}
                       {latest && <span style={{ marginLeft: 2, fontWeight: 700 }}>{latest.value}</span>}
                     </button>
                   );
@@ -355,7 +355,7 @@ export const LabsScreen: React.FC = () => {
         {/* Missing labs */}
         {missingLabs.length > 0 && missingLabs.length < requiredLabs.length && (
           <div style={{ marginTop: 6, padding: '5px 8px', background: 'rgba(239,68,68,0.1)', borderRadius: 5, fontSize: 10, color: 'var(--text-dim)' }}>
-            Не сдано: {missingLabs.slice(0, 8).join(', ')}{missingLabs.length > 8 ? ` +${missingLabs.length - 8}` : ''}
+            РќРµ СЃРґР°РЅРѕ: {missingLabs.slice(0, 8).join(', ')}{missingLabs.length > 8 ? ` +${missingLabs.length - 8}` : ''}
           </div>
         )}
       </div>
@@ -365,16 +365,16 @@ export const LabsScreen: React.FC = () => {
 
       {/* Lab Risks + Indices */}
       <div className="card" style={{ marginTop: 8 }}>
-        <h3 style={{ fontSize: 14 }}>🔬 Риски из анализов</h3>
+        <h3 style={{ fontSize: 14 }}>рџ”¬ Р РёСЃРєРё РёР· Р°РЅР°Р»РёР·РѕРІ</h3>
         {labRisks && labRisks.overallNet > 0 ? (
           <div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 5, marginBottom: 6 }}>
               <div style={{ background: 'var(--bg-secondary)', padding: 7, borderRadius: 6, textAlign: 'center' }}>
-                <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Общий риск</div>
+                <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>РћР±С‰РёР№ СЂРёСЃРє</div>
                 <div style={{ fontSize: 17, fontWeight: 700, color: getRiskColor(labRisks.overallNet) }}>{Math.round(labRisks.overallNet)}%</div>
               </div>
               <div style={{ background: 'var(--bg-secondary)', padding: 7, borderRadius: 6, textAlign: 'center' }}>
-                <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Отклонения</div>
+                <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>РћС‚РєР»РѕРЅРµРЅРёСЏ</div>
                 <div style={{ fontSize: 17, fontWeight: 700 }}>
                   {labRisks.systemBreakdown ? Object.keys(labRisks.systemBreakdown).filter(k => labRisks.systemBreakdown[k].net > 0).length : 0}
                 </div>
@@ -383,7 +383,7 @@ export const LabsScreen: React.FC = () => {
             {/* System breakdown with mechanism markers */}
             {labRisks.systemBreakdown && (
               <div style={{ marginTop: 6 }}>
-                <div style={{ fontSize: 10, fontWeight: 600, marginBottom: 4, color: 'var(--text-dim)' }}>По системам:</div>
+                <div style={{ fontSize: 10, fontWeight: 600, marginBottom: 4, color: 'var(--text-dim)' }}>РџРѕ СЃРёСЃС‚РµРјР°Рј:</div>
                 <div style={{ display: 'grid', gap: 3 }}>
                   {Object.entries(labRisks.systemBreakdown)
                     .filter(([_, v]) => (v as any).net > 0)
@@ -401,11 +401,11 @@ export const LabsScreen: React.FC = () => {
                               <div style={{ width: Math.min(100, bd.net) + '%', height: '100%', background: getRiskColor(bd.net), borderRadius: 3 }} />
                             </div>
                             <span style={{ fontSize: 10, fontWeight: 700, color: getRiskColor(bd.net), minWidth: 24, textAlign: 'right' }}>{Math.round(bd.net)}%</span>
-                            {mechCount > 0 && <span style={{ fontSize: 8, color: 'var(--text-dim)' }}>{mechCount}м</span>}
+                            {mechCount > 0 && <span style={{ fontSize: 8, color: 'var(--text-dim)' }}>{mechCount}Рј</span>}
                           </div>
                           {markers.length > 0 && (
                             <div style={{ fontSize: 8, color: 'var(--text-dim)', marginTop: 2, lineHeight: 1.3 }}>
-                              📊 {markers.join(', ')}
+                              рџ“Љ {markers.join(', ')}
                             </div>
                           )}
                         </div>
@@ -416,12 +416,12 @@ export const LabsScreen: React.FC = () => {
             )}
           </div>
         ) : (
-          <div style={{ color: 'var(--text-dim)', fontSize: 11 }}>Введите данные анализов для оценки рисков</div>
+          <div style={{ color: 'var(--text-dim)', fontSize: 11 }}>Р’РІРµРґРёС‚Рµ РґР°РЅРЅС‹Рµ Р°РЅР°Р»РёР·РѕРІ РґР»СЏ РѕС†РµРЅРєРё СЂРёСЃРєРѕРІ</div>
         )}
       </div>
 
       <div className="card" style={{ marginTop: 8 }}>
-        <h3 style={{ fontSize: 14 }}>📊 Индексы</h3>
+        <h3 style={{ fontSize: 14 }}>рџ“Љ РРЅРґРµРєСЃС‹</h3>
         {indexEntries.length > 0 ? (
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4 }}>
             {indexEntries.map(d => (
@@ -432,21 +432,21 @@ export const LabsScreen: React.FC = () => {
             ))}
           </div>
         ) : (
-          <div style={{ color: 'var(--text-dim)', fontSize: 11 }}>Нет данных</div>
+          <div style={{ color: 'var(--text-dim)', fontSize: 11 }}>РќРµС‚ РґР°РЅРЅС‹С…</div>
         )}
       </div>
 
       {/* PENALTY SECTION */}
       <div className="card" style={{ marginTop: 8, background: anyNoLabs ? 'rgba(239,68,68,0.08)' : 'var(--glass-bg)', borderColor: anyNoLabs ? 'rgba(239,68,68,0.3)' : 'var(--glass-border)' }}>
-        <h3 style={{ fontSize: 14 }}>⚠️ Штраф за отсутствие анализов</h3>
+        <h3 style={{ fontSize: 14 }}>вљ пёЏ РЁС‚СЂР°С„ Р·Р° РѕС‚СЃСѓС‚СЃС‚РІРёРµ Р°РЅР°Р»РёР·РѕРІ</h3>
         <div style={{ fontSize: 10, marginBottom: 6 }}>
           {anyNoLabs ? (
             <div>
-              <div>Множитель: <strong style={{ color: '#ef4444' }}>×{penalty.totalMultiplier.toFixed(2)}</strong></div>
-              <div>Лабы: {Math.round(penalty.labPenalty * 100)}% • Диагностика: {Math.round(penalty.diagnosticPenalty * 100)}%</div>
+              <div>РњРЅРѕР¶РёС‚РµР»СЊ: <strong style={{ color: '#ef4444' }}>Г—{penalty.totalMultiplier.toFixed(2)}</strong></div>
+              <div>Р›Р°Р±С‹: {Math.round(penalty.labPenalty * 100)}% вЂў Р”РёР°РіРЅРѕСЃС‚РёРєР°: {Math.round(penalty.diagnosticPenalty * 100)}%</div>
             </div>
           ) : (
-            <div style={{ color: 'var(--text-dim)' }}>Штраф не применён. Все риски рассчитаны без понижающего коэффициента.</div>
+            <div style={{ color: 'var(--text-dim)' }}>РЁС‚СЂР°С„ РЅРµ РїСЂРёРјРµРЅС‘РЅ. Р’СЃРµ СЂРёСЃРєРё СЂР°СЃСЃС‡РёС‚Р°РЅС‹ Р±РµР· РїРѕРЅРёР¶Р°СЋС‰РµРіРѕ РєРѕСЌС„С„РёС†РёРµРЅС‚Р°.</div>
           )}
         </div>
 
@@ -456,13 +456,13 @@ export const LabsScreen: React.FC = () => {
           background: globalNoLabs ? 'var(--accent)' : '#ef4444', color: globalNoLabs ? '#000' : '#fff',
           border: 'none', marginBottom: 5,
         }}>
-          {globalNoLabs ? '✅ Глобальный штраф применён — отменить' : '🚫 БЕЗ ВСЕХ АНАЛИЗОВ (Штраф)'}
+          {globalNoLabs ? 'вњ… Р“Р»РѕР±Р°Р»СЊРЅС‹Р№ С€С‚СЂР°С„ РїСЂРёРјРµРЅС‘РЅ вЂ” РѕС‚РјРµРЅРёС‚СЊ' : 'рџљ« Р‘Р•Р— Р’РЎР•РҐ РђРќРђР›РР—РћР’ (РЁС‚СЂР°С„)'}
         </button>
 
         {/* Per-system penalty buttons */}
         {!globalNoLabs && (
           <div>
-            <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 3 }}>Или штраф по отдельной системе:</div>
+            <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 3 }}>РР»Рё С€С‚СЂР°С„ РїРѕ РѕС‚РґРµР»СЊРЅРѕР№ СЃРёСЃС‚РµРјРµ:</div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
               {RISK_SYSTEMS.map(sys => {
                 const isActive = noLabsSystems.includes(sys);
@@ -473,7 +473,7 @@ export const LabsScreen: React.FC = () => {
                     border: `1px solid ${isActive ? 'rgba(239,68,68,0.4)' : 'var(--border)'}`,
                     color: isActive ? '#ef4444' : 'var(--text-dim)', fontWeight: isActive ? 700 : 400,
                   }}>
-                    {isActive ? '✕ ' : ''}{sysLabels[sys] || sys}
+                    {isActive ? 'вњ• ' : ''}{sysLabels[sys] || sys}
                   </button>
                 );
               })}
@@ -488,32 +488,32 @@ export const LabsScreen: React.FC = () => {
         <div style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' }} onClick={() => { setShowImport(false); setOcrResult(null); }}>
           <div style={{ position: 'fixed', top: '8%', left: '4%', right: '4%', zIndex: 201, background: 'var(--bg)', borderRadius: 20, maxHeight: '84vh', overflow: 'hidden', display: 'flex', flexDirection: 'column' }} onClick={e => e.stopPropagation()}>
             <div style={{ padding: '12px 16px 8px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontWeight: 700, fontSize: 15 }}>📄 Импорт анализов</span>
-              <button onClick={() => { setShowImport(false); setOcrResult(null); }} style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text-dim)', borderRadius: 8, padding: '4px 10px', fontSize: 12, cursor: 'pointer' }}>✕</button>
+              <span style={{ fontWeight: 700, fontSize: 15 }}>рџ“„ РРјРїРѕСЂС‚ Р°РЅР°Р»РёР·РѕРІ</span>
+              <button onClick={() => { setShowImport(false); setOcrResult(null); }} style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text-dim)', borderRadius: 8, padding: '4px 10px', fontSize: 12, cursor: 'pointer' }}>вњ•</button>
             </div>
             <div style={{ flex: 1, overflowY: 'auto', padding: '12px 16px' }}>
               {ocrLoading && (
                 <div style={{ textAlign: 'center', padding: 40 }}>
                   <div className="loading-spinner" style={{ margin: '0 auto 16px' }} />
-                  <div style={{ fontSize: 13, color: 'var(--text-dim)' }}>Распознаю документ...</div>
-                  <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 4 }}>OCR обработка (10-30 сек)</div>
+                  <div style={{ fontSize: 13, color: 'var(--text-dim)' }}>Р Р°СЃРїРѕР·РЅР°СЋ РґРѕРєСѓРјРµРЅС‚...</div>
+                  <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 4 }}>OCR РѕР±СЂР°Р±РѕС‚РєР° (10-30 СЃРµРє)</div>
                 </div>
               )}
               {!ocrLoading && !ocrResult && (
                 <div>
-                  <p style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 12 }}>Загрузите PDF или фото результатов анализов для автоматического распознавания.</p>
+                  <p style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 12 }}>Р—Р°РіСЂСѓР·РёС‚Рµ PDF РёР»Рё С„РѕС‚Рѕ СЂРµР·СѓР»СЊС‚Р°С‚РѕРІ Р°РЅР°Р»РёР·РѕРІ РґР»СЏ Р°РІС‚РѕРјР°С‚РёС‡РµСЃРєРѕРіРѕ СЂР°СЃРїРѕР·РЅР°РІР°РЅРёСЏ.</p>
                   <div style={{ display: 'grid', gap: 8 }}>
                     <button onClick={() => fileInputRef.current?.click()} style={{ padding: 16, borderRadius: 12, border: '2px dashed var(--border)', background: 'var(--bg-secondary)', color: 'var(--accent)', fontWeight: 600, fontSize: 14, cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
-                      <span style={{ fontSize: 28 }}>📄</span><span>Выбрать PDF или фото</span>
+                      <span style={{ fontSize: 28 }}>рџ“„</span><span>Р’С‹Р±СЂР°С‚СЊ PDF РёР»Рё С„РѕС‚Рѕ</span>
                       <span style={{ fontSize: 10, color: 'var(--text-dim)', fontWeight: 400 }}>PDF, PNG, JPG, WEBP</span>
                     </button>
                     <button onClick={() => { if (cameraInputRef.current) cameraInputRef.current.click(); }} style={{ padding: 16, borderRadius: 12, border: '2px dashed var(--border)', background: 'var(--bg-secondary)', color: 'var(--accent)', fontWeight: 600, fontSize: 14, cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
-                      <span style={{ fontSize: 28 }}>📸</span><span>Сфотографировать</span>
-                      <span style={{ fontSize: 10, color: 'var(--text-dim)', fontWeight: 400 }}>Камера устройства</span>
+                      <span style={{ fontSize: 28 }}>рџ“ё</span><span>РЎС„РѕС‚РѕРіСЂР°С„РёСЂРѕРІР°С‚СЊ</span>
+                      <span style={{ fontSize: 10, color: 'var(--text-dim)', fontWeight: 400 }}>РљР°РјРµСЂР° СѓСЃС‚СЂРѕР№СЃС‚РІР°</span>
                     </button>
                   </div>
                   <div style={{ marginTop: 12, padding: '8px 10px', background: 'rgba(0,230,138,0.08)', borderRadius: 8, fontSize: 10, color: 'var(--text-dim)' }}>
-                    💡 <strong>Совет:</strong> PDF от лабораторий (Гемотест, Инвитро, Хеликс, KDL) распознаются лучше всего. Чёткие фото без бликов.
+                    рџ’Ў <strong>РЎРѕРІРµС‚:</strong> PDF РѕС‚ Р»Р°Р±РѕСЂР°С‚РѕСЂРёР№ (Р“РµРјРѕС‚РµСЃС‚, РРЅРІРёС‚СЂРѕ, РҐРµР»РёРєСЃ, KDL) СЂР°СЃРїРѕР·РЅР°СЋС‚СЃСЏ Р»СѓС‡С€Рµ РІСЃРµРіРѕ. Р§С‘С‚РєРёРµ С„РѕС‚Рѕ Р±РµР· Р±Р»РёРєРѕРІ.
                   </div>
                 </div>
               )}
@@ -521,21 +521,21 @@ export const LabsScreen: React.FC = () => {
                 <div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <span style={{ fontSize: 18 }}>{ocrResult.labs.length > 0 ? '✅' : '⚠️'}</span>
-                      <span style={{ fontWeight: 700, fontSize: 13 }}>{ocrResult.labs.length > 0 ? `Найдено: ${ocrResult.labs.length} показателей` : 'Показатели не найдены'}</span>
+                      <span style={{ fontSize: 18 }}>{ocrResult.labs.length > 0 ? 'вњ…' : 'вљ пёЏ'}</span>
+                      <span style={{ fontWeight: 700, fontSize: 13 }}>{ocrResult.labs.length > 0 ? `РќР°Р№РґРµРЅРѕ: ${ocrResult.labs.length} РїРѕРєР°Р·Р°С‚РµР»РµР№` : 'РџРѕРєР°Р·Р°С‚РµР»Рё РЅРµ РЅР°Р№РґРµРЅС‹'}</span>
                     </div>
                     <span style={{ fontSize: 10, background: 'var(--bg-secondary)', padding: '2px 8px', borderRadius: 4, color: 'var(--text-dim)' }}>
-                      {ocrResult.source === 'pdf' ? 'PDF' : ocrResult.source === 'image' ? 'Фото' : 'Текст'} • {Math.round(ocrResult.confidence * 100)}%
+                      {ocrResult.source === 'pdf' ? 'PDF' : ocrResult.source === 'image' ? 'Р¤РѕС‚Рѕ' : 'РўРµРєСЃС‚'} вЂў {Math.round(ocrResult.confidence * 100)}%
                     </span>
                   </div>
                   {ocrResult.warnings.length > 0 && (
                     <div style={{ background: 'rgba(234,179,8,0.12)', border: '1px solid rgba(234,179,8,0.2)', borderRadius: 8, padding: '8px 10px', marginBottom: 8 }}>
-                      {ocrResult.warnings.map((w, i) => <div key={i} style={{ fontSize: 10, color: '#eab308' }}>⚠️ {w}</div>)}
+                      {ocrResult.warnings.map((w, i) => <div key={i} style={{ fontSize: 10, color: '#eab308' }}>вљ пёЏ {w}</div>)}
                     </div>
                   )}
                   {ocrResult.labs.length > 0 && (
                     <div>
-                      <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 6 }}>Выберите показатели для сохранения в фазу «{PHASE_LABELS[selectedPhase]}»:</div>
+                      <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 6 }}>Р’С‹Р±РµСЂРёС‚Рµ РїРѕРєР°Р·Р°С‚РµР»Рё РґР»СЏ СЃРѕС…СЂР°РЅРµРЅРёСЏ РІ С„Р°Р·Сѓ В«{PHASE_LABELS[selectedPhase]}В»:</div>
                       <div style={{ display: 'grid', gap: 4 }}>
                         {ocrResult.labs.map(lab => {
                           const isSelected = selectedLabs.has(lab.code);
@@ -549,13 +549,13 @@ export const LabsScreen: React.FC = () => {
                               transition: 'all 0.15s',
                             }}>
                               <div style={{ flex: 1 }}>
-                                <div style={{ fontWeight: 600, fontSize: 12, color: isSelected ? 'var(--accent)' : 'var(--text)' }}>{isSelected ? '✓ ' : '○ '}{lab.name || lab.code}</div>
-                                {ucumInfo && <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Норма: {ucumInfo.lln}–{ucumInfo.uln} {ucumInfo.prefUnit}</div>}
+                                <div style={{ fontWeight: 600, fontSize: 12, color: isSelected ? 'var(--accent)' : 'var(--text)' }}>{isSelected ? 'вњ“ ' : 'в—‹ '}{lab.name || lab.code}</div>
+                                {ucumInfo && <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>РќРѕСЂРјР°: {ucumInfo.lln}вЂ“{ucumInfo.uln} {ucumInfo.prefUnit}</div>}
                               </div>
                               <div style={{ textAlign: 'right' }}>
                                 <span style={{ fontWeight: 700, fontSize: 14, color: lab.isAbnormal ? '#ef4444' : 'var(--accent)' }}>{lab.value}</span>
                                 <span style={{ fontSize: 10, color: 'var(--text-dim)', marginLeft: 3 }}>{lab.unit}</span>
-                                {lab.isAbnormal && <span style={{ marginLeft: 4, color: '#ef4444', fontSize: 11 }}>⚠️</span>}
+                                {lab.isAbnormal && <span style={{ marginLeft: 4, color: '#ef4444', fontSize: 11 }}>вљ пёЏ</span>}
                               </div>
                             </button>
                           );
@@ -566,12 +566,12 @@ export const LabsScreen: React.FC = () => {
                         background: selectedLabs.size > 0 ? 'var(--accent)' : 'var(--bg-secondary)',
                         color: selectedLabs.size > 0 ? '#000' : 'var(--text-dim)',
                         border: 'none', borderRadius: 10, fontWeight: 700, fontSize: 14, cursor: selectedLabs.size > 0 ? 'pointer' : 'not-allowed',
-                      }}>✓ Сохранить {selectedLabs.size} показателей</button>
+                      }}>вњ“ РЎРѕС…СЂР°РЅРёС‚СЊ {selectedLabs.size} РїРѕРєР°Р·Р°С‚РµР»РµР№</button>
                     </div>
                   )}
                   {ocrResult.text.length > 0 && (
                     <details style={{ marginTop: 12 }}>
-                      <summary style={{ fontSize: 11, color: 'var(--text-dim)', cursor: 'pointer' }}>📄 Распознанный текст ({ocrResult.text.length} симв.)</summary>
+                      <summary style={{ fontSize: 11, color: 'var(--text-dim)', cursor: 'pointer' }}>рџ“„ Р Р°СЃРїРѕР·РЅР°РЅРЅС‹Р№ С‚РµРєСЃС‚ ({ocrResult.text.length} СЃРёРјРІ.)</summary>
                       <pre style={{ fontSize: 9, color: 'var(--text-dim)', background: 'var(--bg-secondary)', padding: 8, borderRadius: 6, maxHeight: 120, overflow: 'auto', whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>{ocrResult.text.slice(0, 2000)}</pre>
                     </details>
                   )}
@@ -593,34 +593,34 @@ export const LabsScreen: React.FC = () => {
             maxHeight: '50vh', overflowY: 'auto',
           }} onClick={e => e.stopPropagation()}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-              <span style={{ fontWeight: 700, fontSize: 14 }}>🧪 Ввести результат</span>
-              <button onClick={() => setShowLabInput(false)} style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text-dim)', borderRadius: 6, padding: '3px 8px', fontSize: 11, cursor: 'pointer' }}>✕</button>
+              <span style={{ fontWeight: 700, fontSize: 14 }}>рџ§Є Р’РІРµСЃС‚Рё СЂРµР·СѓР»СЊС‚Р°С‚</span>
+              <button onClick={() => setShowLabInput(false)} style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text-dim)', borderRadius: 6, padding: '3px 8px', fontSize: 11, cursor: 'pointer' }}>вњ•</button>
             </div>
 
             {(() => { const info = UCUM_MAP[inputCode.toUpperCase()]; return info ? (
               <div style={{ fontSize: 10, color: 'var(--accent)', marginBottom: 6 }}>
-                {info.name} • Норма: {info.lln}–{info.uln} {info.prefUnit}
+                {info.name} вЂў РќРѕСЂРјР°: {info.lln}вЂ“{info.uln} {info.prefUnit}
               </div>
             ) : null; })()}
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
               <div>
-                <label style={{ fontSize: 9, color: 'var(--text-dim)' }}>Код</label>
+                <label style={{ fontSize: 9, color: 'var(--text-dim)' }}>РљРѕРґ</label>
                 <input value={inputCode} onChange={e => setInputCode(e.target.value)} placeholder="ALT"
                   style={{ width: '100%', padding: '6px 8px', background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text)', fontSize: 13 }} />
               </div>
               <div>
-                <label style={{ fontSize: 9, color: 'var(--text-dim)' }}>Значение</label>
+                <label style={{ fontSize: 9, color: 'var(--text-dim)' }}>Р—РЅР°С‡РµРЅРёРµ</label>
                 <input type="number" value={inputValue} onChange={e => setInputValue(e.target.value)} placeholder="40"
                   style={{ width: '100%', padding: '6px 8px', background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text)', fontSize: 13 }} />
               </div>
               <div>
-                <label style={{ fontSize: 9, color: 'var(--text-dim)' }}>Единица</label>
+                <label style={{ fontSize: 9, color: 'var(--text-dim)' }}>Р•РґРёРЅРёС†Р°</label>
                 <input value={inputUnit} onChange={e => setInputUnit(e.target.value)} placeholder="U/L"
                   style={{ width: '100%', padding: '6px 8px', background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text)', fontSize: 13 }} />
               </div>
               <div>
-                <label style={{ fontSize: 9, color: 'var(--text-dim)' }}>Дата</label>
+                <label style={{ fontSize: 9, color: 'var(--text-dim)' }}>Р”Р°С‚Р°</label>
                 <input type="date" value={inputDate} onChange={e => setInputDate(e.target.value)}
                   style={{ width: '100%', padding: '6px 8px', background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text)', fontSize: 13 }} />
               </div>
@@ -630,7 +630,7 @@ export const LabsScreen: React.FC = () => {
               width: '100%', marginTop: 8, padding: 10, background: 'var(--accent)', color: '#000',
               border: 'none', borderRadius: 8, fontWeight: 700, fontSize: 13, cursor: 'pointer',
             }}>
-              ✓ Сохранить
+              вњ“ РЎРѕС…СЂР°РЅРёС‚СЊ
             </button>
           </div>
         </div>

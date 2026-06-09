@@ -11,22 +11,41 @@ import { PHARMA_DB } from '../core/pharma-database';
 // --- 7x7 Risk Systems & Mechanisms ---
 
 export const RISK_SYSTEMS_V7 = [
-  'cardio', 'hepatic', 'renal', 'neuro', 'endocrine', 'hematologic', 'reproductive'
+  'cardio', 'hepatic', 'renal', 'neuro', 'endocrine', 'hematologic', 'reproductive', 'musculoskeletal',
+  'metabolic', 'ghigf', 'ins_axis', 'neuro_toxicity', 'blood', 'vessels'
 ] as const;
+
+// Core systems (displayed in main risk summary)
+export const CORE_SYSTEMS_V7 = [
+  'cardio', 'hepatic', 'renal', 'neuro', 'endocrine', 'hematologic', 'reproductive', 'musculoskeletal'
+] as const;
+
+// Subsystem parent mapping
+export const SUBSYSTEM_PARENT_V7: Record<string, string> = {
+  vessels: 'cardio',
+  metabolic: 'endocrine',
+  ghigf: 'endocrine',
+  ins_axis: 'endocrine',
+  neuro_toxicity: 'neuro',
+  blood: 'hematologic',
+};
 export type RiskSystemV7 = typeof RISK_SYSTEMS_V7[number];
 
 export const SYSTEM_NAMES_RU: Record<string, string> = {
-  cardio: 'Сердечно-сосудистая',
-  hepatic: 'Печень',
-  renal: 'Почки',
-  neuro: 'Нервная система',
-  endocrine: 'Эндокринная',
-  hematologic: 'Кроветворная',
-  reproductive: 'Репродуктивная',
-  metabolic: 'Метаболизм',
-  ghigf: 'GH/IGF',
-  ins_axis: 'Инсулиновая ось',
-  neuro_toxicity: 'Нейротоксичность',
+  cardio: '?? Сердечно-сосудистая',
+  hepatic: '?? Печень',
+  renal: '?? Почки',
+  neuro: '?? Нервная система',
+  endocrine: '?? Эндокринная',
+  hematologic: '?? Кроветворная',
+  reproductive: '?? Репродуктивная',
+  musculoskeletal: '?? ОДА/Мышцы',
+  metabolic: '? Метаболизм',
+  ghigf: '?? GH/IGF',
+  ins_axis: '?? Инсулиновая ось',
+  neuro_toxicity: '?? Нейротоксичность',
+  blood: '?? Кровь',
+  vessels: '?? Сосуды',
 };
 
 export const MECHANISM_NAMES: Record<string, Record<number, string>> = {
@@ -94,18 +113,18 @@ export interface DrugThreshold {
 }
 
 // Mapping rules from PD params to 7x7 mechanisms:
-// AR_affinity → endocrine 1, reproductive 1,2,5,6
-// aromatization → endocrine 2, reproductive 7, cardio 1(partly)
-// hepatotoxicity → hepatic 1,7, hepatic 2(0.5x), hepatic 6(oral AAS)
-// lipid_impact (negative = harmful) → cardio 1, metabolic 2
-// hct_impact → hematologic 1,4, cardio 3
-// neuro_toxicity → neuro 1,2,3
-// progestogenic → endocrine 3, reproductive 1(secondary)
-// five_alpha_reduction → reproductive 5, reproductive 6(partly)
-// Class-specific: peptides(GH/IGF/GHRP) → endocrine 4, ghigf 1,2, metabolic 3
-// Insulins → endocrine 4, ins_axis 1,2
-// SERMs/AIs → endocrine 2(negative for AIs), reproductive 7
-// Dopamine agonists → endocrine 3(negative), neuro 1(negative)
+// AR_affinity > endocrine 1, reproductive 1,2,5,6
+// aromatization > endocrine 2, reproductive 7, cardio 1(partly)
+// hepatotoxicity > hepatic 1,7, hepatic 2(0.5x), hepatic 6(oral AAS)
+// lipid_impact (negative = harmful) > cardio 1, metabolic 2
+// hct_impact > hematologic 1,4, cardio 3
+// neuro_toxicity > neuro 1,2,3
+// progestogenic > endocrine 3, reproductive 1(secondary)
+// five_alpha_reduction > reproductive 5, reproductive 6(partly)
+// Class-specific: peptides(GH/IGF/GHRP) > endocrine 4, ghigf 1,2, metabolic 3
+// Insulins > endocrine 4, ins_axis 1,2
+// SERMs/AIs > endocrine 2(negative for AIs), reproductive 7
+// Dopamine agonists > endocrine 3(negative), neuro 1(negative)
 
 export const DRUG_THRESHOLDS_V7: Record<string, DrugThreshold> = {
   // === TESTOSTERONE ===
@@ -666,34 +685,55 @@ export interface MatrixResult {
 
 // Base risk per (system, mechanism)
 const BASE_RISK: Record<string, Record<number, number>> = {
-  cardio: { 1: 0.08, 2: 0.10, 3: 0.06, 4: 0.07, 5: 0.05, 6: 0.04, 7: 0.05 },
-  hepatic: { 1: 0.07, 2: 0.08, 3: 0.06, 4: 0.05, 5: 0.04, 6: 0.06, 7: 0.08 },
+  cardio: { 1: 0.08, 2: 0.10, 3: 0.06, 4: 0.07, 5: 0.05, 6: 0.04, 7: 0.05, 8: 0.04 },
+  hepatic: { 1: 0.07, 2: 0.08, 3: 0.06, 4: 0.05, 5: 0.04, 6: 0.06, 7: 0.08, 8: 0.06 },
   renal: { 1: 0.06, 2: 0.04, 3: 0.05, 4: 0.04, 5: 0.03, 6: 0.02, 7: 0.04 },
-  neuro: { 1: 0.08, 2: 0.07, 3: 0.06, 4: 0.06, 5: 0.05, 6: 0.04, 7: 0.06 },
-  endocrine: { 1: 0.10, 2: 0.08, 3: 0.07, 4: 0.06, 5: 0.04, 6: 0.05, 7: 0.05 },
+  neuro: { 1: 0.08, 2: 0.07, 3: 0.06, 4: 0.06, 5: 0.05, 6: 0.04, 7: 0.06, 8: 0.04 },
+  endocrine: { 1: 0.10, 2: 0.08, 3: 0.07, 4: 0.06, 5: 0.04, 6: 0.05, 7: 0.05, 8: 0.05 },
   hematologic: { 1: 0.08, 2: 0.06, 3: 0.04, 4: 0.05, 5: 0.03, 6: 0.07, 7: 0.04 },
   reproductive: { 1: 0.10, 2: 0.08, 3: 0.05, 4: 0.04, 5: 0.06, 6: 0.04, 7: 0.07 },
+  musculoskeletal: { 1: 0.05, 2: 0.04, 3: 0.04, 4: 0.03, 5: 0.04, 6: 0.03, 7: 0.03 },
+  metabolic: { 1: 0.07, 2: 0.08, 3: 0.05, 4: 0.04, 5: 0.03, 6: 0.06 },
+  ghigf: { 1: 0.04, 2: 0.05, 3: 0.03, 4: 0.04, 5: 0.05 },
+  ins_axis: { 1: 0.06, 2: 0.04 },
+  neuro_toxicity: { 1: 0.08, 2: 0.07, 3: 0.06, 4: 0.06, 5: 0.05, 6: 0.04, 7: 0.06 },
+  blood: { 1: 0.08, 2: 0.06, 3: 0.05, 4: 0.04, 5: 0.03, 6: 0.03, 7: 0.04 },
+  vessels: { 1: 0.06, 2: 0.05, 3: 0.08, 4: 0.04, 5: 0.04, 6: 0.03, 7: 0.03 },
 };
 
 const MECH_WEIGHTS: Record<string, Record<number, number>> = {
-  cardio: { 1: 0.15, 2: 0.18, 3: 0.14, 4: 0.14, 5: 0.13, 6: 0.12, 7: 0.14 },
-  hepatic: { 1: 0.18, 2: 0.17, 3: 0.14, 4: 0.12, 5: 0.13, 6: 0.12, 7: 0.14 },
+  cardio: { 1: 0.14, 2: 0.16, 3: 0.12, 4: 0.13, 5: 0.11, 6: 0.10, 7: 0.12, 8: 0.12 },
+  hepatic: { 1: 0.15, 2: 0.15, 3: 0.12, 4: 0.11, 5: 0.10, 6: 0.11, 7: 0.13, 8: 0.13 },
   renal: { 1: 0.20, 2: 0.17, 3: 0.16, 4: 0.14, 5: 0.13, 6: 0.08, 7: 0.12 },
-  neuro: { 1: 0.18, 2: 0.15, 3: 0.13, 4: 0.17, 5: 0.14, 6: 0.10, 7: 0.13 },
-  endocrine: { 1: 0.22, 2: 0.16, 3: 0.14, 4: 0.13, 5: 0.10, 6: 0.11, 7: 0.14 },
+  neuro: { 1: 0.16, 2: 0.13, 3: 0.11, 4: 0.15, 5: 0.12, 6: 0.09, 7: 0.12, 8: 0.12 },
+  endocrine: { 1: 0.18, 2: 0.14, 3: 0.12, 4: 0.12, 5: 0.09, 6: 0.10, 7: 0.12, 8: 0.13 },
   hematologic: { 1: 0.20, 2: 0.14, 3: 0.10, 4: 0.14, 5: 0.08, 6: 0.18, 7: 0.16 },
   reproductive: { 1: 0.20, 2: 0.16, 3: 0.10, 4: 0.08, 5: 0.18, 6: 0.12, 7: 0.16 },
+  musculoskeletal: { 1: 0.18, 2: 0.14, 3: 0.14, 4: 0.10, 5: 0.16, 6: 0.12, 7: 0.16 },
+  metabolic: { 1: 0.25, 2: 0.20, 3: 0.15, 4: 0.12, 5: 0.08, 6: 0.20 },
+  ghigf: { 1: 0.25, 2: 0.25, 3: 0.15, 4: 0.15, 5: 0.20 },
+  ins_axis: { 1: 0.55, 2: 0.45 },
+  neuro_toxicity: { 1: 0.18, 2: 0.15, 3: 0.13, 4: 0.17, 5: 0.14, 6: 0.10, 7: 0.13 },
+  blood: { 1: 0.20, 2: 0.14, 3: 0.16, 4: 0.14, 5: 0.08, 6: 0.10, 7: 0.18 },
+  vessels: { 1: 0.18, 2: 0.12, 3: 0.22, 4: 0.12, 5: 0.10, 6: 0.12, 7: 0.14 },
 };
 
 // Lab-to-mechanism mapping
 const LAB_MECH_MAP: Record<string, Record<number, string[]>> = {
-  cardio: { 1: ['LDL','HDL','TG','NonHDL'], 2: ['SBP','DBP'], 3: ['Hct','LVmass'], 4: ['Fibrinogen','D_dimer'], 5: ['Homocysteine','CRP'], 6: ['CRP'], 7: ['K','Na','Mg'] },
-  hepatic: { 1: ['GGT','ALP','Bilirubin'], 2: ['ALT','AST'], 3: ['GGT','ALT'], 4: ['ALT','AST','LDH'], 5: ['GGT','ALT'], 6: ['ALT','AST'], 7: ['ALT','AST','GGT'] },
+  cardio: { 1: ['LDL','HDL','TG','NonHDL'], 2: ['SBP','DBP'], 3: ['Hct','LVmass'], 4: ['Fibrinogen','D_dimer'], 5: ['Homocysteine','CRP'], 6: ['CRP','Endothelin1'], 7: ['K','Na','Mg'], 8: ['Troponin','BNP'] },
+  hepatic: { 1: ['GGT','ALP','Bilirubin'], 2: ['ALT','AST'], 3: ['GGT','ALT'], 4: ['ALT','AST','LDH'], 5: ['GGT','ALT'], 6: ['ALT','AST'], 7: ['ALT','AST','GGT'], 8: ['LDL','HDL','TG'] },
   renal: { 1: ['SBP','DBP','Hct'], 2: ['Creatinine','eGFR'], 3: ['Proteinuria','Creatinine'], 4: ['K','Na'], 5: ['Creatinine','eGFR'], 6: ['Na','K'], 7: ['Creatinine','ALT'] },
-  neuro: { 1: ['Prolactin','Cortisol'], 2: ['Homocysteine','Glucose'], 3: ['Cortisol','GABA'], 4: ['CRP','IL6','TNF'], 5: ['Homocysteine','OxidativeMarkers'], 6: ['CRP','S100b'], 7: ['Cortisol','Estradiol'] },
-  endocrine: { 1: ['LH','FSH','Testosterone'], 2: ['Estradiol','Testosterone'], 3: ['Prolactin'], 4: ['Glucose','HbA1c','Insulin','HOMA_IR'], 5: ['TSH'], 6: ['Cortisol'], 7: ['Testosterone','Estradiol'] },
+  neuro: { 1: ['Prolactin','Cortisol'], 2: ['Homocysteine','Glucose'], 3: ['Cortisol','GABA'], 4: ['CRP','IL6','TNF'], 5: ['Homocysteine','OxidativeMarkers'], 6: ['CRP','S100b'], 7: ['Cortisol','Estradiol'], 8: ['B12','Folate'] },
+  endocrine: { 1: ['LH','FSH','Testosterone'], 2: ['Estradiol','Testosterone'], 3: ['Prolactin'], 4: ['Glucose','HbA1c','Insulin','HOMA_IR'], 5: ['TSH'], 6: ['Cortisol'], 7: ['Testosterone','Estradiol'], 8: ['IGF1','GH'] },
   hematologic: { 1: ['Hct','Hb','RBC'], 2: ['PLT'], 3: ['WBC'], 4: ['Hct','Fibrinogen'], 5: ['Ferritin','Transferrin','Hb'], 6: ['Fibrinogen','D_dimer'], 7: ['Hct','LDH','Haptoglobin'] },
-  reproductive: { 1: ['LH','FSH','Testosterone'], 2: ['LH','FSH'], 3: ['Testosterone'], 4: ['Testosterone'], 5: ['PSA','Testosterone'], 6: ['PSA'], 7: ['Testosterone','Estradiol'] },
+  reproductive: { 1: ['LH','FSH','Testosterone'], 2: ['LH','FSH'], 3: ['Testosterone'], 4: ['Estradiol','Prolactin'], 5: ['PSA','Testosterone'], 6: ['PSA'], 7: ['Testosterone','Estradiol'] },
+  musculoskeletal: { 1: ['CK','Calcium'], 2: ['CK','Calcium'], 3: ['ALP_bone','Calcium','Phosphorus'], 4: ['Calcium','VitD','ALP_bone'], 5: ['CK','CRP'], 6: ['CRP','ESR'], 7: ['CK'] },
+  metabolic: { 1: ['Glucose','Insulin','HOMA_IR'], 2: ['LDL','HDL','TG'], 3: ['Glucose','HbA1c'], 4: ['Waist','Glucose','Insulin'], 5: ['UricAcid','Creatinine'], 6: ['Glucose','HbA1c','LDL','HDL','Waist'] },
+  ghigf: { 1: ['IGF1','GH'], 2: ['Na','Weight'], 3: ['IGF1','EchoOrgans'], 4: ['Creatinine','eGFR'], 5: ['Glucose','HbA1c'] },
+  ins_axis: { 1: ['Glucose','Insulin','HOMA_IR'], 2: ['Glucose','HbA1c'] },
+  neuro_toxicity: { 1: ['Prolactin','Cortisol'], 2: ['Homocysteine'], 3: ['Cortisol'], 4: ['CRP','IL6'], 5: ['Homocysteine'], 6: ['CRP','S100b'], 7: ['Cortisol','Estradiol'] },
+  blood: { 1: ['Hct','Hb'], 2: ['Hct','Hb','Viscosity'], 3: ['Fibrinogen','D_dimer','INR'], 4: ['Hct','Fibrinogen'], 5: ['Ferritin','Transferrin'], 6: ['LDH','Haptoglobin'], 7: ['D_dimer','Fibrinogen','INR','APTT'] },
+  vessels: { 1: ['Endothelin1','NO'], 2: ['SBP','DBP'], 3: ['LDL','HDL','TG'], 4: ['CRP','CalciumIndex'], 5: ['CRP','ESR','Fibrinogen'], 6: ['HbA1c','Microalbumin'], 7: ['SBP','EchoAorta'] },
 };
 
 // Support substance risk reduction per (system, mechanism) — EXPANDED
