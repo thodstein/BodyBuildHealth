@@ -1,6 +1,7 @@
 ﻿import React, { useState, useMemo } from 'react';
 import type { WeeklyRiskDynamics, WeeklyRiskPoint } from '../../../engines/weekly-risk-dynamics.engine';
 import { getRiskColor } from '../../../core/utils/risk-colors';
+import { PHARMA_DB } from '../../../core/pharma-database';
 
 interface Props {
   dynamics: WeeklyRiskDynamics | null;
@@ -8,6 +9,31 @@ interface Props {
   onWeekSelect: (week: number | null) => void;
   mode: 'week' | 'average';
   onModeChange: (mode: 'week' | 'average') => void;
+}
+
+function getDrugName(id: string): string {
+  const sub = (PHARMA_DB as any)[id];
+  return sub?.name || id;
+}
+
+// Smooth curve interpolation (catmull-rom → cubic bezier)
+function smoothPath(points: { x: number; y: number }[]): string {
+  if (points.length === 0) return '';
+  if (points.length === 1) return `M${points[0].x.toFixed(1)},${points[0].y.toFixed(1)}`;
+  let d = `M${points[0].x.toFixed(1)},${points[0].y.toFixed(1)}`;
+  for (let i = 0; i < points.length - 1; i++) {
+    const p0 = points[i === 0 ? 0 : i - 1];
+    const p1 = points[i];
+    const p2 = points[i + 1];
+    const p3 = points[i + 2 >= points.length ? points.length - 1 : i + 2];
+    const tension = 0.3;
+    const cp1x = p1.x + (p2.x - p0.x) * tension;
+    const cp1y = p1.y + (p2.y - p0.y) * tension;
+    const cp2x = p2.x - (p3.x - p1.x) * tension;
+    const cp2y = p2.y - (p3.y - p1.y) * tension;
+    d += `C${cp1x.toFixed(1)},${cp1y.toFixed(1)} ${cp2x.toFixed(1)},${cp2y.toFixed(1)} ${p2.x.toFixed(1)},${p2.y.toFixed(1)}`;
+  }
+  return d;
 }
 
 export const WeeklyRiskChart: React.FC<Props> = ({ dynamics, selectedWeek, onWeekSelect, mode, onModeChange }) => {
@@ -24,55 +50,51 @@ export const WeeklyRiskChart: React.FC<Props> = ({ dynamics, selectedWeek, onWee
   const weeks = dynamics.weeks;
   const maxWeek = weeks.length - 1;
 
-  // SVG chart dimensions
-  const W = 320;
-  const H = 140;
-  const PAD = 25;
-  const chartW = W - PAD * 2;
-  const chartH = H - PAD * 2;
+  // Responsive dimensions (wider)
+  const W = 560;
+  const H = 180;
+  const PAD = { top: 24, right: 16, bottom: 28, left: 40 };
+  const chartW = W - PAD.left - PAD.right;
+  const chartH = H - PAD.top - PAD.bottom;
 
-  // Find course start/end for shading
   const courseStart = Math.min(...weeks.filter(w => w.activeDrugs.length > 0).map(w => w.week));
   const courseEnd = Math.max(...weeks.filter(w => w.activeDrugs.length > 0).map(w => w.week));
 
-  const toX = (w: number) => PAD + (w / maxWeek) * chartW;
-  const toY = (v: number) => H - PAD - (Math.min(v, 100) / 100) * chartH;
+  const toX = (w: number) => PAD.left + (w / maxWeek) * chartW;
+  const toY = (v: number) => H - PAD.bottom - (Math.min(v, 100) / 100) * chartH;
 
-  // Build path for net risk line
-  const netPath = weeks.map((p, i) => `${i === 0 ? 'M' : 'L'}${toX(p.week).toFixed(1)},${toY(p.overallNet).toFixed(1)}`).join(' ');
-  const rawPath = weeks.map((p, i) => `${i === 0 ? 'M' : 'L'}${toX(p.week).toFixed(1)},${toY(p.overallRaw).toFixed(1)}`).join(' ');
+  const pointsNet = weeks.map(p => ({ x: toX(p.week), y: toY(p.overallNet) }));
+  const pointsRaw = weeks.map(p => ({ x: toX(p.week), y: toY(p.overallRaw) }));
+  const netPath = smoothPath(pointsNet);
+  const rawPath = smoothPath(pointsRaw);
+
+  // Area paths (smooth curve to bottom)
+  const bottom = H - PAD.bottom;
+  const netAreaPath = pointsNet.length > 0
+    ? smoothPath(pointsNet) + ` L${toX(maxWeek).toFixed(1)},${bottom} L${toX(0).toFixed(1)},${bottom} Z`
+    : '';
+  const rawAreaPath = pointsRaw.length > 0
+    ? smoothPath(pointsRaw) + ` L${toX(maxWeek).toFixed(1)},${bottom} L${toX(0).toFixed(1)},${bottom} Z`
+    : '';
 
   // Grid lines
-  const gridLines = [0, 25, 50, 75, 100].map(v => {
-    const y = toY(v);
-    return `<line x1="${PAD}" y1="${y}" x2="${W - PAD}" y2="${y}" stroke="var(--border)" stroke-width="0.5"/>`;
-  });
+  const gridValues = [0, 25, 50, 75, 100];
+  const gridLines = gridValues.map(v => ({
+    y: toY(v),
+    label: `${v}`,
+  }));
 
-  // Week markers every 4 weeks
-  const weekMarkers: string[] = [];
+  // Week markers
   const step = maxWeek <= 16 ? 2 : maxWeek <= 30 ? 4 : 8;
-  for (let w = 0; w <= maxWeek; w += step) {
-    const x = toX(w);
-    weekMarkers.push(`<text x="${x}" y="${H - 5}" fill="var(--text-dim)" font-size="7" text-anchor="middle">${w}</text>`);
-  }
-
-  // Concentration area (shaded)
-  const concArea = weeks.map((p, i) => {
-    const x = toX(p.week);
-    const y = H - PAD - (p.peakConcentration * chartH);
-    return `${i === 0 ? 'M' : 'L'}${x.toFixed(1)},${y.toFixed(1)}`;
-  }).join(' ');
-  const concAreaPath = concArea + ` L${toX(maxWeek).toFixed(1)},${(H - PAD).toFixed(1)} L${toX(0).toFixed(1)},${(H - PAD).toFixed(1)} Z`;
-
-  // Phase labels
-  const phases = weeks.reduce((acc, p) => {
-    if (p.accumulationPhase === 'ramp-up' && !acc.rampUp) acc.rampUp = p.week;
-    if (p.accumulationPhase === 'steady' && !acc.steady) acc.steady = p.week;
-    if (p.accumulationPhase === 'washout' && !acc.washout) acc.washout = p.week;
-    return acc;
-  }, {} as Record<string, number>);
+  const weekTicks: number[] = [];
+  for (let w = 0; w <= maxWeek; w += step) weekTicks.push(w);
+  if (weekTicks[weekTicks.length - 1] !== maxWeek) weekTicks.push(maxWeek);
 
   const selectedPoint = selectedWeek !== null ? weeks.find(p => p.week === selectedWeek) : null;
+
+  // Concentration area smoothing
+  const concPoints = weeks.map(p => ({ x: toX(p.week), y: bottom - p.peakConcentration * chartH }));
+  const concAreaPath = smoothPath(concPoints) + ` L${toX(maxWeek).toFixed(1)},${bottom} L${toX(0).toFixed(1)},${bottom} Z`;
 
   return (
     <div className="card" style={{ marginBottom: 8 }}>
@@ -82,15 +104,11 @@ export const WeeklyRiskChart: React.FC<Props> = ({ dynamics, selectedWeek, onWee
           <button
             onClick={() => onModeChange('average')}
             style={{ padding: '3px 8px', borderRadius: 4, border: '1px solid var(--border)', background: mode === 'average' ? 'var(--accent)' : 'transparent', color: mode === 'average' ? '#000' : 'var(--text-dim)', fontSize: 10, cursor: 'pointer' }}
-          >
-            Среднее
-          </button>
+          >Среднее</button>
           <button
             onClick={() => onModeChange('week')}
             style={{ padding: '3px 8px', borderRadius: 4, border: '1px solid var(--border)', background: mode === 'week' ? 'var(--accent)' : 'transparent', color: mode === 'week' ? '#000' : 'var(--text-dim)', fontSize: 10, cursor: 'pointer' }}
-          >
-            По неделе
-          </button>
+          >По неделе</button>
         </div>
       </div>
 
@@ -98,48 +116,89 @@ export const WeeklyRiskChart: React.FC<Props> = ({ dynamics, selectedWeek, onWee
         <div style={{ marginBottom: 8, display: 'flex', gap: 8, alignItems: 'center' }}>
           <label style={{ fontSize: 11, color: 'var(--text-dim)' }}>Неделя:</label>
           <input
-            type="range"
-            min={0}
-            max={maxWeek}
+            type="range" min={0} max={maxWeek}
             value={selectedWeek ?? 0}
             onChange={e => onWeekSelect(Number(e.target.value))}
             style={{ flex: 1 }}
           />
-          <span style={{ fontSize: 12, fontWeight: 600, minWidth: 30 }}>{selectedWeek ?? 0}</span>
+          <span style={{ fontSize: 12, fontWeight: 600, minWidth: 30, color: 'var(--accent)' }}>{selectedWeek ?? 0}</span>
         </div>
       )}
 
-      <div style={{ display: 'flex', gap: 8, marginBottom: 8, fontSize: 10, flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', gap: 12, marginBottom: 6, fontSize: 10, flexWrap: 'wrap' }}>
         <span style={{ color: '#7c4dff' }}>● Raw (без поддержки)</span>
         <span style={{ color: '#00e68a' }}>● Net (с поддержкой)</span>
-        <span style={{ color: 'rgba(255,152,0,0.4)' }}>▓ Концентрация (PK)</span>
+        <span style={{ color: 'rgba(255,152,0,0.5)' }}>▓ Концентрация (PK)</span>
       </div>
 
-      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', maxWidth: W, height: 'auto' }}>
+      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: 'auto', maxHeight: H + 20 }}>
+        <defs>
+          <linearGradient id="netGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#00e68a" stopOpacity="0.35" />
+            <stop offset="100%" stopColor="#00e68a" stopOpacity="0.02" />
+          </linearGradient>
+          <linearGradient id="rawGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#7c4dff" stopOpacity="0.2" />
+            <stop offset="100%" stopColor="#7c4dff" stopOpacity="0.01" />
+          </linearGradient>
+          <linearGradient id="concGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#ff9800" stopOpacity="0.15" />
+            <stop offset="100%" stopColor="#ff9800" stopOpacity="0.02" />
+          </linearGradient>
+          <filter id="glow">
+            <feGaussianBlur stdDeviation="1.5" result="blur" />
+            <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
+          </filter>
+        </defs>
+
         {/* Course shading */}
         {courseStart !== undefined && courseEnd !== undefined && (
-          <rect x={toX(courseStart)} y={PAD} width={toX(courseEnd) - toX(courseStart)} height={chartH} fill="rgba(0,230,138,0.05)" />
+          <rect x={toX(courseStart)} y={PAD.top} width={toX(courseEnd) - toX(courseStart)} height={chartH}
+            fill="rgba(0,230,138,0.06)" rx="2" />
         )}
-        {gridLines.map((l, i) => <g key={`g${i}`} dangerouslySetInnerHTML={{ __html: l }} />)}
+
+        {/* Grid lines */}
+        {gridLines.map((g, i) => (
+          <g key={`g${i}`}>
+            <line x1={PAD.left} y1={g.y} x2={W - PAD.right} y2={g.y} stroke="var(--border)" strokeWidth="0.5" opacity={0.5} />
+            <text x={PAD.left - 4} y={g.y + 3} fill="var(--text-dim)" fontSize="8" textAnchor="end">{g.label}</text>
+          </g>
+        ))}
+
         {/* Concentration area */}
-        <path d={concAreaPath} fill="rgba(255,152,0,0.12)" stroke="rgba(255,152,0,0.3)" strokeWidth="0.5" />
-        {/* Risk lines */}
-        <path d={rawPath} fill="none" stroke="#7c4dff" strokeWidth="1.5" opacity={0.6} />
-        <path d={netPath} fill="none" stroke="#00e68a" strokeWidth="2" />
+        <path d={concAreaPath} fill="url(#concGrad)" stroke="rgba(255,152,0,0.25)" strokeWidth="0.5" />
+
+        {/* Raw area + line */}
+        <path d={rawAreaPath} fill="url(#rawGrad)" />
+        <path d={rawPath} fill="none" stroke="#7c4dff" strokeWidth="2" opacity={0.7} filter="url(#glow)" />
+
+        {/* Net area + line */}
+        <path d={netAreaPath} fill="url(#netGrad)" />
+        <path d={netPath} fill="none" stroke="#00e68a" strokeWidth="2.5" filter="url(#glow)" />
+
+        {/* Average line */}
+        {mode === 'average' && (
+          <line x1={PAD.left} y1={toY(dynamics.averageRisk.overallNet)} x2={W - PAD.right} y2={toY(dynamics.averageRisk.overallNet)}
+            stroke="#00e68a" strokeWidth="1.5" strokeDasharray="6 3" opacity={0.7} />
+        )}
+
         {/* Selected week indicator */}
         {selectedWeek !== null && selectedPoint && (
           <>
-            <line x1={toX(selectedWeek)} y1={PAD} x2={toX(selectedWeek)} y2={H - PAD} stroke="var(--text-dim)" strokeWidth="0.5" strokeDasharray="3 3" />
-            <circle cx={toX(selectedWeek)} cy={toY(selectedPoint.overallNet)} r="3" fill="#00e68a" />
-            <circle cx={toX(selectedWeek)} cy={toY(selectedPoint.overallRaw)} r="3" fill="#7c4dff" />
+            <line x1={toX(selectedWeek)} y1={PAD.top} x2={toX(selectedWeek)} y2={H - PAD.bottom}
+              stroke="var(--text-dim)" strokeWidth="1" strokeDasharray="4 3" opacity={0.6} />
+            <circle cx={toX(selectedWeek)} cy={toY(selectedPoint.overallNet)} r="5" fill="#00e68a" stroke="#000" strokeWidth="1.5" filter="url(#glow)" />
+            <circle cx={toX(selectedWeek)} cy={toY(selectedPoint.overallRaw)} r="4" fill="#7c4dff" stroke="#000" strokeWidth="1.5" />
+            <circle cx={toX(selectedWeek)} cy={toY(0)} r="2" fill="#ff9800" />
           </>
         )}
-        {/* Average line */}
-        {mode === 'average' && (
-          <line x1={PAD} y1={toY(dynamics.averageRisk.overallNet)} x2={W - PAD} y2={toY(dynamics.averageRisk.overallNet)} stroke="#00e68a" strokeWidth="1" strokeDasharray="4 2" />
-        )}
-        {weekMarkers.map((m, i) => <g key={`w${i}`} dangerouslySetInnerHTML={{ __html: m }} />)}
-        <text x={PAD} y={10} fill="var(--text-dim)" fontSize="8">%</text>
+
+        {/* Week labels */}
+        {weekTicks.map((w, i) => (
+          <text key={`w${i}`} x={toX(w)} y={H - 4} fill="var(--text-dim)" fontSize="8" textAnchor="middle">{w}</text>
+        ))}
+
+        <text x={PAD.left - 2} y={PAD.top + 8} fill="var(--text-dim)" fontSize="8">%</text>
         <text x={W / 2} y={H - 1} fill="var(--text-dim)" fontSize="8" textAnchor="middle">Недели</text>
       </svg>
 
@@ -183,28 +242,28 @@ export const WeeklyRiskChart: React.FC<Props> = ({ dynamics, selectedWeek, onWee
       )}
 
       {/* Stats summary */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginTop: 8, fontSize: 10 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6, marginTop: 8, fontSize: 10 }}>
         <div style={{ background: 'var(--bg-secondary)', padding: '4px 6px', borderRadius: 4, textAlign: 'center' }}>
           <div style={{ color: 'var(--text-dim)' }}>Пик риска</div>
-          <div style={{ fontWeight: 600 }}>{Math.round(dynamics.peakRiskValue)}% (нед. {dynamics.peakRiskWeek})</div>
+          <div style={{ fontWeight: 600 }}>{Math.round(dynamics.peakRiskValue)}%</div>
+          <div style={{ color: 'var(--text-dim)', fontSize: 8 }}>нед. {dynamics.peakRiskWeek}</div>
         </div>
         <div style={{ background: 'var(--bg-secondary)', padding: '4px 6px', borderRadius: 4, textAlign: 'center' }}>
           <div style={{ color: 'var(--text-dim)' }}>Минимум</div>
-          <div style={{ fontWeight: 600 }}>{Math.round(dynamics.minRiskValue)}% (нед. {dynamics.minRiskWeek})</div>
+          <div style={{ fontWeight: 600 }}>{Math.round(dynamics.minRiskValue)}%</div>
+          <div style={{ color: 'var(--text-dim)', fontSize: 8 }}>нед. {dynamics.minRiskWeek}</div>
         </div>
         <div style={{ background: 'var(--bg-secondary)', padding: '4px 6px', borderRadius: 4, textAlign: 'center' }}>
           <div style={{ color: 'var(--text-dim)' }}>Среднее</div>
           <div style={{ fontWeight: 600 }}>{Math.round(dynamics.averageRisk.overallNet)}%</div>
+          <div style={{ color: 'var(--text-dim)', fontSize: 8 }}>overall</div>
+        </div>
+        <div style={{ background: 'var(--bg-secondary)', padding: '4px 6px', borderRadius: 4, textAlign: 'center' }}>
+          <div style={{ color: 'var(--text-dim)' }}>Длит.</div>
+          <div style={{ fontWeight: 600 }}>{dynamics.courseDuration} нед</div>
+          <div style={{ color: 'var(--text-dim)', fontSize: 8 }}>курс</div>
         </div>
       </div>
     </div>
   );
 };
-
-import { PHARMA_DB } from '../../../core/pharma-database';
-
-// Drug name lookup helper
-function getDrugName(id: string): string {
-  const sub = (PHARMA_DB as any)[id] || (PHARMA_DB as any)[id.replace(/_/g, '_')] || (PHARMA_DB as any)[id.toLowerCase()];
-  return sub?.name || id;
-}

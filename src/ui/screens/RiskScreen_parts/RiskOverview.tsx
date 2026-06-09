@@ -1,4 +1,4 @@
-﻿import React from 'react';
+﻿import React, { useState } from 'react';
 import { RISK_SYSTEMS, ALL_RISK_SYSTEMS, DRUG_THRESHOLDS } from '../../../core/constants';
 import { PHARMA_DB } from '../../../core/pharma-database';
 import { SYSTEM_INFO, MECHANISM_INFO, SYSTEM_ORGANS } from '../../../core/risk-info';
@@ -7,6 +7,20 @@ import { RECOMMENDATIONS_DB } from '../../../data/recommendations';
 import type { RiskResult } from '../../../core/types';
 import { getRiskColor } from '../../../core/utils/risk-colors';
 import type { AggregatedRisk } from '../../../engines/risk.engine';
+import type { WeeklyRiskDynamics } from '../../../engines/weekly-risk-dynamics.engine';
+import { WeeklyRiskChart } from './WeeklyRiskChart';
+
+function getThresholdName(id: string): string {
+  const direct = PHARMA_DB[id];
+  if (direct) return direct.name;
+  const normId = id.replace(/[_\-\s]/g, '').toLowerCase();
+  for (const [key, val] of Object.entries(PHARMA_DB)) {
+    const normKey = key.replace(/[_\-\s]/g, '').toLowerCase();
+    if (normKey === normId) return val.name;
+    if (normKey.includes(normId) || normId.includes(normKey)) return val.name;
+  }
+  return id.replace(/_/g, ' ');
+}
 
 interface LabRiskContribution { systemContributions: Record<string, number>; totalRisk: number; }
 
@@ -33,7 +47,10 @@ export const RiskOverview: React.FC<{
   riskHistory?: { date: string; overallRaw: number; overallNet: number }[];
   labRiskContributions: LabRiskContribution | null;
   aggregatedRisk?: AggregatedRisk | null;
-}> = ({ riskResult, globalNoLabs, noLabsSystems, riskHistory, labRiskContributions, aggregatedRisk }) => {
+  weeklyDynamics?: WeeklyRiskDynamics | null;
+}> = ({ riskResult, globalNoLabs, noLabsSystems, riskHistory, labRiskContributions, aggregatedRisk, weeklyDynamics }) => {
+  const [chartSelectedWeek, setChartSelectedWeek] = useState<number | null>(null);
+  const [chartMode, setChartMode] = useState<'week' | 'average'>('average');
 
   const overallStatus = riskResult.overallNet < 30 ? 'Низкий' : riskResult.overallNet < 50 ? 'Умеренный' : riskResult.overallNet < 70 ? 'Повышенный' : riskResult.overallNet < 85 ? 'Высокий' : 'Критический';
   const overallColor = getRiskColor(riskResult.overallNet);
@@ -129,6 +146,17 @@ export const RiskOverview: React.FC<{
             {globalNoLabs ? 'Штраф применён ко всем системам' : `Штраф применён к: ${noLabsSystems.map(s => getSystemLabel(s)).join(', ')}`}
           </div>
         </div>
+      )}
+
+      {/* Понедельная динамика рисков */}
+      {weeklyDynamics && (
+        <WeeklyRiskChart
+          dynamics={weeklyDynamics}
+          selectedWeek={chartSelectedWeek}
+          onWeekSelect={setChartSelectedWeek}
+          mode={chartMode}
+          onModeChange={setChartMode}
+        />
       )}
 
       {/* Системные риски */}
@@ -246,8 +274,8 @@ export const RiskOverview: React.FC<{
         <div style={{ fontSize: 10, color: "var(--text-dim)", marginBottom: 6 }}>Максимальная рекомендуемая дозировка — превышение значительно увеличивает риски</div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4, fontSize: 10 }}>
           {Object.entries(DRUG_THRESHOLDS).slice(0, 8).map(([id, thresh]) => {
+            const name = getThresholdName(id);
             const entry = PHARMA_DB[id];
-            const name = entry ? entry.name : id.replace(/_/g, " ");
             const drugClass = entry ? entry.class : "";
             return (
               <div key={id} style={{ background: "var(--bg-secondary)", padding: "4px 8px", borderRadius: 4 }}>

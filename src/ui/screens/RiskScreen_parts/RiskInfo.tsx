@@ -4,8 +4,21 @@ import { MECHANISM_INFO, SYSTEM_INFO, SYSTEM_INFO_ALL, SYSTEM_ORGANS } from '../
 import { SYSTEM_MECHANISMS } from '../../../core/system-mechanisms';
 import { PHARMA_DB } from '../../../core/pharma-database';
 
+function getThresholdName(id: string): string {
+  const direct = PHARMA_DB[id];
+  if (direct) return direct.name;
+  const normId = id.replace(/[_\-\s]/g, '').toLowerCase();
+  for (const [key, val] of Object.entries(PHARMA_DB)) {
+    const normKey = key.replace(/[_\-\s]/g, '').toLowerCase();
+    if (normKey === normId) return val.name;
+    if (normKey.includes(normId) || normId.includes(normKey)) return val.name;
+  }
+  return id.replace(/_/g, ' ');
+}
+
 export const RiskInfo: React.FC = () => {
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [methodTab, setMethodTab] = useState<'v7' | 'classic'>('classic');
 
   const toggle = (id: string) => setExpanded(expanded === id ? null : id);
 
@@ -48,6 +61,124 @@ OverallNet  = geom(allSystems) × overallMRR × overallHGI × (2 - overallRIR)`}
             <p style={{ margin: '0 0 4px' }}><strong>pdFactor</strong> — вклад фармакодинамики препарата в конкретную систему</p>
             <p style={{ margin: '0 0 4px' }}><strong>coverage</strong> — коэффициент защиты (БАДы, препараты поддержки)</p>
             <p style={{ margin: '0 0 4px' }}><strong>geom()</strong> — геометрическое среднее по всем системам/механизмам</p>
+          </div>
+        )}
+      </div>
+
+      {/* Метод расчёта (таб-переключатель) */}
+      <div className="card" style={{ marginBottom: 8 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }} onClick={() => toggle('method')}>
+          <h4 style={{ margin: 0, fontSize: 13 }}>🔬 Метод расчёта рисков</h4>
+          <span style={{ fontSize: 12 }}>{expanded === 'method' ? '▸' : '▾'}</span>
+        </div>
+        {expanded === 'method' && (
+          <div style={{ marginTop: 8 }}>
+            <div style={{ display: 'flex', gap: 4, marginBottom: 8 }}>
+              <button
+                onClick={() => setMethodTab('v7')}
+                style={{ padding: '4px 12px', borderRadius: 4, border: '1px solid var(--border)', background: methodTab === 'v7' ? 'var(--accent)' : 'transparent', color: methodTab === 'v7' ? '#000' : 'var(--text-dim)', fontSize: 10, cursor: 'pointer', fontWeight: methodTab === 'v7' ? 700 : 400 }}
+              >V7 Симуляция</button>
+              <button
+                onClick={() => setMethodTab('classic')}
+                style={{ padding: '4px 12px', borderRadius: 4, border: '1px solid var(--border)', background: methodTab === 'classic' ? 'var(--accent)' : 'transparent', color: methodTab === 'classic' ? '#000' : 'var(--text-dim)', fontSize: 10, cursor: 'pointer', fontWeight: methodTab === 'classic' ? 700 : 400 }}
+              >Обзор (классический)</button>
+            </div>
+
+            {methodTab === 'v7' && (
+              <div style={{ fontSize: 11, lineHeight: 1.6 }}>
+                <div style={{ background: 'rgba(0,230,138,0.08)', padding: 10, borderRadius: 8, marginBottom: 8 }}>
+                  <strong>V7 — многоуровневая симуляция «вещество → PK → Hill → сигналинг → 7 механизмов → MC → система → риск»</strong>
+                </div>
+                <div style={{ background: 'var(--bg-secondary)', padding: 10, borderRadius: 8, fontFamily: 'monospace', fontSize: 10, marginBottom: 8, overflowX: 'auto', whiteSpace: 'pre-wrap' }}>
+{`1. PK-модель (2-камерная):
+   C(t) = (D/Vd) × (ka/(ka-k10)) × (e^(-k10·t) - e^(-ka·t))
+   с накоплением при повторных дозах
+
+2. Hill-функция (сигналинг):
+   Effect = Emax × C^n / (C^n + EC50^n)
+   n = коэффициент Хилла (крутизна дозо-ответа)
+
+3. Сигналинг → 7 механизмов:
+   • AR-активация      • Ароматизация
+   • 5α-редукция       • Прогестогенность
+   • Гепатотоксичность • Липидный профиль
+   • HCT-нагрузка      • Нейротоксичность
+
+4. 7 общих механизмов (MC):
+   mechContribution = baseRisk × mechWeight × 
+     doseRatio × G × N × T × MRR × HGI × (2 - RIR)
+
+5. Системная агрегация:
+   systemRisk = max(7, min(100, geom(allMechs) + pdFactor × 15))
+
+6. Итоговый риск:
+   OverallNet = geom(allSystems) × overallMRR ×
+     overallHGI × (2 - overallRIR) × (1 - coverage)`}
+                </div>
+                <div style={{ display: 'grid', gap: 4, fontSize: 10 }}>
+                  <div style={{ background: 'rgba(59,130,246,0.08)', padding: 6, borderRadius: 6 }}>
+                    <strong>PK → Hill</strong>: Концентрация препарата во времени преобразуется в фармакодинамический эффект через сигмоидальную Hill-функцию
+                  </div>
+                  <div style={{ background: 'rgba(139,92,246,0.08)', padding: 6, borderRadius: 6 }}>
+                    <strong>Hill → 7 механизмов</strong>: Эффект распределяется по механизмам повреждения пропорционально PD-параметрам препарата
+                  </div>
+                  <div style={{ background: 'rgba(234,179,8,0.08)', padding: 6, borderRadius: 6 }}>
+                    <strong>7 механизмов → MC</strong>: Каждый механизм рассчитывается с учётом дозы, генетики, питания, тренировок, анализов
+                  </div>
+                  <div style={{ background: 'rgba(0,230,138,0.08)', padding: 6, borderRadius: 6 }}>
+                    <strong>MC → система → риск</strong>: Механизмы агрегируются геометрическим средним в системный риск, затем учитывается защита (coverage)
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {methodTab === 'classic' && (
+              <div style={{ fontSize: 11, lineHeight: 1.6 }}>
+                <div style={{ background: 'rgba(0,230,138,0.08)', padding: 10, borderRadius: 8, marginBottom: 8 }}>
+                  <strong>Health Engine v9 — классическая формула агрегации рисков</strong>
+                </div>
+                <div style={{ background: 'var(--bg-secondary)', padding: 10, borderRadius: 8, fontFamily: 'monospace', fontSize: 10, marginBottom: 8, overflowX: 'auto', whiteSpace: 'pre-wrap' }}>
+{`Итоговая формула:
+OverallNet = geom(allSystems) × 
+  overallMRR × overallHGI × (2 - overallRIR)
+
+Где:
+• geom(allSystems) — геометрическое среднее рисков по 
+  18 системам органов (кардио, печень, почки и т.д.)
+
+• overallMRR — среднее отклонение лабораторных 
+  показателей от нормы по всем системам
+
+• overallHGI — агрегированный воспалительный индекс 
+  (CRP, IL-6, TNF-α, фибриноген, СОЭ)
+
+• (2 - overallRIR) — фактор вмешательств:
+  RIR=0.5 → множитель 1.5 (повышение)
+  RIR=1.0 → множитель 1.0 (без изменений)
+
+Вклады источников:
+  Фарма: 35%   Анализы: 25%   Тренировки: 20%
+  Питание: 15%   Диагностика: 5%
+
+Net = Raw × (1 - coverage) — защита вычитается
+  из базового риска`}
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, fontSize: 10 }}>
+                  <div style={{ background: 'var(--bg-secondary)', padding: 6, borderRadius: 6 }}>
+                    <strong>Raw</strong> — риск без поддержки
+                  </div>
+                  <div style={{ background: 'var(--bg-secondary)', padding: 6, borderRadius: 6 }}>
+                    <strong>Net</strong> — с учётом БАДов и терапии
+                  </div>
+                  <div style={{ background: 'var(--bg-secondary)', padding: 6, borderRadius: 6 }}>
+                    <strong>Минимум 7%</strong> — базовый неустранимый риск
+                  </div>
+                  <div style={{ background: 'var(--bg-secondary)', padding: 6, borderRadius: 6 }}>
+                    <strong>Максимум 100%</strong> — критический риск
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -364,8 +495,7 @@ net = \u03a3(sourceRaw \u00d7 weight / totalWeight)`}
           <div style={{ marginTop: 8, fontSize: 10 }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 4 }}>
               {Object.entries(DRUG_THRESHOLDS).slice(0, 18).map(([id, t]) => {
-                const entry = PHARMA_DB[id];
-                const name = entry ? entry.name : id.replace(/_/g, ' ');
+                const name = getThresholdName(id);
                 return (
                 <div key={id} style={{ background: 'var(--bg-secondary)', padding: '4px 8px', borderRadius: 4 }}>
                   <div style={{ fontWeight: 500, fontSize: 11 }}>{name}</div>
