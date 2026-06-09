@@ -9,10 +9,10 @@ import { useDataLink } from '../../../core/data-link';
 import { getGlobalNoLabs, getNoLabsSystems } from '../LabsScreen';
 
 const ORGAN_LABELS: Record<string, string> = {
-  cardio: '?? Сердечно-сосудистая', hepatic: '?? Печень', renal: '?? Почки', neuro: '?? Нервная система',
-  endocrine: '?? Эндокринная', hematologic: '?? Кроветворная', reproductive: '?? Репродуктивная',
-  musculoskeletal: '?? ОДА/Мышцы', metabolic: '? Метаболизм', ghigf: '?? GH/IGF', ins_axis: '?? Инсулиновая ось',
-  neuro_toxicity: '?? Нейротоксичность', blood: '?? Кровь', vessels: '?? Сосуды',
+  cardio: '❤️ Сердечно-сосудистая', hepatic: '🫁 Печень', renal: '💧 Почки', neuro: '🧠 Нервная система',
+  endocrine: '⚖️ Эндокринная', hematologic: '🩸 Кроветворная', reproductive: '💪 Репродуктивная',
+  musculoskeletal: '🦴 ОДА/Мышцы', metabolic: '⚖️ Метаболизм', ghigf: '💪 GH/IGF', ins_axis: '💉 Инсулиновая ось',
+  neuro_toxicity: '⚠️ Нейротоксичность', blood: '🩸 Кровь', vessels: '🫀 Сосуды',
 };
 
 
@@ -166,7 +166,7 @@ export const V7RiskDisplay: React.FC<{ result: V7RiskResult }> = ({ result }) =>
     <div>
       {/* Global Risk */}
       <div className="card" style={{ marginBottom: 12 }}>
-        <h3 style={{ margin: '0 0 10px 0' }}>?? V7 Risk Engine — Полная модель</h3>
+        <h3 style={{ margin: '0 0 10px 0' }}>🔬 V7 Risk Engine — Полная модель</h3>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 6 }}>
           <div style={{ background: 'var(--bg-secondary)', padding: 10, borderRadius: 8, textAlign: 'center' }}>
             <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>Raw Risk</div>
@@ -196,7 +196,7 @@ export const V7RiskDisplay: React.FC<{ result: V7RiskResult }> = ({ result }) =>
 
       {/* Organ Systems */}
       <div className="card" style={{ marginBottom: 12 }}>
-        <h3 style={{ margin: '0 0 10px 0' }}>?? Органные системы (12)</h3>
+        <h3 style={{ margin: '0 0 10px 0' }}>🫀 Органные системы (12)</h3>
         {Object.entries(organSummary).map(([sysKey, sysData]: [string, any]) => {
           const label = ORGAN_LABELS[sysKey] || sysKey;
           const isExpanded = expandedOrgan === sysKey;
@@ -229,7 +229,7 @@ export const V7RiskDisplay: React.FC<{ result: V7RiskResult }> = ({ result }) =>
                           <div style={{ display: 'flex', gap: 4 }}>
                             <span style={{ color: getRiskColor(rawVal) }} title="Raw">{rawVal}%</span>
                             <span style={{ color: getRiskColor(netVal) }} title="Net">{netVal}%</span>
-                            {mechData.geneticMult > 1.05 && <span style={{ fontSize: 8, color: '#eab308' }}>???{mechData.geneticMult.toFixed(2)}</span>}
+                            {mechData.geneticMult > 1.05 && <span style={{ fontSize: 8, color: '#eab308' }}>🧬{mechData.geneticMult.toFixed(2)}</span>}
                           </div>
                         </div>
                         <div style={{ background: 'rgba(255,255,255,0.05)', borderRadius: 2, height: 4, overflow: 'hidden' }}>
@@ -262,7 +262,7 @@ export const V7RiskDisplay: React.FC<{ result: V7RiskResult }> = ({ result }) =>
       {/* PK Time Series */}
       {pkTimeSeries && Object.keys(pkTimeSeries).length > 0 && (
         <div className="card" style={{ marginBottom: 12 }}>
-          <h3 style={{ margin: '0 0 8px 0' }}>?? PK Концентрации ({Object.keys(pkTimeSeries).length} преп.)</h3>
+          <h3 style={{ margin: '0 0 8px 0' }}>💉 PK Концентрации ({Object.keys(pkTimeSeries).length} преп.)</h3>
           {Object.entries(pkTimeSeries).map(([subId, concs]: [string, any]) => {
             const maxConc = Math.max(...(concs as number[]));
             return (
@@ -290,7 +290,7 @@ export const V7RiskDisplay: React.FC<{ result: V7RiskResult }> = ({ result }) =>
 
   const renderMatrix = () => (
     <div className="card" style={{ marginBottom: 12 }}>
-      <h3 style={{ margin: '0 0 10px 0' }}>?? Матрица рисков V7</h3>
+      <h3 style={{ margin: '0 0 10px 0' }}>🔲 Матрица рисков V7</h3>
       <p style={{ fontSize: 11, color: 'var(--text-dim)', margin: '0 0 10px 0' }}>7?7 межорганных взаимодействий</p>
       {Object.entries(matrix.systems).map(([sysKey, sysData]: [string, any]) => {
         const label = SYSTEM_NAMES_RU[sysKey] || sysKey;
@@ -314,7 +314,7 @@ export const V7RiskDisplay: React.FC<{ result: V7RiskResult }> = ({ result }) =>
                     <span style={{ color: 'var(--text-dim)' }}>{mechName}</span>
                     <div style={{ display: 'flex', gap: 4 }}>
                       <span style={{ color: getRiskColor(mech.P_net * 100) }}>{netVal}%</span>
-                      {mech.geneticMult > 1.05 && <span style={{ fontSize: 8, color: '#eab308' }}>???{mech.geneticMult.toFixed(2)}</span>}
+                      {mech.geneticMult > 1.05 && <span style={{ fontSize: 8, color: '#eab308' }}>🧬{mech.geneticMult.toFixed(2)}</span>}
                     </div>
                   </div>
                   <div style={{ background: 'rgba(255,255,255,0.05)', borderRadius: 2, height: 4, overflow: 'hidden' }}>
@@ -336,7 +336,7 @@ export const V7RiskDisplay: React.FC<{ result: V7RiskResult }> = ({ result }) =>
     return (
       <div>
         <div className="card" style={{ marginBottom: 12 }}>
-          <h3 style={{ margin: '0 0 10px 0' }}>?? Временной ряд: Эволюция рисков (84 дня)</h3>
+          <h3 style={{ margin: '0 0 10px 0' }}>📈 Временной ряд: Эволюция рисков (84 дня)</h3>
           <p style={{ fontSize: 11, color: 'var(--text-dim)', margin: '0 0 10px 0' }}>
             Динамика рисков по органным системам на основе PK-моделирования
           </p>
@@ -378,7 +378,7 @@ export const V7RiskDisplay: React.FC<{ result: V7RiskResult }> = ({ result }) =>
     return (
       <div>
         <div className="card" style={{ marginBottom: 12 }}>
-          <h3 style={{ margin: '0 0 10px 0' }}>?? Анализ чувствительности</h3>
+          <h3 style={{ margin: '0 0 10px 0' }}>🔬 Анализ чувствительности</h3>
           <p style={{ fontSize: 11, color: 'var(--text-dim)', margin: '0 0 10px 0' }}>
             Какие параметры сильнее всего влияют на общий риск? Эластичность показывает, на сколько % изменяется риск при 1% изменении параметра.
           </p>
@@ -419,7 +419,7 @@ export const V7RiskDisplay: React.FC<{ result: V7RiskResult }> = ({ result }) =>
 
         <div className="card" style={{ marginTop: 8, padding: '10px 12px' }}>
           <div style={{ fontSize: 10, color: 'var(--text-dim)', lineHeight: 1.5 }}>
-            <b>Как читать:</b> ? (эластичность) = насколько % изменится общий риск при 1% изменении параметра.
+            <b>Как читать:</b> ε (эластичность) = насколько % изменится общий риск при 1% изменении параметра.
             Высокая эластичность = параметр критичен для контроля риска.
             Измените эти параметры в Профиле {'>'} V7 Параметры для снижения рисков.
           </div>
@@ -429,16 +429,16 @@ export const V7RiskDisplay: React.FC<{ result: V7RiskResult }> = ({ result }) =>
   };
 
   const tabs: { id: V7Tab; label: string }[] = [
-    { id: 'organs', label: '?? Органы' },
-    { id: 'matrix', label: '?? Матрица' },
-    { id: 'timeseries', label: '?? Временной ряд' },
-    { id: 'sensitivity', label: '?? Чувствит.' },
-    { id: 'pk', label: '?? PK' },
+    { id: 'organs', label: '🫀 Органы' },
+    { id: 'matrix', label: '🔲 Матрица' },
+    { id: 'timeseries', label: '📈 Временной ряд' },
+    { id: 'sensitivity', label: '📊 Чувствит.' },
+    { id: 'pk', label: '💉 PK' },
   ];
 
   const pkContent = pkTimeSeries && Object.keys(pkTimeSeries).length > 0 ? (
     <div className="card" style={{ marginBottom: 12 }}>
-      <h3 style={{ margin: '0 0 8px 0' }}>?? Фармакокинетика ({Object.keys(pkTimeSeries).length} преп.)</h3>
+      <h3 style={{ margin: '0 0 8px 0' }}>💊 Фармакокинетика ({Object.keys(pkTimeSeries).length} преп.)</h3>
       {Object.entries(pkTimeSeries).map(([subId, concs]: [string, any]) => {
         const maxConc = Math.max(...(concs as number[]));
         return (
@@ -487,10 +487,10 @@ export const V7RiskDisplay: React.FC<{ result: V7RiskResult }> = ({ result }) =>
       {/* Engine Info */}
       <div className="card" style={{ marginBottom: 12 }}>
         <div style={{ fontSize: 10, color: 'var(--text-dim)', textAlign: 'center', lineHeight: 1.5 }}>
-          ?? Health Engine v7.0 — PK {'>'} Hill {'>'} Signaling {'>'} 7мех {'>'} Damage/Recovery {'>'} MC {'>'} Risk<br />
-          12 органов ? 7 механизмов | Нейротоксичность | Межорганные связи | Стаж | Monte Carlo<br />
+          🔬 Health Engine v7.0 — PK {'>'} Hill {'>'} Signaling {'>'} 7мех {'>'} Damage/Recovery {'>'} MC {'>'} Risk<br />
+          12 органов × 7 механизмов | Нейротоксичность | Межорганные связи | Стаж | Monte Carlo<br />
           {mcResult ? '? MC: ' + (mcResult as any).meanGlobalRisk?.toFixed(1) + '% сценариев' : '? Детерминированный режим'}
-          {pkTimeSeries && Object.keys(pkTimeSeries).length > 0 ? ' | ?? PK: ' + Object.keys(pkTimeSeries).length + ' препаратов' : ''}
+          {pkTimeSeries && Object.keys(pkTimeSeries).length > 0 ? ' | 💉 PK: ' + Object.keys(pkTimeSeries).length + ' препаратов' : ''}
         </div>
       </div>
     </div>

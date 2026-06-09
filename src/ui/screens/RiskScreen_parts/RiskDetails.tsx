@@ -11,7 +11,7 @@ interface LabRiskContribution {
   totalRisk: number;
 }
 
-function getSystemIcon(sys: string): string { return SYSTEM_INFO_ALL[sys]?.icon || SYSTEM_INFO[sys]?.icon || '??'; }
+function getSystemIcon(sys: string): string { return SYSTEM_INFO_ALL[sys]?.icon || SYSTEM_INFO[sys]?.icon || '⚠️'; }
 function getSystemLabel(sys: string): string { return SYSTEM_INFO_ALL[sys]?.label || SYSTEM_INFO[sys]?.label || sys; }
 
 // Core systems for display - subsystems shown nested under parents
@@ -138,14 +138,14 @@ export const RiskDetails: React.FC<{
                                 <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 2 }}>
                                   {m.drugs.slice(0, 3).map(d => <span key={d} style={{ background: 'rgba(239,68,68,0.1)', padding: '0 4px', borderRadius: 3, fontSize: 9, color: '#f97316' }}>{d}</span>)}
                                 </div>
-                                <div style={{ fontSize: 9, color: 'var(--accent)', marginTop: 1 }}>?? {m.mitigation}</div>
+                                <div style={{ fontSize: 9, color: 'var(--accent)', marginTop: 1 }}>⚠️ {m.mitigation}</div>
                               </div>
                             );
                           })}
                         </div>
                       )}
 
-                      {labContrib > 0 && <div style={{ fontSize: 10, marginTop: 4, color: 'var(--text-dim)' }}>?? Лаб. вклад: <strong style={{ color: getRiskColor(labContrib) }}>{Math.round(labContrib)}%</strong></div>}
+                      {labContrib > 0 && <div style={{ fontSize: 10, marginTop: 4, color: 'var(--text-dim)' }}>🔬 Лаб. вклад: <strong style={{ color: getRiskColor(labContrib) }}>{Math.round(labContrib)}%</strong></div>}
 
                       {contributorMap[sys] && contributorMap[sys].length > 0 && (
                         <div style={{ marginTop: 4, display: 'flex', flexWrap: 'wrap', gap: 3 }}>
@@ -176,7 +176,7 @@ export const RiskDetails: React.FC<{
 
       {/* Recommendations */}
       <div className="card" style={{ marginTop: 8 }}>
-        <h3 style={{ margin: '0 0 8px', fontSize: 14 }}>?? Рекомендации</h3>
+        <h3 style={{ margin: '0 0 8px', fontSize: 14 }}>✅ Рекомендации</h3>
         {recommendations.length > 0 ? (
           <div style={{ display: 'grid', gap: 4 }}>
             {(showAllRecs ? recommendations : recommendations.slice(0, 5)).map((rec, i) => (

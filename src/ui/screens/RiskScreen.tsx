@@ -32,8 +32,7 @@ function saveRiskHistory(entry: { date: string; overallRaw: number; overallNet: 
 const TAB_LABELS: Record<string, string> = {
   overview: '📊 Обзор',
   dynamics: '📈 Динамика',
-  matrix: '?? Матрица',
-  details: '?? Детали',
+  mechanisms: '⚙️ Механизмы',
   v7: '🔬 Симуляция',
   info: 'ℹ️ Инфо',
 };
@@ -220,7 +219,7 @@ export const RiskScreen: React.FC = () => {
 
   return (
     <div className="screen risk">
-      <h2 style={{ margin: '0 0 6px', fontSize: 'clamp(16, 4.5vw, 18)' }}>?? Риски</h2>
+      <h2 style={{ margin: '0 0 6px', fontSize: 'clamp(16, 4.5vw, 18)' }}>⚠️ Риски</h2>
       <div className="tab-bar" style={{ gap: 2, overflowX: "auto", WebkitOverflowScrolling: "touch", scrollbarWidth: "none" }}>
         {(['overview', 'dynamics', 'mechanisms', 'v7', 'info'] as const).map(t => (
           <button key={t} className={`tab-btn ${tab === t ? 'active' : ''}`} onClick={() => setTab(t)}>

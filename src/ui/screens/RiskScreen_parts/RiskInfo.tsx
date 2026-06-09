@@ -12,7 +12,7 @@ export const RiskInfo: React.FC = () => {
     <div className="risk-info">
       {/* Общее описание */}
       <div className="card" style={{ marginBottom: 8 }}>
-        <h3 style={{ margin: '0 0 8px', fontSize: 15 }}>?? Формулы расчёта рисков</h3>
+        <h3 style={{ margin: '0 0 8px', fontSize: 15 }}>📝 Формулы расчёта рисков</h3>
         <p style={{ fontSize: 11, color: 'var(--text-dim)', lineHeight: 1.5, margin: '0 0 8px' }}>
           Движок Health Engine v9 рассчитывает риски по <strong>14 системам органов</strong> с <strong>7–9 специфичными механизмами</strong> для каждой (105 всего) + <strong>7 общих механизмов</strong> повреждения.
           Результат — значение от 0% (нет риска) до 100% (критический риск).
@@ -26,7 +26,7 @@ export const RiskInfo: React.FC = () => {
       {/* Базовая формула */}
       <div className="card" style={{ marginBottom: 8 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }} onClick={() => toggle('base')}>
-          <h4 style={{ margin: 0, fontSize: 13 }}>?? Базовая формула риска</h4>
+          <h4 style={{ margin: 0, fontSize: 13 }}>📊 Базовая формула риска</h4>
           <span style={{ fontSize: 12 }}>{expanded === 'base' ? '^' : 'Ў'}</span>
         </div>
         {expanded === 'base' && (
@@ -54,7 +54,7 @@ OverallNet  = geom(allSystems) ? overallMRR ? overallHGI ? (2 - overallRIR)`}
       {/* Дозо-зависимый расчёт */}
       <div className="card" style={{ marginBottom: 8 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }} onClick={() => toggle('dose')}>
-          <h4 style={{ margin: 0, fontSize: 13 }}>?? Дозо-зависимый расчёт</h4>
+          <h4 style={{ margin: 0, fontSize: 13 }}>📈 Дозо-зависимый расчёт</h4>
           <span style={{ fontSize: 12 }}>{expanded === 'dose' ? '^' : 'Ў'}</span>
         </div>
         {expanded === 'dose' && (
@@ -83,7 +83,7 @@ if mechContribution > 0.005:
       {/* Множители корректировки */}
       <div className="card" style={{ marginBottom: 8 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }} onClick={() => toggle('multipliers')}>
-          <h4 style={{ margin: 0, fontSize: 13 }}>??? Множители корректировки</h4>
+          <h4 style={{ margin: 0, fontSize: 13 }}>⚙️ Множители корректировки</h4>
           <span style={{ fontSize: 12 }}>{expanded === 'multipliers' ? '^' : 'Ў'}</span>
         </div>
         {expanded === 'multipliers' && (
@@ -154,7 +154,7 @@ if mechContribution > 0.005:
       {/* Фармакодинамика (PD) */}
       <div className="card" style={{ marginBottom: 8 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }} onClick={() => toggle('pd')}>
-          <h4 style={{ margin: 0, fontSize: 13 }}>?? Фармакодинамика (PD)</h4>
+          <h4 style={{ margin: 0, fontSize: 13 }}>📈 Фармакодинамика (PD)</h4>
           <span style={{ fontSize: 12 }}>{expanded === 'pd' ? '^' : 'Ў'}</span>
         </div>
         {expanded === 'pd' && (
@@ -193,7 +193,7 @@ if mechContribution > 0.005:
       {/* 7 механизмов повреждения */}
       <div className="card" style={{ marginBottom: 8 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }} onClick={() => toggle('mechs')}>
-          <h4 style={{ margin: 0, fontSize: 13 }}>?? 7 общих механизмов повреждения</h4>
+          <h4 style={{ margin: 0, fontSize: 13 }}>⚠️ 7 общих механизмов повреждения</h4>
           <span style={{ fontSize: 12 }}>{expanded === 'mechs' ? '^' : 'Ў'}</span>
         </div>
         {expanded === 'mechs' && (
@@ -212,7 +212,7 @@ if mechContribution > 0.005:
       {/* Защита (coverage) */}
       <div className="card" style={{ marginBottom: 8 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }} onClick={() => toggle('coverage')}>
-          <h4 style={{ margin: 0, fontSize: 13 }}>??? Защита (Coverage)</h4>
+          <h4 style={{ margin: 0, fontSize: 13 }}>?⚠️ Защита (Coverage)</h4>
           <span style={{ fontSize: 12 }}>{expanded === 'coverage' ? '^' : 'Ў'}</span>
         </div>
         {expanded === 'coverage' && (
@@ -246,7 +246,7 @@ coverage(cell) = ? supportSubstances(cellCov)
       {/* Штраф за отсутствие анализов */}
       <div className="card" style={{ marginBottom: 8 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }} onClick={() => toggle('penalty')}>
-          <h4 style={{ margin: 0, fontSize: 13 }}>?? Штраф за отсутствие анализов</h4>
+          <h4 style={{ margin: 0, fontSize: 13 }}>⚠️ Штраф за отсутствие анализов</h4>
           <span style={{ fontSize: 12 }}>{expanded === 'penalty' ? '^' : 'Ў'}</span>
         </div>
         {expanded === 'penalty' && (
@@ -274,7 +274,7 @@ OverallNet = min(100, overallNet ? totalMultiplier)`}
       {/* Понедельная динамика */}
       <div className="card" style={{ marginBottom: 8 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }} onClick={() => toggle('dynamics')}>
-          <h4 style={{ margin: 0, fontSize: 13 }}>?? Понедельная динамика (PK)</h4>
+          <h4 style={{ margin: 0, fontSize: 13 }}>⚠️ Понедельная динамика (PK)</h4>
           <span style={{ fontSize: 12 }}>{expanded === 'dynamics' ? '^' : 'Ў'}</span>
         </div>
         {expanded === 'dynamics' && (
@@ -295,13 +295,13 @@ OverallNet = min(100, overallNet ? totalMultiplier)`}
             <p style={{ margin: '0 0 6px' }}>Для каждого препарата рассчитывается фармакокинетический профиль:</p>
             <div style={{ display: 'grid', gap: 4 }}>
               <div style={{ background: 'rgba(234,179,8,0.1)', padding: 6, borderRadius: 6 }}>
-                <strong>?? Накопление</strong> — концентрация растёт от 0 до стационарной
+                <strong>⚠️ Накопление</strong> — концентрация растёт от 0 до стационарной
               </div>
               <div style={{ background: 'rgba(0,230,138,0.1)', padding: 6, borderRadius: 6 }}>
-                <strong>?? Стационар</strong> — концентрация ? 85% от максимума
+                <strong>⚠️ Стационар</strong> — концентрация ? 85% от максимума
               </div>
               <div style={{ background: 'rgba(59,130,246,0.1)', padding: 6, borderRadius: 6 }}>
-                <strong>?? Выведение</strong> — концентрация падает после отмены
+                <strong>⚠️ Выведение</strong> — концентрация падает после отмены
               </div>
             </div>
             <p style={{ margin: '8px 0 0', color: 'var(--text-dim)', fontSize: 10 }}>
@@ -314,7 +314,7 @@ OverallNet = min(100, overallNet ? totalMultiplier)`}
       {/* Агрегация */}
       <div className="card" style={{ marginBottom: 8 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }} onClick={() => toggle('agg')}>
-          <h4 style={{ margin: 0, fontSize: 13 }}>?? Агрегация рисков</h4>
+          <h4 style={{ margin: 0, fontSize: 13 }}>⚠️ Агрегация рисков</h4>
           <span style={{ fontSize: 12 }}>{expanded === 'agg' ? '^' : 'Ў'}</span>
         </div>
         {expanded === 'agg' && (
@@ -342,7 +342,7 @@ net = ?(sourceRaw ? weight / totalWeight)`}
       {/* Пороги препаратов */}
       <div className="card" style={{ marginBottom: 8 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }} onClick={() => toggle('thresholds')}>
-          <h4 style={{ margin: 0, fontSize: 13 }}>?? Пороговые дозы препаратов</h4>
+          <h4 style={{ margin: 0, fontSize: 13 }}>⚠️ Пороговые дозы препаратов</h4>
           <span style={{ fontSize: 12 }}>{expanded === 'thresholds' ? '^' : 'Ў'}</span>
         </div>
         {expanded === 'thresholds' && (
@@ -362,7 +362,7 @@ net = ?(sourceRaw ? weight / totalWeight)`}
       {/* 14 систем */}
       <div className="card" style={{ marginBottom: 8 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }} onClick={() => toggle('systems')}>
-          <h4 style={{ margin: 0, fontSize: 13 }}>?? 14 систем органов</h4>
+          <h4 style={{ margin: 0, fontSize: 13 }}>🫀 14 систем органов</h4>
           <span style={{ fontSize: 12 }}>{expanded === 'systems' ? '^' : 'Ў'}</span>
         </div>
         {expanded === 'systems' && (
@@ -371,7 +371,7 @@ net = ?(sourceRaw ? weight / totalWeight)`}
               const info = SYSTEM_INFO[sys];
               return (
                 <div key={sys} style={{ background: 'var(--bg-secondary)', padding: '6px 10px', borderRadius: 6, marginBottom: 4 }}>
-                  <span style={{ fontSize: 14 }}>{info?.icon || '??'}</span>
+                  <span style={{ fontSize: 14 }}>{info?.icon || '⚠️'}</span>
                   <span style={{ fontWeight: 600, marginLeft: 6 }}>{info?.label || sys}</span>
                   {info?.keyMarkers && <div style={{ fontSize: 9, color: 'var(--text-dim)', marginTop: 2 }}>Ключевые маркеры: {info.keyMarkers.join(', ')}</div>}
                 </div>
@@ -384,7 +384,7 @@ net = ?(sourceRaw ? weight / totalWeight)`}
             {/* Специфичные механизмы по системам */}
       <div className="card" style={{ marginBottom: 8 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }} onClick={() => toggle('sysmechs')}>
-          <h4 style={{ margin: 0, fontSize: 13 }}>?? Специфичные механизмы по системам</h4>
+          <h4 style={{ margin: 0, fontSize: 13 }}>🔬 Специфичные механизмы по системам</h4>
           <span style={{ fontSize: 12 }}>{expanded === 'sysmechs' ? '^' : 'Ў'}</span>
         </div>
         {expanded === 'sysmechs' && (

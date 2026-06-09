@@ -33,20 +33,20 @@ export const SUBSYSTEM_PARENT_V7: Record<string, string> = {
 export type RiskSystemV7 = typeof RISK_SYSTEMS_V7[number];
 
 export const SYSTEM_NAMES_RU: Record<string, string> = {
-  cardio: '?? Сердечно-сосудистая',
-  hepatic: '?? Печень',
-  renal: '?? Почки',
-  neuro: '?? Нервная система',
-  endocrine: '?? Эндокринная',
-  hematologic: '?? Кроветворная',
-  reproductive: '?? Репродуктивная',
-  musculoskeletal: '?? ОДА/Мышцы',
-  metabolic: '? Метаболизм',
-  ghigf: '?? GH/IGF',
-  ins_axis: '?? Инсулиновая ось',
-  neuro_toxicity: '?? Нейротоксичность',
-  blood: '?? Кровь',
-  vessels: '?? Сосуды',
+  cardio: '❤️ Сердечно-сосудистая',
+  hepatic: '🫁 Печень',
+  renal: '💧 Почки',
+  neuro: '🧠 Нервная система',
+  endocrine: '⚖️ Эндокринная',
+  hematologic: '🩸 Кроветворная',
+  reproductive: '💪 Репродуктивная',
+  musculoskeletal: '🦴 ОДА/Мышцы',
+  metabolic: '⚖️ Метаболизм',
+  ghigf: '💪 GH/IGF',
+  ins_axis: '💉 Инсулиновая ось',
+  neuro_toxicity: '⚠️ Нейротоксичность',
+  blood: '🩸 Кровь',
+  vessels: '🫀 Сосуды',
 };
 
 export const MECHANISM_NAMES: Record<string, Record<number, string>> = {
