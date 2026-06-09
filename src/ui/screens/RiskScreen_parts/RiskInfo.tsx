@@ -1,6 +1,6 @@
 ﻿import React, { useState } from 'react';
 import { RISK_SYSTEMS, ALL_RISK_SYSTEMS, DRUG_THRESHOLDS, GENETIC_MULTIPLIERS, MRR_FACTORS, HGI_FACTORS, RIR_FACTORS, SUPPORT_BASE_COVERAGE, BASE_RISK } from '../../../core/constants';
-import { MECHANISM_INFO, SYSTEM_INFO, SYSTEM_ORGANS } from '../../../core/risk-info';
+import { MECHANISM_INFO, SYSTEM_INFO, SYSTEM_INFO_ALL, SYSTEM_ORGANS } from '../../../core/risk-info';
 import { SYSTEM_MECHANISMS } from '../../../core/system-mechanisms';
 import { PHARMA_DB } from '../../../core/pharma-database';
 
@@ -128,7 +128,11 @@ if mechContribution > 0.005:
                 Если отклонение 50%: MRR = 2.0<br/><br/>
                 Нормы по системам:<br/>
                 cardio: 0.8–1.2, hepatic: 0.7–1.3, renal: 0.8–1.2<br/>
-                neuro: 0.85–1.15, endocrine: 0.75–1.25, reproductive: 0.7–1.3
+                neuro: 0.85–1.15, endocrine: 0.75–1.25, reproductive: 0.7–1.3<br/>
+                hematologic: 0.75–1.25, musculoskeletal: 0.8–1.2, metabolic: 0.8–1.2<br/>
+                ghigf: 0.85–1.15, ins_axis: 0.8–1.2, neuro_toxicity: 0.85–1.15<br/>
+                blood: 0.75–1.25, vessels: 0.8–1.2, immunity: 0.8–1.2<br/>
+                thyroid: 0.8–1.2, prostate: 0.75–1.25, skin: 0.85–1.15
               </div>
             </div>
 
@@ -171,20 +175,30 @@ if mechContribution > 0.005:
             <div style={{ marginTop: 8 }}>
               <strong>{'Маппинг PD > Системы:'}</strong>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2, marginTop: 4 }}>
-                {Object.entries({
-                  cardio: 'lipid_impact (0.6)',
-                  hepatic: 'hepatotoxicity (1.0)',
-                  renal: 'hct_impact (0.15)',
-                  neuro: 'neuro_toxicity (1.0)',
-                  endocrine: 'aromatization (0.5)',
-                  hematologic: 'hct_impact (0.5)',
-                  reproductive: 'progestogenic (0.4)',
-                  musculoskeletal: 'lipid_impact (0.1)',
-                }).map(([sys, pd]) => (
-                  <div key={sys} style={{ fontSize: 10, padding: '2px 4px' }}>
-                    <span style={{ fontWeight: 600 }}>{SYSTEM_INFO[sys]?.label || sys}</span>: {pd}
-                  </div>
-                ))}
+                  {Object.entries({
+                    cardio: 'lipid_impact (0.6)',
+                    hepatic: 'hepatotoxicity (1.0)',
+                    renal: 'hct_impact (0.15)',
+                    neuro: 'neuro_toxicity (1.0)',
+                    endocrine: 'aromatization (0.5)',
+                    hematologic: 'hct_impact (0.5)',
+                    reproductive: 'progestogenic (0.4)',
+                    musculoskeletal: 'lipid_impact (0.1)',
+                    metabolic: 'lipid_impact (0.3)',
+                    ghigf: 'aromatization (0.1)',
+                    ins_axis: 'aromatization (0.2)',
+                    neuro_toxicity: 'neuro_toxicity (0.3)',
+                    blood: 'hct_impact (0.3)',
+                    vessels: 'lipid_impact (0.4)',
+                    immunity: 'immunosuppression (0.3)',
+                    thyroid: 'aromatization (0.1)',
+                    prostate: 'progestogenic (0.3)',
+                    skin: 'progestogenic (0.2)',
+                  }).map(([sys, pd]) => (
+                    <div key={sys} style={{ fontSize: 10, padding: '2px 4px' }}>
+                      <span style={{ fontWeight: 600 }}>{(SYSTEM_INFO_ALL[sys] || SYSTEM_INFO[sys])?.label || sys}</span>: {pd}
+                    </div>
+                  ))}
               </div>
             </div>
           </div>
@@ -373,7 +387,7 @@ net = \u03a3(sourceRaw \u00d7 weight / totalWeight)`}
         {expanded === 'systems' && (
           <div style={{ marginTop: 8, fontSize: 11 }}>
             {ALL_RISK_SYSTEMS.map(sys => {
-              const info = SYSTEM_INFO[sys];
+              const info = SYSTEM_INFO_ALL[sys] || SYSTEM_INFO[sys];
               return (
                 <div key={sys} style={{ background: 'var(--bg-secondary)', padding: '6px 10px', borderRadius: 6, marginBottom: 4 }}>
                   <span style={{ fontSize: 14 }}>{info?.icon || '⚠️'}</span>
@@ -404,7 +418,7 @@ overallRisk = geom(allSystems) \u00d7 overallMRR \u00d7 overallHGI \u00d7 (2 - o
             </div>
             <p style={{ margin: '0 0 6px', color: 'var(--text-dim)', fontSize: 10 }}>Механизмы привязаны к препаратам и маркерам анализов:</p>
             {ALL_RISK_SYSTEMS.map(sys => {
-              const info = SYSTEM_INFO[sys];
+              const info = SYSTEM_INFO_ALL[sys] || SYSTEM_INFO[sys];
               const mechs = SYSTEM_MECHANISMS[sys] || [];
               if (mechs.length === 0) return null;
               return (

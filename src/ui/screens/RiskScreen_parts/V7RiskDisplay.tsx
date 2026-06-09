@@ -18,8 +18,9 @@ function getSubstanceName(id: string): string {
 const ORGAN_LABELS: Record<string, string> = {
   cardio: '❤️ Сердечно-сосудистая', hepatic: '🫁 Печень', renal: '💧 Почки', neuro: '🧠 Нервная система',
   endocrine: '⚖️ Эндокринная', hematologic: '🩸 Кроветворная', reproductive: '💪 Репродуктивная',
-  musculoskeletal: '🦴 ОДА/Мышцы', metabolic: '⚖️ Метаболизм', ghigf: '💪 GH/IGF', ins_axis: '💉 Инсулиновая ось',
+  musculoskeletal: '🦴 ОДА/Мышцы', metabolic: '⚖️ Метаболизм', ghigf: '💪 ГР/ИФР-1', ins_axis: '💉 Инсулиновая ось',
   neuro_toxicity: '⚠️ Нейротоксичность', blood: '🩸 Кровь', vessels: '🫀 Сосуды',
+  immunity: '🛡️ Иммунная', thyroid: '🦋 Щитовидная', prostate: '🔬 Простата', skin: '🧴 Кожа',
 };
 
 
@@ -371,8 +372,16 @@ export const V7RiskDisplay: React.FC<{ result: V7RiskResult }> = ({ result }) =>
   };
 
   const renderSensitivity = () => {
+    if (!linked.profile) {
+      return <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-dim)' }}>Загрузка профиля...</div>;
+    }
     if (!sensitivityResults || sensitivityResults.length === 0) {
-      return <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-dim)' }}>Недостаточно данных для анализа чувствительности</div>;
+      return (
+        <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-dim)' }}>
+          <div>Недостаточно данных для анализа чувствительности</div>
+          <div style={{ fontSize: 11, marginTop: 8 }}>Настройте параметры в Профиле {'>'} Параметры V7 или проверьте наличие курса и анализов.</div>
+        </div>
+      );
     }
 
     const top10 = sensitivityResults.slice(0, 10);
@@ -439,25 +448,51 @@ export const V7RiskDisplay: React.FC<{ result: V7RiskResult }> = ({ result }) =>
     { id: 'pk', label: '💉 PK' },
   ];
 
+  const [pkDay, setPkDay] = useState(42);
   const pkContent = pkTimeSeries && Object.keys(pkTimeSeries).length > 0 ? (
     <div className="card" style={{ marginBottom: 12 }}>
       <h3 style={{ margin: '0 0 8px 0' }}>💊 Фармакокинетика ({Object.keys(pkTimeSeries).length} преп.)</h3>
+      <p style={{ fontSize: 11, color: 'var(--text-dim)', margin: '0 0 10px 0' }}>Недельная динамика концентраций препаратов</p>
+      <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 10 }}>
+        <span style={{ fontSize: 10, color: 'var(--text-dim)', whiteSpace: 'nowrap' }}>{(pkDay / 7).toFixed(1)} нед</span>
+        <input type="range" min={0} max={83} value={pkDay} onChange={e => setPkDay(Number(e.target.value))}
+          style={{ flex: 1, accentColor: 'var(--accent)' }} />
+        <span style={{ fontSize: 10, color: 'var(--text-dim)', whiteSpace: 'nowrap' }}>{((83 - pkDay) / 7).toFixed(1)} нед ост.</span>
+      </div>
       {Object.entries(pkTimeSeries).map(([subId, concs]: [string, any]) => {
-        const maxConc = Math.max(...(concs as number[]));
+        const vals = concs as number[];
+        const maxConc = Math.max(...vals, 0.001);
+        const currentVal = vals[pkDay] || 0;
+        const startVal = vals[0] || 0;
+        const concPct = (currentVal / maxConc) * 100;
         return (
-          <div key={subId} style={{ marginBottom: 8 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, fontWeight: 600, marginBottom: 2 }}>
-              <span>{subId}</span>
-              <span style={{ color: 'var(--text-dim)', fontSize: 10 }}>Cmax: {maxConc.toFixed(2)}</span>
+          <div key={subId} style={{ marginBottom: 10, background: 'var(--bg-secondary)', padding: 8, borderRadius: 6 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+              <span style={{ fontSize: 12, fontWeight: 600 }}>{getSubstanceName(subId)}</span>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <span style={{ fontSize: 9, color: 'var(--text-dim)' }}>Нач: {startVal.toFixed(2)}</span>
+                <span style={{ fontSize: 11, fontWeight: 700, color: getRiskColor(concPct) }}>{currentVal.toFixed(2)}</span>
+                <span style={{ fontSize: 9, color: 'var(--text-dim)' }}>Cmax: {maxConc.toFixed(2)}</span>
+              </div>
             </div>
-            <div style={{ display: 'flex', gap: 1, height: 24, background: 'rgba(255,255,255,0.05)', borderRadius: 2, overflow: 'hidden' }}>
-              {(concs as number[]).slice(0, 84).map((c: number, i: number) => (
-                <div key={i} style={{ flex: 1, background: getRiskColor((c / Math.max(0.001, maxConc)) * 100), minHeight: 1 }} />
-              ))}
+            <div style={{ position: 'relative' }}>
+              <div style={{ display: 'flex', gap: 1, height: 36, borderRadius: 4, overflow: 'hidden', alignItems: 'flex-end' }}>
+                {vals.filter((_, i) => i % 2 === 0).map((c: number, i: number) => {
+                  const idx = i * 2;
+                  const isSelected = idx === pkDay || (Math.abs(idx - pkDay) <= 1);
+                  const pctHeight = Math.max(3, (c / maxConc) * 100);
+                  return (
+                    <div key={i} style={{
+                      flex: 1, background: isSelected ? '#00e68a' : getRiskColor((c / maxConc) * 100),
+                      height: `${pctHeight}%`, borderRadius: '1px 1px 0 0', minHeight: 2, opacity: isSelected ? 1 : 0.6,
+                    }} />
+                  );
+                })}
+              </div>
+              <div style={{ position: 'absolute', left: `${(pkDay / 83) * 100}%`, top: 0, bottom: 0, width: 2, background: 'var(--accent)', opacity: 0.8 }} />
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 8, color: 'var(--text-dim)' }}>
-              <span>День 0</span>
-              <span>День 84</span>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 7, color: 'var(--text-dim)', marginTop: 1 }}>
+              <span>0</span><span>2</span><span>4</span><span>6</span><span>8</span><span>10</span><span>12 нед</span>
             </div>
           </div>
         );
