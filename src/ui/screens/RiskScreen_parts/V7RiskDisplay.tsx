@@ -8,6 +8,13 @@ import { useV7Risk } from '../../hooks/useV7Risk';
 import { useDataLink } from '../../../core/data-link';
 import { getGlobalNoLabs, getNoLabsSystems } from '../LabsScreen';
 
+import { PHARMA_DB } from '../../../core/pharma-database';
+
+function getSubstanceName(id: string): string {
+  const entry = PHARMA_DB[id];
+  return entry ? entry.name : id;
+}
+
 const ORGAN_LABELS: Record<string, string> = {
   cardio: '❤️ Сердечно-сосудистая', hepatic: '🫁 Печень', renal: '💧 Почки', neuro: '🧠 Нервная система',
   endocrine: '⚖️ Эндокринная', hematologic: '🩸 Кроветворная', reproductive: '💪 Репродуктивная',
@@ -266,7 +273,7 @@ export const V7RiskDisplay: React.FC<{ result: V7RiskResult }> = ({ result }) =>
           {Object.entries(pkTimeSeries).map(([subId, concs]: [string, any]) => {
             const maxConc = Math.max(...(concs as number[]));
             return (
-              <div key={subId} style={{ marginBottom: 8 }}>
+              <div key={getSubstanceName(subId)} style={{ marginBottom: 8 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, fontWeight: 600, marginBottom: 2 }}>
                   <span>{subId}</span>
                   <span style={{ color: 'var(--text-dim)', fontSize: 10 }}>Cmax: {maxConc.toFixed(2)}</span>
@@ -489,7 +496,7 @@ export const V7RiskDisplay: React.FC<{ result: V7RiskResult }> = ({ result }) =>
         <div style={{ fontSize: 10, color: 'var(--text-dim)', textAlign: 'center', lineHeight: 1.5 }}>
           🔬 Health Engine v7.0 — PK {'>'} Hill {'>'} Signaling {'>'} 7мех {'>'} Damage/Recovery {'>'} MC {'>'} Risk<br />
           12 органов × 7 механизмов | Нейротоксичность | Межорганные связи | Стаж | Monte Carlo<br />
-          {mcResult ? '? MC: ' + (mcResult as any).meanGlobalRisk?.toFixed(1) + '% сценариев' : '? Детерминированный режим'}
+          {mcResult ? '\u{1F3AF} MC: ' + (mcResult as any).meanGlobalRisk?.toFixed(1) + '% сценариев' : '\u2699\uFE0F Детерминированный режим'}
           {pkTimeSeries && Object.keys(pkTimeSeries).length > 0 ? ' | 💉 PK: ' + Object.keys(pkTimeSeries).length + ' препаратов' : ''}
         </div>
       </div>

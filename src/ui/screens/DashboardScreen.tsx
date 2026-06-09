@@ -1,6 +1,7 @@
 ﻿import React, { useEffect, useState, useRef } from 'react';
 import { SummaryCard } from '../cards/SummaryCard';
 import { SystemCard } from '../cards/SystemCard';
+import { PHARMA_DB } from '../../core/pharma-database';
 import { registry } from '../../core/data/registry';
 
 const SYSTEM_LABELS: Record<string, string> = {
@@ -23,6 +24,11 @@ type ScreenId = 'dashboard' | 'pharma' | 'course' | 'peptides' | 'nutrition' | '
 
 interface Props {
   onNavigate?: (screen: ScreenId) => void;
+}
+
+function getSubstanceName(id: string): string {
+  const entry = PHARMA_DB[id];
+  return entry ? entry.name : id;
 }
 
 function riskColor(v: number): string {
@@ -185,7 +191,7 @@ export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
 
       {/* Readiness details */}
       <div className="card">
-        <h3>? Готовность к тренировке</h3>
+        <h3>📊 Готовность к тренировке</h3>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
           {[
             { label: 'Восстановление', value: readiness.recovery, color: readiness.recovery >= 70 ? '#22c55e' : '#eab308' },
@@ -253,7 +259,7 @@ export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
             {courseEntries.slice(0, 4).map((c, i) => (
               <span key={i} style={{ background: 'var(--accent-dim)', color: 'var(--accent)', padding: '3px 10px', borderRadius: 16, fontSize: 11, fontWeight: 600 }}>
-                {c.substanceId} {c.doseValue}{c.doseUnit}
+                {getSubstanceName(c.substanceId)} {c.doseValue}{c.doseUnit}
               </span>
             ))}
             {courseEntries.length > 4 && (

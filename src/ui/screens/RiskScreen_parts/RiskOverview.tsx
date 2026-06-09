@@ -209,7 +209,8 @@ export const RiskOverview: React.FC<{
 
       {/* Пороги */}
       <div className="card" style={{ marginBottom: 8 }}>
-        <h3 style={{ margin: '0 0 8px', fontSize: 15 }}>💊 Пороги</h3>
+        <h3 style={{ margin: '0 0 8px', fontSize: 15 }}>💊 Пороги препаратов</h3>
+        <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 6 }}>Максимальная рекомендуемая дозировка — превышение значительно увеличивает риски</div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, fontSize: 10 }}>
           {Object.entries(DRUG_THRESHOLDS).slice(0, 6).map(([id, thresh]) => (
             <div key={id} style={{ background: 'var(--bg-secondary)', padding: '4px 8px', borderRadius: 4 }}>
