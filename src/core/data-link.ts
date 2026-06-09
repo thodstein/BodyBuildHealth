@@ -206,7 +206,13 @@ export function useDataLink(): LinkedData {
         drugDoses: Object.fromEntries(Object.entries(activeDrugs).map(([k, v]) => [k, v.dosePerWeek])),
       });
       const coverage: Record<string, number> = {};
-      if (result.systemSupport) Object.entries(result.systemSupport).forEach(([k, v]) => { coverage[k] = v; });
+      if (result.systemSupport) {
+        Object.entries(result.systemSupport).forEach(([k, v]) => {
+          // Also distribute to mechanism-level keys for risk.engine.ts lookup
+          coverage[k] = v / 100; // system-level (0-1)
+          for (let m = 1; m <= 9; m++) coverage[`${k}_${m}`] = v / 100; // mechanism-level
+        });
+      }
       return { ...riskResult, coverageMap: coverage } as RiskCalculationResult;
     } catch { return null; }
   })();

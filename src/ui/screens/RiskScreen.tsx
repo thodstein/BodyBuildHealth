@@ -15,8 +15,10 @@ import { RiskDetails } from './RiskScreen_parts/RiskDetails';
 import { V7RiskDisplay } from './RiskScreen_parts/V7RiskDisplay';
 import { WeeklyRiskChart } from './RiskScreen_parts/WeeklyRiskChart';
 import { RiskInfo } from './RiskScreen_parts/RiskInfo';
+import { Risk3DModel } from './RiskScreen_parts/Risk3DModel';
 import { calculateWeeklyRiskDynamics, type WeeklyRiskDynamics } from '../../engines/weekly-risk-dynamics.engine';
 import { useV7Risk } from '../hooks/useV7Risk';
+import { getProfile, updateProfile } from '../../core/profile-manager';
 
 const RISK_HISTORY_KEY = 'risk_history';
 const MAX_HISTORY = 12;
@@ -34,16 +36,30 @@ const TAB_LABELS: Record<string, string> = {
   dynamics: '📈 Динамика',
   mechanisms: '⚙️ Механизмы',
   v7: '🔬 Симуляция',
+  model: '🧍 3D Модель',
   info: 'ℹ️ Инфо',
 };
 
 export const RiskScreen: React.FC = () => {
   const linked = useDataLink();
-  const [tab, setTab] = useState<'overview' | 'dynamics' | 'mechanisms' | 'v7' | 'info'>('overview');
+  const [tab, setTab] = useState<'overview' | 'dynamics' | 'mechanisms' | 'v7' | 'model' | 'info'>('overview');
   const [tick, setTick] = useState(0);
   const [selectedWeek, setSelectedWeek] = useState<number | null>(null);
   const [weekMode, setWeekMode] = useState<'week' | 'average'>('average');
+  const [organWeek, setOrganWeek] = useState(0);
   const { v7Result, legacyResult: v7Legacy } = useV7Risk();
+
+  // MC toggle at RiskScreen level
+  const [mcEnabled, setMcEnabled] = useState(() => {
+    try { return (getProfile().settings.mcRuns ?? 0) > 0; } catch { return false; }
+  });
+  const toggleMC = () => {
+    const next = !mcEnabled;
+    setMcEnabled(next);
+    const p = getProfile();
+    p.settings.mcRuns = next ? 50 : 0;
+    updateProfile(p);
+  };
 
   // Calculate weekly risk dynamics from course
   const weeklyDynamics = useMemo<WeeklyRiskDynamics | null>(() => {
@@ -266,6 +282,7 @@ export const RiskScreen: React.FC = () => {
       case 'overview': return <RiskOverview riskResult={riskResult} globalNoLabs={globalNoLabs} noLabsSystems={noLabsSystems} labRiskContributions={effectiveLabContrib} riskHistory={riskHistory} aggregatedRisk={aggregatedRisk} weeklyDynamics={weeklyDynamics} />;
       case 'mechanisms': return <RiskDetails riskResult={riskResult} labRiskContributions={effectiveLabContrib} isSyntheticLab={isSyntheticLab} />;
       case 'v7': return v7Result ? <V7RiskDisplay result={v7Result} /> : <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-dim)' }}>Загрузка V7...</div>;
+      case 'model': return v7Result ? <Risk3DModel result={v7Result} mcEnabled={mcEnabled} onToggleMC={toggleMC} organWeek={organWeek} onWeekChange={setOrganWeek} /> : <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-dim)' }}>Загрузка V7...</div>;
       case 'dynamics': return <WeeklyRiskChart dynamics={weeklyDynamics} selectedWeek={selectedWeek} onWeekSelect={setSelectedWeek} mode={weekMode} onModeChange={setWeekMode} />;
       case 'info': return <RiskInfo />;
       default: return <RiskOverview riskResult={riskResult} globalNoLabs={globalNoLabs} noLabsSystems={noLabsSystems} labRiskContributions={labRiskContributions} riskHistory={riskHistory} aggregatedRisk={aggregatedRisk} />;
@@ -276,7 +293,7 @@ export const RiskScreen: React.FC = () => {
     <div className="screen risk">
       <h2 style={{ margin: '0 0 6px', fontSize: 'clamp(16, 4.5vw, 18)' }}>⚠️ Риски</h2>
       <div className="tab-bar" style={{ gap: 2, overflowX: "auto", WebkitOverflowScrolling: "touch", scrollbarWidth: "none" }}>
-        {(['overview', 'dynamics', 'mechanisms', 'v7', 'info'] as const).map(t => (
+        {(['overview', 'dynamics', 'mechanisms', 'v7', 'model', 'info'] as const).map(t => (
           <button key={t} className={`tab-btn ${tab === t ? 'active' : ''}`} onClick={() => setTab(t)}>
             {TAB_LABELS[t]}
           </button>

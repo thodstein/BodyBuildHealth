@@ -70,7 +70,9 @@ export function useV7Risk(): { v7Result: V7RiskResult | null; legacyResult: Risk
       smoke: settings.smoke ?? false,
       forceNoLabs: globalNoLabs,
       noLabSystems,
-      supportIds: Object.keys(linked.supportCoverage || {}),
+      // supportIds must be actual supplement IDs matching SUPPORT_REDUCTIONS keys in V7 matrix,
+      // NOT system names from supportCoverage. Use profile's currentSupplements.
+      supportIds: (settings.currentSupplements || []).map(s => s.id).filter(Boolean),
       mcRuns: settings.mcRuns ?? 0,
     };
 

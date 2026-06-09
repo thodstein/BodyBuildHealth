@@ -517,18 +517,12 @@ function calculateSupportScore(
   substances: SubstanceEntry[],
   substanceIds: string[]
 ): { score: number; systemSupport: Record<string, number>; organSupport: Record<string, number> } {
-  let lifestyleSupport = 0;
-
-  if (input.nutritionFactor !== undefined) {
-    lifestyleSupport += input.nutritionFactor * 20;
-  }
-  if (input.trainingFactor !== undefined) {
-    lifestyleSupport += input.trainingFactor * 15;
-  }
-
   const coverage = calculateSupportCoverage(substances, substanceIds, input.supportDoses);
+  // Lifestyle factors (nutrition, training) are already priced into base risk.
+  // Only actual supplement coverage reduces risk — lifestyleSupport removed to avoid
+  // auto-reducing risk by ~27% when user has selected NO support items.
 
-  const totalScore = Math.min(100, Math.max(0, lifestyleSupport + coverage.totalSupport));
+  const totalScore = Math.min(100, Math.max(0, coverage.totalSupport));
 
   return { score: totalScore, systemSupport: coverage.systemSupport, organSupport: coverage.organSupport };
 }
