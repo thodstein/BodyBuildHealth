@@ -33,14 +33,14 @@ export const RiskInfo: React.FC = () => {
           <div style={{ marginTop: 8, fontSize: 11, lineHeight: 1.6 }}>
             <div style={{ background: 'var(--bg-secondary)', padding: 10, borderRadius: 8, fontFamily: 'monospace', fontSize: 11, overflowX: 'auto', whiteSpace: 'pre-wrap', marginBottom: 8 }}>
 {`Raw(system, mech) = max(7, min(100,
-  (1 - ∏ drugs(1 - baseRisk ? doseRatio ? G ? N ? T ? MRR ? HGI ? RIR)) ? 100
+  (1 - ∏(1 - baseRisk × doseRatio × G × N × T × MRR × HGI × RIR)) × 100
   + pdFactor × 15
 ))
 
-Net(system, mech) = Raw ? (1 - coverage)
+Net(system, mech) = Raw × (1 - coverage)
 
-OverallRaw = geom(allSystems) ? overallMRR ? overallHGI ? (2 - overallRIR)
-OverallNet  = geom(allSystems) ? overallMRR ? overallHGI ? (2 - overallRIR)`}
+OverallRaw = geom(allSystems) × overallMRR × overallHGI × (2 - overallRIR)
+OverallNet  = geom(allSystems) × overallMRR × overallHGI × (2 - overallRIR)`}
             </div>
             <p style={{ margin: '0 0 4px' }}><strong>baseRisk</strong> = {BASE_RISK} — константа базового риска</p>
             <p style={{ margin: '0 0 4px' }}><strong>∏ drugs</strong> — произведение по всем активным препаратам (модель «независимого риска»)</p>
@@ -67,10 +67,10 @@ if drug has threshold:
 if drug has no threshold but has mechWeight:
   doseRatio = min(1.5, dosePerWeek / 300)
 
-mechContribution = max(0, baseRisk ? doseRatio ? G ? N ? T ? MRR ? HGI ? RIR ? (1 + mechWeight ? 3))
+mechContribution = max(0, baseRisk × doseRatio × G × N × T × MRR × HGI × RIR × (1 + mechWeight × 3))
 
 if mechContribution > 0.005:
-  prod *= (1 - min(0.99, baseRisk ? doseRatio ? G ? N ? T ? MRR ? HGI ? RIR))`}
+  prod *= (1 - min(0.99, baseRisk × doseRatio × G × N × T × MRR × HGI × RIR))`}
             </div>
             <p style={{ margin: '0 0 4px' }}><strong>thresholdDose</strong> — пороговая доза из DRUG_THRESHOLDS (мг/нед)</p>
             <p style={{ margin: '0 0 4px' }}><strong>Степень 1.2</strong> — нелинейная зависимость «доза-риск» (суперлинейная)</p>
@@ -119,9 +119,9 @@ if mechContribution > 0.005:
             </div>
 
             <div style={{ marginBottom: 12 }}>
-              <strong style={{ color: '#3b82f6' }}>MRR — Medical Risk Ratio</strong>
+                <strong style={{ color: '#3b82f6' }}>MRR — Medical Risk Ratio</strong>
               <div style={{ background: 'var(--bg-secondary)', padding: 8, borderRadius: 6, marginTop: 4, fontFamily: 'monospace', fontSize: 10 }}>
-                MRR(system) = 1 + deviation ? 2<br/>
+                MRR(system) = 1 + deviation × 2<br/>
                 deviation = |value - optimal| / optimal<br/>
                 Если значение в норме: MRR = 1.0<br/>
                 Если отклонение 50%: MRR = 2.0<br/><br/>
@@ -160,7 +160,7 @@ if mechContribution > 0.005:
         {expanded === 'pd' && (
           <div style={{ marginTop: 8, fontSize: 11, lineHeight: 1.6 }}>
             <div style={{ background: 'var(--bg-secondary)', padding: 10, borderRadius: 8, fontFamily: 'monospace', fontSize: 11, marginBottom: 8 }}>
-{`pdFactor = ? |PD_value| ? weight ? (dose / EC50)`}
+{`pdFactor = \u03a3 |PD_value| \u00d7 weight \u00d7 (dose / EC50)`}
             </div>
             <p style={{ margin: '0 0 4px' }}><strong>PD_value</strong> — значение фармакодинамического параметра препарата (от -1 до +4)</p>
             <p style={{ margin: '0 0 4px' }}><strong>weight</strong> — вес связи PD-параметра с системой (0–1)</p>
@@ -218,9 +218,9 @@ if mechContribution > 0.005:
         {expanded === 'coverage' && (
           <div style={{ marginTop: 8, fontSize: 11, lineHeight: 1.6 }}>
             <div style={{ background: 'var(--bg-secondary)', padding: 10, borderRadius: 8, fontFamily: 'monospace', fontSize: 11, marginBottom: 8 }}>
-{`Net = Raw ? (1 - coverage)
+{`Net = Raw \u00d7 (1 - coverage)
 
-coverage(cell) = ? supportSubstances(cellCov)
+coverage(cell) = \u03a3 supportSubstances(cellCov)
 
 Пример: telmisartan покрывает:
   cardio_2 (АГ): 55%
@@ -322,16 +322,16 @@ OverallNet = min(100, overallNet ? totalMultiplier)`}
             <div style={{ background: 'var(--bg-secondary)', padding: 10, borderRadius: 8, fontFamily: 'monospace', fontSize: 11, marginBottom: 8 }}>
 {`systemRisk = geom(allMechanisms) // Геометрическое среднее по 7-9 специфичным механизмам
 
-overallRisk = geom(allSystems) ? overallMRR ? overallHGI ? (2 - overallRIR)
+overallRisk = geom(allSystems) \u00d7 overallMRR \u00d7 overallHGI \u00d7 (2 - overallRIR)
 
-geom(arr) = exp(avg(ln(arr))) ? 100
+geom(arr) = exp(avg(ln(arr))) \u00d7 100
 
 Взвешенная агрегация (из всех источников):
   pharma: 35%  labs: 25%
   training: 20%  nutrition: 15%
   diagnostics: 5%
 
-net = ?(sourceRaw ? weight / totalWeight)`}
+net = \u03a3(sourceRaw \u00d7 weight / totalWeight)`}
             </div>
             <p style={{ margin: '0 0 4px' }}><strong>Геометрическое среднее</strong> — чувствительно к высоким значениям: если хоть один механизм даёт 80%, общий не будет ниже ~60%</p>
             <p style={{ margin: '0 0 4px' }}><strong>Множитель (2 - RIR)</strong> — при максимальной защите RIR=1.0, множитель = 1.0 (без изменения). При отсутствии защиты RIR=0.5, множитель = 1.5 (повышение риска)</p>
@@ -391,11 +391,11 @@ net = ?(sourceRaw ? weight / totalWeight)`}
           <div style={{ marginTop: 8, fontSize: 11 }}>
             <p style={{ margin: '0 0 8px', color: 'var(--text-dim)' }}>Каждая система органов имеет 7–8 специфичных механизмов повреждения, которые рассчитываются независимо и затем агрегируются.</p>
             <div style={{ background: 'var(--bg-secondary)', padding: 10, borderRadius: 8, fontFamily: 'monospace', fontSize: 10, marginBottom: 8, overflowX: 'auto', whiteSpace: 'pre-wrap' }}>
-{`specificRisk(sys, mech) = max(0, baseRisk ? doseRatio ? G ? N ? T ? (1 + mechWeight ? 3))
+{`specificRisk(sys, mech) = max(0, baseRisk \u00d7 doseRatio \u00d7 G \u00d7 N \u00d7 T \u00d7 (1 + mechWeight \u00d7 3))
 
 systemRisk(sys) = geom(allSpecificMechs(sys))
 
-overallRisk = geom(allSystems) ? overallMRR ? overallHGI ? (2 - overallRIR)`}
+overallRisk = geom(allSystems) \u00d7 overallMRR \u00d7 overallHGI \u00d7 (2 - overallRIR)`}
             </div>
             <p style={{ margin: '0 0 6px', color: 'var(--text-dim)', fontSize: 10 }}>Механизмы привязаны к препаратам и маркерам анализов:</p>
             {ALL_RISK_SYSTEMS.map(sys => {

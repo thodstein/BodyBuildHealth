@@ -50,16 +50,44 @@ export const RiskOverview: React.FC<{
     }).slice(0, 8);
   }, [riskResult.systemBreakdown]);
 
-  // Get recommendations for top-risk systems, deduplicated
+  // Get recommendations matching actual risk levels for each system
   const relevantRecs = React.useMemo(() => {
-    const seenSystems = new Set<string>();
-    return RECOMMENDATIONS_DB.filter(rec => {
-      const mappedSystem = mapRiskSystem(rec.riskId.split('_')[0].toLowerCase());
-      if (seenSystems.has(mappedSystem) && rec.type === 'RISK') return false;
-      seenSystems.add(mappedSystem);
+    const riskLevel = (net: number): string => {
+      if (net >= 70) return 'HIGH';
+      if (net >= 40) return 'MEDIUM';
+      if (net >= 20) return 'LOW';
+      return 'NONE';
+    };
+
+    const systemMapped: Record<string, string> = {};
+    for (const [sys, bd] of Object.entries(riskResult.systemBreakdown)) {
+      if (!bd || bd.net <= 20) continue;
+      const level = riskLevel(bd.net);
+      let found = false;
+      for (const rec of RECOMMENDATIONS_DB) {
+        if (found) break;
+        if (rec.type !== 'RISK') continue;
+        const mappedSystem = mapRiskSystem(rec.riskId.split('_')[0].toLowerCase());
+        if (mappedSystem === sys && rec.level === level) {
+          if (!systemMapped[sys]) systemMapped[sys] = rec.recId;
+          found = true;
+        }
+      }
+      if (!found) {
+        const fallbacks = RECOMMENDATIONS_DB.filter(r =>
+          r.type === 'RISK' && mapRiskSystem(r.riskId.split('_')[0].toLowerCase()) === sys
+        );
+        if (fallbacks.length > 0) systemMapped[sys] = fallbacks[fallbacks.length - 1].recId;
+      }
+    }
+    const matchingRecs = RECOMMENDATIONS_DB.filter(r => Object.values(systemMapped).includes(r.recId));
+    const seenTypes = new Set<string>();
+    return matchingRecs.filter(r => {
+      if (seenTypes.has(r.riskId)) return false;
+      seenTypes.add(r.riskId);
       return true;
     }).slice(0, 6);
-  }, []);
+  }, [riskResult.systemBreakdown]);
 
   const anyNoLabs = globalNoLabs || noLabsSystems.length > 0;
 

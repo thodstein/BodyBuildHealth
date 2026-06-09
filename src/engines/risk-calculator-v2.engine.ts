@@ -195,8 +195,8 @@ export function calculateRiskFromAnalyses(arg1: RiskResult | LabPoint[], labs?: 
     };
 
     return {
-      overallRaw: Math.min(100, Math.max(0, geom(rawValues) * 1.05)), // slight penalty for lab contribution
-      overallNet: Math.min(100, Math.max(0, geom(netValues) * 1.05)),
+      overallRaw: Math.min(100, Math.max(0, geom(rawValues))),
+      overallNet: Math.min(100, Math.max(0, geom(netValues))),
       systemBreakdown,
       mechanismBreakdown: riskResult.mechanismBreakdown,
       mechanismDetail: riskResult.mechanismDetail
