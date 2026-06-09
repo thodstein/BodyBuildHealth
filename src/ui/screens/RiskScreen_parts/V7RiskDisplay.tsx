@@ -1,12 +1,12 @@
 ﻿import React, { useState, useMemo } from 'react';
-import { SYSTEM_NAMES_RU, MECHANISM_NAMES } from '../../../engines/risk-engine-v7-matrix';
+import { SYSTEM_NAMES_RU } from '../../../engines/risk-engine-v7-matrix';
 import type { V7RiskResult } from '../../../engines/risk-engine-v7';
 import { sensitivityAnalysis } from '../../../engines/risk-engine-v7-core';
 import { runV7Simulation, type V7RiskInput } from '../../../engines/risk-engine-v7';
 import { getRiskColor } from '../../../core/utils/risk-colors';
-import { useV7Risk } from '../../hooks/useV7Risk';
 import { useDataLink } from '../../../core/data-link';
 import { getGlobalNoLabs, getNoLabsSystems } from '../LabsScreen';
+import { SYSTEM_MECHANISMS } from '../../../core/system-mechanisms';
 
 import { PHARMA_DB } from '../../../core/pharma-database';
 
@@ -24,57 +24,21 @@ const ORGAN_LABELS: Record<string, string> = {
 
 
 
-const ORGAN_DETAIL: Record<string, Record<number, string>> = {
-  cardio: { 1: 'Дислипидемия', 2: 'Артериальная гипертензия', 3: 'Гипертрофия ЛЖ', 4: 'Тромбогенный потенциал', 5: 'Оксилительный стресс миокарда', 6: 'Эндотелиальная дисфункция', 7: 'Аритмогенность', 8: 'Фиброз миокарда' },
-  hepatic: { 1: 'Холестаз', 2: 'Цитолиз гепатоцитов', 3: 'Стеатоз', 4: 'Фиброз', 5: 'Опухолевый риск', 6: 'Оксидативный стресс', 7: 'Иммунное повреждение', 8: 'Нагрузка CYP450' },
-  renal: { 1: 'Гломерулярная гипертензия', 2: 'Тубулоинтерстициальный некроз', 3: 'Протеинурия', 4: 'Электролитный дисбаланс', 5: 'Оксалатное повреждение', 6: 'Нефролитиаз', 7: 'Метаболическое повреждение' },
-  neuro: { 1: 'Нейровоспаление', 2: 'Оксидативный стресс', 3: 'Демиелинизация', 4: 'Нейротоксичность препаратов', 5: 'Ахондроплазия гипофиза', 6: 'Периферическая нейропатия', 7: 'Сосудистые нарушения' },
-  endocrine: { 1: 'Подавление ГГЯ', 2: 'Ароматизация', 3: 'Пролактиновый всплеск', 4: 'Инсулинорезистентность', 5: 'Дисфункция щитовидной', 6: 'Дисбаланс кортизола', 7: 'Десенситизация рецепторов' },
-  hematologic: { 1: 'Эритроцитоз', 2: 'Лейкоцитоз', 3: 'Тромбоцитоз', 4: 'Коагуляция', 5: 'Иммунная дисфункция', 6: 'Диссеминированное свёртывание', 7: 'Гемолиз' },
-  reproductive: { 1: 'Атрофия яичек', 2: 'Олигоспермия', 3: 'Морфология спермы', 4: 'Подвижность спермы', 5: 'ДГПЖ', 6: 'Риск онкологии', 7: 'Эректильная дисф.' },
-  musculoskeletal: { 1: 'Суставной хрящ', 2: 'Связочный аппарат', 3: 'Сухожильные дегенерации', 4: 'Костная плотность', 5: 'Мышечный дисбаланс', 6: 'Воспаление и боль', 7: 'Регенерация и заживление' },
-  metabolic: { 1: 'Инсулинорезистентность', 2: 'Дислипидемия', 3: 'Гипергликемия', 4: 'Ожирение висцеральное', 5: 'Подагра', 6: 'Метаболический синдром', 7: 'Оксидативный стресс' },
-  ghigf: { 1: 'IGF-1 избыток', 2: 'Задержка Na/H2O', 3: 'Гипертрофия органов', 4: 'Почечная нагрузка', 5: 'Печёночная нагрузка', 6: 'Связки и сухожилия', 7: 'Гипергликемия' },
-  ins_axis: { 1: 'Инсулинорезистентность', 2: 'Гипогликемия' },
-  neuro_toxicity: { 1: 'Дофаминовая дисрегуляция', 2: 'Глутаматная эксайтотоксичность', 3: 'ГАМК-дисрегуляция', 4: 'Нейровоспаление', 5: 'Оксидативный стресс', 6: 'Нарушение ГЭБ', 7: 'Серотониновый дисбаланс' },
-  blood: { 1: 'Эритроцитоз', 2: 'Полицитемия', 3: 'Гиперкоагуляция', 4: 'Нарушение реологии', 5: 'Железодефицитная анемия', 6: 'Гемолиз', 7: 'Фибринолиз / ДВС' },
-  vessels: { 1: 'Эндотелиальная дисфункция', 2: 'Вазоконстрикция', 3: 'Атеросклероз', 4: 'Пролиферация интимы', 5: 'Воспаление сосудистой стенки', 6: 'Микроангиопатия', 7: 'Аневризма / расслоение' },
+const V7_TO_SM: Record<string, string> = {
+  cardio: 'cardio', hepatic: 'hepatic', renal: 'renal', neuro: 'neuro',
+  endocrine: 'endocrine', hematologic: 'hematologic', reproductive: 'reproductive',
+  musculoskeletal: 'musculoskeletal', metabolic: 'metabolic', ghigf: 'ghigf',
+  ins_axis: 'ins_axis', neuro_toxicity: 'neuro_toxicity', blood: 'blood', vessels: 'vessels',
 };
 
-// Mapping from V7 organ keys to RISK_SYSTEMS keys (for unified display)
-const V7_TO_RISK_SYSTEM: Record<string, string> = {
-  heart: 'cardio',
-  liver: 'hepatic',
-  kidney: 'renal',
-  vessels: 'vessels',
-  blood: 'blood',
-  endocrine: 'endocrine',
-  metabolic: 'metabolic',
-  ghigf: 'ghigf',
-  ins_axis: 'ins_axis',
-  musculoskeletal: 'musculoskeletal',
-  neuro_toxicity: 'neuro_toxicity',
-  reproductive: 'reproductive',
-};
-
-const RISK_TO_V7: Record<string, string> = {
-  cardio: 'heart',
-  hepatic: 'liver',
-  renal: 'kidney',
-  neuro: 'neuro_toxicity',
-  hematologic: 'blood',
-  endocrine: 'endocrine',
-  reproductive: 'reproductive',
-  musculoskeletal: 'musculoskeletal',
-  metabolic: 'metabolic',
-  ghigf: 'ghigf',
-  ins_axis: 'ins_axis',
-  neuro_toxicity: 'neuro_toxicity',
-  blood: 'blood',
-  vessels: 'vessels',
-};
-
-
+function getMechName(sysKey: string, mechIdx: number): string {
+  const smKey = V7_TO_SM[sysKey];
+  if (!smKey) return `М${mechIdx}`;
+  const mechs = SYSTEM_MECHANISMS[smKey];
+  if (!mechs) return `М${mechIdx}`;
+  const found = mechs.find(m => m.num === mechIdx);
+  return found?.label || `М${mechIdx}`;
+}
 
 
 const SENSITIVITY_LABELS: Record<string, string> = {
@@ -97,7 +61,7 @@ type V7Tab = 'organs' | 'matrix' | 'timeseries' | 'sensitivity' | 'pk';
 export const V7RiskDisplay: React.FC<{ result: V7RiskResult }> = ({ result }) => {
   const [expandedOrgan, setExpandedOrgan] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<V7Tab>('organs');
-  // V7 risk data is passed via props
+  const [selectedDay, setSelectedDay] = useState<number>(42);
   const linked = useDataLink();
 
   const { matrix, organSummary, globalRiskRaw, globalRiskNet, globalPEvent, dataQuality, organs, mcResult, pkTimeSeries } = result;
@@ -224,18 +188,18 @@ export const V7RiskDisplay: React.FC<{ result: V7RiskResult }> = ({ result }) =>
               </div>
               {isExpanded && sysData.mechanisms && sysData.mechanisms.length > 0 && (
                 <div style={{ marginTop: 6, borderTop: '1px solid var(--border)', paddingTop: 6 }}>
-                  {(ORGAN_DETAIL[sysKey] ? Object.entries(ORGAN_DETAIL[sysKey]).map(([idx, name]) => ({ name, idx: Number(idx) })) : []).map((mech) => {
-                    const mechData = sysData.mechanisms[mech.idx];
-                    if (!mechData) return null;
+                  {Object.entries(sysData.mechanisms).map(([idx, mechData]: [string, any]) => {
+                    const mechIdx = Number(idx);
+                    const mechName = getMechName(sysKey, mechIdx);
                     const netVal = Math.round((mechData.P_net ?? mechData.p5 ?? 0) * 100);
                     const rawVal = Math.round((mechData.P_raw ?? mechData.raw ?? 0) * 100);
                     return (
-                      <div key={mech.idx} style={{ marginBottom: 4 }}>
+                      <div key={mechIdx} style={{ marginBottom: 4 }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10 }}>
-                          <span style={{ color: 'var(--text-dim)' }}>{mech.name}</span>
+                          <span style={{ color: 'var(--text-dim)' }}>{mechIdx}. {mechName}</span>
                           <div style={{ display: 'flex', gap: 4 }}>
-                            <span style={{ color: getRiskColor(rawVal) }} title="Raw">{rawVal}%</span>
-                            <span style={{ color: getRiskColor(netVal) }} title="Net">{netVal}%</span>
+                            <span style={{ color: getRiskColor(rawVal) }} title="База">{rawVal}%</span>
+                            <span style={{ color: getRiskColor(netVal) }} title="Нетто">{netVal}%</span>
                             {mechData.geneticMult > 1.05 && <span style={{ fontSize: 8, color: '#eab308' }}>🧬{mechData.geneticMult.toFixed(2)}</span>}
                           </div>
                         </div>
@@ -312,8 +276,7 @@ export const V7RiskDisplay: React.FC<{ result: V7RiskResult }> = ({ result }) =>
             </div>
             {Object.entries(sysData.mechanisms).map(([mechStr, mech]: [string, any]) => {
               const mechIdx = Number(mechStr);
-              const mechNames = MECHANISM_NAMES[sysKey];
-              const mechName = mechNames ? mechNames[mechIdx] : ('М' + mechIdx);
+              const mechName = getMechName(sysKey, mechIdx);
               const netVal = Math.round(mech.P_net * 100);
               return (
                 <div key={mechStr} style={{ marginBottom: 2 }}>
@@ -339,33 +302,66 @@ export const V7RiskDisplay: React.FC<{ result: V7RiskResult }> = ({ result }) =>
   const renderTimeSeries = () => {
     if (!timeSeriesData) return <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-dim)' }}>Нет данных PK для временного ряда</div>;
     const { days, organDaily } = timeSeriesData;
+    const maxDay = days.length - 1;
 
     return (
       <div>
         <div className="card" style={{ marginBottom: 12 }}>
-          <h3 style={{ margin: '0 0 10px 0' }}>📈 Временной ряд: Эволюция рисков (84 дня)</h3>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+            <h3 style={{ margin: '0 0 0 0' }}>📈 Эволюция рисков (84 дня)</h3>
+            <span style={{ fontSize: 13, fontWeight: 700, background: 'var(--bg-secondary)', padding: '4px 10px', borderRadius: 6 }}>
+              День {selectedDay} / {maxDay}
+            </span>
+          </div>
           <p style={{ fontSize: 11, color: 'var(--text-dim)', margin: '0 0 10px 0' }}>
             Динамика рисков по органным системам на основе PK-моделирования
           </p>
+          <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 8 }}>
+            <span style={{ fontSize: 10, color: 'var(--text-dim)', whiteSpace: 'nowrap' }}>{(selectedDay / 7).toFixed(1)} нед</span>
+            <input type="range" min={0} max={maxDay} value={selectedDay} onChange={e => setSelectedDay(Number(e.target.value))}
+              style={{ flex: 1, accentColor: 'var(--accent)' }} />
+            <span style={{ fontSize: 10, color: 'var(--text-dim)', whiteSpace: 'nowrap' }}>{((maxDay - selectedDay) / 7).toFixed(1)} нед</span>
+          </div>
         </div>
 
         {Object.entries(organDaily).map(([organKey, values]: [string, any]) => {
           const label = ORGAN_LABELS[organKey] || organKey;
           const maxVal = Math.max(...values);
-          const lastVal = values[values.length - 1] || 0;
+          const valAtDay = values[selectedDay] || 0;
+          const valAtStart = values[0] || 0;
+          const valAtEnd = values[values.length - 1] || 0;
+          const delta = valAtDay - valAtStart;
+          const deltaStr = delta > 0 ? `+${(delta * 100).toFixed(1)}%` : `${(delta * 100).toFixed(1)}%`;
+          const deltaColor = delta > 0 ? '#ef4444' : delta < 0 ? '#22c55e' : 'var(--text-dim)';
+
           return (
-            <div key={organKey} className="card" style={{ marginBottom: 8 }}>
+            <div key={organKey} className="card" style={{ marginBottom: 6, padding: 10 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                <span style={{ fontSize: 12, fontWeight: 600 }}>{label}</span>
-                <span style={{ fontSize: 12, fontWeight: 700, color: getRiskColor(lastVal * 100) }}>{(lastVal * 100).toFixed(1)}%</span>
+                <span style={{ fontSize: 11, fontWeight: 600 }}>{label}</span>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <span style={{ fontSize: 9, color: 'var(--text-dim)' }}>{(valAtStart * 100).toFixed(1)}%</span>
+                  <span style={{ fontSize: 14, fontWeight: 700, color: getRiskColor(valAtDay * 100) }}>{(valAtDay * 100).toFixed(1)}%</span>
+                  <span style={{ fontSize: 9, color: deltaColor, fontWeight: 600 }}>{deltaStr}</span>
+                  <span style={{ fontSize: 9, color: 'var(--text-dim)' }}>{(valAtEnd * 100).toFixed(1)}%</span>
+                </div>
               </div>
-              <div style={{ display: 'flex', gap: 1, height: 30, background: 'rgba(255,255,255,0.03)', borderRadius: 3, overflow: 'hidden', alignItems: 'flex-end' }}>
-                {values.filter((_: any, i: number) => i % 3 === 0).map((v: number, i: number) => (
-                  <div key={i} style={{ flex: 1, background: getRiskColor(v * 100), height: `${Math.max(3, v / Math.max(0.01, maxVal) * 100)}%`, borderRadius: '1px 1px 0 0', minHeight: 2 }} />
-                ))}
+              <div style={{ position: 'relative' }}>
+                <div style={{ display: 'flex', gap: 1, height: 32, background: 'rgba(255,255,255,0.03)', borderRadius: 3, overflow: 'hidden', alignItems: 'flex-end' }}>
+                  {values.filter((_: any, i: number) => i % 3 === 0).map((v: number, i: number) => {
+                    const isSelected = Math.round(i * 3) === selectedDay || (i > 0 && Math.round((i - 1) * 3) < selectedDay && Math.round((i + 1) * 3) >= selectedDay);
+                    return (
+                      <div key={i} style={{
+                        flex: 1, background: isSelected ? 'var(--accent)' : getRiskColor(v * 100),
+                        height: `${Math.max(3, v / Math.max(0.01, maxVal) * 100)}%`,
+                        borderRadius: '1px 1px 0 0', minHeight: 2, opacity: isSelected ? 1 : 0.7,
+                      }} />
+                    );
+                  })}
+                </div>
+                <div style={{ position: 'absolute', left: `${(selectedDay / maxDay) * 100}%`, top: 0, bottom: 0, width: 2, background: 'var(--accent)', opacity: 0.8 }} />
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 8, color: 'var(--text-dim)', marginTop: 2 }}>
-                <span>День 0</span><span>День 42</span><span>День 84</span>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 7, color: 'var(--text-dim)', marginTop: 1 }}>
+                <span>0</span><span>2 нед</span><span>4 нед</span><span>6 нед</span><span>8 нед</span><span>10 нед</span><span>12 нед</span>
               </div>
             </div>
           );
@@ -406,7 +402,7 @@ export const V7RiskDisplay: React.FC<{ result: V7RiskResult }> = ({ result }) =>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>Базовое: {typeof result.baseValue === 'number' ? result.baseValue.toFixed(2) : result.baseValue}</span>
-                  <span style={{ fontSize: 11, fontWeight: 700, color: elasticityColor }}>? = {result.elasticity.toFixed(3)}</span>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: elasticityColor }}>&epsilon; = {result.elasticity.toFixed(3)}</span>
                   <span style={{ fontSize: 9, padding: '2px 6px', borderRadius: 4, background: `${elasticityColor}22`, color: elasticityColor, fontWeight: 600 }}>{elasticityLevel}</span>
                 </div>
               </div>
