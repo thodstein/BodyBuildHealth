@@ -37,6 +37,23 @@ export default function App() {
 
   useEffect(() => { registry.init().then(() => setInitialized(true)); }, []);
 
+  // Telegram Mini App viewport and theme
+  useEffect(() => {
+    const tg = (window as any).Telegram?.WebApp;
+    if (tg) {
+      tg.expand();
+      tg.enableClosingConfirmation();
+      // Set CSS variable for TG viewport
+      document.documentElement.style.setProperty('--tg-safe-top', (tg.safeAreaInsetTop || 0) + 'px');
+      document.documentElement.style.setProperty('--tg-safe-bottom', (tg.safeAreaInsetBottom || 0) + 'px');
+      // Apply TG theme if dark
+      if (tg.colorScheme === 'dark') {
+        document.documentElement.style.setProperty('--tg-bg', tg.themeParams.bg_color || '#050508');
+        document.documentElement.style.setProperty('--tg-text', tg.themeParams.text_color || '#e8e8f0');
+      }
+    }
+  }, []);
+
   // Telegram back button integration
   useEffect(() => {
     const tg = (window as any).Telegram?.WebApp;

@@ -1521,3 +1521,90 @@ input[type="text"], input[type="number"], input[type="date"], select, textarea {
     grid-template-columns: 1fr !important;
   }
 }
+
+/* === Additional Mobile Optimizations === */
+@media (max-width: 480px) {
+  /* Nutrition charts mobile */
+  .nutrition-charts .card { padding: 10px !important; }
+  .nutrition-charts h3 { font-size: 14px !important; }
+  .nutrition-charts button { font-size: 10px !important; padding: 3px 8px !important; }
+
+  /* V7 Risk Display mobile */
+  .risk-v7-organs-grid { grid-template-columns: 1fr 1fr !important; gap: 6px !important; }
+  .risk-v7-matrix-grid { grid-template-columns: 1fr !important; }
+  .risk-v7-sensitivity-grid { grid-template-columns: 1fr !important; }
+  .risk-v7-pk-bar { height: 16px !important; }
+
+  /* Dashboard mobile optimization */
+  .screen h2 { font-size: 18px !important; }
+  .dashboard-stats { grid-template-columns: 1fr 1fr !important; }
+  .dashboard-nav-grid { grid-template-columns: 1fr 1fr !important; gap: 6px !important; }
+  .dashboard-nav-card { padding: 8px !important; }
+
+  /* Labs screen mobile */
+  .labs-grid { grid-template-columns: 1fr !important; }
+  .labs-phase-selector { flex-wrap: wrap !important; gap: 4px !important; }
+  .labs-phase-btn { font-size: 10px !important; padding: 4px 8px !important; }
+
+  /* Pharma screen mobile */
+  .pharma-class-filters { flex-wrap: wrap !important; gap: 3px !important; }
+  .pharma-class-filters button { font-size: 9px !important; padding: 2px 6px !important; }
+  .pharma-detail-grid { grid-template-columns: 1fr !important; }
+  .pharma-pkpd-grid { grid-template-columns: 1fr !important; }
+  .pharma-synergy-grid { grid-template-columns: 1fr !important; }
+
+  /* Support screen mobile */
+  .support-catalog-grid { grid-template-columns: 1fr !important; }
+  .support-recommendation-grid { grid-template-columns: 1fr !important; }
+  .support-synergy-grid { grid-template-columns: 1fr !important; }
+
+  /* Risk details mobile */
+  .risk-details-mechanism-grid { grid-template-columns: 1fr !important; }
+
+  /* Nutrition overview mobile */
+  .nutrition-overview .card { padding: 10px !important; }
+  .nutrition-overview .grid { grid-template-columns: 1fr 1fr !important; }
+  .nutrition-overview h3 { font-size: 14px !important; }
+
+  /* Calculators mobile */
+  .calculator-grid { grid-template-columns: 1fr !important; }
+
+  /* Fix horizontal scroll on all screens */
+  .screen { overflow-x: hidden !important; }
+  .card { max-width: 100% !important; overflow-x: auto !important; }
+  .tab-bar { overflow-x: auto !important; -webkit-overflow-scrolling: touch !important; scrollbar-width: none !important; }
+  .tab-bar::-webkit-scrollbar { display: none !important; }
+  .tab-btn { flex-shrink: 0 !important; white-space: nowrap !important; }
+
+  /* Fix input zoom on iOS */
+  input, select, textarea { font-size: 16px !important; }
+
+  /* Better touch targets */
+  button { min-height: 36px; min-width: 36px; }
+
+  /* Fix chart container */
+  .nutrition-charts > div { min-width: 0 !important; }
+}
+
+/* === Telegram Mini App Specific === */
+@media all and (display-mode: standalone), all and (display-mode: minimal-ui) {
+  .app { 
+    height: 100vh;
+    height: 100dvh;
+    height: calc(var(--tg-height, 100dvh));
+  }
+  .tabs { 
+    padding-bottom: max(env(safe-area-inset-bottom), 8px);
+    padding-bottom: max(var(--tg-safe-bottom, 0px), env(safe-area-inset-bottom), 8px);
+  }
+  main { 
+    padding-bottom: calc(var(--nav-height) + max(var(--tg-safe-bottom, 0px), env(safe-area-inset-bottom), 8px) + 16px);
+  }
+  .screen { 
+    padding-top: max(var(--tg-safe-top, 0px), env(safe-area-inset-top), 8px);
+  }
+}
+
+/* Prevent overscroll bounce in TG Mini App */
+html { overscroll-behavior: none; }
+body { overscroll-behavior: none; }

@@ -65,7 +65,7 @@ export const NutritionScreen: React.FC = () => {
     switch (tab) {
       case 'overview': return <NutritionOverview profile={linked.profile} avgWeeklyKcal={avgWeeklyKcal} avgWeeklyProtein={avgWeeklyProtein} avgWeeklyFat={avgWeeklyFat} avgWeeklyCarbs={avgWeeklyCarbs} />;
       case 'diary': return <NutritionDiary foodEntries={foodEntries} />;
-      case 'charts': return <NutritionCharts kcalData={[avgWeeklyKcal, avgWeeklyKcal * 1.1, avgWeeklyKcal * 0.9]} proteinData={[avgWeeklyProtein, avgWeeklyProtein * 1.1, avgWeeklyProtein * 0.9]} labels={['День 1', 'День 2', 'День 3']} />;
+      case 'charts': return <NutritionCharts kcalData={[avgWeeklyKcal]} proteinData={[avgWeeklyProtein]} labels={['Текущая']} dailyLogs={dailyLogs} />;
       default: return <NutritionOverview profile={linked.profile} avgWeeklyKcal={avgWeeklyKcal} avgWeeklyProtein={avgWeeklyProtein} avgWeeklyFat={avgWeeklyFat} avgWeeklyCarbs={avgWeeklyCarbs} />;
     }
   };
