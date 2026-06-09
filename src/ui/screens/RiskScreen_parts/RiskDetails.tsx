@@ -25,14 +25,14 @@ export const RiskDetails: React.FC<{
   const [showAllRecs, setShowAllRecs] = React.useState(false);
 
   const recommendations: { text: string; priority: 'high' | 'medium' | 'low' }[] = [];
-  if (riskResult.overallNet > 60) recommendations.push({ text: '? Общий риск ВЫСОКИЙ — обязательная консультация врача', priority: 'high' });
+  if (riskResult.overallNet > 60) recommendations.push({ text: '🔴 Общий риск ВЫСОКИЙ — обязательная консультация врача', priority: 'high' });
   if (riskResult.overallNet > 40) recommendations.push({ text: 'Рекомендуется расширенный чек-ап анализов', priority: 'medium' });
   for (const sys of RISK_SYSTEMS) {
     const bd = riskResult.systemBreakdown[sys];
     if (bd && bd.net > 70) recommendations.push({ text: getSystemIcon(sys) + ' ' + getSystemLabel(sys) + ': риск ' + Math.round(bd.net) + '% — необходим мониторинг', priority: 'high' });
     else if (bd && bd.net > 50) recommendations.push({ text: getSystemIcon(sys) + ' ' + getSystemLabel(sys) + ': риск ' + Math.round(bd.net) + '% — рекомендуется контроль', priority: 'medium' });
   }
-  if (riskResult.overallNet < 30) recommendations.push({ text: '? Общий риск низкий — продолжайте текущую стратегию', priority: 'low' });
+  if (riskResult.overallNet < 30) recommendations.push({ text: '✅ Общий риск низкий — продолжайте текущую стратегию', priority: 'low' });
 
   const contributorMap: Record<string, string[]> = {};
   const mitigationMap: Record<string, { substance: string; reduction: number }[]> = {};
