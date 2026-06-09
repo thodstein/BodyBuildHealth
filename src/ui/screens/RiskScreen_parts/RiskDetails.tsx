@@ -20,7 +20,8 @@ const CORE_DISPLAY_SYSTEMS = ['cardio', 'hepatic', 'renal', 'neuro', 'endocrine'
 export const RiskDetails: React.FC<{
   riskResult: RiskResult;
   labRiskContributions: LabRiskContribution | null;
-}> = ({ riskResult, labRiskContributions }) => {
+  isSyntheticLab?: boolean;
+}> = ({ riskResult, labRiskContributions, isSyntheticLab }) => {
   const [expandedSys, setExpandedSys] = React.useState<string | null>(null);
   const [showAllRecs, setShowAllRecs] = React.useState(false);
 
@@ -145,7 +146,15 @@ export const RiskDetails: React.FC<{
                         </div>
                       )}
 
-                      {labContrib > 0 && <div style={{ fontSize: 10, marginTop: 4, color: 'var(--text-dim)' }}>🔬 Лаб. вклад: <strong style={{ color: getRiskColor(labContrib) }}>{Math.round(labContrib)}%</strong></div>}
+                      {labContrib > 0 && (
+                        <div style={{ fontSize: 10, marginTop: 4, color: 'var(--text-dim)', display: 'flex', alignItems: 'center', gap: 4 }}>
+                          <span>🔬 Лаб. вклад:</span>
+                          <strong style={{ color: getRiskColor(labContrib) }}>{Math.round(labContrib)}%</strong>
+                          {isSyntheticLab && (
+                            <span style={{ color: '#eab308', fontSize: 9, fontWeight: 600 }}>⚠️ штраф</span>
+                          )}
+                        </div>
+                      )}
 
                       {contributorMap[sys] && contributorMap[sys].length > 0 && (
                         <div style={{ marginTop: 4, display: 'flex', flexWrap: 'wrap', gap: 3 }}>

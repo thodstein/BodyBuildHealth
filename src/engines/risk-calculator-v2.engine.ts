@@ -119,8 +119,12 @@ export function calculateRiskFromAnalyses(arg1: RiskResult | LabPoint[], labs?: 
       return;
     }
 
-    const uln = reference.uln; // Upper limit of normal
-    const lln = reference.lln; // Lower limit of normal
+    const uln = reference.uln; // Upper limit of normal (in prefUnit)
+    const lln = reference.lln; // Lower limit of normal (in prefUnit)
+    const coeff = reference.coeff || 1; // Unit conversion coefficient
+
+    // Normalize value to the same units as ULN/LLN
+    const norm = value * coeff;
 
     // Calculate deviation from normal range
     // For values above normal: (value - uln) / uln
@@ -128,12 +132,12 @@ export function calculateRiskFromAnalyses(arg1: RiskResult | LabPoint[], labs?: 
     // For values within normal: 0
     let deviation = 0;
 
-    if (value > uln) {
+    if (norm > uln) {
       // Above normal range
-      deviation = (value - uln) / uln;
-    } else if (value < lln) {
+      deviation = (norm - uln) / uln;
+    } else if (norm < lln) {
       // Below normal range
-      deviation = (lln - value) / lln;
+      deviation = (lln - norm) / lln;
     }
     // If within normal range, deviation remains 0
 
@@ -152,9 +156,9 @@ export function calculateRiskFromAnalyses(arg1: RiskResult | LabPoint[], labs?: 
     // Apply deviation to each mapped system
     Object.entries(systemMap).forEach(([system, weight]) => {
       if (ALL_RISK_SYSTEMS.includes(system as any)) {
-        // Contribution is deviation * weight * 10 (as per spec)
-        // Clamp to reasonable range
-        const contribution = Math.min(100, Math.max(0, deviation * weight * 10));
+        // Contribution is deviation * weight * 25
+        // Allows 2×ULN → 25%, 3×ULN → 50%, 5×ULN → 100%
+        const contribution = Math.min(100, Math.max(0, deviation * weight * 25));
         systemContributions[system] += contribution;
       }
     });

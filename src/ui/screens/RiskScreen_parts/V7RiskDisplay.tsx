@@ -488,44 +488,108 @@ export const V7RiskDisplay: React.FC<{ result: V7RiskResult }> = ({ result }) =>
     const bodyW = 260, bodyH = 520;
     const cx = bodyW / 2;
 
-    // Organ positions on the body (center x, top y, width, height)
-    const organPositions: Record<string, { x: number; y: number; w: number; h: number }> = {
-      heart:      { x: cx + 8,  y: 100, w: 36, h: 40 },
-      vessels:    { x: cx - 50, y: 90,  w: 100, h: 14 },
-      liver:      { x: cx - 10, y: 190, w: 44, h: 38 },
-      kidney:     { x: cx - 30, y: 215, w: 24, h: 18 },
-      blood:      { x: cx - 40, y: 220, w: 80, h: 12 },
-      endocrine:  { x: cx - 8,  y: 70,  w: 22, h: 18 },
-      metabolic:  { x: cx + 8,  y: 195, w: 24, h: 20 },
-      ghigf:      { x: cx - 40, y: 150, w: 18, h: 14 },
-      ins_axis:   { x: cx + 28, y: 208, w: 18, h: 14 },
-      musculoskeletal: { x: cx - 70, y: 250, w: 140, h: 200 },
-      neuro_toxicity:  { x: cx - 16, y: 30,  w: 38, h: 40 },
-      reproductive:    { x: cx - 16, y: 310, w: 40, h: 24 },
+    // Build gradient IDs per organ for volumetric effect
+    const getOrgGrad = (okey: string, pct: number): string => {
+      const c = getRiskColor(pct);
+      // Parse hex to add lighter highlight
+      return `orgGrad_${okey}`;
     };
 
-    // Body part paths (silhouette)
+    // SVG paths for each organ (realistic shapes, positioned in body)
+    const organShapes: Record<string, string> = {
+      heart:
+        `M${cx+4},105 C${cx-2},98 ${cx-6},90 ${cx+2},85 C${cx+10},80 ${cx+16},85 ${cx+18},90 ` +
+        `C${cx+20},85 ${cx+26},80 ${cx+34},85 C${cx+42},90 ${cx+38},98 ${cx+32},105 ` +
+        `C${cx+28},112 ${cx+18},125 ${cx+18},125 C${cx+18},125 ${cx+8},112 ${cx+4},105 Z`,
+
+      liver:
+        `M${cx+20},185 C${cx+40},182 ${cx+50},190 ${cx+48},200 L${cx+46},215 ` +
+        `C${cx+44},228 ${cx+30},235 ${cx+15},230 L${cx+5},225 C${cx-2},220 ${cx+2},210 ${cx+8},205 ` +
+        `C${cx+10},198 ${cx+15},188 ${cx+20},185 Z`,
+
+      kidney:
+        `M${cx-40},210 C${cx-50},208 ${cx-56},218 ${cx-52},228 C${cx-48},238 ${cx-36},240 ` +
+        `C${cx-28},240 ${cx-22},232 ${cx-26},222 C${cx-30},212 ${cx-34},210 ${cx-40},210 Z ` +
+        `M${cx-18},212 C${cx-28},210 ${cx-34},220 ${cx-30},230 C${cx-26},240 ${cx-14},242 ` +
+        `C${cx-6},242 ${cx-0},234 ${cx-4},224 C${cx-8},214 ${cx-12},212 ${cx-18},212 Z`,
+
+      blood:
+        `M${cx-60},225 Q${cx-40},215 ${cx-20},220 T${cx+20},218 T${cx+60},225 ` +
+        `Q${cx+40},235 ${cx+20},232 T${cx-20},234 T${cx-60},225 Z`,
+
+      endocrine:
+        `M${cx-8},65 C${cx-16},60 ${cx-20},68 ${cx-12},74 C${cx-4},80 ${cx+4},78 ${cx+8},74 ` +
+        `C${cx+12},70 ${cx+20},68 ${cx+20},65 C${cx+20},60 ${cx+14},58 ${cx+8},58 ` +
+        `C${cx+2},58 ${cx-2},60 ${cx-8},65 Z`,
+
+      metabolic:
+        `M${cx+14},198 C${cx+6},196 ${cx+4},208 ${cx+12},212 C${cx+20},216 ${cx+30},214 ${cx+32},208 ` +
+        `C${cx+34},202 ${cx+24},200 ${cx+14},198 Z`,
+
+      ghigf:
+        `M${cx-48},145 C${cx-54},140 ${cx-58},148 ${cx-52},154 C${cx-46},160 ${cx-38},158 ${cx-36},154 ` +
+        `C${cx-34},150 ${cx-42},150 ${cx-48},145 Z`,
+
+      ins_axis:
+        `M${cx+30},204 C${cx+24},202 ${cx+22},210 ${cx+28},216 C${cx+34},222 ${cx+44},218 ${cx+42},212 ` +
+        `C${cx+40},206 ${cx+36},206 ${cx+30},204 Z`,
+
+      musculoskeletal:
+        `M${cx-70},270 L${cx-50},260 L${cx-30},270 L${cx-20},300 L${cx-25},340 L${cx-35},380 ` +
+        `L${cx-30},420 L${cx-20},450 L${cx-15},460 ` +
+        `C${cx-25},465 ${cx-40},460 ${cx-45},450 L${cx-50},420 L${cx-55},380 L${cx-60},340 ` +
+        `L${cx-65},300 L${cx-70},270 Z ` +
+        `M${cx+15},270 L${cx+35},260 L${cx+55},270 L${cx+65},300 L${cx+60},340 L${cx+55},380 ` +
+        `L${cx+50},420 L${cx+45},450 L${cx+40},460 ` +
+        `C${cx+30},465 ${cx+20},460 ${cx+15},450 L${cx+20},420 L${cx+30},380 L${cx+35},340 ` +
+        `L${cx+40},300 L${cx+35},270 Z`,
+
+      neuro_toxicity:
+        `M${cx-24},22 C${cx-32},18 ${cx-36},28 ${cx-30},34 C${cx-24},40 ${cx-16},42 ` +
+        `C${cx-8},42 ${cx-0},38 ${cx+0},34 C${cx+0},38 ${cx+8},42 ${cx+16},42 ` +
+        `C${cx+24},42 ${cx+32},40 ${cx+36},34 C${cx+42},28 ${cx+38},18 ${cx+30},22 ` +
+        `C${cx+24},26 ${cx+16},28 ${cx+8},26 C${cx+4},24 ${cx-4},24 ${cx-8},26 ` +
+        `C${cx-16},28 ${cx-24},26 ${cx-24},22 Z`,
+
+      reproductive:
+        `M${cx-24},316 C${cx-32},310 ${cx-38},320 ${cx-30},328 C${cx-22},336 ${cx-10},332 ${cx-8},326 ` +
+        `C${cx-6},320 ${cx-14},322 ${cx-24},316 Z ` +
+        `M${cx+8},316 C${cx+0},310 ${cx-6},320 ${cx+2},328 C${cx+10},336 ${cx+22},332 ${cx+24},326 ` +
+        `C${cx+26},320 ${cx+18},322 ${cx+8},316 Z`,
+    };
+
+    // Body silhouette (improved with shoulders/waist)
     const bodyPaths = `
-      M${cx - 75},70 C${cx - 95},70 ${cx - 100},80 ${cx - 100},100 L${cx - 100},110
-      C${cx - 100},130 ${cx - 105},140 ${cx - 115},150 L${cx - 130},170
-      L${cx - 125},175 L${cx - 110},160
-      C${cx - 100},175 ${cx - 105},190 ${cx - 110},200 L${cx - 100},210
-      C${cx - 95},230 ${cx - 90},250 ${cx - 85},270 L${cx - 80},270
-      L${cx - 75},250 L${cx - 70},300 L${cx - 65},320
-      L${cx - 70},380 L${cx - 65},420 L${cx - 75},460 L${cx - 70},500
-      L${cx - 25},500 L${cx - 25},460 L${cx - 30},420 L${cx - 28},380
-      L${cx - 20},350 L${cx - 10},380 L${cx - 10},420 L${cx - 8},460
-      L${cx - 5},500 L${cx + 5},500 L${cx + 8},460 L${cx + 10},420
-      L${cx + 10},380 L${cx + 20},350 L${cx + 28},380 L${cx + 30},420
-      L${cx + 25},460 L${cx + 25},500 L${cx + 70},500 L${cx + 75},460
-      L${cx + 65},420 L${cx + 70},380 L${cx + 65},320 L${cx + 70},300
-      L${cx + 75},250 L${cx + 80},270 L${cx + 85},270
-      C${cx + 90},250 ${cx + 95},230 ${cx + 100},210 L${cx + 110},200
-      C${cx + 105},190 ${cx + 100},175 ${cx + 110},160 L${cx + 125},175
-      L${cx + 130},170 L${cx + 115},150
-      C${cx + 105},140 ${cx + 100},130 ${cx + 100},110 L${cx + 100},100
-      C${cx + 100},80 ${cx + 95},70 ${cx + 75},70 Z
+      M${cx-75},70 C${cx-95},70 ${cx-105},80 ${cx-105},100 L${cx-105},110
+      C${cx-105},120 ${cx-110},135 ${cx-125},150 L${cx-140},165 L${cx-135},175 L${cx-120},162
+      C${cx-108},175 ${cx-110},190 ${cx-115},205 L${cx-105},215
+      C${cx-98},235 ${cx-92},255 ${cx-88},275 L${cx-82},275
+      L${cx-78},255 L${cx-72},305 L${cx-66},330
+      L${cx-72},390 L${cx-68},430 L${cx-76},470 L${cx-70},510
+      L${cx-25},510 L${cx-25},470 L${cx-30},430 L${cx-28},390
+      L${cx-20},355 L${cx-10},390 L${cx-10},430 L${cx-8},470
+      L${cx-5},510 L${cx+5},510 L${cx+8},470 L${cx+10},430
+      L${cx+10},390 L${cx+20},355 L${cx+28},390 L${cx+30},430
+      L${cx+25},470 L${cx+25},510 L${cx+70},510 L${cx+76},470
+      L${cx+68},430 L${cx+72},390 L${cx+66},330 L${cx+72},305
+      L${cx+78},255 L${cx+82},275 L${cx+88},275
+      C${cx+92},255 ${cx+98},235 ${cx+105},215 L${cx+115},205
+      C${cx+110},190 ${cx+108},175 ${cx+120},162 L${cx+135},175
+      L${cx+140},165 L${cx+125},150
+      C${cx+110},135 ${cx+105},120 ${cx+105},110 L${cx+105},100
+      C${cx+105},80 ${cx+95},70 ${cx+75},70 Z
     `;
+
+    // Helper: get organ value for selected week
+    const get3DOrgVal = (key: string): number => {
+      if (selectedDay > 0 && weeklyOrganData[key] && weeklyOrganData[key].length >= Math.ceil(selectedDay / 7)) {
+        return weeklyOrganData[key][Math.ceil(selectedDay / 7) - 1] ?? 0;
+      }
+      return organSummary[key]?.meanS ?? 0;
+    };
+
+    // Opacity scale for risk
+    const riskOpacity = (pct: number) => Math.max(0.4, Math.min(0.95, 0.4 + pct / 100 * 0.55));
 
     return (
       <div>
@@ -536,6 +600,7 @@ export const V7RiskDisplay: React.FC<{ result: V7RiskResult }> = ({ result }) =>
               <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>Неделя:</span>
               <select value={selectedDay} onChange={e => setSelectedDay(Number(e.target.value))}
                 style={{ padding: '4px 8px', borderRadius: 4, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 11 }}>
+                <option value={0}>📊 Среднее</option>
                 {weekOptions.map(w => <option key={w} value={w * 7}>Нед {w}</option>)}
               </select>
             </div>
@@ -545,71 +610,105 @@ export const V7RiskDisplay: React.FC<{ result: V7RiskResult }> = ({ result }) =>
         <div className="card" style={{ marginBottom: 12, overflow: 'hidden' }}>
           <svg viewBox={`0 0 ${bodyW} ${bodyH}`} style={{ width: '100%', maxWidth: bodyW, height: 'auto', display: 'block', margin: '0 auto' }}>
             <defs>
-              <filter id="bodyShadow"><feDropShadow dx="0" dy="2" stdDeviation="3" floodOpacity="0.3" /></filter>
-              <filter id="organGlow"><feGaussianBlur stdDeviation="2" result="blur" /><feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge></filter>
+              <filter id="bodyShadow"><feDropShadow dx="0" dy="2" stdDeviation="4" floodOpacity="0.35" /></filter>
+              <filter id="organGlow"><feGaussianBlur stdDeviation="3" result="blur" /><feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge></filter>
+              <filter id="organGlowStrong"><feGaussianBlur stdDeviation="5" result="blur" /><feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge></filter>
               <linearGradient id="bodyGrad" x1="0" y1="0" x2="1" y2="0">
-                <stop offset="0%" stopColor="rgba(255,255,255,0.04)" />
-                <stop offset="50%" stopColor="rgba(255,255,255,0.08)" />
-                <stop offset="100%" stopColor="rgba(255,255,255,0.04)" />
+                <stop offset="0%" stopColor="rgba(255,255,255,0.03)" />
+                <stop offset="30%" stopColor="rgba(255,255,255,0.07)" />
+                <stop offset="70%" stopColor="rgba(255,255,255,0.07)" />
+                <stop offset="100%" stopColor="rgba(255,255,255,0.03)" />
               </linearGradient>
+              <radialGradient id="highlight" cx="35%" cy="30%" r="60%">
+                <stop offset="0%" stopColor="rgba(255,255,255,0.4)" />
+                <stop offset="100%" stopColor="rgba(255,255,255,0)" />
+              </radialGradient>
             </defs>
+            {/* Background glow for body */}
+            <ellipse cx={cx} cy={260} rx={90} ry={200} fill="rgba(0,230,138,0.02)" filter="blur(20px)" />
             {/* Body silhouette */}
-            <path d={bodyPaths} fill="var(--bg-secondary)" stroke="rgba(255,255,255,0.15)" strokeWidth="1.5" filter="url(#bodyShadow)" />
-            <path d={bodyPaths} fill="url(#bodyGrad)" />
+            <path d={bodyPaths} fill="var(--bg-secondary)" stroke="rgba(255,255,255,0.12)" strokeWidth="1.5" filter="url(#bodyShadow)" />
+            <path d={bodyPaths} fill="url(#bodyGrad)" stroke="rgba(255,255,255,0.05)" strokeWidth="0.5" />
             {/* Arms */}
-            <ellipse cx={cx - 95} cy={190} rx="10" ry="40" fill="var(--bg-secondary)" stroke="rgba(255,255,255,0.1)" strokeWidth="1" />
-            <ellipse cx={cx + 95} cy={190} rx="10" ry="40" fill="var(--bg-secondary)" stroke="rgba(255,255,255,0.1)" strokeWidth="1" />
+            <ellipse cx={cx - 95} cy={190} rx="12" ry="42" fill="var(--bg-secondary)" stroke="rgba(255,255,255,0.08)" strokeWidth="1" />
+            <ellipse cx={cx + 95} cy={190} rx="12" ry="42" fill="var(--bg-secondary)" stroke="rgba(255,255,255,0.08)" strokeWidth="1" />
             {/* Legs */}
-            <ellipse cx={cx - 25} cy={440} rx="18" ry="60" fill="var(--bg-secondary)" stroke="rgba(255,255,255,0.1)" strokeWidth="1" />
-            <ellipse cx={cx + 25} cy={440} rx="18" ry="60" fill="var(--bg-secondary)" stroke="rgba(255,255,255,0.1)" strokeWidth="1" />
-            {/* Head/face hint */}
-            <ellipse cx={cx} cy={38} rx="28" ry="32" fill="var(--bg-secondary)" stroke="rgba(255,255,255,0.1)" strokeWidth="1" />
+            <ellipse cx={cx - 25} cy={445} rx="20" ry="65" fill="var(--bg-secondary)" stroke="rgba(255,255,255,0.08)" strokeWidth="1" />
+            <ellipse cx={cx + 25} cy={445} rx="20" ry="65" fill="var(--bg-secondary)" stroke="rgba(255,255,255,0.08)" strokeWidth="1" />
+            {/* Head */}
+            <ellipse cx={cx} cy={38} rx="30" ry="35" fill="var(--bg-secondary)" stroke="rgba(255,255,255,0.08)" strokeWidth="1" />
+            <ellipse cx={cx} cy={38} rx="28" ry="33" fill="none" stroke="rgba(255,255,255,0.03)" strokeWidth="0.5" />
 
-            {/* Organs */}
+            {/* Neck */}
+            <rect x={cx - 12} y={62} width={24} height={12} rx={4} fill="var(--bg-secondary)" stroke="rgba(255,255,255,0.05)" strokeWidth="0.5" />
+
+            {/* Organs — rendered as proper shapes */}
             {organKeys.map(okey => {
               const sd = organSummary[okey];
-              const pct = Math.round((sd?.meanS ?? 0) * 100);
-              const pos = organPositions[okey];
-              if (!pos) return null;
+              const orgVal = get3DOrgVal(okey);
+              const pct = Math.round(orgVal * 100);
               const isSelected = selectedOrgan3D === okey;
               const color = getRiskColor(pct);
-              const glowIntensity = isSelected ? 6 : pct > 40 ? 4 : 2;
+              const op = riskOpacity(pct);
+              const path = organShapes[okey];
+              if (!path) return null;
+              const glowFilter = isSelected ? 'url(#organGlowStrong)' : pct > 40 ? 'url(#organGlow)' : undefined;
+
+              // Build a unique gradient for this organ
+              const gradId = `orgG_${okey}`;
+              // Lighter highlight version of the color
+              const hlColor = pct < 20 ? '#66ffb3' : pct < 40 ? '#fff066' : pct < 60 ? '#ffaa44' : pct < 80 ? '#ff6666' : '#ff3344';
+
               return (
                 <g key={okey} onClick={() => setSelectedOrgan3D(isSelected ? null : okey)} style={{ cursor: 'pointer' }}>
-                  {/* Shadow under organ */}
-                  <rect x={pos.x + 2} y={pos.y + 2} width={pos.w} height={pos.h} rx={Math.min(pos.w, pos.h) / 3} fill="rgba(0,0,0,0.3)" opacity={0.4} />
-                  {/* Organ body */}
-                  <rect x={pos.x} y={pos.y} width={pos.w} height={pos.h} rx={Math.min(pos.w, pos.h) / 3}
-                    fill={color} opacity={isSelected ? 0.95 : 0.7}
-                    stroke={isSelected ? '#fff' : 'rgba(255,255,255,0.3)'}
-                    strokeWidth={isSelected ? 2 : 0.5}
-                    filter={pct > 20 ? 'url(#organGlow)' : undefined}
+                  <defs>
+                    <radialGradient id={gradId} cx="35%" cy="30%" r="65%">
+                      <stop offset="0%" stopColor={hlColor} stopOpacity={isSelected ? 0.7 : 0.5} />
+                      <stop offset="100%" stopColor={color} stopOpacity={op} />
+                    </radialGradient>
+                  </defs>
+                  {/* Shadow */}
+                  <path d={path} transform="translate(2,3)" fill="rgba(0,0,0,0.35)" opacity={0.5} filter="url(#bodyShadow)" />
+                  {/* Organ body with gradient */}
+                  <path d={path}
+                    fill={`url(#${gradId})`}
+                    stroke={isSelected ? '#fff' : 'rgba(255,255,255,0.25)'}
+                    strokeWidth={isSelected ? 2 : 0.8}
+                    filter={glowFilter}
                   />
-                  {/* Risk % label on hover/selected */}
+                  {/* Risk % label on selected */}
                   {isSelected && (
-                    <text x={pos.x + pos.w / 2} y={pos.y + pos.h / 2 + 4} fill="#fff" fontSize="11" fontWeight="700" textAnchor="middle" style={{ textShadow: '0 1px 3px rgba(0,0,0,0.8)' }}>
-                      {pct}%
+                    <text x={cx} y={520} fill="#fff" fontSize="11" fontWeight="700" textAnchor="middle" style={{ textShadow: '0 1px 4px rgba(0,0,0,0.9)' }}>
+                      {ORGAN_LABELS_V7[okey] || okey}: {pct}%
                     </text>
                   )}
                 </g>
               );
             })}
 
-            {/* Labels */}
-            <text x={cx} y={bodyH - 8} fill="var(--text-dim)" fontSize="8" textAnchor="middle">🧍 Кликните на орган для деталей</text>
-            <text x={cx} y={17} fill="var(--text-dim)" fontSize="7" textAnchor="middle">ГОЛОВА</text>
-            <text x={cx - 95} y={178} fill="var(--text-dim)" fontSize="6" textAnchor="middle">Л</text>
-            <text x={cx + 95} y={178} fill="var(--text-dim)" fontSize="6" textAnchor="middle">П</text>
+            {/* Internal organ labels */}
+            <text x={cx} y={15} fill="var(--text-dim)" fontSize="7" fontWeight="600" textAnchor="middle">ГОЛОВА</text>
+            <text x={cx - 95} y={180} fill="var(--text-dim)" fontSize="6" textAnchor="middle">Л</text>
+            <text x={cx + 95} y={180} fill="var(--text-dim)" fontSize="6" textAnchor="middle">П</text>
+
+            {/* Selected organ floating label */}
+            {selectedOrgan3D && (
+              <text x={cx} y={bodyH - 14} fill="#fff" fontSize="14" fontWeight="800" textAnchor="middle" style={{ textShadow: '0 2px 8px rgba(0,0,0,0.9)' }}>
+                {ORGAN_LABELS_V7[selectedOrgan3D] || selectedOrgan3D}: {fmtPct01(organSummary[selectedOrgan3D]?.meanS ?? 0)}%
+              </text>
+            )}
 
             {/* Legend */}
-            <rect x={10} y={bodyH - 30} width={10} height={10} rx={2} fill="#22c55e" opacity={0.7} />
-            <text x={22} y={bodyH - 21} fill="var(--text-dim)" fontSize="7">Низкий</text>
-            <rect x={55} y={bodyH - 30} width={10} height={10} rx={2} fill="#eab308" opacity={0.7} />
-            <text x={67} y={bodyH - 21} fill="var(--text-dim)" fontSize="7">Средний</text>
-            <rect x={105} y={bodyH - 30} width={10} height={10} rx={2} fill="#f97316" opacity={0.7} />
-            <text x={117} y={bodyH - 21} fill="var(--text-dim)" fontSize="7">Высокий</text>
-            <rect x={150} y={bodyH - 30} width={10} height={10} rx={2} fill="#ef4444" opacity={0.7} />
-            <text x={162} y={bodyH - 21} fill="var(--text-dim)" fontSize="7">Критический</text>
+            <g transform="translate(10, 479)">
+              <rect x={0} y={0} width={8} height={8} rx={1.5} fill="#22c55e" opacity={0.8} />
+              <text x={10} y={7} fill="var(--text-dim)" fontSize="6">Низк</text>
+              <rect x={40} y={0} width={8} height={8} rx={1.5} fill="#eab308" opacity={0.8} />
+              <text x={50} y={7} fill="var(--text-dim)" fontSize="6">Сред</text>
+              <rect x={80} y={0} width={8} height={8} rx={1.5} fill="#f97316" opacity={0.8} />
+              <text x={90} y={7} fill="var(--text-dim)" fontSize="6">Выс</text>
+              <rect x={115} y={0} width={8} height={8} rx={1.5} fill="#ef4444" opacity={0.8} />
+              <text x={125} y={7} fill="var(--text-dim)" fontSize="6">Крит</text>
+            </g>
           </svg>
         </div>
 

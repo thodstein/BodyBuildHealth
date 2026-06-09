@@ -216,6 +216,20 @@ export const RiskScreen: React.FC = () => {
     return result;
   }, [pharmaRisk, hasLabs, shouldApplyPenalty, noLabsSystems, trainingRisk, nutritionRisk]);
 
+  // Build synthetic lab risk contribution from penalty when no labs exist
+  const syntheticLabContrib = useMemo(() => {
+    if (hasLabs) return null;
+    if (!shouldApplyPenalty) return null;
+    const phase = linked.profile?.settings?.phase || 'baseline';
+    const pen = calculatePenaltyCoefficients(phase, linked.labs || [], [], 1, linked.course, globalNoLabs);
+    const totalMultiplier = 1.0 + pen.labPenalty + pen.diagnosticPenalty;
+    const penaltyPct = Math.min(100, (totalMultiplier - 1) * 100);
+    const penalties = Object.fromEntries(
+      ALL_RISK_SYSTEMS.map(s => [s, penaltyPct])
+    );
+    return { systemContributions: penalties, totalRisk: penaltyPct };
+  }, [hasLabs, shouldApplyPenalty, linked.profile, linked.labs, linked.course, globalNoLabs]);
+
   useEffect(() => {
     if (riskResult) {
       saveRiskHistory({ date: new Date().toISOString().split('T')[0], overallRaw: riskResult.overallRaw, overallNet: riskResult.overallNet });
@@ -252,9 +266,11 @@ export const RiskScreen: React.FC = () => {
 
   const renderContent = () => {
     if (!riskResult) return <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-dim)' }}>Загрузка...</div>;
+    const effectiveLabContrib = labRiskContributions || syntheticLabContrib;
+    const isSyntheticLab = !hasLabs && shouldApplyPenalty; // lab contrib came from penalty, not real labs
     switch (tab) {
-      case 'overview': return <RiskOverview riskResult={riskResult} globalNoLabs={globalNoLabs} noLabsSystems={noLabsSystems} labRiskContributions={labRiskContributions} riskHistory={riskHistory} aggregatedRisk={aggregatedRisk} weeklyDynamics={weeklyDynamics} />;
-      case 'mechanisms': return <RiskDetails riskResult={riskResult} labRiskContributions={labRiskContributions} />;
+      case 'overview': return <RiskOverview riskResult={riskResult} globalNoLabs={globalNoLabs} noLabsSystems={noLabsSystems} labRiskContributions={effectiveLabContrib} riskHistory={riskHistory} aggregatedRisk={aggregatedRisk} weeklyDynamics={weeklyDynamics} />;
+      case 'mechanisms': return <RiskDetails riskResult={riskResult} labRiskContributions={effectiveLabContrib} isSyntheticLab={isSyntheticLab} />;
       case 'v7': return v7Result ? <V7RiskDisplay result={v7Result} /> : <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-dim)' }}>Загрузка V7...</div>;
       case 'dynamics': return <WeeklyRiskChart dynamics={weeklyDynamics} selectedWeek={selectedWeek} onWeekSelect={setSelectedWeek} mode={weekMode} onModeChange={setWeekMode} />;
       case 'info': return <RiskInfo />;

@@ -359,6 +359,7 @@ export function runV7Simulation(input: V7RiskInput): V7RiskResult {
   const matrix = computeV7Matrix(matrixInput, input.supportIds ?? []);
 
   // 5. Compute organ summary from LAST 4 WEEKS average (steady-state)
+  const ORGAN_CALIBRATION = 3.0; // Scale factor for Hill-attenuated drug inputs (EC50=2 vs AR_eff~0.2)
   const organSummaryStartWeek = Math.max(0, numWeeks - 4);
   const stazhMult = stazhChronicMultiplier(
     organInput.Stazh_life,
@@ -384,15 +385,19 @@ export function runV7Simulation(input: V7RiskInput): V7RiskResult {
       }
     }
     const meanS = nSteady > 0 ? sumS / nSteady : 0;
+    const orgMean = Math.min(1, meanS * stazhMult * ORGAN_CALIBRATION);
+    const orgAcute = nSteady > 0 ? Math.min(1, (sumAcute / nSteady) * ORGAN_CALIBRATION) : 0;
+    const orgChronic = Math.min(1, (nSteady > 0 ? sumChronic / nSteady : 0) * stazhMult * ORGAN_CALIBRATION);
+    const orgFibrosis = nSteady > 0 ? Math.min(1, (sumFibrosis / nSteady) * ORGAN_CALIBRATION) : 0;
     organSummary[key] = {
-      meanS: Math.min(1, meanS * stazhMult),
-      p5S: Math.min(1, meanS * stazhMult * 0.85),
-      p95S: Math.min(1, meanS * stazhMult * 1.15),
+      meanS: orgMean,
+      p5S: orgMean * 0.85,
+      p95S: Math.min(1, orgMean * 1.15),
       meanCumRisk: nSteady > 0 ? sumCumRisk / nSteady : 0,
       meanPEvent: nSteady > 0 ? sumPEvent / nSteady : 0,
-      acute: nSteady > 0 ? sumAcute / nSteady : 0,
-      chronic: Math.min(1, (nSteady > 0 ? sumChronic / nSteady : 0) * stazhMult),
-      fibrosis: nSteady > 0 ? sumFibrosis / nSteady : 0,
+      acute: orgAcute,
+      chronic: orgChronic,
+      fibrosis: orgFibrosis,
       mechanisms: [],
     };
   }
@@ -427,8 +432,8 @@ export function runV7Simulation(input: V7RiskInput): V7RiskResult {
   };
   for (const key of organKeys) {
     const last = timeSeries.organStates[key]?.[days - 1];
-    organCumRisks[key] = last?.cumRisk ?? 0;
-    organPEvents[key] = last?.pEvent ?? 0;
+    organCumRisks[key] = (last?.cumRisk ?? 0) * ORGAN_CALIBRATION;
+    organPEvents[key] = Math.min(1, (last?.pEvent ?? 0) * ORGAN_CALIBRATION);
   }
   const globalRiskRaw = globalRiskSoft(organCumRisks, organWeights);
   const globalRiskNet = matrix.overallNet / 100;

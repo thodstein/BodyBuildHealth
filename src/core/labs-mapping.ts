@@ -28,7 +28,20 @@ export function normalizedRatio(code: string, value: number, unit: string): numb
   const norm = value * ucum.coeff;
   const span = ucum.uln - ucum.lln;
   if (span <= 0) return null;
-  return Math.max(0, Math.min(1, (norm - ucum.lln) / span));
+  const lln = ucum.lln;
+  const uln = ucum.uln;
+  const midpoint = (lln + uln) / 2;
+  if (norm <= midpoint) {
+    // Below midpoint: linear 0..0.5
+    return Math.max(0, 0.5 * (norm - lln) / Math.max(0.001, midpoint - lln));
+  } else if (norm <= uln) {
+    // Midpoint to ULN: linear 0.5..1.0
+    return 0.5 + 0.5 * (norm - midpoint) / Math.max(0.001, uln - midpoint);
+  } else {
+    // Above ULN: logarithmic 1.0..~6.0
+    const foldAboveUln = norm / uln;
+    return 1.0 + Math.log2(Math.max(1, foldAboveUln)) * 1.5;
+  }
 }
 
 export function interpretRatio(ratio: number | null): string {
