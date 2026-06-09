@@ -106,9 +106,9 @@ function getSplitRationale(goal: string, level: string, daysPerWeek: number, rec
 
   const reasons: string[] = [];
 
-  if (daysPerWeek <= 3) reasons.push(`${daysPerWeek} дней/нед → фуллбоди или недель/Н сплит для частоты каждой группы ≥2×`);
+  if (daysPerWeek <= 3) reasons.push(`${daysPerWeek} дней/нед → фуллбоди или Верх/Низ сплит для частоты каждой группы ≥2×`);
 
-  else if (daysPerWeek === 4) reasons.push(`${daysPerWeek} дня → оптимально недельерх/Низ для гипертрофии (каждая группа 2×/нед)`);
+  else if (daysPerWeek === 4) reasons.push(`${daysPerWeek} дня → оптимально Верх/Низ для гипертрофии (каждая группа 2×/нед)`);
 
   else if (daysPerWeek === 5) reasons.push(`${daysPerWeek} дней → PPL + акцент или бро-сплит для специализации`);
 
@@ -118,7 +118,7 @@ function getSplitRationale(goal: string, level: string, daysPerWeek: number, rec
 
   if (weakPoints.length > 0) reasons.push(`Отстающие группы (${weakPoints.map(g => GROUP_LABELS[g] || g).join(', ')}): +20% объёма, приоритет в начале тренировки`);
 
-  if (recovery < 55) reasons.push(`недельосстановление ${recovery}% < 55 → рекомендуется делоад или снижение объёма на 30-50%`);
+  if (recovery < 55) reasons.push(`Восстановление ${recovery}% < 55 → рекомендуется делоад или снижение объёма на 30-50%`);
 
   if (goal === 'strength') reasons.push('Силовой период → RIR 1-3, базовые движения, прогрессия весов 2.5-5%/нед');
 
@@ -228,7 +228,7 @@ function buildDayPlan(result: TrainingOutput, daysPerWeek: number, weakPoints: s
 
 
 
-    const dayNames = ['Пн', 'недельт', 'Ср', 'Чт', 'Пт', 'Сб', 'недельс'];
+    const dayNames = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
 
     days.push({ day: d + 1, name: dayNames[d] || `День ${d + 1}`, exercises });
 
@@ -528,7 +528,7 @@ export const PlanScreen: React.FC<{ goal: string }> = ({ goal }) => {
 
               <div className="form-group">
 
-                <label>недельосстановление: {recovery}%</label>
+                <label>Восстановление: {recovery}%</label>
 
                 <input type="range" min={0} max={100} value={recovery} onChange={e => setRecovery(Number(e.target.value))} />
 
@@ -790,7 +790,7 @@ export const PlanScreen: React.FC<{ goal: string }> = ({ goal }) => {
 
                           <thead>
 
-                            <tr><th>Упражнение</th><th>Сеты</th><th>Повторы</th><th>RIR</th><th>Отдых</th><th>недельес</th></tr>
+                            <tr><th>Упражнение</th><th>Сеты</th><th>Повторы</th><th>RIR</th><th>Отдых</th><th>Вес</th></tr>
 
                           </thead>
 
@@ -966,7 +966,7 @@ export const PlanScreen: React.FC<{ goal: string }> = ({ goal }) => {
 
                       <div className="card" style={{ marginBottom: 12 }}>
 
-                        <h4>Неделя {week.weekNumber} — {week.mesocycleType === 'accumulation' ? 'Накопление' : week.mesocycleType === 'intensification' ? 'Интенсификация' : week.mesocycleType === 'peaking' ? 'Пик' : week.mesocycleType === 'deload' ? 'Разгрузка' : 'недельосстановление'}
+                        <h4>Неделя {week.weekNumber} — {week.mesocycleType === 'accumulation' ? 'Накопление' : week.mesocycleType === 'intensification' ? 'Интенсификация' : week.mesocycleType === 'peaking' ? 'Пик' : week.mesocycleType === 'deload' ? 'Разгрузка' : 'Восстановление'}
 
                           {week.isDeload ? ' (Делоад)' : ''}</h4>
 
@@ -1038,7 +1038,7 @@ export const PlanScreen: React.FC<{ goal: string }> = ({ goal }) => {
 
                             )}
 
-                            {!day.isTraining && <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>недельосстановление, растяжка, лёгкое кардио</div>}
+                            {!day.isTraining && <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>Восстановление, растяжка, лёгкое кардио</div>}
 
                           </div>
 
@@ -1106,7 +1106,7 @@ export const PlanScreen: React.FC<{ goal: string }> = ({ goal }) => {
 
               <div className="score-grid">
 
-                <div className="score-item"><span className="label">недельосстановление</span><span className="value" style={{ color: readinessResult.recovery > 60 ? 'var(--success)' : 'var(--danger)' }}>{readinessResult.recovery}</span></div>
+                <div className="score-item"><span className="label">Восстановление</span><span className="value" style={{ color: readinessResult.recovery > 60 ? 'var(--success)' : 'var(--danger)' }}>{readinessResult.recovery}</span></div>
 
                 <div className="score-item"><span className="label">Питание</span><span className="value" style={{ color: readinessResult.nutrition > 60 ? 'var(--success)' : 'var(--danger)' }}>{readinessResult.nutrition}</span></div>
 
@@ -1120,7 +1120,7 @@ export const PlanScreen: React.FC<{ goal: string }> = ({ goal }) => {
 
               <div className="card volume-adjustment" style={{ marginTop: 12 }}>
 
-                <h4>недельлияние на объём</h4>
+                <h4>Влияние на объём</h4>
 
                 <div style={{ fontSize: 13 }}>{readinessResult.recovery < 50 ? 'Объём снижен на 20% (восстановление < 50)' : readinessResult.recovery < 65 ? 'Объём снижен на 10%' : 'Полный объём'}</div>
 
