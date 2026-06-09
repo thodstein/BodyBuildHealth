@@ -212,6 +212,56 @@ main.has-sub-nav {
 .risk-medium.card { border-left:4px solid var(--warning); }
 .risk-low.card { border-left:4px solid var(--success); }
 
+/* === RISK COMPONENTS === */
+.risk-badge {
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  padding:2px 8px;
+  border-radius:4px;
+  font-weight:700;
+  font-size:11px;
+  color:#fff;
+  min-width:32px;
+  text-align:center;
+  transition:all 0.2s;
+}
+.risk-bar {
+  flex:1;
+  background:rgba(255,255,255,0.06);
+  border-radius:4px;
+  height:8px;
+  overflow:hidden;
+}
+.risk-bar-fill {
+  height:100%;
+  border-radius:4px;
+  transition:width 0.4s ease;
+}
+.risk-row {
+  display:flex;
+  align-items:center;
+  gap:8px;
+  background:var(--bg-secondary);
+  border-radius:6px;
+  padding:5px 10px;
+}
+.risk-label {
+  font-size:11px;
+  min-width:70px;
+  color:var(--text-dim);
+}
+.risk-section {
+  margin-bottom:10px;
+}
+.risk-section:last-child { margin-bottom:0; }
+.risk-card-header {
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  background:transparent;
+}
+
 /* === ROWS === */
 .row { display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; padding:4px 0; }
 .row:last-child { margin-bottom:0; }

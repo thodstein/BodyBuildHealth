@@ -161,19 +161,20 @@ export const RiskOverview: React.FC<{
 
       {/* Системные риски */}
       <div className="card" style={{ marginBottom: 8 }}>
-        <h3 style={{ margin: '0 0 8px', fontSize: 15 }}>🫀 Риски по системам</h3>
-        <div style={{ display: 'grid', gap: 6 }}>
+        <h3 style={{ fontSize: 15 }}>🫀 Риски по системам</h3>
+        <div style={{ display: 'grid', gap: 5 }}>
           {ALL_RISK_SYSTEMS.map((sys: string) => {
             const bd = riskResult.systemBreakdown[sys];
             if (!bd) return null;
             const label = SYSTEM_LABELS_SHORT[sys] || getSystemLabel(sys);
+            const netPct = Math.round(bd.net);
             return (
-              <div key={sys} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{ fontSize: 11, minWidth: 70, color: 'var(--text-dim)' }}>{label}</span>
-                <div style={{ flex: 1, background: 'var(--bg-secondary)', borderRadius: 3, height: 8, overflow: 'hidden' }}>
-                  <div style={{ width: `${Math.min(100, bd.net)}%`, height: '100%', background: getRiskColor(bd.net), borderRadius: 3 }} />
+              <div key={sys} style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'var(--bg-secondary)', borderRadius: 6, padding: '4px 8px' }}>
+                <span style={{ fontSize: 11, minWidth: 70, color: netPct > 30 ? getRiskColor(bd.net) : 'var(--text-dim)', fontWeight: netPct > 30 ? 600 : 400 }}>{label}</span>
+                <div style={{ flex: 1, background: 'rgba(255,255,255,0.06)', borderRadius: 3, height: 7, overflow: 'hidden' }}>
+                  <div style={{ width: `${Math.min(100, bd.net)}%`, height: '100%', background: getRiskColor(bd.net), borderRadius: 3, transition: 'width 0.3s' }} />
                 </div>
-                <span style={{ fontWeight: 700, fontSize: 11, color: getRiskColor(bd.net), minWidth: 28, textAlign: 'right' }}>{Math.round(bd.net)}%</span>
+                <span style={{ padding: '1px 6px', borderRadius: 3, fontWeight: 700, fontSize: 10, color: '#fff', background: getRiskColor(bd.net), minWidth: 24, textAlign: 'center' }}>{netPct}%</span>
               </div>
             );
           })}
@@ -214,7 +215,7 @@ export const RiskOverview: React.FC<{
             <div style={{ background: 'var(--bg-secondary)', padding: '6px 8px', borderRadius: 6 }}>
               <div style={{ color: 'var(--text-dim)', fontSize: 9 }}>🧪 Анализы</div>
               <div style={{ fontWeight: 700, color: getRiskColor(aggregatedRisk.labs.overallNet) }}>
-                {anyNoLabs && !labRiskContributions ? `🚫 ${Math.round(aggregatedRisk.labs.overallNet)}%` : `${Math.round(aggregatedRisk.labs.overallNet)}%`}
+                {anyNoLabs ? `🚫 ${Math.round(aggregatedRisk.labs.overallNet)}%` : `${Math.round(aggregatedRisk.labs.overallNet)}%`}
               </div>
             </div>
             <div style={{ background: 'var(--bg-secondary)', padding: '6px 8px', borderRadius: 6 }}>

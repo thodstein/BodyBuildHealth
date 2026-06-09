@@ -39,10 +39,11 @@ export function calculateRiskFromAnalyses(arg1: RiskResult | LabPoint[], labs?: 
 
   // Map each lab code to its contribution to risk systems
   // Format: [labCode]: { [system]: weight }
-  const CODE_TO_SYSTEM_MAP: { [key: string]: { [key: string]: number } } = {
+  // inverse: when true, LOW value → positive risk, HIGH value → 0
+  const CODE_TO_SYSTEM_MAP: { [key: string]: { [system: string]: any; inverse?: boolean } } = {
     // Cardiovascular system
     'LDL': { 'cardio': 1.0 },
-    'HDL': { 'cardio': 1.0 }, // inverse relationship handled separately
+    'HDL': { 'cardio': 1.0, inverse: true }, // low HDL = bad
     'TG': { 'cardio': 1.0 },
     'APOB': { 'cardio': 1.0 },
     'LP(a)': { 'cardio': 1.0 },
@@ -55,7 +56,7 @@ export function calculateRiskFromAnalyses(arg1: RiskResult | LabPoint[], labs?: 
     'ALP': { 'hepatic': 1.0 },
     'BILIRUBIN_TOTAL': { 'hepatic': 1.0 },
     'BILIRUBIN_DIRECT': { 'hepatic': 1.0 },
-    'ALBUMIN': { 'hepatic': 1.0 }, // inverse relationship
+    'ALBUMIN': { 'hepatic': 1.0, inverse: true }, // low albumin = bad
     'PT': { 'hepatic': 1.0 },
     'INR': { 'hepatic': 1.0 },
 
@@ -63,20 +64,20 @@ export function calculateRiskFromAnalyses(arg1: RiskResult | LabPoint[], labs?: 
     'CREATININE': { 'renal': 1.0 },
     'CYSATIN_C': { 'renal': 1.0 },
     'BUN': { 'renal': 1.0 },
-    'GFR': { 'renal': 1.0 }, // inverse relationship
+    'GFR': { 'renal': 1.0, inverse: true }, // low GFR = bad
     'UACR': { 'renal': 1.0 },
 
     // Neurological system
     'HOMOCYSTEINE': { 'neuro': 1.0 },
-    'VITAMIN_B12': { 'neuro': 1.0 }, // inverse relationship
-    'VITAMIN_D': { 'neuro': 1.0 }, // inverse relationship
-    'FOLATE': { 'neuro': 1.0 }, // inverse relationship
-    'BDNF': { 'neuro': 1.0 }, // inverse relationship
+    'VITAMIN_B12': { 'neuro': 1.0, inverse: true }, // low B12 = bad
+    'VITAMIN_D': { 'neuro': 1.0, inverse: true }, // low D = bad
+    'FOLATE': { 'neuro': 1.0, inverse: true }, // low folate = bad
+    'BDNF': { 'neuro': 1.0, inverse: true }, // low BDNF = bad
 
     // Endocrine system
     'TSH': { 'endocrine': 1.0 },
-    'FREE_T3': { 'endocrine': 1.0 }, // inverse relationship
-    'FREE_T4': { 'endocrine': 1.0 }, // inverse relationship
+    'FREE_T3': { 'endocrine': 1.0, inverse: true }, // low FT3 = bad
+    'FREE_T4': { 'endocrine': 1.0, inverse: true }, // low FT4 = bad
     'INSULIN': { 'endocrine': 1.0 },
     'HOMA_IR': { 'endocrine': 1.0 },
     'CORTISOL': { 'endocrine': 1.0 },
@@ -95,9 +96,9 @@ export function calculateRiskFromAnalyses(arg1: RiskResult | LabPoint[], labs?: 
 
     // Reproductive system
     'PROGESTERONE': { 'reproductive': 1.0 },
-    'DHEA_S': { 'reproductive': 1.0 }, // inverse relationship
-    'AMH': { 'reproductive': 1.0 }, // inverse relationship
-    'INHIBIN_B': { 'reproductive': 1.0 }, // inverse relationship
+    'DHEA_S': { 'reproductive': 1.0, inverse: true }, // low DHEA = bad
+    'AMH': { 'reproductive': 1.0, inverse: true }, // low AMH = bad
+    'INHIBIN_B': { 'reproductive': 1.0, inverse: true }, // low inhibin B = bad
 
     // Multi-system hormones
     'TESTOSTERONE': { 'endocrine': 1.0, 'reproductive': 1.0 },
@@ -126,39 +127,44 @@ export function calculateRiskFromAnalyses(arg1: RiskResult | LabPoint[], labs?: 
     // Normalize value to the same units as ULN/LLN
     const norm = value * coeff;
 
-    // Calculate deviation from normal range
-    // For values above normal: (value - uln) / uln
-    // For values below normal: (lln - value) / lln
-    // For values within normal: 0
-    let deviation = 0;
-
-    if (norm > uln) {
-      // Above normal range
-      deviation = (norm - uln) / uln;
-    } else if (norm < lln) {
-      // Below normal range
-      deviation = (lln - norm) / lln;
+    // Get the system mappings for this lab code
+    const systemMapEntry = CODE_TO_SYSTEM_MAP[code];
+    if (!systemMapEntry) {
+      // If no specific mapping, skip
+      return;
     }
-    // If within normal range, deviation remains 0
+    const isInverse = systemMapEntry.inverse === true;
+
+    // Calculate deviation from normal range
+    // For normal markers: high → risk, low → risk
+    // For inverse markers: low → risk, high → risk (but ULN-side ignored if protective)
+    let deviation = 0;
+    if (!isInverse) {
+      // Normal direction: above ULN = risk
+      if (norm > uln) {
+        deviation = (norm - uln) / uln;
+      }
+    } else {
+      // Inverse direction: below LLN = risk (above ULN = protective → 0)
+      if (norm < lln) {
+        deviation = (lln - norm) / lln;
+      }
+    }
+    // If within normal range (or protective side for inverse), deviation = 0
 
     // If no deviation, skip contribution
     if (deviation === 0) {
       return;
     }
 
-    // Get the system mappings for this lab code
-    const systemMap = CODE_TO_SYSTEM_MAP[code];
-    if (!systemMap) {
-      // If no specific mapping, skip
-      return;
-    }
-
-    // Apply deviation to each mapped system
-    Object.entries(systemMap).forEach(([system, weight]) => {
+    // Apply deviation to each mapped system (skip 'inverse' meta-key)
+    Object.entries(systemMapEntry).forEach(([system, weight]) => {
+      if (system === 'inverse') return;
       if (ALL_RISK_SYSTEMS.includes(system as any)) {
+        const w = Number(weight) || 0;
         // Contribution is deviation * weight * 25
         // Allows 2×ULN → 25%, 3×ULN → 50%, 5×ULN → 100%
-        const contribution = Math.min(100, Math.max(0, deviation * weight * 25));
+        const contribution = Math.min(100, Math.max(0, deviation * w * 25));
         systemContributions[system] += contribution;
       }
     });

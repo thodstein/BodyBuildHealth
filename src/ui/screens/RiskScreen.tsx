@@ -73,7 +73,6 @@ export const RiskScreen: React.FC = () => {
     const next = !forceNoLabs;
     setForceNoLabs(next);
     setGlobalNoLabsState(next);
-    setGlobalNoLabsState(next);
     if (next) setNoLabsSystemsState([]);
     notifyDataChange();
   };
@@ -149,27 +148,22 @@ export const RiskScreen: React.FC = () => {
     if (!pharmaRisk) return null;
     const emptyDiag = { overallRaw: 0, overallNet: 0, systemBreakdown: {} as Record<string, { raw: number; net: number }> };
 
-    // When penalty is active and no labs exist, create a synthetic lab contribution reflecting penalty
-    if (!hasLabs && shouldApplyPenalty) {
+    // Build lab contribution: real labs if available, else synthetic from penalty
+    let labContribForAgg: { systemContributions: Record<string, number>; totalRisk: number };
+    if (hasLabs) {
+      labContribForAgg = labRiskContributions || { systemContributions: Object.fromEntries(ALL_RISK_SYSTEMS.map(s => [s, 0])), totalRisk: 0 };
+    } else if (shouldApplyPenalty) {
       const phase = linked.profile?.settings?.phase || 'baseline';
       const pen = calculatePenaltyCoefficients(phase, [], [], 1, linked.course, globalNoLabs);
       const totalMultiplier = 1.0 + pen.labPenalty + pen.diagnosticPenalty;
-      const penaltyPct = Math.min(100, (totalMultiplier - 1) * 100); // e.g. 1.40 → 40%
-      const penaltyContrib = Object.fromEntries(
-        ALL_RISK_SYSTEMS.map(s => [s, penaltyPct * 0.5]) // distribute half the penalty across systems
-      );
-      const penaltyLabContrib = { systemContributions: penaltyContrib, totalRisk: penaltyPct };
-      return calculateAggregatedRisks(pharmaRisk, penaltyLabContrib, trainingRisk, nutritionRisk, emptyDiag);
+      const penaltyPct = Math.min(100, (totalMultiplier - 1) * 100);
+      const penaltyContrib = Object.fromEntries(ALL_RISK_SYSTEMS.map(s => [s, penaltyPct * 0.5]));
+      labContribForAgg = { systemContributions: penaltyContrib, totalRisk: penaltyPct };
+    } else {
+      labContribForAgg = { systemContributions: Object.fromEntries(ALL_RISK_SYSTEMS.map(s => [s, 0])), totalRisk: 0 };
     }
 
-    const emptyLabContrib = { systemContributions: Object.fromEntries(ALL_RISK_SYSTEMS.map(s => [s, 0])), totalRisk: 0 };
-    return calculateAggregatedRisks(
-      pharmaRisk,
-      labRiskContributions || emptyLabContrib,
-      trainingRisk,
-      nutritionRisk,
-      emptyDiag
-    );
+    return calculateAggregatedRisks(pharmaRisk, labContribForAgg, trainingRisk, nutritionRisk, emptyDiag);
   }, [pharmaRisk, labRiskContributions, trainingRisk, nutritionRisk, shouldApplyPenalty, hasLabs, linked.profile, linked.course, globalNoLabs]);
 
   // Merge a risk source (training/nutrition) into a RiskResult

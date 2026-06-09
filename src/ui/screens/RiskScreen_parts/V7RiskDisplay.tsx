@@ -202,50 +202,57 @@ export const V7RiskDisplay: React.FC<{ result: V7RiskResult }> = ({ result }) =>
         </div>
       </div>
 
-      <div className="card" style={{ marginBottom: 12 }}>
-        <h3 style={{ margin: '0 0 10px 0' }}>🫀 Органные системы</h3>
+      <div className="card">
+        <h3 style={{ margin: '0 0 10px' }}>🫀 Органные системы</h3>
         {Object.entries(organSummary).map(([sysKey, sysData]: [string, any]) => {
           const label = ORGAN_LABELS_V7[sysKey] || sysKey;
           const isExpanded = expandedOrgan === sysKey;
           const organVal = getOrganRisk(sysKey);
           const organPct = fmtPct01(organVal);
+          const riskLevel = organPct < 20 ? 'low' : organPct < 40 ? 'medium' : 'high';
           return (
-            <div key={sysKey} style={{ marginBottom: 8, background: 'var(--bg-secondary)', padding: 8, borderRadius: 6 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }} onClick={() => setExpandedOrgan(isExpanded ? null : sysKey)}>
+            <div key={sysKey} className={`risk-${riskLevel}`}
+              style={{ background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', borderRadius: 8, marginBottom: 8, overflow: 'hidden',
+                borderLeft: `3px solid ${getRiskColor(organPct)}` }}>
+              <div className="row" style={{ cursor: 'pointer', marginBottom: 0, padding: '8px 10px' }} onClick={() => setExpandedOrgan(isExpanded ? null : sysKey)}>
                 <span style={{ fontSize: 12, fontWeight: 600 }}>{label}</span>
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                   <div style={{ width: 50, background: 'rgba(255,255,255,0.1)', borderRadius: 3, height: 5, overflow: 'hidden' }}>
                     <div style={{ width: `${Math.min(100, organPct)}%`, height: '100%', background: getRiskColor(organPct), borderRadius: 3 }} />
                   </div>
-                  <span style={{ fontWeight: 700, fontSize: 12, color: getRiskColor(organPct), minWidth: 36, textAlign: 'right' }}>{organPct}%</span>
-                  <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>{isExpanded ? '▾' : '▸'}</span>
+                  <span style={{ padding: '2px 7px', borderRadius: 4, fontWeight: 700, fontSize: 11, color: '#fff', background: getRiskColor(organPct), minWidth: 34, textAlign: 'center' }}>{organPct}%</span>
+                  <span style={{ fontSize: 10, color: 'var(--text-dim)', transition: 'transform 0.2s', transform: isExpanded ? 'rotate(180deg)' : 'rotate(0)' }}>▾</span>
                 </div>
               </div>
-              {isExpanded && sysData.mechanisms && (typeof sysData.mechanisms === 'object') && Object.keys(sysData.mechanisms).length > 0 && (
-                <div style={{ marginTop: 6, borderTop: '1px solid var(--border)', paddingTop: 6 }}>
-                  {Object.entries(sysData.mechanisms).map(([idx, mechData]: [string, any]) => {
-                    const mechIdx = Number(idx);
-                    if (!hasValidMech(sysKey, mechIdx)) return null;
-                    const mechName = getMechName(sysKey, mechIdx);
-                    const netVal = Math.round((mechData.P_net ?? mechData.p5 ?? 0) * 100);
-                    const rawVal = Math.round((mechData.P_raw ?? mechData.raw ?? 0) * 100);
-                    return (
-                      <div key={mechIdx} style={{ marginBottom: 4 }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10 }}>
-                          <span style={{ color: 'var(--text-dim)' }}>{mechName}</span>
-                          <div style={{ display: 'flex', gap: 4 }}>
-                            <span style={{ color: getRiskColor(rawVal) }} title="База">{rawVal}%</span>
-                            <span style={{ color: getRiskColor(netVal) }} title="Нетто">{netVal}%</span>
-                            {mechData.geneticMult > 1.05 && <span style={{ fontSize: 8, color: '#eab308' }}>🧬{mechData.geneticMult.toFixed(2)}</span>}
+              {isExpanded && (
+                <div style={{ padding: '2px 10px 10px' }}>
+                  {sysData.mechanisms && (typeof sysData.mechanisms === 'object') && Object.keys(sysData.mechanisms).length > 0 && (
+                    <div style={{ marginBottom: 8 }}>
+                      {Object.entries(sysData.mechanisms).map(([idx, mechData]: [string, any]) => {
+                        const mechIdx = Number(idx);
+                        if (!hasValidMech(sysKey, mechIdx)) return null;
+                        const mechName = getMechName(sysKey, mechIdx);
+                        const netVal = Math.round((mechData.P_net ?? mechData.p5 ?? 0) * 100);
+                        const rawVal = Math.round((mechData.P_raw ?? mechData.raw ?? 0) * 100);
+                        return (
+                          <div key={mechIdx} style={{ marginBottom: 4 }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10 }}>
+                              <span style={{ color: 'var(--text-dim)' }}>{mechName}</span>
+                              <div style={{ display: 'flex', gap: 4 }}>
+                                <span style={{ color: getRiskColor(rawVal) }} title="База">{rawVal}%</span>
+                                <span style={{ color: getRiskColor(netVal), fontWeight: 600 }} title="Нетто">{netVal}%</span>
+                                {mechData.geneticMult > 1.05 && <span style={{ fontSize: 8, color: '#eab308' }}>🧬{mechData.geneticMult.toFixed(2)}</span>}
+                              </div>
+                            </div>
+                            <div style={{ background: 'rgba(255,255,255,0.05)', borderRadius: 2, height: 4, overflow: 'hidden' }}>
+                              <div style={{ width: Math.min(100, netVal) + '%', height: '100%', background: getRiskColor(netVal), borderRadius: 2, transition: 'width 0.3s' }} />
+                            </div>
                           </div>
-                        </div>
-                        <div style={{ background: 'rgba(255,255,255,0.05)', borderRadius: 2, height: 4, overflow: 'hidden' }}>
-                          <div style={{ width: Math.min(100, netVal) + '%', height: '100%', background: getRiskColor(netVal), borderRadius: 2, transition: 'width 0.3s' }} />
-                        </div>
-                      </div>
-                    );
-                  })}
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 4, marginTop: 8 }}>
+                        );
+                      })}
+                    </div>
+                  )}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 4 }}>
                     <div style={{ background: 'rgba(239,68,68,0.1)', padding: '4px 6px', borderRadius: 4, textAlign: 'center' }}>
                       <div style={{ fontSize: 8, color: 'var(--text-dim)' }}>Острый</div>
                       <div style={{ fontSize: 12, fontWeight: 600 }}>{fmtPct01(sysData.acute ?? 0)}%</div>

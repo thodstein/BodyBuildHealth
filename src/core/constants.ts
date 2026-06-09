@@ -459,7 +459,7 @@ export const UCUM_MAP: Record<string, { prefUnit: string; coeff: number; uln: nu
   'FOL':  { prefUnit: 'ng/mL', coeff: 1, uln: 20, lln: 3, name: 'Фолат' },
   'TIBC': { prefUnit: 'umol/L', coeff: 1, uln: 70, lln: 45, name: 'ОЖСС' },
   'PSA':  { prefUnit: 'ng/mL', coeff: 1, uln: 4, lln: 0, name: 'ПСА' },
-  'DHEA_S': { prefUnit: 'ug/dL', coeff: 1, uln: 560, lln: 80, name: 'ДГЭА-С' ,
+  'DHEA_S': { prefUnit: 'ug/dL', coeff: 1, uln: 560, lln: 80, name: 'ДГЭА-С' },
   'D_DIMER': { prefUnit: 'ug/mL', coeff: 1, uln: 0.5, lln: 0, name: 'D-димер' },
   'FIBRINOGEN': { prefUnit: 'g/L', coeff: 1, uln: 4.0, lln: 2.0, name: 'Фибриноген' },
   'TROPONIN': { prefUnit: 'ng/mL', coeff: 1, uln: 0.04, lln: 0, name: 'Тропонин' },
@@ -478,6 +478,4 @@ export const UCUM_MAP: Record<string, { prefUnit: string; coeff: number; uln: nu
   'HR': { prefUnit: 'bpm', coeff: 1, uln: 90, lln: 60, name: 'ЧСС' },
   'ENDOTHELIN1': { prefUnit: 'pg/mL', coeff: 1, uln: 3.0, lln: 0, name: 'Эндотелин-1' },
   'NO_MARKER': { prefUnit: '?mol/L', coeff: 1, uln: 50, lln: 10, name: 'Оксид азота' },
-
-}
 } as const;

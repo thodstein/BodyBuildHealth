@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import type { UserProfile, LabPoint, CourseEntry, InjuryRecord } from './types';
 import { getProfile, updateProfile, onProfileChange } from './profile-manager';
 import { db } from './db';
+import { UCUM_MAP } from './constants';
 import { calcReadiness } from '../engines/readiness.engine';
 import { calculateRisks } from '../engines/risk.engine';
 import { calculateSupport, generateSupportStack, type SupportInput } from '../engines/support.engine';
@@ -150,10 +151,21 @@ export function useDataLink(): LinkedData {
     const astVal = getLatestLabValue(labs, 'AST');
     const crpVal = getLatestLabValue(labs, 'CRP');
     const hgbVal = getLatestLabValue(labs, 'HGB');
-    const altNorm = altVal !== undefined ? Math.min(1, altVal / 120) : 0.5;
-    const astNorm = astVal !== undefined ? Math.min(1, astVal / 80) : 0.5;
-    const crpNorm = crpVal !== undefined ? Math.min(1, crpVal / 10) : 0.3;
-    const hgbNorm = hgbVal !== undefined ? (hgbVal >= 130 && hgbVal <= 170 ? 0.8 : 0.4) : 0.7;
+    const altUcum = UCUM_MAP['ALT'];
+    const astUcum = UCUM_MAP['AST'];
+    const crpUcum = UCUM_MAP['CRP'];
+    const hgbUcum = UCUM_MAP['HGB'];
+    const normLab = (val: number | undefined, ucum: typeof altUcum, threshold: number): number => {
+      if (val === undefined) return 0.5;
+      const norm = val * (ucum?.coeff || 1);
+      return Math.min(1, norm / (ucum?.uln || threshold));
+    };
+    const altNorm = normLab(altVal, altUcum, 120);
+    const astNorm = normLab(astVal, astUcum, 80);
+    const crpNorm = normLab(crpVal, crpUcum, 10);
+    const hgbNorm = hgbVal !== undefined
+      ? (() => { const n = hgbVal * (hgbUcum?.coeff || 1); return n >= (hgbUcum?.lln || 130) && n <= (hgbUcum?.uln || 170) ? 0.8 : 0.4; })()
+      : 0.7;
 
     return calcReadiness({
       sleepHours: s.baselineSleepHours ?? 7,

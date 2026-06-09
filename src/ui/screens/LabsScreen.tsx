@@ -133,7 +133,22 @@ export const LabsScreen: React.FC = () => {
   const labRisks = useMemo<RiskResult | null>(() => {
     if (!hasLabs) return null;
     const labData = labs.map(l => ({ ...l, date: l.date || new Date().toISOString().split('T')[0] }));
-    return calculateRiskFromAnalyses({ overallRaw: 0, overallNet: 0, systemBreakdown: {} }, labData);
+    // Use overload-1 for raw contributions, then build RiskResult manually
+    // to avoid geometric mean killing the result when most systems have 0
+    const contribs = calculateRiskFromAnalyses(labData);
+    const systemBreakdown: Record<string, { raw: number; net: number }> = {};
+    let maxNet = 0;
+    for (const sys of ALL_RISK_SYSTEMS) {
+      const c = contribs.systemContributions[sys] || 0;
+      systemBreakdown[sys] = { raw: c, net: c };
+      if (c > maxNet) maxNet = c;
+    }
+    // Use max as overall (not geometric mean, which kills with sparse data)
+    const nonZero = Object.values(systemBreakdown).filter(v => v.net > 0);
+    const overallNet = nonZero.length > 0
+      ? Math.round(nonZero.reduce((s, v) => s + v.net, 0) / nonZero.length)
+      : 0;
+    return { overallRaw: maxNet, overallNet, systemBreakdown } as RiskResult;
   }, [hasLabs, labs]);
 
   // Lab indices
@@ -330,8 +345,8 @@ export const LabsScreen: React.FC = () => {
                   const info = UCUM_MAP[code.toUpperCase()];
                   const isSubmitted = submittedCodes.has(code.toUpperCase());
                   const latest = labs.find(l => l.code.toUpperCase() === code.toUpperCase());
-                  const isHigh = latest && info ? latest.value > info.uln : false;
-                  const isLow = latest && info ? latest.value < info.lln : false;
+                  const isHigh = latest && info ? (latest.value * (info.coeff || 1)) > info.uln : false;
+                  const isLow = latest && info ? (latest.value * (info.coeff || 1)) < info.lln : false;
                   return (
                     <button key={code} onClick={() => { setInputCode(code); setInputUnit(info?.prefUnit || ''); setShowLabInput(true); }} style={{
                       padding: '2px 7px', borderRadius: 5, fontSize: 10, cursor: 'pointer',
