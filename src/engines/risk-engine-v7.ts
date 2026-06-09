@@ -16,7 +16,7 @@ import {
   type MCRunConfig, DEFAULT_MC_CONFIG,
 } from './risk-engine-v7-core';
 import {
-  computeAllOrgans, type OrganInput, type AllOrgansResult, type OrganModuleResult, ORGAN_PARAMS,
+  type OrganInput,
 } from './risk-engine-v7-organs';
 import {
   computeV7Matrix, type MatrixInput, type MatrixResult, LAB_REFERENCES, RISK_SYSTEMS_V7,
@@ -26,6 +26,7 @@ import {
 } from './risk-engine-v7-extensions';
 import {
   simulatePK, simulateReceptorsAndSignaling, runMonteCarlo, aggregateMCResults,
+  runTimeSeriesSimulation, type TimeSeriesResult,
   RECEPTOR_DEFAULTS, SIGNALING_DEFAULTS,
 } from './risk-engine-v7-simulation';
 import type { RiskResult, MechanismCell, LabPoint, CourseEntry } from '../core/types';
@@ -83,8 +84,11 @@ export interface V7OrganSummary {
 
 export interface V7RiskResult {
   matrix: MatrixResult;
-  organs: AllOrgansResult;
+  organs: any;  // TimeSeriesResult (was AllOrgansResult)
   organSummary: Record<string, V7OrganSummary>;
+  weeklyOrganData: Record<string, number[]>;  // week-indexed organ risk [0..11]
+  weeklyGlobalData: { raw: number; net: number }[];  // per-week global risk
+  dailyOrganStates?: Record<string, number[]>;
   globalRiskRaw: number;
   globalRiskNet: number;
   globalPEvent: number;
@@ -293,25 +297,60 @@ export function runV7Simulation(input: V7RiskInput): V7RiskResult {
   let erEff = pkResult.finalER;
   let irEff = pkResult.finalIR;
 
-  // 3. Compute organ modules
-  const organs = computeAllOrgans(organInput);
+  // 3. Run time-series simulation (daily organ stepping with PK)
+  const timeSeries = runTimeSeriesSimulation(organInput, pkResult.pkResults as any, days, 1, 0.05);
+  const organKeys = Object.keys(timeSeries.organStates);
+  const w = 7; // days per week
+  const numWeeks = Math.floor(days / w);
 
-  // 4. Apply stazh chronic multiplier
-  const stazhMult = stazhChronicMultiplier(
-    organInput.Stazh_life,
-    organInput.Stazh_cont,
-    organInput.Inflamm_core
-  );
-
-  // 5. Inter-organ influence
-  const organStates: Record<string, number> = {};
-  const organKeys = Object.keys(organs) as (keyof AllOrgansResult)[];
+  // Compute weekly organ averages & daily organ risk
+  const weeklyOrganData: Record<string, number[]> = {};
+  const weeklyGlobalData: { raw: number; net: number }[] = [];
+  const dailyOrgan: Record<string, number[]> = {};
   for (const key of organKeys) {
-    organStates[key] = organs[key].state.composite;
+    weeklyOrganData[key] = [];
+    dailyOrgan[key] = [];
   }
-  const interOrgan = computeInterOrganDamage(organStates);
+  for (let wk = 0; wk < numWeeks; wk++) {
+    const startDay = wk * w;
+    const endDay = Math.min(startDay + w, days);
+    const weekAvg: Record<string, number> = {};
+    for (const key of organKeys) weekAvg[key] = 0;
+    let count = 0;
+    for (let d = startDay; d < endDay; d++) {
+      for (const key of organKeys) {
+        if (timeSeries.organStates[key] && d < timeSeries.organStates[key].length) {
+          const comp = timeSeries.organStates[key][d].composite;
+          dailyOrgan[key].push(comp);
+          weekAvg[key] += comp;
+        }
+      }
+      count++;
+    }
+    for (const key of organKeys) {
+      weeklyOrganData[key].push(count > 0 ? weekAvg[key] / count : 0);
+    }
+    // Weekly global risk from cumulative risk at end of week
+    const wkEnd = Math.min(endDay, days) - 1;
+    const wkCumRisks: Record<string, number> = {};
+    const wkPEvents: Record<string, number> = {};
+    const wkWeights: Record<string, number> = {
+      heart: 0.14, vessels: 0.09, liver: 0.14, kidney: 0.09,
+      blood: 0.05, endocrine: 0.08, metabolic: 0.07, ghigf: 0.04,
+      ins_axis: 0.06, musculoskeletal: 0.05, neuro_toxicity: 0.12, reproductive: 0.05,
+    };
+    for (const key of organKeys) {
+      const st = timeSeries.organStates[key]?.[wkEnd];
+      wkCumRisks[key] = st?.cumRisk ?? 0;
+      wkPEvents[key] = st?.pEvent ?? 0;
+    }
+    weeklyGlobalData.push({
+      raw: globalRiskSoft(wkCumRisks, wkWeights),
+      net: 0, // filled from matrix per-week below
+    });
+  }
 
-  // 6. Compute matrix
+  // 4. Compute matrix
   const matrixInput: MatrixInput = {
     labs: input.labs, course: input.course, genetics: input.genetics,
     nutrition: input.nutrition, training: input.training,
@@ -319,23 +358,49 @@ export function runV7Simulation(input: V7RiskInput): V7RiskResult {
   };
   const matrix = computeV7Matrix(matrixInput, input.supportIds ?? []);
 
-  // 7. Build organ summary with stazh and inter-organ
+  // 5. Compute organ summary from LAST 4 WEEKS average (steady-state)
+  const organSummaryStartWeek = Math.max(0, numWeeks - 4);
+  const stazhMult = stazhChronicMultiplier(
+    organInput.Stazh_life,
+    organInput.Stazh_cont,
+    organInput.Inflamm_core
+  );
   const organSummary: Record<string, V7OrganSummary> = {};
   for (const key of organKeys) {
-    const org = organs[key];
-    const interDamage = interOrgan[key] ?? 0;
-    const enhancedComposite = Math.min(1, org.state.composite * stazhMult + interDamage);
+    let sumS = 0, sumAcute = 0, sumChronic = 0, sumFibrosis = 0, sumCumRisk = 0, sumPEvent = 0;
+    let nSteady = 0;
+    // Use last 4 weeks per-organ from timeSeries
+    const startDay = Math.max(0, days - 28);
+    for (let d = startDay; d < days; d++) {
+      const st = timeSeries.organStates[key]?.[d];
+      if (st) {
+        sumS += st.composite;
+        sumAcute += st.acute;
+        sumChronic += st.chronic;
+        sumFibrosis += st.fibrosis;
+        sumCumRisk += st.cumRisk;
+        sumPEvent += st.pEvent;
+        nSteady++;
+      }
+    }
+    const meanS = nSteady > 0 ? sumS / nSteady : 0;
     organSummary[key] = {
-      meanS: enhancedComposite,
-      p5S: enhancedComposite * 0.85,
-      p95S: Math.min(1, enhancedComposite * 1.15),
-      meanCumRisk: org.state.cumRisk * stazhMult,
-      meanPEvent: 1 - Math.exp(-org.state.hazard * stazhMult),
-      acute: org.state.acute,
-      chronic: Math.min(1, org.state.chronic * stazhMult),
-      fibrosis: org.state.fibrosis,
+      meanS: Math.min(1, meanS * stazhMult),
+      p5S: Math.min(1, meanS * stazhMult * 0.85),
+      p95S: Math.min(1, meanS * stazhMult * 1.15),
+      meanCumRisk: nSteady > 0 ? sumCumRisk / nSteady : 0,
+      meanPEvent: nSteady > 0 ? sumPEvent / nSteady : 0,
+      acute: nSteady > 0 ? sumAcute / nSteady : 0,
+      chronic: Math.min(1, (nSteady > 0 ? sumChronic / nSteady : 0) * stazhMult),
+      fibrosis: nSteady > 0 ? sumFibrosis / nSteady : 0,
       mechanisms: [],
     };
+  }
+
+  // Fill per-week global net from matrix (repeated for each week)
+  const matrixWeekNet = matrix.overallNet / 100;
+  for (let wk = 0; wk < numWeeks; wk++) {
+    weeklyGlobalData[wk].net = Math.min(100, matrixWeekNet * 100);
   }
 
   // Add mechanism details from matrix
@@ -352,7 +417,7 @@ export function runV7Simulation(input: V7RiskInput): V7RiskResult {
     }
   }
 
-  // 8. Global risk
+  // 6. Global risk (from cumulative risk at end of simulation)
   const organCumRisks: Record<string, number> = {};
   const organPEvents: Record<string, number> = {};
   const organWeights: Record<string, number> = {
@@ -361,10 +426,10 @@ export function runV7Simulation(input: V7RiskInput): V7RiskResult {
     ins_axis: 0.06, musculoskeletal: 0.05, neuro_toxicity: 0.12, reproductive: 0.05,
   };
   for (const key of organKeys) {
-    organCumRisks[key] = organSummary[key].meanCumRisk;
-    organPEvents[key] = organSummary[key].meanPEvent;
+    const last = timeSeries.organStates[key]?.[days - 1];
+    organCumRisks[key] = last?.cumRisk ?? 0;
+    organPEvents[key] = last?.pEvent ?? 0;
   }
-
   const globalRiskRaw = globalRiskSoft(organCumRisks, organWeights);
   const globalRiskNet = matrix.overallNet / 100;
   const globalPEvent = globalPEventHard(organPEvents);
@@ -380,18 +445,25 @@ export function runV7Simulation(input: V7RiskInput): V7RiskResult {
   const availableLabs = input.labs.filter(l => LAB_REFERENCES[l.code] || LAB_REFERENCES[l.name]).length;
   const dataQuality = requiredLabs > 0 ? Math.min(1, availableLabs / requiredLabs) : 0;
 
-  // 11. Build legacy RiskResult
+  // 11. Build legacy RiskResult (use organSummary meanS as proxy for totalDamage)
   const systemBreakdown: Record<string, { raw: number; net: number }> = {};
   for (const sys of RISK_SYSTEMS_V7) {
     const matrixSys = matrix.systems[sys];
     systemBreakdown[sys] = { raw: matrixSys.raw, net: matrixSys.net };
   }
-  systemBreakdown.metabolic = systemBreakdown.metabolic ?? { raw: organs.metabolic.totalDamage * 100, net: organs.metabolic.totalDamage * 80 };
-  systemBreakdown.ghigf = systemBreakdown.ghigf ?? { raw: organs.ghigf.totalDamage * 100, net: organs.ghigf.totalDamage * 80 };
-  systemBreakdown.ins_axis = systemBreakdown.ins_axis ?? { raw: organs.ins_axis.totalDamage * 100, net: organs.ins_axis.totalDamage * 80 };
-  systemBreakdown.neuro_toxicity = { raw: organs.neuro_toxicity.totalDamage * 100, net: organs.neuro_toxicity.totalDamage * 80 };
-  systemBreakdown.blood = { raw: organs.blood.totalDamage * 100, net: organs.blood.totalDamage * 80 };
-  systemBreakdown.musculoskeletal = { raw: organs.musculoskeletal.totalDamage * 100, net: organs.musculoskeletal.totalDamage * 80 };
+  const osHeart = organSummary.heart?.meanS ?? 0;
+  const osMetabolic = organSummary.metabolic?.meanS ?? 0;
+  const osGhigf = organSummary.ghigf?.meanS ?? 0;
+  const osIns = organSummary.ins_axis?.meanS ?? 0;
+  const osNeuro = organSummary.neuro_toxicity?.meanS ?? 0;
+  const osBlood = organSummary.blood?.meanS ?? 0;
+  const osMusculo = organSummary.musculoskeletal?.meanS ?? 0;
+  systemBreakdown.metabolic = systemBreakdown.metabolic ?? { raw: osMetabolic * 100, net: osMetabolic * 80 };
+  systemBreakdown.ghigf = systemBreakdown.ghigf ?? { raw: osGhigf * 100, net: osGhigf * 80 };
+  systemBreakdown.ins_axis = systemBreakdown.ins_axis ?? { raw: osIns * 100, net: osIns * 80 };
+  systemBreakdown.neuro_toxicity = { raw: osNeuro * 100, net: osNeuro * 80 };
+  systemBreakdown.blood = { raw: osBlood * 100, net: osBlood * 80 };
+  systemBreakdown.musculoskeletal = { raw: osMusculo * 100, net: osMusculo * 80 };
 
   for (const key of Object.keys(systemBreakdown)) {
     systemBreakdown[key].raw = Math.min(100, systemBreakdown[key].raw * penaltyMultiplier * V7_CALIBRATION_FACTOR);
@@ -442,7 +514,9 @@ export function runV7Simulation(input: V7RiskInput): V7RiskResult {
   }
 
   return {
-    matrix, organs, organSummary,
+    matrix, organs: timeSeries as any, organSummary,
+    weeklyOrganData, weeklyGlobalData,
+    dailyOrganStates: dailyOrgan,
     globalRiskRaw: Math.min(100, globalRiskRaw * 100 * penaltyMultiplier),
     globalRiskNet: Math.min(100, globalRiskNet * 100 * penaltyMultiplier),
     globalPEvent, legacyResult, dataQuality, mode: input.mode,

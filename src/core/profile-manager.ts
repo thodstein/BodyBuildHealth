@@ -11,7 +11,7 @@ export function onProfileChange(fn: ProfileListener): () => void {
   return () => { listeners.delete(fn); };
 }
 
-function notifyAll() {
+export function notifyAll() {
   listeners.forEach(fn => { try { fn(); } catch {} });
 }
 

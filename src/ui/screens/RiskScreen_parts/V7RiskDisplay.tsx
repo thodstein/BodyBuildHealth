@@ -8,8 +8,7 @@ import { useDataLink } from '../../../core/data-link';
 import { getGlobalNoLabs, getNoLabsSystems } from '../LabsScreen';
 import { SYSTEM_MECHANISMS } from '../../../core/system-mechanisms';
 import { PHARMA_DB } from '../../../core/pharma-database';
-import { notifyDataChange } from '../../../core/data-link';
-import { getProfile } from '../../../core/profile-manager';
+import { getProfile, updateProfile } from '../../../core/profile-manager';
 
 function getSubstanceName(id: string): string {
   const entry = PHARMA_DB[id];
@@ -69,6 +68,7 @@ export const V7RiskDisplay: React.FC<{ result: V7RiskResult }> = ({ result }) =>
   const [pkDay, setPkDay] = useState(42);
   const [selectedOrgan3D, setSelectedOrgan3D] = useState<string | null>(null);
   const [mcEnabled, setMcEnabled] = useState<boolean>(false);
+  const [organWeek, setOrganWeek] = useState<number>(0); // 0 = avg over 12 weeks, 1-12 = specific week
   const linked = useDataLink();
 
   const toggleMC = () => {
@@ -76,11 +76,10 @@ export const V7RiskDisplay: React.FC<{ result: V7RiskResult }> = ({ result }) =>
     setMcEnabled(next);
     const p = getProfile();
     p.settings.mcRuns = next ? 50 : 0;
-    localStorage.setItem('he_profile_v2', JSON.stringify(p));
-    notifyDataChange();
+    updateProfile(p);
   };
 
-  const { matrix, organSummary, globalRiskRaw, globalRiskNet, globalPEvent, dataQuality, organs, mcResult, pkTimeSeries } = result;
+  const { matrix, organSummary, globalRiskRaw, globalRiskNet, globalPEvent, dataQuality, organs, mcResult, pkTimeSeries, weeklyOrganData = {}, weeklyGlobalData = [] } = result;
 
   // Scale helpers:
   // globalRiskRaw/Net are already in 0-100 (engine multiplies by 100)
@@ -145,10 +144,31 @@ export const V7RiskDisplay: React.FC<{ result: V7RiskResult }> = ({ result }) =>
     return { days: Array.from({ length: days }, (_, i) => i), organDaily };
   }, [pkTimeSeries, organSummary]);
 
+  // Helper: get organ risk for selected week (0 = avg over full period)
+  const getOrganRisk = (key: string): number => {
+    if (organWeek > 0 && weeklyOrganData[key] && weeklyOrganData[key].length >= organWeek) {
+      return weeklyOrganData[key][organWeek - 1] ?? 0;
+    }
+    return organSummary[key]?.meanS ?? 0;
+  };
+
   const renderOrgans = () => (
     <div>
       <div className="card" style={{ marginBottom: 12 }}>
         <h3 style={{ margin: '0 0 10px 0' }}>🔬 V7 Risk Engine — Полная модель</h3>
+        <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 10 }}>
+          <span style={{ fontSize: 10, color: 'var(--text-dim)', whiteSpace: 'nowrap' }}>Неделя:</span>
+          <select value={organWeek} onChange={e => setOrganWeek(Number(e.target.value))}
+            style={{ padding: '4px 8px', borderRadius: 4, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 11 }}>
+            <option value={0}>📊 Среднее за 12 нед</option>
+            {[1,2,3,4,5,6,7,8,9,10,11,12].map(w => <option key={w} value={w}>Нед {w}</option>)}
+          </select>
+          {organWeek > 0 && weeklyGlobalData[organWeek - 1] && (
+            <span style={{ fontSize: 10, color: 'var(--text-dim)', marginLeft: 8 }}>
+              Общий риск (raw): {fmtPct100(weeklyGlobalData[organWeek - 1].raw)}%
+            </span>
+          )}
+        </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 6 }}>
           <div style={{ background: 'var(--bg-secondary)', padding: 10, borderRadius: 8, textAlign: 'center' }}>
             <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>Raw Risk</div>
@@ -187,7 +207,8 @@ export const V7RiskDisplay: React.FC<{ result: V7RiskResult }> = ({ result }) =>
         {Object.entries(organSummary).map(([sysKey, sysData]: [string, any]) => {
           const label = ORGAN_LABELS_V7[sysKey] || sysKey;
           const isExpanded = expandedOrgan === sysKey;
-          const organPct = fmtPct01(sysData.meanS ?? 0);
+          const organVal = getOrganRisk(sysKey);
+          const organPct = fmtPct01(organVal);
           return (
             <div key={sysKey} style={{ marginBottom: 8, background: 'var(--bg-secondary)', padding: 8, borderRadius: 6 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }} onClick={() => setExpandedOrgan(isExpanded ? null : sysKey)}>
