@@ -20,6 +20,7 @@ import { RISK_SYSTEMS, ALL_RISK_SYSTEMS } from '../../core/constants';
 import { db } from '../../core/db';
 import { getProfile } from '../../core/profile-manager';
 
+
 type ScreenId = 'dashboard' | 'pharma' | 'course' | 'peptides' | 'nutrition' | 'plan' | 'substances' | 'labs' | 'risks' | 'profile' | 'predictive' | 'marketplace' | 'articles' | 'assistant' | 'gamification' | 'fertility-pct' | 'calculators' | 'reports' | 'integrations' | 'role-management' | 'support' | 'training';
 
 interface Props {
@@ -103,10 +104,22 @@ export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
       // Calculate risks
       try {
         const genetics = settings.genetics ?? {};
+        const activeDrugs: Record<string, { dosePerWeek: number }> = {};
+        let totalDose = 0;
+        for (const c of courseData) {
+          const sid = c.substanceId;
+          const freq = typeof c.frequency === 'number' ? c.frequency : 1;
+          if (!activeDrugs[sid]) activeDrugs[sid] = { dosePerWeek: 0 };
+          activeDrugs[sid].dosePerWeek += c.doseValue * freq;
+          totalDose += c.doseValue * freq;
+        }
         const riskInput = {
           genetics,
           nutritionFactor: settings.nutritionFactor ?? 0.8,
           trainingFactor: settings.trainingFactor ?? 0.7,
+          activeDrugs,
+          supportCoverage: {},
+          biomarkerValues: {} as Record<string, number>,
         };
         const result = calculateRisks(riskInput);
         setRiskResult(result);

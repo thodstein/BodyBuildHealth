@@ -135,7 +135,7 @@ const MARKER_TO_LAB: Record<string, string[]> = {
   'Тестостерон общий': ['TT'],
   'ЛГ': ['LH'],
   'ФСГ': ['FSH'],
-  'Корттизол': ['CORTISOL'],
+  'Кортизол': ['CORTISOL'],
   'Ферритин': ['FERRITIN'],
   'Витамин D': ['VITD'],
   'ГСПГ': ['SHBG'],
@@ -310,7 +310,9 @@ export function calculateRisks(i: RiskInput): RiskResult {
 
           const raw = Math.max(5, Math.min(100, (drugContribution * 100 + pdFactor * 15) * labAdjustment * mrrAdjustment * hgiAdjustment));
           const cellCov = (i.supportCoverage || {})[id] || 0;
-          const net = Math.max(0, raw * (1 - cellCov) * (2 - rirAdjustment));
+          const rirMod = Math.min(1, rirAdjustment);
+          const effectiveCov = cellCov * rirMod;
+          const net = Math.max(0, raw * (1 - effectiveCov));
 
           mechBrk[id] = raw;
           mechDetail[id] = {
@@ -365,7 +367,9 @@ export function calculateRisks(i: RiskInput): RiskResult {
 
           const raw = Math.max(7, Math.min(100, (1 - prod) * 100 + pdFactor * 15));
           const cellCov = (i.supportCoverage || {})[id] || 0;
-          const net = Math.max(0, raw * (1 - cellCov));
+          const rirMod = Math.min(1, rirAdjustment);
+          const effectiveCov = cellCov * rirMod;
+          const net = Math.max(0, raw * (1 - effectiveCov));
 
           mechBrk[id] = raw;
           mechDetail[id] = {
@@ -399,8 +403,8 @@ export function calculateRisks(i: RiskInput): RiskResult {
       systemBreakdown: brk,
       mechanismBreakdown: mechBrk,
       mechanismDetail: mechDetail,
-      overallRaw: Math.min(100, Math.max(0, geom(oR) * overallMrr * overallHgi * (2 - overallRir))),
-      overallNet: Math.min(100, Math.max(0, geom(oN) * overallMrr * overallHgi * (2 - overallRir)))
+      overallRaw: Math.min(100, Math.max(0, geom(oR))),
+      overallNet: Math.min(100, Math.max(0, geom(oN)))
    };
 }
 
@@ -418,7 +422,7 @@ export interface AggregatedRisk {
 
 export function calculateAggregatedRisks(
   pharmaResult: RiskResult,
-  labResult: { systemContributions: Record<string, number> },
+  labResult: { systemContributions: Record<string, number>; totalRisk?: number },
   trainingResult: { overallRaw: number; overallNet: number; systemBreakdown?: Record<string, { raw: number; net: number }> },
   nutritionResult: { overallRaw: number; overallNet: number; systemBreakdown?: Record<string, { raw: number; net: number }> },
   diagnosticsResult: { overallRaw: number; overallNet: number; systemBreakdown?: Record<string, { raw: number; net: number }> }
@@ -474,8 +478,8 @@ export function calculateAggregatedRisks(
   return {
     pharma: pharmaResult,
     labs: {
-      overallRaw: labResult.systemContributions.overall ?? 0,
-      overallNet: labResult.systemContributions.overall ?? 0,
+      overallRaw: labResult.totalRisk ?? 0,
+      overallNet: labResult.totalRisk ?? 0,
       systemBreakdown: labResult.systemContributions
     },
     training: trainingResult,
