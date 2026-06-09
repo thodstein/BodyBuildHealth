@@ -3,7 +3,7 @@ import { SummaryCard } from '../cards/SummaryCard';
 import { SystemCard } from '../cards/SystemCard';
 import { PHARMA_DB } from '../../core/pharma-database';
 import { registry } from '../../core/data/registry';
-
+import { UCUM_MAP } from '../../core/constants';
 const SYSTEM_LABELS: Record<string, string> = {
   cardio: 'Сердечно-сосудистая', hepatic: 'Печень', renal: 'Почки',
   neuro: 'Нервная', endocrine: 'Эндокринная', hematologic: 'Кроветворная',
@@ -81,7 +81,8 @@ export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
   const [readiness, setReadiness] = useState<ReadinessScores | null>(null);
   const [alerts, setAlerts] = useState<string[]>([]);
   const [courseEntries, setCourseEntries] = useState<CourseEntry[]>([]);
-  const [labCount, setLabCount] = useState(0);
+  const [labData, setLabData] = useState<(LabPoint & { patientId?: string })[]>([]);
+  const [abnormalLabs, setAbnormalLabs] = useState<{ code: string; name: string; value: number; unit: string; deviation: number }[]>([]);
   const { v7Result } = useV7Risk();
 
   useEffect(() => {
@@ -99,7 +100,27 @@ export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
         courseData = await db.getAll<CourseEntry>('course_log');
         labData = await db.getAll<LabPoint & { patientId?: string }>('labs_log');
         setCourseEntries(courseData);
-        setLabCount(labData.length);
+        setLabData(labData);
+        // Compute abnormal markers
+        const abnormal: { code: string; name: string; value: number; unit: string; deviation: number }[] = [];
+        const latestByCode = new Map<string, LabPoint & { patientId?: string }>();
+        for (const lab of labData) {
+          const existing = latestByCode.get(lab.code);
+          if (!existing || lab.date > existing.date) latestByCode.set(lab.code, lab);
+        }
+        for (const [code, lab] of latestByCode) {
+          const info = UCUM_MAP[code];
+          if (!info) continue;
+          const norm = lab.value * (info.coeff || 1);
+          const isInverse = (info as any).inverse;
+          if (isInverse) {
+            if (norm < info.lln) abnormal.push({ code, name: info.name, value: lab.value, unit: lab.unit, deviation: Math.round(((info.lln - norm) / info.lln) * 100) });
+          } else {
+            if (norm > info.uln) abnormal.push({ code, name: info.name, value: lab.value, unit: lab.unit, deviation: Math.round(((norm - info.uln) / info.uln) * 100) });
+          }
+        }
+        abnormal.sort((a, b) => b.deviation - a.deviation);
+        setAbnormalLabs(abnormal);
       } catch {}
 
       // Calculate risks
@@ -199,7 +220,7 @@ export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
         </div>
         <div style={{ background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', borderRadius: 10, padding: '6px 8px', textAlign: 'center' }}>
           <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>Лабы</div>
-          <div style={{ fontSize: 18, fontWeight: 700 }}>{labCount}</div>
+          <div style={{ fontSize: 18, fontWeight: 700 }}>{labData.length}</div>
         </div>
       </div>
 
@@ -222,7 +243,49 @@ export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
             </div>
           ))}
         </div>
+        <div style={{ marginTop: 8, display: 'flex', gap: 12, fontSize: 10, color: 'var(--text-dim)' }}>
+          <span>Качество сна: {getProfile().settings.baselineSleepQuality ?? 5}/10</span>
+          <span>Часы сна: {getProfile().settings.baselineSleepHours ?? 7}ч</span>
+        </div>
       </div>
+
+      {/* Lab markers */}
+      {labData.length > 0 && (
+        <div className="card" style={{ cursor: 'pointer' }} onClick={onNavigate ? () => onNavigate('labs') : undefined}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <h3 style={{ margin: 0 }}>🧪 Последние анализы</h3>
+            <span style={{ fontSize: 11, color: 'var(--accent)' }}>{'Подробнее >'}</span>
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, marginTop: 6 }}>
+            {(() => {
+              const latestByCode = new Map<string, LabPoint & { patientId?: string }>();
+              for (const lab of labData) {
+                const existing = latestByCode.get(lab.code);
+                if (!existing || lab.date > existing.date) latestByCode.set(lab.code, lab);
+              }
+              return Array.from(latestByCode.values()).slice(0, 12).map(lab => {
+                const info = UCUM_MAP[lab.code];
+                const norm = lab.value * (info?.coeff || 1);
+                const isAbnormal = info && (norm > info.uln || norm < info.lln);
+                return (
+                  <span key={lab.code} style={{
+                    background: isAbnormal ? 'rgba(239,68,68,0.12)' : 'rgba(0,230,138,0.08)',
+                    color: isAbnormal ? '#ef4444' : 'var(--accent)',
+                    padding: '2px 6px', borderRadius: 4, fontSize: 9, fontWeight: 600,
+                  }}>
+                    {info?.name || lab.code} {lab.value}{lab.unit}
+                  </span>
+                );
+              });
+            })()}
+          </div>
+          {abnormalLabs.length > 0 && (
+            <div style={{ marginTop: 6, fontSize: 9, color: '#ef4444' }}>
+              {abnormalLabs.length} отклонений — {abnormalLabs.slice(0, 3).map(a => `${a.name} (↑${a.deviation}%)`).join(', ')}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* System summary */}
       <div className="card" style={{ cursor: 'pointer' }} onClick={onNavigate ? () => onNavigate('risks') : undefined}>

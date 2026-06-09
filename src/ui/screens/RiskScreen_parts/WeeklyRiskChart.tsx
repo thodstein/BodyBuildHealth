@@ -243,25 +243,25 @@ export const WeeklyRiskChart: React.FC<Props> = ({ dynamics, selectedWeek, onWee
 
       {/* Stats summary */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6, marginTop: 8, fontSize: 10 }}>
-        <div style={{ background: 'var(--bg-secondary)', padding: '4px 6px', borderRadius: 4, textAlign: 'center' }}>
-          <div style={{ color: 'var(--text-dim)' }}>Пик риска</div>
-          <div style={{ fontWeight: 600 }}>{Math.round(dynamics.peakRiskValue)}%</div>
-          <div style={{ color: 'var(--text-dim)', fontSize: 8 }}>нед. {dynamics.peakRiskWeek}</div>
+        <div className="risk-row" style={{ flexDirection: 'column', gap: 0, padding: '6px 4px' }}>
+          <div style={{ color: 'var(--text-dim)', fontSize: 8 }}>Пик риска</div>
+          <div className="risk-badge" style={{ background: getRiskColor(dynamics.peakRiskValue), fontSize: 13 }}>{Math.round(dynamics.peakRiskValue)}%</div>
+          <div style={{ color: 'var(--text-dim)', fontSize: 8, marginTop: 2 }}>нед. {dynamics.peakRiskWeek}</div>
         </div>
-        <div style={{ background: 'var(--bg-secondary)', padding: '4px 6px', borderRadius: 4, textAlign: 'center' }}>
-          <div style={{ color: 'var(--text-dim)' }}>Минимум</div>
-          <div style={{ fontWeight: 600 }}>{Math.round(dynamics.minRiskValue)}%</div>
-          <div style={{ color: 'var(--text-dim)', fontSize: 8 }}>нед. {dynamics.minRiskWeek}</div>
+        <div className="risk-row" style={{ flexDirection: 'column', gap: 0, padding: '6px 4px' }}>
+          <div style={{ color: 'var(--text-dim)', fontSize: 8 }}>Минимум</div>
+          <div className="risk-badge" style={{ background: getRiskColor(dynamics.minRiskValue), fontSize: 13 }}>{Math.round(dynamics.minRiskValue)}%</div>
+          <div style={{ color: 'var(--text-dim)', fontSize: 8, marginTop: 2 }}>нед. {dynamics.minRiskWeek}</div>
         </div>
-        <div style={{ background: 'var(--bg-secondary)', padding: '4px 6px', borderRadius: 4, textAlign: 'center' }}>
-          <div style={{ color: 'var(--text-dim)' }}>Среднее</div>
-          <div style={{ fontWeight: 600 }}>{Math.round(dynamics.averageRisk.overallNet)}%</div>
-          <div style={{ color: 'var(--text-dim)', fontSize: 8 }}>overall</div>
+        <div className="risk-row" style={{ flexDirection: 'column', gap: 0, padding: '6px 4px' }}>
+          <div style={{ color: 'var(--text-dim)', fontSize: 8 }}>Среднее</div>
+          <div className="risk-badge" style={{ background: getRiskColor(dynamics.averageRisk.overallNet), fontSize: 13 }}>{Math.round(dynamics.averageRisk.overallNet)}%</div>
+          <div style={{ color: 'var(--text-dim)', fontSize: 8, marginTop: 2 }}>overall</div>
         </div>
-        <div style={{ background: 'var(--bg-secondary)', padding: '4px 6px', borderRadius: 4, textAlign: 'center' }}>
-          <div style={{ color: 'var(--text-dim)' }}>Длит.</div>
-          <div style={{ fontWeight: 600 }}>{dynamics.courseDuration} нед</div>
-          <div style={{ color: 'var(--text-dim)', fontSize: 8 }}>курс</div>
+        <div className="risk-row" style={{ flexDirection: 'column', gap: 0, padding: '6px 4px' }}>
+          <div style={{ color: 'var(--text-dim)', fontSize: 8 }}>Длит.</div>
+          <div className="risk-badge" style={{ background: '#6b7280', fontSize: 13 }}>{dynamics.courseDuration} нед</div>
+          <div style={{ color: 'var(--text-dim)', fontSize: 8, marginTop: 2 }}>курс</div>
         </div>
       </div>
     </div>

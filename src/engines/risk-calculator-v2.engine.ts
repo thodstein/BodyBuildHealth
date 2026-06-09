@@ -47,7 +47,7 @@ export function calculateRiskFromAnalyses(arg1: RiskResult | LabPoint[], labs?: 
     'TG': { 'cardio': 1.0 },
     'APOB': { 'cardio': 1.0 },
     'LP(a)': { 'cardio': 1.0 },
-    'hsCRP': { 'cardio': 1.0 },
+    'hsCRP': { 'cardio': 1.0, 'hematologic': 1.0 },
 
     // Hepatic system
     'ALT': { 'hepatic': 1.0 },
@@ -68,7 +68,7 @@ export function calculateRiskFromAnalyses(arg1: RiskResult | LabPoint[], labs?: 
     'UACR': { 'renal': 1.0 },
 
     // Neurological system
-    'HOMOCYSTEINE': { 'neuro': 1.0 },
+    'HOMOCYSTEINE': { 'cardio': 1.0, 'neuro': 1.0 },
     'VITAMIN_B12': { 'neuro': 1.0, inverse: true }, // low B12 = bad
     'VITAMIN_D': { 'neuro': 1.0, inverse: true }, // low D = bad
     'FOLATE': { 'neuro': 1.0, inverse: true }, // low folate = bad
@@ -105,6 +105,59 @@ export function calculateRiskFromAnalyses(arg1: RiskResult | LabPoint[], labs?: 
     'ESTRADIOL': { 'endocrine': 1.0, 'reproductive': 1.0 },
     'LH': { 'endocrine': 1.0, 'reproductive': 1.0 },
     'FSH': { 'endocrine': 1.0, 'reproductive': 1.0 },
+
+    // Glucose / metabolic
+    'GLUCOSE': { 'metabolic': 1.0, 'endocrine': 1.0 },
+    'GLU': { 'metabolic': 1.0, 'endocrine': 1.0 },
+    'HBA1C': { 'metabolic': 1.0, 'endocrine': 1.0 },
+
+    // Inflammation
+    'CRP': { 'cardio': 1.0, 'hematologic': 1.0 },
+    'FERRITIN': { 'hepatic': 0.5, 'hematologic': 1.0 },
+
+    // Lipid / cardiac extended
+    'APOA1': { 'cardio': 1.0, inverse: true },
+    'NON_HDL': { 'cardio': 1.0 },
+
+    // Thyroid extended
+    'TOTAL_T3': { 'endocrine': 1.0 },
+    'TOTAL_T4': { 'endocrine': 1.0 },
+    'TG_AB': { 'endocrine': 1.0 },
+    'TPO_AB': { 'endocrine': 1.0 },
+    'THYROGLOBULIN': { 'endocrine': 1.0 },
+
+    // Iron panel
+    'IRON': { 'hematologic': 1.0, 'hepatic': 0.5 },
+    'TRANSFERRIN': { 'hematologic': 1.0 },
+    'TIBC': { 'hematologic': 1.0 },
+    'IRON_SAT': { 'hematologic': 1.0 },
+
+    // Coagulation
+    'FIBRINOGEN': { 'cardio': 1.0, 'hepatic': 1.0 },
+    'D_DIMER': { 'cardio': 1.0, 'hematologic': 1.0 },
+
+    // Renal extended
+    'PROTEIN_TOTAL': { 'renal': 1.0, 'hepatic': 1.0 },
+    'TP': { 'renal': 1.0, 'hepatic': 1.0 },
+    'UA': { 'renal': 1.0, 'metabolic': 1.0 },
+    'K': { 'renal': 1.0, 'cardio': 1.0 },
+    'NA': { 'renal': 1.0, 'neuro': 1.0 },
+    'CA': { 'renal': 1.0, 'endocrine': 1.0 },
+    'P': { 'renal': 1.0 },
+    'MG': { 'renal': 1.0, 'neuro': 1.0 },
+
+    // Liver extended
+    'LDH': { 'hepatic': 1.0, 'cardio': 1.0 },
+    'BILIRUBIN_INDIRECT': { 'hepatic': 1.0 },
+
+    // Kidney / cardiovascular
+    'BNP': { 'cardio': 1.0, 'renal': 1.0 },
+    'NT_PROBNP': { 'cardio': 1.0, 'renal': 1.0 },
+
+    // Neuro extended
+    'SEROTONIN': { 'neuro': 1.0 },
+    'DOPAMINE': { 'neuro': 1.0 },
+    'GABA': { 'neuro': 1.0, inverse: true },
   };
 
   // Process each lab result
