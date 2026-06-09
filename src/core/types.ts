@@ -907,6 +907,81 @@ export interface WorkoutLog {
   notes?: string;
 }
 
+// ══ Training Domain — New Types (ULTRA) ══
+
+export type MovementPattern =
+  | 'squat' | 'hinge' | 'horizontal_push' | 'horizontal_pull'
+  | 'vertical_push' | 'vertical_pull' | 'lunge' | 'carry'
+  | 'rotation' | 'anti_rotation' | 'core';
+
+export type ExerciseSlotRole = 'main' | 'secondary' | 'accessory' | 'rehab' | 'warmup';
+
+export interface ExerciseSlot {
+  slotType: ExerciseSlotRole;
+  exerciseId: string;
+  variationId?: string;
+  pattern: MovementPattern;
+  equipment: string[];
+  riskScore: number;
+  techniqueMatchScore: number;
+  targetWeakPoint?: string;
+  targetMuscle?: string;
+}
+
+export type RepPatternType = 'normal' | 'pause' | 'cluster' | 'rest_pause' | 'tempo' | 'explosive' | 'slow' | 'partial';
+
+export interface RepPatternConfig {
+  pattern: RepPatternType;
+  minReps: number;
+  maxReps: number;
+  restBetweenRepsSec?: number;
+  pausePosition?: 'bottom' | 'top' | 'mid';
+  pauseSec?: number;
+}
+
+export interface TempoProfile {
+  eccentricSec: number;
+  pauseBottomSec: number;
+  concentricSec: number;
+  pauseTopSec: number;
+  label: string;
+}
+
+export type SetSchemeType =
+  | 'straight' | 'pyramid' | 'reverse_pyramid' | 'top_backoff'
+  | 'wave' | 'cluster' | 'emom' | 'density' | 'myo_rep';
+
+export interface SetScheme {
+  schemeType: SetSchemeType;
+  totalSets: number;
+  workingSets: number;
+  progressionModel: 'linear' | 'double' | 'autoregulated' | 'rpe';
+  metadata: Record<string, number>;
+}
+
+export interface WarmupBlock {
+  type: 'general' | 'mobility' | 'activation' | 'specific';
+  durationSec: number;
+  exercises: { exerciseId: string; sets: number; reps: number; intensityPct?: number }[];
+  notes?: string;
+}
+
+export interface CooldownBlock {
+  type: 'stretch' | 'breathing' | 'mobility';
+  durationSec: number;
+  exercises: { exerciseId: string; durationSec: number }[];
+}
+
+export interface ExerciseOrderItem {
+  exerciseId: string;
+  role: ExerciseSlotRole;
+  pattern: MovementPattern;
+  difficulty: number;
+  jointStress: number;
+  priorityScore: number;
+  rationale: string;
+}
+
 export interface NutritionDiaryEntry {
   id: string;
   date: string;
