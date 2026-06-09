@@ -8,7 +8,7 @@ const SYSTEM_LABELS: Record<string, string> = {
   cardio: 'Сердечно-сосудистая', hepatic: 'Печень', renal: 'Почки',
   neuro: 'Нервная', endocrine: 'Эндокринная', hematologic: 'Кроветворная',
   reproductive: 'Репродуктивная', musculoskeletal: 'ОДА/Мышцы',
-  metabolic: 'Метаболизм', ghigf: 'GH/IGF', ins_axis: 'Инсулиновая ось',
+  metabolic: 'Метаболизм', ghigf: 'ГР/ИФР-1', ins_axis: 'Инсулиновая ось',
   neuro_toxicity: 'Нейротоксичность', blood: 'Кровь', vessels: 'Сосуды',
 };
 

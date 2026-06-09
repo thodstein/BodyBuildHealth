@@ -643,7 +643,7 @@ const PKPDSimulationTab: React.FC = () => {
                 ))}
               </select>
               {drugDoses.length > 1 && (
-                <button className="btn" style={{ fontSize: 10, padding: '2px 8px' }} onClick={() => removeDrug(idx)}>✕</button>
+                <button className="btn" style={{ fontSize: 10, padding: '2px 8px', width: 'auto', marginTop: 0, flexShrink: 0 }} onClick={() => removeDrug(idx)}>✕</button>
               )}
             </div>
             <div className="pharma-dosage-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>

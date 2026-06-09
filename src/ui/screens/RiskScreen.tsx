@@ -147,8 +147,22 @@ export const RiskScreen: React.FC = () => {
   // Aggregated risk (pharma + labs + training + nutrition + diagnostics)
   const aggregatedRisk = useMemo<AggregatedRisk | null>(() => {
     if (!pharmaRisk) return null;
-    const emptyLabContrib = { systemContributions: Object.fromEntries(ALL_RISK_SYSTEMS.map(s => [s, 0])), totalRisk: 0 };
     const emptyDiag = { overallRaw: 0, overallNet: 0, systemBreakdown: {} as Record<string, { raw: number; net: number }> };
+
+    // When penalty is active and no labs exist, create a synthetic lab contribution reflecting penalty
+    if (!hasLabs && shouldApplyPenalty) {
+      const phase = linked.profile?.settings?.phase || 'baseline';
+      const pen = calculatePenaltyCoefficients(phase, [], [], 1, linked.course, globalNoLabs);
+      const totalMultiplier = 1.0 + pen.labPenalty + pen.diagnosticPenalty;
+      const penaltyPct = Math.min(100, (totalMultiplier - 1) * 100); // e.g. 1.40 → 40%
+      const penaltyContrib = Object.fromEntries(
+        ALL_RISK_SYSTEMS.map(s => [s, penaltyPct * 0.5]) // distribute half the penalty across systems
+      );
+      const penaltyLabContrib = { systemContributions: penaltyContrib, totalRisk: penaltyPct };
+      return calculateAggregatedRisks(pharmaRisk, penaltyLabContrib, trainingRisk, nutritionRisk, emptyDiag);
+    }
+
+    const emptyLabContrib = { systemContributions: Object.fromEntries(ALL_RISK_SYSTEMS.map(s => [s, 0])), totalRisk: 0 };
     return calculateAggregatedRisks(
       pharmaRisk,
       labRiskContributions || emptyLabContrib,
@@ -156,20 +170,51 @@ export const RiskScreen: React.FC = () => {
       nutritionRisk,
       emptyDiag
     );
-  }, [pharmaRisk, labRiskContributions, trainingRisk, nutritionRisk]);
+  }, [pharmaRisk, labRiskContributions, trainingRisk, nutritionRisk, shouldApplyPenalty, hasLabs, linked.profile, linked.course, globalNoLabs]);
 
-  // Merge pharma + lab + penalty
+  // Merge a risk source (training/nutrition) into a RiskResult
+  const mergeRiskSource = (base: RiskResult, source: { systemBreakdown?: Record<string, { raw: number; net: number }>; overallRaw?: number; overallNet?: number }): RiskResult => {
+    if (!source.systemBreakdown) return base;
+    const newBreakdown: Record<string, { raw: number; net: number }> = {};
+    for (const sys of ALL_RISK_SYSTEMS) {
+      const baseVal = base.systemBreakdown[sys] || { raw: 0, net: 0 };
+      const srcVal = source.systemBreakdown[sys] || { raw: 0, net: 0 };
+      newBreakdown[sys] = {
+        raw: Math.min(100, baseVal.raw + srcVal.raw),
+        net: Math.min(100, Math.max(0, baseVal.net + srcVal.net - (baseVal.net * srcVal.net / 100))),
+      };
+    }
+    const rawValues = ALL_RISK_SYSTEMS.map(sys => newBreakdown[sys].raw);
+    const netValues = ALL_RISK_SYSTEMS.map(sys => newBreakdown[sys].net);
+    const geom = (arr: number[]) => {
+      if (!arr.length) return 0;
+      const l = arr.reduce((a, v) => a + Math.log(Math.max(0.0001, v)), 0);
+      return Math.exp(l / arr.length);
+    };
+    return {
+      ...base,
+      systemBreakdown: newBreakdown,
+      overallRaw: Math.min(100, Math.max(0, geom(rawValues))),
+      overallNet: Math.min(100, Math.max(0, geom(netValues))),
+    };
+  };
+
+  // Merge pharma + labs + training + nutrition + penalty
   const riskResult = useMemo<RiskResult | null>(() => {
     if (!pharmaRisk) return null;
     let result = pharmaRisk;
     if (hasLabs) {
       result = calculateRiskFromAnalyses(result, linked.labs);
     }
+    // Merge training risk
+    result = mergeRiskSource(result, trainingRisk);
+    // Merge nutrition risk
+    result = mergeRiskSource(result, nutritionRisk);
     if (shouldApplyPenalty) {
       result = applyPenaltyToResult(result);
     }
     return result;
-  }, [pharmaRisk, hasLabs, shouldApplyPenalty, noLabsSystems]);
+  }, [pharmaRisk, hasLabs, shouldApplyPenalty, noLabsSystems, trainingRisk, nutritionRisk]);
 
   useEffect(() => {
     if (riskResult) {

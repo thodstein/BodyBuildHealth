@@ -17,7 +17,7 @@ const SYSTEM_LABELS_SHORT: Record<string, string> = {
   cardio: '❤️ Сердце', hepatic: '🫁 Печень', renal: '💧 Почки',
   neuro: '🧠 Нервная', endocrine: '⚖️ Эндокр.', hematologic: '🩸 Кровь',
   reproductive: '💪 Репрод.', musculoskeletal: '🦴 ОДА',
-  metabolic: '⚖️ Метаб.', ghigf: '💪 GH/IGF', ins_axis: '💉 Инсулин',
+  metabolic: '⚖️ Метаб.', ghigf: '💪 ГР/ИФР-1', ins_axis: '💉 Инсулин',
   neuro_toxicity: '⚠️ Нейротокс.', blood: '🩸 Кровь', vessels: '🫀 Сосуды',
 };
 
@@ -184,7 +184,9 @@ export const RiskOverview: React.FC<{
             </div>
             <div style={{ background: 'var(--bg-secondary)', padding: '6px 8px', borderRadius: 6 }}>
               <div style={{ color: 'var(--text-dim)', fontSize: 9 }}>🧪 Анализы</div>
-              <div style={{ fontWeight: 700, color: getRiskColor(aggregatedRisk.labs.overallNet) }}>{Math.round(aggregatedRisk.labs.overallNet)}%</div>
+              <div style={{ fontWeight: 700, color: getRiskColor(aggregatedRisk.labs.overallNet) }}>
+                {anyNoLabs && !labRiskContributions ? `🚫 ${Math.round(aggregatedRisk.labs.overallNet)}%` : `${Math.round(aggregatedRisk.labs.overallNet)}%`}
+              </div>
             </div>
             <div style={{ background: 'var(--bg-secondary)', padding: '6px 8px', borderRadius: 6 }}>
               <div style={{ color: 'var(--text-dim)', fontSize: 9 }}>🏋️ Тренировки</div>
