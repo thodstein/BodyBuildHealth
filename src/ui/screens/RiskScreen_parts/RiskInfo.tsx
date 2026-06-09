@@ -2,6 +2,7 @@
 import { RISK_SYSTEMS, ALL_RISK_SYSTEMS, DRUG_THRESHOLDS, GENETIC_MULTIPLIERS, MRR_FACTORS, HGI_FACTORS, RIR_FACTORS, SUPPORT_BASE_COVERAGE, BASE_RISK } from '../../../core/constants';
 import { MECHANISM_INFO, SYSTEM_INFO, SYSTEM_ORGANS } from '../../../core/risk-info';
 import { SYSTEM_MECHANISMS } from '../../../core/system-mechanisms';
+import { PHARMA_DB } from '../../../core/pharma-database';
 
 export const RiskInfo: React.FC = () => {
   const [expanded, setExpanded] = useState<string | null>(null);
@@ -75,7 +76,7 @@ if mechContribution > 0.005:
             <p style={{ margin: '0 0 4px' }}><strong>thresholdDose</strong> — пороговая доза из DRUG_THRESHOLDS (мг/нед)</p>
             <p style={{ margin: '0 0 4px' }}><strong>Степень 1.2</strong> — нелинейная зависимость «доза-риск» (суперлинейная)</p>
             <p style={{ margin: '0 0 4px' }}><strong>mechWeight</strong> — вес механизма (0-1) для препарата и механизма повреждения</p>
-            <p style={{ margin: '0 0 4px' }}><strong>Множитель (1 + mechWeight × 3)</strong> — усиление для значимых механизмов (макс ?4)</p>
+            <p style={{ margin: '0 0 4px' }}><strong>Множитель (1 + mechWeight × 3)</strong> — усиление для значимых механизмов (макс ×4)</p>
           </div>
         )}
       </div>
@@ -348,12 +349,16 @@ net = \u03a3(sourceRaw \u00d7 weight / totalWeight)`}
         {expanded === 'thresholds' && (
           <div style={{ marginTop: 8, fontSize: 10 }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 4 }}>
-              {Object.entries(DRUG_THRESHOLDS).slice(0, 18).map(([id, t]) => (
+              {Object.entries(DRUG_THRESHOLDS).slice(0, 18).map(([id, t]) => {
+                const entry = PHARMA_DB[id];
+                const name = entry ? entry.name : id.replace(/_/g, ' ');
+                return (
                 <div key={id} style={{ background: 'var(--bg-secondary)', padding: '4px 8px', borderRadius: 4 }}>
-                  <div style={{ fontWeight: 500, fontSize: 11 }}>{id.replace(/_/g, ' ')}</div>
+                  <div style={{ fontWeight: 500, fontSize: 11 }}>{name}</div>
                   <div style={{ color: 'var(--text-dim)' }}>{t.dosePerWeek} мг/нед</div>
                 </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         )}

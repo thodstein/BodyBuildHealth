@@ -452,11 +452,18 @@ interface DrugDose {
   totalWeeks: number;
 }
 
+const DRUG_COLORS = ['#7c4dff', '#ff1744', '#00e68a', '#ff9100', '#3b82f6', '#f44336', '#4caf50', '#9c27b0', '#ff5722', '#2196f3'];
+const DAY_SHORT = ['', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
+
 const PKPDSimulationTab: React.FC = () => {
   const [drugDoses, setDrugDoses] = useState<DrugDose[]>([
     { substanceId: 'test_enan', doseMg: 250, frequencyDays: [1, 4], totalWeeks: 12 },
   ]);
-  const [simResult, setSimResult] = useState<{ points: { week: number; cp: number; effect: number; tol: number }[]; peak: number; trough: number; ssDays: number } | null>(null);
+  const [simResult, setSimResult] = useState<{
+    points: { week: number; cp: number; effect: number; tol: number }[];
+    perDrug: { substanceId: string; name: string; points: { week: number; cp: number }[] }[];
+    peak: number; trough: number; ssDays: number;
+  } | null>(null);
 
   // Filter to show only pharma substances
   const allSubstances = useMemo(() => {
@@ -466,7 +473,8 @@ const PKPDSimulationTab: React.FC = () => {
   }, []);
 
   const addDrug = () => {
-    setDrugDoses([...drugDoses, { substanceId: 'test_enan', doseMg: 250, frequencyDays: [1, 4], totalWeeks: 12 }]);
+    const lastId = drugDoses.length > 0 ? drugDoses[drugDoses.length - 1].substanceId : 'test_enan';
+    setDrugDoses([...drugDoses, { substanceId: lastId, doseMg: 250, frequencyDays: [1, 4], totalWeeks: 12 }]);
   };
 
   const removeDrug = (idx: number) => {
@@ -479,14 +487,14 @@ const PKPDSimulationTab: React.FC = () => {
     setDrugDoses(updated);
   };
 
-  const runSimulation = () => {
-    const entries: CourseEntry[] = [];
-    drugDoses.forEach((dd) => {
+  const buildEntries = (doses: DrugDose[]): CourseEntry[] => {
+    const result: CourseEntry[] = [];
+    doses.forEach((dd) => {
       const scheduleSet = new Set(dd.frequencyDays);
       for (let w = 0; w < dd.totalWeeks; w++) {
         for (let d = 1; d <= 7; d++) {
           if (scheduleSet.has(d)) {
-            entries.push({
+            result.push({
               id: `${dd.substanceId}-${w}-${d}`,
               substanceId: dd.substanceId,
               doseValue: dd.doseMg,
@@ -499,17 +507,35 @@ const PKPDSimulationTab: React.FC = () => {
         }
       }
     });
+    return result;
+  };
 
-    if (entries.length === 0) return;
+  const runSimulation = () => {
+    const maxWeeks = Math.max(...drugDoses.map(d => d.totalWeeks));
+    const allEntries = buildEntries(drugDoses);
+    if (allEntries.length === 0) return;
 
-    const superpositionResult = calculateMultiSubstancePKPD(entries, Math.max(...drugDoses.map(d => d.totalWeeks)));
+    const superpositionResult = calculateMultiSubstancePKPD(allEntries, maxWeeks);
+
+    // Per-drug simulations
+    const perDrug: { substanceId: string; name: string; points: { week: number; cp: number }[] }[] = [];
+    drugDoses.forEach((dd) => {
+      const singleEntries = buildEntries([dd]);
+      const singleResult = calculateMultiSubstancePKPD(singleEntries, maxWeeks);
+      const sub = PHARMA_DB[dd.substanceId];
+      perDrug.push({
+        substanceId: dd.substanceId,
+        name: sub?.name || dd.substanceId,
+        points: singleResult.map(p => ({ week: p.week, cp: p.cp })),
+      });
+    });
 
     const firstDrug = PHARMA_DB[drugDoses[0].substanceId];
     let peak = 0;
     let trough = Infinity;
     let ssDays = 0;
 
-    if (firstDrug) {
+    if (firstDrug && drugDoses[0].frequencyDays.length > 0) {
       const intervalH = (168 / drugDoses[0].frequencyDays.length);
       try {
         peak = steadyStatePeak({
@@ -532,26 +558,35 @@ const PKPDSimulationTab: React.FC = () => {
       ssDays = Math.ceil(5 * (firstDrug.pk.halfLifeHours / 24));
     }
 
-    setSimResult({ points: superpositionResult, peak, trough, ssDays });
+    setSimResult({ points: superpositionResult, perDrug, peak, trough, ssDays });
   };
 
   const chart = useMemo(() => {
     if (!simResult || simResult.points.length === 0) return null;
     const W = 600;
-    const H = 200;
-    const PAD = 30;
+    const H = 220;
+    const PAD = 34;
     const pts = simResult.points;
-    const maxCp = Math.max(...pts.map(p => p.cp), 1);
+    const maxCp = Math.max(...pts.map(p => p.cp), ...simResult.perDrug.flatMap(d => d.points.map(p => p.cp)), 1);
     const maxWeek = pts[pts.length - 1].week;
 
     const toX = (w: number) => PAD + (w / maxWeek) * (W - 2 * PAD);
     const toY = (cp: number) => H - PAD - (cp / maxCp) * (H - 2 * PAD);
 
-    const pathD = pts.map((p, i) => `${i === 0 ? 'M' : 'L'}${toX(p.week).toFixed(1)},${toY(p.cp).toFixed(1)}`).join(' ');
+    // Combined (total) concentration line
+    const totalPathD = pts.map((p, i) => `${i === 0 ? 'M' : 'L'}${toX(p.week).toFixed(1)},${toY(p.cp).toFixed(1)}`).join(' ');
+    // Effect line
     const effectPathD = pts.map((p, i) => {
       const ey = H - PAD - (p.effect / 100) * (H - 2 * PAD);
       return `${i === 0 ? 'M' : 'L'}${toX(p.week).toFixed(1)},${ey.toFixed(1)}`;
     }).join(' ');
+
+    // Per-drug lines
+    const perDrugPaths = simResult.perDrug.map((drug, di) => {
+      const color = DRUG_COLORS[di % DRUG_COLORS.length];
+      const d = drug.points.map((p, i) => `${i === 0 ? 'M' : 'L'}${toX(p.week).toFixed(1)},${toY(p.cp).toFixed(1)}`).join(' ');
+      return { substanceId: drug.substanceId, name: drug.name, d, color };
+    });
 
     const gridLines = [0, 0.25, 0.5, 0.75, 1].map((frac) => {
       const y = H - PAD - frac * (H - 2 * PAD);
@@ -568,11 +603,25 @@ const PKPDSimulationTab: React.FC = () => {
     return (
       <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', maxWidth: W, height: 'auto' }}>
         {gridLines.map((l, i) => <g key={i} dangerouslySetInnerHTML={{ __html: l }} />)}
-        <path d={pathD} fill="none" stroke="var(--accent, #7c4dff)" strokeWidth="2" />
-        <path d={effectPathD} fill="none" stroke="#4caf50" strokeWidth="1.5" strokeDasharray="4 2" />
+        {/* Per-drug lines (dashed, behind total) */}
+        {perDrugPaths.map((pd, i) => (
+          <g key={pd.substanceId}>
+            <path d={pd.d} fill="none" stroke={pd.color} strokeWidth="1" strokeDasharray="3 2" opacity={0.6} />
+          </g>
+        ))}
+        {/* Total line */}
+        <path d={totalPathD} fill="none" stroke="var(--accent, #7c4dff)" strokeWidth="2.5" opacity={0.9} />
+        <path d={effectPathD} fill="none" stroke="#4caf50" strokeWidth="1.5" strokeDasharray="4 2" opacity={0.8} />
         {weekMarkers.map((m, i) => <g key={`w${i}`} dangerouslySetInnerHTML={{ __html: m }} />)}
-        <text x={PAD} y={12} fill="var(--accent)" fontSize="9">Сывороточная концентрация</text>
-        <text x={W - PAD} y={12} fill="#4caf50" fontSize="9" textAnchor="end">Эффект %</text>
+        {/* Legend */}
+        <text x={PAD} y={11} fill="var(--accent)" fontSize="9" fontWeight={700}>Суммарная концентрация</text>
+        {perDrugPaths.map((pd, i) => (
+          <text key={pd.substanceId} x={PAD + (i > 0 ? 130 : 0)} y={i === 0 ? 22 : 11}
+            fill={pd.color} fontSize="8" opacity={0.8}>
+            ― {pd.name}
+          </text>
+        ))}
+        <text x={W - PAD} y={11} fill="#4caf50" fontSize="9" textAnchor="end">Эффект %</text>
         <text x={W / 2} y={H - 2} fill="var(--text-dim)" fontSize="9" textAnchor="middle">Недели</text>
       </svg>
     );
@@ -603,8 +652,23 @@ const PKPDSimulationTab: React.FC = () => {
                 <input type="number" value={dd.doseMg} onChange={(e) => updateDrug(idx, 'doseMg', Number(e.target.value))} style={{ width: '100%', fontSize: 12 }} />
               </div>
               <div>
-                <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Дни инъекций</label>
-                <input type="text" value={dd.frequencyDays.join(',')} onChange={(e) => updateDrug(idx, 'frequencyDays', e.target.value.split(',').map(Number).filter(n => n >= 1 && n <= 7))} style={{ width: '100%', fontSize: 12 }} placeholder="1,4" />
+                <label style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 2, display: 'block' }}>Дни инъекций</label>
+                <div style={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+                  {[1,2,3,4,5,6,7].map(d => {
+                    const active = dd.frequencyDays.includes(d);
+                    return (
+                      <button key={d} type="button" onClick={() => {
+                        const next = active ? dd.frequencyDays.filter(x => x !== d) : [...dd.frequencyDays, d].sort();
+                        updateDrug(idx, 'frequencyDays', next);
+                      }} style={{
+                        width: 26, height: 26, borderRadius: 4, fontSize: 9, fontWeight: 700, cursor: 'pointer',
+                        background: active ? 'var(--accent)' : 'var(--bg-secondary)',
+                        color: active ? '#000' : 'var(--text-dim)',
+                        border: `1px solid ${active ? 'var(--accent)' : 'var(--border)'}`,
+                      }}>{DAY_SHORT[d]}</button>
+                    );
+                  })}
+                </div>
               </div>
               <div>
                 <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Недель</label>

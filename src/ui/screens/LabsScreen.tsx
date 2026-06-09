@@ -278,7 +278,7 @@ export const LabsScreen: React.FC = () => {
       <div className="tab-bar" style={{ gap: 2, overflowX: "auto", WebkitOverflowScrolling: "touch", scrollbarWidth: "none" }}>
         {(['results', 'schedule', 'investigations', 'catalog'] as const).map(t => (
           <button key={t} className={`tab-btn ${tab === t ? 'active' : ''}`} onClick={() => setTab(t)}>
-            {t === 'results' ? '📊 Рез-ты' : t === 'schedule' ? '📅 График' : t === 'investigations' ? '🔬 Исслед.' : '📖 Каталог'}
+            {t === 'results' ? '📊 Рез-ты' : t === 'schedule' ? '📅 График' : t === 'investigations' ? '🔬 Исслед.' : '📖 Каталог'}
           </button>
         ))}
       </div>
@@ -419,7 +419,7 @@ export const LabsScreen: React.FC = () => {
       </div>
 
       <div className="card" style={{ marginTop: 8 }}>
-        <h3 style={{ fontSize: 14 }}>📊 Индексы</h3>
+        <h3 style={{ fontSize: 14 }}>📊 Индексы</h3>
         {indexEntries.length > 0 ? (
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4 }}>
             {indexEntries.map(d => (
@@ -454,13 +454,13 @@ export const LabsScreen: React.FC = () => {
           background: globalNoLabs ? 'var(--accent)' : '#ef4444', color: globalNoLabs ? '#000' : '#fff',
           border: 'none', marginBottom: 5,
         }}>
-          {globalNoLabs ? '✅ Глобальный штраф применён — отменить' : '🚫 БЕЗ ВСЕХ АНАЛИЗОВ (Штраф)'}
+          {globalNoLabs ? '✅ Глобальный штраф применён — отменить' : '🚫 БЕЗ ВСЕХ АНАЛИЗОВ (Штраф)'}
         </button>
 
         {/* Per-system penalty buttons */}
         {!globalNoLabs && (
           <div>
-            <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 3 }}>Или штраф по отдельной системе:</div>
+            <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 3 }}>Или штраф по отдельной системе:</div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
               {RISK_SYSTEMS.map(sys => {
                 const isActive = noLabsSystems.includes(sys);
@@ -486,7 +486,7 @@ export const LabsScreen: React.FC = () => {
         <div style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' }} onClick={() => { setShowImport(false); setOcrResult(null); }}>
           <div style={{ position: 'fixed', top: '8%', left: '4%', right: '4%', zIndex: 201, background: 'var(--bg)', borderRadius: 20, maxHeight: '84vh', overflow: 'hidden', display: 'flex', flexDirection: 'column' }} onClick={e => e.stopPropagation()}>
             <div style={{ padding: '12px 16px 8px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontWeight: 700, fontSize: 15 }}>📄 Импорт анализов</span>
+              <span style={{ fontWeight: 700, fontSize: 15 }}>📄 Импорт анализов</span>
               <button onClick={() => { setShowImport(false); setOcrResult(null); }} style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text-dim)', borderRadius: 8, padding: '4px 10px', fontSize: 12, cursor: 'pointer' }}>✕</button>
             </div>
             <div style={{ flex: 1, overflowY: 'auto', padding: '12px 16px' }}>
@@ -511,7 +511,7 @@ export const LabsScreen: React.FC = () => {
                     </button>
                   </div>
                   <div style={{ marginTop: 12, padding: '8px 10px', background: 'rgba(0,230,138,0.08)', borderRadius: 8, fontSize: 10, color: 'var(--text-dim)' }}>
-                    💡 <strong>Совет:</strong> PDF от лабораторий (Гемотест, Инвитро, Хеликс, KDL) распознаются лучше всего. Чёткие фото без бликов.
+                    💡 <strong>Совет:</strong> PDF от лабораторий (Гемотест, Инвитро, Хеликс, KDL) распознаются лучше всего. Чёткие фото без бликов.
                   </div>
                 </div>
               )}
