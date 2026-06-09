@@ -19,6 +19,7 @@ const SYSTEM_LABELS_SHORT: Record<string, string> = {
   reproductive: '💪 Репрод.', musculoskeletal: '🦴 ОДА',
   metabolic: '⚖️ Метаб.', ghigf: '💪 ГР/ИФР-1', ins_axis: '💉 Инсулин',
   neuro_toxicity: '⚠️ Нейротокс.', blood: '🩸 Кровь', vessels: '🫀 Сосуды',
+  immunity: '🛡️ Иммун.', thyroid: '🦋 Щитов.', prostate: '🔬 Простата', skin: '🧴 Кожа',
 };
 
 function mapRiskSystem(riskSystem: string): string {

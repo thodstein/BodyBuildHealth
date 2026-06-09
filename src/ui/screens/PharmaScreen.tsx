@@ -7,13 +7,13 @@ import { checkDrugInteractions } from '../../engines/pharma-interactions.engine'
 import { PHARMA_DETAILS, type PharmaDetail } from '../../data/pharma-details';
 import type { PharmaSubstance, CourseEntry, PD } from '../../core/types';
 import { SYNERGY_PAIRS, type SynergyPair } from '../../engines/support.engine';
-import { SYSTEM_INFO } from '../../core/risk-info';
+import { SYSTEM_INFO, SYSTEM_INFO_ALL } from '../../core/risk-info';
 import { PharmaCourseScreen } from './PharmaCourseScreen';
 
 type Tab = 'catalog' | 'pkpd' | 'dosage' | 'interactions' | 'course';
 
 const SYSTEM_LABELS: Record<string, string> = Object.fromEntries(
-  Object.entries(SYSTEM_INFO).map(([k, v]) => [k, v.label.split(' ').slice(0, 2).join(' ')])
+  Object.entries(SYSTEM_INFO_ALL).map(([k, v]) => [k, v.label.split(' ').slice(0, 2).join(' ')])
 );
 
 const CLASS_LABELS: Record<string, string> = {

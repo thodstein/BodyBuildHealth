@@ -30,6 +30,7 @@ const V7_TO_SM: Record<string, string> = {
   endocrine: 'endocrine', hematologic: 'hematologic', reproductive: 'reproductive',
   musculoskeletal: 'musculoskeletal', metabolic: 'metabolic', ghigf: 'ghigf',
   ins_axis: 'ins_axis', neuro_toxicity: 'neuro_toxicity', blood: 'blood', vessels: 'vessels',
+  immunity: 'immunity', thyroid: 'thyroid', prostate: 'prostate', skin: 'skin',
 };
 
 function getMechName(sysKey: string, mechIdx: number): string {
@@ -374,6 +375,14 @@ export const V7RiskDisplay: React.FC<{ result: V7RiskResult }> = ({ result }) =>
   const renderSensitivity = () => {
     if (!linked.profile) {
       return <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-dim)' }}>Загрузка профиля...</div>;
+    }
+    if (globalRiskNet < 1) {
+      return (
+        <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-dim)' }}>
+          <div>Общий риск = 0%</div>
+          <div style={{ fontSize: 11, marginTop: 8 }}>Анализ чувствительности требует активного риска. Добавьте препараты в курс на вкладке 💊 Фарма.</div>
+        </div>
+      );
     }
     if (!sensitivityResults || sensitivityResults.length === 0) {
       return (

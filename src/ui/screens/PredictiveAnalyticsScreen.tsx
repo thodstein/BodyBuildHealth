@@ -21,6 +21,16 @@ const SYSTEM_LABELS: Record<string, string> = {
   neuro: 'Нервная',
   reproductive: 'Репродуктивная',
   musculoskeletal: 'Суставы и связки',
+  metabolic: 'Метаболизм',
+  ghigf: 'ГР/ИФР-1',
+  ins_axis: 'Инсулиновая ось',
+  neuro_toxicity: 'Нейротоксичность',
+  blood: 'Кровь',
+  vessels: 'Сосуды',
+  immunity: 'Иммунная',
+  thyroid: 'Щитовидная',
+  prostate: 'Простата',
+  skin: 'Кожа',
 };
 
 export const PredictiveAnalyticsScreen: React.FC = () => {

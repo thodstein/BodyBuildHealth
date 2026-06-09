@@ -10,6 +10,7 @@ const SYSTEM_LABELS: Record<string, string> = {
   reproductive: 'Репродуктивная', musculoskeletal: 'ОДА/Мышцы',
   metabolic: 'Метаболизм', ghigf: 'ГР/ИФР-1', ins_axis: 'Инсулиновая ось',
   neuro_toxicity: 'Нейротоксичность', blood: 'Кровь', vessels: 'Сосуды',
+  immunity: 'Иммунная', thyroid: 'Щитовидная', prostate: 'Простата', skin: 'Кожа',
 };
 
 import type { MasterDB, RiskResult, ReadinessScores, CourseEntry, LabPoint } from '../../core/types';
