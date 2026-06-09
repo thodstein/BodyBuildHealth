@@ -30,12 +30,12 @@ function saveRiskHistory(entry: { date: string; overallRaw: number; overallNet: 
 }
 
 const TAB_LABELS: Record<string, string> = {
-  overview: '?? Обзор',
-  dynamics: '?? Динамика',
+  overview: '📊 Обзор',
+  dynamics: '📈 Динамика',
   matrix: '?? Матрица',
   details: '?? Детали',
   v7: '🔬 Симуляция',
-  info: '?? Инфо',
+  info: 'ℹ️ Инфо',
 };
 
 export const RiskScreen: React.FC = () => {

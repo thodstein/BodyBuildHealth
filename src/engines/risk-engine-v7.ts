@@ -1,8 +1,8 @@
 ﻿// ============================================================
 // Health Engine v7.0 — Full Time-Series Simulation with PK Integration
 // Calibration: V7 results are scaled to be comparable with regular engine output
-// V7_CALIBRATION_FACTOR = 0.65 brings V7 geometric mean closer to regular engine range
-export const V7_CALIBRATION_FACTOR = 0.65;
+// V7_CALIBRATION_FACTOR = 1.0 - no calibration, raw V7 values
+export const V7_CALIBRATION_FACTOR = 1.0;
 // Runs organ simulation over T days with actual drug concentrations
 // ============================================================
 
