@@ -340,9 +340,9 @@ export function runV7Simulation(input: V7RiskInput): V7RiskResult {
 
   // Add mechanism details from matrix
   const organSystemMap: Record<string, string> = {
-    heart: 'cardio', vessels: 'cardio', liver: 'hepatic', kidney: 'renal',
-    blood: 'hematologic', endocrine: 'endocrine', metabolic: 'endocrine', ghigf: 'endocrine',
-    ins_axis: 'endocrine', musculoskeletal: 'hematologic', neuro_toxicity: 'neuro',
+    heart: 'cardio', vessels: 'vessels', liver: 'hepatic', kidney: 'renal',
+    blood: 'blood', endocrine: 'endocrine', metabolic: 'metabolic', ghigf: 'ghigf',
+    ins_axis: 'ins_axis', musculoskeletal: 'musculoskeletal', neuro_toxicity: 'neuro_toxicity',
     reproductive: 'reproductive',
   };
   for (const key of organKeys) {

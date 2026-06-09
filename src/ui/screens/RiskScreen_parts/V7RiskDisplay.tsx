@@ -1,5 +1,5 @@
 ﻿import React, { useState, useMemo } from 'react';
-import { SYSTEM_NAMES_RU } from '../../../engines/risk-engine-v7-matrix';
+import { SYSTEM_NAMES_RU, MECHANISM_NAMES } from '../../../engines/risk-engine-v7-matrix';
 import type { V7RiskResult } from '../../../engines/risk-engine-v7';
 import { sensitivityAnalysis } from '../../../engines/risk-engine-v7-core';
 import { runV7Simulation, type V7RiskInput } from '../../../engines/risk-engine-v7';
@@ -14,7 +14,6 @@ function getSubstanceName(id: string): string {
   return entry ? entry.name : id;
 }
 
-// Map from V7 organ keys (used in organSummary) to display labels
 const ORGAN_LABELS_V7: Record<string, string> = {
   heart: '❤️ Сердце', vessels: '🫀 Сосуды', liver: '🫁 Печень', kidney: '💧 Почки',
   blood: '🩸 Кровь', endocrine: '⚖️ Эндокринная', metabolic: '⚖️ Метаболизм',
@@ -23,7 +22,6 @@ const ORGAN_LABELS_V7: Record<string, string> = {
   reproductive: '💪 Репродуктивная',
 };
 
-// Map V7 organ key → SYSTEM_MECHANISMS system key for mechanism name lookup
 const V7_ORGAN_TO_SYSTEM: Record<string, string> = {
   heart: 'cardio', vessels: 'vessels', liver: 'hepatic', kidney: 'renal',
   blood: 'blood', endocrine: 'endocrine', metabolic: 'metabolic',
@@ -33,12 +31,23 @@ const V7_ORGAN_TO_SYSTEM: Record<string, string> = {
 };
 
 function getMechName(sysKey: string, mechIdx: number): string {
-  const smKey = V7_ORGAN_TO_SYSTEM[sysKey];
-  if (!smKey) return `М${mechIdx}`;
+  // First try V7 MECHANISM_NAMES (has up to 8 mechanisms for some systems)
+  const smKey = V7_ORGAN_TO_SYSTEM[sysKey] || sysKey;
+  if (MECHANISM_NAMES[smKey]?.[mechIdx]) {
+    return MECHANISM_NAMES[smKey][mechIdx];
+  }
+  // Then try SYSTEM_MECHANISMS
   const mechs = SYSTEM_MECHANISMS[smKey];
-  if (!mechs) return `М${mechIdx}`;
-  const found = mechs.find(m => m.num === mechIdx);
-  return found?.label || `М${mechIdx}`;
+  if (mechs) {
+    const found = mechs.find(m => m.num === mechIdx);
+    if (found?.label) return found.label;
+  }
+  // Fallback for indices that have no real name
+  return '';
+}
+
+function hasValidMech(sysKey: string, mechIdx: number): boolean {
+  return getMechName(sysKey, mechIdx) !== '';
 }
 
 const SENSITIVITY_LABELS: Record<string, string> = {
@@ -49,20 +58,26 @@ const SENSITIVITY_LABELS: Record<string, string> = {
   volumeTonnes: 'Объём (тонны/нед)', stazhWeeks: 'Стаж (нед)',
 };
 
-type V7Tab = 'organs' | 'matrix' | 'timeseries' | 'sensitivity' | 'pk';
+type V7Tab = 'organs' | 'matrix' | 'timeseries' | 'sensitivity' | 'pk' | '3d';
 
 export const V7RiskDisplay: React.FC<{ result: V7RiskResult }> = ({ result }) => {
   const [expandedOrgan, setExpandedOrgan] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<V7Tab>('organs');
   const [selectedDay, setSelectedDay] = useState<number>(42);
   const [pkDay, setPkDay] = useState(42);
+  const [selectedOrgan3D, setSelectedOrgan3D] = useState<string | null>(null);
   const linked = useDataLink();
 
   const { matrix, organSummary, globalRiskRaw, globalRiskNet, globalPEvent, dataQuality, organs, mcResult, pkTimeSeries } = result;
 
-  const getLevel = (v: number) => v < 20 ? 'Низкий' : v < 40 ? 'Умеренный' : v < 60 ? 'Повышенный' : v < 80 ? 'Высокий' : 'Критический';
-  const fmtPct = (v: number) => Math.round(v);
+  // Values are in 0-1 scale, multiply by 100 for percentage display
+  const fmtPct = (v: number) => Math.round(v * 100);
   const fmtDec = (v: number, d: number) => v.toFixed(d);
+
+  const levelLabel = (v: number) => {
+    const pct = v * 100;
+    return pct < 20 ? 'Низкий' : pct < 40 ? 'Умеренный' : pct < 60 ? 'Повышенный' : pct < 80 ? 'Высокий' : 'Критический';
+  };
 
   const sensitivityResults = useMemo(() => {
     if (!linked.profile) return [];
@@ -120,11 +135,11 @@ export const V7RiskDisplay: React.FC<{ result: V7RiskResult }> = ({ result }) =>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 6 }}>
           <div style={{ background: 'var(--bg-secondary)', padding: 10, borderRadius: 8, textAlign: 'center' }}>
             <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>Raw Risk</div>
-            <div style={{ fontSize: 22, fontWeight: 700, color: getRiskColor(globalRiskRaw) }}>{fmtPct(globalRiskRaw)}%</div>
+            <div style={{ fontSize: 22, fontWeight: 700, color: getRiskColor(fmtPct(globalRiskRaw)) }}>{fmtPct(globalRiskRaw)}%</div>
           </div>
           <div style={{ background: 'var(--bg-secondary)', padding: 10, borderRadius: 8, textAlign: 'center' }}>
             <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>Net Risk</div>
-            <div style={{ fontSize: 22, fontWeight: 700, color: getRiskColor(globalRiskNet) }}>{fmtPct(globalRiskNet)}%</div>
+            <div style={{ fontSize: 22, fontWeight: 700, color: getRiskColor(fmtPct(globalRiskNet)) }}>{fmtPct(globalRiskNet)}%</div>
           </div>
           <div style={{ background: 'var(--bg-secondary)', padding: 10, borderRadius: 8, textAlign: 'center' }}>
             <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>P(событие)</div>
@@ -142,22 +157,24 @@ export const V7RiskDisplay: React.FC<{ result: V7RiskResult }> = ({ result }) =>
         {Object.entries(organSummary).map(([sysKey, sysData]: [string, any]) => {
           const label = ORGAN_LABELS_V7[sysKey] || sysKey;
           const isExpanded = expandedOrgan === sysKey;
+          const organPct = fmtPct(sysData.meanS ?? 0);
           return (
             <div key={sysKey} style={{ marginBottom: 8, background: 'var(--bg-secondary)', padding: 8, borderRadius: 6 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }} onClick={() => setExpandedOrgan(isExpanded ? null : sysKey)}>
                 <span style={{ fontSize: 12, fontWeight: 600 }}>{label}</span>
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                   <div style={{ width: 50, background: 'rgba(255,255,255,0.1)', borderRadius: 3, height: 5, overflow: 'hidden' }}>
-                    <div style={{ width: `${Math.min(100, (sysData.meanS ?? 0) * 100)}%`, height: '100%', background: getRiskColor((sysData.meanS ?? 0) * 100), borderRadius: 3 }} />
+                    <div style={{ width: `${Math.min(100, organPct)}%`, height: '100%', background: getRiskColor(organPct), borderRadius: 3 }} />
                   </div>
-                  <span style={{ fontWeight: 700, fontSize: 12, color: getRiskColor((sysData.meanS ?? 0) * 100), minWidth: 36, textAlign: 'right' }}>{fmtPct((sysData.meanS ?? 0) * 100)}%</span>
-                  <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>{isExpanded ? '▸' : '▾'}</span>
+                  <span style={{ fontWeight: 700, fontSize: 12, color: getRiskColor(organPct), minWidth: 36, textAlign: 'right' }}>{organPct}%</span>
+                  <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>{isExpanded ? '▾' : '▸'}</span>
                 </div>
               </div>
               {isExpanded && sysData.mechanisms && (typeof sysData.mechanisms === 'object') && Object.keys(sysData.mechanisms).length > 0 && (
                 <div style={{ marginTop: 6, borderTop: '1px solid var(--border)', paddingTop: 6 }}>
                   {Object.entries(sysData.mechanisms).map(([idx, mechData]: [string, any]) => {
                     const mechIdx = Number(idx);
+                    if (!hasValidMech(sysKey, mechIdx)) return null;
                     const mechName = getMechName(sysKey, mechIdx);
                     const netVal = Math.round((mechData.P_net ?? mechData.p5 ?? 0) * 100);
                     const rawVal = Math.round((mechData.P_raw ?? mechData.raw ?? 0) * 100);
@@ -180,15 +197,15 @@ export const V7RiskDisplay: React.FC<{ result: V7RiskResult }> = ({ result }) =>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 4, marginTop: 8 }}>
                     <div style={{ background: 'rgba(239,68,68,0.1)', padding: '4px 6px', borderRadius: 4, textAlign: 'center' }}>
                       <div style={{ fontSize: 8, color: 'var(--text-dim)' }}>Острый</div>
-                      <div style={{ fontSize: 12, fontWeight: 600 }}>{fmtPct((sysData.acute ?? 0) * 100)}%</div>
+                      <div style={{ fontSize: 12, fontWeight: 600 }}>{fmtPct(sysData.acute ?? 0)}%</div>
                     </div>
                     <div style={{ background: 'rgba(249,115,22,0.1)', padding: '4px 6px', borderRadius: 4, textAlign: 'center' }}>
                       <div style={{ fontSize: 8, color: 'var(--text-dim)' }}>Хронич.</div>
-                      <div style={{ fontSize: 12, fontWeight: 600 }}>{fmtPct((sysData.chronic ?? 0) * 100)}%</div>
+                      <div style={{ fontSize: 12, fontWeight: 600 }}>{fmtPct(sysData.chronic ?? 0)}%</div>
                     </div>
                     <div style={{ background: 'rgba(168,85,247,0.1)', padding: '4px 6px', borderRadius: 4, textAlign: 'center' }}>
                       <div style={{ fontSize: 8, color: 'var(--text-dim)' }}>Фиброз</div>
-                      <div style={{ fontSize: 12, fontWeight: 600 }}>{fmtPct((sysData.fibrosis ?? 0) * 100)}%</div>
+                      <div style={{ fontSize: 12, fontWeight: 600 }}>{fmtPct(sysData.fibrosis ?? 0)}%</div>
                     </div>
                   </div>
                 </div>
@@ -198,7 +215,6 @@ export const V7RiskDisplay: React.FC<{ result: V7RiskResult }> = ({ result }) =>
         })}
       </div>
 
-      {/* PK Time Series in Organs tab */}
       {pkTimeSeries && Object.keys(pkTimeSeries).length > 0 && (
         <div className="card" style={{ marginBottom: 12 }}>
           <h3 style={{ margin: '0 0 8px 0' }}>💉 PK Концентрации ({Object.keys(pkTimeSeries).length} преп.)</h3>
@@ -252,26 +268,27 @@ export const V7RiskDisplay: React.FC<{ result: V7RiskResult }> = ({ result }) =>
   const renderMatrix = () => (
     <div className="card" style={{ marginBottom: 12 }}>
       <h3 style={{ margin: '0 0 10px 0' }}>🔲 Матрица рисков V7</h3>
-      <p style={{ fontSize: 11, color: 'var(--text-dim)', margin: '0 0 10px 0' }}>7×7 межорганных взаимодействий</p>
+      <p style={{ fontSize: 11, color: 'var(--text-dim)', margin: '0 0 10px 0' }}>18 систем × 7-9 механизмов</p>
       {Object.entries(matrix.systems).map(([sysKey, sysData]: [string, any]) => {
         const label = SYSTEM_NAMES_RU[sysKey] || sysKey;
         return (
           <div key={sysKey} style={{ marginBottom: 8, background: 'var(--bg-secondary)', padding: 8, borderRadius: 6 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-              <span style={{ fontWeight: 600 }}>{label}</span>
+              <span style={{ fontWeight: 600, fontSize: 12 }}>{label}</span>
               <div style={{ display: 'flex', gap: 8 }}>
-                <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>Raw: <b style={{ color: getRiskColor(sysData.raw) }}>{fmtPct(sysData.raw)}%</b></span>
-                <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>Net: <b style={{ color: getRiskColor(sysData.net) }}>{fmtPct(sysData.net)}%</b></span>
+                <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>Raw: <b style={{ color: getRiskColor(sysData.raw) }}>{Math.round(sysData.raw)}%</b></span>
+                <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>Net: <b style={{ color: getRiskColor(sysData.net) }}>{Math.round(sysData.net)}%</b></span>
               </div>
             </div>
             {Object.entries(sysData.mechanisms).map(([mechStr, mech]: [string, any]) => {
               const mechIdx = Number(mechStr);
-              const mechName = getMechName(sysKey, mechIdx);
+              const mechName = MECHANISM_NAMES[sysKey]?.[mechIdx];
+              if (!mechName) return null;
               const netVal = Math.round(mech.P_net * 100);
               return (
                 <div key={mechStr} style={{ marginBottom: 2 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10 }}>
-                    <span style={{ color: 'var(--text-dim)' }}>{mechName}</span>
+                    <span style={{ color: 'var(--text-dim)' }}>{mechIdx}. {mechName}</span>
                     <div style={{ display: 'flex', gap: 4 }}>
                       <span style={{ color: getRiskColor(mech.P_net * 100) }}>{netVal}%</span>
                       {mech.geneticMult > 1.05 && <span style={{ fontSize: 8, color: '#eab308' }}>🧬{mech.geneticMult.toFixed(2)}</span>}
@@ -360,9 +377,9 @@ export const V7RiskDisplay: React.FC<{ result: V7RiskResult }> = ({ result }) =>
 
   const renderSensitivity = () => {
     if (!linked.profile) return <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-dim)' }}>Загрузка профиля...</div>;
-    if (globalRiskNet < 1) return (
+    if (fmtPct(globalRiskNet) < 1) return (
       <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-dim)' }}>
-        <div>Общий риск = 0%</div>
+        <div>Общий риск = {fmtPct(globalRiskNet)}%</div>
         <div style={{ fontSize: 11, marginTop: 8 }}>Добавьте препараты в курс на вкладке 💊 Фарма.</div>
       </div>
     );
@@ -412,10 +429,115 @@ export const V7RiskDisplay: React.FC<{ result: V7RiskResult }> = ({ result }) =>
     );
   };
 
+  const render3DModel = () => {
+    const organKeys = Object.keys(organSummary);
+    const weekOptions = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+
+    return (
+      <div>
+        <div className="card" style={{ marginBottom: 12 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+            <h3 style={{ margin: 0 }}>🧍 3D Модель рисков</h3>
+            <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+              <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>Неделя:</span>
+              <select
+                value={selectedDay}
+                onChange={e => setSelectedDay(Number(e.target.value))}
+                style={{ padding: '4px 8px', borderRadius: 4, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 11 }}
+              >
+                {weekOptions.map(w => (
+                  <option key={w} value={w * 7}>Нед {w}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 12 }}>
+          {organKeys.map(okey => {
+            const sd = organSummary[okey];
+            const pct = Math.round((sd?.meanS ?? 0) * 100);
+            const label = ORGAN_LABELS_V7[okey] || okey;
+            const isSelected = selectedOrgan3D === okey;
+            return (
+              <div
+                key={okey}
+                onClick={() => setSelectedOrgan3D(isSelected ? null : okey)}
+                style={{
+                  background: isSelected ? 'rgba(0,230,138,0.12)' : 'var(--bg-secondary)',
+                  border: isSelected ? '2px solid #00e68a' : '2px solid transparent',
+                  borderRadius: 10, padding: 10, cursor: 'pointer',
+                  transition: 'all 0.2s',
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                  <span style={{ fontWeight: 600, fontSize: 12 }}>{label}</span>
+                  <span style={{
+                    display: 'inline-block', width: 18, height: 18, borderRadius: '50%',
+                    background: getRiskColor(pct),
+                    boxShadow: pct > 40 ? `0 0 8px ${getRiskColor(pct)}` : 'none',
+                  }} />
+                </div>
+                <div style={{ background: 'rgba(255,255,255,0.08)', borderRadius: 6, height: 12, overflow: 'hidden' }}>
+                  <div style={{
+                    width: `${Math.min(100, pct)}%`, height: '100%',
+                    background: getRiskColor(pct),
+                    borderRadius: 6, transition: 'width 0.5s',
+                    boxShadow: pct > 50 ? `0 0 6px ${getRiskColor(pct)}` : 'none',
+                  }} />
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4, fontSize: 9, color: 'var(--text-dim)' }}>
+                  <span>Острый: {Math.round((sd?.acute ?? 0) * 100)}%</span>
+                  <span>Хрон: {Math.round((sd?.chronic ?? 0) * 100)}%</span>
+                </div>
+                {isSelected && sd?.mechanisms && Object.keys(sd.mechanisms).length > 0 && (
+                  <div style={{ marginTop: 8, borderTop: '1px solid var(--border)', paddingTop: 6 }}>
+                    {Object.entries(sd.mechanisms).map(([idx, md]: [string, any]) => {
+                      const mechIdx = Number(idx);
+                      if (!hasValidMech(okey, mechIdx)) return null;
+                      const nm = getMechName(okey, mechIdx);
+                      const mpct = Math.round((md.P_net ?? md.p5 ?? 0) * 100);
+                      return (
+                        <div key={mechIdx} style={{ marginBottom: 2, fontSize: 9, display: 'flex', justifyContent: 'space-between' }}>
+                          <span style={{ color: 'var(--text-dim)' }}>{nm}</span>
+                          <span style={{ color: getRiskColor(mpct), fontWeight: 600 }}>{mpct}%</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="card" style={{ marginBottom: 12 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+            <span style={{ fontSize: 12, fontWeight: 600 }}>Общий риск</span>
+            <div style={{ display: 'flex', gap: 12 }}>
+              <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>Raw: <b style={{ color: getRiskColor(fmtPct(globalRiskRaw)) }}>{fmtPct(globalRiskRaw)}%</b></span>
+              <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>Net: <b style={{ color: getRiskColor(fmtPct(globalRiskNet)) }}>{fmtPct(globalRiskNet)}%</b></span>
+            </div>
+          </div>
+          <div style={{ background: 'rgba(255,255,255,0.08)', borderRadius: 6, height: 16, overflow: 'hidden' }}>
+            <div style={{
+              width: `${Math.min(100, fmtPct(globalRiskNet))}%`, height: '100%',
+              background: `linear-gradient(90deg, #22c55e, ${getRiskColor(fmtPct(globalRiskNet))})`,
+              borderRadius: 6, transition: 'width 0.5s',
+            }} />
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4, fontSize: 9, color: 'var(--text-dim)' }}>
+            <span>Низкий</span><span>Умеренный</span><span>Повышенный</span><span>Высокий</span><span>Критический</span>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   const tabs: { id: V7Tab; label: string }[] = [
     { id: 'organs', label: '🫀 Органы' }, { id: 'matrix', label: '🔲 Матрица' },
     { id: 'timeseries', label: '📈 Временной ряд' }, { id: 'sensitivity', label: '📊 Чувствит.' },
-    { id: 'pk', label: '💉 PK' },
+    { id: 'pk', label: '💉 PK' }, { id: '3d', label: '🧍 3D Модель' },
   ];
 
   const pkContent = pkTimeSeries && Object.keys(pkTimeSeries).length > 0 ? (
@@ -485,11 +607,12 @@ export const V7RiskDisplay: React.FC<{ result: V7RiskResult }> = ({ result }) =>
       {activeTab === 'timeseries' && renderTimeSeries()}
       {activeTab === 'sensitivity' && renderSensitivity()}
       {activeTab === 'pk' && pkContent}
+      {activeTab === '3d' && render3DModel()}
       <div className="card" style={{ marginBottom: 12 }}>
         <div style={{ fontSize: 10, color: 'var(--text-dim)', textAlign: 'center', lineHeight: 1.5 }}>
           🔬 Health Engine v7.0 — PK → Hill → Signaling → 7мех → Damage/Recovery → MC → Risk<br />
           12 органов × 7 механизмов | Нейротоксичность | Межорганные связи | Стаж | Monte Carlo<br />
-          {mcResult ? `🎯 MC: ${(mcResult as any).meanGlobalRisk?.toFixed(1)}% сценариев` : '⚙️ Детерминированный режим'}
+          {mcResult ? `🎯 MC: ${(mcResult as any).meanGlobalRisk?.toFixed(1) || '—'}% сценариев` : '⚙️ Детерминированный режим'}
           {pkTimeSeries && Object.keys(pkTimeSeries).length > 0 ? ` | 💉 PK: ${Object.keys(pkTimeSeries).length} препаратов` : ''}
         </div>
       </div>
