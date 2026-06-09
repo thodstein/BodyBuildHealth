@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import { RISK_SYSTEMS, ALL_RISK_SYSTEMS, DRUG_THRESHOLDS, GENETIC_MULTIPLIERS, MRR_FACTORS, HGI_FACTORS, RIR_FACTORS, SUPPORT_BASE_COVERAGE, BASE_RISK } from '../../../core/constants';
 import { MECHANISM_INFO, SYSTEM_INFO, SYSTEM_INFO_ALL, SYSTEM_ORGANS } from '../../../core/risk-info';
 import { SYSTEM_MECHANISMS } from '../../../core/system-mechanisms';

@@ -1,4 +1,4 @@
-﻿// ============================================================
+// ============================================================
 // Health Engine v7.0 — Risk Matrix (7 systems x 7 mechanisms)
 // Genetics, lab trends, nutrition, training, drug contributions, support coverage
 // Expanded: All PHARMA_DB substances, ULN-based labFactor, expanded support coverage

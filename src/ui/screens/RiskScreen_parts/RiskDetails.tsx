@@ -1,4 +1,4 @@
-﻿import React from 'react';
+import React from 'react';
 import { PHARMA_DB } from '../../../core/pharma-database';
 import { RISK_SYSTEMS, SUBSYSTEM_MAP, SUBSYSTEM_PARENT } from '../../../core/constants';
 import { SYSTEM_INFO, SYSTEM_INFO_ALL, SYSTEM_ORGANS } from '../../../core/risk-info';

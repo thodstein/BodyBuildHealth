@@ -1,4 +1,4 @@
-﻿import React from 'react';
+import React from 'react';
 import { REQUIRED_LABS_PER_PHASE } from '../../../core/constants';
 
 const PHASE_LABELS: Record<string, string> = {

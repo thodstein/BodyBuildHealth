@@ -1,4 +1,4 @@
-﻿export interface Recommendation {
+export interface Recommendation {
   recId: string;
   type: string;
   riskId: string;

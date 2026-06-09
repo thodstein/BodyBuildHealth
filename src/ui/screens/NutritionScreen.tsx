@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { calcNutrition, generateStructuredAdvice } from '../../engines/nutrition.engine';
 import { getProfile } from '../../core/profile-manager';
 import { FOOD_DB } from '../../core/nutrition-database';

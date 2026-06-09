@@ -1,4 +1,4 @@
-﻿import { PharmaSubstance } from './types';
+import { PharmaSubstance } from './types';
 
 export const PHARMA_DB: Record<string, PharmaSubstance> = {
   // === ТЕСТОСТЕРОН ===

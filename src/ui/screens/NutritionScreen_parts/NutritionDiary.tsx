@@ -1,4 +1,4 @@
-﻿import React, { useState, useRef } from 'react';
+import React, { useState, useRef } from 'react';
 import { BarcodeScanner } from '../../components/BarcodeScanner';
 import { type OFFProduct } from '../../../engines/openfoodfacts.engine';
 import { parseFatSecretText, parseNutritionScreenshot } from '../../../engines/nutrition-ocr-parser';

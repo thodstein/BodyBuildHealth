@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import { RISK_SYSTEMS, ALL_RISK_SYSTEMS, DRUG_THRESHOLDS } from '../../../core/constants';
 import { PHARMA_DB } from '../../../core/pharma-database';
 import { SYSTEM_INFO, MECHANISM_INFO, SYSTEM_ORGANS } from '../../../core/risk-info';

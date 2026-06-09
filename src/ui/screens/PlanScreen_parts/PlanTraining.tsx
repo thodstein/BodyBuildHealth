@@ -1,4 +1,4 @@
-﻿import React from 'react';
+import React from 'react';
 import type { TrainingOutput, Exercise } from '../../../core/types';
 import type { MacrocyclePlan } from '../../../engines/training-periodization.engine';
 import type { SplitCandidate } from '../../../engines/split-selector.engine';

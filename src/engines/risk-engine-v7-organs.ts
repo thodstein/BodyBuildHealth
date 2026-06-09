@@ -1,4 +1,4 @@
-﻿// ============================================================
+// ============================================================
 // Health Engine v7.0 — Organ Modules
 // 11 organs × 7 mechanisms per spec (File 1 & 2)
 // Heart, Vessels, Liver, Kidney, Blood, HPTA(Endocrine),

@@ -1,4 +1,4 @@
-﻿// ============================================================
+// ============================================================
 // Health Engine v9 — Risk Calculation Engine
 // Integrates 105 specific mechanisms from SYSTEM_MECHANISMS
 // with drug matching, lab marker adjustment, and PD factors

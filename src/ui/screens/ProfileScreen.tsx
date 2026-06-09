@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import type { UserProfile, InjuryRecord, SupplementEntry, MedicationEntry, LabPoint } from '../../core/types';
 import { getProfile, updateProfile, useProfileRefresh } from '../../core/profile-manager';
 import { db } from '../../core/db';

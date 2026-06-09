@@ -1,4 +1,4 @@
-﻿// ============================================================
+// ============================================================
 // Health Engine v7.0 — Core Mathematical Engine
 // PK → Hill Receptors → Signaling → 7 Mechanisms → Damage/Recovery → Stochastic → Monte Carlo → Global Risk
 // ============================================================

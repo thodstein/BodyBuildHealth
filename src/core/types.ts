@@ -1,4 +1,4 @@
-﻿export type Severity = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+export type Severity = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
 export type InteractionType = 'synergy' | 'conflict' | 'danger' | 'caution';
 export type Onset = 'fast' | 'medium' | 'slow';
 export type Decay = 'fast' | 'medium' | 'slow' | 'very_slow';

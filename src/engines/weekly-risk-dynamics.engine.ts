@@ -1,4 +1,4 @@
-﻿// ============================================================
+// ============================================================
 // Health Engine v9 — Weekly Risk Dynamics Engine
 // Calculates risk per week considering PK accumulation/washout
 // ============================================================

@@ -1,4 +1,4 @@
-﻿// ============================================================
+// ============================================================
 // Health Engine v7.0 — PK Simulation, Receptors, Monte Carlo, Time-Series
 // Full daily loop: PK → Receptors → Signaling → Organs → Risk
 // ============================================================

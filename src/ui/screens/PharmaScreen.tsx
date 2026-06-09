@@ -1,4 +1,4 @@
-﻿import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { PHARMA_DB, SUBSTANCES_BY_CLASS } from '../../core/pharma-database';
 import { calculateDose } from '../../engines/dosage.engine';
 import { simulateCourse, steadyStatePeak, steadyStateTrough, eliminationConstant } from '../../engines/pk-pd.engine';

@@ -1,4 +1,4 @@
-﻿import { parseLabText as parseLabTextFromPdf, parseLabFile, type ParsedLabResult as PdfParsedLabResult } from '../engines/pdf-parser.engine';
+import { parseLabText as parseLabTextFromPdf, parseLabFile, type ParsedLabResult as PdfParsedLabResult } from '../engines/pdf-parser.engine';
 import { parseNutritionScreenshot, parseFatSecretText, type ParsedMeal } from '../engines/nutrition-ocr-parser';
 import { parseLabText as parseLabTextProviderAware, detectProvider } from './lab-auto-parser';
 import { UCUM_MAP } from './constants';

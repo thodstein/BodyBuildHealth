@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import { SYSTEM_INFO } from '../../../core/risk-info';
 
 interface Investigation {

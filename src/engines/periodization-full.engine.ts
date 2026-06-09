@@ -1,4 +1,4 @@
-﻿// ============================================================================
+// ============================================================================
 // periodization-full.engine.ts
 // FULL PERIODIZATION ENGINE V17.5 ULTRA
 // Integration of pereodization_engine.js with TypeScript types

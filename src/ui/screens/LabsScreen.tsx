@@ -1,4 +1,4 @@
-﻿import React, { useState, useMemo, useCallback, useRef } from 'react';
+import React, { useState, useMemo, useCallback, useRef } from 'react';
 import { RISK_SYSTEMS, ALL_RISK_SYSTEMS, REQUIRED_LABS_PER_PHASE, UCUM_MAP } from '../../core/constants';
 import type { RiskResult, LabPoint } from '../../core/types';
 import { calculateRiskFromAnalyses } from '../../engines/risk-calculator-v2.engine';

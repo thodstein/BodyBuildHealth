@@ -1,4 +1,4 @@
-﻿export type RiskLevel = 'LOW' | 'MEDIUM' | 'HIGH';
+export type RiskLevel = 'LOW' | 'MEDIUM' | 'HIGH';
 
 export interface Risk {
   id: string;

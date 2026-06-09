@@ -1,4 +1,4 @@
-﻿import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { SYSTEM_NAMES_RU, MECHANISM_NAMES } from '../../../engines/risk-engine-v7-matrix';
 import type { V7RiskResult } from '../../../engines/risk-engine-v7';
 import { sensitivityAnalysis } from '../../../engines/risk-engine-v7-core';

@@ -1,4 +1,4 @@
-﻿export interface SystemInfo {
+export interface SystemInfo {
   id: string;
   label: string;
   icon: string;

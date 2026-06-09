@@ -1,4 +1,4 @@
-﻿import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { registry } from './core/data/registry';
 import { DashboardScreen } from './ui/screens/DashboardScreen';
 import { PharmaScreen } from './ui/screens/PharmaScreen';

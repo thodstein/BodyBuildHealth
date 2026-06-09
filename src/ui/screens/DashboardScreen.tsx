@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { SummaryCard } from '../cards/SummaryCard';
 import { SystemCard } from '../cards/SystemCard';
 import { PHARMA_DB } from '../../core/pharma-database';

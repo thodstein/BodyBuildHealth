@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import type { LabPoint } from '../../../core/types';
 import { UCUM_MAP } from '../../../core/constants';
 

@@ -1,4 +1,4 @@
-﻿import { RIR_TABLE, SPLIT_LABELS, GROUP_LABELS } from './PlanConstants';
+import { RIR_TABLE, SPLIT_LABELS, GROUP_LABELS } from './PlanConstants';
 import { EXERCISE_CATALOG, getExercisesByGroup, getExerciseById } from '../../../core/exercise-catalog';
 import { calcExercisePrescription } from '../../../engines/training.engine';
 import type { TrainingOutput, Exercise } from '../../../core/types';

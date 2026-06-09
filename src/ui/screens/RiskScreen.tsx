@@ -1,4 +1,4 @@
-﻿import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { RISK_SYSTEMS, ALL_RISK_SYSTEMS, SUBSYSTEM_MAP, SUBSYSTEM_PARENT, DRUG_THRESHOLDS, SUPPORT_BASE_COVERAGE } from '../../core/constants';
 import { SYSTEM_INFO, MECHANISM_INFO, SYSTEM_ORGANS } from '../../core/risk-info';
 import type { RiskResult, MechanismCell, LabPoint } from '../../core/types';

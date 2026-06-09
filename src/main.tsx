@@ -1,4 +1,4 @@
-﻿import { renderAuthModule } from './ui/auth-module';
+import { renderAuthModule } from './ui/auth-module';
 import { db } from './core/db';
 import { registry } from './core/data/registry';
 import { initPWA } from './core/pwa-manager';
