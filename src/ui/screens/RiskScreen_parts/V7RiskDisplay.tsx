@@ -56,7 +56,11 @@ const SENSITIVITY_LABELS: Record<string, string> = {
   sodiumG: 'Натрий (г/д)', potassiumG: 'Калий (г/д)', sleepHours: 'Сон (ч)',
   stressLevel: 'Стресс (1-10)', activityLevel: 'Активность (1-10)',
   workoutsPerWeek: 'Тренировок/нед', avgWorkoutMinutes: 'Длит. тренировки (мин)',
+  lissMinutes: 'LISS (мин/нед)', hasHIIT: 'Наличие HIIT',
   volumeTonnes: 'Объём (тонны/нед)', stazhWeeks: 'Стаж (нед)',
+  avgKcal: 'Ккал/день (дневник)', avgProtein: 'Белки/день (дневник)',
+  avgFat: 'Жиры/день (дневник)', avgCarbs: 'Углеводы/день (дневник)',
+  age: 'Возраст', weight: 'Вес (кг)', waterL: 'Вода (л/день)',
 };
 
 type V7Tab = 'organs' | 'matrix' | 'timeseries' | 'sensitivity' | 'pk' | '3d';
@@ -104,7 +108,14 @@ export const V7RiskDisplay: React.FC<{ result: V7RiskResult }> = ({ result }) =>
       potassiumG: settings.potassiumG ?? 3.0, sleepHours: settings.sleepHours ?? settings.baselineSleepHours ?? 7,
       stressLevel: settings.stressLevel ?? settings.baselineStressLevel ?? 5, activityLevel: settings.activityLevel ?? 5,
       workoutsPerWeek: settings.workoutsPerWeek ?? 3, avgWorkoutMinutes: settings.avgWorkoutMinutes ?? 60,
+      lissMinutes: settings.lissMinutesPerWeek ?? 90, hasHIIT: settings.hasHIIT ? 1 : 0,
       volumeTonnes: settings.volumeTonnes ?? 8000, stazhWeeks: (settings.totalCycles ?? 0) * 12,
+      // Pull from linked nutrition data (auto-derived from food diary)
+      avgKcal: linked.avgWeeklyKcal ?? 2500, avgProtein: linked.avgWeeklyProtein ?? 120,
+      avgFat: linked.avgWeeklyFat ?? 80, avgCarbs: linked.avgWeeklyCarbs ?? 250,
+      // Pull from profile settings
+      age: settings.age ?? 30, weight: settings.weight ?? 80,
+      waterL: (settings as any).waterPerDay ?? 2.5,
     };
     const computeFn = (params: Record<string, number>): number => {
       try {
@@ -112,8 +123,8 @@ export const V7RiskDisplay: React.FC<{ result: V7RiskResult }> = ({ result }) =>
         const input: V7RiskInput = {
           labs: linked.labs || [], course: linked.course || [],
           genetics: { COMT: settings.genetics?.COMT, MTHFR: settings.genetics?.MTHFR, ESR1: settings.genetics?.ESR1, AGTR1: settings.genetics?.AGTR1, NOS3: settings.genetics?.NOS3, SRD5A2: settings.genetics?.SRD5A2, CYP3A4: settings.genetics?.CYP3A4 },
-          nutrition: { proteinPerKg: params.proteinPerKg ?? 1.8, fiberG: params.fiberG ?? 25, omega3G: params.omega3G ?? 1.5, sodiumG: params.sodiumG ?? 3.5, potassiumG: params.potassiumG ?? 3.0 },
-          training: { workoutsPerWeek: Math.round(params.workoutsPerWeek ?? 3), avgWorkoutMinutes: params.avgWorkoutMinutes ?? 60, hasHIIT: settings.hasHIIT ?? false, volumeTonnes: params.volumeTonnes ?? 8000, lissMinutesPerWeek: settings.lissMinutesPerWeek ?? 90 },
+          nutrition: { proteinPerKg: params.proteinPerKg ?? 1.8, fiberG: params.fiberG ?? 25, omega3G: params.omega3G ?? 1.5, sodiumG: params.sodiumG ?? 3.5, potassiumG: params.potassiumG ?? 3.0 } as any,
+          training: { workoutsPerWeek: Math.round(params.workoutsPerWeek ?? 3), avgWorkoutMinutes: params.avgWorkoutMinutes ?? 60, hasHIIT: (params.hasHIIT ?? 0) > 0, volumeTonnes: params.volumeTonnes ?? 8000, lissMinutesPerWeek: params.lissMinutes ?? 90 },
           mode: mode as any, stazhWeeks: Math.max(0, params.stazhWeeks ?? 0),
           continuousWeeks: Math.max(0, (linked.course || []).reduce((max, c) => Math.max(max, (c.endWeek || 12) - (c.startWeek || 0)), 0)),
           sleepHours: params.sleepHours, stressLevel: params.stressLevel, activityLevel: params.activityLevel,
@@ -156,19 +167,32 @@ export const V7RiskDisplay: React.FC<{ result: V7RiskResult }> = ({ result }) =>
     <div>
       <div className="card" style={{ marginBottom: 12 }}>
         <h3 style={{ margin: '0 0 10px 0' }}>🔬 V7 Risk Engine — Полная модель</h3>
-        <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 10 }}>
-          <span style={{ fontSize: 10, color: 'var(--text-dim)', whiteSpace: 'nowrap' }}>Неделя:</span>
-          <select value={organWeek} onChange={e => setOrganWeek(Number(e.target.value))}
-            style={{ padding: '4px 8px', borderRadius: 4, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 11 }}>
-            <option value={0}>📊 Среднее за 12 нед</option>
-            {[1,2,3,4,5,6,7,8,9,10,11,12].map(w => <option key={w} value={w}>Нед {w}</option>)}
-          </select>
-          {organWeek > 0 && weeklyGlobalData[organWeek - 1] && (
-            <span style={{ fontSize: 10, color: 'var(--text-dim)', marginLeft: 8 }}>
-              Общий риск (raw): {fmtPct100(weeklyGlobalData[organWeek - 1].raw)}%
-            </span>
-          )}
-        </div>
+          <div style={{ marginBottom: 10 }}>
+            <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 3 }}>Неделя: {organWeek === 0 ? 'Среднее за 12 нед' : `Нед ${organWeek}`}</div>
+            <div style={{ display: 'flex', gap: 2, overflowX: 'auto', paddingBottom: 2, scrollbarWidth: 'none' }}>
+              <button onClick={() => setOrganWeek(0)} style={{
+                padding: '3px 8px', borderRadius: 6, fontSize: 9, fontWeight: organWeek === 0 ? 700 : 400,
+                cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
+                background: organWeek === 0 ? '#00e68a' : 'var(--bg-secondary)',
+                border: organWeek === 0 ? '1px solid #00e68a' : '1px solid var(--border)',
+                color: organWeek === 0 ? '#000' : 'var(--text-dim)',
+              }}>∅</button>
+              {[1,2,3,4,5,6,7,8,9,10,11,12].map(w => (
+                <button key={w} onClick={() => setOrganWeek(w)} style={{
+                  padding: '3px 8px', borderRadius: 6, fontSize: 9, fontWeight: organWeek === w ? 700 : 400,
+                  cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
+                  background: organWeek === w ? '#00e68a' : 'var(--bg-secondary)',
+                  border: organWeek === w ? '1px solid #00e68a' : '1px solid var(--border)',
+                  color: organWeek === w ? '#000' : 'var(--text-dim)',
+                }}>{w}</button>
+              ))}
+            </div>
+            {organWeek > 0 && weeklyGlobalData[organWeek - 1] && (
+              <div style={{ fontSize: 9, color: 'var(--text-dim)', marginTop: 3 }}>
+                Общий риск (raw): {fmtPct100(weeklyGlobalData[organWeek - 1].raw)}%
+              </div>
+            )}
+          </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 6 }}>
           <div style={{ background: 'var(--bg-secondary)', padding: 10, borderRadius: 8, textAlign: 'center' }}>
             <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>Raw Risk</div>
@@ -603,13 +627,26 @@ export const V7RiskDisplay: React.FC<{ result: V7RiskResult }> = ({ result }) =>
         <div className="card" style={{ marginBottom: 12 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
             <h3 style={{ margin: 0, fontSize: 14 }}>🧍 3D Модель рисков</h3>
-            <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-              <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>Неделя:</span>
-              <select value={selectedDay} onChange={e => setSelectedDay(Number(e.target.value))}
-                style={{ padding: '4px 8px', borderRadius: 4, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 11 }}>
-                <option value={0}>📊 Среднее</option>
-                {weekOptions.map(w => <option key={w} value={w * 7}>Нед {w}</option>)}
-              </select>
+            <div>
+              <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 3 }}>Неделя: {selectedDay === 0 ? 'Среднее' : `Нед ${Math.round(selectedDay / 7)}`}</div>
+              <div style={{ display: 'flex', gap: 2, overflowX: 'auto', paddingBottom: 2, scrollbarWidth: 'none' }}>
+                <button onClick={() => setSelectedDay(0)} style={{
+                  padding: '3px 8px', borderRadius: 6, fontSize: 9, fontWeight: selectedDay === 0 ? 700 : 400,
+                  cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
+                  background: selectedDay === 0 ? '#00e68a' : 'var(--bg-secondary)',
+                  border: selectedDay === 0 ? '1px solid #00e68a' : '1px solid var(--border)',
+                  color: selectedDay === 0 ? '#000' : 'var(--text-dim)',
+                }}>∅</button>
+                {weekOptions.map(w => (
+                  <button key={w} onClick={() => setSelectedDay(w * 7)} style={{
+                    padding: '3px 8px', borderRadius: 6, fontSize: 9, fontWeight: selectedDay === w * 7 ? 700 : 400,
+                    cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
+                    background: selectedDay === w * 7 ? '#00e68a' : 'var(--bg-secondary)',
+                    border: selectedDay === w * 7 ? '1px solid #00e68a' : '1px solid var(--border)',
+                    color: selectedDay === w * 7 ? '#000' : 'var(--text-dim)',
+                  }}>{w}</button>
+                ))}
+              </div>
             </div>
           </div>
         </div>

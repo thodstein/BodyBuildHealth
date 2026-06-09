@@ -713,7 +713,9 @@ const DosageCalculatorTab: React.FC = () => {
   const [mgKg, setMgKg] = useState(2);
   const [weight, setWeight] = useState(90);
   const [concentration, setConcentration] = useState(250);
+  const [syringeMl, setSyringeMl] = useState(1);
   const [result, setResult] = useState<string | null>(null);
+  const [doseResult, setDoseResult] = useState<ReturnType<typeof calculateDose> | null>(null);
 
   const run = () => {
     if (!drug) return;
@@ -723,9 +725,10 @@ const DosageCalculatorTab: React.FC = () => {
       targetDoseMg: baseMg,
       concentrationMgPerMl: concentration,
       roundingStepMl: 0.01,
-      syringeVolumeMl: 1,
+      syringeVolumeMl: syringeMl,
       divisionsPerMl: 100,
     });
+    setDoseResult(dose);
     setResult(
       `${sub?.name ?? drug}\n` +
       `Базовая доза: ${baseMg.toFixed(1)} мг (${mgKg} мг/кг, вес ${weight} кг)\n` +
@@ -736,23 +739,120 @@ const DosageCalculatorTab: React.FC = () => {
     );
   };
 
+  const getSyringeOptions = () => {
+    // Roughly determine syringe size based on injection volume
+    if (!doseResult) return [];
+    const vol = doseResult.volumeMl;
+    if (vol <= 0.5) return [0.3, 0.5, 1];
+    if (vol <= 1) return [1, 3];
+    if (vol <= 3) return [3, 5];
+    return [5, 10];
+  };
+
+  const subDetail = drug ? PHARMA_DB[drug] : null;
+
   return (
-    <div>
-      <div className="card">
-        <select value={drug} onChange={(e) => setDrug(e.target.value)}>
-          <option value="">Выберите препарат</option>
-          {allPharma.map((p) => (
-            <option key={p.id} value={p.id}>{p.name} ({CLASS_LABELS[p.class] || p.class})</option>
-          ))}
-        </select>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
-          <input type="number" value={mgKg} onChange={(e) => setMgKg(Number(e.target.value))} placeholder="мг/кг" />
-          <input type="number" value={weight} onChange={(e) => setWeight(Number(e.target.value))} placeholder="Вес (кг)" />
-          <input type="number" value={concentration} onChange={(e) => setConcentration(Number(e.target.value))} placeholder="мг/мл" />
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+      <div>
+        <div className="card">
+          <h3 style={{ margin: '0 0 12px 0', fontSize: 14, color: 'var(--accent)' }}>📊 Калькулятор дозировки</h3>
+          <div style={{ marginBottom: 12 }}>
+            <label style={{ fontSize: 11, color: 'var(--text-dim)', display: 'block', marginBottom: 4 }}>Препарат</label>
+            <select value={drug} onChange={(e) => setDrug(e.target.value)}
+              style={{ width: '100%', padding: '8px 10px', borderRadius: 8, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12 }}>
+              <option value="">— Выберите препарат —</option>
+              {allPharma.map((p) => (
+                <option key={p.id} value={p.id}>{p.name} ({CLASS_LABELS[p.class] || p.class})</option>
+              ))}
+            </select>
+          </div>
+          {subDetail && (
+            <div style={{ marginBottom: 12, padding: '8px 10px', background: 'var(--bg-secondary)', borderRadius: 6 }}>
+              <div style={{ fontSize: 11, color: 'var(--text-dim)' }}><b style={{ color: 'var(--text)' }}>Концентрация:</b> {(subDetail as any).concentration || 'нет данных'} мг/мл</div>
+              <div style={{ fontSize: 11, color: 'var(--text-dim)' }}><b style={{ color: 'var(--text)' }}>Период полувыведения:</b> {subDetail.tHalfHours ? formatHalfLife(subDetail.tHalfHours) : 'нет данных'}</div>
+            </div>
+          )}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 12 }}>
+            <div>
+              <label style={{ fontSize: 10, color: 'var(--text-dim)', display: 'block', marginBottom: 3 }}>Дозировка (мг/кг/нед)</label>
+              <input type="number" value={mgKg} onChange={(e) => setMgKg(Number(e.target.value))}
+                style={{ width: '100%', padding: '7px 10px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12 }} />
+            </div>
+            <div>
+              <label style={{ fontSize: 10, color: 'var(--text-dim)', display: 'block', marginBottom: 3 }}>Вес (кг)</label>
+              <input type="number" value={weight} onChange={(e) => setWeight(Number(e.target.value))}
+                style={{ width: '100%', padding: '7px 10px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12 }} />
+            </div>
+            <div>
+              <label style={{ fontSize: 10, color: 'var(--text-dim)', display: 'block', marginBottom: 3 }}>Концентрация (мг/мл)</label>
+              <input type="number" value={concentration} onChange={(e) => setConcentration(Number(e.target.value))}
+                style={{ width: '100%', padding: '7px 10px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12 }} />
+            </div>
+            <div>
+              <label style={{ fontSize: 10, color: 'var(--text-dim)', display: 'block', marginBottom: 3 }}>Шприц (мл)</label>
+              <select value={syringeMl} onChange={(e) => setSyringeMl(Number(e.target.value))}
+                style={{ width: '100%', padding: '7px 10px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12 }}>
+                {[0.3, 0.5, 1, 3, 5, 10, 20].map(v => <option key={v} value={v}>{v} мл</option>)}
+              </select>
+            </div>
+          </div>
+          <div style={{ background: 'var(--bg-secondary)', padding: '8px 10px', borderRadius: 6, marginBottom: 12 }}>
+            <div style={{ fontSize: 12, display: 'flex', justifyContent: 'space-between' }}>
+              <span style={{ color: 'var(--text-dim)' }}>Целевая доза:</span>
+              <span style={{ fontWeight: 700 }}>{(mgKg * weight).toFixed(0)} мг/нед</span>
+            </div>
+          </div>
+          <button onClick={run} className="btn" style={{ width: '100%', padding: '10px', fontSize: 13 }}>Рассчитать дозу</button>
         </div>
-        <button onClick={run} className="btn">Рассчитать</button>
       </div>
-      {result && <pre className="output" style={{ whiteSpace: 'pre-wrap', fontSize: 12 }}>{result}</pre>}
+      <div>
+        {doseResult ? (
+          <div className="card">
+            <h3 style={{ margin: '0 0 12px 0', fontSize: 14, color: 'var(--accent)' }}>📋 Результат</h3>
+            <div style={{ display: 'grid', gap: 8 }}>
+              <div style={{ background: 'rgba(0,230,138,0.08)', borderRadius: 8, padding: 12, textAlign: 'center' }}>
+                <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 2 }}>Объём инъекции</div>
+                <div style={{ fontSize: 28, fontWeight: 800, color: 'var(--accent)' }}>{doseResult.volumeMl}</div>
+                <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>мл</div>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+                <div style={{ background: 'var(--bg-secondary)', borderRadius: 8, padding: '10px 12px', textAlign: 'center' }}>
+                  <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 2 }}>Деления шприца</div>
+                  <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--text)' }}>{doseResult.divisions}</div>
+                </div>
+                <div style={{ background: 'var(--bg-secondary)', borderRadius: 8, padding: '10px 12px', textAlign: 'center' }}>
+                  <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 2 }}>Доз на флакон</div>
+                  <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--text)' }}>{doseResult.dosesPerVial || '—'}</div>
+                </div>
+              </div>
+              {doseResult.flags.length > 0 && (
+                <div style={{ background: 'rgba(255,152,0,0.1)', borderRadius: 6, padding: '8px 10px', fontSize: 11, color: '#ff9800' }}>
+                  ⚠ {doseResult.flags.join(', ')}
+                </div>
+              )}
+              {doseResult.flags.length === 0 && (
+                <div style={{ background: 'rgba(0,230,138,0.08)', borderRadius: 6, padding: '8px 10px', fontSize: 11, color: '#00e68a', textAlign: 'center' }}>
+                  ✓ Готово к введению
+                </div>
+              )}
+              <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 6, textAlign: 'center' }}>
+                Базовая доза: {(mgKg * weight).toFixed(1)} мг ({mgKg} мг/кг × {weight} кг)
+              </div>
+              <div style={{ fontSize: 10, color: 'var(--text-dim)', textAlign: 'center' }}>
+                Концентрация: {concentration} мг/мл | Шприц: {syringeMl} мл
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 200, color: 'var(--text-dim)', fontSize: 12 }}>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: 32, marginBottom: 8 }}>💉</div>
+              <div>Выберите препарат и дозировку,</div>
+              <div>чтобы рассчитать объём инъекции</div>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 };
@@ -764,7 +864,17 @@ const InteractionCheckerTab: React.FC = () => {
       PHARMA_CLASSES.includes(s.class as PharmaClass)
     );
   }, []);
+  // Pharma-only synergy pairs
+  const pharmaSynergies = useMemo(() => {
+    return SYNERGY_PAIRS.filter(p => {
+      const a = PHARMA_DB[p.substanceA];
+      const b = PHARMA_DB[p.substanceB];
+      return a && b && PHARMA_CLASSES.includes(a.class as PharmaClass) && PHARMA_CLASSES.includes(b.class as PharmaClass);
+    });
+  }, []);
+
   const [selectedIds, setSelectedIds] = useState<string[]>(['', '']);
+  const [doseMgWk, setDoseMgWk] = useState(300);
 
   const addDrug = () => setSelectedIds([...selectedIds, '']);
   const removeDrug = (idx: number) => setSelectedIds(selectedIds.filter((_, i) => i !== idx));
@@ -774,106 +884,136 @@ const InteractionCheckerTab: React.FC = () => {
     setSelectedIds(updated);
   };
 
+  const validIds = selectedIds.filter(Boolean);
+
   const alerts = useMemo(() => {
-    const validIds = selectedIds.filter(Boolean);
     if (validIds.length < 2) return null;
 
     const course: CourseEntry[] = validIds.map((id, i) => ({
       id: `${id}-${i}`,
       substanceId: id,
-      doseValue: 300,
+      doseValue: doseMgWk,
       doseUnit: 'mg/wk',
       frequency: '2x/week',
       startWeek: 0,
       endWeek: 12,
     }));
 
-    return checkDrugInteractions(course);
-  }, [selectedIds]);
+    try {
+      return checkDrugInteractions(course);
+    } catch (e) {
+      return [];
+    }
+  }, [selectedIds, doseMgWk]);
 
   const hasAlerts = alerts && alerts.length > 0;
 
   return (
     <div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12 }}>
-        {selectedIds.map((id, idx) => (
-          <div key={idx} style={{ display: 'flex', gap: 8 }}>
-            <select value={id} onChange={(e) => updateDrug(idx, e.target.value)} style={{ flex: 1, fontSize: 12 }}>
-              <option value="">Выберите препарат</option>
-              {allSubstances.map((s) => (
-                <option key={s.id} value={s.id}>{s.name}</option>
-              ))}
-            </select>
-            {selectedIds.length > 2 && (
-              <button className="btn" style={{ fontSize: 10, padding: '2px 8px' }} onClick={() => removeDrug(idx)}>✕</button>
-            )}
-          </div>
-        ))}
-      </div>
-      <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
-        <button className="btn" onClick={addDrug}>+ Препарат</button>
+      {/* Header */}
+      <div className="card" style={{ marginBottom: 12 }}>
+        <h3 style={{ margin: '0 0 4px 0', fontSize: 14, color: 'var(--accent)' }}>⚡ Проверка взаимодействий</h3>
+        <p style={{ fontSize: 11, color: 'var(--text-dim)', margin: 0 }}>Выберите 2+ препарата для анализа синергий и конфликтов</p>
       </div>
 
-      {alerts === null && (
-        <div className="card" style={{ fontSize: 12, color: 'var(--text-dim)', textAlign: 'center' }}>
-          Выберите минимум 2 препарата для проверки взаимодействий
-        </div>
-      )}
-
-      {alerts !== null && !hasAlerts && (
-        <div className="card" style={{ fontSize: 12, color: '#4caf50', textAlign: 'center' }}>
-          ✓ Критических взаимодействий не обнаружено
-        </div>
-      )}
-
-      {hasAlerts && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {alerts!.map((alert, i) => (
-            <div
-              key={i}
-              className="card"
-              style={{
-                borderLeft: `4px solid ${SEVERITY_COLORS[alert.type] || '#666'}`,
-                fontSize: 12,
-              }}
-            >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                <span style={{
-                  fontWeight: 700,
-                  fontSize: 11,
-                  textTransform: 'uppercase',
-                  color: SEVERITY_COLORS[alert.type],
-                  padding: '2px 8px',
-                  borderRadius: 3,
-                  background: `${SEVERITY_COLORS[alert.type]}22`,
-                }}>
-                  {alert.type === 'critical' ? 'КРИТИЧЕСКОЕ' : alert.type === 'warning' ? 'ПРЕДУПРЕЖДЕНИЕ' : 'ИНФО'}
-                </span>
-                <span style={{ color: 'var(--text-dim)', fontSize: 11 }}>
-                  {alert.drugs.join(' + ')}
-                </span>
-              </div>
-              <div style={{ marginBottom: 4 }}>
-                <span style={{ fontWeight: 600 }}>Механизм:</span> {alert.mechanism}
-              </div>
-              <div>
-                <span style={{ fontWeight: 600 }}>Рекомендация:</span> {alert.recommendation}
-              </div>
+      {/* Drug selectors */}
+      <div className="card" style={{ marginBottom: 12 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12 }}>
+          {selectedIds.map((id, idx) => (
+            <div key={idx} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <div style={{ fontSize: 10, color: 'var(--text-dim)', minWidth: 18, fontWeight: 600 }}>#{idx + 1}</div>
+              <select value={id} onChange={(e) => updateDrug(idx, e.target.value)}
+                style={{ flex: 1, padding: '8px 10px', borderRadius: 8, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12 }}>
+                <option value="">— Выберите препарат —</option>
+                {allSubstances.map((s) => (
+                  <option key={s.id} value={s.id}>{s.name}</option>
+                ))}
+              </select>
+              {selectedIds.length > 2 && (
+                <button onClick={() => removeDrug(idx)} style={{
+                  padding: '4px 10px', borderRadius: 6, fontSize: 11, cursor: 'pointer',
+                  background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', color: '#ef4444',
+                }}>✕</button>
+              )}
             </div>
           ))}
         </div>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <button onClick={addDrug} style={{
+            padding: '8px 16px', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: 'pointer',
+            background: 'rgba(0,230,138,0.1)', border: '1px solid rgba(0,230,138,0.3)', color: '#00e68a',
+          }}>+ Добавить препарат</button>
+          {validIds.length >= 2 && (
+            <div style={{ fontSize: 11, color: 'var(--text-dim)', marginLeft: 'auto' }}>
+              {validIds.length} препаратов | {doseMgWk} мг/нед
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* No interaction message */}
+      {validIds.length < 2 && (
+        <div className="card" style={{ textAlign: 'center', padding: '24px 16px' }}>
+          <div style={{ fontSize: 28, marginBottom: 8 }}>⚡</div>
+          <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>Выберите минимум 2 препарата для проверки взаимодействий</div>
+        </div>
       )}
 
-      {/* Synergies Section */}
-      {SYNERGY_PAIRS.length > 0 && (
+      {/* No alerts found */}
+      {alerts !== null && !hasAlerts && (
+        <div className="card" style={{ textAlign: 'center', padding: '16px', border: '1px solid rgba(0,230,138,0.3)', background: 'rgba(0,230,138,0.05)' }}>
+          <div style={{ fontSize: 11, color: '#4caf50', fontWeight: 600 }}>✓ Критических взаимодействий не обнаружено</div>
+        </div>
+      )}
+
+      {/* Alerts */}
+      {hasAlerts && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12 }}>
+          <h4 style={{ margin: '0 0 4px 0', fontSize: 12, color: 'var(--text-dim)' }}>Обнаруженные взаимодействия ({alerts!.length})</h4>
+          {alerts!.map((alert, i) => {
+            const severityColor = SEVERITY_COLORS[alert.type] || '#666';
+            const severityBg = `${severityColor}18`;
+            return (
+              <div key={i} className="card" style={{
+                borderLeft: `4px solid ${severityColor}`,
+                fontSize: 12, padding: '12px 14px',
+                background: severityBg,
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                  <span style={{
+                    fontWeight: 700, fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.5px',
+                    color: severityColor, padding: '3px 10px', borderRadius: 4,
+                    background: `${severityColor}22`,
+                  }}>
+                    {alert.type === 'critical' ? '🚨 КРИТИЧЕСКОЕ' : alert.type === 'warning' ? '⚠ ПРЕДУПРЕЖДЕНИЕ' : 'ℹ ИНФО'}
+                  </span>
+                  <span style={{ color: 'var(--text-dim)', fontSize: 11, fontWeight: 500 }}>
+                    {alert.drugs.join(' + ')}
+                  </span>
+                </div>
+                <div style={{ marginBottom: 6, lineHeight: 1.5 }}>
+                  <span style={{ fontWeight: 600, color: 'var(--text)' }}>Механизм:</span>{' '}
+                  <span style={{ color: 'var(--text-light)' }}>{alert.mechanism}</span>
+                </div>
+                <div style={{ lineHeight: 1.5 }}>
+                  <span style={{ fontWeight: 600, color: 'var(--text)' }}>Рекомендация:</span>{' '}
+                  <span style={{ color: severityColor }}>{alert.recommendation}</span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Pharma-only Synergies */}
+      {pharmaSynergies.length > 0 && (
         <div className="card" style={{ marginTop: 12 }}>
-          <h3 style={{ margin: '0 0 8px 0', fontSize: 16 }}>💥 Синергии и комбинации</h3>
+          <h3 style={{ margin: '0 0 4px 0', fontSize: 14, color: 'var(--accent)' }}>💥 Синергии и комбинации</h3>
           <p style={{ fontSize: 11, color: 'var(--text-dim)', margin: '0 0 12px 0' }}>
-            Ключевые синергетические пары между препаратами
+            Ключевые синергетические пары между фармакологическими препаратами
           </p>
-          
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 8 }}>
-            {SYNERGY_PAIRS.map((pair, i) => {
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 8 }}>
+            {pharmaSynergies.map((pair, i) => {
               const synergyColors: Record<string, string> = {
                 synergistic: 'rgba(0,230,138,0.1)',
                 additive: 'rgba(59,130,246,0.1)',
@@ -886,23 +1026,21 @@ const InteractionCheckerTab: React.FC = () => {
                 potentiative: '#f97316',
                 complementary: '#a855f7',
               };
+              const aName = PHARMA_DB[pair.substanceA]?.name || pair.substanceA;
+              const bName = PHARMA_DB[pair.substanceB]?.name || pair.substanceB;
               
               return (
                 <div key={i} style={{
                   background: synergyColors[pair.synergyType] || 'rgba(255,255,255,0.03)',
-                  borderRadius: 6,
-                  padding: '10px 12px',
-                  border: '1px solid ' + (synergyColorsText[pair.synergyType] || '#888') + '40',
+                  borderRadius: 8, padding: '12px 14px',
+                  border: '1px solid ' + (synergyColorsText[pair.synergyType] || '#888') + '50',
+                  transition: 'all 0.15s',
                 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
                     <span style={{
-                      fontSize: 10,
-                      fontWeight: 700,
-                      padding: '2px 6px',
-                      borderRadius: 4,
+                      fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 4,
                       background: synergyColorsText[pair.synergyType] + '20',
                       color: synergyColorsText[pair.synergyType],
-                      textTransform: 'uppercase',
                     }}>
                       {(() => {
                         switch (pair.synergyType) {
@@ -910,48 +1048,31 @@ const InteractionCheckerTab: React.FC = () => {
                           case 'additive': return '+ Аддитивно';
                           case 'potentiative': return '↗ Усиление';
                           case 'complementary': return '↔ Дополнение';
-                          default: return '↔ Дополнение';
+                          default: return pair.synergyType;
                         }
                       })()}
                     </span>
-                    <span style={{
-                      fontSize: 11,
-                      fontWeight: 700,
-                      color: synergyColorsText[pair.synergyType],
-                    }}>
-                      Сила: {Math.round(pair.strength * 100)}%
+                    <span style={{ fontSize: 11, fontWeight: 700, color: synergyColorsText[pair.synergyType] }}>
+                      {Math.round(pair.strength * 100)}%
                     </span>
                   </div>
-                  
-                  <div style={{ fontSize: 12, lineHeight: 1.5, color: 'var(--text-light)' }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6, color: 'var(--text)' }}>
+                    {aName} + {bName}
+                  </div>
+                  <div style={{ fontSize: 11, lineHeight: 1.5, color: 'var(--text-light)' }}>
                     {pair.mechanism}
                   </div>
-                  
                   {pair.clinicalNote && (
-                    <div style={{
-                      marginTop: 6,
-                      fontSize: 10,
-                      color: '#22c55e',
-                      fontStyle: 'italic',
-                    }}>
+                    <div style={{ marginTop: 6, fontSize: 10, color: '#22c55e', fontStyle: 'italic' }}>
                       💡 {pair.clinicalNote}
                     </div>
                   )}
-                  
                   {pair.affectedSystems && pair.affectedSystems.length > 0 && (
-                    <div style={{
-                      marginTop: 6,
-                      display: 'flex',
-                      flexWrap: 'wrap',
-                      gap: 3,
-                    }}>
+                    <div style={{ marginTop: 8, display: 'flex', flexWrap: 'wrap', gap: 3 }}>
                       {pair.affectedSystems.map(sys => (
                         <span key={sys} style={{
-                          fontSize: 8,
-                          padding: '1px 4px',
-                          borderRadius: 3,
-                          background: 'rgba(255,255,255,0.1)',
-                          color: 'var(--text-dim)',
+                          fontSize: 9, padding: '2px 6px', borderRadius: 4,
+                          background: 'rgba(255,255,255,0.08)', color: 'var(--text-dim)',
                         }}>
                           {SYSTEM_LABELS[sys] || sys}
                         </span>

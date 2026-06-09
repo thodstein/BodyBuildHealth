@@ -1,14 +1,15 @@
 import React, { useState, useMemo } from 'react';
 import { SYNERGY_PAIRS, SUPPLEMENT_DESCRIPTIONS, SUPPLEMENT_TARGETS, SUPPORT_RESEARCH, calculateSupport, type SupportInput, type SynergyPair, type SupplementTarget } from '../../engines/support.engine';
 import { RISK_SYSTEMS, ALL_RISK_SYSTEMS } from '../../core/constants';
-import { PHARMA_DB, PHARMA_CLASSES } from '../../core/pharma-database';
+import { PHARMA_DB } from '../../core/pharma-database';
 import { useDataLink } from '../../core/data-link';
 import { SYSTEM_INFO } from '../../core/risk-info';
 import { getRiskColor } from '../../core/utils/risk-colors';
 import { SUPPORT_BASE_COVERAGE } from '../../core/constants';
-import { SUBSTANCES_BY_CLASS } from '../../core/pharma-database';
+import { INTERACTIONS_DB } from '../../data/interactions';
+import type { CourseEntry } from '../../core/types';
 
-type SupportTab = 'catalog' | 'synergies' | 'recommendations' | 'calculator';
+type SupportTab = 'catalog' | 'synergies' | 'calculator' | 'interactions' | 'recommendations';
 
 const SYNERGY_COLORS: Record<string, string> = {
   synergistic: '#22c55e',
@@ -16,6 +17,14 @@ const SYNERGY_COLORS: Record<string, string> = {
   potentiative: '#3b82f6',
   complementary: '#8b5cf6',
   antagonistic: '#ef4444',
+};
+
+const SUPPORT_CLASS_LABELS: Record<string, string> = {
+  support: '💊 Поддержка',
+  peptide_regenerative: '🧬 Регенерация',
+  peptide_nootropic: '🧠 Ноотропы',
+  peptide_immune: '🛡 Иммунная',
+  bady: '🌿 БАДы',
 };
 
 export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTab }) => {
@@ -30,9 +39,11 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   const [prescribedMeds, setPrescribedMeds] = useState<Record<string, boolean>>({});
   const [supportResult, setSupportResult] = useState<{ riskBefore: Record<string, number>; riskAfter: Record<string, number>; score: number } | null>(null);
 
+  // Interaction checker state
+  const [interactionIds, setInteractionIds] = useState<string[]>(['', '']);
+
   // Combine SUPPLEMENT_DESCRIPTIONS with support substances from PHARMA_DB
   const supplementList = useMemo(() => {
-    // First add supplements from SUPPLEMENT_DESCRIPTIONS
     const supplements = Object.entries(SUPPLEMENT_DESCRIPTIONS).map(([id, desc]) => ({
       id,
       name: id.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' '),
@@ -42,7 +53,6 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
       isSupportSubstance: false,
     }));
     
-    // Add support substances from PHARMA_DB (classes: support, peptide_regenerative, peptide_nootropic, peptide_immune)
     const supportClasses = ['support', 'peptide_regenerative', 'peptide_nootropic', 'peptide_immune'] as const;
     const supportSubstances = Object.values(PHARMA_DB).filter(s => 
       supportClasses.includes(s.class as typeof supportClasses[number])
@@ -51,13 +61,30 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
     const supportSupplements = supportSubstances.map(s => ({
       id: s.id,
       name: s.name,
-      description: s.description || 'Поддерживающий препарат класса ' + s.class,
+      description: s.description || 'Поддерживающий препарат класса ' + SUPPORT_CLASS_LABELS[s.class] || s.class,
       targets: undefined,
       research: s.research || [],
       isSupportSubstance: true,
+      pharmaClass: s.class,
     }));
     
     return [...supplements, ...supportSupplements];
+  }, []);
+
+  // All support substances for interaction checker
+  const allSupport = useMemo(() => supplementList, [supplementList]);
+
+  // Support-only synergy pairs
+  const supportSynergies = useMemo(() => {
+    return SYNERGY_PAIRS.filter(p => {
+      const a = PHARMA_DB[p.substanceA];
+      const b = PHARMA_DB[p.substanceB];
+      const supportClasses = ['support', 'peptide_regenerative', 'peptide_nootropic', 'peptide_immune'];
+      // Include: both are support substances, or at least one is a supplement
+      const aIsSupport = a ? supportClasses.includes(a.class) : SUPPLEMENT_DESCRIPTIONS[p.substanceA] !== undefined;
+      const bIsSupport = b ? supportClasses.includes(b.class) : SUPPLEMENT_DESCRIPTIONS[p.substanceB] !== undefined;
+      return aIsSupport || bIsSupport;
+    });
   }, []);
 
   const filteredSupplements = useMemo(() => {
@@ -72,11 +99,9 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
     if (supportClassFilter !== 'all') {
       list = list.filter(s => {
         if (s.isSupportSubstance) {
-          // Check the class from PHARMA_DB
           const substance = Object.values(PHARMA_DB).find(sub => sub.id === s.id);
           return substance?.class === supportClassFilter;
         } else {
-          // Supplements from SUPPLEMENT_DESCRIPTIONS don't have a class, so show all
           return true;
         }
       });
@@ -85,7 +110,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   }, [supplementList, searchQuery, systemFilter, supportClassFilter]);
 
   const filteredSynergies = useMemo(() => {
-    let pairs = SYNERGY_PAIRS;
+    let pairs = supportSynergies;
     if (synergyFilter !== 'all') {
       pairs = pairs.filter(p => p.synergyType === synergyFilter);
     }
@@ -93,7 +118,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
       pairs = pairs.filter(p => p.affectedSystems?.includes(systemFilter));
     }
     return pairs;
-  }, [synergyFilter, systemFilter]);
+  }, [synergyFilter, systemFilter, supportSynergies]);
 
   const handleCalculateSupport = () => {
     const input: SupportInput = {
@@ -121,20 +146,58 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
 
   const selectedDetail = selectedSub ? supplementList.find(s => s.id === selectedSub) : null;
 
+  // Interaction checker
+  const addInteraction = () => setInteractionIds([...interactionIds, '']);
+  const removeInteraction = (idx: number) => setInteractionIds(interactionIds.filter((_, i) => i !== idx));
+  const updateInteraction = (idx: number, value: string) => {
+    const updated = [...interactionIds];
+    updated[idx] = value;
+    setInteractionIds(updated);
+  };
+  const validInteractionIds = interactionIds.filter(Boolean);
+  
+  const supportInteractions = useMemo(() => {
+    if (validInteractionIds.length < 2) return null;
+    const subs: Record<string, string> = {};
+    validInteractionIds.forEach(id => {
+      const s = allSupport.find(x => x.id === id);
+      if (s) subs[id] = s.name;
+    });
+    try {
+      return INTERACTIONS_DB.filter(i => {
+        const a = i.substanceA.toUpperCase();
+        const b = i.substanceB.toUpperCase();
+        return validInteractionIds.some(id => {
+          const up = id.toUpperCase();
+          return a === up || a.includes(up) || up.includes(a);
+        }) && validInteractionIds.some(id => {
+          const up = id.toUpperCase();
+          return b === up || b.includes(up) || up.includes(b);
+        });
+      });
+    } catch { return []; }
+  }, [interactionIds, allSupport]);
+
+  const hasSupportInteractions = supportInteractions && supportInteractions.length > 0;
+  const supportSynergiesList = supportInteractions?.filter(i => i.type === 'synergy') ?? [];
+  const supportConflicts = supportInteractions?.filter(i => i.type === 'conflict') ?? [];
+  const supportCautions = supportInteractions?.filter(i => i.type === 'caution') ?? [];
+
   return (
     <div className="screen support-screen">
-      <div style={{ display: 'flex', gap: 4, marginBottom: 12, overflowX: 'auto' }}>
-        {(['catalog', 'synergies', 'recommendations'] as SupportTab[]).map(t => (
+      <div style={{ display: 'flex', gap: 4, marginBottom: 12, overflowX: 'auto', scrollbarWidth: 'none' }}>
+        {(['catalog', 'synergies', 'calculator', 'interactions', 'recommendations'] as SupportTab[]).map(t => (
           <button key={t} onClick={() => setTab(t)} style={{
             flex: 1, padding: '10px 8px', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600,
             background: tab === t ? 'var(--accent-green, #00e68a)' : 'var(--bg-secondary)',
-            color: tab === t ? '#000' : 'var(--text-dim)', cursor: 'pointer', transition: 'background 0.15s',
+            color: tab === t ? '#000' : 'var(--text-dim)', cursor: 'pointer', transition: 'background 0.15s', whiteSpace: 'nowrap',
           }}>
-            {t === 'catalog' ? 'Каталог' : t === 'synergies' ? 'Синергии' : 'Рекомендации'}
+            {t === 'catalog' ? '📖 Каталог' : t === 'synergies' ? '🔗 Синергии' : t === 'calculator' ? '🧮 Калькулятор' : t === 'interactions' ? '⚡ Взаимод.' : '💡 Рекомендации'}
           </button>
         ))}
       </div>
 
+      {/* ===== CATALOG ===== */}
       {tab === 'catalog' && (
         <div>
           <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
@@ -218,60 +281,212 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
         </div>
       )}
 
+      {/* ===== SYNERGIES ===== */}
       {tab === 'synergies' && (
         <div>
-          <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
-            <select value={synergyFilter} onChange={e => setSynergyFilter(e.target.value)} style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid var(--border-color)', background: 'var(--bg-secondary)', color: 'var(--text-light)', fontSize: 12 }}>
-              <option value="all">Все типы</option>
-              <option value="synergistic">Синергия</option>
-              <option value="additive">Аддитивный</option>
-              <option value="potentiative">Потенцирование</option>
-              <option value="complementary">Комплементарный</option>
-            </select>
-            <select value={systemFilter} onChange={e => setSystemFilter(e.target.value)} style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid var(--border-color)', background: 'var(--bg-secondary)', color: 'var(--text-light)', fontSize: 12 }}>
-              <option value="all">Все системы</option>
-              {ALL_RISK_SYSTEMS.map(s => <option key={s} value={s}>{systemLabels[s]}</option>)}
-            </select>
-            <div style={{ fontSize: 12, color: 'var(--text-dim)', display: 'flex', alignItems: 'center' }}>
-              {filteredSynergies.length} пар
+          <div className="card" style={{ marginBottom: 12 }}>
+            <h3 style={{ margin: '0 0 4px 0', fontSize: 14, color: 'var(--accent)' }}>🔗 Синергии поддержки</h3>
+            <p style={{ fontSize: 11, color: 'var(--text-dim)', margin: '0 0 8px 0' }}>
+              Взаимодействия между препаратами поддержки, БАДами и добавками
+            </p>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <select value={synergyFilter} onChange={e => setSynergyFilter(e.target.value)} style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid var(--border-color)', background: 'var(--bg-secondary)', color: 'var(--text-light)', fontSize: 12, flex: 1 }}>
+                <option value="all">Все типы</option>
+                <option value="synergistic">Синергия</option>
+                <option value="additive">Аддитивный</option>
+                <option value="potentiative">Потенцирование</option>
+                <option value="complementary">Комплементарный</option>
+              </select>
+              <select value={systemFilter} onChange={e => setSystemFilter(e.target.value)} style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid var(--border-color)', background: 'var(--bg-secondary)', color: 'var(--text-light)', fontSize: 12, flex: 1 }}>
+                <option value="all">Все системы</option>
+                {ALL_RISK_SYSTEMS.map(s => <option key={s} value={s}>{systemLabels[s]}</option>)}
+              </select>
+              <div style={{ fontSize: 12, color: 'var(--text-dim)', display: 'flex', alignItems: 'center', whiteSpace: 'nowrap' }}>
+                {filteredSynergies.length} пар
+              </div>
             </div>
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: '70vh', overflowY: 'auto' }}>
-            {filteredSynergies.map((pair, i) => (
-              <div key={i} className="card" style={{ padding: 12, marginBottom: 0 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span style={{ fontWeight: 600, fontSize: 13 }}>{(SUPPLEMENT_DESCRIPTIONS[pair.substanceA] || pair.substanceA.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')).split(' ').length > 5 ? pair.substanceA.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ') : SUPPLEMENT_DESCRIPTIONS[pair.substanceA] || pair.substanceA}</span>
-                    <span style={{ fontSize: 16, color: SYNERGY_COLORS[pair.synergyType] || '#888' }}>
-                      {pair.synergyType === 'synergistic' ? '\u2295' : pair.synergyType === 'additive' ? '+' : pair.synergyType === 'potentiative' ? '\u21D1' : '\u2192'}
-                    </span>
-                    <span style={{ fontWeight: 600, fontSize: 13 }}>{(SUPPLEMENT_DESCRIPTIONS[pair.substanceB] || pair.substanceB.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')).split(' ').length > 5 ? pair.substanceB.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ') : SUPPLEMENT_DESCRIPTIONS[pair.substanceB] || pair.substanceB}</span>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: '70vh', overflowY: 'auto' }}>
+            {filteredSynergies.map((pair, i) => {
+              const aName = SUPPLEMENT_DESCRIPTIONS[pair.substanceA] || PHARMA_DB[pair.substanceA]?.name || pair.substanceA;
+              const bName = SUPPLEMENT_DESCRIPTIONS[pair.substanceB] || PHARMA_DB[pair.substanceB]?.name || pair.substanceB;
+              return (
+                <div key={i} className="card" style={{ padding: 12, marginBottom: 0 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                      <span style={{ fontWeight: 600, fontSize: 13 }}>{aName}</span>
+                      <span style={{ fontSize: 16, color: SYNERGY_COLORS[pair.synergyType] || '#888' }}>
+                        {pair.synergyType === 'synergistic' ? '\u2295' : pair.synergyType === 'additive' ? '+' : pair.synergyType === 'potentiative' ? '\u21D1' : '\u2192'}
+                      </span>
+                      <span style={{ fontWeight: 600, fontSize: 13 }}>{bName}</span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span style={{ fontSize: 11, padding: '2px 6px', borderRadius: 4, background: SYNERGY_COLORS[pair.synergyType] + '22', color: SYNERGY_COLORS[pair.synergyType] }}>
+                        {pair.synergyType === 'synergistic' ? 'Синергия' : pair.synergyType === 'additive' ? 'Аддитивный' : pair.synergyType === 'potentiative' ? 'Потенцирование' : 'Комплементарный'}
+                      </span>
+                      <span style={{ fontSize: 12, fontWeight: 700, color: SYNERGY_COLORS[pair.synergyType] }}>{(pair.strength * 100).toFixed(0)}%</span>
+                    </div>
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <span style={{ fontSize: 11, padding: '2px 6px', borderRadius: 4, background: SYNERGY_COLORS[pair.synergyType] + '22', color: SYNERGY_COLORS[pair.synergyType] }}>
-                      {pair.synergyType === 'synergistic' ? 'Синергия' : pair.synergyType === 'additive' ? 'Аддитивный' : pair.synergyType === 'potentiative' ? 'Потенцирование' : 'Комплементарный'}
-                    </span>
-                    <span style={{ fontSize: 12, fontWeight: 700, color: SYNERGY_COLORS[pair.synergyType] }}>{(pair.strength * 100).toFixed(0)}%</span>
-                  </div>
+                  <div style={{ fontSize: 12, color: 'var(--text-light)', marginBottom: 4 }}>{pair.mechanism}</div>
+                  {pair.affectedSystems && pair.affectedSystems.length > 0 && (
+                    <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                      {pair.affectedSystems.map(s => (
+                        <span key={s} style={{ fontSize: 10, padding: '1px 4px', borderRadius: 3, background: 'rgba(0,230,138,0.08)', color: 'var(--accent-green, #00e68a)' }}>{systemLabels[s] || s}</span>
+                      ))}
+                    </div>
+                  )}
+                  {pair.clinicalNote && <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 4, fontStyle: 'italic' }}>{pair.clinicalNote}</div>}
                 </div>
-                <div style={{ fontSize: 12, color: 'var(--text-light)', marginBottom: 4 }}>{pair.mechanism}</div>
-                {pair.affectedSystems && pair.affectedSystems.length > 0 && (
-                  <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-                    {pair.affectedSystems.map(s => (
-                      <span key={s} style={{ fontSize: 10, padding: '1px 4px', borderRadius: 3, background: 'rgba(0,230,138,0.08)', color: 'var(--accent-green, #00e68a)' }}>{systemLabels[s] || s}</span>
-                    ))}
-                  </div>
-                )}
-                {pair.clinicalNote && <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 4, fontStyle: 'italic' }}>{pair.clinicalNote}</div>}
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
 
+      {/* ===== CALCULATOR ===== */}
+      {tab === 'calculator' && (
+        <div>
+          <div className="card" style={{ marginBottom: 12 }}>
+            <h3 style={{ margin: '0 0 4px 0', fontSize: 14, color: 'var(--accent)' }}>🧮 Калькулятор поддержки</h3>
+            <p style={{ fontSize: 11, color: 'var(--text-dim)', margin: '0 0 12px 0' }}>
+              Быстрый расчёт индекса поддержки и снижения рисков на основе текущих препаратов
+            </p>
+            <button onClick={handleCalculateSupport} style={{
+              width: '100%', padding: '12px', borderRadius: 8, border: 'none', cursor: 'pointer',
+              background: 'var(--accent-green, #00e68a)', color: '#000', fontWeight: 700, fontSize: 14,
+            }}>
+              Рассчитать поддержку
+            </button>
+          </div>
+
+          {supportResult && (
+            <div>
+              <div className="card" style={{ marginBottom: 12, textAlign: 'center' }}>
+                <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 4 }}>Индекс поддержки</div>
+                <div style={{ fontSize: 36, fontWeight: 800, color: getRiskColor(100 - supportResult.score), lineHeight: 1 }}>
+                  {Math.round(supportResult.score)}%
+                </div>
+                <div style={{ background: 'rgba(255,255,255,0.08)', borderRadius: 6, height: 8, marginTop: 8, overflow: 'hidden' }}>
+                  <div style={{ width: `${Math.min(100, supportResult.score)}%`, height: '100%', background: `linear-gradient(90deg, #ef4444, #eab308, #22c55e)`, borderRadius: 6, transition: 'width 0.5s' }} />
+                </div>
+              </div>
+              <div className="card" style={{ marginBottom: 12 }}>
+                <h4 style={{ margin: '0 0 8px 0', fontSize: 13 }}>Риски по системам — до и после поддержки</h4>
+                {RISK_SYSTEMS.map(sys => {
+                  const before = supportResult.riskBefore[sys] ?? 0;
+                  const after = supportResult.riskAfter[sys] ?? 0;
+                  const reduction = before > 0 ? ((before - after) / before * 100) : 0;
+                  return (
+                    <div key={sys} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0', borderBottom: '1px solid var(--border-color)' }}>
+                      <span style={{ fontSize: 14 }}>{SYSTEM_INFO[sys]?.icon || ''}</span>
+                      <span style={{ flex: 1, fontSize: 12, fontWeight: 500 }}>{systemLabels[sys]}</span>
+                      <span style={{ fontSize: 12, color: getRiskColor(before), fontWeight: 600 }}>{Math.round(before)}%</span>
+                      <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>{'\u2192'}</span>
+                      <span style={{ fontSize: 12, color: getRiskColor(after), fontWeight: 600 }}>{Math.round(after)}%</span>
+                      {reduction > 0 && <span style={{ fontSize: 10, color: '#22c55e', fontWeight: 600 }}>{'\u2193'}{reduction.toFixed(0)}%</span>}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ===== INTERACTIONS ===== */}
+      {tab === 'interactions' && (
+        <div>
+          <div className="card" style={{ marginBottom: 12 }}>
+            <h3 style={{ margin: '0 0 4px 0', fontSize: 14, color: 'var(--accent)' }}>⚡ Взаимодействия поддержки</h3>
+            <p style={{ fontSize: 11, color: 'var(--text-dim)', margin: '0 0 12px 0' }}>
+              Проверка синергий и конфликтов между препаратами поддержки и БАДами
+            </p>
+          </div>
+          <div className="card" style={{ marginBottom: 12 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12 }}>
+              {interactionIds.map((id, idx) => (
+                <div key={idx} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <div style={{ fontSize: 10, color: 'var(--text-dim)', minWidth: 18, fontWeight: 600 }}>#{idx + 1}</div>
+                  <select value={id} onChange={(e) => updateInteraction(idx, e.target.value)}
+                    style={{ flex: 1, padding: '8px 10px', borderRadius: 8, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12 }}>
+                    <option value="">— Выберите препарат —</option>
+                    {allSupport.map((s) => (
+                      <option key={s.id} value={s.id}>{s.name}</option>
+                    ))}
+                  </select>
+                  {interactionIds.length > 2 && (
+                    <button onClick={() => removeInteraction(idx)} style={{
+                      padding: '4px 10px', borderRadius: 6, fontSize: 11, cursor: 'pointer',
+                      background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', color: '#ef4444',
+                    }}>✕</button>
+                  )}
+                </div>
+              ))}
+            </div>
+            <button onClick={addInteraction} style={{
+              padding: '8px 16px', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: 'pointer',
+              background: 'rgba(0,230,138,0.1)', border: '1px solid rgba(0,230,138,0.3)', color: '#00e68a',
+            }}>+ Добавить препарат</button>
+          </div>
+
+          {validInteractionIds.length < 2 && (
+            <div className="card" style={{ textAlign: 'center', padding: '24px 16px' }}>
+              <div style={{ fontSize: 28, marginBottom: 8 }}>⚡</div>
+              <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>Выберите минимум 2 препарата поддержки для проверки взаимодействий</div>
+            </div>
+          )}
+
+          {validInteractionIds.length >= 2 && !hasSupportInteractions && (
+            <div className="card" style={{ textAlign: 'center', padding: '16px', border: '1px solid rgba(0,230,138,0.3)', background: 'rgba(0,230,138,0.05)' }}>
+              <div style={{ fontSize: 11, color: '#4caf50', fontWeight: 600 }}>✓ Критических взаимодействий не обнаружено</div>
+            </div>
+          )}
+
+          {hasSupportInteractions && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {supportSynergiesList.length > 0 && (
+                <div className="card">
+                  <h4 style={{ margin: '0 0 8px 0', fontSize: 12, color: '#22c55e' }}>⊕ Синергия ({supportSynergiesList.length})</h4>
+                  {supportSynergiesList.map(i => (
+                    <div key={i.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', borderBottom: '1px solid var(--border)', fontSize: 11, color: 'var(--text-light)' }}>
+                      <span style={{ color: '#22c55e', fontWeight: 600 }}>{i.substanceA} + {i.substanceB}</span>
+                      <span>{i.notes}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {supportConflicts.length > 0 && (
+                <div className="card">
+                  <h4 style={{ margin: '0 0 8px 0', fontSize: 12, color: '#ef4444' }}>⚠ Конфликты ({supportConflicts.length})</h4>
+                  {supportConflicts.map(i => (
+                    <div key={i.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', borderBottom: '1px solid var(--border)', fontSize: 11, color: 'var(--text-light)' }}>
+                      <span style={{ color: '#ef4444', fontWeight: 600 }}>{i.substanceA} + {i.substanceB}</span>
+                      <span>{i.notes}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {supportCautions.length > 0 && (
+                <div className="card">
+                  <h4 style={{ margin: '0 0 8px 0', fontSize: 12, color: '#ff9800' }}>⚡ Осторожность ({supportCautions.length})</h4>
+                  {supportCautions.map(i => (
+                    <div key={i.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', borderBottom: '1px solid var(--border)', fontSize: 11, color: 'var(--text-light)' }}>
+                      <span style={{ color: '#ff9800', fontWeight: 600 }}>{i.substanceA} + {i.substanceB}</span>
+                      <span>{i.notes}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ===== RECOMMENDATIONS ===== */}
       {tab === 'recommendations' && (
         <div>
           <div className="card" style={{ marginBottom: 12, textAlign: 'center' }}>
+            <h3 style={{ margin: '0 0 4px 0', fontSize: 14, color: 'var(--accent)' }}>💡 Рекомендации</h3>
             <p style={{ fontSize: 13, color: 'var(--text-light)', margin: '0 0 12px 0' }}>
               Автоматический подбор поддержки на основе текущего курса, анализов и рисков
             </p>
