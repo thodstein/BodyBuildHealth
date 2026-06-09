@@ -94,7 +94,7 @@ export const RiskDetails: React.FC<{
                   <div style={{ width: `${Math.min(100, groupRisk.net)}%`, height: '100%', background: getRiskColor(groupRisk.net), borderRadius: 3, transition: 'width 0.3s' }} />
                 </div>
                 <span style={{ fontWeight: 700, fontSize: 16, color: getRiskColor(groupRisk.net), minWidth: 40 }}>{Math.round(groupRisk.net)}%</span>
-                <span style={{ fontSize: 12, color: 'var(--text-dim)', transition: 'transform 0.2s', transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)' }}>Ў</span>
+                <span style={{ fontSize: 12, color: 'var(--text-dim)', transition: 'transform 0.2s', transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)' }}>▾</span>
               </div>
             </div>
 
