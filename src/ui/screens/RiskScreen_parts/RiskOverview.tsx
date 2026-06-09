@@ -1,5 +1,6 @@
 ﻿import React from 'react';
 import { RISK_SYSTEMS, ALL_RISK_SYSTEMS, DRUG_THRESHOLDS } from '../../../core/constants';
+import { PHARMA_DB } from '../../../core/pharma-database';
 import { SYSTEM_INFO, MECHANISM_INFO, SYSTEM_ORGANS } from '../../../core/risk-info';
 import { RISKS_DB, RISK_SYSTEM_MAP } from '../../../data/risks';
 import { RECOMMENDATIONS_DB } from '../../../data/recommendations';
@@ -208,16 +209,23 @@ export const RiskOverview: React.FC<{
       )}
 
       {/* Пороги */}
+      {/* Пороги препаратов */}
       <div className="card" style={{ marginBottom: 8 }}>
-        <h3 style={{ margin: '0 0 8px', fontSize: 15 }}>💊 Пороги препаратов</h3>
-        <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 6 }}>Максимальная рекомендуемая дозировка — превышение значительно увеличивает риски</div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, fontSize: 10 }}>
-          {Object.entries(DRUG_THRESHOLDS).slice(0, 6).map(([id, thresh]) => (
-            <div key={id} style={{ background: 'var(--bg-secondary)', padding: '4px 8px', borderRadius: 4 }}>
-              <div style={{ fontWeight: 500 }}>{id.replace(/_/g, ' ')}</div>
-              <div style={{ color: 'var(--text-dim)' }}>{thresh.dosePerWeek} мг/нед</div>
-            </div>
-          ))}
+        <h3 style={{ margin: "0 0 8px", fontSize: 15 }}>💊 Пороги препаратов</h3>
+        <div style={{ fontSize: 10, color: "var(--text-dim)", marginBottom: 6 }}>Максимальная рекомендуемая дозировка — превышение значительно увеличивает риски</div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4, fontSize: 10 }}>
+          {Object.entries(DRUG_THRESHOLDS).slice(0, 8).map(([id, thresh]) => {
+            const entry = PHARMA_DB[id];
+            const name = entry ? entry.name : id.replace(/_/g, " ");
+            const drugClass = entry ? entry.class : "";
+            return (
+              <div key={id} style={{ background: "var(--bg-secondary)", padding: "4px 8px", borderRadius: 4 }}>
+                <div style={{ fontWeight: 500 }}>{name}</div>
+                <div style={{ color: "var(--text-dim)" }}>{thresh.dosePerWeek} мг/нед · Андрогенность: {thresh.androgenicity.toFixed(1)}</div>
+                {drugClass && <div style={{ fontSize: 8, color: "var(--accent)", opacity: 0.7 }}>{drugClass}</div>}
+              </div>
+            );
+          })}
         </div>
       </div>
     </div>

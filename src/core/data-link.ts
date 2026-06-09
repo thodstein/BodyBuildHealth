@@ -177,9 +177,14 @@ export function useDataLink(): LinkedData {
   const risk = (() => {
     try {
       const genetics = s.genetics ?? {};
-      const riskResult = calculateRisks(genetics);
-      const goal = s.primaryGoal ?? s.goal ?? 'health';
-      const supportInput: SupportInput = {
+      const riskResult = calculateRisks({
+        genetics,
+        nutritionFactor: s.nutritionFactor ?? 0.8,
+        trainingFactor: s.trainingFactor ?? 0.7,
+        activeDrugs,
+        supportCoverage: {},
+      });
+      const result = calculateSupport({
         substances: Object.keys(activeDrugs),
         labs: labs.slice(-10).map(l => ({ code: l.code, value: l.value })),
         demographics: { age: s.age ?? 30, weight: s.weight ?? 80, sex: s.sex ?? 'male' },
@@ -187,8 +192,7 @@ export function useDataLink(): LinkedData {
         nutritionFactor: s.nutritionFactor ?? 0.8,
         trainingFactor: s.trainingFactor ?? 0.7,
         drugDoses: Object.fromEntries(Object.entries(activeDrugs).map(([k, v]) => [k, v.dosePerWeek])),
-      };
-      const result = calculateSupport(supportInput);
+      });
       const coverage: Record<string, number> = {};
       if (result.systemSupport) Object.entries(result.systemSupport).forEach(([k, v]) => { coverage[k] = v; });
       return { ...riskResult, coverageMap: coverage } as RiskCalculationResult;

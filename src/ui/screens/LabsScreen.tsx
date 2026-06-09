@@ -153,7 +153,6 @@ export const LabsScreen: React.FC = () => {
   const toggleGlobalNoLabs = useCallback(() => {
     const next = !globalNoLabs;
     setGlobalNoLabs(next);
-    setGlobalNoLabs(next);
     if (next) setNoLabsSystemsState([]); // clear per-system when global
     notifyDataChange();
     setTick(t => t + 1);
@@ -171,7 +170,6 @@ export const LabsScreen: React.FC = () => {
     setNoLabsSystemsState(next);
     // If all systems selected, switch to global
     if (next.length >= RISK_SYSTEMS.length) {
-      setGlobalNoLabs(true);
       setGlobalNoLabs(true);
       next = [];
       setNoLabsSystems(next);

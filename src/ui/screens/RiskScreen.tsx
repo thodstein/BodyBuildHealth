@@ -90,7 +90,7 @@ export const RiskScreen: React.FC = () => {
 
   // Listen for changes from LabsScreen
   useEffect(() => {
-    const interval = setInterval(() => setTick(t => t + 1), 1000);
+    const interval = setInterval(() => setTick(t => t + 1), 5000);
     return () => clearInterval(interval);
   }, []);
 
@@ -146,7 +146,7 @@ export const RiskScreen: React.FC = () => {
 
   // Aggregated risk (pharma + labs + training + nutrition + diagnostics)
   const aggregatedRisk = useMemo<AggregatedRisk | null>(() => {
-    if (!pharmaRisk || !labRiskContributions) return null;
+    if (!pharmaRisk) return null;
     const emptyLabContrib = { systemContributions: Object.fromEntries(ALL_RISK_SYSTEMS.map(s => [s, 0])), totalRisk: 0 };
     const emptyDiag = { overallRaw: 0, overallNet: 0, systemBreakdown: {} as Record<string, { raw: number; net: number }> };
     return calculateAggregatedRisks(
@@ -169,7 +169,7 @@ export const RiskScreen: React.FC = () => {
       result = applyPenaltyToResult(result);
     }
     return result;
-  }, [pharmaRisk, hasLabs, labRiskContributions, shouldApplyPenalty, tick, noLabsSystems]);
+  }, [pharmaRisk, hasLabs, shouldApplyPenalty, noLabsSystems]);
 
   useEffect(() => {
     if (riskResult) {
