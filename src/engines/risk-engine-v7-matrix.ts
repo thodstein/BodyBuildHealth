@@ -907,7 +907,7 @@ export function computeV7Matrix(input: MatrixInput, supportIds: string[] = []): 
     const baseRisks = BASE_RISK[sys] ?? {};
     const weights = MECH_WEIGHTS[sys] ?? {};
 
-    for (let mechIdx = 1; mechIdx <= 7; mechIdx++) {
+    for (let mechIdx = 1; mechIdx <= 9; mechIdx++) {
       const base = baseRisks[mechIdx] ?? 0.02;
 
       const geneticMult = getGeneticMultiplier(input.genetics, sys, mechIdx);
