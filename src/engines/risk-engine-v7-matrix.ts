@@ -12,7 +12,8 @@ import { PHARMA_DB } from '../core/pharma-database';
 
 export const RISK_SYSTEMS_V7 = [
   'cardio', 'hepatic', 'renal', 'neuro', 'endocrine', 'hematologic', 'reproductive', 'musculoskeletal',
-  'metabolic', 'ghigf', 'ins_axis', 'neuro_toxicity', 'blood', 'vessels'
+  'metabolic', 'ghigf', 'ins_axis', 'neuro_toxicity', 'blood', 'vessels',
+  'immunity', 'thyroid', 'prostate', 'skin'
 ] as const;
 
 // Core systems (displayed in main risk summary)

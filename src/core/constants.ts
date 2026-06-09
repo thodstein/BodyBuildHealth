@@ -130,14 +130,17 @@ export const SYRINGE_SPECS: Record<number, { maxVolume: number; divisionsPerMl: 
   5.0: { maxVolume: 5.0, divisionsPerMl: 20 }
 } as const;
 
-export const RISK_SYSTEMS = ['cardio', 'hepatic', 'renal', 'neuro', 'endocrine', 'hematologic', 'reproductive', 'musculoskeletal'] as const;
+export const RISK_SYSTEMS = ['cardio', 'hepatic', 'renal', 'neuro', 'endocrine', 'hematologic', 'reproductive', 'musculoskeletal', 'metabolic', 'ghigf', 'ins_axis', 'neuro_toxicity', 'blood', 'vessels', 'immunity', 'thyroid', 'prostate', 'skin'] as const;
 
-// Subsystem mapping: displays subsystems within main systems
+// Subsystem mapping: subsystems are computed INSIDE parent systems
 export const SUBSYSTEM_MAP: Record<string, string[]> = {
   cardio: ['vessels'],
-  endocrine: ['metabolic', 'ghigf', 'ins_axis'],
+  endocrine: ['metabolic', 'ghigf', 'ins_axis', 'thyroid'],
   neuro: ['neuro_toxicity'],
   hematologic: ['blood'],
+  hepatic: ['skin'],
+  reproductive: ['prostate'],
+  renal: ['immunity'],
 };
 
 // Reverse mapping: subsystem -> parent system
@@ -148,10 +151,14 @@ export const SUBSYSTEM_PARENT: Record<string, string> = {
   ins_axis: 'endocrine',
   neuro_toxicity: 'neuro',
   blood: 'hematologic',
+  thyroid: 'endocrine',
+  skin: 'hepatic',
+  prostate: 'reproductive',
+  immunity: 'renal',
 };
 
-// All systems including subsystems (for backward compat)
-export const ALL_RISK_SYSTEMS = ['cardio', 'hepatic', 'renal', 'neuro', 'endocrine', 'hematologic', 'reproductive', 'musculoskeletal', 'metabolic', 'ghigf', 'ins_axis', 'neuro_toxicity', 'blood', 'vessels'] as const;
+// For backward compat and iteration - only the 8 core systems
+export const ALL_RISK_SYSTEMS = ['cardio', 'hepatic', 'renal', 'neuro', 'endocrine', 'hematologic', 'reproductive', 'musculoskeletal', 'metabolic', 'ghigf', 'ins_axis', 'neuro_toxicity', 'blood', 'vessels', 'immunity', 'thyroid', 'prostate', 'skin'] as const;
 export const BASE_RISK = 0.12;
 
 export const REQUIRED_LABS_PER_PHASE: Record<string, string[]> = {
