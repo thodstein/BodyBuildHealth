@@ -65,25 +65,61 @@ const SENSITIVITY_LABELS: Record<string, string> = {
 
 
 
-export const V7RiskDisplay: React.FC<{ result: V7RiskResult }> = ({ result }) => {
+export const V7RiskDisplay: React.FC<{
+  result: V7RiskResult;
+  organWeek?: number;
+  onWeekChange?: (w: number) => void;
+  mcEnabled?: boolean;
+  onToggleMC?: () => void;
+}> = ({ result, organWeek: externalWeek, onWeekChange: externalWeekChange, mcEnabled: externalMc, onToggleMC: externalToggleMc }) => {
   const [expandedOrgan, setExpandedOrgan] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<string>('organs');
   const [selectedDay, setSelectedDay] = useState<number>(42);
   const [pkDay, setPkDay] = useState(42);
   const [selectedOrgan3D, setSelectedOrgan3D] = useState<string | null>(null);
-  const [mcEnabled, setMcEnabled] = useState<boolean>(false);
-  const [organWeek, setOrganWeek] = useState<number>(0); // 0 = avg over 12 weeks, 1-12 = specific week
+  const [internalMc, setInternalMc] = useState<boolean>(false);
+  const [internalWeek, setInternalWeek] = useState<number>(0);
   const linked = useDataLink();
 
+  const mcEnabled = externalMc !== undefined ? externalMc : internalMc;
+  const organWeek = externalWeek !== undefined ? externalWeek : internalWeek;
+
+  const setOrganWeek = (w: number) => {
+    setInternalWeek(w);
+    if (externalWeekChange) externalWeekChange(w);
+  };
+
   const toggleMC = () => {
-    const next = !mcEnabled;
-    setMcEnabled(next);
-    const p = getProfile();
-    p.settings.mcRuns = next ? 50 : 0;
-    updateProfile(p);
+    if (externalToggleMc) {
+      externalToggleMc();
+    } else {
+      const next = !internalMc;
+      setInternalMc(next);
+      const p = getProfile();
+      p.settings.mcRuns = next ? 50 : 0;
+      updateProfile(p);
+    }
   };
 
   const { matrix, organSummary, globalRiskRaw, globalRiskNet, globalPEvent, dataQuality, organs, mcResult, pkTimeSeries, weeklyOrganData = {}, weeklyGlobalData = [] } = result;
+
+  const effectiveOrganRisk = (key: string): number => {
+    const weekIdx = organWeek;
+    let base: number;
+    if (weekIdx > 0 && weeklyOrganData[key] && weeklyOrganData[key].length >= weekIdx) {
+      base = weeklyOrganData[key][weekIdx - 1] ?? 0;
+    } else {
+      base = organSummary[key]?.meanS ?? 0;
+    }
+    if (mcEnabled && mcResult && mcResult.organSummary[key]) {
+      const detMean = organSummary[key]?.meanS ?? 0.001;
+      const mcMean = mcResult.organSummary[key].meanS;
+      if (detMean > 0.001 && mcMean > 0) {
+        base = Math.min(1, Math.max(0, base * (mcMean / detMean)));
+      }
+    }
+    return base;
+  };
 
   // Scale helpers:
   // globalRiskRaw/Net are already in 0-100 (engine multiplies by 100)
@@ -156,12 +192,7 @@ export const V7RiskDisplay: React.FC<{ result: V7RiskResult }> = ({ result }) =>
   }, [pkTimeSeries, organSummary]);
 
   // Helper: get organ risk for selected week (0 = avg over full period)
-  const getOrganRisk = (key: string): number => {
-    if (organWeek > 0 && weeklyOrganData[key] && weeklyOrganData[key].length >= organWeek) {
-      return weeklyOrganData[key][organWeek - 1] ?? 0;
-    }
-    return organSummary[key]?.meanS ?? 0;
-  };
+  const getOrganRisk = (key: string): number => effectiveOrganRisk(key);
 
   const renderOrgans = () => (
     <div>
@@ -612,12 +643,7 @@ export const V7RiskDisplay: React.FC<{ result: V7RiskResult }> = ({ result }) =>
     `;
 
     // Helper: get organ value for selected week
-    const get3DOrgVal = (key: string): number => {
-      if (selectedDay > 0 && weeklyOrganData[key] && weeklyOrganData[key].length >= Math.ceil(selectedDay / 7)) {
-        return weeklyOrganData[key][Math.ceil(selectedDay / 7) - 1] ?? 0;
-      }
-      return organSummary[key]?.meanS ?? 0;
-    };
+    const get3DOrgVal = (key: string): number => effectiveOrganRisk(key);
 
     // Opacity scale for risk
     const riskOpacity = (pct: number) => Math.max(0.4, Math.min(0.95, 0.4 + pct / 100 * 0.55));
@@ -628,22 +654,22 @@ export const V7RiskDisplay: React.FC<{ result: V7RiskResult }> = ({ result }) =>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
             <h3 style={{ margin: 0, fontSize: 14 }}>🧍 3D Модель рисков</h3>
             <div>
-              <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 3 }}>Неделя: {selectedDay === 0 ? 'Среднее' : `Нед ${Math.round(selectedDay / 7)}`}</div>
+              <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 3 }}>Неделя: {organWeek === 0 ? 'Среднее' : `Нед ${organWeek}`}</div>
               <div style={{ display: 'flex', gap: 2, overflowX: 'auto', paddingBottom: 2, scrollbarWidth: 'none' }}>
-                <button onClick={() => setSelectedDay(0)} style={{
-                  padding: '3px 8px', borderRadius: 6, fontSize: 9, fontWeight: selectedDay === 0 ? 700 : 400,
+                <button onClick={() => setOrganWeek(0)} style={{
+                  padding: '3px 8px', borderRadius: 6, fontSize: 9, fontWeight: organWeek === 0 ? 700 : 400,
                   cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
-                  background: selectedDay === 0 ? '#00e68a' : 'var(--bg-secondary)',
-                  border: selectedDay === 0 ? '1px solid #00e68a' : '1px solid var(--border)',
-                  color: selectedDay === 0 ? '#000' : 'var(--text-dim)',
+                  background: organWeek === 0 ? '#00e68a' : 'var(--bg-secondary)',
+                  border: organWeek === 0 ? '1px solid #00e68a' : '1px solid var(--border)',
+                  color: organWeek === 0 ? '#000' : 'var(--text-dim)',
                 }}>∅</button>
                 {weekOptions.map(w => (
-                  <button key={w} onClick={() => setSelectedDay(w * 7)} style={{
-                    padding: '3px 8px', borderRadius: 6, fontSize: 9, fontWeight: selectedDay === w * 7 ? 700 : 400,
+                  <button key={w} onClick={() => setOrganWeek(w)} style={{
+                    padding: '3px 8px', borderRadius: 6, fontSize: 9, fontWeight: organWeek === w ? 700 : 400,
                     cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
-                    background: selectedDay === w * 7 ? '#00e68a' : 'var(--bg-secondary)',
-                    border: selectedDay === w * 7 ? '1px solid #00e68a' : '1px solid var(--border)',
-                    color: selectedDay === w * 7 ? '#000' : 'var(--text-dim)',
+                    background: organWeek === w ? '#00e68a' : 'var(--bg-secondary)',
+                    border: organWeek === w ? '1px solid #00e68a' : '1px solid var(--border)',
+                    color: organWeek === w ? '#000' : 'var(--text-dim)',
                   }}>{w}</button>
                 ))}
               </div>

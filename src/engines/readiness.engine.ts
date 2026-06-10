@@ -41,5 +41,5 @@ export function calcReadiness(i: ReadinessInput): ReadinessScores {
   else if (fat > 70) { cons = true; reason = 'Усталость > 70'; }
   else if (nut < 50) { cons = true; reason = 'Питание < 50'; }
 
-  return { recovery: Math.round(rec), nutrition: Math.round(nut), support: Math.round(sup), fatigue: Math.round(fat), isConservative: cons, conservativeReason: reason };
+  return { recovery: Math.round(rec), nutrition: Math.round(nut), support: Math.round(sup), fatigue: Math.round(fat), sleep: Math.round(sleepScore), isConservative: cons, conservativeReason: reason };
 }

@@ -194,8 +194,9 @@ export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
   }
 
   const systems = (masterDb.systems || []).slice(0, 8);
-  const daysOnCourse = courseEntries.length > 0
-    ? Math.max(1, Math.floor((Date.now() - (courseEntries[0].startWeek || 0) * 7 * 86400000) / 86400000))
+  const courseStartDate = getProfile().settings.courseStartDate;
+  const daysOnCourse = courseStartDate
+    ? Math.max(1, Math.floor((Date.now() - new Date(courseStartDate).getTime()) / 86400000))
     : 0;
 
   return (

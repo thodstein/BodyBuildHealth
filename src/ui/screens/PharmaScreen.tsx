@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { PHARMA_DB, SUBSTANCES_BY_CLASS } from '../../core/pharma-database';
 import { calculateDose } from '../../engines/dosage.engine';
 import { simulateCourse, steadyStatePeak, steadyStateTrough, eliminationConstant } from '../../engines/pk-pd.engine';
@@ -710,55 +710,54 @@ const PKPDSimulationTab: React.FC = () => {
 const DosageCalculatorTab: React.FC = () => {
   const allPharma = Object.values(PHARMA_DB).filter((s) => PHARMA_CLASSES.includes(s.class as PharmaClass));
   const [drug, setDrug] = useState('');
+  const [doseMode, setDoseMode] = useState<'per_kg' | 'weekly'>('per_kg');
   const [mgKg, setMgKg] = useState(2);
+  const [weeklyMg, setWeeklyMg] = useState(500);
   const [weight, setWeight] = useState(90);
+  const [injectionsPerWeek, setInjectionsPerWeek] = useState(2);
   const [concentration, setConcentration] = useState(250);
+  const [vialMl, setVialMl] = useState(10);
   const [syringeMl, setSyringeMl] = useState(1);
-  const [result, setResult] = useState<string | null>(null);
   const [doseResult, setDoseResult] = useState<ReturnType<typeof calculateDose> | null>(null);
+
+  // Auto-fill concentration from selected drug
+  const subDetail = drug ? PHARMA_DB[drug] : null;
+  const handleDrugChange = (id: string) => {
+    setDrug(id);
+    const sub = PHARMA_DB[id];
+    if ((sub as any)?.concentration) setConcentration(Number((sub as any).concentration));
+  };
 
   const run = () => {
     if (!drug) return;
-    const sub = PHARMA_DB[drug];
-    const baseMg = mgKg * weight;
+    const baseMg = doseMode === 'per_kg' ? mgKg * weight : weeklyMg;
+    const perInjectionMg = baseMg / Math.max(1, injectionsPerWeek);
     const dose = calculateDose({
-      targetDoseMg: baseMg,
+      targetDoseMg: perInjectionMg,
       concentrationMgPerMl: concentration,
       roundingStepMl: 0.01,
       syringeVolumeMl: syringeMl,
+      vialVolumeMl: vialMl,
       divisionsPerMl: 100,
     });
     setDoseResult(dose);
-    setResult(
-      `${sub?.name ?? drug}\n` +
-      `Базовая доза: ${baseMg.toFixed(1)} мг (${mgKg} мг/кг, вес ${weight} кг)\n` +
-      `Объём инъекции: ${dose.volumeMl} мл\n` +
-      `Деления шприца: ${dose.divisions}\n` +
-      `Доз на флакон: ${dose.dosesPerVial || '—'}\n` +
-      (dose.flags.length ? `⚠ ${dose.flags.join(', ')}` : '✓ Готово к введению')
-    );
   };
 
-  const getSyringeOptions = () => {
-    // Roughly determine syringe size based on injection volume
-    if (!doseResult) return [];
-    const vol = doseResult.volumeMl;
-    if (vol <= 0.5) return [0.3, 0.5, 1];
-    if (vol <= 1) return [1, 3];
-    if (vol <= 3) return [3, 5];
-    return [5, 10];
-  };
+  // Re-run on any input change
+  useEffect(() => { run(); }, [drug, doseMode, mgKg, weeklyMg, weight, injectionsPerWeek, concentration, vialMl, syringeMl]);
 
-  const subDetail = drug ? PHARMA_DB[drug] : null;
+  const weeklyTotal = doseMode === 'per_kg' ? mgKg * weight : weeklyMg;
+  const perInjectionMg = weeklyTotal / Math.max(1, injectionsPerWeek);
+  const wastePerVial = vialMl && doseResult ? Math.max(0, vialMl - (doseResult?.dosesPerVial || 0) * doseResult.volumeMl) : 0;
 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
       <div>
         <div className="card">
-          <h3 style={{ margin: '0 0 12px 0', fontSize: 14, color: 'var(--accent)' }}>📊 Калькулятор дозировки</h3>
+          <h3 style={{ margin: '0 0 12px 0', fontSize: 14, color: 'var(--accent)' }}>💉 Калькулятор дозировки</h3>
           <div style={{ marginBottom: 12 }}>
             <label style={{ fontSize: 11, color: 'var(--text-dim)', display: 'block', marginBottom: 4 }}>Препарат</label>
-            <select value={drug} onChange={(e) => setDrug(e.target.value)}
+            <select value={drug} onChange={(e) => handleDrugChange(e.target.value)}
               style={{ width: '100%', padding: '8px 10px', borderRadius: 8, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12 }}>
               <option value="">— Выберите препарат —</option>
               {allPharma.map((p) => (
@@ -772,20 +771,59 @@ const DosageCalculatorTab: React.FC = () => {
               <div style={{ fontSize: 11, color: 'var(--text-dim)' }}><b style={{ color: 'var(--text)' }}>Период полувыведения:</b> {subDetail.tHalfHours ? formatHalfLife(subDetail.tHalfHours) : 'нет данных'}</div>
             </div>
           )}
+
+          {/* Dose mode toggle */}
+          <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
+            <button onClick={() => setDoseMode('per_kg')} style={{
+              flex: 1, padding: '6px 0', borderRadius: 6, fontSize: 11, fontWeight: doseMode === 'per_kg' ? 700 : 400, cursor: 'pointer',
+              background: doseMode === 'per_kg' ? 'rgba(0,230,138,0.15)' : 'var(--bg-secondary)',
+              border: doseMode === 'per_kg' ? '1px solid #00e68a' : '1px solid var(--border)',
+              color: doseMode === 'per_kg' ? '#00e68a' : 'var(--text-dim)',
+            }}>мг/кг/нед</button>
+            <button onClick={() => setDoseMode('weekly')} style={{
+              flex: 1, padding: '6px 0', borderRadius: 6, fontSize: 11, fontWeight: doseMode === 'weekly' ? 700 : 400, cursor: 'pointer',
+              background: doseMode === 'weekly' ? 'rgba(0,230,138,0.15)' : 'var(--bg-secondary)',
+              border: doseMode === 'weekly' ? '1px solid #00e68a' : '1px solid var(--border)',
+              color: doseMode === 'weekly' ? '#00e68a' : 'var(--text-dim)',
+            }}>мг/нед</button>
+          </div>
+
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 12 }}>
+            {doseMode === 'per_kg' ? (
+              <>
+                <div>
+                  <label style={{ fontSize: 10, color: 'var(--text-dim)', display: 'block', marginBottom: 3 }}>мг/кг/нед</label>
+                  <input type="number" value={mgKg} onChange={(e) => setMgKg(Number(e.target.value))}
+                    style={{ width: '100%', padding: '7px 10px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12 }} />
+                </div>
+                <div>
+                  <label style={{ fontSize: 10, color: 'var(--text-dim)', display: 'block', marginBottom: 3 }}>Вес (кг)</label>
+                  <input type="number" value={weight} onChange={(e) => setWeight(Number(e.target.value))}
+                    style={{ width: '100%', padding: '7px 10px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12 }} />
+                </div>
+              </>
+            ) : (
+              <div style={{ gridColumn: '1 / -1' }}>
+                <label style={{ fontSize: 10, color: 'var(--text-dim)', display: 'block', marginBottom: 3 }}>Недельная доза (мг/нед)</label>
+                <input type="number" value={weeklyMg} onChange={(e) => setWeeklyMg(Number(e.target.value))}
+                  style={{ width: '100%', padding: '7px 10px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12 }} />
+              </div>
+            )}
             <div>
-              <label style={{ fontSize: 10, color: 'var(--text-dim)', display: 'block', marginBottom: 3 }}>Дозировка (мг/кг/нед)</label>
-              <input type="number" value={mgKg} onChange={(e) => setMgKg(Number(e.target.value))}
-                style={{ width: '100%', padding: '7px 10px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12 }} />
+              <label style={{ fontSize: 10, color: 'var(--text-dim)', display: 'block', marginBottom: 3 }}>Инъекций/нед</label>
+              <select value={injectionsPerWeek} onChange={(e) => setInjectionsPerWeek(Number(e.target.value))}
+                style={{ width: '100%', padding: '7px 10px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12 }}>
+                {[1, 2, 3, 4, 5, 6, 7].map(v => <option key={v} value={v}>{v}x/нед</option>)}
+              </select>
             </div>
             <div>
-              <label style={{ fontSize: 10, color: 'var(--text-dim)', display: 'block', marginBottom: 3 }}>Вес (кг)</label>
-              <input type="number" value={weight} onChange={(e) => setWeight(Number(e.target.value))}
-                style={{ width: '100%', padding: '7px 10px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12 }} />
-            </div>
-            <div>
-              <label style={{ fontSize: 10, color: 'var(--text-dim)', display: 'block', marginBottom: 3 }}>Концентрация (мг/мл)</label>
+              <label style={{ fontSize: 10, color: 'var(--text-dim)', display: 'block', marginBottom: 3 }}>Конц-ция (мг/мл)</label>
               <input type="number" value={concentration} onChange={(e) => setConcentration(Number(e.target.value))}
+                style={{ width: '100%', padding: '7px 10px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12 }} />
+            </div>
+            <div>
+              <label style={{ fontSize: 10, color: 'var(--text-dim)', display: 'block', marginBottom: 3 }}>Флакон (мл)</label>
+              <input type="number" value={vialMl} onChange={(e) => setVialMl(Number(e.target.value))}
                 style={{ width: '100%', padding: '7px 10px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12 }} />
             </div>
             <div>
@@ -796,13 +834,6 @@ const DosageCalculatorTab: React.FC = () => {
               </select>
             </div>
           </div>
-          <div style={{ background: 'var(--bg-secondary)', padding: '8px 10px', borderRadius: 6, marginBottom: 12 }}>
-            <div style={{ fontSize: 12, display: 'flex', justifyContent: 'space-between' }}>
-              <span style={{ color: 'var(--text-dim)' }}>Целевая доза:</span>
-              <span style={{ fontWeight: 700 }}>{(mgKg * weight).toFixed(0)} мг/нед</span>
-            </div>
-          </div>
-          <button onClick={run} className="btn" style={{ width: '100%', padding: '10px', fontSize: 13 }}>Рассчитать дозу</button>
         </div>
       </div>
       <div>
@@ -810,19 +841,36 @@ const DosageCalculatorTab: React.FC = () => {
           <div className="card">
             <h3 style={{ margin: '0 0 12px 0', fontSize: 14, color: 'var(--accent)' }}>📋 Результат</h3>
             <div style={{ display: 'grid', gap: 8 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+                <div style={{ background: 'rgba(0,230,138,0.08)', borderRadius: 8, padding: 10, textAlign: 'center' }}>
+                  <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 2 }}>Недельная доза</div>
+                  <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--accent)' }}>{weeklyTotal.toFixed(0)}</div>
+                  <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>мг/нед</div>
+                </div>
+                <div style={{ background: 'rgba(0,230,138,0.08)', borderRadius: 8, padding: 10, textAlign: 'center' }}>
+                  <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 2 }}>На инъекцию</div>
+                  <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--accent)' }}>{perInjectionMg.toFixed(1)}</div>
+                  <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>мг × {injectionsPerWeek}/нед</div>
+                </div>
+              </div>
               <div style={{ background: 'rgba(0,230,138,0.08)', borderRadius: 8, padding: 12, textAlign: 'center' }}>
                 <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 2 }}>Объём инъекции</div>
                 <div style={{ fontSize: 28, fontWeight: 800, color: 'var(--accent)' }}>{doseResult.volumeMl}</div>
                 <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>мл</div>
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
                 <div style={{ background: 'var(--bg-secondary)', borderRadius: 8, padding: '10px 12px', textAlign: 'center' }}>
                   <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 2 }}>Деления шприца</div>
                   <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--text)' }}>{doseResult.divisions}</div>
                 </div>
                 <div style={{ background: 'var(--bg-secondary)', borderRadius: 8, padding: '10px 12px', textAlign: 'center' }}>
-                  <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 2 }}>Доз на флакон</div>
+                  <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 2 }}>Доз/флакон</div>
                   <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--text)' }}>{doseResult.dosesPerVial || '—'}</div>
+                </div>
+                <div style={{ background: 'var(--bg-secondary)', borderRadius: 8, padding: '10px 12px', textAlign: 'center' }}>
+                  <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 2 }}>Отход/флакон</div>
+                  <div style={{ fontSize: 20, fontWeight: 700, color: wastePerVial > 1 ? '#ff9800' : 'var(--text)' }}>{wastePerVial.toFixed(2)}</div>
+                  <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>мл</div>
                 </div>
               </div>
               {doseResult.flags.length > 0 && (
@@ -835,12 +883,6 @@ const DosageCalculatorTab: React.FC = () => {
                   ✓ Готово к введению
                 </div>
               )}
-              <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 6, textAlign: 'center' }}>
-                Базовая доза: {(mgKg * weight).toFixed(1)} мг ({mgKg} мг/кг × {weight} кг)
-              </div>
-              <div style={{ fontSize: 10, color: 'var(--text-dim)', textAlign: 'center' }}>
-                Концентрация: {concentration} мг/мл | Шприц: {syringeMl} мл
-              </div>
             </div>
           </div>
         ) : (

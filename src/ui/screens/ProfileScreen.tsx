@@ -751,13 +751,20 @@ export const ProfileScreen: React.FC = () => {
             <div style={{ marginTop: 12 }}>
               <h5>Индексы лабораторий</h5>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                {(['inflammation', 'metabolism', 'thyroid', 'lipids'] as const).map(k => (
-                  <div key={k} style={s.computed}>
-                    <div style={{ fontSize: 11, opacity: 0.6 }}>{k === 'inflammation' ? 'Воспаление' : k === 'metabolism' ? 'Метаболизм' : k === 'thyroid' ? 'Щитовидная' : 'Липиды'}</div>
-                    <div style={{ fontWeight: 600 }}>{(labIndices[k] * 100).toFixed(0)}%</div>
-                    <div style={{ fontSize: 10, opacity: 0.5 }}>{labIndexText[k]}</div>
-                  </div>
-                ))}
+                {(['inflammation', 'metabolism', 'thyroid', 'lipids'] as const).map(k => {
+                  const val = labIndices[k];
+                  const hasData = val > 0 || (() => {
+                    const neededCodes: Record<string, string[]> = { inflammation: ['CRP','FERRITIN'], metabolism: ['GLU','GLUCOSE','HbA1c','HBA1C'], thyroid: ['TSH','FT4','FT3'], lipids: ['LDL','HDL','TG'] };
+                    return (neededCodes[k] || []).some(c => labs.some(l => l.code.toUpperCase() === c));
+                  })();
+                  return (
+                    <div key={k} style={s.computed}>
+                      <div style={{ fontSize: 11, opacity: 0.6 }}>{k === 'inflammation' ? 'Воспаление' : k === 'metabolism' ? 'Метаболизм' : k === 'thyroid' ? 'Щитовидная' : 'Липиды'}</div>
+                      <div style={{ fontWeight: 600 }}>{hasData ? `${(val * 100).toFixed(0)}%` : '—'}</div>
+                      <div style={{ fontSize: 10, opacity: 0.5 }}>{hasData ? labIndexText[k] : 'Нет данных'}</div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}
