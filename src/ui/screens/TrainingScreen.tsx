@@ -423,8 +423,17 @@ export const TrainingScreen: React.FC = () => {
                     <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>
                       Объём ×{currentMicrocycle.volumeMultiplier} | RIR {currentMicrocycle.rirRange[0]}-{currentMicrocycle.rirRange[1]}
                     </span>
-                  </div>
-                  {currentMicrocycle.days.filter((d: any) => d.isTraining).map((day: any, di: number) => {
+                      </div>
+                      {/* Phase training tip */}
+                      {currentMicrocycle && (
+                        <div style={{ padding: '6px 8px', background: 'rgba(0,230,138,0.04)', borderRadius: 6, fontSize: 10, color: 'var(--accent)', marginBottom: 6, lineHeight: 1.4 }}>
+                          {currentMicrocycle.mesocycleType === 'accumulation' ? '📈 Накопление: фокус на объём, технику и гипертрофию. 8-12 повторений, RIR 2-3. Добавь 1-2 подсобных на слабые зоны.' :
+                           currentMicrocycle.mesocycleType === 'intensification' ? '📊 Интенсификация: рост рабочих весов, снижение объёма. 4-8 повторений, RIR 1-2, RPE 8-9. Приоритет — базовые движения.' :
+                           currentMicrocycle.mesocycleType === 'peaking' ? '🏆 Пик: максимальные веса, минимальный объём. 1-3 повторения, RIR 0-1. Только специфичные соревновательные движения.' :
+                           currentMicrocycle.mesocycleType === 'deload' ? '🔄 Разгрузка: восстановление ЦНС и суставов. 50% объёма, лёгкие веса, RIR 3-5. Акцент на мобильность и технику.' : ''}
+                        </div>
+                      )}
+                      {currentMicrocycle.days.filter((d: any) => d.isTraining).map((day: any, di: number) => {
                     const dayExCount = day.exercises?.length || 0;
                     const dayCompounds = day.exercises?.filter((e: any) => e.isCompound).length || 0;
                     const difficultyScore = Math.min(10, Math.round((dayCompounds * 2 + dayExCount) * (day.intensity === 'very_high' ? 1.4 : day.intensity === 'high' ? 1.2 : 1)));
@@ -457,8 +466,12 @@ export const TrainingScreen: React.FC = () => {
                         const exCat = EXERCISE_CATALOG.find(ec => ec.id === ex.exerciseId || ec.name === ex.name);
                         const estMax = ex.weight ? Math.round(ex.weight * (1 + Number(ex.reps) / 30)) : 0;
                         const substitute = exCat?.canReplace?.[0] ? EXERCISE_CATALOG.find(e => e.id === exCat.canReplace![0]) : null;
+                        const role = ei === 0 ? 'main' : ei <= 2 ? 'secondary' : 'accessory';
+                        const roleColor = role === 'main' ? '#ef4444' : role === 'secondary' ? '#f97316' : '#6b7280';
+                        const roleLabel = role === 'main' ? 'ОСН' : role === 'secondary' ? 'ПОДС' : 'АКС';
                         return (
                         <div key={ei} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '2px 0', fontSize: 10, borderBottom: ei < day.exercises.length - 1 ? '1px solid var(--border)' : 'none', gap: 2 }}>
+                          <span style={{ fontSize: 7, padding: '1px 3px', borderRadius: 2, background: `${roleColor}22`, color: roleColor, fontWeight: 700, minWidth: 22, textAlign: 'center', flexShrink: 0 }}>{roleLabel}</span>
                           <span style={{ flex: 1 }} title={ex.technique || ''}>{ex.name}</span>
                           <span style={{ color: 'var(--accent)', fontWeight: 600, minWidth: 55, textAlign: 'right' }}>{ex.sets}×{ex.reps}</span>
                           {estMax > 0 && <span style={{ fontSize: 8, color: '#8b5cf6', minWidth: 40, textAlign: 'right' }}>~{estMax}кг</span>}
