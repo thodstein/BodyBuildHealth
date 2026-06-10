@@ -136,15 +136,23 @@ export async function processUploadedFile(file: File): Promise<OCRResult> {
     try {
       // Try Tesseract OCR for image
       const Tesseract = await import('tesseract.js');
-      const result = await Tesseract.recognize(file, 'rus+eng', {
-        logger: () => {}, // suppress logs
-      });
+      let result;
+      try {
+        result = await Tesseract.recognize(file, 'rus+eng', {
+          logger: (m: any) => { if (m.status === 'recognizing text') confidence = m.progress ?? 0.5; },
+        });
+      } catch (langErr) {
+        // Fallback to English-only if Russian language data isn't available
+        console.warn('rus+eng OCR failed, trying eng only:', langErr);
+        result = await Tesseract.recognize(file, 'eng', {
+          logger: (m: any) => { if (m.status === 'recognizing text') confidence = m.progress ?? 0.5; },
+        });
+      }
       rawText = result.data.text || '';
       
       if (rawText.length > 20) {
         // Parse the OCR text directly (parseLabText is sync)
-        const { parseLabText } = await import('../engines/pdf-parser.engine');
-        const parsed = parseLabText(rawText);
+        const parsed = parseLabTextFromPdf(rawText);
         const pdfLabs = parsed.values.map(v => ({
           code: v.code,
           name: v.name,
@@ -176,18 +184,13 @@ export async function processUploadedFile(file: File): Promise<OCRResult> {
       }
     } catch (err: any) {
       warnings.push('Ошибка OCR: ' + (err?.message || String(err)));
-      // Fallback: try without Tesseract
-      try {
-        const { parseLabText } = await import('../engines/pdf-parser.engine');
-        // At least try with empty text
-      } catch {}
+      // Fallback silently
     }
   } else if (isText) {
     source = 'text';
     try {
       rawText = await file.text();
-      const { parseLabText } = await import('../engines/pdf-parser.engine');
-      const parsed = parseLabText(rawText);
+      const parsed = parseLabTextFromPdf(rawText);
       const pdfLabs = parsed.values.map(v => ({
         code: v.code,
         name: v.name,

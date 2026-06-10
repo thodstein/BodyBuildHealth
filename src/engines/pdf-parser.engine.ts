@@ -121,9 +121,25 @@ const LAB_PATTERNS: { code: string; names: string[]; unitPatterns: string[]; ref
 ];
 
 function extractNumber(text: string): number | null {
-  const match = text.match(/[\d]+[.,]?[\d]*/);
-  if (!match) return null;
-  return parseFloat(match[0].replace(',', '.'));
+  // Try to find the first standalone number that looks like a lab value (not part of a range)
+  const rangeMatch = text.match(/(\d+[\.,]?\d*)\s*[-–]\s*(\d+[\.,]?\d*)/);
+  const allNums = text.match(/[\d]+[.,]?[\d]*/g);
+  if (!allNums) return null;
+  // Filter: skip numbers that appear in a reference range (2.5-5.5 or 2.5 – 5.5)
+  const rangeNums = new Set<string>();
+  if (rangeMatch) { rangeNums.add(rangeMatch[1]); rangeNums.add(rangeMatch[2]); }
+  for (const n of allNums) {
+    if (rangeNums.has(n)) continue;
+    // Skip if it looks like a year, phone number, etc.
+    const clean = n.replace(',', '.');
+    const val = parseFloat(clean);
+    if (isNaN(val) || val <= 0) continue;
+    return val;
+  }
+  // Fallback: first number
+  const first = allNums[0];
+  if (!first) return null;
+  return parseFloat(first.replace(',', '.'));
 }
 
 function extractRefRange(text: string): { low?: number; high?: number } {
@@ -291,6 +307,54 @@ function providerSpecificParse(lines: string[], provider: string): ParsedLabValu
   return tryParseTableRows(dataLines, provider);
 }
 
+function parseLabLineGeneric(line: string, val: number): { unit: string; refLow?: number; refHigh?: number } {
+  // Try to extract unit from the line
+  let unit = '';
+  const unitMatch = line.match(/\b([A-Za-z%\/]{1,15}(?:\^?\d+)?\/[A-Za-z%\/]{1,15}|[μuмmµ]?[ЕU]\/[лL]|[μuм]?[мM]?[оO]?[лL]\/[лL]|%|сек|s|г\/л|mg\/dL|ng\/mL|pg\/mL|mmol\/L|nmol\/L|pmol\/L|ug\/L|mIU\/L|IU\/mL|U\/L)\b/i);
+  if (unitMatch) unit = unitMatch[1];
+  
+  const ref = extractRefRange(line);
+
+  // If no explicit ref range, try to match typical reference pattern from UCUM_MAP
+  if (ref.low === undefined || ref.high === undefined) {
+    // The ref range might be on the same line after the value
+    const refMatch = line.match(/(\d+[\.,]?\d*)\s*[-–]\s*(\d+[\.,]?\d*)/);
+    if (refMatch) {
+      const rl = parseFloat(refMatch[1].replace(',', '.'));
+      const rh = parseFloat(refMatch[2].replace(',', '.'));
+      if (!isNaN(rl) && !isNaN(rh)) {
+        if (ref.low === undefined) ref.low = rl;
+        if (ref.high === undefined) ref.high = rh;
+      }
+    }
+  }
+
+  return { unit, refLow: ref.low, refHigh: ref.high };
+}
+
+function tryParseLabFromLine(line: string): { code: string; name: string; value: number; unit: string; refLow?: number; refHigh?: number } | null {
+  const lowerLine = line.toLowerCase();
+  
+  for (const labDef of LAB_PATTERNS) {
+    const nameMatch = labDef.names.some(n => lowerLine.includes(n.toLowerCase()));
+    if (!nameMatch) continue;
+
+    const val = extractNumber(line.replace(/[^\d.,\s\-–]/g, ' '));
+    if (val === null || val > 100000) continue;
+
+    const parsed = parseLabLineGeneric(line, val);
+    return {
+      code: labDef.code,
+      name: labDef.names[0],
+      value: val,
+      unit: parsed.unit || labDef.unitPatterns[0],
+      refLow: parsed.refLow,
+      refHigh: parsed.refHigh,
+    };
+  }
+  return null;
+}
+
 export function parseLabText(rawText: string): ParsedLabResult {
   const provider = detectProviderFromText(rawText);
 
@@ -298,33 +362,36 @@ export function parseLabText(rawText: string): ParsedLabResult {
 
   let values: ParsedLabValue[] = [];
 
-  if (provider) {
+  if (provider && values.length === 0) {
     values = providerSpecificParse(lines, provider);
   }
 
   if (values.length === 0) {
-    for (const labDef of LAB_PATTERNS) {
-      for (const line of lines) {
-        const lowerLine = line.toLowerCase();
-        const nameMatch = labDef.names.some(n => lowerLine.includes(n.toLowerCase()));
-        if (!nameMatch) continue;
+    for (const line of lines) {
+      const result = tryParseLabFromLine(line);
+      if (!result) continue;
+      
+      // Deduplicate by code
+      if (values.some(v => v.code === result.code)) continue;
 
-        const val = extractNumber(line.replace(/[^\d.,\s\-–]/g, ' '));
-        if (val === null || val > 100000) continue;
+      values.push({
+        ...result,
+        isAbnormal: result.refHigh !== undefined ? result.value > result.refHigh : result.refLow !== undefined ? result.value < result.refLow : undefined,
+      });
+    }
+  }
 
-        const ref = extractRefRange(line);
-
-        values.push({
-          code: labDef.code,
-          name: labDef.names[0],
-          value: val,
-          unit: labDef.unitPatterns[0],
-          refLow: ref.low,
-          refHigh: ref.high,
-          isAbnormal: ref.high !== undefined ? val > ref.high : ref.low !== undefined ? val < ref.low : undefined,
-        });
-        break;
-      }
+  if (values.length > 0 || lines.length > 1) {
+    // Try combined adjacent lines for codes not yet matched
+    for (let i = 0; i < lines.length - 1; i++) {
+      const combined = lines[i] + ' ' + lines[i + 1];
+      const result = tryParseLabFromLine(combined);
+      if (!result) continue;
+      if (values.some(v => v.code === result.code)) continue;
+      values.push({
+        ...result,
+        isAbnormal: result.refHigh !== undefined ? result.value > result.refHigh : result.refLow !== undefined ? result.value < result.refLow : undefined,
+      });
     }
   }
 

@@ -103,22 +103,24 @@ export const V7RiskDisplay: React.FC<{
 
   const { matrix, organSummary, globalRiskRaw, globalRiskNet, globalPEvent, dataQuality, organs, mcResult, pkTimeSeries, weeklyOrganData = {}, weeklyGlobalData = [] } = result;
 
+  // Deterministic organ risk for the current week selection
+  const detOrganRisk = (key: string, weekIdx: number): number => {
+    if (weekIdx > 0 && weeklyOrganData[key] && weeklyOrganData[key].length >= weekIdx) {
+      return weeklyOrganData[key][weekIdx - 1] ?? 0;
+    }
+    return organSummary[key]?.meanS ?? 0;
+  };
+
   const effectiveOrganRisk = (key: string): number => {
     const weekIdx = organWeek;
-    let base: number;
-    if (weekIdx > 0 && weeklyOrganData[key] && weeklyOrganData[key].length >= weekIdx) {
-      base = weeklyOrganData[key][weekIdx - 1] ?? 0;
-    } else {
-      base = organSummary[key]?.meanS ?? 0;
-    }
+    // When a specific week is selected, only show deterministic (weekly) value
+    // MC result is averaged over full period and cannot scale per-week data
+    if (weekIdx > 0) return detOrganRisk(key, weekIdx);
+    // When showing average (weekIdx === 0), use MC if enabled
     if (mcEnabled && mcResult && mcResult.organSummary[key]) {
-      const detMean = organSummary[key]?.meanS ?? 0.001;
-      const mcMean = mcResult.organSummary[key].meanS;
-      if (detMean > 0.001 && mcMean > 0) {
-        base = Math.min(1, Math.max(0, base * (mcMean / detMean)));
-      }
+      return mcResult.organSummary[key].meanS;
     }
-    return base;
+    return detOrganRisk(key, weekIdx);
   };
 
   // Scale helpers:
