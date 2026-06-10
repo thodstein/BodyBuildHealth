@@ -449,6 +449,14 @@ export const TrainingScreen: React.FC = () => {
                     </div>
                   );
                 })}
+                  <div style={{ marginTop: 4, padding: '4px 8px', background: 'rgba(255,255,255,0.03)', borderRadius: 4, fontSize: 9, color: 'var(--text-dim)' }}>
+                      <span style={{ color: 'var(--accent)', fontWeight: 600 }}>
+                        {currentMicrocycle.mesocycleType === 'accumulation' ? '📈 Фаза накопления: высокий объём, умеренная интенсивность. Фокус на гипертрофию и технику.' :
+                         currentMicrocycle.mesocycleType === 'intensification' ? '📊 Фаза интенсификации: снижение объёма, рост весов. RIR 1-2, RPE 8-9.' :
+                         currentMicrocycle.mesocycleType === 'peaking' ? '🏆 Пиковая фаза: минимальный объём, максимальные веса. Подготовка к проходке.' :
+                         currentMicrocycle.mesocycleType === 'deload' ? '🔄 Разгрузка: 50% объёма, RIR 3-5. Восстановление ЦНС и суставов.' : ''}
+                      </span>
+                    </div>
                 </div>
               )}
 
@@ -895,16 +903,26 @@ export const TrainingScreen: React.FC = () => {
           </div>
 
           {diaryProgress.length > 0 && (
-            <div className="card" style={{ padding: '10px 12px' }}>
-              <h4 style={{ margin: '0 0 6px', fontSize: 12 }}>📈 Недельный прогресс</h4>
-              {diaryProgress.slice(0, 6).map((w, i) => (
-                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0', borderBottom: '1px solid var(--border)', fontSize: 10 }}>
-                  <span>Нед {w.week}</span>
-                  <span style={{ color: 'var(--accent)' }}>{w.totalVolume}кг объём</span>
-                  <span style={{ color: 'var(--text-dim)' }}>×{w.workoutCount} трен</span>
-                  <span style={{ color: 'var(--text-dim)' }}>1RM {Math.round(w.total1RM)}кг</span>
-                </div>
-              ))}
+            <div className="card" style={{ padding: '10px 12px', marginBottom: 8 }}>
+              <h4 style={{ margin: '0 0 8px', fontSize: 12 }}>📈 Тоннаж по неделям</h4>
+              <div style={{ display: 'flex', gap: 2, height: 60, alignItems: 'flex-end' }}>
+                {diaryProgress.slice(-12).map((w, i) => {
+                  const maxVol = Math.max(...diaryProgress.map(w => w.totalVolume), 1);
+                  const h = Math.max(4, (w.totalVolume / maxVol) * 100);
+                  const isMax = w.totalVolume === maxVol;
+                  return (
+                    <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}
+                      title={`Нед ${w.week}: ${Math.round(w.totalVolume)}кг × ${w.workoutCount} трен`}>
+                      <div style={{ width: '70%', height: `${h}%`, background: isMax ? 'var(--accent)' : 'rgba(0,230,138,0.3)', borderRadius: '2px 2px 0 0' }} />
+                      <span style={{ fontSize: 7, color: 'var(--text-dim)' }}>{w.week}</span>
+                    </div>
+                  );
+                })}
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: 'var(--text-dim)', marginTop: 4 }}>
+                <span>Неделя</span>
+                <span>Пик: {Math.round(Math.max(...diaryProgress.map(w => w.totalVolume)))} кг</span>
+              </div>
             </div>
           )}
 
