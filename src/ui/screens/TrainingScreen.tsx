@@ -402,12 +402,30 @@ export const TrainingScreen: React.FC = () => {
                       Объём ×{currentMicrocycle.volumeMultiplier} | RIR {currentMicrocycle.rirRange[0]}-{currentMicrocycle.rirRange[1]}
                     </span>
                   </div>
-                  {currentMicrocycle.days.filter((d: any) => d.isTraining).map((day: any, di: number) => (
+                  {currentMicrocycle.days.filter((d: any) => d.isTraining).map((day: any, di: number) => {
+                    const dayExCount = day.exercises?.length || 0;
+                    const dayCompounds = day.exercises?.filter((e: any) => e.isCompound).length || 0;
+                    const difficultyScore = Math.min(10, Math.round((dayCompounds * 2 + dayExCount) * (day.intensity === 'very_high' ? 1.4 : day.intensity === 'high' ? 1.2 : 1)));
+                    const diffLabel = difficultyScore <= 3 ? 'Легко' : difficultyScore <= 5 ? 'Средне' : difficultyScore <= 7 ? 'Тяжело' : 'Экстрим';
+                    const diffColor = difficultyScore <= 3 ? '#22c55e' : difficultyScore <= 5 ? '#84cc16' : difficultyScore <= 7 ? '#ff9100' : '#ef4444';
+                    const adjRecovery = recovery / 10;
+                    const autoRegNote = adjRecovery < 0.4 ? '⚠ Снизить объём на 20% — низкое восстановление' :
+                                       adjRecovery < 0.6 ? '⚡ Умеренная нагрузка — следи за RPE' :
+                                       adjRecovery > 0.8 ? '✅ Высокая готовность — можно добавить подход' : '';
+                    return (
                     <div key={di} style={{ marginBottom: 6, background: 'var(--bg-secondary)', borderRadius: 6, padding: '6px 8px' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
                         <span style={{ fontWeight: 600, fontSize: 11 }}>{day.day}</span>
-                        <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>{day.duration} мин • {day.intensity}</span>
+                        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                          <span style={{ fontSize: 9, padding: '1px 5px', borderRadius: 3, background: `${diffColor}22`, color: diffColor, fontWeight: 600 }}>{diffLabel} {difficultyScore}/10</span>
+                          <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>{day.duration} мин</span>
+                        </div>
                       </div>
+                      {autoRegNote && (
+                        <div style={{ fontSize: 9, color: adjRecovery < 0.4 ? '#ef4444' : adjRecovery < 0.6 ? '#ff9100' : '#22c55e', marginBottom: 3, background: `${adjRecovery < 0.4 ? '#ef4444' : adjRecovery < 0.6 ? '#ff9100' : '#22c55e'}11`, padding: '2px 6px', borderRadius: 3 }}>
+                          {autoRegNote}
+                        </div>
+                      )}
                       {day.exercises.map((ex: any, ei: number) => {
                         const scheme = selectSetScheme({
                           goal, movementPattern: 'squat' as MovementPattern, difficultyLevel: level === 'beginner' ? 'low' : level === 'intermediate' ? 'medium' : 'high',
@@ -429,7 +447,8 @@ export const TrainingScreen: React.FC = () => {
                         );
                       })}
                     </div>
-                  ))}
+                  );
+                })}
                 </div>
               )}
 
