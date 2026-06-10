@@ -86,6 +86,11 @@ export const TrainingScreen: React.FC = () => {
   const [calcRPE, setCalcRPE] = useState(8);
   const [calc1RM, setCalc1RM] = useState(100);
   const [calcPercent, setCalcPercent] = useState(75);
+  const [plSquat, setPlSquat] = useState(140);
+  const [plBench, setPlBench] = useState(100);
+  const [plDeadlift, setPlDeadlift] = useState(180);
+  const [plWeight, setPlWeight] = useState(80);
+  const [plSex, setPlSex] = useState<'male' | 'female'>('male');
 
   // Diary state
   const [diaryStats, setDiaryStats] = useState<StrengthStats[]>([]);
@@ -600,6 +605,25 @@ export const TrainingScreen: React.FC = () => {
                 </div>
               )}
 
+              {/* Strength balance (TZ 38) */}
+              {trainingOutput.volumePerGroup && (() => {
+                const groups = trainingOutput.volumePerGroup as Record<string, number>;
+                const pushVol = (groups.chest || 0) + (groups.shoulders || 0);
+                const pullVol = (groups.back || 0);
+                const quadVol = groups.legs || 0;
+                const ratio = pullVol > 0 ? (pushVol / pullVol).toFixed(1) : '—';
+                const balanced = parseFloat(ratio as string) >= 0.8 && parseFloat(ratio as string) <= 1.2;
+                return (
+                  <div className="card" style={{ padding: '8px 10px', border: '1px solid rgba(139,92,246,0.2)' }}>
+                    <div style={{ fontWeight: 600, fontSize: 11, color: '#8b5cf6', marginBottom: 4 }}>⚖️ Баланс нагрузки</div>
+                    <div style={{ display: 'flex', gap: 8, fontSize: 10, color: 'var(--text-dim)' }}>
+                      <span>Push/Pull: <b style={{ color: balanced ? '#22c55e' : '#ff9100' }}>{ratio}</b> {balanced ? '✓' : '⚠'}</span>
+                      <span>Ноги/Верх: <b>{(quadVol / Math.max(1, pushVol + pullVol)).toFixed(1)}</b></span>
+                    </div>
+                  </div>
+                );
+              })()}
+
               {trainingOutput.volumePerGroup && (
                 <div className="card" style={{ padding: '10px 12px' }}>
                   <h4 style={{ margin: '0 0 6px', fontSize: 12 }}>📊 Объём по группам</h4>
@@ -620,18 +644,21 @@ export const TrainingScreen: React.FC = () => {
                       </span>
                     </div>
                   )}
-                  {/* Workload ratio */}
+                  {/* Workload ratio + Monotony/Strain (TZ 71-72) */}
                   {currentMicrocycle && (
                     <div style={{ marginTop: 4, padding: '6px 8px', background: 'rgba(255,255,255,0.03)', borderRadius: 4, fontSize: 9 }}>
                       <span style={{ fontWeight: 600, color: 'var(--text-dim)' }}>🔬 Нагрузка: </span>
                       <span style={{ color: 'var(--accent)' }}>Острая: {Math.round(currentMicrocycle.volumeMultiplier * bodyWeight * daysPerWeek)} кг/нед</span>
-                      <span style={{ color: 'var(--text-dim)', marginLeft: 6 }}>
+                      <span style={{ color: 'var(--text-dim)', marginLeft: 4 }}>
                         Хрон.: {Math.round(currentMicrocycle.volumeMultiplier * bodyWeight * daysPerWeek * 0.85)} кг/нед
                       </span>
-                      <span style={{ marginLeft: 6, color: currentMicrocycle.mesocycleType === 'deload' ? '#22c55e' : currentMicrocycle.volumeMultiplier > 1.2 ? '#ef4444' : '#ff9100' }}>
-                        A/C: {(currentMicrocycle.volumeMultiplier * 100 / 85).toFixed(1)}%
+                      <span style={{ marginLeft: 4, color: currentMicrocycle.volumeMultiplier > 1.2 ? '#ef4444' : currentMicrocycle.mesocycleType === 'deload' ? '#22c55e' : '#ff9100' }}>
+                        A/C: {(currentMicrocycle.volumeMultiplier * 100 / 85).toFixed(0)}%
                       </span>
-                      <span style={{ marginLeft: 6, color: sleepHours < 6 ? '#ef4444' : sleepHours < 7 ? '#ff9100' : '#22c55e' }}>
+                      {currentMicrocycle.volumeMultiplier > 1.3 && (
+                        <span style={{ marginLeft: 4, color: '#ef4444', fontWeight: 600 }}>⚠ Высокий риск перегрузки</span>
+                      )}
+                      <span style={{ marginLeft: 4, color: sleepHours < 6 ? '#ef4444' : sleepHours < 7 ? '#ff9100' : '#22c55e' }}>
                         Сон: {sleepHours}ч | Стресс: {stressLevel}/10
                       </span>
                     </div>
@@ -1055,6 +1082,63 @@ export const TrainingScreen: React.FC = () => {
               <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--accent)' }}>{calcResults.percentWeight.toFixed(1)} кг</div>
             </div>
           </div>
+
+          {/* Powerlifting Indexes (TZ 7.12) */}
+          <div className="card" style={{ padding: '10px 12px' }}>
+            <h3 style={{ margin: '0 0 8px', fontSize: 13 }}>🏆 Силовые индексы (Wilks/Dots)</h3>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 8 }}>
+              {[
+                { k: plSquat, s: setPlSquat, l: 'Присед (кг)' },
+                { k: plBench, s: setPlBench, l: 'Жим (кг)' },
+                { k: plDeadlift, s: setPlDeadlift, l: 'Тяга (кг)' },
+                { k: plWeight, s: setPlWeight, l: 'Вес тела (кг)' },
+              ].map(f => (
+                <div key={f.l}>
+                  <label style={{ fontSize: 9, color: 'var(--text-dim)' }}>{f.l}</label>
+                  <input type="number" value={f.k} onChange={e => f.s(+e.target.value)}
+                    style={{ width: '100%', padding: '6px 8px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, boxSizing: 'border-box' }} />
+                </div>
+              ))}
+              <div>
+                <label style={{ fontSize: 9, color: 'var(--text-dim)' }}>Пол</label>
+                <div style={{ display: 'flex', gap: 4 }}>
+                  {(['male', 'female'] as const).map(s => (
+                    <button key={s} onClick={() => setPlSex(s)} style={{
+                      flex: 1, padding: '6px 4px', borderRadius: 6, fontSize: 11, cursor: 'pointer',
+                      background: plSex === s ? 'rgba(0,230,138,0.15)' : 'var(--bg-secondary)',
+                      border: plSex === s ? '1px solid var(--accent)' : '1px solid var(--border)',
+                      color: plSex === s ? '#00e68a' : 'var(--text-dim)', fontWeight: plSex === s ? 700 : 400,
+                    }}>{s === 'male' ? 'М' : 'Ж'}</button>
+                  ))}
+                </div>
+              </div>
+            </div>
+            {(() => {
+              const total = plSquat + plBench + plDeadlift;
+              const w = Math.max(plWeight, 30);
+              const coef = plSex === 'male'
+                ? { a: -216.0475144, b: 16.2606339, c: -0.002388645, d: -0.00113732, e: 7.01863e-6, f: -1.291e-8 }
+                : { a: 594.31747775582, b: -27.23842536447, c: 0.82112226871, d: -0.00930733913, e: 4.731582e-5, f: -9.054e-8 };
+              const denom = coef.a + coef.b * w + coef.c * w * w + coef.d * w * w * w + coef.e * w * w * w * w + coef.f * w * w * w * w * w;
+              const dots = denom > 0 ? total * 500 / denom : 0;
+              return (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
+                  <div style={{ background: 'rgba(0,230,138,0.08)', borderRadius: 8, padding: 8, textAlign: 'center' }}>
+                    <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Сумма</div>
+                    <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--accent)' }}>{total} кг</div>
+                  </div>
+                  <div style={{ background: 'rgba(139,92,246,0.08)', borderRadius: 8, padding: 8, textAlign: 'center' }}>
+                    <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Dots</div>
+                    <div style={{ fontSize: 18, fontWeight: 800, color: '#8b5cf6' }}>{dots.toFixed(2)}</div>
+                  </div>
+                  <div style={{ background: 'rgba(249,115,22,0.08)', borderRadius: 8, padding: 8, textAlign: 'center' }}>
+                    <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Отн. вес</div>
+                    <div style={{ fontSize: 18, fontWeight: 800, color: '#f97316' }}>{(total / w).toFixed(1)}×</div>
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
         </div>
       )}
 
@@ -1117,16 +1201,22 @@ export const TrainingScreen: React.FC = () => {
           )}
 
           {diaryStats.length > 0 && (
-            <div className="card" style={{ padding: '10px 12px' }}>
-              <h4 style={{ margin: '0 0 6px', fontSize: 12 }}>🏆 Мои рекорды</h4>
-              {diaryStats.map(s => (
-                <div key={s.exerciseId} style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', borderBottom: '1px solid var(--border)', fontSize: 10 }}>
-                  <span style={{ flex: 1 }}>{s.exerciseName}</span>
-                  <span style={{ color: 'var(--accent)', fontWeight: 600, minWidth: 50, textAlign: 'right' }}>{s.maxWeight}кг</span>
-                  <span style={{ color: 'var(--text-dim)', minWidth: 40, textAlign: 'right' }}>{s.maxReps} повт</span>
-                  <span style={{ color: 'var(--text-dim)', minWidth: 55, textAlign: 'right' }}>1RM {Math.round(s.max1RM)}кг</span>
-                </div>
-              ))}
+            <div className="card" style={{ padding: '10px 12px', marginBottom: 8 }}>
+              <h4 style={{ margin: '0 0 8px', fontSize: 12 }}>🏆 1RM по базовым</h4>
+              {diaryStats.map(s => {
+                const pctMax = diaryStats.length > 0 ? Math.round((s.max1RM / Math.max(...diaryStats.map(d => d.max1RM))) * 100) : 0;
+                return (
+                  <div key={s.exerciseId} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 0', borderBottom: '1px solid var(--border)', fontSize: 10 }}>
+                    <span style={{ flex: 1, fontWeight: 500 }}>{s.exerciseName}</span>
+                    <div style={{ flex: 1, background: 'rgba(255,255,255,0.05)', borderRadius: 3, height: 6, overflow: 'hidden' }}>
+                      <div style={{ width: `${Math.max(5, pctMax)}%`, height: '100%', background: pctMax > 80 ? 'var(--accent)' : pctMax > 50 ? '#8b5cf6' : '#6b7280', borderRadius: 3 }} />
+                    </div>
+                    <span style={{ color: 'var(--accent)', fontWeight: 600, minWidth: 55, textAlign: 'right' }}>{Math.round(s.max1RM)} кг</span>
+                    <span style={{ color: 'var(--text-dim)', minWidth: 45, textAlign: 'right' }}>{s.maxWeight}×{s.maxReps}</span>
+                    <span style={{ color: 'var(--text-dim)', fontSize: 9, minWidth: 30, textAlign: 'right' }}>×{s.workoutCount}</span>
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>
@@ -1215,6 +1305,26 @@ export const TrainingScreen: React.FC = () => {
                   </div>
                 ))}
               </div>
+
+              {/* Projected max-out */}
+              {diaryStats.length > 0 && (
+                <div className="card" style={{ padding: '10px 12px', border: '1px solid rgba(0,230,138,0.2)', marginBottom: 8 }}>
+                  <h4 style={{ margin: '0 0 6px', fontSize: 12, color: 'var(--accent)' }}>🎯 Прогноз к концу макроцикла</h4>
+                  <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 4 }}>
+                    {macrocycle?.totalWeeks || 12} нед × {(trainingOutput?.estimatedProgress || 2)}%/нед прогресс
+                  </div>
+                  {diaryStats.slice(0, 3).map(s => {
+                    const projected = Math.round(s.max1RM * (1 + (trainingOutput?.estimatedProgress || 2) / 100 * (macrocycle?.totalWeeks || 12)));
+                    const gain = projected - Math.round(s.max1RM);
+                    return (
+                      <div key={s.exerciseId} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, padding: '2px 0' }}>
+                        <span>{s.exerciseName}</span>
+                        <span style={{ color: 'var(--text-dim)' }}>{Math.round(s.max1RM)} → <b style={{ color: '#22c55e' }}>{projected}</b> кг (+{gain})</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
 
               <div className="card" style={{ padding: '10px 12px' }}>
                 <h4 style={{ margin: '0 0 6px', fontSize: 12 }}>📊 Параметры фаз</h4>
