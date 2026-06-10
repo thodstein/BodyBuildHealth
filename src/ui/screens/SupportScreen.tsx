@@ -41,6 +41,8 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
 
   // Interaction checker state
   const [interactionIds, setInteractionIds] = useState<string[]>(['', '']);
+  const [interactionSearch, setInteractionSearch] = useState('');
+  const [interactionSearchIdx, setInteractionSearchIdx] = useState<number>(0);
 
   // Combine SUPPLEMENT_DESCRIPTIONS with support substances from PHARMA_DB
   const supplementList = useMemo(() => {
@@ -413,21 +415,37 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
           <div className="card" style={{ marginBottom: 12 }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12 }}>
               {interactionIds.map((id, idx) => (
-                <div key={idx} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                  <div style={{ fontSize: 10, color: 'var(--text-dim)', minWidth: 18, fontWeight: 600 }}>#{idx + 1}</div>
-                  <select value={id} onChange={(e) => updateInteraction(idx, e.target.value)}
-                    style={{ flex: 1, padding: '8px 10px', borderRadius: 8, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12 }}>
-                    <option value="">— Выберите препарат —</option>
-                    {allSupport.map((s) => (
-                      <option key={s.id} value={s.id}>{s.name}</option>
-                    ))}
-                  </select>
-                  {interactionIds.length > 2 && (
-                    <button onClick={() => removeInteraction(idx)} style={{
-                      padding: '4px 10px', borderRadius: 6, fontSize: 11, cursor: 'pointer',
-                      background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', color: '#ef4444',
-                    }}>✕</button>
-                  )}
+                <div key={idx} style={{ display: 'flex', gap: 8, alignItems: 'flex-start', flexDirection: 'column' }}>
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center', width: '100%' }}>
+                    <div style={{ fontSize: 10, color: 'var(--text-dim)', minWidth: 18, fontWeight: 600 }}>#{idx + 1}</div>
+                    <div style={{ position: 'relative', flex: 1 }}>
+                      <input type="text" value={interactionSearchIdx === idx ? interactionSearch : id ? (allSupport.find(s => s.id === id)?.name || id) : ''}
+                        placeholder="🔍 Поиск препарата..."
+                        onFocus={() => { setInteractionSearchIdx(idx); setInteractionSearch(''); }}
+                        onChange={e => { setInteractionSearchIdx(idx); setInteractionSearch(e.target.value); if (!e.target.value) updateInteraction(idx, ''); }}
+                        style={{ width: '100%', padding: '8px 10px', borderRadius: 8, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, boxSizing: 'border-box' }} />
+                      {interactionSearch && interactionSearchIdx === idx && (
+                        <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 10, background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 8, maxHeight: 160, overflowY: 'auto', marginTop: 2 }}>
+                          {allSupport.filter(s => s.name.toLowerCase().includes(interactionSearch.toLowerCase()) || s.id.toLowerCase().includes(interactionSearch.toLowerCase())).map(s => (
+                            <div key={s.id} onClick={() => { updateInteraction(idx, s.id); setInteractionSearch(''); }}
+                              style={{ padding: '6px 10px', cursor: 'pointer', fontSize: 12, borderBottom: '1px solid var(--border)' }}>
+                              <span style={{ fontWeight: id === s.id ? 700 : 400, color: id === s.id ? 'var(--accent)' : 'var(--text)' }}>{s.name}</span>
+                              <span style={{ fontSize: 10, color: 'var(--text-dim)', marginLeft: 6 }}>{s.id}</span>
+                            </div>
+                          ))}
+                          {allSupport.filter(s => s.name.toLowerCase().includes(interactionSearch.toLowerCase())).length === 0 && (
+                            <div style={{ padding: '8px 10px', fontSize: 11, color: 'var(--text-dim)' }}>Ничего не найдено</div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                    {interactionIds.length > 2 && (
+                      <button onClick={() => removeInteraction(idx)} style={{
+                        padding: '4px 10px', borderRadius: 6, fontSize: 11, cursor: 'pointer',
+                        background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', color: '#ef4444',
+                      }}>✕</button>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
@@ -513,24 +531,71 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
                 <div style={{ fontSize: 36, fontWeight: 800, color: getRiskColor(100 - supportResult.score), lineHeight: 1 }}>
                   {Math.round(supportResult.score)}%
                 </div>
+                <div style={{ background: 'rgba(255,255,255,0.08)', borderRadius: 6, height: 8, marginTop: 8, overflow: 'hidden' }}>
+                  <div style={{ width: `${Math.min(100, supportResult.score)}%`, height: '100%', background: 'linear-gradient(90deg, #ef4444, #eab308, #22c55e)', borderRadius: 6, transition: 'width 0.5s' }} />
+                </div>
               </div>
+
               <div className="card" style={{ marginBottom: 12 }}>
-                <h4 style={{ margin: '0 0 8px 0', fontSize: 13 }}>Риски по всем системам — до и после поддержки</h4>
-                {ALL_RISK_SYSTEMS.map(sys => {
-                  const before = supportResult.riskBefore[sys] ?? 0;
-                  const after = supportResult.riskAfter[sys] ?? 0;
-                  const reduction = before > 0 ? ((before - after) / before * 100) : 0;
-                  return (
-                    <div key={sys} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0', borderBottom: '1px solid var(--border-color)' }}>
-                      <span style={{ fontSize: 14 }}>{SYSTEM_INFO_ALL[sys]?.icon || ''}</span>
-                      <span style={{ flex: 1, fontSize: 12, fontWeight: 500 }}>{systemLabels[sys]}</span>
-                      <span style={{ fontSize: 12, color: getRiskColor(before), fontWeight: 600 }}>{Math.round(before)}%</span>
-                      <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>{'\u2192'}</span>
-                      <span style={{ fontSize: 12, color: getRiskColor(after), fontWeight: 600 }}>{Math.round(after)}%</span>
-                      {reduction > 0 && <span style={{ fontSize: 10, color: '#22c55e', fontWeight: 600 }}>{'\u2193'}{reduction.toFixed(0)}%</span>}
-                    </div>
-                  );
-                })}
+                <h4 style={{ margin: '0 0 8px 0', fontSize: 13 }}>Системы с наибольшим снижением риска</h4>
+                {ALL_RISK_SYSTEMS
+                  .map(sys => ({ sys, before: supportResult.riskBefore[sys] ?? 0, after: supportResult.riskAfter[sys] ?? 0 }))
+                  .filter(x => x.before > 0)
+                  .sort((a, b) => (b.before - b.after) - (a.before - a.after))
+                  .slice(0, 5)
+                  .map(({ sys, before, after }) => {
+                    const reduction = before > 0 ? ((before - after) / before * 100) : 0;
+                    return (
+                      <div key={sys} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0', borderBottom: '1px solid var(--border-color)' }}>
+                        <span style={{ fontSize: 14 }}>{SYSTEM_INFO_ALL[sys]?.icon || ''}</span>
+                        <span style={{ flex: 1, fontSize: 12, fontWeight: 500 }}>{systemLabels[sys]}</span>
+                        <span style={{ fontSize: 12, color: getRiskColor(before), fontWeight: 600 }}>{Math.round(before)}%</span>
+                        <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>{'\u2192'}</span>
+                        <span style={{ fontSize: 12, color: getRiskColor(after), fontWeight: 600 }}>{Math.round(after)}%</span>
+                        {reduction > 0 && <span style={{ fontSize: 10, color: '#22c55e', fontWeight: 600 }}>{'\u2193'}{reduction.toFixed(0)}%</span>}
+                      </div>
+                    );
+                  })}
+                {ALL_RISK_SYSTEMS.filter(sys => (supportResult.riskBefore[sys] ?? 0) <= 0).length === ALL_RISK_SYSTEMS.length && (
+                  <div style={{ textAlign: 'center', padding: 12, color: 'var(--text-dim)', fontSize: 12 }}>Нет данных для рекомендаций</div>
+                )}
+              </div>
+
+              <div className="card" style={{ marginBottom: 12 }}>
+                <h4 style={{ margin: '0 0 8px 0', fontSize: 13, color: '#00e68a' }}>🎯 Рекомендованные добавки</h4>
+                {ALL_RISK_SYSTEMS
+                  .map(sys => ({ sys, before: supportResult.riskBefore[sys] ?? 0, after: supportResult.riskAfter[sys] ?? 0 }))
+                  .filter(x => x.before > 20)
+                  .sort((a, b) => b.before - a.before)
+                  .slice(0, 4)
+                  .map(({ sys, before }) => {
+                    const supportedBy = supplementList.filter(s => s.targets?.systems?.includes(sys));
+                    return (
+                      <div key={sys} style={{ padding: '8px 0', borderBottom: '1px solid var(--border-color)' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                          <span style={{ fontSize: 14 }}>{SYSTEM_INFO_ALL[sys]?.icon || ''}</span>
+                          <span style={{ fontWeight: 600, fontSize: 13 }}>{systemLabels[sys]}</span>
+                          <span style={{ fontSize: 11, padding: '1px 6px', borderRadius: 4, background: getRiskColor(before) + '22', color: getRiskColor(before), fontWeight: 600 }}>{Math.round(before)}%</span>
+                        </div>
+                        {supportedBy.length > 0 ? (
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, marginLeft: 20 }}>
+                            {supportedBy.slice(0, 3).map(s => (
+                              <span key={s.id} style={{ fontSize: 10, padding: '2px 6px', borderRadius: 4, background: 'rgba(0,230,138,0.08)', color: '#00e68a' }}>{s.name}</span>
+                            ))}
+                          </div>
+                        ) : (
+                          <div style={{ marginLeft: 20, fontSize: 10, color: 'var(--text-dim)' }}>Нет доступных добавок для этой системы</div>
+                        )}
+                      </div>
+                    );
+                  })}
+              </div>
+
+              <div className="card" style={{ fontSize: 11, color: 'var(--text-dim)', padding: 8 }}>
+                Рекомендации основаны на: {linked.course.length > 0 ? `${linked.course.length} препаратов` : '0 препаратов'}
+                {linked.labs.length > 0 ? `, ${linked.labs.length} анализов` : ''}
+                {linked.profile.settings?.nutritionFactor ? ', питания' : ''}
+                {linked.profile.settings?.trainingFactor ? ', тренировок' : ''}
               </div>
             </div>
           )}

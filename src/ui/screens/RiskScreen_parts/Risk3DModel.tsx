@@ -79,8 +79,10 @@ export const Risk3DModel: React.FC<Props> = ({ result, mcEnabled, onToggleMC, or
   const [riskMode, setRiskMode] = useState<'net' | 'raw' | 'delta'>('net');
   const { organSummary, globalRiskRaw, globalRiskNet, globalPEvent, weeklyOrganData = {}, weeklyGlobalData = [] } = result;
 
-  const weekOptions = [1,2,3,4,5,6,7,8,9,10,11,12];
-  const organKeys = Object.keys(organSummary);
+  const organKeys = Object.keys(organSummary).sort((a, b) => {
+    const order = ['heart', 'vessels', 'liver', 'kidney', 'blood', 'endocrine', 'metabolic', 'ghigf', 'ins_axis', 'musculoskeletal', 'neuro_toxicity', 'reproductive'];
+    return (order.indexOf(a) - order.indexOf(b));
+  });
 
   const getOrganVal = (key: string): number => {
     if (organWeek > 0 && weeklyOrganData[key] && weeklyOrganData[key].length >= organWeek)
@@ -151,23 +153,26 @@ export const Risk3DModel: React.FC<Props> = ({ result, mcEnabled, onToggleMC, or
             </button>
           ))}
         </div>
-        {/* Week slider — visual pill buttons */}
-        <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 4 }}>Неделя: {organWeek === 0 ? 'Среднее за 12 нед' : `Нед ${organWeek}`}</div>
-        <div style={{ display: 'flex', gap: 2, overflowX: 'auto', paddingBottom: 2, scrollbarWidth: 'none' }}>
-          <button onClick={() => onWeekChange(0)} style={{
-            padding: '3px 8px', borderRadius: 6, fontSize: 9, fontWeight: organWeek === 0 ? 700 : 400, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
-            background: organWeek === 0 ? '#00e68a' : 'var(--bg-secondary)',
-            border: organWeek === 0 ? '1px solid #00e68a' : '1px solid var(--border)',
-            color: organWeek === 0 ? '#000' : 'var(--text-dim)',
-          }}>∅</button>
-          {weekOptions.map(w => (
-            <button key={w} onClick={() => onWeekChange(w)} style={{
-              padding: '3px 8px', borderRadius: 6, fontSize: 9, fontWeight: organWeek === w ? 700 : 400, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
-              background: organWeek === w ? '#00e68a' : 'var(--bg-secondary)',
-              border: organWeek === w ? '1px solid #00e68a' : '1px solid var(--border)',
-              color: organWeek === w ? '#000' : 'var(--text-dim)',
-            }}>{w}</button>
-          ))}
+        {/* Week slider — range input */}
+        <div style={{ marginBottom: 4 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 }}>
+            <span style={{ fontSize: 9, color: 'var(--text-dim)' }}>Неделя: {organWeek === 0 ? 'Среднее за 12 нед' : `Нед ${organWeek}`}</span>
+            <div style={{ display: 'flex', gap: 2 }}>
+              <button onClick={() => onWeekChange(0)} style={{
+                padding: '3px 8px', borderRadius: 6, fontSize: 9, fontWeight: organWeek === 0 ? 700 : 400, cursor: 'pointer',
+                background: organWeek === 0 ? '#00e68a' : 'var(--bg-secondary)',
+                border: organWeek === 0 ? '1px solid #00e68a' : '1px solid var(--border)',
+                color: organWeek === 0 ? '#000' : 'var(--text-dim)',
+              }}>∅ Среднее</button>
+            </div>
+          </div>
+          <input type="range" min={0} max={12} value={organWeek} onChange={e => {
+            const v = parseInt(e.target.value);
+            onWeekChange(v);
+          }} style={{ width: '100%', height: 4, accentColor: '#00e68a', cursor: 'pointer' }} />
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 8, color: 'var(--text-dim)', marginTop: 1 }}>
+            <span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span><span>8</span><span>9</span><span>10</span><span>11</span><span>12</span>
+          </div>
         </div>
         {organWeek > 0 && weeklyGlobalData[organWeek - 1] && (
           <div style={{ fontSize: 9, color: 'var(--text-dim)', marginTop: 4 }}>Недельный raw: {Math.round(weeklyGlobalData[organWeek - 1]?.raw ?? 0)}%</div>
@@ -260,9 +265,6 @@ export const Risk3DModel: React.FC<Props> = ({ result, mcEnabled, onToggleMC, or
 
         {renderLabel()}
       </div>
-
-      {/* Selected organ detail */}
-      {selectedOrgan && organSummary[selectedOrgan] && renderLabel()}
 
       {/* Overall risk bar */}
       <div className="card" style={{ marginBottom: 12 }}>

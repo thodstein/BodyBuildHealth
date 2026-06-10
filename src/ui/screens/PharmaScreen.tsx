@@ -9,6 +9,7 @@ import type { PharmaSubstance, CourseEntry, PD } from '../../core/types';
 import { SYNERGY_PAIRS, type SynergyPair } from '../../engines/support.engine';
 import { SYSTEM_INFO, SYSTEM_INFO_ALL } from '../../core/risk-info';
 import { PharmaCourseScreen } from './PharmaCourseScreen';
+import { useDataLink } from '../../core/data-link';
 
 type Tab = 'catalog' | 'pkpd' | 'dosage' | 'interactions' | 'course';
 
@@ -454,11 +455,32 @@ interface DrugDose {
 
 const DRUG_COLORS = ['#7c4dff', '#ff1744', '#00e68a', '#ff9100', '#3b82f6', '#f44336', '#4caf50', '#9c27b0', '#ff5722', '#2196f3'];
 const DAY_SHORT = ['', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
+const parseFreqToDays = (freq: string): number[] => {
+  const match = freq.match(/(\d+)\s*x\s*\/\s*week/i);
+  if (match) {
+    const n = parseInt(match[1]);
+    if (n <= 0) return [1];
+    if (n >= 7) return [1, 2, 3, 4, 5, 6, 7];
+    const days = [];
+    for (let i = 0; i < n; i++) days.push(i + 1);
+    return days;
+  }
+  return [1, 4];
+};
 
 const PKPDSimulationTab: React.FC = () => {
-  const [drugDoses, setDrugDoses] = useState<DrugDose[]>([
-    { substanceId: 'test_enan', doseMg: 250, frequencyDays: [1, 4], totalWeeks: 12 },
-  ]);
+  const linked = useDataLink();
+  const [drugDoses, setDrugDoses] = useState<DrugDose[]>(() => {
+    const courseDrugs = linked.course.slice(0, 5).map(c => ({
+      substanceId: c.substanceId,
+      doseMg: c.doseValue ?? 250,
+      frequencyDays: c.frequency ? parseFreqToDays(String(c.frequency)) : [1, 4],
+      totalWeeks: (c.endWeek ?? 12) - (c.startWeek ?? 0),
+    }));
+    return courseDrugs.length > 0 ? courseDrugs : [
+      { substanceId: 'test_enan', doseMg: 250, frequencyDays: [1, 4], totalWeeks: 12 },
+    ];
+  });
   const [simResult, setSimResult] = useState<{
     points: { week: number; cp: number; effect: number; tol: number }[];
     perDrug: { substanceId: string; name: string; points: { week: number; cp: number }[] }[];
