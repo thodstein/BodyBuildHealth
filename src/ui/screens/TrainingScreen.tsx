@@ -41,7 +41,7 @@ const LEVELS = [
 
 const MUSCLE_GROUPS = ['chest', 'back', 'legs', 'shoulders', 'arms', 'core'] as const;
 const GROUP_LABELS: Record<string, string> = {
-  chest: 'Грудь', back: 'Спина', legs: 'Ноги', shoulders: 'Плечи', arms: 'Руки', core: 'Кор',
+    chest: 'Грудь', back: 'Спина', legs: 'Ноги', shoulders: 'Плечи', arms: 'Руки', core: 'Кор',
 };
 const EQUIP_LABELS: Record<string, string> = { barbell: 'Штанга', dumbbell: 'Гантели', machine: 'Тренажёр', cable: 'Блок', bodyweight: 'Вес тела', band: 'Лента', kettlebell: 'Гиря', specialty_bar: 'Спец. гриф' };
 const JOINT_LABELS: Record<string, string> = { high: 'Высокая', med: 'Средняя', low: 'Низкая' };
@@ -58,12 +58,16 @@ export const TrainingScreen: React.FC = () => {
   const [level, setLevel] = useState('intermediate');
   const [daysPerWeek, setDaysPerWeek] = useState(4);
   const [splitType, setSplitType] = useState('auto');
+  const [splitCandidates, setSplitCandidates] = useState<SplitCandidate[]>([]);
+  const [showSplitPicker, setShowSplitPicker] = useState(false);
+  const [cycleType, setCycleType] = useState('auto');
   const [recovery, setRecovery] = useState(7);
   const [fatigue, setFatigue] = useState(3);
   const [weakPoints, setWeakPoints] = useState<string[]>([]);
   const [bodyWeight, setBodyWeight] = useState(80);
   const [sleepHours, setSleepHours] = useState(7);
   const [stressLevel, setStressLevel] = useState(5);
+  const [customExercises, setCustomExercises] = useState<{ name: string; sets: number; reps: number; rir: number }[]>([]);
   const [trainingOutput, setTrainingOutput] = useState<TrainingOutput | null>(null);
   const [macrocycle, setMacrocycle] = useState<MacrocyclePlan | null>(null);
   const [selectedWeek, setSelectedWeek] = useState(1);
@@ -266,20 +270,54 @@ export const TrainingScreen: React.FC = () => {
             </div>
             <div style={{ marginBottom: 8 }}>
               <label style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 3, display: 'block' }}>Тип сплита</label>
-              <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+              <button onClick={() => { setShowSplitPicker(!showSplitPicker); if (!splitCandidates.length) { const opts = getSplitOptions({ goal, level, daysPerWeek } as any); setSplitCandidates(opts.slice(0, 12)); } }} style={{
+                width: '100%', padding: '6px 10px', borderRadius: 8, textAlign: 'left', cursor: 'pointer',
+                background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 11,
+                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+              }}>
+                <span>{splitType === 'auto' ? '🤖 Авто-выбор' : splitCandidates.find(c => c.id === splitType)?.name || splitType}</span>
+                <span style={{ fontSize: 9, color: 'var(--text-dim)' }}>{showSplitPicker ? '▴' : '▾'}</span>
+              </button>
+              {showSplitPicker && (
+                <div style={{ marginTop: 4, display: 'flex', flexDirection: 'column', gap: 3, maxHeight: 220, overflowY: 'auto', background: 'var(--bg-secondary)', borderRadius: 8, padding: '4px 6px', border: '1px solid var(--border)' }}>
+                  <div key="auto" onClick={() => { setSplitType('auto'); setShowSplitPicker(false); }} style={{
+                    padding: '5px 8px', borderRadius: 6, cursor: 'pointer', fontSize: 11,
+                    background: splitType === 'auto' ? 'rgba(0,230,138,0.1)' : 'transparent',
+                    border: splitType === 'auto' ? '1px solid var(--accent)' : '1px solid transparent',
+                  }}>
+                    <div style={{ fontWeight: 600 }}>🤖 Авто-выбор</div>
+                    <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Движок сам подберёт оптимальный сплит</div>
+                  </div>
+                  {splitCandidates.map(c => (
+                    <div key={c.id || c.name} onClick={() => { setSplitType(c.id || c.name); setShowSplitPicker(false); }} style={{
+                      padding: '5px 8px', borderRadius: 6, cursor: 'pointer', fontSize: 11,
+                      background: splitType === (c.id || c.name) ? 'rgba(0,230,138,0.1)' : 'transparent',
+                      border: splitType === (c.id || c.name) ? '1px solid var(--accent)' : '1px solid transparent',
+                    }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ fontWeight: 600 }}>{c.name}</span>
+                        <span style={{ fontSize: 9, padding: '1px 6px', borderRadius: 3, background: 'rgba(0,230,138,0.1)', color: '#00e68a', fontWeight: 600 }}>{(c.score * 100).toFixed(0)}%</span>
+                      </div>
+                      <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>{c.desc?.slice(0, 80)}{c.desc && c.desc.length > 80 ? '...' : ''}</div>
+                      {c.rationale && <div style={{ fontSize: 8, color: 'var(--accent)', marginTop: 1 }}>{c.rationale.slice(0, 60)}</div>}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div style={{ marginBottom: 8 }}>
+              <label style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 2, display: 'block' }}>Тип цикла</label>
+              <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
                 {[
-                  { v: 'auto', l: 'Авто' },
-                  { v: 'fullbody', l: 'Фулбоди' },
-                  { v: 'upper_lower', l: 'Верх/Низ' },
-                  { v: 'ppl', l: 'PPL' },
-                  { v: 'bro', l: 'Бро-сплит' },
-                  { v: 'powerbuilding', l: 'Пауэрбилдинг' },
-                ].map(s => (
-                  <button key={s.v} onClick={() => { setSplitType(s.v); setTimeout(generatePlan, 50); }} style={{
-                    padding: '3px 8px', borderRadius: 6, fontSize: 10, fontWeight: splitType === s.v ? 700 : 400, cursor: 'pointer',
-                    border: splitType === s.v ? '1px solid var(--accent)' : '1px solid var(--border)',
-                    background: splitType === s.v ? 'rgba(0,230,138,0.15)' : 'var(--bg-secondary)', color: 'var(--text)',
-                  }}>{s.l}</button>
+                  { v: 'auto', l: 'Авто' }, { v: 'pl_strength', l: 'PL Сила' }, { v: 'pl_peaking', l: 'PL Пик' },
+                  { v: 'bb_mass', l: 'BB Масса' }, { v: 'bb_specialization', l: 'BB Спец' },
+                  { v: 'rehab', l: 'Рехаб' }, { v: 'wl_tech', l: 'WL Техника' },
+                ].map(c => (
+                  <button key={c.v} onClick={() => { setCycleType(c.v); setTimeout(generatePlan, 50); }} style={{
+                    padding: '3px 7px', borderRadius: 6, fontSize: 9, fontWeight: cycleType === c.v ? 700 : 400, cursor: 'pointer',
+                    border: cycleType === c.v ? '1px solid var(--accent)' : '1px solid var(--border)',
+                    background: cycleType === c.v ? 'rgba(0,230,138,0.15)' : 'var(--bg-secondary)', color: 'var(--text)',
+                  }}>{c.l}</button>
                 ))}
               </div>
             </div>
@@ -344,6 +382,30 @@ export const TrainingScreen: React.FC = () => {
 
           {trainingOutput && (
             <>
+              {/* Smart Recommendations */}
+              {(() => {
+                const tips: { icon: string; text: string; color: string }[] = [];
+                if (recovery < 5) tips.push({ icon: '⚠️', text: `Восстановление ${recovery}/10 — снизь объём на 15-20%, увеличь сон`, color: '#ef4444' });
+                if (sleepHours < 7) tips.push({ icon: '😴', text: `Сон ${sleepHours}ч — добавь 30-60 мин для лучшего восстановления`, color: '#ff9100' });
+                if (stressLevel > 7) tips.push({ icon: '🧘', text: `Стресс ${stressLevel}/10 — снизь интенсивность, добавь LISS`, color: '#ff9100' });
+                if (currentMicrocycle?.mesocycleType === 'deload') tips.push({ icon: '🔄', text: 'Делоад: фокус на технику и мобильность, не гонись за весами', color: '#3b82f6' });
+                else if (currentMicrocycle?.mesocycleType === 'peaking') tips.push({ icon: '🏆', text: 'Пик: работай с соревновательными движениями, RIR 0-1', color: '#ef4444' });
+                else if (currentMicrocycle?.mesocycleType === 'accumulation') tips.push({ icon: '📈', text: 'Накопление: добавляй подсобку на слабые зоны, 8-12 повторений', color: '#22c55e' });
+                if (weakPoints.length > 0) tips.push({ icon: '🎯', text: `Слабые зоны: ${weakPoints.map(w => GROUP_LABELS[w] || w).join(', ')} — добавь 1-2 подсобных`, color: '#8b5cf6' });
+                if (recovery > 8 && fatigue < 3) tips.push({ icon: '✅', text: 'Отличная готовность — можно добавить 1 сет в основных движениях', color: '#22c55e' });
+                if (tips.length === 0) tips.push({ icon: '💪', text: 'Всё в норме. Придерживайся плана и следи за RPE.', color: '#00e68a' });
+                return (
+                  <div className="card" style={{ padding: '10px 12px', border: '1px solid rgba(0,230,138,0.2)' }}>
+                    <h4 style={{ margin: '0 0 6px', fontSize: 12, color: 'var(--accent)' }}>💡 Рекомендации</h4>
+                    {tips.map((t, i) => (
+                      <div key={i} style={{ fontSize: 10, color: 'var(--text-dim)', padding: '2px 0', display: 'flex', gap: 6, alignItems: 'flex-start' }}>
+                        <span>{t.icon}</span>
+                        <span style={{ color: t.color }}>{t.text}</span>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
               <div className="card" style={{ padding: '10px 12px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
                   <div>
@@ -521,7 +583,22 @@ export const TrainingScreen: React.FC = () => {
                     ))}
                   </div>
                 );
-              })()}
+              })(              )}
+
+              {/* Custom added exercises */}
+              {customExercises.length > 0 && (
+                <div className="card" style={{ padding: '8px 10px', border: '1px dashed rgba(139,92,246,0.3)' }}>
+                  <div style={{ fontWeight: 600, fontSize: 11, color: '#8b5cf6', marginBottom: 4 }}>📝 Добавленные ({customExercises.length})</div>
+                  {customExercises.map((ce, ci) => (
+                    <div key={ci} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 10, padding: '2px 0', borderBottom: ci < customExercises.length - 1 ? '1px solid var(--border)' : 'none' }}>
+                      <span>{ce.name}</span>
+                      <span style={{ color: 'var(--accent)', fontWeight: 600 }}>{ce.sets}×{ce.reps}</span>
+                      <span style={{ color: 'var(--text-dim)', fontSize: 9 }}>RIR {ce.rir}</span>
+                      <button onClick={() => setCustomExercises(customExercises.filter((_, i) => i !== ci))} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: 12, padding: 0 }}>×</button>
+                    </div>
+                  ))}
+                </div>
+              )}
 
               {trainingOutput.volumePerGroup && (
                 <div className="card" style={{ padding: '10px 12px' }}>
@@ -861,6 +938,11 @@ export const TrainingScreen: React.FC = () => {
                 <span style={{ fontSize: 9, padding: '1px 5px', borderRadius: 3, background: 'rgba(249,115,22,0.1)', color: '#f97316' }}>{EQUIP_LABELS[selectedEx.equipment] || selectedEx.equipment}</span>
                 <span style={{ fontSize: 9, padding: '1px 5px', borderRadius: 3, background: selectedEx.jointStress === 'high' ? 'rgba(239,68,68,0.1)' : 'rgba(34,197,94,0.1)', color: selectedEx.jointStress === 'high' ? '#ef4444' : '#22c55e' }}>Суставы: {JOINT_LABELS[selectedEx.jointStress] || selectedEx.jointStress}</span>
                 <span style={{ fontSize: 9, padding: '1px 5px', borderRadius: 3, background: 'rgba(139,92,246,0.1)', color: '#8b5cf6' }}>Усталость: {selectedEx.fatigueCost}/10</span>
+                {selectedEx.difficulty && (
+                  <span style={{ fontSize: 9, padding: '1px 5px', borderRadius: 3, background: selectedEx.difficulty === 'advanced' ? 'rgba(239,68,68,0.1)' : selectedEx.difficulty === 'intermediate' ? 'rgba(249,115,22,0.1)' : 'rgba(34,197,94,0.1)', color: selectedEx.difficulty === 'advanced' ? '#ef4444' : selectedEx.difficulty === 'intermediate' ? '#f97316' : '#22c55e' }}>
+                    {selectedEx.difficulty === 'advanced' ? 'Продвинутый' : selectedEx.difficulty === 'intermediate' ? 'Средний' : 'Новичок'}
+                  </span>
+                )}
               </div>
               {selectedEx.technique && (
                 <div style={{ marginBottom: 6, background: 'rgba(0,230,138,0.05)', borderRadius: 6, padding: '5px 8px', fontSize: 10, color: 'var(--text)', lineHeight: 1.4 }}>
@@ -881,6 +963,13 @@ export const TrainingScreen: React.FC = () => {
                   })}
                 </div>
               )}
+              <button onClick={() => {
+                setCustomExercises([...customExercises, { name: selectedEx.name, sets: 3, reps: 10, rir: 2 }]);
+                setSelectedEx(null);
+              }} style={{
+                width: '100%', marginTop: 6, padding: '6px 12px', borderRadius: 6, border: '1px dashed var(--accent)',
+                background: 'rgba(0,230,138,0.08)', color: 'var(--accent)', fontWeight: 600, fontSize: 11, cursor: 'pointer',
+              }}>+ Добавить в план</button>
             </div>
           )}
         </div>
