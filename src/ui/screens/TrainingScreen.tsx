@@ -61,6 +61,7 @@ export const TrainingScreen: React.FC = () => {
   const [splitCandidates, setSplitCandidates] = useState<SplitCandidate[]>([]);
   const [showSplitPicker, setShowSplitPicker] = useState(false);
   const [cycleType, setCycleType] = useState('auto');
+  const [mesoLength, setMesoLength] = useState(12);
   const [recovery, setRecovery] = useState(7);
   const [fatigue, setFatigue] = useState(3);
   const [weakPoints, setWeakPoints] = useState<string[]>([]);
@@ -129,6 +130,7 @@ export const TrainingScreen: React.FC = () => {
       weakPoints,
       injuries: [],
       experience: level as MacrocycleInput['experience'],
+      currentWeek: 1,
     };
     const macro = generateMacrocycle(macroInput);
     setMacrocycle(macro);
@@ -326,6 +328,18 @@ export const TrainingScreen: React.FC = () => {
                 ))}
               </div>
             </div>
+            <div style={{ marginBottom: 8 }}>
+              <label style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 2, display: 'block' }}>Длина цикла</label>
+              <div style={{ display: 'flex', gap: 3 }}>
+                {[4, 8, 12].map(w => (
+                  <button key={w} onClick={() => setMesoLength(w)} style={{
+                    padding: '3px 10px', borderRadius: 6, fontSize: 10, fontWeight: mesoLength === w ? 700 : 400, cursor: 'pointer',
+                    border: mesoLength === w ? '1px solid var(--accent)' : '1px solid var(--border)',
+                    background: mesoLength === w ? 'rgba(0,230,138,0.15)' : 'var(--bg-secondary)', color: 'var(--text)',
+                  }}>{w} нед</button>
+                ))}
+              </div>
+            </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginBottom: 8 }}>
               <div>
                 <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Дней/нед</label>
@@ -337,7 +351,10 @@ export const TrainingScreen: React.FC = () => {
                 <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Восстановление</label>
                 <input type="range" min={1} max={10} value={recovery} onChange={e => setRecovery(+e.target.value)}
                   style={{ width: '100%', accentColor: 'var(--accent)' }} />
-                <div style={{ textAlign: 'center', fontSize: 10, color: 'var(--text-dim)' }}>{recovery}/10</div>
+                <div style={{ textAlign: 'center', fontSize: 10, color: recovery < 4 ? '#ef4444' : recovery < 6 ? '#ff9100' : '#22c55e' }}>
+                  <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: 4, background: recovery < 4 ? '#ef4444' : recovery < 6 ? '#ff9100' : '#22c55e', marginRight: 4 }} />
+                  {recovery}/10 — {recovery < 4 ? 'Плохое' : recovery < 6 ? 'Среднее' : recovery < 8 ? 'Хорошее' : 'Отличное'}
+                </div>
               </div>
               <div>
                 <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Усталость</label>
@@ -515,6 +532,13 @@ export const TrainingScreen: React.FC = () => {
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
                         <span style={{ fontWeight: 600, fontSize: 11 }}>{day.day}</span>
                         <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                          {(() => {
+                            const hasSquat = day.exercises?.some((e: any) => e.exerciseId?.includes('squat') || e.name?.includes('Присед'));
+                            const hasBench = day.exercises?.some((e: any) => e.exerciseId?.includes('bench') || e.name?.includes('Жим'));
+                            const hasDead = day.exercises?.some((e: any) => e.exerciseId?.includes('deadlift') || e.name?.includes('Тяг'));
+                            const focusTag = hasSquat ? '🦵 Присед' : hasBench ? '🏋️ Жим' : hasDead ? '🔙 Тяга' : '';
+                            return focusTag ? <span style={{ fontSize: 9, color: 'var(--accent)', fontWeight: 600 }}>{focusTag}</span> : null;
+                          })()}
                           <span style={{ fontSize: 9, padding: '1px 5px', borderRadius: 3, background: `${diffColor}22`, color: diffColor, fontWeight: 600 }}>{diffLabel} {difficultyScore}/10</span>
                           <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>{day.duration} мин</span>
                         </div>
@@ -536,6 +560,7 @@ export const TrainingScreen: React.FC = () => {
                         const role = ei === 0 ? 'main' : ei <= 2 ? 'secondary' : 'accessory';
                         const roleColor = role === 'main' ? '#ef4444' : role === 'secondary' ? '#f97316' : '#6b7280';
                         const roleLabel = role === 'main' ? 'ОСН' : role === 'secondary' ? 'ПОДС' : 'АКС';
+                        const restSec = ei === 0 ? (goal === 'strength' ? 180 : 120) : ei <= 2 ? 90 : 60;
                         return (
                         <div key={ei} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '2px 0', fontSize: 10, borderBottom: ei < day.exercises.length - 1 ? '1px solid var(--border)' : 'none', gap: 2 }}>
                           <span style={{ fontSize: 7, padding: '1px 3px', borderRadius: 2, background: `${roleColor}22`, color: roleColor, fontWeight: 700, minWidth: 22, textAlign: 'center', flexShrink: 0 }}>{roleLabel}</span>
@@ -544,8 +569,24 @@ export const TrainingScreen: React.FC = () => {
                           {estMax > 0 && <span style={{ fontSize: 8, color: '#8b5cf6', minWidth: 40, textAlign: 'right' }}>~{estMax}кг</span>}
                           <span style={{ fontSize: 8, color: 'var(--text-dim)', minWidth: 25, textAlign: 'right' }}>RIR{ex.rir}</span>
                           <span style={{ fontSize: 6, padding: '1px 2px', borderRadius: 2, background: 'rgba(139,92,246,0.1)', color: '#8b5cf6', whiteSpace: 'nowrap' }}>{scheme?.schemeType?.slice(0, 6) || '—'}</span>
+                          <span style={{ fontSize: 6, padding: '1px 2px', borderRadius: 2, background: 'rgba(249,115,22,0.1)', color: '#f97316', whiteSpace: 'nowrap' }}>⏱{restSec}с</span>
                           {substitute && <span style={{ fontSize: 6, color: 'var(--text-dim)', maxWidth: 50, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={`Заменить: ${substitute.name}`}>↔{substitute.name.slice(0, 8)}</span>}
                         </div>
+                        );
+                      })}
+                      {/* Rotation suggestion for main lifts */}
+                      {day.exercises?.filter((e: any) => e.isCompound).slice(0, 2).map((ex: any, ei: number) => {
+                        const cat = EXERCISE_CATALOG.find(ec => ec.id === ex.exerciseId || ec.name === ex.name);
+                        const alts = cat?.canReplace?.filter(r => !day.exercises.some((de: any) => de.exerciseId === r || de.name === r)).slice(0, 2) || [];
+                        if (alts.length === 0) return null;
+                        return (
+                          <div key={`rot-${ei}`} style={{ fontSize: 8, color: 'var(--text-dim)', padding: '1px 0', marginLeft: 26, marginBottom: 1 }}>
+                            <span style={{ color: '#8b5cf6' }}>🔄 {ex.name.slice(0, 12)} → </span>
+                            {alts.map((a: string, ai: number) => {
+                              const altEx = EXERCISE_CATALOG.find(e => e.id === a);
+                              return <span key={ai}>{altEx?.name || a}{ai < alts.length - 1 ? ', ' : ''}</span>;
+                            })}
+                          </div>
                         );
                       })}
                     </div>
@@ -559,6 +600,39 @@ export const TrainingScreen: React.FC = () => {
                          currentMicrocycle.mesocycleType === 'deload' ? '🔄 Разгрузка: 50% объёма, RIR 3-5. Восстановление ЦНС и суставов.' : ''}
                       </span>
                     </div>
+                </div>
+              )}
+
+              {/* Quick week summary */}
+              {currentMicrocycle && (
+                <div className="card" style={{ padding: '8px 10px' }}>
+                  <div style={{ fontWeight: 600, fontSize: 11, color: 'var(--accent)', marginBottom: 4 }}>📋 Сводка недели {selectedWeek}</div>
+                  {(() => {
+                    const days = currentMicrocycle.days.filter((d: any) => d.isTraining);
+                    const totalSets = days.reduce((s: number, d: any) => s + (d.exercises?.reduce((ss: number, e: any) => ss + (e.sets || 0), 0) || 0), 0);
+                    const totalReps = days.reduce((s: number, d: any) => s + (d.exercises?.reduce((ss: number, e: any) => ss + (parseInt(String(e.reps)) || 0) * (e.sets || 0), 0) || 0), 0);
+                    const totalTonnage = days.reduce((s: number, d: any) => s + (d.exercises?.reduce((ss: number, e: any) => ss + (e.sets || 0) * (parseInt(String(e.reps)) || 0) * (e.weight || 0), 0) || 0), 0);
+                    return (
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 4, fontSize: 10 }}>
+                        <div style={{ textAlign: 'center', padding: '4px', background: 'rgba(0,230,138,0.05)', borderRadius: 4 }}>
+                          <div style={{ color: 'var(--text-dim)' }}>Дней</div>
+                          <div style={{ fontWeight: 700, color: 'var(--accent)' }}>{days.length}</div>
+                        </div>
+                        <div style={{ textAlign: 'center', padding: '4px', background: 'rgba(0,230,138,0.05)', borderRadius: 4 }}>
+                          <div style={{ color: 'var(--text-dim)' }}>Подходов</div>
+                          <div style={{ fontWeight: 700, color: 'var(--accent)' }}>{totalSets}</div>
+                        </div>
+                        <div style={{ textAlign: 'center', padding: '4px', background: 'rgba(0,230,138,0.05)', borderRadius: 4 }}>
+                          <div style={{ color: 'var(--text-dim)' }}>Повторений</div>
+                          <div style={{ fontWeight: 700, color: 'var(--accent)' }}>{totalReps}</div>
+                        </div>
+                        <div style={{ textAlign: 'center', padding: '4px', background: 'rgba(0,230,138,0.05)', borderRadius: 4 }}>
+                          <div style={{ color: 'var(--text-dim)' }}>Тоннаж</div>
+                          <div style={{ fontWeight: 700, color: 'var(--accent)' }}>{totalTonnage > 0 ? `${(totalTonnage / 1000).toFixed(1)}т` : '—'}</div>
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
               )}
 
@@ -605,6 +679,50 @@ export const TrainingScreen: React.FC = () => {
                 </div>
               )}
 
+              {/* Intensity zone distribution (TZ) */}
+              {currentMicrocycle?.days && (
+                <div className="card" style={{ padding: '8px 10px', marginTop: 8 }}>
+                  <div style={{ fontWeight: 600, fontSize: 11, color: 'var(--accent)', marginBottom: 4 }}>📊 Зоны интенсивности</div>
+                  {(() => {
+                    const reps = currentMicrocycle.days.filter((d: any) => d.isTraining)
+                      .flatMap((d: any) => d.exercises?.map((e: any) => parseInt(String(e.reps)) || 8) || []) || [];
+                    const str = reps.filter(r => r >= 1 && r <= 6).length;
+                    const hyp = reps.filter(r => r >= 7 && r <= 12).length;
+                    const end = reps.filter(r => r >= 13).length;
+                    const total = reps.length || 1;
+                    return (
+                      <div>
+                        <div style={{ display: 'flex', gap: 2, height: 18, borderRadius: 6, overflow: 'hidden', marginBottom: 4 }}>
+                          <div style={{ flex: str || 0.1, background: '#ef4444', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 8, color: '#fff', fontWeight: 600, minWidth: str > 0 ? 20 : 0 }}>
+                            {str > 0 ? `${Math.round((str/total)*100)}%` : ''}
+                          </div>
+                          <div style={{ flex: hyp || 0.1, background: '#22c55e', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 8, color: '#fff', fontWeight: 600, minWidth: hyp > 0 ? 20 : 0 }}>
+                            {hyp > 0 ? `${Math.round((hyp/total)*100)}%` : ''}
+                          </div>
+                          <div style={{ flex: end || 0.1, background: '#3b82f6', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 8, color: '#fff', fontWeight: 600, minWidth: end > 0 ? 20 : 0 }}>
+                            {end > 0 ? `${Math.round((end/total)*100)}%` : ''}
+                          </div>
+                        </div>
+                        <div style={{ display: 'flex', gap: 8, fontSize: 9, color: 'var(--text-dim)' }}>
+                          <span>🔴 Сила ({str})</span><span>🟢 Гипертрофия ({hyp})</span><span>🔵 Выносливость ({end})</span>
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </div>
+              )}
+
+              {/* Workout nutrition tips */}
+              <div className="card" style={{ padding: '8px 10px', border: '1px solid rgba(255,165,2,0.2)', marginTop: 8 }}>
+                <div style={{ fontWeight: 600, fontSize: 11, color: '#ffa502', marginBottom: 4 }}>🍎 Питание вокруг тренировки</div>
+                <div style={{ fontSize: 10, color: 'var(--text-dim)', lineHeight: 1.5 }}>
+                  {goal === 'bulk' ? 'До: белки + углеводы за 2ч. После: быстрый белок + углеводы в течение 30 мин.' :
+                   goal === 'cut' ? 'До: белки за 2ч. После: белок + овощи. Углеводы только вокруг тренировки.' :
+                   goal === 'strength' ? 'До: кофеин + углеводы за 1ч. После: белок + креатин.' :
+                   'До: лёгкий перекус за 1-2ч. После: белок + углеводы в течение 1ч.'}
+                </div>
+              </div>
+
               {/* Strength balance (TZ 38) */}
               {trainingOutput.volumePerGroup && (() => {
                 const groups = trainingOutput.volumePerGroup as Record<string, number>;
@@ -619,6 +737,21 @@ export const TrainingScreen: React.FC = () => {
                     <div style={{ display: 'flex', gap: 8, fontSize: 10, color: 'var(--text-dim)' }}>
                       <span>Push/Pull: <b style={{ color: balanced ? '#22c55e' : '#ff9100' }}>{ratio}</b> {balanced ? '✓' : '⚠'}</span>
                       <span>Ноги/Верх: <b>{(quadVol / Math.max(1, pushVol + pullVol)).toFixed(1)}</b></span>
+                    </div>
+                  </div>
+                );
+              })(                  )}
+
+              {/* Overtraining risk assessment */}
+              {currentMicrocycle && (() => {
+                const acRatio = currentMicrocycle.volumeMultiplier * 100 / 85;
+                const riskScore = (acRatio > 120 ? 3 : acRatio > 100 ? 1 : 0) + (sleepHours < 6 ? 2 : sleepHours < 7 ? 1 : 0) + (stressLevel > 7 ? 2 : stressLevel > 5 ? 1 : 0);
+                const riskLabel = riskScore >= 5 ? '🚨 Высокий риск перетренированности' : riskScore >= 3 ? '⚠️ Умеренный риск' : riskScore >= 1 ? '⚡ Повышенная нагрузка' : '';
+                if (!riskLabel) return null;
+                return (
+                  <div className="card" style={{ padding: '6px 10px', border: `1px solid ${riskScore >= 5 ? 'rgba(239,68,68,0.3)' : 'rgba(255,145,0,0.3)'}`, background: riskScore >= 5 ? 'rgba(239,68,68,0.05)' : 'rgba(255,145,0,0.05)' }}>
+                    <div style={{ fontSize: 10, color: riskScore >= 5 ? '#ef4444' : '#ff9100', fontWeight: 600 }}>
+                      {riskLabel} — {riskScore >= 5 ? 'Снизь нагрузку на 25-30% и увеличь сон' : riskScore >= 3 ? 'Контролируй RPE, спи 7+ часов' : 'Следи за восстановлением'}
                     </div>
                   </div>
                 );
@@ -970,6 +1103,11 @@ export const TrainingScreen: React.FC = () => {
                     {selectedEx.difficulty === 'advanced' ? 'Продвинутый' : selectedEx.difficulty === 'intermediate' ? 'Средний' : 'Новичок'}
                   </span>
                 )}
+                {selectedEx.targetMuscle && (
+                  <span style={{ fontSize: 9, padding: '1px 5px', borderRadius: 3, background: 'rgba(236,72,153,0.1)', color: '#ec4899' }}>
+                    🎯 {selectedEx.targetMuscle}
+                  </span>
+                )}
               </div>
               {selectedEx.technique && (
                 <div style={{ marginBottom: 6, background: 'rgba(0,230,138,0.05)', borderRadius: 6, padding: '5px 8px', fontSize: 10, color: 'var(--text)', lineHeight: 1.4 }}>
@@ -1177,7 +1315,39 @@ export const TrainingScreen: React.FC = () => {
           </div>
 
           {diaryProgress.length > 0 && (
-            <div className="card" style={{ padding: '10px 12px', marginBottom: 8 }}>
+            <>
+              <div className="card" style={{ padding: '10px 12px', marginBottom: 8 }}>
+                <h4 style={{ margin: '0 0 6px', fontSize: 12 }}>🔥 Активность</h4>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 6, fontSize: 10 }}>
+                  <div style={{ textAlign: 'center', background: 'rgba(0,230,138,0.05)', borderRadius: 6, padding: 6 }}>
+                    <div style={{ color: 'var(--text-dim)' }}>Недель</div>
+                    <div style={{ fontWeight: 700, color: 'var(--accent)', fontSize: 16 }}>{diaryProgress.length}</div>
+                  </div>
+                  <div style={{ textAlign: 'center', background: 'rgba(0,230,138,0.05)', borderRadius: 6, padding: 6 }}>
+                    <div style={{ color: 'var(--text-dim)' }}>Тренировок</div>
+                    <div style={{ fontWeight: 700, color: 'var(--accent)', fontSize: 16 }}>{diaryProgress.reduce((s, w) => s + w.workoutCount, 0)}</div>
+                  </div>
+                  <div style={{ textAlign: 'center', background: 'rgba(0,230,138,0.05)', borderRadius: 6, padding: 6 }}>
+                    <div style={{ color: 'var(--text-dim)' }}>Объём</div>
+                    <div style={{ fontWeight: 700, color: 'var(--accent)', fontSize: 16 }}>{diaryProgress.length > 0 ? `${(diaryProgress[diaryProgress.length - 1]?.totalVolume / 1000).toFixed(1)}т` : '—'}</div>
+                  </div>
+                  <div style={{ textAlign: 'center', background: 'rgba(0,230,138,0.05)', borderRadius: 6, padding: 6 }}>
+                    <div style={{ color: 'var(--text-dim)' }}>План</div>
+                    {(() => {
+                      const planned = currentMicrocycle?.days?.filter((d: any) => d.isTraining).length || 0;
+                      const actual = diaryProgress.length > 0 ? (diaryProgress[diaryProgress.length - 1]?.workoutCount || 0) : 0;
+                      const compliance = planned > 0 ? Math.min(100, Math.round((actual / planned) * 100)) : 0;
+                      return (
+                        <>
+                          <div style={{ fontWeight: 700, color: compliance >= 80 ? '#22c55e' : compliance >= 50 ? '#ff9100' : '#ef4444', fontSize: 16 }}>{compliance}%</div>
+                          <div style={{ fontSize: 7, color: 'var(--text-dim)' }}>{actual}/{planned} дн</div>
+                        </>
+                      );
+                    })()}
+                  </div>
+                </div>
+              </div>
+              <div className="card" style={{ padding: '10px 12px', marginBottom: 8 }}>
               <h4 style={{ margin: '0 0 8px', fontSize: 12 }}>📈 Тоннаж по неделям</h4>
               <div style={{ display: 'flex', gap: 2, height: 60, alignItems: 'flex-end' }}>
                 {diaryProgress.slice(-12).map((w, i) => {
@@ -1198,22 +1368,26 @@ export const TrainingScreen: React.FC = () => {
                 <span>Пик: {Math.round(Math.max(...diaryProgress.map(w => w.totalVolume)))} кг</span>
               </div>
             </div>
+            </>
           )}
 
           {diaryStats.length > 0 && (
             <div className="card" style={{ padding: '10px 12px', marginBottom: 8 }}>
               <h4 style={{ margin: '0 0 8px', fontSize: 12 }}>🏆 1RM по базовым</h4>
-              {diaryStats.map(s => {
+              {diaryStats.map((s, i) => {
                 const pctMax = diaryStats.length > 0 ? Math.round((s.max1RM / Math.max(...diaryStats.map(d => d.max1RM))) * 100) : 0;
+                const prev = i < diaryStats.length - 1 ? diaryStats[i + 1] : null;
+                const trend = prev ? (s.max1RM > prev.max1RM * 1.02 ? '↑' : s.max1RM < prev.max1RM * 0.98 ? '↓' : '→') : '→';
+                const trendColor = trend === '↑' ? '#22c55e' : trend === '↓' ? '#ef4444' : '#6b7280';
                 return (
                   <div key={s.exerciseId} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 0', borderBottom: '1px solid var(--border)', fontSize: 10 }}>
+                    <span style={{ fontSize: 11, color: trendColor, minWidth: 12 }}>{trend}</span>
                     <span style={{ flex: 1, fontWeight: 500 }}>{s.exerciseName}</span>
                     <div style={{ flex: 1, background: 'rgba(255,255,255,0.05)', borderRadius: 3, height: 6, overflow: 'hidden' }}>
                       <div style={{ width: `${Math.max(5, pctMax)}%`, height: '100%', background: pctMax > 80 ? 'var(--accent)' : pctMax > 50 ? '#8b5cf6' : '#6b7280', borderRadius: 3 }} />
                     </div>
                     <span style={{ color: 'var(--accent)', fontWeight: 600, minWidth: 55, textAlign: 'right' }}>{Math.round(s.max1RM)} кг</span>
                     <span style={{ color: 'var(--text-dim)', minWidth: 45, textAlign: 'right' }}>{s.maxWeight}×{s.maxReps}</span>
-                    <span style={{ color: 'var(--text-dim)', fontSize: 9, minWidth: 30, textAlign: 'right' }}>×{s.workoutCount}</span>
                   </div>
                 );
               })}
@@ -1288,6 +1462,12 @@ export const TrainingScreen: React.FC = () => {
                          mc.type === 'deload' ? '🔄 Разгрузка' : '📋'} — Мезоцикл {mi + 1}
                       </span>
                       <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>{mc.weeks} нед (нед {mc.weekStart + 1}–{mc.weekStart + mc.weeks})</span>
+                    </div>
+                    <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 4 }}>
+                      {mc.type === 'accumulation' ? 'Объём 100-130%, RIR 2-3, RPE 6-7. Субмаксимальные веса, много подсобки.' :
+                       mc.type === 'intensification' ? 'Объём 70-90%, RIR 1-2, RPE 8-9. Рост весов, снижение подсобки.' :
+                       mc.type === 'peaking' ? 'Объём 40-60%, RIR 0-1, RPE 9-10. Максимальные веса, специфика.' :
+                       mc.type === 'deload' ? 'Объём 30-50%, RIR 3-5, RPE 5-6. Восстановление ЦНС, мобильность.' : ''}
                     </div>
                     <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
                       {Array.from({ length: mc.weeks }, (_, wi) => (
