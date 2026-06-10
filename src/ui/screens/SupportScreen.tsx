@@ -3,7 +3,7 @@ import { SYNERGY_PAIRS, SUPPLEMENT_DESCRIPTIONS, SUPPLEMENT_TARGETS, SUPPORT_RES
 import { RISK_SYSTEMS, ALL_RISK_SYSTEMS } from '../../core/constants';
 import { PHARMA_DB } from '../../core/pharma-database';
 import { useDataLink } from '../../core/data-link';
-import { SYSTEM_INFO } from '../../core/risk-info';
+import { SYSTEM_INFO_ALL } from '../../core/risk-info';
 import { getRiskColor } from '../../core/utils/risk-colors';
 import { SUPPORT_BASE_COVERAGE } from '../../core/constants';
 import { INTERACTIONS_DB } from '../../data/interactions';
@@ -142,7 +142,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
     setSupportResult({ riskBefore, riskAfter, score: result.supportScore ?? 0 });
   };
 
-  const systemLabels: Record<string, string> = Object.fromEntries(ALL_RISK_SYSTEMS.map(k => [k, SYSTEM_INFO[k]?.label ?? k]));
+  const systemLabels: Record<string, string> = Object.fromEntries(ALL_RISK_SYSTEMS.map(k => [k, SYSTEM_INFO_ALL[k]?.label ?? k]));
 
   const selectedDetail = selectedSub ? supplementList.find(s => s.id === selectedSub) : null;
 
@@ -349,11 +349,12 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
           <div className="card" style={{ marginBottom: 12 }}>
             <h3 style={{ margin: '0 0 4px 0', fontSize: 14, color: 'var(--accent)' }}>🧮 Калькулятор поддержки</h3>
             <p style={{ fontSize: 11, color: 'var(--text-dim)', margin: '0 0 12px 0' }}>
-              Быстрый расчёт индекса поддержки и снижения рисков на основе текущих препаратов
+              Расчёт индекса поддержки и снижения рисков на основе всех источников: препараты, анализы, питание, тренировки, генетика
             </p>
             <button onClick={handleCalculateSupport} style={{
-              width: '100%', padding: '12px', borderRadius: 8, border: 'none', cursor: 'pointer',
-              background: 'var(--accent-green, #00e68a)', color: '#000', fontWeight: 700, fontSize: 14,
+              width: '100%', padding: '14px', borderRadius: 8, border: 'none', cursor: 'pointer',
+              background: 'linear-gradient(135deg, #00e68a, #00c853)', color: '#000', fontWeight: 700, fontSize: 15,
+              boxShadow: '0 2px 8px rgba(0,230,138,0.3)',
             }}>
               Рассчитать поддержку
             </button>
@@ -371,14 +372,14 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
                 </div>
               </div>
               <div className="card" style={{ marginBottom: 12 }}>
-                <h4 style={{ margin: '0 0 8px 0', fontSize: 13 }}>Риски по системам — до и после поддержки</h4>
-                {RISK_SYSTEMS.map(sys => {
+                <h4 style={{ margin: '0 0 8px 0', fontSize: 13 }}>Риски по всем системам — до и после поддержки</h4>
+                {ALL_RISK_SYSTEMS.map(sys => {
                   const before = supportResult.riskBefore[sys] ?? 0;
                   const after = supportResult.riskAfter[sys] ?? 0;
                   const reduction = before > 0 ? ((before - after) / before * 100) : 0;
                   return (
                     <div key={sys} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0', borderBottom: '1px solid var(--border-color)' }}>
-                      <span style={{ fontSize: 14 }}>{SYSTEM_INFO[sys]?.icon || ''}</span>
+                      <span style={{ fontSize: 14 }}>{SYSTEM_INFO_ALL[sys]?.icon || ''}</span>
                       <span style={{ flex: 1, fontSize: 12, fontWeight: 500 }}>{systemLabels[sys]}</span>
                       <span style={{ fontSize: 12, color: getRiskColor(before), fontWeight: 600 }}>{Math.round(before)}%</span>
                       <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>{'\u2192'}</span>
@@ -387,6 +388,13 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
                     </div>
                   );
                 })}
+              </div>
+              <div className="card" style={{ fontSize: 11, color: 'var(--text-dim)', padding: 8 }}>
+                Риски рассчитаны с учётом: {linked.course.length > 0 ? `${linked.course.length} препаратов` : '0 препаратов'}
+                {linked.labs.length > 0 ? `, ${linked.labs.length} анализов` : ''}
+                {linked.profile.settings?.nutritionFactor ? ', питания' : ''}
+                {linked.profile.settings?.trainingFactor ? ', тренировок' : ''}
+                {linked.profile.settings?.genetics ? ', генетики' : ''}
               </div>
             </div>
           )}
@@ -507,14 +515,14 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
                 </div>
               </div>
               <div className="card" style={{ marginBottom: 12 }}>
-                <h4 style={{ margin: '0 0 8px 0', fontSize: 13 }}>Риски по системам — до и после поддержки</h4>
-                {RISK_SYSTEMS.map(sys => {
+                <h4 style={{ margin: '0 0 8px 0', fontSize: 13 }}>Риски по всем системам — до и после поддержки</h4>
+                {ALL_RISK_SYSTEMS.map(sys => {
                   const before = supportResult.riskBefore[sys] ?? 0;
                   const after = supportResult.riskAfter[sys] ?? 0;
                   const reduction = before > 0 ? ((before - after) / before * 100) : 0;
                   return (
                     <div key={sys} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0', borderBottom: '1px solid var(--border-color)' }}>
-                      <span style={{ fontSize: 14 }}>{SYSTEM_INFO[sys]?.icon || ''}</span>
+                      <span style={{ fontSize: 14 }}>{SYSTEM_INFO_ALL[sys]?.icon || ''}</span>
                       <span style={{ flex: 1, fontSize: 12, fontWeight: 500 }}>{systemLabels[sys]}</span>
                       <span style={{ fontSize: 12, color: getRiskColor(before), fontWeight: 600 }}>{Math.round(before)}%</span>
                       <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>{'\u2192'}</span>

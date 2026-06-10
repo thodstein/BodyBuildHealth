@@ -4,10 +4,15 @@ export interface ParsedMeal {
   items: Array<{ name: string; qty: string; kcal: number; p: number; f: number; c: number }>;
 }
 
-const FATSECRET_ITEM_REGEX = /^\s*(.+?)\s+(\d+(?:[.,]\d+)?)\s*(г|мл|шт|кусок|порция|сервинг|ст\.л\.)?\s*[,/]?\s*(\d+)\s*(ккал|кал)/i;
-const FATSECRET_TOTAL_REGEX = /итого|всего|total|daily\s+total/i;
-const FATSUCCESS_MACRO_LINE = /(\d+(?:[.,]\d+)?)\s*(ккал|кал|белки?|жиры?|углевод|угл|жиры|бел|б|ж|у|carb|protein|fat|calori)/gi;
-const MFP_LINE_REGEX = /^(.+?)\s+(\d+(?:[.,]\d+)?)\s*(?:(?:г|мл|шт|oz|serving|srvg|slice|cup|tbsp|шт|кус|порц)[,.]?\s*)?(\d+)\s*(ккал|кал|cal)/i;
+// More resilient regex patterns for messy OCR text
+const FATSECRET_ITEM_REGEX = /^\s*(.+?)\s+(\d+(?:[.,]\d+)?)\s*(г|мл|шт|кусок|порция|сервинг|ст\.л\.|oz|ml|g|serving|slice|cup|tbsp)?\s*[,/]?\s*(\d+)\s*(ккал|кал|kcal)/i;
+const FATSECRET_TOTAL_REGEX = /итого|всего|total|daily\s+total|сумма|итог/i;
+const FATSUCCESS_MACRO_LINE = /(\d+(?:[.,]\d+)?)\s*(ккал|кал|kcal|белки?|жиры?|углевод|угл|жиры|бел|протеин|б|ж|у|carb|protein|fat|calori|cal|energy)/gi;
+const MFP_LINE_REGEX = /^(.+?)\s+(\d+(?:[.,]\d+)?)\s*(?:(?:г|мл|шт|oz|serving|srvg|slice|cup|tbsp|шт|кус|порц|ml|g|pcs)[,.]?\s*)?(\d+)\s*(ккал|кал|kcal|cal)/i;
+const INLINE_MACRO_REGEX = /(?:белки?|б|протеин|protein|p)\s*[:\-]?\s*(\d+(?:[.,]\d+)?)/i;
+const INLINE_FAT_REGEX = /(?:жиры?|ж|fat|f)\s*[:\-]?\s*(\d+(?:[.,]\d+)?)/i;
+const INLINE_CARB_REGEX = /(?:углевод|угл|у|carb|c|carbs)\s*[:\-]?\s*(\d+(?:[.,]\d+)?)/i;
+const KCAL_FIRST_REGEX = /^\s*(\d+)\s*(ккал|кал|kcal)\s+(.+?)(?:\s+(\d+(?:[.,]\d+)?)\s*(г|мл|шт|g|ml))?$/i;
 
 const RUSSIAN_FOOD_NAMES: Record<string, string> = {
   'куриная грудка': 'chicken_breast', 'курица': 'chicken_breast', 'грудка куриная': 'chicken_breast',
@@ -157,6 +162,17 @@ export function parseNutritionScreenshot(text: string): ParsedMeal[] {
   return meals.filter(m => m.items.length > 0);
 }
 
+function parseMacroLabel(text: string): { p: number; f: number; c: number } {
+  const p = text.match(INLINE_MACRO_REGEX);
+  const f = text.match(INLINE_FAT_REGEX);
+  const c = text.match(INLINE_CARB_REGEX);
+  return {
+    p: p ? parseFloat(p[1].replace(',', '.')) : 0,
+    f: f ? parseFloat(f[1].replace(',', '.')) : 0,
+    c: c ? parseFloat(c[1].replace(',', '.')) : 0,
+  };
+}
+
 export function parseFatSecretText(text: string): ParsedMeal[] {
   const lines = text.split(/\r?\n/).filter(l => l.trim().length > 1);
   const meals: ParsedMeal[] = [];
@@ -164,13 +180,13 @@ export function parseFatSecretText(text: string): ParsedMeal[] {
   let currentDate = new Date().toISOString().slice(0, 10);
 
   for (const line of lines) {
-    const totalCheck = /итого|всего|total|дневной/i.test(line);
+    const totalCheck = /итого|всего|total|дневной|сумма|итог|daily\s*total/i.test(line);
     if (totalCheck) continue;
 
     const dateMatch = line.match(/(\d{1,2})[./-](\d{1,2})[./-](\d{2,4})/);
     if (dateMatch) currentDate = dateMatch[0];
 
-    const mealMatch = line.match(/(завтрак|обед|ужин|перекус|бранч|полдник)/i);
+    const mealMatch = line.match(/(завтрак|обед|ужин|перекус|бранч|полдник|snack|breakfast|lunch|dinner)/i);
     if (mealMatch) {
       currentMeal = { date: currentDate, mealType: mealMatch[1], items: [] };
       meals.push(currentMeal);
@@ -181,49 +197,71 @@ export function parseFatSecretText(text: string): ParsedMeal[] {
       meals.push(currentMeal);
     }
 
-    // Try to parse kcal with weight info
-    const weightKcalMatch = line.match(/(.+?)\s+(\d+(?:[.,]\d+)?)\s*(г|мл|шт)?\s+(\d+)\s*ккал/i);
-    
+    // Try: kcal first format — "150 kcal Chicken breast 200g"
+    const kcalFirst = line.match(KCAL_FIRST_REGEX);
+    if (kcalFirst) {
+      const kcal = parseInt(kcalFirst[1]);
+      const name = kcalFirst[3]?.trim() || 'Блюдо';
+      const macros = parseMacroLabel(line);
+      currentMeal.items.push({
+        name, qty: '100 г', kcal,
+        p: macros.p, f: macros.f, c: macros.c,
+      });
+      continue;
+    }
+
+    // Try: "Name 200g 300kcal P:20 F:10 C:30" or "Name 200 г 300 ккал Б:20 Ж:10 У:30"
+    const weightKcalMatch = line.match(/(.+?)\s+(\d+(?:[.,]\d+)?)\s*(г|ml|g|мл|шт|oz)?\s+(\d+)\s*(ккал|kcal|кал)/i);
     if (weightKcalMatch) {
       const name = weightKcalMatch[1].trim();
       const weight = parseFloat(weightKcalMatch[2]?.replace(',', '.') || '100');
       const kcal = parseInt(weightKcalMatch[4]) || 0;
-      
-      // Try to parse macros from same line
-      const proteinMatch = line.match(/(?:белки?|б|протеин)\s*[:\-]?\s*(\d+(?:[.,]\d+)?)/i);
-      const fatMatch = line.match(/(?:жиры?|ж)\s*[:\-]?\s*(\d+(?:[.,]\d+)?)/i);
-      const carbMatch = line.match(/(?:углевод|угл|у|карбо)\s*[:\-]?\s*(\d+(?:[.,]\d+)?)/i);
-      
+      const macros = parseMacroLabel(line);
       const mult = weight > 0 ? weight / 100 : 1;
       currentMeal.items.push({
         name: name || 'Блюдо',
         qty: weight > 0 ? `${weight} ${weightKcalMatch[3] || 'г'}` : '100 г',
         kcal: Math.round(kcal),
-        p: Math.round((proteinMatch ? parseFloat(proteinMatch[1].replace(',', '.')) : 0) * mult * 10) / 10,
-        f: Math.round((fatMatch ? parseFloat(fatMatch[1].replace(',', '.')) : 0) * mult * 10) / 10,
-        c: Math.round((carbMatch ? parseFloat(carbMatch[1].replace(',', '.')) : 0) * mult * 10) / 10,
+        p: Math.round(macros.p * mult * 10) / 10,
+        f: Math.round(macros.f * mult * 10) / 10,
+        c: Math.round(macros.c * mult * 10) / 10,
       });
       continue;
     }
 
-    // Fallback: try to parse from lines with kcal only
-    const kcalMatch = line.match(/(\d+)\s*ккал/);
+    // Try FatSecret export format: "Chicken Breast, 200 g, 330 kcal"
+    const fsMatch = line.match(FATSECRET_ITEM_REGEX);
+    if (fsMatch) {
+      const name = fsMatch[1].trim();
+      const weight = parseFloat(fsMatch[2]?.replace(',', '.') || '100');
+      const kcal = parseInt(fsMatch[4]) || 0;
+      const macros = parseMacroLabel(line);
+      const mult = weight > 0 ? weight / 100 : 1;
+      currentMeal.items.push({
+        name,
+        qty: weight > 0 ? `${weight} ${fsMatch[3] || 'г'}` : '100 г',
+        kcal: Math.round(kcal),
+        p: Math.round(macros.p * mult * 10) / 10,
+        f: Math.round(macros.f * mult * 10) / 10,
+        c: Math.round(macros.c * mult * 10) / 10,
+      });
+      continue;
+    }
+
+    // Fallback: line with kcal only
+    const kcalMatch = line.match(/(\d+)\s*(ккал|kcal|кал)/i);
     if (kcalMatch) {
-      const namePart = line.slice(0, line.indexOf(kcalMatch[0])).replace(/^[\s\-–—•·*]+/, '').trim() || 'Блюдо';
-      const qtyMatch = line.match(/(\d+(?:[.,]\d+)?)\s*(г|мл|шт|порц|кусок)/i);
-      
-      const proteinMatch = line.match(/(?:белки?|б|протеин)\s*[:\-]?\s*(\d+(?:[.,]\d+)?)/i);
-      const fatMatch = line.match(/(?:жиры?|ж)\s*[:\-]?\s*(\d+(?:[.,]\d+)?)/i);
-      const carbMatch = line.match(/(?:углевод|угл|у|карбо)\s*[:\-]?\s*(\d+(?:[.,]\d+)?)/i);
-      
+      const namePart = line.replace(kcalMatch[0], '').replace(/^[\s\-–—•·*,:;]+/, '').replace(/[\s\-–—•·*,:;]+$/, '').trim() || 'Блюдо';
+      const qtyMatch = line.match(/(\d+(?:[.,]\d+)?)\s*(г|ml|g|мл|шт|порц|кусок|oz|slice|serving)/i);
+      const macros = parseMacroLabel(line);
       const mult = qtyMatch ? parseFloat(qtyMatch[1].replace(',', '.')) / 100 : 1;
       currentMeal.items.push({
         name: namePart,
         qty: qtyMatch ? qtyMatch[0] : '100 г',
         kcal: parseInt(kcalMatch[1]) || 0,
-        p: Math.round((proteinMatch ? parseFloat(proteinMatch[1].replace(',', '.')) : 0) * mult * 10) / 10,
-        f: Math.round((fatMatch ? parseFloat(fatMatch[1].replace(',', '.')) : 0) * mult * 10) / 10,
-        c: Math.round((carbMatch ? parseFloat(carbMatch[1].replace(',', '.')) : 0) * mult * 10) / 10,
+        p: Math.round(macros.p * mult * 10) / 10,
+        f: Math.round(macros.f * mult * 10) / 10,
+        c: Math.round(macros.c * mult * 10) / 10,
       });
     }
   }

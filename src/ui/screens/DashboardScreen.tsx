@@ -251,6 +251,53 @@ export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
         </div>
       </div>
 
+      {/* Active course info — moved after Readiness */}
+      {courseEntries.length > 0 && (
+        <div className="card" style={{
+          background: 'linear-gradient(135deg, rgba(0,230,138,0.08) 0%, rgba(0,230,138,0.02) 100%)',
+          border: '1px solid rgba(0,230,138,0.25)',
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+            <h3 style={{ margin: 0, fontSize: 14 }}>💊 Активный курс</h3>
+            <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 12, background: 'rgba(0,230,138,0.15)', color: '#00e68a', fontWeight: 600 }}>
+              {courseEntries.length} препаратов
+            </span>
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+            {(() => {
+              const unique = new Map<string, { name: string; totalDose: number; unit: string }>();
+              for (const c of courseEntries) {
+                const key = c.substanceId;
+                if (!unique.has(key)) unique.set(key, { name: getSubstanceName(key), totalDose: 0, unit: c.doseUnit });
+                const entry = unique.get(key)!;
+                entry.totalDose += c.doseValue;
+              }
+              return Array.from(unique.values()).slice(0, 6).map((item, i) => (
+                <div key={i} style={{
+                  background: 'rgba(0,230,138,0.1)', borderRadius: 10, padding: '6px 10px',
+                  border: '1px solid rgba(0,230,138,0.15)',
+                }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#00e68a' }}>{item.name}</div>
+                  <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>{item.totalDose}{item.unit}/нед</div>
+                </div>
+              ));
+            })()}
+            {courseEntries.length > 6 && (
+              <div style={{
+                background: 'var(--bg-secondary)', borderRadius: 10, padding: '6px 10px',
+                display: 'flex', alignItems: 'center', fontSize: 11, color: 'var(--text-dim)',
+              }}>
+                +{courseEntries.length - 6}
+              </div>
+            )}
+          </div>
+          <div style={{ marginTop: 6, display: 'flex', gap: 12, fontSize: 10, color: 'var(--text-dim)' }}>
+            <span>Дней на курсе: <strong style={{ color: '#00e68a' }}>{daysOnCourse}</strong></span>
+            <span>Общий риск: <strong style={{ color: riskResult ? riskColor(riskResult.overallNet) : 'var(--text-dim)' }}>{riskResult ? Math.round(riskResult.overallNet) : '—'}%</strong></span>
+          </div>
+        </div>
+      )}
+
       {/* Lab markers */}
       {labData.length > 0 && (
         <div className="card" style={{ cursor: 'pointer' }} onClick={onNavigate ? () => onNavigate('labs') : undefined}>
@@ -330,25 +377,6 @@ export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
           ))}
         </div>
       </div>
-
-      {/* Active course info */}
-      {courseEntries.length > 0 && (
-        <div className="card">
-          <h3>💊 Активный курс</h3>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-            {courseEntries.slice(0, 4).map((c, i) => (
-              <span key={i} style={{ background: 'var(--accent-dim)', color: 'var(--accent)', padding: '3px 10px', borderRadius: 16, fontSize: 11, fontWeight: 600 }}>
-                {getSubstanceName(c.substanceId)} {c.doseValue}{c.doseUnit}
-              </span>
-            ))}
-            {courseEntries.length > 4 && (
-              <span style={{ background: 'var(--bg-secondary)', color: 'var(--text-dim)', padding: '3px 10px', borderRadius: 16, fontSize: 11 }}>
-                +{courseEntries.length - 4}
-              </span>
-            )}
-          </div>
-        </div>
-      )}
 
       {readiness.isConservative && (
         <div style={{ background: 'var(--warning-dim)', border: '1px solid var(--warning)', borderRadius: 8, padding: '10px 14px', marginTop: 8 }}>
