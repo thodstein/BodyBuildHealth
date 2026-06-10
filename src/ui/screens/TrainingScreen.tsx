@@ -623,6 +623,33 @@ export const TrainingScreen: React.FC = () => {
                     <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 12 }}>
                       {Object.values(runtimeLogs).filter(l => l.completed).length} из {exercises.length} упражнений выполнено
                     </div>
+                    {/* Summary stats */}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginBottom: 12, fontSize: 10 }}>
+                      {(() => {
+                        const totalSets = Object.values(runtimeLogs).reduce((s, l) => s + l.sets.length, 0);
+                        const totalVolume = Object.values(runtimeLogs).reduce((s, l) => s + l.sets.reduce((ss, st) => ss + st.weight * st.reps, 0), 0);
+                        const max1RM = Object.values(runtimeLogs).reduce((max, l) => {
+                          const local = l.sets.reduce((m, st) => Math.max(m, Math.round(st.weight * (1 + st.reps / 30))), 0);
+                          return Math.max(max, local);
+                        }, 0);
+                        return (
+                          <>
+                            <div style={{ background: 'rgba(0,230,138,0.08)', borderRadius: 6, padding: 6 }}>
+                              <div style={{ color: 'var(--text-dim)', fontSize: 8 }}>Подходов</div>
+                              <div style={{ fontWeight: 700, color: 'var(--accent)' }}>{totalSets}</div>
+                            </div>
+                            <div style={{ background: 'rgba(0,230,138,0.08)', borderRadius: 6, padding: 6 }}>
+                              <div style={{ color: 'var(--text-dim)', fontSize: 8 }}>Тоннаж</div>
+                              <div style={{ fontWeight: 700, color: 'var(--accent)' }}>{totalVolume.toLocaleString()} кг</div>
+                            </div>
+                            <div style={{ background: 'rgba(0,230,138,0.08)', borderRadius: 6, padding: 6 }}>
+                              <div style={{ color: 'var(--text-dim)', fontSize: 8 }}>Макс 1RM</div>
+                              <div style={{ fontWeight: 700, color: 'var(--accent)' }}>{max1RM} кг</div>
+                            </div>
+                          </>
+                        );
+                      })()}
+                    </div>
                     <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
                       <button onClick={() => setRuntimeStarted(false)} style={{
                         padding: '8px 20px', borderRadius: 8, border: 'none', cursor: 'pointer',
@@ -664,11 +691,34 @@ export const TrainingScreen: React.FC = () => {
                     </div>
 
                     {/* Target */}
-                    <div style={{ display: 'flex', gap: 12, marginBottom: 6, fontSize: 10, color: 'var(--text-dim)' }}>
+                    <div style={{ display: 'flex', gap: 12, marginBottom: 4, fontSize: 10, color: 'var(--text-dim)' }}>
                       <span>Цель: {ex.sets}×{ex.reps}</span>
                       <span>RIR: {ex.rir}</span>
-                      {ex.weight && <span>Вес: {ex.weight}кг</span>}
+                      {ex.weight && <span>Вес: {ex.weight}кг | ~{Math.round(ex.weight * (1 + Number(ex.reps) / 30))}кг 1RM</span>}
                     </div>
+
+                    {/* Technique note */}
+                    {ex.technique && (
+                      <div style={{ marginBottom: 6, padding: '5px 8px', background: 'rgba(0,230,138,0.05)', borderRadius: 6, fontSize: 9, color: 'var(--text)', lineHeight: 1.4 }}>
+                        <span style={{ fontWeight: 600, color: 'var(--accent)' }}>🎯 </span>{ex.technique}
+                      </div>
+                    )}
+
+                    {/* Warmup ramp-up (first set only) */}
+                    {log.sets.length === 0 && ex.weight && (
+                      <div style={{ marginBottom: 6, padding: '5px 8px', background: 'rgba(255,145,0,0.05)', borderRadius: 6, fontSize: 9 }}>
+                        <div style={{ fontWeight: 600, color: '#ff9100', marginBottom: 3 }}>🔥 Разминочные подходы</div>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 2, color: 'var(--text-dim)' }}>
+                          {[{ pct: 20, reps: 10 }, { pct: 40, reps: 5 }, { pct: 60, reps: 3 }, { pct: 75, reps: 1 }].map(wu => (
+                            <div key={wu.pct} style={{ textAlign: 'center', padding: '2px 4px', background: 'rgba(255,145,0,0.08)', borderRadius: 3 }}>
+                              <div style={{ color: '#ff9100', fontWeight: 600 }}>~{Math.round((ex.weight || 80) * wu.pct / 100)}кг</div>
+                              <div style={{ fontSize: 7 }}>{wu.reps} повт</div>
+                              <div style={{ fontSize: 7 }}>{wu.pct}%</div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
 
                     {/* Progress bar */}
                     <div style={{ background: 'rgba(255,255,255,0.05)', borderRadius: 4, height: 6, marginBottom: 8, overflow: 'hidden' }}>

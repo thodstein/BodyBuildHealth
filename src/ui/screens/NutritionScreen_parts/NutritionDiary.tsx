@@ -1,20 +1,39 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import { BarcodeScanner } from '../../components/BarcodeScanner';
 import { type OFFProduct } from '../../../engines/openfoodfacts.engine';
 import { parseFatSecretText, parseNutritionScreenshot } from '../../../engines/nutrition-ocr-parser';
 import { processUploadedFile, saveParsedMeals } from '../../../core/ocr-engine';
+import { FOOD_DB } from '../../../core/nutrition-database';
 
 export const NutritionDiary: React.FC<{
   foodEntries: { name: string; kcal: number; p: number; f: number; c: number }[];
 }> = ({ foodEntries }) => {
   const [showOCR, setShowOCR] = useState(false);
   const [showBarcode, setShowBarcode] = useState(false);
+  const [foodSearch, setFoodSearch] = useState('');
   const [ocrText, setOcrText] = useState('');
   const [parsedItems, setParsedItems] = useState<{ name: string; kcal: number; p: number; f: number; c: number }[]>([]);
   const [ocrError, setOcrError] = useState('');
   const [ocrFileLoading, setOcrFileLoading] = useState(false);
   const ocrFileRef = useRef<HTMLInputElement>(null);
   const ocrCameraRef = useRef<HTMLInputElement>(null);
+
+  const foodSearchResults = useMemo(() => {
+    if (!foodSearch.trim()) return [];
+    const q = foodSearch.toLowerCase();
+    return FOOD_DB.filter(f => f.name.toLowerCase().includes(q)).slice(0, 12);
+  }, [foodSearch]);
+
+  const addFoodFromDB = (food: typeof FOOD_DB[number]) => {
+    setParsedItems(prev => [...prev, {
+      name: food.name,
+      kcal: food.kcal,
+      p: food.protein,
+      f: food.fat,
+      c: food.carbs,
+    }]);
+    setFoodSearch('');
+  };
 
   const handleBarcodeProduct = (product: OFFProduct) => {
     setShowBarcode(false);
@@ -84,6 +103,26 @@ export const NutritionDiary: React.FC<{
       <div className="card" style={{ marginBottom: 12 }}>
         <h3>📝 Дневник питания</h3>
 
+        {/* Quick food search */}
+        <div style={{ position: 'relative', marginBottom: 10 }}>
+          <input type="text" value={foodSearch} onChange={e => setFoodSearch(e.target.value)}
+            placeholder="🔍 Найти продукт в базе..."
+            style={{ width: '100%', padding: '8px 10px', borderRadius: 8, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, boxSizing: 'border-box' }} />
+          {foodSearchResults.length > 0 && (
+            <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 10, background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 8, maxHeight: 200, overflowY: 'auto', marginTop: 2 }}>
+              {foodSearchResults.map(f => (
+                <div key={f.id} onClick={() => addFoodFromDB(f)} style={{
+                  padding: '6px 10px', cursor: 'pointer', fontSize: 11, borderBottom: '1px solid var(--border)',
+                  display: 'flex', justifyContent: 'space-between', color: 'var(--text)',
+                }}>
+                  <span>{f.name}</span>
+                  <span style={{ color: 'var(--text-dim)', fontSize: 10 }}>{f.kcal}ккал Б{f.protein} Ж{f.fat} У{f.carbs}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
         {/* Barcode Scanner */}
         <button onClick={() => setShowBarcode(!showBarcode)} style={{
           width: '100%', padding: '10px', borderRadius: 8, border: '1px solid var(--border)',
@@ -151,6 +190,18 @@ export const NutritionDiary: React.FC<{
                     </div>
                   ))}
                 </div>
+                <button onClick={() => {
+                  saveParsedMeals(parsedItems.map(item => ({
+                    date: new Date().toISOString().split('T')[0],
+                    mealType: 'Приём пищи',
+                    items: [{ name: item.name, kcal: item.kcal, p: item.p, f: item.f, c: item.c, qty: '100 г' }],
+                  })));
+                  setParsedItems([]);
+                  setOcrText('');
+                }} style={{
+                  width: '100%', marginTop: 8, padding: 8, borderRadius: 8, border: 'none', cursor: 'pointer',
+                  background: 'var(--accent)', color: '#000', fontWeight: 600, fontSize: 13,
+                }}>💾 Сохранить в дневник</button>
               </div>
             )}
           </div>
