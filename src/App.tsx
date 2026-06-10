@@ -3,7 +3,7 @@ import { registry } from './core/data/registry';
 import { DashboardScreen } from './ui/screens/DashboardScreen';
 import { PharmaScreen } from './ui/screens/PharmaScreen';
 import { SupportScreen } from './ui/screens/SupportScreen';
-import { PlanScreen } from './ui/screens/PlanScreen';
+import { TrainingScreen } from './ui/screens/TrainingScreen';
 import { LabsScreen } from './ui/screens/LabsScreen';
 import { RiskScreen } from './ui/screens/RiskScreen';
 import { NutritionScreen } from './ui/screens/NutritionScreen';
@@ -124,7 +124,7 @@ export default function App() {
       case 'home': return <DashboardScreen onNavigate={handleNavigate} />;
       case 'pharma': return <PharmaScreen />;
       case 'support': return <SupportScreen />;
-      case 'training': return <PlanScreen goal="energy" />;
+      case 'training': return <TrainingScreen />;
       case 'labs': return <LabsScreen />;
       case 'risks': return <RiskScreen />;
       case 'nutrition': return <NutritionScreen />;
