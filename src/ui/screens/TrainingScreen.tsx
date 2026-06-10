@@ -6,8 +6,13 @@ import { selectSplit, getSplitOptions, type SplitCandidate } from '../../engines
 import { selectProgressionRule, calcSuggestedWeight, estimate1RM, getDeloadRecommendation } from '../../engines/progression.engine';
 import { RIR_MATRIX } from '../../engines/rir-matrix.engine';
 import { StrengthDiary, type StrengthStats, type WeeklyProgress, type ProgressionAlert } from '../../engines/strength-diary.engine';
+import { generateWarmup } from '../../engines/warmup.engine';
+import { generateCooldown } from '../../engines/cooldown.engine';
+import { selectSetScheme } from '../../engines/set-scheme.engine';
+import { selectTempo, formatTempo } from '../../engines/tempo.engine';
+import { findSubstitute } from '../../engines/exercise-substitution.engine';
 import { useDataLink } from '../../core/data-link';
-import type { TrainingInput, TrainingOutput, Exercise } from '../../core/types';
+import type { TrainingInput, TrainingOutput, Exercise, MovementPattern } from '../../core/types';
 
 const GOALS = [
   { value: 'bulk', label: 'Набор массы', icon: '🏋️' },
@@ -30,7 +35,7 @@ const GROUP_LABELS: Record<string, string> = {
   chest: 'Грудь', back: 'Спина', legs: 'Ноги', shoulders: 'Плечи', arms: 'Руки', core: 'Кор',
 };
 
-type TrainingTab = 'plan' | 'exercises' | 'calculators' | 'diary' | 'cycles';
+type TrainingTab = 'plan' | 'runtime' | 'exercises' | 'calculators' | 'diary' | 'cycles';
 
 export const TrainingScreen: React.FC = () => {
   const linked = useDataLink();
@@ -70,6 +75,18 @@ export const TrainingScreen: React.FC = () => {
   const [logWeight, setLogWeight] = useState(80);
   const [logReps, setLogReps] = useState(8);
   const [logRIR, setLogRIR] = useState(2);
+
+  // Runtime (live workout) state
+  const [runtimeDay, setRuntimeDay] = useState<number>(1);
+  const [runtimeExIdx, setRuntimeExIdx] = useState(0);
+  const [runtimeLogs, setRuntimeLogs] = useState<Record<string, { sets: { weight: number; reps: number; rpe: number; rir: number }[]; completed: boolean }>>({});
+  const [runtimeStarted, setRuntimeStarted] = useState(false);
+  const [showWarmup, setShowWarmup] = useState(false);
+  const [showCooldown, setShowCooldown] = useState(false);
+  const [runtimeSetW, setRuntimeSetW] = useState(80);
+  const [runtimeSetR, setRuntimeSetR] = useState(8);
+  const [runtimeSetRP, setRuntimeSetRP] = useState(7);
+  const [runtimeSetRI, setRuntimeSetRI] = useState(2);
 
   const generatePlan = useCallback(() => {
     const input: TrainingInput = {
@@ -189,8 +206,8 @@ export const TrainingScreen: React.FC = () => {
 
       <div style={{ display: 'flex', gap: 3, marginBottom: 10, overflowX: 'auto', scrollbarWidth: 'none' }}>
         {([
-          ['plan', '📋 План'], ['exercises', '📖 Упражнения'], ['calculators', '📐 Калькуляторы'],
-          ['diary', '📓 Дневник'], ['cycles', '🔄 Циклы'],
+          ['plan', '📋 План'], ['runtime', '🏃 Тренировка'], ['exercises', '📖 Упражнения'],
+          ['calculators', '📐 Калькуляторы'], ['diary', '📓 Дневник'], ['cycles', '🔄 Циклы'],
         ] as [TrainingTab, string][]).map(([k, l]) => (
           <button key={k} onClick={() => setTab(k)} style={{
             padding: '7px 12px', borderRadius: 8, fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap',
@@ -282,13 +299,57 @@ export const TrainingScreen: React.FC = () => {
               </div>
 
               <div className="card" style={{ padding: '8px 10px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
                   <span style={{ fontSize: 10, color: 'var(--text-dim)', whiteSpace: 'nowrap' }}>Нед {selectedWeek}</span>
                   <input type="range" min={1} max={macrocycle?.totalWeeks || 12} value={selectedWeek}
                     onChange={e => setSelectedWeek(+e.target.value)}
                     style={{ flex: 1, accentColor: 'var(--accent)' }} />
                 </div>
+                <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                  <button onClick={() => setShowWarmup(!showWarmup)} style={{
+                    padding: '3px 8px', borderRadius: 4, fontSize: 9, cursor: 'pointer',
+                    background: showWarmup ? 'rgba(255,145,0,0.15)' : 'var(--bg-secondary)',
+                    border: showWarmup ? '1px solid #ff9100' : '1px solid var(--border)',
+                    color: showWarmup ? '#ff9100' : 'var(--text-dim)',
+                  }}>🔥 Разминка</button>
+                  <button onClick={() => setShowCooldown(!showCooldown)} style={{
+                    padding: '3px 8px', borderRadius: 4, fontSize: 9, cursor: 'pointer',
+                    background: showCooldown ? 'rgba(59,130,246,0.15)' : 'var(--bg-secondary)',
+                    border: showCooldown ? '1px solid #3b82f6' : '1px solid var(--border)',
+                    color: showCooldown ? '#3b82f6' : 'var(--text-dim)',
+                  }}>🧊 Заминка</button>
+                </div>
               </div>
+
+              {/* Warmup */}
+              {showWarmup && currentMicrocycle && currentMicrocycle.days.length > 0 && (() => {
+                const wuInput = {
+                  sessionFocus: currentMicrocycle.days[0]?.split || 'fullbody',
+                  primaryExercises: currentMicrocycle.days[0]?.exercises?.slice(0, 2).map((e: any) => e.name) || [],
+                  riskFlags: {} as Record<string, string>,
+                  techniqueIssues: [] as string[],
+                  fatigueLevel: fatigue / 10,
+                  equipmentAvailable: ['barbell', 'dumbbell', 'machine', 'cable', 'bodyweight'],
+                };
+                const warmup = generateWarmup(wuInput);
+                return (
+                  <div className="card" style={{ padding: '8px 10px', border: '1px solid rgba(255,145,0,0.2)' }}>
+                    <div style={{ fontWeight: 600, fontSize: 12, color: '#ff9100', marginBottom: 4 }}>🔥 Разминка</div>
+                    {warmup.map((b, bi) => (
+                      <div key={bi} style={{ fontSize: 10, marginBottom: 2, color: 'var(--text-dim)' }}>
+                        <span style={{ fontWeight: 600, color: '#ff9100' }}>
+                          {b.type === 'general' ? 'Кардио' : b.type === 'mobility' ? 'Мобильность' : b.type === 'activation' ? 'Активация' : 'Специфика'} ({b.durationSec}с)
+                        </span>
+                        {b.exercises?.map((ex, exi) => (
+                          <span key={exi} style={{ marginLeft: 6, color: 'var(--text-dim)' }}>
+                            {ex.exerciseId.replace(/_/g, ' ')} {ex.sets ? `×${ex.sets}` : ''}
+                          </span>
+                        ))}
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
 
               {currentMicrocycle && (
                 <div className="card" style={{ padding: '10px 12px' }}>
@@ -309,18 +370,55 @@ export const TrainingScreen: React.FC = () => {
                         <span style={{ fontWeight: 600, fontSize: 11 }}>{day.day}</span>
                         <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>{day.duration} мин • {day.intensity}</span>
                       </div>
-                      {day.exercises.map((ex: any, ei: number) => (
+                      {day.exercises.map((ex: any, ei: number) => {
+                        const scheme = selectSetScheme({
+                          goal, movementPattern: 'squat' as MovementPattern, difficultyLevel: level === 'beginner' ? 'low' : level === 'intermediate' ? 'medium' : 'high',
+                          techniqueIssues: [], riskFlags: {}, fatigueScore: fatigue / 10, repPattern: 'normal', isPrimaryLift: ei === 0,
+                        });
+                        const tempo = selectTempo(goal, [], {}, ex.isCompound);
+                        return (
                         <div key={ei} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '2px 0', fontSize: 10, borderBottom: ei < day.exercises.length - 1 ? '1px solid var(--border)' : 'none' }}>
                           <span style={{ flex: 1 }}>{ex.name}</span>
                           <span style={{ color: 'var(--accent)', fontWeight: 600, minWidth: 60, textAlign: 'right' }}>{ex.sets}×{ex.reps}</span>
                           <span style={{ fontSize: 9, color: 'var(--text-dim)', minWidth: 30, textAlign: 'right' }}>RIR {ex.rir}</span>
                           {ex.weight && <span style={{ fontSize: 9, color: 'var(--text-dim)', minWidth: 40, textAlign: 'right' }}>{ex.weight}кг</span>}
+                          <span style={{ fontSize: 7, padding: '1px 3px', borderRadius: 2, background: 'rgba(139,92,246,0.1)', color: '#8b5cf6', marginLeft: 3, whiteSpace: 'nowrap' }}>{scheme?.schemeType === 'straight' ? 'straight' : scheme?.schemeType === 'pyramid' ? 'pyramid' : scheme?.schemeType === 'reverse_pyramid' ? 'rev pyr' : scheme?.schemeType === 'top_backoff' ? 'top+off' : scheme?.schemeType || 'straight'}</span>
+                          <span style={{ fontSize: 7, padding: '1px 3px', borderRadius: 2, background: 'rgba(34,197,94,0.1)', color: '#22c55e', marginLeft: 2, whiteSpace: 'nowrap' }}>{formatTempo(tempo)}</span>
                         </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   ))}
                 </div>
               )}
+
+              {/* Cooldown */}
+              {showCooldown && currentMicrocycle && currentMicrocycle.days.length > 0 && (() => {
+                const cdInput = {
+                  muscleGroupsUsed: currentMicrocycle.days[0]?.exercises?.map((e: any) => e.group).filter(Boolean) || [],
+                  fatigueScore: fatigue / 10,
+                  riskFlags: {} as Record<string, string>,
+                  sessionDuration: currentMicrocycle.days[0]?.duration || 60,
+                };
+                const cooldown = generateCooldown(cdInput);
+                return (
+                  <div className="card" style={{ padding: '8px 10px', border: '1px solid rgba(59,130,246,0.2)' }}>
+                    <div style={{ fontWeight: 600, fontSize: 12, color: '#3b82f6', marginBottom: 4 }}>🧊 Заминка</div>
+                    {cooldown.map((b, bi) => (
+                      <div key={bi} style={{ fontSize: 10, marginBottom: 2, color: 'var(--text-dim)' }}>
+                        <span style={{ fontWeight: 600, color: '#3b82f6' }}>
+                          {b.type === 'breathing' ? 'Дыхание' : b.type === 'stretch' ? 'Растяжка' : 'Мобильность'} ({b.durationSec}с)
+                        </span>
+                        {b.exercises?.map((ex, exi) => (
+                          <span key={exi} style={{ marginLeft: 6, color: 'var(--text-dim)' }}>
+                            {ex.exerciseId.replace(/_/g, ' ')}
+                          </span>
+                        ))}
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
 
               {trainingOutput.volumePerGroup && (
                 <div className="card" style={{ padding: '10px 12px' }}>
@@ -336,6 +434,195 @@ export const TrainingScreen: React.FC = () => {
                   ))}
                 </div>
               )}
+            </>
+          )}
+        </div>
+      )}
+
+      {/* ═══════════ RUNTIME (Live Workout) ═══════════ */}
+      {tab === 'runtime' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {!runtimeStarted ? (
+            <div className="card" style={{ padding: '12px' }}>
+              <h3 style={{ margin: '0 0 8px', fontSize: 14 }}>🏃 Начать тренировку</h3>
+              <p style={{ fontSize: 11, color: 'var(--text-dim)', margin: '0 0 10px' }}>
+                Выберите день из плана для отслеживания подходов в реальном времени.
+              </p>
+              {macrocycle && currentMicrocycle ? (
+                <>
+                  <div style={{ display: 'flex', gap: 4, marginBottom: 8, flexWrap: 'wrap' }}>
+                    {currentMicrocycle.days.filter((d: any) => d.isTraining).map((day: any, di: number) => (
+                      <button key={di} onClick={() => setRuntimeDay(di)} style={{
+                        padding: '6px 12px', borderRadius: 8, fontSize: 11, fontWeight: runtimeDay === di ? 700 : 400, cursor: 'pointer',
+                        background: runtimeDay === di ? 'var(--accent)' : 'var(--bg-secondary)',
+                        color: runtimeDay === di ? '#000' : 'var(--text)', border: '1px solid ' + (runtimeDay === di ? 'var(--accent)' : 'var(--border)'),
+                      }}>{day.day}</button>
+                    ))}
+                  </div>
+                  <div style={{ background: 'var(--bg-secondary)', borderRadius: 6, padding: 8, marginBottom: 8 }}>
+                    <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>
+                      {currentMicrocycle.days.filter((d: any) => d.isTraining)[runtimeDay]?.exercises?.length || 0} упражнений • {currentMicrocycle.days.filter((d: any) => d.isTraining)[runtimeDay]?.duration || 60} мин
+                    </div>
+                    <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 2 }}>
+                      Интенсивность: {currentMicrocycle.days.filter((d: any) => d.isTraining)[runtimeDay]?.intensity || 'medium'}
+                    </div>
+                  </div>
+                  <button onClick={() => { setRuntimeStarted(true); setRuntimeLogs({}); setRuntimeExIdx(0); }} style={{
+                    width: '100%', padding: 12, borderRadius: 8, border: 'none', cursor: 'pointer',
+                    background: 'linear-gradient(135deg, #00e68a, #00c853)', color: '#000', fontWeight: 700, fontSize: 14,
+                  }}>▶ Старт</button>
+                </>
+              ) : (
+                <div style={{ textAlign: 'center', color: 'var(--text-dim)', fontSize: 11 }}>
+                  Сначала сгенерируйте план во вкладке 📋 План
+                </div>
+              )}
+            </div>
+          ) : (
+            <>
+              {/* Active workout */}
+              {currentMicrocycle && (() => {
+                const day = currentMicrocycle.days.filter((d: any) => d.isTraining)[runtimeDay];
+                if (!day) return null;
+                const exercises = day.exercises || [];
+                const ex = exercises[runtimeExIdx];
+                if (!ex) return (
+                  <div className="card" style={{ textAlign: 'center', padding: 20 }}>
+                    <div style={{ fontSize: 28, marginBottom: 8 }}>🏆</div>
+                    <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 4 }}>Тренировка завершена!</div>
+                    <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 12 }}>
+                      {Object.values(runtimeLogs).filter(l => l.completed).length} из {exercises.length} упражнений выполнено
+                    </div>
+                    <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
+                      <button onClick={() => setRuntimeStarted(false)} style={{
+                        padding: '8px 20px', borderRadius: 8, border: 'none', cursor: 'pointer',
+                        background: 'var(--accent)', color: '#000', fontWeight: 600, fontSize: 13,
+                      }}>✓ Завершить</button>
+                    </div>
+                  </div>
+                );
+
+                const log = runtimeLogs[ex.exerciseId || ex.name] || { sets: [], completed: false };
+                const totalSets = ex.sets || 3;
+                const currentSet = log.sets.length + 1;
+
+                const last1RM = log.sets.length > 0
+                  ? Math.round(log.sets[log.sets.length - 1].weight * (1 + log.sets[log.sets.length - 1].reps / 30))
+                  : 0;
+
+                const estimatedVolume = log.sets.reduce((s, st) => s + st.weight * st.reps, 0);
+                const avgRPE = log.sets.length > 0 ? Math.round(log.sets.reduce((s, st) => s + st.rpe, 0) / log.sets.length * 10) / 10 : 0;
+
+                const scheme = selectSetScheme({
+                  goal, movementPattern: 'squat' as MovementPattern, difficultyLevel: level === 'beginner' ? 'low' : level === 'intermediate' ? 'medium' : 'high',
+                  techniqueIssues: [], riskFlags: {}, fatigueScore: 0.3, repPattern: 'normal', isPrimaryLift: runtimeExIdx === 0,
+                });
+                const tempo = selectTempo(goal, [], {}, ex.isCompound);
+
+                return (
+                  <div className="card" style={{ padding: '10px 12px' }}>
+                    {/* Exercise header */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                      <div>
+                        <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>Упражнение {runtimeExIdx + 1}/{exercises.length}</span>
+                        <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--accent)' }}>{ex.name}</div>
+                      </div>
+                      <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>  
+                        <span style={{ fontSize: 9, padding: '2px 5px', borderRadius: 3, background: 'rgba(139,92,246,0.1)', color: '#8b5cf6' }}>{scheme?.schemeType || 'straight'}</span>
+                        <span style={{ fontSize: 9, padding: '2px 5px', borderRadius: 3, background: 'rgba(34,197,94,0.1)', color: '#22c55e' }}>{formatTempo(tempo)}</span>
+                      </div>
+                    </div>
+
+                    {/* Target */}
+                    <div style={{ display: 'flex', gap: 12, marginBottom: 6, fontSize: 10, color: 'var(--text-dim)' }}>
+                      <span>Цель: {ex.sets}×{ex.reps}</span>
+                      <span>RIR: {ex.rir}</span>
+                      {ex.weight && <span>Вес: {ex.weight}кг</span>}
+                    </div>
+
+                    {/* Progress bar */}
+                    <div style={{ background: 'rgba(255,255,255,0.05)', borderRadius: 4, height: 6, marginBottom: 8, overflow: 'hidden' }}>
+                      <div style={{ width: `${(currentSet / totalSets) * 100}%`, height: '100%', background: 'var(--accent)', borderRadius: 4, transition: 'width 0.3s' }} />
+                    </div>
+
+                    {/* Previous sets log */}
+                    {log.sets.length > 0 && (
+                      <div style={{ marginBottom: 8 }}>
+                        <div style={{ fontSize: 9, fontWeight: 600, color: 'var(--text-dim)', marginBottom: 2 }}>Выполнено:</div>
+                        {log.sets.map((s, si) => (
+                          <div key={si} style={{ display: 'flex', gap: 8, fontSize: 10, padding: '2px 0' }}>
+                            <span style={{ fontWeight: 600, minWidth: 16 }}>#{si + 1}</span>
+                            <span>{s.weight}кг × {s.reps}</span>
+                            <span style={{ color: 'var(--text-dim)' }}>RPE {s.rpe}</span>
+                            <span style={{ color: 'var(--text-dim)' }}>RIR {s.rir}</span>
+                            <span style={{ color: 'var(--accent)' }}>1RM ~{Math.round(s.weight * (1 + s.reps / 30))}кг</span>
+                          </div>
+                        ))}
+                        {last1RM > 0 && (
+                          <div style={{ fontSize: 9, color: 'var(--accent)', marginTop: 2 }}>1RM последний: {last1RM}кг | Объём: {estimatedVolume}кг | RPE ср: {avgRPE}</div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Set input form (if not completed) */}
+                    {!log.completed && (
+                      <div>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, marginBottom: 6 }}>
+                          <div>
+                            <label style={{ fontSize: 9, color: 'var(--text-dim)' }}>Вес (кг)</label>
+                            <input type="number" value={runtimeSetW} onChange={e => setRuntimeSetW(+e.target.value)}
+                              style={{ width: '100%', padding: '6px 8px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 13, boxSizing: 'border-box' }} />
+                          </div>
+                          <div>
+                            <label style={{ fontSize: 9, color: 'var(--text-dim)' }}>Повторения</label>
+                            <input type="number" value={runtimeSetR} onChange={e => setRuntimeSetR(+e.target.value)}
+                              style={{ width: '100%', padding: '6px 8px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 13, boxSizing: 'border-box' }} />
+                          </div>
+                          <div>
+                            <label style={{ fontSize: 9, color: 'var(--text-dim)' }}>RPE (1-10)</label>
+                            <input type="number" min={1} max={10} value={runtimeSetRP} onChange={e => setRuntimeSetRP(+e.target.value)}
+                              style={{ width: '100%', padding: '6px 8px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 13, boxSizing: 'border-box' }} />
+                          </div>
+                          <div>
+                            <label style={{ fontSize: 9, color: 'var(--text-dim)' }}>RIR</label>
+                            <input type="number" min={0} max={5} value={runtimeSetRI} onChange={e => setRuntimeSetRI(+e.target.value)}
+                              style={{ width: '100%', padding: '6px 8px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 13, boxSizing: 'border-box' }} />
+                          </div>
+                        </div>
+                        <button onClick={() => {
+                          const newLog = { ...log, sets: [...log.sets, { weight: runtimeSetW, reps: runtimeSetR, rpe: runtimeSetRP, rir: runtimeSetRI }] };
+                          setRuntimeLogs({ ...runtimeLogs, [ex.exerciseId || ex.name]: newLog });
+                        }} style={{
+                          width: '100%', padding: 8, borderRadius: 6, border: 'none', cursor: 'pointer',
+                          background: 'var(--accent)', color: '#000', fontWeight: 600, fontSize: 12,
+                          marginBottom: 4,
+                        }}>✓ Записать подход {currentSet}/{totalSets}</button>
+                        <button onClick={() => {
+                          const newLog = { ...log, completed: true };
+                          setRuntimeLogs({ ...runtimeLogs, [ex.exerciseId || ex.name]: newLog });
+                          if (runtimeExIdx < exercises.length - 1) setRuntimeExIdx(runtimeExIdx + 1);
+                        }} style={{
+                          width: '100%', padding: 6, borderRadius: 6, border: '1px solid var(--border)', cursor: 'pointer',
+                          background: 'transparent', color: 'var(--text-dim)', fontSize: 11,
+                        }}>Пропустить →</button>
+                      </div>
+                    )}
+                    {log.completed && (
+                      <div style={{ textAlign: 'center', padding: 8, background: 'rgba(0,230,138,0.1)', borderRadius: 6 }}>
+                        <span style={{ color: '#22c55e', fontWeight: 600 }}>✓ Выполнено — {log.sets.length} подхода(ов)</span>
+                        <div style={{ marginTop: 6 }}>
+                          <button onClick={() => {
+                            if (runtimeExIdx < exercises.length - 1) setRuntimeExIdx(runtimeExIdx + 1);
+                          }} style={{
+                            padding: '8px 16px', borderRadius: 6, border: 'none', cursor: 'pointer',
+                            background: 'var(--accent)', color: '#000', fontWeight: 600, fontSize: 13,
+                          }}>Следующее упражнение →</button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
             </>
           )}
         </div>
