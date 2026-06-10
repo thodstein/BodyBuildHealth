@@ -683,6 +683,7 @@ export interface FoodItem {
   water?: number;
   serving?: number;
   unit?: string;
+  micros?: Record<string, number>;
 }
 
 export interface ReadinessInput {

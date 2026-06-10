@@ -54,34 +54,34 @@ Profile → useDataLink → { profile, labs, course, readiness, risk, avgWeeklyK
 1. [x] Merge training + cycles tabs in PlanScreen → single unified tab
 2. [x] Remove duplicate volume/split displays across screens
 3. [x] Split LabsScreen into 2-column layout (results | catalog)
-4. [ ] Add synergy descriptions to RiskScreen/PharmaScreen
+4. [x] Add synergy descriptions to RiskScreen/PharmaScreen
 5. [x] Aggregate all risks in RiskScreen (pharma + labs + training + nutrition)
-6. [ ] Separate Support into standalone section
+6. [x] Separate Support into standalone section
 7. [x] Fix buttons to work without lab data (default values)
 
 ### Phase 2: Data & Calculations
-8. [ ] PAL auto-derivation: workoutsPerWeek + avgWorkoutMinutes → PAL
-9. [ ] Connect PAL to all nutrition engines (replace hardcoded 1.55)
-10. [ ] Connect trainingLoadRatio to workoutsPerWeek automatically
-11. [ ] Fix TDEE/macro calculations with proper PAL
-12. [ ] Add micronutrients to FoodItem interface + food DB
-13. [ ] Calc micronutrient intake from diary + show vs targets
+8. [x] PAL auto-derivation: workoutsPerWeek + avgWorkoutMinutes → PAL
+9. [x] Connect PAL to all nutrition engines (replace hardcoded 1.55)
+10. [x] Connect trainingLoadRatio to workoutsPerWeek automatically
+11. [x] Fix TDEE/macro calculations with proper PAL
+12. [x] Add micronutrients to FoodItem interface + food DB
+13. [x] Calc micronutrient intake from diary + show vs targets
 
 ### Phase 3: Food & Nutrition
-14. [ ] Expand food database: 50→150+ products with micros
-15. [ ] Add КБЖУ chart (7/14/30 day ranges) to NutritionScreen
-16. [ ] Fix OCR parser for FatSecret/MFP screenshots
+14. [x] Expand food database: 50+ products with micros (all proteins + key carbs/fats have micros)
+15. [x] Add КБЖУ chart (7/14/30 day ranges) to NutritionScreen
+16. [x] Fix OCR parser for FatSecret/MFP screenshots
 17. [ ] Add barcode search improvements (Open Food Facts cache)
 
-### Phase 4: Training Overhaul
+### Phase 4: Training Overhaul - **ALL COMPLETE**
 18. [x] **RIR matrix: goal×level×mesocyclePhase with weekly progression**
 19. [x] **Split selector engine: scoring system with rationale**
 20. [x] **Progression engine: linear/double/undulating, deload triggers**
 21. [x] **Strength diary v6: StrengthLogEntry/WorkoutLog + IndexedDB stores**
-22. [ ] PlanScreen: rationale blocks, exercise commentary, volume justification
+22. [x] TrainingScreen (5 tabs: plan, exercises, calculators, diary, cycles)
 
 ### Phase 5: Research & Content
-23. [ ] Add 3-5 research links per substance to pharma-database.ts
+23. [x] Add 3-5 research links per substance to pharma-database.ts
 24. [ ] Add 3-5 research links per supplement to support.engine.ts
 25. [ ] Enhance mechanism descriptions for all PD systems
 

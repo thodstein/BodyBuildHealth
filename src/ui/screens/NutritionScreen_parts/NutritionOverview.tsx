@@ -20,7 +20,8 @@ export const NutritionOverview: React.FC<{
   avgWeeklyProtein: number;
   avgWeeklyFat: number;
   avgWeeklyCarbs: number;
-}> = ({ profile, avgWeeklyKcal, avgWeeklyProtein, avgWeeklyFat, avgWeeklyCarbs }) => {
+  microsIntake?: Record<string, number>;
+}> = ({ profile, avgWeeklyKcal, avgWeeklyProtein, avgWeeklyFat, avgWeeklyCarbs, microsIntake = {} }) => {
   const s = profile?.settings;
   const pal = profile ? derivePAL(s?.workoutsPerWeek, s?.avgWorkoutMinutes) : 1.55;
 
@@ -104,24 +105,57 @@ export const NutritionOverview: React.FC<{
           })}
         </div>
 
-        {nutritionTargets && (
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, fontSize: 11 }}>
-            <div style={{ background: 'rgba(59,130,246,0.08)', padding: 6, borderRadius: 6, textAlign: 'center' }}>
-              <div style={{ color: 'var(--text-dim)' }}>Вода</div>
-              <div style={{ fontWeight: 700 }}>{nutritionTargets.water} л/д</div>
-            </div>
-            <div style={{ background: 'rgba(34,197,94,0.08)', padding: 6, borderRadius: 6, textAlign: 'center' }}>
-              <div style={{ color: 'var(--text-dim)' }}>Клетчатка</div>
-              <div style={{ fontWeight: 700 }}>{nutritionTargets.fiber} г/д</div>
-            </div>
-            <div style={{ background: 'rgba(249,115,22,0.08)', padding: 6, borderRadius: 6, textAlign: 'center' }}>
-              <div style={{ color: 'var(--text-dim)' }}>Mg/Zn/D3/C</div>
-              <div style={{ fontWeight: 600, fontSize: 10 }}>
-                {nutritionTargets.micros.Mg}/{nutritionTargets.micros.Zn}/{nutritionTargets.micros.VitD}/{nutritionTargets.micros.VitC}
+            {nutritionTargets && (
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, fontSize: 11 }}>
+                <div style={{ background: 'rgba(59,130,246,0.08)', padding: 6, borderRadius: 6, textAlign: 'center' }}>
+                  <div style={{ color: 'var(--text-dim)' }}>Вода</div>
+                  <div style={{ fontWeight: 700 }}>{nutritionTargets.water} л/д</div>
+                </div>
+                <div style={{ background: 'rgba(34,197,94,0.08)', padding: 6, borderRadius: 6, textAlign: 'center' }}>
+                  <div style={{ color: 'var(--text-dim)' }}>Клетчатка</div>
+                  <div style={{ fontWeight: 700 }}>{nutritionTargets.fiber} г/д</div>
+                </div>
+                <div style={{ background: 'rgba(249,115,22,0.08)', padding: 6, borderRadius: 6, textAlign: 'center' }}>
+                  <div style={{ color: 'var(--text-dim)' }}>Mg/Zn/D3/C</div>
+                  <div style={{ fontWeight: 600, fontSize: 10 }}>
+                    {nutritionTargets.micros.Mg}/{nutritionTargets.micros.Zn}/{nutritionTargets.micros.VitD}/{nutritionTargets.micros.VitC}
+                  </div>
+                </div>
               </div>
-            </div>
-          </div>
-        )}
+            )}
+
+            {/* Micronutrient intake vs targets */}
+            {Object.keys(microsIntake).length > 0 && (
+              <div style={{ marginTop: 10, borderTop: '1px solid var(--border)', paddingTop: 8 }}>
+                <div style={{ fontSize: 11, fontWeight: 600, marginBottom: 6 }}>🧪 Микронутриенты (дневная норма)</div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 4 }}>
+                  {Object.entries(MICRONUTRIENT_TARGETS).slice(0, 9).map(([key, target]) => {
+                    const microMap: Record<string, string> = {
+                      Mg: 'Mg', Zn: 'Zn', VitD: 'VitD', VitC: 'VitC', VitB12: 'VitB12',
+                      Omega3_EPA_DHA: 'Omega3', Potassium: 'K', Sodium: 'Na', Iron: 'Fe',
+                    };
+                    const tag = microMap[key] || key;
+                    const intake = microsIntake[tag] || 0;
+                    const pct = target.amount > 0 ? Math.min(200, Math.round((intake / target.amount) * 100)) : 0;
+                    const color = pct < 50 ? '#ef4444' : pct < 80 ? '#ff9100' : '#22c55e';
+                    return (
+                      <div key={key} style={{ background: 'var(--bg-secondary)', padding: '4px 6px', borderRadius: 4, fontSize: 9 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <span style={{ fontWeight: 600 }}>{key === 'Omega3_EPA_DHA' ? 'O3' : key}</span>
+                          <span style={{ color }}>{pct}%</span>
+                        </div>
+                        <div style={{ background: 'rgba(255,255,255,0.08)', borderRadius: 2, height: 3, marginTop: 2, overflow: 'hidden' }}>
+                          <div style={{ width: `${Math.min(100, pct)}%`, height: '100%', background: color, borderRadius: 2 }} />
+                        </div>
+                        <div style={{ color: 'var(--text-dim)', marginTop: 1 }}>
+                          {intake}/{target.amount}{target.unit}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
       </div>
 
       {/* V7 Nutrition Risk Factors */}
