@@ -14,6 +14,15 @@ import { findSubstitute } from '../../engines/exercise-substitution.engine';
 import { useDataLink } from '../../core/data-link';
 import type { TrainingInput, TrainingOutput, Exercise, MovementPattern } from '../../core/types';
 
+const WARMUP_LABELS: Record<string, string> = {
+  jumping_jack: 'Прыжки ноги вместе-врозь', arm_circles: 'Круги руками', leg_swings: 'Махи ногами',
+  hip_circle: 'Круги тазом', ankle_mobility: 'Мобилизация голеностопа', shoulder_circle: 'Круги плечами',
+  thoracic_rotation: 'Грудная ротация', cat_camel: 'Кошка-верблюд', worlds_greatest: 'Растяжка выпадом',
+  banded_clam: 'Ракушка с резинкой', external_rotation: 'Наружная ротация', bird_dog: 'Птица-собака',
+  dead_bug: 'Мёртвый жук', light_cardio: 'Лёгкое кардио', squat: 'Приседания с грифом',
+  deep_breathing: 'Глубокое дыхание', box_breathing: 'Квадратное дыхание 4-7-8',
+};
+
 const GOALS = [
   { value: 'bulk', label: 'Набор массы', icon: '🏋️' },
   { value: 'cut', label: 'Сушка', icon: '🔥' },
@@ -371,7 +380,7 @@ export const TrainingScreen: React.FC = () => {
                         </span>
                         {b.exercises?.map((ex, exi) => (
                           <span key={exi} style={{ marginLeft: 6, color: 'var(--text-dim)' }}>
-                            {ex.exerciseId.replace(/_/g, ' ')} {ex.sets ? `×${ex.sets}` : ''}
+                            {WARMUP_LABELS[ex.exerciseId] || ex.exerciseId.replace(/_/g, ' ')} {ex.sets ? `×${ex.sets}` : ''}
                           </span>
                         ))}
                       </div>
@@ -443,7 +452,7 @@ export const TrainingScreen: React.FC = () => {
                         </span>
                         {b.exercises?.map((ex, exi) => (
                           <span key={exi} style={{ marginLeft: 6, color: 'var(--text-dim)' }}>
-                            {ex.exerciseId.replace(/_/g, ' ')}
+                            {WARMUP_LABELS[ex.exerciseId] || ex.exerciseId.replace(/_/g, ' ')}
                           </span>
                         ))}
                       </div>
@@ -464,6 +473,14 @@ export const TrainingScreen: React.FC = () => {
                       <span style={{ fontSize: 10, color: 'var(--text-dim)', minWidth: 40, textAlign: 'right' }}>{v} подх</span>
                     </div>
                   ))}
+                  {trainingOutput.estimatedProgress !== undefined && (
+                    <div style={{ marginTop: 6, padding: '6px 8px', background: 'rgba(0,230,138,0.05)', borderRadius: 6, fontSize: 10 }}>
+                      <span style={{ color: 'var(--accent)', fontWeight: 600 }}>📈 Ожидаемый прогресс: +{trainingOutput.estimatedProgress}%/нед</span>
+                      <span style={{ color: 'var(--text-dim)', marginLeft: 8 }}>
+                        Модель: {goal} × {level}
+                      </span>
+                    </div>
+                  )}
                 </div>
               )}
             </>
@@ -491,14 +508,17 @@ export const TrainingScreen: React.FC = () => {
                       }}>{day.day}</button>
                     ))}
                   </div>
-                  <div style={{ background: 'var(--bg-secondary)', borderRadius: 6, padding: 8, marginBottom: 8 }}>
-                    <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>
-                      {currentMicrocycle.days.filter((d: any) => d.isTraining)[runtimeDay]?.exercises?.length || 0} упражнений • {currentMicrocycle.days.filter((d: any) => d.isTraining)[runtimeDay]?.duration || 60} мин
-                    </div>
-                    <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 2 }}>
-                      Интенсивность: {currentMicrocycle.days.filter((d: any) => d.isTraining)[runtimeDay]?.intensity || 'medium'}
-                    </div>
-                  </div>
+            <div style={{ background: 'var(--bg-secondary)', borderRadius: 6, padding: 8, marginBottom: 8 }}>
+              <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>
+                {currentMicrocycle.days.filter((d: any) => d.isTraining)[runtimeDay]?.exercises?.length || 0} упражнений • {currentMicrocycle.days.filter((d: any) => d.isTraining)[runtimeDay]?.duration || 60} мин
+              </div>
+              <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 2 }}>
+                Интенсивность: {currentMicrocycle.days.filter((d: any) => d.isTraining)[runtimeDay]?.intensity || 'medium'} | Схема: {(currentMicrocycle as any).mesocycleType || 'accumulation'}
+              </div>
+              <div style={{ fontSize: 10, color: 'var(--accent)', marginTop: 2, fontWeight: 600 }}>
+                Расчётный тоннаж: {currentMicrocycle.days.filter((d: any) => d.isTraining)[runtimeDay]?.exercises?.reduce((sum: number, ex: any) => sum + (ex.sets || 0) * (Number(ex.reps) || 0) * (ex.weight || 0), 0) || 0} кг
+              </div>
+            </div>
                   <button onClick={() => { setRuntimeStarted(true); setRuntimeLogs({}); setRuntimeExIdx(0); }} style={{
                     width: '100%', padding: 12, borderRadius: 8, border: 'none', cursor: 'pointer',
                     background: 'linear-gradient(135deg, #00e68a, #00c853)', color: '#000', fontWeight: 700, fontSize: 14,
@@ -907,6 +927,35 @@ export const TrainingScreen: React.FC = () => {
 
           {macrocycle && (
             <>
+              {/* Weekly volume/intensity chart */}
+              <div className="card" style={{ padding: '10px 12px' }}>
+                <h4 style={{ margin: '0 0 8px', fontSize: 12 }}>📊 Объём и интенсивность по неделям</h4>
+                <div style={{ display: 'flex', gap: 1, height: 80, alignItems: 'flex-end' }}>
+                  {macrocycle.mesocycles.flatMap(mc => mc.microcycles || []).map((mc, wi) => {
+                    const isCurrent = wi + 1 === selectedWeek;
+                    const volH = Math.max(4, (mc?.volumeMultiplier || 1) * 35);
+                    const intH = Math.max(4, (mc?.rpeTarget || 7) * 5);
+                    const color = mc?.mesocycleType === 'accumulation' ? '#22c55e' :
+                                 mc?.mesocycleType === 'intensification' ? '#eab308' :
+                                 mc?.mesocycleType === 'peaking' ? '#ef4444' : '#6b7280';
+                    return (
+                      <div key={wi} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }} title={`Нед ${wi+1}: Объём ×${mc?.volumeMultiplier || 1}, RPE ${mc?.rpeTarget || 7}`}
+                        onClick={() => { setSelectedWeek(wi + 1); setTab('plan'); }}>
+                        <div style={{ width: '70%', height: volH, background: color, borderRadius: '2px 2px 0 0', opacity: isCurrent ? 1 : 0.4 }} />
+                        <div style={{ width: '40%', height: intH, background: color, borderRadius: '2px 2px 0 0', opacity: isCurrent ? 0.8 : 0.3 }} />
+                        <span style={{ fontSize: 7, color: isCurrent ? 'var(--accent)' : 'var(--text-dim)', fontWeight: isCurrent ? 700 : 400 }}>{wi + 1}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'center', gap: 12, fontSize: 9, color: 'var(--text-dim)', marginTop: 4 }}>
+                  <span><span style={{ color: '#22c55e' }}>■</span> Накопление</span>
+                  <span><span style={{ color: '#eab308' }}>■</span> Интенсификация</span>
+                  <span><span style={{ color: '#ef4444' }}>■</span> Пик</span>
+                  <span><span style={{ color: '#6b7280' }}>■</span> Разгрузка</span>
+                </div>
+              </div>
+
               <div className="card" style={{ padding: '10px 12px' }}>
                 <h3 style={{ margin: '0 0 6px', fontSize: 13 }}>📅 {macrocycle.totalWeeks}-недельный макроцикл</h3>
                 <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 6 }}>
