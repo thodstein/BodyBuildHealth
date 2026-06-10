@@ -82,8 +82,8 @@ Profile → useDataLink → { profile, labs, course, readiness, risk, avgWeeklyK
 
 ### Phase 5: Research & Content
 23. [x] Add 3-5 research links per substance to pharma-database.ts
-24. [ ] Add 3-5 research links per supplement to support.engine.ts
-25. [ ] Enhance mechanism descriptions for all PD systems
+24. [x] Add 3-5 research links per supplement to support.engine.ts
+25. [x] Enhance mechanism descriptions for all PD systems
 
 ## Phase 5.8: Buttons Without Lab Data - **COMPLETED**
 

@@ -554,7 +554,7 @@ export const LabsScreen: React.FC = () => {
               )}
               {!ocrLoading && !ocrResult && (
                 <div>
-                  <p style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 12 }}>Загрузите PDF или фото результатов анализов.</p>
+                  <p style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 12 }}>Загрузите PDF, фото или вставьте текст результатов анализов.</p>
                   <div style={{ display: 'grid', gap: 8 }}>
                     <button onClick={() => fileInputRef.current?.click()} style={{ padding: 16, borderRadius: 12, border: '2px dashed var(--border)', background: 'var(--bg-secondary)', color: 'var(--accent)', fontWeight: 600, fontSize: 14, cursor: 'pointer' }}>
                       📄 Выбрать PDF или фото
@@ -562,6 +562,29 @@ export const LabsScreen: React.FC = () => {
                     <button onClick={() => { if (cameraInputRef.current) cameraInputRef.current.click(); }} style={{ padding: 16, borderRadius: 12, border: '2px dashed var(--border)', background: 'var(--bg-secondary)', color: 'var(--accent)', fontWeight: 600, fontSize: 14, cursor: 'pointer' }}>
                       📸 Сфотографировать
                     </button>
+                    <div style={{ borderTop: '1px solid var(--border)', paddingTop: 8 }}>
+                      <textarea
+                        placeholder="Или вставьте текст результатов (скопируйте из PDF/сайта)..."
+                        rows={5}
+                        style={{ width: '100%', padding: '8px 10px', borderRadius: 8, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 11, boxSizing: 'border-box', resize: 'vertical', marginBottom: 6 }}
+                        id="lab-text-paste"
+                      />
+                      <button onClick={async () => {
+                        const ta = document.getElementById('lab-text-paste') as HTMLTextAreaElement;
+                        if (!ta?.value?.trim()) return;
+                        setOcrLoading(true);
+                        try {
+                          const res = await processUploadedFile(new File([ta.value], 'pasted.txt', { type: 'text/plain' }));
+                          setOcrResult(res);
+                          if (res.labs.length > 0) setSelectedLabs(new Set(res.labs.map(l => l.code)));
+                        } catch (e: any) {
+                          setOcrResult({ text: '', labs: [], meals: [], source: 'text', confidence: 0, warnings: ['Ошибка: ' + (e?.message || String(e))] });
+                        }
+                        setOcrLoading(false);
+                      }} style={{ padding: 10, borderRadius: 8, border: '1px solid var(--accent)', background: 'rgba(0,230,138,0.1)', color: 'var(--accent)', fontWeight: 600, fontSize: 13, cursor: 'pointer', width: '100%' }}>
+                        📋 Разобрать вставленный текст
+                      </button>
+                    </div>
                   </div>
                 </div>
               )}

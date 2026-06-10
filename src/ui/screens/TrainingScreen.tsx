@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { EXERCISE_CATALOG } from '../../core/exercise-catalog';
 import { calcTraining, EXERCISE_DB } from '../../engines/training.engine';
 import { generateMacrocycle, getCurrentWeekPlan, MESOCYCLE_PARAMS, type MacrocyclePlan, type Microcycle, type MacrocycleInput } from '../../engines/training-periodization.engine';
@@ -46,6 +46,7 @@ export const TrainingScreen: React.FC = () => {
   const [goal, setGoal] = useState('bulk');
   const [level, setLevel] = useState('intermediate');
   const [daysPerWeek, setDaysPerWeek] = useState(4);
+  const [splitType, setSplitType] = useState('auto');
   const [recovery, setRecovery] = useState(7);
   const [fatigue, setFatigue] = useState(3);
   const [weakPoints, setWeakPoints] = useState<string[]>([]);
@@ -111,6 +112,15 @@ export const TrainingScreen: React.FC = () => {
     setSelectedWeek(1);
     setCurrentMicrocycle(getCurrentWeekPlan(macro, 1));
   }, [goal, level, daysPerWeek, recovery, fatigue, weakPoints]);
+
+  // Auto-regenerate when days/sparse
+  const prevDays = useRef(daysPerWeek);
+  useEffect(() => {
+    if (prevDays.current !== daysPerWeek) {
+      prevDays.current = daysPerWeek;
+      generatePlan();
+    }
+  }, [daysPerWeek]);
 
   useEffect(() => {
     if (macrocycle && selectedWeek > 0) {
@@ -240,10 +250,29 @@ export const TrainingScreen: React.FC = () => {
                 }}>{l.icon} {l.label}</button>
               ))}
             </div>
+            <div style={{ marginBottom: 8 }}>
+              <label style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 3, display: 'block' }}>Тип сплита</label>
+              <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                {[
+                  { v: 'auto', l: 'Авто' },
+                  { v: 'fullbody', l: 'Фулбоди' },
+                  { v: 'upper_lower', l: 'Верх/Низ' },
+                  { v: 'ppl', l: 'PPL' },
+                  { v: 'bro', l: 'Бро-сплит' },
+                  { v: 'powerbuilding', l: 'Пауэрбилдинг' },
+                ].map(s => (
+                  <button key={s.v} onClick={() => { setSplitType(s.v); setTimeout(generatePlan, 50); }} style={{
+                    padding: '3px 8px', borderRadius: 6, fontSize: 10, fontWeight: splitType === s.v ? 700 : 400, cursor: 'pointer',
+                    border: splitType === s.v ? '1px solid var(--accent)' : '1px solid var(--border)',
+                    background: splitType === s.v ? 'rgba(0,230,138,0.15)' : 'var(--bg-secondary)', color: 'var(--text)',
+                  }}>{s.l}</button>
+                ))}
+              </div>
+            </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginBottom: 8 }}>
               <div>
                 <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Дней/нед</label>
-                <input type="range" min={2} max={7} value={daysPerWeek} onChange={e => setDaysPerWeek(+e.target.value)}
+                <input type="range" min={2} max={7} value={daysPerWeek} onChange={e => { setDaysPerWeek(+e.target.value); setTimeout(generatePlan, 50); }}
                   style={{ width: '100%', accentColor: 'var(--accent)' }} />
                 <div style={{ textAlign: 'center', fontSize: 10, color: 'var(--text-dim)' }}>{daysPerWeek}</div>
               </div>
@@ -376,14 +405,17 @@ export const TrainingScreen: React.FC = () => {
                           techniqueIssues: [], riskFlags: {}, fatigueScore: fatigue / 10, repPattern: 'normal', isPrimaryLift: ei === 0,
                         });
                         const tempo = selectTempo(goal, [], {}, ex.isCompound);
+                        const exCat = EXERCISE_CATALOG.find(ec => ec.id === ex.exerciseId || ec.name === ex.name);
+                        const estMax = ex.weight ? Math.round(ex.weight * (1 + Number(ex.reps) / 30)) : 0;
+                        const substitute = exCat?.canReplace?.[0] ? EXERCISE_CATALOG.find(e => e.id === exCat.canReplace![0]) : null;
                         return (
-                        <div key={ei} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '2px 0', fontSize: 10, borderBottom: ei < day.exercises.length - 1 ? '1px solid var(--border)' : 'none' }}>
-                          <span style={{ flex: 1 }}>{ex.name}</span>
-                          <span style={{ color: 'var(--accent)', fontWeight: 600, minWidth: 60, textAlign: 'right' }}>{ex.sets}×{ex.reps}</span>
-                          <span style={{ fontSize: 9, color: 'var(--text-dim)', minWidth: 30, textAlign: 'right' }}>RIR {ex.rir}</span>
-                          {ex.weight && <span style={{ fontSize: 9, color: 'var(--text-dim)', minWidth: 40, textAlign: 'right' }}>{ex.weight}кг</span>}
-                          <span style={{ fontSize: 7, padding: '1px 3px', borderRadius: 2, background: 'rgba(139,92,246,0.1)', color: '#8b5cf6', marginLeft: 3, whiteSpace: 'nowrap' }}>{scheme?.schemeType === 'straight' ? 'straight' : scheme?.schemeType === 'pyramid' ? 'pyramid' : scheme?.schemeType === 'reverse_pyramid' ? 'rev pyr' : scheme?.schemeType === 'top_backoff' ? 'top+off' : scheme?.schemeType || 'straight'}</span>
-                          <span style={{ fontSize: 7, padding: '1px 3px', borderRadius: 2, background: 'rgba(34,197,94,0.1)', color: '#22c55e', marginLeft: 2, whiteSpace: 'nowrap' }}>{formatTempo(tempo)}</span>
+                        <div key={ei} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '2px 0', fontSize: 10, borderBottom: ei < day.exercises.length - 1 ? '1px solid var(--border)' : 'none', gap: 2 }}>
+                          <span style={{ flex: 1 }} title={ex.technique || ''}>{ex.name}</span>
+                          <span style={{ color: 'var(--accent)', fontWeight: 600, minWidth: 55, textAlign: 'right' }}>{ex.sets}×{ex.reps}</span>
+                          {estMax > 0 && <span style={{ fontSize: 8, color: '#8b5cf6', minWidth: 40, textAlign: 'right' }}>~{estMax}кг</span>}
+                          <span style={{ fontSize: 8, color: 'var(--text-dim)', minWidth: 25, textAlign: 'right' }}>RIR{ex.rir}</span>
+                          <span style={{ fontSize: 6, padding: '1px 2px', borderRadius: 2, background: 'rgba(139,92,246,0.1)', color: '#8b5cf6', whiteSpace: 'nowrap' }}>{scheme?.schemeType?.slice(0, 6) || 'str'}</span>
+                          {substitute && <span style={{ fontSize: 6, color: 'var(--text-dim)', maxWidth: 50, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={`Заменить: ${substitute.name}`}>↔{substitute.name.slice(0, 8)}</span>}
                         </div>
                         );
                       })}
@@ -630,81 +662,75 @@ export const TrainingScreen: React.FC = () => {
 
       {/* ═══════════ EXERCISES TAB ═══════════ */}
       {tab === 'exercises' && (
-        <div style={{ display: 'flex', gap: 10 }}>
-          <div style={{ flex: selectedEx ? '0 0 300px' : 1 }}>
+        <div style={{ display: 'flex', gap: 8, flexDirection: selectedEx ? 'row' : 'column' }}>
+          <div style={{ flex: selectedEx ? '0 0 280px' : 1, maxHeight: 'calc(100vh - 200px)', display: 'flex', flexDirection: 'column' }}>
             <input type="text" value={exSearch} onChange={e => setExSearch(e.target.value)}
-              placeholder="🔍 Поиск упражнения..."
-              style={{ width: '100%', padding: '7px 10px', borderRadius: 8, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, marginBottom: 6, boxSizing: 'border-box' }} />
-            <div style={{ display: 'flex', gap: 4, marginBottom: 6, flexWrap: 'wrap' }}>
-              <select value={exGroup} onChange={e => setExGroup(e.target.value)} style={{ padding: '4px 6px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 10 }}>
+              placeholder="🔍 Поиск..."
+              style={{ width: '100%', padding: '7px 10px', borderRadius: 8, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, marginBottom: 4, boxSizing: 'border-box', flexShrink: 0 }} />
+            <div style={{ display: 'flex', gap: 3, marginBottom: 4, flexShrink: 0 }}>
+              <select value={exGroup} onChange={e => setExGroup(e.target.value)} style={{ flex: 1, padding: '4px 4px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 10 }}>
                 <option value="all">Все группы</option>
                 {MUSCLE_GROUPS.map(g => <option key={g} value={g}>{GROUP_LABELS[g]}</option>)}
               </select>
-              <select value={exType} onChange={e => setExType(e.target.value)} style={{ padding: '4px 6px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 10 }}>
+              <select value={exType} onChange={e => setExType(e.target.value)} style={{ flex: 1, padding: '4px 4px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 10 }}>
                 <option value="all">Все типы</option>
                 <option value="compound">Базовые</option>
                 <option value="isolation">Изолирующие</option>
               </select>
-              <select value={exEquipment} onChange={e => setExEquipment(e.target.value)} style={{ padding: '4px 6px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 10 }}>
-                <option value="all">Всё оборудование</option>
+              <select value={exEquipment} onChange={e => setExEquipment(e.target.value)} style={{ flex: 1, padding: '4px 4px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 10 }}>
+                <option value="all">Оборуд.</option>
                 <option value="barbell">Штанга</option>
                 <option value="dumbbell">Гантели</option>
                 <option value="machine">Тренажёр</option>
                 <option value="cable">Блок</option>
-                <option value="bodyweight">Свой вес</option>
+                <option value="bodyweight">Вес тела</option>
               </select>
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 3, maxHeight: 'calc(100vh - 250px)', overflowY: 'auto' }}>
-              {filteredExercises.map(ex => (
-                <div key={ex.id} onClick={() => setSelectedEx(ex)} style={{
-                  padding: '6px 8px', borderRadius: 6, cursor: 'pointer', fontSize: 11,
+            <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 2 }}>
+              {filteredExercises.slice(0, 80).map(ex => (
+                <div key={ex.id} onClick={() => setSelectedEx(selectedEx?.id === ex.id ? null : ex)} style={{
+                  padding: '4px 8px', borderRadius: 6, cursor: 'pointer', fontSize: 11,
                   background: selectedEx?.id === ex.id ? 'rgba(0,230,138,0.1)' : 'var(--bg-secondary)',
                   border: selectedEx?.id === ex.id ? '1px solid var(--accent)' : '1px solid transparent',
                 }}>
-                  <div style={{ fontWeight: 600, fontSize: 11 }}>{ex.name}</div>
-                  <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>
-                    {GROUP_LABELS[ex.group]} • {ex.type === 'compound' ? 'Базовое' : 'Изолирующее'} • {ex.difficulty}
+                  <div style={{ fontWeight: 600, fontSize: 11, display: 'flex', justifyContent: 'space-between' }}>
+                    <span>{ex.name}</span>
+                    <span style={{ fontSize: 9, color: 'var(--text-dim)' }}>{GROUP_LABELS[ex.group]}</span>
                   </div>
                 </div>
               ))}
             </div>
           </div>
           {selectedEx && (
-            <div style={{ flex: 1, background: 'var(--bg-secondary)', borderRadius: 10, padding: '12px 14px', maxHeight: 'calc(100vh - 200px)', overflowY: 'auto' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-                <h3 style={{ margin: 0, fontSize: 14, color: 'var(--accent)' }}>{selectedEx.name}</h3>
-                <button onClick={() => setSelectedEx(null)} style={{ background: 'none', border: 'none', color: 'var(--text-dim)', fontSize: 16, cursor: 'pointer' }}>✕</button>
+            <div style={{ flex: 1, background: 'var(--bg-secondary)', borderRadius: 10, padding: '10px 12px', maxHeight: 'calc(100vh - 190px)', overflowY: 'auto', minWidth: 250 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                <h3 style={{ margin: 0, fontSize: 13, color: 'var(--accent)' }}>{selectedEx.name}</h3>
+                <button onClick={() => setSelectedEx(null)} style={{ background: 'none', border: 'none', color: 'var(--text-dim)', fontSize: 14, cursor: 'pointer', padding: 0 }}>✕</button>
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2px 12px', fontSize: 11, marginBottom: 8 }}>
-                <span style={{ color: 'var(--text-dim)' }}>Группа:</span><span>{GROUP_LABELS[selectedEx.group]}</span>
-                <span style={{ color: 'var(--text-dim)' }}>Тип:</span><span>{selectedEx.type === 'compound' ? 'Базовое' : 'Изолирующее'}</span>
-                <span style={{ color: 'var(--text-dim)' }}>Оборудование:</span><span>{selectedEx.equipment}</span>
-                <span style={{ color: 'var(--text-dim)' }}>Сложность:</span><span>{selectedEx.difficulty}</span>
-                <span style={{ color: 'var(--text-dim)' }}>Суставы:</span><span style={{ color: selectedEx.jointStress === 'high' ? '#ef4444' : selectedEx.jointStress === 'med' ? '#ff9100' : '#22c55e' }}>{selectedEx.jointStress}</span>
-                <span style={{ color: 'var(--text-dim)' }}>Утомляемость:</span><span>{selectedEx.fatigueCost}/10</span>
-                <span style={{ color: 'var(--text-dim)' }}>Целевая мышца:</span><span style={{ fontSize: 10 }}>{selectedEx.targetMuscle || '—'}</span>
+              <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap', marginBottom: 6 }}>
+                <span style={{ fontSize: 9, padding: '1px 5px', borderRadius: 3, background: 'rgba(0,230,138,0.1)', color: '#00e68a' }}>{GROUP_LABELS[selectedEx.group]}</span>
+                <span style={{ fontSize: 9, padding: '1px 5px', borderRadius: 3, background: 'rgba(59,130,246,0.1)', color: '#3b82f6' }}>{selectedEx.type === 'compound' ? 'Базовое' : 'Изолир.'}</span>
+                <span style={{ fontSize: 9, padding: '1px 5px', borderRadius: 3, background: 'rgba(249,115,22,0.1)', color: '#f97316' }}>{selectedEx.equipment}</span>
+                <span style={{ fontSize: 9, padding: '1px 5px', borderRadius: 3, background: selectedEx.jointStress === 'high' ? 'rgba(239,68,68,0.1)' : 'rgba(34,197,94,0.1)', color: selectedEx.jointStress === 'high' ? '#ef4444' : '#22c55e' }}>Суставы: {selectedEx.jointStress}</span>
+                <span style={{ fontSize: 9, padding: '1px 5px', borderRadius: 3, background: 'rgba(139,92,246,0.1)', color: '#8b5cf6' }}>Усталость: {selectedEx.fatigueCost}/10</span>
               </div>
               {selectedEx.technique && (
-                <div style={{ marginBottom: 8, background: 'rgba(0,230,138,0.05)', borderRadius: 6, padding: '6px 8px' }}>
-                  <div style={{ fontWeight: 600, fontSize: 11, color: 'var(--accent)', marginBottom: 3 }}>🎯 Техника</div>
-                  <div style={{ fontSize: 10, color: 'var(--text)', lineHeight: 1.5 }}>{selectedEx.technique}</div>
+                <div style={{ marginBottom: 6, background: 'rgba(0,230,138,0.05)', borderRadius: 6, padding: '5px 8px', fontSize: 10, color: 'var(--text)', lineHeight: 1.4 }}>
+                  <span style={{ fontWeight: 600, color: 'var(--accent)' }}>🎯 </span>{selectedEx.technique}
                 </div>
               )}
               {selectedEx.comments && (
-                <div style={{ marginBottom: 8, background: 'rgba(255,145,0,0.05)', borderRadius: 6, padding: '6px 8px' }}>
-                  <div style={{ fontWeight: 600, fontSize: 11, color: '#ff9100', marginBottom: 3 }}>💡 Комментарий</div>
-                  <div style={{ fontSize: 10, color: 'var(--text-dim)', lineHeight: 1.5 }}>{selectedEx.comments}</div>
+                <div style={{ marginBottom: 6, background: 'rgba(255,145,0,0.05)', borderRadius: 6, padding: '5px 8px', fontSize: 10, color: 'var(--text-dim)', lineHeight: 1.4 }}>
+                  <span style={{ fontWeight: 600, color: '#ff9100' }}>💡 </span>{selectedEx.comments}
                 </div>
               )}
               {selectedEx.canReplace && selectedEx.canReplace.length > 0 && (
-                <div style={{ marginBottom: 4 }}>
-                  <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-dim)', marginBottom: 2 }}>Можно заменить на:</div>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
-                    {selectedEx.canReplace.map(r => {
-                      const rep = EXERCISE_CATALOG.find(e => e.id === r);
-                      return rep ? <span key={r} style={{ fontSize: 9, padding: '2px 5px', borderRadius: 4, background: 'rgba(0,230,138,0.08)', color: '#00e68a' }}>{rep.name}</span> : null;
-                    })}
-                  </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, alignItems: 'center' }}>
+                  <span style={{ fontSize: 9, color: 'var(--text-dim)' }}>Замена:</span>
+                  {selectedEx.canReplace.map(r => {
+                    const rep = EXERCISE_CATALOG.find(e => e.id === r);
+                    return rep ? <span key={r} style={{ fontSize: 9, padding: '1px 5px', borderRadius: 3, background: 'rgba(0,230,138,0.08)', color: '#00e68a' }}>{rep.name}</span> : null;
+                  })}
                 </div>
               )}
             </div>

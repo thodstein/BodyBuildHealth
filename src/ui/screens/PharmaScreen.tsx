@@ -51,6 +51,17 @@ const PD_LABELS: Record<keyof PD, string> = {
   neuro_toxicity: 'Нейротоксичность',
 };
 
+const PD_MECHANISMS: Record<keyof PD, string> = {
+  AR_affinity: 'Сила связывания с андрогеновым рецептором (AR). 1.0 = тестостерон. Выше 1.0 = сильнее активация AR → больше анаболизм. Но высокое сродство без 5α-редукции или ароматизации → "сухой" эффект (тренболон). Механизм: лиганд-AR комплекс транслоцируется в ядро → ARE-транскрипция → синтез сократительных белков.',
+  aromatization: 'Конверсия тестостерона в эстрадиол (E2) ферментом CYP19A1 (ароматаза). 1.0 = полная конверсия (тестостерон), 0 = нет (тренболон). Высокая → гинекомастия, задержка воды, подавление HPTA через E2-рецепторы гипоталамуса. Контроль: ингибиторы ароматазы (анастрозол, летрозол).',
+  five_alpha_reduction: 'Конверсия тестостерона в ДГТ (дигидротестостерон) ферментом 5α-редуктазой (SRD5A2). ДГТ в 3-5× сильнее тестостерона. 1.0 = полная конверсия. Высокая → андрогенная алопеция, акне, гиперплазия простаты. Контроль: финастерид, дутастерид.',
+  progestogenic: 'Активация прогестероновых рецепторов (PR). 0.3+ = значимая. Прогестины → подавление ЛГ/ФСГ через negative feedback на гипоталамус (сильнее чем E2), пролактин-опосредованные эффекты (галакторея, либидо↓). Контроль: каберголин (D2-агонист) при гиперпролактинемии.',
+  hepatotoxicity: 'Гепатотоксичность (повреждение гепатоцитов). 17α-алкилированные стероиды (оральные) проходят first-pass метаболизм в печени → CYP450-опосредованное окисление → ROS → АЛТ/АСТ↑, холестаз, гепатоцеллюлярная аденома. Инъекционные формы минуют first-pass, менее токсичны.',
+  lipid_impact: 'Влияние на липидный профиль. Отрицательные значения = ухудшение: ЛПВП↓ (обратный транспорт холестерина), ЛПНП↑, триглицериды↑. Механизм: AR-опосредованная активация печёночной липазы (HL) → катаболизм ЛПВП; подавление apoA-I синтеза. Статины + Омега-3 для контроля.',
+  hct_impact: 'Влияние на гематокрит (HCT). ААС стимулируют эритропоэз через: 1) прямой AR-механизм на гемопоэтические стволовые клетки, 2) ↑ эритропоэтин (EPO) через гипоксический фактор HIF-1α. HCT >52% → гипервязкость крови, риск тромбоза, инсульта. Контроль: флеботомия, гидратация, аспирин 100 мг.',
+  neuro_toxicity: 'Нейротоксичность (воздействие на ЦНС). Механизмы: 1) GABA_A-антагонизм → снижение ингибиторного тонуса → тревожность, бессонница, агрессия (тренболон), 2) дофаминовая модуляция (D2-подобные рецепторы) → раздражительность, 3) 5-HT (серотониновая) модуляция, 4) нейростероидная дисрегуляция. Контроль: ГАМК-агонисты, магний, мелатонин.',
+};
+
 const SEVERITY_COLORS: Record<string, string> = {
   critical: '#ff1744',
   warning: '#ff9100',
@@ -314,6 +325,7 @@ const CatalogTab: React.FC = () => {
 const DrugDetailCard: React.FC<{ sub: PharmaSubstance; detail?: PharmaDetail }> = ({ sub, detail }) => {
   const pd = sub.pd;
   const pdEntries = Object.entries(pd) as [keyof PD, number][];
+  const [expandedPD, setExpandedPD] = useState<string | null>(null);
 
   const riskLabels: string[] = [];
   if (pd.hepatotoxicity >= 2) riskLabels.push('Гепатотоксичность высокая');
@@ -342,23 +354,30 @@ const DrugDetailCard: React.FC<{ sub: PharmaSubstance; detail?: PharmaDetail }> 
       </div>
 
       <div style={{ borderTop: '1px solid var(--border)', paddingTop: 8, marginBottom: 8 }}>
-        <div style={{ fontWeight: 600, marginBottom: 4 }}>Фармакодинамика</div>
-        {pdEntries.map(([key, val]) => {
-          const absVal = Math.abs(val);
-          const maxScale = key === 'AR_affinity' ? 2 : key === 'hct_impact' ? 6 : key === 'hepatotoxicity' ? 4 : 1.2;
-          const pct = Math.min(100, (absVal / maxScale) * 100);
-          return (
-            <div key={key} style={{ marginBottom: 3 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span>{PD_LABELS[key]}</span>
-                <span style={{ color: pdBarColor(key, val) }}>{val.toFixed(2)}</span>
-              </div>
-              <div style={{ background: 'var(--border)', borderRadius: 2, height: 4 }}>
-                <div style={{ width: `${pct}%`, background: pdBarColor(key, val), height: 4, borderRadius: 2 }} />
-              </div>
-            </div>
-          );
-        })}
+          <div style={{ fontWeight: 600, marginBottom: 4 }}>Фармакодинамика</div>
+            {pdEntries.map(([key, val]) => {
+              const absVal = Math.abs(val);
+              const maxScale = key === 'AR_affinity' ? 2 : key === 'hct_impact' ? 6 : key === 'hepatotoxicity' ? 4 : 1.2;
+              const pct = Math.min(100, (absVal / maxScale) * 100);
+              const mechanism = PD_MECHANISMS[key] || '';
+              const isExpanded = expandedPD === key;
+              return (
+                <div key={key} style={{ marginBottom: 3 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', cursor: 'pointer' }} onClick={() => setExpandedPD(isExpanded ? null : key)}>
+                    <span style={{ fontSize: 11 }}>{PD_LABELS[key]} {isExpanded ? '▾' : '▸'}</span>
+                    <span style={{ color: pdBarColor(key, val), fontWeight: 600 }}>{val.toFixed(2)}</span>
+                  </div>
+                  <div style={{ background: 'var(--border)', borderRadius: 2, height: 4 }}>
+                    <div style={{ width: `${pct}%`, background: pdBarColor(key, val), height: 4, borderRadius: 2, minWidth: 2 }} />
+                  </div>
+                  {isExpanded && mechanism && (
+                    <div style={{ fontSize: 9, color: 'var(--text-dim)', lineHeight: 1.4, marginTop: 2, padding: '3px 6px', background: 'rgba(255,255,255,0.03)', borderRadius: 4 }}>
+                      {mechanism}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
       </div>
 
       {effectLabels.length > 0 && (
