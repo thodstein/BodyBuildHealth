@@ -43,7 +43,7 @@ export function calculateMultiSubstancePKPD(
     for (let s = 0; s < stepsPerWeek; s++) {
       // RK4 шаг для каждого вещества параллельно
       states.forEach(state => {
-        state.A1 += state.dosePerDay * state.bio; // Импульс в депо
+        state.A1 += (state.dosePerDay * state.bio) * (dt / 24); // Доза делится на шаги РК4
         const f11 = -state.ka * state.A1;
         const f12 = state.ka * state.A1 - (state.k10 + state.k12) * state.A2 + state.k21 * state.A3;
         const f13 = state.k12 * state.A2 - state.k21 * state.A3;

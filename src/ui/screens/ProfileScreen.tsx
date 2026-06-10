@@ -16,6 +16,15 @@ const GOALS = [
   { id: 'recomposition', label: 'Рекомпозиция' }, { id: 'health', label: 'Здоровье' }
 ] as const;
 
+const WEIGHT_LOG_KEY = 'he_weight_log';
+interface WeightEntry { date: string; weight: number; }
+function getWeightLog(): WeightEntry[] {
+  try { return JSON.parse(localStorage.getItem(WEIGHT_LOG_KEY) || '[]'); } catch { return []; }
+}
+function saveWeightLog(log: WeightEntry[]) {
+  localStorage.setItem(WEIGHT_LOG_KEY, JSON.stringify(log.slice(-90)));
+}
+
 const DIET_TYPES = [
   { id: 'omnivore', label: 'Всеядное', icon: '🍽️' },
   { id: 'vegetarian', label: 'Вегетарианское', icon: '🥬' },
@@ -109,6 +118,7 @@ export const ProfileScreen: React.FC = () => {
   const [tab, setTab] = useState<ProfileTab>('overview');
   const [labs, setLabs] = useState<LabPoint[]>([]);
   const [editInjury, setEditInjury] = useState<InjuryRecord | null>(null);
+  const [weightLog, setWeightLog] = useState<WeightEntry[]>(getWeightLog);
 
   const s_ = profile.settings;
   const readinessScores = calcReadiness({
@@ -153,6 +163,12 @@ export const ProfileScreen: React.FC = () => {
   }, []);
 
   const save = (partial: Partial<UserProfile['settings']>) => {
+    if (partial.weight !== undefined && partial.weight !== s_.weight) {
+      const newEntry: WeightEntry = { date: new Date().toISOString().split('T')[0], weight: partial.weight };
+      const updated = [...weightLog.filter(w => w.date !== newEntry.date), newEntry].sort((a, b) => a.date.localeCompare(b.date));
+      setWeightLog(updated);
+      saveWeightLog(updated);
+    }
     updateProfile({ settings: { ...s_, ...partial } });
   };
 
@@ -295,6 +311,32 @@ export const ProfileScreen: React.FC = () => {
               ))}
             </div>
           </div>
+          {weightLog.length > 1 && (
+            <div style={s.card}>
+              <h4 style={{ margin: '0 0 8px' }}>История веса ({weightLog.length} записей)</h4>
+              <div style={{ display: 'flex', gap: 2, height: 50, alignItems: 'flex-end' }}>
+                {weightLog.slice(-30).map((e, i) => {
+                  const minW = Math.min(...weightLog.map(w => w.weight));
+                  const maxW = Math.max(...weightLog.map(w => w.weight));
+                  const range = maxW - minW || 1;
+                  const h = Math.max(4, ((e.weight - minW) / range) * 100);
+                  const isLast = i === weightLog.slice(-30).length - 1;
+                  return (
+                    <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}
+                      title={`${e.date}: ${e.weight} кг`}>
+                      <div style={{ width: '70%', height: `${h}%`, background: isLast ? 'var(--accent)' : 'rgba(0,230,138,0.3)', borderRadius: '1px 1px 0 0', minHeight: 2 }} />
+                      {i % 7 === 0 && <span style={{ fontSize: 6, color: 'var(--text-dim)' }}>{e.date.slice(5)}</span>}
+                    </div>
+                  );
+                })}
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: 'var(--text-dim)', marginTop: 2 }}>
+                <span>Мин: {Math.min(...weightLog.map(w => w.weight)).toFixed(1)} кг</span>
+                <span>Текущий: {weightLog[weightLog.length - 1]?.weight?.toFixed(1)} кг</span>
+                <span>Макс: {Math.max(...weightLog.map(w => w.weight)).toFixed(1)} кг</span>
+              </div>
+            </div>
+          )}
         </>
       )}
 

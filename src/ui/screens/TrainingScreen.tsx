@@ -61,6 +61,9 @@ export const TrainingScreen: React.FC = () => {
   const [recovery, setRecovery] = useState(7);
   const [fatigue, setFatigue] = useState(3);
   const [weakPoints, setWeakPoints] = useState<string[]>([]);
+  const [bodyWeight, setBodyWeight] = useState(80);
+  const [sleepHours, setSleepHours] = useState(7);
+  const [stressLevel, setStressLevel] = useState(5);
   const [trainingOutput, setTrainingOutput] = useState<TrainingOutput | null>(null);
   const [macrocycle, setMacrocycle] = useState<MacrocyclePlan | null>(null);
   const [selectedWeek, setSelectedWeek] = useState(1);
@@ -300,6 +303,23 @@ export const TrainingScreen: React.FC = () => {
                 <div style={{ textAlign: 'center', fontSize: 10, color: 'var(--text-dim)' }}>{fatigue}/10</div>
               </div>
             </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginBottom: 8 }}>
+              <div>
+                <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Вес (кг)</label>
+                <input type="number" value={bodyWeight} onChange={e => setBodyWeight(+e.target.value)}
+                  style={{ width: '100%', padding: '5px 6px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, boxSizing: 'border-box' }} />
+              </div>
+              <div>
+                <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Сон (ч)</label>
+                <input type="number" min={0} max={12} value={sleepHours} onChange={e => setSleepHours(+e.target.value)}
+                  style={{ width: '100%', padding: '5px 6px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, boxSizing: 'border-box' }} />
+              </div>
+              <div>
+                <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Стресс (1-10)</label>
+                <input type="number" min={1} max={10} value={stressLevel} onChange={e => setStressLevel(+e.target.value)}
+                  style={{ width: '100%', padding: '5px 6px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, boxSizing: 'border-box' }} />
+              </div>
+            </div>
             <div style={{ marginBottom: 8 }}>
               <label style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 2, display: 'block' }}>Слабые зоны</label>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
@@ -510,6 +530,22 @@ export const TrainingScreen: React.FC = () => {
                       </span>
                     </div>
                   )}
+                  {/* Workload ratio */}
+                  {currentMicrocycle && (
+                    <div style={{ marginTop: 4, padding: '6px 8px', background: 'rgba(255,255,255,0.03)', borderRadius: 4, fontSize: 9 }}>
+                      <span style={{ fontWeight: 600, color: 'var(--text-dim)' }}>🔬 Нагрузка: </span>
+                      <span style={{ color: 'var(--accent)' }}>Острая: {Math.round(currentMicrocycle.volumeMultiplier * bodyWeight * daysPerWeek)} кг/нед</span>
+                      <span style={{ color: 'var(--text-dim)', marginLeft: 6 }}>
+                        Хрон.: {Math.round(currentMicrocycle.volumeMultiplier * bodyWeight * daysPerWeek * 0.85)} кг/нед
+                      </span>
+                      <span style={{ marginLeft: 6, color: currentMicrocycle.mesocycleType === 'deload' ? '#22c55e' : currentMicrocycle.volumeMultiplier > 1.2 ? '#ef4444' : '#ff9100' }}>
+                        A/C: {(currentMicrocycle.volumeMultiplier * 100 / 85).toFixed(1)}%
+                      </span>
+                      <span style={{ marginLeft: 6, color: sleepHours < 6 ? '#ef4444' : sleepHours < 7 ? '#ff9100' : '#22c55e' }}>
+                        Сон: {sleepHours}ч | Стресс: {stressLevel}/10
+                      </span>
+                    </div>
+                  )}
                 </div>
               )}
             </>
@@ -711,7 +747,7 @@ export const TrainingScreen: React.FC = () => {
 
       {/* ═══════════ EXERCISES TAB ═══════════ */}
       {tab === 'exercises' && (
-        <div style={{ display: 'flex', gap: 8, flexDirection: selectedEx ? 'row' : 'column' }}>
+        <div style={{ display: 'flex', gap: 8, flexDirection: selectedEx ? 'row' : 'column', flexWrap: 'wrap' }}>
           <div style={{ flex: selectedEx ? '0 0 280px' : 1, maxHeight: 'calc(100vh - 200px)', display: 'flex', flexDirection: 'column' }}>
             <input type="text" value={exSearch} onChange={e => setExSearch(e.target.value)}
               placeholder="🔍 Поиск..."

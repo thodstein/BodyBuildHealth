@@ -20,6 +20,7 @@ import { calcReadiness } from '../../engines/readiness.engine';
 import { RISK_SYSTEMS, ALL_RISK_SYSTEMS } from '../../core/constants';
 import { db } from '../../core/db';
 import { getProfile } from '../../core/profile-manager';
+import { StrengthDiary } from '../../engines/strength-diary.engine';
 
 
 type ScreenId = 'dashboard' | 'pharma' | 'course' | 'peptides' | 'nutrition' | 'plan' | 'substances' | 'labs' | 'risks' | 'profile' | 'predictive' | 'marketplace' | 'articles' | 'assistant' | 'gamification' | 'fertility-pct' | 'calculators' | 'reports' | 'integrations' | 'role-management' | 'support' | 'training';
@@ -84,6 +85,8 @@ export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
   const [courseEntries, setCourseEntries] = useState<CourseEntry[]>([]);
   const [labData, setLabData] = useState<(LabPoint & { patientId?: string })[]>([]);
   const [abnormalLabs, setAbnormalLabs] = useState<{ code: string; name: string; value: number; unit: string; deviation: number }[]>([]);
+  const [trainingVolume, setTrainingVolume] = useState(0);
+  const [trainingWorkouts, setTrainingWorkouts] = useState(0);
   const { v7Result } = useV7Risk();
 
   useEffect(() => {
@@ -122,6 +125,17 @@ export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
         }
         abnormal.sort((a, b) => b.deviation - a.deviation);
         setAbnormalLabs(abnormal);
+      } catch {}
+
+      // Load training volume
+      try {
+        const diary = new StrengthDiary();
+        const progress = await diary.getWeeklyProgress();
+        if (progress.length > 0) {
+          const latest = progress[progress.length - 1];
+          setTrainingVolume(Math.round(latest.totalVolume));
+          setTrainingWorkouts(latest.workoutCount);
+        }
       } catch {}
 
       // Calculate risks
@@ -224,6 +238,12 @@ export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
           <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>Лабы</div>
           <div style={{ fontSize: 18, fontWeight: 700 }}>{labData.length}</div>
         </div>
+        {trainingWorkouts > 0 && (
+          <div style={{ background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', borderRadius: 10, padding: '6px 8px', textAlign: 'center' }}>
+            <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>Объём/нед</div>
+            <div style={{ fontSize: 18, fontWeight: 700, color: '#00e68a' }}>{trainingVolume.toLocaleString()} кг</div>
+          </div>
+        )}
       </div>
 
       {/* Readiness details */}

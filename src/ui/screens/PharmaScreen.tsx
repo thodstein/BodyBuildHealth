@@ -545,21 +545,17 @@ const PKPDSimulationTab: React.FC = () => {
   const buildEntries = (doses: DrugDose[]): CourseEntry[] => {
     const result: CourseEntry[] = [];
     doses.forEach((dd) => {
-      const scheduleSet = new Set(dd.frequencyDays);
+      const weeklyDose = dd.doseMg * dd.frequencyDays.length;
       for (let w = 0; w < dd.totalWeeks; w++) {
-        for (let d = 1; d <= 7; d++) {
-          if (scheduleSet.has(d)) {
-            result.push({
-              id: `${dd.substanceId}-${w}-${d}`,
-              substanceId: dd.substanceId,
-              doseValue: dd.doseMg,
-              doseUnit: 'mg',
-              frequency: `${scheduleSet.size}x/week`,
-              startWeek: 0,
-              endWeek: dd.totalWeeks,
-            });
-          }
-        }
+        result.push({
+          id: `${dd.substanceId}-w${w}`,
+          substanceId: dd.substanceId,
+          doseValue: weeklyDose,
+          doseUnit: 'mg/wk',
+          frequency: `${dd.frequencyDays.length}x/week`,
+          startWeek: w,
+          endWeek: w + 1,
+        });
       }
     });
     return result;

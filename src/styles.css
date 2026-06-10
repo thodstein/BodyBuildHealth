@@ -1634,6 +1634,21 @@ input[type="text"], input[type="number"], input[type="date"], select, textarea {
 
   /* Fix chart container */
   .nutrition-charts > div { min-width: 0 !important; }
+
+  /* Training screen mobile */
+  .training-screen .card { padding: 8px !important; }
+  .training-screen h3 { font-size: 13px !important; }
+  .training-screen h4 { font-size: 12px !important; }
+  .training-screen button { font-size: 10px !important; }
+  .training-screen select { font-size: 9px !important; }
+  /* Collapse 3-col grids to 2-col */
+  .training-screen div[style*="grid-template-columns: 1fr 1fr 1fr"] {
+    grid-template-columns: 1fr 1fr !important;
+  }
+  /* Exercise detail squeezed */
+  .training-screen div[style*="0 0 280px"] { 
+    flex: 0 0 100% !important; 
+  }
 }
 
 /* === Telegram Mini App Specific === */
@@ -1658,3 +1673,25 @@ input[type="text"], input[type="number"], input[type="date"], select, textarea {
 /* Prevent overscroll bounce in TG Mini App */
 html { overscroll-behavior: none; }
 body { overscroll-behavior: none; }
+
+/* === Beautiful Sub-tabs === */
+.tab-btn, .tab-button {
+  transition: all 0.2s ease;
+  border-radius: 10px !important;
+  letter-spacing: -0.01em;
+}
+.tab-btn.active, .tab-button.active {
+  box-shadow: 0 2px 8px rgba(0,230,138,0.2);
+}
+/* Card polish */
+.card {
+  border: 1px solid rgba(255,255,255,0.04) !important;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+/* Smooth slider */
+input[type="range"] {
+  transition: opacity 0.15s;
+}
+input[type="range"]:active {
+  opacity: 0.8;
+}

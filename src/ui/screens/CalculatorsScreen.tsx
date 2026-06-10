@@ -770,7 +770,7 @@ export const CalculatorsScreen: React.FC<CalcProps> = ({ initialTab = 'fitness' 
         <button className={'calc-tab-btn' + (activeTab === 'fitness' ? ' active' : '')} onClick={() => setActiveTab('fitness')}>Фитнес</button>
         <button className={'calc-tab-btn' + (activeTab === 'nutrition' ? ' active' : '')} onClick={() => setActiveTab('nutrition')}>Питание</button>
         <button className={'calc-tab-btn' + (activeTab === 'health' ? ' active' : '')} onClick={() => setActiveTab('health')}>Здоровье</button>
-        {/* Поддержка перенесена в отдельную вкладку */}
+        <button className={'calc-tab-btn' + (activeTab === 'support' ? ' active' : '')} onClick={() => setActiveTab('support')}>💊 Поддержка</button>
       </div>
 
       {activeTab === 'fitness' && (
@@ -1070,16 +1070,149 @@ export const CalculatorsScreen: React.FC<CalcProps> = ({ initialTab = 'fitness' 
 
       {activeTab === 'support' && (
         <div className="calculator-panel">
-          <div className="card" style={{ textAlign: 'center', padding: 24 }}>
-            <div style={{ fontSize: 32, marginBottom: 8 }}>💊</div>
-            <h3 style={{ margin: '0 0 8px 0' }}>Калькулятор поддержки перенесён</h3>
-            <p style={{ fontSize: 13, color: 'var(--text-dim)', margin: '0 0 16px 0' }}>
-              Функционал расчёта поддержки, подбора и выдачи препаратов перенесён на отдельную вкладку <strong>«Поддержка»</strong> в главной навигации.
-            </p>
-            <p style={{ fontSize: 12, color: 'var(--text-dim)' }}>
-              Там доступны: каталог БАДов, синергии, калькулятор рисков, проверка взаимодействий и рекомендации.
-            </p>
+          <div className="card" style={{ marginBottom: 12 }}>
+            <h3 style={{ margin: '0 0 8px 0' }}>🧮 Калькулятор поддержки</h3>
+            <p style={{ fontSize: 11, color: 'var(--text-dim)', margin: 0 }}>Автоматический подбор поддержки на основе вашего курса препаратов</p>
           </div>
+
+          <div className="card" style={{ marginBottom: 12 }}>
+            <h4 style={{ margin: '0 0 8px 0' }}>Цель</h4>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              {[
+                { v: 'muscle_gain', l: 'Набор массы' }, { v: 'fat_loss', l: 'Сушка' },
+                { v: 'strength', l: 'Сила' }, { v: 'endurance', l: 'Выносливость' },
+                { v: 'recomp', l: 'Рекомпозиция' }, { v: 'maintenance', l: 'Поддержание' },
+                { v: 'health', l: 'Здоровье' },
+              ].map(g => (
+                <button key={g.v} onClick={() => setSupportGoal(g.v)} style={{
+                  padding: '6px 12px', borderRadius: 8, fontSize: 12, cursor: 'pointer',
+                  background: supportGoal === g.v ? 'rgba(0,230,138,0.15)' : 'var(--bg-secondary)',
+                  border: supportGoal === g.v ? '1px solid var(--accent)' : '1px solid var(--border)',
+                  color: supportGoal === g.v ? '#00e68a' : 'var(--text-dim)', fontWeight: supportGoal === g.v ? 700 : 400,
+                }}>{g.l}</button>
+              ))}
+            </div>
+          </div>
+
+          <div className="card" style={{ marginBottom: 12 }}>
+            <h4 style={{ margin: '0 0 8px 0' }}>Препараты курса ({supportDrugs.length})</h4>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 8 }}>
+              {supportDrugs.map(id => {
+                const sub = PHARMA_DB[id];
+                return (
+                  <div key={id} style={{
+                    padding: '4px 10px', borderRadius: 16, fontSize: 11, fontWeight: 600,
+                    background: 'rgba(0,230,138,0.1)', border: '1px solid rgba(0,230,138,0.3)', color: '#00e68a',
+                    display: 'flex', alignItems: 'center', gap: 6,
+                  }}>
+                    {sub?.name || id}
+                    <button onClick={() => setSupportDrugs(supportDrugs.filter(d => d !== id))} style={{
+                      background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: 13, padding: 0, lineHeight: 1,
+                    }}>×</button>
+                  </div>
+                );
+              })}
+              {supportDrugs.length === 0 && (
+                <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>Нет препаратов. Добавьте курс во вкладке 💊 Фарма.</span>
+              )}
+            </div>
+            {supportDrugs.length > 0 && (
+              <div style={{ marginBottom: 8 }}>
+                <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 4 }}>Уровень защиты: <b style={{ color: 'var(--accent)', textTransform: 'uppercase' }}>{SUPPORT_LEVELS[autoLevel]?.label || autoLevel}</b> — {SUPPORT_LEVELS[autoLevel]?.desc}</div>
+                <div style={{ display: 'flex', gap: 4 }}>
+                  {(['basic', 'standard', 'enhanced', 'maximum'] as const).map(l => (
+                    <button key={l} onClick={() => setSupportLevel(l)} style={{
+                      padding: '4px 10px', borderRadius: 6, fontSize: 10, cursor: 'pointer',
+                      background: supportLevel === l ? 'rgba(0,230,138,0.2)' : 'var(--bg-secondary)',
+                      border: supportLevel === l ? '1px solid var(--accent)' : '1px solid var(--border)',
+                      color: supportLevel === l ? '#00e68a' : 'var(--text-dim)', fontWeight: supportLevel === l ? 700 : 400,
+                    }}>{SUPPORT_LEVELS[l]?.label}</button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {supportResult && (
+            <>
+              <div className="card" style={{ marginBottom: 12, textAlign: 'center' }}>
+                <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 4 }}>Индекс поддержки</div>
+                <div style={{ fontSize: 36, fontWeight: 800, color: (supportResult.supportScore ?? 100) > 70 ? '#22c55e' : (supportResult.supportScore ?? 100) > 40 ? '#eab308' : '#ef4444', lineHeight: 1 }}>
+                  {Math.round(supportResult.supportScore ?? 0)}%
+                </div>
+                <div style={{ background: 'rgba(255,255,255,0.08)', borderRadius: 6, height: 8, marginTop: 8, overflow: 'hidden' }}>
+                  <div style={{ width: `${Math.min(100, supportResult.supportScore ?? 0)}%`, height: '100%', background: 'linear-gradient(90deg, #ef4444, #eab308, #22c55e)', borderRadius: 6 }} />
+                </div>
+              </div>
+
+              <div className="card" style={{ marginBottom: 12 }}>
+                <h4 style={{ margin: '0 0 8px 0' }}>📋 Рекомендованные добавки ({SUPPORT_LEVELS[supportLevel]?.subs?.length || 0})</h4>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                  {SUPPORT_LEVELS[supportLevel]?.subs?.map(id => (
+                    <div key={id} style={{
+                      padding: '4px 10px', borderRadius: 16, fontSize: 10, fontWeight: 600,
+                      background: 'rgba(139,92,246,0.1)', border: '1px solid rgba(139,92,246,0.3)', color: '#8b5cf6',
+                    }}>
+                      {id.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="card" style={{ marginBottom: 12 }}>
+                <h4 style={{ margin: '0 0 8px 0' }}>📊 Покрытие систем</h4>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4 }}>
+                  {Object.entries(activeSystems).map(([sys, active]) => {
+                    const coverage = (supportResult as any)?.coverage?.[sys] ?? 0;
+                    const pct = Math.round(coverage * 100);
+                    return (
+                      <div key={sys} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 6px' }}>
+                        <button onClick={() => setActiveSystems({ ...activeSystems, [sys]: !active })} style={{
+                          width: 16, height: 16, borderRadius: 4, border: active ? 'none' : '1px solid var(--border)',
+                          background: active ? 'var(--accent)' : 'var(--bg-secondary)', cursor: 'pointer', padding: 0, flexShrink: 0,
+                        }}>
+                          {active ? '✓' : ''}
+                        </button>
+                        <span style={{ fontSize: 10, flex: 1 }}>{sys === 'cardio' ? 'ССС' : sys === 'hepatic' ? 'Печень' : sys === 'renal' ? 'Почки' : sys === 'neuro' ? 'Нервы' : sys === 'endocrine' ? 'Эндо' : sys === 'hematologic' ? 'Кровь' : sys === 'reproductive' ? 'Репрод' : sys === 'musculoskeletal' ? 'Суставы' : sys}</span>
+                        <div style={{ width: 40, background: 'rgba(255,255,255,0.08)', borderRadius: 3, height: 4, overflow: 'hidden' }}>
+                          <div style={{ width: `${pct}%`, height: '100%', background: pct > 60 ? '#22c55e' : pct > 30 ? '#eab308' : '#ef4444', borderRadius: 3 }} />
+                        </div>
+                        <span style={{ fontSize: 9, color: 'var(--text-dim)', minWidth: 22, textAlign: 'right' }}>{pct}%</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {supportDrugs.length > 0 && (
+                <div className="card" style={{ marginBottom: 12 }}>
+                  <h4 style={{ margin: '0 0 8px 0' }}>🔬 Детали по препаратам</h4>
+                  {supportDrugs.map(id => {
+                    const med = SUPPORT_MED_DETAIL[id];
+                    const name = PHARMA_DB[id]?.name || id;
+                    if (!med) return null;
+                    return (
+                      <div key={id} style={{ marginBottom: 6, background: 'var(--bg-secondary)', borderRadius: 6, padding: 8 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', cursor: 'pointer' }} onClick={() => setExpandedMed(expandedMed === id ? null : id)}>
+                          <span style={{ fontWeight: 600, fontSize: 12 }}>{name}</span>
+                          <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>{expandedMed === id ? '▾' : '▸'}</span>
+                        </div>
+                        {expandedMed === id && (
+                          <div style={{ marginTop: 6, fontSize: 10, color: 'var(--text-dim)', lineHeight: 1.5 }}>
+                            <div style={{ marginBottom: 4 }}>{med.description}</div>
+                            <div style={{ marginBottom: 4 }}><b>Механизм:</b> {med.mechanism}</div>
+                            {med.risks && med.risks.length > 0 && (
+                              <div style={{ color: '#ef4444' }}>⚠ {med.risks.join(' · ')}</div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </>
+          )}
         </div>
       )}
     </div>
