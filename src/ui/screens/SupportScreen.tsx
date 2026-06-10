@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { SYNERGY_PAIRS, SUPPLEMENT_DESCRIPTIONS, SUPPLEMENT_TARGETS, SUPPORT_RESEARCH, calculateSupport, type SupportInput, type SynergyPair, type SupplementTarget } from '../../engines/support.engine';
 import { RISK_SYSTEMS, ALL_RISK_SYSTEMS } from '../../core/constants';
 import { PHARMA_DB } from '../../core/pharma-database';
@@ -10,7 +10,7 @@ import { INTERACTIONS_DB } from '../../data/interactions';
 import { generateWeeklyProtocol } from '../../engines/auto-plan.engine';
 import type { CourseEntry } from '../../core/types';
 
-type SupportTab = 'catalog' | 'synergies' | 'calculator' | 'interactions' | 'recommendations' | 'protocol';
+type SupportTab = 'catalog' | 'synergies' | 'calculator' | 'interactions' | 'protocol';
 
 const SYNERGY_COLORS: Record<string, string> = {
   synergistic: '#22c55e',
@@ -37,9 +37,65 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   const [systemFilter, setSystemFilter] = useState<string>('all');
   const [supportClassFilter, setSupportClassFilter] = useState<string>('all');
   const [supportLevel, setSupportLevel] = useState<'basic' | 'standard' | 'enhanced' | 'maximum'>('standard');
-  const [prescribedMeds, setPrescribedMeds] = useState<Record<string, boolean>>({});
-  const [supportResult, setSupportResult] = useState<{ riskBefore: Record<string, number>; riskAfter: Record<string, number>; score: number } | null>(null);
+  const [supportGoal, setSupportGoal] = useState('muscle_gain');
+  const [supportDrugs, setSupportDrugs] = useState<string[]>([]);
+  const [autoLevel, setAutoLevel] = useState<'basic' | 'standard' | 'enhanced' | 'maximum'>('standard');
+  const [expandedMed, setExpandedMed] = useState<string | null>(null);
+  const [activeSystems, setActiveSystems] = useState<Record<string, boolean>>({
+    cardio: true, hepatic: true, renal: true, neuro: true, endocrine: true, hematologic: true, reproductive: true, musculoskeletal: true,
+  });
+  const [supportResult, setSupportResult] = useState<ReturnType<typeof calculateSupport> | null>(null);
   const [autoProtocol, setAutoProtocol] = useState<ReturnType<typeof generateWeeklyProtocol> | null>(null);
+
+  const SUPPORT_LEVELS: Record<string, { label: string; desc: string; subs: string[] }> = {
+    basic: { label: 'Базовый минимум', desc: 'Обязательная защита печени и ССС', subs: ['nac', 'omega3', 'vitamin_d3'] },
+    standard: { label: 'Умный среднячок', desc: 'Комплексная защита всех ключевых систем + суставы', subs: ['nac', 'omega3', 'tudca', 'magnesium', 'vitamin_d3', 'coq10', 'zinc', 'vitamin_k2', 'vitamin_b12', 'glucosamine', 'collagen'] },
+    enhanced: { label: 'Усиление', desc: 'Максимальная защита + нейро + почки + кровь + суставы + антиоксиданты', subs: ['nac', 'omega3', 'tudca', 'magnesium', 'vitamin_d3', 'coq10', 'zinc', 'berberine', 'ashwagandha', 'alpha_lipoic', 'vitamin_k2', 'selenium', 'milk_thistle', 'vitamin_b12', 'folate', 'taurine', 'glucosamine', 'msm', 'collagen', 'vitamin_c', 'bpc157'] },
+    maximum: { label: 'Полный максимум', desc: 'Абсолютная защита + рецептурные + ХГЧ + все системы + суставы + пептиды', subs: ['nac', 'omega3', 'tudca', 'magnesium', 'vitamin_d3', 'coq10', 'zinc', 'berberine', 'ashwagandha', 'alpha_lipoic', 'telmisartan', 'nebivolol', 'saw_palmetto', 'hcg', 'vitamin_k2', 'selenium', 'milk_thistle', 'probiotics', 'vitamin_b12', 'folate', 'iron', 'copper', 'astragalus', 'taurine', 'melatonin', 'ginseng', 'egcg', 'curcumin', 'phosphatidylcholine', 'l_carnitine', 'glucosamine', 'chondroitin', 'msm', 'collagen', 'hyaluronic', 'boswellia', 'vitamin_c', 'bromelain', 'bpc157', 'tb500'] },
+  };
+
+  useEffect(() => {
+    const s = linked.profile?.settings;
+    if (!s) return;
+    const goalMap: Record<string, string> = { bulk: 'muscle_gain', cut: 'fat_loss', strength: 'strength', endurance: 'endurance', recomp: 'recomp', maintenance: 'maintenance' };
+    const goal = s.goal || s.primaryGoal || 'maintenance';
+    if (goalMap[goal]) setSupportGoal(goalMap[goal]);
+    if (linked.course.length > 0) setSupportDrugs(linked.course.map(c => c.substanceId));
+  }, []);
+
+  useEffect(() => {
+    const HIGH_RISK = ['trenbolone_acetate', 'trenbolone_enanthate', 'methandienone', 'stanozolol', 'oxandrolone'];
+    const ORAL_17AA = ['methandienone', 'stanozolol', 'oxandrolone', 'halodrol'];
+    let hasHighRisk = false, hasOral = false, count = supportDrugs.length;
+    for (const id of supportDrugs) {
+      if (HIGH_RISK.includes(id)) hasHighRisk = true;
+      if (ORAL_17AA.includes(id)) hasOral = true;
+    }
+    let level: 'basic' | 'standard' | 'enhanced' | 'maximum' = 'basic';
+    if (hasHighRisk || (hasOral && count >= 2)) level = 'maximum';
+    else if (hasOral || count >= 3) level = 'enhanced';
+    else if (count >= 1) level = 'standard';
+    setAutoLevel(level);
+    setSupportLevel(level);
+  }, [supportDrugs]);
+
+  const calcSupport = () => {
+    const s = linked.profile?.settings;
+    const input: SupportInput = {
+      userId: linked.profile?.id || 'current',
+      substances: supportDrugs.length > 0 ? supportDrugs : (linked.course?.map(c => c.substanceId) || []),
+      goals: [supportGoal],
+      labs: (linked.labs || []).map(l => ({ code: l.code, value: l.value })),
+      demographics: { age: s?.age ?? 30, weight: s?.weight ?? 80, sex: (s?.sex ?? 'male') as 'male' | 'female' },
+      genetics: s?.genetics,
+      nutritionFactor: s?.nutritionFactor ?? 0.8,
+      trainingFactor: s?.trainingFactor ?? 0.7,
+      drugDoses: Object.fromEntries((linked.course || []).map(c => [c.substanceId, c.doseValue])),
+    };
+    setSupportResult(calculateSupport(input));
+  };
+
+  useEffect(() => { if (supportDrugs.length > 0) calcSupport(); }, [supportDrugs, supportGoal, supportLevel]);
 
   // Interaction checker state
   const [interactionIds, setInteractionIds] = useState<string[]>(['', '']);
@@ -124,28 +180,6 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
     return pairs;
   }, [synergyFilter, systemFilter, supportSynergies]);
 
-  const handleCalculateSupport = () => {
-    const input: SupportInput = {
-      userId: linked.profile.id || 'current-user',
-      substances: linked.course.map(c => c.substanceId),
-      goals: [linked.profile.settings?.goal ?? 'maintenance'],
-      labs: linked.labs.map(l => ({ code: l.code, value: l.value })),
-      demographics: { age: linked.profile.settings?.age ?? 30, weight: linked.profile.settings?.weight ?? 70, sex: (linked.profile.settings?.sex ?? 'male') as 'male' | 'female' },
-      genetics: linked.profile.settings?.genetics,
-      nutritionFactor: linked.profile.settings?.nutritionFactor ?? 1.0,
-      trainingFactor: linked.profile.settings?.trainingFactor ?? 1.0,
-      drugDoses: Object.fromEntries(Object.entries(linked.activeDrugs).map(([k, v]) => [k, v.dosePerWeek])),
-    };
-    const result = calculateSupport(input);
-    const riskBefore: Record<string, number> = {};
-    const riskAfter: Record<string, number> = {};
-    for (const sys of ALL_RISK_SYSTEMS) {
-      riskBefore[sys] = result.riskAssessment?.systemBreakdown?.[sys]?.raw ?? 0;
-      riskAfter[sys] = result.riskAssessment?.systemBreakdown?.[sys]?.net ?? 0;
-    }
-    setSupportResult({ riskBefore, riskAfter, score: result.supportScore ?? 0 });
-  };
-
   const systemLabels: Record<string, string> = Object.fromEntries(ALL_RISK_SYSTEMS.map(k => [k, SYSTEM_INFO_ALL[k]?.label ?? k]));
 
   const selectedDetail = selectedSub ? supplementList.find(s => s.id === selectedSub) : null;
@@ -190,13 +224,13 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   return (
     <div className="screen support-screen">
       <div style={{ display: 'flex', gap: 4, marginBottom: 12, overflowX: 'auto', scrollbarWidth: 'none' }}>
-        {(['catalog', 'synergies', 'calculator', 'interactions', 'recommendations', 'protocol'] as SupportTab[]).map(t => (
+        {(['catalog', 'synergies', 'calculator', 'interactions', 'protocol'] as SupportTab[]).map(t => (
           <button key={t} onClick={() => setTab(t)} style={{
             flex: 1, padding: '10px 8px', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600,
             background: tab === t ? 'var(--accent-green, #00e68a)' : 'var(--bg-secondary)',
             color: tab === t ? '#000' : 'var(--text-dim)', cursor: 'pointer', transition: 'background 0.15s', whiteSpace: 'nowrap',
           }}>
-            {t === 'catalog' ? '📖 Каталог' : t === 'synergies' ? '🔗 Синергии' : t === 'calculator' ? '🧮 Калькулятор' : t === 'interactions' ? '⚡ Взаимод.' : t === 'recommendations' ? '💡 Реком.' : '📅 Протокол'}
+            {t === 'catalog' ? '📖 Каталог' : t === 'synergies' ? '🔗 Синергии' : t === 'calculator' ? '🧮 Калькулятор' : t === 'interactions' ? '⚡ Взаимод.' : '📅 Протокол'}
           </button>
         ))}
       </div>
@@ -355,7 +389,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
             <p style={{ fontSize: 11, color: 'var(--text-dim)', margin: '0 0 12px 0' }}>
               Расчёт индекса поддержки и снижения рисков на основе всех источников: препараты, анализы, питание, тренировки, генетика
             </p>
-            <button onClick={handleCalculateSupport} style={{
+            <button onClick={calcSupport} style={{
               width: '100%', padding: '14px', borderRadius: 8, border: 'none', cursor: 'pointer',
               background: 'linear-gradient(135deg, #00e68a, #00c853)', color: '#000', fontWeight: 700, fontSize: 15,
               boxShadow: '0 2px 8px rgba(0,230,138,0.3)',
@@ -364,43 +398,102 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
             </button>
           </div>
 
+          <div className="card" style={{ marginBottom: 12 }}>
+            <h4 style={{ margin: '0 0 6px 0', fontSize: 12 }}>Цель</h4>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+              {[{ v: 'muscle_gain', l: 'Набор массы' }, { v: 'fat_loss', l: 'Сушка' }, { v: 'strength', l: 'Сила' }, { v: 'endurance', l: 'Выносливость' }, { v: 'recomp', l: 'Рекомпозиция' }, { v: 'maintenance', l: 'Поддержание' }].map(g => (
+                <button key={g.v} onClick={() => setSupportGoal(g.v)} style={{
+                  padding: '5px 10px', borderRadius: 6, fontSize: 11, cursor: 'pointer',
+                  background: supportGoal === g.v ? 'rgba(0,230,138,0.15)' : 'var(--bg-secondary)',
+                  border: supportGoal === g.v ? '1px solid var(--accent)' : '1px solid var(--border)',
+                  color: supportGoal === g.v ? '#00e68a' : 'var(--text-dim)', fontWeight: supportGoal === g.v ? 700 : 400,
+                }}>{g.l}</button>
+              ))}
+            </div>
+            <div style={{ marginTop: 8, fontSize: 11, color: 'var(--text-dim)' }}>
+              Препаратов: <b style={{ color: 'var(--accent)' }}>{linked.course.length}</b> | Авто-уровень: <b style={{ color: '#8b5cf6' }}>{SUPPORT_LEVELS[autoLevel]?.label || autoLevel}</b>
+              <div style={{ display: 'flex', gap: 3, marginTop: 4 }}>
+                {(['basic', 'standard', 'enhanced', 'maximum'] as const).map(l => (
+                  <button key={l} onClick={() => setSupportLevel(l)} style={{
+                    padding: '3px 8px', borderRadius: 4, fontSize: 10, cursor: 'pointer',
+                    background: supportLevel === l ? 'rgba(0,230,138,0.2)' : 'var(--bg-secondary)',
+                    border: supportLevel === l ? '1px solid var(--accent)' : '1px solid var(--border)',
+                    color: supportLevel === l ? '#00e68a' : 'var(--text-dim)', fontWeight: supportLevel === l ? 700 : 400,
+                  }}>{SUPPORT_LEVELS[l]?.label}</button>
+                ))}
+              </div>
+            </div>
+          </div>
+
           {supportResult && (
-            <div>
+            <>
               <div className="card" style={{ marginBottom: 12, textAlign: 'center' }}>
                 <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 4 }}>Индекс поддержки</div>
-                <div style={{ fontSize: 36, fontWeight: 800, color: getRiskColor(100 - supportResult.score), lineHeight: 1 }}>
-                  {Math.round(supportResult.score)}%
+                <div style={{ fontSize: 36, fontWeight: 800, color: (supportResult.supportScore ?? 100) > 70 ? '#22c55e' : (supportResult.supportScore ?? 100) > 40 ? '#eab308' : '#ef4444', lineHeight: 1 }}>
+                  {Math.round(supportResult.supportScore ?? 0)}%
                 </div>
                 <div style={{ background: 'rgba(255,255,255,0.08)', borderRadius: 6, height: 8, marginTop: 8, overflow: 'hidden' }}>
-                  <div style={{ width: `${Math.min(100, supportResult.score)}%`, height: '100%', background: `linear-gradient(90deg, #ef4444, #eab308, #22c55e)`, borderRadius: 6, transition: 'width 0.5s' }} />
+                  <div style={{ width: `${Math.min(100, supportResult.supportScore ?? 0)}%`, height: '100%', background: 'linear-gradient(90deg, #ef4444, #eab308, #22c55e)', borderRadius: 6 }} />
                 </div>
               </div>
+
               <div className="card" style={{ marginBottom: 12 }}>
-                <h4 style={{ margin: '0 0 8px 0', fontSize: 13 }}>Риски по всем системам — до и после поддержки</h4>
-                {ALL_RISK_SYSTEMS.map(sys => {
-                  const before = supportResult.riskBefore[sys] ?? 0;
-                  const after = supportResult.riskAfter[sys] ?? 0;
-                  const reduction = before > 0 ? ((before - after) / before * 100) : 0;
+                <h4 style={{ margin: '0 0 6px 0', fontSize: 12 }}>📊 Риски — до и после поддержки</h4>
+                {ALL_RISK_SYSTEMS.slice(0, 8).map(sys => {
+                  const before = supportResult?.riskAssessment?.systemBreakdown?.[sys]?.raw ?? 0;
+                  const after = supportResult?.riskAssessment?.systemBreakdown?.[sys]?.net ?? 0;
+                  const reduction = before > 0 ? Math.round(((before - after) / before) * 100) : 0;
                   return (
-                    <div key={sys} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0', borderBottom: '1px solid var(--border-color)' }}>
-                      <span style={{ fontSize: 14 }}>{SYSTEM_INFO_ALL[sys]?.icon || ''}</span>
-                      <span style={{ flex: 1, fontSize: 12, fontWeight: 500 }}>{systemLabels[sys]}</span>
-                      <span style={{ fontSize: 12, color: getRiskColor(before), fontWeight: 600 }}>{Math.round(before)}%</span>
-                      <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>{'\u2192'}</span>
-                      <span style={{ fontSize: 12, color: getRiskColor(after), fontWeight: 600 }}>{Math.round(after)}%</span>
-                      {reduction > 0 && <span style={{ fontSize: 10, color: '#22c55e', fontWeight: 600 }}>{'\u2193'}{reduction.toFixed(0)}%</span>}
+                    <div key={sys} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '3px 0', borderBottom: '1px solid var(--border-color)', fontSize: 11 }}>
+                      <span style={{ fontSize: 13, minWidth: 18 }}>{SYSTEM_INFO_ALL[sys]?.icon || ''}</span>
+                      <span style={{ flex: 1, fontWeight: 500 }}>{systemLabels[sys]}</span>
+                      <span style={{ fontSize: 10, color: getRiskColor(before), fontWeight: 600, minWidth: 24, textAlign: 'right' }}>{Math.round(before)}%</span>
+                      <span style={{ fontSize: 9, color: 'var(--text-dim)' }}>→</span>
+                      <span style={{ fontSize: 10, color: getRiskColor(after), fontWeight: 600, minWidth: 24, textAlign: 'right' }}>{Math.round(after)}%</span>
+                      {reduction > 0 && <span style={{ fontSize: 9, color: '#22c55e', fontWeight: 600, minWidth: 30, textAlign: 'right' }}>↓{reduction}%</span>}
                     </div>
                   );
                 })}
               </div>
-              <div className="card" style={{ fontSize: 11, color: 'var(--text-dim)', padding: 8 }}>
-                Риски рассчитаны с учётом: {linked.course.length > 0 ? `${linked.course.length} препаратов` : '0 препаратов'}
-                {linked.labs.length > 0 ? `, ${linked.labs.length} анализов` : ''}
-                {linked.profile.settings?.nutritionFactor ? ', питания' : ''}
-                {linked.profile.settings?.trainingFactor ? ', тренировок' : ''}
-                {linked.profile.settings?.genetics ? ', генетики' : ''}
+
+              <div className="card" style={{ marginBottom: 12 }}>
+                <h4 style={{ margin: '0 0 6px 0', fontSize: 12 }}>🛡 Покрытие систем</h4>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4 }}>
+                  {Object.entries(activeSystems).map(([sys, _]) => {
+                    const cov = supportResult?.systemSupport?.[sys] ?? 0;
+                    const pct = Math.round(cov * 100);
+                    return (
+                      <div key={sys} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '2px 4px' }}>
+                        <span style={{ fontSize: 10, flex: 1 }}>{sys === 'cardio' ? 'ССС' : sys === 'hepatic' ? 'Печень' : sys === 'renal' ? 'Почки' : sys === 'neuro' ? 'Нервы' : sys === 'endocrine' ? 'Эндо' : sys === 'hematologic' ? 'Кровь' : sys === 'reproductive' ? 'Репрод' : sys === 'musculoskeletal' ? 'Суставы' : sys}</span>
+                        <div style={{ width: 35, background: 'rgba(255,255,255,0.08)', borderRadius: 2, height: 5, overflow: 'hidden' }}>
+                          <div style={{ width: `${Math.min(100, pct)}%`, height: '100%', background: pct > 60 ? '#22c55e' : pct > 30 ? '#eab308' : '#ef4444', borderRadius: 2 }} />
+                        </div>
+                        <span style={{ fontSize: 8, color: 'var(--text-dim)', minWidth: 20, textAlign: 'right' }}>{pct}%</span>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
-            </div>
+
+              <div className="card" style={{ marginBottom: 12 }}>
+                <h4 style={{ margin: '0 0 6px 0', fontSize: 12 }}>📋 Рекомендованные добавки</h4>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
+                  {SUPPORT_LEVELS[supportLevel]?.subs?.slice(0, 15).map(id => (
+                    <span key={id} style={{ fontSize: 9, padding: '2px 6px', borderRadius: 4, background: 'rgba(139,92,246,0.1)', color: '#8b5cf6', fontWeight: 500 }}>
+                      {id.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
+                    </span>
+                  ))}
+                </div>
+              </div>
+
+              <div className="card" style={{ fontSize: 10, color: 'var(--text-dim)', padding: 8 }}>
+                <div style={{ marginBottom: 2 }}>
+                  <b>Общий риск:</b> до <span style={{ color: getRiskColor(supportResult?.riskBeforeSupport ?? 0), fontWeight: 600 }}>{Math.round(supportResult?.riskBeforeSupport ?? 0)}%</span>
+                  {' → '}после <span style={{ color: getRiskColor(supportResult?.riskAfterSupport ?? 0), fontWeight: 600 }}>{Math.round(supportResult?.riskAfterSupport ?? 0)}%</span>
+                </div>
+                <div>Источники: {linked.course.length} препаратов, {linked.labs.length} анализов, питание, тренировки{linked.profile?.settings?.genetics ? ', генетика' : ''}</div>
+              </div>
+            </>
           )}
         </div>
       )}
@@ -510,99 +603,6 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
         </div>
       )}
 
-      {/* ===== RECOMMENDATIONS ===== */}
-      {tab === 'recommendations' && (
-        <div>
-          <div className="card" style={{ marginBottom: 12, textAlign: 'center' }}>
-            <h3 style={{ margin: '0 0 4px 0', fontSize: 14, color: 'var(--accent)' }}>💡 Рекомендации</h3>
-            <p style={{ fontSize: 13, color: 'var(--text-light)', margin: '0 0 12px 0' }}>
-              Автоматический подбор поддержки на основе текущего курса, анализов и рисков
-            </p>
-            <button onClick={handleCalculateSupport} style={{
-              padding: '10px 24px', borderRadius: 8, border: 'none', cursor: 'pointer',
-              background: 'var(--accent-green, #00e68a)', color: '#000', fontWeight: 700, fontSize: 14,
-            }}>
-              Рассчитать оптимальную поддержку
-            </button>
-          </div>
-
-          {supportResult && (
-            <div>
-              <div className="card" style={{ marginBottom: 12, textAlign: 'center' }}>
-                <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 4 }}>Индекс поддержки</div>
-                <div style={{ fontSize: 36, fontWeight: 800, color: getRiskColor(100 - supportResult.score), lineHeight: 1 }}>
-                  {Math.round(supportResult.score)}%
-                </div>
-                <div style={{ background: 'rgba(255,255,255,0.08)', borderRadius: 6, height: 8, marginTop: 8, overflow: 'hidden' }}>
-                  <div style={{ width: `${Math.min(100, supportResult.score)}%`, height: '100%', background: 'linear-gradient(90deg, #ef4444, #eab308, #22c55e)', borderRadius: 6, transition: 'width 0.5s' }} />
-                </div>
-              </div>
-
-              <div className="card" style={{ marginBottom: 12 }}>
-                <h4 style={{ margin: '0 0 8px 0', fontSize: 13 }}>Системы с наибольшим снижением риска</h4>
-                {ALL_RISK_SYSTEMS
-                  .map(sys => ({ sys, before: supportResult.riskBefore[sys] ?? 0, after: supportResult.riskAfter[sys] ?? 0 }))
-                  .filter(x => x.before > 0)
-                  .sort((a, b) => (b.before - b.after) - (a.before - a.after))
-                  .slice(0, 5)
-                  .map(({ sys, before, after }) => {
-                    const reduction = before > 0 ? ((before - after) / before * 100) : 0;
-                    return (
-                      <div key={sys} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0', borderBottom: '1px solid var(--border-color)' }}>
-                        <span style={{ fontSize: 14 }}>{SYSTEM_INFO_ALL[sys]?.icon || ''}</span>
-                        <span style={{ flex: 1, fontSize: 12, fontWeight: 500 }}>{systemLabels[sys]}</span>
-                        <span style={{ fontSize: 12, color: getRiskColor(before), fontWeight: 600 }}>{Math.round(before)}%</span>
-                        <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>{'\u2192'}</span>
-                        <span style={{ fontSize: 12, color: getRiskColor(after), fontWeight: 600 }}>{Math.round(after)}%</span>
-                        {reduction > 0 && <span style={{ fontSize: 10, color: '#22c55e', fontWeight: 600 }}>{'\u2193'}{reduction.toFixed(0)}%</span>}
-                      </div>
-                    );
-                  })}
-                {ALL_RISK_SYSTEMS.filter(sys => (supportResult.riskBefore[sys] ?? 0) <= 0).length === ALL_RISK_SYSTEMS.length && (
-                  <div style={{ textAlign: 'center', padding: 12, color: 'var(--text-dim)', fontSize: 12 }}>Нет данных для рекомендаций</div>
-                )}
-              </div>
-
-              <div className="card" style={{ marginBottom: 12 }}>
-                <h4 style={{ margin: '0 0 8px 0', fontSize: 13, color: '#00e68a' }}>🎯 Рекомендованные добавки</h4>
-                {ALL_RISK_SYSTEMS
-                  .map(sys => ({ sys, before: supportResult.riskBefore[sys] ?? 0, after: supportResult.riskAfter[sys] ?? 0 }))
-                  .filter(x => x.before > 20)
-                  .sort((a, b) => b.before - a.before)
-                  .slice(0, 4)
-                  .map(({ sys, before }) => {
-                    const supportedBy = supplementList.filter(s => s.targets?.systems?.includes(sys));
-                    return (
-                      <div key={sys} style={{ padding: '8px 0', borderBottom: '1px solid var(--border-color)' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-                          <span style={{ fontSize: 14 }}>{SYSTEM_INFO_ALL[sys]?.icon || ''}</span>
-                          <span style={{ fontWeight: 600, fontSize: 13 }}>{systemLabels[sys]}</span>
-                          <span style={{ fontSize: 11, padding: '1px 6px', borderRadius: 4, background: getRiskColor(before) + '22', color: getRiskColor(before), fontWeight: 600 }}>{Math.round(before)}%</span>
-                        </div>
-                        {supportedBy.length > 0 ? (
-                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, marginLeft: 20 }}>
-                            {supportedBy.slice(0, 3).map(s => (
-                              <span key={s.id} style={{ fontSize: 10, padding: '2px 6px', borderRadius: 4, background: 'rgba(0,230,138,0.08)', color: '#00e68a' }}>{s.name}</span>
-                            ))}
-                          </div>
-                        ) : (
-                          <div style={{ marginLeft: 20, fontSize: 10, color: 'var(--text-dim)' }}>Нет доступных добавок для этой системы</div>
-                        )}
-                      </div>
-                    );
-                  })}
-              </div>
-
-              <div className="card" style={{ fontSize: 11, color: 'var(--text-dim)', padding: 8 }}>
-                Рекомендации основаны на: {linked.course.length > 0 ? `${linked.course.length} препаратов` : '0 препаратов'}
-                {linked.labs.length > 0 ? `, ${linked.labs.length} анализов` : ''}
-                {linked.profile.settings?.nutritionFactor ? ', питания' : ''}
-                {linked.profile.settings?.trainingFactor ? ', тренировок' : ''}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
       {/* ===== PROTOCOL ===== */}
       {tab === 'protocol' && (
         <div>

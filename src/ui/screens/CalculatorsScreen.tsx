@@ -2,12 +2,16 @@ import React, { useState, useEffect } from 'react';
 import { calculateDose } from '../../engines/dosage.engine';
 import { SYRINGE_SPECS, DRUG_THRESHOLDS, SUPPORT_BASE_COVERAGE } from '../../core/constants';
 import { calcNutrition } from '../../engines/nutrition.engine';
-import { calculateSupport, generateSupportStack } from '../../engines/support.engine';
+import { calculateSupport, SYNERGY_PAIRS, SUPPLEMENT_DESCRIPTIONS, type SupportInput } from '../../engines/support.engine';
 import { PHARMA_DB, SUBSTANCES_BY_CLASS } from '../../core/pharma-database';
 import { getProfile } from '../../core/profile-manager';
 import { db } from '../../core/db';
 import { INTERACTIONS_DB } from '../../data/interactions';
-import type { DoseRequest, NutritionInput, CourseEntry } from '../../core/types';
+import { useDataLink } from '../../core/data-link';
+import { SYSTEM_INFO_ALL } from '../../core/risk-info';
+import { ALL_RISK_SYSTEMS } from '../../core/constants';
+import { getRiskColor } from '../../core/utils/risk-colors';
+import type { DoseRequest, NutritionInput, CourseEntry, LabPoint } from '../../core/types';
 
 const PAL_OPTIONS = [
   { value: 1.2, label: 'Минимальная (сидячий образ жизни)' },
@@ -531,6 +535,7 @@ interface CalcProps {
 }
 
 export const CalculatorsScreen: React.FC<CalcProps> = ({ initialTab = 'fitness' }) => {
+  const linked = useDataLink();
   const [activeTab, setActiveTab] = useState<'fitness' | 'nutrition' | 'health' | 'support'>(initialTab);
 
   const [bmiWeight, setBmiWeight] = useState(70);
@@ -646,11 +651,19 @@ export const CalculatorsScreen: React.FC<CalcProps> = ({ initialTab = 'fitness' 
   }, []);
 
   const calcSupport = () => {
-    const result = calculateSupport({
-      substances: supportDrugs,
+    const s = getProfile().settings;
+    const input: SupportInput = {
+      userId: linked.profile?.id || 'current',
+      substances: supportDrugs.length > 0 ? supportDrugs : (linked.course?.map(c => c.substanceId) || []),
       goals: [supportGoal],
-      drugDoses: Object.fromEntries(supportDrugs.map(id => [id, 100]))
-    });
+      labs: (linked.labs || []).map(l => ({ code: l.code, value: l.value })),
+      demographics: { age: s?.age ?? 30, weight: s?.weight ?? 80, sex: (s?.sex ?? 'male') as 'male' | 'female' },
+      genetics: s?.genetics,
+      nutritionFactor: s?.nutritionFactor ?? 0.8,
+      trainingFactor: s?.trainingFactor ?? 0.7,
+      drugDoses: Object.fromEntries((linked.course || []).map(c => [c.substanceId, c.doseValue])),
+    };
+    const result = calculateSupport(input);
     setSupportResult(result);
   };
 
@@ -1160,22 +1173,36 @@ export const CalculatorsScreen: React.FC<CalcProps> = ({ initialTab = 'fitness' 
               </div>
 
               <div className="card" style={{ marginBottom: 12 }}>
-                <h4 style={{ margin: '0 0 8px 0' }}>📊 Покрытие систем</h4>
+                <h4 style={{ margin: '0 0 8px 0' }}>📊 Риски — до и после поддержки</h4>
+                {ALL_RISK_SYSTEMS.slice(0, 8).map(sys => {
+                  const before = supportResult?.riskAssessment?.systemBreakdown?.[sys]?.raw ?? 0;
+                  const after = supportResult?.riskAssessment?.systemBreakdown?.[sys]?.net ?? 0;
+                  const reduction = before > 0 ? Math.round(((before - after) / before) * 100) : 0;
+                  const sysLabel = SYSTEM_INFO_ALL[sys]?.label || sys;
+                  return (
+                    <div key={sys} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '3px 0', borderBottom: '1px solid var(--border-color)', fontSize: 11 }}>
+                      <span style={{ fontSize: 13, minWidth: 18 }}>{SYSTEM_INFO_ALL[sys]?.icon || ''}</span>
+                      <span style={{ flex: 1, fontWeight: 500 }}>{sysLabel}</span>
+                      <span style={{ fontSize: 10, color: getRiskColor(before), fontWeight: 600, minWidth: 24, textAlign: 'right' }}>{Math.round(before)}%</span>
+                      <span style={{ fontSize: 9, color: 'var(--text-dim)' }}>→</span>
+                      <span style={{ fontSize: 10, color: getRiskColor(after), fontWeight: 600, minWidth: 24, textAlign: 'right' }}>{Math.round(after)}%</span>
+                      {reduction > 0 && <span style={{ fontSize: 9, color: '#22c55e', fontWeight: 600, minWidth: 30, textAlign: 'right' }}>↓{reduction}%</span>}
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="card" style={{ marginBottom: 12 }}>
+                <h4 style={{ margin: '0 0 8px 0' }}>🛡 Покрытие систем</h4>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4 }}>
                   {Object.entries(activeSystems).map(([sys, active]) => {
-                    const coverage = (supportResult as any)?.coverage?.[sys] ?? 0;
-                    const pct = Math.round(coverage * 100);
+                    const coverageVal = supportResult?.systemSupport?.[sys] ?? supportResult?.organSupport?.[sys] ?? 0;
+                    const pct = Math.round(coverageVal * 100);
                     return (
-                      <div key={sys} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 6px' }}>
-                        <button onClick={() => setActiveSystems({ ...activeSystems, [sys]: !active })} style={{
-                          width: 16, height: 16, borderRadius: 4, border: active ? 'none' : '1px solid var(--border)',
-                          background: active ? 'var(--accent)' : 'var(--bg-secondary)', cursor: 'pointer', padding: 0, flexShrink: 0,
-                        }}>
-                          {active ? '✓' : ''}
-                        </button>
+                      <div key={sys} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '3px 4px' }}>
                         <span style={{ fontSize: 10, flex: 1 }}>{sys === 'cardio' ? 'ССС' : sys === 'hepatic' ? 'Печень' : sys === 'renal' ? 'Почки' : sys === 'neuro' ? 'Нервы' : sys === 'endocrine' ? 'Эндо' : sys === 'hematologic' ? 'Кровь' : sys === 'reproductive' ? 'Репрод' : sys === 'musculoskeletal' ? 'Суставы' : sys}</span>
-                        <div style={{ width: 40, background: 'rgba(255,255,255,0.08)', borderRadius: 3, height: 4, overflow: 'hidden' }}>
-                          <div style={{ width: `${pct}%`, height: '100%', background: pct > 60 ? '#22c55e' : pct > 30 ? '#eab308' : '#ef4444', borderRadius: 3 }} />
+                        <div style={{ width: 40, background: 'rgba(255,255,255,0.08)', borderRadius: 3, height: 5, overflow: 'hidden' }}>
+                          <div style={{ width: `${Math.min(100, pct)}%`, height: '100%', background: pct > 60 ? '#22c55e' : pct > 30 ? '#eab308' : '#ef4444', borderRadius: 3 }} />
                         </div>
                         <span style={{ fontSize: 9, color: 'var(--text-dim)', minWidth: 22, textAlign: 'right' }}>{pct}%</span>
                       </div>
@@ -1184,6 +1211,19 @@ export const CalculatorsScreen: React.FC<CalcProps> = ({ initialTab = 'fitness' 
                 </div>
               </div>
 
+              <div className="card" style={{ fontSize: 11, color: 'var(--text-dim)', padding: 8, marginBottom: 12 }}>
+                <div style={{ marginBottom: 4 }}>
+                  <b>Риск до:</b> <span style={{ color: getRiskColor(supportResult?.riskBeforeSupport ?? 0), fontWeight: 600 }}>{Math.round(supportResult?.riskBeforeSupport ?? 0)}%</span>
+                  {' → '}
+                  <b>после:</b> <span style={{ color: getRiskColor(supportResult?.riskAfterSupport ?? 0), fontWeight: 600 }}>{Math.round(supportResult?.riskAfterSupport ?? 0)}%</span>
+                </div>
+                <div>Источники: {linked.course.length} препаратов, {linked.labs.length} анализов, питание, тренировки, {linked.profile?.settings?.genetics ? 'генетика' : 'без генетики'}</div>
+                {supportResult?.metadata?.affectedSystems && (
+                  <div style={{ marginTop: 4 }}>
+                    Затронутые системы: {supportResult.metadata.affectedSystems.map((s: any) => SYSTEM_INFO_ALL[s.id]?.label || s.id).join(', ')}
+                  </div>
+                )}
+              </div>
               {supportDrugs.length > 0 && (
                 <div className="card" style={{ marginBottom: 12 }}>
                   <h4 style={{ margin: '0 0 8px 0' }}>🔬 Детали по препаратам</h4>
