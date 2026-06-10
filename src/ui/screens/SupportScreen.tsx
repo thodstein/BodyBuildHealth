@@ -7,9 +7,10 @@ import { SYSTEM_INFO_ALL } from '../../core/risk-info';
 import { getRiskColor } from '../../core/utils/risk-colors';
 import { SUPPORT_BASE_COVERAGE } from '../../core/constants';
 import { INTERACTIONS_DB } from '../../data/interactions';
+import { generateWeeklyProtocol } from '../../engines/auto-plan.engine';
 import type { CourseEntry } from '../../core/types';
 
-type SupportTab = 'catalog' | 'synergies' | 'calculator' | 'interactions' | 'recommendations';
+type SupportTab = 'catalog' | 'synergies' | 'calculator' | 'interactions' | 'recommendations' | 'protocol';
 
 const SYNERGY_COLORS: Record<string, string> = {
   synergistic: '#22c55e',
@@ -38,6 +39,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   const [supportLevel, setSupportLevel] = useState<'basic' | 'standard' | 'enhanced' | 'maximum'>('standard');
   const [prescribedMeds, setPrescribedMeds] = useState<Record<string, boolean>>({});
   const [supportResult, setSupportResult] = useState<{ riskBefore: Record<string, number>; riskAfter: Record<string, number>; score: number } | null>(null);
+  const [autoProtocol, setAutoProtocol] = useState<ReturnType<typeof generateWeeklyProtocol> | null>(null);
 
   // Interaction checker state
   const [interactionIds, setInteractionIds] = useState<string[]>(['', '']);
@@ -188,13 +190,13 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   return (
     <div className="screen support-screen">
       <div style={{ display: 'flex', gap: 4, marginBottom: 12, overflowX: 'auto', scrollbarWidth: 'none' }}>
-        {(['catalog', 'synergies', 'calculator', 'interactions', 'recommendations'] as SupportTab[]).map(t => (
+        {(['catalog', 'synergies', 'calculator', 'interactions', 'recommendations', 'protocol'] as SupportTab[]).map(t => (
           <button key={t} onClick={() => setTab(t)} style={{
             flex: 1, padding: '10px 8px', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600,
             background: tab === t ? 'var(--accent-green, #00e68a)' : 'var(--bg-secondary)',
             color: tab === t ? '#000' : 'var(--text-dim)', cursor: 'pointer', transition: 'background 0.15s', whiteSpace: 'nowrap',
           }}>
-            {t === 'catalog' ? '📖 Каталог' : t === 'synergies' ? '🔗 Синергии' : t === 'calculator' ? '🧮 Калькулятор' : t === 'interactions' ? '⚡ Взаимод.' : '💡 Рекомендации'}
+            {t === 'catalog' ? '📖 Каталог' : t === 'synergies' ? '🔗 Синергии' : t === 'calculator' ? '🧮 Калькулятор' : t === 'interactions' ? '⚡ Взаимод.' : t === 'recommendations' ? '💡 Реком.' : '📅 Протокол'}
           </button>
         ))}
       </div>
@@ -597,6 +599,62 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
                 {linked.profile.settings?.nutritionFactor ? ', питания' : ''}
                 {linked.profile.settings?.trainingFactor ? ', тренировок' : ''}
               </div>
+            </div>
+          )}
+        </div>
+      )}
+      {/* ===== PROTOCOL ===== */}
+      {tab === 'protocol' && (
+        <div>
+          <div className="card" style={{ marginBottom: 12 }}>
+            <h3 style={{ margin: '0 0 4px 0', fontSize: 14, color: 'var(--accent)' }}>📅 Недельный протокол</h3>
+            <p style={{ fontSize: 11, color: 'var(--text-dim)', margin: '0 0 12px 0' }}>
+              Расписание приёма препаратов и добавок по дням недели
+            </p>
+            {!autoProtocol && (
+              <button onClick={() => {
+                const courseIds: { substanceId: string; dose: string }[] = linked.course.map(c => ({
+                  substanceId: c.substanceId,
+                  dose: `${c.doseValue} ${c.doseUnit}`,
+                }));
+                const goalId = linked.course.some(c => c.substanceId.includes('test')) ? 'mass_gain' : 'health';
+                const protocol = generateWeeklyProtocol(goalId, courseIds as any, Object.keys(linked.supportCoverage || {}),
+                  undefined, linked.course.some(c => c.substanceId.includes('test')) ? 'course' : 'baseline', []);
+                setAutoProtocol(protocol);
+              }} style={{
+                width: '100%', padding: 12, background: 'var(--accent)', color: '#000',
+                border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 600, fontSize: 13,
+              }}>
+                📅 Сгенерировать протокол
+              </button>
+            )}
+          </div>
+          {autoProtocol && (
+            <div className="card">
+              <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 8 }}>
+                Соблюдение: {autoProtocol.overallAdherenceScore}%
+              </div>
+              {autoProtocol.days.map((day: any, i: number) => (
+                <div key={i} style={{ background: 'var(--bg-secondary)', borderRadius: 6, padding: 8, marginBottom: 4 }}>
+                  <div style={{ fontWeight: 600, fontSize: 11, marginBottom: 2 }}>{day.date}</div>
+                  {day.slots.map((slot: any, j: number) => (
+                    <div key={j} style={{ marginLeft: 6, marginBottom: 2 }}>
+                      <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>
+                        {slot.time === 'morning' ? '🌅 Утро' : slot.time === 'evening' ? '🌙 Вечер' : '☀️ День'}
+                      </div>
+                      {slot.substances.map((s: any, k: number) => (
+                        <div key={k} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, padding: '1px 0' }}>
+                          <span>{s.name}</span><span style={{ color: 'var(--accent)' }}>{s.dose}</span>
+                        </div>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              ))}
+              <button onClick={() => setAutoProtocol(null)} style={{
+                background: 'var(--bg-secondary)', color: 'var(--text)', border: '1px solid var(--border)',
+                borderRadius: 6, padding: '6px 12px', fontSize: 10, cursor: 'pointer', marginTop: 6,
+              }}>✕ Закрыть</button>
             </div>
           )}
         </div>

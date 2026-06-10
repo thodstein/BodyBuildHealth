@@ -414,6 +414,7 @@ export async function parsePDF(file: File): Promise<ParsedLabResult> {
     const arrayBuffer = await file.arrayBuffer();
     const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
     let fullText = '';
+    let allItems: TextItem[] = [];
     for (let i = 1; i <= pdf.numPages; i++) {
       const page = await pdf.getPage(i);
       const content = await page.getTextContent();
@@ -424,6 +425,7 @@ export async function parsePDF(file: File): Promise<ParsedLabResult> {
         width: item.width ?? 0,
         height: item.height ?? 0,
       })).filter((it: TextItem) => it.str.trim().length > 0);
+      allItems.push(...items);
 
       const rows = groupByRows(items);
       for (const row of rows) {
@@ -432,6 +434,13 @@ export async function parsePDF(file: File): Promise<ParsedLabResult> {
     }
     const result = parseLabText(fullText);
     if (result.values.length === 0 && fullText.length > 50) {
+      // Fallback: try parsing raw items text without row grouping
+      const rawText = allItems.map(it => it.str).join(' ');
+      const rawResult = parseLabText(rawText);
+      if (rawResult.values.length > 0) {
+        rawResult.warnings = ['Предупреждение: PDF распознан в сыром режиме (таблица не разобрана).'];
+        return rawResult;
+      }
       result.warnings = ['Предупреждение: PDF распознан, но показатели не найдены. Попробуйте ввести данные вручную.'];
     }
     return result;

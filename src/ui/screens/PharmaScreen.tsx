@@ -711,33 +711,39 @@ const PKPDSimulationTab: React.FC = () => {
         })}
       </div>
 
-      {/* Searchable drug adder */}
+      {/* Searchable drug adder — grid of cards like Dosage tab */}
       <div className="card" style={{ marginBottom: 12 }}>
         <input type="text" value={pkSearch} onChange={e => setPkSearch(e.target.value)}
           placeholder="🔍 Поиск препарата для добавления..."
-          style={{ width: '100%', padding: '8px 10px', borderRadius: 8, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12 }} />
-        {pkSearch && pkFiltered.length > 0 && (
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 6, maxHeight: 180, overflowY: 'auto' }}>
+          style={{ width: '100%', padding: '8px 10px', borderRadius: 8, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, marginBottom: 8, boxSizing: 'border-box' }} />
+        {pkSearch && pkFiltered.length > 0 ? (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 4, maxHeight: 200, overflowY: 'auto' }}>
             {pkFiltered.map(s => (
-              <button key={s.id} onClick={() => addDrug(s.id)} style={{
-                padding: '5px 10px', borderRadius: 16, fontSize: 10, cursor: 'pointer', whiteSpace: 'nowrap',
-                background: 'rgba(0,230,138,0.1)', border: '1px solid rgba(0,230,138,0.3)', color: '#00e68a',
+              <div key={s.id} onClick={() => addDrug(s.id)} style={{
+                padding: '6px 8px', borderRadius: 8, cursor: 'pointer',
+                background: 'var(--bg-secondary)', border: '1px solid var(--border)',
               }}>
-                + {s.name}
-              </button>
+                <div style={{ fontSize: 11, fontWeight: 600 }}>{s.name}</div>
+                <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>{CLASS_LABELS[s.class] || s.class}</div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 4, maxHeight: 200, overflowY: 'auto' }}>
+            {unusedSubstances.slice(0, 12).map(s => (
+              <div key={s.id} onClick={() => addDrug(s.id)} style={{
+                padding: '6px 8px', borderRadius: 8, cursor: 'pointer',
+                background: 'var(--bg-secondary)', border: '1px solid var(--border)',
+              }}>
+                <div style={{ fontSize: 11, fontWeight: 600 }}>{s.name}</div>
+                <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>{CLASS_LABELS[s.class] || s.class}</div>
+              </div>
             ))}
           </div>
         )}
-        {!drugDoses.length && !pkSearch && (
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 6 }}>
-            {unusedSubstances.slice(0, 8).map(s => (
-              <button key={s.id} onClick={() => addDrug(s.id)} style={{
-                padding: '5px 10px', borderRadius: 16, fontSize: 10, cursor: 'pointer', whiteSpace: 'nowrap',
-                background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text-dim)',
-              }}>
-                + {s.name}
-              </button>
-            ))}
+        {drugDoses.length > 0 && !pkSearch && (
+          <div style={{ marginTop: 6, fontSize: 10, color: 'var(--text-dim)', textAlign: 'center' }}>
+            Введите название в поиск чтобы добавить ещё препарат
           </div>
         )}
       </div>

@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { PHARMA_DB, SUBSTANCES_BY_CLASS } from '../../core/pharma-database';
 import { validateCourse } from '../../engines/pharmacology.engine';
 import { checkDrugInteractions } from '../../engines/pharma-interactions.engine';
-import { generateWeeklyProtocol } from '../../engines/auto-plan.engine';
 import { db } from '../../core/db';
 import { notifyDataChange } from '../../core/data-link';
 import type { CourseEntry } from '../../core/types';
@@ -48,7 +47,6 @@ export const PharmaCourseScreen: React.FC = () => {
   const [endWeek, setEndWeek] = useState(12);
   const [interactions, setInteractions] = useState<ReturnType<typeof checkDrugInteractions>>([]);
   const [validation, setValidation] = useState<{ valid: boolean; warnings: string[] }>({ valid: true, warnings: [] });
-  const [autoProtocol, setAutoProtocol] = useState<ReturnType<typeof generateWeeklyProtocol> | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -174,9 +172,9 @@ export const PharmaCourseScreen: React.FC = () => {
           <div style={{ display: 'grid', gap: 6 }}>
             {interactions.map((alert: any, i: number) => (
               <div key={i} style={{
-                background: alert.severity === 'critical' ? 'rgba(239,68,68,0.15)' : 'rgba(255,165,2,0.1)',
+                background: alert.type === 'critical' ? 'rgba(239,68,68,0.15)' : 'rgba(255,165,2,0.1)',
                 borderRadius: 6, padding: '8px 10px',
-                borderLeft: `3px solid ${alert.severity === 'critical' ? '#ef4444' : '#eab308'}`,
+                borderLeft: `3px solid ${alert.type === 'critical' ? '#ef4444' : '#eab308'}`,
               }}>
                 <div style={{ fontWeight: 600, fontSize: 11 }}>{alert.type}: {alert.drugs?.join(' + ')}</div>
                 <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 2 }}>{alert.mechanism}</div>
@@ -186,53 +184,7 @@ export const PharmaCourseScreen: React.FC = () => {
         </div>
       )}
 
-      {/* PCT redirect */}
-      {course.length > 0 && (
-        <div className="card" style={{ marginTop: 8, textAlign: 'center', padding: '12px 16px' }}>
-          <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>
-            🌱 План ПКТ перенесён в отдельный раздел <b style={{ color: '#00e68a' }}>«ПКТ и Фертильность»</b> на главной
-          </div>
-        </div>
-      )}
-
-      {/* Auto protocol */}
-      {course.length > 0 && !autoProtocol && (
-        <div className="card" style={{ marginTop: 8 }}>
-          <button onClick={() => {
-            const goalId = course.some(c => c.substanceId.includes('test')) ? 'mass_gain' : 'health';
-            const protocol = generateWeeklyProtocol(goalId, [], [], undefined, course.some(c => c.substanceId.includes('test')) ? 'course' : 'baseline', []);
-            setAutoProtocol(protocol);
-          }} style={{
-            width: '100%', padding: 10, background: 'var(--bg-secondary)', color: 'var(--text)',
-            border: '1px solid var(--border)', borderRadius: 8, cursor: 'pointer', fontWeight: 600, fontSize: 12,
-          }}>
-            📅 Недельный протокол
-          </button>
-        </div>
-      )}
-
-      {autoProtocol && (
-        <div className="card" style={{ marginTop: 8 }}>
-          <h3>📅 Недельный протокол</h3>
-          <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 6 }}>Соблюдение: {autoProtocol.overallAdherenceScore}%</div>
-          {autoProtocol.days.map((day: any, i: number) => (
-            <div key={i} style={{ background: 'var(--bg-secondary)', borderRadius: 6, padding: 8, marginBottom: 4 }}>
-              <div style={{ fontWeight: 600, fontSize: 11, marginBottom: 2 }}>{day.date}</div>
-              {day.slots.map((slot: any, j: number) => (
-                <div key={j} style={{ marginLeft: 6, marginBottom: 2 }}>
-                  <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>{slot.time === 'morning' ? '🌅 Утро' : slot.time === 'evening' ? '🌙 Вечер' : '☀️ День'}</div>
-                  {slot.substances.map((s: any, k: number) => (
-                    <div key={k} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, padding: '1px 0' }}>
-                      <span>{s.name}</span><span style={{ color: 'var(--accent)' }}>{s.dose}</span>
-                    </div>
-                  ))}
-                </div>
-              ))}
-            </div>
-          ))}
-          <button onClick={() => setAutoProtocol(null)} style={{ background: 'var(--bg-secondary)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: 6, padding: '6px 12px', fontSize: 10, cursor: 'pointer', marginTop: 6 }}>Закрыть</button>
-        </div>
-      )}
+      {/* Auto protocol — moved to Support tab */}
 
       {/* ========= DRUG PICKER MODAL ========= */}
       {showPicker && (

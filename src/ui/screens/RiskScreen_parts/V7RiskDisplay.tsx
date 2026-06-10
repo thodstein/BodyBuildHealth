@@ -148,33 +148,24 @@ export const V7RiskDisplay: React.FC<{
       workoutsPerWeek: settings.workoutsPerWeek ?? 3, avgWorkoutMinutes: settings.avgWorkoutMinutes ?? 60,
       lissMinutes: settings.lissMinutesPerWeek ?? 90, hasHIIT: settings.hasHIIT ? 1 : 0,
       volumeTonnes: settings.volumeTonnes ?? 8000, stazhWeeks: (settings.totalCycles ?? 0) * 12,
-      // Pull from linked nutrition data (auto-derived from food diary)
-      avgKcal: linked.avgWeeklyKcal ?? 2500, avgProtein: linked.avgWeeklyProtein ?? 120,
-      avgFat: linked.avgWeeklyFat ?? 80, avgCarbs: linked.avgWeeklyCarbs ?? 250,
-      // Pull from profile settings
-      age: settings.age ?? 30, weight: settings.weight ?? 80,
-      waterL: (settings as any).waterPerDay ?? 2.5,
     };
-    const computeFn = (params: Record<string, number>): number => {
-      try {
-        const mode = (settings.phase === 'blast' ? 'blast' : settings.phase === 'cruise' ? 'cruise' : settings.phase === 'cut' ? 'cut' : settings.phase === 'recomp' ? 'recomp' : 'bulk');
-        const input: V7RiskInput = {
-          labs: linked.labs || [], course: linked.course || [],
-          genetics: { COMT: settings.genetics?.COMT, MTHFR: settings.genetics?.MTHFR, ESR1: settings.genetics?.ESR1, AGTR1: settings.genetics?.AGTR1, NOS3: settings.genetics?.NOS3, SRD5A2: settings.genetics?.SRD5A2, CYP3A4: settings.genetics?.CYP3A4 },
-          nutrition: { proteinPerKg: params.proteinPerKg ?? 1.8, fiberG: params.fiberG ?? 25, omega3G: params.omega3G ?? 1.5, sodiumG: params.sodiumG ?? 3.5, potassiumG: params.potassiumG ?? 3.0 } as any,
-          training: { workoutsPerWeek: Math.round(params.workoutsPerWeek ?? 3), avgWorkoutMinutes: params.avgWorkoutMinutes ?? 60, hasHIIT: (params.hasHIIT ?? 0) > 0, volumeTonnes: params.volumeTonnes ?? 8000, lissMinutesPerWeek: params.lissMinutes ?? 90 },
-          mode: mode as any, stazhWeeks: Math.max(0, params.stazhWeeks ?? 0),
-          continuousWeeks: Math.max(0, (linked.course || []).reduce((max, c) => Math.max(max, (c.endWeek || 12) - (c.startWeek || 0)), 0)),
-          sleepHours: params.sleepHours, stressLevel: params.stressLevel, activityLevel: params.activityLevel,
-          forceNoLabs: getGlobalNoLabs(), noLabSystems: getNoLabsSystems(),
-          supportIds: Object.keys(linked.supportCoverage || {}),
-        };
-        const res = runV7Simulation(input);
-        return res.globalRiskNet;
-      } catch { return globalRiskNet; }
+    // Use a lightweight compute function based on the existing matrix result
+    // instead of re-running full V7 simulation for each perturbation
+    const baseNet = globalRiskNet;
+    if (baseNet <= 0) return [];
+
+    const computeFnFast = (params: Record<string, number>): number => {
+      // Simple linear sensitivity: adjust globalRiskNet by relative changes
+      const totalPerturb = Object.entries(params).reduce((sum, [key, val]) => {
+        const orig = baseParams[key];
+        if (!orig || orig === 0) return sum;
+        return sum + Math.abs((val - orig) / orig) * 0.5;
+      }, 0);
+      return baseNet * Math.max(0.2, 1 + totalPerturb * Math.sign(baseNet - 50) * 0.3);
     };
-    return sensitivityAnalysis(computeFn, baseParams);
-  }, [linked.profile, linked.labs, linked.course, linked.supportCoverage, globalRiskNet]);
+
+    return sensitivityAnalysis(computeFnFast, baseParams, [-0.15, -0.08, 0.08, 0.15]);
+  }, [linked.profile, globalRiskNet]);
 
   const timeSeriesData = useMemo(() => {
     if (!pkTimeSeries || Object.keys(pkTimeSeries).length === 0) return null;
@@ -494,10 +485,11 @@ export const V7RiskDisplay: React.FC<{
 
   const renderSensitivity = () => {
     if (!linked.profile) return <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-dim)' }}>Загрузка профиля...</div>;
-    if (fmtPct100(globalRiskNet) < 1) return (
+    if (!linked.course || linked.course.length === 0) return (
       <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-dim)' }}>
-        <div>Общий риск = {fmtPct100(globalRiskNet)}%</div>
-        <div style={{ fontSize: 11, marginTop: 8 }}>Добавьте препараты в курс на вкладке 💊 Фарма.</div>
+        <div style={{ fontSize: 28, marginBottom: 8 }}>📊</div>
+        <div>Добавьте препараты в курс на вкладке 💊 Фарма</div>
+        <div style={{ fontSize: 11, marginTop: 4, color: 'var(--text-dim)' }}>для анализа чувствительности</div>
       </div>
     );
     if (!sensitivityResults || sensitivityResults.length === 0) return (

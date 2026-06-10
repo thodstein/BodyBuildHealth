@@ -13,15 +13,15 @@ export function checkDrugInteractions(course: CourseEntry[]): InteractionAlert[]
   const alerts: InteractionAlert[] = [];
 
   // 1. Тренболон + Нандролон (прогестиновая синергия → сильное подавление, риск эректильной дисфункции)
-  if (activeIds.has('tren_acet') || activeIds.has('tren_enan')) {
-    if (activeIds.has('npp') || activeIds.has('deca')) {
-      alerts.push({
-        type: 'critical',
-        drugs: ['trenbolone', 'nandrolone'],
-        mechanism: 'Синергетическое прогестиновое действие → сильное подавление ЛГ/ФСГ, риск пролактина.',
-        recommendation: 'Контроль PRL каждые 2 нед. При >20 нг/мл добавить каберголин 0.25мг 2р/нед.'
-      });
-    }
+  const hasTren = activeIds.has('tren_acet') || activeIds.has('tren_enan') || Array.from(activeIds).some(id => id.includes('tren'));
+  const hasNand = activeIds.has('npp') || activeIds.has('deca') || activeIds.has('nandrolone') || Array.from(activeIds).some(id => id.includes('nand'));
+  if (hasTren && hasNand) {
+    alerts.push({
+      type: 'critical',
+      drugs: ['trenbolone', 'nandrolone'],
+      mechanism: 'Синергетическое прогестиновое действие → сильное подавление ЛГ/ФСГ, риск пролактина.',
+      recommendation: 'Контроль PRL каждые 2 нед. При >20 нг/мл добавить каберголин 0.25мг 2р/нед.'
+    });
   }
 
   // 2. Оральные 17-α + Высокие дозы Тестостерона (печень)
@@ -38,7 +38,7 @@ export function checkDrugInteractions(course: CourseEntry[]): InteractionAlert[]
 
   // 3. SARMs + Ингибиторы ароматазы (риск чрезмерного подавления E2)
   const sarms = course.filter(c => c.substanceId.startsWith('ostarine') || c.substanceId.startsWith('lgd') || c.substanceId.startsWith('rad'));
-  if (sarms.length && activeIds.has('anastro') || activeIds.has('letrozole')) {
+  if (sarms.length > 0 && (activeIds.has('anastro') || activeIds.has('letrozole'))) {
     alerts.push({
       type: 'warning',
       drugs: [...sarms.map(s => s.substanceId), 'ai'],
