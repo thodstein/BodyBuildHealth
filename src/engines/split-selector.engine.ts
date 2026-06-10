@@ -158,6 +158,8 @@ const SPLIT_CATALOG: Record<string, {
 
 export function selectSplit(input: TrainingInput): SplitCandidate[] {
   const candidates: SplitCandidate[] = [];
+  const LEVEL_RU: Record<string, string> = { beginner: 'Новичок', intermediate: 'Средний', advanced: 'Продвинутый', enhanced: 'Усиленный' };
+  const GOAL_RU: Record<string, string> = { bulk: 'Набор массы', cut: 'Сушка', strength: 'Сила', maintenance: 'Поддержание', recomp: 'Рекомпозиция', rehab: 'Реабилитация' };
   const { daysPerWeek, recovery, fatigue, nutrition, level, goal, weakPoints, injuries } = input;
   const hasInjury = injuries && injuries.length > 0;
 
@@ -176,22 +178,22 @@ export function selectSplit(input: TrainingInput): SplitCandidate[] {
     // Level match (×2)
     if (split.levels.includes(level)) {
       score += 20;
-      rationale.push(`Уровень "${level}" — допустим для данного сплита`);
+      rationale.push(`Уровень "${LEVEL_RU[level] || level}" — допустим для данного сплита`);
     } else {
       score -= 15;
-      rationale.push(`Уровень "${level}" — не рекомендуется для данного сплита`);
+      rationale.push(`Уровень "${LEVEL_RU[level] || level}" — не рекомендуется для данного сплита`);
     }
 
     // Goal match (×2)
     if (split.goals.includes(goal)) {
       score += 20;
-      rationale.push(`Цель "${goal}" — оптимальна для данного сплита`);
+      rationale.push(`Цель "${GOAL_RU[goal] || goal}" — оптимальна для данного сплита`);
     } else if (goal === 'strength' && id === 'strength_4') {
       score += 25;
       rationale.push('Силовая цель → силовой сплит приоритет');
     } else {
       score -= 10;
-      rationale.push(`Цель "${goal}" — не оптимальна для данного сплита`);
+      rationale.push(`Цель "${GOAL_RU[goal] || goal}" — не оптимальна для данного сплита`);
     }
 
     // Recovery compatibility (×1.5)

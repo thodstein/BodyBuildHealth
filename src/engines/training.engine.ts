@@ -94,7 +94,7 @@ export function calcExercisePrescription(
     ? (goal === 'strength' ? 180 : 120)
     : (goal === 'cut' ? 45 : 60);
 
-  const progressionNote = !isDeload ? ` | Эед ${weekNumber}: +2.5-5% весов или +1 сет на группу` : '';
+  const progressionNote = !isDeload ? ` | Нед ${weekNumber}: +2.5-5% весов или +1 сет на группу` : '';
 
   return { sets, reps, rir, dropSet, dropSetReps: dropSet ? `${Math.max(4, range[0] - 2)}-${range[1]}` : '', backoffSet, rest, progressionNote };
 }
@@ -181,9 +181,9 @@ export function calcTraining(i: TrainingInput): TrainingOutput {
   let isDeload = false;
   let deloadReason = '';
 
-  if (i.recovery < 55) { isDeload = true; deloadReason = 'Recovery < 55'; phase = 'deload'; Object.keys(volMap).forEach(k => { volMap[k] *= 0.5; }); }
-  else if (i.fatigue > 70) { isDeload = true; deloadReason = 'Fatigue > 70'; phase = 'deload'; Object.keys(volMap).forEach(k => { volMap[k] *= 0.6; }); }
-  else if (i.nutrition < 55) { isDeload = true; deloadReason = 'Nutrition < 55'; phase = 'deload'; Object.keys(volMap).forEach(k => { volMap[k] *= 0.7; }); }
+  if (i.recovery < 55) { isDeload = true; deloadReason = 'Восстановление < 55'; phase = 'deload'; Object.keys(volMap).forEach(k => { volMap[k] *= 0.5; }); }
+  else if (i.fatigue > 70) { isDeload = true; deloadReason = 'Усталость > 70'; phase = 'deload'; Object.keys(volMap).forEach(k => { volMap[k] *= 0.6; }); }
+  else if (i.nutrition < 55) { isDeload = true; deloadReason = 'Питание < 55'; phase = 'deload'; Object.keys(volMap).forEach(k => { volMap[k] *= 0.7; }); }
 
   // RIR из матрицы
   const levelConfigRir = levelConfig.rirBase;
@@ -199,15 +199,18 @@ export function calcTraining(i: TrainingInput): TrainingOutput {
   const weeklyProgression = generateWeeklyPlan(i, 6);
   
   // Формирование плана на неделю
-  const weekNum = 1; // Base week
+  const weekNum = 1;
+  const PHASE_NAMES_RU: Record<string, string> = { base: 'База', build: 'Накопление', peak: 'Пик', deload: 'Разгрузка' };
+  const PROGRESSION_NAMES_RU: Record<string, string> = { linear: 'Линейная', double: 'Двойная', undulating: 'Волнообразная', conjugate: 'Конъюгейт' };
+  const phaseName = PHASE_NAMES_RU[phase] || phase;
+  const progName = PROGRESSION_NAMES_RU[weeklyProgression[0].progressionType] || weeklyProgression[0].progressionType;
   const weekPlan = isDeload
-    ? `ЭХФЫп ${weekNum} (ФХЫЮФ): 50% объёма, RIR 4, без отказов, акцент на технику и мобильность`
-    : `ЭХФЫп ${weekNum} (${phase.toUpperCase()}): ${Math.round(weeklyProgression[0].volumeTotal)} общих подходов, RIR ${rir}, прогрессия ${weeklyProgression[0].progressionType}`;
+    ? `Неделя ${weekNum} (Разгрузка): 50% объёма, RIR 4, без отказов, акцент на технику и мобильность`
+    : `Неделя ${weekNum} (${phaseName}): ${Math.round(weeklyProgression[0].volumeTotal)} общих подходов, RIR ${rir}, прогрессия ${progName}`;
 
-  const progressionNote = !isDeload ? ` | Эед 2-6: +2.5-5% весов или +1 сет на группу` : '';
+  const progressionNote = !isDeload ? ` | Нед 2-6: +2.5-5% весов или +1 сет на группу` : '';
 
-  // Добавление прогрессии в описание
-  splitDesc += ` (${weeklyProgression[0].progressionType})`;
+  splitDesc += ` (${progName})`;
 
   return {
     splitName,
