@@ -198,29 +198,31 @@ export const V7RiskDisplay: React.FC<{
     <div>
       <div className="card" style={{ marginBottom: 12 }}>
         <h3 style={{ margin: '0 0 10px 0' }}>🔬 V7 Risk Engine — Полная модель</h3>
-          <div style={{ marginBottom: 10 }}>
-            <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 3 }}>Неделя: {organWeek === 0 ? 'Среднее за 12 нед' : `Нед ${organWeek}`}</div>
-            <div style={{ display: 'flex', gap: 2, overflowX: 'auto', paddingBottom: 2, scrollbarWidth: 'none' }}>
-              <button onClick={() => setOrganWeek(0)} style={{
-                padding: '3px 8px', borderRadius: 6, fontSize: 9, fontWeight: organWeek === 0 ? 700 : 400,
-                cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
-                background: organWeek === 0 ? '#00e68a' : 'var(--bg-secondary)',
-                border: organWeek === 0 ? '1px solid #00e68a' : '1px solid var(--border)',
-                color: organWeek === 0 ? '#000' : 'var(--text-dim)',
-              }}>∅</button>
-              {[1,2,3,4,5,6,7,8,9,10,11,12].map(w => (
-                <button key={w} onClick={() => setOrganWeek(w)} style={{
-                  padding: '3px 8px', borderRadius: 6, fontSize: 9, fontWeight: organWeek === w ? 700 : 400,
-                  cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
-                  background: organWeek === w ? '#00e68a' : 'var(--bg-secondary)',
-                  border: organWeek === w ? '1px solid #00e68a' : '1px solid var(--border)',
-                  color: organWeek === w ? '#000' : 'var(--text-dim)',
-                }}>{w}</button>
+          <div style={{ marginBottom: 12 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+              <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>Временной срез:</span>
+              <span style={{ fontSize: 13, fontWeight: 700, color: '#00e68a' }}>
+                {organWeek === 0 ? 'Среднее за 12 нед' : `Неделя ${organWeek}`}
+              </span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontSize: 9, color: 'var(--text-dim)', whiteSpace: 'nowrap', minWidth: 22, textAlign: 'right' }}>∅</span>
+              <input type="range" min={0} max={12} value={organWeek} onChange={e => setOrganWeek(Number(e.target.value))}
+                style={{ flex: 1, accentColor: '#00e68a', height: 4, cursor: 'pointer' }} />
+              <span style={{ fontSize: 9, color: 'var(--text-dim)', whiteSpace: 'nowrap', minWidth: 22 }}>12</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 2, padding: '0 24px' }}>
+              {[0,1,2,3,4,5,6,7,8,9,10,11,12].map(w => (
+                <span key={w} onClick={() => setOrganWeek(w)} style={{
+                  width: 6, height: 6, borderRadius: '50%', cursor: 'pointer',
+                  background: organWeek === w ? '#00e68a' : 'rgba(255,255,255,0.15)',
+                  transition: 'all 0.2s',
+                }} />
               ))}
             </div>
             {organWeek > 0 && weeklyGlobalData[organWeek - 1] && (
-              <div style={{ fontSize: 9, color: 'var(--text-dim)', marginTop: 3 }}>
-                Общий риск (raw): {fmtPct100(weeklyGlobalData[organWeek - 1].raw)}%
+              <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 4, textAlign: 'center' }}>
+                Общий риск (raw): <b style={{ color: getRiskColor(fmtPct100(weeklyGlobalData[organWeek - 1].raw)) }}>{fmtPct100(weeklyGlobalData[organWeek - 1].raw)}%</b>
               </div>
             )}
           </div>
@@ -557,82 +559,83 @@ export const V7RiskDisplay: React.FC<{
       return `orgGrad_${okey}`;
     };
 
-    // SVG paths for each organ (realistic shapes, positioned in body)
     const organShapes: Record<string, string> = {
-      heart:
-        `M${cx+4},105 C${cx-2},98 ${cx-6},90 ${cx+2},85 C${cx+10},80 ${cx+16},85 ${cx+18},90 ` +
-        `C${cx+20},85 ${cx+26},80 ${cx+34},85 C${cx+42},90 ${cx+38},98 ${cx+32},105 ` +
-        `C${cx+28},112 ${cx+18},125 ${cx+18},125 C${cx+18},125 ${cx+8},112 ${cx+4},105 Z`,
-
-      liver:
-        `M${cx+20},185 C${cx+40},182 ${cx+50},190 ${cx+48},200 L${cx+46},215 ` +
-        `C${cx+44},228 ${cx+30},235 ${cx+15},230 L${cx+5},225 C${cx-2},220 ${cx+2},210 ${cx+8},205 ` +
-        `C${cx+10},198 ${cx+15},188 ${cx+20},185 Z`,
-
-      kidney:
-        `M${cx-40},210 C${cx-50},208 ${cx-56},218 ${cx-52},228 C${cx-48},238 ${cx-36},240 ` +
-        `C${cx-28},240 ${cx-22},232 ${cx-26},222 C${cx-30},212 ${cx-34},210 ${cx-40},210 Z ` +
-        `M${cx-18},212 C${cx-28},210 ${cx-34},220 ${cx-30},230 C${cx-26},240 ${cx-14},242 ` +
-        `C${cx-6},242 ${cx-0},234 ${cx-4},224 C${cx-8},214 ${cx-12},212 ${cx-18},212 Z`,
-
-      blood:
-        `M${cx-60},225 Q${cx-40},215 ${cx-20},220 T${cx+20},218 T${cx+60},225 ` +
-        `Q${cx+40},235 ${cx+20},232 T${cx-20},234 T${cx-60},225 Z`,
+      neuro_toxicity:
+        `M${cx-35},20 C${cx-45},10 ${cx-55},22 ${cx-48},32 C${cx-42},40 ${cx-30},44 ` +
+        `C${cx-20},44 ${cx-10},40 ${cx-8},34 C${cx-6},40 ${cx+6},44 ${cx+16},44 ` +
+        `C${cx+26},44 ${cx+38},40 ${cx+44},32 C${cx+50},22 ${cx+40},10 ${cx+30},20 ` +
+        `C${cx+24},26 ${cx+14},30 ${cx+4},28 C${cx-4},26 ${cx-14},26 ${cx-24},28 ` +
+        `C${cx-30},26 ${cx-34},22 ${cx-35},20 Z`,
 
       endocrine:
-        `M${cx-8},65 C${cx-16},60 ${cx-20},68 ${cx-12},74 C${cx-4},80 ${cx+4},78 ${cx+8},74 ` +
-        `C${cx+12},70 ${cx+20},68 ${cx+20},65 C${cx+20},60 ${cx+14},58 ${cx+8},58 ` +
-        `C${cx+2},58 ${cx-2},60 ${cx-8},65 Z`,
-
-      metabolic:
-        `M${cx+14},198 C${cx+6},196 ${cx+4},208 ${cx+12},212 C${cx+20},216 ${cx+30},214 ${cx+32},208 ` +
-        `C${cx+34},202 ${cx+24},200 ${cx+14},198 Z`,
+        `M${cx-10},72 C${cx-20},66 ${cx-24},78 ${cx-14},84 C${cx-4},88 ${cx+4},88 ${cx+14},84 ` +
+        `C${cx+24},78 ${cx+20},66 ${cx+10},72 C${cx+6},74 ${cx-2},74 ${cx-6},72 Z`,
 
       ghigf:
-        `M${cx-48},145 C${cx-54},140 ${cx-58},148 ${cx-52},154 C${cx-46},160 ${cx-38},158 ${cx-36},154 ` +
-        `C${cx-34},150 ${cx-42},150 ${cx-48},145 Z`,
+        `M${cx-22},48 C${cx-32},42 ${cx-36},54 ${cx-26},60 C${cx-16},64 ${cx-4},62 ${cx-2},56 ` +
+        `C${cx+0},50 ${cx-12},52 ${cx-22},48 Z`,
+
+      heart:
+        `M${cx-16},110 C${cx-26},100 ${cx-30},88 ${cx-18},82 C${cx-10},78 ${cx-2},82 ${cx+0},88 ` +
+        `C${cx+2},82 ${cx+10},78 ${cx+18},82 C${cx+30},88 ${cx+26},100 ${cx+16},110 ` +
+        `C${cx+12},116 ${cx+6},122 ${cx+0},126 C${cx-6},122 ${cx-12},116 ${cx-16},110 Z`,
+
+      blood:
+        `M${cx-75},225 Q${cx-50},210 ${cx-25},218 T${cx+25},218 T${cx+75},225 ` +
+        `Q${cx+50},238 ${cx+25},230 T${cx-25},230 T${cx-75},225 Z`,
+
+      vessels:
+        `M${cx-80},140 L${cx-80},160 M${cx+80},140 L${cx+80},160 ` +
+        `M${cx+60},120 L${cx+60},200 M${cx-60},120 L${cx-60},200`,
+
+      liver:
+        `M${cx+20},190 C${cx+40},186 ${cx+55},194 ${cx+52},210 L${cx+50},225 ` +
+        `C${cx+48},240 ${cx+34},248 ${cx+18},244 L${cx-4},238 C${cx-12},234 ${cx-8},222 ${cx-2},216 ` +
+        `C${cx+4},208 ${cx+10},194 ${cx+20},190 Z`,
+
+      metabolic:
+        `M${cx-8},200 C${cx-20},196 ${cx-22},212 ${cx-10},218 C${cx-2},222 ${cx+8},220 ${cx+12},214 ` +
+        `C${cx+16},208 ${cx+4},204 ${cx-8},200 Z`,
 
       ins_axis:
-        `M${cx+30},204 C${cx+24},202 ${cx+22},210 ${cx+28},216 C${cx+34},222 ${cx+44},218 ${cx+42},212 ` +
-        `C${cx+40},206 ${cx+36},206 ${cx+30},204 Z`,
+        `M${cx+26},204 C${cx+16},200 ${cx+14},214 ${cx+24},220 C${cx+34},226 ${cx+46},222 ${cx+44},214 ` +
+        `C${cx+42},206 ${cx+34},208 ${cx+26},204 Z`,
+
+      kidney:
+        `M${cx-55},240 C${cx-68},236 ${cx-74},248 ${cx-66},260 C${cx-58},272 ${cx-42},272 ` +
+        `C${cx-36},272 ${cx-30},262 ${cx-34},250 C${cx-38},240 ${cx-46},240 ${cx-55},240 Z ` +
+        `M${cx+34},240 C${cx+22},236 ${cx+16},248 ${cx+24},260 C${cx+32},272 ${cx+48},272 ` +
+        `C${cx+54},272 ${cx+60},262 ${cx+56},250 C${cx+52},240 ${cx+44},240 ${cx+34},240 Z`,
 
       musculoskeletal:
-        `M${cx-70},270 L${cx-50},260 L${cx-30},270 L${cx-20},300 L${cx-25},340 L${cx-35},380 ` +
-        `L${cx-30},420 L${cx-20},450 L${cx-15},460 ` +
-        `C${cx-25},465 ${cx-40},460 ${cx-45},450 L${cx-50},420 L${cx-55},380 L${cx-60},340 ` +
-        `L${cx-65},300 L${cx-70},270 Z ` +
-        `M${cx+15},270 L${cx+35},260 L${cx+55},270 L${cx+65},300 L${cx+60},340 L${cx+55},380 ` +
-        `L${cx+50},420 L${cx+45},450 L${cx+40},460 ` +
-        `C${cx+30},465 ${cx+20},460 ${cx+15},450 L${cx+20},420 L${cx+30},380 L${cx+35},340 ` +
-        `L${cx+40},300 L${cx+35},270 Z`,
-
-      neuro_toxicity:
-        `M${cx-24},22 C${cx-32},18 ${cx-36},28 ${cx-30},34 C${cx-24},40 ${cx-16},42 ` +
-        `C${cx-8},42 ${cx-0},38 ${cx+0},34 C${cx+0},38 ${cx+8},42 ${cx+16},42 ` +
-        `C${cx+24},42 ${cx+32},40 ${cx+36},34 C${cx+42},28 ${cx+38},18 ${cx+30},22 ` +
-        `C${cx+24},26 ${cx+16},28 ${cx+8},26 C${cx+4},24 ${cx-4},24 ${cx-8},26 ` +
-        `C${cx-16},28 ${cx-24},26 ${cx-24},22 Z`,
+        `M${cx-80},290 L${cx-65},280 L${cx-50},290 L${cx-42},320 L${cx-46},360 L${cx-52},400 ` +
+        `L${cx-48},440 L${cx-44},470 L${cx-40},480 ` +
+        `C${cx-50},486 ${cx-64},480 ${cx-68},470 L${cx-72},440 L${cx-76},400 L${cx-80},360 ` +
+        `L${cx-84},320 L${cx-80},290 Z ` +
+        `M${cx+40},290 L${cx+55},280 L${cx+70},290 L${cx+74},320 L${cx+70},360 L${cx+64},400 ` +
+        `L${cx+60},440 L${cx+56},470 L${cx+52},480 ` +
+        `C${cx+42},486 ${cx+28},480 ${cx+24},470 L${cx+28},440 L${cx+32},400 L${cx+40},360 ` +
+        `L${cx+44},320 L${cx+40},290 Z`,
 
       reproductive:
-        `M${cx-24},316 C${cx-32},310 ${cx-38},320 ${cx-30},328 C${cx-22},336 ${cx-10},332 ${cx-8},326 ` +
-        `C${cx-6},320 ${cx-14},322 ${cx-24},316 Z ` +
-        `M${cx+8},316 C${cx+0},310 ${cx-6},320 ${cx+2},328 C${cx+10},336 ${cx+22},332 ${cx+24},326 ` +
-        `C${cx+26},320 ${cx+18},322 ${cx+8},316 Z`,
+        `M${cx-30},330 C${cx-40},322 ${cx-46},336 ${cx-36},346 C${cx-26},356 ${cx-12},350 ${cx-10},338 ` +
+        `C${cx-8},326 ${cx-20},328 ${cx-30},330 Z ` +
+        `M${cx+10},330 C${cx+0},322 ${cx-6},336 ${cx+4},346 C${cx+14},356 ${cx+28},350 ${cx+30},338 ` +
+        `C${cx+32},326 ${cx+20},328 ${cx+10},330 Z`,
     };
 
-    // Body silhouette (improved with shoulders/waist)
     const bodyPaths = `
       M${cx-75},70 C${cx-95},70 ${cx-105},80 ${cx-105},100 L${cx-105},110
       C${cx-105},120 ${cx-110},135 ${cx-125},150 L${cx-140},165 L${cx-135},175 L${cx-120},162
       C${cx-108},175 ${cx-110},190 ${cx-115},205 L${cx-105},215
       C${cx-98},235 ${cx-92},255 ${cx-88},275 L${cx-82},275
       L${cx-78},255 L${cx-72},305 L${cx-66},330
-      L${cx-72},390 L${cx-68},430 L${cx-76},470 L${cx-70},510
+      L${cx-72},390 L${cx-68},430 L${cx-74},470 L${cx-70},510
       L${cx-25},510 L${cx-25},470 L${cx-30},430 L${cx-28},390
       L${cx-20},355 L${cx-10},390 L${cx-10},430 L${cx-8},470
       L${cx-5},510 L${cx+5},510 L${cx+8},470 L${cx+10},430
       L${cx+10},390 L${cx+20},355 L${cx+28},390 L${cx+30},430
-      L${cx+25},470 L${cx+25},510 L${cx+70},510 L${cx+76},470
+      L${cx+25},470 L${cx+25},510 L${cx+70},510 L${cx+74},470
       L${cx+68},430 L${cx+72},390 L${cx+66},330 L${cx+72},305
       L${cx+78},255 L${cx+82},275 L${cx+88},275
       C${cx+92},255 ${cx+98},235 ${cx+105},215 L${cx+115},205
@@ -653,25 +656,15 @@ export const V7RiskDisplay: React.FC<{
         <div className="card" style={{ marginBottom: 12 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
             <h3 style={{ margin: 0, fontSize: 14 }}>🧍 3D Модель рисков</h3>
-            <div>
-              <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 3 }}>Неделя: {organWeek === 0 ? 'Среднее' : `Нед ${organWeek}`}</div>
-              <div style={{ display: 'flex', gap: 2, overflowX: 'auto', paddingBottom: 2, scrollbarWidth: 'none' }}>
-                <button onClick={() => setOrganWeek(0)} style={{
-                  padding: '3px 8px', borderRadius: 6, fontSize: 9, fontWeight: organWeek === 0 ? 700 : 400,
-                  cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
-                  background: organWeek === 0 ? '#00e68a' : 'var(--bg-secondary)',
-                  border: organWeek === 0 ? '1px solid #00e68a' : '1px solid var(--border)',
-                  color: organWeek === 0 ? '#000' : 'var(--text-dim)',
-                }}>∅</button>
-                {weekOptions.map(w => (
-                  <button key={w} onClick={() => setOrganWeek(w)} style={{
-                    padding: '3px 8px', borderRadius: 6, fontSize: 9, fontWeight: organWeek === w ? 700 : 400,
-                    cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
-                    background: organWeek === w ? '#00e68a' : 'var(--bg-secondary)',
-                    border: organWeek === w ? '1px solid #00e68a' : '1px solid var(--border)',
-                    color: organWeek === w ? '#000' : 'var(--text-dim)',
-                  }}>{w}</button>
-                ))}
+            <div style={{ minWidth: 180 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 }}>
+                <span style={{ fontSize: 9, color: 'var(--text-dim)' }}>{organWeek === 0 ? '∅ Среднее' : `Нед ${organWeek}`}</span>
+              </div>
+              <input type="range" min={0} max={12} value={organWeek} onChange={e => setOrganWeek(Number(e.target.value))}
+                style={{ width: '100%', accentColor: '#00e68a', height: 3, cursor: 'pointer' }} />
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 1 }}>
+                <span style={{ fontSize: 8, color: 'var(--text-dim)' }}>∅</span>
+                <span style={{ fontSize: 8, color: 'var(--text-dim)' }}>12</span>
               </div>
             </div>
           </div>

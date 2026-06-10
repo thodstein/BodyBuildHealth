@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { PHARMA_DB, SUBSTANCES_BY_CLASS } from '../../core/pharma-database';
 import { validateCourse } from '../../engines/pharmacology.engine';
 import { checkDrugInteractions } from '../../engines/pharma-interactions.engine';
-import { generatePCTPlan } from '../../engines/pct-planner.engine';
 import { generateWeeklyProtocol } from '../../engines/auto-plan.engine';
 import { db } from '../../core/db';
 import { notifyDataChange } from '../../core/data-link';
@@ -47,7 +46,6 @@ export const PharmaCourseScreen: React.FC = () => {
   const [freq, setFreq] = useState('2x/wk');
   const [startWeek, setStartWeek] = useState(0);
   const [endWeek, setEndWeek] = useState(12);
-  const [pctPlan, setPctPlan] = useState<ReturnType<typeof generatePCTPlan> | null>(null);
   const [interactions, setInteractions] = useState<ReturnType<typeof checkDrugInteractions>>([]);
   const [validation, setValidation] = useState<{ valid: boolean; warnings: string[] }>({ valid: true, warnings: [] });
   const [autoProtocol, setAutoProtocol] = useState<ReturnType<typeof generateWeeklyProtocol> | null>(null);
@@ -102,12 +100,6 @@ export const PharmaCourseScreen: React.FC = () => {
       setCourse(prev => prev.filter(e => e.id !== id));
       notifyDataChange();
     } catch (e) { console.error(e); }
-  };
-
-  const buildPCT = () => {
-    if (!course.length) return;
-    const plan = generatePCTPlan(course, Math.max(...course.map(c => c.endWeek)));
-    setPctPlan(plan);
   };
 
   const subName = (id: string) => PHARMA_DB[id]?.name ?? id;
@@ -194,33 +186,12 @@ export const PharmaCourseScreen: React.FC = () => {
         </div>
       )}
 
-      {/* PCT */}
-      {course.length > 0 && !pctPlan && (
-        <div className="card" style={{ marginTop: 8 }}>
-          <button onClick={buildPCT} style={{
-            width: '100%', padding: 10, background: 'var(--accent)', color: '#000',
-            border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 700, fontSize: 13,
-          }}>
-            🔄 Сгенерировать ПКТ
-          </button>
-        </div>
-      )}
-
-      {pctPlan && (
-        <div className="card" style={{ marginTop: 8 }}>
-          <h3>📋 План ПКТ</h3>
-          <div style={{ fontSize: 11, marginBottom: 6 }}>Начало: неделя {pctPlan.pctStartWeek}</div>
-          {pctPlan.warnings.length > 0 && (
-            <div style={{ background: 'var(--warning-dim)', borderRadius: 6, padding: 6, marginBottom: 6 }}>
-              {pctPlan.warnings.map((w: string, i: number) => <div key={i} style={{ fontSize: 10, color: 'var(--warning)' }}>{w}</div>)}
-            </div>
-          )}
-          {pctPlan.pctProtocol.map((p: any, i: number) => (
-            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: 11 }}>
-              <span>{p.drug}</span>
-              <span style={{ color: 'var(--text-dim)' }}>{p.dose} • {p.durationWeeks} нед</span>
-            </div>
-          ))}
+      {/* PCT redirect */}
+      {course.length > 0 && (
+        <div className="card" style={{ marginTop: 8, textAlign: 'center', padding: '12px 16px' }}>
+          <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>
+            🌱 План ПКТ перенесён в отдельный раздел <b style={{ color: '#00e68a' }}>«ПКТ и Фертильность»</b> на главной
+          </div>
         </div>
       )}
 

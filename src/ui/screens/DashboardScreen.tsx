@@ -67,6 +67,7 @@ const NAV_CARDS: { id: ScreenId; icon: string; label: string; desc: string; colo
   { id: 'training', icon: '🏋️', label: 'Тренировки', desc: 'Планы, RIR', color: '#00e68a' },
   { id: 'support', icon: '💊', label: 'Поддержка', desc: 'БАДы, протоколы', color: '#1e90ff' },
   { id: 'nutrition', icon: '🍎', label: 'Питание', desc: 'КБЖУ, дневник', color: '#ffa502' },
+  { id: 'fertility-pct', icon: '🌱', label: 'ПКТ и Фертильность', desc: 'План ПКТ, фертильность', color: '#22c55e' },
   { id: 'calculators', icon: '🧮', label: 'Калькуляторы', desc: 'Дозировки', color: '#a855f7' },
   { id: 'profile', icon: '👤', label: 'Профиль', desc: 'Настройки', color: '#6b7280' },
   { id: 'marketplace', icon: '🛒', label: 'Маркетплейс', desc: 'Препараты и БАДы', color: '#f97316' },

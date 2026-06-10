@@ -710,6 +710,7 @@ const PKPDSimulationTab: React.FC = () => {
 const DosageCalculatorTab: React.FC = () => {
   const allPharma = Object.values(PHARMA_DB).filter((s) => PHARMA_CLASSES.includes(s.class as PharmaClass));
   const [drug, setDrug] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
   const [doseMode, setDoseMode] = useState<'per_kg' | 'weekly'>('per_kg');
   const [mgKg, setMgKg] = useState(2);
   const [weeklyMg, setWeeklyMg] = useState(500);
@@ -720,7 +721,6 @@ const DosageCalculatorTab: React.FC = () => {
   const [syringeMl, setSyringeMl] = useState(1);
   const [doseResult, setDoseResult] = useState<ReturnType<typeof calculateDose> | null>(null);
 
-  // Auto-fill concentration from selected drug
   const subDetail = drug ? PHARMA_DB[drug] : null;
   const handleDrugChange = (id: string) => {
     setDrug(id);
@@ -743,158 +743,176 @@ const DosageCalculatorTab: React.FC = () => {
     setDoseResult(dose);
   };
 
-  // Re-run on any input change
   useEffect(() => { run(); }, [drug, doseMode, mgKg, weeklyMg, weight, injectionsPerWeek, concentration, vialMl, syringeMl]);
 
   const weeklyTotal = doseMode === 'per_kg' ? mgKg * weight : weeklyMg;
   const perInjectionMg = weeklyTotal / Math.max(1, injectionsPerWeek);
   const wastePerVial = vialMl && doseResult ? Math.max(0, vialMl - (doseResult?.dosesPerVial || 0) * doseResult.volumeMl) : 0;
 
+  const filtered = searchTerm
+    ? allPharma.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase()) || p.class.toLowerCase().includes(searchTerm.toLowerCase()))
+    : allPharma;
+
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-      <div>
-        <div className="card">
-          <h3 style={{ margin: '0 0 12px 0', fontSize: 14, color: 'var(--accent)' }}>💉 Калькулятор дозировки</h3>
-          <div style={{ marginBottom: 12 }}>
-            <label style={{ fontSize: 11, color: 'var(--text-dim)', display: 'block', marginBottom: 4 }}>Препарат</label>
-            <select value={drug} onChange={(e) => handleDrugChange(e.target.value)}
-              style={{ width: '100%', padding: '8px 10px', borderRadius: 8, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12 }}>
-              <option value="">— Выберите препарат —</option>
-              {allPharma.map((p) => (
-                <option key={p.id} value={p.id}>{p.name} ({CLASS_LABELS[p.class] || p.class})</option>
-              ))}
-            </select>
+    <div>
+      <div className="card" style={{ marginBottom: 12 }}>
+        <h3 style={{ margin: '0 0 12px 0', fontSize: 14, color: 'var(--accent)' }}>💉 Калькулятор дозировки</h3>
+
+        {/* Search */}
+        <input
+          type="text" value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          placeholder="Поиск препарата..."
+          style={{ width: '100%', padding: '8px 10px', borderRadius: 8, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, marginBottom: 12, boxSizing: 'border-box' }}
+        />
+
+        {/* Drug cards grid */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))', gap: 6, maxHeight: 220, overflowY: 'auto', marginBottom: 12 }}>
+          {filtered.map((p) => {
+            const isSelected = drug === p.id;
+            return (
+              <div key={p.id} onClick={() => handleDrugChange(p.id)} style={{
+                padding: '8px 10px', borderRadius: 8, cursor: 'pointer',
+                background: isSelected ? 'rgba(0,230,138,0.15)' : 'var(--bg-secondary)',
+                border: isSelected ? '1.5px solid #00e68a' : '1px solid var(--border)',
+                transition: 'all 0.15s',
+              }}>
+                <div style={{ fontSize: 12, fontWeight: 600, color: isSelected ? '#00e68a' : 'var(--text)', marginBottom: 2 }}>{p.name}</div>
+                <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>{CLASS_LABELS[p.class] || p.class}</div>
+              </div>
+            );
+          })}
+        </div>
+
+        {subDetail && (
+          <div style={{ marginBottom: 12, padding: '8px 10px', background: 'var(--bg-secondary)', borderRadius: 6 }}>
+            <div style={{ fontSize: 11, color: 'var(--text-dim)' }}><b style={{ color: 'var(--text)' }}>Концентрация:</b> {(subDetail as any).concentration || 'нет данных'} мг/мл</div>
+            <div style={{ fontSize: 11, color: 'var(--text-dim)' }}><b style={{ color: 'var(--text)' }}>Период полувыведения:</b> {subDetail.tHalfHours ? formatHalfLife(subDetail.tHalfHours) : 'нет данных'}</div>
           </div>
-          {subDetail && (
-            <div style={{ marginBottom: 12, padding: '8px 10px', background: 'var(--bg-secondary)', borderRadius: 6 }}>
-              <div style={{ fontSize: 11, color: 'var(--text-dim)' }}><b style={{ color: 'var(--text)' }}>Концентрация:</b> {(subDetail as any).concentration || 'нет данных'} мг/мл</div>
-              <div style={{ fontSize: 11, color: 'var(--text-dim)' }}><b style={{ color: 'var(--text)' }}>Период полувыведения:</b> {subDetail.tHalfHours ? formatHalfLife(subDetail.tHalfHours) : 'нет данных'}</div>
+        )}
+
+        {/* Pill toggle */}
+        <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
+          <button onClick={() => setDoseMode('per_kg')} style={{
+            flex: 1, padding: '6px 0', borderRadius: 20, fontSize: 11, fontWeight: doseMode === 'per_kg' ? 700 : 400, cursor: 'pointer',
+            background: doseMode === 'per_kg' ? 'rgba(0,230,138,0.15)' : 'var(--bg-secondary)',
+            border: doseMode === 'per_kg' ? '1px solid #00e68a' : '1px solid var(--border)',
+            color: doseMode === 'per_kg' ? '#00e68a' : 'var(--text-dim)',
+          }}>мг/кг/нед</button>
+          <button onClick={() => setDoseMode('weekly')} style={{
+            flex: 1, padding: '6px 0', borderRadius: 20, fontSize: 11, fontWeight: doseMode === 'weekly' ? 700 : 400, cursor: 'pointer',
+            background: doseMode === 'weekly' ? 'rgba(0,230,138,0.15)' : 'var(--bg-secondary)',
+            border: doseMode === 'weekly' ? '1px solid #00e68a' : '1px solid var(--border)',
+            color: doseMode === 'weekly' ? '#00e68a' : 'var(--text-dim)',
+          }}>мг/нед</button>
+        </div>
+
+        {/* Input fields */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 12 }}>
+          {doseMode === 'per_kg' ? (
+            <>
+              <div>
+                <label style={{ fontSize: 10, color: 'var(--text-dim)', display: 'block', marginBottom: 3 }}>мг/кг/нед</label>
+                <input type="number" value={mgKg} onChange={(e) => setMgKg(Number(e.target.value))}
+                  style={{ width: '100%', padding: '7px 10px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, boxSizing: 'border-box' }} />
+              </div>
+              <div>
+                <label style={{ fontSize: 10, color: 'var(--text-dim)', display: 'block', marginBottom: 3 }}>Вес (кг)</label>
+                <input type="number" value={weight} onChange={(e) => setWeight(Number(e.target.value))}
+                  style={{ width: '100%', padding: '7px 10px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, boxSizing: 'border-box' }} />
+              </div>
+            </>
+          ) : (
+            <div style={{ gridColumn: '1 / -1' }}>
+              <label style={{ fontSize: 10, color: 'var(--text-dim)', display: 'block', marginBottom: 3 }}>Недельная доза (мг/нед)</label>
+              <input type="number" value={weeklyMg} onChange={(e) => setWeeklyMg(Number(e.target.value))}
+                style={{ width: '100%', padding: '7px 10px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, boxSizing: 'border-box' }} />
             </div>
           )}
-
-          {/* Dose mode toggle */}
-          <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
-            <button onClick={() => setDoseMode('per_kg')} style={{
-              flex: 1, padding: '6px 0', borderRadius: 6, fontSize: 11, fontWeight: doseMode === 'per_kg' ? 700 : 400, cursor: 'pointer',
-              background: doseMode === 'per_kg' ? 'rgba(0,230,138,0.15)' : 'var(--bg-secondary)',
-              border: doseMode === 'per_kg' ? '1px solid #00e68a' : '1px solid var(--border)',
-              color: doseMode === 'per_kg' ? '#00e68a' : 'var(--text-dim)',
-            }}>мг/кг/нед</button>
-            <button onClick={() => setDoseMode('weekly')} style={{
-              flex: 1, padding: '6px 0', borderRadius: 6, fontSize: 11, fontWeight: doseMode === 'weekly' ? 700 : 400, cursor: 'pointer',
-              background: doseMode === 'weekly' ? 'rgba(0,230,138,0.15)' : 'var(--bg-secondary)',
-              border: doseMode === 'weekly' ? '1px solid #00e68a' : '1px solid var(--border)',
-              color: doseMode === 'weekly' ? '#00e68a' : 'var(--text-dim)',
-            }}>мг/нед</button>
+          <div>
+            <label style={{ fontSize: 10, color: 'var(--text-dim)', display: 'block', marginBottom: 3 }}>Инъекций/нед</label>
+            <select value={injectionsPerWeek} onChange={(e) => setInjectionsPerWeek(Number(e.target.value))}
+              style={{ width: '100%', padding: '7px 10px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12 }}>
+              {[1, 2, 3, 4, 5, 6, 7].map(v => <option key={v} value={v}>{v}x/нед</option>)}
+            </select>
           </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 12 }}>
-            {doseMode === 'per_kg' ? (
-              <>
-                <div>
-                  <label style={{ fontSize: 10, color: 'var(--text-dim)', display: 'block', marginBottom: 3 }}>мг/кг/нед</label>
-                  <input type="number" value={mgKg} onChange={(e) => setMgKg(Number(e.target.value))}
-                    style={{ width: '100%', padding: '7px 10px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12 }} />
-                </div>
-                <div>
-                  <label style={{ fontSize: 10, color: 'var(--text-dim)', display: 'block', marginBottom: 3 }}>Вес (кг)</label>
-                  <input type="number" value={weight} onChange={(e) => setWeight(Number(e.target.value))}
-                    style={{ width: '100%', padding: '7px 10px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12 }} />
-                </div>
-              </>
-            ) : (
-              <div style={{ gridColumn: '1 / -1' }}>
-                <label style={{ fontSize: 10, color: 'var(--text-dim)', display: 'block', marginBottom: 3 }}>Недельная доза (мг/нед)</label>
-                <input type="number" value={weeklyMg} onChange={(e) => setWeeklyMg(Number(e.target.value))}
-                  style={{ width: '100%', padding: '7px 10px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12 }} />
-              </div>
-            )}
-            <div>
-              <label style={{ fontSize: 10, color: 'var(--text-dim)', display: 'block', marginBottom: 3 }}>Инъекций/нед</label>
-              <select value={injectionsPerWeek} onChange={(e) => setInjectionsPerWeek(Number(e.target.value))}
-                style={{ width: '100%', padding: '7px 10px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12 }}>
-                {[1, 2, 3, 4, 5, 6, 7].map(v => <option key={v} value={v}>{v}x/нед</option>)}
-              </select>
-            </div>
-            <div>
-              <label style={{ fontSize: 10, color: 'var(--text-dim)', display: 'block', marginBottom: 3 }}>Конц-ция (мг/мл)</label>
-              <input type="number" value={concentration} onChange={(e) => setConcentration(Number(e.target.value))}
-                style={{ width: '100%', padding: '7px 10px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12 }} />
-            </div>
-            <div>
-              <label style={{ fontSize: 10, color: 'var(--text-dim)', display: 'block', marginBottom: 3 }}>Флакон (мл)</label>
-              <input type="number" value={vialMl} onChange={(e) => setVialMl(Number(e.target.value))}
-                style={{ width: '100%', padding: '7px 10px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12 }} />
-            </div>
-            <div>
-              <label style={{ fontSize: 10, color: 'var(--text-dim)', display: 'block', marginBottom: 3 }}>Шприц (мл)</label>
-              <select value={syringeMl} onChange={(e) => setSyringeMl(Number(e.target.value))}
-                style={{ width: '100%', padding: '7px 10px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12 }}>
-                {[0.3, 0.5, 1, 3, 5, 10, 20].map(v => <option key={v} value={v}>{v} мл</option>)}
-              </select>
-            </div>
+          <div>
+            <label style={{ fontSize: 10, color: 'var(--text-dim)', display: 'block', marginBottom: 3 }}>Конц-ция (мг/мл)</label>
+            <input type="number" value={concentration} onChange={(e) => setConcentration(Number(e.target.value))}
+              style={{ width: '100%', padding: '7px 10px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, boxSizing: 'border-box' }} />
+          </div>
+          <div>
+            <label style={{ fontSize: 10, color: 'var(--text-dim)', display: 'block', marginBottom: 3 }}>Флакон (мл)</label>
+            <input type="number" value={vialMl} onChange={(e) => setVialMl(Number(e.target.value))}
+              style={{ width: '100%', padding: '7px 10px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, boxSizing: 'border-box' }} />
+          </div>
+          <div>
+            <label style={{ fontSize: 10, color: 'var(--text-dim)', display: 'block', marginBottom: 3 }}>Шприц (мл)</label>
+            <select value={syringeMl} onChange={(e) => setSyringeMl(Number(e.target.value))}
+              style={{ width: '100%', padding: '7px 10px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12 }}>
+              {[0.3, 0.5, 1, 3, 5, 10, 20].map(v => <option key={v} value={v}>{v} мл</option>)}
+            </select>
           </div>
         </div>
       </div>
-      <div>
-        {doseResult ? (
-          <div className="card">
-            <h3 style={{ margin: '0 0 12px 0', fontSize: 14, color: 'var(--accent)' }}>📋 Результат</h3>
-            <div style={{ display: 'grid', gap: 8 }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
-                <div style={{ background: 'rgba(0,230,138,0.08)', borderRadius: 8, padding: 10, textAlign: 'center' }}>
-                  <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 2 }}>Недельная доза</div>
-                  <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--accent)' }}>{weeklyTotal.toFixed(0)}</div>
-                  <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>мг/нед</div>
-                </div>
-                <div style={{ background: 'rgba(0,230,138,0.08)', borderRadius: 8, padding: 10, textAlign: 'center' }}>
-                  <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 2 }}>На инъекцию</div>
-                  <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--accent)' }}>{perInjectionMg.toFixed(1)}</div>
-                  <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>мг × {injectionsPerWeek}/нед</div>
-                </div>
+
+      {doseResult ? (
+        <div className="card">
+          <h3 style={{ margin: '0 0 12px 0', fontSize: 14, color: 'var(--accent)' }}>📋 Результат</h3>
+          <div style={{ display: 'grid', gap: 8 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+              <div style={{ background: 'rgba(0,230,138,0.08)', borderRadius: 8, padding: 10, textAlign: 'center' }}>
+                <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 2 }}>Недельная доза</div>
+                <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--accent)' }}>{weeklyTotal.toFixed(0)}</div>
+                <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>мг/нед</div>
               </div>
-              <div style={{ background: 'rgba(0,230,138,0.08)', borderRadius: 8, padding: 12, textAlign: 'center' }}>
-                <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 2 }}>Объём инъекции</div>
-                <div style={{ fontSize: 28, fontWeight: 800, color: 'var(--accent)' }}>{doseResult.volumeMl}</div>
-                <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>мл</div>
+              <div style={{ background: 'rgba(0,230,138,0.08)', borderRadius: 8, padding: 10, textAlign: 'center' }}>
+                <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 2 }}>На инъекцию</div>
+                <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--accent)' }}>{perInjectionMg.toFixed(1)}</div>
+                <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>мг × {injectionsPerWeek}/нед</div>
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
-                <div style={{ background: 'var(--bg-secondary)', borderRadius: 8, padding: '10px 12px', textAlign: 'center' }}>
-                  <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 2 }}>Деления шприца</div>
-                  <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--text)' }}>{doseResult.divisions}</div>
-                </div>
-                <div style={{ background: 'var(--bg-secondary)', borderRadius: 8, padding: '10px 12px', textAlign: 'center' }}>
-                  <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 2 }}>Доз/флакон</div>
-                  <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--text)' }}>{doseResult.dosesPerVial || '—'}</div>
-                </div>
-                <div style={{ background: 'var(--bg-secondary)', borderRadius: 8, padding: '10px 12px', textAlign: 'center' }}>
-                  <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 2 }}>Отход/флакон</div>
-                  <div style={{ fontSize: 20, fontWeight: 700, color: wastePerVial > 1 ? '#ff9800' : 'var(--text)' }}>{wastePerVial.toFixed(2)}</div>
-                  <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>мл</div>
-                </div>
-              </div>
-              {doseResult.flags.length > 0 && (
-                <div style={{ background: 'rgba(255,152,0,0.1)', borderRadius: 6, padding: '8px 10px', fontSize: 11, color: '#ff9800' }}>
-                  ⚠ {doseResult.flags.join(', ')}
-                </div>
-              )}
-              {doseResult.flags.length === 0 && (
-                <div style={{ background: 'rgba(0,230,138,0.08)', borderRadius: 6, padding: '8px 10px', fontSize: 11, color: '#00e68a', textAlign: 'center' }}>
-                  ✓ Готово к введению
-                </div>
-              )}
             </div>
-          </div>
-        ) : (
-          <div className="card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 200, color: 'var(--text-dim)', fontSize: 12 }}>
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: 32, marginBottom: 8 }}>💉</div>
-              <div>Выберите препарат и дозировку,</div>
-              <div>чтобы рассчитать объём инъекции</div>
+            <div style={{ background: 'rgba(0,230,138,0.08)', borderRadius: 8, padding: 12, textAlign: 'center' }}>
+              <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 2 }}>Объём инъекции</div>
+              <div style={{ fontSize: 28, fontWeight: 800, color: 'var(--accent)' }}>{doseResult.volumeMl}</div>
+              <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>мл</div>
             </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
+              <div style={{ background: 'var(--bg-secondary)', borderRadius: 8, padding: '10px 12px', textAlign: 'center' }}>
+                <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 2 }}>Деления шприца</div>
+                <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--text)' }}>{doseResult.divisions}</div>
+              </div>
+              <div style={{ background: 'var(--bg-secondary)', borderRadius: 8, padding: '10px 12px', textAlign: 'center' }}>
+                <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 2 }}>Доз/флакон</div>
+                <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--text)' }}>{doseResult.dosesPerVial || '—'}</div>
+              </div>
+              <div style={{ background: 'var(--bg-secondary)', borderRadius: 8, padding: '10px 12px', textAlign: 'center' }}>
+                <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 2 }}>Отход/флакон</div>
+                <div style={{ fontSize: 20, fontWeight: 700, color: wastePerVial > 1 ? '#ff9800' : 'var(--text)' }}>{wastePerVial.toFixed(2)}</div>
+                <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>мл</div>
+              </div>
+            </div>
+            {doseResult.flags.length > 0 && (
+              <div style={{ background: 'rgba(255,152,0,0.1)', borderRadius: 6, padding: '8px 10px', fontSize: 11, color: '#ff9800' }}>
+                ⚠ {doseResult.flags.join(', ')}
+              </div>
+            )}
+            {doseResult.flags.length === 0 && (
+              <div style={{ background: 'rgba(0,230,138,0.08)', borderRadius: 6, padding: '8px 10px', fontSize: 11, color: '#00e68a', textAlign: 'center' }}>
+                ✓ Готово к введению
+              </div>
+            )}
           </div>
-        )}
-      </div>
+        </div>
+      ) : (
+        <div className="card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 200, color: 'var(--text-dim)', fontSize: 12 }}>
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ fontSize: 32, marginBottom: 8 }}>💉</div>
+            <div>Выберите препарат и дозировку,</div>
+            <div>чтобы рассчитать объём инъекции</div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
@@ -917,6 +935,7 @@ const InteractionCheckerTab: React.FC = () => {
 
   const [selectedIds, setSelectedIds] = useState<string[]>(['', '']);
   const [doseMgWk, setDoseMgWk] = useState(300);
+  const [interactSearch, setInteractSearch] = useState('');
 
   const addDrug = () => setSelectedIds([...selectedIds, '']);
   const removeDrug = (idx: number) => setSelectedIds(selectedIds.filter((_, i) => i !== idx));
@@ -927,6 +946,14 @@ const InteractionCheckerTab: React.FC = () => {
   };
 
   const validIds = selectedIds.filter(Boolean);
+
+  const interactFiltered = interactSearch
+    ? allSubstances.filter(p => p.name.toLowerCase().includes(interactSearch.toLowerCase()) || p.class.toLowerCase().includes(interactSearch.toLowerCase()))
+    : allSubstances;
+
+  const unusedSubstances = useMemo(() => {
+    return interactFiltered.filter(p => !selectedIds.includes(p.id));
+  }, [interactFiltered, selectedIds]);
 
   const alerts = useMemo(() => {
     if (validIds.length < 2) return null;
@@ -964,14 +991,46 @@ const InteractionCheckerTab: React.FC = () => {
           {selectedIds.map((id, idx) => (
             <div key={idx} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
               <div style={{ fontSize: 10, color: 'var(--text-dim)', minWidth: 18, fontWeight: 600 }}>#{idx + 1}</div>
-              <select value={id} onChange={(e) => updateDrug(idx, e.target.value)}
-                style={{ flex: 1, padding: '8px 10px', borderRadius: 8, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12 }}>
-                <option value="">— Выберите препарат —</option>
-                {allSubstances.map((s) => (
-                  <option key={s.id} value={s.id}>{s.name}</option>
-                ))}
-              </select>
-              {selectedIds.length > 2 && (
+              {id ? (
+                <div style={{
+                  flex: 1, padding: '8px 10px', borderRadius: 8, background: 'rgba(0,230,138,0.15)', border: '1px solid #00e68a',
+                  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                }}>
+                  <div>
+                    <span style={{ fontSize: 12, fontWeight: 600, color: '#00e68a' }}>{PHARMA_DB[id]?.name || id}</span>
+                    <span style={{ fontSize: 10, color: 'var(--text-dim)', marginLeft: 6 }}>{id ? CLASS_LABELS[PHARMA_DB[id]?.class] || '' : ''}</span>
+                  </div>
+                  <button onClick={() => updateDrug(idx, '')} style={{
+                    padding: '2px 8px', borderRadius: 4, fontSize: 10, cursor: 'pointer',
+                    background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.3)', color: '#ef4444',
+                  }}>✕</button>
+                </div>
+              ) : (
+                <div style={{ flex: 1 }}>
+                  <input
+                    type="text" value={interactSearch}
+                    onChange={(e) => setInteractSearch(e.target.value)}
+                    placeholder="Поиск препарата..."
+                    style={{ width: '100%', padding: '8px 10px', borderRadius: 8, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, boxSizing: 'border-box', marginBottom: 6 }}
+                  />
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, maxHeight: 140, overflowY: 'auto' }}>
+                    {unusedSubstances.map((s) => (
+                      <div key={s.id} onClick={() => { updateDrug(idx, s.id); setInteractSearch(''); }} style={{
+                        padding: '5px 8px', borderRadius: 6, cursor: 'pointer', fontSize: 11,
+                        background: 'var(--bg-secondary)', border: '1px solid var(--border)',
+                        transition: 'all 0.1s',
+                        whiteSpace: 'nowrap',
+                      }}>
+                        {s.name}
+                      </div>
+                    ))}
+                    {unusedSubstances.length === 0 && (
+                      <div style={{ fontSize: 11, color: 'var(--text-dim)', padding: 4 }}>Нет доступных препаратов</div>
+                    )}
+                  </div>
+                </div>
+              )}
+              {selectedIds.length > 2 && id === '' && (
                 <button onClick={() => removeDrug(idx)} style={{
                   padding: '4px 10px', borderRadius: 6, fontSize: 11, cursor: 'pointer',
                   background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', color: '#ef4444',

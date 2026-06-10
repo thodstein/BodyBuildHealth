@@ -302,6 +302,12 @@ export function runV7Simulation(input: V7RiskInput): V7RiskResult {
   const organKeys = Object.keys(timeSeries.organStates);
   const w = 7; // days per week
   const numWeeks = Math.floor(days / w);
+  const ORGAN_CALIBRATION = 3.0;
+  const stazhMult = stazhChronicMultiplier(
+    organInput.Stazh_life,
+    organInput.Stazh_cont,
+    organInput.Inflamm_core
+  );
 
   // Compute weekly organ averages & daily organ risk
   const weeklyOrganData: Record<string, number[]> = {};
@@ -328,7 +334,8 @@ export function runV7Simulation(input: V7RiskInput): V7RiskResult {
       count++;
     }
     for (const key of organKeys) {
-      weeklyOrganData[key].push(count > 0 ? weekAvg[key] / count : 0);
+      const raw = count > 0 ? weekAvg[key] / count : 0;
+      weeklyOrganData[key].push(Math.min(1, raw * stazhMult * ORGAN_CALIBRATION));
     }
     // Weekly global risk from cumulative risk at end of week
     const wkEnd = Math.min(endDay, days) - 1;
@@ -359,13 +366,7 @@ export function runV7Simulation(input: V7RiskInput): V7RiskResult {
   const matrix = computeV7Matrix(matrixInput, input.supportIds ?? []);
 
   // 5. Compute organ summary from LAST 4 WEEKS average (steady-state)
-  const ORGAN_CALIBRATION = 3.0; // Scale factor for Hill-attenuated drug inputs (EC50=2 vs AR_eff~0.2)
   const organSummaryStartWeek = Math.max(0, numWeeks - 4);
-  const stazhMult = stazhChronicMultiplier(
-    organInput.Stazh_life,
-    organInput.Stazh_cont,
-    organInput.Inflamm_core
-  );
   const organSummary: Record<string, V7OrganSummary> = {};
   for (const key of organKeys) {
     let sumS = 0, sumAcute = 0, sumChronic = 0, sumFibrosis = 0, sumCumRisk = 0, sumPEvent = 0;

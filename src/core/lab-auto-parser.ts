@@ -14,7 +14,6 @@ export interface ParsedLabResult {
   labName?: string;
 }
 
-// Normal ranges by lab provider (common variations)
 const LAB_REFERENCE_RANGES: Record<string, Partial<Record<string, { low: number; high: number }>>> = {
   gemotest: {},
   helix: {},
@@ -23,24 +22,19 @@ const LAB_REFERENCE_RANGES: Record<string, Partial<Record<string, { low: number;
 };
 
 const LINE_PATTERNS = [
-   // Pattern 1: Marker: Value Unit (most common)
-   /([A-Za-z0-9().\/-]{2,40})[\s:]+([\d,.]+)\s*([A-Za-z%\/0-9.-]{1,20})/i,
-   // Pattern 2: Value Unit Marker
-   /([\d,.]+)\s*([A-Za-z%\/0-9.-]{1,20})\s+([A-Za-z0-9().\/-]{2,40})/i,
-   // Pattern 3: Marker Value Unit (no separator)
-   /([A-Za-z0-9().\/-]{2,40})\s+([\d,.]+)\s*([A-Za-z%\/0-9.-]{1,20})/i,
-   // Pattern 4: With reference ranges: Marker Value Unit (Low-High)
-   /([A-Za-z0-9().\/-]{2,40})[\s:]+([\d,.]+)\s*([A-Za-z%\/0-9.-]{1,20})\s*[\(\[\{]\s*([\d,.]+)\s*[-–]\s*([\d,.]+)\s*[\)\]\}]/i,
-   // Pattern 5: Marker Value Unit Low-High
-   /([A-Za-z0-9().\/-]{2,40})[\s:]+([\d,.]+)\s*([A-Za-z%\/0-9.-]{1,20})\s*([\d,.]+)\s*[-–]\s*([\d,.]+)/i
+   /([A-Za-zА-Яа-я0-9().\/ -]{2,60})[\s:]+([\d,.]+)\s*([A-Za-z%\/0-9.\-^]{1,20})/i,
+   /([\d,.]+)\s*([A-Za-z%\/0-9.\-^]{1,20})\s+([A-Za-zА-Яа-я0-9().\/ -]{2,60})/i,
+   /([A-Za-zА-Яа-я0-9().\/ -]{2,60})\s+([\d,.]+)\s*([A-Za-z%\/0-9.\-^]{1,20})/i,
+   /([A-Za-zА-Яа-я0-9().\/ -]{2,60})[\s:]+([\d,.]+)\s*([A-Za-z%\/0-9.\-^]{1,20})\s*[\(\[\{]\s*([\d,.]+)\s*[-–]\s*([\d,.]+)\s*[\)\]\}]/i,
+   /([A-Za-zА-Яа-я0-9().\/ -]{2,60})[\s:]+([\d,.]+)\s*([A-Za-z%\/0-9.\-^]{1,20})\s*([\d,.]+)\s*[-–]\s*([\d,.]+)/i,
 ];
 
 export function detectProvider(text: string): ParsedLabResult['provider'] {
   const lower = text.toLowerCase();
   if (lower.includes('gemotest')) return 'gemotest';
-  if (lower.includes('invitro')) return 'invitro';
-  if (lower.includes('helix')) return 'helix';
-  if (lower.includes('kdl')) return 'kdl';
+  if (lower.includes('инвитро') || lower.includes('invitro')) return 'invitro';
+  if (lower.includes('helix') || lower.includes('хеликс')) return 'helix';
+  if (lower.includes('kdl') || lower.includes('кдл')) return 'kdl';
   return 'unknown';
 }
 
@@ -49,89 +43,115 @@ export function parseLabText(text: string): ParsedLabResult[] {
   const provider = detectProvider(text);
   const lines = text.replace(/\r\n/g, '\n').split('\n').map((l) => l.trim()).filter(Boolean);
 
-   for (const line of lines) {
-     for (const pat of LINE_PATTERNS) {
-       const match = line.match(pat);
-       if (!match) continue;
+  const seenMarkers = new Set<string>();
 
-        let markerRaw: string = '';
-        let valStr: string = '';
-        let unit: string = '';
-       let refLow: string | undefined;
-       let refHigh: string | undefined;
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    let matched = false;
 
-       // Handle different pattern matches
-       if (pat === LINE_PATTERNS[0]) {
-         // Pattern 1: Marker: Value Unit
-         markerRaw = match[1];
-         valStr = match[2];
-         unit = match[3];
-       } else if (pat === LINE_PATTERNS[1]) {
-         // Pattern 2: Value Unit Marker
-         valStr = match[1];
-         unit = match[2];
-         markerRaw = match[3];
-       } else if (pat === LINE_PATTERNS[2]) {
-         // Pattern 3: Marker Value Unit
-         markerRaw = match[1];
-         valStr = match[2];
-         unit = match[3];
-       } else if (pat === LINE_PATTERNS[3]) {
-         // Pattern 4: Marker: Value Unit (Low-High)
-         markerRaw = match[1];
-         valStr = match[2];
-         unit = match[3];
-         refLow = match[4];
-         refHigh = match[5];
-       } else if (pat === LINE_PATTERNS[4]) {
-         // Pattern 5: Marker Value Unit Low-High
-         markerRaw = match[1];
-         valStr = match[2];
-         unit = match[3];
-         refLow = match[4];
-         refHigh = match[5];
-       }
+    for (const pat of LINE_PATTERNS) {
+      const match = line.match(pat);
+      if (!match) continue;
 
-       const value = parseFloat(valStr.replace(',', '.'));
-       const marker = resolveLabMarker(markerRaw);
-       if (!marker || Number.isNaN(value) || value <= 0) continue;
+      let markerRaw = '';
+      let valStr = '';
+      let unit = '';
+      let refLow: string | undefined;
+      let refHigh: string | undefined;
 
-       let refRange: string | undefined;
-       let isAbnormal: boolean | undefined;
-       let deviation: 'low' | 'high' | 'normal' | undefined;
-       
-       if (refLow !== undefined && refHigh !== undefined) {
-         refRange = `${refLow}-${refHigh}`;
-         isAbnormal = value < parseFloat(refLow) || value > parseFloat(refHigh);
-         if (isAbnormal) {
-           deviation = value < parseFloat(refLow) ? 'low' : 'high';
-         }
-       } else {
-         // Check against UCUM_MAP norms if available
-         const ucum = UCUM_MAP[marker];
-         if (ucum) {
-           const ratio = normalizedRatio(marker, value, unit);
-           isAbnormal = ratio !== null && (ratio < 0.2 || ratio > 0.8);
-           if (isAbnormal && ratio !== null) {
-             deviation = ratio < 0.2 ? 'low' : 'high';
-           }
-         }
-       }
+      if (pat === LINE_PATTERNS[0]) {
+        markerRaw = match[1];
+        valStr = match[2];
+        unit = match[3];
+      } else if (pat === LINE_PATTERNS[1]) {
+        valStr = match[1];
+        unit = match[2];
+        markerRaw = match[3];
+      } else if (pat === LINE_PATTERNS[2]) {
+        markerRaw = match[1];
+        valStr = match[2];
+        unit = match[3];
+      } else if (pat === LINE_PATTERNS[3]) {
+        markerRaw = match[1];
+        valStr = match[2];
+        unit = match[3];
+        refLow = match[4];
+        refHigh = match[5];
+      } else if (pat === LINE_PATTERNS[4]) {
+        markerRaw = match[1];
+        valStr = match[2];
+        unit = match[3];
+        refLow = match[4];
+        refHigh = match[5];
+      }
 
-       results.push({
-         marker,
-         value,
-         unit: unit.trim(),
-         refRange,
-         confidence: 0.85,
-         raw: line,
-         provider,
-         isAbnormal,
-         deviation
-       });
-       break;
-     }
-   }
+      const value = parseFloat(valStr.replace(',', '.'));
+      const marker = resolveLabMarker(markerRaw);
+      if (!marker || Number.isNaN(value) || value <= 0) continue;
+      if (seenMarkers.has(marker)) continue;
+      seenMarkers.add(marker);
+
+      let refRange: string | undefined;
+      let isAbnormal: boolean | undefined;
+      let deviation: 'low' | 'high' | 'normal' | undefined;
+
+      if (refLow !== undefined && refHigh !== undefined) {
+        refRange = `${refLow}-${refHigh}`;
+        isAbnormal = value < parseFloat(refLow) || value > parseFloat(refHigh);
+        if (isAbnormal) {
+          deviation = value < parseFloat(refLow) ? 'low' : 'high';
+        }
+      } else {
+        const ucum = UCUM_MAP[marker];
+        if (ucum) {
+          const ratio = normalizedRatio(marker, value, unit);
+          isAbnormal = ratio !== null && (ratio < 0.2 || ratio > 0.8);
+          if (isAbnormal && ratio !== null) {
+            deviation = ratio < 0.2 ? 'low' : 'high';
+          }
+        }
+      }
+
+      results.push({
+        marker,
+        value,
+        unit: unit.trim(),
+        refRange,
+        confidence: 0.85,
+        raw: line,
+        provider,
+        isAbnormal,
+        deviation
+      });
+      matched = true;
+      break;
+    }
+
+    if (!matched) {
+      const nextLine = i + 1 < lines.length ? lines[i + 1] : '';
+      const combined = (line + ' ' + nextLine).trim();
+      for (const pat of LINE_PATTERNS) {
+        const m = combined.match(pat);
+        if (!m) continue;
+        let markerRaw = '';
+        let valStr = '';
+        let u = '';
+        if (pat === LINE_PATTERNS[0] || pat === LINE_PATTERNS[2]) {
+          markerRaw = m[1]; valStr = m[2]; u = m[3];
+        } else { continue; }
+        const value = parseFloat(valStr.replace(',', '.'));
+        const marker = resolveLabMarker(markerRaw);
+        if (!marker || Number.isNaN(value) || value <= 0) continue;
+        if (seenMarkers.has(marker)) continue;
+        seenMarkers.add(marker);
+        results.push({
+          marker, value, unit: u.trim(),
+          confidence: 0.6, raw: combined, provider,
+        });
+        break;
+      }
+    }
+  }
 
   return results;
 }
