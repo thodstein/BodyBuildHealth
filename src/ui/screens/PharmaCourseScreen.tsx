@@ -220,12 +220,12 @@ export const PharmaCourseScreen: React.FC = () => {
               </button>
             </div>
 
-            {/* Class selector - horizontal scroll */}
+            {/* Class selector — pills */}
             <div style={{
-              padding: '8px 12px',
-              display: 'flex', gap: 4, overflowX: 'auto',
-              scrollbarWidth: 'none',
+              padding: '8px 8px 4px',
+              display: 'flex', gap: 4, flexWrap: 'wrap',
               borderBottom: '1px solid var(--border)',
+              maxHeight: 120, overflowY: 'auto',
             }}>
               {Object.entries(CLASS_LABELS).map(([cls, label]) => {
                 const hasSubs = SUBSTANCES_BY_CLASS[cls]?.length > 0;
@@ -234,14 +234,14 @@ export const PharmaCourseScreen: React.FC = () => {
                 const color = CLASS_COLORS[cls] || 'var(--accent)';
                 return (
                   <button key={cls} onClick={() => setPickerClass(cls)} style={{
-                    background: isActive ? `${color}20` : 'transparent',
+                    background: isActive ? `${color}20` : 'var(--bg-secondary)',
                     border: `1px solid ${isActive ? color : 'var(--border)'}`,
                     color: isActive ? color : 'var(--text-dim)',
-                    borderRadius: 20, padding: '5px 10px', fontSize: 11,
+                    borderRadius: 20, padding: '7px 14px', fontSize: 12,
                     fontWeight: isActive ? 700 : 500, cursor: 'pointer',
                     whiteSpace: 'nowrap', transition: 'all 0.15s',
                   }}>
-                    {label}
+                    {label} <span style={{ fontSize: 9, opacity: 0.6 }}>{SUBSTANCES_BY_CLASS[cls]?.length || 0}</span>
                   </button>
                 );
               })}
@@ -249,72 +249,58 @@ export const PharmaCourseScreen: React.FC = () => {
 
             {/* Scrollable content */}
             <div style={{ flex: 1, overflowY: 'auto', padding: '10px 12px' }}>
-              {/* Substance grid */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 12 }}>
+              {/* Substance grid — one-click add with defaults */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, marginBottom: 8 }}>
                 {subsForClass.map(sub => {
                   const color = CLASS_COLORS[sub.class] || 'var(--accent)';
+                  const defDose = sub.dosageRange?.min ? Math.round((sub.dosageRange.min + sub.dosageRange.max) / 2) : 250;
                   return (
-                    <button key={sub.id} onClick={() => addEntry(sub.id)} style={{
+                    <div key={sub.id} onClick={() => {
+                      setDose(String(defDose));
+                      addEntry(sub.id);
+                    }} style={{
                       background: 'var(--bg-secondary)',
                       border: `1px solid var(--border)`,
-                      borderRadius: 10, padding: '10px 8px',
+                      borderRadius: 10, padding: '8px 6px',
                       cursor: 'pointer', textAlign: 'center',
-                      transition: 'border-color 0.15s',
-                    }}>
-                      <div style={{ fontWeight: 600, fontSize: 11, color: color, marginBottom: 2 }}>{sub.name}</div>
-                      {sub.tHalfHours && (
-                        <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>T½ {sub.tHalfHours >= 168 ? `${(sub.tHalfHours/168).toFixed(1)} нед` : sub.tHalfHours >= 24 ? `${(sub.tHalfHours/24).toFixed(1)} дн` : `${sub.tHalfHours.toFixed(0)} ч`}</div>
-                      )}
-                      {sub.dosageRange && (
-                        <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>{sub.dosageRange.min}–{sub.dosageRange.max} {sub.dosageRange.unit}</div>
-                      )}
-                    </button>
+                      transition: 'all 0.15s',
+                    }} onMouseEnter={e => (e.currentTarget.style.borderColor = color)}
+                       onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--border)')}>
+                      <div style={{ fontWeight: 600, fontSize: 11, color, marginBottom: 2 }}>{sub.name}</div>
+                      <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>
+                        {sub.pk?.halfLifeHours ? `T½ ${sub.pk.halfLifeHours >= 168 ? `${(sub.pk.halfLifeHours/168).toFixed(1)} нед` : `${(sub.pk.halfLifeHours/24).toFixed(1)} дн`}` : ''}
+                        {sub.dosageRange ? ` | ${sub.dosageRange.min}–${sub.dosageRange.max}${sub.dosageRange.unit}` : ''}
+                      </div>
+                      <div style={{ fontSize: 9, color: 'var(--accent)', marginTop: 2 }}>{defDose} мг → добавить</div>
+                    </div>
                   );
                 })}
               </div>
 
-              {/* Dose settings */}
+              {/* Dose settings — for custom dosing before clicking */}
               <div style={{
-                background: 'var(--bg-secondary)', borderRadius: 10, padding: 10,
+                background: 'var(--bg-secondary)', borderRadius: 10, padding: 8,
                 border: '1px solid var(--border)',
               }}>
-                <div style={{ fontWeight: 600, fontSize: 12, marginBottom: 8 }}>⚙️ Параметры дозировки</div>
-
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
-                  {/* Dose */}
+                <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 4 }}>
+                  Или задайте свои параметры (нажмите на препарат выше для быстрого добавления):
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 4 }}>
                   <div>
-                    <label style={{ fontSize: 10, color: 'var(--text-dim)', display: 'block', marginBottom: 2 }}>Доза</label>
                     <input type="number" value={dose} onChange={e => setDose(e.target.value)} placeholder="200"
-                      style={{ width: '100%', padding: '6px 8px', background: 'var(--bg-tertiary)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text)', fontSize: 13, outline: 'none' }} />
+                      style={{ width: '100%', padding: '5px 6px', background: 'var(--bg-tertiary)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text)', fontSize: 12, boxSizing: 'border-box' }} />
                   </div>
-                  {/* Unit */}
                   <div>
-                    <label style={{ fontSize: 10, color: 'var(--text-dim)', display: 'block', marginBottom: 2 }}>Единица</label>
-                    <select value={unit} onChange={e => setUnit(e.target.value)}
-                      style={{ width: '100%', padding: '6px 8px', background: 'var(--bg-tertiary)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text)', fontSize: 13, outline: 'none' }}>
-                      {UNIT_OPTIONS.map(u => <option key={u} value={u}>{u}</option>)}
-                    </select>
-                  </div>
-                  {/* Freq */}
-                  <div>
-                    <label style={{ fontSize: 10, color: 'var(--text-dim)', display: 'block', marginBottom: 2 }}>Частота</label>
                     <select value={freq} onChange={e => setFreq(e.target.value)}
-                      style={{ width: '100%', padding: '6px 8px', background: 'var(--bg-tertiary)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text)', fontSize: 13, outline: 'none' }}>
+                      style={{ width: '100%', padding: '5px 6px', background: 'var(--bg-tertiary)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text)', fontSize: 11, boxSizing: 'border-box' }}>
                       {FREQ_OPTIONS.map(f => <option key={f.value} value={f.value}>{f.label}</option>)}
                     </select>
                   </div>
-                  {/* Weeks */}
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4 }}>
-                    <div>
-                      <label style={{ fontSize: 10, color: 'var(--text-dim)', display: 'block', marginBottom: 2 }}>С нед.</label>
-                      <input type="number" value={startWeek} onChange={e => setStartWeek(parseInt(e.target.value) || 0)} min={0}
-                        style={{ width: '100%', padding: '6px 8px', background: 'var(--bg-tertiary)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text)', fontSize: 13, outline: 'none' }} />
-                    </div>
-                    <div>
-                      <label style={{ fontSize: 10, color: 'var(--text-dim)', display: 'block', marginBottom: 2 }}>По нед.</label>
-                      <input type="number" value={endWeek} onChange={e => setEndWeek(parseInt(e.target.value) || 12)} min={1}
-                        style={{ width: '100%', padding: '6px 8px', background: 'var(--bg-tertiary)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text)', fontSize: 13, outline: 'none' }} />
-                    </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
+                    <input type="number" value={startWeek} onChange={e => setStartWeek(parseInt(e.target.value) || 0)} min={0} placeholder="0"
+                      style={{ width: '100%', padding: '5px 4px', background: 'var(--bg-tertiary)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text)', fontSize: 11, boxSizing: 'border-box' }} />
+                    <input type="number" value={endWeek} onChange={e => setEndWeek(parseInt(e.target.value) || 12)} min={1} placeholder="12"
+                      style={{ width: '100%', padding: '5px 4px', background: 'var(--bg-tertiary)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text)', fontSize: 11, boxSizing: 'border-box' }} />
                   </div>
                 </div>
               </div>

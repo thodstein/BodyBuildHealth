@@ -302,30 +302,24 @@ export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
 
       <AlertBanner messages={alerts} />
 
-      {/* Quick stats */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 12 }}>
-        <div style={{ background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', borderRadius: 10, padding: '6px 8px', textAlign: 'center' }}>
-          <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>Готовность</div>
-          <div style={{ fontSize: 18, fontWeight: 700, color: readiness.recovery >= 70 ? '#22c55e' : readiness.recovery >= 50 ? '#eab308' : '#ef4444' }}>{Math.round(readiness.recovery)}%</div>
+      {/* ── TOP CARD: Readiness + Course + Labs ── */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 6, marginBottom: 12 }}>
+        <div style={{ background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', borderRadius: 10, padding: '8px 6px', textAlign: 'center' }}>
+          <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>Готовность</div>
+          <div style={{ fontSize: 20, fontWeight: 800, color: readiness.recovery >= 70 ? '#22c55e' : readiness.recovery >= 50 ? '#eab308' : '#ef4444' }}>{Math.round(readiness.recovery)}%</div>
         </div>
-        <div style={{ background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', borderRadius: 10, padding: '6px 8px', textAlign: 'center' }}>
-          <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>Риск</div>
-          <div style={{ fontSize: 18, fontWeight: 700, color: riskResult ? riskColor(riskResult.overallNet) : 'var(--text-dim)' }}>{riskResult ? Math.round(riskResult.overallNet) : '—'}%</div>
+        <div style={{ background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', borderRadius: 10, padding: '8px 6px', textAlign: 'center' }}>
+          <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>Общий риск</div>
+          <div style={{ fontSize: 20, fontWeight: 800, color: riskResult ? riskColor(riskResult.overallNet) : 'var(--text-dim)' }}>{riskResult ? Math.round(riskResult.overallNet) : '—'}%</div>
         </div>
-        <div style={{ background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', borderRadius: 10, padding: '6px 8px', textAlign: 'center' }}>
-          <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>Курс</div>
-          <div style={{ fontSize: 18, fontWeight: 700 }}>{daysOnCourse} дн</div>
+        <div style={{ background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', borderRadius: 10, padding: '8px 6px', textAlign: 'center' }}>
+          <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>Курс</div>
+          <div style={{ fontSize: 20, fontWeight: 800 }}>{daysOnCourse} дн</div>
         </div>
-        <div style={{ background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', borderRadius: 10, padding: '6px 8px', textAlign: 'center' }}>
-          <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>Лабы</div>
-          <div style={{ fontSize: 18, fontWeight: 700 }}>{labData.length}</div>
+        <div style={{ background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', borderRadius: 10, padding: '8px 6px', textAlign: 'center' }}>
+          <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>Лабы</div>
+          <div style={{ fontSize: 20, fontWeight: 800 }}>{labData.length}</div>
         </div>
-        {trainingWorkouts > 0 && (
-          <div style={{ background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', borderRadius: 10, padding: '6px 8px', textAlign: 'center' }}>
-            <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>Объём/нед</div>
-            <div style={{ fontSize: 18, fontWeight: 700, color: '#00e68a' }}>{trainingVolume.toLocaleString()} кг</div>
-          </div>
-        )}
       </div>
 
       {/* ── Global Risk Card: 3 calculation methods ── */}
