@@ -237,6 +237,51 @@ export function analyzeClinicalRisks(input: ClinicalAnalysisInput): ClinicalAnal
   // Sort by risk
   results.sort((a, b) => b.riskPercent - a.riskPercent);
 
+  // ── Add drug-only pathologies (from compound mapping, no lab markers needed) ──
+  const seenPathologyIds = new Set(results.map(r => r.pathologyId));
+  const compliancePenalty = input.weeksSinceLab > 4
+    ? Math.min(3.0, 1.0 + (input.weeksSinceLab - 4) * 0.15)
+    : 1.0;
+
+  for (const compoundName of normalizedCompounds) {
+    const riskMap = COMPOUND_RISK_MAP[compoundName];
+    if (!riskMap) continue;
+
+    for (const riskId of riskMap.riskIds) {
+      if (seenPathologyIds.has(riskId)) continue;
+      seenPathologyIds.add(riskId);
+
+      const pathology = CLINICAL_PATHOLOGIES[riskId];
+      if (!pathology) continue;
+
+      // Estimate risk from drug exposure only
+      const baseRisk = Math.min(40, Math.max(10, (15 / pathology.zCrit) * 50));
+      const exposureMod = Math.min(1.5, 1 + (input.tWeeks - 4) * 0.02);
+      const drugRisk = Math.min(95, Math.round(baseRisk * exposureMod * compliancePenalty * 10) / 10);
+
+      const { status, alertLevel } = stratify(drugRisk);
+
+      results.push({
+        pathologyId: riskId,
+        pathologyName: pathology.name,
+        systemName: pathology.systemName,
+        systemIcon: pathology.systemIcon,
+        hillScore: 0,
+        severity95: 0,
+        riskPercent: drugRisk,
+        status,
+        alertLevel,
+        markersUsed: [],
+        pharmaTriggers: pathology.pharmaTriggers,
+        instrumental: pathology.instrumentalVerification,
+        contributingCompounds: [compoundName],
+      });
+    }
+  }
+
+  // Re-sort after adding drug-only pathologies
+  results.sort((a, b) => b.riskPercent - a.riskPercent);
+
   // Group by system
   const systemMap = new Map<string, PathologyResult[]>();
   for (const r of results) {
@@ -263,11 +308,14 @@ export function analyzeClinicalRisks(input: ClinicalAnalysisInput): ClinicalAnal
   // Summary
   const criticalCount = results.filter(r => r.alertLevel >= 3).length;
   const highCount = results.filter(r => r.alertLevel === 2).length;
+  const drugOnlyCount = results.filter(r => r.markersUsed.length === 0).length;
   const summary = criticalCount > 0
-    ? `🔴 ${criticalCount} критических рисков. ${highCount} повышенных. Требуется немедленное внимание.`
+    ? `🔴 ${criticalCount} критических рисков, ${highCount} повышенных. ${drugOnlyCount > 0 ? `${drugOnlyCount} — оценка по препаратам (без анализов).` : ''} Требуется внимание.`
     : highCount > 0
-      ? `🟡 ${highCount} повышенных рисков. Рекомендуется коррекция курса.`
-      : `✅ Все оценённые показатели в пределах нормы.`;
+      ? `🟡 ${highCount} повышенных рисков. ${drugOnlyCount > 0 ? `${drugOnlyCount} — по препаратам.` : ''} Рекомендуется коррекция.`
+      : drugOnlyCount > 0
+        ? `📋 ${drugOnlyCount} патологий оценено по препаратам. Сдайте анализы для точного прогноза.`
+        : `✅ Все показатели в норме.`;
 
   return {
     results,
