@@ -163,7 +163,7 @@ const MARKER_TO_LAB: Record<string, string[]> = {
 };
 
 function geom(arr: number[]) {
-   if (!arr.length) return 0;
+   if (!arr.length) return 5; // Minimum risk floor — never return 0%
    const l = arr.reduce((a, v) => a + Math.log(Math.max(0.0001, v)), 0);
    return Math.exp(l / arr.length) * 100;
 }

@@ -172,6 +172,118 @@ export const DRUG_DATABASE: Record<string, DrugRecord> = {
 };
 
 // ---------------------------------------------------------------------------
+// Ester → Generic Name Mapping (PHARMA_DB keys → DRUG_DATABASE keys)
+// ---------------------------------------------------------------------------
+
+/**
+ * Maps PHARMA_DB ester-specific substance IDs to generic drug names
+ * used in DRUG_DATABASE. Without this, course entries like 'tren_acet'
+ * would always fall into unknownDrugs because DRUG_DATABASE only has
+ * generic names like 'trenbolone'.
+ */
+const ESTER_TO_GENERIC: Record<string, string> = {
+  // Testosterone esters
+  test_enan: 'testosterone',
+  test_prop: 'testosterone',
+  test_cyp: 'testosterone',
+  test_undec: 'testosterone',
+  sustanon: 'testosterone',
+  test_base: 'testosterone',
+  test_susp: 'testosterone',
+  // Trenbolone esters
+  tren_acet: 'trenbolone',
+  tren_enan: 'trenbolone',
+  tren_hex: 'trenbolone',
+  tren_base: 'trenbolone',
+  parabolan: 'trenbolone',
+  // Nandrolone esters
+  npp: 'nandrolone',
+  deca: 'nandrolone',
+  nandrolone_decanoate: 'nandrolone',
+  // Boldenone esters
+  bold_undec: 'boldenone',
+  boldenone_undecylenate: 'boldenone',
+  eq: 'boldenone',
+  equipoise: 'boldenone',
+  // Drostanolone (Masteron) esters
+  drostanolone_prop: 'masteron',
+  drostanolone_enan: 'masteron',
+  masteron_propionate: 'masteron',
+  masteron_enanthate: 'masteron',
+  // Oral 17-aa
+  methand: 'dianabol',
+  methandrostenolone: 'dianabol',
+  dbol: 'dianabol',
+  oxan: 'oxandrolone',
+  anavar: 'oxandrolone',
+  stan: 'stanozolol',
+  stanozolol_oral: 'stanozolol',
+  winstrol: 'stanozolol',
+  anadrol: 'anadrol',
+  oxymetholone: 'anadrol',
+  turinabol: 'dianabol',
+  halotestin: 'dianabol',
+  superdrol: 'dianabol',
+  // Peptides/support — map generics from PHARMA_DB
+  hgh: 'growth_hormone',
+  somatropin: 'growth_hormone',
+  insulin_short: 'insulin',
+  insulin_glargine: 'insulin',
+  insulin_aspart: 'insulin',
+  insulin_lispro: 'insulin',
+  insulin_detemir: 'insulin',
+  clen: 'clenbuterol',
+  clenbuterol_hydrochloride: 'clenbuterol',
+  // Finasteride/Dutasteride — interaction-only (no DRUG_DATABASE entry)
+  // These won't match anything but that's fine; they interact, not cause pathology directly
+};
+
+/** Regex patterns for fuzzy matching: startsWith or includes */
+const GENERIC_PATTERNS: [RegExp, string][] = [
+  [/^test/i, 'testosterone'],
+  [/^tren/i, 'trenbolone'],
+  [/^nandrolone|^npp|^deca/i, 'nandrolone'],
+  [/bold|eq/i, 'boldenone'],
+  [/masteron|drostanolone/i, 'masteron'],
+  [/dbol|methand|dianabol|turinabol|halotestin|superdrol/i, 'dianabol'],
+  [/anavar|oxan/i, 'oxandrolone'],
+  [/winstrol|stan/i, 'stanozolol'],
+  [/anadrol|oxymetholone/i, 'anadrol'],
+  [/hgh|somatropin|growth/i, 'growth_hormone'],
+  [/insulin/i, 'insulin'],
+  [/clen/i, 'clenbuterol'],
+  [/primobolan|metenolone/i, 'masteron'],  // closest match in DB
+];
+
+/**
+ * Resolve a PHARMA_DB substanceId to a generic drug name in DRUG_DATABASE.
+ * Tries exact match first, then ester→generic map, then regex patterns.
+ * Returns the original name if no match found.
+ */
+function resolveDrugName(input: string): string {
+  const name = input.toLowerCase().trim();
+
+  // 1. Exact match in DRUG_DATABASE
+  if (DRUG_DATABASE[name]) return name;
+
+  // 2. Ester → Generic mapping
+  if (ESTER_TO_GENERIC[name]) return ESTER_TO_GENERIC[name];
+
+  // 3. Fuzzy regex matching
+  for (const [pattern, generic] of GENERIC_PATTERNS) {
+    if (pattern.test(name)) return generic;
+  }
+
+  // 4. Partial match — check if any DRUG_DATABASE key is a substring
+  for (const key of Object.keys(DRUG_DATABASE)) {
+    if (name.includes(key)) return key;
+  }
+
+  // 5. No match — return as-is (will become unknown)
+  return name;
+}
+
+// ---------------------------------------------------------------------------
 // Core Engine — mapStackToPathologies
 // ---------------------------------------------------------------------------
 
@@ -200,11 +312,12 @@ export function mapStackToPathologies(drugs: DrugEntry[]): MapperResult {
   const unknownDrugs: string[] = [];
 
   for (const drug of drugs) {
-    const name = drug.name.toLowerCase().trim();
+    const rawName = drug.name.toLowerCase().trim();
+    const name = resolveDrugName(rawName);
     const record = DRUG_DATABASE[name];
 
     if (!record) {
-      unknownDrugs.push(name);
+      unknownDrugs.push(rawName);
       continue;
     }
 
@@ -222,7 +335,7 @@ export function mapStackToPathologies(drugs: DrugEntry[]): MapperResult {
         pathologyAgg[pid] = { cumulativeTriggerStrength: 0, contributingDrugs: [] };
       }
       pathologyAgg[pid].cumulativeTriggerStrength += strength;
-      pathologyAgg[pid].contributingDrugs.push(name);
+      pathologyAgg[pid].contributingDrugs.push(rawName);
     }
   }
 

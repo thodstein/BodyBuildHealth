@@ -8,18 +8,20 @@ import { LabsScreen } from './ui/screens/LabsScreen';
 import { RiskScreen } from './ui/screens/RiskScreen';
 import { NutritionScreen } from './ui/screens/NutritionScreen';
 import { ProfileScreen } from './ui/screens/ProfileScreen';
+import { ArticlesScreen } from './ui/screens/ArticlesScreen';
 import { CalculatorsScreen } from './ui/screens/CalculatorsScreen';
 import { PctScreen } from './ui/screens/PctScreen';
 import { ToastContainer } from './ui/ToastContainer';
 
-type Tab = 'home' | 'pharma' | 'training' | 'labs' | 'risks' | 'support' | 'nutrition' | 'profile' | 'calculators' | 'pct';
+type Tab = 'home' | 'pharma' | 'training' | 'labs' | 'risks' | 'support' | 'nutrition' | 'profile' | 'calculators' | 'pct' | 'articles';
 
-// Bottom nav: 4 primary tabs
+// Bottom nav: 5 primary tabs
 const PRIMARY_NAV: { id: Tab; label: string; icon: React.ReactNode }[] = [
   { id: 'home', label: 'Главная', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg> },
   { id: 'labs', label: 'Анализы', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 3h6v7l5 8H4l5-8V3z"/><line x1="9" y1="3" x2="15" y2="3"/></svg> },
   { id: 'risks', label: 'Риски', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg> },
-  { id: 'pharma', label: 'Фармакология', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg> },
+  { id: 'pharma', label: 'Фарма', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg> },
+  { id: 'articles', label: 'Статьи', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg> },
 ];
 
 function HulkBg() {
@@ -96,7 +98,7 @@ export default function App() {
       'peptides': 'pharma',
       'predictive': 'home',
       'marketplace': 'home',
-      'articles': 'home',
+      'articles': 'articles',
       'assistant': 'home',
       'gamification': 'home',
       'fertility-pct': 'pct',
@@ -131,6 +133,7 @@ export default function App() {
       case 'profile': return <ProfileScreen />;
       case 'calculators': return <CalculatorsScreen />;
       case 'pct': return <PctScreen onBack={() => go('home')} />;
+      case 'articles': return <ArticlesScreen />;
       default: return <DashboardScreen onNavigate={handleNavigate} />;
     }
   };

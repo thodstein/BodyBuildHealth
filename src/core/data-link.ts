@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import type { UserProfile, LabPoint, CourseEntry, InjuryRecord } from './types';
 import { getProfile, updateProfile, onProfileChange } from './profile-manager';
 import { db } from './db';
-import { UCUM_MAP } from './constants';
+import { UCUM_MAP, ALL_RISK_SYSTEMS } from './constants';
 import { calcReadiness } from '../engines/readiness.engine';
 import { calculateRisks } from '../engines/risk.engine';
 import { calculateSupport, generateSupportStack, type SupportInput } from '../engines/support.engine';
@@ -187,6 +187,12 @@ export function useDataLink(): LinkedData {
   })();
 
   const risk = (() => {
+    // Default risk result for error fallback
+    const defaultRisk = {
+      overallRaw: 5, overallNet: 5,
+      coverageMap: {} as Record<string, number>,
+      systemBreakdown: {} as Record<string, { raw: number; net: number }>,
+    };
     try {
       const genetics = s.genetics ?? {};
       const riskResult = calculateRisks({
@@ -215,7 +221,16 @@ export function useDataLink(): LinkedData {
         });
       }
       return { ...riskResult, coverageMap: coverage } as RiskCalculationResult;
-    } catch { return null; }
+    } catch (e) {
+      console.warn('Risk calculation failed:', e);
+      // Return basic fallback with default 50% coverage for all systems
+      const fallbackCoverage: Record<string, number> = {};
+      for (const sys of ALL_RISK_SYSTEMS) {
+        fallbackCoverage[sys] = 0.5;
+        for (let m = 1; m <= 9; m++) fallbackCoverage[`${sys}_${m}`] = 0.5;
+      }
+      return { ...defaultRisk, coverageMap: fallbackCoverage } as RiskCalculationResult;
+    }
   })();
 
   const avg = computeWeeklyAverages();
