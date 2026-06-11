@@ -124,6 +124,33 @@ export const NutritionOverview: React.FC<{
               </div>
             )}
 
+            {/* Macro targets vs actual (enhanced display) */}
+            {nutritionTargets && avgWeeklyKcal > 0 && (
+              <div style={{ marginTop: 10, borderTop: '1px solid var(--border)', paddingTop: 8 }}>
+                <div style={{ fontSize: 11, fontWeight: 600, marginBottom: 6 }}>🎯 Цели vs Факт</div>
+                {[
+                  { l: 'Калории', a: avgWeeklyKcal, t: nutritionTargets.kcal, u: 'ккал', c: '#22c55e' },
+                  { l: 'Белки', a: avgWeeklyProtein, t: nutritionTargets.protein, u: 'г', c: '#3b82f6' },
+                  { l: 'Жиры', a: avgWeeklyFat, t: nutritionTargets.fats, u: 'г', c: '#f97316' },
+                  { l: 'Углеводы', a: avgWeeklyCarbs, t: nutritionTargets.carbs, u: 'г', c: '#a855f7' },
+                ].map(m => {
+                  const pct = m.t > 0 ? Math.min(150, Math.round((m.a / m.t) * 100)) : 0;
+                  const color = pct >= 85 && pct <= 115 ? '#22c55e' : pct < 85 ? '#ff9100' : '#ef4444';
+                  return (
+                    <div key={m.l} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3, fontSize: 10 }}>
+                      <span style={{ minWidth: 55, color: 'var(--text-dim)' }}>{m.l}</span>
+                      <div style={{ flex: 1, background: 'rgba(255,255,255,0.05)', borderRadius: 3, height: 6, overflow: 'hidden', position: 'relative' }}>
+                        <div style={{ width: `${Math.min(100, pct)}%`, height: '100%', background: m.c, borderRadius: 3 }} />
+                        <div style={{ position: 'absolute', left: '85%', top: 0, bottom: 0, width: 1, background: 'rgba(255,255,255,0.3)' }} />
+                      </div>
+                      <span style={{ color, fontWeight: 600, minWidth: 40, textAlign: 'right' }}>{Math.round(m.a)}/{m.t}{m.u}</span>
+                      <span style={{ color, fontSize: 9, minWidth: 24, textAlign: 'right' }}>{pct}%</span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
             {/* Micronutrient intake vs targets */}
             {Object.keys(microsIntake).length > 0 && (
               <div style={{ marginTop: 10, borderTop: '1px solid var(--border)', paddingTop: 8 }}>

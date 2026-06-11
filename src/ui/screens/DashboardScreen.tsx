@@ -91,6 +91,8 @@ export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
   const [todayProtein, setTodayProtein] = useState(0);
   const [todayWater, setTodayWater] = useState(0);
   const [recoveryTrend, setRecoveryTrend] = useState<'up' | 'down' | 'stable'>('stable');
+  const [combinedReadiness, setCombinedReadiness] = useState(0);
+  const [trainingStreak, setTrainingStreak] = useState(0);
   const { v7Result } = useV7Risk();
 
   useEffect(() => {
@@ -164,7 +166,14 @@ export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
         }
       } catch {}
 
-      // Calculate recovery trend (compare last 2 weeks)
+      // Combined readiness score (recovery + sleep + nutrition - stress)
+      const recoveryScore = readiness?.recovery ?? 50;
+      const sleepScore = (settings.baselineSleepQuality ?? 5) * 10;
+      const nutritionScore = 70; // default
+      const stressPenalty = (settings.baselineStressLevel ?? 5) * 5;
+      setCombinedReadiness(Math.round(Math.min(100, Math.max(10, (recoveryScore * 0.4 + sleepScore * 0.3 + nutritionScore * 0.3 - stressPenalty)))));
+
+      // Calculate training streak
       try {
         const diary = new StrengthDiary();
         const progress = await diary.getWeeklyProgress();
@@ -175,6 +184,13 @@ export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
           else if (last.workoutCount < prev.workoutCount) setRecoveryTrend('down');
           else setRecoveryTrend('stable');
         }
+        // Count consecutive weeks with workouts
+        let streak = 0;
+        for (let i = progress.length - 1; i >= 0; i--) {
+          if (progress[i].workoutCount > 0) streak++;
+          else break;
+        }
+        setTrainingStreak(streak);
       } catch {}
 
       // Calculate risks
@@ -283,6 +299,37 @@ export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
             <div style={{ fontSize: 18, fontWeight: 700, color: '#00e68a' }}>{trainingVolume.toLocaleString()} кг</div>
           </div>
         )}
+      </div>
+
+      {/* Readiness gauge + streak */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 12 }}>
+        <div style={{ background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', borderRadius: 10, padding: '10px 12px', textAlign: 'center' }}>
+          <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 4 }}>Готовность</div>
+          <div style={{ position: 'relative', width: 80, height: 80, margin: '0 auto 4px' }}>
+            <svg viewBox="0 0 100 100" style={{ width: '100%', height: '100%', transform: 'rotate(-90deg)' }}>
+              <circle cx="50" cy="50" r="40" fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="8" />
+              <circle cx="50" cy="50" r="40" fill="none" 
+                stroke={combinedReadiness > 70 ? '#22c55e' : combinedReadiness > 40 ? '#eab308' : '#ef4444'} 
+                strokeWidth="8" strokeDasharray={`${combinedReadiness * 2.51} 251`} strokeLinecap="round" />
+            </svg>
+            <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <span style={{ fontSize: 22, fontWeight: 800, color: combinedReadiness > 70 ? '#22c55e' : combinedReadiness > 40 ? '#eab308' : '#ef4444' }}>{combinedReadiness}</span>
+            </div>
+          </div>
+          <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>{combinedReadiness > 70 ? 'Отлично' : combinedReadiness > 40 ? 'Средне' : 'Низкая'}</div>
+        </div>
+        <div style={{ background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', borderRadius: 10, padding: '10px 12px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+          {trainingStreak > 0 && (
+            <div style={{ textAlign: 'center', marginBottom: 6 }}>
+              <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>Стрик тренировок</div>
+              <div style={{ fontSize: 22, fontWeight: 800, color: '#00e68a' }}>{trainingStreak} нед</div>
+            </div>
+          )}
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>Объём / нед</div>
+            <div style={{ fontSize: 18, fontWeight: 700, color: '#00e68a' }}>{trainingVolume > 0 ? `${(trainingVolume / 1000).toFixed(1)} т` : '—'}</div>
+          </div>
+        </div>
       </div>
 
       {/* Quick actions */}
