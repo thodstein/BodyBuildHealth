@@ -1,16 +1,25 @@
 {
-  "name": "ocr-microservice",
+  "name": "health-engine-server",
   "version": "1.0.0",
-  "description": "Local lab OCR microservice — pdf-parse + tesseract.js. Zero paid APIs.",
-  "main": "ocr-microservice.js",
+  "description": "Health Engine v9 — Backend microservices: OCR, Articles, MDSS",
   "scripts": {
-    "start": "node ocr-microservice.js",
-    "dev": "node --watch ocr-microservice.js"
+    "start:ocr": "node ocr-microservice.js",
+    "start:articles": "npx tsx articles-server.ts",
+    "dev:ocr": "node --watch ocr-microservice.js",
+    "dev:articles": "npx tsx --watch articles-server.ts"
   },
   "dependencies": {
     "express": "^4.21.0",
+    "gray-matter": "^4.0.3",
+    "marked": "^15.0.0",
     "multer": "^1.4.5-lts.1",
     "pdf-parse": "^1.1.1",
     "tesseract.js": "^5.1.1"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.0",
+    "@types/node": "^22.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0"
   }
 }
