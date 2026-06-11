@@ -20,6 +20,7 @@ import { calcReadiness } from '../../engines/readiness.engine';
 import { RISK_SYSTEMS, ALL_RISK_SYSTEMS } from '../../core/constants';
 import { runMDSS } from '../../engines/mdss-engine';
 import type { MDSSOutput } from '../../engines/mdss-engine';
+import { dailyCheckin } from '../../engines/daily-checkin.engine';
 import { db } from '../../core/db';
 import { getProfile } from '../../core/profile-manager';
 import { StrengthDiary } from '../../engines/strength-diary.engine';
@@ -361,36 +362,60 @@ export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
         </div>
       </div>
 
-      {/* Readiness gauge + streak */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 12 }}>
-        <div style={{ background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', borderRadius: 10, padding: '10px 12px', textAlign: 'center' }}>
-          <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 4 }}>Готовность</div>
-          <div style={{ position: 'relative', width: 80, height: 80, margin: '0 auto 4px' }}>
-            <svg viewBox="0 0 100 100" style={{ width: '100%', height: '100%', transform: 'rotate(-90deg)' }}>
-              <circle cx="50" cy="50" r="40" fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="8" />
-              <circle cx="50" cy="50" r="40" fill="none" 
-                stroke={combinedReadiness > 70 ? '#22c55e' : combinedReadiness > 40 ? '#eab308' : '#ef4444'} 
-                strokeWidth="8" strokeDasharray={`${combinedReadiness * 2.51} 251`} strokeLinecap="round" />
-            </svg>
-            <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <span style={{ fontSize: 22, fontWeight: 800, color: combinedReadiness > 70 ? '#22c55e' : combinedReadiness > 40 ? '#eab308' : '#ef4444' }}>{combinedReadiness}</span>
+      {/* Daily Check-in Card */}
+      {(() => {
+        const settings = getProfile().settings;
+        const checkin = dailyCheckin({
+          sleepHours: settings.baselineSleepHours ?? 7,
+          sleepQuality: settings.baselineSleepQuality ?? 4,
+          restingHR: 60,
+          hrvMs: Math.round((settings.baselineHrvRatio ?? 0.6) * 80),
+          bodyWeight: settings.weight ?? 80,
+          subjectiveEnergy: 5 - (settings.fatigueLevel ?? 3),
+          subjectiveSoreness: (settings.fatigueLevel ?? 3),
+          subjectiveStress: settings.baselineStressLevel ?? 3,
+          waterLiters: settings.dailyWaterLiters ?? 2.5,
+          nutritionQuality: Math.round((settings.nutritionFactor ?? 0.7) * 5),
+          trainingYesterday: false,
+          yesterdayRPE: 5,
+          sleepDebtHours: 0,
+          weightTrend: 0,
+        });
+        return (
+          <div style={{ background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', borderRadius: 10, padding: '10px 12px', marginBottom: 12 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, textAlign: 'center' }}>
+              <div>
+                <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>Готовность</div>
+                <div style={{ fontSize: 28, fontWeight: 800, color: checkin.readinessScore >= 65 ? '#22c55e' : checkin.readinessScore >= 40 ? '#eab308' : '#ef4444' }}>
+                  {checkin.readinessScore}%
+                </div>
+                <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>{checkin.readinessLabel}</div>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2, fontSize: 10, color: 'var(--text-dim)', alignContent: 'center' }}>
+                <div>😴 Сон: <b style={{ color: checkin.metrics.sleepScore >= 60 ? '#22c55e' : '#f97316' }}>{checkin.metrics.sleepScore}</b></div>
+                <div>💓 HRV: <b style={{ color: checkin.metrics.hrvScore >= 60 ? '#22c55e' : '#f97316' }}>{checkin.metrics.hrvScore}</b></div>
+                <div>💧 Вода: <b style={{ color: checkin.metrics.hydrationScore >= 60 ? '#22c55e' : '#f97316' }}>{checkin.metrics.hydrationScore}</b></div>
+                <div>🍽 Питание: <b style={{ color: checkin.metrics.nutritionScore >= 60 ? '#22c55e' : '#f97316' }}>{checkin.metrics.nutritionScore}</b></div>
+                <div>😵 Усталость: <b style={{ color: checkin.metrics.fatigueScore <= 40 ? '#22c55e' : '#f97316' }}>{Math.round(100 - checkin.metrics.fatigueScore)}</b></div>
+                <div>🔄 Восст: <b style={{ color: checkin.metrics.recoveryScore >= 60 ? '#22c55e' : '#f97316' }}>{checkin.metrics.recoveryScore}</b></div>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: checkin.trainToday ? '#22c55e' : '#ef4444', marginBottom: 4 }}>
+                  {checkin.trainToday ? '✅ Тренироваться' : '🔴 Отдых'}
+                </div>
+                {trainingStreak > 0 && (
+                  <div style={{ fontSize: 9, color: 'var(--text-dim)', marginTop: 2 }}>Стрик: {trainingStreak} нед</div>
+                )}
+              </div>
             </div>
+            {checkin.recommendations.length > 0 && (
+              <div style={{ marginTop: 6, fontSize: 9, color: '#f97316', borderTop: '1px solid var(--border)', paddingTop: 4 }}>
+                {checkin.recommendations.slice(0, 2).map((r, i) => (<div key={i}>• {r}</div>))}
+              </div>
+            )}
           </div>
-          <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>{combinedReadiness > 70 ? 'Отлично' : combinedReadiness > 40 ? 'Средне' : 'Низкая'}</div>
-        </div>
-        <div style={{ background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', borderRadius: 10, padding: '10px 12px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-          {trainingStreak > 0 && (
-            <div style={{ textAlign: 'center', marginBottom: 6 }}>
-              <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>Стрик тренировок</div>
-              <div style={{ fontSize: 22, fontWeight: 800, color: '#00e68a' }}>{trainingStreak} нед</div>
-            </div>
-          )}
-          <div style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>Объём / нед</div>
-            <div style={{ fontSize: 18, fontWeight: 700, color: '#00e68a' }}>{trainingVolume > 0 ? `${(trainingVolume / 1000).toFixed(1)} т` : '—'}</div>
-          </div>
-        </div>
-      </div>
+        );
+      })()}
 
       {/* Quick actions */}
       <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
