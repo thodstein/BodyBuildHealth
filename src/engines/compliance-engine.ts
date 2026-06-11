@@ -315,41 +315,89 @@ interface OrganConfig {
 }
 
 const CLINICAL_DB_REF: Record<string, OrganConfig> = {
-  renal_fsgs: {
-    name: 'Фокальный сегментарный гломерулосклероз (Почки)',
-    linkedMarkers: ['KIM-1', 'Cystatin_C', 'Nephrin', 'UACR', 'Creatinine'],
+  // ── Kidney (common markers) ──
+  renal: {
+    name: 'Токсическая нефропатия (Почки)',
+    linkedMarkers: ['Creatinine', 'Cystatin_C', 'eGFR', 'Urea', 'Uric_Acid', 'KIM-1', 'UACR'],
     kAggression: 0.4, zCrit: 12.0,
     genetics: { 'APOL1_mutation': 1.8, 'ACE_DD': 1.2 },
   },
-  hepatic_cholestasis: {
-    name: 'Токсический гепатит и Холестаз (Печень)',
-    linkedMarkers: ['CK-18', 'GLDH', 'GGT', 'Bile_Acids', 'ALT', 'AST'],
+  // ── Liver (common markers) ──
+  hepatic: {
+    name: 'Токсический гепатит (Печень)',
+    linkedMarkers: ['ALT', 'AST', 'GGT', 'ALP', 'Bilirubin_Total', 'Bilirubin_Direct', 'Bile_Acids', 'CK-18'],
     kAggression: 0.6, zCrit: 6.0,
     genetics: { 'UGT2B17_deletion': 2.0, 'CYP3A4_slow': 1.5 },
   },
-  cardiac_fibrosis: {
-    name: 'Фиброз миокарда и Кардиомиопатия',
-    linkedMarkers: ['Galectin-3', 'NT-proBNP', 'Troponin_I', 'ADMA'],
-    kAggression: 0.5, zCrit: 8.0,
-    genetics: { 'ApoE4': 1.4, 'ACTN3_RR': 1.3 },
+  // ── Heart (common markers) ──
+  cardiac: {
+    name: 'Кардиомиопатия (Сердце)',
+    linkedMarkers: ['NT-proBNP', 'Troponin_I', 'CK-MB', 'Galectin-3', 'ADMA', 'hs-CRP'],
+    kAggression: 0.25, zCrit: 20.0,
+    genetics: { 'ApoE4': 1.4, 'MTHFR_mutation': 1.3 },
   },
-  cns_neurotoxicity: {
-    name: 'Нейротоксичность ЦНС',
-    linkedMarkers: ['Cortisol_night', 'HVA', 'BDNF', 'Serotonin'],
-    kAggression: 0.7, zCrit: 5.0,
-    genetics: { 'COMT_slow': 1.7, 'BDNF_val66met': 1.5 },
-  },
-  hpta_suppression: {
-    name: 'Подавление оси HPTA',
-    linkedMarkers: ['LH', 'FSH', 'Prolactin', 'TT', 'FreeT', 'SHBG', 'Inhibin_B'],
-    kAggression: 0.3, zCrit: 15.0,
-    genetics: { 'AR_CAG_short': 1.3, 'SHBG_rs1799941': 1.4 },
-  },
-  prostate_hyperplasia: {
-    name: 'Гиперплазия простаты',
-    linkedMarkers: ['PSA', 'DHT', 'PSA_Free'],
+  // ── Blood vessels / lipids ──
+  vascular: {
+    name: 'Атеросклероз и дислипидемия (Сосуды)',
+    linkedMarkers: ['LDL', 'HDL', 'Triglycerides', 'ApoB', 'ApoA1', 'Cholesterol_Total', 'oxLDL'],
     kAggression: 0.35, zCrit: 14.0,
+    genetics: { 'ApoE4': 1.5, 'LDLR_mutation': 1.6 },
+  },
+  // ── Blood / hematology ──
+  hematologic: {
+    name: 'Эритроцитоз и гипервязкость (Кровь)',
+    linkedMarkers: ['Hematocrit', 'Hemoglobin', 'RBC', 'Ferritin', 'EPO', 'Platelets'],
+    kAggression: 0.3, zCrit: 15.0,
+    genetics: { 'JAK2_V617F': 2.5 },
+  },
+  // ── CNS ──
+  cns: {
+    name: 'Нейротоксичность (ЦНС)',
+    linkedMarkers: ['Cortisol_night', 'Cortisol', 'Prolactin', 'HVA', 'Serotonin', 'Dopamine'],
+    kAggression: 0.55, zCrit: 7.0,
+    genetics: { 'COMT_slow': 1.7, 'MAOA_mutation': 1.5 },
+  },
+  // ── HPTA / Endocrine ──
+  endocrine: {
+    name: 'Подавление HPTA (Эндокринная)',
+    linkedMarkers: ['LH', 'FSH', 'Testosterone_Total', 'Testosterone_Free', 'SHBG', 'Inhibin_B', 'Prolactin', 'DHEA_S'],
+    kAggression: 0.3, zCrit: 12.0,
+    genetics: { 'AR_CAG_short': 1.3, 'SHBG_rs1799941': 1.3 },
+  },
+  // ── Prostate ──
+  prostate: {
+    name: 'Гиперплазия простаты',
+    linkedMarkers: ['PSA', 'PSA_Free', 'DHT'],
+    kAggression: 0.15, zCrit: 30.0,
     genetics: { 'AR_CAG_short': 1.6, 'SRD5A2_V89L': 1.3 },
+  },
+  // ── Metabolism / Insulin ──
+  metabolic: {
+    name: 'Инсулинорезистентность (Метаболизм)',
+    linkedMarkers: ['Glucose', 'HbA1c', 'HOMA-IR', 'Insulin', 'C-Peptide', 'Fructosamine'],
+    kAggression: 0.4, zCrit: 10.0,
+    genetics: { 'TCF7L2': 1.5 },
+  },
+  // ── Thyroid ──
+  thyroid: {
+    name: 'Гипотиреоз (Щитовидная)',
+    linkedMarkers: ['TSH', 'T4_free', 'T3_free'],
+    kAggression: 0.25, zCrit: 18.0,
+    genetics: {},
+  },
+  // ── Immune / Inflammation ──
+  immunity: {
+    name: 'Системное воспаление (Иммунитет)',
+    linkedMarkers: ['hs-CRP', 'CRP', 'Homocysteine', 'Fibrinogen', 'ESR'],
+    kAggression: 0.35, zCrit: 14.0,
+    genetics: {},
+  },
+  // ── Musculoskeletal ──
+  musculoskeletal: {
+    name: 'Десикация суставов (ОДА)',
+    linkedMarkers: ['CTX', 'COMP', 'Calcium', 'Vitamin_D', 'PTH', 'Osteocalcin'],
+    kAggression: 0.3, zCrit: 16.0,
+    genetics: { 'COL1A1': 1.4 },
   },
 };
 

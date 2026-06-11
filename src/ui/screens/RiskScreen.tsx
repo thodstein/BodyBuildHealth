@@ -799,14 +799,80 @@ const ClinicalRiskDisplay: React.FC = () => {
   const handleAnalyze = async () => {
     setLoading(true);
     try {
-      const { analyzeClinicalRisks } = await import('../../engines/clinical-analyzer.engine');
+      const [{ analyzeClinicalRisks }, { mapStackToPathologies }, { SYSTEM_GROUPS, CLINICAL_PATHOLOGIES }] = await Promise.all([
+        import('../../engines/clinical-analyzer.engine'),
+        import('../../engines/drug-mapper.engine'),
+        import('../../data/clinical-pathology-db'),
+      ]);
+
       const compounds = course.map(c => c.substanceId.toLowerCase());
       const markers = labs.map(l => ({ code: l.code || l.name, value: l.value }));
       const genetics = Object.keys(s?.genetics || {}).filter(k => !!(s?.genetics as any)?.[k]);
       const labDates = labs.map(l => l.date).filter(Boolean).sort().reverse();
       const weeksSinceLab = labDates[0] ? (Date.now() - new Date(labDates[0]).getTime()) / (7 * 24 * 3600 * 1000) : 52;
       const tWeeks = course.length > 0 ? course.reduce((max, c) => Math.max(max, (c.endWeek || 12) - (c.startWeek || 0)), 0) : 4;
-      setResult(analyzeClinicalRisks({ compounds, markers, tWeeks: Math.max(1, tWeeks), weeksSinceLab, genetics }));
+
+      // Run clinical analysis
+      const clinical = analyzeClinicalRisks({ compounds, markers, tWeeks: Math.max(1, tWeeks), weeksSinceLab, genetics });
+
+      // Also run drug mapper to capture ALL drug-based pathologies
+      const mapperDrugs = course.map(c => ({ name: c.substanceId.toLowerCase(), dosageMg: c.doseValue }));
+      const mapper = mapStackToPathologies(mapperDrugs);
+
+      // Merge mapper pathologies into clinical results
+      const existingIds = new Set(clinical.results.map((r: any) => r.pathologyId));
+      const newResults = [...clinical.results];
+
+      for (const mp of mapper.activePathologies) {
+        if (!existingIds.has(mp.pathologyId)) {
+          // Find matching clinical pathology or create one
+          const cp = CLINICAL_PATHOLOGIES[mp.pathologyId];
+          if (cp) {
+            newResults.push({
+              pathologyId: mp.pathologyId,
+              pathologyName: cp.name,
+              systemName: cp.systemName,
+              systemIcon: cp.systemIcon,
+              hillScore: 0,
+              severity95: 0,
+              riskPercent: Math.min(80, Math.round(mp.cumulativeTriggerStrength * 25 * 10) / 10),
+              status: mp.cumulativeTriggerStrength >= 2 ? 'ПОВЫШЕННЫЙ РИСК' : mp.cumulativeTriggerStrength >= 1.2 ? 'УМЕРЕННЫЙ РИСК' : 'НИЗКИЙ РИСК',
+              alertLevel: mp.cumulativeTriggerStrength >= 2 ? 2 : mp.cumulativeTriggerStrength >= 1.2 ? 1 : 0,
+              markersUsed: [],
+              pharmaTriggers: mp.contributingDrugs,
+              instrumental: cp.instrumentalVerification,
+              contributingCompounds: mp.contributingDrugs,
+            });
+          }
+        }
+      }
+
+      // Re-sort
+      newResults.sort((a: any, b: any) => b.riskPercent - a.riskPercent);
+
+      // Rebuild systems
+      const systemMap = new Map<string, any[]>();
+      for (const r of newResults) {
+        const sysKey = SYSTEM_GROUPS.find(g => g.pathologyIds.includes(r.pathologyId))?.systemKey || 'other';
+        if (!systemMap.has(sysKey)) systemMap.set(sysKey, []);
+        systemMap.get(sysKey)!.push(r);
+      }
+
+      const systems = SYSTEM_GROUPS.map(g => ({
+        systemKey: g.systemKey,
+        systemName: g.systemName,
+        icon: g.icon,
+        maxRisk: Math.max(0, ...(systemMap.get(g.systemKey) || []).map((r: any) => r.riskPercent)),
+        pathologies: systemMap.get(g.systemKey) || [],
+      })).filter((s: any) => s.pathologies.length > 0);
+
+      setResult({
+        ...clinical,
+        results: newResults,
+        systems,
+        overallMaxRisk: newResults.length > 0 ? newResults[0].riskPercent : 0,
+        mapperPathologies: mapper.activePathologies.length,
+      } as any);
     } catch (e) { console.error(e); }
     setLoading(false);
   };
