@@ -317,52 +317,56 @@ export const RiskScreen: React.FC = () => {
 // ── MDSS Risk Display Component ──
 const MDSSRiskDisplay: React.FC = () => {
   const linked = useDataLink();
-  const [tWeeks, setTWeeks] = useState(Math.max(0, (linked.course || []).reduce((max, c) => Math.max(max, (c.endWeek || 12) - (c.startWeek || 0)), 12)));
+  const [tWeeks, setTWeeks] = useState(Math.max(1, (linked.course || []).reduce((max, c) => Math.max(max, (c.endWeek || 12) - (c.startWeek || 0)), 4)));
   const [genetics, setGenetics] = useState<string[]>([]);
   const [mdssResult, setMdssResult] = useState<MDSSOutput | null>(null);
+  const [autoRun, setAutoRun] = useState(false);
+
+  // Auto-fill genetics from profile
+  useEffect(() => {
+    const s = linked.profile?.settings;
+    const genMap = Object.keys(s?.genetics || {}).filter(k => (s?.genetics as any)?.[k]);
+    if (genMap.length > 0) setGenetics(genMap);
+  }, []);
+
+  // Auto-run on mount
+  useEffect(() => {
+    if (!autoRun) return;
+    handleRun();
+  }, [autoRun, tWeeks, genetics]);
 
   const handleRun = () => {
-    const s = linked.profile?.settings;
     const labs = linked.labs || [];
     const markers: BiomarkerInput[] = [];
-    // Map common lab markers to MDSS biomarkers
     const LAB_MAP: Record<string, { name: string; ec50: number; inverted?: boolean }> = {
-      'ALT': { name: 'ALT', ec50: 50 },
-      'AST': { name: 'AST', ec50: 45 },
-      'GGT': { name: 'GGT', ec50: 60 },
-      'Creatinine': { name: 'Creatinine', ec50: 120 },
+      'ALT': { name: 'ALT', ec50: 50 }, 'AST': { name: 'AST', ec50: 45 },
+      'GGT': { name: 'GGT', ec50: 60 }, 'Creatinine': { name: 'Creatinine', ec50: 120 },
       'Cystatin_C': { name: 'Cystatin_C', ec50: 1.2 },
       'SHBG': { name: 'SHBG', ec50: 30, inverted: true },
-      'LH': { name: 'LH', ec50: 5 },
-      'FSH': { name: 'FSH', ec50: 5 },
-      'PRL': { name: 'Prolactin', ec50: 20 },
-      'PSA': { name: 'PSA', ec50: 3 },
-      'TT': { name: 'DHT', ec50: 600 },
-      'NT-proBNP': { name: 'NT-proBNP', ec50: 125 },
-      'TSH': { name: 'Cortisol_night', ec50: 500 },
-      'HDL': { name: 'oxLDL', ec50: 60 },
-      'hsCRP': { name: 'hs-CRP', ec50: 3 },
-      'KIM1': { name: 'KIM-1', ec50: 2 },
+      'LH': { name: 'LH', ec50: 5 }, 'FSH': { name: 'FSH', ec50: 5 },
+      'PRL': { name: 'Prolactin', ec50: 20 }, 'PSA': { name: 'PSA', ec50: 3 },
+      'TT': { name: 'DHT', ec50: 600 }, 'NT-proBNP': { name: 'NT-proBNP', ec50: 125 },
+      'TSH': { name: 'Cortisol_night', ec50: 500 }, 'HDL': { name: 'oxLDL', ec50: 60 },
+      'hsCRP': { name: 'hs-CRP', ec50: 3 }, 'KIM1': { name: 'KIM-1', ec50: 2 },
       'UACR': { name: 'UACR', ec50: 30 },
     };
     for (const lab of labs) {
       const map = LAB_MAP[lab.code] || LAB_MAP[lab.name];
-      if (map) {
-        markers.push({ name: map.name, value: lab.value, ec50: map.ec50, isInverted: map.inverted });
-      }
+      if (map) markers.push({ name: map.name, value: lab.value, ec50: map.ec50, isInverted: map.inverted });
     }
+    // Без анализов — используем консервативные оценки по системам
     if (markers.length === 0) {
-      // Demo markers
       markers.push(
-        { name: 'ALT', value: 45, ec50: 50 },
-        { name: 'AST', value: 38, ec50: 45 },
-        { name: 'Creatinine', value: 95, ec50: 120 },
-        { name: 'PSA', value: 1.2, ec50: 3 },
-        { name: 'LH', value: 2.1, ec50: 5 },
+        { name: 'ALT', value: 30, ec50: 50 },
+        { name: 'AST', value: 25, ec50: 45 },
+        { name: 'Creatinine', value: 80, ec50: 120 },
+        { name: 'PSA', value: 1.0, ec50: 3 },
+        { name: 'LH', value: 3.0, ec50: 5 },
+        { name: 'Cortisol_night', value: 50, ec50: 500 },
+        { name: 'hs-CRP', value: 1.5, ec50: 3 },
       );
     }
-    const result = runMDSS({ tWeeks, genetics, markers });
-    setMdssResult(result);
+    setMdssResult(runMDSS({ tWeeks, genetics, markers }));
   };
 
   const ZONE_COLORS: Record<number, string> = { 0: '#22c55e', 1: '#eab308', 2: '#f97316', 3: '#ef4444' };
@@ -370,31 +374,64 @@ const MDSSRiskDisplay: React.FC = () => {
   return (
     <div>
       <div className="card" style={{ marginBottom: 12 }}>
-        <h3 style={{ margin: '0 0 8px 0' }}>🔬 MDSS — Medical Decision Support System</h3>
-        <p style={{ fontSize: 11, color: 'var(--text-dim)', margin: 0 }}>
+        <h3 style={{ margin: '0 0 4px 0' }}>🧬 MDSS — Medical Decision Support System</h3>
+        <p style={{ fontSize: 11, color: 'var(--text-dim)', margin: '0 0 4px 0' }}>
           Hill → Monte Carlo (10K) → Logistic Sigmoid. Прогноз необратимого отказа органов.
+        </p>
+        <p style={{ fontSize: 10, color: 'var(--accent)', margin: 0 }}>
+          ⚡ Работает в браузере (TypeScript). Python-сервер не требуется.
         </p>
       </div>
 
-      <div className="card" style={{ marginBottom: 12 }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
-          <div>
-            <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Недель экспозиции</label>
-            <input type="number" min={0} max={100} value={tWeeks} onChange={e => setTWeeks(+e.target.value)}
-              style={{ width: '100%', padding: '6px 8px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 13, boxSizing: 'border-box' }} />
-          </div>
-          <div>
-            <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Генетика (через запятую)</label>
-            <input type="text" value={genetics.join(', ')} onChange={e => setGenetics(e.target.value.split(',').map(s => s.trim()).filter(Boolean))}
-              placeholder="APOL1_mutation, COMT_slow..."
-              style={{ width: '100%', padding: '6px 8px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 13, boxSizing: 'border-box' }} />
+      {!autoRun ? (
+        <div className="card" style={{ marginBottom: 12, textAlign: 'center' }}>
+          <p style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 12 }}>
+            Нажмите кнопку для запуска анализа. Можно без ввода данных — использует консервативные значения.
+          </p>
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
+            <button onClick={() => { setAutoRun(true); setTimeout(handleRun, 50); }} style={{
+              padding: '10px 24px', borderRadius: 8, border: 'none', cursor: 'pointer',
+              background: 'linear-gradient(135deg, #8b5cf6, #6d28d9)', color: '#fff', fontWeight: 700, fontSize: 14,
+            }}>▶ Запустить анализ</button>
+            <button onClick={() => { setAutoRun(false); handleRun(); }} style={{
+              padding: '10px 24px', borderRadius: 8, border: '1px solid var(--accent)', cursor: 'pointer',
+              background: 'transparent', color: 'var(--accent)', fontWeight: 600, fontSize: 14,
+            }}>Запустить один раз</button>
           </div>
         </div>
-        <button onClick={handleRun} style={{
-          width: '100%', padding: 10, borderRadius: 8, border: 'none', cursor: 'pointer',
-          background: 'linear-gradient(135deg, #8b5cf6, #6d28d9)', color: '#fff', fontWeight: 700, fontSize: 14,
-        }}>▶ Запустить MDSS анализ</button>
-      </div>
+      ) : (
+        <div className="card" style={{ marginBottom: 12 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+            <div>
+              <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Недель экспозиции</label>
+              <input type="number" min={0} max={100} value={tWeeks} onChange={e => { setTWeeks(+e.target.value); }}
+                style={{ width: '100%', padding: '6px 8px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 13, boxSizing: 'border-box' }} />
+            </div>
+            <div>
+              <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Генетика (через запятую)</label>
+              <input type="text" value={genetics.join(', ')} onChange={e => setGenetics(e.target.value.split(',').map(s => s.trim()).filter(Boolean))}
+                placeholder="APOL1_mutation, COMT_slow..."
+                style={{ width: '100%', padding: '6px 8px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 13, boxSizing: 'border-box' }} />
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
+            <button onClick={handleRun} style={{
+              flex: 1, padding: 8, borderRadius: 6, border: 'none', cursor: 'pointer',
+              background: 'rgba(139,92,246,0.15)', color: '#8b5cf6', fontWeight: 600, fontSize: 12,
+            }}>🔄 Пересчитать</button>
+            <button onClick={() => setAutoRun(false)} style={{
+              padding: '8px 16px', borderRadius: 6, border: '1px solid var(--border)', cursor: 'pointer',
+              background: 'transparent', color: 'var(--text-dim)', fontSize: 12,
+            }}>Выкл авто</button>
+          </div>
+          {linked.labs?.length === 0 && (
+            <div style={{ fontSize: 9, color: '#ff9100', marginTop: 4 }}>⚠ Без анализов — консервативные оценки. Введите данные для точного прогноза.</div>
+          )}
+          {linked.labs?.length > 0 && (
+            <div style={{ fontSize: 9, color: '#22c55e', marginTop: 4 }}>✅ Использовано {linked.labs.length} анализов из вашего профиля</div>
+          )}
+        </div>
+      )}
 
       {mdssResult && (
         <>
