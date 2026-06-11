@@ -533,11 +533,12 @@ const ComplianceDisplay: React.FC = () => {
   const labs = linked.labs || [];
   const course = linked.course || [];
 
-  // Extract markers from labs
   const [report, setReport] = useState<ComplianceReport | null>(null);
+  const [ranOnce, setRanOnce] = useState(false);
 
-  // Dates
+  // Dates — recompute when labs/course change
   const today = new Date().toISOString().slice(0, 10);
+
   const latestLabDate = useMemo(() => {
     if (labs.length === 0) {
       const d = new Date();
@@ -548,13 +549,18 @@ const ComplianceDisplay: React.FC = () => {
     return dates[0] || today;
   }, [labs]);
 
-  // Course start
   const courseStartDate = useMemo(() => {
     if (course.length > 0) {
       const starts = course.map(c => c.startWeek || 0);
       const minStart = Math.min(...starts);
+      if (minStart <= 0 && course.length === 1 && course[0].startWeek === 0) {
+        // Course just started — use today minus a few days
+        const d = new Date();
+        d.setDate(d.getDate() - 3);
+        return d.toISOString().slice(0, 10);
+      }
       const d = new Date();
-      d.setDate(d.getDate() - 7 * minStart);
+      d.setDate(d.getDate() - 7 * Math.max(1, minStart));
       return d.toISOString().slice(0, 10);
     }
     const d = new Date();
@@ -562,10 +568,14 @@ const ComplianceDisplay: React.FC = () => {
     return d.toISOString().slice(0, 10);
   }, [course]);
 
-  const [cycleStart, setCycleStart] = useState(courseStartDate);
-  const [lastLab, setLastLab] = useState(latestLabDate);
+  const [cycleStart, setCycleStart] = useState('');
+  const [lastLab, setLastLab] = useState('');
   const [kAgg, setKAgg] = useState(0.4);
   const [zCrit, setZCrit] = useState(12.0);
+
+  // Sync state with memoized values
+  useEffect(() => { setCycleStart(courseStartDate); }, [courseStartDate]);
+  useEffect(() => { setLastLab(latestLabDate); }, [latestLabDate]);
 
   const genetics = useMemo(() => {
     const g = (s?.genetics as Record<string, boolean | string>) || {};
@@ -573,20 +583,27 @@ const ComplianceDisplay: React.FC = () => {
   }, [s]);
 
   const markers = useMemo(() => {
+    if (!labs.length) return [];
     return labs.map(l => ({
       name: l.code || l.name || '',
       value: l.value || 0,
-      ec50: l.name === 'ALT' ? 50 : l.name === 'AST' ? 45 : l.name === 'Creatinine' ? 120 : 3,
-      isInverted: l.name === 'SHBG' || l.name === 'HDL',
+      ec50: l.code === 'ALT' ? 50 : l.code === 'AST' ? 45 : l.code === 'GGT' ? 60
+        : l.code === 'Creatinine' ? 120 : l.code === 'Cystatin_C' ? 1.2
+        : l.code === 'PSA' ? 4 : l.code === 'Hematocrit' ? 52
+        : l.code === 'HDL' ? 1.0 : l.code === 'LDL' ? 4.0
+        : l.code === 'Glucose' ? 6.0 : l.code === 'LH' ? 5 : 3,
+      isInverted: l.code === 'SHBG' || l.code === 'HDL' || l.code === 'eGFR' || l.code === 'Testosterone_Total',
     }));
   }, [labs]);
 
-  // Auto-calc on mount
+  // Run analysis when dates are ready
   useEffect(() => {
+    if (!cycleStart || !lastLab) return;
     runAnalysis();
-  }, []);
+  }, [cycleStart, lastLab, markers.length, kAgg, zCrit]);
 
   const runAnalysis = () => {
+    if (!cycleStart || !lastLab) return;
     const result = analyzeWithCompliance({
       cycleStartDate: cycleStart,
       latestLabDate: lastLab,
