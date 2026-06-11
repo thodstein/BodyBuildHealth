@@ -21,6 +21,7 @@ import { RISK_SYSTEMS, ALL_RISK_SYSTEMS } from '../../core/constants';
 import { runMDSS } from '../../engines/mdss-engine';
 import type { MDSSOutput } from '../../engines/mdss-engine';
 import { dailyCheckin } from '../../engines/daily-checkin.engine';
+import { loadEntries, computeStats } from '../../engines/body-composition.engine';
 import { db } from '../../core/db';
 import { getProfile } from '../../core/profile-manager';
 import { StrengthDiary } from '../../engines/strength-diary.engine';
@@ -413,6 +414,43 @@ export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
                 {checkin.recommendations.slice(0, 2).map((r, i) => (<div key={i}>• {r}</div>))}
               </div>
             )}
+          </div>
+        );
+      })()}
+
+      {/* Body Composition quick stats */}
+      {(() => {
+        const entries = loadEntries();
+        if (entries.length < 2) return null;
+        const s = getProfile().settings;
+        const stats = computeStats(entries, s.targetWeight, s.height);
+        if (!stats) return null;
+        return (
+          <div style={{ background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', borderRadius: 10, padding: '8px 10px', marginBottom: 12 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 4, textAlign: 'center' }}>
+              <div>
+                <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Вес</div>
+                <div style={{ fontSize: 16, fontWeight: 700 }}>{stats.currentWeight} <span style={{ fontSize: 9, color: stats.weightChange >= 0 ? '#ef4444' : '#22c55e' }}>{stats.weightChange >= 0 ? '+' : ''}{stats.weightChange} кг</span></div>
+              </div>
+              <div>
+                <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Тренд</div>
+                <div style={{ fontSize: 16, fontWeight: 700, color: stats.trend7Day > 0.1 ? '#ef4444' : stats.trend7Day < -0.1 ? '#22c55e' : 'var(--text-dim)' }}>
+                  {stats.trend7Day > 0 ? '+' : ''}{stats.trend7Day} кг/нед
+                </div>
+              </div>
+              <div>
+                <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>FFMI</div>
+                <div style={{ fontSize: 16, fontWeight: 700, color: stats.ffmi >= 22 ? '#22c55e' : stats.ffmi >= 20 ? '#eab308' : 'var(--text-dim)' }}>
+                  {stats.ffmi > 0 ? stats.ffmi : '—'}
+                </div>
+              </div>
+              <div>
+                <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Цель</div>
+                <div style={{ fontSize: 16, fontWeight: 700, color: stats.goalProgress >= 50 ? '#22c55e' : stats.goalProgress >= 25 ? '#eab308' : 'var(--text-dim)' }}>
+                  {stats.goalWeight > 0 ? `${stats.goalProgress}%` : '—'}
+                </div>
+              </div>
+            </div>
           </div>
         );
       })()}
