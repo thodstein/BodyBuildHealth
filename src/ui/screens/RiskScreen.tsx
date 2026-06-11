@@ -21,8 +21,6 @@ import { calculateWeeklyRiskDynamics, type WeeklyRiskDynamics } from '../../engi
 import { useV7Risk } from '../hooks/useV7Risk';
 import { getProfile, updateProfile } from '../../core/profile-manager';
 import { analyzeWithCompliance, type ComplianceReport, getComplianceStatus } from '../../engines/compliance-engine';
-import { analyzeClinicalRisks, type ClinicalAnalysisOutput } from '../../engines/clinical-analyzer.engine';
-import { SYSTEM_GROUPS } from '../../data/clinical-pathology-db';
 
 const RISK_HISTORY_KEY = 'risk_history';
 const MAX_HISTORY = 12;
@@ -778,17 +776,22 @@ const ClinicalRiskDisplay: React.FC = () => {
   const course = linked.course || [];
   const labs = linked.labs || [];
   const s = linked.profile?.settings;
-  const [result, setResult] = useState<ClinicalAnalysisOutput | null>(null);
+  const [result, setResult] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
 
-  const handleAnalyze = () => {
-    const compounds = course.map(c => c.substanceId.toLowerCase());
-    const markers = labs.map(l => ({ code: l.code || l.name, value: l.value }));
-    const genetics = Object.keys(s?.genetics || {}).filter(k => !!(s?.genetics as any)?.[k]);
-    const labDates = labs.map(l => l.date).filter(Boolean).sort().reverse();
-    const weeksSinceLab = labDates[0] ? (Date.now() - new Date(labDates[0]).getTime()) / (7 * 24 * 3600 * 1000) : 52;
-    const tWeeks = course.length > 0 ? course.reduce((max, c) => Math.max(max, (c.endWeek || 12) - (c.startWeek || 0)), 0) : 4;
-
-    setResult(analyzeClinicalRisks({ compounds, markers, tWeeks: Math.max(1, tWeeks), weeksSinceLab, genetics }));
+  const handleAnalyze = async () => {
+    setLoading(true);
+    try {
+      const { analyzeClinicalRisks } = await import('../../engines/clinical-analyzer.engine');
+      const compounds = course.map(c => c.substanceId.toLowerCase());
+      const markers = labs.map(l => ({ code: l.code || l.name, value: l.value }));
+      const genetics = Object.keys(s?.genetics || {}).filter(k => !!(s?.genetics as any)?.[k]);
+      const labDates = labs.map(l => l.date).filter(Boolean).sort().reverse();
+      const weeksSinceLab = labDates[0] ? (Date.now() - new Date(labDates[0]).getTime()) / (7 * 24 * 3600 * 1000) : 52;
+      const tWeeks = course.length > 0 ? course.reduce((max, c) => Math.max(max, (c.endWeek || 12) - (c.startWeek || 0)), 0) : 4;
+      setResult(analyzeClinicalRisks({ compounds, markers, tWeeks: Math.max(1, tWeeks), weeksSinceLab, genetics }));
+    } catch (e) { console.error(e); }
+    setLoading(false);
   };
 
   useEffect(() => { handleAnalyze(); }, []);
@@ -805,8 +808,8 @@ const ClinicalRiskDisplay: React.FC = () => {
       </div>
 
       {!result && (
-        <button onClick={handleAnalyze} style={{ width: '100%', padding: 10, borderRadius: 8, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg, #ec4899, #8b5cf6)', color: '#fff', fontWeight: 700, fontSize: 14, marginBottom: 8 }}>
-          ▶ Запустить клинический анализ
+        <button onClick={handleAnalyze} disabled={loading} style={{ width: '100%', padding: 10, borderRadius: 8, border: 'none', cursor: loading ? 'wait' : 'pointer', background: loading ? 'var(--border)' : 'linear-gradient(135deg, #ec4899, #8b5cf6)', color: '#fff', fontWeight: 700, fontSize: 14, marginBottom: 8 }}>
+          {loading ? '⏳ Анализ...' : '▶ Запустить клинический анализ'}
         </button>
       )}
 
@@ -823,7 +826,7 @@ const ClinicalRiskDisplay: React.FC = () => {
             🔄 Пересчитать
           </button>
 
-          {result.systems.map(system => (
+          {result.systems.map((system: any) => (
             <details key={system.systemKey} style={{ marginBottom: 8 }}>
               <summary style={{ padding: '8px 10px', borderRadius: 8, cursor: 'pointer', background: 'var(--bg-secondary)', border: '1px solid var(--border)', fontSize: 12, fontWeight: 600, listStyle: 'none', display: 'flex', alignItems: 'center', gap: 6 }}>
                 {system.icon} {system.systemName}
@@ -832,7 +835,7 @@ const ClinicalRiskDisplay: React.FC = () => {
                 </span>
               </summary>
               <div style={{ padding: '4px 0 0 4px' }}>
-                {system.pathologies.map(r => (
+                {system.pathologies.map((r: any) => (
                   <div key={r.pathologyId} className="card" style={{ marginBottom: 4, borderLeft: `3px solid ${zoneColors[r.alertLevel]}`, padding: '6px 8px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, marginBottom: 2 }}>
                       <span style={{ fontWeight: 600 }}>{r.pathologyName}</span>

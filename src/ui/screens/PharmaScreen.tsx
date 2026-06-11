@@ -14,8 +14,6 @@ import { mapStackToPathologies, getKnownDrugNames, DRUG_DATABASE } from '../../e
 import type { DrugEntry, MapperResult } from '../../engines/drug-mapper.engine';
 import { runAdvancedDiagnostics, ESTER_HALF_LIFE_DAYS } from '../../engines/advanced-diagnostics.engine';
 import type { DrugDoseInput, VitalsInput, AdvancedDiagnosticsResult, PKPDOutput, InteractionOutput, VitalsOutput, BioAgeOutput, PCTRebootOutput } from '../../engines/advanced-diagnostics.engine';
-import { analyzeClinicalRisks, type ClinicalAnalysisOutput, type PathologyResult } from '../../engines/clinical-analyzer.engine';
-import { COMPOUND_RISK_MAP, SYSTEM_GROUPS } from '../../data/clinical-pathology-db';
 
 type Tab = 'catalog' | 'pkpd' | 'dosage' | 'interactions' | 'course' | 'mapper' | 'diagnostics';
 
@@ -1348,7 +1346,7 @@ const MapperTab: React.FC = () => {
   const [newDrugName, setNewDrugName] = useState('');
   const [newDrugDose, setNewDrugDose] = useState(0);
   const [mapperResult, setMapperResult] = useState<MapperResult | null>(null);
-  const [clinicalResult, setClinicalResult] = useState<ClinicalAnalysisOutput | null>(null);
+  const [clinicalResult, setClinicalResult] = useState<any>(null);
   const [useCourse, setUseCourse] = useState(true);
 
   const knownNames = useMemo(() => getKnownDrugNames(), []);
@@ -1372,31 +1370,20 @@ const MapperTab: React.FC = () => {
     if (drugs.length === 0) return;
     setMapperResult(mapStackToPathologies(drugs));
 
-    // Also run clinical analysis
-    const compoundNames = course.length > 0
-      ? course.map(c => c.substanceId.toLowerCase())
-      : manualDrugs.map(d => d.name);
-    const markers = (linked.labs || []).map(l => ({
-      code: l.code || l.name,
-      value: l.value,
-    }));
-    const s = linked.profile?.settings;
-    const genetics = Object.keys(s?.genetics || {}).filter(k => !!(s?.genetics as any)?.[k]);
-    const labDates = (linked.labs || []).map(l => l.date).filter(Boolean).sort().reverse();
-    const weeksSinceLab = labDates[0]
-      ? (Date.now() - new Date(labDates[0]).getTime()) / (7 * 24 * 3600 * 1000)
-      : 52;
-    const tWeeks = course.length > 0
-      ? course.reduce((max, c) => Math.max(max, (c.endWeek || 12) - (c.startWeek || 0)), 0)
-      : 4;
+    // Lazy-load clinical analysis
+    import('../../engines/clinical-analyzer.engine').then(({ analyzeClinicalRisks }) => {
+      const compoundNames = course.length > 0
+        ? course.map(c => c.substanceId.toLowerCase())
+        : manualDrugs.map(d => d.name);
+      const markers = (linked.labs || []).map(l => ({ code: l.code || l.name, value: l.value }));
+      const s2 = linked.profile?.settings;
+      const genetics = Object.keys(s2?.genetics || {}).filter(k => !!(s2?.genetics as any)?.[k]);
+      const labDates = (linked.labs || []).map(l => l.date).filter(Boolean).sort().reverse();
+      const weeksSinceLab = labDates[0] ? (Date.now() - new Date(labDates[0]).getTime()) / (7 * 24 * 3600 * 1000) : 52;
+      const tWeeks = course.length > 0 ? course.reduce((max, c) => Math.max(max, (c.endWeek || 12) - (c.startWeek || 0)), 0) : 4;
 
-    setClinicalResult(analyzeClinicalRisks({
-      compounds: compoundNames,
-      markers,
-      tWeeks: Math.max(1, tWeeks),
-      weeksSinceLab,
-      genetics,
-    }));
+      setClinicalResult(analyzeClinicalRisks({ compounds: compoundNames, markers, tWeeks: Math.max(1, tWeeks), weeksSinceLab, genetics }));
+    }).catch(console.error);
   };
 
   const addManualDrug = () => {
@@ -1593,7 +1580,7 @@ const MapperTab: React.FC = () => {
           </div>
 
           {/* Per-system accordion */}
-          {clinicalResult.systems.map(system => (
+          {clinicalResult.systems.map((system: any) => (
             <details key={system.systemKey} style={{ marginBottom: 6 }}>
               <summary style={{
                 padding: '6px 10px', borderRadius: 8, cursor: 'pointer',
@@ -1611,7 +1598,7 @@ const MapperTab: React.FC = () => {
                 <span style={{ fontSize: 9, color: 'var(--text-dim)' }}>({system.pathologies.length})</span>
               </summary>
               <div style={{ padding: '4px 0 0 8px' }}>
-                {system.pathologies.map(r => {
+                {system.pathologies.map((r: any) => {
                   const zoneColor = r.alertLevel >= 3 ? '#ef4444' : r.alertLevel >= 2 ? '#f97316' : r.alertLevel >= 1 ? '#eab308' : '#22c55e';
                   return (
                     <div key={r.pathologyId} style={{
