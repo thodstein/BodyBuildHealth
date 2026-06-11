@@ -104,12 +104,12 @@ export function stepPK(
 ): number {
   const kel = computeEliminationRate(pk.halfLifeHours);
   const doseConc = (doseMg * pk.bioavailability) / Math.max(1, pk.Vd);
-  const C_next = C_prev * Math.exp(-kel) + doseConc + noise;
+  const C_next = C_prev * Math.exp(-kel * 24) + doseConc + noise;
   return Math.max(0, C_next);
 }
 
 export function stepAUC(aucPrev: number, concentration: number): number {
-  return aucPrev + concentration;
+  return aucPrev + concentration * 24; // daily integration
 }
 
 // --- 2. Receptors (Hill + Desensitization) ---

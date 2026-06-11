@@ -247,6 +247,33 @@ export const NutritionDiary: React.FC<{
           </div>
         )}
 
+        {/* Weekly nutrition summary */}
+        {foodEntries.length > 0 && (() => {
+          const totalKcal = foodEntries.reduce((s, e) => s + e.kcal, 0);
+          const totalP = foodEntries.reduce((s, e) => s + e.p, 0);
+          const totalF = foodEntries.reduce((s, e) => s + e.f, 0);
+          const totalC = foodEntries.reduce((s, e) => s + e.c, 0);
+          const days = Math.max(1, new Set(foodEntries.map(e => (e as any).date).filter(Boolean)).size || foodEntries.length / 3);
+          return (
+            <div className="card" style={{ padding: '8px 10px', marginBottom: 8 }}>
+              <div style={{ fontWeight: 600, fontSize: 11, color: 'var(--accent)', marginBottom: 4 }}>📊 Сводка за неделю (~{days} дн)</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 4, fontSize: 9 }}>
+                {[
+                  { l: 'Ккал/д', v: Math.round(totalKcal / days), c: '#22c55e' },
+                  { l: 'Белки/д', v: Math.round(totalP / days) + 'г', c: '#3b82f6' },
+                  { l: 'Жиры/д', v: Math.round(totalF / days) + 'г', c: '#f97316' },
+                  { l: 'Углеводы/д', v: Math.round(totalC / days) + 'г', c: '#a855f7' },
+                ].map(m => (
+                  <div key={m.l} style={{ textAlign: 'center', background: 'rgba(0,230,138,0.05)', borderRadius: 4, padding: '3px 2px' }}>
+                    <div style={{ color: 'var(--text-dim)' }}>{m.l}</div>
+                    <div style={{ fontWeight: 600, color: m.c, fontSize: 11 }}>{m.v}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })()}
+
         {/* Existing diary entries */}
         {foodEntries.length === 0 ? (
           <div style={{ textAlign: 'center', padding: 20, color: 'var(--text-dim)' }}>

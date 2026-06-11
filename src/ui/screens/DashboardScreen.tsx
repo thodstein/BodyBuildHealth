@@ -89,6 +89,8 @@ export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
   const [trainingWorkouts, setTrainingWorkouts] = useState(0);
   const [todayKcal, setTodayKcal] = useState(0);
   const [todayProtein, setTodayProtein] = useState(0);
+  const [todayWater, setTodayWater] = useState(0);
+  const [recoveryTrend, setRecoveryTrend] = useState<'up' | 'down' | 'stable'>('stable');
   const { v7Result } = useV7Risk();
 
   useEffect(() => {
@@ -155,7 +157,23 @@ export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
             });
             setTodayKcal(Math.round(kcal));
             setTodayProtein(Math.round(protein));
+            // Calculate water from litres/day setting
+            const prof = getProfile().settings;
+            setTodayWater(Math.round((prof.dailyWaterLiters ?? 2.5) * 1000));
           }
+        }
+      } catch {}
+
+      // Calculate recovery trend (compare last 2 weeks)
+      try {
+        const diary = new StrengthDiary();
+        const progress = await diary.getWeeklyProgress();
+        if (progress.length >= 2) {
+          const last = progress[progress.length - 1];
+          const prev = progress[progress.length - 2];
+          if (last.workoutCount > prev.workoutCount) setRecoveryTrend('up');
+          else if (last.workoutCount < prev.workoutCount) setRecoveryTrend('down');
+          else setRecoveryTrend('stable');
         }
       } catch {}
 
@@ -279,15 +297,34 @@ export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
         }}>🍎 Питание</button>
       </div>
 
-      {/* Today's nutrition */}
-      {todayKcal > 0 && (
+      {/* Today's nutrition + recovery trend */}
+      {(todayKcal > 0 || todayWater > 0) && (
         <div className="card" style={{ marginBottom: 12 }}>
-          <h3 style={{ margin: '0 0 4px 0' }}>🍎 Сегодня</h3>
-          <div style={{ display: 'flex', gap: 8, fontSize: 11 }}>
-            <span style={{ color: 'var(--accent)', fontWeight: 600 }}>{todayKcal} ккал</span>
-            <span style={{ color: 'var(--text-dim)' }}>Б: {todayProtein}г</span>
-            <span style={{ color: 'var(--accent)', fontWeight: 600 }}>{(todayProtein * 4 / todayKcal * 100).toFixed(0)}%</span>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+            <h3 style={{ margin: 0 }}>🍎 Сегодня</h3>
+            <span style={{ fontSize: 10, color: recoveryTrend === 'up' ? '#22c55e' : recoveryTrend === 'down' ? '#ef4444' : '#6b7280' }}>
+              Восст: {recoveryTrend === 'up' ? '↑ Растёт' : recoveryTrend === 'down' ? '↓ Падает' : '→ Стабильно'}
+            </span>
           </div>
+          <div style={{ display: 'flex', gap: 8, fontSize: 11, flexWrap: 'wrap' }}>
+            {todayKcal > 0 && (
+              <>
+                <span style={{ color: 'var(--accent)', fontWeight: 600 }}>{todayKcal} ккал</span>
+                <span style={{ color: 'var(--text-dim)' }}>Б: {todayProtein}г</span>
+                <span style={{ color: 'var(--accent)', fontWeight: 600 }}>{(todayProtein * 4 / Math.max(1, todayKcal) * 100).toFixed(0)}%</span>
+              </>
+            )}
+            {todayWater > 0 && (
+              <span style={{ color: '#3b82f6', fontWeight: 600, marginLeft: todayKcal > 0 ? 8 : 0 }}>
+                💧 {todayWater} мл / {(getProfile().settings.dailyWaterLiters ?? 2.5) * 1000} мл цели
+              </span>
+            )}
+          </div>
+          {todayWater > 0 && (
+            <div style={{ background: 'rgba(255,255,255,0.08)', borderRadius: 4, height: 5, marginTop: 4, overflow: 'hidden' }}>
+              <div style={{ width: `${Math.min(100, todayWater / ((getProfile().settings.dailyWaterLiters ?? 2.5) * 1000) * 100)}%`, height: '100%', background: '#3b82f6', borderRadius: 4 }} />
+            </div>
+          )}
         </div>
       )}
 
