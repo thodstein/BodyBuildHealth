@@ -10,8 +10,12 @@ import { SYNERGY_PAIRS, type SynergyPair } from '../../engines/support.engine';
 import { SYSTEM_INFO, SYSTEM_INFO_ALL } from '../../core/risk-info';
 import { PharmaCourseScreen } from './PharmaCourseScreen';
 import { useDataLink } from '../../core/data-link';
+import { mapStackToPathologies, getKnownDrugNames, DRUG_DATABASE } from '../../engines/drug-mapper.engine';
+import type { DrugEntry, MapperResult } from '../../engines/drug-mapper.engine';
+import { runAdvancedDiagnostics, ESTER_HALF_LIFE_DAYS } from '../../engines/advanced-diagnostics.engine';
+import type { DrugDoseInput, VitalsInput, AdvancedDiagnosticsResult, PKPDOutput, InteractionOutput, VitalsOutput, BioAgeOutput, PCTRebootOutput } from '../../engines/advanced-diagnostics.engine';
 
-type Tab = 'catalog' | 'pkpd' | 'dosage' | 'interactions' | 'course';
+type Tab = 'catalog' | 'pkpd' | 'dosage' | 'interactions' | 'course' | 'mapper' | 'diagnostics';
 
 const SYSTEM_LABELS: Record<string, string> = Object.fromEntries(
   Object.entries(SYSTEM_INFO_ALL).map(([k, v]) => [k, v.label.split(' ').slice(0, 2).join(' ')])
@@ -120,6 +124,8 @@ export const PharmaScreen: React.FC = () => {
           ['dosage', '📊 Доза'],
           ['interactions', '⚡ Взаимод.'],
           ['course', '💊 Курс'],
+          ['mapper', '🧬 Стек→Риск'],
+          ['diagnostics', '🔬 Диагностика'],
         ] as [Tab, string][]).map(([key, label]) => (
           <button
             key={key}
@@ -135,6 +141,8 @@ export const PharmaScreen: React.FC = () => {
       {tab === 'dosage' && <DosageCalculatorTab />}
       {tab === 'interactions' && <InteractionCheckerTab />}
       {tab === 'course' && <PharmaCourseScreen />}
+      {tab === 'mapper' && <MapperTab />}
+      {tab === 'diagnostics' && <DiagnosticsTab />}
     </div>
   );
 };
@@ -1296,6 +1304,577 @@ const InteractionCheckerTab: React.FC = () => {
                 </div>
               );
             })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ── MapperTab — Drug Stack → Pathology Mapper ──
+const MapperTab: React.FC = () => {
+  const linked = useDataLink();
+  const course = linked.course || [];
+  const [manualDrugs, setManualDrugs] = useState<DrugEntry[]>([]);
+  const [newDrugName, setNewDrugName] = useState('');
+  const [newDrugDose, setNewDrugDose] = useState(0);
+  const [mapperResult, setMapperResult] = useState<MapperResult | null>(null);
+  const [useCourse, setUseCourse] = useState(true);
+
+  const knownNames = useMemo(() => getKnownDrugNames(), []);
+
+  useEffect(() => {
+    if (course.length > 0) {
+      const drugs: DrugEntry[] = course.map(c => ({
+        name: c.substanceId.toLowerCase(),
+        dosageMg: c.doseUnit === 'mg/wk'
+          ? c.doseValue
+          : c.doseUnit === 'mg' ? c.doseValue : c.doseValue * 1000,
+      }));
+      setMapperResult(mapStackToPathologies(drugs));
+    }
+  }, [course]);
+
+  const handleRunManual = () => {
+    const drugs = useCourse && course.length > 0
+      ? course.map(c => ({ name: c.substanceId.toLowerCase(), dosageMg: c.doseValue }))
+      : [...manualDrugs];
+    if (drugs.length === 0) return;
+    setMapperResult(mapStackToPathologies(drugs));
+  };
+
+  const addManualDrug = () => {
+    const name = newDrugName.trim().toLowerCase();
+    if (!name || manualDrugs.some(d => d.name === name)) return;
+    setManualDrugs([...manualDrugs, { name, dosageMg: newDrugDose || 100 }]);
+    setNewDrugName('');
+    setNewDrugDose(0);
+  };
+
+  const removeManualDrug = (name: string) => {
+    setManualDrugs(manualDrugs.filter(d => d.name !== name));
+  };
+
+  const markerInLabs = (marker: string): boolean => {
+    return !!linked.labs?.some(l => l.code === marker || l.name === marker);
+  };
+
+  const getSeverityClass = (strength: number): string => {
+    if (strength >= 2.0) return 'high';
+    if (strength >= 1.2) return 'medium';
+    return 'low';
+  };
+
+  return (
+    <div>
+      <div className="card" style={{ marginBottom: 12 }}>
+        <h3 style={{ margin: '0 0 4px 0' }}>🧬 Маппер: Стек препаратов → Патологии органов</h3>
+        <p style={{ fontSize: 11, color: 'var(--text-dim)', margin: 0 }}>
+          Алгоритм ищет в графе знаний все патологии для вашего стека.
+          Стек-синергия: если 2+ препарата бьют по одной системе → кумулятивный удар.
+          <br />
+          <span style={{ color: 'var(--accent)', fontSize: 10 }}>
+            ⚡ Работает в браузере. Сервер не нужен.
+          </span>
+        </p>
+      </div>
+
+      <div className="card" style={{ marginBottom: 12 }}>
+        <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+          <button onClick={() => setUseCourse(true)} style={{
+            flex: 1, padding: '8px 12px', borderRadius: 6, border: useCourse ? '1px solid var(--accent)' : '1px solid var(--border)',
+            background: useCourse ? 'rgba(0,230,138,0.08)' : 'var(--bg-secondary)', color: 'var(--text)', fontWeight: 600, fontSize: 13, cursor: 'pointer',
+          }}>
+            💊 Из курса ({course.length} преп.)
+          </button>
+          <button onClick={() => setUseCourse(false)} style={{
+            flex: 1, padding: '8px 12px', borderRadius: 6, border: !useCourse ? '1px solid var(--accent)' : '1px solid var(--border)',
+            background: !useCourse ? 'rgba(0,230,138,0.08)' : 'var(--bg-secondary)', color: 'var(--text)', fontWeight: 600, fontSize: 13, cursor: 'pointer',
+          }}>
+            ✏️ Вручную ({manualDrugs.length} преп.)
+          </button>
+        </div>
+
+        {!useCourse && (
+          <div>
+            <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
+              <select value={newDrugName} onChange={e => setNewDrugName(e.target.value)}
+                style={{ flex: 1, padding: '6px 8px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12 }}>
+                <option value="">Выбрать препарат...</option>
+                {knownNames.map(n => (<option key={n} value={n}>{n}</option>))}
+              </select>
+              <input type="number" placeholder="мг/нед" value={newDrugDose || ''}
+                onChange={e => setNewDrugDose(+e.target.value)}
+                style={{ width: 80, padding: '6px 8px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12 }} />
+              <button onClick={addManualDrug} style={{
+                padding: '6px 12px', borderRadius: 6, border: 'none', background: 'var(--accent)', color: '#000', fontWeight: 700, fontSize: 12, cursor: 'pointer',
+              }}>+</button>
+            </div>
+            {manualDrugs.length > 0 && (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 4 }}>
+                {manualDrugs.map(d => (
+                  <span key={d.name} onClick={() => removeManualDrug(d.name)} style={{
+                    padding: '3px 8px', borderRadius: 6, background: 'rgba(139,92,246,0.15)', color: '#a78bfa',
+                    fontSize: 11, display: 'inline-flex', alignItems: 'center', gap: 4, cursor: 'pointer',
+                  }}>{d.name} {d.dosageMg}мг ✕</span>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        <button onClick={handleRunManual} style={{
+          width: '100%', padding: 10, borderRadius: 8, border: 'none', cursor: 'pointer', marginTop: 4,
+          background: 'linear-gradient(135deg, #8b5cf6, #6d28d9)', color: '#fff', fontWeight: 700, fontSize: 14,
+        }}>▶ Запустить маппинг стека</button>
+      </div>
+
+      {mapperResult && (
+        <>
+          <div className="card" style={{ marginBottom: 12, display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, textAlign: 'center' }}>
+            <div>
+              <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--accent)' }}>{mapperResult.activePathologies.length}</div>
+              <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Патологии</div>
+            </div>
+            <div>
+              <div style={{ fontSize: 20, fontWeight: 800, color: '#60a5fa' }}>{mapperResult.requiredBiomarkers.length}</div>
+              <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Биомаркеры</div>
+            </div>
+            <div>
+              <div style={{ fontSize: 20, fontWeight: 800, color: mapperResult.unknownDrugs.length > 0 ? '#f97316' : 'var(--text-dim)' }}>
+                {mapperResult.knownDrugs}/{mapperResult.totalDrugs}
+              </div>
+              <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Распознано</div>
+            </div>
+          </div>
+
+          <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 6, color: 'var(--text-dim)' }}>Активные патологии (по убыванию тяжести)</div>
+          {mapperResult.activePathologies.map(p => {
+            const sev = getSeverityClass(p.cumulativeTriggerStrength);
+            const ZONE_COLORS: Record<string, string> = { high: '#ef4444', medium: '#f97316', low: '#eab308' };
+            return (
+              <div key={p.pathologyId} className="card" style={{ marginBottom: 8, borderLeft: `4px solid ${ZONE_COLORS[sev]}` }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                  <div>
+                    <span style={{ fontWeight: 600, fontSize: 13 }}>{p.pathologyLabel}</span>
+                    <span style={{ marginLeft: 6, padding: '1px 6px', borderRadius: 4, background: `${ZONE_COLORS[sev]}22`, color: ZONE_COLORS[sev], fontSize: 10, fontWeight: 600 }}>
+                      {p.cumulativeTriggerStrength} Σ
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', gap: 4 }}>
+                    {p.contributingDrugs.map(d => (
+                      <span key={d} style={{ padding: '2px 6px', borderRadius: 4, background: 'rgba(139,92,246,0.12)', color: '#a78bfa', fontSize: 10 }}>{d}</span>
+                    ))}
+                  </div>
+                </div>
+                <div style={{ background: 'rgba(255,255,255,0.04)', borderRadius: 4, height: 6, overflow: 'hidden', marginBottom: 4 }}>
+                  <div style={{ width: `${Math.min(100, p.cumulativeTriggerStrength * 35)}%`, height: '100%', background: ZONE_COLORS[sev], borderRadius: 4, transition: 'width 0.5s' }} />
+                </div>
+                <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>
+                  {p.contributingDrugs.length > 1
+                    ? `Стек-синергия: ${p.contributingDrugs.join(' + ')} → кумулятивный удар ${p.cumulativeTriggerStrength}`
+                    : `Один препарат: ${p.contributingDrugs[0]}`}
+                </div>
+              </div>
+            );
+          })}
+
+          <div className="card" style={{ marginBottom: 12 }}>
+            <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 4, color: 'var(--text-dim)' }}>
+              🧪 Требуемые биомаркеры ({mapperResult.requiredBiomarkers.length})
+            </div>
+            <div style={{ fontSize: 10, color: 'var(--accent)', marginBottom: 6 }}>
+              Зелёные — есть в ваших анализах, серые — необходимо сдать
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+              {mapperResult.requiredBiomarkers.map(m => {
+                const has = markerInLabs(m);
+                return (
+                  <span key={m} style={{
+                    padding: '4px 8px', borderRadius: 6, fontSize: 10, fontWeight: 600,
+                    background: has ? 'rgba(0,230,138,0.15)' : 'rgba(255,255,255,0.05)',
+                    color: has ? '#00e68a' : 'var(--text-dim)',
+                    border: `1px solid ${has ? 'rgba(0,230,138,0.3)' : 'var(--border)'}`,
+                  }}>{has ? '✅ ' : '⬜ '}{m}</span>
+                );
+              })}
+            </div>
+          </div>
+
+          {mapperResult.unknownDrugs.length > 0 && (
+            <div className="card" style={{ marginBottom: 12, borderLeft: '4px solid #f97316' }}>
+              <div style={{ fontSize: 11, color: '#f97316', fontWeight: 600 }}>
+                Неизвестные препараты: {mapperResult.unknownDrugs.join(', ')}
+              </div>
+              <div style={{ fontSize: 9, color: 'var(--text-dim)', marginTop: 2 }}>
+                Эти препараты отсутствуют в графе знаний. Они исключены из расчёта.
+              </div>
+            </div>
+          )}
+        </>
+      )}
+
+      {!mapperResult && (
+        <div className="card" style={{ textAlign: 'center', padding: 24 }}>
+          <div style={{ fontSize: 32, marginBottom: 8 }}>🧬</div>
+          <div style={{ fontSize: 13, color: 'var(--text-dim)' }}>
+            {course.length > 0
+              ? `В курсе ${course.length} препаратов. Нажмите «Запустить маппинг».`
+              : 'Добавьте препараты в курс или вручную и нажмите «Запустить маппинг».'}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ── DiagnosticsTab — 5-Engine Advanced Diagnostics ──
+const DiagnosticsTab: React.FC = () => {
+  const linked = useDataLink();
+  const course = linked.course || [];
+  const profile = linked.profile;
+
+  // Drug stack
+  const [diagDrugs, setDiagDrugs] = useState<DrugDoseInput[]>([]);
+  const [useCourseDrugs, setUseCourseDrugs] = useState(true);
+
+  // Manual drug entry
+  const [manName, setManName] = useState('');
+  const [manEster, setManEster] = useState('enanthate');
+  const [manMg, setManMg] = useState(250);
+  const [manFreq, setManFreq] = useState(2);
+
+  // Vitals
+  const [hrv, setHrv] = useState(55);
+  const [rhr, setRhr] = useState(62);
+  const [bpSys, setBpSys] = useState(125);
+  const [bpDia, setBpDia] = useState(80);
+
+  // Patient
+  const s = profile?.settings;
+  const dob = s?.dateOfBirth ? new Date(s.dateOfBirth) : null;
+  const calcAge = dob ? Math.floor((Date.now() - dob.getTime()) / 31556952000) : 30;
+  const [age, setAge] = useState(calcAge);
+  const [has19Nor, setHas19Nor] = useState(false);
+
+  // Results
+  const [result, setResult] = useState<AdvancedDiagnosticsResult | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  const esterOptions = Object.keys(ESTER_HALF_LIFE_DAYS);
+
+  // Auto-fill from course
+  useEffect(() => {
+    if (useCourseDrugs && course.length > 0) {
+      const mapped: DrugDoseInput[] = course.map(c => {
+        const ester = c.substanceId.includes('enan') ? 'enanthate'
+          : c.substanceId.includes('prop') ? 'propionate'
+          : c.substanceId.includes('cyp') ? 'cypionate'
+          : c.substanceId.includes('undec') ? 'undecanoate'
+          : c.substanceId.includes('acet') ? 'acetate'
+          : c.substanceId.includes('deca') || c.substanceId === 'deca' ? 'decanoate'
+          : c.substanceId.includes('oral') ? 'oral'
+          : 'enanthate';
+        return {
+          name: c.substanceId,
+          ester,
+          mgPerWeek: c.doseUnit === 'mg/wk' ? c.doseValue : c.doseValue,
+          injectionsPerWeek: typeof c.frequency === 'number' ? c.frequency : 2,
+        };
+      });
+      setDiagDrugs(mapped);
+    }
+  }, [course, useCourseDrugs]);
+
+  const addManual = () => {
+    if (!manName.trim()) return;
+    setDiagDrugs([...diagDrugs, { name: manName.trim().toLowerCase(), ester: manEster, mgPerWeek: manMg, injectionsPerWeek: manFreq }]);
+    setManName('');
+  };
+
+  const removeDrug = (idx: number) => {
+    setDiagDrugs(diagDrugs.filter((_, i) => i !== idx));
+  };
+
+  const handleRun = () => {
+    setLoading(true);
+    const vitals: VitalsInput = { hrv, rhr, bpSys, bpDia };
+    const res = runAdvancedDiagnostics(age, diagDrugs, vitals, has19Nor);
+    setResult(res);
+    setLoading(false);
+  };
+
+  const SEV_COLORS: Record<string, string> = { critical: '#ef4444', warning: '#f97316' };
+  const BIO_DANGER = '#ef4444';
+  const BIO_SAFE = '#00e68a';
+
+  return (
+    <div>
+      <div className="card" style={{ marginBottom: 12 }}>
+        <h3 style={{ margin: '0 0 4px 0' }}>🔬 5-Engine Advanced Diagnostics</h3>
+        <p style={{ fontSize: 11, color: 'var(--text-dim)', margin: 0 }}>
+          PK/PD · Межлекарственные конфликты · Витальные показатели · BioAge · ПКТ-Таймер
+          <br />
+          <span style={{ color: 'var(--accent)', fontSize: 10 }}>
+            ⚡ Все 5 движков работают в браузере. Сервер не нужен.
+          </span>
+        </p>
+      </div>
+
+      {/* Drug stack */}
+      <div className="card" style={{ marginBottom: 12 }}>
+        <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+          <button onClick={() => setUseCourseDrugs(true)} style={{
+            flex: 1, padding: '6px 10px', borderRadius: 6, border: useCourseDrugs ? '1px solid var(--accent)' : '1px solid var(--border)',
+            background: useCourseDrugs ? 'rgba(0,230,138,0.08)' : 'var(--bg-secondary)', color: 'var(--text)', fontSize: 12, cursor: 'pointer',
+          }}>
+            💊 Из курса ({course.length})
+          </button>
+          <button onClick={() => setUseCourseDrugs(false)} style={{
+            flex: 1, padding: '6px 10px', borderRadius: 6, border: !useCourseDrugs ? '1px solid var(--accent)' : '1px solid var(--border)',
+            background: !useCourseDrugs ? 'rgba(0,230,138,0.08)' : 'var(--bg-secondary)', color: 'var(--text)', fontSize: 12, cursor: 'pointer',
+          }}>
+            ✏️ Вручную ({diagDrugs.length})
+          </button>
+        </div>
+
+        {!useCourseDrugs && (
+          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 6 }}>
+            <input value={manName} onChange={e => setManName(e.target.value)} placeholder="Препарат" style={{ width: 100, padding: '5px 6px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 11 }} />
+            <select value={manEster} onChange={e => setManEster(e.target.value)} style={{ width: 110, padding: '5px 4px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 11 }}>
+              {esterOptions.map(e => (<option key={e} value={e}>{e} ({ESTER_HALF_LIFE_DAYS[e]}д)</option>))}
+            </select>
+            <input type="number" value={manMg} onChange={e => setManMg(+e.target.value)} placeholder="мг/нед" style={{ width: 70, padding: '5px 6px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 11 }} />
+            <input type="number" value={manFreq} onChange={e => setManFreq(+e.target.value)} placeholder="инж/нед" style={{ width: 60, padding: '5px 6px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 11 }} />
+            <button onClick={addManual} style={{ padding: '5px 12px', borderRadius: 6, border: 'none', background: 'var(--accent)', color: '#000', fontWeight: 700, fontSize: 11, cursor: 'pointer' }}>+</button>
+          </div>
+        )}
+
+        {diagDrugs.length > 0 && (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 8 }}>
+            {diagDrugs.map((d, i) => (
+              <span key={i} onClick={() => removeDrug(i)} style={{
+                padding: '3px 8px', borderRadius: 6, background: 'rgba(0,230,138,0.1)', color: 'var(--accent)',
+                fontSize: 10, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 3,
+              }}>
+                {d.name} [{d.ester}] {d.mgPerWeek}мг {d.injectionsPerWeek}×/нед ✕
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Vitals + Patient */}
+      <div className="card" style={{ marginBottom: 12 }}>
+        <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 6, color: 'var(--text-dim)' }}>Витальные показатели</div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 6, marginBottom: 8 }}>
+          <div>
+            <label style={{ fontSize: 9, color: 'var(--text-dim)' }}>HRV (мс)</label>
+            <input type="number" value={hrv} onChange={e => setHrv(+e.target.value)}
+              style={{ width: '100%', padding: '5px 6px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, boxSizing: 'border-box' }} />
+          </div>
+          <div>
+            <label style={{ fontSize: 9, color: 'var(--text-dim)' }}>RHR (уд/мин)</label>
+            <input type="number" value={rhr} onChange={e => setRhr(+e.target.value)}
+              style={{ width: '100%', padding: '5px 6px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, boxSizing: 'border-box' }} />
+          </div>
+          <div>
+            <label style={{ fontSize: 9, color: 'var(--text-dim)' }}>АД сист.</label>
+            <input type="number" value={bpSys} onChange={e => setBpSys(+e.target.value)}
+              style={{ width: '100%', padding: '5px 6px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, boxSizing: 'border-box' }} />
+          </div>
+          <div>
+            <label style={{ fontSize: 9, color: 'var(--text-dim)' }}>АД диаст.</label>
+            <input type="number" value={bpDia} onChange={e => setBpDia(+e.target.value)}
+              style={{ width: '100%', padding: '5px 6px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, boxSizing: 'border-box' }} />
+          </div>
+        </div>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <div>
+            <label style={{ fontSize: 9, color: 'var(--text-dim)' }}>Возраст (лет)</label>
+            <input type="number" value={age} onChange={e => setAge(+e.target.value)}
+              style={{ width: 80, padding: '5px 6px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, boxSizing: 'border-box' }} />
+          </div>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--text-dim)', cursor: 'pointer', marginTop: 14 }}>
+            <input type="checkbox" checked={has19Nor} onChange={e => setHas19Nor(e.target.checked)}
+              style={{ accentColor: '#ef4444' }} />
+            19-nor в анамнезе
+          </label>
+        </div>
+      </div>
+
+      {/* Run button */}
+      <button onClick={handleRun} disabled={diagDrugs.length === 0 || loading} style={{
+        width: '100%', padding: 12, borderRadius: 8, border: 'none', cursor: diagDrugs.length === 0 ? 'not-allowed' : 'pointer', marginBottom: 12,
+        background: diagDrugs.length === 0 ? 'var(--border)' : 'linear-gradient(135deg, #ef4444, #8b5cf6)',
+        color: '#fff', fontWeight: 700, fontSize: 15, opacity: diagDrugs.length === 0 ? 0.5 : 1,
+      }}>
+        {loading ? '⏳ Анализ...' : '🔬 Запустить все 5 движков'}
+        <span style={{ fontSize: 10, display: 'block', fontWeight: 400, opacity: 0.7 }}>
+          PK/PD + Взаимодействия + Виталы + BioAge + ПКТ-Таймер
+        </span>
+      </button>
+
+      {/* Results */}
+      {result && (
+        <>
+          {/* Summary */}
+          <div className="card" style={{
+            marginBottom: 12, padding: '10px 14px',
+            background: result.summary.startsWith('✅') ? 'rgba(0,230,138,0.08)' : 'rgba(239,68,68,0.08)',
+            borderLeft: `3px solid ${result.summary.startsWith('✅') ? '#00e68a' : '#ef4444'}`,
+          }}>
+            <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-dim)', marginBottom: 2 }}>Итоговая оценка</div>
+            <div style={{ fontSize: 13, color: 'var(--text)', lineHeight: 1.4 }}>{result.summary}</div>
+          </div>
+
+          {/* ── Engine 1: PK/PD ── */}
+          <div className="card" style={{ marginBottom: 10 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#60a5fa', marginBottom: 6 }}>1. PK/PD — Концентрации и качели</div>
+            {result.pkpd.map((r, i) => (
+              <div key={i} style={{
+                marginBottom: 8, padding: '8px 10px', borderRadius: 6,
+                background: r.hormonalSwingFlag ? 'rgba(239,68,68,0.08)' : 'rgba(255,255,255,0.03)',
+                border: `1px solid ${r.hormonalSwingFlag ? 'rgba(239,68,68,0.3)' : 'var(--border)'}`,
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
+                  <span style={{ fontWeight: 600 }}>{r.drugName} [{r.ester}]</span>
+                  <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>T½ = {r.halfLifeDays} дн</span>
+                </div>
+                <div style={{ display: 'flex', gap: 8, marginTop: 4, fontSize: 10 }}>
+                  <span style={{ color: '#00e68a' }}>Пик: {r.peakConcMg}мг</span>
+                  <span style={{ color: '#60a5fa' }}>Спад: {r.troughConcMg}мг</span>
+                  <span style={{ color: r.hormonalSwingFlag ? '#ef4444' : 'var(--text-dim)', fontWeight: 600 }}>
+                    Δ{r.peakTroughDeltaPct}%
+                  </span>
+                </div>
+                {r.hormonalSwingFlag && (
+                  <div style={{ marginTop: 4, fontSize: 10, color: '#ef4444', fontWeight: 600 }}>
+                    🔴 Красный флаг: Гормональные качели! Частота инъекций должна быть увеличена.
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+
+          {/* ── Engine 2: Interactions ── */}
+          {result.interactions.length > 0 && (
+            <div className="card" style={{ marginBottom: 10 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: '#ef4444', marginBottom: 6 }}>2. Межлекарственные конфликты</div>
+              {result.interactions.map((r, i) => (
+                <div key={i} style={{
+                  marginBottom: 6, padding: '8px 10px', borderRadius: 6,
+                  background: 'rgba(239,68,68,0.06)', borderLeft: `3px solid ${SEV_COLORS[r.severity]}`,
+                }}>
+                  <div style={{ fontSize: 10, fontWeight: 600, color: SEV_COLORS[r.severity] }}>
+                    {r.severity.toUpperCase()} — {r.drugsInvolved.join(' + ')}
+                  </div>
+                  <div style={{ fontSize: 11, marginTop: 2 }}>{r.message}</div>
+                  <div style={{ fontSize: 9, color: 'var(--text-dim)', marginTop: 2 }}>{r.mechanism}</div>
+                </div>
+              ))}
+            </div>
+          )}
+          {result.interactions.length === 0 && (
+            <div className="card" style={{ marginBottom: 10, textAlign: 'center', padding: 8 }}>
+              <div style={{ fontSize: 11, color: '#00e68a' }}>✅ Конфликтов не обнаружено</div>
+            </div>
+          )}
+
+          {/* ── Engine 3: Vitals ── */}
+          <div className="card" style={{ marginBottom: 10 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#f59e0b', marginBottom: 6 }}>3. Витальные показатели</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 6, fontSize: 10 }}>
+              <div>
+                <span style={{ color: 'var(--text-dim)' }}>HRV: </span>
+                <span style={{ fontWeight: 600, color: result.vitals.hrv < 35 ? '#ef4444' : 'var(--accent)' }}>{result.vitals.hrv} мс</span>
+              </div>
+              <div>
+                <span style={{ color: 'var(--text-dim)' }}>RHR: </span>
+                <span style={{ fontWeight: 600, color: result.vitals.rhr > 75 ? '#ef4444' : 'var(--accent)' }}>{result.vitals.rhr} уд/мин</span>
+              </div>
+              <div>
+                <span style={{ color: 'var(--text-dim)' }}>АД: </span>
+                <span style={{ fontWeight: 600, color: result.vitals.bpSys > 140 || result.vitals.bpDia > 90 ? '#ef4444' : 'var(--accent)' }}>
+                  {result.vitals.bpSys}/{result.vitals.bpDia}
+                </span>
+              </div>
+            </div>
+            {result.vitals.alerts.length > 0 && (
+              <div style={{ marginTop: 8 }}>
+                {result.vitals.alerts.map((a, i) => (
+                  <div key={i} style={{ fontSize: 10, color: '#f97316', padding: '4px 0' }}>⚠ {a}</div>
+                ))}
+              </div>
+            )}
+            {result.vitals.alerts.length === 0 && (
+              <div style={{ marginTop: 4, fontSize: 10, color: '#00e68a' }}>✅ Витальные показатели в норме</div>
+            )}
+          </div>
+
+          {/* ── Engine 4: BioAge ── */}
+          <div className="card" style={{ marginBottom: 10 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#a855f7', marginBottom: 6 }}>4. BioAge — Биологическое старение</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, textAlign: 'center' }}>
+              <div>
+                <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Хронологический</div>
+                <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--text)' }}>{result.bioage.chronologicalAge}</div>
+              </div>
+              <div>
+                <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Биологический</div>
+                <div style={{ fontSize: 24, fontWeight: 800, color: result.bioage.ageAcceleration > 2 ? '#ef4444' : '#00e68a' }}>
+                  {result.bioage.biologicalAge}
+                </div>
+              </div>
+            </div>
+            <div style={{ marginTop: 8, display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 4, fontSize: 9, color: 'var(--text-dim)' }}>
+              <div>АД-штраф: +{result.bioage.bpPenalty} лет</div>
+              <div>HRV-штраф: +{result.bioage.hrvPenalty} лет</div>
+              <div>Токс. нагрузка: +{result.bioage.toxicLoadPenalty} лет</div>
+            </div>
+            <div style={{ marginTop: 4, fontSize: 11, fontWeight: 600, color: result.bioage.ageAcceleration > 2 ? '#f97316' : 'var(--accent)' }}>
+              {result.bioage.agingRate}
+            </div>
+          </div>
+
+          {/* ── Engine 5: PCT Reboot ── */}
+          <div className="card" style={{ marginBottom: 10 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#ec4899', marginBottom: 6 }}>5. ПКТ-Таймер и HPTA Ребут</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 6 }}>
+              <div>
+                <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Начало ПКТ</div>
+                <div style={{ fontSize: 22, fontWeight: 800, color: '#ec4899' }}>День {result.pctReboot.pctStartDay}</div>
+                <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>
+                  от {result.pctReboot.longestHalfLifeDrug} (T½={result.pctReboot.longestHalfLifeDays}д)
+                </div>
+              </div>
+              <div>
+                <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Вероятность ребута</div>
+                <div style={{ fontSize: 22, fontWeight: 800, color: result.pctReboot.rebootSuccessProbability >= 70 ? '#00e68a' : result.pctReboot.rebootSuccessProbability >= 40 ? '#f59e0b' : '#ef4444' }}>
+                  {result.pctReboot.rebootSuccessProbability}%
+                </div>
+                <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>
+                  {result.pctReboot.has19Nor ? '19-nor: -40%' : 'Без 19-nor'}
+                </div>
+              </div>
+            </div>
+            <div style={{
+              padding: '8px 10px', borderRadius: 6, fontSize: 11,
+              background: 'rgba(236,72,153,0.06)', borderLeft: '3px solid #ec4899',
+            }}>
+              {result.pctReboot.recommendation}
+            </div>
+          </div>
+        </>
+      )}
+
+      {!result && !loading && (
+        <div className="card" style={{ textAlign: 'center', padding: 24 }}>
+          <div style={{ fontSize: 32, marginBottom: 8 }}>🔬</div>
+          <div style={{ fontSize: 13, color: 'var(--text-dim)' }}>
+            {diagDrugs.length > 0
+              ? `Готово к анализу: ${diagDrugs.length} препаратов. Нажмите «Запустить все 5 движков».`
+              : 'Добавьте препараты и заполните витальные показатели.'}
           </div>
         </div>
       )}

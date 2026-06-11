@@ -1,6 +1,7 @@
 import { parseLabText as parseLabTextFromPdf, parseLabFile, type ParsedLabResult as PdfParsedLabResult } from '../engines/pdf-parser.engine';
 import { parseNutritionScreenshot, parseFatSecretText, type ParsedMeal } from '../engines/nutrition-ocr-parser';
 import { parseLabText as parseLabTextProviderAware, detectProvider } from './lab-auto-parser';
+import { parseLabResults as parseWithBiomarkerRegex, type ExtractedMarker } from '../engines/biomarker-regex-engine';
 import { UCUM_MAP } from './constants';
 import { db } from './db';
 import { notifyDataChange } from './data-link';
@@ -168,6 +169,26 @@ export async function processUploadedFile(file: File): Promise<OCRResult> {
         labs = mergeParsedResults(pdfLabs, providerResults, providerName);
         if (providerName !== 'unknown') warnings.push(`Распознан бланк: ${providerName}`);
 
+        // Enhanced biomarker regex engine (third pass)
+        const regexResults = parseWithBiomarkerRegex(rawText, 'tesseract');
+        if (regexResults.extractedMarkers.length > 0) {
+          const existingCodes = new Set(labs.map(l => l.code));
+          for (const m of regexResults.extractedMarkers) {
+            if (!existingCodes.has(m.code)) {
+              labs.push({
+                code: m.code,
+                name: m.name,
+                value: m.value,
+                unit: m.unit,
+                refLow: undefined,
+                refHigh: m.ec50 > 0 ? m.ec50 : undefined,
+                isAbnormal: m.confidence > 0.7 ? undefined : true,
+              });
+            }
+          }
+          warnings.push(...regexResults.warnings);
+        }
+
         // Also try nutrition parsing
         let mealItems = parseNutritionScreenshot(rawText);
         if (mealItems.length === 0) {
@@ -203,6 +224,28 @@ export async function processUploadedFile(file: File): Promise<OCRResult> {
       const providerResults = parseLabTextProviderAware(rawText);
       const providerName = detectProvider(rawText);
       labs = mergeParsedResults(pdfLabs, providerResults, providerName);
+
+      // Additional pass: biomarker regex engine (enhanced heuristics)
+      const regexResults = parseWithBiomarkerRegex(rawText, 'text');
+      if (regexResults.extractedMarkers.length > 0) {
+        // Merge regex results — only add markers not already found
+        const existingCodes = new Set(labs.map(l => l.code));
+        for (const m of regexResults.extractedMarkers) {
+          if (!existingCodes.has(m.code)) {
+            labs.push({
+              code: m.code,
+              name: m.name,
+              value: m.value,
+              unit: m.unit,
+              refLow: undefined,
+              refHigh: m.ec50 > 0 ? m.ec50 : undefined,
+              isAbnormal: m.confidence > 0.7 ? undefined : true,
+            });
+          }
+        }
+        warnings.push(...regexResults.warnings);
+      }
+
       if (providerName !== 'unknown') warnings.push(`Распознан бланк: ${providerName}`);
 
       let mealItems = parseNutritionScreenshot(rawText);

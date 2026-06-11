@@ -1,5 +1,8 @@
 # Health Engine v9 — Master Plan & Build Instructions
 
+## Build Target: Telegram Mini App (WebView)
+**ALL code MUST work in browser-only (no servers, no Python).** Every feature is built as client-side TypeScript running in Telegram WebView. Python services are secondary (external API only). Code must be compiled via Vite and deployed as static files.
+
 ## Critical Issues (User-Reported)
 1. **Дубли информации** — тренировки показываются в 2 местах (training tab + cycles tab), данные повторяются
 2. **Нет кнопки без анализов** — лабы/расчёты должны работать и без введённых данных

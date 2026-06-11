@@ -20,6 +20,7 @@ import { Risk3DModel } from './RiskScreen_parts/Risk3DModel';
 import { calculateWeeklyRiskDynamics, type WeeklyRiskDynamics } from '../../engines/weekly-risk-dynamics.engine';
 import { useV7Risk } from '../hooks/useV7Risk';
 import { getProfile, updateProfile } from '../../core/profile-manager';
+import { analyzeWithCompliance, type ComplianceReport, getComplianceStatus } from '../../engines/compliance-engine';
 
 const RISK_HISTORY_KEY = 'risk_history';
 const MAX_HISTORY = 12;
@@ -39,12 +40,13 @@ const TAB_LABELS: Record<string, string> = {
   v7: '🔬 Симуляция',
   model: '🧍 3D Модель',
   mdss: '🧬 MDSS',
+  compliance: '🕒 Комплаенс',
   info: 'ℹ️ Инфо',
 };
 
 export const RiskScreen: React.FC = () => {
   const linked = useDataLink();
-  const [tab, setTab] = useState<'overview' | 'dynamics' | 'mechanisms' | 'v7' | 'model' | 'info' | 'mdss'>('overview');
+  const [tab, setTab] = useState<'overview' | 'dynamics' | 'mechanisms' | 'v7' | 'model' | 'info' | 'mdss' | 'compliance'>('overview');
   const [tick, setTick] = useState(0);
   const [selectedWeek, setSelectedWeek] = useState<number | null>(null);
   const [weekMode, setWeekMode] = useState<'week' | 'average'>('average');
@@ -288,6 +290,7 @@ export const RiskScreen: React.FC = () => {
       case 'dynamics': return <WeeklyRiskChart dynamics={weeklyDynamics} selectedWeek={selectedWeek} onWeekSelect={setSelectedWeek} mode={weekMode} onModeChange={setWeekMode} />;
       case 'info': return <RiskInfo />;
       case 'mdss': return <MDSSRiskDisplay />;
+      case 'compliance': return <ComplianceDisplay />;
       default: return <RiskOverview riskResult={riskResult} globalNoLabs={globalNoLabs} noLabsSystems={noLabsSystems} labRiskContributions={labRiskContributions} riskHistory={riskHistory} aggregatedRisk={aggregatedRisk} />;
     }
   };
@@ -296,7 +299,7 @@ export const RiskScreen: React.FC = () => {
     <div className="screen risk">
       <h2 style={{ margin: '0 0 6px', fontSize: 'clamp(16, 4.5vw, 18)' }}>⚠️ Риски</h2>
       <div style={{ display: 'flex', gap: 3, overflowX: 'auto', marginBottom: 12, scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' }}>
-        {(['overview', 'dynamics', 'mechanisms', 'v7', 'model', 'mdss', 'info'] as const).map(t => (
+        {(['overview', 'dynamics', 'mechanisms', 'v7', 'model', 'mdss', 'compliance', 'info'] as const).map(t => (
           <button key={t} onClick={() => setTab(t)} style={{
             flex: '0 0 auto', padding: '8px 14px', borderRadius: 8, fontSize: 12, fontWeight: tab === t ? 700 : 400,
             whiteSpace: 'nowrap', cursor: 'pointer', transition: 'all 0.15s',
@@ -467,6 +470,251 @@ const MDSSRiskDisplay: React.FC = () => {
             </div>
           ))}
         </>
+      )}
+    </div>
+  );
+};
+
+// ── Compliance Display Component ──
+const ComplianceDisplay: React.FC = () => {
+  const linked = useDataLink();
+  const profile = linked.profile;
+  const s = profile?.settings;
+  const labs = linked.labs || [];
+  const course = linked.course || [];
+
+  // Extract markers from labs
+  const [report, setReport] = useState<ComplianceReport | null>(null);
+
+  // Dates
+  const today = new Date().toISOString().slice(0, 10);
+  const latestLabDate = useMemo(() => {
+    if (labs.length === 0) {
+      const d = new Date();
+      d.setMonth(d.getMonth() - 3);
+      return d.toISOString().slice(0, 10);
+    }
+    const dates = labs.map(l => l.date || '').filter(Boolean).sort().reverse();
+    return dates[0] || today;
+  }, [labs]);
+
+  // Course start
+  const courseStartDate = useMemo(() => {
+    if (course.length > 0) {
+      const starts = course.map(c => c.startWeek || 0);
+      const minStart = Math.min(...starts);
+      const d = new Date();
+      d.setDate(d.getDate() - 7 * minStart);
+      return d.toISOString().slice(0, 10);
+    }
+    const d = new Date();
+    d.setDate(d.getDate() - 28);
+    return d.toISOString().slice(0, 10);
+  }, [course]);
+
+  const [cycleStart, setCycleStart] = useState(courseStartDate);
+  const [lastLab, setLastLab] = useState(latestLabDate);
+  const [kAgg, setKAgg] = useState(0.4);
+  const [zCrit, setZCrit] = useState(12.0);
+
+  const genetics = useMemo(() => {
+    const g = (s?.genetics as Record<string, boolean | string>) || {};
+    return Object.keys(g).filter(k => !!g[k]);
+  }, [s]);
+
+  const markers = useMemo(() => {
+    return labs.map(l => ({
+      name: l.code || l.name || '',
+      value: l.value || 0,
+      ec50: l.name === 'ALT' ? 50 : l.name === 'AST' ? 45 : l.name === 'Creatinine' ? 120 : 3,
+      isInverted: l.name === 'SHBG' || l.name === 'HDL',
+    }));
+  }, [labs]);
+
+  // Auto-calc on mount
+  useEffect(() => {
+    runAnalysis();
+  }, []);
+
+  const runAnalysis = () => {
+    const result = analyzeWithCompliance({
+      cycleStartDate: cycleStart,
+      latestLabDate: lastLab,
+      currentDate: today,
+      genetics,
+      markers,
+      kAggressionOverride: kAgg,
+      zCritOverride: zCrit,
+    });
+    setReport(result);
+  };
+
+  const msPerWeek = 7 * 24 * 3600 * 1000;
+  const weeksSinceLab = Math.max(0, (new Date(today).getTime() - new Date(lastLab).getTime()) / msPerWeek);
+  const compliance = getComplianceStatus(weeksSinceLab);
+
+  const complianceColors: Record<string, string> = {
+    compliant: '#00e68a',
+    overdue: '#f97316',
+    critical: '#ef4444',
+  };
+
+  return (
+    <div>
+      <div className="card" style={{ marginBottom: 12 }}>
+        <h3 style={{ margin: '0 0 4px 0' }}>🕒 Комплаенс — Data Decay & Uncertainty Engine</h3>
+        <p style={{ fontSize: 11, color: 'var(--text-dim)', margin: 0 }}>
+          Отслеживание дисциплины сдачи анализов. Data Decay — штрафной коэффициент за устаревшие данные.
+          <br />
+          <span style={{ color: 'var(--accent)', fontSize: 10 }}>
+            ⚡ Работает в браузере. Сервер не нужен.
+          </span>
+        </p>
+      </div>
+
+      {/* Input card */}
+      <div className="card" style={{ marginBottom: 12 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 8 }}>
+          <div>
+            <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Дата начала курса</label>
+            <input type="date" value={cycleStart} onChange={e => setCycleStart(e.target.value)}
+              style={{ width: '100%', padding: '6px 8px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, boxSizing: 'border-box' }} />
+          </div>
+          <div>
+            <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Последние анализы</label>
+            <input type="date" value={lastLab} onChange={e => setLastLab(e.target.value)}
+              style={{ width: '100%', padding: '6px 8px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, boxSizing: 'border-box' }} />
+          </div>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 6 }}>
+          <div>
+            <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>k_aggression</label>
+            <input type="number" value={kAgg} step={0.1} min={0.1} max={2} onChange={e => setKAgg(+e.target.value)}
+              style={{ width: '100%', padding: '6px 8px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, boxSizing: 'border-box' }} />
+          </div>
+          <div>
+            <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Z_crit</label>
+            <input type="number" value={zCrit} step={1} min={1} max={50} onChange={e => setZCrit(+e.target.value)}
+              style={{ width: '100%', padding: '6px 8px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, boxSizing: 'border-box' }} />
+          </div>
+        </div>
+        <button onClick={runAnalysis} style={{
+          width: '100%', padding: 10, borderRadius: 8, border: 'none', cursor: 'pointer',
+          background: 'linear-gradient(135deg, #f97316, #ef4444)', color: '#fff', fontWeight: 700, fontSize: 14,
+        }}>▶ Анализ с комплаенс-контролем</button>
+
+        <div style={{ display: 'flex', gap: 2, marginTop: 6, fontSize: 9, color: 'var(--text-dim)', justifyContent: 'space-between' }}>
+          <span>Анализов: {labs.length}</span>
+          <span>Генетика: {genetics.length > 0 ? genetics.join(',') : 'нет'}</span>
+          <span style={{ color: complianceColors[compliance], fontWeight: 600 }}>Статус: {compliance}</span>
+        </div>
+      </div>
+
+      {/* Results */}
+      {report && (
+        <>
+          {/* Compliance warning */}
+          <div className="card" style={{
+            marginBottom: 12, padding: '10px 14px',
+            background: report.systemWarnings.complianceStatus === 'compliant'
+              ? 'rgba(0,230,138,0.06)'
+              : report.systemWarnings.complianceStatus === 'critical'
+                ? 'rgba(239,68,68,0.08)'
+                : 'rgba(249,115,22,0.06)',
+            borderLeft: `3px solid ${complianceColors[report.systemWarnings.complianceStatus]}`,
+          }}>
+            <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 4, fontWeight: 600 }}>
+              ⚠ Системные предупреждения
+            </div>
+            <div style={{ fontSize: 10, color: 'var(--text)', lineHeight: 1.5, marginBottom: 6 }}>
+              {report.systemWarnings.disclaimer}
+            </div>
+            <div style={{
+              fontSize: 11, fontWeight: 700,
+              color: report.systemWarnings.complianceStatus === 'compliant' ? '#00e68a' : '#f97316',
+            }}>
+              {report.systemWarnings.penaltyStatus}
+            </div>
+            <div style={{ display: 'flex', gap: 12, marginTop: 4, fontSize: 9, color: 'var(--text-dim)' }}>
+              <span>{report.systemWarnings.weeksOnCycle} нед на курсе</span>
+              <span>{report.systemWarnings.weeksSinceLastLab} нед с анализов</span>
+            </div>
+          </div>
+
+          {/* Risk analysis card */}
+          <div className="card" style={{ marginBottom: 12 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', marginBottom: 8 }}>
+              📊 Анализ рисков с штрафом
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, textAlign: 'center', marginBottom: 8 }}>
+              <div>
+                <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Штрафной коэфф.</div>
+                <div style={{ fontSize: 24, fontWeight: 800, color: report.riskAnalysis.penaltyMultiplierApplied > 1 ? '#ef4444' : '#00e68a' }}>
+                  {report.riskAnalysis.penaltyMultiplierApplied}x
+                </div>
+              </div>
+              <div>
+                <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Вероятность отказа</div>
+                <div style={{
+                  fontSize: 24, fontWeight: 800,
+                  color: report.riskAnalysis.probabilityPercent >= 80 ? '#ef4444'
+                    : report.riskAnalysis.probabilityPercent >= 50 ? '#f97316'
+                    : report.riskAnalysis.probabilityPercent >= 20 ? '#eab308'
+                    : '#00e68a',
+                }}>
+                  {report.riskAnalysis.probabilityPercent}%
+                </div>
+              </div>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 4, fontSize: 9, color: 'var(--text-dim)', marginBottom: 6 }}>
+              <div>Hill: {report.riskAnalysis.worstHillScore}</div>
+              <div>Sev95: {report.riskAnalysis.severity95th}</div>
+              <div>Z_raw: {report.riskAnalysis.zTotalRaw}</div>
+              <div>Z_adj: {report.riskAnalysis.zTotalAdjusted}</div>
+              <div>Genetic: {report.riskAnalysis.active19NorPenalty ? 'Да' : 'Нет'}</div>
+              <div style={{ fontWeight: 600, color: 'var(--text)' }}>
+                {report.riskAnalysis.clinicalStatus}
+              </div>
+            </div>
+          </div>
+
+          {/* Per-organ breakdown */}
+          <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 6, color: 'var(--text-dim)' }}>⬇ Пер-орган с штрафом</div>
+          {Object.entries(report.organDetails).map(([key, r]) => {
+            const zoneColor = r.riskPercent >= 80 ? '#ef4444' : r.riskPercent >= 50 ? '#f97316' : r.riskPercent >= 20 ? '#eab308' : '#00e68a';
+            return (
+              <div key={key} className="card" style={{
+                marginBottom: 6, borderLeft: `4px solid ${zoneColor}`,
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                  <span style={{ fontWeight: 600, fontSize: 11 }}>{r.organName}</span>
+                  <span style={{ padding: '2px 6px', borderRadius: 4, background: `${zoneColor}22`, color: zoneColor, fontSize: 10, fontWeight: 600 }}>
+                    {r.riskPercent}% — {r.status}
+                  </span>
+                </div>
+                <div style={{ background: 'rgba(255,255,255,0.04)', borderRadius: 4, height: 6, overflow: 'hidden', marginBottom: 4 }}>
+                  <div style={{ width: `${Math.min(100, r.riskPercent)}%`, height: '100%', background: zoneColor, borderRadius: 4 }} />
+                </div>
+                <div style={{ display: 'flex', gap: 8, fontSize: 9, color: 'var(--text-dim)' }}>
+                  <span>Hill: {r.hillScore}</span>
+                  <span>Z_adj: {r.zTotalAdjusted}</span>
+                  <span>×{r.penaltyFactor} штраф</span>
+                </div>
+              </div>
+            );
+          })}
+        </>
+      )}
+
+      {!report && (
+        <div className="card" style={{ textAlign: 'center', padding: 24 }}>
+          <div style={{ fontSize: 32, marginBottom: 8 }}>🕒</div>
+          <div style={{ fontSize: 13, color: 'var(--text-dim)' }}>
+            {labs.length > 0
+              ? `Найдено ${labs.length} анализов. Нажмите «Анализ с комплаенс-контролем».`
+              : 'Анализы не найдены. Система применит максимальный штраф.'}
+          </div>
+        </div>
       )}
     </div>
   );
