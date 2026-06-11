@@ -1,228 +1,194 @@
-import React, { useEffect, useState } from 'react';
-import { createArticle, updateArticle, submitForReview, processReview, publishArticle, filterArticles } from '../../engines/articles.engine';
-import { db } from '../../core/db';
-import { getCurrentProfile, type LocalUserProfile } from '../../core/auth-manager';
-import type { Article, ArticleStatus } from '../../core/types';
+import React, { useMemo, useState } from 'react';
+import { getSortedArticles, type ArticleManifestEntry, ARTICLES_MANIFEST } from '../../data/articles-manifest';
 
 const CATEGORIES = [
-  { value: 'nutrition', label: 'Питание' },
-  { value: 'pharma', label: 'Фармакология' },
-  { value: 'labs', label: 'Лаборатория' },
+  { value: 'all', label: 'Все' },
+  { value: 'pharma', label: 'Фарма' },
+  { value: 'labs', label: 'Анализы' },
   { value: 'training', label: 'Тренировки' },
+  { value: 'nutrition', label: 'Питание' },
   { value: 'support', label: 'Поддержка' },
 ];
 
-const STATUS_LABELS: Record<ArticleStatus, string> = {
-  draft: 'Черновик',
-  review: 'На ревью',
-  published: 'Опубликована',
-  archived: 'Архив',
-};
+function renderMarkdown(md: string): string {
+  let html = md
+    // Headers
+    .replace(/^### (.+)$/gm, '<h4>$1</h4>')
+    .replace(/^## (.+)$/gm, '<h3>$1</h3>')
+    .replace(/^# (.+)$/gm, '<h2>$1</h2>')
+    // Bold
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    // Italic
+    .replace(/\*(.+?)\*/g, '<em>$1</em>')
+    // Lists
+    .replace(/^- (.+)$/gm, '<li>$1</li>')
+    .replace(/(<li>.*<\/li>\n?)+/g, '<ul>$&</ul>')
+    // Tables (simple)
+    .replace(/^\|(.+)\|$/gm, (line) => {
+      const cells = line.split('|').filter(c => c.trim());
+      if (cells.every(c => /^[-: ]+$/.test(c))) return '';
+      return '<tr>' + cells.map(c => `<td>${c.trim()}</td>`).join('') + '</tr>';
+    })
+    // Horizontal rules
+    .replace(/^---$/gm, '<hr/>')
+    // Line breaks
+    .replace(/\n\n/g, '<br/><br/>')
+    // Checkboxes
+    .replace(/- \[ \] (.+)/g, '☐ $1')
+    .replace(/- \[x\] (.+)/g, '☑ $1');
 
-const STATUS_COLORS: Record<ArticleStatus, string> = {
-  draft: '#9e9e9e',
-  review: '#2196f3',
-  published: '#4caf50',
-  archived: '#757575',
-};
-
-const SEED_ARTICLES: Article[] = [
-  {
-    id: 'seed-1', title: 'Основы нутрициологии для спортсменов',
-    content: 'Подробное руководство по питанию для достижения спортивных целей. Белок: 1.6-2.2 г/кг массы тела для гипертрофии, углеводы: 4-7 г/кг в зависимости от объёма тренировок, жиры: 0.8-1.2 г/кг. Микронутриенты: витамин D 2000-5000 МЕ/день, омега-3 2-3 г EPA+DHA, цинк 25-50 мг, магний 400 мг бисглицинат. Хронология питания: белково-углеводное окно 30-60 мин после тренировки, казеин перед сном для ночного анаболизма.',
-    category: 'nutrition', authorId: 'team', authorName: 'Health Engine Team',
-    createdAt: '2026-05-01', updatedAt: '2026-05-01', version: 1, likes: 42, views: 1280, isPinned: true,
-    status: 'published', teaser: 'Руководство по БЖУ, микронутриентам и хронологии питания для гипертрофии', tags: ['питание', 'спорт', 'добавки'], publishedAt: '2026-05-01',
-  },
-  {
-    id: 'seed-2', title: 'Понимание фармакокинетики стероидов',
-    content: 'Как ААС работают в организме: абсорбция, распределение, метаболизм, выведение. Период полувыведения определяет частоту инъекций и стабильность уровня. Эфиры тестостерона: пропионат (2-3 дня), энантат (4-5 дней), ципионат (5-7 дней), ундеканоат (16-20 недель). Накопление (стационарный уровень) достигается через 4-5 периодов полувыведения. Токсичность: 17-α алкилированные оральные вызывают холестаз и повышение АЛТ/АСТ, инъекционные — минимальная гепатотоксичность.',
-    category: 'pharma', authorId: 'dr-pharm', authorName: 'Dr. Pharm',
-    createdAt: '2026-05-15', updatedAt: '2026-05-15', version: 1, likes: 28, views: 890, isPinned: false,
-    status: 'published', teaser: 'Эфиры, T½, стационарный уровень, гепатотоксичность и пути метаболизма', tags: ['фармакология', 'ААС', 'PK/PD'], publishedAt: '2026-05-15',
-  },
-  {
-    id: 'seed-3', title: 'Анализ крови: что показывают ключевые biomarkers',
-    content: 'Расшифровка результатов лабораторных анализов для оптимизации здоровья. Ключевые панели: гематология (HGB, HCT, RBC), гепатология (ALT, AST, GGT, билирубин), липиды (ОХС, ЛПНП, ЛПВП, ТГ), эндокринология (TT, FT, E2, PRL, LH, FSH, TSH), почки (креатинин, eGFR, мочевина). Референсные диапазоны зависят от фазы (базовая линия, курс, ПКТ). Индекс HOMA-IR для оценки инсулинорезистентности.',
-    category: 'labs', authorId: 'lab-spec', authorName: 'Lab Specialist',
-    createdAt: '2026-05-10', updatedAt: '2026-05-10', version: 1, likes: 35, views: 1050, isPinned: false,
-    status: 'published', teaser: 'Расшифровка гематологии, гепатологии, липидов и эндокринологии', tags: ['анализы', 'biomarkers', 'здоровье'], publishedAt: '2026-05-10',
-  },
-];
+  return `<div style="line-height:1.7;font-size:13px">${html}</div>`;
+}
 
 export const ArticlesScreen: React.FC = () => {
-  const [articles, setArticles] = useState<Article[]>([]);
-  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [category, setCategory] = useState<string>('all');
-  const [statusFilter, setStatusFilter] = useState<ArticleStatus | 'all'>('all');
-  const [currentUser, setCurrentUser] = useState<LocalUserProfile | null>(null);
-  const [isAdmin, setIsAdmin] = useState(false);
+  const [category, setCategory] = useState('all');
   const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [editingArticle, setEditingArticle] = useState<Article | null>(null);
-  const [showCreate, setShowCreate] = useState(false);
-  const [newTitle, setNewTitle] = useState('');
-  const [newContent, setNewContent] = useState('');
-  const [newCategory, setNewCategory] = useState('nutrition');
-  const [newTags, setNewTags] = useState('');
+  const [pdfViewer, setPdfViewer] = useState<string | null>(null);
 
-  useEffect(() => {
-    (async () => {
-      try {
-        await db.init();
-        const stored: Article[] = await db.getAll('articles') ?? [];
-        if (stored.length === 0) {
-          for (const a of SEED_ARTICLES) await db.put('articles', a);
-          setArticles(SEED_ARTICLES);
-        } else {
-          setArticles(stored);
-        }
-      } catch {
-        setArticles(SEED_ARTICLES);
-      }
-      try {
-        const profile = await getCurrentProfile();
-        setCurrentUser(profile);
-        setIsAdmin(profile?.role === 'admin' || profile?.role === 'editor');
-      } catch {}
-      setLoading(false);
-    })();
-  }, []);
+  const articles = useMemo(() => {
+    let list = getSortedArticles();
+    if (category !== 'all') list = list.filter(a => a.category === category);
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      list = list.filter(a =>
+        a.title.toLowerCase().includes(q) ||
+        a.description.toLowerCase().includes(q) ||
+        a.tags.some(t => t.includes(q))
+      );
+    }
+    return list;
+  }, [category, search]);
 
-  const saveArticles = async (updated: Article[]) => {
-    setArticles(updated);
-    try { for (const a of updated) await db.put('articles', a); } catch {}
+  const toggle = (id: string) => setExpandedId(expandedId === id ? null : id);
+
+  const openPDF = (url: string) => {
+    const tg = (window as any).Telegram?.WebApp;
+    if (tg?.openLink) {
+      tg.openLink(window.location.origin + url);
+    } else {
+      window.open(url, '_blank');
+    }
   };
-
-  const published = filterArticles(articles, { status: 'published', category: category === 'all' ? undefined : category, search: search || undefined });
-  const adminArticles = isAdmin ? filterArticles(articles, { status: statusFilter === 'all' ? undefined : statusFilter, category: category === 'all' ? undefined : category, search: search || undefined }) : [];
-
-  const handleCreate = () => {
-    if (!newTitle.trim() || !newContent.trim()) return;
-    const article = createArticle({
-      title: newTitle.trim(),
-      content: newContent.trim(),
-      category: newCategory,
-      authorId: currentUser?.id ?? 'anonymous',
-      authorName: currentUser?.name ?? 'Аноним',
-      tags: newTags.split(',').map(t => t.trim()).filter(Boolean),
-      teaser: newContent.trim().substring(0, 150),
-      status: 'draft',
-    });
-    saveArticles([...articles, article]);
-    setNewTitle(''); setNewContent(''); setNewCategory('nutrition'); setNewTags(''); setShowCreate(false);
-  };
-
-  const handleSubmitReview = (article: Article) => {
-    const updated = submitForReview(article, currentUser?.id ?? 'anonymous');
-    saveArticles(articles.map(a => a.id === updated.id ? updated : a));
-  };
-
-  const handleApprove = (article: Article) => {
-    const updated = processReview(article, currentUser?.id ?? 'admin', 'approve');
-    saveArticles(articles.map(a => a.id === updated.id ? updated : a));
-  };
-
-  const handleReject = (article: Article) => {
-    const updated = processReview(article, currentUser?.id ?? 'admin', 'reject');
-    saveArticles(articles.map(a => a.id === updated.id ? updated : a));
-  };
-
-  if (loading) return <div className="screen articles"><div className="loading-spinner" /></div>;
 
   return (
-    <div className="screen articles">
-      <div className="articles-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
-        <h2 style={{ margin: 0 }}>База знаний</h2>
-        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-          <input type="text" placeholder="Поиск статей..." value={search} onChange={e => setSearch(e.target.value)} style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg-secondary)', color: 'var(--text)', fontSize: 13 }} />
-          <select value={category} onChange={e => setCategory(e.target.value)} style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg-secondary)', color: 'var(--text)', fontSize: 13 }}>
-            <option value="all">Все категории</option>
-            {CATEGORIES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
-          </select>
-          {isAdmin && (
-            <select value={statusFilter} onChange={e => setStatusFilter(e.target.value as any)} style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg-secondary)', color: 'var(--text)', fontSize: 13 }}>
-              <option value="all">Все статусы</option>
-              <option value="draft">Черновики</option>
-              <option value="review">На ревью</option>
-              <option value="published">Опубликованные</option>
-              <option value="archived">Архив</option>
-            </select>
-          )}
-          {isAdmin && (
-            <button onClick={() => setShowCreate(true)} style={{ background: 'var(--accent)', color: '#000', border: 'none', borderRadius: 8, padding: '6px 14px', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>+ Создать</button>
-          )}
-        </div>
+    <div className="screen">
+      <h2 style={{ margin: '0 0 8px', fontSize: 'clamp(15,4vw,18)' }}>📚 Статьи</h2>
+
+      {/* Filters */}
+      <div style={{ display: 'flex', gap: 6, marginBottom: 8, flexWrap: 'wrap' }}>
+        <input
+          type="text" value={search} onChange={e => setSearch(e.target.value)}
+          placeholder="🔍 Поиск по статьям..."
+          style={{ flex: 1, minWidth: 140, padding: '8px 10px', borderRadius: 8, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12 }}
+        />
+      </div>
+      <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 10 }}>
+        {CATEGORIES.map(c => (
+          <button key={c.value} onClick={() => setCategory(c.value)} style={{
+            padding: '5px 12px', borderRadius: 16, fontSize: 11, cursor: 'pointer',
+            background: category === c.value ? 'rgba(0,230,138,0.12)' : 'var(--bg-secondary)',
+            color: category === c.value ? 'var(--accent)' : 'var(--text-dim)',
+            border: `1px solid ${category === c.value ? 'var(--accent)' : 'var(--border)'}`,
+            fontWeight: category === c.value ? 600 : 400,
+          }}>{c.label}</button>
+        ))}
       </div>
 
-      {showCreate && (
-        <div style={{ background: 'var(--bg-secondary)', borderRadius: 12, padding: 16, marginBottom: 16 }}>
-          <h3 style={{ margin: '0 0 12px' }}>Новая статья</h3>
-          <input type="text" placeholder="Заголовок" value={newTitle} onChange={e => setNewTitle(e.target.value)} style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg-primary)', color: 'var(--text)', fontSize: 14, marginBottom: 8, boxSizing: 'border-box' }} />
-          <select value={newCategory} onChange={e => setNewCategory(e.target.value)} style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg-primary)', color: 'var(--text)', fontSize: 13, marginBottom: 8 }}>
-            {CATEGORIES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
-          </select>
-          <textarea placeholder="Содержание..." value={newContent} onChange={e => setNewContent(e.target.value)} rows={6} style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg-primary)', color: 'var(--text)', fontSize: 13, marginBottom: 8, boxSizing: 'border-box', resize: 'vertical' }} />
-          <input type="text" placeholder="Теги (через запятую)" value={newTags} onChange={e => setNewTags(e.target.value)} style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg-primary)', color: 'var(--text)', fontSize: 13, marginBottom: 8, boxSizing: 'border-box' }} />
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button onClick={handleCreate} style={{ background: 'var(--accent)', color: '#000', border: 'none', borderRadius: 8, padding: '8px 20px', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>Сохранить черновик</button>
-            <button onClick={() => setShowCreate(false)} style={{ background: 'var(--bg-tertiary)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: 8, padding: '8px 20px', fontSize: 13, cursor: 'pointer' }}>Отмена</button>
+      {/* PDF Viewer Modal */}
+      {pdfViewer && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 300, background: 'rgba(0,0,0,0.85)',
+          display: 'flex', flexDirection: 'column',
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 14px', background: 'var(--bg)' }}>
+            <span style={{ fontWeight: 600, fontSize: 13 }}>📄 PDF Документ</span>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button onClick={() => openPDF(pdfViewer)} style={{
+                padding: '5px 14px', borderRadius: 6, background: 'var(--accent)', color: '#000', border: 'none', fontWeight: 600, fontSize: 11, cursor: 'pointer',
+              }}>Открыть</button>
+              <button onClick={() => setPdfViewer(null)} style={{
+                padding: '5px 14px', borderRadius: 6, background: 'var(--bg-secondary)', color: 'var(--text-dim)', border: '1px solid var(--border)', fontSize: 11, cursor: 'pointer',
+              }}>✕ Закрыть</button>
+            </div>
+          </div>
+          <div style={{ flex: 1, padding: 16, textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12 }}>
+            <div style={{ fontSize: 48 }}>📄</div>
+            <div style={{ fontSize: 14, color: 'var(--text)' }}>PDF документ доступен для скачивания</div>
+            <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>Нажмите «Открыть» для просмотра в браузере или скачивания</div>
           </div>
         </div>
       )}
 
-      {isAdmin && statusFilter !== 'all' && adminArticles.length > 0 && (
-        <div style={{ marginBottom: 16 }}>
-          <h3 style={{ marginBottom: 8, fontSize: 14, color: 'var(--text-dim)' }}>Модерация ({STATUS_LABELS[statusFilter as ArticleStatus] ?? statusFilter})</h3>
-          {adminArticles.map(a => (
-            <div key={a.id} style={{ background: 'var(--bg-secondary)', borderRadius: 10, padding: 12, marginBottom: 8 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div>
-                  <span style={{ fontWeight: 600, fontSize: 14 }}>{a.title}</span>
-                  <span style={{ fontSize: 11, marginLeft: 8, padding: '2px 6px', borderRadius: 4, background: STATUS_COLORS[a.status] + '22', color: STATUS_COLORS[a.status] }}>{STATUS_LABELS[a.status]}</span>
+      {/* Articles list */}
+      {articles.length === 0 && (
+        <div className="card" style={{ textAlign: 'center', padding: 30 }}>
+          <div style={{ fontSize: 32, marginBottom: 8 }}>📭</div>
+          <div style={{ fontSize: 13, color: 'var(--text-dim)' }}>Статьи не найдены</div>
+        </div>
+      )}
+
+      {articles.map(article => {
+        const isExpanded = expandedId === article.id;
+        return (
+          <div key={article.id} className="card" style={{ marginBottom: 8, padding: '10px 12px' }}>
+            <div onClick={() => {
+              if (article.content_type === 'pdf') {
+                setPdfViewer(article.file_url || '');
+              } else {
+                toggle(article.id);
+              }
+            }} style={{ cursor: 'pointer' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 }}>
+                <div style={{ flex: 1 }}>
+                  <span style={{ fontWeight: 600, fontSize: 13 }}>
+                    {article.content_type === 'pdf' ? '📄 ' : '📝 '}
+                    {article.title}
+                  </span>
+                  <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 2 }}>
+                    {article.description}
+                  </div>
                 </div>
-                <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>{a.authorName ?? a.authorId} · {new Date(a.updatedAt).toLocaleDateString()}</span>
+                <span style={{
+                  padding: '2px 8px', borderRadius: 4, fontSize: 9, whiteSpace: 'nowrap',
+                  background: article.content_type === 'pdf' ? 'rgba(239,68,68,0.1)' : 'rgba(0,230,138,0.08)',
+                  color: article.content_type === 'pdf' ? '#ef4444' : 'var(--accent)',
+                }}>
+                  {article.content_type === 'pdf' ? 'PDF' : 'Статья'}
+                </span>
               </div>
-              <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 4 }}>{a.teaser}</div>
-              <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
-                {a.status === 'draft' && <button onClick={() => handleSubmitReview(a)} style={{ background: '#2196f3', color: '#fff', border: 'none', borderRadius: 6, padding: '4px 12px', fontSize: 12, cursor: 'pointer' }}>На ревью</button>}
-                {a.status === 'review' && <button onClick={() => handleApprove(a)} style={{ background: '#4caf50', color: '#fff', border: 'none', borderRadius: 6, padding: '4px 12px', fontSize: 12, cursor: 'pointer' }}>Одобрить</button>}
-                {a.status === 'review' && <button onClick={() => handleReject(a)} style={{ background: '#f44336', color: '#fff', border: 'none', borderRadius: 6, padding: '4px 12px', fontSize: 12, cursor: 'pointer' }}>Отклонить</button>}
-                <button onClick={() => setExpandedId(expandedId === a.id ? null : a.id)} style={{ background: 'var(--bg-tertiary)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: 6, padding: '4px 12px', fontSize: 12, cursor: 'pointer' }}>{expandedId === a.id ? 'Свернуть' : 'Читать'}</button>
+              <div style={{ display: 'flex', gap: 8, fontSize: 9, color: 'var(--text-dim)' }}>
+                <span>{article.date}</span>
+                <span>{article.authorName}</span>
+                <span>{CATEGORIES.find(c => c.value === article.category)?.label || article.category}</span>
               </div>
-              {expandedId === a.id && <div style={{ marginTop: 8, fontSize: 13, lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>{a.content}</div>}
             </div>
-          ))}
-        </div>
-      )}
 
-      <div className="articles-grid" style={{ display: 'grid', gap: 12 }}>
-        {published.map(article => (
-          <div key={article.id} className="article-card" style={{ background: 'var(--bg-secondary)', borderRadius: 12, padding: 16 }}>
-            {article.isPinned && <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 4, background: 'rgba(0,230,138,0.15)', color: 'var(--accent)', fontWeight: 700, marginBottom: 4, display: 'inline-block' }}>Закреплено</span>}
-            <h3 style={{ margin: '0 0 4px', fontSize: 16 }}>{article.title}</h3>
-            <p style={{ fontSize: 12, color: 'var(--text-dim)', margin: '0 0 8px' }}>
-              <span>{article.authorName ?? article.authorId}</span> · <span>{new Date(article.publishedAt ?? article.createdAt).toLocaleDateString()}</span> · <span>{CATEGORIES.find(c => c.value === article.category)?.label ?? article.category}</span>
-            </p>
-            <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 8 }}>
-              {article.tags.map(tag => (
-                <span key={tag} style={{ fontSize: 11, padding: '1px 6px', borderRadius: 4, background: 'var(--bg-tertiary)', color: 'var(--text-dim)' }}>{tag}</span>
-              ))}
-            </div>
-            <p style={{ fontSize: 13, color: 'var(--text-dim)', lineHeight: 1.5, margin: '0 0 8px' }}>
-              {expandedId === article.id ? article.content : article.teaser || article.content.substring(0, 200) + '...'}
-            </p>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <button onClick={() => setExpandedId(expandedId === article.id ? null : article.id)} style={{ background: 'none', border: '1px solid var(--accent)', borderRadius: 6, color: 'var(--accent)', padding: '4px 14px', fontSize: 12, cursor: 'pointer' }}>
-                {expandedId === article.id ? 'Свернуть' : 'Читать далее →'}
-              </button>
-              <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>{article.views} просмотров · {article.likes} лайков</span>
-            </div>
+            {/* Expanded MD content */}
+            {isExpanded && article.content && (
+              <div style={{
+                marginTop: 10, padding: '10px 12px', borderRadius: 8,
+                background: 'var(--bg-secondary)', borderTop: '1px solid var(--border)',
+              }}>
+                <div dangerouslySetInnerHTML={{ __html: renderMarkdown(article.content) }} />
+                {article.tags.length > 0 && (
+                  <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 8 }}>
+                    {article.tags.map(t => (
+                      <span key={t} style={{ padding: '2px 8px', borderRadius: 10, background: 'rgba(0,230,138,0.06)', color: 'var(--accent)', fontSize: 9 }}>
+                        #{t}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
-        ))}
-        {published.length === 0 && (
-          <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-dim)' }}><p>Статей не найдено. Попробуйте изменить фильтры.</p></div>
-        )}
+        );
+      })}
+
+      {/* Stats */}
+      <div className="card" style={{ marginTop: 8, padding: '8px 12px', textAlign: 'center', fontSize: 10, color: 'var(--text-dim)' }}>
+        {ARTICLES_MANIFEST.length} статей в библиотеке · {ARTICLES_MANIFEST.filter(a => a.content_type === 'pdf').length} PDF · {ARTICLES_MANIFEST.filter(a => a.content_type === 'markdown').length} Markdown
       </div>
     </div>
   );
