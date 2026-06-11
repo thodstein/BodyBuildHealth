@@ -21,6 +21,8 @@ import { calculateWeeklyRiskDynamics, type WeeklyRiskDynamics } from '../../engi
 import { useV7Risk } from '../hooks/useV7Risk';
 import { getProfile, updateProfile } from '../../core/profile-manager';
 import { analyzeWithCompliance, type ComplianceReport, getComplianceStatus } from '../../engines/compliance-engine';
+import { analyzeClinicalRisks, type ClinicalAnalysisOutput } from '../../engines/clinical-analyzer.engine';
+import { SYSTEM_GROUPS } from '../../data/clinical-pathology-db';
 
 const RISK_HISTORY_KEY = 'risk_history';
 const MAX_HISTORY = 12;
@@ -41,12 +43,13 @@ const TAB_LABELS: Record<string, string> = {
   model: '🧍 3D Модель',
   mdss: '🧬 MDSS',
   compliance: '🕒 Комплаенс',
+  clinical: '🏥 Клиника',
   info: 'ℹ️ Инфо',
 };
 
 export const RiskScreen: React.FC = () => {
   const linked = useDataLink();
-  const [tab, setTab] = useState<'overview' | 'dynamics' | 'mechanisms' | 'v7' | 'model' | 'info' | 'mdss' | 'compliance'>('overview');
+  const [tab, setTab] = useState<'overview' | 'dynamics' | 'mechanisms' | 'v7' | 'model' | 'info' | 'mdss' | 'compliance' | 'clinical'>('overview');
   const [tick, setTick] = useState(0);
   const [selectedWeek, setSelectedWeek] = useState<number | null>(null);
   const [weekMode, setWeekMode] = useState<'week' | 'average'>('average');
@@ -291,6 +294,7 @@ export const RiskScreen: React.FC = () => {
       case 'info': return <RiskInfo />;
       case 'mdss': return <MDSSRiskDisplay />;
       case 'compliance': return <ComplianceDisplay />;
+      case 'clinical': return <ClinicalRiskDisplay />;
       default: return <RiskOverview riskResult={riskResult} globalNoLabs={globalNoLabs} noLabsSystems={noLabsSystems} labRiskContributions={labRiskContributions} riskHistory={riskHistory} aggregatedRisk={aggregatedRisk} />;
     }
   };
@@ -299,7 +303,7 @@ export const RiskScreen: React.FC = () => {
     <div className="screen risk">
       <h2 style={{ margin: '0 0 6px', fontSize: 'clamp(16, 4.5vw, 18)' }}>⚠️ Риски</h2>
       <div style={{ display: 'flex', gap: 3, overflowX: 'auto', marginBottom: 12, scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' }}>
-        {(['overview', 'dynamics', 'mechanisms', 'v7', 'model', 'mdss', 'compliance', 'info'] as const).map(t => (
+        {(['overview', 'dynamics', 'mechanisms', 'v7', 'model', 'mdss', 'compliance', 'clinical', 'info'] as const).map(t => (
           <button key={t} onClick={() => setTab(t)} style={{
             flex: '0 0 auto', padding: '8px 14px', borderRadius: 8, fontSize: 12, fontWeight: tab === t ? 700 : 400,
             whiteSpace: 'nowrap', cursor: 'pointer', transition: 'all 0.15s',
@@ -763,6 +767,90 @@ const ComplianceDisplay: React.FC = () => {
               : 'Анализы не найдены. Система применит максимальный штраф.'}
           </div>
         </div>
+      )}
+    </div>
+  );
+};
+
+// ── Clinical Risk Display ──
+const ClinicalRiskDisplay: React.FC = () => {
+  const linked = useDataLink();
+  const course = linked.course || [];
+  const labs = linked.labs || [];
+  const s = linked.profile?.settings;
+  const [result, setResult] = useState<ClinicalAnalysisOutput | null>(null);
+
+  const handleAnalyze = () => {
+    const compounds = course.map(c => c.substanceId.toLowerCase());
+    const markers = labs.map(l => ({ code: l.code || l.name, value: l.value }));
+    const genetics = Object.keys(s?.genetics || {}).filter(k => !!(s?.genetics as any)?.[k]);
+    const labDates = labs.map(l => l.date).filter(Boolean).sort().reverse();
+    const weeksSinceLab = labDates[0] ? (Date.now() - new Date(labDates[0]).getTime()) / (7 * 24 * 3600 * 1000) : 52;
+    const tWeeks = course.length > 0 ? course.reduce((max, c) => Math.max(max, (c.endWeek || 12) - (c.startWeek || 0)), 0) : 4;
+
+    setResult(analyzeClinicalRisks({ compounds, markers, tWeeks: Math.max(1, tWeeks), weeksSinceLab, genetics }));
+  };
+
+  useEffect(() => { handleAnalyze(); }, []);
+
+  const zoneColors: Record<number, string> = { 0: '#22c55e', 1: '#eab308', 2: '#f97316', 3: '#ef4444' };
+
+  return (
+    <div>
+      <div className="card" style={{ marginBottom: 12 }}>
+        <h3 style={{ margin: '0 0 4px 0' }}>🏥 Клинические патологии</h3>
+        <p style={{ fontSize: 11, color: 'var(--text-dim)', margin: 0 }}>
+          28 патологий в 8 системах. Hill → MC (10K) → Sigmoid. Связь препарат→патология из клинической базы.
+        </p>
+      </div>
+
+      {!result && (
+        <button onClick={handleAnalyze} style={{ width: '100%', padding: 10, borderRadius: 8, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg, #ec4899, #8b5cf6)', color: '#fff', fontWeight: 700, fontSize: 14, marginBottom: 8 }}>
+          ▶ Запустить клинический анализ
+        </button>
+      )}
+
+      {result && (
+        <>
+          <div className="card" style={{ marginBottom: 10, textAlign: 'center' }}>
+            <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>Максимальный риск</div>
+            <div style={{ fontSize: 32, fontWeight: 800, color: result.overallMaxRisk >= 80 ? '#ef4444' : result.overallMaxRisk >= 50 ? '#f97316' : '#22c55e' }}>
+              {result.overallMaxRisk}%
+            </div>
+            <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>{result.markersAnalyzed} маркеров · {result.results.length} патологий</div>
+          </div>
+          <button onClick={handleAnalyze} style={{ width: '100%', padding: 6, borderRadius: 6, border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-dim)', cursor: 'pointer', fontSize: 10, marginBottom: 8 }}>
+            🔄 Пересчитать
+          </button>
+
+          {result.systems.map(system => (
+            <details key={system.systemKey} style={{ marginBottom: 8 }}>
+              <summary style={{ padding: '8px 10px', borderRadius: 8, cursor: 'pointer', background: 'var(--bg-secondary)', border: '1px solid var(--border)', fontSize: 12, fontWeight: 600, listStyle: 'none', display: 'flex', alignItems: 'center', gap: 6 }}>
+                {system.icon} {system.systemName}
+                <span style={{ marginLeft: 'auto', padding: '2px 8px', borderRadius: 4, fontSize: 10, background: system.maxRisk >= 80 ? 'rgba(239,68,68,0.12)' : system.maxRisk >= 50 ? 'rgba(249,115,22,0.12)' : 'rgba(0,230,138,0.08)', color: system.maxRisk >= 80 ? '#ef4444' : system.maxRisk >= 50 ? '#f97316' : '#00e68a', fontWeight: 600 }}>
+                  {Math.round(system.maxRisk)}%
+                </span>
+              </summary>
+              <div style={{ padding: '4px 0 0 4px' }}>
+                {system.pathologies.map(r => (
+                  <div key={r.pathologyId} className="card" style={{ marginBottom: 4, borderLeft: `3px solid ${zoneColors[r.alertLevel]}`, padding: '6px 8px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, marginBottom: 2 }}>
+                      <span style={{ fontWeight: 600 }}>{r.pathologyName}</span>
+                      <span style={{ padding: '1px 5px', borderRadius: 3, background: `${zoneColors[r.alertLevel]}18`, color: zoneColors[r.alertLevel], fontWeight: 600, fontSize: 9 }}>{r.riskPercent}%</span>
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 3, fontSize: 8, color: 'var(--text-dim)' }}>
+                      <div>Hill: {r.hillScore}</div><div>MC95: {r.severity95}</div><div>Маркеры: {r.markersUsed.length}</div>
+                    </div>
+                    {r.contributingCompounds.length > 0 && (
+                      <div style={{ fontSize: 8, color: '#8b5cf6', marginTop: 2 }}>Препараты: {r.contributingCompounds.join(', ')}</div>
+                    )}
+                    {r.alertLevel >= 2 && <div style={{ fontSize: 8, color: '#f97316', marginTop: 2 }}>🔬 {r.instrumental}</div>}
+                  </div>
+                ))}
+              </div>
+            </details>
+          ))}
+        </>
       )}
     </div>
   );

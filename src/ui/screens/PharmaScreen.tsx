@@ -14,6 +14,8 @@ import { mapStackToPathologies, getKnownDrugNames, DRUG_DATABASE } from '../../e
 import type { DrugEntry, MapperResult } from '../../engines/drug-mapper.engine';
 import { runAdvancedDiagnostics, ESTER_HALF_LIFE_DAYS } from '../../engines/advanced-diagnostics.engine';
 import type { DrugDoseInput, VitalsInput, AdvancedDiagnosticsResult, PKPDOutput, InteractionOutput, VitalsOutput, BioAgeOutput, PCTRebootOutput } from '../../engines/advanced-diagnostics.engine';
+import { analyzeClinicalRisks, type ClinicalAnalysisOutput, type PathologyResult } from '../../engines/clinical-analyzer.engine';
+import { COMPOUND_RISK_MAP, SYSTEM_GROUPS } from '../../data/clinical-pathology-db';
 
 type Tab = 'catalog' | 'pkpd' | 'dosage' | 'interactions' | 'course' | 'mapper' | 'diagnostics';
 
@@ -1346,6 +1348,7 @@ const MapperTab: React.FC = () => {
   const [newDrugName, setNewDrugName] = useState('');
   const [newDrugDose, setNewDrugDose] = useState(0);
   const [mapperResult, setMapperResult] = useState<MapperResult | null>(null);
+  const [clinicalResult, setClinicalResult] = useState<ClinicalAnalysisOutput | null>(null);
   const [useCourse, setUseCourse] = useState(true);
 
   const knownNames = useMemo(() => getKnownDrugNames(), []);
@@ -1368,6 +1371,32 @@ const MapperTab: React.FC = () => {
       : [...manualDrugs];
     if (drugs.length === 0) return;
     setMapperResult(mapStackToPathologies(drugs));
+
+    // Also run clinical analysis
+    const compoundNames = course.length > 0
+      ? course.map(c => c.substanceId.toLowerCase())
+      : manualDrugs.map(d => d.name);
+    const markers = (linked.labs || []).map(l => ({
+      code: l.code || l.name,
+      value: l.value,
+    }));
+    const s = linked.profile?.settings;
+    const genetics = Object.keys(s?.genetics || {}).filter(k => !!(s?.genetics as any)?.[k]);
+    const labDates = (linked.labs || []).map(l => l.date).filter(Boolean).sort().reverse();
+    const weeksSinceLab = labDates[0]
+      ? (Date.now() - new Date(labDates[0]).getTime()) / (7 * 24 * 3600 * 1000)
+      : 52;
+    const tWeeks = course.length > 0
+      ? course.reduce((max, c) => Math.max(max, (c.endWeek || 12) - (c.startWeek || 0)), 0)
+      : 4;
+
+    setClinicalResult(analyzeClinicalRisks({
+      compounds: compoundNames,
+      markers,
+      tWeeks: Math.max(1, tWeeks),
+      weeksSinceLab,
+      genetics,
+    }));
   };
 
   const addManualDrug = () => {
@@ -1541,7 +1570,82 @@ const MapperTab: React.FC = () => {
         </>
       )}
 
-      {!mapperResult && (
+      {/* ── Clinical Pathology Analysis ── */}
+      {clinicalResult && clinicalResult.results.length > 0 && (
+        <div style={{ marginTop: 8 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6, color: '#ec4899' }}>
+            🏥 Клинические патологии ({clinicalResult.results.length})
+          </div>
+
+          {/* Summary */}
+          <div className="card" style={{
+            marginBottom: 10, padding: '8px 12px',
+            background: clinicalResult.overallMaxRisk >= 80 ? 'rgba(239,68,68,0.08)' :
+              clinicalResult.overallMaxRisk >= 50 ? 'rgba(249,115,22,0.06)' : 'rgba(0,230,138,0.04)',
+            borderLeft: `3px solid ${clinicalResult.overallMaxRisk >= 80 ? '#ef4444' : clinicalResult.overallMaxRisk >= 50 ? '#f97316' : '#00e68a'}`,
+          }}>
+            <div style={{ fontSize: 11 }}>{clinicalResult.summary}</div>
+            <div style={{ display: 'flex', gap: 10, marginTop: 2, fontSize: 9, color: 'var(--text-dim)' }}>
+              <span>🧪 {clinicalResult.markersAnalyzed} маркеров</span>
+              <span>📋 {clinicalResult.requiredLabPanel.length} в панели</span>
+              <span>🔬 {clinicalResult.requiredInstrumental.length} исследований</span>
+            </div>
+          </div>
+
+          {/* Per-system accordion */}
+          {clinicalResult.systems.map(system => (
+            <details key={system.systemKey} style={{ marginBottom: 6 }}>
+              <summary style={{
+                padding: '6px 10px', borderRadius: 8, cursor: 'pointer',
+                background: 'var(--bg-secondary)', border: '1px solid var(--border)',
+                fontSize: 11, fontWeight: 600, listStyle: 'none',
+                display: 'flex', alignItems: 'center', gap: 6,
+              }}>
+                {system.icon} {system.systemName}
+                <span style={{
+                  marginLeft: 'auto', padding: '1px 6px', borderRadius: 4, fontSize: 10,
+                  background: system.maxRisk >= 80 ? 'rgba(239,68,68,0.15)' :
+                    system.maxRisk >= 50 ? 'rgba(249,115,22,0.15)' : 'rgba(0,230,138,0.10)',
+                  color: system.maxRisk >= 80 ? '#ef4444' : system.maxRisk >= 50 ? '#f97316' : '#00e68a',
+                }}>{Math.round(system.maxRisk)}%</span>
+                <span style={{ fontSize: 9, color: 'var(--text-dim)' }}>({system.pathologies.length})</span>
+              </summary>
+              <div style={{ padding: '4px 0 0 8px' }}>
+                {system.pathologies.map(r => {
+                  const zoneColor = r.alertLevel >= 3 ? '#ef4444' : r.alertLevel >= 2 ? '#f97316' : r.alertLevel >= 1 ? '#eab308' : '#22c55e';
+                  return (
+                    <div key={r.pathologyId} style={{
+                      marginBottom: 6, padding: '6px 8px', borderRadius: 6,
+                      background: 'rgba(255,255,255,0.02)', borderLeft: `3px solid ${zoneColor}`,
+                    }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, marginBottom: 3 }}>
+                        <span style={{ fontWeight: 600 }}>{r.pathologyName}</span>
+                        <span style={{ padding: '1px 5px', borderRadius: 3, background: `${zoneColor}20`, color: zoneColor, fontWeight: 600, fontSize: 9 }}>
+                          {r.riskPercent}% — {r.status.split('(')[0].trim()}
+                        </span>
+                      </div>
+                      <div style={{ display: 'flex', gap: 8, fontSize: 8, color: 'var(--text-dim)' }}>
+                        <span>Hill: {r.hillScore}</span>
+                        <span>MC95: {r.severity95}</span>
+                        {r.contributingCompounds.length > 0 && (
+                          <span>Препараты: {r.contributingCompounds.join(', ')}</span>
+                        )}
+                      </div>
+                      {r.alertLevel >= 2 && (
+                        <div style={{ marginTop: 3, fontSize: 9, color: '#f97316' }}>
+                          🔬 {r.instrumental}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </details>
+          ))}
+        </div>
+      )}
+
+      {!mapperResult && !clinicalResult && (
         <div className="card" style={{ textAlign: 'center', padding: 24 }}>
           <div style={{ fontSize: 32, marginBottom: 8 }}>🧬</div>
           <div style={{ fontSize: 13, color: 'var(--text-dim)' }}>

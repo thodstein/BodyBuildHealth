@@ -186,24 +186,27 @@ export function generateTrainingPlan(input: PipelineInput): PipelineOutput {
       const groups = bestSplit.groupsPerDay[dayIdx % bestSplit.groupsPerDay.length] || [];
 
       const exerciseGenInput = {
-        sessionFocus: goal,
+        slots: groups.map((g: string, i: number) => ({
+          pattern: (['horizontal_push','horizontal_pull','squat','hinge','vertical_push','vertical_pull','accessory'] as const)[i % 7],
+          role: (i === 0 ? 'main' : i === 1 ? 'secondary' : 'accessory') as 'main' | 'secondary' | 'accessory',
+          priority: i + 1,
+        })),
         goal,
         equipmentAvailable: input.equipmentAvailable || ['barbell', 'dumbbell', 'bench', 'cable'],
         weakPoints,
         techniqueIssues: input.techniqueIssues || [],
-        riskFlags: input.riskFlags || {},
-        injuries: (injuries || []).map(i => ({ joint: i.location, severity: injuryToSeverity(i.movementLimit) })),
-        jointLimitations: input.jointLimitations || {},
-        userLevel: level,
+        riskSnapshot: input.riskFlags || {},
+        exerciseDB: [],
       };
       const genOutput = generateExercises(exerciseGenInput);
 
       const exercises: PipelineExercise[] = [];
-      for (const slot of genOutput.exerciseSlots) {
+      for (const entry of genOutput.selectedExercises) {
+        const slot = entry.exercise;
         const sets = autoAdjustment.adjustmentFactor < 0.7 ? 3 : autoAdjustment.adjustmentFactor < 0.9 ? 4 : 5;
         exercises.push({
-          exerciseId: slot.exerciseId,
-          name: slot.exerciseId,
+          exerciseId: slot.id,
+          name: slot.name,
           group: groups[0] || 'chest',
           sets: Math.max(2, Math.round(sets * weekPlan.volumeMultiplier)),
           repsMin: goal === 'strength' ? 3 : goal === 'hypertrophy' || goal === 'bulk' ? 8 : 10,
@@ -211,13 +214,12 @@ export function generateTrainingPlan(input: PipelineInput): PipelineOutput {
           rir: weekPlan.rirBase,
           rest: goal === 'strength' ? 180 : 90,
           isCompound: true,
-          comments: slot.targetWeakPoint ? `Акцент: ${slot.targetWeakPoint}` : undefined,
         });
       }
 
       const warmupBlocks = generateWarmup({
         sessionFocus: goal,
-        primaryExercises: genOutput.exerciseSlots.map(s => s.exerciseId),
+        primaryExercises: genOutput.selectedExercises.map(s => s.exercise.id),
         riskFlags: input.riskFlags || {},
         techniqueIssues: input.techniqueIssues || [],
         fatigueLevel: input.fatigue / 100,
