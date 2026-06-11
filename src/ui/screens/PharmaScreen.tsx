@@ -514,6 +514,7 @@ const PKPDSimulationTab: React.FC = () => {
     peak: number; trough: number; ssDays: number;
   } | null>(null);
   const [pkSearch, setPkSearch] = useState('');
+  const [pkClass, setPkClass] = useState<string>('');
   const [showAllDrugs, setShowAllDrugs] = useState(true);
   const [visibleDrugs, setVisibleDrugs] = useState<Set<string>>(new Set());
 
@@ -522,10 +523,23 @@ const PKPDSimulationTab: React.FC = () => {
   }, []);
 
   const pkFiltered = useMemo(() => {
-    if (!pkSearch.trim()) return [];
+    if (!pkSearch.trim() && !pkClass) return [];
     const q = pkSearch.toLowerCase();
-    return allSubstances.filter(s => s.name.toLowerCase().includes(q) || s.id.toLowerCase().includes(q));
-  }, [pkSearch, allSubstances]);
+    let list = allSubstances;
+    if (pkClass) list = list.filter(s => s.class === pkClass);
+    if (pkSearch.trim()) list = list.filter(s => s.name.toLowerCase().includes(q) || s.id.toLowerCase().includes(q));
+    return list;
+  }, [pkSearch, pkClass, allSubstances]);
+
+  // Class-grouped substances for quick-pick
+  const substancesByClass = useMemo(() => {
+    const map: Record<string, typeof allSubstances> = {};
+    for (const s of allSubstances) {
+      if (!map[s.class]) map[s.class] = [];
+      map[s.class].push(s);
+    }
+    return map;
+  }, [allSubstances]);
 
   const unusedSubstances = useMemo(() => {
     const used = new Set(drugDoses.map(d => d.substanceId));
@@ -734,39 +748,52 @@ const PKPDSimulationTab: React.FC = () => {
         })}
       </div>
 
-      {/* Searchable drug adder — grid of cards like Dosage tab */}
+      {/* Class-picker chips for quick drug selection */}
       <div className="card" style={{ marginBottom: 12 }}>
-        <input type="text" value={pkSearch} onChange={e => setPkSearch(e.target.value)}
-          placeholder="🔍 Поиск препарата для добавления..."
-          style={{ width: '100%', padding: '8px 10px', borderRadius: 8, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, marginBottom: 8, boxSizing: 'border-box' }} />
-        {pkSearch && pkFiltered.length > 0 ? (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 4, maxHeight: 200, overflowY: 'auto' }}>
+        <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-dim)', marginBottom: 6 }}>Выберите класс препарата:</div>
+        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 6 }}>
+          {Object.entries(CLASS_LABELS).map(([cls, label]) => (
+            <button key={cls} onClick={() => { setPkClass(pkClass === cls ? '' : cls); setPkSearch(''); }} style={{
+              padding: '5px 10px', borderRadius: 16, fontSize: 10, cursor: 'pointer', fontWeight: pkClass === cls ? 700 : 400,
+              background: pkClass === cls ? 'rgba(0,230,138,0.15)' : 'var(--bg-secondary)',
+              color: pkClass === cls ? 'var(--accent)' : 'var(--text-dim)',
+              border: `1px solid ${pkClass === cls ? 'var(--accent)' : 'var(--border)'}`,
+              whiteSpace: 'nowrap',
+            }}>{label}</button>
+          ))}
+        </div>
+
+        {/* Quick search within class */}
+        {pkClass && (
+          <input type="text" value={pkSearch} onChange={e => setPkSearch(e.target.value)}
+            placeholder={`🔍 Поиск в ${CLASS_LABELS[pkClass] || pkClass}...`}
+            style={{ width: '100%', padding: '6px 8px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 11, marginBottom: 6, boxSizing: 'border-box' }} />
+        )}
+
+        {/* Drug cards */}
+        {(pkClass || pkSearch) && pkFiltered.length > 0 && (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 4, maxHeight: 180, overflowY: 'auto' }}>
             {pkFiltered.map(s => (
               <div key={s.id} onClick={() => addDrug(s.id)} style={{
                 padding: '6px 8px', borderRadius: 8, cursor: 'pointer',
                 background: 'var(--bg-secondary)', border: '1px solid var(--border)',
               }}>
-                <div style={{ fontSize: 11, fontWeight: 600 }}>{s.name}</div>
-                <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>{CLASS_LABELS[s.class] || s.class}</div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 4, maxHeight: 200, overflowY: 'auto' }}>
-            {unusedSubstances.slice(0, 12).map(s => (
-              <div key={s.id} onClick={() => addDrug(s.id)} style={{
-                padding: '6px 8px', borderRadius: 8, cursor: 'pointer',
-                background: 'var(--bg-secondary)', border: '1px solid var(--border)',
-              }}>
-                <div style={{ fontSize: 11, fontWeight: 600 }}>{s.name}</div>
-                <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>{CLASS_LABELS[s.class] || s.class}</div>
+                <div style={{ fontSize: 10, fontWeight: 600 }}>{s.name}</div>
+                <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>{s.pk?.halfLifeHours ? `${(s.pk.halfLifeHours / 24).toFixed(1)} дн` : ''}</div>
               </div>
             ))}
           </div>
         )}
-        {drugDoses.length > 0 && !pkSearch && (
-          <div style={{ marginTop: 6, fontSize: 10, color: 'var(--text-dim)', textAlign: 'center' }}>
-            Введите название в поиск чтобы добавить ещё препарат
+
+        {drugDoses.length > 0 && !pkClass && !pkSearch && (
+          <div style={{ fontSize: 10, color: 'var(--text-dim)', textAlign: 'center', padding: 4 }}>
+            Выберите класс препарата выше чтобы добавить
+          </div>
+        )}
+
+        {pkClass && pkFiltered.length === 0 && !pkSearch && (
+          <div style={{ fontSize: 10, color: 'var(--text-dim)', textAlign: 'center' }}>
+            Все препараты этого класса уже добавлены
           </div>
         )}
       </div>

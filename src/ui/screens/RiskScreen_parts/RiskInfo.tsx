@@ -37,6 +37,49 @@ export const RiskInfo: React.FC = () => {
         </div>
       </div>
 
+      {/* ── MDSS Pipeline description ── */}
+      <div className="card risk-section" style={{ marginBottom: 8 }}>
+        <div className="risk-card-header" style={{ cursor: 'pointer' }} onClick={() => toggle('mdss-pipeline')}>
+          <h4 style={{ margin: 0, fontSize: 13 }}>🧬 MDSS v2.0 — Три модели расчёта</h4>
+          <span style={{ fontSize: 12 }}>{expanded === 'mdss-pipeline' ? '▸' : '▾'}</span>
+        </div>
+        {expanded === 'mdss-pipeline' && (
+          <div style={{ marginTop: 8, fontSize: 11, lineHeight: 1.6 }}>
+            <p style={{ margin: '0 0 8px', color: 'var(--accent)' }}>
+              Система использует 3 независимых метода расчёта для повышения точности прогноза:
+            </p>
+
+            <div style={{ background: 'var(--bg-secondary)', padding: 8, borderRadius: 8, marginBottom: 8 }}>
+              <strong style={{ color: '#60a5fa' }}>1. V7 Базовый расчёт</strong>
+              <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 2 }}>
+                Классический движок: baseRisk × doseRatio × G × N × T × MRR × HGI × RIR + PD
+                <br/>14 систем × 7-9 механизмов = 105 параметров. Агрегация: геометрическое среднее.
+              </div>
+            </div>
+
+            <div style={{ background: 'var(--bg-secondary)', padding: 8, borderRadius: 8, marginBottom: 8 }}>
+              <strong style={{ color: '#f59e0b' }}>2. Монте-Карло (V7 + MC)</strong>
+              <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 2 }}>
+                PK-модель (накопление) → Hill (доза-ответ) → 7 механизмов → MC-симуляция (10K итераций, σ=15%)
+                <br/>Возвращает 95-й перцентиль распределения риска.
+              </div>
+            </div>
+
+            <div style={{ background: 'var(--bg-secondary)', padding: 8, borderRadius: 8, marginBottom: 8 }}>
+              <strong style={{ color: '#8b5cf6' }}>3. MDSS v2.0 (Hill + MC + Sigmoid)</strong>
+              <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 2 }}>
+                <strong>Hill:</strong> X²/(EC50²+X²) для каждого биомаркера (n=2.0)<br/>
+                <strong>MC:</strong> Геометрическое среднее всех Hill-оценок органа + Box-Muller шум → 95-й перцентиль<br/>
+                <strong>Sigmoid:</strong> 100/(1+exp(-k·(Z-Z_crit))) с overflow guard (±50)<br/>
+                <strong>Z_total:</strong> sev95 × t_weeks × genFactor × compliancePenalty<br/>
+                <strong>14 систем органов:</strong> почки, печень, сердце, сосуды, ЦНС, эндокринная, кроветворная, иммунная, метаболизм, GH/IGF, ОДА, щитовидная, простата, кожа<br/>
+                <strong>Compliance:</strong> если анализы {'>'} 4 нед — штраф ×(1.0 + (недели-4)·0.15)
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
       {/* Базовая формула */}
       <div className="card risk-section" style={{ marginBottom: 8 }}>
         <div className="risk-card-header" style={{ cursor: 'pointer' }} onClick={() => toggle('base')}>

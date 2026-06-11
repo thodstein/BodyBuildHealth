@@ -149,11 +149,12 @@ export const PharmaCourseScreen: React.FC = () => {
         </div>
       )}
 
-      {/* Add button */}
+      {/* Add button — always visible at top */}
       <button onClick={() => setShowPicker(true)} style={{
-        width: '100%', padding: 12, background: 'var(--accent)', color: '#000',
+        width: '100%', padding: 12, background: 'linear-gradient(135deg, var(--accent), #00b368)', color: '#000',
         border: 'none', borderRadius: 10, cursor: 'pointer', fontWeight: 700,
         fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+        marginBottom: 10, position: 'sticky', top: 0, zIndex: 5, boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
       }}>
         <span style={{ fontSize: 20 }}>+</span> Добавить препарат
       </button>

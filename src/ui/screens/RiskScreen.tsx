@@ -328,15 +328,25 @@ const MDSSRiskDisplay: React.FC = () => {
   // Auto-fill genetics from profile
   useEffect(() => {
     const s = linked.profile?.settings;
-    const genMap = Object.keys(s?.genetics || {}).filter(k => (s?.genetics as any)?.[k]);
+    const genMap = Object.keys(s?.genetics || {}).filter(k => !!(s?.genetics as any)?.[k]);
     if (genMap.length > 0) setGenetics(genMap);
   }, []);
+
+  // Compute weeksSinceLab from linked dates
+  const weeksSinceLab = (() => {
+    const labs = linked.labs || [];
+    if (!labs.length) return 52;
+    const dates = labs.map(l => l.date).filter(Boolean).sort().reverse();
+    if (!dates[0]) return 52;
+    const ms = Date.now() - new Date(dates[0]).getTime();
+    return Math.max(0, ms / (7 * 24 * 3600 * 1000));
+  })();
 
   // Auto-run on mount
   useEffect(() => {
     if (!autoRun) return;
     handleRun();
-  }, [autoRun, tWeeks, genetics]);
+  }, [autoRun, tWeeks, genetics, weeksSinceLab]);
 
   const handleRun = () => {
     const labs = linked.labs || [];
@@ -369,7 +379,7 @@ const MDSSRiskDisplay: React.FC = () => {
         { name: 'hs-CRP', value: 1.5, ec50: 3 },
       );
     }
-    setMdssResult(runMDSS({ tWeeks, genetics, markers }));
+    setMdssResult(runMDSS({ tWeeks, weeksSinceLab, genetics, markers }));
   };
 
   const ZONE_COLORS: Record<number, string> = { 0: '#22c55e', 1: '#eab308', 2: '#f97316', 3: '#ef4444' };
@@ -438,15 +448,35 @@ const MDSSRiskDisplay: React.FC = () => {
 
       {mdssResult && (
         <>
+          {/* Compliance penalty banner */}
+          {mdssResult.compliancePenalty > 1 && (
+            <div className="card" style={{
+              marginBottom: 12, padding: '8px 12px', background: 'rgba(239,68,68,0.08)',
+              borderLeft: '3px solid #ef4444',
+            }}>
+              <div style={{ fontSize: 10, color: '#f97316', fontWeight: 600 }}>
+                ⚠ Штраф за просрочку анализов: ×{mdssResult.compliancePenalty}
+                ({mdssResult.weeksSinceLastLab} нед без анализов)
+              </div>
+            </div>
+          )}
+
+          {/* Overall risk */}
           <div className="card" style={{ marginBottom: 12, textAlign: 'center' }}>
-            <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 4 }}>Максимальный риск</div>
+            <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 4 }}>
+              Максимальный риск по всем 14 системам
+            </div>
             <div style={{ fontSize: 36, fontWeight: 800, color: ZONE_COLORS[mdssResult.overallAlertLevel] }}>
               {mdssResult.overallMaxRisk}%
             </div>
+            <div style={{ fontSize: 9, color: 'var(--text-dim)', marginTop: 2 }}>
+              {mdssResult.allMarkersUsed.length} биомаркеров · {Object.keys(mdssResult.organSystemsReport).length} систем
+            </div>
           </div>
 
-          {Object.entries(mdssResult.organSystemsReport).map(([key, r]) => (
-            <div key={key} className="card" style={{
+          {/* Sorted organs */}
+          {mdssResult.sortedOrgans.map(r => (
+            <div key={r.organKey} className="card" style={{
               marginBottom: 8, borderLeft: `4px solid ${ZONE_COLORS[r.alertLevel]}`,
             }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
@@ -456,19 +486,37 @@ const MDSSRiskDisplay: React.FC = () => {
                 </span>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 4, fontSize: 9, color: 'var(--text-dim)', marginBottom: 4 }}>
-                <div>Hill: {r.hillScore.toFixed(2)}</div>
-                <div>MC P95: {r.severity95.toFixed(2)}</div>
-                <div>Z_total: {r.zTotal.toFixed(1)}</div>
-                <div>Gen: ×{r.geneticFactor.toFixed(1)}</div>
+                <div>Hill: {r.hillScore}</div>
+                <div>MC P95: {r.severity95}</div>
+                <div>Z: {r.zTotal}</div>
+                <div>Gen: ×{r.geneticFactor}</div>
               </div>
               <div style={{ background: 'rgba(255,255,255,0.05)', borderRadius: 4, height: 8, overflow: 'hidden' }}>
                 <div style={{ width: `${Math.min(100, r.riskPercentage)}%`, height: '100%', background: ZONE_COLORS[r.alertLevel], borderRadius: 4 }} />
               </div>
               <div style={{ fontSize: 9, color: 'var(--text-dim)', marginTop: 3 }}>
-                Маркеры: {r.markersUsed.join(', ')}
+                Маркеры ({r.markersUsed.length}): {r.markersUsed.join(', ')}
               </div>
             </div>
           ))}
+
+          {/* Missing markers */}
+          {mdssResult.markersNotFound.length > 0 && (
+            <div className="card" style={{
+              marginBottom: 12, padding: '8px 12px', background: 'rgba(255,255,255,0.02)',
+            }}>
+              <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-dim)', marginBottom: 4 }}>
+                🧪 Не сдано ({mdssResult.markersNotFound.length}): сдайте эти маркеры для точного прогноза
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
+                {mdssResult.markersNotFound.map(m => (
+                  <span key={m} style={{ padding: '2px 6px', borderRadius: 4, background: 'rgba(255,255,255,0.05)', color: 'var(--text-dim)', fontSize: 9 }}>
+                    {m}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
         </>
       )}
     </div>

@@ -18,6 +18,8 @@ import { calculateRisks } from '../../engines/risk.engine';
 import { useV7Risk } from '../hooks/useV7Risk';
 import { calcReadiness } from '../../engines/readiness.engine';
 import { RISK_SYSTEMS, ALL_RISK_SYSTEMS } from '../../core/constants';
+import { runMDSS } from '../../engines/mdss-engine';
+import type { MDSSOutput } from '../../engines/mdss-engine';
 import { db } from '../../core/db';
 import { getProfile } from '../../core/profile-manager';
 import { StrengthDiary } from '../../engines/strength-diary.engine';
@@ -80,6 +82,7 @@ const NAV_CARDS: { id: ScreenId; icon: string; label: string; desc: string; colo
 export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
   const [masterDb, setMasterDb] = useState<MasterDB | null>(null);
   const [riskResult, setRiskResult] = useState<RiskResult | null>(null);
+  const [mdssResult, setMdssResult] = useState<MDSSOutput | null>(null);
   const [readiness, setReadiness] = useState<ReadinessScores | null>(null);
   const [alerts, setAlerts] = useState<string[]>([]);
   const [courseEntries, setCourseEntries] = useState<CourseEntry[]>([]);
@@ -215,6 +218,30 @@ export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
         };
         const result = calculateRisks(riskInput);
         setRiskResult(result);
+
+        // Compute MDSS risk from lab data
+        try {
+          const markers = labData.map(l => ({
+            name: l.code || l.name,
+            value: l.value,
+            ec50: l.name === 'ALT' ? 50 : l.name === 'AST' ? 45 : l.name === 'Creatinine' ? 120 : 3,
+            isInverted: l.name === 'SHBG' || l.name === 'HDL',
+          }));
+          const labDates = labData.map(l => l.date).filter(Boolean).sort().reverse();
+          const weeksSinceLab = labDates[0]
+            ? (Date.now() - new Date(labDates[0]).getTime()) / (7 * 24 * 3600 * 1000)
+            : 52;
+          const tWeeks = courseData.length > 0
+            ? Math.max(1, courseData.reduce((max, c) => Math.max(max, (c.endWeek || 12) - (c.startWeek || 0)), 0))
+            : 4;
+          const mdss = runMDSS({
+            tWeeks,
+            weeksSinceLab,
+            genetics: Object.keys(genetics).filter(k => !!(genetics as any)?.[k]),
+            markers,
+          });
+          setMdssResult(mdss);
+        } catch {}
       } catch {}
 
       // Calculate readiness
@@ -299,6 +326,65 @@ export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
             <div style={{ fontSize: 18, fontWeight: 700, color: '#00e68a' }}>{trainingVolume.toLocaleString()} кг</div>
           </div>
         )}
+      </div>
+
+      {/* ── Global Risk Card: 3 calculation methods ── */}
+      <div style={{ background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', borderRadius: 10, padding: '10px 12px', marginBottom: 12 }}>
+        <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 8, display: 'flex', justifyContent: 'space-between' }}>
+          <span>⚠️ Глобальный риск</span>
+          <span style={{ fontSize: 10, color: 'var(--text-dim)', fontWeight: 400 }}>
+            Курс: {daysOnCourse} дн · Лабы: {(() => {
+              const dates = labData.map(l => l.date).filter(Boolean).sort().reverse();
+              if (!dates[0]) return 'нет';
+              const d = Math.round((Date.now() - new Date(dates[0]).getTime()) / (24 * 3600 * 1000));
+              return `${d} дн назад`;
+            })()}
+          </span>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+          {/* V7 Risk */}
+          <div style={{ textAlign: 'center', background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: '6px 4px' }}>
+            <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 2 }}>V7 Базовый</div>
+            <div style={{ fontSize: 16, fontWeight: 800, color: riskResult ? riskColor(riskResult.overallRaw) : 'var(--text-dim)' }}>
+              {riskResult ? Math.round(riskResult.overallRaw) : '—'}
+            </div>
+            <div style={{ fontSize: 8, color: 'var(--text-dim)' }}>
+              с поддержкой: <span style={{ color: riskResult ? riskColor(riskResult.overallNet) : 'var(--text-dim)', fontWeight: 600 }}>
+                {riskResult ? Math.round(riskResult.overallNet) : '—'}
+              </span>
+            </div>
+          </div>
+          {/* Monte Carlo (V7) */}
+          <div style={{ textAlign: 'center', background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: '6px 4px' }}>
+            <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 2 }}>Монте-Карло</div>
+            <div style={{ fontSize: 16, fontWeight: 800, color: v7Result?.globalRiskRaw !== undefined
+              ? (v7Result.globalRiskRaw > 70 ? '#ef4444' : v7Result.globalRiskRaw > 40 ? '#f97316' : v7Result.globalRiskRaw > 15 ? '#eab308' : '#22c55e')
+              : 'var(--text-dim)' }}>
+              {v7Result?.globalRiskRaw !== undefined ? `${Math.round(v7Result.globalRiskRaw)}%` : '—'}
+            </div>
+            <div style={{ fontSize: 8, color: 'var(--text-dim)' }}>
+              нетто: <span style={{ fontWeight: 600, color: v7Result?.globalRiskNet !== undefined
+                ? (v7Result.globalRiskNet > 70 ? '#ef4444' : v7Result.globalRiskNet > 40 ? '#f97316' : '#22c55e')
+                : 'var(--text-dim)' }}>
+                {v7Result?.globalRiskNet !== undefined ? `${Math.round(v7Result.globalRiskNet)}%` : '—'}
+              </span>
+            </div>
+          </div>
+          {/* MDSS 3rd model */}
+          <div style={{ textAlign: 'center', background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: '6px 4px' }}>
+            <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 2 }}>MDSS v2</div>
+            <div style={{ fontSize: 16, fontWeight: 800, color: mdssResult?.overallAlertLevel !== undefined
+              ? (mdssResult.overallAlertLevel >= 3 ? '#ef4444' : mdssResult.overallAlertLevel >= 2 ? '#f97316' : mdssResult.overallAlertLevel >= 1 ? '#eab308' : '#22c55e')
+              : 'var(--text-dim)' }}>
+              {mdssResult ? `${mdssResult.overallMaxRisk}%` : '—'}
+            </div>
+            <div style={{ fontSize: 8, color: 'var(--text-dim)' }}>
+              {mdssResult?.compliancePenalty && mdssResult.compliancePenalty > 1
+                ? `Штраф ×${mdssResult.compliancePenalty}`
+                : `${mdssResult?.sortedOrgans?.length || 0} систем`}
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Readiness gauge + streak */}
