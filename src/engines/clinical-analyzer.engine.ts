@@ -118,24 +118,28 @@ function stratify(pct: number): { status: string; alertLevel: number } {
 
 function normalizeCompoundName(name: string): string {
   const n = name.toLowerCase().trim();
-  // Direct matches
+  // Direct matches in COMPOUND_RISK_MAP
   if (COMPOUND_RISK_MAP[n]) return n;
-  // Ester → generic matching
+  // PHARMA_DB ester IDs → generic names
   if (n.includes('test')) return 'testosterone';
   if (n.includes('tren')) return 'trenbolone';
-  if (n.includes('nandrolone') || n === 'npp' || n === 'deca') return 'nandrolone';
-  if (n.includes('methand') || n.includes('dianabol') || n === 'dbol') return 'dianabol';
+  if (n === 'npp' || n === 'deca' || n.includes('nandrolone')) return 'nandrolone';
+  if (n.includes('bold') || n === 'eq') return 'boldenone';
+  if (n.includes('drostanolone') || n.includes('masteron')) return 'masteron';
+  if (n.includes('prim') || n.includes('methenolone')) return 'masteron'; // closest match
+  if (n === 'methand' || n.includes('dianabol') || n === 'dbol' || n === 'trena' || n.includes('turinabol')) return 'dianabol';
   if (n.includes('stan') || n.includes('winstrol')) return 'stanozolol';
   if (n.includes('oxan') || n.includes('anavar')) return 'oxandrolone';
-  if (n.includes('masteron') || n.includes('drostanolone')) return 'masteron';
-  if (n.includes('bold') || n.includes('eq')) return 'boldenone';
-  if (n.includes('halo') || n.includes('fluoxymesterone')) return 'halotestin';
-  if (n.includes('methyltrien') || n.includes('metribolone')) return 'methyltrienolone';
+  if (n.includes('anadrol') || n.includes('oxymetholone')) return 'dianabol'; // closest
+  if (n === 'halo' || n.includes('halotestin') || n.includes('fluoxymesterone')) return 'halotestin';
+  if (n === 'superdrol' || n.includes('methyltrien') || n.includes('metribolone')) return 'methyltrienolone';
+  if (n.includes('proviron') || n.includes('mesterolone')) return 'masteron';
   if (n.includes('hgh') || n.includes('growth') || n.includes('somatropin')) return 'growth_hormone';
-  if (n.includes('insulin')) return 'insulin';
+  if (n.includes('insulin') || n.startsWith('ins_')) return 'insulin';
   if (n.includes('ghrp') || n.includes('hexarelin') || n.includes('ipamorelin')) return 'peptides_ghrp';
-  if (n.includes('cjc') || n.includes('sermorelin') || n.includes('tesamorelin')) return 'peptides_ghrh';
+  if (n.includes('cjc') || n.includes('sermorelin') || n.includes('tesamorelin') || n.includes('mk677')) return 'peptides_ghrh';
   if (n.includes('igf')) return 'igf1';
+  // SARMs → no clinical mapping, skip
   return n;
 }
 
