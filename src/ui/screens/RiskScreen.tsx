@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { RISK_SYSTEMS, ALL_RISK_SYSTEMS, SUBSYSTEM_MAP, SUBSYSTEM_PARENT, DRUG_THRESHOLDS, SUPPORT_BASE_COVERAGE } from '../../core/constants';
 import { SYSTEM_INFO, MECHANISM_INFO, SYSTEM_ORGANS } from '../../core/risk-info';
-import type { RiskResult, MechanismCell, LabPoint } from '../../core/types';
+import type { RiskResult, MechanismCell, LabPoint, CourseEntry } from '../../core/types';
 import { calculateRisks, calculateAggregatedRisks, type AggregatedRisk } from '../../engines/risk.engine';
 import { calculateRiskFromAnalyses } from '../../engines/risk-calculator-v2.engine';
 import { calculatePenaltyCoefficients } from '../../engines/labs-penalty.engine';
@@ -15,6 +15,7 @@ import { RiskDetails } from './RiskScreen_parts/RiskDetails';
 import { V7RiskDisplay } from './RiskScreen_parts/V7RiskDisplay';
 import { WeeklyRiskChart } from './RiskScreen_parts/WeeklyRiskChart';
 import { RiskInfo } from './RiskScreen_parts/RiskInfo';
+import { runMDSS, type MDSSInput, type MDSSOutput, type BiomarkerInput } from '../../engines/mdss-engine';
 import { Risk3DModel } from './RiskScreen_parts/Risk3DModel';
 import { calculateWeeklyRiskDynamics, type WeeklyRiskDynamics } from '../../engines/weekly-risk-dynamics.engine';
 import { useV7Risk } from '../hooks/useV7Risk';
@@ -37,12 +38,13 @@ const TAB_LABELS: Record<string, string> = {
   mechanisms: '⚙️ Механизмы',
   v7: '🔬 Симуляция',
   model: '🧍 3D Модель',
+  mdss: '🧬 MDSS',
   info: 'ℹ️ Инфо',
 };
 
 export const RiskScreen: React.FC = () => {
   const linked = useDataLink();
-  const [tab, setTab] = useState<'overview' | 'dynamics' | 'mechanisms' | 'v7' | 'model' | 'info'>('overview');
+  const [tab, setTab] = useState<'overview' | 'dynamics' | 'mechanisms' | 'v7' | 'model' | 'info' | 'mdss'>('overview');
   const [tick, setTick] = useState(0);
   const [selectedWeek, setSelectedWeek] = useState<number | null>(null);
   const [weekMode, setWeekMode] = useState<'week' | 'average'>('average');
@@ -285,6 +287,7 @@ export const RiskScreen: React.FC = () => {
       case 'model': return v7Result ? <Risk3DModel result={v7Result} mcEnabled={mcEnabled} onToggleMC={toggleMC} organWeek={organWeek} onWeekChange={setOrganWeek} /> : <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-dim)' }}>Загрузка V7...</div>;
       case 'dynamics': return <WeeklyRiskChart dynamics={weeklyDynamics} selectedWeek={selectedWeek} onWeekSelect={setSelectedWeek} mode={weekMode} onModeChange={setWeekMode} />;
       case 'info': return <RiskInfo />;
+      case 'mdss': return <MDSSRiskDisplay />;
       default: return <RiskOverview riskResult={riskResult} globalNoLabs={globalNoLabs} noLabsSystems={noLabsSystems} labRiskContributions={labRiskContributions} riskHistory={riskHistory} aggregatedRisk={aggregatedRisk} />;
     }
   };
@@ -293,7 +296,7 @@ export const RiskScreen: React.FC = () => {
     <div className="screen risk">
       <h2 style={{ margin: '0 0 6px', fontSize: 'clamp(16, 4.5vw, 18)' }}>⚠️ Риски</h2>
       <div style={{ display: 'flex', gap: 3, overflowX: 'auto', marginBottom: 12, scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' }}>
-        {(['overview', 'dynamics', 'mechanisms', 'v7', 'model', 'info'] as const).map(t => (
+        {(['overview', 'dynamics', 'mechanisms', 'v7', 'model', 'mdss', 'info'] as const).map(t => (
           <button key={t} onClick={() => setTab(t)} style={{
             flex: '0 0 auto', padding: '8px 14px', borderRadius: 8, fontSize: 12, fontWeight: tab === t ? 700 : 400,
             whiteSpace: 'nowrap', cursor: 'pointer', transition: 'all 0.15s',
@@ -307,6 +310,127 @@ export const RiskScreen: React.FC = () => {
         ))}
       </div>
       {renderContent()}
+    </div>
+  );
+};
+
+// ── MDSS Risk Display Component ──
+const MDSSRiskDisplay: React.FC = () => {
+  const linked = useDataLink();
+  const [tWeeks, setTWeeks] = useState(Math.max(0, (linked.course || []).reduce((max, c) => Math.max(max, (c.endWeek || 12) - (c.startWeek || 0)), 12)));
+  const [genetics, setGenetics] = useState<string[]>([]);
+  const [mdssResult, setMdssResult] = useState<MDSSOutput | null>(null);
+
+  const handleRun = () => {
+    const s = linked.profile?.settings;
+    const labs = linked.labs || [];
+    const markers: BiomarkerInput[] = [];
+    // Map common lab markers to MDSS biomarkers
+    const LAB_MAP: Record<string, { name: string; ec50: number; inverted?: boolean }> = {
+      'ALT': { name: 'ALT', ec50: 50 },
+      'AST': { name: 'AST', ec50: 45 },
+      'GGT': { name: 'GGT', ec50: 60 },
+      'Creatinine': { name: 'Creatinine', ec50: 120 },
+      'Cystatin_C': { name: 'Cystatin_C', ec50: 1.2 },
+      'SHBG': { name: 'SHBG', ec50: 30, inverted: true },
+      'LH': { name: 'LH', ec50: 5 },
+      'FSH': { name: 'FSH', ec50: 5 },
+      'PRL': { name: 'Prolactin', ec50: 20 },
+      'PSA': { name: 'PSA', ec50: 3 },
+      'TT': { name: 'DHT', ec50: 600 },
+      'NT-proBNP': { name: 'NT-proBNP', ec50: 125 },
+      'TSH': { name: 'Cortisol_night', ec50: 500 },
+      'HDL': { name: 'oxLDL', ec50: 60 },
+      'hsCRP': { name: 'hs-CRP', ec50: 3 },
+      'KIM1': { name: 'KIM-1', ec50: 2 },
+      'UACR': { name: 'UACR', ec50: 30 },
+    };
+    for (const lab of labs) {
+      const map = LAB_MAP[lab.code] || LAB_MAP[lab.name];
+      if (map) {
+        markers.push({ name: map.name, value: lab.value, ec50: map.ec50, isInverted: map.inverted });
+      }
+    }
+    if (markers.length === 0) {
+      // Demo markers
+      markers.push(
+        { name: 'ALT', value: 45, ec50: 50 },
+        { name: 'AST', value: 38, ec50: 45 },
+        { name: 'Creatinine', value: 95, ec50: 120 },
+        { name: 'PSA', value: 1.2, ec50: 3 },
+        { name: 'LH', value: 2.1, ec50: 5 },
+      );
+    }
+    const result = runMDSS({ tWeeks, genetics, markers });
+    setMdssResult(result);
+  };
+
+  const ZONE_COLORS: Record<number, string> = { 0: '#22c55e', 1: '#eab308', 2: '#f97316', 3: '#ef4444' };
+
+  return (
+    <div>
+      <div className="card" style={{ marginBottom: 12 }}>
+        <h3 style={{ margin: '0 0 8px 0' }}>🔬 MDSS — Medical Decision Support System</h3>
+        <p style={{ fontSize: 11, color: 'var(--text-dim)', margin: 0 }}>
+          Hill → Monte Carlo (10K) → Logistic Sigmoid. Прогноз необратимого отказа органов.
+        </p>
+      </div>
+
+      <div className="card" style={{ marginBottom: 12 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
+          <div>
+            <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Недель экспозиции</label>
+            <input type="number" min={0} max={100} value={tWeeks} onChange={e => setTWeeks(+e.target.value)}
+              style={{ width: '100%', padding: '6px 8px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 13, boxSizing: 'border-box' }} />
+          </div>
+          <div>
+            <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Генетика (через запятую)</label>
+            <input type="text" value={genetics.join(', ')} onChange={e => setGenetics(e.target.value.split(',').map(s => s.trim()).filter(Boolean))}
+              placeholder="APOL1_mutation, COMT_slow..."
+              style={{ width: '100%', padding: '6px 8px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 13, boxSizing: 'border-box' }} />
+          </div>
+        </div>
+        <button onClick={handleRun} style={{
+          width: '100%', padding: 10, borderRadius: 8, border: 'none', cursor: 'pointer',
+          background: 'linear-gradient(135deg, #8b5cf6, #6d28d9)', color: '#fff', fontWeight: 700, fontSize: 14,
+        }}>▶ Запустить MDSS анализ</button>
+      </div>
+
+      {mdssResult && (
+        <>
+          <div className="card" style={{ marginBottom: 12, textAlign: 'center' }}>
+            <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 4 }}>Максимальный риск</div>
+            <div style={{ fontSize: 36, fontWeight: 800, color: ZONE_COLORS[mdssResult.overallAlertLevel] }}>
+              {mdssResult.overallMaxRisk}%
+            </div>
+          </div>
+
+          {Object.entries(mdssResult.organSystemsReport).map(([key, r]) => (
+            <div key={key} className="card" style={{
+              marginBottom: 8, borderLeft: `4px solid ${ZONE_COLORS[r.alertLevel]}`,
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                <span style={{ fontWeight: 600, fontSize: 12 }}>{r.organName}</span>
+                <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 4, background: `${ZONE_COLORS[r.alertLevel]}22`, color: ZONE_COLORS[r.alertLevel], fontWeight: 600 }}>
+                  {Math.round(r.riskPercentage)}% — {r.status.split('(')[0].trim()}
+                </span>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 4, fontSize: 9, color: 'var(--text-dim)', marginBottom: 4 }}>
+                <div>Hill: {r.hillScore.toFixed(2)}</div>
+                <div>MC P95: {r.severity95.toFixed(2)}</div>
+                <div>Z_total: {r.zTotal.toFixed(1)}</div>
+                <div>Gen: ×{r.geneticFactor.toFixed(1)}</div>
+              </div>
+              <div style={{ background: 'rgba(255,255,255,0.05)', borderRadius: 4, height: 8, overflow: 'hidden' }}>
+                <div style={{ width: `${Math.min(100, r.riskPercentage)}%`, height: '100%', background: ZONE_COLORS[r.alertLevel], borderRadius: 4 }} />
+              </div>
+              <div style={{ fontSize: 9, color: 'var(--text-dim)', marginTop: 3 }}>
+                Маркеры: {r.markersUsed.join(', ')}
+              </div>
+            </div>
+          ))}
+        </>
+      )}
     </div>
   );
 };
