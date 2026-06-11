@@ -11,6 +11,7 @@ export const NutritionDiary: React.FC<{
   const [showOCR, setShowOCR] = useState(false);
   const [showBarcode, setShowBarcode] = useState(false);
   const [foodSearch, setFoodSearch] = useState('');
+  const [mealType, setMealType] = useState('Перекус');
   const [ocrText, setOcrText] = useState('');
   const [parsedItems, setParsedItems] = useState<{ name: string; kcal: number; p: number; f: number; c: number }[]>([]);
   const [ocrError, setOcrError] = useState('');
@@ -21,7 +22,7 @@ export const NutritionDiary: React.FC<{
   const foodSearchResults = useMemo(() => {
     if (!foodSearch.trim()) return [];
     const q = foodSearch.toLowerCase();
-    return FOOD_DB.filter(f => f.name.toLowerCase().includes(q)).slice(0, 12);
+    return FOOD_DB.filter(f => f.name.toLowerCase().includes(q)).slice(0, 8);
   }, [foodSearch]);
 
   const addFoodFromDB = (food: typeof FOOD_DB[number]) => {
@@ -33,7 +34,20 @@ export const NutritionDiary: React.FC<{
       c: food.carbs,
     }]);
     setFoodSearch('');
+    // Save as favorite
+    try {
+      const favs = JSON.parse(localStorage.getItem('he_food_favs') || '[]');
+      const updated = [food.id, ...favs.filter((f: string) => f !== food.id)].slice(0, 8);
+      localStorage.setItem('he_food_favs', JSON.stringify(updated));
+    } catch {}
   };
+
+  const favoriteFoods = useMemo(() => {
+    try {
+      const favs: string[] = JSON.parse(localStorage.getItem('he_food_favs') || '[]');
+      return favs.map(id => FOOD_DB.find(f => f.id === id)).filter(Boolean) as typeof FOOD_DB;
+    } catch { return []; }
+  }, []);
 
   const handleBarcodeProduct = (product: OFFProduct) => {
     setShowBarcode(false);
@@ -108,6 +122,16 @@ export const NutritionDiary: React.FC<{
           <input type="text" value={foodSearch} onChange={e => setFoodSearch(e.target.value)}
             placeholder="🔍 Найти продукт в базе..."
             style={{ width: '100%', padding: '8px 10px', borderRadius: 8, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, boxSizing: 'border-box' }} />
+          <div style={{ display: 'flex', gap: 3, marginTop: 4 }}>
+            {['Завтрак', 'Обед', 'Ужин', 'Перекус', 'До трени', 'После трени'].map(mt => (
+              <button key={mt} onClick={() => setMealType(mt)} style={{
+                padding: '2px 6px', borderRadius: 4, fontSize: 9, cursor: 'pointer',
+                background: mealType === mt ? 'rgba(0,230,138,0.15)' : 'var(--bg-secondary)',
+                border: mealType === mt ? '1px solid var(--accent)' : '1px solid var(--border)',
+                color: mealType === mt ? '#00e68a' : 'var(--text-dim)', fontWeight: mealType === mt ? 600 : 400,
+              }}>{mt}</button>
+            ))}
+          </div>
           {foodSearchResults.length > 0 && (
             <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 10, background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 8, maxHeight: 200, overflowY: 'auto', marginTop: 2 }}>
               {foodSearchResults.map(f => (
@@ -122,6 +146,22 @@ export const NutritionDiary: React.FC<{
             </div>
           )}
         </div>
+
+        {/* Favorites quick-add */}
+        {favoriteFoods.length > 0 && (
+          <div style={{ marginBottom: 8 }}>
+            <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 3 }}>⭐ Избранное</div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
+              {favoriteFoods.map(f => (
+                <button key={f.id} onClick={() => addFoodFromDB(f)} style={{
+                  padding: '3px 8px', borderRadius: 6, fontSize: 10, cursor: 'pointer',
+                  background: 'rgba(139,92,246,0.1)', border: '1px solid rgba(139,92,246,0.3)', color: '#8b5cf6',
+                  fontWeight: 500, whiteSpace: 'nowrap',
+                }}>⭐ {f.name.slice(0, 15)}</button>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Barcode Scanner */}
         <button onClick={() => setShowBarcode(!showBarcode)} style={{
@@ -193,7 +233,7 @@ export const NutritionDiary: React.FC<{
                 <button onClick={() => {
                   saveParsedMeals(parsedItems.map(item => ({
                     date: new Date().toISOString().split('T')[0],
-                    mealType: 'Приём пищи',
+                    mealType: mealType,
                     items: [{ name: item.name, kcal: item.kcal, p: item.p, f: item.f, c: item.c, qty: '100 г' }],
                   })));
                   setParsedItems([]);

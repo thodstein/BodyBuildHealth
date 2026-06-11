@@ -6,6 +6,7 @@ import { selectSplit, getSplitOptions, type SplitCandidate } from '../../engines
 import { selectProgressionRule, calcSuggestedWeight, estimate1RM, getDeloadRecommendation } from '../../engines/progression.engine';
 import { RIR_MATRIX } from '../../engines/rir-matrix.engine';
 import { StrengthDiary, type StrengthStats, type WeeklyProgress, type ProgressionAlert } from '../../engines/strength-diary.engine';
+import type { WorkoutLog } from '../../core/types';
 import { generateWarmup } from '../../engines/warmup.engine';
 import { generateCooldown } from '../../engines/cooldown.engine';
 import { selectSetScheme } from '../../engines/set-scheme.engine';
@@ -46,7 +47,7 @@ const GROUP_LABELS: Record<string, string> = {
 const EQUIP_LABELS: Record<string, string> = { barbell: 'Штанга', dumbbell: 'Гантели', machine: 'Тренажёр', cable: 'Блок', bodyweight: 'Вес тела', band: 'Лента', kettlebell: 'Гиря', specialty_bar: 'Спец. гриф' };
 const JOINT_LABELS: Record<string, string> = { high: 'Высокая', med: 'Средняя', low: 'Низкая' };
 
-type TrainingTab = 'plan' | 'runtime' | 'exercises' | 'calculators' | 'diary' | 'cycles';
+type TrainingTab = 'plan' | 'runtime' | 'exercises' | 'calculators' | 'diary' | 'cycles' | 'history';
 
 export const TrainingScreen: React.FC = () => {
   const linked = useDataLink();
@@ -100,6 +101,8 @@ export const TrainingScreen: React.FC = () => {
   const [logWeight, setLogWeight] = useState(80);
   const [logReps, setLogReps] = useState(8);
   const [logRIR, setLogRIR] = useState(2);
+  const [historyWorkouts, setHistoryWorkouts] = useState<WorkoutLog[]>([]);
+  const [historyExpanded, setHistoryExpanded] = useState<string | null>(null);
 
   // Runtime (live workout) state
   const [runtimeDay, setRuntimeDay] = useState<number>(1);
@@ -243,6 +246,7 @@ export const TrainingScreen: React.FC = () => {
         {([
           ['plan', '📋 План'], ['runtime', '🏃 Тренировка'], ['exercises', '📖 Упражнения'],
           ['calculators', '📐 Калькуляторы'], ['diary', '📓 Дневник'], ['cycles', '🔄 Циклы'],
+          ['history', '📜 История'],
         ] as [TrainingTab, string][]).map(([k, l]) => (
           <button key={k} onClick={() => setTab(k)} style={{
             padding: '7px 12px', borderRadius: 8, fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap',
@@ -1567,6 +1571,68 @@ export const TrainingScreen: React.FC = () => {
               </div>
             </>
           )}
+          </div>
+        )}
+      {/* ═══════════ HISTORY TAB ═══════════ */}
+      {tab === 'history' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div className="card" style={{ padding: '10px 12px' }}>
+            <h3 style={{ margin: '0 0 8px', fontSize: 13 }}>📜 История тренировок</h3>
+            {diaryProgress.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: 20, color: 'var(--text-dim)' }}>
+                Нет записей. Начните вести дневник на вкладке 📓 Дневник.
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {diaryProgress.sort((a, b) => b.week - a.week).map((w, wi) => (
+                  <div key={wi} style={{
+                    background: 'var(--bg-secondary)', borderRadius: 8, padding: '8px 10px',
+                    border: historyExpanded === `w${wi}` ? '1px solid var(--accent)' : '1px solid transparent',
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}
+                      onClick={() => setHistoryExpanded(historyExpanded === `w${wi}` ? null : `w${wi}`)}>
+                      <div>
+                        <span style={{ fontWeight: 600, fontSize: 13 }}>Неделя {w.week}</span>
+                        <span style={{ fontSize: 10, color: 'var(--text-dim)', marginLeft: 8 }}>{w.workoutCount} тренировок</span>
+                      </div>
+                      <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                        <span style={{ fontSize: 11, color: 'var(--accent)', fontWeight: 600 }}>{Math.round(w.totalVolume).toLocaleString()} кг</span>
+                        <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>
+                          {w.compoundWorkouts > 0 ? `Баз: ${w.compoundWorkouts}` : `Изол: ${w.isolationWorkouts}`}
+                        </span>
+                        <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>{historyExpanded === `w${wi}` ? '▴' : '▾'}</span>
+                      </div>
+                    </div>
+                    {historyExpanded === `w${wi}` && (
+                      <div style={{ marginTop: 6, borderTop: '1px solid var(--border)', paddingTop: 6 }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 4, marginBottom: 6, fontSize: 9 }}>
+                          <div style={{ background: 'rgba(0,230,138,0.05)', borderRadius: 4, padding: 4, textAlign: 'center' }}>
+                            <div style={{ color: 'var(--text-dim)' }}>Объём</div>
+                            <div style={{ fontWeight: 600, color: 'var(--accent)' }}>{Math.round(w.totalVolume)} кг</div>
+                          </div>
+                          <div style={{ background: 'rgba(0,230,138,0.05)', borderRadius: 4, padding: 4, textAlign: 'center' }}>
+                            <div style={{ color: 'var(--text-dim)' }}>Тренировок</div>
+                            <div style={{ fontWeight: 600, color: 'var(--accent)' }}>{w.workoutCount}</div>
+                          </div>
+                          <div style={{ background: 'rgba(0,230,138,0.05)', borderRadius: 4, padding: 4, textAlign: 'center' }}>
+                            <div style={{ color: 'var(--text-dim)' }}>1RM ср.</div>
+                            <div style={{ fontWeight: 600, color: 'var(--accent)' }}>{Math.round(w.total1RM)} кг</div>
+                          </div>
+                        </div>
+                        {diaryStats.filter(s => s.workoutCount > 0 && s.lastWorkoutDate >= `2020-01-01`).slice(0, 5).map(s => (
+                          <div key={s.exerciseId} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, padding: '2px 0', borderBottom: '1px solid var(--border)' }}>
+                            <span>{s.exerciseName}</span>
+                            <span style={{ color: 'var(--accent)', fontWeight: 600 }}>{s.maxWeight}×{s.maxReps}</span>
+                            <span style={{ color: 'var(--text-dim)' }}>1RM {Math.round(s.max1RM)} кг</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>

@@ -87,6 +87,8 @@ export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
   const [abnormalLabs, setAbnormalLabs] = useState<{ code: string; name: string; value: number; unit: string; deviation: number }[]>([]);
   const [trainingVolume, setTrainingVolume] = useState(0);
   const [trainingWorkouts, setTrainingWorkouts] = useState(0);
+  const [todayKcal, setTodayKcal] = useState(0);
+  const [todayProtein, setTodayProtein] = useState(0);
   const { v7Result } = useV7Risk();
 
   useEffect(() => {
@@ -135,6 +137,25 @@ export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
           const latest = progress[progress.length - 1];
           setTrainingVolume(Math.round(latest.totalVolume));
           setTrainingWorkouts(latest.workoutCount);
+        }
+      } catch {}
+
+      // Load today's nutrition
+      try {
+        const raw = localStorage.getItem('nutrition_diary');
+        if (raw) {
+          const diary = JSON.parse(raw);
+          const today = new Date().toISOString().split('T')[0];
+          const dayData = diary[today];
+          if (dayData?.meals) {
+            let kcal = 0, protein = 0;
+            Object.values(dayData.meals).flat().forEach((m: any) => {
+              kcal += m.kcal || m.totalKcal || 0;
+              protein += m.p || m.protein || m.totalProtein || 0;
+            });
+            setTodayKcal(Math.round(kcal));
+            setTodayProtein(Math.round(protein));
+          }
         }
       } catch {}
 
@@ -245,6 +266,30 @@ export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
           </div>
         )}
       </div>
+
+      {/* Quick actions */}
+      <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
+        <button onClick={() => onNavigate?.('training')} style={{
+          flex: 1, padding: '10px 12px', borderRadius: 10, border: 'none', cursor: 'pointer',
+          background: 'linear-gradient(135deg, #00e68a, #00c853)', color: '#000', fontWeight: 700, fontSize: 13,
+        }}>🏋️ Тренировка</button>
+        <button onClick={() => onNavigate?.('nutrition')} style={{
+          flex: 1, padding: '10px 12px', borderRadius: 10, border: 'none', cursor: 'pointer',
+          background: 'linear-gradient(135deg, #ffa502, #ff7f50)', color: '#000', fontWeight: 700, fontSize: 13,
+        }}>🍎 Питание</button>
+      </div>
+
+      {/* Today's nutrition */}
+      {todayKcal > 0 && (
+        <div className="card" style={{ marginBottom: 12 }}>
+          <h3 style={{ margin: '0 0 4px 0' }}>🍎 Сегодня</h3>
+          <div style={{ display: 'flex', gap: 8, fontSize: 11 }}>
+            <span style={{ color: 'var(--accent)', fontWeight: 600 }}>{todayKcal} ккал</span>
+            <span style={{ color: 'var(--text-dim)' }}>Б: {todayProtein}г</span>
+            <span style={{ color: 'var(--accent)', fontWeight: 600 }}>{(todayProtein * 4 / todayKcal * 100).toFixed(0)}%</span>
+          </div>
+        </div>
+      )}
 
       {/* Readiness details */}
       <div className="card">
