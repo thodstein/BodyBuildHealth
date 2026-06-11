@@ -1596,6 +1596,14 @@ export const TrainingScreen: React.FC = () => {
                         <span style={{ fontSize: 10, color: 'var(--text-dim)', marginLeft: 8 }}>{w.workoutCount} тренировок</span>
                       </div>
                       <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                        {(() => {
+                          const sorted = diaryProgress.sort((a, b) => b.week - a.week);
+                          const prev = sorted[wi + 1];
+                          const delta = prev ? Math.round((w.totalVolume - prev.totalVolume) / Math.max(1, prev.totalVolume) * 100) : 0;
+                          const arrow = prev ? (delta > 5 ? '↑' : delta < -5 ? '↓' : '→') : '';
+                          const arrColor = delta > 5 ? '#22c55e' : delta < -5 ? '#ef4444' : '#6b7280';
+                          return arrow ? <span style={{ fontSize: 13, color: arrColor, fontWeight: 700, minWidth: 16 }}>{arrow}</span> : null;
+                        })()}
                         <span style={{ fontSize: 11, color: 'var(--accent)', fontWeight: 600 }}>{Math.round(w.totalVolume).toLocaleString()} кг</span>
                         <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>
                           {w.compoundWorkouts > 0 ? `Баз: ${w.compoundWorkouts}` : `Изол: ${w.isolationWorkouts}`}
