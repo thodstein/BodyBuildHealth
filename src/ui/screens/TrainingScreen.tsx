@@ -506,6 +506,14 @@ export const TrainingScreen: React.FC = () => {
                     </span>
                     <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>
                       Объём ×{currentMicrocycle.volumeMultiplier} | RIR {currentMicrocycle.rirRange[0]}-{currentMicrocycle.rirRange[1]}
+                      {currentMicrocycle.mesocycleType !== 'deload' && currentMicrocycle.mesocycleType !== 'peaking' && (
+                        <span style={{ color: '#22c55e', fontWeight: 600, marginLeft: 6 }}>
+                          ↑+{(currentMicrocycle.mesocycleType === 'accumulation' ? 2.5 : 3.75)}%/нед
+                        </span>
+                      )}
+                      {currentMicrocycle.mesocycleType === 'deload' && (
+                        <span style={{ color: '#3b82f6', fontWeight: 600, marginLeft: 6 }}>↓-50%</span>
+                      )}
                     </span>
                       </div>
                       {/* Phase training tip */}
@@ -548,6 +556,9 @@ export const TrainingScreen: React.FC = () => {
                           {autoRegNote}
                         </div>
                       )}
+                      <div style={{ fontSize: 8, color: 'var(--text-dim)', marginBottom: 3, padding: '1px 4px', background: 'rgba(255,165,2,0.05)', borderRadius: 3 }}>
+                        🍎 {goal === 'bulk' ? 'До: бел.+угл. После: быстрый протеин' : goal === 'cut' ? 'До: белок. Углеводы только вокруг' : goal === 'strength' ? 'До: кофеин+угл. После: протеин+креатин' : 'До/после: белок+углеводы'}
+                      </div>
                       {day.exercises.map((ex: any, ei: number) => {
                         const scheme = selectSetScheme({
                           goal, movementPattern: 'squat' as MovementPattern, difficultyLevel: level === 'beginner' ? 'low' : level === 'intermediate' ? 'medium' : 'high',
@@ -612,8 +623,10 @@ export const TrainingScreen: React.FC = () => {
                     const totalSets = days.reduce((s: number, d: any) => s + (d.exercises?.reduce((ss: number, e: any) => ss + (e.sets || 0), 0) || 0), 0);
                     const totalReps = days.reduce((s: number, d: any) => s + (d.exercises?.reduce((ss: number, e: any) => ss + (parseInt(String(e.reps)) || 0) * (e.sets || 0), 0) || 0), 0);
                     const totalTonnage = days.reduce((s: number, d: any) => s + (d.exercises?.reduce((ss: number, e: any) => ss + (e.sets || 0) * (parseInt(String(e.reps)) || 0) * (e.weight || 0), 0) || 0), 0);
+                    const totalMin = days.reduce((s: number, d: any) => s + (d.duration || 0), 0);
+                    const density = totalMin > 0 ? Math.round(totalTonnage / totalMin) : 0;
                     return (
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 4, fontSize: 10 }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr 1fr', gap: 4, fontSize: 10 }}>
                         <div style={{ textAlign: 'center', padding: '4px', background: 'rgba(0,230,138,0.05)', borderRadius: 4 }}>
                           <div style={{ color: 'var(--text-dim)' }}>Дней</div>
                           <div style={{ fontWeight: 700, color: 'var(--accent)' }}>{days.length}</div>
@@ -623,16 +636,45 @@ export const TrainingScreen: React.FC = () => {
                           <div style={{ fontWeight: 700, color: 'var(--accent)' }}>{totalSets}</div>
                         </div>
                         <div style={{ textAlign: 'center', padding: '4px', background: 'rgba(0,230,138,0.05)', borderRadius: 4 }}>
-                          <div style={{ color: 'var(--text-dim)' }}>Повторений</div>
+                          <div style={{ color: 'var(--text-dim)' }}>Повторов</div>
                           <div style={{ fontWeight: 700, color: 'var(--accent)' }}>{totalReps}</div>
                         </div>
                         <div style={{ textAlign: 'center', padding: '4px', background: 'rgba(0,230,138,0.05)', borderRadius: 4 }}>
                           <div style={{ color: 'var(--text-dim)' }}>Тоннаж</div>
                           <div style={{ fontWeight: 700, color: 'var(--accent)' }}>{totalTonnage > 0 ? `${(totalTonnage / 1000).toFixed(1)}т` : '—'}</div>
                         </div>
+                        <div style={{ textAlign: 'center', padding: '4px', background: 'rgba(0,230,138,0.05)', borderRadius: 4 }}>
+                          <div style={{ color: 'var(--text-dim)' }}>Плотность</div>
+                          <div style={{ fontWeight: 700, color: density > 50 ? '#22c55e' : density > 25 ? '#ff9100' : '#ef4444' }}>{density} кг/мин</div>
+                        </div>
                       </div>
                     );
                   })()}
+                </div>
+              )}
+
+              {/* Weekly training calendar (TZ) */}
+              {currentMicrocycle && (
+                <div className="card" style={{ padding: '10px 12px', marginTop: 8 }}>
+                  <h4 style={{ margin: '0 0 6px', fontSize: 12 }}>📅 Календарь недели</h4>
+                  <div style={{ display: 'flex', gap: 3 }}>
+                    {['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'].map((dayName, di) => {
+                      const day = currentMicrocycle.days.find((d: any) => d.isTraining && d.day?.includes(dayName));
+                      const isTraining = !!day;
+                      return (
+                        <div key={di} style={{
+                          flex: 1, textAlign: 'center', padding: '4px 2px', borderRadius: 6, fontSize: 9,
+                          background: isTraining ? 'rgba(0,230,138,0.1)' : 'rgba(255,255,255,0.02)',
+                          border: isTraining ? '1px solid rgba(0,230,138,0.2)' : '1px solid var(--border)',
+                          color: isTraining ? 'var(--accent)' : 'var(--text-dim)',
+                          fontWeight: isTraining ? 600 : 400,
+                        }}>
+                          <div>{dayName}</div>
+                          {isTraining && <div style={{ fontSize: 7, marginTop: 1 }}>{day?.exercises?.length || 0} упр</div>}
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               )}
 
