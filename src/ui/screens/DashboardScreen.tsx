@@ -302,30 +302,10 @@ export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
 
       <AlertBanner messages={alerts} />
 
-      {/* ── TOP CARD: Readiness + Course + Labs ── */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 6, marginBottom: 12 }}>
-        <div style={{ background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', borderRadius: 10, padding: '8px 6px', textAlign: 'center' }}>
-          <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>Готовность</div>
-          <div style={{ fontSize: 20, fontWeight: 800, color: readiness.recovery >= 70 ? '#22c55e' : readiness.recovery >= 50 ? '#eab308' : '#ef4444' }}>{Math.round(readiness.recovery)}%</div>
-        </div>
-        <div style={{ background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', borderRadius: 10, padding: '8px 6px', textAlign: 'center' }}>
-          <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>Общий риск</div>
-          <div style={{ fontSize: 20, fontWeight: 800, color: riskResult ? riskColor(riskResult.overallNet) : 'var(--text-dim)' }}>{riskResult ? Math.round(riskResult.overallNet) : '—'}%</div>
-        </div>
-        <div style={{ background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', borderRadius: 10, padding: '8px 6px', textAlign: 'center' }}>
-          <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>Курс</div>
-          <div style={{ fontSize: 20, fontWeight: 800 }}>{daysOnCourse} дн</div>
-        </div>
-        <div style={{ background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', borderRadius: 10, padding: '8px 6px', textAlign: 'center' }}>
-          <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>Лабы</div>
-          <div style={{ fontSize: 20, fontWeight: 800 }}>{labData.length}</div>
-        </div>
-      </div>
-
       {/* ── Global Risk Card: 3 calculation methods ── */}
       <div style={{ background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', borderRadius: 10, padding: '10px 12px', marginBottom: 12 }}>
         <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 8, display: 'flex', justifyContent: 'space-between' }}>
-          <span>⚠️ Глобальный риск</span>
+          <span>⚠️ Риск · Готовность {Math.round(readiness.recovery)}%</span>
           <span style={{ fontSize: 10, color: 'var(--text-dim)', fontWeight: 400 }}>
             Курс: {daysOnCourse} дн · Лабы: {(() => {
               const dates = labData.map(l => l.date).filter(Boolean).sort().reverse();

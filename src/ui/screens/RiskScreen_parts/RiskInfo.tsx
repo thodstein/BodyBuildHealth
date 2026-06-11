@@ -28,12 +28,15 @@ export const RiskInfo: React.FC = () => {
       <div className="card" style={{ marginBottom: 8 }}>
         <h3 style={{ margin: '0 0 8px', fontSize: 15 }}>📝 Формулы расчёта рисков</h3>
         <p style={{ fontSize: 11, color: 'var(--text-dim)', lineHeight: 1.5, margin: '0 0 8px' }}>
-          Движок Health Engine v9 рассчитывает риски по <strong>14 системам органов</strong> с <strong>7–9 специфичными механизмами</strong> для каждой (105 всего) + <strong>7 общих механизмов</strong> повреждения.
-          Результат — значение от 0% (нет риска) до 100% (критический риск).
+          Health Engine v9 использует <strong>4 независимых метода</strong> расчёта рисков:
         </p>
-        <div style={{ background: 'rgba(0,230,138,0.08)', padding: 8, borderRadius: 8, fontSize: 10, color: 'var(--text-dim)' }}>
-          <strong>Raw</strong> — риск без учёта поддержки (препараты + генетика + питание + тренировки).<br/>
-          <strong>Net</strong> — итоговый риск с учётом БАДов, препаратов поддержки и образа жизни.
+        <div style={{ background: 'rgba(0,230,138,0.08)', padding: 8, borderRadius: 8, fontSize: 10, color: 'var(--text-dim)', lineHeight: 1.6 }}>
+          <strong>1. V7 Базовый</strong> — 14 систем × 7-9 механизмов (105). baseRisk × doseRatio × G × N × T × MRR × HGI × RIR + PD<br/>
+          <strong>2. V7 + Монте-Карло</strong> — PK-накопление → Hill → MC-симуляция (10K, σ=15%) → 95-й перцентиль<br/>
+          <strong>3. MDSS v2.0</strong> — Hill(X²/(EC50²+X²)) → MC(all markers) → Sigmoid(100/(1+e^(-k·(Z-Z_crit)))) с overflow guard<br/>
+          <strong>4. Клинические патологии</strong> — 28 патологий, 70+ маркеров, связь препарат→патология. Hill → MC → Sigmoid<br/>
+          <br/>
+          <strong>Raw</strong> — риск без учёта поддержки. <strong>Net</strong> — с учётом БАДов и образа жизни.
         </div>
       </div>
 
@@ -75,6 +78,42 @@ export const RiskInfo: React.FC = () => {
                 <strong>14 систем органов:</strong> почки, печень, сердце, сосуды, ЦНС, эндокринная, кроветворная, иммунная, метаболизм, GH/IGF, ОДА, щитовидная, простата, кожа<br/>
                 <strong>Compliance:</strong> если анализы {'>'} 4 нед — штраф ×(1.0 + (недели-4)·0.15)
               </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ── Clinical Pathology section ── */}
+      <div className="card risk-section" style={{ marginBottom: 8 }}>
+        <div className="risk-card-header" style={{ cursor: 'pointer' }} onClick={() => toggle('clinical')}>
+          <h4 style={{ margin: 0, fontSize: 13 }}>🏥 Клинические патологии (4-я модель)</h4>
+          <span style={{ fontSize: 12 }}>{expanded === 'clinical' ? '▸' : '▾'}</span>
+        </div>
+        {expanded === 'clinical' && (
+          <div style={{ marginTop: 8, fontSize: 11, lineHeight: 1.6 }}>
+            <p style={{ margin: '0 0 8px' }}>
+              Четвёртая модель напрямую связывает препараты с конкретными медицинскими патологиями через клиническую базу данных.
+            </p>
+            <div style={{ background: 'var(--bg-secondary)', padding: 8, borderRadius: 8, marginBottom: 6 }}>
+              <strong style={{ color: '#ec4899' }}>База данных:</strong>
+              <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 2 }}>
+                • 28 патологий в 8 системах органов<br/>
+                • 70+ клинических биомаркеров с эмпирическими EC50<br/>
+                • 13 препаратов (все классы ААС + ГР + инсулин + пептиды)<br/>
+                • Каждый препарат → список рисков → лабораторная панель → инструментальная верификация
+              </div>
+            </div>
+            <div style={{ background: 'var(--bg-secondary)', padding: 8, borderRadius: 8, marginBottom: 6 }}>
+              <strong style={{ color: '#8b5cf6' }}>Pipeline:</strong>
+              <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 2 }}>
+                1. <strong>Hill function:</strong> X²/(EC50²+X²) — для каждого маркера с учётом inverted (NO, HDL, LH, FSH, eGFR, Glucose, Testosterone)<br/>
+                2. <strong>Monte Carlo:</strong> 10K итераций, σ=15%, 95-й перцентиль<br/>
+                3. <strong>Sigmoid:</strong> 100/(1+exp(-k·(Z_total-Z_crit))) — персонализированные k и Z_crit для каждой патологии<br/>
+                4. <strong>Compliance penalty:</strong> ×(1.0 + (weeks_since_lab - 4) × 0.15) при просрочке анализов {'>'} 4 нед
+              </div>
+            </div>
+            <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>
+              <strong>8 систем:</strong> Сердечно-сосудистая (7 пат.) · Гепатобилиарная (4) · Нефрологическая (3) · Эндокринная (4) · Репродуктивная/HPTA (3) · ЦНС (2) · Иммунная/кожа (2) · Опорно-двигательная (2)
             </div>
           </div>
         )}
