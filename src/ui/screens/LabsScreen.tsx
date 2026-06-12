@@ -6,7 +6,6 @@ import { calculatePenaltyCoefficients } from '../../engines/labs-penalty.engine'
 import { computeLabIndexDetails, type LabIndexDetail } from '../../engines/labs-indices.engine';
 import { interpretLabs, computeHOMA_IR, type LabCompositeResult } from '../../engines/lab-analysis.engine';
 import { analyzeLabDrugCorrelation, type LabDrugAlert } from '../../engines/lab-pharma-correlation.engine';
-import { quickParse, parseLabResults } from '../../engines/biomarker-regex-engine';
 import { getRiskColor } from '../../core/utils/risk-colors';
 import { useDataLink, notifyDataChange } from '../../core/data-link';
 import { db } from '../../core/db';
@@ -14,7 +13,6 @@ import { LabsResults } from './LabsScreen_parts/LabsResults';
 import { LabsSchedule } from './LabsScreen_parts/LabsSchedule';
 import { LabsInvestigations } from './LabsScreen_parts/LabsInvestigations';
 import { processUploadedFile, saveParsedLabs, type ParsedLabValue, type OCRResult } from '../../core/ocr-engine';
-import { SYSTEM_MECHANISMS } from '../../core/system-mechanisms';
 import { getProfile, updateProfile } from '../../core/profile-manager';
 
 const NO_LABS_KEY = 'he_force_no_labs';
@@ -42,7 +40,6 @@ const PHASE_LABELS: Record<string, string> = {
   course_bridge_course: 'Курс+Мост',
 };
 
-// Map profile phase names to REQUIRED_LABS_PER_PHASE keys
 const PROFILE_PHASE_TO_LABS_PHASE: Record<string, string> = {
   baseline: 'baseline',
   course: 'on_cycle',
@@ -54,8 +51,8 @@ const PROFILE_PHASE_TO_LABS_PHASE: Record<string, string> = {
 };
 
 const sysLabels: Record<string, string> = {
-  cardio: 'Сердце', hepatic: 'Печень', renal: 'Почки',
-  neuro: 'Нервная', endocrine: 'Эндокринная', hematologic: 'Кровь',
+  cardio: 'Сердечно-сосудистая', hepatic: 'Печень', renal: 'Почки',
+  neuro: 'Нервная система', endocrine: 'Эндокринная', hematologic: 'Кровь',
   reproductive: 'Репродуктивная', musculoskeletal: 'Мышечная', metabolic: 'Метаболизм',
   other: 'Прочее',
 };
@@ -92,7 +89,6 @@ const CATALOG_LAB_DESCRIPTIONS: Record<string, string> = {
   'GLU': 'Глюкоза крови натощак. Скрининг инсулинорезистентности и диабета.',
   'INS': 'Инсулин. Повышен при инсулинорезистентности. Гормон роста и набора массы.',
   'HOMA': 'HOMA-IR. Инсулин × Глюкоза / 22.5. >2.7 — инсулинорезистентность.',
-  'HOMAIR': 'HOMA-IR. Инсулин × Глюкоза / 22.5. >2.7 — инсулинорезистентность.',
   'CREATININE': 'Креатинин. Продукт распада креатина. Маркёр функции почек.',
   'CORTISOL': 'Кортизол. Гормон стресса. Подавляется некоторыми ААС и ГХСБ.',
   'IGF1': 'Инсулиноподобный фактор роста-1. Опосредует эффекты ГР. Маркёр анаболического статуса.',
@@ -122,37 +118,31 @@ const CATALOG_LAB_DESCRIPTIONS: Record<string, string> = {
   'FIBRINOGEN': 'Фибриноген. Фактор свёртывания. Повышается при воспалении.',
   'TROPONIN': 'Тропонин. Маркёр повреждения миокарда. Высокая специфичность.',
   'BNP': 'Натрийуретический пептид. Маркёр сердечной недостаточности.',
-  'INR': 'Международное нормализованное отношение. Контроль свёртываемости.',
-  'APTT': 'Активированное частичное тромбопластиновое время. Скрининг свёртывания.',
-  'PROG': 'Прогестерон. Стероидный гормон, предшественник кортизола и андрогенов.',
-  'FT': 'Свободный тестостерон. Биологически активная фракция тестостерона.',
-  'DHT': 'Дигидротестостерон. Мощный андроген, образуется из Т под действием 5α-редуктазы.',
 };
 
-const LAB_ICONS: Record<string, string> = {
-  'risks-indices': `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>`,
-  schedule: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><path d="M8 14h.01"/><path d="M12 14h.01"/><path d="M16 14h.01"/><path d="M8 18h.01"/><path d="M12 18h.01"/><path d="M16 18h.01"/></svg>`,
-  catalog: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/><line x1="8" y1="7" x2="16" y2="7"/><line x1="8" y1="11" x2="14" y2="11"/><line x1="8" y1="15" x2="12" y2="15"/></svg>`,
-  investigations: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><path d="M8 11h6"/><path d="M11 8v6"/></svg>`,
-  archive: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>`,
-  chart: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/><line x1="2" y1="20" x2="22" y2="20"/></svg>`,
-};
-type LabSubTab = 'chart' | 'archive' | 'schedule' | 'catalog' | 'investigations' | 'risks-indices';
-const LAB_NAV_CARDS: { id: LabSubTab; label: string; desc: string }[] = [
-  { id: 'archive', label: 'Архив', desc: 'Просмотр и анализ показателей, история сдачи' },
-  { id: 'chart', label: 'Графики', desc: 'Динамика маркеров по датам' },
-  { id: 'schedule', label: 'График', desc: 'Календарь сдачи анализов по фазам' },
-  { id: 'catalog', label: 'Каталог', desc: 'Справочник маркеров и референсных значений' },
-  { id: 'investigations', label: 'Обследования', desc: 'Дополнительные инструментальные исследования' },
-  { id: 'risks-indices', label: 'Риски и индексы', desc: 'Расчёт рисков и композитных индексов' },
+const MAIN_LAB_TABS: { id: MainLabTab; label: string; icon: string }[] = [
+  { id: 'lab', label: 'Анализы', icon: '🔬' },
+  { id: 'investigations', label: 'Обследования', icon: '🩺' },
+  { id: 'risks', label: 'Риски и индексы', icon: '⚠️' },
 ];
+
+type MainLabTab = 'lab' | 'investigations' | 'risks';
+
+const LAB_SUB_TABS: { id: LabSubTab; label: string; icon: string }[] = [
+  { id: 'current', label: 'Текущие', icon: '🔬' },
+  { id: 'archive', label: 'Архив', icon: '📦' },
+  { id: 'catalog', label: 'Каталог', icon: '📖' },
+  { id: 'chart', label: 'График', icon: '📈' },
+];
+
+type LabSubTab = 'current' | 'archive' | 'catalog' | 'chart';
 
 export const LabsScreen: React.FC = () => {
   const linked = useDataLink();
   const profilePhase = linked.profile?.settings?.phase || '';
   const initialLabsPhase = PROFILE_PHASE_TO_LABS_PHASE[profilePhase] || 'baseline';
-  const [view, setView] = useState<'main' | 'detail'>('main');
-  const [tab, setTab] = useState<LabSubTab>('archive');
+  const [mainTab, setMainTab] = useState<MainLabTab>('lab');
+  const [subTab, setSubTab] = useState<LabSubTab>('current');
   const [globalNoLabs, setGlobalNoLabs] = useState(getGlobalNoLabs());
   const [noLabsSystems, setNoLabsSystemsState] = useState<string[]>(getNoLabsSystems());
   const [selectedPhase, setSelectedPhase] = useState(initialLabsPhase);
@@ -176,10 +166,8 @@ export const LabsScreen: React.FC = () => {
   const hasLabs = linked.labs && linked.labs.length > 0;
   const labs: LabPoint[] = linked.labs || [];
 
-  // Save phase to profile when user changes it
   const handlePhaseChange = (phase: string) => {
     setSelectedPhase(phase);
-    // Also update profile so phase syncs across screens
     try {
       const p = getProfile();
       p.settings.phase = phase === 'on_cycle' ? 'course' : phase === 'course_bridge_course' ? 'course-bridge-course' : phase;
@@ -187,6 +175,14 @@ export const LabsScreen: React.FC = () => {
       notifyDataChange();
     } catch {}
   };
+
+  const handleNewLabs = useCallback(async () => {
+    setInputCode('');
+    setInputValue('');
+    setInputUnit('');
+    setInputDate(new Date().toISOString().split('T')[0]);
+    setShowLabInput(true);
+  }, []);
 
   const requiredLabs = useMemo(() => {
     return (REQUIRED_LABS_PER_PHASE as Record<string, string[]>)[selectedPhase] || [];
@@ -280,7 +276,6 @@ export const LabsScreen: React.FC = () => {
     return calculatePenaltyCoefficients(selectedPhase, labs, [], 1, linked.course, globalNoLabs);
   }, [selectedPhase, labs, linked.course, globalNoLabs]);
 
-  // Lab risks — compute contributions per marker for detailed display
   const labRisks = useMemo<{ overallNet: number; systemBreakdown: Record<string, { raw: number; net: number }>; markerDeviations: { code: string; name: string; value: number; uln: number; lln: number; deviation: number; system: string }[] } | null>(() => {
     if (!hasLabs) return null;
     const labData = labs.map(l => ({ ...l, date: l.date || new Date().toISOString().split('T')[0] }));
@@ -296,8 +291,6 @@ export const LabsScreen: React.FC = () => {
     const overallNet = nonZero.length > 0
       ? Math.round(nonZero.reduce((s, v) => s + v.net, 0) / nonZero.length)
       : 0;
-
-    // Per-marker deviations
     const markerDeviations: { code: string; name: string; value: number; uln: number; lln: number; deviation: number; system: string }[] = [];
     for (const lab of labs) {
       const ref = UCUM_MAP[lab.code];
@@ -308,7 +301,6 @@ export const LabsScreen: React.FC = () => {
       if (norm > ref.uln) deviation = (norm - ref.uln) / ref.uln;
       else if (norm < ref.lln) deviation = -((ref.lln - norm) / ref.lln);
       if (Math.abs(deviation) > 0.01) {
-        // Find which system this marker belongs to
         let sys = 'other';
         for (const [s, codes] of Object.entries(LAB_SYSTEM_GROUPS)) {
           if (codes.includes(lab.code.toUpperCase())) { sys = s; break; }
@@ -322,7 +314,6 @@ export const LabsScreen: React.FC = () => {
       }
     }
     markerDeviations.sort((a, b) => Math.abs(b.deviation) - Math.abs(a.deviation));
-
     return { overallNet, systemBreakdown, markerDeviations };
   }, [hasLabs, labs]);
 
@@ -340,13 +331,6 @@ export const LabsScreen: React.FC = () => {
     if (!hasLabs || linked.course.length === 0) return [];
     return analyzeLabDrugCorrelation(labs, linked.course, linked.profile?.settings?.phase || 'on_cycle');
   }, [hasLabs, labs, linked.course]);
-
-  const indexEntries = useMemo(() => {
-    return Object.entries(labIndexDetails).map(([key, detail]) => ({
-      key, label: detail.label, value: Math.round(detail.value * 100),
-      interpretation: detail.interpretation,
-    }));
-  }, [labIndexDetails]);
 
   const toggleGlobalNoLabs = useCallback(() => {
     const next = !globalNoLabs;
@@ -429,79 +413,60 @@ export const LabsScreen: React.FC = () => {
   const anyNoLabs = globalNoLabs || noLabsSystems.length > 0;
   const deviationCount = labRisks?.markerDeviations?.length ?? 0;
 
-  const goToSub = (subTab: typeof tab) => {
-    setTab(subTab);
-    setView('detail');
+  const sysColors: Record<string, string> = {
+    hepatic: '#22c55e', renal: '#3b82f6', endocrine: '#a855f7',
+    hematologic: '#ef4444', cardio: '#f97316', metabolic: '#eab308',
+    reproductive: '#ec4899', neuro: '#14b8a6', other: '#6b7280',
   };
 
-  const goBack = () => setView('main');
-
   return (
-    <div className="screen labs" style={{ padding: view === 'main' ? 0 : undefined, overflow: view === 'main' ? 'hidden' : undefined, height: '100%', display: 'flex', flexDirection: 'column' }}>
+    <div className="screen labs" style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
 
-      {/* ≡≡≡ MAIN VIEW: HERO + CARDS ≡≡≡ */}
-      {view === 'main' && (
+      {/* ─── MAIN TAB BAR ─── */}
+      <div style={{ display: 'flex', gap: 2, padding: '8px 12px 0', flexShrink: 0, borderBottom: '1px solid var(--border)' }}>
+        {MAIN_LAB_TABS.map(t => (
+          <button key={t.id} onClick={() => setMainTab(t.id)} style={{
+            flex: 1, padding: '10px 4px', cursor: 'pointer', transition: 'all 0.2s',
+            color: mainTab === t.id ? 'var(--accent)' : 'var(--text-dim)',
+            border: 'none', borderBottom: `2px solid ${mainTab === t.id ? 'var(--accent)' : 'transparent'}`,
+            fontWeight: mainTab === t.id ? 700 : 400, fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, background: 'transparent',
+          }}>
+            <span>{t.icon}</span>
+            <span>{t.label}</span>
+          </button>
+        ))}
+      </div>
+
+      {/* ─── SCROLLABLE CONTENT ─── */}
+      <div style={{ flex: 1, overflowY: 'auto', padding: '0 12px 80px' }}>
+
+      {/* ≡≡≡ LAB SUB-TABS (only when mainTab === 'lab') ≡≡≡ */}
+      {mainTab === 'lab' && (
         <>
-          <div style={{ position: 'relative', width: '100%', height: '38vh', minHeight: 200, overflow: 'hidden', flexShrink: 0 }}>
-            <img src="/hero-image.jpg" alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
-            <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '50%', background: 'linear-gradient(to top, var(--bg) 0%, transparent 100%)', pointerEvents: 'none' }} />
+          {/* Sub-tab bar */}
+          <div style={{ display: 'flex', gap: 2, padding: '6px 0 2px', flexShrink: 0 }}>
+            {LAB_SUB_TABS.map(t => (
+              <button key={t.id} onClick={() => setSubTab(t.id)} style={{
+                flex: 1, padding: '7px 4px', cursor: 'pointer', transition: 'all 0.2s',
+                color: subTab === t.id ? 'var(--accent)' : 'var(--text-dim)',
+                border: 'none', borderBottom: `2px solid ${subTab === t.id ? 'var(--accent)' : 'transparent'}`,
+                fontWeight: subTab === t.id ? 700 : 400, fontSize: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 3, background: 'transparent',
+              }}>
+                <span>{t.icon}</span>
+                <span>{t.label}</span>
+              </button>
+            ))}
           </div>
 
-          <div style={{ padding: '8px 12px 16px', position: 'relative', zIndex: 2, flex: 1, overflowY: 'auto' }}>
-            <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 8, textAlign: 'center' }}>
-              {hasLabs ? `${labs.length} показателей • фаза: ${PHASE_LABELS[selectedPhase] || selectedPhase}` : 'Нет данных анализов'}
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-              {LAB_NAV_CARDS.map(card => (
-                <div key={card.id} onClick={() => goToSub(card.id)} style={{
-                  position: 'relative', borderRadius: 18, padding: '16px 12px', cursor: 'pointer',
-                  transition: 'all 0.35s cubic-bezier(0.22, 0.68, 0, 1)',
-                  background: 'linear-gradient(135deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.01) 100%)',
-                  border: '1px solid rgba(255, 255, 255, 0.05)',
-                  overflow: 'hidden', display: 'flex', flexDirection: 'column', gap: 8,
-                }}>
-                  <div style={{
-                    width: 34, height: 34, borderRadius: 10,
-                    background: 'rgba(200,245,96,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    color: 'rgba(200,245,96,0.7)', flexShrink: 0,
-                  }} dangerouslySetInnerHTML={{ __html: LAB_ICONS[card.id] }} />
-                  <div style={{ fontWeight: 700, fontSize: 14, color: '#FFFFFF', letterSpacing: '-0.3px', lineHeight: 1.2 }}>
-                    {card.label}
-                  </div>
-                  <div style={{ fontSize: 10, color: 'rgba(255, 255, 255, 0.3)', lineHeight: 1.3, fontWeight: 400 }}>
-                    {card.desc}
-                  </div>
-                </div>
-              ))}
-            </div>
-
-
-          </div>
-        </>
-      )}
-
-      {/* ≡≡≡ DETAIL VIEW ≡≡≡ */}
-      {view === 'detail' && (
-        <div style={{ flex: 1, overflowY: 'auto', padding: '0 12px 16px' }}>
-          {/* Back button + title */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 0', position: 'sticky', top: 0, zIndex: 10, background: 'var(--bg)' }}>
-            <button onClick={goBack} style={{
-              width: 32, height: 32, borderRadius: 10, border: '1px solid var(--border)',
-              background: 'var(--bg-secondary)', color: 'var(--text)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, flexShrink: 0,
-            }}>←</button>
-            <span style={{ fontWeight: 700, fontSize: 16 }}>{LAB_NAV_CARDS.find(c => c.id === tab)?.label || tab}</span>
-          </div>
-
-      {/* ≡≡≡ ARCHIVE TAB (results + history) ≡≡≡ */}
-      {tab === 'archive' && (
+      {/* ≡≡≡ CURRENT LABS TAB ≡≡≡ */}
+      {subTab === 'current' && (
         <div>
-          {/* Phase selector (archive only) */}
-          <div style={{ display: 'flex', gap: 3, overflowX: 'auto', marginBottom: 8, scrollbarWidth: 'none' }}>
+          {/* Phase selector */}
+          <div style={{ display: 'flex', gap: 3, overflowX: 'auto', margin: '10px 0', scrollbarWidth: 'none' }}>
             {Object.entries(PHASE_LABELS).map(([key, label]) => (
               <button key={key} onClick={() => handlePhaseChange(key)} style={{
-                padding: '5px 9px', borderRadius: 14, fontSize: 11, fontWeight: 600,
-                whiteSpace: 'nowrap', cursor: 'pointer', transition: 'all 0.15s',
+                padding: '6px 12px', borderRadius: 16, fontSize: 11, fontWeight: 600,
+                whiteSpace: 'nowrap', cursor: 'pointer', transition: 'all 0.2s',
                 background: selectedPhase === key ? 'var(--accent)' : 'var(--bg-secondary)',
                 color: selectedPhase === key ? '#000' : 'var(--text-dim)',
                 border: `1px solid ${selectedPhase === key ? 'var(--accent)' : 'var(--border)'}`,
@@ -511,16 +476,45 @@ export const LabsScreen: React.FC = () => {
               </button>
             ))}
           </div>
-          {/* Summary stat */}
-          <div className="card" style={{ marginBottom: 8, padding: '10px 12px', border: '1px solid var(--border)', background: 'var(--bg-secondary)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>Всего записей: {labs.length}</span>
-              <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>Тестов: {new Set(labs.map(l => l.code.toUpperCase())).size}</span>
-            </div>
+
+          {/* Action buttons */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 10 }}>
+            <button onClick={() => setShowLabInput(true)} style={{
+              padding: '12px 10px', borderRadius: 12, cursor: 'pointer', fontWeight: 700, fontSize: 12,
+              background: 'linear-gradient(135deg, rgba(0,230,138,0.12) 0%, rgba(0,230,138,0.04) 100%)',
+              border: '1px solid rgba(0,230,138,0.25)', color: 'var(--accent)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+            }}>
+              <span style={{ fontSize: 16 }}>➕</span> Добавить анализы
+            </button>
+            <button onClick={handleNewLabs} style={{
+              padding: '12px 10px', borderRadius: 12, cursor: 'pointer', fontWeight: 700, fontSize: 12,
+              background: 'linear-gradient(135deg, rgba(59,130,246,0.12) 0%, rgba(59,130,246,0.04) 100%)',
+              border: '1px solid rgba(59,130,246,0.25)', color: '#3b82f6',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+            }}>
+              <span style={{ fontSize: 16 }}>🔄</span> Новые анализы
+            </button>
           </div>
 
-          {/* Penalty card — always visible */}
-          <div className="card" style={{ marginBottom: 8, padding: 10, background: anyNoLabs ? 'rgba(239,68,68,0.08)' : 'var(--glass-bg)', borderColor: anyNoLabs ? 'rgba(239,68,68,0.3)' : 'var(--glass-border)' }}>
+          {/* Import buttons — PDF + Фото */}
+          <div style={{ display: 'flex', gap: 4, marginBottom: 10 }}>
+            <input ref={fileInputRef} type="file" accept=".pdf,.png,.jpg,.jpeg,.webp,.txt" style={{ display: 'none' }}
+              onChange={e => { const f = e.target.files?.[0]; if (f) handleFileUpload(f); }} />
+            <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" style={{ display: 'none' }}
+              onChange={e => { const f = e.target.files?.[0]; if (f) handleFileUpload(f); }} />
+            <button onClick={() => { setShowImport(true); setTimeout(() => fileInputRef.current?.click(), 100); }} style={{
+              flex: 1, padding: 8, borderRadius: 8, border: '1px solid var(--border)',
+              background: 'var(--bg-secondary)', color: 'var(--accent)', fontWeight: 600, fontSize: 11, cursor: 'pointer',
+            }}>📄 Загрузить PDF</button>
+            <button onClick={() => { setShowImport(true); setTimeout(() => cameraInputRef.current?.click(), 100); }} style={{
+              flex: 1, padding: 8, borderRadius: 8, border: '1px solid var(--border)',
+              background: 'var(--bg-secondary)', color: 'var(--accent)', fontWeight: 600, fontSize: 11, cursor: 'pointer',
+            }}>📸 Сфотографировать</button>
+          </div>
+
+          {/* Penalty card */}
+          <div className="card" style={{ marginBottom: 10, padding: 10, background: anyNoLabs ? 'rgba(239,68,68,0.08)' : 'var(--glass-bg)', borderColor: anyNoLabs ? 'rgba(239,68,68,0.3)' : 'var(--glass-border)' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
               <span style={{ fontSize: 11, fontWeight: 600 }}>⚠️ Штраф за отсутствие анализов</span>
               <button onClick={toggleGlobalNoLabs} style={{
@@ -537,37 +531,24 @@ export const LabsScreen: React.FC = () => {
             )}
           </div>
 
-          {/* Import buttons — PDF + Фото (без Вручную) */}
-          <div style={{ display: 'flex', gap: 4, marginBottom: 8 }}>
-            <input ref={fileInputRef} type="file" accept=".pdf,.png,.jpg,.jpeg,.webp,.txt" style={{ display: 'none' }}
-              onChange={e => { const f = e.target.files?.[0]; if (f) handleFileUpload(f); }} />
-            <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" style={{ display: 'none' }}
-              onChange={e => { const f = e.target.files?.[0]; if (f) handleFileUpload(f); }} />
-            <button onClick={() => { setShowImport(true); setTimeout(() => fileInputRef.current?.click(), 100); }} style={{
-              flex: 1, padding: 7, borderRadius: 6, border: '1px solid var(--border)',
-              background: 'var(--bg-secondary)', color: 'var(--accent)', fontWeight: 600, fontSize: 11, cursor: 'pointer',
-            }}>📄 PDF</button>
-            <button onClick={() => { setShowImport(true); setTimeout(() => cameraInputRef.current?.click(), 100); }} style={{
-              flex: 1, padding: 7, borderRadius: 6, border: '1px solid var(--border)',
-              background: 'var(--bg-secondary)', color: 'var(--accent)', fontWeight: 600, fontSize: 11, cursor: 'pointer',
-            }}>📸 Фото</button>
-          </div>
-
           {/* Required labs progress */}
-          <div className="card" style={{ marginBottom: 8 }}>
+          <div className="card" style={{ marginBottom: 10 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
               <span style={{ fontSize: 12, fontWeight: 700 }}>{PHASE_LABELS[selectedPhase]}</span>
               <span style={{ fontSize: 11, fontWeight: 700, color: completionPct === 100 ? 'var(--accent)' : completionPct > 50 ? '#eab308' : '#ef4444' }}>
-                {submittedCount}/{requiredLabs.length}
+                Готово {submittedCount}/{requiredLabs.length}
               </span>
             </div>
-            <div style={{ background: 'var(--bg-secondary)', borderRadius: 4, height: 5, overflow: 'hidden', marginBottom: 8 }}>
-              <div style={{ width: `${completionPct}%`, height: '100%', background: completionPct === 100 ? 'var(--accent)' : '#eab308', borderRadius: 4, transition: 'width 0.3s' }} />
+            <div style={{ background: 'var(--bg-secondary)', borderRadius: 4, height: 6, overflow: 'hidden', marginBottom: 8 }}>
+              <div style={{ width: `${completionPct}%`, height: '100%', background: completionPct === 100 ? 'var(--accent)' : '#eab308', borderRadius: 4, transition: 'width 0.4s ease' }} />
             </div>
             {Object.entries(labsBySystem).map(([system, codes]) => (
-              <div key={system} style={{ marginBottom: 4 }}>
-                <div style={{ fontSize: 9, fontWeight: 600, color: 'var(--accent)', marginBottom: 2 }}>{sysLabels[system] || system}</div>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
+              <div key={system} style={{ marginBottom: 6 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                  <div style={{ width: 8, height: 8, borderRadius: '50%', background: sysColors[system] || '#6b7280', flexShrink: 0 }} />
+                  <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--accent)' }}>{sysLabels[system] || system}</span>
+                </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
                   {codes.map(code => {
                     const info = UCUM_MAP[code.toUpperCase()];
                     const isSubmitted = submittedCodes.has(code.toUpperCase());
@@ -576,14 +557,14 @@ export const LabsScreen: React.FC = () => {
                     const isLow = latest && info ? (latest.value * (info.coeff || 1)) < info.lln : false;
                     return (
                       <button key={code} onClick={() => { setInputCode(code); setInputUnit(info?.prefUnit || ''); setShowLabInput(true); }} style={{
-                        padding: '2px 6px', borderRadius: 4, fontSize: 9, cursor: 'pointer',
-                        background: isSubmitted ? (isHigh ? 'rgba(239,68,68,0.15)' : isLow ? 'rgba(249,115,22,0.15)' : 'rgba(0,230,138,0.1)') : 'var(--bg-secondary)',
-                        border: `1px solid ${isSubmitted ? (isHigh ? 'rgba(239,68,68,0.3)' : isLow ? 'rgba(249,115,22,0.3)' : 'rgba(0,230,138,0.2)') : 'var(--border)'}`,
+                        padding: '3px 8px', borderRadius: 6, fontSize: 10, cursor: 'pointer', transition: 'all 0.15s',
+                        background: isSubmitted ? (isHigh ? 'rgba(239,68,68,0.12)' : isLow ? 'rgba(249,115,22,0.12)' : 'rgba(0,230,138,0.08)') : 'var(--bg-secondary)',
+                        border: `1px solid ${isSubmitted ? (isHigh ? 'rgba(239,68,68,0.3)' : isLow ? 'rgba(249,115,22,0.3)' : 'rgba(0,230,138,0.15)') : 'var(--border)'}`,
                         color: isSubmitted ? (isHigh ? '#ef4444' : isLow ? '#f97316' : 'var(--accent)') : 'var(--text-dim)',
                         fontWeight: isSubmitted ? 600 : 400,
                       }}>
                         {isSubmitted ? (isHigh ? '↑' : isLow ? '↓' : '✓') : '○'} {info?.name || code}
-                        {latest && <span style={{ marginLeft: 2, fontWeight: 700 }}>{latest.value}</span>}
+                        {latest && <span style={{ marginLeft: 3, fontWeight: 700 }}>{latest.value}</span>}
                       </button>
                     );
                   })}
@@ -591,210 +572,182 @@ export const LabsScreen: React.FC = () => {
               </div>
             ))}
             {missingLabs.length > 0 && missingLabs.length < requiredLabs.length && (
-              <div style={{ marginTop: 4, padding: '3px 6px', background: 'rgba(239,68,68,0.08)', borderRadius: 4, fontSize: 9, color: 'var(--text-dim)' }}>
-                Не сдано: {missingLabs.slice(0, 6).join(', ')}{missingLabs.length > 6 ? ` +${missingLabs.length - 6}` : ''}
+              <div style={{ marginTop: 4, padding: '4px 8px', background: 'rgba(239,68,68,0.06)', borderRadius: 6, fontSize: 9, color: 'var(--text-dim)' }}>
+                Не сдано: {missingLabs.slice(0, 8).join(', ')}{missingLabs.length > 8 ? ` +${missingLabs.length - 8}` : ''}
               </div>
             )}
           </div>
+        </div>
+      )}
 
-          {/* Entered results */}
+      {/* ≡≡≡ ARCHIVE TAB ≡≡≡ */}
+      {subTab === 'archive' && (
+        <div>
+          <div style={{ fontSize: 14, fontWeight: 700, padding: '10px 0' }}>📦 Архив результатов</div>
+
+          {/* Summary */}
+          <div className="card" style={{ marginBottom: 10, padding: '10px 12px', background: 'var(--bg-secondary)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>Всего записей: {labs.length}</span>
+              <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>Тестов: {new Set(labs.map(l => l.code.toUpperCase())).size}</span>
+            </div>
+          </div>
+
+          {/* LabsResults — красивые карточки */}
           <LabsResults labs={labs} />
-        </div>
-      )}
 
-      {/* ≡≡≡ CHART TAB ≡≡≡ */}
-      {tab === 'chart' && (() => {
-        const ref = chartSelectedCode ? UCUM_MAP[chartSelectedCode] : null;
-        const vals = chartData.map(d => d.value);
-        const minD = vals.length > 0 ? Math.min(...vals, ref ? ref.lln : 0) : 0;
-        const maxD = vals.length > 0 ? Math.max(...vals, ref ? ref.uln : 100) : 100;
-        const pad = (maxD - minD) * 0.15 || 5;
-        const chartMin = Math.max(0, minD - pad);
-        const chartMax = maxD + pad;
-        const chartRange = chartMax - chartMin;
-        const n = chartData.length;
-        const barW = Math.max(20, Math.min(55, (300 - 50) / (n || 1)));
-        const chartW = Math.max(300, n * barW + 55);
-        const chartH = 200;
-        const xBase = 45;
-        return (
-          <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 100px)', overflow: 'hidden' }}>
-            <div style={{ fontSize: 16, fontWeight: 700, padding: '8px 0', flexShrink: 0 }}>Графики маркеров</div>
-            <div style={{ position: 'relative', marginBottom: 8, flexShrink: 0 }}>
-              <input value={chartMarkerSearch} onChange={e => setChartMarkerSearch(e.target.value)}
-                placeholder="🔍 Поиск маркера..."
-                style={{ width: '100%', padding: '8px 10px', background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', fontSize: 13, outline: 'none', boxSizing: 'border-box' }} />
-              {chartMarkerSearch && (
-                <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 20, maxHeight: 180, overflowY: 'auto', border: '1px solid var(--border)', borderRadius: 8, background: 'var(--bg-secondary)', marginTop: 2 }}>
-                  {uniqMarkers.filter(m => m.code.includes(chartMarkerSearch.toUpperCase()) || m.name.toLowerCase().includes(chartMarkerSearch.toLowerCase())).map(m => (
-                    <button key={m.code} onClick={() => { setChartSelectedCode(m.code); setChartMarkerSearch(''); }} style={{
-                      display: 'block', width: '100%', padding: '6px 10px', fontSize: 12, textAlign: 'left', cursor: 'pointer',
-                      background: chartSelectedCode === m.code ? 'rgba(0,230,138,0.1)' : 'transparent',
-                      border: 'none', borderBottom: '1px solid rgba(255,255,255,0.03)', color: 'var(--text)',
-                    }}>{m.name} <span style={{ color: 'var(--text-dim)', fontSize: 10 }}>({m.code})</span></button>
-                  ))}
-                  {uniqMarkers.filter(m => m.code.includes(chartMarkerSearch.toUpperCase()) || m.name.toLowerCase().includes(chartMarkerSearch.toLowerCase())).length === 0 && (
-                    <div style={{ padding: '8px 10px', fontSize: 11, color: 'var(--text-dim)' }}>Нет совпадений</div>
-                  )}
-                </div>
-              )}
-            </div>
-            {chartSelectedCode ? (chartData.length > 0 ? (
-              <div className="card" style={{ flex: 1, padding: 10, overflow: 'auto', minHeight: 200 }}>
-                <div style={{ marginBottom: 6, fontSize: 11, color: 'var(--text-dim)' }}>
-                  {ref?.name || chartSelectedCode} — <span style={{ color: 'var(--accent)' }}>{chartData.length} записей</span>
-                </div>
-                <svg viewBox={`0 0 ${chartW} ${chartH + 30}`} style={{ width: '100%', height: 'auto', display: 'block' }}>
-                  {[0, 0.25, 0.5, 0.75, 1].map(f => { const y = chartH - f * chartH; return (
-                    <g key={f}>
-                      <line x1={xBase} y1={y} x2={chartW - 10} y2={y} stroke="rgba(255,255,255,0.05)" strokeWidth={0.5} />
-                      <text x={xBase - 4} y={y + 3} fill="var(--text-dim)" fontSize={8} textAnchor="end">{(chartMin + f * chartRange).toFixed(1)}</text>
-                    </g>
-                  );})}
-                  {ref && (<>
-                    <line x1={xBase} y1={chartH - ((ref.uln - chartMin) / chartRange) * chartH} x2={chartW - 10} y2={chartH - ((ref.uln - chartMin) / chartRange) * chartH} stroke="#ef4444" strokeWidth={1} strokeDasharray="4 2" />
-                    <text x={chartW - 10} y={chartH - ((ref.uln - chartMin) / chartRange) * chartH - 3} fill="#ef4444" fontSize={7} textAnchor="end">ULN {ref.uln}{ref.prefUnit ? ' ' + ref.prefUnit : ''}</text>
-                  </>)}
-                  {ref && (<>
-                    <line x1={xBase} y1={chartH - ((ref.lln - chartMin) / chartRange) * chartH} x2={chartW - 10} y2={chartH - ((ref.lln - chartMin) / chartRange) * chartH} stroke="#22c55e" strokeWidth={1} strokeDasharray="4 2" />
-                    <text x={chartW - 10} y={chartH - ((ref.lln - chartMin) / chartRange) * chartH - 3} fill="#22c55e" fontSize={7} textAnchor="end">LLN {ref.lln}{ref.prefUnit ? ' ' + ref.prefUnit : ''}</text>
-                  </>)}
-                  {chartData.map((d, i) => {
-                    const x = xBase + i * barW;
-                    const barH = Math.max(0, ((d.value - chartMin) / chartRange) * chartH);
-                    const y = chartH - barH;
-                    const color = ref ? (d.value > ref.uln ? '#ef4444' : d.value < ref.lln ? '#f97316' : 'var(--accent)') : 'var(--accent)';
-                    return (
-                      <g key={`${d.date}_${i}`}>
-                        <rect x={x + 1} y={y} width={Math.max(3, barW - 2)} height={barH} fill={color} rx={2} opacity={0.85} />
-                        <text x={x + barW / 2} y={y - 3} fill={color} fontSize={7} textAnchor="middle" fontWeight={600}>{d.value}</text>
-                        <text x={x + barW / 2} y={chartH + 10} fill="var(--text-dim)" fontSize={6} textAnchor="middle">{d.date.slice(5)}</text>
-                        {d.phase && <text x={x + barW / 2} y={chartH + 20} fill="var(--accent)" fontSize={5} textAnchor="middle">{(PHASE_LABELS[d.phase] || d.phase)[0]}</text>}
-                      </g>
-                    );
-                  })}
-                  <line x1={xBase} y1={chartH} x2={chartW - 10} y2={chartH} stroke="var(--border)" strokeWidth={1} />
-                </svg>
-                <div style={{ display: 'flex', gap: 12, marginTop: 6, fontSize: 9, color: 'var(--text-dim)', flexWrap: 'wrap' }}>
-                  <span><span style={{ display: 'inline-block', width: 10, height: 2, background: '#ef4444', verticalAlign: 'middle', marginRight: 4 }} /> ULN</span>
-                  <span><span style={{ display: 'inline-block', width: 10, height: 2, background: '#22c55e', verticalAlign: 'middle', marginRight: 4 }} /> LLN</span>
-                  <span><span style={{ display: 'inline-block', width: 10, height: 8, background: 'var(--accent)', verticalAlign: 'middle', marginRight: 4, borderRadius: 2 }} /> В норме</span>
-                  <span><span style={{ display: 'inline-block', width: 10, height: 8, background: '#ef4444', verticalAlign: 'middle', marginRight: 4, borderRadius: 2 }} /> Выше нормы</span>
-                  <span><span style={{ display: 'inline-block', width: 10, height: 8, background: '#f97316', verticalAlign: 'middle', marginRight: 4, borderRadius: 2 }} /> Ниже нормы</span>
-                </div>
-              </div>
-            ) : (
-              <div className="card" style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 200 }}>
-                <div style={{ textAlign: 'center', fontSize: 11, color: 'var(--text-dim)' }}>Нет данных для этого маркера</div>
-              </div>
-            )) : (
-              <div className="card" style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 200 }}>
-                <div style={{ textAlign: 'center', fontSize: 11, color: 'var(--text-dim)' }}>Выберите маркер для просмотра динамики</div>
-              </div>
-            )}
-          </div>
-        );
-      })()}
-
-      {/* ≡≡≡ SCHEDULE TAB ≡≡≡ */}
-      {tab === 'schedule' && (
-        <div>
-          <LabsSchedule />
-        </div>
-      )}
-
-      {/* ≡≡≡ INVESTIGATIONS TAB ≡≡≡ */}
-      {tab === 'investigations' && (
-        <div>
-          <LabsInvestigations />
-        </div>
-      )}
-
-      {/* ≡≡≡ CATALOG TAB ≡≡≡ */}
-      {tab === 'catalog' && (() => {
-        const systemOrder = ['hepatic','renal','endocrine','hematologic','cardio','metabolic','reproductive','neuro','other'];
-        return (
-          <div style={{ height: 'calc(100vh - 100px)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-            <div style={{ fontSize: 16, fontWeight: 700, padding: '8px 0', flexShrink: 0 }}>Каталог маркеров</div>
-            <div style={{ position: 'relative', marginBottom: 8, flexShrink: 0 }}>
-              <input value={catalogSearch} onChange={e => setCatalogSearch(e.target.value)}
-                placeholder="🔍 Поиск маркера по названию или коду..."
-                style={{ width: '100%', padding: '8px 10px', background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', fontSize: 13, outline: 'none', boxSizing: 'border-box' }} />
-            </div>
-            <div style={{ flex: 1, overflowY: 'auto', paddingBottom: 16 }}>
-              {systemOrder.map(sys => {
-                const entries = groupedCatalog[sys];
-                if (!entries || entries.length === 0) return null;
-                return (
-                  <div key={sys} className="card" style={{ marginBottom: 8, padding: 10 }}>
-                    <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--accent)', marginBottom: 8 }}>
-                      {sysLabels[sys] || sys} <span style={{ fontSize: 10, color: 'var(--text-dim)', fontWeight: 400 }}>({entries.length})</span>
-                    </div>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-                      {entries.map(entry => (
-                        <button key={entry.code} onClick={() => setCatalogDetail(entry)} style={{
-                          padding: '6px 10px', borderRadius: 8, cursor: 'pointer', textAlign: 'left',
-                          background: 'var(--bg-secondary)', border: '1px solid var(--border)',
-                          color: 'var(--text)', fontSize: 11, minWidth: 140, flex: '1 0 auto', maxWidth: '100%',
-                          transition: 'all 0.15s',
+          {/* History by date */}
+          <div style={{ marginTop: 12 }}>
+            {(() => {
+              const byDate = new Map<string, LabPoint[]>();
+              for (const lab of labs) {
+                const d = lab.date || '';
+                if (!byDate.has(d)) byDate.set(d, []);
+                byDate.get(d)!.push(lab);
+              }
+              const sortedDates = Array.from(byDate.keys()).sort().reverse();
+              if (sortedDates.length === 0) return <div style={{ fontSize: 12, color: 'var(--text-dim)', textAlign: 'center', padding: 24 }}>Нет данных анализов</div>;
+              return sortedDates.map(date => (
+                <div key={date} style={{
+                  marginBottom: 8, padding: '10px 12px', borderRadius: 12, background: 'var(--bg-secondary)',
+                  border: '1px solid var(--border)',
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--accent)' }}>{date}</span>
+                    <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>{byDate.get(date)!.length} маркеров</span>
+                  </div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
+                    {byDate.get(date)!.map(lab => {
+                      const info = UCUM_MAP[lab.code.toUpperCase()];
+                      const norm = lab.value * (info?.coeff || 1);
+                      const isAbnormal = info && (norm > info.uln || norm < info.lln);
+                      return (
+                        <span key={lab.code + lab.date} style={{
+                          background: isAbnormal ? 'rgba(239,68,68,0.1)' : 'rgba(0,230,138,0.06)',
+                          color: isAbnormal ? '#ef4444' : 'var(--accent)',
+                          padding: '3px 8px', borderRadius: 6, fontSize: 10, fontWeight: 600,
+                          border: `1px solid ${isAbnormal ? 'rgba(239,68,68,0.2)' : 'rgba(0,230,138,0.1)'}`,
                         }}>
-                          <div style={{ fontWeight: 600, fontSize: 12, marginBottom: 2 }}>{entry.name}</div>
-                          <div style={{ fontSize: 10, color: 'var(--accent)' }}>
-                            {entry.lln}–{entry.uln} {entry.unit}
-                          </div>
-                          {entry.description && (
-                            <div style={{ fontSize: 9, color: 'var(--text-dim)', marginTop: 2, lineHeight: 1.3, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
-                              {entry.description}
-                            </div>
-                          )}
-                        </button>
-                      ))}
+                          {info?.name || lab.code} {lab.value}{lab.unit}
+                        </span>
+                      );
+                    })}
+                  </div>
+                </div>
+              ));
+            })()}
+          </div>
+        </div>
+      )}
+
+      {/* ≡≡≡ CATALOG TAB — капитально улучшен ≡≡≡ */}
+      {subTab === 'catalog' && (() => {
+        const systemOrder = ['hepatic','renal','endocrine','hematologic','cardio','metabolic','reproductive','neuro','other'];
+        const sysIcons: Record<string, string> = {
+          hepatic: '🫁', renal: '🫘', endocrine: '🧬', hematologic: '🩸',
+          cardio: '❤️', metabolic: '⚡', reproductive: '🧫', neuro: '🧠', other: '📋',
+        };
+        return (
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 0' }}>
+              <span style={{ fontSize: 18 }}>📖</span>
+              <span style={{ fontSize: 16, fontWeight: 700 }}>Каталог маркеров</span>
+              <span style={{ fontSize: 11, color: 'var(--text-dim)', marginLeft: 'auto' }}>{catalogEntries.length}</span>
+            </div>
+
+            {/* Search */}
+            <div style={{ position: 'relative', marginBottom: 10 }}>
+              <input value={catalogSearch} onChange={e => setCatalogSearch(e.target.value)}
+                placeholder="🔍 Поиск по названию или коду..."
+                style={{ width: '100%', padding: '10px 12px', background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: 10, color: 'var(--text)', fontSize: 13, outline: 'none', boxSizing: 'border-box' }} />
+            </div>
+
+            {/* Systems */}
+            {systemOrder.map(sys => {
+              const entries = groupedCatalog[sys];
+              if (!entries || entries.length === 0) return null;
+              return (
+                <div key={sys} className="card" style={{ marginBottom: 10, padding: 12, overflow: 'hidden' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                    <span style={{ fontSize: 18 }}>{sysIcons[sys] || '📋'}</span>
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--accent)' }}>{sysLabels[sys] || sys}</div>
+                      <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>{entries.length} маркеров</div>
                     </div>
                   </div>
-                );
-              })}
-              {filteredCatalogEntries.length === 0 && (
-                <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-dim)', fontSize: 12 }}>
-                  Нет маркеров по запросу «{catalogSearch}»
+                  <div style={{ display: 'grid', gap: 4 }}>
+                    {entries.map(entry => (
+                      <button key={entry.code} onClick={() => setCatalogDetail(entry)} style={{
+                        display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderRadius: 8, cursor: 'pointer', textAlign: 'left', width: '100%',
+                        background: 'var(--bg-secondary)', border: '1px solid var(--border)',
+                        color: 'var(--text)', fontSize: 11, transition: 'all 0.15s',
+                      }}>
+                        <div style={{
+                          width: 28, height: 28, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          background: sysColors[sys] + '18', color: sysColors[sys], fontWeight: 700, fontSize: 10, flexShrink: 0,
+                        }}>
+                          {entry.code.slice(0, 3)}
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontWeight: 600, fontSize: 11, marginBottom: 2 }}>{entry.name}</div>
+                          <div style={{ fontSize: 9, color: 'var(--accent)' }}>{entry.lln}–{entry.uln} {entry.unit}</div>
+                        </div>
+                        <span style={{ color: 'var(--text-dim)', fontSize: 11 }}>→</span>
+                      </button>
+                    ))}
+                  </div>
                 </div>
-              )}
-            </div>
+              );
+            })}
+            {filteredCatalogEntries.length === 0 && (
+              <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-dim)', fontSize: 12 }}>
+                Нет маркеров по запросу «{catalogSearch}»
+              </div>
+            )}
 
             {/* Detail Modal */}
             {catalogDetail && (() => {
               const info = UCUM_MAP[catalogDetail.code];
               return (
-                <div style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => setCatalogDetail(null)}>
-                  <div style={{ width: '92%', maxWidth: 400, zIndex: 201, background: 'var(--bg)', borderRadius: 16, padding: '14px 16px', boxShadow: '0 8px 32px rgba(0,0,0,0.4)' }} onClick={e => e.stopPropagation()}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
-                      <div>
-                        <div style={{ fontWeight: 700, fontSize: 16 }}>{catalogDetail.name}</div>
-                        <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>{catalogDetail.code}</div>
+                <div style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(10px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 12 }} onClick={() => setCatalogDetail(null)}>
+                  <div style={{ width: '100%', maxWidth: 420, zIndex: 201, background: 'var(--bg)', borderRadius: 20, padding: '16px 18px', boxShadow: '0 12px 40px rgba(0,0,0,0.5)' }} onClick={e => e.stopPropagation()}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <div style={{
+                          width: 36, height: 36, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          background: sysColors[catalogDetail.system] + '20', color: sysColors[catalogDetail.system], fontWeight: 700, fontSize: 12,
+                        }}>
+                          {catalogDetail.code.slice(0, 3)}
+                        </div>
+                        <div>
+                          <div style={{ fontWeight: 700, fontSize: 16 }}>{catalogDetail.name}</div>
+                          <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>{catalogDetail.code}</div>
+                        </div>
                       </div>
-                      <button onClick={() => setCatalogDetail(null)} style={{ background: 'var(--bg-secondary)', border: 'none', color: 'var(--text-dim)', borderRadius: 6, padding: '3px 8px', fontSize: 11, cursor: 'pointer' }}>✕</button>
+                      <button onClick={() => setCatalogDetail(null)} style={{ background: 'var(--bg-secondary)', border: 'none', color: 'var(--text-dim)', borderRadius: 8, padding: '4px 10px', fontSize: 12, cursor: 'pointer' }}>✕</button>
                     </div>
-                    <div style={{ display: 'grid', gap: 6, marginBottom: 8 }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 8px', background: 'var(--bg-secondary)', borderRadius: 6 }}>
-                        <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>Система</span>
-                        <span style={{ fontSize: 11, fontWeight: 600 }}>{sysLabels[catalogDetail.system] || catalogDetail.system}</span>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 10 }}>
+                      <div style={{ padding: '6px 10px', background: 'var(--bg-secondary)', borderRadius: 8 }}>
+                        <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 2 }}>Система</div>
+                        <div style={{ fontSize: 12, fontWeight: 600 }}>{sysLabels[catalogDetail.system] || catalogDetail.system}</div>
                       </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 8px', background: 'var(--bg-secondary)', borderRadius: 6 }}>
-                        <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>Референс</span>
-                        <span style={{ fontSize: 11, fontWeight: 600 }}>{catalogDetail.lln} – {catalogDetail.uln} {catalogDetail.unit}</span>
+                      <div style={{ padding: '6px 10px', background: 'var(--bg-secondary)', borderRadius: 8 }}>
+                        <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 2 }}>Референс</div>
+                        <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--accent)' }}>{catalogDetail.lln}–{catalogDetail.uln}</div>
                       </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 8px', background: 'var(--bg-secondary)', borderRadius: 6 }}>
-                        <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>Единица</span>
-                        <span style={{ fontSize: 11, fontWeight: 600 }}>{catalogDetail.unit || '—'}</span>
+                      <div style={{ padding: '6px 10px', background: 'var(--bg-secondary)', borderRadius: 8 }}>
+                        <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 2 }}>Единица</div>
+                        <div style={{ fontSize: 12, fontWeight: 600 }}>{catalogDetail.unit || '—'}</div>
                       </div>
                       {info && info.coeff !== 1 && (
-                        <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 8px', background: 'var(--bg-secondary)', borderRadius: 6 }}>
-                          <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>Коэффициент</span>
-                          <span style={{ fontSize: 11, fontWeight: 600 }}>{info.coeff}</span>
+                        <div style={{ padding: '6px 10px', background: 'var(--bg-secondary)', borderRadius: 8 }}>
+                          <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 2 }}>Коэффициент</div>
+                          <div style={{ fontSize: 12, fontWeight: 600 }}>{info.coeff}</div>
                         </div>
                       )}
                     </div>
                     {catalogDetail.description && (
-                      <div style={{ fontSize: 12, color: 'var(--text)', lineHeight: 1.5, padding: '8px 0', borderTop: '1px solid var(--border)' }}>
+                      <div style={{ fontSize: 12, color: 'var(--text)', lineHeight: 1.6, padding: '10px 0', borderTop: '1px solid var(--border)' }}>
                         {catalogDetail.description}
                       </div>
                     )}
@@ -806,357 +759,346 @@ export const LabsScreen: React.FC = () => {
         );
       })()}
 
-      {/* ≡≡≡ RISKS & INDICES TAB — redesigned: 4 sections, no phase selector ≡≡≡ */}
-      {tab === 'risks-indices' && (
-        <div style={{ height: 'calc(100vh - 110px)', overflowY: 'auto', paddingBottom: 24 }}>
+      {/* ≡≡≡ CHART TAB — улучшенный ≡≡≡ */}
+      {subTab === 'chart' && (() => {
+        const ref = chartSelectedCode ? UCUM_MAP[chartSelectedCode] : null;
+        const vals = chartData.map(d => d.value);
+        const minD = vals.length > 0 ? Math.min(...vals, ref ? ref.lln : 0) : 0;
+        const maxD = vals.length > 0 ? Math.max(...vals, ref ? ref.uln : 100) : 100;
+        const pad = (maxD - minD) * 0.2 || 10;
+        const chartMin = Math.max(0, minD - pad);
+        const chartMax = maxD + pad;
+        const chartRange = chartMax - chartMin;
+        const n = chartData.length;
+        const barW = Math.max(28, Math.min(60, (320 - 50) / (n || 1)));
+        const chartW = Math.max(320, n * barW + 60);
+        const chartH = 240;
+        const xBase = 50;
+        return (
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 0' }}>
+              <span style={{ fontSize: 18 }}>📈</span>
+              <span style={{ fontSize: 16, fontWeight: 700 }}>Графики маркеров</span>
+            </div>
 
-          {/* ─── Section 1: Lab-Pharma Risks ─── */}
-          <div className="card" style={{ padding: 10, marginTop: 8 }}>
-            <h4 style={{ margin: '0 0 8px', fontSize: 12, fontWeight: 700, color: 'var(--accent)' }}>
-              🧬 Лабораторно-фармацевтические риски
-            </h4>
-            {labPharmaAlerts.length > 0 ? (
-              <div style={{ display: 'grid', gap: 3 }}>
-                {labPharmaAlerts.map((a, i) => (
-                  <div key={i} style={{
-                    fontSize: 9, padding: '4px 6px', borderRadius: 6,
-                    background: a.severity === 'critical' ? 'rgba(239,68,68,0.08)' : a.severity === 'high' ? 'rgba(245,158,11,0.08)' : 'var(--bg-secondary)',
-                    border: `1px solid ${a.severity === 'critical' ? 'rgba(239,68,68,0.2)' : a.severity === 'high' ? 'rgba(245,158,11,0.2)' : 'transparent'}`,
-                  }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 2 }}>
-                      <span style={{ fontWeight: 600, color: a.severity === 'critical' ? '#ef4444' : a.severity === 'high' ? '#f59e0b' : 'var(--text)' }}>
-                        {a.marker} {a.actualStatus === 'high' ? '↑' : a.actualStatus === 'low' ? '↓' : ''} {a.value}{a.unit}
-                      </span>
-                      <span style={{
-                        fontSize: 8, padding: '1px 5px', borderRadius: 4, fontWeight: 600,
-                        background: a.severity === 'critical' ? '#ef4444' : a.severity === 'high' ? '#f59e0b' : '#22c55e',
-                        color: a.severity === 'critical' || a.severity === 'high' ? '#fff' : '#000',
-                      }}>
-                        {a.severity === 'critical' ? 'КРИТ' : a.severity === 'high' ? 'ВЫСОК' : 'МОНИТ'}
-                      </span>
-                    </div>
-                    <div style={{ color: 'var(--text-dim)', fontSize: 8 }}>
-                      {a.drugCause?.join(', ')} — {a.recommendation}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div style={{ fontSize: 10, color: 'var(--text-dim)', textAlign: 'center', padding: '12px 0' }}>
-                {hasLabs
-                  ? 'Связи анализов с препаратами не обнаружены'
-                  : 'Введите анализы для расчёта лабораторно-фармацевтических рисков'}
-              </div>
-            )}
-          </div>
-
-          {/* ─── Section 2: Composite Indices ─── */}
-          <div className="card" style={{ padding: 10, marginTop: 8 }}>
-            <h4 style={{ margin: '0 0 8px', fontSize: 12, fontWeight: 700, color: 'var(--accent)' }}>
-              📊 Композитные индексы здоровья
-            </h4>
-            {(() => {
-              const r = labAnalysisResult;
-              // ASI (Anabolic Synthesis Index) — higher = better, computed from inverse of disruptions
-              const rawASI = r ? Math.max(0, Math.round(100 - (
-                (r.hormoneScore || 0) * 0.4 +
-                Math.min(100, (r.inflammation || 0) / 6 * 50) * 0.3 +
-                (r.kidneyStress || 0) * 0.3
-              ))) : null;
-              const ASI = rawASI !== null ? Math.min(100, rawASI) : null;
-              // HMI (Hepatic Metabolic Index) — from liverStress
-              const HMI = r ? Math.round(Math.min(100, r.liverStress || 0)) : null;
-              // CR (Cardiac Risk) — from cardioRisk
-              const CR = r ? Math.round(Math.min(100, r.cardioRisk || 0)) : null;
-
-              const statusColor = (val: number, invert: boolean) => {
-                if (!invert) {
-                  if (val <= 30) return '#22c55e';
-                  if (val <= 60) return '#eab308';
-                  return '#ef4444';
-                }
-                // inverted: higher = better
-                if (val >= 70) return '#22c55e';
-                if (val >= 40) return '#eab308';
-                return '#ef4444';
-              };
-              const statusLabel = (val: number, invert: boolean) => {
-                if (!invert) {
-                  if (val <= 30) return 'Норма';
-                  if (val <= 60) return 'Внимание';
-                  return 'Опасность';
-                }
-                if (val >= 70) return 'Хорошо';
-                if (val >= 40) return 'Умеренно';
-                return 'Низкий';
-              };
-
-              return (
-                <div style={{ display: 'grid', gap: 6 }}>
-                  {/* ASI card */}
-                  <div style={{
-                    padding: 8, borderRadius: 8,
-                    background: ASI !== null ? `rgba(${ASI >= 70 ? '34,197,94' : ASI >= 40 ? '234,179,8' : '239,68,68'},0.06)` : 'var(--bg-secondary)',
-                    border: ASI !== null ? `1px solid rgba(${ASI >= 70 ? '34,197,94' : ASI >= 40 ? '234,179,8' : '239,68,68'},0.2)` : '1px solid var(--border)',
-                  }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <div>
-                        <div style={{ fontSize: 10, fontWeight: 600 }}>ASI (Анаболический синтез)</div>
-                        <div style={{ fontSize: 8, color: 'var(--text-dim)', marginTop: 2 }}>
-                          Отражает способность организма к анаболизму на основе гормонального фона, воспаления и почечной функции
-                        </div>
-                      </div>
-                      <div style={{ textAlign: 'right' }}>
-                        {ASI !== null ? (
-                          <>
-                            <div style={{ fontSize: 18, fontWeight: 700, color: statusColor(ASI, true) }}>{ASI}%</div>
-                            <div style={{ fontSize: 8, color: statusColor(ASI, true), fontWeight: 600 }}>{statusLabel(ASI, true)}</div>
-                          </>
-                        ) : (
-                          <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>Нет данных</div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* HMI card */}
-                  <div style={{
-                    padding: 8, borderRadius: 8,
-                    background: HMI !== null ? `rgba(${HMI <= 30 ? '34,197,94' : HMI <= 60 ? '234,179,8' : '239,68,68'},0.06)` : 'var(--bg-secondary)',
-                    border: HMI !== null ? `1px solid rgba(${HMI <= 30 ? '34,197,94' : HMI <= 60 ? '234,179,8' : '239,68,68'},0.2)` : '1px solid var(--border)',
-                  }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <div>
-                        <div style={{ fontSize: 10, fontWeight: 600 }}>HMI (Гепатический метаболизм)</div>
-                        <div style={{ fontSize: 8, color: 'var(--text-dim)', marginTop: 2 }}>
-                          Стресс печени по трансаминазам, GGT, билирубину, ЩФ
-                        </div>
-                      </div>
-                      <div style={{ textAlign: 'right' }}>
-                        {HMI !== null ? (
-                          <>
-                            <div style={{ fontSize: 18, fontWeight: 700, color: statusColor(HMI, false) }}>{HMI}%</div>
-                            <div style={{ fontSize: 8, color: statusColor(HMI, false), fontWeight: 600 }}>{statusLabel(HMI, false)}</div>
-                          </>
-                        ) : (
-                          <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>Нет данных</div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* CR card */}
-                  <div style={{
-                    padding: 8, borderRadius: 8,
-                    background: CR !== null ? `rgba(${CR <= 30 ? '34,197,94' : CR <= 60 ? '234,179,8' : '239,68,68'},0.06)` : 'var(--bg-secondary)',
-                    border: CR !== null ? `1px solid rgba(${CR <= 30 ? '34,197,94' : CR <= 60 ? '234,179,8' : '239,68,68'},0.2)` : '1px solid var(--border)',
-                  }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <div>
-                        <div style={{ fontSize: 10, fontWeight: 600 }}>CR (Кардиориск)</div>
-                        <div style={{ fontSize: 8, color: 'var(--text-dim)', marginTop: 2 }}>
-                          Липидный профиль, воспаление, гомоцистеин
-                        </div>
-                      </div>
-                      <div style={{ textAlign: 'right' }}>
-                        {CR !== null ? (
-                          <>
-                            <div style={{ fontSize: 18, fontWeight: 700, color: statusColor(CR, false) }}>{CR}%</div>
-                            <div style={{ fontSize: 8, color: statusColor(CR, false), fontWeight: 600 }}>{statusLabel(CR, false)}</div>
-                          </>
-                        ) : (
-                          <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>Нет данных</div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Divider + computed indices from labIndexDetails */}
-                  {indexEntries.length > 0 && (
-                    <>
-                      <div style={{ height: 1, background: 'var(--border)', margin: '4px 0' }} />
-                      <div style={{ fontSize: 9, fontWeight: 600, color: 'var(--text-dim)', marginBottom: 4 }}>Детальные индексы:</div>
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 3 }}>
-                        {indexEntries.map(d => (
-                          <div key={d.key} style={{
-                            padding: '4px 6px', borderRadius: 5,
-                            background: 'var(--bg-secondary)',
-                            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                          }}>
-                            <span style={{ fontSize: 9 }}>{d.label}</span>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                              <div style={{
-                                width: 30, height: 4, borderRadius: 2,
-                                background: 'rgba(255,255,255,0.08)', overflow: 'hidden',
-                              }}>
-                                <div style={{
-                                  width: `${Math.min(100, d.value)}%`, height: '100%',
-                                  background: getRiskColor(d.value), borderRadius: 2,
-                                }} />
-                              </div>
-                              <span style={{ fontWeight: 700, fontSize: 10, color: getRiskColor(d.value), minWidth: 24, textAlign: 'right' }}>
-                                {d.value}%
-                              </span>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </>
+            {/* Search */}
+            <div style={{ position: 'relative', marginBottom: 10 }}>
+              <input value={chartMarkerSearch} onChange={e => setChartMarkerSearch(e.target.value)}
+                placeholder="🔍 Выберите маркер для просмотра динамики..."
+                style={{ width: '100%', padding: '10px 12px', background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: 10, color: 'var(--text)', fontSize: 13, outline: 'none', boxSizing: 'border-box' }} />
+              {chartMarkerSearch && (
+                <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 20, maxHeight: 200, overflowY: 'auto', border: '1px solid var(--border)', borderRadius: 10, background: 'var(--bg-secondary)', marginTop: 4, boxShadow: '0 8px 24px rgba(0,0,0,0.3)' }}>
+                  {uniqMarkers.filter(m => m.code.includes(chartMarkerSearch.toUpperCase()) || m.name.toLowerCase().includes(chartMarkerSearch.toLowerCase())).map(m => (
+                    <button key={m.code} onClick={() => { setChartSelectedCode(m.code); setChartMarkerSearch(''); }} style={{
+                      display: 'block', width: '100%', padding: '8px 12px', fontSize: 12, textAlign: 'left', cursor: 'pointer',
+                      background: chartSelectedCode === m.code ? 'rgba(0,230,138,0.1)' : 'transparent',
+                      border: 'none', borderBottom: '1px solid rgba(255,255,255,0.03)', color: 'var(--text)',
+                    }}>{m.name} <span style={{ color: 'var(--text-dim)', fontSize: 10 }}>({m.code})</span></button>
+                  ))}
+                  {uniqMarkers.filter(m => m.code.includes(chartMarkerSearch.toUpperCase()) || m.name.toLowerCase().includes(chartMarkerSearch.toLowerCase())).length === 0 && (
+                    <div style={{ padding: '10px 12px', fontSize: 11, color: 'var(--text-dim)' }}>Нет совпадений</div>
                   )}
                 </div>
-              );
-            })()}
-          </div>
-
-          {/* ─── Section 3: All System Risks ─── */}
-          <div className="card" style={{ padding: 10, marginTop: 8 }}>
-            <h4 style={{ margin: '0 0 8px', fontSize: 12, fontWeight: 700, color: 'var(--accent)' }}>
-              ⚠️ Риски по системам организма
-            </h4>
-            {labRisks && Object.values(labRisks.systemBreakdown).some(v => v.net > 0) ? (
-              <div>
-                {/* Summary header */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 8 }}>
-                  <div style={{ background: 'var(--bg-secondary)', padding: 8, borderRadius: 6, textAlign: 'center' }}>
-                    <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Общий риск</div>
-                    <div style={{ fontSize: 20, fontWeight: 700, color: getRiskColor(labRisks.overallNet) }}>{Math.round(labRisks.overallNet)}%</div>
-                  </div>
-                  <div style={{ background: 'var(--bg-secondary)', padding: 8, borderRadius: 6, textAlign: 'center' }}>
-                    <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Отклонения</div>
-                    <div style={{ fontSize: 20, fontWeight: 700, color: deviationCount > 0 ? '#ef4444' : 'var(--text-dim)' }}>
-                      {deviationCount}
-                    </div>
-                    <div style={{ fontSize: 8, color: 'var(--text-dim)' }}>маркеров</div>
-                  </div>
-                </div>
-
-                {/* System breakdown */}
-                <div style={{ display: 'grid', gap: 3 }}>
-                  {Object.entries(labRisks.systemBreakdown)
-                    .filter(([_, v]) => v.net > 0)
-                    .sort(([_, a], [__, b]) => b.net - a.net)
-                    .map(([sys, val]) => {
-                      const level = val.net <= 25 ? 'low' : val.net <= 50 ? 'medium' : val.net <= 75 ? 'high' : 'critical';
-                      const levelColors: Record<string, { bg: string; text: string; bar: string }> = {
-                        low: { bg: 'rgba(34,197,94,0.08)', text: '#22c55e', bar: '#22c55e' },
-                        medium: { bg: 'rgba(234,179,8,0.08)', text: '#eab308', bar: '#eab308' },
-                        high: { bg: 'rgba(249,115,22,0.08)', text: '#f97316', bar: '#f97316' },
-                        critical: { bg: 'rgba(239,68,68,0.08)', text: '#ef4444', bar: '#ef4444' },
-                      };
-                      const c = levelColors[level];
-                      return (
-                        <div key={sys} style={{
-                          display: 'flex', alignItems: 'center', gap: 6,
-                          padding: '5px 8px', borderRadius: 6,
-                          background: c.bg,
-                          border: `1px solid ${c.bg.replace('0.08', '0.15')}`,
-                        }}>
-                          <span style={{
-                            fontSize: 9, fontWeight: 600, minWidth: 60, color: c.text,
-                          }}>
-                            {sysLabels[sys] || sys}
-                          </span>
-                          <div style={{ flex: 1, height: 6, background: 'rgba(255,255,255,0.06)', borderRadius: 3, overflow: 'hidden' }}>
-                            <div style={{
-                              width: `${Math.min(100, val.net)}%`, height: '100%',
-                              background: c.bar, borderRadius: 3,
-                              transition: 'width 0.4s ease',
-                            }} />
-                          </div>
-                          <span style={{ fontSize: 11, fontWeight: 700, color: c.text, minWidth: 28, textAlign: 'right' }}>
-                            {Math.round(val.net)}%
-                          </span>
-                        </div>
-                      );
-                    })}
-                </div>
-              </div>
-            ) : (
-              <div style={{ fontSize: 10, color: 'var(--text-dim)', textAlign: 'center', padding: '12px 0' }}>
-                {hasLabs
-                  ? 'Все системы в норме — отклонений не обнаружено'
-                  : 'Введите анализы для расчёта системных рисков'}
-              </div>
-            )}
-          </div>
-
-          {/* ─── Section 4: Abnormal Markers ─── */}
-          <div className="card" style={{ padding: 10, marginTop: 8 }}>
-            <h4 style={{ margin: '0 0 8px', fontSize: 12, fontWeight: 700, color: 'var(--accent)' }}>
-              🔬 Маркеры с отклонениями
-            </h4>
-            {deviationCount > 0 && labRisks ? (
-              <div style={{ display: 'grid', gap: 3 }}>
-                {labRisks.markerDeviations.map(m => {
-                  const isHigh = m.deviation > 0;
-                  const absDev = Math.abs(m.deviation);
-                  const devLevel = absDev <= 20 ? 'low' : absDev <= 50 ? 'medium' : absDev <= 100 ? 'high' : 'critical';
-                  const devColors: Record<string, { bg: string; text: string }> = {
-                    low: { bg: 'rgba(34,197,94,0.06)', text: '#22c55e' },
-                    medium: { bg: 'rgba(234,179,8,0.06)', text: '#eab308' },
-                    high: { bg: 'rgba(249,115,22,0.06)', text: '#f97316' },
-                    critical: { bg: 'rgba(239,68,68,0.06)', text: '#ef4444' },
-                  };
-                  const dc = devColors[devLevel];
-                  return (
-                    <div key={m.code + m.value} style={{
-                      display: 'flex', alignItems: 'center', gap: 5,
-                      padding: '5px 8px', borderRadius: 6,
-                      background: dc.bg,
-                      border: `1px solid ${dc.bg.replace('0.06', '0.12')}`,
-                    }}>
-                      <span style={{ fontSize: 8, color: 'var(--text-dim)', minWidth: 46 }}>{sysLabels[m.system] || m.system}</span>
-                      <span style={{ fontSize: 10, fontWeight: 600, flex: 1, color: 'var(--text)' }}>{m.name}</span>
-                      <span style={{ fontSize: 8, color: 'var(--text-dim)' }}>{m.lln}–{m.uln}</span>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-                        <span style={{ fontSize: 10, fontWeight: 700, color: dc.text }}>{m.value}</span>
-                        <span style={{
-                          fontSize: 8, padding: '1px 4px', borderRadius: 3, fontWeight: 600,
-                          background: dc.text + '22', color: dc.text,
-                        }}>
-                          {isHigh ? '↑' : '↓'}{absDev}%
-                        </span>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            ) : (
-              <div style={{ fontSize: 10, color: 'var(--text-dim)', textAlign: 'center', padding: '12px 0' }}>
-                {hasLabs
-                  ? 'Все маркеры в пределах нормы'
-                  : 'Введите анализы для просмотра отклонений'}
-              </div>
-            )}
-          </div>
-
-          {/* Penalty info footer */}
-          {anyNoLabs && (
-            <div className="card" style={{ padding: 8, marginTop: 8, background: 'rgba(239,68,68,0.06)', borderColor: 'rgba(239,68,68,0.2)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: 9, color: '#ef4444', fontWeight: 600 }}>⚠️ Штраф за отсутствие анализов</span>
-                <span style={{ fontSize: 9, fontWeight: 700, color: '#ef4444' }}>×{penalty.totalMultiplier.toFixed(2)}</span>
-              </div>
-              <div style={{ fontSize: 8, color: 'var(--text-dim)', marginTop: 2 }}>
-                Коэффициент применяется ко всем системным рискам
-              </div>
+              )}
             </div>
-          )}
+
+            {chartSelectedCode ? (chartData.length > 0 ? (
+              <div className="card" style={{ padding: 14 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: 14 }}>{ref?.name || chartSelectedCode}</div>
+                    <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>{chartData.length} записей • Реф: {ref?.lln}–{ref?.uln} {ref?.prefUnit || ''}</div>
+                  </div>
+                  <div style={{
+                    padding: '4px 10px', borderRadius: 6, fontSize: 10, fontWeight: 600,
+                    background: chartData[chartData.length - 1].value > (ref?.uln || 999) ? 'rgba(239,68,68,0.12)' :
+                      chartData[chartData.length - 1].value < (ref?.lln || 0) ? 'rgba(249,115,22,0.12)' : 'rgba(0,230,138,0.1)',
+                    color: chartData[chartData.length - 1].value > (ref?.uln || 999) ? '#ef4444' :
+                      chartData[chartData.length - 1].value < (ref?.lln || 0) ? '#f97316' : 'var(--accent)',
+                  }}>
+                    Последнее: {chartData[chartData.length - 1].value}
+                  </div>
+                </div>
+
+                {/* Chart */}
+                <svg viewBox={`0 0 ${chartW} ${chartH + 40}`} style={{ width: '100%', height: 'auto', display: 'block' }}>
+                  <defs>
+                    <linearGradient id="chartBg" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="rgba(0,230,138,0.08)" />
+                      <stop offset="100%" stopColor="rgba(0,230,138,0.01)" />
+                    </linearGradient>
+                  </defs>
+                  <rect x={xBase} y={0} width={chartW - xBase - 10} height={chartH} fill="url(#chartBg)" rx={6} />
+                  {[0, 0.25, 0.5, 0.75, 1].map(f => {
+                    const y = chartH - f * chartH;
+                    return (
+                      <g key={f}>
+                        <line x1={xBase} y1={y} x2={chartW - 10} y2={y} stroke="rgba(255,255,255,0.04)" strokeWidth={0.5} />
+                        <text x={xBase - 5} y={y + 3} fill="var(--text-dim)" fontSize={8} textAnchor="end">{(chartMin + f * chartRange).toFixed(1)}</text>
+                      </g>
+                    );
+                  })}
+                  {ref && (
+                    <line x1={xBase} y1={chartH - ((ref.uln - chartMin) / chartRange) * chartH} x2={chartW - 10} y2={chartH - ((ref.uln - chartMin) / chartRange) * chartH}
+                      stroke="#ef4444" strokeWidth={1.5} strokeDasharray="6 3" opacity={0.7} />
+                  )}
+                  {ref && (
+                    <line x1={xBase} y1={chartH - ((ref.lln - chartMin) / chartRange) * chartH} x2={chartW - 10} y2={chartH - ((ref.lln - chartMin) / chartRange) * chartH}
+                      stroke="#22c55e" strokeWidth={1.5} strokeDasharray="6 3" opacity={0.7} />
+                  )}
+                  {/* Area fill under the line */}
+                  {chartData.length > 0 && (
+                    <path d={`M${xBase + barW / 2},${chartH} ${chartData.map((d, i) => {
+                      const x = xBase + i * barW + barW / 2;
+                      const barH = Math.max(0, ((d.value - chartMin) / chartRange) * chartH);
+                      const y = chartH - barH;
+                      return `L${x},${y}`;
+                    }).join(' ')} L${xBase + (chartData.length - 1) * barW + barW / 2},${chartH} Z`}
+                      fill="rgba(0,230,138,0.06)" />
+                  )}
+                  {/* Bars with gradient */}
+                  {chartData.map((d, i) => {
+                    const x = xBase + i * barW;
+                    const barH = Math.max(0, ((d.value - chartMin) / chartRange) * chartH);
+                    const y = chartH - barH;
+                    const color = ref ? (d.value > ref.uln ? '#ef4444' : d.value < ref.lln ? '#f97316' : 'var(--accent)') : 'var(--accent)';
+                    return (
+                      <g key={`${d.date}_${i}`}>
+                        <rect x={x + 2} y={y} width={Math.max(4, barW - 4)} height={barH} fill={color} rx={3} opacity={0.85} />
+                        <text x={x + barW / 2} y={y - 5} fill={color} fontSize={8} textAnchor="middle" fontWeight={700}>{d.value}</text>
+                        <text x={x + barW / 2} y={chartH + 12} fill="var(--text-dim)" fontSize={7} textAnchor="middle">{d.date.slice(5)}</text>
+                        {d.phase && (
+                          <rect x={x + barW / 2 - 6} y={chartH + 18} width={12} height={12} rx={3} fill={color + '22'}>
+                            <text x={x + barW / 2} y={chartH + 27} fill={color} fontSize={6} textAnchor="middle" fontWeight={700}>
+                              {(PHASE_LABELS[d.phase] || d.phase).slice(0, 2)}
+                            </text>
+                          </rect>
+                        )}
+                      </g>
+                    );
+                  })}
+                  <line x1={xBase} y1={chartH} x2={chartW - 10} y2={chartH} stroke="var(--border)" strokeWidth={1} />
+                </svg>
+
+                {/* Legend */}
+                <div style={{ display: 'flex', gap: 12, marginTop: 8, fontSize: 9, color: 'var(--text-dim)', flexWrap: 'wrap', justifyContent: 'center' }}>
+                  <span><span style={{ display: 'inline-block', width: 12, height: 2, background: '#ef4444', verticalAlign: 'middle', marginRight: 4 }} /> Верхняя граница</span>
+                  <span><span style={{ display: 'inline-block', width: 12, height: 2, background: '#22c55e', verticalAlign: 'middle', marginRight: 4 }} /> Нижняя граница</span>
+                  <span><span style={{ display: 'inline-block', width: 10, height: 8, background: 'var(--accent)', verticalAlign: 'middle', marginRight: 4, borderRadius: 2 }} /> Норма</span>
+                  <span><span style={{ display: 'inline-block', width: 10, height: 8, background: '#ef4444', verticalAlign: 'middle', marginRight: 4, borderRadius: 2 }} /> Высокий</span>
+                  <span><span style={{ display: 'inline-block', width: 10, height: 8, background: '#f97316', verticalAlign: 'middle', marginRight: 4, borderRadius: 2 }} /> Низкий</span>
+                </div>
+              </div>
+            ) : (
+              <div className="card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 200, padding: 20 }}>
+                <div style={{ textAlign: 'center', fontSize: 11, color: 'var(--text-dim)' }}>Нет данных для этого маркера</div>
+              </div>
+            )) : (
+              <div className="card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 200, padding: 20 }}>
+                <div style={{ textAlign: 'center', fontSize: 11, color: 'var(--text-dim)' }}>
+                  <div style={{ fontSize: 32, marginBottom: 12 }}>📊</div>
+                  Выберите маркер для просмотра динамики
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })()}
+
+        </>
+      )}
+
+      {/* ≡≡≡ INVESTIGATIONS TAB ≡≡≡ */}
+      {mainTab === 'investigations' && (
+        <div style={{ paddingTop: 8 }}>
+          <LabsInvestigations />
         </div>
       )}
 
-      </div>
-      )}
+      {/* ≡≡≡ RISKS & INDICES TAB ≡≡≡ */}
+      {mainTab === 'risks' && (() => {
+        const r = labAnalysisResult;
+        const rawASI = r ? Math.max(0, Math.round(100 - (
+          (r.hormoneScore || 0) * 0.4 + Math.min(100, (r.inflammation || 0) / 6 * 50) * 0.3 + (r.kidneyStress || 0) * 0.3
+        ))) : null;
+        const ASI = rawASI !== null ? Math.min(100, rawASI) : null;
+        const HMI = r ? Math.round(Math.min(100, r.liverStress || 0)) : null;
+        const CR = r ? Math.round(Math.min(100, r.cardioRisk || 0)) : null;
+        const statusColor = (val: number, invert: boolean) => {
+          if (!invert) { if (val <= 30) return '#22c55e'; if (val <= 60) return '#eab308'; return '#ef4444'; }
+          if (val >= 70) return '#22c55e'; if (val >= 40) return '#eab308'; return '#ef4444';
+        };
+        const statusLabel = (val: number, invert: boolean) => {
+          if (!invert) { if (val <= 30) return 'Норма'; if (val <= 60) return 'Внимание'; return 'Опасность'; }
+          if (val >= 70) return 'Хорошо'; if (val >= 40) return 'Умеренно'; return 'Низкий';
+        };
+        const indexEntries = Object.entries(labIndexDetails).map(([key, detail]) => ({
+          key, label: detail.label, value: Math.round(detail.value * 100),
+        }));
+        return (
+          <div>
+            <div style={{ fontSize: 16, fontWeight: 700, padding: '10px 0' }}>⚠️ Риски и индексы здоровья</div>
 
-      {/* OCR Import Modal */}
-      {showImport && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(12px)' }} onClick={() => { setShowImport(false); setOcrResult(null); }}>
-          <div style={{ position: 'fixed', top: '8%', left: '4%', right: '4%', zIndex: 201, background: 'var(--bg)', borderRadius: 20, maxHeight: '84vh', overflow: 'hidden', display: 'flex', flexDirection: 'column' }} onClick={e => e.stopPropagation()}>
-            <div style={{ padding: '12px 16px 8px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontWeight: 700, fontSize: 15 }}>📄 Импорт анализов</span>
-              <button onClick={() => { setShowImport(false); setOcrResult(null); }} style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text-dim)', borderRadius: 8, padding: '4px 10px', fontSize: 12, cursor: 'pointer' }}>✕</button>
+            {/* Lab-Pharma Risks */}
+            <div className="card" style={{ padding: 10, marginBottom: 8 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--accent)', marginBottom: 8 }}>🧬 Лабораторно-фармацевтические риски</div>
+              {labPharmaAlerts.length > 0 ? (
+                <div style={{ display: 'grid', gap: 3 }}>
+                  {labPharmaAlerts.map((a, i) => (
+                    <div key={i} style={{
+                      fontSize: 9, padding: '4px 6px', borderRadius: 6,
+                      background: a.severity === 'critical' ? 'rgba(239,68,68,0.08)' : a.severity === 'high' ? 'rgba(245,158,11,0.08)' : 'var(--bg-secondary)',
+                      border: `1px solid ${a.severity === 'critical' ? 'rgba(239,68,68,0.2)' : a.severity === 'high' ? 'rgba(245,158,11,0.2)' : 'transparent'}`,
+                    }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 2 }}>
+                        <span style={{ fontWeight: 600, color: a.severity === 'critical' ? '#ef4444' : a.severity === 'high' ? '#f59e0b' : 'var(--text)' }}>
+                          {a.marker} {a.actualStatus === 'high' ? '↑' : a.actualStatus === 'low' ? '↓' : ''} {a.value}{a.unit}
+                        </span>
+                        <span style={{ fontSize: 8, padding: '1px 5px', borderRadius: 4, fontWeight: 600, background: a.severity === 'critical' ? '#ef4444' : a.severity === 'high' ? '#f59e0b' : '#22c55e', color: a.severity === 'critical' || a.severity === 'high' ? '#fff' : '#000' }}>
+                          {a.severity === 'critical' ? 'КРИТ' : a.severity === 'high' ? 'ВЫСОК' : 'МОНИТ'}
+                        </span>
+                      </div>
+                      <div style={{ color: 'var(--text-dim)', fontSize: 8 }}>{a.drugCause?.join(', ')} — {a.recommendation}</div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div style={{ fontSize: 10, color: 'var(--text-dim)', textAlign: 'center', padding: '12px 0' }}>
+                  {hasLabs ? 'Связи анализов с препаратами не обнаружены' : 'Введите анализы для расчёта рисков'}
+                </div>
+              )}
             </div>
-            <div style={{ flex: 1, overflowY: 'auto', padding: '12px 16px' }}>
+
+            {/* Composite Indices */}
+            <div className="card" style={{ padding: 10, marginBottom: 8 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--accent)', marginBottom: 8 }}>📊 Композитные индексы здоровья</div>
+              <div style={{ display: 'grid', gap: 6 }}>
+                {[
+                  { label: 'ASI (Анаболический синтез)', desc: 'Способность к анаболизму', val: ASI, inv: true },
+                  { label: 'HMI (Гепатический метаболизм)', desc: 'Стресс печени', val: HMI, inv: false },
+                  { label: 'CR (Кардиориск)', desc: 'Липиды + воспаление', val: CR, inv: false },
+                ].map(item => (
+                  <div key={item.label} style={{
+                    padding: 8, borderRadius: 8,
+                    background: item.val !== null ? `rgba(${item.inv ? (item.val >= 70 ? '34,197,94' : item.val >= 40 ? '234,179,8' : '239,68,68') : (item.val <= 30 ? '34,197,94' : item.val <= 60 ? '234,179,8' : '239,68,68')},0.06)` : 'var(--bg-secondary)',
+                    border: item.val !== null ? `1px solid rgba(${item.inv ? (item.val >= 70 ? '34,197,94' : item.val >= 40 ? '234,179,8' : '239,68,68') : (item.val <= 30 ? '34,197,94' : item.val <= 60 ? '234,179,8' : '239,68,68')},0.2)` : '1px solid var(--border)',
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div>
+                        <div style={{ fontSize: 10, fontWeight: 600 }}>{item.label}</div>
+                        <div style={{ fontSize: 8, color: 'var(--text-dim)', marginTop: 2 }}>{item.desc}</div>
+                      </div>
+                      <div style={{ textAlign: 'right' }}>
+                        {item.val !== null ? (
+                          <><div style={{ fontSize: 18, fontWeight: 700, color: statusColor(item.val, item.inv) }}>{item.val}%</div>
+                            <div style={{ fontSize: 8, color: statusColor(item.val, item.inv), fontWeight: 600 }}>{statusLabel(item.val, item.inv)}</div></>
+                        ) : (
+                          <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>Нет данных</div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                {indexEntries.length > 0 && (
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 3, marginTop: 4 }}>
+                    {indexEntries.map(d => (
+                      <div key={d.key} style={{ padding: '4px 6px', borderRadius: 5, background: 'var(--bg-secondary)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ fontSize: 9 }}>{d.label}</span>
+                        <span style={{ fontWeight: 700, fontSize: 10, color: getRiskColor(d.value), minWidth: 24, textAlign: 'right' }}>{d.value}%</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* System Risks */}
+            <div className="card" style={{ padding: 10, marginBottom: 8 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--accent)', marginBottom: 8 }}>⚠️ Риски по системам организма</div>
+              {labRisks && Object.values(labRisks.systemBreakdown).some(v => v.net > 0) ? (
+                <div style={{ display: 'grid', gap: 3 }}>
+                  {Object.entries(labRisks.systemBreakdown).filter(([_, v]) => v.net > 0).sort(([_, a], [__, b]) => b.net - a.net).map(([sys, val]) => {
+                    const level = val.net <= 25 ? 'low' : val.net <= 50 ? 'medium' : val.net <= 75 ? 'high' : 'critical';
+                    const lc: Record<string, { bg: string; text: string; bar: string }> = {
+                      low: { bg: 'rgba(34,197,94,0.08)', text: '#22c55e', bar: '#22c55e' },
+                      medium: { bg: 'rgba(234,179,8,0.08)', text: '#eab308', bar: '#eab308' },
+                      high: { bg: 'rgba(249,115,22,0.08)', text: '#f97316', bar: '#f97316' },
+                      critical: { bg: 'rgba(239,68,68,0.08)', text: '#ef4444', bar: '#ef4444' },
+                    };
+                    const c = lc[level];
+                    return (
+                      <div key={sys} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 8px', borderRadius: 6, background: c.bg, border: `1px solid ${c.bg.replace('0.08', '0.15')}` }}>
+                        <span style={{ fontSize: 9, fontWeight: 600, minWidth: 60, color: c.text }}>{sysLabels[sys] || sys}</span>
+                        <div style={{ flex: 1, height: 6, background: 'rgba(255,255,255,0.06)', borderRadius: 3, overflow: 'hidden' }}>
+                          <div style={{ width: `${Math.min(100, val.net)}%`, height: '100%', background: c.bar, borderRadius: 3, transition: 'width 0.4s ease' }} />
+                        </div>
+                        <span style={{ fontSize: 11, fontWeight: 700, color: c.text, minWidth: 28, textAlign: 'right' }}>{Math.round(val.net)}%</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div style={{ fontSize: 10, color: 'var(--text-dim)', textAlign: 'center', padding: '12px 0' }}>
+                  {hasLabs ? 'Все системы в норме' : 'Введите анализы для расчёта рисков'}
+                </div>
+              )}
+            </div>
+
+            {/* Abnormal Markers */}
+            <div className="card" style={{ padding: 10, marginBottom: 8 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--accent)', marginBottom: 8 }}>🔬 Маркеры с отклонениями</div>
+              {deviationCount > 0 && labRisks ? (
+                <div style={{ display: 'grid', gap: 3 }}>
+                  {labRisks.markerDeviations.map(m => {
+                    const isHigh = m.deviation > 0;
+                    const absDev = Math.abs(m.deviation);
+                    const devLevel = absDev <= 20 ? 'low' : absDev <= 50 ? 'medium' : absDev <= 100 ? 'high' : 'critical';
+                    const devColors: Record<string, { bg: string; text: string }> = {
+                      low: { bg: 'rgba(34,197,94,0.06)', text: '#22c55e' }, medium: { bg: 'rgba(234,179,8,0.06)', text: '#eab308' },
+                      high: { bg: 'rgba(249,115,22,0.06)', text: '#f97316' }, critical: { bg: 'rgba(239,68,68,0.06)', text: '#ef4444' },
+                    };
+                    const dc = devColors[devLevel];
+                    return (
+                      <div key={m.code + m.value} style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 8px', borderRadius: 6, background: dc.bg, border: `1px solid ${dc.bg.replace('0.06', '0.12')}` }}>
+                        <span style={{ fontSize: 8, color: 'var(--text-dim)', minWidth: 46 }}>{sysLabels[m.system] || m.system}</span>
+                        <span style={{ fontSize: 10, fontWeight: 600, flex: 1, color: 'var(--text)' }}>{m.name}</span>
+                        <span style={{ fontSize: 8, color: 'var(--text-dim)' }}>{m.lln}–{m.uln}</span>
+                        <span style={{ fontSize: 10, fontWeight: 700, color: dc.text }}>{m.value} <span style={{ fontSize: 8, padding: '1px 4px', borderRadius: 3, fontWeight: 600, background: dc.text + '22', color: dc.text }}>{isHigh ? '↑' : '↓'}{absDev}%</span></span>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div style={{ fontSize: 10, color: 'var(--text-dim)', textAlign: 'center', padding: '12px 0' }}>
+                  {hasLabs ? 'Все маркеры в норме' : 'Введите анализы для просмотра отклонений'}
+                </div>
+              )}
+            </div>
+
+            {/* Penalty */}
+            {anyNoLabs && (
+              <div className="card" style={{ padding: 8, marginBottom: 8, background: 'rgba(239,68,68,0.06)', borderColor: 'rgba(239,68,68,0.2)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: 9, color: '#ef4444', fontWeight: 600 }}>⚠️ Штраф за отсутствие анализов</span>
+                  <span style={{ fontSize: 9, fontWeight: 700, color: '#ef4444' }}>×{penalty.totalMultiplier.toFixed(2)}</span>
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })()}
+
+      </div>
+
+      {/* OCR Import Modal — full screen */}
+      {showImport && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(12px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 12 }} onClick={() => { setShowImport(false); setOcrResult(null); }}>
+          <div style={{ width: '100%', maxWidth: 480, zIndex: 201, background: 'var(--bg)', borderRadius: 20, maxHeight: '90vh', overflow: 'hidden', display: 'flex', flexDirection: 'column', boxShadow: '0 16px 48px rgba(0,0,0,0.5)' }} onClick={e => e.stopPropagation()}>
+            <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
+              <span style={{ fontWeight: 700, fontSize: 16 }}>📄 Импорт анализов</span>
+              <button onClick={() => { setShowImport(false); setOcrResult(null); }} style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text-dim)', borderRadius: 8, padding: '6px 12px', fontSize: 13, cursor: 'pointer' }}>✕</button>
+            </div>
+            <div style={{ flex: 1, overflowY: 'auto', padding: '12px 16px', maxHeight: '70vh' }}>
               {ocrLoading && (
                 <div style={{ textAlign: 'center', padding: 40 }}>
                   <div className="loading-spinner" style={{ margin: '0 auto 16px' }} />
@@ -1175,9 +1117,9 @@ export const LabsScreen: React.FC = () => {
                     </button>
                     <div style={{ borderTop: '1px solid var(--border)', paddingTop: 8 }}>
                       <textarea
-                        placeholder=""
+                        placeholder="Вставьте текст анализов..."
                         rows={5}
-                        style={{ width: '100%', padding: '8px 10px', borderRadius: 8, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 11, boxSizing: 'border-box', resize: 'vertical', marginBottom: 6 }}
+                        style={{ width: '100%', padding: '10px 12px', borderRadius: 8, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 11, boxSizing: 'border-box', resize: 'vertical', marginBottom: 6 }}
                         id="lab-text-paste"
                       />
                       <button onClick={async () => {
@@ -1231,28 +1173,53 @@ export const LabsScreen: React.FC = () => {
         </div>
       )}
 
-      {/* Lab Input Modal */}
+      {/* Lab Input Modal — full screen */}
       {showLabInput && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => setShowLabInput(false)}>
-          <div style={{ width: '92%', maxWidth: 400, zIndex: 201, background: 'var(--bg)', borderRadius: 16, padding: '12px 14px', boxShadow: '0 8px 32px rgba(0,0,0,0.4)' }} onClick={e => e.stopPropagation()}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-              <span style={{ fontWeight: 700, fontSize: 14 }}>🧪 Ввести результат</span>
-              <button onClick={() => setShowLabInput(false)} style={{ background: 'var(--bg-secondary)', border: 'none', color: 'var(--text-dim)', borderRadius: 6, padding: '3px 8px', fontSize: 11, cursor: 'pointer' }}>✕</button>
+        <div style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(10px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 12 }} onClick={() => setShowLabInput(false)}>
+          <div style={{ width: '100%', maxWidth: 420, zIndex: 201, background: 'var(--bg)', borderRadius: 20, padding: '16px 18px', boxShadow: '0 12px 40px rgba(0,0,0,0.5)' }} onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 18 }}>🧪</span>
+                <span style={{ fontWeight: 700, fontSize: 15 }}>Ввести результат</span>
+              </div>
+              <button onClick={() => setShowLabInput(false)} style={{ background: 'var(--bg-secondary)', border: 'none', color: 'var(--text-dim)', borderRadius: 8, padding: '4px 10px', fontSize: 11, cursor: 'pointer' }}>✕</button>
             </div>
             {(() => { const info = UCUM_MAP[inputCode.toUpperCase()]; return info ? (
-              <div style={{ fontSize: 10, color: 'var(--accent)', marginBottom: 6 }}>{info.name} • Норма: {info.lln}–{info.uln} {info.prefUnit}</div>
+              <div style={{ fontSize: 10, color: 'var(--accent)', marginBottom: 8, padding: '6px 10px', background: 'rgba(0,230,138,0.06)', borderRadius: 8 }}>
+                {info.name} • Норма: {info.lln}–{info.uln} {info.prefUnit}
+              </div>
             ) : null; })()}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
-              <div><label style={{ fontSize: 9, color: 'var(--text-dim)' }}>Код</label><input value={inputCode} onChange={e => setInputCode(e.target.value)} placeholder="ALT" style={{ width: '100%', padding: '6px 8px', background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text)', fontSize: 13 }} /></div>
-              <div><label style={{ fontSize: 9, color: 'var(--text-dim)' }}>Значение</label><input type="number" value={inputValue} onChange={e => setInputValue(e.target.value)} placeholder="40" style={{ width: '100%', padding: '6px 8px', background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text)', fontSize: 13 }} /></div>
-              <div><label style={{ fontSize: 9, color: 'var(--text-dim)' }}>Единица</label><input value={inputUnit} onChange={e => setInputUnit(e.target.value)} placeholder="U/L" style={{ width: '100%', padding: '6px 8px', background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text)', fontSize: 13 }} /></div>
-              <div><label style={{ fontSize: 9, color: 'var(--text-dim)' }}>Дата</label><input type="date" value={inputDate} onChange={e => setInputDate(e.target.value)} style={{ width: '100%', padding: '6px 8px', background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text)', fontSize: 13 }} /></div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <label style={{ fontSize: 9, color: 'var(--text-dim)', fontWeight: 600 }}>Код маркера</label>
+                <input value={inputCode} onChange={e => setInputCode(e.target.value)} placeholder="ALT" style={{ width: '100%', padding: '8px 10px', background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', fontSize: 13 }} />
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <label style={{ fontSize: 9, color: 'var(--text-dim)', fontWeight: 600 }}>Значение</label>
+                <input type="number" value={inputValue} onChange={e => setInputValue(e.target.value)} placeholder="40" style={{ width: '100%', padding: '8px 10px', background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', fontSize: 13 }} />
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <label style={{ fontSize: 9, color: 'var(--text-dim)', fontWeight: 600 }}>Единица</label>
+                <input value={inputUnit} onChange={e => setInputUnit(e.target.value)} placeholder="U/L" style={{ width: '100%', padding: '8px 10px', background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', fontSize: 13 }} />
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <label style={{ fontSize: 9, color: 'var(--text-dim)', fontWeight: 600 }}>Дата</label>
+                <input type="date" value={inputDate} onChange={e => setInputDate(e.target.value)} style={{ width: '100%', padding: '8px 10px', background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', fontSize: 13 }} />
+              </div>
             </div>
-            <button onClick={addLab} style={{ width: '100%', marginTop: 8, padding: 10, background: 'var(--accent)', color: '#000', border: 'none', borderRadius: 8, fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>✓ Сохранить</button>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 12 }}>
+              <button onClick={() => setShowLabInput(false)} style={{
+                padding: 10, borderRadius: 10, border: '1px solid var(--border)',
+                background: 'var(--bg-secondary)', color: 'var(--text-dim)', fontWeight: 600, fontSize: 13, cursor: 'pointer',
+              }}>✕ Отмена</button>
+              <button onClick={addLab} style={{
+                padding: 10, borderRadius: 10, border: 'none',
+                background: 'var(--accent)', color: '#000', fontWeight: 700, fontSize: 13, cursor: 'pointer',
+              }}>✓ Сохранить</button>
+            </div>
           </div>
         </div>
       )}
     </div>
   );
 };
-
