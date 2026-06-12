@@ -473,11 +473,11 @@ export const LabsScreen: React.FC = () => {
   };
 
   return (
-    <div className="screen labs" style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+    <div className="screen labs" style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden', padding: 0 }}>
 
       {/* ─── HERO PAGE ─── */}
       {mainTab === 'hero' && (
-        <div style={{ flex: 1, overflowY: 'auto', padding: '40px 16px 70px' }}>
+        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '40px 16px 70px' }}>
           {/* Hero section */}
           <div style={{ textAlign: 'center', marginBottom: 28 }}>
             <div style={{ fontSize: 48, marginBottom: 12 }}>🧪</div>
@@ -530,7 +530,7 @@ export const LabsScreen: React.FC = () => {
 
       {/* ─── SCROLLABLE CONTENT (only when not on hero) ─── */}
       {mainTab !== 'hero' && (
-      <div style={{ flex: 1, overflowY: 'auto', padding: '0 12px 70px' }}>
+      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '0 12px 70px' }}>
 
       {/* ≡≡≡ LAB SUB-TABS (only when mainTab === 'lab') ≡≡≡ */}
       {mainTab === 'lab' && (

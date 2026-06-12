@@ -28,7 +28,7 @@ const NAV_CARDS: { id: ScreenId; label: string; desc: string }[] = [
 
 export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
   return (
-    <div className="screen" style={{ padding: 0, overflow: 'hidden', height: '100%', display: 'flex', flexDirection: 'column' }}>
+    <div className="screen" style={{ padding: 0, overflow: 'hidden', flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
       <div style={{
         position: 'relative',
         width: '100%',

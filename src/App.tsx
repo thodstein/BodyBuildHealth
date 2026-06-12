@@ -155,7 +155,7 @@ export default function App() {
   return (
     <div className="app" >
       <DarkBg />
-      <main ref={mainRef} style={{ position: 'relative', zIndex: 1, flex: 1, overflow: 'hidden', height: 'calc(100vh - var(--nav-height))' }}>
+      <main ref={mainRef} style={{ position: 'relative', zIndex: 1, flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
         {renderContent()}
       </main>
       <ToastContainer />
