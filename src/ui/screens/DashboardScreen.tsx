@@ -365,63 +365,115 @@ export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
             )}
           </div>
         );
-      })()}
+      }      )()}
 
-      {/* Daily Check-in Card */}
-      {(() => {
-        const settings = getProfile().settings;
-        const todayMetric = getTodayMetric();
-        const checkin = dailyCheckin({
-          sleepHours: todayMetric.sleepHours || (settings.baselineSleepHours ?? 7),
-          sleepQuality: todayMetric.sleepQuality || (settings.baselineSleepQuality ?? 4),
-          restingHR: todayMetric.restingHR || 60,
-          hrvMs: todayMetric.hrvMs || Math.round((settings.baselineHrvRatio ?? 0.6) * 80),
-          bodyWeight: todayMetric.weightKg || (settings.weight ?? 80),
-          subjectiveEnergy: todayMetric.subjectiveEnergy || (6 - (settings.fatigueLevel ?? 3)),
-          subjectiveSoreness: todayMetric.subjectiveSoreness || (settings.fatigueLevel ?? 3),
-          subjectiveStress: todayMetric.subjectiveStress || (settings.baselineStressLevel ?? 3),
-          waterLiters: todayMetric.waterLiters || (settings.dailyWaterLiters ?? 2.5),
-          nutritionQuality: Math.round((settings.nutritionFactor ?? 0.7) * 5),
-          trainingYesterday: false,
-          yesterdayRPE: 5,
-          sleepDebtHours: 0,
-          weightTrend: weightTrend(7),
-        });
-        return (
-          <div style={{ background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', borderRadius: 10, padding: '10px 12px', marginBottom: 12 }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, textAlign: 'center' }}>
-              <div>
-                <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>Готовность</div>
-                <div style={{ fontSize: 28, fontWeight: 800, color: checkin.readinessScore >= 65 ? '#22c55e' : checkin.readinessScore >= 40 ? '#eab308' : '#ef4444' }}>
-                  {checkin.readinessScore}%
-                </div>
-                <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>{checkin.readinessLabel}</div>
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2, fontSize: 10, color: 'var(--text-dim)', alignContent: 'center' }}>
-                <div>😴 Сон: <b style={{ color: checkin.metrics.sleepScore >= 60 ? '#22c55e' : '#f97316' }}>{checkin.metrics.sleepScore}</b></div>
-                <div>💓 HRV: <b style={{ color: checkin.metrics.hrvScore >= 60 ? '#22c55e' : '#f97316' }}>{checkin.metrics.hrvScore}</b></div>
-                <div>💧 Вода: <b style={{ color: checkin.metrics.hydrationScore >= 60 ? '#22c55e' : '#f97316' }}>{checkin.metrics.hydrationScore}</b></div>
-                <div>🍽 Питание: <b style={{ color: checkin.metrics.nutritionScore >= 60 ? '#22c55e' : '#f97316' }}>{checkin.metrics.nutritionScore}</b></div>
-                <div>😵 Усталость: <b style={{ color: checkin.metrics.fatigueScore <= 40 ? '#22c55e' : '#f97316' }}>{Math.round(100 - checkin.metrics.fatigueScore)}</b></div>
-                <div>🔄 Восст: <b style={{ color: checkin.metrics.recoveryScore >= 60 ? '#22c55e' : '#f97316' }}>{checkin.metrics.recoveryScore}</b></div>
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                <div style={{ fontSize: 12, fontWeight: 700, color: checkin.trainToday ? '#22c55e' : '#ef4444', marginBottom: 4 }}>
-                  {checkin.trainToday ? '✅ Тренироваться' : ''}
-                </div>
-                {trainingStreak > 0 && (
-                  <div style={{ fontSize: 9, color: 'var(--text-dim)', marginTop: 2 }}>Стрик: {trainingStreak} нед</div>
-                )}
-              </div>
-            </div>
-            {checkin.recommendations.length > 0 && (
-              <div style={{ marginTop: 6, fontSize: 9, color: '#f97316', borderTop: '1px solid var(--border)', paddingTop: 4 }}>
-                {checkin.recommendations.slice(0, 2).map((r, i) => (<div key={i}>• {r}</div>))}
-              </div>
-            )}
-          </div>
-        );
-      })()}
+      {/* ═══ HULK HERO ═══ */}
+      <div style={{
+        background: 'linear-gradient(135deg, rgba(0,230,138,0.08) 0%, rgba(0,80,50,0.12) 100%)',
+        borderRadius: 16, padding: '16px 12px 12px', marginBottom: 14,
+        border: '1px solid rgba(0,230,138,0.15)', position: 'relative', overflow: 'hidden',
+      }}>
+        <div style={{ textAlign: 'center', marginBottom: 8, position: 'relative', zIndex: 1 }}>
+          <div style={{ fontSize: 10, color: 'var(--accent)', fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', opacity: 0.8 }}>Health Engine</div>
+          <div style={{ fontSize: 13, fontWeight: 800, background: 'linear-gradient(90deg, #00e68a, #00bcd4)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Bodybuilding &amp; Health</div>
+        </div>
+        <svg viewBox="0 0 340 220" style={{ width: '100%', maxHeight: 220, display: 'block' }}>
+          <defs>
+            <radialGradient id="hulkSkin" cx="50%" cy="40%" r="60%">
+              <stop offset="0%" stopColor="#6bcf7a"/>
+              <stop offset="100%" stopColor="#2d8a3e"/>
+            </radialGradient>
+            <radialGradient id="hulkShorts" cx="50%" cy="50%" r="70%">
+              <stop offset="0%" stopColor="#7c3aed"/>
+              <stop offset="100%" stopColor="#4c1d95"/>
+            </radialGradient>
+            <linearGradient id="dumbGrad" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stopColor="#666"/>
+              <stop offset="100%" stopColor="#333"/>
+            </linearGradient>
+          </defs>
+
+          {/* Shadow */}
+          <ellipse cx="170" cy="205" rx="120" ry="12" fill="rgba(0,0,0,0.2)"/>
+
+          {/* Left leg */}
+          <path d="M145 160 L130 200 L115 200 L125 160Z" fill="#1a5c2a"/>
+          {/* Right leg */}
+          <path d="M195 160 L210 200 L225 200 L215 160Z" fill="#1a5c2a"/>
+
+          {/* Shorts */}
+          <ellipse cx="170" cy="152" rx="50" ry="30" fill="url(#hulkShorts)"/>
+          <path d="M120 152 Q170 175 220 152 L215 165 Q170 185 125 165Z" fill="url(#hulkShorts)"/>
+
+          {/* Torso */}
+          <ellipse cx="170" cy="115" rx="45" ry="45" fill="url(#hulkSkin)"/>
+          {/* Chest detail */}
+          <path d="M130 95 Q170 75 210 95 Q170 120 130 95Z" fill="rgba(255,255,255,0.04)"/>
+
+          {/* Left arm (holding dumbbell) */}
+          <path d="M125 100 L95 125 L85 145 L95 150 L105 140 L95 160 L105 165 L115 145Z" fill="url(#hulkSkin)" stroke="#1a5c2a" strokeWidth="1"/>
+
+          {/* Dumbbell - big */}
+          <rect x="72" y="150" width="46" height="10" rx="3" fill="url(#dumbGrad)" stroke="#555" strokeWidth="1"/>
+          <rect x="68" y="148" width="8" height="14" rx="2" fill="#555"/>
+          <rect x="114" y="148" width="8" height="14" rx="2" fill="#555"/>
+          <rect x="72" y="140" width="10" height="30" rx="3" fill="#555"/>
+          <rect x="108" y="140" width="10" height="30" rx="3" fill="#555"/>
+          <rect x="88" y="148" width="14" height="4" rx="1" fill="#777"/>
+
+          {/* Right arm (holding vial) */}
+          <path d="M215 100 L245 115 L255 130 L245 140 L235 130 L248 145 L238 150 L225 135Z" fill="url(#hulkSkin)" stroke="#1a5c2a" strokeWidth="1"/>
+
+          {/* Trenbolone vial */}
+          <g transform="translate(230, 132)">
+            <rect x="0" y="0" width="32" height="44" rx="4" fill="rgba(255,200,50,0.85)" stroke="#c79810" strokeWidth="1.5"/>
+            <rect x="8" y="-3" width="16" height="6" rx="2" fill="#c79810"/>
+            <rect x="11" y="-6" width="10" height="5" rx="2" fill="#999"/>
+            <rect x="2" y="8" width="28" height="20" rx="2" fill="rgba(255,180,0,0.3)"/>
+            <line x1="6" y1="12" x2="26" y2="12" stroke="#c79810" strokeWidth="0.8"/>
+            <line x1="6" y1="20" x2="26" y2="20" stroke="#c79810" strokeWidth="0.8"/>
+            <line x1="6" y1="28" x2="26" y2="28" stroke="#c79810" strokeWidth="0.8"/>
+            <text x="16" y="40" textAnchor="middle" fontSize="5" fill="#333" fontWeight="700" fontFamily="monospace">ТРЕН</text>
+            <text x="16" y="47" textAnchor="middle" fontSize="4.5" fill="#666" fontFamily="monospace">БОЛОН</text>
+          </g>
+
+          {/* Neck */}
+          <rect x="155" y="72" width="30" height="15" rx="5" fill="url(#hulkSkin)"/>
+
+          {/* Head */}
+          <ellipse cx="170" cy="48" rx="32" ry="35" fill="url(#hulkSkin)"/>
+
+          {/* Jaw */}
+          <path d="M140 55 Q170 80 200 55" fill="none" stroke="#1a5c2a" strokeWidth="1.5"/>
+
+          {/* Hair */}
+          <path d="M138 30 Q150 10 170 12 Q190 10 202 30 Q195 22 170 20 Q145 22 138 30Z" fill="#1a1a1a"/>
+
+          {/* Eyes */}
+          <ellipse cx="157" cy="42" rx="5" ry="4" fill="white"/>
+          <ellipse cx="183" cy="42" rx="5" ry="4" fill="white"/>
+          <circle cx="157" cy="42" r="2.5" fill="#222"/>
+          <circle cx="183" cy="42" r="2.5" fill="#222"/>
+
+          {/* Eyebrows (angry) */}
+          <path d="M148 34 L162 38 L162 37Z" fill="#1a1a1a"/>
+          <path d="M192 34 L178 38 L178 37Z" fill="#1a1a1a"/>
+
+          {/* Smile (confident) */}
+          <path d="M158 56 Q170 64 182 56" fill="none" stroke="#1a5c2a" strokeWidth="1.5" strokeLinecap="round"/>
+
+          {/* Muscles highlight on torso */}
+          <rect x="148" y="100" width="15" height="25" rx="4" fill="rgba(255,255,255,0.03)"/>
+          <rect x="177" y="100" width="15" height="25" rx="4" fill="rgba(255,255,255,0.03)"/>
+
+          {/* Abs hint */}
+          <line x1="160" y1="125" x2="180" y2="125" stroke="rgba(255,255,255,0.04)" strokeWidth="1"/>
+          <line x1="160" y1="133" x2="180" y2="133" stroke="rgba(255,255,255,0.04)" strokeWidth="1"/>
+        </svg>
+        <div style={{ textAlign: 'center', marginTop: 6, fontSize: 9, color: 'var(--text-dim)', opacity: 0.6 }}>
+          v9.0 · BodyBuildHealth
+        </div>
+      </div>
 
       {/* Body Composition quick stats */}
       {(() => {
