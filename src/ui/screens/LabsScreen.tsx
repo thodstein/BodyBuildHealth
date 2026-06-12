@@ -35,12 +35,12 @@ export function setNoLabsSystems(systems: string[]) {
 }
 
 const PHASE_LABELS: Record<string, string> = {
-  baseline: '',
-  on_cycle: '',
-  bridge: '',
-  pct: '',
-  post_pct: '✅ После ПКТ',
-  course_bridge_course: '',
+  baseline: 'Базовый',
+  on_cycle: 'На курсе',
+  bridge: 'Бридж',
+  pct: 'ПКТ',
+  post_pct: 'После ПКТ',
+  course_bridge_course: 'Курс+Бридж',
 };
 
 // Map profile phase names to REQUIRED_LABS_PER_PHASE keys
@@ -58,19 +58,18 @@ const sysLabels: Record<string, string> = {
   cardio: 'Сердце', hepatic: 'Печень', renal: 'Почки',
   neuro: 'Нервная', endocrine: 'Эндокринная', hematologic: 'Кровь',
   reproductive: 'Репродуктивная', musculoskeletal: 'Мышечная', metabolic: 'Метаболизм',
+  other: 'Прочее',
 };
 
 const LAB_SYSTEM_GROUPS: Record<string, string[]> = {
-  '': ['ALT','AST','GGT','ALP','BILIRUBIN_TOTAL','BIL','ALB','LDH','BILIRUBIN_DIRECT','BILIRUBIN_INDIRECT'],
-  '': ['CREATININE','BUN','EGFR','PROTEIN_TOTAL','TP','UA','UACR','K','NA','CA','P','MG'],
-  '': ['TT','TSH','FT3','FT4','E2','PRL','LH','FSH','SHBG','CORTISOL','INS','HOMA','IGF1','TOTAL_T3','TOTAL_T4','TG_AB','TPO_AB','THYROGLOBULIN'],
-  '': ['HGB','HCT','PLT','WBC','RBC','MCV','MCH','MCHC','RDW','IRON','TRANSFERRIN','TIBC','IRON_SAT','FERRITIN'],
-  '': ['LDL','HDL','TG','APOB','APOA1','NON_HDL','LP_A'],
-  '': ['CRP','hsCRP','FIBRINOGEN','D_DIMER'],
-  '': ['GLUCOSE','GLU','HBA1C','INSULIN','HOMA_IR'],
-  '': ['VITD','VITAMIN_D','CALCIDIOL','B12','VITAMIN_B12','FOLATE'],
-  '': ['PSA','DHEA_S','AMH','INHIBIN_B','PROGESTERONE','DHT','FT','TESTOSTERONE','ESTRADIOL'],
-  '': ['HOMOCYSTEINE','BDNF','SEROTONIN','DOPAMINE','GABA','VITAMIN_B12','FOLATE'],
+  hepatic: ['ALT','AST','GGT','ALP','BILIRUBIN_TOTAL','BIL','ALB','LDH','BILIRUBIN_DIRECT','BILIRUBIN_INDIRECT'],
+  renal: ['CREATININE','BUN','EGFR','PROTEIN_TOTAL','TP','UA','UACR','K','NA','CA','P','MG'],
+  endocrine: ['TT','TSH','FT3','FT4','E2','PRL','LH','FSH','SHBG','CORTISOL','INS','HOMA','IGF1','TOTAL_T3','TOTAL_T4','TG_AB','TPO_AB','THYROGLOBULIN'],
+  hematologic: ['HGB','HCT','PLT','WBC','RBC','MCV','MCH','MCHC','RDW','IRON','TRANSFERRIN','TIBC','IRON_SAT','FERRITIN'],
+  cardio: ['LDL','HDL','TG','APOB','APOA1','NON_HDL','LP_A','CRP','hsCRP','FIBRINOGEN','D_DIMER'],
+  metabolic: ['GLUCOSE','GLU','HBA1C','INSULIN','HOMA_IR','VITD','VITAMIN_D','CALCIDIOL','B12','VITAMIN_B12','FOLATE'],
+  reproductive: ['PSA','DHEA_S','AMH','INHIBIN_B','PROGESTERONE','DHT','FT','TESTOSTERONE','ESTRADIOL'],
+  neuro: ['HOMOCYSTEINE','BDNF','SEROTONIN','DOPAMINE','GABA','VITAMIN_B12','FOLATE'],
 };
 
 const LAB_ICONS: Record<string, string> = {
@@ -144,8 +143,8 @@ export const LabsScreen: React.FC = () => {
         }
       }
       if (!found) {
-        if (!groups['']) groups[''] = [];
-        groups[''].push(code);
+        if (!groups['other']) groups['other'] = [];
+        groups['other'].push(code);
       }
     }
     return groups;
@@ -395,20 +394,7 @@ export const LabsScreen: React.FC = () => {
             ))}
           </div>
 
-          {/* Tab bar */}
-          <div style={{ display: 'flex', gap: 3, marginBottom: 8, overflowX: 'auto', scrollbarWidth: 'none' }}>
-            {(['results', 'schedule', 'investigations', 'archive', 'catalog'] as const).map(t => (
-              <button key={t} onClick={() => setTab(t)} style={{
-                flex: 1, padding: '8px 6px', borderRadius: 8, fontSize: 12, fontWeight: 600,
-                whiteSpace: 'nowrap', cursor: 'pointer', transition: 'all 0.15s',
-                background: tab === t ? 'rgba(0,230,138,0.15)' : 'var(--bg-secondary)',
-                color: tab === t ? '#00e68a' : 'var(--text-dim)',
-                border: tab === t ? '1px solid #00e68a' : '1px solid var(--border)',
-              }}>
-                {t === 'results' ? '📊 Результаты' : t === 'schedule' ? '📅 График' : t === 'investigations' ? '🔬 Обследования' : t === 'archive' ? '📦 Архив' : '📚 Каталог'}
-              </button>
-            ))}
-          </div>
+
 
       {/* ≡≡≡ RESULTS TAB ≡≡≡ */}
       {tab === 'results' && (
@@ -426,7 +412,7 @@ export const LabsScreen: React.FC = () => {
             </div>
             {Object.entries(labsBySystem).map(([system, codes]) => (
               <div key={system} style={{ marginBottom: 4 }}>
-                <div style={{ fontSize: 9, fontWeight: 600, color: 'var(--accent)', marginBottom: 2 }}>{system}</div>
+                <div style={{ fontSize: 9, fontWeight: 600, color: 'var(--accent)', marginBottom: 2 }}>{sysLabels[system] || system}</div>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
                   {codes.map(code => {
                     const info = UCUM_MAP[code.toUpperCase()];

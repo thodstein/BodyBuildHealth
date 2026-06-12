@@ -11,31 +11,31 @@ interface Investigation {
 }
 
 const SYSTEM_LABELS_INVEST: Record<string, string> = {
-  cardio: '❤️ Сердечно-сосудистая',
-  hepatic: '',
-  renal: '',
-  neuro: '',
-  endocrine: '',
-  reproductive: '',
-  musculoskeletal: '',
-  hematologic: '',
+  cardio: 'Сердце',
+  hepatic: 'Печень',
+  renal: 'Почки',
+  neuro: 'Нервная',
+  endocrine: 'Эндокринная',
+  reproductive: 'Репродуктивная',
+  musculoskeletal: 'Мышечная',
+  hematologic: 'Кровь',
 };
 
 const INVESTIGATIONS_DATA: Investigation[] = [
-  { id: 'echo_kg', name: '', system: 'cardio', freq: '', markers: '', reason: '' },
-  { id: 'ekg', name: '', system: 'cardio', freq: '', markers: 'QTc, гипертрофия ЛЖ, аритмии, ишемия, блокады', reason: '' },
-  { id: 'usg_heart_24h', name: '', system: 'cardio', freq: '', markers: '', reason: '' },
-  { id: 'usg_abd', name: '', system: 'hepatic', freq: '', markers: '', reason: '' },
-  { id: 'fibroscan', name: '', system: 'hepatic', freq: '', markers: '', reason: '' },
-  { id: 'usg_kidney', name: '', system: 'renal', freq: '', markers: '', reason: '' },
-  { id: 'mri_brain', name: '', system: 'neuro', freq: '', markers: '', reason: '' },
-  { id: 'eeg', name: '', system: 'neuro', freq: '', markers: '', reason: '' },
-  { id: 'usg_thyroid', name: '', system: 'endocrine', freq: '', markers: '', reason: '' },
-  { id: 'usg_prostate', name: '', system: 'reproductive', freq: '', markers: '', reason: '' },
-  { id: 'spermiogram', name: '', system: 'reproductive', freq: '', markers: '', reason: '' },
-  { id: 'densitometry', name: '', system: 'musculoskeletal', freq: '', markers: '', reason: '' },
-  { id: 'usg_joints', name: '', system: 'musculoskeletal', freq: '', markers: '', reason: '' },
-  { id: 'blood_smear', name: '', system: 'hematologic', freq: '', markers: '', reason: '' },
+  { id: 'echo_kg', name: 'Эхокардиограмма (Эхо-КГ)', system: 'cardio', freq: '1 раз/год на курсе', markers: 'Структура сердца, фракция выброса, клапаны, размеры камер', reason: 'ААС и ГХСБ влияют на массу миокарда ЛЖ' },
+  { id: 'ekg', name: 'Электрокардиограмма (ЭКГ)', system: 'cardio', freq: 'Каждые 3-6 мес', markers: 'QTc, гипертрофия ЛЖ, аритмии, ишемия, блокады', reason: 'Скрининг аритмий и гипертрофии на фоне ААС' },
+  { id: 'usg_heart_24h', name: 'Холтер (суточное мониторирование ЭКГ)', system: 'cardio', freq: 'По показаниям', markers: 'Аритмии, ишемия, вариабельность ритма', reason: 'При симптомах: сердцебиение, одышка, предобмороки' },
+  { id: 'usg_abd', name: 'УЗИ органов брюшной полости', system: 'hepatic', freq: '1 раз/6 мес на курсе', markers: 'Размеры печени, эхогенность, очаги, диффузные изменения', reason: 'Контроль гепатотоксичности ААС, скрининг НАЖБП' },
+  { id: 'fibroscan', name: 'Фиброскан (эластография печени)', system: 'hepatic', freq: '1 раз/год', markers: 'Степень фиброза и стеатоза (кПа, CAP)', reason: 'При длительном приёме ААС или повышенных трансаминазах' },
+  { id: 'usg_kidney', name: 'УЗИ почек', system: 'renal', freq: '1 раз/год', markers: 'Размеры, структура, конкременты, кровоток', reason: 'Контроль нефротоксичности и мочекаменной болезни' },
+  { id: 'mri_brain', name: 'МРТ головного мозга', system: 'neuro', freq: 'По показаниям', markers: 'Очаги, атрофия, гипофиз, гипоталамус', reason: 'При неврологической симптоматике или подозрении на аденому гипофиза' },
+  { id: 'eeg', name: 'Электроэнцефалограмма (ЭЭГ)', system: 'neuro', freq: 'По показаниям', markers: 'Биоэлектрическая активность, эпиактивность', reason: 'При судорогах, нарушениях сна, когнитивных жалобах' },
+  { id: 'usg_thyroid', name: 'УЗИ щитовидной железы', system: 'endocrine', freq: '1 раз/год', markers: 'Размеры, узлы, структура, кровоток', reason: 'Контроль на фоне препаратов, влияющих на ось HPT, и йодсодержащих' },
+  { id: 'usg_prostate', name: 'УЗИ простаты (ТРУЗИ/трансабдоминально)', system: 'reproductive', freq: '1 раз/год после 40', markers: 'Объём, структура, узлы, остаточная моча', reason: 'Скрининг ДГПЖ на фоне андрогенов' },
+  { id: 'spermiogram', name: 'Спермограмма', system: 'reproductive', freq: 'Через 3-4 мес после отмены', markers: 'Концентрация, подвижность, морфология, MAR-тест', reason: 'Оценка фертильности после курса ААС' },
+  { id: 'densitometry', name: 'Денситометрия (DXA)', system: 'musculoskeletal', freq: '1 раз/1-2 года', markers: 'Минеральная плотность костей (T-критерий)', reason: 'Контроль костной массы на длительной ГХСБ и антиэстрогенах' },
+  { id: 'usg_joints', name: 'УЗИ суставов', system: 'musculoskeletal', freq: 'По показаниям', markers: 'Выпот, синовит, энтезопатии, эрозии', reason: 'При суставных болях на фоне ААС или ГХСБ' },
+  { id: 'blood_smear', name: 'Мазок крови (лейкоцитарная формула)', system: 'hematologic', freq: 'Каждые 3-6 мес', markers: 'Нейтрофилы, лимфоциты, моноциты, эозинофилы, базофилы, бласты', reason: 'Оценка лейкопоэза и иммунного ответа на фоне ААС' },
 ];
 
 export const LabsInvestigations: React.FC = () => {

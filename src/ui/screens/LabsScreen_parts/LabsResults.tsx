@@ -3,18 +3,18 @@ import type { LabPoint } from '../../../core/types';
 import { UCUM_MAP } from '../../../core/constants';
 
 const LAB_SYSTEM_MAP: Record<string, string> = {
-  'ALT': '', 'AST': '', 'GGT': '', 'ALP': '',
-  'BILIRUBIN_TOTAL': '', 'BIL_T': '', 'BIL': '', 'ALB': '',
-  'CREATININE': '', 'BUN': '', 'EGFR': '', 'PROTEIN_TOTAL': '', 'UA': '',
-  'TSH': '', 'FT3': '', 'FT4': '',
-  'TESTOSTERONE': '', 'TT': '', 'E2': '', 'ESTRADIOL': '',
-  'PRL': '', 'PROLACTIN': '', 'CORTISOL': '',
-  'INSULIN': '', 'INS': '', 'HOMA': '',
-  'LH': '', 'FSH': '', 'SHBG': '', 'IGF1': '',
-  'HGB': '', 'HCT': '', 'PLT': '', 'WBC': '',
-  'LDL': '', 'HDL': '', 'TG': '', 'GLU': '', 'GLUCOSE': '',
-  'HBA1C': '', 'HOMOCYSTEINE': '', 'FERRITIN': '',
-  'CRP': '', 'VITD': '', 'CALCIDIOL': '',
+  'ALT': 'hepatic', 'AST': 'hepatic', 'GGT': 'hepatic', 'ALP': 'hepatic',
+  'BILIRUBIN_TOTAL': 'hepatic', 'BIL_T': 'hepatic', 'BIL': 'hepatic', 'ALB': 'hepatic',
+  'CREATININE': 'renal', 'BUN': 'renal', 'EGFR': 'renal', 'PROTEIN_TOTAL': 'renal', 'UA': 'renal',
+  'TSH': 'endocrine', 'FT3': 'endocrine', 'FT4': 'endocrine',
+  'TESTOSTERONE': 'endocrine', 'TT': 'endocrine', 'E2': 'endocrine', 'ESTRADIOL': 'endocrine',
+  'PRL': 'endocrine', 'PROLACTIN': 'endocrine', 'CORTISOL': 'endocrine',
+  'INSULIN': 'metabolic', 'INS': 'metabolic', 'HOMA': 'metabolic',
+  'LH': 'endocrine', 'FSH': 'endocrine', 'SHBG': 'endocrine', 'IGF1': 'endocrine',
+  'HGB': 'hematologic', 'HCT': 'hematologic', 'PLT': 'hematologic', 'WBC': 'hematologic',
+  'LDL': 'cardio', 'HDL': 'cardio', 'TG': 'cardio', 'GLU': 'metabolic', 'GLUCOSE': 'metabolic',
+  'HBA1C': 'metabolic', 'HOMOCYSTEINE': 'neuro', 'FERRITIN': 'hematologic',
+  'CRP': 'cardio', 'VITD': 'metabolic', 'CALCIDIOL': 'metabolic',
 };
 
 function getLabStatus(lab: LabPoint): 'normal' | 'high' | 'low' | 'unknown' {
