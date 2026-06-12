@@ -428,6 +428,7 @@ export interface LabPoint {
   phase: string;
   source?: string;
   patientId?: string;
+  archived?: boolean;
 }
 export interface CourseEntry {
   id: string;

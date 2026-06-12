@@ -176,6 +176,8 @@ export const LabsScreen: React.FC = () => {
 
   const hasLabs = linked.labs && linked.labs.length > 0;
   const labs: LabPoint[] = linked.labs || [];
+  const currentLabs = useMemo(() => labs.filter(l => !l.archived && l.phase === selectedPhase), [labs, selectedPhase]);
+  const archiveLabs = useMemo(() => labs.filter(l => l.archived || l.phase !== selectedPhase), [labs, selectedPhase]);
 
   const handlePhaseChange = (phase: string) => {
     setSelectedPhase(phase);
@@ -197,14 +199,21 @@ export const LabsScreen: React.FC = () => {
 
   const confirmNewLabs = useCallback(async () => {
     setShowNewLabsConfirm(false);
-    const initial: Record<string, string> = {};
-    for (const code of requiredLabs) {
-      const existing = labs.find(l => l.code.toUpperCase() === code.toUpperCase());
-      initial[code] = existing ? String(existing.value) : '';
-    }
-    setBatchValues(initial);
+    // Mark all existing current-phase labs as archived
+    const toArchive = labs.filter(l => !l.archived && l.phase === selectedPhase);
+    try {
+      await db.init();
+      for (const lab of toArchive) {
+        await db.put('labs_log', { ...lab, archived: true });
+      }
+      if (toArchive.length > 0) notifyDataChange();
+    } catch (e) { console.error(e); }
+    // Show EMPTY batch form
+    const empty: Record<string, string> = {};
+    for (const code of requiredLabs) { empty[code] = ''; }
+    setBatchValues(empty);
     setShowNewLabsBatch(true);
-  }, [requiredLabs, labs]);
+  }, [requiredLabs, labs, selectedPhase]);
 
   const handleBatchSave = useCallback(async () => {
     try {
@@ -254,8 +263,8 @@ export const LabsScreen: React.FC = () => {
   }, [requiredLabs]);
 
   const submittedCodes = useMemo(() => {
-    return new Set(labs.map(l => l.code.toUpperCase()));
-  }, [labs]);
+    return new Set(currentLabs.map(l => l.code.toUpperCase()));
+  }, [currentLabs]);
 
   const missingLabs = useMemo(() => {
     return requiredLabs.filter(code => !submittedCodes.has(code.toUpperCase()));
@@ -474,7 +483,7 @@ export const LabsScreen: React.FC = () => {
 
       {/* ─── HERO PAGE ─── */}
       {mainTab === 'hero' && (
-        <div style={{ flex: 1, overflowY: 'auto', padding: '40px 16px 80px' }}>
+        <div style={{ flex: 1, overflowY: 'auto', padding: '40px 16px 70px' }}>
           {/* Hero section */}
           <div style={{ textAlign: 'center', marginBottom: 28 }}>
             <div style={{ fontSize: 48, marginBottom: 12 }}>🧪</div>
@@ -522,15 +531,12 @@ export const LabsScreen: React.FC = () => {
             display: 'flex', alignItems: 'center', gap: 4,
             fontWeight: 600,
           }}>← Назад</button>
-          <span style={{ fontSize: 12, color: 'var(--text-dim)', marginLeft: 'auto' }}>
-            {mainTab === 'lab' ? '🔬 Анализы' : mainTab === 'investigations' ? '🩺 Обследования' : '⚠️ Риски и индексы'}
-          </span>
         </div>
       )}
 
       {/* ─── SCROLLABLE CONTENT (only when not on hero) ─── */}
       {mainTab !== 'hero' && (
-      <div style={{ flex: 1, overflowY: 'auto', padding: '0 12px 80px' }}>
+      <div style={{ flex: 1, overflowY: 'auto', padding: '0 12px 70px' }}>
 
       {/* ≡≡≡ LAB SUB-TABS (only when mainTab === 'lab') ≡≡≡ */}
       {mainTab === 'lab' && (
@@ -682,7 +688,7 @@ export const LabsScreen: React.FC = () => {
                   {codes.map(code => {
                     const info = UCUM_MAP[code.toUpperCase()];
                     const isSubmitted = submittedCodes.has(code.toUpperCase());
-                    const latest = labs.find(l => l.code.toUpperCase() === code.toUpperCase());
+                    const latest = currentLabs.find(l => l.code.toUpperCase() === code.toUpperCase());
                     const isHigh = latest && info ? (latest.value * (info.coeff || 1)) > info.uln : false;
                     const isLow = latest && info ? (latest.value * (info.coeff || 1)) < info.lln : false;
                     return (
@@ -716,11 +722,11 @@ export const LabsScreen: React.FC = () => {
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 0' }}>
             <span style={{ fontSize: 18 }}>📦</span>
             <span style={{ fontSize: 14, fontWeight: 700 }}>Архив результатов</span>
-            <span style={{ fontSize: 11, color: 'var(--text-dim)', marginLeft: 'auto' }}>{labs.length} записей • {new Set(labs.map(l => l.code.toUpperCase())).size} тестов</span>
+            <span style={{ fontSize: 11, color: 'var(--text-dim)', marginLeft: 'auto' }}>{archiveLabs.length} записей • {new Set(archiveLabs.map(l => l.code.toUpperCase())).size} тестов</span>
           </div>
 
           {/* LabsResults — красивые карточки */}
-          <LabsResults labs={labs} />
+          <LabsResults labs={archiveLabs} />
         </div>
       )}
 

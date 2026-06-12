@@ -149,7 +149,7 @@ export default function App() {
   return (
     <div className="app" >
       <DarkBg />
-      <main ref={mainRef} style={{ position: 'relative', zIndex: 1 }}>
+      <main ref={mainRef} style={{ position: 'relative', zIndex: 1, flex: 1, overflow: 'hidden' }}>
         {renderContent()}
       </main>
       <ToastContainer />
