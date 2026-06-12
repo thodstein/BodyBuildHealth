@@ -16,11 +16,11 @@ function getSubstanceName(id: string): string {
 }
 
 const ORGAN_LABELS_V7: Record<string, string> = {
-  heart: '❤️ Сердце', vessels: '', liver: '', kidney: '',
-  blood: '', endocrine: '⚖️ Эндокринная', metabolic: '⚖️ Метаболизм',
-  ghigf: '', ins_axis: '',
-  musculoskeletal: '', neuro_toxicity: '⚠️ Нейротоксичность',
-  reproductive: '',
+  heart: '❤️ Сердце', vessels: '🩸 Сосуды', liver: '🫁 Печень', kidney: '🫘 Почки',
+  blood: '🩸 Кровь', endocrine: '⚖️ Эндокринная', metabolic: '⚡ Метаболизм',
+  ghigf: '📈 GH/IGF', ins_axis: '🍬 Инсулин',
+  musculoskeletal: '💪 Опорно-двигательная', neuro_toxicity: '🧠 Нейротоксичность',
+  reproductive: '🧬 Репродуктивная',
 };
 
 const V7_ORGAN_TO_SYSTEM: Record<string, string> = {
@@ -241,13 +241,15 @@ export const V7RiskDisplay: React.FC<{
           <button
             onClick={toggleMC}
             style={{
-              padding: '6px 16px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer',
-              background: mcEnabled ? 'rgba(139,92,246,0.2)' : 'var(--bg-secondary)',
+              padding: '8px 20px', borderRadius: 20, fontSize: 12, fontWeight: 700, cursor: 'pointer',
+              background: mcEnabled ? 'linear-gradient(135deg, #8b5cf6, #6d28d9)' : 'var(--bg-secondary)',
               border: mcEnabled ? '1px solid #8b5cf6' : '1px solid var(--border)',
-              color: mcEnabled ? '#8b5cf6' : 'var(--text-dim)',
+              color: mcEnabled ? '#fff' : 'var(--text-dim)',
+              boxShadow: mcEnabled ? '0 0 16px rgba(139,92,246,0.35)' : 'none',
+              transition: 'all 0.3s',
             }}
           >
-            {mcEnabled ? '' : ''}
+            🎲 Монте-Карло: {mcEnabled ? 'ВКЛ' : 'ВЫКЛ'}
           </button>
         </div>
       </div>

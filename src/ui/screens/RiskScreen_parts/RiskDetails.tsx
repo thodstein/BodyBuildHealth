@@ -191,7 +191,7 @@ export const RiskDetails: React.FC<{
             {(showAllRecs ? recommendations : recommendations.slice(0, 5)).map((rec, i) => (
               <div key={i} style={{ padding: 6, borderRadius: 6, background: rec.priority === 'high' ? 'rgba(239,68,68,0.15)' : rec.priority === 'medium' ? 'rgba(234,179,8,0.15)' : 'rgba(34,197,94,0.15)', fontSize: 11 }}>{rec.text}</div>
             ))}
-            {recommendations.length > 5 && <button onClick={() => setShowAllRecs(!showAllRecs)} style={{ background: 'none', border: 'none', color: 'var(--accent)', fontSize: 11, cursor: 'pointer', padding: 4 }}>{showAllRecs ? '' : ''}</button>}
+            {recommendations.length > 5 && <button onClick={() => setShowAllRecs(!showAllRecs)} style={{ background: 'none', border: 'none', color: 'var(--accent)', fontSize: 11, cursor: 'pointer', padding: 4 }}>{showAllRecs ? '▲ Скрыть' : '▼ Показать ещё'}</button>}
           </div>
         ) : <div style={{ color: 'var(--text-dim)', textAlign: 'center', padding: 12, fontSize: 12 }}>Нет специфических рекомендаций</div>}
       </div>

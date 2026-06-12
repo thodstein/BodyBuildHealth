@@ -1,5 +1,5 @@
 ﻿import React, { useState, useMemo, useEffect } from 'react';
-import { RISK_SYSTEMS, ALL_RISK_SYSTEMS, SUBSYSTEM_MAP, SUBSYSTEM_PARENT, DRUG_THRESHOLDS, SUPPORT_BASE_COVERAGE } from '../../core/constants';
+import { RISK_SYSTEMS, ALL_RISK_SYSTEMS, SUBSYSTEM_MAP, SUBSYSTEM_PARENT, DRUG_THRESHOLDS, SUPPORT_BASE_COVERAGE, UCUM_MAP } from '../../core/constants';
 import { SYSTEM_INFO, MECHANISM_INFO, SYSTEM_ORGANS } from '../../core/risk-info';
 import type { RiskResult, MechanismCell, LabPoint, CourseEntry } from '../../core/types';
 import { calculateRisks, calculateAggregatedRisks, type AggregatedRisk } from '../../engines/risk.engine';
@@ -21,6 +21,8 @@ import { calculateWeeklyRiskDynamics, type WeeklyRiskDynamics } from '../../engi
 import { useV7Risk } from '../hooks/useV7Risk';
 import { getProfile, updateProfile } from '../../core/profile-manager';
 import { analyzeWithCompliance, type ComplianceReport, getComplianceStatus } from '../../engines/compliance-engine';
+import { analyzeLabDrugCorrelation, type LabDrugAlert } from '../../engines/lab-pharma-correlation.engine';
+import { interpretLabs, computeHOMA_IR, type LabCompositeResult } from '../../engines/lab-analysis.engine';
 import { validateDiagnostics, getDiagnosticSummary } from '../../engines/diagnostics.engine';
 
 const RISK_HISTORY_KEY = 'risk_history';
@@ -50,7 +52,8 @@ export const RiskScreen: React.FC = () => {
   const linked = useDataLink();
   const labAnalysis = linked.labAnalysis;
   const readinessData = linked.readiness;
-  const [tab, setTab] = useState<'overview' | 'dynamics' | 'mechanisms' | 'v7' | 'model' | 'info' | 'mdss' | 'compliance' | 'clinical'>('overview');
+  const [mainTab, setMainTab] = useState<'hero' | 'calculations' | 'clinical' | 'info'>('hero');
+  const [subTab, setSubTab] = useState<'overview' | 'dynamics' | 'mechanisms' | 'v7' | 'model' | 'info' | 'mdss' | 'compliance' | 'clinical' | 'labs_risks'>('overview');
   const [tick, setTick] = useState(0);
   const [selectedWeek, setSelectedWeek] = useState<number | null>(null);
   const [weekMode, setWeekMode] = useState<'week' | 'average'>('average');
@@ -307,7 +310,7 @@ export const RiskScreen: React.FC = () => {
     if (!riskResult) return <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-dim)' }}>Загрузка...</div>;
     const effectiveLabContrib = labRiskContributions || syntheticLabContrib;
     const isSyntheticLab = !hasLabs && shouldApplyPenalty; // lab contrib came from penalty, not real labs
-    switch (tab) {
+    switch (subTab) {
       case 'overview': return <RiskOverview riskResult={riskResult} globalNoLabs={globalNoLabs} noLabsSystems={noLabsSystems} labRiskContributions={effectiveLabContrib} riskHistory={riskHistory} aggregatedRisk={aggregatedRisk} weeklyDynamics={weeklyDynamics} />;
       case 'mechanisms': return <RiskDetails riskResult={riskResult} labRiskContributions={effectiveLabContrib} isSyntheticLab={isSyntheticLab} />;
       case 'v7': return v7Result ? <V7RiskDisplay result={v7Result} organWeek={organWeek} onWeekChange={setOrganWeek} mcEnabled={mcEnabled} onToggleMC={toggleMC} /> : <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-dim)' }}>Загрузка V7...</div>;
@@ -317,28 +320,92 @@ export const RiskScreen: React.FC = () => {
       case 'mdss': return <MDSSRiskDisplay />;
       case 'compliance': return <ComplianceDisplay />;
       case 'clinical': return <ClinicalRiskDisplay />;
+      case 'labs_risks': return <LabsRisksTab />;
       default: return <RiskOverview riskResult={riskResult} globalNoLabs={globalNoLabs} noLabsSystems={noLabsSystems} labRiskContributions={labRiskContributions} riskHistory={riskHistory} aggregatedRisk={aggregatedRisk} />;
     }
   };
 
+  const CALC_SUBTABS = ['overview','dynamics','mechanisms','v7','mdss'] as const;
+  const CLINICAL_SUBTABS = ['model','compliance','clinical','labs_risks'] as const;
+
+  const SUBTAB_LABELS: Record<string, string> = {
+    overview: '📊 Обзор', dynamics: '📈 Динамика', mechanisms: '⚙️ Механизмы',
+    v7: '🧬 Монте Карло', model: '🧮 3D Модель', mdss: '🏥 MDSS',
+    compliance: '✅ Комплаенс', clinical: '🩺 Клиника', info: 'ℹ️ Инфо',
+    labs_risks: '🩸 Анализы',
+  };
+
+  const mainTabLabel = mainTab === 'calculations' ? 'Комплексные расчеты' :
+    mainTab === 'clinical' ? 'Клиника' : mainTab === 'info' ? 'Общая информация' : '';
+
   return (
-    <div className="screen risk">
-      <h2 style={{ margin: '0 0 6px', fontSize: 'clamp(16, 4.5vw, 18)' }}>⚠️ Риски</h2>
-      <div style={{ display: 'flex', gap: 3, overflowX: 'auto', marginBottom: 12, scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' }}>
-        {(['overview', 'dynamics', 'mechanisms', 'v7', 'model', 'mdss', 'compliance', 'clinical', 'info'] as const).map(t => (
-          <button key={t} onClick={() => setTab(t)} style={{
-            flex: '0 0 auto', padding: '8px 14px', borderRadius: 8, fontSize: 12, fontWeight: tab === t ? 700 : 400,
-            whiteSpace: 'nowrap', cursor: 'pointer', transition: 'all 0.15s',
-            background: tab === t ? 'rgba(0,230,138,0.15)' : 'var(--bg-secondary)',
-            color: tab === t ? '#00e68a' : 'var(--text-dim)',
-            border: tab === t ? '1px solid #00e68a' : '1px solid var(--border)',
-            boxShadow: tab === t ? '0 1px 6px rgba(0,230,138,0.15)' : 'none',
-          }}>
-            {TAB_LABELS[t]}
-          </button>
-        ))}
-      </div>
-      {renderContent()}
+    <div className="screen risk" style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden', padding: 0 }}>
+      {/* ─── HERO PAGE ─── */}
+      {mainTab === 'hero' && (
+        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '24px 16px 70px' }}>
+          <div style={{ textAlign: 'center', marginBottom: 28 }}>
+            <div style={{ fontSize: 48, marginBottom: 12 }}>⚠️</div>
+            <h1 style={{ fontSize: 22, fontWeight: 800, color: 'var(--accent)', margin: '0 0 8px' }}>Оценка рисков</h1>
+            <p style={{ fontSize: 13, color: 'var(--text-dim)', margin: 0, lineHeight: 1.5 }}>
+              Комплексный анализ — расчёты, клинические модели и справочная информация
+            </p>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {[
+              { id: 'calculations', icon: '🧮', title: 'Комплексные расчеты', desc: 'Базовый расчёт, Монте Карло (V7), MDSS — все аналитические модели рисков.', color: '#22c55e' },
+              { id: 'clinical', icon: '🏥', title: 'Клиника', desc: '3D модель, комплаенс, клинические риски и анализы.', color: '#3b82f6' },
+              { id: 'info', icon: 'ℹ️', title: 'Общая информация', desc: 'Формулы, механизмы, пороги препаратов и справочные данные.', color: '#a855f7' },
+            ].map(card => (
+              <button key={card.id} onClick={() => setMainTab(card.id as any)} style={{
+                display: 'flex', alignItems: 'center', gap: 16, padding: '18px 16px', borderRadius: 16, cursor: 'pointer', textAlign: 'left', width: '100%',
+                background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', color: 'var(--text)',
+                transition: 'all 0.2s',
+              }}>
+                <div style={{ width: 52, height: 52, borderRadius: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                  background: card.color + '18', fontSize: 26 }}>
+                  {card.icon}
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 4, color: card.color }}>{card.title}</div>
+                  <div style={{ fontSize: 11, color: 'var(--text-dim)', lineHeight: 1.4 }}>{card.desc}</div>
+                </div>
+                <span style={{ color: card.color, fontSize: 18, opacity: 0.6 }}>→</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ─── TOP NAV BAR ─── */}
+      {mainTab !== 'hero' && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '6px 12px', flexShrink: 0, borderBottom: '1px solid var(--border)' }}>
+          <button onClick={() => setMainTab('hero')} style={{
+            padding: '6px 8px', cursor: 'pointer', fontSize: 14, color: 'var(--text-dim)',
+            border: 'none', background: 'transparent', display: 'flex', alignItems: 'center', gap: 4, fontWeight: 600,
+          }}>← Назад</button>
+        </div>
+      )}
+
+      {/* ─── SCROLLABLE CONTENT ─── */}
+      {mainTab !== 'hero' && (
+        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '0 12px 70px' }}>
+          {/* Sub-tab pills */}
+          <div style={{ display: 'flex', gap: 4, overflowX: 'auto', padding: '8px 0 4px', scrollbarWidth: 'none' }}>
+            {(mainTab === 'calculations' ? CALC_SUBTABS : mainTab === 'clinical' ? CLINICAL_SUBTABS : ['info'] as const).map(t => (
+              <button key={t} onClick={() => setSubTab(t as any)} style={{
+                padding: '6px 14px', borderRadius: 16, fontSize: 11, fontWeight: 600,
+                whiteSpace: 'nowrap', cursor: 'pointer', transition: 'all 0.2s', flexShrink: 0,
+                background: subTab === t ? 'var(--accent)' : 'var(--bg-secondary)',
+                color: subTab === t ? '#000' : 'var(--text-dim)',
+                border: `1px solid ${subTab === t ? 'var(--accent)' : 'var(--border)'}`,
+              }}>
+                {SUBTAB_LABELS[t] || t}
+              </button>
+            ))}
+          </div>
+          {renderContent()}
+        </div>
+      )}
     </div>
   );
 };
@@ -962,6 +1029,144 @@ const ClinicalRiskDisplay: React.FC = () => {
           ))}
         </>
       )}
+    </div>
+  );
+};
+
+// ── Labs Risks Tab (Анализы sub-tab in Clinical) ──
+const LabsRisksTab: React.FC = () => {
+  const linked = useDataLink();
+  const labs = linked.labs || [];
+  const hasLabs = labs.length > 0;
+  const [riskSections, setRiskSections] = useState<Record<string,boolean>>({ pharma:true, indices:true, systems:true, markers:true });
+
+  const sysLabels: Record<string,string> = {
+    cardio:'Сердечно-сосудистая', hepatic:'Печень', renal:'Почки', neuro:'Нервная',
+    endocrine:'Эндокринная', hematologic:'Кровь', reproductive:'Репродуктивная', musculoskeletal:'Мышечная', metabolic:'Метаболизм', other:'Прочее'
+  };
+
+  const labPharmaAlerts = useMemo(() => {
+    if (!hasLabs || linked.course.length === 0) return [] as LabDrugAlert[];
+    return analyzeLabDrugCorrelation(labs, linked.course, linked.profile?.settings?.phase || 'on_cycle');
+  }, [hasLabs, labs, linked.course]);
+
+  const labAnalysisRes = useMemo(() => {
+    if (!hasLabs) return null;
+    return interpretLabs(labs);
+  }, [hasLabs, labs]);
+
+  const r = labAnalysisRes;
+  const ASI = r ? Math.max(0, Math.round(100 - ((r.hormoneScore||0)*0.4 + Math.min(100, (r.inflammation||0)/6*50)*0.3 + (r.kidneyStress||0)*0.3))) : null;
+  const HMI = r ? Math.round(Math.min(100, (r.liverStress||0) * 1.2 + (r.inflammation||0) * 0.5)) : null;
+  const CR = r ? Math.round(Math.min(100, (r.cardioRisk||0) * 1.1 + (r.inflammation||0) * 0.6)) : null;
+  const statusColor = (v: number|null, inv: boolean) => {
+    if (v===null) return 'var(--text-dim)';
+    if (inv) return v>=70 ? '#22c55e' : v>=40 ? '#eab308' : '#ef4444';
+    return v<=30 ? '#22c55e' : v<=60 ? '#eab308' : '#ef4444';
+  };
+  const statusLabel = (v: number|null, inv: boolean) => {
+    if (v===null) return 'Н/Д';
+    if (inv) return v>=70 ? 'Хорошо' : v>=40 ? 'Умеренно' : 'Плохо';
+    return v<=30 ? 'Хорошо' : v<=60 ? 'Умеренно' : 'Повышен';
+  };
+
+  const labRisks = useMemo(() => {
+    if (!hasLabs) return null;
+    const contribs = calculateRiskFromAnalyses(labs) as any;
+    const sb: Record<string,{raw:number;net:number}> = {};
+    for (const sys of ALL_RISK_SYSTEMS) {
+      const c = contribs.systemContributions?.[sys] || 0;
+      sb[sys] = { raw: c, net: c };
+    }
+    const devs: { code:string; name:string; value:number; uln:number; lln:number; deviation:number; system:string }[] = [];
+    for (const lab of labs) {
+      const ref = UCUM_MAP[lab.code];
+      if (!ref?.uln || !ref?.lln) continue;
+      const norm = lab.value * (ref.coeff || 1);
+      let deviation = 0;
+      if (norm > ref.uln) deviation = (norm - ref.uln) / ref.uln;
+      else if (norm < ref.lln) deviation = -((ref.lln - norm) / ref.lln);
+      if (Math.abs(deviation) > 0.01) {
+        let sys = 'other';
+        for (const [s, codes] of Object.entries(LAB_SYSTEM_GROUPS)) {
+          if (codes.includes(lab.code.toUpperCase())) { sys = s; break; }
+        }
+        devs.push({ code: lab.code, name: ref.name || lab.code, value: lab.value, uln: ref.uln, lln: ref.lln, deviation: Math.round(deviation*100), system: sys });
+      }
+    }
+    devs.sort((a,b) => Math.abs(b.deviation)-Math.abs(a.deviation));
+    return { systemBreakdown: sb, markerDeviations: devs, deviationCount: devs.length };
+  }, [hasLabs, labs]);
+
+  const penalty = useMemo(() => {
+    return calculatePenaltyCoefficients('baseline', labs, [], 1, linked.course, false);
+  }, [labs, linked.course]);
+
+  const sysColors: Record<string,string> = {
+    hepatic:'#22c55e', renal:'#3b82f6', endocrine:'#a855f7', hematologic:'#ef4444',
+    cardio:'#f97316', metabolic:'#eab308', reproductive:'#ec4899', neuro:'#14b8a6', other:'#6b7280'
+  };
+
+  const LAB_SYSTEM_GROUPS: Record<string,string[]> = {
+    hepatic:['ALT','AST','GGT','ALP','BILIRUBIN_TOTAL','BIL','ALB'], renal:['CREATININE','BUN','EGFR','PROTEIN_TOTAL','TP','UA','UACR'],
+    endocrine:['TSH','FT3','FT4','TESTOSTERONE','TT','E2','ESTRADIOL','PRL','PROLACTIN','CORTISOL','LH','FSH','SHBG','IGF1'],
+    hematologic:['HGB','HCT','PLT','WBC','FERRITIN'], cardio:['LDL','HDL','TG','CRP','HOMOCYSTEINE'],
+    metabolic:['GLU','GLUCOSE','HBA1C','INSULIN','INS','HOMA','VITD'], reproductive:['PSA','INHB','AMH'], neuro:['HOMOCYSTEINE'], other:[]
+  };
+
+  return (
+    <div>
+      {[
+        {key:'pharma',icon:'🧬',title:'Лабораторно-фармацевтические риски',
+         body: labPharmaAlerts.length>0 ? <div style={{display:'grid',gap:3}}>{labPharmaAlerts.map((a,i)=>
+          <div key={i} style={{padding:'6px 8px',borderRadius:6,background:a.severity==='critical'?'rgba(239,68,68,0.08)':a.severity==='high'?'rgba(249,115,22,0.08)':'rgba(234,179,8,0.08)',border:`1px solid ${a.severity==='critical'?'rgba(239,68,68,0.2)':a.severity==='high'?'rgba(249,115,22,0.2)':'rgba(234,179,8,0.2)'}`}}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+              <span style={{fontSize:9,fontWeight:600,color:a.severity==='critical'?'#ef4444':a.severity==='high'?'#f97316':'#eab308'}}>{a.marker} × {a.drugCause?.join(', ')}</span>
+              <span style={{fontSize:7,fontWeight:700,padding:'1px 5px',borderRadius:3,background:a.severity==='critical'?'#ef4444':a.severity==='high'?'#f97316':'#eab308',color:'#fff'}}>{a.severity==='critical'?'КРИТ':a.severity==='high'?'ВЫСОК':'МОНИТ'}</span>
+            </div><div style={{color:'var(--text-dim)',fontSize:8}}>{a.recommendation}</div></div>)}</div> :
+          <div style={{fontSize:10,color:'var(--text-dim)',textAlign:'center',padding:'12px 0'}}>{hasLabs?'Не обнаружены':'Введите анализы'}</div>},
+        {key:'indices',icon:'📊',title:'Композитные индексы здоровья',
+         body:<div style={{display:'grid',gap:6}}>{[{label:'ASI (Анаболический синтез)',desc:'Способность к анаболизму',val:ASI,inv:true},{label:'HMI (Гепатический метаболизм)',desc:'Стресс печени',val:HMI,inv:false},{label:'CR (Кардиориск)',desc:'Липиды + воспаление',val:CR,inv:false}].map(item=>
+          <div key={item.label} style={{padding:8,borderRadius:8,background:item.val!==null?`rgba(${item.inv?(item.val>=70?'34,197,94':item.val>=40?'234,179,8':'239,68,68'):(item.val<=30?'34,197,94':item.val<=60?'234,179,8':'239,68,68')},0.06)`:'var(--bg-secondary)',border:item.val!==null?`1px solid rgba(${item.inv?(item.val>=70?'34,197,94':item.val>=40?'234,179,8':'239,68,68'):(item.val<=30?'34,197,94':item.val<=60?'234,179,8':'239,68,68')},0.2)`:'1px solid var(--border)'}}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+              <div><div style={{fontSize:10,fontWeight:600}}>{item.label}</div><div style={{fontSize:8,color:'var(--text-dim)',marginTop:2}}>{item.desc}</div></div>
+              {item.val!==null ? <div style={{textAlign:'right'}}><div style={{fontSize:18,fontWeight:700,color:statusColor(item.val,item.inv)}}>{item.val}%</div><div style={{fontSize:8,color:statusColor(item.val,item.inv),fontWeight:600}}>{statusLabel(item.val,item.inv)}</div></div> : <div style={{fontSize:10,color:'var(--text-dim)'}}>Нет данных</div>}
+            </div></div>)}</div>},
+        {key:'systems',icon:'⚠️',title:'Риски по системам организма',
+         body: labRisks && Object.values(labRisks.systemBreakdown).some(v=>v.net>0) ? <div style={{display:'grid',gap:3}}>{Object.entries(labRisks.systemBreakdown).filter(([,v])=>v.net>0).sort(([,a],[,b])=>b.net-a.net).map(([sys,val])=>{
+          const lvl=val.net<=25?'low':val.net<=50?'medium':val.net<=75?'high':'critical';
+          const lc={low:{bg:'rgba(34,197,94,0.08)',text:'#22c55e',bar:'#22c55e'},medium:{bg:'rgba(234,179,8,0.08)',text:'#eab308',bar:'#eab308'},high:{bg:'rgba(249,115,22,0.08)',text:'#f97316',bar:'#f97316'},critical:{bg:'rgba(239,68,68,0.08)',text:'#ef4444',bar:'#ef4444'}}[lvl];
+          return <div key={sys} style={{display:'flex',alignItems:'center',gap:6,padding:'5px 8px',borderRadius:6,background:lc.bg,border:`1px solid ${lc.bg.replace('0.08','0.15')}`}}>
+            <span style={{fontSize:9,fontWeight:600,minWidth:60,color:lc.text}}>{sysLabels[sys]||sys}</span>
+            <div style={{flex:1,height:6,background:'rgba(255,255,255,0.06)',borderRadius:3,overflow:'hidden'}}><div style={{width:`${Math.min(100,val.net)}%`,height:'100%',background:lc.bar,borderRadius:3,transition:'width 0.4s ease'}}/></div>
+            <span style={{fontSize:11,fontWeight:700,color:lc.text,minWidth:28,textAlign:'right'}}>{Math.round(val.net)}%</span></div>})}</div> :
+          <div style={{fontSize:10,color:'var(--text-dim)',textAlign:'center',padding:'12px 0'}}>{hasLabs?'Все системы в норме':'Введите анализы'}</div>},
+        {key:'markers',icon:'🔬',title:'Маркеры с отклонениями',
+         body: labRisks && labRisks.deviationCount>0 ? <div style={{display:'grid',gap:3}}>{labRisks.markerDeviations.map(m=>{
+          const isHigh=m.deviation>0; const absDev=Math.abs(m.deviation);
+          const dl=absDev<=20?'low':absDev<=50?'medium':absDev<=100?'high':'critical';
+          const dc={low:{bg:'rgba(34,197,94,0.06)',text:'#22c55e'},medium:{bg:'rgba(234,179,8,0.06)',text:'#eab308'},high:{bg:'rgba(249,115,22,0.06)',text:'#f97316'},critical:{bg:'rgba(239,68,68,0.06)',text:'#ef4444'}}[dl];
+          return <div key={m.code+m.value} style={{display:'flex',alignItems:'center',gap:5,padding:'5px 8px',borderRadius:6,background:dc.bg,border:`1px solid ${dc.bg.replace('0.06','0.12')}`}}>
+            <span style={{fontSize:8,color:'var(--text-dim)',minWidth:46}}>{sysLabels[m.system]||m.system}</span>
+            <span style={{fontSize:10,fontWeight:600,flex:1,color:'var(--text)'}}>{m.name}</span>
+            <span style={{fontSize:8,color:'var(--text-dim)'}}>{m.lln}–{m.uln}</span>
+            <span style={{fontSize:10,fontWeight:700,color:dc.text}}>{m.value} <span style={{fontSize:8,padding:'1px 4px',borderRadius:3,fontWeight:600,background:dc.text+'22',color:dc.text}}>{isHigh?'↑':'↓'}{absDev}%</span></span></div>})}</div> :
+          <div style={{fontSize:10,color:'var(--text-dim)',textAlign:'center',padding:'12px 0'}}>{hasLabs?'Все маркеры в норме':'Введите анализы'}</div>},
+      ].map(b => (
+        <div key={b.key} className="card" style={{ padding: 0, overflow: 'hidden', marginBottom: 8 }}>
+          <button onClick={() => setRiskSections(s => ({...s, [b.key]: !s[b.key]}))} style={{
+            display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '10px 12px', cursor: 'pointer', textAlign: 'left',
+            background: 'transparent', border: 'none', color: 'var(--text)', fontSize: 12, fontWeight: 700,
+          }}>
+            <span style={{ fontSize: 12, transition: 'transform 0.2s', transform: riskSections[b.key] ? 'rotate(90deg)' : 'rotate(0deg)' }}>▶</span>
+            {b.icon} {b.title}
+          </button>
+          {riskSections[b.key] && <div style={{ padding: '0 12px 12px' }}>{b.body}</div>}
+        </div>
+      ))}
+      {!hasLabs && <div className="card" style={{ textAlign: 'center', padding: 24 }}>
+        <div style={{ fontSize: 36, marginBottom: 10 }}>🧪</div>
+        <div style={{ fontSize: 13, color: 'var(--text-dim)' }}>Нет данных анализов</div></div>}
     </div>
   );
 };
