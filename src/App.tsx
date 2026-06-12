@@ -41,35 +41,41 @@ export default function App() {
 
   // Telegram Mini App viewport and theme
   useEffect(() => {
-    const tg = (window as any).Telegram?.WebApp;
-    if (tg) {
-      tg.expand();
-      tg.enableClosingConfirmation();
-      // Set CSS variable for TG viewport
-      document.documentElement.style.setProperty('--tg-safe-top', (tg.safeAreaInsetTop || 0) + 'px');
-      document.documentElement.style.setProperty('--tg-safe-bottom', (tg.safeAreaInsetBottom || 0) + 'px');
-      // Apply TG theme if dark
-      if (tg.colorScheme === 'dark') {
-        document.documentElement.style.setProperty('--tg-bg', tg.themeParams.bg_color || '#050508');
-        document.documentElement.style.setProperty('--tg-text', tg.themeParams.text_color || '#e8e8f0');
+    try {
+      const tg = (window as any).Telegram?.WebApp;
+      if (tg) {
+        if (typeof tg.expand === 'function') tg.expand();
+        if (typeof tg.enableClosingConfirmation === 'function') tg.enableClosingConfirmation();
+        document.documentElement.style.setProperty('--tg-safe-top', (tg.safeAreaInsetTop || 0) + 'px');
+        document.documentElement.style.setProperty('--tg-safe-bottom', (tg.safeAreaInsetBottom || 0) + 'px');
+        if (tg.colorScheme === 'dark') {
+          document.documentElement.style.setProperty('--tg-bg', tg.themeParams.bg_color || '#050508');
+          document.documentElement.style.setProperty('--tg-text', tg.themeParams.text_color || '#e8e8f0');
+        }
       }
+    } catch (e) {
+      console.warn('[App] TG viewport init failed:', e);
     }
   }, []);
 
   // Telegram back button integration
   useEffect(() => {
-    const tg = (window as any).Telegram?.WebApp;
-    if (tg?.BackButton) {
-      tg.BackButton.show();
-      const handler = () => {
-        if (tab !== 'home') {
-          setTab('home');
-        } else {
-          tg.close();
-        }
-      };
-      tg.BackButton.onClick(handler);
-      return () => tg.BackButton.offClick(handler);
+    try {
+      const tg = (window as any).Telegram?.WebApp;
+      if (tg?.BackButton) {
+        if (typeof tg.BackButton.show === 'function') tg.BackButton.show();
+        const handler = () => {
+          if (tab !== 'home') {
+            setTab('home');
+          } else if (typeof tg.close === 'function') {
+            tg.close();
+          }
+        };
+        if (typeof tg.BackButton.onClick === 'function') tg.BackButton.onClick(handler);
+        return () => { try { if (typeof tg.BackButton.offClick === 'function') tg.BackButton.offClick(handler); } catch {} };
+      }
+    } catch (e) {
+      console.warn('[App] BackButton init failed:', e);
     }
   }, [tab]);
 

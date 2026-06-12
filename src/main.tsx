@@ -69,6 +69,17 @@ function fixMobileViewport() {
   window.addEventListener('orientationchange', () => setTimeout(setVH, 100));
 }
 
+function showBootstrapError(msg: string) {
+  const app = document.getElementById('app');
+  if (app) {
+    app.innerHTML = `<div style="padding:24px;color:#ff453a;font-family:system-ui,sans-serif;">
+      <h2 style="margin:0 0 8px;font-size:18px;">Ошибка загрузки</h2>
+      <p style="margin:0 0 16px;color:#aaa;font-size:14px;">${msg}</p>
+      <button onclick="location.reload()" style="padding:10px 20px;background:#007aff;color:#fff;border:none;border-radius:8px;cursor:pointer;">⟳ Перезагрузить</button>
+    </div>`;
+  }
+}
+
 async function bootstrap() {
   const app = document.getElementById('app');
   if (!app) {
@@ -76,24 +87,29 @@ async function bootstrap() {
     return;
   }
 
-  // Fix mobile viewport
-  fixMobileViewport();
+  console.log('[bootstrap] step 1: fixMobileViewport');
+  try { fixMobileViewport(); } catch (e) { console.warn('fixMobileViewport failed:', e); }
 
-  // Initialize Telegram WebApp if available
-  const isTg = initTelegramWebApp();
+  console.log('[bootstrap] step 2: initTelegramWebApp');
+  let isTg = false;
+  try { isTg = initTelegramWebApp(); } catch (e) { console.warn('initTelegramWebApp failed:', e); }
 
   if (!isTg) {
-    // Not in Telegram — use PWA
-    initPWA();
+    console.log('[bootstrap] not TG, initPWA');
+    try { initPWA(); } catch (e) { console.warn('initPWA failed:', e); }
+  } else {
+    console.log('[bootstrap] is TG mode');
   }
 
+  console.log('[bootstrap] step 3: db.init');
   try {
     await db.init();
   } catch (e) {
-    app.innerHTML = '<div style="padding:20px;color:#ff453a;">Error initializing database. Please reload.</div>';
+    showBootstrapError('Ошибка инициализации базы данных. Перезагрузите.');
     return;
   }
 
+  console.log('[bootstrap] step 4: ensureAdmin');
   try {
     const adminEmail = import.meta.env.VITE_ADMIN_EMAIL || '';
     const adminPass = import.meta.env.VITE_ADMIN_PASSWORD || '';
@@ -104,6 +120,7 @@ async function bootstrap() {
     console.warn('Admin seed failed:', e);
   }
 
+  console.log('[bootstrap] step 5: registry.init + crypto');
   try {
     await registry.init();
     const cryptoKey = import.meta.env.VITE_CRYPTO_KEY || '';
@@ -116,23 +133,39 @@ async function bootstrap() {
     console.warn('Crypto/Registry init failed:', e);
   }
 
-  initErrorHandler('app');
-  optimizeDBSpace(db, 50);
+  console.log('[bootstrap] step 6: error handler + optimize');
+  try { initErrorHandler('app'); } catch (e) { console.warn('initErrorHandler failed:', e); }
+  try { optimizeDBSpace(db, 50); } catch (e) { console.warn('optimizeDBSpace failed:', e); }
 
   if (!isTg) {
-    registerSW();
+    console.log('[bootstrap] step 7: registerSW');
+    try { registerSW(); } catch (e) { console.warn('registerSW failed:', e); }
   }
 
-  initCloudSync();
-  processQueue();
+  console.log('[bootstrap] step 8: initCloudSync + processQueue');
+  try { initCloudSync(); } catch (e) { console.warn('initCloudSync failed:', e); }
+  try { processQueue(); } catch (e) { console.warn('processQueue failed:', e); }
 
+  console.log('[bootstrap] step 9: renderAuthModule');
   const onLogin = (profile: any) => {
-    initRealtime(profile.id || 'user_default');
-    const root = createRoot(app);
-    root.render(<App />);
+    console.log('[bootstrap] onLogin called, profile.id:', profile?.id);
+    try {
+      try { initRealtime(profile.id || 'user_default'); } catch (e) { console.warn('initRealtime failed:', e); }
+      const root = createRoot(app);
+      console.log('[bootstrap] createRoot done, rendering <App />');
+      root.render(<App />);
+    } catch (e) {
+      console.error('[bootstrap] React render failed:', e);
+      showBootstrapError('Ошибка рендеринга приложения: ' + ((e as Error)?.message || e));
+    }
   };
 
-  renderAuthModule(app, onLogin);
+  try {
+    await renderAuthModule(app, onLogin);
+  } catch (e) {
+    console.error('[bootstrap] renderAuthModule failed:', e);
+    showBootstrapError('Ошибка авторизации: ' + ((e as Error)?.message || e));
+  }
 }
 
 if (document.readyState === 'loading') {
