@@ -9,11 +9,10 @@ import { RiskScreen } from './ui/screens/RiskScreen';
 import { NutritionScreen } from './ui/screens/NutritionScreen';
 import { ProfileScreen } from './ui/screens/ProfileScreen';
 import { ArticlesScreen } from './ui/screens/ArticlesScreen';
-import { PctScreen } from './ui/screens/PctScreen';
-import { ReportsScreen } from './ui/screens/ReportsScreen';
+
 import { ToastContainer } from './ui/ToastContainer';
 
-type Tab = 'home' | 'pharma' | 'training' | 'labs' | 'risks' | 'support' | 'nutrition' | 'profile' | 'pct' | 'articles' | 'reports';
+type Tab = 'home' | 'pharma' | 'training' | 'labs' | 'risks' | 'support' | 'nutrition' | 'profile' | 'articles';
 
 // Bottom nav: 5 primary tabs
 const PRIMARY_NAV: { id: Tab; label: string; icon: React.ReactNode }[] = [
@@ -100,8 +99,8 @@ export default function App() {
       'articles': 'articles',
       'assistant': 'home',
       'gamification': 'home',
-      'fertility-pct': 'pct',
-      'reports': 'reports',
+      'fertility-pct': 'support',
+      'reports': 'profile',
       'integrations': 'home',
       'role-management': 'profile',
       'recovery': 'training',
@@ -136,9 +135,7 @@ export default function App() {
       case 'risks': return <RiskScreen />;
       case 'nutrition': return <NutritionScreen />;
       case 'profile': return <ProfileScreen />;
-      case 'pct': return <PctScreen onBack={() => go('home')} />;
       case 'articles': return <ArticlesScreen />;
-      case 'reports': return <ReportsScreen />;
       default: return <DashboardScreen onNavigate={handleNavigate} />;
     }
   };

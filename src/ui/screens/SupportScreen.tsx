@@ -9,6 +9,7 @@ import { SUPPORT_BASE_COVERAGE } from '../../core/constants';
 import { INTERACTIONS_DB } from '../../data/interactions';
 import { generateWeeklyProtocol } from '../../engines/auto-plan.engine';
 import { ALL_SUBSTANCES, type SupportSubstance, type SupportInteraction } from '../../data/support-database';
+import { FertilityPCTScreen } from './FertilityPCTScreen';
 import { ALL_STACKS, EFFECT_LABELS_ru, findStacksByEffect, getSubstanceLabel as getStackSubLabel, type SupportStack } from '../../data/support-stacks';
 import {
   PEPTIDE_DB, PEPTIDE_LIST, PEPTIDE_SYNERGY, PEPTIDE_CONFLICTS, PEPTIDE_GOAL_PROFILES,
@@ -33,7 +34,7 @@ import { generateStack, selectBestStack, type StackResult } from '../../engines/
 import { ReportEngine, type ReportInput } from '../../engines/report-engine';
 import type { CourseEntry } from '../../core/types';
 
-type SupportTab = 'catalog' | 'synergies' | 'calculator' | 'interactions' | 'protocol' | 'stacks' | 'peptides' | 'recs';
+type SupportTab = 'catalog' | 'synergies' | 'calculator' | 'interactions' | 'protocol' | 'stacks' | 'peptides' | 'recs' | 'fertility-pct';
 
 const SYNERGY_COLORS: Record<string, string> = {
   synergistic: '#22c55e',
@@ -819,13 +820,13 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   return (
     <div className="screen support-screen">
       <div style={{ display: 'flex', gap: 4, marginBottom: 12, overflowX: 'auto', scrollbarWidth: 'none' }}>
-        {(['catalog', 'synergies', 'calculator', 'interactions', 'protocol', 'stacks', 'peptides', 'recs'] as SupportTab[]).map(t => (
+        {(['catalog', 'synergies', 'calculator', 'interactions', 'protocol', 'stacks', 'peptides', 'recs', 'fertility-pct'] as SupportTab[]).map(t => (
           <button key={t} onClick={() => setTab(t)} style={{
             flex: 1, padding: '10px 8px', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600,
             background: tab === t ? 'var(--accent-green, #00e68a)' : 'var(--bg-secondary)',
             color: tab === t ? '#000' : 'var(--text-dim)', cursor: 'pointer', transition: 'background 0.15s', whiteSpace: 'nowrap',
           }}>
-            {t === 'catalog' ? '📖 Каталог' : t === 'synergies' ? '🔗 Синергии' : t === 'calculator' ? '🧮 Калькулятор' : t === 'interactions' ? '⚠️ Взаимодействия' : t === 'stacks' ? '📦 Стеки' : t === 'peptides' ? '🧬 Пептиды' : t === 'recs' ? '💡 Реком.' : '📅 Протокол'}
+            {t === 'catalog' ? '📖 Каталог' : t === 'synergies' ? '🔗 Синергии' : t === 'calculator' ? '🧮 Калькулятор' : t === 'interactions' ? '⚠️ Взаимодействия' : t === 'stacks' ? '📦 Стеки' : t === 'peptides' ? '🧬 Пептиды' : t === 'recs' ? '💡 Реком.' : t === 'fertility-pct' ? '🧬 Фертильность' : '📅 Протокол'}
           </button>
         ))}
       </div>
@@ -1930,6 +1931,9 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
 
       {/* ===== RECS TAB ===== */}
       {tab === 'recs' && <RecsTab profile={linked.profile} labs={labAnalysis} readiness={linked.readiness} course={linked.course} />}
+
+      {/* ===== FERTILITY/PCT TAB ===== */}
+      {tab === 'fertility-pct' && <FertilityPCTScreen />}
     </div>
   );
 };

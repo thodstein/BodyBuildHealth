@@ -2,12 +2,13 @@
 import type { UserProfile, InjuryRecord, SupplementEntry, MedicationEntry, LabPoint } from '../../core/types';
 import { getProfile, updateProfile, useProfileRefresh } from '../../core/profile-manager';
 import { db } from '../../core/db';
+import { ReportsScreen } from './ReportsScreen';
 import { calcReadiness } from '../../engines/readiness.engine';
 import { computeLabIndices, interpretLabIndices } from '../../engines/labs-indices.engine';
 import { calculateIndices } from '../../engines/clinical-indices.engine';
 import { NAVY_BF_FORMULAS, MUSCLE_GROUPS_FULL, INJURY_LOCATIONS } from '../../core/constants';
 
-type ProfileTab = 'overview' | 'anthropometry' | 'sleep' | 'lifestyle' | 'diet' | 'nutrition_v7' | 'genetics' | 'injuries' | 'progress';
+type ProfileTab = 'overview' | 'anthropometry' | 'sleep' | 'lifestyle' | 'diet' | 'nutrition_v7' | 'genetics' | 'injuries' | 'progress' | 'reports';
 
 const GOALS = [
   { id: 'bulk', label: 'Масса' }, { id: 'cut', label: 'Сушка' },
@@ -197,7 +198,8 @@ export const ProfileScreen: React.FC = () => {
   const tabs: { id: ProfileTab; label: string }[] = [
     { id: 'overview', label: 'Обзор' }, { id: 'anthropometry', label: 'Антропометрия' },
     { id: 'sleep', label: 'Сон' }, { id: 'lifestyle', label: 'Образ жизни' },
-    { id: 'diet', label: 'Питание' }, { id: 'injuries', label: 'Травмы' }, { id: 'progress', label: 'Прогресс' }
+    { id: 'diet', label: 'Питание' }, { id: 'injuries', label: 'Травмы' },
+    { id: 'progress', label: 'Прогресс' }, { id: 'reports', label: '📊 Отчёты' }
   ];
 
   return (
@@ -812,6 +814,8 @@ export const ProfileScreen: React.FC = () => {
           )}
         </div>
       )}
+
+      {tab === 'reports' && <ReportsScreen />}
     </div>
   );
 };
