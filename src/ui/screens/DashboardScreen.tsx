@@ -1,29 +1,18 @@
 ﻿import React, { useEffect, useState, useRef } from 'react';
-import { SummaryCard } from '../cards/SummaryCard';
-import { SystemCard } from '../cards/SystemCard';
 import { PHARMA_DB } from '../../core/pharma-database';
 import { registry } from '../../core/data/registry';
 import { UCUM_MAP } from '../../core/constants';
-const SYSTEM_LABELS: Record<string, string> = {
-  cardio: '', hepatic: '', renal: '',
-  neuro: '', endocrine: '', hematologic: '',
-  reproductive: '', musculoskeletal: '',
-  metabolic: '', ghigf: '', ins_axis: '',
-  neuro_toxicity: '', blood: '', vessels: '',
-  immunity: '', thyroid: '', prostate: '', skin: '',
-};
 
 import type { MasterDB, RiskResult, ReadinessScores, CourseEntry, LabPoint } from '../../core/types';
 import { calculateRisks } from '../../engines/risk.engine';
 import { useV7Risk } from '../hooks/useV7Risk';
 import { calcReadiness } from '../../engines/readiness.engine';
-import { RISK_SYSTEMS, ALL_RISK_SYSTEMS } from '../../core/constants';
+
 import { runMDSS } from '../../engines/mdss-engine';
 import type { MDSSOutput } from '../../engines/mdss-engine';
 import { dailyCheckin } from '../../engines/daily-checkin.engine';
 import { loadEntries, computeStats } from '../../engines/body-composition.engine';
 import { getNutritionStats } from '../../engines/nutrition-tracker.engine';
-import { computeHealthScore } from '../../engines/health-score-v2.engine';
 import { getTodayMetric, weightTrend } from '../../engines/profile-settings.engine';
 import { db } from '../../core/db';
 import { getProfile } from '../../core/profile-manager';
@@ -308,40 +297,10 @@ export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
 
       <AlertBanner messages={alerts} />
 
-      {(() => {
-        const s = getProfile().settings;
-        const hs = computeHealthScore({
-          pharmaRisk: riskResult ? Math.round(riskResult.overallNet) : 30,
-          weeksSinceLab: (() => {
-            const dates = labData.map(l => l.date).filter(Boolean).sort().reverse();
-            return dates[0] ? (Date.now() - new Date(dates[0]).getTime()) / (7 * 24 * 3600 * 1000) : 12;
-          })(),
-          nutritionAdherence: todayKcal > 0 ? Math.round(Math.min(100, todayKcal / 3000 * 100)) : 50,
-          trainingConsistency: trainingWorkouts > 0 ? Math.round(trainingWorkouts / 4 * 100) : 50,
-          sleepScore: (s.baselineSleepHours ?? 7) >= 7.5 ? 80 : 50,
-          hrvScore: (s.baselineHrvRatio ?? 0.6) >= 0.7 ? 75 : 50,
-          weightTrend: 0,
-          subjectiveEnergy: 6 - (s.fatigueLevel ?? 3),
-          subjectiveStress: s.baselineStressLevel ?? 3,
-        });
-        return (
-          <div style={{ background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', borderRadius: 10, padding: '8px 12px', marginBottom: 12 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-dim)', whiteSpace: 'nowrap' }}>🫀 Health Score</div>
-              <div style={{ flex: 1, height: 10, borderRadius: 6, background: 'rgba(255,255,255,0.06)', overflow: 'hidden' }}>
-                <div style={{ width: `${hs.overallScore}%`, height: '100%', borderRadius: 6, background: hs.overallScore >= 65 ? 'linear-gradient(90deg, #22c55e, #00e68a)' : hs.overallScore >= 40 ? 'linear-gradient(90deg, #eab308, #f59e0b)' : 'linear-gradient(90deg, #f97316, #ef4444)', transition: 'width 0.5s' }} />
-              </div>
-              <div style={{ fontSize: 14, fontWeight: 800, color: hs.overallScore >= 65 ? '#22c55e' : hs.overallScore >= 40 ? '#eab308' : '#ef4444', minWidth: 36, textAlign: 'right' }}>{hs.overallScore}</div>
-              <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>{hs.label}</div>
-            </div>
-          </div>
-        );
-      })()}
-
-      {/* ── Global Risk Card: 3 calculation methods ── */}
+      {/* ── Global Risk Card: 3 methods, each TWO big numbers ── */}
       <div style={{ background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', borderRadius: 10, padding: '10px 12px', marginBottom: 12 }}>
-        <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 8, display: 'flex', justifyContent: 'space-between' }}>
-          <span>⚠️ Риск · Готовность {Math.round(readiness.recovery)}%</span>
+        <div style={{ fontSize: 11, fontWeight: 700, marginBottom: 8, display: 'flex', justifyContent: 'space-between' }}>
+          <span>⚠️ Риск-Индекс</span>
           <span style={{ fontSize: 10, color: 'var(--text-dim)', fontWeight: 400 }}>
             Курс: {daysOnCourse} дн · Лабы: {(() => {
               const dates = labData.map(l => l.date).filter(Boolean).sort().reverse();
@@ -352,47 +311,23 @@ export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
           </span>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
-          {/* V7 Risk */}
-          <div style={{ textAlign: 'center', background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: '6px 4px' }}>
-            <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 2 }}>V7 Базовый</div>
-            <div style={{ fontSize: 16, fontWeight: 800, color: riskResult ? riskColor(riskResult.overallRaw) : 'var(--text-dim)' }}>
-              {riskResult ? Math.round(riskResult.overallRaw) : '—'}
-            </div>
-            <div style={{ fontSize: 8, color: 'var(--text-dim)' }}>
-              с поддержкой: <span style={{ color: riskResult ? riskColor(riskResult.overallNet) : 'var(--text-dim)', fontWeight: 600 }}>
-                {riskResult ? Math.round(riskResult.overallNet) : '—'}
-              </span>
-            </div>
+          {/* V7 */}
+          <div style={{ textAlign: 'center', background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: '8px 4px' }}>
+            <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-dim)', marginBottom: 4 }}>V7</div>
+            <div style={{ fontSize: 20, fontWeight: 800, color: riskResult ? riskColor(riskResult.overallRaw) : 'var(--text-dim)' }}>{riskResult ? Math.round(riskResult.overallRaw) : '—'}</div>
+            <div style={{ fontSize: 20, fontWeight: 800, color: riskResult ? riskColor(riskResult.overallNet) : 'var(--text-dim)' }}>{riskResult ? Math.round(riskResult.overallNet) : '—'}</div>
           </div>
-          {/* Monte Carlo (V7) */}
-          <div style={{ textAlign: 'center', background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: '6px 4px' }}>
-            <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 2 }}>Монте-Карло</div>
-            <div style={{ fontSize: 16, fontWeight: 800, color: v7Result?.globalRiskRaw !== undefined
-              ? (v7Result.globalRiskRaw > 70 ? '#ef4444' : v7Result.globalRiskRaw > 40 ? '#f97316' : v7Result.globalRiskRaw > 15 ? '#eab308' : '#22c55e')
-              : 'var(--text-dim)' }}>
-              {v7Result?.globalRiskRaw !== undefined ? `${Math.round(v7Result.globalRiskRaw)}%` : '—'}
-            </div>
-            <div style={{ fontSize: 8, color: 'var(--text-dim)' }}>
-              нетто: <span style={{ fontWeight: 600, color: v7Result?.globalRiskNet !== undefined
-                ? (v7Result.globalRiskNet > 70 ? '#ef4444' : v7Result.globalRiskNet > 40 ? '#f97316' : '#22c55e')
-                : 'var(--text-dim)' }}>
-                {v7Result?.globalRiskNet !== undefined ? `${Math.round(v7Result.globalRiskNet)}%` : '—'}
-              </span>
-            </div>
+          {/* Monte Carlo */}
+          <div style={{ textAlign: 'center', background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: '8px 4px' }}>
+            <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-dim)', marginBottom: 4 }}>Монте-Карло</div>
+            <div style={{ fontSize: 20, fontWeight: 800, color: v7Result?.globalRiskRaw !== undefined ? (v7Result.globalRiskRaw > 70 ? '#ef4444' : v7Result.globalRiskRaw > 40 ? '#f97316' : v7Result.globalRiskRaw > 15 ? '#eab308' : '#22c55e') : 'var(--text-dim)' }}>{v7Result?.globalRiskRaw !== undefined ? `${Math.round(v7Result.globalRiskRaw)}` : '—'}</div>
+            <div style={{ fontSize: 20, fontWeight: 800, color: v7Result?.globalRiskNet !== undefined ? (v7Result.globalRiskNet > 70 ? '#ef4444' : v7Result.globalRiskNet > 40 ? '#f97316' : '#22c55e') : 'var(--text-dim)' }}>{v7Result?.globalRiskNet !== undefined ? `${Math.round(v7Result.globalRiskNet)}` : '—'}</div>
           </div>
-          {/* MDSS 3rd model */}
-          <div style={{ textAlign: 'center', background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: '6px 4px' }}>
-            <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 2 }}>MDSS v2</div>
-            <div style={{ fontSize: 16, fontWeight: 800, color: mdssResult?.overallAlertLevel !== undefined
-              ? (mdssResult.overallAlertLevel >= 3 ? '#ef4444' : mdssResult.overallAlertLevel >= 2 ? '#f97316' : mdssResult.overallAlertLevel >= 1 ? '#eab308' : '#22c55e')
-              : 'var(--text-dim)' }}>
-              {mdssResult ? `${mdssResult.overallMaxRisk}%` : '—'}
-            </div>
-            <div style={{ fontSize: 8, color: 'var(--text-dim)' }}>
-              {mdssResult?.compliancePenalty && mdssResult.compliancePenalty > 1
-                ? ``
-                : `${mdssResult?.sortedOrgans?.length || 0} систем`}
-            </div>
+          {/* MDSS */}
+          <div style={{ textAlign: 'center', background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: '8px 4px' }}>
+            <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-dim)', marginBottom: 4 }}>MDSS</div>
+            <div style={{ fontSize: 20, fontWeight: 800, color: mdssResult?.overallAlertLevel !== undefined ? (mdssResult.overallAlertLevel >= 3 ? '#ef4444' : mdssResult.overallAlertLevel >= 2 ? '#f97316' : mdssResult.overallAlertLevel >= 1 ? '#eab308' : '#22c55e') : 'var(--text-dim)' }}>{mdssResult ? `${mdssResult.overallMaxRisk}` : '—'}</div>
+            <div style={{ fontSize: 20, fontWeight: 800, color: mdssResult?.compliancePenalty && mdssResult.compliancePenalty > 1 ? '#ef4444' : '#22c55e' }}>{mdssResult?.compliancePenalty ? `${Math.round(mdssResult.compliancePenalty * 100)}` : '—'}</div>
           </div>
         </div>
       </div>
@@ -597,30 +532,7 @@ export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
         </div>
       )}
 
-      {/* Readiness details */}
-      <div className="card">
-        <h3>📊 Готовность к тренировке</h3>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-          {[
-            { label: 'Восст.', value: readiness.recovery, color: readiness.recovery >= 70 ? '#22c55e' : '#eab308' },
-            { label: 'Питание', value: readiness.nutrition, color: readiness.nutrition >= 70 ? '#22c55e' : '#eab308' },
-            { label: 'Сон', value: (readiness.sleep ?? 0), color: (readiness.sleep ?? 0) >= 70 ? '#22c55e' : '#eab308' },
-            { label: 'Стресс', value: 100 - (readiness.stress ?? 50), color: (readiness.stress ?? 0) < 30 ? '#22c55e' : '#ef4444' },
-          ].map(item => (
-            <div key={item.label} style={{ background: 'var(--bg-secondary)', borderRadius: 8, padding: '6px 8px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                <span style={{ fontSize: 12, color: 'var(--text-dim)' }}>{item.label}</span>
-                <span style={{ fontSize: 13, fontWeight: 700, color: item.color }}>{Math.round(item.value)}%</span>
-              </div>
-              <ProgressBar value={item.value} color={item.color} />
-            </div>
-          ))}
-        </div>
-        <div style={{ marginTop: 8, display: 'flex', gap: 12, fontSize: 10, color: 'var(--text-dim)' }}>
-          <span>Качество сна: {getProfile().settings.baselineSleepQuality ?? 5}/10</span>
-          <span>Часы сна: {getProfile().settings.baselineSleepHours ?? 7}ч</span>
-        </div>
-      </div>
+
 
       {/* Active course info — moved after Readiness */}
       {courseEntries.length > 0 && (
@@ -669,59 +581,9 @@ export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
         </div>
       )}
 
-      {/* Lab markers */}
-      {labData.length > 0 && (
-        <div className="card" style={{ cursor: 'pointer' }} onClick={onNavigate ? () => onNavigate('labs') : undefined}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <h3 style={{ margin: 0 }}>🧪 Последние анализы</h3>
-            <span style={{ fontSize: 11, color: 'var(--accent)' }}>{''}</span>
-          </div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, marginTop: 6 }}>
-            {(() => {
-              const latestByCode = new Map<string, LabPoint & { patientId?: string }>();
-              for (const lab of labData) {
-                const existing = latestByCode.get(lab.code);
-                if (!existing || lab.date > existing.date) latestByCode.set(lab.code, lab);
-              }
-              return Array.from(latestByCode.values()).slice(0, 12).map(lab => {
-                const info = UCUM_MAP[lab.code];
-                const norm = lab.value * (info?.coeff || 1);
-                const isAbnormal = info && (norm > info.uln || norm < info.lln);
-                return (
-                  <span key={lab.code} style={{
-                    background: isAbnormal ? 'rgba(239,68,68,0.12)' : 'rgba(0,230,138,0.08)',
-                    color: isAbnormal ? '#ef4444' : 'var(--accent)',
-                    padding: '2px 6px', borderRadius: 4, fontSize: 9, fontWeight: 600,
-                  }}>
-                    {info?.name || lab.code} {lab.value}{lab.unit}
-                  </span>
-                );
-              });
-            })()}
-          </div>
-          {abnormalLabs.length > 0 && (
-            <div style={{ marginTop: 6, fontSize: 9, color: '#ef4444' }}>
-              {abnormalLabs.length} отклонений — {abnormalLabs.slice(0, 3).map(a => `${a.name} (↑${a.deviation}%)`).join(', ')}
-            </div>
-          )}
-        </div>
-      )}
 
-      {/* System summary */}
-      <div className="card" style={{ cursor: 'pointer' }} onClick={onNavigate ? () => onNavigate('risks') : undefined}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <h3 style={{ margin: 0 }}>🫀 Системы организма</h3>
-          <span style={{ fontSize: 11, color: 'var(--accent)' }}>{''}</span>
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, marginTop: 8 }}>
-          {riskResult && Object.entries(riskResult.systemBreakdown).map(([sys, vals]) => (
-            <div key={sys} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 0', fontSize: 12 }}>
-              <span style={{ color: 'var(--text-dim)' }}>{SYSTEM_LABELS[sys] ?? sys}</span>
-              <span style={{ fontWeight: 600, color: riskColor(vals.net) }}>{Math.round(vals.net)}%</span>
-            </div>
-          ))}
-        </div>
-      </div>
+
+
 
       {/* Navigation cards */}
       <div className="card">

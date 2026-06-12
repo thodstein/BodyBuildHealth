@@ -78,7 +78,7 @@ export const LabsScreen: React.FC = () => {
   // Read phase from profile on mount, fall back to 'baseline'
   const profilePhase = linked.profile?.settings?.phase || '';
   const initialLabsPhase = PROFILE_PHASE_TO_LABS_PHASE[profilePhase] || 'baseline';
-  const [tab, setTab] = useState<'results' | 'schedule' | 'catalog' | 'investigations'>('results');
+  const [tab, setTab] = useState<'results' | 'schedule' | 'catalog' | 'investigations' | 'archive'>('results');
   const [globalNoLabs, setGlobalNoLabs] = useState(getGlobalNoLabs());
   const [noLabsSystems, setNoLabsSystemsState] = useState<string[]>(getNoLabsSystems());
   const [selectedPhase, setSelectedPhase] = useState(initialLabsPhase);
@@ -320,7 +320,7 @@ export const LabsScreen: React.FC = () => {
 
       {/* Tab bar */}
       <div style={{ display: 'flex', gap: 3, marginBottom: 8, overflowX: 'auto', scrollbarWidth: 'none' }}>
-        {(['results', 'schedule', 'investigations', 'catalog'] as const).map(t => (
+        {(['results', 'schedule', 'investigations', 'archive', 'catalog'] as const).map(t => (
           <button key={t} onClick={() => setTab(t)} style={{
             flex: 1, padding: '8px 6px', borderRadius: 8, fontSize: 12, fontWeight: 600,
             whiteSpace: 'nowrap', cursor: 'pointer', transition: 'all 0.15s',
@@ -328,7 +328,7 @@ export const LabsScreen: React.FC = () => {
             color: tab === t ? '#00e68a' : 'var(--text-dim)',
             border: tab === t ? '1px solid #00e68a' : '1px solid var(--border)',
           }}>
-            {t === 'results' ? '📊 Результаты' : t === 'schedule' ? '📅 График' : t === 'investigations' ? '🔬 Обследования' : '📚 Каталог'}
+            {t === 'results' ? '📊 Результаты' : t === 'schedule' ? '📅 График' : t === 'investigations' ? '🔬 Обследования' : t === 'archive' ? '📦 Архив' : '📚 Каталог'}
           </button>
         ))}
       </div>
@@ -531,6 +531,49 @@ export const LabsScreen: React.FC = () => {
       {tab === 'catalog' && (
         <div>
           <LabsCatalog />
+        </div>
+      )}
+
+      {/* ≡≡≡ ARCHIVE TAB ≡≡≡ */}
+      {tab === 'archive' && (
+        <div>
+          <div className="card" style={{ marginBottom: 8 }}>
+            <h3 style={{ margin: '0 0 8px 0' }}>📦 Архив анализов</h3>
+            <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 8 }}>
+              Всего записей: {labs.length} · Уникальных тестов: {new Set(labs.map(l => l.code.toUpperCase())).size}
+            </div>
+            {(() => {
+              const byDate = new Map<string, LabPoint[]>();
+              for (const lab of labs) {
+                const d = lab.date || '';
+                if (!byDate.has(d)) byDate.set(d, []);
+                byDate.get(d)!.push(lab);
+              }
+              const sortedDates = Array.from(byDate.keys()).sort().reverse();
+              if (sortedDates.length === 0) return <div style={{ fontSize: 12, color: 'var(--text-dim)', textAlign: 'center', padding: 20 }}>Нет данных анализов</div>;
+              return sortedDates.map(date => (
+                <div key={date} style={{ marginBottom: 10, padding: 10, borderRadius: 8, background: 'var(--bg-secondary)' }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--accent)', marginBottom: 6 }}>{date}</div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
+                    {byDate.get(date)!.map(lab => {
+                      const info = UCUM_MAP[lab.code.toUpperCase()];
+                      const norm = lab.value * (info?.coeff || 1);
+                      const isAbnormal = info && (norm > info.uln || norm < info.lln);
+                      return (
+                        <span key={lab.code + lab.date} style={{
+                          background: isAbnormal ? 'rgba(239,68,68,0.12)' : 'rgba(0,230,138,0.08)',
+                          color: isAbnormal ? '#ef4444' : 'var(--accent)',
+                          padding: '2px 6px', borderRadius: 4, fontSize: 9, fontWeight: 600,
+                        }}>
+                          {info?.name || lab.code} {lab.value}{lab.unit}
+                        </span>
+                      );
+                    })}
+                  </div>
+                </div>
+              ));
+            })()}
+          </div>
         </div>
       )}
 
