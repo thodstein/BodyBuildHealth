@@ -1083,7 +1083,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
                     const pct = Math.round(cov * 100);
                     return (
                       <div key={sys} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '2px 4px' }}>
-                        <span style={{ fontSize: 10, flex: 1 }}>{sys === 'cardio' ? '' : sys === 'hepatic' ? '' : sys === 'renal' ? '' : sys === 'neuro' ? '' : sys === 'endocrine' ? '' : sys === 'hematologic' ? '' : sys === 'reproductive' ? '' : sys === 'musculoskeletal' ? '' : sys}</span>
+                        <span style={{ fontSize: 10, flex: 1 }}>{systemLabels[sys] || sys}</span>
                         <div style={{ width: 35, background: 'rgba(255,255,255,0.08)', borderRadius: 2, height: 5, overflow: 'hidden' }}>
                           <div style={{ width: `${Math.min(100, pct)}%`, height: '100%', background: pct > 60 ? '#22c55e' : pct > 30 ? '#eab308' : '#ef4444', borderRadius: 2 }} />
                         </div>
@@ -1245,7 +1245,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
                   {weeklyPlan.schedules.map((day, di) => {
                     const timeSlots: { key: string; label: string; color: string; items: SupplementPlanEntry[] }[] = [
                       { key: 'emptyStomach', label: '🌅 Натощак', color: '#f59e0b', items: day.emptyStomach },
-                      { key: 'morning', label: '', color: '#3b82f6', items: day.morning },
+                      { key: 'morning', label: '☀️ Утро', color: '#3b82f6', items: day.morning },
                       { key: 'lunch', label: '🍽 Обед', color: '#22c55e', items: day.lunch },
                       { key: 'evening', label: '🌆 Вечер', color: '#8b5cf6', items: day.evening },
                       { key: 'night', label: '🌙 На ночь', color: '#6366f1', items: day.night },
@@ -1285,7 +1285,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
                     {labAnalysis.homaIR !== null && (
                       <>
                         <span style={{ color: 'var(--text-dim)' }}>HOMA-IR:</span>
-                        <span style={{ fontWeight: 600, color: labAnalysis.homaIR > 2.5 ? '#ef4444' : labAnalysis.homaIR > 1.5 ? '#f59e0b' : '#22c55e' }}>{labAnalysis.homaIR.toFixed(2)} {labAnalysis.homaIR > 2.5 ? '' : labAnalysis.homaIR > 1.5 ? '' : ''}</span>
+                        <span style={{ fontWeight: 600, color: labAnalysis.homaIR > 2.5 ? '#ef4444' : labAnalysis.homaIR > 1.5 ? '#f59e0b' : '#22c55e' }}>{labAnalysis.homaIR.toFixed(2)} {labAnalysis.homaIR > 2.5 ? '⚠️ Инсулинорезистентность' : labAnalysis.homaIR > 1.5 ? '⚡ Пограничный' : '✅ Норма'}</span>
                       </>
                     )}
                     <span style={{ color: 'var(--text-dim)' }}>Печёночная нагрузка:</span>
@@ -1349,7 +1349,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
                   <h4 style={{ margin: '0 0 6px 0', fontSize: 12 }}>📊 Риски по модели: {RISK_MODEL_LABELS[riskModel].split(' ')[1]}</h4>
                   {Object.entries(modelRiskResult).map(([sys, data]) => (
                     <div key={sys} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '2px 0', borderBottom: '1px solid var(--border-color)', fontSize: 10 }}>
-                      <span style={{ flex: 1 }}>{sys === 'cardio' ? '' : sys === 'hepatic' ? '' : sys === 'renal' ? '' : sys === 'neuro' ? '' : sys === 'endocrine' ? '' : sys === 'hematologic' ? '' : sys === 'reproductive' ? '' : ''}</span>
+                      <span style={{ flex: 1 }}>{systemLabels[sys] || sys}</span>
                       <span style={{ color: getRiskColor(data.raw), fontWeight: 600 }}>{data.raw}%</span>
                       <span style={{ color: 'var(--text-dim)' }}>→</span>
                       <span style={{ color: getRiskColor(data.net), fontWeight: 600 }}>{data.net}%</span>
@@ -1512,7 +1512,6 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
                 </div>
               )}
 
-              <ReportSummaryCard supportResult={supportResult} />
                     </div>
                     {interactionIds.length > 2 && (
                       <button onClick={() => removeInteraction(idx)} style={{
@@ -1524,6 +1523,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
                 </div>
               ))}
             </div>
+            {supportResult && <ReportSummaryCard supportResult={supportResult} />}
             <button onClick={addInteraction} style={{
               padding: '8px 16px', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: 'pointer',
               background: 'rgba(0,230,138,0.1)', border: '1px solid rgba(0,230,138,0.3)', color: '#00e68a',
@@ -1697,7 +1697,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
                   background: pepSchedule.includes(d) ? 'rgba(0,230,138,0.2)' : 'var(--bg-secondary)',
                   border: pepSchedule.includes(d) ? '1px solid var(--accent)' : '1px solid var(--border)',
                   color: pepSchedule.includes(d) ? '#00e68a' : 'var(--text-dim)', fontWeight: pepSchedule.includes(d) ? 700 : 400,
-                }}>{d === 'Mon' ? '' : d === 'Tue' ? '' : d === 'Wed' ? '' : d === 'Thu' ? '' : d === 'Fri' ? '' : d === 'Sat' ? '' : ''}</button>
+                }}>{d === 'Mon' ? 'Пн' : d === 'Tue' ? 'Вт' : d === 'Wed' ? 'Ср' : d === 'Thu' ? 'Чт' : d === 'Fri' ? 'Пт' : d === 'Sat' ? 'Сб' : 'Вс'}</button>
               ))}
             </div>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
@@ -1786,7 +1786,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
                     <tbody>
                       {pepResult.pk.days.map(d => (
                         <tr key={d.day} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', background: d.inject ? 'rgba(139,92,246,0.05)' : 'transparent' }}>
-                          <td style={{ padding: '2px 4px' }}>{d.day} ({d.weekday === 'Mon' ? '' : d.weekday === 'Tue' ? '' : d.weekday === 'Wed' ? '' : d.weekday === 'Thu' ? '' : d.weekday === 'Fri' ? '' : d.weekday === 'Sat' ? '' : ''})</td>
+                          <td style={{ padding: '2px 4px' }}>{d.day} ({d.weekday === 'Mon' ? 'Пн' : d.weekday === 'Tue' ? 'Вт' : d.weekday === 'Wed' ? 'Ср' : d.weekday === 'Thu' ? 'Чт' : d.weekday === 'Fri' ? 'Пт' : d.weekday === 'Sat' ? 'Сб' : 'Вс'})</td>
                           <td style={{ padding: '2px 4px', textAlign: 'center' }}>{d.inject ? '💉' : ''}</td>
                           <td style={{ padding: '2px 4px', textAlign: 'right', fontFamily: 'monospace', color: d.concentration > pepResult.pk.avgConcentration * 1.5 ? '#22c55e' : 'var(--text-light)' }}>{d.concentration.toFixed(0)}</td>
                         </tr>
@@ -1959,7 +1959,7 @@ const RecsTab: React.FC<{ profile: any; labs: any; readiness: any; course: any }
   const st = shouldTrainToday(70, 'moderate', 30, 70);
   return (<div>
     <button onClick={run} style={{ width:'100%', padding:12, borderRadius:8, border:'none', cursor:'pointer', marginBottom:10, background:'linear-gradient(135deg,#8b5cf6,#6366f1)', color:'#fff', fontWeight:700, fontSize:14 }}>💡 Сгенерировать рекомендации</button>
-    <div className="card" style={{ marginBottom:8 }}><div style={{ fontSize:11, fontWeight:700, color:st.train?'#22c55e':'#ef4444' }}>{st.train ? '' : '🔴 Отдых'}</div><div style={{ fontSize:9, color:'var(--text-dim)' }}>{st.reason}</div></div>
+    <div className="card" style={{ marginBottom:8 }}><div style={{ fontSize:11, fontWeight:700, color:st.train?'#22c55e':'#ef4444' }}>{st.train ? '✅ Тренировка' : '🔴 Отдых'}</div><div style={{ fontSize:9, color:'var(--text-dim)' }}>{st.reason}</div></div>
     {fusion && <div className="card" style={{ marginBottom:8 }}><h4 style={{ margin:'0 0 4px', fontSize:12 }}>🎯 Fusion Decision</h4><div style={{ fontSize:9 }}>{fusion.overallRecommendation}</div></div>}
     {recs.map((r,i) => <div key={i} className="card" style={{ marginBottom:4, padding:8 }}>
       <div style={{ fontWeight:600, fontSize:11, color: r.severity === 'critical' ? '#ef4444' : r.severity === 'high' ? '#f59e0b' : r.severity === 'medium' ? '#f97316' : '#22c55e' }}>{r.title}</div>

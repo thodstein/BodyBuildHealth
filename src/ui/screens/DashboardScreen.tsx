@@ -20,7 +20,7 @@ import { StrengthDiary } from '../../engines/strength-diary.engine';
 import { interpretLabs, type LabCompositeResult } from '../../engines/lab-analysis.engine';
 
 
-type ScreenId = 'dashboard' | 'pharma' | 'course' | 'peptides' | 'nutrition' | 'plan' | 'substances' | 'labs' | 'risks' | 'profile' | 'predictive' | 'marketplace' | 'articles' | 'assistant' | 'gamification' | 'fertility-pct' | 'reports' | 'integrations' | 'role-management' | 'support' | 'training' | 'full';
+type ScreenId = 'dashboard' | 'pharma' | 'course' | 'peptides' | 'nutrition' | 'plan' | 'substances' | 'labs' | 'risks' | 'profile' | 'predictive' | 'marketplace' | 'articles' | 'assistant' | 'gamification' | 'fertility-pct' | 'reports' | 'integrations' | 'role-management' | 'support' | 'training';
 
 interface Props {
   onNavigate?: (screen: ScreenId) => void;
@@ -68,7 +68,6 @@ const NAV_CARDS: { id: ScreenId; icon: string; label: string; desc: string; colo
   { id: 'fertility-pct', icon: '🧬', label: 'Фертильность', desc: 'ПКТ, спермограмма', color: '#8b5cf6' },
   { id: 'profile', icon: '👤', label: 'Профиль', desc: 'Настройки, антропометрия', color: '#6b7280' },
   { id: 'articles', icon: '📚', label: 'Статьи', desc: 'База знаний и руководства', color: '#ec4899' },
-  { id: 'full', icon: '🔧', label: 'Полная интеграция', desc: 'PK, стеки, синергии', color: '#06b6d4' },
 ];
 
 export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {

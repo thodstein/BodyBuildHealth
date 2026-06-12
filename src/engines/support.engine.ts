@@ -534,7 +534,7 @@ function calculateSupportScore(
 ): { score: number; systemSupport: Record<string, number>; organSupport: Record<string, number> } {
   const coverage = calculateSupportCoverage(substances, substanceIds, input.supportDoses);
   // Lifestyle factors (nutrition, training) are already priced into base risk.
-  // Only actual supplement coverage reduces risk  lifestyleSupport lifestyleSupport removed to avoid
+  // Only actual supplement coverage reduces risk. lifestyleSupport removed to avoid
   // auto-reducing risk by ~27% when user has selected NO support items.
 
   const totalScore = Math.min(100, Math.max(0, coverage.totalSupport));
@@ -1128,7 +1128,7 @@ export const SUPPLEMENT_TARGETS: Record<string, SupplementTarget> = {
     systems: ['neuro', 'cardio', 'hepatic'],
     organs: ['nervous_system', 'brain', 'liver'],
     biomarkers: ['CRP', 'ALT', 'AST', 'HbA1c', 'гликированный Hb'],
-    mechanisms: ['универсальный антиоксидант (водный + липидный)', 'регенерация витаминов C и E', 'повышение глутатиона через Nrf2', 'хелатирование тяжёлых металлов', '改善 митохондриальной функции']
+    mechanisms: ['универсальный антиоксидант (водный + липидный)', 'регенерация витаминов C и E', 'повышение глутатиона через Nrf2', 'хелатирование тяжёлых металлов', 'улучшение митохондриальной функции']
   },
   ashwagandha: {
     systems: ['neuro', 'endocrine', 'reproductive'],

@@ -11,10 +11,9 @@ import { ProfileScreen } from './ui/screens/ProfileScreen';
 import { ArticlesScreen } from './ui/screens/ArticlesScreen';
 import { PctScreen } from './ui/screens/PctScreen';
 import { ReportsScreen } from './ui/screens/ReportsScreen';
-import { FullIntegrationScreen } from './ui/screens/FullIntegrationScreen';
 import { ToastContainer } from './ui/ToastContainer';
 
-type Tab = 'home' | 'pharma' | 'training' | 'labs' | 'risks' | 'support' | 'nutrition' | 'profile' | 'pct' | 'articles' | 'reports' | 'full';
+type Tab = 'home' | 'pharma' | 'training' | 'labs' | 'risks' | 'support' | 'nutrition' | 'profile' | 'pct' | 'articles' | 'reports';
 
 // Bottom nav: 5 primary tabs
 const PRIMARY_NAV: { id: Tab; label: string; icon: React.ReactNode }[] = [
@@ -111,8 +110,6 @@ export default function App() {
       'bloodwork': 'labs',
       'toolkit': 'training',
       'training-tools': 'training',
-      'full': 'full',
-      'integration': 'full',
     };
     const target = tabMap[screen] || 'home';
     go(target);
@@ -142,7 +139,6 @@ export default function App() {
       case 'pct': return <PctScreen onBack={() => go('home')} />;
       case 'articles': return <ArticlesScreen />;
       case 'reports': return <ReportsScreen />;
-      case 'full': return <FullIntegrationScreen />;
       default: return <DashboardScreen onNavigate={handleNavigate} />;
     }
   };
