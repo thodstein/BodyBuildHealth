@@ -724,6 +724,15 @@ export const LabsScreen: React.FC = () => {
               </div>
             )}
           </div>
+
+          {/* Показать текущие результаты */}
+          {currentLabs.length > 0 && (
+            <div style={{ marginTop: 4 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--accent)', marginBottom: 6 }}>📋 Результаты текущей фазы</div>
+              <LabsResults labs={currentLabs} />
+            </div>
+          )}
+
         </div>
       )}
 
