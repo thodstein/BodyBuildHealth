@@ -34,6 +34,7 @@ function DarkBg() {
 export default function App() {
   const [tab, setTab] = useState<Tab>('home');
   const [initialized, setInitialized] = useState(false);
+  const [screenKey, setScreenKey] = useState(0);
   // touchRef removed
   const mainRef = useRef<HTMLElement>(null);
 
@@ -80,7 +81,11 @@ export default function App() {
   }, [tab]);
 
   const go = (t: Tab) => {
-    setTab(t);
+    if (tab === t) {
+      setScreenKey(k => k + 1);
+    } else {
+      setTab(t);
+    }
     if (mainRef.current) mainRef.current.scrollTop = 0;
     window.scrollTo(0, 0);
   };
@@ -132,24 +137,25 @@ export default function App() {
       </div>
     );
 
+    const key = `screen-${tab}-${screenKey}`;
     switch (tab) {
-      case 'home': return <DashboardScreen onNavigate={handleNavigate} />;
-      case 'pharma': return <PharmaScreen />;
-      case 'support': return <SupportScreen />;
-      case 'training': return <TrainingScreen />;
-      case 'labs': return <LabsScreen />;
-      case 'risks': return <RiskScreen />;
-      case 'nutrition': return <NutritionScreen />;
-      case 'profile': return <ProfileScreen />;
-      case 'articles': return <ArticlesScreen />;
-      default: return <DashboardScreen onNavigate={handleNavigate} />;
+      case 'home': return <DashboardScreen key={key} onNavigate={handleNavigate} />;
+      case 'pharma': return <PharmaScreen key={key} />;
+      case 'support': return <SupportScreen key={key} />;
+      case 'training': return <TrainingScreen key={key} />;
+      case 'labs': return <LabsScreen key={key} />;
+      case 'risks': return <RiskScreen key={key} />;
+      case 'nutrition': return <NutritionScreen key={key} />;
+      case 'profile': return <ProfileScreen key={key} />;
+      case 'articles': return <ArticlesScreen key={key} />;
+      default: return <DashboardScreen key={key} onNavigate={handleNavigate} />;
     }
   };
 
   return (
     <div className="app" >
       <DarkBg />
-      <main ref={mainRef} style={{ position: 'relative', zIndex: 1, flex: 1, overflow: 'hidden' }}>
+      <main ref={mainRef} style={{ position: 'relative', zIndex: 1, flex: 1, overflow: 'hidden', height: 'calc(100vh - var(--nav-height))' }}>
         {renderContent()}
       </main>
       <ToastContainer />

@@ -142,13 +142,12 @@ export const LabsScreen: React.FC = () => {
   const profilePhase = linked.profile?.settings?.phase || '';
   const initialLabsPhase = PROFILE_PHASE_TO_LABS_PHASE[profilePhase] || 'baseline';
   const [mainTab, setMainTab] = useState<MainLabTab>('hero');
-  const [subTab, setSubTab] = useState<LabSubTab>('hero');
+  const [subTab, setSubTab] = useState<LabSubTab>('current');
   const [globalNoLabs, setGlobalNoLabs] = useState(getGlobalNoLabs());
   const [noLabsSystems, setNoLabsSystemsState] = useState<string[]>(getNoLabsSystems());
   const [selectedPhase, setSelectedPhase] = useState(initialLabsPhase);
   const [showLabInput, setShowLabInput] = useState(false);
-  const [showNewLabsBatch, setShowNewLabsBatch] = useState(false);
-  const [showNewLabsConfirm, setShowNewLabsConfirm] = useState(false);
+  const [showNewLabsInline, setShowNewLabsInline] = useState(false);
   const [batchValues, setBatchValues] = useState<Record<string, string>>({});
   const [inputCode, setInputCode] = useState('');
   const [inputValue, setInputValue] = useState('');
@@ -162,7 +161,7 @@ export const LabsScreen: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const [chartMarkerSearch, setChartMarkerSearch] = useState('');
-  const [chartSelectedCode, setChartSelectedCode] = useState('');
+  const [chartSelectedCodes, setChartSelectedCodes] = useState<Set<string>>(new Set());
   const [chartFilterSys, setChartFilterSys] = useState('all');
   const [catalogSearch, setCatalogSearch] = useState('');
   const [catalogDetail, setCatalogDetail] = useState<{ code: string; name: string; unit: string; uln: number; lln: number; system: string; description: string } | null>(null);
@@ -176,8 +175,8 @@ export const LabsScreen: React.FC = () => {
 
   const hasLabs = linked.labs && linked.labs.length > 0;
   const labs: LabPoint[] = linked.labs || [];
-  const currentLabs = useMemo(() => labs.filter(l => !l.archived && l.phase === selectedPhase), [labs, selectedPhase]);
-  const archiveLabs = useMemo(() => labs.filter(l => l.archived || l.phase !== selectedPhase), [labs, selectedPhase]);
+  const currentLabs = useMemo(() => labs.filter(l => !l.archived && (!l.phase || l.phase === selectedPhase)), [labs, selectedPhase]);
+  const archiveLabs = useMemo(() => labs.filter(l => l.archived || (l.phase && l.phase !== selectedPhase)), [labs, selectedPhase]);
 
   const handlePhaseChange = (phase: string) => {
     setSelectedPhase(phase);
@@ -194,13 +193,8 @@ export const LabsScreen: React.FC = () => {
   }, [selectedPhase]);
 
   const handleNewLabs = useCallback(async () => {
-    setShowNewLabsConfirm(true);
-  }, []);
-
-  const confirmNewLabs = useCallback(async () => {
-    setShowNewLabsConfirm(false);
-    // Mark all existing current-phase labs as archived
-    const toArchive = labs.filter(l => !l.archived && l.phase === selectedPhase);
+    // Archive all current-phase labs, then show empty batch form
+    const toArchive = labs.filter(l => !l.archived && (!l.phase || l.phase === selectedPhase));
     try {
       await db.init();
       for (const lab of toArchive) {
@@ -208,12 +202,11 @@ export const LabsScreen: React.FC = () => {
       }
       if (toArchive.length > 0) notifyDataChange();
     } catch (e) { console.error(e); }
-    // Show EMPTY batch form
     const empty: Record<string, string> = {};
     for (const code of requiredLabs) { empty[code] = ''; }
     setBatchValues(empty);
-    setShowNewLabsBatch(true);
-  }, [requiredLabs, labs, selectedPhase]);
+    setShowNewLabsInline(true);
+  }, [requiredLabs, labs, selectedPhase, setBatchValues, setShowNewLabsInline]);
 
   const handleBatchSave = useCallback(async () => {
     try {
@@ -236,7 +229,7 @@ export const LabsScreen: React.FC = () => {
         saved++;
       }
       if (saved > 0) notifyDataChange();
-      setShowNewLabsBatch(false);
+      setShowNewLabsInline(false);
       setBatchValues({});
       setTick(t => t + 1);
     } catch (e) { console.error(e); }
@@ -325,10 +318,11 @@ export const LabsScreen: React.FC = () => {
   }, [filteredCatalogBySys]);
 
   const chartData = useMemo(() => {
-    if (!chartSelectedCode) return [];
-    return labs.filter(l => l.code.toUpperCase() === chartSelectedCode.toUpperCase())
+    if (chartSelectedCodes.size === 0) return [];
+    const codes = Array.from(chartSelectedCodes).map(c => c.toUpperCase());
+    return labs.filter(l => codes.includes(l.code.toUpperCase()))
       .sort((a, b) => a.date.localeCompare(b.date));
-  }, [labs, chartSelectedCode]);
+  }, [labs, chartSelectedCodes]);
 
   const penalty = useMemo(() => {
     return calculatePenaltyCoefficients(selectedPhase, labs, [], 1, linked.course, globalNoLabs);
@@ -541,60 +535,22 @@ export const LabsScreen: React.FC = () => {
       {/* ≡≡≡ LAB SUB-TABS (only when mainTab === 'lab') ≡≡≡ */}
       {mainTab === 'lab' && (
         <>
-          {/* Sub-tab hero page */}
-          {subTab === 'hero' && (
-            <div style={{ textAlign: 'center', padding: '20px 0' }}>
-              <div style={{ fontSize: 36, marginBottom: 8 }}>🔬</div>
-              <h2 style={{ fontSize: 18, fontWeight: 700, color: 'var(--accent)', margin: '0 0 4px' }}>Анализы</h2>
-              <p style={{ fontSize: 12, color: 'var(--text-dim)', margin: '0 0 20px' }}>Выберите раздел</p>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                {LAB_SUB_TABS.filter(t => t.id !== 'hero').map(t => (
-                  <button key={t.id} onClick={() => setSubTab(t.id)} style={{
-                    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, padding: '20px 12px', borderRadius: 16, cursor: 'pointer', textAlign: 'center',
-                    background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', color: 'var(--text)',
-                    transition: 'all 0.2s',
-                  }}>
-                    <div style={{ fontSize: 28 }}>{t.icon}</div>
-                    <div>
-                      <div style={{ fontSize: 13, fontWeight: 700 }}>{t.label}</div>
-                      <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 2 }}>
-                        {t.id === 'current' ? 'Ввод и просмотр' : t.id === 'archive' ? 'История записей' : t.id === 'catalog' ? 'Справочник маркеров' : 'Динамика показателей'}
-                      </div>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Sub-tab cards (2x2) — навигация */}
-          {subTab !== 'hero' && (<>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, padding: '10px 0 12px' }}>
+          {/* Sub-tab segmented control */}
+          <div style={{ display: 'flex', gap: 4, overflowX: 'auto', padding: '8px 0 4px', scrollbarWidth: 'none' }}>
             {LAB_SUB_TABS.filter(t => t.id !== 'hero').map(t => (
               <button key={t.id} onClick={() => setSubTab(t.id)} style={{
-                display: 'flex', alignItems: 'center', gap: 10, padding: '14px 12px', borderRadius: 14, cursor: 'pointer', textAlign: 'left',
-                background: subTab === t.id ? 'rgba(0,230,138,0.08)' : 'var(--bg-secondary)',
-                border: `1px solid ${subTab === t.id ? 'rgba(0,230,138,0.3)' : 'var(--border)'}`,
-                color: 'var(--text)', transition: 'all 0.2s',
+                padding: '6px 14px', borderRadius: 16, fontSize: 11, fontWeight: 600,
+                whiteSpace: 'nowrap', cursor: 'pointer', transition: 'all 0.2s', flexShrink: 0,
+                background: subTab === t.id ? 'var(--accent)' : 'var(--bg-secondary)',
+                color: subTab === t.id ? '#000' : 'var(--text-dim)',
+                border: `1px solid ${subTab === t.id ? 'var(--accent)' : 'var(--border)'}`,
               }}>
-                <div style={{
-                  width: 38, height: 38, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-                  background: subTab === t.id ? 'var(--accent)' : 'rgba(255,255,255,0.06)',
-                  fontSize: 18,
-                }}>
-                  {t.icon}
-                </div>
-                <div>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: subTab === t.id ? 'var(--accent)' : 'var(--text)' }}>{t.label}</div>
-                  <div style={{ fontSize: 9, color: 'var(--text-dim)', marginTop: 1 }}>
-                    {t.id === 'current' ? 'Ввод и просмотр' : t.id === 'archive' ? 'История записей' : t.id === 'catalog' ? 'Справочник маркеров' : 'Динамика показателей'}
-                  </div>
-                </div>
+                {t.icon} {t.label}
               </button>
             ))}
           </div>
 
-      {/* ≡≡≡ CURRENT LABS TAB ≡≡≡ */}
+          {/* ≡≡≡ CURRENT LABS TAB ≡≡≡ */}
       {subTab === 'current' && (
         <div>
           {/* Phase selector */}
@@ -648,6 +604,61 @@ export const LabsScreen: React.FC = () => {
               background: 'var(--bg-secondary)', color: 'var(--accent)', fontWeight: 600, fontSize: 11, cursor: 'pointer',
             }}>📸 Сфотографировать</button>
           </div>
+
+          {/* Inline batch form for new labs */}
+          {showNewLabsInline && (
+            <div className="card" style={{ marginBottom: 10, padding: 12, border: '1px solid rgba(0,230,138,0.25)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                <span style={{ fontWeight: 700, fontSize: 13, color: 'var(--accent)' }}>📋 Новые анализы — {PHASE_LABELS[selectedPhase]}</span>
+                <button onClick={() => { setShowNewLabsInline(false); setBatchValues({}); }} style={{
+                  background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text-dim)',
+                  borderRadius: 8, padding: '4px 10px', fontSize: 11, cursor: 'pointer',
+                }}>✕ Отмена</button>
+              </div>
+              <div style={{ display: 'grid', gap: 6 }}>
+                {Object.entries(labsBySystem).map(([system, codes]) => (
+                  <div key={system}>
+                    <div style={{ fontSize: 9, color: sysColors[system] || 'var(--accent)', fontWeight: 600, marginBottom: 4 }}>
+                      {sysLabels[system] || system}
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4 }}>
+                      {codes.map(code => {
+                        const info = UCUM_MAP[code.toUpperCase()];
+                        return (
+                          <div key={code} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 8px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)' }}>
+                            <span style={{ fontSize: 9, fontWeight: 600, color: 'var(--text)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {info?.name || code}
+                            </span>
+                            <input
+                              value={batchValues[code] || ''}
+                              onChange={e => setBatchValues(prev => ({ ...prev, [code]: e.target.value }))}
+                              placeholder="0"
+                              type="number"
+                              style={{
+                                width: 60, padding: '4px 6px', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border)',
+                                borderRadius: 4, color: 'var(--accent)', fontSize: 11, fontWeight: 600, textAlign: 'right',
+                              }}
+                            />
+                            <span style={{ fontSize: 8, color: 'var(--text-dim)' }}>{info?.prefUnit || ''}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div style={{ marginTop: 10, display: 'flex', gap: 8 }}>
+                <button onClick={() => { setShowNewLabsInline(false); setBatchValues({}); }} style={{
+                  flex: 1, padding: '10px 12px', borderRadius: 10, border: '1px solid var(--border)',
+                  background: 'var(--bg-secondary)', color: 'var(--text-dim)', fontWeight: 600, fontSize: 12, cursor: 'pointer',
+                }}>✕ Отмена</button>
+                <button onClick={handleBatchSave} style={{
+                  flex: 1, padding: '10px 12px', borderRadius: 10, border: 'none',
+                  background: 'var(--accent)', color: '#000', fontWeight: 700, fontSize: 12, cursor: 'pointer',
+                }}>✓ Сохранить все</button>
+              </div>
+            </div>
+          )}
 
           {/* Penalty card */}
           <div className="card" style={{ marginBottom: 10, padding: 10, background: anyNoLabs ? 'rgba(239,68,68,0.08)' : 'var(--glass-bg)', borderColor: anyNoLabs ? 'rgba(239,68,68,0.3)' : 'var(--glass-border)' }}>
@@ -862,31 +873,46 @@ export const LabsScreen: React.FC = () => {
         );
       })()}
 
-      {/* ≡≡≡ CHART TAB — chip-based marker selector ≡≡≡ */}
+      {/* ≡≡≡ CHART TAB — multi-marker selector ≡≡≡ */}
       {subTab === 'chart' && (() => {
-        const ref = chartSelectedCode ? UCUM_MAP[chartSelectedCode] : null;
-        const vals = chartData.map(d => d.value);
-        const minD = vals.length > 0 ? Math.min(...vals, ref ? ref.lln : 0) : 0;
-        const maxD = vals.length > 0 ? Math.max(...vals, ref ? ref.uln : 100) : 100;
-        const pad = (maxD - minD) * 0.2 || 10;
-        const chartMin = Math.max(0, minD - pad);
-        const chartMax = maxD + pad;
+        const selCodes = Array.from(chartSelectedCodes);
+        const chartPalette = ['var(--accent)','#3b82f6','#f97316','#a855f7','#ef4444','#eab308','#14b8a6','#ec4899'];
+        // Group labs by code for multi-marker rendering
+        const seriesByCode: Record<string, LabPoint[]> = {};
+        if (selCodes.length > 0) {
+          for (const code of selCodes) {
+            seriesByCode[code] = labs.filter(l => l.code.toUpperCase() === code.toUpperCase()).sort((a,b) => a.date.localeCompare(b.date));
+          }
+        }
+        // All unique dates from all series
+        const allDatesSet = new Set<string>();
+        Object.values(seriesByCode).forEach(pts => pts.forEach(p => allDatesSet.add(p.date)));
+        const allDates = Array.from(allDatesSet).sort();
+        // Compute global chart bounds
+        const globalVals = Object.values(seriesByCode).flat().map(d => d.value);
+        const globalMin = globalVals.length > 0 ? Math.min(...globalVals) : 0;
+        const globalMax = globalVals.length > 0 ? Math.max(...globalVals) : 100;
+        const pad = (globalMax - globalMin) * 0.2 || 10;
+        const chartMin = Math.max(0, globalMin - pad);
+        const chartMax = globalMax + pad;
         const chartRange = chartMax - chartMin;
-        const n = chartData.length;
+        const n = allDates.length;
         const barW = Math.max(28, Math.min(60, (320 - 50) / (n || 1)));
-        const chartW = Math.max(320, n * barW + 60);
-        const chartH = 240;
+        const chartW = Math.max(320, n * barW + 60 + 120);
+        const chartH = 220;
         const xBase = 50;
+        const hasSelection = selCodes.length > 0;
         return (
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 0' }}>
               <span style={{ fontSize: 18 }}>📈</span>
-              <span style={{ fontSize: 16, fontWeight: 700 }}>Графики маркеров</span>
+              <span style={{ fontSize: 15, fontWeight: 700 }}>Графики маркеров</span>
+              {hasSelection && <span style={{ fontSize: 9, color: 'var(--accent)' }}>{selCodes.length} выбрано</span>}
             </div>
 
             {/* System filter chips */}
-            <div style={{ display: 'flex', gap: 4, overflowX: 'auto', marginBottom: 10, scrollbarWidth: 'none', paddingBottom: 4 }}>
-              <button onClick={() => { setChartMarkerSearch(''); setChartSelectedCode(''); setChartFilterSys('all'); }} style={{
+            <div style={{ display: 'flex', gap: 4, overflowX: 'auto', marginBottom: 8, scrollbarWidth: 'none', paddingBottom: 4 }}>
+              <button onClick={() => { setChartMarkerSearch(''); setChartFilterSys('all'); }} style={{
                 padding: '5px 10px', borderRadius: 14, fontSize: 10, fontWeight: 600, whiteSpace: 'nowrap', cursor: 'pointer', flexShrink: 0,
                 background: chartFilterSys === 'all' ? 'var(--accent)' : 'var(--bg-secondary)',
                 color: chartFilterSys === 'all' ? '#000' : 'var(--text-dim)',
@@ -899,11 +925,7 @@ export const LabsScreen: React.FC = () => {
                 });
                 if (sysMarkers.length === 0) return null;
                 return (
-                  <button key={sys} onClick={() => {
-                    setChartMarkerSearch('');
-                    setChartSelectedCode('');
-                    setChartFilterSys(prev => prev === sys ? 'all' : sys);
-                  }} style={{
+                  <button key={sys} onClick={() => setChartFilterSys(prev => prev === sys ? 'all' : sys)} style={{
                     padding: '5px 10px', borderRadius: 14, fontSize: 10, fontWeight: 600, whiteSpace: 'nowrap', cursor: 'pointer', flexShrink: 0,
                     background: chartFilterSys === sys ? 'var(--accent)' : 'var(--bg-secondary)',
                     color: chartFilterSys === sys ? '#000' : 'var(--text-dim)',
@@ -915,68 +937,61 @@ export const LabsScreen: React.FC = () => {
               })}
             </div>
 
-            {/* Marker grid (only when no marker selected) */}
-            {!chartSelectedCode && (
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, marginBottom: 10 }}>
-                {(chartFilterSys !== 'all'
-                  ? uniqMarkers.filter(m => {
-                      const codes = LAB_SYSTEM_GROUPS[chartFilterSys];
-                      return codes ? codes.includes(m.code) : false;
-                    })
-                  : uniqMarkers
-                ).map(m => (
-                  <button key={m.code} onClick={() => { setChartSelectedCode(m.code); setChartMarkerSearch(''); }} style={{
+            {/* Marker grid — always visible for multi-select */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, marginBottom: 8 }}>
+              {(chartFilterSys !== 'all'
+                ? uniqMarkers.filter(m => { const codes = LAB_SYSTEM_GROUPS[chartFilterSys]; return codes ? codes.includes(m.code) : false; })
+                : uniqMarkers
+              ).map(m => {
+                const isSelected = chartSelectedCodes.has(m.code);
+                return (
+                  <button key={m.code} onClick={() => {
+                    setChartSelectedCodes(prev => { const next = new Set(prev); if (next.has(m.code)) next.delete(m.code); else next.add(m.code); return next; });
+                  }} style={{
                     display: 'flex', alignItems: 'center', gap: 6, padding: '8px 10px', borderRadius: 8, cursor: 'pointer', textAlign: 'left',
-                    background: 'var(--bg-secondary)', border: '1px solid var(--border)',
+                    background: isSelected ? 'rgba(0,230,138,0.12)' : 'var(--bg-secondary)',
+                    border: `1px solid ${isSelected ? 'rgba(0,230,138,0.3)' : 'var(--border)'}`,
                     color: 'var(--text)', fontSize: 11, transition: 'all 0.15s',
                   }}>
                     <div style={{
                       width: 24, height: 24, borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-                      background: 'rgba(0,230,138,0.12)', color: 'var(--accent)', fontSize: 9, fontWeight: 700,
+                      background: isSelected ? 'var(--accent)' : 'rgba(0,230,138,0.12)',
+                      color: isSelected ? '#000' : 'var(--accent)', fontSize: 9, fontWeight: 700,
                     }}>
-                      {m.code.slice(0, 2)}
+                      {isSelected ? '✓' : m.code.slice(0, 2)}
                     </div>
                     <div style={{ minWidth: 0 }}>
                       <div style={{ fontWeight: 600, fontSize: 10, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.name}</div>
                       <div style={{ fontSize: 8, color: 'var(--text-dim)' }}>{m.code}</div>
                     </div>
                   </button>
-                ))}
-                {uniqMarkers.length === 0 && (
-                  <div style={{ gridColumn: '1/-1', textAlign: 'center', padding: 30, color: 'var(--text-dim)', fontSize: 12 }}>
-                    Введите анализы во вкладке «Текущие»
-                  </div>
-                )}
-              </div>
-            )}
-
-            {chartSelectedCode ? (chartData.length > 0 ? (
-              <div className="card" style={{ padding: 14 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-                  <div>
-                    <div style={{ fontWeight: 700, fontSize: 14 }}>{ref?.name || chartSelectedCode}</div>
-                    <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>{chartData.length} записей • Реф: {ref?.lln}–{ref?.uln} {ref?.prefUnit || ''}</div>
-                  </div>
-                  <div style={{
-                    padding: '4px 10px', borderRadius: 6, fontSize: 10, fontWeight: 600,
-                    background: chartData[chartData.length - 1].value > (ref?.uln || 999) ? 'rgba(239,68,68,0.12)' :
-                      chartData[chartData.length - 1].value < (ref?.lln || 0) ? 'rgba(249,115,22,0.12)' : 'rgba(0,230,138,0.1)',
-                    color: chartData[chartData.length - 1].value > (ref?.uln || 999) ? '#ef4444' :
-                      chartData[chartData.length - 1].value < (ref?.lln || 0) ? '#f97316' : 'var(--accent)',
-                  }}>
-                    Последнее: {chartData[chartData.length - 1].value}
-                  </div>
+                );
+              })}
+              {uniqMarkers.length === 0 && (
+                <div style={{ gridColumn: '1/-1', textAlign: 'center', padding: 30, color: 'var(--text-dim)', fontSize: 12 }}>
+                  Введите анализы во вкладке «Текущие»
                 </div>
+              )}
+            </div>
 
-                {/* Chart */}
+            {/* Chart area */}
+            {hasSelection ? (
+              <div className="card" style={{ padding: 12 }}>
+                {/* Legend */}
+                <div style={{ display: 'flex', gap: 10, marginBottom: 10, flexWrap: 'wrap', fontSize: 9 }}>
+                  {selCodes.map((code, i) => {
+                    const info = UCUM_MAP[code];
+                    return (
+                      <span key={code} style={{ display: 'flex', alignItems: 'center', gap: 4, color: 'var(--text-dim)' }}>
+                        <span style={{ width: 10, height: 10, borderRadius: 3, background: chartPalette[i % chartPalette.length], flexShrink: 0 }} />
+                        {info?.name || code}
+                      </span>
+                    );
+                  })}
+                </div>
+                {/* SVG Chart */}
                 <svg viewBox={`0 0 ${chartW} ${chartH + 40}`} style={{ width: '100%', height: 'auto', display: 'block' }}>
-                  <defs>
-                    <linearGradient id="chartBg" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="rgba(0,230,138,0.08)" />
-                      <stop offset="100%" stopColor="rgba(0,230,138,0.01)" />
-                    </linearGradient>
-                  </defs>
-                  <rect x={xBase} y={0} width={chartW - xBase - 10} height={chartH} fill="url(#chartBg)" rx={6} />
+                  <rect x={xBase} y={0} width={chartW - xBase - 10} height={chartH} fill="rgba(255,255,255,0.02)" rx={6} />
                   {[0, 0.25, 0.5, 0.75, 1].map(f => {
                     const y = chartH - f * chartH;
                     return (
@@ -986,66 +1001,50 @@ export const LabsScreen: React.FC = () => {
                       </g>
                     );
                   })}
-                  {ref && (
-                    <line x1={xBase} y1={chartH - ((ref.uln - chartMin) / chartRange) * chartH} x2={chartW - 10} y2={chartH - ((ref.uln - chartMin) / chartRange) * chartH}
-                      stroke="#ef4444" strokeWidth={1.5} strokeDasharray="6 3" opacity={0.7} />
-                  )}
-                  {ref && (
-                    <line x1={xBase} y1={chartH - ((ref.lln - chartMin) / chartRange) * chartH} x2={chartW - 10} y2={chartH - ((ref.lln - chartMin) / chartRange) * chartH}
-                      stroke="#22c55e" strokeWidth={1.5} strokeDasharray="6 3" opacity={0.7} />
-                  )}
-                  {/* Area fill under the line */}
-                  {chartData.length > 0 && (
-                    <path d={`M${xBase + barW / 2},${chartH} ${chartData.map((d, i) => {
-                      const x = xBase + i * barW + barW / 2;
-                      const barH = Math.max(0, ((d.value - chartMin) / chartRange) * chartH);
-                      const y = chartH - barH;
-                      return `L${x},${y}`;
-                    }).join(' ')} L${xBase + (chartData.length - 1) * barW + barW / 2},${chartH} Z`}
-                      fill="rgba(0,230,138,0.06)" />
-                  )}
-                  {/* Bars with gradient */}
-                  {chartData.map((d, i) => {
-                    const x = xBase + i * barW;
-                    const barH = Math.max(0, ((d.value - chartMin) / chartRange) * chartH);
-                    const y = chartH - barH;
-                    const color = ref ? (d.value > ref.uln ? '#ef4444' : d.value < ref.lln ? '#f97316' : 'var(--accent)') : 'var(--accent)';
+                  {/* One bar group per date */}
+                  {allDates.map((date, di) => {
+                    const x = xBase + di * barW;
+                    const groupW = Math.max(6, barW - 4);
+                    const perBarW = selCodes.length > 1 ? groupW / selCodes.length : groupW;
                     return (
-                      <g key={`${d.date}_${i}`}>
-                        <rect x={x + 2} y={y} width={Math.max(4, barW - 4)} height={barH} fill={color} rx={3} opacity={0.85} />
-                        <text x={x + barW / 2} y={y - 5} fill={color} fontSize={8} textAnchor="middle" fontWeight={700}>{d.value}</text>
-                        <text x={x + barW / 2} y={chartH + 12} fill="var(--text-dim)" fontSize={7} textAnchor="middle">{d.date.slice(5)}</text>
-                        {d.phase && (
-                          <rect x={x + barW / 2 - 6} y={chartH + 18} width={12} height={12} rx={3} fill={color + '22'}>
-                            <text x={x + barW / 2} y={chartH + 27} fill={color} fontSize={6} textAnchor="middle" fontWeight={700}>
-                              {(PHASE_LABELS[d.phase] || d.phase).slice(0, 2)}
-                            </text>
-                          </rect>
-                        )}
+                      <g key={date}>
+                        {/* Date label */}
+                        <text x={x + barW / 2} y={chartH + 12} fill="var(--text-dim)" fontSize={7} textAnchor="middle">{date.slice(5)}</text>
+                        {/* Bars per code */}
+                        {selCodes.map((code, ci) => {
+                          const pts = seriesByCode[code] || [];
+                          const pt = pts.find(p => p.date === date);
+                          if (!pt) return null;
+                          const barH = Math.max(2, ((pt.value - chartMin) / chartRange) * chartH);
+                          const y = chartH - barH;
+                          const color = chartPalette[ci % chartPalette.length];
+                          return (
+                            <g key={`${date}_${code}`}>
+                              <rect x={x + 2 + ci * perBarW} y={y} width={Math.max(3, perBarW - 2)} height={barH} fill={color} rx={2} opacity={0.85} />
+                              {selCodes.length <= 2 && (
+                                <text x={x + 2 + ci * perBarW + perBarW / 2} y={y - 3} fill={color} fontSize={7} textAnchor="middle" fontWeight={700}>{pt.value}</text>
+                              )}
+                            </g>
+                          );
+                        })}
                       </g>
                     );
                   })}
                   <line x1={xBase} y1={chartH} x2={chartW - 10} y2={chartH} stroke="var(--border)" strokeWidth={1} />
                 </svg>
-
-                {/* Legend */}
-                <div style={{ display: 'flex', gap: 12, marginTop: 8, fontSize: 9, color: 'var(--text-dim)', flexWrap: 'wrap', justifyContent: 'center' }}>
-                  <span><span style={{ display: 'inline-block', width: 12, height: 2, background: '#ef4444', verticalAlign: 'middle', marginRight: 4 }} /> Верхняя граница</span>
-                  <span><span style={{ display: 'inline-block', width: 12, height: 2, background: '#22c55e', verticalAlign: 'middle', marginRight: 4 }} /> Нижняя граница</span>
-                  <span><span style={{ display: 'inline-block', width: 10, height: 8, background: 'var(--accent)', verticalAlign: 'middle', marginRight: 4, borderRadius: 2 }} /> Норма</span>
-                  <span><span style={{ display: 'inline-block', width: 10, height: 8, background: '#ef4444', verticalAlign: 'middle', marginRight: 4, borderRadius: 2 }} /> Высокий</span>
-                  <span><span style={{ display: 'inline-block', width: 10, height: 8, background: '#f97316', verticalAlign: 'middle', marginRight: 4, borderRadius: 2 }} /> Низкий</span>
+                {/* Clear selection */}
+                <div style={{ marginTop: 8, textAlign: 'center' }}>
+                  <button onClick={() => setChartSelectedCodes(new Set())} style={{
+                    fontSize: 9, color: 'var(--text-dim)', background: 'var(--bg-secondary)', border: '1px solid var(--border)',
+                    borderRadius: 8, padding: '4px 12px', cursor: 'pointer',
+                  }}>✕ Сбросить выбор</button>
                 </div>
               </div>
             ) : (
-              <div className="card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 200, padding: 20 }}>
-                <div style={{ textAlign: 'center', fontSize: 11, color: 'var(--text-dim)' }}>Нет данных для этого маркера</div>
-              </div>
-            )) : (
-              <div className="card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 200, padding: 20 }}>
+              <div className="card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 160, padding: 20 }}>
                 <div style={{ textAlign: 'center', fontSize: 11, color: 'var(--text-dim)' }}>
-                  <div style={{ fontSize: 32, marginBottom: 12 }}>📊</div>
-                  Выберите маркер для просмотра динамики
+                  <div style={{ fontSize: 28, marginBottom: 10 }}>📊</div>
+                  Выберите 1+ маркеров для сравнения
                 </div>
               </div>
             )}
@@ -1053,10 +1052,7 @@ export const LabsScreen: React.FC = () => {
         );
       })()}
 
-          </>)}
-        </>
-      )}
-
+        </>)}
       {/* ≡≡≡ INVESTIGATIONS TAB ≡≡≡ */}
       {mainTab === 'investigations' && (
         <div style={{ paddingTop: 8 }}>
@@ -1397,101 +1393,6 @@ export const LabsScreen: React.FC = () => {
         </div>
       )}
 
-      {/* Confirm New Labs Dialog */}
-      {showNewLabsConfirm && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 250, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(10px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }} onClick={() => setShowNewLabsConfirm(false)}>
-          <div style={{ width: '100%', maxWidth: 360, zIndex: 251, background: 'var(--bg)', borderRadius: 20, padding: '20px 18px', boxShadow: '0 12px 40px rgba(0,0,0,0.5)' }} onClick={e => e.stopPropagation()}>
-            <div style={{ fontSize: 32, textAlign: 'center', marginBottom: 12 }}>📋</div>
-            <div style={{ fontSize: 15, fontWeight: 700, textAlign: 'center', marginBottom: 8 }}>Новые анализы фазы</div>
-            <div style={{ fontSize: 12, color: 'var(--text-dim)', textAlign: 'center', lineHeight: 1.5, marginBottom: 16 }}>
-              Текущие анализы будут перенесены в архив. Заполните новые значения для фазы <strong>{PHASE_LABELS[selectedPhase]}</strong>.
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-              <button onClick={() => setShowNewLabsConfirm(false)} style={{
-                padding: 10, borderRadius: 10, border: '1px solid var(--border)',
-                background: 'var(--bg-secondary)', color: 'var(--text-dim)', fontWeight: 600, fontSize: 13, cursor: 'pointer',
-              }}>✕ Отмена</button>
-              <button onClick={confirmNewLabs} style={{
-                padding: 10, borderRadius: 10, border: 'none',
-                background: 'var(--accent)', color: '#000', fontWeight: 700, fontSize: 13, cursor: 'pointer',
-              }}>✓ Продолжить</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Batch Labs Input Modal — full screen to bottom */}
-      {showNewLabsBatch && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(12px)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', padding: 0 }} onClick={() => setShowNewLabsBatch(false)}>
-          <div style={{ width: '100%', maxWidth: 480, zIndex: 201, background: 'var(--bg)', borderRadius: '20px 20px 0 0', maxHeight: '85vh', overflow: 'hidden', display: 'flex', flexDirection: 'column', boxShadow: '0 -12px 48px rgba(0,0,0,0.5)' }} onClick={e => e.stopPropagation()}>
-            <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
-              <div>
-                <span style={{ fontWeight: 700, fontSize: 16 }}>📋 Новые анализы — {PHASE_LABELS[selectedPhase]}</span>
-                <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 2 }}>Заполните значения для фазы {PHASE_LABELS[selectedPhase].toLowerCase()}</div>
-              </div>
-              <button onClick={() => setShowNewLabsBatch(false)} style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text-dim)', borderRadius: 8, padding: '6px 12px', fontSize: 13, cursor: 'pointer' }}>✕</button>
-            </div>
-            <div style={{ flex: 1, overflowY: 'auto', padding: '12px 16px' }}>
-              {requiredLabs.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: 30, color: 'var(--text-dim)', fontSize: 12 }}>
-                  Нет анализов для выбранной фазы
-                </div>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  {(() => {
-                    const bySystem: Record<string, { code: string; name: string }[]> = {};
-                    for (const code of requiredLabs) {
-                      let sys = 'other';
-                      for (const [s, codes] of Object.entries(LAB_SYSTEM_GROUPS)) {
-                        if (codes.includes(code.toUpperCase())) { sys = s; break; }
-                      }
-                      const info = UCUM_MAP[code.toUpperCase()];
-                      if (!bySystem[sys]) bySystem[sys] = [];
-                      bySystem[sys].push({ code, name: info?.name || code });
-                    }
-                    const sysOrder = ['hepatic','renal','endocrine','hematologic','cardio','metabolic','reproductive','neuro','other'];
-                    return sysOrder.flatMap(sys => {
-                      const items = bySystem[sys];
-                      if (!items || items.length === 0) return [];
-                      return [
-                        <div key={`hdr-${sys}`} style={{ fontSize: 10, fontWeight: 700, color: sysColors[sys] || '#6b7280', padding: '8px 0 2px', display: 'flex', alignItems: 'center', gap: 4 }}>
-                          <span style={{ width: 6, height: 6, borderRadius: '50%', background: sysColors[sys] || '#6b7280' }} />
-                          {sysLabels[sys] || sys}
-                        </div>,
-                        ...items.map(item => (
-                          <div key={item.code} style={{
-                            display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', borderRadius: 8,
-                            background: 'var(--bg-secondary)', border: '1px solid var(--border)',
-                          }}>
-                            <div style={{ flex: 1, minWidth: 0 }}>
-                              <div style={{ fontSize: 11, fontWeight: 600 }}>{item.name}</div>
-                              <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>{item.code}</div>
-                            </div>
-                            <input type="number" step="any" value={batchValues[item.code] ?? ''}
-                              onChange={e => setBatchValues(prev => ({ ...prev, [item.code]: e.target.value }))}
-                              placeholder="Значение"
-                              style={{ width: 100, padding: '6px 8px', borderRadius: 6, background: 'var(--bg)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, textAlign: 'right' }} />
-                          </div>
-                        ))
-                      ];
-                    });
-                  })()}
-                </div>
-              )}
-            </div>
-            <div style={{ padding: '12px 16px', borderTop: '1px solid var(--border)', display: 'flex', gap: 8 }}>
-              <button onClick={() => { setShowNewLabsBatch(false); setBatchValues({}); }} style={{
-                flex: 1, padding: '10px 12px', borderRadius: 10, border: '1px solid var(--border)',
-                background: 'var(--bg-secondary)', color: 'var(--text-dim)', fontWeight: 600, fontSize: 13, cursor: 'pointer',
-              }}>✕ Отмена</button>
-              <button onClick={handleBatchSave} style={{
-                flex: 1, padding: '10px 12px', borderRadius: 10, border: 'none',
-                background: 'var(--accent)', color: '#000', fontWeight: 700, fontSize: 13, cursor: 'pointer',
-              }}>✓ Сохранить все</button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };
