@@ -163,6 +163,7 @@ export const LabsScreen: React.FC = () => {
   const [chartMarkerSearch, setChartMarkerSearch] = useState('');
   const [chartSelectedCodes, setChartSelectedCodes] = useState<Set<string>>(new Set());
   const [chartFilterSys, setChartFilterSys] = useState('all');
+  const [chartGridOpen, setChartGridOpen] = useState(true);
   const [catalogSearch, setCatalogSearch] = useState('');
   const [catalogDetail, setCatalogDetail] = useState<{ code: string; name: string; unit: string; uln: number; lln: number; system: string; description: string } | null>(null);
   const [catFilterSys, setCatFilterSys] = useState('all');
@@ -602,59 +603,64 @@ export const LabsScreen: React.FC = () => {
             <button onClick={() => { setShowImport(true); setTimeout(() => cameraInputRef.current?.click(), 100); }} style={{
               flex: 1, padding: 8, borderRadius: 8, border: '1px solid var(--border)',
               background: 'var(--bg-secondary)', color: 'var(--accent)', fontWeight: 600, fontSize: 11, cursor: 'pointer',
-            }}>📸 Сфотографировать</button>
+            }}>📸 Загрузить JPG</button>
           </div>
 
-          {/* Inline batch form for new labs */}
+          {/* Inline batch form — same layout as progress card chips */}
           {showNewLabsInline && (
-            <div className="card" style={{ marginBottom: 10, padding: 12, border: '1px solid rgba(0,230,138,0.25)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-                <span style={{ fontWeight: 700, fontSize: 13, color: 'var(--accent)' }}>📋 Новые анализы — {PHASE_LABELS[selectedPhase]}</span>
+            <div className="card" style={{ marginBottom: 10, padding: 10, border: '1px solid rgba(0,230,138,0.25)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                <span style={{ fontWeight: 700, fontSize: 12, color: 'var(--accent)' }}>📋 Новые анализы — {PHASE_LABELS[selectedPhase]}</span>
                 <button onClick={() => { setShowNewLabsInline(false); setBatchValues({}); }} style={{
                   background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text-dim)',
-                  borderRadius: 8, padding: '4px 10px', fontSize: 11, cursor: 'pointer',
-                }}>✕ Отмена</button>
+                  borderRadius: 8, padding: '3px 10px', fontSize: 10, cursor: 'pointer',
+                }}>✕</button>
               </div>
-              <div style={{ display: 'grid', gap: 6 }}>
-                {Object.entries(labsBySystem).map(([system, codes]) => (
-                  <div key={system}>
-                    <div style={{ fontSize: 9, color: sysColors[system] || 'var(--accent)', fontWeight: 600, marginBottom: 4 }}>
-                      {sysLabels[system] || system}
-                    </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4 }}>
-                      {codes.map(code => {
-                        const info = UCUM_MAP[code.toUpperCase()];
-                        return (
-                          <div key={code} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 8px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)' }}>
-                            <span style={{ fontSize: 9, fontWeight: 600, color: 'var(--text)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                              {info?.name || code}
-                            </span>
-                            <input
-                              value={batchValues[code] || ''}
-                              onChange={e => setBatchValues(prev => ({ ...prev, [code]: e.target.value }))}
-                              placeholder="0"
-                              type="number"
-                              style={{
-                                width: 60, padding: '4px 6px', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border)',
-                                borderRadius: 4, color: 'var(--accent)', fontSize: 11, fontWeight: 600, textAlign: 'right',
-                              }}
-                            />
-                            <span style={{ fontSize: 8, color: 'var(--text-dim)' }}>{info?.prefUnit || ''}</span>
-                          </div>
-                        );
-                      })}
-                    </div>
+              {Object.entries(labsBySystem).map(([system, codes]) => (
+                <div key={system} style={{ marginBottom: 6 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 4 }}>
+                    <div style={{ width: 7, height: 7, borderRadius: '50%', background: sysColors[system] || '#6b7280', flexShrink: 0 }} />
+                    <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--accent)' }}>{sysLabels[system] || system}</span>
                   </div>
-                ))}
-              </div>
-              <div style={{ marginTop: 10, display: 'flex', gap: 8 }}>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
+                    {codes.map(code => {
+                      const info = UCUM_MAP[code.toUpperCase()];
+                      const filled = batchValues[code] && batchValues[code].trim() !== '';
+                      return (
+                        <div key={code} style={{
+                          display: 'flex', alignItems: 'center', gap: 3, padding: '3px 6px', borderRadius: 6,
+                          background: filled ? 'rgba(0,230,138,0.10)' : 'var(--bg-secondary)',
+                          border: `1px solid ${filled ? 'rgba(0,230,138,0.25)' : 'var(--border)'}`,
+                          transition: 'all 0.15s',
+                        }}>
+                          <span style={{ fontSize: 10, fontWeight: filled ? 600 : 400, color: filled ? 'var(--accent)' : 'var(--text-dim)' }}>
+                            {filled ? '✓' : '○'} {info?.name || code}
+                          </span>
+                          <input
+                            value={batchValues[code] || ''}
+                            onChange={e => setBatchValues(prev => ({ ...prev, [code]: e.target.value }))}
+                            placeholder="0"
+                            type="number"
+                            style={{
+                              width: 48, padding: '2px 4px', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border)',
+                              borderRadius: 3, color: 'var(--accent)', fontSize: 10, fontWeight: 600, textAlign: 'right',
+                            }}
+                          />
+                          <span style={{ fontSize: 7, color: 'var(--text-dim)', minWidth: 16 }}>{info?.prefUnit || ''}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+              <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
                 <button onClick={() => { setShowNewLabsInline(false); setBatchValues({}); }} style={{
-                  flex: 1, padding: '10px 12px', borderRadius: 10, border: '1px solid var(--border)',
-                  background: 'var(--bg-secondary)', color: 'var(--text-dim)', fontWeight: 600, fontSize: 12, cursor: 'pointer',
+                  flex: 1, padding: '8px 12px', borderRadius: 10, border: '1px solid var(--border)',
+                  background: 'var(--bg-secondary)', color: 'var(--text-dim)', fontWeight: 600, fontSize: 11, cursor: 'pointer',
                 }}>✕ Отмена</button>
                 <button onClick={handleBatchSave} style={{
-                  flex: 1, padding: '10px 12px', borderRadius: 10, border: 'none',
-                  background: 'var(--accent)', color: '#000', fontWeight: 700, fontSize: 12, cursor: 'pointer',
+                  flex: 1, padding: '8px 12px', borderRadius: 10, border: 'none',
+                  background: 'var(--accent)', color: '#000', fontWeight: 700, fontSize: 11, cursor: 'pointer',
                 }}>✓ Сохранить все</button>
               </div>
             </div>
@@ -915,11 +921,16 @@ export const LabsScreen: React.FC = () => {
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 0' }}>
               <span style={{ fontSize: 18 }}>📈</span>
-              <span style={{ fontSize: 15, fontWeight: 700 }}>Графики маркеров</span>
+              <span style={{ fontSize: 15, fontWeight: 700, flex: 1 }}>Графики маркеров</span>
               {hasSelection && <span style={{ fontSize: 9, color: 'var(--accent)' }}>{selCodes.length} выбрано</span>}
+              <button onClick={() => setChartGridOpen(g => !g)} style={{
+                marginLeft: 'auto', background: 'var(--bg-secondary)', border: '1px solid var(--border)',
+                borderRadius: 6, padding: '3px 8px', fontSize: 10, color: 'var(--text-dim)', cursor: 'pointer', whiteSpace: 'nowrap',
+              }}>{chartGridOpen ? '▲ Скрыть' : '▼ Маркеры'}</button>
             </div>
 
-            {/* System filter chips */}
+            {/* System filter chips + marker grid (collapsible) */}
+            {chartGridOpen && (<>
             <div style={{ display: 'flex', gap: 4, overflowX: 'auto', marginBottom: 8, scrollbarWidth: 'none', paddingBottom: 4 }}>
               <button onClick={() => { setChartMarkerSearch(''); setChartFilterSys('all'); }} style={{
                 padding: '5px 10px', borderRadius: 14, fontSize: 10, fontWeight: 600, whiteSpace: 'nowrap', cursor: 'pointer', flexShrink: 0,
@@ -983,6 +994,7 @@ export const LabsScreen: React.FC = () => {
               )}
             </div>
 
+            </>)}
             {/* Chart area */}
             {hasSelection ? (
               <div className="card" style={{ padding: 12 }}>
@@ -1270,10 +1282,10 @@ export const LabsScreen: React.FC = () => {
       </div>
       )}
 
-      {/* OCR Import Modal — full screen to bottom */}
+      {/* OCR Import Modal — centered */}
       {showImport && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(12px)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', padding: 0 }} onClick={() => { setShowImport(false); setOcrResult(null); }}>
-          <div style={{ width: '100%', maxWidth: 480, zIndex: 201, background: 'var(--bg)', borderRadius: '20px 20px 0 0', maxHeight: '85vh', overflow: 'hidden', display: 'flex', flexDirection: 'column', boxShadow: '0 -12px 48px rgba(0,0,0,0.5)' }} onClick={e => e.stopPropagation()}>
+        <div style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(12px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }} onClick={() => { setShowImport(false); setOcrResult(null); }}>
+          <div style={{ width: '100%', maxWidth: 480, zIndex: 201, background: 'var(--bg)', borderRadius: 20, maxHeight: '85vh', overflow: 'hidden', display: 'flex', flexDirection: 'column', boxShadow: '0 12px 48px rgba(0,0,0,0.5)' }} onClick={e => e.stopPropagation()}>
             <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
               <span style={{ fontWeight: 700, fontSize: 16 }}>📄 Импорт анализов</span>
               <button onClick={() => { setShowImport(false); setOcrResult(null); }} style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text-dim)', borderRadius: 8, padding: '6px 12px', fontSize: 13, cursor: 'pointer' }}>✕</button>
