@@ -31,7 +31,7 @@ import { StrengthDiary } from '../../engines/strength-diary.engine';
 import { interpretLabs, type LabCompositeResult } from '../../engines/lab-analysis.engine';
 
 
-type ScreenId = 'dashboard' | 'pharma' | 'course' | 'peptides' | 'nutrition' | 'plan' | 'substances' | 'labs' | 'risks' | 'profile' | 'predictive' | 'marketplace' | 'articles' | 'assistant' | 'gamification' | 'fertility-pct' | 'calculators' | 'reports' | 'integrations' | 'role-management' | 'support' | 'training';
+type ScreenId = 'dashboard' | 'pharma' | 'course' | 'peptides' | 'nutrition' | 'plan' | 'substances' | 'labs' | 'risks' | 'profile' | 'predictive' | 'marketplace' | 'articles' | 'assistant' | 'gamification' | 'fertility-pct' | 'calculators' | 'reports' | 'integrations' | 'role-management' | 'support' | 'training' | 'recovery' | 'performance' | 'toolkit';
 
 interface Props {
   onNavigate?: (screen: ScreenId) => void;
@@ -73,16 +73,16 @@ function AlertBanner({ messages }: { messages: string[] }) {
 
 // Navigation cards for the Dashboard
 const NAV_CARDS: { id: ScreenId; icon: string; label: string; desc: string; color: string }[] = [
-  { id: 'training', icon: '🏋️', label: 'Тренировки', desc: 'Планы, RIR', color: '#00e68a' },
-  { id: 'support', icon: '💊', label: 'Поддержка', desc: 'БАДы, протоколы', color: '#1e90ff' },
-  { id: 'nutrition', icon: '🍎', label: 'Питание', desc: 'КБЖУ, дневник', color: '#ffa502' },
-  { id: 'fertility-pct', icon: '🌱', label: 'ПКТ и Фертильность', desc: 'План ПКТ, фертильность', color: '#22c55e' },
-  { id: 'calculators', icon: '🧮', label: 'Калькуляторы', desc: 'Дозировки', color: '#a855f7' },
+  { id: 'training', icon: '🏋️', label: 'Тренировки', desc: 'Планы, RIR, дневник', color: '#00e68a' },
+  { id: 'support', icon: '💊', label: 'Поддержка', desc: 'БАДы, калькулятор, пептиды', color: '#1e90ff' },
+  { id: 'nutrition', icon: '🍎', label: 'Питание', desc: 'КБЖУ, дневник, план', color: '#ffa502' },
+  { id: 'recovery', icon: '🔄', label: 'Восстановление', desc: 'Сон, HRV, прехаб, делоад', color: '#22c55e' },
+  { id: 'performance', icon: '⚡', label: 'Лаборатория', desc: 'Кровь, стеки, ПКТ, прогноз', color: '#a855f7' },
+  { id: 'toolkit', icon: '🧰', label: 'Инструменты', desc: 'Движение, календарь, логгер', color: '#06b6d4' },
+  { id: 'calculators', icon: '🧮', label: 'Калькуляторы', desc: 'BMI, BMR, дозировки', color: '#f97316' },
+  { id: 'fertility-pct', icon: '🌱', label: 'ПКТ и Фертильность', desc: 'План ПКТ, фертильность', color: '#8b5cf6' },
   { id: 'profile', icon: '👤', label: 'Профиль', desc: 'Настройки', color: '#6b7280' },
-  { id: 'marketplace', icon: '🛒', label: 'Маркетплейс', desc: 'Препараты и БАДы', color: '#f97316' },
-  { id: 'articles', icon: '📖', label: 'Статьи', desc: 'База знаний', color: '#06b6d4' },
-  { id: 'assistant', icon: '🤖', label: 'Ассистент', desc: 'Чекапы и ответы', color: '#8b5cf6' },
-  { id: 'reports', icon: '📊', label: 'Отчёты', desc: 'Экспорт и печать', color: '#ec4899' },
+  { id: 'articles', icon: '📖', label: 'Статьи', desc: 'База знаний', color: '#ec4899' },
 ];
 
 export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
