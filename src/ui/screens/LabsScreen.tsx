@@ -135,14 +135,14 @@ const LAB_SUB_TABS: { id: LabSubTab; label: string; icon: string }[] = [
   { id: 'chart', label: 'График', icon: '📈' },
 ];
 
-type LabSubTab = 'current' | 'archive' | 'catalog' | 'chart';
+type LabSubTab = 'hero' | 'current' | 'archive' | 'catalog' | 'chart';
 
 export const LabsScreen: React.FC = () => {
   const linked = useDataLink();
   const profilePhase = linked.profile?.settings?.phase || '';
   const initialLabsPhase = PROFILE_PHASE_TO_LABS_PHASE[profilePhase] || 'baseline';
   const [mainTab, setMainTab] = useState<MainLabTab>('hero');
-  const [subTab, setSubTab] = useState<LabSubTab>('current');
+  const [subTab, setSubTab] = useState<LabSubTab>('hero');
   const [globalNoLabs, setGlobalNoLabs] = useState(getGlobalNoLabs());
   const [noLabsSystems, setNoLabsSystemsState] = useState<string[]>(getNoLabsSystems());
   const [selectedPhase, setSelectedPhase] = useState(initialLabsPhase);
@@ -455,11 +455,11 @@ export const LabsScreen: React.FC = () => {
 
       {/* ─── HERO PAGE ─── */}
       {mainTab === 'hero' && (
-        <div style={{ flex: 1, overflowY: 'auto', padding: '20px 16px 80px' }}>
+        <div style={{ flex: 1, overflowY: 'auto', padding: '40px 16px 80px' }}>
           {/* Hero section */}
-          <div style={{ textAlign: 'center', padding: '40px 0 30px' }}>
+          <div style={{ textAlign: 'center', marginBottom: 28 }}>
             <div style={{ fontSize: 48, marginBottom: 12 }}>🧪</div>
-            <h1 style={{ fontSize: 22, fontWeight: 800, color: 'var(--accent)', margin: '0 0 6px' }}>Лаборатория</h1>
+            <h1 style={{ fontSize: 24, fontWeight: 800, color: 'var(--accent)', margin: '0 0 8px' }}>Лаборатория</h1>
             <p style={{ fontSize: 13, color: 'var(--text-dim)', margin: 0, lineHeight: 1.5 }}>
               Контролируйте своё здоровье — анализы, обследования и оценка рисков
             </p>
@@ -468,14 +468,14 @@ export const LabsScreen: React.FC = () => {
           {/* 3 cards */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             {[
-              { id: 'lab', icon: '🔬', title: 'Анализы', desc: 'Ввод, просмотр и динамика лабораторных показателей. Каталог маркеров и графики.', color: 'var(--accent)', bg: 'rgba(0,230,138,0.06)', border: 'rgba(0,230,138,0.2)' },
-              { id: 'investigations', icon: '🩺', title: 'Обследования', desc: 'Плановые чекапы, инструментальная диагностика и частота прохождения.', color: '#3b82f6', bg: 'rgba(59,130,246,0.06)', border: 'rgba(59,130,246,0.2)' },
-              { id: 'risks', icon: '⚠️', title: 'Риски и индексы', desc: 'Агрегированные риски по системам, композитные индексы здоровья и отклонения.', color: '#f97316', bg: 'rgba(249,115,22,0.06)', border: 'rgba(249,115,22,0.2)' },
+              { id: 'lab', icon: '🔬', title: 'Анализы', desc: 'Ввод, просмотр и динамика лабораторных показателей. Каталог маркеров и графики.', color: 'var(--accent)' },
+              { id: 'investigations', icon: '🩺', title: 'Обследования', desc: 'Плановые чекапы, инструментальная диагностика и частота прохождения.', color: '#3b82f6' },
+              { id: 'risks', icon: '⚠️', title: 'Риски и индексы', desc: 'Агрегированные риски по системам, композитные индексы здоровья и отклонения.', color: '#f97316' },
             ].map(card => (
               <button key={card.id} onClick={() => setMainTab(card.id as MainLabTab)} style={{
                 display: 'flex', alignItems: 'center', gap: 16, padding: '18px 16px', borderRadius: 16, cursor: 'pointer', textAlign: 'left', width: '100%',
-                background: card.bg, border: `1px solid ${card.border}`, color: 'var(--text)',
-                transition: 'all 0.2s', boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', color: 'var(--text)',
+                transition: 'all 0.2s',
               }}>
                 <div style={{
                   width: 52, height: 52, borderRadius: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
@@ -491,23 +491,6 @@ export const LabsScreen: React.FC = () => {
               </button>
             ))}
           </div>
-
-          {/* Quick stats */}
-          {linked.labs && linked.labs.length > 0 && (
-            <div className="card" style={{ marginTop: 16, padding: 14 }}>
-              <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--accent)', marginBottom: 8 }}>📊 Краткая сводка</div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                <div style={{ padding: '8px 10px', background: 'var(--bg-secondary)', borderRadius: 8 }}>
-                  <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--accent)' }}>{linked.labs.length}</div>
-                  <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Всего записей</div>
-                </div>
-                <div style={{ padding: '8px 10px', background: 'var(--bg-secondary)', borderRadius: 8 }}>
-                  <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--accent)' }}>{new Set(linked.labs.map(l => l.code)).size}</div>
-                  <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Уникальных тестов</div>
-                </div>
-              </div>
-            </div>
-          )}
         </div>
       )}
 
@@ -540,17 +523,55 @@ export const LabsScreen: React.FC = () => {
       {/* ≡≡≡ LAB SUB-TABS (only when mainTab === 'lab') ≡≡≡ */}
       {mainTab === 'lab' && (
         <>
-          {/* Sub-tab bar */}
-          <div style={{ display: 'flex', gap: 2, padding: '6px 0 2px', flexShrink: 0 }}>
-            {LAB_SUB_TABS.map(t => (
+          {/* Sub-tab hero page */}
+          {subTab === 'hero' && (
+            <div style={{ textAlign: 'center', padding: '20px 0' }}>
+              <div style={{ fontSize: 36, marginBottom: 8 }}>🔬</div>
+              <h2 style={{ fontSize: 18, fontWeight: 700, color: 'var(--accent)', margin: '0 0 4px' }}>Анализы</h2>
+              <p style={{ fontSize: 12, color: 'var(--text-dim)', margin: '0 0 20px' }}>Выберите раздел</p>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                {LAB_SUB_TABS.filter(t => t.id !== 'hero').map(t => (
+                  <button key={t.id} onClick={() => setSubTab(t.id)} style={{
+                    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, padding: '20px 12px', borderRadius: 16, cursor: 'pointer', textAlign: 'center',
+                    background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', color: 'var(--text)',
+                    transition: 'all 0.2s',
+                  }}>
+                    <div style={{ fontSize: 28 }}>{t.icon}</div>
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 700 }}>{t.label}</div>
+                      <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 2 }}>
+                        {t.id === 'current' ? 'Ввод и просмотр' : t.id === 'archive' ? 'История записей' : t.id === 'catalog' ? 'Справочник маркеров' : 'Динамика показателей'}
+                      </div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Sub-tab cards (2x2) — навигация */}
+          {subTab !== 'hero' && (<>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, padding: '10px 0 12px' }}>
+            {LAB_SUB_TABS.filter(t => t.id !== 'hero').map(t => (
               <button key={t.id} onClick={() => setSubTab(t.id)} style={{
-                flex: 1, padding: '7px 4px', cursor: 'pointer', transition: 'all 0.2s',
-                color: subTab === t.id ? 'var(--accent)' : 'var(--text-dim)',
-                border: 'none', borderBottom: `2px solid ${subTab === t.id ? 'var(--accent)' : 'transparent'}`,
-                fontWeight: subTab === t.id ? 700 : 400, fontSize: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 3, background: 'transparent',
+                display: 'flex', alignItems: 'center', gap: 10, padding: '14px 12px', borderRadius: 14, cursor: 'pointer', textAlign: 'left',
+                background: subTab === t.id ? 'rgba(0,230,138,0.08)' : 'var(--bg-secondary)',
+                border: `1px solid ${subTab === t.id ? 'rgba(0,230,138,0.3)' : 'var(--border)'}`,
+                color: 'var(--text)', transition: 'all 0.2s',
               }}>
-                <span>{t.icon}</span>
-                <span>{t.label}</span>
+                <div style={{
+                  width: 38, height: 38, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                  background: subTab === t.id ? 'var(--accent)' : 'rgba(255,255,255,0.06)',
+                  fontSize: 18,
+                }}>
+                  {t.icon}
+                </div>
+                <div>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: subTab === t.id ? 'var(--accent)' : 'var(--text)' }}>{t.label}</div>
+                  <div style={{ fontSize: 9, color: 'var(--text-dim)', marginTop: 1 }}>
+                    {t.id === 'current' ? 'Ввод и просмотр' : t.id === 'archive' ? 'История записей' : t.id === 'catalog' ? 'Справочник маркеров' : 'Динамика показателей'}
+                  </div>
+                </div>
               </button>
             ))}
           </div>
@@ -1026,6 +1047,7 @@ export const LabsScreen: React.FC = () => {
         );
       })()}
 
+          </>)}
         </>
       )}
 
