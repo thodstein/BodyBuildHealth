@@ -134,6 +134,7 @@ export const TrainingScreen: React.FC = () => {
     const input: TrainingInput = {
       goal, level, daysPerWeek, recovery, fatigue, nutrition: 7,
       weakPoints, sessionDuration: 60, exercises: [],
+      splitType,
     };
     const output = calcTraining(input);
     setTrainingOutput(output);

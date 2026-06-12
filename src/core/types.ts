@@ -736,6 +736,7 @@ export interface TrainingInput {
   sessionDuration?: number;
   rir?: number;
   exercises?: Exercise[];
+  splitType?: string;
 }
 
 export interface TrainingOutput {

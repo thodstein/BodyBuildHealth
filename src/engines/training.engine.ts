@@ -168,9 +168,16 @@ export function calcTraining(i: TrainingInput): TrainingOutput {
     s.minDays <= i.daysPerWeek && s.maxDays >= i.daysPerWeek && s.level.includes(i.level)
   );
 
-  let selectedKey = availableSplits.length > 0 ? availableSplits[0][0] : 'upper_lower_4';
-  if (i.goal === 'rehab') selectedKey = 'recovery_3';
-  if (i.goal === 'strength' && i.daysPerWeek >= 4) selectedKey = 'strength_4';
+  let selectedKey = 'upper_lower_4';
+  if (i.splitType && i.splitType !== 'auto' && TRAINING_SPLITS[i.splitType]) {
+    selectedKey = i.splitType;
+  } else if (i.goal === 'rehab') {
+    selectedKey = 'recovery_3';
+  } else if (i.goal === 'strength' && i.daysPerWeek >= 4) {
+    selectedKey = availableSplits.find(([k]) => k.includes('strength') || k === 'upper_lower_4')?.[0] || 'upper_lower_4';
+  } else if (availableSplits.length > 0) {
+    selectedKey = availableSplits[0][0];
+  }
 
   const selected = TRAINING_SPLITS[selectedKey];
   let splitName = selected.name;
