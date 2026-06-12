@@ -37,10 +37,10 @@ export function setNoLabsSystems(systems: string[]) {
 const PHASE_LABELS: Record<string, string> = {
   baseline: 'Базовый',
   on_cycle: 'На курсе',
-  bridge: 'Бридж',
+  bridge: 'Мост',
   pct: 'ПКТ',
   post_pct: 'После ПКТ',
-  course_bridge_course: 'Курс+Бридж',
+  course_bridge_course: 'Курс+Мост',
 };
 
 // Map profile phase names to REQUIRED_LABS_PER_PHASE keys
@@ -73,20 +73,19 @@ const LAB_SYSTEM_GROUPS: Record<string, string[]> = {
 };
 
 const LAB_ICONS: Record<string, string> = {
-  results: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>`,
+  'risks-indices': `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>`,
   schedule: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><path d="M8 14h.01"/><path d="M12 14h.01"/><path d="M16 14h.01"/><path d="M8 18h.01"/><path d="M12 18h.01"/><path d="M16 18h.01"/></svg>`,
   catalog: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/><line x1="8" y1="7" x2="16" y2="7"/><line x1="8" y1="11" x2="14" y2="11"/><line x1="8" y1="15" x2="12" y2="15"/></svg>`,
   investigations: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><path d="M8 11h6"/><path d="M11 8v6"/></svg>`,
   archive: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>`,
 };
-
-type LabSubTab = 'results' | 'schedule' | 'catalog' | 'investigations' | 'archive';
+type LabSubTab = 'schedule' | 'catalog' | 'investigations' | 'archive' | 'risks-indices';
 const LAB_NAV_CARDS: { id: LabSubTab; label: string; desc: string }[] = [
-  { id: 'results', label: 'Результаты', desc: 'Просмотр и анализ показателей, риски и индексы' },
+  { id: 'archive', label: 'Результаты', desc: 'Просмотр и анализ показателей, история сдачи' },
   { id: 'schedule', label: 'График', desc: 'Календарь сдачи анализов по фазам' },
   { id: 'catalog', label: 'Каталог', desc: 'Справочник маркеров и референсных значений' },
   { id: 'investigations', label: 'Обследования', desc: 'Дополнительные инструментальные исследования' },
-  { id: 'archive', label: 'Архив', desc: 'История всех сданных анализов' },
+  { id: 'risks-indices', label: 'Риски и индексы', desc: 'Расчёт рисков и композитных индексов' },
 ];
 
 export const LabsScreen: React.FC = () => {
@@ -94,7 +93,7 @@ export const LabsScreen: React.FC = () => {
   const profilePhase = linked.profile?.settings?.phase || '';
   const initialLabsPhase = PROFILE_PHASE_TO_LABS_PHASE[profilePhase] || 'baseline';
   const [view, setView] = useState<'main' | 'detail'>('main');
-  const [tab, setTab] = useState<LabSubTab>('results');
+  const [tab, setTab] = useState<LabSubTab>('archive');
   const [globalNoLabs, setGlobalNoLabs] = useState(getGlobalNoLabs());
   const [noLabsSystems, setNoLabsSystemsState] = useState<string[]>(getNoLabsSystems());
   const [selectedPhase, setSelectedPhase] = useState(initialLabsPhase);
@@ -396,11 +395,18 @@ export const LabsScreen: React.FC = () => {
 
 
 
-      {/* ≡≡≡ RESULTS TAB ≡≡≡ */}
-      {tab === 'results' && (
+      {/* ≡≡≡ ARCHIVE TAB (results + history) ≡≡≡ */}
+      {tab === 'archive' && (
         <div>
+          {/* Summary stat */}
+          <div className="card" style={{ marginBottom: 8, padding: '10px 12px', border: '1px solid var(--border)', background: 'var(--bg-secondary)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>Всего записей: {labs.length}</span>
+              <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>Тестов: {new Set(labs.map(l => l.code.toUpperCase())).size}</span>
+            </div>
+          </div>
+
           {/* Required labs progress */}
-          <div className="card" style={{ marginBottom: 8 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
               <h3 style={{ margin: 0, fontSize: 13 }}>{PHASE_LABELS[selectedPhase]}</h3>
               <span style={{ fontSize: 11, fontWeight: 700, color: completionPct === 100 ? 'var(--accent)' : completionPct > 50 ? '#eab308' : '#ef4444' }}>
@@ -461,11 +467,57 @@ export const LabsScreen: React.FC = () => {
                 background: 'var(--bg-secondary)', color: 'var(--text-dim)', fontWeight: 600, fontSize: 11, cursor: 'pointer',
               }}>✏️ Вручную</button>
             </div>
-          </div>
 
           {/* Entered results */}
           <LabsResults labs={labs} />
 
+          {/* Inline penalty card */}
+          <div className="card" style={{ marginTop: 8, padding: 10, background: anyNoLabs ? 'rgba(239,68,68,0.08)' : 'var(--glass-bg)', borderColor: anyNoLabs ? 'rgba(239,68,68,0.3)' : 'var(--glass-border)' }}>
+            <h4 style={{ margin: '0 0 6px', fontSize: 11 }}>⚠️ Штраф за отсутствие анализов</h4>
+            {anyNoLabs ? (
+              <div style={{ fontSize: 10, marginBottom: 6 }}>
+                Штраф ×{penalty.totalMultiplier.toFixed(2)} — Будет наложен штрафной коэффициент на все риски
+              </div>
+            ) : (
+              <div style={{ fontSize: 10, color: 'var(--accent)', marginBottom: 6 }}>
+                Нажмите «Без анализов» чтобы применить штрафной коэффициент. Или введите анализы ниже
+              </div>
+            )}
+            <button onClick={toggleGlobalNoLabs} style={{
+              padding: '6px 12px', borderRadius: 6, cursor: 'pointer', fontWeight: 700, fontSize: 10,
+              background: globalNoLabs ? 'var(--accent)' : '#ef4444', color: globalNoLabs ? '#000' : '#fff',
+              border: 'none',
+            }}>
+              {globalNoLabs ? '✅ Применён штраф' : '🚫 Без анализов'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ≡≡≡ SCHEDULE TAB ≡≡≡ */}
+      {tab === 'schedule' && (
+        <div>
+          <LabsSchedule />
+        </div>
+      )}
+
+      {/* ≡≡≡ INVESTIGATIONS TAB ≡≡≡ */}
+      {tab === 'investigations' && (
+        <div>
+          <LabsInvestigations />
+        </div>
+      )}
+
+      {/* ≡≡≡ CATALOG TAB ≡≡≡ */}
+      {tab === 'catalog' && (
+        <div>
+          <LabsCatalog />
+        </div>
+      )}
+
+      {/* ≡≡≡ RISKS & INDICES TAB ≡≡≡ */}
+      {tab === 'risks-indices' && (
+        <div>
           {/* Lab Analysis Composite Scores */}
           {labAnalysisResult && (
             <div className="card" style={{ padding: 10, marginTop: 8 }}>
@@ -573,78 +625,6 @@ export const LabsScreen: React.FC = () => {
               </div>
             </div>
           )}
-
-          <LabPenaltySection
-            anyNoLabs={anyNoLabs} penalty={penalty} globalNoLabs={globalNoLabs}
-            toggleGlobalNoLabs={toggleGlobalNoLabs}
-            noLabsSystems={noLabsSystems} toggleSystemNoLabs={toggleSystemNoLabs}
-            showInput={() => setShowLabInput(true)} showImport={() => { setShowImport(true); setTimeout(() => fileInputRef.current?.click(), 100); }}
-            hasLabs={hasLabs}
-          />
-        </div>
-      )}
-
-      {/* ≡≡≡ SCHEDULE TAB ≡≡≡ */}
-      {tab === 'schedule' && (
-        <div>
-          <LabsSchedule />
-        </div>
-      )}
-
-      {/* ≡≡≡ INVESTIGATIONS TAB ≡≡≡ */}
-      {tab === 'investigations' && (
-        <div>
-          <LabsInvestigations />
-        </div>
-      )}
-
-      {/* ≡≡≡ CATALOG TAB ≡≡≡ */}
-      {tab === 'catalog' && (
-        <div>
-          <LabsCatalog />
-        </div>
-      )}
-
-      {/* ≡≡≡ ARCHIVE TAB ≡≡≡ */}
-      {tab === 'archive' && (
-        <div>
-          <div className="card" style={{ marginBottom: 8 }}>
-            <h3 style={{ margin: '0 0 8px 0' }}>📦 Архив анализов</h3>
-            <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 8 }}>
-              Всего записей: {labs.length} · Уникальных тестов: {new Set(labs.map(l => l.code.toUpperCase())).size}
-            </div>
-            {(() => {
-              const byDate = new Map<string, LabPoint[]>();
-              for (const lab of labs) {
-                const d = lab.date || '';
-                if (!byDate.has(d)) byDate.set(d, []);
-                byDate.get(d)!.push(lab);
-              }
-              const sortedDates = Array.from(byDate.keys()).sort().reverse();
-              if (sortedDates.length === 0) return <div style={{ fontSize: 12, color: 'var(--text-dim)', textAlign: 'center', padding: 20 }}>Нет данных анализов</div>;
-              return sortedDates.map(date => (
-                <div key={date} style={{ marginBottom: 10, padding: 10, borderRadius: 8, background: 'var(--bg-secondary)' }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--accent)', marginBottom: 6 }}>{date}</div>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
-                    {byDate.get(date)!.map(lab => {
-                      const info = UCUM_MAP[lab.code.toUpperCase()];
-                      const norm = lab.value * (info?.coeff || 1);
-                      const isAbnormal = info && (norm > info.uln || norm < info.lln);
-                      return (
-                        <span key={lab.code + lab.date} style={{
-                          background: isAbnormal ? 'rgba(239,68,68,0.12)' : 'rgba(0,230,138,0.08)',
-                          color: isAbnormal ? '#ef4444' : 'var(--accent)',
-                          padding: '2px 6px', borderRadius: 4, fontSize: 9, fontWeight: 600,
-                        }}>
-                          {info?.name || lab.code} {lab.value}{lab.unit}
-                        </span>
-                      );
-                    })}
-                  </div>
-                </div>
-              ));
-            })()}
-          </div>
         </div>
       )}
 
@@ -759,60 +739,3 @@ export const LabsScreen: React.FC = () => {
   );
 };
 
-function LabPenaltySection({ anyNoLabs, penalty, globalNoLabs, toggleGlobalNoLabs, noLabsSystems, toggleSystemNoLabs, showInput, showImport, hasLabs }: {
-  anyNoLabs: boolean; penalty: any; globalNoLabs: boolean; toggleGlobalNoLabs: () => void;
-  noLabsSystems: string[]; toggleSystemNoLabs: (sys: string) => void;
-  showInput: () => void; showImport: () => void; hasLabs: boolean;
-}) {
-  return (
-    <div className="card" style={{ marginTop: 8, background: anyNoLabs ? 'rgba(239,68,68,0.08)' : 'var(--glass-bg)', borderColor: anyNoLabs ? 'rgba(239,68,68,0.3)' : 'var(--glass-border)' }}>
-      {!hasLabs && !anyNoLabs && (
-        <div style={{ fontSize: 10, color: 'var(--accent)', marginBottom: 6, textAlign: 'center' }}>
-          Нет данных анализов — риски не рассчитаны
-        </div>
-      )}
-      <h3 style={{ fontSize: 13, margin: '0 0 6px' }}>⚠️ Штраф за отсутствие анализов</h3>
-      <div style={{ fontSize: 10, marginBottom: 6 }}>
-        {anyNoLabs ? (
-          <div>
-            <div>Множитель: <strong style={{ color: '#ef4444' }}>×{penalty.totalMultiplier.toFixed(2)}</strong></div>
-            <div>Лабы: {Math.round(penalty.labPenalty * 100)}% • Диагностика: {Math.round(penalty.diagnosticPenalty * 100)}%</div>
-          </div>
-        ) : (
-          <div style={{ color: 'var(--text-dim)' }}>Штраф не применён.</div>
-        )}
-      </div>
-      <div style={{ display: 'flex', gap: 4, marginBottom: 6 }}>
-        <button onClick={showInput} style={{ flex: 1, padding: 7, borderRadius: 6, border: '1px solid var(--border)', background: 'var(--bg-secondary)', color: 'var(--accent)', fontWeight: 600, fontSize: 10, cursor: 'pointer' }}>✏️ Ввести</button>
-        <button onClick={showImport} style={{ flex: 1, padding: 7, borderRadius: 6, border: '1px solid var(--border)', background: 'var(--bg-secondary)', color: 'var(--accent)', fontWeight: 600, fontSize: 10, cursor: 'pointer' }}>📄 Импорт</button>
-        <button onClick={toggleGlobalNoLabs} style={{
-          flex: 1, padding: 7, borderRadius: 6, cursor: 'pointer', fontWeight: 700, fontSize: 10,
-          background: globalNoLabs ? 'var(--accent)' : '#ef4444', color: globalNoLabs ? '#000' : '#fff',
-          border: 'none',
-        }}>
-          {globalNoLabs ? '✅ Штраф' : '🚫 Без анализов'}
-        </button>
-      </div>
-      {!globalNoLabs && (
-        <div>
-          <div style={{ fontSize: 8, color: 'var(--text-dim)', marginBottom: 2 }}>По системам:</div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
-            {RISK_SYSTEMS.map(sys => {
-              const isActive = noLabsSystems.includes(sys);
-              return (
-                <button key={sys} onClick={() => toggleSystemNoLabs(sys)} style={{
-                  padding: '2px 6px', borderRadius: 8, fontSize: 8, cursor: 'pointer',
-                  background: isActive ? 'rgba(239,68,68,0.2)' : 'var(--bg-secondary)',
-                  border: `1px solid ${isActive ? 'rgba(239,68,68,0.4)' : 'var(--border)'}`,
-                  color: isActive ? '#ef4444' : 'var(--text-dim)', fontWeight: isActive ? 700 : 400,
-                }}>
-                  {isActive ? '✕ ' : ''}{sysLabels[sys] || sys}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}

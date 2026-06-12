@@ -4,10 +4,10 @@ import { REQUIRED_LABS_PER_PHASE } from '../../../core/constants';
 const PHASE_LABELS: Record<string, string> = {
   baseline: 'Базовый',
   on_cycle: 'На курсе',
-  bridge: 'Бридж',
+  bridge: 'Мост',
   pct: 'ПКТ',
   post_pct: 'После ПКТ',
-  course_bridge_course: 'Курс+Бридж',
+  course_bridge_course: 'Курс+Мост',
 };
 
 const PHASE_DESCRIPTIONS: Record<string, string> = {
