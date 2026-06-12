@@ -6,11 +6,11 @@ import { useDataLink } from '../../core/data-link';
 import type { DoseRequest, NutritionInput } from '../../core/types';
 
 const PAL_OPTIONS = [
-  { value: 1.2, label: '' },
-  { value: 1.375, label: '' },
-  { value: 1.55, label: '' },
-  { value: 1.725, label: '' },
-  { value: 1.9, label: '' },
+  { value: 1.2, label: 'Сидячий (1.2)' },
+  { value: 1.375, label: 'Легкий (1.375)' },
+  { value: 1.55, label: 'Умеренный (1.55)' },
+  { value: 1.725, label: 'Высокий (1.725)' },
+  { value: 1.9, label: 'Экстремальный (1.9)' },
 ];
 
 const DRUG_OPTIONS = Object.keys(DRUG_THRESHOLDS);

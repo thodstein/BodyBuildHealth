@@ -96,7 +96,7 @@ export const NutritionCharts: React.FC<{
     labels: chartData.labels,
     datasets: [
       {
-        label: '',
+        label: 'Ккал',
         data: chartData.kcalLine,
         borderColor: '#22c55e',
         backgroundColor: 'rgba(34,197,94,0.1)',
@@ -104,7 +104,7 @@ export const NutritionCharts: React.FC<{
         fill: true,
       },
       {
-        label: '',
+        label: 'Среднее',
         data: Array(range).fill(chartData.avgKcal),
         borderColor: 'rgba(34,197,94,0.4)',
         borderDash: [5, 5],
@@ -118,7 +118,7 @@ export const NutritionCharts: React.FC<{
     labels: chartData.labels,
     datasets: [
       {
-        label: '',
+        label: 'Белки',
         data: chartData.proteinLine,
         borderColor: '#3b82f6',
         backgroundColor: 'rgba(59,130,246,0.1)',
@@ -126,7 +126,7 @@ export const NutritionCharts: React.FC<{
         fill: true,
       },
       {
-        label: '',
+        label: 'Жиры',
         data: chartData.fatLine,
         borderColor: '#f97316',
         backgroundColor: 'rgba(249,115,22,0.1)',
@@ -134,7 +134,7 @@ export const NutritionCharts: React.FC<{
         fill: true,
       },
       {
-        label: '',
+        label: 'Углеводы',
         data: chartData.carbsLine,
         borderColor: '#a855f7',
         backgroundColor: 'rgba(168,85,247,0.1)',
@@ -200,10 +200,10 @@ export const NutritionCharts: React.FC<{
         <h3 style={{ margin: '0 0 8px 0' }}>📊 Средние за {range} дней</h3>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
           {[
-            { label: '', val: chartData.avgKcal, unit: '', color: '#22c55e' },
-            { label: '', val: chartData.avgProtein, unit: '', color: '#3b82f6' },
-            { label: '', val: chartData.avgFat, unit: '', color: '#f97316' },
-            { label: '', val: chartData.avgCarbs, unit: '', color: '#a855f7' },
+            { label: 'Ккал', val: chartData.avgKcal, unit: '', color: '#22c55e' },
+            { label: 'Белки', val: chartData.avgProtein, unit: 'г', color: '#3b82f6' },
+            { label: 'Жиры', val: chartData.avgFat, unit: 'г', color: '#f97316' },
+            { label: 'Углеводы', val: chartData.avgCarbs, unit: 'г', color: '#a855f7' },
           ].map(s => (
             <div key={s.label} style={{ background: 'var(--bg-secondary)', padding: 10, borderRadius: 8, textAlign: 'center' }}>
               <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>{s.label}</div>

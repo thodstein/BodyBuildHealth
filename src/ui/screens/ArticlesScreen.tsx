@@ -2,12 +2,12 @@
 import { getSortedArticles, type ArticleManifestEntry, ARTICLES_MANIFEST } from '../../data/articles-manifest';
 
 const CATEGORIES = [
-  { value: 'all', label: '' },
-  { value: 'pharma', label: '' },
-  { value: 'labs', label: '' },
-  { value: 'training', label: '' },
-  { value: 'nutrition', label: '' },
-  { value: 'support', label: '' },
+  { value: 'all', label: 'Все' },
+  { value: 'pharma', label: 'Фарма' },
+  { value: 'labs', label: 'Анализы' },
+  { value: 'training', label: 'Тренировки' },
+  { value: 'nutrition', label: 'Питание' },
+  { value: 'support', label: 'Поддержка' },
 ];
 
 function renderMarkdown(md: string): string {

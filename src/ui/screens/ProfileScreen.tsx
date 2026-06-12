@@ -10,10 +10,10 @@ import { NAVY_BF_FORMULAS, MUSCLE_GROUPS_FULL, INJURY_LOCATIONS } from '../../co
 type ProfileTab = 'overview' | 'anthropometry' | 'sleep' | 'lifestyle' | 'diet' | 'nutrition_v7' | 'genetics' | 'injuries' | 'progress';
 
 const GOALS = [
-  { id: 'bulk', label: '' }, { id: 'cut', label: '' },
-  { id: 'maintenance', label: '' }, { id: 'strength', label: '' },
-  { id: 'hypertrophy', label: '' }, { id: 'rehab', label: '' },
-  { id: 'recomposition', label: '' }, { id: 'health', label: '' }
+  { id: 'bulk', label: 'Масса' }, { id: 'cut', label: 'Сушка' },
+  { id: 'maintenance', label: 'Поддержка' }, { id: 'strength', label: 'Сила' },
+  { id: 'hypertrophy', label: 'Гипертрофия' }, { id: 'rehab', label: 'Реабилитация' },
+  { id: 'recomposition', label: 'Реcomp' }, { id: 'health', label: 'Здоровье' }
 ] as const;
 
 const WEIGHT_LOG_KEY = 'he_weight_log';
@@ -26,73 +26,73 @@ function saveWeightLog(log: WeightEntry[]) {
 }
 
 const DIET_TYPES = [
-  { id: 'omnivore', label: '', icon: '' },
-  { id: 'vegetarian', label: '', icon: '' },
-  { id: 'vegan', label: '', icon: '' },
-  { id: 'pescatarian', label: '', icon: '' },
-  { id: 'keto', label: '', icon: '' },
-  { id: 'paleo', label: '', icon: '' },
-  { id: 'mediterranean', label: '', icon: '' },
+  { id: 'omnivore', label: 'Всеядное', icon: '' },
+  { id: 'vegetarian', label: 'Вегетарианское', icon: '' },
+  { id: 'vegan', label: 'Веганское', icon: '' },
+  { id: 'pescatarian', label: 'Пескатарианское', icon: '' },
+  { id: 'keto', label: 'Кето', icon: '' },
+  { id: 'paleo', label: 'Палео', icon: '' },
+  { id: 'mediterranean', label: 'Средиземноморское', icon: '' },
 ] as const;
 
 const ALLERGEN_OPTIONS = [
-  { id: 'dairy', label: '' },
-  { id: 'gluten', label: '' },
-  { id: 'soy', label: '' },
-  { id: 'eggs', label: '' },
-  { id: 'fish', label: '' },
-  { id: 'shellfish', label: '' },
-  { id: 'tree_nuts', label: '' },
-  { id: 'peanuts', label: '' },
+  { id: 'dairy', label: 'Молочные' },
+  { id: 'gluten', label: 'Глютен' },
+  { id: 'soy', label: 'Соя' },
+  { id: 'eggs', label: 'Яйца' },
+  { id: 'fish', label: 'Рыба' },
+  { id: 'shellfish', label: 'Морепродукты' },
+  { id: 'tree_nuts', label: 'Орехи' },
+  { id: 'peanuts', label: 'Арахис' },
 ];
 
 const INTOLERANCE_OPTIONS = [
-  { id: 'lactose', label: '' },
-  { id: 'fructose', label: '' },
-  { id: 'histamine', label: '' },
-  { id: 'sorbitol', label: '' },
+  { id: 'lactose', label: 'Лактоза' },
+  { id: 'fructose', label: 'Фруктоза' },
+  { id: 'histamine', label: 'Гистамин' },
+  { id: 'sorbitol', label: 'Сорбитол' },
 ];
 
 const COOKING_SKILLS = [
-  { id: 'none', label: '' },
-  { id: 'basic', label: '' },
-  { id: 'intermediate', label: '' },
-  { id: 'advanced', label: '' },
+  { id: 'none', label: 'Не умею' },
+  { id: 'basic', label: 'Базовые' },
+  { id: 'intermediate', label: 'Средние' },
+  { id: 'advanced', label: 'Продвинутые' },
 ] as const;
 
 const TRAINING_LEVELS = [
-  { id: 'beginner', label: '' }, { id: 'intermediate', label: '' },
-  { id: 'advanced', label: '' }, { id: 'enhanced', label: '' }
+  { id: 'beginner', label: 'Новичок' }, { id: 'intermediate', label: 'Средний' },
+  { id: 'advanced', label: 'Продвинутый' }, { id: 'enhanced', label: 'Enhanced' }
 ] as const;
 
 const PHARMA_EXPERIENCE = [
-  { id: 'none', label: '' }, { id: 'beginner', label: '' },
-  { id: 'intermediate', label: '' }, { id: 'advanced', label: '' }
+  { id: 'none', label: 'Нет' }, { id: 'beginner', label: 'Начинающий' },
+  { id: 'intermediate', label: 'Средний' }, { id: 'advanced', label: 'Продвинутый' }
 ] as const;
 
 const CHRONOTYPES = [
-  { id: 'lark', label: '' }, { id: 'owl', label: '' }, { id: 'mixed', label: '' }
+  { id: 'lark', label: 'Жаворонок' }, { id: 'owl', label: 'Сова' }, { id: 'mixed', label: 'Смешанный' }
 ] as const;
 
 const COURSE_PHASES = [
-  { id: 'baseline', label: '' },
-  { id: 'course', label: '' },
-  { id: 'course-bridge-course', label: '' },
-  { id: 'bridge', label: '' },
-  { id: 'pct', label: '' },
-  { id: 'post_pct', label: '' },
-  { id: 'fertility', label: '' },
+  { id: 'baseline', label: 'База' },
+  { id: 'course', label: 'Курс' },
+  { id: 'course-bridge-course', label: 'Курс+Бридж' },
+  { id: 'bridge', label: 'Бридж' },
+  { id: 'pct', label: 'ПКТ' },
+  { id: 'post_pct', label: 'После ПКТ' },
+  { id: 'fertility', label: 'Фертильность' },
 ] as const;
 
 const INJURY_TYPES: { id: InjuryRecord['type']; label: string }[] = [
-  { id: 'joint', label: '' }, { id: 'muscle', label: '' }, { id: 'bone', label: '' },
-  { id: 'ligament', label: '' }, { id: 'tendon', label: '' }, { id: 'nerve', label: '' }
+  { id: 'joint', label: 'Сустав' }, { id: 'muscle', label: 'Мышца' }, { id: 'bone', label: 'Кость' },
+  { id: 'ligament', label: 'Связка' }, { id: 'tendon', label: 'Сухожилие' }, { id: 'nerve', label: 'Нерв' }
 ];
 
 const MOVEMENT_LIMITS: { id: InjuryRecord['movementLimit']; label: string }[] = [
-  { id: 'none', label: '' }, { id: 'mild', label: '' },
-  { id: 'moderate', label: '' }, { id: 'severe', label: '' },
-  { id: 'full_restriction', label: '' }
+  { id: 'none', label: 'Нет' }, { id: 'mild', label: 'Лёгкое' },
+  { id: 'moderate', label: 'Умеренное' }, { id: 'severe', label: 'Сильное' },
+  { id: 'full_restriction', label: 'Полное' }
 ];
 
 const s: Record<string, React.CSSProperties> = {
@@ -195,9 +195,9 @@ export const ProfileScreen: React.FC = () => {
   };
 
   const tabs: { id: ProfileTab; label: string }[] = [
-    { id: 'overview', label: '' }, { id: 'anthropometry', label: '' },
-    { id: 'sleep', label: '' }, { id: 'lifestyle', label: '' },
-    { id: 'diet', label: '' }, { id: 'injuries', label: '' }, { id: 'progress', label: '' }
+    { id: 'overview', label: 'Обзор' }, { id: 'anthropometry', label: 'Антропометрия' },
+    { id: 'sleep', label: 'Сон' }, { id: 'lifestyle', label: 'Образ жизни' },
+    { id: 'diet', label: 'Питание' }, { id: 'injuries', label: 'Травмы' }, { id: 'progress', label: 'Прогресс' }
   ];
 
   return (
@@ -215,10 +215,10 @@ export const ProfileScreen: React.FC = () => {
               <h4 style={{ margin: '0 0 8px' }}>Оценка готовности</h4>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 8, textAlign: 'center' }}>
                 {[
-                  { label: '', value: readinessScores.recovery, good: 60 },
-                  { label: '', value: readinessScores.nutrition, good: 60 },
-                  { label: '', value: readinessScores.support, good: 60 },
-                  { label: '', value: readinessScores.fatigue, good: 40, invert: true },
+                  { label: 'Восст.', value: readinessScores.recovery, good: 60 },
+                  { label: 'Питание', value: readinessScores.nutrition, good: 60 },
+                  { label: 'Поддержка', value: readinessScores.support, good: 60 },
+                  { label: 'Усталость', value: readinessScores.fatigue, good: 40, invert: true },
                 ].map(m => (
                   <div key={m.label}>
                     <div style={{ fontSize: 20, fontWeight: 700, color: m.invert ? (m.value <= m.good ? '#00e68a' : m.value <= 60 ? '#ff9800' : '#f44336') : (m.value >= m.good ? '#00e68a' : m.value >= 40 ? '#ff9800' : '#f44336') }}>{m.value}</div>
@@ -750,7 +750,7 @@ export const ProfileScreen: React.FC = () => {
               <div>
                 <span style={s.label}>Сторона</span>
                 <div style={s.btnGroup}>
-                  {[{ id: 'left', label: '' }, { id: 'right', label: '' }, { id: 'both', label: '' }].map(x => <button key={x.id} style={editInjury.side === x.id ? s.btnActive : s.btn} onClick={() => setEditInjury({ ...editInjury, side: x.id as any })}>{x.label}</button>)}
+                  {[{ id: 'left', label: 'Левая' }, { id: 'right', label: 'Правая' }, { id: 'both', label: 'Обе' }].map(x => <button key={x.id} style={editInjury.side === x.id ? s.btnActive : s.btn} onClick={() => setEditInjury({ ...editInjury, side: x.id as any })}>{x.label}</button>)}
                 </div>
               </div>
               <div style={s.row}>

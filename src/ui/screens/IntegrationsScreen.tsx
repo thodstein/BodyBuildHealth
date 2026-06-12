@@ -48,8 +48,8 @@ export const IntegrationsScreen: React.FC = () => {
 
   const tabs: { id: TabId; label: string; icon: string }[] = [
     { id: 'fatsecret', label: 'FatSecret', icon: '' },
-    { id: 'lab', label: '', icon: '' },
-    { id: 'wearables', label: '', icon: '⌚' },
+    { id: 'lab', label: 'Анализы', icon: '' },
+    { id: 'wearables', label: 'Носимые', icon: '⌚' },
     { id: 'telegram', label: 'Telegram', icon: '✈️' },
   ];
 

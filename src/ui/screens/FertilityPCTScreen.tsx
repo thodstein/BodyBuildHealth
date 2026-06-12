@@ -20,7 +20,7 @@ const s: Record<string, React.CSSProperties> = {
 };
 
 const VARICOCELE = [
-  { id: 'none', label: '' }, { id: 'grade1', label: '1 степень' },
+  { id: 'none', label: 'Нет' }, { id: 'grade1', label: '1 степень' },
   { id: 'grade2', label: '2 степень' }, { id: 'grade3', label: '3 степень' }
 ] as const;
 
@@ -137,7 +137,7 @@ export const FertilityPCTScreen: React.FC = () => {
   );
 
   const fertTabs: { id: FertTab; label: string }[] = [
-    { id: 'semen', label: '' }, { id: 'hormones', label: '' }, { id: 'structure', label: 'DFI/Структура' }
+    { id: 'semen', label: 'Спермограмма' }, { id: 'hormones', label: 'Гормоны' }, { id: 'structure', label: 'DFI/Структура' }
   ];
 
   return (
@@ -237,9 +237,9 @@ export const FertilityPCTScreen: React.FC = () => {
           <div style={{ marginTop: 12 }}>
             <h4 style={{ margin: '0 0 6px', fontSize: 13 }}>Суб-индексы IF v2</h4>
             {[
-              { label: '', value: result.spermIndex },
-              { label: '', value: result.hormonalIndex ?? 0 },
-              { label: '', value: result.structuralIndex ?? 0 },
+              { label: 'Сперма', value: result.spermIndex },
+              { label: 'Гормоны', value: result.hormonalIndex ?? 0 },
+              { label: 'Структура', value: result.structuralIndex ?? 0 },
             ].map(si => (
               <div key={si.label} style={{ marginBottom: 6 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>

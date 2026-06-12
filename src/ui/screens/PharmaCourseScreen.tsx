@@ -30,8 +30,8 @@ const FREQ_OPTIONS = [
   { value: '1x/wk', label: '1×/нед' },
   { value: '2x/wk', label: '2×/нед' },
   { value: '3x/wk', label: '3×/нед' },
-  { value: 'eod', label: '' },
-  { value: 'daily', label: '' },
+  { value: 'eod', label: 'Ч/день' },
+  { value: 'daily', label: 'Ежедн.' },
 ];
 
 const UNIT_OPTIONS = ['mg/wk', 'mg', 'mcg', 'IU', 'ml'];

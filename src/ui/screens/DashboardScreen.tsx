@@ -531,10 +531,10 @@ export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
             <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-dim)', marginBottom: 4 }}>🍎 Сегодня · {nutStats.streak} дн streak</div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 4, textAlign: 'center' }}>
               {[
-                { label: '', val: t.kcal, target: targets.kcal, color: '#ffa502' },
-                { label: '', val: t.protein, target: targets.protein, color: '#ef4444' },
-                { label: '', val: t.fat, target: targets.fat, color: '#f59e0b' },
-                { label: '', val: t.carbs, target: targets.carbs, color: '#3b82f6' },
+                { label: 'Ккал', val: t.kcal, target: targets.kcal, color: '#ffa502' },
+                { label: 'Белки', val: t.protein, target: targets.protein, color: '#ef4444' },
+                { label: 'Жиры', val: t.fat, target: targets.fat, color: '#f59e0b' },
+                { label: 'Углеводы', val: t.carbs, target: targets.carbs, color: '#3b82f6' },
               ].map(m => {
                 const pct = Math.min(100, Math.round((m.val / m.target) * 100));
                 return (
@@ -602,10 +602,10 @@ export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
         <h3>📊 Готовность к тренировке</h3>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
           {[
-            { label: '', value: readiness.recovery, color: readiness.recovery >= 70 ? '#22c55e' : '#eab308' },
-            { label: '', value: readiness.nutrition, color: readiness.nutrition >= 70 ? '#22c55e' : '#eab308' },
-            { label: '', value: (readiness.sleep ?? 0), color: (readiness.sleep ?? 0) >= 70 ? '#22c55e' : '#eab308' },
-            { label: '', value: 100 - (readiness.stress ?? 50), color: (readiness.stress ?? 0) < 30 ? '#22c55e' : '#ef4444' },
+            { label: 'Восст.', value: readiness.recovery, color: readiness.recovery >= 70 ? '#22c55e' : '#eab308' },
+            { label: 'Питание', value: readiness.nutrition, color: readiness.nutrition >= 70 ? '#22c55e' : '#eab308' },
+            { label: 'Сон', value: (readiness.sleep ?? 0), color: (readiness.sleep ?? 0) >= 70 ? '#22c55e' : '#eab308' },
+            { label: 'Стресс', value: 100 - (readiness.stress ?? 50), color: (readiness.stress ?? 0) < 30 ? '#22c55e' : '#ef4444' },
           ].map(item => (
             <div key={item.label} style={{ background: 'var(--bg-secondary)', borderRadius: 8, padding: '6px 8px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>

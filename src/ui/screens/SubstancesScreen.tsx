@@ -95,13 +95,13 @@ export const SubstancesScreen: React.FC = () => {
                   <div style={{ display: 'grid', gap: 4 }}>
                     {[
                       { label: 'AR сродство', value: s.pd.AR_affinity },
-                      { label: '', value: s.pd.aromatization },
+                      { label: 'Ароматизация', value: s.pd.aromatization },
                       { label: '5-α редуктаза', value: s.pd.five_alpha_reduction },
-                      { label: '', value: s.pd.progestogenic },
-                      { label: '', value: s.pd.hepatotoxicity },
-                      { label: '', value: s.pd.lipid_impact },
-                      { label: '', value: s.pd.hct_impact },
-                      { label: '', value: s.pd.neuro_toxicity },
+                      { label: 'Гестагенность', value: s.pd.progestogenic },
+                      { label: 'Гепатотоксичность', value: s.pd.hepatotoxicity },
+                      { label: 'Липиды', value: s.pd.lipid_impact },
+                      { label: 'Гематокрит', value: s.pd.hct_impact },
+                      { label: 'Нейротоксичность', value: s.pd.neuro_toxicity },
                     ].map(item => {
                       const val = item.value;
                       const absVal = Math.abs(val);

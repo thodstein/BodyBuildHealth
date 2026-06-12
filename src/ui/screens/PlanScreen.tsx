@@ -24,17 +24,17 @@ import type { MacrocyclePlan, Microcycle } from '../../engines/training-periodiz
 
 const GOALS = [
 
-  { value: 'bulk', label: '' },
+  { value: 'bulk', label: 'Масса' },
 
-  { value: 'cut', label: '' },
+  { value: 'cut', label: 'Сушка' },
 
-  { value: 'maintenance', label: '' },
+  { value: 'maintenance', label: 'Поддержка' },
 
-  { value: 'strength', label: '' },
+  { value: 'strength', label: 'Сила' },
 
-  { value: 'recomp', label: '' },
+  { value: 'recomp', label: 'Реcomp' },
 
-  { value: 'rehab', label: '' },
+  { value: 'rehab', label: 'Реабилитация' },
 
 ] as const;
 
@@ -42,13 +42,13 @@ const GOALS = [
 
 const LEVELS = [
 
-  { value: 'beginner', label: '' },
+  { value: 'beginner', label: 'Новичок' },
 
-  { value: 'intermediate', label: '' },
+  { value: 'intermediate', label: 'Средний' },
 
-  { value: 'advanced', label: '' },
+  { value: 'advanced', label: 'Продвинутый' },
 
-  { value: 'enhanced', label: '' },
+  { value: 'enhanced', label: 'Enhanced' },
 
 ] as const;
 

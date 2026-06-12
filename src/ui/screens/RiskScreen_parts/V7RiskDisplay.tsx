@@ -851,9 +851,9 @@ export const V7RiskDisplay: React.FC<{
   };
 
   const tabs: { id: string; label: string }[] = [
-    { id: 'organs', label: '' }, { id: 'matrix', label: '' },
-    { id: 'timeseries', label: '' }, { id: 'sensitivity', label: '' },
-    { id: 'pk', label: '' },
+    { id: 'organs', label: 'Органы' }, { id: 'matrix', label: 'Матрица' },
+    { id: 'timeseries', label: 'Динамика' }, { id: 'sensitivity', label: 'Чувствительность' },
+    { id: 'pk', label: 'Фармакокинетика' },
   ];
 
   const pkContent = pkTimeSeries && Object.keys(pkTimeSeries).length > 0 ? (

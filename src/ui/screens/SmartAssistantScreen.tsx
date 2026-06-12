@@ -36,11 +36,11 @@ interface CheckupQuestion {
 }
 
 const CHECKUP_QUESTIONS: CheckupQuestion[] = [
-  { label: '', key: 'sleep', min: 1, max: 10 },
-  { label: '', key: 'stress', min: 1, max: 10 },
-  { label: '', key: 'doms', min: 1, max: 10 },
-  { label: '', key: 'libido', min: 0, max: 10 },
-  { label: '', key: 'wellbeing', min: 1, max: 10 },
+  { label: 'Сон (1-10)', key: 'sleep', min: 1, max: 10 },
+  { label: 'Стресс (1-10)', key: 'stress', min: 1, max: 10 },
+  { label: 'Крепатура (1-10)', key: 'doms', min: 1, max: 10 },
+  { label: 'Либидо (0-10)', key: 'libido', min: 0, max: 10 },
+  { label: 'Самочувствие (1-10)', key: 'wellbeing', min: 1, max: 10 },
 ];
 
 export const SmartAssistantScreen: React.FC = () => {

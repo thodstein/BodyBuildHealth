@@ -108,10 +108,10 @@ export const PctScreen: React.FC<Props> = ({ onBack }) => {
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               {[
-                { icon: '', label: '', desc: `${pctPlan.pctProtocol.reduce((max: number, p: any) => Math.max(max, p.endWeek || 0), 0) - pctPlan.pctStartWeek + 1} недель` },
-                { icon: '', label: '', desc: '' },
-                { icon: '', label: '', desc: '' },
-                { icon: '', label: '', desc: '' },
+                { icon: '📅', label: 'Длительность', desc: `${pctPlan.pctProtocol.reduce((max: number, p: any) => Math.max(max, p.endWeek || 0), 0) - pctPlan.pctStartWeek + 1} недель` },
+                { icon: '💊', label: 'Препараты', desc: `${pctPlan.pctProtocol.length} препаратов в протоколе` },
+                { icon: '📊', label: 'Мониторинг', desc: 'Контроль гормонов каждые 2-4 нед' },
+                { icon: '🧬', label: 'Восстановление', desc: 'Цель: LH/ФСГ > 5, тестостерон > 15 нмоль/л' },
               ].map((item, i) => (
                 <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
                   <span style={{ fontSize: 16 }}>{item.icon}</span>
