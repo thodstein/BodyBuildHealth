@@ -314,20 +314,29 @@ export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
           {/* V7 */}
           <div style={{ textAlign: 'center', background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: '8px 4px' }}>
             <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-dim)', marginBottom: 4 }}>V7</div>
-            <div style={{ fontSize: 20, fontWeight: 800, color: riskResult ? riskColor(riskResult.overallRaw) : 'var(--text-dim)' }}>{riskResult ? Math.round(riskResult.overallRaw) : '—'}</div>
-            <div style={{ fontSize: 20, fontWeight: 800, color: riskResult ? riskColor(riskResult.overallNet) : 'var(--text-dim)' }}>{riskResult ? Math.round(riskResult.overallNet) : '—'}</div>
+            <div style={{ fontSize: 22, fontWeight: 800 }}>
+              <span style={{ color: riskResult ? riskColor(riskResult.overallRaw) : 'var(--text-dim)' }}>{riskResult ? Math.round(riskResult.overallRaw) : '—'}</span>
+              <span style={{ color: 'var(--text-dim)', fontSize: 14, margin: '0 4px' }}>/</span>
+              <span style={{ color: riskResult ? riskColor(riskResult.overallNet) : 'var(--text-dim)' }}>{riskResult ? Math.round(riskResult.overallNet) : '—'}</span>
+            </div>
           </div>
           {/* Monte Carlo */}
           <div style={{ textAlign: 'center', background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: '8px 4px' }}>
             <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-dim)', marginBottom: 4 }}>Монте-Карло</div>
-            <div style={{ fontSize: 20, fontWeight: 800, color: v7Result?.globalRiskRaw !== undefined ? (v7Result.globalRiskRaw > 70 ? '#ef4444' : v7Result.globalRiskRaw > 40 ? '#f97316' : v7Result.globalRiskRaw > 15 ? '#eab308' : '#22c55e') : 'var(--text-dim)' }}>{v7Result?.globalRiskRaw !== undefined ? `${Math.round(v7Result.globalRiskRaw)}` : '—'}</div>
-            <div style={{ fontSize: 20, fontWeight: 800, color: v7Result?.globalRiskNet !== undefined ? (v7Result.globalRiskNet > 70 ? '#ef4444' : v7Result.globalRiskNet > 40 ? '#f97316' : '#22c55e') : 'var(--text-dim)' }}>{v7Result?.globalRiskNet !== undefined ? `${Math.round(v7Result.globalRiskNet)}` : '—'}</div>
+            <div style={{ fontSize: 22, fontWeight: 800 }}>
+              <span style={{ color: v7Result?.globalRiskRaw !== undefined ? (v7Result.globalRiskRaw > 70 ? '#ef4444' : v7Result.globalRiskRaw > 40 ? '#f97316' : v7Result.globalRiskRaw > 15 ? '#eab308' : '#22c55e') : 'var(--text-dim)' }}>{v7Result?.globalRiskRaw !== undefined ? Math.round(v7Result.globalRiskRaw) : '—'}</span>
+              <span style={{ color: 'var(--text-dim)', fontSize: 14, margin: '0 4px' }}>/</span>
+              <span style={{ color: v7Result?.globalRiskNet !== undefined ? (v7Result.globalRiskNet > 70 ? '#ef4444' : v7Result.globalRiskNet > 40 ? '#f97316' : '#22c55e') : 'var(--text-dim)' }}>{v7Result?.globalRiskNet !== undefined ? Math.round(v7Result.globalRiskNet) : '—'}</span>
+            </div>
           </div>
           {/* MDSS */}
           <div style={{ textAlign: 'center', background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: '8px 4px' }}>
             <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-dim)', marginBottom: 4 }}>MDSS</div>
-            <div style={{ fontSize: 20, fontWeight: 800, color: mdssResult?.overallAlertLevel !== undefined ? (mdssResult.overallAlertLevel >= 3 ? '#ef4444' : mdssResult.overallAlertLevel >= 2 ? '#f97316' : mdssResult.overallAlertLevel >= 1 ? '#eab308' : '#22c55e') : 'var(--text-dim)' }}>{mdssResult ? `${mdssResult.overallMaxRisk}` : '—'}</div>
-            <div style={{ fontSize: 20, fontWeight: 800, color: mdssResult?.compliancePenalty && mdssResult.compliancePenalty > 1 ? '#ef4444' : '#22c55e' }}>{mdssResult?.compliancePenalty ? `${Math.round(mdssResult.compliancePenalty * 100)}` : '—'}</div>
+            <div style={{ fontSize: 22, fontWeight: 800 }}>
+              <span style={{ color: mdssResult?.overallAlertLevel !== undefined ? (mdssResult.overallAlertLevel >= 3 ? '#ef4444' : mdssResult.overallAlertLevel >= 2 ? '#f97316' : mdssResult.overallAlertLevel >= 1 ? '#eab308' : '#22c55e') : 'var(--text-dim)' }}>{mdssResult ? mdssResult.overallMaxRisk : '—'}</span>
+              <span style={{ color: 'var(--text-dim)', fontSize: 14, margin: '0 4px' }}>/</span>
+              <span style={{ color: mdssResult?.compliancePenalty && mdssResult.compliancePenalty > 1 ? '#ef4444' : '#22c55e' }}>{mdssResult ? Math.round((mdssResult.compliancePenalty || 0) * 100) : '—'}</span>
+            </div>
           </div>
         </div>
       </div>
