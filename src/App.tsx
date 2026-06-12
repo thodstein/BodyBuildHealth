@@ -9,15 +9,12 @@ import { RiskScreen } from './ui/screens/RiskScreen';
 import { NutritionScreen } from './ui/screens/NutritionScreen';
 import { ProfileScreen } from './ui/screens/ProfileScreen';
 import { ArticlesScreen } from './ui/screens/ArticlesScreen';
-import { CalculatorsScreen } from './ui/screens/CalculatorsScreen';
 import { PctScreen } from './ui/screens/PctScreen';
-import { RecoveryScreen } from './ui/screens/RecoveryScreen';
-import { PerformanceScreen } from './ui/screens/PerformanceScreen';
-import { TrainingToolkitScreen } from './ui/screens/TrainingToolkitScreen';
+import { ReportsScreen } from './ui/screens/ReportsScreen';
 import { FullIntegrationScreen } from './ui/screens/FullIntegrationScreen';
 import { ToastContainer } from './ui/ToastContainer';
 
-type Tab = 'home' | 'pharma' | 'training' | 'labs' | 'risks' | 'support' | 'nutrition' | 'profile' | 'calculators' | 'pct' | 'articles' | 'recovery' | 'performance' | 'toolkit' | 'full';
+type Tab = 'home' | 'pharma' | 'training' | 'labs' | 'risks' | 'support' | 'nutrition' | 'profile' | 'pct' | 'articles' | 'reports' | 'full';
 
 // Bottom nav: 5 primary tabs
 const PRIMARY_NAV: { id: Tab; label: string; icon: React.ReactNode }[] = [
@@ -25,7 +22,7 @@ const PRIMARY_NAV: { id: Tab; label: string; icon: React.ReactNode }[] = [
   { id: 'labs', label: 'Анализы', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 3h6v7l5 8H4l5-8V3z"/><line x1="9" y1="3" x2="15" y2="3"/></svg> },
   { id: 'risks', label: 'Риски', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg> },
   { id: 'pharma', label: 'Фарма', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg> },
-  { id: 'articles', label: 'Статьи', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg> },
+  { id: 'support', label: 'Поддержка', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg> },
 ];
 
 function HulkBg() {
@@ -95,7 +92,7 @@ export default function App() {
       'risks': 'risks',
       'nutrition': 'nutrition',
       'profile': 'profile',
-      'calculators': 'calculators',
+      'calculators': 'home',
       'course': 'training',
       'plan': 'training',
       'substances': 'pharma',
@@ -106,15 +103,15 @@ export default function App() {
       'assistant': 'home',
       'gamification': 'home',
       'fertility-pct': 'pct',
-      'reports': 'home',
+      'reports': 'reports',
       'integrations': 'home',
       'role-management': 'profile',
-      'recovery': 'recovery',
-      'wellness': 'recovery',
-      'performance': 'performance',
-      'bloodwork': 'performance',
-      'toolkit': 'toolkit',
-      'training-tools': 'toolkit',
+      'recovery': 'training',
+      'wellness': 'training',
+      'performance': 'pharma',
+      'bloodwork': 'labs',
+      'toolkit': 'training',
+      'training-tools': 'training',
       'full': 'full',
       'integration': 'full',
     };
@@ -143,12 +140,9 @@ export default function App() {
       case 'risks': return <RiskScreen />;
       case 'nutrition': return <NutritionScreen />;
       case 'profile': return <ProfileScreen />;
-      case 'calculators': return <CalculatorsScreen />;
       case 'pct': return <PctScreen onBack={() => go('home')} />;
       case 'articles': return <ArticlesScreen />;
-      case 'recovery': return <RecoveryScreen />;
-      case 'performance': return <PerformanceScreen />;
-      case 'toolkit': return <TrainingToolkitScreen />;
+      case 'reports': return <ReportsScreen />;
       case 'full': return <FullIntegrationScreen />;
       default: return <DashboardScreen onNavigate={handleNavigate} />;
     }
