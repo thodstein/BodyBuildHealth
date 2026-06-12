@@ -174,10 +174,10 @@ export const LabsScreen: React.FC = () => {
 
   const uid = () => { try { return crypto.randomUUID?.() || `${Date.now()}_${Math.random().toString(36).slice(2)}`; } catch { return `${Date.now()}_${Math.random().toString(36).slice(2)}`; } };
 
-  const hasLabs = linked.labs && linked.labs.length > 0;
   const labs: LabPoint[] = linked.labs || [];
   const currentLabs = useMemo(() => labs.filter(l => !l.archived && (!l.phase || l.phase === selectedPhase)), [labs, selectedPhase]);
   const archiveLabs = useMemo(() => labs.filter(l => l.archived || (l.phase && l.phase !== selectedPhase)), [labs, selectedPhase]);
+  const hasLabs = currentLabs && currentLabs.length > 0;
 
   const handlePhaseChange = (phase: string) => {
     setSelectedPhase(phase);
@@ -326,12 +326,12 @@ export const LabsScreen: React.FC = () => {
   }, [labs, chartSelectedCodes]);
 
   const penalty = useMemo(() => {
-    return calculatePenaltyCoefficients(selectedPhase, labs, [], 1, linked.course, globalNoLabs);
-  }, [selectedPhase, labs, linked.course, globalNoLabs]);
+    return calculatePenaltyCoefficients(selectedPhase, currentLabs, [], 1, linked.course, globalNoLabs);
+  }, [selectedPhase, currentLabs, linked.course, globalNoLabs]);
 
   const labRisks = useMemo<{ overallNet: number; systemBreakdown: Record<string, { raw: number; net: number }>; markerDeviations: { code: string; name: string; value: number; uln: number; lln: number; deviation: number; system: string }[] } | null>(() => {
     if (!hasLabs) return null;
-    const labData = labs.map(l => ({ ...l, date: l.date || new Date().toISOString().split('T')[0] }));
+    const labData = currentLabs.map(l => ({ ...l, date: l.date || new Date().toISOString().split('T')[0] }));
     const contribs = calculateRiskFromAnalyses(labData) as any;
     const systemBreakdown: Record<string, { raw: number; net: number }> = {};
     let maxNet = 0;
@@ -345,7 +345,7 @@ export const LabsScreen: React.FC = () => {
       ? Math.round(nonZero.reduce((s, v) => s + v.net, 0) / nonZero.length)
       : 0;
     const markerDeviations: { code: string; name: string; value: number; uln: number; lln: number; deviation: number; system: string }[] = [];
-    for (const lab of labs) {
+    for (const lab of currentLabs) {
       const ref = UCUM_MAP[lab.code];
       if (!ref) continue;
       const coeff = ref.coeff || 1;
@@ -372,18 +372,18 @@ export const LabsScreen: React.FC = () => {
 
   const labIndexDetails = useMemo(() => {
     if (!hasLabs) return {} as Record<string, LabIndexDetail>;
-    return computeLabIndexDetails(labs);
-  }, [hasLabs, labs]);
+    return computeLabIndexDetails(currentLabs);
+  }, [hasLabs, currentLabs]);
 
   const labAnalysisResult = useMemo(() => {
     if (!hasLabs) return null;
-    return interpretLabs(labs);
-  }, [hasLabs, labs]);
+    return interpretLabs(currentLabs);
+  }, [hasLabs, currentLabs]);
 
   const labPharmaAlerts = useMemo(() => {
     if (!hasLabs || linked.course.length === 0) return [];
-    return analyzeLabDrugCorrelation(labs, linked.course, linked.profile?.settings?.phase || 'on_cycle');
-  }, [hasLabs, labs, linked.course]);
+    return analyzeLabDrugCorrelation(currentLabs, linked.course, linked.profile?.settings?.phase || 'on_cycle');
+  }, [hasLabs, currentLabs, linked.course]);
 
   const toggleGlobalNoLabs = useCallback(() => {
     const next = !globalNoLabs;
