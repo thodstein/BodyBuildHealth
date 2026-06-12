@@ -11,9 +11,12 @@ import { ProfileScreen } from './ui/screens/ProfileScreen';
 import { ArticlesScreen } from './ui/screens/ArticlesScreen';
 import { CalculatorsScreen } from './ui/screens/CalculatorsScreen';
 import { PctScreen } from './ui/screens/PctScreen';
+import { RecoveryScreen } from './ui/screens/RecoveryScreen';
+import { PerformanceScreen } from './ui/screens/PerformanceScreen';
+import { TrainingToolkitScreen } from './ui/screens/TrainingToolkitScreen';
 import { ToastContainer } from './ui/ToastContainer';
 
-type Tab = 'home' | 'pharma' | 'training' | 'labs' | 'risks' | 'support' | 'nutrition' | 'profile' | 'calculators' | 'pct' | 'articles';
+type Tab = 'home' | 'pharma' | 'training' | 'labs' | 'risks' | 'support' | 'nutrition' | 'profile' | 'calculators' | 'pct' | 'articles' | 'recovery' | 'performance' | 'toolkit';
 
 // Bottom nav: 5 primary tabs
 const PRIMARY_NAV: { id: Tab; label: string; icon: React.ReactNode }[] = [
@@ -105,6 +108,12 @@ export default function App() {
       'reports': 'home',
       'integrations': 'home',
       'role-management': 'profile',
+      'recovery': 'recovery',
+      'wellness': 'recovery',
+      'performance': 'performance',
+      'bloodwork': 'performance',
+      'toolkit': 'toolkit',
+      'training-tools': 'toolkit',
     };
     const target = tabMap[screen] || 'home';
     go(target);
@@ -134,6 +143,9 @@ export default function App() {
       case 'calculators': return <CalculatorsScreen />;
       case 'pct': return <PctScreen onBack={() => go('home')} />;
       case 'articles': return <ArticlesScreen />;
+      case 'recovery': return <RecoveryScreen />;
+      case 'performance': return <PerformanceScreen />;
+      case 'toolkit': return <TrainingToolkitScreen />;
       default: return <DashboardScreen onNavigate={handleNavigate} />;
     }
   };

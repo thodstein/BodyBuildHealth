@@ -15,6 +15,17 @@ import { findSubstitute } from '../../engines/exercise-substitution.engine';
 import { useDataLink } from '../../core/data-link';
 import type { TrainingInput, TrainingOutput, Exercise, MovementPattern } from '../../core/types';
 import { computeAnalytics, type AnalyticsSnapshot, type WeeklyBreakdown } from '../../engines/analytics-engine';
+import { computeConstraints } from '../../engines/training-constraints.engine';
+import { generatePeriodization, getPhaseParams } from '../../engines/cycle-periodization.engine';
+import { selectBestProgram } from '../../engines/consolidated-engines';
+import { getTrainingMethods, getMethodsByCategory, getVolumeReferences, getVolumeByMuscle, getSplitVisuals } from '../../engines/training-methodology.engine';
+import { buildVisualDashboard, computeWeeklyChart, computeMuscleVolume, computeProgression, type VizSessionData } from '../../engines/training-visualization.engine';
+import { getProgramById, getProgramsByGoal, FULL_PROGRAM_LIBRARY } from '../../engines/complete-program-library.engine';
+import { getWorkoutTimers, getOptimalRest, getGymChecklists, getBPMGuide } from '../../engines/goal-timer-checklist.engine';
+import { generateWeeklyReport, analyzeMeasurements, loadMeasurements, saveMeasurement, type BodyMeasurement } from '../../engines/log-analytics-progression.engine';
+import { getExerciseBio } from '../../data/exercise-biomechanics-db';
+import { getStrengthLevel, getNextLevelTarget } from '../../engines/performance-analytics.engine';
+import { computeStructuredAnalytics } from '../../engines/structured-analytics.engine';
 
 const WARMUP_LABELS: Record<string, string> = {
   jumping_jack: 'Прыжки ноги вместе-врозь', arm_circles: 'Круги руками', leg_swings: 'Махи ногами',
@@ -48,14 +59,16 @@ const GROUP_LABELS: Record<string, string> = {
 const EQUIP_LABELS: Record<string, string> = { barbell: 'Штанга', dumbbell: 'Гантели', machine: 'Тренажёр', cable: 'Блок', bodyweight: 'Вес тела', band: 'Лента', kettlebell: 'Гиря', specialty_bar: 'Спец. гриф' };
 const JOINT_LABELS: Record<string, string> = { high: 'Высокая', med: 'Средняя', low: 'Низкая' };
 
-type TrainingTab = 'plan' | 'runtime' | 'exercises' | 'calculators' | 'diary' | 'cycles' | 'history' | 'analytics';
+type TrainingTab = 'plan' | 'runtime' | 'exercises' | 'calculators' | 'diary' | 'cycles' | 'history' | 'analytics' | 'methods' | 'visual' | 'programs' | 'timers' | 'progress';
 
 export const TrainingScreen: React.FC = () => {
   const linked = useDataLink();
+  const readiness = linked.readiness;
+  const labAnalysis = linked.labAnalysis;
   const diary = useMemo(() => new StrengthDiary(), []);
   const [tab, setTab] = useState<TrainingTab>('plan');
 
-  // Plan state
+  // Plan state — pre-fill from readiness and labAnalysis
   const [goal, setGoal] = useState('bulk');
   const [level, setLevel] = useState('intermediate');
   const [daysPerWeek, setDaysPerWeek] = useState(4);
@@ -64,12 +77,12 @@ export const TrainingScreen: React.FC = () => {
   const [showSplitPicker, setShowSplitPicker] = useState(false);
   const [cycleType, setCycleType] = useState('auto');
   const [mesoLength, setMesoLength] = useState(12);
-  const [recovery, setRecovery] = useState(7);
-  const [fatigue, setFatigue] = useState(3);
+  const [recovery, setRecovery] = useState(Math.round((readiness?.recovery ?? 70) / 10));
+  const [fatigue, setFatigue] = useState(Math.round((readiness?.fatigue ?? 30) / 10));
   const [weakPoints, setWeakPoints] = useState<string[]>([]);
   const [bodyWeight, setBodyWeight] = useState(80);
-  const [sleepHours, setSleepHours] = useState(7);
-  const [stressLevel, setStressLevel] = useState(5);
+  const [sleepHours, setSleepHours] = useState(linked.profile?.settings?.baselineSleepHours ?? 7);
+  const [stressLevel, setStressLevel] = useState(linked.profile?.settings?.baselineStressLevel ?? 5);
   const [customExercises, setCustomExercises] = useState<{ name: string; sets: number; reps: number; rir: number }[]>([]);
   const [trainingOutput, setTrainingOutput] = useState<TrainingOutput | null>(null);
   const [macrocycle, setMacrocycle] = useState<MacrocyclePlan | null>(null);
@@ -143,36 +156,28 @@ export const TrainingScreen: React.FC = () => {
   }, [goal, level, daysPerWeek, recovery, fatigue, weakPoints]);
 
   // Auto-regenerate when days/sparse
+  const loadDiaryStats = async () => {
+    try {
+      const progress = await diary.getWeeklyProgress();
+      setDiaryProgress(progress);
+      const compoundIds = EXERCISE_CATALOG.filter(e => e.type === 'compound').slice(0, 10).map(e => e.id);
+      const stats: StrengthStats[] = [];
+      for (const id of compoundIds) { const s = await diary.getExerciseStats(id); if (s) stats.push(s); }
+      setDiaryStats(stats);
+      const wLogs = await diary.getWorkoutLogs();
+      setHistoryWorkouts(wLogs.reverse());
+    } catch {}
+  };
+
   const prevDays = useRef(daysPerWeek);
-  useEffect(() => {
-    if (prevDays.current !== daysPerWeek) {
-      prevDays.current = daysPerWeek;
-      generatePlan();
-    }
-  }, [daysPerWeek]);
+  useEffect(() => { loadDiaryStats(); }, []);
+  useEffect(() => { if (prevDays.current !== daysPerWeek) { prevDays.current = daysPerWeek; generatePlan(); } }, [daysPerWeek]);
 
   useEffect(() => {
     if (macrocycle && selectedWeek > 0) {
       setCurrentMicrocycle(getCurrentWeekPlan(macrocycle, selectedWeek));
     }
   }, [macrocycle, selectedWeek]);
-
-  useEffect(() => {
-    (async () => {
-      try {
-        const progress = await diary.getWeeklyProgress();
-        setDiaryProgress(progress);
-        // Load stats for top compounds
-        const compoundIds = EXERCISE_CATALOG.filter(e => e.type === 'compound').slice(0, 10).map(e => e.id);
-        const stats: StrengthStats[] = [];
-        for (const id of compoundIds) {
-          const s = await diary.getExerciseStats(id);
-          if (s) stats.push(s);
-        }
-        setDiaryStats(stats);
-      } catch {}
-    })();
-  }, []);
 
   const filteredExercises = useMemo(() => {
     let list = EXERCISE_CATALOG;
@@ -217,6 +222,29 @@ export const TrainingScreen: React.FC = () => {
       if (s) stats.push(s);
     }
     setDiaryStats(stats);
+    // Also save workout log and reload history
+    await diary.saveWorkoutLog({
+      id: `workout_${Date.now()}`,
+      date: new Date().toISOString().split('T')[0],
+      duration: 60,
+      exercises: [{
+        id: `log_${Date.now()}`,
+        date: new Date().toISOString().split('T')[0],
+        exerciseId: logExercise,
+        exerciseName: ex?.name || logExercise,
+        sets: [{ weight: logWeight, reps: logReps, rir: logRIR }],
+        totalVolume: logWeight * logReps,
+        estimated1RM: Math.round(logWeight * (1 + logReps / 30)),
+        isCompound: ex?.type === 'compound',
+        weekNumber: selectedWeek,
+      }],
+      overallRPE: 7,
+      recoveryBefore: recovery,
+      split: trainingOutput?.splitName || 'custom',
+      weekNumber: selectedWeek,
+    });
+    const wLogs = await diary.getWorkoutLogs();
+    setHistoryWorkouts(wLogs.reverse());
     setLogExercise('');
     setLogWeight(80);
     setLogReps(8);
@@ -248,6 +276,9 @@ export const TrainingScreen: React.FC = () => {
           ['plan', '📋 План'], ['runtime', '🏃 Тренировка'], ['exercises', '📖 Упражнения'],
           ['calculators', '📐 Калькуляторы'], ['diary', '📓 Дневник'], ['cycles', '🔄 Циклы'],
           ['history', '📜 История'], ['analytics', '📊 Аналитика'],
+          ['methods', '📚 Методы'], ['visual', '📈 Визуал.'],
+          ['programs', '📦 Программы'], ['timers', '⏱ Таймеры'],
+          ['progress', '📏 Замеры'],
         ] as [TrainingTab, string][]).map(([k, l]) => (
           <button key={k} onClick={() => setTab(k)} style={{
             padding: '7px 12px', borderRadius: 8, fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap',
@@ -409,6 +440,31 @@ export const TrainingScreen: React.FC = () => {
 
           {trainingOutput && (
             <>
+              {/* Training constraints check */}
+              {(() => {
+                const constraints = computeConstraints({
+                  riskSnapshot: {},
+                  fatigueLevel: fatigue / 10,
+                  recoveryLevel: recovery / 10,
+                  priScore: recovery / 10,
+                  jointFatigue: {},
+                  cumulativeLoad: { weekly: 0, patternLoad: {}, jointLoad: {}, overload: false },
+                  equipmentAvailable: ['barbell', 'dumbbell', 'bench'],
+                  goal,
+                });
+                if (constraints.recommendations.length === 0) return null;
+                return (
+                  <div className="card" style={{
+                    marginBottom: 8, padding: '6px 10px',
+                    background: 'rgba(249,115,22,0.06)', borderLeft: '3px solid #f97316',
+                  }}>
+                    <div style={{ fontSize: 10, fontWeight: 600, color: '#f97316' }}>⚠ Ограничения тренировки</div>
+                    {constraints.recommendations.map((r, i) => (
+                      <div key={i} style={{ fontSize: 9, color: 'var(--text-dim)', marginTop: 2 }}>• {r}</div>
+                    ))}
+                  </div>
+                );
+              })()}
               {/* Smart Recommendations */}
               {(() => {
                 const tips: { icon: string; text: string; color: string }[] = [];
@@ -540,6 +596,12 @@ export const TrainingScreen: React.FC = () => {
                     const autoRegNote = adjRecovery < 0.4 ? '⚠ Снизить объём на 20% — низкое восстановление' :
                                        adjRecovery < 0.6 ? '⚡ Умеренная нагрузка — следи за RPE' :
                                        adjRecovery > 0.8 ? '✅ Высокая готовность — можно добавить подход' : '';
+                    const labWarnings: string[] = [];
+                    if (labAnalysis) {
+                      if (labAnalysis.liverStress > 60) labWarnings.push(`⚠ Печень ${labAnalysis.liverStress}% — исключить гепатотоксичные нагрузки`);
+                      if (labAnalysis.inflammation > 5) labWarnings.push(`⚠ Воспаление ${labAnalysis.inflammation.toFixed(1)} — рекомендован deload`);
+                      if (labAnalysis.kidneyStress > 50) labWarnings.push(`⚠ Почки ${labAnalysis.kidneyStress}% — контроль гидратации`);
+                    }
                     return (
                     <div key={di} style={{ marginBottom: 6, background: 'var(--bg-secondary)', borderRadius: 6, padding: '6px 8px' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
@@ -551,7 +613,29 @@ export const TrainingScreen: React.FC = () => {
                             const hasDead = day.exercises?.some((e: any) => e.exerciseId?.includes('deadlift') || e.name?.includes('Тяг'));
                             const focusTag = hasSquat ? '🦵 Присед' : hasBench ? '🏋️ Жим' : hasDead ? '🔙 Тяга' : '';
                             return focusTag ? <span style={{ fontSize: 9, color: 'var(--accent)', fontWeight: 600 }}>{focusTag}</span> : null;
-                          })()}
+              })()}
+
+              {/* Periodization phase info */}
+              {(() => {
+                const pp = getPhaseParams({
+                  goal: goal === 'bulk' ? 'hypertrophy' : goal as any,
+                  phase: cycleType === 'peaking' ? 'peaking' : cycleType === 'intensification' ? 'intensification' : cycleType === 'deload' ? 'deload' : 'accumulation',
+                  analytics: { fatigue: fatigue / 10, recovery: recovery / 10, risk: 0 },
+                });
+                return (
+                  <div className="card" style={{ marginBottom: 8, padding: '6px 10px', background: 'rgba(139,92,246,0.06)', borderLeft: '3px solid #8b5cf6' }}>
+                    <div style={{ fontSize: 10, fontWeight: 600, color: '#8b5cf6', marginBottom: 2 }}>
+                      🔄 Фаза: {cycleType === 'peaking' ? 'Пик' : cycleType === 'intensification' ? 'Интенсификация' : cycleType === 'deload' ? 'Разгрузка' : 'Накопление'}
+                    </div>
+                    <div style={{ display: 'flex', gap: 10, fontSize: 9, color: 'var(--text-dim)' }}>
+                      <span>Объём: <b>{pp.volumeLevel}</b></span>
+                      <span>Интенсивность: <b>{pp.intensityLevel}</b></span>
+                      <span>Частота: <b>{pp.frequencyLevel}</b></span>
+                      <span>Приоритет: <b>{pp.priority}</b></span>
+                    </div>
+                  </div>
+                );
+              })()}
                           <span style={{ fontSize: 9, padding: '1px 5px', borderRadius: 3, background: `${diffColor}22`, color: diffColor, fontWeight: 600 }}>{diffLabel} {difficultyScore}/10</span>
                           <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>{day.duration} мин</span>
                         </div>
@@ -561,6 +645,11 @@ export const TrainingScreen: React.FC = () => {
                           {autoRegNote}
                         </div>
                       )}
+                      {labWarnings.length > 0 && labWarnings.map((w, wi) => (
+                        <div key={wi} style={{ fontSize: 9, color: '#ef4444', marginBottom: 3, background: 'rgba(239,68,68,0.08)', padding: '2px 6px', borderRadius: 3 }}>
+                          {w}
+                        </div>
+                      ))}
                       <div style={{ fontSize: 8, color: 'var(--text-dim)', marginBottom: 3, padding: '1px 4px', background: 'rgba(255,165,2,0.05)', borderRadius: 3 }}>
                         🍎 {goal === 'bulk' ? 'До: бел.+угл. После: быстрый протеин' : goal === 'cut' ? 'До: белок. Углеводы только вокруг' : goal === 'strength' ? 'До: кофеин+угл. После: протеин+креатин' : 'До/после: белок+углеводы'}
                       </div>
@@ -881,6 +970,26 @@ export const TrainingScreen: React.FC = () => {
                 Расчётный тоннаж: {currentMicrocycle.days.filter((d: any) => d.isTraining)[runtimeDay]?.exercises?.reduce((sum: number, ex: any) => sum + (ex.sets || 0) * (Number(ex.reps) || 0) * (ex.weight || 0), 0) || 0} кг
               </div>
             </div>
+                  {/* Session difficulty estimate */}
+                  {(() => {
+                    const dayExercises = currentMicrocycle.days.filter((d: any) => d.isTraining)[runtimeDay]?.exercises || [];
+                    const totalSets = dayExercises.reduce((s: number, e: any) => s + (e.sets || 0), 0);
+                    const avgIntensity = dayExercises.length > 0
+                      ? dayExercises.reduce((s: number, e: any) => s + (e.intensity || 70), 0) / dayExercises.length
+                      : 70;
+                    const difficulty = totalSets > 25 ? 'Высокая' : totalSets > 15 ? 'Средняя' : 'Низкая';
+                    const color = difficulty === 'Высокая' ? '#ef4444' : difficulty === 'Средняя' ? '#f59e0b' : '#22c55e';
+                    return (
+                      <div style={{ fontSize: 10, margin: '6px 0', padding: '6px 8px', borderRadius: 6, background: 'rgba(255,255,255,0.03)' }}>
+                        <span style={{ color: 'var(--text-dim)' }}>Сложность: </span>
+                        <span style={{ fontWeight: 600, color }}>{difficulty}</span>
+                        <span style={{ color: 'var(--text-dim)', marginLeft: 6 }}>· {totalSets} подходов · ~{avgIntensity.toFixed(0)}% ср.</span>
+                        {totalSets > 25 && (
+                          <div style={{ color: '#f97316', marginTop: 2 }}>⚠ Высокий объём — отдых ≥ 3 мин между подходами</div>
+                        )}
+                      </div>
+                    );
+                  })()}
                   <button onClick={() => { setRuntimeStarted(true); setRuntimeLogs({}); setRuntimeExIdx(0); }} style={{
                     width: '100%', padding: 12, borderRadius: 8, border: 'none', cursor: 'pointer',
                     background: 'linear-gradient(135deg, #00e68a, #00c853)', color: '#000', fontWeight: 700, fontSize: 14,
@@ -935,7 +1044,54 @@ export const TrainingScreen: React.FC = () => {
                       })()}
                     </div>
                     <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
-                      <button onClick={() => setRuntimeStarted(false)} style={{
+                      <button onClick={async () => {
+                        // Save completed workout to IndexedDB
+                        const completedExercises = Object.entries(runtimeLogs)
+                          .filter(([_, log]) => log.sets.length > 0)
+                          .map(([exId, log]) => ({
+                            exerciseId: exId,
+                            exerciseName: EXERCISE_CATALOG.find(e => e.id === exId)?.name || exId,
+                            sets: log.sets,
+                            totalVolume: log.sets.reduce((sum, s) => sum + s.weight * s.reps, 0),
+                            maxWeight: Math.max(...log.sets.map(s => s.weight), 0),
+                            estimated1RM: log.sets.length > 0
+                              ? Math.round(log.sets[log.sets.length - 1].weight * (1 + log.sets[log.sets.length - 1].reps / 30))
+                              : 0,
+                          }));
+                        const totalVolume = completedExercises.reduce((s, e) => s + e.totalVolume, 0);
+                        if (completedExercises.length > 0) {
+                          const dateStr = new Date().toISOString().split('T')[0];
+                          const ts = Date.now();
+                          const strengthEntries = completedExercises.map((ex, i) => ({
+                            id: `log_${ts}_${i}`,
+                            date: dateStr,
+                            exerciseId: ex.exerciseId,
+                            exerciseName: ex.exerciseName,
+                            sets: ex.sets,
+                            totalVolume: ex.totalVolume,
+                            estimated1RM: ex.estimated1RM,
+                            isCompound: EXERCISE_CATALOG.find(e => e.id === ex.exerciseId)?.type === 'compound',
+                            weekNumber: selectedWeek,
+                          }));
+                          await diary.saveWorkoutLog({
+                            id: `workout_${ts}`,
+                            date: dateStr,
+                            duration: Math.round(runtimeExIdx * 5 + completedExercises.reduce((s, e) => s + e.sets.length, 0) * 3),
+                            exercises: strengthEntries,
+                            overallRPE: 7,
+                            recoveryBefore: recovery,
+                            split: trainingOutput?.splitName || 'custom',
+                            weekNumber: selectedWeek,
+                          });
+                          for (const se of strengthEntries) {
+                            await diary.saveStrengthLog(se);
+                          }
+                          // Reload stats and history
+                          await loadDiaryStats();
+                        }
+                        setRuntimeStarted(false);
+                        setRuntimeLogs({});
+                      }} style={{
                         padding: '8px 20px', borderRadius: 8, border: 'none', cursor: 'pointer',
                         background: 'var(--accent)', color: '#000', fontWeight: 600, fontSize: 13,
                       }}>✓ Завершить</button>
@@ -1025,6 +1181,24 @@ export const TrainingScreen: React.FC = () => {
                         {last1RM > 0 && (
                           <div style={{ fontSize: 9, color: 'var(--accent)', marginTop: 2 }}>1RM последний: {last1RM}кг | Объём: {estimatedVolume}кг | RPE ср: {avgRPE}</div>
                         )}
+                        {/* Autoregulation hint */}
+                        {log.sets.length >= 1 && (() => {
+                          const lastSet = log.sets[log.sets.length - 1];
+                          let hint = '';
+                          let hintColor = 'var(--text-dim)';
+                          if (lastSet.rpe <= 5 && lastSet.rir >= 3) {
+                            hint = '🟢 RPE низкий — можно увеличить вес на 2.5-5 кг';
+                            hintColor = '#22c55e';
+                          } else if (lastSet.rpe >= 9.5 && lastSet.rir <= 0) {
+                            hint = '🔴 RPE предельный — снизьте вес или остановитесь';
+                            hintColor = '#ef4444';
+                          } else if (lastSet.rpe >= 8.5 && lastSet.rir <= 1) {
+                            hint = '🟡 RPE высокий — держите вес или уменьшите';
+                            hintColor = '#f59e0b';
+                          }
+                          if (!hint) return null;
+                          return <div style={{ fontSize: 9, color: hintColor, marginTop: 2, fontWeight: 600 }}>{hint}</div>;
+                        })()}
                       </div>
                     )}
 
@@ -1166,6 +1340,9 @@ export const TrainingScreen: React.FC = () => {
                   <span style={{ fontWeight: 600, color: '#ff9100' }}>💡 </span>{selectedEx.comments}
                 </div>
               )}
+              {(() => { const bio = getExerciseBio(selectedEx.id); if (!bio) return null; const js = bio.jointStress; const strs = Object.entries(js||{}).map(([k,v])=>`${k} ${v}/10`); return <div style={{ marginBottom: 6, background: 'rgba(59,130,246,0.05)', borderRadius: 6, padding: '5px 8px', fontSize: 9 }}>
+                <span style={{ fontWeight: 600, color: '#3b82f6' }}>🔬 Биомеханика:</span> Суставы: {strs.join(', ')} | Сложность: {bio.difficulty}/10 | ЦНС: {bio.cnsDemand || 5}/10
+              </div>; })()}
               {selectedEx.canReplace && selectedEx.canReplace.length > 0 && (
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, alignItems: 'center' }}>
                   <span style={{ fontSize: 9, color: 'var(--text-dim)' }}>Замена:</span>
@@ -1324,6 +1501,7 @@ export const TrainingScreen: React.FC = () => {
               );
             })()}
           </div>
+          <StrengthLevelCard />
         </div>
       )}
 
@@ -1645,9 +1823,107 @@ export const TrainingScreen: React.FC = () => {
         </div>
       )}
       {/* ═══════════ ANALYTICS TAB ═══════════ */}
-      {tab === 'analytics' && <AnalyticsTab sessions={historyWorkouts} />}
+      {tab === 'analytics' && <><AnalyticsTab sessions={historyWorkouts} /><StructuredAnalyticsCard sessions={historyWorkouts} /></>}
+      {tab === 'methods' && <MethodsTab />}
+      {tab === 'visual' && <VisualTab sessions={historyWorkouts} />}
+      {tab === 'programs' && <ProgramsTab />}
+      {tab === 'timers' && <TimersTab />}
+      {tab === 'progress' && <ProgressTab historyWorkouts={historyWorkouts} />}
     </div>
   );
+};
+
+const MethodsTab: React.FC = () => {
+  const methods = React.useMemo(() => getTrainingMethods(), []);
+  const volumes = React.useMemo(() => getVolumeReferences(), []);
+  const visuals = React.useMemo(() => getSplitVisuals(), []);
+  const [methodCat, setMethodCat] = React.useState('all');
+  const filtered = methodCat === 'all' ? methods : getMethodsByCategory(methodCat);
+  const cats = [...new Set(methods.map(m => m.category))];
+
+  return (<div>
+    <div style={{ display:'flex', gap:4, marginBottom:8, flexWrap:'wrap' }}>
+      <button onClick={()=>setMethodCat('all')} style={{ padding:'4px 10px', borderRadius:6, fontSize:10, background: methodCat==='all'?'var(--accent)':'var(--bg-secondary)', color: methodCat==='all'?'#000':'var(--text-dim)', border:'none', cursor:'pointer' }}>Все</button>
+      {cats.map(c => <button key={c} onClick={()=>setMethodCat(c)} style={{ padding:'4px 10px', borderRadius:6, fontSize:10, background: methodCat===c?'rgba(139,92,246,0.2)':'var(--bg-secondary)', border: methodCat===c?'1px solid #8b5cf6':'1px solid var(--border)', color: methodCat===c?'#8b5cf6':'var(--text-dim)', cursor:'pointer' }}>{c}</button>)}
+    </div>
+    {filtered.map((m,i) => <div key={i} className="card" style={{ marginBottom:6, padding:10 }}>
+      <div style={{ fontWeight:600, fontSize:12 }}>{m.name} <span style={{ fontSize:9, color:'var(--text-dim)' }}>[{m.category}]</span></div>
+      <div style={{ fontSize:9, color:'var(--text-light)', marginTop:2 }}>{m.description}</div>
+      <div style={{ fontSize:8, color:'var(--text-dim)' }}>Лучше всего для: {m.bestFor}</div>
+    </div>)}
+
+    <h4 style={{ margin:'12px 0 8px', fontSize:12 }}>📊 Volume Landmarks (MEV/MAV/MRV)</h4>
+    {volumes.map((v,i) => <div key={i} className="card" style={{ marginBottom:4, padding:8 }}>
+      <div style={{ fontWeight:600, fontSize:11 }}>{v.muscle}</div>
+      <div style={{ display:'flex', gap:6, fontSize:9, marginTop:2 }}>
+        <span>Новичок: {v.beginner.mev}-{v.beginner.mav}-{v.beginner.mrv}</span>
+        <span>Средний: {v.intermediate.mev}-{v.intermediate.mav}-{v.intermediate.mrv}</span>
+        <span>Продв: {v.advanced.mev}-{v.advanced.mav}-{v.advanced.mrv}</span>
+      </div>
+    </div>)}
+
+    <h4 style={{ margin:'12px 0 8px', fontSize:12 }}>📐 Визуализация сплитов</h4>
+    {visuals.map((s,i) => <div key={i} className="card" style={{ marginBottom:4, padding:8 }}>
+      <div style={{ fontWeight:600, fontSize:11 }}>{s.name}</div>
+      <div style={{ fontSize:9, color:'var(--text-dim)' }}>{(s as any).schedule?.join(' | ') || s.name}</div>
+    </div>)}
+  </div>);
+};
+
+const VisualTab: React.FC<{ sessions: any[] }> = ({ sessions }) => {
+  const vizSessions: VizSessionData[] = React.useMemo(() => sessions.map((s:any) => ({
+    week: s.weekNumber || 1, date: s.date || '', exercises: (s.exercises || []).map((e:any) => ({
+      name: e.exerciseName || e.name || '', sets: e.sets?.length || 0, reps: Math.max(...(e.sets||[{reps:0}]).map((st:any)=>st.reps||0), 0),
+      weight: Math.max(...(e.sets||[{weight:0}]).map((st:any)=>st.weight||0), 0), rpe: 7, volume: e.totalVolume || 0,
+    }))
+  })), [sessions]);
+  const dashboard = React.useMemo(() => sessions.length > 2 ? buildVisualDashboard(vizSessions) : null, [sessions, vizSessions]);
+  const weekly = React.useMemo(() => computeWeeklyChart(vizSessions), [vizSessions]);
+  const muscleVol = React.useMemo(() => computeMuscleVolume(vizSessions), [vizSessions]);
+  const prog = React.useMemo(() => computeProgression(vizSessions), [vizSessions]);
+
+  if (sessions.length < 2) return <div className="card" style={{ padding:20, textAlign:'center', color:'var(--text-dim)' }}>Нужно минимум 2 тренировки для визуализации</div>;
+
+  return (<div>
+    {dashboard && <div className="card" style={{ marginBottom:8, padding:10 }}>
+      <h4 style={{ margin:'0 0 6px', fontSize:12 }}>📈 Недельный график</h4>
+      <div style={{ display:'flex', alignItems:'flex-end', gap:2, height:100 }}>
+        {weekly.map((w,i) => { const maxV = Math.max(...weekly.map(x=>x.volume),1); return <div key={i} style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center' }}>
+          <div style={{ width:'100%', background:'rgba(0,230,138,0.3)', borderRadius:'2px 2px 0 0', height:`${Math.max(5, (w.volume/maxV)*100)}%` }} title={`Неделя ${w.week}: ${w.volume} кг`} />
+          <span style={{ fontSize:7, color:'var(--text-dim)', marginTop:2 }}>{w.week}</span>
+        </div>})}
+      </div>
+      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:4, fontSize:9, marginTop:4 }}>
+        <span>Пик объёма: <b>{(dashboard.summary as any).peakVolume || dashboard.summary.totalVolume}</b></span>
+        <span>Средняя интенс.: <b>{dashboard.summary.avgIntensity}%</b></span>
+        <span>Тренд: <b style={{color:(dashboard.summary as any).trend==='up'?'#22c55e':'#ef4444'}}>{(dashboard.summary as any).trend==='up'?'↑':'→'}</b></span>
+      </div>
+    </div>}
+
+    <div className="card" style={{ marginBottom:8, padding:10 }}>
+      <h4 style={{ margin:'0 0 6px', fontSize:12 }}>💪 Объём по группам мышц</h4>
+      {muscleVol.map((mv,i) => <div key={i} style={{ display:'flex', alignItems:'center', gap:6, marginBottom:2 }}>
+        <span style={{ width:60, fontSize:9, color:'var(--text-dim)' }}>{mv.muscle}</span>
+        <div style={{ flex:1, background:'rgba(255,255,255,0.06)', borderRadius:3, height:8, overflow:'hidden' }}>
+          <div style={{ width:`${mv.percent}%`, height:'100%', background:'#3b82f6', borderRadius:3 }} />
+        </div>
+        <span style={{ fontSize:9, fontWeight:600 }}>{mv.percent}%</span>
+      </div>)}
+    </div>
+
+    <div className="card" style={{ padding:10 }}>
+      <h4 style={{ margin:'0 0 6px', fontSize:12 }}>📈 Прогрессия 1RM</h4>
+      {prog.slice(0,5).map((p,i) => <div key={i} style={{ marginBottom:4 }}>
+        <div style={{ fontWeight:600, fontSize:10 }}>{p.exercise}</div>
+        <div style={{ display:'flex', gap:4, alignItems:'flex-end', height:30 }}>
+          {p.weeks.map((w,wi) => { const max = Math.max(...p.weeks.map(x=>x.estimated1RM),1); return <div key={wi} style={{ flex:1, textAlign:'center' }}>
+            <div style={{ width:'100%', background: w.estimated1RM > (p.weeks[wi-1]?.estimated1RM||0) ? '#22c55e' : '#ef4444', borderRadius:2, height:`${Math.max(3,(w.estimated1RM/max)*30)}%` }} />
+            <span style={{ fontSize:6, color:'var(--text-dim)' }}>Н{w.week}</span>
+          </div>})}
+        </div>
+      </div>)}
+    </div>
+  </div>);
 };
 
 // ── Analytics Tab Component ──
@@ -1798,4 +2074,124 @@ const AnalyticsTab: React.FC<{ sessions: WorkoutLog[] }> = ({ sessions }) => {
       </div>
     </div>
   );
+};
+
+const ProgramsTab: React.FC = () => {
+  const [selectedId, setSelectedId] = React.useState<string | null>(null);
+  const [goalFilter, setGoalFilter] = React.useState('all');
+  const programs = goalFilter === 'all' ? FULL_PROGRAM_LIBRARY : getProgramsByGoal(goalFilter);
+  const selected = selectedId ? getProgramById(selectedId) : null;
+  return (<div>
+    <div style={{ display:'flex', gap:4, marginBottom:8 }}>
+      {['all','strength','hypertrophy','peaking'].map(g => <button key={g} onClick={()=>{setGoalFilter(g);setSelectedId(null);}} style={{ padding:'4px 10px',borderRadius:6,fontSize:10,cursor:'pointer',background:goalFilter===g?'var(--accent)':'var(--bg-secondary)',color:goalFilter===g?'#000':'var(--text-dim)',border:'none' }}>{g==='all'?'Все':g==='strength'?'Сила':g==='hypertrophy'?'Масса':'Пик'}</button>)}
+    </div>
+    {!selected && <div style={{ display:'grid', gap:6 }}>{programs.map(p => <div key={p.id} onClick={()=>setSelectedId(p.id)} className="card" style={{ padding:10, cursor:'pointer' }}><div style={{ fontWeight:600, fontSize:13 }}>{p.name} <span style={{ fontSize:9, color:'var(--text-dim)' }}>{p.level}</span></div><div style={{ fontSize:9, color:'var(--text-light)', marginTop:2 }}>{p.description}</div></div>)}</div>}
+    {selected && <div className="card" style={{ padding:12 }}><button onClick={()=>setSelectedId(null)} style={{ background:'var(--bg-secondary)',border:'none',color:'var(--text-dim)',cursor:'pointer',fontSize:11,marginBottom:8 }}>Back</button>
+      {(()=>{const s:any=selected; return <><h3 style={{margin:'0 0 4px',fontSize:14}}>{s.name}</h3><p style={{fontSize:10,color:'var(--text-dim)'}}>{s.description}</p><div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:4,fontSize:10,marginTop:8}}><span>Level: <b>{s.level}</b></span><span>Goal: <b>{s.goal}</b></span><span>Days/wk: <b>{s.daysPerWeek}</b></span></div></>;})()}
+    </div>}
+  </div>);
+};
+
+const TimersTab: React.FC = () => {
+  const timers = React.useMemo(() => getWorkoutTimers(), []);
+  const checklists = React.useMemo(() => getGymChecklists(), []);
+  const bpm = React.useMemo(() => getBPMGuide(), []);
+  return (<div>
+    <div className="card" style={{ marginBottom:8, padding:10 }}><h4 style={{ margin:'0 0 6px',fontSize:12 }}>⏱ Таймеры ({timers.length})</h4>{timers.map((t,i)=><div key={i} style={{ marginBottom:4,fontSize:10 }}><b>{t.name}</b> ({t.type}): работа {t.workSec}с / отдых {t.restSec}с × {t.rounds} раундов</div>)}</div>
+    <div className="card" style={{ marginBottom:8, padding:10 }}><h4 style={{ margin:'0 0 6px',fontSize:12 }}>🎵 BPM</h4>{bpm.map((b:any,i)=><div key={i} style={{ fontSize:9, display:'flex',justifyContent:'space-between' }}><span>{b.phase || b.name}</span><span style={{ fontWeight:600 }}>{b.bpmRange} BPM</span></div>)}</div>
+    <div className="card" style={{ padding:10 }}><h4 style={{ margin:'0 0 6px',fontSize:12 }}>✅ Чек-листы</h4>{checklists.map((c,i)=><div key={i} style={{ marginBottom:6 }}><div style={{ fontWeight:600,fontSize:11 }}>{(c as any).name || (c as any).title}</div>{c.items?.map((item:any,ii:number)=><div key={ii} style={{ fontSize:8,color:'var(--text-light)',marginLeft:6 }}>✓ {item}</div>)}</div>)}</div>
+  </div>);
+};
+
+const ProgressTab: React.FC<{ historyWorkouts: WorkoutLog[] }> = ({ historyWorkouts }) => {
+  const [measurements, setMeasurements] = React.useState<BodyMeasurement[]>([]);
+  const [repData, setRepData] = React.useState<any>(null);
+  const [mWeight, setMWeight] = React.useState(80);
+  const [mWaist, setMWaist] = React.useState(85);
+  const [mChest, setMChest] = React.useState(100);
+  const [mArm, setMArm] = React.useState(38);
+  const [mThigh, setMThigh] = React.useState(60);
+  const [mDate, setMDate] = React.useState(new Date().toISOString().split('T')[0]);
+
+  React.useEffect(() => { setMeasurements(loadMeasurements()); }, []);
+  const analytics = React.useMemo(() => analyzeMeasurements(175), [measurements]);
+
+  const save = () => {
+    const updated = saveMeasurement({ date: mDate, weightKg: mWeight, waistCm: mWaist, chestCm: mChest, armCm: mArm, thighCm: mThigh, calfCm: 38, neckCm: 38, hipCm: 95, shoulderCm: 120, forearmCm: 32, wristCm: 18, ankleCm: 22, bodyFatPercent: 15 } as any);
+    setMeasurements(updated);
+  };
+
+  React.useEffect(() => {
+    if (historyWorkouts.length > 0) {
+      const logs: any[] = [];
+      historyWorkouts.forEach((w: any) => (w.exercises || []).forEach((e: any) => {
+        (e.sets || []).forEach((s: any) => logs.push({ date: w.date, exercise: e.exerciseName || e.exerciseId, weight: s.weight, reps: s.reps, rpe: 7 }));
+      }));
+      if (logs.length > 0) setRepData(generateWeeklyReport(logs, logs.map((l: any) => ({ date: l.date, durationMin: 60 }))));
+    }
+  }, [historyWorkouts]);
+
+  return (<div>
+    <div className="card" style={{ marginBottom:8, padding:10 }}>
+      <h4 style={{ margin:'0 0 6px',fontSize:12 }}>📏 Замеры тела</h4>
+      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:4 }}>
+        <div><label style={{ fontSize:9 }}>Вес</label><input type="number" value={mWeight} onChange={e=>setMWeight(+e.target.value)} style={{ width:'100%',padding:'4px',borderRadius:4,background:'var(--bg-secondary)',border:'1px solid var(--border)',color:'var(--text)',fontSize:11,boxSizing:'border-box' }} /></div>
+        <div><label style={{ fontSize:9 }}>Талия</label><input type="number" value={mWaist} onChange={e=>setMWaist(+e.target.value)} style={{ width:'100%',padding:'4px',borderRadius:4,background:'var(--bg-secondary)',border:'1px solid var(--border)',color:'var(--text)',fontSize:11,boxSizing:'border-box' }} /></div>
+        <div><label style={{ fontSize:9 }}>Грудь</label><input type="number" value={mChest} onChange={e=>setMChest(+e.target.value)} style={{ width:'100%',padding:'4px',borderRadius:4,background:'var(--bg-secondary)',border:'1px solid var(--border)',color:'var(--text)',fontSize:11,boxSizing:'border-box' }} /></div>
+        <div><label style={{ fontSize:9 }}>Бицепс</label><input type="number" value={mArm} onChange={e=>setMArm(+e.target.value)} style={{ width:'100%',padding:'4px',borderRadius:4,background:'var(--bg-secondary)',border:'1px solid var(--border)',color:'var(--text)',fontSize:11,boxSizing:'border-box' }} /></div>
+        <div><label style={{ fontSize:9 }}>Бедро</label><input type="number" value={mThigh} onChange={e=>setMThigh(+e.target.value)} style={{ width:'100%',padding:'4px',borderRadius:4,background:'var(--bg-secondary)',border:'1px solid var(--border)',color:'var(--text)',fontSize:11,boxSizing:'border-box' }} /></div>
+        <div><label style={{ fontSize:9 }}>Дата</label><input type="date" value={mDate} onChange={e=>setMDate(e.target.value)} style={{ width:'100%',padding:'4px',borderRadius:4,background:'var(--bg-secondary)',border:'1px solid var(--border)',color:'var(--text)',fontSize:11,boxSizing:'border-box' }} /></div>
+      </div>
+      <button onClick={save} style={{ width:'100%',marginTop:6,padding:8,borderRadius:6,border:'none',cursor:'pointer',background:'var(--accent)',color:'#000',fontWeight:600,fontSize:12 }}>Сохранить замер</button>
+    </div>
+
+    {measurements.length > 0 && <div className="card" style={{ marginBottom:8, padding:10 }}>
+      <h4 style={{ margin:'0 0 4px',fontSize:12 }}>📊 История ({measurements.length})</h4>
+        {measurements.slice(-5).reverse().map((m:any,i)=><div key={i} style={{ fontSize:9,padding:'2px 0',borderBottom:'1px solid rgba(255,255,255,0.03)' }}>
+        {m.date}: Вес {m.weightKg}кг | Талия {m.waistCm}см | Грудь {m.chestCm}см | Бицепс {m.armCm}см | Бедро {m.thighCm}см
+      </div>)}
+    </div>}
+
+    {analytics && <div className="card" style={{ padding:10 }}>
+      <h4 style={{ margin:'0 0 4px',fontSize:12 }}>📈 Аналитика</h4>
+      <div style={{ display:'grid',gridTemplateColumns:'1fr 1fr',gap:'2px 8px',fontSize:10 }}>
+        <span>FFMI:</span><span style={{ fontWeight:600 }}>{analytics.ffmi?.toFixed(1)}</span>
+        <span>LBM:</span><span style={{ fontWeight:600 }}>{analytics.lbm?.toFixed(1)} кг</span>
+        <span>BMI:</span><span style={{ fontWeight:600 }}>{analytics.bmi?.toFixed(1)}</span>
+        <span>Fat:</span><span style={{ fontWeight:600 }}>{analytics.fatMass?.toFixed(1)} кг</span>
+      </div>
+    </div>}
+
+    {repData && <div className="card" style={{ padding:10, marginTop:8 }}>
+      <h4 style={{ margin:'0 0 4px',fontSize:12 }}>📋 Недельный отчёт</h4>
+      <div style={{ fontSize:9,color:'var(--text-light)' }}>{repData.insights?.slice(0,3).map((r:any,i:number)=><div key={i}>• {r}</div>)}</div>
+    </div>}
+  </div>);
+};
+
+const StrengthLevelCard: React.FC = () => {
+  const [slEx, setSlEx] = React.useState('squat');
+  const [slWt, setSlWt] = React.useState(80);
+  const [sl1RM, setSl1RM] = React.useState(140);
+  const level = getStrengthLevel(slEx, slWt, sl1RM) as string;
+  const next = getNextLevelTarget(slEx, slWt, level as any);
+  return (<div className="card" style={{ marginTop:8, padding:10 }}>
+    <h4 style={{ margin:'0 0 6px',fontSize:12 }}>📊 Уровень силы</h4>
+    <div style={{ display:'grid',gridTemplateColumns:'1fr 1fr',gap:4 }}>
+      <div><label style={{ fontSize:9 }}>Упражнение</label><select value={slEx} onChange={e=>setSlEx(e.target.value)} style={{ width:'100%',padding:'4px',borderRadius:4,background:'var(--bg-secondary)',border:'1px solid var(--border)',color:'var(--text)',fontSize:11 }}><option value="squat">Присед</option><option value="bench">Жим</option><option value="deadlift">Тяга</option></select></div>
+      <div><label style={{ fontSize:9 }}>Вес тела (кг)</label><input type="number" value={slWt} onChange={e=>setSlWt(+e.target.value)} style={{ width:'100%',padding:'4px',borderRadius:4,background:'var(--bg-secondary)',border:'1px solid var(--border)',color:'var(--text)',fontSize:11,boxSizing:'border-box' }} /></div>
+      <div><label style={{ fontSize:9 }}>1RM (кг)</label><input type="number" value={sl1RM} onChange={e=>setSl1RM(+e.target.value)} style={{ width:'100%',padding:'4px',borderRadius:4,background:'var(--bg-secondary)',border:'1px solid var(--border)',color:'var(--text)',fontSize:11,boxSizing:'border-box' }} /></div>
+    </div>
+    <div style={{ marginTop:6,fontSize:10 }}>Уровень: <b style={{ color:'var(--accent)' }}>{level}</b> | До следующего: <b style={{ color:'#8b5cf6' }}>{next} кг</b></div>
+  </div>);
+};
+
+const StructuredAnalyticsCard: React.FC<{ sessions: any[] }> = ({ sessions }) => {
+  const result = React.useMemo(() => sessions.length > 0 ? computeStructuredAnalytics(sessions) : null, [sessions]);
+  if (!result) return null;
+  return (<div className="card" style={{ marginTop:8, padding:10 }}>
+    <h4 style={{ margin:'0 0 4px',fontSize:12 }}>📊 Структурная</h4>
+    <div style={{ fontSize:10 }}>Сессий: <b>{(result as any).sessionCount || sessions.length}</b> | Объём: <b>{(result as any).totalVolume || '—'}</b></div>
+    {(result as any).insights?.slice(0,3).map((r:any,i:number)=><div key={i} style={{ fontSize:9,color:'var(--text-dim)',marginTop:2 }}>• {r}</div>)}
+  </div>);
 };

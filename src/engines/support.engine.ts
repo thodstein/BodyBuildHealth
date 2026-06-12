@@ -17,6 +17,21 @@ import {
   SUPPORT_BASE_COVERAGE
 } from '../core/constants';
 import { MASTER_DB } from '../core/master-db';
+import {
+  findSubstancesByOrgan,
+  findSubstancesByCategory,
+  findInteractionsForSubstance,
+  findSynergies,
+  findConflicts,
+  getSubstance,
+  searchSubstances,
+  ALL_SUBSTANCES,
+  ALL_INTERACTIONS,
+  ALL_RISKS,
+  type SupportSubstance,
+  type SupportInteraction,
+  type SupportRisk,
+} from '../data/support-database';
 
 export interface SupportInput {
   userId?: string;
@@ -1332,6 +1347,72 @@ export const SUPPLEMENT_TARGETS: Record<string, SupplementTarget> = {
     mechanisms: ['витамин D полураспад увеличение', '1α-гидроксилаза потенциация', 'SHBG снижение', 'остеокальцин модуляция', 'магний/кальций реабсорбция']
   },
 };
+
+export function checkSupportInteractions(
+  substanceIds: string[]
+): { synergies: SupportInteraction[]; conflicts: SupportInteraction[]; cautions: SupportInteraction[] } {
+  const synergies: SupportInteraction[] = [];
+  const conflicts: SupportInteraction[] = [];
+  const cautions: SupportInteraction[] = [];
+  const seen = new Set<string>();
+  for (const id of substanceIds) {
+    const interactions = findInteractionsForSubstance(id);
+    for (const inter of interactions) {
+      const otherId = inter.substanceA === id ? inter.substanceB : inter.substanceA;
+      if (substanceIds.includes(otherId) && !seen.has(inter.interactionId)) {
+        seen.add(inter.interactionId);
+        if (inter.type === 'synergy') synergies.push(inter);
+        else if (inter.type === 'conflict') conflicts.push(inter);
+        else if (inter.type === 'caution') cautions.push(inter);
+      }
+    }
+  }
+  return { synergies, conflicts, cautions };
+}
+
+export function findSupportForSystem(systemId: string): SupportSubstance[] {
+  return findSubstancesByOrgan(systemId);
+}
+
+export function findSupportForGoal(
+  goalRisks: string[],
+  maxResults: number = 20
+): { substance: SupportSubstance; relevanceScore: number }[] {
+  const scored: { substance: SupportSubstance; score: number }[] = [];
+  for (const sub of ALL_SUBSTANCES) {
+    let score = 0;
+    for (const risk of goalRisks) {
+      const riskLower = risk.toLowerCase();
+      if (sub.deficiency && sub.deficiency.toLowerCase().includes(riskLower)) score += 3;
+      if (sub.organs.some(o => riskLower.includes(o.toLowerCase()))) score += 1;
+      if (sub.mechanisms.some(m => riskLower.includes(m.toLowerCase()))) score += 1;
+      if (sub.description && sub.description.toLowerCase().includes(riskLower)) score += 1;
+    }
+    if (score > 0) scored.push({ substance: sub, score });
+  }
+  scored.sort((a, b) => b.score - a.score);
+  return scored.slice(0, maxResults).map(s => ({ substance: s.substance, relevanceScore: s.score }));
+}
+
+export function getSubstanceInfo(id: string): SupportSubstance | undefined {
+  return getSubstance(id);
+}
+
+export function searchSupport(query: string): SupportSubstance[] {
+  return searchSubstances(query);
+}
+
+export function getSupportSubstancesByCategory(category: string): SupportSubstance[] {
+  return findSubstancesByCategory(category);
+}
+
+export function getSupportDatabaseStats() {
+  return {
+    totalSubstances: ALL_SUBSTANCES.length,
+    totalInteractions: ALL_INTERACTIONS.length,
+    totalRisks: ALL_RISKS.length,
+  };
+}
 
 export function generateSupportStack(goal: string, blacklist: string[] = []): SubstanceEntry[] {
   const goalEntry = MASTER_DB.goals.find(g => g.id === goal);

@@ -55,8 +55,11 @@ export const LabsResults: React.FC<{
   }, {});
 
   const addNewLab = () => {
-    // TODO: Open modal for adding new lab
-    alert('Функция добавления анализов будет доступна в следующей версии');
+    const confirmed = window.confirm('Добавление анализов доступно через кнопку «Добавить» на вкладке «Ввод». Перейти на вкладку «Ввод»?');
+    if (confirmed) {
+      const inputTab = document.querySelector('[data-tab="input"]') as HTMLElement;
+      if (inputTab) inputTab.click();
+    }
   };
 
   return (

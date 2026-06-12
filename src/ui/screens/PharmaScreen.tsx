@@ -7,6 +7,7 @@ import { checkDrugInteractions } from '../../engines/pharma-interactions.engine'
 import { PHARMA_DETAILS, type PharmaDetail } from '../../data/pharma-details';
 import type { PharmaSubstance, CourseEntry, PD } from '../../core/types';
 import { SYNERGY_PAIRS, type SynergyPair } from '../../engines/support.engine';
+import { ALL_INTERACTIONS, findInteractionsForSubstance, type SupportInteraction } from '../../data/support-database';
 import { SYSTEM_INFO, SYSTEM_INFO_ALL } from '../../core/risk-info';
 import { PharmaCourseScreen } from './PharmaCourseScreen';
 import { useDataLink } from '../../core/data-link';
@@ -1125,6 +1126,24 @@ const InteractionCheckerTab: React.FC = () => {
 
   const hasAlerts = alerts && alerts.length > 0;
 
+  // Support DB cross-interactions
+  const supportCrossAlerts = useMemo(() => {
+    if (validIds.length < 2) return [];
+    const results: SupportInteraction[] = [];
+    for (const id of validIds) {
+      const interactions = findInteractionsForSubstance(id);
+      for (const inter of interactions) {
+        const other = inter.substanceA === id ? inter.substanceB : inter.substanceA;
+        if (validIds.includes(other) && !results.some(r => r.interactionId === inter.interactionId)) {
+          results.push(inter);
+        }
+      }
+    }
+    return results;
+  }, [validIds]);
+
+  const hasSupportAlerts = supportCrossAlerts.length > 0;
+
   return (
     <div>
       {/* Header */}
@@ -1246,11 +1265,25 @@ const InteractionCheckerTab: React.FC = () => {
                 </div>
                 <div style={{ lineHeight: 1.5 }}>
                   <span style={{ fontWeight: 600, color: 'var(--text)' }}>Рекомендация:</span>{' '}
-                  <span style={{ color: severityColor }}>{alert.recommendation}</span>
+                  <span style={{ color: 'var(--text-light)' }}>{alert.recommendation}</span>
                 </div>
               </div>
             );
           })}
+          {hasSupportAlerts && (
+            <div style={{ marginTop: 8 }}>
+              <h4 style={{ margin: '0 0 4px 0', fontSize: 11, color: '#8b5cf6' }}>💊 Поддержка: взаимодействия ({supportCrossAlerts.length})</h4>
+              {supportCrossAlerts.map((inter, i) => (
+                <div key={i} style={{ padding: '6px 10px', marginBottom: 4, borderRadius: 6, fontSize: 10,
+                  background: inter.type === 'conflict' ? 'rgba(239,68,68,0.08)' : inter.type === 'caution' ? 'rgba(245,158,11,0.08)' : 'rgba(34,197,94,0.08)',
+                  borderLeft: `3px solid ${inter.type === 'conflict' ? '#ef4444' : inter.type === 'caution' ? '#f59e0b' : '#22c55e'}`,
+                }}>
+                  <span style={{ fontWeight: 600, color: inter.type === 'conflict' ? '#ef4444' : inter.type === 'caution' ? '#f59e0b' : '#22c55e' }}>{inter.substanceA} + {inter.substanceB}</span>
+                  <span style={{ color: 'var(--text-dim)', marginLeft: 6 }}>{inter.notes}</span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 

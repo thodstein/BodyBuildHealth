@@ -22,9 +22,13 @@ import { runMDSS } from '../../engines/mdss-engine';
 import type { MDSSOutput } from '../../engines/mdss-engine';
 import { dailyCheckin } from '../../engines/daily-checkin.engine';
 import { loadEntries, computeStats } from '../../engines/body-composition.engine';
+import { getNutritionStats } from '../../engines/nutrition-tracker.engine';
+import { computeHealthScore } from '../../engines/health-score-v2.engine';
+import { getTodayMetric, weightTrend } from '../../engines/profile-settings.engine';
 import { db } from '../../core/db';
 import { getProfile } from '../../core/profile-manager';
 import { StrengthDiary } from '../../engines/strength-diary.engine';
+import { interpretLabs, type LabCompositeResult } from '../../engines/lab-analysis.engine';
 
 
 type ScreenId = 'dashboard' | 'pharma' | 'course' | 'peptides' | 'nutrition' | 'plan' | 'substances' | 'labs' | 'risks' | 'profile' | 'predictive' | 'marketplace' | 'articles' | 'assistant' | 'gamification' | 'fertility-pct' | 'calculators' | 'reports' | 'integrations' | 'role-management' | 'support' | 'training';
@@ -304,6 +308,36 @@ export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
 
       <AlertBanner messages={alerts} />
 
+      {(() => {
+        const s = getProfile().settings;
+        const hs = computeHealthScore({
+          pharmaRisk: riskResult ? Math.round(riskResult.overallNet) : 30,
+          weeksSinceLab: (() => {
+            const dates = labData.map(l => l.date).filter(Boolean).sort().reverse();
+            return dates[0] ? (Date.now() - new Date(dates[0]).getTime()) / (7 * 24 * 3600 * 1000) : 12;
+          })(),
+          nutritionAdherence: todayKcal > 0 ? Math.round(Math.min(100, todayKcal / 3000 * 100)) : 50,
+          trainingConsistency: trainingWorkouts > 0 ? Math.round(trainingWorkouts / 4 * 100) : 50,
+          sleepScore: (s.baselineSleepHours ?? 7) >= 7.5 ? 80 : 50,
+          hrvScore: (s.baselineHrvRatio ?? 0.6) >= 0.7 ? 75 : 50,
+          weightTrend: 0,
+          subjectiveEnergy: 6 - (s.fatigueLevel ?? 3),
+          subjectiveStress: s.baselineStressLevel ?? 3,
+        });
+        return (
+          <div style={{ background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', borderRadius: 10, padding: '8px 12px', marginBottom: 12 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-dim)', whiteSpace: 'nowrap' }}>🫀 Health Score</div>
+              <div style={{ flex: 1, height: 10, borderRadius: 6, background: 'rgba(255,255,255,0.06)', overflow: 'hidden' }}>
+                <div style={{ width: `${hs.overallScore}%`, height: '100%', borderRadius: 6, background: hs.overallScore >= 65 ? 'linear-gradient(90deg, #22c55e, #00e68a)' : hs.overallScore >= 40 ? 'linear-gradient(90deg, #eab308, #f59e0b)' : 'linear-gradient(90deg, #f97316, #ef4444)', transition: 'width 0.5s' }} />
+              </div>
+              <div style={{ fontSize: 14, fontWeight: 800, color: hs.overallScore >= 65 ? '#22c55e' : hs.overallScore >= 40 ? '#eab308' : '#ef4444', minWidth: 36, textAlign: 'right' }}>{hs.overallScore}</div>
+              <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>{hs.label}</div>
+            </div>
+          </div>
+        );
+      })()}
+
       {/* ── Global Risk Card: 3 calculation methods ── */}
       <div style={{ background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', borderRadius: 10, padding: '10px 12px', marginBottom: 12 }}>
         <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 8, display: 'flex', justifyContent: 'space-between' }}>
@@ -363,24 +397,55 @@ export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
         </div>
       </div>
 
+      {/* Lab Analysis Summary */}
+      {(() => {
+        if (labData.length === 0) return null;
+        const la = interpretLabs(labData);
+        if (!la || la.interpretations.length === 0) return null;
+        return (
+          <div style={{ background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', borderRadius: 10, padding: '8px 10px', marginBottom: 12 }}>
+            <div style={{ fontWeight: 600, fontSize: 11, marginBottom: 4, display: 'flex', justifyContent: 'space-between' }}>
+              <span>🧪 Сводка анализов</span>
+              <span style={{ fontSize: 8, color: 'var(--text-dim)' }}>{labData.length} тестов</span>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '2px 6px', fontSize: 9 }}>
+              {la.homaIR !== null && (
+                <><span style={{ color: 'var(--text-dim)' }}>HOMA-IR</span><span style={{ fontWeight: 600, color: la.homaIR > 2.5 ? '#ef4444' : la.homaIR > 1.5 ? '#f59e0b' : '#22c55e', textAlign: 'right' }}>{la.homaIR.toFixed(1)}</span><span/></>
+              )}
+              <span style={{ color: 'var(--text-dim)' }}>Печень</span><span style={{ fontWeight: 600, color: la.liverStress > 60 ? '#ef4444' : la.liverStress > 30 ? '#f59e0b' : '#22c55e', textAlign: 'right' }}>{la.liverStress}%</span><span/>
+              <span style={{ color: 'var(--text-dim)' }}>Кардио</span><span style={{ fontWeight: 600, color: la.cardioRisk > 60 ? '#ef4444' : la.cardioRisk > 30 ? '#f59e0b' : '#22c55e', textAlign: 'right' }}>{la.cardioRisk}%</span><span/>
+              <span style={{ color: 'var(--text-dim)' }}>Воспаление</span><span style={{ fontWeight: 600, color: la.inflammation > 6 ? '#ef4444' : la.inflammation > 3 ? '#f59e0b' : '#22c55e', textAlign: 'right' }}>{la.inflammation.toFixed(0)}</span><span/>
+              <span style={{ color: 'var(--text-dim)' }}>Почки</span><span style={{ fontWeight: 600, color: la.kidneyStress > 60 ? '#ef4444' : la.kidneyStress > 30 ? '#f59e0b' : '#22c55e', textAlign: 'right' }}>{la.kidneyStress}%</span><span/>
+              <span style={{ color: 'var(--text-dim)' }}>Гормоны</span><span style={{ fontWeight: 600, color: la.hormoneScore > 60 ? '#ef4444' : la.hormoneScore > 30 ? '#f59e0b' : '#22c55e', textAlign: 'right' }}>{la.hormoneScore}%</span><span/>
+            </div>
+            {la.interpretations.filter(i => i.status === 'critical_high' || i.status === 'high').length > 0 && (
+              <div style={{ marginTop: 3, fontSize: 8, color: '#ef4444' }}>
+                ⚠ {la.interpretations.filter(i => i.status === 'critical_high' || i.status === 'high').length} отклонений
+              </div>
+            )}
+          </div>
+        );
+      })()}
+
       {/* Daily Check-in Card */}
       {(() => {
         const settings = getProfile().settings;
+        const todayMetric = getTodayMetric();
         const checkin = dailyCheckin({
-          sleepHours: settings.baselineSleepHours ?? 7,
-          sleepQuality: settings.baselineSleepQuality ?? 4,
-          restingHR: 60,
-          hrvMs: Math.round((settings.baselineHrvRatio ?? 0.6) * 80),
-          bodyWeight: settings.weight ?? 80,
-          subjectiveEnergy: 5 - (settings.fatigueLevel ?? 3),
-          subjectiveSoreness: (settings.fatigueLevel ?? 3),
-          subjectiveStress: settings.baselineStressLevel ?? 3,
-          waterLiters: settings.dailyWaterLiters ?? 2.5,
+          sleepHours: todayMetric.sleepHours || (settings.baselineSleepHours ?? 7),
+          sleepQuality: todayMetric.sleepQuality || (settings.baselineSleepQuality ?? 4),
+          restingHR: todayMetric.restingHR || 60,
+          hrvMs: todayMetric.hrvMs || Math.round((settings.baselineHrvRatio ?? 0.6) * 80),
+          bodyWeight: todayMetric.weightKg || (settings.weight ?? 80),
+          subjectiveEnergy: todayMetric.subjectiveEnergy || (6 - (settings.fatigueLevel ?? 3)),
+          subjectiveSoreness: todayMetric.subjectiveSoreness || (settings.fatigueLevel ?? 3),
+          subjectiveStress: todayMetric.subjectiveStress || (settings.baselineStressLevel ?? 3),
+          waterLiters: todayMetric.waterLiters || (settings.dailyWaterLiters ?? 2.5),
           nutritionQuality: Math.round((settings.nutritionFactor ?? 0.7) * 5),
           trainingYesterday: false,
           yesterdayRPE: 5,
           sleepDebtHours: 0,
-          weightTrend: 0,
+          weightTrend: weightTrend(7),
         });
         return (
           <div style={{ background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', borderRadius: 10, padding: '10px 12px', marginBottom: 12 }}>
@@ -449,8 +514,42 @@ export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
                 <div style={{ fontSize: 16, fontWeight: 700, color: stats.goalProgress >= 50 ? '#22c55e' : stats.goalProgress >= 25 ? '#eab308' : 'var(--text-dim)' }}>
                   {stats.goalWeight > 0 ? `${stats.goalProgress}%` : '—'}
                 </div>
-              </div>
+                </div>
             </div>
+          </div>
+        );
+      })()}
+
+      {/* Nutrition quick bar */}
+      {(() => {
+        const nutStats = getNutritionStats();
+        if (!nutStats || nutStats.today.entries === 0) return null;
+        const t = nutStats.today;
+        const targets = { kcal: 3000, protein: 180, fat: 80, carbs: 350 };
+        return (
+          <div style={{ background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', borderRadius: 10, padding: '8px 10px', marginBottom: 12 }}>
+            <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-dim)', marginBottom: 4 }}>🍎 Сегодня · {nutStats.streak} дн streak</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 4, textAlign: 'center' }}>
+              {[
+                { label: 'Ккал', val: t.kcal, target: targets.kcal, color: '#ffa502' },
+                { label: 'Белок', val: t.protein, target: targets.protein, color: '#ef4444' },
+                { label: 'Жиры', val: t.fat, target: targets.fat, color: '#f59e0b' },
+                { label: 'Угли', val: t.carbs, target: targets.carbs, color: '#3b82f6' },
+              ].map(m => {
+                const pct = Math.min(100, Math.round((m.val / m.target) * 100));
+                return (
+                  <div key={m.label}>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: m.color }}>{m.val}<span style={{ fontSize: 8, color: 'var(--text-dim)' }}>/{m.target}</span></div>
+                    <div style={{ background: 'rgba(255,255,255,0.05)', borderRadius: 3, height: 4, marginTop: 2, overflow: 'hidden' }}>
+                      <div style={{ width: `${pct}%`, height: '100%', background: m.color, borderRadius: 3 }} />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            {t.waterMl > 0 && (
+              <div style={{ marginTop: 4, fontSize: 9, color: '#60a5fa' }}>💧 {t.waterMl} мл воды</div>
+            )}
           </div>
         );
       })()}

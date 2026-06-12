@@ -1,0 +1,262 @@
+import React, { useState, useMemo } from 'react';
+import { useDataLink } from '../../core/data-link';
+import { analyzeRecovery, shouldTrain, type SleepData, type HRVData, type RecoveryOutput } from '../../engines/recovery-optimization.engine';
+import { getBiohackingProtocols, getHomeGymSetups } from '../../engines/biohacking-environment.engine';
+import { generateDeload, getDeloadChecklist, getAllTechniques, getCues, type DeloadProtocol } from '../../engines/genetic-deload-technique.engine';
+import { getFederationRules, getGripProtocols, getMobilityFlows, getPostureAssessments, getCompetitionCalendar } from '../../engines/federation-grip-mobility.engine';
+import { detectOvertraining, type OvertrainingInput, type OvertrainingOutput } from '../../engines/overtraining-scheduler.engine';
+import { analyzeBiomechanics, quickSafetyCheck, type BiomechanicsInput, type RiskOutput } from '../../engines/biomechanics-risk-engine';
+import { getPrehabRoutine, getAllPrehabRoutines, getRehabProtocol, getBloodPanels, type PrehabRoutine } from '../../engines/injury-cycle-blood.engine';
+
+export const RecoveryScreen: React.FC = () => {
+  const linked = useDataLink();
+  const profile = linked.profile?.settings;
+  const [tab, setTab] = useState('recovery');
+
+  const [sleepHrs, setSleepHrs] = useState(profile?.baselineSleepHours ?? 7);
+  const [sleepQual, setSleepQual] = useState(profile?.baselineSleepQuality ?? 6);
+  const [hrvRmssd, setHrvRmssd] = useState(Math.round((profile?.baselineHrvRatio ?? 0.7) * 80));
+  const [restHR, setRestHR] = useState(60);
+  const [fatigueLvl, setFatigueLvl] = useState(profile?.fatigueLevel ?? 3);
+  const [recResult, setRecResult] = useState<RecoveryOutput | null>(null);
+
+  const runRecovery = () => {
+    const sleep: SleepData = { hours: sleepHrs, quality: sleepQual, bedtime: '23:00', wakeTime: '07:00', latencyMin: 15, awakenings: Math.max(0, 5 - sleepQual) };
+    const hrv: HRVData = { rmssd: hrvRmssd, sdnn: hrvRmssd * 1.6, restingHR: restHR, readinessScore: Math.round(hrvRmssd / 1.2) };
+    setRecResult(analyzeRecovery({ sleep, hrv, fatigueScore: fatigueLvl, trainingDaysThisWeek: 4, currentWeek: 4, periodizationPhase: 'intensification', recentPR: false, injuryHistory: [] }));
+  };
+
+  const [otMarkers, setOtMarkers] = useState<OvertrainingInput>({
+    performanceDecline: 0, hrvSuppression: 0, restingHRIncrease: 0, sleepHours: 7, sleepQuality: 6,
+    moodDisturbance: false, appetiteLoss: false, frequentIllness: false,
+    jointPainIncrease: false, rpeInflation: false, recoveryTimeExtension: false,
+    libidoDecrease: false, trainingMotivation: 7,
+  });
+  const [otResult, setOtResult] = useState<OvertrainingOutput | null>(null);
+  const updateOT = (k: keyof OvertrainingInput, v: number | boolean) => setOtMarkers({ ...otMarkers, [k]: v });
+  const runOT = () => setOtResult(detectOvertraining(otMarkers));
+
+  const [deloadResult, setDeloadResult] = useState<DeloadProtocol | null>(null);
+  const runDeload = () => { const p = generateDeload({ weeksInCycle: 8, fatigueScore: fatigueLvl * 10, priScore: 50, sleepScore: sleepQual * 15, hrvSuppression: 2, jointPain: 2, motivation: 7, gymPerformance: 'stable' }); setDeloadResult(p); };
+
+  const techniques = useMemo(() => getAllTechniques(), []);
+  const [techIdx, setTechIdx] = useState(0);
+  const gripProtocols = useMemo(() => getGripProtocols(), []);
+  const mobilityFlows = useMemo(() => getMobilityFlows(), []);
+  const postureAssessments = useMemo(() => getPostureAssessments(), []);
+  const competitions = useMemo(() => getCompetitionCalendar(), []);
+
+  const tabs = ['recovery','overtraining','deload','biohacking','technique','grip','mobility','posture','competition','biomech','prehab'];
+  const tabLabels: Record<string, string> = {
+    recovery:'🔄 Восст.',overtraining:'⚠ Перетрен',deload:'📉 Разгрузка',biohacking:'🧬 Биохакинг',
+    technique:'🏋️ Техника',grip:'🤝 Хват',mobility:'🧘 Мобильность',
+    posture:'🦴 Осанка',competition:'🏆 Соревнования',biomech:'🔬 Биомех',prehab:'🩹 Прехаб',
+  };
+
+  return (
+    <div className="screen">
+      <h2>🔄 Восстановление</h2>
+      <div style={{ display:'flex', gap:3, marginBottom:10, overflowX:'auto', scrollbarWidth:'none' }}>
+        {tabs.map(t => <button key={t} onClick={() => setTab(t)} style={{
+          padding:'6px 10px', borderRadius:8, fontSize:11, cursor:'pointer', whiteSpace:'nowrap',
+          background: tab===t ? 'var(--accent-green)' : 'var(--bg-secondary)',
+          color: tab===t ? '#000' : 'var(--text-dim)', border:'none', fontWeight:tab===t?700:400,
+        }}>{tabLabels[t]}</button>)}
+      </div>
+
+      {tab === 'recovery' && <div>
+        <div className="card" style={{ marginBottom:8 }}>
+          <h4 style={{ margin:'0 0 8px', fontSize:12 }}>📊 Анализ восстановления</h4>
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
+            <div><label style={{ fontSize:10, color:'var(--text-dim)' }}>Сон (ч)</label><input type="number" value={sleepHrs} onChange={e=>setSleepHrs(+e.target.value)} style={{ width:'100%', padding:'6px 8px', borderRadius:6, background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text)', fontSize:12, boxSizing:'border-box' }} /></div>
+            <div><label style={{ fontSize:10, color:'var(--text-dim)' }}>Качество сна</label><input type="range" min={1} max={10} value={sleepQual} onChange={e=>setSleepQual(+e.target.value)} /><span style={{ fontSize:10, color:'var(--text-dim)' }}>{sleepQual}/10</span></div>
+            <div><label style={{ fontSize:10, color:'var(--text-dim)' }}>HRV RMSSD</label><input type="number" value={hrvRmssd} onChange={e=>setHrvRmssd(+e.target.value)} style={{ width:'100%', padding:'6px 8px', borderRadius:6, background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text)', fontSize:12, boxSizing:'border-box' }} /></div>
+            <div><label style={{ fontSize:10, color:'var(--text-dim)' }}>Усталость</label><input type="range" min={1} max={10} value={fatigueLvl} onChange={e=>setFatigueLvl(+e.target.value)} /><span style={{ fontSize:10 }}>{fatigueLvl}/10</span></div>
+          </div>
+          <button onClick={runRecovery} style={{ width:'100%', padding:10, borderRadius:8, border:'none', cursor:'pointer', marginTop:8, background:'linear-gradient(135deg,#00e68a,#00c853)', color:'#000', fontWeight:700, fontSize:13 }}>Анализировать</button>
+        </div>
+        {recResult && <div className="card">
+          <h4 style={{ margin:'0 0 6px', fontSize:12 }}>📈 Результат</h4>
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'3px 8px', fontSize:10 }}>
+            <span style={{ color:'var(--text-dim)' }}>Индекс восстановления</span><span style={{ fontWeight:700, color: recResult.overallRecoveryIndex > 70 ? '#22c55e' : recResult.overallRecoveryIndex > 40 ? '#f59e0b' : '#ef4444' }}>{recResult.overallRecoveryIndex}%</span>
+            <span style={{ color:'var(--text-dim)' }}>Сон</span><span style={{ fontWeight:600 }}>{recResult.sleepScore}%</span>
+            <span style={{ color:'var(--text-dim)' }}>HRV</span><span style={{ fontWeight:600 }}>{recResult.hrvScore}%</span>
+            <span style={{ color:'var(--text-dim)' }}>Риск перетрена</span><span style={{ fontWeight:700, color: recResult.overtrainingRisk > 60 ? '#ef4444' : '#22c55e' }}>{recResult.overtrainingRisk}%</span>
+            <span style={{ color:'var(--text-dim)' }}>Делоад</span><span style={{ fontWeight:600, color: recResult.deloadRecommended ? '#ef4444' : '#22c55e' }}>{recResult.deloadRecommended ? '⚠ Рекомендован' : '✓ Не нужен'}</span>
+            <span style={{ color:'var(--text-dim)' }}>Суперкомпенсация</span><span style={{ fontWeight:600 }}>{recResult.supercompensationHours}ч</span>
+          </div>
+          {recResult.recommendations.length > 0 && <div style={{ marginTop:4, fontSize:9, color:'#f59e0b' }}>{recResult.recommendations.slice(0,3).map((r,i)=><div key={i}>• {r}</div>)}</div>}
+          {(() => { const st = shouldTrain(recResult.overallRecoveryIndex, fatigueLvl * 10); return <div style={{ marginTop:6, fontSize:10, color: st.train ? '#22c55e' : '#ef4444', fontWeight:700 }}>{st.train ? '✅ Тренироваться' : `🔴 Отдых: ${st.message}`}</div>; })()}
+        </div>}
+      </div>}
+
+      {tab === 'overtraining' && <div>
+        <div className="card" style={{ marginBottom:8 }}>
+          <h4 style={{ margin:'0 0 8px', fontSize:12 }}>⚠ Маркеры перетренированности</h4>
+          {Object.entries(otMarkers).map(([k, v]) => (
+            <div key={k} style={{ display:'flex', alignItems:'center', gap:6, marginBottom:4 }}>
+              <span style={{ flex:1, fontSize:10, color:'var(--text-dim)' }}>{k.replace(/([A-Z])/g,' $1').replace(/^./,c=>c.toUpperCase())}</span>
+              {typeof v === 'boolean' ? <input type="checkbox" checked={v} onChange={e=>updateOT(k as keyof OvertrainingInput, e.target.checked)} /> : <><input type="range" min={0} max={10} value={v as number} onChange={e=>updateOT(k as keyof OvertrainingInput, +e.target.value)} style={{ width:100 }} /><span style={{ fontSize:9, minWidth:16, textAlign:'right' }}>{(v as number)}/10</span></>}
+            </div>
+          ))}
+          <button onClick={runOT} style={{ width:'100%', padding:10, borderRadius:8, border:'none', cursor:'pointer', marginTop:6, background:'linear-gradient(135deg,#ef4444,#dc2626)', color:'#fff', fontWeight:700, fontSize:13 }}>Детектировать перетрен</button>
+        </div>
+        {otResult && <div className="card">
+          <h4 style={{ margin:'0 0 6px', fontSize:12 }}>Результат: {otResult.riskLevel} ({otResult.riskPercent}%)</h4>
+          <div style={{ fontSize:10, marginBottom:6 }}>{otResult.recommendation}</div>
+          {otResult.markers.filter(m=>m.status==='warning'||m.status==='critical').slice(0,5).map((m,i)=><div key={i} style={{ fontSize:9, color:'#ef4444' }}>⚠ {m.name}: {m.score}/{m.maxScore}</div>)}
+        </div>}
+      </div>}
+
+      {tab === 'deload' && <div>
+        <button onClick={runDeload} style={{ width:'100%', padding:12, borderRadius:8, border:'none', cursor:'pointer', marginBottom:10, background:'linear-gradient(135deg,#f59e0b,#d97706)', color:'#000', fontWeight:700, fontSize:14 }}>📉 Сгенерировать разгрузку</button>
+        {deloadResult && <div className="card">
+          <h4 style={{ margin:'0 0 6px', fontSize:12 }}>{deloadResult.type} — {deloadResult.weeks} нед</h4>
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'3px 8px', fontSize:10 }}>
+            <span>Объём:</span><span style={{ fontWeight:600 }}>{deloadResult.volumePercent}%</span>
+            <span>Интенсивность:</span><span style={{ fontWeight:600 }}>{deloadResult.intensityPercent}%</span>
+            <span>Тренировок/нед:</span><span style={{ fontWeight:600 }}>{deloadResult.frequencyDays}</span>
+          </div>
+          <div style={{ marginTop:6, fontSize:9, color:'var(--text-dim)' }}>{deloadResult.nutritionAdjustment}</div>
+          {deloadResult.dailyActivities.length > 0 && <div style={{ marginTop:4, fontSize:9 }}>{deloadResult.dailyActivities.map((a,i)=><div key={i}>✓ {a}</div>)}</div>}
+        </div>}
+      </div>}
+
+      {tab === 'biohacking' && <div>
+        <h4 style={{ fontSize:12, marginBottom:8 }}>🧬 Протоколы биохакинга</h4>
+        {getBiohackingProtocols().map((p,i) => <div key={i} className="card" style={{ marginBottom:6, padding:10 }}>
+          <div style={{ fontWeight:600, fontSize:12 }}>{p.name} <span style={{ fontSize:9, color:'var(--text-dim)' }}>({p.category})</span></div>
+          <div style={{ fontSize:9, color:'var(--text-dim)', marginTop:2 }}>{p.frequency} · {p.timing}</div>
+          <div style={{ fontSize:9, color:'var(--text-light)', marginTop:4 }}>{typeof p.protocol === 'string' ? p.protocol : (p.protocol as any[]).map((s:any) => s.action || String(s)).join(' → ')}</div>
+          <div style={{ display:'flex', gap:4, marginTop:4 }}>{p.benefits.slice(0,3).map((b,bi)=><span key={bi} style={{ fontSize:8, padding:'2px 5px', borderRadius:3, background:'rgba(0,230,138,0.08)', color:'#00e68a' }}>{b}</span>)}</div>
+        </div>)}
+        <h4 style={{ fontSize:12, margin:'12px 0 8px' }}>🏠 Home Gym Setups</h4>
+        {getHomeGymSetups().map((g,i) => <div key={i} className="card" style={{ marginBottom:6, padding:10 }}>
+          <div style={{ fontWeight:600, fontSize:12 }}>{(g as any).name || (g as any).tier || 'Home Gym'} <span style={{ color:'var(--accent)' }}>{g.budget}</span></div>
+          <div style={{ fontSize:9, color:'var(--text-dim)', marginTop:2 }}>{g.equipment.slice(0,6).join(', ')}</div>
+        </div>)}
+      </div>}
+
+      {tab === 'technique' && <div>
+        <div style={{ display:'flex', gap:4, marginBottom:8, overflowX:'auto' }}>
+          {techniques.map((t,i) => <button key={i} onClick={()=>setTechIdx(i)} style={{ padding:'6px 12px', borderRadius:8, fontSize:11, cursor:'pointer', whiteSpace:'nowrap', background: techIdx===i ? 'var(--accent-green)' : 'var(--bg-secondary)', color: techIdx===i ? '#000' : 'var(--text-dim)', border:'none' }}>{t.name}</button>)}
+        </div>
+        {techniques[techIdx] && <div className="card">
+          <h4 style={{ margin:'0 0 8px', fontSize:14 }}>{techniques[techIdx].name}</h4>
+          <div style={{ fontSize:10, marginBottom:6 }}><b>Подготовка:</b> {techniques[techIdx].setup}</div>
+          <div style={{ fontSize:10, marginBottom:6 }}><b>Выполнение:</b> {techniques[techIdx].execution}</div>
+          <div style={{ display:'flex', gap:4, flexWrap:'wrap', marginBottom:6 }}>
+            {(techniques[techIdx] as any).commonMistakes?.map((e: string, i: number) => <span key={i} style={{ fontSize:8, padding:'2px 5px', borderRadius:3, background:'rgba(239,68,68,0.1)', color:'#ef4444' }}>❌ {e}</span>)}
+          </div>
+          <div style={{ display:'flex', gap:4, flexWrap:'wrap' }}>
+            {getCues(techniques[techIdx].name).map((c,i) => <span key={i} style={{ fontSize:8, padding:'2px 5px', borderRadius:3, background:'rgba(0,230,138,0.08)', color:'#00e68a' }}>💡 {(c as any).instruction || (c as any).text || String(c)}</span>)}
+          </div>
+        </div>}
+      </div>}
+
+      {tab === 'grip' && <div>
+        <h4 style={{ fontSize:12, marginBottom:8 }}>🤝 Протоколы хвата</h4>
+        {gripProtocols.map((p,i) => <div key={i} className="card" style={{ marginBottom:6, padding:10 }}>
+          <div style={{ fontWeight:600, fontSize:12 }}>{p.name} ({p.type})</div>
+          <div style={{ fontSize:9, color:'var(--text-light)', marginTop:4 }}>{p.exercises.slice(0,4).join(' · ')}</div>
+        </div>)}
+      </div>}
+
+      {tab === 'mobility' && <div>
+        <h4 style={{ fontSize:12, marginBottom:8 }}>🧘 Мобильность</h4>
+        {mobilityFlows.map((f,i) => <div key={i} className="card" style={{ marginBottom:6, padding:10 }}>
+          <div style={{ fontWeight:600, fontSize:12 }}>{f.name} <span style={{ fontSize:9, color:'var(--text-dim)' }}>({(f as any).duration || '10'}мин, {(f as any).level || 'all'})</span></div>
+          <div style={{ fontSize:9, color:'var(--text-light)', marginTop:4 }}>{(f as any).description || f.name}</div>
+        </div>)}
+      </div>}
+
+      {tab === 'posture' && <div>
+        <h4 style={{ fontSize:12, marginBottom:8 }}>🦴 Оценка осанки</h4>
+        {postureAssessments.map((p,i) => <div key={i} className="card" style={{ marginBottom:6, padding:10 }}>
+          <div style={{ fontWeight:600, fontSize:12 }}>{p.deviation}</div>
+          <div style={{ fontSize:9, color:'var(--text-dim)', marginTop:2 }}>{(p as any).causes || ''}</div>
+          <div style={{ display:'flex', flexWrap:'wrap', gap:3, marginTop:4 }}>
+            {(p as any).correctives?.slice(0,6).map((c: string, ci: number) => <span key={ci} style={{ fontSize:8, padding:'2px 5px', borderRadius:3, background:'rgba(59,130,246,0.1)', color:'#3b82f6' }}>{c}</span>)}
+          </div>
+        </div>)}
+      </div>}
+
+      {tab === 'competition' && <div>
+        <h4 style={{ fontSize:12, marginBottom:8 }}>🏆 Календарь соревнований</h4>
+        {competitions.map((c,i) => <div key={i} className="card" style={{ marginBottom:6, padding:10 }}>
+          <div style={{ fontWeight:600, fontSize:12 }}>{c.name} ({(c as any).federation || ''})</div>
+          <div style={{ fontSize:9, color:'var(--text-dim)' }}>{c.date} · {c.location}</div>
+        </div>)}
+        <div className="card" style={{ marginTop:8 }}>
+          <h4 style={{ margin:'0 0 6px', fontSize:12 }}>📐 Правила федераций</h4>
+          {getFederationRules().map((f,i) => <div key={i} style={{ marginBottom:6, padding:'6px 0', borderBottom:'1px solid rgba(255,255,255,0.05)' }}>
+            <div style={{ fontWeight:600, fontSize:11 }}>{f.name}</div>
+            <div style={{ fontSize:9, color:'var(--text-dim)' }}>{f.commands} · {(f as any).equipment || ''}</div>
+          </div>)}
+        </div>
+      </div>}
+
+      {tab === 'biomech' && <BiomechTab />}
+      {tab === 'prehab' && <PrehabTab />}
+    </div>
+  );
+};
+
+const PrehabTab: React.FC = () => {
+  const routines = React.useMemo(() => getAllPrehabRoutines(), []);
+  const bloodPanels = React.useMemo(() => getBloodPanels(), []);
+  return (<div>
+    <div className="card" style={{ marginBottom:8, padding:10 }}>
+      <h4 style={{ margin:'0 0 6px',fontSize:12 }}>🩹 Прехаб-рутины ({routines.length})</h4>
+      {routines.map((r:any,i) => <div key={i} style={{ marginBottom:6,padding:'6px 0',borderBottom:'1px solid rgba(255,255,255,0.05)' }}>
+        <div style={{ fontWeight:600,fontSize:11 }}>{r.name || r.pattern || r.id} — {(r as any).duration || r.frequency || ''}</div>
+        <div style={{ fontSize:9,color:'var(--text-light)',marginTop:2 }}>{(r as any).exercises?.slice(0,6).join(' · ') || ''}</div>
+      </div>)}
+    </div>
+    <div className="card" style={{ padding:10 }}>
+      <h4 style={{ margin:'0 0 6px',fontSize:12 }}>🩸 График анализов крови</h4>
+      {bloodPanels.map((p:any,i) => <div key={i} style={{ marginBottom:4,fontSize:10 }}>
+        <b>{p.name || p.panel || p.id}</b> — {p.frequency || ''} (маркеров: {p.markers?.length || 0})
+      </div>)}
+    </div>
+  </div>);
+};
+
+const BiomechTab: React.FC = () => {
+  const [h, setH] = React.useState(175);
+  const [w, setW] = React.useState(80);
+  const [ex, setEx] = React.useState('squat');
+  const [load, setLoad] = React.useState(100);
+  const [r, setR] = React.useState<RiskOutput | null>(null);
+  const run = () => {
+    const input: BiomechanicsInput = {
+      exercise: { exerciseId: ex, category: ex, isUnilateral: false, expectedROM: { minCm: 20, maxCm: 80 }, jointAnglesDeg: {} } as any,
+      load: { weightKg: load, barPosition: 'high_bar', stance: 'medium', grip: 'medium' },
+      anthropometry: { heightCm: h, weightKg: w },
+    };
+    setR(analyzeBiomechanics(input));
+  };
+  const safe = quickSafetyCheck(ex, {});
+  return (<div>
+    <div className="card" style={{ marginBottom:8, padding:10 }}>
+      <h4 style={{ margin:'0 0 6px',fontSize:12 }}>🔬 Анализ биомеханики</h4>
+      <div style={{ display:'grid',gridTemplateColumns:'1fr 1fr',gap:4 }}>
+        <div><label style={{ fontSize:9 }}>Рост (см)</label><input type="number" value={h} onChange={e=>setH(+e.target.value)} style={{ width:'100%',padding:'4px',borderRadius:4,background:'var(--bg-secondary)',border:'1px solid var(--border)',color:'var(--text)',fontSize:11,boxSizing:'border-box' }} /></div>
+        <div><label style={{ fontSize:9 }}>Вес (кг)</label><input type="number" value={w} onChange={e=>setW(+e.target.value)} style={{ width:'100%',padding:'4px',borderRadius:4,background:'var(--bg-secondary)',border:'1px solid var(--border)',color:'var(--text)',fontSize:11,boxSizing:'border-box' }} /></div>
+        <div><label style={{ fontSize:9 }}>Упражнение</label><select value={ex} onChange={e=>setEx(e.target.value)} style={{ width:'100%',padding:'4px',borderRadius:4,background:'var(--bg-secondary)',border:'1px solid var(--border)',color:'var(--text)',fontSize:11 }}><option value="squat">Присед</option><option value="deadlift">Тяга</option><option value="bench">Жим</option></select></div>
+        <div><label style={{ fontSize:9 }}>Нагрузка (кг)</label><input type="number" value={load} onChange={e=>setLoad(+e.target.value)} style={{ width:'100%',padding:'4px',borderRadius:4,background:'var(--bg-secondary)',border:'1px solid var(--border)',color:'var(--text)',fontSize:11,boxSizing:'border-box' }} /></div>
+      </div>
+      <button onClick={run} style={{ width:'100%',padding:8,borderRadius:6,border:'none',cursor:'pointer',marginTop:6,background:'var(--accent)',color:'#000',fontWeight:600,fontSize:12 }}>Анализировать</button>
+      <div style={{ marginTop:4,fontSize:10,color:safe.safe?'#22c55e':'#ef4444',fontWeight:600 }}>{safe.safe ? '✅ Безопасно' : `⚠ ${safe.reason}`}</div>
+    </div>
+    {r && <div className="card" style={{ padding:10 }}>
+      <h4 style={{ margin:'0 0 6px',fontSize:12 }}>Результат</h4>
+      <div style={{ display:'grid',gridTemplateColumns:'1fr 1fr',gap:'2px 8px',fontSize:10 }}>
+        <span>Риск:</span><span style={{ fontWeight:700,color:r.overallRiskScore>60?'#ef4444':r.overallRiskScore>30?'#f59e0b':'#22c55e' }}>{r.overallRiskScore}%</span>
+        <span>Уровень:</span><span style={{ fontWeight:600 }}>{r.riskLevel}</span>
+        {r.jointTorques && <><span>Колено:</span><span style={{ fontWeight:600 }}>{r.jointTorques.kneeNm?.toFixed(0)} Nm</span></>}
+        {r.spineLoad && <><span>Позвоночник:</span><span style={{ fontWeight:600 }}>{r.spineLoad.shearN?.toFixed(0)} N</span></>}
+      </div>
+    </div>}
+  </div>);
+};

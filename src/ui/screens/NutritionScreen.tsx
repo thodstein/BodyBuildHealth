@@ -5,6 +5,12 @@ import { FOOD_DB } from '../../core/nutrition-database';
 import { MICRONUTRIENT_TARGETS } from '../../core/constants';
 import { useDataLink, derivePAL } from '../../core/data-link';
 import type { FoodItem, UserProfile } from '../../core/types';
+import { type LabCompositeResult } from '../../engines/lab-analysis.engine';
+import { generateMealPlan, type MealPlanInput, type DailyMealPlan } from '../../engines/meal-plan-generator.engine';
+import { generateWeeklyMealPlan, generateGroceryList, getFoodSwaps, getPortionGuide } from '../../engines/meal-planning-system.engine';
+import { calculateMacroPlan, generateCarbCycle, getSupplementTimings, getRecipes } from '../../engines/nutrition-periodization.engine';
+import { getRestaurantGuide, getTopAthleteChoices, getTravelWorkouts, getSleepStacks } from '../../engines/restaurant-travel-sleep.engine';
+import { generateMacroCycle, calcCycleAdherence, type WeeklyCyclePlan } from '../../engines/nutrition-cycling.engine';
 import { NutritionOverview } from './NutritionScreen_parts/NutritionOverview';
 import { NutritionDiary } from './NutritionScreen_parts/NutritionDiary';
 import { NutritionCharts } from './NutritionScreen_parts/NutritionCharts';
@@ -18,9 +24,26 @@ interface DiaryEntry {
   date?: string;
 }
 
+const NutritionLabContext: React.FC<{ labAnalysis: LabCompositeResult }> = ({ labAnalysis }) => (
+  <div style={{ background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', borderRadius: 10, padding: '8px 10px', marginTop: 8 }}>
+    <div style={{ fontWeight: 600, fontSize: 11, marginBottom: 4 }}>🧪 Контекст питания из анализов</div>
+    <div style={{ fontSize: 10, color: 'var(--text-dim)', lineHeight: 1.6 }}>
+      {labAnalysis.homaIR !== null && labAnalysis.homaIR > 2.5 && <div>⚠ HOMA-IR {labAnalysis.homaIR.toFixed(1)} — рекомендованы низко-ГИ продукты, ограничение простых углеводов</div>}
+      {labAnalysis.liverStress > 40 && <div>⚠ Печёночная нагрузка {labAnalysis.liverStress}% — исключить алкоголь, добавить NAC/омега-3</div>}
+      {labAnalysis.inflammation > 4 && <div>⚠ Воспаление {labAnalysis.inflammation.toFixed(1)} — противовоспалительная диета: омега-3, куркума, ягоды</div>}
+      {labAnalysis.kidneyStress > 40 && <div>⚠ Почечная нагрузка {labAnalysis.kidneyStress}% — контроль белка и соли</div>}
+      {labAnalysis.hormoneScore > 40 && <div>⚠ Гормональный дисбаланс {labAnalysis.hormoneScore}% — цинк, витамин D, крестоцветные</div>}
+      {labAnalysis.homaIR !== null && labAnalysis.homaIR <= 2.5 && labAnalysis.liverStress <= 40 && labAnalysis.inflammation <= 4 && labAnalysis.kidneyStress <= 40 && labAnalysis.hormoneScore <= 40 && (
+        <div style={{ color: '#22c55e' }}>✅ Все показатели в норме — стандартный план питания</div>
+      )}
+    </div>
+  </div>
+);
+
 export const NutritionScreen: React.FC = () => {
   const linked = useDataLink();
-  const [tab, setTab] = useState<'overview' | 'diary' | 'charts' | 'mealplan'>('overview');
+  const labAnalysis = linked.labAnalysis;
+  const [tab, setTab] = useState<'overview' | 'diary' | 'charts' | 'mealplan' | 'grocery' | 'restaurant' | 'cycling'>('overview');
   const [foodEntries, setFoodEntries] = useState<DiaryEntry[]>([]);
   const [dailyLogs, setDailyLogs] = useState<Record<string, DiaryEntry[]>>({});
 
@@ -80,11 +103,19 @@ export const NutritionScreen: React.FC = () => {
   }, [foodEntries]);
 
   const renderContent = () => {
+    const s = linked.profile?.settings;
+    const tKcal = linked.avgWeeklyKcal || (s?.weight ? Math.round(s.weight * 30) : 2200);
+    const tProt = linked.avgWeeklyProtein || (s?.weight ? Math.round(s.weight * 2) : 140);
+    const tFat = linked.avgWeeklyFat || Math.round(tKcal * 0.25 / 9);
+    const tCarbs = linked.avgWeeklyCarbs || Math.round((tKcal - tProt * 4 - tFat * 9) / 4);
     switch (tab) {
-      case 'overview': return <NutritionOverview profile={linked.profile} avgWeeklyKcal={avgWeeklyKcal} avgWeeklyProtein={avgWeeklyProtein} avgWeeklyFat={avgWeeklyFat} avgWeeklyCarbs={avgWeeklyCarbs} microsIntake={microsIntake} />;
+      case 'overview': return <><NutritionOverview profile={linked.profile} avgWeeklyKcal={avgWeeklyKcal} avgWeeklyProtein={avgWeeklyProtein} avgWeeklyFat={avgWeeklyFat} avgWeeklyCarbs={avgWeeklyCarbs} microsIntake={microsIntake} />{labAnalysis && <NutritionLabContext labAnalysis={labAnalysis} />}</>;
       case 'diary': return <NutritionDiary foodEntries={foodEntries} />;
       case 'charts': return <NutritionCharts kcalData={[avgWeeklyKcal]} proteinData={[avgWeeklyProtein]} labels={['Текущая']} dailyLogs={dailyLogs} />;
-      case 'mealplan': return <MealPlan profile={linked.profile} />;
+      case 'mealplan': return <MealPlanExtended tKcal={tKcal} tProt={tProt} tFat={tFat} tCarbs={tCarbs} />;
+      case 'grocery': return <GroceryTab tKcal={tKcal} tProt={tProt} />;
+      case 'restaurant': return <RestaurantTab />;
+      case 'cycling': return <CyclingTab tKcal={tKcal} tProt={tProt} />;
       default: return <NutritionOverview profile={linked.profile} avgWeeklyKcal={avgWeeklyKcal} avgWeeklyProtein={avgWeeklyProtein} avgWeeklyFat={avgWeeklyFat} avgWeeklyCarbs={avgWeeklyCarbs} microsIntake={microsIntake} />;
     }
   };
@@ -92,9 +123,9 @@ export const NutritionScreen: React.FC = () => {
   return (
     <div className="screen nutrition">
       <div className="tab-bar">
-        {(['overview', 'diary', 'charts', 'mealplan'] as const).map(t => (
+        {(['overview', 'diary', 'charts', 'mealplan', 'grocery', 'restaurant', 'cycling'] as const).map(t => (
           <button key={t} className={`tab-btn ${tab === t ? 'active' : ''}`} onClick={() => setTab(t)}>
-            {t === 'overview' ? '📊 Обзор' : t === 'diary' ? '📝 Дневник' : t === 'charts' ? '📈 Графики' : '🍽️ План питания'}
+            {t === 'overview' ? '📊 Обзор' : t === 'diary' ? '📝 Дневник' : t === 'charts' ? '📈 Графики' : t === 'mealplan' ? '🍽️ План' : t === 'grocery' ? '🛒 Закупки' : t === 'restaurant' ? '🍔 Рестораны' : '🔄 Цикл'}
           </button>
         ))}
       </div>
@@ -188,4 +219,72 @@ const MealPlan: React.FC<{ profile: UserProfile | null }> = ({ profile }) => {
       </div>
     </div>
   );
+};
+
+const MealPlanExtended: React.FC<{ tKcal: number; tProt: number; tFat: number; tCarbs: number }> = ({ tKcal, tProt, tFat, tCarbs }) => {
+  const [planDays, setPlanDays] = React.useState(3);
+  const [mealPlan, setMealPlan] = React.useState<DailyMealPlan[] | null>(null);
+  const [weeklyPlan, setWeeklyPlan] = React.useState<any[] | null>(null);
+  const recipes = React.useMemo(() => getRecipes(), []);
+  const timings = React.useMemo(() => getSupplementTimings(), []);
+
+  return (
+    <div>
+      <div className="card" style={{ marginBottom: 8 }}>
+        <h4 style={{ margin: '0 0 6px', fontSize: 12 }}>🍽️ Генератор плана питания</h4>
+        <div style={{ display: 'flex', gap: 4, marginBottom: 8 }}>
+          <input type="number" value={planDays} onChange={e => setPlanDays(+e.target.value)} style={{ width: 50, padding: '4px 6px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12 }} />
+          <span style={{ fontSize: 10, color: 'var(--text-dim)', alignSelf: 'center' }}>дней</span>
+          <button onClick={() => setMealPlan(generateMealPlan({ targetKcal: tKcal, targetProtein: tProt, targetFat: tFat, targetCarbs: tCarbs, days: planDays, preferences: { excludePork: false, excludeFish: false, excludeDairy: false, highCarb: false, keto: false } }))} style={{ padding: '6px 12px', borderRadius: 6, background: 'var(--accent)', color: '#000', border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: 11 }}>Сгенерировать</button>
+          <button onClick={() => setWeeklyPlan(generateWeeklyMealPlan([1,3,5], 'bulk', tKcal, tProt))} style={{ padding: '6px 12px', borderRadius: 6, background: '#8b5cf6', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: 11 }}>Недельный</button>
+        </div>
+        {mealPlan && <div style={{ maxHeight: 250, overflowY: 'auto', fontSize: 9 }}>
+          {mealPlan.map((d, di) => <div key={di} style={{ marginBottom: 6 }}><span style={{ fontWeight: 600 }}>День {d.day}</span>: {d.meals.map(m => m.name + ': ' + m.items.map(i => i.name + ' ' + i.amount).join(', ')).join(' | ')}</div>)}
+        </div>}
+        {weeklyPlan && <div>{weeklyPlan.slice(0,3).map((d: any, di: number) => <div key={di} className="card" style={{ padding: 6, marginBottom: 4 }}><span style={{ fontWeight: 600, fontSize: 10 }}>{d.dayName} {d.isTrainingDay ? '🏋️' : '🛌'}</span> — {d.dailyKcal} ккал</div>)}</div>}
+      </div>
+      <div className="card" style={{ marginBottom: 8 }}><h4 style={{ margin: '0 0 4px', fontSize: 12 }}>⏰ Тайминг добавок</h4>{timings.slice(0,6).map((t:any,i:number)=><div key={i} style={{fontSize:9,padding:'2px 0'}}><b>{t.name}</b>: {t.morning||''}{t.preWorkout||''}{t.evening||''}{t.beforeBed||''} — {t.dosage}</div>)}</div>
+      <div className="card"><h4 style={{ margin: '0 0 4px', fontSize: 12 }}>🍳 Рецепты ({recipes.length})</h4>{recipes.slice(0,5).map((r:any,i:number)=><div key={i} style={{marginBottom:4}}><b style={{fontSize:10}}>{r.name}</b><span style={{fontSize:9,color:'var(--text-dim)'}}> — {r.kcal}ккал Б:{r.protein} Ж:{r.fat} У:{r.carbs}</span></div>)}</div>
+    </div>
+  );
+};
+
+const GroceryTab: React.FC<{ tKcal: number; tProt: number }> = ({ tKcal, tProt }) => {
+  const weeklyPlan = React.useMemo(() => generateWeeklyMealPlan([1,3,5], 'bulk', tKcal, tProt), [tKcal, tProt]);
+  const grocery = React.useMemo(() => generateGroceryList(weeklyPlan), [weeklyPlan]);
+  const swaps = React.useMemo(() => getFoodSwaps(), []);
+  const portions = React.useMemo(() => getPortionGuide(), []);
+  return (<div>
+    {grocery.length > 0 && <div className="card" style={{ marginBottom: 8 }}><h4 style={{ margin: '0 0 4px', fontSize: 12 }}>🛒 Список закупок</h4>{grocery.map((cat:any,i:number)=><div key={i} style={{marginBottom:4}}><b style={{fontSize:10,color:'var(--accent)'}}>{cat.category}</b>{cat.items.map((it:any,j:number)=><div key={j} style={{fontSize:9,paddingLeft:8}}>• {it.name} — {it.quantity}</div>)}</div>)}</div>}
+    <div className="card" style={{ marginBottom: 8 }}><h4 style={{ margin: '0 0 4px', fontSize: 12 }}>🔄 Замены</h4>{swaps.map((s:any,i:number)=><div key={i} style={{fontSize:9,padding:'2px 0'}}><span style={{color:'#ef4444'}}>{s.original}</span> → <span style={{color:'#22c55e'}}>{s.replacement}</span></div>)}</div>
+    <div className="card"><h4 style={{ margin: '0 0 4px', fontSize: 12 }}>✋ Порции</h4>{portions.map((p:any,i:number)=><div key={i} style={{fontSize:9,padding:'2px 0'}}>{p.visual} = {p.food} ({p.kcal}ккал)</div>)}</div>
+  </div>);
+};
+
+const RestaurantTab: React.FC = () => {
+  const guide = React.useMemo(() => getRestaurantGuide(), []);
+  const top = React.useMemo(() => getTopAthleteChoices(), []);
+  const travels = React.useMemo(() => getTravelWorkouts(), []);
+  const sleepStacks = React.useMemo(() => getSleepStacks(), []);
+  return (<div>
+    <div className="card" style={{ marginBottom: 8 }}><h4 style={{ margin: '0 0 4px', fontSize: 12 }}>🍔 Рестораны ({guide.length})</h4><div style={{ maxHeight: 200, overflowY: 'auto' }}>{guide.slice(0,12).map((r:any,i:number)=><div key={i} style={{fontSize:9,padding:'2px 4px',display:'flex',justifyContent:'space-between'}}><span>{r.chain}: {r.item}</span><span style={{color:r.athleteRating==='excellent'?'#22c55e':'#f59e0b'}}>Б:{r.protein}г</span></div>)}</div></div>
+    <div className="card" style={{ marginBottom: 8 }}><h4 style={{ margin: '0 0 4px', fontSize: 12 }}>✈️ Тренировки в поездках</h4>{travels.map((w:any,i:number)=><div key={i} style={{marginBottom:4}}><b style={{fontSize:10}}>{w.name}</b><span style={{fontSize:9,color:'var(--text-dim)'}}> ({w.duration}мин)</span></div>)}</div>
+    <div className="card"><h4 style={{ margin: '0 0 4px', fontSize: 12 }}>😴 Стек для сна</h4>{sleepStacks.map((s:any,i:number)=><div key={i} style={{marginBottom:4}}><b style={{fontSize:10}}>{s.name}</b><span style={{fontSize:9,color:'var(--text-light)'}}>: {s.supplements.join(' + ')}</span></div>)}</div>
+  </div>);
+};
+
+const CyclingTab: React.FC<{ tKcal: number; tProt: number }> = ({ tKcal, tProt }) => {
+  const WEEK = ['Пн','Вт','Ср','Чт','Пт','Сб','Вс'];
+  const [cycle, setCycle] = React.useState<WeeklyCyclePlan | null>(null);
+  const gen = () => {
+    const targets: any = { kcal: Math.round(tKcal), protein: Math.round(tProt), fats: Math.round(tKcal * 0.25 / 9), carbs: Math.round((tKcal - tProt * 4 - tKcal * 0.25) / 4), water: 3, fiber: 30, steps: 8000 };
+    setCycle(generateMacroCycle(targets, [true,true,false,true,true,false,false], new Date().toISOString().split('T')[0]));
+  };
+  return (<div>
+    <button onClick={gen} style={{ width:'100%',padding:12,borderRadius:8,border:'none',cursor:'pointer',marginBottom:10,background:'linear-gradient(135deg,#3b82f6,#6366f1)',color:'#fff',fontWeight:700,fontSize:14 }}>🔄 Сгенерировать макро-цикл</button>
+    {cycle && <div>{cycle.days.map((d,i)=><div key={i} className="card" style={{ marginBottom:4, padding:8 }}>
+      <div style={{ fontWeight:600,fontSize:11 }}>{WEEK[i]} {d.isTrainingDay ? '🏋️ Трен.' : '🛌 Отдых'} — {d.targets.kcal} ккал</div>
+      <div style={{ fontSize:9,color:'var(--text-light)' }}>Б:{d.targets.p}г Ж:{d.targets.f}г У:{d.targets.c}г</div>
+    </div>)}</div>}
+  </div>);
 };

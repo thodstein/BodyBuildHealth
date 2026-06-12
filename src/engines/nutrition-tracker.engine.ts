@@ -1,221 +1,309 @@
-import { NutritionTargets, FoodItem } from '../core/types';
-import { NUTRITION_MACRO_RANGES, MICRONUTRIENT_TARGETS } from '../core/constants';
-import { FoodItem as DBFood } from '../core/nutrition-database';
+/**
+ * Nutrition Tracker Engine — Food diary, macros, meal templates, water tracking.
+ *
+ * Features:
+ *  - Quick food log (name, kcal, protein, fat, carbs)
+ *  - Daily macro summary with visual bars
+ *  - Weekly history
+ *  - Meal templates (breakfast, lunch, dinner, snack, post-workout)
+ *  - Water tracking with goal
+ *  - Calorie surplus/deficit calculation
+ *
+ * Data stored in localStorage under 'he_nutrition_log'.
+ *
+ * @module nutrition-tracker-engine
+ */
 
-export interface MealLog {
-  id: string; date: string; time: string;
-  items: Array<{ id: string; name: string; qty: number; kcal: number; p: number; f: number; c: number; fiber: number }>;
-  total: { kcal: number; p: number; f: number; c: number; fiber: number; water: number; steps: number };
+// ═══════════════════════════════════════════════════════════════════════════
+// Types
+// ═══════════════════════════════════════════════════════════════════════════
+
+export interface FoodEntry {
+  id: string;
+  date: string;          // YYYY-MM-DD
+  time: string;          // HH:MM
+  meal: 'breakfast' | 'lunch' | 'dinner' | 'snack' | 'post_workout' | 'other';
+  name: string;
+  amount: number;        // grams
+  kcal: number;
+  protein: number;       // grams
+  fat: number;           // grams
+  carbs: number;         // grams
 }
 
-export function calcNutritionTargets(weightKg: number, heightCm: number, age: number, sex: 'male'|'female', pal: number, goal: string, bfPct?: number): NutritionTargets {
-  const bmrKatch = bfPct ? 370 + 21.6 * (weightKg * (100 - bfPct) / 100) : 0;
-  const bmrMifflin = sex === 'male' ? 10*weightKg + 6.25*heightCm - 5*age + 5 : 10*weightKg + 6.25*heightCm - 5*age - 161;
-  const bmr = bfPct ? Math.max(bmrMifflin, bmrKatch) : bmrMifflin;
-  const tdee = bmr * pal;
-  let kcal = tdee;
-  if (goal === 'bulk') kcal += Math.min(500, tdee * 0.15);
-  else if (goal === 'cut') kcal = Math.max(bmr, tdee * 0.8);
-  else if (goal === 'recomp') kcal += 100;
-
-  const range = NUTRITION_MACRO_RANGES[goal] || NUTRITION_MACRO_RANGES.maintenance;
-  const [pMin, pMax] = range.protein;
-  const protein = Math.round(((pMin+pMax)/2) * weightKg);
-  const [fMin, fMax] = range.fats;
-  const fats = Math.max(0.8*weightKg, Math.round(((fMin+fMax)/2) * weightKg));
-  const carbs = Math.max(150, Math.round((kcal - protein*4 - fats*9)/4));
-  
-  const micros: Record<string, number> = {};
-  Object.entries(MICRONUTRIENT_TARGETS).forEach(([k, v]) => {
-    micros[k] = goal === 'cut' ? Math.round(v.amount * 1.15) : v.amount;
-  });
-  return { bmr: Math.round(bmr), tdee: Math.round(tdee), kcal: Math.round(kcal), protein, fats, carbs, water: Math.round((0.033*weightKg+0.5)*10)/10, fiber: sex==='male'?35:25, micros };
+export interface WaterEntry {
+  date: string;
+  amountMl: number;      // ml
 }
 
-export function calcAdherence(log: MealLog['total'], target: NutritionTargets): { kcal: number; pro: number; water: number; score: number } {
-  const kcalD = Math.abs(log.kcal - target.kcal) / target.kcal;
-  const proD = Math.abs(log.p - target.protein) / target.protein;
-  const waterD = Math.abs(log.water - target.water) / target.water;
-  return {
-    kcal: Math.max(0, Math.min(100, Math.round((1-kcalD)*100))),
-    pro: Math.max(0, Math.min(100, Math.round((1-proD)*100))),
-    water: Math.max(0, Math.min(100, Math.round((1-waterD)*100))),
-    score: Math.round(((1-kcalD)*0.4 + (1-proD)*0.35 + (1-waterD)*0.25)*100)
-  };
+export interface DailyMacros {
+  date: string;
+  kcal: number;
+  protein: number;
+  fat: number;
+  carbs: number;
+  waterMl: number;
+  entries: number;
+  meals: Record<string, { kcal: number; protein: number; entries: number }>;
 }
 
-export function getWeeklyAnalytics(logs: MealLog[], today: string): { daysLogged: number; avgKcal: number; trend: 'up'|'down'|'stable'; adherenceAvg: number } {
-  const week = logs.filter(l => {
-    const d = new Date(l.date);
-    const now = new Date(today);
-    return (now.getTime() - d.getTime()) <= 7*24*60*60*1000;
-  });
-  const avgKcal = week.length ? Math.round(week.reduce((s,l)=>s+l.total.kcal,0)/week.length) : 0;
-  const trend = week.length < 3 ? 'stable' : avgKcal > week[0].total.kcal*1.05 ? 'up' : avgKcal < week[0].total.kcal*0.95 ? 'down' : 'stable';
-  return { daysLogged: week.length, avgKcal, trend, adherenceAvg: week.length ? Math.round(week.reduce((s,l)=>s+calcAdherence(l.total, {kcal:2200,protein:160,fats:70,carbs:250,water:3,fiber:35,bmr:1600,tdee:2200,micros:{}}).score,0)/week.length) : 0 };
+export interface MacroTargets {
+  kcal: number;
+  protein: number;
+  fat: number;
+  carbs: number;
+  waterMl: number;
 }
 
-export function getPharmaInteractions(drugs: string[]): string {
-  if (!drugs.length) return '✅ Нет активных препаратов.';
-  const map: Record<string, string> = {
-    'клeнбутерол': 'Снижает K/Mg/Таурин. Добавьте курагу, гречку, магний 400мг.',
-    'телмисартан': 'Повышает K. Ограничьте калий до 3г/день.',
-    'метформин': 'Снижает B12/фолат. Добавьте метилкобаламин 1000мкг.',
-    'статины': 'Снижают CoQ10, повышают ALT. Добавьте 200мг CoQ10.',
-    'анастрозол': 'Риск болей в суставах. Добавьте Омега-3 + Хондроитин.'
-  };
-  let txt = '';
-  drugs.forEach(d => {
-    const key = Object.keys(map).find(k => d.toLowerCase().includes(k));
-    if (key) txt += `• ${key}: ${map[key]}\n`;
-  });
-  return txt || '⚠️ Взаимодействий не найдено.';
+export interface NutritionStats {
+  today: DailyMacros;
+  yesterday: DailyMacros;
+  weekAvg: { kcal: number; protein: number; fat: number; carbs: number };
+  streak: number;       // consecutive days logged
+  totalDays: number;
 }
 
-export interface FoodDBItem {
-  id: string; name: string; kcal: number; p: number; f: number; c: number; fiber?: number; water?: number;
+// ═══════════════════════════════════════════════════════════════════════════
+// Meal Templates (quick-add)
+// ═══════════════════════════════════════════════════════════════════════════
+
+export interface MealTemplate {
+  id: string;
+  name: string;
+  meal: FoodEntry['meal'];
+  foods: { name: string; amount: number; kcal: number; protein: number; fat: number; carbs: number }[];
 }
 
-export const FOOD_DB: FoodDBItem[] = [
-  { id: 'chicken_breast', name: 'куриная грудка', kcal: 165, p: 31, f: 3.6, c: 0, fiber: 0, water: 65 },
-  { id: 'beef', name: 'говядина', kcal: 250, p: 26, f: 15, c: 0, fiber: 0, water: 59 },
-  { id: 'salmon', name: 'лосось', kcal: 208, p: 20, f: 13, c: 0, fiber: 0, water: 64 },
-  { id: 'eggs', name: 'яйца', kcal: 155, p: 13, f: 11, c: 1.1, fiber: 0, water: 75 },
-  { id: 'cottage_cheese', name: 'творог', kcal: 121, p: 18, f: 5, c: 3.3, fiber: 0, water: 72 },
-  { id: 'milk', name: 'молоко', kcal: 42, p: 3.4, f: 1, c: 5, fiber: 0, water: 88 },
-  { id: 'kefir', name: 'кефир', kcal: 40, p: 3, f: 1, c: 4, fiber: 0, water: 90 },
-  { id: 'buckwheat', name: 'гречка', kcal: 343, p: 13, f: 3.4, c: 72, fiber: 10, water: 10 },
-  { id: 'rice', name: 'рис', kcal: 345, p: 7, f: 0.6, c: 79, fiber: 1.3, water: 10 },
-  { id: 'oatmeal', name: 'овсянка', kcal: 389, p: 17, f: 7, c: 66, fiber: 11, water: 8 },
-  { id: 'pasta', name: 'макароны', kcal: 350, p: 12, f: 1.5, c: 75, fiber: 3, water: 10 },
-  { id: 'potato', name: 'картофель', kcal: 77, p: 2, f: 0.1, c: 17, fiber: 2.2, water: 79 },
-  { id: 'whole_grain_bread', name: 'хлеб цельнозерновой', kcal: 247, p: 13, f: 3.4, c: 41, fiber: 7, water: 35 },
-  { id: 'banana', name: 'банан', kcal: 96, p: 1.3, f: 0.4, c: 23, fiber: 2.6, water: 75 },
-  { id: 'apple', name: 'яблоко', kcal: 52, p: 0.3, f: 0.2, c: 14, fiber: 2.4, water: 86 },
-  { id: 'vegetable_salad', name: 'овощной салат', kcal: 35, p: 1.5, f: 1, c: 4, fiber: 2, water: 150 },
-  { id: 'walnuts', name: 'орехи грецкие', kcal: 654, p: 15, f: 65, c: 14, fiber: 6.7, water: 4 },
-  { id: 'cheese', name: 'сыр', kcal: 350, p: 25, f: 27, c: 0.5, fiber: 0, water: 40 },
-  { id: 'whey_protein', name: 'протеин сывороточный', kcal: 400, p: 80, f: 5, c: 10, fiber: 0, water: 3 },
-  { id: 'peanut_butter', name: 'арахисовая паста', kcal: 588, p: 25, f: 50, c: 20, fiber: 6, water: 1 },
-  { id: 'avocado', name: 'авокадо', kcal: 160, p: 2, f: 15, c: 9, fiber: 7, water: 73 },
-  { id: 'broccoli', name: 'брокколи', kcal: 34, p: 2.8, f: 0.4, c: 7, fiber: 2.6, water: 89 },
-  { id: 'spinach', name: 'шпинат', kcal: 23, p: 2.9, f: 0.4, c: 3.6, fiber: 2.2, water: 91 },
-  { id: 'tomato', name: 'томаты', kcal: 18, p: 0.9, f: 0.2, c: 3.9, fiber: 1.2, water: 95 },
-  { id: 'cucumber', name: 'огурцы', kcal: 15, p: 0.7, f: 0.1, c: 3.6, fiber: 0.5, water: 96 },
-  { id: 'onion', name: 'лук', kcal: 40, p: 1.1, f: 0.1, c: 9, fiber: 1.7, water: 89 },
-  { id: 'carrot', name: 'морковь', kcal: 41, p: 0.9, f: 0.2, c: 10, fiber: 2.8, water: 88 },
-  { id: 'beetroot', name: 'свекла', kcal: 43, p: 1.7, f: 0.2, c: 10, fiber: 2.8, water: 88 },
-  { id: 'olive_oil', name: 'масло оливковое', kcal: 884, p: 0, f: 100, c: 0, fiber: 0, water: 0 },
-  { id: 'honey', name: 'мед', kcal: 304, p: 0.3, f: 0, c: 82, fiber: 0.2, water: 17 },
+export const MEAL_TEMPLATES: MealTemplate[] = [
+  {
+    id: 'breakfast_gainer', name: 'Завтрак (набор)', meal: 'breakfast',
+    foods: [
+      { name: 'Овсянка', amount: 100, kcal: 370, protein: 12, fat: 7, carbs: 60 },
+      { name: 'Яйца цельные', amount: 150, kcal: 230, protein: 19, fat: 16, carbs: 1 },
+      { name: 'Банан', amount: 120, kcal: 110, protein: 1, fat: 0, carbs: 27 },
+      { name: 'Молоко 2.5%', amount: 300, kcal: 160, protein: 9, fat: 7, carbs: 14 },
+    ],
+  },
+  {
+    id: 'lunch_standard', name: 'Обед (стандарт)', meal: 'lunch',
+    foods: [
+      { name: 'Куриная грудка', amount: 200, kcal: 330, protein: 62, fat: 7, carbs: 0 },
+      { name: 'Рис басмати', amount: 150, kcal: 520, protein: 11, fat: 1, carbs: 115 },
+      { name: 'Овощной салат', amount: 200, kcal: 60, protein: 3, fat: 1, carbs: 10 },
+      { name: 'Оливковое масло', amount: 15, kcal: 135, protein: 0, fat: 15, carbs: 0 },
+    ],
+  },
+  {
+    id: 'post_workout', name: 'Пост-тренировочный', meal: 'post_workout',
+    foods: [
+      { name: 'Сывороточный протеин', amount: 40, kcal: 160, protein: 32, fat: 1, carbs: 4 },
+      { name: 'Банан', amount: 150, kcal: 135, protein: 2, fat: 0, carbs: 34 },
+      { name: 'Белый рис', amount: 150, kcal: 195, protein: 4, fat: 0, carbs: 43 },
+    ],
+  },
+  {
+    id: 'dinner_cut', name: 'Ужин (сушка)', meal: 'dinner',
+    foods: [
+      { name: 'Белая рыба', amount: 200, kcal: 180, protein: 40, fat: 2, carbs: 0 },
+      { name: 'Брокколи', amount: 200, kcal: 70, protein: 6, fat: 1, carbs: 12 },
+      { name: 'Авокадо', amount: 50, kcal: 80, protein: 1, fat: 8, carbs: 4 },
+    ],
+  },
+  {
+    id: 'snack_protein', name: 'Перекус (белковый)', meal: 'snack',
+    foods: [
+      { name: 'Творог 5%', amount: 200, kcal: 240, protein: 34, fat: 10, carbs: 6 },
+      { name: 'Миндаль', amount: 30, kcal: 175, protein: 6, fat: 15, carbs: 6 },
+    ],
+  },
 ];
 
-export function searchFood(query: string): FoodDBItem[] {
-  const q = query.toLowerCase();
-  return FOOD_DB.filter(f => f.name.toLowerCase().includes(q) || f.id.toLowerCase().includes(q));
+// ═══════════════════════════════════════════════════════════════════════════
+// Storage
+// ═══════════════════════════════════════════════════════════════════════════
+
+const FOOD_KEY = 'he_food_log';
+const WATER_KEY = 'he_water_log';
+
+export function loadFoodLog(): FoodEntry[] {
+  try { return JSON.parse(localStorage.getItem(FOOD_KEY) || '[]'); } catch { return []; }
 }
 
-export function getFoodById(id: string): FoodDBItem | undefined {
-  return FOOD_DB.find(f => f.id === id);
+function saveFoodLog(entries: FoodEntry[]) {
+  entries.sort((a, b) => b.date.localeCompare(a.date) || b.time.localeCompare(a.time));
+  localStorage.setItem(FOOD_KEY, JSON.stringify(entries.slice(-1000)));
 }
 
-export interface MealDiary {
-  date: string;
-  meals: {
-    type: 'breakfast' | 'lunch' | 'dinner' | 'snack';
-    items: { foodId: string; name: string; weight: number; kcal: number; p: number; f: number; c: number }[];
-  }[];
+export function addFood(entry: Omit<FoodEntry, 'id'>): FoodEntry[] {
+  const entries = loadFoodLog();
+  entries.push({ ...entry, id: 'food_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6) });
+  saveFoodLog(entries);
+  return entries;
 }
 
-function loadAllDiaries(): MealDiary[] {
-  try {
-    const raw = localStorage.getItem('nutrition_diary');
-    return raw ? JSON.parse(raw) : [];
-  } catch { return []; }
+export function addMealTemplate(templateId: string, date?: string): FoodEntry[] {
+  const tmpl = MEAL_TEMPLATES.find(t => t.id === templateId);
+  if (!tmpl) return loadFoodLog();
+
+  const today = date || new Date().toISOString().slice(0, 10);
+  const now = new Date().toTimeString().slice(0, 5);
+  const entries = loadFoodLog();
+
+  for (const food of tmpl.foods) {
+    entries.push({
+      id: 'food_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
+      date: today,
+      time: now,
+      meal: tmpl.meal,
+      name: food.name,
+      amount: food.amount,
+      kcal: food.kcal,
+      protein: food.protein,
+      fat: food.fat,
+      carbs: food.carbs,
+    });
+  }
+
+  saveFoodLog(entries);
+  return entries;
 }
 
-function saveAllDiaries(diaries: MealDiary[]): void {
-  localStorage.setItem('nutrition_diary', JSON.stringify(diaries));
+export function removeFood(id: string): FoodEntry[] {
+  const entries = loadFoodLog().filter(e => e.id !== id);
+  saveFoodLog(entries);
+  return entries;
 }
 
-export function getDiary(date: string): MealDiary {
-  const diaries = loadAllDiaries();
-  return diaries.find(d => d.date === date) || { date, meals: [] };
+// Water
+export function loadWaterLog(): WaterEntry[] {
+  try { return JSON.parse(localStorage.getItem(WATER_KEY) || '[]'); } catch { return []; }
 }
 
-export function getDiaryRange(startDate: string, endDate: string): MealDiary[] {
-  const diaries = loadAllDiaries();
-  const start = new Date(startDate).getTime();
-  const end = new Date(endDate).getTime();
-  return diaries.filter(d => {
-    const t = new Date(d.date).getTime();
-    return t >= start && t <= end;
+export function addWater(amountMl: number): WaterEntry[] {
+  const today = new Date().toISOString().slice(0, 10);
+  const entries = loadWaterLog();
+  const existing = entries.find(e => e.date === today);
+  if (existing) existing.amountMl += amountMl;
+  else entries.push({ date: today, amountMl });
+  localStorage.setItem(WATER_KEY, JSON.stringify(entries.slice(-90)));
+  return entries;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Analytics
+// ═══════════════════════════════════════════════════════════════════════════
+
+export function getDailyMacros(date: string): DailyMacros {
+  const foods = loadFoodLog().filter(f => f.date === date);
+  const water = loadWaterLog().find(w => w.date === date);
+  const meals: Record<string, { kcal: number; protein: number; entries: number }> = {};
+
+  for (const f of foods) {
+    if (!meals[f.meal]) meals[f.meal] = { kcal: 0, protein: 0, entries: 0 };
+    meals[f.meal].kcal += f.kcal;
+    meals[f.meal].protein += f.protein;
+    meals[f.meal].entries++;
+  }
+
+  return {
+    date,
+    kcal: foods.reduce((s, f) => s + f.kcal, 0),
+    protein: foods.reduce((s, f) => s + f.protein, 0),
+    fat: foods.reduce((s, f) => s + f.fat, 0),
+    carbs: foods.reduce((s, f) => s + f.carbs, 0),
+    waterMl: water?.amountMl || 0,
+    entries: foods.length,
+    meals,
+  };
+}
+
+export function getNutritionStats(targets?: MacroTargets): NutritionStats | null {
+  const today = new Date().toISOString().slice(0, 10);
+  const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+
+  const todayMacros = getDailyMacros(today);
+  const yesterdayMacros = getDailyMacros(yesterday);
+
+  if (todayMacros.entries === 0 && yesterdayMacros.entries === 0) return null;
+
+  // Week average
+  const weekFoods = loadFoodLog().filter(f => {
+    const d = new Date(f.date);
+    const weekAgo = new Date(Date.now() - 7 * 86400000);
+    return d >= weekAgo;
   });
-}
+  const daysWithFood = new Set(weekFoods.map(f => f.date)).size || 1;
+  const weekAvg = {
+    kcal: Math.round(weekFoods.reduce((s, f) => s + f.kcal, 0) / daysWithFood),
+    protein: Math.round(weekFoods.reduce((s, f) => s + f.protein, 0) / daysWithFood),
+    fat: Math.round(weekFoods.reduce((s, f) => s + f.fat, 0) / daysWithFood),
+    carbs: Math.round(weekFoods.reduce((s, f) => s + f.carbs, 0) / daysWithFood),
+  };
 
-export function addMealEntry(date: string, mealType: 'breakfast' | 'lunch' | 'dinner' | 'snack', foodId: string, weight: number): MealDiary {
-  const diaries = loadAllDiaries();
-  let diary = diaries.find(d => d.date === date);
-  if (!diary) {
-    diary = { date, meals: [] };
-    diaries.push(diary);
+  // Streak
+  let streak = 0;
+  const allFood = loadFoodLog();
+  const dates = [...new Set(allFood.map(f => f.date))].sort().reverse();
+  const todayDate = new Date(today);
+  for (let i = 0; i < dates.length; i++) {
+    const expected = new Date(todayDate);
+    expected.setDate(expected.getDate() - i);
+    if (dates[i] === expected.toISOString().slice(0, 10)) streak++;
+    else break;
   }
-  let meal = diary.meals.find(m => m.type === mealType);
-  if (!meal) {
-    meal = { type: mealType, items: [] };
-    diary.meals.push(meal);
+
+  return {
+    today: todayMacros,
+    yesterday: yesterdayMacros,
+    weekAvg,
+    streak,
+    totalDays: [...new Set(allFood.map(f => f.date))].length,
+  };
+}
+
+export function getWeeklyHistory(): { date: string; kcal: number; protein: number; fat: number; carbs: number }[] {
+  const foods = loadFoodLog();
+  const weekMap = new Map<string, { kcal: number; protein: number; fat: number; carbs: number }>();
+
+  for (const f of foods) {
+    const d = f.date;
+    if (!weekMap.has(d)) weekMap.set(d, { kcal: 0, protein: 0, fat: 0, carbs: 0 });
+    const w = weekMap.get(d)!;
+    w.kcal += f.kcal;
+    w.protein += f.protein;
+    w.fat += f.fat;
+    w.carbs += f.carbs;
   }
-  const food = getFoodById(foodId);
-  if (!food) return diary;
-  const scale = weight / 100;
-  meal.items.push({
-    foodId,
-    name: food.name,
-    weight,
-    kcal: Math.round(food.kcal * scale),
-    p: Math.round(food.p * scale * 10) / 10,
-    f: Math.round(food.f * scale * 10) / 10,
-    c: Math.round(food.c * scale * 10) / 10,
-  });
-  saveAllDiaries(diaries);
-  return diary;
+
+  return [...weekMap.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .slice(-14)
+    .map(([date, m]) => ({ date, ...m }));
 }
 
-export function removeMealEntry(date: string, mealType: 'breakfast' | 'lunch' | 'dinner' | 'snack', foodId: string): MealDiary {
-  const diaries = loadAllDiaries();
-  const diary = diaries.find(d => d.date === date);
-  if (!diary) return { date, meals: [] };
-  const meal = diary.meals.find(m => m.type === mealType);
-  if (!meal) return diary;
-  const idx = meal.items.findIndex(i => i.foodId === foodId);
-  if (idx !== -1) meal.items.splice(idx, 1);
-  saveAllDiaries(diaries);
-  return diary;
+// ═══════════════════════════════════════════════════════════════════════════
+// Adherence calculator (used by health-score.engine.ts)
+// ═══════════════════════════════════════════════════════════════════════════
+
+export interface AdherenceTarget {
+  kcal: number;
+  protein: number;
+  fats?: number;
+  carbs?: number;
+  [key: string]: any;
 }
 
-export function getDailyTotals(date: string): { kcal: number; p: number; f: number; c: number; fiber: number; water: number } {
-  const diary = getDiary(date);
-  let kcal = 0, p = 0, f = 0, c = 0, fiber = 0, water = 0;
-  for (const meal of diary.meals) {
-    for (const item of meal.items) {
-      kcal += item.kcal;
-      p += item.p;
-      f += item.f;
-      c += item.c;
-      const food = getFoodById(item.foodId);
-      if (food) {
-        const scale = item.weight / 100;
-        fiber += (food.fiber || 0) * scale;
-        water += (food.water || 0) * scale;
-      }
-    }
-  }
-  return { kcal: Math.round(kcal), p: Math.round(p * 10) / 10, f: Math.round(f * 10) / 10, c: Math.round(c * 10) / 10, fiber: Math.round(fiber * 10) / 10, water: Math.round(water * 10) / 10 };
-}
+export function calcAdherence(
+  actual: { kcal: number; protein?: number; p?: number; fat?: number; f?: number; carbs?: number; c?: number },
+  target: AdherenceTarget,
+): { score: number; deviation: { kcal: number; protein: number } } {
+  const actualKcal = actual.kcal || 0;
+  const actualProtein = actual.protein || actual.p || 0;
+  const targetProtein = target.protein || 0;
 
-export function saveDiary(diary: MealDiary): void {
-  const diaries = loadAllDiaries();
-  const idx = diaries.findIndex(d => d.date === diary.date);
-  if (idx !== -1) diaries[idx] = diary;
-  else diaries.push(diary);
-  saveAllDiaries(diaries);
+  const kcalDev = target.kcal > 0 ? Math.abs(actualKcal - target.kcal) / target.kcal : 0;
+  const protDev = targetProtein > 0 ? Math.abs(actualProtein - targetProtein) / targetProtein : 0;
+
+  const score = Math.round(Math.max(0, 100 - kcalDev * 50 - protDev * 30));
+  return { score, deviation: { kcal: Math.round(kcalDev * 100), protein: Math.round(protDev * 100) } };
 }

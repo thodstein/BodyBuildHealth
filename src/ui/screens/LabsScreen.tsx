@@ -4,6 +4,8 @@ import type { RiskResult, LabPoint } from '../../core/types';
 import { calculateRiskFromAnalyses } from '../../engines/risk-calculator-v2.engine';
 import { calculatePenaltyCoefficients } from '../../engines/labs-penalty.engine';
 import { computeLabIndexDetails, type LabIndexDetail } from '../../engines/labs-indices.engine';
+import { interpretLabs, computeHOMA_IR, type LabCompositeResult } from '../../engines/lab-analysis.engine';
+import { analyzeLabDrugCorrelation, type LabDrugAlert } from '../../engines/lab-pharma-correlation.engine';
 import { getRiskColor } from '../../core/utils/risk-colors';
 import { useDataLink, notifyDataChange } from '../../core/data-link';
 import { db } from '../../core/db';
@@ -197,6 +199,16 @@ export const LabsScreen: React.FC = () => {
     return computeLabIndexDetails(labs);
   }, [hasLabs, labs]);
 
+  const labAnalysisResult = useMemo(() => {
+    if (!hasLabs) return null;
+    return interpretLabs(labs);
+  }, [hasLabs, labs]);
+
+  const labPharmaAlerts = useMemo(() => {
+    if (!hasLabs || linked.course.length === 0) return [];
+    return analyzeLabDrugCorrelation(labs, linked.course, linked.profile?.settings?.phase || 'on_cycle');
+  }, [hasLabs, labs, linked.course]);
+
   const indexEntries = useMemo(() => {
     return Object.entries(labIndexDetails).map(([key, detail]) => ({
       key, label: detail.label, value: Math.round(detail.value * 100),
@@ -389,6 +401,32 @@ export const LabsScreen: React.FC = () => {
 
           {/* Entered results */}
           <LabsResults labs={labs} />
+
+          {/* Lab Analysis Composite Scores */}
+          {labAnalysisResult && (
+            <div className="card" style={{ padding: 10, marginTop: 8 }}>
+              <h4 style={{ margin: '0 0 6px 0', fontSize: 12 }}>🧪 Композитные индексы</h4>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr 1fr', gap: '2px 6px', fontSize: 10, alignItems: 'center' }}>
+                {labAnalysisResult.homaIR !== null && <><span style={{ color: 'var(--text-dim)' }}>HOMA-IR</span><span><div style={{ background: 'rgba(255,255,255,0.08)', borderRadius: 3, height: 6, overflow: 'hidden' }}><div style={{ width: `${Math.min(100, labAnalysisResult.homaIR * 40)}%`, height: '100%', background: labAnalysisResult.homaIR > 2.5 ? '#ef4444' : '#22c55e', borderRadius: 3 }} /></div></span><span style={{ fontWeight: 600, textAlign: 'right', color: labAnalysisResult.homaIR > 2.5 ? '#ef4444' : '#22c55e' }}>{labAnalysisResult.homaIR.toFixed(2)}</span></>}
+                <span style={{ color: 'var(--text-dim)' }}>Печень</span><div><div style={{ background: 'rgba(255,255,255,0.08)', borderRadius: 3, height: 6, overflow: 'hidden' }}><div style={{ width: `${labAnalysisResult.liverStress}%`, height: '100%', background: labAnalysisResult.liverStress > 60 ? '#ef4444' : '#22c55e', borderRadius: 3 }} /></div></div><span style={{ fontWeight: 600, textAlign: 'right', color: labAnalysisResult.liverStress > 60 ? '#ef4444' : '#22c55e' }}>{labAnalysisResult.liverStress}%</span>
+                <span style={{ color: 'var(--text-dim)' }}>Кардио</span><div><div style={{ background: 'rgba(255,255,255,0.08)', borderRadius: 3, height: 6, overflow: 'hidden' }}><div style={{ width: `${labAnalysisResult.cardioRisk}%`, height: '100%', background: labAnalysisResult.cardioRisk > 60 ? '#ef4444' : '#22c55e', borderRadius: 3 }} /></div></div><span style={{ fontWeight: 600, textAlign: 'right', color: labAnalysisResult.cardioRisk > 60 ? '#ef4444' : '#22c55e' }}>{labAnalysisResult.cardioRisk}%</span>
+                <span style={{ color: 'var(--text-dim)' }}>Воспаление</span><div><div style={{ background: 'rgba(255,255,255,0.08)', borderRadius: 3, height: 6, overflow: 'hidden' }}><div style={{ width: `${Math.min(100, labAnalysisResult.inflammation * 15)}%`, height: '100%', background: labAnalysisResult.inflammation > 6 ? '#ef4444' : '#22c55e', borderRadius: 3 }} /></div></div><span style={{ fontWeight: 600, textAlign: 'right', color: labAnalysisResult.inflammation > 6 ? '#ef4444' : '#22c55e' }}>{labAnalysisResult.inflammation.toFixed(1)}</span>
+                <span style={{ color: 'var(--text-dim)' }}>Почки</span><div><div style={{ background: 'rgba(255,255,255,0.08)', borderRadius: 3, height: 6, overflow: 'hidden' }}><div style={{ width: `${labAnalysisResult.kidneyStress}%`, height: '100%', background: labAnalysisResult.kidneyStress > 60 ? '#ef4444' : '#22c55e', borderRadius: 3 }} /></div></div><span style={{ fontWeight: 600, textAlign: 'right', color: labAnalysisResult.kidneyStress > 60 ? '#ef4444' : '#22c55e' }}>{labAnalysisResult.kidneyStress}%</span>
+                <span style={{ color: 'var(--text-dim)' }}>Гормоны</span><div><div style={{ background: 'rgba(255,255,255,0.08)', borderRadius: 3, height: 6, overflow: 'hidden' }}><div style={{ width: `${labAnalysisResult.hormoneScore}%`, height: '100%', background: labAnalysisResult.hormoneScore > 60 ? '#ef4444' : '#22c55e', borderRadius: 3 }} /></div></div><span style={{ fontWeight: 600, textAlign: 'right', color: labAnalysisResult.hormoneScore > 60 ? '#ef4444' : '#22c55e' }}>{labAnalysisResult.hormoneScore}%</span>
+              </div>
+            </div>
+          )}
+
+          {/* Lab-Pharma Correlation */}
+          {labPharmaAlerts.length > 0 && (
+            <div className="card" style={{ padding: 10, marginTop: 8 }}>
+              <h4 style={{ margin: '0 0 6px', fontSize: 12 }}>💊 Связь анализы↔препараты ({labPharmaAlerts.length})</h4>
+              {labPharmaAlerts.map((a,i) => <div key={i} style={{ fontSize:9, padding:'3px 0', borderBottom:'1px solid rgba(255,255,255,0.03)', display:'flex',justifyContent:'space-between' }}>
+                <span>{a.marker} {a.actualStatus === 'high' ? '↑' : a.actualStatus === 'low' ? '↓' : ''} {a.value}{a.unit}</span>
+                <span style={{ color: a.severity === 'critical' ? '#ef4444' : a.severity === 'high' ? '#f59e0b' : '#22c55e' }}>{a.drugCause?.join(', ')} — {a.recommendation}</span>
+              </div>)}
+            </div>
+          )}
 
           {/* Lab Risks + Deviations */}
           {labRisks && (

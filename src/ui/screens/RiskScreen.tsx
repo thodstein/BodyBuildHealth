@@ -21,6 +21,7 @@ import { calculateWeeklyRiskDynamics, type WeeklyRiskDynamics } from '../../engi
 import { useV7Risk } from '../hooks/useV7Risk';
 import { getProfile, updateProfile } from '../../core/profile-manager';
 import { analyzeWithCompliance, type ComplianceReport, getComplianceStatus } from '../../engines/compliance-engine';
+import { validateDiagnostics, getDiagnosticSummary } from '../../engines/diagnostics.engine';
 
 const RISK_HISTORY_KEY = 'risk_history';
 const MAX_HISTORY = 12;
@@ -47,6 +48,8 @@ const TAB_LABELS: Record<string, string> = {
 
 export const RiskScreen: React.FC = () => {
   const linked = useDataLink();
+  const labAnalysis = linked.labAnalysis;
+  const readinessData = linked.readiness;
   const [tab, setTab] = useState<'overview' | 'dynamics' | 'mechanisms' | 'v7' | 'model' | 'info' | 'mdss' | 'compliance' | 'clinical'>('overview');
   const [tick, setTick] = useState(0);
   const [selectedWeek, setSelectedWeek] = useState<number | null>(null);
@@ -164,6 +167,24 @@ export const RiskScreen: React.FC = () => {
     return { overallRaw: risk, overallNet: risk * 0.8, systemBreakdown };
   }, [linked.profile]);
 
+  // Lab analysis risk — from lab-analysis.engine (HOMA-IR, liver, cardio, etc.)
+  const labAnalysisRisk = useMemo(() => {
+    if (!labAnalysis) return null;
+    const breakdown: Record<string, { raw: number; net: number }> = {};
+    for (const sys of ALL_RISK_SYSTEMS) {
+      let r = 0;
+      if (sys === 'hepatic') r = labAnalysis.liverStress;
+      else if (sys === 'cardio') r = labAnalysis.cardioRisk;
+      else if (sys === 'renal') r = labAnalysis.kidneyStress;
+      else if (sys === 'endocrine') r = labAnalysis.hormoneScore;
+      else if (sys === 'hematologic') r = labAnalysis.inflammation * 5;
+      else r = (labAnalysis.liverStress + labAnalysis.cardioRisk + labAnalysis.kidneyStress + labAnalysis.hormoneScore) / 8;
+      breakdown[sys] = { raw: Math.min(100, r), net: Math.min(100, r * 0.7) };
+    }
+    const overall = Math.min(100, (labAnalysis.liverStress + labAnalysis.cardioRisk + labAnalysis.kidneyStress + labAnalysis.hormoneScore + labAnalysis.inflammation * 5) / 5);
+    return { overallRaw: overall, overallNet: overall * 0.7, systemBreakdown: breakdown };
+  }, [labAnalysis]);
+
   // Aggregated risk (pharma + labs + training + nutrition + diagnostics)
   const aggregatedRisk = useMemo<AggregatedRisk | null>(() => {
     if (!pharmaRisk) return null;
@@ -225,6 +246,9 @@ export const RiskScreen: React.FC = () => {
     result = mergeRiskSource(result, trainingRisk);
     // Merge nutrition risk
     result = mergeRiskSource(result, nutritionRisk);
+    if (labAnalysisRisk) {
+      result = mergeRiskSource(result, labAnalysisRisk);
+    }
     if (shouldApplyPenalty) {
       result = applyPenaltyToResult(result);
     }

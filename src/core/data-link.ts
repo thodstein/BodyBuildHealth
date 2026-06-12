@@ -6,6 +6,7 @@ import { UCUM_MAP, ALL_RISK_SYSTEMS } from './constants';
 import { calcReadiness } from '../engines/readiness.engine';
 import { calculateRisks } from '../engines/risk.engine';
 import { calculateSupport, generateSupportStack, type SupportInput } from '../engines/support.engine';
+import { interpretLabs, type LabCompositeResult } from '../engines/lab-analysis.engine';
 import type { ReadinessScores, RiskCalculationResult } from './types';
 
 let globalTick = 0;
@@ -28,6 +29,7 @@ export interface LinkedData {
   avgWeeklyCarbs: number;
   activeDrugs: Record<string, { dosePerWeek: number }>;
   supportCoverage: Record<string, number>;
+  labAnalysis: LabCompositeResult | null;
   pal: number;
   trainingLoadRatio: number;
   refetch: () => void;
@@ -234,9 +236,10 @@ export function useDataLink(): LinkedData {
   })();
 
   const avg = computeWeeklyAverages();
+  const labAnalysis = labs.length > 0 ? interpretLabs(labs) : null;
 
   return {
-    profile, labs, course, readiness, risk,
+    profile, labs, course, readiness, risk, labAnalysis,
     avgWeeklyKcal: avg.kcal, avgWeeklyProtein: avg.protein,
     avgWeeklyFat: avg.fat, avgWeeklyCarbs: avg.carbs,
     activeDrugs,
