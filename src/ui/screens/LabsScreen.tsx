@@ -55,9 +55,9 @@ const PROFILE_PHASE_TO_LABS_PHASE: Record<string, string> = {
 };
 
 const sysLabels: Record<string, string> = {
-  cardio: '❤️ Сердце', hepatic: '', renal: '',
-  neuro: '', endocrine: '', hematologic: '',
-  reproductive: '', musculoskeletal: '', metabolic: '',
+  cardio: 'Сердце', hepatic: 'Печень', renal: 'Почки',
+  neuro: 'Нервная', endocrine: 'Эндокринная', hematologic: 'Кровь',
+  reproductive: 'Репродуктивная', musculoskeletal: 'Мышечная', metabolic: 'Метаболизм',
 };
 
 const LAB_SYSTEM_GROUPS: Record<string, string[]> = {
@@ -587,6 +587,14 @@ export const LabsScreen: React.FC = () => {
               </div>
             </div>
           )}
+
+          <LabPenaltySection
+            anyNoLabs={anyNoLabs} penalty={penalty} globalNoLabs={globalNoLabs}
+            toggleGlobalNoLabs={toggleGlobalNoLabs}
+            noLabsSystems={noLabsSystems} toggleSystemNoLabs={toggleSystemNoLabs}
+            showInput={() => setShowLabInput(true)} showImport={() => { setShowImport(true); setTimeout(() => fileInputRef.current?.click(), 100); }}
+            hasLabs={hasLabs}
+          />
         </div>
       )}
 
@@ -656,15 +664,6 @@ export const LabsScreen: React.FC = () => {
 
       </div>
       )}
-
-      {/* Penalty section for detail view */}
-      <LabPenaltySection
-        anyNoLabs={anyNoLabs} penalty={penalty} globalNoLabs={globalNoLabs}
-        toggleGlobalNoLabs={toggleGlobalNoLabs}
-        noLabsSystems={noLabsSystems} toggleSystemNoLabs={toggleSystemNoLabs}
-        showInput={() => setShowLabInput(true)} showImport={() => { setShowImport(true); setTimeout(() => fileInputRef.current?.click(), 100); }}
-        hasLabs={hasLabs}
-      />
 
       {/* OCR Import Modal */}
       {showImport && (
