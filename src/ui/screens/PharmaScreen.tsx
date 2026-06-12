@@ -120,13 +120,13 @@ export const PharmaScreen: React.FC = () => {
       <h2>Фармакология</h2>
       <div className="tab-bar" style={{ marginBottom: 8 }}>
         {([
-          ['catalog', ''],
+          ['catalog', '📖 Каталог'],
           ['pkpd', '⚙️ PK/PD'],
-          ['dosage', ''],
+          ['dosage', '💊 Дозировки'],
           ['interactions', '⚡ Взаимод.'],
-          ['course', ''],
-          ['mapper', ''],
-          ['diagnostics', ''],
+          ['course', '📋 Курс'],
+          ['mapper', '🗺 Маппер'],
+          ['diagnostics', '🩺 Диагностика'],
         ] as [Tab, string][]).map(([key, label]) => (
           <button
             key={key}

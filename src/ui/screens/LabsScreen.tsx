@@ -328,7 +328,7 @@ export const LabsScreen: React.FC = () => {
             color: tab === t ? '#00e68a' : 'var(--text-dim)',
             border: tab === t ? '1px solid #00e68a' : '1px solid var(--border)',
           }}>
-            {t === 'results' ? '' : t === 'schedule' ? '' : t === 'investigations' ? '' : ''}
+            {t === 'results' ? '📊 Результаты' : t === 'schedule' ? '📅 График' : t === 'investigations' ? '🔬 Обследования' : '📚 Каталог'}
           </button>
         ))}
       </div>

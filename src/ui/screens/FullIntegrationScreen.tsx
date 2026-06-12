@@ -34,7 +34,7 @@ export const FullIntegrationScreen: React.FC = () => {
   const [tab, setTab] = useState('calc');
 
   const tabs = ['calc','pk','stack','synergy','risk','brain','recovery','meal','programs','ordering','variation','coaching','labs','tempo','warmup','pipeline'];
-  const labels: Record<string,string> = {calc:'',pk:'',stack:'',synergy:'⚡ Синергия',risk:'⚠ Риски',brain:'',recovery:'',meal:'',programs:'',ordering:'',variation:'',coaching:'',labs:'',tempo:'⏱ Темп',warmup:'',pipeline:''};
+  const labels: Record<string,string> = {calc:'🧮 Кальк.',pk:'💊 ФК',stack:'📦 Стек',synergy:'⚡ Синергия',risk:'⚠ Риски',brain:'🧠 Мозг',recovery:'💪 Восст.',meal:'🥗 Питание',programs:'📋 Программы',ordering:'📦 Заказ',variation:'🔄 Вариации',coaching:'🎯 Коучинг',labs:'🔬 Анализы',tempo:'⏱ Темп',warmup:'🏃 Разминка',pipeline:'📊 Пайплайн'};
 
   return (<div className="screen"><h2>🔧 Полная интеграция</h2>
     <div style={{ display:'flex',gap:3,marginBottom:10,overflowX:'auto',scrollbarWidth:'none' }}>

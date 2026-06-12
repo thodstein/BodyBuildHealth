@@ -73,16 +73,16 @@ function AlertBanner({ messages }: { messages: string[] }) {
 
 // Navigation cards for the Dashboard
 const NAV_CARDS: { id: ScreenId; icon: string; label: string; desc: string; color: string }[] = [
-  { id: 'training', icon: '', label: '', desc: '', color: '#00e68a' },
-  { id: 'support', icon: '', label: '', desc: '', color: '#1e90ff' },
-  { id: 'nutrition', icon: '', label: '', desc: '', color: '#ffa502' },
-  { id: 'recovery', icon: '', label: '', desc: '', color: '#22c55e' },
-  { id: 'performance', icon: '⚡', label: '', desc: '', color: '#a855f7' },
-  { id: 'toolkit', icon: '', label: '', desc: '', color: '#06b6d4' },
-  { id: 'calculators', icon: '', label: '', desc: 'BMI, BMR, дозировки', color: '#f97316' },
-  { id: 'fertility-pct', icon: '', label: '', desc: '', color: '#8b5cf6' },
-  { id: 'profile', icon: '', label: '', desc: '', color: '#6b7280' },
-  { id: 'articles', icon: '', label: '', desc: '', color: '#ec4899' },
+  { id: 'training', icon: '🏋️', label: 'Тренировки', desc: 'План, дневник, упражнения', color: '#00e68a' },
+  { id: 'support', icon: '🛡️', label: 'Поддержка', desc: 'БАДы, пептиды, протоколы', color: '#1e90ff' },
+  { id: 'nutrition', icon: '🍎', label: 'Питание', desc: 'Дневник, КБЖУ, графики', color: '#ffa502' },
+  { id: 'recovery', icon: '💤', label: 'Восстановление', desc: 'Сон, HRV, усталость', color: '#22c55e' },
+  { id: 'performance', icon: '⚡', label: 'Производительность', desc: 'Маркеры, стеки, ПКТ', color: '#a855f7' },
+  { id: 'toolkit', icon: '🧰', label: 'Инструменты', desc: 'Движение, биомеханика', color: '#06b6d4' },
+  { id: 'calculators', icon: '🧮', label: 'Калькуляторы', desc: 'BMI, BMR, дозировки', color: '#f97316' },
+  { id: 'fertility-pct', icon: '🧬', label: 'Фертильность', desc: 'ПКТ, спермограмма', color: '#8b5cf6' },
+  { id: 'profile', icon: '👤', label: 'Профиль', desc: 'Настройки, антропометрия', color: '#6b7280' },
+  { id: 'articles', icon: '📚', label: 'Статьи', desc: 'База знаний и руководства', color: '#ec4899' },
 ];
 
 export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {

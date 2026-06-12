@@ -32,7 +32,7 @@ export const PerformanceScreen: React.FC = () => {
   const pctProtocols = useMemo(() => getPCTProtocols(), []);
 
   const tabs = ['blood','stacks','macro','periodization','meet','bbprep','pct','predict'];
-  const labels: Record<string,string> = {blood:'',stacks:'',macro:'',periodization:'',meet:'',bbprep:'',pct:'',predict:''};
+  const labels: Record<string,string> = {blood:'🩸 Маркеры',stacks:'📦 Стеки',macro:'📐 Макро',periodization:'🔄 Периодизация',meet:'🏆 Соревн.',bbprep:'🏋 Бодибилдинг',pct:'🧬 ПКТ',predict:'🔮 Прогноз'};
 
   return (<div className="screen">
     <h2>⚡ Лаборатория</h2>

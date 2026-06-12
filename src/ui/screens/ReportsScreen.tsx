@@ -117,21 +117,21 @@ export const ReportsScreen: React.FC = () => {
       <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 8 }}>
         {(['summary', 'labs', 'nutrition', 'pharma', 'print'] as ReportTab[]).map(t => (
           <button key={t} className={`tab-button ${tab === t ? 'active' : ''}`} onClick={() => setTab(t)}>
-            {t === 'summary' ? '' : t === 'labs' ? '' : t === 'nutrition' ? '' : t === 'pharma' ? '' : ''}
+            {t === 'summary' ? '📊 Сводка' : t === 'labs' ? '🔬 Анализы' : t === 'nutrition' ? '🍎 Питание' : t === 'pharma' ? '💊 Фарма' : '🖨 Печать'}
           </button>
         ))}
       </div>
       <div style={{ display: 'flex', gap: 4, marginBottom: 12 }}>
         {(['day', 'week', 'month'] as ReportPeriod[]).map(p => (
           <button key={p} className={`tab-button ${period === p ? 'active' : ''}`} onClick={() => setPeriod(p)} style={{ fontSize: 11, padding: '4px 10px' }}>
-            {p === 'day' ? '' : p === 'week' ? '' : ''}
+            {p === 'day' ? 'День' : p === 'week' ? 'Неделя' : 'Месяц'}
           </button>
         ))}
       </div>
 
       {tab === 'summary' && (
         <div style={{ background: 'var(--bg-secondary)', borderRadius: 12, padding: 16, marginBottom: 12 }}>
-          <h4 style={{ margin: '0 0 8px' }}>Сводка — {period === 'day' ? '' : period === 'week' ? '' : ''}</h4>
+            <h4 style={{ margin: '0 0 8px' }}>Сводка — {period === 'day' ? 'День' : period === 'week' ? 'Неделя' : 'Месяц'}</h4>
           {readiness && (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 8, textAlign: 'center', marginBottom: 12 }}>
               {[{ l: '', v: readiness.recovery, g: 60 }, { l: '', v: readiness.nutrition, g: 60 }, { l: '', v: readiness.support, g: 60 }, { l: '', v: readiness.fatigue, g: 40, inv: true }].map(m => (

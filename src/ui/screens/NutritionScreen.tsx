@@ -126,7 +126,7 @@ export const NutritionScreen: React.FC = () => {
       <div className="tab-bar">
         {(['overview', 'diary', 'charts', 'mealplan', 'grocery', 'restaurant', 'cycling'] as const).map(t => (
           <button key={t} className={`tab-btn ${tab === t ? 'active' : ''}`} onClick={() => setTab(t)}>
-            {t === 'overview' ? '' : t === 'diary' ? '' : t === 'charts' ? '' : t === 'mealplan' ? '' : t === 'grocery' ? '' : t === 'restaurant' ? '' : ''}
+            {t === 'overview' ? '📊 Обзор' : t === 'diary' ? '📝 Дневник' : t === 'charts' ? '📈 Графики' : t === 'mealplan' ? '🥗 План' : t === 'grocery' ? '🛒 Список' : t === 'restaurant' ? '🍽 Ресторан' : '🔄 Циклирование'}
           </button>
         ))}
       </div>
