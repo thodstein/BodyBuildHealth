@@ -160,7 +160,7 @@ export function selectSplit(input: TrainingInput): SplitCandidate[] {
   const candidates: SplitCandidate[] = [];
   const LEVEL_RU: Record<string, string> = { beginner: 'Новичок', intermediate: 'Средний', advanced: 'Продвинутый', enhanced: 'Усиленный' };
   const GOAL_RU: Record<string, string> = { bulk: 'Набор массы', cut: 'Сушка', strength: 'Сила', maintenance: 'Поддержание', recomp: 'Рекомпозиция', rehab: 'Реабилитация' };
-  const { daysPerWeek, recovery, fatigue, nutrition, level, goal, weakPoints, injuries } = input;
+  const { daysPerWeek = 4, recovery = 70, fatigue = 30, nutrition = 70, level = 'intermediate', goal = 'strength', weakPoints = [], injuries = [] } = input;
   const hasInjury = injuries && injuries.length > 0;
 
   for (const [id, split] of Object.entries(SPLIT_CATALOG)) {
