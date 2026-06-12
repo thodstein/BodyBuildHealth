@@ -3,6 +3,35 @@ import { UCUM_MAP } from './constants';
 
 const SYNONYM_MAP = synonyms as Record<string, string>;
 
+/** Maps LAB_PATTERNS codes to UCUM_MAP keys where they differ */
+const CODE_ALIAS: Record<string, string> = {
+  'TESTO': 'TT',
+  'ESTR': 'E2',
+  'FER': 'FERRITIN',
+  'PROL': 'PRL',
+  'CORT': 'CORTISOL',
+  'DHEA': 'DHEA_S',
+  'FTESTO': 'FT',
+  'CREAT': 'CREATININE',
+  'URIC': 'UA',
+  'BILD': 'DBIL',
+  'HBA1C': 'HbA1c',
+  'FOLATE': 'FOL',
+  'INSULIN': 'INS',
+  'DIMER': 'D_DIMER',
+  'FIB': 'FIBRINOGEN',
+  'TROP': 'TROPONIN',
+  'PHOS': 'P',
+};
+
+/** Convert any known code to a UCUM_MAP key (returns the code itself if no alias exists) */
+export function mapToUcumCode(code: string): string {
+  if (UCUM_MAP[code]) return code;
+  const alias = CODE_ALIAS[code.toUpperCase()];
+  if (alias && UCUM_MAP[alias]) return alias;
+  return code;
+}
+
 /** Resolve free-text marker name to canonical UCUM code when possible. */
 export function resolveLabMarker(name: string): string {
   const trimmed = name.trim();
@@ -13,9 +42,7 @@ export function resolveLabMarker(name: string): string {
 
   const fromSynonym = SYNONYM_MAP[trimmed.toLowerCase()];
   if (fromSynonym) {
-    const code = fromSynonym.toUpperCase();
-    if (UCUM_MAP[code]) return code;
-    return code;
+    return mapToUcumCode(fromSynonym.toUpperCase());
   }
 
   return upper;

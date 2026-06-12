@@ -136,10 +136,8 @@ function extractNumber(text: string): number | null {
     if (isNaN(val) || val <= 0) continue;
     return val;
   }
-  // Fallback: first number
-  const first = allNums[0];
-  if (!first) return null;
-  return parseFloat(first.replace(',', '.'));
+  // All numbers are part of a range — not a value column
+  return null;
 }
 
 function extractRefRange(text: string): { low?: number; high?: number } {
@@ -233,12 +231,23 @@ function rowToString(items: TextItem[]): string {
 function tryParseTableRows(lines: string[], provider: string | null): ParsedLabValue[] {
   const values: ParsedLabValue[] = [];
 
-  const colDelim = lines.some(l => l.includes('\t')) ? '\t' : /\s{3,}/;
+  // Try tab → 3+ spaces → single space as fallback
+  const hasTab = lines.some(l => l.includes('\t'));
+  const hasTripleSpace = lines.some(l => /\s{3,}/.test(l));
+
+  const colDelim: string | RegExp = hasTab ? '\t' : (hasTripleSpace ? /\s{3,}/ : /\s+/);
 
   for (const line of lines) {
-    const cols = typeof colDelim === 'string'
+    let cols = typeof colDelim === 'string'
       ? line.split(colDelim).map(c => c.trim()).filter(Boolean)
       : line.split(colDelim).map(c => c.trim()).filter(Boolean);
+
+    // Single-space fallback: if we have 4+ words and at least 2 look numeric, use them
+    if (!hasTab && !hasTripleSpace && cols.length < 3) {
+      const spaceSplit = line.split(/\s+/).map(c => c.trim()).filter(Boolean);
+      const numCount = spaceSplit.filter(s => /^[\d,.]+$/.test(s)).length;
+      if (spaceSplit.length >= 3 && numCount >= 1) cols = spaceSplit;
+    }
 
     if (cols.length < 2) continue;
 
@@ -255,18 +264,19 @@ function tryParseTableRows(lines: string[], provider: string | null): ParsedLabV
 
       for (let ci = 0; ci < cols.length; ci++) {
         const cell = cols[ci];
+        // Extract reference range from any cell that has a range pattern
+        const ref = extractRefRange(cell);
+        if (ref.low !== undefined || ref.high !== undefined) {
+          refLow = ref.low;
+          refHigh = ref.high;
+        }
         const num = extractNumber(cell);
         if (num !== null && num > 0 && cell.length < 30) {
           if (val === null) {
             val = num;
-            const ref = extractRefRange(cell);
-            if (ref.low !== undefined || ref.high !== undefined) {
-              refLow = ref.low;
-              refHigh = ref.high;
-            }
           }
         }
-        const unitMatch = cell.match(/^([A-Za-z%\/0-9.\-^]{1,20})$/);
+        const unitMatch = cell.match(/^([A-Za-zА-Яа-я%\/0-9.\-^]{1,20})$/i);
         if (unitMatch && !unit) {
           unit = unitMatch[1];
         }

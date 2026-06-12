@@ -3,6 +3,7 @@ import { parseNutritionScreenshot, parseFatSecretText, type ParsedMeal } from '.
 import { parseLabText as parseLabTextProviderAware, detectProvider } from './lab-auto-parser';
 import { parseLabResults as parseWithBiomarkerRegex, type ExtractedMarker } from '../engines/biomarker-regex-engine';
 import { UCUM_MAP } from './constants';
+import { mapToUcumCode } from './labs-mapping';
 import { db } from './db';
 import { notifyDataChange } from './data-link';
 import type { LabPoint } from './types';
@@ -63,9 +64,10 @@ function mergeParsedResults(
 
   // Second pass: PDF parser results as fallback for codes not found by provider parser
   for (const pv of pdfResults) {
-    if (seen.has(pv.code)) continue;
-    seen.add(pv.code);
-    const info = UCUM_MAP[pv.code];
+    const ucumCode = mapToUcumCode(pv.code);
+    if (seen.has(ucumCode)) continue;
+    seen.add(ucumCode);
+    const info = UCUM_MAP[ucumCode];
     let displayValue = pv.value;
     let displayUnit = pv.unit;
     if (info && info.coeff && info.prefUnit && pv.unit !== info.prefUnit) {
@@ -74,7 +76,7 @@ function mergeParsedResults(
       displayUnit = info.prefUnit;
     }
     merged.push({
-      code: pv.code,
+      code: ucumCode,
       name: info?.name ?? pv.name,
       value: displayValue,
       unit: displayUnit,
