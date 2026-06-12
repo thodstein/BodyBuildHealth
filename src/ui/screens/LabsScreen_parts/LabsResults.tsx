@@ -45,6 +45,7 @@ function getLabStatus(lab: LabPoint): 'normal' | 'high' | 'low' | 'unknown' {
 
 export const LabsResults: React.FC<{ labs: LabPoint[] }> = ({ labs }) => {
   const [filterSystem, setFilterSystem] = useState<string>('all');
+  const [isExpanded, setIsExpanded] = useState(true);
 
   const sortedLabs = useMemo(() =>
     [...labs].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()),
@@ -73,6 +74,19 @@ export const LabsResults: React.FC<{ labs: LabPoint[] }> = ({ labs }) => {
 
   return (
     <div>
+      {/* Expand/Collapse header */}
+      <button onClick={() => setIsExpanded(!isExpanded)} style={{
+        display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '10px 12px', marginBottom: 8,
+        borderRadius: 10, cursor: 'pointer', textAlign: 'left',
+        background: 'var(--bg-secondary)', border: '1px solid var(--border)',
+        color: 'var(--text)', fontSize: 12, fontWeight: 600,
+      }}>
+        <span style={{ fontSize: 14, transition: 'transform 0.2s', transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)' }}>▶</span>
+        <span>История анализов</span>
+        <span style={{ fontSize: 10, color: 'var(--text-dim)', marginLeft: 'auto' }}>{labs.length} записей</span>
+      </button>
+
+      {isExpanded && (<>
       {/* System filter */}
       <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 10 }}>
         <button onClick={() => setFilterSystem('all')} style={{
@@ -157,6 +171,7 @@ export const LabsResults: React.FC<{ labs: LabPoint[] }> = ({ labs }) => {
           </div>
         ))
       )}
+      </>)}
     </div>
   );
 };

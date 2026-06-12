@@ -126,7 +126,7 @@ const MAIN_LAB_TABS: { id: MainLabTab; label: string; icon: string }[] = [
   { id: 'risks', label: 'Риски и индексы', icon: '⚠️' },
 ];
 
-type MainLabTab = 'lab' | 'investigations' | 'risks';
+type MainLabTab = 'hero' | 'lab' | 'investigations' | 'risks';
 
 const LAB_SUB_TABS: { id: LabSubTab; label: string; icon: string }[] = [
   { id: 'current', label: 'Текущие', icon: '🔬' },
@@ -141,12 +141,14 @@ export const LabsScreen: React.FC = () => {
   const linked = useDataLink();
   const profilePhase = linked.profile?.settings?.phase || '';
   const initialLabsPhase = PROFILE_PHASE_TO_LABS_PHASE[profilePhase] || 'baseline';
-  const [mainTab, setMainTab] = useState<MainLabTab>('lab');
+  const [mainTab, setMainTab] = useState<MainLabTab>('hero');
   const [subTab, setSubTab] = useState<LabSubTab>('current');
   const [globalNoLabs, setGlobalNoLabs] = useState(getGlobalNoLabs());
   const [noLabsSystems, setNoLabsSystemsState] = useState<string[]>(getNoLabsSystems());
   const [selectedPhase, setSelectedPhase] = useState(initialLabsPhase);
   const [showLabInput, setShowLabInput] = useState(false);
+  const [showNewLabsBatch, setShowNewLabsBatch] = useState(false);
+  const [batchValues, setBatchValues] = useState<Record<string, string>>({});
   const [inputCode, setInputCode] = useState('');
   const [inputValue, setInputValue] = useState('');
   const [inputUnit, setInputUnit] = useState('');
@@ -176,17 +178,46 @@ export const LabsScreen: React.FC = () => {
     } catch {}
   };
 
-  const handleNewLabs = useCallback(async () => {
-    setInputCode('');
-    setInputValue('');
-    setInputUnit('');
-    setInputDate(new Date().toISOString().split('T')[0]);
-    setShowLabInput(true);
-  }, []);
-
   const requiredLabs = useMemo(() => {
     return (REQUIRED_LABS_PER_PHASE as Record<string, string[]>)[selectedPhase] || [];
   }, [selectedPhase]);
+
+  const handleNewLabs = useCallback(async () => {
+    const initial: Record<string, string> = {};
+    for (const code of requiredLabs) {
+      const existing = labs.find(l => l.code.toUpperCase() === code.toUpperCase());
+      initial[code] = existing ? String(existing.value) : '';
+    }
+    setBatchValues(initial);
+    setShowNewLabsBatch(true);
+  }, [requiredLabs, labs]);
+
+  const handleBatchSave = useCallback(async () => {
+    try {
+      await db.init();
+      let saved = 0;
+      for (const [code, valStr] of Object.entries(batchValues)) {
+        const val = parseFloat(valStr);
+        if (!valStr || isNaN(val)) continue;
+        const info = UCUM_MAP[code.toUpperCase()];
+        const lab: LabPoint = {
+          id: crypto.randomUUID(),
+          code: code.toUpperCase(),
+          name: info?.name || code,
+          value: val,
+          unit: info?.prefUnit || '',
+          date: new Date().toISOString().split('T')[0],
+          phase: selectedPhase,
+        };
+        await db.put('labs_log', lab);
+        saved++;
+      }
+      if (saved > 0) notifyDataChange();
+      setShowNewLabsBatch(false);
+      setBatchValues({});
+      setTick(t => t + 1);
+    } catch (e) { console.error(e); }
+  }, [batchValues, selectedPhase]);
 
   const labsBySystem = useMemo(() => {
     const groups: Record<string, string[]> = {};
@@ -422,22 +453,88 @@ export const LabsScreen: React.FC = () => {
   return (
     <div className="screen labs" style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
 
-      {/* ─── MAIN TAB BAR ─── */}
-      <div style={{ display: 'flex', gap: 2, padding: '8px 12px 0', flexShrink: 0, borderBottom: '1px solid var(--border)' }}>
-        {MAIN_LAB_TABS.map(t => (
-          <button key={t.id} onClick={() => setMainTab(t.id)} style={{
-            flex: 1, padding: '10px 4px', cursor: 'pointer', transition: 'all 0.2s',
-            color: mainTab === t.id ? 'var(--accent)' : 'var(--text-dim)',
-            border: 'none', borderBottom: `2px solid ${mainTab === t.id ? 'var(--accent)' : 'transparent'}`,
-            fontWeight: mainTab === t.id ? 700 : 400, fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, background: 'transparent',
-          }}>
-            <span>{t.icon}</span>
-            <span>{t.label}</span>
-          </button>
-        ))}
-      </div>
+      {/* ─── HERO PAGE ─── */}
+      {mainTab === 'hero' && (
+        <div style={{ flex: 1, overflowY: 'auto', padding: '20px 16px 80px' }}>
+          {/* Hero section */}
+          <div style={{ textAlign: 'center', padding: '40px 0 30px' }}>
+            <div style={{ fontSize: 48, marginBottom: 12 }}>🧪</div>
+            <h1 style={{ fontSize: 22, fontWeight: 800, color: 'var(--accent)', margin: '0 0 6px' }}>Лаборатория</h1>
+            <p style={{ fontSize: 13, color: 'var(--text-dim)', margin: 0, lineHeight: 1.5 }}>
+              Контролируйте своё здоровье — анализы, обследования и оценка рисков
+            </p>
+          </div>
 
-      {/* ─── SCROLLABLE CONTENT ─── */}
+          {/* 3 cards */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {[
+              { id: 'lab', icon: '🔬', title: 'Анализы', desc: 'Ввод, просмотр и динамика лабораторных показателей. Каталог маркеров и графики.', color: 'var(--accent)', bg: 'rgba(0,230,138,0.06)', border: 'rgba(0,230,138,0.2)' },
+              { id: 'investigations', icon: '🩺', title: 'Обследования', desc: 'Плановые чекапы, инструментальная диагностика и частота прохождения.', color: '#3b82f6', bg: 'rgba(59,130,246,0.06)', border: 'rgba(59,130,246,0.2)' },
+              { id: 'risks', icon: '⚠️', title: 'Риски и индексы', desc: 'Агрегированные риски по системам, композитные индексы здоровья и отклонения.', color: '#f97316', bg: 'rgba(249,115,22,0.06)', border: 'rgba(249,115,22,0.2)' },
+            ].map(card => (
+              <button key={card.id} onClick={() => setMainTab(card.id as MainLabTab)} style={{
+                display: 'flex', alignItems: 'center', gap: 16, padding: '18px 16px', borderRadius: 16, cursor: 'pointer', textAlign: 'left', width: '100%',
+                background: card.bg, border: `1px solid ${card.border}`, color: 'var(--text)',
+                transition: 'all 0.2s', boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+              }}>
+                <div style={{
+                  width: 52, height: 52, borderRadius: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                  background: card.color + '18', fontSize: 26,
+                }}>
+                  {card.icon}
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 4, color: card.color }}>{card.title}</div>
+                  <div style={{ fontSize: 11, color: 'var(--text-dim)', lineHeight: 1.4 }}>{card.desc}</div>
+                </div>
+                <span style={{ color: card.color, fontSize: 18, opacity: 0.6 }}>→</span>
+              </button>
+            ))}
+          </div>
+
+          {/* Quick stats */}
+          {linked.labs && linked.labs.length > 0 && (
+            <div className="card" style={{ marginTop: 16, padding: 14 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--accent)', marginBottom: 8 }}>📊 Краткая сводка</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                <div style={{ padding: '8px 10px', background: 'var(--bg-secondary)', borderRadius: 8 }}>
+                  <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--accent)' }}>{linked.labs.length}</div>
+                  <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Всего записей</div>
+                </div>
+                <div style={{ padding: '8px 10px', background: 'var(--bg-secondary)', borderRadius: 8 }}>
+                  <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--accent)' }}>{new Set(linked.labs.map(l => l.code)).size}</div>
+                  <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Уникальных тестов</div>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ─── MAIN TAB BAR (only when not on hero) ─── */}
+      {mainTab !== 'hero' && (
+        <div style={{ display: 'flex', gap: 2, padding: '8px 12px 0', flexShrink: 0, borderBottom: '1px solid var(--border)' }}>
+          <button onClick={() => setMainTab('hero')} style={{
+            padding: '8px 6px', cursor: 'pointer', fontSize: 16, transition: 'all 0.2s',
+            color: 'var(--text-dim)', border: 'none', background: 'transparent',
+            display: 'flex', alignItems: 'center', gap: 2,
+          }}>←</button>
+          {MAIN_LAB_TABS.map(t => (
+            <button key={t.id} onClick={() => setMainTab(t.id)} style={{
+              flex: 1, padding: '10px 4px', cursor: 'pointer', transition: 'all 0.2s',
+              color: mainTab === t.id ? 'var(--accent)' : 'var(--text-dim)',
+              border: 'none', borderBottom: `2px solid ${mainTab === t.id ? 'var(--accent)' : 'transparent'}`,
+              fontWeight: mainTab === t.id ? 700 : 400, fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, background: 'transparent',
+            }}>
+              <span>{t.icon}</span>
+              <span>{t.label}</span>
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* ─── SCROLLABLE CONTENT (only when not on hero) ─── */}
+      {mainTab !== 'hero' && (
       <div style={{ flex: 1, overflowY: 'auto', padding: '0 12px 80px' }}>
 
       {/* ≡≡≡ LAB SUB-TABS (only when mainTab === 'lab') ≡≡≡ */}
@@ -487,13 +584,13 @@ export const LabsScreen: React.FC = () => {
             }}>
               <span style={{ fontSize: 16 }}>➕</span> Добавить анализы
             </button>
-            <button onClick={handleNewLabs} style={{
+              <button onClick={handleNewLabs} style={{
               padding: '12px 10px', borderRadius: 12, cursor: 'pointer', fontWeight: 700, fontSize: 12,
               background: 'linear-gradient(135deg, rgba(59,130,246,0.12) 0%, rgba(59,130,246,0.04) 100%)',
               border: '1px solid rgba(59,130,246,0.25)', color: '#3b82f6',
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
             }}>
-              <span style={{ fontSize: 16 }}>🔄</span> Новые анализы
+              <span style={{ fontSize: 16 }}>📋</span> Новые анализы (фаза)
             </button>
           </div>
 
@@ -583,70 +680,34 @@ export const LabsScreen: React.FC = () => {
       {/* ≡≡≡ ARCHIVE TAB ≡≡≡ */}
       {subTab === 'archive' && (
         <div>
-          <div style={{ fontSize: 14, fontWeight: 700, padding: '10px 0' }}>📦 Архив результатов</div>
-
-          {/* Summary */}
-          <div className="card" style={{ marginBottom: 10, padding: '10px 12px', background: 'var(--bg-secondary)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>Всего записей: {labs.length}</span>
-              <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>Тестов: {new Set(labs.map(l => l.code.toUpperCase())).size}</span>
-            </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 0' }}>
+            <span style={{ fontSize: 18 }}>📦</span>
+            <span style={{ fontSize: 14, fontWeight: 700 }}>Архив результатов</span>
+            <span style={{ fontSize: 11, color: 'var(--text-dim)', marginLeft: 'auto' }}>{labs.length} записей • {new Set(labs.map(l => l.code.toUpperCase())).size} тестов</span>
           </div>
 
           {/* LabsResults — красивые карточки */}
           <LabsResults labs={labs} />
-
-          {/* History by date */}
-          <div style={{ marginTop: 12 }}>
-            {(() => {
-              const byDate = new Map<string, LabPoint[]>();
-              for (const lab of labs) {
-                const d = lab.date || '';
-                if (!byDate.has(d)) byDate.set(d, []);
-                byDate.get(d)!.push(lab);
-              }
-              const sortedDates = Array.from(byDate.keys()).sort().reverse();
-              if (sortedDates.length === 0) return <div style={{ fontSize: 12, color: 'var(--text-dim)', textAlign: 'center', padding: 24 }}>Нет данных анализов</div>;
-              return sortedDates.map(date => (
-                <div key={date} style={{
-                  marginBottom: 8, padding: '10px 12px', borderRadius: 12, background: 'var(--bg-secondary)',
-                  border: '1px solid var(--border)',
-                }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                    <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--accent)' }}>{date}</span>
-                    <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>{byDate.get(date)!.length} маркеров</span>
-                  </div>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
-                    {byDate.get(date)!.map(lab => {
-                      const info = UCUM_MAP[lab.code.toUpperCase()];
-                      const norm = lab.value * (info?.coeff || 1);
-                      const isAbnormal = info && (norm > info.uln || norm < info.lln);
-                      return (
-                        <span key={lab.code + lab.date} style={{
-                          background: isAbnormal ? 'rgba(239,68,68,0.1)' : 'rgba(0,230,138,0.06)',
-                          color: isAbnormal ? '#ef4444' : 'var(--accent)',
-                          padding: '3px 8px', borderRadius: 6, fontSize: 10, fontWeight: 600,
-                          border: `1px solid ${isAbnormal ? 'rgba(239,68,68,0.2)' : 'rgba(0,230,138,0.1)'}`,
-                        }}>
-                          {info?.name || lab.code} {lab.value}{lab.unit}
-                        </span>
-                      );
-                    })}
-                  </div>
-                </div>
-              ));
-            })()}
-          </div>
         </div>
       )}
 
-      {/* ≡≡≡ CATALOG TAB — капитально улучшен ≡≡≡ */}
+      {/* ≡≡≡ CATALOG TAB — system-chip-based ≡≡≡ */}
       {subTab === 'catalog' && (() => {
         const systemOrder = ['hepatic','renal','endocrine','hematologic','cardio','metabolic','reproductive','neuro','other'];
         const sysIcons: Record<string, string> = {
           hepatic: '🫁', renal: '🫘', endocrine: '🧬', hematologic: '🩸',
           cardio: '❤️', metabolic: '⚡', reproductive: '🧫', neuro: '🧠', other: '📋',
         };
+        const [catFilterSys, setCatFilterSys] = useState('all');
+        const filteredBySys = catFilterSys === 'all' ? filteredCatalogEntries : filteredCatalogEntries.filter(e => e.system === catFilterSys);
+        const groupedFiltered = useMemo(() => {
+          const g: Record<string, typeof filteredCatalogEntries> = {};
+          for (const e of filteredBySys) {
+            if (!g[e.system]) g[e.system] = [];
+            g[e.system].push(e);
+          }
+          return g;
+        }, [filteredBySys]);
         return (
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 0' }}>
@@ -655,16 +716,29 @@ export const LabsScreen: React.FC = () => {
               <span style={{ fontSize: 11, color: 'var(--text-dim)', marginLeft: 'auto' }}>{catalogEntries.length}</span>
             </div>
 
-            {/* Search */}
-            <div style={{ position: 'relative', marginBottom: 10 }}>
-              <input value={catalogSearch} onChange={e => setCatalogSearch(e.target.value)}
-                placeholder="🔍 Поиск по названию или коду..."
-                style={{ width: '100%', padding: '10px 12px', background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: 10, color: 'var(--text)', fontSize: 13, outline: 'none', boxSizing: 'border-box' }} />
+            {/* System filter chips (replaces text search) */}
+            <div style={{ display: 'flex', gap: 4, overflowX: 'auto', marginBottom: 10, scrollbarWidth: 'none', paddingBottom: 4 }}>
+              <button onClick={() => setCatFilterSys('all')} style={{
+                padding: '6px 12px', borderRadius: 16, fontSize: 10, fontWeight: 600, whiteSpace: 'nowrap', cursor: 'pointer', flexShrink: 0,
+                background: catFilterSys === 'all' ? 'var(--accent)' : 'var(--bg-secondary)',
+                color: catFilterSys === 'all' ? '#000' : 'var(--text-dim)',
+                border: `1px solid ${catFilterSys === 'all' ? 'var(--accent)' : 'var(--border)'}`,
+              }}>Все</button>
+              {systemOrder.map(sys => (
+                <button key={sys} onClick={() => setCatFilterSys(sys)} style={{
+                  padding: '6px 12px', borderRadius: 16, fontSize: 10, fontWeight: 600, whiteSpace: 'nowrap', cursor: 'pointer', flexShrink: 0,
+                  background: catFilterSys === sys ? sysColors[sys] + '22' : 'var(--bg-secondary)',
+                  color: catFilterSys === sys ? sysColors[sys] : 'var(--text-dim)',
+                  border: `1px solid ${catFilterSys === sys ? sysColors[sys] : 'var(--border)'}`,
+                }}>
+                  {sysIcons[sys] || ''} {sysLabels[sys] || sys}
+                </button>
+              ))}
             </div>
 
             {/* Systems */}
             {systemOrder.map(sys => {
-              const entries = groupedCatalog[sys];
+              const entries = groupedFiltered[sys];
               if (!entries || entries.length === 0) return null;
               return (
                 <div key={sys} className="card" style={{ marginBottom: 10, padding: 12, overflow: 'hidden' }}>
@@ -699,9 +773,9 @@ export const LabsScreen: React.FC = () => {
                 </div>
               );
             })}
-            {filteredCatalogEntries.length === 0 && (
+            {filteredBySys.length === 0 && (
               <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-dim)', fontSize: 12 }}>
-                Нет маркеров по запросу «{catalogSearch}»
+                Нет маркеров в выбранной системе
               </div>
             )}
 
@@ -709,8 +783,8 @@ export const LabsScreen: React.FC = () => {
             {catalogDetail && (() => {
               const info = UCUM_MAP[catalogDetail.code];
               return (
-                <div style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(10px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 12 }} onClick={() => setCatalogDetail(null)}>
-                  <div style={{ width: '100%', maxWidth: 420, zIndex: 201, background: 'var(--bg)', borderRadius: 20, padding: '16px 18px', boxShadow: '0 12px 40px rgba(0,0,0,0.5)' }} onClick={e => e.stopPropagation()}>
+                <div style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(10px)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', padding: 0 }} onClick={() => setCatalogDetail(null)}>
+                  <div style={{ width: '100%', maxWidth: 420, zIndex: 201, background: 'var(--bg)', borderRadius: '20px 20px 0 0', padding: '16px 18px 24px', boxShadow: '0 -12px 40px rgba(0,0,0,0.5)' }} onClick={e => e.stopPropagation()}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                         <div style={{
@@ -759,7 +833,7 @@ export const LabsScreen: React.FC = () => {
         );
       })()}
 
-      {/* ≡≡≡ CHART TAB — улучшенный ≡≡≡ */}
+      {/* ≡≡≡ CHART TAB — chip-based marker selector ≡≡≡ */}
       {subTab === 'chart' && (() => {
         const ref = chartSelectedCode ? UCUM_MAP[chartSelectedCode] : null;
         const vals = chartData.map(d => d.value);
@@ -781,26 +855,73 @@ export const LabsScreen: React.FC = () => {
               <span style={{ fontSize: 16, fontWeight: 700 }}>Графики маркеров</span>
             </div>
 
-            {/* Search */}
-            <div style={{ position: 'relative', marginBottom: 10 }}>
-              <input value={chartMarkerSearch} onChange={e => setChartMarkerSearch(e.target.value)}
-                placeholder="🔍 Выберите маркер для просмотра динамики..."
-                style={{ width: '100%', padding: '10px 12px', background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: 10, color: 'var(--text)', fontSize: 13, outline: 'none', boxSizing: 'border-box' }} />
-              {chartMarkerSearch && (
-                <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 20, maxHeight: 200, overflowY: 'auto', border: '1px solid var(--border)', borderRadius: 10, background: 'var(--bg-secondary)', marginTop: 4, boxShadow: '0 8px 24px rgba(0,0,0,0.3)' }}>
-                  {uniqMarkers.filter(m => m.code.includes(chartMarkerSearch.toUpperCase()) || m.name.toLowerCase().includes(chartMarkerSearch.toLowerCase())).map(m => (
-                    <button key={m.code} onClick={() => { setChartSelectedCode(m.code); setChartMarkerSearch(''); }} style={{
-                      display: 'block', width: '100%', padding: '8px 12px', fontSize: 12, textAlign: 'left', cursor: 'pointer',
-                      background: chartSelectedCode === m.code ? 'rgba(0,230,138,0.1)' : 'transparent',
-                      border: 'none', borderBottom: '1px solid rgba(255,255,255,0.03)', color: 'var(--text)',
-                    }}>{m.name} <span style={{ color: 'var(--text-dim)', fontSize: 10 }}>({m.code})</span></button>
-                  ))}
-                  {uniqMarkers.filter(m => m.code.includes(chartMarkerSearch.toUpperCase()) || m.name.toLowerCase().includes(chartMarkerSearch.toLowerCase())).length === 0 && (
-                    <div style={{ padding: '10px 12px', fontSize: 11, color: 'var(--text-dim)' }}>Нет совпадений</div>
-                  )}
-                </div>
-              )}
+            {/* System filter chips (replaces text search) */}
+            <div style={{ display: 'flex', gap: 4, overflowX: 'auto', marginBottom: 10, scrollbarWidth: 'none', paddingBottom: 4 }}>
+              <button onClick={() => setChartMarkerSearch('')} style={{
+                padding: '5px 10px', borderRadius: 14, fontSize: 10, fontWeight: 600, whiteSpace: 'nowrap', cursor: 'pointer', flexShrink: 0,
+                background: !chartMarkerSearch ? 'var(--accent)' : 'var(--bg-secondary)',
+                color: !chartMarkerSearch ? '#000' : 'var(--text-dim)',
+                border: `1px solid ${!chartMarkerSearch ? 'var(--accent)' : 'var(--border)'}`,
+              }}>Все маркеры</button>
+              {['hepatic','renal','endocrine','hematologic','cardio','metabolic','reproductive','neuro','other'].map(sys => {
+                const hasAny = uniqMarkers.some(m => {
+                  for (const [s, codes] of Object.entries(LAB_SYSTEM_GROUPS)) {
+                    if (s === sys && codes.includes(m.code)) return true;
+                  }
+                  return false;
+                });
+                if (!hasAny) return null;
+                return (
+                  <button key={sys} onClick={() => {
+                    const first = uniqMarkers.find(m => {
+                      const c = LAB_SYSTEM_GROUPS[sys];
+                      return c && c.includes(m.code);
+                    });
+                    setChartMarkerSearch(first?.code || '');
+                    setChartSelectedCode(first?.code || '');
+                  }} style={{
+                    padding: '5px 10px', borderRadius: 14, fontSize: 10, fontWeight: 600, whiteSpace: 'nowrap', cursor: 'pointer', flexShrink: 0,
+                    background: 'var(--bg-secondary)',
+                    color: 'var(--text-dim)',
+                    border: '1px solid var(--border)',
+                  }}>
+                    {sysLabels[sys] || sys}
+                  </button>
+                );
+              })}
             </div>
+
+            {/* Marker grid */}
+            {!chartSelectedCode && (
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, marginBottom: 10 }}>
+                {(chartMarkerSearch
+                  ? uniqMarkers.filter(m => m.code.includes(chartMarkerSearch.toUpperCase()) || m.name.toLowerCase().includes(chartMarkerSearch.toLowerCase()))
+                  : uniqMarkers
+                ).map(m => (
+                  <button key={m.code} onClick={() => { setChartSelectedCode(m.code); setChartMarkerSearch(''); }} style={{
+                    display: 'flex', alignItems: 'center', gap: 6, padding: '8px 10px', borderRadius: 8, cursor: 'pointer', textAlign: 'left',
+                    background: 'var(--bg-secondary)', border: '1px solid var(--border)',
+                    color: 'var(--text)', fontSize: 11, transition: 'all 0.15s',
+                  }}>
+                    <div style={{
+                      width: 24, height: 24, borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                      background: 'rgba(0,230,138,0.12)', color: 'var(--accent)', fontSize: 9, fontWeight: 700,
+                    }}>
+                      {m.code.slice(0, 2)}
+                    </div>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontWeight: 600, fontSize: 10, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.name}</div>
+                      <div style={{ fontSize: 8, color: 'var(--text-dim)' }}>{m.code}</div>
+                    </div>
+                  </button>
+                ))}
+                {uniqMarkers.length === 0 && (
+                  <div style={{ gridColumn: '1/-1', textAlign: 'center', padding: 30, color: 'var(--text-dim)', fontSize: 12 }}>
+                    Введите анализы во вкладке «Текущие»
+                  </div>
+                )}
+              </div>
+            )}
 
             {chartSelectedCode ? (chartData.length > 0 ? (
               <div className="card" style={{ padding: 14 }}>
@@ -1089,11 +1210,12 @@ export const LabsScreen: React.FC = () => {
       })()}
 
       </div>
+      )}
 
-      {/* OCR Import Modal — full screen */}
+      {/* OCR Import Modal — full screen to bottom */}
       {showImport && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(12px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 12 }} onClick={() => { setShowImport(false); setOcrResult(null); }}>
-          <div style={{ width: '100%', maxWidth: 480, zIndex: 201, background: 'var(--bg)', borderRadius: 20, maxHeight: '90vh', overflow: 'hidden', display: 'flex', flexDirection: 'column', boxShadow: '0 16px 48px rgba(0,0,0,0.5)' }} onClick={e => e.stopPropagation()}>
+        <div style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(12px)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', padding: 0 }} onClick={() => { setShowImport(false); setOcrResult(null); }}>
+          <div style={{ width: '100%', maxWidth: 480, zIndex: 201, background: 'var(--bg)', borderRadius: '20px 20px 0 0', maxHeight: '85vh', overflow: 'hidden', display: 'flex', flexDirection: 'column', boxShadow: '0 -12px 48px rgba(0,0,0,0.5)' }} onClick={e => e.stopPropagation()}>
             <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
               <span style={{ fontWeight: 700, fontSize: 16 }}>📄 Импорт анализов</span>
               <button onClick={() => { setShowImport(false); setOcrResult(null); }} style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text-dim)', borderRadius: 8, padding: '6px 12px', fontSize: 13, cursor: 'pointer' }}>✕</button>
@@ -1173,10 +1295,10 @@ export const LabsScreen: React.FC = () => {
         </div>
       )}
 
-      {/* Lab Input Modal — full screen */}
+      {/* Lab Input Modal — full screen to bottom */}
       {showLabInput && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(10px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 12 }} onClick={() => setShowLabInput(false)}>
-          <div style={{ width: '100%', maxWidth: 420, zIndex: 201, background: 'var(--bg)', borderRadius: 20, padding: '16px 18px', boxShadow: '0 12px 40px rgba(0,0,0,0.5)' }} onClick={e => e.stopPropagation()}>
+        <div style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(10px)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', padding: '0' }} onClick={() => setShowLabInput(false)}>
+          <div style={{ width: '100%', maxWidth: 420, zIndex: 201, background: 'var(--bg)', borderRadius: '20px 20px 0 0', padding: '16px 18px 24px', boxShadow: '0 -12px 40px rgba(0,0,0,0.5)' }} onClick={e => e.stopPropagation()}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <span style={{ fontSize: 18 }}>🧪</span>
@@ -1216,6 +1338,79 @@ export const LabsScreen: React.FC = () => {
                 padding: 10, borderRadius: 10, border: 'none',
                 background: 'var(--accent)', color: '#000', fontWeight: 700, fontSize: 13, cursor: 'pointer',
               }}>✓ Сохранить</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Batch Labs Input Modal — full screen to bottom */}
+      {showNewLabsBatch && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(12px)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', padding: 0 }} onClick={() => setShowNewLabsBatch(false)}>
+          <div style={{ width: '100%', maxWidth: 480, zIndex: 201, background: 'var(--bg)', borderRadius: '20px 20px 0 0', maxHeight: '85vh', overflow: 'hidden', display: 'flex', flexDirection: 'column', boxShadow: '0 -12px 48px rgba(0,0,0,0.5)' }} onClick={e => e.stopPropagation()}>
+            <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
+              <div>
+                <span style={{ fontWeight: 700, fontSize: 16 }}>📋 Новые анализы — {PHASE_LABELS[selectedPhase]}</span>
+                <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 2 }}>Заполните значения для фазы {PHASE_LABELS[selectedPhase].toLowerCase()}</div>
+              </div>
+              <button onClick={() => setShowNewLabsBatch(false)} style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text-dim)', borderRadius: 8, padding: '6px 12px', fontSize: 13, cursor: 'pointer' }}>✕</button>
+            </div>
+            <div style={{ flex: 1, overflowY: 'auto', padding: '12px 16px' }}>
+              {requiredLabs.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: 30, color: 'var(--text-dim)', fontSize: 12 }}>
+                  Нет анализов для выбранной фазы
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {(() => {
+                    const bySystem: Record<string, { code: string; name: string }[]> = {};
+                    for (const code of requiredLabs) {
+                      let sys = 'other';
+                      for (const [s, codes] of Object.entries(LAB_SYSTEM_GROUPS)) {
+                        if (codes.includes(code.toUpperCase())) { sys = s; break; }
+                      }
+                      const info = UCUM_MAP[code.toUpperCase()];
+                      if (!bySystem[sys]) bySystem[sys] = [];
+                      bySystem[sys].push({ code, name: info?.name || code });
+                    }
+                    const sysOrder = ['hepatic','renal','endocrine','hematologic','cardio','metabolic','reproductive','neuro','other'];
+                    return sysOrder.flatMap(sys => {
+                      const items = bySystem[sys];
+                      if (!items || items.length === 0) return [];
+                      return [
+                        <div key={`hdr-${sys}`} style={{ fontSize: 10, fontWeight: 700, color: sysColors[sys] || '#6b7280', padding: '8px 0 2px', display: 'flex', alignItems: 'center', gap: 4 }}>
+                          <span style={{ width: 6, height: 6, borderRadius: '50%', background: sysColors[sys] || '#6b7280' }} />
+                          {sysLabels[sys] || sys}
+                        </div>,
+                        ...items.map(item => (
+                          <div key={item.code} style={{
+                            display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', borderRadius: 8,
+                            background: 'var(--bg-secondary)', border: '1px solid var(--border)',
+                          }}>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ fontSize: 11, fontWeight: 600 }}>{item.name}</div>
+                              <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>{item.code}</div>
+                            </div>
+                            <input type="number" step="any" value={batchValues[item.code] ?? ''}
+                              onChange={e => setBatchValues(prev => ({ ...prev, [item.code]: e.target.value }))}
+                              placeholder="Значение"
+                              style={{ width: 100, padding: '6px 8px', borderRadius: 6, background: 'var(--bg)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, textAlign: 'right' }} />
+                          </div>
+                        ))
+                      ];
+                    });
+                  })()}
+                </div>
+              )}
+            </div>
+            <div style={{ padding: '12px 16px', borderTop: '1px solid var(--border)', display: 'flex', gap: 8 }}>
+              <button onClick={() => { setShowNewLabsBatch(false); setBatchValues({}); }} style={{
+                flex: 1, padding: '10px 12px', borderRadius: 10, border: '1px solid var(--border)',
+                background: 'var(--bg-secondary)', color: 'var(--text-dim)', fontWeight: 600, fontSize: 13, cursor: 'pointer',
+              }}>✕ Отмена</button>
+              <button onClick={handleBatchSave} style={{
+                flex: 1, padding: '10px 12px', borderRadius: 10, border: 'none',
+                background: 'var(--accent)', color: '#000', fontWeight: 700, fontSize: 13, cursor: 'pointer',
+              }}>✓ Сохранить все</button>
             </div>
           </div>
         </div>
