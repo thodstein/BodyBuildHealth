@@ -73,12 +73,29 @@ const LAB_SYSTEM_GROUPS: Record<string, string[]> = {
   '': ['HOMOCYSTEINE','BDNF','SEROTONIN','DOPAMINE','GABA','VITAMIN_B12','FOLATE'],
 };
 
+const LAB_ICONS: Record<string, string> = {
+  results: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>`,
+  schedule: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><path d="M8 14h.01"/><path d="M12 14h.01"/><path d="M16 14h.01"/><path d="M8 18h.01"/><path d="M12 18h.01"/><path d="M16 18h.01"/></svg>`,
+  catalog: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/><line x1="8" y1="7" x2="16" y2="7"/><line x1="8" y1="11" x2="14" y2="11"/><line x1="8" y1="15" x2="12" y2="15"/></svg>`,
+  investigations: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><path d="M8 11h6"/><path d="M11 8v6"/></svg>`,
+  archive: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>`,
+};
+
+type LabSubTab = 'results' | 'schedule' | 'catalog' | 'investigations' | 'archive';
+const LAB_NAV_CARDS: { id: LabSubTab; label: string; desc: string }[] = [
+  { id: 'results', label: 'Результаты', desc: 'Просмотр и анализ показателей, риски и индексы' },
+  { id: 'schedule', label: 'График', desc: 'Календарь сдачи анализов по фазам' },
+  { id: 'catalog', label: 'Каталог', desc: 'Справочник маркеров и референсных значений' },
+  { id: 'investigations', label: 'Обследования', desc: 'Дополнительные инструментальные исследования' },
+  { id: 'archive', label: 'Архив', desc: 'История всех сданных анализов' },
+];
+
 export const LabsScreen: React.FC = () => {
   const linked = useDataLink();
-  // Read phase from profile on mount, fall back to 'baseline'
   const profilePhase = linked.profile?.settings?.phase || '';
   const initialLabsPhase = PROFILE_PHASE_TO_LABS_PHASE[profilePhase] || 'baseline';
-  const [tab, setTab] = useState<'results' | 'schedule' | 'catalog' | 'investigations' | 'archive'>('results');
+  const [view, setView] = useState<'main' | 'detail'>('main');
+  const [tab, setTab] = useState<LabSubTab>('results');
   const [globalNoLabs, setGlobalNoLabs] = useState(getGlobalNoLabs());
   const [noLabsSystems, setNoLabsSystemsState] = useState<string[]>(getNoLabsSystems());
   const [selectedPhase, setSelectedPhase] = useState(initialLabsPhase);
@@ -298,40 +315,100 @@ export const LabsScreen: React.FC = () => {
   const anyNoLabs = globalNoLabs || noLabsSystems.length > 0;
   const deviationCount = labRisks?.markerDeviations?.length ?? 0;
 
+  const goToSub = (subTab: typeof tab) => {
+    setTab(subTab);
+    setView('detail');
+  };
+
+  const goBack = () => setView('main');
+
   return (
-    <div className="screen labs">
-      <h2 style={{ margin: '0 0 10px', fontSize: 18 }}>🧪 Анализы</h2>
+    <div className="screen labs" style={{ padding: view === 'main' ? 0 : undefined, overflow: view === 'main' ? 'hidden' : undefined, height: '100%', display: 'flex', flexDirection: 'column' }}>
 
-      {/* Phase selector */}
-      <div style={{ display: 'flex', gap: 3, overflowX: 'auto', marginBottom: 8, scrollbarWidth: 'none' }}>
-        {Object.entries(PHASE_LABELS).map(([key, label]) => (
-          <button key={key} onClick={() => handlePhaseChange(key)} style={{
-            padding: '5px 9px', borderRadius: 14, fontSize: 11, fontWeight: 600,
-            whiteSpace: 'nowrap', cursor: 'pointer', transition: 'all 0.15s',
-            background: selectedPhase === key ? 'var(--accent)' : 'var(--bg-secondary)',
-            color: selectedPhase === key ? '#000' : 'var(--text-dim)',
-            border: `1px solid ${selectedPhase === key ? 'var(--accent)' : 'var(--border)'}`,
-            flexShrink: 0,
-          }}>
-            {label}
-          </button>
-        ))}
-      </div>
+      {/* ≡≡≡ MAIN VIEW: HERO + CARDS ≡≡≡ */}
+      {view === 'main' && (
+        <>
+          <div style={{ position: 'relative', width: '100%', height: '38vh', minHeight: 200, overflow: 'hidden', flexShrink: 0 }}>
+            <img src="/hero-image.jpg" alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+            <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '50%', background: 'linear-gradient(to top, var(--bg) 0%, transparent 100%)', pointerEvents: 'none' }} />
+          </div>
 
-      {/* Tab bar */}
-      <div style={{ display: 'flex', gap: 3, marginBottom: 8, overflowX: 'auto', scrollbarWidth: 'none' }}>
-        {(['results', 'schedule', 'investigations', 'archive', 'catalog'] as const).map(t => (
-          <button key={t} onClick={() => setTab(t)} style={{
-            flex: 1, padding: '8px 6px', borderRadius: 8, fontSize: 12, fontWeight: 600,
-            whiteSpace: 'nowrap', cursor: 'pointer', transition: 'all 0.15s',
-            background: tab === t ? 'rgba(0,230,138,0.15)' : 'var(--bg-secondary)',
-            color: tab === t ? '#00e68a' : 'var(--text-dim)',
-            border: tab === t ? '1px solid #00e68a' : '1px solid var(--border)',
-          }}>
-            {t === 'results' ? '📊 Результаты' : t === 'schedule' ? '📅 График' : t === 'investigations' ? '🔬 Обследования' : t === 'archive' ? '📦 Архив' : '📚 Каталог'}
-          </button>
-        ))}
-      </div>
+          <div style={{ padding: '8px 12px 16px', position: 'relative', zIndex: 2, flex: 1, overflowY: 'auto' }}>
+            <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 8, textAlign: 'center' }}>
+              {hasLabs ? `${labs.length} показателей • фаза: ${PHASE_LABELS[selectedPhase] || selectedPhase}` : 'Нет данных анализов'}
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+              {LAB_NAV_CARDS.map(card => (
+                <div key={card.id} onClick={() => goToSub(card.id)} style={{
+                  position: 'relative', borderRadius: 18, padding: '16px 12px', cursor: 'pointer',
+                  transition: 'all 0.35s cubic-bezier(0.22, 0.68, 0, 1)',
+                  background: 'linear-gradient(135deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.01) 100%)',
+                  border: '1px solid rgba(255, 255, 255, 0.05)',
+                  overflow: 'hidden', display: 'flex', flexDirection: 'column', gap: 8,
+                }}>
+                  <div style={{
+                    width: 34, height: 34, borderRadius: 10,
+                    background: 'rgba(200,245,96,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    color: 'rgba(200,245,96,0.7)', flexShrink: 0,
+                  }} dangerouslySetInnerHTML={{ __html: LAB_ICONS[card.id] }} />
+                  <div style={{ fontWeight: 700, fontSize: 14, color: '#FFFFFF', letterSpacing: '-0.3px', lineHeight: 1.2 }}>
+                    {card.label}
+                  </div>
+                  <div style={{ fontSize: 10, color: 'rgba(255, 255, 255, 0.3)', lineHeight: 1.3, fontWeight: 400 }}>
+                    {card.desc}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+
+          </div>
+        </>
+      )}
+
+      {/* ≡≡≡ DETAIL VIEW ≡≡≡ */}
+      {view === 'detail' && (
+        <div style={{ flex: 1, overflowY: 'auto', padding: '0 12px 16px' }}>
+          {/* Back button + title */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 0', position: 'sticky', top: 0, zIndex: 10, background: 'var(--bg)' }}>
+            <button onClick={goBack} style={{
+              width: 32, height: 32, borderRadius: 10, border: '1px solid var(--border)',
+              background: 'var(--bg-secondary)', color: 'var(--text)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, flexShrink: 0,
+            }}>←</button>
+            <span style={{ fontWeight: 700, fontSize: 16 }}>{LAB_NAV_CARDS.find(c => c.id === tab)?.label || tab}</span>
+          </div>
+
+          {/* Phase selector */}
+          <div style={{ display: 'flex', gap: 3, overflowX: 'auto', marginBottom: 8, scrollbarWidth: 'none' }}>
+            {Object.entries(PHASE_LABELS).map(([key, label]) => (
+              <button key={key} onClick={() => handlePhaseChange(key)} style={{
+                padding: '5px 9px', borderRadius: 14, fontSize: 11, fontWeight: 600,
+                whiteSpace: 'nowrap', cursor: 'pointer', transition: 'all 0.15s',
+                background: selectedPhase === key ? 'var(--accent)' : 'var(--bg-secondary)',
+                color: selectedPhase === key ? '#000' : 'var(--text-dim)',
+                border: `1px solid ${selectedPhase === key ? 'var(--accent)' : 'var(--border)'}`,
+                flexShrink: 0,
+              }}>
+                {label}
+              </button>
+            ))}
+          </div>
+
+          {/* Tab bar */}
+          <div style={{ display: 'flex', gap: 3, marginBottom: 8, overflowX: 'auto', scrollbarWidth: 'none' }}>
+            {(['results', 'schedule', 'investigations', 'archive', 'catalog'] as const).map(t => (
+              <button key={t} onClick={() => setTab(t)} style={{
+                flex: 1, padding: '8px 6px', borderRadius: 8, fontSize: 12, fontWeight: 600,
+                whiteSpace: 'nowrap', cursor: 'pointer', transition: 'all 0.15s',
+                background: tab === t ? 'rgba(0,230,138,0.15)' : 'var(--bg-secondary)',
+                color: tab === t ? '#00e68a' : 'var(--text-dim)',
+                border: tab === t ? '1px solid #00e68a' : '1px solid var(--border)',
+              }}>
+                {t === 'results' ? '📊 Результаты' : t === 'schedule' ? '📅 График' : t === 'investigations' ? '🔬 Обследования' : t === 'archive' ? '📦 Архив' : '📚 Каталог'}
+              </button>
+            ))}
+          </div>
 
       {/* ≡≡≡ RESULTS TAB ≡≡≡ */}
       {tab === 'results' && (
@@ -577,47 +654,17 @@ export const LabsScreen: React.FC = () => {
         </div>
       )}
 
-      {/* Penalty section — shown on all tabs */}
-      <div className="card" style={{ marginTop: 8, background: anyNoLabs ? 'rgba(239,68,68,0.08)' : 'var(--glass-bg)', borderColor: anyNoLabs ? 'rgba(239,68,68,0.3)' : 'var(--glass-border)' }}>
-        <h3 style={{ fontSize: 13, margin: '0 0 6px' }}>⚠️ Штраф за отсутствие анализов</h3>
-        <div style={{ fontSize: 10, marginBottom: 6 }}>
-          {anyNoLabs ? (
-            <div>
-              <div>Множитель: <strong style={{ color: '#ef4444' }}>×{penalty.totalMultiplier.toFixed(2)}</strong></div>
-              <div>Лабы: {Math.round(penalty.labPenalty * 100)}% • Диагностика: {Math.round(penalty.diagnosticPenalty * 100)}%</div>
-            </div>
-          ) : (
-            <div style={{ color: 'var(--text-dim)' }}>Штраф не применён.</div>
-          )}
-        </div>
-        <button onClick={toggleGlobalNoLabs} style={{
-          width: '100%', padding: 8, borderRadius: 6, cursor: 'pointer', fontWeight: 700, fontSize: 11,
-          background: globalNoLabs ? 'var(--accent)' : '#ef4444', color: globalNoLabs ? '#000' : '#fff',
-          border: 'none', marginBottom: 4,
-        }}>
-          {globalNoLabs ? '✅ Отменить глобальный штраф' : ''}
-        </button>
-        {!globalNoLabs && (
-          <div>
-            <div style={{ fontSize: 8, color: 'var(--text-dim)', marginBottom: 2 }}>Или по системе:</div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
-              {RISK_SYSTEMS.map(sys => {
-                const isActive = noLabsSystems.includes(sys);
-                return (
-                  <button key={sys} onClick={() => toggleSystemNoLabs(sys)} style={{
-                    padding: '2px 6px', borderRadius: 8, fontSize: 8, cursor: 'pointer',
-                    background: isActive ? 'rgba(239,68,68,0.2)' : 'var(--bg-secondary)',
-                    border: `1px solid ${isActive ? 'rgba(239,68,68,0.4)' : 'var(--border)'}`,
-                    color: isActive ? '#ef4444' : 'var(--text-dim)', fontWeight: isActive ? 700 : 400,
-                  }}>
-                    {isActive ? '✕ ' : ''}{sysLabels[sys] || sys}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        )}
       </div>
+      )}
+
+      {/* Penalty section for detail view */}
+      <LabPenaltySection
+        anyNoLabs={anyNoLabs} penalty={penalty} globalNoLabs={globalNoLabs}
+        toggleGlobalNoLabs={toggleGlobalNoLabs}
+        noLabsSystems={noLabsSystems} toggleSystemNoLabs={toggleSystemNoLabs}
+        showInput={() => setShowLabInput(true)} showImport={() => { setShowImport(true); setTimeout(() => fileInputRef.current?.click(), 100); }}
+        hasLabs={hasLabs}
+      />
 
       {/* OCR Import Modal */}
       {showImport && (
@@ -726,3 +773,61 @@ export const LabsScreen: React.FC = () => {
     </div>
   );
 };
+
+function LabPenaltySection({ anyNoLabs, penalty, globalNoLabs, toggleGlobalNoLabs, noLabsSystems, toggleSystemNoLabs, showInput, showImport, hasLabs }: {
+  anyNoLabs: boolean; penalty: any; globalNoLabs: boolean; toggleGlobalNoLabs: () => void;
+  noLabsSystems: string[]; toggleSystemNoLabs: (sys: string) => void;
+  showInput: () => void; showImport: () => void; hasLabs: boolean;
+}) {
+  return (
+    <div className="card" style={{ marginTop: 8, background: anyNoLabs ? 'rgba(239,68,68,0.08)' : 'var(--glass-bg)', borderColor: anyNoLabs ? 'rgba(239,68,68,0.3)' : 'var(--glass-border)' }}>
+      {!hasLabs && !anyNoLabs && (
+        <div style={{ fontSize: 10, color: 'var(--accent)', marginBottom: 6, textAlign: 'center' }}>
+          Нет данных анализов — риски не рассчитаны
+        </div>
+      )}
+      <h3 style={{ fontSize: 13, margin: '0 0 6px' }}>⚠️ Штраф за отсутствие анализов</h3>
+      <div style={{ fontSize: 10, marginBottom: 6 }}>
+        {anyNoLabs ? (
+          <div>
+            <div>Множитель: <strong style={{ color: '#ef4444' }}>×{penalty.totalMultiplier.toFixed(2)}</strong></div>
+            <div>Лабы: {Math.round(penalty.labPenalty * 100)}% • Диагностика: {Math.round(penalty.diagnosticPenalty * 100)}%</div>
+          </div>
+        ) : (
+          <div style={{ color: 'var(--text-dim)' }}>Штраф не применён.</div>
+        )}
+      </div>
+      <div style={{ display: 'flex', gap: 4, marginBottom: 6 }}>
+        <button onClick={showInput} style={{ flex: 1, padding: 7, borderRadius: 6, border: '1px solid var(--border)', background: 'var(--bg-secondary)', color: 'var(--accent)', fontWeight: 600, fontSize: 10, cursor: 'pointer' }}>✏️ Ввести</button>
+        <button onClick={showImport} style={{ flex: 1, padding: 7, borderRadius: 6, border: '1px solid var(--border)', background: 'var(--bg-secondary)', color: 'var(--accent)', fontWeight: 600, fontSize: 10, cursor: 'pointer' }}>📄 Импорт</button>
+        <button onClick={toggleGlobalNoLabs} style={{
+          flex: 1, padding: 7, borderRadius: 6, cursor: 'pointer', fontWeight: 700, fontSize: 10,
+          background: globalNoLabs ? 'var(--accent)' : '#ef4444', color: globalNoLabs ? '#000' : '#fff',
+          border: 'none',
+        }}>
+          {globalNoLabs ? '✅ Штраф' : '🚫 Без анализов'}
+        </button>
+      </div>
+      {!globalNoLabs && (
+        <div>
+          <div style={{ fontSize: 8, color: 'var(--text-dim)', marginBottom: 2 }}>По системам:</div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
+            {RISK_SYSTEMS.map(sys => {
+              const isActive = noLabsSystems.includes(sys);
+              return (
+                <button key={sys} onClick={() => toggleSystemNoLabs(sys)} style={{
+                  padding: '2px 6px', borderRadius: 8, fontSize: 8, cursor: 'pointer',
+                  background: isActive ? 'rgba(239,68,68,0.2)' : 'var(--bg-secondary)',
+                  border: `1px solid ${isActive ? 'rgba(239,68,68,0.4)' : 'var(--border)'}`,
+                  color: isActive ? '#ef4444' : 'var(--text-dim)', fontWeight: isActive ? 700 : 400,
+                }}>
+                  {isActive ? '✕ ' : ''}{sysLabels[sys] || sys}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
