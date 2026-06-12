@@ -14,9 +14,10 @@ import { PctScreen } from './ui/screens/PctScreen';
 import { RecoveryScreen } from './ui/screens/RecoveryScreen';
 import { PerformanceScreen } from './ui/screens/PerformanceScreen';
 import { TrainingToolkitScreen } from './ui/screens/TrainingToolkitScreen';
+import { FullIntegrationScreen } from './ui/screens/FullIntegrationScreen';
 import { ToastContainer } from './ui/ToastContainer';
 
-type Tab = 'home' | 'pharma' | 'training' | 'labs' | 'risks' | 'support' | 'nutrition' | 'profile' | 'calculators' | 'pct' | 'articles' | 'recovery' | 'performance' | 'toolkit';
+type Tab = 'home' | 'pharma' | 'training' | 'labs' | 'risks' | 'support' | 'nutrition' | 'profile' | 'calculators' | 'pct' | 'articles' | 'recovery' | 'performance' | 'toolkit' | 'full';
 
 // Bottom nav: 5 primary tabs
 const PRIMARY_NAV: { id: Tab; label: string; icon: React.ReactNode }[] = [
@@ -114,6 +115,8 @@ export default function App() {
       'bloodwork': 'performance',
       'toolkit': 'toolkit',
       'training-tools': 'toolkit',
+      'full': 'full',
+      'integration': 'full',
     };
     const target = tabMap[screen] || 'home';
     go(target);
@@ -146,6 +149,7 @@ export default function App() {
       case 'recovery': return <RecoveryScreen />;
       case 'performance': return <PerformanceScreen />;
       case 'toolkit': return <TrainingToolkitScreen />;
+      case 'full': return <FullIntegrationScreen />;
       default: return <DashboardScreen onNavigate={handleNavigate} />;
     }
   };
