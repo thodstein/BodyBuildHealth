@@ -181,11 +181,13 @@ export function calculateWeeklyProgression(
   
   const wpFactor = 1.2;
   const nonWpFactor = Math.max(0.7, 1.0 - (0.1 * weakPoints.length));
-  
+  const weakCount = groups.filter(g => weakPoints.includes(g)).length;
+  const normFactor = weakCount * wpFactor + (groups.length - weakCount) * nonWpFactor;
+
   groups.forEach(g => { 
     volumePerGroup[g] = weakPoints.includes(g) 
-      ? Math.round(volumeTotal * wpFactor / groups.length) 
-      : Math.round(volumeTotal * nonWpFactor / groups.length); 
+      ? Math.round(volumeTotal * wpFactor / normFactor) 
+      : Math.round(volumeTotal * nonWpFactor / normFactor); 
   });
 
   // Подбор техники интенсивности по фазе
@@ -272,7 +274,7 @@ export function calculateRIR(
   
   if (phase === 'deload') {
     rirBase = 4;
-    rationale += ` +${4 - rirBase} RIR (делоад)`;
+    rationale += ` +0 RIR (делоад)`;
   }
   
   // Compound vs Isolation

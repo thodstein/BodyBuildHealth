@@ -158,9 +158,11 @@ export function calcTraining(i: TrainingInput): TrainingOutput {
   const volMap: Record<string, number> = {};
   const wpFactor = 1.2;
   const nonWpFactor = Math.max(0.7, 1.0 - (0.1 * i.weakPoints.length));
+  const weakCount = groups.filter(g => i.weakPoints.includes(g)).length;
+  const normFactor = weakCount * wpFactor + (groups.length - weakCount) * nonWpFactor;
 
   groups.forEach(g => { 
-    volMap[g] = i.weakPoints.includes(g) ? volume * wpFactor : volume * nonWpFactor; 
+    volMap[g] = volume * (i.weakPoints.includes(g) ? wpFactor : nonWpFactor) / normFactor; 
   });
 
   // Use unified TRAINING_SPLITS with groupsPerDay format
