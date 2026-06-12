@@ -6,6 +6,7 @@ import { calculatePenaltyCoefficients } from '../../engines/labs-penalty.engine'
 import { computeLabIndexDetails, type LabIndexDetail } from '../../engines/labs-indices.engine';
 import { interpretLabs, computeHOMA_IR, type LabCompositeResult } from '../../engines/lab-analysis.engine';
 import { analyzeLabDrugCorrelation, type LabDrugAlert } from '../../engines/lab-pharma-correlation.engine';
+import { quickParse, parseLabResults } from '../../engines/biomarker-regex-engine';
 import { getRiskColor } from '../../core/utils/risk-colors';
 import { useDataLink, notifyDataChange } from '../../core/data-link';
 import { db } from '../../core/db';
