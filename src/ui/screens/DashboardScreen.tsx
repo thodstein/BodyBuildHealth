@@ -370,17 +370,10 @@ export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
       {/* ═══ HULK HERO ═══ */}
       <div style={{
         background: 'linear-gradient(135deg, rgba(0,230,138,0.08) 0%, rgba(0,80,50,0.12) 100%)',
-        borderRadius: 16, padding: '16px 12px 12px', marginBottom: 14,
-        border: '1px solid rgba(0,230,138,0.15)', position: 'relative', overflow: 'hidden',
+        borderRadius: 16, padding: 0, marginBottom: 14,
+        border: '1px solid rgba(0,230,138,0.15)', overflow: 'hidden',
       }}>
-        <div style={{ textAlign: 'center', marginBottom: 8, position: 'relative', zIndex: 1 }}>
-          <div style={{ fontSize: 10, color: 'var(--accent)', fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', opacity: 0.8 }}>Health Engine</div>
-          <div style={{ fontSize: 13, fontWeight: 800, background: 'linear-gradient(90deg, #00e68a, #00bcd4)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Bodybuilding &amp; Health</div>
-        </div>
-        <img src="/hulk-hero.jpg" alt="Hulk Hero" style={{ width: '100%', display: 'block', borderRadius: 10 }} />
-        <div style={{ textAlign: 'center', marginTop: 6, fontSize: 9, color: 'var(--text-dim)', opacity: 0.6 }}>
-          v9.0 · BodyBuildHealth
-        </div>
+        <img src="/hulk-hero.jpg" alt="Hulk Hero" style={{ width: '100%', height: '80vh', display: 'block', objectFit: 'cover', borderRadius: 16 }} />
       </div>
 
       {/* Body Composition quick stats */}
