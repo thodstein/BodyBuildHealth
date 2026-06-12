@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+﻿import React, { useState, useMemo } from 'react';
 import { Line } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
@@ -96,7 +96,7 @@ export const NutritionCharts: React.FC<{
     labels: chartData.labels,
     datasets: [
       {
-        label: 'Калории (ккал)',
+        label: '',
         data: chartData.kcalLine,
         borderColor: '#22c55e',
         backgroundColor: 'rgba(34,197,94,0.1)',
@@ -104,7 +104,7 @@ export const NutritionCharts: React.FC<{
         fill: true,
       },
       {
-        label: 'Цель',
+        label: '',
         data: Array(range).fill(chartData.avgKcal),
         borderColor: 'rgba(34,197,94,0.4)',
         borderDash: [5, 5],
@@ -118,7 +118,7 @@ export const NutritionCharts: React.FC<{
     labels: chartData.labels,
     datasets: [
       {
-        label: 'Белки (г)',
+        label: '',
         data: chartData.proteinLine,
         borderColor: '#3b82f6',
         backgroundColor: 'rgba(59,130,246,0.1)',
@@ -126,7 +126,7 @@ export const NutritionCharts: React.FC<{
         fill: true,
       },
       {
-        label: 'Жиры (г)',
+        label: '',
         data: chartData.fatLine,
         borderColor: '#f97316',
         backgroundColor: 'rgba(249,115,22,0.1)',
@@ -134,7 +134,7 @@ export const NutritionCharts: React.FC<{
         fill: true,
       },
       {
-        label: 'Углеводы (г)',
+        label: '',
         data: chartData.carbsLine,
         borderColor: '#a855f7',
         backgroundColor: 'rgba(168,85,247,0.1)',
@@ -161,17 +161,17 @@ export const NutritionCharts: React.FC<{
     <div className="nutrition-charts">
       {!hasRealData && (
         <div className="card" style={{ marginBottom: 8, padding: '8px 12px', background: 'rgba(255,165,2,0.08)', borderColor: 'rgba(255,165,2,0.3)' }}>
-          <div style={{ fontSize: 11, color: '#ffa502' }}>📊 Нет данных дневника. Графики — оценочные значения.</div>
+          <div style={{ fontSize: 11, color: '#ffa502' }}>рџ“Љ РќРµС‚ РґР°РЅРЅС‹С… РґРЅРµРІРЅРёРєР°. Р“СЂР°С„РёРєРё вЂ” РѕС†РµРЅРѕС‡РЅС‹Рµ Р·РЅР°С‡РµРЅРёСЏ.</div>
         </div>
       )}
       {hasRealData && daysWithData < range && (
         <div className="card" style={{ marginBottom: 8, padding: '8px 12px', background: 'rgba(30,144,255,0.08)', borderColor: 'rgba(30,144,255,0.3)' }}>
-          <div style={{ fontSize: 11, color: '#1e90ff' }}>📊 Данные за {daysWithData} из {range} дней.</div>
+          <div style={{ fontSize: 11, color: '#1e90ff' }}>рџ“Љ Р”Р°РЅРЅС‹Рµ Р·Р° {daysWithData} РёР· {range} РґРЅРµР№.</div>
         </div>
       )}
       <div className="card" style={{ marginBottom: 12 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-          <h3 style={{ margin: 0 }}>📈 Графики КБЖУ</h3>
+          <h3 style={{ margin: 0 }}>рџ“€ Р“СЂР°С„РёРєРё РљР‘Р–РЈ</h3>
           <div style={{ display: 'flex', gap: 4 }}>
             {([7, 14, 30] as ChartRange[]).map(r => (
               <button key={r} onClick={() => setRange(r)} style={{
@@ -180,30 +180,30 @@ export const NutritionCharts: React.FC<{
                 border: range === r ? '1px solid #00e68a' : '1px solid var(--border)',
                 color: range === r ? '#00e68a' : 'var(--text-dim)', fontWeight: 600,
               }}>
-                {r}д
+                {r}Рґ
               </button>
             ))}
           </div>
         </div>
 
         <div style={{ height: 220, marginBottom: 16 }}>
-          <Line data={kcalChartData} options={commonOptions('Калории за период')} />
+          <Line data={kcalChartData} options={commonOptions('')} />
         </div>
 
         <div style={{ height: 220 }}>
-          <Line data={macroChartData} options={commonOptions('Макронутриенты (Б/Ж/У)')} />
+          <Line data={macroChartData} options={commonOptions('')} />
         </div>
       </div>
 
       {/* Summary stats */}
       <div className="card" style={{ marginBottom: 12 }}>
-        <h3 style={{ margin: '0 0 8px 0' }}>📊 Средние за {range} дней</h3>
+        <h3 style={{ margin: '0 0 8px 0' }}>рџ“Љ РЎСЂРµРґРЅРёРµ Р·Р° {range} РґРЅРµР№</h3>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
           {[
-            { label: 'Калории', val: chartData.avgKcal, unit: 'ккал/д', color: '#22c55e' },
-            { label: 'Белки', val: chartData.avgProtein, unit: 'г/д', color: '#3b82f6' },
-            { label: 'Жиры', val: chartData.avgFat, unit: 'г/д', color: '#f97316' },
-            { label: 'Углеводы', val: chartData.avgCarbs, unit: 'г/д', color: '#a855f7' },
+            { label: '', val: chartData.avgKcal, unit: '', color: '#22c55e' },
+            { label: '', val: chartData.avgProtein, unit: '', color: '#3b82f6' },
+            { label: '', val: chartData.avgFat, unit: '', color: '#f97316' },
+            { label: '', val: chartData.avgCarbs, unit: '', color: '#a855f7' },
           ].map(s => (
             <div key={s.label} style={{ background: 'var(--bg-secondary)', padding: 10, borderRadius: 8, textAlign: 'center' }}>
               <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>{s.label}</div>

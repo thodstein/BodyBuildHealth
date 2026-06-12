@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+﻿import React, { useState, useRef } from 'react';
 import { useDataLink } from '../../core/data-link';
 import { db } from '../../core/db';
 import { calculateIndices } from '../../engines/clinical-indices.engine';
@@ -74,13 +74,13 @@ export const ReportsScreen: React.FC = () => {
       for (const [meal, items] of Object.entries(day.meals))
         for (const item of items)
           entries.push({ date, meal, food: item.name, weight_g: item.weight, kcal: item.kcal, protein_g: item.p, fat_g: item.f, carbs_g: item.c, fiber_g: item.fiber });
-    if (!entries.length) { setImportMsg('Нет данных дневника'); return; }
+    if (!entries.length) { setImportMsg(''); return; }
     const headers = ['date', 'meal', 'food', 'weight_g', 'kcal', 'protein_g', 'fat_g', 'carbs_g', 'fiber_g'];
     triggerDownload([headers.join(','), ...entries.map(e => headers.map(h => escapeCSV(e[h])).join(','))].join('\n'), `nutrition-diary-${new Date().toISOString().slice(0, 10)}.csv`, 'text/csv');
   };
 
   const handleExportLabsCSV = () => {
-    if (!labs.length) { setImportMsg('Нет данных анализов'); return; }
+    if (!labs.length) { setImportMsg(''); return; }
     const headers = ['date', 'code', 'name', 'value', 'unit', 'phase', 'ref_low', 'ref_high'];
     const rows = labs.map(l => { const ref = UCUM_MAP[l.code]; return [l.date, l.code, l.name || '', l.value, l.unit, l.phase, ref?.lln ?? '', ref?.uln ?? ''].map(escapeCSV).join(','); });
     triggerDownload([headers.join(','), ...rows].join('\n'), `labs-export-${new Date().toISOString().slice(0, 10)}.csv`, 'text/csv');
@@ -97,93 +97,93 @@ export const ReportsScreen: React.FC = () => {
         if (data.labs && Array.isArray(data.labs)) { await db.init(); for (const lab of data.labs) await db.put('labs_log', { ...lab, patientId: 'current-user' }); }
         if (data.course && Array.isArray(data.course)) { await db.init(); for (const entry of data.course) await db.put('course_log', entry); }
         if (data.nutritionDiary) localStorage.setItem('nutrition_diary', JSON.stringify(data.nutritionDiary));
-        setImportMsg('Импорт выполнен. Перезагрузите страницу.');
-      } catch { setImportMsg('Ошибка импорта: файл повреждён.'); }
+        setImportMsg('');
+      } catch { setImportMsg(''); }
     };
     reader.readAsText(file);
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   const systemLabels: Record<string, string> = {
-    cardio: 'Сердечно-сосудистая', hepatic: 'Печень', renal: 'Почки',
-    neuro: 'Нервная', endocrine: 'Эндокринная', hematologic: 'Кроветворная', reproductive: 'Репродуктивная'
+    cardio: '', hepatic: '', renal: '',
+    neuro: '', endocrine: '', hematologic: '', reproductive: ''
   };
 
   const btn: React.CSSProperties = { padding: '6px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg-primary)', color: 'inherit', fontSize: 12, cursor: 'pointer' };
 
   return (
     <div className="screen reports">
-      <h2>Отчёты</h2>
+      <h2>РћС‚С‡С‘С‚С‹</h2>
       <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 8 }}>
         {(['summary', 'labs', 'nutrition', 'pharma', 'print'] as ReportTab[]).map(t => (
           <button key={t} className={`tab-button ${tab === t ? 'active' : ''}`} onClick={() => setTab(t)}>
-            {t === 'summary' ? 'Сводка' : t === 'labs' ? 'Анализы' : t === 'nutrition' ? 'Питание' : t === 'pharma' ? 'Фарма' : 'Печать'}
+            {t === 'summary' ? '' : t === 'labs' ? '' : t === 'nutrition' ? '' : t === 'pharma' ? '' : ''}
           </button>
         ))}
       </div>
       <div style={{ display: 'flex', gap: 4, marginBottom: 12 }}>
         {(['day', 'week', 'month'] as ReportPeriod[]).map(p => (
           <button key={p} className={`tab-button ${period === p ? 'active' : ''}`} onClick={() => setPeriod(p)} style={{ fontSize: 11, padding: '4px 10px' }}>
-            {p === 'day' ? 'День' : p === 'week' ? 'Неделя' : 'Месяц'}
+            {p === 'day' ? '' : p === 'week' ? '' : ''}
           </button>
         ))}
       </div>
 
       {tab === 'summary' && (
         <div style={{ background: 'var(--bg-secondary)', borderRadius: 12, padding: 16, marginBottom: 12 }}>
-          <h4 style={{ margin: '0 0 8px' }}>Сводка — {period === 'day' ? 'день' : period === 'week' ? 'неделя' : 'месяц'}</h4>
+          <h4 style={{ margin: '0 0 8px' }}>РЎРІРѕРґРєР° вЂ” {period === 'day' ? '' : period === 'week' ? '' : ''}</h4>
           {readiness && (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 8, textAlign: 'center', marginBottom: 12 }}>
-              {[{ l: 'Восст.', v: readiness.recovery, g: 60 }, { l: 'Питание', v: readiness.nutrition, g: 60 }, { l: 'Поддержка', v: readiness.support, g: 60 }, { l: 'Усталость', v: readiness.fatigue, g: 40, inv: true }].map(m => (
+              {[{ l: '', v: readiness.recovery, g: 60 }, { l: '', v: readiness.nutrition, g: 60 }, { l: '', v: readiness.support, g: 60 }, { l: '', v: readiness.fatigue, g: 40, inv: true }].map(m => (
                 <div key={m.l}><div style={{ fontSize: 20, fontWeight: 700, color: m.inv ? (m.v <= m.g ? '#00e68a' : '#ff9800') : (m.v >= m.g ? '#00e68a' : '#ff9800') }}>{m.v}</div><div style={{ fontSize: 11 }}>{m.l}</div></div>
               ))}
             </div>
           )}
-          {risk && <div style={{ marginBottom: 12 }}><h5 style={{ margin: '0 0 4px' }}>Риск</h5><div style={{ fontSize: 18, fontWeight: 700, color: risk.overallNet > 50 ? '#f44336' : risk.overallNet > 25 ? '#ff9800' : '#00e68a' }}>{risk.overallNet.toFixed(1)}% чистый</div></div>}
+          {risk && <div style={{ marginBottom: 12 }}><h5 style={{ margin: '0 0 4px' }}>Р РёСЃРє</h5><div style={{ fontSize: 18, fontWeight: 700, color: risk.overallNet > 50 ? '#f44336' : risk.overallNet > 25 ? '#ff9800' : '#00e68a' }}>{risk.overallNet.toFixed(1)}% С‡РёСЃС‚С‹Р№</div></div>}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-            <div style={{ padding: 8, borderRadius: 8, background: 'rgba(0,230,138,0.08)' }}><div style={{ fontSize: 11, opacity: 0.6 }}>Ср. ккал/{period === 'day' ? 'день' : 'нед'}</div><div style={{ fontSize: 18, fontWeight: 700 }}>{avgWeeklyKcal}</div></div>
-            <div style={{ padding: 8, borderRadius: 8, background: 'rgba(0,230,138,0.08)' }}><div style={{ fontSize: 11, opacity: 0.6 }}>Ср. белок/{period === 'day' ? 'день' : 'нед'}</div><div style={{ fontSize: 18, fontWeight: 700 }}>{avgWeeklyProtein}г</div></div>
+            <div style={{ padding: 8, borderRadius: 8, background: 'rgba(0,230,138,0.08)' }}><div style={{ fontSize: 11, opacity: 0.6 }}>РЎСЂ. РєРєР°Р»/{period === 'day' ? '' : ''}</div><div style={{ fontSize: 18, fontWeight: 700 }}>{avgWeeklyKcal}</div></div>
+            <div style={{ padding: 8, borderRadius: 8, background: 'rgba(0,230,138,0.08)' }}><div style={{ fontSize: 11, opacity: 0.6 }}>РЎСЂ. Р±РµР»РѕРє/{period === 'day' ? '' : ''}</div><div style={{ fontSize: 18, fontWeight: 700 }}>{avgWeeklyProtein}Рі</div></div>
           </div>
-          <div style={{ marginTop: 8, fontSize: 12, opacity: 0.7 }}>Анализов: {periodLabs.length} | Препаратов: {course.length} | Травм: {profile.settings.injuries?.length ?? 0}</div>
+          <div style={{ marginTop: 8, fontSize: 12, opacity: 0.7 }}>РђРЅР°Р»РёР·РѕРІ: {periodLabs.length} | РџСЂРµРїР°СЂР°С‚РѕРІ: {course.length} | РўСЂР°РІРј: {profile.settings.injuries?.length ?? 0}</div>
         </div>
       )}
 
       {tab === 'labs' && (
         <div style={{ background: 'var(--bg-secondary)', borderRadius: 12, padding: 16, marginBottom: 12 }}>
-          <h4 style={{ margin: '0 0 8px' }}>Анализы за период</h4>
-          {periodLabs.length === 0 ? <p style={{ fontSize: 13, opacity: 0.6 }}>Нет данных</p> : (
+          <h4 style={{ margin: '0 0 8px' }}>РђРЅР°Р»РёР·С‹ Р·Р° РїРµСЂРёРѕРґ</h4>
+          {periodLabs.length === 0 ? <p style={{ fontSize: 13, opacity: 0.6 }}>РќРµС‚ РґР°РЅРЅС‹С…</p> : (
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
-              <thead><tr><th style={{ padding: 6, textAlign: 'left', borderBottom: '1px solid var(--border)' }}>Показатель</th><th style={{ padding: 6, textAlign: 'right', borderBottom: '1px solid var(--border)' }}>Значение</th><th style={{ padding: 6, borderBottom: '1px solid var(--border)' }}>Ед.</th><th style={{ padding: 6, textAlign: 'center', borderBottom: '1px solid var(--border)' }}>Дата</th></tr></thead>
+              <thead><tr><th style={{ padding: 6, textAlign: 'left', borderBottom: '1px solid var(--border)' }}>РџРѕРєР°Р·Р°С‚РµР»СЊ</th><th style={{ padding: 6, textAlign: 'right', borderBottom: '1px solid var(--border)' }}>Р—РЅР°С‡РµРЅРёРµ</th><th style={{ padding: 6, borderBottom: '1px solid var(--border)' }}>Р•Рґ.</th><th style={{ padding: 6, textAlign: 'center', borderBottom: '1px solid var(--border)' }}>Р”Р°С‚Р°</th></tr></thead>
               <tbody>{periodLabs.sort((a, b) => (b.date || '').localeCompare(a.date || '')).map(l => {
                 const ref = UCUM_MAP[l.code]; const abn = ref && (l.value < ref.lln || l.value > ref.uln);
                 return <tr key={l.id} style={{ color: abn ? '#ff9800' : 'inherit' }}><td style={{ padding: 6, borderBottom: '1px solid var(--border)' }}>{l.name || l.code}</td><td style={{ padding: 6, textAlign: 'right', borderBottom: '1px solid var(--border)' }}>{l.value}</td><td style={{ padding: 6, borderBottom: '1px solid var(--border)' }}>{l.unit}</td><td style={{ padding: 6, textAlign: 'center', borderBottom: '1px solid var(--border)' }}>{l.date}</td></tr>;
               })}</tbody>
             </table>
           )}
-          <button style={{ ...btn, marginTop: 8 }} onClick={handleExportLabsCSV}>Экспорт CSV</button>
+          <button style={{ ...btn, marginTop: 8 }} onClick={handleExportLabsCSV}>Р­РєСЃРїРѕСЂС‚ CSV</button>
         </div>
       )}
 
       {tab === 'nutrition' && (
         <div style={{ background: 'var(--bg-secondary)', borderRadius: 12, padding: 16, marginBottom: 12 }}>
-          <h4 style={{ margin: '0 0 8px' }}>Питание</h4>
+          <h4 style={{ margin: '0 0 8px' }}>РџРёС‚Р°РЅРёРµ</h4>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 8, textAlign: 'center', marginBottom: 12 }}>
-            <div><div style={{ fontSize: 18, fontWeight: 700 }}>{avgWeeklyKcal}</div><div style={{ fontSize: 11, opacity: 0.6 }}>ккал</div></div>
-            <div><div style={{ fontSize: 18, fontWeight: 700 }}>{avgWeeklyProtein}г</div><div style={{ fontSize: 11, opacity: 0.6 }}>Белок</div></div>
-            <div><div style={{ fontSize: 18, fontWeight: 700 }}>{avgWeeklyFat}г</div><div style={{ fontSize: 11, opacity: 0.6 }}>Жиры</div></div>
-            <div><div style={{ fontSize: 18, fontWeight: 700 }}>{avgWeeklyCarbs}г</div><div style={{ fontSize: 11, opacity: 0.6 }}>Углеводы</div></div>
+            <div><div style={{ fontSize: 18, fontWeight: 700 }}>{avgWeeklyKcal}</div><div style={{ fontSize: 11, opacity: 0.6 }}>РєРєР°Р»</div></div>
+            <div><div style={{ fontSize: 18, fontWeight: 700 }}>{avgWeeklyProtein}Рі</div><div style={{ fontSize: 11, opacity: 0.6 }}>Р‘РµР»РѕРє</div></div>
+            <div><div style={{ fontSize: 18, fontWeight: 700 }}>{avgWeeklyFat}Рі</div><div style={{ fontSize: 11, opacity: 0.6 }}>Р–РёСЂС‹</div></div>
+            <div><div style={{ fontSize: 18, fontWeight: 700 }}>{avgWeeklyCarbs}Рі</div><div style={{ fontSize: 11, opacity: 0.6 }}>РЈРіР»РµРІРѕРґС‹</div></div>
           </div>
-          <button style={btn} onClick={handleExportDiaryCSV}>Экспорт дневника CSV</button>
+          <button style={btn} onClick={handleExportDiaryCSV}>Р­РєСЃРїРѕСЂС‚ РґРЅРµРІРЅРёРєР° CSV</button>
         </div>
       )}
 
       {tab === 'pharma' && (
         <div style={{ background: 'var(--bg-secondary)', borderRadius: 12, padding: 16, marginBottom: 12 }}>
-          <h4 style={{ margin: '0 0 8px' }}>Курс</h4>
-          {course.length === 0 ? <p style={{ fontSize: 13, opacity: 0.6 }}>Нет записей</p> : (
+          <h4 style={{ margin: '0 0 8px' }}>РљСѓСЂСЃ</h4>
+          {course.length === 0 ? <p style={{ fontSize: 13, opacity: 0.6 }}>РќРµС‚ Р·Р°РїРёСЃРµР№</p> : (
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
-              <thead><tr><th style={{ padding: 6, textAlign: 'left', borderBottom: '1px solid var(--border)' }}>Препарат</th><th style={{ padding: 6, textAlign: 'right', borderBottom: '1px solid var(--border)' }}>Доза</th><th style={{ padding: 6, textAlign: 'center', borderBottom: '1px solid var(--border)' }}>Частота</th><th style={{ padding: 6, textAlign: 'center', borderBottom: '1px solid var(--border)' }}>Недели</th></tr></thead>
-              <tbody>{course.map(c => <tr key={c.id}><td style={{ padding: 6, borderBottom: '1px solid var(--border)' }}>{c.substanceId}</td><td style={{ padding: 6, textAlign: 'right', borderBottom: '1px solid var(--border)' }}>{c.doseValue} {c.doseUnit}</td><td style={{ padding: 6, textAlign: 'center', borderBottom: '1px solid var(--border)' }}>{c.frequency}</td><td style={{ padding: 6, textAlign: 'center', borderBottom: '1px solid var(--border)' }}>{c.startWeek}–{c.endWeek}</td></tr>)}</tbody>
+              <thead><tr><th style={{ padding: 6, textAlign: 'left', borderBottom: '1px solid var(--border)' }}>РџСЂРµРїР°СЂР°С‚</th><th style={{ padding: 6, textAlign: 'right', borderBottom: '1px solid var(--border)' }}>Р”РѕР·Р°</th><th style={{ padding: 6, textAlign: 'center', borderBottom: '1px solid var(--border)' }}>Р§Р°СЃС‚РѕС‚Р°</th><th style={{ padding: 6, textAlign: 'center', borderBottom: '1px solid var(--border)' }}>РќРµРґРµР»Рё</th></tr></thead>
+              <tbody>{course.map(c => <tr key={c.id}><td style={{ padding: 6, borderBottom: '1px solid var(--border)' }}>{c.substanceId}</td><td style={{ padding: 6, textAlign: 'right', borderBottom: '1px solid var(--border)' }}>{c.doseValue} {c.doseUnit}</td><td style={{ padding: 6, textAlign: 'center', borderBottom: '1px solid var(--border)' }}>{c.frequency}</td><td style={{ padding: 6, textAlign: 'center', borderBottom: '1px solid var(--border)' }}>{c.startWeek}вЂ“{c.endWeek}</td></tr>)}</tbody>
             </table>
           )}
         </div>
@@ -192,49 +192,49 @@ export const ReportsScreen: React.FC = () => {
       {tab === 'print' && (
         <div id="printable-report" style={{ fontSize: 13, lineHeight: 1.5 }}>
           <div style={{ borderBottom: '2px solid #00e68a', paddingBottom: 12, marginBottom: 16 }}>
-            <h1 style={{ margin: 0, fontSize: 20 }}>Health Engine — Отчёт</h1>
-            <span style={{ opacity: 0.6, fontSize: 12 }}>Дата: {new Date().toISOString().slice(0, 10)} | Период: {period === 'day' ? 'День' : period === 'week' ? 'Неделя' : 'Месяц'}</span>
+            <h1 style={{ margin: 0, fontSize: 20 }}>Health Engine вЂ” РћС‚С‡С‘С‚</h1>
+            <span style={{ opacity: 0.6, fontSize: 12 }}>Р”Р°С‚Р°: {new Date().toISOString().slice(0, 10)} | РџРµСЂРёРѕРґ: {period === 'day' ? '' : period === 'week' ? '' : ''}</span>
           </div>
           {profile && (
             <div style={{ marginBottom: 20 }}>
-              <h2 style={{ fontSize: 16, borderLeft: '3px solid #00e68a', paddingLeft: 8, margin: '0 0 8px' }}>Профиль</h2>
+              <h2 style={{ fontSize: 16, borderLeft: '3px solid #00e68a', paddingLeft: 8, margin: '0 0 8px' }}>РџСЂРѕС„РёР»СЊ</h2>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                 <tbody>
-                  <tr><td style={{ padding: 4, borderBottom: '1px solid var(--border)', fontWeight: 600 }}>Имя</td><td style={{ padding: 4, borderBottom: '1px solid var(--border)' }}>{profile.name || '—'}</td></tr>
-                  <tr><td style={{ padding: 4, borderBottom: '1px solid var(--border)', fontWeight: 600 }}>Возраст/Пол</td><td style={{ padding: 4, borderBottom: '1px solid var(--border)' }}>{profile.settings?.age ?? '—'} / {profile.settings?.sex === 'male' ? 'М' : 'Ж'}</td></tr>
-                  <tr><td style={{ padding: 4, borderBottom: '1px solid var(--border)', fontWeight: 600 }}>Вес/Цель</td><td style={{ padding: 4, borderBottom: '1px solid var(--border)' }}>{profile.settings?.weight ?? '—'} кг / {profile.settings?.primaryGoal || profile.settings?.goal || '—'}</td></tr>
+                  <tr><td style={{ padding: 4, borderBottom: '1px solid var(--border)', fontWeight: 600 }}>РРјСЏ</td><td style={{ padding: 4, borderBottom: '1px solid var(--border)' }}>{profile.name || 'вЂ”'}</td></tr>
+                  <tr><td style={{ padding: 4, borderBottom: '1px solid var(--border)', fontWeight: 600 }}>Р’РѕР·СЂР°СЃС‚/РџРѕР»</td><td style={{ padding: 4, borderBottom: '1px solid var(--border)' }}>{profile.settings?.age ?? 'вЂ”'} / {profile.settings?.sex === 'male' ? '' : ''}</td></tr>
+                  <tr><td style={{ padding: 4, borderBottom: '1px solid var(--border)', fontWeight: 600 }}>Р’РµСЃ/Р¦РµР»СЊ</td><td style={{ padding: 4, borderBottom: '1px solid var(--border)' }}>{profile.settings?.weight ?? 'вЂ”'} РєРі / {profile.settings?.primaryGoal || profile.settings?.goal || 'вЂ”'}</td></tr>
                 </tbody>
               </table>
             </div>
           )}
           {risk && (
             <div style={{ marginBottom: 20 }}>
-              <h2 style={{ fontSize: 16, borderLeft: '3px solid #f44336', paddingLeft: 8, margin: '0 0 8px' }}>Риски</h2>
-              <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 8 }}>Общий чистый: {risk.overallNet.toFixed(1)}%</div>
+              <h2 style={{ fontSize: 16, borderLeft: '3px solid #f44336', paddingLeft: 8, margin: '0 0 8px' }}>Р РёСЃРєРё</h2>
+              <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 8 }}>РћР±С‰РёР№ С‡РёСЃС‚С‹Р№: {risk.overallNet.toFixed(1)}%</div>
               {risk.systemBreakdown && <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}><tbody>{Object.entries(risk.systemBreakdown).map(([sys, data]) => <tr key={sys}><td style={{ padding: 4, borderBottom: '1px solid var(--border)' }}>{systemLabels[sys] || sys}</td><td style={{ padding: 4, textAlign: 'right', borderBottom: '1px solid var(--border)' }}>{data.net.toFixed(1)}%</td></tr>)}</tbody></table>}
             </div>
           )}
           {readiness && (
             <div style={{ marginBottom: 20 }}>
-              <h2 style={{ fontSize: 16, borderLeft: '3px solid #00e68a', paddingLeft: 8, margin: '0 0 8px' }}>Готовность</h2>
+              <h2 style={{ fontSize: 16, borderLeft: '3px solid #00e68a', paddingLeft: 8, margin: '0 0 8px' }}>Р“РѕС‚РѕРІРЅРѕСЃС‚СЊ</h2>
               <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
-                <div><strong>Восстановление:</strong> {readiness.recovery}%</div>
-                <div><strong>Питание:</strong> {readiness.nutrition}%</div>
-                <div><strong>Поддержка:</strong> {readiness.support}%</div>
-                <div><strong>Усталость:</strong> {readiness.fatigue}%</div>
+                <div><strong>Р’РѕСЃСЃС‚Р°РЅРѕРІР»РµРЅРёРµ:</strong> {readiness.recovery}%</div>
+                <div><strong>РџРёС‚Р°РЅРёРµ:</strong> {readiness.nutrition}%</div>
+                <div><strong>РџРѕРґРґРµСЂР¶РєР°:</strong> {readiness.support}%</div>
+                <div><strong>РЈСЃС‚Р°Р»РѕСЃС‚СЊ:</strong> {readiness.fatigue}%</div>
               </div>
             </div>
           )}
           <div style={{ marginTop: 32, borderTop: '1px solid var(--border)', fontSize: 11, opacity: 0.5, textAlign: 'center', paddingTop: 8 }}>
-            Отчёт сформирован автоматически. Информация носит справочный характер.
+            РћС‚С‡С‘С‚ СЃС„РѕСЂРјРёСЂРѕРІР°РЅ Р°РІС‚РѕРјР°С‚РёС‡РµСЃРєРё. РРЅС„РѕСЂРјР°С†РёСЏ РЅРѕСЃРёС‚ СЃРїСЂР°РІРѕС‡РЅС‹Р№ С…Р°СЂР°РєС‚РµСЂ.
           </div>
         </div>
       )}
 
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12, marginBottom: 12 }}>
-        <button style={btn} onClick={handleExportJSON}>Экспорт JSON</button>
-        <button style={btn} onClick={handleExportDiaryCSV}>Дневник CSV</button>
-        <button style={btn} onClick={handleExportLabsCSV}>Анализы CSV</button>
+        <button style={btn} onClick={handleExportJSON}>Р­РєСЃРїРѕСЂС‚ JSON</button>
+        <button style={btn} onClick={handleExportDiaryCSV}>Р”РЅРµРІРЅРёРє CSV</button>
+        <button style={btn} onClick={handleExportLabsCSV}>РђРЅР°Р»РёР·С‹ CSV</button>
         <button style={btn} onClick={() => {
           const reportData: WeeklyReportData = {
             ctx: { role: 'user', phase: profile?.settings?.phase ?? 'baseline', courseStartDate: profile?.settings?.courseStartDate },
@@ -243,8 +243,8 @@ export const ReportsScreen: React.FC = () => {
             measurements: {}, goal: profile?.settings?.primaryGoal ?? 'maintenance',
             macros: { p: linked.avgWeeklyProtein, f: linked.avgWeeklyFat, c: linked.avgWeeklyCarbs },
             stepsAvg: 0, bpAvg: { sys: 120, dia: 80 }, bpNotes: '',
-            trainingFeel: readiness ? `Восстановление: ${readiness.recovery}%, Усталость: ${readiness.fatigue}%` : '—',
-            generalFeel: readiness && readiness.recovery > 60 ? 'Хорошее' : readiness && readiness.recovery > 40 ? 'Умеренное' : 'Плохое',
+            trainingFeel: readiness ? `` : 'вЂ”',
+            generalFeel: readiness && readiness.recovery > 60 ? '' : readiness && readiness.recovery > 40 ? '' : '',
             meds: course.map(c => c.substanceId).join(', '),
             supplements: (profile?.settings?.currentSupplements as any[] ?? []).map((s: any) => s.name ?? s).join(', '),
             lastLabDate: linked.labs.length > 0 ? linked.labs.sort((a, b) => b.date.localeCompare(a.date))[0].date : '',
@@ -253,7 +253,7 @@ export const ReportsScreen: React.FC = () => {
           const html = generateWeeklyReportHTML(reportData);
           const w = window.open('', '_blank');
           if (w) { w.document.write(html); w.document.close(); }
-        }}>Недельный отчёт</button>
+        }}>РќРµРґРµР»СЊРЅС‹Р№ РѕС‚С‡С‘С‚</button>
         <button style={btn} onClick={() => {
           const ctx: UserContext = { role: 'doctor', phase: profile?.settings?.phase ?? 'baseline' };
           const risks: any = { overallRaw: risk?.overallRaw ?? 0, overallNet: risk?.overallNet ?? 0, systemBreakdown: risk?.systemBreakdown ?? {} };
@@ -261,9 +261,9 @@ export const ReportsScreen: React.FC = () => {
           const html = generateMedicalReportHTML(ctx, linked.labs, risks, pct, '');
           const w = window.open('', '_blank');
           if (w) { w.document.write(html); w.document.close(); }
-        }}>Медицинский отчёт</button>
-        <button style={btn} onClick={() => window.print()}>Печать PDF</button>
-        <button style={btn} onClick={() => fileInputRef.current?.click()}>Импорт</button>
+        }}>РњРµРґРёС†РёРЅСЃРєРёР№ РѕС‚С‡С‘С‚</button>
+        <button style={btn} onClick={() => window.print()}>РџРµС‡Р°С‚СЊ PDF</button>
+        <button style={btn} onClick={() => fileInputRef.current?.click()}>РРјРїРѕСЂС‚</button>
         <input ref={fileInputRef} type="file" accept=".json" style={{ display: 'none' }} onChange={handleImportJSON} />
       </div>
       {importMsg && <div style={{ background: 'rgba(0,230,138,0.12)', padding: 8, borderRadius: 8, fontSize: 12 }}>{importMsg}</div>}

@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 import type { RiskResult, MechanismCell } from '../../../core/types';
 import { RISK_SYSTEMS } from '../../../core/constants';
 import { MECHANISM_INFO, SYSTEM_INFO } from '../../../core/risk-info';
@@ -43,7 +43,7 @@ export const RiskMatrix: React.FC<{
       result.push({
         mechanismKey: key,
         systemKey: sysKey,
-        mechanismLabel: mechInfo ? mechInfo.label : `Механизм ${mechNum}`,
+        mechanismLabel: mechInfo ? mechInfo.label : `РњРµС…Р°РЅРёР·Рј ${mechNum}`,
         mechanismDescription: mechInfo ? mechInfo.description : '',
         systemLabel: sysInfo ? sysInfo.label : sysKey,
         raw: cell.raw,
@@ -72,19 +72,19 @@ export const RiskMatrix: React.FC<{
     <div className="risk-matrix">
       <div className="card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-          <h3 style={{ margin: 0 }}>🔬 Матрица механизмов</h3>
+          <h3 style={{ margin: 0 }}>рџ”¬ РњР°С‚СЂРёС†Р° РјРµС…Р°РЅРёР·РјРѕРІ</h3>
           <div style={{ display: 'flex', gap: 4 }}>
             <button
               onClick={() => setView('matrix')}
               style={{ padding: '4px 10px', borderRadius: 4, border: '1px solid var(--border)', background: view === 'matrix' ? 'var(--accent)' : 'transparent', color: view === 'matrix' ? '#000' : 'var(--text)', fontSize: 10, cursor: 'pointer' }}
             >
-              Механизмы
+              РњРµС…Р°РЅРёР·РјС‹
             </button>
             <button
               onClick={() => setView('systems')}
               style={{ padding: '4px 10px', borderRadius: 4, border: '1px solid var(--border)', background: view === 'systems' ? 'var(--accent)' : 'transparent', color: view === 'systems' ? '#000' : 'var(--text)', fontSize: 10, cursor: 'pointer' }}
             >
-              По системам
+              РџРѕ СЃРёСЃС‚РµРјР°Рј
             </button>
           </div>
         </div>
@@ -92,11 +92,11 @@ export const RiskMatrix: React.FC<{
         {view === 'matrix' ? (
           <div>
             <div style={{ display: 'flex', gap: 8, marginBottom: 8, fontSize: 10, color: 'var(--text-dim)' }}>
-              <span>🟢 &lt;20%</span>
-              <span>🟡 20-40%</span>
-              <span>🟠 40-60%</span>
-              <span>🔴 60-80%</span>
-              <span>⛔ &gt;80%</span>
+              <span>рџџў &lt;20%</span>
+              <span>рџџЎ 20-40%</span>
+              <span>рџџ  40-60%</span>
+              <span>рџ”ґ 60-80%</span>
+              <span>в›” &gt;80%</span>
             </div>
 
             {rows.map((row) => (
@@ -106,7 +106,7 @@ export const RiskMatrix: React.FC<{
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                     <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>{row.systemLabel}</span>
                     <span style={{ padding: '2px 6px', borderRadius: 4, fontSize: 9, fontWeight: 600, background: row.net > 60 ? 'rgba(239,68,68,0.2)' : row.net > 30 ? 'rgba(234,179,8,0.2)' : 'rgba(34,197,94,0.2)', color: row.net > 60 ? '#ef4444' : row.net > 30 ? '#eab308' : '#22c55e' }}>
-                      {row.net > 60 ? '❗ Высокий' : row.net > 30 ? '⚡ Умеренный' : '✓ Низкий'}
+                      {row.net > 60 ? 'вќ— Р’С‹СЃРѕРєРёР№' : row.net > 30 ? 'вљЎ РЈРјРµСЂРµРЅРЅС‹Р№' : 'вњ“ РќРёР·РєРёР№'}
                     </span>
                   </div>
                 </div>
@@ -121,7 +121,7 @@ export const RiskMatrix: React.FC<{
                 )}
                 {row.coverage > 0 && (
                   <div style={{ fontSize: 9, color: row.coverage > 0.5 ? '#22c55e' : 'var(--text-dim)', marginTop: 2 }}>
-                    🛡️ Защита: {Math.round(row.coverage * 100)}%
+                    рџ›ЎпёЏ Р—Р°С‰РёС‚Р°: {Math.round(row.coverage * 100)}%
                   </div>
                 )}
               </div>
@@ -137,7 +137,7 @@ export const RiskMatrix: React.FC<{
                 <div key={sysKey} style={{ marginBottom: 12, background: 'var(--bg-secondary)', padding: 10, borderRadius: 8 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
                     <div>
-                      <span style={{ fontSize: 16 }}>{sysInfo?.icon || '⚠️'}</span>
+                      <span style={{ fontSize: 16 }}>{sysInfo?.icon || 'вљ пёЏ'}</span>
                       <span style={{ fontWeight: 700, marginLeft: 6 }}>{sysInfo?.label || sysKey}</span>
                     </div>
                     <span style={{ fontWeight: 700, color: getRiskColor(avgNet), fontSize: 16 }}>{Math.round(avgNet)}%</span>
@@ -153,7 +153,7 @@ export const RiskMatrix: React.FC<{
                         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11 }}>
                           <div>
                             <span style={{ fontWeight: 600 }}>{row.mechanismLabel}</span>
-                            {specMech && <div style={{ fontSize: 9, color: 'var(--text-dim)', marginTop: 1 }}>{specMech.description.substring(0, 60)}…</div>}
+                            {specMech && <div style={{ fontSize: 9, color: 'var(--text-dim)', marginTop: 1 }}>{specMech.description.substring(0, 60)}вЂ¦</div>}
                           </div>
                           <span style={{ color: getTextColor(row.net), fontWeight: 700 }}>{Math.round(row.net)}%</span>
                         </div>

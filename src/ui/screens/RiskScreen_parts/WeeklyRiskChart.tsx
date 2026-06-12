@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+﻿import React, { useState, useMemo } from 'react';
 import type { WeeklyRiskDynamics, WeeklyRiskPoint } from '../../../engines/weekly-risk-dynamics.engine';
 import { getRiskColor } from '../../../core/utils/risk-colors';
 import { PHARMA_DB } from '../../../core/pharma-database';
@@ -16,7 +16,7 @@ function getDrugName(id: string): string {
   return sub?.name || id;
 }
 
-// Smooth curve interpolation (catmull-rom → cubic bezier)
+// Smooth curve interpolation (catmull-rom в†’ cubic bezier)
 function smoothPath(points: { x: number; y: number }[]): string {
   if (points.length === 0) return '';
   if (points.length === 1) return `M${points[0].x.toFixed(1)},${points[0].y.toFixed(1)}`;
@@ -41,7 +41,7 @@ export const WeeklyRiskChart: React.FC<Props> = ({ dynamics, selectedWeek, onWee
     return (
       <div className="card" style={{ padding: 12 }}>
         <div style={{ textAlign: 'center', color: 'var(--text-dim)', fontSize: 12 }}>
-          Нет данных о курсе для расчёта динамики рисков
+          РќРµС‚ РґР°РЅРЅС‹С… Рѕ РєСѓСЂСЃРµ РґР»СЏ СЂР°СЃС‡С‘С‚Р° РґРёРЅР°РјРёРєРё СЂРёСЃРєРѕРІ
         </div>
       </div>
     );
@@ -99,22 +99,22 @@ export const WeeklyRiskChart: React.FC<Props> = ({ dynamics, selectedWeek, onWee
   return (
     <div className="card" style={{ marginBottom: 8 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-        <h3 style={{ margin: 0, fontSize: 14 }}>📈 Динамика рисков по неделям</h3>
+        <h3 style={{ margin: 0, fontSize: 14 }}>рџ“€ Р”РёРЅР°РјРёРєР° СЂРёСЃРєРѕРІ РїРѕ РЅРµРґРµР»СЏРј</h3>
         <div style={{ display: 'flex', gap: 4 }}>
           <button
             onClick={() => onModeChange('average')}
             style={{ padding: '3px 8px', borderRadius: 4, border: '1px solid var(--border)', background: mode === 'average' ? 'var(--accent)' : 'transparent', color: mode === 'average' ? '#000' : 'var(--text-dim)', fontSize: 10, cursor: 'pointer' }}
-          >Среднее</button>
+          >РЎСЂРµРґРЅРµРµ</button>
           <button
             onClick={() => onModeChange('week')}
             style={{ padding: '3px 8px', borderRadius: 4, border: '1px solid var(--border)', background: mode === 'week' ? 'var(--accent)' : 'transparent', color: mode === 'week' ? '#000' : 'var(--text-dim)', fontSize: 10, cursor: 'pointer' }}
-          >По неделе</button>
+          >РџРѕ РЅРµРґРµР»Рµ</button>
         </div>
       </div>
 
       {mode === 'week' && (
         <div style={{ marginBottom: 8, display: 'flex', gap: 8, alignItems: 'center' }}>
-          <label style={{ fontSize: 11, color: 'var(--text-dim)' }}>Неделя:</label>
+          <label style={{ fontSize: 11, color: 'var(--text-dim)' }}>РќРµРґРµР»СЏ:</label>
           <input
             type="range" min={0} max={maxWeek}
             value={selectedWeek ?? 0}
@@ -126,9 +126,9 @@ export const WeeklyRiskChart: React.FC<Props> = ({ dynamics, selectedWeek, onWee
       )}
 
       <div style={{ display: 'flex', gap: 12, marginBottom: 6, fontSize: 10, flexWrap: 'wrap' }}>
-        <span style={{ color: '#7c4dff' }}>● Raw (без поддержки)</span>
-        <span style={{ color: '#00e68a' }}>● Net (с поддержкой)</span>
-        <span style={{ color: 'rgba(255,152,0,0.5)' }}>▓ Концентрация (PK)</span>
+        <span style={{ color: '#7c4dff' }}>в—Џ Raw (Р±РµР· РїРѕРґРґРµСЂР¶РєРё)</span>
+        <span style={{ color: '#00e68a' }}>в—Џ Net (СЃ РїРѕРґРґРµСЂР¶РєРѕР№)</span>
+        <span style={{ color: 'rgba(255,152,0,0.5)' }}>в–“ РљРѕРЅС†РµРЅС‚СЂР°С†РёСЏ (PK)</span>
       </div>
 
       <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: 'auto', maxHeight: H + 20 }}>
@@ -199,20 +199,20 @@ export const WeeklyRiskChart: React.FC<Props> = ({ dynamics, selectedWeek, onWee
         ))}
 
         <text x={PAD.left - 2} y={PAD.top + 8} fill="var(--text-dim)" fontSize="8">%</text>
-        <text x={W / 2} y={H - 1} fill="var(--text-dim)" fontSize="8" textAnchor="middle">Недели</text>
+        <text x={W / 2} y={H - 1} fill="var(--text-dim)" fontSize="8" textAnchor="middle">РќРµРґРµР»Рё</text>
       </svg>
 
       {/* Selected week details */}
       {selectedPoint && mode === 'week' && (
         <div style={{ background: 'var(--bg-secondary)', borderRadius: 8, padding: 10, marginTop: 8 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-            <span style={{ fontWeight: 700, fontSize: 13 }}>Неделя {selectedPoint.week}</span>
+            <span style={{ fontWeight: 700, fontSize: 13 }}>РќРµРґРµР»СЏ {selectedPoint.week}</span>
             <span style={{
               padding: '2px 8px', borderRadius: 4, fontSize: 10, fontWeight: 600,
               background: selectedPoint.accumulationPhase === 'steady' ? 'rgba(0,230,138,0.15)' : selectedPoint.accumulationPhase === 'ramp-up' ? 'rgba(234,179,8,0.15)' : selectedPoint.accumulationPhase === 'washout' ? 'rgba(59,130,246,0.15)' : 'rgba(107,114,128,0.15)',
               color: selectedPoint.accumulationPhase === 'steady' ? '#00e68a' : selectedPoint.accumulationPhase === 'ramp-up' ? '#eab308' : selectedPoint.accumulationPhase === 'washout' ? '#3b82f6' : '#6b7280',
             }}>
-              {selectedPoint.accumulationPhase === 'steady' ? '🔄 Стационар' : selectedPoint.accumulationPhase === 'ramp-up' ? '📈 Накопление' : selectedPoint.accumulationPhase === 'washout' ? '📉 Выведение' : '—'}
+              {selectedPoint.accumulationPhase === 'steady' ? '' : selectedPoint.accumulationPhase === 'ramp-up' ? '' : selectedPoint.accumulationPhase === 'washout' ? '' : 'вЂ”'}
             </span>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, fontSize: 11 }}>
@@ -225,7 +225,7 @@ export const WeeklyRiskChart: React.FC<Props> = ({ dynamics, selectedWeek, onWee
               <div style={{ fontWeight: 700, color: getRiskColor(selectedPoint.overallNet) }}>{Math.round(selectedPoint.overallNet)}%</div>
             </div>
             <div style={{ textAlign: 'center' }}>
-              <div style={{ color: 'var(--text-dim)', fontSize: 9 }}>Конц.</div>
+              <div style={{ color: 'var(--text-dim)', fontSize: 9 }}>РљРѕРЅС†.</div>
               <div style={{ fontWeight: 700 }}>{Math.round(selectedPoint.peakConcentration * 100)}%</div>
             </div>
           </div>
@@ -244,24 +244,24 @@ export const WeeklyRiskChart: React.FC<Props> = ({ dynamics, selectedWeek, onWee
       {/* Stats summary */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6, marginTop: 8, fontSize: 10 }}>
         <div className="risk-row" style={{ flexDirection: 'column', gap: 0, padding: '6px 4px' }}>
-          <div style={{ color: 'var(--text-dim)', fontSize: 8 }}>Пик риска</div>
+          <div style={{ color: 'var(--text-dim)', fontSize: 8 }}>РџРёРє СЂРёСЃРєР°</div>
           <div className="risk-badge" style={{ background: getRiskColor(dynamics.peakRiskValue), fontSize: 13 }}>{Math.round(dynamics.peakRiskValue)}%</div>
-          <div style={{ color: 'var(--text-dim)', fontSize: 8, marginTop: 2 }}>нед. {dynamics.peakRiskWeek}</div>
+          <div style={{ color: 'var(--text-dim)', fontSize: 8, marginTop: 2 }}>РЅРµРґ. {dynamics.peakRiskWeek}</div>
         </div>
         <div className="risk-row" style={{ flexDirection: 'column', gap: 0, padding: '6px 4px' }}>
-          <div style={{ color: 'var(--text-dim)', fontSize: 8 }}>Минимум</div>
+          <div style={{ color: 'var(--text-dim)', fontSize: 8 }}>РњРёРЅРёРјСѓРј</div>
           <div className="risk-badge" style={{ background: getRiskColor(dynamics.minRiskValue), fontSize: 13 }}>{Math.round(dynamics.minRiskValue)}%</div>
-          <div style={{ color: 'var(--text-dim)', fontSize: 8, marginTop: 2 }}>нед. {dynamics.minRiskWeek}</div>
+          <div style={{ color: 'var(--text-dim)', fontSize: 8, marginTop: 2 }}>РЅРµРґ. {dynamics.minRiskWeek}</div>
         </div>
         <div className="risk-row" style={{ flexDirection: 'column', gap: 0, padding: '6px 4px' }}>
-          <div style={{ color: 'var(--text-dim)', fontSize: 8 }}>Среднее</div>
+          <div style={{ color: 'var(--text-dim)', fontSize: 8 }}>РЎСЂРµРґРЅРµРµ</div>
           <div className="risk-badge" style={{ background: getRiskColor(dynamics.averageRisk.overallNet), fontSize: 13 }}>{Math.round(dynamics.averageRisk.overallNet)}%</div>
           <div style={{ color: 'var(--text-dim)', fontSize: 8, marginTop: 2 }}>overall</div>
         </div>
         <div className="risk-row" style={{ flexDirection: 'column', gap: 0, padding: '6px 4px' }}>
-          <div style={{ color: 'var(--text-dim)', fontSize: 8 }}>Длит.</div>
-          <div className="risk-badge" style={{ background: '#6b7280', fontSize: 13 }}>{dynamics.courseDuration} нед</div>
-          <div style={{ color: 'var(--text-dim)', fontSize: 8, marginTop: 2 }}>курс</div>
+          <div style={{ color: 'var(--text-dim)', fontSize: 8 }}>Р”Р»РёС‚.</div>
+          <div className="risk-badge" style={{ background: '#6b7280', fontSize: 13 }}>{dynamics.courseDuration} РЅРµРґ</div>
+          <div style={{ color: 'var(--text-dim)', fontSize: 8, marginTop: 2 }}>РєСѓСЂСЃ</div>
         </div>
       </div>
     </div>

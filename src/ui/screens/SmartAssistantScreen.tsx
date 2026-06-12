@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+﻿import React, { useEffect, useState, useRef } from 'react';
 import { getSmartAssistantResponse, type UserContext } from '../../engines/assistant.engine';
 import { useDataLink } from '../../core/data-link';
 import { UCUM_MAP } from '../../core/constants';
@@ -11,21 +11,21 @@ interface GlossaryTerm {
 }
 
 const GLOSSARY: GlossaryTerm[] = [
-  { term: 'RIR (Повторения в запасе)', abbr: 'RIR', definition: 'Количество повторений «в запасе» до отказа. RIR 2 = ещё 2 повторения.', units: 'шкала 0-10' },
-  { term: 'Гематокрит', abbr: 'Hct', definition: 'Доля эритроцитов в крови. Норма для мужчин 40–52%, для женщин 36–46%. >54% критично.', units: '%' },
-  { term: 'EC50', abbr: 'EC50', definition: 'Концентрация препарата, при которой достигается 50% максимального эффекта.', units: 'мг/мл' },
-  { term: 'BMR (Базовый метаболизм)', abbr: 'BMR', definition: 'Базовый метаболизм, калории в покое. Рассчитывается по формуле Миффлина.', units: 'ккал/день' },
-  { term: 'TDEE (Общий расход энергии)', abbr: 'TDEE', definition: 'Общий дневной расход энергии. TDEE = BMR × коэффициент активности.', units: 'ккал/день' },
-  { term: 'HOMA-IR', abbr: 'HOMA-IR', definition: 'Индекс инсулинорезистентности. >2.5 = ИР. Формула: (глюкоза × инсулин) / 22.5', units: 'условные единицы' },
-  { term: 'HGI (Индекс гомеостаза/иммунитета)', abbr: 'HGI', definition: 'Индекс гомеостаза/иммунитета.', units: 'условные единицы' },
-  { term: 'MRR (Минимальный диапазон рисков)', abbr: 'MRR', definition: 'Минимальный диапазон рисков.', units: 'условные единицы' },
-  { term: 'ПКТ (Послекурсовая терапия)', abbr: 'ПКТ', definition: 'Послекурсовая терапия. Восстановление нормальной функции ГГА после ААС.', units: '' },
-  { term: 'ГСПГ', abbr: 'ГСПГ', definition: 'Глобулин, связывающий половые гормоны. Связывает тестостерон, снижая свободную фракцию.', units: 'нмоль/л' },
-  { term: 'Свободный тестостерон', abbr: 'Free T', definition: 'Активная фракция тестостерона (≈2% от общего). Биологически активный гормон.', units: 'пмоль/л' },
-  { term: 'eGFR', abbr: 'eGFR', definition: 'Расчётная скорость клубочковой фильтрации почек. Норма >90 мл/мин/1.73м².', units: 'мл/мин/1.73м²' },
-  { term: 'ЛПНП/ЛПВП', abbr: 'ЛПНП/ЛПВП', definition: 'Липопротеины низкой/высокой плотности. ЛПНП – «плохой», ЛПВП – «хороший» холестерин.', units: 'ммоль/л' },
-  { term: 'Холестерин общий', abbr: 'ОХС', definition: 'Сумма всех фракций холестерина. Норма <5.2 ммоль/л.', units: 'ммоль/л' },
-  { term: 'Ферритин', abbr: 'Ferritin', definition: 'Белок-депо железа. Норма 30–300 мкг/л. <30 = дефицит, >500 = перегрузка.', units: 'мкг/л' },
+  { term: 'RIR (РџРѕРІС‚РѕСЂРµРЅРёСЏ РІ Р·Р°РїР°СЃРµ)', abbr: 'RIR', definition: '', units: 'С€РєР°Р»Р° 0-10' },
+  { term: '', abbr: 'Hct', definition: '', units: '%' },
+  { term: 'EC50', abbr: 'EC50', definition: '', units: '' },
+  { term: 'BMR (Р‘Р°Р·РѕРІС‹Р№ РјРµС‚Р°Р±РѕР»РёР·Рј)', abbr: 'BMR', definition: '', units: '' },
+  { term: 'TDEE (РћР±С‰РёР№ СЂР°СЃС…РѕРґ СЌРЅРµСЂРіРёРё)', abbr: 'TDEE', definition: '', units: '' },
+  { term: 'HOMA-IR', abbr: 'HOMA-IR', definition: '', units: 'СѓСЃР»РѕРІРЅС‹Рµ РµРґРёРЅРёС†С‹' },
+  { term: 'HGI (РРЅРґРµРєСЃ РіРѕРјРµРѕСЃС‚Р°Р·Р°/РёРјРјСѓРЅРёС‚РµС‚Р°)', abbr: 'HGI', definition: '', units: 'СѓСЃР»РѕРІРЅС‹Рµ РµРґРёРЅРёС†С‹' },
+  { term: 'MRR (РњРёРЅРёРјР°Р»СЊРЅС‹Р№ РґРёР°РїР°Р·РѕРЅ СЂРёСЃРєРѕРІ)', abbr: 'MRR', definition: '', units: 'СѓСЃР»РѕРІРЅС‹Рµ РµРґРёРЅРёС†С‹' },
+  { term: '', abbr: '', definition: '', units: '' },
+  { term: '', abbr: '', definition: '', units: '' },
+  { term: '', abbr: 'Free T', definition: '', units: '' },
+  { term: 'eGFR', abbr: 'eGFR', definition: '', units: '' },
+  { term: '', abbr: '', definition: '', units: '' },
+  { term: '', abbr: '', definition: '', units: '' },
+  { term: '', abbr: 'Ferritin', definition: '', units: '' },
 ];
 
 interface CheckupQuestion {
@@ -36,11 +36,11 @@ interface CheckupQuestion {
 }
 
 const CHECKUP_QUESTIONS: CheckupQuestion[] = [
-  { label: 'Как вы спали в среднем за неделю?', key: 'sleep', min: 1, max: 10 },
-  { label: 'Уровень стресса за неделю?', key: 'stress', min: 1, max: 10 },
-  { label: 'Боль в мышцах (DOMS) за последние 3 дня?', key: 'doms', min: 1, max: 10 },
-  { label: 'Либидо?', key: 'libido', min: 0, max: 10 },
-  { label: 'Общее самочувствие?', key: 'wellbeing', min: 1, max: 10 },
+  { label: '', key: 'sleep', min: 1, max: 10 },
+  { label: '', key: 'stress', min: 1, max: 10 },
+  { label: '', key: 'doms', min: 1, max: 10 },
+  { label: '', key: 'libido', min: 0, max: 10 },
+  { label: '', key: 'wellbeing', min: 1, max: 10 },
 ];
 
 export const SmartAssistantScreen: React.FC = () => {
@@ -65,7 +65,7 @@ export const SmartAssistantScreen: React.FC = () => {
   useEffect(() => {
     setMessages([{
       id: 1,
-      text: 'Привет! Я ваш умный ассистент Health Engine. Задайте вопрос — я использую ваши данные для персонализированных рекомендаций.',
+      text: '',
       isUser: false
     }]);
   }, []);
@@ -106,7 +106,7 @@ export const SmartAssistantScreen: React.FC = () => {
     } catch (error) {
       setMessages(prev => [...prev, {
         id: Date.now() + 1,
-        text: 'Извините, произошла ошибка. Попробуйте еще раз.',
+        text: '',
         isUser: false
       }]);
     } finally {
@@ -135,7 +135,7 @@ export const SmartAssistantScreen: React.FC = () => {
 
     const summaryMsg = {
       id: Date.now(),
-      text: `📋 Чекап недели:\n• Сон: ${sleep}/10\n• Стресс: ${stress}/10\n• DOMS: ${doms}/10\n• Либидо: ${libido}/10\n• Самочувствие: ${wellbeing}/10\n\nВосстановление: ${recovery}% | Усталость: ${fatigue}%${recovery < 40 ? '\n⚠️ Низкое восстановление! Рекомендую снизить нагрузку.' : recovery < 70 ? '\n✅ Умеренное восстановление. Следите за нагрузкой.' : '\n🟢 Отличное восстановление!'}`,
+      text: ``,
       isUser: false
     };
 
@@ -157,14 +157,14 @@ export const SmartAssistantScreen: React.FC = () => {
   );
 
   if (loading && messages.length === 1) {
-    return <div className="screen assistant">Загрузка умного ассистента...</div>;
+    return <div className="screen assistant">Р—Р°РіСЂСѓР·РєР° СѓРјРЅРѕРіРѕ Р°СЃСЃРёСЃС‚РµРЅС‚Р°...</div>;
   }
 
   return (
     <div className="screen assistant">
       <div className="assistant-header">
-        <h2>Умный ассистент</h2>
-        <p>Чекапы и глоссарий</p>
+        <h2>РЈРјРЅС‹Р№ Р°СЃСЃРёСЃС‚РµРЅС‚</h2>
+        <p>Р§РµРєР°РїС‹ Рё РіР»РѕСЃСЃР°СЂРёР№</p>
       </div>
       
       <div className="messages-container" ref={messagesEndRef}>
@@ -173,7 +173,7 @@ export const SmartAssistantScreen: React.FC = () => {
             <div className="message-content">{msg.text}</div>
           </div>
         ))}
-        {loading && <div className="message loading-message">Ассистент думает...</div>}
+        {loading && <div className="message loading-message">РђСЃСЃРёСЃС‚РµРЅС‚ РґСѓРјР°РµС‚...</div>}
       </div>
       
       <div className="input-area">
@@ -182,7 +182,7 @@ export const SmartAssistantScreen: React.FC = () => {
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyPress={handleKeyPress}
-          placeholder="Задайте вопрос ассистенту..."
+          placeholder=""
           className="assistant-input"
           disabled={loading}
         />
@@ -191,30 +191,30 @@ export const SmartAssistantScreen: React.FC = () => {
           disabled={loading || !input.trim()}
           className="send-btn"
         >
-          {loading ? 'Отправка...' : 'Отправить'}
+          {loading ? '' : ''}
         </button>
       </div>
       
       <div className="assistant-footer">
         <div className="quick-actions">
-          <button className="quick-action" onClick={() => setCheckupOpen(true)}>📋 Чекап недели</button>
-          <button className="quick-action" onClick={() => { setGlossaryOpen(true); setGlossarySearch(''); setExpandedTerm(null); }}>📖 Глоссарий</button>
+          <button className="quick-action" onClick={() => setCheckupOpen(true)}>рџ“‹ Р§РµРєР°Рї РЅРµРґРµР»Рё</button>
+          <button className="quick-action" onClick={() => { setGlossaryOpen(true); setGlossarySearch(''); setExpandedTerm(null); }}>рџ“– Р“Р»РѕСЃСЃР°СЂРёР№</button>
           <button className="quick-action" onClick={() => {
             const rdy = linked.readiness;
-            if (!rdy) { setMessages(m => [...m, { id: Date.now(), text: '⚠️ Данные о готовности ещё не загружены. Заполните профиль и анализы.', isUser: false }]); return; }
-            setMessages(m => [...m, { id: Date.now(), text: `🔔 Напоминания:\n• Следующий приём добавок: через 2 часа\n• Следующие анализы: проверьте расписание во вкладке «Анализы»\n• Восстановление: ${rdy.recovery}% — ${rdy.recovery < 40 ? 'рекомендуется делоад' : rdy.recovery < 70 ? 'умеренное, следите за нагрузкой' : 'хорошее'}\n• Тренировка сегодня: ${rdy.recovery > 60 ? 'можно тренироваться в полном объёме' : rdy.recovery > 40 ? 'снизьте объём на 20-30%' : 'рекомендуется отдых или лёгкое восстановление'}`, isUser: false }]);
-          }}>🔔 Напоминания</button>
+            if (!rdy) { setMessages(m => [...m, { id: Date.now(), text: 'вљ пёЏ Р”Р°РЅРЅС‹Рµ Рѕ РіРѕС‚РѕРІРЅРѕСЃС‚Рё РµС‰С‘ РЅРµ Р·Р°РіСЂСѓР¶РµРЅС‹. Р—Р°РїРѕР»РЅРёС‚Рµ РїСЂРѕС„РёР»СЊ Рё Р°РЅР°Р»РёР·С‹.', isUser: false }]); return; }
+            setMessages(m => [...m, { id: Date.now(), text: ``, isUser: false }]);
+          }}>рџ”” РќР°РїРѕРјРёРЅР°РЅРёСЏ</button>
           <button className="quick-action" onClick={() => {
             const quickQuestions = [
-              'Как снизить пролактин на тренболоне?',
-              'Что делать, если гематокрит 55%?',
-              'Какая поддержка сердца нужна на курсе?',
-              'Как восстановить тестостерон после курса?',
-              'Как рассчитать TDEE?',
+              '',
+              '',
+              '',
+              '',
+              '',
             ];
             const q = quickQuestions[Math.floor(Math.random() * quickQuestions.length)];
             setInput(q);
-          }}>💡 Быстрый вопрос</button>
+          }}>рџ’Ў Р‘С‹СЃС‚СЂС‹Р№ РІРѕРїСЂРѕСЃ</button>
         </div>
       </div>
       
@@ -223,20 +223,20 @@ export const SmartAssistantScreen: React.FC = () => {
         <div className="modal-overlay" onClick={() => setGlossaryOpen(false)}>
           <div className="modal glossary-modal" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
-              <h3>📖 Глоссарий терминов</h3>
-              <button className="modal-close" onClick={() => setGlossaryOpen(false)}>✕</button>
+              <h3>рџ“– Р“Р»РѕСЃСЃР°СЂРёР№ С‚РµСЂРјРёРЅРѕРІ</h3>
+              <button className="modal-close" onClick={() => setGlossaryOpen(false)}>вњ•</button>
             </div>
             <input
               type="text"
               className="glossary-search"
-              placeholder="Поиск по терминам..."
+              placeholder=""
               value={glossarySearch}
               onChange={e => { setGlossarySearch(e.target.value); setExpandedTerm(null); }}
               autoFocus
             />
             <div className="glossary-list">
               {filteredGlossary.length === 0 && (
-                <div className="glossary-empty">Термины не найдены</div>
+                <div className="glossary-empty">РўРµСЂРјРёРЅС‹ РЅРµ РЅР°Р№РґРµРЅС‹</div>
               )}
               {filteredGlossary.map(g => (
                 <div
@@ -262,8 +262,8 @@ export const SmartAssistantScreen: React.FC = () => {
         <div className="modal-overlay" onClick={() => resetCheckup()}>
           <div className="modal checkup-modal" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
-              <h3>📋 Чекап недели</h3>
-              <button className="modal-close" onClick={() => resetCheckup()}>✕</button>
+              <h3>рџ“‹ Р§РµРєР°Рї РЅРµРґРµР»Рё</h3>
+              <button className="modal-close" onClick={() => resetCheckup()}>вњ•</button>
             </div>
             {!checkupSubmitted ? (
               <>
@@ -288,14 +288,14 @@ export const SmartAssistantScreen: React.FC = () => {
                   </div>
                 ))}
                 <button className="checkup-submit-btn" onClick={submitCheckup}>
-                  Отправить чекап
+                  РћС‚РїСЂР°РІРёС‚СЊ С‡РµРєР°Рї
                 </button>
               </>
             ) : (
               <div className="checkup-result">
-                <p>✅ Чекап отправлен! Результаты добавлены в чат.</p>
+                <p>вњ… Р§РµРєР°Рї РѕС‚РїСЂР°РІР»РµРЅ! Р РµР·СѓР»СЊС‚Р°С‚С‹ РґРѕР±Р°РІР»РµРЅС‹ РІ С‡Р°С‚.</p>
                 <button className="checkup-submit-btn" onClick={resetCheckup}>
-                  Закрыть
+                  Р—Р°РєСЂС‹С‚СЊ
                 </button>
               </div>
             )}

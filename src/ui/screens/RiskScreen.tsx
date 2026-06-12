@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+﻿import React, { useState, useMemo, useEffect } from 'react';
 import { RISK_SYSTEMS, ALL_RISK_SYSTEMS, SUBSYSTEM_MAP, SUBSYSTEM_PARENT, DRUG_THRESHOLDS, SUPPORT_BASE_COVERAGE } from '../../core/constants';
 import { SYSTEM_INFO, MECHANISM_INFO, SYSTEM_ORGANS } from '../../core/risk-info';
 import type { RiskResult, MechanismCell, LabPoint, CourseEntry } from '../../core/types';
@@ -35,15 +35,15 @@ function saveRiskHistory(entry: { date: string; overallRaw: number; overallNet: 
 }
 
 const TAB_LABELS: Record<string, string> = {
-  overview: '📊 Обзор',
-  dynamics: '📈 Динамика',
-  mechanisms: '⚙️ Механизмы',
-  v7: '🔬 Симуляция',
-  model: '🧍 3D Модель',
-  mdss: '🧬 MDSS',
-  compliance: '🕒 Комплаенс',
-  clinical: '🏥 Клиника',
-  info: 'ℹ️ Инфо',
+  overview: '',
+  dynamics: '',
+  mechanisms: 'вљ™пёЏ РњРµС…Р°РЅРёР·РјС‹',
+  v7: '',
+  model: '',
+  mdss: '',
+  compliance: '',
+  clinical: '',
+  info: 'в„№пёЏ РРЅС„Рѕ',
 };
 
 export const RiskScreen: React.FC = () => {
@@ -167,7 +167,7 @@ export const RiskScreen: React.FC = () => {
     return { overallRaw: risk, overallNet: risk * 0.8, systemBreakdown };
   }, [linked.profile]);
 
-  // Lab analysis risk — from lab-analysis.engine (HOMA-IR, liver, cardio, etc.)
+  // Lab analysis risk вЂ” from lab-analysis.engine (HOMA-IR, liver, cardio, etc.)
   const labAnalysisRisk = useMemo(() => {
     if (!labAnalysis) return null;
     const breakdown: Record<string, { raw: number; net: number }> = {};
@@ -304,14 +304,14 @@ export const RiskScreen: React.FC = () => {
   const riskHistory = useMemo(() => loadRiskHistory(), []);
 
   const renderContent = () => {
-    if (!riskResult) return <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-dim)' }}>Загрузка...</div>;
+    if (!riskResult) return <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-dim)' }}>Р—Р°РіСЂСѓР·РєР°...</div>;
     const effectiveLabContrib = labRiskContributions || syntheticLabContrib;
     const isSyntheticLab = !hasLabs && shouldApplyPenalty; // lab contrib came from penalty, not real labs
     switch (tab) {
       case 'overview': return <RiskOverview riskResult={riskResult} globalNoLabs={globalNoLabs} noLabsSystems={noLabsSystems} labRiskContributions={effectiveLabContrib} riskHistory={riskHistory} aggregatedRisk={aggregatedRisk} weeklyDynamics={weeklyDynamics} />;
       case 'mechanisms': return <RiskDetails riskResult={riskResult} labRiskContributions={effectiveLabContrib} isSyntheticLab={isSyntheticLab} />;
-      case 'v7': return v7Result ? <V7RiskDisplay result={v7Result} organWeek={organWeek} onWeekChange={setOrganWeek} mcEnabled={mcEnabled} onToggleMC={toggleMC} /> : <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-dim)' }}>Загрузка V7...</div>;
-      case 'model': return v7Result ? <Risk3DModel result={v7Result} mcEnabled={mcEnabled} onToggleMC={toggleMC} organWeek={organWeek} onWeekChange={setOrganWeek} /> : <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-dim)' }}>Загрузка V7...</div>;
+      case 'v7': return v7Result ? <V7RiskDisplay result={v7Result} organWeek={organWeek} onWeekChange={setOrganWeek} mcEnabled={mcEnabled} onToggleMC={toggleMC} /> : <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-dim)' }}>Р—Р°РіСЂСѓР·РєР° V7...</div>;
+      case 'model': return v7Result ? <Risk3DModel result={v7Result} mcEnabled={mcEnabled} onToggleMC={toggleMC} organWeek={organWeek} onWeekChange={setOrganWeek} /> : <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-dim)' }}>Р—Р°РіСЂСѓР·РєР° V7...</div>;
       case 'dynamics': return <WeeklyRiskChart dynamics={weeklyDynamics} selectedWeek={selectedWeek} onWeekSelect={setSelectedWeek} mode={weekMode} onModeChange={setWeekMode} />;
       case 'info': return <RiskInfo />;
       case 'mdss': return <MDSSRiskDisplay />;
@@ -323,7 +323,7 @@ export const RiskScreen: React.FC = () => {
 
   return (
     <div className="screen risk">
-      <h2 style={{ margin: '0 0 6px', fontSize: 'clamp(16, 4.5vw, 18)' }}>⚠️ Риски</h2>
+      <h2 style={{ margin: '0 0 6px', fontSize: 'clamp(16, 4.5vw, 18)' }}>вљ пёЏ Р РёСЃРєРё</h2>
       <div style={{ display: 'flex', gap: 3, overflowX: 'auto', marginBottom: 12, scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' }}>
         {(['overview', 'dynamics', 'mechanisms', 'v7', 'model', 'mdss', 'compliance', 'clinical', 'info'] as const).map(t => (
           <button key={t} onClick={() => setTab(t)} style={{
@@ -343,7 +343,7 @@ export const RiskScreen: React.FC = () => {
   );
 };
 
-// ── MDSS Risk Display Component ──
+// в”Ђв”Ђ MDSS Risk Display Component в”Ђв”Ђ
 const MDSSRiskDisplay: React.FC = () => {
   const linked = useDataLink();
   const [tWeeks, setTWeeks] = useState(Math.max(1, (linked.course || []).reduce((max, c) => Math.max(max, (c.endWeek || 12) - (c.startWeek || 0)), 4)));
@@ -393,7 +393,7 @@ const MDSSRiskDisplay: React.FC = () => {
       const map = LAB_MAP[lab.code] || LAB_MAP[lab.name];
       if (map) markers.push({ name: map.name, value: lab.value, ec50: map.ec50, isInverted: map.inverted });
     }
-    // Без анализов — используем консервативные оценки по системам
+    // Р‘РµР· Р°РЅР°Р»РёР·РѕРІ вЂ” РёСЃРїРѕР»СЊР·СѓРµРј РєРѕРЅСЃРµСЂРІР°С‚РёРІРЅС‹Рµ РѕС†РµРЅРєРё РїРѕ СЃРёСЃС‚РµРјР°Рј
     if (markers.length === 0) {
       markers.push(
         { name: 'ALT', value: 30, ec50: 50 },
@@ -413,41 +413,41 @@ const MDSSRiskDisplay: React.FC = () => {
   return (
     <div>
       <div className="card" style={{ marginBottom: 12 }}>
-        <h3 style={{ margin: '0 0 4px 0' }}>🧬 MDSS — Medical Decision Support System</h3>
+        <h3 style={{ margin: '0 0 4px 0' }}>рџ§¬ MDSS вЂ” Medical Decision Support System</h3>
         <p style={{ fontSize: 11, color: 'var(--text-dim)', margin: '0 0 4px 0' }}>
-          Hill → Monte Carlo (10K) → Logistic Sigmoid. Прогноз необратимого отказа органов.
+          Hill в†’ Monte Carlo (10K) в†’ Logistic Sigmoid. РџСЂРѕРіРЅРѕР· РЅРµРѕР±СЂР°С‚РёРјРѕРіРѕ РѕС‚РєР°Р·Р° РѕСЂРіР°РЅРѕРІ.
         </p>
         <p style={{ fontSize: 10, color: 'var(--accent)', margin: 0 }}>
-          ⚡ Работает в браузере (TypeScript). Python-сервер не требуется.
+          вљЎ Р Р°Р±РѕС‚Р°РµС‚ РІ Р±СЂР°СѓР·РµСЂРµ (TypeScript). Python-СЃРµСЂРІРµСЂ РЅРµ С‚СЂРµР±СѓРµС‚СЃСЏ.
         </p>
       </div>
 
       {!autoRun ? (
         <div className="card" style={{ marginBottom: 12, textAlign: 'center' }}>
           <p style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 12 }}>
-            Нажмите кнопку для запуска анализа. Можно без ввода данных — использует консервативные значения.
+            РќР°Р¶РјРёС‚Рµ РєРЅРѕРїРєСѓ РґР»СЏ Р·Р°РїСѓСЃРєР° Р°РЅР°Р»РёР·Р°. РњРѕР¶РЅРѕ Р±РµР· РІРІРѕРґР° РґР°РЅРЅС‹С… вЂ” РёСЃРїРѕР»СЊР·СѓРµС‚ РєРѕРЅСЃРµСЂРІР°С‚РёРІРЅС‹Рµ Р·РЅР°С‡РµРЅРёСЏ.
           </p>
           <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
             <button onClick={() => { setAutoRun(true); setTimeout(handleRun, 50); }} style={{
               padding: '10px 24px', borderRadius: 8, border: 'none', cursor: 'pointer',
               background: 'linear-gradient(135deg, #8b5cf6, #6d28d9)', color: '#fff', fontWeight: 700, fontSize: 14,
-            }}>▶ Запустить анализ</button>
+            }}>в–¶ Р—Р°РїСѓСЃС‚РёС‚СЊ Р°РЅР°Р»РёР·</button>
             <button onClick={() => { setAutoRun(false); handleRun(); }} style={{
               padding: '10px 24px', borderRadius: 8, border: '1px solid var(--accent)', cursor: 'pointer',
               background: 'transparent', color: 'var(--accent)', fontWeight: 600, fontSize: 14,
-            }}>Запустить один раз</button>
+            }}>Р—Р°РїСѓСЃС‚РёС‚СЊ РѕРґРёРЅ СЂР°Р·</button>
           </div>
         </div>
       ) : (
         <div className="card" style={{ marginBottom: 12 }}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
             <div>
-              <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Недель экспозиции</label>
+              <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>РќРµРґРµР»СЊ СЌРєСЃРїРѕР·РёС†РёРё</label>
               <input type="number" min={0} max={100} value={tWeeks} onChange={e => { setTWeeks(+e.target.value); }}
                 style={{ width: '100%', padding: '6px 8px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 13, boxSizing: 'border-box' }} />
             </div>
             <div>
-              <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Генетика (через запятую)</label>
+              <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Р“РµРЅРµС‚РёРєР° (С‡РµСЂРµР· Р·Р°РїСЏС‚СѓСЋ)</label>
               <input type="text" value={genetics.join(', ')} onChange={e => setGenetics(e.target.value.split(',').map(s => s.trim()).filter(Boolean))}
                 placeholder="APOL1_mutation, COMT_slow..."
                 style={{ width: '100%', padding: '6px 8px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 13, boxSizing: 'border-box' }} />
@@ -457,17 +457,17 @@ const MDSSRiskDisplay: React.FC = () => {
             <button onClick={handleRun} style={{
               flex: 1, padding: 8, borderRadius: 6, border: 'none', cursor: 'pointer',
               background: 'rgba(139,92,246,0.15)', color: '#8b5cf6', fontWeight: 600, fontSize: 12,
-            }}>🔄 Пересчитать</button>
+            }}>рџ”„ РџРµСЂРµСЃС‡РёС‚Р°С‚СЊ</button>
             <button onClick={() => setAutoRun(false)} style={{
               padding: '8px 16px', borderRadius: 6, border: '1px solid var(--border)', cursor: 'pointer',
               background: 'transparent', color: 'var(--text-dim)', fontSize: 12,
-            }}>Выкл авто</button>
+            }}>Р’С‹РєР» Р°РІС‚Рѕ</button>
           </div>
           {linked.labs?.length === 0 && (
-            <div style={{ fontSize: 9, color: '#ff9100', marginTop: 4 }}>⚠ Без анализов — консервативные оценки. Введите данные для точного прогноза.</div>
+            <div style={{ fontSize: 9, color: '#ff9100', marginTop: 4 }}>вљ  Р‘РµР· Р°РЅР°Р»РёР·РѕРІ вЂ” РєРѕРЅСЃРµСЂРІР°С‚РёРІРЅС‹Рµ РѕС†РµРЅРєРё. Р’РІРµРґРёС‚Рµ РґР°РЅРЅС‹Рµ РґР»СЏ С‚РѕС‡РЅРѕРіРѕ РїСЂРѕРіРЅРѕР·Р°.</div>
           )}
           {linked.labs?.length > 0 && (
-            <div style={{ fontSize: 9, color: '#22c55e', marginTop: 4 }}>✅ Использовано {linked.labs.length} анализов из вашего профиля</div>
+            <div style={{ fontSize: 9, color: '#22c55e', marginTop: 4 }}>вњ… РСЃРїРѕР»СЊР·РѕРІР°РЅРѕ {linked.labs.length} Р°РЅР°Р»РёР·РѕРІ РёР· РІР°С€РµРіРѕ РїСЂРѕС„РёР»СЏ</div>
           )}
         </div>
       )}
@@ -481,8 +481,8 @@ const MDSSRiskDisplay: React.FC = () => {
               borderLeft: '3px solid #ef4444',
             }}>
               <div style={{ fontSize: 10, color: '#f97316', fontWeight: 600 }}>
-                ⚠ Штраф за просрочку анализов: ×{mdssResult.compliancePenalty}
-                ({mdssResult.weeksSinceLastLab} нед без анализов)
+                вљ  РЁС‚СЂР°С„ Р·Р° РїСЂРѕСЃСЂРѕС‡РєСѓ Р°РЅР°Р»РёР·РѕРІ: Г—{mdssResult.compliancePenalty}
+                ({mdssResult.weeksSinceLastLab} РЅРµРґ Р±РµР· Р°РЅР°Р»РёР·РѕРІ)
               </div>
             </div>
           )}
@@ -490,13 +490,13 @@ const MDSSRiskDisplay: React.FC = () => {
           {/* Overall risk */}
           <div className="card" style={{ marginBottom: 12, textAlign: 'center' }}>
             <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 4 }}>
-              Максимальный риск по всем 14 системам
+              РњР°РєСЃРёРјР°Р»СЊРЅС‹Р№ СЂРёСЃРє РїРѕ РІСЃРµРј 14 СЃРёСЃС‚РµРјР°Рј
             </div>
             <div style={{ fontSize: 36, fontWeight: 800, color: ZONE_COLORS[mdssResult.overallAlertLevel] }}>
               {mdssResult.overallMaxRisk}%
             </div>
             <div style={{ fontSize: 9, color: 'var(--text-dim)', marginTop: 2 }}>
-              {mdssResult.allMarkersUsed.length} биомаркеров · {Object.keys(mdssResult.organSystemsReport).length} систем
+              {mdssResult.allMarkersUsed.length} Р±РёРѕРјР°СЂРєРµСЂРѕРІ В· {Object.keys(mdssResult.organSystemsReport).length} СЃРёСЃС‚РµРј
             </div>
           </div>
 
@@ -508,20 +508,20 @@ const MDSSRiskDisplay: React.FC = () => {
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
                 <span style={{ fontWeight: 600, fontSize: 12 }}>{r.organName}</span>
                 <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 4, background: `${ZONE_COLORS[r.alertLevel]}22`, color: ZONE_COLORS[r.alertLevel], fontWeight: 600 }}>
-                  {Math.round(r.riskPercentage)}% — {r.status.split('(')[0].trim()}
+                  {Math.round(r.riskPercentage)}% вЂ” {r.status.split('(')[0].trim()}
                 </span>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 4, fontSize: 9, color: 'var(--text-dim)', marginBottom: 4 }}>
                 <div>Hill: {r.hillScore}</div>
                 <div>MC P95: {r.severity95}</div>
                 <div>Z: {r.zTotal}</div>
-                <div>Gen: ×{r.geneticFactor}</div>
+                <div>Gen: Г—{r.geneticFactor}</div>
               </div>
               <div style={{ background: 'rgba(255,255,255,0.05)', borderRadius: 4, height: 8, overflow: 'hidden' }}>
                 <div style={{ width: `${Math.min(100, r.riskPercentage)}%`, height: '100%', background: ZONE_COLORS[r.alertLevel], borderRadius: 4 }} />
               </div>
               <div style={{ fontSize: 9, color: 'var(--text-dim)', marginTop: 3 }}>
-                Маркеры ({r.markersUsed.length}): {r.markersUsed.join(', ')}
+                РњР°СЂРєРµСЂС‹ ({r.markersUsed.length}): {r.markersUsed.join(', ')}
               </div>
             </div>
           ))}
@@ -532,7 +532,7 @@ const MDSSRiskDisplay: React.FC = () => {
               marginBottom: 12, padding: '8px 12px', background: 'rgba(255,255,255,0.02)',
             }}>
               <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-dim)', marginBottom: 4 }}>
-                🧪 Не сдано ({mdssResult.markersNotFound.length}): сдайте эти маркеры для точного прогноза
+                рџ§Є РќРµ СЃРґР°РЅРѕ ({mdssResult.markersNotFound.length}): СЃРґР°Р№С‚Рµ СЌС‚Рё РјР°СЂРєРµСЂС‹ РґР»СЏ С‚РѕС‡РЅРѕРіРѕ РїСЂРѕРіРЅРѕР·Р°
               </div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
                 {mdssResult.markersNotFound.map(m => (
@@ -549,7 +549,7 @@ const MDSSRiskDisplay: React.FC = () => {
   );
 };
 
-// ── Compliance Display Component ──
+// в”Ђв”Ђ Compliance Display Component в”Ђв”Ђ
 const ComplianceDisplay: React.FC = () => {
   const linked = useDataLink();
   const profile = linked.profile;
@@ -560,7 +560,7 @@ const ComplianceDisplay: React.FC = () => {
   const [report, setReport] = useState<ComplianceReport | null>(null);
   const [ranOnce, setRanOnce] = useState(false);
 
-  // Dates — recompute when labs/course change
+  // Dates вЂ” recompute when labs/course change
   const today = new Date().toISOString().slice(0, 10);
 
   const latestLabDate = useMemo(() => {
@@ -578,7 +578,7 @@ const ComplianceDisplay: React.FC = () => {
       const starts = course.map(c => c.startWeek || 0);
       const minStart = Math.min(...starts);
       if (minStart <= 0 && course.length === 1 && course[0].startWeek === 0) {
-        // Course just started — use today minus a few days
+        // Course just started вЂ” use today minus a few days
         const d = new Date();
         d.setDate(d.getDate() - 3);
         return d.toISOString().slice(0, 10);
@@ -653,12 +653,12 @@ const ComplianceDisplay: React.FC = () => {
   return (
     <div>
       <div className="card" style={{ marginBottom: 12 }}>
-        <h3 style={{ margin: '0 0 4px 0' }}>🕒 Комплаенс — Data Decay & Uncertainty Engine</h3>
+        <h3 style={{ margin: '0 0 4px 0' }}>рџ•’ РљРѕРјРїР»Р°РµРЅСЃ вЂ” Data Decay & Uncertainty Engine</h3>
         <p style={{ fontSize: 11, color: 'var(--text-dim)', margin: 0 }}>
-          Отслеживание дисциплины сдачи анализов. Data Decay — штрафной коэффициент за устаревшие данные.
+          РћС‚СЃР»РµР¶РёРІР°РЅРёРµ РґРёСЃС†РёРїР»РёРЅС‹ СЃРґР°С‡Рё Р°РЅР°Р»РёР·РѕРІ. Data Decay вЂ” С€С‚СЂР°С„РЅРѕР№ РєРѕСЌС„С„РёС†РёРµРЅС‚ Р·Р° СѓСЃС‚Р°СЂРµРІС€РёРµ РґР°РЅРЅС‹Рµ.
           <br />
           <span style={{ color: 'var(--accent)', fontSize: 10 }}>
-            ⚡ Работает в браузере. Сервер не нужен.
+            вљЎ Р Р°Р±РѕС‚Р°РµС‚ РІ Р±СЂР°СѓР·РµСЂРµ. РЎРµСЂРІРµСЂ РЅРµ РЅСѓР¶РµРЅ.
           </span>
         </p>
       </div>
@@ -667,12 +667,12 @@ const ComplianceDisplay: React.FC = () => {
       <div className="card" style={{ marginBottom: 12 }}>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 8 }}>
           <div>
-            <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Дата начала курса</label>
+            <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Р”Р°С‚Р° РЅР°С‡Р°Р»Р° РєСѓСЂСЃР°</label>
             <input type="date" value={cycleStart} onChange={e => setCycleStart(e.target.value)}
               style={{ width: '100%', padding: '6px 8px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, boxSizing: 'border-box' }} />
           </div>
           <div>
-            <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Последние анализы</label>
+            <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>РџРѕСЃР»РµРґРЅРёРµ Р°РЅР°Р»РёР·С‹</label>
             <input type="date" value={lastLab} onChange={e => setLastLab(e.target.value)}
               style={{ width: '100%', padding: '6px 8px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, boxSizing: 'border-box' }} />
           </div>
@@ -692,12 +692,12 @@ const ComplianceDisplay: React.FC = () => {
         <button onClick={runAnalysis} style={{
           width: '100%', padding: 10, borderRadius: 8, border: 'none', cursor: 'pointer',
           background: 'linear-gradient(135deg, #f97316, #ef4444)', color: '#fff', fontWeight: 700, fontSize: 14,
-        }}>▶ Анализ с комплаенс-контролем</button>
+        }}>в–¶ РђРЅР°Р»РёР· СЃ РєРѕРјРїР»Р°РµРЅСЃ-РєРѕРЅС‚СЂРѕР»РµРј</button>
 
         <div style={{ display: 'flex', gap: 2, marginTop: 6, fontSize: 9, color: 'var(--text-dim)', justifyContent: 'space-between' }}>
-          <span>Анализов: {labs.length}</span>
-          <span>Генетика: {genetics.length > 0 ? genetics.join(',') : 'нет'}</span>
-          <span style={{ color: complianceColors[compliance], fontWeight: 600 }}>Статус: {compliance}</span>
+          <span>РђРЅР°Р»РёР·РѕРІ: {labs.length}</span>
+          <span>Р“РµРЅРµС‚РёРєР°: {genetics.length > 0 ? genetics.join(',') : ''}</span>
+          <span style={{ color: complianceColors[compliance], fontWeight: 600 }}>РЎС‚Р°С‚СѓСЃ: {compliance}</span>
         </div>
       </div>
 
@@ -715,7 +715,7 @@ const ComplianceDisplay: React.FC = () => {
             borderLeft: `3px solid ${complianceColors[report.systemWarnings.complianceStatus]}`,
           }}>
             <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 4, fontWeight: 600 }}>
-              ⚠ Системные предупреждения
+              вљ  РЎРёСЃС‚РµРјРЅС‹Рµ РїСЂРµРґСѓРїСЂРµР¶РґРµРЅРёСЏ
             </div>
             <div style={{ fontSize: 10, color: 'var(--text)', lineHeight: 1.5, marginBottom: 6 }}>
               {report.systemWarnings.disclaimer}
@@ -727,25 +727,25 @@ const ComplianceDisplay: React.FC = () => {
               {report.systemWarnings.penaltyStatus}
             </div>
             <div style={{ display: 'flex', gap: 12, marginTop: 4, fontSize: 9, color: 'var(--text-dim)' }}>
-              <span>{report.systemWarnings.weeksOnCycle} нед на курсе</span>
-              <span>{report.systemWarnings.weeksSinceLastLab} нед с анализов</span>
+              <span>{report.systemWarnings.weeksOnCycle} РЅРµРґ РЅР° РєСѓСЂСЃРµ</span>
+              <span>{report.systemWarnings.weeksSinceLastLab} РЅРµРґ СЃ Р°РЅР°Р»РёР·РѕРІ</span>
             </div>
           </div>
 
           {/* Risk analysis card */}
           <div className="card" style={{ marginBottom: 12 }}>
             <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', marginBottom: 8 }}>
-              📊 Анализ рисков с штрафом
+              рџ“Љ РђРЅР°Р»РёР· СЂРёСЃРєРѕРІ СЃ С€С‚СЂР°С„РѕРј
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, textAlign: 'center', marginBottom: 8 }}>
               <div>
-                <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Штрафной коэфф.</div>
+                <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>РЁС‚СЂР°С„РЅРѕР№ РєРѕСЌС„С„.</div>
                 <div style={{ fontSize: 24, fontWeight: 800, color: report.riskAnalysis.penaltyMultiplierApplied > 1 ? '#ef4444' : '#00e68a' }}>
                   {report.riskAnalysis.penaltyMultiplierApplied}x
                 </div>
               </div>
               <div>
-                <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Вероятность отказа</div>
+                <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Р’РµСЂРѕСЏС‚РЅРѕСЃС‚СЊ РѕС‚РєР°Р·Р°</div>
                 <div style={{
                   fontSize: 24, fontWeight: 800,
                   color: report.riskAnalysis.probabilityPercent >= 80 ? '#ef4444'
@@ -762,7 +762,7 @@ const ComplianceDisplay: React.FC = () => {
               <div>Sev95: {report.riskAnalysis.severity95th}</div>
               <div>Z_raw: {report.riskAnalysis.zTotalRaw}</div>
               <div>Z_adj: {report.riskAnalysis.zTotalAdjusted}</div>
-              <div>Genetic: {report.riskAnalysis.active19NorPenalty ? 'Да' : 'Нет'}</div>
+              <div>Genetic: {report.riskAnalysis.active19NorPenalty ? '' : ''}</div>
               <div style={{ fontWeight: 600, color: 'var(--text)' }}>
                 {report.riskAnalysis.clinicalStatus}
               </div>
@@ -770,7 +770,7 @@ const ComplianceDisplay: React.FC = () => {
           </div>
 
           {/* Per-organ breakdown */}
-          <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 6, color: 'var(--text-dim)' }}>⬇ Пер-орган с штрафом</div>
+          <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 6, color: 'var(--text-dim)' }}>в¬‡ РџРµСЂ-РѕСЂРіР°РЅ СЃ С€С‚СЂР°С„РѕРј</div>
           {Object.entries(report.organDetails).map(([key, r]) => {
             const zoneColor = r.riskPercent >= 80 ? '#ef4444' : r.riskPercent >= 50 ? '#f97316' : r.riskPercent >= 20 ? '#eab308' : '#00e68a';
             return (
@@ -780,7 +780,7 @@ const ComplianceDisplay: React.FC = () => {
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
                   <span style={{ fontWeight: 600, fontSize: 11 }}>{r.organName}</span>
                   <span style={{ padding: '2px 6px', borderRadius: 4, background: `${zoneColor}22`, color: zoneColor, fontSize: 10, fontWeight: 600 }}>
-                    {r.riskPercent}% — {r.status}
+                    {r.riskPercent}% вЂ” {r.status}
                   </span>
                 </div>
                 <div style={{ background: 'rgba(255,255,255,0.04)', borderRadius: 4, height: 6, overflow: 'hidden', marginBottom: 4 }}>
@@ -789,7 +789,7 @@ const ComplianceDisplay: React.FC = () => {
                 <div style={{ display: 'flex', gap: 8, fontSize: 9, color: 'var(--text-dim)' }}>
                   <span>Hill: {r.hillScore}</span>
                   <span>Z_adj: {r.zTotalAdjusted}</span>
-                  <span>×{r.penaltyFactor} штраф</span>
+                  <span>Г—{r.penaltyFactor} С€С‚СЂР°С„</span>
                 </div>
               </div>
             );
@@ -799,11 +799,11 @@ const ComplianceDisplay: React.FC = () => {
 
       {!report && (
         <div className="card" style={{ textAlign: 'center', padding: 24 }}>
-          <div style={{ fontSize: 32, marginBottom: 8 }}>🕒</div>
+          <div style={{ fontSize: 32, marginBottom: 8 }}>рџ•’</div>
           <div style={{ fontSize: 13, color: 'var(--text-dim)' }}>
             {labs.length > 0
-              ? `Найдено ${labs.length} анализов. Нажмите «Анализ с комплаенс-контролем».`
-              : 'Анализы не найдены. Система применит максимальный штраф.'}
+              ? ``
+              : ''}
           </div>
         </div>
       )}
@@ -811,7 +811,7 @@ const ComplianceDisplay: React.FC = () => {
   );
 };
 
-// ── Clinical Risk Display ──
+// в”Ђв”Ђ Clinical Risk Display в”Ђв”Ђ
 const ClinicalRiskDisplay: React.FC = () => {
   const linked = useDataLink();
   const course = linked.course || [];
@@ -860,7 +860,7 @@ const ClinicalRiskDisplay: React.FC = () => {
               hillScore: 0,
               severity95: 0,
               riskPercent: Math.min(80, Math.round(mp.cumulativeTriggerStrength * 25 * 10) / 10),
-              status: mp.cumulativeTriggerStrength >= 2 ? 'ПОВЫШЕННЫЙ РИСК' : mp.cumulativeTriggerStrength >= 1.2 ? 'УМЕРЕННЫЙ РИСК' : 'НИЗКИЙ РИСК',
+              status: mp.cumulativeTriggerStrength >= 2 ? '' : mp.cumulativeTriggerStrength >= 1.2 ? '' : '',
               alertLevel: mp.cumulativeTriggerStrength >= 2 ? 2 : mp.cumulativeTriggerStrength >= 1.2 ? 1 : 0,
               markersUsed: [],
               pharmaTriggers: mp.contributingDrugs,
@@ -908,29 +908,29 @@ const ClinicalRiskDisplay: React.FC = () => {
   return (
     <div>
       <div className="card" style={{ marginBottom: 12 }}>
-        <h3 style={{ margin: '0 0 4px 0' }}>🏥 Клинические патологии</h3>
+        <h3 style={{ margin: '0 0 4px 0' }}>рџЏҐ РљР»РёРЅРёС‡РµСЃРєРёРµ РїР°С‚РѕР»РѕРіРёРё</h3>
         <p style={{ fontSize: 11, color: 'var(--text-dim)', margin: 0 }}>
-          28 патологий в 8 системах. Hill → MC (10K) → Sigmoid. Связь препарат→патология из клинической базы.
+          28 РїР°С‚РѕР»РѕРіРёР№ РІ 8 СЃРёСЃС‚РµРјР°С…. Hill в†’ MC (10K) в†’ Sigmoid. РЎРІСЏР·СЊ РїСЂРµРїР°СЂР°С‚в†’РїР°С‚РѕР»РѕРіРёСЏ РёР· РєР»РёРЅРёС‡РµСЃРєРѕР№ Р±Р°Р·С‹.
         </p>
       </div>
 
       {!result && (
         <button onClick={handleAnalyze} disabled={loading} style={{ width: '100%', padding: 10, borderRadius: 8, border: 'none', cursor: loading ? 'wait' : 'pointer', background: loading ? 'var(--border)' : 'linear-gradient(135deg, #ec4899, #8b5cf6)', color: '#fff', fontWeight: 700, fontSize: 14, marginBottom: 8 }}>
-          {loading ? '⏳ Анализ...' : '▶ Запустить клинический анализ'}
+          {loading ? 'вЏі РђРЅР°Р»РёР·...' : 'в–¶ Р—Р°РїСѓСЃС‚РёС‚СЊ РєР»РёРЅРёС‡РµСЃРєРёР№ Р°РЅР°Р»РёР·'}
         </button>
       )}
 
       {result && (
         <>
           <div className="card" style={{ marginBottom: 10, textAlign: 'center' }}>
-            <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>Максимальный риск</div>
+            <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>РњР°РєСЃРёРјР°Р»СЊРЅС‹Р№ СЂРёСЃРє</div>
             <div style={{ fontSize: 32, fontWeight: 800, color: result.overallMaxRisk >= 80 ? '#ef4444' : result.overallMaxRisk >= 50 ? '#f97316' : '#22c55e' }}>
               {result.overallMaxRisk}%
             </div>
-            <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>{result.markersAnalyzed} маркеров · {result.results.length} патологий</div>
+            <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>{result.markersAnalyzed} РјР°СЂРєРµСЂРѕРІ В· {result.results.length} РїР°С‚РѕР»РѕРіРёР№</div>
           </div>
           <button onClick={handleAnalyze} style={{ width: '100%', padding: 6, borderRadius: 6, border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-dim)', cursor: 'pointer', fontSize: 10, marginBottom: 8 }}>
-            🔄 Пересчитать
+            рџ”„ РџРµСЂРµСЃС‡РёС‚Р°С‚СЊ
           </button>
 
           {result.systems.map((system: any) => (
@@ -949,12 +949,12 @@ const ClinicalRiskDisplay: React.FC = () => {
                       <span style={{ padding: '1px 5px', borderRadius: 3, background: `${zoneColors[r.alertLevel]}18`, color: zoneColors[r.alertLevel], fontWeight: 600, fontSize: 9 }}>{r.riskPercent}%</span>
                     </div>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 3, fontSize: 8, color: 'var(--text-dim)' }}>
-                      <div>Hill: {r.hillScore}</div><div>MC95: {r.severity95}</div><div>Маркеры: {r.markersUsed.length}</div>
+                      <div>Hill: {r.hillScore}</div><div>MC95: {r.severity95}</div><div>РњР°СЂРєРµСЂС‹: {r.markersUsed.length}</div>
                     </div>
                     {r.contributingCompounds.length > 0 && (
-                      <div style={{ fontSize: 8, color: '#8b5cf6', marginTop: 2 }}>Препараты: {r.contributingCompounds.join(', ')}</div>
+                      <div style={{ fontSize: 8, color: '#8b5cf6', marginTop: 2 }}>РџСЂРµРїР°СЂР°С‚С‹: {r.contributingCompounds.join(', ')}</div>
                     )}
-                    {r.alertLevel >= 2 && <div style={{ fontSize: 8, color: '#f97316', marginTop: 2 }}>🔬 {r.instrumental}</div>}
+                    {r.alertLevel >= 2 && <div style={{ fontSize: 8, color: '#f97316', marginTop: 2 }}>рџ”¬ {r.instrumental}</div>}
                   </div>
                 ))}
               </div>

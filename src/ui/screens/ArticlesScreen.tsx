@@ -1,13 +1,13 @@
-import React, { useMemo, useState } from 'react';
+﻿import React, { useMemo, useState } from 'react';
 import { getSortedArticles, type ArticleManifestEntry, ARTICLES_MANIFEST } from '../../data/articles-manifest';
 
 const CATEGORIES = [
-  { value: 'all', label: 'Все' },
-  { value: 'pharma', label: 'Фарма' },
-  { value: 'labs', label: 'Анализы' },
-  { value: 'training', label: 'Тренировки' },
-  { value: 'nutrition', label: 'Питание' },
-  { value: 'support', label: 'Поддержка' },
+  { value: 'all', label: '' },
+  { value: 'pharma', label: '' },
+  { value: 'labs', label: '' },
+  { value: 'training', label: '' },
+  { value: 'nutrition', label: '' },
+  { value: 'support', label: '' },
 ];
 
 function renderMarkdown(md: string): string {
@@ -34,8 +34,8 @@ function renderMarkdown(md: string): string {
     // Line breaks
     .replace(/\n\n/g, '<br/><br/>')
     // Checkboxes
-    .replace(/- \[ \] (.+)/g, '☐ $1')
-    .replace(/- \[x\] (.+)/g, '☑ $1');
+    .replace(/- \[ \] (.+)/g, 'вђ $1')
+    .replace(/- \[x\] (.+)/g, 'в‘ $1');
 
   return `<div style="line-height:1.7;font-size:13px">${html}</div>`;
 }
@@ -73,13 +73,13 @@ export const ArticlesScreen: React.FC = () => {
 
   return (
     <div className="screen">
-      <h2 style={{ margin: '0 0 8px', fontSize: 'clamp(15,4vw,18)' }}>📚 Статьи</h2>
+      <h2 style={{ margin: '0 0 8px', fontSize: 'clamp(15,4vw,18)' }}>рџ“љ РЎС‚Р°С‚СЊРё</h2>
 
       {/* Filters */}
       <div style={{ display: 'flex', gap: 6, marginBottom: 8, flexWrap: 'wrap' }}>
         <input
           type="text" value={search} onChange={e => setSearch(e.target.value)}
-          placeholder="🔍 Поиск по статьям..."
+          placeholder=""
           style={{ flex: 1, minWidth: 140, padding: '8px 10px', borderRadius: 8, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12 }}
         />
       </div>
@@ -102,20 +102,20 @@ export const ArticlesScreen: React.FC = () => {
           display: 'flex', flexDirection: 'column',
         }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 14px', background: 'var(--bg)' }}>
-            <span style={{ fontWeight: 600, fontSize: 13 }}>📄 PDF Документ</span>
+            <span style={{ fontWeight: 600, fontSize: 13 }}>рџ“„ PDF Р”РѕРєСѓРјРµРЅС‚</span>
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={() => openPDF(pdfViewer)} style={{
                 padding: '5px 14px', borderRadius: 6, background: 'var(--accent)', color: '#000', border: 'none', fontWeight: 600, fontSize: 11, cursor: 'pointer',
-              }}>Открыть</button>
+              }}>РћС‚РєСЂС‹С‚СЊ</button>
               <button onClick={() => setPdfViewer(null)} style={{
                 padding: '5px 14px', borderRadius: 6, background: 'var(--bg-secondary)', color: 'var(--text-dim)', border: '1px solid var(--border)', fontSize: 11, cursor: 'pointer',
-              }}>✕ Закрыть</button>
+              }}>вњ• Р—Р°РєСЂС‹С‚СЊ</button>
             </div>
           </div>
           <div style={{ flex: 1, padding: 16, textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12 }}>
-            <div style={{ fontSize: 48 }}>📄</div>
-            <div style={{ fontSize: 14, color: 'var(--text)' }}>PDF документ доступен для скачивания</div>
-            <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>Нажмите «Открыть» для просмотра в браузере или скачивания</div>
+            <div style={{ fontSize: 48 }}>рџ“„</div>
+            <div style={{ fontSize: 14, color: 'var(--text)' }}>PDF РґРѕРєСѓРјРµРЅС‚ РґРѕСЃС‚СѓРїРµРЅ РґР»СЏ СЃРєР°С‡РёРІР°РЅРёСЏ</div>
+            <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>РќР°Р¶РјРёС‚Рµ В«РћС‚РєСЂС‹С‚СЊВ» РґР»СЏ РїСЂРѕСЃРјРѕС‚СЂР° РІ Р±СЂР°СѓР·РµСЂРµ РёР»Рё СЃРєР°С‡РёРІР°РЅРёСЏ</div>
           </div>
         </div>
       )}
@@ -123,8 +123,8 @@ export const ArticlesScreen: React.FC = () => {
       {/* Articles list */}
       {articles.length === 0 && (
         <div className="card" style={{ textAlign: 'center', padding: 30 }}>
-          <div style={{ fontSize: 32, marginBottom: 8 }}>📭</div>
-          <div style={{ fontSize: 13, color: 'var(--text-dim)' }}>Статьи не найдены</div>
+          <div style={{ fontSize: 32, marginBottom: 8 }}>рџ“­</div>
+          <div style={{ fontSize: 13, color: 'var(--text-dim)' }}>РЎС‚Р°С‚СЊРё РЅРµ РЅР°Р№РґРµРЅС‹</div>
         </div>
       )}
 
@@ -142,7 +142,7 @@ export const ArticlesScreen: React.FC = () => {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 }}>
                 <div style={{ flex: 1 }}>
                   <span style={{ fontWeight: 600, fontSize: 13 }}>
-                    {article.content_type === 'pdf' ? '📄 ' : '📝 '}
+                    {article.content_type === 'pdf' ? '' : ''}
                     {article.title}
                   </span>
                   <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 2 }}>
@@ -154,7 +154,7 @@ export const ArticlesScreen: React.FC = () => {
                   background: article.content_type === 'pdf' ? 'rgba(239,68,68,0.1)' : 'rgba(0,230,138,0.08)',
                   color: article.content_type === 'pdf' ? '#ef4444' : 'var(--accent)',
                 }}>
-                  {article.content_type === 'pdf' ? 'PDF' : 'Статья'}
+                  {article.content_type === 'pdf' ? 'PDF' : ''}
                 </span>
               </div>
               <div style={{ display: 'flex', gap: 8, fontSize: 9, color: 'var(--text-dim)' }}>
@@ -188,7 +188,7 @@ export const ArticlesScreen: React.FC = () => {
 
       {/* Stats */}
       <div className="card" style={{ marginTop: 8, padding: '8px 12px', textAlign: 'center', fontSize: 10, color: 'var(--text-dim)' }}>
-        {ARTICLES_MANIFEST.length} статей в библиотеке · {ARTICLES_MANIFEST.filter(a => a.content_type === 'pdf').length} PDF · {ARTICLES_MANIFEST.filter(a => a.content_type === 'markdown').length} Markdown
+        {ARTICLES_MANIFEST.length} СЃС‚Р°С‚РµР№ РІ Р±РёР±Р»РёРѕС‚РµРєРµ В· {ARTICLES_MANIFEST.filter(a => a.content_type === 'pdf').length} PDF В· {ARTICLES_MANIFEST.filter(a => a.content_type === 'markdown').length} Markdown
       </div>
     </div>
   );

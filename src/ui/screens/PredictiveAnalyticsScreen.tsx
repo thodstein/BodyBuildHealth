@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { calculateRisks } from '../../engines/risk.engine';
 import { generateReadinessForecast, predictLabTrend, runWhatIf } from '../../engines/predictive.engine';
 import type { RiskInput, RiskResult } from '../../core/types';
@@ -6,31 +6,31 @@ import type { ForecastResult, LabForecast } from '../../engines/predictive.engin
 import { useDataLink, getLatestLabValue } from '../../core/data-link';
 
 const SCENARIO_NAMES: Record<string, string> = {
-  'Baseline': 'Базовый',
-  'High Risk Cycle': 'Высокорисковый курс',
-  'Optimized Protocol': 'Оптимизированный протокол',
-  'Post Cycle Therapy': 'ПКТ (послекурсовая терапия)',
+  'Baseline': '',
+  'High Risk Cycle': '',
+  'Optimized Protocol': '',
+  'Post Cycle Therapy': '',
 };
 
 const SYSTEM_LABELS: Record<string, string> = {
-  hepatic: 'Печень',
-  cardio: 'Сердечно-сосудистая',
-  endocrine: 'Эндокринная',
-  renal: 'Почки',
-  hematologic: 'Кроветворение',
-  neuro: 'Нервная',
-  reproductive: 'Репродуктивная',
-  musculoskeletal: 'Суставы и связки',
-  metabolic: 'Метаболизм',
-  ghigf: 'ГР/ИФР-1',
-  ins_axis: 'Инсулиновая ось',
-  neuro_toxicity: 'Нейротоксичность',
-  blood: 'Кровь',
-  vessels: 'Сосуды',
-  immunity: 'Иммунная',
-  thyroid: 'Щитовидная',
-  prostate: 'Простата',
-  skin: 'Кожа',
+  hepatic: '',
+  cardio: '',
+  endocrine: '',
+  renal: '',
+  hematologic: '',
+  neuro: '',
+  reproductive: '',
+  musculoskeletal: '',
+  metabolic: '',
+  ghigf: '',
+  ins_axis: '',
+  neuro_toxicity: '',
+  blood: '',
+  vessels: '',
+  immunity: '',
+  thyroid: '',
+  prostate: '',
+  skin: '',
 };
 
 export const PredictiveAnalyticsScreen: React.FC = () => {
@@ -123,7 +123,7 @@ export const PredictiveAnalyticsScreen: React.FC = () => {
       const result = calculateRisks(riskInput);
       setRiskResult(result);
     } catch (error) {
-      console.error('Ошибка расчёта рисков:', error);
+      console.error('', error);
     } finally {
       setLoading(false);
     }
@@ -151,10 +151,10 @@ export const PredictiveAnalyticsScreen: React.FC = () => {
 
   return (
     <div className="screen predictive-analytics">
-      <h2>Предиктивная аналитика — Сценарии «Что если»</h2>
+      <h2>РџСЂРµРґРёРєС‚РёРІРЅР°СЏ Р°РЅР°Р»РёС‚РёРєР° вЂ” РЎС†РµРЅР°СЂРёРё В«Р§С‚Рѕ РµСЃР»РёВ»</h2>
 
       <div className="card" style={{ marginBottom: 16 }}>
-        <h3>Выбор сценария</h3>
+        <h3>Р’С‹Р±РѕСЂ СЃС†РµРЅР°СЂРёСЏ</h3>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
           {Object.keys(predefinedScenarios).map((scenario) => (
             <button
@@ -170,13 +170,13 @@ export const PredictiveAnalyticsScreen: React.FC = () => {
       </div>
 
       <div className="card" style={{ marginBottom: 16 }}>
-        <h3>Входные параметры рисков</h3>
+        <h3>Р’С…РѕРґРЅС‹Рµ РїР°СЂР°РјРµС‚СЂС‹ СЂРёСЃРєРѕРІ</h3>
         <div className="grid">
           <div>
-            <h4>Генетические факторы</h4>
+            <h4>Р“РµРЅРµС‚РёС‡РµСЃРєРёРµ С„Р°РєС‚РѕСЂС‹</h4>
             <div style={{ display: 'grid', gap: 4 }}>
               <div>
-                <label>Печень:</label>
+                <label>РџРµС‡РµРЅСЊ:</label>
                 <select
                   onChange={(e) => handleInputChange('genetics', (prev) => ({
                     ...prev,
@@ -184,13 +184,13 @@ export const PredictiveAnalyticsScreen: React.FC = () => {
                   }))}
                   style={{ width: '100%' }}
                 >
-                  <option value="Val/Val">Val/Val (Норма)</option>
-                  <option value="Val/Mut">Val/Mut (Умеренный)</option>
-                  <option value="Mut/Mut">Mut/Mut (Высокий риск)</option>
+                  <option value="Val/Val">Val/Val (РќРѕСЂРјР°)</option>
+                  <option value="Val/Mut">Val/Mut (РЈРјРµСЂРµРЅРЅС‹Р№)</option>
+                  <option value="Mut/Mut">Mut/Mut (Р’С‹СЃРѕРєРёР№ СЂРёСЃРє)</option>
                 </select>
               </div>
               <div>
-                <label>Сердечно-сосудистая:</label>
+                <label>РЎРµСЂРґРµС‡РЅРѕ-СЃРѕСЃСѓРґРёСЃС‚Р°СЏ:</label>
                 <select
                   onChange={(e) => handleInputChange('genetics', (prev) => ({
                     ...prev,
@@ -198,19 +198,19 @@ export const PredictiveAnalyticsScreen: React.FC = () => {
                   }))}
                   style={{ width: '100%' }}
                 >
-                  <option value="Val/Val">Val/Val (Норма)</option>
-                  <option value="Val/Mut">Val/Mut (Умеренный)</option>
-                  <option value="Mut/Mut">Mut/Mut (Высокий риск)</option>
+                  <option value="Val/Val">Val/Val (РќРѕСЂРјР°)</option>
+                  <option value="Val/Mut">Val/Mut (РЈРјРµСЂРµРЅРЅС‹Р№)</option>
+                  <option value="Mut/Mut">Mut/Mut (Р’С‹СЃРѕРєРёР№ СЂРёСЃРє)</option>
                 </select>
               </div>
             </div>
           </div>
 
           <div>
-            <h4>Факторы образа жизни</h4>
+            <h4>Р¤Р°РєС‚РѕСЂС‹ РѕР±СЂР°Р·Р° Р¶РёР·РЅРё</h4>
             <div style={{ display: 'grid', gap: 4 }}>
               <div>
-                <label>Качество питания:</label>
+                <label>РљР°С‡РµСЃС‚РІРѕ РїРёС‚Р°РЅРёСЏ:</label>
                 <input
                   type="number"
                   min="0.5"
@@ -221,11 +221,11 @@ export const PredictiveAnalyticsScreen: React.FC = () => {
                   style={{ width: '100%' }}
                 />
                 <p style={{ fontSize: 11, color: 'var(--text-dim)' }}>
-                  1.0 = среднее, {'>'}1.0 = хорошее, {'<'}1.0 = плохое
+                  1.0 = СЃСЂРµРґРЅРµРµ, {'>'}1.0 = С…РѕСЂРѕС€РµРµ, {'<'}1.0 = РїР»РѕС…РѕРµ
                 </p>
               </div>
               <div>
-                <label>Интенсивность тренировок:</label>
+                <label>РРЅС‚РµРЅСЃРёРІРЅРѕСЃС‚СЊ С‚СЂРµРЅРёСЂРѕРІРѕРє:</label>
                 <input
                   type="number"
                   min="0.5"
@@ -236,11 +236,11 @@ export const PredictiveAnalyticsScreen: React.FC = () => {
                   style={{ width: '100%' }}
                 />
                 <p style={{ fontSize: 11, color: 'var(--text-dim)' }}>
-                  1.0 = средняя, {'>'}1.0 = высокая, {'<'}1.0 = низкая
+                  1.0 = СЃСЂРµРґРЅСЏСЏ, {'>'}1.0 = РІС‹СЃРѕРєР°СЏ, {'<'}1.0 = РЅРёР·РєР°СЏ
                 </p>
               </div>
               <div>
-                <label>Ответ на вмешательства:</label>
+                <label>РћС‚РІРµС‚ РЅР° РІРјРµС€Р°С‚РµР»СЊСЃС‚РІР°:</label>
                 <input
                   type="number"
                   min="0"
@@ -251,7 +251,7 @@ export const PredictiveAnalyticsScreen: React.FC = () => {
                   style={{ width: '100%' }}
                 />
                 <p style={{ fontSize: 11, color: 'var(--text-dim)' }}>
-                  Насколько хорошо организм реагирует на вмешательства (0–1)
+                  РќР°СЃРєРѕР»СЊРєРѕ С…РѕСЂРѕС€Рѕ РѕСЂРіР°РЅРёР·Рј СЂРµР°РіРёСЂСѓРµС‚ РЅР° РІРјРµС€Р°С‚РµР»СЊСЃС‚РІР° (0вЂ“1)
                 </p>
               </div>
             </div>
@@ -262,45 +262,45 @@ export const PredictiveAnalyticsScreen: React.FC = () => {
       {loading ? (
         <div className="loading-screen">
           <div className="loading-spinner"></div>
-          <p>Расчёт рисков...</p>
+          <p>Р Р°СЃС‡С‘С‚ СЂРёСЃРєРѕРІ...</p>
         </div>
       ) : (
         <div className="card" style={{ marginBottom: 16 }}>
-          <h3>Результаты анализа рисков</h3>
+          <h3>Р РµР·СѓР»СЊС‚Р°С‚С‹ Р°РЅР°Р»РёР·Р° СЂРёСЃРєРѕРІ</h3>
           {riskResult ? (
             <>
               <div className="row">
-                <span className="label">Общий базовый риск:</span>
+                <span className="label">РћР±С‰РёР№ Р±Р°Р·РѕРІС‹Р№ СЂРёСЃРє:</span>
                 <span className="value">
                   {riskResult.overallRaw?.toFixed(1)}%
                 </span>
               </div>
               <div className="row">
-                <span className="label">Общий скорректированный риск:</span>
+                <span className="label">РћР±С‰РёР№ СЃРєРѕСЂСЂРµРєС‚РёСЂРѕРІР°РЅРЅС‹Р№ СЂРёСЃРє:</span>
                 <span className="value">
                   {riskResult.overallNet?.toFixed(1)}%
                 </span>
               </div>
               <div style={{ marginTop: 12 }}>
-                <h4>Разбивка по системам:</h4>
+                <h4>Р Р°Р·Р±РёРІРєР° РїРѕ СЃРёСЃС‚РµРјР°Рј:</h4>
                 <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 8 }}>
                   {Object.entries(riskResult.systemBreakdown || {}).map(([system, values]) => (
                     <div key={system} className="card" style={{ padding: 12, margin: 0 }}>
                       <h4 style={{ margin: '0 0 8px 0', fontSize: 14 }}>{SYSTEM_LABELS[system] || system}</h4>
                       <div className="row">
-                        <span className="label">Базовый:</span>
+                        <span className="label">Р‘Р°Р·РѕРІС‹Р№:</span>
                         <span className="value">
                           {values.raw?.toFixed(1)}%
                         </span>
                       </div>
                       <div className="row">
-                        <span className="label">Скорректированный:</span>
+                        <span className="label">РЎРєРѕСЂСЂРµРєС‚РёСЂРѕРІР°РЅРЅС‹Р№:</span>
                         <span className="value">
                           {values.net?.toFixed(1)}%
                         </span>
                       </div>
                       <div style={{ marginTop: 6, fontSize: 11, color: 'var(--text-dim)' }}>
-                        Снижение риска: {(values.raw! > 0 ? ((1 - values.net! / values.raw!) * 100) : 0).toFixed(0)}%
+                        РЎРЅРёР¶РµРЅРёРµ СЂРёСЃРєР°: {(values.raw! > 0 ? ((1 - values.net! / values.raw!) * 100) : 0).toFixed(0)}%
                       </div>
                     </div>
                   ))}
@@ -308,39 +308,39 @@ export const PredictiveAnalyticsScreen: React.FC = () => {
               </div>
             </>
           ) : (
-            <p>Данные о рисках отсутствуют</p>
+            <p>Р”Р°РЅРЅС‹Рµ Рѕ СЂРёСЃРєР°С… РѕС‚СЃСѓС‚СЃС‚РІСѓСЋС‚</p>
           )}
         </div>
       )}
 
       <div className="card">
-        <h3>Анализ «Что если»</h3>
+        <h3>РђРЅР°Р»РёР· В«Р§С‚Рѕ РµСЃР»РёВ»</h3>
         <p style={{ marginBottom: 12 }}>
-          Измените любой параметр выше, чтобы увидеть, как это влияет на ваш профиль рисков в реальном времени.
-          Это позволяет тестировать различные протоколы, добавки или изменения образа жизни до их реализации.
+          РР·РјРµРЅРёС‚Рµ Р»СЋР±РѕР№ РїР°СЂР°РјРµС‚СЂ РІС‹С€Рµ, С‡С‚РѕР±С‹ СѓРІРёРґРµС‚СЊ, РєР°Рє СЌС‚Рѕ РІР»РёСЏРµС‚ РЅР° РІР°С€ РїСЂРѕС„РёР»СЊ СЂРёСЃРєРѕРІ РІ СЂРµР°Р»СЊРЅРѕРј РІСЂРµРјРµРЅРё.
+          Р­С‚Рѕ РїРѕР·РІРѕР»СЏРµС‚ С‚РµСЃС‚РёСЂРѕРІР°С‚СЊ СЂР°Р·Р»РёС‡РЅС‹Рµ РїСЂРѕС‚РѕРєРѕР»С‹, РґРѕР±Р°РІРєРё РёР»Рё РёР·РјРµРЅРµРЅРёСЏ РѕР±СЂР°Р·Р° Р¶РёР·РЅРё РґРѕ РёС… СЂРµР°Р»РёР·Р°С†РёРё.
         </p>
         <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
           <button onClick={handleCalculateRisks} className="btn">
-            Пересчитать риски
+            РџРµСЂРµСЃС‡РёС‚Р°С‚СЊ СЂРёСЃРєРё
           </button>
           <button
             onClick={() => handleScenarioChange('Baseline')}
             className="btn secondary"
           >
-            Сбросить к базовому
+            РЎР±СЂРѕСЃРёС‚СЊ Рє Р±Р°Р·РѕРІРѕРјСѓ
           </button>
         </div>
       </div>
 
       <div className="card">
-        <h3>Прогноз готовности (7 дней)</h3>
-        <p style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 8 }}>Модель Хольта: прогноз на основе последних данных готовности.</p>
+        <h3>РџСЂРѕРіРЅРѕР· РіРѕС‚РѕРІРЅРѕСЃС‚Рё (7 РґРЅРµР№)</h3>
+        <p style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 8 }}>РњРѕРґРµР»СЊ РҐРѕР»СЊС‚Р°: РїСЂРѕРіРЅРѕР· РЅР° РѕСЃРЅРѕРІРµ РїРѕСЃР»РµРґРЅРёС… РґР°РЅРЅС‹С… РіРѕС‚РѕРІРЅРѕСЃС‚Рё.</p>
         <ReadinessForecastBlock initialHistory={readiness ? [readiness.recovery] : undefined} />
       </div>
 
       <div className="card">
-        <h3>Тренд лабораторных показателей</h3>
-        <p style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 8 }}>Прогноз по данным анализов (HCT, АЛТ, и др.).</p>
+        <h3>РўСЂРµРЅРґ Р»Р°Р±РѕСЂР°С‚РѕСЂРЅС‹С… РїРѕРєР°Р·Р°С‚РµР»РµР№</h3>
+        <p style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 8 }}>РџСЂРѕРіРЅРѕР· РїРѕ РґР°РЅРЅС‹Рј Р°РЅР°Р»РёР·РѕРІ (HCT, РђР›Рў, Рё РґСЂ.).</p>
         <LabTrendBlock initialPoints={labs.length > 0 ? labs.slice(-7).map(l => l.value) : undefined} />
       </div>
     </div>
@@ -362,15 +362,15 @@ const ReadinessForecastBlock: React.FC<{ initialHistory?: number[] }> = ({ initi
           <input key={i} type="number" value={v} onChange={e => { const h = [...history]; h[i] = +e.target.value; setHistory(h); }} style={{ width: 48, padding: '4px 6px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', fontSize: 12, textAlign: 'center' }} />
         ))}
       </div>
-      <button onClick={calc} style={{ background: 'var(--accent-blue)', color: '#fff', border: 'none', borderRadius: 8, padding: '6px 14px', fontSize: 12, cursor: 'pointer' }}>Рассчитать прогноз</button>
+      <button onClick={calc} style={{ background: 'var(--accent-blue)', color: '#fff', border: 'none', borderRadius: 8, padding: '6px 14px', fontSize: 12, cursor: 'pointer' }}>Р Р°СЃСЃС‡РёС‚Р°С‚СЊ РїСЂРѕРіРЅРѕР·</button>
       {forecast && (
         <div style={{ marginTop: 10 }}>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             {forecast.values.map((v, i) => (
               <div key={i} style={{ background: 'var(--bg-secondary)', borderRadius: 6, padding: '6px 10px', textAlign: 'center', minWidth: 48 }}>
                 <div style={{ fontSize: 15, fontWeight: 700 }}>{v}</div>
-                <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Д+{i + 1}</div>
-                <div style={{ fontSize: 8, color: 'var(--text-dim)' }}>[{forecast.ci95[i][0]}–{forecast.ci95[i][1]}]</div>
+                <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Р”+{i + 1}</div>
+                <div style={{ fontSize: 8, color: 'var(--text-dim)' }}>[{forecast.ci95[i][0]}вЂ“{forecast.ci95[i][1]}]</div>
               </div>
             ))}
           </div>
@@ -396,29 +396,29 @@ const LabTrendBlock: React.FC<{ initialPoints?: number[] }> = ({ initialPoints }
           <input key={i} type="number" value={v} onChange={e => { const p = [...points]; p[i] = +e.target.value; setPoints(p); }} style={{ width: 48, padding: '4px 6px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', fontSize: 12, textAlign: 'center' }} />
         ))}
       </div>
-      <button onClick={calc} style={{ background: 'var(--accent-blue)', color: '#fff', border: 'none', borderRadius: 8, padding: '6px 14px', fontSize: 12, cursor: 'pointer' }}>Спрогнозировать тренд</button>
+      <button onClick={calc} style={{ background: 'var(--accent-blue)', color: '#fff', border: 'none', borderRadius: 8, padding: '6px 14px', fontSize: 12, cursor: 'pointer' }}>РЎРїСЂРѕРіРЅРѕР·РёСЂРѕРІР°С‚СЊ С‚СЂРµРЅРґ</button>
       {forecast && (
         <div style={{ marginTop: 10 }}>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
             <div style={{ background: 'var(--bg-secondary)', borderRadius: 6, padding: '6px 10px', textAlign: 'center' }}>
               <div style={{ fontSize: 14, fontWeight: 700 }}>{forecast.current}</div>
-              <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Сейчас</div>
+              <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>РЎРµР№С‡Р°СЃ</div>
             </div>
             <div style={{ background: 'var(--bg-secondary)', borderRadius: 6, padding: '6px 10px', textAlign: 'center' }}>
               <div style={{ fontSize: 14, fontWeight: 700 }}>{forecast.w4}</div>
-              <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>4 нед</div>
+              <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>4 РЅРµРґ</div>
             </div>
             <div style={{ background: 'var(--bg-secondary)', borderRadius: 6, padding: '6px 10px', textAlign: 'center' }}>
               <div style={{ fontSize: 14, fontWeight: 700 }}>{forecast.w8}</div>
-              <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>8 нед</div>
+              <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>8 РЅРµРґ</div>
             </div>
             <div style={{ background: 'var(--bg-secondary)', borderRadius: 6, padding: '6px 10px', textAlign: 'center' }}>
               <div style={{ fontSize: 14, fontWeight: 700 }}>{forecast.w12}</div>
-              <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>12 нед</div>
+              <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>12 РЅРµРґ</div>
             </div>
           </div>
           {forecast.alert && <div style={{ fontSize: 11, color: '#ef4444', marginTop: 6 }}>{forecast.alert}</div>}
-          <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 4 }}>95% CI через 4 нед: [{forecast.ci95w4[0]}–{forecast.ci95w4[1]}] | 12 нед: [{forecast.ci95w12[0]}–{forecast.ci95w12[1]}]</div>
+          <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 4 }}>95% CI С‡РµСЂРµР· 4 РЅРµРґ: [{forecast.ci95w4[0]}вЂ“{forecast.ci95w4[1]}] | 12 РЅРµРґ: [{forecast.ci95w12[0]}вЂ“{forecast.ci95w12[1]}]</div>
         </div>
       )}
     </div>

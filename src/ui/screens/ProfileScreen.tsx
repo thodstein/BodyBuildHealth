@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+﻿import React, { useEffect, useState } from 'react';
 import type { UserProfile, InjuryRecord, SupplementEntry, MedicationEntry, LabPoint } from '../../core/types';
 import { getProfile, updateProfile, useProfileRefresh } from '../../core/profile-manager';
 import { db } from '../../core/db';
@@ -10,10 +10,10 @@ import { NAVY_BF_FORMULAS, MUSCLE_GROUPS_FULL, INJURY_LOCATIONS } from '../../co
 type ProfileTab = 'overview' | 'anthropometry' | 'sleep' | 'lifestyle' | 'diet' | 'nutrition_v7' | 'genetics' | 'injuries' | 'progress';
 
 const GOALS = [
-  { id: 'bulk', label: 'Набор массы' }, { id: 'cut', label: 'Сушка' },
-  { id: 'maintenance', label: 'Поддержание' }, { id: 'strength', label: 'Сила' },
-  { id: 'hypertrophy', label: 'Гипертрофия' }, { id: 'rehab', label: 'Реабилитация' },
-  { id: 'recomposition', label: 'Рекомпозиция' }, { id: 'health', label: 'Здоровье' }
+  { id: 'bulk', label: '' }, { id: 'cut', label: '' },
+  { id: 'maintenance', label: '' }, { id: 'strength', label: '' },
+  { id: 'hypertrophy', label: '' }, { id: 'rehab', label: '' },
+  { id: 'recomposition', label: '' }, { id: 'health', label: '' }
 ] as const;
 
 const WEIGHT_LOG_KEY = 'he_weight_log';
@@ -26,73 +26,73 @@ function saveWeightLog(log: WeightEntry[]) {
 }
 
 const DIET_TYPES = [
-  { id: 'omnivore', label: 'Всеядное', icon: '🍽️' },
-  { id: 'vegetarian', label: 'Вегетарианское', icon: '🥬' },
-  { id: 'vegan', label: 'Веганское', icon: '🌱' },
-  { id: 'pescatarian', label: 'Пескетарианское', icon: '🐟' },
-  { id: 'keto', label: 'Кето', icon: '🥑' },
-  { id: 'paleo', label: 'Палео', icon: '🥩' },
-  { id: 'mediterranean', label: 'Средиземноморское', icon: '🫒' },
+  { id: 'omnivore', label: '', icon: '' },
+  { id: 'vegetarian', label: '', icon: '' },
+  { id: 'vegan', label: '', icon: '' },
+  { id: 'pescatarian', label: '', icon: '' },
+  { id: 'keto', label: '', icon: '' },
+  { id: 'paleo', label: '', icon: '' },
+  { id: 'mediterranean', label: '', icon: '' },
 ] as const;
 
 const ALLERGEN_OPTIONS = [
-  { id: 'dairy', label: 'Молочные продукты' },
-  { id: 'gluten', label: 'Глютен' },
-  { id: 'soy', label: 'Соя' },
-  { id: 'eggs', label: 'Яйца' },
-  { id: 'fish', label: 'Рыба' },
-  { id: 'shellfish', label: 'Моллюски' },
-  { id: 'tree_nuts', label: 'Орехи' },
-  { id: 'peanuts', label: 'Арахис' },
+  { id: 'dairy', label: '' },
+  { id: 'gluten', label: '' },
+  { id: 'soy', label: '' },
+  { id: 'eggs', label: '' },
+  { id: 'fish', label: '' },
+  { id: 'shellfish', label: '' },
+  { id: 'tree_nuts', label: '' },
+  { id: 'peanuts', label: '' },
 ];
 
 const INTOLERANCE_OPTIONS = [
-  { id: 'lactose', label: 'Лактоза' },
-  { id: 'fructose', label: 'Фруктоза' },
-  { id: 'histamine', label: 'Гистамин' },
-  { id: 'sorbitol', label: 'Сорбитол' },
+  { id: 'lactose', label: '' },
+  { id: 'fructose', label: '' },
+  { id: 'histamine', label: '' },
+  { id: 'sorbitol', label: '' },
 ];
 
 const COOKING_SKILLS = [
-  { id: 'none', label: 'Не готовлю' },
-  { id: 'basic', label: 'Базовые навыки' },
-  { id: 'intermediate', label: 'Средний уровень' },
-  { id: 'advanced', label: 'Продвинутый' },
+  { id: 'none', label: '' },
+  { id: 'basic', label: '' },
+  { id: 'intermediate', label: '' },
+  { id: 'advanced', label: '' },
 ] as const;
 
 const TRAINING_LEVELS = [
-  { id: 'beginner', label: 'Новичок' }, { id: 'intermediate', label: 'Средний' },
-  { id: 'advanced', label: 'Продвинутый' }, { id: 'enhanced', label: 'Усиленный' }
+  { id: 'beginner', label: '' }, { id: 'intermediate', label: '' },
+  { id: 'advanced', label: '' }, { id: 'enhanced', label: '' }
 ] as const;
 
 const PHARMA_EXPERIENCE = [
-  { id: 'none', label: 'Нет' }, { id: 'beginner', label: 'Новичок' },
-  { id: 'intermediate', label: 'Средний' }, { id: 'advanced', label: 'Опытный' }
+  { id: 'none', label: '' }, { id: 'beginner', label: '' },
+  { id: 'intermediate', label: '' }, { id: 'advanced', label: '' }
 ] as const;
 
 const CHRONOTYPES = [
-  { id: 'lark', label: 'Жаворонок' }, { id: 'owl', label: 'Сова' }, { id: 'mixed', label: 'Смешанный' }
+  { id: 'lark', label: '' }, { id: 'owl', label: '' }, { id: 'mixed', label: '' }
 ] as const;
 
 const COURSE_PHASES = [
-  { id: 'baseline', label: 'Базовый' },
-  { id: 'course', label: 'Курс' },
-  { id: 'course-bridge-course', label: 'Курс-Мост-Курс' },
-  { id: 'bridge', label: 'Мост' },
-  { id: 'pct', label: 'ПКТ' },
-  { id: 'post_pct', label: 'После ПКТ' },
-  { id: 'fertility', label: 'Фертильность' },
+  { id: 'baseline', label: '' },
+  { id: 'course', label: '' },
+  { id: 'course-bridge-course', label: '' },
+  { id: 'bridge', label: '' },
+  { id: 'pct', label: '' },
+  { id: 'post_pct', label: '' },
+  { id: 'fertility', label: '' },
 ] as const;
 
 const INJURY_TYPES: { id: InjuryRecord['type']; label: string }[] = [
-  { id: 'joint', label: 'Сустав' }, { id: 'muscle', label: 'Мышца' }, { id: 'bone', label: 'Кость' },
-  { id: 'ligament', label: 'Связка' }, { id: 'tendon', label: 'Сухожилие' }, { id: 'nerve', label: 'Нерв' }
+  { id: 'joint', label: '' }, { id: 'muscle', label: '' }, { id: 'bone', label: '' },
+  { id: 'ligament', label: '' }, { id: 'tendon', label: '' }, { id: 'nerve', label: '' }
 ];
 
 const MOVEMENT_LIMITS: { id: InjuryRecord['movementLimit']; label: string }[] = [
-  { id: 'none', label: 'Нет' }, { id: 'mild', label: 'Лёгкое' },
-  { id: 'moderate', label: 'Умеренное' }, { id: 'severe', label: 'Сильное' },
-  { id: 'full_restriction', label: 'Полное ограничение' }
+  { id: 'none', label: '' }, { id: 'mild', label: '' },
+  { id: 'moderate', label: '' }, { id: 'severe', label: '' },
+  { id: 'full_restriction', label: '' }
 ];
 
 const s: Record<string, React.CSSProperties> = {
@@ -139,7 +139,7 @@ export const ProfileScreen: React.FC = () => {
   const labIndexText = labIndices ? interpretLabIndices(labIndices) : null;
 
   const bmi = s_.height && s_.weight ? (s_.weight / Math.pow(s_.height / 100, 2)).toFixed(1) : null;
-  const bmiText = bmi ? `${bmi} кг/м²` : 'Нет данных';
+  const bmiText = bmi ? `${bmi} РєРі/РјВІ` : '';
   const lbm = s_.weight && s_.bodyFat ? (s_.weight * (1 - s_.bodyFat / 100)).toFixed(1) : null;
   const navyBf = (() => {
     if (!s_.waistCm || !s_.neckCm || !s_.height) return null;
@@ -153,7 +153,7 @@ export const ProfileScreen: React.FC = () => {
     }
     return null;
   })();
-  const navyBfText = navyBf ? `${navyBf}%` : 'Нет данных';
+  const navyBfText = navyBf ? `${navyBf}%` : '';
 
   useEffect(() => {
     const load = async () => {
@@ -173,7 +173,7 @@ export const ProfileScreen: React.FC = () => {
   };
 
   const addInjury = () => {
-    const newInj: InjuryRecord = { id: crypto.randomUUID(), type: 'muscle', location: 'Колено', painLevel: 3, movementLimit: 'none', side: 'left', chronic: false, date: new Date().toISOString().slice(0, 10) };
+    const newInj: InjuryRecord = { id: crypto.randomUUID(), type: 'muscle', location: '', painLevel: 3, movementLimit: 'none', side: 'left', chronic: false, date: new Date().toISOString().slice(0, 10) };
     setEditInjury(newInj);
   };
 
@@ -195,9 +195,9 @@ export const ProfileScreen: React.FC = () => {
   };
 
   const tabs: { id: ProfileTab; label: string }[] = [
-    { id: 'overview', label: 'Обзор' }, { id: 'anthropometry', label: 'Антропометрия' },
-    { id: 'sleep', label: 'Сон' }, { id: 'lifestyle', label: 'Образ жизни' },
-    { id: 'diet', label: 'Питание' }, { id: 'injuries', label: 'Травмы' }, { id: 'progress', label: 'Прогресс' }
+    { id: 'overview', label: '' }, { id: 'anthropometry', label: '' },
+    { id: 'sleep', label: '' }, { id: 'lifestyle', label: '' },
+    { id: 'diet', label: '' }, { id: 'injuries', label: '' }, { id: 'progress', label: '' }
   ];
 
   return (
@@ -212,13 +212,13 @@ export const ProfileScreen: React.FC = () => {
         <>
           {readinessScores && (
             <div style={s.card}>
-              <h4 style={{ margin: '0 0 8px' }}>Оценка готовности</h4>
+              <h4 style={{ margin: '0 0 8px' }}>РћС†РµРЅРєР° РіРѕС‚РѕРІРЅРѕСЃС‚Рё</h4>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 8, textAlign: 'center' }}>
                 {[
-                  { label: 'Восстановление', value: readinessScores.recovery, good: 60 },
-                  { label: 'Питание', value: readinessScores.nutrition, good: 60 },
-                  { label: 'Поддержка', value: readinessScores.support, good: 60 },
-                  { label: 'Усталость', value: readinessScores.fatigue, good: 40, invert: true },
+                  { label: '', value: readinessScores.recovery, good: 60 },
+                  { label: '', value: readinessScores.nutrition, good: 60 },
+                  { label: '', value: readinessScores.support, good: 60 },
+                  { label: '', value: readinessScores.fatigue, good: 40, invert: true },
                 ].map(m => (
                   <div key={m.label}>
                     <div style={{ fontSize: 20, fontWeight: 700, color: m.invert ? (m.value <= m.good ? '#00e68a' : m.value <= 60 ? '#ff9800' : '#f44336') : (m.value >= m.good ? '#00e68a' : m.value >= 40 ? '#ff9800' : '#f44336') }}>{m.value}</div>
@@ -229,45 +229,45 @@ export const ProfileScreen: React.FC = () => {
             </div>
           )}
           <div style={s.card}>
-            <h4 style={{ margin: '0 0 8px' }}>Фаза курса</h4>
+            <h4 style={{ margin: '0 0 8px' }}>Р¤Р°Р·Р° РєСѓСЂСЃР°</h4>
             <div style={s.btnGroup}>
               {COURSE_PHASES.map(p => <button key={p.id} style={(s_.phase ?? 'baseline') === p.id ? s.btnActive : s.btn} onClick={() => save({ phase: p.id })}>{p.label}</button>)}
             </div>
             {s_.courseStartDate && (
               <div style={{ marginTop: 6 }}>
-                <span style={s.label}>Дата начала курса</span>
+                <span style={s.label}>Р”Р°С‚Р° РЅР°С‡Р°Р»Р° РєСѓСЂСЃР°</span>
                 <input style={s.input} type="date" value={s_.courseStartDate} onChange={e => save({ courseStartDate: e.target.value })} />
               </div>
             )}
             {!s_.courseStartDate && s_.phase && s_.phase !== 'baseline' && (
-              <button style={{ ...s.btn, marginTop: 6 }} onClick={() => save({ courseStartDate: new Date().toISOString().slice(0, 10) })}>Указать дату начала</button>
+              <button style={{ ...s.btn, marginTop: 6 }} onClick={() => save({ courseStartDate: new Date().toISOString().slice(0, 10) })}>РЈРєР°Р·Р°С‚СЊ РґР°С‚Сѓ РЅР°С‡Р°Р»Р°</button>
             )}
           </div>
           <div style={s.card}>
-            <h4 style={{ margin: '0 0 8px' }}>Основная информация</h4>
+            <h4 style={{ margin: '0 0 8px' }}>РћСЃРЅРѕРІРЅР°СЏ РёРЅС„РѕСЂРјР°С†РёСЏ</h4>
             <div style={s.row}>
-              <div><span style={s.label}>Имя</span><input style={s.input} value={profile.name} onChange={e => updateProfile({ name: e.target.value })} placeholder="Имя" /></div>
+              <div><span style={s.label}>РРјСЏ</span><input style={s.input} value={profile.name} onChange={e => updateProfile({ name: e.target.value })} placeholder="" /></div>
               <div><span style={s.label}>Email</span><input style={s.input} value={s_.email ?? ''} disabled placeholder="Email" /></div>
             </div>
             <div style={s.row}>
-              <div><span style={s.label}>Возраст</span><input style={s.input} type="number" value={s_.age ?? ''} onChange={e => save({ age: +e.target.value })} placeholder="30" /></div>
-              <div><span style={s.label}>Пол</span>
+              <div><span style={s.label}>Р’РѕР·СЂР°СЃС‚</span><input style={s.input} type="number" value={s_.age ?? ''} onChange={e => save({ age: +e.target.value })} placeholder="30" /></div>
+              <div><span style={s.label}>РџРѕР»</span>
                 <div style={s.btnGroup}>
-                  <button style={s_.sex === 'male' ? s.btnActive : s.btn} onClick={() => save({ sex: 'male' })}>Муж</button>
-                  <button style={s_.sex === 'female' ? s.btnActive : s.btn} onClick={() => save({ sex: 'female' })}>Жен</button>
+                  <button style={s_.sex === 'male' ? s.btnActive : s.btn} onClick={() => save({ sex: 'male' })}>РњСѓР¶</button>
+                  <button style={s_.sex === 'female' ? s.btnActive : s.btn} onClick={() => save({ sex: 'female' })}>Р–РµРЅ</button>
                 </div>
               </div>
             </div>
           </div>
           {clinicalIndices && (
             <div style={s.card}>
-              <h4 style={{ margin: '0 0 8px' }}>Клинические индексы</h4>
+              <h4 style={{ margin: '0 0 8px' }}>РљР»РёРЅРёС‡РµСЃРєРёРµ РёРЅРґРµРєСЃС‹</h4>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, textAlign: 'center' }}>
                 {[
-                  { n: 'HOMA-IR', v: clinicalIndices.homaIR.value, l: clinicalIndices.homaIR.status === 'normal' ? 'Норма' : 'ИР' },
-                  { n: 'eGFR', v: clinicalIndices.egfr.value, l: clinicalIndices.egfr.status === 'normal' ? 'Норма' : `Ст.${clinicalIndices.egfr.status.toUpperCase()}` },
-                  { n: 'LDL/HDL', v: clinicalIndices.ldlHdlRatio.value, l: clinicalIndices.ldlHdlRatio.status === 'optimal' ? 'Оптим.' : 'Повышен' },
-                  { n: 'De Ritis', v: clinicalIndices.deritis.value, l: clinicalIndices.deritis.status === 'normal' ? 'Норма' : 'Патология' },
+                  { n: 'HOMA-IR', v: clinicalIndices.homaIR.value, l: clinicalIndices.homaIR.status === 'normal' ? '' : '' },
+                  { n: 'eGFR', v: clinicalIndices.egfr.value, l: clinicalIndices.egfr.status === 'normal' ? '' : `` },
+                  { n: 'LDL/HDL', v: clinicalIndices.ldlHdlRatio.value, l: clinicalIndices.ldlHdlRatio.status === 'optimal' ? '' : '' },
+                  { n: 'De Ritis', v: clinicalIndices.deritis.value, l: clinicalIndices.deritis.status === 'normal' ? '' : '' },
                 ].map(i => <div key={i.n}><div style={{ fontSize: 18, fontWeight: 700 }}>{i.v}</div><div style={{ fontSize: 11 }}>{i.n}</div><div style={{ fontSize: 10, opacity: 0.6 }}>{i.l}</div></div>)}
               </div>
             </div>
@@ -278,31 +278,31 @@ export const ProfileScreen: React.FC = () => {
       {tab === 'anthropometry' && (
         <>
           <div style={s.card}>
-            <h4 style={{ margin: '0 0 8px' }}>Основные параметры</h4>
+            <h4 style={{ margin: '0 0 8px' }}>РћСЃРЅРѕРІРЅС‹Рµ РїР°СЂР°РјРµС‚СЂС‹</h4>
             <div style={s.row}>
-              <div><span style={s.label}>Рост (см)</span><input style={s.input} type="number" value={s_.height ?? ''} onChange={e => save({ height: +e.target.value })} /></div>
-              <div><span style={s.label}>Вес (кг)</span><input style={s.input} type="number" step="0.1" value={s_.weight} onChange={e => save({ weight: +e.target.value })} /></div>
+              <div><span style={s.label}>Р РѕСЃС‚ (СЃРј)</span><input style={s.input} type="number" value={s_.height ?? ''} onChange={e => save({ height: +e.target.value })} /></div>
+              <div><span style={s.label}>Р’РµСЃ (РєРі)</span><input style={s.input} type="number" step="0.1" value={s_.weight} onChange={e => save({ weight: +e.target.value })} /></div>
             </div>
             <div style={s.row}>
-              <div><span style={s.label}>% жира (ручной)</span><input style={s.input} type="number" step="0.1" value={s_.bodyFat ?? ''} onChange={e => save({ bodyFat: e.target.value ? +e.target.value : undefined })} placeholder="Optional" /></div>
-              <div><span style={s.label}>Пол</span>
+              <div><span style={s.label}>% Р¶РёСЂР° (СЂСѓС‡РЅРѕР№)</span><input style={s.input} type="number" step="0.1" value={s_.bodyFat ?? ''} onChange={e => save({ bodyFat: e.target.value ? +e.target.value : undefined })} placeholder="Optional" /></div>
+              <div><span style={s.label}>РџРѕР»</span>
                 <div style={s.btnGroup}>
-                  <button style={s_.sex === 'male' ? s.btnActive : s.btn} onClick={() => save({ sex: 'male' })}>М</button>
-                  <button style={s_.sex === 'female' ? s.btnActive : s.btn} onClick={() => save({ sex: 'female' })}>Ж</button>
+                  <button style={s_.sex === 'male' ? s.btnActive : s.btn} onClick={() => save({ sex: 'male' })}>Рњ</button>
+                  <button style={s_.sex === 'female' ? s.btnActive : s.btn} onClick={() => save({ sex: 'female' })}>Р–</button>
                 </div>
               </div>
             </div>
-            {bmi && <div style={s.computed}>BMI: {bmiText} - {parseFloat(bmi) < 18.5 ? 'Недостаток' : parseFloat(bmi) < 25 ? 'Норма' : parseFloat(bmi) < 30 ? 'Избыток' : 'Ожирение'}</div>}
-            {lbm && <div style={s.computed}>LBM (сухая масса): {lbm} кг</div>}
-            {navyBf && <div style={s.computed}>Navy BF%: {navyBfText} - {parseFloat(navyBf) < 6 ? 'Слишком низко' : parseFloat(navyBf) < 18 ? 'Норма' : parseFloat(navyBf) < 25 ? 'Высоко' : 'Очень высоко'}</div>}
+            {bmi && <div style={s.computed}>BMI: {bmiText} - {parseFloat(bmi) < 18.5 ? '' : parseFloat(bmi) < 25 ? '' : parseFloat(bmi) < 30 ? '' : ''}</div>}
+            {lbm && <div style={s.computed}>LBM (СЃСѓС…Р°СЏ РјР°СЃСЃР°): {lbm} РєРі</div>}
+            {navyBf && <div style={s.computed}>Navy BF%: {navyBfText} - {parseFloat(navyBf) < 6 ? '' : parseFloat(navyBf) < 18 ? '' : parseFloat(navyBf) < 25 ? '' : ''}</div>}
           </div>
           <div style={s.card}>
-            <h4 style={{ margin: '0 0 8px' }}>Обхваты (см)</h4>
+            <h4 style={{ margin: '0 0 8px' }}>РћР±С…РІР°С‚С‹ (СЃРј)</h4>
             <div style={s.row3}>
               {[
-                { k: 'waistCm', l: 'Талия' }, { k: 'neckCm', l: 'Шея' }, { k: 'chestCm', l: 'Грудь' },
-                { k: 'hipCm', l: 'Бедро (таз)' }, { k: 'forearmCm', l: 'Предплечье' }, { k: 'bicepCm', l: 'Бицепс' },
-                { k: 'thighCm', l: 'Бедро верх' }
+                { k: 'waistCm', l: '' }, { k: 'neckCm', l: '' }, { k: 'chestCm', l: '' },
+                { k: 'hipCm', l: '' }, { k: 'forearmCm', l: '' }, { k: 'bicepCm', l: '' },
+                { k: 'thighCm', l: '' }
               ].map(c => (
                 <div key={c.k}>
                   <span style={s.label}>{c.l}</span>
@@ -313,7 +313,7 @@ export const ProfileScreen: React.FC = () => {
           </div>
           {weightLog.length > 1 && (
             <div style={s.card}>
-              <h4 style={{ margin: '0 0 8px' }}>История веса ({weightLog.length} записей)</h4>
+              <h4 style={{ margin: '0 0 8px' }}>РСЃС‚РѕСЂРёСЏ РІРµСЃР° ({weightLog.length} Р·Р°РїРёСЃРµР№)</h4>
               <div style={{ display: 'flex', gap: 2, height: 50, alignItems: 'flex-end' }}>
                 {weightLog.slice(-30).map((e, i) => {
                   const minW = Math.min(...weightLog.map(w => w.weight));
@@ -323,7 +323,7 @@ export const ProfileScreen: React.FC = () => {
                   const isLast = i === weightLog.slice(-30).length - 1;
                   return (
                     <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}
-                      title={`${e.date}: ${e.weight} кг`}>
+                      title={`${e.date}: ${e.weight} РєРі`}>
                       <div style={{ width: '70%', height: `${h}%`, background: isLast ? 'var(--accent)' : 'rgba(0,230,138,0.3)', borderRadius: '1px 1px 0 0', minHeight: 2 }} />
                       {i % 7 === 0 && <span style={{ fontSize: 6, color: 'var(--text-dim)' }}>{e.date.slice(5)}</span>}
                     </div>
@@ -331,9 +331,9 @@ export const ProfileScreen: React.FC = () => {
                 })}
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: 'var(--text-dim)', marginTop: 2 }}>
-                <span>Мин: {Math.min(...weightLog.map(w => w.weight)).toFixed(1)} кг</span>
-                <span>Текущий: {weightLog[weightLog.length - 1]?.weight?.toFixed(1)} кг</span>
-                <span>Макс: {Math.max(...weightLog.map(w => w.weight)).toFixed(1)} кг</span>
+                <span>РњРёРЅ: {Math.min(...weightLog.map(w => w.weight)).toFixed(1)} РєРі</span>
+                <span>РўРµРєСѓС‰РёР№: {weightLog[weightLog.length - 1]?.weight?.toFixed(1)} РєРі</span>
+                <span>РњР°РєСЃ: {Math.max(...weightLog.map(w => w.weight)).toFixed(1)} РєРі</span>
               </div>
             </div>
           )}
@@ -342,25 +342,25 @@ export const ProfileScreen: React.FC = () => {
 
       {tab === 'sleep' && (
         <div style={s.card}>
-          <h4 style={{ margin: '0 0 8px' }}>Параметры сна</h4>
+          <h4 style={{ margin: '0 0 8px' }}>РџР°СЂР°РјРµС‚СЂС‹ СЃРЅР°</h4>
           <div>
-            <span style={s.label}>Длительность сна: {s_.baselineSleepHours ?? 7} ч</span>
+            <span style={s.label}>Р”Р»РёС‚РµР»СЊРЅРѕСЃС‚СЊ СЃРЅР°: {s_.baselineSleepHours ?? 7} С‡</span>
             <input style={s.slider} type="range" min="0" max="12" step="0.5" value={s_.baselineSleepHours ?? 7} onChange={e => save({ baselineSleepHours: +e.target.value })} />
           </div>
           <div>
-            <span style={s.label}>Качество сна: {s_.baselineSleepQuality ?? 5}/10</span>
+            <span style={s.label}>РљР°С‡РµСЃС‚РІРѕ СЃРЅР°: {s_.baselineSleepQuality ?? 5}/10</span>
             <input style={s.slider} type="range" min="1" max="10" step="1" value={s_.baselineSleepQuality ?? 5} onChange={e => save({ baselineSleepQuality: +e.target.value })} />
           </div>
           <div>
-            <span style={s.label}>Пробуждения ночью: {s_.nightAwakenings ?? 1}</span>
+            <span style={s.label}>РџСЂРѕР±СѓР¶РґРµРЅРёСЏ РЅРѕС‡СЊСЋ: {s_.nightAwakenings ?? 1}</span>
             <input style={s.slider} type="range" min="0" max="10" step="1" value={s_.nightAwakenings ?? 1} onChange={e => save({ nightAwakenings: +e.target.value })} />
           </div>
           <div style={s.row}>
-            <div><span style={s.label}>Время засыпания</span><input style={s.input} type="time" value={s_.bedtime ?? '23:00'} onChange={e => save({ bedtime: e.target.value })} /></div>
-            <div><span style={s.label}>Время подъёма</span><input style={s.input} type="time" value={s_.wakeTime ?? '07:00'} onChange={e => save({ wakeTime: e.target.value })} /></div>
+            <div><span style={s.label}>Р’СЂРµРјСЏ Р·Р°СЃС‹РїР°РЅРёСЏ</span><input style={s.input} type="time" value={s_.bedtime ?? '23:00'} onChange={e => save({ bedtime: e.target.value })} /></div>
+            <div><span style={s.label}>Р’СЂРµРјСЏ РїРѕРґСЉС‘РјР°</span><input style={s.input} type="time" value={s_.wakeTime ?? '07:00'} onChange={e => save({ wakeTime: e.target.value })} /></div>
           </div>
           <div>
-            <span style={s.label}>Хронотип</span>
+            <span style={s.label}>РҐСЂРѕРЅРѕС‚РёРї</span>
             <div style={s.btnGroup}>
               {CHRONOTYPES.map(c => <button key={c.id} style={(s_.chronotype ?? 'mixed') === c.id ? s.btnActive : s.btn} onClick={() => save({ chronotype: c.id })}>{c.label}</button>)}
             </div>
@@ -371,54 +371,54 @@ export const ProfileScreen: React.FC = () => {
       {tab === 'lifestyle' && (
         <>
           <div style={s.card}>
-            <h4 style={{ margin: '0 0 8px' }}>Стресс и усталость</h4>
+            <h4 style={{ margin: '0 0 8px' }}>РЎС‚СЂРµСЃСЃ Рё СѓСЃС‚Р°Р»РѕСЃС‚СЊ</h4>
             <div>
-              <span style={s.label}>Стресс: {s_.baselineStressLevel ?? 3}/10</span>
+              <span style={s.label}>РЎС‚СЂРµСЃСЃ: {s_.baselineStressLevel ?? 3}/10</span>
               <input style={s.slider} type="range" min="1" max="10" value={s_.baselineStressLevel ?? 3} onChange={e => save({ baselineStressLevel: +e.target.value })} />
             </div>
             <div>
-              <span style={s.label}>Усталость: {s_.fatigueLevel ?? 3}/10</span>
+              <span style={s.label}>РЈСЃС‚Р°Р»РѕСЃС‚СЊ: {s_.fatigueLevel ?? 3}/10</span>
               <input style={s.slider} type="range" min="1" max="10" value={s_.fatigueLevel ?? 3} onChange={e => save({ fatigueLevel: +e.target.value })} />
             </div>
           </div>
           <div style={s.card}>
-            <h4 style={{ margin: '0 0 8px' }}>Активность</h4>
+            <h4 style={{ margin: '0 0 8px' }}>РђРєС‚РёРІРЅРѕСЃС‚СЊ</h4>
             <div>
-              <span style={s.label}>Шаги/день: {s_.dailySteps ?? 6000}</span>
+              <span style={s.label}>РЁР°РіРё/РґРµРЅСЊ: {s_.dailySteps ?? 6000}</span>
               <input style={s.slider} type="range" min="0" max="30000" step="500" value={s_.dailySteps ?? 6000} onChange={e => save({ dailySteps: +e.target.value })} />
             </div>
             <div>
-              <span style={s.label}>Вода/день (л): {s_.dailyWaterLiters ?? 2}</span>
+              <span style={s.label}>Р’РѕРґР°/РґРµРЅСЊ (Р»): {s_.dailyWaterLiters ?? 2}</span>
               <input style={s.slider} type="range" min="0" max="6" step="0.1" value={s_.dailyWaterLiters ?? 2} onChange={e => save({ dailyWaterLiters: +e.target.value })} />
             </div>
             <div style={s.row}>
-              <div><span style={s.label}>Тренировок/нед</span><input style={s.input} type="number" min="0" max="7" value={s_.workoutsPerWeek ?? 3} onChange={e => save({ workoutsPerWeek: +e.target.value })} /></div>
-              <div><span style={s.label}>Мин/тренировку</span><input style={s.input} type="number" min="15" max="180" value={s_.avgWorkoutMinutes ?? 60} onChange={e => save({ avgWorkoutMinutes: +e.target.value })} /></div>
+              <div><span style={s.label}>РўСЂРµРЅРёСЂРѕРІРѕРє/РЅРµРґ</span><input style={s.input} type="number" min="0" max="7" value={s_.workoutsPerWeek ?? 3} onChange={e => save({ workoutsPerWeek: +e.target.value })} /></div>
+              <div><span style={s.label}>РњРёРЅ/С‚СЂРµРЅРёСЂРѕРІРєСѓ</span><input style={s.input} type="number" min="15" max="180" value={s_.avgWorkoutMinutes ?? 60} onChange={e => save({ avgWorkoutMinutes: +e.target.value })} /></div>
             </div>
           </div>
           <div style={s.card}>
-            <h4 style={{ margin: '0 0 8px' }}>Уровни и опыт</h4>
+            <h4 style={{ margin: '0 0 8px' }}>РЈСЂРѕРІРЅРё Рё РѕРїС‹С‚</h4>
             <div>
-              <span style={s.label}>Тренировочный уровень</span>
+              <span style={s.label}>РўСЂРµРЅРёСЂРѕРІРѕС‡РЅС‹Р№ СѓСЂРѕРІРµРЅСЊ</span>
               <div style={s.btnGroup}>
                 {TRAINING_LEVELS.map(l => <button key={l.id} style={(s_.trainingLevel ?? 'intermediate') === l.id ? s.btnActive : s.btn} onClick={() => save({ trainingLevel: l.id as any })}>{l.label}</button>)}
               </div>
             </div>
             <div>
-              <span style={s.label}>Фармакологический опыт</span>
+              <span style={s.label}>Р¤Р°СЂРјР°РєРѕР»РѕРіРёС‡РµСЃРєРёР№ РѕРїС‹С‚</span>
               <div style={s.btnGroup}>
                 {PHARMA_EXPERIENCE.map(e => <button key={e.id} style={(s_.pharmaExperience ?? 'none') === e.id ? s.btnActive : s.btn} onClick={() => save({ pharmaExperience: e.id as any })}>{e.label}</button>)}
               </div>
             </div>
           </div>
           <div style={s.card}>
-            <h4 style={{ margin: '0 0 8px' }}>Цель</h4>
+            <h4 style={{ margin: '0 0 8px' }}>Р¦РµР»СЊ</h4>
             <div style={s.btnGroup}>
               {GOALS.map(g => <button key={g.id} style={(s_.primaryGoal ?? s_.goal ?? '') === g.id ? s.btnActive : s.btn} onClick={() => save({ primaryGoal: g.id as any, goal: g.id })}>{g.label}</button>)}
             </div>
           </div>
           <div style={s.card}>
-            <h4 style={{ margin: '0 0 8px' }}>Отстающие группы</h4>
+            <h4 style={{ margin: '0 0 8px' }}>РћС‚СЃС‚Р°СЋС‰РёРµ РіСЂСѓРїРїС‹</h4>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
               {MUSCLE_GROUPS_FULL.map(m => (
                 <button key={m.id} style={(s_.weakPoints ?? []).includes(m.id) ? s.chipActive : s.chip} onClick={() => toggleWeakPoint(m.id)}>{m.label}</button>
@@ -426,30 +426,30 @@ export const ProfileScreen: React.FC = () => {
             </div>
           </div>
           <div style={s.card}>
-            <h4 style={{ margin: '0 0 8px' }}>Принимаю: БАДы</h4>
+            <h4 style={{ margin: '0 0 8px' }}>РџСЂРёРЅРёРјР°СЋ: Р‘РђР”С‹</h4>
             {(s_.currentSupplements ?? []).map((sup, i) => (
               <div key={sup.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0', borderBottom: '1px solid var(--border)' }}>
-                <span style={{ flex: 1, fontSize: 13 }}>{sup.name} — {sup.doseMg} {sup.doseUnit}</span>
-                <button style={s.delBtn} onClick={() => save({ currentSupplements: (s_.currentSupplements ?? []).filter((_, j) => j !== i) })}>Удалить</button>
+                <span style={{ flex: 1, fontSize: 13 }}>{sup.name} вЂ” {sup.doseMg} {sup.doseUnit}</span>
+                <button style={s.delBtn} onClick={() => save({ currentSupplements: (s_.currentSupplements ?? []).filter((_, j) => j !== i) })}>РЈРґР°Р»РёС‚СЊ</button>
               </div>
             ))}
             <button style={{ ...s.btn, marginTop: 8 }} onClick={() => {
-              const ns: SupplementEntry = { id: crypto.randomUUID(), name: 'Новый БАД', doseMg: 0, doseUnit: 'mg' };
+              const ns: SupplementEntry = { id: crypto.randomUUID(), name: '', doseMg: 0, doseUnit: 'mg' };
               save({ currentSupplements: [...(s_.currentSupplements ?? []), ns] });
-            }}>+ Добавить БАД</button>
+            }}>+ Р”РѕР±Р°РІРёС‚СЊ Р‘РђР”</button>
           </div>
           <div style={s.card}>
-            <h4 style={{ margin: '0 0 8px' }}>Принимаю: Аптека</h4>
+            <h4 style={{ margin: '0 0 8px' }}>РџСЂРёРЅРёРјР°СЋ: РђРїС‚РµРєР°</h4>
             {(s_.currentMedications ?? []).map((med, i) => (
               <div key={med.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0', borderBottom: '1px solid var(--border)' }}>
-                <span style={{ flex: 1, fontSize: 13 }}>{med.name} — {med.doseMg} {med.doseUnit} ({med.frequency})</span>
-                <button style={s.delBtn} onClick={() => save({ currentMedications: (s_.currentMedications ?? []).filter((_, j) => j !== i) })}>Удалить</button>
+                <span style={{ flex: 1, fontSize: 13 }}>{med.name} вЂ” {med.doseMg} {med.doseUnit} ({med.frequency})</span>
+                <button style={s.delBtn} onClick={() => save({ currentMedications: (s_.currentMedications ?? []).filter((_, j) => j !== i) })}>РЈРґР°Р»РёС‚СЊ</button>
               </div>
             ))}
             <button style={{ ...s.btn, marginTop: 8 }} onClick={() => {
-              const nm: MedicationEntry = { id: crypto.randomUUID(), name: 'Новый препарат', doseMg: 0, doseUnit: 'mg', frequency: 'daily' };
+              const nm: MedicationEntry = { id: crypto.randomUUID(), name: '', doseMg: 0, doseUnit: 'mg', frequency: 'daily' };
               save({ currentMedications: [...(s_.currentMedications ?? []), nm] });
-            }}>+ Добавить препарат</button>
+            }}>+ Р”РѕР±Р°РІРёС‚СЊ РїСЂРµРїР°СЂР°С‚</button>
           </div>
          </>
       )}
@@ -457,7 +457,7 @@ export const ProfileScreen: React.FC = () => {
       {tab === 'diet' && (
         <div>
           <div className="card" style={{ marginBottom: 12 }}>
-            <h3 style={{ margin: '0 0 12px 0' }}>Тип питания</h3>
+            <h3 style={{ margin: '0 0 12px 0' }}>РўРёРї РїРёС‚Р°РЅРёСЏ</h3>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: 8 }}>
               {DIET_TYPES.map(dt => (
                 <button key={dt.id} onClick={() => save({ dietType: dt.id as any })} style={{
@@ -472,7 +472,7 @@ export const ProfileScreen: React.FC = () => {
           </div>
 
           <div className="card" style={{ marginBottom: 12 }}>
-            <h3 style={{ margin: '0 0 12px 0' }}>Пищевые аллергии</h3>
+            <h3 style={{ margin: '0 0 12px 0' }}>РџРёС‰РµРІС‹Рµ Р°Р»Р»РµСЂРіРёРё</h3>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
               {ALLERGEN_OPTIONS.map(a => {
                 const active = (s_.foodAllergies ?? []).includes(a.id);
@@ -494,7 +494,7 @@ export const ProfileScreen: React.FC = () => {
           </div>
 
           <div className="card" style={{ marginBottom: 12 }}>
-            <h3 style={{ margin: '0 0 12px 0' }}>Непереносимости</h3>
+            <h3 style={{ margin: '0 0 12px 0' }}>РќРµРїРµСЂРµРЅРѕСЃРёРјРѕСЃС‚Рё</h3>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
               {INTOLERANCE_OPTIONS.map(it => {
                 const active = (s_.foodIntolerances ?? []).includes(it.id);
@@ -516,7 +516,7 @@ export const ProfileScreen: React.FC = () => {
           </div>
 
           <div className="card" style={{ marginBottom: 12 }}>
-            <h3 style={{ margin: '0 0 12px 0' }}>Навыки готовки</h3>
+            <h3 style={{ margin: '0 0 12px 0' }}>РќР°РІС‹РєРё РіРѕС‚РѕРІРєРё</h3>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
               {COOKING_SKILLS.map(cs => (
                 <button key={cs.id} onClick={() => save({ cookingSkill: cs.id as any })} style={{
@@ -532,7 +532,7 @@ export const ProfileScreen: React.FC = () => {
           </div>
 
           <div className="card" style={{ marginBottom: 12 }}>
-            <h3 style={{ margin: '0 0 12px 0' }}>Приёмов пищи в день</h3>
+            <h3 style={{ margin: '0 0 12px 0' }}>РџСЂРёС‘РјРѕРІ РїРёС‰Рё РІ РґРµРЅСЊ</h3>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
               <input type="range" min={2} max={7} value={s_.mealsPerDay ?? 4} onChange={e => save({ mealsPerDay: parseInt(e.target.value) })} style={{ flex: 1, accentColor: '#00e68a' }} />
               <span style={{ fontSize: 18, fontWeight: 700, minWidth: 24, textAlign: 'center' }}>{s_.mealsPerDay ?? 4}</span>
@@ -542,7 +542,7 @@ export const ProfileScreen: React.FC = () => {
           {((s_.foodAllergies ?? []).length + (s_.foodIntolerances ?? []).length > 0 || s_.dietType) && (
             <div className="card" style={{ marginBottom: 12, borderColor: 'var(--accent-green, #00e68a)', borderWidth: 1 }}>
               <div style={{ fontSize: 12, color: 'var(--accent-green, #00e68a)', fontWeight: 600, marginBottom: 4 }}>
-                Активные ограничения
+                РђРєС‚РёРІРЅС‹Рµ РѕРіСЂР°РЅРёС‡РµРЅРёСЏ
               </div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
                 {s_.dietType && <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 4, background: 'rgba(0,230,138,0.1)', color: 'var(--accent-green, #00e68a)' }}>
@@ -567,95 +567,95 @@ export const ProfileScreen: React.FC = () => {
       {tab === 'nutrition_v7' && (
         <div>
           <div className="card" style={{ marginBottom: 12 }}>
-            <h3 style={{ margin: '0 0 12px 0' }}>🥩 Параметры питания V7</h3>
-            <p style={{ fontSize: 11, color: 'var(--text-dim)', margin: '0 0 12px 0' }}>Эти параметры используются V7 риск-движком для расчёта рисков. Укажите ваши реальные значения для точных расчётов.</p>
+            <h3 style={{ margin: '0 0 12px 0' }}>рџҐ© РџР°СЂР°РјРµС‚СЂС‹ РїРёС‚Р°РЅРёСЏ V7</h3>
+            <p style={{ fontSize: 11, color: 'var(--text-dim)', margin: '0 0 12px 0' }}>Р­С‚Рё РїР°СЂР°РјРµС‚СЂС‹ РёСЃРїРѕР»СЊР·СѓСЋС‚СЃСЏ V7 СЂРёСЃРє-РґРІРёР¶РєРѕРј РґР»СЏ СЂР°СЃС‡С‘С‚Р° СЂРёСЃРєРѕРІ. РЈРєР°Р¶РёС‚Рµ РІР°С€Рё СЂРµР°Р»СЊРЅС‹Рµ Р·РЅР°С‡РµРЅРёСЏ РґР»СЏ С‚РѕС‡РЅС‹С… СЂР°СЃС‡С‘С‚РѕРІ.</p>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}>
               <div>
-                <label style={{ fontSize: 12, opacity: 0.7, display: 'block', marginBottom: 4 }}>Белок, г/кг</label>
+                <label style={{ fontSize: 12, opacity: 0.7, display: 'block', marginBottom: 4 }}>Р‘РµР»РѕРє, Рі/РєРі</label>
                 <input style={s.input} type="number" step="0.1" min="0.5" max="4" value={s_.proteinPerKg ?? 1.8} onChange={e => save({ proteinPerKg: e.target.value ? +e.target.value : undefined })} placeholder="1.8" />
-                <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>Рекомендация: 1.6–2.2 г/кг</div>
+                <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>Р РµРєРѕРјРµРЅРґР°С†РёСЏ: 1.6вЂ“2.2 Рі/РєРі</div>
               </div>
               <div>
-                <label style={{ fontSize: 12, opacity: 0.7, display: 'block', marginBottom: 4 }}>Клетчатка, г/день</label>
+                <label style={{ fontSize: 12, opacity: 0.7, display: 'block', marginBottom: 4 }}>РљР»РµС‚С‡Р°С‚РєР°, Рі/РґРµРЅСЊ</label>
                 <input style={s.input} type="number" step="1" min="10" max="60" value={s_.fiberG ?? 25} onChange={e => save({ fiberG: e.target.value ? +e.target.value : undefined })} placeholder="25" />
-                <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>Рекомендация: 25–35 г/день</div>
+                <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>Р РµРєРѕРјРµРЅРґР°С†РёСЏ: 25вЂ“35 Рі/РґРµРЅСЊ</div>
               </div>
               <div>
-                <label style={{ fontSize: 12, opacity: 0.7, display: 'block', marginBottom: 4 }}>Омега-3, г/день</label>
+                <label style={{ fontSize: 12, opacity: 0.7, display: 'block', marginBottom: 4 }}>РћРјРµРіР°-3, Рі/РґРµРЅСЊ</label>
                 <input style={s.input} type="number" step="0.1" min="0" max="5" value={s_.omega3G ?? 1.5} onChange={e => save({ omega3G: e.target.value ? +e.target.value : undefined })} placeholder="1.5" />
-                <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>Рекомендация: 1.5–3 г EPA+DHA</div>
+                <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>Р РµРєРѕРјРµРЅРґР°С†РёСЏ: 1.5вЂ“3 Рі EPA+DHA</div>
               </div>
               <div>
-                <label style={{ fontSize: 12, opacity: 0.7, display: 'block', marginBottom: 4 }}>Натрий, г/день</label>
+                <label style={{ fontSize: 12, opacity: 0.7, display: 'block', marginBottom: 4 }}>РќР°С‚СЂРёР№, Рі/РґРµРЅСЊ</label>
                 <input style={s.input} type="number" step="0.1" min="0.5" max="8" value={s_.sodiumG ?? 3.5} onChange={e => save({ sodiumG: e.target.value ? +e.target.value : undefined })} placeholder="3.5" />
-                <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>Норма: 2.3–4 г/день</div>
+                <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>РќРѕСЂРјР°: 2.3вЂ“4 Рі/РґРµРЅСЊ</div>
               </div>
               <div>
-                <label style={{ fontSize: 12, opacity: 0.7, display: 'block', marginBottom: 4 }}>Калий, г/день</label>
+                <label style={{ fontSize: 12, opacity: 0.7, display: 'block', marginBottom: 4 }}>РљР°Р»РёР№, Рі/РґРµРЅСЊ</label>
                 <input style={s.input} type="number" step="0.1" min="1" max="6" value={s_.potassiumG ?? 3.0} onChange={e => save({ potassiumG: e.target.value ? +e.target.value : undefined })} placeholder="3.0" />
-                <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>Норма: 2.6–3.4 г/день</div>
+                <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>РќРѕСЂРјР°: 2.6вЂ“3.4 Рі/РґРµРЅСЊ</div>
               </div>
             </div>
           </div>
 
           <div className="card" style={{ marginBottom: 12 }}>
-            <h3 style={{ margin: '0 0 12px 0' }}>🍷 Образ жизни (V7)</h3>
+            <h3 style={{ margin: '0 0 12px 0' }}>рџЌ· РћР±СЂР°Р· Р¶РёР·РЅРё (V7)</h3>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}>
               <div>
-                <label style={{ fontSize: 12, opacity: 0.7, display: 'block', marginBottom: 4 }}>Алкоголь, доз/неделю</label>
+                <label style={{ fontSize: 12, opacity: 0.7, display: 'block', marginBottom: 4 }}>РђР»РєРѕРіРѕР»СЊ, РґРѕР·/РЅРµРґРµР»СЋ</label>
                 <input style={s.input} type="number" step="1" min="0" max="30" value={s_.alcoholPerWeek ?? 0} onChange={e => save({ alcoholPerWeek: e.target.value ? +e.target.value : undefined })} placeholder="0" />
               </div>
               <div>
-                <label style={{ fontSize: 12, opacity: 0.7, display: 'block', marginBottom: 4 }}>Уровень стресса (1-10)</label>
+                <label style={{ fontSize: 12, opacity: 0.7, display: 'block', marginBottom: 4 }}>РЈСЂРѕРІРµРЅСЊ СЃС‚СЂРµСЃСЃР° (1-10)</label>
                 <input style={s.input} type="number" step="1" min="1" max="10" value={s_.stressLevel ?? 5} onChange={e => save({ stressLevel: e.target.value ? +e.target.value : undefined })} placeholder="5" />
               </div>
               <div>
-                <label style={{ fontSize: 12, opacity: 0.7, display: 'block', marginBottom: 4 }}>Уровень активности (1-10)</label>
+                <label style={{ fontSize: 12, opacity: 0.7, display: 'block', marginBottom: 4 }}>РЈСЂРѕРІРµРЅСЊ Р°РєС‚РёРІРЅРѕСЃС‚Рё (1-10)</label>
                 <input style={s.input} type="number" step="1" min="1" max="10" value={s_.activityLevel ?? 5} onChange={e => save({ activityLevel: e.target.value ? +e.target.value : undefined })} placeholder="5" />
               </div>
               <div>
-                <label style={{ fontSize: 12, opacity: 0.7, display: 'block', marginBottom: 4 }}>Сон, часов/ночь</label>
+                <label style={{ fontSize: 12, opacity: 0.7, display: 'block', marginBottom: 4 }}>РЎРѕРЅ, С‡Р°СЃРѕРІ/РЅРѕС‡СЊ</label>
                 <input style={s.input} type="number" step="0.5" min="3" max="12" value={s_.sleepHours ?? s_.baselineSleepHours ?? 7} onChange={e => save({ sleepHours: e.target.value ? +e.target.value : undefined })} placeholder="7" />
               </div>
             </div>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
-              <label style={{ fontSize: 12, opacity: 0.7 }}>Курение</label>
+              <label style={{ fontSize: 12, opacity: 0.7 }}>РљСѓСЂРµРЅРёРµ</label>
               <button onClick={() => save({ smoke: !s_.smoke })} style={{
                 padding: '6px 14px', borderRadius: 8, fontSize: 12, cursor: 'pointer',
                 background: s_.smoke ? 'rgba(239,68,68,0.15)' : 'rgba(0,230,138,0.1)',
                 border: s_.smoke ? '1px solid #ef4444' : '1px solid #00e68a',
                 color: s_.smoke ? '#ef4444' : '#00e68a', fontWeight: 600,
               }}>
-                {s_.smoke ? '🚬 Да, курю' : '✅ Не курю'}
+                {s_.smoke ? '' : 'вњ… РќРµ РєСѓСЂСЋ'}
               </button>
             </div>
           </div>
 
           <div className="card" style={{ marginBottom: 12 }}>
-            <h3 style={{ margin: '0 0 12px 0' }}>🏋️ Тренировочные параметры (V7)</h3>
+            <h3 style={{ margin: '0 0 12px 0' }}>рџЏ‹пёЏ РўСЂРµРЅРёСЂРѕРІРѕС‡РЅС‹Рµ РїР°СЂР°РјРµС‚СЂС‹ (V7)</h3>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}>
               <div>
-                <label style={{ fontSize: 12, opacity: 0.7, display: 'block', marginBottom: 4 }}>Включает HIIT</label>
+                <label style={{ fontSize: 12, opacity: 0.7, display: 'block', marginBottom: 4 }}>Р’РєР»СЋС‡Р°РµС‚ HIIT</label>
                 <button onClick={() => save({ hasHIIT: !s_.hasHIIT })} style={{
                   padding: '6px 14px', borderRadius: 8, fontSize: 12, cursor: 'pointer',
                   background: s_.hasHIIT ? 'rgba(0,230,138,0.15)' : 'var(--bg-primary)',
                   border: s_.hasHIIT ? '1px solid #00e68a' : '1px solid var(--border)',
                   color: s_.hasHIIT ? '#00e68a' : 'var(--text-dim)', fontWeight: 600,
                 }}>
-                  {s_.hasHIIT ? '✅ Да' : '❌ Нет'}
+                  {s_.hasHIIT ? 'вњ… Р”Р°' : 'вќЊ РќРµС‚'}
                 </button>
               </div>
               <div>
-                <label style={{ fontSize: 12, opacity: 0.7, display: 'block', marginBottom: 4 }}>Объём, тонн/нед</label>
+                <label style={{ fontSize: 12, opacity: 0.7, display: 'block', marginBottom: 4 }}>РћР±СЉС‘Рј, С‚РѕРЅРЅ/РЅРµРґ</label>
                 <input style={s.input} type="number" step="500" min="0" max="30000" value={s_.volumeTonnes ?? 8000} onChange={e => save({ volumeTonnes: e.target.value ? +e.target.value : undefined })} placeholder="8000" />
               </div>
               <div>
-                <label style={{ fontSize: 12, opacity: 0.7, display: 'block', marginBottom: 4 }}>LISS, мин/неделю</label>
+                <label style={{ fontSize: 12, opacity: 0.7, display: 'block', marginBottom: 4 }}>LISS, РјРёРЅ/РЅРµРґРµР»СЋ</label>
                 <input style={s.input} type="number" step="10" min="0" max="300" value={s_.lissMinutesPerWeek ?? 90} onChange={e => save({ lissMinutesPerWeek: e.target.value ? +e.target.value : undefined })} placeholder="90" />
               </div>
               <div>
-                <label style={{ fontSize: 12, opacity: 0.7, display: 'block', marginBottom: 4 }}>Завершённых курсов ААС</label>
+                <label style={{ fontSize: 12, opacity: 0.7, display: 'block', marginBottom: 4 }}>Р—Р°РІРµСЂС€С‘РЅРЅС‹С… РєСѓСЂСЃРѕРІ РђРђРЎ</label>
                 <input style={s.input} type="number" step="1" min="0" max="50" value={s_.totalCycles ?? 0} onChange={e => save({ totalCycles: e.target.value ? +e.target.value : undefined })} placeholder="0" />
               </div>
             </div>
@@ -666,17 +666,17 @@ export const ProfileScreen: React.FC = () => {
       {tab === 'genetics' && (
         <div>
           <div className="card" style={{ marginBottom: 12 }}>
-            <h3 style={{ margin: '0 0 12px 0' }}>🧬 Генетические полиморфизмы</h3>
-            <p style={{ fontSize: 11, color: 'var(--text-dim)', margin: '0 0 12px 0' }}>Укажите ваши генетические варианты, если известны. Они влияют на расчёт рисков в V7 движке через генетические множители.</p>
+            <h3 style={{ margin: '0 0 12px 0' }}>рџ§¬ Р“РµРЅРµС‚РёС‡РµСЃРєРёРµ РїРѕР»РёРјРѕСЂС„РёР·РјС‹</h3>
+            <p style={{ fontSize: 11, color: 'var(--text-dim)', margin: '0 0 12px 0' }}>РЈРєР°Р¶РёС‚Рµ РІР°С€Рё РіРµРЅРµС‚РёС‡РµСЃРєРёРµ РІР°СЂРёР°РЅС‚С‹, РµСЃР»Рё РёР·РІРµСЃС‚РЅС‹. РћРЅРё РІР»РёСЏСЋС‚ РЅР° СЂР°СЃС‡С‘С‚ СЂРёСЃРєРѕРІ РІ V7 РґРІРёР¶РєРµ С‡РµСЂРµР· РіРµРЅРµС‚РёС‡РµСЃРєРёРµ РјРЅРѕР¶РёС‚РµР»Рё.</p>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
               {([
-                { key: 'COMT', label: 'COMT', desc: 'Катехол-О-метилтрансфераза. Влияет на метаболизм дофамина и стресс-устойчивость.', options: ['Met/Met', 'Val/Met', 'Val/Val'] },
-                { key: 'MTHFR', label: 'MTHFR', desc: 'Метилентетрагидрофолатредуктаза. Влияет на гомоцистеин и фолатный цикл.', options: ['C677T/C677T', 'C677T/A1298C', 'A1298C/A1298C', 'C677T/+', 'A1298C/+', '+/+' ] },
-                { key: 'ESR1', label: 'ESR1', desc: 'Эстрогеновый рецептор α. Влияет на чувствительность к эстрадиолу.', options: ['PvuII TT', 'PvuII TC', 'PvuII CC'] },
-                { key: 'AGTR1', label: 'AGTR1', desc: 'Рецептор ангиотензина II. Влияет на АД и гипертрофию сердца.', options: ['1166CC', '1166AC', '1166AA'] },
-                { key: 'NOS3', label: 'NOS3', desc: 'Эндотелиальная NO-синтаза. Влияет на вазодилатацию и эндотелий.', options: ['Glu298Glu', 'Glu298Asp', 'Asp298Asp'] },
-                { key: 'SRD5A2', label: 'SRD5A2', desc: '5α-редуктаза. Влияет на конверсию тестостерона → DHT.', options: ['V89L V/V', 'V89L V/L', 'V89L L/L'] },
-                { key: 'CYP3A4', label: 'CYP3A4', desc: 'Цитохром P450 3A4. Влияет на метаболизм большинства ААС.', options: ['*1/*1 (WT)', '*1/*22', '*22/*22'] },
+                { key: 'COMT', label: 'COMT', desc: '', options: ['Met/Met', 'Val/Met', 'Val/Val'] },
+                { key: 'MTHFR', label: 'MTHFR', desc: '', options: ['C677T/C677T', 'C677T/A1298C', 'A1298C/A1298C', 'C677T/+', 'A1298C/+', '+/+' ] },
+                { key: 'ESR1', label: 'ESR1', desc: '', options: ['PvuII TT', 'PvuII TC', 'PvuII CC'] },
+                { key: 'AGTR1', label: 'AGTR1', desc: '', options: ['1166CC', '1166AC', '1166AA'] },
+                { key: 'NOS3', label: 'NOS3', desc: '', options: ['Glu298Glu', 'Glu298Asp', 'Asp298Asp'] },
+                { key: 'SRD5A2', label: 'SRD5A2', desc: '5О±-СЂРµРґСѓРєС‚Р°Р·Р°. Р’Р»РёСЏРµС‚ РЅР° РєРѕРЅРІРµСЂСЃРёСЋ С‚РµСЃС‚РѕСЃС‚РµСЂРѕРЅР° в†’ DHT.', options: ['V89L V/V', 'V89L V/L', 'V89L L/L'] },
+                { key: 'CYP3A4', label: 'CYP3A4', desc: '', options: ['*1/*1 (WT)', '*1/*22', '*22/*22'] },
               ] as const).map(gene => (
                 <div key={gene.key} style={{ background: 'var(--bg-secondary)', padding: 10, borderRadius: 8 }}>
                   <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 2 }}>{gene.label}</div>
@@ -687,7 +687,7 @@ export const ProfileScreen: React.FC = () => {
                       background: !(s_.genetics ?? {})[gene.key] ? 'rgba(0,230,138,0.1)' : 'var(--bg-primary)',
                       border: !(s_.genetics ?? {})[gene.key] ? '1px solid #00e68a' : '1px solid var(--border)',
                       color: !(s_.genetics ?? {})[gene.key] ? '#00e68a' : 'var(--text-dim)', fontWeight: 500,
-                    }}>Не знаю</button>
+                    }}>РќРµ Р·РЅР°СЋ</button>
                     {gene.options.map(opt => (
                       <button key={opt} onClick={() => { const g = {...(s_.genetics ?? {})}; g[gene.key] = opt; save({ genetics: g }); }} style={{
                         padding: '4px 8px', borderRadius: 6, fontSize: 10, cursor: 'pointer',
@@ -707,64 +707,64 @@ export const ProfileScreen: React.FC = () => {
         <>
           <div style={s.card}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h4 style={{ margin: 0 }}>Травмы</h4>
-              <button style={s.btnActive} onClick={addInjury}>+ Добавить</button>
+              <h4 style={{ margin: 0 }}>РўСЂР°РІРјС‹</h4>
+              <button style={s.btnActive} onClick={addInjury}>+ Р”РѕР±Р°РІРёС‚СЊ</button>
             </div>
           </div>
           {(s_.injuries ?? []).map(inj => (
             <div key={inj.id} style={s.card}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                <strong>{inj.location} — {INJURY_TYPES.find(t => t.id === inj.type)?.label ?? inj.type}</strong>
+                <strong>{inj.location} вЂ” {INJURY_TYPES.find(t => t.id === inj.type)?.label ?? inj.type}</strong>
                 <div style={{ display: 'flex', gap: 4 }}>
-                  <button style={s.btn} onClick={() => setEditInjury(inj)}>Ред.</button>
-                  <button style={s.delBtn} onClick={() => deleteInjury(inj.id)}>Удалить</button>
+                  <button style={s.btn} onClick={() => setEditInjury(inj)}>Р РµРґ.</button>
+                  <button style={s.delBtn} onClick={() => deleteInjury(inj.id)}>РЈРґР°Р»РёС‚СЊ</button>
                 </div>
               </div>
               <div style={{ fontSize: 12, opacity: 0.8 }}>
-                Боль: {inj.painLevel}/10 | Ограничение: {MOVEMENT_LIMITS.find(m => m.id === inj.movementLimit)?.label} | Сторона: {inj.side === 'left' ? 'Левая' : inj.side === 'right' ? 'Правая' : 'Обе'} | {inj.chronic ? 'Хроническая' : 'Острая'}
+                Р‘РѕР»СЊ: {inj.painLevel}/10 | РћРіСЂР°РЅРёС‡РµРЅРёРµ: {MOVEMENT_LIMITS.find(m => m.id === inj.movementLimit)?.label} | РЎС‚РѕСЂРѕРЅР°: {inj.side === 'left' ? '' : inj.side === 'right' ? '' : ''} | {inj.chronic ? '' : ''}
               </div>
               {inj.notes && <div style={{ fontSize: 11, opacity: 0.6, marginTop: 4 }}>{inj.notes}</div>}
             </div>
           ))}
           {editInjury && (
             <div style={{ ...s.card, border: '1px solid #00e68a' }}>
-              <h4 style={{ margin: '0 0 8px' }}>{editInjury.id && (s_.injuries ?? []).find(i => i.id === editInjury.id) ? 'Редактирование' : 'Новая травма'}</h4>
+              <h4 style={{ margin: '0 0 8px' }}>{editInjury.id && (s_.injuries ?? []).find(i => i.id === editInjury.id) ? '' : ''}</h4>
               <div>
-                <span style={s.label}>Тип</span>
+                <span style={s.label}>РўРёРї</span>
                 <div style={s.btnGroup}>{INJURY_TYPES.map(t => <button key={t.id} style={editInjury.type === t.id ? s.btnActive : s.btn} onClick={() => setEditInjury({ ...editInjury, type: t.id })}>{t.label}</button>)}</div>
               </div>
               <div>
-                <span style={s.label}>Локализация</span>
+                <span style={s.label}>Р›РѕРєР°Р»РёР·Р°С†РёСЏ</span>
                 <select style={s.input} value={editInjury.location} onChange={e => setEditInjury({ ...editInjury, location: e.target.value })}>
                   {INJURY_LOCATIONS.map(l => <option key={l} value={l}>{l}</option>)}
                 </select>
               </div>
               <div>
-                <span style={s.label}>Боль: {editInjury.painLevel}/10</span>
+                <span style={s.label}>Р‘РѕР»СЊ: {editInjury.painLevel}/10</span>
                 <input style={s.slider} type="range" min="1" max="10" value={editInjury.painLevel} onChange={e => setEditInjury({ ...editInjury, painLevel: +e.target.value })} />
               </div>
               <div>
-                <span style={s.label}>Ограничение движений</span>
+                <span style={s.label}>РћРіСЂР°РЅРёС‡РµРЅРёРµ РґРІРёР¶РµРЅРёР№</span>
                 <div style={s.btnGroup}>{MOVEMENT_LIMITS.map(m => <button key={m.id} style={editInjury.movementLimit === m.id ? s.btnActive : s.btn} onClick={() => setEditInjury({ ...editInjury, movementLimit: m.id })}>{m.label}</button>)}</div>
               </div>
               <div>
-                <span style={s.label}>Сторона</span>
+                <span style={s.label}>РЎС‚РѕСЂРѕРЅР°</span>
                 <div style={s.btnGroup}>
-                  {[{ id: 'left', label: 'Левая' }, { id: 'right', label: 'Правая' }, { id: 'both', label: 'Обе' }].map(x => <button key={x.id} style={editInjury.side === x.id ? s.btnActive : s.btn} onClick={() => setEditInjury({ ...editInjury, side: x.id as any })}>{x.label}</button>)}
+                  {[{ id: 'left', label: '' }, { id: 'right', label: '' }, { id: 'both', label: '' }].map(x => <button key={x.id} style={editInjury.side === x.id ? s.btnActive : s.btn} onClick={() => setEditInjury({ ...editInjury, side: x.id as any })}>{x.label}</button>)}
                 </div>
               </div>
               <div style={s.row}>
-                <div><span style={s.label}>Дата</span><input style={s.input} type="date" value={editInjury.date ?? ''} onChange={e => setEditInjury({ ...editInjury, date: e.target.value })} /></div>
-                <div><span style={s.label}>Хроническая</span>
+                <div><span style={s.label}>Р”Р°С‚Р°</span><input style={s.input} type="date" value={editInjury.date ?? ''} onChange={e => setEditInjury({ ...editInjury, date: e.target.value })} /></div>
+                <div><span style={s.label}>РҐСЂРѕРЅРёС‡РµСЃРєР°СЏ</span>
                   <div style={s.btnGroup}>
-                    <button style={editInjury.chronic ? s.btnActive : s.btn} onClick={() => setEditInjury({ ...editInjury, chronic: true })}>Да</button>
-                    <button style={!editInjury.chronic ? s.btnActive : s.btn} onClick={() => setEditInjury({ ...editInjury, chronic: false })}>Нет</button>
+                    <button style={editInjury.chronic ? s.btnActive : s.btn} onClick={() => setEditInjury({ ...editInjury, chronic: true })}>Р”Р°</button>
+                    <button style={!editInjury.chronic ? s.btnActive : s.btn} onClick={() => setEditInjury({ ...editInjury, chronic: false })}>РќРµС‚</button>
                   </div>
                 </div>
               </div>
-              <div><span style={s.label}>Заметки</span><textarea style={{ ...s.input, minHeight: 50 }} value={editInjury.notes ?? ''} onChange={e => setEditInjury({ ...editInjury, notes: e.target.value })} /></div>
-              <button style={s.saveBtn} onClick={() => saveInjury(editInjury)}>Сохранить</button>
-              <button style={{ ...s.btn, width: '100%', marginTop: 4 }} onClick={() => setEditInjury(null)}>Отмена</button>
+              <div><span style={s.label}>Р—Р°РјРµС‚РєРё</span><textarea style={{ ...s.input, minHeight: 50 }} value={editInjury.notes ?? ''} onChange={e => setEditInjury({ ...editInjury, notes: e.target.value })} /></div>
+              <button style={s.saveBtn} onClick={() => saveInjury(editInjury)}>РЎРѕС…СЂР°РЅРёС‚СЊ</button>
+              <button style={{ ...s.btn, width: '100%', marginTop: 4 }} onClick={() => setEditInjury(null)}>РћС‚РјРµРЅР°</button>
             </div>
           )}
         </>
@@ -772,26 +772,26 @@ export const ProfileScreen: React.FC = () => {
 
       {tab === 'progress' && (
         <div style={s.card}>
-          <h4 style={{ margin: '0 0 8px' }}>Прогресс к цели</h4>
+          <h4 style={{ margin: '0 0 8px' }}>РџСЂРѕРіСЂРµСЃСЃ Рє С†РµР»Рё</h4>
           <div style={s.row}>
-            <div><span style={s.label}>Текущий вес</span><div style={{ fontSize: 20, fontWeight: 700 }}>{s_.weight} кг</div></div>
-            <div><span style={s.label}>Целевой вес</span><input style={s.input} type="number" value={s_.targetWeight ?? ''} onChange={e => save({ targetWeight: e.target.value ? +e.target.value : undefined })} placeholder="Цель (кг)" /></div>
+            <div><span style={s.label}>РўРµРєСѓС‰РёР№ РІРµСЃ</span><div style={{ fontSize: 20, fontWeight: 700 }}>{s_.weight} РєРі</div></div>
+            <div><span style={s.label}>Р¦РµР»РµРІРѕР№ РІРµСЃ</span><input style={s.input} type="number" value={s_.targetWeight ?? ''} onChange={e => save({ targetWeight: e.target.value ? +e.target.value : undefined })} placeholder="" /></div>
           </div>
           {s_.targetWeight && (
             <div>
               <div style={{ height: 8, borderRadius: 4, background: 'var(--border)', overflow: 'hidden', margin: '8px 0' }}>
                 <div style={{ height: '100%', borderRadius: 4, background: '#00e68a', width: `${Math.min(100, Math.max(0, Math.round((1 - Math.abs(s_.weight - s_.targetWeight) / Math.max(1, Math.abs(s_.targetWeight)))) * 100))}%` }} />
               </div>
-              <div style={{ fontSize: 12, opacity: 0.7, textAlign: 'center' }}>{Math.round((1 - Math.abs(s_.weight - s_.targetWeight) / Math.max(1, Math.abs(s_.targetWeight))) * 100)}% к цели</div>
+              <div style={{ fontSize: 12, opacity: 0.7, textAlign: 'center' }}>{Math.round((1 - Math.abs(s_.weight - s_.targetWeight) / Math.max(1, Math.abs(s_.targetWeight))) * 100)}% Рє С†РµР»Рё</div>
             </div>
           )}
           <div style={{ marginTop: 12 }}>
-            <span style={s.label}>Целевой % жира</span>
-            <input style={s.input} type="number" step="0.1" value={s_.targetBodyFat ?? ''} onChange={e => save({ targetBodyFat: e.target.value ? +e.target.value : undefined })} placeholder="Цель (% жира)" />
+            <span style={s.label}>Р¦РµР»РµРІРѕР№ % Р¶РёСЂР°</span>
+            <input style={s.input} type="number" step="0.1" value={s_.targetBodyFat ?? ''} onChange={e => save({ targetBodyFat: e.target.value ? +e.target.value : undefined })} placeholder="" />
           </div>
           {labIndices && labIndexText && (
             <div style={{ marginTop: 12 }}>
-              <h5>Индексы лабораторий</h5>
+              <h5>РРЅРґРµРєСЃС‹ Р»Р°Р±РѕСЂР°С‚РѕСЂРёР№</h5>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
                 {(['inflammation', 'metabolism', 'thyroid', 'lipids'] as const).map(k => {
                   const val = labIndices[k];
@@ -801,9 +801,9 @@ export const ProfileScreen: React.FC = () => {
                   })();
                   return (
                     <div key={k} style={s.computed}>
-                      <div style={{ fontSize: 11, opacity: 0.6 }}>{k === 'inflammation' ? 'Воспаление' : k === 'metabolism' ? 'Метаболизм' : k === 'thyroid' ? 'Щитовидная' : 'Липиды'}</div>
-                      <div style={{ fontWeight: 600 }}>{hasData ? `${(val * 100).toFixed(0)}%` : '—'}</div>
-                      <div style={{ fontSize: 10, opacity: 0.5 }}>{hasData ? labIndexText[k] : 'Нет данных'}</div>
+                      <div style={{ fontSize: 11, opacity: 0.6 }}>{k === 'inflammation' ? '' : k === 'metabolism' ? '' : k === 'thyroid' ? '' : ''}</div>
+                      <div style={{ fontWeight: 600 }}>{hasData ? `${(val * 100).toFixed(0)}%` : 'вЂ”'}</div>
+                      <div style={{ fontSize: 10, opacity: 0.5 }}>{hasData ? labIndexText[k] : ''}</div>
                     </div>
                   );
                 })}

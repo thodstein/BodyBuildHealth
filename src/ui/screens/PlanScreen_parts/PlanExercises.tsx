@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 import { EXERCISE_CATALOG } from '../../../core/exercise-catalog';
 import { GROUP_LABELS, MUSCLE_GROUPS } from './PlanConstants';
 
@@ -23,7 +23,7 @@ export const PlanExercises: React.FC = () => {
                 <div>
                   <span style={{ fontWeight: 600 }}>{ex.name}</span>
                   <span style={{ fontSize: 10, marginLeft: 6, padding: '1px 5px', borderRadius: 3, background: ex.type === 'compound' ? 'rgba(0,230,138,0.12)' : 'rgba(100,150,255,0.12)' }}>
-                    {ex.type === 'compound' ? 'Составное' : 'Изолирующее'}
+                    {ex.type === 'compound' ? '' : ''}
                   </span>
                 </div>
                 <span style={{ fontSize: 10 }}>{ex.equipment} | {ex.difficulty} | {ex.jointStress}</span>
@@ -32,9 +32,9 @@ export const PlanExercises: React.FC = () => {
               {ex.technique && <div style={{ fontSize: 11, marginTop: 2 }}>{ex.technique}</div>}
               {ex.comments && <div style={{ fontSize: 10, marginTop: 2 }}>{ex.comments}</div>}
               <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 4 }}>
-                {ex.pauseSeconds && <span style={{ fontSize: 9, padding: '1px 5px', borderRadius: 3, background: 'rgba(234,179,8,0.12)' }}>Пауза {ex.pauseSeconds}с</span>}
-                {ex.peakContraction && <span style={{ fontSize: 9, padding: '1px 5px', borderRadius: 3, background: 'rgba(249,115,22,0.12)' }}>Пик сокращения</span>}
-                {ex.stretchPhase && <span style={{ fontSize: 9, padding: '1px 5px', borderRadius: 3, background: 'rgba(34,197,94,0.12)' }}>Растяжка</span>}
+                {ex.pauseSeconds && <span style={{ fontSize: 9, padding: '1px 5px', borderRadius: 3, background: 'rgba(234,179,8,0.12)' }}>РџР°СѓР·Р° {ex.pauseSeconds}СЃ</span>}
+                {ex.peakContraction && <span style={{ fontSize: 9, padding: '1px 5px', borderRadius: 3, background: 'rgba(249,115,22,0.12)' }}>РџРёРє СЃРѕРєСЂР°С‰РµРЅРёСЏ</span>}
+                {ex.stretchPhase && <span style={{ fontSize: 9, padding: '1px 5px', borderRadius: 3, background: 'rgba(34,197,94,0.12)' }}>Р Р°СЃС‚СЏР¶РєР°</span>}
               </div>
             </div>
           ))}

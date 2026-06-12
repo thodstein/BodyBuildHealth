@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 import { PHARMA_DB } from '../../../core/pharma-database';
 import { RISK_SYSTEMS, SUBSYSTEM_MAP, SUBSYSTEM_PARENT } from '../../../core/constants';
 import { SYSTEM_INFO, SYSTEM_INFO_ALL, SYSTEM_ORGANS } from '../../../core/risk-info';
@@ -11,7 +11,7 @@ interface LabRiskContribution {
   totalRisk: number;
 }
 
-function getSystemIcon(sys: string): string { return SYSTEM_INFO_ALL[sys]?.icon || SYSTEM_INFO[sys]?.icon || '⚠️'; }
+function getSystemIcon(sys: string): string { return SYSTEM_INFO_ALL[sys]?.icon || SYSTEM_INFO[sys]?.icon || 'вљ пёЏ'; }
 function getSystemLabel(sys: string): string { return SYSTEM_INFO_ALL[sys]?.label || SYSTEM_INFO[sys]?.label || sys; }
 
 // Core systems for display - subsystems shown nested under parents
@@ -26,14 +26,14 @@ export const RiskDetails: React.FC<{
   const [showAllRecs, setShowAllRecs] = React.useState(false);
 
   const recommendations: { text: string; priority: 'high' | 'medium' | 'low' }[] = [];
-  if (riskResult.overallNet > 60) recommendations.push({ text: '🔴 Общий риск ВЫСОКИЙ — обязательная консультация врача', priority: 'high' });
-  if (riskResult.overallNet > 40) recommendations.push({ text: 'Рекомендуется расширенный чек-ап анализов', priority: 'medium' });
+  if (riskResult.overallNet > 60) recommendations.push({ text: '', priority: 'high' });
+  if (riskResult.overallNet > 40) recommendations.push({ text: '', priority: 'medium' });
   for (const sys of RISK_SYSTEMS) {
     const bd = riskResult.systemBreakdown[sys];
-    if (bd && bd.net > 70) recommendations.push({ text: getSystemIcon(sys) + ' ' + getSystemLabel(sys) + ': риск ' + Math.round(bd.net) + '% — необходим мониторинг', priority: 'high' });
-    else if (bd && bd.net > 50) recommendations.push({ text: getSystemIcon(sys) + ' ' + getSystemLabel(sys) + ': риск ' + Math.round(bd.net) + '% — рекомендуется контроль', priority: 'medium' });
+    if (bd && bd.net > 70) recommendations.push({ text: getSystemIcon(sys) + ' ' + getSystemLabel(sys) + ': СЂРёСЃРє ' + Math.round(bd.net) + '% вЂ” РЅРµРѕР±С…РѕРґРёРј РјРѕРЅРёС‚РѕСЂРёРЅРі', priority: 'high' });
+    else if (bd && bd.net > 50) recommendations.push({ text: getSystemIcon(sys) + ' ' + getSystemLabel(sys) + ': СЂРёСЃРє ' + Math.round(bd.net) + '% вЂ” СЂРµРєРѕРјРµРЅРґСѓРµС‚СЃСЏ РєРѕРЅС‚СЂРѕР»СЊ', priority: 'medium' });
   }
-  if (riskResult.overallNet < 30) recommendations.push({ text: '✅ Общий риск низкий — продолжайте текущую стратегию', priority: 'low' });
+  if (riskResult.overallNet < 30) recommendations.push({ text: 'вњ… РћР±С‰РёР№ СЂРёСЃРє РЅРёР·РєРёР№ вЂ” РїСЂРѕРґРѕР»Р¶Р°Р№С‚Рµ С‚РµРєСѓС‰СѓСЋ СЃС‚СЂР°С‚РµРіРёСЋ', priority: 'low' });
 
   const contributorMap: Record<string, string[]> = {};
   const mitigationMap: Record<string, { substance: string; reduction: number }[]> = {};
@@ -87,7 +87,7 @@ export const RiskDetails: React.FC<{
                 <span style={{ fontSize: 16 }}>{icon}</span>
                 <div>
                   <span style={{ fontWeight: 700, fontSize: 14 }}>{label}</span>
-                  {group.length > 1 && <span style={{ fontSize: 10, color: 'var(--text-dim)', marginLeft: 6 }}>+{group.length - 1} подсистем</span>}
+                  {group.length > 1 && <span style={{ fontSize: 10, color: 'var(--text-dim)', marginLeft: 6 }}>+{group.length - 1} РїРѕРґСЃРёСЃС‚РµРј</span>}
                 </div>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -95,7 +95,7 @@ export const RiskDetails: React.FC<{
                   <div style={{ width: `${Math.min(100, groupRisk.net)}%`, height: '100%', background: getRiskColor(groupRisk.net), borderRadius: 3, transition: 'width 0.3s' }} />
                 </div>
                 <span style={{ fontWeight: 700, fontSize: 16, color: getRiskColor(groupRisk.net), minWidth: 40 }}>{Math.round(groupRisk.net)}%</span>
-                <span style={{ fontSize: 12, color: 'var(--text-dim)', transition: 'transform 0.2s', transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)' }}>▾</span>
+                <span style={{ fontSize: 12, color: 'var(--text-dim)', transition: 'transform 0.2s', transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)' }}>в–ѕ</span>
               </div>
             </div>
 
@@ -117,14 +117,14 @@ export const RiskDetails: React.FC<{
                         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                           <span style={{ fontSize: 12 }}>{sysIcon}</span>
                           <span style={{ fontWeight: 600, fontSize: 12 }}>{sysLabel}</span>
-                          {isSub && <span style={{ fontSize: 9, color: 'var(--text-dim)' }}>(подсистема)</span>}
+                          {isSub && <span style={{ fontSize: 9, color: 'var(--text-dim)' }}>(РїРѕРґСЃРёСЃС‚РµРјР°)</span>}
                           {bd && <span style={{ fontSize: 11, fontWeight: 700, color: getRiskColor(bd.net), marginLeft: 6 }}>{Math.round(bd.net)}%</span>}
                         </div>
                       </div>
 
                       {mechanisms.length > 0 && (
                         <div style={{ marginTop: 4 }}>
-                          <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--accent)', marginBottom: 3 }}>Специфичные механизмы ({mechanisms.length}):</div>
+                          <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--accent)', marginBottom: 3 }}>РЎРїРµС†РёС„РёС‡РЅС‹Рµ РјРµС…Р°РЅРёР·РјС‹ ({mechanisms.length}):</div>
                           {mechanisms.map(m => {
                             const mechKey = `${sys}_${m.num}`;
                             const mechDetail = riskResult.mechanismDetail?.[mechKey];
@@ -139,7 +139,7 @@ export const RiskDetails: React.FC<{
                                 <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 2 }}>
                                   {m.drugs.slice(0, 3).map(d => <span key={d} style={{ background: 'rgba(239,68,68,0.1)', padding: '0 4px', borderRadius: 3, fontSize: 9, color: '#f97316' }}>{d}</span>)}
                                 </div>
-                                <div style={{ fontSize: 9, color: 'var(--accent)', marginTop: 1 }}>⚠️ {m.mitigation}</div>
+                                <div style={{ fontSize: 9, color: 'var(--accent)', marginTop: 1 }}>вљ пёЏ {m.mitigation}</div>
                               </div>
                             );
                           })}
@@ -148,10 +148,10 @@ export const RiskDetails: React.FC<{
 
                       {labContrib > 0 && (
                         <div style={{ fontSize: 10, marginTop: 4, color: 'var(--text-dim)', display: 'flex', alignItems: 'center', gap: 4 }}>
-                          <span>🔬 Лаб. вклад:</span>
+                          <span>рџ”¬ Р›Р°Р±. РІРєР»Р°Рґ:</span>
                           <strong style={{ color: getRiskColor(labContrib) }}>{Math.round(labContrib)}%</strong>
                           {isSyntheticLab && (
-                            <span style={{ color: '#eab308', fontSize: 9, fontWeight: 600 }}>⚠️ штраф</span>
+                            <span style={{ color: '#eab308', fontSize: 9, fontWeight: 600 }}>вљ пёЏ С€С‚СЂР°С„</span>
                           )}
                         </div>
                       )}
@@ -162,8 +162,8 @@ export const RiskDetails: React.FC<{
                         </div>
                       )}
 
-                      {SYSTEM_ORGANS[sys] && <div style={{ fontSize: 9, color: 'var(--text-dim)', marginTop: 3 }}><strong>Органы:</strong> {SYSTEM_ORGANS[sys].join(', ')}</div>}
-                      {info?.keyMarkers && info.keyMarkers.length > 0 && <div style={{ fontSize: 9, color: 'var(--text-dim)', marginTop: 1 }}><strong>Маркеры:</strong> {info.keyMarkers.slice(0, 5).join(', ')}</div>}
+                      {SYSTEM_ORGANS[sys] && <div style={{ fontSize: 9, color: 'var(--text-dim)', marginTop: 3 }}><strong>РћСЂРіР°РЅС‹:</strong> {SYSTEM_ORGANS[sys].join(', ')}</div>}
+                      {info?.keyMarkers && info.keyMarkers.length > 0 && <div style={{ fontSize: 9, color: 'var(--text-dim)', marginTop: 1 }}><strong>РњР°СЂРєРµСЂС‹:</strong> {info.keyMarkers.slice(0, 5).join(', ')}</div>}
                     </div>
                   );
                 })}
@@ -185,20 +185,20 @@ export const RiskDetails: React.FC<{
 
       {/* Recommendations */}
       <div className="card" style={{ marginTop: 8 }}>
-        <h3 style={{ margin: '0 0 8px', fontSize: 14 }}>✅ Рекомендации</h3>
+        <h3 style={{ margin: '0 0 8px', fontSize: 14 }}>вњ… Р РµРєРѕРјРµРЅРґР°С†РёРё</h3>
         {recommendations.length > 0 ? (
           <div style={{ display: 'grid', gap: 4 }}>
             {(showAllRecs ? recommendations : recommendations.slice(0, 5)).map((rec, i) => (
               <div key={i} style={{ padding: 6, borderRadius: 6, background: rec.priority === 'high' ? 'rgba(239,68,68,0.15)' : rec.priority === 'medium' ? 'rgba(234,179,8,0.15)' : 'rgba(34,197,94,0.15)', fontSize: 11 }}>{rec.text}</div>
             ))}
-            {recommendations.length > 5 && <button onClick={() => setShowAllRecs(!showAllRecs)} style={{ background: 'none', border: 'none', color: 'var(--accent)', fontSize: 11, cursor: 'pointer', padding: 4 }}>{showAllRecs ? 'Скрыть' : 'Показать ещё'}</button>}
+            {recommendations.length > 5 && <button onClick={() => setShowAllRecs(!showAllRecs)} style={{ background: 'none', border: 'none', color: 'var(--accent)', fontSize: 11, cursor: 'pointer', padding: 4 }}>{showAllRecs ? '' : ''}</button>}
           </div>
-        ) : <div style={{ color: 'var(--text-dim)', textAlign: 'center', padding: 12, fontSize: 12 }}>Нет специфических рекомендаций</div>}
+        ) : <div style={{ color: 'var(--text-dim)', textAlign: 'center', padding: 12, fontSize: 12 }}>РќРµС‚ СЃРїРµС†РёС„РёС‡РµСЃРєРёС… СЂРµРєРѕРјРµРЅРґР°С†РёР№</div>}
       </div>
 
       <div style={{ fontSize: 10, color: 'var(--text-dim)', textAlign: 'center', marginTop: 8, fontStyle: 'italic', lineHeight: 1.4 }}>
-        Данные расчёты носят информационный характер и не заменяют консультацию врача.<br/>
-        {RISK_SYSTEMS.length} систем органов × 7-9 специфичных механизмов каждая.
+        Р”Р°РЅРЅС‹Рµ СЂР°СЃС‡С‘С‚С‹ РЅРѕСЃСЏС‚ РёРЅС„РѕСЂРјР°С†РёРѕРЅРЅС‹Р№ С…Р°СЂР°РєС‚РµСЂ Рё РЅРµ Р·Р°РјРµРЅСЏСЋС‚ РєРѕРЅСЃСѓР»СЊС‚Р°С†РёСЋ РІСЂР°С‡Р°.<br/>
+        {RISK_SYSTEMS.length} СЃРёСЃС‚РµРј РѕСЂРіР°РЅРѕРІ Г— 7-9 СЃРїРµС†РёС„РёС‡РЅС‹С… РјРµС…Р°РЅРёР·РјРѕРІ РєР°Р¶РґР°СЏ.
       </div>
     </div>
   );

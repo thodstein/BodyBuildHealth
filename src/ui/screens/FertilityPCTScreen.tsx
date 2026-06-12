@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+﻿import React, { useState, useMemo, useEffect } from 'react';
 import { calcFertility } from '../../engines/fertility.engine';
 import type { FertilityInput, FertilityResult, LabPoint } from '../../core/types';
 import { FERTILITY_TARGET, FERTILITY_TAU_WEEKS } from '../../core/constants';
@@ -20,8 +20,8 @@ const s: Record<string, React.CSSProperties> = {
 };
 
 const VARICOCELE = [
-  { id: 'none', label: 'Нет' }, { id: 'grade1', label: '1 степень' },
-  { id: 'grade2', label: '2 степень' }, { id: 'grade3', label: '3 степень' }
+  { id: 'none', label: '' }, { id: 'grade1', label: '1 СЃС‚РµРїРµРЅСЊ' },
+  { id: 'grade2', label: '2 СЃС‚РµРїРµРЅСЊ' }, { id: 'grade3', label: '3 СЃС‚РµРїРµРЅСЊ' }
 ] as const;
 
 export const FertilityPCTScreen: React.FC = () => {
@@ -137,48 +137,48 @@ export const FertilityPCTScreen: React.FC = () => {
   );
 
   const fertTabs: { id: FertTab; label: string }[] = [
-    { id: 'semen', label: 'Спермограмма' }, { id: 'hormones', label: 'Гормоны крови' }, { id: 'structure', label: 'DFI/Структура' }
+    { id: 'semen', label: '' }, { id: 'hormones', label: '' }, { id: 'structure', label: 'DFI/РЎС‚СЂСѓРєС‚СѓСЂР°' }
   ];
 
   return (
     <div className="screen fertility-pct">
-      <h2>Фертильность и ПКТ</h2>
+      <h2>Р¤РµСЂС‚РёР»СЊРЅРѕСЃС‚СЊ Рё РџРљРў</h2>
       <div style={{ display: 'flex', gap: 4, marginBottom: 12 }}>
         {fertTabs.map(t => <button key={t.id} className={`tab-button ${tab === t.id ? 'active' : ''}`} onClick={() => setTab(t.id)}>{t.label}</button>)}
       </div>
 
       {tab === 'semen' && (
         <div style={s.card}>
-          <h4 style={{ margin: '0 0 8px' }}>Спермограмма расширенная</h4>
+          <h4 style={{ margin: '0 0 8px' }}>РЎРїРµСЂРјРѕРіСЂР°РјРјР° СЂР°СЃС€РёСЂРµРЅРЅР°СЏ</h4>
           <div style={s.row}>
-            <div>{field('Объём (мл) ≥1.5', volume, setVolume, '1.5')}</div>
-            <div>{field('Концентрация (млн/мл) ≥16', concentration, setConcentration, '16')}</div>
+            <div>{field('', volume, setVolume, '1.5')}</div>
+            <div>{field('', concentration, setConcentration, '16')}</div>
           </div>
           <div style={s.row}>
-            <div>{field('Общее кол-во (млн) ≥39', totalCount, setTotalCount, '39')}</div>
-            <div>{field('PR подвижность (%) ≥30', pr, setPr, '30')}</div>
+            <div>{field('', totalCount, setTotalCount, '39')}</div>
+            <div>{field('PR РїРѕРґРІРёР¶РЅРѕСЃС‚СЊ (%) в‰Ґ30', pr, setPr, '30')}</div>
           </div>
           <div style={s.row}>
-            <div>{field('NP подвижность (%)', np, setNp, '10')}</div>
-            <div>{field('Неподвижные (%)', immotile, setImmotile, '0')}</div>
+            <div>{field('NP РїРѕРґРІРёР¶РЅРѕСЃС‚СЊ (%)', np, setNp, '10')}</div>
+            <div>{field('', immotile, setImmotile, '0')}</div>
           </div>
           <div style={s.row}>
-            <div>{field('Морфология (%) ≥4', morphology, setMorphology, '4')}</div>
-            <div>{field('Жизнеспособность (%) ≥58', viability, setViability, '58')}</div>
+            <div>{field('', morphology, setMorphology, '4')}</div>
+            <div>{field('', viability, setViability, '58')}</div>
           </div>
           <div style={s.row}>
-            <div>{field('pH 7.2–8.0', ph, setPh, '7.4')}</div>
-            <div>{field('Фруктоза (мг/дл)', fructose, setFructose, '13')}</div>
+            <div>{field('pH 7.2вЂ“8.0', ph, setPh, '7.4')}</div>
+            <div>{field('', fructose, setFructose, '13')}</div>
           </div>
           <div style={s.row}>
-            <div>{field('Цинк (ммоль/эякулят)', zincMmol, setZincMmol, '2')}</div>
-            <div>{field('MAR-тест (%) <50', mar, setMar, '0')}</div>
+            <div>{field('', zincMmol, setZincMmol, '2')}</div>
+            <div>{field('MAR-С‚РµСЃС‚ (%) <50', mar, setMar, '0')}</div>
           </div>
           <div style={s.row}>
-            <div>{field('Лейкоциты (млн/мл) <1', leukocytes, setLeukocytes, '0')}</div>
+            <div>{field('', leukocytes, setLeukocytes, '0')}</div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <label><input type="checkbox" style={s.check} checked={viscosity} onChange={e => setViscosity(e.target.checked)} /> Вязкость</label>
-              <label><input type="checkbox" style={s.check} checked={agglutination} onChange={e => setAgglutination(e.target.checked)} /> Агглютинация</label>
+              <label><input type="checkbox" style={s.check} checked={viscosity} onChange={e => setViscosity(e.target.checked)} /> Р’СЏР·РєРѕСЃС‚СЊ</label>
+              <label><input type="checkbox" style={s.check} checked={agglutination} onChange={e => setAgglutination(e.target.checked)} /> РђРіРіР»СЋС‚РёРЅР°С†РёСЏ</label>
             </div>
           </div>
         </div>
@@ -186,26 +186,26 @@ export const FertilityPCTScreen: React.FC = () => {
 
       {tab === 'hormones' && (
         <div style={s.card}>
-          <h4 style={{ margin: '0 0 8px' }}>Гормоны крови (10 маркеров)</h4>
-          <p style={{ fontSize: 11, opacity: 0.6, margin: '0 0 8px' }}>Автозаполнение из LabsScreen</p>
+          <h4 style={{ margin: '0 0 8px' }}>Р“РѕСЂРјРѕРЅС‹ РєСЂРѕРІРё (10 РјР°СЂРєРµСЂРѕРІ)</h4>
+          <p style={{ fontSize: 11, opacity: 0.6, margin: '0 0 8px' }}>РђРІС‚РѕР·Р°РїРѕР»РЅРµРЅРёРµ РёР· LabsScreen</p>
           <div style={s.row}>
-            <div>{field('ЛГ (мМЕ/мл)', lh, setLh, '5')}</div>
-            <div>{field('ФСГ (мМЕ/мл)', fsh, setFsh, '4')}</div>
+            <div>{field('', lh, setLh, '5')}</div>
+            <div>{field('', fsh, setFsh, '4')}</div>
           </div>
           <div style={s.row}>
-            <div>{field('Тестостерон (нг/дл)', tt, setTt, '500')}</div>
-            <div>{field('Тестостерон свободный (пг/мл)', ft, setFt, '15')}</div>
+            <div>{field('', tt, setTt, '500')}</div>
+            <div>{field('', ft, setFt, '15')}</div>
           </div>
           <div style={s.row}>
-            <div>{field('Эстрадиол (пг/мл)', e2, setE2, '25')}</div>
-            <div>{field('Пролактин (нг/мл)', prl, setPrl, '8')}</div>
+            <div>{field('', e2, setE2, '25')}</div>
+            <div>{field('', prl, setPrl, '8')}</div>
           </div>
           <div style={s.row}>
-            <div>{field('ГСПГ (нмоль/л)', shbg, setShbg, '30')}</div>
-            <div>{field('Ингибин Б (пг/мл)', inhb, setInhb, '150')}</div>
+            <div>{field('', shbg, setShbg, '30')}</div>
+            <div>{field('', inhb, setInhb, '150')}</div>
           </div>
           <div style={s.row}>
-            <div>{field('АМГ (нг/мл)', amh, setAmh, '4')}</div>
+            <div>{field('', amh, setAmh, '4')}</div>
             <div></div>
           </div>
         </div>
@@ -213,11 +213,11 @@ export const FertilityPCTScreen: React.FC = () => {
 
       {tab === 'structure' && (
         <div style={s.card}>
-          <h4 style={{ margin: '0 0 8px' }}>DFI и структурные факторы</h4>
+          <h4 style={{ margin: '0 0 8px' }}>DFI Рё СЃС‚СЂСѓРєС‚СѓСЂРЅС‹Рµ С„Р°РєС‚РѕСЂС‹</h4>
           <div style={s.row}>
-            <div>{field('DFI (%) ≤15 норма', dfi, setDfi, '0')}</div>
+            <div>{field('DFI (%) в‰¤15 РЅРѕСЂРјР°', dfi, setDfi, '0')}</div>
             <div>
-              <span style={s.label}>Варикоцеле</span>
+              <span style={s.label}>Р’Р°СЂРёРєРѕС†РµР»Рµ</span>
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                 {VARICOCELE.map(v => <button key={v.id} style={varicocele === v.id ? s.btnActive : s.btn} onClick={() => setVaricocele(v.id)}>{v.label}</button>)}
               </div>
@@ -227,7 +227,7 @@ export const FertilityPCTScreen: React.FC = () => {
       )}
 
       <div style={{ ...s.card, borderColor: scoreColor, background: scoreBg, border: `1px solid ${scoreColor}` }}>
-        <h3 style={{ color: scoreColor, margin: '0 0 8px' }}>Индекс фертильности: {result.ifScore}</h3>
+        <h3 style={{ color: scoreColor, margin: '0 0 8px' }}>РРЅРґРµРєСЃ С„РµСЂС‚РёР»СЊРЅРѕСЃС‚Рё: {result.ifScore}</h3>
         <p style={{ color: scoreColor, margin: '0 0 4px' }}>{result.interpretation}</p>
         <div style={s.barTrack}>
           <div style={{ height: '100%', borderRadius: 5, background: scoreColor, width: `${result.ifScore}%`, transition: 'width 0.3s' }} />
@@ -235,11 +235,11 @@ export const FertilityPCTScreen: React.FC = () => {
 
         {result.spermIndex !== undefined && (
           <div style={{ marginTop: 12 }}>
-            <h4 style={{ margin: '0 0 6px', fontSize: 13 }}>Суб-индексы IF v2</h4>
+            <h4 style={{ margin: '0 0 6px', fontSize: 13 }}>РЎСѓР±-РёРЅРґРµРєСЃС‹ IF v2</h4>
             {[
-              { label: 'Спермограмма (55%)', value: result.spermIndex },
-              { label: 'Гормоны (30%)', value: result.hormonalIndex ?? 0 },
-              { label: 'Структура (15%)', value: result.structuralIndex ?? 0 },
+              { label: '', value: result.spermIndex },
+              { label: '', value: result.hormonalIndex ?? 0 },
+              { label: '', value: result.structuralIndex ?? 0 },
             ].map(si => (
               <div key={si.label} style={{ marginBottom: 6 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
@@ -263,21 +263,21 @@ export const FertilityPCTScreen: React.FC = () => {
         <div style={{ display: 'flex', gap: 16, marginTop: 12 }}>
           <div style={{ textAlign: 'center' }}>
             <div style={{ fontSize: 18, fontWeight: 700, color: result.forecast6w >= 60 ? '#00e68a' : '#ff9800' }}>{result.forecast6w}</div>
-            <div style={{ fontSize: 11, opacity: 0.6 }}>Прогноз 6 нед</div>
+            <div style={{ fontSize: 11, opacity: 0.6 }}>РџСЂРѕРіРЅРѕР· 6 РЅРµРґ</div>
           </div>
           <div style={{ textAlign: 'center' }}>
             <div style={{ fontSize: 18, fontWeight: 700, color: result.forecast12w >= 60 ? '#00e68a' : '#ff9800' }}>{result.forecast12w}</div>
-            <div style={{ fontSize: 11, opacity: 0.6 }}>Прогноз 12 нед</div>
+            <div style={{ fontSize: 11, opacity: 0.6 }}>РџСЂРѕРіРЅРѕР· 12 РЅРµРґ</div>
           </div>
         </div>
       </div>
 
       <div style={s.card}>
-        <h4 style={{ margin: '0 0 8px' }}>Прогноз восстановления</h4>
+        <h4 style={{ margin: '0 0 8px' }}>РџСЂРѕРіРЅРѕР· РІРѕСЃСЃС‚Р°РЅРѕРІР»РµРЅРёСЏ</h4>
         <svg viewBox={`0 0 ${chartW} ${chartH}`} style={{ width: '100%', maxWidth: 380 }}>
           {[0, 25, 50, 75, 100].map(v => <line key={v} x1={padL} y1={toY(v)} x2={padL + plotW} y2={toY(v)} stroke="var(--border)" strokeWidth={0.5} />)}
           {[0, 6, 12, 18, 24].map(w => <text key={w} x={toX(w)} y={chartH - 4} textAnchor="middle" fill="var(--text-secondary)" fontSize={10}>{w}</text>)}
-          <text x={chartW / 2} y={chartH} textAnchor="middle" fill="var(--text-secondary)" fontSize={10}>Недели</text>
+          <text x={chartW / 2} y={chartH} textAnchor="middle" fill="var(--text-secondary)" fontSize={10}>РќРµРґРµР»Рё</text>
           <polygon points={areaPoints} fill={scoreColor} opacity={0.15} />
           <polyline points={polyline} fill="none" stroke={scoreColor} strokeWidth={2} />
           <line x1={padL} y1={toY(60)} x2={padL + plotW} y2={toY(60)} stroke="#00e68a" strokeWidth={1} strokeDasharray="4,3" />
@@ -288,16 +288,16 @@ export const FertilityPCTScreen: React.FC = () => {
       </div>
 
       <div style={s.card}>
-        <h4 style={{ margin: '0 0 8px' }}>Рекомендации по ПКТ и восстановлению</h4>
+        <h4 style={{ margin: '0 0 8px' }}>Р РµРєРѕРјРµРЅРґР°С†РёРё РїРѕ РџРљРў Рё РІРѕСЃСЃС‚Р°РЅРѕРІР»РµРЅРёСЋ</h4>
         <div style={{ fontSize: 13, lineHeight: 1.6 }}>
-          <h5>HCG на цикле</h5>
-          <p>500–1000 МЕ 2–3 раза в неделю начиная с 3-й недели цикла.</p>
-          <h5>ПКТ: Кломифен</h5>
-          <p>50 мг/день — 2 нед, затем 25 мг/день — 2 нед.</p>
-          <h5>ПКТ: Тамоксифен (альтернатива)</h5>
-          <p>20 мг/день — 4 недели.</p>
-          <h5>Нутритивная поддержка</h5>
-          <ul><li>Цинк 30 мг/день</li><li>Селен 100 мкг/день</li><li>L-карнитин 1 г/день</li><li>CoQ10 200 мг/день</li><li>Витамин E 400 МЕ/день</li></ul>
+          <h5>HCG РЅР° С†РёРєР»Рµ</h5>
+          <p>500вЂ“1000 РњР• 2вЂ“3 СЂР°Р·Р° РІ РЅРµРґРµР»СЋ РЅР°С‡РёРЅР°СЏ СЃ 3-Р№ РЅРµРґРµР»Рё С†РёРєР»Р°.</p>
+          <h5>РџРљРў: РљР»РѕРјРёС„РµРЅ</h5>
+          <p>50 РјРі/РґРµРЅСЊ вЂ” 2 РЅРµРґ, Р·Р°С‚РµРј 25 РјРі/РґРµРЅСЊ вЂ” 2 РЅРµРґ.</p>
+          <h5>РџРљРў: РўР°РјРѕРєСЃРёС„РµРЅ (Р°Р»СЊС‚РµСЂРЅР°С‚РёРІР°)</h5>
+          <p>20 РјРі/РґРµРЅСЊ вЂ” 4 РЅРµРґРµР»Рё.</p>
+          <h5>РќСѓС‚СЂРёС‚РёРІРЅР°СЏ РїРѕРґРґРµСЂР¶РєР°</h5>
+          <ul><li>Р¦РёРЅРє 30 РјРі/РґРµРЅСЊ</li><li>РЎРµР»РµРЅ 100 РјРєРі/РґРµРЅСЊ</li><li>L-РєР°СЂРЅРёС‚РёРЅ 1 Рі/РґРµРЅСЊ</li><li>CoQ10 200 РјРі/РґРµРЅСЊ</li><li>Р’РёС‚Р°РјРёРЅ E 400 РњР•/РґРµРЅСЊ</li></ul>
         </div>
       </div>
     </div>

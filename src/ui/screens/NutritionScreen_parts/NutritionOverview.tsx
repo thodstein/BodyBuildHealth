@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+﻿import React, { useMemo } from 'react';
 import { derivePAL } from '../../../core/data-link';
 import { calcNutrition } from '../../../engines/nutrition.engine';
 import { MICRONUTRIENT_TARGETS } from '../../../core/constants';
@@ -6,12 +6,12 @@ import { nutritionMultipliers } from '../../../engines/risk-engine-v7-core';
 import type { UserProfile } from '../../../core/types';
 
 const NUTRITION_FACTOR_LABELS: Record<string, { label: string; desc: string; good: boolean }> = {
-  renal_protein: { label: '🫘 Белок → Почки', desc: 'Высокое потребление белка (более 2.2 г/кг) увеличивает нагрузку на почки', good: false },
-  cardio_fiber: { label: '❤️ Клетчатка → Сердце', desc: 'Низкое потребление клетчатки (менее 20 г/д) увеличивает риск дислипидемии', good: false },
-  cardio_omega3: { label: '🫀 Омега-3 → Сердце', desc: 'Достаточное потребление омега-3 (от 2 г/д) снижает кардиориск на 25%', good: true },
-  neuro_omega3: { label: '🧠 Омега-3 → Нейро', desc: 'Омега-3 ≥2 г/д снижает нейровоспаление на 20%', good: true },
-  cardio_sodium: { label: '🧂 Натрий → Сердце', desc: 'Избыток натрия (более 5 г/д) повышает АД и кардиориск', good: false },
-  cardio_potassium: { label: '🍌 Калий → Сердце', desc: 'Дефицит калия (менее 2 г/д) повышает риск аритмий', good: false },
+  renal_protein: { label: '', desc: '', good: false },
+  cardio_fiber: { label: 'вќ¤пёЏ РљР»РµС‚С‡Р°С‚РєР° в†’ РЎРµСЂРґС†Рµ', desc: '', good: false },
+  cardio_omega3: { label: '', desc: '', good: true },
+  neuro_omega3: { label: '', desc: '', good: true },
+  cardio_sodium: { label: '', desc: '', good: false },
+  cardio_potassium: { label: '', desc: '', good: false },
 };
 
 export const NutritionOverview: React.FC<{
@@ -55,18 +55,18 @@ export const NutritionOverview: React.FC<{
   const pctCarbs = nutritionTargets ? Math.min(150, Math.round((avgWeeklyCarbs / nutritionTargets.carbs) * 100)) : 0;
 
   const goalInfo = s?.primaryGoal ? {
-    bulk: 'Набор массы', cut: 'Сушка', maintenance: 'Поддержание',
-    strength: 'Сила', hypertrophy: 'Гипертрофия', recomposition: 'Рекомпозиция',
-    health: 'Здоровье', rehab: 'Восстановление', fitness: 'Фитнес',
-    endurance: 'Выносливость',
-  }[s.primaryGoal] || s.primaryGoal : 'Не указана';
+    bulk: '', cut: '', maintenance: '',
+    strength: '', hypertrophy: '', recomposition: '',
+    health: '', rehab: '', fitness: '',
+    endurance: '',
+  }[s.primaryGoal] || s.primaryGoal : '';
 
   return (
     <div className="nutrition-overview">
       {/* Main Macros Card */}
       <div className="card" style={{ marginBottom: 12 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-          <h3 style={{ margin: 0 }}>📊 КБЖУ — {goalInfo}</h3>
+          <h3 style={{ margin: 0 }}>рџ“Љ РљР‘Р–РЈ вЂ” {goalInfo}</h3>
           <span style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, background: 'rgba(0,230,138,0.1)', color: '#00e68a', fontWeight: 600 }}>
             PAL: {pal.toFixed(2)}
           </span>
@@ -74,19 +74,19 @@ export const NutritionOverview: React.FC<{
 
         {nutritionTargets && (
           <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 10 }}>
-            BMR: {nutritionTargets.bmr} ккал | TDEE: {nutritionTargets.tdee} ккал
+            BMR: {nutritionTargets.bmr} РєРєР°Р» | TDEE: {nutritionTargets.tdee} РєРєР°Р»
           </div>
         )}
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 12 }}>
           {[
-            { label: 'Калории', val: avgWeeklyKcal, target: nutritionTargets?.kcal ?? 0, unit: 'ккал', color: '#22c55e' },
-            { label: 'Белки', val: avgWeeklyProtein, target: nutritionTargets?.protein ?? 0, unit: 'г', color: '#3b82f6' },
-            { label: 'Жиры', val: avgWeeklyFat, target: nutritionTargets?.fats ?? 0, unit: 'г', color: '#f97316' },
-            { label: 'Углеводы', val: avgWeeklyCarbs, target: nutritionTargets?.carbs ?? 0, unit: 'г', color: '#a855f7' },
+            { label: '', val: avgWeeklyKcal, target: nutritionTargets?.kcal ?? 0, unit: '', color: '#22c55e' },
+            { label: '', val: avgWeeklyProtein, target: nutritionTargets?.protein ?? 0, unit: '', color: '#3b82f6' },
+            { label: '', val: avgWeeklyFat, target: nutritionTargets?.fats ?? 0, unit: '', color: '#f97316' },
+            { label: '', val: avgWeeklyCarbs, target: nutritionTargets?.carbs ?? 0, unit: '', color: '#a855f7' },
           ].map(m => {
             const pct = m.target > 0 ? Math.min(200, Math.round((m.val / m.target) * 100)) : 0;
-            const status = pct < 80 ? '⬇️' : pct > 110 ? '⬆️' : '✅';
+            const status = pct < 80 ? 'в¬‡пёЏ' : pct > 110 ? 'в¬†пёЏ' : 'вњ…';
             return (
               <div key={m.label} style={{ background: 'var(--bg-secondary)', padding: 10, borderRadius: 8 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
@@ -99,7 +99,7 @@ export const NutritionOverview: React.FC<{
                 <div style={{ background: 'rgba(255,255,255,0.1)', borderRadius: 3, height: 4, marginTop: 4, overflow: 'hidden' }}>
                   <div style={{ width: `${Math.min(100, pct)}%`, height: '100%', background: m.color, borderRadius: 3 }} />
                 </div>
-                <div style={{ fontSize: 9, color: 'var(--text-dim)', marginTop: 2 }}>{pct}% от цели</div>
+                <div style={{ fontSize: 9, color: 'var(--text-dim)', marginTop: 2 }}>{pct}% РѕС‚ С†РµР»Рё</div>
               </div>
             );
           })}
@@ -108,12 +108,12 @@ export const NutritionOverview: React.FC<{
             {nutritionTargets && (
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, fontSize: 11 }}>
                 <div style={{ background: 'rgba(59,130,246,0.08)', padding: 6, borderRadius: 6, textAlign: 'center' }}>
-                  <div style={{ color: 'var(--text-dim)' }}>Вода</div>
-                  <div style={{ fontWeight: 700 }}>{nutritionTargets.water} л/д</div>
+                  <div style={{ color: 'var(--text-dim)' }}>Р’РѕРґР°</div>
+                  <div style={{ fontWeight: 700 }}>{nutritionTargets.water} Р»/Рґ</div>
                 </div>
                 <div style={{ background: 'rgba(34,197,94,0.08)', padding: 6, borderRadius: 6, textAlign: 'center' }}>
-                  <div style={{ color: 'var(--text-dim)' }}>Клетчатка</div>
-                  <div style={{ fontWeight: 700 }}>{nutritionTargets.fiber} г/д</div>
+                  <div style={{ color: 'var(--text-dim)' }}>РљР»РµС‚С‡Р°С‚РєР°</div>
+                  <div style={{ fontWeight: 700 }}>{nutritionTargets.fiber} Рі/Рґ</div>
                 </div>
                 <div style={{ background: 'rgba(249,115,22,0.08)', padding: 6, borderRadius: 6, textAlign: 'center' }}>
                   <div style={{ color: 'var(--text-dim)' }}>Mg/Zn/D3/C</div>
@@ -127,12 +127,12 @@ export const NutritionOverview: React.FC<{
             {/* Macro targets vs actual (enhanced display) */}
             {nutritionTargets && avgWeeklyKcal > 0 && (
               <div style={{ marginTop: 10, borderTop: '1px solid var(--border)', paddingTop: 8 }}>
-                <div style={{ fontSize: 11, fontWeight: 600, marginBottom: 6 }}>🎯 Цели vs Факт</div>
+                <div style={{ fontSize: 11, fontWeight: 600, marginBottom: 6 }}>рџЋЇ Р¦РµР»Рё vs Р¤Р°РєС‚</div>
                 {[
-                  { l: 'Калории', a: avgWeeklyKcal, t: nutritionTargets.kcal, u: 'ккал', c: '#22c55e' },
-                  { l: 'Белки', a: avgWeeklyProtein, t: nutritionTargets.protein, u: 'г', c: '#3b82f6' },
-                  { l: 'Жиры', a: avgWeeklyFat, t: nutritionTargets.fats, u: 'г', c: '#f97316' },
-                  { l: 'Углеводы', a: avgWeeklyCarbs, t: nutritionTargets.carbs, u: 'г', c: '#a855f7' },
+                  { l: '', a: avgWeeklyKcal, t: nutritionTargets.kcal, u: '', c: '#22c55e' },
+                  { l: '', a: avgWeeklyProtein, t: nutritionTargets.protein, u: '', c: '#3b82f6' },
+                  { l: '', a: avgWeeklyFat, t: nutritionTargets.fats, u: '', c: '#f97316' },
+                  { l: '', a: avgWeeklyCarbs, t: nutritionTargets.carbs, u: '', c: '#a855f7' },
                 ].map(m => {
                   const pct = m.t > 0 ? Math.min(150, Math.round((m.a / m.t) * 100)) : 0;
                   const color = pct >= 85 && pct <= 115 ? '#22c55e' : pct < 85 ? '#ff9100' : '#ef4444';
@@ -154,7 +154,7 @@ export const NutritionOverview: React.FC<{
             {/* Micronutrient intake vs targets */}
             {Object.keys(microsIntake).length > 0 && (
               <div style={{ marginTop: 10, borderTop: '1px solid var(--border)', paddingTop: 8 }}>
-                <div style={{ fontSize: 11, fontWeight: 600, marginBottom: 6 }}>🧪 Микронутриенты (дневная норма)</div>
+                <div style={{ fontSize: 11, fontWeight: 600, marginBottom: 6 }}>рџ§Є РњРёРєСЂРѕРЅСѓС‚СЂРёРµРЅС‚С‹ (РґРЅРµРІРЅР°СЏ РЅРѕСЂРјР°)</div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 4 }}>
                   {Object.entries(MICRONUTRIENT_TARGETS).slice(0, 9).map(([key, target]) => {
                     const microMap: Record<string, string> = {
@@ -187,9 +187,9 @@ export const NutritionOverview: React.FC<{
 
       {/* V7 Nutrition Risk Factors */}
       <div className="card" style={{ marginBottom: 12 }}>
-        <h3 style={{ margin: '0 0 8px 0' }}>🔬 Влияние питания на риски (V7)</h3>
+        <h3 style={{ margin: '0 0 8px 0' }}>рџ”¬ Р’Р»РёСЏРЅРёРµ РїРёС‚Р°РЅРёСЏ РЅР° СЂРёСЃРєРё (V7)</h3>
         <p style={{ fontSize: 11, color: 'var(--text-dim)', margin: '0 0 10px 0' }}>
-          Как ваши параметры питания влияют на риск-расчёт в V7 движке. Коэффициент выше 1.0 = усиление риска, ниже 1.0 = снижение.
+          РљР°Рє РІР°С€Рё РїР°СЂР°РјРµС‚СЂС‹ РїРёС‚Р°РЅРёСЏ РІР»РёСЏСЋС‚ РЅР° СЂРёСЃРє-СЂР°СЃС‡С‘С‚ РІ V7 РґРІРёР¶РєРµ. РљРѕСЌС„С„РёС†РёРµРЅС‚ РІС‹С€Рµ 1.0 = СѓСЃРёР»РµРЅРёРµ СЂРёСЃРєР°, РЅРёР¶Рµ 1.0 = СЃРЅРёР¶РµРЅРёРµ.
         </p>
         <div style={{ display: 'grid', gap: 6 }}>
           {Object.entries(v7Factors).map(([key, factor]) => {
@@ -199,7 +199,7 @@ export const NutritionOverview: React.FC<{
             const barColor = (factor as number) < 1 ? '#22c55e' : (factor as number) > 1 ? '#ef4444' : '#6b7280';
             const isGood = info.good;
             const isFactorGood = (factor as number) <= 1.0;
-            const statusIcon = isGood ? (isFactorGood ? '✅' : '⚠️') : (isFactorGood ? '✅' : '🔴');
+            const statusIcon = isGood ? (isFactorGood ? 'вњ…' : 'вљ пёЏ') : (isFactorGood ? 'вњ…' : '');
             return (
               <div key={key} style={{ background: 'var(--bg-secondary)', padding: 8, borderRadius: 6 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -218,7 +218,7 @@ export const NutritionOverview: React.FC<{
                       }} />
                     </div>
                     <span style={{ fontWeight: 700, fontSize: 13, color: barColor, minWidth: 36, textAlign: 'right' }}>
-                      ×{(factor as number).toFixed(2)}
+                      Г—{(factor as number).toFixed(2)}
                     </span>
                   </div>
                 </div>
@@ -229,15 +229,15 @@ export const NutritionOverview: React.FC<{
 
         {/* Current nutrition parameters from profile */}
         <div style={{ marginTop: 10, background: 'var(--bg-secondary)', padding: 8, borderRadius: 6 }}>
-          <div style={{ fontSize: 11, fontWeight: 600, marginBottom: 6 }}>Текущие параметры питания (Профиль → V7 Параметры):</div>
+          <div style={{ fontSize: 11, fontWeight: 600, marginBottom: 6 }}>РўРµРєСѓС‰РёРµ РїР°СЂР°РјРµС‚СЂС‹ РїРёС‚Р°РЅРёСЏ (РџСЂРѕС„РёР»СЊ в†’ V7 РџР°СЂР°РјРµС‚СЂС‹):</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 4, fontSize: 11 }}>
             {[
-              { label: 'Белок', val: s?.proteinPerKg ?? 1.8, unit: 'г/кг' },
-              { label: 'Клетчатка', val: s?.fiberG ?? 25, unit: 'г/д' },
-              { label: 'Омега-3', val: s?.omega3G ?? 1.5, unit: 'г/д' },
-              { label: 'Натрий', val: s?.sodiumG ?? 3.5, unit: 'г/д' },
-              { label: 'Калий', val: s?.potassiumG ?? 3.0, unit: 'г/д' },
-              { label: 'Вода', val: s?.dailyWaterLiters ?? 2.5, unit: 'л/д' },
+              { label: '', val: s?.proteinPerKg ?? 1.8, unit: '' },
+              { label: '', val: s?.fiberG ?? 25, unit: '' },
+              { label: '', val: s?.omega3G ?? 1.5, unit: '' },
+              { label: '', val: s?.sodiumG ?? 3.5, unit: '' },
+              { label: '', val: s?.potassiumG ?? 3.0, unit: '' },
+              { label: '', val: s?.dailyWaterLiters ?? 2.5, unit: '' },
             ].map(p => (
               <div key={p.label} style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <span style={{ color: 'var(--text-dim)' }}>{p.label}:</span>

@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 import type { LabPoint } from '../../../core/types';
 import { UCUM_MAP } from '../../../core/constants';
 
@@ -19,7 +19,7 @@ function getLabStatus(lab: LabPoint): 'normal' | 'high' | 'low' | 'unknown' {
 function getLabRefInfo(lab: LabPoint): string {
   const range = LAB_RANGES[lab.code.toUpperCase()];
   if (!range) return '';
-  return `${range.min}–${range.max} ${range.unit}`;
+  return `${range.min}вЂ“${range.max} ${range.unit}`;
 }
 
 export const LabsOverview: React.FC<{
@@ -37,30 +37,30 @@ export const LabsOverview: React.FC<{
   const systemGroups: Record<string, LabPoint[]> = {};
   const labSystemMap: Record<string, string> = {
     // Cardiovascular
-    'LDL': 'Сердечно-сосудистая', 'HDL': 'Сердечно-сосудистая', 'TG': 'Сердечно-сосудистая',
-    'GLU': 'Сердечно-сосудистая', 'HBA1C': 'Сердечно-сосудистая', 'HOMOCYSTEINE': 'Сердечно-сосудистая',
+    'LDL': '', 'HDL': '', 'TG': '',
+    'GLU': '', 'HBA1C': '', 'HOMOCYSTEINE': '',
     // Hepatic
-    'ALT': 'Печень', 'AST': 'Печень', 'GGT': 'Печень', 'ALP': 'Печень',
-    'BILIRUBIN_TOTAL': 'Печень', 'BIL_T': 'Печень', 'BIL': 'Печень', 'ALB': 'Печень',
+    'ALT': '', 'AST': '', 'GGT': '', 'ALP': '',
+    'BILIRUBIN_TOTAL': '', 'BIL_T': '', 'BIL': '', 'ALB': '',
     // Renal
-    'CREATININE': 'Почки', 'BUN': 'Почки', 'EGFR': 'Почки', 'PROTEIN_TOTAL': 'Почки', 'TP': 'Почки', 'UA': 'Почки',
+    'CREATININE': '', 'BUN': '', 'EGFR': '', 'PROTEIN_TOTAL': '', 'TP': '', 'UA': '',
     // Endocrine
-    'TSH': 'Эндокринная', 'FT3': 'Эндокринная', 'FT4': 'Эндокринная',
-    'TESTOSTERONE': 'Эндокринная', 'TT': 'Эндокринная', 'E2': 'Эндокринная', 'ESTRADIOL': 'Эндокринная',
-    'PRL': 'Эндокринная', 'PROLACTIN': 'Эндокринная', 'CORTISOL': 'Эндокринная',
-    'INSULIN': 'Эндокринная', 'INS': 'Эндокринная', 'HOMA': 'Эндокринная',
-    'LH': 'Эндокринная', 'FSH': 'Эндокринная', 'SHBG': 'Эндокринная',
+    'TSH': '', 'FT3': '', 'FT4': '',
+    'TESTOSTERONE': '', 'TT': '', 'E2': '', 'ESTRADIOL': '',
+    'PRL': '', 'PROLACTIN': '', 'CORTISOL': '',
+    'INSULIN': '', 'INS': '', 'HOMA': '',
+    'LH': '', 'FSH': '', 'SHBG': '',
     // Hematologic
-    'HGB': 'Кроветворение', 'HCT': 'Кроветворение', 'PLT': 'Кроветворение', 'WBC': 'Кроветворение',
-    'RBC': 'Кроветворение', 'MCV': 'Кроветворение', 'MCH': 'Кроветворение',
+    'HGB': '', 'HCT': '', 'PLT': '', 'WBC': '',
+    'RBC': '', 'MCV': '', 'MCH': '',
     // Other
-    'CRP': 'Воспаление', 'FERRITIN': 'Воспаление/Железо', 'VITD': 'Витамины', 'CALCIDIOL': 'Витамины',
-    'IGF1': 'Эндокринная', 'DHEA_S': 'Эндокринная', 'PSA': 'Репродуктивная',
-    'PROGESTERONE': 'Репродуктивная', 'AMH': 'Репродуктивная', 'INHB': 'Репродуктивная',
+    'CRP': '', 'FERRITIN': '', 'VITD': '', 'CALCIDIOL': '',
+    'IGF1': '', 'DHEA_S': '', 'PSA': '',
+    'PROGESTERONE': '', 'AMH': '', 'INHB': '',
   };
 
   labs.forEach(lab => {
-    const system = labSystemMap[lab.code.toUpperCase()] || 'Другие';
+    const system = labSystemMap[lab.code.toUpperCase()] || '';
     if (!systemGroups[system]) systemGroups[system] = [];
     systemGroups[system].push(lab);
   });
@@ -69,41 +69,41 @@ export const LabsOverview: React.FC<{
     <div className="labs-overview">
       {!hasLabs && !forceNoLabs && (
         <div style={{ background: 'rgba(239,68,68,0.15)', padding: 12, borderRadius: 8, marginBottom: 12 }}>
-          <strong>⚠️ Внимание!</strong> Нет данных анализов. Некоторые функции могут быть ограничены.
-          Перейдите на вкладку «Результаты» для ввода данных.
+          <strong>вљ пёЏ Р’РЅРёРјР°РЅРёРµ!</strong> РќРµС‚ РґР°РЅРЅС‹С… Р°РЅР°Р»РёР·РѕРІ. РќРµРєРѕС‚РѕСЂС‹Рµ С„СѓРЅРєС†РёРё РјРѕРіСѓС‚ Р±С‹С‚СЊ РѕРіСЂР°РЅРёС‡РµРЅС‹.
+          РџРµСЂРµР№РґРёС‚Рµ РЅР° РІРєР»Р°РґРєСѓ В«Р РµР·СѓР»СЊС‚Р°С‚С‹В» РґР»СЏ РІРІРѕРґР° РґР°РЅРЅС‹С….
         </div>
       )}
 
       {forceNoLabs && (
         <div style={{ background: 'rgba(239,68,68,0.2)', padding: 12, borderRadius: 8, marginBottom: 12 }}>
-          <strong>🚫 Применен штраф за отсутствие анализов</strong>
+          <strong>рџљ« РџСЂРёРјРµРЅРµРЅ С€С‚СЂР°С„ Р·Р° РѕС‚СЃСѓС‚СЃС‚РІРёРµ Р°РЅР°Р»РёР·РѕРІ</strong>
         </div>
       )}
 
       {/* Stats Summary */}
       <div className="card">
-        <h3>📋 Статистика анализов</h3>
+        <h3>рџ“‹ РЎС‚Р°С‚РёСЃС‚РёРєР° Р°РЅР°Р»РёР·РѕРІ</h3>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
           <div style={{ background: 'var(--bg-secondary)', padding: 10, borderRadius: 8, textAlign: 'center' }}>
-            <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>Всего</div>
+            <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>Р’СЃРµРіРѕ</div>
             <div style={{ fontSize: 22, fontWeight: 700 }}>{labs.length}</div>
           </div>
           <div style={{ background: 'var(--bg-secondary)', padding: 10, borderRadius: 8, textAlign: 'center' }}>
-            <div style={{ fontSize: 11, color: '#22c55e' }}>✓ Норма</div>
+            <div style={{ fontSize: 11, color: '#22c55e' }}>вњ“ РќРѕСЂРјР°</div>
             <div style={{ fontSize: 22, fontWeight: 700, color: '#22c55e' }}>{normalCount}</div>
           </div>
           <div style={{ background: 'var(--bg-secondary)', padding: 10, borderRadius: 8, textAlign: 'center' }}>
-            <div style={{ fontSize: 11, color: '#ef4444' }}>↑ Выше нормы</div>
+            <div style={{ fontSize: 11, color: '#ef4444' }}>в†‘ Р’С‹С€Рµ РЅРѕСЂРјС‹</div>
             <div style={{ fontSize: 22, fontWeight: 700, color: '#ef4444' }}>{highCount}</div>
           </div>
           <div style={{ background: 'var(--bg-secondary)', padding: 10, borderRadius: 8, textAlign: 'center' }}>
-            <div style={{ fontSize: 11, color: '#f97316' }}>↓ Ниже нормы</div>
+            <div style={{ fontSize: 11, color: '#f97316' }}>в†“ РќРёР¶Рµ РЅРѕСЂРјС‹</div>
             <div style={{ fontSize: 22, fontWeight: 700, color: '#f97316' }}>{lowCount}</div>
           </div>
         </div>
         {abnormalCount > 0 && (
           <div style={{ marginTop: 8, padding: 8, background: 'rgba(239,68,68,0.1)', borderRadius: 6, fontSize: 12 }}>
-            ⚠️ <strong>{abnormalCount}</strong> из {labs.length} показателей вне нормы ({highCount} ↑, {lowCount} ↓)
+            вљ пёЏ <strong>{abnormalCount}</strong> РёР· {labs.length} РїРѕРєР°Р·Р°С‚РµР»РµР№ РІРЅРµ РЅРѕСЂРјС‹ ({highCount} в†‘, {lowCount} в†“)
           </div>
         )}
       </div>
@@ -111,7 +111,7 @@ export const LabsOverview: React.FC<{
       {/* Lab Values by System */}
       {labs.length > 0 && (
         <div className="card" style={{ marginTop: 12 }}>
-          <h3>🔬 Показатели по системам</h3>
+          <h3>рџ”¬ РџРѕРєР°Р·Р°С‚РµР»Рё РїРѕ СЃРёСЃС‚РµРјР°Рј</h3>
           {Object.entries(systemGroups)
             .sort(([a], [b]) => a.localeCompare(b))
             .map(([system, systemLabs]) => (
@@ -127,7 +127,7 @@ export const LabsOverview: React.FC<{
                     const status = getLabStatus(lab);
                     const refInfo = getLabRefInfo(lab);
                     const statusColor = status === 'high' ? '#ef4444' : status === 'low' ? '#f97316' : '#22c55e';
-                    const statusIcon = status === 'high' ? '↑' : status === 'low' ? '↓' : '✓';
+                    const statusIcon = status === 'high' ? 'в†‘' : status === 'low' ? 'в†“' : 'вњ“';
                     return (
                       <div key={lab.code + '-' + lab.date} style={{ background: 'var(--bg-secondary)', padding: 6, borderRadius: 6, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <div>

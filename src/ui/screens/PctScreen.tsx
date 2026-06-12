@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { db } from '../../core/db';
 import type { CourseEntry } from '../../core/types';
 import { generatePCTPlan } from '../../engines/pct-planner.engine';
@@ -10,8 +10,8 @@ const CLASS_COLORS: Record<string, string> = {
 };
 
 const CLASS_LABELS: Record<string, string> = {
-  pct_serm: 'СЕРМ', pct_aromatase: 'Ингибиторы ароматазы',
-  pct_dopamine: 'Допаминовые агонисты', pct_gonadotropin: 'Гонадотропины',
+  pct_serm: '', pct_aromatase: '',
+  pct_dopamine: '', pct_gonadotropin: '',
 };
 
 interface Props {
@@ -39,28 +39,28 @@ export const PctScreen: React.FC<Props> = ({ onBack }) => {
         <button onClick={onBack} style={{
           padding: '6px 12px', borderRadius: 8, fontSize: 13, cursor: 'pointer',
           background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)',
-        }}>← Назад</button>
-        <h2 style={{ margin: 0, fontSize: 18 }}>🌱 ПКТ и Фертильность</h2>
+        }}>в†ђ РќР°Р·Р°Рґ</button>
+        <h2 style={{ margin: 0, fontSize: 18 }}>рџЊ± РџРљРў Рё Р¤РµСЂС‚РёР»СЊРЅРѕСЃС‚СЊ</h2>
       </div>
 
       {course.length === 0 && (
         <div className="card" style={{ textAlign: 'center', padding: 40, color: 'var(--text-dim)' }}>
-          <div style={{ fontSize: 32, marginBottom: 8 }}>💊</div>
-          <div>Курс не найден</div>
-          <div style={{ fontSize: 11, marginTop: 4 }}>Добавьте препараты во вкладке Фармакология {'>'} Курс</div>
+          <div style={{ fontSize: 32, marginBottom: 8 }}>рџ’Љ</div>
+          <div>РљСѓСЂСЃ РЅРµ РЅР°Р№РґРµРЅ</div>
+          <div style={{ fontSize: 11, marginTop: 4 }}>Р”РѕР±Р°РІСЊС‚Рµ РїСЂРµРїР°СЂР°С‚С‹ РІРѕ РІРєР»Р°РґРєРµ Р¤Р°СЂРјР°РєРѕР»РѕРіРёСЏ {'>'} РљСѓСЂСЃ</div>
         </div>
       )}
 
       {course.length > 0 && !pctPlan && (
         <div className="card" style={{ textAlign: 'center', padding: 20 }}>
           <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 12 }}>
-            Активных веществ в курсе: {course.length}
+            РђРєС‚РёРІРЅС‹С… РІРµС‰РµСЃС‚РІ РІ РєСѓСЂСЃРµ: {course.length}
           </div>
           <button onClick={buildPCT} style={{
             padding: '12px 24px', borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: 'pointer',
             background: 'linear-gradient(135deg, #00e68a, #00c77a)', color: '#000', border: 'none',
           }}>
-            🔄 Сгенерировать ПКТ
+            рџ”„ РЎРіРµРЅРµСЂРёСЂРѕРІР°С‚СЊ РџРљРў
           </button>
         </div>
       )}
@@ -68,14 +68,14 @@ export const PctScreen: React.FC<Props> = ({ onBack }) => {
       {pctPlan && (
         <>
           <div className="card">
-            <h3 style={{ margin: '0 0 8px' }}>📋 План ПКТ</h3>
+            <h3 style={{ margin: '0 0 8px' }}>рџ“‹ РџР»Р°РЅ РџРљРў</h3>
             <div style={{ fontSize: 12, marginBottom: 6 }}>
-              Начало: <b>неделя {pctPlan.pctStartWeek}</b>
+              РќР°С‡Р°Р»Рѕ: <b>РЅРµРґРµР»СЏ {pctPlan.pctStartWeek}</b>
             </div>
             {pctPlan.warnings.length > 0 && (
               <div style={{ background: 'rgba(255,152,0,0.1)', borderRadius: 6, padding: '8px 10px', marginBottom: 8 }}>
                 {pctPlan.warnings.map((w: string, i: number) => (
-                  <div key={i} style={{ fontSize: 10, color: '#ff9800' }}>⚠ {w}</div>
+                  <div key={i} style={{ fontSize: 10, color: '#ff9800' }}>вљ  {w}</div>
                 ))}
               </div>
             )}
@@ -95,23 +95,23 @@ export const PctScreen: React.FC<Props> = ({ onBack }) => {
                   <span style={{ fontWeight: 700, fontSize: 13 }}>{p.doseValue}{p.doseUnit}</span>
                 </div>
                 <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 4 }}>
-                  {p.timing || `${p.frequency}`} | Нед {p.startWeek}-{p.endWeek}
+                  {p.timing || `${p.frequency}`} | РќРµРґ {p.startWeek}-{p.endWeek}
                 </div>
               </div>
             ))}
           </div>
 
           <div className="card">
-            <h3 style={{ margin: '0 0 8px' }}>🧬 Фертильность</h3>
+            <h3 style={{ margin: '0 0 8px' }}>рџ§¬ Р¤РµСЂС‚РёР»СЊРЅРѕСЃС‚СЊ</h3>
             <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 8 }}>
-              Рекомендации для восстановления фертильности после курса
+              Р РµРєРѕРјРµРЅРґР°С†РёРё РґР»СЏ РІРѕСЃСЃС‚Р°РЅРѕРІР»РµРЅРёСЏ С„РµСЂС‚РёР»СЊРЅРѕСЃС‚Рё РїРѕСЃР»Рµ РєСѓСЂСЃР°
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               {[
-                { icon: '🔄', label: 'Длительность ПКТ', desc: `${pctPlan.pctProtocol.reduce((max: number, p: any) => Math.max(max, p.endWeek || 0), 0) - pctPlan.pctStartWeek + 1} недель` },
-                { icon: '🩸', label: 'Контроль анализов', desc: 'Тестостерон, ЛГ, ФСГ, эстрадиол, пролактин, ГСПГ — через 4-6 нед после начала ПКТ' },
-                { icon: '🧪', label: 'Спермограмма', desc: 'Через 3 месяца после завершения ПКТ для оценки фертильности' },
-                { icon: '💊', label: 'Поддержка', desc: 'Цинк, селен, карнитин, коэнзим Q10, витамин D — для качества сперматогенеза' },
+                { icon: '', label: '', desc: `${pctPlan.pctProtocol.reduce((max: number, p: any) => Math.max(max, p.endWeek || 0), 0) - pctPlan.pctStartWeek + 1} РЅРµРґРµР»СЊ` },
+                { icon: '', label: '', desc: '' },
+                { icon: '', label: '', desc: '' },
+                { icon: '', label: '', desc: '' },
               ].map((item, i) => (
                 <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
                   <span style={{ fontSize: 16 }}>{item.icon}</span>

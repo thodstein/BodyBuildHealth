@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from 'react';
+﻿import React, { useEffect, useState, useMemo } from 'react';
 import { MOCK_MARKETPLACE_DB, getBestPrice, generateAffiliateLink } from '../../engines/marketplace.engine';
 import type { MarketplaceItem, PurchaseOption } from '../../core/types';
 
@@ -6,10 +6,10 @@ type CategoryFilter = 'all' | 'pharma' | 'supplement' | 'vitamin';
 type SortMode = 'price' | 'category' | 'name';
 
 const CATEGORY_LABELS: Record<CategoryFilter, string> = {
-  all: 'Все',
-  pharma: 'Фарма',
-  supplement: 'БАДы',
-  vitamin: 'Витамины'
+  all: '',
+  pharma: '',
+  supplement: '',
+  vitamin: ''
 };
 
 const MECHANISM_COLORS: Record<string, string> = {
@@ -31,14 +31,14 @@ function getMechanismColor(mechanism: string): string {
 function getMechanismLabel(mechanism: string): string {
   const [prefix, num] = mechanism.split('_');
   const labels: Record<string, string> = {
-    cardio: 'КВС',
-    hepatic: 'Печень',
-    renal: 'Почки',
-    neuro: 'Нейро',
-    endocrine: 'Эндокр',
-    hematologic: 'Кровь',
-    reproductive: 'Репр',
-    glucose: 'Глюк'
+    cardio: '',
+    hepatic: '',
+    renal: '',
+    neuro: '',
+    endocrine: '',
+    hematologic: '',
+    reproductive: '',
+    glucose: ''
   };
   return `${labels[prefix] || prefix}_${num}`;
 }
@@ -69,12 +69,12 @@ export const MarketplaceScreen: React.FC = () => {
   }, [items, filter, sort]);
 
   if (loading) {
-    return <div className="screen marketplace">Загрузка Маркетплейс...</div>;
+    return <div className="screen marketplace">Р—Р°РіСЂСѓР·РєР° РњР°СЂРєРµС‚РїР»РµР№СЃ...</div>;
   }
 
   return (
     <div className="screen marketplace">
-      <h2>Маркетплейс</h2>
+      <h2>РњР°СЂРєРµС‚РїР»РµР№СЃ</h2>
 
       <div className="marketplace-controls">
         <div className="filter-tabs">
@@ -89,8 +89,8 @@ export const MarketplaceScreen: React.FC = () => {
           ))}
         </div>
         <div className="sort-controls">
-          <span>Сортировка:</span>
-          {([['price', 'Цена'], ['category', 'Категория'], ['name', 'Имя']] as [SortMode, string][]).map(([mode, label]) => (
+          <span>РЎРѕСЂС‚РёСЂРѕРІРєР°:</span>
+          {([['price', ''], ['category', ''], ['name', '']] as [SortMode, string][]).map(([mode, label]) => (
             <button
               key={mode}
               className={`sort-btn ${sort === mode ? 'active' : ''}`}
@@ -115,7 +115,7 @@ export const MarketplaceScreen: React.FC = () => {
                 </span>
               </div>
 
-              {item.dailyDose && <p className="dose">Суточная доза: {item.dailyDose}</p>}
+              {item.dailyDose && <p className="dose">РЎСѓС‚РѕС‡РЅР°СЏ РґРѕР·Р°: {item.dailyDose}</p>}
 
               {item.mechanisms && item.mechanisms.length > 0 && (
                 <div className="mechanism-tags">
@@ -131,18 +131,18 @@ export const MarketplaceScreen: React.FC = () => {
                 </div>
               )}
 
-              {item.synergy && <p className="synergy">⚡ {item.synergy}</p>}
+              {item.synergy && <p className="synergy">вљЎ {item.synergy}</p>}
 
               <div className="purchase-options">
-                <h4>Варианты покупки:</h4>
+                <h4>Р’Р°СЂРёР°РЅС‚С‹ РїРѕРєСѓРїРєРё:</h4>
                 <ul>
                   {item.purchaseOptions.map((opt, idx) => {
                     const isBest = best && opt.platform === best.platform && opt.price === best.price;
                     return (
                       <li key={idx} className={isBest ? 'best-option' : ''}>
-                        <strong>{opt.platform}:</strong> {opt.price} {opt.currency}, доставка {opt.deliveryDays} дн.
-                        {isBest && <span className="best-price-badge">Лучшая цена</span>}
-                        <a href={generateAffiliateLink(opt)} target="_blank" rel="noopener noreferrer" className="btn-link">Купить</a>
+                        <strong>{opt.platform}:</strong> {opt.price} {opt.currency}, РґРѕСЃС‚Р°РІРєР° {opt.deliveryDays} РґРЅ.
+                        {isBest && <span className="best-price-badge">Р›СѓС‡С€Р°СЏ С†РµРЅР°</span>}
+                        <a href={generateAffiliateLink(opt)} target="_blank" rel="noopener noreferrer" className="btn-link">РљСѓРїРёС‚СЊ</a>
                       </li>
                     );
                   })}
@@ -152,7 +152,7 @@ export const MarketplaceScreen: React.FC = () => {
               {best && (
                 <div className="best-price">
                   <span className="best-price-value">
-                    Лучшая цена: {best.price} {best.currency} ({best.platform})
+                    Р›СѓС‡С€Р°СЏ С†РµРЅР°: {best.price} {best.currency} ({best.platform})
                   </span>
                 </div>
               )}

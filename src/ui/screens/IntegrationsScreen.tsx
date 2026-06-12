@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+﻿import React, { useState, useEffect, useCallback } from 'react';
 
 type TabId = 'wearables' | 'lab' | 'fatsecret' | 'telegram';
 
@@ -9,33 +9,33 @@ const LS = {
 };
 
 const MOCK_FOODS = [
-  { id: '1', name: 'Куриная грудка гриль', calories: 165, protein: 31, fat: 3.6, carbs: 0, serving: '100 г' },
-  { id: '2', name: 'Гречка варёная', calories: 92, protein: 3.4, fat: 0.6, carbs: 19.9, serving: '100 г' },
-  { id: '3', name: 'Яйцо куриное', calories: 155, protein: 12.6, fat: 10.6, carbs: 1.1, serving: '1 шт (60 г)' },
-  { id: '4', name: 'Творог 5%', calories: 121, protein: 17.2, fat: 5, carbs: 1.8, serving: '100 г' },
-  { id: '5', name: 'Банан', calories: 89, protein: 1.1, fat: 0.3, carbs: 22.8, serving: '1 шт (120 г)' },
-  { id: '6', name: 'Овсянка на воде', calories: 88, protein: 3, fat: 1.5, carbs: 15, serving: '100 г' },
-  { id: '7', name: 'Лосось запечённый', calories: 208, protein: 20.4, fat: 13.4, carbs: 0, serving: '100 г' },
-  { id: '8', name: 'Рис белый варёный', calories: 130, protein: 2.7, fat: 0.3, carbs: 28.2, serving: '100 г' },
+  { id: '1', name: '', calories: 165, protein: 31, fat: 3.6, carbs: 0, serving: '100 Рі' },
+  { id: '2', name: '', calories: 92, protein: 3.4, fat: 0.6, carbs: 19.9, serving: '100 Рі' },
+  { id: '3', name: '', calories: 155, protein: 12.6, fat: 10.6, carbs: 1.1, serving: '1 С€С‚ (60 Рі)' },
+  { id: '4', name: '', calories: 121, protein: 17.2, fat: 5, carbs: 1.8, serving: '100 Рі' },
+  { id: '5', name: '', calories: 89, protein: 1.1, fat: 0.3, carbs: 22.8, serving: '1 С€С‚ (120 Рі)' },
+  { id: '6', name: '', calories: 88, protein: 3, fat: 1.5, carbs: 15, serving: '100 Рі' },
+  { id: '7', name: '', calories: 208, protein: 20.4, fat: 13.4, carbs: 0, serving: '100 Рі' },
+  { id: '8', name: '', calories: 130, protein: 2.7, fat: 0.3, carbs: 28.2, serving: '100 Рі' },
 ];
 
 const LABS = [
-  { id: 'invitro', name: 'Инвитро', icon: '🔬' },
-  { id: 'helix', name: 'Хеликс', icon: '🧬' },
-  { id: 'cmd', name: 'CMD', icon: '🏥' },
-  { id: 'medsi', name: 'Медси', icon: '💊' },
-  { id: 'gemotest', name: 'Гемотест', icon: '🩸' },
+  { id: 'invitro', name: '', icon: '' },
+  { id: 'helix', name: '', icon: '' },
+  { id: 'cmd', name: 'CMD', icon: '' },
+  { id: 'medsi', name: '', icon: '' },
+  { id: 'gemotest', name: '', icon: '' },
 ];
 
 const DEVICES = [
-  { id: 'polar_h10', brand: 'Polar', model: 'H10', icon: '❤️' },
-  { id: 'polar_vantage', brand: 'Polar', model: 'Vantage', icon: '⌚' },
-  { id: 'garmin_forerunner', brand: 'Garmin', model: 'Forerunner', icon: '🏃' },
-  { id: 'garmin_fenix', brand: 'Garmin', model: 'Fenix', icon: '🏔️' },
-  { id: 'apple_watch', brand: 'Apple', model: 'Watch', icon: '🍎' },
+  { id: 'polar_h10', brand: 'Polar', model: 'H10', icon: 'вќ¤пёЏ' },
+  { id: 'polar_vantage', brand: 'Polar', model: 'Vantage', icon: 'вЊљ' },
+  { id: 'garmin_forerunner', brand: 'Garmin', model: 'Forerunner', icon: '' },
+  { id: 'garmin_fenix', brand: 'Garmin', model: 'Fenix', icon: '' },
+  { id: 'apple_watch', brand: 'Apple', model: 'Watch', icon: '' },
 ];
 
-const DAYS = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'] as const;
+const DAYS = ['', '', '', '', '', '', ''] as const;
 
 function loadJson<T>(key: string, fallback: T): T {
   const raw = LS.get(key);
@@ -47,15 +47,15 @@ export const IntegrationsScreen: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabId>('fatsecret');
 
   const tabs: { id: TabId; label: string; icon: string }[] = [
-    { id: 'fatsecret', label: 'FatSecret', icon: '🍎' },
-    { id: 'lab', label: 'Лаборатории', icon: '🔬' },
-    { id: 'wearables', label: 'Устройства', icon: '⌚' },
-    { id: 'telegram', label: 'Telegram', icon: '✈️' },
+    { id: 'fatsecret', label: 'FatSecret', icon: '' },
+    { id: 'lab', label: '', icon: '' },
+    { id: 'wearables', label: '', icon: 'вЊљ' },
+    { id: 'telegram', label: 'Telegram', icon: 'вњ€пёЏ' },
   ];
 
   return (
     <div className="screen integrations">
-      <h2>Интеграции</h2>
+      <h2>РРЅС‚РµРіСЂР°С†РёРё</h2>
       <div style={{ display: 'flex', gap: 4, overflowX: 'auto', paddingBottom: 8, marginBottom: 16, borderBottom: '1px solid var(--border)' }}>
         {tabs.map(t => (
           <button
@@ -140,17 +140,17 @@ const FatSecretTab: React.FC = () => {
   return (
     <div>
       <div className="card">
-        <h3>🔑 API-ключ FatSecret</h3>
+        <h3>рџ”‘ API-РєР»СЋС‡ FatSecret</h3>
         {!connected ? (
           <div>
             <input
               type="password"
-              placeholder="Введите API-ключ"
+              placeholder=""
               value={apiKey}
               onChange={e => setApiKey(e.target.value)}
             />
             <button className="btn" onClick={handleConnect} disabled={!apiKey.trim()}>
-              Подключить
+              РџРѕРґРєР»СЋС‡РёС‚СЊ
             </button>
           </div>
         ) : (
@@ -159,25 +159,25 @@ const FatSecretTab: React.FC = () => {
               <span style={{
                 width: 10, height: 10, borderRadius: '50%', background: 'var(--success)', display: 'inline-block',
               }} />
-              <span style={{ color: 'var(--success)', fontWeight: 600, fontSize: 14 }}>Подключено</span>
+              <span style={{ color: 'var(--success)', fontWeight: 600, fontSize: 14 }}>РџРѕРґРєР»СЋС‡РµРЅРѕ</span>
             </div>
             <button className="btn secondary" onClick={handleDisconnect}>
-              Отключить
+              РћС‚РєР»СЋС‡РёС‚СЊ
             </button>
           </div>
         )}
         <p style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 10 }}>
-          API подключение требует серверного компонента
+          API РїРѕРґРєР»СЋС‡РµРЅРёРµ С‚СЂРµР±СѓРµС‚ СЃРµСЂРІРµСЂРЅРѕРіРѕ РєРѕРјРїРѕРЅРµРЅС‚Р°
         </p>
       </div>
 
       {connected && (
         <div className="card">
-          <h3>🔍 Поиск продуктов</h3>
+          <h3>рџ”Ќ РџРѕРёСЃРє РїСЂРѕРґСѓРєС‚РѕРІ</h3>
           <div style={{ display: 'flex', gap: 8 }}>
             <input
               type="text"
-              placeholder="Введите название продукта..."
+              placeholder=""
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && handleSearch()}
@@ -189,7 +189,7 @@ const FatSecretTab: React.FC = () => {
               onClick={handleSearch}
               disabled={searching || !searchQuery.trim()}
             >
-              {searching ? '...' : 'Найти'}
+              {searching ? '...' : ''}
             </button>
           </div>
 
@@ -205,12 +205,12 @@ const FatSecretTab: React.FC = () => {
                 }}>
                   <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 4 }}>{food.name}</div>
                   <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 4 }}>
-                    {food.serving} • {food.calories} ккал
+                    {food.serving} вЂў {food.calories} РєРєР°Р»
                   </div>
                   <div style={{ display: 'flex', gap: 12, fontSize: 12 }}>
-                    <span style={{ color: 'var(--info)' }}>Б {food.protein}г</span>
-                    <span style={{ color: 'var(--warning)' }}>Ж {food.fat}г</span>
-                    <span style={{ color: 'var(--accent)' }}>У {food.carbs}г</span>
+                    <span style={{ color: 'var(--info)' }}>Р‘ {food.protein}Рі</span>
+                    <span style={{ color: 'var(--warning)' }}>Р– {food.fat}Рі</span>
+                    <span style={{ color: 'var(--accent)' }}>РЈ {food.carbs}Рі</span>
                   </div>
                 </div>
               ))}
@@ -222,12 +222,12 @@ const FatSecretTab: React.FC = () => {
       {connected && recentSearches.length > 0 && (
         <div className="card">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-            <h3 style={{ margin: 0 }}>🕐 Недавние запросы</h3>
+            <h3 style={{ margin: 0 }}>рџ•ђ РќРµРґР°РІРЅРёРµ Р·Р°РїСЂРѕСЃС‹</h3>
             <button
               style={{ background: 'none', border: 'none', color: 'var(--danger)', fontSize: 12, cursor: 'pointer' }}
               onClick={clearRecent}
             >
-              Очистить
+              РћС‡РёСЃС‚РёС‚СЊ
             </button>
           </div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
@@ -288,13 +288,13 @@ const LabTab: React.FC = () => {
       setConnections(updated);
       LS.set('he_lab_connections', JSON.stringify(updated));
       setImporting(null);
-      setImportMsg(`${LABS.find(l => l.id === labId)?.name}: данные импортированы`);
+      setImportMsg(`${LABS.find(l => l.id === labId)?.name}: РґР°РЅРЅС‹Рµ РёРјРїРѕСЂС‚РёСЂРѕРІР°РЅС‹`);
       setTimeout(() => setImportMsg(null), 3000);
     }, 1500);
   };
 
   const formatDate = (iso: string | null) => {
-    if (!iso) return '—';
+    if (!iso) return 'вЂ”';
     const d = new Date(iso);
     return d.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
   };
@@ -312,7 +312,7 @@ const LabTab: React.FC = () => {
           color: 'var(--success)',
           fontWeight: 500,
         }}>
-          ✓ {importMsg}
+          вњ“ {importMsg}
         </div>
       )}
 
@@ -327,7 +327,7 @@ const LabTab: React.FC = () => {
                   <div style={{ fontWeight: 600, fontSize: 15 }}>{lab.name}</div>
                   {conn.lastSync && (
                     <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>
-                      Посл. синхр.: {formatDate(conn.lastSync)}
+                      РџРѕСЃР». СЃРёРЅС…СЂ.: {formatDate(conn.lastSync)}
                     </div>
                   )}
                 </div>
@@ -339,7 +339,7 @@ const LabTab: React.FC = () => {
                   display: 'inline-block',
                 }} />
                 <span style={{ fontSize: 12, color: conn.connected ? 'var(--success)' : 'var(--text-dim)', fontWeight: 500 }}>
-                  {conn.connected ? 'Подключено' : 'Не подключено'}
+                  {conn.connected ? '' : ''}
                 </span>
               </div>
             </div>
@@ -347,7 +347,7 @@ const LabTab: React.FC = () => {
             <div style={{ display: 'flex', gap: 8 }}>
               {!conn.connected ? (
                 <button className="btn" style={{ margin: 0 }} onClick={() => handleConnect(lab.id)}>
-                  Подключить
+                  РџРѕРґРєР»СЋС‡РёС‚СЊ
                 </button>
               ) : (
                 <>
@@ -357,14 +357,14 @@ const LabTab: React.FC = () => {
                     onClick={() => handleImport(lab.id)}
                     disabled={importing === lab.id}
                   >
-                    {importing === lab.id ? 'Импорт...' : 'Импорт результатов'}
+                    {importing === lab.id ? '' : ''}
                   </button>
                   <button
                     className="btn secondary"
                     style={{ margin: 0, width: 'auto', flexShrink: 0 }}
                     onClick={() => handleDisconnect(lab.id)}
                   >
-                    ✕
+                    вњ•
                   </button>
                 </>
               )}
@@ -392,10 +392,10 @@ const WearablesTab: React.FC = () => {
   const handleConnect = (deviceId: string) => {
     const hasBt = typeof navigator !== 'undefined' && 'bluetooth' in navigator;
     if (!hasBt) {
-      setBluetoothMsg('Web Bluetooth не поддерживается в этом браузере. Используйте мобильное приложение для подключения устройств.');
+      setBluetoothMsg('Web Bluetooth РЅРµ РїРѕРґРґРµСЂР¶РёРІР°РµС‚СЃСЏ РІ СЌС‚РѕРј Р±СЂР°СѓР·РµСЂРµ. РСЃРїРѕР»СЊР·СѓР№С‚Рµ РјРѕР±РёР»СЊРЅРѕРµ РїСЂРёР»РѕР¶РµРЅРёРµ РґР»СЏ РїРѕРґРєР»СЋС‡РµРЅРёСЏ СѓСЃС‚СЂРѕР№СЃС‚РІ.');
       setTimeout(() => setBluetoothMsg(null), 4000);
     } else {
-      setBluetoothMsg('Поиск устройств Bluetooth...');
+      setBluetoothMsg('');
       setTimeout(() => setBluetoothMsg(null), 2000);
     }
 
@@ -405,7 +405,7 @@ const WearablesTab: React.FC = () => {
         hrv: 45 + Math.floor(Math.random() * 20),
         steps: 5000 + Math.floor(Math.random() * 8000),
         calories: 1800 + Math.floor(Math.random() * 600),
-        sleepPhases: 'Глубокий: 2ч 10м, Лёгкий: 3ч 40м, REM: 1ч 20м',
+        sleepPhases: '',
       };
       const updated = {
         ...connections,
@@ -430,7 +430,7 @@ const WearablesTab: React.FC = () => {
   };
 
   const formatDate = (iso: string | null) => {
-    if (!iso) return '—';
+    if (!iso) return 'вЂ”';
     const d = new Date(iso);
     return d.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
   };
@@ -462,18 +462,18 @@ const WearablesTab: React.FC = () => {
                   <div style={{ fontWeight: 600, fontSize: 15 }}>{device.brand} {device.model}</div>
                   {conn.lastSync && (
                     <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>
-                      Синхр.: {formatDate(conn.lastSync)}
+                      РЎРёРЅС…СЂ.: {formatDate(conn.lastSync)}
                     </div>
                   )}
                 </div>
               </div>
               {!conn.connected ? (
                 <button className="btn" style={{ margin: 0, padding: '8px 16px', fontSize: 13 }} onClick={() => handleConnect(device.id)}>
-                  Подключить
+                  РџРѕРґРєР»СЋС‡РёС‚СЊ
                 </button>
               ) : (
                 <button className="btn secondary" style={{ margin: 0, padding: '8px 16px', fontSize: 13, color: 'var(--danger)' }} onClick={() => handleDisconnect(device.id)}>
-                  Отключить
+                  РћС‚РєР»СЋС‡РёС‚СЊ
                 </button>
               )}
             </div>
@@ -485,15 +485,15 @@ const WearablesTab: React.FC = () => {
                 padding: '10px 12px',
                 border: '1px solid var(--border)',
               }}>
-                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)', marginBottom: 8 }}>Синхронизированные данные</div>
+                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)', marginBottom: 8 }}>РЎРёРЅС…СЂРѕРЅРёР·РёСЂРѕРІР°РЅРЅС‹Рµ РґР°РЅРЅС‹Рµ</div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
-                  <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>Покой: <span style={{ color: 'var(--text)', fontWeight: 600 }}>{conn.data.hrRest} уд/мин</span></div>
-                  <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>HRV: <span style={{ color: 'var(--text)', fontWeight: 600 }}>{conn.data.hrv} мс</span></div>
-                  <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>Шаги: <span style={{ color: 'var(--text)', fontWeight: 600 }}>{conn.data.steps.toLocaleString()}</span></div>
-                  <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>Калории: <span style={{ color: 'var(--text)', fontWeight: 600 }}>{conn.data.calories}</span></div>
+                  <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>РџРѕРєРѕР№: <span style={{ color: 'var(--text)', fontWeight: 600 }}>{conn.data.hrRest} СѓРґ/РјРёРЅ</span></div>
+                  <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>HRV: <span style={{ color: 'var(--text)', fontWeight: 600 }}>{conn.data.hrv} РјСЃ</span></div>
+                  <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>РЁР°РіРё: <span style={{ color: 'var(--text)', fontWeight: 600 }}>{conn.data.steps.toLocaleString()}</span></div>
+                  <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>РљР°Р»РѕСЂРёРё: <span style={{ color: 'var(--text)', fontWeight: 600 }}>{conn.data.calories}</span></div>
                 </div>
                 <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 6 }}>
-                  Сон: <span style={{ color: 'var(--text)' }}>{conn.data.sleepPhases}</span>
+                  РЎРѕРЅ: <span style={{ color: 'var(--text)' }}>{conn.data.sleepPhases}</span>
                 </div>
               </div>
             )}
@@ -547,7 +547,7 @@ const TelegramTab: React.FC = () => {
     setTestMsg(null);
     setTimeout(() => {
       setTesting(false);
-      setTestMsg('Тестовое сообщение отправлено успешно ✓');
+      setTestMsg('');
       setTimeout(() => setTestMsg(null), 3000);
     }, 1000);
   };
@@ -571,31 +571,31 @@ const TelegramTab: React.FC = () => {
   return (
     <div>
       <div className="card">
-        <h3>🤖 Настройка бота</h3>
+        <h3>рџ¤– РќР°СЃС‚СЂРѕР№РєР° Р±РѕС‚Р°</h3>
         {!connected ? (
           <div>
             <input
               type="password"
-              placeholder="Токен бота (от @BotFather)"
+              placeholder=""
               value={botToken}
               onChange={e => setBotToken(e.target.value)}
             />
             <button className="btn" onClick={handleConnect} disabled={!botToken.trim()}>
-              Подключить бота
+              РџРѕРґРєР»СЋС‡РёС‚СЊ Р±РѕС‚Р°
             </button>
           </div>
         ) : (
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
               <span style={{ width: 10, height: 10, borderRadius: '50%', background: 'var(--success)', display: 'inline-block' }} />
-              <span style={{ color: 'var(--success)', fontWeight: 600, fontSize: 14 }}>Подключено</span>
+              <span style={{ color: 'var(--success)', fontWeight: 600, fontSize: 14 }}>РџРѕРґРєР»СЋС‡РµРЅРѕ</span>
             </div>
             <div style={{ fontSize: 13, color: 'var(--text-dim)', marginBottom: 8 }}>
               Chat ID: <span style={{ color: 'var(--text)', fontFamily: 'monospace' }}>{chatId}</span>
             </div>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               <button className="btn secondary" style={{ margin: 0, padding: '8px 16px', fontSize: 13 }} onClick={handleDisconnect}>
-                Отключить
+                РћС‚РєР»СЋС‡РёС‚СЊ
               </button>
               <button
                 className="btn"
@@ -603,7 +603,7 @@ const TelegramTab: React.FC = () => {
                 onClick={handleTest}
                 disabled={testing}
               >
-                {testing ? 'Отправка...' : 'Тест соединения'}
+                {testing ? '' : ''}
               </button>
               {botLink && (
                 <a
@@ -617,7 +617,7 @@ const TelegramTab: React.FC = () => {
                     fontSize: 13, fontWeight: 600, textDecoration: 'none',
                   }}
                 >
-                  Открыть бота ↗
+                  РћС‚РєСЂС‹С‚СЊ Р±РѕС‚Р° в†—
                 </a>
               )}
             </div>
@@ -628,7 +628,7 @@ const TelegramTab: React.FC = () => {
       {connected && (
         <>
           <div className="card">
-            <h3>📅 Время еженедельного чекапа</h3>
+            <h3>рџ“… Р’СЂРµРјСЏ РµР¶РµРЅРµРґРµР»СЊРЅРѕРіРѕ С‡РµРєР°РїР°</h3>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
               <select
                 value={checkupDay}
@@ -649,11 +649,11 @@ const TelegramTab: React.FC = () => {
           </div>
 
           <div className="card">
-            <h3>🔔 Уведомления</h3>
+            <h3>рџ”” РЈРІРµРґРѕРјР»РµРЅРёСЏ</h3>
             {([
-              { key: 'articles' as const, label: 'Статьи и рекомендации' },
-              { key: 'checkups' as const, label: 'Чекапы и напоминания' },
-              { key: 'reports' as const, label: 'Отчёты и аналитика' },
+              { key: 'articles' as const, label: '' },
+              { key: 'checkups' as const, label: '' },
+              { key: 'reports' as const, label: '' },
             ]).map(item => (
               <div key={item.key} style={{
                 display: 'flex', justifyContent: 'space-between', alignItems: 'center',

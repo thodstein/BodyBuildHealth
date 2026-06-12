@@ -6,11 +6,11 @@ import { useDataLink } from '../../core/data-link';
 import type { DoseRequest, NutritionInput } from '../../core/types';
 
 const PAL_OPTIONS = [
-  { value: 1.2, label: 'РњРёРЅРёРјР°Р»СЊРЅР°СЏ (СЃРёРґСЏС‡РёР№ РѕР±СЂР°Р· Р¶РёР·РЅРё)' },
-  { value: 1.375, label: 'Р›С‘РіРєР°СЏ (1-3 РґРЅСЏ/РЅРµРґРµР»СЏ)' },
-  { value: 1.55, label: 'РЈРјРµСЂРµРЅРЅР°СЏ (3-5 РґРЅРµР№/РЅРµРґРµР»СЏ)' },
-  { value: 1.725, label: 'Р’С‹СЃРѕРєР°СЏ (6-7 РґРЅРµР№/РЅРµРґРµР»СЏ)' },
-  { value: 1.9, label: 'Р­РєСЃС‚СЂРµРјР°Р»СЊРЅР°СЏ (2 СЂР°Р·Р°/РґРµРЅСЊ)' },
+  { value: 1.2, label: '' },
+  { value: 1.375, label: '' },
+  { value: 1.55, label: '' },
+  { value: 1.725, label: '' },
+  { value: 1.9, label: '' },
 ];
 
 const DRUG_OPTIONS = Object.keys(DRUG_THRESHOLDS);
@@ -170,18 +170,18 @@ export const CalculatorsScreen: React.FC<CalcProps> = ({ initialTab = 'fitness' 
       ref = 30 - (gripAge - 30) * 0.2;
     }
     const pct = Math.min(100, Math.max(0, (gripKg / ref) * 100));
-    let level = 'РќРёР·РєРёР№';
-    if (pct >= 80) level = 'РћС‚Р»РёС‡РЅС‹Р№';
-    else if (pct >= 60) level = 'РЎСЂРµРґРЅРёР№';
-    else if (pct >= 40) level = 'РќРёР¶Рµ СЃСЂРµРґРЅРµРіРѕ';
+    let level = '';
+    if (pct >= 80) level = '';
+    else if (pct >= 60) level = '';
+    else if (pct >= 40) level = '';
     setGripResult({ percentile: Math.round(pct), level });
   };
 
   const calcStress = () => {
     const stress = Math.max(0, Math.min(100, 100 - (hrvValue - 20) * 2));
-    let level = 'РќРёР·РєРёР№';
-    if (stress >= 70) level = 'Р’С‹СЃРѕРєРёР№';
-    else if (stress >= 30) level = 'РЈРјРµСЂРµРЅРЅС‹Р№';
+    let level = '';
+    if (stress >= 70) level = '';
+    else if (stress >= 30) level = '';
     setStressResult({ stress: Math.round(stress), level });
   };
 
@@ -194,7 +194,7 @@ export const CalculatorsScreen: React.FC<CalcProps> = ({ initialTab = 'fitness' 
     setAiEntries(next);
   };
 
-  const bmiCategory = (v: number) => v < 18.5 ? 'РќРµРґРѕСЃС‚Р°С‚РѕС‡РЅС‹Р№ РІРµСЃ' : v < 25 ? 'РќРѕСЂРјР°' : v < 30 ? 'РР·Р±С‹С‚РѕС‡РЅС‹Р№ РІРµСЃ' : 'РћР¶РёСЂРµРЅРёРµ';
+  const bmiCategory = (v: number) => v < 18.5 ? '' : v < 25 ? '' : v < 30 ? '' : '';
 
   return (
     <div className="screen calculators">
@@ -319,7 +319,7 @@ export const CalculatorsScreen: React.FC<CalcProps> = ({ initialTab = 'fitness' 
                     <select value={entry.drug} onChange={e => updateAiEntry(i, 'drug', e.target.value)}>
                       {DRUG_OPTIONS.map(d => <option key={d} value={d}>{d}</option>)}
                     </select>
-                    <input type="number" value={entry.doseMgWeek} onChange={e => updateAiEntry(i, 'doseMgWeek', Number(e.target.value))} placeholder="РјРі/РЅРµРґ" style={{ width: 80 }} />
+                    <input type="number" value={entry.doseMgWeek} onChange={e => updateAiEntry(i, 'doseMgWeek', Number(e.target.value))} placeholder="" style={{ width: 80 }} />
                     <span>РјРі/РЅРµРґ</span>
                     {aiEntries.length > 1 && <button onClick={() => removeAiEntry(i)}>вњ•</button>}
                   </div>
@@ -330,7 +330,7 @@ export const CalculatorsScreen: React.FC<CalcProps> = ({ initialTab = 'fitness' 
               {aiResult !== null && (
                 <div className="result">
                   <span className="label">РђРЅРґСЂРѕРіРµРЅРЅС‹Р№ РёРЅРґРµРєСЃ:</span> <span className="value">{aiResult.toFixed(2)}</span>
-                  <span className="interpretation"> вЂ” {aiResult > 3 ? 'Р’С‹СЃРѕРєР°СЏ РЅР°РіСЂСѓР·РєР°' : aiResult > 1.5 ? 'РЈРјРµСЂРµРЅРЅР°СЏ РЅР°РіСЂСѓР·РєР°' : 'РќРёР·РєР°СЏ РЅР°РіСЂСѓР·РєР°'}</span>
+                  <span className="interpretation"> вЂ” {aiResult > 3 ? '' : aiResult > 1.5 ? '' : ''}</span>
                 </div>
               )}
             </div>
@@ -357,9 +357,9 @@ export const CalculatorsScreen: React.FC<CalcProps> = ({ initialTab = 'fitness' 
                   <div><span className="label">Р”РµС„РёС†РёС‚:</span> <span className="value">{deficitResult.deficit} РєРєР°Р»/РґРµРЅСЊ</span></div>
                   <div><span className="label">РџРѕС‚РµСЂСЏ РІРµСЃР°:</span> <span className="value">{deficitResult.rateKgWeek.toFixed(2)} РєРі/РЅРµРґ</span></div>
                   <span className="interpretation">
-                    {deficitResult.deficit <= 0 ? 'РџСЂРѕС„РёС†РёС‚ РёР»Рё РїРѕРґРґРµСЂР¶РєР°' :
-                     deficitResult.deficit < 500 ? 'РњСЏРіРєРёР№ РґРµС„РёС†РёС‚' :
-                     deficitResult.deficit < 1000 ? 'РЈРјРµСЂРµРЅРЅС‹Р№ РґРµС„РёС†РёС‚' : 'РђРіСЂРµСЃСЃРёРІРЅС‹Р№ РґРµС„РёС†РёС‚'}
+                    {deficitResult.deficit <= 0 ? '' :
+                     deficitResult.deficit < 500 ? '' :
+                     deficitResult.deficit < 1000 ? '' : ''}
                   </span>
                 </div>
               )}
@@ -442,7 +442,7 @@ export const CalculatorsScreen: React.FC<CalcProps> = ({ initialTab = 'fitness' 
               {caResult !== null && (
                 <div className="result">
                   <span className="label">РЎРєРѕСЂСЂРµРєС‚РёСЂРѕРІР°РЅРЅС‹Р№ Ca:</span> <span className="value">{caResult.toFixed(2)} РјРјРѕР»СЊ/Р»</span>
-                  <span className="interpretation"> вЂ” {caResult < 2.1 ? 'Р“РёРїРѕРєР°Р»СЊС†РёРµРјРёСЏ' : caResult > 2.6 ? 'Р“РёРїРµСЂРєР°Р»СЊС†РёРµРјРёСЏ' : 'РќРѕСЂРјР°'}</span>
+                  <span className="interpretation"> вЂ” {caResult < 2.1 ? '' : caResult > 2.6 ? '' : ''}</span>
                 </div>
               )}
             </div>

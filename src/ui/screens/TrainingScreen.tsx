@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
+﻿import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { EXERCISE_CATALOG } from '../../core/exercise-catalog';
 import { calcTraining, EXERCISE_DB } from '../../engines/training.engine';
 import { generateMacrocycle, getCurrentWeekPlan, MESOCYCLE_PARAMS, type MacrocyclePlan, type Microcycle, type MacrocycleInput } from '../../engines/training-periodization.engine';
@@ -28,36 +28,36 @@ import { getStrengthLevel, getNextLevelTarget } from '../../engines/performance-
 import { computeStructuredAnalytics } from '../../engines/structured-analytics.engine';
 
 const WARMUP_LABELS: Record<string, string> = {
-  jumping_jack: 'Прыжки ноги вместе-врозь', arm_circles: 'Круги руками', leg_swings: 'Махи ногами',
-  hip_circle: 'Круги тазом', ankle_mobility: 'Мобилизация голеностопа', shoulder_circle: 'Круги плечами',
-  thoracic_rotation: 'Грудная ротация', cat_camel: 'Кошка-верблюд', worlds_greatest: 'Растяжка выпадом',
-  banded_clam: 'Ракушка с резинкой', external_rotation: 'Наружная ротация', bird_dog: 'Птица-собака',
-  dead_bug: 'Мёртвый жук', light_cardio: 'Лёгкое кардио', squat: 'Приседания с грифом',
-  deep_breathing: 'Глубокое дыхание', box_breathing: 'Квадратное дыхание 4-7-8',
+  jumping_jack: '', arm_circles: '', leg_swings: '',
+  hip_circle: '', ankle_mobility: '', shoulder_circle: '',
+  thoracic_rotation: '', cat_camel: '', worlds_greatest: '',
+  banded_clam: '', external_rotation: '', bird_dog: '',
+  dead_bug: '', light_cardio: '', squat: '',
+  deep_breathing: '', box_breathing: '',
 };
 
 const GOALS = [
-  { value: 'bulk', label: 'Набор массы', icon: '🏋️' },
-  { value: 'cut', label: 'Сушка', icon: '🔥' },
-  { value: 'strength', label: 'Сила', icon: '💪' },
-  { value: 'maintenance', label: 'Поддержание', icon: '⚖️' },
-  { value: 'recomp', label: 'Рекомпозиция', icon: '🔄' },
-  { value: 'rehab', label: 'Реабилитация', icon: '🏥' },
+  { value: 'bulk', label: '', icon: '' },
+  { value: 'cut', label: '', icon: '' },
+  { value: 'strength', label: '', icon: '' },
+  { value: 'maintenance', label: '', icon: 'вљ–пёЏ' },
+  { value: 'recomp', label: '', icon: '' },
+  { value: 'rehab', label: '', icon: '' },
 ] as const;
 
 const LEVELS = [
-  { value: 'beginner', label: 'Новичок', icon: '🌱' },
-  { value: 'intermediate', label: 'Средний', icon: '🌿' },
-  { value: 'advanced', label: 'Продвинутый', icon: '🌳' },
-  { value: 'enhanced', label: 'Усиленный', icon: '⚡' },
+  { value: 'beginner', label: '', icon: '' },
+  { value: 'intermediate', label: '', icon: '' },
+  { value: 'advanced', label: '', icon: '' },
+  { value: 'enhanced', label: '', icon: 'вљЎ' },
 ] as const;
 
 const MUSCLE_GROUPS = ['chest', 'back', 'legs', 'shoulders', 'arms', 'core'] as const;
 const GROUP_LABELS: Record<string, string> = {
-    chest: 'Грудь', back: 'Спина', legs: 'Ноги', shoulders: 'Плечи', arms: 'Руки', core: 'Кор',
+    chest: '', back: '', legs: '', shoulders: '', arms: '', core: '',
 };
-const EQUIP_LABELS: Record<string, string> = { barbell: 'Штанга', dumbbell: 'Гантели', machine: 'Тренажёр', cable: 'Блок', bodyweight: 'Вес тела', band: 'Лента', kettlebell: 'Гиря', specialty_bar: 'Спец. гриф' };
-const JOINT_LABELS: Record<string, string> = { high: 'Высокая', med: 'Средняя', low: 'Низкая' };
+const EQUIP_LABELS: Record<string, string> = { barbell: '', dumbbell: '', machine: '', cable: '', bodyweight: '', band: '', kettlebell: '', specialty_bar: '' };
+const JOINT_LABELS: Record<string, string> = { high: '', med: '', low: '' };
 
 type TrainingTab = 'plan' | 'runtime' | 'exercises' | 'calculators' | 'diary' | 'cycles' | 'history' | 'analytics' | 'methods' | 'visual' | 'programs' | 'timers' | 'progress';
 
@@ -68,7 +68,7 @@ export const TrainingScreen: React.FC = () => {
   const diary = useMemo(() => new StrengthDiary(), []);
   const [tab, setTab] = useState<TrainingTab>('plan');
 
-  // Plan state — pre-fill from readiness and labAnalysis
+  // Plan state вЂ” pre-fill from readiness and labAnalysis
   const [goal, setGoal] = useState('bulk');
   const [level, setLevel] = useState('intermediate');
   const [daysPerWeek, setDaysPerWeek] = useState(4);
@@ -263,22 +263,22 @@ export const TrainingScreen: React.FC = () => {
     if (!output.volumePerGroup) return '';
     return Object.entries(output.volumePerGroup)
       .filter(([_, v]) => v > 0)
-      .map(([g, v]) => `${GROUP_LABELS[g] || g}: ${v} подх`)
-      .join(' • ');
+      .map(([g, v]) => `${GROUP_LABELS[g] || g}: ${v} РїРѕРґС…`)
+      .join(' вЂў ');
   };
 
   return (
     <div className="screen training-screen" style={{ padding: '0 4px' }}>
-      <h2 style={{ margin: '0 0 8px', fontSize: 16, color: 'var(--accent)' }}>🏋️ Тренировки</h2>
+      <h2 style={{ margin: '0 0 8px', fontSize: 16, color: 'var(--accent)' }}>рџЏ‹пёЏ РўСЂРµРЅРёСЂРѕРІРєРё</h2>
 
       <div style={{ display: 'flex', gap: 3, marginBottom: 10, overflowX: 'auto', scrollbarWidth: 'none' }}>
         {([
-          ['plan', '📋 План'], ['runtime', '🏃 Тренировка'], ['exercises', '📖 Упражнения'],
-          ['calculators', '📐 Калькуляторы'], ['diary', '📓 Дневник'], ['cycles', '🔄 Циклы'],
-          ['history', '📜 История'], ['analytics', '📊 Аналитика'],
-          ['methods', '📚 Методы'], ['visual', '📈 Визуал.'],
-          ['programs', '📦 Программы'], ['timers', '⏱ Таймеры'],
-          ['progress', '📏 Замеры'],
+          ['plan', ''], ['runtime', ''], ['exercises', ''],
+          ['calculators', ''], ['diary', ''], ['cycles', ''],
+          ['history', ''], ['analytics', ''],
+          ['methods', ''], ['visual', ''],
+          ['programs', ''], ['timers', 'вЏ± РўР°Р№РјРµСЂС‹'],
+          ['progress', ''],
         ] as [TrainingTab, string][]).map(([k, l]) => (
           <button key={k} onClick={() => setTab(k)} style={{
             padding: '7px 12px', borderRadius: 8, fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap',
@@ -288,11 +288,11 @@ export const TrainingScreen: React.FC = () => {
         ))}
       </div>
 
-      {/* ═══════════ PLAN TAB ═══════════ */}
+      {/* в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ PLAN TAB в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ */}
       {tab === 'plan' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           <div className="card" style={{ padding: '10px 12px' }}>
-            <h3 style={{ margin: '0 0 8px', fontSize: 13 }}>⚙️ Параметры плана</h3>
+            <h3 style={{ margin: '0 0 8px', fontSize: 13 }}>вљ™пёЏ РџР°СЂР°РјРµС‚СЂС‹ РїР»Р°РЅР°</h3>
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
               {GOALS.map(g => (
                 <button key={g.value} onClick={() => setGoal(g.value)} style={{
@@ -312,14 +312,14 @@ export const TrainingScreen: React.FC = () => {
               ))}
             </div>
             <div style={{ marginBottom: 8 }}>
-              <label style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 3, display: 'block' }}>Тип сплита</label>
+              <label style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 3, display: 'block' }}>РўРёРї СЃРїР»РёС‚Р°</label>
               <button onClick={() => { setShowSplitPicker(!showSplitPicker); if (!splitCandidates.length) { const opts = getSplitOptions({ goal, level, daysPerWeek, recovery, fatigue, nutrition: 7, weakPoints, sessionDuration: 60, exercises: [] } as any); setSplitCandidates(opts.slice(0, 12)); } }} style={{
                 width: '100%', padding: '6px 10px', borderRadius: 8, textAlign: 'left', cursor: 'pointer',
                 background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 11,
                 display: 'flex', justifyContent: 'space-between', alignItems: 'center',
               }}>
-                <span>{splitType === 'auto' ? '🤖 Авто-выбор' : splitCandidates.find(c => c.id === splitType)?.name || splitType}</span>
-                <span style={{ fontSize: 9, color: 'var(--text-dim)' }}>{showSplitPicker ? '▴' : '▾'}</span>
+                <span>{splitType === 'auto' ? '' : splitCandidates.find(c => c.id === splitType)?.name || splitType}</span>
+                <span style={{ fontSize: 9, color: 'var(--text-dim)' }}>{showSplitPicker ? 'в–ґ' : 'в–ѕ'}</span>
               </button>
               {showSplitPicker && (
                 <div style={{ marginTop: 4, display: 'flex', flexDirection: 'column', gap: 3, maxHeight: 220, overflowY: 'auto', background: 'var(--bg-secondary)', borderRadius: 8, padding: '4px 6px', border: '1px solid var(--border)' }}>
@@ -328,8 +328,8 @@ export const TrainingScreen: React.FC = () => {
                     background: splitType === 'auto' ? 'rgba(0,230,138,0.1)' : 'transparent',
                     border: splitType === 'auto' ? '1px solid var(--accent)' : '1px solid transparent',
                   }}>
-                    <div style={{ fontWeight: 600 }}>🤖 Авто-выбор</div>
-                    <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Движок сам подберёт оптимальный сплит</div>
+                    <div style={{ fontWeight: 600 }}>рџ¤– РђРІС‚Рѕ-РІС‹Р±РѕСЂ</div>
+                    <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Р”РІРёР¶РѕРє СЃР°Рј РїРѕРґР±РµСЂС‘С‚ РѕРїС‚РёРјР°Р»СЊРЅС‹Р№ СЃРїР»РёС‚</div>
                   </div>
                   {splitCandidates.map(c => (
                     <div key={c.id || c.name} onClick={() => { setSplitType(c.id || c.name); setShowSplitPicker(false); }} style={{
@@ -349,12 +349,12 @@ export const TrainingScreen: React.FC = () => {
               )}
             </div>
             <div style={{ marginBottom: 8 }}>
-              <label style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 2, display: 'block' }}>Тип цикла</label>
+              <label style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 2, display: 'block' }}>РўРёРї С†РёРєР»Р°</label>
               <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
                 {[
-                  { v: 'auto', l: 'Авто' }, { v: 'pl_strength', l: 'PL Сила' }, { v: 'pl_peaking', l: 'PL Пик' },
-                  { v: 'bb_mass', l: 'BB Масса' }, { v: 'bb_specialization', l: 'BB Спец' },
-                  { v: 'rehab', l: 'Рехаб' }, { v: 'wl_tech', l: 'WL Техника' },
+                  { v: 'auto', l: '' }, { v: 'pl_strength', l: 'PL РЎРёР»Р°' }, { v: 'pl_peaking', l: 'PL РџРёРє' },
+                  { v: 'bb_mass', l: 'BB РњР°СЃСЃР°' }, { v: 'bb_specialization', l: 'BB РЎРїРµС†' },
+                  { v: 'rehab', l: '' }, { v: 'wl_tech', l: 'WL РўРµС…РЅРёРєР°' },
                 ].map(c => (
                   <button key={c.v} onClick={() => { setCycleType(c.v); setTimeout(generatePlan, 50); }} style={{
                     padding: '3px 7px', borderRadius: 6, fontSize: 9, fontWeight: cycleType === c.v ? 700 : 400, cursor: 'pointer',
@@ -365,35 +365,35 @@ export const TrainingScreen: React.FC = () => {
               </div>
             </div>
             <div style={{ marginBottom: 8 }}>
-              <label style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 2, display: 'block' }}>Длина цикла</label>
+              <label style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 2, display: 'block' }}>Р”Р»РёРЅР° С†РёРєР»Р°</label>
               <div style={{ display: 'flex', gap: 3 }}>
                 {[4, 8, 12].map(w => (
                   <button key={w} onClick={() => setMesoLength(w)} style={{
                     padding: '3px 10px', borderRadius: 6, fontSize: 10, fontWeight: mesoLength === w ? 700 : 400, cursor: 'pointer',
                     border: mesoLength === w ? '1px solid var(--accent)' : '1px solid var(--border)',
                     background: mesoLength === w ? 'rgba(0,230,138,0.15)' : 'var(--bg-secondary)', color: 'var(--text)',
-                  }}>{w} нед</button>
+                  }}>{w} РЅРµРґ</button>
                 ))}
               </div>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginBottom: 8 }}>
               <div>
-                <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Дней/нед</label>
+                <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Р”РЅРµР№/РЅРµРґ</label>
                 <input type="range" min={2} max={7} value={daysPerWeek} onChange={e => { setDaysPerWeek(+e.target.value); setTimeout(generatePlan, 50); }}
                   style={{ width: '100%', accentColor: 'var(--accent)' }} />
                 <div style={{ textAlign: 'center', fontSize: 10, color: 'var(--text-dim)' }}>{daysPerWeek}</div>
               </div>
               <div>
-                <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Восстановление</label>
+                <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Р’РѕСЃСЃС‚Р°РЅРѕРІР»РµРЅРёРµ</label>
                 <input type="range" min={1} max={10} value={recovery} onChange={e => setRecovery(+e.target.value)}
                   style={{ width: '100%', accentColor: 'var(--accent)' }} />
                 <div style={{ textAlign: 'center', fontSize: 10, color: recovery < 4 ? '#ef4444' : recovery < 6 ? '#ff9100' : '#22c55e' }}>
                   <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: 4, background: recovery < 4 ? '#ef4444' : recovery < 6 ? '#ff9100' : '#22c55e', marginRight: 4 }} />
-                  {recovery}/10 — {recovery < 4 ? 'Плохое' : recovery < 6 ? 'Среднее' : recovery < 8 ? 'Хорошее' : 'Отличное'}
+                  {recovery}/10 вЂ” {recovery < 4 ? '' : recovery < 6 ? '' : recovery < 8 ? '' : ''}
                 </div>
               </div>
               <div>
-                <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Усталость</label>
+                <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>РЈСЃС‚Р°Р»РѕСЃС‚СЊ</label>
                 <input type="range" min={1} max={10} value={fatigue} onChange={e => setFatigue(+e.target.value)}
                   style={{ width: '100%', accentColor: 'var(--accent)' }} />
                 <div style={{ textAlign: 'center', fontSize: 10, color: 'var(--text-dim)' }}>{fatigue}/10</div>
@@ -401,23 +401,23 @@ export const TrainingScreen: React.FC = () => {
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginBottom: 8 }}>
               <div>
-                <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Вес (кг)</label>
+                <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Р’РµСЃ (РєРі)</label>
                 <input type="number" value={bodyWeight} onChange={e => setBodyWeight(+e.target.value)}
                   style={{ width: '100%', padding: '5px 6px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, boxSizing: 'border-box' }} />
               </div>
               <div>
-                <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Сон (ч)</label>
+                <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>РЎРѕРЅ (С‡)</label>
                 <input type="number" min={0} max={12} value={sleepHours} onChange={e => setSleepHours(+e.target.value)}
                   style={{ width: '100%', padding: '5px 6px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, boxSizing: 'border-box' }} />
               </div>
               <div>
-                <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Стресс (1-10)</label>
+                <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>РЎС‚СЂРµСЃСЃ (1-10)</label>
                 <input type="number" min={1} max={10} value={stressLevel} onChange={e => setStressLevel(+e.target.value)}
                   style={{ width: '100%', padding: '5px 6px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, boxSizing: 'border-box' }} />
               </div>
             </div>
             <div style={{ marginBottom: 8 }}>
-              <label style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 2, display: 'block' }}>Слабые зоны</label>
+              <label style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 2, display: 'block' }}>РЎР»Р°Р±С‹Рµ Р·РѕРЅС‹</label>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
                 {MUSCLE_GROUPS.map(g => {
                   const active = weakPoints.includes(g);
@@ -435,7 +435,7 @@ export const TrainingScreen: React.FC = () => {
             <button onClick={generatePlan} style={{
               width: '100%', padding: 10, borderRadius: 8, border: 'none', cursor: 'pointer',
               background: 'linear-gradient(135deg, #00e68a, #00c853)', color: '#000', fontWeight: 700, fontSize: 13,
-            }}>▶ Сгенерировать план</button>
+            }}>в–¶ РЎРіРµРЅРµСЂРёСЂРѕРІР°С‚СЊ РїР»Р°РЅ</button>
           </div>
 
           {trainingOutput && (
@@ -458,9 +458,9 @@ export const TrainingScreen: React.FC = () => {
                     marginBottom: 8, padding: '6px 10px',
                     background: 'rgba(249,115,22,0.06)', borderLeft: '3px solid #f97316',
                   }}>
-                    <div style={{ fontSize: 10, fontWeight: 600, color: '#f97316' }}>⚠ Ограничения тренировки</div>
+                    <div style={{ fontSize: 10, fontWeight: 600, color: '#f97316' }}>вљ  РћРіСЂР°РЅРёС‡РµРЅРёСЏ С‚СЂРµРЅРёСЂРѕРІРєРё</div>
                     {constraints.recommendations.map((r, i) => (
-                      <div key={i} style={{ fontSize: 9, color: 'var(--text-dim)', marginTop: 2 }}>• {r}</div>
+                      <div key={i} style={{ fontSize: 9, color: 'var(--text-dim)', marginTop: 2 }}>вЂў {r}</div>
                     ))}
                   </div>
                 );
@@ -468,18 +468,18 @@ export const TrainingScreen: React.FC = () => {
               {/* Smart Recommendations */}
               {(() => {
                 const tips: { icon: string; text: string; color: string }[] = [];
-                if (recovery < 5) tips.push({ icon: '⚠️', text: `Восстановление ${recovery}/10 — снизь объём на 15-20%, увеличь сон`, color: '#ef4444' });
-                if (sleepHours < 7) tips.push({ icon: '😴', text: `Сон ${sleepHours}ч — добавь 30-60 мин для лучшего восстановления`, color: '#ff9100' });
-                if (stressLevel > 7) tips.push({ icon: '🧘', text: `Стресс ${stressLevel}/10 — снизь интенсивность, добавь LISS`, color: '#ff9100' });
-                if (currentMicrocycle?.mesocycleType === 'deload') tips.push({ icon: '🔄', text: 'Делоад: фокус на технику и мобильность, не гонись за весами', color: '#3b82f6' });
-                else if (currentMicrocycle?.mesocycleType === 'peaking') tips.push({ icon: '🏆', text: 'Пик: работай с соревновательными движениями, RIR 0-1', color: '#ef4444' });
-                else if (currentMicrocycle?.mesocycleType === 'accumulation') tips.push({ icon: '📈', text: 'Накопление: добавляй подсобку на слабые зоны, 8-12 повторений', color: '#22c55e' });
-                if (weakPoints.length > 0) tips.push({ icon: '🎯', text: `Слабые зоны: ${weakPoints.map(w => GROUP_LABELS[w] || w).join(', ')} — добавь 1-2 подсобных`, color: '#8b5cf6' });
-                if (recovery > 8 && fatigue < 3) tips.push({ icon: '✅', text: 'Отличная готовность — можно добавить 1 сет в основных движениях', color: '#22c55e' });
-                if (tips.length === 0) tips.push({ icon: '💪', text: 'Всё в норме. Придерживайся плана и следи за RPE.', color: '#00e68a' });
+                if (recovery < 5) tips.push({ icon: 'вљ пёЏ', text: ``, color: '#ef4444' });
+                if (sleepHours < 7) tips.push({ icon: '', text: ``, color: '#ff9100' });
+                if (stressLevel > 7) tips.push({ icon: '', text: ``, color: '#ff9100' });
+                if (currentMicrocycle?.mesocycleType === 'deload') tips.push({ icon: '', text: '', color: '#3b82f6' });
+                else if (currentMicrocycle?.mesocycleType === 'peaking') tips.push({ icon: '', text: '', color: '#ef4444' });
+                else if (currentMicrocycle?.mesocycleType === 'accumulation') tips.push({ icon: '', text: '', color: '#22c55e' });
+                if (weakPoints.length > 0) tips.push({ icon: '', text: ``, color: '#8b5cf6' });
+                if (recovery > 8 && fatigue < 3) tips.push({ icon: 'вњ…', text: '', color: '#22c55e' });
+                if (tips.length === 0) tips.push({ icon: '', text: '', color: '#00e68a' });
                 return (
                   <div className="card" style={{ padding: '10px 12px', border: '1px solid rgba(0,230,138,0.2)' }}>
-                    <h4 style={{ margin: '0 0 6px', fontSize: 12, color: 'var(--accent)' }}>💡 Рекомендации</h4>
+                    <h4 style={{ margin: '0 0 6px', fontSize: 12, color: 'var(--accent)' }}>рџ’Ў Р РµРєРѕРјРµРЅРґР°С†РёРё</h4>
                     {tips.map((t, i) => (
                       <div key={i} style={{ fontSize: 10, color: 'var(--text-dim)', padding: '2px 0', display: 'flex', gap: 6, alignItems: 'flex-start' }}>
                         <span>{t.icon}</span>
@@ -496,7 +496,7 @@ export const TrainingScreen: React.FC = () => {
                     <span style={{ fontSize: 10, color: 'var(--text-dim)', marginLeft: 6 }}>RIR {getRIRstr(goal, level, trainingOutput.isDeload)}</span>
                   </div>
                   {trainingOutput.isDeload && (
-                    <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 4, background: 'rgba(255,145,0,0.15)', color: '#ff9100', fontWeight: 600 }}>РАЗГРУЗКА</span>
+                    <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 4, background: 'rgba(255,145,0,0.15)', color: '#ff9100', fontWeight: 600 }}>Р РђР—Р“Р РЈР—РљРђ</span>
                   )}
                 </div>
                 <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 4 }}>{trainingOutput.splitDesc}</div>
@@ -505,7 +505,7 @@ export const TrainingScreen: React.FC = () => {
 
               <div className="card" style={{ padding: '8px 10px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                  <span style={{ fontSize: 10, color: 'var(--text-dim)', whiteSpace: 'nowrap' }}>Нед {selectedWeek}</span>
+                  <span style={{ fontSize: 10, color: 'var(--text-dim)', whiteSpace: 'nowrap' }}>РќРµРґ {selectedWeek}</span>
                   <input type="range" min={1} max={macrocycle?.totalWeeks || 12} value={selectedWeek}
                     onChange={e => setSelectedWeek(+e.target.value)}
                     style={{ flex: 1, accentColor: 'var(--accent)' }} />
@@ -516,13 +516,13 @@ export const TrainingScreen: React.FC = () => {
                     background: showWarmup ? 'rgba(255,145,0,0.15)' : 'var(--bg-secondary)',
                     border: showWarmup ? '1px solid #ff9100' : '1px solid var(--border)',
                     color: showWarmup ? '#ff9100' : 'var(--text-dim)',
-                  }}>🔥 Разминка</button>
+                  }}>рџ”Ґ Р Р°Р·РјРёРЅРєР°</button>
                   <button onClick={() => setShowCooldown(!showCooldown)} style={{
                     padding: '3px 8px', borderRadius: 4, fontSize: 9, cursor: 'pointer',
                     background: showCooldown ? 'rgba(59,130,246,0.15)' : 'var(--bg-secondary)',
                     border: showCooldown ? '1px solid #3b82f6' : '1px solid var(--border)',
                     color: showCooldown ? '#3b82f6' : 'var(--text-dim)',
-                  }}>🧊 Заминка</button>
+                  }}>рџ§Љ Р—Р°РјРёРЅРєР°</button>
                 </div>
               </div>
 
@@ -539,15 +539,15 @@ export const TrainingScreen: React.FC = () => {
                 const warmup = generateWarmup(wuInput);
                 return (
                   <div className="card" style={{ padding: '8px 10px', border: '1px solid rgba(255,145,0,0.2)' }}>
-                    <div style={{ fontWeight: 600, fontSize: 12, color: '#ff9100', marginBottom: 4 }}>🔥 Разминка</div>
+                    <div style={{ fontWeight: 600, fontSize: 12, color: '#ff9100', marginBottom: 4 }}>рџ”Ґ Р Р°Р·РјРёРЅРєР°</div>
                     {warmup.map((b, bi) => (
                       <div key={bi} style={{ fontSize: 10, marginBottom: 2, color: 'var(--text-dim)' }}>
                         <span style={{ fontWeight: 600, color: '#ff9100' }}>
-                          {b.type === 'general' ? 'Кардио' : b.type === 'mobility' ? 'Мобильность' : b.type === 'activation' ? 'Активация' : 'Специфика'} ({b.durationSec}с)
+                          {b.type === 'general' ? '' : b.type === 'mobility' ? '' : b.type === 'activation' ? '' : ''} ({b.durationSec}СЃ)
                         </span>
                         {b.exercises?.map((ex, exi) => (
                           <span key={exi} style={{ marginLeft: 6, color: 'var(--text-dim)' }}>
-                            {WARMUP_LABELS[ex.exerciseId] || ex.exerciseId.replace(/_/g, ' ')} {ex.sets ? `×${ex.sets}` : ''}
+                            {WARMUP_LABELS[ex.exerciseId] || ex.exerciseId.replace(/_/g, ' ')} {ex.sets ? `Г—${ex.sets}` : ''}
                           </span>
                         ))}
                       </div>
@@ -560,47 +560,47 @@ export const TrainingScreen: React.FC = () => {
                 <div className="card" style={{ padding: '10px 12px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
                     <span style={{ fontSize: 12, fontWeight: 700 }}>
-                      {currentMicrocycle.mesocycleType === 'accumulation' ? '📈 Накопление' :
-                       currentMicrocycle.mesocycleType === 'intensification' ? '📊 Интенсификация' :
-                       currentMicrocycle.mesocycleType === 'peaking' ? '🏆 Пик' :
-                       currentMicrocycle.mesocycleType === 'deload' ? '🔄 Разгрузка' : '📋'} — Неделя {selectedWeek}
+                      {currentMicrocycle.mesocycleType === 'accumulation' ? '' :
+                       currentMicrocycle.mesocycleType === 'intensification' ? '' :
+                       currentMicrocycle.mesocycleType === 'peaking' ? '' :
+                       currentMicrocycle.mesocycleType === 'deload' ? '' : ''} вЂ” РќРµРґРµР»СЏ {selectedWeek}
                     </span>
                     <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>
-                      Объём ×{currentMicrocycle.volumeMultiplier} | RIR {currentMicrocycle.rirRange[0]}-{currentMicrocycle.rirRange[1]}
+                      РћР±СЉС‘Рј Г—{currentMicrocycle.volumeMultiplier} | RIR {currentMicrocycle.rirRange[0]}-{currentMicrocycle.rirRange[1]}
                       {currentMicrocycle.mesocycleType !== 'deload' && currentMicrocycle.mesocycleType !== 'peaking' && (
                         <span style={{ color: '#22c55e', fontWeight: 600, marginLeft: 6 }}>
-                          ↑+{(currentMicrocycle.mesocycleType === 'accumulation' ? 2.5 : 3.75)}%/нед
+                          в†‘+{(currentMicrocycle.mesocycleType === 'accumulation' ? 2.5 : 3.75)}%/РЅРµРґ
                         </span>
                       )}
                       {currentMicrocycle.mesocycleType === 'deload' && (
-                        <span style={{ color: '#3b82f6', fontWeight: 600, marginLeft: 6 }}>↓-50%</span>
+                        <span style={{ color: '#3b82f6', fontWeight: 600, marginLeft: 6 }}>в†“-50%</span>
                       )}
                     </span>
                       </div>
                       {/* Phase training tip */}
                       {currentMicrocycle && (
                         <div style={{ padding: '6px 8px', background: 'rgba(0,230,138,0.04)', borderRadius: 6, fontSize: 10, color: 'var(--accent)', marginBottom: 6, lineHeight: 1.4 }}>
-                          {currentMicrocycle.mesocycleType === 'accumulation' ? '📈 Накопление: фокус на объём, технику и гипертрофию. 8-12 повторений, RIR 2-3. Добавь 1-2 подсобных на слабые зоны.' :
-                           currentMicrocycle.mesocycleType === 'intensification' ? '📊 Интенсификация: рост рабочих весов, снижение объёма. 4-8 повторений, RIR 1-2, RPE 8-9. Приоритет — базовые движения.' :
-                           currentMicrocycle.mesocycleType === 'peaking' ? '🏆 Пик: максимальные веса, минимальный объём. 1-3 повторения, RIR 0-1. Только специфичные соревновательные движения.' :
-                           currentMicrocycle.mesocycleType === 'deload' ? '🔄 Разгрузка: восстановление ЦНС и суставов. 50% объёма, лёгкие веса, RIR 3-5. Акцент на мобильность и технику.' : ''}
+                          {currentMicrocycle.mesocycleType === 'accumulation' ? '' :
+                           currentMicrocycle.mesocycleType === 'intensification' ? '' :
+                           currentMicrocycle.mesocycleType === 'peaking' ? '' :
+                           currentMicrocycle.mesocycleType === 'deload' ? '' : ''}
                         </div>
                       )}
                       {currentMicrocycle.days.filter((d: any) => d.isTraining).map((day: any, di: number) => {
                     const dayExCount = day.exercises?.length || 0;
                     const dayCompounds = day.exercises?.filter((e: any) => e.isCompound).length || 0;
                     const difficultyScore = Math.min(10, Math.round((dayCompounds * 2 + dayExCount) * (day.intensity === 'very_high' ? 1.4 : day.intensity === 'high' ? 1.2 : 1)));
-                    const diffLabel = difficultyScore <= 3 ? 'Легко' : difficultyScore <= 5 ? 'Средне' : difficultyScore <= 7 ? 'Тяжело' : 'Экстрим';
+                    const diffLabel = difficultyScore <= 3 ? '' : difficultyScore <= 5 ? '' : difficultyScore <= 7 ? '' : '';
                     const diffColor = difficultyScore <= 3 ? '#22c55e' : difficultyScore <= 5 ? '#84cc16' : difficultyScore <= 7 ? '#ff9100' : '#ef4444';
                     const adjRecovery = recovery / 10;
-                    const autoRegNote = adjRecovery < 0.4 ? '⚠ Снизить объём на 20% — низкое восстановление' :
-                                       adjRecovery < 0.6 ? '⚡ Умеренная нагрузка — следи за RPE' :
-                                       adjRecovery > 0.8 ? '✅ Высокая готовность — можно добавить подход' : '';
+                    const autoRegNote = adjRecovery < 0.4 ? 'вљ  РЎРЅРёР·РёС‚СЊ РѕР±СЉС‘Рј РЅР° 20% вЂ” РЅРёР·РєРѕРµ РІРѕСЃСЃС‚Р°РЅРѕРІР»РµРЅРёРµ' :
+                                       adjRecovery < 0.6 ? 'вљЎ РЈРјРµСЂРµРЅРЅР°СЏ РЅР°РіСЂСѓР·РєР° вЂ” СЃР»РµРґРё Р·Р° RPE' :
+                                       adjRecovery > 0.8 ? 'вњ… Р’С‹СЃРѕРєР°СЏ РіРѕС‚РѕРІРЅРѕСЃС‚СЊ вЂ” РјРѕР¶РЅРѕ РґРѕР±Р°РІРёС‚СЊ РїРѕРґС…РѕРґ' : '';
                     const labWarnings: string[] = [];
                     if (labAnalysis) {
-                      if (labAnalysis.liverStress > 60) labWarnings.push(`⚠ Печень ${labAnalysis.liverStress}% — исключить гепатотоксичные нагрузки`);
-                      if (labAnalysis.inflammation > 5) labWarnings.push(`⚠ Воспаление ${labAnalysis.inflammation.toFixed(1)} — рекомендован deload`);
-                      if (labAnalysis.kidneyStress > 50) labWarnings.push(`⚠ Почки ${labAnalysis.kidneyStress}% — контроль гидратации`);
+                      if (labAnalysis.liverStress > 60) labWarnings.push(`вљ  РџРµС‡РµРЅСЊ ${labAnalysis.liverStress}% вЂ” РёСЃРєР»СЋС‡РёС‚СЊ РіРµРїР°С‚РѕС‚РѕРєСЃРёС‡РЅС‹Рµ РЅР°РіСЂСѓР·РєРё`);
+                      if (labAnalysis.inflammation > 5) labWarnings.push(`вљ  Р’РѕСЃРїР°Р»РµРЅРёРµ ${labAnalysis.inflammation.toFixed(1)} вЂ” СЂРµРєРѕРјРµРЅРґРѕРІР°РЅ deload`);
+                      if (labAnalysis.kidneyStress > 50) labWarnings.push(`вљ  РџРѕС‡РєРё ${labAnalysis.kidneyStress}% вЂ” РєРѕРЅС‚СЂРѕР»СЊ РіРёРґСЂР°С‚Р°С†РёРё`);
                     }
                     return (
                     <div key={di} style={{ marginBottom: 6, background: 'var(--bg-secondary)', borderRadius: 6, padding: '6px 8px' }}>
@@ -608,10 +608,10 @@ export const TrainingScreen: React.FC = () => {
                         <span style={{ fontWeight: 600, fontSize: 11 }}>{day.day}</span>
                         <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                           {(() => {
-                            const hasSquat = day.exercises?.some((e: any) => e.exerciseId?.includes('squat') || e.name?.includes('Присед'));
-                            const hasBench = day.exercises?.some((e: any) => e.exerciseId?.includes('bench') || e.name?.includes('Жим'));
-                            const hasDead = day.exercises?.some((e: any) => e.exerciseId?.includes('deadlift') || e.name?.includes('Тяг'));
-                            const focusTag = hasSquat ? '🦵 Присед' : hasBench ? '🏋️ Жим' : hasDead ? '🔙 Тяга' : '';
+                            const hasSquat = day.exercises?.some((e: any) => e.exerciseId?.includes('squat') || e.name?.includes(''));
+                            const hasBench = day.exercises?.some((e: any) => e.exerciseId?.includes('bench') || e.name?.includes(''));
+                            const hasDead = day.exercises?.some((e: any) => e.exerciseId?.includes('deadlift') || e.name?.includes(''));
+                            const focusTag = hasSquat ? '' : hasBench ? '' : hasDead ? '' : '';
                             return focusTag ? <span style={{ fontSize: 9, color: 'var(--accent)', fontWeight: 600 }}>{focusTag}</span> : null;
               })()}
 
@@ -625,19 +625,19 @@ export const TrainingScreen: React.FC = () => {
                 return (
                   <div className="card" style={{ marginBottom: 8, padding: '6px 10px', background: 'rgba(139,92,246,0.06)', borderLeft: '3px solid #8b5cf6' }}>
                     <div style={{ fontSize: 10, fontWeight: 600, color: '#8b5cf6', marginBottom: 2 }}>
-                      🔄 Фаза: {cycleType === 'peaking' ? 'Пик' : cycleType === 'intensification' ? 'Интенсификация' : cycleType === 'deload' ? 'Разгрузка' : 'Накопление'}
+                      рџ”„ Р¤Р°Р·Р°: {cycleType === 'peaking' ? '' : cycleType === 'intensification' ? '' : cycleType === 'deload' ? '' : ''}
                     </div>
                     <div style={{ display: 'flex', gap: 10, fontSize: 9, color: 'var(--text-dim)' }}>
-                      <span>Объём: <b>{pp.volumeLevel}</b></span>
-                      <span>Интенсивность: <b>{pp.intensityLevel}</b></span>
-                      <span>Частота: <b>{pp.frequencyLevel}</b></span>
-                      <span>Приоритет: <b>{pp.priority}</b></span>
+                      <span>РћР±СЉС‘Рј: <b>{pp.volumeLevel}</b></span>
+                      <span>РРЅС‚РµРЅСЃРёРІРЅРѕСЃС‚СЊ: <b>{pp.intensityLevel}</b></span>
+                      <span>Р§Р°СЃС‚РѕС‚Р°: <b>{pp.frequencyLevel}</b></span>
+                      <span>РџСЂРёРѕСЂРёС‚РµС‚: <b>{pp.priority}</b></span>
                     </div>
                   </div>
                 );
               })()}
                           <span style={{ fontSize: 9, padding: '1px 5px', borderRadius: 3, background: `${diffColor}22`, color: diffColor, fontWeight: 600 }}>{diffLabel} {difficultyScore}/10</span>
-                          <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>{day.duration} мин</span>
+                          <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>{day.duration} РјРёРЅ</span>
                         </div>
                       </div>
                       {autoRegNote && (
@@ -651,7 +651,7 @@ export const TrainingScreen: React.FC = () => {
                         </div>
                       ))}
                       <div style={{ fontSize: 8, color: 'var(--text-dim)', marginBottom: 3, padding: '1px 4px', background: 'rgba(255,165,2,0.05)', borderRadius: 3 }}>
-                        🍎 {goal === 'bulk' ? 'До: бел.+угл. После: быстрый протеин' : goal === 'cut' ? 'До: белок. Углеводы только вокруг' : goal === 'strength' ? 'До: кофеин+угл. После: протеин+креатин' : 'До/после: белок+углеводы'}
+                        рџЌЋ {goal === 'bulk' ? '' : goal === 'cut' ? '' : goal === 'strength' ? '' : ''}
                       </div>
                       {day.exercises.map((ex: any, ei: number) => {
                         const scheme = selectSetScheme({
@@ -664,18 +664,18 @@ export const TrainingScreen: React.FC = () => {
                         const substitute = exCat?.canReplace?.[0] ? EXERCISE_CATALOG.find(e => e.id === exCat.canReplace![0]) : null;
                         const role = ei === 0 ? 'main' : ei <= 2 ? 'secondary' : 'accessory';
                         const roleColor = role === 'main' ? '#ef4444' : role === 'secondary' ? '#f97316' : '#6b7280';
-                        const roleLabel = role === 'main' ? 'ОСН' : role === 'secondary' ? 'ПОДС' : 'АКС';
+                        const roleLabel = role === 'main' ? '' : role === 'secondary' ? '' : '';
                         const restSec = ei === 0 ? (goal === 'strength' ? 180 : 120) : ei <= 2 ? 90 : 60;
                         return (
                         <div key={ei} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '2px 0', fontSize: 10, borderBottom: ei < day.exercises.length - 1 ? '1px solid var(--border)' : 'none', gap: 2 }}>
                           <span style={{ fontSize: 7, padding: '1px 3px', borderRadius: 2, background: `${roleColor}22`, color: roleColor, fontWeight: 700, minWidth: 22, textAlign: 'center', flexShrink: 0 }}>{roleLabel}</span>
                           <span style={{ flex: 1 }} title={ex.technique || ''}>{ex.name}</span>
-                          <span style={{ color: 'var(--accent)', fontWeight: 600, minWidth: 55, textAlign: 'right' }}>{ex.sets}×{ex.reps}</span>
-                          {estMax > 0 && <span style={{ fontSize: 8, color: '#8b5cf6', minWidth: 40, textAlign: 'right' }}>~{estMax}кг</span>}
+                          <span style={{ color: 'var(--accent)', fontWeight: 600, minWidth: 55, textAlign: 'right' }}>{ex.sets}Г—{ex.reps}</span>
+                          {estMax > 0 && <span style={{ fontSize: 8, color: '#8b5cf6', minWidth: 40, textAlign: 'right' }}>~{estMax}РєРі</span>}
                           <span style={{ fontSize: 8, color: 'var(--text-dim)', minWidth: 25, textAlign: 'right' }}>RIR{ex.rir}</span>
-                          <span style={{ fontSize: 6, padding: '1px 2px', borderRadius: 2, background: 'rgba(139,92,246,0.1)', color: '#8b5cf6', whiteSpace: 'nowrap' }}>{scheme?.schemeType?.slice(0, 6) || '—'}</span>
-                          <span style={{ fontSize: 6, padding: '1px 2px', borderRadius: 2, background: 'rgba(249,115,22,0.1)', color: '#f97316', whiteSpace: 'nowrap' }}>⏱{restSec}с</span>
-                          {substitute && <span style={{ fontSize: 6, color: 'var(--text-dim)', maxWidth: 50, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={`Заменить: ${substitute.name}`}>↔{substitute.name.slice(0, 8)}</span>}
+                          <span style={{ fontSize: 6, padding: '1px 2px', borderRadius: 2, background: 'rgba(139,92,246,0.1)', color: '#8b5cf6', whiteSpace: 'nowrap' }}>{scheme?.schemeType?.slice(0, 6) || 'вЂ”'}</span>
+                          <span style={{ fontSize: 6, padding: '1px 2px', borderRadius: 2, background: 'rgba(249,115,22,0.1)', color: '#f97316', whiteSpace: 'nowrap' }}>вЏ±{restSec}СЃ</span>
+                          {substitute && <span style={{ fontSize: 6, color: 'var(--text-dim)', maxWidth: 50, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={``}>в†”{substitute.name.slice(0, 8)}</span>}
                         </div>
                         );
                       })}
@@ -686,7 +686,7 @@ export const TrainingScreen: React.FC = () => {
                         if (alts.length === 0) return null;
                         return (
                           <div key={`rot-${ei}`} style={{ fontSize: 8, color: 'var(--text-dim)', padding: '1px 0', marginLeft: 26, marginBottom: 1 }}>
-                            <span style={{ color: '#8b5cf6' }}>🔄 {ex.name.slice(0, 12)} → </span>
+                            <span style={{ color: '#8b5cf6' }}>рџ”„ {ex.name.slice(0, 12)} в†’ </span>
                             {alts.map((a: string, ai: number) => {
                               const altEx = EXERCISE_CATALOG.find(e => e.id === a);
                               return <span key={ai}>{altEx?.name || a}{ai < alts.length - 1 ? ', ' : ''}</span>;
@@ -699,10 +699,10 @@ export const TrainingScreen: React.FC = () => {
                 })}
                   <div style={{ marginTop: 4, padding: '4px 8px', background: 'rgba(255,255,255,0.03)', borderRadius: 4, fontSize: 9, color: 'var(--text-dim)' }}>
                       <span style={{ color: 'var(--accent)', fontWeight: 600 }}>
-                        {currentMicrocycle.mesocycleType === 'accumulation' ? '📈 Фаза накопления: высокий объём, умеренная интенсивность. Фокус на гипертрофию и технику.' :
-                         currentMicrocycle.mesocycleType === 'intensification' ? '📊 Фаза интенсификации: снижение объёма, рост весов. RIR 1-2, RPE 8-9.' :
-                         currentMicrocycle.mesocycleType === 'peaking' ? '🏆 Пиковая фаза: минимальный объём, максимальные веса. Подготовка к проходке.' :
-                         currentMicrocycle.mesocycleType === 'deload' ? '🔄 Разгрузка: 50% объёма, RIR 3-5. Восстановление ЦНС и суставов.' : ''}
+                        {currentMicrocycle.mesocycleType === 'accumulation' ? '' :
+                         currentMicrocycle.mesocycleType === 'intensification' ? '' :
+                         currentMicrocycle.mesocycleType === 'peaking' ? '' :
+                         currentMicrocycle.mesocycleType === 'deload' ? '' : ''}
                       </span>
                     </div>
                 </div>
@@ -711,7 +711,7 @@ export const TrainingScreen: React.FC = () => {
               {/* Quick week summary */}
               {currentMicrocycle && (
                 <div className="card" style={{ padding: '8px 10px' }}>
-                  <div style={{ fontWeight: 600, fontSize: 11, color: 'var(--accent)', marginBottom: 4 }}>📋 Сводка недели {selectedWeek}</div>
+                  <div style={{ fontWeight: 600, fontSize: 11, color: 'var(--accent)', marginBottom: 4 }}>рџ“‹ РЎРІРѕРґРєР° РЅРµРґРµР»Рё {selectedWeek}</div>
                   {(() => {
                     const days = currentMicrocycle.days.filter((d: any) => d.isTraining);
                     const totalSets = days.reduce((s: number, d: any) => s + (d.exercises?.reduce((ss: number, e: any) => ss + (e.sets || 0), 0) || 0), 0);
@@ -722,24 +722,24 @@ export const TrainingScreen: React.FC = () => {
                     return (
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr 1fr', gap: 4, fontSize: 10 }}>
                         <div style={{ textAlign: 'center', padding: '4px', background: 'rgba(0,230,138,0.05)', borderRadius: 4 }}>
-                          <div style={{ color: 'var(--text-dim)' }}>Дней</div>
+                          <div style={{ color: 'var(--text-dim)' }}>Р”РЅРµР№</div>
                           <div style={{ fontWeight: 700, color: 'var(--accent)' }}>{days.length}</div>
                         </div>
                         <div style={{ textAlign: 'center', padding: '4px', background: 'rgba(0,230,138,0.05)', borderRadius: 4 }}>
-                          <div style={{ color: 'var(--text-dim)' }}>Подходов</div>
+                          <div style={{ color: 'var(--text-dim)' }}>РџРѕРґС…РѕРґРѕРІ</div>
                           <div style={{ fontWeight: 700, color: 'var(--accent)' }}>{totalSets}</div>
                         </div>
                         <div style={{ textAlign: 'center', padding: '4px', background: 'rgba(0,230,138,0.05)', borderRadius: 4 }}>
-                          <div style={{ color: 'var(--text-dim)' }}>Повторов</div>
+                          <div style={{ color: 'var(--text-dim)' }}>РџРѕРІС‚РѕСЂРѕРІ</div>
                           <div style={{ fontWeight: 700, color: 'var(--accent)' }}>{totalReps}</div>
                         </div>
                         <div style={{ textAlign: 'center', padding: '4px', background: 'rgba(0,230,138,0.05)', borderRadius: 4 }}>
-                          <div style={{ color: 'var(--text-dim)' }}>Тоннаж</div>
-                          <div style={{ fontWeight: 700, color: 'var(--accent)' }}>{totalTonnage > 0 ? `${(totalTonnage / 1000).toFixed(1)}т` : '—'}</div>
+                          <div style={{ color: 'var(--text-dim)' }}>РўРѕРЅРЅР°Р¶</div>
+                          <div style={{ fontWeight: 700, color: 'var(--accent)' }}>{totalTonnage > 0 ? `${(totalTonnage / 1000).toFixed(1)}С‚` : 'вЂ”'}</div>
                         </div>
                         <div style={{ textAlign: 'center', padding: '4px', background: 'rgba(0,230,138,0.05)', borderRadius: 4 }}>
-                          <div style={{ color: 'var(--text-dim)' }}>Плотность</div>
-                          <div style={{ fontWeight: 700, color: density > 50 ? '#22c55e' : density > 25 ? '#ff9100' : '#ef4444' }}>{density} кг/мин</div>
+                          <div style={{ color: 'var(--text-dim)' }}>РџР»РѕС‚РЅРѕСЃС‚СЊ</div>
+                          <div style={{ fontWeight: 700, color: density > 50 ? '#22c55e' : density > 25 ? '#ff9100' : '#ef4444' }}>{density} РєРі/РјРёРЅ</div>
                         </div>
                       </div>
                     );
@@ -750,9 +750,9 @@ export const TrainingScreen: React.FC = () => {
               {/* Weekly training calendar (TZ) */}
               {currentMicrocycle && (
                 <div className="card" style={{ padding: '10px 12px', marginTop: 8 }}>
-                  <h4 style={{ margin: '0 0 6px', fontSize: 12 }}>📅 Календарь недели</h4>
+                  <h4 style={{ margin: '0 0 6px', fontSize: 12 }}>рџ“… РљР°Р»РµРЅРґР°СЂСЊ РЅРµРґРµР»Рё</h4>
                   <div style={{ display: 'flex', gap: 3 }}>
-                    {['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'].map((dayName, di) => {
+                    {['', '', '', '', '', '', ''].map((dayName, di) => {
                       const day = currentMicrocycle.days.find((d: any) => d.isTraining && d.day?.includes(dayName));
                       const isTraining = !!day;
                       return (
@@ -764,7 +764,7 @@ export const TrainingScreen: React.FC = () => {
                           fontWeight: isTraining ? 600 : 400,
                         }}>
                           <div>{dayName}</div>
-                          {isTraining && <div style={{ fontSize: 7, marginTop: 1 }}>{day?.exercises?.length || 0} упр</div>}
+                          {isTraining && <div style={{ fontSize: 7, marginTop: 1 }}>{day?.exercises?.length || 0} СѓРїСЂ</div>}
                         </div>
                       );
                     })}
@@ -783,11 +783,11 @@ export const TrainingScreen: React.FC = () => {
                 const cooldown = generateCooldown(cdInput);
                 return (
                   <div className="card" style={{ padding: '8px 10px', border: '1px solid rgba(59,130,246,0.2)' }}>
-                    <div style={{ fontWeight: 600, fontSize: 12, color: '#3b82f6', marginBottom: 4 }}>🧊 Заминка</div>
+                    <div style={{ fontWeight: 600, fontSize: 12, color: '#3b82f6', marginBottom: 4 }}>рџ§Љ Р—Р°РјРёРЅРєР°</div>
                     {cooldown.map((b, bi) => (
                       <div key={bi} style={{ fontSize: 10, marginBottom: 2, color: 'var(--text-dim)' }}>
                         <span style={{ fontWeight: 600, color: '#3b82f6' }}>
-                          {b.type === 'breathing' ? 'Дыхание' : b.type === 'stretch' ? 'Растяжка' : 'Мобильность'} ({b.durationSec}с)
+                          {b.type === 'breathing' ? '' : b.type === 'stretch' ? '' : ''} ({b.durationSec}СЃ)
                         </span>
                         {b.exercises?.map((ex, exi) => (
                           <span key={exi} style={{ marginLeft: 6, color: 'var(--text-dim)' }}>
@@ -803,13 +803,13 @@ export const TrainingScreen: React.FC = () => {
               {/* Custom added exercises */}
               {customExercises.length > 0 && (
                 <div className="card" style={{ padding: '8px 10px', border: '1px dashed rgba(139,92,246,0.3)' }}>
-                  <div style={{ fontWeight: 600, fontSize: 11, color: '#8b5cf6', marginBottom: 4 }}>📝 Добавленные ({customExercises.length})</div>
+                  <div style={{ fontWeight: 600, fontSize: 11, color: '#8b5cf6', marginBottom: 4 }}>рџ“ќ Р”РѕР±Р°РІР»РµРЅРЅС‹Рµ ({customExercises.length})</div>
                   {customExercises.map((ce, ci) => (
                     <div key={ci} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 10, padding: '2px 0', borderBottom: ci < customExercises.length - 1 ? '1px solid var(--border)' : 'none' }}>
                       <span>{ce.name}</span>
-                      <span style={{ color: 'var(--accent)', fontWeight: 600 }}>{ce.sets}×{ce.reps}</span>
+                      <span style={{ color: 'var(--accent)', fontWeight: 600 }}>{ce.sets}Г—{ce.reps}</span>
                       <span style={{ color: 'var(--text-dim)', fontSize: 9 }}>RIR {ce.rir}</span>
-                      <button onClick={() => setCustomExercises(customExercises.filter((_, i) => i !== ci))} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: 12, padding: 0 }}>×</button>
+                      <button onClick={() => setCustomExercises(customExercises.filter((_, i) => i !== ci))} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: 12, padding: 0 }}>Г—</button>
                     </div>
                   ))}
                 </div>
@@ -818,7 +818,7 @@ export const TrainingScreen: React.FC = () => {
               {/* Intensity zone distribution (TZ) */}
               {currentMicrocycle?.days && (
                 <div className="card" style={{ padding: '8px 10px', marginTop: 8 }}>
-                  <div style={{ fontWeight: 600, fontSize: 11, color: 'var(--accent)', marginBottom: 4 }}>📊 Зоны интенсивности</div>
+                  <div style={{ fontWeight: 600, fontSize: 11, color: 'var(--accent)', marginBottom: 4 }}>рџ“Љ Р—РѕРЅС‹ РёРЅС‚РµРЅСЃРёРІРЅРѕСЃС‚Рё</div>
                   {(() => {
                     const reps = currentMicrocycle.days.filter((d: any) => d.isTraining)
                       .flatMap((d: any) => d.exercises?.map((e: any) => parseInt(String(e.reps)) || 8) || []) || [];
@@ -840,7 +840,7 @@ export const TrainingScreen: React.FC = () => {
                           </div>
                         </div>
                         <div style={{ display: 'flex', gap: 8, fontSize: 9, color: 'var(--text-dim)' }}>
-                          <span>🔴 Сила ({str})</span><span>🟢 Гипертрофия ({hyp})</span><span>🔵 Выносливость ({end})</span>
+                          <span>рџ”ґ РЎРёР»Р° ({str})</span><span>рџџў Р“РёРїРµСЂС‚СЂРѕС„РёСЏ ({hyp})</span><span>рџ”µ Р’С‹РЅРѕСЃР»РёРІРѕСЃС‚СЊ ({end})</span>
                         </div>
                       </div>
                     );
@@ -850,12 +850,12 @@ export const TrainingScreen: React.FC = () => {
 
               {/* Workout nutrition tips */}
               <div className="card" style={{ padding: '8px 10px', border: '1px solid rgba(255,165,2,0.2)', marginTop: 8 }}>
-                <div style={{ fontWeight: 600, fontSize: 11, color: '#ffa502', marginBottom: 4 }}>🍎 Питание вокруг тренировки</div>
+                <div style={{ fontWeight: 600, fontSize: 11, color: '#ffa502', marginBottom: 4 }}>рџЌЋ РџРёС‚Р°РЅРёРµ РІРѕРєСЂСѓРі С‚СЂРµРЅРёСЂРѕРІРєРё</div>
                 <div style={{ fontSize: 10, color: 'var(--text-dim)', lineHeight: 1.5 }}>
-                  {goal === 'bulk' ? 'До: белки + углеводы за 2ч. После: быстрый белок + углеводы в течение 30 мин.' :
-                   goal === 'cut' ? 'До: белки за 2ч. После: белок + овощи. Углеводы только вокруг тренировки.' :
-                   goal === 'strength' ? 'До: кофеин + углеводы за 1ч. После: белок + креатин.' :
-                   'До: лёгкий перекус за 1-2ч. После: белок + углеводы в течение 1ч.'}
+                  {goal === 'bulk' ? '' :
+                   goal === 'cut' ? '' :
+                   goal === 'strength' ? '' :
+                   ''}
                 </div>
               </div>
 
@@ -865,14 +865,14 @@ export const TrainingScreen: React.FC = () => {
                 const pushVol = (groups.chest || 0) + (groups.shoulders || 0);
                 const pullVol = (groups.back || 0);
                 const quadVol = groups.legs || 0;
-                const ratio = pullVol > 0 ? (pushVol / pullVol).toFixed(1) : '—';
+                const ratio = pullVol > 0 ? (pushVol / pullVol).toFixed(1) : 'вЂ”';
                 const balanced = parseFloat(ratio as string) >= 0.8 && parseFloat(ratio as string) <= 1.2;
                 return (
                   <div className="card" style={{ padding: '8px 10px', border: '1px solid rgba(139,92,246,0.2)' }}>
-                    <div style={{ fontWeight: 600, fontSize: 11, color: '#8b5cf6', marginBottom: 4 }}>⚖️ Баланс нагрузки</div>
+                    <div style={{ fontWeight: 600, fontSize: 11, color: '#8b5cf6', marginBottom: 4 }}>вљ–пёЏ Р‘Р°Р»Р°РЅСЃ РЅР°РіСЂСѓР·РєРё</div>
                     <div style={{ display: 'flex', gap: 8, fontSize: 10, color: 'var(--text-dim)' }}>
-                      <span>Push/Pull: <b style={{ color: balanced ? '#22c55e' : '#ff9100' }}>{ratio}</b> {balanced ? '✓' : '⚠'}</span>
-                      <span>Ноги/Верх: <b>{(quadVol / Math.max(1, pushVol + pullVol)).toFixed(1)}</b></span>
+                      <span>Push/Pull: <b style={{ color: balanced ? '#22c55e' : '#ff9100' }}>{ratio}</b> {balanced ? 'вњ“' : 'вљ '}</span>
+                      <span>РќРѕРіРё/Р’РµСЂС…: <b>{(quadVol / Math.max(1, pushVol + pullVol)).toFixed(1)}</b></span>
                     </div>
                   </div>
                 );
@@ -882,12 +882,12 @@ export const TrainingScreen: React.FC = () => {
               {currentMicrocycle && (() => {
                 const acRatio = currentMicrocycle.volumeMultiplier * 100 / 85;
                 const riskScore = (acRatio > 120 ? 3 : acRatio > 100 ? 1 : 0) + (sleepHours < 6 ? 2 : sleepHours < 7 ? 1 : 0) + (stressLevel > 7 ? 2 : stressLevel > 5 ? 1 : 0);
-                const riskLabel = riskScore >= 5 ? '🚨 Высокий риск перетренированности' : riskScore >= 3 ? '⚠️ Умеренный риск' : riskScore >= 1 ? '⚡ Повышенная нагрузка' : '';
+                const riskLabel = riskScore >= 5 ? '' : riskScore >= 3 ? 'вљ пёЏ РЈРјРµСЂРµРЅРЅС‹Р№ СЂРёСЃРє' : riskScore >= 1 ? 'вљЎ РџРѕРІС‹С€РµРЅРЅР°СЏ РЅР°РіСЂСѓР·РєР°' : '';
                 if (!riskLabel) return null;
                 return (
                   <div className="card" style={{ padding: '6px 10px', border: `1px solid ${riskScore >= 5 ? 'rgba(239,68,68,0.3)' : 'rgba(255,145,0,0.3)'}`, background: riskScore >= 5 ? 'rgba(239,68,68,0.05)' : 'rgba(255,145,0,0.05)' }}>
                     <div style={{ fontSize: 10, color: riskScore >= 5 ? '#ef4444' : '#ff9100', fontWeight: 600 }}>
-                      {riskLabel} — {riskScore >= 5 ? 'Снизь нагрузку на 25-30% и увеличь сон' : riskScore >= 3 ? 'Контролируй RPE, спи 7+ часов' : 'Следи за восстановлением'}
+                      {riskLabel} вЂ” {riskScore >= 5 ? '' : riskScore >= 3 ? '' : ''}
                     </div>
                   </div>
                 );
@@ -895,40 +895,40 @@ export const TrainingScreen: React.FC = () => {
 
               {trainingOutput.volumePerGroup && (
                 <div className="card" style={{ padding: '10px 12px' }}>
-                  <h4 style={{ margin: '0 0 6px', fontSize: 12 }}>📊 Объём по группам</h4>
+                  <h4 style={{ margin: '0 0 6px', fontSize: 12 }}>рџ“Љ РћР±СЉС‘Рј РїРѕ РіСЂСѓРїРїР°Рј</h4>
                   {Object.entries(trainingOutput.volumePerGroup).map(([g, v]) => (
                     <div key={g} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
                       <span style={{ fontSize: 11, minWidth: 50 }}>{GROUP_LABELS[g] || g}</span>
                       <div style={{ flex: 1, background: 'rgba(255,255,255,0.05)', borderRadius: 3, height: 6, overflow: 'hidden' }}>
                         <div style={{ width: `${Math.min(100, v / 2)}%`, height: '100%', background: 'var(--accent)', borderRadius: 3 }} />
                       </div>
-                      <span style={{ fontSize: 10, color: 'var(--text-dim)', minWidth: 40, textAlign: 'right' }}>{v} подх</span>
+                      <span style={{ fontSize: 10, color: 'var(--text-dim)', minWidth: 40, textAlign: 'right' }}>{v} РїРѕРґС…</span>
                     </div>
                   ))}
                   {trainingOutput.estimatedProgress !== undefined && (
                     <div style={{ marginTop: 6, padding: '6px 8px', background: 'rgba(0,230,138,0.05)', borderRadius: 6, fontSize: 10 }}>
-                      <span style={{ color: 'var(--accent)', fontWeight: 600 }}>📈 Ожидаемый прогресс: +{trainingOutput.estimatedProgress}%/нед</span>
+                      <span style={{ color: 'var(--accent)', fontWeight: 600 }}>рџ“€ РћР¶РёРґР°РµРјС‹Р№ РїСЂРѕРіСЂРµСЃСЃ: +{trainingOutput.estimatedProgress}%/РЅРµРґ</span>
                       <span style={{ color: 'var(--text-dim)', marginLeft: 8 }}>
-                        Модель: {goal} × {level}
+                        РњРѕРґРµР»СЊ: {goal} Г— {level}
                       </span>
                     </div>
                   )}
                   {/* Workload ratio + Monotony/Strain (TZ 71-72) */}
                   {currentMicrocycle && (
                     <div style={{ marginTop: 4, padding: '6px 8px', background: 'rgba(255,255,255,0.03)', borderRadius: 4, fontSize: 9 }}>
-                      <span style={{ fontWeight: 600, color: 'var(--text-dim)' }}>🔬 Нагрузка: </span>
-                      <span style={{ color: 'var(--accent)' }}>Острая: {Math.round(currentMicrocycle.volumeMultiplier * bodyWeight * daysPerWeek)} кг/нед</span>
+                      <span style={{ fontWeight: 600, color: 'var(--text-dim)' }}>рџ”¬ РќР°РіСЂСѓР·РєР°: </span>
+                      <span style={{ color: 'var(--accent)' }}>РћСЃС‚СЂР°СЏ: {Math.round(currentMicrocycle.volumeMultiplier * bodyWeight * daysPerWeek)} РєРі/РЅРµРґ</span>
                       <span style={{ color: 'var(--text-dim)', marginLeft: 4 }}>
-                        Хрон.: {Math.round(currentMicrocycle.volumeMultiplier * bodyWeight * daysPerWeek * 0.85)} кг/нед
+                        РҐСЂРѕРЅ.: {Math.round(currentMicrocycle.volumeMultiplier * bodyWeight * daysPerWeek * 0.85)} РєРі/РЅРµРґ
                       </span>
                       <span style={{ marginLeft: 4, color: currentMicrocycle.volumeMultiplier > 1.2 ? '#ef4444' : currentMicrocycle.mesocycleType === 'deload' ? '#22c55e' : '#ff9100' }}>
                         A/C: {(currentMicrocycle.volumeMultiplier * 100 / 85).toFixed(0)}%
                       </span>
                       {currentMicrocycle.volumeMultiplier > 1.3 && (
-                        <span style={{ marginLeft: 4, color: '#ef4444', fontWeight: 600 }}>⚠ Высокий риск перегрузки</span>
+                        <span style={{ marginLeft: 4, color: '#ef4444', fontWeight: 600 }}>вљ  Р’С‹СЃРѕРєРёР№ СЂРёСЃРє РїРµСЂРµРіСЂСѓР·РєРё</span>
                       )}
                       <span style={{ marginLeft: 4, color: sleepHours < 6 ? '#ef4444' : sleepHours < 7 ? '#ff9100' : '#22c55e' }}>
-                        Сон: {sleepHours}ч | Стресс: {stressLevel}/10
+                        РЎРѕРЅ: {sleepHours}С‡ | РЎС‚СЂРµСЃСЃ: {stressLevel}/10
                       </span>
                     </div>
                   )}
@@ -939,14 +939,14 @@ export const TrainingScreen: React.FC = () => {
         </div>
       )}
 
-      {/* ═══════════ RUNTIME (Live Workout) ═══════════ */}
+      {/* в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ RUNTIME (Live Workout) в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ */}
       {tab === 'runtime' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {!runtimeStarted ? (
             <div className="card" style={{ padding: '12px' }}>
-              <h3 style={{ margin: '0 0 8px', fontSize: 14 }}>🏃 Начать тренировку</h3>
+              <h3 style={{ margin: '0 0 8px', fontSize: 14 }}>рџЏѓ РќР°С‡Р°С‚СЊ С‚СЂРµРЅРёСЂРѕРІРєСѓ</h3>
               <p style={{ fontSize: 11, color: 'var(--text-dim)', margin: '0 0 10px' }}>
-                Выберите день из плана для отслеживания подходов в реальном времени.
+                Р’С‹Р±РµСЂРёС‚Рµ РґРµРЅСЊ РёР· РїР»Р°РЅР° РґР»СЏ РѕС‚СЃР»РµР¶РёРІР°РЅРёСЏ РїРѕРґС…РѕРґРѕРІ РІ СЂРµР°Р»СЊРЅРѕРј РІСЂРµРјРµРЅРё.
               </p>
               {macrocycle && currentMicrocycle ? (
                 <>
@@ -961,13 +961,13 @@ export const TrainingScreen: React.FC = () => {
                   </div>
             <div style={{ background: 'var(--bg-secondary)', borderRadius: 6, padding: 8, marginBottom: 8 }}>
               <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>
-                {currentMicrocycle.days.filter((d: any) => d.isTraining)[runtimeDay]?.exercises?.length || 0} упражнений • {currentMicrocycle.days.filter((d: any) => d.isTraining)[runtimeDay]?.duration || 60} мин
+                {currentMicrocycle.days.filter((d: any) => d.isTraining)[runtimeDay]?.exercises?.length || 0} СѓРїСЂР°Р¶РЅРµРЅРёР№ вЂў {currentMicrocycle.days.filter((d: any) => d.isTraining)[runtimeDay]?.duration || 60} РјРёРЅ
               </div>
               <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 2 }}>
-                Интенсивность: {currentMicrocycle.days.filter((d: any) => d.isTraining)[runtimeDay]?.intensity || 'средняя'} | Схема: {(currentMicrocycle as any).mesocycleType || 'накопление'}
+                РРЅС‚РµРЅСЃРёРІРЅРѕСЃС‚СЊ: {currentMicrocycle.days.filter((d: any) => d.isTraining)[runtimeDay]?.intensity || 'СЃСЂРµРґРЅСЏСЏ'} | РЎС…РµРјР°: {(currentMicrocycle as any).mesocycleType || ''}
               </div>
               <div style={{ fontSize: 10, color: 'var(--accent)', marginTop: 2, fontWeight: 600 }}>
-                Расчётный тоннаж: {currentMicrocycle.days.filter((d: any) => d.isTraining)[runtimeDay]?.exercises?.reduce((sum: number, ex: any) => sum + (ex.sets || 0) * (Number(ex.reps) || 0) * (ex.weight || 0), 0) || 0} кг
+                Р Р°СЃС‡С‘С‚РЅС‹Р№ С‚РѕРЅРЅР°Р¶: {currentMicrocycle.days.filter((d: any) => d.isTraining)[runtimeDay]?.exercises?.reduce((sum: number, ex: any) => sum + (ex.sets || 0) * (Number(ex.reps) || 0) * (ex.weight || 0), 0) || 0} РєРі
               </div>
             </div>
                   {/* Session difficulty estimate */}
@@ -977,15 +977,15 @@ export const TrainingScreen: React.FC = () => {
                     const avgIntensity = dayExercises.length > 0
                       ? dayExercises.reduce((s: number, e: any) => s + (e.intensity || 70), 0) / dayExercises.length
                       : 70;
-                    const difficulty = totalSets > 25 ? 'Высокая' : totalSets > 15 ? 'Средняя' : 'Низкая';
-                    const color = difficulty === 'Высокая' ? '#ef4444' : difficulty === 'Средняя' ? '#f59e0b' : '#22c55e';
+                    const difficulty = totalSets > 25 ? '' : totalSets > 15 ? '' : '';
+                    const color = difficulty === '' ? '#ef4444' : difficulty === '' ? '#f59e0b' : '#22c55e';
                     return (
                       <div style={{ fontSize: 10, margin: '6px 0', padding: '6px 8px', borderRadius: 6, background: 'rgba(255,255,255,0.03)' }}>
-                        <span style={{ color: 'var(--text-dim)' }}>Сложность: </span>
+                        <span style={{ color: 'var(--text-dim)' }}>РЎР»РѕР¶РЅРѕСЃС‚СЊ: </span>
                         <span style={{ fontWeight: 600, color }}>{difficulty}</span>
-                        <span style={{ color: 'var(--text-dim)', marginLeft: 6 }}>· {totalSets} подходов · ~{avgIntensity.toFixed(0)}% ср.</span>
+                        <span style={{ color: 'var(--text-dim)', marginLeft: 6 }}>В· {totalSets} РїРѕРґС…РѕРґРѕРІ В· ~{avgIntensity.toFixed(0)}% СЃСЂ.</span>
                         {totalSets > 25 && (
-                          <div style={{ color: '#f97316', marginTop: 2 }}>⚠ Высокий объём — отдых ≥ 3 мин между подходами</div>
+                          <div style={{ color: '#f97316', marginTop: 2 }}>вљ  Р’С‹СЃРѕРєРёР№ РѕР±СЉС‘Рј вЂ” РѕС‚РґС‹С… в‰Ґ 3 РјРёРЅ РјРµР¶РґСѓ РїРѕРґС…РѕРґР°РјРё</div>
                         )}
                       </div>
                     );
@@ -993,11 +993,11 @@ export const TrainingScreen: React.FC = () => {
                   <button onClick={() => { setRuntimeStarted(true); setRuntimeLogs({}); setRuntimeExIdx(0); }} style={{
                     width: '100%', padding: 12, borderRadius: 8, border: 'none', cursor: 'pointer',
                     background: 'linear-gradient(135deg, #00e68a, #00c853)', color: '#000', fontWeight: 700, fontSize: 14,
-                  }}>▶ Старт</button>
+                  }}>в–¶ РЎС‚Р°СЂС‚</button>
                 </>
               ) : (
                 <div style={{ textAlign: 'center', color: 'var(--text-dim)', fontSize: 11 }}>
-                  Сначала сгенерируйте план во вкладке 📋 План
+                  РЎРЅР°С‡Р°Р»Р° СЃРіРµРЅРµСЂРёСЂСѓР№С‚Рµ РїР»Р°РЅ РІРѕ РІРєР»Р°РґРєРµ рџ“‹ РџР»Р°РЅ
                 </div>
               )}
             </div>
@@ -1011,10 +1011,10 @@ export const TrainingScreen: React.FC = () => {
                 const ex = exercises[runtimeExIdx];
                 if (!ex) return (
                   <div className="card" style={{ textAlign: 'center', padding: 20 }}>
-                    <div style={{ fontSize: 28, marginBottom: 8 }}>🏆</div>
-                    <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 4 }}>Тренировка завершена!</div>
+                    <div style={{ fontSize: 28, marginBottom: 8 }}>рџЏ†</div>
+                    <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 4 }}>РўСЂРµРЅРёСЂРѕРІРєР° Р·Р°РІРµСЂС€РµРЅР°!</div>
                     <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 12 }}>
-                      {Object.values(runtimeLogs).filter(l => l.completed).length} из {exercises.length} упражнений выполнено
+                      {Object.values(runtimeLogs).filter(l => l.completed).length} РёР· {exercises.length} СѓРїСЂР°Р¶РЅРµРЅРёР№ РІС‹РїРѕР»РЅРµРЅРѕ
                     </div>
                     {/* Summary stats */}
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginBottom: 12, fontSize: 10 }}>
@@ -1028,16 +1028,16 @@ export const TrainingScreen: React.FC = () => {
                         return (
                           <>
                             <div style={{ background: 'rgba(0,230,138,0.08)', borderRadius: 6, padding: 6 }}>
-                              <div style={{ color: 'var(--text-dim)', fontSize: 8 }}>Подходов</div>
+                              <div style={{ color: 'var(--text-dim)', fontSize: 8 }}>РџРѕРґС…РѕРґРѕРІ</div>
                               <div style={{ fontWeight: 700, color: 'var(--accent)' }}>{totalSets}</div>
                             </div>
                             <div style={{ background: 'rgba(0,230,138,0.08)', borderRadius: 6, padding: 6 }}>
-                              <div style={{ color: 'var(--text-dim)', fontSize: 8 }}>Тоннаж</div>
-                              <div style={{ fontWeight: 700, color: 'var(--accent)' }}>{totalVolume.toLocaleString()} кг</div>
+                              <div style={{ color: 'var(--text-dim)', fontSize: 8 }}>РўРѕРЅРЅР°Р¶</div>
+                              <div style={{ fontWeight: 700, color: 'var(--accent)' }}>{totalVolume.toLocaleString()} РєРі</div>
                             </div>
                             <div style={{ background: 'rgba(0,230,138,0.08)', borderRadius: 6, padding: 6 }}>
-                              <div style={{ color: 'var(--text-dim)', fontSize: 8 }}>Макс 1RM</div>
-                              <div style={{ fontWeight: 700, color: 'var(--accent)' }}>{max1RM} кг</div>
+                              <div style={{ color: 'var(--text-dim)', fontSize: 8 }}>РњР°РєСЃ 1RM</div>
+                              <div style={{ fontWeight: 700, color: 'var(--accent)' }}>{max1RM} РєРі</div>
                             </div>
                           </>
                         );
@@ -1094,7 +1094,7 @@ export const TrainingScreen: React.FC = () => {
                       }} style={{
                         padding: '8px 20px', borderRadius: 8, border: 'none', cursor: 'pointer',
                         background: 'var(--accent)', color: '#000', fontWeight: 600, fontSize: 13,
-                      }}>✓ Завершить</button>
+                      }}>вњ“ Р—Р°РІРµСЂС€РёС‚СЊ</button>
                     </div>
                   </div>
                 );
@@ -1121,7 +1121,7 @@ export const TrainingScreen: React.FC = () => {
                     {/* Exercise header */}
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
                       <div>
-                        <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>Упражнение {runtimeExIdx + 1}/{exercises.length}</span>
+                        <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>РЈРїСЂР°Р¶РЅРµРЅРёРµ {runtimeExIdx + 1}/{exercises.length}</span>
                         <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--accent)' }}>{ex.name}</div>
                       </div>
                       <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>  
@@ -1132,27 +1132,27 @@ export const TrainingScreen: React.FC = () => {
 
                     {/* Target */}
                     <div style={{ display: 'flex', gap: 12, marginBottom: 4, fontSize: 10, color: 'var(--text-dim)' }}>
-                      <span>Цель: {ex.sets}×{ex.reps}</span>
+                      <span>Р¦РµР»СЊ: {ex.sets}Г—{ex.reps}</span>
                       <span>RIR: {ex.rir}</span>
-                      {ex.weight && <span>Вес: {ex.weight}кг | ~{Math.round(ex.weight * (1 + Number(ex.reps) / 30))}кг 1RM</span>}
+                      {ex.weight && <span>Р’РµСЃ: {ex.weight}РєРі | ~{Math.round(ex.weight * (1 + Number(ex.reps) / 30))}РєРі 1RM</span>}
                     </div>
 
                     {/* Technique note */}
                     {ex.technique && (
                       <div style={{ marginBottom: 6, padding: '5px 8px', background: 'rgba(0,230,138,0.05)', borderRadius: 6, fontSize: 9, color: 'var(--text)', lineHeight: 1.4 }}>
-                        <span style={{ fontWeight: 600, color: 'var(--accent)' }}>🎯 </span>{ex.technique}
+                        <span style={{ fontWeight: 600, color: 'var(--accent)' }}>рџЋЇ </span>{ex.technique}
                       </div>
                     )}
 
                     {/* Warmup ramp-up (first set only) */}
                     {log.sets.length === 0 && ex.weight && (
                       <div style={{ marginBottom: 6, padding: '5px 8px', background: 'rgba(255,145,0,0.05)', borderRadius: 6, fontSize: 9 }}>
-                        <div style={{ fontWeight: 600, color: '#ff9100', marginBottom: 3 }}>🔥 Разминочные подходы</div>
+                        <div style={{ fontWeight: 600, color: '#ff9100', marginBottom: 3 }}>рџ”Ґ Р Р°Р·РјРёРЅРѕС‡РЅС‹Рµ РїРѕРґС…РѕРґС‹</div>
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 2, color: 'var(--text-dim)' }}>
                           {[{ pct: 20, reps: 10 }, { pct: 40, reps: 5 }, { pct: 60, reps: 3 }, { pct: 75, reps: 1 }].map(wu => (
                             <div key={wu.pct} style={{ textAlign: 'center', padding: '2px 4px', background: 'rgba(255,145,0,0.08)', borderRadius: 3 }}>
-                              <div style={{ color: '#ff9100', fontWeight: 600 }}>~{Math.round((ex.weight || 80) * wu.pct / 100)}кг</div>
-                              <div style={{ fontSize: 7 }}>{wu.reps} повт</div>
+                              <div style={{ color: '#ff9100', fontWeight: 600 }}>~{Math.round((ex.weight || 80) * wu.pct / 100)}РєРі</div>
+                              <div style={{ fontSize: 7 }}>{wu.reps} РїРѕРІС‚</div>
                               <div style={{ fontSize: 7 }}>{wu.pct}%</div>
                             </div>
                           ))}
@@ -1168,18 +1168,18 @@ export const TrainingScreen: React.FC = () => {
                     {/* Previous sets log */}
                     {log.sets.length > 0 && (
                       <div style={{ marginBottom: 8 }}>
-                        <div style={{ fontSize: 9, fontWeight: 600, color: 'var(--text-dim)', marginBottom: 2 }}>Выполнено:</div>
+                        <div style={{ fontSize: 9, fontWeight: 600, color: 'var(--text-dim)', marginBottom: 2 }}>Р’С‹РїРѕР»РЅРµРЅРѕ:</div>
                         {log.sets.map((s, si) => (
                           <div key={si} style={{ display: 'flex', gap: 8, fontSize: 10, padding: '2px 0' }}>
                             <span style={{ fontWeight: 600, minWidth: 16 }}>#{si + 1}</span>
-                            <span>{s.weight}кг × {s.reps}</span>
+                            <span>{s.weight}РєРі Г— {s.reps}</span>
                             <span style={{ color: 'var(--text-dim)' }}>RPE {s.rpe}</span>
                             <span style={{ color: 'var(--text-dim)' }}>RIR {s.rir}</span>
-                            <span style={{ color: 'var(--accent)' }}>1RM ~{Math.round(s.weight * (1 + s.reps / 30))}кг</span>
+                            <span style={{ color: 'var(--accent)' }}>1RM ~{Math.round(s.weight * (1 + s.reps / 30))}РєРі</span>
                           </div>
                         ))}
                         {last1RM > 0 && (
-                          <div style={{ fontSize: 9, color: 'var(--accent)', marginTop: 2 }}>1RM последний: {last1RM}кг | Объём: {estimatedVolume}кг | RPE ср: {avgRPE}</div>
+                          <div style={{ fontSize: 9, color: 'var(--accent)', marginTop: 2 }}>1RM РїРѕСЃР»РµРґРЅРёР№: {last1RM}РєРі | РћР±СЉС‘Рј: {estimatedVolume}РєРі | RPE СЃСЂ: {avgRPE}</div>
                         )}
                         {/* Autoregulation hint */}
                         {log.sets.length >= 1 && (() => {
@@ -1187,13 +1187,13 @@ export const TrainingScreen: React.FC = () => {
                           let hint = '';
                           let hintColor = 'var(--text-dim)';
                           if (lastSet.rpe <= 5 && lastSet.rir >= 3) {
-                            hint = '🟢 RPE низкий — можно увеличить вес на 2.5-5 кг';
+                            hint = '';
                             hintColor = '#22c55e';
                           } else if (lastSet.rpe >= 9.5 && lastSet.rir <= 0) {
-                            hint = '🔴 RPE предельный — снизьте вес или остановитесь';
+                            hint = '';
                             hintColor = '#ef4444';
                           } else if (lastSet.rpe >= 8.5 && lastSet.rir <= 1) {
-                            hint = '🟡 RPE высокий — держите вес или уменьшите';
+                            hint = '';
                             hintColor = '#f59e0b';
                           }
                           if (!hint) return null;
@@ -1207,12 +1207,12 @@ export const TrainingScreen: React.FC = () => {
                       <div>
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, marginBottom: 6 }}>
                           <div>
-                            <label style={{ fontSize: 9, color: 'var(--text-dim)' }}>Вес (кг)</label>
+                            <label style={{ fontSize: 9, color: 'var(--text-dim)' }}>Р’РµСЃ (РєРі)</label>
                             <input type="number" value={runtimeSetW} onChange={e => setRuntimeSetW(+e.target.value)}
                               style={{ width: '100%', padding: '6px 8px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 13, boxSizing: 'border-box' }} />
                           </div>
                           <div>
-                            <label style={{ fontSize: 9, color: 'var(--text-dim)' }}>Повторения</label>
+                            <label style={{ fontSize: 9, color: 'var(--text-dim)' }}>РџРѕРІС‚РѕСЂРµРЅРёСЏ</label>
                             <input type="number" value={runtimeSetR} onChange={e => setRuntimeSetR(+e.target.value)}
                               style={{ width: '100%', padding: '6px 8px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 13, boxSizing: 'border-box' }} />
                           </div>
@@ -1234,7 +1234,7 @@ export const TrainingScreen: React.FC = () => {
                           width: '100%', padding: 8, borderRadius: 6, border: 'none', cursor: 'pointer',
                           background: 'var(--accent)', color: '#000', fontWeight: 600, fontSize: 12,
                           marginBottom: 4,
-                        }}>✓ Записать подход {currentSet}/{totalSets}</button>
+                        }}>вњ“ Р—Р°РїРёСЃР°С‚СЊ РїРѕРґС…РѕРґ {currentSet}/{totalSets}</button>
                         <button onClick={() => {
                           const newLog = { ...log, completed: true };
                           setRuntimeLogs({ ...runtimeLogs, [ex.exerciseId || ex.name]: newLog });
@@ -1242,19 +1242,19 @@ export const TrainingScreen: React.FC = () => {
                         }} style={{
                           width: '100%', padding: 6, borderRadius: 6, border: '1px solid var(--border)', cursor: 'pointer',
                           background: 'transparent', color: 'var(--text-dim)', fontSize: 11,
-                        }}>Пропустить →</button>
+                        }}>РџСЂРѕРїСѓСЃС‚РёС‚СЊ в†’</button>
                       </div>
                     )}
                     {log.completed && (
                       <div style={{ textAlign: 'center', padding: 8, background: 'rgba(0,230,138,0.1)', borderRadius: 6 }}>
-                        <span style={{ color: '#22c55e', fontWeight: 600 }}>✓ Выполнено — {log.sets.length} подхода(ов)</span>
+                        <span style={{ color: '#22c55e', fontWeight: 600 }}>вњ“ Р’С‹РїРѕР»РЅРµРЅРѕ вЂ” {log.sets.length} РїРѕРґС…РѕРґР°(РѕРІ)</span>
                         <div style={{ marginTop: 6 }}>
                           <button onClick={() => {
                             if (runtimeExIdx < exercises.length - 1) setRuntimeExIdx(runtimeExIdx + 1);
                           }} style={{
                             padding: '8px 16px', borderRadius: 6, border: 'none', cursor: 'pointer',
                             background: 'var(--accent)', color: '#000', fontWeight: 600, fontSize: 13,
-                          }}>Следующее упражнение →</button>
+                          }}>РЎР»РµРґСѓСЋС‰РµРµ СѓРїСЂР°Р¶РЅРµРЅРёРµ в†’</button>
                         </div>
                       </div>
                     )}
@@ -1266,30 +1266,30 @@ export const TrainingScreen: React.FC = () => {
         </div>
       )}
 
-      {/* ═══════════ EXERCISES TAB ═══════════ */}
+      {/* в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ EXERCISES TAB в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ */}
       {tab === 'exercises' && (
         <div style={{ display: 'flex', gap: 8, flexDirection: selectedEx ? 'row' : 'column', flexWrap: 'wrap' }}>
           <div style={{ flex: selectedEx ? '0 0 280px' : 1, maxHeight: 'calc(100vh - 200px)', display: 'flex', flexDirection: 'column' }}>
             <input type="text" value={exSearch} onChange={e => setExSearch(e.target.value)}
-              placeholder="🔍 Поиск..."
+              placeholder=""
               style={{ width: '100%', padding: '7px 10px', borderRadius: 8, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, marginBottom: 4, boxSizing: 'border-box', flexShrink: 0 }} />
             <div style={{ display: 'flex', gap: 3, marginBottom: 4, flexShrink: 0 }}>
               <select value={exGroup} onChange={e => setExGroup(e.target.value)} style={{ flex: 1, padding: '4px 4px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 10 }}>
-                <option value="all">Все группы</option>
+                <option value="all">Р’СЃРµ РіСЂСѓРїРїС‹</option>
                 {MUSCLE_GROUPS.map(g => <option key={g} value={g}>{GROUP_LABELS[g]}</option>)}
               </select>
               <select value={exType} onChange={e => setExType(e.target.value)} style={{ flex: 1, padding: '4px 4px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 10 }}>
-                <option value="all">Все типы</option>
-                <option value="compound">Базовые</option>
-                <option value="isolation">Изолирующие</option>
+                <option value="all">Р’СЃРµ С‚РёРїС‹</option>
+                <option value="compound">Р‘Р°Р·РѕРІС‹Рµ</option>
+                <option value="isolation">РР·РѕР»РёСЂСѓСЋС‰РёРµ</option>
               </select>
               <select value={exEquipment} onChange={e => setExEquipment(e.target.value)} style={{ flex: 1, padding: '4px 4px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 10 }}>
-                <option value="all">Оборуд.</option>
-                <option value="barbell">Штанга</option>
-                <option value="dumbbell">Гантели</option>
-                <option value="machine">Тренажёр</option>
-                <option value="cable">Блок</option>
-                <option value="bodyweight">Вес тела</option>
+                <option value="all">РћР±РѕСЂСѓРґ.</option>
+                <option value="barbell">РЁС‚Р°РЅРіР°</option>
+                <option value="dumbbell">Р“Р°РЅС‚РµР»Рё</option>
+                <option value="machine">РўСЂРµРЅР°Р¶С‘СЂ</option>
+                <option value="cable">Р‘Р»РѕРє</option>
+                <option value="bodyweight">Р’РµСЃ С‚РµР»Р°</option>
               </select>
             </div>
             <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 2 }}>
@@ -1311,41 +1311,41 @@ export const TrainingScreen: React.FC = () => {
             <div style={{ flex: 1, background: 'var(--bg-secondary)', borderRadius: 10, padding: '10px 12px', maxHeight: 'calc(100vh - 190px)', overflowY: 'auto', minWidth: 250 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
                 <h3 style={{ margin: 0, fontSize: 13, color: 'var(--accent)' }}>{selectedEx.name}</h3>
-                <button onClick={() => setSelectedEx(null)} style={{ background: 'none', border: 'none', color: 'var(--text-dim)', fontSize: 14, cursor: 'pointer', padding: 0 }}>✕</button>
+                <button onClick={() => setSelectedEx(null)} style={{ background: 'none', border: 'none', color: 'var(--text-dim)', fontSize: 14, cursor: 'pointer', padding: 0 }}>вњ•</button>
               </div>
               <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap', marginBottom: 6 }}>
                 <span style={{ fontSize: 9, padding: '1px 5px', borderRadius: 3, background: 'rgba(0,230,138,0.1)', color: '#00e68a' }}>{GROUP_LABELS[selectedEx.group]}</span>
-                <span style={{ fontSize: 9, padding: '1px 5px', borderRadius: 3, background: 'rgba(59,130,246,0.1)', color: '#3b82f6' }}>{selectedEx.type === 'compound' ? 'Базовое' : 'Изолир.'}</span>
+                <span style={{ fontSize: 9, padding: '1px 5px', borderRadius: 3, background: 'rgba(59,130,246,0.1)', color: '#3b82f6' }}>{selectedEx.type === 'compound' ? '' : ''}</span>
                 <span style={{ fontSize: 9, padding: '1px 5px', borderRadius: 3, background: 'rgba(249,115,22,0.1)', color: '#f97316' }}>{EQUIP_LABELS[selectedEx.equipment] || selectedEx.equipment}</span>
-                <span style={{ fontSize: 9, padding: '1px 5px', borderRadius: 3, background: selectedEx.jointStress === 'high' ? 'rgba(239,68,68,0.1)' : 'rgba(34,197,94,0.1)', color: selectedEx.jointStress === 'high' ? '#ef4444' : '#22c55e' }}>Суставы: {JOINT_LABELS[selectedEx.jointStress] || selectedEx.jointStress}</span>
-                <span style={{ fontSize: 9, padding: '1px 5px', borderRadius: 3, background: 'rgba(139,92,246,0.1)', color: '#8b5cf6' }}>Усталость: {selectedEx.fatigueCost}/10</span>
+                <span style={{ fontSize: 9, padding: '1px 5px', borderRadius: 3, background: selectedEx.jointStress === 'high' ? 'rgba(239,68,68,0.1)' : 'rgba(34,197,94,0.1)', color: selectedEx.jointStress === 'high' ? '#ef4444' : '#22c55e' }}>РЎСѓСЃС‚Р°РІС‹: {JOINT_LABELS[selectedEx.jointStress] || selectedEx.jointStress}</span>
+                <span style={{ fontSize: 9, padding: '1px 5px', borderRadius: 3, background: 'rgba(139,92,246,0.1)', color: '#8b5cf6' }}>РЈСЃС‚Р°Р»РѕСЃС‚СЊ: {selectedEx.fatigueCost}/10</span>
                 {selectedEx.difficulty && (
                   <span style={{ fontSize: 9, padding: '1px 5px', borderRadius: 3, background: selectedEx.difficulty === 'advanced' ? 'rgba(239,68,68,0.1)' : selectedEx.difficulty === 'intermediate' ? 'rgba(249,115,22,0.1)' : 'rgba(34,197,94,0.1)', color: selectedEx.difficulty === 'advanced' ? '#ef4444' : selectedEx.difficulty === 'intermediate' ? '#f97316' : '#22c55e' }}>
-                    {selectedEx.difficulty === 'advanced' ? 'Продвинутый' : selectedEx.difficulty === 'intermediate' ? 'Средний' : 'Новичок'}
+                    {selectedEx.difficulty === 'advanced' ? '' : selectedEx.difficulty === 'intermediate' ? '' : ''}
                   </span>
                 )}
                 {selectedEx.targetMuscle && (
                   <span style={{ fontSize: 9, padding: '1px 5px', borderRadius: 3, background: 'rgba(236,72,153,0.1)', color: '#ec4899' }}>
-                    🎯 {selectedEx.targetMuscle}
+                    рџЋЇ {selectedEx.targetMuscle}
                   </span>
                 )}
               </div>
               {selectedEx.technique && (
                 <div style={{ marginBottom: 6, background: 'rgba(0,230,138,0.05)', borderRadius: 6, padding: '5px 8px', fontSize: 10, color: 'var(--text)', lineHeight: 1.4 }}>
-                  <span style={{ fontWeight: 600, color: 'var(--accent)' }}>🎯 </span>{selectedEx.technique}
+                  <span style={{ fontWeight: 600, color: 'var(--accent)' }}>рџЋЇ </span>{selectedEx.technique}
                 </div>
               )}
               {selectedEx.comments && (
                 <div style={{ marginBottom: 6, background: 'rgba(255,145,0,0.05)', borderRadius: 6, padding: '5px 8px', fontSize: 10, color: 'var(--text-dim)', lineHeight: 1.4 }}>
-                  <span style={{ fontWeight: 600, color: '#ff9100' }}>💡 </span>{selectedEx.comments}
+                  <span style={{ fontWeight: 600, color: '#ff9100' }}>рџ’Ў </span>{selectedEx.comments}
                 </div>
               )}
               {(() => { const bio = getExerciseBio(selectedEx.id); if (!bio) return null; const js = bio.jointStress; const strs = Object.entries(js||{}).map(([k,v])=>`${k} ${v}/10`); return <div style={{ marginBottom: 6, background: 'rgba(59,130,246,0.05)', borderRadius: 6, padding: '5px 8px', fontSize: 9 }}>
-                <span style={{ fontWeight: 600, color: '#3b82f6' }}>🔬 Биомеханика:</span> Суставы: {strs.join(', ')} | Сложность: {bio.difficulty}/10 | ЦНС: {bio.cnsDemand || 5}/10
+                <span style={{ fontWeight: 600, color: '#3b82f6' }}>рџ”¬ Р‘РёРѕРјРµС…Р°РЅРёРєР°:</span> РЎСѓСЃС‚Р°РІС‹: {strs.join(', ')} | РЎР»РѕР¶РЅРѕСЃС‚СЊ: {bio.difficulty}/10 | Р¦РќРЎ: {bio.cnsDemand || 5}/10
               </div>; })()}
               {selectedEx.canReplace && selectedEx.canReplace.length > 0 && (
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, alignItems: 'center' }}>
-                  <span style={{ fontSize: 9, color: 'var(--text-dim)' }}>Замена:</span>
+                  <span style={{ fontSize: 9, color: 'var(--text-dim)' }}>Р—Р°РјРµРЅР°:</span>
                   {selectedEx.canReplace.map(r => {
                     const rep = EXERCISE_CATALOG.find(e => e.id === r);
                     return rep ? <span key={r} style={{ fontSize: 9, padding: '1px 5px', borderRadius: 3, background: 'rgba(0,230,138,0.08)', color: '#00e68a' }}>{rep.name}</span> : null;
@@ -1358,24 +1358,24 @@ export const TrainingScreen: React.FC = () => {
               }} style={{
                 width: '100%', marginTop: 6, padding: '6px 12px', borderRadius: 6, border: '1px dashed var(--accent)',
                 background: 'rgba(0,230,138,0.08)', color: 'var(--accent)', fontWeight: 600, fontSize: 11, cursor: 'pointer',
-              }}>+ Добавить в план</button>
+              }}>+ Р”РѕР±Р°РІРёС‚СЊ РІ РїР»Р°РЅ</button>
             </div>
           )}
         </div>
       )}
 
-      {/* ═══════════ CALCULATORS TAB ═══════════ */}
+      {/* в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ CALCULATORS TAB в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ */}
       {tab === 'calculators' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           <div className="card" style={{ padding: '10px 12px' }}>
-            <h3 style={{ margin: '0 0 8px', fontSize: 13 }}>📐 Калькулятор 1RM</h3>
+            <h3 style={{ margin: '0 0 8px', fontSize: 13 }}>рџ“ђ РљР°Р»СЊРєСѓР»СЏС‚РѕСЂ 1RM</h3>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 8 }}>
               <div>
-                <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Вес (кг)</label>
+                <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Р’РµСЃ (РєРі)</label>
                 <input type="number" value={calcWeight} onChange={e => setCalcWeight(+e.target.value)} style={{ width: '100%', padding: '6px 8px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, boxSizing: 'border-box' }} />
               </div>
               <div>
-                <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Повторения</label>
+                <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>РџРѕРІС‚РѕСЂРµРЅРёСЏ</label>
                 <input type="number" value={calcReps} onChange={e => setCalcReps(+e.target.value)} style={{ width: '100%', padding: '6px 8px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, boxSizing: 'border-box' }} />
               </div>
             </div>
@@ -1383,30 +1383,30 @@ export const TrainingScreen: React.FC = () => {
               <div style={{ background: 'rgba(0,230,138,0.08)', borderRadius: 8, padding: 8, textAlign: 'center' }}>
                 <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Epley</div>
                 <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--accent)' }}>{calcResults.epley1RM.toFixed(1)}</div>
-                <div style={{ fontSize: 8, color: 'var(--text-dim)' }}>кг</div>
+                <div style={{ fontSize: 8, color: 'var(--text-dim)' }}>РєРі</div>
               </div>
               <div style={{ background: 'rgba(0,230,138,0.08)', borderRadius: 8, padding: 8, textAlign: 'center' }}>
                 <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Brzycki</div>
                 <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--accent)' }}>{calcResults.brzycki1RM.toFixed(1)}</div>
-                <div style={{ fontSize: 8, color: 'var(--text-dim)' }}>кг</div>
+                <div style={{ fontSize: 8, color: 'var(--text-dim)' }}>РєРі</div>
               </div>
               <div style={{ background: 'rgba(0,230,138,0.08)', borderRadius: 8, padding: 8, textAlign: 'center' }}>
-                <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Среднее</div>
+                <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>РЎСЂРµРґРЅРµРµ</div>
                 <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--accent)' }}>{((calcResults.epley1RM + calcResults.brzycki1RM) / 2).toFixed(1)}</div>
-                <div style={{ fontSize: 8, color: 'var(--text-dim)' }}>кг</div>
+                <div style={{ fontSize: 8, color: 'var(--text-dim)' }}>РєРі</div>
               </div>
             </div>
           </div>
 
           <div className="card" style={{ padding: '10px 12px' }}>
-            <h3 style={{ margin: '0 0 8px', fontSize: 13 }}>📊 RPE ↔ %1RM</h3>
+            <h3 style={{ margin: '0 0 8px', fontSize: 13 }}>рџ“Љ RPE в†” %1RM</h3>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginBottom: 8 }}>
               <div>
-                <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Вес (кг)</label>
+                <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Р’РµСЃ (РєРі)</label>
                 <input type="number" value={calcWeight} onChange={e => setCalcWeight(+e.target.value)} style={{ width: '100%', padding: '6px 8px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, boxSizing: 'border-box' }} />
               </div>
               <div>
-                <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Повторения</label>
+                <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>РџРѕРІС‚РѕСЂРµРЅРёСЏ</label>
                 <input type="number" value={calcReps} onChange={e => setCalcReps(+e.target.value)} style={{ width: '100%', padding: '6px 8px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, boxSizing: 'border-box' }} />
               </div>
               <div>
@@ -1416,44 +1416,44 @@ export const TrainingScreen: React.FC = () => {
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
               <div style={{ background: 'rgba(0,230,138,0.08)', borderRadius: 8, padding: 8, textAlign: 'center' }}>
-                <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>1RM (через RPE)</div>
+                <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>1RM (С‡РµСЂРµР· RPE)</div>
                 <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--accent)' }}>{calcResults.rpe1RM.toFixed(1)}</div>
-                <div style={{ fontSize: 8, color: 'var(--text-dim)' }}>кг</div>
+                <div style={{ fontSize: 8, color: 'var(--text-dim)' }}>РєРі</div>
               </div>
               <div style={{ background: 'rgba(0,230,138,0.08)', borderRadius: 8, padding: 8, textAlign: 'center' }}>
-                <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>%1RM при RPE{calcRPE}</div>
+                <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>%1RM РїСЂРё RPE{calcRPE}</div>
                 <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--accent)' }}>{(calcResults.rpePercent * 100).toFixed(1)}%</div>
               </div>
             </div>
           </div>
 
           <div className="card" style={{ padding: '10px 12px' }}>
-            <h3 style={{ margin: '0 0 8px', fontSize: 13 }}>🎯 %1RM → Рабочий вес</h3>
+            <h3 style={{ margin: '0 0 8px', fontSize: 13 }}>рџЋЇ %1RM в†’ Р Р°Р±РѕС‡РёР№ РІРµСЃ</h3>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 8 }}>
               <div>
-                <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>1RM (кг)</label>
+                <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>1RM (РєРі)</label>
                 <input type="number" value={calc1RM} onChange={e => setCalc1RM(+e.target.value)} style={{ width: '100%', padding: '6px 8px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, boxSizing: 'border-box' }} />
               </div>
               <div>
-                <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>% от 1RM</label>
+                <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>% РѕС‚ 1RM</label>
                 <input type="number" min={30} max={100} value={calcPercent} onChange={e => setCalcPercent(+e.target.value)} style={{ width: '100%', padding: '6px 8px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, boxSizing: 'border-box' }} />
               </div>
             </div>
             <div style={{ background: 'rgba(0,230,138,0.08)', borderRadius: 8, padding: 10, textAlign: 'center' }}>
-              <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Рабочий вес ({calcPercent}% от {calc1RM}кг)</div>
-              <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--accent)' }}>{calcResults.percentWeight.toFixed(1)} кг</div>
+              <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Р Р°Р±РѕС‡РёР№ РІРµСЃ ({calcPercent}% РѕС‚ {calc1RM}РєРі)</div>
+              <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--accent)' }}>{calcResults.percentWeight.toFixed(1)} РєРі</div>
             </div>
           </div>
 
           {/* Powerlifting Indexes (TZ 7.12) */}
           <div className="card" style={{ padding: '10px 12px' }}>
-            <h3 style={{ margin: '0 0 8px', fontSize: 13 }}>🏆 Силовые индексы (Wilks/Dots)</h3>
+            <h3 style={{ margin: '0 0 8px', fontSize: 13 }}>рџЏ† РЎРёР»РѕРІС‹Рµ РёРЅРґРµРєСЃС‹ (Wilks/Dots)</h3>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 8 }}>
               {[
-                { k: plSquat, s: setPlSquat, l: 'Присед (кг)' },
-                { k: plBench, s: setPlBench, l: 'Жим (кг)' },
-                { k: plDeadlift, s: setPlDeadlift, l: 'Тяга (кг)' },
-                { k: plWeight, s: setPlWeight, l: 'Вес тела (кг)' },
+                { k: plSquat, s: setPlSquat, l: '' },
+                { k: plBench, s: setPlBench, l: '' },
+                { k: plDeadlift, s: setPlDeadlift, l: '' },
+                { k: plWeight, s: setPlWeight, l: '' },
               ].map(f => (
                 <div key={f.l}>
                   <label style={{ fontSize: 9, color: 'var(--text-dim)' }}>{f.l}</label>
@@ -1462,7 +1462,7 @@ export const TrainingScreen: React.FC = () => {
                 </div>
               ))}
               <div>
-                <label style={{ fontSize: 9, color: 'var(--text-dim)' }}>Пол</label>
+                <label style={{ fontSize: 9, color: 'var(--text-dim)' }}>РџРѕР»</label>
                 <div style={{ display: 'flex', gap: 4 }}>
                   {(['male', 'female'] as const).map(s => (
                     <button key={s} onClick={() => setPlSex(s)} style={{
@@ -1470,7 +1470,7 @@ export const TrainingScreen: React.FC = () => {
                       background: plSex === s ? 'rgba(0,230,138,0.15)' : 'var(--bg-secondary)',
                       border: plSex === s ? '1px solid var(--accent)' : '1px solid var(--border)',
                       color: plSex === s ? '#00e68a' : 'var(--text-dim)', fontWeight: plSex === s ? 700 : 400,
-                    }}>{s === 'male' ? 'М' : 'Ж'}</button>
+                    }}>{s === 'male' ? '' : ''}</button>
                   ))}
                 </div>
               </div>
@@ -1486,16 +1486,16 @@ export const TrainingScreen: React.FC = () => {
               return (
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
                   <div style={{ background: 'rgba(0,230,138,0.08)', borderRadius: 8, padding: 8, textAlign: 'center' }}>
-                    <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Сумма</div>
-                    <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--accent)' }}>{total} кг</div>
+                    <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>РЎСѓРјРјР°</div>
+                    <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--accent)' }}>{total} РєРі</div>
                   </div>
                   <div style={{ background: 'rgba(139,92,246,0.08)', borderRadius: 8, padding: 8, textAlign: 'center' }}>
                     <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Dots</div>
                     <div style={{ fontSize: 18, fontWeight: 800, color: '#8b5cf6' }}>{dots.toFixed(2)}</div>
                   </div>
                   <div style={{ background: 'rgba(249,115,22,0.08)', borderRadius: 8, padding: 8, textAlign: 'center' }}>
-                    <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Отн. вес</div>
-                    <div style={{ fontSize: 18, fontWeight: 800, color: '#f97316' }}>{(total / w).toFixed(1)}×</div>
+                    <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>РћС‚РЅ. РІРµСЃ</div>
+                    <div style={{ fontSize: 18, fontWeight: 800, color: '#f97316' }}>{(total / w).toFixed(1)}Г—</div>
                   </div>
                 </div>
               );
@@ -1505,27 +1505,27 @@ export const TrainingScreen: React.FC = () => {
         </div>
       )}
 
-      {/* ═══════════ DIARY TAB ═══════════ */}
+      {/* в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ DIARY TAB в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ */}
       {tab === 'diary' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           <div className="card" style={{ padding: '10px 12px' }}>
-            <h3 style={{ margin: '0 0 8px', fontSize: 13 }}>📝 Записать подход</h3>
+            <h3 style={{ margin: '0 0 8px', fontSize: 13 }}>рџ“ќ Р—Р°РїРёСЃР°С‚СЊ РїРѕРґС…РѕРґ</h3>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 6, marginBottom: 8 }}>
               <div>
-                <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Упражнение</label>
+                <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>РЈРїСЂР°Р¶РЅРµРЅРёРµ</label>
                 <select value={logExercise} onChange={e => setLogExercise(e.target.value)} style={{ width: '100%', padding: '6px 4px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 11, boxSizing: 'border-box' }}>
-                  <option value="">— Выбрать —</option>
+                  <option value="">вЂ” Р’С‹Р±СЂР°С‚СЊ вЂ”</option>
                   {EXERCISE_CATALOG.filter(e => e.type === 'compound').slice(0, 20).map(e => (
                     <option key={e.id} value={e.id}>{e.name.slice(0, 20)}</option>
                   ))}
                 </select>
               </div>
               <div>
-                <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Вес (кг)</label>
+                <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Р’РµСЃ (РєРі)</label>
                 <input type="number" value={logWeight} onChange={e => setLogWeight(+e.target.value)} style={{ width: '100%', padding: '6px 4px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, boxSizing: 'border-box' }} />
               </div>
               <div>
-                <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Повторения</label>
+                <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>РџРѕРІС‚РѕСЂРµРЅРёСЏ</label>
                 <input type="number" value={logReps} onChange={e => setLogReps(+e.target.value)} style={{ width: '100%', padding: '6px 4px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, boxSizing: 'border-box' }} />
               </div>
               <div>
@@ -1536,28 +1536,28 @@ export const TrainingScreen: React.FC = () => {
             <button onClick={handleLogWorkout} style={{
               width: '100%', padding: 8, borderRadius: 8, border: 'none', cursor: 'pointer',
               background: 'var(--accent)', color: '#000', fontWeight: 600, fontSize: 12,
-            }}>✓ Записать</button>
+            }}>вњ“ Р—Р°РїРёСЃР°С‚СЊ</button>
           </div>
 
           {diaryProgress.length > 0 && (
             <>
               <div className="card" style={{ padding: '10px 12px', marginBottom: 8 }}>
-                <h4 style={{ margin: '0 0 6px', fontSize: 12 }}>🔥 Активность</h4>
+                <h4 style={{ margin: '0 0 6px', fontSize: 12 }}>рџ”Ґ РђРєС‚РёРІРЅРѕСЃС‚СЊ</h4>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 6, fontSize: 10 }}>
                   <div style={{ textAlign: 'center', background: 'rgba(0,230,138,0.05)', borderRadius: 6, padding: 6 }}>
-                    <div style={{ color: 'var(--text-dim)' }}>Недель</div>
+                    <div style={{ color: 'var(--text-dim)' }}>РќРµРґРµР»СЊ</div>
                     <div style={{ fontWeight: 700, color: 'var(--accent)', fontSize: 16 }}>{diaryProgress.length}</div>
                   </div>
                   <div style={{ textAlign: 'center', background: 'rgba(0,230,138,0.05)', borderRadius: 6, padding: 6 }}>
-                    <div style={{ color: 'var(--text-dim)' }}>Тренировок</div>
+                    <div style={{ color: 'var(--text-dim)' }}>РўСЂРµРЅРёСЂРѕРІРѕРє</div>
                     <div style={{ fontWeight: 700, color: 'var(--accent)', fontSize: 16 }}>{diaryProgress.reduce((s, w) => s + w.workoutCount, 0)}</div>
                   </div>
                   <div style={{ textAlign: 'center', background: 'rgba(0,230,138,0.05)', borderRadius: 6, padding: 6 }}>
-                    <div style={{ color: 'var(--text-dim)' }}>Объём</div>
-                    <div style={{ fontWeight: 700, color: 'var(--accent)', fontSize: 16 }}>{diaryProgress.length > 0 ? `${(diaryProgress[diaryProgress.length - 1]?.totalVolume / 1000).toFixed(1)}т` : '—'}</div>
+                    <div style={{ color: 'var(--text-dim)' }}>РћР±СЉС‘Рј</div>
+                    <div style={{ fontWeight: 700, color: 'var(--accent)', fontSize: 16 }}>{diaryProgress.length > 0 ? `${(diaryProgress[diaryProgress.length - 1]?.totalVolume / 1000).toFixed(1)}С‚` : 'вЂ”'}</div>
                   </div>
                   <div style={{ textAlign: 'center', background: 'rgba(0,230,138,0.05)', borderRadius: 6, padding: 6 }}>
-                    <div style={{ color: 'var(--text-dim)' }}>План</div>
+                    <div style={{ color: 'var(--text-dim)' }}>РџР»Р°РЅ</div>
                     {(() => {
                       const planned = currentMicrocycle?.days?.filter((d: any) => d.isTraining).length || 0;
                       const actual = diaryProgress.length > 0 ? (diaryProgress[diaryProgress.length - 1]?.workoutCount || 0) : 0;
@@ -1565,7 +1565,7 @@ export const TrainingScreen: React.FC = () => {
                       return (
                         <>
                           <div style={{ fontWeight: 700, color: compliance >= 80 ? '#22c55e' : compliance >= 50 ? '#ff9100' : '#ef4444', fontSize: 16 }}>{compliance}%</div>
-                          <div style={{ fontSize: 7, color: 'var(--text-dim)' }}>{actual}/{planned} дн</div>
+                          <div style={{ fontSize: 7, color: 'var(--text-dim)' }}>{actual}/{planned} РґРЅ</div>
                         </>
                       );
                     })()}
@@ -1573,7 +1573,7 @@ export const TrainingScreen: React.FC = () => {
                 </div>
               </div>
               <div className="card" style={{ padding: '10px 12px', marginBottom: 8 }}>
-              <h4 style={{ margin: '0 0 8px', fontSize: 12 }}>📈 Тоннаж по неделям</h4>
+              <h4 style={{ margin: '0 0 8px', fontSize: 12 }}>рџ“€ РўРѕРЅРЅР°Р¶ РїРѕ РЅРµРґРµР»СЏРј</h4>
               <div style={{ display: 'flex', gap: 2, height: 60, alignItems: 'flex-end' }}>
                 {diaryProgress.slice(-12).map((w, i) => {
                   const maxVol = Math.max(...diaryProgress.map(w => w.totalVolume), 1);
@@ -1581,7 +1581,7 @@ export const TrainingScreen: React.FC = () => {
                   const isMax = w.totalVolume === maxVol;
                   return (
                     <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}
-                      title={`Нед ${w.week}: ${Math.round(w.totalVolume)}кг × ${w.workoutCount} трен`}>
+                      title={``}>
                       <div style={{ width: '70%', height: `${h}%`, background: isMax ? 'var(--accent)' : 'rgba(0,230,138,0.3)', borderRadius: '2px 2px 0 0' }} />
                       <span style={{ fontSize: 7, color: 'var(--text-dim)' }}>{w.week}</span>
                     </div>
@@ -1589,8 +1589,8 @@ export const TrainingScreen: React.FC = () => {
                 })}
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: 'var(--text-dim)', marginTop: 4 }}>
-                <span>Неделя</span>
-                <span>Пик: {Math.round(Math.max(...diaryProgress.map(w => w.totalVolume)))} кг</span>
+                <span>РќРµРґРµР»СЏ</span>
+                <span>РџРёРє: {Math.round(Math.max(...diaryProgress.map(w => w.totalVolume)))} РєРі</span>
               </div>
             </div>
             </>
@@ -1598,12 +1598,12 @@ export const TrainingScreen: React.FC = () => {
 
           {diaryStats.length > 0 && (
             <div className="card" style={{ padding: '10px 12px', marginBottom: 8 }}>
-              <h4 style={{ margin: '0 0 8px', fontSize: 12 }}>🏆 1RM по базовым</h4>
+              <h4 style={{ margin: '0 0 8px', fontSize: 12 }}>рџЏ† 1RM РїРѕ Р±Р°Р·РѕРІС‹Рј</h4>
               {diaryStats.map((s, i) => {
                 const pctMax = diaryStats.length > 0 ? Math.round((s.max1RM / Math.max(...diaryStats.map(d => d.max1RM))) * 100) : 0;
                 const prev = i < diaryStats.length - 1 ? diaryStats[i + 1] : null;
-                const trend = prev ? (s.max1RM > prev.max1RM * 1.02 ? '↑' : s.max1RM < prev.max1RM * 0.98 ? '↓' : '→') : '→';
-                const trendColor = trend === '↑' ? '#22c55e' : trend === '↓' ? '#ef4444' : '#6b7280';
+                const trend = prev ? (s.max1RM > prev.max1RM * 1.02 ? 'в†‘' : s.max1RM < prev.max1RM * 0.98 ? 'в†“' : 'в†’') : 'в†’';
+                const trendColor = trend === 'в†‘' ? '#22c55e' : trend === 'в†“' ? '#ef4444' : '#6b7280';
                 return (
                   <div key={s.exerciseId} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 0', borderBottom: '1px solid var(--border)', fontSize: 10 }}>
                     <span style={{ fontSize: 11, color: trendColor, minWidth: 12 }}>{trend}</span>
@@ -1611,8 +1611,8 @@ export const TrainingScreen: React.FC = () => {
                     <div style={{ flex: 1, background: 'rgba(255,255,255,0.05)', borderRadius: 3, height: 6, overflow: 'hidden' }}>
                       <div style={{ width: `${Math.max(5, pctMax)}%`, height: '100%', background: pctMax > 80 ? 'var(--accent)' : pctMax > 50 ? '#8b5cf6' : '#6b7280', borderRadius: 3 }} />
                     </div>
-                    <span style={{ color: 'var(--accent)', fontWeight: 600, minWidth: 55, textAlign: 'right' }}>{Math.round(s.max1RM)} кг</span>
-                    <span style={{ color: 'var(--text-dim)', minWidth: 45, textAlign: 'right' }}>{s.maxWeight}×{s.maxReps}</span>
+                    <span style={{ color: 'var(--accent)', fontWeight: 600, minWidth: 55, textAlign: 'right' }}>{Math.round(s.max1RM)} РєРі</span>
+                    <span style={{ color: 'var(--text-dim)', minWidth: 45, textAlign: 'right' }}>{s.maxWeight}Г—{s.maxReps}</span>
                   </div>
                 );
               })}
@@ -1621,11 +1621,11 @@ export const TrainingScreen: React.FC = () => {
         </div>
       )}
 
-      {/* ═══════════ CYCLES TAB ═══════════ */}
+      {/* в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ CYCLES TAB в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ */}
       {tab === 'cycles' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           <div className="card" style={{ padding: '10px 12px' }}>
-            <h3 style={{ margin: '0 0 8px', fontSize: 13 }}>🔄 Структура цикла</h3>
+            <h3 style={{ margin: '0 0 8px', fontSize: 13 }}>рџ”„ РЎС‚СЂСѓРєС‚СѓСЂР° С†РёРєР»Р°</h3>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 8 }}>
               {GOALS.map(g => (
                 <button key={g.value} onClick={() => setGoal(g.value)} style={{
@@ -1638,14 +1638,14 @@ export const TrainingScreen: React.FC = () => {
             <button onClick={generatePlan} style={{
               width: '100%', padding: 8, borderRadius: 8, border: 'none', cursor: 'pointer',
               background: 'var(--accent)', color: '#000', fontWeight: 600, fontSize: 12,
-            }}>▶ Сгенерировать макроцикл</button>
+            }}>в–¶ РЎРіРµРЅРµСЂРёСЂРѕРІР°С‚СЊ РјР°РєСЂРѕС†РёРєР»</button>
           </div>
 
           {macrocycle && (
             <>
               {/* Weekly volume/intensity chart */}
               <div className="card" style={{ padding: '10px 12px' }}>
-                <h4 style={{ margin: '0 0 8px', fontSize: 12 }}>📊 Объём и интенсивность по неделям</h4>
+                <h4 style={{ margin: '0 0 8px', fontSize: 12 }}>рџ“Љ РћР±СЉС‘Рј Рё РёРЅС‚РµРЅСЃРёРІРЅРѕСЃС‚СЊ РїРѕ РЅРµРґРµР»СЏРј</h4>
                 <div style={{ display: 'flex', gap: 1, height: 80, alignItems: 'flex-end' }}>
                   {macrocycle.mesocycles.flatMap(mc => mc.microcycles || []).map((mc, wi) => {
                     const isCurrent = wi + 1 === selectedWeek;
@@ -1655,7 +1655,7 @@ export const TrainingScreen: React.FC = () => {
                                  mc?.mesocycleType === 'intensification' ? '#eab308' :
                                  mc?.mesocycleType === 'peaking' ? '#ef4444' : '#6b7280';
                     return (
-                      <div key={wi} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }} title={`Нед ${wi+1}: Объём ×${mc?.volumeMultiplier || 1}, RPE ${mc?.rpeTarget || 7}`}
+                      <div key={wi} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }} title={``}
                         onClick={() => { setSelectedWeek(wi + 1); setTab('plan'); }}>
                         <div style={{ width: '70%', height: volH, background: color, borderRadius: '2px 2px 0 0', opacity: isCurrent ? 1 : 0.4 }} />
                         <div style={{ width: '40%', height: intH, background: color, borderRadius: '2px 2px 0 0', opacity: isCurrent ? 0.8 : 0.3 }} />
@@ -1665,34 +1665,34 @@ export const TrainingScreen: React.FC = () => {
                   })}
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'center', gap: 12, fontSize: 9, color: 'var(--text-dim)', marginTop: 4 }}>
-                  <span><span style={{ color: '#22c55e' }}>■</span> Накопление</span>
-                  <span><span style={{ color: '#eab308' }}>■</span> Интенсификация</span>
-                  <span><span style={{ color: '#ef4444' }}>■</span> Пик</span>
-                  <span><span style={{ color: '#6b7280' }}>■</span> Разгрузка</span>
+                  <span><span style={{ color: '#22c55e' }}>в– </span> РќР°РєРѕРїР»РµРЅРёРµ</span>
+                  <span><span style={{ color: '#eab308' }}>в– </span> РРЅС‚РµРЅСЃРёС„РёРєР°С†РёСЏ</span>
+                  <span><span style={{ color: '#ef4444' }}>в– </span> РџРёРє</span>
+                  <span><span style={{ color: '#6b7280' }}>в– </span> Р Р°Р·РіСЂСѓР·РєР°</span>
                 </div>
               </div>
 
               <div className="card" style={{ padding: '10px 12px' }}>
-                <h3 style={{ margin: '0 0 6px', fontSize: 13 }}>📅 {macrocycle.totalWeeks}-недельный макроцикл</h3>
+                <h3 style={{ margin: '0 0 6px', fontSize: 13 }}>рџ“… {macrocycle.totalWeeks}-РЅРµРґРµР»СЊРЅС‹Р№ РјР°РєСЂРѕС†РёРєР»</h3>
                 <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 6 }}>
-                  {GOALS.find(g => g.value === macrocycle.goal)?.label} • {LEVELS.find(l => l.value === macrocycle.level)?.label}
+                  {GOALS.find(g => g.value === macrocycle.goal)?.label} вЂў {LEVELS.find(l => l.value === macrocycle.level)?.label}
                 </div>
                 {macrocycle.mesocycles.map((mc, mi) => (
                   <div key={mi} style={{ marginBottom: 6, background: 'var(--bg-secondary)', borderRadius: 6, padding: '8px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
                       <span style={{ fontWeight: 600, fontSize: 12 }}>
-                        {mc.type === 'accumulation' ? '📈 Накопление' :
-                         mc.type === 'intensification' ? '📊 Интенсификация' :
-                         mc.type === 'peaking' ? '🏆 Пик' :
-                         mc.type === 'deload' ? '🔄 Разгрузка' : '📋'} — Мезоцикл {mi + 1}
+                        {mc.type === 'accumulation' ? '' :
+                         mc.type === 'intensification' ? '' :
+                         mc.type === 'peaking' ? '' :
+                         mc.type === 'deload' ? '' : ''} вЂ” РњРµР·РѕС†РёРєР» {mi + 1}
                       </span>
-                      <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>{mc.weeks} нед (нед {mc.weekStart + 1}–{mc.weekStart + mc.weeks})</span>
+                      <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>{mc.weeks} РЅРµРґ (РЅРµРґ {mc.weekStart + 1}вЂ“{mc.weekStart + mc.weeks})</span>
                     </div>
                     <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 4 }}>
-                      {mc.type === 'accumulation' ? 'Объём 100-130%, RIR 2-3, RPE 6-7. Субмаксимальные веса, много подсобки.' :
-                       mc.type === 'intensification' ? 'Объём 70-90%, RIR 1-2, RPE 8-9. Рост весов, снижение подсобки.' :
-                       mc.type === 'peaking' ? 'Объём 40-60%, RIR 0-1, RPE 9-10. Максимальные веса, специфика.' :
-                       mc.type === 'deload' ? 'Объём 30-50%, RIR 3-5, RPE 5-6. Восстановление ЦНС, мобильность.' : ''}
+                      {mc.type === 'accumulation' ? '' :
+                       mc.type === 'intensification' ? '' :
+                       mc.type === 'peaking' ? '' :
+                       mc.type === 'deload' ? '' : ''}
                     </div>
                     <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
                       {Array.from({ length: mc.weeks }, (_, wi) => (
@@ -1714,9 +1714,9 @@ export const TrainingScreen: React.FC = () => {
               {/* Projected max-out */}
               {diaryStats.length > 0 && (
                 <div className="card" style={{ padding: '10px 12px', border: '1px solid rgba(0,230,138,0.2)', marginBottom: 8 }}>
-                  <h4 style={{ margin: '0 0 6px', fontSize: 12, color: 'var(--accent)' }}>🎯 Прогноз к концу макроцикла</h4>
+                  <h4 style={{ margin: '0 0 6px', fontSize: 12, color: 'var(--accent)' }}>рџЋЇ РџСЂРѕРіРЅРѕР· Рє РєРѕРЅС†Сѓ РјР°РєСЂРѕС†РёРєР»Р°</h4>
                   <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 4 }}>
-                    {macrocycle?.totalWeeks || 12} нед × {(trainingOutput?.estimatedProgress || 2)}%/нед прогресс
+                    {macrocycle?.totalWeeks || 12} РЅРµРґ Г— {(trainingOutput?.estimatedProgress || 2)}%/РЅРµРґ РїСЂРѕРіСЂРµСЃСЃ
                   </div>
                   {diaryStats.slice(0, 3).map(s => {
                     const projected = Math.round(s.max1RM * (1 + (trainingOutput?.estimatedProgress || 2) / 100 * (macrocycle?.totalWeeks || 12)));
@@ -1724,7 +1724,7 @@ export const TrainingScreen: React.FC = () => {
                     return (
                       <div key={s.exerciseId} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, padding: '2px 0' }}>
                         <span>{s.exerciseName}</span>
-                        <span style={{ color: 'var(--text-dim)' }}>{Math.round(s.max1RM)} → <b style={{ color: '#22c55e' }}>{projected}</b> кг (+{gain})</span>
+                        <span style={{ color: 'var(--text-dim)' }}>{Math.round(s.max1RM)} в†’ <b style={{ color: '#22c55e' }}>{projected}</b> РєРі (+{gain})</span>
                       </div>
                     );
                   })}
@@ -1732,17 +1732,17 @@ export const TrainingScreen: React.FC = () => {
               )}
 
               <div className="card" style={{ padding: '10px 12px' }}>
-                <h4 style={{ margin: '0 0 6px', fontSize: 12 }}>📊 Параметры фаз</h4>
+                <h4 style={{ margin: '0 0 6px', fontSize: 12 }}>рџ“Љ РџР°СЂР°РјРµС‚СЂС‹ С„Р°Р·</h4>
                 {(['accumulation', 'intensification', 'peaking', 'deload'] as const).map(phase => {
                   const params = MESOCYCLE_PARAMS[phase];
                   if (!params) return null;
                   return (
                     <div key={phase} style={{ marginBottom: 4, padding: '4px 6px', background: 'var(--bg-secondary)', borderRadius: 4, fontSize: 10 }}>
                       <span style={{ fontWeight: 600 }}>
-                        {phase === 'accumulation' ? 'Накопление' : phase === 'intensification' ? 'Интенсификация' : phase === 'peaking' ? 'Пик' : 'Разгрузка'}
+                        {phase === 'accumulation' ? '' : phase === 'intensification' ? '' : phase === 'peaking' ? '' : ''}
                       </span>
                       <span style={{ color: 'var(--text-dim)', marginLeft: 6 }}>
-                        Объём: {params.volumeMultiplier}× | RIR: {params.rirRange[0]}-{params.rirRange[1]} | RPE: {params.rpeTarget}
+                        РћР±СЉС‘Рј: {params.volumeMultiplier}Г— | RIR: {params.rirRange[0]}-{params.rirRange[1]} | RPE: {params.rpeTarget}
                       </span>
                     </div>
                   );
@@ -1752,14 +1752,14 @@ export const TrainingScreen: React.FC = () => {
           )}
           </div>
         )}
-      {/* ═══════════ HISTORY TAB ═══════════ */}
+      {/* в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ HISTORY TAB в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ */}
       {tab === 'history' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           <div className="card" style={{ padding: '10px 12px' }}>
-            <h3 style={{ margin: '0 0 8px', fontSize: 13 }}>📜 История тренировок</h3>
+            <h3 style={{ margin: '0 0 8px', fontSize: 13 }}>рџ“њ РСЃС‚РѕСЂРёСЏ С‚СЂРµРЅРёСЂРѕРІРѕРє</h3>
             {diaryProgress.length === 0 ? (
               <div style={{ textAlign: 'center', padding: 20, color: 'var(--text-dim)' }}>
-                Нет записей. Начните вести дневник на вкладке 📓 Дневник.
+                РќРµС‚ Р·Р°РїРёСЃРµР№. РќР°С‡РЅРёС‚Рµ РІРµСЃС‚Рё РґРЅРµРІРЅРёРє РЅР° РІРєР»Р°РґРєРµ рџ““ Р”РЅРµРІРЅРёРє.
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -1771,46 +1771,46 @@ export const TrainingScreen: React.FC = () => {
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}
                       onClick={() => setHistoryExpanded(historyExpanded === `w${wi}` ? null : `w${wi}`)}>
                       <div>
-                        <span style={{ fontWeight: 600, fontSize: 13 }}>Неделя {w.week}</span>
-                        <span style={{ fontSize: 10, color: 'var(--text-dim)', marginLeft: 8 }}>{w.workoutCount} тренировок</span>
+                        <span style={{ fontWeight: 600, fontSize: 13 }}>РќРµРґРµР»СЏ {w.week}</span>
+                        <span style={{ fontSize: 10, color: 'var(--text-dim)', marginLeft: 8 }}>{w.workoutCount} С‚СЂРµРЅРёСЂРѕРІРѕРє</span>
                       </div>
                       <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
                         {(() => {
                           const sorted = diaryProgress.sort((a, b) => b.week - a.week);
                           const prev = sorted[wi + 1];
                           const delta = prev ? Math.round((w.totalVolume - prev.totalVolume) / Math.max(1, prev.totalVolume) * 100) : 0;
-                          const arrow = prev ? (delta > 5 ? '↑' : delta < -5 ? '↓' : '→') : '';
+                          const arrow = prev ? (delta > 5 ? 'в†‘' : delta < -5 ? 'в†“' : 'в†’') : '';
                           const arrColor = delta > 5 ? '#22c55e' : delta < -5 ? '#ef4444' : '#6b7280';
                           return arrow ? <span style={{ fontSize: 13, color: arrColor, fontWeight: 700, minWidth: 16 }}>{arrow}</span> : null;
                         })()}
-                        <span style={{ fontSize: 11, color: 'var(--accent)', fontWeight: 600 }}>{Math.round(w.totalVolume).toLocaleString()} кг</span>
+                        <span style={{ fontSize: 11, color: 'var(--accent)', fontWeight: 600 }}>{Math.round(w.totalVolume).toLocaleString()} РєРі</span>
                         <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>
-                          {w.compoundWorkouts > 0 ? `Баз: ${w.compoundWorkouts}` : `Изол: ${w.isolationWorkouts}`}
+                          {w.compoundWorkouts > 0 ? `` : ``}
                         </span>
-                        <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>{historyExpanded === `w${wi}` ? '▴' : '▾'}</span>
+                        <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>{historyExpanded === `w${wi}` ? 'в–ґ' : 'в–ѕ'}</span>
                       </div>
                     </div>
                     {historyExpanded === `w${wi}` && (
                       <div style={{ marginTop: 6, borderTop: '1px solid var(--border)', paddingTop: 6 }}>
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 4, marginBottom: 6, fontSize: 9 }}>
                           <div style={{ background: 'rgba(0,230,138,0.05)', borderRadius: 4, padding: 4, textAlign: 'center' }}>
-                            <div style={{ color: 'var(--text-dim)' }}>Объём</div>
-                            <div style={{ fontWeight: 600, color: 'var(--accent)' }}>{Math.round(w.totalVolume)} кг</div>
+                            <div style={{ color: 'var(--text-dim)' }}>РћР±СЉС‘Рј</div>
+                            <div style={{ fontWeight: 600, color: 'var(--accent)' }}>{Math.round(w.totalVolume)} РєРі</div>
                           </div>
                           <div style={{ background: 'rgba(0,230,138,0.05)', borderRadius: 4, padding: 4, textAlign: 'center' }}>
-                            <div style={{ color: 'var(--text-dim)' }}>Тренировок</div>
+                            <div style={{ color: 'var(--text-dim)' }}>РўСЂРµРЅРёСЂРѕРІРѕРє</div>
                             <div style={{ fontWeight: 600, color: 'var(--accent)' }}>{w.workoutCount}</div>
                           </div>
                           <div style={{ background: 'rgba(0,230,138,0.05)', borderRadius: 4, padding: 4, textAlign: 'center' }}>
-                            <div style={{ color: 'var(--text-dim)' }}>1RM ср.</div>
-                            <div style={{ fontWeight: 600, color: 'var(--accent)' }}>{Math.round(w.total1RM)} кг</div>
+                            <div style={{ color: 'var(--text-dim)' }}>1RM СЃСЂ.</div>
+                            <div style={{ fontWeight: 600, color: 'var(--accent)' }}>{Math.round(w.total1RM)} РєРі</div>
                           </div>
                         </div>
                         {diaryStats.filter(s => s.workoutCount > 0 && s.lastWorkoutDate >= `2020-01-01`).slice(0, 5).map(s => (
                           <div key={s.exerciseId} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, padding: '2px 0', borderBottom: '1px solid var(--border)' }}>
                             <span>{s.exerciseName}</span>
-                            <span style={{ color: 'var(--accent)', fontWeight: 600 }}>{s.maxWeight}×{s.maxReps}</span>
-                            <span style={{ color: 'var(--text-dim)' }}>1RM {Math.round(s.max1RM)} кг</span>
+                            <span style={{ color: 'var(--accent)', fontWeight: 600 }}>{s.maxWeight}Г—{s.maxReps}</span>
+                            <span style={{ color: 'var(--text-dim)' }}>1RM {Math.round(s.max1RM)} РєРі</span>
                           </div>
                         ))}
                       </div>
@@ -1822,7 +1822,7 @@ export const TrainingScreen: React.FC = () => {
           </div>
         </div>
       )}
-      {/* ═══════════ ANALYTICS TAB ═══════════ */}
+      {/* в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ ANALYTICS TAB в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ */}
       {tab === 'analytics' && <><AnalyticsTab sessions={historyWorkouts} /><StructuredAnalyticsCard sessions={historyWorkouts} /></>}
       {tab === 'methods' && <MethodsTab />}
       {tab === 'visual' && <VisualTab sessions={historyWorkouts} />}
@@ -1843,26 +1843,26 @@ const MethodsTab: React.FC = () => {
 
   return (<div>
     <div style={{ display:'flex', gap:4, marginBottom:8, flexWrap:'wrap' }}>
-      <button onClick={()=>setMethodCat('all')} style={{ padding:'4px 10px', borderRadius:6, fontSize:10, background: methodCat==='all'?'var(--accent)':'var(--bg-secondary)', color: methodCat==='all'?'#000':'var(--text-dim)', border:'none', cursor:'pointer' }}>Все</button>
+      <button onClick={()=>setMethodCat('all')} style={{ padding:'4px 10px', borderRadius:6, fontSize:10, background: methodCat==='all'?'var(--accent)':'var(--bg-secondary)', color: methodCat==='all'?'#000':'var(--text-dim)', border:'none', cursor:'pointer' }}>Р’СЃРµ</button>
       {cats.map(c => <button key={c} onClick={()=>setMethodCat(c)} style={{ padding:'4px 10px', borderRadius:6, fontSize:10, background: methodCat===c?'rgba(139,92,246,0.2)':'var(--bg-secondary)', border: methodCat===c?'1px solid #8b5cf6':'1px solid var(--border)', color: methodCat===c?'#8b5cf6':'var(--text-dim)', cursor:'pointer' }}>{c}</button>)}
     </div>
     {filtered.map((m,i) => <div key={i} className="card" style={{ marginBottom:6, padding:10 }}>
       <div style={{ fontWeight:600, fontSize:12 }}>{m.name} <span style={{ fontSize:9, color:'var(--text-dim)' }}>[{m.category}]</span></div>
       <div style={{ fontSize:9, color:'var(--text-light)', marginTop:2 }}>{m.description}</div>
-      <div style={{ fontSize:8, color:'var(--text-dim)' }}>Лучше всего для: {m.bestFor}</div>
+      <div style={{ fontSize:8, color:'var(--text-dim)' }}>Р›СѓС‡С€Рµ РІСЃРµРіРѕ РґР»СЏ: {m.bestFor}</div>
     </div>)}
 
-    <h4 style={{ margin:'12px 0 8px', fontSize:12 }}>📊 Volume Landmarks (MEV/MAV/MRV)</h4>
+    <h4 style={{ margin:'12px 0 8px', fontSize:12 }}>рџ“Љ Volume Landmarks (MEV/MAV/MRV)</h4>
     {volumes.map((v,i) => <div key={i} className="card" style={{ marginBottom:4, padding:8 }}>
       <div style={{ fontWeight:600, fontSize:11 }}>{v.muscle}</div>
       <div style={{ display:'flex', gap:6, fontSize:9, marginTop:2 }}>
-        <span>Новичок: {v.beginner.mev}-{v.beginner.mav}-{v.beginner.mrv}</span>
-        <span>Средний: {v.intermediate.mev}-{v.intermediate.mav}-{v.intermediate.mrv}</span>
-        <span>Продв: {v.advanced.mev}-{v.advanced.mav}-{v.advanced.mrv}</span>
+        <span>РќРѕРІРёС‡РѕРє: {v.beginner.mev}-{v.beginner.mav}-{v.beginner.mrv}</span>
+        <span>РЎСЂРµРґРЅРёР№: {v.intermediate.mev}-{v.intermediate.mav}-{v.intermediate.mrv}</span>
+        <span>РџСЂРѕРґРІ: {v.advanced.mev}-{v.advanced.mav}-{v.advanced.mrv}</span>
       </div>
     </div>)}
 
-    <h4 style={{ margin:'12px 0 8px', fontSize:12 }}>📐 Визуализация сплитов</h4>
+    <h4 style={{ margin:'12px 0 8px', fontSize:12 }}>рџ“ђ Р’РёР·СѓР°Р»РёР·Р°С†РёСЏ СЃРїР»РёС‚РѕРІ</h4>
     {visuals.map((s,i) => <div key={i} className="card" style={{ marginBottom:4, padding:8 }}>
       <div style={{ fontWeight:600, fontSize:11 }}>{s.name}</div>
       <div style={{ fontSize:9, color:'var(--text-dim)' }}>{(s as any).schedule?.join(' | ') || s.name}</div>
@@ -1882,26 +1882,26 @@ const VisualTab: React.FC<{ sessions: any[] }> = ({ sessions }) => {
   const muscleVol = React.useMemo(() => computeMuscleVolume(vizSessions), [vizSessions]);
   const prog = React.useMemo(() => computeProgression(vizSessions), [vizSessions]);
 
-  if (sessions.length < 2) return <div className="card" style={{ padding:20, textAlign:'center', color:'var(--text-dim)' }}>Нужно минимум 2 тренировки для визуализации</div>;
+  if (sessions.length < 2) return <div className="card" style={{ padding:20, textAlign:'center', color:'var(--text-dim)' }}>РќСѓР¶РЅРѕ РјРёРЅРёРјСѓРј 2 С‚СЂРµРЅРёСЂРѕРІРєРё РґР»СЏ РІРёР·СѓР°Р»РёР·Р°С†РёРё</div>;
 
   return (<div>
     {dashboard && <div className="card" style={{ marginBottom:8, padding:10 }}>
-      <h4 style={{ margin:'0 0 6px', fontSize:12 }}>📈 Недельный график</h4>
+      <h4 style={{ margin:'0 0 6px', fontSize:12 }}>рџ“€ РќРµРґРµР»СЊРЅС‹Р№ РіСЂР°С„РёРє</h4>
       <div style={{ display:'flex', alignItems:'flex-end', gap:2, height:100 }}>
         {weekly.map((w,i) => { const maxV = Math.max(...weekly.map(x=>x.volume),1); return <div key={i} style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center' }}>
-          <div style={{ width:'100%', background:'rgba(0,230,138,0.3)', borderRadius:'2px 2px 0 0', height:`${Math.max(5, (w.volume/maxV)*100)}%` }} title={`Неделя ${w.week}: ${w.volume} кг`} />
+          <div style={{ width:'100%', background:'rgba(0,230,138,0.3)', borderRadius:'2px 2px 0 0', height:`${Math.max(5, (w.volume/maxV)*100)}%` }} title={``} />
           <span style={{ fontSize:7, color:'var(--text-dim)', marginTop:2 }}>{w.week}</span>
         </div>})}
       </div>
       <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:4, fontSize:9, marginTop:4 }}>
-        <span>Пик объёма: <b>{(dashboard.summary as any).peakVolume || dashboard.summary.totalVolume}</b></span>
-        <span>Средняя интенс.: <b>{dashboard.summary.avgIntensity}%</b></span>
-        <span>Тренд: <b style={{color:(dashboard.summary as any).trend==='up'?'#22c55e':'#ef4444'}}>{(dashboard.summary as any).trend==='up'?'↑':'→'}</b></span>
+        <span>РџРёРє РѕР±СЉС‘РјР°: <b>{(dashboard.summary as any).peakVolume || dashboard.summary.totalVolume}</b></span>
+        <span>РЎСЂРµРґРЅСЏСЏ РёРЅС‚РµРЅСЃ.: <b>{dashboard.summary.avgIntensity}%</b></span>
+        <span>РўСЂРµРЅРґ: <b style={{color:(dashboard.summary as any).trend==='up'?'#22c55e':'#ef4444'}}>{(dashboard.summary as any).trend==='up'?'в†‘':'в†’'}</b></span>
       </div>
     </div>}
 
     <div className="card" style={{ marginBottom:8, padding:10 }}>
-      <h4 style={{ margin:'0 0 6px', fontSize:12 }}>💪 Объём по группам мышц</h4>
+      <h4 style={{ margin:'0 0 6px', fontSize:12 }}>рџ’Є РћР±СЉС‘Рј РїРѕ РіСЂСѓРїРїР°Рј РјС‹С€С†</h4>
       {muscleVol.map((mv,i) => <div key={i} style={{ display:'flex', alignItems:'center', gap:6, marginBottom:2 }}>
         <span style={{ width:60, fontSize:9, color:'var(--text-dim)' }}>{mv.muscle}</span>
         <div style={{ flex:1, background:'rgba(255,255,255,0.06)', borderRadius:3, height:8, overflow:'hidden' }}>
@@ -1912,13 +1912,13 @@ const VisualTab: React.FC<{ sessions: any[] }> = ({ sessions }) => {
     </div>
 
     <div className="card" style={{ padding:10 }}>
-      <h4 style={{ margin:'0 0 6px', fontSize:12 }}>📈 Прогрессия 1RM</h4>
+      <h4 style={{ margin:'0 0 6px', fontSize:12 }}>рџ“€ РџСЂРѕРіСЂРµСЃСЃРёСЏ 1RM</h4>
       {prog.slice(0,5).map((p,i) => <div key={i} style={{ marginBottom:4 }}>
         <div style={{ fontWeight:600, fontSize:10 }}>{p.exercise}</div>
         <div style={{ display:'flex', gap:4, alignItems:'flex-end', height:30 }}>
           {p.weeks.map((w,wi) => { const max = Math.max(...p.weeks.map(x=>x.estimated1RM),1); return <div key={wi} style={{ flex:1, textAlign:'center' }}>
             <div style={{ width:'100%', background: w.estimated1RM > (p.weeks[wi-1]?.estimated1RM||0) ? '#22c55e' : '#ef4444', borderRadius:2, height:`${Math.max(3,(w.estimated1RM/max)*30)}%` }} />
-            <span style={{ fontSize:6, color:'var(--text-dim)' }}>Н{w.week}</span>
+            <span style={{ fontSize:6, color:'var(--text-dim)' }}>Рќ{w.week}</span>
           </div>})}
         </div>
       </div>)}
@@ -1926,7 +1926,7 @@ const VisualTab: React.FC<{ sessions: any[] }> = ({ sessions }) => {
   </div>);
 };
 
-// ── Analytics Tab Component ──
+// в”Ђв”Ђ Analytics Tab Component в”Ђв”Ђ
 const AnalyticsTab: React.FC<{ sessions: WorkoutLog[] }> = ({ sessions }) => {
   const analytics = useMemo(() => {
     const mapped = sessions.map(w => ({
@@ -1953,9 +1953,9 @@ const AnalyticsTab: React.FC<{ sessions: WorkoutLog[] }> = ({ sessions }) => {
   if (!analytics || sessions.length === 0) {
     return (
       <div className="card" style={{ textAlign: 'center', padding: 30 }}>
-        <div style={{ fontSize: 32, marginBottom: 8 }}>📊</div>
+        <div style={{ fontSize: 32, marginBottom: 8 }}>рџ“Љ</div>
         <div style={{ fontSize: 13, color: 'var(--text-dim)' }}>
-          Нет данных для аналитики. Запишите тренировки во вкладке «Дневник».
+          РќРµС‚ РґР°РЅРЅС‹С… РґР»СЏ Р°РЅР°Р»РёС‚РёРєРё. Р—Р°РїРёС€РёС‚Рµ С‚СЂРµРЅРёСЂРѕРІРєРё РІРѕ РІРєР»Р°РґРєРµ В«Р”РЅРµРІРЅРёРєВ».
         </div>
       </div>
     );
@@ -1968,27 +1968,27 @@ const AnalyticsTab: React.FC<{ sessions: WorkoutLog[] }> = ({ sessions }) => {
       {/* Summary cards */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 10 }}>
         <div className="card" style={{ padding: '8px 10px', textAlign: 'center' }}>
-          <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Объём/нед</div>
-          <div style={{ fontSize: 18, fontWeight: 800, color: '#00e68a' }}>{volume.weeklyVolumeKg.toLocaleString()} кг</div>
+          <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>РћР±СЉС‘Рј/РЅРµРґ</div>
+          <div style={{ fontSize: 18, fontWeight: 800, color: '#00e68a' }}>{volume.weeklyVolumeKg.toLocaleString()} РєРі</div>
           <div style={{ fontSize: 9, color: volume.volumeTrend >= 0 ? '#22c55e' : '#ef4444' }}>
-            {volume.volumeTrend >= 0 ? '↑' : '↓'} {Math.abs(volume.volumeTrend)}% vs пред.
+            {volume.volumeTrend >= 0 ? 'в†‘' : 'в†“'} {Math.abs(volume.volumeTrend)}% vs РїСЂРµРґ.
           </div>
         </div>
         <div className="card" style={{ padding: '8px 10px', textAlign: 'center' }}>
-          <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Интенсивность</div>
+          <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>РРЅС‚РµРЅСЃРёРІРЅРѕСЃС‚СЊ</div>
           <div style={{ fontSize: 18, fontWeight: 800, color: '#60a5fa' }}>{intensity.avgIntensity}%</div>
           <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>
             RPE avg: {intensity.avgRPE}
           </div>
         </div>
         <div className="card" style={{ padding: '8px 10px', textAlign: 'center' }}>
-          <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Усталость</div>
+          <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>РЈСЃС‚Р°Р»РѕСЃС‚СЊ</div>
           <div style={{ fontSize: 18, fontWeight: 800, color: fatigue.weeklyFatigue > 0.7 ? '#ef4444' : fatigue.weeklyFatigue > 0.4 ? '#f59e0b' : '#22c55e' }}>
             {Math.round(fatigue.weeklyFatigue * 100)}%
           </div>
         </div>
         <div className="card" style={{ padding: '8px 10px', textAlign: 'center' }}>
-          <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Готовность</div>
+          <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Р“РѕС‚РѕРІРЅРѕСЃС‚СЊ</div>
           <div style={{ fontSize: 18, fontWeight: 800, color: recovery.readinessEstimate > 60 ? '#22c55e' : recovery.readinessEstimate > 40 ? '#f59e0b' : '#ef4444' }}>
             {recovery.readinessEstimate}%
           </div>
@@ -1997,22 +1997,22 @@ const AnalyticsTab: React.FC<{ sessions: WorkoutLog[] }> = ({ sessions }) => {
 
       {/* Intensity distribution */}
       <div className="card" style={{ marginBottom: 10, padding: '8px 10px' }}>
-        <div style={{ fontSize: 11, fontWeight: 600, marginBottom: 4 }}>Распределение нагрузки</div>
+        <div style={{ fontSize: 11, fontWeight: 600, marginBottom: 4 }}>Р Р°СЃРїСЂРµРґРµР»РµРЅРёРµ РЅР°РіСЂСѓР·РєРё</div>
         <div style={{ display: 'flex', height: 10, borderRadius: 6, overflow: 'hidden', marginBottom: 4 }}>
-          <div style={{ width: `${intensity.intensityDistribution.strength}%`, background: '#ef4444' }} title="Сила" />
-          <div style={{ width: `${intensity.intensityDistribution.hypertrophy}%`, background: '#f59e0b' }} title="Гипертрофия" />
-          <div style={{ width: `${intensity.intensityDistribution.endurance}%`, background: '#22c55e' }} title="Выносливость" />
+          <div style={{ width: `${intensity.intensityDistribution.strength}%`, background: '#ef4444' }} title="" />
+          <div style={{ width: `${intensity.intensityDistribution.hypertrophy}%`, background: '#f59e0b' }} title="" />
+          <div style={{ width: `${intensity.intensityDistribution.endurance}%`, background: '#22c55e' }} title="" />
         </div>
         <div style={{ display: 'flex', gap: 10, fontSize: 9, color: 'var(--text-dim)' }}>
-          <span>🔴 Сила {intensity.intensityDistribution.strength}%</span>
-          <span>🟠 Гипертрофия {intensity.intensityDistribution.hypertrophy}%</span>
-          <span>🟢 Выносливость {intensity.intensityDistribution.endurance}%</span>
+          <span>рџ”ґ РЎРёР»Р° {intensity.intensityDistribution.strength}%</span>
+          <span>рџџ  Р“РёРїРµСЂС‚СЂРѕС„РёСЏ {intensity.intensityDistribution.hypertrophy}%</span>
+          <span>рџџў Р’С‹РЅРѕСЃР»РёРІРѕСЃС‚СЊ {intensity.intensityDistribution.endurance}%</span>
         </div>
       </div>
 
       {/* Volume by group */}
       <div className="card" style={{ marginBottom: 10, padding: '8px 10px' }}>
-        <div style={{ fontSize: 11, fontWeight: 600, marginBottom: 6 }}>Объём по группам мышц</div>
+        <div style={{ fontSize: 11, fontWeight: 600, marginBottom: 6 }}>РћР±СЉС‘Рј РїРѕ РіСЂСѓРїРїР°Рј РјС‹С€С†</div>
         {Object.entries(volume.volumeByGroup)
           .sort(([, a], [, b]) => b - a)
           .slice(0, 8)
@@ -2024,7 +2024,7 @@ const AnalyticsTab: React.FC<{ sessions: WorkoutLog[] }> = ({ sessions }) => {
                 <div style={{ flex: 1, height: 6, borderRadius: 4, background: 'rgba(255,255,255,0.05)', overflow: 'hidden' }}>
                   <div style={{ width: `${(vol / maxVol) * 100}%`, height: '100%', background: '#8b5cf6', borderRadius: 4 }} />
                 </div>
-                <span style={{ fontSize: 9, color: 'var(--text-dim)', width: 50 }}>{Math.round(vol).toLocaleString()} кг</span>
+                <span style={{ fontSize: 9, color: 'var(--text-dim)', width: 50 }}>{Math.round(vol).toLocaleString()} РєРі</span>
               </div>
             );
           })}
@@ -2033,7 +2033,7 @@ const AnalyticsTab: React.FC<{ sessions: WorkoutLog[] }> = ({ sessions }) => {
       {/* Strength estimates */}
       {Object.keys(strength.estimated1RM).length > 0 && (
         <div className="card" style={{ marginBottom: 10, padding: '8px 10px' }}>
-          <div style={{ fontSize: 11, fontWeight: 600, marginBottom: 6 }}>Расчётный 1RM</div>
+          <div style={{ fontSize: 11, fontWeight: 600, marginBottom: 6 }}>Р Р°СЃС‡С‘С‚РЅС‹Р№ 1RM</div>
           {Object.entries(strength.estimated1RM)
             .sort(([, a], [, b]) => b - a)
             .slice(0, 5)
@@ -2043,9 +2043,9 @@ const AnalyticsTab: React.FC<{ sessions: WorkoutLog[] }> = ({ sessions }) => {
                 <div key={exId} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3, fontSize: 11 }}>
                   <span style={{ color: 'var(--text-dim)' }}>{exId}</span>
                   <span>
-                    <strong>{rm} кг</strong>
+                    <strong>{rm} РєРі</strong>
                     <span style={{ marginLeft: 6, fontSize: 10, color: trend >= 0 ? '#22c55e' : '#ef4444' }}>
-                      {trend >= 0 ? '↑' : '↓'} {Math.abs(trend)}%
+                      {trend >= 0 ? 'в†‘' : 'в†“'} {Math.abs(trend)}%
                     </span>
                   </span>
                 </div>
@@ -2056,7 +2056,7 @@ const AnalyticsTab: React.FC<{ sessions: WorkoutLog[] }> = ({ sessions }) => {
 
       {/* Fatigue details */}
       <div className="card" style={{ padding: '8px 10px' }}>
-        <div style={{ fontSize: 11, fontWeight: 600, marginBottom: 4 }}>Метрики усталости</div>
+        <div style={{ fontSize: 11, fontWeight: 600, marginBottom: 4 }}>РњРµС‚СЂРёРєРё СѓСЃС‚Р°Р»РѕСЃС‚Рё</div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 4, fontSize: 10 }}>
           <div>
             <span style={{ color: 'var(--text-dim)' }}>Monotony: </span>
@@ -2067,7 +2067,7 @@ const AnalyticsTab: React.FC<{ sessions: WorkoutLog[] }> = ({ sessions }) => {
             <span style={{ fontWeight: 600, color: fatigue.strain > 300 ? '#ef4444' : 'var(--accent)' }}>{fatigue.strain}</span>
           </div>
           <div>
-            <span style={{ color: 'var(--text-dim)' }}>ЦНС: </span>
+            <span style={{ color: 'var(--text-dim)' }}>Р¦РќРЎ: </span>
             <span style={{ fontWeight: 600, color: fatigue.cnsFatigue > 0.7 ? '#ef4444' : 'var(--accent)' }}>{Math.round(fatigue.cnsFatigue * 100)}%</span>
           </div>
         </div>
@@ -2083,7 +2083,7 @@ const ProgramsTab: React.FC = () => {
   const selected = selectedId ? getProgramById(selectedId) : null;
   return (<div>
     <div style={{ display:'flex', gap:4, marginBottom:8 }}>
-      {['all','strength','hypertrophy','peaking'].map(g => <button key={g} onClick={()=>{setGoalFilter(g);setSelectedId(null);}} style={{ padding:'4px 10px',borderRadius:6,fontSize:10,cursor:'pointer',background:goalFilter===g?'var(--accent)':'var(--bg-secondary)',color:goalFilter===g?'#000':'var(--text-dim)',border:'none' }}>{g==='all'?'Все':g==='strength'?'Сила':g==='hypertrophy'?'Масса':'Пик'}</button>)}
+      {['all','strength','hypertrophy','peaking'].map(g => <button key={g} onClick={()=>{setGoalFilter(g);setSelectedId(null);}} style={{ padding:'4px 10px',borderRadius:6,fontSize:10,cursor:'pointer',background:goalFilter===g?'var(--accent)':'var(--bg-secondary)',color:goalFilter===g?'#000':'var(--text-dim)',border:'none' }}>{g==='all'?'':g==='strength'?'':g==='hypertrophy'?'':''}</button>)}
     </div>
     {!selected && <div style={{ display:'grid', gap:6 }}>{programs.map(p => <div key={p.id} onClick={()=>setSelectedId(p.id)} className="card" style={{ padding:10, cursor:'pointer' }}><div style={{ fontWeight:600, fontSize:13 }}>{p.name} <span style={{ fontSize:9, color:'var(--text-dim)' }}>{p.level}</span></div><div style={{ fontSize:9, color:'var(--text-light)', marginTop:2 }}>{p.description}</div></div>)}</div>}
     {selected && <div className="card" style={{ padding:12 }}><button onClick={()=>setSelectedId(null)} style={{ background:'var(--bg-secondary)',border:'none',color:'var(--text-dim)',cursor:'pointer',fontSize:11,marginBottom:8 }}>Back</button>
@@ -2097,9 +2097,9 @@ const TimersTab: React.FC = () => {
   const checklists = React.useMemo(() => getGymChecklists(), []);
   const bpm = React.useMemo(() => getBPMGuide(), []);
   return (<div>
-    <div className="card" style={{ marginBottom:8, padding:10 }}><h4 style={{ margin:'0 0 6px',fontSize:12 }}>⏱ Таймеры ({timers.length})</h4>{timers.map((t,i)=><div key={i} style={{ marginBottom:4,fontSize:10 }}><b>{t.name}</b> ({t.type}): работа {t.workSec}с / отдых {t.restSec}с × {t.rounds} раундов</div>)}</div>
-    <div className="card" style={{ marginBottom:8, padding:10 }}><h4 style={{ margin:'0 0 6px',fontSize:12 }}>🎵 BPM</h4>{bpm.map((b:any,i)=><div key={i} style={{ fontSize:9, display:'flex',justifyContent:'space-between' }}><span>{b.phase || b.name}</span><span style={{ fontWeight:600 }}>{b.bpmRange} BPM</span></div>)}</div>
-    <div className="card" style={{ padding:10 }}><h4 style={{ margin:'0 0 6px',fontSize:12 }}>✅ Чек-листы</h4>{checklists.map((c,i)=><div key={i} style={{ marginBottom:6 }}><div style={{ fontWeight:600,fontSize:11 }}>{(c as any).name || (c as any).title}</div>{c.items?.map((item:any,ii:number)=><div key={ii} style={{ fontSize:8,color:'var(--text-light)',marginLeft:6 }}>✓ {item}</div>)}</div>)}</div>
+    <div className="card" style={{ marginBottom:8, padding:10 }}><h4 style={{ margin:'0 0 6px',fontSize:12 }}>вЏ± РўР°Р№РјРµСЂС‹ ({timers.length})</h4>{timers.map((t,i)=><div key={i} style={{ marginBottom:4,fontSize:10 }}><b>{t.name}</b> ({t.type}): СЂР°Р±РѕС‚Р° {t.workSec}СЃ / РѕС‚РґС‹С… {t.restSec}СЃ Г— {t.rounds} СЂР°СѓРЅРґРѕРІ</div>)}</div>
+    <div className="card" style={{ marginBottom:8, padding:10 }}><h4 style={{ margin:'0 0 6px',fontSize:12 }}>рџЋµ BPM</h4>{bpm.map((b:any,i)=><div key={i} style={{ fontSize:9, display:'flex',justifyContent:'space-between' }}><span>{b.phase || b.name}</span><span style={{ fontWeight:600 }}>{b.bpmRange} BPM</span></div>)}</div>
+    <div className="card" style={{ padding:10 }}><h4 style={{ margin:'0 0 6px',fontSize:12 }}>вњ… Р§РµРє-Р»РёСЃС‚С‹</h4>{checklists.map((c,i)=><div key={i} style={{ marginBottom:6 }}><div style={{ fontWeight:600,fontSize:11 }}>{(c as any).name || (c as any).title}</div>{c.items?.map((item:any,ii:number)=><div key={ii} style={{ fontSize:8,color:'var(--text-light)',marginLeft:6 }}>вњ“ {item}</div>)}</div>)}</div>
   </div>);
 };
 
@@ -2133,38 +2133,38 @@ const ProgressTab: React.FC<{ historyWorkouts: WorkoutLog[] }> = ({ historyWorko
 
   return (<div>
     <div className="card" style={{ marginBottom:8, padding:10 }}>
-      <h4 style={{ margin:'0 0 6px',fontSize:12 }}>📏 Замеры тела</h4>
+      <h4 style={{ margin:'0 0 6px',fontSize:12 }}>рџ“Џ Р—Р°РјРµСЂС‹ С‚РµР»Р°</h4>
       <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:4 }}>
-        <div><label style={{ fontSize:9 }}>Вес</label><input type="number" value={mWeight} onChange={e=>setMWeight(+e.target.value)} style={{ width:'100%',padding:'4px',borderRadius:4,background:'var(--bg-secondary)',border:'1px solid var(--border)',color:'var(--text)',fontSize:11,boxSizing:'border-box' }} /></div>
-        <div><label style={{ fontSize:9 }}>Талия</label><input type="number" value={mWaist} onChange={e=>setMWaist(+e.target.value)} style={{ width:'100%',padding:'4px',borderRadius:4,background:'var(--bg-secondary)',border:'1px solid var(--border)',color:'var(--text)',fontSize:11,boxSizing:'border-box' }} /></div>
-        <div><label style={{ fontSize:9 }}>Грудь</label><input type="number" value={mChest} onChange={e=>setMChest(+e.target.value)} style={{ width:'100%',padding:'4px',borderRadius:4,background:'var(--bg-secondary)',border:'1px solid var(--border)',color:'var(--text)',fontSize:11,boxSizing:'border-box' }} /></div>
-        <div><label style={{ fontSize:9 }}>Бицепс</label><input type="number" value={mArm} onChange={e=>setMArm(+e.target.value)} style={{ width:'100%',padding:'4px',borderRadius:4,background:'var(--bg-secondary)',border:'1px solid var(--border)',color:'var(--text)',fontSize:11,boxSizing:'border-box' }} /></div>
-        <div><label style={{ fontSize:9 }}>Бедро</label><input type="number" value={mThigh} onChange={e=>setMThigh(+e.target.value)} style={{ width:'100%',padding:'4px',borderRadius:4,background:'var(--bg-secondary)',border:'1px solid var(--border)',color:'var(--text)',fontSize:11,boxSizing:'border-box' }} /></div>
-        <div><label style={{ fontSize:9 }}>Дата</label><input type="date" value={mDate} onChange={e=>setMDate(e.target.value)} style={{ width:'100%',padding:'4px',borderRadius:4,background:'var(--bg-secondary)',border:'1px solid var(--border)',color:'var(--text)',fontSize:11,boxSizing:'border-box' }} /></div>
+        <div><label style={{ fontSize:9 }}>Р’РµСЃ</label><input type="number" value={mWeight} onChange={e=>setMWeight(+e.target.value)} style={{ width:'100%',padding:'4px',borderRadius:4,background:'var(--bg-secondary)',border:'1px solid var(--border)',color:'var(--text)',fontSize:11,boxSizing:'border-box' }} /></div>
+        <div><label style={{ fontSize:9 }}>РўР°Р»РёСЏ</label><input type="number" value={mWaist} onChange={e=>setMWaist(+e.target.value)} style={{ width:'100%',padding:'4px',borderRadius:4,background:'var(--bg-secondary)',border:'1px solid var(--border)',color:'var(--text)',fontSize:11,boxSizing:'border-box' }} /></div>
+        <div><label style={{ fontSize:9 }}>Р“СЂСѓРґСЊ</label><input type="number" value={mChest} onChange={e=>setMChest(+e.target.value)} style={{ width:'100%',padding:'4px',borderRadius:4,background:'var(--bg-secondary)',border:'1px solid var(--border)',color:'var(--text)',fontSize:11,boxSizing:'border-box' }} /></div>
+        <div><label style={{ fontSize:9 }}>Р‘РёС†РµРїСЃ</label><input type="number" value={mArm} onChange={e=>setMArm(+e.target.value)} style={{ width:'100%',padding:'4px',borderRadius:4,background:'var(--bg-secondary)',border:'1px solid var(--border)',color:'var(--text)',fontSize:11,boxSizing:'border-box' }} /></div>
+        <div><label style={{ fontSize:9 }}>Р‘РµРґСЂРѕ</label><input type="number" value={mThigh} onChange={e=>setMThigh(+e.target.value)} style={{ width:'100%',padding:'4px',borderRadius:4,background:'var(--bg-secondary)',border:'1px solid var(--border)',color:'var(--text)',fontSize:11,boxSizing:'border-box' }} /></div>
+        <div><label style={{ fontSize:9 }}>Р”Р°С‚Р°</label><input type="date" value={mDate} onChange={e=>setMDate(e.target.value)} style={{ width:'100%',padding:'4px',borderRadius:4,background:'var(--bg-secondary)',border:'1px solid var(--border)',color:'var(--text)',fontSize:11,boxSizing:'border-box' }} /></div>
       </div>
-      <button onClick={save} style={{ width:'100%',marginTop:6,padding:8,borderRadius:6,border:'none',cursor:'pointer',background:'var(--accent)',color:'#000',fontWeight:600,fontSize:12 }}>Сохранить замер</button>
+      <button onClick={save} style={{ width:'100%',marginTop:6,padding:8,borderRadius:6,border:'none',cursor:'pointer',background:'var(--accent)',color:'#000',fontWeight:600,fontSize:12 }}>РЎРѕС…СЂР°РЅРёС‚СЊ Р·Р°РјРµСЂ</button>
     </div>
 
     {measurements.length > 0 && <div className="card" style={{ marginBottom:8, padding:10 }}>
-      <h4 style={{ margin:'0 0 4px',fontSize:12 }}>📊 История ({measurements.length})</h4>
+      <h4 style={{ margin:'0 0 4px',fontSize:12 }}>рџ“Љ РСЃС‚РѕСЂРёСЏ ({measurements.length})</h4>
         {measurements.slice(-5).reverse().map((m:any,i)=><div key={i} style={{ fontSize:9,padding:'2px 0',borderBottom:'1px solid rgba(255,255,255,0.03)' }}>
-        {m.date}: Вес {m.weightKg}кг | Талия {m.waistCm}см | Грудь {m.chestCm}см | Бицепс {m.armCm}см | Бедро {m.thighCm}см
+        {m.date}: Р’РµСЃ {m.weightKg}РєРі | РўР°Р»РёСЏ {m.waistCm}СЃРј | Р“СЂСѓРґСЊ {m.chestCm}СЃРј | Р‘РёС†РµРїСЃ {m.armCm}СЃРј | Р‘РµРґСЂРѕ {m.thighCm}СЃРј
       </div>)}
     </div>}
 
     {analytics && <div className="card" style={{ padding:10 }}>
-      <h4 style={{ margin:'0 0 4px',fontSize:12 }}>📈 Аналитика</h4>
+      <h4 style={{ margin:'0 0 4px',fontSize:12 }}>рџ“€ РђРЅР°Р»РёС‚РёРєР°</h4>
       <div style={{ display:'grid',gridTemplateColumns:'1fr 1fr',gap:'2px 8px',fontSize:10 }}>
         <span>FFMI:</span><span style={{ fontWeight:600 }}>{analytics.ffmi?.toFixed(1)}</span>
-        <span>LBM:</span><span style={{ fontWeight:600 }}>{analytics.lbm?.toFixed(1)} кг</span>
+        <span>LBM:</span><span style={{ fontWeight:600 }}>{analytics.lbm?.toFixed(1)} РєРі</span>
         <span>BMI:</span><span style={{ fontWeight:600 }}>{analytics.bmi?.toFixed(1)}</span>
-        <span>Fat:</span><span style={{ fontWeight:600 }}>{analytics.fatMass?.toFixed(1)} кг</span>
+        <span>Fat:</span><span style={{ fontWeight:600 }}>{analytics.fatMass?.toFixed(1)} РєРі</span>
       </div>
     </div>}
 
     {repData && <div className="card" style={{ padding:10, marginTop:8 }}>
-      <h4 style={{ margin:'0 0 4px',fontSize:12 }}>📋 Недельный отчёт</h4>
-      <div style={{ fontSize:9,color:'var(--text-light)' }}>{repData.insights?.slice(0,3).map((r:any,i:number)=><div key={i}>• {r}</div>)}</div>
+      <h4 style={{ margin:'0 0 4px',fontSize:12 }}>рџ“‹ РќРµРґРµР»СЊРЅС‹Р№ РѕС‚С‡С‘С‚</h4>
+      <div style={{ fontSize:9,color:'var(--text-light)' }}>{repData.insights?.slice(0,3).map((r:any,i:number)=><div key={i}>вЂў {r}</div>)}</div>
     </div>}
   </div>);
 };
@@ -2176,13 +2176,13 @@ const StrengthLevelCard: React.FC = () => {
   const level = getStrengthLevel(slEx, slWt, sl1RM) as string;
   const next = getNextLevelTarget(slEx, slWt, level as any);
   return (<div className="card" style={{ marginTop:8, padding:10 }}>
-    <h4 style={{ margin:'0 0 6px',fontSize:12 }}>📊 Уровень силы</h4>
+    <h4 style={{ margin:'0 0 6px',fontSize:12 }}>рџ“Љ РЈСЂРѕРІРµРЅСЊ СЃРёР»С‹</h4>
     <div style={{ display:'grid',gridTemplateColumns:'1fr 1fr',gap:4 }}>
-      <div><label style={{ fontSize:9 }}>Упражнение</label><select value={slEx} onChange={e=>setSlEx(e.target.value)} style={{ width:'100%',padding:'4px',borderRadius:4,background:'var(--bg-secondary)',border:'1px solid var(--border)',color:'var(--text)',fontSize:11 }}><option value="squat">Присед</option><option value="bench">Жим</option><option value="deadlift">Тяга</option></select></div>
-      <div><label style={{ fontSize:9 }}>Вес тела (кг)</label><input type="number" value={slWt} onChange={e=>setSlWt(+e.target.value)} style={{ width:'100%',padding:'4px',borderRadius:4,background:'var(--bg-secondary)',border:'1px solid var(--border)',color:'var(--text)',fontSize:11,boxSizing:'border-box' }} /></div>
-      <div><label style={{ fontSize:9 }}>1RM (кг)</label><input type="number" value={sl1RM} onChange={e=>setSl1RM(+e.target.value)} style={{ width:'100%',padding:'4px',borderRadius:4,background:'var(--bg-secondary)',border:'1px solid var(--border)',color:'var(--text)',fontSize:11,boxSizing:'border-box' }} /></div>
+      <div><label style={{ fontSize:9 }}>РЈРїСЂР°Р¶РЅРµРЅРёРµ</label><select value={slEx} onChange={e=>setSlEx(e.target.value)} style={{ width:'100%',padding:'4px',borderRadius:4,background:'var(--bg-secondary)',border:'1px solid var(--border)',color:'var(--text)',fontSize:11 }}><option value="squat">РџСЂРёСЃРµРґ</option><option value="bench">Р–РёРј</option><option value="deadlift">РўСЏРіР°</option></select></div>
+      <div><label style={{ fontSize:9 }}>Р’РµСЃ С‚РµР»Р° (РєРі)</label><input type="number" value={slWt} onChange={e=>setSlWt(+e.target.value)} style={{ width:'100%',padding:'4px',borderRadius:4,background:'var(--bg-secondary)',border:'1px solid var(--border)',color:'var(--text)',fontSize:11,boxSizing:'border-box' }} /></div>
+      <div><label style={{ fontSize:9 }}>1RM (РєРі)</label><input type="number" value={sl1RM} onChange={e=>setSl1RM(+e.target.value)} style={{ width:'100%',padding:'4px',borderRadius:4,background:'var(--bg-secondary)',border:'1px solid var(--border)',color:'var(--text)',fontSize:11,boxSizing:'border-box' }} /></div>
     </div>
-    <div style={{ marginTop:6,fontSize:10 }}>Уровень: <b style={{ color:'var(--accent)' }}>{level}</b> | До следующего: <b style={{ color:'#8b5cf6' }}>{next} кг</b></div>
+    <div style={{ marginTop:6,fontSize:10 }}>РЈСЂРѕРІРµРЅСЊ: <b style={{ color:'var(--accent)' }}>{level}</b> | Р”Рѕ СЃР»РµРґСѓСЋС‰РµРіРѕ: <b style={{ color:'#8b5cf6' }}>{next} РєРі</b></div>
   </div>);
 };
 
@@ -2190,8 +2190,8 @@ const StructuredAnalyticsCard: React.FC<{ sessions: any[] }> = ({ sessions }) =>
   const result = React.useMemo(() => sessions.length > 0 ? computeStructuredAnalytics(sessions) : null, [sessions]);
   if (!result) return null;
   return (<div className="card" style={{ marginTop:8, padding:10 }}>
-    <h4 style={{ margin:'0 0 4px',fontSize:12 }}>📊 Структурная</h4>
-    <div style={{ fontSize:10 }}>Сессий: <b>{(result as any).sessionCount || sessions.length}</b> | Объём: <b>{(result as any).totalVolume || '—'}</b></div>
-    {(result as any).insights?.slice(0,3).map((r:any,i:number)=><div key={i} style={{ fontSize:9,color:'var(--text-dim)',marginTop:2 }}>• {r}</div>)}
+    <h4 style={{ margin:'0 0 4px',fontSize:12 }}>рџ“Љ РЎС‚СЂСѓРєС‚СѓСЂРЅР°СЏ</h4>
+    <div style={{ fontSize:10 }}>РЎРµСЃСЃРёР№: <b>{(result as any).sessionCount || sessions.length}</b> | РћР±СЉС‘Рј: <b>{(result as any).totalVolume || 'вЂ”'}</b></div>
+    {(result as any).insights?.slice(0,3).map((r:any,i:number)=><div key={i} style={{ fontSize:9,color:'var(--text-dim)',marginTop:2 }}>вЂў {r}</div>)}
   </div>);
 };

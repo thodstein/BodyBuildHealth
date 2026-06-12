@@ -1,16 +1,16 @@
-import React, { useEffect, useState, useRef } from 'react';
+﻿import React, { useEffect, useState, useRef } from 'react';
 import { SummaryCard } from '../cards/SummaryCard';
 import { SystemCard } from '../cards/SystemCard';
 import { PHARMA_DB } from '../../core/pharma-database';
 import { registry } from '../../core/data/registry';
 import { UCUM_MAP } from '../../core/constants';
 const SYSTEM_LABELS: Record<string, string> = {
-  cardio: 'Сердечно-сосудистая', hepatic: 'Печень', renal: 'Почки',
-  neuro: 'Нервная', endocrine: 'Эндокринная', hematologic: 'Кроветворная',
-  reproductive: 'Репродуктивная', musculoskeletal: 'ОДА/Мышцы',
-  metabolic: 'Метаболизм', ghigf: 'ГР/ИФР-1', ins_axis: 'Инсулиновая ось',
-  neuro_toxicity: 'Нейротоксичность', blood: 'Кровь', vessels: 'Сосуды',
-  immunity: 'Иммунная', thyroid: 'Щитовидная', prostate: 'Простата', skin: 'Кожа',
+  cardio: '', hepatic: '', renal: '',
+  neuro: '', endocrine: '', hematologic: '',
+  reproductive: '', musculoskeletal: '',
+  metabolic: '', ghigf: '', ins_axis: '',
+  neuro_toxicity: '', blood: '', vessels: '',
+  immunity: '', thyroid: '', prostate: '', skin: '',
 };
 
 import type { MasterDB, RiskResult, ReadinessScores, CourseEntry, LabPoint } from '../../core/types';
@@ -63,7 +63,7 @@ function AlertBanner({ messages }: { messages: string[] }) {
   if (!messages.length) return null;
   return (
     <div style={{ background: 'var(--danger-dim)', border: '1px solid var(--danger)', borderRadius: 8, padding: '10px 14px', marginBottom: 12 }}>
-      <div style={{ fontWeight: 700, color: 'var(--danger)', fontSize: 13, marginBottom: 4 }}>⚠️ Внимание</div>
+      <div style={{ fontWeight: 700, color: 'var(--danger)', fontSize: 13, marginBottom: 4 }}>вљ пёЏ Р’РЅРёРјР°РЅРёРµ</div>
       {messages.map((m, i) => (
         <div key={i} style={{ fontSize: 12, color: 'var(--danger)', lineHeight: 1.6 }}>{m}</div>
       ))}
@@ -73,16 +73,16 @@ function AlertBanner({ messages }: { messages: string[] }) {
 
 // Navigation cards for the Dashboard
 const NAV_CARDS: { id: ScreenId; icon: string; label: string; desc: string; color: string }[] = [
-  { id: 'training', icon: '🏋️', label: 'Тренировки', desc: 'Планы, RIR, дневник', color: '#00e68a' },
-  { id: 'support', icon: '💊', label: 'Поддержка', desc: 'БАДы, калькулятор, пептиды', color: '#1e90ff' },
-  { id: 'nutrition', icon: '🍎', label: 'Питание', desc: 'КБЖУ, дневник, план', color: '#ffa502' },
-  { id: 'recovery', icon: '🔄', label: 'Восстановление', desc: 'Сон, HRV, прехаб, делоад', color: '#22c55e' },
-  { id: 'performance', icon: '⚡', label: 'Лаборатория', desc: 'Кровь, стеки, ПКТ, прогноз', color: '#a855f7' },
-  { id: 'toolkit', icon: '🧰', label: 'Инструменты', desc: 'Движение, календарь, логгер', color: '#06b6d4' },
-  { id: 'calculators', icon: '🧮', label: 'Калькуляторы', desc: 'BMI, BMR, дозировки', color: '#f97316' },
-  { id: 'fertility-pct', icon: '🌱', label: 'ПКТ и Фертильность', desc: 'План ПКТ, фертильность', color: '#8b5cf6' },
-  { id: 'profile', icon: '👤', label: 'Профиль', desc: 'Настройки', color: '#6b7280' },
-  { id: 'articles', icon: '📖', label: 'Статьи', desc: 'База знаний', color: '#ec4899' },
+  { id: 'training', icon: '', label: '', desc: '', color: '#00e68a' },
+  { id: 'support', icon: '', label: '', desc: '', color: '#1e90ff' },
+  { id: 'nutrition', icon: '', label: '', desc: '', color: '#ffa502' },
+  { id: 'recovery', icon: '', label: '', desc: '', color: '#22c55e' },
+  { id: 'performance', icon: 'вљЎ', label: '', desc: '', color: '#a855f7' },
+  { id: 'toolkit', icon: '', label: '', desc: '', color: '#06b6d4' },
+  { id: 'calculators', icon: '', label: '', desc: 'BMI, BMR, РґРѕР·РёСЂРѕРІРєРё', color: '#f97316' },
+  { id: 'fertility-pct', icon: '', label: '', desc: '', color: '#8b5cf6' },
+  { id: 'profile', icon: '', label: '', desc: '', color: '#6b7280' },
+  { id: 'articles', icon: '', label: '', desc: '', color: '#ec4899' },
 ];
 
 export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
@@ -266,7 +266,7 @@ export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
           proteinRatio: 0.8,
           waterRatio: Math.min(1, (settings.dailyWaterLiters ?? 2) / 3),
           fiberRatio: 0.6,
-          omega3Flag: (settings.currentSupplements ?? []).some(sup => /omega|омега/i.test(sup.name)),
+          omega3Flag: (settings.currentSupplements ?? []).some(sup => /omega|РѕРјРµРіР°/i.test(sup.name)),
           trainingLoadRatio: 0.7,
           subjFatigue: settings.fatigueLevel ?? 3,
           hrIncrease: 0.1,
@@ -276,10 +276,10 @@ export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
 
       // Alerts
       const newAlerts: string[] = [];
-      if (settings.age && settings.age > 40) newAlerts.push('Возраст > 40: рекомендуется расширенный чекап');
+      if (settings.age && settings.age > 40) newAlerts.push('');
       if (courseData.length > 0) {
         const hasAi = courseData.some(c => /oxandrolone|stanozolol|methandienone|oxymetholone|halotestin/i.test(c.substanceId));
-        if (hasAi) newAlerts.push('Оральные ААС: обязательный мониторинг печени (АЛТ, АСТ, ГГТ)');
+        if (hasAi) newAlerts.push('');
       }
       setAlerts(newAlerts);
     };
@@ -291,7 +291,7 @@ export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
     return (
       <div className="screen screen-loading">
         <div className="loading-spinner"/>
-        <span>Загрузка...</span>
+        <span>Р—Р°РіСЂСѓР·РєР°...</span>
       </div>
     );
   }
@@ -304,7 +304,7 @@ export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
 
   return (
     <div className="screen">
-      <h2>🏠 Главная</h2>
+      <h2>рџЏ  Р“Р»Р°РІРЅР°СЏ</h2>
 
       <AlertBanner messages={alerts} />
 
@@ -327,7 +327,7 @@ export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
         return (
           <div style={{ background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', borderRadius: 10, padding: '8px 12px', marginBottom: 12 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-dim)', whiteSpace: 'nowrap' }}>🫀 Health Score</div>
+              <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-dim)', whiteSpace: 'nowrap' }}>рџ«Ђ Health Score</div>
               <div style={{ flex: 1, height: 10, borderRadius: 6, background: 'rgba(255,255,255,0.06)', overflow: 'hidden' }}>
                 <div style={{ width: `${hs.overallScore}%`, height: '100%', borderRadius: 6, background: hs.overallScore >= 65 ? 'linear-gradient(90deg, #22c55e, #00e68a)' : hs.overallScore >= 40 ? 'linear-gradient(90deg, #eab308, #f59e0b)' : 'linear-gradient(90deg, #f97316, #ef4444)', transition: 'width 0.5s' }} />
               </div>
@@ -338,45 +338,45 @@ export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
         );
       })()}
 
-      {/* ── Global Risk Card: 3 calculation methods ── */}
+      {/* в”Ђв”Ђ Global Risk Card: 3 calculation methods в”Ђв”Ђ */}
       <div style={{ background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', borderRadius: 10, padding: '10px 12px', marginBottom: 12 }}>
         <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 8, display: 'flex', justifyContent: 'space-between' }}>
-          <span>⚠️ Риск · Готовность {Math.round(readiness.recovery)}%</span>
+          <span>вљ пёЏ Р РёСЃРє В· Р“РѕС‚РѕРІРЅРѕСЃС‚СЊ {Math.round(readiness.recovery)}%</span>
           <span style={{ fontSize: 10, color: 'var(--text-dim)', fontWeight: 400 }}>
-            Курс: {daysOnCourse} дн · Лабы: {(() => {
+            РљСѓСЂСЃ: {daysOnCourse} РґРЅ В· Р›Р°Р±С‹: {(() => {
               const dates = labData.map(l => l.date).filter(Boolean).sort().reverse();
-              if (!dates[0]) return 'нет';
+              if (!dates[0]) return '';
               const d = Math.round((Date.now() - new Date(dates[0]).getTime()) / (24 * 3600 * 1000));
-              return `${d} дн назад`;
+              return `${d} РґРЅ РЅР°Р·Р°Рґ`;
             })()}
           </span>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
           {/* V7 Risk */}
           <div style={{ textAlign: 'center', background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: '6px 4px' }}>
-            <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 2 }}>V7 Базовый</div>
+            <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 2 }}>V7 Р‘Р°Р·РѕРІС‹Р№</div>
             <div style={{ fontSize: 16, fontWeight: 800, color: riskResult ? riskColor(riskResult.overallRaw) : 'var(--text-dim)' }}>
-              {riskResult ? Math.round(riskResult.overallRaw) : '—'}
+              {riskResult ? Math.round(riskResult.overallRaw) : 'вЂ”'}
             </div>
             <div style={{ fontSize: 8, color: 'var(--text-dim)' }}>
-              с поддержкой: <span style={{ color: riskResult ? riskColor(riskResult.overallNet) : 'var(--text-dim)', fontWeight: 600 }}>
-                {riskResult ? Math.round(riskResult.overallNet) : '—'}
+              СЃ РїРѕРґРґРµСЂР¶РєРѕР№: <span style={{ color: riskResult ? riskColor(riskResult.overallNet) : 'var(--text-dim)', fontWeight: 600 }}>
+                {riskResult ? Math.round(riskResult.overallNet) : 'вЂ”'}
               </span>
             </div>
           </div>
           {/* Monte Carlo (V7) */}
           <div style={{ textAlign: 'center', background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: '6px 4px' }}>
-            <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 2 }}>Монте-Карло</div>
+            <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 2 }}>РњРѕРЅС‚Рµ-РљР°СЂР»Рѕ</div>
             <div style={{ fontSize: 16, fontWeight: 800, color: v7Result?.globalRiskRaw !== undefined
               ? (v7Result.globalRiskRaw > 70 ? '#ef4444' : v7Result.globalRiskRaw > 40 ? '#f97316' : v7Result.globalRiskRaw > 15 ? '#eab308' : '#22c55e')
               : 'var(--text-dim)' }}>
-              {v7Result?.globalRiskRaw !== undefined ? `${Math.round(v7Result.globalRiskRaw)}%` : '—'}
+              {v7Result?.globalRiskRaw !== undefined ? `${Math.round(v7Result.globalRiskRaw)}%` : 'вЂ”'}
             </div>
             <div style={{ fontSize: 8, color: 'var(--text-dim)' }}>
-              нетто: <span style={{ fontWeight: 600, color: v7Result?.globalRiskNet !== undefined
+              РЅРµС‚С‚Рѕ: <span style={{ fontWeight: 600, color: v7Result?.globalRiskNet !== undefined
                 ? (v7Result.globalRiskNet > 70 ? '#ef4444' : v7Result.globalRiskNet > 40 ? '#f97316' : '#22c55e')
                 : 'var(--text-dim)' }}>
-                {v7Result?.globalRiskNet !== undefined ? `${Math.round(v7Result.globalRiskNet)}%` : '—'}
+                {v7Result?.globalRiskNet !== undefined ? `${Math.round(v7Result.globalRiskNet)}%` : 'вЂ”'}
               </span>
             </div>
           </div>
@@ -386,12 +386,12 @@ export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
             <div style={{ fontSize: 16, fontWeight: 800, color: mdssResult?.overallAlertLevel !== undefined
               ? (mdssResult.overallAlertLevel >= 3 ? '#ef4444' : mdssResult.overallAlertLevel >= 2 ? '#f97316' : mdssResult.overallAlertLevel >= 1 ? '#eab308' : '#22c55e')
               : 'var(--text-dim)' }}>
-              {mdssResult ? `${mdssResult.overallMaxRisk}%` : '—'}
+              {mdssResult ? `${mdssResult.overallMaxRisk}%` : 'вЂ”'}
             </div>
             <div style={{ fontSize: 8, color: 'var(--text-dim)' }}>
               {mdssResult?.compliancePenalty && mdssResult.compliancePenalty > 1
-                ? `Штраф ×${mdssResult.compliancePenalty}`
-                : `${mdssResult?.sortedOrgans?.length || 0} систем`}
+                ? ``
+                : `${mdssResult?.sortedOrgans?.length || 0} СЃРёСЃС‚РµРј`}
             </div>
           </div>
         </div>
@@ -405,22 +405,22 @@ export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
         return (
           <div style={{ background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', borderRadius: 10, padding: '8px 10px', marginBottom: 12 }}>
             <div style={{ fontWeight: 600, fontSize: 11, marginBottom: 4, display: 'flex', justifyContent: 'space-between' }}>
-              <span>🧪 Сводка анализов</span>
-              <span style={{ fontSize: 8, color: 'var(--text-dim)' }}>{labData.length} тестов</span>
+              <span>рџ§Є РЎРІРѕРґРєР° Р°РЅР°Р»РёР·РѕРІ</span>
+              <span style={{ fontSize: 8, color: 'var(--text-dim)' }}>{labData.length} С‚РµСЃС‚РѕРІ</span>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '2px 6px', fontSize: 9 }}>
               {la.homaIR !== null && (
                 <><span style={{ color: 'var(--text-dim)' }}>HOMA-IR</span><span style={{ fontWeight: 600, color: la.homaIR > 2.5 ? '#ef4444' : la.homaIR > 1.5 ? '#f59e0b' : '#22c55e', textAlign: 'right' }}>{la.homaIR.toFixed(1)}</span><span/></>
               )}
-              <span style={{ color: 'var(--text-dim)' }}>Печень</span><span style={{ fontWeight: 600, color: la.liverStress > 60 ? '#ef4444' : la.liverStress > 30 ? '#f59e0b' : '#22c55e', textAlign: 'right' }}>{la.liverStress}%</span><span/>
-              <span style={{ color: 'var(--text-dim)' }}>Кардио</span><span style={{ fontWeight: 600, color: la.cardioRisk > 60 ? '#ef4444' : la.cardioRisk > 30 ? '#f59e0b' : '#22c55e', textAlign: 'right' }}>{la.cardioRisk}%</span><span/>
-              <span style={{ color: 'var(--text-dim)' }}>Воспаление</span><span style={{ fontWeight: 600, color: la.inflammation > 6 ? '#ef4444' : la.inflammation > 3 ? '#f59e0b' : '#22c55e', textAlign: 'right' }}>{la.inflammation.toFixed(0)}</span><span/>
-              <span style={{ color: 'var(--text-dim)' }}>Почки</span><span style={{ fontWeight: 600, color: la.kidneyStress > 60 ? '#ef4444' : la.kidneyStress > 30 ? '#f59e0b' : '#22c55e', textAlign: 'right' }}>{la.kidneyStress}%</span><span/>
-              <span style={{ color: 'var(--text-dim)' }}>Гормоны</span><span style={{ fontWeight: 600, color: la.hormoneScore > 60 ? '#ef4444' : la.hormoneScore > 30 ? '#f59e0b' : '#22c55e', textAlign: 'right' }}>{la.hormoneScore}%</span><span/>
+              <span style={{ color: 'var(--text-dim)' }}>РџРµС‡РµРЅСЊ</span><span style={{ fontWeight: 600, color: la.liverStress > 60 ? '#ef4444' : la.liverStress > 30 ? '#f59e0b' : '#22c55e', textAlign: 'right' }}>{la.liverStress}%</span><span/>
+              <span style={{ color: 'var(--text-dim)' }}>РљР°СЂРґРёРѕ</span><span style={{ fontWeight: 600, color: la.cardioRisk > 60 ? '#ef4444' : la.cardioRisk > 30 ? '#f59e0b' : '#22c55e', textAlign: 'right' }}>{la.cardioRisk}%</span><span/>
+              <span style={{ color: 'var(--text-dim)' }}>Р’РѕСЃРїР°Р»РµРЅРёРµ</span><span style={{ fontWeight: 600, color: la.inflammation > 6 ? '#ef4444' : la.inflammation > 3 ? '#f59e0b' : '#22c55e', textAlign: 'right' }}>{la.inflammation.toFixed(0)}</span><span/>
+              <span style={{ color: 'var(--text-dim)' }}>РџРѕС‡РєРё</span><span style={{ fontWeight: 600, color: la.kidneyStress > 60 ? '#ef4444' : la.kidneyStress > 30 ? '#f59e0b' : '#22c55e', textAlign: 'right' }}>{la.kidneyStress}%</span><span/>
+              <span style={{ color: 'var(--text-dim)' }}>Р“РѕСЂРјРѕРЅС‹</span><span style={{ fontWeight: 600, color: la.hormoneScore > 60 ? '#ef4444' : la.hormoneScore > 30 ? '#f59e0b' : '#22c55e', textAlign: 'right' }}>{la.hormoneScore}%</span><span/>
             </div>
             {la.interpretations.filter(i => i.status === 'critical_high' || i.status === 'high').length > 0 && (
               <div style={{ marginTop: 3, fontSize: 8, color: '#ef4444' }}>
-                ⚠ {la.interpretations.filter(i => i.status === 'critical_high' || i.status === 'high').length} отклонений
+                вљ  {la.interpretations.filter(i => i.status === 'critical_high' || i.status === 'high').length} РѕС‚РєР»РѕРЅРµРЅРёР№
               </div>
             )}
           </div>
@@ -451,32 +451,32 @@ export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
           <div style={{ background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', borderRadius: 10, padding: '10px 12px', marginBottom: 12 }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, textAlign: 'center' }}>
               <div>
-                <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>Готовность</div>
+                <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>Р“РѕС‚РѕРІРЅРѕСЃС‚СЊ</div>
                 <div style={{ fontSize: 28, fontWeight: 800, color: checkin.readinessScore >= 65 ? '#22c55e' : checkin.readinessScore >= 40 ? '#eab308' : '#ef4444' }}>
                   {checkin.readinessScore}%
                 </div>
                 <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>{checkin.readinessLabel}</div>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2, fontSize: 10, color: 'var(--text-dim)', alignContent: 'center' }}>
-                <div>😴 Сон: <b style={{ color: checkin.metrics.sleepScore >= 60 ? '#22c55e' : '#f97316' }}>{checkin.metrics.sleepScore}</b></div>
-                <div>💓 HRV: <b style={{ color: checkin.metrics.hrvScore >= 60 ? '#22c55e' : '#f97316' }}>{checkin.metrics.hrvScore}</b></div>
-                <div>💧 Вода: <b style={{ color: checkin.metrics.hydrationScore >= 60 ? '#22c55e' : '#f97316' }}>{checkin.metrics.hydrationScore}</b></div>
-                <div>🍽 Питание: <b style={{ color: checkin.metrics.nutritionScore >= 60 ? '#22c55e' : '#f97316' }}>{checkin.metrics.nutritionScore}</b></div>
-                <div>😵 Усталость: <b style={{ color: checkin.metrics.fatigueScore <= 40 ? '#22c55e' : '#f97316' }}>{Math.round(100 - checkin.metrics.fatigueScore)}</b></div>
-                <div>🔄 Восст: <b style={{ color: checkin.metrics.recoveryScore >= 60 ? '#22c55e' : '#f97316' }}>{checkin.metrics.recoveryScore}</b></div>
+                <div>рџґ РЎРѕРЅ: <b style={{ color: checkin.metrics.sleepScore >= 60 ? '#22c55e' : '#f97316' }}>{checkin.metrics.sleepScore}</b></div>
+                <div>рџ’“ HRV: <b style={{ color: checkin.metrics.hrvScore >= 60 ? '#22c55e' : '#f97316' }}>{checkin.metrics.hrvScore}</b></div>
+                <div>рџ’§ Р’РѕРґР°: <b style={{ color: checkin.metrics.hydrationScore >= 60 ? '#22c55e' : '#f97316' }}>{checkin.metrics.hydrationScore}</b></div>
+                <div>рџЌЅ РџРёС‚Р°РЅРёРµ: <b style={{ color: checkin.metrics.nutritionScore >= 60 ? '#22c55e' : '#f97316' }}>{checkin.metrics.nutritionScore}</b></div>
+                <div>рџµ РЈСЃС‚Р°Р»РѕСЃС‚СЊ: <b style={{ color: checkin.metrics.fatigueScore <= 40 ? '#22c55e' : '#f97316' }}>{Math.round(100 - checkin.metrics.fatigueScore)}</b></div>
+                <div>рџ”„ Р’РѕСЃСЃС‚: <b style={{ color: checkin.metrics.recoveryScore >= 60 ? '#22c55e' : '#f97316' }}>{checkin.metrics.recoveryScore}</b></div>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
                 <div style={{ fontSize: 12, fontWeight: 700, color: checkin.trainToday ? '#22c55e' : '#ef4444', marginBottom: 4 }}>
-                  {checkin.trainToday ? '✅ Тренироваться' : '🔴 Отдых'}
+                  {checkin.trainToday ? 'вњ… РўСЂРµРЅРёСЂРѕРІР°С‚СЊСЃСЏ' : ''}
                 </div>
                 {trainingStreak > 0 && (
-                  <div style={{ fontSize: 9, color: 'var(--text-dim)', marginTop: 2 }}>Стрик: {trainingStreak} нед</div>
+                  <div style={{ fontSize: 9, color: 'var(--text-dim)', marginTop: 2 }}>РЎС‚СЂРёРє: {trainingStreak} РЅРµРґ</div>
                 )}
               </div>
             </div>
             {checkin.recommendations.length > 0 && (
               <div style={{ marginTop: 6, fontSize: 9, color: '#f97316', borderTop: '1px solid var(--border)', paddingTop: 4 }}>
-                {checkin.recommendations.slice(0, 2).map((r, i) => (<div key={i}>• {r}</div>))}
+                {checkin.recommendations.slice(0, 2).map((r, i) => (<div key={i}>вЂў {r}</div>))}
               </div>
             )}
           </div>
@@ -494,25 +494,25 @@ export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
           <div style={{ background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', borderRadius: 10, padding: '8px 10px', marginBottom: 12 }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 4, textAlign: 'center' }}>
               <div>
-                <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Вес</div>
-                <div style={{ fontSize: 16, fontWeight: 700 }}>{stats.currentWeight} <span style={{ fontSize: 9, color: stats.weightChange >= 0 ? '#ef4444' : '#22c55e' }}>{stats.weightChange >= 0 ? '+' : ''}{stats.weightChange} кг</span></div>
+                <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Р’РµСЃ</div>
+                <div style={{ fontSize: 16, fontWeight: 700 }}>{stats.currentWeight} <span style={{ fontSize: 9, color: stats.weightChange >= 0 ? '#ef4444' : '#22c55e' }}>{stats.weightChange >= 0 ? '+' : ''}{stats.weightChange} РєРі</span></div>
               </div>
               <div>
-                <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Тренд</div>
+                <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>РўСЂРµРЅРґ</div>
                 <div style={{ fontSize: 16, fontWeight: 700, color: stats.trend7Day > 0.1 ? '#ef4444' : stats.trend7Day < -0.1 ? '#22c55e' : 'var(--text-dim)' }}>
-                  {stats.trend7Day > 0 ? '+' : ''}{stats.trend7Day} кг/нед
+                  {stats.trend7Day > 0 ? '+' : ''}{stats.trend7Day} РєРі/РЅРµРґ
                 </div>
               </div>
               <div>
                 <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>FFMI</div>
                 <div style={{ fontSize: 16, fontWeight: 700, color: stats.ffmi >= 22 ? '#22c55e' : stats.ffmi >= 20 ? '#eab308' : 'var(--text-dim)' }}>
-                  {stats.ffmi > 0 ? stats.ffmi : '—'}
+                  {stats.ffmi > 0 ? stats.ffmi : 'вЂ”'}
                 </div>
               </div>
               <div>
-                <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Цель</div>
+                <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Р¦РµР»СЊ</div>
                 <div style={{ fontSize: 16, fontWeight: 700, color: stats.goalProgress >= 50 ? '#22c55e' : stats.goalProgress >= 25 ? '#eab308' : 'var(--text-dim)' }}>
-                  {stats.goalWeight > 0 ? `${stats.goalProgress}%` : '—'}
+                  {stats.goalWeight > 0 ? `${stats.goalProgress}%` : 'вЂ”'}
                 </div>
                 </div>
             </div>
@@ -528,13 +528,13 @@ export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
         const targets = { kcal: 3000, protein: 180, fat: 80, carbs: 350 };
         return (
           <div style={{ background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', borderRadius: 10, padding: '8px 10px', marginBottom: 12 }}>
-            <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-dim)', marginBottom: 4 }}>🍎 Сегодня · {nutStats.streak} дн streak</div>
+            <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-dim)', marginBottom: 4 }}>рџЌЋ РЎРµРіРѕРґРЅСЏ В· {nutStats.streak} РґРЅ streak</div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 4, textAlign: 'center' }}>
               {[
-                { label: 'Ккал', val: t.kcal, target: targets.kcal, color: '#ffa502' },
-                { label: 'Белок', val: t.protein, target: targets.protein, color: '#ef4444' },
-                { label: 'Жиры', val: t.fat, target: targets.fat, color: '#f59e0b' },
-                { label: 'Угли', val: t.carbs, target: targets.carbs, color: '#3b82f6' },
+                { label: '', val: t.kcal, target: targets.kcal, color: '#ffa502' },
+                { label: '', val: t.protein, target: targets.protein, color: '#ef4444' },
+                { label: '', val: t.fat, target: targets.fat, color: '#f59e0b' },
+                { label: '', val: t.carbs, target: targets.carbs, color: '#3b82f6' },
               ].map(m => {
                 const pct = Math.min(100, Math.round((m.val / m.target) * 100));
                 return (
@@ -548,7 +548,7 @@ export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
               })}
             </div>
             {t.waterMl > 0 && (
-              <div style={{ marginTop: 4, fontSize: 9, color: '#60a5fa' }}>💧 {t.waterMl} мл воды</div>
+              <div style={{ marginTop: 4, fontSize: 9, color: '#60a5fa' }}>рџ’§ {t.waterMl} РјР» РІРѕРґС‹</div>
             )}
           </div>
         );
@@ -559,33 +559,33 @@ export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
         <button onClick={() => onNavigate?.('training')} style={{
           flex: 1, padding: '10px 12px', borderRadius: 10, border: 'none', cursor: 'pointer',
           background: 'linear-gradient(135deg, #00e68a, #00c853)', color: '#000', fontWeight: 700, fontSize: 13,
-        }}>🏋️ Тренировка</button>
+        }}>рџЏ‹пёЏ РўСЂРµРЅРёСЂРѕРІРєР°</button>
         <button onClick={() => onNavigate?.('nutrition')} style={{
           flex: 1, padding: '10px 12px', borderRadius: 10, border: 'none', cursor: 'pointer',
           background: 'linear-gradient(135deg, #ffa502, #ff7f50)', color: '#000', fontWeight: 700, fontSize: 13,
-        }}>🍎 Питание</button>
+        }}>рџЌЋ РџРёС‚Р°РЅРёРµ</button>
       </div>
 
       {/* Today's nutrition + recovery trend */}
       {(todayKcal > 0 || todayWater > 0) && (
         <div className="card" style={{ marginBottom: 12 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-            <h3 style={{ margin: 0 }}>🍎 Сегодня</h3>
+            <h3 style={{ margin: 0 }}>рџЌЋ РЎРµРіРѕРґРЅСЏ</h3>
             <span style={{ fontSize: 10, color: recoveryTrend === 'up' ? '#22c55e' : recoveryTrend === 'down' ? '#ef4444' : '#6b7280' }}>
-              Восст: {recoveryTrend === 'up' ? '↑ Растёт' : recoveryTrend === 'down' ? '↓ Падает' : '→ Стабильно'}
+              Р’РѕСЃСЃС‚: {recoveryTrend === 'up' ? 'в†‘ Р Р°СЃС‚С‘С‚' : recoveryTrend === 'down' ? 'в†“ РџР°РґР°РµС‚' : 'в†’ РЎС‚Р°Р±РёР»СЊРЅРѕ'}
             </span>
           </div>
           <div style={{ display: 'flex', gap: 8, fontSize: 11, flexWrap: 'wrap' }}>
             {todayKcal > 0 && (
               <>
-                <span style={{ color: 'var(--accent)', fontWeight: 600 }}>{todayKcal} ккал</span>
-                <span style={{ color: 'var(--text-dim)' }}>Б: {todayProtein}г</span>
+                <span style={{ color: 'var(--accent)', fontWeight: 600 }}>{todayKcal} РєРєР°Р»</span>
+                <span style={{ color: 'var(--text-dim)' }}>Р‘: {todayProtein}Рі</span>
                 <span style={{ color: 'var(--accent)', fontWeight: 600 }}>{(todayProtein * 4 / Math.max(1, todayKcal) * 100).toFixed(0)}%</span>
               </>
             )}
             {todayWater > 0 && (
               <span style={{ color: '#3b82f6', fontWeight: 600, marginLeft: todayKcal > 0 ? 8 : 0 }}>
-                💧 {todayWater} мл / {(getProfile().settings.dailyWaterLiters ?? 2.5) * 1000} мл цели
+                рџ’§ {todayWater} РјР» / {(getProfile().settings.dailyWaterLiters ?? 2.5) * 1000} РјР» С†РµР»Рё
               </span>
             )}
           </div>
@@ -599,13 +599,13 @@ export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
 
       {/* Readiness details */}
       <div className="card">
-        <h3>📊 Готовность к тренировке</h3>
+        <h3>рџ“Љ Р“РѕС‚РѕРІРЅРѕСЃС‚СЊ Рє С‚СЂРµРЅРёСЂРѕРІРєРµ</h3>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
           {[
-            { label: 'Восстановление', value: readiness.recovery, color: readiness.recovery >= 70 ? '#22c55e' : '#eab308' },
-            { label: 'Энергия', value: readiness.nutrition, color: readiness.nutrition >= 70 ? '#22c55e' : '#eab308' },
-            { label: 'Сон', value: (readiness.sleep ?? 0), color: (readiness.sleep ?? 0) >= 70 ? '#22c55e' : '#eab308' },
-            { label: 'Стресс', value: 100 - (readiness.stress ?? 50), color: (readiness.stress ?? 0) < 30 ? '#22c55e' : '#ef4444' },
+            { label: '', value: readiness.recovery, color: readiness.recovery >= 70 ? '#22c55e' : '#eab308' },
+            { label: '', value: readiness.nutrition, color: readiness.nutrition >= 70 ? '#22c55e' : '#eab308' },
+            { label: '', value: (readiness.sleep ?? 0), color: (readiness.sleep ?? 0) >= 70 ? '#22c55e' : '#eab308' },
+            { label: '', value: 100 - (readiness.stress ?? 50), color: (readiness.stress ?? 0) < 30 ? '#22c55e' : '#ef4444' },
           ].map(item => (
             <div key={item.label} style={{ background: 'var(--bg-secondary)', borderRadius: 8, padding: '6px 8px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
@@ -617,21 +617,21 @@ export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
           ))}
         </div>
         <div style={{ marginTop: 8, display: 'flex', gap: 12, fontSize: 10, color: 'var(--text-dim)' }}>
-          <span>Качество сна: {getProfile().settings.baselineSleepQuality ?? 5}/10</span>
-          <span>Часы сна: {getProfile().settings.baselineSleepHours ?? 7}ч</span>
+          <span>РљР°С‡РµСЃС‚РІРѕ СЃРЅР°: {getProfile().settings.baselineSleepQuality ?? 5}/10</span>
+          <span>Р§Р°СЃС‹ СЃРЅР°: {getProfile().settings.baselineSleepHours ?? 7}С‡</span>
         </div>
       </div>
 
-      {/* Active course info — moved after Readiness */}
+      {/* Active course info вЂ” moved after Readiness */}
       {courseEntries.length > 0 && (
         <div className="card" style={{
           background: 'linear-gradient(135deg, rgba(0,230,138,0.08) 0%, rgba(0,230,138,0.02) 100%)',
           border: '1px solid rgba(0,230,138,0.25)',
         }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-            <h3 style={{ margin: 0, fontSize: 14 }}>💊 Активный курс</h3>
+            <h3 style={{ margin: 0, fontSize: 14 }}>рџ’Љ РђРєС‚РёРІРЅС‹Р№ РєСѓСЂСЃ</h3>
             <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 12, background: 'rgba(0,230,138,0.15)', color: '#00e68a', fontWeight: 600 }}>
-              {courseEntries.length} препаратов
+              {courseEntries.length} РїСЂРµРїР°СЂР°С‚РѕРІ
             </span>
           </div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
@@ -649,7 +649,7 @@ export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
                   border: '1px solid rgba(0,230,138,0.15)',
                 }}>
                   <div style={{ fontSize: 11, fontWeight: 700, color: '#00e68a' }}>{item.name}</div>
-                  <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>{item.totalDose}{item.unit}/нед</div>
+                  <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>{item.totalDose}{item.unit}/РЅРµРґ</div>
                 </div>
               ));
             })()}
@@ -663,8 +663,8 @@ export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
             )}
           </div>
           <div style={{ marginTop: 6, display: 'flex', gap: 12, fontSize: 10, color: 'var(--text-dim)' }}>
-            <span>Дней на курсе: <strong style={{ color: '#00e68a' }}>{daysOnCourse}</strong></span>
-            <span>Общий риск: <strong style={{ color: riskResult ? riskColor(riskResult.overallNet) : 'var(--text-dim)' }}>{riskResult ? Math.round(riskResult.overallNet) : '—'}%</strong></span>
+            <span>Р”РЅРµР№ РЅР° РєСѓСЂСЃРµ: <strong style={{ color: '#00e68a' }}>{daysOnCourse}</strong></span>
+            <span>РћР±С‰РёР№ СЂРёСЃРє: <strong style={{ color: riskResult ? riskColor(riskResult.overallNet) : 'var(--text-dim)' }}>{riskResult ? Math.round(riskResult.overallNet) : 'вЂ”'}%</strong></span>
           </div>
         </div>
       )}
@@ -673,8 +673,8 @@ export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
       {labData.length > 0 && (
         <div className="card" style={{ cursor: 'pointer' }} onClick={onNavigate ? () => onNavigate('labs') : undefined}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <h3 style={{ margin: 0 }}>🧪 Последние анализы</h3>
-            <span style={{ fontSize: 11, color: 'var(--accent)' }}>{'Подробнее >'}</span>
+            <h3 style={{ margin: 0 }}>рџ§Є РџРѕСЃР»РµРґРЅРёРµ Р°РЅР°Р»РёР·С‹</h3>
+            <span style={{ fontSize: 11, color: 'var(--accent)' }}>{''}</span>
           </div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, marginTop: 6 }}>
             {(() => {
@@ -701,7 +701,7 @@ export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
           </div>
           {abnormalLabs.length > 0 && (
             <div style={{ marginTop: 6, fontSize: 9, color: '#ef4444' }}>
-              {abnormalLabs.length} отклонений — {abnormalLabs.slice(0, 3).map(a => `${a.name} (↑${a.deviation}%)`).join(', ')}
+              {abnormalLabs.length} РѕС‚РєР»РѕРЅРµРЅРёР№ вЂ” {abnormalLabs.slice(0, 3).map(a => `${a.name} (в†‘${a.deviation}%)`).join(', ')}
             </div>
           )}
         </div>
@@ -710,8 +710,8 @@ export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
       {/* System summary */}
       <div className="card" style={{ cursor: 'pointer' }} onClick={onNavigate ? () => onNavigate('risks') : undefined}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <h3 style={{ margin: 0 }}>🫀 Системы организма</h3>
-          <span style={{ fontSize: 11, color: 'var(--accent)' }}>{'Подробнее >'}</span>
+          <h3 style={{ margin: 0 }}>рџ«Ђ РЎРёСЃС‚РµРјС‹ РѕСЂРіР°РЅРёР·РјР°</h3>
+          <span style={{ fontSize: 11, color: 'var(--accent)' }}>{''}</span>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, marginTop: 8 }}>
           {riskResult && Object.entries(riskResult.systemBreakdown).map(([sys, vals]) => (
@@ -725,7 +725,7 @@ export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
 
       {/* Navigation cards */}
       <div className="card">
-        <h3>📂 Разделы</h3>
+        <h3>рџ“‚ Р Р°Р·РґРµР»С‹</h3>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
           {NAV_CARDS.map(card => (
             <div
@@ -751,7 +751,7 @@ export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
 
       {readiness.isConservative && (
         <div style={{ background: 'var(--warning-dim)', border: '1px solid var(--warning)', borderRadius: 8, padding: '10px 14px', marginTop: 8 }}>
-          <div style={{ fontWeight: 700, color: 'var(--warning)', fontSize: 13 }}>⚠️ Консервативный режим</div>
+          <div style={{ fontWeight: 700, color: 'var(--warning)', fontSize: 13 }}>вљ пёЏ РљРѕРЅСЃРµСЂРІР°С‚РёРІРЅС‹Р№ СЂРµР¶РёРј</div>
           <div style={{ fontSize: 12, color: 'var(--warning)', marginTop: 4 }}>{readiness.conservativeReason}</div>
         </div>
       )}

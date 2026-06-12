@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { PHARMA_DB, SUBSTANCES_BY_CLASS } from '../../core/pharma-database';
 import { validateCourse } from '../../engines/pharmacology.engine';
 import { checkDrugInteractions } from '../../engines/pharma-interactions.engine';
@@ -7,13 +7,13 @@ import { notifyDataChange } from '../../core/data-link';
 import type { CourseEntry } from '../../core/types';
 
 const CLASS_LABELS: Record<string, string> = {
-  testosterone: '💉 Тестостерон', trenbolone: '⚡ Тренболон', nandrolone: '💊 Нандролон',
-  boldenone: '🐴 Болденон', primobolan: '💎 Примоболан', oral_17aa: '☠️ Оральные 17-α',
-  sarm: '🧬 SARMs', peptide_ghrh: '🧪 GHRH', peptide_ghrp: '🧪 GHRP',
-  igf1: '🔬 IGF-1', mgf: '🔬 MGF', insulin: '💉 Инсулины',
-  pct_serm: '🟢 СЕРМ', pct_aromatase: '🔴 АИ', pct_dopamine: '🟡 ДА',
-  pct_gonadotropin: '🔵 ХГЧ', drostanolone: '💪 Мастерон',
-  peptide_gnrh: '🧪 GnRH', peptide_fat_loss: '🔥 Жиросжигатели', peptide_other: '🧪 Пептиды',
+  testosterone: '', trenbolone: 'вљЎ РўСЂРµРЅР±РѕР»РѕРЅ', nandrolone: '',
+  boldenone: '', primobolan: '', oral_17aa: 'в пёЏ РћСЂР°Р»СЊРЅС‹Рµ 17-О±',
+  sarm: '', peptide_ghrh: '', peptide_ghrp: '',
+  igf1: '', mgf: '', insulin: '',
+  pct_serm: '', pct_aromatase: '', pct_dopamine: '',
+  pct_gonadotropin: '', drostanolone: '',
+  peptide_gnrh: '', peptide_fat_loss: '', peptide_other: '',
 };
 
 const CLASS_COLORS: Record<string, string> = {
@@ -27,11 +27,11 @@ const CLASS_COLORS: Record<string, string> = {
 };
 
 const FREQ_OPTIONS = [
-  { value: '1x/wk', label: '1×/нед' },
-  { value: '2x/wk', label: '2×/нед' },
-  { value: '3x/wk', label: '3×/нед' },
-  { value: 'eod', label: 'Через день' },
-  { value: 'daily', label: 'Ежедневно' },
+  { value: '1x/wk', label: '1Г—/РЅРµРґ' },
+  { value: '2x/wk', label: '2Г—/РЅРµРґ' },
+  { value: '3x/wk', label: '3Г—/РЅРµРґ' },
+  { value: 'eod', label: '' },
+  { value: 'daily', label: '' },
 ];
 
 const UNIT_OPTIONS = ['mg/wk', 'mg', 'mcg', 'IU', 'ml'];
@@ -103,18 +103,18 @@ export const PharmaCourseScreen: React.FC = () => {
   const subName = (id: string) => PHARMA_DB[id]?.name ?? id;
   const subClass = (id: string) => PHARMA_DB[id]?.class ?? '';
 
-  if (loading) return <div className="screen-loading"><div className="loading-spinner"/><span>Загрузка...</span></div>;
+  if (loading) return <div className="screen-loading"><div className="loading-spinner"/><span>Р—Р°РіСЂСѓР·РєР°...</span></div>;
 
   const subsForClass = SUBSTANCES_BY_CLASS[pickerClass] ?? [];
 
   return (
     <div className="screen pharma-course">
-      <h2>💊 Мой курс</h2>
+      <h2>рџ’Љ РњРѕР№ РєСѓСЂСЃ</h2>
 
       {/* Course entries */}
       {course.length > 0 ? (
         <div className="card" style={{ marginBottom: 8 }}>
-          <h3>📋 Текущий курс</h3>
+          <h3>рџ“‹ РўРµРєСѓС‰РёР№ РєСѓСЂСЃ</h3>
           <div style={{ display: 'grid', gap: 6 }}>
             {course.map(entry => {
               const cls = subClass(entry.substanceId);
@@ -128,14 +128,14 @@ export const PharmaCourseScreen: React.FC = () => {
                   <div style={{ flex: 1 }}>
                     <div style={{ fontWeight: 600, fontSize: 12 }}>{subName(entry.substanceId)}</div>
                     <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 2 }}>
-                      {entry.doseValue} {entry.doseUnit} • {typeof entry.frequency === 'number' ? `${entry.frequency}×/нед` : entry.frequency} • нед {entry.startWeek}–{entry.endWeek}
+                      {entry.doseValue} {entry.doseUnit} вЂў {typeof entry.frequency === 'number' ? `${entry.frequency}Г—/РЅРµРґ` : entry.frequency} вЂў РЅРµРґ {entry.startWeek}вЂ“{entry.endWeek}
                     </div>
                   </div>
                   <button onClick={() => removeEntry(entry.id)} style={{
                     background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.3)',
                     color: '#ef4444', borderRadius: 6, padding: '4px 8px', fontSize: 10, cursor: 'pointer',
                   }}>
-                    ✕
+                    вњ•
                   </button>
                 </div>
               );
@@ -144,32 +144,32 @@ export const PharmaCourseScreen: React.FC = () => {
         </div>
       ) : (
         <div className="card" style={{ textAlign: 'center', padding: 20, marginBottom: 8 }}>
-          <div style={{ fontSize: 36, marginBottom: 8 }}>💊</div>
-          <div style={{ fontSize: 13, color: 'var(--text-dim)' }}>Курс пуст. Добавьте препараты.</div>
+          <div style={{ fontSize: 36, marginBottom: 8 }}>рџ’Љ</div>
+          <div style={{ fontSize: 13, color: 'var(--text-dim)' }}>РљСѓСЂСЃ РїСѓСЃС‚. Р”РѕР±Р°РІСЊС‚Рµ РїСЂРµРїР°СЂР°С‚С‹.</div>
         </div>
       )}
 
-      {/* Add button — always visible at top */}
+      {/* Add button вЂ” always visible at top */}
       <button onClick={() => setShowPicker(true)} style={{
         width: '100%', padding: 12, background: 'linear-gradient(135deg, var(--accent), #00b368)', color: '#000',
         border: 'none', borderRadius: 10, cursor: 'pointer', fontWeight: 700,
         fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
         marginBottom: 10, position: 'sticky', top: 0, zIndex: 5, boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
       }}>
-        <span style={{ fontSize: 20 }}>+</span> Добавить препарат
+        <span style={{ fontSize: 20 }}>+</span> Р”РѕР±Р°РІРёС‚СЊ РїСЂРµРїР°СЂР°С‚
       </button>
 
       {/* Validation warnings */}
       {validation.warnings.length > 0 && (
         <div style={{ background: 'var(--warning-dim)', border: '1px solid var(--warning)', borderRadius: 8, padding: 8, marginTop: 8 }}>
-          {validation.warnings.map((w, i) => <div key={i} style={{ fontSize: 11, color: 'var(--warning)' }}>⚠️ {w}</div>)}
+          {validation.warnings.map((w, i) => <div key={i} style={{ fontSize: 11, color: 'var(--warning)' }}>вљ пёЏ {w}</div>)}
         </div>
       )}
 
       {/* Interactions */}
       {interactions.length > 0 && (
         <div className="card" style={{ marginTop: 8 }}>
-          <h3>⚡ Взаимодействия</h3>
+          <h3>вљЎ Р’Р·Р°РёРјРѕРґРµР№СЃС‚РІРёСЏ</h3>
           <div style={{ display: 'grid', gap: 6 }}>
             {interactions.map((alert: any, i: number) => (
               <div key={i} style={{
@@ -185,7 +185,7 @@ export const PharmaCourseScreen: React.FC = () => {
         </div>
       )}
 
-      {/* Auto protocol — moved to Support tab */}
+      {/* Auto protocol вЂ” moved to Support tab */}
 
       {/* ========= DRUG PICKER MODAL ========= */}
       {showPicker && (
@@ -210,17 +210,17 @@ export const PharmaCourseScreen: React.FC = () => {
               borderBottom: '1px solid var(--border)',
               display: 'flex', justifyContent: 'space-between', alignItems: 'center',
             }}>
-              <div style={{ fontWeight: 700, fontSize: 15 }}>💊 Добавить препарат</div>
+              <div style={{ fontWeight: 700, fontSize: 15 }}>рџ’Љ Р”РѕР±Р°РІРёС‚СЊ РїСЂРµРїР°СЂР°С‚</div>
               <button onClick={() => setShowPicker(false)} style={{
                 background: 'var(--bg-secondary)', border: '1px solid var(--border)',
                 color: 'var(--text-dim)', borderRadius: 8, padding: '4px 10px',
                 fontSize: 12, cursor: 'pointer',
               }}>
-                ✕ Закрыть
+                вњ• Р—Р°РєСЂС‹С‚СЊ
               </button>
             </div>
 
-            {/* Class selector — pills */}
+            {/* Class selector вЂ” pills */}
             <div style={{
               padding: '8px 8px 4px',
               display: 'flex', gap: 4, flexWrap: 'wrap',
@@ -249,7 +249,7 @@ export const PharmaCourseScreen: React.FC = () => {
 
             {/* Scrollable content */}
             <div style={{ flex: 1, overflowY: 'auto', padding: '10px 12px' }}>
-              {/* Substance grid — one-click add with defaults */}
+              {/* Substance grid вЂ” one-click add with defaults */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, marginBottom: 8 }}>
                 {subsForClass.map(sub => {
                   const color = CLASS_COLORS[sub.class] || 'var(--accent)';
@@ -268,22 +268,22 @@ export const PharmaCourseScreen: React.FC = () => {
                        onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--border)')}>
                       <div style={{ fontWeight: 600, fontSize: 11, color, marginBottom: 2 }}>{sub.name}</div>
                       <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>
-                        {sub.pk?.halfLifeHours ? `T½ ${sub.pk.halfLifeHours >= 168 ? `${(sub.pk.halfLifeHours/168).toFixed(1)} нед` : `${(sub.pk.halfLifeHours/24).toFixed(1)} дн`}` : ''}
-                        {sub.dosageRange ? ` | ${sub.dosageRange.min}–${sub.dosageRange.max}${sub.dosageRange.unit}` : ''}
+                        {sub.pk?.halfLifeHours ? `TВЅ ${sub.pk.halfLifeHours >= 168 ? `${(sub.pk.halfLifeHours/168).toFixed(1)} РЅРµРґ` : `${(sub.pk.halfLifeHours/24).toFixed(1)} РґРЅ`}` : ''}
+                        {sub.dosageRange ? ` | ${sub.dosageRange.min}вЂ“${sub.dosageRange.max}${sub.dosageRange.unit}` : ''}
                       </div>
-                      <div style={{ fontSize: 9, color: 'var(--accent)', marginTop: 2 }}>{defDose} мг → добавить</div>
+                      <div style={{ fontSize: 9, color: 'var(--accent)', marginTop: 2 }}>{defDose} РјРі в†’ РґРѕР±Р°РІРёС‚СЊ</div>
                     </div>
                   );
                 })}
               </div>
 
-              {/* Dose settings — for custom dosing before clicking */}
+              {/* Dose settings вЂ” for custom dosing before clicking */}
               <div style={{
                 background: 'var(--bg-secondary)', borderRadius: 10, padding: 8,
                 border: '1px solid var(--border)',
               }}>
                 <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 4 }}>
-                  Или задайте свои параметры (нажмите на препарат выше для быстрого добавления):
+                  РР»Рё Р·Р°РґР°Р№С‚Рµ СЃРІРѕРё РїР°СЂР°РјРµС‚СЂС‹ (РЅР°Р¶РјРёС‚Рµ РЅР° РїСЂРµРїР°СЂР°С‚ РІС‹С€Рµ РґР»СЏ Р±С‹СЃС‚СЂРѕРіРѕ РґРѕР±Р°РІР»РµРЅРёСЏ):
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 4 }}>
                   <div>
