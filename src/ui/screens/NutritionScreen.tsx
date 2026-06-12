@@ -44,7 +44,7 @@ const NutritionLabContext: React.FC<{ labAnalysis: LabCompositeResult }> = ({ la
 export const NutritionScreen: React.FC = () => {
   const linked = useDataLink();
   const labAnalysis = linked.labAnalysis;
-  const [tab, setTab] = useState<'overview' | 'diary' | 'charts' | 'mealplan' | 'grocery' | 'restaurant' | 'cycling'>('overview');
+  const [tab, setTab] = useState<'overview' | 'diary' | 'charts' | 'mealplan' | 'grocery' | 'restaurant' | 'cycling' | 'calc'>('overview');
   const [foodEntries, setFoodEntries] = useState<DiaryEntry[]>([]);
   const [dailyLogs, setDailyLogs] = useState<Record<string, DiaryEntry[]>>({});
 
@@ -116,6 +116,7 @@ export const NutritionScreen: React.FC = () => {
       case 'mealplan': return <MealPlanExtended tKcal={tKcal} tProt={tProt} tFat={tFat} tCarbs={tCarbs} />;
       case 'grocery': return <GroceryTab tKcal={tKcal} tProt={tProt} />;
       case 'restaurant': return <RestaurantTab />;
+      case 'calc': return <NutritionCalculators />;
       case 'cycling': return <CyclingTab tKcal={tKcal} tProt={tProt} />;
       default: return <NutritionOverview profile={linked.profile} avgWeeklyKcal={avgWeeklyKcal} avgWeeklyProtein={avgWeeklyProtein} avgWeeklyFat={avgWeeklyFat} avgWeeklyCarbs={avgWeeklyCarbs} microsIntake={microsIntake} />;
     }
@@ -124,9 +125,9 @@ export const NutritionScreen: React.FC = () => {
   return (
     <div className="screen nutrition">
       <div className="tab-bar">
-        {(['overview', 'diary', 'charts', 'mealplan', 'grocery', 'restaurant', 'cycling'] as const).map(t => (
+        {(['overview', 'diary', 'charts', 'mealplan', 'grocery', 'restaurant', 'calc', 'cycling'] as const).map(t => (
           <button key={t} className={`tab-btn ${tab === t ? 'active' : ''}`} onClick={() => setTab(t)}>
-            {t === 'overview' ? '📊 Обзор' : t === 'diary' ? '📝 Дневник' : t === 'charts' ? '📈 Графики' : t === 'mealplan' ? '🥗 План' : t === 'grocery' ? '🛒 Список' : t === 'restaurant' ? '🍽 Ресторан' : '🔄 Циклирование'}
+            {t === 'overview' ? '📊 Обзор' : t === 'diary' ? '📝 Дневник' : t === 'charts' ? '📈 Графики' : t === 'mealplan' ? '🥗 План' : t === 'grocery' ? '🛒 Список' : t === 'restaurant' ? '🍽 Ресторан' : t === 'calc' ? '📐 Калькуляторы' : '🔄 Циклирование'}
           </button>
         ))}
       </div>
@@ -298,4 +299,147 @@ const QuickAdviceCard: React.FC = () => {
     <h4 style={{ margin:'0 0 4px',fontSize:12 }}>💡 Совет по питанию</h4>
     <div style={{ fontSize:9,color:'var(--text-light)',lineHeight:1.6 }}>{advice}</div>
   </div>);
+};
+
+const NutritionCalculators: React.FC = () => {
+  const [dTdee, setDTdee] = useState(2500);
+  const [dTarget, setDTarget] = useState(2000);
+  const [dResult, setDResult] = useState<{ deficit: number; rateKgWeek: number } | null>(null);
+  const [mWeight, setMWeight] = useState(70);
+  const [mHeight, setMHeight] = useState(175);
+  const [mAge, setMAge] = useState(25);
+  const [mSex, setMSex] = useState<'male' | 'female'>('male');
+  const [mPal, setMPal] = useState(1.55);
+  const [mGoal, setMGoal] = useState('maintenance');
+  const [mResult, setMResult] = useState<{ kcal: number; protein: number; fats: number; carbs: number; water: number; fiber: number } | null>(null);
+  const [hGlucose, setHGlucose] = useState(5.0);
+  const [hInsulin, setHInsulin] = useState(10);
+  const [hResult, setHResult] = useState<{ index: number; resistant: boolean } | null>(null);
+
+  const calcDeficit = () => {
+    const deficit = dTdee - dTarget;
+    setDResult({ deficit, rateKgWeek: deficit / 7700 });
+  };
+
+  const calcMacros = () => {
+    const t = calcNutrition({ weightKg: mWeight, heightCm: mHeight, age: mAge, sex: mSex, pal: mPal, goal: mGoal });
+    setMResult({ kcal: t.kcal, protein: t.protein, fats: t.fats, carbs: t.carbs, water: t.water, fiber: t.fiber });
+  };
+
+  const calcHOMA = () => {
+    const index = (hGlucose * hInsulin) / 22.5;
+    setHResult({ index, resistant: index > 2.5 });
+  };
+
+  const PAL_OPTS = [
+    { v: 1.2, l: 'Сидячий (1.2)' }, { v: 1.375, l: 'Легкий (1.375)' },
+    { v: 1.55, l: 'Умеренный (1.55)' }, { v: 1.725, l: 'Высокий (1.725)' },
+    { v: 1.9, l: 'Экстремальный (1.9)' },
+  ];
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <div className="card" style={{ padding: '10px 12px' }}>
+        <h3 style={{ margin: '0 0 8px', fontSize: 13 }}>🔥 Калорийный дефицит</h3>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 8 }}>
+          <div>
+            <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>TDEE (ккал/день)</label>
+            <input type="number" value={dTdee} onChange={e => setDTdee(+e.target.value)} style={{ width: '100%', padding: '6px 8px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, boxSizing: 'border-box' }} />
+          </div>
+          <div>
+            <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Целевые ккал/день</label>
+            <input type="number" value={dTarget} onChange={e => setDTarget(+e.target.value)} style={{ width: '100%', padding: '6px 8px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, boxSizing: 'border-box' }} />
+          </div>
+        </div>
+        <button onClick={calcDeficit} style={{ width: '100%', padding: 6, borderRadius: 6, border: 'none', cursor: 'pointer', background: 'var(--accent)', color: '#000', fontWeight: 600, fontSize: 11, marginBottom: 8 }}>Рассчитать</button>
+        {dResult !== null && (
+          <div style={{ background: 'rgba(0,230,138,0.08)', borderRadius: 8, padding: 10, textAlign: 'center' }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: dResult.deficit > 0 ? '#ef4444' : '#22c55e' }}>{dResult.deficit > 0 ? `Дефицит ${dResult.deficit} ккал/день` : 'Нет дефицита'}</div>
+            <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>Потеря веса: {dResult.rateKgWeek.toFixed(2)} кг/нед</div>
+          </div>
+        )}
+      </div>
+
+      <div className="card" style={{ padding: '10px 12px' }}>
+        <h3 style={{ margin: '0 0 8px', fontSize: 13 }}>⚖️ Расчёт макросов</h3>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 8 }}>
+          <div>
+            <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Вес (кг)</label>
+            <input type="number" value={mWeight} onChange={e => setMWeight(+e.target.value)} style={{ width: '100%', padding: '6px 8px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, boxSizing: 'border-box' }} />
+          </div>
+          <div>
+            <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Рост (см)</label>
+            <input type="number" value={mHeight} onChange={e => setMHeight(+e.target.value)} style={{ width: '100%', padding: '6px 8px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, boxSizing: 'border-box' }} />
+          </div>
+          <div>
+            <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Возраст</label>
+            <input type="number" value={mAge} onChange={e => setMAge(+e.target.value)} style={{ width: '100%', padding: '6px 8px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, boxSizing: 'border-box' }} />
+          </div>
+          <div>
+            <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Пол</label>
+            <div style={{ display: 'flex', gap: 4 }}>
+              {(['male', 'female'] as const).map(s => (
+                <button key={s} onClick={() => setMSex(s)} style={{
+                  flex: 1, padding: '6px 4px', borderRadius: 6, fontSize: 11, cursor: 'pointer',
+                  background: mSex === s ? 'rgba(0,230,138,0.15)' : 'var(--bg-secondary)',
+                  border: mSex === s ? '1px solid var(--accent)' : '1px solid var(--border)',
+                  color: mSex === s ? '#00e68a' : 'var(--text-dim)', fontWeight: mSex === s ? 700 : 400,
+                }}>{s === 'male' ? 'Мужской' : 'Женский'}</button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>PAL</label>
+            <select value={mPal} onChange={e => setMPal(+e.target.value)} style={{ width: '100%', padding: '6px 4px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 11, boxSizing: 'border-box' }}>
+              {PAL_OPTS.map(o => <option key={o.v} value={o.v}>{o.l}</option>)}
+            </select>
+          </div>
+          <div>
+            <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Цель</label>
+            <select value={mGoal} onChange={e => setMGoal(e.target.value)} style={{ width: '100%', padding: '6px 4px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 11, boxSizing: 'border-box' }}>
+              <option value="bulk">Набор массы</option>
+              <option value="cut">Снижение веса</option>
+              <option value="maintenance">Поддержание</option>
+              <option value="recomp">Рекомпозиция</option>
+              <option value="rehab">Реабилитация</option>
+            </select>
+          </div>
+        </div>
+        <button onClick={calcMacros} style={{ width: '100%', padding: 6, borderRadius: 6, border: 'none', cursor: 'pointer', background: 'var(--accent)', color: '#000', fontWeight: 600, fontSize: 11, marginBottom: 8 }}>Рассчитать</button>
+        {mResult !== null && (
+          <div style={{ background: 'rgba(0,230,138,0.08)', borderRadius: 8, padding: 10 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, textAlign: 'center', fontSize: 10 }}>
+              <div><span style={{ color: 'var(--text-dim)' }}>Ккал</span><div style={{ fontSize: 16, fontWeight: 700, color: 'var(--accent)' }}>{mResult.kcal}</div></div>
+              <div><span style={{ color: 'var(--text-dim)' }}>Белки</span><div style={{ fontSize: 16, fontWeight: 700, color: '#3b82f6' }}>{mResult.protein}г</div></div>
+              <div><span style={{ color: 'var(--text-dim)' }}>Жиры</span><div style={{ fontSize: 16, fontWeight: 700, color: '#f59e0b' }}>{mResult.fats}г</div></div>
+              <div><span style={{ color: 'var(--text-dim)' }}>Углеводы</span><div style={{ fontSize: 16, fontWeight: 700, color: '#ef4444' }}>{mResult.carbs}г</div></div>
+              <div><span style={{ color: 'var(--text-dim)' }}>Вода</span><div style={{ fontSize: 16, fontWeight: 700, color: '#06b6d4' }}>{mResult.water}л</div></div>
+              <div><span style={{ color: 'var(--text-dim)' }}>Клетчатка</span><div style={{ fontSize: 16, fontWeight: 700, color: '#22c55e' }}>{mResult.fiber}г</div></div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div className="card" style={{ padding: '10px 12px' }}>
+        <h3 style={{ margin: '0 0 8px', fontSize: 13 }}>🩸 HOMA-IR</h3>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 8 }}>
+          <div>
+            <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Глюкоза (ммоль/л)</label>
+            <input type="number" step="0.1" value={hGlucose} onChange={e => setHGlucose(+e.target.value)} style={{ width: '100%', padding: '6px 8px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, boxSizing: 'border-box' }} />
+          </div>
+          <div>
+            <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Инсулин (μЕ/мл)</label>
+            <input type="number" step="0.1" value={hInsulin} onChange={e => setHInsulin(+e.target.value)} style={{ width: '100%', padding: '6px 8px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, boxSizing: 'border-box' }} />
+          </div>
+        </div>
+        <button onClick={calcHOMA} style={{ width: '100%', padding: 6, borderRadius: 6, border: 'none', cursor: 'pointer', background: 'var(--accent)', color: '#000', fontWeight: 600, fontSize: 11, marginBottom: 8 }}>Рассчитать</button>
+        {hResult !== null && (
+          <div style={{ background: 'rgba(0,230,138,0.08)', borderRadius: 8, padding: 10, textAlign: 'center' }}>
+            <div style={{ fontSize: 22, fontWeight: 800, color: hResult.resistant ? '#ef4444' : 'var(--accent)' }}>{hResult.index.toFixed(2)}</div>
+            <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>{hResult.resistant ? 'Инсулинорезистентность (>2.5)' : 'Норма'}</div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
 };

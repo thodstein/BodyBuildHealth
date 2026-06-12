@@ -114,6 +114,26 @@ export const TrainingScreen: React.FC = () => {
   const [plDeadlift, setPlDeadlift] = useState(180);
   const [plWeight, setPlWeight] = useState(80);
   const [plSex, setPlSex] = useState<'male' | 'female'>('male');
+  const [bmiWeight, setBmiWeight] = useState(70);
+  const [bmiHeight, setBmiHeight] = useState(175);
+  const [bmiResult, setBmiResult] = useState<number | null>(null);
+  const [bmrWeight, setBmrWeight] = useState(70);
+  const [bmrHeight, setBmrHeight] = useState(175);
+  const [bmrAge, setBmrAge] = useState(25);
+  const [bmrSex, setBmrSex] = useState<'male' | 'female'>('male');
+  const [bmrResult, setBmrResult] = useState<number | null>(null);
+  const [bmrKmWeight, setBmrKmWeight] = useState(70);
+  const [bmrKmBodyFat, setBmrKmBodyFat] = useState(15);
+  const [bmrKmResult, setBmrKmResult] = useState<number | null>(null);
+  const [tdeeBmr, setTdeeBmr] = useState(1700);
+  const [tdeePal, setTdeePal] = useState(1.55);
+  const [tdeeResult, setTdeeResult] = useState<number | null>(null);
+  const [gripKg, setGripKg] = useState(45);
+  const [gripSex, setGripSex] = useState<'male' | 'female'>('male');
+  const [gripAge, setGripAge] = useState(30);
+  const [gripResult, setGripResult] = useState<{ percentile: number; level: string } | null>(null);
+  const [hrvValue, setHrvValue] = useState(50);
+  const [stressResult, setStressResult] = useState<{ stress: number; level: string } | null>(null);
 
   // Diary state
   const [diaryStats, setDiaryStats] = useState<StrengthStats[]>([]);
@@ -274,6 +294,47 @@ export const TrainingScreen: React.FC = () => {
       .map(([g, v]) => `${GROUP_LABELS[g] || g}: ${v} подх`)
       .join(' • ');
   };
+
+  const calcBMI = () => {
+    const hm = bmiHeight / 100;
+    setBmiResult(bmiWeight / (hm * hm));
+  };
+
+  const calcBMR = () => {
+    if (bmrSex === 'male')
+      setBmrResult(10 * bmrWeight + 6.25 * bmrHeight - 5 * bmrAge + 5);
+    else setBmrResult(10 * bmrWeight + 6.25 * bmrHeight - 5 * bmrAge - 161);
+  };
+
+  const calcBMR_KM = () => {
+    const lbm = bmrKmWeight * (100 - bmrKmBodyFat) / 100;
+    setBmrKmResult(370 + 21.6 * lbm);
+  };
+
+  const calcTDEE = () => setTdeeResult(tdeeBmr * tdeePal);
+
+  const calcGrip = () => {
+    let ref: number;
+    if (gripSex === 'male') ref = 50 - (gripAge - 30) * 0.3;
+    else ref = 30 - (gripAge - 30) * 0.2;
+    const pct = Math.min(100, Math.max(0, (gripKg / ref) * 100));
+    setGripResult({ percentile: Math.round(pct), level: pct >= 80 ? 'Отлично' : pct >= 60 ? 'Хорошо' : pct >= 40 ? 'Средне' : 'Низкий' });
+  };
+
+  const calcStress = () => {
+    const stress = Math.max(0, Math.min(100, 100 - (hrvValue - 20) * 2));
+    setStressResult({ stress: Math.round(stress), level: stress >= 70 ? 'Высокий' : stress >= 30 ? 'Средний' : 'Низкий' });
+  };
+
+  const PAL_OPTIONS = [
+    { value: 1.2, label: 'Сидячий (1.2)' },
+    { value: 1.375, label: 'Легкий (1.375)' },
+    { value: 1.55, label: 'Умеренный (1.55)' },
+    { value: 1.725, label: 'Высокий (1.725)' },
+    { value: 1.9, label: 'Экстремальный (1.9)' },
+  ];
+
+  const bmiCategory = (v: number) => v < 18.5 ? 'Недостаток веса' : v < 25 ? 'Норма' : v < 30 ? 'Избыток' : 'Ожирение';
 
   return (
     <div className="screen training-screen" style={{ padding: '0 4px' }}>
@@ -1529,6 +1590,166 @@ export const TrainingScreen: React.FC = () => {
             })()}
           </div>
           <StrengthLevelCard />
+
+          {/* ═══ BMI ═══ */}
+          <div className="card" style={{ padding: '10px 12px' }}>
+            <h3 style={{ margin: '0 0 8px', fontSize: 13 }}>⚖️ Индекс массы тела (BMI)</h3>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 8 }}>
+              <div>
+                <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Вес (кг)</label>
+                <input type="number" value={bmiWeight} onChange={e => setBmiWeight(+e.target.value)} style={{ width: '100%', padding: '6px 8px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, boxSizing: 'border-box' }} />
+              </div>
+              <div>
+                <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Рост (см)</label>
+                <input type="number" value={bmiHeight} onChange={e => setBmiHeight(+e.target.value)} style={{ width: '100%', padding: '6px 8px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, boxSizing: 'border-box' }} />
+              </div>
+            </div>
+            <button onClick={calcBMI} style={{ width: '100%', padding: 6, borderRadius: 6, border: 'none', cursor: 'pointer', background: 'var(--accent)', color: '#000', fontWeight: 600, fontSize: 11, marginBottom: 8 }}>Рассчитать</button>
+            {bmiResult !== null && (
+              <div style={{ background: 'rgba(0,230,138,0.08)', borderRadius: 8, padding: 10, textAlign: 'center' }}>
+                <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--accent)' }}>{bmiResult.toFixed(1)}</div>
+                <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>{bmiCategory(bmiResult)}</div>
+              </div>
+            )}
+          </div>
+
+          {/* ═══ BMR Mifflin-St Jeor ═══ */}
+          <div className="card" style={{ padding: '10px 12px' }}>
+            <h3 style={{ margin: '0 0 8px', fontSize: 13 }}>🔥 BMR (Миффлин-Сан Жеор)</h3>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 8 }}>
+              <div>
+                <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Вес (кг)</label>
+                <input type="number" value={bmrWeight} onChange={e => setBmrWeight(+e.target.value)} style={{ width: '100%', padding: '6px 8px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, boxSizing: 'border-box' }} />
+              </div>
+              <div>
+                <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Рост (см)</label>
+                <input type="number" value={bmrHeight} onChange={e => setBmrHeight(+e.target.value)} style={{ width: '100%', padding: '6px 8px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, boxSizing: 'border-box' }} />
+              </div>
+              <div>
+                <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Возраст</label>
+                <input type="number" value={bmrAge} onChange={e => setBmrAge(+e.target.value)} style={{ width: '100%', padding: '6px 8px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, boxSizing: 'border-box' }} />
+              </div>
+              <div>
+                <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Пол</label>
+                <div style={{ display: 'flex', gap: 4 }}>
+                  {(['male', 'female'] as const).map(s => (
+                    <button key={s} onClick={() => setBmrSex(s)} style={{
+                      flex: 1, padding: '6px 4px', borderRadius: 6, fontSize: 11, cursor: 'pointer',
+                      background: bmrSex === s ? 'rgba(0,230,138,0.15)' : 'var(--bg-secondary)',
+                      border: bmrSex === s ? '1px solid var(--accent)' : '1px solid var(--border)',
+                      color: bmrSex === s ? '#00e68a' : 'var(--text-dim)', fontWeight: bmrSex === s ? 700 : 400,
+                    }}>{s === 'male' ? 'Мужской' : 'Женский'}</button>
+                  ))}
+                </div>
+              </div>
+            </div>
+            <button onClick={calcBMR} style={{ width: '100%', padding: 6, borderRadius: 6, border: 'none', cursor: 'pointer', background: 'var(--accent)', color: '#000', fontWeight: 600, fontSize: 11, marginBottom: 8 }}>Рассчитать</button>
+            {bmrResult !== null && (
+              <div style={{ background: 'rgba(0,230,138,0.08)', borderRadius: 8, padding: 10, textAlign: 'center' }}>
+                <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--accent)' }}>{bmrResult.toFixed(0)}</div>
+                <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>ккал/день</div>
+              </div>
+            )}
+          </div>
+
+          {/* ═══ BMR Katch-McArdle ═══ */}
+          <div className="card" style={{ padding: '10px 12px' }}>
+            <h3 style={{ margin: '0 0 8px', fontSize: 13 }}>🔥 BMR (Кэтч-Мкардл)</h3>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 8 }}>
+              <div>
+                <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Вес (кг)</label>
+                <input type="number" value={bmrKmWeight} onChange={e => setBmrKmWeight(+e.target.value)} style={{ width: '100%', padding: '6px 8px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, boxSizing: 'border-box' }} />
+              </div>
+              <div>
+                <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>% жира</label>
+                <input type="number" step="0.1" value={bmrKmBodyFat} onChange={e => setBmrKmBodyFat(+e.target.value)} style={{ width: '100%', padding: '6px 8px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, boxSizing: 'border-box' }} />
+              </div>
+            </div>
+            <button onClick={calcBMR_KM} style={{ width: '100%', padding: 6, borderRadius: 6, border: 'none', cursor: 'pointer', background: 'var(--accent)', color: '#000', fontWeight: 600, fontSize: 11, marginBottom: 8 }}>Рассчитать</button>
+            {bmrKmResult !== null && (
+              <div style={{ background: 'rgba(0,230,138,0.08)', borderRadius: 8, padding: 10, textAlign: 'center' }}>
+                <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--accent)' }}>{bmrKmResult.toFixed(0)}</div>
+                <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>ккал/день (LBM: {(bmrKmWeight * (100 - bmrKmBodyFat) / 100).toFixed(1)} кг)</div>
+              </div>
+            )}
+          </div>
+
+          {/* ═══ TDEE ═══ */}
+          <div className="card" style={{ padding: '10px 12px' }}>
+            <h3 style={{ margin: '0 0 8px', fontSize: 13 }}>⚡ TDEE</h3>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 8 }}>
+              <div>
+                <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>BMR (ккал)</label>
+                <input type="number" value={tdeeBmr} onChange={e => setTdeeBmr(+e.target.value)} style={{ width: '100%', padding: '6px 8px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, boxSizing: 'border-box' }} />
+              </div>
+              <div>
+                <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>PAL</label>
+                <select value={tdeePal} onChange={e => setTdeePal(+e.target.value)} style={{ width: '100%', padding: '6px 4px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 11, boxSizing: 'border-box' }}>
+                  {PAL_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                </select>
+              </div>
+            </div>
+            <button onClick={calcTDEE} style={{ width: '100%', padding: 6, borderRadius: 6, border: 'none', cursor: 'pointer', background: 'var(--accent)', color: '#000', fontWeight: 600, fontSize: 11, marginBottom: 8 }}>Рассчитать</button>
+            {tdeeResult !== null && (
+              <div style={{ background: 'rgba(0,230,138,0.08)', borderRadius: 8, padding: 10, textAlign: 'center' }}>
+                <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--accent)' }}>{tdeeResult.toFixed(0)}</div>
+                <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>ккал/день</div>
+              </div>
+            )}
+          </div>
+
+          {/* ═══ Grip Strength ═══ */}
+          <div className="card" style={{ padding: '10px 12px' }}>
+            <h3 style={{ margin: '0 0 8px', fontSize: 13 }}>🤚 Сила хвата</h3>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginBottom: 8 }}>
+              <div>
+                <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Сила (кг)</label>
+                <input type="number" value={gripKg} onChange={e => setGripKg(+e.target.value)} style={{ width: '100%', padding: '6px 8px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, boxSizing: 'border-box' }} />
+              </div>
+              <div>
+                <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Пол</label>
+                <div style={{ display: 'flex', gap: 4 }}>
+                  {(['male', 'female'] as const).map(s => (
+                    <button key={s} onClick={() => setGripSex(s)} style={{
+                      flex: 1, padding: '6px 4px', borderRadius: 6, fontSize: 11, cursor: 'pointer',
+                      background: gripSex === s ? 'rgba(0,230,138,0.15)' : 'var(--bg-secondary)',
+                      border: gripSex === s ? '1px solid var(--accent)' : '1px solid var(--border)',
+                      color: gripSex === s ? '#00e68a' : 'var(--text-dim)', fontWeight: gripSex === s ? 700 : 400,
+                    }}>{s === 'male' ? 'Мужской' : 'Женский'}</button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Возраст</label>
+                <input type="number" value={gripAge} onChange={e => setGripAge(+e.target.value)} style={{ width: '100%', padding: '6px 8px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, boxSizing: 'border-box' }} />
+              </div>
+            </div>
+            <button onClick={calcGrip} style={{ width: '100%', padding: 6, borderRadius: 6, border: 'none', cursor: 'pointer', background: 'var(--accent)', color: '#000', fontWeight: 600, fontSize: 11, marginBottom: 8 }}>Оценить</button>
+            {gripResult !== null && (
+              <div style={{ background: 'rgba(0,230,138,0.08)', borderRadius: 8, padding: 10, textAlign: 'center' }}>
+                <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--accent)' }}>{gripResult.percentile}%</div>
+                <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>{gripResult.level}</div>
+              </div>
+            )}
+          </div>
+
+          {/* ═══ Stress (HRV) ═══ */}
+          <div className="card" style={{ padding: '10px 12px' }}>
+            <h3 style={{ margin: '0 0 8px', fontSize: 13 }}>🧠 Стресс (HRV)</h3>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 6, marginBottom: 8 }}>
+              <div>
+                <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>RMSSD / HRV (мс)</label>
+                <input type="number" value={hrvValue} onChange={e => setHrvValue(+e.target.value)} style={{ width: '100%', padding: '6px 8px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, boxSizing: 'border-box' }} />
+              </div>
+            </div>
+            <button onClick={calcStress} style={{ width: '100%', padding: 6, borderRadius: 6, border: 'none', cursor: 'pointer', background: 'var(--accent)', color: '#000', fontWeight: 600, fontSize: 11, marginBottom: 8 }}>Оценить</button>
+            {stressResult !== null && (
+              <div style={{ background: 'rgba(0,230,138,0.08)', borderRadius: 8, padding: 10, textAlign: 'center' }}>
+                <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--accent)' }}>{stressResult.stress}%</div>
+                <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>{stressResult.level}</div>
+              </div>
+            )}
+          </div>
         </div>
       )}
 

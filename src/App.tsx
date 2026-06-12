@@ -92,7 +92,6 @@ export default function App() {
       'risks': 'risks',
       'nutrition': 'nutrition',
       'profile': 'profile',
-      'calculators': 'home',
       'course': 'training',
       'plan': 'training',
       'substances': 'pharma',

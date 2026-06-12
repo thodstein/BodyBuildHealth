@@ -6,6 +6,7 @@ import { calculateMultiSubstancePKPD } from '../../engines/pkpd-superposition.en
 import { checkDrugInteractions } from '../../engines/pharma-interactions.engine';
 import { PHARMA_DETAILS, type PharmaDetail } from '../../data/pharma-details';
 import type { PharmaSubstance, CourseEntry, PD } from '../../core/types';
+import { SYRINGE_SPECS, DRUG_THRESHOLDS } from '../../core/constants';
 import { SYNERGY_PAIRS, type SynergyPair } from '../../engines/support.engine';
 import { ALL_INTERACTIONS, findInteractionsForSubstance, type SupportInteraction } from '../../data/support-database';
 import { SYSTEM_INFO, SYSTEM_INFO_ALL } from '../../core/risk-info';
@@ -1059,6 +1060,66 @@ const DosageCalculatorTab: React.FC = () => {
             <div style={{ fontSize: 32, marginBottom: 8 }}>💉</div>
             <div>Выберите препарат и дозировку,</div>
             <div>чтобы рассчитать объём инъекции</div>
+          </div>
+        </div>
+      )}
+
+      {/* ═══ Androgenic Index Calculator ═══ */}
+      <AndrogenicIndexCalculator />
+    </div>
+  );
+};
+
+const DRUG_OPTIONS = Object.keys(DRUG_THRESHOLDS);
+
+const AndrogenicIndexCalculator: React.FC = () => {
+  const [entries, setEntries] = useState<{ drug: string; doseMgWeek: number }[]>([{ drug: 'testosterone_enanthate', doseMgWeek: 300 }]);
+  const [aiResult, setAiResult] = useState<number | null>(null);
+
+  const addEntry = () => setEntries([...entries, { drug: 'testosterone_enanthate', doseMgWeek: 300 }]);
+  const removeEntry = (i: number) => setEntries(entries.filter((_, idx) => idx !== i));
+  const updateEntry = (i: number, field: 'drug' | 'doseMgWeek', val: string | number) => {
+    const next = [...entries];
+    if (field === 'drug') next[i] = { ...next[i], drug: val as string };
+    else next[i] = { ...next[i], doseMgWeek: val as number };
+    setEntries(next);
+  };
+
+  const calcAI = () => {
+    let total = 0;
+    entries.forEach(e => {
+      const dt = DRUG_THRESHOLDS[e.drug];
+      if (dt) total += e.doseMgWeek * dt.androgenicity / 100;
+    });
+    setAiResult(total);
+  };
+
+  return (
+    <div className="card" style={{ marginTop: 12 }}>
+      <h3 style={{ margin: '0 0 12px 0', fontSize: 14, color: 'var(--accent)' }}>📊 Андрогенный индекс стека</h3>
+      <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 8 }}>Σ (доза × AR_affinity / 100) — суммарная андрогенная нагрузка</div>
+      {entries.map((entry, i) => (
+        <div key={i} style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 6 }}>
+          <select value={entry.drug} onChange={e => updateEntry(i, 'drug', e.target.value)}
+            style={{ flex: 1, padding: '6px 4px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 11 }}>
+            {DRUG_OPTIONS.map(d => <option key={d} value={d}>{d.replace(/_/g, ' ')}</option>)}
+          </select>
+          <input type="number" value={entry.doseMgWeek} onChange={e => updateEntry(i, 'doseMgWeek', +e.target.value)}
+            style={{ width: 80, padding: '6px 4px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 11 }} />
+          <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>мг/нед</span>
+          {entries.length > 1 && <button onClick={() => removeEntry(i)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: 14 }}>✕</button>}
+        </div>
+      ))}
+      <div style={{ display: 'flex', gap: 6 }}>
+        <button onClick={addEntry} style={{ flex: 1, padding: 6, borderRadius: 6, border: '1px dashed var(--accent)', background: 'transparent', color: 'var(--accent)', cursor: 'pointer', fontSize: 11 }}>+ Добавить препарат</button>
+        <button onClick={calcAI} style={{ flex: 1, padding: 6, borderRadius: 6, border: 'none', background: 'var(--accent)', color: '#000', fontWeight: 600, cursor: 'pointer', fontSize: 11 }}>Рассчитать</button>
+      </div>
+      {aiResult !== null && (
+        <div style={{ marginTop: 8, background: 'rgba(0,230,138,0.08)', borderRadius: 8, padding: 12, textAlign: 'center' }}>
+          <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Андрогенный индекс</div>
+          <div style={{ fontSize: 24, fontWeight: 800, color: aiResult > 3 ? '#ef4444' : aiResult > 1.5 ? '#f59e0b' : 'var(--accent)' }}>{aiResult.toFixed(2)}</div>
+          <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>
+            {aiResult > 3 ? 'Высокая андрогенная нагрузка' : aiResult > 1.5 ? 'Умеренная' : 'Низкая'}
           </div>
         </div>
       )}
