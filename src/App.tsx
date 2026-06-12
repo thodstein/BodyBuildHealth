@@ -24,10 +24,10 @@ const PRIMARY_NAV: { id: Tab; label: string; icon: React.ReactNode }[] = [
   { id: 'support', label: 'Поддержка', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg> },
 ];
 
-function HulkBg() {
+function DarkBg() {
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 0, overflow: 'hidden', pointerEvents: 'none' }}>
-      <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse at 70% 50%, rgba(0,230,138,0.04) 0%, transparent 60%)' }} />
+      <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse at 70% 50%, rgba(200,245,96,0.03) 0%, transparent 60%)' }} />
     </div>
   );
 }
@@ -145,7 +145,7 @@ export default function App() {
 
   return (
     <div className="app" >
-      <HulkBg />
+      <DarkBg />
       <main ref={mainRef} style={{ position: 'relative', zIndex: 1 }}>
         {renderContent()}
       </main>

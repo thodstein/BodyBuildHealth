@@ -62,7 +62,7 @@ function AlertBanner({ messages }: { messages: string[] }) {
 
 // Navigation cards for the Dashboard
 const NAV_CARDS: { id: ScreenId; icon: string; label: string; desc: string; color: string }[] = [
-  { id: 'training', icon: '🏋️', label: 'Тренировки', desc: 'План, дневник, упражнения', color: '#00e68a' },
+  { id: 'training', icon: '🏋️', label: 'Тренировки', desc: 'План, дневник, упражнения', color: '#C8F560' },
   { id: 'nutrition', icon: '🍎', label: 'Питание', desc: 'Дневник, КБЖУ, графики', color: '#ffa502' },
   { id: 'reports', icon: '📊', label: 'Отчёты', desc: 'Сводки, анализы, печать', color: '#a855f7' },
   { id: 'fertility-pct', icon: '🧬', label: 'Фертильность', desc: 'ПКТ, спермограмма', color: '#8b5cf6' },
@@ -294,7 +294,7 @@ export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
       <AlertBanner messages={alerts} />
 
       {/* ── Global Risk Card: 3 methods, each TWO big numbers ── */}
-      <div style={{ background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', borderRadius: 10, padding: '10px 12px', marginBottom: 12 }}>
+      <div style={{ background: 'var(--card-bg)', border: '1px solid var(--border)', borderRadius: 10, padding: '10px 12px', marginBottom: 12 }}>
         <div style={{ fontSize: 11, fontWeight: 700, marginBottom: 8, display: 'flex', justifyContent: 'space-between' }}>
           <span>⚠️ Риск-Индекс</span>
           <span style={{ fontSize: 10, color: 'var(--text-dim)', fontWeight: 400 }}>
@@ -343,7 +343,7 @@ export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
         const la = interpretLabs(labData);
         if (!la || la.interpretations.length === 0) return null;
         return (
-          <div style={{ background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', borderRadius: 10, padding: '8px 10px', marginBottom: 12 }}>
+          <div style={{ background: 'var(--card-bg)', border: '1px solid var(--border)', borderRadius: 10, padding: '8px 10px', marginBottom: 12 }}>
             <div style={{ fontWeight: 600, fontSize: 11, marginBottom: 4, display: 'flex', justifyContent: 'space-between' }}>
               <span>🧪 Сводка анализов</span>
               <span style={{ fontSize: 8, color: 'var(--text-dim)' }}>{labData.length} тестов</span>
@@ -369,9 +369,9 @@ export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
 
       {/* ═══ HULK HERO ═══ */}
       <div style={{
-        background: 'linear-gradient(135deg, rgba(0,230,138,0.08) 0%, rgba(0,80,50,0.12) 100%)',
+        background: 'var(--card-bg)',
         borderRadius: 16, padding: 0, marginBottom: 14,
-        border: '1px solid rgba(0,230,138,0.15)', overflow: 'hidden',
+        border: '1px solid var(--border)', overflow: 'hidden',
       }}>
         <img src="/hulk-hero.jpg" alt="Hulk Hero" style={{ width: '100%', height: '80vh', display: 'block', objectFit: 'cover', borderRadius: 16 }} />
       </div>
@@ -384,7 +384,7 @@ export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
         const stats = computeStats(entries, s.targetWeight, s.height);
         if (!stats) return null;
         return (
-          <div style={{ background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', borderRadius: 10, padding: '8px 10px', marginBottom: 12 }}>
+          <div style={{ background: 'var(--card-bg)', border: '1px solid var(--border)', borderRadius: 10, padding: '8px 10px', marginBottom: 12 }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 4, textAlign: 'center' }}>
               <div>
                 <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Вес</div>
@@ -420,7 +420,7 @@ export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
         const t = nutStats.today;
         const targets = { kcal: 3000, protein: 180, fat: 80, carbs: 350 };
         return (
-          <div style={{ background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', borderRadius: 10, padding: '8px 10px', marginBottom: 12 }}>
+          <div style={{ background: 'var(--card-bg)', border: '1px solid var(--border)', borderRadius: 10, padding: '8px 10px', marginBottom: 12 }}>
             <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-dim)', marginBottom: 4 }}>🍎 Сегодня · {nutStats.streak} дн streak</div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 4, textAlign: 'center' }}>
               {[
@@ -451,7 +451,7 @@ export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
       <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
         <button onClick={() => onNavigate?.('training')} style={{
           flex: 1, padding: '10px 12px', borderRadius: 10, border: 'none', cursor: 'pointer',
-          background: 'linear-gradient(135deg, #00e68a, #00c853)', color: '#000', fontWeight: 700, fontSize: 13,
+            background: 'linear-gradient(135deg, #C8F560, #A8E040)', color: '#0A0A0A', fontWeight: 700, fontSize: 13,
         }}>🏋️ Тренировка</button>
         <button onClick={() => onNavigate?.('nutrition')} style={{
           flex: 1, padding: '10px 12px', borderRadius: 10, border: 'none', cursor: 'pointer',
@@ -500,7 +500,7 @@ export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
         }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
             <h3 style={{ margin: 0, fontSize: 14 }}>💊 Активный курс</h3>
-            <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 12, background: 'rgba(0,230,138,0.15)', color: '#00e68a', fontWeight: 600 }}>
+            <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 12, background: 'rgba(200,245,96,0.15)', color: '#C8F560', fontWeight: 600 }}>
               {courseEntries.length} препаратов
             </span>
           </div>
@@ -518,7 +518,7 @@ export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
                   background: 'rgba(0,230,138,0.1)', borderRadius: 10, padding: '6px 10px',
                   border: '1px solid rgba(0,230,138,0.15)',
                 }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: '#00e68a' }}>{item.name}</div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#C8F560' }}>{item.name}</div>
                   <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>{item.totalDose}{item.unit}/нед</div>
                 </div>
               ));
@@ -533,7 +533,7 @@ export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
             )}
           </div>
           <div style={{ marginTop: 6, display: 'flex', gap: 12, fontSize: 10, color: 'var(--text-dim)' }}>
-            <span>Дней на курсе: <strong style={{ color: '#00e68a' }}>{daysOnCourse}</strong></span>
+            <span>Дней на курсе: <strong style={{ color: '#C8F560' }}>{daysOnCourse}</strong></span>
             <span>Общий риск: <strong style={{ color: riskResult ? riskColor(riskResult.overallNet) : 'var(--text-dim)' }}>{riskResult ? Math.round(riskResult.overallNet) : '—'}%</strong></span>
           </div>
         </div>
