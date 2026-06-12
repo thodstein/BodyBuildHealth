@@ -151,7 +151,7 @@ main.has-sub-nav {
   font-size:22px;
   font-weight:800;
   margin:8px 0 16px;
-  color:var(--text);
+  color:var(--accent);
   letter-spacing:-0.5px;
 }
 .screen h2:first-child { margin-top:4px; }

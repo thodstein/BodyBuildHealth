@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
-  <meta name="theme-color" content="#050508" />
+  <meta name="theme-color" content="#0A0A0A" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="mobile-web-app-capable" content="yes" />
@@ -14,7 +14,7 @@
   <link rel="manifest" href="/manifest.json" />
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    html, body { height: 100%; overscroll-behavior: none; background: #050508; color: #e8e8f0;
+    html, body { height: 100%; overscroll-behavior: none; background: #0A0A0A; color: #FFFFFF;
       font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif;
       line-height: 1.5; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;
       overflow: hidden; touch-action: pan-y;
@@ -22,8 +22,8 @@
     #app { height: 100%; display: flex; flex-direction: column; }
     .loading-screen { display: flex; flex-direction: column; align-items: center; justify-content: center;
       height: 100vh; gap: 16px; position: relative; z-index: 1; }
-    .loading-spinner { width: 40px; height: 40px; border: 3px solid #1a3a2a;
-      border-top: 3px solid #00e68a; border-radius: 50%; animation: spin 1s linear infinite; }
+    .loading-spinner { width: 40px; height: 40px; border: 3px solid #2A2A2A;
+      border-top: 3px solid #C8F560; border-radius: 50%; animation: spin 1s linear infinite; }
     @keyframes spin { to { transform: rotate(360deg); } }
     /* Prevent text selection on mobile */
     .screen, .card, .nav-btn, .tab-btn, button { -webkit-user-select: none; user-select: none; }
@@ -38,7 +38,7 @@
   <div id="app">
     <div class="loading-screen">
       <div class="loading-spinner"></div>
-      <span style="color: #a0a0bc;">Загрузка Health Engine...</span>
+      <span style="color: #888888;">Загрузка Health Engine...</span>
     </div>
   </div>
   <script type="module" src="/src/main.tsx"></script>
