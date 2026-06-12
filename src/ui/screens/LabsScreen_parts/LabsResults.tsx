@@ -45,7 +45,7 @@ function getLabStatus(lab: LabPoint): 'normal' | 'high' | 'low' | 'unknown' {
 
 export const LabsResults: React.FC<{ labs: LabPoint[] }> = ({ labs }) => {
   const [filterSystem, setFilterSystem] = useState<string>('all');
-  const [isExpanded, setIsExpanded] = useState(true);
+  const [expandedDates, setExpandedDates] = useState<Set<string>>(new Set());
 
   const sortedLabs = useMemo(() =>
     [...labs].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()),
@@ -72,21 +72,17 @@ export const LabsResults: React.FC<{ labs: LabPoint[] }> = ({ labs }) => {
     return acc;
   }, {});
 
+  const toggleDate = (date: string) => {
+    setExpandedDates(prev => {
+      const next = new Set(prev);
+      if (next.has(date)) next.delete(date);
+      else next.add(date);
+      return next;
+    });
+  };
+
   return (
     <div>
-      {/* Expand/Collapse header */}
-      <button onClick={() => setIsExpanded(!isExpanded)} style={{
-        display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '10px 12px', marginBottom: 8,
-        borderRadius: 10, cursor: 'pointer', textAlign: 'left',
-        background: 'var(--bg-secondary)', border: '1px solid var(--border)',
-        color: 'var(--text)', fontSize: 12, fontWeight: 600,
-      }}>
-        <span style={{ fontSize: 14, transition: 'transform 0.2s', transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)' }}>▶</span>
-        <span>История анализов</span>
-        <span style={{ fontSize: 10, color: 'var(--text-dim)', marginLeft: 'auto' }}>{labs.length} записей</span>
-      </button>
-
-      {isExpanded && (<>
       {/* System filter */}
       <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 10 }}>
         <button onClick={() => setFilterSystem('all')} style={{
@@ -114,64 +110,75 @@ export const LabsResults: React.FC<{ labs: LabPoint[] }> = ({ labs }) => {
           <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 4 }}>Введите анализы во вкладке «Текущие»</div>
         </div>
       ) : (
-        Object.entries(groupedByDate).map(([date, dateLabs]) => (
-          <div key={date} className="card" style={{ marginBottom: 10, padding: 12, overflow: 'hidden' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-              <span style={{ fontSize: 14 }}>📅</span>
-              <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--accent)' }}>
-                {new Date(date).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })}
-              </span>
-              <span style={{ fontSize: 10, color: 'var(--text-dim)', marginLeft: 'auto' }}>
-                {dateLabs.length} маркеров
-              </span>
-            </div>
-            <div style={{ display: 'grid', gap: 4 }}>
-              {dateLabs.map((lab) => {
-                const status = getLabStatus(lab);
-                const info = UCUM_MAP[lab.code.toUpperCase()];
-                const sys = LAB_SYSTEM_MAP[lab.code.toUpperCase()] || 'other';
-                const sysColor = sysColors[sys] || '#6b7280';
-                const isAbnormal = status === 'high' || status === 'low';
-                const statusIcon = status === 'high' ? '↑' : status === 'low' ? '↓' : '✓';
-                const statusColor = status === 'high' ? '#ef4444' : status === 'low' ? '#f97316' : sysColor;
+        Object.entries(groupedByDate).map(([date, dateLabs]) => {
+          const isOpen = expandedDates.has(date);
+          return (
+            <div key={date} className="card" style={{ marginBottom: 10, padding: 0, overflow: 'hidden' }}>
+              {/* Date header with collapse toggle */}
+              <button onClick={() => toggleDate(date)} style={{
+                display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '12px', cursor: 'pointer', textAlign: 'left',
+                background: 'transparent', border: 'none', color: 'var(--text)',
+              }}>
+                <span style={{ fontSize: 14, transition: 'transform 0.2s', transform: isOpen ? 'rotate(90deg)' : 'rotate(0deg)' }}>▶</span>
+                <span style={{ fontSize: 14 }}>📅</span>
+                <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--accent)' }}>
+                  {new Date(date).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })}
+                </span>
+                <span style={{ fontSize: 10, color: 'var(--text-dim)', marginLeft: 'auto' }}>
+                  {dateLabs.length} маркеров
+                </span>
+              </button>
 
-                return (
-                  <div key={lab.code + lab.date} style={{
-                    display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderRadius: 8,
-                    background: isAbnormal ? 'rgba(239,68,68,0.04)' : 'var(--bg-secondary)',
-                    border: `1px solid ${isAbnormal ? 'rgba(239,68,68,0.12)' : 'var(--border)'}`,
-                    transition: 'all 0.15s',
-                  }}>
-                    <div style={{
-                      width: 26, height: 26, borderRadius: 7, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-                      background: sysColor + '16', color: sysColor, fontWeight: 700, fontSize: 9,
-                    }}>
-                      {lab.code.slice(0, 2)}
-                    </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontWeight: 600, fontSize: 11, color: isAbnormal ? '#ef4444' : 'var(--text)' }}>
-                        {lab.name || lab.code}
+              {/* Lab cards (collapsible) */}
+              {isOpen && (
+                <div style={{ padding: '0 12px 12px', display: 'grid', gap: 4 }}>
+                  {dateLabs.map((lab) => {
+                    const status = getLabStatus(lab);
+                    const info = UCUM_MAP[lab.code.toUpperCase()];
+                    const sys = LAB_SYSTEM_MAP[lab.code.toUpperCase()] || 'other';
+                    const sysColor = sysColors[sys] || '#6b7280';
+                    const isAbnormal = status === 'high' || status === 'low';
+                    const statusIcon = status === 'high' ? '↑' : status === 'low' ? '↓' : '✓';
+                    const statusColor = status === 'high' ? '#ef4444' : status === 'low' ? '#f97316' : sysColor;
+
+                    return (
+                      <div key={lab.code + lab.date} style={{
+                        display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderRadius: 8,
+                        background: isAbnormal ? 'rgba(239,68,68,0.04)' : 'var(--bg-secondary)',
+                        border: `1px solid ${isAbnormal ? 'rgba(239,68,68,0.12)' : 'var(--border)'}`,
+                        transition: 'all 0.15s',
+                      }}>
+                        <div style={{
+                          width: 26, height: 26, borderRadius: 7, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                          background: sysColor + '16', color: sysColor, fontWeight: 700, fontSize: 9,
+                        }}>
+                          {lab.code.slice(0, 2)}
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontWeight: 600, fontSize: 11, color: isAbnormal ? '#ef4444' : 'var(--text)' }}>
+                            {lab.name || lab.code}
+                          </div>
+                          <div style={{ fontSize: 9, color: 'var(--text-dim)', lineHeight: 1.3 }}>
+                            {sysLabels[sys] || sys}
+                            {info && ` • ${info.lln}–${info.uln} ${info.prefUnit || ''}`}
+                          </div>
+                        </div>
+                        <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                          <div style={{ fontWeight: 700, fontSize: 13, color: statusColor }}>
+                            {lab.value}
+                            <span style={{ fontSize: 9, color: 'var(--text-dim)', marginLeft: 2 }}>{lab.unit || ''}</span>
+                            <span style={{ marginLeft: 3, fontSize: 11 }}>{statusIcon}</span>
+                          </div>
+                        </div>
                       </div>
-                      <div style={{ fontSize: 9, color: 'var(--text-dim)', lineHeight: 1.3 }}>
-                        {sysLabels[sys] || sys}
-                        {info && ` • ${info.lln}–${info.uln} ${info.prefUnit || ''}`}
-                      </div>
-                    </div>
-                    <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                      <div style={{ fontWeight: 700, fontSize: 13, color: statusColor }}>
-                        {lab.value}
-                        <span style={{ fontSize: 9, color: 'var(--text-dim)', marginLeft: 2 }}>{lab.unit || ''}</span>
-                        <span style={{ marginLeft: 3, fontSize: 11 }}>{statusIcon}</span>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
+                    );
+                  })}
+                </div>
+              )}
             </div>
-          </div>
-        ))
+          );
+        })
       )}
-      </>)}
     </div>
   );
 };
