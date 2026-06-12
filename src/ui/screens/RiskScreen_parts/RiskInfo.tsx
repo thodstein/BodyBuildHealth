@@ -24,134 +24,134 @@ export const RiskInfo: React.FC = () => {
 
   return (
     <div className="risk-info">
-      {/* РћР±С‰РµРµ РѕРїРёСЃР°РЅРёРµ */}
+      {/* Общее описание */}
       <div className="card" style={{ marginBottom: 8 }}>
-        <h3 style={{ margin: '0 0 8px', fontSize: 15 }}>рџ“ќ Р¤РѕСЂРјСѓР»С‹ СЂР°СЃС‡С‘С‚Р° СЂРёСЃРєРѕРІ</h3>
+        <h3 style={{ margin: '0 0 8px', fontSize: 15 }}>📝 Формулы расчёта рисков</h3>
         <p style={{ fontSize: 11, color: 'var(--text-dim)', lineHeight: 1.5, margin: '0 0 8px' }}>
-          Health Engine v9 РёСЃРїРѕР»СЊР·СѓРµС‚ <strong>4 РЅРµР·Р°РІРёСЃРёРјС‹С… РјРµС‚РѕРґР°</strong> СЂР°СЃС‡С‘С‚Р° СЂРёСЃРєРѕРІ:
+          Health Engine v9 использует <strong>4 независимых метода</strong> расчёта рисков:
         </p>
         <div style={{ background: 'rgba(0,230,138,0.08)', padding: 8, borderRadius: 8, fontSize: 10, color: 'var(--text-dim)', lineHeight: 1.6 }}>
-          <strong>1. V7 Р‘Р°Р·РѕРІС‹Р№</strong> вЂ” 14 СЃРёСЃС‚РµРј Г— 7-9 РјРµС…Р°РЅРёР·РјРѕРІ (105). baseRisk Г— doseRatio Г— G Г— N Г— T Г— MRR Г— HGI Г— RIR + PD<br/>
-          <strong>2. V7 + РњРѕРЅС‚Рµ-РљР°СЂР»Рѕ</strong> вЂ” PK-РЅР°РєРѕРїР»РµРЅРёРµ в†’ Hill в†’ MC-СЃРёРјСѓР»СЏС†РёСЏ (10K, Пѓ=15%) в†’ 95-Р№ РїРµСЂС†РµРЅС‚РёР»СЊ<br/>
-          <strong>3. MDSS v2.0</strong> вЂ” Hill(XВІ/(EC50ВІ+XВІ)) в†’ MC(all markers) в†’ Sigmoid(100/(1+e^(-kВ·(Z-Z_crit)))) СЃ overflow guard<br/>
-          <strong>4. РљР»РёРЅРёС‡РµСЃРєРёРµ РїР°С‚РѕР»РѕРіРёРё</strong> вЂ” 28 РїР°С‚РѕР»РѕРіРёР№, 70+ РјР°СЂРєРµСЂРѕРІ, СЃРІСЏР·СЊ РїСЂРµРїР°СЂР°С‚в†’РїР°С‚РѕР»РѕРіРёСЏ. Hill в†’ MC в†’ Sigmoid<br/>
+          <strong>1. V7 Базовый</strong> — 14 систем × 7-9 механизмов (105). baseRisk × doseRatio × G × N × T × MRR × HGI × RIR + PD<br/>
+          <strong>2. V7 + Монте-Карло</strong> — PK-накопление → Hill → MC-симуляция (10K, σ=15%) → 95-й перцентиль<br/>
+          <strong>3. MDSS v2.0</strong> — Hill(X²/(EC50²+X²)) → MC(all markers) → Sigmoid(100/(1+e^(-k·(Z-Z_crit)))) с overflow guard<br/>
+          <strong>4. Клинические патологии</strong> — 28 патологий, 70+ маркеров, связь препарат→патология. Hill → MC → Sigmoid<br/>
           <br/>
-          <strong>Raw</strong> вЂ” СЂРёСЃРє Р±РµР· СѓС‡С‘С‚Р° РїРѕРґРґРµСЂР¶РєРё. <strong>Net</strong> вЂ” СЃ СѓС‡С‘С‚РѕРј Р‘РђР”РѕРІ Рё РѕР±СЂР°Р·Р° Р¶РёР·РЅРё.
+          <strong>Raw</strong> — риск без учёта поддержки. <strong>Net</strong> — с учётом БАДов и образа жизни.
         </div>
       </div>
 
-      {/* в”Ђв”Ђ MDSS Pipeline description в”Ђв”Ђ */}
+      {/* ── MDSS Pipeline description ── */}
       <div className="card risk-section" style={{ marginBottom: 8 }}>
         <div className="risk-card-header" style={{ cursor: 'pointer' }} onClick={() => toggle('mdss-pipeline')}>
-          <h4 style={{ margin: 0, fontSize: 13 }}>рџ§¬ MDSS v2.0 вЂ” РўСЂРё РјРѕРґРµР»Рё СЂР°СЃС‡С‘С‚Р°</h4>
-          <span style={{ fontSize: 12 }}>{expanded === 'mdss-pipeline' ? 'в–ё' : 'в–ѕ'}</span>
+          <h4 style={{ margin: 0, fontSize: 13 }}>🧬 MDSS v2.0 — Три модели расчёта</h4>
+          <span style={{ fontSize: 12 }}>{expanded === 'mdss-pipeline' ? '▸' : '▾'}</span>
         </div>
         {expanded === 'mdss-pipeline' && (
           <div style={{ marginTop: 8, fontSize: 11, lineHeight: 1.6 }}>
             <p style={{ margin: '0 0 8px', color: 'var(--accent)' }}>
-              РЎРёСЃС‚РµРјР° РёСЃРїРѕР»СЊР·СѓРµС‚ 3 РЅРµР·Р°РІРёСЃРёРјС‹С… РјРµС‚РѕРґР° СЂР°СЃС‡С‘С‚Р° РґР»СЏ РїРѕРІС‹С€РµРЅРёСЏ С‚РѕС‡РЅРѕСЃС‚Рё РїСЂРѕРіРЅРѕР·Р°:
+              Система использует 3 независимых метода расчёта для повышения точности прогноза:
             </p>
 
             <div style={{ background: 'var(--bg-secondary)', padding: 8, borderRadius: 8, marginBottom: 8 }}>
-              <strong style={{ color: '#60a5fa' }}>1. V7 Р‘Р°Р·РѕРІС‹Р№ СЂР°СЃС‡С‘С‚</strong>
+              <strong style={{ color: '#60a5fa' }}>1. V7 Базовый расчёт</strong>
               <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 2 }}>
-                РљР»Р°СЃСЃРёС‡РµСЃРєРёР№ РґРІРёР¶РѕРє: baseRisk Г— doseRatio Г— G Г— N Г— T Г— MRR Г— HGI Г— RIR + PD
-                <br/>14 СЃРёСЃС‚РµРј Г— 7-9 РјРµС…Р°РЅРёР·РјРѕРІ = 105 РїР°СЂР°РјРµС‚СЂРѕРІ. РђРіСЂРµРіР°С†РёСЏ: РіРµРѕРјРµС‚СЂРёС‡РµСЃРєРѕРµ СЃСЂРµРґРЅРµРµ.
+                Классический движок: baseRisk × doseRatio × G × N × T × MRR × HGI × RIR + PD
+                <br/>14 систем × 7-9 механизмов = 105 параметров. Агрегация: геометрическое среднее.
               </div>
             </div>
 
             <div style={{ background: 'var(--bg-secondary)', padding: 8, borderRadius: 8, marginBottom: 8 }}>
-              <strong style={{ color: '#f59e0b' }}>2. РњРѕРЅС‚Рµ-РљР°СЂР»Рѕ (V7 + MC)</strong>
+              <strong style={{ color: '#f59e0b' }}>2. Монте-Карло (V7 + MC)</strong>
               <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 2 }}>
-                PK-РјРѕРґРµР»СЊ (РЅР°РєРѕРїР»РµРЅРёРµ) в†’ Hill (РґРѕР·Р°-РѕС‚РІРµС‚) в†’ 7 РјРµС…Р°РЅРёР·РјРѕРІ в†’ MC-СЃРёРјСѓР»СЏС†РёСЏ (10K РёС‚РµСЂР°С†РёР№, Пѓ=15%)
-                <br/>Р’РѕР·РІСЂР°С‰Р°РµС‚ 95-Р№ РїРµСЂС†РµРЅС‚РёР»СЊ СЂР°СЃРїСЂРµРґРµР»РµРЅРёСЏ СЂРёСЃРєР°.
+                PK-модель (накопление) → Hill (доза-ответ) → 7 механизмов → MC-симуляция (10K итераций, σ=15%)
+                <br/>Возвращает 95-й перцентиль распределения риска.
               </div>
             </div>
 
             <div style={{ background: 'var(--bg-secondary)', padding: 8, borderRadius: 8, marginBottom: 8 }}>
               <strong style={{ color: '#8b5cf6' }}>3. MDSS v2.0 (Hill + MC + Sigmoid)</strong>
               <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 2 }}>
-                <strong>Hill:</strong> XВІ/(EC50ВІ+XВІ) РґР»СЏ РєР°Р¶РґРѕРіРѕ Р±РёРѕРјР°СЂРєРµСЂР° (n=2.0)<br/>
-                <strong>MC:</strong> Р“РµРѕРјРµС‚СЂРёС‡РµСЃРєРѕРµ СЃСЂРµРґРЅРµРµ РІСЃРµС… Hill-РѕС†РµРЅРѕРє РѕСЂРіР°РЅР° + Box-Muller С€СѓРј в†’ 95-Р№ РїРµСЂС†РµРЅС‚РёР»СЊ<br/>
-                <strong>Sigmoid:</strong> 100/(1+exp(-kВ·(Z-Z_crit))) СЃ overflow guard (В±50)<br/>
-                <strong>Z_total:</strong> sev95 Г— t_weeks Г— genFactor Г— compliancePenalty<br/>
-                <strong>14 СЃРёСЃС‚РµРј РѕСЂРіР°РЅРѕРІ:</strong> РїРѕС‡РєРё, РїРµС‡РµРЅСЊ, СЃРµСЂРґС†Рµ, СЃРѕСЃСѓРґС‹, Р¦РќРЎ, СЌРЅРґРѕРєСЂРёРЅРЅР°СЏ, РєСЂРѕРІРµС‚РІРѕСЂРЅР°СЏ, РёРјРјСѓРЅРЅР°СЏ, РјРµС‚Р°Р±РѕР»РёР·Рј, GH/IGF, РћР”Рђ, С‰РёС‚РѕРІРёРґРЅР°СЏ, РїСЂРѕСЃС‚Р°С‚Р°, РєРѕР¶Р°<br/>
-                <strong>Compliance:</strong> РµСЃР»Рё Р°РЅР°Р»РёР·С‹ {'>'} 4 РЅРµРґ вЂ” С€С‚СЂР°С„ Г—(1.0 + (РЅРµРґРµР»Рё-4)В·0.15)
+                <strong>Hill:</strong> X²/(EC50²+X²) для каждого биомаркера (n=2.0)<br/>
+                <strong>MC:</strong> Геометрическое среднее всех Hill-оценок органа + Box-Muller шум → 95-й перцентиль<br/>
+                <strong>Sigmoid:</strong> 100/(1+exp(-k·(Z-Z_crit))) с overflow guard (±50)<br/>
+                <strong>Z_total:</strong> sev95 × t_weeks × genFactor × compliancePenalty<br/>
+                <strong>14 систем органов:</strong> почки, печень, сердце, сосуды, ЦНС, эндокринная, кроветворная, иммунная, метаболизм, GH/IGF, ОДА, щитовидная, простата, кожа<br/>
+                <strong>Compliance:</strong> если анализы {'>'} 4 нед — штраф ×(1.0 + (недели-4)·0.15)
               </div>
             </div>
           </div>
         )}
       </div>
 
-      {/* в”Ђв”Ђ Clinical Pathology section в”Ђв”Ђ */}
+      {/* ── Clinical Pathology section ── */}
       <div className="card risk-section" style={{ marginBottom: 8 }}>
         <div className="risk-card-header" style={{ cursor: 'pointer' }} onClick={() => toggle('clinical')}>
-          <h4 style={{ margin: 0, fontSize: 13 }}>рџЏҐ РљР»РёРЅРёС‡РµСЃРєРёРµ РїР°С‚РѕР»РѕРіРёРё (4-СЏ РјРѕРґРµР»СЊ)</h4>
-          <span style={{ fontSize: 12 }}>{expanded === 'clinical' ? 'в–ё' : 'в–ѕ'}</span>
+          <h4 style={{ margin: 0, fontSize: 13 }}>🏥 Клинические патологии (4-я модель)</h4>
+          <span style={{ fontSize: 12 }}>{expanded === 'clinical' ? '▸' : '▾'}</span>
         </div>
         {expanded === 'clinical' && (
           <div style={{ marginTop: 8, fontSize: 11, lineHeight: 1.6 }}>
             <p style={{ margin: '0 0 8px' }}>
-              Р§РµС‚РІС‘СЂС‚Р°СЏ РјРѕРґРµР»СЊ РЅР°РїСЂСЏРјСѓСЋ СЃРІСЏР·С‹РІР°РµС‚ РїСЂРµРїР°СЂР°С‚С‹ СЃ РєРѕРЅРєСЂРµС‚РЅС‹РјРё РјРµРґРёС†РёРЅСЃРєРёРјРё РїР°С‚РѕР»РѕРіРёСЏРјРё С‡РµСЂРµР· РєР»РёРЅРёС‡РµСЃРєСѓСЋ Р±Р°Р·Сѓ РґР°РЅРЅС‹С….
+              Четвёртая модель напрямую связывает препараты с конкретными медицинскими патологиями через клиническую базу данных.
             </p>
             <div style={{ background: 'var(--bg-secondary)', padding: 8, borderRadius: 8, marginBottom: 6 }}>
-              <strong style={{ color: '#ec4899' }}>Р‘Р°Р·Р° РґР°РЅРЅС‹С…:</strong>
+              <strong style={{ color: '#ec4899' }}>База данных:</strong>
               <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 2 }}>
-                вЂў 28 РїР°С‚РѕР»РѕРіРёР№ РІ 8 СЃРёСЃС‚РµРјР°С… РѕСЂРіР°РЅРѕРІ<br/>
-                вЂў 70+ РєР»РёРЅРёС‡РµСЃРєРёС… Р±РёРѕРјР°СЂРєРµСЂРѕРІ СЃ СЌРјРїРёСЂРёС‡РµСЃРєРёРјРё EC50<br/>
-                вЂў 13 РїСЂРµРїР°СЂР°С‚РѕРІ (РІСЃРµ РєР»Р°СЃСЃС‹ РђРђРЎ + Р“Р  + РёРЅСЃСѓР»РёРЅ + РїРµРїС‚РёРґС‹)<br/>
-                вЂў РљР°Р¶РґС‹Р№ РїСЂРµРїР°СЂР°С‚ в†’ СЃРїРёСЃРѕРє СЂРёСЃРєРѕРІ в†’ Р»Р°Р±РѕСЂР°С‚РѕСЂРЅР°СЏ РїР°РЅРµР»СЊ в†’ РёРЅСЃС‚СЂСѓРјРµРЅС‚Р°Р»СЊРЅР°СЏ РІРµСЂРёС„РёРєР°С†РёСЏ
+                • 28 патологий в 8 системах органов<br/>
+                • 70+ клинических биомаркеров с эмпирическими EC50<br/>
+                • 13 препаратов (все классы ААС + ГР + инсулин + пептиды)<br/>
+                • Каждый препарат → список рисков → лабораторная панель → инструментальная верификация
               </div>
             </div>
             <div style={{ background: 'var(--bg-secondary)', padding: 8, borderRadius: 8, marginBottom: 6 }}>
               <strong style={{ color: '#8b5cf6' }}>Pipeline:</strong>
               <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 2 }}>
-                1. <strong>Hill function:</strong> XВІ/(EC50ВІ+XВІ) вЂ” РґР»СЏ РєР°Р¶РґРѕРіРѕ РјР°СЂРєРµСЂР° СЃ СѓС‡С‘С‚РѕРј inverted (NO, HDL, LH, FSH, eGFR, Glucose, Testosterone)<br/>
-                2. <strong>Monte Carlo:</strong> 10K РёС‚РµСЂР°С†РёР№, Пѓ=15%, 95-Р№ РїРµСЂС†РµРЅС‚РёР»СЊ<br/>
-                3. <strong>Sigmoid:</strong> 100/(1+exp(-kВ·(Z_total-Z_crit))) вЂ” РїРµСЂСЃРѕРЅР°Р»РёР·РёСЂРѕРІР°РЅРЅС‹Рµ k Рё Z_crit РґР»СЏ РєР°Р¶РґРѕР№ РїР°С‚РѕР»РѕРіРёРё<br/>
-                4. <strong>Compliance penalty:</strong> Г—(1.0 + (weeks_since_lab - 4) Г— 0.15) РїСЂРё РїСЂРѕСЃСЂРѕС‡РєРµ Р°РЅР°Р»РёР·РѕРІ {'>'} 4 РЅРµРґ
+                1. <strong>Hill function:</strong> X²/(EC50²+X²) — для каждого маркера с учётом inverted (NO, HDL, LH, FSH, eGFR, Glucose, Testosterone)<br/>
+                2. <strong>Monte Carlo:</strong> 10K итераций, σ=15%, 95-й перцентиль<br/>
+                3. <strong>Sigmoid:</strong> 100/(1+exp(-k·(Z_total-Z_crit))) — персонализированные k и Z_crit для каждой патологии<br/>
+                4. <strong>Compliance penalty:</strong> ×(1.0 + (weeks_since_lab - 4) × 0.15) при просрочке анализов {'>'} 4 нед
               </div>
             </div>
             <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>
-              <strong>8 СЃРёСЃС‚РµРј:</strong> РЎРµСЂРґРµС‡РЅРѕ-СЃРѕСЃСѓРґРёСЃС‚Р°СЏ (7 РїР°С‚.) В· Р“РµРїР°С‚РѕР±РёР»РёР°СЂРЅР°СЏ (4) В· РќРµС„СЂРѕР»РѕРіРёС‡РµСЃРєР°СЏ (3) В· Р­РЅРґРѕРєСЂРёРЅРЅР°СЏ (4) В· Р РµРїСЂРѕРґСѓРєС‚РёРІРЅР°СЏ/HPTA (3) В· Р¦РќРЎ (2) В· РРјРјСѓРЅРЅР°СЏ/РєРѕР¶Р° (2) В· РћРїРѕСЂРЅРѕ-РґРІРёРіР°С‚РµР»СЊРЅР°СЏ (2)
+              <strong>8 систем:</strong> Сердечно-сосудистая (7 пат.) · Гепатобилиарная (4) · Нефрологическая (3) · Эндокринная (4) · Репродуктивная/HPTA (3) · ЦНС (2) · Иммунная/кожа (2) · Опорно-двигательная (2)
             </div>
           </div>
         )}
       </div>
 
-      {/* Р‘Р°Р·РѕРІР°СЏ С„РѕСЂРјСѓР»Р° */}
+      {/* Базовая формула */}
       <div className="card risk-section" style={{ marginBottom: 8 }}>
         <div className="risk-card-header" style={{ cursor: 'pointer' }} onClick={() => toggle('base')}>
-          <h4 style={{ margin: 0, fontSize: 13 }}>рџ“Љ Р‘Р°Р·РѕРІР°СЏ С„РѕСЂРјСѓР»Р° СЂРёСЃРєР°</h4>
-          <span style={{ fontSize: 12 }}>{expanded === 'base' ? 'в–ё' : 'в–ѕ'}</span>
+          <h4 style={{ margin: 0, fontSize: 13 }}>📊 Базовая формула риска</h4>
+          <span style={{ fontSize: 12 }}>{expanded === 'base' ? '▸' : '▾'}</span>
         </div>
         {expanded === 'base' && (
           <div style={{ marginTop: 8, fontSize: 11, lineHeight: 1.6 }}>
             <div style={{ background: 'var(--bg-secondary)', padding: 10, borderRadius: 8, fontFamily: 'monospace', fontSize: 11, overflowX: 'auto', whiteSpace: 'pre-wrap', marginBottom: 8 }}>
 {`Raw(system, mech) = max(7, min(100,
-  (1 - в€Џ(1 - baseRisk Г— doseRatio Г— G Г— N Г— T Г— MRR Г— HGI Г— RIR)) Г— 100
-  + pdFactor Г— 15
+  (1 - ∏(1 - baseRisk × doseRatio × G × N × T × MRR × HGI × RIR)) × 100
+  + pdFactor × 15
 ))
 
-Net(system, mech) = Raw Г— (1 - coverage)
+Net(system, mech) = Raw × (1 - coverage)
 
-OverallRaw = geom(allSystems) Г— overallMRR Г— overallHGI Г— (2 - overallRIR)
-OverallNet  = geom(allSystems) Г— overallMRR Г— overallHGI Г— (2 - overallRIR)`}
+OverallRaw = geom(allSystems) × overallMRR × overallHGI × (2 - overallRIR)
+OverallNet  = geom(allSystems) × overallMRR × overallHGI × (2 - overallRIR)`}
             </div>
-            <p style={{ margin: '0 0 4px' }}><strong>baseRisk</strong> = {BASE_RISK} вЂ” РєРѕРЅСЃС‚Р°РЅС‚Р° Р±Р°Р·РѕРІРѕРіРѕ СЂРёСЃРєР°</p>
-            <p style={{ margin: '0 0 4px' }}><strong>в€Џ drugs</strong> вЂ” РїСЂРѕРёР·РІРµРґРµРЅРёРµ РїРѕ РІСЃРµРј Р°РєС‚РёРІРЅС‹Рј РїСЂРµРїР°СЂР°С‚Р°Рј (РјРѕРґРµР»СЊ В«РЅРµР·Р°РІРёСЃРёРјРѕРіРѕ СЂРёСЃРєР°В»)</p>
-            <p style={{ margin: '0 0 4px' }}><strong>pdFactor</strong> вЂ” РІРєР»Р°Рґ С„Р°СЂРјР°РєРѕРґРёРЅР°РјРёРєРё РїСЂРµРїР°СЂР°С‚Р° РІ РєРѕРЅРєСЂРµС‚РЅСѓСЋ СЃРёСЃС‚РµРјСѓ</p>
-            <p style={{ margin: '0 0 4px' }}><strong>coverage</strong> вЂ” РєРѕСЌС„С„РёС†РёРµРЅС‚ Р·Р°С‰РёС‚С‹ (Р‘РђР”С‹, РїСЂРµРїР°СЂР°С‚С‹ РїРѕРґРґРµСЂР¶РєРё)</p>
-            <p style={{ margin: '0 0 4px' }}><strong>geom()</strong> вЂ” РіРµРѕРјРµС‚СЂРёС‡РµСЃРєРѕРµ СЃСЂРµРґРЅРµРµ РїРѕ РІСЃРµРј СЃРёСЃС‚РµРјР°Рј/РјРµС…Р°РЅРёР·РјР°Рј</p>
+            <p style={{ margin: '0 0 4px' }}><strong>baseRisk</strong> = {BASE_RISK} — константа базового риска</p>
+            <p style={{ margin: '0 0 4px' }}><strong>∏ drugs</strong> — произведение по всем активным препаратам (модель «независимого риска»)</p>
+            <p style={{ margin: '0 0 4px' }}><strong>pdFactor</strong> — вклад фармакодинамики препарата в конкретную систему</p>
+            <p style={{ margin: '0 0 4px' }}><strong>coverage</strong> — коэффициент защиты (БАДы, препараты поддержки)</p>
+            <p style={{ margin: '0 0 4px' }}><strong>geom()</strong> — геометрическое среднее по всем системам/механизмам</p>
           </div>
         )}
       </div>
 
-      {/* РњРµС‚РѕРґ СЂР°СЃС‡С‘С‚Р° (С‚Р°Р±-РїРµСЂРµРєР»СЋС‡Р°С‚РµР»СЊ) */}
+      {/* Метод расчёта (таб-переключатель) */}
       <div className="card risk-section" style={{ marginBottom: 8 }}>
         <div className="risk-card-header" style={{ cursor: 'pointer' }} onClick={() => toggle('method')}>
-          <h4 style={{ margin: 0, fontSize: 13 }}>рџ”¬ РњРµС‚РѕРґ СЂР°СЃС‡С‘С‚Р° СЂРёСЃРєРѕРІ</h4>
-          <span style={{ fontSize: 12 }}>{expanded === 'method' ? 'в–ё' : 'в–ѕ'}</span>
+          <h4 style={{ margin: 0, fontSize: 13 }}>🔬 Метод расчёта рисков</h4>
+          <span style={{ fontSize: 12 }}>{expanded === 'method' ? '▸' : '▾'}</span>
         </div>
         {expanded === 'method' && (
           <div style={{ marginTop: 8 }}>
@@ -159,56 +159,56 @@ OverallNet  = geom(allSystems) Г— overallMRR Г— overallHGI Г— (2 - over
               <button
                 onClick={() => setMethodTab('v7')}
                 style={{ padding: '4px 12px', borderRadius: 4, border: '1px solid var(--border)', background: methodTab === 'v7' ? 'var(--accent)' : 'transparent', color: methodTab === 'v7' ? '#000' : 'var(--text-dim)', fontSize: 10, cursor: 'pointer', fontWeight: methodTab === 'v7' ? 700 : 400 }}
-              >V7 РЎРёРјСѓР»СЏС†РёСЏ</button>
+              >V7 Симуляция</button>
               <button
                 onClick={() => setMethodTab('classic')}
                 style={{ padding: '4px 12px', borderRadius: 4, border: '1px solid var(--border)', background: methodTab === 'classic' ? 'var(--accent)' : 'transparent', color: methodTab === 'classic' ? '#000' : 'var(--text-dim)', fontSize: 10, cursor: 'pointer', fontWeight: methodTab === 'classic' ? 700 : 400 }}
-              >РћР±Р·РѕСЂ (РєР»Р°СЃСЃРёС‡РµСЃРєРёР№)</button>
+              >Обзор (классический)</button>
             </div>
 
             {methodTab === 'v7' && (
               <div style={{ fontSize: 11, lineHeight: 1.6 }}>
                 <div style={{ background: 'rgba(0,230,138,0.08)', padding: 10, borderRadius: 8, marginBottom: 8 }}>
-                  <strong>V7 вЂ” РјРЅРѕРіРѕСѓСЂРѕРІРЅРµРІР°СЏ СЃРёРјСѓР»СЏС†РёСЏ В«РІРµС‰РµСЃС‚РІРѕ в†’ PK в†’ Hill в†’ СЃРёРіРЅР°Р»РёРЅРі в†’ 7 РјРµС…Р°РЅРёР·РјРѕРІ в†’ MC в†’ СЃРёСЃС‚РµРјР° в†’ СЂРёСЃРєВ»</strong>
+                  <strong>V7 — многоуровневая симуляция «вещество → PK → Hill → сигналинг → 7 механизмов → MC → система → риск»</strong>
                 </div>
                 <div style={{ background: 'var(--bg-secondary)', padding: 10, borderRadius: 8, fontFamily: 'monospace', fontSize: 10, marginBottom: 8, overflowX: 'auto', whiteSpace: 'pre-wrap' }}>
-{`1. PK-РјРѕРґРµР»СЊ (2-РєР°РјРµСЂРЅР°СЏ):
-   C(t) = (D/Vd) Г— (ka/(ka-k10)) Г— (e^(-k10В·t) - e^(-kaВ·t))
-   СЃ РЅР°РєРѕРїР»РµРЅРёРµРј РїСЂРё РїРѕРІС‚РѕСЂРЅС‹С… РґРѕР·Р°С…
+{`1. PK-модель (2-камерная):
+   C(t) = (D/Vd) × (ka/(ka-k10)) × (e^(-k10·t) - e^(-ka·t))
+   с накоплением при повторных дозах
 
-2. Hill-С„СѓРЅРєС†РёСЏ (СЃРёРіРЅР°Р»РёРЅРі):
-   Effect = Emax Г— C^n / (C^n + EC50^n)
-   n = РєРѕСЌС„С„РёС†РёРµРЅС‚ РҐРёР»Р»Р° (РєСЂСѓС‚РёР·РЅР° РґРѕР·Рѕ-РѕС‚РІРµС‚Р°)
+2. Hill-функция (сигналинг):
+   Effect = Emax × C^n / (C^n + EC50^n)
+   n = коэффициент Хилла (крутизна дозо-ответа)
 
-3. РЎРёРіРЅР°Р»РёРЅРі в†’ 7 РјРµС…Р°РЅРёР·РјРѕРІ:
-   вЂў AR-Р°РєС‚РёРІР°С†РёСЏ      вЂў РђСЂРѕРјР°С‚РёР·Р°С†РёСЏ
-   вЂў 5О±-СЂРµРґСѓРєС†РёСЏ       вЂў РџСЂРѕРіРµСЃС‚РѕРіРµРЅРЅРѕСЃС‚СЊ
-   вЂў Р“РµРїР°С‚РѕС‚РѕРєСЃРёС‡РЅРѕСЃС‚СЊ вЂў Р›РёРїРёРґРЅС‹Р№ РїСЂРѕС„РёР»СЊ
-   вЂў HCT-РЅР°РіСЂСѓР·РєР°      вЂў РќРµР№СЂРѕС‚РѕРєСЃРёС‡РЅРѕСЃС‚СЊ
+3. Сигналинг → 7 механизмов:
+   • AR-активация      • Ароматизация
+   • 5α-редукция       • Прогестогенность
+   • Гепатотоксичность • Липидный профиль
+   • HCT-нагрузка      • Нейротоксичность
 
-4. 7 РѕР±С‰РёС… РјРµС…Р°РЅРёР·РјРѕРІ (MC):
-   mechContribution = baseRisk Г— mechWeight Г— 
-     doseRatio Г— G Г— N Г— T Г— MRR Г— HGI Г— (2 - RIR)
+4. 7 общих механизмов (MC):
+   mechContribution = baseRisk × mechWeight × 
+     doseRatio × G × N × T × MRR × HGI × (2 - RIR)
 
-5. РЎРёСЃС‚РµРјРЅР°СЏ Р°РіСЂРµРіР°С†РёСЏ:
-   systemRisk = max(7, min(100, geom(allMechs) + pdFactor Г— 15))
+5. Системная агрегация:
+   systemRisk = max(7, min(100, geom(allMechs) + pdFactor × 15))
 
-6. РС‚РѕРіРѕРІС‹Р№ СЂРёСЃРє:
-   OverallNet = geom(allSystems) Г— overallMRR Г—
-     overallHGI Г— (2 - overallRIR) Г— (1 - coverage)`}
+6. Итоговый риск:
+   OverallNet = geom(allSystems) × overallMRR ×
+     overallHGI × (2 - overallRIR) × (1 - coverage)`}
                 </div>
                 <div style={{ display: 'grid', gap: 4, fontSize: 10 }}>
                   <div style={{ background: 'rgba(59,130,246,0.08)', padding: 6, borderRadius: 6 }}>
-                    <strong>PK в†’ Hill</strong>: РљРѕРЅС†РµРЅС‚СЂР°С†РёСЏ РїСЂРµРїР°СЂР°С‚Р° РІРѕ РІСЂРµРјРµРЅРё РїСЂРµРѕР±СЂР°Р·СѓРµС‚СЃСЏ РІ С„Р°СЂРјР°РєРѕРґРёРЅР°РјРёС‡РµСЃРєРёР№ СЌС„С„РµРєС‚ С‡РµСЂРµР· СЃРёРіРјРѕРёРґР°Р»СЊРЅСѓСЋ Hill-С„СѓРЅРєС†РёСЋ
+                    <strong>PK → Hill</strong>: Концентрация препарата во времени преобразуется в фармакодинамический эффект через сигмоидальную Hill-функцию
                   </div>
                   <div style={{ background: 'rgba(139,92,246,0.08)', padding: 6, borderRadius: 6 }}>
-                    <strong>Hill в†’ 7 РјРµС…Р°РЅРёР·РјРѕРІ</strong>: Р­С„С„РµРєС‚ СЂР°СЃРїСЂРµРґРµР»СЏРµС‚СЃСЏ РїРѕ РјРµС…Р°РЅРёР·РјР°Рј РїРѕРІСЂРµР¶РґРµРЅРёСЏ РїСЂРѕРїРѕСЂС†РёРѕРЅР°Р»СЊРЅРѕ PD-РїР°СЂР°РјРµС‚СЂР°Рј РїСЂРµРїР°СЂР°С‚Р°
+                    <strong>Hill → 7 механизмов</strong>: Эффект распределяется по механизмам повреждения пропорционально PD-параметрам препарата
                   </div>
                   <div style={{ background: 'rgba(234,179,8,0.08)', padding: 6, borderRadius: 6 }}>
-                    <strong>7 РјРµС…Р°РЅРёР·РјРѕРІ в†’ MC</strong>: РљР°Р¶РґС‹Р№ РјРµС…Р°РЅРёР·Рј СЂР°СЃСЃС‡РёС‚С‹РІР°РµС‚СЃСЏ СЃ СѓС‡С‘С‚РѕРј РґРѕР·С‹, РіРµРЅРµС‚РёРєРё, РїРёС‚Р°РЅРёСЏ, С‚СЂРµРЅРёСЂРѕРІРѕРє, Р°РЅР°Р»РёР·РѕРІ
+                    <strong>7 механизмов → MC</strong>: Каждый механизм рассчитывается с учётом дозы, генетики, питания, тренировок, анализов
                   </div>
                   <div style={{ background: 'rgba(0,230,138,0.08)', padding: 6, borderRadius: 6 }}>
-                    <strong>MC в†’ СЃРёСЃС‚РµРјР° в†’ СЂРёСЃРє</strong>: РњРµС…Р°РЅРёР·РјС‹ Р°РіСЂРµРіРёСЂСѓСЋС‚СЃСЏ РіРµРѕРјРµС‚СЂРёС‡РµСЃРєРёРј СЃСЂРµРґРЅРёРј РІ СЃРёСЃС‚РµРјРЅС‹Р№ СЂРёСЃРє, Р·Р°С‚РµРј СѓС‡РёС‚С‹РІР°РµС‚СЃСЏ Р·Р°С‰РёС‚Р° (coverage)
+                    <strong>MC → система → риск</strong>: Механизмы агрегируются геометрическим средним в системный риск, затем учитывается защита (coverage)
                   </div>
                 </div>
               </div>
@@ -217,46 +217,46 @@ OverallNet  = geom(allSystems) Г— overallMRR Г— overallHGI Г— (2 - over
             {methodTab === 'classic' && (
               <div style={{ fontSize: 11, lineHeight: 1.6 }}>
                 <div style={{ background: 'rgba(0,230,138,0.08)', padding: 10, borderRadius: 8, marginBottom: 8 }}>
-                  <strong>Health Engine v9 вЂ” РєР»Р°СЃСЃРёС‡РµСЃРєР°СЏ С„РѕСЂРјСѓР»Р° Р°РіСЂРµРіР°С†РёРё СЂРёСЃРєРѕРІ</strong>
+                  <strong>Health Engine v9 — классическая формула агрегации рисков</strong>
                 </div>
                 <div style={{ background: 'var(--bg-secondary)', padding: 10, borderRadius: 8, fontFamily: 'monospace', fontSize: 10, marginBottom: 8, overflowX: 'auto', whiteSpace: 'pre-wrap' }}>
-{`РС‚РѕРіРѕРІР°СЏ С„РѕСЂРјСѓР»Р°:
-OverallNet = geom(allSystems) Г— 
-  overallMRR Г— overallHGI Г— (2 - overallRIR)
+{`Итоговая формула:
+OverallNet = geom(allSystems) × 
+  overallMRR × overallHGI × (2 - overallRIR)
 
-Р“РґРµ:
-вЂў geom(allSystems) вЂ” РіРµРѕРјРµС‚СЂРёС‡РµСЃРєРѕРµ СЃСЂРµРґРЅРµРµ СЂРёСЃРєРѕРІ РїРѕ 
-  18 СЃРёСЃС‚РµРјР°Рј РѕСЂРіР°РЅРѕРІ (РєР°СЂРґРёРѕ, РїРµС‡РµРЅСЊ, РїРѕС‡РєРё Рё С‚.Рґ.)
+Где:
+• geom(allSystems) — геометрическое среднее рисков по 
+  18 системам органов (кардио, печень, почки и т.д.)
 
-вЂў overallMRR вЂ” СЃСЂРµРґРЅРµРµ РѕС‚РєР»РѕРЅРµРЅРёРµ Р»Р°Р±РѕСЂР°С‚РѕСЂРЅС‹С… 
-  РїРѕРєР°Р·Р°С‚РµР»РµР№ РѕС‚ РЅРѕСЂРјС‹ РїРѕ РІСЃРµРј СЃРёСЃС‚РµРјР°Рј
+• overallMRR — среднее отклонение лабораторных 
+  показателей от нормы по всем системам
 
-вЂў overallHGI вЂ” Р°РіСЂРµРіРёСЂРѕРІР°РЅРЅС‹Р№ РІРѕСЃРїР°Р»РёС‚РµР»СЊРЅС‹Р№ РёРЅРґРµРєСЃ 
-  (CRP, IL-6, TNF-О±, С„РёР±СЂРёРЅРѕРіРµРЅ, РЎРћР­)
+• overallHGI — агрегированный воспалительный индекс 
+  (CRP, IL-6, TNF-α, фибриноген, СОЭ)
 
-вЂў (2 - overallRIR) вЂ” С„Р°РєС‚РѕСЂ РІРјРµС€Р°С‚РµР»СЊСЃС‚РІ:
-  RIR=0.5 в†’ РјРЅРѕР¶РёС‚РµР»СЊ 1.5 (РїРѕРІС‹С€РµРЅРёРµ)
-  RIR=1.0 в†’ РјРЅРѕР¶РёС‚РµР»СЊ 1.0 (Р±РµР· РёР·РјРµРЅРµРЅРёР№)
+• (2 - overallRIR) — фактор вмешательств:
+  RIR=0.5 → множитель 1.5 (повышение)
+  RIR=1.0 → множитель 1.0 (без изменений)
 
-Р’РєР»Р°РґС‹ РёСЃС‚РѕС‡РЅРёРєРѕРІ:
-  Р¤Р°СЂРјР°: 35%   РђРЅР°Р»РёР·С‹: 25%   РўСЂРµРЅРёСЂРѕРІРєРё: 20%
-  РџРёС‚Р°РЅРёРµ: 15%   Р”РёР°РіРЅРѕСЃС‚РёРєР°: 5%
+Вклады источников:
+  Фарма: 35%   Анализы: 25%   Тренировки: 20%
+  Питание: 15%   Диагностика: 5%
 
-Net = Raw Г— (1 - coverage) вЂ” Р·Р°С‰РёС‚Р° РІС‹С‡РёС‚Р°РµС‚СЃСЏ
-  РёР· Р±Р°Р·РѕРІРѕРіРѕ СЂРёСЃРєР°`}
+Net = Raw × (1 - coverage) — защита вычитается
+  из базового риска`}
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, fontSize: 10 }}>
                   <div style={{ background: 'var(--bg-secondary)', padding: 6, borderRadius: 6 }}>
-                    <strong>Raw</strong> вЂ” СЂРёСЃРє Р±РµР· РїРѕРґРґРµСЂР¶РєРё
+                    <strong>Raw</strong> — риск без поддержки
                   </div>
                   <div style={{ background: 'var(--bg-secondary)', padding: 6, borderRadius: 6 }}>
-                    <strong>Net</strong> вЂ” СЃ СѓС‡С‘С‚РѕРј Р‘РђР”РѕРІ Рё С‚РµСЂР°РїРёРё
+                    <strong>Net</strong> — с учётом БАДов и терапии
                   </div>
                   <div style={{ background: 'var(--bg-secondary)', padding: 6, borderRadius: 6 }}>
-                    <strong>РњРёРЅРёРјСѓРј 7%</strong> вЂ” Р±Р°Р·РѕРІС‹Р№ РЅРµСѓСЃС‚СЂР°РЅРёРјС‹Р№ СЂРёСЃРє
+                    <strong>Минимум 7%</strong> — базовый неустранимый риск
                   </div>
                   <div style={{ background: 'var(--bg-secondary)', padding: 6, borderRadius: 6 }}>
-                    <strong>РњР°РєСЃРёРјСѓРј 100%</strong> вЂ” РєСЂРёС‚РёС‡РµСЃРєРёР№ СЂРёСЃРє
+                    <strong>Максимум 100%</strong> — критический риск
                   </div>
                 </div>
               </div>
@@ -265,11 +265,11 @@ Net = Raw Г— (1 - coverage) вЂ” Р·Р°С‰РёС‚Р° РІС‹С‡
         )}
       </div>
 
-      {/* Р”РѕР·Рѕ-Р·Р°РІРёСЃРёРјС‹Р№ СЂР°СЃС‡С‘С‚ */}
+      {/* Дозо-зависимый расчёт */}
       <div className="card" style={{ marginBottom: 8 }}>
         <div className="risk-card-header" style={{ cursor: 'pointer' }} onClick={() => toggle('dose')}>
-          <h4 style={{ margin: 0, fontSize: 13 }}>рџ“€ Р”РѕР·Рѕ-Р·Р°РІРёСЃРёРјС‹Р№ СЂР°СЃС‡С‘С‚</h4>
-          <span style={{ fontSize: 12 }}>{expanded === 'dose' ? 'в–ё' : 'в–ѕ'}</span>
+          <h4 style={{ margin: 0, fontSize: 13 }}>📈 Дозо-зависимый расчёт</h4>
+          <span style={{ fontSize: 12 }}>{expanded === 'dose' ? '▸' : '▾'}</span>
         </div>
         {expanded === 'dose' && (
           <div style={{ marginTop: 8, fontSize: 11, lineHeight: 1.6 }}>
@@ -281,29 +281,29 @@ if drug has threshold:
 if drug has no threshold but has mechWeight:
   doseRatio = min(1.5, dosePerWeek / 300)
 
-mechContribution = max(0, baseRisk Г— doseRatio Г— G Г— N Г— T Г— MRR Г— HGI Г— RIR Г— (1 + mechWeight Г— 3))
+mechContribution = max(0, baseRisk × doseRatio × G × N × T × MRR × HGI × RIR × (1 + mechWeight × 3))
 
 if mechContribution > 0.005:
-  prod *= (1 - min(0.99, baseRisk Г— doseRatio Г— G Г— N Г— T Г— MRR Г— HGI Г— RIR))`}
+  prod *= (1 - min(0.99, baseRisk × doseRatio × G × N × T × MRR × HGI × RIR))`}
             </div>
-            <p style={{ margin: '0 0 4px' }}><strong>thresholdDose</strong> вЂ” РїРѕСЂРѕРіРѕРІР°СЏ РґРѕР·Р° РёР· DRUG_THRESHOLDS (РјРі/РЅРµРґ)</p>
-            <p style={{ margin: '0 0 4px' }}><strong>РЎС‚РµРїРµРЅСЊ 1.2</strong> вЂ” РЅРµР»РёРЅРµР№РЅР°СЏ Р·Р°РІРёСЃРёРјРѕСЃС‚СЊ В«РґРѕР·Р°-СЂРёСЃРєВ» (СЃСѓРїРµСЂР»РёРЅРµР№РЅР°СЏ)</p>
-            <p style={{ margin: '0 0 4px' }}><strong>mechWeight</strong> вЂ” РІРµСЃ РјРµС…Р°РЅРёР·РјР° (0-1) РґР»СЏ РїСЂРµРїР°СЂР°С‚Р° Рё РјРµС…Р°РЅРёР·РјР° РїРѕРІСЂРµР¶РґРµРЅРёСЏ</p>
-            <p style={{ margin: '0 0 4px' }}><strong>РњРЅРѕР¶РёС‚РµР»СЊ (1 + mechWeight Г— 3)</strong> вЂ” СѓСЃРёР»РµРЅРёРµ РґР»СЏ Р·РЅР°С‡РёРјС‹С… РјРµС…Р°РЅРёР·РјРѕРІ (РјР°РєСЃ Г—4)</p>
+            <p style={{ margin: '0 0 4px' }}><strong>thresholdDose</strong> — пороговая доза из DRUG_THRESHOLDS (мг/нед)</p>
+            <p style={{ margin: '0 0 4px' }}><strong>Степень 1.2</strong> — нелинейная зависимость «доза-риск» (суперлинейная)</p>
+            <p style={{ margin: '0 0 4px' }}><strong>mechWeight</strong> — вес механизма (0-1) для препарата и механизма повреждения</p>
+            <p style={{ margin: '0 0 4px' }}><strong>Множитель (1 + mechWeight × 3)</strong> — усиление для значимых механизмов (макс ×4)</p>
           </div>
         )}
       </div>
 
-      {/* РњРЅРѕР¶РёС‚РµР»Рё РєРѕСЂСЂРµРєС‚РёСЂРѕРІРєРё */}
+      {/* Множители корректировки */}
       <div className="card" style={{ marginBottom: 8 }}>
         <div className="risk-card-header" style={{ cursor: 'pointer' }} onClick={() => toggle('multipliers')}>
-          <h4 style={{ margin: 0, fontSize: 13 }}>вљ™пёЏ РњРЅРѕР¶РёС‚РµР»Рё РєРѕСЂСЂРµРєС‚РёСЂРѕРІРєРё</h4>
-          <span style={{ fontSize: 12 }}>{expanded === 'multipliers' ? 'в–ё' : 'в–ѕ'}</span>
+          <h4 style={{ margin: 0, fontSize: 13 }}>⚙️ Множители корректировки</h4>
+          <span style={{ fontSize: 12 }}>{expanded === 'multipliers' ? '▸' : '▾'}</span>
         </div>
         {expanded === 'multipliers' && (
           <div style={{ marginTop: 8, fontSize: 11, lineHeight: 1.6 }}>
             <div style={{ marginBottom: 12 }}>
-              <strong style={{ color: 'var(--accent)' }}>G вЂ” Р“РµРЅРµС‚РёС‡РµСЃРєРёР№ РјРЅРѕР¶РёС‚РµР»СЊ</strong>
+              <strong style={{ color: 'var(--accent)' }}>G — Генетический множитель</strong>
               <div style={{ background: 'var(--bg-secondary)', padding: 8, borderRadius: 6, marginTop: 4, fontFamily: 'monospace', fontSize: 10 }}>
                 G = GENETIC_MULTIPLIERS[system][genotype]<br/>
                 COMT: Met/Met=2.0, Val/Met=1.5, Val/Val=1.0<br/>
@@ -315,75 +315,75 @@ if mechContribution > 0.005:
             </div>
 
             <div style={{ marginBottom: 12 }}>
-              <strong style={{ color: '#eab308' }}>N вЂ” Р¤Р°РєС‚РѕСЂ РїРёС‚Р°РЅРёСЏ</strong>
+              <strong style={{ color: '#eab308' }}>N — Фактор питания</strong>
               <div style={{ background: 'var(--bg-secondary)', padding: 8, borderRadius: 6, marginTop: 4 }}>
                 N = clamp(nutritionFactor, 0.5, 1.5)<br/>
-                РџРѕ СѓРјРѕР»С‡Р°РЅРёСЋ: 0.8 (СЃСЂРµРґРЅРµРµ РїРёС‚Р°РЅРёРµ)<br/>
-                0.5 = РїР»РѕС…РѕРµ РїРёС‚Р°РЅРёРµ, 1.0 = С…РѕСЂРѕС€РµРµ, 1.5 = РёРґРµР°Р»СЊРЅРѕРµ
+                По умолчанию: 0.8 (среднее питание)<br/>
+                0.5 = плохое питание, 1.0 = хорошее, 1.5 = идеальное
               </div>
             </div>
 
             <div style={{ marginBottom: 12 }}>
-              <strong style={{ color: '#f97316' }}>T вЂ” Р¤Р°РєС‚РѕСЂ С‚СЂРµРЅРёСЂРѕРІРѕРє</strong>
+              <strong style={{ color: '#f97316' }}>T — Фактор тренировок</strong>
               <div style={{ background: 'var(--bg-secondary)', padding: 8, borderRadius: 6, marginTop: 4 }}>
                 T = clamp(trainingFactor, 1.0, 1.5)<br/>
-                РџРѕ СѓРјРѕР»С‡Р°РЅРёСЋ: 0.7 (СѓРјРµСЂРµРЅРЅС‹Рµ С‚СЂРµРЅРёСЂРѕРІРєРё)<br/>
-                РЈРІРµР»РёС‡РёРІР°РµС‚ СЂРёСЃРє РїСЂРё С‡СЂРµР·РјРµСЂРЅС‹С… РЅР°РіСЂСѓР·РєР°С…
+                По умолчанию: 0.7 (умеренные тренировки)<br/>
+                Увеличивает риск при чрезмерных нагрузках
               </div>
             </div>
 
             <div style={{ marginBottom: 12 }}>
-                <strong style={{ color: '#3b82f6' }}>MRR вЂ” Medical Risk Ratio</strong>
+                <strong style={{ color: '#3b82f6' }}>MRR — Medical Risk Ratio</strong>
               <div style={{ background: 'var(--bg-secondary)', padding: 8, borderRadius: 6, marginTop: 4, fontFamily: 'monospace', fontSize: 10 }}>
-                MRR(system) = 1 + deviation Г— 2<br/>
+                MRR(system) = 1 + deviation × 2<br/>
                 deviation = |value - optimal| / optimal<br/>
-                Р•СЃР»Рё Р·РЅР°С‡РµРЅРёРµ РІ РЅРѕСЂРјРµ: MRR = 1.0<br/>
-                Р•СЃР»Рё РѕС‚РєР»РѕРЅРµРЅРёРµ 50%: MRR = 2.0<br/><br/>
-                РќРѕСЂРјС‹ РїРѕ СЃРёСЃС‚РµРјР°Рј:<br/>
-                cardio: 0.8вЂ“1.2, hepatic: 0.7вЂ“1.3, renal: 0.8вЂ“1.2<br/>
-                neuro: 0.85вЂ“1.15, endocrine: 0.75вЂ“1.25, reproductive: 0.7вЂ“1.3<br/>
-                hematologic: 0.75вЂ“1.25, musculoskeletal: 0.8вЂ“1.2, metabolic: 0.8вЂ“1.2<br/>
-                ghigf: 0.85вЂ“1.15, ins_axis: 0.8вЂ“1.2, neuro_toxicity: 0.85вЂ“1.15<br/>
-                blood: 0.75вЂ“1.25, vessels: 0.8вЂ“1.2, immunity: 0.8вЂ“1.2<br/>
-                thyroid: 0.8вЂ“1.2, prostate: 0.75вЂ“1.25, skin: 0.85вЂ“1.15
+                Если значение в норме: MRR = 1.0<br/>
+                Если отклонение 50%: MRR = 2.0<br/><br/>
+                Нормы по системам:<br/>
+                cardio: 0.8–1.2, hepatic: 0.7–1.3, renal: 0.8–1.2<br/>
+                neuro: 0.85–1.15, endocrine: 0.75–1.25, reproductive: 0.7–1.3<br/>
+                hematologic: 0.75–1.25, musculoskeletal: 0.8–1.2, metabolic: 0.8–1.2<br/>
+                ghigf: 0.85–1.15, ins_axis: 0.8–1.2, neuro_toxicity: 0.85–1.15<br/>
+                blood: 0.75–1.25, vessels: 0.8–1.2, immunity: 0.8–1.2<br/>
+                thyroid: 0.8–1.2, prostate: 0.75–1.25, skin: 0.85–1.15
               </div>
             </div>
 
             <div style={{ marginBottom: 12 }}>
-              <strong style={{ color: '#8b5cf6' }}>HGI вЂ” Hemostasis/GI Index</strong>
+              <strong style={{ color: '#8b5cf6' }}>HGI — Hemostasis/GI Index</strong>
               <div style={{ background: 'var(--bg-secondary)', padding: 8, borderRadius: 6, marginTop: 4 }}>
                 HGI = clamp(average(hgiMarkers), 0.5, 1.5)<br/>
-                Р’РµСЃР°: CRP=0.30, IL-6=0.25, TNF-О±=0.20, Р¤РёР±СЂРёРЅРѕРіРµРЅ=0.15, РЎРћР­=0.10
+                Веса: CRP=0.30, IL-6=0.25, TNF-α=0.20, Фибриноген=0.15, СОЭ=0.10
               </div>
             </div>
 
             <div>
-              <strong style={{ color: '#22c55e' }}>RIR вЂ” Risk Intervention Response</strong>
+              <strong style={{ color: '#22c55e' }}>RIR — Risk Intervention Response</strong>
               <div style={{ background: 'var(--bg-secondary)', padding: 8, borderRadius: 6, marginTop: 4 }}>
                 RIR = 0.5 + (interventionResponse ? 0.5)<br/>
-                0.5 = РЅРµС‚ РІРјРµС€Р°С‚РµР»СЊСЃС‚РІ, 1.0 = РјР°РєСЃРёРјР°Р»СЊРЅР°СЏ СЌС„С„РµРєС‚РёРІРЅРѕСЃС‚СЊ<br/>
-                Р’Р»РёСЏРЅРёРµ РЅР° РёС‚РѕРі: Overall Г— HGI Г— (2 - RIR)
+                0.5 = нет вмешательств, 1.0 = максимальная эффективность<br/>
+                Влияние на итог: Overall × HGI × (2 - RIR)
               </div>
             </div>
           </div>
         )}
       </div>
 
-      {/* Р¤Р°СЂРјР°РєРѕРґРёРЅР°РјРёРєР° (PD) */}
+      {/* Фармакодинамика (PD) */}
       <div className="card" style={{ marginBottom: 8 }}>
         <div className="risk-card-header" style={{ cursor: 'pointer' }} onClick={() => toggle('pd')}>
-          <h4 style={{ margin: 0, fontSize: 13 }}>рџ“€ Р¤Р°СЂРјР°РєРѕРґРёРЅР°РјРёРєР° (PD)</h4>
-          <span style={{ fontSize: 12 }}>{expanded === 'pd' ? 'в–ё' : 'в–ѕ'}</span>
+          <h4 style={{ margin: 0, fontSize: 13 }}>📈 Фармакодинамика (PD)</h4>
+          <span style={{ fontSize: 12 }}>{expanded === 'pd' ? '▸' : '▾'}</span>
         </div>
         {expanded === 'pd' && (
           <div style={{ marginTop: 8, fontSize: 11, lineHeight: 1.6 }}>
             <div style={{ background: 'var(--bg-secondary)', padding: 10, borderRadius: 8, fontFamily: 'monospace', fontSize: 11, marginBottom: 8 }}>
 {`pdFactor = \u03a3 |PD_value| \u00d7 weight \u00d7 (dose / EC50)`}
             </div>
-            <p style={{ margin: '0 0 4px' }}><strong>PD_value</strong> вЂ” Р·РЅР°С‡РµРЅРёРµ С„Р°СЂРјР°РєРѕРґРёРЅР°РјРёС‡РµСЃРєРѕРіРѕ РїР°СЂР°РјРµС‚СЂР° РїСЂРµРїР°СЂР°С‚Р° (РѕС‚ -1 РґРѕ +4)</p>
-            <p style={{ margin: '0 0 4px' }}><strong>weight</strong> вЂ” РІРµСЃ СЃРІСЏР·Рё PD-РїР°СЂР°РјРµС‚СЂР° СЃ СЃРёСЃС‚РµРјРѕР№ (0вЂ“1)</p>
-            <p style={{ margin: '0 0 4px' }}><strong>EC50</strong> вЂ” РїРѕР»СѓРјР°РєСЃРёРјР°Р»СЊРЅР°СЏ СЌС„С„РµРєС‚РёРІРЅР°СЏ РєРѕРЅС†РµРЅС‚СЂР°С†РёСЏ (РјРі/Р»)</p>
-            <p style={{ margin: '0 0 4px' }}><strong>Г— 15</strong> вЂ” РјР°СЃС€С‚Р°Р±РёСЂРѕРІР°РЅРёРµ PD-РІРєР»Р°РґР° РІ РёС‚РѕРіРѕРІС‹Р№ СЂРёСЃРє</p>
+            <p style={{ margin: '0 0 4px' }}><strong>PD_value</strong> — значение фармакодинамического параметра препарата (от -1 до +4)</p>
+            <p style={{ margin: '0 0 4px' }}><strong>weight</strong> — вес связи PD-параметра с системой (0–1)</p>
+            <p style={{ margin: '0 0 4px' }}><strong>EC50</strong> — полумаксимальная эффективная концентрация (мг/л)</p>
+            <p style={{ margin: '0 0 4px' }}><strong>× 15</strong> — масштабирование PD-вклада в итоговый риск</p>
 
             <div style={{ marginTop: 8 }}>
               <strong>{''}</strong>
@@ -418,15 +418,15 @@ if mechContribution > 0.005:
         )}
       </div>
 
-      {/* 7 РјРµС…Р°РЅРёР·РјРѕРІ РїРѕРІСЂРµР¶РґРµРЅРёСЏ */}
+      {/* 7 механизмов повреждения */}
       <div className="card" style={{ marginBottom: 8 }}>
         <div className="risk-card-header" style={{ cursor: 'pointer' }} onClick={() => toggle('mechs')}>
-          <h4 style={{ margin: 0, fontSize: 13 }}>вљ пёЏ 7 РѕР±С‰РёС… РјРµС…Р°РЅРёР·РјРѕРІ РїРѕРІСЂРµР¶РґРµРЅРёСЏ</h4>
-          <span style={{ fontSize: 12 }}>{expanded === 'mechs' ? 'в–ё' : 'в–ѕ'}</span>
+          <h4 style={{ margin: 0, fontSize: 13 }}>⚠️ 7 общих механизмов повреждения</h4>
+          <span style={{ fontSize: 12 }}>{expanded === 'mechs' ? '▸' : '▾'}</span>
         </div>
         {expanded === 'mechs' && (
           <div style={{ marginTop: 8, fontSize: 11, lineHeight: 1.5 }}>
-            <p style={{ margin: '0 0 6px', color: 'var(--text-dim)' }}>РљР°Р¶РґС‹Р№ РїСЂРµРїР°СЂР°С‚ РґРµР№СЃС‚РІСѓРµС‚ С‡РµСЂРµР· 1-5 РјРµС…Р°РЅРёР·РјРѕРІ СЃ СЂР°Р·РЅС‹Рј РІРµСЃРѕРј (0-1):</p>
+            <p style={{ margin: '0 0 6px', color: 'var(--text-dim)' }}>Каждый препарат действует через 1-5 механизмов с разным весом (0-1):</p>
             {Object.entries(MECHANISM_INFO).map(([num, info]) => (
               <div key={num} style={{ background: 'var(--bg-secondary)', padding: '6px 10px', borderRadius: 6, marginBottom: 4 }}>
                 <div style={{ fontWeight: 600 }}>{info.id}. {num}. {info.label}</div>
@@ -437,11 +437,11 @@ if mechContribution > 0.005:
         )}
       </div>
 
-      {/* Р—Р°С‰РёС‚Р° (coverage) */}
+      {/* Защита (coverage) */}
       <div className="card" style={{ marginBottom: 8 }}>
         <div className="risk-card-header" style={{ cursor: 'pointer' }} onClick={() => toggle('coverage')}>
-          <h4 style={{ margin: 0, fontSize: 13 }}>рџ›ЎпёЏ Р—Р°С‰РёС‚Р° (Coverage)</h4>
-          <span style={{ fontSize: 12 }}>{expanded === 'coverage' ? 'в–ё' : 'в–ѕ'}</span>
+          <h4 style={{ margin: 0, fontSize: 13 }}>🛡️ Защита (Coverage)</h4>
+          <span style={{ fontSize: 12 }}>{expanded === 'coverage' ? '▸' : '▾'}</span>
         </div>
         {expanded === 'coverage' && (
           <div style={{ marginTop: 8, fontSize: 11, lineHeight: 1.6 }}>
@@ -450,13 +450,13 @@ if mechContribution > 0.005:
 
 coverage(cell) = \u03a3 supportSubstances(cellCov)
 
-РџСЂРёРјРµСЂ: telmisartan РїРѕРєСЂС‹РІР°РµС‚:
-  cardio_2 (РђР“): 55%
-  cardio_3 (Р“РёРїРµСЂС‚СЂРѕС„РёСЏ Р›Р–): 45%
-  renal_1 (Р“РёРїРµСЂС‚РµРЅР·РёСЏ): 50%`}
+Пример: telmisartan покрывает:
+  cardio_2 (АГ): 55%
+  cardio_3 (Гипертрофия ЛЖ): 45%
+  renal_1 (Гипертензия): 50%`}
             </div>
-            <p style={{ margin: '0 0 4px' }}>РљР°Р¶РґС‹Р№ Р‘РђР”/РїСЂРµРїР°СЂР°С‚ РїРѕРґРґРµСЂР¶РєРё РёРјРµРµС‚ РєРѕСЌС„С„РёС†РёРµРЅС‚ РїРѕРєСЂС‹С‚РёСЏ (0-1) РґР»СЏ РєРѕРЅРєСЂРµС‚РЅС‹С… СЏС‡РµРµРє В«СЃРёСЃС‚РµРјР°_РјРµС…Р°РЅРёР·РјВ».</p>
-            <p style={{ margin: '0 0 4px' }}>РЎСѓРјРјР° РІСЃРµС… РїРѕРєСЂС‹С‚РёР№ РІС‹С‡РёС‚Р°РµС‚СЃСЏ РёР· Raw РґР»СЏ РїРѕР»СѓС‡РµРЅРёСЏ Net.</p>
+            <p style={{ margin: '0 0 4px' }}>Каждый БАД/препарат поддержки имеет коэффициент покрытия (0-1) для конкретных ячеек «система_механизм».</p>
+            <p style={{ margin: '0 0 4px' }}>Сумма всех покрытий вычитается из Raw для получения Net.</p>
             <div style={{ marginTop: 8, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4 }}>
               {Object.entries(SUPPORT_BASE_COVERAGE).slice(0, 10).map(([sub, effects]) => (
                 <div key={sub} style={{ background: 'var(--bg-secondary)', padding: 4, borderRadius: 4, fontSize: 10 }}>
@@ -471,107 +471,107 @@ coverage(cell) = \u03a3 supportSubstances(cellCov)
         )}
       </div>
 
-      {/* РЁС‚СЂР°С„ Р·Р° РѕС‚СЃСѓС‚СЃС‚РІРёРµ Р°РЅР°Р»РёР·РѕРІ */}
+      {/* Штраф за отсутствие анализов */}
       <div className="card" style={{ marginBottom: 8 }}>
         <div className="risk-card-header" style={{ cursor: 'pointer' }} onClick={() => toggle('penalty')}>
-          <h4 style={{ margin: 0, fontSize: 13 }}>вљ пёЏ РЁС‚СЂР°С„ Р·Р° РѕС‚СЃСѓС‚СЃС‚РІРёРµ Р°РЅР°Р»РёР·РѕРІ</h4>
-          <span style={{ fontSize: 12 }}>{expanded === 'penalty' ? 'в–ё' : 'в–ѕ'}</span>
+          <h4 style={{ margin: 0, fontSize: 13 }}>⚠️ Штраф за отсутствие анализов</h4>
+          <span style={{ fontSize: 12 }}>{expanded === 'penalty' ? '▸' : '▾'}</span>
         </div>
         {expanded === 'penalty' && (
           <div style={{ marginTop: 8, fontSize: 11, lineHeight: 1.6 }}>
             <div style={{ background: 'var(--bg-secondary)', padding: 10, borderRadius: 8, fontFamily: 'monospace', fontSize: 11, marginBottom: 8 }}>
-{`labPenalty = labRatio Г— 0.40 (РёР»Рё 0.50 РїСЂРё в‰Ґ90% РїСЂРѕРїСѓС‰РµРЅРѕ)
-diagPenalty = diagRatio Г— 0.25 (РёР»Рё 0.35 РїСЂРё в‰Ґ90% РїСЂРѕРїСѓС‰РµРЅРѕ)
-totalMultiplier = 1.0 + labPenalty + diagPenalty (РјР°РєСЃ 2.0)
+{`labPenalty = labRatio × 0.40 (или 0.50 при ≥90% пропущено)
+diagPenalty = diagRatio × 0.25 (или 0.35 при ≥90% пропущено)
+totalMultiplier = 1.0 + labPenalty + diagPenalty (макс 2.0)
 
-Р”Р»СЏ РєР°Р¶РґРѕР№ СЃРёСЃС‚РµРјС‹:
+Для каждой системы:
   if systemHasPenalty:
     systemNet = min(100, systemNet ? totalMultiplier)
   else:
-    systemNet = systemNet (Р±РµР· С€С‚СЂР°С„Р°)
+    systemNet = systemNet (без штрафа)
 
 OverallNet = min(100, overallNet ? totalMultiplier)`}
             </div>
-            <p style={{ margin: '0 0 4px' }}><strong>labRatio</strong> вЂ” РґРѕР»СЏ РѕС‚СЃСѓС‚СЃС‚РІСѓСЋС‰РёС… Р°РЅР°Р»РёР·РѕРІ РёР· РѕР±СЏР·Р°С‚РµР»СЊРЅС‹С… РґР»СЏ С‚РµРєСѓС‰РµР№ С„Р°Р·С‹</p>
-            <p style={{ margin: '0 0 4px' }}><strong>diagRatio</strong> вЂ” РґРѕР»СЏ РѕС‚СЃСѓС‚СЃС‚РІСѓСЋС‰РёС… РѕР±СЃР»РµРґРѕРІР°РЅРёР№</p>
-            <p style={{ margin: '0 0 4px' }}><strong>РљРЅРѕРїРєР° В«Р‘РµР· Р°РЅР°Р»РёР·РѕРІВ»</strong> вЂ” РїСЂРёРЅСѓРґРёС‚РµР»СЊРЅРѕ РЅР°Р·РЅР°С‡Р°РµС‚ С€С‚СЂР°С„РЅРѕР№ РєРѕСЌС„С„РёС†РёРµРЅС‚</p>
+            <p style={{ margin: '0 0 4px' }}><strong>labRatio</strong> — доля отсутствующих анализов из обязательных для текущей фазы</p>
+            <p style={{ margin: '0 0 4px' }}><strong>diagRatio</strong> — доля отсутствующих обследований</p>
+            <p style={{ margin: '0 0 4px' }}><strong>Кнопка «Без анализов»</strong> — принудительно назначает штрафной коэффициент</p>
           </div>
         )}
       </div>
 
-      {/* РџРѕРЅРµРґРµР»СЊРЅР°СЏ РґРёРЅР°РјРёРєР° */}
+      {/* Понедельная динамика */}
       <div className="card" style={{ marginBottom: 8 }}>
         <div className="risk-card-header" style={{ cursor: 'pointer' }} onClick={() => toggle('dynamics')}>
-          <h4 style={{ margin: 0, fontSize: 13 }}>вљ пёЏ РџРѕРЅРµРґРµР»СЊРЅР°СЏ РґРёРЅР°РјРёРєР° (PK)</h4>
-          <span style={{ fontSize: 12 }}>{expanded === 'dynamics' ? 'в–ё' : 'в–ѕ'}</span>
+          <h4 style={{ margin: 0, fontSize: 13 }}>⚠️ Понедельная динамика (PK)</h4>
+          <span style={{ fontSize: 12 }}>{expanded === 'dynamics' ? '▸' : '▾'}</span>
         </div>
         {expanded === 'dynamics' && (
           <div style={{ marginTop: 8, fontSize: 11, lineHeight: 1.6 }}>
             <div style={{ background: 'var(--bg-secondary)', padding: 10, borderRadius: 8, fontFamily: 'monospace', fontSize: 11, marginBottom: 8 }}>
-{`k = ln(2) / TВЅ_hours   (РєРѕРЅСЃС‚Р°РЅС‚Р° РІС‹РІРµРґРµРЅРёСЏ)
+{`k = ln(2) / T½_hours   (константа выведения)
 
-РќР°РєРѕРїР»РµРЅРёРµ (РІРѕ РІСЂРµРјСЏ РїСЂРёС‘РјР°):
+Накопление (во время приёма):
   factor = 1 - e^(-k ? weeks ? 168)
-  > РґРѕСЃС‚РёРіР°РµС‚ ~99% Р·Р° 5 Г— TВЅ
+  > достигает ~99% за 5 × T½
 
-Р’С‹РІРµРґРµРЅРёРµ (РїРѕСЃР»Рµ РѕС‚РјРµРЅС‹):
+Выведение (после отмены):
   peakConc = 1 - e^(-k ? usedWeeks ? 168)
   factor = peakConc ? e^(-k ? weeksSinceEnd ? 168)
 
-Р­С„С„РµРєС‚РёРІРЅР°СЏ РґРѕР·Р° = dosePerWeek Г— max(factor, 0.05)`}
+Эффективная доза = dosePerWeek × max(factor, 0.05)`}
             </div>
-            <p style={{ margin: '0 0 6px' }}>Р”Р»СЏ РєР°Р¶РґРѕРіРѕ РїСЂРµРїР°СЂР°С‚Р° СЂР°СЃСЃС‡РёС‚С‹РІР°РµС‚СЃСЏ С„Р°СЂРјР°РєРѕРєРёРЅРµС‚РёС‡РµСЃРєРёР№ РїСЂРѕС„РёР»СЊ:</p>
+            <p style={{ margin: '0 0 6px' }}>Для каждого препарата рассчитывается фармакокинетический профиль:</p>
             <div style={{ display: 'grid', gap: 4 }}>
               <div style={{ background: 'rgba(234,179,8,0.1)', padding: 6, borderRadius: 6 }}>
-                <strong>вљ пёЏ РќР°РєРѕРїР»РµРЅРёРµ</strong> вЂ” РєРѕРЅС†РµРЅС‚СЂР°С†РёСЏ СЂР°СЃС‚С‘С‚ РѕС‚ 0 РґРѕ СЃС‚Р°С†РёРѕРЅР°СЂРЅРѕР№
+                <strong>⚠️ Накопление</strong> — концентрация растёт от 0 до стационарной
               </div>
               <div style={{ background: 'rgba(0,230,138,0.1)', padding: 6, borderRadius: 6 }}>
-                <strong>вљ пёЏ РЎС‚Р°С†РёРѕРЅР°СЂ</strong> вЂ” РєРѕРЅС†РµРЅС‚СЂР°С†РёСЏ в‰€ 85% РѕС‚ РјР°РєСЃРёРјСѓРјР°
+                <strong>⚠️ Стационар</strong> — концентрация ≈ 85% от максимума
               </div>
               <div style={{ background: 'rgba(59,130,246,0.1)', padding: 6, borderRadius: 6 }}>
-                <strong>вљ пёЏ Р’С‹РІРµРґРµРЅРёРµ</strong> вЂ” РєРѕРЅС†РµРЅС‚СЂР°С†РёСЏ РїР°РґР°РµС‚ РїРѕСЃР»Рµ РѕС‚РјРµРЅС‹
+                <strong>⚠️ Выведение</strong> — концентрация падает после отмены
               </div>
             </div>
             <p style={{ margin: '8px 0 0', color: 'var(--text-dim)', fontSize: 10 }}>
-              РџСЂРёРјРµСЂС‹: РўРµСЃС‚РѕСЃС‚РµСЂРѕРЅ СЌРЅР°РЅС‚Р°С‚ (TВЅ 14 РґРЅРµР№) {'>'} СЃС‚Р°С†РёРѕРЅР°СЂ С‡РµСЂРµР· ~10 РЅРµРґ, РІС‹РІРµРґРµРЅРёРµ ~10 РЅРµРґ. РўСЂРµРЅР±РѕР»РѕРЅ Р°С†РµС‚Р°С‚ (TВЅ 3 РґРЅСЏ) {'>'} СЃС‚Р°С†РёРѕРЅР°СЂ С‡РµСЂРµР· ~2 РЅРµРґ, РІС‹РІРµРґРµРЅРёРµ ~2 РЅРµРґ.
+              Примеры: Тестостерон энантат (T½ 14 дней) {'>'} стационар через ~10 нед, выведение ~10 нед. Тренболон ацетат (T½ 3 дня) {'>'} стационар через ~2 нед, выведение ~2 нед.
             </p>
           </div>
         )}
       </div>
 
-      {/* РђРіСЂРµРіР°С†РёСЏ */}
+      {/* Агрегация */}
       <div className="card" style={{ marginBottom: 8 }}>
         <div className="risk-card-header" style={{ cursor: 'pointer' }} onClick={() => toggle('agg')}>
-          <h4 style={{ margin: 0, fontSize: 13 }}>вљ пёЏ РђРіСЂРµРіР°С†РёСЏ СЂРёСЃРєРѕРІ</h4>
-          <span style={{ fontSize: 12 }}>{expanded === 'agg' ? 'в–ё' : 'в–ѕ'}</span>
+          <h4 style={{ margin: 0, fontSize: 13 }}>⚠️ Агрегация рисков</h4>
+          <span style={{ fontSize: 12 }}>{expanded === 'agg' ? '▸' : '▾'}</span>
         </div>
         {expanded === 'agg' && (
           <div style={{ marginTop: 8, fontSize: 11, lineHeight: 1.6 }}>
             <div style={{ background: 'var(--bg-secondary)', padding: 10, borderRadius: 8, fontFamily: 'monospace', fontSize: 11, marginBottom: 8 }}>
-{`systemRisk = geom(allMechanisms) // Р“РµРѕРјРµС‚СЂРёС‡РµСЃРєРѕРµ СЃСЂРµРґРЅРµРµ РїРѕ 7-9 СЃРїРµС†РёС„РёС‡РЅС‹Рј РјРµС…Р°РЅРёР·РјР°Рј
+{`systemRisk = geom(allMechanisms) // Геометрическое среднее по 7-9 специфичным механизмам
 
 overallRisk = geom(allSystems) \u00d7 overallMRR \u00d7 overallHGI \u00d7 (2 - overallRIR)
 
 geom(arr) = exp(avg(ln(arr))) \u00d7 100
 
-Р’Р·РІРµС€РµРЅРЅР°СЏ Р°РіСЂРµРіР°С†РёСЏ (РёР· РІСЃРµС… РёСЃС‚РѕС‡РЅРёРєРѕРІ):
+Взвешенная агрегация (из всех источников):
   pharma: 35%  labs: 25%
   training: 20%  nutrition: 15%
   diagnostics: 5%
 
 net = \u03a3(sourceRaw \u00d7 weight / totalWeight)`}
             </div>
-            <p style={{ margin: '0 0 4px' }}><strong>Р“РµРѕРјРµС‚СЂРёС‡РµСЃРєРѕРµ СЃСЂРµРґРЅРµРµ</strong> вЂ” С‡СѓРІСЃС‚РІРёС‚РµР»СЊРЅРѕ Рє РІС‹СЃРѕРєРёРј Р·РЅР°С‡РµРЅРёСЏРј: РµСЃР»Рё С…РѕС‚СЊ РѕРґРёРЅ РјРµС…Р°РЅРёР·Рј РґР°С‘С‚ 80%, РѕР±С‰РёР№ РЅРµ Р±СѓРґРµС‚ РЅРёР¶Рµ ~60%</p>
-            <p style={{ margin: '0 0 4px' }}><strong>РњРЅРѕР¶РёС‚РµР»СЊ (2 - RIR)</strong> вЂ” РїСЂРё РјР°РєСЃРёРјР°Р»СЊРЅРѕР№ Р·Р°С‰РёС‚Рµ RIR=1.0, РјРЅРѕР¶РёС‚РµР»СЊ = 1.0 (Р±РµР· РёР·РјРµРЅРµРЅРёСЏ). РџСЂРё РѕС‚СЃСѓС‚СЃС‚РІРёРё Р·Р°С‰РёС‚С‹ RIR=0.5, РјРЅРѕР¶РёС‚РµР»СЊ = 1.5 (РїРѕРІС‹С€РµРЅРёРµ СЂРёСЃРєР°)</p>
+            <p style={{ margin: '0 0 4px' }}><strong>Геометрическое среднее</strong> — чувствительно к высоким значениям: если хоть один механизм даёт 80%, общий не будет ниже ~60%</p>
+            <p style={{ margin: '0 0 4px' }}><strong>Множитель (2 - RIR)</strong> — при максимальной защите RIR=1.0, множитель = 1.0 (без изменения). При отсутствии защиты RIR=0.5, множитель = 1.5 (повышение риска)</p>
           </div>
         )}
       </div>
 
-      {/* РџРѕСЂРѕРіРё РїСЂРµРїР°СЂР°С‚РѕРІ */}
+      {/* Пороги препаратов */}
       <div className="card" style={{ marginBottom: 8 }}>
         <div className="risk-card-header" style={{ cursor: 'pointer' }} onClick={() => toggle('thresholds')}>
-          <h4 style={{ margin: 0, fontSize: 13 }}>вљ пёЏ РџРѕСЂРѕРіРѕРІС‹Рµ РґРѕР·С‹ РїСЂРµРїР°СЂР°С‚РѕРІ</h4>
-          <span style={{ fontSize: 12 }}>{expanded === 'thresholds' ? 'в–ё' : 'в–ѕ'}</span>
+          <h4 style={{ margin: 0, fontSize: 13 }}>⚠️ Пороговые дозы препаратов</h4>
+          <span style={{ fontSize: 12 }}>{expanded === 'thresholds' ? '▸' : '▾'}</span>
         </div>
         {expanded === 'thresholds' && (
           <div style={{ marginTop: 8, fontSize: 10 }}>
@@ -581,7 +581,7 @@ net = \u03a3(sourceRaw \u00d7 weight / totalWeight)`}
                 return (
                 <div key={id} style={{ background: 'var(--bg-secondary)', padding: '4px 8px', borderRadius: 4 }}>
                   <div style={{ fontWeight: 500, fontSize: 11 }}>{name}</div>
-                  <div style={{ color: 'var(--text-dim)' }}>{t.dosePerWeek} РјРі/РЅРµРґ</div>
+                  <div style={{ color: 'var(--text-dim)' }}>{t.dosePerWeek} мг/нед</div>
                 </div>
                 );
               })}
@@ -590,11 +590,11 @@ net = \u03a3(sourceRaw \u00d7 weight / totalWeight)`}
         )}
       </div>
 
-      {/* 14 СЃРёСЃС‚РµРј */}
+      {/* 14 систем */}
       <div className="card" style={{ marginBottom: 8 }}>
         <div className="risk-card-header" style={{ cursor: 'pointer' }} onClick={() => toggle('systems')}>
-          <h4 style={{ margin: 0, fontSize: 13 }}>рџ«Ђ 14 СЃРёСЃС‚РµРј РѕСЂРіР°РЅРѕРІ</h4>
-          <span style={{ fontSize: 12 }}>{expanded === 'systems' ? 'в–ё' : 'в–ѕ'}</span>
+          <h4 style={{ margin: 0, fontSize: 13 }}>🫀 14 систем органов</h4>
+          <span style={{ fontSize: 12 }}>{expanded === 'systems' ? '▸' : '▾'}</span>
         </div>
         {expanded === 'systems' && (
           <div style={{ marginTop: 8, fontSize: 11 }}>
@@ -602,9 +602,9 @@ net = \u03a3(sourceRaw \u00d7 weight / totalWeight)`}
               const info = SYSTEM_INFO_ALL[sys] || SYSTEM_INFO[sys];
               return (
                 <div key={sys} style={{ background: 'var(--bg-secondary)', padding: '6px 10px', borderRadius: 6, marginBottom: 4 }}>
-                  <span style={{ fontSize: 14 }}>{info?.icon || 'вљ пёЏ'}</span>
+                  <span style={{ fontSize: 14 }}>{info?.icon || '⚠️'}</span>
                   <span style={{ fontWeight: 600, marginLeft: 6 }}>{info?.label || sys}</span>
-                  {info?.keyMarkers && <div style={{ fontSize: 9, color: 'var(--text-dim)', marginTop: 2 }}>РљР»СЋС‡РµРІС‹Рµ РјР°СЂРєРµСЂС‹: {info.keyMarkers.join(', ')}</div>}
+                  {info?.keyMarkers && <div style={{ fontSize: 9, color: 'var(--text-dim)', marginTop: 2 }}>Ключевые маркеры: {info.keyMarkers.join(', ')}</div>}
                 </div>
               );
             })}
@@ -612,15 +612,15 @@ net = \u03a3(sourceRaw \u00d7 weight / totalWeight)`}
         )}
       </div>
 
-            {/* РЎРїРµС†РёС„РёС‡РЅС‹Рµ РјРµС…Р°РЅРёР·РјС‹ РїРѕ СЃРёСЃС‚РµРјР°Рј */}
+            {/* Специфичные механизмы по системам */}
       <div className="card" style={{ marginBottom: 8 }}>
         <div className="risk-card-header" style={{ cursor: 'pointer' }} onClick={() => toggle('sysmechs')}>
-          <h4 style={{ margin: 0, fontSize: 13 }}>рџ”¬ РЎРїРµС†РёС„РёС‡РЅС‹Рµ РјРµС…Р°РЅРёР·РјС‹ РїРѕ СЃРёСЃС‚РµРјР°Рј</h4>
-          <span style={{ fontSize: 12 }}>{expanded === 'sysmechs' ? 'в–ё' : 'в–ѕ'}</span>
+          <h4 style={{ margin: 0, fontSize: 13 }}>🔬 Специфичные механизмы по системам</h4>
+          <span style={{ fontSize: 12 }}>{expanded === 'sysmechs' ? '▸' : '▾'}</span>
         </div>
         {expanded === 'sysmechs' && (
           <div style={{ marginTop: 8, fontSize: 11 }}>
-            <p style={{ margin: '0 0 8px', color: 'var(--text-dim)' }}>РљР°Р¶РґР°СЏ СЃРёСЃС‚РµРјР° РѕСЂРіР°РЅРѕРІ РёРјРµРµС‚ 7вЂ“8 СЃРїРµС†РёС„РёС‡РЅС‹С… РјРµС…Р°РЅРёР·РјРѕРІ РїРѕРІСЂРµР¶РґРµРЅРёСЏ, РєРѕС‚РѕСЂС‹Рµ СЂР°СЃСЃС‡РёС‚С‹РІР°СЋС‚СЃСЏ РЅРµР·Р°РІРёСЃРёРјРѕ Рё Р·Р°С‚РµРј Р°РіСЂРµРіРёСЂСѓСЋС‚СЃСЏ.</p>
+            <p style={{ margin: '0 0 8px', color: 'var(--text-dim)' }}>Каждая система органов имеет 7–8 специфичных механизмов повреждения, которые рассчитываются независимо и затем агрегируются.</p>
             <div style={{ background: 'var(--bg-secondary)', padding: 10, borderRadius: 8, fontFamily: 'monospace', fontSize: 10, marginBottom: 8, overflowX: 'auto', whiteSpace: 'pre-wrap' }}>
 {`specificRisk(sys, mech) = max(0, baseRisk \u00d7 doseRatio \u00d7 G \u00d7 N \u00d7 T \u00d7 (1 + mechWeight \u00d7 3))
 
@@ -628,7 +628,7 @@ systemRisk(sys) = geom(allSpecificMechs(sys))
 
 overallRisk = geom(allSystems) \u00d7 overallMRR \u00d7 overallHGI \u00d7 (2 - overallRIR)`}
             </div>
-            <p style={{ margin: '0 0 6px', color: 'var(--text-dim)', fontSize: 10 }}>РњРµС…Р°РЅРёР·РјС‹ РїСЂРёРІСЏР·Р°РЅС‹ Рє РїСЂРµРїР°СЂР°С‚Р°Рј Рё РјР°СЂРєРµСЂР°Рј Р°РЅР°Р»РёР·РѕРІ:</p>
+            <p style={{ margin: '0 0 6px', color: 'var(--text-dim)', fontSize: 10 }}>Механизмы привязаны к препаратам и маркерам анализов:</p>
             {ALL_RISK_SYSTEMS.map(sys => {
               const info = SYSTEM_INFO_ALL[sys] || SYSTEM_INFO[sys];
               const mechs = SYSTEM_MECHANISMS[sys] || [];
@@ -637,7 +637,7 @@ overallRisk = geom(allSystems) \u00d7 overallMRR \u00d7 overallHGI \u00d7 (2 - o
                 <div key={sys} style={{ background: 'var(--bg-secondary)', padding: '6px 10px', borderRadius: 6, marginBottom: 4 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <span style={{ fontWeight: 600 }}>{info?.icon || '?'} {info?.label || sys}</span>
-                    <span style={{ fontSize: 9, color: 'var(--text-dim)' }}>{mechs.length} РјРµС….</span>
+                    <span style={{ fontSize: 9, color: 'var(--text-dim)' }}>{mechs.length} мех.</span>
                   </div>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 2, marginTop: 3 }}>
                     {mechs.map(m => (
@@ -648,7 +648,7 @@ overallRisk = geom(allSystems) \u00d7 overallMRR \u00d7 overallHGI \u00d7 (2 - o
                   </div>
                   {SYSTEM_ORGANS[sys] && (
                     <div style={{ fontSize: 9, color: 'var(--text-dim)', marginTop: 2 }}>
-                      РћСЂРіР°РЅС‹: {SYSTEM_ORGANS[sys].slice(0, 3).join(', ')}
+                      Органы: {SYSTEM_ORGANS[sys].slice(0, 3).join(', ')}
                     </div>
                   )}
                 </div>
@@ -660,8 +660,8 @@ overallRisk = geom(allSystems) \u00d7 overallMRR \u00d7 overallHGI \u00d7 (2 - o
 
 {/* Disclaimer */}
       <div style={{ fontSize: 10, color: 'var(--text-dim)', textAlign: 'center', marginTop: 8, fontStyle: 'italic', lineHeight: 1.4 }}>
-        Р”Р°РЅРЅС‹Рµ СЂР°СЃС‡С‘С‚С‹ РЅРѕСЃСЏС‚ РёРЅС„РѕСЂРјР°С†РёРѕРЅРЅС‹Р№ С…Р°СЂР°РєС‚РµСЂ Рё РЅРµ Р·Р°РјРµРЅСЏСЋС‚ РєРѕРЅСЃСѓР»СЊС‚Р°С†РёСЋ РІСЂР°С‡Р°.<br/>
-        РњРѕРґРµР»СЊ Health Engine v9 вЂ” РјР°С‚РµРјР°С‚РёС‡РµСЃРєР°СЏ Р°РїРїСЂРѕРєСЃРёРјР°С†РёСЏ РЅР° РѕСЃРЅРѕРІРµ РѕРїСѓР±Р»РёРєРѕРІР°РЅРЅС‹С… РґР°РЅРЅС‹С….
+        Данные расчёты носят информационный характер и не заменяют консультацию врача.<br/>
+        Модель Health Engine v9 — математическая аппроксимация на основе опубликованных данных.
       </div>
     </div>
   );

@@ -20,13 +20,13 @@ export function calculateHealthScore(
   targetKcal: number,
   targetProtein: number
 ): HealthScoreResult {
-  // 1. Р¤Р°СЂРјР°-РЅР°РіСЂСѓР·РєР° (РѕР±СЂР°С‚РЅРѕ РїСЂРѕРїРѕСЂС†РёРѕРЅР°Р»СЊРЅР°: РјРµРЅСЊС€Рµ С‚РѕРєСЃРёС‡РЅРѕСЃС‚СЊ = РІС‹С€Рµ СЃРєРѕСЂ)
+  // 1. Фарма-нагрузка (обратно пропорциональна: меньше токсичность = выше скор)
   const pkpd = calculateMultiSubstancePKPD(course, 4);
   const avgCp = pkpd.length ? pkpd.reduce((s, w) => s + w.cp, 0) / pkpd.length : 0;
   const avgTol = pkpd.length ? pkpd.reduce((s, w) => s + w.tol, 0) / pkpd.length : 0;
   const pharmaScore = pkpd.length ? clamp(100 - (avgCp / 500 * 60) - (avgTol * 40)) : 50;
 
-  // 2. Р›Р°Р±РѕСЂР°С‚РѕСЂРЅС‹Р№ СЃС‚Р°С‚СѓСЃ (РЅР° Р±Р°Р·Рµ РёРЅРґРµРєСЃРѕРІ Рё РѕС‚РєР»РѕРЅРµРЅРёР№)
+  // 2. Лабораторный статус (на базе индексов и отклонений)
   const indices = calculateIndices(labs);
   let labDeviations = 0;
   Object.values(indices).forEach(idx => {
@@ -34,7 +34,7 @@ export function calculateHealthScore(
   });
   const labsScore = clamp(100 - (labDeviations * 15));
 
-  // 3. РќСѓС‚СЂРёС‚РёРІРЅС‹Р№ adherence (СЃСЂРµРґРЅРµРµ Р·Р° РїРѕСЃР»РµРґРЅРёРµ 7 РґРЅРµР№)
+  // 3. Нутритивный adherence (среднее за последние 7 дней)
   const recentLogs = nutritionLog.slice(-7);
   const adherenceScores = recentLogs.map(l => {
     const target = { bmr: 0, tdee: 0, kcal: targetKcal, protein: targetProtein, fats: 0, carbs: 0, water: 0, fiber: 0, micros: {} };
@@ -42,16 +42,16 @@ export function calculateHealthScore(
   });
   const nutritionScore = recentLogs.length ? clamp(Math.round(adherenceScores.reduce((a,b)=>a+b,0)/recentLogs.length)) : 50;
 
-  // РС‚РѕРі
+  // Итог
   const score = Math.round(pharmaScore * 0.35 + labsScore * 0.45 + nutritionScore * 0.20);
   const trend = score > 65 ? 'improving' : score > 45 ? 'stable' : 'declining';
-  const vector = trend === 'improving' ? 'рџџў РљСѓСЂСЃ РїРµСЂРµРЅРѕСЃРёС‚СЃСЏ С…РѕСЂРѕС€Рѕ. РџСЂРѕРґРѕР»Р¶Р°С‚СЊ РјРѕРЅРёС‚РѕСЂРёРЅРі.' : trend === 'stable' ? 'рџџЎ РЎС‚Р°Р±РёР»СЊРЅС‹Р№ РїСЂРѕС„РёР»СЊ. РЈСЃРёР»РёС‚СЊ РїРѕРґРґРµСЂР¶РєСѓ РїРµС‡РµРЅРё/Р»РёРїРёРґРѕРІ.' : 'рџ”ґ РџСЂРѕРіСЂРµСЃСЃРёСЂСѓСЋС‰Р°СЏ РЅР°РіСЂСѓР·РєР°. Р Р°СЃСЃРјРѕС‚СЂРµС‚СЊ СЃРЅРёР¶РµРЅРёРµ РґРѕР· РёР»Рё РїР°СѓР·Сѓ.';
+  const vector = trend === 'improving' ? '🟢 Курс переносится хорошо. Продолжать мониторинг.' : trend === 'stable' ? '🟡 Стабильный профиль. Усилить поддержку печени/липидов.' : '🔴 Прогрессирующая нагрузка. Рассмотреть снижение доз или паузу.';
 
   const recommendations: string[] = [];
-  if (pharmaScore < 60) recommendations.push('вљ пёЏ Р’С‹СЃРѕРєР°СЏ РєРѕРЅС†РµРЅС‚СЂР°С†РёСЏ/С‚РѕР»РµСЂР°РЅС‚РЅРѕСЃС‚СЊ. Р Р°СЃСЃРјРѕС‚СЂРµС‚СЊ РґРµР»РѕРґ РёР»Рё СЃРЅРёР¶РµРЅРёРµ РґРѕР·С‹.');
-  if (labsScore < 70) recommendations.push('рџ©ё РћС‚РєР»РѕРЅРµРЅРёСЏ РІ РјР°СЂРєРµСЂР°С…. РЎРІРµСЂСЊС‚РµСЃСЊ СЃ РєР»РёРЅРёС‡РµСЃРєРёРјРё РёРЅРґРµРєСЃР°РјРё РІРѕ РІРєР»Р°РґРєРµ "Р›Р°Р±С‹".');
-  if (nutritionScore < 60) recommendations.push('рџҐ— РќРёР·РєРёР№ adherence. РЎРєРѕСЂСЂРµРєС‚РёСЂСѓР№С‚Рµ Р‘Р–РЈ Рё РІРѕРґРЅС‹Р№ Р±Р°Р»Р°РЅСЃ РїРѕ РїР»Р°РЅРёСЂРѕРІС‰РёРєСѓ.');
-  if (recommendations.length === 0) recommendations.push('вњ… Р’СЃРµ СЃРёСЃС‚РµРјС‹ РІ РїСЂРµРґРµР»Р°С… С†РµР»РµРІС‹С… РґРёР°РїР°Р·РѕРЅРѕРІ.');
+  if (pharmaScore < 60) recommendations.push('⚠️ Высокая концентрация/толерантность. Рассмотреть делод или снижение дозы.');
+  if (labsScore < 70) recommendations.push('🩸 Отклонения в маркерах. Сверьтесь с клиническими индексами во вкладке "Лабы".');
+  if (nutritionScore < 60) recommendations.push('🥗 Низкий adherence. Скорректируйте БЖУ и водный баланс по планировщику.');
+  if (recommendations.length === 0) recommendations.push('✅ Все системы в пределах целевых диапазонов.');
 
   return { score, trend, vector, breakdown: { pharma: Math.round(pharmaScore), labs: Math.round(labsScore), nutrition: Math.round(nutritionScore) }, recommendations };
 }

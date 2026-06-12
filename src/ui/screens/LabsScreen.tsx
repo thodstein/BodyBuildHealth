@@ -39,7 +39,7 @@ const PHASE_LABELS: Record<string, string> = {
   on_cycle: '',
   bridge: '',
   pct: '',
-  post_pct: 'вњ… РџРѕСЃР»Рµ РџРљРў',
+  post_pct: '✅ После ПКТ',
   course_bridge_course: '',
 };
 
@@ -55,7 +55,7 @@ const PROFILE_PHASE_TO_LABS_PHASE: Record<string, string> = {
 };
 
 const sysLabels: Record<string, string> = {
-  cardio: 'вќ¤пёЏ РЎРµСЂРґС†Рµ', hepatic: '', renal: '',
+  cardio: '❤️ Сердце', hepatic: '', renal: '',
   neuro: '', endocrine: '', hematologic: '',
   reproductive: '', musculoskeletal: '', metabolic: '',
 };
@@ -149,7 +149,7 @@ export const LabsScreen: React.FC = () => {
     return calculatePenaltyCoefficients(selectedPhase, labs, [], 1, linked.course, globalNoLabs);
   }, [selectedPhase, labs, linked.course, globalNoLabs]);
 
-  // Lab risks вЂ” compute contributions per marker for detailed display
+  // Lab risks — compute contributions per marker for detailed display
   const labRisks = useMemo<{ overallNet: number; systemBreakdown: Record<string, { raw: number; net: number }>; markerDeviations: { code: string; name: string; value: number; uln: number; lln: number; deviation: number; system: string }[] } | null>(() => {
     if (!hasLabs) return null;
     const labData = labs.map(l => ({ ...l, date: l.date || new Date().toISOString().split('T')[0] }));
@@ -300,7 +300,7 @@ export const LabsScreen: React.FC = () => {
 
   return (
     <div className="screen labs">
-      <h2 style={{ margin: '0 0 10px', fontSize: 18 }}>рџ§Є РђРЅР°Р»РёР·С‹</h2>
+      <h2 style={{ margin: '0 0 10px', fontSize: 18 }}>🧪 Анализы</h2>
 
       {/* Phase selector */}
       <div style={{ display: 'flex', gap: 3, overflowX: 'auto', marginBottom: 8, scrollbarWidth: 'none' }}>
@@ -333,7 +333,7 @@ export const LabsScreen: React.FC = () => {
         ))}
       </div>
 
-      {/* в‰Ўв‰Ўв‰Ў RESULTS TAB в‰Ўв‰Ўв‰Ў */}
+      {/* ≡≡≡ RESULTS TAB ≡≡≡ */}
       {tab === 'results' && (
         <div>
           {/* Required labs progress */}
@@ -365,7 +365,7 @@ export const LabsScreen: React.FC = () => {
                         color: isSubmitted ? (isHigh ? '#ef4444' : isLow ? '#f97316' : 'var(--accent)') : 'var(--text-dim)',
                         fontWeight: isSubmitted ? 600 : 400,
                       }}>
-                        {isSubmitted ? (isHigh ? 'в†‘' : isLow ? 'в†“' : 'вњ“') : 'в—‹'} {info?.name || code}
+                        {isSubmitted ? (isHigh ? '↑' : isLow ? '↓' : '✓') : '○'} {info?.name || code}
                         {latest && <span style={{ marginLeft: 2, fontWeight: 700 }}>{latest.value}</span>}
                       </button>
                     );
@@ -375,7 +375,7 @@ export const LabsScreen: React.FC = () => {
             ))}
             {missingLabs.length > 0 && missingLabs.length < requiredLabs.length && (
               <div style={{ marginTop: 4, padding: '3px 6px', background: 'rgba(239,68,68,0.08)', borderRadius: 4, fontSize: 9, color: 'var(--text-dim)' }}>
-                РќРµ СЃРґР°РЅРѕ: {missingLabs.slice(0, 6).join(', ')}{missingLabs.length > 6 ? ` +${missingLabs.length - 6}` : ''}
+                Не сдано: {missingLabs.slice(0, 6).join(', ')}{missingLabs.length > 6 ? ` +${missingLabs.length - 6}` : ''}
               </div>
             )}
 
@@ -388,15 +388,15 @@ export const LabsScreen: React.FC = () => {
               <button onClick={() => { setShowImport(true); setTimeout(() => fileInputRef.current?.click(), 100); }} style={{
                 flex: 1, padding: 7, borderRadius: 6, border: '1px solid var(--border)',
                 background: 'var(--bg-secondary)', color: 'var(--accent)', fontWeight: 600, fontSize: 11, cursor: 'pointer',
-              }}>рџ“„ PDF</button>
+              }}>📄 PDF</button>
               <button onClick={() => { setShowImport(true); setTimeout(() => cameraInputRef.current?.click(), 100); }} style={{
                 flex: 1, padding: 7, borderRadius: 6, border: '1px solid var(--border)',
                 background: 'var(--bg-secondary)', color: 'var(--accent)', fontWeight: 600, fontSize: 11, cursor: 'pointer',
-              }}>рџ“ё Р¤РѕС‚Рѕ</button>
+              }}>📸 Фото</button>
               <button onClick={() => setShowLabInput(true)} style={{
                 flex: 1, padding: 7, borderRadius: 6, border: '1px solid var(--border)',
                 background: 'var(--bg-secondary)', color: 'var(--text-dim)', fontWeight: 600, fontSize: 11, cursor: 'pointer',
-              }}>вњЏпёЏ Р’СЂСѓС‡РЅСѓСЋ</button>
+              }}>✏️ Вручную</button>
             </div>
           </div>
 
@@ -406,14 +406,14 @@ export const LabsScreen: React.FC = () => {
           {/* Lab Analysis Composite Scores */}
           {labAnalysisResult && (
             <div className="card" style={{ padding: 10, marginTop: 8 }}>
-              <h4 style={{ margin: '0 0 6px 0', fontSize: 12 }}>рџ§Є РљРѕРјРїРѕР·РёС‚РЅС‹Рµ РёРЅРґРµРєСЃС‹</h4>
+              <h4 style={{ margin: '0 0 6px 0', fontSize: 12 }}>🧪 Композитные индексы</h4>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr 1fr', gap: '2px 6px', fontSize: 10, alignItems: 'center' }}>
                 {labAnalysisResult.homaIR !== null && <><span style={{ color: 'var(--text-dim)' }}>HOMA-IR</span><span><div style={{ background: 'rgba(255,255,255,0.08)', borderRadius: 3, height: 6, overflow: 'hidden' }}><div style={{ width: `${Math.min(100, labAnalysisResult.homaIR * 40)}%`, height: '100%', background: labAnalysisResult.homaIR > 2.5 ? '#ef4444' : '#22c55e', borderRadius: 3 }} /></div></span><span style={{ fontWeight: 600, textAlign: 'right', color: labAnalysisResult.homaIR > 2.5 ? '#ef4444' : '#22c55e' }}>{labAnalysisResult.homaIR.toFixed(2)}</span></>}
-                <span style={{ color: 'var(--text-dim)' }}>РџРµС‡РµРЅСЊ</span><div><div style={{ background: 'rgba(255,255,255,0.08)', borderRadius: 3, height: 6, overflow: 'hidden' }}><div style={{ width: `${labAnalysisResult.liverStress}%`, height: '100%', background: labAnalysisResult.liverStress > 60 ? '#ef4444' : '#22c55e', borderRadius: 3 }} /></div></div><span style={{ fontWeight: 600, textAlign: 'right', color: labAnalysisResult.liverStress > 60 ? '#ef4444' : '#22c55e' }}>{labAnalysisResult.liverStress}%</span>
-                <span style={{ color: 'var(--text-dim)' }}>РљР°СЂРґРёРѕ</span><div><div style={{ background: 'rgba(255,255,255,0.08)', borderRadius: 3, height: 6, overflow: 'hidden' }}><div style={{ width: `${labAnalysisResult.cardioRisk}%`, height: '100%', background: labAnalysisResult.cardioRisk > 60 ? '#ef4444' : '#22c55e', borderRadius: 3 }} /></div></div><span style={{ fontWeight: 600, textAlign: 'right', color: labAnalysisResult.cardioRisk > 60 ? '#ef4444' : '#22c55e' }}>{labAnalysisResult.cardioRisk}%</span>
-                <span style={{ color: 'var(--text-dim)' }}>Р’РѕСЃРїР°Р»РµРЅРёРµ</span><div><div style={{ background: 'rgba(255,255,255,0.08)', borderRadius: 3, height: 6, overflow: 'hidden' }}><div style={{ width: `${Math.min(100, labAnalysisResult.inflammation * 15)}%`, height: '100%', background: labAnalysisResult.inflammation > 6 ? '#ef4444' : '#22c55e', borderRadius: 3 }} /></div></div><span style={{ fontWeight: 600, textAlign: 'right', color: labAnalysisResult.inflammation > 6 ? '#ef4444' : '#22c55e' }}>{labAnalysisResult.inflammation.toFixed(1)}</span>
-                <span style={{ color: 'var(--text-dim)' }}>РџРѕС‡РєРё</span><div><div style={{ background: 'rgba(255,255,255,0.08)', borderRadius: 3, height: 6, overflow: 'hidden' }}><div style={{ width: `${labAnalysisResult.kidneyStress}%`, height: '100%', background: labAnalysisResult.kidneyStress > 60 ? '#ef4444' : '#22c55e', borderRadius: 3 }} /></div></div><span style={{ fontWeight: 600, textAlign: 'right', color: labAnalysisResult.kidneyStress > 60 ? '#ef4444' : '#22c55e' }}>{labAnalysisResult.kidneyStress}%</span>
-                <span style={{ color: 'var(--text-dim)' }}>Р“РѕСЂРјРѕРЅС‹</span><div><div style={{ background: 'rgba(255,255,255,0.08)', borderRadius: 3, height: 6, overflow: 'hidden' }}><div style={{ width: `${labAnalysisResult.hormoneScore}%`, height: '100%', background: labAnalysisResult.hormoneScore > 60 ? '#ef4444' : '#22c55e', borderRadius: 3 }} /></div></div><span style={{ fontWeight: 600, textAlign: 'right', color: labAnalysisResult.hormoneScore > 60 ? '#ef4444' : '#22c55e' }}>{labAnalysisResult.hormoneScore}%</span>
+                <span style={{ color: 'var(--text-dim)' }}>Печень</span><div><div style={{ background: 'rgba(255,255,255,0.08)', borderRadius: 3, height: 6, overflow: 'hidden' }}><div style={{ width: `${labAnalysisResult.liverStress}%`, height: '100%', background: labAnalysisResult.liverStress > 60 ? '#ef4444' : '#22c55e', borderRadius: 3 }} /></div></div><span style={{ fontWeight: 600, textAlign: 'right', color: labAnalysisResult.liverStress > 60 ? '#ef4444' : '#22c55e' }}>{labAnalysisResult.liverStress}%</span>
+                <span style={{ color: 'var(--text-dim)' }}>Кардио</span><div><div style={{ background: 'rgba(255,255,255,0.08)', borderRadius: 3, height: 6, overflow: 'hidden' }}><div style={{ width: `${labAnalysisResult.cardioRisk}%`, height: '100%', background: labAnalysisResult.cardioRisk > 60 ? '#ef4444' : '#22c55e', borderRadius: 3 }} /></div></div><span style={{ fontWeight: 600, textAlign: 'right', color: labAnalysisResult.cardioRisk > 60 ? '#ef4444' : '#22c55e' }}>{labAnalysisResult.cardioRisk}%</span>
+                <span style={{ color: 'var(--text-dim)' }}>Воспаление</span><div><div style={{ background: 'rgba(255,255,255,0.08)', borderRadius: 3, height: 6, overflow: 'hidden' }}><div style={{ width: `${Math.min(100, labAnalysisResult.inflammation * 15)}%`, height: '100%', background: labAnalysisResult.inflammation > 6 ? '#ef4444' : '#22c55e', borderRadius: 3 }} /></div></div><span style={{ fontWeight: 600, textAlign: 'right', color: labAnalysisResult.inflammation > 6 ? '#ef4444' : '#22c55e' }}>{labAnalysisResult.inflammation.toFixed(1)}</span>
+                <span style={{ color: 'var(--text-dim)' }}>Почки</span><div><div style={{ background: 'rgba(255,255,255,0.08)', borderRadius: 3, height: 6, overflow: 'hidden' }}><div style={{ width: `${labAnalysisResult.kidneyStress}%`, height: '100%', background: labAnalysisResult.kidneyStress > 60 ? '#ef4444' : '#22c55e', borderRadius: 3 }} /></div></div><span style={{ fontWeight: 600, textAlign: 'right', color: labAnalysisResult.kidneyStress > 60 ? '#ef4444' : '#22c55e' }}>{labAnalysisResult.kidneyStress}%</span>
+                <span style={{ color: 'var(--text-dim)' }}>Гормоны</span><div><div style={{ background: 'rgba(255,255,255,0.08)', borderRadius: 3, height: 6, overflow: 'hidden' }}><div style={{ width: `${labAnalysisResult.hormoneScore}%`, height: '100%', background: labAnalysisResult.hormoneScore > 60 ? '#ef4444' : '#22c55e', borderRadius: 3 }} /></div></div><span style={{ fontWeight: 600, textAlign: 'right', color: labAnalysisResult.hormoneScore > 60 ? '#ef4444' : '#22c55e' }}>{labAnalysisResult.hormoneScore}%</span>
               </div>
             </div>
           )}
@@ -421,10 +421,10 @@ export const LabsScreen: React.FC = () => {
           {/* Lab-Pharma Correlation */}
           {labPharmaAlerts.length > 0 && (
             <div className="card" style={{ padding: 10, marginTop: 8 }}>
-              <h4 style={{ margin: '0 0 6px', fontSize: 12 }}>рџ’Љ РЎРІСЏР·СЊ Р°РЅР°Р»РёР·С‹в†”РїСЂРµРїР°СЂР°С‚С‹ ({labPharmaAlerts.length})</h4>
+              <h4 style={{ margin: '0 0 6px', fontSize: 12 }}>💊 Связь анализы↔препараты ({labPharmaAlerts.length})</h4>
               {labPharmaAlerts.map((a,i) => <div key={i} style={{ fontSize:9, padding:'3px 0', borderBottom:'1px solid rgba(255,255,255,0.03)', display:'flex',justifyContent:'space-between' }}>
-                <span>{a.marker} {a.actualStatus === 'high' ? 'в†‘' : a.actualStatus === 'low' ? 'в†“' : ''} {a.value}{a.unit}</span>
-                <span style={{ color: a.severity === 'critical' ? '#ef4444' : a.severity === 'high' ? '#f59e0b' : '#22c55e' }}>{a.drugCause?.join(', ')} вЂ” {a.recommendation}</span>
+                <span>{a.marker} {a.actualStatus === 'high' ? '↑' : a.actualStatus === 'low' ? '↓' : ''} {a.value}{a.unit}</span>
+                <span style={{ color: a.severity === 'critical' ? '#ef4444' : a.severity === 'high' ? '#f59e0b' : '#22c55e' }}>{a.drugCause?.join(', ')} — {a.recommendation}</span>
               </div>)}
             </div>
           )}
@@ -432,25 +432,25 @@ export const LabsScreen: React.FC = () => {
           {/* Lab Risks + Deviations */}
           {labRisks && (
             <div className="card" style={{ marginTop: 8 }}>
-              <h3 style={{ fontSize: 13, margin: '0 0 8px' }}>рџ”¬ Р РёСЃРєРё РёР· Р°РЅР°Р»РёР·РѕРІ</h3>
+              <h3 style={{ fontSize: 13, margin: '0 0 8px' }}>🔬 Риски из анализов</h3>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 8 }}>
                 <div style={{ background: 'var(--bg-secondary)', padding: 8, borderRadius: 6, textAlign: 'center' }}>
-                  <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>РћР±С‰РёР№ СЂРёСЃРє</div>
+                  <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Общий риск</div>
                   <div style={{ fontSize: 20, fontWeight: 700, color: getRiskColor(labRisks.overallNet) }}>{Math.round(labRisks.overallNet)}%</div>
                 </div>
                 <div style={{ background: 'var(--bg-secondary)', padding: 8, borderRadius: 6, textAlign: 'center' }}>
-                  <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>РћС‚РєР»РѕРЅРµРЅРёСЏ</div>
+                  <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Отклонения</div>
                   <div style={{ fontSize: 20, fontWeight: 700, color: deviationCount > 0 ? '#ef4444' : 'var(--text-dim)' }}>
                     {deviationCount}
                   </div>
-                  <div style={{ fontSize: 8, color: 'var(--text-dim)' }}>РјР°СЂРєРµСЂРѕРІ</div>
+                  <div style={{ fontSize: 8, color: 'var(--text-dim)' }}>маркеров</div>
                 </div>
               </div>
 
               {/* Per-marker deviations */}
               {deviationCount > 0 && (
                 <div style={{ marginBottom: 8 }}>
-                  <div style={{ fontSize: 10, fontWeight: 600, marginBottom: 4, color: 'var(--text-dim)' }}>РњР°СЂРєРµСЂС‹ СЃ РѕС‚РєР»РѕРЅРµРЅРёСЏРјРё:</div>
+                  <div style={{ fontSize: 10, fontWeight: 600, marginBottom: 4, color: 'var(--text-dim)' }}>Маркеры с отклонениями:</div>
                   <div style={{ display: 'grid', gap: 2 }}>
                     {labRisks.markerDeviations.slice(0, 10).map(m => {
                       const isHigh = m.deviation > 0;
@@ -459,8 +459,8 @@ export const LabsScreen: React.FC = () => {
                         <div key={m.code} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '3px 6px', background: 'var(--bg-secondary)', borderRadius: 4 }}>
                           <span style={{ fontSize: 8, color: 'var(--accent)', minWidth: 50 }}>{m.system}</span>
                           <span style={{ fontSize: 10, fontWeight: 600, flex: 1 }}>{m.name}</span>
-                          <span style={{ fontSize: 9, color: 'var(--text-dim)' }}>РЅРѕСЂРјР° {m.lln}вЂ“{m.uln}</span>
-                          <span style={{ fontSize: 10, fontWeight: 700, color }}>{m.value} ({isHigh ? 'в†‘' : 'в†“'}{Math.abs(m.deviation)}%)</span>
+                          <span style={{ fontSize: 9, color: 'var(--text-dim)' }}>норма {m.lln}–{m.uln}</span>
+                          <span style={{ fontSize: 10, fontWeight: 700, color }}>{m.value} ({isHigh ? '↑' : '↓'}{Math.abs(m.deviation)}%)</span>
                         </div>
                       );
                     })}
@@ -471,7 +471,7 @@ export const LabsScreen: React.FC = () => {
               {/* Systems breakdown */}
               {Object.entries(labRisks.systemBreakdown).filter(([_, v]) => v.net > 0).length > 0 && (
                 <div style={{ marginTop: 4 }}>
-                  <div style={{ fontSize: 10, fontWeight: 600, marginBottom: 4, color: 'var(--text-dim)' }}>РџРѕ СЃРёСЃС‚РµРјР°Рј:</div>
+                  <div style={{ fontSize: 10, fontWeight: 600, marginBottom: 4, color: 'var(--text-dim)' }}>По системам:</div>
                   <div style={{ display: 'grid', gap: 2 }}>
                     {Object.entries(labRisks.systemBreakdown)
                       .filter(([_, v]) => v.net > 0)
@@ -491,7 +491,7 @@ export const LabsScreen: React.FC = () => {
               )}
 
               {deviationCount === 0 && (
-                <div style={{ fontSize: 10, color: 'var(--text-dim)', textAlign: 'center' }}>Р’СЃРµ РїРѕРєР°Р·Р°С‚РµР»Рё РІ РЅРѕСЂРјРµ</div>
+                <div style={{ fontSize: 10, color: 'var(--text-dim)', textAlign: 'center' }}>Все показатели в норме</div>
               )}
             </div>
           )}
@@ -499,7 +499,7 @@ export const LabsScreen: React.FC = () => {
           {/* Indices */}
           {indexEntries.length > 0 && (
             <div className="card" style={{ marginTop: 8 }}>
-              <h3 style={{ fontSize: 13, margin: '0 0 6px' }}>рџ“Љ РРЅРґРµРєСЃС‹</h3>
+              <h3 style={{ fontSize: 13, margin: '0 0 6px' }}>📊 Индексы</h3>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4 }}>
                 {indexEntries.map(d => (
                   <div key={d.key} style={{ background: 'var(--bg-secondary)', padding: 5, borderRadius: 5, display: 'flex', justifyContent: 'space-between' }}>
@@ -513,38 +513,38 @@ export const LabsScreen: React.FC = () => {
         </div>
       )}
 
-      {/* в‰Ўв‰Ўв‰Ў SCHEDULE TAB в‰Ўв‰Ўв‰Ў */}
+      {/* ≡≡≡ SCHEDULE TAB ≡≡≡ */}
       {tab === 'schedule' && (
         <div>
           <LabsSchedule />
         </div>
       )}
 
-      {/* в‰Ўв‰Ўв‰Ў INVESTIGATIONS TAB в‰Ўв‰Ўв‰Ў */}
+      {/* ≡≡≡ INVESTIGATIONS TAB ≡≡≡ */}
       {tab === 'investigations' && (
         <div>
           <LabsInvestigations />
         </div>
       )}
 
-      {/* в‰Ўв‰Ўв‰Ў CATALOG TAB в‰Ўв‰Ўв‰Ў */}
+      {/* ≡≡≡ CATALOG TAB ≡≡≡ */}
       {tab === 'catalog' && (
         <div>
           <LabsCatalog />
         </div>
       )}
 
-      {/* Penalty section вЂ” shown on all tabs */}
+      {/* Penalty section — shown on all tabs */}
       <div className="card" style={{ marginTop: 8, background: anyNoLabs ? 'rgba(239,68,68,0.08)' : 'var(--glass-bg)', borderColor: anyNoLabs ? 'rgba(239,68,68,0.3)' : 'var(--glass-border)' }}>
-        <h3 style={{ fontSize: 13, margin: '0 0 6px' }}>вљ пёЏ РЁС‚СЂР°С„ Р·Р° РѕС‚СЃСѓС‚СЃС‚РІРёРµ Р°РЅР°Р»РёР·РѕРІ</h3>
+        <h3 style={{ fontSize: 13, margin: '0 0 6px' }}>⚠️ Штраф за отсутствие анализов</h3>
         <div style={{ fontSize: 10, marginBottom: 6 }}>
           {anyNoLabs ? (
             <div>
-              <div>РњРЅРѕР¶РёС‚РµР»СЊ: <strong style={{ color: '#ef4444' }}>Г—{penalty.totalMultiplier.toFixed(2)}</strong></div>
-              <div>Р›Р°Р±С‹: {Math.round(penalty.labPenalty * 100)}% вЂў Р”РёР°РіРЅРѕСЃС‚РёРєР°: {Math.round(penalty.diagnosticPenalty * 100)}%</div>
+              <div>Множитель: <strong style={{ color: '#ef4444' }}>×{penalty.totalMultiplier.toFixed(2)}</strong></div>
+              <div>Лабы: {Math.round(penalty.labPenalty * 100)}% • Диагностика: {Math.round(penalty.diagnosticPenalty * 100)}%</div>
             </div>
           ) : (
-            <div style={{ color: 'var(--text-dim)' }}>РЁС‚СЂР°С„ РЅРµ РїСЂРёРјРµРЅС‘РЅ.</div>
+            <div style={{ color: 'var(--text-dim)' }}>Штраф не применён.</div>
           )}
         </div>
         <button onClick={toggleGlobalNoLabs} style={{
@@ -552,11 +552,11 @@ export const LabsScreen: React.FC = () => {
           background: globalNoLabs ? 'var(--accent)' : '#ef4444', color: globalNoLabs ? '#000' : '#fff',
           border: 'none', marginBottom: 4,
         }}>
-          {globalNoLabs ? 'вњ… РћС‚РјРµРЅРёС‚СЊ РіР»РѕР±Р°Р»СЊРЅС‹Р№ С€С‚СЂР°С„' : ''}
+          {globalNoLabs ? '✅ Отменить глобальный штраф' : ''}
         </button>
         {!globalNoLabs && (
           <div>
-            <div style={{ fontSize: 8, color: 'var(--text-dim)', marginBottom: 2 }}>РР»Рё РїРѕ СЃРёСЃС‚РµРјРµ:</div>
+            <div style={{ fontSize: 8, color: 'var(--text-dim)', marginBottom: 2 }}>Или по системе:</div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
               {RISK_SYSTEMS.map(sys => {
                 const isActive = noLabsSystems.includes(sys);
@@ -567,7 +567,7 @@ export const LabsScreen: React.FC = () => {
                     border: `1px solid ${isActive ? 'rgba(239,68,68,0.4)' : 'var(--border)'}`,
                     color: isActive ? '#ef4444' : 'var(--text-dim)', fontWeight: isActive ? 700 : 400,
                   }}>
-                    {isActive ? 'вњ• ' : ''}{sysLabels[sys] || sys}
+                    {isActive ? '✕ ' : ''}{sysLabels[sys] || sys}
                   </button>
                 );
               })}
@@ -581,25 +581,25 @@ export const LabsScreen: React.FC = () => {
         <div style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(12px)' }} onClick={() => { setShowImport(false); setOcrResult(null); }}>
           <div style={{ position: 'fixed', top: '8%', left: '4%', right: '4%', zIndex: 201, background: 'var(--bg)', borderRadius: 20, maxHeight: '84vh', overflow: 'hidden', display: 'flex', flexDirection: 'column' }} onClick={e => e.stopPropagation()}>
             <div style={{ padding: '12px 16px 8px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontWeight: 700, fontSize: 15 }}>рџ“„ РРјРїРѕСЂС‚ Р°РЅР°Р»РёР·РѕРІ</span>
-              <button onClick={() => { setShowImport(false); setOcrResult(null); }} style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text-dim)', borderRadius: 8, padding: '4px 10px', fontSize: 12, cursor: 'pointer' }}>вњ•</button>
+              <span style={{ fontWeight: 700, fontSize: 15 }}>📄 Импорт анализов</span>
+              <button onClick={() => { setShowImport(false); setOcrResult(null); }} style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text-dim)', borderRadius: 8, padding: '4px 10px', fontSize: 12, cursor: 'pointer' }}>✕</button>
             </div>
             <div style={{ flex: 1, overflowY: 'auto', padding: '12px 16px' }}>
               {ocrLoading && (
                 <div style={{ textAlign: 'center', padding: 40 }}>
                   <div className="loading-spinner" style={{ margin: '0 auto 16px' }} />
-                  <div style={{ fontSize: 13, color: 'var(--text-dim)' }}>Р Р°СЃРїРѕР·РЅР°СЋ РґРѕРєСѓРјРµРЅС‚...</div>
+                  <div style={{ fontSize: 13, color: 'var(--text-dim)' }}>Распознаю документ...</div>
                 </div>
               )}
               {!ocrLoading && !ocrResult && (
                 <div>
-                  <p style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 12 }}>Р—Р°РіСЂСѓР·РёС‚Рµ PDF, С„РѕС‚Рѕ РёР»Рё РІСЃС‚Р°РІСЊС‚Рµ С‚РµРєСЃС‚ СЂРµР·СѓР»СЊС‚Р°С‚РѕРІ Р°РЅР°Р»РёР·РѕРІ.</p>
+                  <p style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 12 }}>Загрузите PDF, фото или вставьте текст результатов анализов.</p>
                   <div style={{ display: 'grid', gap: 8 }}>
                     <button onClick={() => fileInputRef.current?.click()} style={{ padding: 16, borderRadius: 12, border: '2px dashed var(--border)', background: 'var(--bg-secondary)', color: 'var(--accent)', fontWeight: 600, fontSize: 14, cursor: 'pointer' }}>
-                      рџ“„ Р’С‹Р±СЂР°С‚СЊ PDF РёР»Рё С„РѕС‚Рѕ
+                      📄 Выбрать PDF или фото
                     </button>
                     <button onClick={() => { if (cameraInputRef.current) cameraInputRef.current.click(); }} style={{ padding: 16, borderRadius: 12, border: '2px dashed var(--border)', background: 'var(--bg-secondary)', color: 'var(--accent)', fontWeight: 600, fontSize: 14, cursor: 'pointer' }}>
-                      рџ“ё РЎС„РѕС‚РѕРіСЂР°С„РёСЂРѕРІР°С‚СЊ
+                      📸 Сфотографировать
                     </button>
                     <div style={{ borderTop: '1px solid var(--border)', paddingTop: 8 }}>
                       <textarea
@@ -621,7 +621,7 @@ export const LabsScreen: React.FC = () => {
                         }
                         setOcrLoading(false);
                       }} style={{ padding: 10, borderRadius: 8, border: '1px solid var(--accent)', background: 'rgba(0,230,138,0.1)', color: 'var(--accent)', fontWeight: 600, fontSize: 13, cursor: 'pointer', width: '100%' }}>
-                        рџ“‹ Р Р°Р·РѕР±СЂР°С‚СЊ РІСЃС‚Р°РІР»РµРЅРЅС‹Р№ С‚РµРєСЃС‚
+                        📋 Разобрать вставленный текст
                       </button>
                     </div>
                   </div>
@@ -630,7 +630,7 @@ export const LabsScreen: React.FC = () => {
               {ocrResult && !ocrLoading && (
                 <div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                    <span style={{ fontWeight: 700, fontSize: 13 }}>{ocrResult.labs.length > 0 ? `вњ… РќР°Р№РґРµРЅРѕ: ${ocrResult.labs.length}` : 'вљ пёЏ РќРµ РЅР°Р№РґРµРЅРѕ'}</span>
+                    <span style={{ fontWeight: 700, fontSize: 13 }}>{ocrResult.labs.length > 0 ? `✅ Найдено: ${ocrResult.labs.length}` : '⚠️ Не найдено'}</span>
                     <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>{Math.round(ocrResult.confidence * 100)}%</span>
                   </div>
                   {ocrResult.labs.map(lab => {
@@ -641,7 +641,7 @@ export const LabsScreen: React.FC = () => {
                         background: isSelected ? 'rgba(0,230,138,0.1)' : 'var(--bg-secondary)',
                         border: `1px solid ${isSelected ? 'var(--accent)' : 'var(--border)'}`,
                       }}>
-                        <span style={{ fontWeight: 600, fontSize: 12 }}>{isSelected ? 'вњ“ ' : 'в—‹ '}{lab.name || lab.code}</span>
+                        <span style={{ fontWeight: 600, fontSize: 12 }}>{isSelected ? '✓ ' : '○ '}{lab.name || lab.code}</span>
                         <span style={{ fontWeight: 700, fontSize: 13, color: lab.isAbnormal ? '#ef4444' : 'var(--accent)' }}>{lab.value} {lab.unit}</span>
                       </button>
                     );
@@ -651,7 +651,7 @@ export const LabsScreen: React.FC = () => {
                     background: selectedLabs.size > 0 ? 'var(--accent)' : 'var(--bg-secondary)',
                     color: selectedLabs.size > 0 ? '#000' : 'var(--text-dim)',
                     border: 'none', borderRadius: 10, fontWeight: 700, fontSize: 14, cursor: selectedLabs.size > 0 ? 'pointer' : 'not-allowed',
-                  }}>вњ“ РЎРѕС…СЂР°РЅРёС‚СЊ {selectedLabs.size} РїРѕРєР°Р·Р°С‚РµР»РµР№</button>
+                  }}>✓ Сохранить {selectedLabs.size} показателей</button>
                 </div>
               )}
             </div>
@@ -664,19 +664,19 @@ export const LabsScreen: React.FC = () => {
         <div style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)' }} onClick={() => setShowLabInput(false)}>
           <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 201, background: 'var(--bg)', borderRadius: '16px 16px 0 0', padding: '12px 14px' }} onClick={e => e.stopPropagation()}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-              <span style={{ fontWeight: 700, fontSize: 14 }}>рџ§Є Р’РІРµСЃС‚Рё СЂРµР·СѓР»СЊС‚Р°С‚</span>
-              <button onClick={() => setShowLabInput(false)} style={{ background: 'var(--bg-secondary)', border: 'none', color: 'var(--text-dim)', borderRadius: 6, padding: '3px 8px', fontSize: 11, cursor: 'pointer' }}>вњ•</button>
+              <span style={{ fontWeight: 700, fontSize: 14 }}>🧪 Ввести результат</span>
+              <button onClick={() => setShowLabInput(false)} style={{ background: 'var(--bg-secondary)', border: 'none', color: 'var(--text-dim)', borderRadius: 6, padding: '3px 8px', fontSize: 11, cursor: 'pointer' }}>✕</button>
             </div>
             {(() => { const info = UCUM_MAP[inputCode.toUpperCase()]; return info ? (
-              <div style={{ fontSize: 10, color: 'var(--accent)', marginBottom: 6 }}>{info.name} вЂў РќРѕСЂРјР°: {info.lln}вЂ“{info.uln} {info.prefUnit}</div>
+              <div style={{ fontSize: 10, color: 'var(--accent)', marginBottom: 6 }}>{info.name} • Норма: {info.lln}–{info.uln} {info.prefUnit}</div>
             ) : null; })()}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
-              <div><label style={{ fontSize: 9, color: 'var(--text-dim)' }}>РљРѕРґ</label><input value={inputCode} onChange={e => setInputCode(e.target.value)} placeholder="ALT" style={{ width: '100%', padding: '6px 8px', background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text)', fontSize: 13 }} /></div>
-              <div><label style={{ fontSize: 9, color: 'var(--text-dim)' }}>Р—РЅР°С‡РµРЅРёРµ</label><input type="number" value={inputValue} onChange={e => setInputValue(e.target.value)} placeholder="40" style={{ width: '100%', padding: '6px 8px', background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text)', fontSize: 13 }} /></div>
-              <div><label style={{ fontSize: 9, color: 'var(--text-dim)' }}>Р•РґРёРЅРёС†Р°</label><input value={inputUnit} onChange={e => setInputUnit(e.target.value)} placeholder="U/L" style={{ width: '100%', padding: '6px 8px', background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text)', fontSize: 13 }} /></div>
-              <div><label style={{ fontSize: 9, color: 'var(--text-dim)' }}>Р”Р°С‚Р°</label><input type="date" value={inputDate} onChange={e => setInputDate(e.target.value)} style={{ width: '100%', padding: '6px 8px', background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text)', fontSize: 13 }} /></div>
+              <div><label style={{ fontSize: 9, color: 'var(--text-dim)' }}>Код</label><input value={inputCode} onChange={e => setInputCode(e.target.value)} placeholder="ALT" style={{ width: '100%', padding: '6px 8px', background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text)', fontSize: 13 }} /></div>
+              <div><label style={{ fontSize: 9, color: 'var(--text-dim)' }}>Значение</label><input type="number" value={inputValue} onChange={e => setInputValue(e.target.value)} placeholder="40" style={{ width: '100%', padding: '6px 8px', background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text)', fontSize: 13 }} /></div>
+              <div><label style={{ fontSize: 9, color: 'var(--text-dim)' }}>Единица</label><input value={inputUnit} onChange={e => setInputUnit(e.target.value)} placeholder="U/L" style={{ width: '100%', padding: '6px 8px', background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text)', fontSize: 13 }} /></div>
+              <div><label style={{ fontSize: 9, color: 'var(--text-dim)' }}>Дата</label><input type="date" value={inputDate} onChange={e => setInputDate(e.target.value)} style={{ width: '100%', padding: '6px 8px', background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text)', fontSize: 13 }} /></div>
             </div>
-            <button onClick={addLab} style={{ width: '100%', marginTop: 8, padding: 10, background: 'var(--accent)', color: '#000', border: 'none', borderRadius: 8, fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>вњ“ РЎРѕС…СЂР°РЅРёС‚СЊ</button>
+            <button onClick={addLab} style={{ width: '100%', marginTop: 8, padding: 10, background: 'var(--accent)', color: '#000', border: 'none', borderRadius: 8, fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>✓ Сохранить</button>
           </div>
         </div>
       )}

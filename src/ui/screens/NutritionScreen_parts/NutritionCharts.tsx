@@ -161,17 +161,17 @@ export const NutritionCharts: React.FC<{
     <div className="nutrition-charts">
       {!hasRealData && (
         <div className="card" style={{ marginBottom: 8, padding: '8px 12px', background: 'rgba(255,165,2,0.08)', borderColor: 'rgba(255,165,2,0.3)' }}>
-          <div style={{ fontSize: 11, color: '#ffa502' }}>рџ“Љ РќРµС‚ РґР°РЅРЅС‹С… РґРЅРµРІРЅРёРєР°. Р“СЂР°С„РёРєРё вЂ” РѕС†РµРЅРѕС‡РЅС‹Рµ Р·РЅР°С‡РµРЅРёСЏ.</div>
+          <div style={{ fontSize: 11, color: '#ffa502' }}>📊 Нет данных дневника. Графики — оценочные значения.</div>
         </div>
       )}
       {hasRealData && daysWithData < range && (
         <div className="card" style={{ marginBottom: 8, padding: '8px 12px', background: 'rgba(30,144,255,0.08)', borderColor: 'rgba(30,144,255,0.3)' }}>
-          <div style={{ fontSize: 11, color: '#1e90ff' }}>рџ“Љ Р”Р°РЅРЅС‹Рµ Р·Р° {daysWithData} РёР· {range} РґРЅРµР№.</div>
+          <div style={{ fontSize: 11, color: '#1e90ff' }}>📊 Данные за {daysWithData} из {range} дней.</div>
         </div>
       )}
       <div className="card" style={{ marginBottom: 12 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-          <h3 style={{ margin: 0 }}>рџ“€ Р“СЂР°С„РёРєРё РљР‘Р–РЈ</h3>
+          <h3 style={{ margin: 0 }}>📈 Графики КБЖУ</h3>
           <div style={{ display: 'flex', gap: 4 }}>
             {([7, 14, 30] as ChartRange[]).map(r => (
               <button key={r} onClick={() => setRange(r)} style={{
@@ -180,7 +180,7 @@ export const NutritionCharts: React.FC<{
                 border: range === r ? '1px solid #00e68a' : '1px solid var(--border)',
                 color: range === r ? '#00e68a' : 'var(--text-dim)', fontWeight: 600,
               }}>
-                {r}Рґ
+                {r}д
               </button>
             ))}
           </div>
@@ -197,7 +197,7 @@ export const NutritionCharts: React.FC<{
 
       {/* Summary stats */}
       <div className="card" style={{ marginBottom: 12 }}>
-        <h3 style={{ margin: '0 0 8px 0' }}>рџ“Љ РЎСЂРµРґРЅРёРµ Р·Р° {range} РґРЅРµР№</h3>
+        <h3 style={{ margin: '0 0 8px 0' }}>📊 Средние за {range} дней</h3>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
           {[
             { label: '', val: chartData.avgKcal, unit: '', color: '#22c55e' },

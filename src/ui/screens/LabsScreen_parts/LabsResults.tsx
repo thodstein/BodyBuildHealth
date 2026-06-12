@@ -66,9 +66,9 @@ export const LabsResults: React.FC<{
     <div className="labs-results" aria-label="">
       <div className="card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-          <h3 style={{ margin: 0 }}>рџ“‹ Р РµР·СѓР»СЊС‚Р°С‚С‹ Р°РЅР°Р»РёР·РѕРІ</h3>
+          <h3 style={{ margin: 0 }}>📋 Результаты анализов</h3>
           <button onClick={addNewLab} style={{ background: 'var(--accent)', color: '#000', border: 'none', padding: '6px 12px', borderRadius: 6, cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
-            + Р”РѕР±Р°РІРёС‚СЊ
+            + Добавить
           </button>
         </div>
 
@@ -78,7 +78,7 @@ export const LabsResults: React.FC<{
             onClick={() => setFilterSystem('all')}
             style={{ padding: '4px 8px', borderRadius: 4, border: '1px solid var(--border)', background: filterSystem === 'all' ? 'var(--accent)' : 'transparent', color: filterSystem === 'all' ? '#000' : 'var(--text)', fontSize: 11, cursor: 'pointer' }}
           >
-            Р’СЃРµ
+            Все
           </button>
           {systems.map(sys => (
             <button
@@ -93,30 +93,30 @@ export const LabsResults: React.FC<{
 
         {labs.length === 0 ? (
           <div style={{ textAlign: 'center', padding: 20, color: 'var(--text-dim)' }}>
-            <div style={{ fontSize: 32, marginBottom: 8 }}>рџ§Є</div>
-            <div>РќРµС‚ РґР°РЅРЅС‹С… Р°РЅР°Р»РёР·РѕРІ</div>
-            <div style={{ fontSize: 12, marginTop: 4 }}>РќР°Р¶РјРёС‚Рµ В«+ Р”РѕР±Р°РІРёС‚СЊВ» РґР»СЏ РІРІРѕРґР° СЂРµР·СѓР»СЊС‚Р°С‚РѕРІ</div>
+            <div style={{ fontSize: 32, marginBottom: 8 }}>🧪</div>
+            <div>Нет данных анализов</div>
+            <div style={{ fontSize: 12, marginTop: 4 }}>Нажмите «+ Добавить» для ввода результатов</div>
           </div>
         ) : (
           Object.entries(groupedByDate).map(([date, dateLabs]) => (
             <div key={date} style={{ marginBottom: 12 }}>
               <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--accent)', marginBottom: 4 }}>
-                рџ“… {new Date(date).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })}
+                📅 {new Date(date).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })}
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4 }}>
                 {dateLabs.map((lab) => {
                   const status = getLabStatus(lab);
                   const info = UCUM_MAP[lab.code.toUpperCase()];
                   const statusColor = status === 'high' ? '#ef4444' : status === 'low' ? '#f97316' : '#22c55e';
-                  const statusIcon = status === 'high' ? 'в†‘' : status === 'low' ? 'в†“' : 'вњ“';
+                  const statusIcon = status === 'high' ? '↑' : status === 'low' ? '↓' : '✓';
                   const systemName = LAB_SYSTEM_MAP[lab.code.toUpperCase()] || '';
 
                   return (
-                    <div key={lab.code} className="lab-card" aria-label={`РђРЅР°Р»РёР·: ${lab.name}`} style={{ background: 'var(--bg-secondary)', padding: 8, borderRadius: 6, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div key={lab.code} className="lab-card" aria-label={`Анализ: ${lab.name}`} style={{ background: 'var(--bg-secondary)', padding: 8, borderRadius: 6, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <div>
                         <div style={{ fontWeight: 600, fontSize: 12 }}>{lab.name || lab.code}</div>
                         <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>
-                          {systemName}{info ? ` вЂў ${info.lln}вЂ“${info.uln} ${info.prefUnit}` : ''}
+                          {systemName}{info ? ` • ${info.lln}–${info.uln} ${info.prefUnit}` : ''}
                         </div>
                       </div>
                       <div style={{ textAlign: 'right' }}>

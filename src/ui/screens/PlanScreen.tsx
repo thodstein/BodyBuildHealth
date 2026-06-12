@@ -106,13 +106,13 @@ function getSplitRationale(goal: string, level: string, daysPerWeek: number, rec
 
   const reasons: string[] = [];
 
-  if (daysPerWeek <= 3) reasons.push(`${daysPerWeek} РґРЅРµР№/РЅРµРґ в†’ С„СѓР»Р»Р±РѕРґРё РёР»Рё Р’РµСЂС…/РќРёР· СЃРїР»РёС‚ РґР»СЏ С‡Р°СЃС‚РѕС‚С‹ РєР°Р¶РґРѕР№ РіСЂСѓРїРїС‹ в‰Ґ2Г—`);
+  if (daysPerWeek <= 3) reasons.push(`${daysPerWeek} дней/нед → фуллбоди или Верх/Низ сплит для частоты каждой группы ≥2×`);
 
-  else if (daysPerWeek === 4) reasons.push(`${daysPerWeek} РґРЅСЏ в†’ РѕРїС‚РёРјР°Р»СЊРЅРѕ Р’РµСЂС…/РќРёР· РґР»СЏ РіРёРїРµСЂС‚СЂРѕС„РёРё (РєР°Р¶РґР°СЏ РіСЂСѓРїРїР° 2Г—/РЅРµРґ)`);
+  else if (daysPerWeek === 4) reasons.push(`${daysPerWeek} дня → оптимально Верх/Низ для гипертрофии (каждая группа 2×/нед)`);
 
-  else if (daysPerWeek === 5) reasons.push(`${daysPerWeek} РґРЅРµР№ в†’ PPL + Р°РєС†РµРЅС‚ РёР»Рё Р±СЂРѕ-СЃРїР»РёС‚ РґР»СЏ СЃРїРµС†РёР°Р»РёР·Р°С†РёРё`);
+  else if (daysPerWeek === 5) reasons.push(`${daysPerWeek} дней → PPL + акцент или бро-сплит для специализации`);
 
-  else reasons.push(`${daysPerWeek} РґРЅРµР№ в†’ PPL РґРІР°Р¶РґС‹ РґР»СЏ РјР°РєСЃРёРјР°Р»СЊРЅРѕРіРѕ РѕР±СЉС‘РјР° Рё С‡Р°СЃС‚РѕС‚С‹`);
+  else reasons.push(`${daysPerWeek} дней → PPL дважды для максимального объёма и частоты`);
 
 
 
@@ -218,7 +218,7 @@ function buildDayPlan(result: TrainingOutput, daysPerWeek: number, weakPoints: s
 
         const dropPct = presc.dropSet ? 'в€’20%' : undefined;
 
-        const backoffReps = presc.backoffSet ? '+2РїРѕРІ' : undefined;
+        const backoffReps = presc.backoffSet ? '+2пов' : undefined;
 
         exercises.push({ ...ex, sets: setsForEx, reps: parseInt(presc.reps.split('-')[0], 10) || 10, rir: rirVal, rest: ex.type === 'compound' ? 120 : 60, targetMuscle: ex.targetMuscle, technique: ex.technique, comments: ex.comments, dropSet: presc.dropSet, backoffSet: presc.backoffSet, canReplace: ex.canReplace, cannotReplace: ex.cannotReplace });
 
@@ -472,7 +472,7 @@ export const PlanScreen: React.FC<{ goal: string }> = ({ goal }) => {
 
             <button key={t} className={`tab-btn ${tab === t ? 'active' : ''}`} onClick={() => setTab(t)}>
 
-              {t === 'plan' ? '' : t === 'readiness' ? '' : ''}
+              {t === 'plan' ? 'План' : t === 'readiness' ? 'Готовность' : 'Упражнения'}
 
           </button>
 
@@ -490,13 +490,13 @@ export const PlanScreen: React.FC<{ goal: string }> = ({ goal }) => {
 
           <div className="card input-form">
 
-            <h3>РџР°СЂР°РјРµС‚СЂС‹ РїСЂРѕРіСЂР°РјРјС‹</h3>
+            <h3>Параметры программы</h3>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
 
               <div className="form-group">
 
-                <label>Р¦РµР»СЊ</label>
+                <label>Цель</label>
 
                 <select value={goalState} onChange={e => setGoalState(e.target.value)}>
 
@@ -508,7 +508,7 @@ export const PlanScreen: React.FC<{ goal: string }> = ({ goal }) => {
 
               <div className="form-group">
 
-                <label>РЈСЂРѕРІРµРЅСЊ</label>
+                <label>Уровень</label>
 
                 <select value={level} onChange={e => setLevel(e.target.value)}>
 
@@ -520,7 +520,7 @@ export const PlanScreen: React.FC<{ goal: string }> = ({ goal }) => {
 
               <div className="form-group">
 
-                <label>Р”РЅРµР№/РЅРµРґРµР»СЋ: {daysPerWeek}</label>
+                <label>Дней/неделю: {daysPerWeek}</label>
 
                 <input type="range" min={2} max={6} value={daysPerWeek} onChange={e => setDaysPerWeek(Number(e.target.value))} />
 
@@ -528,7 +528,7 @@ export const PlanScreen: React.FC<{ goal: string }> = ({ goal }) => {
 
               <div className="form-group">
 
-                <label>Р’РѕСЃСЃС‚Р°РЅРѕРІР»РµРЅРёРµ: {recovery}%</label>
+                <label>Восстановление: {recovery}%</label>
 
                 <input type="range" min={0} max={100} value={recovery} onChange={e => setRecovery(Number(e.target.value))} />
 
@@ -536,7 +536,7 @@ export const PlanScreen: React.FC<{ goal: string }> = ({ goal }) => {
 
               <div className="form-group">
 
-                <label>РЈС‚РѕРјР»С‘РЅРЅРѕСЃС‚СЊ: {fatigue}%</label>
+                <label>Утомлённость: {fatigue}%</label>
 
                 <input type="range" min={0} max={100} value={fatigue} onChange={e => setFatigue(Number(e.target.value))} />
 
@@ -544,7 +544,7 @@ export const PlanScreen: React.FC<{ goal: string }> = ({ goal }) => {
 
               <div className="form-group">
 
-                <label>РџРёС‚Р°РЅРёРµ: {nutrition}%</label>
+                <label>Питание: {nutrition}%</label>
 
                 <input type="range" min={0} max={100} value={nutrition} onChange={e => setNutrition(Number(e.target.value))} />
 
@@ -554,7 +554,7 @@ export const PlanScreen: React.FC<{ goal: string }> = ({ goal }) => {
 
             <div className="form-group" style={{ marginTop: 8 }}>
 
-              <label>РЎР»Р°Р±С‹Рµ С‚РѕС‡РєРё</label>
+              <label>Слабые точки</label>
 
               <div className="checkbox-group">
 
@@ -576,7 +576,7 @@ export const PlanScreen: React.FC<{ goal: string }> = ({ goal }) => {
 
             <div style={{ marginTop: 8, fontSize: 12, color: 'var(--text-dim)' }}>
 
-              PAL (РєРѕСЌС„С„РёС†РёРµРЅС‚ Р°РєС‚РёРІРЅРѕСЃС‚Рё): {palForDisplay} | РўСЂРµРЅРёСЂРѕРІРѕРє: {profile.settings.workoutsPerWeek ?? 3}/РЅРµРґ Г— {profile.settings.avgWorkoutMinutes ?? 60} РјРёРЅ
+              PAL (коэффициент активности): {palForDisplay} | Тренировок: {profile.settings.workoutsPerWeek ?? 3}/нед × {profile.settings.avgWorkoutMinutes ?? 60} мин
 
             </div>
 
@@ -614,7 +614,7 @@ export const PlanScreen: React.FC<{ goal: string }> = ({ goal }) => {
 
                 <div className="row">
 
-                  <span className="label">РџСЂРѕРіСЂРµСЃСЃРёСЏ</span>
+                  <span className="label">Прогрессия</span>
 
                   <span style={{ fontSize: 13 }}>{progressionRule.name}</span>
 
@@ -624,7 +624,7 @@ export const PlanScreen: React.FC<{ goal: string }> = ({ goal }) => {
 
                   <div className="deload-badge" style={{ background: 'var(--warning, #f90)', padding: '4px 8px', borderRadius: 4, marginTop: 8 }}>
 
-                    Р Р°Р·РіСЂСѓР·РєР°: {trainingResult.deloadReason}
+                    Разгрузка: {trainingResult.deloadReason}
 
                   </div>
 
@@ -634,7 +634,7 @@ export const PlanScreen: React.FC<{ goal: string }> = ({ goal }) => {
 
                   <div style={{ background: 'rgba(239,68,68,0.12)', padding: '6px 10px', borderRadius: 6, marginTop: 8, fontSize: 12, color: '#ef4444' }}>
 
-                    вљ пёЏ {deloadRec.reason}
+                    ⚠️ {deloadRec.reason}
 
                   </div>
 
@@ -642,9 +642,9 @@ export const PlanScreen: React.FC<{ goal: string }> = ({ goal }) => {
 
                 <div style={{ marginTop: 8, fontSize: 12, color: 'var(--text-light)', lineHeight: 1.5 }}>
 
-                  <strong style={{ color: 'var(--accent)' }}>РћР±РѕСЃРЅРѕРІР°РЅРёРµ:</strong>
+                  <strong style={{ color: 'var(--accent)' }}>Обоснование:</strong>
 
-                  {bestSplit ? bestSplit.rationale.map((r, i) => <div key={i}>вЂў {r}</div>) : splitRationale.map((r, i) => <div key={i}>вЂў {r}</div>)}
+                  {bestSplit ? bestSplit.rationale.map((r, i) => <div key={i}>• {r}</div>) : splitRationale.map((r, i) => <div key={i}>• {r}</div>)}
 
                 </div>
 
@@ -658,7 +658,7 @@ export const PlanScreen: React.FC<{ goal: string }> = ({ goal }) => {
 
                 <div className="card" style={{ marginTop: 12 }}>
 
-                  <h3 style={{ margin: '0 0 8px 0' }}>РђР»СЊС‚РµСЂРЅР°С‚РёРІРЅС‹Рµ СЃРїР»РёС‚С‹</h3>
+                  <h3 style={{ margin: '0 0 8px 0' }}>Альтернативные сплиты</h3>
 
                   {splitOptions.slice(0, 4).map((opt, i) => (
 
@@ -666,7 +666,7 @@ export const PlanScreen: React.FC<{ goal: string }> = ({ goal }) => {
 
                       <div>
 
-                        <div style={{ fontWeight: 600, fontSize: 13 }}>{opt.name} <span style={{ fontSize: 11, color: i === 0 ? 'var(--accent)' : 'var(--text-dim)' }}>{i === 0 ? 'в… Р›СѓС‡С€РёР№' : `#${i + 1}`}</span></div>
+                        <div style={{ fontWeight: 600, fontSize: 13 }}>{opt.name} <span style={{ fontSize: 11, color: i === 0 ? 'var(--accent)' : 'var(--text-dim)' }}>{i === 0 ? '★ Лучший' : `#${i + 1}`}</span></div>
 
                         <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 2 }}>{formatSplitGroups(opt.groupsPerDay)}</div>
 
@@ -676,7 +676,7 @@ export const PlanScreen: React.FC<{ goal: string }> = ({ goal }) => {
 
                         <div style={{ fontWeight: 700, fontSize: 14, color: opt.score >= 60 ? 'var(--accent)' : opt.score >= 30 ? '#eab308' : '#ef4444' }}>{opt.score}</div>
 
-                        <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Р±Р°Р»Р»РѕРІ</div>
+                        <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>баллов</div>
 
                       </div>
 
@@ -694,7 +694,7 @@ export const PlanScreen: React.FC<{ goal: string }> = ({ goal }) => {
 
               <div className="card" style={{ marginTop: 12 }}>
 
-                <h3 style={{ margin: '0 0 8px 0' }}>РџСЂРѕРіСЂРµСЃСЃРёСЏ: {progressionRule.name}</h3>
+                <h3 style={{ margin: '0 0 8px 0' }}>Прогрессия: {progressionRule.name}</h3>
 
                 <div style={{ fontSize: 12, color: 'var(--text-light)', marginBottom: 8 }}>{progressionRule.description}</div>
 
@@ -702,23 +702,23 @@ export const PlanScreen: React.FC<{ goal: string }> = ({ goal }) => {
 
                   <div style={{ background: 'var(--bg-secondary)', borderRadius: 6, padding: '6px 10px' }}>
 
-                    <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>РџСЂРёСЂРѕСЃС‚ РІРµСЃР°/РЅРµРґ</div>
+                    <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>Прирост веса/нед</div>
 
-                    <div style={{ fontWeight: 700 }}>{progressionRule.weeklyWeightIncrement} РєРі</div>
-
-                  </div>
-
-                  <div style={{ background: 'var(--bg-secondary)', borderRadius: 6, padding: '6px 10px' }}>
-
-                    <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>Р”РµР»РѕР°Рґ С‡РµСЂРµР·</div>
-
-                    <div style={{ fontWeight: 700 }}>{progressionRule.deloadTrigger.plateauWeeks} РЅРµРґ РїР»Р°С‚Рѕ</div>
+                    <div style={{ fontWeight: 700 }}>{progressionRule.weeklyWeightIncrement} кг</div>
 
                   </div>
 
                   <div style={{ background: 'var(--bg-secondary)', borderRadius: 6, padding: '6px 10px' }}>
 
-                    <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>РћР±СЉС‘Рј РґРµР»РѕР°РґР°</div>
+                    <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>Делоад через</div>
+
+                    <div style={{ fontWeight: 700 }}>{progressionRule.deloadTrigger.plateauWeeks} нед плато</div>
+
+                  </div>
+
+                  <div style={{ background: 'var(--bg-secondary)', borderRadius: 6, padding: '6px 10px' }}>
+
+                    <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>Объём делоада</div>
 
                     <div style={{ fontWeight: 700 }}>{Math.round(progressionRule.deloadProtocol.volumeMultiplier * 100)}%</div>
 
@@ -726,7 +726,7 @@ export const PlanScreen: React.FC<{ goal: string }> = ({ goal }) => {
 
                   <div style={{ background: 'var(--bg-secondary)', borderRadius: 6, padding: '6px 10px' }}>
 
-                    <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>RIR+ РґРµР»РѕР°РґР°</div>
+                    <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>RIR+ делоада</div>
 
                     <div style={{ fontWeight: 700 }}>+{progressionRule.deloadProtocol.rirAdd}</div>
 
@@ -742,7 +742,7 @@ export const PlanScreen: React.FC<{ goal: string }> = ({ goal }) => {
 
               <div className="card volume-table">
 
-                <h3>РћР±СЉС‘Рј (СЃРµС‚РѕРІ/РЅРµРґ) вЂ” MV-MRV</h3>
+                <h3>Объём (сетов/нед) — MV-MRV</h3>
 
                 <div className="grid volume-grid">
 
@@ -778,11 +778,11 @@ export const PlanScreen: React.FC<{ goal: string }> = ({ goal }) => {
 
                     <div key={day.day} className="day-block">
 
-                      <h4>{day.day} вЂ” {day.name}</h4>
+                      <h4>{day.day} — {day.name}</h4>
 
                       {day.exercises.length === 0 ? (
 
-                        <p className="rest-day">РћС‚РґС‹С… вЂ” РІРѕСЃСЃС‚Р°РЅРѕРІР»РµРЅРёРµ, СЂР°СЃС‚СЏР¶РєР°, Р»С‘РіРєРѕРµ РєР°СЂРґРёРѕ</p>
+                        <p className="rest-day">Отдых — восстановление, растяжка, лёгкое кардио</p>
 
                       ) : (
 
@@ -790,7 +790,7 @@ export const PlanScreen: React.FC<{ goal: string }> = ({ goal }) => {
 
                           <thead>
 
-                            <tr><th>РЈРїСЂР°Р¶РЅРµРЅРёРµ</th><th>РЎРµС‚С‹</th><th>РџРѕРІС‚РѕСЂС‹</th><th>RIR</th><th>РћС‚РґС‹С…</th><th>Р’РµСЃ</th></tr>
+                            <tr><th>Упражнение</th><th>Сеты</th><th>Повторы</th><th>RIR</th><th>Отдых</th><th>Вес</th></tr>
 
                           </thead>
 
@@ -810,9 +810,9 @@ export const PlanScreen: React.FC<{ goal: string }> = ({ goal }) => {
 
                                   {ex.targetMuscle && <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 1 }}>{ex.targetMuscle}</div>}
 
-                                  {ex.dropSet && <span style={{ fontSize: 9, padding: '1px 4px', borderRadius: 3, background: 'rgba(249,115,22,0.15)', color: '#f97316', marginLeft: 4 }}>Р”СЂРѕРї</span>}
+                                  {ex.dropSet && <span style={{ fontSize: 9, padding: '1px 4px', borderRadius: 3, background: 'rgba(249,115,22,0.15)', color: '#f97316', marginLeft: 4 }}>Дроп</span>}
 
-                                  {ex.backoffSet && <span style={{ fontSize: 9, padding: '1px 4px', borderRadius: 3, background: 'rgba(34,197,94,0.12)', color: '#22c55e', marginLeft: 4 }}>Р‘СЌРє</span>}
+                                  {ex.backoffSet && <span style={{ fontSize: 9, padding: '1px 4px', borderRadius: 3, background: 'rgba(34,197,94,0.12)', color: '#22c55e', marginLeft: 4 }}>Бэк</span>}
 
                                 </td>
 
@@ -828,7 +828,7 @@ export const PlanScreen: React.FC<{ goal: string }> = ({ goal }) => {
 
                                   <div style={{ fontWeight: 700, color: suggestion.isDeload ? '#ef4444' : 'var(--accent)' }}>
 
-                                    {suggestion.suggestedWeight > 0 ? `${suggestion.suggestedWeight} РєРі` : 'вЂ”'}
+                                    {suggestion.suggestedWeight > 0 ? `${suggestion.suggestedWeight} кг` : '—'}
 
                                   </div>
 
@@ -860,7 +860,7 @@ export const PlanScreen: React.FC<{ goal: string }> = ({ goal }) => {
 
               <div className="card" style={{ marginTop: 16, display: macrocycle ? 'none' : 'block' }}>
 
-                <h3 style={{ margin: '0 0 10px 0' }}>РџРµСЂРёРѕРґРёР·Р°С†РёСЏ (РјР°РєСЂРѕС†РёРєР»)</h3>
+                <h3 style={{ margin: '0 0 10px 0' }}>Периодизация (макроцикл)</h3>
 
                 <button onClick={() => {
 
@@ -880,7 +880,7 @@ export const PlanScreen: React.FC<{ goal: string }> = ({ goal }) => {
 
                 }} style={{ background: 'var(--accent)', color: '#000', border: 'none', borderRadius: 8, padding: '8px 20px', fontSize: 14, cursor: 'pointer', width: '100%', fontWeight: 700 }}>
 
-                  РЎРіРµРЅРµСЂРёСЂРѕРІР°С‚СЊ РјР°РєСЂРѕС†РёРєР»
+                  Сгенерировать макроцикл
 
                 </button>
 
@@ -898,13 +898,13 @@ export const PlanScreen: React.FC<{ goal: string }> = ({ goal }) => {
 
                   }} style={{ background: 'var(--danger)', color: '#fff', border: 'none', borderRadius: 8, padding: '6px 12px', fontSize: 13, cursor: 'pointer', marginBottom: 12, fontWeight: 600 }}>
 
-                    в¬…пёЏ РЎРєСЂС‹С‚СЊ РјР°РєСЂРѕС†РёРєР»
+                    ⬅️ Скрыть макроцикл
 
                   </button>
 
                   <div className="card" style={{ marginTop: 12 }}>
 
-                    <h4 style={{ margin: '0 0 8px 0' }}>РћР±Р·РѕСЂ ({macrocycle.totalWeeks} РЅРµРґ.)</h4>
+                    <h4 style={{ margin: '0 0 8px 0' }}>Обзор ({macrocycle.totalWeeks} нед.)</h4>
 
                     <div style={{ display: 'flex', gap: 4, overflowX: 'auto', paddingBottom: 4 }}>
 
@@ -930,9 +930,9 @@ export const PlanScreen: React.FC<{ goal: string }> = ({ goal }) => {
 
                                 style={{ padding: '4px 6px', margin: '1px 0', borderRadius: 4, fontSize: 10, cursor: 'pointer', background: selectedWeek === wk.weekNumber ? 'var(--accent-blue)' : 'var(--bg-secondary)', color: selectedWeek === wk.weekNumber ? '#fff' : 'var(--text-primary)', borderLeft: `3px solid ${mesoColor[meso.type] || '#888'}` }}>
 
-                                <div style={{ fontWeight: 600 }}>Рќ{wk.weekNumber}</div>
+                                <div style={{ fontWeight: 600 }}>Н{wk.weekNumber}</div>
 
-                                <div style={{ fontSize: 9 }}>{wk.isDeload ? '' : meso.type === 'accumulation' ? '' : meso.type === 'intensification' ? '' : meso.type === 'peaking' ? '' : meso.type.slice(0, 4)}</div>
+                                <div style={{ fontSize: 9 }}>{wk.isDeload ? 'делоад' : meso.type === 'accumulation' ? 'накопл.' : meso.type === 'intensification' ? 'интенс.' : meso.type === 'peaking' ? 'пик' : meso.type.slice(0, 4)}</div>
 
                                 <div style={{ fontSize: 9 }}>RIR {wk.rirRange.join('-')}</div>
 
@@ -966,21 +966,21 @@ export const PlanScreen: React.FC<{ goal: string }> = ({ goal }) => {
 
                       <div className="card" style={{ marginBottom: 12 }}>
 
-                        <h4>РќРµРґРµР»СЏ {week.weekNumber} вЂ” {week.mesocycleType === 'accumulation' ? '' : week.mesocycleType === 'intensification' ? '' : week.mesocycleType === 'peaking' ? '' : week.mesocycleType === 'deload' ? '' : ''}
+                        <h4>Неделя {week.weekNumber} — {week.mesocycleType === 'accumulation' ? 'Накопление' : week.mesocycleType === 'intensification' ? 'Интенсификация' : week.mesocycleType === 'peaking' ? 'Пик' : week.mesocycleType === 'deload' ? 'Разгрузка' : 'Рабочая фаза'}
 
-                          {week.isDeload ? ' (Р”РµР»РѕР°Рґ)' : ''}</h4>
+                          {week.isDeload ? ' (Делоад)' : ''}</h4>
 
                         <div style={{ fontSize: 12, color: 'var(--text-light)', marginBottom: 8 }}>{mesoInfo?.description}</div>
 
                         <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
 
-                          <div style={{ background: 'var(--bg-secondary)', borderRadius: 6, padding: '4px 10px', fontSize: 11 }}>РћР±СЉС‘Рј: Г—{adapted.volumeMultiplier.toFixed(2)}</div>
+                          <div style={{ background: 'var(--bg-secondary)', borderRadius: 6, padding: '4px 10px', fontSize: 11 }}>Объём: ×{adapted.volumeMultiplier.toFixed(2)}</div>
 
                           <div style={{ background: 'var(--bg-secondary)', borderRadius: 6, padding: '4px 10px', fontSize: 11 }}>RIR: {adapted.rirRange.join('-')}</div>
 
                           <div style={{ background: 'var(--bg-secondary)', borderRadius: 6, padding: '4px 10px', fontSize: 11 }}>RPE: {adapted.rpeTarget}</div>
 
-                          {recovery < 40 && <div style={{ background: 'rgba(239,68,68,0.15)', borderRadius: 6, padding: '4px 10px', fontSize: 11, color: '#ef4444' }}>вљ пёЏ РђРІС‚РѕРґРµР»РѕРґС‹</div>}
+                          {recovery < 40 && <div style={{ background: 'rgba(239,68,68,0.15)', borderRadius: 6, padding: '4px 10px', fontSize: 11, color: '#ef4444' }}>⚠️ Автоделоды</div>}
 
                         </div>
 
@@ -996,7 +996,7 @@ export const PlanScreen: React.FC<{ goal: string }> = ({ goal }) => {
 
                                 <span style={{ fontSize: 11, color: day.isTraining ? 'var(--accent-blue)' : 'var(--text-dim)' }}>{day.isTraining ? day.split : ''}</span>
 
-                                {day.isTraining && <span style={{ fontSize: 11, padding: '1px 6px', borderRadius: 4, background: day.intensity === 'very_high' ? 'rgba(239,68,68,0.2)' : day.intensity === 'high' ? 'rgba(249,115,22,0.2)' : day.intensity === 'medium' ? 'rgba(234,179,8,0.2)' : 'rgba(34,197,94,0.2)', color: day.intensity === 'very_high' ? '#ef4444' : day.intensity === 'high' ? '#f97316' : day.intensity === 'medium' ? '#eab308' : '#22c55e' }}>{day.intensity === 'very_high' ? '' : day.intensity === 'high' ? '' : day.intensity === 'medium' ? 'СЃСЂРµРґРЅСЏСЏ' : ''}</span>}
+                                {day.isTraining && <span style={{ fontSize: 11, padding: '1px 6px', borderRadius: 4, background: day.intensity === 'very_high' ? 'rgba(239,68,68,0.2)' : day.intensity === 'high' ? 'rgba(249,115,22,0.2)' : day.intensity === 'medium' ? 'rgba(234,179,8,0.2)' : 'rgba(34,197,94,0.2)', color: day.intensity === 'very_high' ? '#ef4444' : day.intensity === 'high' ? '#f97316' : day.intensity === 'medium' ? '#eab308' : '#22c55e' }}>{day.intensity === 'very_high' ? 'очень высокая' : day.intensity === 'high' ? 'высокая' : day.intensity === 'medium' ? 'средняя' : 'лёгкая'}</span>}
 
                               </div>
 
@@ -1012,15 +1012,15 @@ export const PlanScreen: React.FC<{ goal: string }> = ({ goal }) => {
 
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
 
-                                      <div><span>{ex.isCompound ? '' : ''}{ex.name}</span>{ex.targetMuscle && <span style={{ fontSize: 9, marginLeft: 4, color: 'var(--accent)' }}>{ex.targetMuscle}</span>}</div>
+                                      <div><span>{ex.isCompound ? 'Базовое: ' : 'Изоляция: '}{ex.name}</span>{ex.targetMuscle && <span style={{ fontSize: 9, marginLeft: 4, color: 'var(--accent)' }}>{ex.targetMuscle}</span>}</div>
 
                                       <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
 
-                                        <span style={{ color: 'var(--text-dim)' }}>{ex.sets}Г—{ex.reps} RIR {ex.rir}</span>
+                                        <span style={{ color: 'var(--text-dim)' }}>{ex.sets}×{ex.reps} RIR {ex.rir}</span>
 
-                                        {ex.dropSet && <span style={{ fontSize: 9, padding: '0 3px', borderRadius: 3, background: 'rgba(249,115,22,0.15)', color: '#f97316' }}>Р”СЂРѕРї</span>}
+                                        {ex.dropSet && <span style={{ fontSize: 9, padding: '0 3px', borderRadius: 3, background: 'rgba(249,115,22,0.15)', color: '#f97316' }}>Дроп</span>}
 
-                                        {ex.backoffSet && <span style={{ fontSize: 9, padding: '0 3px', borderRadius: 3, background: 'rgba(34,197,94,0.12)', color: '#22c55e' }}>Р‘СЌРє</span>}
+                                        {ex.backoffSet && <span style={{ fontSize: 9, padding: '0 3px', borderRadius: 3, background: 'rgba(34,197,94,0.12)', color: '#22c55e' }}>Бэк</span>}
 
                                       </div>
 
@@ -1028,7 +1028,7 @@ export const PlanScreen: React.FC<{ goal: string }> = ({ goal }) => {
 
                                     {ex.technique && <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 2, lineHeight: 1.4 }}>{ex.technique}</div>}
 
-                                    {ex.canReplace && ex.canReplace.length > 0 && <div style={{ fontSize: 9, marginTop: 2, color: 'var(--text-dim)' }}>С‡Р°РјРµРЅС‹: {ex.canReplace.map(rId => getExerciseById(rId)?.name || rId).join(', ')}</div>}
+                                    {ex.canReplace && ex.canReplace.length > 0 && <div style={{ fontSize: 9, marginTop: 2, color: 'var(--text-dim)' }}>Замены: {ex.canReplace.map(rId => getExerciseById(rId)?.name || rId).join(', ')}</div>}
 
                                   </div>
 
@@ -1038,7 +1038,7 @@ export const PlanScreen: React.FC<{ goal: string }> = ({ goal }) => {
 
                             )}
 
-                            {!day.isTraining && <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>Р’РѕСЃСЃС‚Р°РЅРѕРІР»РµРЅРёРµ, СЂР°СЃС‚СЏР¶РєР°, Р»С‘РіРєРѕРµ РєР°СЂРґРёРѕ</div>}
+                            {!day.isTraining && <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>Восстановление, растяжка, лёгкое кардио</div>}
 
                           </div>
 
@@ -1070,29 +1070,29 @@ export const PlanScreen: React.FC<{ goal: string }> = ({ goal }) => {
 
           <div className="card readiness-inputs">
 
-            <h3>Р“РѕС‚РѕРІРЅРѕСЃС‚СЊ Рє С‚СЂРµРЅРёСЂРѕРІРєРµ</h3>
+            <h3>Готовность к тренировке</h3>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
 
-              <div className="form-group"><label>РЎРѕРЅ: {sleepHours}С‡</label><input type="range" min={0} max={12} step={0.5} value={sleepHours} onChange={e => setSleepHours(Number(e.target.value))} /></div>
+              <div className="form-group"><label>Сон: {sleepHours}ч</label><input type="range" min={0} max={12} step={0.5} value={sleepHours} onChange={e => setSleepHours(Number(e.target.value))} /></div>
 
-              <div className="form-group"><label>РљР°С‡РµСЃС‚РІРѕ: {sleepQuality}/10</label><input type="range" min={1} max={10} value={sleepQuality} onChange={e => setSleepQuality(Number(e.target.value))} /></div>
+              <div className="form-group"><label>Качество: {sleepQuality}/10</label><input type="range" min={1} max={10} value={sleepQuality} onChange={e => setSleepQuality(Number(e.target.value))} /></div>
 
-              <div className="form-group"><label>РџСЂРѕР±СѓР¶РґРµРЅРёСЏ: {nightAwakenings}</label><input type="range" min={0} max={5} value={nightAwakenings} onChange={e => setNightAwakenings(Number(e.target.value))} /></div>
+              <div className="form-group"><label>Пробуждения: {nightAwakenings}</label><input type="range" min={0} max={5} value={nightAwakenings} onChange={e => setNightAwakenings(Number(e.target.value))} /></div>
 
               <div className="form-group"><label>HRV: {hrvRatio}</label><input type="range" min={0.5} max={1.5} step={0.05} value={hrvRatio} onChange={e => setHrvRatio(Number(e.target.value))} /></div>
 
               <div className="form-group"><label>DOMS: {doms}/10</label><input type="range" min={0} max={10} value={doms} onChange={e => setDoms(Number(e.target.value))} /></div>
 
-              <div className="form-group"><label>РЎС‚СЂРµСЃСЃ: {stress}/10</label><input type="range" min={0} max={10} value={stress} onChange={e => setStress(Number(e.target.value))} /></div>
+              <div className="form-group"><label>Стресс: {stress}/10</label><input type="range" min={0} max={10} value={stress} onChange={e => setStress(Number(e.target.value))} /></div>
 
-              <div className="form-group"><label>РљР°Р»РѕСЂРёРё: {calRatio}</label><input type="range" min={0.5} max={1.5} step={0.05} value={calRatio} onChange={e => setCalRatio(Number(e.target.value))} /></div>
+              <div className="form-group"><label>Калории: {calRatio}</label><input type="range" min={0.5} max={1.5} step={0.05} value={calRatio} onChange={e => setCalRatio(Number(e.target.value))} /></div>
 
-              <div className="form-group"><label>Р‘РµР»РѕРє: {proteinRatio}</label><input type="range" min={0.5} max={1.5} step={0.05} value={proteinRatio} onChange={e => setProteinRatio(Number(e.target.value))} /></div>
+              <div className="form-group"><label>Белок: {proteinRatio}</label><input type="range" min={0.5} max={1.5} step={0.05} value={proteinRatio} onChange={e => setProteinRatio(Number(e.target.value))} /></div>
 
-              <div className="form-group"><label>РќР°РіСЂСѓР·РєР°: {trainingLoadRatio}</label><input type="range" min={0} max={2} step={0.05} value={trainingLoadRatio} onChange={e => setTrainingLoadRatio(Number(e.target.value))} /></div>
+              <div className="form-group"><label>Нагрузка: {trainingLoadRatio}</label><input type="range" min={0} max={2} step={0.05} value={trainingLoadRatio} onChange={e => setTrainingLoadRatio(Number(e.target.value))} /></div>
 
-              <div className="form-group"><label>РЈСЃС‚Р°Р»РѕСЃС‚СЊ: {subjFatigue}/10</label><input type="range" min={0} max={10} value={subjFatigue} onChange={e => setSubjFatigue(Number(e.target.value))} /></div>
+              <div className="form-group"><label>Усталость: {subjFatigue}/10</label><input type="range" min={0} max={10} value={subjFatigue} onChange={e => setSubjFatigue(Number(e.target.value))} /></div>
 
             </div>
 
@@ -1102,29 +1102,29 @@ export const PlanScreen: React.FC<{ goal: string }> = ({ goal }) => {
 
             <div className="card readiness-scores">
 
-              <h3>РћС†РµРЅРєРё РіРѕС‚РѕРІРЅРѕСЃС‚Рё</h3>
+              <h3>Оценки готовности</h3>
 
               <div className="score-grid">
 
-                <div className="score-item"><span className="label">Р’РѕСЃСЃС‚Р°РЅРѕРІР»РµРЅРёРµ</span><span className="value" style={{ color: readinessResult.recovery > 60 ? 'var(--success)' : 'var(--danger)' }}>{readinessResult.recovery}</span></div>
+                <div className="score-item"><span className="label">Восстановление</span><span className="value" style={{ color: readinessResult.recovery > 60 ? 'var(--success)' : 'var(--danger)' }}>{readinessResult.recovery}</span></div>
 
-                <div className="score-item"><span className="label">РџРёС‚Р°РЅРёРµ</span><span className="value" style={{ color: readinessResult.nutrition > 60 ? 'var(--success)' : 'var(--danger)' }}>{readinessResult.nutrition}</span></div>
+                <div className="score-item"><span className="label">Питание</span><span className="value" style={{ color: readinessResult.nutrition > 60 ? 'var(--success)' : 'var(--danger)' }}>{readinessResult.nutrition}</span></div>
 
-                <div className="score-item"><span className="label">РџРѕРґРґРµСЂР¶РєР°</span><span className="value">{readinessResult.support}</span></div>
+                <div className="score-item"><span className="label">Поддержка</span><span className="value">{readinessResult.support}</span></div>
 
-                <div className="score-item"><span className="label">РЈС‚РѕРјР»С‘РЅРЅРѕСЃС‚СЊ</span><span className="value" style={{ color: readinessResult.fatigue < 50 ? 'var(--success)' : 'var(--danger)' }}>{readinessResult.fatigue}</span></div>
+                <div className="score-item"><span className="label">Утомлённость</span><span className="value" style={{ color: readinessResult.fatigue < 50 ? 'var(--success)' : 'var(--danger)' }}>{readinessResult.fatigue}</span></div>
 
               </div>
 
-              {readinessResult.isConservative && <div style={{ background: 'var(--warning)', padding: 8, borderRadius: 4, marginTop: 8, fontSize: 13 }}>РљРѕРЅСЃРµСЂРІР°С‚РёРІРЅС‹Р№ СЂРµР¶РёРј: {readinessResult.conservativeReason}</div>}
+              {readinessResult.isConservative && <div style={{ background: 'var(--warning)', padding: 8, borderRadius: 4, marginTop: 8, fontSize: 13 }}>Консервативный режим: {readinessResult.conservativeReason}</div>}
 
               <div className="card volume-adjustment" style={{ marginTop: 12 }}>
 
-                <h4>Р’Р»РёСЏРЅРёРµ РЅР° РѕР±СЉС‘Рј</h4>
+                <h4>Влияние на объём</h4>
 
-                <div style={{ fontSize: 13 }}>{readinessResult.recovery < 50 ? '' : readinessResult.recovery < 65 ? '' : ''}</div>
+                <div style={{ fontSize: 13 }}>{readinessResult.recovery < 50 ? 'Восстановление низкое: снизьте объём на 20-30%.' : readinessResult.recovery < 65 ? 'Восстановление среднее: держите RIR выше и не идите в отказ.' : 'Восстановление хорошее: можно выполнять плановый объём.'}</div>
 
-                <div style={{ fontSize: 13 }}>{readinessResult.fatigue > 70 ? '' : readinessResult.fatigue > 50 ? '' : ''}</div>
+                <div style={{ fontSize: 13 }}>{readinessResult.fatigue > 70 ? 'Утомлённость высокая: рекомендован делоад или лёгкая техника.' : readinessResult.fatigue > 50 ? 'Утомлённость повышена: контролируйте RPE и отдых.' : 'Утомлённость в норме.'}</div>
 
               </div>
 
@@ -1160,11 +1160,11 @@ export const PlanScreen: React.FC<{ goal: string }> = ({ goal }) => {
 
                       <div><span style={{ fontWeight: 600, fontSize: 13 }}>{ex.name}</span>
 
-                        <span style={{ fontSize: 10, marginLeft: 6, padding: '1px 5px', borderRadius: 3, background: ex.type === 'compound' ? 'rgba(0,230,138,0.12)' : 'rgba(100,150,255,0.12)', color: ex.type === 'compound' ? '#00e68a' : '#6496ff' }}>{ex.type === 'compound' ? '' : ''}</span>
+                        <span style={{ fontSize: 10, marginLeft: 6, padding: '1px 5px', borderRadius: 3, background: ex.type === 'compound' ? 'rgba(0,230,138,0.12)' : 'rgba(100,150,255,0.12)', color: ex.type === 'compound' ? '#00e68a' : '#6496ff' }}>{ex.type === 'compound' ? 'Базовое' : 'Изолирующее'}</span>
 
                       </div>
 
-                      <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>{ex.equipment} | {ex.difficulty} | СЃСѓСЃС‚Р°РІС‹: {ex.jointStress}</span>
+                      <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>{ex.equipment} | {ex.difficulty} | суставы: {ex.jointStress}</span>
 
                     </div>
 
@@ -1176,17 +1176,17 @@ export const PlanScreen: React.FC<{ goal: string }> = ({ goal }) => {
 
                     <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 4 }}>
 
-                      {ex.pauseSeconds ? <span style={{ fontSize: 9, padding: '1px 5px', borderRadius: 3, background: 'rgba(234,179,8,0.12)', color: '#eab308' }}>РџР°СѓР·Р° {ex.pauseSeconds}СЃ</span> : null}
+                      {ex.pauseSeconds ? <span style={{ fontSize: 9, padding: '1px 5px', borderRadius: 3, background: 'rgba(234,179,8,0.12)', color: '#eab308' }}>Пауза {ex.pauseSeconds}с</span> : null}
 
-                      {ex.peakContraction && <span style={{ fontSize: 9, padding: '1px 5px', borderRadius: 3, background: 'rgba(249,115,22,0.12)', color: '#f97316' }}>РџРёРєРѕРІРѕРµ СЃРѕРєСЂР°С‰РµРЅРёРµ</span>}
+                      {ex.peakContraction && <span style={{ fontSize: 9, padding: '1px 5px', borderRadius: 3, background: 'rgba(249,115,22,0.12)', color: '#f97316' }}>Пиковое сокращение</span>}
 
-                      {ex.stretchPhase && <span style={{ fontSize: 9, padding: '1px 5px', borderRadius: 3, background: 'rgba(34,197,94,0.12)', color: '#22c55e' }}>Р Р°СЃС‚СЏР¶РµРЅРёРµ</span>}
+                      {ex.stretchPhase && <span style={{ fontSize: 9, padding: '1px 5px', borderRadius: 3, background: 'rgba(34,197,94,0.12)', color: '#22c55e' }}>Растяжение</span>}
 
                     </div>
 
                     {subInfo && subInfo.substitutes.length > 0 && (
 
-                      <div style={{ marginTop: 4, fontSize: 10 }}><span style={{ color: 'var(--text-dim)' }}>С‡Р°РјРµРЅРёС‚РµР»Рё: </span>
+                      <div style={{ marginTop: 4, fontSize: 10 }}><span style={{ color: 'var(--text-dim)' }}>Заменители: </span>
 
                         {subInfo.substitutes.map(s => <span key={s.id} style={{ padding: '1px 5px', borderRadius: 3, background: 'rgba(0,230,138,0.08)', margin: '0 2px' }}>{getExerciseById(s.id)?.name || s.id} ({s.reason})</span>)}
 

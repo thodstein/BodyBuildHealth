@@ -32,7 +32,7 @@ const LAB_SYSTEM_MAP: Record<string, string> = {
 const LAB_DESCRIPTIONS: Record<string, string> = {
   'ALT': '',
   'AST': '',
-  'GGT': 'О“-РіР»СѓС‚Р°РјРёР»С‚СЂР°РЅСЃС„РµСЂР°Р·Р°. Р§СѓРІСЃС‚РІРёС‚РµР»СЊРЅС‹Р№ РјР°СЂРєС‘СЂ С…РѕР»РµСЃС‚Р°Р·Р° Рё Р°Р»РєРѕРіРѕР»СЊРЅРѕРіРѕ РїРѕСЂР°Р¶РµРЅРёСЏ. РџРѕРІС‹С€Р°РµС‚СЃСЏ РїСЂРё РїСЂРёС‘РјРµ РѕСЂР°Р»СЊРЅС‹С… РђРђРЎ.',
+  'GGT': 'Γ-глутамилтрансфераза. Чувствительный маркёр холестаза и алкогольного поражения. Повышается при приёме оральных ААС.',
   'HCT': '',
   'HGB': '',
   'PLT': '',
@@ -50,7 +50,7 @@ const LAB_DESCRIPTIONS: Record<string, string> = {
   'TG': '',
   'GLU': '',
   'INS': '',
-  'HOMA': 'HOMA-IR. РРЅСЃСѓР»РёРЅ Г— Р“Р»СЋРєРѕР·Р° / 22.5. >2.7 вЂ” РёРЅСЃСѓР»РёРЅРѕСЂРµР·РёСЃС‚РµРЅС‚РЅРѕСЃС‚СЊ.',
+  'HOMA': 'HOMA-IR. Инсулин × Глюкоза / 22.5. >2.7 — инсулинорезистентность.',
   'CREATININE': '',
   'CORTISOL': '',
   'IGF1': '',
@@ -101,9 +101,9 @@ export const LabsCatalog: React.FC = () => {
   return (
     <div className="labs-catalog">
       <div className="card">
-        <h3>рџ“– РљР°С‚Р°Р»РѕРі Р°РЅР°Р»РёР·РѕРІ</h3>
+        <h3>📖 Каталог анализов</h3>
         <p style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 12 }}>
-          РЎРїСЂР°РІРѕС‡РЅРёРє Р»Р°Р±РѕСЂР°С‚РѕСЂРЅС‹С… РјР°СЂРєРµСЂРѕРІ СЃ СЂРµС„РµСЂРµРЅСЃРЅС‹РјРё Р·РЅР°С‡РµРЅРёСЏРјРё Рё РѕРїРёСЃР°РЅРёСЏРјРё. Р’СЃРµРіРѕ: {catalogEntries.length} РјР°СЂРєРµСЂРѕРІ.
+          Справочник лабораторных маркеров с референсными значениями и описаниями. Всего: {catalogEntries.length} маркеров.
         </p>
 
         {/* Search */}
@@ -121,7 +121,7 @@ export const LabsCatalog: React.FC = () => {
             onClick={() => setFilterSystem('all')}
             style={{ padding: '4px 8px', borderRadius: 4, border: '1px solid var(--border)', background: filterSystem === 'all' ? 'var(--accent)' : 'transparent', color: filterSystem === 'all' ? '#000' : 'var(--text)', fontSize: 11, cursor: 'pointer' }}
           >
-            Р’СЃРµ ({catalogEntries.length})
+            Все ({catalogEntries.length})
           </button>
           {systems.map(sys => {
             const count = catalogEntries.filter(e => e.system === sys).length;
@@ -147,7 +147,7 @@ export const LabsCatalog: React.FC = () => {
                   <span style={{ fontSize: 11, color: 'var(--text-dim)', marginLeft: 6 }}>({entry.code})</span>
                 </div>
                 <div style={{ fontSize: 11, background: 'rgba(0,230,138,0.1)', padding: '2px 8px', borderRadius: 4 }}>
-                  {entry.min}вЂ“{entry.max} {entry.unit}
+                  {entry.min}–{entry.max} {entry.unit}
                 </div>
               </div>
               <div style={{ fontSize: 10, color: 'var(--accent)', marginTop: 2 }}>{entry.system}</div>
@@ -160,7 +160,7 @@ export const LabsCatalog: React.FC = () => {
 
         {filtered.length === 0 && (
           <div style={{ textAlign: 'center', padding: 20, color: 'var(--text-dim)' }}>
-            РќРёС‡РµРіРѕ РЅРµ РЅР°Р№РґРµРЅРѕ РїРѕ Р·Р°РїСЂРѕСЃСѓ В«{search}В»
+            Ничего не найдено по запросу «{search}»
           </div>
         )}
       </div>

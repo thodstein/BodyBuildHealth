@@ -36,19 +36,19 @@ export const SubstancesScreen: React.FC = () => {
 
   return (
     <div className="screen substances">
-      <h2>РЎРїСЂР°РІРѕС‡РЅРёРє РІРµС‰РµСЃС‚РІ</h2>
+      <h2>Справочник веществ</h2>
 
       <div className="card" style={{ marginBottom: 12 }}>
         <input
           type="text"
-          placeholder="&#128270; РџРѕРёСЃРє РїРѕ РЅР°Р·РІР°РЅРёСЋ..."
+          placeholder="&#128270; Поиск по названию..."
           value={search}
           onChange={e => setSearch(e.target.value)}
           className="input"
           style={{ marginBottom: 8 }}
         />
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-          <button className={'btn secondary' + (selectedClass === 'all' ? ' active' : '')} style={{ fontSize: 11, padding: '4px 10px' }} onClick={() => setSelectedClass('all')}>Р’СЃРµ</button>
+          <button className={'btn secondary' + (selectedClass === 'all' ? ' active' : '')} style={{ fontSize: 11, padding: '4px 10px' }} onClick={() => setSelectedClass('all')}>Все</button>
           {allClasses.map(cls => (
             <button key={cls} className={'btn secondary' + (selectedClass === cls ? ' active' : '')} style={{ fontSize: 11, padding: '4px 10px', borderColor: selectedClass === cls ? CLASS_COLORS[cls] : undefined }} onClick={() => setSelectedClass(cls)}>
               {CLASS_LABELS[cls] ?? cls}
@@ -58,7 +58,7 @@ export const SubstancesScreen: React.FC = () => {
       </div>
 
       <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 8 }}>
-        РќР°Р№РґРµРЅРѕ: {filteredSubstances.length} РІРµС‰РµСЃС‚РІ
+        Найдено: {filteredSubstances.length} веществ
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -74,7 +74,7 @@ export const SubstancesScreen: React.FC = () => {
                 </div>
                 <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                   {s.esters && s.esters.length > 0 && <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 10, background: 'var(--accent-dim)', color: 'var(--accent)' }}>{s.esters.join(', ')}</span>}
-                  <span style={{ fontSize: 16, color: 'var(--text-dim)' }}>{isExpanded ? 'в–І' : 'в–ј'}</span>
+                  <span style={{ fontSize: 16, color: 'var(--text-dim)' }}>{isExpanded ? '▲' : '▼'}</span>
                 </div>
               </div>
 
@@ -82,21 +82,21 @@ export const SubstancesScreen: React.FC = () => {
                 <div style={{ marginTop: 10 }} onClick={e => e.stopPropagation()}>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, fontSize: 12, marginBottom: 8 }}>
                     <div style={{ background: 'var(--bg-secondary)', borderRadius: 8, padding: 8, textAlign: 'center' }}>
-                      <div style={{ color: 'var(--text-dim)', fontSize: 10 }}>TВЅ (С‡Р°СЃРѕРІ)</div>
+                      <div style={{ color: 'var(--text-dim)', fontSize: 10 }}>T½ (часов)</div>
                       <div style={{ fontWeight: 700, fontSize: 16, color }}>{s.pk.halfLifeHours}</div>
                     </div>
                     <div style={{ background: 'var(--bg-secondary)', borderRadius: 8, padding: 8, textAlign: 'center' }}>
-                      <div style={{ color: 'var(--text-dim)', fontSize: 10 }}>Р‘РёРѕРґРѕСЃС‚СѓРїРЅРѕСЃС‚СЊ</div>
+                      <div style={{ color: 'var(--text-dim)', fontSize: 10 }}>Биодоступность</div>
                       <div style={{ fontWeight: 700, fontSize: 16 }}>{(s.pk.bioavailability * 100).toFixed(0)}%</div>
                     </div>
                   </div>
 
-                  <div style={{ fontWeight: 600, fontSize: 12, marginBottom: 6, color: 'var(--accent)' }}>Р¤Р°СЂРјР°РєРѕРґРёРЅР°РјРёРєР°</div>
+                  <div style={{ fontWeight: 600, fontSize: 12, marginBottom: 6, color: 'var(--accent)' }}>Фармакодинамика</div>
                   <div style={{ display: 'grid', gap: 4 }}>
                     {[
-                      { label: 'AR СЃСЂРѕРґСЃС‚РІРѕ', value: s.pd.AR_affinity },
+                      { label: 'AR сродство', value: s.pd.AR_affinity },
                       { label: '', value: s.pd.aromatization },
-                      { label: '5-О± СЂРµРґСѓРєС‚Р°Р·Р°', value: s.pd.five_alpha_reduction },
+                      { label: '5-α редуктаза', value: s.pd.five_alpha_reduction },
                       { label: '', value: s.pd.progestogenic },
                       { label: '', value: s.pd.hepatotoxicity },
                       { label: '', value: s.pd.lipid_impact },
@@ -116,7 +116,7 @@ export const SubstancesScreen: React.FC = () => {
                   </div>
 
                   <div style={{ marginTop: 8, fontSize: 11, color: 'var(--text-dim)' }}>
-                    EC50: {s.ec50} В· РҐРёР»Р»: {s.n_hill} В· РњР°РєСЃ. СЌС„С„РµРєС‚: {(s.maxEffect * 100).toFixed(0)}%
+                    EC50: {s.ec50} · Хилл: {s.n_hill} · Макс. эффект: {(s.maxEffect * 100).toFixed(0)}%
                   </div>
                 </div>
               )}
@@ -128,7 +128,7 @@ export const SubstancesScreen: React.FC = () => {
       {filteredSubstances.length === 0 && (
         <div className="card" style={{ textAlign: 'center', padding: 24 }}>
           <div style={{ fontSize: 32, marginBottom: 8 }}>&#128138;</div>
-          <div style={{ color: 'var(--text-dim)' }}>РќРёС‡РµРіРѕ РЅРµ РЅР°Р№РґРµРЅРѕ. РџРѕРїСЂРѕР±СѓР№С‚Рµ РґСЂСѓРіРѕР№ Р·Р°РїСЂРѕСЃ.</div>
+          <div style={{ color: 'var(--text-dim)' }}>Ничего не найдено. Попробуйте другой запрос.</div>
         </div>
       )}
     </div>

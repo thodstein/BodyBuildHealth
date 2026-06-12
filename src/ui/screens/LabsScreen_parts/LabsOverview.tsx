@@ -19,7 +19,7 @@ function getLabStatus(lab: LabPoint): 'normal' | 'high' | 'low' | 'unknown' {
 function getLabRefInfo(lab: LabPoint): string {
   const range = LAB_RANGES[lab.code.toUpperCase()];
   if (!range) return '';
-  return `${range.min}вЂ“${range.max} ${range.unit}`;
+  return `${range.min}–${range.max} ${range.unit}`;
 }
 
 export const LabsOverview: React.FC<{
@@ -69,41 +69,41 @@ export const LabsOverview: React.FC<{
     <div className="labs-overview">
       {!hasLabs && !forceNoLabs && (
         <div style={{ background: 'rgba(239,68,68,0.15)', padding: 12, borderRadius: 8, marginBottom: 12 }}>
-          <strong>вљ пёЏ Р’РЅРёРјР°РЅРёРµ!</strong> РќРµС‚ РґР°РЅРЅС‹С… Р°РЅР°Р»РёР·РѕРІ. РќРµРєРѕС‚РѕСЂС‹Рµ С„СѓРЅРєС†РёРё РјРѕРіСѓС‚ Р±С‹С‚СЊ РѕРіСЂР°РЅРёС‡РµРЅС‹.
-          РџРµСЂРµР№РґРёС‚Рµ РЅР° РІРєР»Р°РґРєСѓ В«Р РµР·СѓР»СЊС‚Р°С‚С‹В» РґР»СЏ РІРІРѕРґР° РґР°РЅРЅС‹С….
+          <strong>⚠️ Внимание!</strong> Нет данных анализов. Некоторые функции могут быть ограничены.
+          Перейдите на вкладку «Результаты» для ввода данных.
         </div>
       )}
 
       {forceNoLabs && (
         <div style={{ background: 'rgba(239,68,68,0.2)', padding: 12, borderRadius: 8, marginBottom: 12 }}>
-          <strong>рџљ« РџСЂРёРјРµРЅРµРЅ С€С‚СЂР°С„ Р·Р° РѕС‚СЃСѓС‚СЃС‚РІРёРµ Р°РЅР°Р»РёР·РѕРІ</strong>
+          <strong>🚫 Применен штраф за отсутствие анализов</strong>
         </div>
       )}
 
       {/* Stats Summary */}
       <div className="card">
-        <h3>рџ“‹ РЎС‚Р°С‚РёСЃС‚РёРєР° Р°РЅР°Р»РёР·РѕРІ</h3>
+        <h3>📋 Статистика анализов</h3>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
           <div style={{ background: 'var(--bg-secondary)', padding: 10, borderRadius: 8, textAlign: 'center' }}>
-            <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>Р’СЃРµРіРѕ</div>
+            <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>Всего</div>
             <div style={{ fontSize: 22, fontWeight: 700 }}>{labs.length}</div>
           </div>
           <div style={{ background: 'var(--bg-secondary)', padding: 10, borderRadius: 8, textAlign: 'center' }}>
-            <div style={{ fontSize: 11, color: '#22c55e' }}>вњ“ РќРѕСЂРјР°</div>
+            <div style={{ fontSize: 11, color: '#22c55e' }}>✓ Норма</div>
             <div style={{ fontSize: 22, fontWeight: 700, color: '#22c55e' }}>{normalCount}</div>
           </div>
           <div style={{ background: 'var(--bg-secondary)', padding: 10, borderRadius: 8, textAlign: 'center' }}>
-            <div style={{ fontSize: 11, color: '#ef4444' }}>в†‘ Р’С‹С€Рµ РЅРѕСЂРјС‹</div>
+            <div style={{ fontSize: 11, color: '#ef4444' }}>↑ Выше нормы</div>
             <div style={{ fontSize: 22, fontWeight: 700, color: '#ef4444' }}>{highCount}</div>
           </div>
           <div style={{ background: 'var(--bg-secondary)', padding: 10, borderRadius: 8, textAlign: 'center' }}>
-            <div style={{ fontSize: 11, color: '#f97316' }}>в†“ РќРёР¶Рµ РЅРѕСЂРјС‹</div>
+            <div style={{ fontSize: 11, color: '#f97316' }}>↓ Ниже нормы</div>
             <div style={{ fontSize: 22, fontWeight: 700, color: '#f97316' }}>{lowCount}</div>
           </div>
         </div>
         {abnormalCount > 0 && (
           <div style={{ marginTop: 8, padding: 8, background: 'rgba(239,68,68,0.1)', borderRadius: 6, fontSize: 12 }}>
-            вљ пёЏ <strong>{abnormalCount}</strong> РёР· {labs.length} РїРѕРєР°Р·Р°С‚РµР»РµР№ РІРЅРµ РЅРѕСЂРјС‹ ({highCount} в†‘, {lowCount} в†“)
+            ⚠️ <strong>{abnormalCount}</strong> из {labs.length} показателей вне нормы ({highCount} ↑, {lowCount} ↓)
           </div>
         )}
       </div>
@@ -111,7 +111,7 @@ export const LabsOverview: React.FC<{
       {/* Lab Values by System */}
       {labs.length > 0 && (
         <div className="card" style={{ marginTop: 12 }}>
-          <h3>рџ”¬ РџРѕРєР°Р·Р°С‚РµР»Рё РїРѕ СЃРёСЃС‚РµРјР°Рј</h3>
+          <h3>🔬 Показатели по системам</h3>
           {Object.entries(systemGroups)
             .sort(([a], [b]) => a.localeCompare(b))
             .map(([system, systemLabs]) => (
@@ -127,7 +127,7 @@ export const LabsOverview: React.FC<{
                     const status = getLabStatus(lab);
                     const refInfo = getLabRefInfo(lab);
                     const statusColor = status === 'high' ? '#ef4444' : status === 'low' ? '#f97316' : '#22c55e';
-                    const statusIcon = status === 'high' ? 'в†‘' : status === 'low' ? 'в†“' : 'вњ“';
+                    const statusIcon = status === 'high' ? '↑' : status === 'low' ? '↓' : '✓';
                     return (
                       <div key={lab.code + '-' + lab.date} style={{ background: 'var(--bg-secondary)', padding: 6, borderRadius: 6, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <div>

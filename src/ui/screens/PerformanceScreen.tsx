@@ -35,91 +35,91 @@ export const PerformanceScreen: React.FC = () => {
   const labels: Record<string,string> = {blood:'',stacks:'',macro:'',periodization:'',meet:'',bbprep:'',pct:'',predict:''};
 
   return (<div className="screen">
-    <h2>вљЎ Р›Р°Р±РѕСЂР°С‚РѕСЂРёСЏ</h2>
+    <h2>⚡ Лаборатория</h2>
     <div style={{ display:'flex', gap:3, marginBottom:10, overflowX:'auto', scrollbarWidth:'none' }}>
       {tabs.map(t => <button key={t} onClick={()=>setTab(t)} style={{ padding:'6px 10px', borderRadius:8, fontSize:11, cursor:'pointer', whiteSpace:'nowrap', background:tab===t?'var(--accent-green)':'var(--bg-secondary)', color:tab===t?'#000':'var(--text-dim)', border:'none', fontWeight:tab===t?700:400 }}>{labels[t]}</button>)}
     </div>
 
     {tab==='blood' && <div>
-      <div className="card" style={{ marginBottom:8 }}><h4 style={{ margin:'0 0 4px', fontSize:12 }}>вљ  РљСЂРёС‚РёС‡РµСЃРєРёРµ РјР°СЂРєРµСЂС‹</h4>
-        {criticalMarkers.slice(0,6).map((m,i)=><div key={i} style={{ fontSize:9, padding:'3px 6px', borderBottom:'1px solid rgba(255,255,255,0.03)' }}><b>{m.name}</b> ({m.code}) вЂ” {m.whatItMeans}</div>)}
+      <div className="card" style={{ marginBottom:8 }}><h4 style={{ margin:'0 0 4px', fontSize:12 }}>⚠ Критические маркеры</h4>
+        {criticalMarkers.slice(0,6).map((m,i)=><div key={i} style={{ fontSize:9, padding:'3px 6px', borderBottom:'1px solid rgba(255,255,255,0.03)' }}><b>{m.name}</b> ({m.code}) — {m.whatItMeans}</div>)}
       </div>
       {bloodMarkers.slice(0,8).map((m,i)=><div key={i} className="card" style={{ marginBottom:4, padding:8 }}>
-        <div style={{ fontWeight:600, fontSize:11 }}>{m.name} ({m.code}) вЂ” {m.optimalRange} {m.unit}</div>
+        <div style={{ fontWeight:600, fontSize:11 }}>{m.name} ({m.code}) — {m.optimalRange} {m.unit}</div>
         <div style={{ fontSize:8, color:'var(--text-light)', marginTop:2 }}>{m.whatItMeans}</div>
-        {m.actionPlan?.slice(0,2).map((a,ai)=><div key={ai} style={{ fontSize:8, color:'#f59e0b', marginTop:1 }}>вЂў {a.condition}: {a.action}</div>)}
+        {m.actionPlan?.slice(0,2).map((a,ai)=><div key={ai} style={{ fontSize:8, color:'#f59e0b', marginTop:1 }}>• {a.condition}: {a.action}</div>)}
       </div>)}
     </div>}
 
     {tab==='stacks' && <div>
       {stacks.map((s,i)=><div key={i} className="card" style={{ marginBottom:6, padding:10 }}>
-        <div style={{ fontWeight:600, fontSize:12 }}>{s.name} ({s.goal}) <span style={{ fontSize:9, color:'var(--text-dim)' }}>{s.level} В· {s.monthlyCost}</span></div>
-        <div style={{ fontSize:9, color:'var(--text-light)', marginTop:4 }}>{s.supplements.map(x=>`${x.name} ${x.dosage} (${x.timing})`).join(' В· ')}</div>
-        {s.expectedBenefits?.slice(0,3).map((b,bi)=><div key={bi} style={{ fontSize:8, color:'#22c55e' }}>вњ“ {b}</div>)}
+        <div style={{ fontWeight:600, fontSize:12 }}>{s.name} ({s.goal}) <span style={{ fontSize:9, color:'var(--text-dim)' }}>{s.level} · {s.monthlyCost}</span></div>
+        <div style={{ fontSize:9, color:'var(--text-light)', marginTop:4 }}>{s.supplements.map(x=>`${x.name} ${x.dosage} (${x.timing})`).join(' · ')}</div>
+        {s.expectedBenefits?.slice(0,3).map((b,bi)=><div key={bi} style={{ fontSize:8, color:'#22c55e' }}>✓ {b}</div>)}
       </div>)}
     </div>}
 
     {tab==='macro' && <div className="card">
-      <h4 style={{ margin:'0 0 8px', fontSize:12 }}>рџ§® РџРѕР»РЅС‹Р№ СЂР°СЃС‡С‘С‚ РјР°РєСЂРѕ</h4>
+      <h4 style={{ margin:'0 0 8px', fontSize:12 }}>🧮 Полный расчёт макро</h4>
       <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
-        <div><label style={{ fontSize:10 }}>Р’РµСЃ (РєРі)</label><input type="number" value={macroWeight} onChange={e=>setMacroWeight(+e.target.value)} style={{ width:'100%',padding:'6px',borderRadius:6,background:'var(--bg-secondary)',border:'1px solid var(--border)',color:'var(--text)',fontSize:12,boxSizing:'border-box' }} /></div>
-        <div><label style={{ fontSize:10 }}>Р РѕСЃС‚ (СЃРј)</label><input type="number" value={macroH} onChange={e=>setMacroH(+e.target.value)} style={{ width:'100%',padding:'6px',borderRadius:6,background:'var(--bg-secondary)',border:'1px solid var(--border)',color:'var(--text)',fontSize:12,boxSizing:'border-box' }} /></div>
-        <div><label style={{ fontSize:10 }}>Р’РѕР·СЂР°СЃС‚</label><input type="number" value={macroAge} onChange={e=>setMacroAge(+e.target.value)} style={{ width:'100%',padding:'6px',borderRadius:6,background:'var(--bg-secondary)',border:'1px solid var(--border)',color:'var(--text)',fontSize:12,boxSizing:'border-box' }} /></div>
+        <div><label style={{ fontSize:10 }}>Вес (кг)</label><input type="number" value={macroWeight} onChange={e=>setMacroWeight(+e.target.value)} style={{ width:'100%',padding:'6px',borderRadius:6,background:'var(--bg-secondary)',border:'1px solid var(--border)',color:'var(--text)',fontSize:12,boxSizing:'border-box' }} /></div>
+        <div><label style={{ fontSize:10 }}>Рост (см)</label><input type="number" value={macroH} onChange={e=>setMacroH(+e.target.value)} style={{ width:'100%',padding:'6px',borderRadius:6,background:'var(--bg-secondary)',border:'1px solid var(--border)',color:'var(--text)',fontSize:12,boxSizing:'border-box' }} /></div>
+        <div><label style={{ fontSize:10 }}>Возраст</label><input type="number" value={macroAge} onChange={e=>setMacroAge(+e.target.value)} style={{ width:'100%',padding:'6px',borderRadius:6,background:'var(--bg-secondary)',border:'1px solid var(--border)',color:'var(--text)',fontSize:12,boxSizing:'border-box' }} /></div>
         <div><label style={{ fontSize:10 }}>BF%</label><input type="number" value={macroBf} onChange={e=>setMacroBf(+e.target.value)} style={{ width:'100%',padding:'6px',borderRadius:6,background:'var(--bg-secondary)',border:'1px solid var(--border)',color:'var(--text)',fontSize:12,boxSizing:'border-box' }} /></div>
-        <div><label style={{ fontSize:10 }}>Р¦РµР»СЊ</label><select value={macroGoal} onChange={e=>setMacroGoal(e.target.value as any)} style={{ width:'100%',padding:'6px',borderRadius:6,background:'var(--bg-secondary)',border:'1px solid var(--border)',color:'var(--text)',fontSize:12 }}><option value="bulk">РќР°Р±РѕСЂ</option><option value="cut">РЎСѓС€РєР°</option><option value="maintenance">РџРѕРґРґРµСЂР¶Р°РЅРёРµ</option></select></div>
+        <div><label style={{ fontSize:10 }}>Цель</label><select value={macroGoal} onChange={e=>setMacroGoal(e.target.value as any)} style={{ width:'100%',padding:'6px',borderRadius:6,background:'var(--bg-secondary)',border:'1px solid var(--border)',color:'var(--text)',fontSize:12 }}><option value="bulk">Набор</option><option value="cut">Сушка</option><option value="maintenance">Поддержание</option></select></div>
       </div>
       <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'2px 12px', fontSize:10, marginTop:8 }}>
-        <span>BMR:</span><span style={{ fontWeight:600 }}>{macroResult.bmr.mifflin} РєРєР°Р»</span>
-        <span>Katch:</span><span style={{ fontWeight:600 }}>{macroResult.bmr.katch} РєРєР°Р»</span>
-        <span>TDEE (moderate):</span><span style={{ fontWeight:600 }}>{macroResult.tdee.moderate} РєРєР°Р»</span>
+        <span>BMR:</span><span style={{ fontWeight:600 }}>{macroResult.bmr.mifflin} ккал</span>
+        <span>Katch:</span><span style={{ fontWeight:600 }}>{macroResult.bmr.katch} ккал</span>
+        <span>TDEE (moderate):</span><span style={{ fontWeight:600 }}>{macroResult.tdee.moderate} ккал</span>
       </div>
-      <h5 style={{ margin:'10px 0 4px', fontSize:11 }}>Р¦РµР»СЊ: {macroGoal === 'bulk' ? '' : macroGoal === 'cut' ? '' : ''}</h5>
-      <div style={{ fontSize:10 }}>РљРєР°Р»: <b>{macroResult.goals[macroGoal].kcal}</b> | Р‘: <b>{macroResult.goals[macroGoal].protein}Рі</b> | Р–: <b>{macroResult.goals[macroGoal].fat}Рі</b> | РЈ: <b>{macroResult.goals[macroGoal].carbs}Рі</b></div>
-      <h5 style={{ margin:'8px 0 4px', fontSize:11 }}>Р Р°Р·Р±РёРІРєР° РїРѕ 5 РїСЂРёС‘РјР°Рј:</h5>
-      {mealSplit.map((m,i)=><div key={i} style={{ fontSize:9, padding:'2px 0', display:'flex',gap:8 }}><span>РџСЂРёС‘Рј {m.meal}:</span><span>{m.kcal} РєРєР°Р»</span><span>Р‘:{m.protein}Рі</span><span>Р–:{m.fat}Рі</span><span>РЈ:{m.carbs}Рі</span></div>)}
+      <h5 style={{ margin:'10px 0 4px', fontSize:11 }}>Цель: {macroGoal === 'bulk' ? '' : macroGoal === 'cut' ? '' : ''}</h5>
+      <div style={{ fontSize:10 }}>Ккал: <b>{macroResult.goals[macroGoal].kcal}</b> | Б: <b>{macroResult.goals[macroGoal].protein}г</b> | Ж: <b>{macroResult.goals[macroGoal].fat}г</b> | У: <b>{macroResult.goals[macroGoal].carbs}г</b></div>
+      <h5 style={{ margin:'8px 0 4px', fontSize:11 }}>Разбивка по 5 приёмам:</h5>
+      {mealSplit.map((m,i)=><div key={i} style={{ fontSize:9, padding:'2px 0', display:'flex',gap:8 }}><span>Приём {m.meal}:</span><span>{m.kcal} ккал</span><span>Б:{m.protein}г</span><span>Ж:{m.fat}г</span><span>У:{m.carbs}г</span></div>)}
     </div>}
 
     {tab==='periodization' && <div>
       {periodizationModels.map((p,i)=><div key={i} className="card" style={{ marginBottom:6, padding:10 }}>
         <div style={{ fontWeight:600, fontSize:12 }}>{p.name} <span style={{ fontSize:9, color:'var(--text-dim)' }}>({p.type})</span></div>
         <div style={{ fontSize:9, color:'var(--text-light)', marginTop:2 }}>{p.description}</div>
-        <div style={{ fontSize:8, color:'var(--text-dim)' }}>{p.macrocycleWeeks} РЅРµРґ В· {p.phases?.length} С„Р°Р·</div>
+        <div style={{ fontSize:8, color:'var(--text-dim)' }}>{p.macrocycleWeeks} нед · {p.phases?.length} фаз</div>
       </div>)}
     </div>}
 
     {tab==='meet' && <div>
       <div className="card" style={{ marginBottom:8 }}>
-        <h4 style={{ margin:'0 0 6px', fontSize:12 }}>рџЏ† РЎС‚СЂР°С‚РµРіРёСЏ СЃРѕСЂРµРІРЅРѕРІР°РЅРёР№</h4>
+        <h4 style={{ margin:'0 0 6px', fontSize:12 }}>🏆 Стратегия соревнований</h4>
         <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:4 }}>
-          <div><label style={{ fontSize:10 }}>РџСЂРёСЃРµРґ 1RM</label><input type="number" value={meetSquat} onChange={e=>setMeetSquat(+e.target.value)} style={{ width:'100%',padding:'6px',borderRadius:6,background:'var(--bg-secondary)',border:'1px solid var(--border)',color:'var(--text)',fontSize:12,boxSizing:'border-box' }} /></div>
-          <div><label style={{ fontSize:10 }}>Р–РёРј 1RM</label><input type="number" value={meetBench} onChange={e=>setMeetBench(+e.target.value)} style={{ width:'100%',padding:'6px',borderRadius:6,background:'var(--bg-secondary)',border:'1px solid var(--border)',color:'var(--text)',fontSize:12,boxSizing:'border-box' }} /></div>
-          <div><label style={{ fontSize:10 }}>РўСЏРіР° 1RM</label><input type="number" value={meetDeadlift} onChange={e=>setMeetDeadlift(+e.target.value)} style={{ width:'100%',padding:'6px',borderRadius:6,background:'var(--bg-secondary)',border:'1px solid var(--border)',color:'var(--text)',fontSize:12,boxSizing:'border-box' }} /></div>
-          <div><label style={{ fontSize:10 }}>Р’РµСЃ С‚РµР»Р°</label><input type="number" value={meetBodyW} onChange={e=>setMeetBodyW(+e.target.value)} style={{ width:'100%',padding:'6px',borderRadius:6,background:'var(--bg-secondary)',border:'1px solid var(--border)',color:'var(--text)',fontSize:12,boxSizing:'border-box' }} /></div>
+          <div><label style={{ fontSize:10 }}>Присед 1RM</label><input type="number" value={meetSquat} onChange={e=>setMeetSquat(+e.target.value)} style={{ width:'100%',padding:'6px',borderRadius:6,background:'var(--bg-secondary)',border:'1px solid var(--border)',color:'var(--text)',fontSize:12,boxSizing:'border-box' }} /></div>
+          <div><label style={{ fontSize:10 }}>Жим 1RM</label><input type="number" value={meetBench} onChange={e=>setMeetBench(+e.target.value)} style={{ width:'100%',padding:'6px',borderRadius:6,background:'var(--bg-secondary)',border:'1px solid var(--border)',color:'var(--text)',fontSize:12,boxSizing:'border-box' }} /></div>
+          <div><label style={{ fontSize:10 }}>Тяга 1RM</label><input type="number" value={meetDeadlift} onChange={e=>setMeetDeadlift(+e.target.value)} style={{ width:'100%',padding:'6px',borderRadius:6,background:'var(--bg-secondary)',border:'1px solid var(--border)',color:'var(--text)',fontSize:12,boxSizing:'border-box' }} /></div>
+          <div><label style={{ fontSize:10 }}>Вес тела</label><input type="number" value={meetBodyW} onChange={e=>setMeetBodyW(+e.target.value)} style={{ width:'100%',padding:'6px',borderRadius:6,background:'var(--bg-secondary)',border:'1px solid var(--border)',color:'var(--text)',fontSize:12,boxSizing:'border-box' }} /></div>
         </div>
-        <button onClick={()=>setMeetResult(generateMeetStrategy(meetSquat, meetBench, meetDeadlift, meetBodyW, meetFed))} style={{ width:'100%',padding:10,borderRadius:8,border:'none',cursor:'pointer',marginTop:6,background:'var(--accent)',color:'#000',fontWeight:700,fontSize:13 }}>Р Р°СЃСЃС‡РёС‚Р°С‚СЊ</button>
+        <button onClick={()=>setMeetResult(generateMeetStrategy(meetSquat, meetBench, meetDeadlift, meetBodyW, meetFed))} style={{ width:'100%',padding:10,borderRadius:8,border:'none',cursor:'pointer',marginTop:6,background:'var(--accent)',color:'#000',fontWeight:700,fontSize:13 }}>Рассчитать</button>
       </div>
-      {meetResult && <div className="card"><div style={{ fontWeight:700,fontSize:14 }}>РўРѕС‚Р°Р»: {meetResult.total.opener}/{meetResult.total.second}/{meetResult.total.third} РєРі (Wilks: {meetResult.total.wilks.toFixed(1)})</div>
-        {meetResult.attempts.map((s,i)=><div key={i} style={{ marginTop:6 }}><div style={{ fontWeight:600,fontSize:11 }}>{s.lift}: {s.openerKg}/{s.secondKg}/{s.thirdKg} РєРі</div>
-          <div style={{ fontSize:8, color:'var(--text-dim)' }}>{s.warmupSequence?.map(w=>`${w.weight}Г—${w.reps}`).join(' в†’ ')}</div></div>)}
+      {meetResult && <div className="card"><div style={{ fontWeight:700,fontSize:14 }}>Тотал: {meetResult.total.opener}/{meetResult.total.second}/{meetResult.total.third} кг (Wilks: {meetResult.total.wilks.toFixed(1)})</div>
+        {meetResult.attempts.map((s,i)=><div key={i} style={{ marginTop:6 }}><div style={{ fontWeight:600,fontSize:11 }}>{s.lift}: {s.openerKg}/{s.secondKg}/{s.thirdKg} кг</div>
+          <div style={{ fontSize:8, color:'var(--text-dim)' }}>{s.warmupSequence?.map(w=>`${w.weight}×${w.reps}`).join(' → ')}</div></div>)}
       </div>}
     </div>}
 
     {tab==='bbprep' && <div>
-      <h4 style={{ fontSize:12, marginBottom:8 }}>рџ’Є РџРѕРґРіРѕС‚РѕРІРєР° Рє СЃРѕСЂРµРІРЅРѕРІР°РЅРёСЏРј</h4>
+      <h4 style={{ fontSize:12, marginBottom:8 }}>💪 Подготовка к соревнованиям</h4>
       {bbPrep.map((p,i)=><div key={i} className="card" style={{ marginBottom:6, padding:10 }}>
-        <div style={{ fontWeight:600, fontSize:12 }}>{p.phase} (РЅРµРґ {p.weeksOut} РґРѕ СЃС‚Р°СЂС‚Р°)</div>
-        <div style={{ fontSize:9, color:'var(--text-light)', marginTop:2 }}>РўСЂРµРЅРёСЂРѕРІРєРё: {p.training} | РљР°СЂРґРёРѕ: {p.cardio} | РЈРіР»РµРІРѕРґС‹: {p.carbs}</div>
+        <div style={{ fontWeight:600, fontSize:12 }}>{p.phase} (нед {p.weeksOut} до старта)</div>
+        <div style={{ fontSize:9, color:'var(--text-light)', marginTop:2 }}>Тренировки: {p.training} | Кардио: {p.cardio} | Углеводы: {p.carbs}</div>
       </div>)}
     </div>}
 
     {tab==='pct' && <div>
-      <h4 style={{ fontSize:12, marginBottom:8 }}>рџ”„ РџСЂРѕС‚РѕРєРѕР»С‹ РџРљРў</h4>
+      <h4 style={{ fontSize:12, marginBottom:8 }}>🔄 Протоколы ПКТ</h4>
       {pctProtocols.map((p,i)=><div key={i} className="card" style={{ marginBottom:6, padding:10 }}>
         <div style={{ fontWeight:600, fontSize:12 }}>{p.name} ({p.forCycle})</div>
-        <div style={{ fontSize:9, color:'var(--text-dim)', marginTop:2 }}>{p.totalWeeks} РЅРµРґРµР»СЊ В· РЈСЃРїРµС…: {p.successRate}</div>
+        <div style={{ fontSize:9, color:'var(--text-dim)', marginTop:2 }}>{p.totalWeeks} недель · Успех: {p.successRate}</div>
         <div style={{ fontSize:8, color:'var(--text-light)', marginTop:4 }}>{p.expectedRecovery}</div>
         {p.timeline?.slice(0,4).map((t,ti)=><div key={ti} style={{ fontSize:8, marginTop:2 }}>
-          <b>РќРµРґ {t.week}:</b> {t.compounds.map(c=>`${c.name} ${c.dosage}`).join(', ')} вЂ” {t.notes}
+          <b>Нед {t.week}:</b> {t.compounds.map(c=>`${c.name} ${c.dosage}`).join(', ')} — {t.notes}
         </div>)}
       </div>)}
     </div>}
@@ -135,17 +135,17 @@ const PredictTab: React.FC = () => {
   const pri = React.useMemo(() => computePRI({sleepQuality:7,hrvValue:70,fatigue:30,stress:20,readiness:70,trainingLoad:80} as any), []);
   return (<div>
     <div className="card" style={{ marginBottom:8,padding:10 }}>
-      <h4 style={{ margin:'0 0 6px',fontSize:12 }}>рџ”® РџСЂРѕРіРЅРѕР· СЃРёР»С‹</h4>
+      <h4 style={{ margin:'0 0 6px',fontSize:12 }}>🔮 Прогноз силы</h4>
       <div style={{ display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:4 }}>
-        <div><label style={{ fontSize:9 }}>РџСЂРёСЃРµРґ</label><input type="number" value={sq} onChange={e=>setSq(+e.target.value)} style={{ width:'100%',padding:'4px',borderRadius:4,background:'var(--bg-secondary)',border:'1px solid var(--border)',color:'var(--text)',fontSize:11,boxSizing:'border-box' }} /></div>
-        <div><label style={{ fontSize:9 }}>Р–РёРј</label><input type="number" value={bp} onChange={e=>setBp(+e.target.value)} style={{ width:'100%',padding:'4px',borderRadius:4,background:'var(--bg-secondary)',border:'1px solid var(--border)',color:'var(--text)',fontSize:11,boxSizing:'border-box' }} /></div>
-        <div><label style={{ fontSize:9 }}>РўСЏРіР°</label><input type="number" value={dl} onChange={e=>setDl(+e.target.value)} style={{ width:'100%',padding:'4px',borderRadius:4,background:'var(--bg-secondary)',border:'1px solid var(--border)',color:'var(--text)',fontSize:11,boxSizing:'border-box' }} /></div>
+        <div><label style={{ fontSize:9 }}>Присед</label><input type="number" value={sq} onChange={e=>setSq(+e.target.value)} style={{ width:'100%',padding:'4px',borderRadius:4,background:'var(--bg-secondary)',border:'1px solid var(--border)',color:'var(--text)',fontSize:11,boxSizing:'border-box' }} /></div>
+        <div><label style={{ fontSize:9 }}>Жим</label><input type="number" value={bp} onChange={e=>setBp(+e.target.value)} style={{ width:'100%',padding:'4px',borderRadius:4,background:'var(--bg-secondary)',border:'1px solid var(--border)',color:'var(--text)',fontSize:11,boxSizing:'border-box' }} /></div>
+        <div><label style={{ fontSize:9 }}>Тяга</label><input type="number" value={dl} onChange={e=>setDl(+e.target.value)} style={{ width:'100%',padding:'4px',borderRadius:4,background:'var(--bg-secondary)',border:'1px solid var(--border)',color:'var(--text)',fontSize:11,boxSizing:'border-box' }} /></div>
       </div>
-      {result.slice(0,5).map((r:any,i)=> <div key={i} style={{ fontSize:9,marginTop:4 }}>{(r as any).exercise || (r as any).lift}: {(r as any).current1RM} в†’ <b style={{color:'#22c55e'}}>{(r as any).projected1RM || (r as any).week12 || 'вЂ”'} РєРі</b></div>)}
+      {result.slice(0,5).map((r:any,i)=> <div key={i} style={{ fontSize:9,marginTop:4 }}>{(r as any).exercise || (r as any).lift}: {(r as any).current1RM} → <b style={{color:'#22c55e'}}>{(r as any).projected1RM || (r as any).week12 || '—'} кг</b></div>)}
     </div>
     <div className="card" style={{ padding:10 }}>
-      <h4 style={{ margin:'0 0 4px',fontSize:12 }}>рџ“Љ PRI</h4>
-      <div style={{ fontSize:10 }}>Р“РѕС‚РѕРІРЅРѕСЃС‚СЊ: <b style={{color:(pri as any).score>70?'#22c55e':'#f59e0b'}}>{(pri as any).score || (pri as any).pri}%</b> | РЈСЂРѕРІРµРЅСЊ: {(pri as any).level || 'вЂ”'}</div>
+      <h4 style={{ margin:'0 0 4px',fontSize:12 }}>📊 PRI</h4>
+      <div style={{ fontSize:10 }}>Готовность: <b style={{color:(pri as any).score>70?'#22c55e':'#f59e0b'}}>{(pri as any).score || (pri as any).pri}%</b> | Уровень: {(pri as any).level || '—'}</div>
     </div>
   </div>);
 };

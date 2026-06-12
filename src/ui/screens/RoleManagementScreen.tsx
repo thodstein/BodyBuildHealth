@@ -149,7 +149,7 @@ export const RoleManagementScreen: React.FC = () => {
     const next = users.map(u => u.id === userId ? { ...u, role: newRole } : u);
     persistUsers(next);
     const target = next.find(u => u.id === userId);
-    appendLog(getCurrentUserId(), 'ROLE_CHANGE', `${target?.fullName}: СЂРѕР»СЊ в†’ ${ROLE_LABELS[newRole]}`);
+    appendLog(getCurrentUserId(), 'ROLE_CHANGE', `${target?.fullName}: роль → ${ROLE_LABELS[newRole]}`);
     setAuditLog(loadLog());
     if (selectedUser?.id === userId) setSelectedUser(target || null);
   };
@@ -158,7 +158,7 @@ export const RoleManagementScreen: React.FC = () => {
     const next = users.map(u => u.id === userId ? { ...u, status: newStatus } : u);
     persistUsers(next);
     const target = next.find(u => u.id === userId);
-    appendLog(getCurrentUserId(), 'STATUS_CHANGE', `${target?.fullName}: СЃС‚Р°С‚СѓСЃ в†’ ${STATUS_LABELS[newStatus]}`);
+    appendLog(getCurrentUserId(), 'STATUS_CHANGE', `${target?.fullName}: статус → ${STATUS_LABELS[newStatus]}`);
     setAuditLog(loadLog());
     if (selectedUser?.id === userId) setSelectedUser(target || null);
     db.put('users', target!).catch(() => {});
@@ -168,8 +168,8 @@ export const RoleManagementScreen: React.FC = () => {
     const next = users.map(u => u.id === userId ? { ...u, [field]: value } : u);
     persistUsers(next);
     const target = next.find(u => u.id === userId);
-    const label = field === 'consentCoach' ? 'С‚СЂРµРЅРµСЂСѓ' : '';
-    appendLog(getCurrentUserId(), 'CONSENT_CHANGE', `${target?.fullName}: РґРѕСЃС‚СѓРї ${label} в†’ ${value ? 'СЂР°Р·СЂРµС€С‘РЅ' : ''}`);
+    const label = field === 'consentCoach' ? 'тренеру' : '';
+    appendLog(getCurrentUserId(), 'CONSENT_CHANGE', `${target?.fullName}: доступ ${label} → ${value ? 'разрешён' : ''}`);
     setAuditLog(loadLog());
     if (selectedUser?.id === userId) setSelectedUser(target || null);
     db.put('users', target!).catch(() => {});
@@ -204,28 +204,28 @@ export const RoleManagementScreen: React.FC = () => {
   return (
     <div className="screen role-management">
       <div className="role-management-header">
-        <h2>РЈРїСЂР°РІР»РµРЅРёРµ СЂРѕР»СЏРјРё Рё РїСЂР°РІР°РјРё РґРѕСЃС‚СѓРїР°</h2>
-        <p>РќР°СЃС‚СЂРѕР№РєР° СЂРѕР»РµР№ РїРѕР»СЊР·РѕРІР°С‚РµР»РµР№ Рё РёС… РїСЂР°РІ РґРѕСЃС‚СѓРїР° Рє С„СѓРЅРєС†РёРѕРЅР°Р»Сѓ СЃРёСЃС‚РµРјС‹</p>
+        <h2>Управление ролями и правами доступа</h2>
+        <p>Настройка ролей пользователей и их прав доступа к функционалу системы</p>
         <div className="role-management-actions">
           <button className="btn" onClick={() => { setShowAddForm(true); setSelectedUser(null); }}>
-            Р”РѕР±Р°РІРёС‚СЊ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ
+            Добавить пользователя
           </button>
         </div>
       </div>
 
       <div className="role-management-tabs">
-        <button className={tab === 'users' ? 'active' : ''} onClick={() => setTab('users')}>РџРѕР»СЊР·РѕРІР°С‚РµР»Рё</button>
-        <button className={tab === 'permissions' ? 'active' : ''} onClick={() => setTab('permissions')}>Р РѕР»Рё Рё СЂР°Р·СЂРµС€РµРЅРёСЏ</button>
-        <button className={tab === 'log' ? 'active' : ''} onClick={() => setTab('log')}>Р–СѓСЂРЅР°Р» РґРµР№СЃС‚РІРёР№</button>
+        <button className={tab === 'users' ? 'active' : ''} onClick={() => setTab('users')}>Пользователи</button>
+        <button className={tab === 'permissions' ? 'active' : ''} onClick={() => setTab('permissions')}>Роли и разрешения</button>
+        <button className={tab === 'log' ? 'active' : ''} onClick={() => setTab('log')}>Журнал действий</button>
       </div>
 
       {showAddForm && (
         <div className="add-user-form">
-          <h3>РќРѕРІС‹Р№ РїРѕР»СЊР·РѕРІР°С‚РµР»СЊ</h3>
+          <h3>Новый пользователь</h3>
           <div className="form-row">
-            <label>Р¤РРћ<input value={addForm.fullName} onChange={e => setAddForm(f => ({ ...f, fullName: e.target.value }))} /></label>
+            <label>ФИО<input value={addForm.fullName} onChange={e => setAddForm(f => ({ ...f, fullName: e.target.value }))} /></label>
             <label>Email<input type="email" value={addForm.email} onChange={e => setAddForm(f => ({ ...f, email: e.target.value }))} /></label>
-            <label>Р РѕР»СЊ
+            <label>Роль
               <select value={addForm.role} onChange={e => setAddForm(f => ({ ...f, role: e.target.value as Role }))}>
                 {(Object.keys(ROLE_LABELS) as Role[]).map(r => (
                   <option key={r} value={r}>{ROLE_LABELS[r]}</option>
@@ -234,23 +234,23 @@ export const RoleManagementScreen: React.FC = () => {
             </label>
           </div>
           <div className="form-actions">
-            <button className="btn" onClick={handleAddUser}>Р”РѕР±Р°РІРёС‚СЊ</button>
-            <button className="btn secondary" onClick={() => setShowAddForm(false)}>РћС‚РјРµРЅР°</button>
+            <button className="btn" onClick={handleAddUser}>Добавить</button>
+            <button className="btn secondary" onClick={() => setShowAddForm(false)}>Отмена</button>
           </div>
         </div>
       )}
 
       {selectedUser && (
         <div className="user-details-panel">
-          <h3>Р РµРґР°РєС‚РёСЂРѕРІР°РЅРёРµ: {selectedUser.fullName}</h3>
+          <h3>Редактирование: {selectedUser.fullName}</h3>
           <div className="user-info">
             <p><strong>Email:</strong> {selectedUser.email}</p>
-            <p><strong>Р¤РРћ:</strong> {selectedUser.fullName}</p>
-            <p><strong>РџРѕСЃР»РµРґРЅРёР№ РІС…РѕРґ:</strong> {selectedUser.lastLogin ? new Date(selectedUser.lastLogin).toLocaleString() : ''}</p>
+            <p><strong>ФИО:</strong> {selectedUser.fullName}</p>
+            <p><strong>Последний вход:</strong> {selectedUser.lastLogin ? new Date(selectedUser.lastLogin).toLocaleString() : ''}</p>
           </div>
 
           <div className="role-editor">
-            <h4>Р РѕР»СЊ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ</h4>
+            <h4>Роль пользователя</h4>
             <div className="role-options">
               {(Object.keys(ROLE_LABELS) as Role[]).map(r => (
                 <label key={r}>
@@ -262,7 +262,7 @@ export const RoleManagementScreen: React.FC = () => {
           </div>
 
           <div className="status-editor">
-            <h4>РЎС‚Р°С‚СѓСЃ СѓС‡С‘С‚РЅРѕР№ Р·Р°РїРёСЃРё</h4>
+            <h4>Статус учётной записи</h4>
             <div className="status-options">
               {(Object.keys(STATUS_LABELS) as Status[]).map(s => (
                 <label key={s}>
@@ -274,28 +274,28 @@ export const RoleManagementScreen: React.FC = () => {
           </div>
 
           <div className="consent-editor">
-            <h4>РЎРѕРіР»Р°СЃРёСЏ РЅР° РґРѕСЃС‚СѓРї</h4>
+            <h4>Согласия на доступ</h4>
             <label className="toggle-row">
               <input type="checkbox" checked={selectedUser.consentCoach} onChange={e => handleConsentChange(selectedUser.id, 'consentCoach', e.target.checked)} />
-              Р Р°Р·СЂРµС€РёС‚СЊ РґРѕСЃС‚СѓРї С‚СЂРµРЅРµСЂСѓ
+              Разрешить доступ тренеру
             </label>
             <label className="toggle-row">
               <input type="checkbox" checked={selectedUser.consentDoctor} onChange={e => handleConsentChange(selectedUser.id, 'consentDoctor', e.target.checked)} />
-              Р Р°Р·СЂРµС€РёС‚СЊ РґРѕСЃС‚СѓРї РІСЂР°С‡Сѓ
+              Разрешить доступ врачу
             </label>
           </div>
 
           <div className="notes-editor">
-            <h4>Р—Р°РјРµС‚РєРё</h4>
+            <h4>Заметки</h4>
             <textarea value={editNotes} onChange={e => setEditNotes(e.target.value)} rows={3} />
-            <button className="btn secondary" onClick={() => handleSaveNotes(selectedUser.id)}>РЎРѕС…СЂР°РЅРёС‚СЊ Р·Р°РјРµС‚РєРё</button>
+            <button className="btn secondary" onClick={() => handleSaveNotes(selectedUser.id)}>Сохранить заметки</button>
           </div>
 
           <div className="user-actions">
             {selectedUser.id !== currentUserId && (
-              <button className="btn danger" onClick={() => handleDeleteUser(selectedUser.id)}>РЈРґР°Р»РёС‚СЊ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ</button>
+              <button className="btn danger" onClick={() => handleDeleteUser(selectedUser.id)}>Удалить пользователя</button>
             )}
-            <button className="btn secondary" onClick={() => setSelectedUser(null)}>Р—Р°РєСЂС‹С‚СЊ</button>
+            <button className="btn secondary" onClick={() => setSelectedUser(null)}>Закрыть</button>
           </div>
         </div>
       )}
@@ -304,11 +304,11 @@ export const RoleManagementScreen: React.FC = () => {
         <div className="users-list">
           <div className="users-table-header">
             <div>Email</div>
-            <div>Р¤РРћ</div>
-            <div>Р РѕР»СЊ</div>
-            <div>РЎС‚Р°С‚СѓСЃ</div>
-            <div>Р”РѕСЃС‚СѓРї</div>
-            <div>Р”РµР№СЃС‚РІРёСЏ</div>
+            <div>ФИО</div>
+            <div>Роль</div>
+            <div>Статус</div>
+            <div>Доступ</div>
+            <div>Действия</div>
           </div>
           <div className="users-table-body">
             {users.map(user => (
@@ -324,29 +324,29 @@ export const RoleManagementScreen: React.FC = () => {
                 <div className="user-consent">
                   {user.consentCoach && ''}
                   {user.consentDoctor && ''}
-                  {!user.consentCoach && !user.consentDoctor && 'вЂ”'}
+                  {!user.consentCoach && !user.consentDoctor && '—'}
                 </div>
                 <div className="user-actions">
-                  <button className="btn-icon" title="" onClick={e => { e.stopPropagation(); openEdit(user); }}>вњЏпёЏ</button>
+                  <button className="btn-icon" title="" onClick={e => { e.stopPropagation(); openEdit(user); }}>✏️</button>
                   {user.id !== currentUserId && (
-                    <button className="btn-icon" title="" onClick={e => { e.stopPropagation(); handleDeleteUser(user.id); }}>рџ—‘пёЏ</button>
+                    <button className="btn-icon" title="" onClick={e => { e.stopPropagation(); handleDeleteUser(user.id); }}>🗑️</button>
                   )}
                 </div>
               </div>
             ))}
-            {users.length === 0 && <div className="empty-state"><p>РџРѕР»СЊР·РѕРІР°С‚РµР»Рё РЅРµ РЅР°Р№РґРµРЅС‹.</p></div>}
+            {users.length === 0 && <div className="empty-state"><p>Пользователи не найдены.</p></div>}
           </div>
         </div>
       )}
 
       {tab === 'permissions' && (
         <div className="permissions-matrix">
-          <h3>РњР°С‚СЂРёС†Р° РїСЂР°РІ РґРѕСЃС‚СѓРїР° (РўР— 21)</h3>
+          <h3>Матрица прав доступа (ТЗ 21)</h3>
           <table>
             <thead>
               <tr>
-                <th>Р РѕР»СЊ</th>
-                <th>Р’РѕР·РјРѕР¶РЅРѕСЃС‚Рё</th>
+                <th>Роль</th>
+                <th>Возможности</th>
               </tr>
             </thead>
             <tbody>
@@ -369,14 +369,14 @@ export const RoleManagementScreen: React.FC = () => {
 
       {tab === 'log' && (
         <div className="audit-log">
-          <h3>Р–СѓСЂРЅР°Р» РґРµР№СЃС‚РІРёР№</h3>
-          {auditLog.length === 0 && <p>РќРµС‚ Р·Р°РїРёСЃРµР№.</p>}
+          <h3>Журнал действий</h3>
+          {auditLog.length === 0 && <p>Нет записей.</p>}
           <table>
             <thead>
               <tr>
-                <th>Р’СЂРµРјСЏ</th>
-                <th>Р”РµР№СЃС‚РІРёРµ</th>
-                <th>Р”РµС‚Р°Р»Рё</th>
+                <th>Время</th>
+                <th>Действие</th>
+                <th>Детали</th>
               </tr>
             </thead>
             <tbody>

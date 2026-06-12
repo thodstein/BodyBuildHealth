@@ -10,7 +10,7 @@ let client: ReturnType<typeof createClient> | null = null;
 let subscriptions: Record<string, any> = {};
 
 export function initRealtime(userId: string = "user_default") {
-  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) return console.warn("вљ пёЏ Supabase credentials missing for Realtime");
+  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) return console.warn("⚠️ Не заданы ключи Supabase для Realtime");
   client = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
   STORES.forEach(store => {

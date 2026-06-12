@@ -48,7 +48,7 @@ async function retryWithBackoff<T>(fn: () => Promise<T>, attempt: number = 1): P
 
 export function initCloudSync() {
   if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-    console.warn("вљ пёЏ Supabase credentials missing. Sync disabled.");
+    console.warn("⚠️ Не заданы ключи Supabase. Синхронизация отключена.");
     return null;
   }
   client = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);

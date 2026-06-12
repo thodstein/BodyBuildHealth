@@ -16,10 +16,10 @@ function getSubstanceName(id: string): string {
 }
 
 const ORGAN_LABELS_V7: Record<string, string> = {
-  heart: 'вќ¤пёЏ РЎРµСЂРґС†Рµ', vessels: '', liver: '', kidney: '',
-  blood: '', endocrine: 'вљ–пёЏ Р­РЅРґРѕРєСЂРёРЅРЅР°СЏ', metabolic: 'вљ–пёЏ РњРµС‚Р°Р±РѕР»РёР·Рј',
+  heart: '❤️ Сердце', vessels: '', liver: '', kidney: '',
+  blood: '', endocrine: '⚖️ Эндокринная', metabolic: '⚖️ Метаболизм',
   ghigf: '', ins_axis: '',
-  musculoskeletal: '', neuro_toxicity: 'вљ пёЏ РќРµР№СЂРѕС‚РѕРєСЃРёС‡РЅРѕСЃС‚СЊ',
+  musculoskeletal: '', neuro_toxicity: '⚠️ Нейротоксичность',
   reproductive: '',
 };
 
@@ -52,15 +52,15 @@ function hasValidMech(sysKey: string, mechIdx: number): boolean {
 }
 
 const SENSITIVITY_LABELS: Record<string, string> = {
-  proteinPerKg: '', fiberG: '', omega3G: '',
-  sodiumG: '', potassiumG: '', sleepHours: '',
-  stressLevel: '', activityLevel: '',
-  workoutsPerWeek: '', avgWorkoutMinutes: '',
-  lissMinutes: 'LISS (РјРёРЅ/РЅРµРґ)', hasHIIT: '',
-  volumeTonnes: '', stazhWeeks: '',
-  avgKcal: '', avgProtein: '',
-  avgFat: '', avgCarbs: '',
-  age: '', weight: '', waterL: '',
+  proteinPerKg: 'Белок (г/кг)', fiberG: 'Клетчатка', omega3G: 'Омега-3',
+  sodiumG: 'Натрий', potassiumG: 'Калий', sleepHours: 'Сон',
+  stressLevel: 'Стресс', activityLevel: 'Активность',
+  workoutsPerWeek: 'Тренировок/нед', avgWorkoutMinutes: 'Минут/трен',
+  lissMinutes: 'LISS (мин/нед)', hasHIIT: 'HIIT',
+  volumeTonnes: 'Тоннаж', stazhWeeks: 'Стаж',
+  avgKcal: 'Калории', avgProtein: 'Белки',
+  avgFat: 'Жиры', avgCarbs: 'Углеводы',
+  age: 'Возраст', weight: 'Вес', waterL: 'Вода',
 };
 
 
@@ -190,12 +190,12 @@ export const V7RiskDisplay: React.FC<{
   const renderOrgans = () => (
     <div>
       <div className="card" style={{ marginBottom: 12 }}>
-        <h3 style={{ margin: '0 0 10px 0' }}>рџ”¬ V7 Risk Engine вЂ” РџРѕР»РЅР°СЏ РјРѕРґРµР»СЊ</h3>
+        <h3 style={{ margin: '0 0 10px 0' }}>🔬 V7 Risk Engine — Полная модель</h3>
           <div style={{ marginBottom: 12 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-              <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>Р’СЂРµРјРµРЅРЅРѕР№ СЃСЂРµР·:</span>
+              <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>Временной срез:</span>
               <span style={{ fontSize: 13, fontWeight: 700, color: '#00e68a' }}>
-                {organWeek === 0 ? '' : `РќРµРґРµР»СЏ ${organWeek}`}
+                {organWeek === 0 ? '' : `Неделя ${organWeek}`}
               </span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -215,7 +215,7 @@ export const V7RiskDisplay: React.FC<{
             </div>
             {organWeek > 0 && weeklyGlobalData[organWeek - 1] && (
               <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 4, textAlign: 'center' }}>
-                РћР±С‰РёР№ СЂРёСЃРє (raw): <b style={{ color: getRiskColor(fmtPct100(weeklyGlobalData[organWeek - 1].raw)) }}>{fmtPct100(weeklyGlobalData[organWeek - 1].raw)}%</b>
+                Общий риск (raw): <b style={{ color: getRiskColor(fmtPct100(weeklyGlobalData[organWeek - 1].raw)) }}>{fmtPct100(weeklyGlobalData[organWeek - 1].raw)}%</b>
               </div>
             )}
           </div>
@@ -229,11 +229,11 @@ export const V7RiskDisplay: React.FC<{
             <div style={{ fontSize: 22, fontWeight: 700, color: getRiskColor(globalRiskNet) }}>{fmtPct100(globalRiskNet)}%</div>
           </div>
           <div style={{ background: 'var(--bg-secondary)', padding: 10, borderRadius: 8, textAlign: 'center' }}>
-            <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>P(СЃРѕР±С‹С‚РёРµ)</div>
+            <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>P(событие)</div>
             <div style={{ fontSize: 22, fontWeight: 700, color: getRiskColor(globalPEvent * 100) }}>{(globalPEvent * 100).toFixed(1)}%</div>
           </div>
           <div style={{ background: 'var(--bg-secondary)', padding: 10, borderRadius: 8, textAlign: 'center' }}>
-            <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>РљР°С‡РµСЃС‚РІРѕ РґР°РЅРЅС‹С…</div>
+            <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>Качество данных</div>
             <div style={{ fontSize: 22, fontWeight: 700, color: dataQuality > 0.7 ? '#22c55e' : dataQuality > 0.4 ? '#eab308' : '#ef4444' }}>{(dataQuality * 100).toFixed(0)}%</div>
           </div>
         </div>
@@ -253,7 +253,7 @@ export const V7RiskDisplay: React.FC<{
       </div>
 
       <div className="card">
-        <h3 style={{ margin: '0 0 10px' }}>рџ«Ђ РћСЂРіР°РЅРЅС‹Рµ СЃРёСЃС‚РµРјС‹</h3>
+        <h3 style={{ margin: '0 0 10px' }}>🫀 Органные системы</h3>
         {Object.entries(organSummary).map(([sysKey, sysData]: [string, any]) => {
           const label = ORGAN_LABELS_V7[sysKey] || sysKey;
           const isExpanded = expandedOrgan === sysKey;
@@ -271,7 +271,7 @@ export const V7RiskDisplay: React.FC<{
                     <div style={{ width: `${Math.min(100, organPct)}%`, height: '100%', background: getRiskColor(organPct), borderRadius: 3 }} />
                   </div>
                   <span style={{ padding: '2px 7px', borderRadius: 4, fontWeight: 700, fontSize: 11, color: '#fff', background: getRiskColor(organPct), minWidth: 34, textAlign: 'center' }}>{organPct}%</span>
-                  <span style={{ fontSize: 10, color: 'var(--text-dim)', transition: 'transform 0.2s', transform: isExpanded ? 'rotate(180deg)' : 'rotate(0)' }}>в–ѕ</span>
+                  <span style={{ fontSize: 10, color: 'var(--text-dim)', transition: 'transform 0.2s', transform: isExpanded ? 'rotate(180deg)' : 'rotate(0)' }}>▾</span>
                 </div>
               </div>
               {isExpanded && (
@@ -291,7 +291,7 @@ export const V7RiskDisplay: React.FC<{
                               <div style={{ display: 'flex', gap: 4 }}>
                                 <span style={{ color: getRiskColor(rawVal) }} title="">{rawVal}%</span>
                                 <span style={{ color: getRiskColor(netVal), fontWeight: 600 }} title="">{netVal}%</span>
-                                {mechData.geneticMult > 1.05 && <span style={{ fontSize: 8, color: '#eab308' }}>рџ§¬{mechData.geneticMult.toFixed(2)}</span>}
+                                {mechData.geneticMult > 1.05 && <span style={{ fontSize: 8, color: '#eab308' }}>🧬{mechData.geneticMult.toFixed(2)}</span>}
                               </div>
                             </div>
                             <div style={{ background: 'rgba(255,255,255,0.05)', borderRadius: 2, height: 4, overflow: 'hidden' }}>
@@ -304,15 +304,15 @@ export const V7RiskDisplay: React.FC<{
                   )}
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 4 }}>
                     <div style={{ background: 'rgba(239,68,68,0.1)', padding: '4px 6px', borderRadius: 4, textAlign: 'center' }}>
-                      <div style={{ fontSize: 8, color: 'var(--text-dim)' }}>РћСЃС‚СЂС‹Р№</div>
+                      <div style={{ fontSize: 8, color: 'var(--text-dim)' }}>Острый</div>
                       <div style={{ fontSize: 12, fontWeight: 600 }}>{fmtPct01(sysData.acute ?? 0)}%</div>
                     </div>
                     <div style={{ background: 'rgba(249,115,22,0.1)', padding: '4px 6px', borderRadius: 4, textAlign: 'center' }}>
-                      <div style={{ fontSize: 8, color: 'var(--text-dim)' }}>РҐСЂРѕРЅРёС‡.</div>
+                      <div style={{ fontSize: 8, color: 'var(--text-dim)' }}>Хронич.</div>
                       <div style={{ fontSize: 12, fontWeight: 600 }}>{fmtPct01(sysData.chronic ?? 0)}%</div>
                     </div>
                     <div style={{ background: 'rgba(168,85,247,0.1)', padding: '4px 6px', borderRadius: 4, textAlign: 'center' }}>
-                      <div style={{ fontSize: 8, color: 'var(--text-dim)' }}>Р¤РёР±СЂРѕР·</div>
+                      <div style={{ fontSize: 8, color: 'var(--text-dim)' }}>Фиброз</div>
                       <div style={{ fontSize: 12, fontWeight: 600 }}>{fmtPct01(sysData.fibrosis ?? 0)}%</div>
                     </div>
                   </div>
@@ -325,12 +325,12 @@ export const V7RiskDisplay: React.FC<{
 
       {pkTimeSeries && Object.keys(pkTimeSeries).length > 0 && (
         <div className="card" style={{ marginBottom: 12 }}>
-          <h3 style={{ margin: '0 0 8px 0' }}>рџ’‰ PK РљРѕРЅС†РµРЅС‚СЂР°С†РёРё ({Object.keys(pkTimeSeries).length} РїСЂРµРї.)</h3>
+          <h3 style={{ margin: '0 0 8px 0' }}>💉 PK Концентрации ({Object.keys(pkTimeSeries).length} преп.)</h3>
           <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 10 }}>
-            <span style={{ fontSize: 10, color: 'var(--text-dim)', whiteSpace: 'nowrap' }}>{(pkDay / 7).toFixed(1)} РЅРµРґ</span>
+            <span style={{ fontSize: 10, color: 'var(--text-dim)', whiteSpace: 'nowrap' }}>{(pkDay / 7).toFixed(1)} нед</span>
             <input type="range" min={0} max={83} value={pkDay} onChange={e => setPkDay(Number(e.target.value))}
               style={{ flex: 1, accentColor: 'var(--accent)' }} />
-            <span style={{ fontSize: 10, color: 'var(--text-dim)', whiteSpace: 'nowrap' }}>{((83 - pkDay) / 7).toFixed(1)} РЅРµРґ РѕСЃС‚.</span>
+            <span style={{ fontSize: 10, color: 'var(--text-dim)', whiteSpace: 'nowrap' }}>{((83 - pkDay) / 7).toFixed(1)} нед ост.</span>
           </div>
           {Object.entries(pkTimeSeries).map(([subId, concs]: [string, any]) => {
             const vals = concs as number[];
@@ -342,7 +342,7 @@ export const V7RiskDisplay: React.FC<{
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
                   <span style={{ fontSize: 12, fontWeight: 600 }}>{getSubstanceName(subId)}</span>
                   <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                    <span style={{ fontSize: 9, color: 'var(--text-dim)' }}>РќР°С‡: {startVal.toFixed(2)}</span>
+                    <span style={{ fontSize: 9, color: 'var(--text-dim)' }}>Нач: {startVal.toFixed(2)}</span>
                     <span style={{ fontSize: 11, fontWeight: 700, color: getRiskColor((currentVal / maxConc) * 100) }}>{currentVal.toFixed(2)}</span>
                     <span style={{ fontSize: 9, color: 'var(--text-dim)' }}>Cmax: {maxConc.toFixed(2)}</span>
                   </div>
@@ -363,7 +363,7 @@ export const V7RiskDisplay: React.FC<{
                   <div style={{ position: 'absolute', left: `${(pkDay / 83) * 100}%`, top: 0, bottom: 0, width: 2, background: 'var(--accent)', opacity: 0.8 }} />
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 7, color: 'var(--text-dim)', marginTop: 1 }}>
-                  <span>0</span><span>2</span><span>4</span><span>6</span><span>8</span><span>10</span><span>12 РЅРµРґ</span>
+                  <span>0</span><span>2</span><span>4</span><span>6</span><span>8</span><span>10</span><span>12 нед</span>
                 </div>
               </div>
             );
@@ -375,8 +375,8 @@ export const V7RiskDisplay: React.FC<{
 
   const renderMatrix = () => (
     <div className="card" style={{ marginBottom: 12 }}>
-      <h3 style={{ margin: '0 0 10px 0' }}>рџ”І РњР°С‚СЂРёС†Р° СЂРёСЃРєРѕРІ V7</h3>
-      <p style={{ fontSize: 11, color: 'var(--text-dim)', margin: '0 0 10px 0' }}>18 СЃРёСЃС‚РµРј Г— 7-9 РјРµС…Р°РЅРёР·РјРѕРІ</p>
+      <h3 style={{ margin: '0 0 10px 0' }}>🔲 Матрица рисков V7</h3>
+      <p style={{ fontSize: 11, color: 'var(--text-dim)', margin: '0 0 10px 0' }}>18 систем × 7-9 механизмов</p>
       {Object.entries(matrix.systems).map(([sysKey, sysData]: [string, any]) => {
         const label = SYSTEM_NAMES_RU[sysKey] || sysKey;
         return (
@@ -399,7 +399,7 @@ export const V7RiskDisplay: React.FC<{
                     <span style={{ color: 'var(--text-dim)' }}>{mechIdx}. {mechName}</span>
                     <div style={{ display: 'flex', gap: 4 }}>
                       <span style={{ color: getRiskColor(mech.P_net * 100) }}>{netVal}%</span>
-                      {mech.geneticMult > 1.05 && <span style={{ fontSize: 8, color: '#eab308' }}>рџ§¬{mech.geneticMult.toFixed(2)}</span>}
+                      {mech.geneticMult > 1.05 && <span style={{ fontSize: 8, color: '#eab308' }}>🧬{mech.geneticMult.toFixed(2)}</span>}
                     </div>
                   </div>
                   <div style={{ background: 'rgba(255,255,255,0.05)', borderRadius: 2, height: 4, overflow: 'hidden' }}>
@@ -415,7 +415,7 @@ export const V7RiskDisplay: React.FC<{
   );
 
   const renderTimeSeries = () => {
-    if (!timeSeriesData) return <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-dim)' }}>РќРµС‚ РґР°РЅРЅС‹С… PK РґР»СЏ РІСЂРµРјРµРЅРЅРѕРіРѕ СЂСЏРґР°</div>;
+    if (!timeSeriesData) return <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-dim)' }}>Нет данных PK для временного ряда</div>;
     const { days, organDaily } = timeSeriesData;
     const maxDay = days.length - 1;
 
@@ -423,17 +423,17 @@ export const V7RiskDisplay: React.FC<{
       <div>
         <div className="card" style={{ marginBottom: 12 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-            <h3 style={{ margin: '0 0 0 0' }}>рџ“€ Р­РІРѕР»СЋС†РёСЏ СЂРёСЃРєРѕРІ (84 РґРЅСЏ)</h3>
+            <h3 style={{ margin: '0 0 0 0' }}>📈 Эволюция рисков (84 дня)</h3>
             <span style={{ fontSize: 13, fontWeight: 700, background: 'var(--bg-secondary)', padding: '4px 10px', borderRadius: 6 }}>
-              Р”РµРЅСЊ {selectedDay} / {maxDay}
+              День {selectedDay} / {maxDay}
             </span>
           </div>
-          <p style={{ fontSize: 11, color: 'var(--text-dim)', margin: '0 0 10px 0' }}>Р”РёРЅР°РјРёРєР° СЂРёСЃРєРѕРІ РїРѕ РѕСЂРіР°РЅРЅС‹Рј СЃРёСЃС‚РµРјР°Рј</p>
+          <p style={{ fontSize: 11, color: 'var(--text-dim)', margin: '0 0 10px 0' }}>Динамика рисков по органным системам</p>
           <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 8 }}>
-            <span style={{ fontSize: 10, color: 'var(--text-dim)', whiteSpace: 'nowrap' }}>{(selectedDay / 7).toFixed(1)} РЅРµРґ</span>
+            <span style={{ fontSize: 10, color: 'var(--text-dim)', whiteSpace: 'nowrap' }}>{(selectedDay / 7).toFixed(1)} нед</span>
             <input type="range" min={0} max={maxDay} value={selectedDay} onChange={e => setSelectedDay(Number(e.target.value))}
               style={{ flex: 1, accentColor: 'var(--accent)' }} />
-            <span style={{ fontSize: 10, color: 'var(--text-dim)', whiteSpace: 'nowrap' }}>{((maxDay - selectedDay) / 7).toFixed(1)} РЅРµРґ</span>
+            <span style={{ fontSize: 10, color: 'var(--text-dim)', whiteSpace: 'nowrap' }}>{((maxDay - selectedDay) / 7).toFixed(1)} нед</span>
           </div>
         </div>
 
@@ -474,7 +474,7 @@ export const V7RiskDisplay: React.FC<{
                 <div style={{ position: 'absolute', left: `${(selectedDay / maxDay) * 100}%`, top: 0, bottom: 0, width: 2, background: 'var(--accent)', opacity: 0.8 }} />
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 7, color: 'var(--text-dim)', marginTop: 1 }}>
-                <span>0</span><span>2</span><span>4</span><span>6</span><span>8</span><span>10</span><span>12 РЅРµРґ</span>
+                <span>0</span><span>2</span><span>4</span><span>6</span><span>8</span><span>10</span><span>12 нед</span>
               </div>
             </div>
           );
@@ -484,18 +484,18 @@ export const V7RiskDisplay: React.FC<{
   };
 
   const renderSensitivity = () => {
-    if (!linked.profile) return <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-dim)' }}>Р—Р°РіСЂСѓР·РєР° РїСЂРѕС„РёР»СЏ...</div>;
+    if (!linked.profile) return <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-dim)' }}>Загрузка профиля...</div>;
     if (!linked.course || linked.course.length === 0) return (
       <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-dim)' }}>
-        <div style={{ fontSize: 28, marginBottom: 8 }}>рџ“Љ</div>
-        <div>Р”РѕР±Р°РІСЊС‚Рµ РїСЂРµРїР°СЂР°С‚С‹ РІ РєСѓСЂСЃ РЅР° РІРєР»Р°РґРєРµ рџ’Љ Р¤Р°СЂРјР°</div>
-        <div style={{ fontSize: 11, marginTop: 4, color: 'var(--text-dim)' }}>РґР»СЏ Р°РЅР°Р»РёР·Р° С‡СѓРІСЃС‚РІРёС‚РµР»СЊРЅРѕСЃС‚Рё</div>
+        <div style={{ fontSize: 28, marginBottom: 8 }}>📊</div>
+        <div>Добавьте препараты в курс на вкладке 💊 Фарма</div>
+        <div style={{ fontSize: 11, marginTop: 4, color: 'var(--text-dim)' }}>для анализа чувствительности</div>
       </div>
     );
     if (!sensitivityResults || sensitivityResults.length === 0) return (
       <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-dim)' }}>
-        <div>РќРµРґРѕСЃС‚Р°С‚РѕС‡РЅРѕ РґР°РЅРЅС‹С… РґР»СЏ Р°РЅР°Р»РёР·Р° С‡СѓРІСЃС‚РІРёС‚РµР»СЊРЅРѕСЃС‚Рё</div>
-        <div style={{ fontSize: 11, marginTop: 8 }}>РќР°СЃС‚СЂРѕР№С‚Рµ РїР°СЂР°РјРµС‚СЂС‹ РІ РџСЂРѕС„РёР»Рµ {'>'} РџР°СЂР°РјРµС‚СЂС‹ V7</div>
+        <div>Недостаточно данных для анализа чувствительности</div>
+        <div style={{ fontSize: 11, marginTop: 8 }}>Настройте параметры в Профиле {'>'} Параметры V7</div>
       </div>
     );
 
@@ -505,9 +505,9 @@ export const V7RiskDisplay: React.FC<{
     return (
       <div>
         <div className="card" style={{ marginBottom: 12 }}>
-          <h3 style={{ margin: '0 0 10px 0' }}>рџ”¬ РђРЅР°Р»РёР· С‡СѓРІСЃС‚РІРёС‚РµР»СЊРЅРѕСЃС‚Рё</h3>
+          <h3 style={{ margin: '0 0 10px 0' }}>🔬 Анализ чувствительности</h3>
           <p style={{ fontSize: 11, color: 'var(--text-dim)', margin: '0 0 10px 0' }}>
-            РљР°РєРёРµ РїР°СЂР°РјРµС‚СЂС‹ СЃРёР»СЊРЅРµРµ РІСЃРµРіРѕ РІР»РёСЏСЋС‚ РЅР° РѕР±С‰РёР№ СЂРёСЃРє? Р­Р»Р°СЃС‚РёС‡РЅРѕСЃС‚СЊ РїРѕРєР°Р·С‹РІР°РµС‚, РЅР° СЃРєРѕР»СЊРєРѕ % РёР·РјРµРЅСЏРµС‚СЃСЏ СЂРёСЃРє РїСЂРё 1% РёР·РјРµРЅРµРЅРёРё РїР°СЂР°РјРµС‚СЂР°.
+            Какие параметры сильнее всего влияют на общий риск? Эластичность показывает, на сколько % изменяется риск при 1% изменении параметра.
           </p>
         </div>
         {top10.map((result, idx) => {
@@ -523,7 +523,7 @@ export const V7RiskDisplay: React.FC<{
                   <span style={{ fontSize: 12, fontWeight: 600 }}>{label}</span>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>Р‘Р°Р·РѕРІРѕРµ: {typeof result.baseValue === 'number' ? result.baseValue.toFixed(2) : result.baseValue}</span>
+                  <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>Базовое: {typeof result.baseValue === 'number' ? result.baseValue.toFixed(2) : result.baseValue}</span>
                   <span style={{ fontSize: 11, fontWeight: 700, color: elasticityColor }}>Оµ = {result.elasticity.toFixed(3)}</span>
                   <span style={{ fontSize: 9, padding: '2px 6px', borderRadius: 4, background: `${elasticityColor}22`, color: elasticityColor, fontWeight: 600 }}>{elasticityLevel}</span>
                 </div>
@@ -649,10 +649,10 @@ export const V7RiskDisplay: React.FC<{
       <div>
         <div className="card" style={{ marginBottom: 12 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-            <h3 style={{ margin: 0, fontSize: 14 }}>рџ§Ќ 3D РњРѕРґРµР»СЊ СЂРёСЃРєРѕРІ</h3>
+            <h3 style={{ margin: 0, fontSize: 14 }}>🧍 3D Модель рисков</h3>
             <div style={{ minWidth: 180 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 }}>
-                <span style={{ fontSize: 9, color: 'var(--text-dim)' }}>{organWeek === 0 ? 'в€… РЎСЂРµРґРЅРµРµ' : `РќРµРґ ${organWeek}`}</span>
+                <span style={{ fontSize: 9, color: 'var(--text-dim)' }}>{organWeek === 0 ? '∅ Среднее' : `Нед ${organWeek}`}</span>
               </div>
               <input type="range" min={0} max={12} value={organWeek} onChange={e => setOrganWeek(Number(e.target.value))}
                 style={{ width: '100%', accentColor: '#00e68a', height: 3, cursor: 'pointer' }} />
@@ -699,7 +699,7 @@ export const V7RiskDisplay: React.FC<{
             {/* Neck */}
             <rect x={cx - 12} y={62} width={24} height={12} rx={4} fill="var(--bg-secondary)" stroke="rgba(255,255,255,0.05)" strokeWidth="0.5" />
 
-            {/* Organs вЂ” rendered as proper shapes */}
+            {/* Organs — rendered as proper shapes */}
             {organKeys.map(okey => {
               const sd = organSummary[okey];
               const orgVal = get3DOrgVal(okey);
@@ -744,9 +744,9 @@ export const V7RiskDisplay: React.FC<{
             })}
 
             {/* Internal organ labels */}
-            <text x={cx} y={15} fill="var(--text-dim)" fontSize="7" fontWeight="600" textAnchor="middle">Р“РћР›РћР’Рђ</text>
-            <text x={cx - 95} y={180} fill="var(--text-dim)" fontSize="6" textAnchor="middle">Р›</text>
-            <text x={cx + 95} y={180} fill="var(--text-dim)" fontSize="6" textAnchor="middle">Рџ</text>
+            <text x={cx} y={15} fill="var(--text-dim)" fontSize="7" fontWeight="600" textAnchor="middle">ГОЛОВА</text>
+            <text x={cx - 95} y={180} fill="var(--text-dim)" fontSize="6" textAnchor="middle">Л</text>
+            <text x={cx + 95} y={180} fill="var(--text-dim)" fontSize="6" textAnchor="middle">П</text>
 
             {/* Selected organ floating label */}
             {selectedOrgan3D && (
@@ -758,13 +758,13 @@ export const V7RiskDisplay: React.FC<{
             {/* Legend */}
             <g transform="translate(10, 479)">
               <rect x={0} y={0} width={8} height={8} rx={1.5} fill="#22c55e" opacity={0.8} />
-              <text x={10} y={7} fill="var(--text-dim)" fontSize="6">РќРёР·Рє</text>
+              <text x={10} y={7} fill="var(--text-dim)" fontSize="6">Низк</text>
               <rect x={40} y={0} width={8} height={8} rx={1.5} fill="#eab308" opacity={0.8} />
-              <text x={50} y={7} fill="var(--text-dim)" fontSize="6">РЎСЂРµРґ</text>
+              <text x={50} y={7} fill="var(--text-dim)" fontSize="6">Сред</text>
               <rect x={80} y={0} width={8} height={8} rx={1.5} fill="#f97316" opacity={0.8} />
-              <text x={90} y={7} fill="var(--text-dim)" fontSize="6">Р’С‹СЃ</text>
+              <text x={90} y={7} fill="var(--text-dim)" fontSize="6">Выс</text>
               <rect x={115} y={0} width={8} height={8} rx={1.5} fill="#ef4444" opacity={0.8} />
-              <text x={125} y={7} fill="var(--text-dim)" fontSize="6">РљСЂРёС‚</text>
+              <text x={125} y={7} fill="var(--text-dim)" fontSize="6">Крит</text>
             </g>
           </svg>
         </div>
@@ -783,19 +783,19 @@ export const V7RiskDisplay: React.FC<{
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginBottom: 8 }}>
               <div style={{ background: 'var(--bg-secondary)', padding: '4px 8px', borderRadius: 6, textAlign: 'center' }}>
-                <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>РћСЃС‚СЂС‹Р№</div>
+                <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Острый</div>
                 <div style={{ fontWeight: 700, fontSize: 13, color: getRiskColor(fmtPct01(organSummary[selectedOrgan3D].acute ?? 0)) }}>
                   {fmtPct01(organSummary[selectedOrgan3D].acute ?? 0)}%
                 </div>
               </div>
               <div style={{ background: 'var(--bg-secondary)', padding: '4px 8px', borderRadius: 6, textAlign: 'center' }}>
-                <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>РҐСЂРѕРЅРёС‡РµСЃРєРёР№</div>
+                <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Хронический</div>
                 <div style={{ fontWeight: 700, fontSize: 13, color: getRiskColor(fmtPct01(organSummary[selectedOrgan3D].chronic ?? 0)) }}>
                   {fmtPct01(organSummary[selectedOrgan3D].chronic ?? 0)}%
                 </div>
               </div>
               <div style={{ background: 'var(--bg-secondary)', padding: '4px 8px', borderRadius: 6, textAlign: 'center' }}>
-                <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Р¤РёР±СЂРѕР·</div>
+                <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Фиброз</div>
                 <div style={{ fontWeight: 700, fontSize: 13, color: getRiskColor(fmtPct01(organSummary[selectedOrgan3D].fibrosis ?? 0)) }}>
                   {fmtPct01(organSummary[selectedOrgan3D].fibrosis ?? 0)}%
                 </div>
@@ -803,7 +803,7 @@ export const V7RiskDisplay: React.FC<{
             </div>
             {organSummary[selectedOrgan3D].mechanisms && Object.keys(organSummary[selectedOrgan3D].mechanisms).length > 0 && (
               <div style={{ borderTop: '1px solid var(--border)', paddingTop: 6 }}>
-                <div style={{ fontSize: 11, fontWeight: 600, marginBottom: 4 }}>РњРµС…Р°РЅРёР·РјС‹:</div>
+                <div style={{ fontSize: 11, fontWeight: 600, marginBottom: 4 }}>Механизмы:</div>
                 {Object.entries(organSummary[selectedOrgan3D].mechanisms).map(([idx, md]: [string, any]) => {
                   const mechIdx = Number(idx);
                   if (!hasValidMech(selectedOrgan3D, mechIdx)) return null;
@@ -829,7 +829,7 @@ export const V7RiskDisplay: React.FC<{
         {/* Overall risk bar */}
         <div className="card" style={{ marginBottom: 12 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-            <span style={{ fontSize: 12, fontWeight: 600 }}>РћР±С‰РёР№ СЂРёСЃРє</span>
+            <span style={{ fontSize: 12, fontWeight: 600 }}>Общий риск</span>
             <div style={{ display: 'flex', gap: 12 }}>
               <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>Raw: <b style={{ color: getRiskColor(globalRiskRaw) }}>{fmtPct100(globalRiskRaw)}%</b></span>
               <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>Net: <b style={{ color: getRiskColor(globalRiskNet) }}>{fmtPct100(globalRiskNet)}%</b></span>
@@ -843,7 +843,7 @@ export const V7RiskDisplay: React.FC<{
             }} />
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4, fontSize: 9, color: 'var(--text-dim)' }}>
-            <span>РќРёР·РєРёР№</span><span>РЈРјРµСЂРµРЅРЅС‹Р№</span><span>РџРѕРІС‹С€РµРЅРЅС‹Р№</span><span>Р’С‹СЃРѕРєРёР№</span><span>РљСЂРёС‚РёС‡РµСЃРєРёР№</span>
+            <span>Низкий</span><span>Умеренный</span><span>Повышенный</span><span>Высокий</span><span>Критический</span>
           </div>
         </div>
       </div>
@@ -858,12 +858,12 @@ export const V7RiskDisplay: React.FC<{
 
   const pkContent = pkTimeSeries && Object.keys(pkTimeSeries).length > 0 ? (
     <div className="card" style={{ marginBottom: 12 }}>
-      <h3 style={{ margin: '0 0 8px 0' }}>рџ’Љ Р¤Р°СЂРјР°РєРѕРєРёРЅРµС‚РёРєР° ({Object.keys(pkTimeSeries).length} РїСЂРµРї.)</h3>
-      <p style={{ fontSize: 11, color: 'var(--text-dim)', margin: '0 0 10px 0' }}>РќРµРґРµР»СЊРЅР°СЏ РґРёРЅР°РјРёРєР° РєРѕРЅС†РµРЅС‚СЂР°С†РёР№ РїСЂРµРїР°СЂР°С‚РѕРІ</p>
+      <h3 style={{ margin: '0 0 8px 0' }}>💊 Фармакокинетика ({Object.keys(pkTimeSeries).length} преп.)</h3>
+      <p style={{ fontSize: 11, color: 'var(--text-dim)', margin: '0 0 10px 0' }}>Недельная динамика концентраций препаратов</p>
       <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 10 }}>
-        <span style={{ fontSize: 10, color: 'var(--text-dim)', whiteSpace: 'nowrap' }}>{(pkDay / 7).toFixed(1)} РЅРµРґ</span>
+        <span style={{ fontSize: 10, color: 'var(--text-dim)', whiteSpace: 'nowrap' }}>{(pkDay / 7).toFixed(1)} нед</span>
         <input type="range" min={0} max={83} value={pkDay} onChange={e => setPkDay(Number(e.target.value))} style={{ flex: 1, accentColor: 'var(--accent)' }} />
-        <span style={{ fontSize: 10, color: 'var(--text-dim)', whiteSpace: 'nowrap' }}>{((83 - pkDay) / 7).toFixed(1)} РЅРµРґ РѕСЃС‚.</span>
+        <span style={{ fontSize: 10, color: 'var(--text-dim)', whiteSpace: 'nowrap' }}>{((83 - pkDay) / 7).toFixed(1)} нед ост.</span>
       </div>
       {Object.entries(pkTimeSeries).map(([subId, concs]: [string, any]) => {
         const vals = concs as number[];
@@ -875,7 +875,7 @@ export const V7RiskDisplay: React.FC<{
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
               <span style={{ fontSize: 12, fontWeight: 600 }}>{getSubstanceName(subId)}</span>
               <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                <span style={{ fontSize: 9, color: 'var(--text-dim)' }}>РќР°С‡: {startVal.toFixed(2)}</span>
+                <span style={{ fontSize: 9, color: 'var(--text-dim)' }}>Нач: {startVal.toFixed(2)}</span>
                 <span style={{ fontSize: 11, fontWeight: 700, color: getRiskColor((currentVal / maxConc) * 100) }}>{currentVal.toFixed(2)}</span>
                 <span style={{ fontSize: 9, color: 'var(--text-dim)' }}>Cmax: {maxConc.toFixed(2)}</span>
               </div>
@@ -896,13 +896,13 @@ export const V7RiskDisplay: React.FC<{
               <div style={{ position: 'absolute', left: `${(pkDay / 83) * 100}%`, top: 0, bottom: 0, width: 2, background: 'var(--accent)', opacity: 0.8 }} />
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 7, color: 'var(--text-dim)', marginTop: 1 }}>
-              <span>0</span><span>2</span><span>4</span><span>6</span><span>8</span><span>10</span><span>12 РЅРµРґ</span>
+              <span>0</span><span>2</span><span>4</span><span>6</span><span>8</span><span>10</span><span>12 нед</span>
             </div>
           </div>
         );
       })}
     </div>
-  ) : <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-dim)' }}>РќРµС‚ РґР°РЅРЅС‹С… PK. Р”РѕР±Р°РІСЊС‚Рµ РїСЂРµРїР°СЂР°С‚С‹ РІ РєСѓСЂСЃ.</div>;
+  ) : <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-dim)' }}>Нет данных PK. Добавьте препараты в курс.</div>;
 
   return (
     <div style={{ padding: '0 0 80px 0' }}>
@@ -926,10 +926,10 @@ export const V7RiskDisplay: React.FC<{
       {activeTab === 'pk' && pkContent}
       <div className="card" style={{ marginBottom: 12 }}>
         <div style={{ fontSize: 10, color: 'var(--text-dim)', textAlign: 'center', lineHeight: 1.5 }}>
-          рџ”¬ Health Engine v7.0 вЂ” PK в†’ Hill в†’ Signaling в†’ 7РјРµС… в†’ Damage/Recovery в†’ MC в†’ Risk<br />
-          12 РѕСЂРіР°РЅРѕРІ Г— 7 РјРµС…Р°РЅРёР·РјРѕРІ | РќРµР№СЂРѕС‚РѕРєСЃРёС‡РЅРѕСЃС‚СЊ | РњРµР¶РѕСЂРіР°РЅРЅС‹Рµ СЃРІСЏР·Рё | РЎС‚Р°Р¶ | Monte Carlo<br />
-          {mcResult ? `рџЋЇ MC: СЃСЂРµРґ. ${((mcResult as any).meanGlobalRisk * 100 || 0).toFixed(1)}% [P5: ${((mcResult as any).p5GlobalRisk * 100 || 0).toFixed(1)}% вЂ” P95: ${((mcResult as any).p95GlobalRisk * 100 || 0).toFixed(1)}%]` : mcEnabled ? '' : 'вљ™пёЏ Р”РµС‚РµСЂРјРёРЅРёСЂРѕРІР°РЅРЅС‹Р№ СЂРµР¶РёРј'}
-          {pkTimeSeries && Object.keys(pkTimeSeries).length > 0 ? ` | рџ’‰ PK: ${Object.keys(pkTimeSeries).length} РїСЂРµРїР°СЂР°С‚РѕРІ` : ''}
+          🔬 Health Engine v7.0 — PK → Hill → Signaling → 7мех → Damage/Recovery → MC → Risk<br />
+          12 органов × 7 механизмов | Нейротоксичность | Межорганные связи | Стаж | Monte Carlo<br />
+          {mcResult ? `🎯 MC: сред. ${((mcResult as any).meanGlobalRisk * 100 || 0).toFixed(1)}% [P5: ${((mcResult as any).p5GlobalRisk * 100 || 0).toFixed(1)}% — P95: ${((mcResult as any).p95GlobalRisk * 100 || 0).toFixed(1)}%]` : mcEnabled ? '' : '⚙️ Детерминированный режим'}
+          {pkTimeSeries && Object.keys(pkTimeSeries).length > 0 ? ` | 💉 PK: ${Object.keys(pkTimeSeries).length} препаратов` : ''}
         </div>
       </div>
     </div>

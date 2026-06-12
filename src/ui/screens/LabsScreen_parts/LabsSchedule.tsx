@@ -45,7 +45,7 @@ const LAB_DESCRIPTIONS: Record<string, string> = {
   'TG': '',
   'GLU': '',
   'INS': '',
-  'HOMA': 'HOMA-IR вЂ” РёРЅРґРµРєСЃ РёРЅСЃСѓР»РёРЅРѕСЂРµР·РёСЃС‚РµРЅС‚РЅРѕСЃС‚Рё',
+  'HOMA': 'HOMA-IR — индекс инсулинорезистентности',
   'CREATININE': '',
   'UA': '',
   'CORTISOL': '',
@@ -62,9 +62,9 @@ export const LabsSchedule: React.FC = () => {
   return (
     <div className="labs-schedule">
       <div className="card">
-        <h3>рџ“… Р“СЂР°С„РёРє СЃРґР°С‡Рё Р°РЅР°Р»РёР·РѕРІ</h3>
+        <h3>📅 График сдачи анализов</h3>
         <p style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 12 }}>
-          Р РµРєРѕРјРµРЅРґСѓРµРјС‹Р№ РіСЂР°С„РёРє СЃРґР°С‡Рё Р°РЅР°Р»РёР·РѕРІ РїРѕ С„Р°Р·Р°Рј РєСѓСЂСЃР°. РљР°Р¶РґР°СЏ С„Р°Р·Р° С‚СЂРµР±СѓРµС‚ РѕРїСЂРµРґРµР»С‘РЅРЅС‹Р№ РЅР°Р±РѕСЂ РјР°СЂРєРµСЂРѕРІ.
+          Рекомендуемый график сдачи анализов по фазам курса. Каждая фаза требует определённый набор маркеров.
         </p>
 
         {Object.entries(REQUIRED_LABS_PER_PHASE).map(([phase, labs]) => {
@@ -89,13 +89,13 @@ export const LabsSchedule: React.FC = () => {
                   }}>
                     {code}
                     {LAB_DESCRIPTIONS[code] && (
-                      <span style={{ fontSize: 9, color: 'var(--text-dim)', marginLeft: 4 }} title={LAB_DESCRIPTIONS[code]}>в„№пёЏ</span>
+                      <span style={{ fontSize: 9, color: 'var(--text-dim)', marginLeft: 4 }} title={LAB_DESCRIPTIONS[code]}>ℹ️</span>
                     )}
                   </span>
                 ))}
               </div>
               <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 4 }}>
-                Р’СЃРµРіРѕ РјР°СЂРєРµСЂРѕРІ: {labs.length}
+                Всего маркеров: {labs.length}
               </div>
             </div>
           );

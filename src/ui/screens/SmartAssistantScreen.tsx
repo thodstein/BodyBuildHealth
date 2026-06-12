@@ -11,14 +11,14 @@ interface GlossaryTerm {
 }
 
 const GLOSSARY: GlossaryTerm[] = [
-  { term: 'RIR (РџРѕРІС‚РѕСЂРµРЅРёСЏ РІ Р·Р°РїР°СЃРµ)', abbr: 'RIR', definition: '', units: 'С€РєР°Р»Р° 0-10' },
+  { term: 'RIR (Повторения в запасе)', abbr: 'RIR', definition: '', units: 'шкала 0-10' },
   { term: '', abbr: 'Hct', definition: '', units: '%' },
   { term: 'EC50', abbr: 'EC50', definition: '', units: '' },
-  { term: 'BMR (Р‘Р°Р·РѕРІС‹Р№ РјРµС‚Р°Р±РѕР»РёР·Рј)', abbr: 'BMR', definition: '', units: '' },
-  { term: 'TDEE (РћР±С‰РёР№ СЂР°СЃС…РѕРґ СЌРЅРµСЂРіРёРё)', abbr: 'TDEE', definition: '', units: '' },
-  { term: 'HOMA-IR', abbr: 'HOMA-IR', definition: '', units: 'СѓСЃР»РѕРІРЅС‹Рµ РµРґРёРЅРёС†С‹' },
-  { term: 'HGI (РРЅРґРµРєСЃ РіРѕРјРµРѕСЃС‚Р°Р·Р°/РёРјРјСѓРЅРёС‚РµС‚Р°)', abbr: 'HGI', definition: '', units: 'СѓСЃР»РѕРІРЅС‹Рµ РµРґРёРЅРёС†С‹' },
-  { term: 'MRR (РњРёРЅРёРјР°Р»СЊРЅС‹Р№ РґРёР°РїР°Р·РѕРЅ СЂРёСЃРєРѕРІ)', abbr: 'MRR', definition: '', units: 'СѓСЃР»РѕРІРЅС‹Рµ РµРґРёРЅРёС†С‹' },
+  { term: 'BMR (Базовый метаболизм)', abbr: 'BMR', definition: '', units: '' },
+  { term: 'TDEE (Общий расход энергии)', abbr: 'TDEE', definition: '', units: '' },
+  { term: 'HOMA-IR', abbr: 'HOMA-IR', definition: '', units: 'условные единицы' },
+  { term: 'HGI (Индекс гомеостаза/иммунитета)', abbr: 'HGI', definition: '', units: 'условные единицы' },
+  { term: 'MRR (Минимальный диапазон рисков)', abbr: 'MRR', definition: '', units: 'условные единицы' },
   { term: '', abbr: '', definition: '', units: '' },
   { term: '', abbr: '', definition: '', units: '' },
   { term: '', abbr: 'Free T', definition: '', units: '' },
@@ -157,14 +157,14 @@ export const SmartAssistantScreen: React.FC = () => {
   );
 
   if (loading && messages.length === 1) {
-    return <div className="screen assistant">Р—Р°РіСЂСѓР·РєР° СѓРјРЅРѕРіРѕ Р°СЃСЃРёСЃС‚РµРЅС‚Р°...</div>;
+    return <div className="screen assistant">Загрузка умного ассистента...</div>;
   }
 
   return (
     <div className="screen assistant">
       <div className="assistant-header">
-        <h2>РЈРјРЅС‹Р№ Р°СЃСЃРёСЃС‚РµРЅС‚</h2>
-        <p>Р§РµРєР°РїС‹ Рё РіР»РѕСЃСЃР°СЂРёР№</p>
+        <h2>Умный ассистент</h2>
+        <p>Чекапы и глоссарий</p>
       </div>
       
       <div className="messages-container" ref={messagesEndRef}>
@@ -173,7 +173,7 @@ export const SmartAssistantScreen: React.FC = () => {
             <div className="message-content">{msg.text}</div>
           </div>
         ))}
-        {loading && <div className="message loading-message">РђСЃСЃРёСЃС‚РµРЅС‚ РґСѓРјР°РµС‚...</div>}
+        {loading && <div className="message loading-message">Ассистент думает...</div>}
       </div>
       
       <div className="input-area">
@@ -197,13 +197,13 @@ export const SmartAssistantScreen: React.FC = () => {
       
       <div className="assistant-footer">
         <div className="quick-actions">
-          <button className="quick-action" onClick={() => setCheckupOpen(true)}>рџ“‹ Р§РµРєР°Рї РЅРµРґРµР»Рё</button>
-          <button className="quick-action" onClick={() => { setGlossaryOpen(true); setGlossarySearch(''); setExpandedTerm(null); }}>рџ“– Р“Р»РѕСЃСЃР°СЂРёР№</button>
+          <button className="quick-action" onClick={() => setCheckupOpen(true)}>📋 Чекап недели</button>
+          <button className="quick-action" onClick={() => { setGlossaryOpen(true); setGlossarySearch(''); setExpandedTerm(null); }}>📖 Глоссарий</button>
           <button className="quick-action" onClick={() => {
             const rdy = linked.readiness;
-            if (!rdy) { setMessages(m => [...m, { id: Date.now(), text: 'вљ пёЏ Р”Р°РЅРЅС‹Рµ Рѕ РіРѕС‚РѕРІРЅРѕСЃС‚Рё РµС‰С‘ РЅРµ Р·Р°РіСЂСѓР¶РµРЅС‹. Р—Р°РїРѕР»РЅРёС‚Рµ РїСЂРѕС„РёР»СЊ Рё Р°РЅР°Р»РёР·С‹.', isUser: false }]); return; }
+            if (!rdy) { setMessages(m => [...m, { id: Date.now(), text: '⚠️ Данные о готовности ещё не загружены. Заполните профиль и анализы.', isUser: false }]); return; }
             setMessages(m => [...m, { id: Date.now(), text: ``, isUser: false }]);
-          }}>рџ”” РќР°РїРѕРјРёРЅР°РЅРёСЏ</button>
+          }}>🔔 Напоминания</button>
           <button className="quick-action" onClick={() => {
             const quickQuestions = [
               '',
@@ -214,7 +214,7 @@ export const SmartAssistantScreen: React.FC = () => {
             ];
             const q = quickQuestions[Math.floor(Math.random() * quickQuestions.length)];
             setInput(q);
-          }}>рџ’Ў Р‘С‹СЃС‚СЂС‹Р№ РІРѕРїСЂРѕСЃ</button>
+          }}>💡 Быстрый вопрос</button>
         </div>
       </div>
       
@@ -223,8 +223,8 @@ export const SmartAssistantScreen: React.FC = () => {
         <div className="modal-overlay" onClick={() => setGlossaryOpen(false)}>
           <div className="modal glossary-modal" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
-              <h3>рџ“– Р“Р»РѕСЃСЃР°СЂРёР№ С‚РµСЂРјРёРЅРѕРІ</h3>
-              <button className="modal-close" onClick={() => setGlossaryOpen(false)}>вњ•</button>
+              <h3>📖 Глоссарий терминов</h3>
+              <button className="modal-close" onClick={() => setGlossaryOpen(false)}>✕</button>
             </div>
             <input
               type="text"
@@ -236,7 +236,7 @@ export const SmartAssistantScreen: React.FC = () => {
             />
             <div className="glossary-list">
               {filteredGlossary.length === 0 && (
-                <div className="glossary-empty">РўРµСЂРјРёРЅС‹ РЅРµ РЅР°Р№РґРµРЅС‹</div>
+                <div className="glossary-empty">Термины не найдены</div>
               )}
               {filteredGlossary.map(g => (
                 <div
@@ -262,8 +262,8 @@ export const SmartAssistantScreen: React.FC = () => {
         <div className="modal-overlay" onClick={() => resetCheckup()}>
           <div className="modal checkup-modal" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
-              <h3>рџ“‹ Р§РµРєР°Рї РЅРµРґРµР»Рё</h3>
-              <button className="modal-close" onClick={() => resetCheckup()}>вњ•</button>
+              <h3>📋 Чекап недели</h3>
+              <button className="modal-close" onClick={() => resetCheckup()}>✕</button>
             </div>
             {!checkupSubmitted ? (
               <>
@@ -288,14 +288,14 @@ export const SmartAssistantScreen: React.FC = () => {
                   </div>
                 ))}
                 <button className="checkup-submit-btn" onClick={submitCheckup}>
-                  РћС‚РїСЂР°РІРёС‚СЊ С‡РµРєР°Рї
+                  Отправить чекап
                 </button>
               </>
             ) : (
               <div className="checkup-result">
-                <p>вњ… Р§РµРєР°Рї РѕС‚РїСЂР°РІР»РµРЅ! Р РµР·СѓР»СЊС‚Р°С‚С‹ РґРѕР±Р°РІР»РµРЅС‹ РІ С‡Р°С‚.</p>
+                <p>✅ Чекап отправлен! Результаты добавлены в чат.</p>
                 <button className="checkup-submit-btn" onClick={resetCheckup}>
-                  Р—Р°РєСЂС‹С‚СЊ
+                  Закрыть
                 </button>
               </div>
             )}

@@ -24,15 +24,15 @@ function getThresholdName(id: string): string {
 
 interface LabRiskContribution { systemContributions: Record<string, number>; totalRisk: number; }
 
-function getSystemIcon(sys: string): string { return SYSTEM_INFO[sys]?.icon || 'вљ пёЏ'; }
+function getSystemIcon(sys: string): string { return SYSTEM_INFO[sys]?.icon || '⚠️'; }
 function getSystemLabel(sys: string): string { return SYSTEM_INFO[sys]?.label || sys; }
 
 const SYSTEM_LABELS_SHORT: Record<string, string> = {
-  cardio: 'вќ¤пёЏ РЎРµСЂРґС†Рµ', hepatic: '', renal: '',
-  neuro: '', endocrine: 'вљ–пёЏ Р­РЅРґРѕРєСЂ.', hematologic: '',
+  cardio: '❤️ Сердце', hepatic: '', renal: '',
+  neuro: '', endocrine: '⚖️ Эндокр.', hematologic: '',
   reproductive: '', musculoskeletal: '',
-  metabolic: 'вљ–пёЏ РњРµС‚Р°Р±.', ghigf: '', ins_axis: '',
-  neuro_toxicity: 'вљ пёЏ РќРµР№СЂРѕС‚РѕРєСЃ.', blood: '', vessels: '',
+  metabolic: '⚖️ Метаб.', ghigf: '', ins_axis: '',
+  neuro_toxicity: '⚠️ Нейротокс.', blood: '', vessels: '',
   immunity: '', thyroid: '', prostate: '', skin: '',
 };
 
@@ -111,9 +111,9 @@ export const RiskOverview: React.FC<{
 
   return (
     <div className="risk-overview">
-      {/* РћР±С‰РёР№ СЂРёСЃРє */}
+      {/* Общий риск */}
       <div className="card" style={{ marginBottom: 8 }}>
-        <h3 style={{ margin: '0 0 8px', fontSize: 'clamp(13, 4vw, 15)' }}>рџ“Љ РћР±С‰РёР№ СЂРёСЃРє</h3>
+        <h3 style={{ margin: '0 0 8px', fontSize: 'clamp(13, 4vw, 15)' }}>📊 Общий риск</h3>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(80px, 1fr))', gap: 4 }}>
           <div style={{ background: 'var(--bg-secondary)', padding: '8px 6px', borderRadius: 8, textAlign: 'center' }}>
             <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Raw</div>
@@ -124,7 +124,7 @@ export const RiskOverview: React.FC<{
             <div style={{ fontSize: 20, fontWeight: 700, color: overallColor }}>{Math.round(riskResult.overallNet)}%</div>
           </div>
           <div style={{ background: 'var(--bg-secondary)', padding: '8px 6px', borderRadius: 8, textAlign: 'center' }}>
-            <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>РЎС‚Р°С‚СѓСЃ</div>
+            <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Статус</div>
             <div style={{ fontSize: 13, fontWeight: 700, color: overallColor }}>{overallStatus}</div>
           </div>
         </div>
@@ -141,14 +141,14 @@ export const RiskOverview: React.FC<{
       {/* Penalty info */}
       {anyNoLabs && (
         <div style={{ background: 'rgba(239,68,68,0.12)', padding: 10, borderRadius: 8, marginBottom: 8, border: '1px solid rgba(239,68,68,0.2)' }}>
-          <div style={{ fontWeight: 700, fontSize: 12, color: '#ef4444' }}>рџљ« РЁС‚СЂР°С„ Р·Р° РѕС‚СЃСѓС‚СЃС‚РІРёРµ Р°РЅР°Р»РёР·РѕРІ</div>
+          <div style={{ fontWeight: 700, fontSize: 12, color: '#ef4444' }}>🚫 Штраф за отсутствие анализов</div>
           <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 4 }}>
-            {globalNoLabs ? '' : `РЁС‚СЂР°С„ РїСЂРёРјРµРЅС‘РЅ Рє: ${noLabsSystems.map(s => getSystemLabel(s)).join(', ')}`}
+            {globalNoLabs ? '' : `Штраф применён к: ${noLabsSystems.map(s => getSystemLabel(s)).join(', ')}`}
           </div>
         </div>
       )}
 
-      {/* РџРѕРЅРµРґРµР»СЊРЅР°СЏ РґРёРЅР°РјРёРєР° СЂРёСЃРєРѕРІ */}
+      {/* Понедельная динамика рисков */}
       {weeklyDynamics && (
         <WeeklyRiskChart
           dynamics={weeklyDynamics}
@@ -159,9 +159,9 @@ export const RiskOverview: React.FC<{
         />
       )}
 
-      {/* РЎРёСЃС‚РµРјРЅС‹Рµ СЂРёСЃРєРё */}
+      {/* Системные риски */}
       <div className="card" style={{ marginBottom: 8 }}>
-        <h3 style={{ fontSize: 15 }}>рџ«Ђ Р РёСЃРєРё РїРѕ СЃРёСЃС‚РµРјР°Рј</h3>
+        <h3 style={{ fontSize: 15 }}>🫀 Риски по системам</h3>
         <div style={{ display: 'grid', gap: 5 }}>
           {ALL_RISK_SYSTEMS.map((sys: string) => {
             const bd = riskResult.systemBreakdown[sys];
@@ -181,10 +181,10 @@ export const RiskOverview: React.FC<{
         </div>
       </div>
 
-      {/* РљР»СЋС‡РµРІС‹Рµ СЂРёСЃРєРё */}
+      {/* Ключевые риски */}
       {relevantRisks.length > 0 && (
         <div className="card" style={{ marginBottom: 8 }}>
-          <h3 style={{ margin: '0 0 8px', fontSize: 15 }}>вљЎ РљР»СЋС‡РµРІС‹Рµ СЂРёСЃРєРё</h3>
+          <h3 style={{ margin: '0 0 8px', fontSize: 15 }}>⚡ Ключевые риски</h3>
           <div style={{ display: 'grid', gap: 5 }}>
             {relevantRisks.map(risk => {
               const levelColor = risk.levels.includes('HIGH') ? '#ef4444' : risk.levels.includes('MEDIUM') ? '#eab308' : '#22c55e';
@@ -203,37 +203,37 @@ export const RiskOverview: React.FC<{
       )}
 
 
-      {/* РСЃС‚РѕС‡РЅРёРєРё СЂРёСЃРєРѕРІ */}
+      {/* Источники рисков */}
       {aggregatedRisk && (
         <div className="card" style={{ marginBottom: 8 }}>
-          <h3 style={{ margin: '0 0 8px', fontSize: 15 }}>рџ”Ќ РСЃС‚РѕС‡РЅРёРєРё СЂРёСЃРєРѕРІ</h3>
+          <h3 style={{ margin: '0 0 8px', fontSize: 15 }}>🔍 Источники рисков</h3>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, fontSize: 11 }}>
             <div style={{ background: 'var(--bg-secondary)', padding: '6px 8px', borderRadius: 6 }}>
-              <div style={{ color: 'var(--text-dim)', fontSize: 9 }}>рџ’Љ Р¤Р°СЂРјР°</div>
+              <div style={{ color: 'var(--text-dim)', fontSize: 9 }}>💊 Фарма</div>
               <div style={{ fontWeight: 700, color: getRiskColor(aggregatedRisk.pharma.overallNet) }}>{Math.round(aggregatedRisk.pharma.overallNet)}%</div>
             </div>
             <div style={{ background: 'var(--bg-secondary)', padding: '6px 8px', borderRadius: 6 }}>
-              <div style={{ color: 'var(--text-dim)', fontSize: 9 }}>рџ§Є РђРЅР°Р»РёР·С‹</div>
+              <div style={{ color: 'var(--text-dim)', fontSize: 9 }}>🧪 Анализы</div>
               <div style={{ fontWeight: 700, color: getRiskColor(aggregatedRisk.labs.overallNet) }}>
-                {anyNoLabs ? `рџљ« ${Math.round(aggregatedRisk.labs.overallNet)}%` : `${Math.round(aggregatedRisk.labs.overallNet)}%`}
+                {anyNoLabs ? `🚫 ${Math.round(aggregatedRisk.labs.overallNet)}%` : `${Math.round(aggregatedRisk.labs.overallNet)}%`}
               </div>
             </div>
             <div style={{ background: 'var(--bg-secondary)', padding: '6px 8px', borderRadius: 6 }}>
-              <div style={{ color: 'var(--text-dim)', fontSize: 9 }}>рџЏ‹пёЏ РўСЂРµРЅРёСЂРѕРІРєРё</div>
+              <div style={{ color: 'var(--text-dim)', fontSize: 9 }}>🏋️ Тренировки</div>
               <div style={{ fontWeight: 700, color: getRiskColor(aggregatedRisk.training.overallNet) }}>{Math.round(aggregatedRisk.training.overallNet)}%</div>
             </div>
             <div style={{ background: 'var(--bg-secondary)', padding: '6px 8px', borderRadius: 6 }}>
-              <div style={{ color: 'var(--text-dim)', fontSize: 9 }}>рџҐ— РџРёС‚Р°РЅРёРµ</div>
+              <div style={{ color: 'var(--text-dim)', fontSize: 9 }}>🥗 Питание</div>
               <div style={{ fontWeight: 700, color: getRiskColor(aggregatedRisk.nutrition.overallNet) }}>{Math.round(aggregatedRisk.nutrition.overallNet)}%</div>
             </div>
           </div>
         </div>
       )}
 
-      {/* Р РµРєРѕРјРµРЅРґР°С†РёРё */}
+      {/* Рекомендации */}
       {relevantRecs.length > 0 && (
         <div className="card" style={{ marginBottom: 8 }}>
-          <h3 style={{ margin: '0 0 8px', fontSize: 15 }}>вњ… Р РµРєРѕРјРµРЅРґР°С†РёРё</h3>
+          <h3 style={{ margin: '0 0 8px', fontSize: 15 }}>✅ Рекомендации</h3>
           <div style={{ display: 'grid', gap: 5 }}>
             {relevantRecs.map(rec => {
               const levelColor = rec.level === 'HIGH' || rec.level === 'CRITICAL' ? '#ef4444' : rec.level === 'MEDIUM' ? '#eab308' : '#22c55e';
@@ -251,10 +251,10 @@ export const RiskOverview: React.FC<{
         </div>
       )}
 
-      {/* РСЃС‚РѕСЂРёСЏ */}
+      {/* История */}
       {riskHistory && riskHistory.length > 1 && (
         <div className="card" style={{ marginBottom: 8 }}>
-          <h3 style={{ margin: '0 0 8px', fontSize: 15 }}>рџ“€ РСЃС‚РѕСЂРёСЏ</h3>
+          <h3 style={{ margin: '0 0 8px', fontSize: 15 }}>📈 История</h3>
           <div style={{ display: 'flex', gap: 3, alignItems: 'flex-end', height: 50 }}>
             {riskHistory.slice(-8).map((entry, i) => (
               <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
@@ -268,11 +268,11 @@ export const RiskOverview: React.FC<{
         </div>
       )}
 
-      {/* РџРѕСЂРѕРіРё */}
-      {/* РџРѕСЂРѕРіРё РїСЂРµРїР°СЂР°С‚РѕРІ */}
+      {/* Пороги */}
+      {/* Пороги препаратов */}
       <div className="card" style={{ marginBottom: 8 }}>
-        <h3 style={{ margin: "0 0 8px", fontSize: 15 }}>рџ’Љ РџРѕСЂРѕРіРё РїСЂРµРїР°СЂР°С‚РѕРІ</h3>
-        <div style={{ fontSize: 10, color: "var(--text-dim)", marginBottom: 6 }}>РњР°РєСЃРёРјР°Р»СЊРЅР°СЏ СЂРµРєРѕРјРµРЅРґСѓРµРјР°СЏ РґРѕР·РёСЂРѕРІРєР° вЂ” РїСЂРµРІС‹С€РµРЅРёРµ Р·РЅР°С‡РёС‚РµР»СЊРЅРѕ СѓРІРµР»РёС‡РёРІР°РµС‚ СЂРёСЃРєРё</div>
+        <h3 style={{ margin: "0 0 8px", fontSize: 15 }}>💊 Пороги препаратов</h3>
+        <div style={{ fontSize: 10, color: "var(--text-dim)", marginBottom: 6 }}>Максимальная рекомендуемая дозировка — превышение значительно увеличивает риски</div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4, fontSize: 10 }}>
           {Object.entries(DRUG_THRESHOLDS).slice(0, 8).map(([id, thresh]) => {
             const name = getThresholdName(id);
@@ -281,7 +281,7 @@ export const RiskOverview: React.FC<{
             return (
               <div key={id} style={{ background: "var(--bg-secondary)", padding: "4px 8px", borderRadius: 4 }}>
                 <div style={{ fontWeight: 500 }}>{name}</div>
-                <div style={{ color: "var(--text-dim)" }}>{thresh.dosePerWeek} РјРі/РЅРµРґ В· РђРЅРґСЂРѕРіРµРЅРЅРѕСЃС‚СЊ: {thresh.androgenicity.toFixed(1)}</div>
+                <div style={{ color: "var(--text-dim)" }}>{thresh.dosePerWeek} мг/нед · Андрогенность: {thresh.androgenicity.toFixed(1)}</div>
                 {drugClass && <div style={{ fontSize: 8, color: "var(--accent)", opacity: 0.7 }}>{drugClass}</div>}
               </div>
             );

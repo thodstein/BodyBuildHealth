@@ -115,7 +115,7 @@ export const NutritionDiary: React.FC<{
   return (
     <div className="nutrition-diary">
       <div className="card" style={{ marginBottom: 12 }}>
-        <h3>рџ“ќ Р”РЅРµРІРЅРёРє РїРёС‚Р°РЅРёСЏ</h3>
+        <h3>📝 Дневник питания</h3>
 
         {/* Quick food search */}
         <div style={{ position: 'relative', marginBottom: 10 }}>
@@ -140,7 +140,7 @@ export const NutritionDiary: React.FC<{
                   display: 'flex', justifyContent: 'space-between', color: 'var(--text)',
                 }}>
                   <span>{f.name}</span>
-                  <span style={{ color: 'var(--text-dim)', fontSize: 10 }}>{f.kcal}РєРєР°Р» Р‘{f.protein} Р–{f.fat} РЈ{f.carbs}</span>
+                  <span style={{ color: 'var(--text-dim)', fontSize: 10 }}>{f.kcal}ккал Б{f.protein} Ж{f.fat} У{f.carbs}</span>
                 </div>
               ))}
             </div>
@@ -150,7 +150,7 @@ export const NutritionDiary: React.FC<{
         {/* Favorites quick-add */}
         {favoriteFoods.length > 0 && (
           <div style={{ marginBottom: 8 }}>
-            <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 3 }}>в­ђ РР·Р±СЂР°РЅРЅРѕРµ</div>
+            <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 3 }}>⭐ Избранное</div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
               {favoriteFoods.map(f => (
                 <button key={f.id} onClick={() => addFoodFromDB(f)} style={{
@@ -178,10 +178,10 @@ export const NutritionDiary: React.FC<{
         {/* File/Camera upload for nutrition OCR */}
         <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
           <button onClick={() => ocrFileRef.current?.click()} disabled={ocrFileLoading} style={{ flex: 1, padding: 10, borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg-secondary)', color: 'var(--accent)', fontWeight: 600, fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, opacity: ocrFileLoading ? 0.5 : 1 }}>
-            {ocrFileLoading ? 'вЏі' : ''} {ocrFileLoading ? '' : ''}
+            {ocrFileLoading ? '⏳' : ''} {ocrFileLoading ? '' : ''}
           </button>
           <button onClick={() => { if (ocrCameraRef.current) ocrCameraRef.current.click(); }} disabled={ocrFileLoading} style={{ flex: 1, padding: 10, borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg-secondary)', color: 'var(--accent)', fontWeight: 600, fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, opacity: ocrFileLoading ? 0.5 : 1 }}>
-            рџ“ё РЎРЅРёРјРѕРє
+            📸 Снимок
           </button>
         </div>
         <input ref={ocrFileRef} type="file" accept=".pdf,.png,.jpg,.jpeg,.webp,.txt" style={{ display: 'none' }} onChange={e => { const f = e.target.files?.[0]; if (f) handleOcrFileUpload(f); }} />
@@ -199,8 +199,8 @@ export const NutritionDiary: React.FC<{
         {showOCR && (
           <div style={{ marginBottom: 12 }}>
             <p style={{ fontSize: 11, color: 'var(--text-dim)', margin: '0 0 8px 0' }}>
-              РЎРєРѕРїРёСЂСѓР№С‚Рµ С‚РµРєСЃС‚ РёР· FatSecret, MyFitnessPal РёР»Рё РґСЂСѓРіРѕРіРѕ С‚СЂРµРєРµСЂР° РїРёС‚Р°РЅРёСЏ Рё РІСЃС‚Р°РІСЊС‚Рµ РµРіРѕ РЅРёР¶Рµ.
-              РџРѕРґРґРµСЂР¶РёРІР°СЋС‚СЃСЏ С„РѕСЂРјР°С‚С‹: В«РќР°Р·РІР°РЅРёРµ 100Рі 250 РєРєР°Р» Р‘: 15 Р–: 10 РЈ: 20В» Рё С‚Р°Р±Р»РёС†С‹.
+              Скопируйте текст из FatSecret, MyFitnessPal или другого трекера питания и вставьте его ниже.
+              Поддерживаются форматы: «Название 100г 250 ккал Б: 15 Ж: 10 У: 20» и таблицы.
             </p>
             <textarea
               value={ocrText}
@@ -216,17 +216,17 @@ export const NutritionDiary: React.FC<{
               marginTop: 8, padding: '8px 16px', borderRadius: 8, border: 'none',
               background: '#00e68a', color: '#000', fontWeight: 600, cursor: 'pointer',
             }}>
-              Р Р°СЃРїРѕР·РЅР°С‚СЊ
+              Распознать
             </button>
             {ocrError && <div style={{ color: '#ef4444', fontSize: 12, marginTop: 8 }}>{ocrError}</div>}
             {parsedItems.length > 0 && (
               <div style={{ marginTop: 12 }}>
-                <h4 style={{ margin: '0 0 8px 0' }}>Р Р°СЃРїРѕР·РЅР°РЅРѕ: {parsedItems.length} РїРѕР·РёС†РёР№</h4>
+                <h4 style={{ margin: '0 0 8px 0' }}>Распознано: {parsedItems.length} позиций</h4>
                 <div style={{ display: 'grid', gap: 4 }}>
                   {parsedItems.map((item, i) => (
                     <div key={i} style={{ background: 'var(--bg-secondary)', padding: '6px 10px', borderRadius: 6, display: 'flex', justifyContent: 'space-between' }}>
                       <span style={{ fontSize: 12, fontWeight: 500 }}>{item.name}</span>
-                      <span style={{ fontSize: 12, color: 'var(--text-dim)' }}>{item.kcal} РєРєР°Р» | Р‘:{item.p} Р–:{item.f} РЈ:{item.c}</span>
+                      <span style={{ fontSize: 12, color: 'var(--text-dim)' }}>{item.kcal} ккал | Б:{item.p} Ж:{item.f} У:{item.c}</span>
                     </div>
                   ))}
                 </div>
@@ -234,14 +234,14 @@ export const NutritionDiary: React.FC<{
                   saveParsedMeals(parsedItems.map(item => ({
                     date: new Date().toISOString().split('T')[0],
                     mealType: mealType,
-                    items: [{ name: item.name, kcal: item.kcal, p: item.p, f: item.f, c: item.c, qty: '100 Рі' }],
+                    items: [{ name: item.name, kcal: item.kcal, p: item.p, f: item.f, c: item.c, qty: '100 г' }],
                   })));
                   setParsedItems([]);
                   setOcrText('');
                 }} style={{
                   width: '100%', marginTop: 8, padding: 8, borderRadius: 8, border: 'none', cursor: 'pointer',
                   background: 'var(--accent)', color: '#000', fontWeight: 600, fontSize: 13,
-                }}>рџ’ѕ РЎРѕС…СЂР°РЅРёС‚СЊ РІ РґРЅРµРІРЅРёРє</button>
+                }}>💾 Сохранить в дневник</button>
               </div>
             )}
           </div>
@@ -256,7 +256,7 @@ export const NutritionDiary: React.FC<{
           const days = Math.max(1, new Set(foodEntries.map(e => (e as any).date).filter(Boolean)).size || foodEntries.length / 3);
           return (
             <div className="card" style={{ padding: '8px 10px', marginBottom: 8 }}>
-              <div style={{ fontWeight: 600, fontSize: 11, color: 'var(--accent)', marginBottom: 4 }}>рџ“Љ РЎРІРѕРґРєР° Р·Р° РЅРµРґРµР»СЋ (~{days} РґРЅ)</div>
+              <div style={{ fontWeight: 600, fontSize: 11, color: 'var(--accent)', marginBottom: 4 }}>📊 Сводка за неделю (~{days} дн)</div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 4, fontSize: 9 }}>
                 {[
                   { l: '', v: Math.round(totalKcal / days), c: '#22c55e' },
@@ -277,7 +277,7 @@ export const NutritionDiary: React.FC<{
         {/* Existing diary entries */}
         {foodEntries.length === 0 ? (
           <div style={{ textAlign: 'center', padding: 20, color: 'var(--text-dim)' }}>
-            РќРµС‚ Р·Р°РїРёСЃРµР№ РІ РґРЅРµРІРЅРёРєРµ
+            Нет записей в дневнике
           </div>
         ) : (
           <div className="list">
@@ -285,7 +285,7 @@ export const NutritionDiary: React.FC<{
               <div key={i} style={{ padding: 8, borderBottom: '1px solid var(--border)' }}>
                 <div style={{ fontWeight: 600 }}>{entry.name}</div>
                 <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>
-                  {entry.kcal} РєРєР°Р» | {entry.p}Рі Р±РµР»РєРё | {entry.f}Рі Р¶РёСЂС‹ | {entry.c}Рі СѓРіР»РµРІРѕРґС‹
+                  {entry.kcal} ккал | {entry.p}г белки | {entry.f}г жиры | {entry.c}г углеводы
                 </div>
               </div>
             ))}

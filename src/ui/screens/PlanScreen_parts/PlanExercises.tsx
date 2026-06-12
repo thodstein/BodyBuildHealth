@@ -32,9 +32,9 @@ export const PlanExercises: React.FC = () => {
               {ex.technique && <div style={{ fontSize: 11, marginTop: 2 }}>{ex.technique}</div>}
               {ex.comments && <div style={{ fontSize: 10, marginTop: 2 }}>{ex.comments}</div>}
               <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 4 }}>
-                {ex.pauseSeconds && <span style={{ fontSize: 9, padding: '1px 5px', borderRadius: 3, background: 'rgba(234,179,8,0.12)' }}>РџР°СѓР·Р° {ex.pauseSeconds}СЃ</span>}
-                {ex.peakContraction && <span style={{ fontSize: 9, padding: '1px 5px', borderRadius: 3, background: 'rgba(249,115,22,0.12)' }}>РџРёРє СЃРѕРєСЂР°С‰РµРЅРёСЏ</span>}
-                {ex.stretchPhase && <span style={{ fontSize: 9, padding: '1px 5px', borderRadius: 3, background: 'rgba(34,197,94,0.12)' }}>Р Р°СЃС‚СЏР¶РєР°</span>}
+                {ex.pauseSeconds && <span style={{ fontSize: 9, padding: '1px 5px', borderRadius: 3, background: 'rgba(234,179,8,0.12)' }}>Пауза {ex.pauseSeconds}с</span>}
+                {ex.peakContraction && <span style={{ fontSize: 9, padding: '1px 5px', borderRadius: 3, background: 'rgba(249,115,22,0.12)' }}>Пик сокращения</span>}
+                {ex.stretchPhase && <span style={{ fontSize: 9, padding: '1px 5px', borderRadius: 3, background: 'rgba(34,197,94,0.12)' }}>Растяжка</span>}
               </div>
             </div>
           ))}

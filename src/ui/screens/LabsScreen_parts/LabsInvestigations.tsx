@@ -11,7 +11,7 @@ interface Investigation {
 }
 
 const SYSTEM_LABELS_INVEST: Record<string, string> = {
-  cardio: 'вќ¤пёЏ РЎРµСЂРґРµС‡РЅРѕ-СЃРѕСЃСѓРґРёСЃС‚Р°СЏ',
+  cardio: '❤️ Сердечно-сосудистая',
   hepatic: '',
   renal: '',
   neuro: '',
@@ -23,7 +23,7 @@ const SYSTEM_LABELS_INVEST: Record<string, string> = {
 
 const INVESTIGATIONS_DATA: Investigation[] = [
   { id: 'echo_kg', name: '', system: 'cardio', freq: '', markers: '', reason: '' },
-  { id: 'ekg', name: '', system: 'cardio', freq: '', markers: 'QTc, РіРёРїРµСЂС‚СЂРѕС„РёСЏ Р›Р–, Р°СЂРёС‚РјРёРё, РёС€РµРјРёСЏ, Р±Р»РѕРєР°РґС‹', reason: '' },
+  { id: 'ekg', name: '', system: 'cardio', freq: '', markers: 'QTc, гипертрофия ЛЖ, аритмии, ишемия, блокады', reason: '' },
   { id: 'usg_heart_24h', name: '', system: 'cardio', freq: '', markers: '', reason: '' },
   { id: 'usg_abd', name: '', system: 'hepatic', freq: '', markers: '', reason: '' },
   { id: 'fibroscan', name: '', system: 'hepatic', freq: '', markers: '', reason: '' },
@@ -62,9 +62,9 @@ export const LabsInvestigations: React.FC = () => {
   return (
     <div className="labs-investigations">
       <div className="card">
-        <h3>рџ”¬ РСЃСЃР»РµРґРѕРІР°РЅРёСЏ Рё РѕР±СЃР»РµРґРѕРІР°РЅРёСЏ</h3>
+        <h3>🔬 Исследования и обследования</h3>
         <p style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 8 }}>
-          РРЅСЃС‚СЂСѓРјРµРЅС‚Р°Р»СЊРЅС‹Рµ Рё Р°РїРїР°СЂР°С‚РЅС‹Рµ РёСЃСЃР»РµРґРѕРІР°РЅРёСЏ РґР»СЏ РјРѕРЅРёС‚РѕСЂРёРЅРіР° РЅР° РєСѓСЂСЃРµ Рё РІ РџРљРў
+          Инструментальные и аппаратные исследования для мониторинга на курсе и в ПКТ
         </p>
 
         {/* Progress */}
@@ -99,7 +99,7 @@ export const LabsInvestigations: React.FC = () => {
                     </span>
                   </div>
                   <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>
-                    {isCollapsed ? 'в–ј' : 'в–І'}
+                    {isCollapsed ? '▼' : '▲'}
                   </span>
                 </div>
                 {!isCollapsed && (
@@ -125,11 +125,11 @@ export const LabsInvestigations: React.FC = () => {
                               border: isDone ? '1px solid rgba(0,230,138,0.3)' : '1px solid var(--border)',
                               whiteSpace: 'nowrap',
                             }}>
-                              {isDone ? 'вњ“' : 'вњ—'}
+                              {isDone ? '✓' : '✗'}
                             </button>
                           </div>
-                          <div style={{ fontSize: 10, color: 'var(--accent)', marginBottom: 2 }}>вЏ± {inv.freq}</div>
-                          <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 2 }}><b>РџР°СЂР°РјРµС‚СЂС‹:</b> {inv.markers}</div>
+                          <div style={{ fontSize: 10, color: 'var(--accent)', marginBottom: 2 }}>⏱ {inv.freq}</div>
+                          <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 2 }}><b>Параметры:</b> {inv.markers}</div>
                           <div style={{ fontSize: 10, color: 'var(--text-dim)', fontStyle: 'italic', lineHeight: 1.3 }}>{inv.reason}</div>
                         </div>
                       );

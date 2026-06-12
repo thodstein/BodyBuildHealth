@@ -28,6 +28,6 @@ export async function triggerLocalPush(title: string, body: string) {
     const registration = await navigator.serviceWorker.getRegistration();
     registration?.showNotification(title, { body, icon: '/icon.png', tag: 'health-engine' });
   } else {
-    console.warn('вљ пёЏ Push permission denied');
+    console.warn('⚠️ Push permission denied');
   }
 }

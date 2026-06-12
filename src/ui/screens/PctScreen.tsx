@@ -39,28 +39,28 @@ export const PctScreen: React.FC<Props> = ({ onBack }) => {
         <button onClick={onBack} style={{
           padding: '6px 12px', borderRadius: 8, fontSize: 13, cursor: 'pointer',
           background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)',
-        }}>в†ђ РќР°Р·Р°Рґ</button>
-        <h2 style={{ margin: 0, fontSize: 18 }}>рџЊ± РџРљРў Рё Р¤РµСЂС‚РёР»СЊРЅРѕСЃС‚СЊ</h2>
+        }}>← Назад</button>
+        <h2 style={{ margin: 0, fontSize: 18 }}>🌱 ПКТ и Фертильность</h2>
       </div>
 
       {course.length === 0 && (
         <div className="card" style={{ textAlign: 'center', padding: 40, color: 'var(--text-dim)' }}>
-          <div style={{ fontSize: 32, marginBottom: 8 }}>рџ’Љ</div>
-          <div>РљСѓСЂСЃ РЅРµ РЅР°Р№РґРµРЅ</div>
-          <div style={{ fontSize: 11, marginTop: 4 }}>Р”РѕР±Р°РІСЊС‚Рµ РїСЂРµРїР°СЂР°С‚С‹ РІРѕ РІРєР»Р°РґРєРµ Р¤Р°СЂРјР°РєРѕР»РѕРіРёСЏ {'>'} РљСѓСЂСЃ</div>
+          <div style={{ fontSize: 32, marginBottom: 8 }}>💊</div>
+          <div>Курс не найден</div>
+          <div style={{ fontSize: 11, marginTop: 4 }}>Добавьте препараты во вкладке Фармакология {'>'} Курс</div>
         </div>
       )}
 
       {course.length > 0 && !pctPlan && (
         <div className="card" style={{ textAlign: 'center', padding: 20 }}>
           <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 12 }}>
-            РђРєС‚РёРІРЅС‹С… РІРµС‰РµСЃС‚РІ РІ РєСѓСЂСЃРµ: {course.length}
+            Активных веществ в курсе: {course.length}
           </div>
           <button onClick={buildPCT} style={{
             padding: '12px 24px', borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: 'pointer',
             background: 'linear-gradient(135deg, #00e68a, #00c77a)', color: '#000', border: 'none',
           }}>
-            рџ”„ РЎРіРµРЅРµСЂРёСЂРѕРІР°С‚СЊ РџРљРў
+            🔄 Сгенерировать ПКТ
           </button>
         </div>
       )}
@@ -68,14 +68,14 @@ export const PctScreen: React.FC<Props> = ({ onBack }) => {
       {pctPlan && (
         <>
           <div className="card">
-            <h3 style={{ margin: '0 0 8px' }}>рџ“‹ РџР»Р°РЅ РџРљРў</h3>
+            <h3 style={{ margin: '0 0 8px' }}>📋 План ПКТ</h3>
             <div style={{ fontSize: 12, marginBottom: 6 }}>
-              РќР°С‡Р°Р»Рѕ: <b>РЅРµРґРµР»СЏ {pctPlan.pctStartWeek}</b>
+              Начало: <b>неделя {pctPlan.pctStartWeek}</b>
             </div>
             {pctPlan.warnings.length > 0 && (
               <div style={{ background: 'rgba(255,152,0,0.1)', borderRadius: 6, padding: '8px 10px', marginBottom: 8 }}>
                 {pctPlan.warnings.map((w: string, i: number) => (
-                  <div key={i} style={{ fontSize: 10, color: '#ff9800' }}>вљ  {w}</div>
+                  <div key={i} style={{ fontSize: 10, color: '#ff9800' }}>⚠ {w}</div>
                 ))}
               </div>
             )}
@@ -95,20 +95,20 @@ export const PctScreen: React.FC<Props> = ({ onBack }) => {
                   <span style={{ fontWeight: 700, fontSize: 13 }}>{p.doseValue}{p.doseUnit}</span>
                 </div>
                 <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 4 }}>
-                  {p.timing || `${p.frequency}`} | РќРµРґ {p.startWeek}-{p.endWeek}
+                  {p.timing || `${p.frequency}`} | Нед {p.startWeek}-{p.endWeek}
                 </div>
               </div>
             ))}
           </div>
 
           <div className="card">
-            <h3 style={{ margin: '0 0 8px' }}>рџ§¬ Р¤РµСЂС‚РёР»СЊРЅРѕСЃС‚СЊ</h3>
+            <h3 style={{ margin: '0 0 8px' }}>🧬 Фертильность</h3>
             <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 8 }}>
-              Р РµРєРѕРјРµРЅРґР°С†РёРё РґР»СЏ РІРѕСЃСЃС‚Р°РЅРѕРІР»РµРЅРёСЏ С„РµСЂС‚РёР»СЊРЅРѕСЃС‚Рё РїРѕСЃР»Рµ РєСѓСЂСЃР°
+              Рекомендации для восстановления фертильности после курса
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               {[
-                { icon: '', label: '', desc: `${pctPlan.pctProtocol.reduce((max: number, p: any) => Math.max(max, p.endWeek || 0), 0) - pctPlan.pctStartWeek + 1} РЅРµРґРµР»СЊ` },
+                { icon: '', label: '', desc: `${pctPlan.pctProtocol.reduce((max: number, p: any) => Math.max(max, p.endWeek || 0), 0) - pctPlan.pctStartWeek + 1} недель` },
                 { icon: '', label: '', desc: '' },
                 { icon: '', label: '', desc: '' },
                 { icon: '', label: '', desc: '' },

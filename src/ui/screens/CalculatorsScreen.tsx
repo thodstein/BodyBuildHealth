@@ -199,120 +199,120 @@ export const CalculatorsScreen: React.FC<CalcProps> = ({ initialTab = 'fitness' 
   return (
     <div className="screen calculators">
       <div className="calculators-header">
-        <h2>РљР°Р»СЊРєСѓР»СЏС‚РѕСЂС‹ Рё С„РѕСЂРјСѓР»С‹</h2>
-        <p>РРЅСЃС‚СЂСѓРјРµРЅС‚С‹ РґР»СЏ СЂР°СЃС‡С‘С‚Р° РїРѕРєР°Р·Р°С‚РµР»РµР№ Р·РґРѕСЂРѕРІСЊСЏ Рё РїСЂРѕРёР·РІРѕРґРёС‚РµР»СЊРЅРѕСЃС‚Рё</p>
+        <h2>Калькуляторы и формулы</h2>
+        <p>Инструменты для расчёта показателей здоровья и производительности</p>
       </div>
 
       <div className="calc-tabs">
-        <button className={'calc-tab-btn' + (activeTab === 'fitness' ? ' active' : '')} onClick={() => setActiveTab('fitness')}>Р¤РёС‚РЅРµСЃ</button>
-        <button className={'calc-tab-btn' + (activeTab === 'nutrition' ? ' active' : '')} onClick={() => setActiveTab('nutrition')}>РџРёС‚Р°РЅРёРµ</button>
-        <button className={'calc-tab-btn' + (activeTab === 'health' ? ' active' : '')} onClick={() => setActiveTab('health')}>Р—РґРѕСЂРѕРІСЊРµ</button>
+        <button className={'calc-tab-btn' + (activeTab === 'fitness' ? ' active' : '')} onClick={() => setActiveTab('fitness')}>Фитнес</button>
+        <button className={'calc-tab-btn' + (activeTab === 'nutrition' ? ' active' : '')} onClick={() => setActiveTab('nutrition')}>Питание</button>
+        <button className={'calc-tab-btn' + (activeTab === 'health' ? ' active' : '')} onClick={() => setActiveTab('health')}>Здоровье</button>
       </div>
 
       {activeTab === 'fitness' && (
         <div className="calculator-panel">
-          <h3>Р¤РёС‚РЅРµСЃ РєР°Р»СЊРєСѓР»СЏС‚РѕСЂС‹</h3>
+          <h3>Фитнес калькуляторы</h3>
           <div className="calculator-group">
 
             <div className="calculator-item">
-              <h4>РРЅРґРµРєСЃ РјР°СЃСЃС‹ С‚РµР»Р° (BMI)</h4>
-              <p className="description">Р’РµСЃ / Р РѕСЃС‚ВІ вЂ” РѕС†РµРЅРєР° РјР°СЃСЃС‹ С‚РµР»Р°</p>
+              <h4>Индекс массы тела (BMI)</h4>
+              <p className="description">Вес / Рост² — оценка массы тела</p>
               <div className="input-group">
-                <label>Р’РµСЃ (РєРі): <input type="number" value={bmiWeight} onChange={e => setBmiWeight(Number(e.target.value))} /></label>
-                <label>Р РѕСЃС‚ (СЃРј): <input type="number" value={bmiHeight} onChange={e => setBmiHeight(Number(e.target.value))} /></label>
-                <button onClick={calcBMI}>Р Р°СЃСЃС‡РёС‚Р°С‚СЊ</button>
+                <label>Вес (кг): <input type="number" value={bmiWeight} onChange={e => setBmiWeight(Number(e.target.value))} /></label>
+                <label>Рост (см): <input type="number" value={bmiHeight} onChange={e => setBmiHeight(Number(e.target.value))} /></label>
+                <button onClick={calcBMI}>Рассчитать</button>
               </div>
               {bmiResult !== null && (
                 <div className="result">
                   <span className="label">BMI:</span> <span className="value">{bmiResult.toFixed(1)}</span>
-                  <span className="interpretation"> вЂ” {bmiCategory(bmiResult)}</span>
+                  <span className="interpretation"> — {bmiCategory(bmiResult)}</span>
                 </div>
               )}
             </div>
 
             <div className="calculator-item">
-              <h4>BMR (РњРёС„С„Р»РёРЅ-РЎР°РЅ Р–РµРѕСЂ)</h4>
-              <p className="description">Р‘Р°Р·РѕРІС‹Р№ РјРµС‚Р°Р±РѕР»РёР·Рј: 10Г—РІРµСЃ + 6.25Г—СЂРѕСЃС‚ в€’ 5Г—РІРѕР·СЂР°СЃС‚ В± 161</p>
+              <h4>BMR (Миффлин-Сан Жеор)</h4>
+              <p className="description">Базовый метаболизм: 10×вес + 6.25×рост − 5×возраст ± 161</p>
               <div className="input-group">
-                <label>Р’РµСЃ (РєРі): <input type="number" value={bmrWeight} onChange={e => setBmrWeight(Number(e.target.value))} /></label>
-                <label>Р РѕСЃС‚ (СЃРј): <input type="number" value={bmrHeight} onChange={e => setBmrHeight(Number(e.target.value))} /></label>
-                <label>Р’РѕР·СЂР°СЃС‚: <input type="number" value={bmrAge} onChange={e => setBmrAge(Number(e.target.value))} /></label>
-                <label>РџРѕР»:
+                <label>Вес (кг): <input type="number" value={bmrWeight} onChange={e => setBmrWeight(Number(e.target.value))} /></label>
+                <label>Рост (см): <input type="number" value={bmrHeight} onChange={e => setBmrHeight(Number(e.target.value))} /></label>
+                <label>Возраст: <input type="number" value={bmrAge} onChange={e => setBmrAge(Number(e.target.value))} /></label>
+                <label>Пол:
                   <select value={bmrSex} onChange={e => setBmrSex(e.target.value as 'male' | 'female')}>
-                    <option value="male">РњСѓР¶СЃРєРѕР№</option>
-                    <option value="female">Р–РµРЅСЃРєРёР№</option>
+                    <option value="male">Мужской</option>
+                    <option value="female">Женский</option>
                   </select>
                 </label>
-                <button onClick={calcBMR}>Р Р°СЃСЃС‡РёС‚Р°С‚СЊ</button>
+                <button onClick={calcBMR}>Рассчитать</button>
               </div>
               {bmrResult !== null && (
                 <div className="result">
-                  <span className="label">BMR:</span> <span className="value">{bmrResult.toFixed(0)} РєРєР°Р»/РґРµРЅСЊ</span>
+                  <span className="label">BMR:</span> <span className="value">{bmrResult.toFixed(0)} ккал/день</span>
                 </div>
               )}
             </div>
 
             <div className="calculator-item">
-              <h4>BMR (РљСЌС‚С‡-РњРєР°СЂРґР»)</h4>
-              <p className="description">370 + 21.6 Г— LBM вЂ” РґР»СЏ Р»СЋРґРµР№ СЃ РёР·РІРµСЃС‚РЅС‹Рј % Р¶РёСЂР°</p>
+              <h4>BMR (Кэтч-Мкардл)</h4>
+              <p className="description">370 + 21.6 × LBM — для людей с известным % жира</p>
               <div className="input-group">
-                <label>Р’РµСЃ (РєРі): <input type="number" value={bmrKmWeight} onChange={e => setBmrKmWeight(Number(e.target.value))} /></label>
-                <label>РўРѕР»С‰РёРЅР° Р¶РёСЂР° (%): <input type="number" step="0.1" value={bmrKmBodyFat} onChange={e => setBmrKmBodyFat(Number(e.target.value))} /></label>
-                <button onClick={calcBMR_KM}>Р Р°СЃСЃС‡РёС‚Р°С‚СЊ</button>
+                <label>Вес (кг): <input type="number" value={bmrKmWeight} onChange={e => setBmrKmWeight(Number(e.target.value))} /></label>
+                <label>Толщина жира (%): <input type="number" step="0.1" value={bmrKmBodyFat} onChange={e => setBmrKmBodyFat(Number(e.target.value))} /></label>
+                <button onClick={calcBMR_KM}>Рассчитать</button>
               </div>
               {bmrKmResult !== null && (
                 <div className="result">
-                  <span className="label">BMR (Katch-McArdle):</span> <span className="value">{bmrKmResult.toFixed(0)} РєРєР°Р»/РґРµРЅСЊ</span>
-                  <span className="interpretation"> вЂ” LBM: {(bmrKmWeight * (100 - bmrKmBodyFat) / 100).toFixed(1)} РєРі</span>
+                  <span className="label">BMR (Katch-McArdle):</span> <span className="value">{bmrKmResult.toFixed(0)} ккал/день</span>
+                  <span className="interpretation"> — LBM: {(bmrKmWeight * (100 - bmrKmBodyFat) / 100).toFixed(1)} кг</span>
                 </div>
               )}
             </div>
 
             <div className="calculator-item">
               <h4>TDEE</h4>
-              <p className="description">BMR Г— PAL вЂ” РѕР±С‰РёР№ РґРЅРµРІРЅРѕР№ СЂР°СЃС…РѕРґ СЌРЅРµСЂРіРёРё</p>
+              <p className="description">BMR × PAL — общий дневной расход энергии</p>
               <div className="input-group">
-                <label>BMR (РєРєР°Р»): <input type="number" value={tdeeBmr} onChange={e => setTdeeBmr(Number(e.target.value))} /></label>
-                <label>РЈСЂРѕРІРµРЅСЊ Р°РєС‚РёРІРЅРѕСЃС‚Рё:
+                <label>BMR (ккал): <input type="number" value={tdeeBmr} onChange={e => setTdeeBmr(Number(e.target.value))} /></label>
+                <label>Уровень активности:
                   <select value={tdeePal} onChange={e => setTdeePal(Number(e.target.value))}>
                     {PAL_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
                   </select>
                 </label>
-                <button onClick={calcTDEE}>Р Р°СЃСЃС‡РёС‚Р°С‚СЊ</button>
+                <button onClick={calcTDEE}>Рассчитать</button>
               </div>
               {tdeeResult !== null && (
                 <div className="result">
-                  <span className="label">TDEE:</span> <span className="value">{tdeeResult.toFixed(0)} РєРєР°Р»/РґРµРЅСЊ</span>
+                  <span className="label">TDEE:</span> <span className="value">{tdeeResult.toFixed(0)} ккал/день</span>
                 </div>
               )}
             </div>
 
             <div className="calculator-item">
-              <h4>Р”РѕР·РёСЂРѕРІРєР° РїСЂРµРїР°СЂР°С‚Р°</h4>
-              <p className="description">Р Р°СЃС‡С‘С‚ РѕР±СЉС‘РјР° РёРЅСЉРµРєС†РёРё РїРѕ РґРѕР·Рµ Рё РєРѕРЅС†РµРЅС‚СЂР°С†РёРё</p>
+              <h4>Дозировка препарата</h4>
+              <p className="description">Расчёт объёма инъекции по дозе и концентрации</p>
               <div className="input-group">
-                <label>Р¦РµР»РµРІР°СЏ РґРѕР·Р° (РјРі): <input type="number" value={doseTarget} onChange={e => setDoseTarget(Number(e.target.value))} /></label>
-                <label>РљРѕРЅС†РµРЅС‚СЂР°С†РёСЏ (РјРі/РјР»): <input type="number" value={doseConcentration} onChange={e => setDoseConcentration(Number(e.target.value))} /></label>
-                <label>РЁРїСЂРёС† (РјР»):
+                <label>Целевая доза (мг): <input type="number" value={doseTarget} onChange={e => setDoseTarget(Number(e.target.value))} /></label>
+                <label>Концентрация (мг/мл): <input type="number" value={doseConcentration} onChange={e => setDoseConcentration(Number(e.target.value))} /></label>
+                <label>Шприц (мл):
                   <select value={doseSyringe} onChange={e => setDoseSyringe(Number(e.target.value))}>
-                    {Object.keys(SYRINGE_SPECS).map(k => <option key={k} value={k}>{k} РјР»</option>)}
+                    {Object.keys(SYRINGE_SPECS).map(k => <option key={k} value={k}>{k} мл</option>)}
                   </select>
                 </label>
-                <button onClick={calcDose}>Р Р°СЃСЃС‡РёС‚Р°С‚СЊ</button>
+                <button onClick={calcDose}>Рассчитать</button>
               </div>
               {doseResult !== null && (
                 <div className="result">
-                  <div><span className="label">РћР±СЉС‘Рј:</span> <span className="value">{doseResult.volumeMl} РјР»</span></div>
-                  <div><span className="label">Р”РµР»РµРЅРёСЏ:</span> <span className="value">{doseResult.divisions}</span></div>
-                  <div><span className="label">Р”РѕР· РІРѕ С„Р»Р°РєРѕРЅРµ:</span> <span className="value">{doseResult.dosesPerVial}</span></div>
-                  {doseResult.flags.length > 0 && <div className="interpretation">вљ  {doseResult.flags.join(', ')}</div>}
+                  <div><span className="label">Объём:</span> <span className="value">{doseResult.volumeMl} мл</span></div>
+                  <div><span className="label">Деления:</span> <span className="value">{doseResult.divisions}</span></div>
+                  <div><span className="label">Доз во флаконе:</span> <span className="value">{doseResult.dosesPerVial}</span></div>
+                  {doseResult.flags.length > 0 && <div className="interpretation">⚠ {doseResult.flags.join(', ')}</div>}
                 </div>
               )}
             </div>
 
             <div className="calculator-item">
-              <h4>РђРЅРґСЂРѕРіРµРЅРЅС‹Р№ РёРЅРґРµРєСЃ СЃС‚РµРєР°</h4>
-              <p className="description">ОЈ (РґРѕР·Р° Г— AR_affinity / 100) вЂ” СЃСѓРјРјР°СЂРЅР°СЏ Р°РЅРґСЂРѕРіРµРЅРЅР°СЏ РЅР°РіСЂСѓР·РєР°</p>
+              <h4>Андрогенный индекс стека</h4>
+              <p className="description">Σ (доза × AR_affinity / 100) — суммарная андрогенная нагрузка</p>
               <div className="input-group">
                 {aiEntries.map((entry, i) => (
                   <div key={i} style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
@@ -320,17 +320,17 @@ export const CalculatorsScreen: React.FC<CalcProps> = ({ initialTab = 'fitness' 
                       {DRUG_OPTIONS.map(d => <option key={d} value={d}>{d}</option>)}
                     </select>
                     <input type="number" value={entry.doseMgWeek} onChange={e => updateAiEntry(i, 'doseMgWeek', Number(e.target.value))} placeholder="" style={{ width: 80 }} />
-                    <span>РјРі/РЅРµРґ</span>
-                    {aiEntries.length > 1 && <button onClick={() => removeAiEntry(i)}>вњ•</button>}
+                    <span>мг/нед</span>
+                    {aiEntries.length > 1 && <button onClick={() => removeAiEntry(i)}>✕</button>}
                   </div>
                 ))}
-                <button onClick={addAiEntry}>+ Р”РѕР±Р°РІРёС‚СЊ РїСЂРµРїР°СЂР°С‚</button>
-                <button onClick={calcAI}>Р Р°СЃСЃС‡РёС‚Р°С‚СЊ</button>
+                <button onClick={addAiEntry}>+ Добавить препарат</button>
+                <button onClick={calcAI}>Рассчитать</button>
               </div>
               {aiResult !== null && (
                 <div className="result">
-                  <span className="label">РђРЅРґСЂРѕРіРµРЅРЅС‹Р№ РёРЅРґРµРєСЃ:</span> <span className="value">{aiResult.toFixed(2)}</span>
-                  <span className="interpretation"> вЂ” {aiResult > 3 ? '' : aiResult > 1.5 ? '' : ''}</span>
+                  <span className="label">Андрогенный индекс:</span> <span className="value">{aiResult.toFixed(2)}</span>
+                  <span className="interpretation"> — {aiResult > 3 ? '' : aiResult > 1.5 ? '' : ''}</span>
                 </div>
               )}
             </div>
@@ -341,21 +341,21 @@ export const CalculatorsScreen: React.FC<CalcProps> = ({ initialTab = 'fitness' 
 
       {activeTab === 'nutrition' && (
         <div className="calculator-panel">
-          <h3>РџРёС‚Р°РЅРёРµ</h3>
+          <h3>Питание</h3>
           <div className="calculator-group">
 
             <div className="calculator-item">
-              <h4>РљР°Р»РѕСЂРёР№РЅС‹Р№ РґРµС„РёС†РёС‚</h4>
-              <p className="description">TDEE в€’ С†РµР»РµРІС‹Рµ РєРєР°Р» в†’ СЃРєРѕСЂРѕСЃС‚СЊ РїРѕС‚РµСЂРё РІРµСЃР°</p>
+              <h4>Калорийный дефицит</h4>
+              <p className="description">TDEE − целевые ккал → скорость потери веса</p>
               <div className="input-group">
-                <label>TDEE (РєРєР°Р»/РґРµРЅСЊ): <input type="number" value={deficitTdee} onChange={e => setDeficitTdee(Number(e.target.value))} /></label>
-                <label>Р¦РµР»РµРІС‹Рµ РєРєР°Р»/РґРµРЅСЊ: <input type="number" value={deficitTarget} onChange={e => setDeficitTarget(Number(e.target.value))} /></label>
-                <button onClick={calcDeficit}>Р Р°СЃСЃС‡РёС‚Р°С‚СЊ</button>
+                <label>TDEE (ккал/день): <input type="number" value={deficitTdee} onChange={e => setDeficitTdee(Number(e.target.value))} /></label>
+                <label>Целевые ккал/день: <input type="number" value={deficitTarget} onChange={e => setDeficitTarget(Number(e.target.value))} /></label>
+                <button onClick={calcDeficit}>Рассчитать</button>
               </div>
               {deficitResult !== null && (
                 <div className="result">
-                  <div><span className="label">Р”РµС„РёС†РёС‚:</span> <span className="value">{deficitResult.deficit} РєРєР°Р»/РґРµРЅСЊ</span></div>
-                  <div><span className="label">РџРѕС‚РµСЂСЏ РІРµСЃР°:</span> <span className="value">{deficitResult.rateKgWeek.toFixed(2)} РєРі/РЅРµРґ</span></div>
+                  <div><span className="label">Дефицит:</span> <span className="value">{deficitResult.deficit} ккал/день</span></div>
+                  <div><span className="label">Потеря веса:</span> <span className="value">{deficitResult.rateKgWeek.toFixed(2)} кг/нед</span></div>
                   <span className="interpretation">
                     {deficitResult.deficit <= 0 ? '' :
                      deficitResult.deficit < 500 ? '' :
@@ -366,16 +366,16 @@ export const CalculatorsScreen: React.FC<CalcProps> = ({ initialTab = 'fitness' 
             </div>
 
             <div className="calculator-item">
-              <h4>РњР°РєСЂРѕСЃС‹ (СЂР°СЃС‡С‘С‚ Р‘Р–РЈ)</h4>
-              <p className="description">РџРѕР»РЅС‹Р№ СЂР°СЃС‡С‘С‚ Р‘Р–РЈ Рё РјРёРєСЂРѕСЌР»РµРјРµРЅС‚РѕРІ РїРѕ РґРІРёРіСѓ nutrition</p>
+              <h4>Макросы (расчёт БЖУ)</h4>
+              <p className="description">Полный расчёт БЖУ и микроэлементов по двигу nutrition</p>
               <div className="input-group">
-                <label>Р’РµСЃ (РєРі): <input type="number" value={macroWeight} onChange={e => setMacroWeight(Number(e.target.value))} /></label>
-                <label>Р РѕСЃС‚ (СЃРј): <input type="number" value={macroHeight} onChange={e => setMacroHeight(Number(e.target.value))} /></label>
-                <label>Р’РѕР·СЂР°СЃС‚: <input type="number" value={macroAge} onChange={e => setMacroAge(Number(e.target.value))} /></label>
-                <label>РџРѕР»:
+                <label>Вес (кг): <input type="number" value={macroWeight} onChange={e => setMacroWeight(Number(e.target.value))} /></label>
+                <label>Рост (см): <input type="number" value={macroHeight} onChange={e => setMacroHeight(Number(e.target.value))} /></label>
+                <label>Возраст: <input type="number" value={macroAge} onChange={e => setMacroAge(Number(e.target.value))} /></label>
+                <label>Пол:
                   <select value={macroSex} onChange={e => setMacroSex(e.target.value as 'male' | 'female')}>
-                    <option value="male">РњСѓР¶СЃРєРѕР№</option>
-                    <option value="female">Р–РµРЅСЃРєРёР№</option>
+                    <option value="male">Мужской</option>
+                    <option value="female">Женский</option>
                   </select>
                 </label>
                 <label>PAL:
@@ -383,41 +383,41 @@ export const CalculatorsScreen: React.FC<CalcProps> = ({ initialTab = 'fitness' 
                     {PAL_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
                   </select>
                 </label>
-                <label>Р¦РµР»СЊ:
+                <label>Цель:
                   <select value={macroGoal} onChange={e => setMacroGoal(e.target.value)}>
-                    <option value="bulk">РќР°Р±РѕСЂ РјР°СЃСЃС‹</option>
-                    <option value="cut">РЎРЅРёР¶РµРЅРёРµ РІРµСЃР°</option>
-                    <option value="maintenance">РџРѕРґРґРµСЂР¶Р°РЅРёРµ</option>
-                    <option value="recomp">Р РµРєРѕРјРїРѕР·РёС†РёСЏ</option>
-                    <option value="rehab">Р РµР°Р±РёР»РёС‚Р°С†РёСЏ</option>
+                    <option value="bulk">Набор массы</option>
+                    <option value="cut">Снижение веса</option>
+                    <option value="maintenance">Поддержание</option>
+                    <option value="recomp">Рекомпозиция</option>
+                    <option value="rehab">Реабилитация</option>
                   </select>
                 </label>
-                <button onClick={calcMacros}>Р Р°СЃСЃС‡РёС‚Р°С‚СЊ</button>
+                <button onClick={calcMacros}>Рассчитать</button>
               </div>
               {macroResult !== null && (
                 <div className="result">
-                  <div><span className="label">РљРєР°Р»:</span> <span className="value">{macroResult.kcal}</span></div>
-                  <div><span className="label">Р‘РµР»РєРё:</span> <span className="value">{macroResult.protein} Рі</span></div>
-                  <div><span className="label">Р–РёСЂС‹:</span> <span className="value">{macroResult.fats} Рі</span></div>
-                  <div><span className="label">РЈРіР»РµРІРѕРґС‹:</span> <span className="value">{macroResult.carbs} Рі</span></div>
-                  <div><span className="label">Р’РѕРґР°:</span> <span className="value">{macroResult.water} Р»</span></div>
-                  <div><span className="label">РљР»РµС‚С‡Р°С‚РєР°:</span> <span className="value">{macroResult.fiber} Рі</span></div>
+                  <div><span className="label">Ккал:</span> <span className="value">{macroResult.kcal}</span></div>
+                  <div><span className="label">Белки:</span> <span className="value">{macroResult.protein} г</span></div>
+                  <div><span className="label">Жиры:</span> <span className="value">{macroResult.fats} г</span></div>
+                  <div><span className="label">Углеводы:</span> <span className="value">{macroResult.carbs} г</span></div>
+                  <div><span className="label">Вода:</span> <span className="value">{macroResult.water} л</span></div>
+                  <div><span className="label">Клетчатка:</span> <span className="value">{macroResult.fiber} г</span></div>
                 </div>
               )}
             </div>
 
             <div className="calculator-item">
               <h4>HOMA-IR</h4>
-              <p className="description">(Р“Р»СЋРєРѕР·Р° Г— РРЅСЃСѓР»РёРЅ) / 22.5 вЂ” РёРЅРґРµРєСЃ РёРЅСЃСѓР»РёРЅРѕСЂРµР·РёСЃС‚РµРЅС‚РЅРѕСЃС‚Рё</p>
+              <p className="description">(Глюкоза × Инсулин) / 22.5 — индекс инсулинорезистентности</p>
               <div className="input-group">
-                <label>Р“Р»СЋРєРѕР·Р° (РјРјРѕР»СЊ/Р»): <input type="number" step="0.1" value={homaGlucose} onChange={e => setHomaGlucose(Number(e.target.value))} /></label>
-                <label>РРЅСЃСѓР»РёРЅ (ОјР•/РјР»): <input type="number" step="0.1" value={homaInsulin} onChange={e => setHomaInsulin(Number(e.target.value))} /></label>
-                <button onClick={calcHOMA}>Р Р°СЃСЃС‡РёС‚Р°С‚СЊ</button>
+                <label>Глюкоза (ммоль/л): <input type="number" step="0.1" value={homaGlucose} onChange={e => setHomaGlucose(Number(e.target.value))} /></label>
+                <label>Инсулин (μЕ/мл): <input type="number" step="0.1" value={homaInsulin} onChange={e => setHomaInsulin(Number(e.target.value))} /></label>
+                <button onClick={calcHOMA}>Рассчитать</button>
               </div>
               {homaResult !== null && (
                 <div className="result">
                   <span className="label">HOMA-IR:</span> <span className="value">{homaResult.index.toFixed(2)}</span>
-                  <span className="interpretation"> вЂ” {homaResult.resistant ? 'вљЎ РРЅСЃСѓР»РёРЅРѕСЂРµР·РёСЃС‚РµРЅС‚РЅРѕСЃС‚СЊ (>2.5)' : 'вњ… РќРѕСЂРјР°'}</span>
+                  <span className="interpretation"> — {homaResult.resistant ? '⚡ Инсулинорезистентность (>2.5)' : '✅ Норма'}</span>
                 </div>
               )}
             </div>
@@ -428,74 +428,74 @@ export const CalculatorsScreen: React.FC<CalcProps> = ({ initialTab = 'fitness' 
 
       {activeTab === 'health' && (
         <div className="calculator-panel">
-          <h3>Р—РґРѕСЂРѕРІСЊРµ</h3>
+          <h3>Здоровье</h3>
           <div className="calculator-group">
 
             <div className="calculator-item">
-              <h4>РљР°Р»СЊС†РёР№ СЃРєРѕСЂСЂРµРєС‚РёСЂРѕРІР°РЅРЅС‹Р№</h4>
-              <p className="description">Ca_РѕР±С‰ + 0.8 Г— (4.0 в€’ Р°Р»СЊР±СѓРјРёРЅ) вЂ” РєРѕСЂСЂРµРєС†РёСЏ РЅР° Р±РµР»РѕРє</p>
+              <h4>Кальций скорректированный</h4>
+              <p className="description">Ca_общ + 0.8 × (4.0 − альбумин) — коррекция на белок</p>
               <div className="input-group">
-                <label>РћР±С‰РёР№ Ca (РјРјРѕР»СЊ/Р»): <input type="number" step="0.01" value={caTotal} onChange={e => setCaTotal(Number(e.target.value))} /></label>
-                <label>РђР»СЊР±СѓРјРёРЅ (Рі/РґР»): <input type="number" step="0.1" value={caAlbumin} onChange={e => setCaAlbumin(Number(e.target.value))} /></label>
-                <button onClick={calcCa}>Р Р°СЃСЃС‡РёС‚Р°С‚СЊ</button>
+                <label>Общий Ca (ммоль/л): <input type="number" step="0.01" value={caTotal} onChange={e => setCaTotal(Number(e.target.value))} /></label>
+                <label>Альбумин (г/дл): <input type="number" step="0.1" value={caAlbumin} onChange={e => setCaAlbumin(Number(e.target.value))} /></label>
+                <button onClick={calcCa}>Рассчитать</button>
               </div>
               {caResult !== null && (
                 <div className="result">
-                  <span className="label">РЎРєРѕСЂСЂРµРєС‚РёСЂРѕРІР°РЅРЅС‹Р№ Ca:</span> <span className="value">{caResult.toFixed(2)} РјРјРѕР»СЊ/Р»</span>
-                  <span className="interpretation"> вЂ” {caResult < 2.1 ? '' : caResult > 2.6 ? '' : ''}</span>
+                  <span className="label">Скорректированный Ca:</span> <span className="value">{caResult.toFixed(2)} ммоль/л</span>
+                  <span className="interpretation"> — {caResult < 2.1 ? '' : caResult > 2.6 ? '' : ''}</span>
                 </div>
               )}
             </div>
 
             <div className="calculator-item">
-              <h4>РђС‚РµСЂРѕРіРµРЅРЅС‹Р№ РёРЅРґРµРєСЃ</h4>
-              <p className="description">(РћР±С‰РёР№ С…РѕР»РµСЃС‚РµСЂРёРЅ в€’ HDL) / HDL вЂ” СЂРёСЃРє Р°С‚РµСЂРѕСЃРєР»РµСЂРѕР·Р°</p>
+              <h4>Атерогенный индекс</h4>
+              <p className="description">(Общий холестерин − HDL) / HDL — риск атеросклероза</p>
               <div className="input-group">
-                <label>РћР±С‰РёР№ С…РѕР»РµСЃС‚РµСЂРёРЅ (РјРјРѕР»СЊ/Р»): <input type="number" step="0.01" value={aiTotalChol} onChange={e => setAiTotalChol(Number(e.target.value))} /></label>
-                <label>HDL (РјРјРѕР»СЊ/Р»): <input type="number" step="0.01" value={aiHdl} onChange={e => setAiHdl(Number(e.target.value))} /></label>
-                <button onClick={calcAtherogenic}>Р Р°СЃСЃС‡РёС‚Р°С‚СЊ</button>
+                <label>Общий холестерин (ммоль/л): <input type="number" step="0.01" value={aiTotalChol} onChange={e => setAiTotalChol(Number(e.target.value))} /></label>
+                <label>HDL (ммоль/л): <input type="number" step="0.01" value={aiHdl} onChange={e => setAiHdl(Number(e.target.value))} /></label>
+                <button onClick={calcAtherogenic}>Рассчитать</button>
               </div>
               {aiResult2 !== null && (
                 <div className="result">
-                  <span className="label">РђС‚РµСЂРѕРіРµРЅРЅС‹Р№ РёРЅРґРµРєСЃ:</span> <span className="value">{aiResult2.index.toFixed(2)}</span>
-                  <span className="interpretation"> вЂ” {aiResult2.highRisk ? 'вљ  Р’С‹СЃРѕРєРёР№ СЂРёСЃРє (>3)' : 'вњ… Р”РѕРїСѓСЃС‚РёРјС‹Р№'}</span>
+                  <span className="label">Атерогенный индекс:</span> <span className="value">{aiResult2.index.toFixed(2)}</span>
+                  <span className="interpretation"> — {aiResult2.highRisk ? '⚠ Высокий риск (>3)' : '✅ Допустимый'}</span>
                 </div>
               )}
             </div>
 
             <div className="calculator-item">
-              <h4>РЎРёР»Р° С…РІР°С‚Р°</h4>
-              <p className="description">РћС†РµРЅРєР° РѕР±С‰РµР№ СЃРёР»С‹ РїРѕ РєРёСЃС‚РµРІРѕР№ РґРёРЅР°РјРѕРјРµС‚СЂРёРё</p>
+              <h4>Сила хвата</h4>
+              <p className="description">Оценка общей силы по кистевой динамометрии</p>
               <div className="input-group">
-                <label>РЎРёР»Р° С…РІР°С‚Р° (РєРі): <input type="number" value={gripKg} onChange={e => setGripKg(Number(e.target.value))} /></label>
-                <label>РџРѕР»:
+                <label>Сила хвата (кг): <input type="number" value={gripKg} onChange={e => setGripKg(Number(e.target.value))} /></label>
+                <label>Пол:
                   <select value={gripSex} onChange={e => setGripSex(e.target.value as 'male' | 'female')}>
-                    <option value="male">РњСѓР¶СЃРєРѕР№</option>
-                    <option value="female">Р–РµРЅСЃРєРёР№</option>
+                    <option value="male">Мужской</option>
+                    <option value="female">Женский</option>
                   </select>
                 </label>
-                <label>Р’РѕР·СЂР°СЃС‚: <input type="number" value={gripAge} onChange={e => setGripAge(Number(e.target.value))} /></label>
-                <button onClick={calcGrip}>РћС†РµРЅРёС‚СЊ</button>
+                <label>Возраст: <input type="number" value={gripAge} onChange={e => setGripAge(Number(e.target.value))} /></label>
+                <button onClick={calcGrip}>Оценить</button>
               </div>
               {gripResult !== null && (
                 <div className="result">
-                  <span className="label">РџСЂРѕС†РµРЅС‚РёР»СЊ:</span> <span className="value">{gripResult.percentile}%</span>
-                  <span className="interpretation"> вЂ” {gripResult.level}</span>
+                  <span className="label">Процентиль:</span> <span className="value">{gripResult.percentile}%</span>
+                  <span className="interpretation"> — {gripResult.level}</span>
                 </div>
               )}
             </div>
 
             <div className="calculator-item">
-              <h4>РЎС‚СЂРµСЃСЃ (HRV)</h4>
-              <p className="description">РћС†РµРЅРєР° СЃС‚СЂРµСЃСЃР° РїРѕ РІР°СЂРёР°Р±РµР»СЊРЅРѕСЃС‚Рё СЃРµСЂРґРµС‡РЅРѕРіРѕ СЂРёС‚РјР°</p>
+              <h4>Стресс (HRV)</h4>
+              <p className="description">Оценка стресса по вариабельности сердечного ритма</p>
               <div className="input-group">
-                <label>RMSSD / HRV (РјСЃ): <input type="number" value={hrvValue} onChange={e => setHrvValue(Number(e.target.value))} /></label>
-                <button onClick={calcStress}>РћС†РµРЅРёС‚СЊ</button>
+                <label>RMSSD / HRV (мс): <input type="number" value={hrvValue} onChange={e => setHrvValue(Number(e.target.value))} /></label>
+                <button onClick={calcStress}>Оценить</button>
               </div>
               {stressResult !== null && (
                 <div className="result">
-                  <span className="label">РЈСЂРѕРІРµРЅСЊ СЃС‚СЂРµСЃСЃР°:</span> <span className="value">{stressResult.stress}%</span>
-                  <span className="interpretation"> вЂ” {stressResult.level}</span>
+                  <span className="label">Уровень стресса:</span> <span className="value">{stressResult.stress}%</span>
+                  <span className="interpretation"> — {stressResult.level}</span>
                 </div>
               )}
             </div>

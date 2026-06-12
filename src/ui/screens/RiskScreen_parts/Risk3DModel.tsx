@@ -28,7 +28,7 @@ function getMechName(sysKey: string, mechIdx: number): string {
 }
 function hasValidMech(sysKey: string, mechIdx: number): boolean { return getMechName(sysKey, mechIdx) !== ''; }
 
-// Anatomic SVG paths вЂ” organs properly positioned and scaled on a 280Г—540 canvas
+// Anatomic SVG paths — organs properly positioned and scaled on a 280×540 canvas
 const bodyW = 280, bodyH = 540, cx = bodyW / 2;
 const buildPath = (template: (c: number) => string) => template(cx);
 const organShapes: Record<string, string> = {
@@ -107,13 +107,13 @@ export const Risk3DModel: React.FC<Props> = ({ result, mcEnabled, onToggleMC, or
           <span style={{ padding: '2px 10px', borderRadius: 4, fontSize: 11, fontWeight: 700, color: '#fff', background: getRiskColor(pct) }}>{pct}%</span>
         </div>
         <div style={{ display: 'flex', gap: 6, fontSize: 10, color: 'var(--text-dim)' }}>
-          <span>РћСЃС‚СЂС‹Р№: <b style={{ color: getRiskColor(Math.round((sd.acute??0)*100)) }}>{Math.round((sd.acute??0)*100)}%</b></span>
-          <span>РҐСЂРѕРЅРёС‡: <b style={{ color: getRiskColor(Math.round((sd.chronic??0)*100)) }}>{Math.round((sd.chronic??0)*100)}%</b></span>
-          <span>Р¤РёР±СЂРѕР·: <b style={{ color: getRiskColor(Math.round((sd.fibrosis??0)*100)) }}>{Math.round((sd.fibrosis??0)*100)}%</b></span>
+          <span>Острый: <b style={{ color: getRiskColor(Math.round((sd.acute??0)*100)) }}>{Math.round((sd.acute??0)*100)}%</b></span>
+          <span>Хронич: <b style={{ color: getRiskColor(Math.round((sd.chronic??0)*100)) }}>{Math.round((sd.chronic??0)*100)}%</b></span>
+          <span>Фиброз: <b style={{ color: getRiskColor(Math.round((sd.fibrosis??0)*100)) }}>{Math.round((sd.fibrosis??0)*100)}%</b></span>
         </div>
         {sd.mechanisms && Object.keys(sd.mechanisms).length > 0 && (
           <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', marginTop: 6, paddingTop: 6 }}>
-            <div style={{ fontSize: 9, fontWeight: 600, color: '#00e68a', marginBottom: 3 }}>РњРµС…Р°РЅРёР·РјС‹:</div>
+            <div style={{ fontSize: 9, fontWeight: 600, color: '#00e68a', marginBottom: 3 }}>Механизмы:</div>
             {Object.entries(sd.mechanisms).slice(0, 4).map(([idx, md]: [string, any]) => {
               const mi = Number(idx);
               if (!hasValidMech(selectedOrgan, mi)) return null;
@@ -132,7 +132,7 @@ export const Risk3DModel: React.FC<Props> = ({ result, mcEnabled, onToggleMC, or
       {/* Controls */}
       <div className="card" style={{ marginBottom: 10, padding: '12px 14px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-          <h3 style={{ margin: 0, fontSize: 14 }}>рџ§Ќ РњРѕРґРµР»СЊ С‚РµР»Р° вЂ” РѕСЂРіР°РЅС‹</h3>
+          <h3 style={{ margin: 0, fontSize: 14 }}>🧍 Модель тела — органы</h3>
           <button onClick={onToggleMC} style={{
             padding: '5px 12px', borderRadius: 6, fontSize: 10, fontWeight: 700, cursor: 'pointer',
             background: mcEnabled ? 'rgba(139,92,246,0.2)' : 'var(--bg-secondary)',
@@ -149,21 +149,21 @@ export const Risk3DModel: React.FC<Props> = ({ result, mcEnabled, onToggleMC, or
               background: riskMode === m ? 'rgba(0,230,138,0.15)' : 'var(--bg-secondary)',
               color: riskMode === m ? '#00e68a' : 'var(--text-dim)',
             }}>
-              {m === 'net' ? 'Net (СЃ РїРѕРґРґРµСЂР¶РєРѕР№)' : m === 'raw' ? 'Raw (Р±РµР· РїРѕРґРґРµСЂР¶РєРё)' : 'О” Р Р°Р·РЅРёС†Р°'}
+              {m === 'net' ? 'Net (с поддержкой)' : m === 'raw' ? 'Raw (без поддержки)' : 'Δ Разница'}
             </button>
           ))}
         </div>
-        {/* Week slider вЂ” range input */}
+        {/* Week slider — range input */}
         <div style={{ marginBottom: 4 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 }}>
-            <span style={{ fontSize: 9, color: 'var(--text-dim)' }}>РќРµРґРµР»СЏ: {organWeek === 0 ? '' : `РќРµРґ ${organWeek}`}</span>
+            <span style={{ fontSize: 9, color: 'var(--text-dim)' }}>Неделя: {organWeek === 0 ? '' : `Нед ${organWeek}`}</span>
             <div style={{ display: 'flex', gap: 2 }}>
               <button onClick={() => onWeekChange(0)} style={{
                 padding: '3px 8px', borderRadius: 6, fontSize: 9, fontWeight: organWeek === 0 ? 700 : 400, cursor: 'pointer',
                 background: organWeek === 0 ? '#00e68a' : 'var(--bg-secondary)',
                 border: organWeek === 0 ? '1px solid #00e68a' : '1px solid var(--border)',
                 color: organWeek === 0 ? '#000' : 'var(--text-dim)',
-              }}>в€… РЎСЂРµРґРЅРµРµ</button>
+              }}>∅ Среднее</button>
             </div>
           </div>
           <input type="range" min={0} max={12} value={organWeek} onChange={e => {
@@ -175,7 +175,7 @@ export const Risk3DModel: React.FC<Props> = ({ result, mcEnabled, onToggleMC, or
           </div>
         </div>
         {organWeek > 0 && weeklyGlobalData[organWeek - 1] && (
-          <div style={{ fontSize: 9, color: 'var(--text-dim)', marginTop: 4 }}>РќРµРґРµР»СЊРЅС‹Р№ raw: {Math.round(weeklyGlobalData[organWeek - 1]?.raw ?? 0)}%</div>
+          <div style={{ fontSize: 9, color: 'var(--text-dim)', marginTop: 4 }}>Недельный raw: {Math.round(weeklyGlobalData[organWeek - 1]?.raw ?? 0)}%</div>
         )}
       </div>
 
@@ -221,12 +221,12 @@ export const Risk3DModel: React.FC<Props> = ({ result, mcEnabled, onToggleMC, or
           {/* Neck */}
           <rect x={cx - 13} y={66} width={26} height={14} rx={5} fill="var(--bg-secondary)" stroke="rgba(255,255,255,0.04)" strokeWidth="0.5" />
 
-          {/* Vessels (spine) вЂ” render behind organs */}
+          {/* Vessels (spine) — render behind organs */}
           <g opacity={0.3}>
             <path d={organShapes.vessels} fill="none" stroke="rgba(255,255,255,0.2)" strokeWidth="1.5" strokeDasharray="4,3" />
           </g>
 
-          {/* Organs вЂ” render in z-order from back to front: kidney, metabolic, ins_axis, blood, liver, ghigf, endocrine, heart, musculoskeletal, neuro, reproductive */}
+          {/* Organs — render in z-order from back to front: kidney, metabolic, ins_axis, blood, liver, ghigf, endocrine, heart, musculoskeletal, neuro, reproductive */}
           {['kidney', 'metabolic', 'ins_axis', 'blood', 'liver', 'ghigf', 'endocrine', 'heart', 'musculoskeletal', 'neuro_toxicity', 'reproductive'].filter(k => organKeys.includes(k)).map(okey => {
             const orgVal = getOrganVal(okey);
             const pct = Math.round(orgVal * 100);
@@ -253,13 +253,13 @@ export const Risk3DModel: React.FC<Props> = ({ result, mcEnabled, onToggleMC, or
           })}
 
           {/* Body part labels */}
-          <text x={cx} y={bodyH - 6} fill="var(--text-dim)" fontSize="6" textAnchor="middle">РњРѕРґРµР»СЊ С‚РµР»Р° вЂ” РЅР°Р¶РјРёС‚Рµ РЅР° РѕСЂРіР°РЅ</text>
+          <text x={cx} y={bodyH - 6} fill="var(--text-dim)" fontSize="6" textAnchor="middle">Модель тела — нажмите на орган</text>
           {/* Legend */}
           <g transform="translate(8, bodyH - 22)">
-            <rect x={0} y={0} width={6} height={6} rx={1} fill="#22c55e" opacity={0.8} /><text x={8} y={5} fill="var(--text-dim)" fontSize="5">РќРёР·Рє</text>
-            <rect x={30} y={0} width={6} height={6} rx={1} fill="#eab308" opacity={0.8} /><text x={38} y={5} fill="var(--text-dim)" fontSize="5">РЎСЂРµРґ</text>
-            <rect x={60} y={0} width={6} height={6} rx={1} fill="#f97316" opacity={0.8} /><text x={68} y={5} fill="var(--text-dim)" fontSize="5">Р’С‹СЃ</text>
-            <rect x={90} y={0} width={6} height={6} rx={1} fill="#ef4444" opacity={0.8} /><text x={98} y={5} fill="var(--text-dim)" fontSize="5">РљСЂРёС‚</text>
+            <rect x={0} y={0} width={6} height={6} rx={1} fill="#22c55e" opacity={0.8} /><text x={8} y={5} fill="var(--text-dim)" fontSize="5">Низк</text>
+            <rect x={30} y={0} width={6} height={6} rx={1} fill="#eab308" opacity={0.8} /><text x={38} y={5} fill="var(--text-dim)" fontSize="5">Сред</text>
+            <rect x={60} y={0} width={6} height={6} rx={1} fill="#f97316" opacity={0.8} /><text x={68} y={5} fill="var(--text-dim)" fontSize="5">Выс</text>
+            <rect x={90} y={0} width={6} height={6} rx={1} fill="#ef4444" opacity={0.8} /><text x={98} y={5} fill="var(--text-dim)" fontSize="5">Крит</text>
           </g>
         </svg>
 
@@ -269,7 +269,7 @@ export const Risk3DModel: React.FC<Props> = ({ result, mcEnabled, onToggleMC, or
       {/* Overall risk bar */}
       <div className="card" style={{ marginBottom: 12 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-          <span style={{ fontSize: 12, fontWeight: 600 }}>РћР±С‰РёР№ СЂРёСЃРє: <span style={{ color: overallColor }}>{Math.round(displayRisk)}%</span></span>
+          <span style={{ fontSize: 12, fontWeight: 600 }}>Общий риск: <span style={{ color: overallColor }}>{Math.round(displayRisk)}%</span></span>
           <span style={{ fontSize: 9, color: 'var(--text-dim)' }}>{overallLabel}</span>
         </div>
         <div style={{ display: 'flex', gap: 12, marginBottom: 6, fontSize: 10 }}>
@@ -287,7 +287,7 @@ export const Risk3DModel: React.FC<Props> = ({ result, mcEnabled, onToggleMC, or
 
       {/* Grid of all organs */}
       <div className="card">
-        <h3 style={{ fontSize: 12, marginBottom: 6 }}>Р’СЃРµ РѕСЂРіР°РЅС‹</h3>
+        <h3 style={{ fontSize: 12, marginBottom: 6 }}>Все органы</h3>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4 }}>
           {organKeys.map(okey => {
             const pct = Math.round(getOrganVal(okey) * 100);
