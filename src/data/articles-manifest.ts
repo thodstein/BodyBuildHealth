@@ -13,7 +13,7 @@ export interface ArticleManifestEntry {
   title: string;
   date: string;
   description: string;
-  content_type: 'markdown' | 'pdf';
+  content_type: 'markdown' | 'pdf' | 'html';
   category: 'pharma' | 'labs' | 'training' | 'nutrition' | 'support' | 'other';
   /** For MD: raw markdown content */
   content?: string;

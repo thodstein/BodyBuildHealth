@@ -10,37 +10,36 @@ const CATEGORIES = [
   { value: 'support', label: 'Поддержка' },
 ];
 
+const ARTICLE_SECTIONS = [
+  { id: 'new', icon: '🆕', title: 'Новые статьи', desc: 'Последние добавленные статьи', color: 'var(--accent)' },
+  { id: 'recommended', icon: '⭐', title: 'Рекомендуемое', desc: 'Популярные и рекомендованные статьи', color: '#3b82f6' },
+  { id: 'all', icon: '📚', title: 'Все статьи', desc: 'Полная библиотека статей', color: '#8b5cf6' },
+] as const;
+
 function renderMarkdown(md: string): string {
   let html = md
-    // Headers
     .replace(/^### (.+)$/gm, '<h4>$1</h4>')
     .replace(/^## (.+)$/gm, '<h3>$1</h3>')
     .replace(/^# (.+)$/gm, '<h2>$1</h2>')
-    // Bold
     .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-    // Italic
     .replace(/\*(.+?)\*/g, '<em>$1</em>')
-    // Lists
     .replace(/^- (.+)$/gm, '<li>$1</li>')
     .replace(/(<li>.*<\/li>\n?)+/g, '<ul>$&</ul>')
-    // Tables (simple)
     .replace(/^\|(.+)\|$/gm, (line) => {
       const cells = line.split('|').filter(c => c.trim());
       if (cells.every(c => /^[-: ]+$/.test(c))) return '';
       return '<tr>' + cells.map(c => `<td>${c.trim()}</td>`).join('') + '</tr>';
     })
-    // Horizontal rules
     .replace(/^---$/gm, '<hr/>')
-    // Line breaks
     .replace(/\n\n/g, '<br/><br/>')
-    // Checkboxes
     .replace(/- \[ \] (.+)/g, '☐ $1')
     .replace(/- \[x\] (.+)/g, '☑ $1');
-
   return `<div style="line-height:1.7;font-size:13px">${html}</div>`;
 }
 
 export const ArticlesScreen: React.FC = () => {
+  const [page, setPage] = useState<'hero' | 'list'>('hero');
+  const [listSection, setListSection] = useState<string>('all');
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('all');
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -48,6 +47,7 @@ export const ArticlesScreen: React.FC = () => {
 
   const articles = useMemo(() => {
     let list = getSortedArticles();
+    if (listSection === 'new') list = list.slice(0, 3);
     if (category !== 'all') list = list.filter(a => a.category === category);
     if (search.trim()) {
       const q = search.toLowerCase();
@@ -58,7 +58,7 @@ export const ArticlesScreen: React.FC = () => {
       );
     }
     return list;
-  }, [category, search]);
+  }, [category, search, listSection]);
 
   const toggle = (id: string) => setExpandedId(expandedId === id ? null : id);
 
@@ -71,17 +71,55 @@ export const ArticlesScreen: React.FC = () => {
     }
   };
 
+  const goToList = (section: string) => {
+    setListSection(section);
+    setPage('list');
+  };
+
+  if (page === 'hero') {
+    return (
+      <div className="screen articles" style={{ display:'flex', flexDirection:'column', overflow:'hidden', padding:0 }}>
+        <div style={{ flex:'0 0 55vh', position:'relative', maxHeight:'65vh' }}>
+          <img src="/articles-hero.png" alt="" style={{ width:'100%', height:'100%', display:'block', objectFit:'cover', objectPosition:'center top' }} />
+          <div style={{ position:'absolute', bottom:14, left:20, right:20 }}>
+            <h1 style={{ fontSize:22, fontWeight:800, color:'#fff', margin:'0 0 2px', textShadow:'0 2px 14px rgba(0,0,0,0.9)' }}>Статьи</h1>
+            <p style={{ fontSize:11, color:'rgba(255,255,255,0.9)', margin:0, lineHeight:1.3, textShadow:'0 1px 8px rgba(0,0,0,0.8)' }}>
+              База знаний: фармакология, анализы, тренировки, питание
+            </p>
+          </div>
+        </div>
+        <div style={{ flex:1, padding:'10px 16px 80px', display:'flex', flexDirection:'column', gap:8 }}>
+          {ARTICLE_SECTIONS.map(s => (
+            <button key={s.id} onClick={() => goToList(s.id)} style={{
+              display:'flex', alignItems:'center', gap:12, padding:'12px 14px', borderRadius:14, cursor:'pointer', textAlign:'left', width:'100%',
+              background:'var(--glass-bg)', border:'1px solid var(--glass-border)', color:'var(--text)', transition:'all 0.2s',
+            }}>
+              <div style={{ width:40, height:40, borderRadius:12, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, background:s.color+'18', fontSize:20 }}>{s.icon}</div>
+              <div style={{ flex:1 }}>
+                <div style={{ fontSize:13, fontWeight:700, marginBottom:2, color:s.color }}>{s.title}</div>
+                <div style={{ fontSize:10, color:'var(--text-dim)', lineHeight:1.3 }}>{s.desc}</div>
+              </div>
+              <span style={{ color:s.color, fontSize:16, opacity:0.6 }}>→</span>
+            </button>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="screen">
-      <h2 style={{ margin: '0 0 8px', fontSize: 'clamp(15,4vw,18)' }}>📚 Статьи</h2>
+      <div style={{ display:'flex', alignItems:'center', gap:4, padding:'6px 0px', flexShrink:0, marginBottom:8 }}>
+        <button onClick={() => setPage('hero')} style={{
+          padding:'6px 8px', cursor:'pointer', fontSize:14,
+          color:'var(--text-dim)', border:'none', background:'transparent',
+          display:'flex', alignItems:'center', gap:4, fontWeight:600,
+        }}>← На главную</button>
+      </div>
 
-      {/* Filters */}
       <div style={{ display: 'flex', gap: 6, marginBottom: 8, flexWrap: 'wrap' }}>
-        <input
-          type="text" value={search} onChange={e => setSearch(e.target.value)}
-          placeholder=""
-          style={{ flex: 1, minWidth: 140, padding: '8px 10px', borderRadius: 8, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12 }}
-        />
+        <input type="text" value={search} onChange={e => setSearch(e.target.value)}
+          placeholder="" style={{ flex: 1, minWidth: 140, padding: '8px 10px', borderRadius: 8, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12 }} />
       </div>
       <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 10 }}>
         {CATEGORIES.map(c => (
@@ -95,32 +133,23 @@ export const ArticlesScreen: React.FC = () => {
         ))}
       </div>
 
-      {/* PDF Viewer Modal */}
       {pdfViewer && (
-        <div style={{
-          position: 'fixed', inset: 0, zIndex: 300, background: 'rgba(0,0,0,0.85)',
-          display: 'flex', flexDirection: 'column',
-        }}>
+        <div style={{ position: 'fixed', inset: 0, zIndex: 300, background: 'rgba(0,0,0,0.85)', display: 'flex', flexDirection: 'column' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 14px', background: 'var(--bg)' }}>
             <span style={{ fontWeight: 600, fontSize: 13 }}>📄 PDF Документ</span>
             <div style={{ display: 'flex', gap: 8 }}>
-              <button onClick={() => openPDF(pdfViewer)} style={{
-                padding: '5px 14px', borderRadius: 6, background: 'var(--accent)', color: '#000', border: 'none', fontWeight: 600, fontSize: 11, cursor: 'pointer',
-              }}>Открыть</button>
-              <button onClick={() => setPdfViewer(null)} style={{
-                padding: '5px 14px', borderRadius: 6, background: 'var(--bg-secondary)', color: 'var(--text-dim)', border: '1px solid var(--border)', fontSize: 11, cursor: 'pointer',
-              }}>✕ Закрыть</button>
+              <button onClick={() => openPDF(pdfViewer)} style={{ padding: '5px 14px', borderRadius: 6, background: 'var(--accent)', color: '#000', border: 'none', fontWeight: 600, fontSize: 11, cursor: 'pointer' }}>Открыть</button>
+              <button onClick={() => setPdfViewer(null)} style={{ padding: '5px 14px', borderRadius: 6, background: 'var(--bg-secondary)', color: 'var(--text-dim)', border: '1px solid var(--border)', fontSize: 11, cursor: 'pointer' }}>✕ Закрыть</button>
             </div>
           </div>
           <div style={{ flex: 1, padding: 16, textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12 }}>
             <div style={{ fontSize: 48 }}>📄</div>
-            <div style={{ fontSize: 14, color: 'var(--text)' }}>PDF документ доступен для скачивания</div>
-            <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>Нажмите «Открыть» для просмотра в браузере или скачивания</div>
+            <div style={{ fontSize: 14, color: 'var(--text)' }}>PDF документ доступен для просмотра</div>
+            <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>Нажмите «Открыть» для просмотра в браузере</div>
           </div>
         </div>
       )}
 
-      {/* Articles list */}
       {articles.length === 0 && (
         <div className="card" style={{ textAlign: 'center', padding: 30 }}>
           <div style={{ fontSize: 32, marginBottom: 8 }}>📭</div>
@@ -133,29 +162,18 @@ export const ArticlesScreen: React.FC = () => {
         return (
           <div key={article.id} className="card" style={{ marginBottom: 8, padding: '10px 12px' }}>
             <div onClick={() => {
-              if (article.content_type === 'pdf') {
-                setPdfViewer(article.file_url || '');
-              } else {
-                toggle(article.id);
-              }
+              if (article.content_type === 'pdf') { setPdfViewer(article.file_url || ''); }
+              else { toggle(article.id); }
             }} style={{ cursor: 'pointer' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 }}>
                 <div style={{ flex: 1 }}>
-                  <span style={{ fontWeight: 600, fontSize: 13 }}>
-                    {article.content_type === 'pdf' ? '' : ''}
-                    {article.title}
-                  </span>
-                  <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 2 }}>
-                    {article.description}
-                  </div>
+                  <span style={{ fontWeight: 600, fontSize: 13 }}>{article.title}</span>
+                  <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 2 }}>{article.description}</div>
                 </div>
-                <span style={{
-                  padding: '2px 8px', borderRadius: 4, fontSize: 9, whiteSpace: 'nowrap',
+                <span style={{ padding: '2px 8px', borderRadius: 4, fontSize: 9, whiteSpace: 'nowrap',
                   background: article.content_type === 'pdf' ? 'rgba(239,68,68,0.1)' : 'rgba(0,230,138,0.08)',
                   color: article.content_type === 'pdf' ? '#ef4444' : 'var(--accent)',
-                }}>
-                  {article.content_type === 'pdf' ? 'PDF' : ''}
-                </span>
+                }}>{article.content_type === 'pdf' ? 'PDF' : (article.content_type === 'html' ? 'HTML' : 'MD')}</span>
               </div>
               <div style={{ display: 'flex', gap: 8, fontSize: 9, color: 'var(--text-dim)' }}>
                 <span>{article.date}</span>
@@ -163,20 +181,13 @@ export const ArticlesScreen: React.FC = () => {
                 <span>{CATEGORIES.find(c => c.value === article.category)?.label || article.category}</span>
               </div>
             </div>
-
-            {/* Expanded MD content */}
             {isExpanded && article.content && (
-              <div style={{
-                marginTop: 10, padding: '10px 12px', borderRadius: 8,
-                background: 'var(--bg-secondary)', borderTop: '1px solid var(--border)',
-              }}>
+              <div style={{ marginTop: 10, padding: '10px 12px', borderRadius: 8, background: 'var(--bg-secondary)', borderTop: '1px solid var(--border)' }}>
                 <div dangerouslySetInnerHTML={{ __html: renderMarkdown(article.content) }} />
                 {article.tags.length > 0 && (
                   <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 8 }}>
                     {article.tags.map(t => (
-                      <span key={t} style={{ padding: '2px 8px', borderRadius: 10, background: 'rgba(0,230,138,0.06)', color: 'var(--accent)', fontSize: 9 }}>
-                        #{t}
-                      </span>
+                      <span key={t} style={{ padding: '2px 8px', borderRadius: 10, background: 'rgba(0,230,138,0.06)', color: 'var(--accent)', fontSize: 9 }}>#{t}</span>
                     ))}
                   </div>
                 )}
@@ -186,9 +197,8 @@ export const ArticlesScreen: React.FC = () => {
         );
       })}
 
-      {/* Stats */}
       <div className="card" style={{ marginTop: 8, padding: '8px 12px', textAlign: 'center', fontSize: 10, color: 'var(--text-dim)' }}>
-        {ARTICLES_MANIFEST.length} статей в библиотеке · {ARTICLES_MANIFEST.filter(a => a.content_type === 'pdf').length} PDF · {ARTICLES_MANIFEST.filter(a => a.content_type === 'markdown').length} Markdown
+        {ARTICLES_MANIFEST.length} статей · {ARTICLES_MANIFEST.filter(a => a.content_type === 'pdf').length} PDF · {ARTICLES_MANIFEST.filter(a => a.content_type === 'markdown').length} MD
       </div>
     </div>
   );

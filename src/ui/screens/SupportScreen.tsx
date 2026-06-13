@@ -842,7 +842,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
               </p>
             </div>
           </div>
-          <div style={{ flex:1, padding:'10px 16px 80px', display:'flex', flexDirection:'column', gap:8, overflowY:'auto' }}>
+          <div style={{ flex:1, padding:'10px 16px 80px', display:'flex', flexDirection:'column', gap:8 }}>
             <div onClick={() => setSupportView('calc')} style={{
               display:'flex', alignItems:'center', gap:12, padding:'12px 14px', borderRadius:14, cursor:'pointer', textAlign:'left', width:'100%',
               background:'var(--glass-bg)', border:'1px solid var(--glass-border)', color:'var(--text)', transition:'all 0.2s',
