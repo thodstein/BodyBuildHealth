@@ -54,6 +54,12 @@ export const RiskScreen: React.FC = () => {
   const readinessData = linked.readiness;
   const [mainTab, setMainTab] = useState<'hero' | 'calculations' | 'clinical' | 'info'>('hero');
   const [subTab, setSubTab] = useState<'overview' | 'dynamics' | 'mechanisms' | 'v7' | 'model' | 'info' | 'mdss' | 'compliance' | 'clinical' | 'labs_risks'>('overview');
+
+  // Force subTab when mainTab changes
+  useEffect(() => {
+    if (mainTab === 'info') setSubTab('info');
+    else if (mainTab === 'clinical') setSubTab('model');
+  }, [mainTab]);
   const [calcPage, setCalcPage] = useState<'hero' | 'basic' | 'montecarlo' | 'mdss'>('hero');
   const [tick, setTick] = useState(0);
   const [selectedWeek, setSelectedWeek] = useState<number | null>(null);
@@ -367,7 +373,7 @@ export const RiskScreen: React.FC = () => {
           {/* Hero image */}
           <div style={{ position: 'relative', margin: '-16px -16px 12px -16px' }}>
             <img src="/risk-hero.png" alt="" style={{
-              width: '100%', height: 'auto', maxHeight: '55vh', display: 'block',
+              width: '100%', height: 'auto', maxHeight: '62vh', display: 'block',
               objectFit: 'cover', objectPosition: 'center top',
             }} />
             <div style={{ position: 'absolute', bottom: 10, left: 16, right: 16 }}>

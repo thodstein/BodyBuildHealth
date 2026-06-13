@@ -132,10 +132,11 @@ const LAB_SUB_TABS: { id: LabSubTab; label: string; icon: string }[] = [
   { id: 'current', label: 'Текущие', icon: '🔬' },
   { id: 'archive', label: 'Архив', icon: '📦' },
   { id: 'catalog', label: 'Каталог', icon: '📖' },
-  { id: 'chart', label: 'График', icon: '📈' },
+  { id: 'chart', label: 'Динамика', icon: '📈' },
+  { id: 'schedule', label: 'График сдачи', icon: '📅' },
 ];
 
-type LabSubTab = 'hero' | 'current' | 'archive' | 'catalog' | 'chart';
+type LabSubTab = 'hero' | 'current' | 'archive' | 'catalog' | 'chart' | 'schedule';
 
 export const LabsScreen: React.FC = () => {
   const linked = useDataLink();
@@ -482,7 +483,7 @@ export const LabsScreen: React.FC = () => {
           {/* Hero section with image */}
           <div style={{ position: 'relative', margin: '-16px -16px 16px -16px' }}>
             <img src="/lab-hero.png" alt="" style={{
-              width: '100%', height: 'auto', maxHeight: '55vh', display: 'block',
+              width: '100%', height: 'auto',               maxHeight: '62vh', display: 'block',
               objectFit: 'cover', objectPosition: 'center top',
             }} />
             <div style={{ position: 'absolute', bottom: 14, left: 20, right: 20 }}>
@@ -1078,6 +1079,62 @@ export const LabsScreen: React.FC = () => {
       })()}
 
         </>)}
+      {/* ≡≡≡ SCHEDULE TAB — график сдачи анализов по фазам ≡≡≡ */}
+      {subTab === 'schedule' && (
+        <div>
+          <div style={{ display:'flex', alignItems:'center', gap:8, padding:'10px 0' }}>
+            <span style={{ fontSize:18 }}>📅</span>
+            <span style={{ fontSize:15, fontWeight:700 }}>График сдачи анализов</span>
+          </div>
+          <div className="card" style={{ padding:14 }}>
+            <div style={{ fontSize:12, fontWeight:700, color:'var(--accent)', marginBottom:8 }}>
+              План сдачи по фазам: {PHASE_LABELS[selectedPhase]}
+            </div>
+            <div style={{ display:'grid', gap:6 }}>
+              {Object.entries(labsBySystem).map(([system, codes]) => {
+                const submitted = codes.filter(c => submittedCodes.has(c.toUpperCase())).length;
+                const total = codes.length;
+                const pct = total > 0 ? Math.round(submitted/total*100) : 0;
+                return (
+                  <div key={system} style={{ padding:8, borderRadius:10, border:'1px solid var(--border)', background:'var(--bg-secondary)' }}>
+                    <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:4 }}>
+                      <div style={{ width:8, height:8, borderRadius:'50%', background: sysColors[system]||'#6b7280' }}/>
+                      <span style={{ fontSize:10, fontWeight:600, color:'var(--accent)' }}>{sysLabels[system]||system}</span>
+                      <span style={{ fontSize:9, color:'var(--text-dim)', marginLeft:'auto' }}>{submitted}/{total}</span>
+                    </div>
+                    <div style={{ height:6, background:'rgba(255,255,255,0.05)', borderRadius:3, overflow:'hidden' }}>
+                      <div style={{ width:`${pct}%`, height:'100%', background:pct===100?'var(--accent)':pct>50?'#eab308':'#f97316', borderRadius:3, transition:'width 0.4s' }}/>
+                    </div>
+                    <div style={{ display:'flex', flexWrap:'wrap', gap:2, marginTop:4 }}>
+                      {codes.map(code => {
+                        const info = UCUM_MAP[code.toUpperCase()];
+                        const done = submittedCodes.has(code.toUpperCase());
+                        return (
+                          <span key={code} style={{
+                            fontSize:8, padding:'1px 5px', borderRadius:3,
+                            background: done ? 'rgba(0,230,138,0.12)' : 'rgba(239,68,68,0.08)',
+                            color: done ? 'var(--accent)' : '#ef4444',
+                            border:`1px solid ${done?'rgba(0,230,138,0.2)':'rgba(239,68,68,0.15)'}`,
+                          }}>
+                            {done ? '✓' : '○'} {info?.name||code}
+                          </span>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            {missingLabs.length > 0 && (
+              <div style={{ marginTop:8, padding:8, borderRadius:8, background:'rgba(239,68,68,0.06)', border:'1px solid rgba(239,68,68,0.15)' }}>
+                <div style={{ fontSize:10, fontWeight:600, color:'#ef4444', marginBottom:4 }}>⚠️ Не сдано ({missingLabs.length})</div>
+                <div style={{ fontSize:9, color:'var(--text-dim)', lineHeight:1.5 }}>{missingLabs.slice(0,15).join(', ')}{missingLabs.length>15?` +${missingLabs.length-15}`:''}</div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* ≡≡≡ INVESTIGATIONS TAB ≡≡≡ */}
       {mainTab === 'investigations' && (
         <div style={{ paddingTop: 8 }}>
