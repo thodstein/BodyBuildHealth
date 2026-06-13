@@ -480,13 +480,13 @@ export const LabsScreen: React.FC = () => {
       {mainTab === 'hero' && (
         <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '40px 16px 70px' }}>
           {/* Hero section with image */}
-          <div style={{ position: 'relative', marginBottom: 16 }}>
+          <div style={{ position: 'relative', marginBottom: 12 }}>
             <img src="/lab-hero.png" alt="" style={{
-              width: '100%', height: 'auto', maxHeight: '40vh', display: 'block',
-              objectFit: 'contain', objectPosition: 'center top',
-              borderRadius: 0, marginBottom: -4,
+              width: '100%', height: 'auto', maxHeight: '55vh', display: 'block',
+              objectFit: 'cover', objectPosition: 'center top',
+              marginBottom: -4,
             }} />
-            <div style={{ position: 'absolute', bottom: 12, left: 16, right: 16 }}>
+            <div style={{ position: 'absolute', bottom: 10, left: 16, right: 16 }}>
               <h1 style={{ fontSize: 20, fontWeight: 800, color: '#fff', margin: '0 0 2px', textShadow: '0 2px 12px rgba(0,0,0,0.8)' }}>Лаборатория</h1>
               <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.85)', margin: 0, lineHeight: 1.3, textShadow: '0 1px 6px rgba(0,0,0,0.7)' }}>
                 Контролируйте своё здоровье — анализы, обследования и оценка рисков
