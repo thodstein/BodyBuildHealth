@@ -44,6 +44,11 @@ const CLASS_LABELS: Record<string, string> = {
   peptide_gnrh: 'GnRH',
   peptide_fat_loss: 'Жиросжигающие',
   peptide_other: 'Прочие',
+  support: 'Поддержка',
+  peptide_regenerative: 'Регенеративные',
+  peptide_immune: 'Иммунные',
+  peptide_nootropic: 'Ноотропы',
+  dht_derivative: 'DHT производные',
 };
 
 const PD_LABELS: Record<keyof PD, string> = {
@@ -101,7 +106,8 @@ const PHARMA_CLASSES = [
   'testosterone', 'trenbolone', 'nandrolone', 'boldenone', 'primobolan', 'oral_17aa',
   'sarm', 'peptide_ghrh', 'peptide_ghrp', 'igf1', 'mgf', 'insulin', 'pct_serm',
   'pct_aromatase', 'pct_dopamine', 'pct_gonadotropin', 'drostanolone', 'peptide_gnrh',
-  'peptide_fat_loss', 'peptide_other'
+  'peptide_fat_loss', 'peptide_other', 'support', 'peptide_regenerative', 'peptide_immune',
+  'peptide_nootropic', 'dht_derivative'
 ] as const;
 
 type PharmaClass = typeof PHARMA_CLASSES[number];
@@ -322,49 +328,119 @@ const CatalogTab: React.FC = () => {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [filterClass, setFilterClass] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [collapsedClasses, setCollapsedClasses] = useState<Record<string, boolean>>({});
 
-  // Filter to show only pharma substances
   const pharmaSubstances = useMemo(() => {
     return Object.values(PHARMA_DB).filter(s => 
       PHARMA_CLASSES.includes(s.class as PharmaClass)
     );
   }, []);
 
+  const groupedByClass = useMemo(() => {
+    const map: Record<string, typeof pharmaSubstances> = {};
+    for (const s of pharmaSubstances) {
+      if (!map[s.class]) map[s.class] = [];
+      map[s.class].push(s);
+    }
+    return map;
+  }, [pharmaSubstances]);
+
   const filteredList = useMemo(() => {
-    let list = filterClass === 'all' ? pharmaSubstances : pharmaSubstances.filter(s => s.class === filterClass);
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
-      list = list.filter(s => s.name.toLowerCase().includes(q) || s.id.toLowerCase().includes(q) || (s.class && s.class.toLowerCase().includes(q)));
+      return pharmaSubstances.filter(s => s.name.toLowerCase().includes(q) || s.id.toLowerCase().includes(q) || (s.class && s.class.toLowerCase().includes(q)));
     }
-    return list;
+    if (filterClass === 'all') return pharmaSubstances;
+    return pharmaSubstances.filter(s => s.class === filterClass);
   }, [filterClass, searchQuery, pharmaSubstances]);
+
+  const toggleClass = (cls: string) => {
+    setCollapsedClasses(prev => ({ ...prev, [cls]: !prev[cls] }));
+  };
+
+  const filteredGrouped = useMemo(() => {
+    if (filterClass !== 'all' || searchQuery) return null;
+    return groupedByClass;
+  }, [filterClass, searchQuery, groupedByClass]);
 
   const selected = selectedId ? PHARMA_DB[selectedId] : null;
   const detail = selectedId ? PHARMA_DETAILS[selectedId] : undefined;
 
   return (
-    <div className="catalog-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1.2fr', gap: 12 }}>
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.2fr', gap: 12 }}>
       <div style={{ maxHeight: 'calc(100vh - 160px)', overflowY: 'auto', paddingRight: 4 }}>
-        <input type="text" placeholder="" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', fontSize: 13, marginBottom: 8, boxSizing: 'border-box' }} />
-        <div className="pharma-class-filters" style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 8 }}>
-          <button onClick={() => setFilterClass('all')} style={{ padding: '3px 8px', borderRadius: 4, fontSize: 11, border: filterClass === 'all' ? '1px solid var(--accent)' : '1px solid var(--border)', background: filterClass === 'all' ? 'rgba(0,230,138,0.15)' : 'transparent', color: 'var(--text-primary)', cursor: 'pointer' }}>Все</button>
+        <input type="text" placeholder="Поиск по названию..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
+          style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border)',
+            background: 'var(--bg-secondary)', color: 'var(--text)', fontSize: 13, marginBottom: 8, boxSizing: 'border-box' }} />
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, marginBottom: 8 }}>
+          <button onClick={() => setFilterClass('all')} style={{
+            padding: '4px 10px', borderRadius: 14, fontSize: 10, cursor: 'pointer',
+            background: filterClass === 'all' ? 'rgba(0,230,138,0.15)' : 'transparent',
+            color: filterClass === 'all' ? 'var(--accent)' : 'var(--text-dim)',
+            border: `1px solid ${filterClass === 'all' ? 'var(--accent)' : 'var(--border)'}`,
+            fontWeight: filterClass === 'all' ? 700 : 400,
+          }}>Все</button>
           {PHARMA_CLASSES.map(cls => (
-            <button key={cls} onClick={() => setFilterClass(cls)} style={{ padding: '3px 8px', borderRadius: 4, fontSize: 11, border: filterClass === cls ? '1px solid var(--accent)' : '1px solid var(--border)', background: filterClass === cls ? 'rgba(0,230,138,0.15)' : 'transparent', color: 'var(--text-primary)', cursor: 'pointer' }}>{CLASS_LABELS[cls] || cls}</button>
+            <button key={cls} onClick={() => setFilterClass(cls)} style={{
+              padding: '4px 10px', borderRadius: 14, fontSize: 10, cursor: 'pointer',
+              background: filterClass === cls ? 'rgba(0,230,138,0.15)' : 'transparent',
+              color: filterClass === cls ? 'var(--accent)' : 'var(--text-dim)',
+              border: `1px solid ${filterClass === cls ? 'var(--accent)' : 'var(--border)'}`,
+              fontWeight: filterClass === cls ? 700 : 400,
+            }}>{CLASS_LABELS[cls] || cls}</button>
           ))}
         </div>
-        {filteredList.map(s => (
-          <div key={s.id} onClick={() => setSelectedId(s.id)} style={{
-            padding: '8px 10px', borderRadius: 6, cursor: 'pointer', marginBottom: 4,
-            background: selectedId === s.id ? 'rgba(0,230,138,0.12)' : 'var(--bg-secondary)',
-            border: selectedId === s.id ? '1px solid var(--accent)' : '1px solid transparent',
-          }}>
-            <div style={{ fontWeight: 600, fontSize: 13 }}>{s.name}</div>
-            <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>{CLASS_LABELS[s.class] || s.class}</div>
+
+        {/* Grouped view when "Все" */}
+        {filteredGrouped ? (
+          <div>
+            {Object.entries(filteredGrouped).map(([cls, substances]) => {
+              const isCollapsed = collapsedClasses[cls] ?? false;
+              return (
+                <div key={cls} style={{ marginBottom: 6 }}>
+                  <div onClick={() => toggleClass(cls)} style={{
+                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                    padding: '6px 10px', borderRadius: 6, cursor: 'pointer',
+                    background: 'var(--bg-secondary)', marginBottom: 2,
+                  }}>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--accent)' }}>
+                      {CLASS_LABELS[cls] || cls}
+                      <span style={{ fontSize: 9, color: 'var(--text-dim)', marginLeft: 6, fontWeight: 400 }}>
+                        {substances.length}
+                      </span>
+                    </span>
+                    <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>{isCollapsed ? '▸' : '▾'}</span>
+                  </div>
+                  {!isCollapsed && substances.map(s => (
+                    <div key={s.id} onClick={() => setSelectedId(s.id)} style={{
+                      padding: '5px 10px 5px 16px', borderRadius: 4, cursor: 'pointer',
+                      background: selectedId === s.id ? 'rgba(0,230,138,0.12)' : 'transparent',
+                      borderLeft: selectedId === s.id ? '3px solid var(--accent)' : '3px solid transparent',
+                      marginBottom: 1,
+                    }}>
+                      <div style={{ fontWeight: 600, fontSize: 12 }}>{s.name}</div>
+                    </div>
+                  ))}
+                </div>
+              );
+            })}
           </div>
-        ))}
+        ) : (
+          /* Flat list when filter is specific class or search is active */
+          filteredList.map(s => (
+            <div key={s.id} onClick={() => setSelectedId(s.id)} style={{
+              padding: '7px 10px', borderRadius: 6, cursor: 'pointer', marginBottom: 3,
+              background: selectedId === s.id ? 'rgba(0,230,138,0.12)' : 'var(--bg-secondary)',
+              border: selectedId === s.id ? '1px solid var(--accent)' : '1px solid transparent',
+            }}>
+              <div style={{ fontWeight: 600, fontSize: 12 }}>{s.name}</div>
+              <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>{CLASS_LABELS[s.class] || s.class}</div>
+            </div>
+          ))
+        )}
         {filteredList.length === 0 && (
-          <div style={{ padding: 20, textAlign: 'center', color: 'var(--text-dim)' }}>
-            {searchQuery ? '' : ''}
+          <div style={{ padding: 20, textAlign: 'center', color: 'var(--text-dim)', fontSize: 12 }}>
+            {searchQuery ? 'Ничего не найдено' : ''}
           </div>
         )}
       </div>
@@ -372,7 +448,7 @@ const CatalogTab: React.FC = () => {
         {selected ? <DrugDetailCard sub={selected} detail={detail} /> : (
           <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-dim)' }}>
             <div style={{ fontSize: 40, marginBottom: 12 }}>💊</div>
-            <div>Выберите препарат из списка</div>
+            <div style={{ fontSize: 13 }}>Выберите препарат из списка</div>
           </div>
         )}
       </div>
@@ -754,28 +830,43 @@ const PKPDSimulationTab: React.FC = () => {
 
   return (
     <div>
+      {/* Current simulation drugs */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12 }}>
         {drugDoses.map((dd, idx) => {
           const sub = PHARMA_DB[dd.substanceId];
           return (
-            <div key={idx} className="card" style={{ padding: 8, fontSize: 12 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                <div style={{ flex: 1, marginRight: 8, padding: '4px 8px', background: 'var(--bg-secondary)', borderRadius: 6, fontWeight: 600, fontSize: 13 }}>
-                  {sub?.name || dd.substanceId}
-                  <span style={{ fontSize: 9, color: 'var(--text-dim)', marginLeft: 6 }}>{CLASS_LABELS[sub?.class as string] || sub?.class}</span>
+            <div key={idx} style={{
+              background: 'var(--glass-bg)', border: '1px solid var(--glass-border)',
+              borderRadius: 12, padding: '10px 12px', fontSize: 12,
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontWeight: 700, fontSize: 13, color: 'var(--accent)' }}>
+                    {sub?.name || dd.substanceId}
+                  </span>
+                  <span style={{ fontSize: 9, padding: '2px 8px', borderRadius: 10,
+                    background: 'rgba(0,230,138,0.12)', color: 'var(--accent)' }}>
+                    {CLASS_LABELS[sub?.class as string] || sub?.class}
+                  </span>
                 </div>
                 {drugDoses.length > 1 && (
-                  <button className="btn" style={{ fontSize: 10, padding: '2px 8px', width: 'auto', marginTop: 0, flexShrink: 0 }} onClick={() => removeDrug(idx)}>✕</button>
+                  <button onClick={() => removeDrug(idx)} style={{
+                    width: 26, height: 26, borderRadius: 6, cursor: 'pointer', fontSize: 12,
+                    background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.3)', color: '#ef4444',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  }}>✕</button>
                 )}
               </div>
-              <div className="pharma-dosage-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', gap: 8, alignItems: 'end' }}>
                 <div>
-                  <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Доза (мг)</label>
-                  <input type="number" value={dd.doseMg} onChange={(e) => updateDrug(idx, 'doseMg', Number(e.target.value))} style={{ width: '100%', fontSize: 12 }} />
+                  <label style={{ fontSize: 9, color: 'var(--text-dim)', display: 'block', marginBottom: 2 }}>Доза (мг)</label>
+                  <input type="number" value={dd.doseMg} onChange={(e) => updateDrug(idx, 'doseMg', Number(e.target.value))}
+                    style={{ width: '100%', padding: '5px 8px', borderRadius: 6, background: 'var(--bg-secondary)',
+                      border: '1px solid var(--border)', color: 'var(--text)', fontSize: 11, boxSizing: 'border-box' }} />
                 </div>
                 <div>
-                  <label style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 2, display: 'block' }}>Дни</label>
-                  <div style={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+                  <label style={{ fontSize: 9, color: 'var(--text-dim)', display: 'block', marginBottom: 2 }}>Дни</label>
+                  <div style={{ display: 'flex', gap: 2 }}>
                     {[1,2,3,4,5,6,7].map(d => {
                       const active = dd.frequencyDays.includes(d);
                       return (
@@ -783,17 +874,19 @@ const PKPDSimulationTab: React.FC = () => {
                           const next = active ? dd.frequencyDays.filter(x => x !== d) : [...dd.frequencyDays, d].sort();
                           updateDrug(idx, 'frequencyDays', next);
                         }} style={{
-                          width: 26, height: 26, borderRadius: 4, fontSize: 9, fontWeight: 700, cursor: 'pointer',
+                          width: 24, height: 24, borderRadius: 4, fontSize: 8, fontWeight: 700, cursor: 'pointer',
                           background: active ? 'var(--accent)' : 'var(--bg-secondary)', color: active ? '#000' : 'var(--text-dim)',
                           border: `1px solid ${active ? 'var(--accent)' : 'var(--border)'}`,
-                        }}>{DAY_SHORT[d]}</button>
+                        }}>{['','Пн','Вт','Ср','Чт','Пт','Сб','Вс'][d]}</button>
                       );
                     })}
                   </div>
                 </div>
                 <div>
-                  <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Недель</label>
-                  <input type="number" value={dd.totalWeeks} onChange={(e) => updateDrug(idx, 'totalWeeks', Number(e.target.value))} style={{ width: '100%', fontSize: 12 }} />
+                  <label style={{ fontSize: 9, color: 'var(--text-dim)', display: 'block', marginBottom: 2 }}>Недель</label>
+                  <input type="number" value={dd.totalWeeks} onChange={(e) => updateDrug(idx, 'totalWeeks', Number(e.target.value))}
+                    style={{ width: '100%', padding: '5px 8px', borderRadius: 6, background: 'var(--bg-secondary)',
+                      border: '1px solid var(--border)', color: 'var(--text)', fontSize: 11, boxSizing: 'border-box' }} />
                 </div>
               </div>
             </div>
@@ -801,13 +894,25 @@ const PKPDSimulationTab: React.FC = () => {
         })}
       </div>
 
-      {/* Class-picker chips for quick drug selection */}
-      <div className="card" style={{ marginBottom: 12 }}>
-        <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-dim)', marginBottom: 6 }}>Выберите класс препарата:</div>
+      {/* Drug class selector */}
+      <div style={{
+        background: 'var(--glass-bg)', border: '1px solid var(--glass-border)',
+        borderRadius: 12, padding: '12px 14px', marginBottom: 12,
+      }}>
+        <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-dim)', marginBottom: 8 }}>
+          {drugDoses.length === 0 ? 'Начните — выберите класс препарата:' : 'Добавить препарат — выберите класс:'}
+        </div>
         <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 6 }}>
+          <button onClick={() => { setPkClass(''); setPkSearch(''); setShowAllDrugs(true); }} style={{
+            padding: '4px 12px', borderRadius: 16, fontSize: 10, cursor: 'pointer', fontWeight: !pkClass ? 700 : 400,
+            background: !pkClass ? 'rgba(0,230,138,0.15)' : 'var(--bg-secondary)',
+            color: !pkClass ? 'var(--accent)' : 'var(--text-dim)',
+            border: `1px solid ${!pkClass ? 'var(--accent)' : 'var(--border)'}`,
+            whiteSpace: 'nowrap',
+          }}>Все классы</button>
           {Object.entries(CLASS_LABELS).map(([cls, label]) => (
-            <button key={cls} onClick={() => { setPkClass(pkClass === cls ? '' : cls); setPkSearch(''); }} style={{
-              padding: '5px 10px', borderRadius: 16, fontSize: 10, cursor: 'pointer', fontWeight: pkClass === cls ? 700 : 400,
+            <button key={cls} onClick={() => { setPkClass(pkClass === cls ? '' : cls); setPkSearch(''); setShowAllDrugs(false); }} style={{
+              padding: '4px 12px', borderRadius: 16, fontSize: 10, cursor: 'pointer', fontWeight: pkClass === cls ? 700 : 400,
               background: pkClass === cls ? 'rgba(0,230,138,0.15)' : 'var(--bg-secondary)',
               color: pkClass === cls ? 'var(--accent)' : 'var(--text-dim)',
               border: `1px solid ${pkClass === cls ? 'var(--accent)' : 'var(--border)'}`,
@@ -816,86 +921,98 @@ const PKPDSimulationTab: React.FC = () => {
           ))}
         </div>
 
-        {/* Quick search within class */}
-        {pkClass && (
-          <input type="text" value={pkSearch} onChange={e => setPkSearch(e.target.value)}
-            placeholder={``}
-            style={{ width: '100%', padding: '6px 8px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 11, marginBottom: 6, boxSizing: 'border-box' }} />
-        )}
+        {/* Search */}
+        <input type="text" value={pkSearch} onChange={e => setPkSearch(e.target.value)}
+          placeholder={drugDoses.length === 0 ? 'Начните вводить название...' : 'Поиск препарата...'}
+          style={{ width: '100%', padding: '6px 10px', borderRadius: 8, background: 'var(--bg-secondary)',
+            border: '1px solid var(--border)', color: 'var(--text)', fontSize: 11, marginBottom: 6,
+            boxSizing: 'border-box' }} />
 
-        {/* Drug cards */}
-        {(pkClass || pkSearch) && pkFiltered.length > 0 && (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 4, maxHeight: 180, overflowY: 'auto' }}>
+        {/* Drug grid */}
+        {(showAllDrugs || pkClass || pkSearch) && pkFiltered.length > 0 && (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 4, maxHeight: 200, overflowY: 'auto' }}>
             {pkFiltered.map(s => (
               <div key={s.id} onClick={() => addDrug(s.id)} style={{
-                padding: '6px 8px', borderRadius: 8, cursor: 'pointer',
+                padding: '7px 9px', borderRadius: 8, cursor: 'pointer',
                 background: 'var(--bg-secondary)', border: '1px solid var(--border)',
+                transition: 'all 0.15s',
               }}>
-                <div style={{ fontSize: 10, fontWeight: 600 }}>{s.name}</div>
-                <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>{s.pk?.halfLifeHours ? `${(s.pk.halfLifeHours / 24).toFixed(1)} дн` : ''}</div>
+                <div style={{ fontSize: 11, fontWeight: 600 }}>{s.name}</div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: 'var(--text-dim)', marginTop: 2 }}>
+                  <span>{CLASS_LABELS[s.class] || s.class}</span>
+                  <span>{s.pk?.halfLifeHours ? `${(s.pk.halfLifeHours / 24).toFixed(1)} дн` : ''}</span>
+                </div>
               </div>
             ))}
           </div>
         )}
 
-        {drugDoses.length > 0 && !pkClass && !pkSearch && (
-          <div style={{ fontSize: 10, color: 'var(--text-dim)', textAlign: 'center', padding: 4 }}>
-            Выберите класс препарата выше чтобы добавить
+        {!showAllDrugs && !pkClass && !pkSearch && drugDoses.length > 0 && (
+          <div style={{ fontSize: 10, color: 'var(--text-dim)', textAlign: 'center', padding: 8 }}>
+            Выберите класс или начните поиск
           </div>
         )}
 
-        {pkClass && pkFiltered.length === 0 && !pkSearch && (
-          <div style={{ fontSize: 10, color: 'var(--text-dim)', textAlign: 'center' }}>
+        {pkFiltered.length === 0 && (pkClass || pkSearch) && (
+          <div style={{ fontSize: 10, color: 'var(--text-dim)', textAlign: 'center', padding: 8 }}>
             Все препараты этого класса уже добавлены
           </div>
         )}
       </div>
 
+      {/* Run simulation */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
-        <button className="btn" onClick={runSimulation}>▶ Симуляция</button>
-        <button className="btn" onClick={() => setShowAllDrugs(!showAllDrugs)}>
-          {showAllDrugs ? '' : ''}
-        </button>
+        <button onClick={runSimulation} style={{
+          flex: 1, padding: '10px 0', borderRadius: 10, border: 'none',
+          background: 'linear-gradient(135deg, #00e68a, #00c853)', color: '#000', fontWeight: 700, fontSize: 13,
+          cursor: 'pointer',
+        }}>▶ Запустить симуляцию</button>
       </div>
 
       {simResult && (
         <div>
-          {/* Per-drug visibility legend */}
-          {!showAllDrugs && (
-            <div className="card" style={{ marginBottom: 8, display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-              {simResult.perDrug.map((d, i) => {
-                const visible = visibleDrugs.has(d.substanceId);
-                return (
-                  <button key={d.substanceId} onClick={() => toggleDrugVisibility(d.substanceId)} style={{
-                    padding: '4px 10px', borderRadius: 16, fontSize: 10, cursor: 'pointer',
-                    background: visible ? `${DRUG_COLORS[i % DRUG_COLORS.length]}22` : 'var(--bg-secondary)',
-                    border: `1px solid ${visible ? DRUG_COLORS[i % DRUG_COLORS.length] : 'var(--border)'}`,
-                    color: visible ? DRUG_COLORS[i % DRUG_COLORS.length] : 'var(--text-dim)',
-                    fontWeight: visible ? 700 : 400,
-                  }}>
-                    {d.name}
-                  </button>
-                );
-              })}
-            </div>
-          )}
-          <div className="card" style={{ fontSize: 12, marginBottom: 8 }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
-              <div><span style={{ color: 'var(--text-dim)' }}>Cmax стацион.:</span><br/><strong>{simResult.peak.toFixed(1)} мг/л</strong></div>
-              <div><span style={{ color: 'var(--text-dim)' }}>Cmin стацион.:</span><br/><strong>{simResult.trough.toFixed(1)} мг/л</strong></div>
-              <div><span style={{ color: 'var(--text-dim)' }}>Стацион. ≈:</span><br/><strong>{simResult.ssDays} дн</strong></div>
+          {/* PK metrics */}
+          <div style={{
+            background: 'var(--glass-bg)', border: '1px solid var(--glass-border)',
+            borderRadius: 12, padding: '12px 14px', marginBottom: 8, fontSize: 12,
+          }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 6 }}>
+              <div style={{ textAlign: 'center', padding: '8px 4px', background: 'var(--bg-secondary)', borderRadius: 8 }}>
+                <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Cmax стацион.</div>
+                <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--accent)' }}>{simResult.peak.toFixed(1)}</div>
+                <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>мг/л</div>
+              </div>
+              <div style={{ textAlign: 'center', padding: '8px 4px', background: 'var(--bg-secondary)', borderRadius: 8 }}>
+                <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Cmin стацион.</div>
+                <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--accent)' }}>{simResult.trough.toFixed(1)}</div>
+                <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>мг/л</div>
+              </div>
+              <div style={{ textAlign: 'center', padding: '8px 4px', background: 'var(--bg-secondary)', borderRadius: 8 }}>
+                <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Стационарный</div>
+                <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--accent)' }}>≈{simResult.ssDays}</div>
+                <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>дн</div>
+              </div>
             </div>
             {simResult.peak > 50 && (
-              <div style={{ color: '#ff1744', marginTop: 6, fontWeight: 600 }}>⚠ Высокая пиковая концентрация — риск побочных эффектов</div>
+              <div style={{ color: '#ff1744', fontWeight: 600, fontSize: 10, textAlign: 'center', padding: '4px 8px', background: 'rgba(255,23,68,0.08)', borderRadius: 6 }}>
+                ⚠ Высокая пиковая концентрация — риск побочных эффектов
+              </div>
             )}
             {simResult.points.length > 0 && simResult.points[simResult.points.length - 1].tol > 0.3 && (
-              <div style={{ color: '#ff9100', marginTop: 4 }}>⚠ Значительная толерантность ({(simResult.points[simResult.points.length - 1].tol * 100).toFixed(0)}%)</div>
+              <div style={{ color: '#ff9100', fontWeight: 600, fontSize: 10, textAlign: 'center', padding: '4px 8px', background: 'rgba(255,145,0,0.08)', borderRadius: 6, marginTop: 4 }}>
+                ⚠ Толерантность {(simResult.points[simResult.points.length - 1].tol * 100).toFixed(0)}%
+              </div>
             )}
           </div>
-          <div className="card" style={{ padding: 4 }}>
+
+          {/* Chart */}
+          <div style={{
+            background: 'var(--glass-bg)', border: '1px solid var(--glass-border)',
+            borderRadius: 12, padding: 8, marginBottom: 8,
+          }}>
             {chart}
-            <div style={{ display: 'flex', justifyContent: 'center', gap: 12, marginTop: 6, fontSize: 10, color: 'var(--text-dim)' }}>
-              <span><span style={{ color: 'var(--accent)', fontWeight: 700 }}>━</span> Суммарная концентрация</span>
+            <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 10, marginTop: 6, fontSize: 10, color: 'var(--text-dim)' }}>
+              <span><span style={{ color: 'var(--accent)', fontWeight: 700 }}>━</span> Суммарная</span>
               {simResult.perDrug.map((d, i) => (
                 <span key={d.substanceId}><span style={{ color: DRUG_COLORS[i % DRUG_COLORS.length], fontWeight: 700 }}>- -</span> {d.name}</span>
               ))}
@@ -913,6 +1030,7 @@ const DosageCalculatorTab: React.FC = () => {
   const allPharma = Object.values(PHARMA_DB).filter((s) => PHARMA_CLASSES.includes(s.class as PharmaClass));
   const [drug, setDrug] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
+  const [dosageClass, setDosageClass] = useState('');
   const [doseMode, setDoseMode] = useState<'per_kg' | 'weekly'>('per_kg');
   const [mgKg, setMgKg] = useState(2);
   const [weeklyMg, setWeeklyMg] = useState(500);
@@ -953,7 +1071,7 @@ const DosageCalculatorTab: React.FC = () => {
 
   const filtered = searchTerm
     ? allPharma.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase()) || p.class.toLowerCase().includes(searchTerm.toLowerCase()))
-    : allPharma;
+    : dosageClass ? allPharma.filter(p => p.class === dosageClass) : allPharma;
 
   return (
     <div>
@@ -970,19 +1088,42 @@ const DosageCalculatorTab: React.FC = () => {
         ))}
       </div>
 
-      {dosageSub === 'dosage' && <><div className="card" style={{ marginBottom: 12 }}>
+      {dosageSub === 'dosage' && <><div style={{
+        background: 'var(--glass-bg)', border: '1px solid var(--glass-border)',
+        borderRadius: 12, padding: '14px 16px', marginBottom: 12,
+      }}>
         <h3 style={{ margin: '0 0 12px 0', fontSize: 14, color: 'var(--accent)' }}>💉 Калькулятор дозировки</h3>
+
+        {/* Class filter chips */}
+        <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap', marginBottom: 8 }}>
+          <button onClick={() => { setDosageClass(''); setSearchTerm(''); }} style={{
+            padding: '3px 10px', borderRadius: 14, fontSize: 9, cursor: 'pointer',
+            fontWeight: !dosageClass ? 700 : 400,
+            background: !dosageClass ? 'rgba(0,230,138,0.15)' : 'var(--bg-secondary)',
+            color: !dosageClass ? 'var(--accent)' : 'var(--text-dim)',
+            border: `1px solid ${!dosageClass ? 'var(--accent)' : 'var(--border)'}`,
+          }}>Все</button>
+          {PHARMA_CLASSES.map(cls => (
+            <button key={cls} onClick={() => { setDosageClass(dosageClass === cls ? '' : cls); setSearchTerm(''); }} style={{
+              padding: '3px 10px', borderRadius: 14, fontSize: 9, cursor: 'pointer',
+              fontWeight: dosageClass === cls ? 700 : 400,
+              background: dosageClass === cls ? 'rgba(0,230,138,0.15)' : 'var(--bg-secondary)',
+              color: dosageClass === cls ? 'var(--accent)' : 'var(--text-dim)',
+              border: `1px solid ${dosageClass === cls ? 'var(--accent)' : 'var(--border)'}`,
+            }}>{CLASS_LABELS[cls] || cls}</button>
+          ))}
+        </div>
 
         {/* Search */}
         <input
           type="text" value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          placeholder=""
+          placeholder="Поиск препарата..."
           style={{ width: '100%', padding: '8px 10px', borderRadius: 8, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, marginBottom: 12, boxSizing: 'border-box' }}
         />
 
         {/* Drug cards grid */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))', gap: 6, maxHeight: 220, overflowY: 'auto', marginBottom: 12 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 5, maxHeight: 200, overflowY: 'auto', marginBottom: 12 }}>
           {filtered.map((p) => {
             const isSelected = drug === p.id;
             return (
@@ -992,32 +1133,32 @@ const DosageCalculatorTab: React.FC = () => {
                 border: isSelected ? '1.5px solid #00e68a' : '1px solid var(--border)',
                 transition: 'all 0.15s',
               }}>
-                <div style={{ fontSize: 12, fontWeight: 600, color: isSelected ? '#00e68a' : 'var(--text)', marginBottom: 2 }}>{p.name}</div>
-                <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>{CLASS_LABELS[p.class] || p.class}</div>
+                <div style={{ fontSize: 11, fontWeight: 600, color: isSelected ? '#00e68a' : 'var(--text)', marginBottom: 2 }}>{p.name}</div>
+                <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>{CLASS_LABELS[p.class] || p.class}</div>
               </div>
             );
           })}
         </div>
 
-        {subDetail && (
-          <div style={{ marginBottom: 12, padding: '8px 10px', background: 'var(--bg-secondary)', borderRadius: 6 }}>
-            <div style={{ fontSize: 11, color: 'var(--text-dim)' }}><b style={{ color: 'var(--text)' }}>Концентрация:</b> {(subDetail as any).concentration || ''} мг/мл</div>
-            <div style={{ fontSize: 11, color: 'var(--text-dim)' }}><b style={{ color: 'var(--text)' }}>Период полувыведения:</b> {subDetail.tHalfHours ? formatHalfLife(subDetail.tHalfHours) : ''}</div>
+        {drug && subDetail && (
+          <div style={{ marginBottom: 12, padding: '8px 10px', background: 'rgba(0,230,138,0.06)', borderRadius: 8, border: '1px solid rgba(0,230,138,0.2)' }}>
+            <div style={{ fontSize: 10, color: 'var(--text-dim)' }}><b style={{ color: 'var(--text)' }}>Концентрация:</b> {(subDetail as any).concentration || '—'} мг/мл</div>
+            <div style={{ fontSize: 10, color: 'var(--text-dim)' }}><b style={{ color: 'var(--text)' }}>Период полувыведения:</b> {subDetail.pk?.halfLifeHours ? formatHalfLife(subDetail.pk.halfLifeHours) : '—'}</div>
           </div>
         )}
 
         {/* Pill toggle */}
         <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
           <button onClick={() => setDoseMode('per_kg')} style={{
-            flex: 1, padding: '6px 0', borderRadius: 20, fontSize: 11, fontWeight: doseMode === 'per_kg' ? 700 : 400, cursor: 'pointer',
+            flex: 1, padding: '7px 0', borderRadius: 20, fontSize: 11, fontWeight: doseMode === 'per_kg' ? 700 : 400, cursor: 'pointer',
             background: doseMode === 'per_kg' ? 'rgba(0,230,138,0.15)' : 'var(--bg-secondary)',
-            border: doseMode === 'per_kg' ? '1px solid #00e68a' : '1px solid var(--border)',
+            border: doseMode === 'per_kg' ? '1.5px solid #00e68a' : '1px solid var(--border)',
             color: doseMode === 'per_kg' ? '#00e68a' : 'var(--text-dim)',
           }}>мг/кг/нед</button>
           <button onClick={() => setDoseMode('weekly')} style={{
-            flex: 1, padding: '6px 0', borderRadius: 20, fontSize: 11, fontWeight: doseMode === 'weekly' ? 700 : 400, cursor: 'pointer',
+            flex: 1, padding: '7px 0', borderRadius: 20, fontSize: 11, fontWeight: doseMode === 'weekly' ? 700 : 400, cursor: 'pointer',
             background: doseMode === 'weekly' ? 'rgba(0,230,138,0.15)' : 'var(--bg-secondary)',
-            border: doseMode === 'weekly' ? '1px solid #00e68a' : '1px solid var(--border)',
+            border: doseMode === 'weekly' ? '1.5px solid #00e68a' : '1px solid var(--border)',
             color: doseMode === 'weekly' ? '#00e68a' : 'var(--text-dim)',
           }}>мг/нед</button>
         </div>
@@ -1027,44 +1168,44 @@ const DosageCalculatorTab: React.FC = () => {
           {doseMode === 'per_kg' ? (
             <>
               <div>
-                <label style={{ fontSize: 10, color: 'var(--text-dim)', display: 'block', marginBottom: 3 }}>мг/кг/нед</label>
+                <label style={{ fontSize: 9, color: 'var(--text-dim)', display: 'block', marginBottom: 3 }}>мг/кг/нед</label>
                 <input type="number" value={mgKg} onChange={(e) => setMgKg(Number(e.target.value))}
-                  style={{ width: '100%', padding: '7px 10px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, boxSizing: 'border-box' }} />
+                  style={{ width: '100%', padding: '7px 10px', borderRadius: 8, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, boxSizing: 'border-box' }} />
               </div>
               <div>
-                <label style={{ fontSize: 10, color: 'var(--text-dim)', display: 'block', marginBottom: 3 }}>Вес (кг)</label>
+                <label style={{ fontSize: 9, color: 'var(--text-dim)', display: 'block', marginBottom: 3 }}>Вес (кг)</label>
                 <input type="number" value={weight} onChange={(e) => setWeight(Number(e.target.value))}
-                  style={{ width: '100%', padding: '7px 10px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, boxSizing: 'border-box' }} />
+                  style={{ width: '100%', padding: '7px 10px', borderRadius: 8, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, boxSizing: 'border-box' }} />
               </div>
             </>
           ) : (
             <div style={{ gridColumn: '1 / -1' }}>
-              <label style={{ fontSize: 10, color: 'var(--text-dim)', display: 'block', marginBottom: 3 }}>Недельная доза (мг/нед)</label>
+              <label style={{ fontSize: 9, color: 'var(--text-dim)', display: 'block', marginBottom: 3 }}>Недельная доза (мг/нед)</label>
               <input type="number" value={weeklyMg} onChange={(e) => setWeeklyMg(Number(e.target.value))}
-                style={{ width: '100%', padding: '7px 10px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, boxSizing: 'border-box' }} />
+                style={{ width: '100%', padding: '7px 10px', borderRadius: 8, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, boxSizing: 'border-box' }} />
             </div>
           )}
           <div>
-            <label style={{ fontSize: 10, color: 'var(--text-dim)', display: 'block', marginBottom: 3 }}>Инъекций/нед</label>
+            <label style={{ fontSize: 9, color: 'var(--text-dim)', display: 'block', marginBottom: 3 }}>Инъекций/нед</label>
             <select value={injectionsPerWeek} onChange={(e) => setInjectionsPerWeek(Number(e.target.value))}
-              style={{ width: '100%', padding: '7px 10px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12 }}>
+              style={{ width: '100%', padding: '7px 10px', borderRadius: 8, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12 }}>
               {[1, 2, 3, 4, 5, 6, 7].map(v => <option key={v} value={v}>{v}x/нед</option>)}
             </select>
           </div>
           <div>
-            <label style={{ fontSize: 10, color: 'var(--text-dim)', display: 'block', marginBottom: 3 }}>Конц-ция (мг/мл)</label>
+            <label style={{ fontSize: 9, color: 'var(--text-dim)', display: 'block', marginBottom: 3 }}>Конц-ция (мг/мл)</label>
             <input type="number" value={concentration} onChange={(e) => setConcentration(Number(e.target.value))}
-              style={{ width: '100%', padding: '7px 10px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, boxSizing: 'border-box' }} />
+              style={{ width: '100%', padding: '7px 10px', borderRadius: 8, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, boxSizing: 'border-box' }} />
           </div>
           <div>
-            <label style={{ fontSize: 10, color: 'var(--text-dim)', display: 'block', marginBottom: 3 }}>Флакон (мл)</label>
+            <label style={{ fontSize: 9, color: 'var(--text-dim)', display: 'block', marginBottom: 3 }}>Флакон (мл)</label>
             <input type="number" value={vialMl} onChange={(e) => setVialMl(Number(e.target.value))}
-              style={{ width: '100%', padding: '7px 10px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, boxSizing: 'border-box' }} />
+              style={{ width: '100%', padding: '7px 10px', borderRadius: 8, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, boxSizing: 'border-box' }} />
           </div>
           <div>
-            <label style={{ fontSize: 10, color: 'var(--text-dim)', display: 'block', marginBottom: 3 }}>Шприц (мл)</label>
+            <label style={{ fontSize: 9, color: 'var(--text-dim)', display: 'block', marginBottom: 3 }}>Шприц (мл)</label>
             <select value={syringeMl} onChange={(e) => setSyringeMl(Number(e.target.value))}
-              style={{ width: '100%', padding: '7px 10px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12 }}>
+              style={{ width: '100%', padding: '7px 10px', borderRadius: 8, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12 }}>
               {[0.3, 0.5, 1, 3, 5, 10, 20].map(v => <option key={v} value={v}>{v} мл</option>)}
             </select>
           </div>
@@ -1072,55 +1213,62 @@ const DosageCalculatorTab: React.FC = () => {
       </div>
 
       {doseResult ? (
-        <div className="card">
+        <div style={{
+          background: 'var(--glass-bg)', border: '1px solid var(--glass-border)',
+          borderRadius: 12, padding: '14px 16px',
+        }}>
           <h3 style={{ margin: '0 0 12px 0', fontSize: 14, color: 'var(--accent)' }}>📋 Результат</h3>
           <div style={{ display: 'grid', gap: 8 }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
-              <div style={{ background: 'rgba(0,230,138,0.08)', borderRadius: 8, padding: 10, textAlign: 'center' }}>
-                <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 2 }}>Недельная доза</div>
-                <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--accent)' }}>{weeklyTotal.toFixed(0)}</div>
+              <div style={{ background: 'rgba(0,230,138,0.08)', borderRadius: 10, padding: '12px 10px', textAlign: 'center' }}>
+                <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 4 }}>Недельная доза</div>
+                <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--accent)' }}>{weeklyTotal.toFixed(0)}</div>
                 <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>мг/нед</div>
               </div>
-              <div style={{ background: 'rgba(0,230,138,0.08)', borderRadius: 8, padding: 10, textAlign: 'center' }}>
-                <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 2 }}>На инъекцию</div>
-                <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--accent)' }}>{perInjectionMg.toFixed(1)}</div>
+              <div style={{ background: 'rgba(0,230,138,0.08)', borderRadius: 10, padding: '12px 10px', textAlign: 'center' }}>
+                <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 4 }}>На инъекцию</div>
+                <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--accent)' }}>{perInjectionMg.toFixed(1)}</div>
                 <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>мг × {injectionsPerWeek}/нед</div>
               </div>
             </div>
-            <div style={{ background: 'rgba(0,230,138,0.08)', borderRadius: 8, padding: 12, textAlign: 'center' }}>
-              <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 2 }}>Объём инъекции</div>
-              <div style={{ fontSize: 28, fontWeight: 800, color: 'var(--accent)' }}>{doseResult.volumeMl}</div>
+            <div style={{ background: 'rgba(0,230,138,0.08)', borderRadius: 12, padding: '14px 12px', textAlign: 'center' }}>
+              <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 4 }}>Объём инъекции</div>
+              <div style={{ fontSize: 32, fontWeight: 800, color: 'var(--accent)' }}>{doseResult.volumeMl}</div>
               <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>мл</div>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
-              <div style={{ background: 'var(--bg-secondary)', borderRadius: 8, padding: '10px 12px', textAlign: 'center' }}>
+              <div style={{ background: 'var(--bg-secondary)', borderRadius: 10, padding: '12px', textAlign: 'center' }}>
                 <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 2 }}>Деления шприца</div>
                 <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--text)' }}>{doseResult.divisions}</div>
               </div>
-              <div style={{ background: 'var(--bg-secondary)', borderRadius: 8, padding: '10px 12px', textAlign: 'center' }}>
+              <div style={{ background: 'var(--bg-secondary)', borderRadius: 10, padding: '12px', textAlign: 'center' }}>
                 <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 2 }}>Доз/флакон</div>
                 <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--text)' }}>{doseResult.dosesPerVial || '—'}</div>
               </div>
-              <div style={{ background: 'var(--bg-secondary)', borderRadius: 8, padding: '10px 12px', textAlign: 'center' }}>
+              <div style={{ background: 'var(--bg-secondary)', borderRadius: 10, padding: '12px', textAlign: 'center' }}>
                 <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 2 }}>Отход/флакон</div>
                 <div style={{ fontSize: 20, fontWeight: 700, color: wastePerVial > 1 ? '#ff9800' : 'var(--text)' }}>{wastePerVial.toFixed(2)}</div>
                 <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>мл</div>
               </div>
             </div>
             {doseResult.flags.length > 0 && (
-              <div style={{ background: 'rgba(255,152,0,0.1)', borderRadius: 6, padding: '8px 10px', fontSize: 11, color: '#ff9800' }}>
+              <div style={{ background: 'rgba(255,152,0,0.12)', borderRadius: 8, padding: '8px 10px', fontSize: 11, color: '#ff9800' }}>
                 ⚠ {doseResult.flags.join(', ')}
               </div>
             )}
             {doseResult.flags.length === 0 && (
-              <div style={{ background: 'rgba(0,230,138,0.08)', borderRadius: 6, padding: '8px 10px', fontSize: 11, color: '#00e68a', textAlign: 'center' }}>
+              <div style={{ background: 'rgba(0,230,138,0.08)', borderRadius: 8, padding: '8px 10px', fontSize: 11, color: '#00e68a', textAlign: 'center' }}>
                 ✓ Готово к введению
               </div>
             )}
           </div>
         </div>
       ) : (
-        <div className="card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 200, color: 'var(--text-dim)', fontSize: 12 }}>
+        <div style={{
+          background: 'var(--glass-bg)', border: '1px solid var(--glass-border)',
+          borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center',
+          minHeight: 180, color: 'var(--text-dim)', fontSize: 12,
+        }}>
           <div style={{ textAlign: 'center' }}>
             <div style={{ fontSize: 32, marginBottom: 8 }}>💉</div>
             <div>Выберите препарат и дозировку,</div>
@@ -1141,13 +1289,25 @@ const DRUG_OPTIONS = Object.keys(DRUG_THRESHOLDS);
 const AndrogenicIndexCalculator: React.FC = () => {
   const [entries, setEntries] = useState<{ drug: string; doseMgWeek: number }[]>([{ drug: 'testosterone_enanthate', doseMgWeek: 300 }]);
   const [aiResult, setAiResult] = useState<number | null>(null);
+  const [aiSearch, setAiSearch] = useState('');
+  const [aiOpen, setAiOpen] = useState<number | null>(null);
+
+  const allAiDrugs = useMemo(() => {
+    return DRUG_OPTIONS.filter(d => PHARMA_DB[d]?.name && DRUG_THRESHOLDS[d]?.androgenicity);
+  }, []);
+
+  const aiFiltered = aiSearch
+    ? allAiDrugs.filter(d => PHARMA_DB[d]!.name.toLowerCase().includes(aiSearch.toLowerCase()))
+    : allAiDrugs;
 
   const addEntry = () => setEntries([...entries, { drug: 'testosterone_enanthate', doseMgWeek: 300 }]);
   const removeEntry = (i: number) => setEntries(entries.filter((_, idx) => idx !== i));
   const updateEntry = (i: number, field: 'drug' | 'doseMgWeek', val: string | number) => {
     const next = [...entries];
-    if (field === 'drug') next[i] = { ...next[i], drug: val as string };
-    else next[i] = { ...next[i], doseMgWeek: val as number };
+    if (field === 'drug') {
+      next[i] = { ...next[i], drug: val as string };
+      setAiOpen(null);
+    } else next[i] = { ...next[i], doseMgWeek: val as number };
     setEntries(next);
   };
 
@@ -1161,31 +1321,94 @@ const AndrogenicIndexCalculator: React.FC = () => {
   };
 
   return (
-    <div className="card" style={{ marginTop: 12 }}>
-      <h3 style={{ margin: '0 0 12px 0', fontSize: 14, color: 'var(--accent)' }}>📊 Андрогенный индекс стека</h3>
-      <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 8 }}>Σ (доза × AR_affinity / 100) — суммарная андрогенная нагрузка</div>
+    <div style={{
+      background: 'var(--glass-bg)', border: '1px solid var(--glass-border)',
+      borderRadius: 12, padding: '14px 16px', marginTop: 8,
+    }}>
+      <h3 style={{ margin: '0 0 4px 0', fontSize: 14, color: 'var(--accent)' }}>📊 Андрогенный индекс стека</h3>
+      <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 12, lineHeight: 1.4 }}>
+        Σ (доза × AR_affinity / 100) — суммарная андрогенная нагрузка всех препаратов
+      </div>
+
       {entries.map((entry, i) => (
-        <div key={i} style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 6 }}>
-          <select value={entry.drug} onChange={e => updateEntry(i, 'drug', e.target.value)}
-            style={{ flex: 1, padding: '6px 8px', borderRadius: 8, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 11 }}>
-            {DRUG_OPTIONS.filter(d => PHARMA_DB[d]?.name).map(d => <option key={d} value={d}>{PHARMA_DB[d]!.name}</option>)}
-          </select>
-          <input type="number" value={entry.doseMgWeek} onChange={e => updateEntry(i, 'doseMgWeek', +e.target.value)}
-            style={{ width: 80, padding: '6px 4px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 11 }} />
-          <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>мг/нед</span>
-          {entries.length > 1 && <button onClick={() => removeEntry(i)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: 14 }}>✕</button>}
+        <div key={i} style={{
+          background: 'var(--bg-secondary)', borderRadius: 10, padding: '10px 12px',
+          marginBottom: 8, border: '1px solid var(--border)',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+            <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-dim)', minWidth: 16 }}>#{i + 1}</span>
+            <div style={{ flex: 1, position: 'relative' }}>
+              {entry.drug && aiOpen !== i ? (
+                <div style={{
+                  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                  padding: '6px 10px', borderRadius: 8, cursor: 'pointer',
+                  background: 'rgba(0,230,138,0.1)', border: '1px solid rgba(0,230,138,0.3)',
+                }} onClick={() => { setAiOpen(i); setAiSearch(''); }}>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--accent)' }}>
+                    {PHARMA_DB[entry.drug]?.name || entry.drug}
+                  </span>
+                  <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>
+                    {DRUG_THRESHOLDS[entry.drug]?.androgenicity ? `${DRUG_THRESHOLDS[entry.drug].androgenicity}%` : ''} ▾
+                  </span>
+                </div>
+              ) : (
+                <div>
+                  <input type="text" value={aiSearch} onChange={e => setAiSearch(e.target.value)}
+                    placeholder="Поиск препарата..."
+                    style={{ width: '100%', padding: '6px 10px', borderRadius: 8, background: 'var(--bg-secondary)',
+                      border: '1px solid var(--border)', color: 'var(--text)', fontSize: 11, boxSizing: 'border-box' }}
+                    autoFocus />
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, maxHeight: 130, overflowY: 'auto', marginTop: 4 }}>
+                    {aiFiltered.slice(0, 30).map(d => (
+                      <div key={d} onClick={() => updateEntry(i, 'drug', d)} style={{
+                        padding: '4px 8px', borderRadius: 6, cursor: 'pointer', fontSize: 10,
+                        background: 'var(--bg-secondary)', border: '1px solid var(--border)',
+                      }}>
+                        {PHARMA_DB[d]!.name}
+                        <span style={{ marginLeft: 4, color: 'var(--text-dim)', fontSize: 9 }}>
+                          {DRUG_THRESHOLDS[d]?.androgenicity}%
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+            {entries.length > 1 && (
+              <button onClick={() => removeEntry(i)} style={{
+                width: 24, height: 24, borderRadius: 6, cursor: 'pointer', fontSize: 11,
+                background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', color: '#ef4444',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}>✕</button>
+            )}
+          </div>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <input type="number" value={entry.doseMgWeek} onChange={e => updateEntry(i, 'doseMgWeek', +e.target.value)}
+              style={{ flex: 1, padding: '6px 10px', borderRadius: 8, background: 'var(--bg-secondary)',
+                border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12,
+                boxSizing: 'border-box' }} />
+            <span style={{ fontSize: 10, color: 'var(--text-dim)', fontWeight: 600, whiteSpace: 'nowrap' }}>мг/нед</span>
+          </div>
         </div>
       ))}
-      <div style={{ display: 'flex', gap: 6 }}>
-        <button onClick={addEntry} style={{ flex: 1, padding: 6, borderRadius: 6, border: '1px dashed var(--accent)', background: 'transparent', color: 'var(--accent)', cursor: 'pointer', fontSize: 11 }}>+ Добавить препарат</button>
-        <button onClick={calcAI} style={{ flex: 1, padding: 6, borderRadius: 6, border: 'none', background: 'var(--accent)', color: '#000', fontWeight: 600, cursor: 'pointer', fontSize: 11 }}>Рассчитать</button>
+
+      <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
+        <button onClick={addEntry} style={{
+          flex: 1, padding: '7px 0', borderRadius: 8, cursor: 'pointer', fontSize: 11,
+          border: '1px dashed var(--accent)', background: 'transparent', color: 'var(--accent)',
+        }}>+ Добавить препарат</button>
+        <button onClick={calcAI} style={{
+          flex: 1, padding: '7px 0', borderRadius: 8, border: 'none',
+          background: 'linear-gradient(135deg, #00e68a, #00c853)', color: '#000', fontWeight: 700, cursor: 'pointer', fontSize: 11,
+        }}>Рассчитать</button>
       </div>
+
       {aiResult !== null && (
-        <div style={{ marginTop: 8, background: 'rgba(0,230,138,0.08)', borderRadius: 8, padding: 12, textAlign: 'center' }}>
-          <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Андрогенный индекс</div>
-          <div style={{ fontSize: 24, fontWeight: 800, color: aiResult > 3 ? '#ef4444' : aiResult > 1.5 ? '#f59e0b' : 'var(--accent)' }}>{aiResult.toFixed(2)}</div>
-          <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>
-            {aiResult > 3 ? 'Высокая андрогенная нагрузка' : aiResult > 1.5 ? 'Умеренная' : 'Низкая'}
+        <div style={{ marginTop: 10, background: 'rgba(0,230,138,0.08)', borderRadius: 12, padding: 14, textAlign: 'center' }}>
+          <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 4 }}>Андрогенный индекс стека</div>
+          <div style={{ fontSize: 28, fontWeight: 800, color: aiResult > 3 ? '#ef4444' : aiResult > 1.5 ? '#f59e0b' : 'var(--accent)' }}>{aiResult.toFixed(2)}</div>
+          <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 4 }}>
+            {aiResult > 3 ? '⚡ Высокая андрогенная нагрузка' : aiResult > 1.5 ? '⚠ Умеренная' : '✓ Низкая'}
           </div>
         </div>
       )}
@@ -1288,7 +1511,10 @@ const InteractionCheckerTab: React.FC = () => {
       </div>
 
       {interactSub === 'synergies' ? (
-        <div className="card">
+        <div style={{
+          background: 'var(--glass-bg)', border: '1px solid var(--glass-border)',
+          borderRadius: 12, padding: '14px 16px',
+        }}>
           <h3 style={{ margin: '0 0 4px 0', fontSize: 14, color: 'var(--accent)' }}>💥 Синергии и комбинации</h3>
           <p style={{ fontSize: 11, color: 'var(--text-dim)', margin: '0 0 12px 0' }}>
             Ключевые синергетические пары между фармакологическими препаратами
@@ -1312,8 +1538,9 @@ const InteractionCheckerTab: React.FC = () => {
               return (
                 <div key={i} style={{
                   background: synergyColors[pair.synergyType] || 'rgba(255,255,255,0.03)',
-                  borderRadius: 8, padding: '12px 14px',
+                  borderRadius: 10, padding: '12px 14px',
                   border: '1px solid ' + (synergyColorsText[pair.synergyType] || '#888') + '50',
+                  transition: 'all 0.15s',
                 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
                     <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 4,
@@ -1359,29 +1586,38 @@ const InteractionCheckerTab: React.FC = () => {
         </div>
       ) : (<>
       {/* Header */}
-      <div className="card" style={{ marginBottom: 12 }}>
+      <div style={{
+        background: 'var(--glass-bg)', border: '1px solid var(--glass-border)',
+        borderRadius: 12, padding: '14px 16px', marginBottom: 12,
+      }}>
         <h3 style={{ margin: '0 0 4px 0', fontSize: 14, color: 'var(--accent)' }}>⚡ Проверка взаимодействий</h3>
         <p style={{ fontSize: 11, color: 'var(--text-dim)', margin: 0 }}>Выберите 2+ препарата для анализа синергий и конфликтов</p>
       </div>
 
       {/* Drug selectors */}
-      <div className="card" style={{ marginBottom: 12 }}>
+      <div style={{
+        background: 'var(--glass-bg)', border: '1px solid var(--glass-border)',
+        borderRadius: 12, padding: '14px 16px', marginBottom: 12,
+      }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12 }}>
           {selectedIds.map((id, idx) => (
-            <div key={idx} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-              <div style={{ fontSize: 10, color: 'var(--text-dim)', minWidth: 18, fontWeight: 600 }}>#{idx + 1}</div>
+            <div key={idx} style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+              <div style={{ fontSize: 10, color: 'var(--text-dim)', minWidth: 18, fontWeight: 600, marginTop: 6 }}>#{idx + 1}</div>
               {id ? (
                 <div style={{
-                  flex: 1, padding: '8px 10px', borderRadius: 8, background: 'rgba(0,230,138,0.15)', border: '1px solid #00e68a',
+                  flex: 1, padding: '8px 10px', borderRadius: 8, background: 'rgba(0,230,138,0.12)',
+                  border: '1px solid rgba(0,230,138,0.3)',
                   display: 'flex', justifyContent: 'space-between', alignItems: 'center',
                 }}>
                   <div>
-                    <span style={{ fontSize: 12, fontWeight: 600, color: '#00e68a' }}>{PHARMA_DB[id]?.name || id}</span>
-                    <span style={{ fontSize: 10, color: 'var(--text-dim)', marginLeft: 6 }}>{id ? CLASS_LABELS[PHARMA_DB[id]?.class] || '' : ''}</span>
+                    <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--accent)' }}>{PHARMA_DB[id]?.name || id}</span>
+                    <span style={{ fontSize: 10, color: 'var(--text-dim)', marginLeft: 6 }}>
+                      {id && PHARMA_DB[id] ? CLASS_LABELS[PHARMA_DB[id]?.class as string] || '' : ''}
+                    </span>
                   </div>
                   <button onClick={() => updateDrug(idx, '')} style={{
                     padding: '2px 8px', borderRadius: 4, fontSize: 10, cursor: 'pointer',
-                    background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.3)', color: '#ef4444',
+                    background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.3)', color: '#ef4444',
                   }}>✕</button>
                 </div>
               ) : (
@@ -1389,10 +1625,11 @@ const InteractionCheckerTab: React.FC = () => {
                   <input
                     type="text" value={interactSearch}
                     onChange={(e) => setInteractSearch(e.target.value)}
-                    placeholder=""
-                    style={{ width: '100%', padding: '8px 10px', borderRadius: 8, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, boxSizing: 'border-box', marginBottom: 6 }}
+                    placeholder="Поиск препарата..."
+                    style={{ width: '100%', padding: '8px 10px', borderRadius: 8, background: 'var(--bg-secondary)',
+                      border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, boxSizing: 'border-box', marginBottom: 6 }}
                   />
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, maxHeight: 140, overflowY: 'auto' }}>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, maxHeight: 130, overflowY: 'auto' }}>
                     {unusedSubstances.map((s) => (
                       <div key={s.id} onClick={() => { updateDrug(idx, s.id); setInteractSearch(''); }} style={{
                         padding: '5px 8px', borderRadius: 6, cursor: 'pointer', fontSize: 11,
@@ -1407,13 +1644,12 @@ const InteractionCheckerTab: React.FC = () => {
                       <div style={{ fontSize: 11, color: 'var(--text-dim)', padding: 4 }}>Нет доступных препаратов</div>
                     )}
                   </div>
+                  {selectedIds.length > 2 && (
+                    <button onClick={() => removeDrug(idx)} style={{ marginTop: 4, padding: '3px 10px', borderRadius: 6, fontSize: 10, cursor: 'pointer', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', color: '#ef4444' }}>
+                      ✕ Удалить
+                    </button>
+                  )}
                 </div>
-              )}
-              {selectedIds.length > 2 && id === '' && (
-                <button onClick={() => removeDrug(idx)} style={{
-                  padding: '4px 10px', borderRadius: 6, fontSize: 11, cursor: 'pointer',
-                  background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', color: '#ef4444',
-                }}>✕</button>
               )}
             </div>
           ))}
@@ -1421,11 +1657,11 @@ const InteractionCheckerTab: React.FC = () => {
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           <button onClick={addDrug} style={{
             padding: '8px 16px', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: 'pointer',
-            background: 'rgba(0,230,138,0.1)', border: '1px solid rgba(0,230,138,0.3)', color: '#00e68a',
+            background: 'rgba(0,230,138,0.1)', border: '1px solid rgba(0,230,138,0.3)', color: 'var(--accent)',
           }}>+ Добавить препарат</button>
           {validIds.length >= 2 && (
             <div style={{ fontSize: 11, color: 'var(--text-dim)', marginLeft: 'auto' }}>
-              {validIds.length} препаратов | {doseMgWk} мг/нед
+              {validIds.length} препаратов
             </div>
           )}
         </div>
@@ -1433,7 +1669,10 @@ const InteractionCheckerTab: React.FC = () => {
 
       {/* No interaction message */}
       {validIds.length < 2 && (
-        <div className="card" style={{ textAlign: 'center', padding: '24px 16px' }}>
+        <div style={{
+          background: 'var(--glass-bg)', border: '1px solid var(--glass-border)',
+          borderRadius: 12, textAlign: 'center', padding: '24px 16px',
+        }}>
           <div style={{ fontSize: 28, marginBottom: 8 }}>⚡</div>
           <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>Выберите минимум 2 препарата для проверки взаимодействий</div>
         </div>
@@ -1441,23 +1680,28 @@ const InteractionCheckerTab: React.FC = () => {
 
       {/* No alerts found */}
       {alerts !== null && !hasAlerts && (
-        <div className="card" style={{ textAlign: 'center', padding: '16px', border: '1px solid rgba(0,230,138,0.3)', background: 'rgba(0,230,138,0.05)' }}>
+        <div style={{
+          border: '1px solid rgba(0,230,138,0.3)',
+          borderRadius: 12, textAlign: 'center', padding: '16px',
+          background: 'rgba(0,230,138,0.05)',
+        }}>
           <div style={{ fontSize: 11, color: '#4caf50', fontWeight: 600 }}>✓ Критических взаимодействий не обнаружено</div>
         </div>
       )}
 
       {/* Alerts */}
       {hasAlerts && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           <h4 style={{ margin: '0 0 4px 0', fontSize: 12, color: 'var(--text-dim)' }}>Обнаруженные взаимодействия ({alerts!.length})</h4>
           {alerts!.map((alert, i) => {
             const severityColor = SEVERITY_COLORS[alert.type] || '#666';
             const severityBg = `${severityColor}18`;
             return (
-              <div key={i} className="card" style={{
+              <div key={i} style={{
                 borderLeft: `4px solid ${severityColor}`,
-                fontSize: 12, padding: '12px 14px',
+                borderRadius: 12, fontSize: 12, padding: '12px 14px',
                 background: severityBg,
+                border: `1px solid ${severityColor}40`,
               }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                   <span style={{
@@ -1465,7 +1709,7 @@ const InteractionCheckerTab: React.FC = () => {
                     color: severityColor, padding: '3px 10px', borderRadius: 4,
                     background: `${severityColor}22`,
                   }}>
-                    {alert.type === 'critical' ? '' : alert.type === 'warning' ? '⚠ ПРЕДУПРЕЖДЕНИЕ' : 'ℹ ИНФО'}
+                    {alert.type === 'critical' ? '⚠ КРИТИЧЕСКОЕ' : alert.type === 'warning' ? '⚠ ПРЕДУПРЕЖДЕНИЕ' : 'ℹ ИНФО'}
                   </span>
                   <span style={{ color: 'var(--text-dim)', fontSize: 11, fontWeight: 500 }}>
                     {alert.drugs.join(' + ')}
@@ -1486,7 +1730,7 @@ const InteractionCheckerTab: React.FC = () => {
             <div style={{ marginTop: 8 }}>
               <h4 style={{ margin: '0 0 4px 0', fontSize: 11, color: '#8b5cf6' }}>💊 Поддержка: взаимодействия ({supportCrossAlerts.length})</h4>
               {supportCrossAlerts.map((inter, i) => (
-                <div key={i} style={{ padding: '6px 10px', marginBottom: 4, borderRadius: 6, fontSize: 10,
+                <div key={i} style={{ padding: '6px 10px', marginBottom: 4, borderRadius: 8, fontSize: 10,
                   background: inter.type === 'conflict' ? 'rgba(239,68,68,0.08)' : inter.type === 'caution' ? 'rgba(245,158,11,0.08)' : 'rgba(34,197,94,0.08)',
                   borderLeft: `3px solid ${inter.type === 'conflict' ? '#ef4444' : inter.type === 'caution' ? '#f59e0b' : '#22c55e'}`,
                 }}>
