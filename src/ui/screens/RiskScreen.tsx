@@ -350,7 +350,7 @@ export const RiskScreen: React.FC = () => {
         {v7Result ? <Risk3DModel result={v7Result} mcEnabled={mcEnabled} onToggleMC={toggleMC} organWeek={organWeek} onWeekChange={setOrganWeek} /> : <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-dim)' }}>Загрузка V7...</div>}
       </React.Suspense>;
       case 'dynamics': return weeklyDynamics ? <WeeklyRiskChart dynamics={weeklyDynamics} selectedWeek={selectedWeek} onWeekSelect={setSelectedWeek} mode={weekMode} onModeChange={setWeekMode} /> : <div style={{ textAlign:'center', padding:40, color:'var(--text-dim)' }}>Нет данных для динамики</div>;
-      case 'info': return <RiskInfo />;
+      case 'info': return <RiskInfo riskResult={riskResult} v7Result={v7Result} mdssResult={mdssResult} weeklyDynamics={weeklyDynamics} aggregatedRisk={aggregatedRisk} />;
       case 'mdss': return <MDSSRiskDisplay />;
       case 'compliance': return <ComplianceDisplay />;
       case 'clinical': return <ClinicalRiskDisplay />;

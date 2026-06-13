@@ -131,12 +131,94 @@ Hill-функция: H(x) = x^n / (EC50^n + x^n)
 Фармакокинетика: концентрации по дням для каждого препарата` },
 ];
 
-export const RiskInfo: React.FC = () => {
+export const RiskInfo: React.FC<{
+  riskResult?: any; v7Result?: any; mdssResult?: any;
+  weeklyDynamics?: any; aggregatedRisk?: any;
+}> = ({ riskResult, v7Result, mdssResult, weeklyDynamics, aggregatedRisk }) => {
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const toggle = (id: string) => setExpanded(s => ({ ...s, [id]: !s[id] }));
 
   return (
     <div>
+      {/* ─── REAL CALCULATION RESULTS ─── */}
+      <div style={{ padding:'8px 0' }}>
+        <span style={{ fontSize:16, fontWeight:700, color:'var(--accent)' }}>📊 Результаты расчётов</span>
+      </div>
+      <div style={{ display:'flex', flexWrap:'wrap', gap:6, marginBottom:16 }}>
+        {riskResult && (
+          <div style={{ flex:'1 1 45%', minWidth:120, padding:'10px 8px', borderRadius:12, textAlign:'center',
+            background:'rgba(0,230,138,0.08)', border:'1px solid rgba(0,230,138,0.2)',
+          }}>
+            <div style={{ fontSize:9, color:'var(--text-dim)' }}>Общий риск (raw)</div>
+            <div style={{ fontSize:22, fontWeight:800, color:riskResult.overallRaw >= 60 ? '#ef4444' : riskResult.overallRaw >= 30 ? '#f59e0b' : '#00e68a' }}>
+              {Math.round(riskResult.overallRaw)}%
+            </div>
+          </div>
+        )}
+        {riskResult && (
+          <div style={{ flex:'1 1 45%', minWidth:120, padding:'10px 8px', borderRadius:12, textAlign:'center',
+            background:'rgba(0,230,138,0.08)', border:'1px solid rgba(0,230,138,0.2)',
+          }}>
+            <div style={{ fontSize:9, color:'var(--text-dim)' }}>Чистый риск (net)</div>
+            <div style={{ fontSize:22, fontWeight:800, color:riskResult.overallNet >= 60 ? '#ef4444' : riskResult.overallNet >= 30 ? '#f59e0b' : '#00e68a' }}>
+              {Math.round(riskResult.overallNet)}%
+            </div>
+          </div>
+        )}
+        {v7Result && (
+          <>
+            <div style={{ flex:'1 1 45%', minWidth:120, padding:'10px 8px', borderRadius:12, textAlign:'center',
+              background:'rgba(139,92,246,0.1)', border:'1px solid rgba(139,92,246,0.2)',
+            }}>
+              <div style={{ fontSize:9, color:'var(--text-dim)' }}>V7 Monte Carlo</div>
+              <div style={{ fontSize:22, fontWeight:800, color:'#8b5cf6' }}>{Math.round(v7Result.globalRiskNet)}%</div>
+            </div>
+            <div style={{ flex:'1 1 45%', minWidth:120, padding:'10px 8px', borderRadius:12, textAlign:'center',
+              background:'rgba(249,115,22,0.1)', border:'1px solid rgba(249,115,22,0.2)',
+            }}>
+              <div style={{ fontSize:9, color:'var(--text-dim)' }}>MDSS</div>
+              <div style={{ fontSize:22, fontWeight:800, color:'#f97316' }}>{mdssResult ? `${Math.round(mdssResult.overallMaxRisk)}%` : '—'}</div>
+            </div>
+          </>
+        )}
+        {aggregatedRisk && (
+          <div style={{ flex:'1 1 100%', padding:'10px 8px', borderRadius:12, textAlign:'center',
+            background:'rgba(59,130,246,0.08)', border:'1px solid rgba(59,130,246,0.2)',
+          }}>
+            <div style={{ fontSize:9, color:'var(--text-dim)' }}>Агрегированный риск (фарма+анализы+тренировки+питание)</div>
+            <div style={{ fontSize:20, fontWeight:800, color:'#3b82f6' }}>{Math.round(aggregatedRisk)}%</div>
+          </div>
+        )}
+      </div>
+
+      {riskResult?.systemBreakdown && (
+        <div style={{ marginBottom:16, padding:'10px 12px', borderRadius:12,
+          background:'var(--glass-bg)', border:'1px solid var(--glass-border)',
+        }}>
+          <div style={{ fontSize:12, fontWeight:700, marginBottom:8, color:'var(--accent)' }}>По системам</div>
+          {Object.entries(riskResult.systemBreakdown).map(([sys, v]: [string, any]) => (
+            <div key={sys} style={{ marginBottom:4 }}>
+              <div style={{ display:'flex', justifyContent:'space-between', fontSize:11 }}>
+                <span>{sys}</span>
+                <span style={{ fontWeight:600, color:v.net >= 60 ? '#ef4444' : v.net >= 30 ? '#f59e0b' : '#00e68a' }}>{Math.round(v.net)}%</span>
+              </div>
+              <div style={{ height:4, borderRadius:2, background:'var(--border)', overflow:'hidden' }}>
+                <div style={{ height:'100%', width:`${v.net}%`, background:v.net >= 60 ? '#ef4444' : v.net >= 30 ? '#f59e0b' : '#00e68a', borderRadius:2 }} />
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {!riskResult && !v7Result && (
+        <div style={{ padding:20, textAlign:'center', color:'var(--text-dim)', fontSize:12, marginBottom:16,
+          background:'var(--glass-bg)', borderRadius:12, border:'1px solid var(--glass-border)',
+        }}>
+          Нет данных расчётов. Перейдите в «Комплексные расчёты» для генерации.
+        </div>
+      )}
+
+      {/* ─── REFERENCE INFO ─── */}
       <div style={{ padding:'8px 0' }}>
         <span style={{ fontSize:16, fontWeight:700 }}>ℹ️ Справочная информация</span>
       </div>

@@ -1613,7 +1613,8 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
             <div style={{ background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', borderRadius: 12, padding: '14px 16px' }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12 }}>
                 {(() => {
-                  const pharmaAll = Object.values(PHARMA_DB).filter((s): s is (typeof PHARMA_DB)[string] => !!s?.name);
+                  const PHARMA_CORE_FILTER = new Set(['testosterone','trenbolone','nandrolone','boldenone','primobolan','oral_17aa','sarm','drostanolone','dht_derivative','igf1','mgf','insulin','pct_serm','pct_aromatase','pct_dopamine','pct_gonadotropin']);
+                  const pharmaAll = Object.values(PHARMA_DB).filter((s): s is (typeof PHARMA_DB)[string] => !!s?.name && PHARMA_CORE_FILTER.has(s.class));
                   const pharmaFiltered = pharmaInteractSearch ? pharmaAll.filter(s => s.name.toLowerCase().includes(pharmaInteractSearch.toLowerCase())) : pharmaAll;
                   const pharmaValid = pharmaInteractIds.filter(Boolean);
                   return (

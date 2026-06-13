@@ -130,6 +130,7 @@ export const PharmaScreen: React.FC = () => {
   const [page, setPage] = useState<PharmaPage>('main');
   const [subTab, setSubTab] = useState<SubTab>('catalog');
   const [courseSub, setCourseSub] = useState<'course' | 'mapper' | 'diagnostics'>('course');
+  const linked = useDataLink();
 
   // Filter to show only pharma substances (exclude support classes)
   const pharmaSubstances = useMemo(() => {
@@ -182,6 +183,36 @@ export const PharmaScreen: React.FC = () => {
         padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', flexShrink:0, marginBottom:6,
         background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600,
       }}>← Назад</button>
+
+      {/* ─── INFO: calculation summary dashboard ─── */}
+      {page === 'info' && (
+        <div style={{ marginBottom:10, padding:'10px 12px', borderRadius:12,
+          background:'var(--glass-bg)', border:'1px solid var(--glass-border)',
+        }}>
+          <div style={{ fontSize:12, fontWeight:700, color:'var(--accent)', marginBottom:8 }}>📊 Сводка расчётов</div>
+          <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
+            <div style={{ flex:'1 1 45%', minWidth:90, padding:'8px 6px', borderRadius:8, textAlign:'center',
+              background:'rgba(0,230,138,0.08)',
+            }}>
+              <div style={{ fontSize:8, color:'var(--text-dim)' }}>Препаратов в курсе</div>
+              <div style={{ fontSize:18, fontWeight:800 }}>{linked.course.length}</div>
+            </div>
+            <div style={{ flex:'1 1 45%', minWidth:90, padding:'8px 6px', borderRadius:8, textAlign:'center',
+              background:'rgba(0,230,138,0.08)',
+            }}>
+              <div style={{ fontSize:8, color:'var(--text-dim)' }}>Общий риск</div>
+              <div style={{ fontSize:18, fontWeight:800, color: (linked.risk?.overallNet ?? 0) >= 60 ? '#ef4444' : (linked.risk?.overallNet ?? 0) >= 30 ? '#f59e0b' : '#00e68a' }}>
+                {linked.risk ? `${Math.round(linked.risk.overallNet)}%` : '—'}
+              </div>
+            </div>
+          </div>
+          {Object.keys(linked.activeDrugs).length > 0 && (
+            <div style={{ marginTop:6, fontSize:10, color:'var(--text-dim)' }}>
+              Активные вещества: {Object.keys(linked.activeDrugs).map(d => PHARMA_DB[d]?.name || d).join(', ')}
+            </div>
+          )}
+        </div>
+      )}
       <div style={{ display:'flex', gap:4, overflowX:'auto', marginBottom:8, scrollbarWidth:'none' }}>
         {page === 'course' && (['course','mapper','diagnostics'] as const).map(t => (
           <button key={t} onClick={() => setCourseSub(t)} style={{
