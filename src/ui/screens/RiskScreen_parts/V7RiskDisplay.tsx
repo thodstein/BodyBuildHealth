@@ -69,7 +69,8 @@ export const V7RiskDisplay: React.FC<{
   onWeekChange?: (w: number) => void;
   mcEnabled?: boolean;
   onToggleMC?: () => void;
-}> = ({ result, organWeek: externalWeek, onWeekChange: externalWeekChange, mcEnabled: externalMc, onToggleMC: externalToggleMc }) => {
+  forcedTab?: string;
+}> = ({ result, organWeek: externalWeek, onWeekChange: externalWeekChange, mcEnabled: externalMc, onToggleMC: externalToggleMc, forcedTab }) => {
   const [expandedOrgan, setExpandedOrgan] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<string>('organs');
   const [selectedDay, setSelectedDay] = useState<number>(42);
@@ -904,8 +905,15 @@ export const V7RiskDisplay: React.FC<{
     </div>
   ) : <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-dim)' }}>Нет данных PK. Добавьте препараты в курс.</div>;
 
+  // Map user-facing page names to V7 internal tab names
+  const tabMap: Record<string, string> = {
+    organs: 'organs', dynamics: 'timeseries', sensitivity: 'sensitivity', pk: 'pk',
+  };
+  const effectiveTab = forcedTab ? (tabMap[forcedTab] || 'organs') : activeTab;
+
   return (
     <div style={{ padding: '0 0 80px 0' }}>
+      {/* MC toggle bar — always show */}
       <div style={{ marginBottom:10, padding:12, borderRadius:16, background:'var(--glass-bg)', border:'1px solid var(--glass-border)', display:'flex', alignItems:'center', gap:12, flexWrap:'wrap' }}>
         <div style={{ flex:1, minWidth:200 }}>
           <div style={{ fontSize:13, fontWeight:700, color:'var(--accent)' }}>🎲 Монте-Карло моделирование</div>
@@ -915,11 +923,24 @@ export const V7RiskDisplay: React.FC<{
         </div>
         <button onClick={toggleMC} style={{ padding:'8px 20px', borderRadius:20, fontSize:12, fontWeight:700, cursor:'pointer', whiteSpace:'nowrap', background:mcEnabled?'linear-gradient(135deg,#8b5cf6,#6d28d9)':'var(--bg-secondary)', border:mcEnabled?'1px solid #8b5cf6':'1px solid var(--border)', color:mcEnabled?'#fff':'var(--text-dim)', boxShadow:mcEnabled?'0 0 16px rgba(139,92,246,0.35)':'none', transition:'all 0.3s' }}>🎲 МК: {mcEnabled?'ВКЛ':'ВЫКЛ'}</button>
       </div>
-      {activeTab === 'organs' && renderOrgans()}
-      {activeTab === 'matrix' && renderMatrix()}
-      {activeTab === 'timeseries' && renderTimeSeries()}
-      {activeTab === 'sensitivity' && renderSensitivity()}
-      {activeTab === 'pk' && pkContent}
+      {/* Tab bar — only when forcedTab is not provided */}
+      {!forcedTab && (
+        <div style={{ display:'flex', gap:4, overflowX:'auto', marginBottom:10, scrollbarWidth:'none', paddingBottom:2 }}>
+          {tabs.map(t => (
+            <button key={t.id} onClick={() => setActiveTab(t.id)} style={{
+              padding:'6px 14px', borderRadius:16, fontSize:11, fontWeight:600, whiteSpace:'nowrap', cursor:'pointer', flexShrink:0,
+              background: activeTab === t.id ? 'var(--accent)' : 'var(--bg-secondary)',
+              color: activeTab === t.id ? '#000' : 'var(--text-dim)',
+              border: `1px solid ${activeTab === t.id ? 'var(--accent)' : 'var(--border)'}`,
+            }}>{t.label}</button>
+          ))}
+        </div>
+      )}
+      {effectiveTab === 'organs' && renderOrgans()}
+      {effectiveTab === 'matrix' && renderMatrix()}
+      {effectiveTab === 'timeseries' && renderTimeSeries()}
+      {effectiveTab === 'sensitivity' && renderSensitivity()}
+      {effectiveTab === 'pk' && pkContent}
     </div>
   );
 };

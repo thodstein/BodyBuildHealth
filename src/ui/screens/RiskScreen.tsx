@@ -1,7 +1,7 @@
 ﻿import React, { useState, useMemo, useEffect } from 'react';
 import { RISK_SYSTEMS, ALL_RISK_SYSTEMS, SUBSYSTEM_MAP, SUBSYSTEM_PARENT, DRUG_THRESHOLDS, SUPPORT_BASE_COVERAGE, UCUM_MAP } from '../../core/constants';
 import { PHARMA_DB } from '../../core/pharma-database';
-import { SYSTEM_INFO, MECHANISM_INFO, SYSTEM_ORGANS } from '../../core/risk-info';
+import { SYSTEM_INFO, SYSTEM_INFO_ALL, MECHANISM_INFO, SYSTEM_ORGANS } from '../../core/risk-info';
 import type { RiskResult, MechanismCell, LabPoint, CourseEntry } from '../../core/types';
 import { calculateRisks, calculateAggregatedRisks, type AggregatedRisk } from '../../engines/risk.engine';
 import { calculateRiskFromAnalyses } from '../../engines/risk-calculator-v2.engine';
@@ -284,9 +284,13 @@ export const RiskScreen: React.FC = () => {
 
   useEffect(() => {
     if (riskResult) {
-      saveRiskHistory({ date: new Date().toISOString().split('T')[0], overallRaw: riskResult.overallRaw, overallNet: riskResult.overallNet });
+      const today = new Date().toISOString().split('T')[0];
+      const existing = loadRiskHistory();
+      if (!existing.some(h => h.date === today)) {
+        saveRiskHistory({ date: today, overallRaw: riskResult.overallRaw, overallNet: riskResult.overallNet });
+      }
     }
-  }, [riskResult?.overallRaw, riskResult?.overallNet]);
+  }, [tick, riskResult]);
 
   function applyPenaltyToResult(result: RiskResult): RiskResult {
     const phase = linked.profile?.settings?.phase || 'baseline';
@@ -470,7 +474,7 @@ export const RiskScreen: React.FC = () => {
     // ── Key Risks page ──
     if (basicPage === 'key_risks') {
       const sorted = ALL_RISK_SYSTEMS.map(sys => ({
-        sys, label: SYSTEM_INFO[sys]?.label || sys,
+        sys, label: SYSTEM_INFO[sys]?.label || SYSTEM_INFO_ALL[sys]?.label || sys,
         raw: riskResult.systemBreakdown?.[sys]?.raw ?? 0,
         net: riskResult.systemBreakdown?.[sys]?.net ?? 0,
       })).sort((a, b) => b.net - a.net);
@@ -499,9 +503,20 @@ export const RiskScreen: React.FC = () => {
 
     // ── History + Drug Thresholds page ──
     if (basicPage === 'history') {
+      // All pharmacology EXCEPT support supplements
+      const SUPPORT_IDS = new Set([
+        'telmi','nebivolol','nac','tudca','omega3','magnesium','berberine','aspirin',
+        'milk_thistle','curcumin_sup','alpha_lipoic','coq10','phosphatidylcholine',
+        'ashwagandha','tongkat_ali','fadogia','shilajit','ginseng_sup','saw_palmetto',
+        'probiotics_sup','taurine_sup','vitamin_d3','vitamin_k2','zinc_sup','boron',
+        'selenium_sup','vitamin_b6','vitamin_b12','folate',
+      ]);
       const drugEntries = Object.entries(DRUG_THRESHOLDS)
-        .filter(([k]) => !k.includes('_'))
-        .map(([k, v]) => ({ id: k, ...v }))
+        .filter(([k]) => !SUPPORT_IDS.has(k))
+        .map(([k, v]) => ({ id: k, name: PHARMA_DB[k]?.name || k, dosePerWeek: v.dosePerWeek, androgenicity: v.androgenicity }));
+      // Dedup by name (keep first)
+      const seen = new Set<string>();
+      const deduped = drugEntries.filter(d => { if (seen.has(d.name)) return false; seen.add(d.name); return true; })
         .sort((a, b) => b.androgenicity - a.androgenicity);
       return (
         <div>
@@ -512,7 +527,7 @@ export const RiskScreen: React.FC = () => {
               <div style={{ fontSize:10, color:'var(--text-dim)', textAlign:'center', padding:10 }}>Нет сохранённой истории</div>
             ) : (
               <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
-                {riskHistory.slice(-8).reverse().map((h: any, i: number) => (
+                {riskHistory.map((h: any, i: number) => (
                   <div key={i} style={{ display:'flex', justifyContent:'space-between', padding:'4px 8px', borderRadius:4, background:'var(--bg-secondary)', fontSize:10 }}>
                     <span style={{ color:'var(--text-dim)' }}>{h.date}</span>
                     <span style={{ color:getRiskColor(h.overallNet), fontWeight:600 }}>Net: {Math.round(h.overallNet)}%</span>
@@ -523,22 +538,20 @@ export const RiskScreen: React.FC = () => {
             )}
           </div>
 
-          {/* Drug Thresholds — ALL pharmacology in Russian */}
+          {/* Drug Thresholds — only AAS/GH/Insulin, Russian names, no duplicates */}
           <div className="card" style={{ marginBottom:10, padding:12 }}>
-            <div style={{ fontSize:12, fontWeight:700, color:'var(--accent)', marginBottom:8 }}>💊 Пороги препаратов (вся фармакология)</div>
+            <div style={{ fontSize:12, fontWeight:700, color:'var(--accent)', marginBottom:8 }}>💊 Препараты и пороги (ААС, ГР, инсулины)</div>
             <div style={{ display:'grid', gap:6 }}>
-              {drugEntries.map(d => {
-                const pharma = PHARMA_DB[d.id];
-                const name = pharma?.name || d.id;
+              {deduped.map(d => {
                 const anColor = d.androgenicity < 0.3 ? '#22c55e' : d.androgenicity < 0.7 ? '#eab308' : d.androgenicity < 1.2 ? '#f97316' : '#ef4444';
                 return (
                   <div key={d.id} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'6px 10px', borderRadius:8, background:'var(--bg-secondary)', border:'1px solid var(--border)' }}>
                     <div style={{ flex:1 }}>
-                      <div style={{ fontSize:11, fontWeight:600, color:'var(--text)' }}>{name}</div>
-                      <div style={{ fontSize:9, color:'var(--text-dim)' }}>доза/нед: {d.dosePerWeek}</div>
+                      <div style={{ fontSize:11, fontWeight:600, color:'var(--text)' }}>{d.name}</div>
+                      <div style={{ fontSize:9, color:'var(--text-dim)' }}>{d.dosePerWeek}/нед</div>
                     </div>
                     <div style={{ textAlign:'right' }}>
-                      <div style={{ fontSize:9, color:'var(--text-dim)' }}>Андрогенность</div>
+                      <div style={{ fontSize:9, color:'var(--text-dim)' }}>Андрог.</div>
                       <div style={{ fontSize:14, fontWeight:700, color:anColor }}>{d.androgenicity.toFixed(1)}</div>
                     </div>
                   </div>
@@ -613,8 +626,9 @@ export const RiskScreen: React.FC = () => {
       );
     }
 
-    // Sub-pages: render V7RiskDisplay with appropriate section
-    return <V7RiskDisplay result={v7Result} organWeek={organWeek} onWeekChange={setOrganWeek} mcEnabled={mcEnabled} onToggleMC={toggleMC} />;
+    // Sub-pages: render V7RiskDisplay with forcedTab for specific content
+    const tabForPage: Record<string, string> = { organs:'organs', dynamics:'dynamics', sensitivity:'sensitivity', pk:'pk' };
+    return <V7RiskDisplay result={v7Result} organWeek={organWeek} onWeekChange={setOrganWeek} mcEnabled={mcEnabled} onToggleMC={toggleMC} forcedTab={tabForPage[mcPage] || ''} />;
   };
 
   const mainTabLabel = mainTab === 'calculations' ? 'Комплексные расчеты' :
@@ -672,18 +686,13 @@ export const RiskScreen: React.FC = () => {
 
       {/* ─── SCROLLABLE CONTENT ─── */}
       {mainTab !== 'hero' && (
-        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', position: 'relative' }}>
-          {/* Background image for calc sub-hero */}
-          {mainTab==='calculations' && calcPage==='hero' && (
-            <img src="/calc-hero.png" alt="" style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'cover', opacity:0.25, pointerEvents:'none' }} />
-          )}
-          <div style={{ position:'relative', zIndex:1, padding:'0 12px 70px' }}>
+        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '0 0 70px' }}>
+          <div style={{ padding:'0 12px' }}>
 
           {/* ───── COMPLEX CALCULATIONS SUB-HERO ───── */}
           {mainTab === 'calculations' && calcPage === 'hero' && (
-            <div style={{ position:'relative', padding:12, borderRadius:16, overflow:'hidden', border:'1px solid var(--border)' }}>
-              <img src="/calc-hero.png" alt="" style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'cover', opacity:0.18, pointerEvents:'none' }} />
-              <div style={{ position:'relative', zIndex:1 }}>
+            <div style={{ padding:12, borderRadius:16, border:'1px solid var(--border)' }}>
+              <div style={{ position:'relative' }}>
               {/* Summary card */}
               <div style={{ marginTop: 10, padding: 14, borderRadius: 16, background: 'var(--glass-bg)', border: '1px solid var(--glass-border)' }}>
                 <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--accent)', marginBottom: 10, textAlign: 'center' }}>

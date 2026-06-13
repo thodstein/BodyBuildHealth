@@ -1,13 +1,13 @@
 ﻿import React, { useState } from 'react';
 import { SYSTEM_MECHANISMS } from '../../../core/system-mechanisms';
-import { SYSTEM_INFO, MECHANISM_INFO, SYSTEM_ORGANS } from '../../../core/risk-info';
+import { SYSTEM_INFO, SYSTEM_INFO_ALL, MECHANISM_INFO, SYSTEM_ORGANS } from '../../../core/risk-info';
 import { PHARMA_DB } from '../../../core/pharma-database';
 import { RISK_SYSTEMS, ALL_RISK_SYSTEMS } from '../../../core/constants';
 import type { RiskResult } from '../../../core/types';
 import { getRiskColor } from '../../../core/utils/risk-colors';
 
 function getSystemIcon(sys: string): string { return SYSTEM_INFO[sys]?.icon || '⚠️'; }
-function getSystemLabel(sys: string): string { return SYSTEM_INFO[sys]?.label || sys; }
+function getSystemLabel(sys: string): string { return SYSTEM_INFO[sys]?.label || SYSTEM_INFO_ALL[sys]?.label || sys; }
 
 const SYSTEM_ICONS: Record<string, string> = {
   cardio:'❤️', hepatic:'🫁', renal:'🫘', neuro:'🧠', endocrine:'⚖️', hematologic:'🩸',
