@@ -32,6 +32,7 @@ import { fuseDecisions, shouldTrainToday, type FusedDecision } from '../../engin
 import { optimizeStack, type StackInput as OptStackInput } from '../../engines/supplement-optimizer.engine';
 import { generateStack, selectBestStack, type StackResult } from '../../engines/stack-builder.engine';
 import { ReportEngine, type ReportInput } from '../../engines/report-engine';
+import { checkDrugInteractions } from '../../engines/pharma-interactions.engine';
 import type { CourseEntry } from '../../core/types';
 
 type SupportTab = 'catalog' | 'synergies' | 'calculator' | 'interactions' | 'protocol' | 'stacks' | 'peptides' | 'recs' | 'fertility-pct';
@@ -694,9 +695,12 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   useEffect(() => { if (supportDrugs.length > 0) calcSupport(); }, [supportDrugs, supportGoal, supportLevel]);
 
   // Interaction checker state
+  const [interactTab, setInteractTab] = useState<'support' | 'pharma'>('support');
   const [interactionIds, setInteractionIds] = useState<string[]>(['', '']);
   const [interactionSearch, setInteractionSearch] = useState('');
   const [interactionSearchIdx, setInteractionSearchIdx] = useState<number>(0);
+  const [pharmaInteractIds, setPharmaInteractIds] = useState<string[]>(['', '']);
+  const [pharmaInteractSearch, setPharmaInteractSearch] = useState('');
 
   // Combine SUPPLEMENT_DESCRIPTIONS with support substances from PHARMA_DB
   const supplementList = useMemo(() => {
@@ -1480,13 +1484,32 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
       {/* ===== INTERACTIONS ===== */}
       {tab === 'interactions' && (
         <div>
-          <div className="card" style={{ marginBottom: 12 }}>
+          <div style={{ display:'flex', gap:4, marginBottom:8 }}>
+            {(['support','pharma'] as const).map(t => (
+              <button key={t} onClick={() => setInteractTab(t)} style={{
+                padding:'6px 14px', borderRadius:16, fontSize:11, fontWeight:600, whiteSpace:'nowrap',
+                cursor:'pointer',
+                background: interactTab === t ? 'var(--accent)' : 'var(--bg-secondary)',
+                color: interactTab === t ? '#000' : 'var(--text-dim)',
+                border: `1px solid ${interactTab === t ? 'var(--accent)' : 'var(--border)'}`,
+              }}>{t === 'support' ? '💊 Поддержка' : '💉 Фарма'}</button>
+            ))}
+          </div>
+
+          {interactTab === 'support' ? (<>
+          <div style={{
+            background: 'var(--glass-bg)', border: '1px solid var(--glass-border)',
+            borderRadius: 12, padding: '14px 16px', marginBottom: 12,
+          }}>
             <h3 style={{ margin: '0 0 4px 0', fontSize: 14, color: 'var(--accent)' }}>⚡ Взаимодействия поддержки</h3>
             <p style={{ fontSize: 11, color: 'var(--text-dim)', margin: '0 0 12px 0' }}>
               Проверка синергий и конфликтов между препаратами поддержки и БАДами
             </p>
           </div>
-          <div className="card" style={{ marginBottom: 12 }}>
+          <div style={{
+            background: 'var(--glass-bg)', border: '1px solid var(--glass-border)',
+            borderRadius: 12, padding: '14px 16px', marginBottom: 12,
+          }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12 }}>
               {interactionIds.map((id, idx) => (
                 <div key={idx} style={{ display: 'flex', gap: 8, alignItems: 'flex-start', flexDirection: 'column' }}>
@@ -1571,7 +1594,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
               {supportCautions.length > 0 && (
                 <div className="card">
                   <h4 style={{ margin: '0 0 8px 0', fontSize: 12, color: '#ff9800' }}>⚡ Осторожность ({supportCautions.length})</h4>
-                  {supportCautions.map(i => (
+              {supportCautions.map(i => (
                     <div key={i.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', borderBottom: '1px solid var(--border)', fontSize: 11, color: 'var(--text-light)' }}>
                       <span style={{ color: '#ff9800', fontWeight: 600 }}>{i.substanceA} + {i.substanceB}</span>
                       <span>{i.notes}</span>
@@ -1580,7 +1603,66 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
                 </div>
               )}
             </div>
-          )}
+          )}</>) : (
+          /* ─── PHARMA INTERACTIONS ─── */
+          <div>
+            <div style={{ background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', borderRadius: 12, padding: '14px 16px', marginBottom: 12 }}>
+              <h3 style={{ margin: '0 0 4px 0', fontSize: 14, color: 'var(--accent)' }}>💉 Взаимодействия фармы</h3>
+              <p style={{ fontSize: 11, color: 'var(--text-dim)', margin: 0 }}>Проверка синергий и конфликтов между фармакологическими препаратами</p>
+            </div>
+            <div style={{ background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', borderRadius: 12, padding: '14px 16px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12 }}>
+                {(() => {
+                  const pharmaAll = Object.values(PHARMA_DB).filter((s): s is (typeof PHARMA_DB)[string] => !!s?.name);
+                  const pharmaFiltered = pharmaInteractSearch ? pharmaAll.filter(s => s.name.toLowerCase().includes(pharmaInteractSearch.toLowerCase())) : pharmaAll;
+                  const pharmaValid = pharmaInteractIds.filter(Boolean);
+                  return (
+                    <>
+                      {pharmaInteractIds.map((id, idx) => (
+                        <div key={idx} style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+                          <div style={{ fontSize: 10, color: 'var(--text-dim)', minWidth: 18, fontWeight: 600, marginTop: 8 }}>#{idx + 1}</div>
+                          <div style={{ flex: 1, position:'relative' }}>
+                            <input type="text" value={id ? (PHARMA_DB[id]?.name || '') : pharmaInteractSearch} onChange={e => { setPharmaInteractSearch(e.target.value); if (!e.target.value) { const next = [...pharmaInteractIds]; next[idx] = ''; setPharmaInteractIds(next); }}} placeholder="🔍 Поиск..." style={{ width:'100%', padding:'8px 10px', borderRadius:8, background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text)', fontSize:12, boxSizing:'border-box' }} />
+                            {!id && pharmaInteractSearch && (
+                              <div style={{ position:'absolute', zIndex:10, background:'var(--bg)', border:'1px solid var(--border)', borderRadius:8, maxHeight:140, overflowY:'auto', marginTop:2, width:'calc(100% - 2px)' }}>
+                                {pharmaFiltered.map(s => (
+                                  <div key={s.id} onClick={() => { const next = [...pharmaInteractIds]; next[idx] = s.id; setPharmaInteractIds(next); setPharmaInteractSearch(''); }} style={{ padding:'6px 10px', cursor:'pointer', fontSize:11, borderBottom:'1px solid var(--border)' }}>
+                                    <span style={{ fontWeight:600 }}>{s.name}</span>
+                                    <span style={{ marginLeft:6, color:'var(--text-dim)', fontSize:9 }}>{s.class}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                          {pharmaInteractIds.length > 2 && <button onClick={() => setPharmaInteractIds(pharmaInteractIds.filter((_, ix) => ix !== idx))} style={{ padding:'4px 8px', borderRadius:6, fontSize:11, cursor:'pointer', background:'rgba(239,68,68,0.1)', border:'1px solid rgba(239,68,68,0.3)', color:'#ef4444', marginTop:4 }}>✕</button>}
+                        </div>
+                      ))}
+                      <button onClick={() => setPharmaInteractIds([...pharmaInteractIds, ''])} style={{ padding:'8px 16px', borderRadius:8, fontSize:11, fontWeight:600, cursor:'pointer', background:'rgba(0,230,138,0.1)', border:'1px solid rgba(0,230,138,0.3)', color:'#00e68a' }}>+ Добавить препарат</button>
+                      {pharmaValid.length >= 2 && (
+                        <div style={{ marginTop: 8 }}>
+                          {checkDrugInteractions(pharmaValid.map((id, i) => ({ id: `${id}-${i}`, substanceId: id, doseValue: 300, doseUnit: 'mg/wk', frequency: '2x/week', startWeek: 0, endWeek: 12 }))).map((alert, i) => {
+                            const c = alert.type === 'critical' ? '#ff1744' : alert.type === 'warning' ? '#ff9100' : '#2979ff';
+                            return <div key={i} style={{ borderLeft:`4px solid ${c}`, borderRadius:8, padding:'10px 12px', marginBottom:6, background:`${c}18`, border:`1px solid ${c}40` }}>
+                              <div style={{ fontWeight:700, fontSize:10, color:c, marginBottom:4 }}>{alert.type === 'critical' ? '⚠ КРИТИЧЕСКОЕ' : alert.type === 'warning' ? '⚠ ПРЕДУПРЕЖДЕНИЕ' : 'ℹ ИНФО'}</div>
+                              <div style={{ fontSize:11, color:'var(--text)', marginBottom:4 }}>{alert.drugs.join(' + ')}</div>
+                              <div style={{ fontSize:10, color:'var(--text-dim)' }}><b>Механизм:</b> {alert.mechanism}</div>
+                              <div style={{ fontSize:10, color:'var(--text-dim)' }}><b>Рекомендация:</b> {alert.recommendation}</div>
+                            </div>;
+                          })}
+                        </div>
+                      )}
+                      {pharmaValid.length >= 2 && checkDrugInteractions(pharmaValid.map((id, i) => ({ id: `${id}-${i}`, substanceId: id, doseValue: 300, doseUnit: 'mg/wk', frequency: '2x/week', startWeek: 0, endWeek: 12 }))).length === 0 && (
+                        <div style={{ marginTop:8, padding:'12px', borderRadius:8, background:'rgba(0,230,138,0.08)', textAlign:'center' }}>
+                          <span style={{ fontSize:11, color:'#4caf50', fontWeight:600 }}>✓ Критических взаимодействий не обнаружено</span>
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
+              </div>
+            </div>
+          </div>
+        )}
         </div>
       )}
 

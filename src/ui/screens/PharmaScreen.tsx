@@ -110,10 +110,19 @@ const PHARMA_CLASSES = [
   'peptide_nootropic', 'dht_derivative'
 ] as const;
 
+// Core pharma classes for synergies (exclude support/vitamins)
+const PHARMA_CORE_CLASSES = [
+  'testosterone', 'trenbolone', 'nandrolone', 'boldenone', 'primobolan', 'oral_17aa',
+  'sarm', 'peptide_ghrh', 'peptide_ghrp', 'igf1', 'mgf', 'insulin', 'pct_serm',
+  'pct_aromatase', 'pct_dopamine', 'pct_gonadotropin', 'drostanolone', 'peptide_gnrh',
+  'peptide_fat_loss', 'peptide_other', 'peptide_regenerative', 'peptide_immune',
+  'peptide_nootropic', 'dht_derivative'
+] as const;
+
 type PharmaClass = typeof PHARMA_CLASSES[number];
 
 type PharmaPage = 'main' | 'course' | 'calculators' | 'info';
-type SubTab = 'catalog' | 'pkpd' | 'dosage' | 'interactions';
+type SubTab = 'catalog' | 'pkpd' | 'dosage' | 'interactions' | 'androgen' | 'course-risk' | 'synergies';
 
 export const PharmaScreen: React.FC = () => {
   const [page, setPage] = useState<PharmaPage>('main');
@@ -135,7 +144,14 @@ export const PharmaScreen: React.FC = () => {
     ];
     return (
       <div className="screen pharma" style={{ padding: 0 }}>
-        <img src="./pharma-hero.png" alt="" style={{ width:'100%', height:'auto', maxHeight:'30vh', objectFit:'contain', display:'block', borderRadius:0, background:'var(--bg-secondary)' }} />
+        <div style={{ width:'100%', height:'35vh', position:'relative', backgroundImage:'url(./pharma-hero.png)', backgroundSize:'cover', backgroundPosition:'center', backgroundRepeat:'no-repeat' }}>
+          <div style={{ position:'absolute', bottom:10, left:16, right:16 }}>
+            <h1 style={{ fontSize:20, fontWeight:800, color:'#fff', margin:'0 0 2px', textShadow:'0 2px 12px rgba(0,0,0,0.8)' }}>Фармакология</h1>
+            <p style={{ fontSize:11, color:'rgba(255,255,255,0.85)', margin:0, lineHeight:1.3, textShadow:'0 1px 6px rgba(0,0,0,0.7)' }}>
+              Курс, PK/PD симуляция, каталог веществ и проверка взаимодействий
+            </p>
+          </div>
+        </div>
         <div style={{ padding:'12px', display:'flex', flexDirection:'column', gap:8 }}>
           {cards.map(c => (
             <button key={c.key} onClick={() => setPage(c.key)} style={{
@@ -182,14 +198,14 @@ export const PharmaScreen: React.FC = () => {
             border: `1px solid ${subTab === t ? 'var(--accent)' : 'var(--border)'}`,
           }}>{t === 'pkpd' ? '⚙️ PK/PD' : '💊 Дозировки'}</button>
         ))}
-        {page === 'info' && (['catalog','interactions'] as const).map(t => (
+        {page === 'info' && (['catalog','interactions','pkpd','dosage','course-risk'] as const).map(t => (
           <button key={t} onClick={() => setSubTab(t)} style={{
             padding:'6px 14px', borderRadius:16, fontSize:11, fontWeight:600, whiteSpace:'nowrap',
             cursor:'pointer', flexShrink:0,
             background: subTab === t ? 'var(--accent)' : 'var(--bg-secondary)',
             color: subTab === t ? '#000' : 'var(--text-dim)',
             border: `1px solid ${subTab === t ? 'var(--accent)' : 'var(--border)'}`,
-          }}>{t === 'catalog' ? '📖 Каталог' : '⚡ Взаимодействия'}</button>
+          }}>{t === 'catalog' ? '📖 Каталог' : t === 'interactions' ? '⚡ Взаимодействия' : t === 'pkpd' ? '⚙️ PK/PD' : t === 'dosage' ? '💊 Дозировки' : '📋 Риск курса'}</button>
         ))}
       </div>
       {page === 'course' && courseSub === 'course' && <PharmaCourseScreen />}
@@ -199,6 +215,9 @@ export const PharmaScreen: React.FC = () => {
       {page === 'calculators' && subTab === 'dosage' && <DosageCalculatorTab />}
       {page === 'info' && subTab === 'catalog' && <CatalogTab />}
       {page === 'info' && subTab === 'interactions' && <InteractionCheckerTab />}
+      {page === 'info' && subTab === 'pkpd' && <PKPDSimulationTab />}
+      {page === 'info' && subTab === 'dosage' && <DosageCalculatorTab />}
+      {page === 'info' && subTab === 'course-risk' && <CourseRiskTab />}
     </div>
   );
 };
@@ -857,7 +876,8 @@ const PKPDSimulationTab: React.FC = () => {
                   }}>✕</button>
                 )}
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', gap: 8, alignItems: 'end' }}>
+              {/* Row 1: Dose + Weeks */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 6 }}>
                 <div>
                   <label style={{ fontSize: 9, color: 'var(--text-dim)', display: 'block', marginBottom: 2 }}>Доза (мг)</label>
                   <input type="number" value={dd.doseMg} onChange={(e) => updateDrug(idx, 'doseMg', Number(e.target.value))}
@@ -865,28 +885,29 @@ const PKPDSimulationTab: React.FC = () => {
                       border: '1px solid var(--border)', color: 'var(--text)', fontSize: 11, boxSizing: 'border-box' }} />
                 </div>
                 <div>
-                  <label style={{ fontSize: 9, color: 'var(--text-dim)', display: 'block', marginBottom: 2 }}>Дни</label>
-                  <div style={{ display: 'flex', gap: 2 }}>
-                    {[1,2,3,4,5,6,7].map(d => {
-                      const active = dd.frequencyDays.includes(d);
-                      return (
-                        <button key={d} type="button" onClick={() => {
-                          const next = active ? dd.frequencyDays.filter(x => x !== d) : [...dd.frequencyDays, d].sort();
-                          updateDrug(idx, 'frequencyDays', next);
-                        }} style={{
-                          width: 24, height: 24, borderRadius: 4, fontSize: 8, fontWeight: 700, cursor: 'pointer',
-                          background: active ? 'var(--accent)' : 'var(--bg-secondary)', color: active ? '#000' : 'var(--text-dim)',
-                          border: `1px solid ${active ? 'var(--accent)' : 'var(--border)'}`,
-                        }}>{['','Пн','Вт','Ср','Чт','Пт','Сб','Вс'][d]}</button>
-                      );
-                    })}
-                  </div>
-                </div>
-                <div>
                   <label style={{ fontSize: 9, color: 'var(--text-dim)', display: 'block', marginBottom: 2 }}>Недель</label>
                   <input type="number" value={dd.totalWeeks} onChange={(e) => updateDrug(idx, 'totalWeeks', Number(e.target.value))}
                     style={{ width: '100%', padding: '5px 8px', borderRadius: 6, background: 'var(--bg-secondary)',
                       border: '1px solid var(--border)', color: 'var(--text)', fontSize: 11, boxSizing: 'border-box' }} />
+                </div>
+              </div>
+              {/* Row 2: Days — full width */}
+              <div>
+                <label style={{ fontSize: 9, color: 'var(--text-dim)', display: 'block', marginBottom: 3 }}>Дни инъекций:</label>
+                <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
+                  {[1,2,3,4,5,6,7].map(d => {
+                    const active = dd.frequencyDays.includes(d);
+                    return (
+                      <button key={d} type="button" onClick={() => {
+                        const next = active ? dd.frequencyDays.filter(x => x !== d) : [...dd.frequencyDays, d].sort();
+                        updateDrug(idx, 'frequencyDays', next);
+                      }} style={{
+                        flex: 1, minWidth: 36, height: 28, borderRadius: 6, fontSize: 9, fontWeight: 700, cursor: 'pointer',
+                        background: active ? 'var(--accent)' : 'var(--bg-secondary)', color: active ? '#000' : 'var(--text-dim)',
+                        border: `1px solid ${active ? 'var(--accent)' : 'var(--border)'}`,
+                      }}>{['','Пн','Вт','Ср','Чт','Пт','Сб','Вс'][d]}</button>
+                    );
+                  })}
                 </div>
               </div>
             </div>
@@ -902,9 +923,9 @@ const PKPDSimulationTab: React.FC = () => {
         <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-dim)', marginBottom: 8 }}>
           {drugDoses.length === 0 ? 'Начните — выберите класс препарата:' : 'Добавить препарат — выберите класс:'}
         </div>
-        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 6 }}>
+        <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap', marginBottom: 6 }}>
           <button onClick={() => { setPkClass(''); setPkSearch(''); setShowAllDrugs(true); }} style={{
-            padding: '4px 12px', borderRadius: 16, fontSize: 10, cursor: 'pointer', fontWeight: !pkClass ? 700 : 400,
+            padding: '4px 12px', borderRadius: 16, fontSize: 9, cursor: 'pointer', fontWeight: !pkClass ? 700 : 400,
             background: !pkClass ? 'rgba(0,230,138,0.15)' : 'var(--bg-secondary)',
             color: !pkClass ? 'var(--accent)' : 'var(--text-dim)',
             border: `1px solid ${!pkClass ? 'var(--accent)' : 'var(--border)'}`,
@@ -912,7 +933,7 @@ const PKPDSimulationTab: React.FC = () => {
           }}>Все классы</button>
           {Object.entries(CLASS_LABELS).map(([cls, label]) => (
             <button key={cls} onClick={() => { setPkClass(pkClass === cls ? '' : cls); setPkSearch(''); setShowAllDrugs(false); }} style={{
-              padding: '4px 12px', borderRadius: 16, fontSize: 10, cursor: 'pointer', fontWeight: pkClass === cls ? 700 : 400,
+              padding: '4px 12px', borderRadius: 16, fontSize: 9, cursor: 'pointer', fontWeight: pkClass === cls ? 700 : 400,
               background: pkClass === cls ? 'rgba(0,230,138,0.15)' : 'var(--bg-secondary)',
               color: pkClass === cls ? 'var(--accent)' : 'var(--text-dim)',
               border: `1px solid ${pkClass === cls ? 'var(--accent)' : 'var(--border)'}`,
@@ -930,7 +951,7 @@ const PKPDSimulationTab: React.FC = () => {
 
         {/* Drug grid */}
         {(showAllDrugs || pkClass || pkSearch) && pkFiltered.length > 0 && (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 4, maxHeight: 200, overflowY: 'auto' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: 4, maxHeight: 200, overflowY: 'auto' }}>
             {pkFiltered.map(s => (
               <div key={s.id} onClick={() => addDrug(s.id)} style={{
                 padding: '7px 9px', borderRadius: 8, cursor: 'pointer',
@@ -961,10 +982,10 @@ const PKPDSimulationTab: React.FC = () => {
       </div>
 
       {/* Run simulation */}
-      <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+      <div style={{ marginBottom: 12 }}>
         <button onClick={runSimulation} style={{
-          flex: 1, padding: '10px 0', borderRadius: 10, border: 'none',
-          background: 'linear-gradient(135deg, #00e68a, #00c853)', color: '#000', fontWeight: 700, fontSize: 13,
+          width: '100%', padding: '12px 0', borderRadius: 10, border: 'none',
+          background: 'linear-gradient(135deg, #00e68a, #00c853)', color: '#000', fontWeight: 700, fontSize: 14,
           cursor: 'pointer',
         }}>▶ Запустить симуляцию</button>
       </div>
@@ -976,21 +997,21 @@ const PKPDSimulationTab: React.FC = () => {
             background: 'var(--glass-bg)', border: '1px solid var(--glass-border)',
             borderRadius: 12, padding: '12px 14px', marginBottom: 8, fontSize: 12,
           }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 6 }}>
-              <div style={{ textAlign: 'center', padding: '8px 4px', background: 'var(--bg-secondary)', borderRadius: 8 }}>
-                <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Cmax стацион.</div>
-                <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--accent)' }}>{simResult.peak.toFixed(1)}</div>
-                <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>мг/л</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginBottom: 6 }}>
+              <div style={{ textAlign: 'center', padding: '6px 2px', background: 'var(--bg-secondary)', borderRadius: 8 }}>
+                <div style={{ fontSize: 8, color: 'var(--text-dim)' }}>Cmax</div>
+                <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--accent)' }}>{simResult.peak.toFixed(1)}</div>
+                <div style={{ fontSize: 8, color: 'var(--text-dim)' }}>мг/л</div>
               </div>
-              <div style={{ textAlign: 'center', padding: '8px 4px', background: 'var(--bg-secondary)', borderRadius: 8 }}>
-                <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Cmin стацион.</div>
-                <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--accent)' }}>{simResult.trough.toFixed(1)}</div>
-                <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>мг/л</div>
+              <div style={{ textAlign: 'center', padding: '6px 2px', background: 'var(--bg-secondary)', borderRadius: 8 }}>
+                <div style={{ fontSize: 8, color: 'var(--text-dim)' }}>Cmin</div>
+                <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--accent)' }}>{simResult.trough.toFixed(1)}</div>
+                <div style={{ fontSize: 8, color: 'var(--text-dim)' }}>мг/л</div>
               </div>
-              <div style={{ textAlign: 'center', padding: '8px 4px', background: 'var(--bg-secondary)', borderRadius: 8 }}>
-                <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Стационарный</div>
-                <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--accent)' }}>≈{simResult.ssDays}</div>
-                <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>дн</div>
+              <div style={{ textAlign: 'center', padding: '6px 2px', background: 'var(--bg-secondary)', borderRadius: 8 }}>
+                <div style={{ fontSize: 8, color: 'var(--text-dim)' }}>SS</div>
+                <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--accent)' }}>≈{simResult.ssDays}</div>
+                <div style={{ fontSize: 8, color: 'var(--text-dim)' }}>дн</div>
               </div>
             </div>
             {simResult.peak > 50 && (
@@ -1218,46 +1239,40 @@ const DosageCalculatorTab: React.FC = () => {
           borderRadius: 12, padding: '14px 16px',
         }}>
           <h3 style={{ margin: '0 0 12px 0', fontSize: 14, color: 'var(--accent)' }}>📋 Результат</h3>
-          <div style={{ display: 'grid', gap: 8 }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
-              <div style={{ background: 'rgba(0,230,138,0.08)', borderRadius: 10, padding: '12px 10px', textAlign: 'center' }}>
+            <div style={{ display: 'grid', gap: 10 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+              <div style={{ background: 'rgba(0,230,138,0.08)', borderRadius: 10, padding: '14px 10px', textAlign: 'center' }}>
                 <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 4 }}>Недельная доза</div>
-                <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--accent)' }}>{weeklyTotal.toFixed(0)}</div>
+                <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--accent)' }}>{weeklyTotal.toFixed(0)}</div>
                 <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>мг/нед</div>
               </div>
-              <div style={{ background: 'rgba(0,230,138,0.08)', borderRadius: 10, padding: '12px 10px', textAlign: 'center' }}>
+              <div style={{ background: 'rgba(0,230,138,0.08)', borderRadius: 10, padding: '14px 10px', textAlign: 'center' }}>
                 <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 4 }}>На инъекцию</div>
-                <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--accent)' }}>{perInjectionMg.toFixed(1)}</div>
+                <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--accent)' }}>{perInjectionMg.toFixed(1)}</div>
                 <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>мг × {injectionsPerWeek}/нед</div>
               </div>
             </div>
-            <div style={{ background: 'rgba(0,230,138,0.08)', borderRadius: 12, padding: '14px 12px', textAlign: 'center' }}>
+            <div style={{ background: 'rgba(0,230,138,0.08)', borderRadius: 12, padding: '16px 12px', textAlign: 'center' }}>
               <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 4 }}>Объём инъекции</div>
-              <div style={{ fontSize: 32, fontWeight: 800, color: 'var(--accent)' }}>{doseResult.volumeMl}</div>
+              <div style={{ fontSize: 36, fontWeight: 800, color: 'var(--accent)' }}>{doseResult.volumeMl}</div>
               <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>мл</div>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
-              <div style={{ background: 'var(--bg-secondary)', borderRadius: 10, padding: '12px', textAlign: 'center' }}>
-                <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 2 }}>Деления шприца</div>
-                <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--text)' }}>{doseResult.divisions}</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+              <div style={{ background: 'var(--bg-secondary)', borderRadius: 10, padding: '14px', textAlign: 'center' }}>
+                <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 4 }}>Деления шприца</div>
+                <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--text)' }}>{doseResult.divisions}</div>
               </div>
-              <div style={{ background: 'var(--bg-secondary)', borderRadius: 10, padding: '12px', textAlign: 'center' }}>
-                <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 2 }}>Доз/флакон</div>
-                <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--text)' }}>{doseResult.dosesPerVial || '—'}</div>
-              </div>
-              <div style={{ background: 'var(--bg-secondary)', borderRadius: 10, padding: '12px', textAlign: 'center' }}>
-                <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 2 }}>Отход/флакон</div>
-                <div style={{ fontSize: 20, fontWeight: 700, color: wastePerVial > 1 ? '#ff9800' : 'var(--text)' }}>{wastePerVial.toFixed(2)}</div>
-                <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>мл</div>
+              <div style={{ background: 'var(--bg-secondary)', borderRadius: 10, padding: '14px', textAlign: 'center' }}>
+                <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 4 }}>Доз / флакон</div>
+                <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--text)' }}>{doseResult.dosesPerVial || '—'}</div>
               </div>
             </div>
-            {doseResult.flags.length > 0 && (
-              <div style={{ background: 'rgba(255,152,0,0.12)', borderRadius: 8, padding: '8px 10px', fontSize: 11, color: '#ff9800' }}>
+            {doseResult.flags.length > 0 ? (
+              <div style={{ background: 'rgba(255,152,0,0.12)', borderRadius: 8, padding: '10px 12px', fontSize: 11, color: '#ff9800' }}>
                 ⚠ {doseResult.flags.join(', ')}
               </div>
-            )}
-            {doseResult.flags.length === 0 && (
-              <div style={{ background: 'rgba(0,230,138,0.08)', borderRadius: 8, padding: '8px 10px', fontSize: 11, color: '#00e68a', textAlign: 'center' }}>
+            ) : (
+              <div style={{ background: 'rgba(0,230,138,0.08)', borderRadius: 8, padding: '10px 12px', fontSize: 11, color: '#00e68a', textAlign: 'center' }}>
                 ✓ Готово к введению
               </div>
             )}
@@ -1287,27 +1302,30 @@ const DosageCalculatorTab: React.FC = () => {
 const DRUG_OPTIONS = Object.keys(DRUG_THRESHOLDS);
 
 const AndrogenicIndexCalculator: React.FC = () => {
-  const [entries, setEntries] = useState<{ drug: string; doseMgWeek: number }[]>([{ drug: 'testosterone_enanthate', doseMgWeek: 300 }]);
+  const [entries, setEntries] = useState<{ drug: string; doseMgWeek: number; search: string }[]>([
+    { drug: 'testosterone_enanthate', doseMgWeek: 300, search: '' }
+  ]);
   const [aiResult, setAiResult] = useState<number | null>(null);
-  const [aiSearch, setAiSearch] = useState('');
-  const [aiOpen, setAiOpen] = useState<number | null>(null);
 
   const allAiDrugs = useMemo(() => {
     return DRUG_OPTIONS.filter(d => PHARMA_DB[d]?.name && DRUG_THRESHOLDS[d]?.androgenicity);
   }, []);
 
-  const aiFiltered = aiSearch
-    ? allAiDrugs.filter(d => PHARMA_DB[d]!.name.toLowerCase().includes(aiSearch.toLowerCase()))
-    : allAiDrugs;
-
-  const addEntry = () => setEntries([...entries, { drug: 'testosterone_enanthate', doseMgWeek: 300 }]);
+  const addEntry = () => setEntries([...entries, { drug: 'testosterone_enanthate', doseMgWeek: 300, search: '' }]);
   const removeEntry = (i: number) => setEntries(entries.filter((_, idx) => idx !== i));
-  const updateEntry = (i: number, field: 'drug' | 'doseMgWeek', val: string | number) => {
+  const setDrugFor = (i: number, drugId: string) => {
     const next = [...entries];
-    if (field === 'drug') {
-      next[i] = { ...next[i], drug: val as string };
-      setAiOpen(null);
-    } else next[i] = { ...next[i], doseMgWeek: val as number };
+    next[i] = { ...next[i], drug: drugId, search: '' };
+    setEntries(next);
+  };
+  const setSearchFor = (i: number, val: string) => {
+    const next = [...entries];
+    next[i] = { ...next[i], search: val };
+    setEntries(next);
+  };
+  const setDoseFor = (i: number, val: number) => {
+    const next = [...entries];
+    next[i] = { ...next[i], doseMgWeek: val };
     setEntries(next);
   };
 
@@ -1319,6 +1337,14 @@ const AndrogenicIndexCalculator: React.FC = () => {
     });
     setAiResult(total);
   };
+
+  const aiFiltereds = useMemo(() => {
+    return entries.map(e => {
+      if (!e.search) return allAiDrugs;
+      const q = e.search.toLowerCase();
+      return allAiDrugs.filter(d => PHARMA_DB[d]!.name.toLowerCase().includes(q));
+    });
+  }, [entries, allAiDrugs]);
 
   return (
     <div style={{
@@ -1338,39 +1364,32 @@ const AndrogenicIndexCalculator: React.FC = () => {
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
             <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-dim)', minWidth: 16 }}>#{i + 1}</span>
             <div style={{ flex: 1, position: 'relative' }}>
-              {entry.drug && aiOpen !== i ? (
-                <div style={{
-                  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                  padding: '6px 10px', borderRadius: 8, cursor: 'pointer',
-                  background: 'rgba(0,230,138,0.1)', border: '1px solid rgba(0,230,138,0.3)',
-                }} onClick={() => { setAiOpen(i); setAiSearch(''); }}>
-                  <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--accent)' }}>
-                    {PHARMA_DB[entry.drug]?.name || entry.drug}
-                  </span>
-                  <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>
-                    {DRUG_THRESHOLDS[entry.drug]?.androgenicity ? `${DRUG_THRESHOLDS[entry.drug].androgenicity}%` : ''} ▾
-                  </span>
-                </div>
-              ) : (
-                <div>
-                  <input type="text" value={aiSearch} onChange={e => setAiSearch(e.target.value)}
-                    placeholder="Поиск препарата..."
-                    style={{ width: '100%', padding: '6px 10px', borderRadius: 8, background: 'var(--bg-secondary)',
-                      border: '1px solid var(--border)', color: 'var(--text)', fontSize: 11, boxSizing: 'border-box' }}
-                    autoFocus />
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, maxHeight: 130, overflowY: 'auto', marginTop: 4 }}>
-                    {aiFiltered.slice(0, 30).map(d => (
-                      <div key={d} onClick={() => updateEntry(i, 'drug', d)} style={{
-                        padding: '4px 8px', borderRadius: 6, cursor: 'pointer', fontSize: 10,
-                        background: 'var(--bg-secondary)', border: '1px solid var(--border)',
-                      }}>
-                        {PHARMA_DB[d]!.name}
-                        <span style={{ marginLeft: 4, color: 'var(--text-dim)', fontSize: 9 }}>
-                          {DRUG_THRESHOLDS[d]?.androgenicity}%
-                        </span>
-                      </div>
-                    ))}
-                  </div>
+              <input type="text" value={entry.search} onChange={e => setSearchFor(i, e.target.value)}
+                placeholder={entry.drug ? `${PHARMA_DB[entry.drug]?.name} — нажмите чтобы изменить` : 'Поиск препарата...'}
+                style={{ width: '100%', padding: '6px 10px', borderRadius: 8, background: 'var(--bg-secondary)',
+                  border: entry.drug ? '1px solid rgba(0,230,138,0.3)' : '1px solid var(--border)',
+                  color: entry.drug ? 'var(--accent)' : 'var(--text)', fontSize: 11, boxSizing: 'border-box',
+                  fontWeight: entry.drug ? 600 : 400 }} />
+              {entry.search && (
+                <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 10,
+                  background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: 8, marginTop: 2,
+                  maxHeight: 160, overflowY: 'auto' }}>
+                  {aiFiltereds[i].slice(0, 20).map(d => (
+                    <div key={d} onClick={() => setDrugFor(i, d)} style={{
+                      padding: '6px 10px', cursor: 'pointer', fontSize: 11,
+                      borderBottom: '1px solid var(--border)',
+                    }}>
+                      <span style={{ fontWeight: 600 }}>{PHARMA_DB[d]!.name}</span>
+                      <span style={{ marginLeft: 6, color: 'var(--text-dim)', fontSize: 9 }}>
+                        AR {DRUG_THRESHOLDS[d]?.androgenicity}%
+                      </span>
+                    </div>
+                  ))}
+                  {aiFiltereds[i].length === 0 && (
+                    <div style={{ padding: 8, fontSize: 10, color: 'var(--text-dim)', textAlign: 'center' }}>
+                      Ничего не найдено
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -1383,7 +1402,7 @@ const AndrogenicIndexCalculator: React.FC = () => {
             )}
           </div>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            <input type="number" value={entry.doseMgWeek} onChange={e => updateEntry(i, 'doseMgWeek', +e.target.value)}
+            <input type="number" value={entry.doseMgWeek} onChange={e => setDoseFor(i, +e.target.value)}
               style={{ flex: 1, padding: '6px 10px', borderRadius: 8, background: 'var(--bg-secondary)',
                 border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12,
                 boxSizing: 'border-box' }} />
@@ -1424,12 +1443,12 @@ const InteractionCheckerTab: React.FC = () => {
       PHARMA_CLASSES.includes(s.class as PharmaClass)
     );
   }, []);
-  // Pharma-only synergy pairs
+  // Pharma-only synergy pairs (exclude support/vitamins)
   const pharmaSynergies = useMemo(() => {
     return SYNERGY_PAIRS.filter(p => {
       const a = PHARMA_DB[p.substanceA];
       const b = PHARMA_DB[p.substanceB];
-      return a && b && PHARMA_CLASSES.includes(a.class as PharmaClass) && PHARMA_CLASSES.includes(b.class as PharmaClass);
+      return a && b && PHARMA_CORE_CLASSES.includes(a.class as any) && PHARMA_CORE_CLASSES.includes(b.class as any);
     });
   }, []);
 
@@ -2398,6 +2417,82 @@ const DiagnosticsTab: React.FC = () => {
               ? ``
               : ''}
           </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+/* ─── Course Risk Tab (Info Page) ─── */
+const CourseRiskTab: React.FC = () => {
+  const linked = useDataLink();
+  const profile = linked.profile;
+  const risk = linked.risk;
+  const settings = profile?.settings;
+  const weight = settings?.weight || 0;
+  const height = settings?.height || 0;
+  const bmi = weight && height ? weight / Math.pow(height / 100, 2) : 0;
+
+  return (
+    <div>
+      <div className="card" style={{ marginBottom: 12 }}>
+        <div style={{ fontSize: 20, fontWeight: 800, marginBottom: 4 }}>📊 Риск курса</div>
+        <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>Агрегированный риск из всех источников (фарма, анализы, тренировки, питание)</div>
+      </div>
+
+      {settings && (
+        <div className="card" style={{ marginBottom: 12 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+            <div style={{ textAlign: 'center', padding: '10px 6px', borderRadius: 12, background: 'rgba(0,230,138,0.08)' }}>
+              <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Вес</div>
+              <div style={{ fontSize: 18, fontWeight: 800 }}>{weight || '—'} кг</div>
+            </div>
+            <div style={{ textAlign: 'center', padding: '10px 6px', borderRadius: 12, background: 'rgba(0,230,138,0.08)' }}>
+              <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>ИМТ</div>
+              <div style={{ fontSize: 18, fontWeight: 800, color: bmi > 30 ? '#ef4444' : bmi > 25 ? '#f59e0b' : '#00e68a' }}>{bmi ? bmi.toFixed(1) : '—'}</div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {risk && (
+        <div className="card" style={{ marginBottom: 12 }}>
+          <div style={{ fontSize: 12, color: 'var(--accent)', fontWeight: 700, marginBottom: 8, textAlign: 'center' }}>Общий риск</div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, textAlign: 'center' }}>
+            <div style={{ padding: '10px 6px', borderRadius: 12, background: 'rgba(34,197,94,0.08)' }}>
+              <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Raw</div>
+              <div style={{ fontSize: 22, fontWeight: 800, color: risk.overallRaw >= 60 ? '#ef4444' : risk.overallRaw >= 30 ? '#f59e0b' : '#00e68a' }}>{Math.round(risk.overallRaw)}%</div>
+            </div>
+            <div style={{ padding: '10px 6px', borderRadius: 12, background: 'rgba(34,197,94,0.08)' }}>
+              <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Net (с поддержкой)</div>
+              <div style={{ fontSize: 22, fontWeight: 800, color: risk.overallNet >= 60 ? '#ef4444' : risk.overallNet >= 30 ? '#f59e0b' : '#00e68a' }}>{Math.round(risk.overallNet)}%</div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {risk?.systemBreakdown && (
+        <div className="card">
+          <div style={{ fontSize: 12, color: 'var(--accent)', fontWeight: 700, marginBottom: 8, textAlign: 'center' }}>По системам</div>
+          {Object.entries(risk.systemBreakdown).map(([sys, v]) => (
+            <div key={sys} style={{ marginBottom: 6 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11 }}>
+                <span>{SYSTEM_LABELS_INVEST[sys] || sys}</span>
+                <span style={{ fontWeight: 600, color: v.net >= 60 ? '#ef4444' : v.net >= 30 ? '#f59e0b' : '#00e68a' }}>{Math.round(v.net)}%</span>
+              </div>
+              <div style={{ height: 6, borderRadius: 3, background: 'var(--border)', overflow: 'hidden' }}>
+                <div style={{ height: '100%', borderRadius: 3, width: `${v.net}%`, background: v.net >= 60 ? '#ef4444' : v.net >= 30 ? '#f59e0b' : '#00e68a', transition: 'width 0.3s' }} />
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {!risk && (
+        <div className="card" style={{ textAlign: 'center', padding: 20 }}>
+          <div style={{ fontSize: 24, marginBottom: 4 }}>📋</div>
+          <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>Нет данных для расчёта риска</div>
+          <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 2 }}>Добавьте информацию в профиль, фармакологию и анализы</div>
         </div>
       )}
     </div>

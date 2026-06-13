@@ -636,11 +636,11 @@ export const RiskScreen: React.FC = () => {
 
   return (
     <div className="screen risk" style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden', padding: 0 }}>
-      {/* ─── HERO PAGE (full screen) ─── */}
+      {/* ─── HERO PAGE (full screen, NO black bars) ─── */}
       {mainTab === 'hero' && (
         <div style={{ flex: 1, minHeight: 0, display:'flex', flexDirection:'column', overflowY:'auto' }}>
-          <div style={{ height: '100dvh', position:'relative', flexShrink: 0 }}>
-            <img src="/risk-hero.png" alt="" style={{ width:'100%', height:'100%', display:'block', objectFit:'cover', objectPosition:'center top' }} />
+          <div style={{ height: '100dvh', position:'relative', flexShrink: 0,
+            backgroundImage: 'url(/risk-hero.png)', backgroundSize:'cover', backgroundPosition:'center', backgroundRepeat:'no-repeat' }}>
             <div style={{ position: 'absolute', bottom: 10, left: 16, right: 16 }}>
               <h1 style={{ fontSize: 20, fontWeight: 800, color: '#fff', margin: '0 0 2px', textShadow: '0 2px 12px rgba(0,0,0,0.8)' }}>Оценка рисков</h1>
               <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.85)', margin: 0, lineHeight: 1.3, textShadow: '0 1px 6px rgba(0,0,0,0.7)' }}>
@@ -698,26 +698,26 @@ export const RiskScreen: React.FC = () => {
                 <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--accent)', marginBottom: 10, textAlign: 'center' }}>
                   📊 Средний риск курса
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                   {[
                     { label: 'Базовый', icon: '📋', net: Math.round(riskResult?.overallNet ?? 0), raw: Math.round(riskResult?.overallRaw ?? 0), color: '#22c55e' },
                     { label: 'Монте-Карло', icon: '🎲', net: v7Result ? Math.round(v7Result.globalRiskNet) : null, raw: v7Result ? Math.round(v7Result.globalRiskRaw) : null, color: '#8b5cf6' },
                     { label: 'MDSS', icon: '🏥', net: mdssResult ? Math.round(mdssResult.overallMaxRisk) : null, raw: null, color: '#f97316' },
                   ].map((item, i) => (
                     <div key={i} style={{
-                      textAlign: 'center', padding: '10px 6px', borderRadius: 12,
+                      flex: '1 1 30%', minWidth: 100, textAlign: 'center', padding: '10px 4px', borderRadius: 12,
                       background: item.color + '0d', border: `1px solid ${item.color}22`,
                     }}>
                       <div style={{ fontSize: 10, color: item.color, fontWeight: 600 }}>{item.icon} {item.label}</div>
-                      <div style={{ display: 'flex', justifyContent: 'center', gap: 8, marginTop: 2 }}>
-                        <span style={{ fontSize: 22, fontWeight: 800, color: item.net != null ? getRiskColor(item.net) : 'var(--text-dim)' }}>
+                      <div style={{ display: 'flex', justifyContent: 'center', gap: 6, marginTop: 2 }}>
+                        <span style={{ fontSize: 'clamp(16px, 5vw, 22px)', fontWeight: 800, color: item.net != null ? getRiskColor(item.net) : 'var(--text-dim)' }}>
                           {item.net != null ? `${item.net}%` : '—'}
                         </span>
-                        <span style={{ fontSize: 22, fontWeight: 800, color: item.raw != null ? getRiskColor(item.raw) : 'var(--text-dim)' }}>
+                        <span style={{ fontSize: 'clamp(16px, 5vw, 22px)', fontWeight: 800, color: item.raw != null ? getRiskColor(item.raw) : 'var(--text-dim)' }}>
                           {item.raw != null ? `${item.raw}%` : '—'}
                         </span>
                       </div>
-                      <div style={{ fontSize: 8, color: 'var(--text-dim)', marginTop: 1 }}>net · raw</div>
+                      <div style={{ fontSize: 'clamp(7px, 2vw, 8px)', color: 'var(--text-dim)', marginTop: 1 }}>net · raw</div>
                     </div>
                   ))}
                 </div>

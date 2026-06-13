@@ -1,11 +1,13 @@
 ﻿import React, { useState, useMemo, useEffect } from 'react';
 import { calcFertility } from '../../engines/fertility.engine';
-import type { FertilityInput, FertilityResult, LabPoint } from '../../core/types';
+import type { FertilityInput, FertilityResult, LabPoint, CourseEntry } from '../../core/types';
 import { FERTILITY_TARGET, FERTILITY_TAU_WEEKS } from '../../core/constants';
 import { db } from '../../core/db';
 import { getProfile } from '../../core/profile-manager';
+import { generatePCTPlan } from '../../engines/pct-planner.engine';
+import { PHARMA_DB } from '../../core/pharma-database';
 
-type FertTab = 'semen' | 'hormones' | 'structure';
+type FertTab = 'semen' | 'hormones' | 'structure' | 'pct-plan';
 
 const s: Record<string, React.CSSProperties> = {
   card: { background: 'var(--bg-secondary)', borderRadius: 12, padding: 16, marginBottom: 12 },
@@ -54,6 +56,15 @@ export const FertilityPCTScreen: React.FC = () => {
   const [shbg, setShbg] = useState('');
   const [inhb, setInhb] = useState('');
   const [amh, setAmh] = useState('');
+
+  // ─── PCT Plan ───
+  const [pctCourse, setPctCourse] = useState<CourseEntry[]>([]);
+  const [pctPlan, setPctPlan] = useState<ReturnType<typeof generatePCTPlan> | null>(null);
+  const CLASS_COLORS: Record<string, string> = { pct_serm: '#22c55e', pct_aromatase: '#ef4444', pct_dopamine: '#eab308', pct_gonadotropin: '#3b82f6' };
+  const CLASS_LABEL_PCT: Record<string, string> = { pct_serm: 'СЕРМ', pct_aromatase: 'Ингиб.ароматазы', pct_dopamine: 'Дофамин', pct_gonadotropin: 'Гонадотропин' };
+  useEffect(() => {
+    db.init().then(() => db.getAll<CourseEntry>('course_log')).then(data => setPctCourse(data)).catch(() => {});
+  }, []);
 
   useEffect(() => {
     const loadLabs = async () => {
@@ -137,7 +148,7 @@ export const FertilityPCTScreen: React.FC = () => {
   );
 
   const fertTabs: { id: FertTab; label: string }[] = [
-    { id: 'semen', label: 'Спермограмма' }, { id: 'hormones', label: 'Гормоны' }, { id: 'structure', label: 'DFI/Структура' }
+    { id: 'semen', label: 'Спермограмма' }, { id: 'hormones', label: 'Гормоны' }, { id: 'structure', label: 'DFI/Структура' }, { id: 'pct-plan', label: 'ПКТ план' }
   ];
 
   return (
@@ -223,6 +234,121 @@ export const FertilityPCTScreen: React.FC = () => {
               </div>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* ─── PCT TIMER ─── */}
+      {tab === 'pct-plan' && pctPlan && (
+        <div className="card" style={{ marginBottom: 12 }}>
+          <div style={{ textAlign: 'center', padding: '8px 0' }}>
+            <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 6 }}>⏳ Таймер ПКТ</div>
+            {(() => {
+              const minWeek = pctCourse.length > 0 ? Math.min(...pctCourse.map(e => e.startWeek)) : 0;
+              const maxWeek = pctCourse.length > 0 ? Math.max(...pctCourse.map(e => e.endWeek)) : 0;
+              const pctWeek = pctPlan.pctStartWeek;
+              const totalCourseWeeks = maxWeek - minWeek;
+              return (
+                <div>
+                  <div style={{ fontSize: 28, fontWeight: 800, color: '#ec4899' }}>
+                    Неделя <span style={{ fontSize: 36 }}>{pctWeek}</span>
+                  </div>
+                  <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 2 }}>
+                    Старт ПКТ через {Math.max(1, pctWeek - maxWeek)} нед после курса
+                  </div>
+                  <div style={{ marginTop: 8, height: 6, borderRadius: 3, background: 'var(--border)', overflow: 'hidden', maxWidth: 240, marginLeft: 'auto', marginRight: 'auto' }}>
+                    <div style={{ height: '100%', borderRadius: 3, width: `${Math.min(100, (pctWeek / (totalCourseWeeks + 12)) * 100)}%`, background: 'linear-gradient(90deg, #ec4899, #8b5cf6)', transition: 'width 0.5s' }} />
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'center', gap: 16, marginTop: 6, fontSize: 10, color: 'var(--text-dim)' }}>
+                    <span>Курс: {minWeek}-{maxWeek} нед</span>
+                    <span>ПКТ: {pctWeek}+ нед</span>
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
+        </div>
+      )}
+
+      {/* ─── PCT PLAN TAB ─── */}
+      {tab === 'pct-plan' && (
+        <div>
+          {pctCourse.length === 0 ? (
+            <div style={s.card}>
+              <div style={{ textAlign: 'center', padding: 20, color: 'var(--text-dim)' }}>
+                <div style={{ fontSize: 28, marginBottom: 8 }}>💊</div>
+                <div>Курс не найден</div>
+                <div style={{ fontSize: 11, marginTop: 4 }}>Добавьте препараты во вкладке Фармакология {'>'} Курс</div>
+              </div>
+            </div>
+          ) : !pctPlan ? (
+            <div style={s.card}>
+              <div style={{ textAlign: 'center', padding: 20 }}>
+                <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 12 }}>
+                  Активных веществ в курсе: {pctCourse.length}
+                </div>
+                <button onClick={() => { const plan = generatePCTPlan(pctCourse, Math.max(...pctCourse.map(c => c.endWeek))); setPctPlan(plan); }} style={{
+                  padding: '12px 24px', borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: 'pointer',
+                  background: 'linear-gradient(135deg, #00e68a, #00c77a)', color: '#000', border: 'none',
+                }}>
+                  🔄 Сгенерировать ПКТ
+                </button>
+              </div>
+            </div>
+          ) : (
+            <>
+              <div style={s.card}>
+                <h4 style={{ margin: '0 0 8px' }}>План ПКТ</h4>
+                <div style={{ fontSize: 12, marginBottom: 6 }}>
+                  Начало: <b>неделя {pctPlan.pctStartWeek}</b>
+                </div>
+                {pctPlan.warnings.length > 0 && (
+                  <div style={{ background: 'rgba(255,152,0,0.1)', borderRadius: 6, padding: '8px 10px', marginBottom: 8 }}>
+                    {pctPlan.warnings.map((w: string, i: number) => (
+                      <div key={i} style={{ fontSize: 10, color: '#ff9800' }}>⚠ {w}</div>
+                    ))}
+                  </div>
+                )}
+                {pctPlan.pctProtocol.map((p: any, i: number) => (
+                  <div key={i} style={{
+                    background: 'var(--bg-secondary)', borderRadius: 8, padding: '10px 12px', marginBottom: 6,
+                    borderLeft: `3px solid ${CLASS_COLORS[p.class] || '#666'}`,
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div>
+                        <span style={{ fontWeight: 600, fontSize: 13 }}>{PHARMA_DB[p.substanceId]?.name || p.substanceId}</span>
+                        <span style={{ fontSize: 9, marginLeft: 6, padding: '2px 6px', borderRadius: 4, background: `${CLASS_COLORS[p.class] || '#666'}22`, color: CLASS_COLORS[p.class] || '#666' }}>{CLASS_LABEL_PCT[p.class] || p.class}</span>
+                      </div>
+                      <span style={{ fontWeight: 700, fontSize: 13 }}>{p.doseValue}{p.doseUnit}</span>
+                    </div>
+                    <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 4 }}>
+                      {p.timing || `${p.frequency}`} | Нед {p.startWeek}-{p.endWeek}
+                    </div>
+                  </div>
+                ))}
+                <button onClick={() => setPctPlan(null)} style={{ marginTop: 8, padding: '6px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-dim)', cursor: 'pointer', fontSize: 11 }}>✕ Сбросить</button>
+              </div>
+              <div style={s.card}>
+                <h4 style={{ margin: '0 0 8px' }}>Восстановление фертильности</h4>
+                <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 8 }}>Рекомендации для восстановления после курса</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {[
+                    { icon: '📅', label: 'Длительность', desc: `${pctPlan.pctProtocol.reduce((max: number, p: any) => Math.max(max, p.endWeek || 0), 0) - pctPlan.pctStartWeek + 1} недель` },
+                    { icon: '💊', label: 'Препараты', desc: `${pctPlan.pctProtocol.length} препаратов в протоколе` },
+                    { icon: '📊', label: 'Мониторинг', desc: 'Контроль гормонов каждые 2-4 нед' },
+                    { icon: '🧬', label: 'Цель', desc: 'LH/ФСГ > 5, тестостерон > 15 нмоль/л' },
+                  ].map((item, i) => (
+                    <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+                      <span style={{ fontSize: 16 }}>{item.icon}</span>
+                      <div>
+                        <div style={{ fontSize: 12, fontWeight: 600 }}>{item.label}</div>
+                        <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>{item.desc}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
         </div>
       )}
 

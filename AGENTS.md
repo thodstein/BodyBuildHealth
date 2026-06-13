@@ -145,11 +145,36 @@ if (shouldApplyPenalty && finalResult.systemBreakdown) {
 - Works without any lab data being entered
 - RiskScreen already aggregates from all sources (pharma, support, labs, training, nutrition)
 
+## Phase 5.10: PK/PD, Dosage Calc, Андрогенный индекс, Синергии, PCT, Взаимодействия — **COMPLETED**
+
+### Day 76: Полный редизайн взаимодействий и мобильных форм
+
+**Изменения:**
+- ✅ **PK/PD мобильная верстка**: дни инъекций вынесены на отдельную строку (не помещались в 3 колонки на телефоне). Весь блок — glass-morphism.
+- ✅ **Калькулятор дозировок**: убран "Отход/флакон", переделан в 2-колоночный читаемый формат с class-фильтрами, пустое состояние на glass.
+- ✅ **Андрогенный индекс**: заменён сложный toggle на стабильный autocomplete (постоянный input + выпадающий список). При выборе не сбрасывается.
+- ✅ **Синергии в фарме**: создан `PHARMA_CORE_CLASSES` (без support/vitamins), каталог показывает все классы, а синергии — только AAS+пептиды+инсулин.
+- ✅ **PCT план в FertilityPCTScreen**: добавлена 4-я вкладка "ПКТ план" с `generatePCTPlan`, отображением протокола и рекомендаций.
+- ✅ **Фарма-взаимодействия в SupportScreen**: добавлен подраздел "Фарма" внутри вкладки "Взаимодействия" с двумя пилюлями «Поддержка / Фарма». Использует `checkDrugInteractions` из `pharma-interactions.engine`.
+
+**Технические детали:**
+- `interactTab` state (`'support' | 'pharma'`) для переключения подраздела в `SupportScreen.tsx`
+- `pharmaInteractIds` + `pharmaInteractSearch` — component-level state для фарма-взаимодействий
+- `PHARMA_CORE_CLASSES` в `PharmaScreen.tsx` для фильтрации синергий
+- `generatePCTPlan()` импортирован в `FertilityPCTScreen.tsx`
+- Русские подписи: `⚠ КРИТИЧЕСКОЕ / ⚠ ПРЕДУПРЕЖДЕНИЕ / ℹ ИНФО`
+
+**Файлы:**
+- `src/ui/screens/PharmaScreen.tsx` — PK/PD, dosage calc, androgenic index, synergies, catalog, info page (CourseRiskTab, all subs)
+- `src/ui/screens/SupportScreen.tsx` — pharma interactions sub-tab
+- `src/ui/screens/FertilityPCTScreen.tsx` — PCT plan tab, PCT timer (countdown)
+- `src/ui/screens/RiskScreen.tsx` — mobile-optimized risk cards (flexWrap + clamp)
+
 ## Build Commands
 ```bash
-cd D:\V9
-npx tsc --noEmit
-npx vite build
+cd D:\BodyBuildHealth
+$env:NODE_OPTIONS='--max-old-space-size=2048'; npx tsc --noEmit
+$env:NODE_OPTIONS='--max-old-space-size=2048'; npx vite build
 ```
 
 ## Key Decisions
