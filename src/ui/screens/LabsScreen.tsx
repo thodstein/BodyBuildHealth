@@ -482,7 +482,7 @@ export const LabsScreen: React.FC = () => {
           {/* Hero section with image */}
           <div style={{ position: 'relative', margin: '-16px -16px 16px -16px' }}>
             <img src="/lab-hero.png" alt="" style={{
-              width: '100%', height: 'auto', maxHeight: '45vh', display: 'block',
+              width: '100%', height: 'auto', maxHeight: '55vh', display: 'block',
               objectFit: 'cover', objectPosition: 'center top',
             }} />
             <div style={{ position: 'absolute', bottom: 14, left: 20, right: 20 }}>

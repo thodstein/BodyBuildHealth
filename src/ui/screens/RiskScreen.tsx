@@ -367,7 +367,7 @@ export const RiskScreen: React.FC = () => {
           {/* Hero image */}
           <div style={{ position: 'relative', margin: '-16px -16px 12px -16px' }}>
             <img src="/risk-hero.png" alt="" style={{
-              width: '100%', height: 'auto', maxHeight: '45vh', display: 'block',
+              width: '100%', height: 'auto', maxHeight: '55vh', display: 'block',
               objectFit: 'cover', objectPosition: 'center top',
             }} />
             <div style={{ position: 'absolute', bottom: 10, left: 16, right: 16 }}>
@@ -382,8 +382,8 @@ export const RiskScreen: React.FC = () => {
               { id: 'calculations', icon: '🧮', title: 'Комплексные расчеты', desc: 'Базовый расчёт, Монте Карло (V7), MDSS — все аналитические модели рисков.', color: '#22c55e' },
               { id: 'clinical', icon: '🏥', title: 'Клиника', desc: '3D модель, комплаенс, клинические риски и анализы.', color: '#3b82f6' },
               { id: 'info', icon: 'ℹ️', title: 'Общая информация', desc: 'Формулы, механизмы, пороги препаратов и справочные данные.', color: '#a855f7' },
-            ].map(card => (
-              <button key={card.id} onClick={() => setMainTab(card.id as any)} style={{
+              ].map(card => (
+              <button key={card.id} onClick={() => { setMainTab(card.id as any); setSubTab(card.id === 'info' ? 'info' : 'overview'); }} style={{
                 display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', borderRadius: 14, cursor: 'pointer', textAlign: 'left', width: '100%',
                 background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', color: 'var(--text)',
                 transition: 'all 0.2s',
@@ -436,15 +436,15 @@ export const RiskScreen: React.FC = () => {
                       background: item.color + '0d', border: `1px solid ${item.color}22`,
                     }}>
                       <div style={{ fontSize: 10, color: item.color, fontWeight: 600 }}>{item.icon} {item.label}</div>
-                      <div style={{ display: 'flex', justifyContent: 'center', gap: 5, marginTop: 4 }}>
+                      <div style={{ display: 'flex', justifyContent: 'center', gap: 8, marginTop: 2 }}>
                         <span style={{ fontSize: 22, fontWeight: 800, color: item.net != null ? getRiskColor(item.net) : 'var(--text-dim)' }}>
                           {item.net != null ? `${item.net}%` : '—'}
                         </span>
-                        <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-dim)', alignSelf: 'flex-end', marginBottom: 2 }}>
+                        <span style={{ fontSize: 22, fontWeight: 800, color: item.raw != null ? getRiskColor(item.raw) : 'var(--text-dim)' }}>
                           {item.raw != null ? `${item.raw}%` : '—'}
                         </span>
                       </div>
-                      <div style={{ fontSize: 7, color: 'var(--text-dim)', marginTop: 2 }}>net · raw</div>
+                      <div style={{ fontSize: 8, color: 'var(--text-dim)', marginTop: 1 }}>net · raw</div>
                     </div>
                   ))}
                 </div>
