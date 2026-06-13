@@ -24,26 +24,26 @@ const SYSTEM_LABELS: Record<string, string> = Object.fromEntries(
 );
 
 const CLASS_LABELS: Record<string, string> = {
-  testosterone: '',
-  trenbolone: '',
-  nandrolone: '',
-  boldenone: '',
-  primobolan: '',
-  oral_17aa: '',
+  testosterone: 'Тестостерон',
+  trenbolone: 'Тренболон',
+  nandrolone: 'Нандролон',
+  boldenone: 'Болденон',
+  primobolan: 'Примоболан',
+  oral_17aa: 'Оральные 17-α',
   sarm: 'SARMs',
-  peptide_ghrh: '',
-  peptide_ghrp: '',
-  igf1: '',
-  mgf: '',
-  insulin: '',
-  pct_serm: '',
-  pct_aromatase: '',
-  pct_dopamine: '',
-  pct_gonadotropin: '',
-  drostanolone: '',
-  peptide_gnrh: '',
-  peptide_fat_loss: '',
-  peptide_other: '',
+  peptide_ghrh: 'GHRH',
+  peptide_ghrp: 'GHRP',
+  igf1: 'IGF-1',
+  mgf: 'МГФ',
+  insulin: 'Инсулин',
+  pct_serm: 'СЕРМ',
+  pct_aromatase: 'Ингиб. ароматазы',
+  pct_dopamine: 'Дофамин',
+  pct_gonadotropin: 'Гонадотропин',
+  drostanolone: 'Дростанолон',
+  peptide_gnrh: 'GnRH',
+  peptide_fat_loss: 'Жиросжигающие',
+  peptide_other: 'Прочие',
 };
 
 const PD_LABELS: Record<keyof PD, string> = {
@@ -129,7 +129,7 @@ export const PharmaScreen: React.FC = () => {
     ];
     return (
       <div className="screen pharma" style={{ padding: 0 }}>
-        <img src="./pharma-hero.png" alt="" style={{ width:'100%', display:'block', borderRadius:0 }} />
+        <img src="./pharma-hero.png" alt="" style={{ width:'100%', maxHeight:'35vh', objectFit:'cover', display:'block', borderRadius:0 }} />
         <div style={{ padding:'12px', display:'flex', flexDirection:'column', gap:8 }}>
           {cards.map(c => (
             <button key={c.key} onClick={() => setPage(c.key)} style={{
@@ -572,14 +572,22 @@ const PKPDSimulationTab: React.FC = () => {
     return Object.values(PHARMA_DB).filter(s => PHARMA_CLASSES.includes(s.class as PharmaClass));
   }, []);
 
+  // Show unused (not in current simulation) by default
+  const unusedSubstances = useMemo(() => {
+    const used = new Set(drugDoses.map(d => d.substanceId));
+    return allSubstances.filter(s => !used.has(s.id));
+  }, [drugDoses, allSubstances]);
+
   const pkFiltered = useMemo(() => {
-    if (!pkSearch.trim() && !pkClass) return [];
-    const q = pkSearch.toLowerCase();
-    let list = allSubstances;
-    if (pkClass) list = list.filter(s => s.class === pkClass);
-    if (pkSearch.trim()) list = list.filter(s => s.name.toLowerCase().includes(q) || s.id.toLowerCase().includes(q));
-    return list;
-  }, [pkSearch, pkClass, allSubstances]);
+    if (pkSearch.trim() || pkClass) {
+      const q = pkSearch.toLowerCase();
+      let list = allSubstances;
+      if (pkClass) list = list.filter(s => s.class === pkClass);
+      if (pkSearch.trim()) list = list.filter(s => s.name.toLowerCase().includes(q) || s.id.toLowerCase().includes(q));
+      return list;
+    }
+    return unusedSubstances;
+  }, [pkSearch, pkClass, allSubstances, unusedSubstances]);
 
   // Class-grouped substances for quick-pick
   const substancesByClass = useMemo(() => {
@@ -590,11 +598,6 @@ const PKPDSimulationTab: React.FC = () => {
     }
     return map;
   }, [allSubstances]);
-
-  const unusedSubstances = useMemo(() => {
-    const used = new Set(drugDoses.map(d => d.substanceId));
-    return allSubstances.filter(s => !used.has(s.id));
-  }, [drugDoses, allSubstances]);
 
   const addDrug = (id: string) => {
     setDrugDoses([...drugDoses, { substanceId: id, doseMg: 250, frequencyDays: [1, 4], totalWeeks: 12 }]);
@@ -906,6 +909,7 @@ const PKPDSimulationTab: React.FC = () => {
 };
 
 const DosageCalculatorTab: React.FC = () => {
+  const [dosageSub, setDosageSub] = useState<'dosage' | 'androgen'>('dosage');
   const allPharma = Object.values(PHARMA_DB).filter((s) => PHARMA_CLASSES.includes(s.class as PharmaClass));
   const [drug, setDrug] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
@@ -953,7 +957,20 @@ const DosageCalculatorTab: React.FC = () => {
 
   return (
     <div>
-      <div className="card" style={{ marginBottom: 12 }}>
+      {/* Sub-tab pills */}
+      <div style={{ display:'flex', gap:4, marginBottom:8 }}>
+        {(['dosage','androgen'] as const).map(t => (
+          <button key={t} onClick={() => setDosageSub(t)} style={{
+            padding:'6px 14px', borderRadius:16, fontSize:11, fontWeight:600, whiteSpace:'nowrap',
+            cursor:'pointer', flexShrink:0,
+            background: dosageSub === t ? 'var(--accent)' : 'var(--bg-secondary)',
+            color: dosageSub === t ? '#000' : 'var(--text-dim)',
+            border: `1px solid ${dosageSub === t ? 'var(--accent)' : 'var(--border)'}`,
+          }}>{t === 'dosage' ? '💉 Калькулятор дозировок' : '🧬 Андрогенный индекс'}</button>
+        ))}
+      </div>
+
+      {dosageSub === 'dosage' && <><div className="card" style={{ marginBottom: 12 }}>
         <h3 style={{ margin: '0 0 12px 0', fontSize: 14, color: 'var(--accent)' }}>💉 Калькулятор дозировки</h3>
 
         {/* Search */}
@@ -1113,7 +1130,8 @@ const DosageCalculatorTab: React.FC = () => {
       )}
 
       {/* ═══ Androgenic Index Calculator ═══ */}
-      <AndrogenicIndexCalculator />
+      </>}
+      {dosageSub === 'androgen' && <AndrogenicIndexCalculator />}
     </div>
   );
 };
@@ -1176,6 +1194,7 @@ const AndrogenicIndexCalculator: React.FC = () => {
 };
 
 const InteractionCheckerTab: React.FC = () => {
+  const [interactSub, setInteractSub] = useState<'interactions' | 'synergies'>('interactions');
   // Filter to show only pharma substances
   const allSubstances = useMemo(() => {
     return Object.values(PHARMA_DB).filter(s => 
@@ -1255,6 +1274,90 @@ const InteractionCheckerTab: React.FC = () => {
 
   return (
     <div>
+      {/* Sub-tab pills */}
+      <div style={{ display:'flex', gap:4, marginBottom:8 }}>
+        {(['interactions','synergies'] as const).map(t => (
+          <button key={t} onClick={() => setInteractSub(t)} style={{
+            padding:'6px 14px', borderRadius:16, fontSize:11, fontWeight:600, whiteSpace:'nowrap',
+            cursor:'pointer', flexShrink:0,
+            background: interactSub === t ? 'var(--accent)' : 'var(--bg-secondary)',
+            color: interactSub === t ? '#000' : 'var(--text-dim)',
+            border: `1px solid ${interactSub === t ? 'var(--accent)' : 'var(--border)'}`,
+          }}>{t === 'interactions' ? '⚡ Взаимодействия' : '💥 Синергии и комбинации'}</button>
+        ))}
+      </div>
+
+      {interactSub === 'synergies' ? (
+        <div className="card">
+          <h3 style={{ margin: '0 0 4px 0', fontSize: 14, color: 'var(--accent)' }}>💥 Синергии и комбинации</h3>
+          <p style={{ fontSize: 11, color: 'var(--text-dim)', margin: '0 0 12px 0' }}>
+            Ключевые синергетические пары между фармакологическими препаратами
+          </p>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 8 }}>
+            {pharmaSynergies.map((pair, i) => {
+              const synergyColors: Record<string, string> = {
+                synergistic: 'rgba(0,230,138,0.1)',
+                additive: 'rgba(59,130,246,0.1)',
+                potentiative: 'rgba(249,115,22,0.1)',
+                complementary: 'rgba(168,85,247,0.1)',
+              };
+              const synergyColorsText: Record<string, string> = {
+                synergistic: '#00e68a',
+                additive: '#3b82f6',
+                potentiative: '#f97316',
+                complementary: '#a855f7',
+              };
+              const aName = PHARMA_DB[pair.substanceA]?.name || pair.substanceA;
+              const bName = PHARMA_DB[pair.substanceB]?.name || pair.substanceB;
+              return (
+                <div key={i} style={{
+                  background: synergyColors[pair.synergyType] || 'rgba(255,255,255,0.03)',
+                  borderRadius: 8, padding: '12px 14px',
+                  border: '1px solid ' + (synergyColorsText[pair.synergyType] || '#888') + '50',
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+                    <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 4,
+                      background: synergyColorsText[pair.synergyType] + '20', color: synergyColorsText[pair.synergyType],
+                    }}>
+                      {pair.synergyType === 'synergistic' ? '⊕ Синергия' : pair.synergyType === 'additive' ? '+ Аддитивно' : pair.synergyType === 'potentiative' ? '↗ Усиление' : '↔ Дополнение'}
+                    </span>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: synergyColorsText[pair.synergyType] }}>
+                      {Math.round(pair.strength * 100)}%
+                    </span>
+                  </div>
+                  <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6, color: 'var(--text)' }}>
+                    {aName} + {bName}
+                  </div>
+                  <div style={{ fontSize: 11, lineHeight: 1.5, color: 'var(--text-light)' }}>
+                    {pair.mechanism}
+                  </div>
+                  {pair.clinicalNote && (
+                    <div style={{ marginTop: 6, fontSize: 10, color: '#22c55e', fontStyle: 'italic' }}>
+                      💡 {pair.clinicalNote}
+                    </div>
+                  )}
+                  {pair.affectedSystems && pair.affectedSystems.length > 0 && (
+                    <div style={{ marginTop: 8, display: 'flex', flexWrap: 'wrap', gap: 3 }}>
+                      {pair.affectedSystems.map(sys => (
+                        <span key={sys} style={{
+                          fontSize: 9, padding: '2px 6px', borderRadius: 4,
+                          background: synergyColorsText[pair.synergyType] + '20',
+                          color: synergyColorsText[pair.synergyType],
+                        }}>{SYSTEM_INFO[sys]?.label || sys}</span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+            {pharmaSynergies.length === 0 && (
+              <div style={{ textAlign: 'center', padding: 20, color: 'var(--text-dim)', fontSize: 12 }}>
+                Нет синергий для отображения
+              </div>
+            )}
+          </div>
+        </div>
+      ) : (<>
       {/* Header */}
       <div className="card" style={{ marginBottom: 12 }}>
         <h3 style={{ margin: '0 0 4px 0', fontSize: 14, color: 'var(--accent)' }}>⚡ Проверка взаимодействий</h3>
@@ -1396,86 +1499,7 @@ const InteractionCheckerTab: React.FC = () => {
         </div>
       )}
 
-      {/* Pharma-only Synergies */}
-      {pharmaSynergies.length > 0 && (
-        <div className="card" style={{ marginTop: 12 }}>
-          <h3 style={{ margin: '0 0 4px 0', fontSize: 14, color: 'var(--accent)' }}>💥 Синергии и комбинации</h3>
-          <p style={{ fontSize: 11, color: 'var(--text-dim)', margin: '0 0 12px 0' }}>
-            Ключевые синергетические пары между фармакологическими препаратами
-          </p>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 8 }}>
-            {pharmaSynergies.map((pair, i) => {
-              const synergyColors: Record<string, string> = {
-                synergistic: 'rgba(0,230,138,0.1)',
-                additive: 'rgba(59,130,246,0.1)',
-                potentiative: 'rgba(249,115,22,0.1)',
-                complementary: 'rgba(168,85,247,0.1)',
-              };
-              const synergyColorsText: Record<string, string> = {
-                synergistic: '#00e68a',
-                additive: '#3b82f6',
-                potentiative: '#f97316',
-                complementary: '#a855f7',
-              };
-              const aName = PHARMA_DB[pair.substanceA]?.name || pair.substanceA;
-              const bName = PHARMA_DB[pair.substanceB]?.name || pair.substanceB;
-              
-              return (
-                <div key={i} style={{
-                  background: synergyColors[pair.synergyType] || 'rgba(255,255,255,0.03)',
-                  borderRadius: 8, padding: '12px 14px',
-                  border: '1px solid ' + (synergyColorsText[pair.synergyType] || '#888') + '50',
-                  transition: 'all 0.15s',
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
-                    <span style={{
-                      fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 4,
-                      background: synergyColorsText[pair.synergyType] + '20',
-                      color: synergyColorsText[pair.synergyType],
-                    }}>
-                      {(() => {
-                        switch (pair.synergyType) {
-                          case 'synergistic': return '⊕ Синергия';
-                          case 'additive': return '+ Аддитивно';
-                          case 'potentiative': return '↗ Усиление';
-                          case 'complementary': return '↔ Дополнение';
-                          default: return pair.synergyType;
-                        }
-                      })()}
-                    </span>
-                    <span style={{ fontSize: 11, fontWeight: 700, color: synergyColorsText[pair.synergyType] }}>
-                      {Math.round(pair.strength * 100)}%
-                    </span>
-                  </div>
-                  <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6, color: 'var(--text)' }}>
-                    {aName} + {bName}
-                  </div>
-                  <div style={{ fontSize: 11, lineHeight: 1.5, color: 'var(--text-light)' }}>
-                    {pair.mechanism}
-                  </div>
-                  {pair.clinicalNote && (
-                    <div style={{ marginTop: 6, fontSize: 10, color: '#22c55e', fontStyle: 'italic' }}>
-                      💡 {pair.clinicalNote}
-                    </div>
-                  )}
-                  {pair.affectedSystems && pair.affectedSystems.length > 0 && (
-                    <div style={{ marginTop: 8, display: 'flex', flexWrap: 'wrap', gap: 3 }}>
-                      {pair.affectedSystems.map(sys => (
-                        <span key={sys} style={{
-                          fontSize: 9, padding: '2px 6px', borderRadius: 4,
-                          background: 'rgba(255,255,255,0.08)', color: 'var(--text-dim)',
-                        }}>
-                          {SYSTEM_LABELS[sys] || sys}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
+      </>)}
     </div>
   );
 };
@@ -1558,9 +1582,6 @@ const MapperTab: React.FC = () => {
           Алгоритм ищет в графе знаний все патологии для вашего стека.
           Стек-синергия: если 2+ препарата бьют по одной системе → кумулятивный удар.
           <br />
-          <span style={{ color: 'var(--accent)', fontSize: 10 }}>
-            ⚡ Работает в браузере. Сервер не нужен.
-          </span>
         </p>
       </div>
 
@@ -1875,9 +1896,6 @@ const DiagnosticsTab: React.FC = () => {
         <p style={{ fontSize: 11, color: 'var(--text-dim)', margin: 0 }}>
           PK/PD · Межлекарственные конфликты · Витальные показатели · BioAge · ПКТ-Таймер
           <br />
-          <span style={{ color: 'var(--accent)', fontSize: 10 }}>
-            ⚡ Все 5 движков работают в браузере. Сервер не нужен.
-          </span>
         </p>
       </div>
 

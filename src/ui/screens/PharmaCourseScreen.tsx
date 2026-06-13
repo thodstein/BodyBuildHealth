@@ -7,13 +7,15 @@ import { notifyDataChange } from '../../core/data-link';
 import type { CourseEntry } from '../../core/types';
 
 const CLASS_LABELS: Record<string, string> = {
-  testosterone: '', trenbolone: '⚡ Тренболон', nandrolone: '',
-  boldenone: '', primobolan: '', oral_17aa: '☠️ Оральные 17-α',
-  sarm: '', peptide_ghrh: '', peptide_ghrp: '',
-  igf1: '', mgf: '', insulin: '',
-  pct_serm: '', pct_aromatase: '', pct_dopamine: '',
-  pct_gonadotropin: '', drostanolone: '',
-  peptide_gnrh: '', peptide_fat_loss: '', peptide_other: '',
+  testosterone: 'Тестостерон', trenbolone: 'Тренболон', nandrolone: 'Нандролон',
+  boldenone: 'Болденон', primobolan: 'Примоболан', oral_17aa: 'Оральные 17-α',
+  sarm: 'SARM', peptide_ghrh: 'GHRH', peptide_ghrp: 'GHRP',
+  igf1: 'IGF-1', mgf: 'МГФ', insulin: 'Инсулин',
+  pct_serm: 'СЕРМ', pct_aromatase: 'Ингиб. ароматазы', pct_dopamine: 'Дофамин',
+  pct_gonadotropin: 'Гонадотропин', drostanolone: 'Дростанолон',
+  peptide_gnrh: 'GnRH', peptide_fat_loss: 'Жиросжигающие', peptide_other: 'Прочие',
+  support: 'Поддержка', peptide_regenerative: 'Регенеративные', peptide_immune: 'Иммунные',
+  peptide_nootropic: 'Ноотропы',
 };
 
 const CLASS_COLORS: Record<string, string> = {
@@ -24,6 +26,8 @@ const CLASS_COLORS: Record<string, string> = {
   pct_serm: '#22c55e', pct_aromatase: '#ef4444', pct_dopamine: '#eab308',
   pct_gonadotropin: '#3b82f6', drostanolone: '#f97316',
   peptide_gnrh: '#14b8a6', peptide_fat_loss: '#f97316', peptide_other: '#6b7280',
+  support: '#22c55e', peptide_regenerative: '#ec4899', peptide_immune: '#a855f7',
+  peptide_nootropic: '#8b5cf6',
 };
 
 const FREQ_OPTIONS = [
@@ -34,7 +38,18 @@ const FREQ_OPTIONS = [
   { value: 'daily', label: 'Ежедн.' },
 ];
 
+const FREQ_SHORT: Record<string, string> = {
+  '1x/wk': '1р/нед', '2x/wk': '2р/нед', '3x/wk': '3р/нед',
+  'eod': 'ч/д', 'daily': 'ежедн',
+};
+
 const UNIT_OPTIONS = ['mg/wk', 'mg', 'mcg', 'IU', 'ml'];
+
+const pillStyle: React.CSSProperties = {
+  display: 'inline-flex', alignItems: 'center', gap: 4,
+  padding: '2px 8px', borderRadius: 10, fontSize: 10,
+  fontWeight: 600, whiteSpace: 'nowrap',
+};
 
 export const PharmaCourseScreen: React.FC = () => {
   const [course, setCourse] = useState<CourseEntry[]>([]);
@@ -100,92 +115,249 @@ export const PharmaCourseScreen: React.FC = () => {
     } catch (e) { console.error(e); }
   };
 
+  const updateEntry = async (id: string, changes: Partial<CourseEntry>) => {
+    try {
+      const entry = course.find(e => e.id === id);
+      if (!entry) return;
+      const updated = { ...entry, ...changes };
+      await db.put('course_log', updated);
+      setCourse(prev => prev.map(e => e.id === id ? updated : e));
+      notifyDataChange();
+    } catch (e) { console.error(e); }
+  };
+
   const subName = (id: string) => PHARMA_DB[id]?.name ?? id;
   const subClass = (id: string) => PHARMA_DB[id]?.class ?? '';
 
-  if (loading) return <div className="screen-loading"><div className="loading-spinner"/><span>Загрузка...</span></div>;
+  const freqDisplay = (entry: CourseEntry) => {
+    if (typeof entry.frequency === 'number') return `${entry.frequency}×/нед`;
+    return FREQ_SHORT[entry.frequency] || entry.frequency;
+  };
+
+  const classColor = (cls: string) => CLASS_COLORS[cls] || 'var(--accent)';
+
+  const totalWeeks = course.reduce((max, e) => Math.max(max, e.endWeek || 0), 0);
+  const currentWeek = 0;
+
+  const weekBar = (entry: CourseEntry) => {
+    const w = totalWeeks || 16;
+    const s = ((entry.startWeek || 0) / w) * 100;
+    const e = (((entry.endWeek || w) - (entry.startWeek || 0)) / w) * 100;
+    return { left: `${s}%`, width: `${e}%` };
+  };
+
+  if (loading) return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '60px 20px', gap: 12 }}>
+      <div style={{ width: 32, height: 32, border: '3px solid var(--border)', borderTopColor: '#00e68a', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+      <span style={{ fontSize: 13, color: 'var(--text-dim)' }}>Загрузка курса...</span>
+    </div>
+  );
 
   const subsForClass = SUBSTANCES_BY_CLASS[pickerClass] ?? [];
 
   return (
-    <div className="screen pharma-course">
-      <h2>💊 Мой курс</h2>
+    <div style={{ padding: '0 0 16px' }}>
+      <style>{`
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .pc-card { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; backdrop-filter: blur(8px); transition: all 0.2s; }
+        .pc-card:hover { border-color: rgba(255,255,255,0.12); }
+        .pc-btn { cursor: pointer; transition: all 0.15s; user-select: none; }
+        .pc-btn:active { transform: scale(0.97); }
+        .pc-sub-btn { cursor: pointer; transition: all 0.15s; }
+        .pc-sub-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 16px rgba(0,0,0,0.3); }
+        .pc-sub-btn:active { transform: scale(0.96); }
+        .pc-input { transition: border-color 0.15s; }
+        .pc-input:focus { border-color: #00e68a !important; outline: none; }
+      `}</style>
+
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontSize: 20 }}>💊</span>
+          <span style={{ fontWeight: 700, fontSize: 16, color: '#fff' }}>Мой курс</span>
+          {course.length > 0 && (
+            <span style={{ background: 'rgba(0,230,138,0.15)', color: '#00e68a', borderRadius: 10, padding: '1px 8px', fontSize: 11, fontWeight: 600 }}>
+              {course.length}
+            </span>
+          )}
+        </div>
+        <button onClick={() => setShowPicker(true)} className="pc-btn" style={{
+          background: 'linear-gradient(135deg, #00e68a, #00b368)', color: '#000',
+          border: 'none', borderRadius: 10, padding: '8px 16px', fontWeight: 700,
+          fontSize: 13, display: 'flex', alignItems: 'center', gap: 6,
+          boxShadow: '0 2px 12px rgba(0,230,138,0.25)',
+        }}>
+          <span style={{ fontSize: 16, lineHeight: 1 }}>+</span> Добавить
+        </button>
+      </div>
 
       {/* Course entries */}
       {course.length > 0 ? (
-        <div className="card" style={{ marginBottom: 8 }}>
-          <h3>📋 Текущий курс</h3>
-          <div style={{ display: 'grid', gap: 6 }}>
-            {course.map(entry => {
-              const cls = subClass(entry.substanceId);
-              const color = CLASS_COLORS[cls] || 'var(--accent)';
-              return (
-                <div key={entry.id} style={{
-                  background: 'var(--bg-secondary)', borderRadius: 8, padding: '8px 10px',
-                  borderLeft: `3px solid ${color}`,
-                  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                }}>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: 600, fontSize: 12 }}>{subName(entry.substanceId)}</div>
-                    <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 2 }}>
-                      {entry.doseValue} {entry.doseUnit} • {typeof entry.frequency === 'number' ? `${entry.frequency}×/нед` : entry.frequency} • нед {entry.startWeek}–{entry.endWeek}
-                    </div>
-                  </div>
-                  <button onClick={() => removeEntry(entry.id)} style={{
-                    background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.3)',
-                    color: '#ef4444', borderRadius: 6, padding: '4px 8px', fontSize: 10, cursor: 'pointer',
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {course.map((entry, idx) => {
+            const cls = subClass(entry.substanceId);
+            const color = classColor(cls);
+            const sub = PHARMA_DB[entry.substanceId];
+            const bar = weekBar(entry);
+            return (
+              <div key={entry.id} className="pc-card" style={{
+                overflow: 'hidden', position: 'relative',
+                borderLeft: `3px solid ${color}`,
+              }}>
+                {/* Week bar background */}
+                {totalWeeks > 0 && (
+                  <div style={{
+                    position: 'absolute', top: 0, left: 0, right: 0, height: 3,
+                    background: 'rgba(255,255,255,0.04)',
                   }}>
-                    ✕
-                  </button>
+                    <div style={{
+                      position: 'absolute', top: 0, left: bar.left, width: bar.width, height: '100%',
+                      background: `${color}60`, borderRadius: '0 2px 2px 0',
+                    }} />
+                  </div>
+                )}
+
+                <div style={{ padding: '10px 12px', display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+                  {/* Class icon */}
+                  <div style={{
+                    width: 32, height: 32, borderRadius: 8,
+                    background: `${color}18`, border: `1px solid ${color}30`,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: 15, flexShrink: 0,
+                  }}>
+                    {cls === 'testosterone' || cls === 'trenbolone' || cls === 'nandrolone' || cls === 'boldenone' || cls === 'primobolan' || cls === 'drostanolone' ? '💉'
+                    : cls === 'oral_17aa' ? '💊'
+                    : cls === 'sarm' ? '🧬'
+                    : cls === 'peptide_ghrh' || cls === 'peptide_ghrp' || cls === 'peptide_fat_loss' || cls === 'peptide_gnrh' || cls === 'peptide_regenerative' || cls === 'peptide_immune' || cls === 'peptide_nootropic' || cls === 'peptide_other' ? '🧪'
+                    : cls === 'igf1' || cls === 'mgf' ? '🔬'
+                    : cls === 'insulin' ? '🩸'
+                    : cls === 'pct_serm' || cls === 'pct_aromatase' || cls === 'pct_dopamine' || cls === 'pct_gonadotropin' ? '🔄'
+                    : cls === 'support' ? '🛡️'
+                    : '💊'}
+                  </div>
+
+                  {/* Main info */}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginBottom: 2 }}>
+                      <span style={{ fontWeight: 700, fontSize: 13, color: '#fff' }}>{subName(entry.substanceId)}</span>
+                      <span style={{ ...pillStyle, background: `${color}20`, color, border: `1px solid ${color}40` }}>
+                        {CLASS_LABELS[cls] || cls}
+                      </span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', fontSize: 11, color: 'rgba(255,255,255,0.5)' }}>
+                      <span style={{ color: '#fff', fontWeight: 600 }}>{entry.doseValue}</span>
+                      <span style={{ color: 'rgba(255,255,255,0.4)' }}>{entry.doseUnit}</span>
+                      <span style={{ color: 'rgba(255,255,255,0.2)' }}>·</span>
+                      <span>{freqDisplay(entry)}</span>
+                      <span style={{ color: 'rgba(255,255,255,0.2)' }}>·</span>
+                      <span>нед {entry.startWeek}–{entry.endWeek}</span>
+                      {sub?.pk?.halfLifeHours && (
+                        <>
+                          <span style={{ color: 'rgba(255,255,255,0.2)' }}>·</span>
+                          <span>T½ {sub.pk.halfLifeHours >= 168 ? `${(sub.pk.halfLifeHours / 168).toFixed(1)} нед` : `${(sub.pk.halfLifeHours / 24).toFixed(1)} дн`}</span>
+                        </>
+                      )}
+                    </div>
+                    {/* Week bar visual */}
+                    {totalWeeks > 0 && (
+                      <div style={{ marginTop: 6, height: 4, background: 'rgba(255,255,255,0.06)', borderRadius: 2, position: 'relative', overflow: 'hidden' }}>
+                        <div style={{
+                          position: 'absolute', top: 0, left: bar.left, width: bar.width, height: '100%',
+                          background: `linear-gradient(90deg, ${color}60, ${color})`,
+                          borderRadius: 2,
+                        }} />
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Actions */}
+                  <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+                    <button onClick={() => removeEntry(entry.id)} className="pc-btn" style={{
+                      background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.25)',
+                      color: '#ef4444', borderRadius: 8, padding: '6px 8px', fontSize: 12, lineHeight: 1,
+                    }}
+                      title="Удалить">
+                      ✕
+                    </button>
+                  </div>
                 </div>
-              );
-            })}
-          </div>
+              </div>
+            );
+          })}
         </div>
       ) : (
-        <div className="card" style={{ textAlign: 'center', padding: 20, marginBottom: 8 }}>
-          <div style={{ fontSize: 36, marginBottom: 8 }}>💊</div>
-          <div style={{ fontSize: 13, color: 'var(--text-dim)' }}>Курс пуст. Добавьте препараты.</div>
+        <div className="pc-card" style={{ textAlign: 'center', padding: '28px 16px' }}>
+          <div style={{ fontSize: 36, marginBottom: 8, opacity: 0.6 }}>💊</div>
+          <div style={{ fontSize: 13, color: 'var(--text-dim)', marginBottom: 4 }}>Курс пуст</div>
+          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)' }}>Нажмите «Добавить», чтобы начать</div>
         </div>
       )}
 
-      {/* Add button — always visible at top */}
-      <button onClick={() => setShowPicker(true)} style={{
-        width: '100%', padding: 12, background: 'linear-gradient(135deg, var(--accent), #00b368)', color: '#000',
-        border: 'none', borderRadius: 10, cursor: 'pointer', fontWeight: 700,
-        fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-        marginBottom: 10, position: 'sticky', top: 0, zIndex: 5, boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
-      }}>
-        <span style={{ fontSize: 20 }}>+</span> Добавить препарат
-      </button>
-
       {/* Validation warnings */}
       {validation.warnings.length > 0 && (
-        <div style={{ background: 'var(--warning-dim)', border: '1px solid var(--warning)', borderRadius: 8, padding: 8, marginTop: 8 }}>
-          {validation.warnings.map((w, i) => <div key={i} style={{ fontSize: 11, color: 'var(--warning)' }}>⚠️ {w}</div>)}
+        <div style={{
+          marginTop: 10, background: 'rgba(255,165,2,0.08)', border: '1px solid rgba(255,165,2,0.25)',
+          borderRadius: 10, padding: '8px 12px',
+        }}>
+          <div style={{ fontSize: 11, fontWeight: 600, color: '#f59e0b', marginBottom: 4 }}>⚠️ Предупреждения</div>
+          {validation.warnings.map((w, i) => (
+            <div key={i} style={{ fontSize: 11, color: 'rgba(255,165,2,0.8)', padding: '2px 0' }}>{w}</div>
+          ))}
         </div>
       )}
 
       {/* Interactions */}
       {interactions.length > 0 && (
-        <div className="card" style={{ marginTop: 8 }}>
-          <h3>⚡ Взаимодействия</h3>
-          <div style={{ display: 'grid', gap: 6 }}>
-            {interactions.map((alert: any, i: number) => (
-              <div key={i} style={{
-                background: alert.type === 'critical' ? 'rgba(239,68,68,0.15)' : 'rgba(255,165,2,0.1)',
-                borderRadius: 6, padding: '8px 10px',
-                borderLeft: `3px solid ${alert.type === 'critical' ? '#ef4444' : '#eab308'}`,
-              }}>
-                <div style={{ fontWeight: 600, fontSize: 11 }}>{alert.type}: {alert.drugs?.join(' + ')}</div>
-                <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 2 }}>{alert.mechanism}</div>
-              </div>
-            ))}
+        <div className="pc-card" style={{ marginTop: 10, padding: 0, overflow: 'hidden' }}>
+          <div style={{ padding: '8px 12px', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span>⚡</span>
+            <span style={{ fontWeight: 700, fontSize: 12 }}>Взаимодействия</span>
+            <span style={{ background: 'rgba(255,255,255,0.06)', borderRadius: 8, padding: '0 6px', fontSize: 10, color: 'var(--text-dim)' }}>{interactions.length}</span>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
+            {interactions.map((alert: any, i: number) => {
+              const isCrit = alert.type === 'critical';
+              return (
+                <div key={i} style={{
+                  padding: '8px 12px',
+                  borderBottom: i < interactions.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none',
+                  borderLeft: `3px solid ${isCrit ? '#ef4444' : '#eab308'}`,
+                  background: isCrit ? 'rgba(239,68,68,0.06)' : 'rgba(255,165,2,0.04)',
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                    <span style={{
+                      ...pillStyle, fontSize: 9,
+                      background: isCrit ? 'rgba(239,68,68,0.15)' : 'rgba(255,165,2,0.15)',
+                      color: isCrit ? '#ef4444' : '#f59e0b',
+                    }}>
+                      {isCrit ? 'Критично' : 'Внимание'}
+                    </span>
+                    <span style={{ fontSize: 11, fontWeight: 600 }}>{alert.drugs?.join(' + ')}</span>
+                  </div>
+                  <div style={{ fontSize: 10, color: 'var(--text-dim)', lineHeight: 1.4 }}>{alert.mechanism}</div>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
 
-      {/* Auto protocol — moved to Support tab */}
+      {/* Summary stats */}
+      {course.length > 1 && (
+        <div className="pc-card" style={{ marginTop: 10, padding: '10px 12px', display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+          <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>
+            Всего препаратов: <span style={{ color: '#fff', fontWeight: 700 }}>{course.length}</span>
+          </div>
+          <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>
+            Длительность: <span style={{ color: '#fff', fontWeight: 700 }}>нед 0–{totalWeeks}</span>
+          </div>
+          <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>
+            Классы: <span style={{ color: '#fff', fontWeight: 700 }}>
+              {[...new Set(course.map(e => subClass(e.substanceId)).filter(Boolean))].length}
+            </span>
+          </div>
+        </div>
+      )}
 
       {/* ========= DRUG PICKER MODAL ========= */}
       {showPicker && (
@@ -193,114 +365,157 @@ export const PharmaCourseScreen: React.FC = () => {
           position: 'fixed', inset: 0, zIndex: 200,
           background: 'rgba(0,0,0,0.7)',
           backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)',
-          display: 'flex', flexDirection: 'column',
+          display: 'flex', flexDirection: 'column', justifyContent: 'center',
+          alignItems: 'center',
         }} onClick={() => setShowPicker(false)}>
           <div style={{
-            position: 'fixed', top: '8%', left: '4%', right: '4%', zIndex: 201,
-            background: 'var(--bg, #050508)',
-            borderTop: '1px solid var(--border)',
-            borderRadius: '20px',
-            maxHeight: '82vh',
+            width: '92%', maxWidth: 420,
+            maxHeight: '88vh',
+            background: '#0a0a0f',
+            border: '1px solid rgba(255,255,255,0.08)',
+            borderRadius: 20,
             overflow: 'hidden',
             display: 'flex', flexDirection: 'column',
+            boxShadow: '0 20px 60px rgba(0,0,0,0.6)',
           }} onClick={e => e.stopPropagation()}>
             {/* Modal header */}
             <div style={{
-              padding: '12px 16px 8px',
-              borderBottom: '1px solid var(--border)',
+              padding: '14px 16px 10px',
+              borderBottom: '1px solid rgba(255,255,255,0.06)',
               display: 'flex', justifyContent: 'space-between', alignItems: 'center',
             }}>
-              <div style={{ fontWeight: 700, fontSize: 15 }}>💊 Добавить препарат</div>
-              <button onClick={() => setShowPicker(false)} style={{
-                background: 'var(--bg-secondary)', border: '1px solid var(--border)',
-                color: 'var(--text-dim)', borderRadius: 8, padding: '4px 10px',
-                fontSize: 12, cursor: 'pointer',
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontWeight: 700, fontSize: 15, color: '#fff' }}>💊 Добавить препарат</span>
+              </div>
+              <button onClick={() => setShowPicker(false)} className="pc-btn" style={{
+                background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)',
+                color: 'rgba(255,255,255,0.5)', borderRadius: 8, padding: '5px 10px',
+                fontSize: 12, lineHeight: 1,
               }}>
-                ✕ Закрыть
+                ✕
               </button>
             </div>
 
-            {/* Class selector — pills */}
+            {/* Class selector — scrollable pills */}
             <div style={{
-              padding: '8px 8px 4px',
-              display: 'flex', gap: 4, flexWrap: 'wrap',
-              borderBottom: '1px solid var(--border)',
-              maxHeight: 120, overflowY: 'auto',
+              padding: '8px 10px 6px',
+              display: 'flex', gap: 5, flexWrap: 'wrap',
+              borderBottom: '1px solid rgba(255,255,255,0.06)',
+              maxHeight: 100, overflowY: 'auto',
             }}>
               {Object.entries(CLASS_LABELS).map(([cls, label]) => {
                 const hasSubs = SUBSTANCES_BY_CLASS[cls]?.length > 0;
                 if (!hasSubs) return null;
                 const isActive = pickerClass === cls;
-                const color = CLASS_COLORS[cls] || 'var(--accent)';
+                const color = CLASS_COLORS[cls] || '#00e68a';
                 return (
-                  <button key={cls} onClick={() => setPickerClass(cls)} style={{
-                    background: isActive ? `${color}20` : 'var(--bg-secondary)',
-                    border: `1px solid ${isActive ? color : 'var(--border)'}`,
-                    color: isActive ? color : 'var(--text-dim)',
-                    borderRadius: 20, padding: '7px 14px', fontSize: 12,
-                    fontWeight: isActive ? 700 : 500, cursor: 'pointer',
-                    whiteSpace: 'nowrap', transition: 'all 0.15s',
+                  <button key={cls} onClick={() => setPickerClass(cls)} className="pc-btn" style={{
+                    background: isActive ? `${color}18` : 'rgba(255,255,255,0.04)',
+                    border: `1px solid ${isActive ? `${color}50` : 'rgba(255,255,255,0.08)'}`,
+                    color: isActive ? color : 'rgba(255,255,255,0.5)',
+                    borderRadius: 20, padding: '6px 12px', fontSize: 11,
+                    fontWeight: isActive ? 700 : 500,
+                    whiteSpace: 'nowrap',
                   }}>
-                    {label} <span style={{ fontSize: 9, opacity: 0.6 }}>{SUBSTANCES_BY_CLASS[cls]?.length || 0}</span>
+                    {label}
+                    <span style={{ marginLeft: 4, fontSize: 9, opacity: 0.5 }}>{SUBSTANCES_BY_CLASS[cls]?.length || 0}</span>
                   </button>
                 );
               })}
             </div>
 
             {/* Scrollable content */}
-            <div style={{ flex: 1, overflowY: 'auto', padding: '10px 12px' }}>
-              {/* Substance grid — one-click add with defaults */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, marginBottom: 8 }}>
+            <div style={{ flex: 1, overflowY: 'auto', padding: '8px 10px' }}>
+              {/* Substance grid — one-click add */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 10 }}>
                 {subsForClass.map(sub => {
-                  const color = CLASS_COLORS[sub.class] || 'var(--accent)';
+                  const color = CLASS_COLORS[sub.class] || '#00e68a';
                   const defDose = sub.dosageRange?.min ? Math.round((sub.dosageRange.min + sub.dosageRange.max) / 2) : 250;
+                  const hl = sub.pk?.halfLifeHours;
                   return (
                     <div key={sub.id} onClick={() => {
                       setDose(String(defDose));
                       addEntry(sub.id);
-                    }} style={{
-                      background: 'var(--bg-secondary)',
-                      border: `1px solid var(--border)`,
-                      borderRadius: 10, padding: '8px 6px',
+                    }} className="pc-sub-btn" style={{
+                      background: 'rgba(255,255,255,0.03)',
+                      border: `1px solid rgba(255,255,255,0.06)`,
+                      borderRadius: 10, padding: '10px 8px',
                       cursor: 'pointer', textAlign: 'center',
-                      transition: 'all 0.15s',
-                    }} onMouseEnter={e => (e.currentTarget.style.borderColor = color)}
-                       onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--border)')}>
-                      <div style={{ fontWeight: 600, fontSize: 11, color, marginBottom: 2 }}>{sub.name}</div>
-                      <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>
-                        {sub.pk?.halfLifeHours ? `T½ ${sub.pk.halfLifeHours >= 168 ? `${(sub.pk.halfLifeHours/168).toFixed(1)} нед` : `${(sub.pk.halfLifeHours/24).toFixed(1)} дн`}` : ''}
-                        {sub.dosageRange ? ` | ${sub.dosageRange.min}–${sub.dosageRange.max}${sub.dosageRange.unit}` : ''}
+                      position: 'relative', overflow: 'hidden',
+                    }}>
+                      {/* Top color bar */}
+                      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: color }} />
+                      <div style={{ fontWeight: 700, fontSize: 11, color, marginBottom: 3, lineHeight: 1.3 }}>{sub.name}</div>
+                      <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)', marginBottom: 2 }}>
+                        {hl ? (hl >= 168 ? `T½ ${(hl / 168).toFixed(1)} нед` : `T½ ${(hl / 24).toFixed(1)} дн`) : ''}
+                        {sub.dosageRange ? ` · ${sub.dosageRange.min}–${sub.dosageRange.max} ${sub.dosageRange.unit}` : ''}
                       </div>
-                      <div style={{ fontSize: 9, color: 'var(--accent)', marginTop: 2 }}>{defDose} мг → добавить</div>
+                      <div style={{
+                        display: 'inline-flex', alignItems: 'center', gap: 3,
+                        background: `${color}15`, color, borderRadius: 6,
+                        padding: '2px 8px', fontSize: 9, fontWeight: 600, marginTop: 2,
+                      }}>
+                        + {defDose} {unit}
+                      </div>
                     </div>
                   );
                 })}
               </div>
 
-              {/* Dose settings — for custom dosing before clicking */}
+              {/* Custom dose settings */}
               <div style={{
-                background: 'var(--bg-secondary)', borderRadius: 10, padding: 8,
-                border: '1px solid var(--border)',
+                background: 'rgba(255,255,255,0.03)', borderRadius: 10, padding: '10px 12px',
+                border: '1px solid rgba(255,255,255,0.06)',
               }}>
-                <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 4 }}>
-                  Или задайте свои параметры (нажмите на препарат выше для быстрого добавления):
+                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', marginBottom: 8, lineHeight: 1.3 }}>
+                  Задайте свою дозировку, затем нажмите на препарат выше:
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 4 }}>
-                  <div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+                  <div style={{ display: 'flex', gap: 4 }}>
                     <input type="number" value={dose} onChange={e => setDose(e.target.value)} placeholder="200"
-                      style={{ width: '100%', padding: '5px 6px', background: 'var(--bg-tertiary)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text)', fontSize: 12, boxSizing: 'border-box' }} />
+                      className="pc-input" style={{
+                        flex: 1, padding: '7px 8px', background: 'rgba(255,255,255,0.04)',
+                        border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8,
+                        color: '#fff', fontSize: 12, boxSizing: 'border-box', minWidth: 0,
+                      }} />
+                    <select value={unit} onChange={e => setUnit(e.target.value)}
+                      style={{
+                        padding: '7px 6px', background: 'rgba(255,255,255,0.04)',
+                        border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8,
+                        color: '#fff', fontSize: 10, boxSizing: 'border-box', minWidth: 56,
+                      }}>
+                      {UNIT_OPTIONS.map(u => <option key={u} value={u}>{u}</option>)}
+                    </select>
                   </div>
-                  <div>
+                  <div style={{ display: 'flex', gap: 4 }}>
                     <select value={freq} onChange={e => setFreq(e.target.value)}
-                      style={{ width: '100%', padding: '5px 6px', background: 'var(--bg-tertiary)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text)', fontSize: 11, boxSizing: 'border-box' }}>
+                      style={{
+                        flex: 1, padding: '7px 8px', background: 'rgba(255,255,255,0.04)',
+                        border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8,
+                        color: '#fff', fontSize: 11, boxSizing: 'border-box', minWidth: 0,
+                      }}>
                       {FREQ_OPTIONS.map(f => <option key={f.value} value={f.value}>{f.label}</option>)}
                     </select>
                   </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, marginTop: 6 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', whiteSpace: 'nowrap' }}>c нед</span>
                     <input type="number" value={startWeek} onChange={e => setStartWeek(parseInt(e.target.value) || 0)} min={0} placeholder="0"
-                      style={{ width: '100%', padding: '5px 4px', background: 'var(--bg-tertiary)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text)', fontSize: 11, boxSizing: 'border-box' }} />
+                      className="pc-input" style={{
+                        flex: 1, padding: '7px 8px', background: 'rgba(255,255,255,0.04)',
+                        border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8,
+                        color: '#fff', fontSize: 12, boxSizing: 'border-box', minWidth: 0, width: '100%',
+                      }} />
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', whiteSpace: 'nowrap' }}>по нед</span>
                     <input type="number" value={endWeek} onChange={e => setEndWeek(parseInt(e.target.value) || 12)} min={1} placeholder="12"
-                      style={{ width: '100%', padding: '5px 4px', background: 'var(--bg-tertiary)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text)', fontSize: 11, boxSizing: 'border-box' }} />
+                      className="pc-input" style={{
+                        flex: 1, padding: '7px 8px', background: 'rgba(255,255,255,0.04)',
+                        border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8,
+                        color: '#fff', fontSize: 12, boxSizing: 'border-box', minWidth: 0, width: '100%',
+                      }} />
                   </div>
                 </div>
               </div>

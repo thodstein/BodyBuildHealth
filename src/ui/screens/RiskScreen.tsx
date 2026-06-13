@@ -983,11 +983,9 @@ const MDSSRiskDisplay: React.FC = () => {
                   {Math.round(r.riskPercentage)}% — {r.status.split('(')[0].trim()}
                 </span>
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 4, fontSize: 9, color: 'var(--text-dim)', marginBottom: 4 }}>
-                <div>Hill: {r.hillScore}</div>
-                <div>MC P95: {r.severity95}</div>
-                <div>Z: {r.zTotal}</div>
-                <div>Gen: ×{r.geneticFactor}</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, fontSize: 10, color: 'var(--text-dim)', marginBottom: 4 }}>
+                <div>Hill: {r.hillScore} · MC P95: {r.severity95}</div>
+                <div>Z: {r.zTotal} · Gen: ×{r.geneticFactor}</div>
               </div>
               <div style={{ background: 'rgba(255,255,255,0.05)', borderRadius: 4, height: 8, overflow: 'hidden' }}>
                 <div style={{ width: `${Math.min(100, r.riskPercentage)}%`, height: '100%', background: ZONE_COLORS[r.alertLevel], borderRadius: 4 }} />
