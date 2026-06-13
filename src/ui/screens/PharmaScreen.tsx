@@ -23,6 +23,8 @@ const SYSTEM_LABELS: Record<string, string> = Object.fromEntries(
   Object.entries(SYSTEM_INFO_ALL).map(([k, v]) => [k, v.label.split(' ').slice(0, 2).join(' ')])
 );
 
+const INJECTABLE_WITH_ESTERS = new Set(['testosterone','trenbolone','nandrolone','boldenone','primobolan','drostanolone']);
+
 const CLASS_LABELS: Record<string, string> = {
   testosterone: 'Тестостерон',
   trenbolone: 'Тренболон',
@@ -143,16 +145,17 @@ export const PharmaScreen: React.FC = () => {
       { key:'info' as const, icon:'📖', title:'Общая информация', desc:'Каталог веществ и проверка взаимодействий', color:'#22c55e' },
     ];
     return (
-      <div className="screen pharma" style={{ padding: 0 }}>
-        <div style={{ width:'100%', height:'35vh', position:'relative', backgroundImage:'url(./pharma-hero.png)', backgroundSize:'cover', backgroundPosition:'center', backgroundRepeat:'no-repeat' }}>
-          <div style={{ position:'absolute', bottom:10, left:16, right:16 }}>
-            <h1 style={{ fontSize:20, fontWeight:800, color:'#fff', margin:'0 0 2px', textShadow:'0 2px 12px rgba(0,0,0,0.8)' }}>Фармакология</h1>
-            <p style={{ fontSize:11, color:'rgba(255,255,255,0.85)', margin:0, lineHeight:1.3, textShadow:'0 1px 6px rgba(0,0,0,0.7)' }}>
+      <div className="screen pharma" style={{ flex:1, minHeight:0, display:'flex', flexDirection:'column', overflow:'hidden', padding:0 }}>
+        <div style={{ flex:'0 0 42vh', position:'relative', maxHeight:'50vh' }}>
+          <img src="/pharma-hero.png" alt="" style={{ width:'100%', height:'100%', display:'block', objectFit:'cover', objectPosition:'center top' }} />
+          <div style={{ position:'absolute', bottom:14, left:20, right:20 }}>
+            <h1 style={{ fontSize:22, fontWeight:800, color:'#fff', margin:'0 0 2px', textShadow:'0 2px 14px rgba(0,0,0,0.9)' }}>Фармакология</h1>
+            <p style={{ fontSize:11, color:'rgba(255,255,255,0.9)', margin:0, lineHeight:1.3, textShadow:'0 1px 8px rgba(0,0,0,0.8)' }}>
               Курс, PK/PD симуляция, каталог веществ и проверка взаимодействий
             </p>
           </div>
         </div>
-        <div style={{ padding:'12px', display:'flex', flexDirection:'column', gap:8 }}>
+        <div style={{ flex:1, padding:'10px 16px 80px', display:'flex', flexDirection:'column', gap:8, overflowY:'auto' }}>
           {cards.map(c => (
             <button key={c.key} onClick={() => setPage(c.key)} style={{
               display:'flex', alignItems:'center', gap:12, padding:'14px 16px', borderRadius:14,
@@ -662,6 +665,7 @@ const PKPDSimulationTab: React.FC = () => {
   const [pkClass, setPkClass] = useState<string>('');
   const [showAllDrugs, setShowAllDrugs] = useState(true);
   const [visibleDrugs, setVisibleDrugs] = useState<Set<string>>(new Set());
+  const [pkEsterPopup, setPkEsterPopup] = useState<{ baseClass: string; label: string } | null>(null);
 
   const allSubstances = useMemo(() => {
     return Object.values(PHARMA_DB).filter(s => PHARMA_CLASSES.includes(s.class as PharmaClass));
@@ -949,34 +953,75 @@ const PKPDSimulationTab: React.FC = () => {
             border: '1px solid var(--border)', color: 'var(--text)', fontSize: 11, marginBottom: 6,
             boxSizing: 'border-box' }} />
 
-        {/* Drug grid */}
-        {(showAllDrugs || pkClass || pkSearch) && pkFiltered.length > 0 && (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: 4, maxHeight: 200, overflowY: 'auto' }}>
-            {pkFiltered.map(s => (
-              <div key={s.id} onClick={() => addDrug(s.id)} style={{
-                padding: '7px 9px', borderRadius: 8, cursor: 'pointer',
-                background: 'var(--bg-secondary)', border: '1px solid var(--border)',
-                transition: 'all 0.15s',
-              }}>
-                <div style={{ fontSize: 11, fontWeight: 600 }}>{s.name}</div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: 'var(--text-dim)', marginTop: 2 }}>
-                  <span>{CLASS_LABELS[s.class] || s.class}</span>
-                  <span>{s.pk?.halfLifeHours ? `${(s.pk.halfLifeHours / 24).toFixed(1)} дн` : ''}</span>
-                </div>
+        {/* Drug grid with ester grouping */}
+        {(() => {
+          const pkGrouped: { cls: string; label: string }[] = [];
+          const pkSingles: typeof allSubstances = [];
+          const seenCls = new Set<string>();
+          for (const s of pkFiltered) {
+            if (INJECTABLE_WITH_ESTERS.has(s.class)) {
+              if (!seenCls.has(s.class)) { seenCls.add(s.class); pkGrouped.push({ cls: s.class, label: CLASS_LABELS[s.class] || s.class }); }
+            } else { pkSingles.push(s); }
+          }
+          return (<>
+            {(showAllDrugs || pkClass || pkSearch) && (pkGrouped.length + pkSingles.length > 0) && (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: 4, maxHeight: 200, overflowY: 'auto' }}>
+                {pkGrouped.map(g => (
+                  <div key={g.cls} onClick={() => setPkEsterPopup({ baseClass: g.cls, label: g.label })} style={{
+                    padding:'8px 9px', borderRadius:8, cursor:'pointer',
+                    background:'var(--bg-secondary)', border:'1px solid var(--accent)',
+                  }}>
+                    <div style={{ fontSize:12, fontWeight:700, color:'var(--accent)', marginBottom:2 }}>{g.label}</div>
+                    <div style={{ fontSize:9, color:'var(--text-dim)' }}>👆 Эфиры</div>
+                  </div>
+                ))}
+                {pkSingles.map(s => (
+                  <div key={s.id} onClick={() => addDrug(s.id)} style={{
+                    padding: '7px 9px', borderRadius: 8, cursor: 'pointer',
+                    background: 'var(--bg-secondary)', border: '1px solid var(--border)',
+                    transition: 'all 0.15s',
+                  }}>
+                    <div style={{ fontSize: 11, fontWeight: 600 }}>{s.name}</div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: 'var(--text-dim)', marginTop: 2 }}>
+                      <span>{CLASS_LABELS[s.class] || s.class}</span>
+                      <span>{s.pk?.halfLifeHours ? `${(s.pk.halfLifeHours / 24).toFixed(1)} дн` : ''}</span>
+                    </div>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
-        )}
+            )}
 
-        {!showAllDrugs && !pkClass && !pkSearch && drugDoses.length > 0 && (
-          <div style={{ fontSize: 10, color: 'var(--text-dim)', textAlign: 'center', padding: 8 }}>
-            Выберите класс или начните поиск
-          </div>
-        )}
+            {!showAllDrugs && !pkClass && !pkSearch && drugDoses.length > 0 && (
+              <div style={{ fontSize: 10, color: 'var(--text-dim)', textAlign: 'center', padding: 8 }}>
+                Выберите класс или начните поиск
+              </div>
+            )}
 
-        {pkFiltered.length === 0 && (pkClass || pkSearch) && (
-          <div style={{ fontSize: 10, color: 'var(--text-dim)', textAlign: 'center', padding: 8 }}>
-            Все препараты этого класса уже добавлены
+            {pkFiltered.length === 0 && (pkClass || pkSearch) && (
+              <div style={{ fontSize: 10, color: 'var(--text-dim)', textAlign: 'center', padding: 8 }}>
+                Все препараты этого класса уже добавлены
+              </div>
+            )}
+          </>);
+        })()}
+
+        {/* PK ester popup */}
+        {pkEsterPopup && (
+          <div style={{ position:'fixed', inset:0, zIndex:1000, background:'rgba(0,0,0,0.6)', display:'flex', alignItems:'center', justifyContent:'center' }} onClick={() => setPkEsterPopup(null)}>
+            <div style={{ background:'var(--bg)', borderRadius:16, padding:20, maxWidth:320, width:'90%', maxHeight:'70vh', overflowY:'auto' }} onClick={e => e.stopPropagation()}>
+              <h3 style={{ margin:'0 0 12px', fontSize:15 }}>{pkEsterPopup.label} — выберите эфир</h3>
+              {allSubstances.filter(p => p.class === pkEsterPopup.baseClass).map(p => (
+                <div key={p.id} onClick={() => { addDrug(p.id); setPkEsterPopup(null); }} style={{
+                  padding:'10px 12px', borderRadius:10, cursor:'pointer', marginBottom:4,
+                  background:'var(--bg-secondary)', border:'1px solid var(--border)',
+                }}>
+                  <div style={{ fontSize:13, fontWeight:600 }}>{p.name}</div>
+                  <div style={{ fontSize:10, color:'var(--text-dim)', marginTop:2 }}>
+                    T½={(p.pk.halfLifeHours/24).toFixed(1)}дн {p.esters?.[0] ? `| ${p.esters[0]}` : ''}
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </div>
@@ -1061,10 +1106,12 @@ const DosageCalculatorTab: React.FC = () => {
   const [vialMl, setVialMl] = useState(10);
   const [syringeMl, setSyringeMl] = useState(1);
   const [doseResult, setDoseResult] = useState<ReturnType<typeof calculateDose> | null>(null);
+  const [esterPopup, setEsterPopup] = useState<{ baseClass: string; label: string } | null>(null);
 
   const subDetail = drug ? PHARMA_DB[drug] : null;
   const handleDrugChange = (id: string) => {
     setDrug(id);
+    setEsterPopup(null);
     const sub = PHARMA_DB[id];
     if ((sub as any)?.concentration) setConcentration(Number((sub as any).concentration));
   };
@@ -1090,12 +1137,41 @@ const DosageCalculatorTab: React.FC = () => {
   const perInjectionMg = weeklyTotal / Math.max(1, injectionsPerWeek);
   const wastePerVial = vialMl && doseResult ? Math.max(0, vialMl - (doseResult?.dosesPerVial || 0) * doseResult.volumeMl) : 0;
 
-  const filtered = searchTerm
+  const rawFiltered = searchTerm
     ? allPharma.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase()) || p.class.toLowerCase().includes(searchTerm.toLowerCase()))
     : dosageClass ? allPharma.filter(p => p.class === dosageClass) : allPharma;
+  const noOrals = rawFiltered.filter(p => p.class !== 'oral_17aa');
+  const grouped: { type: 'class'; cls: string; label: string }[] = [];
+  const singles: typeof noOrals = [];
+  const seenClasses = new Set<string>();
+  for (const p of noOrals) {
+    if (INJECTABLE_WITH_ESTERS.has(p.class)) {
+      if (!seenClasses.has(p.class)) { seenClasses.add(p.class); grouped.push({ type:'class', cls: p.class, label: CLASS_LABELS[p.class] || p.class }); }
+    } else { singles.push(p); }
+  }
 
   return (
     <div>
+      {/* Ester popup */}
+      {esterPopup && (
+        <div style={{ position:'fixed', inset:0, zIndex:1000, background:'rgba(0,0,0,0.6)', display:'flex', alignItems:'center', justifyContent:'center' }} onClick={() => setEsterPopup(null)}>
+          <div style={{ background:'var(--bg)', borderRadius:16, padding:20, maxWidth:320, width:'90%', maxHeight:'70vh', overflowY:'auto' }} onClick={e => e.stopPropagation()}>
+            <h3 style={{ margin:'0 0 12px', fontSize:15 }}>{esterPopup.label} — выберите эфир</h3>
+            {noOrals.filter(p => p.class === esterPopup.baseClass).map(p => (
+              <div key={p.id} onClick={() => handleDrugChange(p.id)} style={{
+                padding:'10px 12px', borderRadius:10, cursor:'pointer', marginBottom:4,
+                background:'var(--bg-secondary)', border:'1px solid var(--border)',
+              }}>
+                <div style={{ fontSize:13, fontWeight:600 }}>{p.name}</div>
+                <div style={{ fontSize:10, color:'var(--text-dim)', marginTop:2 }}>
+                  T½={(p.pk.halfLifeHours/24).toFixed(1)}дн {p.esters?.[0] ? `| Эфир: ${p.esters[0]}` : ''}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Sub-tab pills */}
       <div style={{ display:'flex', gap:4, marginBottom:8 }}>
         {(['dosage','androgen'] as const).map(t => (
@@ -1143,19 +1219,27 @@ const DosageCalculatorTab: React.FC = () => {
           style={{ width: '100%', padding: '8px 10px', borderRadius: 8, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, marginBottom: 12, boxSizing: 'border-box' }}
         />
 
-        {/* Drug cards grid */}
+        {/* Drug cards grid: grouped injectable classes + singles */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 5, maxHeight: 200, overflowY: 'auto', marginBottom: 12 }}>
-          {filtered.map((p) => {
+          {grouped.map(g => (
+            <div key={g.cls} onClick={() => setEsterPopup({ baseClass: g.cls, label: g.label })} style={{
+              padding:'10px 10px', borderRadius:8, cursor:'pointer',
+              background:'var(--bg-secondary)', border:'1px solid var(--accent)',
+            }}>
+              <div style={{ fontSize:12, fontWeight:700, color:'var(--accent)', marginBottom:2 }}>{g.label}</div>
+              <div style={{ fontSize:9, color:'var(--text-dim)' }}>👆 Выбрать эфир</div>
+            </div>
+          ))}
+          {singles.map(p => {
             const isSelected = drug === p.id;
             return (
               <div key={p.id} onClick={() => handleDrugChange(p.id)} style={{
-                padding: '8px 10px', borderRadius: 8, cursor: 'pointer',
+                padding:'8px 10px', borderRadius:8, cursor:'pointer',
                 background: isSelected ? 'rgba(0,230,138,0.15)' : 'var(--bg-secondary)',
                 border: isSelected ? '1.5px solid #00e68a' : '1px solid var(--border)',
-                transition: 'all 0.15s',
               }}>
-                <div style={{ fontSize: 11, fontWeight: 600, color: isSelected ? '#00e68a' : 'var(--text)', marginBottom: 2 }}>{p.name}</div>
-                <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>{CLASS_LABELS[p.class] || p.class}</div>
+                <div style={{ fontSize:11, fontWeight:600, color: isSelected ? '#00e68a' : 'var(--text)', marginBottom:2 }}>{p.name}</div>
+                <div style={{ fontSize:9, color:'var(--text-dim)' }}>{CLASS_LABELS[p.class] || p.class}</div>
               </div>
             );
           })}
@@ -1306,6 +1390,7 @@ const AndrogenicIndexCalculator: React.FC = () => {
     { drug: 'testosterone_enanthate', doseMgWeek: 300, search: '' }
   ]);
   const [aiResult, setAiResult] = useState<number | null>(null);
+  const [aiEsterPopup, setAiEsterPopup] = useState<{ baseClass: string; label: string; entryIdx: number } | null>(null);
 
   const allAiDrugs = useMemo(() => {
     return DRUG_OPTIONS.filter(d => PHARMA_DB[d]?.name && DRUG_THRESHOLDS[d]?.androgenicity);
@@ -1374,22 +1459,45 @@ const AndrogenicIndexCalculator: React.FC = () => {
                 <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 10,
                   background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: 8, marginTop: 2,
                   maxHeight: 160, overflowY: 'auto' }}>
-                  {aiFiltereds[i].slice(0, 20).map(d => (
-                    <div key={d} onClick={() => setDrugFor(i, d)} style={{
-                      padding: '6px 10px', cursor: 'pointer', fontSize: 11,
-                      borderBottom: '1px solid var(--border)',
-                    }}>
-                      <span style={{ fontWeight: 600 }}>{PHARMA_DB[d]!.name}</span>
-                      <span style={{ marginLeft: 6, color: 'var(--text-dim)', fontSize: 9 }}>
-                        AR {DRUG_THRESHOLDS[d]?.androgenicity}%
-                      </span>
-                    </div>
-                  ))}
-                  {aiFiltereds[i].length === 0 && (
-                    <div style={{ padding: 8, fontSize: 10, color: 'var(--text-dim)', textAlign: 'center' }}>
-                      Ничего не найдено
-                    </div>
-                  )}
+                  {(() => {
+                    const aiGrouped: { cls: string; label: string }[] = [];
+                    const aiSingles: string[] = [];
+                    const seenCls = new Set<string>();
+                    for (const d of aiFiltereds[i]) {
+                      const sub = PHARMA_DB[d];
+                      if (!sub) continue;
+                      if (INJECTABLE_WITH_ESTERS.has(sub.class)) {
+                        if (!seenCls.has(sub.class)) { seenCls.add(sub.class); aiGrouped.push({ cls: sub.class, label: CLASS_LABELS[sub.class] || sub.class }); }
+                      } else { aiSingles.push(d); }
+                    }
+                    return (<>
+                      {aiGrouped.map(g => (
+                        <div key={g.cls} onClick={() => setAiEsterPopup({ baseClass: g.cls, label: g.label, entryIdx: i })} style={{
+                          padding:'6px 10px', cursor:'pointer', fontSize:11, borderBottom:'1px solid var(--border)',
+                          background:'rgba(0,230,138,0.06)',
+                        }}>
+                          <span style={{ fontWeight:700, color:'var(--accent)' }}>{g.label}</span>
+                          <span style={{ marginLeft:6, color:'var(--accent)', fontSize:9 }}>👆 Выбрать эфир</span>
+                        </div>
+                      ))}
+                      {aiSingles.slice(0, 20).map(d => (
+                        <div key={d} onClick={() => setDrugFor(i, d)} style={{
+                          padding: '6px 10px', cursor: 'pointer', fontSize: 11,
+                          borderBottom: '1px solid var(--border)',
+                        }}>
+                          <span style={{ fontWeight: 600 }}>{PHARMA_DB[d]!.name}</span>
+                          <span style={{ marginLeft: 6, color: 'var(--text-dim)', fontSize: 9 }}>
+                            AR {DRUG_THRESHOLDS[d]?.androgenicity}%
+                          </span>
+                        </div>
+                      ))}
+                      {aiFiltereds[i].length === 0 && (
+                        <div style={{ padding: 8, fontSize: 10, color: 'var(--text-dim)', textAlign: 'center' }}>
+                          Ничего не найдено
+                        </div>
+                      )}
+                    </>);
+                  })()}
                 </div>
               )}
             </div>
@@ -1428,6 +1536,29 @@ const AndrogenicIndexCalculator: React.FC = () => {
           <div style={{ fontSize: 28, fontWeight: 800, color: aiResult > 3 ? '#ef4444' : aiResult > 1.5 ? '#f59e0b' : 'var(--accent)' }}>{aiResult.toFixed(2)}</div>
           <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 4 }}>
             {aiResult > 3 ? '⚡ Высокая андрогенная нагрузка' : aiResult > 1.5 ? '⚠ Умеренная' : '✓ Низкая'}
+          </div>
+        </div>
+      )}
+
+      {/* AI ester popup */}
+      {aiEsterPopup && (
+        <div style={{ position:'fixed', inset:0, zIndex:1000, background:'rgba(0,0,0,0.6)', display:'flex', alignItems:'center', justifyContent:'center' }} onClick={() => setAiEsterPopup(null)}>
+          <div style={{ background:'var(--bg)', borderRadius:16, padding:20, maxWidth:320, width:'90%', maxHeight:'70vh', overflowY:'auto' }} onClick={e => e.stopPropagation()}>
+            <h3 style={{ margin:'0 0 12px', fontSize:15 }}>{aiEsterPopup.label} — выберите эфир</h3>
+            {allAiDrugs
+              .map(d => PHARMA_DB[d])
+              .filter((s): s is NonNullable<typeof s> => !!s && s.class === aiEsterPopup.baseClass)
+              .map(s => (
+              <div key={s.id} onClick={() => { setDrugFor(aiEsterPopup.entryIdx, s.id); setAiEsterPopup(null); }} style={{
+                padding:'10px 12px', borderRadius:10, cursor:'pointer', marginBottom:4,
+                background:'var(--bg-secondary)', border:'1px solid var(--border)',
+              }}>
+                <div style={{ fontSize:13, fontWeight:600 }}>{s.name}</div>
+                <div style={{ fontSize:10, color:'var(--text-dim)', marginTop:2 }}>
+                  AR {DRUG_THRESHOLDS[s.id]?.androgenicity}% {s.esters?.[0] ? `| ${s.esters[0]}` : ''}
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       )}

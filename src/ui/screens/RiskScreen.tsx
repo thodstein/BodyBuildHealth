@@ -636,19 +636,19 @@ export const RiskScreen: React.FC = () => {
 
   return (
     <div className="screen risk" style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden', padding: 0 }}>
-      {/* ─── HERO PAGE (full screen, NO black bars) ─── */}
+      {/* ─── HERO PAGE ─── */}
       {mainTab === 'hero' && (
-        <div style={{ flex: 1, minHeight: 0, display:'flex', flexDirection:'column', overflowY:'auto' }}>
-          <div style={{ height: '100dvh', position:'relative', flexShrink: 0,
-            backgroundImage: 'url(/risk-hero.png)', backgroundSize:'cover', backgroundPosition:'center', backgroundRepeat:'no-repeat' }}>
-            <div style={{ position: 'absolute', bottom: 10, left: 16, right: 16 }}>
-              <h1 style={{ fontSize: 20, fontWeight: 800, color: '#fff', margin: '0 0 2px', textShadow: '0 2px 12px rgba(0,0,0,0.8)' }}>Оценка рисков</h1>
-              <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.85)', margin: 0, lineHeight: 1.3, textShadow: '0 1px 6px rgba(0,0,0,0.7)' }}>
+        <div style={{ flex: 1, minHeight: 0, display:'flex', flexDirection:'column', overflow:'hidden' }}>
+          <div style={{ flex:'0 0 42vh', position:'relative', maxHeight:'50vh' }}>
+            <img src="/risk-hero.png" alt="" style={{ width:'100%', height:'100%', display:'block', objectFit:'cover', objectPosition:'center top' }} />
+            <div style={{ position: 'absolute', bottom: 14, left: 20, right: 20 }}>
+              <h1 style={{ fontSize: 22, fontWeight: 800, color: '#fff', margin: '0 0 2px', textShadow: '0 2px 14px rgba(0,0,0,0.9)' }}>Оценка рисков</h1>
+              <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.9)', margin: 0, lineHeight: 1.3, textShadow: '0 1px 8px rgba(0,0,0,0.8)' }}>
                 Комплексный анализ — расчёты, клинические модели и справочная информация
               </p>
             </div>
           </div>
-          <div style={{ padding:'10px 16px 80px', display:'flex', flexDirection:'column', gap:8 }}>
+          <div style={{ flex:1, padding:'10px 16px 80px', display:'flex', flexDirection:'column', gap:8, overflowY:'auto' }}>
             {[
               { id: 'calculations', icon: '🧮', title: 'Комплексные расчеты', desc: 'Базовый расчёт, Монте Карло (V7), MDSS — все аналитические модели рисков.', color: '#22c55e' },
               { id: 'clinical', icon: '🏥', title: 'Клиника', desc: '3D модель, комплаенс, клинические риски и анализы.', color: '#3b82f6' },
