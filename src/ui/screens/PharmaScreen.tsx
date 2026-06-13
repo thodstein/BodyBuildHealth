@@ -1570,42 +1570,47 @@ const PeptideCalcTab: React.FC = () => {
         <p style={{ fontSize:11, color:'var(--text-dim)', margin:0 }}>Разведение, PK‑модель, риски и протоколы</p>
       </div>
 
-      {/* Sub-tabs */}
-      <div style={{ display:'flex', gap:4, marginBottom:8 }}>
-        {(['peptides','growth'] as const).map(t => (
-          <button key={t} onClick={() => setPepTab(t)} style={{
-            padding:'6px 14px', borderRadius:16, fontSize:11, fontWeight:600, cursor:'pointer',
-            background: pepTab === t ? 'var(--accent)' : 'var(--bg-secondary)',
-            color: pepTab === t ? '#000' : 'var(--text-dim)',
-            border: `1px solid ${pepTab === t ? 'var(--accent)' : 'var(--border)'}`,
-          }}>{t === 'peptides' ? '🧬 Пептиды' : '📈 Факторы роста'}</button>
-        ))}
+      {/* Unified peptide + growth factor selector */}
+      <div style={{ background:'var(--glass-bg)', border:'1px solid var(--glass-border)', borderRadius:12, padding:'14px 16px', marginBottom:8 }}>
+        <div style={{ display:'flex', flexWrap:'wrap', gap:4, maxHeight:160, overflowY:'auto' }}>
+          {PEPTIDE_LIST.map(p => {
+            const sel = peptideId === p.id;
+            return <div key={p.id} onClick={() => { setPeptideId(p.id); const pd = PEPTIDE_DB[p.id]; if (pd) { setPepAmount(pd.amountMg); setPepRoute(pd.routes[0]); setPepResult(null); setGrowthId(null); }}} style={{
+              padding:'6px 10px', borderRadius:8, cursor:'pointer', fontSize:10,
+              background: sel ? 'rgba(0,230,138,0.15)' : 'var(--bg-secondary)',
+              border: sel ? '1.5px solid #00e68a' : '1px solid var(--border)',
+              color: sel ? '#00e68a' : 'var(--text)', fontWeight: sel ? 700 : 400,
+            }}>{p.shortName}</div>;
+          })}
+          {(() => {
+            const GROWTH_CLASSES = new Set(['peptide_ghrh','peptide_ghrp','igf1','mgf','insulin','peptide_gnrh','peptide_fat_loss','peptide_other','peptide_regenerative','peptide_immune','peptide_nootropic','pct_gonadotropin']);
+            const inPeptideDb = new Set(PEPTIDE_LIST.map(p => PEPTIDE_DB[p.id]?.name.toLowerCase()));
+            return Object.values(PHARMA_DB).filter(s => !!s?.name && GROWTH_CLASSES.has(s.class) && s.id !== 'mk677' && !inPeptideDb.has(s.name.toLowerCase())).map(s => {
+              const sel = growthId === s.id;
+              return <div key={s.id} onClick={() => { setGrowthId(s.id); setPepResult(null); }} style={{
+                padding:'6px 10px', borderRadius:8, cursor:'pointer', fontSize:10,
+                background: sel ? 'rgba(139,92,246,0.15)' : 'var(--bg-secondary)',
+                border: sel ? '1.5px solid #8b5cf6' : '1px solid var(--border)',
+                color: sel ? '#8b5cf6' : 'var(--text)', fontWeight: sel ? 700 : 400,
+              }}>{s.name}</div>;
+            });
+          })()}
+        </div>
+        {PEPTIDE_DB[peptideId] && (
+          <div style={{ display:'flex', flexWrap:'wrap', gap:4, marginTop:6 }}>
+            {PEPTIDE_DB[peptideId].effects.map(e => (
+              <span key={e} style={{ fontSize:9, padding:'2px 6px', borderRadius:4, background:'rgba(0,230,138,0.1)', color:'#00e68a' }}>{e}</span>
+            ))}
+          </div>
+        )}
+        {growthId && PHARMA_DB[growthId] && (
+          <div style={{ marginTop:6, padding:'8px 10px', background:'rgba(139,92,246,0.06)', borderRadius:8, fontSize:10, color:'var(--text-dim)', lineHeight:1.6 }}>
+            <b>{PHARMA_DB[growthId].name}</b> — T½ {(PHARMA_DB[growthId].pk?.halfLifeHours ?? 0).toFixed(0)}ч, био {((PHARMA_DB[growthId].pk?.bioavailability ?? 0) * 100).toFixed(0)}%
+          </div>
+        )}
       </div>
 
-      {pepTab === 'peptides' ? (<>
-        {/* Peptide selector grid */}
-        <div style={{ background:'var(--glass-bg)', border:'1px solid var(--glass-border)', borderRadius:12, padding:'14px 16px', marginBottom:8 }}>
-          <div style={{ display:'flex', flexWrap:'wrap', gap:4, maxHeight:140, overflowY:'auto' }}>
-            {PEPTIDE_LIST.map(p => {
-              const sel = peptideId === p.id;
-              return <div key={p.id} onClick={() => { setPeptideId(p.id); const pd = PEPTIDE_DB[p.id]; if (pd) { setPepAmount(pd.amountMg); setPepRoute(pd.routes[0]); setPepResult(null); }}} style={{
-                padding:'6px 10px', borderRadius:8, cursor:'pointer', fontSize:10,
-                background: sel ? 'rgba(0,230,138,0.15)' : 'var(--bg-secondary)',
-                border: sel ? '1.5px solid #00e68a' : '1px solid var(--border)',
-                color: sel ? '#00e68a' : 'var(--text)', fontWeight: sel ? 700 : 400,
-              }}>{p.shortName}</div>;
-            })}
-          </div>
-          {PEPTIDE_DB[peptideId] && (
-            <div style={{ display:'flex', flexWrap:'wrap', gap:4, marginTop:6 }}>
-              {PEPTIDE_DB[peptideId].effects.map(e => (
-                <span key={e} style={{ fontSize:9, padding:'2px 6px', borderRadius:4, background:'rgba(0,230,138,0.1)', color:'#00e68a' }}>{e}</span>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Dilution calculator */}
+      {/* Dilution calculator */}
         <div style={{ background:'var(--glass-bg)', border:'1px solid var(--glass-border)', borderRadius:12, padding:'14px 16px', marginBottom:8 }}>
           <div style={{ fontSize:12, fontWeight:700, marginBottom:8 }}>💧 Разведение</div>
           <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
@@ -1800,39 +1805,19 @@ const PeptideCalcTab: React.FC = () => {
             )}
           </div>
         </>)}
-      </>) : (
-        /* ─── GROWTH FACTORS TAB ─── */
-        <div>
-          <div style={{ background:'var(--glass-bg)', border:'1px solid var(--glass-border)', borderRadius:12, padding:'14px 16px', marginBottom:8 }}>
-            <div style={{ display:'flex', flexWrap:'wrap', gap:4, maxHeight:180, overflowY:'auto' }}>
-              {(() => {
-                const PHARMA_GROWTH = new Set(['peptide_ghrh','peptide_ghrp','igf1','mgf','insulin','peptide_gnrh','peptide_fat_loss','peptide_other','peptide_regenerative','peptide_immune','peptide_nootropic','pct_gonadotropin']);
-                return Object.values(PHARMA_DB).filter(s => !!s?.name && PHARMA_GROWTH.has(s.class) && s.id !== 'mk677').map(s => {
-                  const sel = growthId === s.id;
-                  return <div key={s.id} onClick={() => setGrowthId(s.id)} style={{
-                    padding:'6px 10px', borderRadius:8, cursor:'pointer', fontSize:10,
-                    background: sel ? 'rgba(139,92,246,0.15)' : 'var(--bg-secondary)',
-                    border: sel ? '1.5px solid #8b5cf6' : '1px solid var(--border)',
-                    color: sel ? '#8b5cf6' : 'var(--text)', fontWeight: sel ? 700 : 400,
-                  }}>{s.name}</div>;
-                });
-              })()}
-            </div>
+      {/* ─── GROWTH FACTOR DETAIL (always visible when selected) ─── */}
+      {growthId && growthSel && (
+        <div style={{ background:'var(--glass-bg)', border:'1px solid var(--glass-border)', borderRadius:12, padding:'14px 16px' }}>
+          <div style={{ fontSize:13, fontWeight:700, color:'var(--accent)', marginBottom:8 }}>{growthSel.name}</div>
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6, fontSize:10, color:'var(--text-dim)', lineHeight:1.6 }}>
+            <span><b>Класс:</b> {CLASS_LABELS[growthSel.class] || growthSel.class}</span>
+            <span><b>T½:</b> {growthSel.pk?.halfLifeHours ? `${(growthSel.pk.halfLifeHours).toFixed(0)}ч` : '—'}</span>
+            <span><b>Биодоступность:</b> {growthSel.pk?.bioavailability ? `${(growthSel.pk.bioavailability * 100).toFixed(0)}%` : '—'}</span>
+            <span><b>Vd:</b> {growthSel.pk?.Vd ? `${growthSel.pk.Vd} л` : '—'}</span>
           </div>
-          {growthSel && (
-            <div style={{ background:'var(--glass-bg)', border:'1px solid var(--glass-border)', borderRadius:12, padding:'14px 16px' }}>
-              <div style={{ fontSize:13, fontWeight:700, color:'var(--accent)', marginBottom:8 }}>{growthSel.name}</div>
-              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6, fontSize:10, color:'var(--text-dim)', lineHeight:1.6 }}>
-                <span><b>Класс:</b> {CLASS_LABELS[growthSel.class] || growthSel.class}</span>
-                <span><b>T½:</b> {growthSel.pk?.halfLifeHours ? `${(growthSel.pk.halfLifeHours).toFixed(0)}ч` : '—'}</span>
-                <span><b>Биодоступность:</b> {growthSel.pk?.bioavailability ? `${(growthSel.pk.bioavailability * 100).toFixed(0)}%` : '—'}</span>
-                <span><b>Vd:</b> {growthSel.pk?.Vd ? `${growthSel.pk.Vd} л` : '—'}</span>
-              </div>
-              {growthSel.research && growthSel.research.length > 0 && (
-                <div style={{ fontSize:9, color:'var(--text-dim)', marginTop:6 }}>
-                  <b>Исследования:</b> {growthSel.research.map(r => r.study).join('; ')}
-                </div>
-              )}
+          {growthSel.research && growthSel.research.length > 0 && (
+            <div style={{ fontSize:9, color:'var(--text-dim)', marginTop:6 }}>
+              <b>Исследования:</b> {growthSel.research.map(r => r.study).join('; ')}
             </div>
           )}
         </div>

@@ -829,7 +829,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   const supportCautions = supportInteractions?.filter(i => i.type === 'caution') ?? [];
 
   return (
-    <div className="screen support-screen">
+    <div className="screen support-screen" style={tab === 'main' ? { flex:1, minHeight:0, display:'flex', flexDirection:'column', overflow:'hidden', padding:0 } : undefined}>
       {/* ===== MAIN HERO (like LabsScreen) ===== */}
       {tab === 'main' && supportView === 'main' && (
         <div style={{ flex: 1, minHeight: 0, display:'flex', flexDirection:'column', overflow:'hidden' }}>
@@ -838,7 +838,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
             <div style={{ position: 'absolute', bottom: 14, left: 20, right: 20 }}>
               <h1 style={{ fontSize: 22, fontWeight: 800, color: '#fff', margin: '0 0 2px', textShadow: '0 2px 14px rgba(0,0,0,0.9)' }}>Поддержка</h1>
               <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.9)', margin: 0, lineHeight: 1.3, textShadow: '0 1px 8px rgba(0,0,0,0.8)' }}>
-                Фармакологическая поддержка, пептиды и готовые протоколы
+                Фармакологическая поддержка, пептиды и предлагаемые препараты поддержки для уменьшения рисков
               </p>
             </div>
           </div>
