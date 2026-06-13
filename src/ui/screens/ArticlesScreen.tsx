@@ -95,7 +95,7 @@ export const ArticlesScreen: React.FC = () => {
                 <div style={{ width:40, height:40, borderRadius:12, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, background:s.color+'18', fontSize:20 }}>{s.icon}</div>
                 <div style={{ flex:1 }}>
                   <div style={{ fontSize:13, fontWeight:700, marginBottom:2, color:s.color }}>{s.title}</div>
-                  <div style={{ fontSize:10, color:'var(--text-dim)', lineHeight:1.3 }}>{s.desc}</div>
+                  <div style={{ fontSize:10, color:'rgba(255,255,255,0.85)', lineHeight:1.3 }}>{s.desc}</div>
                 </div>
                 <span style={{ color:s.color, fontSize:16, opacity:0.6 }}>→</span>
               </button>

@@ -28,48 +28,17 @@ const NAV_CARDS: { id: ScreenId; label: string; desc: string }[] = [
 
 export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
   return (
-    <div className="screen" style={{ padding: 0, overflow: 'hidden', flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
-      <div style={{
-        position: 'relative',
-        width: '100%',
-        height: '45vh',
-        minHeight: 240,
-        overflow: 'hidden',
-        flexShrink: 0,
-      }}>
-        <img
-          src="/hero-image.jpg"
-          alt=""
-          style={{
-            width: '100%',
-            height: '100%',
-            objectFit: 'cover',
-            display: 'block',
-          }}
-        />
-        <div style={{
-          position: 'absolute',
-          bottom: 0,
-          left: 0,
-          right: 0,
-          height: '50%',
-          background: 'linear-gradient(to top, var(--bg) 0%, transparent 100%)',
-          pointerEvents: 'none',
-        }} />
-      </div>
-
-      <div style={{
-        padding: '10px 12px 20px',
-        position: 'relative',
-        zIndex: 2,
-        flex: 1,
-        overflowY: 'auto',
-      }}>
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: '1fr 1fr',
-          gap: 8,
-        }}>
+    <div style={{ position:'fixed', inset:0, zIndex:100, display:'flex', flexDirection:'column' }}>
+      <img src="/main-hero.png" alt="" style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'cover', objectPosition:'center top' }} />
+      <div style={{ position:'absolute', inset:0, background:'linear-gradient(transparent 50%, rgba(0,0,0,0.85))' }} />
+      <div style={{ position:'relative', zIndex:2, flex:1, display:'flex', flexDirection:'column', justifyContent:'flex-end', padding:'16px 16px 80px' }}>
+        <div style={{ marginBottom:16 }}>
+          <h1 style={{ fontSize:24, fontWeight:800, color:'#fff', margin:0, textShadow:'0 2px 14px rgba(0,0,0,0.9)' }}>Главная</h1>
+          <p style={{ fontSize:12, color:'rgba(255,255,255,0.85)', margin:'4px 0 0', textShadow:'0 1px 8px rgba(0,0,0,0.8)' }}>
+            Управляйте здоровьем, тренировками, питанием и фармакологией
+          </p>
+        </div>
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
           {NAV_CARDS.map(card => (
             <Card key={card.id} card={card} onNavigate={onNavigate} />
           ))}
@@ -94,9 +63,9 @@ const Card: React.FC<{ card: typeof NAV_CARDS[number]; onNavigate: Props['onNavi
         cursor: 'pointer',
         transition: 'all 0.35s cubic-bezier(0.22, 0.68, 0, 1)',
         background: hovered
-          ? 'linear-gradient(135deg, rgba(200,245,96,0.07) 0%, rgba(200,245,96,0.02) 100%)'
-          : 'linear-gradient(135deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.01) 100%)',
-        border: hovered ? '1px solid rgba(200,245,96,0.2)' : '1px solid rgba(255, 255, 255, 0.05)',
+          ? 'rgba(30,32,40,0.45)'
+          : 'rgba(20,22,30,0.35)',
+        border: hovered ? '1px solid rgba(200,245,96,0.3)' : '1px solid rgba(255,255,255,0.08)',
         transform: hovered ? 'translateY(-2px)' : 'translateY(0)',
         boxShadow: hovered ? '0 12px 40px rgba(0,0,0,0.4)' : 'none',
         overflow: 'hidden',
@@ -125,7 +94,7 @@ const Card: React.FC<{ card: typeof NAV_CARDS[number]; onNavigate: Props['onNavi
       <div style={{
         fontWeight: 700,
         fontSize: 15,
-        color: hovered ? '#C8F560' : '#FFFFFF',
+        color: hovered ? '#C8F560' : 'rgba(255,255,255,0.95)',
         letterSpacing: '-0.3px',
         lineHeight: 1.2,
         transition: 'color 0.3s ease',
@@ -136,7 +105,7 @@ const Card: React.FC<{ card: typeof NAV_CARDS[number]; onNavigate: Props['onNavi
       {/* Description */}
       <div style={{
         fontSize: 11,
-        color: hovered ? 'rgba(255,255,255,0.45)' : 'rgba(255, 255, 255, 0.3)',
+        color: hovered ? 'rgba(255,255,255,0.75)' : 'rgba(255, 255, 255, 0.55)',
         lineHeight: 1.4,
         fontWeight: 400,
         transition: 'color 0.3s ease',
