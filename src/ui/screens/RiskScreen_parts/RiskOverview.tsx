@@ -28,12 +28,12 @@ function getSystemIcon(sys: string): string { return SYSTEM_INFO[sys]?.icon || '
 function getSystemLabel(sys: string): string { return SYSTEM_INFO[sys]?.label || sys; }
 
 const SYSTEM_LABELS_SHORT: Record<string, string> = {
-  cardio: '❤️ Сердце', hepatic: '', renal: '',
-  neuro: '', endocrine: '⚖️ Эндокр.', hematologic: '',
-  reproductive: '', musculoskeletal: '',
-  metabolic: '⚖️ Метаб.', ghigf: '', ins_axis: '',
-  neuro_toxicity: '⚠️ Нейротокс.', blood: '', vessels: '',
-  immunity: '', thyroid: '', prostate: '', skin: '',
+  cardio: '❤️ Сердце', hepatic: '🫁 Печень', renal: '🫘 Почки',
+  neuro: '🧠 Нервная', endocrine: '⚖️ Эндокр.', hematologic: '🩸 Кровь',
+  reproductive: '🧬 Репрод.', musculoskeletal: '💪 Мышцы',
+  metabolic: '⚡ Метабол.', ghigf: '📈 GH/IGF', ins_axis: '🍬 Инсулин',
+  neuro_toxicity: '⚠️ Нейротокс.', blood: '🩸 Кровь', vessels: '🫀 Сосуды',
+  immunity: '🛡️ Иммунит.', thyroid: '🦋 Щитовид.', prostate: '🔴 Простата', skin: '🧴 Кожа',
 };
 
 function mapRiskSystem(riskSystem: string): string {
@@ -52,7 +52,7 @@ export const RiskOverview: React.FC<{
   const [chartSelectedWeek, setChartSelectedWeek] = useState<number | null>(null);
   const [chartMode, setChartMode] = useState<'week' | 'average'>('average');
 
-  const overallStatus = riskResult.overallNet < 30 ? '' : riskResult.overallNet < 50 ? '' : riskResult.overallNet < 70 ? '' : riskResult.overallNet < 85 ? '' : '';
+  const overallStatus = riskResult.overallNet < 20 ? '✅ Низкий' : riskResult.overallNet < 40 ? '⚠️ Умеренный' : riskResult.overallNet < 60 ? '🔶 Повышенный' : riskResult.overallNet < 80 ? '🔴 Высокий' : '💀 Критический';
   const overallColor = getRiskColor(riskResult.overallNet);
 
   // Filter risks that belong to systems with elevated risk (>20%), deduplicate by system
@@ -274,7 +274,7 @@ export const RiskOverview: React.FC<{
         <h3 style={{ margin: "0 0 8px", fontSize: 15 }}>💊 Пороги препаратов</h3>
         <div style={{ fontSize: 10, color: "var(--text-dim)", marginBottom: 6 }}>Максимальная рекомендуемая дозировка — превышение значительно увеличивает риски</div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4, fontSize: 10 }}>
-          {Object.entries(DRUG_THRESHOLDS).slice(0, 8).map(([id, thresh]) => {
+          {Object.entries(DRUG_THRESHOLDS).map(([id, thresh]) => {
             const name = getThresholdName(id);
             const entry = PHARMA_DB[id];
             const drugClass = entry ? entry.class : "";

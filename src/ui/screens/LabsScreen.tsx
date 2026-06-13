@@ -478,24 +478,22 @@ export const LabsScreen: React.FC = () => {
 
       {/* ─── HERO PAGE ─── */}
       {mainTab === 'hero' && (
-        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '0 0 70px' }}>
-          {/* Hero section with image */}
-          <div style={{ position: 'relative', marginBottom: 12 }}>
+        <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          {/* Hero image */}
+          <div style={{ flex: '0 0 58vh', position: 'relative', maxHeight: '65vh' }}>
             <img src="/lab-hero.png" alt="" style={{
-              width: '100%', height: 'auto', maxHeight: '55vh', display: 'block',
+              width: '100%', height: '100%', display: 'block',
               objectFit: 'cover', objectPosition: 'center top',
-              marginBottom: -4,
             }} />
-            <div style={{ position: 'absolute', bottom: 10, left: 16, right: 16 }}>
-              <h1 style={{ fontSize: 20, fontWeight: 800, color: '#fff', margin: '0 0 2px', textShadow: '0 2px 12px rgba(0,0,0,0.8)' }}>Лаборатория</h1>
-              <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.85)', margin: 0, lineHeight: 1.3, textShadow: '0 1px 6px rgba(0,0,0,0.7)' }}>
+            <div style={{ position: 'absolute', bottom: 16, left: 16, right: 16 }}>
+              <h1 style={{ fontSize: 22, fontWeight: 800, color: '#fff', margin: '0 0 2px', textShadow: '0 2px 14px rgba(0,0,0,0.9)' }}>Лаборатория</h1>
+              <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.9)', margin: 0, lineHeight: 1.3, textShadow: '0 1px 8px rgba(0,0,0,0.8)' }}>
                 Контролируйте своё здоровье — анализы и обследования
               </p>
             </div>
           </div>
-
-          {/* 3 cards */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: '0 16px' }}>
+          {/* Cards below — flex-shrink-0 to never scroll */}
+          <div style={{ flexShrink: 0, padding: '10px 16px 70px', display: 'flex', flexDirection: 'column', gap: 8 }}>
             {[
               { id: 'lab', icon: '🔬', title: 'Анализы', desc: 'Ввод, просмотр и динамика лабораторных показателей. Каталог маркеров и графики.', color: 'var(--accent)' },
               { id: 'investigations', icon: '🩺', title: 'Обследования', desc: 'Плановые чекапы, инструментальная диагностика и частота прохождения.', color: '#3b82f6' },

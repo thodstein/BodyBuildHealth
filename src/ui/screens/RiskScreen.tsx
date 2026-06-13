@@ -345,11 +345,10 @@ export const RiskScreen: React.FC = () => {
       {mainTab === 'hero' && (
         <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '0 0 70px' }}>
           {/* Hero image */}
-          <div style={{ position: 'relative', marginBottom: 10 }}>
+          <div style={{ position: 'relative', marginBottom: 8 }}>
             <img src="/risk-hero.png" alt="" style={{
-              width: '100%', height: 'auto', maxHeight: '60vh', display: 'block',
+              width: '100%', height: 'auto', maxHeight: '62vh', display: 'block',
               objectFit: 'cover', objectPosition: 'center top',
-              marginBottom: -4,
             }} />
             <div style={{ position: 'absolute', bottom: 10, left: 16, right: 16 }}>
               <h1 style={{ fontSize: 20, fontWeight: 800, color: '#fff', margin: '0 0 2px', textShadow: '0 2px 12px rgba(0,0,0,0.8)' }}>Оценка рисков</h1>
@@ -402,33 +401,32 @@ export const RiskScreen: React.FC = () => {
           {mainTab === 'calculations' && calcPage === 'hero' && (
             <div>
               {/* Summary card */}
-              <div style={{ marginTop: 10, padding: 16, borderRadius: 18, background: 'var(--glass-bg)', border: '1px solid var(--glass-border)' }}>
-                <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--accent)', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ fontSize: 20 }}>📊</span> Общая оценка среднего риска курса
+              <div style={{ marginTop: 10, padding: 14, borderRadius: 16, background: 'var(--glass-bg)', border: '1px solid var(--glass-border)' }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--accent)', marginBottom: 10, textAlign: 'center' }}>
+                  📊 Средний риск курса
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
                   {[
-                    { label: 'Базовый', sub: 'расчёт', icon: '📋', risk: riskResult?.overallNet ?? 0, raw: riskResult?.overallRaw ?? 0, color: '#22c55e' },
-                    { label: 'Монте', sub: 'Карло V7', icon: '🎲', risk: v7Result ? Math.round(v7Result.globalRiskNet * 100) : '-', raw: v7Result ? Math.round(v7Result.globalRiskRaw * 100) : '-', color: '#8b5cf6' },
-                    { label: 'MDSS', sub: '', icon: '🏥', risk: '-', raw: '-', color: '#f97316' },
+                    { label: 'Базовый', icon: '📋', net: Math.round(riskResult?.overallNet ?? 0), raw: Math.round(riskResult?.overallRaw ?? 0), color: '#22c55e' },
+                    { label: 'Монте-Карло', icon: '🎲', net: v7Result ? Math.round(v7Result.globalRiskNet) : null, raw: v7Result ? Math.round(v7Result.globalRiskRaw) : null, color: '#8b5cf6' },
+                    { label: 'MDSS', icon: '🏥', net: null, raw: null, color: '#f97316' },
                   ].map((item, i) => (
                     <div key={i} style={{
-                      textAlign: 'center', padding: '12px 8px', borderRadius: 12,
-                      background: item.color + '10', border: `1px solid ${item.color}22`,
+                      textAlign: 'center', padding: '10px 6px', borderRadius: 12,
+                      background: item.color + '0d', border: `1px solid ${item.color}22`,
                     }}>
-                      <div style={{ fontSize: 10, color: item.color, fontWeight: 600, marginBottom: 2 }}>{item.icon} {item.label}</div>
-                      {item.sub && <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 6 }}>{item.sub}</div>}
-                      <div style={{ fontSize: 26, fontWeight: 800, color: 'var(--accent)' }}>
-                        {typeof item.risk === 'number' ? `${item.risk}%` : item.risk}
+                      <div style={{ fontSize: 10, color: item.color, fontWeight: 600 }}>{item.icon} {item.label}</div>
+                      <div style={{ display: 'flex', justifyContent: 'center', gap: 5, marginTop: 4 }}>
+                        <span style={{ fontSize: 22, fontWeight: 800, color: item.net != null ? getRiskColor(item.net) : 'var(--text-dim)' }}>
+                          {item.net != null ? `${item.net}%` : '—'}
+                        </span>
+                        <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-dim)', alignSelf: 'flex-end', marginBottom: 2 }}>
+                          {item.raw != null ? `${item.raw}%` : '—'}
+                        </span>
                       </div>
-                      <div style={{ fontSize: 9, color: 'var(--text-dim)', marginTop: 2 }}>
-                        сырой: {typeof item.raw === 'number' ? `${item.raw}%` : item.raw}
-                      </div>
+                      <div style={{ fontSize: 7, color: 'var(--text-dim)', marginTop: 2 }}>net · raw</div>
                     </div>
                   ))}
-                </div>
-                <div style={{ fontSize: 9, color: 'var(--text-dim)', textAlign: 'center', marginTop: 12 }}>
-                  Цветной % — с учётом поддержки • Серый — без учёта
                 </div>
               </div>
 
