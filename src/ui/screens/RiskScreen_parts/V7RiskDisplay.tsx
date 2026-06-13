@@ -906,32 +906,20 @@ export const V7RiskDisplay: React.FC<{
 
   return (
     <div style={{ padding: '0 0 80px 0' }}>
-      <div className="card" style={{ marginBottom: 12, padding: '8px 10px', display: 'flex', gap: 4, overflowX: 'auto', WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none' }}>
-        {tabs.map(t => (
-          <button key={t.id} onClick={() => setActiveTab(t.id)} style={{
-            padding: '7px 12px', borderRadius: 6, fontSize: 11, fontWeight: activeTab === t.id ? 700 : 400,
-            background: activeTab === t.id ? '#00e68a' : 'var(--bg-secondary)',
-            border: 'none',
-            color: activeTab === t.id ? '#000' : 'var(--text-dim)', cursor: 'pointer', whiteSpace: 'nowrap',
-            transition: 'all 0.15s',
-          }}>
-            {t.label}
-          </button>
-        ))}
+      <div style={{ marginBottom:10, padding:12, borderRadius:16, background:'var(--glass-bg)', border:'1px solid var(--glass-border)', display:'flex', alignItems:'center', gap:12, flexWrap:'wrap' }}>
+        <div style={{ flex:1, minWidth:200 }}>
+          <div style={{ fontSize:13, fontWeight:700, color:'var(--accent)' }}>🎲 Монте-Карло моделирование</div>
+          <div style={{ fontSize:10, color:'var(--text-dim)', marginTop:2 }}>
+            {mcEnabled ? mcResult ? `MC: ${((mcResult as any).meanGlobalRisk*100||0).toFixed(1)}% [P5: ${((mcResult as any).p5GlobalRisk*100||0).toFixed(1)}–P95: ${((mcResult as any).p95GlobalRisk*100||0).toFixed(1)}%]` : 'Загрузка...' : 'Детерминированный режим'}
+          </div>
+        </div>
+        <button onClick={toggleMC} style={{ padding:'8px 20px', borderRadius:20, fontSize:12, fontWeight:700, cursor:'pointer', whiteSpace:'nowrap', background:mcEnabled?'linear-gradient(135deg,#8b5cf6,#6d28d9)':'var(--bg-secondary)', border:mcEnabled?'1px solid #8b5cf6':'1px solid var(--border)', color:mcEnabled?'#fff':'var(--text-dim)', boxShadow:mcEnabled?'0 0 16px rgba(139,92,246,0.35)':'none', transition:'all 0.3s' }}>🎲 МК: {mcEnabled?'ВКЛ':'ВЫКЛ'}</button>
       </div>
       {activeTab === 'organs' && renderOrgans()}
       {activeTab === 'matrix' && renderMatrix()}
       {activeTab === 'timeseries' && renderTimeSeries()}
       {activeTab === 'sensitivity' && renderSensitivity()}
       {activeTab === 'pk' && pkContent}
-      <div className="card" style={{ marginBottom: 12 }}>
-        <div style={{ fontSize: 10, color: 'var(--text-dim)', textAlign: 'center', lineHeight: 1.5 }}>
-          🔬 Health Engine v7.0 — PK → Hill → Signaling → 7мех → Damage/Recovery → MC → Risk<br />
-          12 органов × 7 механизмов | Нейротоксичность | Межорганные связи | Стаж | Monte Carlo<br />
-          {mcResult ? `🎯 MC: сред. ${((mcResult as any).meanGlobalRisk * 100 || 0).toFixed(1)}% [P5: ${((mcResult as any).p5GlobalRisk * 100 || 0).toFixed(1)}% — P95: ${((mcResult as any).p95GlobalRisk * 100 || 0).toFixed(1)}%]` : mcEnabled ? '' : '⚙️ Детерминированный режим'}
-          {pkTimeSeries && Object.keys(pkTimeSeries).length > 0 ? ` | 💉 PK: ${Object.keys(pkTimeSeries).length} препаратов` : ''}
-        </div>
-      </div>
     </div>
   );
 };
