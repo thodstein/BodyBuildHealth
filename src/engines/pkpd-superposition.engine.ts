@@ -15,21 +15,31 @@ export function calculateMultiSubstancePKPD(
   const dt = PKPD_DEFAULTS.dt_hours;
   const stepsPerWeek = Math.round(7 * 24 / dt);
   const totalTol: number[] = Array(weeks + 1).fill(0);
-  
-  // Группировка и инициализация веществ
-  const substances = new Map<string, SubstanceState>();
+
+  // Группировка и инициализация веществ + расписание болюсов
+  const substances = new Map<string, SubstanceState & { injSchedule: Set<number>; injDose: number }>();
   course.forEach(c => {
     const sub = PHARMA_DB[c.substanceId];
     if (!sub) return;
-    const dailyDose = c.doseValue * (c.doseUnit.includes('/wk') ? 1 / 7 : 1);
+    const freqStr = String(c.frequency ?? '');
+    const freqMatch = freqStr.match(/(\d+)x\/week/);
+    const injectionsPerWeek = freqMatch ? parseInt(freqMatch[1]) : 2;
+    const dosePerInjection = c.doseValue / injectionsPerWeek;
+    const intervalSteps = Math.round(stepsPerWeek / injectionsPerWeek);
+    const totalInjections = injectionsPerWeek * Math.max(0, c.endWeek ?? weeks);
+    const schedule = new Set<number>();
+    for (let i = 0; i < totalInjections; i++) schedule.add(i * intervalSteps + 1);
     if (!substances.has(c.substanceId)) {
       substances.set(c.substanceId, {
         A1: 0, A2: 0, A3: 0,
-        dosePerDay: dailyDose, bio: sub.pk.bioavailability, ka: sub.pk.ka,
-        k10: sub.pk.k10, k12: sub.pk.k12, k21: sub.pk.k21, Vd: sub.pk.Vd
+        dosePerDay: dosePerInjection * injectionsPerWeek / 7, bio: sub.pk.bioavailability, ka: sub.pk.ka,
+        k10: sub.pk.k10, k12: sub.pk.k12, k21: sub.pk.k21, Vd: sub.pk.Vd,
+        injSchedule: schedule, injDose: dosePerInjection * sub.pk.bioavailability
       });
     } else {
-      substances.get(c.substanceId)!.dosePerDay += dailyDose;
+      const ex = substances.get(c.substanceId)!;
+      schedule.forEach(s => ex.injSchedule.add(s));
+      ex.injDose += dosePerInjection * sub.pk.bioavailability;
     }
   });
 
@@ -40,10 +50,15 @@ export function calculateMultiSubstancePKPD(
     let weekTotalCp = 0;
     let weekIntegralCp = 0;
 
+    const baseStep = w * stepsPerWeek;
     for (let s = 0; s < stepsPerWeek; s++) {
-      // RK4 шаг для каждого вещества параллельно
+      const step = baseStep + s;
+
       states.forEach(state => {
-        state.A1 += (state.dosePerDay * state.bio) * (dt / 24); // Доза делится на шаги РК4
+        // Bolus injection at scheduled steps
+        if (state.injSchedule.has(step)) state.A1 += state.injDose;
+
+        // RK4 шаг для каждого вещества
         const f11 = -state.ka * state.A1;
         const f12 = state.ka * state.A1 - (state.k10 + state.k12) * state.A2 + state.k21 * state.A3;
         const f13 = state.k12 * state.A2 - state.k21 * state.A3;
@@ -60,12 +75,12 @@ export function calculateMultiSubstancePKPD(
         state.A1 = Math.max(0, state.A1 + (f11 + 2*f21 + 2*f31 + f41) * dt / 6);
         state.A2 = Math.max(0, state.A2 + (f12 + 2*f22 + 2*f32 + f42) * dt / 6);
         state.A3 = Math.max(0, state.A3 + (f13 + 2*f23 + 2*f33 + f43) * dt / 6);
-        
-        weekTotalCp += (state.A2 / state.Vd) * (bayesian.clearanceK ?? 1);
-        weekIntegralCp += (state.A2 / state.Vd) * dt;
+
+        const cp = (state.A2 / state.Vd) * (bayesian.clearanceK ?? 1);
+        weekTotalCp += cp;
+        weekIntegralCp += cp * dt;
       });
 
-      // Накопление толерантности (глобальная по суммарному AUC)
       totalTol[w] = Math.min(PKPD_DEFAULTS.maxTol, totalTol[w] + kTol * weekTotalCp * dt);
     }
 

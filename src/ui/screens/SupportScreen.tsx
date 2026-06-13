@@ -592,6 +592,8 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   const [goalRecommendations, setGoalRecommendations] = useState<ReturnType<typeof findSupportForGoal> | null>(null);
 
   // Peptide calculator state
+  const [pepTab, setPepTab] = useState<'peptides' | 'growth'>('peptides');
+  const [growthId, setGrowthId] = useState<string | null>(null);
   const [peptideId, setPeptideId] = useState('cjc1295');
   const [pepAmount, setPepAmount] = useState(2);
   const [pepAmountUnit, setPepAmountUnit] = useState<'mg' | 'mcg'>('mg');
@@ -828,17 +830,19 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
 
   return (
     <div className="screen support-screen">
-      <div style={{ display: 'flex', gap: 4, marginBottom: 12, overflowX: 'auto', scrollbarWidth: 'none' }}>
-        {(['catalog', 'synergies', 'calculator', 'interactions', 'stacks', 'peptides', 'fertility-pct'] as SupportTab[]).map(t => (
-          <button key={t} onClick={() => setTab(t)} style={{
-            flex: 1, padding: '10px 8px', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600,
-            background: tab === t ? 'var(--accent-green, #00e68a)' : 'var(--bg-secondary)',
-            color: tab === t ? '#000' : 'var(--text-dim)', cursor: 'pointer', transition: 'background 0.15s', whiteSpace: 'nowrap',
-          }}>
-            {t === 'catalog' ? '📖 Каталог' : t === 'synergies' ? '🔗 Синергии' : t === 'calculator' ? '🧮 Калькулятор' : t === 'interactions' ? '⚠️ Взаимодействия' : t === 'stacks' ? '📦 Стеки' : t === 'peptides' ? '🧬 Пептиды' : t === 'fertility-pct' ? '🧬 Фертильность' : ''}
-          </button>
-        ))}
-      </div>
+      {tab !== 'main' && (
+        <div style={{ display: 'flex', gap: 4, marginBottom: 12, overflowX: 'auto', scrollbarWidth: 'none' }}>
+          {(['catalog', 'synergies', 'calculator', 'interactions', 'stacks', 'peptides', 'fertility-pct'] as SupportTab[]).map(t => (
+            <button key={t} onClick={() => setTab(t)} style={{
+              flex: 1, padding: '10px 8px', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600,
+              background: tab === t ? 'var(--accent-green, #00e68a)' : 'var(--bg-secondary)',
+              color: tab === t ? '#000' : 'var(--text-dim)', cursor: 'pointer', transition: 'background 0.15s', whiteSpace: 'nowrap',
+            }}>
+              {t === 'catalog' ? '📖 Каталог' : t === 'synergies' ? '🔗 Синергии' : t === 'calculator' ? '🧮 Калькулятор' : t === 'interactions' ? '⚠️ Взаимодействия' : t === 'stacks' ? '📦 Стеки' : t === 'peptides' ? '🧬 Пептиды' : t === 'fertility-pct' ? '🧬 Фертильность' : ''}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* ===== MAIN (hero + cards) ===== */}
       {tab === 'main' && supportView === 'main' && (
@@ -1848,35 +1852,72 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
             <p style={{ fontSize: 11, color: 'var(--text-dim)', margin: 0 }}>Расчёт разведения, дозировки, PK‑модели и рисков для пептидов и факторов роста</p>
           </div>
 
-          {/* Additional PHARMA_DB items */}
-          <div className="card" style={{ marginBottom: 8 }}>
-            <div style={{ fontSize: 11, fontWeight: 600, marginBottom: 6 }}>📦 Дополнительные вещества</div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, maxHeight: 120, overflowY: 'auto' }}>
-              {(() => {
-                const PHARMA_PEPTIDE_CLASSES = new Set(['peptide_ghrh','peptide_ghrp','igf1','mgf','insulin','peptide_gnrh','peptide_fat_loss','peptide_other','peptide_regenerative','peptide_immune','peptide_nootropic','pct_gonadotropin']);
-                return Object.values(PHARMA_DB).filter(s => !!s?.name && PHARMA_PEPTIDE_CLASSES.has(s.class) && s.id !== 'mk677').map(s => (
-                  <span key={s.id} style={{ fontSize: 9, padding: '3px 8px', borderRadius: 12, background: 'rgba(139,92,246,0.1)', border: '1px solid rgba(139,92,246,0.2)', color: '#8b5cf6' }}>
-                    {s.name}
-                  </span>
-                ));
-              })()}
-            </div>
-            <div style={{ marginTop: 6, fontSize: 9, color: 'var(--text-dim)' }}>↑ Используйте калькулятор разведения ниже для выбранного пептида</div>
+          {/* Peptide + Growth Factor selector tabs */}
+          <div style={{ display:'flex', gap:4, marginBottom:8 }}>
+            {(['peptides','growth'] as const).map(t => (
+              <button key={t} onClick={() => setPepTab(t)} style={{
+                padding:'6px 14px', borderRadius:16, fontSize:11, fontWeight:600, cursor:'pointer',
+                background: pepTab === t ? 'var(--accent)' : 'var(--bg-secondary)',
+                color: pepTab === t ? '#000' : 'var(--text-dim)',
+                border: `1px solid ${pepTab === t ? 'var(--accent)' : 'var(--border)'}`,
+              }}>{t === 'peptides' ? '🧬 Пептиды' : '📈 Факторы роста'}</button>
+            ))}
           </div>
 
-          {/* Peptide selector */}
-          <div className="card" style={{ marginBottom: 8 }}>
-            <select value={peptideId} onChange={e => { setPeptideId(e.target.value); const p = PEPTIDE_DB[e.target.value]; if (p) { setPepAmount(p.amountMg); setPepRoute(p.routes[0]); setPepResult(null); } }} style={{ width: '100%', padding: '8px', borderRadius: 8, border: '1px solid var(--border-color)', background: 'var(--bg-secondary)', color: 'var(--text-light)', fontSize: 13 }}>
-              {PEPTIDE_LIST.map(p => <option key={p.id} value={p.id}>{p.shortName} — {p.name} ({p.className})</option>)}
-            </select>
-            {PEPTIDE_DB[peptideId] && (
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 6 }}>
-                {PEPTIDE_DB[peptideId].effects.map(e => (
-                  <span key={e} style={{ fontSize: 9, padding: '2px 6px', borderRadius: 4, background: 'rgba(0,230,138,0.1)', color: '#00e68a' }}>{e}</span>
-                ))}
+          {pepTab === 'peptides' ? (
+            <div className="card" style={{ marginBottom: 8 }}>
+              <div style={{ display:'flex', flexWrap:'wrap', gap:4, maxHeight:160, overflowY:'auto' }}>
+                {PEPTIDE_LIST.map(p => {
+                  const sel = peptideId === p.id;
+                  return (
+                    <div key={p.id} onClick={() => { setPeptideId(p.id); const pd = PEPTIDE_DB[p.id]; if (pd) { setPepAmount(pd.amountMg); setPepRoute(pd.routes[0]); setPepResult(null); }}} style={{
+                      padding:'6px 10px', borderRadius:8, cursor:'pointer', fontSize:10,
+                      background: sel ? 'rgba(0,230,138,0.15)' : 'var(--bg-secondary)',
+                      border: sel ? '1.5px solid #00e68a' : '1px solid var(--border)',
+                      color: sel ? '#00e68a' : 'var(--text)', fontWeight: sel ? 700 : 400,
+                    }}>{p.shortName}</div>
+                  );
+                })}
               </div>
-            )}
-          </div>
+              {PEPTIDE_DB[peptideId] && (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 6 }}>
+                  {PEPTIDE_DB[peptideId].effects.map(e => (
+                    <span key={e} style={{ fontSize: 9, padding: '2px 6px', borderRadius: 4, background: 'rgba(0,230,138,0.1)', color: '#00e68a' }}>{e}</span>
+                  ))}
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="card" style={{ marginBottom: 8 }}>
+              <div style={{ display:'flex', flexWrap:'wrap', gap:4, maxHeight:160, overflowY:'auto' }}>
+                {(() => {
+                  const PHARMA_GROWTH_CLASSES = new Set(['peptide_ghrh','peptide_ghrp','igf1','mgf','insulin','peptide_gnrh','peptide_fat_loss','peptide_other','peptide_regenerative','peptide_immune','peptide_nootropic','pct_gonadotropin']);
+                  return Object.values(PHARMA_DB).filter(s => !!s?.name && PHARMA_GROWTH_CLASSES.has(s.class) && s.id !== 'mk677').map(s => {
+                    const sel = growthId === s.id;
+                    return <div key={s.id} onClick={() => setGrowthId(s.id)} style={{
+                      padding:'6px 10px', borderRadius:8, cursor:'pointer', fontSize:10,
+                      background: sel ? 'rgba(139,92,246,0.15)' : 'var(--bg-secondary)',
+                      border: sel ? '1.5px solid #8b5cf6' : '1px solid var(--border)',
+                      color: sel ? '#8b5cf6' : 'var(--text)', fontWeight: sel ? 700 : 400,
+                    }}>{s.name}</div>;
+                  });
+                })()}
+              </div>
+              {(() => {
+                const s = growthId ? PHARMA_DB[growthId] : null;
+                if (!s) return null;
+                return (
+                  <div style={{ marginTop:6, padding:'8px 10px', background:'rgba(139,92,246,0.06)', borderRadius:8, fontSize:10, color:'var(--text-dim)', lineHeight:1.6 }}>
+                    <div><b>Класс:</b> {s.class}</div>
+                    <div><b>Период полувыведения:</b> {s.pk?.halfLifeHours ? `${(s.pk.halfLifeHours).toFixed(0)} ч` : '—'}</div>
+                    <div><b>Биодоступность:</b> {s.pk?.bioavailability ? `${(s.pk.bioavailability * 100).toFixed(0)}%` : '—'}</div>
+                    <div><b>Объём распределения:</b> {s.pk?.Vd ? `${s.pk.Vd} л` : '—'}</div>
+                    {s.research && s.research.length > 0 && <div style={{ marginTop:4 }}><b>Исследования:</b> {s.research.map(r => r.study).join('; ')}</div>}
+                  </div>
+                );
+              })()}
+            </div>
+          )}
 
           {/* Dilution calculator */}
           <div className="card" style={{ marginBottom: 8 }}>
