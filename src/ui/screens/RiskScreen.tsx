@@ -1,5 +1,6 @@
 ﻿import React, { useState, useMemo, useEffect } from 'react';
 import { RISK_SYSTEMS, ALL_RISK_SYSTEMS, SUBSYSTEM_MAP, SUBSYSTEM_PARENT, DRUG_THRESHOLDS, SUPPORT_BASE_COVERAGE, UCUM_MAP } from '../../core/constants';
+import { PHARMA_DB } from '../../core/pharma-database';
 import { SYSTEM_INFO, MECHANISM_INFO, SYSTEM_ORGANS } from '../../core/risk-info';
 import type { RiskResult, MechanismCell, LabPoint, CourseEntry } from '../../core/types';
 import { calculateRisks, calculateAggregatedRisks, type AggregatedRisk } from '../../engines/risk.engine';
@@ -61,6 +62,8 @@ export const RiskScreen: React.FC = () => {
     else if (mainTab === 'clinical') setSubTab('model');
   }, [mainTab]);
   const [calcPage, setCalcPage] = useState<'hero' | 'basic' | 'montecarlo' | 'mdss'>('hero');
+  const [basicPage, setBasicPage] = useState<'main' | 'dynamics' | 'mechanisms' | 'key_risks' | 'history'>('main');
+  const [mcPage, setMcPage] = useState<'main' | 'organs' | 'dynamics' | 'sensitivity' | 'pk'>('main');
   const [tick, setTick] = useState(0);
   const [selectedWeek, setSelectedWeek] = useState<number | null>(null);
   const [weekMode, setWeekMode] = useState<'week' | 'average'>('average');
@@ -360,23 +363,258 @@ export const RiskScreen: React.FC = () => {
     v7: '🧬 Монте Карло', model: '🧮 3D Модель', mdss: '🏥 MDSS',
     compliance: '✅ Комплаенс', clinical: '🩺 Клиника', info: 'ℹ️ Инфо',
     labs_risks: '🩸 Анализы',
+    main: '📋 Главная',
+    organs: '🧬 Органы и Матрицы',
+    sensitivity: '📊 Чувствительность',
+    pk: '💊 Фармакокинетика',
+    key_risks: '🔑 Ключевые',
+    history: '📜 История и пороги',
   };
 
-  // Basic Calc inline view — reused sub-components as cards
-  const BasicCalcView: React.FC<{
-    riskResult: RiskResult; aggregatedRisk: AggregatedRisk | null; weeklyDynamics: WeeklyRiskDynamics | null;
-    globalNoLabs: boolean; noLabsSystems: string[]; riskHistory: any[]; labRiskContributions: any; syntheticLabContrib: any;
-    hasLabs: boolean; shouldApplyPenalty: boolean;
-    selectedWeek: number | null; weekMode: string; setSelectedWeek: any; setWeekMode: any;
-  }> = ({ riskResult, aggregatedRisk, weeklyDynamics, globalNoLabs, noLabsSystems, riskHistory, labRiskContributions, syntheticLabContrib, hasLabs, shouldApplyPenalty, selectedWeek, weekMode, setSelectedWeek, setWeekMode }) => {
+  const SYSTEM_ICONS_V2: Record<string, string> = {
+    cardio:'❤️', hepatic:'🫁', renal:'🫘', neuro:'🧠', endocrine:'⚖️', hematologic:'🩸',
+    reproductive:'🧬', musculoskeletal:'💪', metabolic:'⚡', ghigf:'📈', ins_axis:'🍬',
+    neuro_toxicity:'⚠️', blood:'🩸', vessels:'🩸', immunity:'🛡️', thyroid:'🦋', prostate:'🔴', skin:'🧴'
+  };
+
+  // Basic Calc — multi-page view
+  const renderBasicCalc = () => {
+    if (!riskResult) return <div style={{ textAlign:'center', padding:40, color:'var(--text-dim)' }}>Загрузка...</div>;
     const effectiveLabContrib = labRiskContributions || syntheticLabContrib;
     const isSyntheticLab = !hasLabs && shouldApplyPenalty;
-    return (
-      <div>
-        <RiskOverview riskResult={riskResult} globalNoLabs={globalNoLabs} noLabsSystems={noLabsSystems} labRiskContributions={effectiveLabContrib} riskHistory={riskHistory} aggregatedRisk={aggregatedRisk} weeklyDynamics={weeklyDynamics} hideRecs />
-        <RiskDetails riskResult={riskResult} labRiskContributions={effectiveLabContrib} isSyntheticLab={isSyntheticLab} />
-      </div>
-    );
+
+    // ── Main page: cards ──
+    if (basicPage === 'main') {
+      const cardDefs = [
+        { key:'dynamics', icon:'📈', title:'Динамика рисков', desc:'График изменения Raw и Net рисков по неделям', color:'#3b82f6' },
+        { key:'mechanisms', icon:'⚙️', title:'Системы и механизмы', desc:'Риски по всем системам организма с описанием механизмов', color:'#a855f7' },
+        { key:'key_risks', icon:'🔑', title:'Ключевые риски', desc:'Основные факторы риска по каждой системе', color:'#ef4444' },
+        { key:'history', icon:'📜', title:'История и пороги препаратов', desc:'Динамика рисков и пороговые дозы всей фармакологии', color:'#f97316' },
+      ];
+      return (
+        <div>
+          {/* Общий Риск */}
+          <div className="card" style={{ marginBottom:10, padding:16, textAlign:'center',
+            background:'linear-gradient(135deg, rgba(0,230,138,0.08) 0%, rgba(0,230,138,0.02) 100%)',
+            border:'1px solid rgba(0,230,138,0.2)' }}>
+            <div style={{ fontSize:11, color:'var(--text-dim)', marginBottom:6 }}>📊 Общий риск</div>
+            <div style={{ display:'flex', justifyContent:'center', gap:20, marginBottom:4 }}>
+              <div>
+                <div style={{ fontSize:9, color:'var(--text-dim)' }}>Net</div>
+                <div style={{ fontSize:32, fontWeight:800, color:getRiskColor(riskResult.overallNet) }}>{Math.round(riskResult.overallNet)}%</div>
+              </div>
+              <div>
+                <div style={{ fontSize:9, color:'var(--text-dim)' }}>Raw</div>
+                <div style={{ fontSize:32, fontWeight:800, color:getRiskColor(riskResult.overallRaw) }}>{Math.round(riskResult.overallRaw)}%</div>
+              </div>
+            </div>
+            <div style={{ height:6, background:'var(--bg-secondary)', borderRadius:3, overflow:'hidden', marginBottom:8 }}>
+              <div style={{ width:`${Math.min(100, riskResult.overallNet)}%`, height:'100%', background:getRiskColor(riskResult.overallNet), borderRadius:3, transition:'width 0.5s' }} />
+            </div>
+            <div style={{ fontSize:9, color:'var(--text-dim)' }}>
+              {riskResult.overallNet < 25 ? 'Низкий риск' : riskResult.overallNet < 50 ? 'Умеренный риск' : riskResult.overallNet < 75 ? 'Высокий риск' : 'Критический риск'}
+            </div>
+          </div>
+
+          {/* Источники рисков */}
+          <div className="card" style={{ marginBottom:10, padding:12 }}>
+            <div style={{ fontSize:12, fontWeight:700, color:'var(--accent)', marginBottom:8 }}>📋 Источники рисков</div>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
+              {[
+                { label:'Фармакология', value:pharmaRisk?.overallNet ?? 0, color:'#8b5cf6' },
+                { label:'Лаборатория', value:hasLabs ? (labRiskContributions?.totalRisk ?? 0) : (shouldApplyPenalty ? (syntheticLabContrib?.totalRisk ?? 0) : 0), color:'#3b82f6' },
+                { label:'Тренировки', value:trainingRisk.overallNet ?? 0, color:'#f97316' },
+                { label:'Питание', value:nutritionRisk.overallNet ?? 0, color:'#22c55e' },
+              ].map(s => (
+                <div key={s.label} style={{ padding:'8px 10px', borderRadius:8, background:'var(--bg-secondary)', border:'1px solid var(--border)' }}>
+                  <div style={{ fontSize:9, color:'var(--text-dim)', marginBottom:2 }}>{s.label}</div>
+                  <div style={{ fontSize:18, fontWeight:700, color:getRiskColor(s.value) }}>{Math.round(s.value)}%</div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* 4 nav cards */}
+          <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+            {cardDefs.map(c => (
+              <button key={c.key} onClick={() => setBasicPage(c.key as any)} style={{
+                display:'flex', alignItems:'center', gap:12, padding:'12px 14px', borderRadius:14,
+                cursor:'pointer', textAlign:'left', width:'100%',
+                background:'var(--glass-bg)', border:'1px solid var(--glass-border)', color:'var(--text)',
+              }}>
+                <div style={{ width:40, height:40, borderRadius:12, display:'flex', alignItems:'center', justifyContent:'center',
+                  flexShrink:0, background:c.color+'18', fontSize:20 }}>{c.icon}</div>
+                <div style={{ flex:1 }}>
+                  <div style={{ fontSize:13, fontWeight:700, marginBottom:2, color:c.color }}>{c.title}</div>
+                  <div style={{ fontSize:10, color:'var(--text-dim)', lineHeight:1.3 }}>{c.desc}</div>
+                </div>
+                <span style={{ color:c.color, fontSize:16, opacity:0.6 }}>→</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      );
+    }
+
+    // ── Dynamics page ──
+    if (basicPage === 'dynamics') {
+      if (!weeklyDynamics) return <div style={{ textAlign:'center', padding:40, color:'var(--text-dim)' }}>Нет данных для динамики</div>;
+      return <WeeklyRiskChart dynamics={weeklyDynamics} selectedWeek={selectedWeek} onWeekSelect={setSelectedWeek} mode={weekMode} onModeChange={setWeekMode} />;
+    }
+
+    // ── Mechanisms page (vessels → Сосуды) ──
+    if (basicPage === 'mechanisms') {
+      return <RiskDetails riskResult={riskResult} labRiskContributions={effectiveLabContrib} isSyntheticLab={isSyntheticLab} />;
+    }
+
+    // ── Key Risks page ──
+    if (basicPage === 'key_risks') {
+      const sorted = ALL_RISK_SYSTEMS.map(sys => ({
+        sys, label: SYSTEM_INFO[sys]?.label || sys,
+        raw: riskResult.systemBreakdown?.[sys]?.raw ?? 0,
+        net: riskResult.systemBreakdown?.[sys]?.net ?? 0,
+      })).sort((a, b) => b.net - a.net);
+      return (
+        <div>
+          <div className="card" style={{ marginBottom:10, padding:12 }}>
+            <div style={{ fontSize:12, fontWeight:700, color:'var(--accent)', marginBottom:8 }}>🔑 Ключевые риски по системам</div>
+            {sorted.filter(s => s.net > 5).map(s => (
+              <div key={s.sys} style={{ marginBottom:6, padding:'8px 10px', borderRadius:8, background:'var(--bg-secondary)', border:'1px solid var(--border)' }}>
+                <div style={{ display:'flex', justifyContent:'space-between', marginBottom:4 }}>
+                  <span style={{ fontSize:11, fontWeight:600, color:getRiskColor(s.net) }}>{SYSTEM_ICONS_V2[s.sys] || ''} {s.label}</span>
+                  <span style={{ fontSize:11, fontWeight:700, color:getRiskColor(s.net) }}>{Math.round(s.net)}%</span>
+                </div>
+                <div style={{ height:4, background:'var(--bg)', borderRadius:2, overflow:'hidden' }}>
+                  <div style={{ width:`${s.net}%`, height:'100%', background:getRiskColor(s.net), borderRadius:2 }} />
+                </div>
+                <div style={{ display:'flex', gap:8, marginTop:2, fontSize:9, color:'var(--text-dim)' }}>
+                  <span>Raw: {Math.round(s.raw)}%</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    }
+
+    // ── History + Drug Thresholds page ──
+    if (basicPage === 'history') {
+      const drugEntries = Object.entries(DRUG_THRESHOLDS)
+        .filter(([k]) => !k.includes('_'))
+        .map(([k, v]) => ({ id: k, ...v }))
+        .sort((a, b) => b.androgenicity - a.androgenicity);
+      return (
+        <div>
+          {/* Risk History */}
+          <div className="card" style={{ marginBottom:10, padding:12 }}>
+            <div style={{ fontSize:12, fontWeight:700, color:'var(--accent)', marginBottom:8 }}>📜 История рисков</div>
+            {riskHistory.length === 0 ? (
+              <div style={{ fontSize:10, color:'var(--text-dim)', textAlign:'center', padding:10 }}>Нет сохранённой истории</div>
+            ) : (
+              <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
+                {riskHistory.slice(-8).reverse().map((h: any, i: number) => (
+                  <div key={i} style={{ display:'flex', justifyContent:'space-between', padding:'4px 8px', borderRadius:4, background:'var(--bg-secondary)', fontSize:10 }}>
+                    <span style={{ color:'var(--text-dim)' }}>{h.date}</span>
+                    <span style={{ color:getRiskColor(h.overallNet), fontWeight:600 }}>Net: {Math.round(h.overallNet)}%</span>
+                    <span style={{ color:getRiskColor(h.overallRaw), fontWeight:600 }}>Raw: {Math.round(h.overallRaw)}%</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Drug Thresholds — ALL pharmacology in Russian */}
+          <div className="card" style={{ marginBottom:10, padding:12 }}>
+            <div style={{ fontSize:12, fontWeight:700, color:'var(--accent)', marginBottom:8 }}>💊 Пороги препаратов (вся фармакология)</div>
+            <div style={{ display:'grid', gap:6 }}>
+              {drugEntries.map(d => {
+                const pharma = PHARMA_DB[d.id];
+                const name = pharma?.name || d.id;
+                const anColor = d.androgenicity < 0.3 ? '#22c55e' : d.androgenicity < 0.7 ? '#eab308' : d.androgenicity < 1.2 ? '#f97316' : '#ef4444';
+                return (
+                  <div key={d.id} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'6px 10px', borderRadius:8, background:'var(--bg-secondary)', border:'1px solid var(--border)' }}>
+                    <div style={{ flex:1 }}>
+                      <div style={{ fontSize:11, fontWeight:600, color:'var(--text)' }}>{name}</div>
+                      <div style={{ fontSize:9, color:'var(--text-dim)' }}>доза/нед: {d.dosePerWeek}</div>
+                    </div>
+                    <div style={{ textAlign:'right' }}>
+                      <div style={{ fontSize:9, color:'var(--text-dim)' }}>Андрогенность</div>
+                      <div style={{ fontSize:14, fontWeight:700, color:anColor }}>{d.androgenicity.toFixed(1)}</div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    return null;
+  };
+
+  // Monte Carlo multi-page view
+  const renderMonteCarlo = () => {
+    if (!v7Result) return <div style={{ textAlign:'center', padding:40, color:'var(--text-dim)' }}>Загрузка V7...</div>;
+
+    // Main page: MC toggle + 4 nav cards
+    if (mcPage === 'main') {
+      const mcCards = [
+        { key:'organs', icon:'🧬', title:'Органы и Матрицы', desc:'Матрица рисков по органам и системам с временным срезом', color:'#8b5cf6' },
+        { key:'dynamics', icon:'📈', title:'Динамика', desc:'Временной ряд рисков по дням на 12 недель', color:'#3b82f6' },
+        { key:'sensitivity', icon:'📊', title:'Чувствительность', desc:'Анализ чувствительности к параметрам образа жизни', color:'#f97316' },
+        { key:'pk', icon:'💊', title:'Фармакокинетика', desc:'PK/PD симуляция концентрации препаратов', color:'#22c55e' },
+      ];
+      return (
+        <div>
+          {/* MC Toggle card */}
+          <div className="card" style={{ marginBottom:10, padding:12, textAlign:'center',
+            background:'rgba(139,92,246,0.06)', border:'1px solid rgba(139,92,246,0.2)' }}>
+            <div style={{ fontSize:14, fontWeight:700, color:'#8b5cf6', marginBottom:8 }}>🎲 Монте Карло (V7)</div>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom:8 }}>
+              <div style={{ padding:'8px 0', borderRadius:8, background:'var(--bg-secondary)' }}>
+                <div style={{ fontSize:9, color:'var(--text-dim)' }}>Raw</div>
+                <div style={{ fontSize:24, fontWeight:800, color:getRiskColor(v7Result.globalRiskRaw) }}>{Math.round(v7Result.globalRiskRaw)}%</div>
+              </div>
+              <div style={{ padding:'8px 0', borderRadius:8, background:'var(--bg-secondary)' }}>
+                <div style={{ fontSize:9, color:'var(--text-dim)' }}>Net</div>
+                <div style={{ fontSize:24, fontWeight:800, color:getRiskColor(v7Result.globalRiskNet) }}>{Math.round(v7Result.globalRiskNet)}%</div>
+              </div>
+            </div>
+            <button onClick={toggleMC} style={{
+              padding:'8px 20px', borderRadius:20, fontSize:12, fontWeight:700, cursor:'pointer',
+              background:mcEnabled?'linear-gradient(135deg,#8b5cf6,#6d28d9)':'var(--bg-secondary)',
+              border:mcEnabled?'1px solid #8b5cf6':'1px solid var(--border)',
+              color:mcEnabled?'#fff':'var(--text-dim)',
+              boxShadow:mcEnabled?'0 0 16px rgba(139,92,246,0.35)':'none',
+              transition:'all 0.3s',
+            }}>{mcEnabled ? '✅ MC включён' : '▶ Включить Монте Карло'}</button>
+          </div>
+
+          {/* 4 nav cards */}
+          <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+            {mcCards.map(c => (
+              <button key={c.key} onClick={() => setMcPage(c.key as any)} style={{
+                display:'flex', alignItems:'center', gap:12, padding:'12px 14px', borderRadius:14,
+                cursor:'pointer', textAlign:'left', width:'100%',
+                background:'var(--glass-bg)', border:'1px solid var(--glass-border)', color:'var(--text)',
+              }}>
+                <div style={{ width:40, height:40, borderRadius:12, display:'flex', alignItems:'center', justifyContent:'center',
+                  flexShrink:0, background:c.color+'18', fontSize:20 }}>{c.icon}</div>
+                <div style={{ flex:1 }}>
+                  <div style={{ fontSize:13, fontWeight:700, marginBottom:2, color:c.color }}>{c.title}</div>
+                  <div style={{ fontSize:10, color:'var(--text-dim)', lineHeight:1.3 }}>{c.desc}</div>
+                </div>
+                <span style={{ color:c.color, fontSize:16, opacity:0.6 }}>→</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      );
+    }
+
+    // Sub-pages: render V7RiskDisplay with appropriate section
+    return <V7RiskDisplay result={v7Result} organWeek={organWeek} onWeekChange={setOrganWeek} mcEnabled={mcEnabled} onToggleMC={toggleMC} />;
   };
 
   const mainTabLabel = mainTab === 'calculations' ? 'Комплексные расчеты' :
@@ -387,7 +625,7 @@ export const RiskScreen: React.FC = () => {
       {/* ─── HERO PAGE ─── */}
       {mainTab === 'hero' && (
         <div style={{ flex: 1, minHeight: 0, display:'flex', flexDirection:'column', overflow:'hidden' }}>
-          <div style={{ flex:'0 0 58vh', position:'relative', maxHeight:'65vh' }}>
+          <div style={{ flex:'0 0 42vh', position:'relative', maxHeight:'50vh' }}>
             <img src="/risk-hero.png" alt="" style={{ width:'100%', height:'100%', display:'block', objectFit:'cover', objectPosition:'center top' }} />
             <div style={{ position: 'absolute', bottom: 10, left: 16, right: 16 }}>
               <h1 style={{ fontSize: 20, fontWeight: 800, color: '#fff', margin: '0 0 2px', textShadow: '0 2px 12px rgba(0,0,0,0.8)' }}>Оценка рисков</h1>
@@ -396,7 +634,7 @@ export const RiskScreen: React.FC = () => {
               </p>
             </div>
           </div>
-          <div style={{ flexShrink:0, padding:'10px 16px 80px', display:'flex', flexDirection:'column', gap:8, overflowY:'auto' }}>
+          <div style={{ flex:1, padding:'10px 16px 80px', display:'flex', flexDirection:'column', gap:8, overflowY:'auto' }}>
             {[
               { id: 'calculations', icon: '🧮', title: 'Комплексные расчеты', desc: 'Базовый расчёт, Монте Карло (V7), MDSS — все аналитические модели рисков.', color: '#22c55e' },
               { id: 'clinical', icon: '🏥', title: 'Клиника', desc: '3D модель, комплаенс, клинические риски и анализы.', color: '#3b82f6' },
@@ -434,11 +672,18 @@ export const RiskScreen: React.FC = () => {
 
       {/* ─── SCROLLABLE CONTENT ─── */}
       {mainTab !== 'hero' && (
-        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '0 12px 70px', backgroundImage: mainTab==='calculations'&&calcPage==='hero'?'linear-gradient(rgba(5,5,14,0.78),rgba(5,5,14,0.82)),url(/calc-hero.png)':'none', backgroundSize:'cover', backgroundPosition:'center', backgroundAttachment:'scroll' }}>
+        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', position: 'relative' }}>
+          {/* Background image for calc sub-hero */}
+          {mainTab==='calculations' && calcPage==='hero' && (
+            <img src="/calc-hero.png" alt="" style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'cover', opacity:0.25, pointerEvents:'none' }} />
+          )}
+          <div style={{ position:'relative', zIndex:1, padding:'0 12px 70px' }}>
 
           {/* ───── COMPLEX CALCULATIONS SUB-HERO ───── */}
           {mainTab === 'calculations' && calcPage === 'hero' && (
-            <div style={{ padding:12, borderRadius:16, backgroundImage:'linear-gradient(rgba(5,5,14,0.82),rgba(5,5,14,0.82)),url(/calc-hero.png)', backgroundSize:'cover', backgroundPosition:'center', border:'1px solid var(--border)' }}>
+            <div style={{ position:'relative', padding:12, borderRadius:16, overflow:'hidden', border:'1px solid var(--border)' }}>
+              <img src="/calc-hero.png" alt="" style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'cover', opacity:0.18, pointerEvents:'none' }} />
+              <div style={{ position:'relative', zIndex:1 }}>
               {/* Summary card */}
               <div style={{ marginTop: 10, padding: 14, borderRadius: 16, background: 'var(--glass-bg)', border: '1px solid var(--glass-border)' }}>
                 <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--accent)', marginBottom: 10, textAlign: 'center' }}>
@@ -478,8 +723,8 @@ export const RiskScreen: React.FC = () => {
                 ].map(card => (
                   <button key={card.id} onClick={() => {
                     setCalcPage(card.id as any);
-                    if (card.id === 'basic') setSubTab('overview');
-                    else if (card.id === 'montecarlo') setSubTab('v7');
+                    if (card.id === 'basic') { setBasicPage('main'); setSubTab('overview'); }
+                    else if (card.id === 'montecarlo') { setMcPage('main'); setSubTab('v7'); }
                     else setSubTab('mdss');
                   }} style={{
                     display: 'flex', alignItems: 'center', gap: 12, padding: '14px 14px', borderRadius: 14, cursor: 'pointer', textAlign: 'left', width: '100%',
@@ -499,6 +744,7 @@ export const RiskScreen: React.FC = () => {
                 ))}
               </div>
             </div>
+            </div>
           )}
 
           {/* ───── REGULAR SUB-TAB NAVIGATION ───── */}
@@ -512,33 +758,44 @@ export const RiskScreen: React.FC = () => {
                     background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text-dim)', fontWeight: 600,
                   }}>← Назад</button>
                 )}
-                {(mainTab === 'calculations'
-                  ? (calcPage === 'basic' ? ['overview','dynamics','mechanisms'] : calcPage === 'montecarlo' ? ['v7'] : ['mdss']) as readonly string[]
-                  : mainTab === 'clinical' ? CLINICAL_SUBTABS as readonly string[]
-                  : ['info'] as readonly string[]
-                ).map(t => (
-                  <button key={t} onClick={() => setSubTab(t as any)} style={{
-                    padding: '6px 14px', borderRadius: 16, fontSize: 11, fontWeight: 600,
-                    whiteSpace: 'nowrap', cursor: 'pointer', transition: 'all 0.2s', flexShrink: 0,
-                    background: subTab === t ? 'var(--accent)' : 'var(--bg-secondary)',
-                    color: subTab === t ? '#000' : 'var(--text-dim)',
-                    border: `1px solid ${subTab === t ? 'var(--accent)' : 'var(--border)'}`,
-                  }}>
-                    {SUBTAB_LABELS[t] || t}
-                  </button>
-                ))}
+        {(mainTab === 'calculations'
+          ? (calcPage === 'basic'
+            ? (basicPage === 'main' ? ['main'] as const : [basicPage] as const)
+            : calcPage === 'montecarlo'
+            ? (mcPage === 'main' ? ['main'] as const : [mcPage] as const)
+            : calcPage === 'mdss' ? ['mdss'] as const
+            : ['overview'] as const)
+          : mainTab === 'clinical' ? CLINICAL_SUBTABS as readonly string[]
+          : ['info'] as readonly string[]
+        ).map(t => (
+          <button key={t} onClick={() => {
+            if (mainTab === 'calculations') {
+              if (calcPage === 'basic') setBasicPage(t as any);
+              else if (calcPage === 'montecarlo') setMcPage(t as any);
+              else setSubTab(t as any);
+            } else {
+              setSubTab(t as any);
+            }
+          }} style={{
+            padding: '6px 14px', borderRadius: 16, fontSize: 11, fontWeight: 600,
+            whiteSpace: 'nowrap', cursor: 'pointer', transition: 'all 0.2s', flexShrink: 0,
+            background: subTab === t || basicPage === t || mcPage === t ? 'var(--accent)' : 'var(--bg-secondary)',
+            color: subTab === t || basicPage === t || mcPage === t ? '#000' : 'var(--text-dim)',
+            border: `1px solid ${subTab === t || basicPage === t || mcPage === t ? 'var(--accent)' : 'var(--border)'}`,
+          }}>
+            {SUBTAB_LABELS[t] || t}
+          </button>
+        ))}
               </div>
-              {/* BASIC CALC — all content inline on one page */}
-              {mainTab === 'calculations' && calcPage === 'basic' && riskResult && (
-                <BasicCalcView riskResult={riskResult} aggregatedRisk={aggregatedRisk} weeklyDynamics={weeklyDynamics}
-                  globalNoLabs={globalNoLabs} noLabsSystems={noLabsSystems} riskHistory={riskHistory}
-                  labRiskContributions={labRiskContributions} syntheticLabContrib={syntheticLabContrib}
-                  hasLabs={hasLabs} shouldApplyPenalty={shouldApplyPenalty}
-                  selectedWeek={selectedWeek} weekMode={weekMode} setSelectedWeek={setSelectedWeek} setWeekMode={setWeekMode} />
-              )}
-              {!(mainTab === 'calculations' && calcPage === 'basic') && renderContent()}
+              {/* BASIC CALC — multi-page */}
+              {mainTab === 'calculations' && calcPage === 'basic' && riskResult && renderBasicCalc()}
+              {/* MONTE CARLO — multi-page */}
+              {mainTab === 'calculations' && calcPage === 'montecarlo' && renderMonteCarlo()}
+              {/* All other content */}
+              {!((mainTab === 'calculations' && calcPage === 'basic') || (mainTab === 'calculations' && calcPage === 'montecarlo')) && renderContent()}
             </>
           )}
+          </div>
         </div>
       )}
     </div>
@@ -785,12 +1042,7 @@ const ComplianceDisplay: React.FC = () => {
   }, [course]);
 
   const [cycleStart, setCycleStart] = useState(courseStartDate);
-  const [lastLab, setLastLab] = useState(latestLabDate);
-  useEffect(() => { setLastLab(latestLabDate); }, [latestLabDate]);
   useEffect(() => { setCycleStart(courseStartDate); }, [courseStartDate]);
-
-  // Sync auto-values
-  useEffect(() => { /* dates auto-computed, no input needed */ }, []);
 
   const genetics = useMemo(() => {
     const g = (s?.genetics as Record<string, boolean | string>) || {};
@@ -819,12 +1071,12 @@ const ComplianceDisplay: React.FC = () => {
   const kAgg = 0.4;
   const zCrit = 12.0;
 
-  // Auto-run
+  // Auto-run — use latestLabDate directly, no stale state
   useEffect(() => {
-    if (!cycleStart || !lastLab) return;
+    if (!cycleStart || !latestLabDate) return;
     const result = analyzeWithCompliance({
       cycleStartDate: cycleStart,
-      latestLabDate: lastLab,
+      latestLabDate,
       currentDate: today,
       genetics,
       markers,
@@ -832,10 +1084,10 @@ const ComplianceDisplay: React.FC = () => {
       zCritOverride: zCrit,
     });
     setReport(result);
-  }, [cycleStart, lastLab, markers.length]);
+  }, [cycleStart, latestLabDate, markers.length]);
 
   const msPerWeek = 7 * 24 * 3600 * 1000;
-  const weeksSinceLab = Math.max(0, (new Date(today).getTime() - new Date(lastLab).getTime()) / msPerWeek);
+  const weeksSinceLab = Math.max(0, (new Date(today).getTime() - new Date(latestLabDate).getTime()) / msPerWeek);
   const compliance = getComplianceStatus(weeksSinceLab);
   const complianceColors: Record<string, string> = { compliant:'#00e68a', overdue:'#f97316', critical:'#ef4444' };
 
