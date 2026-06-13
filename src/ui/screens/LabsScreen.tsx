@@ -479,13 +479,21 @@ export const LabsScreen: React.FC = () => {
       {/* ─── HERO PAGE ─── */}
       {mainTab === 'hero' && (
         <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '40px 16px 70px' }}>
-          {/* Hero section */}
-          <div style={{ textAlign: 'center', marginBottom: 28 }}>
-            <div style={{ fontSize: 48, marginBottom: 12 }}>🧪</div>
-            <h1 style={{ fontSize: 24, fontWeight: 800, color: 'var(--accent)', margin: '0 0 8px' }}>Лаборатория</h1>
-            <p style={{ fontSize: 13, color: 'var(--text-dim)', margin: 0, lineHeight: 1.5 }}>
-              Контролируйте своё здоровье — анализы, обследования и оценка рисков
-            </p>
+          {/* Hero section with image */}
+          <div style={{
+            position: 'relative', marginBottom: 20, borderRadius: 20, overflow: 'hidden',
+            background: 'linear-gradient(180deg, rgba(5,5,14,0) 40%, var(--bg) 100%)',
+          }}>
+            <img src="/lab-hero.png" alt="Лаборатория" style={{
+              width: '100%', height: 'auto', maxHeight: 260, display: 'block',
+              objectFit: 'cover', objectPosition: 'center top', borderRadius: 16,
+            }} />
+            <div style={{ position: 'absolute', bottom: 8, left: 16, right: 16 }}>
+              <h1 style={{ fontSize: 22, fontWeight: 800, color: '#fff', margin: '0 0 4px', textShadow: '0 2px 12px rgba(0,0,0,0.7)' }}>Лаборатория</h1>
+              <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.8)', margin: 0, lineHeight: 1.4, textShadow: '0 1px 6px rgba(0,0,0,0.6)' }}>
+                Контролируйте своё здоровье — анализы, обследования и оценка рисков
+              </p>
+            </div>
           </div>
 
           {/* 3 cards */}

@@ -110,12 +110,12 @@ export const Risk3DModel: React.FC<Props> = ({ result, mcEnabled, onToggleMC, or
 
     // Scene
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color('#0a0d12');
-    scene.fog = new THREE.Fog('#0a0d12', 2, 8);
+    scene.background = null;
+    scene.fog = null;
 
     // Camera
-    const camera = new THREE.PerspectiveCamera(45, w / h, 0.1, 20);
-    camera.position.set(0, 0.3, 4);
+    const camera = new THREE.PerspectiveCamera(40, w / h, 0.1, 20);
+    camera.position.set(0, 0.2, 3.5);
     camera.lookAt(0, 0, 0);
 
     // Renderer
@@ -155,15 +155,6 @@ export const Risk3DModel: React.FC<Props> = ({ result, mcEnabled, onToggleMC, or
     rim.position.set(0, -0.5, 3);
     scene.add(rim);
 
-    // Ground plane
-    const groundGeo = new THREE.PlaneGeometry(8, 8);
-    const groundMat = new THREE.MeshStandardMaterial({ color: '#111522', roughness: 0.9 });
-    const ground = new THREE.Mesh(groundGeo, groundMat);
-    ground.position.y = -2.2;
-    ground.rotation.x = -Math.PI / 2;
-    ground.receiveShadow = true;
-    scene.add(ground);
-
     // Meshes map
     const meshes = new Map<string, THREE.Mesh>();
 
@@ -172,7 +163,8 @@ export const Risk3DModel: React.FC<Props> = ({ result, mcEnabled, onToggleMC, or
     loader.load('/hulk.glb', (gltf) => {
       setLoading(false);
       const model = gltf.scene;
-      model.position.set(0, -0.3, 0);
+      let modelScale = 1;
+      model.position.set(0, -0.15, 0);
       
       // Add to scene and collect meshes
       model.traverse((child) => {
@@ -332,9 +324,9 @@ export const Risk3DModel: React.FC<Props> = ({ result, mcEnabled, onToggleMC, or
       <div
         ref={containerRef}
         style={{
-          width: '100%', height: 'clamp(300px, 50vh, 500px)',
+          width: '100%', height: '85vh', maxHeight: 'calc(100vh - 60px)',
           borderRadius: 16, overflow: 'hidden',
-          background: 'radial-gradient(ellipse at center, #151a24 0%, #0a0d12 100%)',
+          background: 'transparent',
           border: '1px solid var(--border)',
           position: 'relative',
         }}
