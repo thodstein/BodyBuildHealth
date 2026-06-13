@@ -398,18 +398,18 @@ export const RiskScreen: React.FC = () => {
       return (
         <div>
           {/* Общий Риск */}
-          <div className="card" style={{ marginBottom:10, padding:16, textAlign:'center',
+          <div className="card" style={{ marginBottom:10, padding:16, textAlign:'center', width:'100%', maxWidth:'100%', boxSizing:'border-box', overflow:'hidden',
             background:'linear-gradient(135deg, rgba(0,230,138,0.08) 0%, rgba(0,230,138,0.02) 100%)',
             border:'1px solid rgba(0,230,138,0.2)' }}>
             <div style={{ fontSize:11, color:'var(--text-dim)', marginBottom:6 }}>📊 Общий риск</div>
-            <div style={{ display:'flex', justifyContent:'center', gap:20, marginBottom:4 }}>
+            <div style={{ display:'flex', justifyContent:'center', gap:10, marginBottom:4, flexWrap:'wrap' }}>
               <div>
                 <div style={{ fontSize:9, color:'var(--text-dim)' }}>Net</div>
-                <div style={{ fontSize:32, fontWeight:800, color:getRiskColor(riskResult.overallNet) }}>{Math.round(riskResult.overallNet)}%</div>
+                <div style={{ fontSize:28, fontWeight:800, color:getRiskColor(riskResult.overallNet) }}>{Math.round(riskResult.overallNet)}%</div>
               </div>
               <div>
                 <div style={{ fontSize:9, color:'var(--text-dim)' }}>Raw</div>
-                <div style={{ fontSize:32, fontWeight:800, color:getRiskColor(riskResult.overallRaw) }}>{Math.round(riskResult.overallRaw)}%</div>
+                <div style={{ fontSize:28, fontWeight:800, color:getRiskColor(riskResult.overallRaw) }}>{Math.round(riskResult.overallRaw)}%</div>
               </div>
             </div>
             <div style={{ height:6, background:'var(--bg-secondary)', borderRadius:3, overflow:'hidden', marginBottom:8 }}>
@@ -423,7 +423,7 @@ export const RiskScreen: React.FC = () => {
           {/* Источники рисков */}
           <div className="card" style={{ marginBottom:10, padding:12 }}>
             <div style={{ fontSize:12, fontWeight:700, color:'var(--accent)', marginBottom:8 }}>📋 Источники рисков</div>
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:4 }}>
               {[
                 { label:'Фармакология', value:pharmaRisk?.overallNet ?? 0, color:'#8b5cf6' },
                 { label:'Лаборатория', value:hasLabs ? (labRiskContributions?.totalRisk ?? 0) : (shouldApplyPenalty ? (syntheticLabContrib?.totalRisk ?? 0) : 0), color:'#3b82f6' },
@@ -512,8 +512,8 @@ export const RiskScreen: React.FC = () => {
         'selenium_sup','vitamin_b6','vitamin_b12','folate',
       ]);
       const drugEntries = Object.entries(DRUG_THRESHOLDS)
-        .filter(([k]) => !SUPPORT_IDS.has(k))
-        .map(([k, v]) => ({ id: k, name: PHARMA_DB[k]?.name || k, dosePerWeek: v.dosePerWeek, androgenicity: v.androgenicity }));
+        .filter(([k]) => !SUPPORT_IDS.has(k) && PHARMA_DB[k]?.name)
+        .map(([k, v]) => ({ id: k, name: PHARMA_DB[k]!.name, dosePerWeek: v.dosePerWeek, androgenicity: v.androgenicity }));
       // Dedup by name (keep first)
       const seen = new Set<string>();
       const deduped = drugEntries.filter(d => { if (seen.has(d.name)) return false; seen.add(d.name); return true; })
@@ -762,7 +762,11 @@ export const RiskScreen: React.FC = () => {
               {/* Sub-tab pills + back button for calculations */}
               <div style={{ display: 'flex', gap: 4, overflowX: 'auto', padding: '8px 0 4px', scrollbarWidth: 'none', alignItems: 'center' }}>
                 {mainTab === 'calculations' && (
-                  <button onClick={() => { setCalcPage('hero'); setSubTab('overview'); }} style={{
+                  <button onClick={() => {
+                    if (basicPage !== 'main') { setBasicPage('main'); return; }
+                    if (mcPage !== 'main') { setMcPage('main'); return; }
+                    setCalcPage('hero'); setSubTab('overview');
+                  }} style={{
                     padding: '4px 8px', borderRadius: 6, fontSize: 10, cursor: 'pointer', flexShrink: 0,
                     background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text-dim)', fontWeight: 600,
                   }}>← Назад</button>

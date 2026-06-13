@@ -106,8 +106,13 @@ const PHARMA_CLASSES = [
 
 type PharmaClass = typeof PHARMA_CLASSES[number];
 
+type PharmaPage = 'main' | 'course' | 'calculators' | 'info';
+type SubTab = 'catalog' | 'pkpd' | 'dosage' | 'interactions';
+
 export const PharmaScreen: React.FC = () => {
-  const [tab, setTab] = useState<Tab>('catalog');
+  const [page, setPage] = useState<PharmaPage>('main');
+  const [subTab, setSubTab] = useState<SubTab>('catalog');
+  const [courseSub, setCourseSub] = useState<'course' | 'mapper' | 'diagnostics'>('course');
 
   // Filter to show only pharma substances (exclude support classes)
   const pharmaSubstances = useMemo(() => {
@@ -116,35 +121,78 @@ export const PharmaScreen: React.FC = () => {
     );
   }, []);
 
+  if (page === 'main') {
+    const cards = [
+      { key:'course' as const, icon:'📋', title:'Курс', desc:'Управление курсом, маппинг препаратов, диагностика', color:'#8b5cf6' },
+      { key:'calculators' as const, icon:'⚙️', title:'Калькуляторы', desc:'PK/PD симуляция, расчёт дозировок', color:'#3b82f6' },
+      { key:'info' as const, icon:'📖', title:'Общая информация', desc:'Каталог веществ и проверка взаимодействий', color:'#22c55e' },
+    ];
+    return (
+      <div className="screen pharma" style={{ padding: 0 }}>
+        <img src="./pharma-hero.png" alt="" style={{ width:'100%', display:'block', borderRadius:0 }} />
+        <div style={{ padding:'12px', display:'flex', flexDirection:'column', gap:8 }}>
+          {cards.map(c => (
+            <button key={c.key} onClick={() => setPage(c.key)} style={{
+              display:'flex', alignItems:'center', gap:12, padding:'14px 16px', borderRadius:14,
+              cursor:'pointer', textAlign:'left', width:'100%',
+              background:'var(--glass-bg)', border:'1px solid var(--glass-border)', color:'var(--text)',
+            }}>
+              <div style={{ width:44, height:44, borderRadius:12, display:'flex', alignItems:'center', justifyContent:'center',
+                flexShrink:0, background:c.color+'18', fontSize:22 }}>{c.icon}</div>
+              <div style={{ flex:1 }}>
+                <div style={{ fontSize:14, fontWeight:700, marginBottom:2, color:c.color }}>{c.title}</div>
+                <div style={{ fontSize:11, color:'var(--text-dim)', lineHeight:1.3 }}>{c.desc}</div>
+              </div>
+              <span style={{ color:c.color, fontSize:18, opacity:0.6 }}>→</span>
+            </button>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="screen pharma">
-      <h2>Фармакология</h2>
-      <div className="tab-bar" style={{ marginBottom: 8 }}>
-        {([
-          ['catalog', '📖 Каталог'],
-          ['pkpd', '⚙️ PK/PD'],
-          ['dosage', '💊 Дозировки'],
-          ['interactions', '⚡ Взаимод.'],
-          ['course', '📋 Курс'],
-          ['mapper', '🗺 Маппер'],
-          ['diagnostics', '🩺 Диагностика'],
-        ] as [Tab, string][]).map(([key, label]) => (
-          <button
-            key={key}
-            className={`tab-btn ${tab === key ? 'active' : ''}`}
-            onClick={() => setTab(key)}
-          >
-            {label}
-          </button>
+      <div style={{ display:'flex', gap:4, overflowX:'auto', marginBottom:8, scrollbarWidth:'none', alignItems:'center' }}>
+        <button onClick={() => setPage('main')} style={{
+          padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', flexShrink:0,
+          background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600,
+        }}>← Назад</button>
+        {page === 'course' && (['course','mapper','diagnostics'] as const).map(t => (
+          <button key={t} onClick={() => setCourseSub(t)} style={{
+            padding:'6px 14px', borderRadius:16, fontSize:11, fontWeight:600, whiteSpace:'nowrap',
+            cursor:'pointer', flexShrink:0,
+            background: courseSub === t ? 'var(--accent)' : 'var(--bg-secondary)',
+            color: courseSub === t ? '#000' : 'var(--text-dim)',
+            border: `1px solid ${courseSub === t ? 'var(--accent)' : 'var(--border)'}`,
+          }}>{t === 'course' ? '📋 Курс' : t === 'mapper' ? '🗺 Маппер' : '🩺 Диагностика'}</button>
+        ))}
+        {page === 'calculators' && (['pkpd','dosage'] as const).map(t => (
+          <button key={t} onClick={() => setSubTab(t)} style={{
+            padding:'6px 14px', borderRadius:16, fontSize:11, fontWeight:600, whiteSpace:'nowrap',
+            cursor:'pointer', flexShrink:0,
+            background: subTab === t ? 'var(--accent)' : 'var(--bg-secondary)',
+            color: subTab === t ? '#000' : 'var(--text-dim)',
+            border: `1px solid ${subTab === t ? 'var(--accent)' : 'var(--border)'}`,
+          }}>{t === 'pkpd' ? '⚙️ PK/PD' : '💊 Дозировки'}</button>
+        ))}
+        {page === 'info' && (['catalog','interactions'] as const).map(t => (
+          <button key={t} onClick={() => setSubTab(t)} style={{
+            padding:'6px 14px', borderRadius:16, fontSize:11, fontWeight:600, whiteSpace:'nowrap',
+            cursor:'pointer', flexShrink:0,
+            background: subTab === t ? 'var(--accent)' : 'var(--bg-secondary)',
+            color: subTab === t ? '#000' : 'var(--text-dim)',
+            border: `1px solid ${subTab === t ? 'var(--accent)' : 'var(--border)'}`,
+          }}>{t === 'catalog' ? '📖 Каталог' : '⚡ Взаимодействия'}</button>
         ))}
       </div>
-      {tab === 'catalog' && <CatalogTab />}
-      {tab === 'pkpd' && <PKPDSimulationTab />}
-      {tab === 'dosage' && <DosageCalculatorTab />}
-      {tab === 'interactions' && <InteractionCheckerTab />}
-      {tab === 'course' && <PharmaCourseScreen />}
-      {tab === 'mapper' && <MapperTab />}
-      {tab === 'diagnostics' && <DiagnosticsTab />}
+      {page === 'course' && courseSub === 'course' && <PharmaCourseScreen />}
+      {page === 'course' && courseSub === 'mapper' && <MapperTab />}
+      {page === 'course' && courseSub === 'diagnostics' && <DiagnosticsTab />}
+      {page === 'calculators' && subTab === 'pkpd' && <PKPDSimulationTab />}
+      {page === 'calculators' && subTab === 'dosage' && <DosageCalculatorTab />}
+      {page === 'info' && subTab === 'catalog' && <CatalogTab />}
+      {page === 'info' && subTab === 'interactions' && <InteractionCheckerTab />}
     </div>
   );
 };
