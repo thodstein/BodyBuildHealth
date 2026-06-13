@@ -7,7 +7,6 @@ import { SYSTEM_INFO_ALL } from '../../core/risk-info';
 import { getRiskColor } from '../../core/utils/risk-colors';
 import { SUPPORT_BASE_COVERAGE } from '../../core/constants';
 import { INTERACTIONS_DB } from '../../data/interactions';
-import { generateWeeklyProtocol } from '../../engines/auto-plan.engine';
 import { ALL_SUBSTANCES, type SupportSubstance, type SupportInteraction } from '../../data/support-database';
 import { FertilityPCTScreen } from './FertilityPCTScreen';
 import { ALL_STACKS, EFFECT_LABELS_ru, findStacksByEffect, getSubstanceLabel as getStackSubLabel, type SupportStack } from '../../data/support-stacks';
@@ -35,7 +34,10 @@ import { ReportEngine, type ReportInput } from '../../engines/report-engine';
 import { checkDrugInteractions } from '../../engines/pharma-interactions.engine';
 import type { CourseEntry } from '../../core/types';
 
-type SupportTab = 'catalog' | 'synergies' | 'calculator' | 'interactions' | 'protocol' | 'stacks' | 'peptides' | 'recs' | 'fertility-pct';
+type SupportTab = 'main' | 'catalog' | 'synergies' | 'calculator' | 'interactions' | 'stacks' | 'peptides' | 'fertility-pct';
+type SupportView = 'main' | 'calc' | 'fertility';
+type CalcView = 'main' | 'calculator' | 'peptides' | 'info';
+type InfoView = 'main' | 'catalog' | 'synergies' | 'stacks';
 
 const SYNERGY_COLORS: Record<string, string> = {
   synergistic: '#22c55e',
@@ -564,7 +566,10 @@ const SUPPORT_MED_DETAIL: Record<string, {
 
 export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTab }) => {
   const linked = useDataLink();
-  const [tab, setTab] = useState<SupportTab>(initialTab || 'catalog');
+  const [tab, setTab] = useState<SupportTab>(initialTab || 'main');
+  const [supportView, setSupportView] = useState<SupportView>('main');
+  const [calcView, setCalcView] = useState<CalcView>('main');
+  const [infoView, setInfoView] = useState<InfoView>('main');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedSub, setSelectedSub] = useState<string | null>(null);
   const [synergyFilter, setSynergyFilter] = useState<string>('all');
@@ -579,7 +584,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
     cardio: true, hepatic: true, renal: true, neuro: true, endocrine: true, hematologic: true, reproductive: true, musculoskeletal: true,
   });
   const [supportResult, setSupportResult] = useState<ReturnType<typeof calculateSupport> | null>(null);
-  const [autoProtocol, setAutoProtocol] = useState<ReturnType<typeof generateWeeklyProtocol> | null>(null);
+
   const [dbInteractions, setDbInteractions] = useState<ReturnType<typeof checkSupportInteractions> | null>(null);
   const [dbSearchQuery, setDbSearchQuery] = useState('');
   const [dbSearchResults, setDbSearchResults] = useState<SupportSubstance[]>([]);
@@ -824,16 +829,143 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   return (
     <div className="screen support-screen">
       <div style={{ display: 'flex', gap: 4, marginBottom: 12, overflowX: 'auto', scrollbarWidth: 'none' }}>
-        {(['catalog', 'synergies', 'calculator', 'interactions', 'protocol', 'stacks', 'peptides', 'recs', 'fertility-pct'] as SupportTab[]).map(t => (
+        {(['catalog', 'synergies', 'calculator', 'interactions', 'stacks', 'peptides', 'fertility-pct'] as SupportTab[]).map(t => (
           <button key={t} onClick={() => setTab(t)} style={{
             flex: 1, padding: '10px 8px', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600,
             background: tab === t ? 'var(--accent-green, #00e68a)' : 'var(--bg-secondary)',
             color: tab === t ? '#000' : 'var(--text-dim)', cursor: 'pointer', transition: 'background 0.15s', whiteSpace: 'nowrap',
           }}>
-            {t === 'catalog' ? '📖 Каталог' : t === 'synergies' ? '🔗 Синергии' : t === 'calculator' ? '🧮 Калькулятор' : t === 'interactions' ? '⚠️ Взаимодействия' : t === 'stacks' ? '📦 Стеки' : t === 'peptides' ? '🧬 Пептиды' : t === 'recs' ? '💡 Реком.' : t === 'fertility-pct' ? '🧬 Фертильность' : '📅 Протокол'}
+            {t === 'catalog' ? '📖 Каталог' : t === 'synergies' ? '🔗 Синергии' : t === 'calculator' ? '🧮 Калькулятор' : t === 'interactions' ? '⚠️ Взаимодействия' : t === 'stacks' ? '📦 Стеки' : t === 'peptides' ? '🧬 Пептиды' : t === 'fertility-pct' ? '🧬 Фертильность' : ''}
           </button>
         ))}
       </div>
+
+      {/* ===== MAIN (hero + cards) ===== */}
+      {tab === 'main' && supportView === 'main' && (
+        <div>
+          <div style={{ position:'relative', borderRadius:16, overflow:'hidden', marginBottom:16, minHeight:200 }}>
+            <img src="/support-hero.png" alt="Поддержка" style={{ width:'100%', height:'42vh', objectFit:'cover', objectPosition:'center top', display:'block' }} />
+            <div style={{ position:'absolute', bottom:0, inset:'0 0', background:'linear-gradient(transparent 40%, rgba(0,0,0,0.85))', display:'flex', alignItems:'flex-end', padding:'16px' }}>
+              <div style={{ fontSize:24, fontWeight:800, color:'#fff', textShadow:'0 2px 8px rgba(0,0,0,0.5)' }}>Поддержка</div>
+            </div>
+          </div>
+          <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+            <div onClick={() => setSupportView('calc')} style={{ padding:'18px 16px', borderRadius:12, cursor:'pointer', background:'var(--glass-bg)', border:'1px solid var(--glass-border)', transition:'all 0.15s', display:'flex', alignItems:'center', gap:12 }}>
+              <div style={{ fontSize:28 }}>🧮</div>
+              <div>
+                <div style={{ fontSize:15, fontWeight:700, color:'var(--accent)' }}>Расчет поддержки</div>
+                <div style={{ fontSize:11, color:'var(--text-dim)', marginTop:2 }}>Калькулятор поддержки, пептиды, каталог и стеки</div>
+              </div>
+            </div>
+            <div onClick={() => setSupportView('fertility')} style={{ padding:'18px 16px', borderRadius:12, cursor:'pointer', background:'var(--glass-bg)', border:'1px solid var(--glass-border)', transition:'all 0.15s', display:'flex', alignItems:'center', gap:12 }}>
+              <div style={{ fontSize:28 }}>🧬</div>
+              <div>
+                <div style={{ fontSize:15, fontWeight:700, color:'var(--accent)' }}>ПКТ и Фертильность</div>
+                <div style={{ fontSize:11, color:'var(--text-dim)', marginTop:2 }}>Анализы, план ПКТ, восстановление фертильности</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ===== CALC SUB-NAVIGATION ===== */}
+      {tab === 'main' && supportView === 'calc' && calcView === 'main' && (
+        <div>
+          <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:12 }}>
+            <button onClick={() => setSupportView('main')} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← Назад</button>
+            <span style={{ fontSize:13, fontWeight:700 }}>🧮 Расчет поддержки</span>
+          </div>
+          <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+            <div onClick={() => { setSupportView('main'); setTab('calculator'); }} style={{ padding:'18px 16px', borderRadius:12, cursor:'pointer', background:'var(--glass-bg)', border:'1px solid var(--glass-border)', display:'flex', alignItems:'center', gap:12 }}>
+              <div style={{ fontSize:28 }}>🧮</div>
+              <div>
+                <div style={{ fontSize:15, fontWeight:700, color:'var(--accent)' }}>Калькулятор поддержки</div>
+                <div style={{ fontSize:11, color:'var(--text-dim)', marginTop:2 }}>Расчёт рисков, покрытия систем и недельного протокола</div>
+              </div>
+            </div>
+            <div onClick={() => { setSupportView('main'); setTab('peptides'); }} style={{ padding:'18px 16px', borderRadius:12, cursor:'pointer', background:'var(--glass-bg)', border:'1px solid var(--glass-border)', display:'flex', alignItems:'center', gap:12 }}>
+              <div style={{ fontSize:28 }}>🧬</div>
+              <div>
+                <div style={{ fontSize:15, fontWeight:700, color:'var(--accent)' }}>Пептидный калькулятор</div>
+                <div style={{ fontSize:11, color:'var(--text-dim)', marginTop:2 }}>Разведение, дозировки, PK модель и протоколы</div>
+              </div>
+            </div>
+            <div onClick={() => setCalcView('info')} style={{ padding:'18px 16px', borderRadius:12, cursor:'pointer', background:'var(--glass-bg)', border:'1px solid var(--glass-border)', display:'flex', alignItems:'center', gap:12 }}>
+              <div style={{ fontSize:28 }}>ℹ️</div>
+              <div>
+                <div style={{ fontSize:15, fontWeight:700, color:'var(--accent)' }}>Общая информация</div>
+                <div style={{ fontSize:11, color:'var(--text-dim)', marginTop:2 }}>Каталог, синергии и взаимодействия, готовые стеки</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ===== CALC → INFO SUB-NAVIGATION ===== */}
+      {tab === 'main' && supportView === 'calc' && calcView === 'info' && infoView === 'main' && (
+        <div>
+          <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:12 }}>
+            <button onClick={() => setCalcView('main')} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← Назад</button>
+            <span style={{ fontSize:13, fontWeight:700 }}>ℹ️ Общая информация</span>
+          </div>
+          <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+            <div onClick={() => { setSupportView('main'); setTab('catalog'); }} style={{ padding:'18px 16px', borderRadius:12, cursor:'pointer', background:'var(--glass-bg)', border:'1px solid var(--glass-border)', display:'flex', alignItems:'center', gap:12 }}>
+              <div style={{ fontSize:28 }}>📖</div>
+              <div>
+                <div style={{ fontSize:15, fontWeight:700, color:'var(--accent)' }}>Каталог</div>
+                <div style={{ fontSize:11, color:'var(--text-dim)', marginTop:2 }}>Справочник препаратов поддержки и БАДов</div>
+              </div>
+            </div>
+            <div onClick={() => { setSupportView('main'); setTab('interactions'); }} style={{ padding:'18px 16px', borderRadius:12, cursor:'pointer', background:'var(--glass-bg)', border:'1px solid var(--glass-border)', display:'flex', alignItems:'center', gap:12 }}>
+              <div style={{ fontSize:28 }}>🔗</div>
+              <div>
+                <div style={{ fontSize:15, fontWeight:700, color:'var(--accent)' }}>Синергии и взаимодействия</div>
+                <div style={{ fontSize:11, color:'var(--text-dim)', marginTop:2 }}>Синергии поддержки и проверка взаимодействий</div>
+              </div>
+            </div>
+            <div onClick={() => { setSupportView('main'); setTab('stacks'); }} style={{ padding:'18px 16px', borderRadius:12, cursor:'pointer', background:'var(--glass-bg)', border:'1px solid var(--glass-border)', display:'flex', alignItems:'center', gap:12 }}>
+              <div style={{ fontSize:28 }}>📦</div>
+              <div>
+                <div style={{ fontSize:15, fontWeight:700, color:'var(--accent)' }}>Готовые стеки</div>
+                <div style={{ fontSize:11, color:'var(--text-dim)', marginTop:2 }}>Готовые протоколы и комбинации поддержки</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ===== FERTILITY SUB-NAVIGATION ===== */}
+      {tab === 'main' && supportView === 'fertility' && (
+        <div>
+          <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:12 }}>
+            <button onClick={() => setSupportView('main')} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← Назад</button>
+            <span style={{ fontSize:13, fontWeight:700 }}>🧬 ПКТ и Фертильность</span>
+          </div>
+          <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+            <div onClick={() => setTab('fertility-pct')} style={{ padding:'18px 16px', borderRadius:12, cursor:'pointer', background:'var(--glass-bg)', border:'1px solid var(--glass-border)', display:'flex', alignItems:'center', gap:12 }}>
+              <div style={{ fontSize:28 }}>🩸</div>
+              <div>
+                <div style={{ fontSize:15, fontWeight:700, color:'var(--accent)' }}>Анализы</div>
+                <div style={{ fontSize:11, color:'var(--text-dim)', marginTop:2 }}>Ингибин B, ФСГ, ЛГ, эстрадиол, тестостерон, прогестерон</div>
+              </div>
+            </div>
+            <div onClick={() => setTab('fertility-pct')} style={{ padding:'18px 16px', borderRadius:12, cursor:'pointer', background:'var(--glass-bg)', border:'1px solid var(--glass-border)', display:'flex', alignItems:'center', gap:12 }}>
+              <div style={{ fontSize:28 }}>📋</div>
+              <div>
+                <div style={{ fontSize:15, fontWeight:700, color:'var(--accent)' }}>План ПКТ</div>
+                <div style={{ fontSize:11, color:'var(--text-dim)', marginTop:2 }}>Протокол послекурсовой терапии и таймер</div>
+              </div>
+            </div>
+            <div onClick={() => setTab('fertility-pct')} style={{ padding:'18px 16px', borderRadius:12, cursor:'pointer', background:'var(--glass-bg)', border:'1px solid var(--glass-border)', display:'flex', alignItems:'center', gap:12 }}>
+              <div style={{ fontSize:28 }}>🌱</div>
+              <div>
+                <div style={{ fontSize:15, fontWeight:700, color:'var(--accent)' }}>План восстановления Фертильности</div>
+                <div style={{ fontSize:11, color:'var(--text-dim)', marginTop:2 }}>Восстановление сперматогенеза и гормонального фона</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ===== CATALOG ===== */}
       {tab === 'catalog' && (
@@ -1713,7 +1845,23 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
         <div>
           <div className="card" style={{ marginBottom: 12 }}>
             <h3 style={{ margin: '0 0 4px 0', fontSize: 14, color: 'var(--accent)' }}>🧬 Пептидный калькулятор</h3>
-            <p style={{ fontSize: 11, color: 'var(--text-dim)', margin: 0 }}>Расчёт разведения, дозировки, PK‑модели и рисков для 13 пептидов</p>
+            <p style={{ fontSize: 11, color: 'var(--text-dim)', margin: 0 }}>Расчёт разведения, дозировки, PK‑модели и рисков для пептидов и факторов роста</p>
+          </div>
+
+          {/* Additional PHARMA_DB items */}
+          <div className="card" style={{ marginBottom: 8 }}>
+            <div style={{ fontSize: 11, fontWeight: 600, marginBottom: 6 }}>📦 Дополнительные вещества</div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, maxHeight: 120, overflowY: 'auto' }}>
+              {(() => {
+                const PHARMA_PEPTIDE_CLASSES = new Set(['peptide_ghrh','peptide_ghrp','igf1','mgf','insulin','peptide_gnrh','peptide_fat_loss','peptide_other','peptide_regenerative','peptide_immune','peptide_nootropic','pct_gonadotropin']);
+                return Object.values(PHARMA_DB).filter(s => !!s?.name && PHARMA_PEPTIDE_CLASSES.has(s.class) && s.id !== 'mk677').map(s => (
+                  <span key={s.id} style={{ fontSize: 9, padding: '3px 8px', borderRadius: 12, background: 'rgba(139,92,246,0.1)', border: '1px solid rgba(139,92,246,0.2)', color: '#8b5cf6' }}>
+                    {s.name}
+                  </span>
+                ));
+              })()}
+            </div>
+            <div style={{ marginTop: 6, fontSize: 9, color: 'var(--text-dim)' }}>↑ Используйте калькулятор разведения ниже для выбранного пептида</div>
           </div>
 
           {/* Peptide selector */}
@@ -1954,66 +2102,6 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
           </div>
         </div>
       )}
-
-      {/* ===== PROTOCOL ===== */}
-      {tab === 'protocol' && (
-        <div>
-          <div className="card" style={{ marginBottom: 12 }}>
-            <h3 style={{ margin: '0 0 4px 0', fontSize: 14, color: 'var(--accent)' }}>📅 Недельный протокол</h3>
-            <p style={{ fontSize: 11, color: 'var(--text-dim)', margin: '0 0 12px 0' }}>
-              Расписание приёма препаратов и добавок по дням недели
-            </p>
-            {!autoProtocol && (
-              <button onClick={() => {
-                const courseIds: { substanceId: string; dose: string }[] = linked.course.map(c => ({
-                  substanceId: c.substanceId,
-                  dose: `${c.doseValue} ${c.doseUnit}`,
-                }));
-                const goalId = linked.course.some(c => c.substanceId.includes('test')) ? 'mass_gain' : 'health';
-                const protocol = generateWeeklyProtocol(goalId, courseIds as any, Object.keys(linked.supportCoverage || {}),
-                  undefined, linked.course.some(c => c.substanceId.includes('test')) ? 'course' : 'baseline', []);
-                setAutoProtocol(protocol);
-              }} style={{
-                width: '100%', padding: 12, background: 'var(--accent)', color: '#000',
-                border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 600, fontSize: 13,
-              }}>
-                📅 Сгенерировать протокол
-              </button>
-            )}
-          </div>
-          {autoProtocol && (
-            <div className="card">
-              <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 8 }}>
-                Соблюдение: {autoProtocol.overallAdherenceScore}%
-              </div>
-              {autoProtocol.days.map((day: any, i: number) => (
-                <div key={i} style={{ background: 'var(--bg-secondary)', borderRadius: 6, padding: 8, marginBottom: 4 }}>
-                  <div style={{ fontWeight: 600, fontSize: 11, marginBottom: 2 }}>{day.date}</div>
-                  {day.slots.map((slot: any, j: number) => (
-                    <div key={j} style={{ marginLeft: 6, marginBottom: 2 }}>
-                      <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>
-                        {slot.time === 'morning' ? '🌅 Утро' : slot.time === 'evening' ? '🌙 Вечер' : ''}
-                      </div>
-                      {slot.substances.map((s: any, k: number) => (
-                        <div key={k} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, padding: '1px 0' }}>
-                          <span>{s.name}</span><span style={{ color: 'var(--accent)' }}>{s.dose}</span>
-                        </div>
-                      ))}
-                    </div>
-                  ))}
-                </div>
-              ))}
-              <button onClick={() => setAutoProtocol(null)} style={{
-                background: 'var(--bg-secondary)', color: 'var(--text)', border: '1px solid var(--border)',
-                borderRadius: 6, padding: '6px 12px', fontSize: 10, cursor: 'pointer', marginTop: 6,
-              }}>✕ Закрыть</button>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* ===== RECS TAB ===== */}
-      {tab === 'recs' && <RecsTab profile={linked.profile} labs={labAnalysis} readiness={linked.readiness} course={linked.course} />}
 
       {/* ===== FERTILITY/PCT TAB ===== */}
       {tab === 'fertility-pct' && <FertilityPCTScreen />}

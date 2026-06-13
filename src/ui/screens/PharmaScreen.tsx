@@ -1117,7 +1117,7 @@ const PKPDSimulationTab: React.FC = () => {
 };
 
 const DosageCalculatorTab: React.FC = () => {
-  const [dosageSub, setDosageSub] = useState<'dosage' | 'androgen'>('dosage');
+  const [dosageSub, setDosageSub] = useState<'dosage' | 'androgen' | 'peptides'>('dosage');
   const allPharma = Object.values(PHARMA_DB).filter((s) => PHARMA_CLASSES.includes(s.class as PharmaClass));
   const [drug, setDrug] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
@@ -1162,14 +1162,12 @@ const DosageCalculatorTab: React.FC = () => {
   const perInjectionMg = weeklyTotal / Math.max(1, injectionsPerWeek);
   const wastePerVial = vialMl && doseResult ? Math.max(0, vialMl - (doseResult?.dosesPerVial || 0) * doseResult.volumeMl) : 0;
 
-  const rawFiltered = searchTerm
-    ? allPharma.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase()) || p.class.toLowerCase().includes(searchTerm.toLowerCase()))
-    : dosageClass ? allPharma.filter(p => p.class === dosageClass) : allPharma;
-  const noOrals = rawFiltered.filter(p => p.class !== 'oral_17aa');
+  const KEEP_CLASSES = new Set(['testosterone','trenbolone','nandrolone','boldenone','primobolan','drostanolone','pct_gonadotropin']);
+  const pharmaFiltered = allPharma.filter(p => KEEP_CLASSES.has(p.class));
   const grouped: { type: 'class'; cls: string; label: string }[] = [];
-  const singles: typeof noOrals = [];
+  const singles: typeof pharmaFiltered = [];
   const seenClasses = new Set<string>();
-  for (const p of noOrals) {
+  for (const p of pharmaFiltered) {
     if (INJECTABLE_WITH_ESTERS.has(p.class)) {
       if (!seenClasses.has(p.class)) { seenClasses.add(p.class); grouped.push({ type:'class', cls: p.class, label: CLASS_LABELS[p.class] || p.class }); }
     } else { singles.push(p); }
@@ -1182,7 +1180,7 @@ const DosageCalculatorTab: React.FC = () => {
         <div style={{ position:'fixed', inset:0, zIndex:1000, background:'rgba(0,0,0,0.6)', display:'flex', alignItems:'center', justifyContent:'center' }} onClick={() => setEsterPopup(null)}>
           <div style={{ background:'var(--bg)', borderRadius:16, padding:20, maxWidth:320, width:'90%', maxHeight:'70vh', overflowY:'auto' }} onClick={e => e.stopPropagation()}>
             <h3 style={{ margin:'0 0 12px', fontSize:15 }}>{esterPopup.label} — выберите эфир</h3>
-            {noOrals.filter(p => p.class === esterPopup.baseClass).map(p => (
+            {pharmaFiltered.filter(p => p.class === esterPopup.baseClass).map(p => (
               <div key={p.id} onClick={() => handleDrugChange(p.id)} style={{
                 padding:'10px 12px', borderRadius:10, cursor:'pointer', marginBottom:4,
                 background:'var(--bg-secondary)', border:'1px solid var(--border)',
@@ -1199,14 +1197,14 @@ const DosageCalculatorTab: React.FC = () => {
 
       {/* Sub-tab pills */}
       <div style={{ display:'flex', gap:4, marginBottom:8 }}>
-        {(['dosage','androgen'] as const).map(t => (
+        {(['dosage','androgen','peptides'] as const).map(t => (
           <button key={t} onClick={() => setDosageSub(t)} style={{
             padding:'6px 14px', borderRadius:16, fontSize:11, fontWeight:600, whiteSpace:'nowrap',
             cursor:'pointer', flexShrink:0,
             background: dosageSub === t ? 'var(--accent)' : 'var(--bg-secondary)',
             color: dosageSub === t ? '#000' : 'var(--text-dim)',
             border: `1px solid ${dosageSub === t ? 'var(--accent)' : 'var(--border)'}`,
-          }}>{t === 'dosage' ? '💉 Калькулятор дозировок' : '🧬 Андрогенный индекс'}</button>
+          }}>{t === 'dosage' ? '💉 Фармакология' : t === 'androgen' ? '🧬 Андрогенный индекс' : '🧪 Пептиды'}</button>
         ))}
       </div>
 
@@ -1214,35 +1212,7 @@ const DosageCalculatorTab: React.FC = () => {
         background: 'var(--glass-bg)', border: '1px solid var(--glass-border)',
         borderRadius: 12, padding: '14px 16px', marginBottom: 12,
       }}>
-        <h3 style={{ margin: '0 0 12px 0', fontSize: 14, color: 'var(--accent)' }}>💉 Калькулятор дозировки</h3>
-
-        {/* Class filter chips */}
-        <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap', marginBottom: 8 }}>
-          <button onClick={() => { setDosageClass(''); setSearchTerm(''); }} style={{
-            padding: '3px 10px', borderRadius: 14, fontSize: 9, cursor: 'pointer',
-            fontWeight: !dosageClass ? 700 : 400,
-            background: !dosageClass ? 'rgba(0,230,138,0.15)' : 'var(--bg-secondary)',
-            color: !dosageClass ? 'var(--accent)' : 'var(--text-dim)',
-            border: `1px solid ${!dosageClass ? 'var(--accent)' : 'var(--border)'}`,
-          }}>Все</button>
-          {PHARMA_CLASSES.map(cls => (
-            <button key={cls} onClick={() => { setDosageClass(dosageClass === cls ? '' : cls); setSearchTerm(''); }} style={{
-              padding: '3px 10px', borderRadius: 14, fontSize: 9, cursor: 'pointer',
-              fontWeight: dosageClass === cls ? 700 : 400,
-              background: dosageClass === cls ? 'rgba(0,230,138,0.15)' : 'var(--bg-secondary)',
-              color: dosageClass === cls ? 'var(--accent)' : 'var(--text-dim)',
-              border: `1px solid ${dosageClass === cls ? 'var(--accent)' : 'var(--border)'}`,
-            }}>{CLASS_LABELS[cls] || cls}</button>
-          ))}
-        </div>
-
-        {/* Search */}
-        <input
-          type="text" value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          placeholder="Поиск препарата..."
-          style={{ width: '100%', padding: '8px 10px', borderRadius: 8, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, marginBottom: 12, boxSizing: 'border-box' }}
-        />
+        <h3 style={{ margin: '0 0 12px 0', fontSize: 14, color: 'var(--accent)' }}>💉 Фармакология</h3>
 
         {/* Drug cards grid: grouped injectable classes + singles */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 5, maxHeight: 200, overflowY: 'auto', marginBottom: 12 }}>
@@ -1404,6 +1374,7 @@ const DosageCalculatorTab: React.FC = () => {
       {/* ═══ Androgenic Index Calculator ═══ */}
       </>}
       {dosageSub === 'androgen' && <AndrogenicIndexCalculator />}
+      {dosageSub === 'peptides' && <PeptideCalcTab />}
     </div>
   );
 };
@@ -1585,6 +1556,51 @@ const AndrogenicIndexCalculator: React.FC = () => {
               </div>
             ))}
           </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const PeptideCalcTab: React.FC = () => {
+  const PEPTIDE_CLASSES = new Set(['peptide_ghrh','peptide_ghrp','igf1','mgf','insulin','peptide_gnrh','peptide_fat_loss','peptide_other','peptide_regenerative','peptide_immune','peptide_nootropic','pct_gonadotropin']);
+  const items = Object.values(PHARMA_DB).filter(s => !!s?.name && PEPTIDE_CLASSES.has(s.class));
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [pepSearch, setPepSearch] = useState('');
+  const sel = selectedId ? PHARMA_DB[selectedId] : null;
+  const filteredItems = pepSearch ? items.filter(s => s.name.toLowerCase().includes(pepSearch.toLowerCase())) : items;
+  const enhanced = [...filteredItems.filter(s => s.id !== 'mk677')];
+
+  return (
+    <div>
+      <div style={{ background:'var(--glass-bg)', border:'1px solid var(--glass-border)', borderRadius:12, padding:'14px 16px', marginBottom:12 }}>
+        <h3 style={{ margin:'0 0 4px 0', fontSize:14, color:'var(--accent)' }}>🧪 Калькулятор пептидов</h3>
+        <p style={{ fontSize:11, color:'var(--text-dim)', margin:'0 0 12px 0' }}>Дозировки пептидов, факторов роста и сопутствующих веществ</p>
+        <input type="text" value={pepSearch} onChange={e => setPepSearch(e.target.value)} placeholder="🔍 Поиск..." style={{ width:'100%', padding:'7px 10px', borderRadius:8, background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text)', fontSize:12, boxSizing:'border-box', marginBottom:8 }} />
+        <div style={{ display:'flex', flexWrap:'wrap', gap:4, maxHeight:180, overflowY:'auto' }}>
+          {enhanced.length === 0 && <div style={{ padding:8, fontSize:10, color:'var(--text-dim)' }}>Ничего не найдено</div>}
+          {enhanced.map(s => {
+            const selCls = selectedId === s.id ? 'rgba(0,230,138,0.15)' : 'var(--bg-secondary)';
+            const selBrd = selectedId === s.id ? '1.5px solid #00e68a' : '1px solid var(--border)';
+            return <div key={s.id} onClick={() => setSelectedId(s.id)} style={{ padding:'6px 10px', borderRadius:8, cursor:'pointer', background:selCls, border:selBrd, fontSize:10, fontWeight:600 }}>{s.name}</div>;
+          })}
+        </div>
+      </div>
+
+      {sel && (
+        <div style={{ background:'var(--glass-bg)', border:'1px solid var(--glass-border)', borderRadius:12, padding:'14px 16px', marginBottom:12 }}>
+          <div style={{ fontSize:12, fontWeight:700, color:'var(--accent)', marginBottom:8 }}>{sel.name}</div>
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6, fontSize:10, color:'var(--text-dim)', marginBottom:8 }}>
+            <span>Класс: {CLASS_LABELS[sel.class] || sel.class}</span>
+            <span>T½: {sel.pk?.halfLifeHours ? `${(sel.pk.halfLifeHours).toFixed(0)}ч` : '—'}</span>
+            <span>Биодоступность: {sel.pk?.bioavailability ? `${(sel.pk.bioavailability * 100).toFixed(0)}%` : '—'}</span>
+            <span>Vd: {sel.pk?.Vd ? `${sel.pk.Vd} л` : '—'}</span>
+          </div>
+          {sel.research && sel.research.length > 0 && (
+            <div style={{ fontSize:9, color:'var(--text-dim)', marginTop:6, lineHeight:1.4 }}>
+              <b>Исследования:</b> {sel.research.map(r => r.study).join('; ')}
+            </div>
+          )}
         </div>
       )}
     </div>
