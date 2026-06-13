@@ -58,6 +58,7 @@ export const PharmaCourseScreen: React.FC = () => {
   const [dose, setDose] = useState('');
   const [unit, setUnit] = useState('mg/wk');
   const [freq, setFreq] = useState('2x/wk');
+  const [selectedDays, setSelectedDays] = useState<number[]>([1, 4]);
   const [startWeek, setStartWeek] = useState(0);
   const [endWeek, setEndWeek] = useState(12);
   const [interactions, setInteractions] = useState<ReturnType<typeof checkDrugInteractions>>([]);
@@ -94,7 +95,7 @@ export const PharmaCourseScreen: React.FC = () => {
       substanceId,
       doseValue: d,
       doseUnit: unit,
-      frequency: freq,
+      frequency: selectedDays.length >= 7 ? 'daily' : selectedDays.length <= 1 ? '1x/wk' : `${selectedDays.length}x/wk`,
       startWeek,
       endWeek
     };
@@ -474,28 +475,32 @@ export const PharmaCourseScreen: React.FC = () => {
                   <div style={{ display: 'flex', gap: 4 }}>
                     <input type="number" value={dose} onChange={e => setDose(e.target.value)} placeholder="200"
                       className="pc-input" style={{
-                        flex: 1, padding: '7px 8px', background: 'rgba(255,255,255,0.04)',
+                        flex: 2, padding: '7px 8px', background: 'rgba(255,255,255,0.04)',
                         border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8,
                         color: '#fff', fontSize: 12, boxSizing: 'border-box', minWidth: 0,
                       }} />
                     <select value={unit} onChange={e => setUnit(e.target.value)}
                       style={{
-                        padding: '7px 6px', background: 'rgba(255,255,255,0.04)',
+                        flex: 1, padding: '7px 6px', background: 'rgba(255,255,255,0.04)',
                         border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8,
                         color: '#fff', fontSize: 10, boxSizing: 'border-box', minWidth: 56,
                       }}>
                       {UNIT_OPTIONS.map(u => <option key={u} value={u}>{u}</option>)}
                     </select>
                   </div>
-                  <div style={{ display: 'flex', gap: 4 }}>
-                    <select value={freq} onChange={e => setFreq(e.target.value)}
-                      style={{
-                        flex: 1, padding: '7px 8px', background: 'rgba(255,255,255,0.04)',
-                        border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8,
-                        color: '#fff', fontSize: 11, boxSizing: 'border-box', minWidth: 0,
-                      }}>
-                      {FREQ_OPTIONS.map(f => <option key={f.value} value={f.value}>{f.label}</option>)}
-                    </select>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent:'center', gap:3, flexWrap:'wrap' }}>
+                    <span style={{ fontSize:9, color:'rgba(255,255,255,0.35)', whiteSpace:'nowrap', minWidth:40 }}>Дни:</span>
+                    {['Пн','Вт','Ср','Чт','Пт','Сб','Вс'].map((day, idx) => (
+                      <button key={idx} onClick={() => {
+                        setSelectedDays(prev => prev.includes(idx) ? prev.filter(d => d !== idx) : [...prev, idx].sort());
+                      }} style={{
+                        width:28, height:28, borderRadius:'50%', fontSize:9, fontWeight:600,
+                        cursor:'pointer', border:`1px solid ${selectedDays.includes(idx) ? '#00e68a' : 'rgba(255,255,255,0.15)'}`,
+                        background: selectedDays.includes(idx) ? 'rgba(0,230,138,0.2)' : 'rgba(255,255,255,0.04)',
+                        color: selectedDays.includes(idx) ? '#00e68a' : 'rgba(255,255,255,0.5)',
+                        display:'flex', alignItems:'center', justifyContent:'center',
+                      }}>{day}</button>
+                    ))}
                   </div>
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, marginTop: 6 }}>

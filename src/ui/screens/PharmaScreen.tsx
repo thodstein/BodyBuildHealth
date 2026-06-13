@@ -129,7 +129,7 @@ export const PharmaScreen: React.FC = () => {
     ];
     return (
       <div className="screen pharma" style={{ padding: 0 }}>
-        <img src="./pharma-hero.png" alt="" style={{ width:'100%', maxHeight:'35vh', objectFit:'cover', display:'block', borderRadius:0 }} />
+        <img src="./pharma-hero.png" alt="" style={{ width:'100%', height:'auto', maxHeight:'30vh', objectFit:'contain', display:'block', borderRadius:0, background:'var(--bg-secondary)' }} />
         <div style={{ padding:'12px', display:'flex', flexDirection:'column', gap:8 }}>
           {cards.map(c => (
             <button key={c.key} onClick={() => setPage(c.key)} style={{
@@ -153,11 +153,11 @@ export const PharmaScreen: React.FC = () => {
 
   return (
     <div className="screen pharma">
-      <div style={{ display:'flex', gap:4, overflowX:'auto', marginBottom:8, scrollbarWidth:'none', alignItems:'center' }}>
-        <button onClick={() => setPage('main')} style={{
-          padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', flexShrink:0,
-          background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600,
-        }}>← Назад</button>
+      <button onClick={() => setPage('main')} style={{
+        padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', flexShrink:0, marginBottom:6,
+        background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600,
+      }}>← Назад</button>
+      <div style={{ display:'flex', gap:4, overflowX:'auto', marginBottom:8, scrollbarWidth:'none' }}>
         {page === 'course' && (['course','mapper','diagnostics'] as const).map(t => (
           <button key={t} onClick={() => setCourseSub(t)} style={{
             padding:'6px 14px', borderRadius:16, fontSize:11, fontWeight:600, whiteSpace:'nowrap',
@@ -1167,8 +1167,8 @@ const AndrogenicIndexCalculator: React.FC = () => {
       {entries.map((entry, i) => (
         <div key={i} style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 6 }}>
           <select value={entry.drug} onChange={e => updateEntry(i, 'drug', e.target.value)}
-            style={{ flex: 1, padding: '6px 4px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 11 }}>
-            {DRUG_OPTIONS.map(d => <option key={d} value={d}>{d.replace(/_/g, ' ')}</option>)}
+            style={{ flex: 1, padding: '6px 8px', borderRadius: 8, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 11 }}>
+            {DRUG_OPTIONS.filter(d => PHARMA_DB[d]?.name).map(d => <option key={d} value={d}>{PHARMA_DB[d]!.name}</option>)}
           </select>
           <input type="number" value={entry.doseMgWeek} onChange={e => updateEntry(i, 'doseMgWeek', +e.target.value)}
             style={{ width: 80, padding: '6px 4px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 11 }} />
