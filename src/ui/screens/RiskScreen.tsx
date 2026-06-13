@@ -16,7 +16,7 @@ import { V7RiskDisplay } from './RiskScreen_parts/V7RiskDisplay';
 import { WeeklyRiskChart } from './RiskScreen_parts/WeeklyRiskChart';
 import { RiskInfo } from './RiskScreen_parts/RiskInfo';
 import { runMDSS, type MDSSInput, type MDSSOutput, type BiomarkerInput } from '../../engines/mdss-engine';
-import { Risk3DModel } from './RiskScreen_parts/Risk3DModel';
+// import { Risk3DModel } from './RiskScreen_parts/Risk3DModel';
 import { calculateWeeklyRiskDynamics, type WeeklyRiskDynamics } from '../../engines/weekly-risk-dynamics.engine';
 import { useV7Risk } from '../hooks/useV7Risk';
 import { getProfile, updateProfile } from '../../core/profile-manager';
@@ -315,7 +315,7 @@ export const RiskScreen: React.FC = () => {
       case 'overview': return <RiskOverview riskResult={riskResult} globalNoLabs={globalNoLabs} noLabsSystems={noLabsSystems} labRiskContributions={effectiveLabContrib} riskHistory={riskHistory} aggregatedRisk={aggregatedRisk} weeklyDynamics={weeklyDynamics} />;
       case 'mechanisms': return <RiskDetails riskResult={riskResult} labRiskContributions={effectiveLabContrib} isSyntheticLab={isSyntheticLab} />;
       case 'v7': return v7Result ? <V7RiskDisplay result={v7Result} organWeek={organWeek} onWeekChange={setOrganWeek} mcEnabled={mcEnabled} onToggleMC={toggleMC} /> : <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-dim)' }}>Загрузка V7...</div>;
-      case 'model': return v7Result ? <Risk3DModel result={v7Result} mcEnabled={mcEnabled} onToggleMC={toggleMC} organWeek={organWeek} onWeekChange={setOrganWeek} /> : <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-dim)' }}>Загрузка V7...</div>;
+      case 'model': return <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-dim)' }}>3D модель загружается...</div>;
       case 'dynamics': return <WeeklyRiskChart dynamics={weeklyDynamics} selectedWeek={selectedWeek} onWeekSelect={setSelectedWeek} mode={weekMode} onModeChange={setWeekMode} />;
       case 'info': return <RiskInfo />;
       case 'mdss': return <MDSSRiskDisplay />;
