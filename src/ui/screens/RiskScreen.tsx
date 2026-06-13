@@ -784,8 +784,10 @@ const ComplianceDisplay: React.FC = () => {
     return d.toISOString().slice(0, 10);
   }, [course]);
 
-  const [cycleStart] = useState(courseStartDate);
-  const [lastLab] = useState(latestLabDate);
+  const [cycleStart, setCycleStart] = useState(courseStartDate);
+  const [lastLab, setLastLab] = useState(latestLabDate);
+  useEffect(() => { setLastLab(latestLabDate); }, [latestLabDate]);
+  useEffect(() => { setCycleStart(courseStartDate); }, [courseStartDate]);
 
   // Sync auto-values
   useEffect(() => { /* dates auto-computed, no input needed */ }, []);
