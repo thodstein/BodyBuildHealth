@@ -35,14 +35,14 @@ function getMechName(sysKey: string, mechIdx: number): string {
   const smKey = V7_ORGAN_TO_SYSTEM[sysKey] || sysKey;
   if (MECHANISM_NAMES[smKey]?.[mechIdx]) {
     const name = MECHANISM_NAMES[smKey][mechIdx];
-    return name && name.length > 1 ? name : `Механизм ${mechIdx + 1}`;
+    if (name && name.length > 1) return name;
   }
   const mechs = SYSTEM_MECHANISMS[smKey];
   if (mechs) {
     const found = mechs.find(m => m.num === mechIdx);
     if (found?.label && found.label.length > 1) return found.label;
   }
-  return `Механизм ${mechIdx + 1}`;
+  return '';
 }
 
 function hasValidMech(sysKey: string, mechIdx: number): boolean {
@@ -323,54 +323,6 @@ export const V7RiskDisplay: React.FC<{
           );
         })}
       </div>
-
-      {pkTimeSeries && Object.keys(pkTimeSeries).length > 0 && (
-        <div className="card" style={{ marginBottom: 12 }}>
-          <h3 style={{ margin: '0 0 8px 0' }}>💉 PK Концентрации ({Object.keys(pkTimeSeries).length} преп.)</h3>
-          <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 10 }}>
-            <span style={{ fontSize: 10, color: 'var(--text-dim)', whiteSpace: 'nowrap' }}>{(pkDay / 7).toFixed(1)} нед</span>
-            <input type="range" min={0} max={83} value={pkDay} onChange={e => setPkDay(Number(e.target.value))}
-              style={{ flex: 1, accentColor: 'var(--accent)' }} />
-            <span style={{ fontSize: 10, color: 'var(--text-dim)', whiteSpace: 'nowrap' }}>{((83 - pkDay) / 7).toFixed(1)} нед ост.</span>
-          </div>
-          {Object.entries(pkTimeSeries).map(([subId, concs]: [string, any]) => {
-            const vals = concs as number[];
-            const maxConc = Math.max(...vals, 0.001);
-            const currentVal = vals[pkDay] || 0;
-            const startVal = vals[0] || 0;
-            return (
-              <div key={subId} style={{ marginBottom: 10, background: 'var(--bg-secondary)', padding: 8, borderRadius: 6 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                  <span style={{ fontSize: 12, fontWeight: 600 }}>{getSubstanceName(subId)}</span>
-                  <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                    <span style={{ fontSize: 9, color: 'var(--text-dim)' }}>Нач: {startVal.toFixed(2)}</span>
-                    <span style={{ fontSize: 11, fontWeight: 700, color: getRiskColor((currentVal / maxConc) * 100) }}>{currentVal.toFixed(2)}</span>
-                    <span style={{ fontSize: 9, color: 'var(--text-dim)' }}>Cmax: {maxConc.toFixed(2)}</span>
-                  </div>
-                </div>
-                <div style={{ position: 'relative' }}>
-                  <div style={{ display: 'flex', gap: 1, height: 36, borderRadius: 4, overflow: 'hidden', alignItems: 'flex-end' }}>
-                    {vals.filter((_, i) => i % 2 === 0).map((c: number, i: number) => {
-                      const idx = i * 2;
-                      const isSelected = idx === pkDay || Math.abs(idx - pkDay) <= 1;
-                      return (
-                        <div key={i} style={{
-                          flex: 1, background: isSelected ? '#00e68a' : getRiskColor((c / maxConc) * 100),
-                          height: `${Math.max(3, (c / maxConc) * 100)}%`, borderRadius: '1px 1px 0 0', minHeight: 2, opacity: isSelected ? 1 : 0.6,
-                        }} />
-                      );
-                    })}
-                  </div>
-                  <div style={{ position: 'absolute', left: `${(pkDay / 83) * 100}%`, top: 0, bottom: 0, width: 2, background: 'var(--accent)', opacity: 0.8 }} />
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 7, color: 'var(--text-dim)', marginTop: 1 }}>
-                  <span>0</span><span>2</span><span>4</span><span>6</span><span>8</span><span>10</span><span>12 нед</span>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
     </div>
   );
 
@@ -936,8 +888,8 @@ export const V7RiskDisplay: React.FC<{
           ))}
         </div>
       )}
-      {effectiveTab === 'organs' && renderOrgans()}
-      {effectiveTab === 'matrix' && renderMatrix()}
+      {(effectiveTab === 'organs' || forcedTab === 'organs') && renderOrgans()}
+      {(effectiveTab === 'organs' || effectiveTab === 'matrix' || (forcedTab === 'organs')) && renderMatrix()}
       {effectiveTab === 'timeseries' && renderTimeSeries()}
       {effectiveTab === 'sensitivity' && renderSensitivity()}
       {effectiveTab === 'pk' && pkContent}
