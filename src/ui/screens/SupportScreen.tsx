@@ -829,15 +829,15 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   const supportCautions = supportInteractions?.filter(i => i.type === 'caution') ?? [];
 
   return (
-    <div className="screen support-screen" style={tab === 'main' ? { flex:1, minHeight:0, display:'flex', flexDirection:'column', overflow:'hidden', padding:0 } : undefined}>
-      {/* ===== MAIN HERO (like LabsScreen) ===== */}
+    <div className="screen support-screen">
+      {/* ===== MAIN HERO ===== */}
       {tab === 'main' && supportView === 'main' && (
-        <div style={{ flex: 1, minHeight: 0, display:'flex', flexDirection:'column', overflow:'hidden' }}>
-          <div style={{ flex:'0 0 42vh', height:'42vh', minHeight:'200px', position:'relative', maxHeight:'50vh' }}>
+        <div style={{ display:'flex', flexDirection:'column', minHeight:'calc(100vh - 60px)' }}>
+          <div style={{ position:'relative', width:'100%', height:'42vh', minHeight:200 }}>
             <img src="/support-hero.png" alt="" style={{ width:'100%', height:'100%', display:'block', objectFit:'cover', objectPosition:'center top' }} />
-            <div style={{ position: 'absolute', bottom: 14, left: 20, right: 20 }}>
-              <h1 style={{ fontSize: 22, fontWeight: 800, color: '#fff', margin: '0 0 2px', textShadow: '0 2px 14px rgba(0,0,0,0.9)' }}>Поддержка</h1>
-              <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.9)', margin: 0, lineHeight: 1.3, textShadow: '0 1px 8px rgba(0,0,0,0.8)' }}>
+            <div style={{ position:'absolute', bottom:14, left:20, right:20, background:'linear-gradient(transparent, rgba(0,0,0,0.7))', padding:'20px 0 8px' }}>
+              <h1 style={{ fontSize:22, fontWeight:800, color:'#fff', margin:'0 0 2px', textShadow:'0 2px 14px rgba(0,0,0,0.9)' }}>Поддержка</h1>
+              <p style={{ fontSize:11, color:'rgba(255,255,255,0.9)', margin:0, lineHeight:1.3, textShadow:'0 1px 8px rgba(0,0,0,0.8)' }}>
                 Фармакологическая поддержка, пептиды и предлагаемые препараты поддержки для уменьшения рисков
               </p>
             </div>
@@ -873,7 +873,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
       {tab === 'main' && supportView === 'calc' && calcView === 'main' && (
         <div>
           <button onClick={() => setSupportView('main')} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', marginBottom:8, background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← Назад</button>
-          <div style={{ height:'25vh', minHeight:160, position:'relative', borderRadius:14, overflow:'hidden', marginBottom:10 }}>
+          <div style={{ height:'38vh', minHeight:200, position:'relative', borderRadius:14, overflow:'hidden', marginBottom:10 }}>
             <img src="/calc-hero.png" alt="" style={{ width:'100%', height:'100%', display:'block', objectFit:'cover', objectPosition:'center top' }} />
             <div style={{ position:'absolute', bottom:12, left:16, right:16 }}>
               <h2 style={{ fontSize:18, fontWeight:800, color:'#fff', margin:0, textShadow:'0 2px 10px rgba(0,0,0,0.9)' }}>Расчет поддержки</h2>
@@ -1001,6 +1001,15 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
       {tab === 'main' && supportView === 'fertility' && (
         <div>
           <button onClick={() => setSupportView('main')} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', marginBottom:8, background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← Назад</button>
+          <div style={{ height:'38vh', minHeight:200, position:'relative', borderRadius:14, overflow:'hidden', marginBottom:10 }}>
+            <img src="/fertility-hero.png" alt="" style={{ width:'100%', height:'100%', display:'block', objectFit:'cover', objectPosition:'center top' }} />
+            <div style={{ position:'absolute', bottom:12, left:16, right:16 }}>
+              <h2 style={{ fontSize:18, fontWeight:800, color:'#fff', margin:0, textShadow:'0 2px 10px rgba(0,0,0,0.9)' }}>ПКТ и Фертильность</h2>
+              <p style={{ fontSize:10, color:'rgba(255,255,255,0.9)', margin:'2px 0 0', textShadow:'0 1px 6px rgba(0,0,0,0.8)' }}>
+                Анализы, план ПКТ и восстановление фертильности
+              </p>
+            </div>
+          </div>
           <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
             {[
               { icon:'🩸', title:'Анализы', desc:'Ингибин B, ФСГ, ЛГ, эстрадиол, тестостерон, прогестерон', action:() => setTab('fertility-pct'), color:'#ef4444' },
