@@ -1086,9 +1086,34 @@ export const LabsScreen: React.FC = () => {
             <span style={{ fontSize:18 }}>📅</span>
             <span style={{ fontSize:15, fontWeight:700 }}>График сдачи анализов</span>
           </div>
-          <div className="card" style={{ padding:14 }}>
-            <div style={{ fontSize:12, fontWeight:700, color:'var(--accent)', marginBottom:8 }}>
-              План сдачи по фазам: {PHASE_LABELS[selectedPhase]}
+          {/* Phase selector */}
+          <div style={{ display:'flex', gap:3, overflowX:'auto', marginBottom:10, scrollbarWidth:'none' }}>
+            {Object.entries(PHASE_LABELS).map(([key,label]) => (
+              <button key={key} onClick={() => handlePhaseChange(key)} style={{
+                padding:'6px 12px', borderRadius:16, fontSize:11, fontWeight:600, whiteSpace:'nowrap', cursor:'pointer',
+                background: selectedPhase===key?'var(--accent)':'var(--bg-secondary)',
+                color: selectedPhase===key?'#000':'var(--text-dim)',
+                border:`1px solid ${selectedPhase===key?'var(--accent)':'var(--border)'}`,
+              }}>{label}</button>
+            ))}
+          </div>
+          {/* Schedule info */}
+          <div className="card" style={{ marginBottom:10, padding:12, border:'1px solid rgba(0,230,138,0.2)' }}>
+            <div style={{ fontSize:12, fontWeight:700, color:'var(--accent)', marginBottom:6 }}>
+              📋 План сдачи: {PHASE_LABELS[selectedPhase]}
+            </div>
+            <div style={{ fontSize:10, color:'var(--text-dim)', marginBottom:8, lineHeight:1.5 }}>
+              {(() => {
+                const phases: Record<string,string> = {
+                  baseline:'Перед началом курса — полный базовый скрининг (45 маркеров)',
+                  on_cycle:'Каждые 4 недели на курсе — контроль печени, липидов, гормонов (32 маркера)',
+                  bridge:'Между курсами — восстановительный мониторинг (17 маркеров)',
+                  pct:'Послекурсовая терапия — контроль восстановления оси HPG (19 маркеров)',
+                  post_pct:'Через 4-6 недель после ПКТ — финальная проверка (24 маркера)',
+                  course_bridge_course:'Между курсами — расширенный контроль (20 маркеров)',
+                };
+                return phases[selectedPhase] || 'Следуйте рекомендованному графику';
+              })()}
             </div>
             <div style={{ display:'grid', gap:6 }}>
               {Object.entries(labsBySystem).map(([system, codes]) => {
@@ -1100,7 +1125,7 @@ export const LabsScreen: React.FC = () => {
                     <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:4 }}>
                       <div style={{ width:8, height:8, borderRadius:'50%', background: sysColors[system]||'#6b7280' }}/>
                       <span style={{ fontSize:10, fontWeight:600, color:'var(--accent)' }}>{sysLabels[system]||system}</span>
-                      <span style={{ fontSize:9, color:'var(--text-dim)', marginLeft:'auto' }}>{submitted}/{total}</span>
+                      <span style={{ fontSize:9, color:'var(--text-dim)', marginLeft:'auto' }}>{submitted}/{total} · {pct}%</span>
                     </div>
                     <div style={{ height:6, background:'rgba(255,255,255,0.05)', borderRadius:3, overflow:'hidden' }}>
                       <div style={{ width:`${pct}%`, height:'100%', background:pct===100?'var(--accent)':pct>50?'#eab308':'#f97316', borderRadius:3, transition:'width 0.4s' }}/>
