@@ -834,7 +834,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
       {tab === 'main' && supportView === 'main' && (
         <div style={{ display:'flex', flexDirection:'column', minHeight:'calc(100vh - 60px)' }}>
           <div style={{ position:'relative', width:'100%', height:'48vh', minHeight:250 }}>
-            <img src="/support-hero.png" alt="" style={{ width:'100%', height:'100%', display:'block', objectFit:'cover', objectPosition:'center top' }} />
+            <img src="/support-hero.jpg" alt="" style={{ width:'100%', height:'100%', display:'block', objectFit:'cover', objectPosition:'center top' }} />
             <div style={{ position:'absolute', bottom:14, left:20, right:20, background:'linear-gradient(transparent, rgba(0,0,0,0.7))', padding:'20px 0 8px' }}>
               <h1 style={{ fontSize:22, fontWeight:800, color:'#fff', margin:'0 0 2px', textShadow:'0 2px 14px rgba(0,0,0,0.9)' }}>Поддержка</h1>
               <p style={{ fontSize:11, color:'rgba(255,255,255,0.9)', margin:0, lineHeight:1.3, textShadow:'0 1px 8px rgba(0,0,0,0.8)' }}>

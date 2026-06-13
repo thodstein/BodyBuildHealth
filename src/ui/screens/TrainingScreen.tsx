@@ -67,6 +67,7 @@ const PHASE_HINTS: Record<string, string> = {
 };
 
 type TrainingTab = 'plan' | 'runtime' | 'exercises' | 'calculators' | 'diary' | 'cycles' | 'history' | 'analytics' | 'methods' | 'visual' | 'programs' | 'timers' | 'progress';
+type TrainingPage = 'hero' | 'tabs';
 
 export const TrainingScreen: React.FC = () => {
   const linked = useDataLink();
@@ -74,6 +75,7 @@ export const TrainingScreen: React.FC = () => {
   const labAnalysis = linked.labAnalysis;
   const diary = useMemo(() => new StrengthDiary(), []);
   const [tab, setTab] = useState<TrainingTab>('plan');
+  const [page, setPage] = useState<TrainingPage>('hero');
 
   // Plan state — pre-fill from readiness and labAnalysis
   const [goal, setGoal] = useState('bulk');
@@ -337,7 +339,62 @@ export const TrainingScreen: React.FC = () => {
   const bmiCategory = (v: number) => v < 18.5 ? 'Недостаток веса' : v < 25 ? 'Норма' : v < 30 ? 'Избыток' : 'Ожирение';
 
   return (
-    <div className="screen training-screen" style={{ padding: '0 4px' }}>
+    <div className="screen training-screen" style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'auto', padding: 0 }}>
+
+      {/* ─── HERO PAGE ─── */}
+      {page === 'hero' && (
+        <div style={{ flex: 1, minHeight: 0, display:'flex', flexDirection:'column', overflow:'visible' }}>
+          <div style={{ flex:'0 0 48vh', position:'relative', maxHeight:'57vh' }}>
+            <img src="/training-hero.jpg" alt="" style={{ width:'100%', height:'100%', display:'block', objectFit:'cover', objectPosition:'center top' }} />
+            <div style={{ position: 'absolute', bottom: 14, left: 20, right: 20 }}>
+              <h1 style={{ fontSize: 22, fontWeight: 800, color: '#fff', margin: '0 0 2px', textShadow: '0 2px 14px rgba(0,0,0,0.9)' }}>Тренировки</h1>
+              <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.9)', margin: 0, lineHeight: 1.3, textShadow: '0 1px 8px rgba(0,0,0,0.8)' }}>
+                План, дневник, упражнения, калькуляторы и аналитика
+              </p>
+            </div>
+          </div>
+          <div style={{ flex:1, padding:'10px 16px 80px', display:'flex', flexDirection:'column', gap:8 }}>
+            {[
+              { id: 'plan', icon: '🏋️', title: 'Тренировки', desc: 'План, дневник, история, анализ, прогресс', color: 'var(--accent)' },
+              { id: 'cycles', icon: '📅', title: 'Планирование', desc: 'План, циклы, методики, программы, таймеры', color: '#3b82f6' },
+              { id: 'exercises', icon: 'ℹ️', title: 'Общая информация', desc: 'Упражнения, калькуляторы', color: '#8b5cf6' },
+            ].map(card => (
+              <button key={card.id} onClick={() => { setPage('tabs'); setTab(card.id as TrainingTab); }} style={{
+                display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', borderRadius: 14, cursor: 'pointer', textAlign: 'left', width: '100%',
+                background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', color: 'var(--text)',
+                transition: 'all 0.2s',
+              }}>
+                <div style={{
+                  width: 40, height: 40, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                  background: card.color + '18', fontSize: 20,
+                }}>
+                  {card.icon}
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 2, color: card.color }}>{card.title}</div>
+                  <div style={{ fontSize: 10, color: 'var(--text-dim)', lineHeight: 1.3 }}>{card.desc}</div>
+                </div>
+                <span style={{ color: card.color, fontSize: 16, opacity: 0.6 }}>→</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ─── TAB VIEW (when not on hero) ─── */}
+      {page !== 'hero' && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '6px 12px', flexShrink: 0, borderBottom: '1px solid var(--border)' }}>
+          <button onClick={() => setPage('hero')} style={{
+            padding: '6px 8px', cursor: 'pointer', fontSize: 14,
+            color: 'var(--text-dim)', border: 'none', background: 'transparent',
+            display: 'flex', alignItems: 'center', gap: 4,
+            fontWeight: 600,
+          }}>← На главную</button>
+        </div>
+      )}
+
+      {page !== 'hero' && (
+      <div style={{ padding: '0 4px' }}>
       <h2 style={{ margin: '0 0 8px', fontSize: 16, color: 'var(--accent)' }}>🏋️ Тренировки</h2>
 
       <div style={{ display: 'flex', gap: 3, marginBottom: 10, overflowX: 'auto', scrollbarWidth: 'none' }}>
@@ -2071,6 +2128,8 @@ export const TrainingScreen: React.FC = () => {
       {tab === 'programs' && <ProgramsTab />}
       {tab === 'timers' && <TimersTab />}
       {tab === 'progress' && <ProgressTab historyWorkouts={historyWorkouts} />}
+    </div>
+      )}
     </div>
   );
 };
