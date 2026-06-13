@@ -832,38 +832,37 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
     <div className="screen support-screen">
       {/* ===== MAIN HERO ===== */}
       {tab === 'main' && supportView === 'main' && (
-        <div style={{ display:'flex', flexDirection:'column', minHeight:'calc(100vh - 60px)' }}>
-          <div style={{ position:'relative', width:'100%', height:'48vh', minHeight:250 }}>
-            <img src="/support-hero.jpg" alt="" style={{ width:'100%', height:'100%', display:'block', objectFit:'cover', objectPosition:'center top' }} />
-            <div style={{ position:'absolute', bottom:14, left:20, right:20, background:'linear-gradient(transparent, rgba(0,0,0,0.7))', padding:'20px 0 8px' }}>
-              <h1 style={{ fontSize:22, fontWeight:800, color:'#fff', margin:'0 0 2px', textShadow:'0 2px 14px rgba(0,0,0,0.9)' }}>Поддержка</h1>
-              <p style={{ fontSize:11, color:'rgba(255,255,255,0.9)', margin:0, lineHeight:1.3, textShadow:'0 1px 8px rgba(0,0,0,0.8)' }}>
-                Фармакологическая поддержка, пептиды и предлагаемые препараты поддержки для уменьшения рисков
-              </p>
-            </div>
-          </div>
-          <div style={{ flex:1, padding:'10px 16px 80px', display:'flex', flexDirection:'column', gap:8 }}>
-            <div onClick={() => setSupportView('calc')} style={{
-              display:'flex', alignItems:'center', gap:12, padding:'12px 14px', borderRadius:14, cursor:'pointer', textAlign:'left', width:'100%',
-              background:'var(--glass-bg)', border:'1px solid var(--glass-border)', color:'var(--text)', transition:'all 0.2s',
-            }}>
-              <div style={{ width:40, height:40, borderRadius:12, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, background:'rgba(0,230,138,0.1)', fontSize:20 }}>🧮</div>
-              <div style={{ flex:1 }}>
-                <div style={{ fontSize:13, fontWeight:700, marginBottom:2, color:'var(--accent)' }}>Расчет поддержки</div>
-                <div style={{ fontSize:10, color:'var(--text-dim)', lineHeight:1.3 }}>Калькулятор поддержки, пептидный калькулятор, каталог, синергии и готовые стеки</div>
+        <div style={{ position:'fixed', inset:0, zIndex:100, display:'flex', flexDirection:'column' }}>
+          <img src="/support-hero.jpg" alt="" style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'cover', objectPosition:'center top' }} />
+          <div style={{ position:'absolute', inset:0, background:'linear-gradient(transparent 50%, rgba(0,0,0,0.85))' }} />
+          <div style={{ position:'relative', zIndex:2, flex:1, display:'flex', flexDirection:'column', justifyContent:'flex-end', padding:'16px 16px 80px' }}>
+            <h1 style={{ fontSize:22, fontWeight:800, color:'#fff', margin:'0 0 2px', textShadow:'0 2px 14px rgba(0,0,0,0.9)' }}>Поддержка</h1>
+            <p style={{ fontSize:11, color:'rgba(255,255,255,0.9)', margin:'0 0 16px', lineHeight:1.3, textShadow:'0 1px 8px rgba(0,0,0,0.8)' }}>
+              Фармакологическая поддержка, пептиды и предлагаемые препараты поддержки для уменьшения рисков
+            </p>
+            <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+              <div onClick={() => setSupportView('calc')} style={{
+                display:'flex', alignItems:'center', gap:12, padding:'12px 14px', borderRadius:14, cursor:'pointer', textAlign:'left', width:'100%',
+                background:'rgba(20,22,30,0.35)', border:'1px solid var(--glass-border)', color:'var(--text)', transition:'all 0.2s',
+              }}>
+                <div style={{ width:40, height:40, borderRadius:12, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, background:'rgba(0,230,138,0.1)', fontSize:20 }}>🧮</div>
+                <div style={{ flex:1 }}>
+                  <div style={{ fontSize:13, fontWeight:700, marginBottom:2, color:'var(--accent)' }}>Расчет поддержки</div>
+                  <div style={{ fontSize:10, color:'var(--text-dim)', lineHeight:1.3 }}>Калькулятор поддержки, пептидный калькулятор, каталог, синергии и готовые стеки</div>
+                </div>
+                <span style={{ color:'var(--accent)', fontSize:16, opacity:0.6 }}>→</span>
               </div>
-              <span style={{ color:'var(--accent)', fontSize:16, opacity:0.6 }}>→</span>
-            </div>
-            <div onClick={() => setSupportView('fertility')} style={{
-              display:'flex', alignItems:'center', gap:12, padding:'12px 14px', borderRadius:14, cursor:'pointer', textAlign:'left', width:'100%',
-              background:'var(--glass-bg)', border:'1px solid var(--glass-border)', color:'var(--text)', transition:'all 0.2s',
-            }}>
-              <div style={{ width:40, height:40, borderRadius:12, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, background:'rgba(139,92,246,0.1)', fontSize:20 }}>🧬</div>
-              <div style={{ flex:1 }}>
-                <div style={{ fontSize:13, fontWeight:700, marginBottom:2, color:'#8b5cf6' }}>ПКТ и Фертильность</div>
-                <div style={{ fontSize:10, color:'var(--text-dim)', lineHeight:1.3 }}>Анализы, план ПКТ и восстановление фертильности</div>
+              <div onClick={() => setSupportView('fertility')} style={{
+                display:'flex', alignItems:'center', gap:12, padding:'12px 14px', borderRadius:14, cursor:'pointer', textAlign:'left', width:'100%',
+                background:'rgba(20,22,30,0.35)', border:'1px solid var(--glass-border)', color:'var(--text)', transition:'all 0.2s',
+              }}>
+                <div style={{ width:40, height:40, borderRadius:12, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, background:'rgba(139,92,246,0.1)', fontSize:20 }}>🧬</div>
+                <div style={{ flex:1 }}>
+                  <div style={{ fontSize:13, fontWeight:700, marginBottom:2, color:'#8b5cf6' }}>ПКТ и Фертильность</div>
+                  <div style={{ fontSize:10, color:'var(--text-dim)', lineHeight:1.3 }}>Анализы, план ПКТ и восстановление фертильности</div>
+                </div>
+                <span style={{ color:'#8b5cf6', fontSize:16, opacity:0.6 }}>→</span>
               </div>
-              <span style={{ color:'#8b5cf6', fontSize:16, opacity:0.6 }}>→</span>
             </div>
           </div>
         </div>
@@ -871,35 +870,34 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
 
       {/* ===== SUB-NAVIGATION (calc / fertility menus) ===== */}
       {tab === 'main' && supportView === 'calc' && calcView === 'main' && (
-        <div>
-          <button onClick={() => setSupportView('main')} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', marginBottom:8, background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← Назад</button>
-          <div style={{ height:'48vh', minHeight:250, position:'relative', borderRadius:14, overflow:'hidden', marginBottom:10 }}>
-            <img src="/calc-hero.jpg" alt="" style={{ width:'100%', height:'100%', display:'block', objectFit:'cover', objectPosition:'center top' }} />
-            <div style={{ position:'absolute', bottom:12, left:16, right:16 }}>
-              <h2 style={{ fontSize:18, fontWeight:800, color:'#fff', margin:0, textShadow:'0 2px 10px rgba(0,0,0,0.9)' }}>Расчет поддержки</h2>
-              <p style={{ fontSize:10, color:'rgba(255,255,255,0.9)', margin:'2px 0 0', textShadow:'0 1px 6px rgba(0,0,0,0.8)' }}>
-                Калькулятор поддержки, пептидный калькулятор и общая информация
-              </p>
-            </div>
-          </div>
-          <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
-            {[
-              { icon:'🧮', title:'Калькулятор поддержки', desc:'Расчёт рисков, покрытия систем и недельного протокола', action:() => { setSupportView('main'); setTab('calculator'); }, color:'var(--accent)' },
-              { icon:'🧬', title:'Пептидный калькулятор', desc:'Разведение, дозировки, PK модель и протоколы', action:() => { setSupportView('main'); setTab('peptides'); }, color:'var(--accent)' },
-              { icon:'ℹ️', title:'Общая информация', desc:'Каталог, синергии и взаимодействия, готовые стеки', action:() => { setCalcView('info'); setInfoView('catalog'); }, color:'#3b82f6' },
-            ].map((card, i) => (
-              <div key={i} onClick={card.action} style={{
-                display:'flex', alignItems:'center', gap:12, padding:'12px 14px', borderRadius:14, cursor:'pointer', textAlign:'left', width:'100%',
-                background:'var(--glass-bg)', border:'1px solid var(--glass-border)',
-              }}>
-                <div style={{ width:40, height:40, borderRadius:12, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, background:card.color+'18', fontSize:20 }}>{card.icon}</div>
-                <div style={{ flex:1 }}>
-                  <div style={{ fontSize:13, fontWeight:700, marginBottom:2, color:card.color }}>{card.title}</div>
-                  <div style={{ fontSize:10, color:'var(--text-dim)', lineHeight:1.3 }}>{card.desc}</div>
+        <div style={{ position:'fixed', inset:0, zIndex:100, display:'flex', flexDirection:'column' }}>
+          <img src="/calc-hero.jpg" alt="" style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'cover', objectPosition:'center top' }} />
+          <div style={{ position:'absolute', inset:0, background:'linear-gradient(transparent 50%, rgba(0,0,0,0.85))' }} />
+          <div style={{ position:'relative', zIndex:2, flex:1, display:'flex', flexDirection:'column', justifyContent:'flex-end', padding:'16px 16px 80px' }}>
+            <button onClick={() => setSupportView('main')} style={{ alignSelf:'flex-start', padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', marginBottom:8, background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← Назад</button>
+            <h2 style={{ fontSize:18, fontWeight:800, color:'#fff', margin:'8px 0 2px', textShadow:'0 2px 10px rgba(0,0,0,0.9)' }}>Расчет поддержки</h2>
+            <p style={{ fontSize:10, color:'rgba(255,255,255,0.9)', margin:'0 0 16px', textShadow:'0 1px 6px rgba(0,0,0,0.8)' }}>
+              Калькулятор поддержки, пептидный калькулятор и общая информация
+            </p>
+            <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+              {[
+                { icon:'🧮', title:'Калькулятор поддержки', desc:'Расчёт рисков, покрытия систем и недельного протокола', action:() => { setSupportView('main'); setTab('calculator'); }, color:'var(--accent)' },
+                { icon:'🧬', title:'Пептидный калькулятор', desc:'Разведение, дозировки, PK модель и протоколы', action:() => { setSupportView('main'); setTab('peptides'); }, color:'var(--accent)' },
+                { icon:'ℹ️', title:'Общая информация', desc:'Каталог, синергии и взаимодействия, готовые стеки', action:() => { setCalcView('info'); setInfoView('catalog'); }, color:'#3b82f6' },
+              ].map((card, i) => (
+                <div key={i} onClick={card.action} style={{
+                  display:'flex', alignItems:'center', gap:12, padding:'12px 14px', borderRadius:14, cursor:'pointer', textAlign:'left', width:'100%',
+                  background:'rgba(20,22,30,0.35)', border:'1px solid var(--glass-border)',
+                }}>
+                  <div style={{ width:40, height:40, borderRadius:12, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, background:card.color+'18', fontSize:20 }}>{card.icon}</div>
+                  <div style={{ flex:1 }}>
+                    <div style={{ fontSize:13, fontWeight:700, marginBottom:2, color:card.color }}>{card.title}</div>
+                    <div style={{ fontSize:10, color:'var(--text-dim)', lineHeight:1.3 }}>{card.desc}</div>
+                  </div>
+                  <span style={{ color:card.color, fontSize:16, opacity:0.6 }}>→</span>
                 </div>
-                <span style={{ color:card.color, fontSize:16, opacity:0.6 }}>→</span>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
         </div>
       )}
@@ -951,35 +949,34 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
       )}
 
       {tab === 'main' && supportView === 'fertility' && (
-        <div>
-          <button onClick={() => setSupportView('main')} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', marginBottom:8, background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← Назад</button>
-          <div style={{ height:'48vh', minHeight:250, position:'relative', borderRadius:14, overflow:'hidden', marginBottom:10 }}>
-            <img src="/fertility-hero.jpg" alt="" style={{ width:'100%', height:'100%', display:'block', objectFit:'cover', objectPosition:'center top' }} />
-            <div style={{ position:'absolute', bottom:12, left:16, right:16 }}>
-              <h2 style={{ fontSize:18, fontWeight:800, color:'#fff', margin:0, textShadow:'0 2px 10px rgba(0,0,0,0.9)' }}>ПКТ и Фертильность</h2>
-              <p style={{ fontSize:10, color:'rgba(255,255,255,0.9)', margin:'2px 0 0', textShadow:'0 1px 6px rgba(0,0,0,0.8)' }}>
-                Анализы, план ПКТ и восстановление фертильности
-              </p>
-            </div>
-          </div>
-          <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
-            {[
-              { icon:'🩸', title:'Анализы', desc:'Ингибин B, ФСГ, ЛГ, эстрадиол, тестостерон, прогестерон', action:() => setTab('fertility-pct'), color:'#ef4444' },
-              { icon:'📋', title:'План ПКТ', desc:'Протокол послекурсовой терапии и таймер', action:() => setTab('fertility-pct'), color:'var(--accent)' },
-              { icon:'🌱', title:'План восстановления Фертильности', desc:'Восстановление сперматогенеза и гормонального фона', action:() => setTab('fertility-pct'), color:'#8b5cf6' },
-            ].map((card, i) => (
-              <div key={i} onClick={card.action} style={{
-                display:'flex', alignItems:'center', gap:12, padding:'12px 14px', borderRadius:14, cursor:'pointer', textAlign:'left', width:'100%',
-                background:'var(--glass-bg)', border:'1px solid var(--glass-border)',
-              }}>
-                <div style={{ width:40, height:40, borderRadius:12, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, background:card.color+'18', fontSize:20 }}>{card.icon}</div>
-                <div style={{ flex:1 }}>
-                  <div style={{ fontSize:13, fontWeight:700, marginBottom:2, color:card.color }}>{card.title}</div>
-                  <div style={{ fontSize:10, color:'var(--text-dim)', lineHeight:1.3 }}>{card.desc}</div>
+        <div style={{ position:'fixed', inset:0, zIndex:100, display:'flex', flexDirection:'column' }}>
+          <img src="/fertility-hero.jpg" alt="" style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'cover', objectPosition:'center top' }} />
+          <div style={{ position:'absolute', inset:0, background:'linear-gradient(transparent 50%, rgba(0,0,0,0.85))' }} />
+          <div style={{ position:'relative', zIndex:2, flex:1, display:'flex', flexDirection:'column', justifyContent:'flex-end', padding:'16px 16px 80px' }}>
+            <button onClick={() => setSupportView('main')} style={{ alignSelf:'flex-start', padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', marginBottom:8, background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← Назад</button>
+            <h2 style={{ fontSize:18, fontWeight:800, color:'#fff', margin:'8px 0 2px', textShadow:'0 2px 10px rgba(0,0,0,0.9)' }}>ПКТ и Фертильность</h2>
+            <p style={{ fontSize:10, color:'rgba(255,255,255,0.9)', margin:'0 0 16px', textShadow:'0 1px 6px rgba(0,0,0,0.8)' }}>
+              Анализы, план ПКТ и восстановление фертильности
+            </p>
+            <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+              {[
+                { icon:'🩸', title:'Анализы', desc:'Ингибин B, ФСГ, ЛГ, эстрадиол, тестостерон, прогестерон', action:() => setTab('fertility-pct'), color:'#ef4444' },
+                { icon:'📋', title:'План ПКТ', desc:'Протокол послекурсовой терапии и таймер', action:() => setTab('fertility-pct'), color:'var(--accent)' },
+                { icon:'🌱', title:'План восстановления Фертильности', desc:'Восстановление сперматогенеза и гормонального фона', action:() => setTab('fertility-pct'), color:'#8b5cf6' },
+              ].map((card, i) => (
+                <div key={i} onClick={card.action} style={{
+                  display:'flex', alignItems:'center', gap:12, padding:'12px 14px', borderRadius:14, cursor:'pointer', textAlign:'left', width:'100%',
+                  background:'rgba(20,22,30,0.35)', border:'1px solid var(--glass-border)',
+                }}>
+                  <div style={{ width:40, height:40, borderRadius:12, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, background:card.color+'18', fontSize:20 }}>{card.icon}</div>
+                  <div style={{ flex:1 }}>
+                    <div style={{ fontSize:13, fontWeight:700, marginBottom:2, color:card.color }}>{card.title}</div>
+                    <div style={{ fontSize:10, color:'var(--text-dim)', lineHeight:1.3 }}>{card.desc}</div>
+                  </div>
+                  <span style={{ color:card.color, fontSize:16, opacity:0.6 }}>→</span>
                 </div>
-                <span style={{ color:card.color, fontSize:16, opacity:0.6 }}>→</span>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
         </div>
       )}
