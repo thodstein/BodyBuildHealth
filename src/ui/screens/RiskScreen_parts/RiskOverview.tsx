@@ -220,8 +220,9 @@ export const RiskOverview: React.FC<{
         <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:4, fontSize:10 }}>
           {(() => {
             const seen = new Set<string>();
+            const allowed = /testosterone|trenbolone|nandrolone|boldenone|methenolone|oxandrolone|stanozolol|methandienone|oxymetholone|superdrol|halotestin|drostanolone|mesterolone|turinabol|insulin|gh_|igf|mgf|somatropin|cjc|ghrp|ipamorelin|mk677|sermorelin|hgh/i;
             return Object.entries(DRUG_THRESHOLDS)
-              .filter(([id]) => { const e = PHARMA_DB[id]; return e && !seen.has(e.name) && (seen.add(e.name) || true); })
+              .filter(([id]) => { const e = PHARMA_DB[id]; return e && !seen.has(e.name) && (seen.add(e.name) || true) && allowed.test(id); })
               .sort(([,a], [,b]) => b.androgenicity - a.androgenicity)
               .map(([id, thresh]) => {
                 const entry = PHARMA_DB[id];

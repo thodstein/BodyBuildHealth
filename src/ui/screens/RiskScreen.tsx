@@ -1108,6 +1108,7 @@ const LabsRisksTab: React.FC = () => {
 
   const labRisks = useMemo(() => {
     if (!hasLabs) return null;
+    try {
     const contribs = calculateRiskFromAnalyses(labs) as any;
     const sb: Record<string,{raw:number;net:number}> = {};
     for (const sys of ALL_RISK_SYSTEMS) {
@@ -1132,6 +1133,7 @@ const LabsRisksTab: React.FC = () => {
     }
     devs.sort((a,b) => Math.abs(b.deviation)-Math.abs(a.deviation));
     return { systemBreakdown: sb, markerDeviations: devs, deviationCount: devs.length };
+    } catch { return null; }
   }, [hasLabs, labs]);
 
   const penalty = useMemo(() => {
