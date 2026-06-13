@@ -32,19 +32,17 @@ const V7_ORGAN_TO_SYSTEM: Record<string, string> = {
 };
 
 function getMechName(sysKey: string, mechIdx: number): string {
-  // First try V7 MECHANISM_NAMES (has up to 8 mechanisms for some systems)
   const smKey = V7_ORGAN_TO_SYSTEM[sysKey] || sysKey;
   if (MECHANISM_NAMES[smKey]?.[mechIdx]) {
-    return MECHANISM_NAMES[smKey][mechIdx];
+    const name = MECHANISM_NAMES[smKey][mechIdx];
+    return name && name.length > 1 ? name : `Механизм ${mechIdx + 1}`;
   }
-  // Then try SYSTEM_MECHANISMS
   const mechs = SYSTEM_MECHANISMS[smKey];
   if (mechs) {
     const found = mechs.find(m => m.num === mechIdx);
-    if (found?.label) return found.label;
+    if (found?.label && found.label.length > 1) return found.label;
   }
-  // Fallback for indices that have no real name
-  return '';
+  return `Механизм ${mechIdx + 1}`;
 }
 
 function hasValidMech(sysKey: string, mechIdx: number): boolean {
