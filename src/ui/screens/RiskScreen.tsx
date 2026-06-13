@@ -16,7 +16,7 @@ import { V7RiskDisplay } from './RiskScreen_parts/V7RiskDisplay';
 import { WeeklyRiskChart } from './RiskScreen_parts/WeeklyRiskChart';
 import { RiskInfo } from './RiskScreen_parts/RiskInfo';
 import { runMDSS, type MDSSInput, type MDSSOutput, type BiomarkerInput } from '../../engines/mdss-engine';
-// import { Risk3DModel } from './RiskScreen_parts/Risk3DModel';
+const Risk3DModel = React.lazy(() => import('./RiskScreen_parts/Risk3DModel').then(m => ({ default: m.Risk3DModel })));
 import { calculateWeeklyRiskDynamics, type WeeklyRiskDynamics } from '../../engines/weekly-risk-dynamics.engine';
 import { useV7Risk } from '../hooks/useV7Risk';
 import { getProfile, updateProfile } from '../../core/profile-manager';
@@ -305,6 +305,24 @@ export const RiskScreen: React.FC = () => {
     return finalResult;
   }
 
+  // MDSS result for summary card
+  const mdssResult = useMemo(() => {
+    try {
+      const labs = linked.labs || [];
+      const markers: BiomarkerInput[] = labs.slice(0, 20).map(l => ({
+        code: l.code, name: l.name, value: l.value, unit: l.unit, date: l.date, ec50: 1.0,
+      }));
+      const course = linked.course || [];
+      const weeks = course.reduce((max, c) => Math.max(max, (c.endWeek || 12) - (c.startWeek || 0)), 4);
+      return runMDSS({
+        markers,
+        tWeeks: Math.max(1, weeks),
+        weeksSinceLab: 12,
+        genetics: Object.keys(linked.profile?.settings?.genetics || {}).filter(k => !!(linked.profile?.settings?.genetics as any)?.[k]).slice(0, 3),
+      });
+    } catch { return null; }
+  }, [linked.labs, linked.course, linked.profile, linked.activeDrugs, linked.supportCoverage]);
+
   const riskHistory = useMemo(() => loadRiskHistory(), []);
 
   const renderContent = () => {
@@ -315,8 +333,10 @@ export const RiskScreen: React.FC = () => {
       case 'overview': return <RiskOverview riskResult={riskResult} globalNoLabs={globalNoLabs} noLabsSystems={noLabsSystems} labRiskContributions={effectiveLabContrib} riskHistory={riskHistory} aggregatedRisk={aggregatedRisk} weeklyDynamics={weeklyDynamics} />;
       case 'mechanisms': return <RiskDetails riskResult={riskResult} labRiskContributions={effectiveLabContrib} isSyntheticLab={isSyntheticLab} />;
       case 'v7': return v7Result ? <V7RiskDisplay result={v7Result} organWeek={organWeek} onWeekChange={setOrganWeek} mcEnabled={mcEnabled} onToggleMC={toggleMC} /> : <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-dim)' }}>Загрузка V7...</div>;
-      case 'model': return <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-dim)' }}>3D модель загружается...</div>;
-      case 'dynamics': return <WeeklyRiskChart dynamics={weeklyDynamics} selectedWeek={selectedWeek} onWeekSelect={setSelectedWeek} mode={weekMode} onModeChange={setWeekMode} />;
+      case 'model': return <React.Suspense fallback={<div style={{ textAlign: 'center', padding: 40, color: 'var(--text-dim)' }}>Загрузка 3D модели...</div>}>
+        {v7Result ? <Risk3DModel result={v7Result} mcEnabled={mcEnabled} onToggleMC={toggleMC} organWeek={organWeek} onWeekChange={setOrganWeek} /> : <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-dim)' }}>Загрузка V7...</div>}
+      </React.Suspense>;
+      case 'dynamics': return weeklyDynamics ? <WeeklyRiskChart dynamics={weeklyDynamics} selectedWeek={selectedWeek} onWeekSelect={setSelectedWeek} mode={weekMode} onModeChange={setWeekMode} /> : <div style={{ textAlign:'center', padding:40, color:'var(--text-dim)' }}>Нет данных для динамики</div>;
       case 'info': return <RiskInfo />;
       case 'mdss': return <MDSSRiskDisplay />;
       case 'compliance': return <ComplianceDisplay />;
@@ -343,11 +363,11 @@ export const RiskScreen: React.FC = () => {
     <div className="screen risk" style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden', padding: 0 }}>
       {/* ─── HERO PAGE ─── */}
       {mainTab === 'hero' && (
-        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '0 0 70px' }}>
+        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '0 16px 70px' }}>
           {/* Hero image */}
-          <div style={{ position: 'relative', marginBottom: 8 }}>
+          <div style={{ position: 'relative', margin: '-16px -16px 12px -16px' }}>
             <img src="/risk-hero.png" alt="" style={{
-              width: '100%', height: 'auto', maxHeight: '62vh', display: 'block',
+              width: '100%', height: 'auto', maxHeight: '45vh', display: 'block',
               objectFit: 'cover', objectPosition: 'center top',
             }} />
             <div style={{ position: 'absolute', bottom: 10, left: 16, right: 16 }}>
@@ -357,7 +377,7 @@ export const RiskScreen: React.FC = () => {
               </p>
             </div>
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: '0 16px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {[
               { id: 'calculations', icon: '🧮', title: 'Комплексные расчеты', desc: 'Базовый расчёт, Монте Карло (V7), MDSS — все аналитические модели рисков.', color: '#22c55e' },
               { id: 'clinical', icon: '🏥', title: 'Клиника', desc: '3D модель, комплаенс, клинические риски и анализы.', color: '#3b82f6' },
@@ -409,7 +429,7 @@ export const RiskScreen: React.FC = () => {
                   {[
                     { label: 'Базовый', icon: '📋', net: Math.round(riskResult?.overallNet ?? 0), raw: Math.round(riskResult?.overallRaw ?? 0), color: '#22c55e' },
                     { label: 'Монте-Карло', icon: '🎲', net: v7Result ? Math.round(v7Result.globalRiskNet) : null, raw: v7Result ? Math.round(v7Result.globalRiskRaw) : null, color: '#8b5cf6' },
-                    { label: 'MDSS', icon: '🏥', net: null, raw: null, color: '#f97316' },
+                    { label: 'MDSS', icon: '🏥', net: mdssResult ? Math.round(mdssResult.overallMaxRisk) : null, raw: null, color: '#f97316' },
                   ].map((item, i) => (
                     <div key={i} style={{
                       textAlign: 'center', padding: '10px 6px', borderRadius: 12,

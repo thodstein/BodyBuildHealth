@@ -1,268 +1,77 @@
-﻿import React, { useState, useMemo } from 'react';
-import type { WeeklyRiskDynamics, WeeklyRiskPoint } from '../../../engines/weekly-risk-dynamics.engine';
+﻿import React from 'react';
+import type { WeeklyRiskDynamics } from '../../../engines/weekly-risk-dynamics.engine';
 import { getRiskColor } from '../../../core/utils/risk-colors';
-import { PHARMA_DB } from '../../../core/pharma-database';
 
 interface Props {
-  dynamics: WeeklyRiskDynamics | null;
+  dynamics: WeeklyRiskDynamics;
   selectedWeek: number | null;
-  onWeekSelect: (week: number | null) => void;
+  onWeekSelect: (w: number | null) => void;
   mode: 'week' | 'average';
-  onModeChange: (mode: 'week' | 'average') => void;
-}
-
-function getDrugName(id: string): string {
-  const sub = (PHARMA_DB as any)[id];
-  return sub?.name || id;
-}
-
-// Smooth curve interpolation (catmull-rom → cubic bezier)
-function smoothPath(points: { x: number; y: number }[]): string {
-  if (points.length === 0) return '';
-  if (points.length === 1) return `M${points[0].x.toFixed(1)},${points[0].y.toFixed(1)}`;
-  let d = `M${points[0].x.toFixed(1)},${points[0].y.toFixed(1)}`;
-  for (let i = 0; i < points.length - 1; i++) {
-    const p0 = points[i === 0 ? 0 : i - 1];
-    const p1 = points[i];
-    const p2 = points[i + 1];
-    const p3 = points[i + 2 >= points.length ? points.length - 1 : i + 2];
-    const tension = 0.3;
-    const cp1x = p1.x + (p2.x - p0.x) * tension;
-    const cp1y = p1.y + (p2.y - p0.y) * tension;
-    const cp2x = p2.x - (p3.x - p1.x) * tension;
-    const cp2y = p2.y - (p3.y - p1.y) * tension;
-    d += `C${cp1x.toFixed(1)},${cp1y.toFixed(1)} ${cp2x.toFixed(1)},${cp2y.toFixed(1)} ${p2.x.toFixed(1)},${p2.y.toFixed(1)}`;
-  }
-  return d;
+  onModeChange: (m: 'week' | 'average') => void;
 }
 
 export const WeeklyRiskChart: React.FC<Props> = ({ dynamics, selectedWeek, onWeekSelect, mode, onModeChange }) => {
-  if (!dynamics || dynamics.weeks.length === 0) {
-    return (
-      <div className="card" style={{ padding: 12 }}>
-        <div style={{ textAlign: 'center', color: 'var(--text-dim)', fontSize: 12 }}>
-          Нет данных о курсе для расчёта динамики рисков
-        </div>
-      </div>
-    );
-  }
+  const data = dynamics.weeks || [];
+  if (data.length === 0) return <div style={{ color:'var(--text-dim)',textAlign:'center',padding:20 }}>Нет данных динамики</div>;
 
-  const weeks = dynamics.weeks;
-  const maxWeek = weeks.length - 1;
+  const maxVal = Math.max(...data.map(d => Math.max(d.overallNet, d.overallRaw)), 5);
+  const w = 320;
+  const h = 180;
+  const pad = { top: 10, right: 20, bottom: 30, left: 35 };
+  const cw = w - pad.left - pad.right;
+  const ch = h - pad.top - pad.bottom;
+  const stepX = cw / Math.max(1, data.length - 1);
 
-  // Responsive dimensions (wider)
-  const W = 560;
-  const H = 180;
-  const PAD = { top: 24, right: 16, bottom: 28, left: 40 };
-  const chartW = W - PAD.left - PAD.right;
-  const chartH = H - PAD.top - PAD.bottom;
+  const toX = (i: number) => pad.left + i * stepX;
+  const toY = (v: number) => pad.top + ch - (v / maxVal) * ch;
 
-  const courseStart = Math.min(...weeks.filter(w => w.activeDrugs.length > 0).map(w => w.week));
-  const courseEnd = Math.max(...weeks.filter(w => w.activeDrugs.length > 0).map(w => w.week));
-
-  const toX = (w: number) => PAD.left + (w / maxWeek) * chartW;
-  const toY = (v: number) => H - PAD.bottom - (Math.min(v, 100) / 100) * chartH;
-
-  const pointsNet = weeks.map(p => ({ x: toX(p.week), y: toY(p.overallNet) }));
-  const pointsRaw = weeks.map(p => ({ x: toX(p.week), y: toY(p.overallRaw) }));
-  const netPath = smoothPath(pointsNet);
-  const rawPath = smoothPath(pointsRaw);
-
-  // Area paths (smooth curve to bottom)
-  const bottom = H - PAD.bottom;
-  const netAreaPath = pointsNet.length > 0
-    ? smoothPath(pointsNet) + ` L${toX(maxWeek).toFixed(1)},${bottom} L${toX(0).toFixed(1)},${bottom} Z`
-    : '';
-  const rawAreaPath = pointsRaw.length > 0
-    ? smoothPath(pointsRaw) + ` L${toX(maxWeek).toFixed(1)},${bottom} L${toX(0).toFixed(1)},${bottom} Z`
-    : '';
-
-  // Grid lines
-  const gridValues = [0, 25, 50, 75, 100];
-  const gridLines = gridValues.map(v => ({
-    y: toY(v),
-    label: `${v}`,
-  }));
-
-  // Week markers
-  const step = maxWeek <= 16 ? 2 : maxWeek <= 30 ? 4 : 8;
-  const weekTicks: number[] = [];
-  for (let w = 0; w <= maxWeek; w += step) weekTicks.push(w);
-  if (weekTicks[weekTicks.length - 1] !== maxWeek) weekTicks.push(maxWeek);
-
-  const selectedPoint = selectedWeek !== null ? weeks.find(p => p.week === selectedWeek) : null;
-
-  // Concentration area smoothing
-  const concPoints = weeks.map(p => ({ x: toX(p.week), y: bottom - p.peakConcentration * chartH }));
-  const concAreaPath = smoothPath(concPoints) + ` L${toX(maxWeek).toFixed(1)},${bottom} L${toX(0).toFixed(1)},${bottom} Z`;
+  const rawPath = data.map((d, i) => `${i === 0 ? 'M' : 'L'}${toX(i)},${toY(d.overallRaw)}`).join(' ');
+  const netPath = data.map((d, i) => `${i === 0 ? 'M' : 'L'}${toX(i)},${toY(d.overallNet)}`).join(' ');
 
   return (
-    <div className="card" style={{ marginBottom: 8 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-        <h3 style={{ margin: 0, fontSize: 14 }}>📈 Динамика рисков по неделям</h3>
-        <div style={{ display: 'flex', gap: 4 }}>
-          <button
-            onClick={() => onModeChange('average')}
-            style={{ padding: '3px 8px', borderRadius: 4, border: '1px solid var(--border)', background: mode === 'average' ? 'var(--accent)' : 'transparent', color: mode === 'average' ? '#000' : 'var(--text-dim)', fontSize: 10, cursor: 'pointer' }}
-          >Среднее</button>
-          <button
-            onClick={() => onModeChange('week')}
-            style={{ padding: '3px 8px', borderRadius: 4, border: '1px solid var(--border)', background: mode === 'week' ? 'var(--accent)' : 'transparent', color: mode === 'week' ? '#000' : 'var(--text-dim)', fontSize: 10, cursor: 'pointer' }}
-          >По неделе</button>
-        </div>
+    <div>
+      <div style={{ display:'flex', gap:2, marginBottom:8, background:'var(--bg-secondary)', borderRadius:8, padding:2, width:'fit-content' }}>
+        {(['average','week'] as const).map(m => (
+          <button key={m} onClick={() => onModeChange(m)} style={{
+            padding:'4px 12px', borderRadius:6, fontSize:10, fontWeight:600, cursor:'pointer', border:'none',
+            background: mode === m ? 'var(--accent)' : 'transparent',
+            color: mode === m ? '#000' : 'var(--text-dim)', transition:'all 0.15s',
+          }}>{m === 'average' ? 'Средний' : 'Понедельно'}</button>
+        ))}
       </div>
-
-      {mode === 'week' && (
-        <div style={{ marginBottom: 8, display: 'flex', gap: 8, alignItems: 'center' }}>
-          <label style={{ fontSize: 11, color: 'var(--text-dim)' }}>Неделя:</label>
-          <input
-            type="range" min={0} max={maxWeek}
-            value={selectedWeek ?? 0}
-            onChange={e => onWeekSelect(Number(e.target.value))}
-            style={{ flex: 1 }}
-          />
-          <span style={{ fontSize: 12, fontWeight: 600, minWidth: 30, color: 'var(--accent)' }}>{selectedWeek ?? 0}</span>
-        </div>
-      )}
-
-      <div style={{ display: 'flex', gap: 12, marginBottom: 6, fontSize: 10, flexWrap: 'wrap' }}>
-        <span style={{ color: '#7c4dff' }}>● Raw (без поддержки)</span>
-        <span style={{ color: '#00e68a' }}>● Net (с поддержкой)</span>
-        <span style={{ color: 'rgba(255,152,0,0.5)' }}>▓ Концентрация (PK)</span>
-      </div>
-
-      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: 'auto', maxHeight: H + 20 }}>
-        <defs>
-          <linearGradient id="netGrad" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#00e68a" stopOpacity="0.35" />
-            <stop offset="100%" stopColor="#00e68a" stopOpacity="0.02" />
-          </linearGradient>
-          <linearGradient id="rawGrad" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#7c4dff" stopOpacity="0.2" />
-            <stop offset="100%" stopColor="#7c4dff" stopOpacity="0.01" />
-          </linearGradient>
-          <linearGradient id="concGrad" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#ff9800" stopOpacity="0.15" />
-            <stop offset="100%" stopColor="#ff9800" stopOpacity="0.02" />
-          </linearGradient>
-          <filter id="glow">
-            <feGaussianBlur stdDeviation="1.5" result="blur" />
-            <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
-          </filter>
-        </defs>
-
-        {/* Course shading */}
-        {courseStart !== undefined && courseEnd !== undefined && (
-          <rect x={toX(courseStart)} y={PAD.top} width={toX(courseEnd) - toX(courseStart)} height={chartH}
-            fill="rgba(0,230,138,0.06)" rx="2" />
-        )}
-
-        {/* Grid lines */}
-        {gridLines.map((g, i) => (
-          <g key={`g${i}`}>
-            <line x1={PAD.left} y1={g.y} x2={W - PAD.right} y2={g.y} stroke="var(--border)" strokeWidth="0.5" opacity={0.5} />
-            <text x={PAD.left - 4} y={g.y + 3} fill="var(--text-dim)" fontSize="8" textAnchor="end">{g.label}</text>
+      <svg viewBox={`0 0 ${w} ${h}`} style={{ width:'100%', height:'auto', display:'block' }}>
+        {/* Grid */}
+        {[0, 0.25, 0.5, 0.75, 1].map(f => (
+          <g key={f}>
+            <line x1={pad.left} y1={toY(maxVal * f)} x2={w - pad.right} y2={toY(maxVal * f)} stroke="rgba(255,255,255,0.04)" strokeWidth={0.5} />
+            <text x={pad.left - 4} y={toY(maxVal * f) + 3} fill="var(--text-dim)" fontSize={8} textAnchor="end">{Math.round(maxVal * f)}%</text>
           </g>
         ))}
-
-        {/* Concentration area */}
-        <path d={concAreaPath} fill="url(#concGrad)" stroke="rgba(255,152,0,0.25)" strokeWidth="0.5" />
-
-        {/* Raw area + line */}
-        <path d={rawAreaPath} fill="url(#rawGrad)" />
-        <path d={rawPath} fill="none" stroke="#7c4dff" strokeWidth="2" opacity={0.7} filter="url(#glow)" />
-
-        {/* Net area + line */}
-        <path d={netAreaPath} fill="url(#netGrad)" />
-        <path d={netPath} fill="none" stroke="#00e68a" strokeWidth="2.5" filter="url(#glow)" />
-
-        {/* Average line */}
-        {mode === 'average' && (
-          <line x1={PAD.left} y1={toY(dynamics.averageRisk.overallNet)} x2={W - PAD.right} y2={toY(dynamics.averageRisk.overallNet)}
-            stroke="#00e68a" strokeWidth="1.5" strokeDasharray="6 3" opacity={0.7} />
-        )}
-
-        {/* Selected week indicator */}
-        {selectedWeek !== null && selectedPoint && (
-          <>
-            <line x1={toX(selectedWeek)} y1={PAD.top} x2={toX(selectedWeek)} y2={H - PAD.bottom}
-              stroke="var(--text-dim)" strokeWidth="1" strokeDasharray="4 3" opacity={0.6} />
-            <circle cx={toX(selectedWeek)} cy={toY(selectedPoint.overallNet)} r="5" fill="#00e68a" stroke="#000" strokeWidth="1.5" filter="url(#glow)" />
-            <circle cx={toX(selectedWeek)} cy={toY(selectedPoint.overallRaw)} r="4" fill="#7c4dff" stroke="#000" strokeWidth="1.5" />
-            <circle cx={toX(selectedWeek)} cy={toY(0)} r="2" fill="#ff9800" />
-          </>
-        )}
-
-        {/* Week labels */}
-        {weekTicks.map((w, i) => (
-          <text key={`w${i}`} x={toX(w)} y={H - 4} fill="var(--text-dim)" fontSize="8" textAnchor="middle">{w}</text>
+        {/* Raw area */}
+        <path d={`${rawPath} L${toX(data.length - 1)},${pad.top + ch} L${toX(0)},${pad.top + ch} Z`} fill="rgba(239,68,68,0.08)" />
+        {/* Net area */}
+        <path d={`${netPath} L${toX(data.length - 1)},${pad.top + ch} L${toX(0)},${pad.top + ch} Z`} fill="rgba(0,230,138,0.1)" />
+        {/* Raw line */}
+        <path d={rawPath} fill="none" stroke="rgba(239,68,68,0.5)" strokeWidth={2} strokeDasharray="4 2" />
+        {/* Net line */}
+        <path d={netPath} fill="none" stroke="var(--accent)" strokeWidth={2.5} />
+        {/* Dots */}
+        {data.map((d, i) => (
+          <g key={i}>
+            <circle cx={toX(i)} cy={toY(d.overallNet)} r={3} fill="var(--accent)" style={{ cursor:'pointer' }} onClick={() => onWeekSelect(i)} />
+            <circle cx={toX(i)} cy={toY(d.overallRaw)} r={2} fill="#ef4444" opacity={0.6} />
+            {selectedWeek === i && <circle cx={toX(i)} cy={toY(d.overallNet)} r={6} fill="none" stroke="var(--accent)" strokeWidth={2} />}
+          </g>
         ))}
-
-        <text x={PAD.left - 2} y={PAD.top + 8} fill="var(--text-dim)" fontSize="8">%</text>
-        <text x={W / 2} y={H - 1} fill="var(--text-dim)" fontSize="8" textAnchor="middle">Недели</text>
+        {/* X axis labels */}
+        {data.map((d, i) => i % Math.max(1, Math.floor(data.length / 6)) === 0 ? (
+          <text key={`l${i}`} x={toX(i)} y={h - 8} fill="var(--text-dim)" fontSize={7} textAnchor="middle">Нед. {d.week}</text>
+        ) : null)}
       </svg>
-
-      {/* Selected week details */}
-      {selectedPoint && mode === 'week' && (
-        <div style={{ background: 'var(--bg-secondary)', borderRadius: 8, padding: 10, marginTop: 8 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-            <span style={{ fontWeight: 700, fontSize: 13 }}>Неделя {selectedPoint.week}</span>
-            <span style={{
-              padding: '2px 8px', borderRadius: 4, fontSize: 10, fontWeight: 600,
-              background: selectedPoint.accumulationPhase === 'steady' ? 'rgba(0,230,138,0.15)' : selectedPoint.accumulationPhase === 'ramp-up' ? 'rgba(234,179,8,0.15)' : selectedPoint.accumulationPhase === 'washout' ? 'rgba(59,130,246,0.15)' : 'rgba(107,114,128,0.15)',
-              color: selectedPoint.accumulationPhase === 'steady' ? '#00e68a' : selectedPoint.accumulationPhase === 'ramp-up' ? '#eab308' : selectedPoint.accumulationPhase === 'washout' ? '#3b82f6' : '#6b7280',
-            }}>
-              {selectedPoint.accumulationPhase === 'steady' ? '' : selectedPoint.accumulationPhase === 'ramp-up' ? '' : selectedPoint.accumulationPhase === 'washout' ? '' : '—'}
-            </span>
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, fontSize: 11 }}>
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ color: 'var(--text-dim)', fontSize: 9 }}>Raw</div>
-              <div style={{ fontWeight: 700, color: getRiskColor(selectedPoint.overallRaw) }}>{Math.round(selectedPoint.overallRaw)}%</div>
-            </div>
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ color: 'var(--text-dim)', fontSize: 9 }}>Net</div>
-              <div style={{ fontWeight: 700, color: getRiskColor(selectedPoint.overallNet) }}>{Math.round(selectedPoint.overallNet)}%</div>
-            </div>
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ color: 'var(--text-dim)', fontSize: 9 }}>Конц.</div>
-              <div style={{ fontWeight: 700 }}>{Math.round(selectedPoint.peakConcentration * 100)}%</div>
-            </div>
-          </div>
-          {selectedPoint.activeDrugs.length > 0 && (
-            <div style={{ marginTop: 6, display: 'flex', flexWrap: 'wrap', gap: 3 }}>
-              {selectedPoint.activeDrugs.map(d => (
-                <span key={d} style={{ background: 'rgba(0,230,138,0.1)', padding: '1px 6px', borderRadius: 4, fontSize: 9, color: 'var(--accent)' }}>
-                  {getDrugName(d)}
-                </span>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Stats summary */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6, marginTop: 8, fontSize: 10 }}>
-        <div className="risk-row" style={{ flexDirection: 'column', gap: 0, padding: '6px 4px' }}>
-          <div style={{ color: 'var(--text-dim)', fontSize: 8 }}>Пик риска</div>
-          <div className="risk-badge" style={{ background: getRiskColor(dynamics.peakRiskValue), fontSize: 13 }}>{Math.round(dynamics.peakRiskValue)}%</div>
-          <div style={{ color: 'var(--text-dim)', fontSize: 8, marginTop: 2 }}>нед. {dynamics.peakRiskWeek}</div>
-        </div>
-        <div className="risk-row" style={{ flexDirection: 'column', gap: 0, padding: '6px 4px' }}>
-          <div style={{ color: 'var(--text-dim)', fontSize: 8 }}>Минимум</div>
-          <div className="risk-badge" style={{ background: getRiskColor(dynamics.minRiskValue), fontSize: 13 }}>{Math.round(dynamics.minRiskValue)}%</div>
-          <div style={{ color: 'var(--text-dim)', fontSize: 8, marginTop: 2 }}>нед. {dynamics.minRiskWeek}</div>
-        </div>
-        <div className="risk-row" style={{ flexDirection: 'column', gap: 0, padding: '6px 4px' }}>
-          <div style={{ color: 'var(--text-dim)', fontSize: 8 }}>Среднее</div>
-          <div className="risk-badge" style={{ background: getRiskColor(dynamics.averageRisk.overallNet), fontSize: 13 }}>{Math.round(dynamics.averageRisk.overallNet)}%</div>
-          <div style={{ color: 'var(--text-dim)', fontSize: 8, marginTop: 2 }}>overall</div>
-        </div>
-        <div className="risk-row" style={{ flexDirection: 'column', gap: 0, padding: '6px 4px' }}>
-          <div style={{ color: 'var(--text-dim)', fontSize: 8 }}>Длит.</div>
-          <div className="risk-badge" style={{ background: '#6b7280', fontSize: 13 }}>{dynamics.courseDuration} нед</div>
-          <div style={{ color: 'var(--text-dim)', fontSize: 8, marginTop: 2 }}>курс</div>
-        </div>
+      {/* Legend */}
+      <div style={{ display:'flex', gap:12, marginTop:6, fontSize:9, color:'var(--text-dim)', justifyContent:'center' }}>
+        <span><span style={{ display:'inline-block', width:12, height:2, background:'var(--accent)', verticalAlign:'middle', marginRight:4 }} /> Net риск</span>
+        <span><span style={{ display:'inline-block', width:12, height:2, background:'rgba(239,68,68,0.5)', verticalAlign:'middle', marginRight:4, border:'1px dashed #ef4444' }} /> Raw риск</span>
       </div>
     </div>
   );
