@@ -406,7 +406,7 @@ export const RiskScreen: React.FC = () => {
               { id: 'clinical', icon: '🏥', title: 'Клиника', desc: '3D модель, комплаенс, клинические риски и анализы.', color: '#3b82f6' },
               { id: 'info', icon: 'ℹ️', title: 'Общая информация', desc: 'Формулы, механизмы, пороги препаратов и справочные данные.', color: '#a855f7' },
               ].map(card => (
-              <button key={card.id} onClick={() => { setMainTab(card.id as any); setSubTab(card.id === 'info' ? 'info' : 'overview'); }} style={{
+              <button key={card.id} onClick={() => { setMainTab(card.id as any); setSubTab(card.id === 'info' ? 'info' : card.id === 'clinical' ? 'model' : 'overview'); }} style={{
                 display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', borderRadius: 14, cursor: 'pointer', textAlign: 'left', width: '100%',
                 background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', color: 'var(--text)',
                 transition: 'all 0.2s',
@@ -422,9 +422,9 @@ export const RiskScreen: React.FC = () => {
                 <span style={{ color: card.color, fontSize: 16, opacity: 0.6 }}>→</span>
               </button>
             ))}
-          </div>
-        </div>
-      )}
+              </div>
+            </div>
+          )}
 
       {/* ─── TOP NAV BAR ─── */}
       {mainTab !== 'hero' && (
@@ -442,14 +442,7 @@ export const RiskScreen: React.FC = () => {
 
           {/* ───── COMPLEX CALCULATIONS SUB-HERO ───── */}
           {mainTab === 'calculations' && calcPage === 'hero' && (
-            <div>
-              {/* Background image */}
-              <div style={{ margin:'-12px -12px 10px -12px', position:'relative' }}>
-                <img src="/calc-hero.png" alt="" style={{ width:'100%', height:'auto', maxHeight:'30vh', display:'block', objectFit:'cover', objectPosition:'center' }} />
-                <div style={{ position:'absolute', bottom:8, left:14, right:14 }}>
-                  <span style={{ fontSize:16, fontWeight:800, color:'#fff', textShadow:'0 2px 10px rgba(0,0,0,0.8)' }}>Комплексные расчеты</span>
-                </div>
-              </div>
+            <div style={{ padding:12, borderRadius:16, background:'linear-gradient(rgba(5,5,14,0.8),rgba(5,5,14,0.85)),url(/calc-hero.png) center/cover no-repeat', border:'1px solid var(--border)' }}>
               {/* Summary card */}
               <div style={{ marginTop: 10, padding: 14, borderRadius: 16, background: 'var(--glass-bg)', border: '1px solid var(--glass-border)' }}>
                 <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--accent)', marginBottom: 10, textAlign: 'center' }}>
