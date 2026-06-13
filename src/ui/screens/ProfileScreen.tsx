@@ -9,6 +9,7 @@ import { calculateIndices } from '../../engines/clinical-indices.engine';
 import { NAVY_BF_FORMULAS, MUSCLE_GROUPS_FULL, INJURY_LOCATIONS } from '../../core/constants';
 
 type ProfileTab = 'overview' | 'anthropometry' | 'sleep' | 'lifestyle' | 'diet' | 'nutrition_v7' | 'genetics' | 'injuries' | 'progress' | 'reports';
+type ProfilePage = 'hero' | 'tabs';
 
 const GOALS = [
   { id: 'bulk', label: 'Масса' }, { id: 'cut', label: 'Сушка' },
@@ -117,6 +118,7 @@ const s: Record<string, React.CSSProperties> = {
 export const ProfileScreen: React.FC = () => {
   const profile = useProfileRefresh();
   const [tab, setTab] = useState<ProfileTab>('overview');
+  const [page, setPage] = useState<ProfilePage>('hero');
   const [labs, setLabs] = useState<LabPoint[]>([]);
   const [editInjury, setEditInjury] = useState<InjuryRecord | null>(null);
   const [weightLog, setWeightLog] = useState<WeightEntry[]>(getWeightLog);
@@ -204,13 +206,61 @@ export const ProfileScreen: React.FC = () => {
 
   return (
     <div className="screen profile">
-      <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 12 }}>
-        {tabs.map(t => (
-          <button key={t.id} className={`tab-button ${tab === t.id ? 'active' : ''}`} onClick={() => setTab(t.id)}>{t.label}</button>
-        ))}
-      </div>
+      {page === 'hero' ? (
+        <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          <div style={{ flex: '0 0 48vh', position: 'relative' }}>
+            <img src="/profile-hero.png" alt="" style={{ width: '100%', height: '100%', display: 'block', objectFit: 'cover', objectPosition: 'center top' }} />
+            <div style={{ position: 'absolute', bottom: 14, left: 20, right: 20 }}>
+              <h1 style={{ fontSize: 22, fontWeight: 800, color: '#fff', margin: '0 0 2px', textShadow: '0 2px 14px rgba(0,0,0,0.9)' }}>Профиль</h1>
+              <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.9)', margin: 0, lineHeight: 1.3, textShadow: '0 1px 8px rgba(0,0,0,0.8)' }}>
+                Управление профилем, отчёты и контакты
+              </p>
+            </div>
+          </div>
+          <div style={{ flex: 1, padding: '10px 16px 80px', display: 'flex', flexDirection: 'column', gap: 8, overflowY: 'auto' }}>
+            {[
+              { id: 'overview', icon: '📋', title: 'Сведения о пользователе', desc: 'Обзор, антропометрия, сон, образ жизни, питание, травмы', color: '#00e68a' },
+              { id: 'reports', icon: '📊', title: 'Отчеты', desc: 'Прогресс и отчёты', color: '#3b82f6' },
+              { id: 'progress', icon: '📞', title: 'Контакты', desc: 'Сведения о разработчике, друзья, магазины, тренера и врачи', color: '#8b5cf6' },
+            ].map(card => (
+              <button key={card.id} onClick={() => { setPage('tabs'); setTab(card.id as ProfileTab); }} style={{
+                display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', borderRadius: 14, cursor: 'pointer', textAlign: 'left', width: '100%',
+                background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', color: 'var(--text)',
+                transition: 'all 0.2s',
+              }}>
+                <div style={{
+                  width: 40, height: 40, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                  background: card.color + '18', fontSize: 20,
+                }}>
+                  {card.icon}
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 2, color: card.color }}>{card.title}</div>
+                  <div style={{ fontSize: 10, color: 'var(--text-dim)', lineHeight: 1.3 }}>{card.desc}</div>
+                </div>
+                <span style={{ color: card.color, fontSize: 16, opacity: 0.6 }}>→</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : (
+        <>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '6px 0px', flexShrink: 0, borderBottom: '1px solid var(--border)', marginBottom: 8, width: '100%' }}>
+            <button onClick={() => setPage('hero')} style={{
+              padding: '6px 8px', cursor: 'pointer', fontSize: 14,
+              color: 'var(--text-dim)', border: 'none', background: 'transparent',
+              display: 'flex', alignItems: 'center', gap: 4,
+              fontWeight: 600,
+            }}>← На главную</button>
+          </div>
 
-      {tab === 'overview' && (
+          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 12 }}>
+            {tabs.map(t => (
+              <button key={t.id} className={`tab-button ${tab === t.id ? 'active' : ''}`} onClick={() => setTab(t.id)}>{t.label}</button>
+            ))}
+          </div>
+
+          {tab === 'overview' && (
         <>
           {readinessScores && (
             <div style={s.card}>
@@ -816,6 +866,8 @@ export const ProfileScreen: React.FC = () => {
       )}
 
       {tab === 'reports' && <ReportsScreen />}
+        </>
+      )}
     </div>
   );
 };

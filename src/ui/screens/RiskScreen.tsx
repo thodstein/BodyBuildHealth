@@ -639,7 +639,7 @@ export const RiskScreen: React.FC = () => {
       {/* ─── HERO PAGE ─── */}
       {mainTab === 'hero' && (
         <div style={{ flex: 1, minHeight: 0, display:'flex', flexDirection:'column', overflow:'hidden' }}>
-          <div style={{ flex:'0 0 48vh', position:'relative', maxHeight:'56vh' }}>
+          <div style={{ flex:'0 0 60vh', position:'relative', maxHeight:'70vh' }}>
             <img src="/risk-hero.png" alt="" style={{ width:'100%', height:'100%', display:'block', objectFit:'cover', objectPosition:'center top' }} />
             <div style={{ position: 'absolute', bottom: 14, left: 20, right: 20 }}>
               <h1 style={{ fontSize: 22, fontWeight: 800, color: '#fff', margin: '0 0 2px', textShadow: '0 2px 14px rgba(0,0,0,0.9)' }}>Оценка рисков</h1>
