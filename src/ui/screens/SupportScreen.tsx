@@ -830,146 +830,125 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
 
   return (
     <div className="screen support-screen">
-      {tab !== 'main' && (
-        <div style={{ display: 'flex', gap: 4, marginBottom: 12, overflowX: 'auto', scrollbarWidth: 'none' }}>
-          {(['catalog', 'synergies', 'calculator', 'interactions', 'stacks', 'peptides', 'fertility-pct'] as SupportTab[]).map(t => (
-            <button key={t} onClick={() => setTab(t)} style={{
-              flex: 1, padding: '10px 8px', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600,
-              background: tab === t ? 'var(--accent-green, #00e68a)' : 'var(--bg-secondary)',
-              color: tab === t ? '#000' : 'var(--text-dim)', cursor: 'pointer', transition: 'background 0.15s', whiteSpace: 'nowrap',
-            }}>
-              {t === 'catalog' ? '📖 Каталог' : t === 'synergies' ? '🔗 Синергии' : t === 'calculator' ? '🧮 Калькулятор' : t === 'interactions' ? '⚠️ Взаимодействия' : t === 'stacks' ? '📦 Стеки' : t === 'peptides' ? '🧬 Пептиды' : t === 'fertility-pct' ? '🧬 Фертильность' : ''}
-            </button>
-          ))}
-        </div>
-      )}
-
-      {/* ===== MAIN (hero + cards) ===== */}
+      {/* ===== MAIN HERO (like LabsScreen) ===== */}
       {tab === 'main' && supportView === 'main' && (
-        <div>
-          <div style={{ position:'relative', borderRadius:16, overflow:'hidden', marginBottom:16, minHeight:200 }}>
-            <img src="/support-hero.png" alt="Поддержка" style={{ width:'100%', height:'42vh', objectFit:'cover', objectPosition:'center top', display:'block' }} />
-            <div style={{ position:'absolute', bottom:0, inset:'0 0', background:'linear-gradient(transparent 40%, rgba(0,0,0,0.85))', display:'flex', alignItems:'flex-end', padding:'16px' }}>
-              <div style={{ fontSize:24, fontWeight:800, color:'#fff', textShadow:'0 2px 8px rgba(0,0,0,0.5)' }}>Поддержка</div>
+        <div style={{ flex: 1, minHeight: 0, display:'flex', flexDirection:'column', overflow:'hidden' }}>
+          <div style={{ flex:'0 0 42vh', position:'relative', maxHeight:'50vh' }}>
+            <img src="/support-hero.png" alt="" style={{ width:'100%', height:'100%', display:'block', objectFit:'cover', objectPosition:'center top' }} />
+            <div style={{ position: 'absolute', bottom: 14, left: 20, right: 20 }}>
+              <h1 style={{ fontSize: 22, fontWeight: 800, color: '#fff', margin: '0 0 2px', textShadow: '0 2px 14px rgba(0,0,0,0.9)' }}>Поддержка</h1>
+              <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.9)', margin: 0, lineHeight: 1.3, textShadow: '0 1px 8px rgba(0,0,0,0.8)' }}>
+                Фармакологическая поддержка, пептиды и готовые протоколы
+              </p>
             </div>
           </div>
-          <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
-            <div onClick={() => setSupportView('calc')} style={{ padding:'18px 16px', borderRadius:12, cursor:'pointer', background:'var(--glass-bg)', border:'1px solid var(--glass-border)', transition:'all 0.15s', display:'flex', alignItems:'center', gap:12 }}>
-              <div style={{ fontSize:28 }}>🧮</div>
-              <div>
-                <div style={{ fontSize:15, fontWeight:700, color:'var(--accent)' }}>Расчет поддержки</div>
-                <div style={{ fontSize:11, color:'var(--text-dim)', marginTop:2 }}>Калькулятор поддержки, пептиды, каталог и стеки</div>
+          <div style={{ flex:1, padding:'10px 16px 80px', display:'flex', flexDirection:'column', gap:8, overflowY:'auto' }}>
+            <div onClick={() => setSupportView('calc')} style={{
+              display:'flex', alignItems:'center', gap:12, padding:'12px 14px', borderRadius:14, cursor:'pointer', textAlign:'left', width:'100%',
+              background:'var(--glass-bg)', border:'1px solid var(--glass-border)', color:'var(--text)', transition:'all 0.2s',
+            }}>
+              <div style={{ width:40, height:40, borderRadius:12, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, background:'rgba(0,230,138,0.1)', fontSize:20 }}>🧮</div>
+              <div style={{ flex:1 }}>
+                <div style={{ fontSize:13, fontWeight:700, marginBottom:2, color:'var(--accent)' }}>Расчет поддержки</div>
+                <div style={{ fontSize:10, color:'var(--text-dim)', lineHeight:1.3 }}>Калькулятор поддержки, пептидный калькулятор, каталог, синергии и готовые стеки</div>
               </div>
+              <span style={{ color:'var(--accent)', fontSize:16, opacity:0.6 }}>→</span>
             </div>
-            <div onClick={() => setSupportView('fertility')} style={{ padding:'18px 16px', borderRadius:12, cursor:'pointer', background:'var(--glass-bg)', border:'1px solid var(--glass-border)', transition:'all 0.15s', display:'flex', alignItems:'center', gap:12 }}>
-              <div style={{ fontSize:28 }}>🧬</div>
-              <div>
-                <div style={{ fontSize:15, fontWeight:700, color:'var(--accent)' }}>ПКТ и Фертильность</div>
-                <div style={{ fontSize:11, color:'var(--text-dim)', marginTop:2 }}>Анализы, план ПКТ, восстановление фертильности</div>
+            <div onClick={() => setSupportView('fertility')} style={{
+              display:'flex', alignItems:'center', gap:12, padding:'12px 14px', borderRadius:14, cursor:'pointer', textAlign:'left', width:'100%',
+              background:'var(--glass-bg)', border:'1px solid var(--glass-border)', color:'var(--text)', transition:'all 0.2s',
+            }}>
+              <div style={{ width:40, height:40, borderRadius:12, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, background:'rgba(139,92,246,0.1)', fontSize:20 }}>🧬</div>
+              <div style={{ flex:1 }}>
+                <div style={{ fontSize:13, fontWeight:700, marginBottom:2, color:'#8b5cf6' }}>ПКТ и Фертильность</div>
+                <div style={{ fontSize:10, color:'var(--text-dim)', lineHeight:1.3 }}>Анализы, план ПКТ и восстановление фертильности</div>
               </div>
+              <span style={{ color:'#8b5cf6', fontSize:16, opacity:0.6 }}>→</span>
             </div>
           </div>
         </div>
       )}
 
-      {/* ===== CALC SUB-NAVIGATION ===== */}
+      {/* ===== SUB-NAVIGATION (calc / fertility menus) ===== */}
       {tab === 'main' && supportView === 'calc' && calcView === 'main' && (
         <div>
-          <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:12 }}>
-            <button onClick={() => setSupportView('main')} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← Назад</button>
-            <span style={{ fontSize:13, fontWeight:700 }}>🧮 Расчет поддержки</span>
-          </div>
+          <button onClick={() => setSupportView('main')} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', marginBottom:8, background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← Назад</button>
           <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
-            <div onClick={() => { setSupportView('main'); setTab('calculator'); }} style={{ padding:'18px 16px', borderRadius:12, cursor:'pointer', background:'var(--glass-bg)', border:'1px solid var(--glass-border)', display:'flex', alignItems:'center', gap:12 }}>
-              <div style={{ fontSize:28 }}>🧮</div>
-              <div>
-                <div style={{ fontSize:15, fontWeight:700, color:'var(--accent)' }}>Калькулятор поддержки</div>
-                <div style={{ fontSize:11, color:'var(--text-dim)', marginTop:2 }}>Расчёт рисков, покрытия систем и недельного протокола</div>
+            {[
+              { icon:'🧮', title:'Калькулятор поддержки', desc:'Расчёт рисков, покрытия систем и недельного протокола', action:() => { setSupportView('main'); setTab('calculator'); }, color:'var(--accent)' },
+              { icon:'🧬', title:'Пептидный калькулятор', desc:'Разведение, дозировки, PK модель и протоколы', action:() => { setSupportView('main'); setTab('peptides'); }, color:'var(--accent)' },
+              { icon:'ℹ️', title:'Общая информация', desc:'Каталог, синергии и взаимодействия, готовые стеки', action:() => setCalcView('info'), color:'#3b82f6' },
+            ].map((card, i) => (
+              <div key={i} onClick={card.action} style={{
+                display:'flex', alignItems:'center', gap:12, padding:'12px 14px', borderRadius:14, cursor:'pointer', textAlign:'left', width:'100%',
+                background:'var(--glass-bg)', border:'1px solid var(--glass-border)',
+              }}>
+                <div style={{ width:40, height:40, borderRadius:12, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, background:card.color+'18', fontSize:20 }}>{card.icon}</div>
+                <div style={{ flex:1 }}>
+                  <div style={{ fontSize:13, fontWeight:700, marginBottom:2, color:card.color }}>{card.title}</div>
+                  <div style={{ fontSize:10, color:'var(--text-dim)', lineHeight:1.3 }}>{card.desc}</div>
+                </div>
+                <span style={{ color:card.color, fontSize:16, opacity:0.6 }}>→</span>
               </div>
-            </div>
-            <div onClick={() => { setSupportView('main'); setTab('peptides'); }} style={{ padding:'18px 16px', borderRadius:12, cursor:'pointer', background:'var(--glass-bg)', border:'1px solid var(--glass-border)', display:'flex', alignItems:'center', gap:12 }}>
-              <div style={{ fontSize:28 }}>🧬</div>
-              <div>
-                <div style={{ fontSize:15, fontWeight:700, color:'var(--accent)' }}>Пептидный калькулятор</div>
-                <div style={{ fontSize:11, color:'var(--text-dim)', marginTop:2 }}>Разведение, дозировки, PK модель и протоколы</div>
-              </div>
-            </div>
-            <div onClick={() => setCalcView('info')} style={{ padding:'18px 16px', borderRadius:12, cursor:'pointer', background:'var(--glass-bg)', border:'1px solid var(--glass-border)', display:'flex', alignItems:'center', gap:12 }}>
-              <div style={{ fontSize:28 }}>ℹ️</div>
-              <div>
-                <div style={{ fontSize:15, fontWeight:700, color:'var(--accent)' }}>Общая информация</div>
-                <div style={{ fontSize:11, color:'var(--text-dim)', marginTop:2 }}>Каталог, синергии и взаимодействия, готовые стеки</div>
-              </div>
-            </div>
+            ))}
           </div>
         </div>
       )}
 
-      {/* ===== CALC → INFO SUB-NAVIGATION ===== */}
       {tab === 'main' && supportView === 'calc' && calcView === 'info' && infoView === 'main' && (
         <div>
-          <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:12 }}>
-            <button onClick={() => setCalcView('main')} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← Назад</button>
-            <span style={{ fontSize:13, fontWeight:700 }}>ℹ️ Общая информация</span>
-          </div>
+          <button onClick={() => setCalcView('main')} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', marginBottom:8, background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← Назад</button>
           <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
-            <div onClick={() => { setSupportView('main'); setTab('catalog'); }} style={{ padding:'18px 16px', borderRadius:12, cursor:'pointer', background:'var(--glass-bg)', border:'1px solid var(--glass-border)', display:'flex', alignItems:'center', gap:12 }}>
-              <div style={{ fontSize:28 }}>📖</div>
-              <div>
-                <div style={{ fontSize:15, fontWeight:700, color:'var(--accent)' }}>Каталог</div>
-                <div style={{ fontSize:11, color:'var(--text-dim)', marginTop:2 }}>Справочник препаратов поддержки и БАДов</div>
+            {[
+              { icon:'📖', title:'Каталог', desc:'Справочник препаратов поддержки и БАДов', action:() => { setSupportView('main'); setTab('catalog'); }, color:'var(--accent)' },
+              { icon:'🔗', title:'Синергии и взаимодействия', desc:'Синергии поддержки и проверка взаимодействий', action:() => { setSupportView('main'); setTab('interactions'); }, color:'#3b82f6' },
+              { icon:'📦', title:'Готовые стеки', desc:'Готовые протоколы и комбинации поддержки', action:() => { setSupportView('main'); setTab('stacks'); }, color:'#8b5cf6' },
+            ].map((card, i) => (
+              <div key={i} onClick={card.action} style={{
+                display:'flex', alignItems:'center', gap:12, padding:'12px 14px', borderRadius:14, cursor:'pointer', textAlign:'left', width:'100%',
+                background:'var(--glass-bg)', border:'1px solid var(--glass-border)',
+              }}>
+                <div style={{ width:40, height:40, borderRadius:12, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, background:card.color+'18', fontSize:20 }}>{card.icon}</div>
+                <div style={{ flex:1 }}>
+                  <div style={{ fontSize:13, fontWeight:700, marginBottom:2, color:card.color }}>{card.title}</div>
+                  <div style={{ fontSize:10, color:'var(--text-dim)', lineHeight:1.3 }}>{card.desc}</div>
+                </div>
+                <span style={{ color:card.color, fontSize:16, opacity:0.6 }}>→</span>
               </div>
-            </div>
-            <div onClick={() => { setSupportView('main'); setTab('interactions'); }} style={{ padding:'18px 16px', borderRadius:12, cursor:'pointer', background:'var(--glass-bg)', border:'1px solid var(--glass-border)', display:'flex', alignItems:'center', gap:12 }}>
-              <div style={{ fontSize:28 }}>🔗</div>
-              <div>
-                <div style={{ fontSize:15, fontWeight:700, color:'var(--accent)' }}>Синергии и взаимодействия</div>
-                <div style={{ fontSize:11, color:'var(--text-dim)', marginTop:2 }}>Синергии поддержки и проверка взаимодействий</div>
-              </div>
-            </div>
-            <div onClick={() => { setSupportView('main'); setTab('stacks'); }} style={{ padding:'18px 16px', borderRadius:12, cursor:'pointer', background:'var(--glass-bg)', border:'1px solid var(--glass-border)', display:'flex', alignItems:'center', gap:12 }}>
-              <div style={{ fontSize:28 }}>📦</div>
-              <div>
-                <div style={{ fontSize:15, fontWeight:700, color:'var(--accent)' }}>Готовые стеки</div>
-                <div style={{ fontSize:11, color:'var(--text-dim)', marginTop:2 }}>Готовые протоколы и комбинации поддержки</div>
-              </div>
-            </div>
+            ))}
           </div>
         </div>
       )}
 
-      {/* ===== FERTILITY SUB-NAVIGATION ===== */}
       {tab === 'main' && supportView === 'fertility' && (
         <div>
-          <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:12 }}>
-            <button onClick={() => setSupportView('main')} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← Назад</button>
-            <span style={{ fontSize:13, fontWeight:700 }}>🧬 ПКТ и Фертильность</span>
-          </div>
+          <button onClick={() => setSupportView('main')} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', marginBottom:8, background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← Назад</button>
           <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
-            <div onClick={() => setTab('fertility-pct')} style={{ padding:'18px 16px', borderRadius:12, cursor:'pointer', background:'var(--glass-bg)', border:'1px solid var(--glass-border)', display:'flex', alignItems:'center', gap:12 }}>
-              <div style={{ fontSize:28 }}>🩸</div>
-              <div>
-                <div style={{ fontSize:15, fontWeight:700, color:'var(--accent)' }}>Анализы</div>
-                <div style={{ fontSize:11, color:'var(--text-dim)', marginTop:2 }}>Ингибин B, ФСГ, ЛГ, эстрадиол, тестостерон, прогестерон</div>
+            {[
+              { icon:'🩸', title:'Анализы', desc:'Ингибин B, ФСГ, ЛГ, эстрадиол, тестостерон, прогестерон', action:() => setTab('fertility-pct'), color:'#ef4444' },
+              { icon:'📋', title:'План ПКТ', desc:'Протокол послекурсовой терапии и таймер', action:() => setTab('fertility-pct'), color:'var(--accent)' },
+              { icon:'🌱', title:'План восстановления Фертильности', desc:'Восстановление сперматогенеза и гормонального фона', action:() => setTab('fertility-pct'), color:'#8b5cf6' },
+            ].map((card, i) => (
+              <div key={i} onClick={card.action} style={{
+                display:'flex', alignItems:'center', gap:12, padding:'12px 14px', borderRadius:14, cursor:'pointer', textAlign:'left', width:'100%',
+                background:'var(--glass-bg)', border:'1px solid var(--glass-border)',
+              }}>
+                <div style={{ width:40, height:40, borderRadius:12, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, background:card.color+'18', fontSize:20 }}>{card.icon}</div>
+                <div style={{ flex:1 }}>
+                  <div style={{ fontSize:13, fontWeight:700, marginBottom:2, color:card.color }}>{card.title}</div>
+                  <div style={{ fontSize:10, color:'var(--text-dim)', lineHeight:1.3 }}>{card.desc}</div>
+                </div>
+                <span style={{ color:card.color, fontSize:16, opacity:0.6 }}>→</span>
               </div>
-            </div>
-            <div onClick={() => setTab('fertility-pct')} style={{ padding:'18px 16px', borderRadius:12, cursor:'pointer', background:'var(--glass-bg)', border:'1px solid var(--glass-border)', display:'flex', alignItems:'center', gap:12 }}>
-              <div style={{ fontSize:28 }}>📋</div>
-              <div>
-                <div style={{ fontSize:15, fontWeight:700, color:'var(--accent)' }}>План ПКТ</div>
-                <div style={{ fontSize:11, color:'var(--text-dim)', marginTop:2 }}>Протокол послекурсовой терапии и таймер</div>
-              </div>
-            </div>
-            <div onClick={() => setTab('fertility-pct')} style={{ padding:'18px 16px', borderRadius:12, cursor:'pointer', background:'var(--glass-bg)', border:'1px solid var(--glass-border)', display:'flex', alignItems:'center', gap:12 }}>
-              <div style={{ fontSize:28 }}>🌱</div>
-              <div>
-                <div style={{ fontSize:15, fontWeight:700, color:'var(--accent)' }}>План восстановления Фертильности</div>
-                <div style={{ fontSize:11, color:'var(--text-dim)', marginTop:2 }}>Восстановление сперматогенеза и гормонального фона</div>
-              </div>
-            </div>
+            ))}
           </div>
         </div>
       )}
+
+      {/* ===== NON-MAIN CONTENT (with back button) ===== */}
+      {tab !== 'main' && tab !== 'fertility-pct' && (
+        <>
+          <button onClick={() => setTab('main')} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', marginBottom:8, background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← На главную</button>
 
       {/* ===== CATALOG ===== */}
       {tab === 'catalog' && (
@@ -1852,72 +1831,45 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
             <p style={{ fontSize: 11, color: 'var(--text-dim)', margin: 0 }}>Расчёт разведения, дозировки, PK‑модели и рисков для пептидов и факторов роста</p>
           </div>
 
-          {/* Peptide + Growth Factor selector tabs */}
-          <div style={{ display:'flex', gap:4, marginBottom:8 }}>
-            {(['peptides','growth'] as const).map(t => (
-              <button key={t} onClick={() => setPepTab(t)} style={{
-                padding:'6px 14px', borderRadius:16, fontSize:11, fontWeight:600, cursor:'pointer',
-                background: pepTab === t ? 'var(--accent)' : 'var(--bg-secondary)',
-                color: pepTab === t ? '#000' : 'var(--text-dim)',
-                border: `1px solid ${pepTab === t ? 'var(--accent)' : 'var(--border)'}`,
-              }}>{t === 'peptides' ? '🧬 Пептиды' : '📈 Факторы роста'}</button>
-            ))}
-          </div>
-
-          {pepTab === 'peptides' ? (
-            <div className="card" style={{ marginBottom: 8 }}>
-              <div style={{ display:'flex', flexWrap:'wrap', gap:4, maxHeight:160, overflowY:'auto' }}>
-                {PEPTIDE_LIST.map(p => {
-                  const sel = peptideId === p.id;
-                  return (
-                    <div key={p.id} onClick={() => { setPeptideId(p.id); const pd = PEPTIDE_DB[p.id]; if (pd) { setPepAmount(pd.amountMg); setPepRoute(pd.routes[0]); setPepResult(null); }}} style={{
-                      padding:'6px 10px', borderRadius:8, cursor:'pointer', fontSize:10,
-                      background: sel ? 'rgba(0,230,138,0.15)' : 'var(--bg-secondary)',
-                      border: sel ? '1.5px solid #00e68a' : '1px solid var(--border)',
-                      color: sel ? '#00e68a' : 'var(--text)', fontWeight: sel ? 700 : 400,
-                    }}>{p.shortName}</div>
-                  );
-                })}
-              </div>
-              {PEPTIDE_DB[peptideId] && (
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 6 }}>
-                  {PEPTIDE_DB[peptideId].effects.map(e => (
-                    <span key={e} style={{ fontSize: 9, padding: '2px 6px', borderRadius: 4, background: 'rgba(0,230,138,0.1)', color: '#00e68a' }}>{e}</span>
-                  ))}
-                </div>
-              )}
-            </div>
-          ) : (
-            <div className="card" style={{ marginBottom: 8 }}>
-              <div style={{ display:'flex', flexWrap:'wrap', gap:4, maxHeight:160, overflowY:'auto' }}>
-                {(() => {
-                  const PHARMA_GROWTH_CLASSES = new Set(['peptide_ghrh','peptide_ghrp','igf1','mgf','insulin','peptide_gnrh','peptide_fat_loss','peptide_other','peptide_regenerative','peptide_immune','peptide_nootropic','pct_gonadotropin']);
-                  return Object.values(PHARMA_DB).filter(s => !!s?.name && PHARMA_GROWTH_CLASSES.has(s.class) && s.id !== 'mk677').map(s => {
-                    const sel = growthId === s.id;
-                    return <div key={s.id} onClick={() => setGrowthId(s.id)} style={{
-                      padding:'6px 10px', borderRadius:8, cursor:'pointer', fontSize:10,
-                      background: sel ? 'rgba(139,92,246,0.15)' : 'var(--bg-secondary)',
-                      border: sel ? '1.5px solid #8b5cf6' : '1px solid var(--border)',
-                      color: sel ? '#8b5cf6' : 'var(--text)', fontWeight: sel ? 700 : 400,
-                    }}>{s.name}</div>;
-                  });
-                })()}
-              </div>
+          {/* Unified peptide + growth factor selector */}
+          <div className="card" style={{ marginBottom: 8 }}>
+            <div style={{ display:'flex', flexWrap:'wrap', gap:4, maxHeight:160, overflowY:'auto' }}>
+              {PEPTIDE_LIST.map(p => {
+                const sel = peptideId === p.id;
+                return <div key={p.id} onClick={() => { setPeptideId(p.id); const pd = PEPTIDE_DB[p.id]; if (pd) { setPepAmount(pd.amountMg); setPepRoute(pd.routes[0]); setPepResult(null); setGrowthId(null); }}} style={{
+                  padding:'6px 10px', borderRadius:8, cursor:'pointer', fontSize:10,
+                  background: sel ? 'rgba(0,230,138,0.15)' : 'var(--bg-secondary)',
+                  border: sel ? '1.5px solid #00e68a' : '1px solid var(--border)',
+                  color: sel ? '#00e68a' : 'var(--text)', fontWeight: sel ? 700 : 400,
+                }}>{p.shortName}</div>;
+              })}
               {(() => {
-                const s = growthId ? PHARMA_DB[growthId] : null;
-                if (!s) return null;
-                return (
-                  <div style={{ marginTop:6, padding:'8px 10px', background:'rgba(139,92,246,0.06)', borderRadius:8, fontSize:10, color:'var(--text-dim)', lineHeight:1.6 }}>
-                    <div><b>Класс:</b> {s.class}</div>
-                    <div><b>Период полувыведения:</b> {s.pk?.halfLifeHours ? `${(s.pk.halfLifeHours).toFixed(0)} ч` : '—'}</div>
-                    <div><b>Биодоступность:</b> {s.pk?.bioavailability ? `${(s.pk.bioavailability * 100).toFixed(0)}%` : '—'}</div>
-                    <div><b>Объём распределения:</b> {s.pk?.Vd ? `${s.pk.Vd} л` : '—'}</div>
-                    {s.research && s.research.length > 0 && <div style={{ marginTop:4 }}><b>Исследования:</b> {s.research.map(r => r.study).join('; ')}</div>}
-                  </div>
-                );
+                const GROWTH_CLASSES = new Set(['peptide_ghrh','peptide_ghrp','igf1','mgf','insulin','peptide_gnrh','peptide_fat_loss','peptide_other','peptide_regenerative','peptide_immune','peptide_nootropic','pct_gonadotropin']);
+                const inPeptideDb = new Set(PEPTIDE_LIST.map(p => PEPTIDE_DB[p.id]?.name.toLowerCase()));
+                return Object.values(PHARMA_DB).filter(s => !!s?.name && GROWTH_CLASSES.has(s.class) && s.id !== 'mk677' && !inPeptideDb.has(s.name.toLowerCase())).map(s => {
+                  const sel = growthId === s.id;
+                  return <div key={s.id} onClick={() => { setGrowthId(s.id); setPepResult(null); }} style={{
+                    padding:'6px 10px', borderRadius:8, cursor:'pointer', fontSize:10,
+                    background: sel ? 'rgba(139,92,246,0.15)' : 'var(--bg-secondary)',
+                    border: sel ? '1.5px solid #8b5cf6' : '1px solid var(--border)',
+                    color: sel ? '#8b5cf6' : 'var(--text)', fontWeight: sel ? 700 : 400,
+                  }}>{s.name}</div>;
+                });
               })()}
             </div>
-          )}
+            {PEPTIDE_DB[peptideId] && (
+              <div style={{ display:'flex', flexWrap:'wrap', gap:4, marginTop:6 }}>
+                {PEPTIDE_DB[peptideId].effects.map(e => (
+                  <span key={e} style={{ fontSize:9, padding:'2px 6px', borderRadius:4, background:'rgba(0,230,138,0.1)', color:'#00e68a' }}>{e}</span>
+                ))}
+              </div>
+            )}
+            {growthId && PHARMA_DB[growthId] && (
+              <div style={{ marginTop:6, padding:'8px 10px', background:'rgba(139,92,246,0.06)', borderRadius:8, fontSize:10, color:'var(--text-dim)', lineHeight:1.6 }}>
+                <b>{PHARMA_DB[growthId].name}</b> — T½ {(PHARMA_DB[growthId].pk?.halfLifeHours ?? 0).toFixed(0)}ч, био {(PHARMA_DB[growthId].pk?.bioavailability ?? 0) * 100}%
+              </div>
+            )}
+          </div>
 
           {/* Dilution calculator */}
           <div className="card" style={{ marginBottom: 8 }}>
@@ -2143,9 +2095,16 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
           </div>
         </div>
       )}
+      </>
+      )}
 
-      {/* ===== FERTILITY/PCT TAB ===== */}
-      {tab === 'fertility-pct' && <FertilityPCTScreen />}
+      {/* ===== FERTILITY/PCT TAB (with back button) ===== */}
+      {tab === 'fertility-pct' && (
+        <div>
+          <button onClick={() => setTab('main')} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', marginBottom:8, background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← На главную</button>
+          <FertilityPCTScreen />
+        </div>
+      )}
     </div>
   );
 };

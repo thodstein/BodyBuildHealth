@@ -952,34 +952,11 @@ const PKPDSimulationTab: React.FC = () => {
         })}
       </div>
 
-      {/* Drug class selector */}
+      {/* Drug selector */}
       <div style={{
         background: 'var(--glass-bg)', border: '1px solid var(--glass-border)',
         borderRadius: 12, padding: '12px 14px', marginBottom: 12,
       }}>
-        <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-dim)', marginBottom: 8 }}>
-          {drugDoses.length === 0 ? 'Начните — выберите класс препарата:' : 'Добавить препарат — выберите класс:'}
-        </div>
-        <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap', marginBottom: 6 }}>
-          <button onClick={() => { setPkClass(''); setPkSearch(''); setShowAllDrugs(true); }} style={{
-            padding: '4px 12px', borderRadius: 16, fontSize: 9, cursor: 'pointer', fontWeight: !pkClass ? 700 : 400,
-            background: !pkClass ? 'rgba(0,230,138,0.15)' : 'var(--bg-secondary)',
-            color: !pkClass ? 'var(--accent)' : 'var(--text-dim)',
-            border: `1px solid ${!pkClass ? 'var(--accent)' : 'var(--border)'}`,
-            whiteSpace: 'nowrap',
-          }}>Все классы</button>
-          {Object.entries(CLASS_LABELS).map(([cls, label]) => (
-            <button key={cls} onClick={() => { setPkClass(pkClass === cls ? '' : cls); setPkSearch(''); setShowAllDrugs(false); }} style={{
-              padding: '4px 12px', borderRadius: 16, fontSize: 9, cursor: 'pointer', fontWeight: pkClass === cls ? 700 : 400,
-              background: pkClass === cls ? 'rgba(0,230,138,0.15)' : 'var(--bg-secondary)',
-              color: pkClass === cls ? 'var(--accent)' : 'var(--text-dim)',
-              border: `1px solid ${pkClass === cls ? 'var(--accent)' : 'var(--border)'}`,
-              whiteSpace: 'nowrap',
-            }}>{label}</button>
-          ))}
-        </div>
-
-        {/* Search */}
         <input type="text" value={pkSearch} onChange={e => setPkSearch(e.target.value)}
           placeholder={drugDoses.length === 0 ? 'Начните вводить название...' : 'Поиск препарата...'}
           style={{ width: '100%', padding: '6px 10px', borderRadius: 8, background: 'var(--bg-secondary)',

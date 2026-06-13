@@ -4,6 +4,7 @@ import { PHARMA_DB, PKPD_DEFAULTS } from '../core/constants';
 interface SubstanceState {
   A1: number; A2: number; A3: number;
   dosePerDay: number; bio: number; ka: number; k10: number; k12: number; k21: number; Vd: number;
+  injSchedule: Set<number>; injDose: number;
 }
 
 export function calculateMultiSubstancePKPD(
@@ -17,7 +18,7 @@ export function calculateMultiSubstancePKPD(
   const totalTol: number[] = Array(weeks + 1).fill(0);
 
   // Группировка и инициализация веществ + расписание болюсов
-  const substances = new Map<string, SubstanceState & { injSchedule: Set<number>; injDose: number }>();
+  const substances = new Map<string, SubstanceState>();
   course.forEach(c => {
     const sub = PHARMA_DB[c.substanceId];
     if (!sub) return;
