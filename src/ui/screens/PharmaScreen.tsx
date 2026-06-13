@@ -1474,8 +1474,8 @@ const AndrogenicIndexCalculator: React.FC = () => {
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
             <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-dim)', minWidth: 16 }}>#{i + 1}</span>
             <div style={{ flex: 1, position: 'relative' }}>
-              <input type="text" value={entry.search} onChange={e => setSearchFor(i, e.target.value)}
-                placeholder={entry.drug ? `${PHARMA_DB[entry.drug]?.name} — нажмите чтобы изменить` : 'Поиск препарата...'}
+              <input type="text" value={entry.search || (entry.drug ? (PHARMA_DB[entry.drug]?.name || '') : '')} onChange={e => setSearchFor(i, e.target.value)}
+                placeholder={entry.drug ? 'Нажмите чтобы изменить...' : 'Поиск препарата...'}
                 style={{ width: '100%', padding: '6px 10px', borderRadius: 8, background: 'var(--bg-secondary)',
                   border: entry.drug ? '1px solid rgba(0,230,138,0.3)' : '1px solid var(--border)',
                   color: entry.drug ? 'var(--accent)' : 'var(--text)', fontSize: 11, boxSizing: 'border-box',
@@ -1593,18 +1593,20 @@ const AndrogenicIndexCalculator: React.FC = () => {
 
 const InteractionCheckerTab: React.FC = () => {
   const [interactSub, setInteractSub] = useState<'interactions' | 'synergies'>('interactions');
-  // Filter to show only pharma substances
+  // Filter to show only pharma core substances (exclude peptides, PCT, support)
+  const PHARMA_INTERACT_FILTER = new Set(['testosterone','trenbolone','nandrolone','boldenone','primobolan','oral_17aa','sarm','drostanolone','dht_derivative','igf1','mgf','insulin']);
   const allSubstances = useMemo(() => {
     return Object.values(PHARMA_DB).filter(s => 
-      PHARMA_CLASSES.includes(s.class as PharmaClass)
+      !!s?.name && PHARMA_INTERACT_FILTER.has(s.class)
     );
   }, []);
-  // Pharma-only synergy pairs (exclude support/vitamins)
+  // Pharma-only synergy pairs (AAS/insulin only, exclude peptides/PCT/support)
+  const PHARMA_INTERACT_FILTER_SYNERGY = new Set(['testosterone','trenbolone','nandrolone','boldenone','primobolan','oral_17aa','sarm','drostanolone','dht_derivative','igf1','mgf','insulin']);
   const pharmaSynergies = useMemo(() => {
     return SYNERGY_PAIRS.filter(p => {
       const a = PHARMA_DB[p.substanceA];
       const b = PHARMA_DB[p.substanceB];
-      return a && b && PHARMA_CORE_CLASSES.includes(a.class as any) && PHARMA_CORE_CLASSES.includes(b.class as any);
+      return a && b && PHARMA_INTERACT_FILTER_SYNERGY.has(a.class) && PHARMA_INTERACT_FILTER_SYNERGY.has(b.class);
     });
   }, []);
 

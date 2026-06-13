@@ -110,6 +110,37 @@ Halotestin: до 20 мг/нед · андрогенность ×1.8
 Метаболизм: Берберин 500 мг × 2, метформин 500–1000 мг, хром 200 мкг.
 Иммунитет: Витамин D3 2000–5000 МЕ, цинк 30 мг, витамин C 1000 мг.` },
 
+  { id:'penalties', icon:'⚠️', title:'Штрафы и модификаторы рисков', content:
+`Штраф за отсутствие анализов (Data Decay Penalty):
+- Множитель = 1.0 + labPenalty + diagnosticPenalty
+- labPenalty = ratioMissingLabs × 0.40 (если ≥90% пропущено → ×0.50)
+- diagnosticPenalty = ratioMissingDiagnostics × 0.25 (если ≥90% → ×0.35)
+- Итоговый множитель ограничен 2.0 (максимум ×2 к риску)
+
+Применение:
+- Если forceNoLabs=true ИЛИ pen.noLabsPenalty=true → штраф применяется ко ВСЕМ системам
+- Raw каждой системы: Math.min(100, raw × totalMultiplier)
+- Net каждой системы: Math.min(100, net × totalMultiplier)
+- Общий raw: Math.min(100, overallRaw × totalMultiplier)
+- Общий net: Math.min(100, overallNet × totalMultiplier)
+
+Data Decay:
+- Множитель = 1 + 0.05 × weeksWithoutLabs
+- При >12 недель без анализов: критический множитель ×1.5+
+- Учитывается в V7 Monte Carlo как отдельный параметр
+
+Веса источников риска (агрегированный риск):
+- Фарма: 40%
+- Анализы: 25%
+- Тренировки: 20%
+- Питание: 15%
+
+Синергии рисков (Fuzzy Logic):
+- Если кардио >50 И эндокринный >50 → общий риск +10%
+- Если печень >50 И почки >50 → +8% к обоим
+- Если нейро >40 И эндокринный >60 → +12% нейро
+- Метаболический синдром: метаболизм >50 + инсулин >50 + кардио >40 → +15% ко всем трём` },
+
   { id:'v7_info', icon:'🧬', title:'V7 — Монте-Карло моделирование', content:
 `V7 Base:
 - Детерминированный расчёт по матрице 18 систем × 8 механизмов
@@ -131,93 +162,12 @@ Hill-функция: H(x) = x^n / (EC50^n + x^n)
 Фармакокинетика: концентрации по дням для каждого препарата` },
 ];
 
-export const RiskInfo: React.FC<{
-  riskResult?: any; v7Result?: any; mdssResult?: any;
-  weeklyDynamics?: any; aggregatedRisk?: any;
-}> = ({ riskResult, v7Result, mdssResult, weeklyDynamics, aggregatedRisk }) => {
+export const RiskInfo: React.FC = () => {
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const toggle = (id: string) => setExpanded(s => ({ ...s, [id]: !s[id] }));
 
   return (
     <div>
-      {/* ─── REAL CALCULATION RESULTS ─── */}
-      <div style={{ padding:'8px 0' }}>
-        <span style={{ fontSize:16, fontWeight:700, color:'var(--accent)' }}>📊 Результаты расчётов</span>
-      </div>
-      <div style={{ display:'flex', flexWrap:'wrap', gap:6, marginBottom:16 }}>
-        {riskResult && (
-          <div style={{ flex:'1 1 45%', minWidth:120, padding:'10px 8px', borderRadius:12, textAlign:'center',
-            background:'rgba(0,230,138,0.08)', border:'1px solid rgba(0,230,138,0.2)',
-          }}>
-            <div style={{ fontSize:9, color:'var(--text-dim)' }}>Общий риск (raw)</div>
-            <div style={{ fontSize:22, fontWeight:800, color:riskResult.overallRaw >= 60 ? '#ef4444' : riskResult.overallRaw >= 30 ? '#f59e0b' : '#00e68a' }}>
-              {Math.round(riskResult.overallRaw)}%
-            </div>
-          </div>
-        )}
-        {riskResult && (
-          <div style={{ flex:'1 1 45%', minWidth:120, padding:'10px 8px', borderRadius:12, textAlign:'center',
-            background:'rgba(0,230,138,0.08)', border:'1px solid rgba(0,230,138,0.2)',
-          }}>
-            <div style={{ fontSize:9, color:'var(--text-dim)' }}>Чистый риск (net)</div>
-            <div style={{ fontSize:22, fontWeight:800, color:riskResult.overallNet >= 60 ? '#ef4444' : riskResult.overallNet >= 30 ? '#f59e0b' : '#00e68a' }}>
-              {Math.round(riskResult.overallNet)}%
-            </div>
-          </div>
-        )}
-        {v7Result && (
-          <>
-            <div style={{ flex:'1 1 45%', minWidth:120, padding:'10px 8px', borderRadius:12, textAlign:'center',
-              background:'rgba(139,92,246,0.1)', border:'1px solid rgba(139,92,246,0.2)',
-            }}>
-              <div style={{ fontSize:9, color:'var(--text-dim)' }}>V7 Monte Carlo</div>
-              <div style={{ fontSize:22, fontWeight:800, color:'#8b5cf6' }}>{Math.round(v7Result.globalRiskNet)}%</div>
-            </div>
-            <div style={{ flex:'1 1 45%', minWidth:120, padding:'10px 8px', borderRadius:12, textAlign:'center',
-              background:'rgba(249,115,22,0.1)', border:'1px solid rgba(249,115,22,0.2)',
-            }}>
-              <div style={{ fontSize:9, color:'var(--text-dim)' }}>MDSS</div>
-              <div style={{ fontSize:22, fontWeight:800, color:'#f97316' }}>{mdssResult ? `${Math.round(mdssResult.overallMaxRisk)}%` : '—'}</div>
-            </div>
-          </>
-        )}
-        {aggregatedRisk && (
-          <div style={{ flex:'1 1 100%', padding:'10px 8px', borderRadius:12, textAlign:'center',
-            background:'rgba(59,130,246,0.08)', border:'1px solid rgba(59,130,246,0.2)',
-          }}>
-            <div style={{ fontSize:9, color:'var(--text-dim)' }}>Агрегированный риск (фарма+анализы+тренировки+питание)</div>
-            <div style={{ fontSize:20, fontWeight:800, color:'#3b82f6' }}>{Math.round(aggregatedRisk)}%</div>
-          </div>
-        )}
-      </div>
-
-      {riskResult?.systemBreakdown && (
-        <div style={{ marginBottom:16, padding:'10px 12px', borderRadius:12,
-          background:'var(--glass-bg)', border:'1px solid var(--glass-border)',
-        }}>
-          <div style={{ fontSize:12, fontWeight:700, marginBottom:8, color:'var(--accent)' }}>По системам</div>
-          {Object.entries(riskResult.systemBreakdown).map(([sys, v]: [string, any]) => (
-            <div key={sys} style={{ marginBottom:4 }}>
-              <div style={{ display:'flex', justifyContent:'space-between', fontSize:11 }}>
-                <span>{sys}</span>
-                <span style={{ fontWeight:600, color:v.net >= 60 ? '#ef4444' : v.net >= 30 ? '#f59e0b' : '#00e68a' }}>{Math.round(v.net)}%</span>
-              </div>
-              <div style={{ height:4, borderRadius:2, background:'var(--border)', overflow:'hidden' }}>
-                <div style={{ height:'100%', width:`${v.net}%`, background:v.net >= 60 ? '#ef4444' : v.net >= 30 ? '#f59e0b' : '#00e68a', borderRadius:2 }} />
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {!riskResult && !v7Result && (
-        <div style={{ padding:20, textAlign:'center', color:'var(--text-dim)', fontSize:12, marginBottom:16,
-          background:'var(--glass-bg)', borderRadius:12, border:'1px solid var(--glass-border)',
-        }}>
-          Нет данных расчётов. Перейдите в «Комплексные расчёты» для генерации.
-        </div>
-      )}
-
       {/* ─── REFERENCE INFO ─── */}
       <div style={{ padding:'8px 0' }}>
         <span style={{ fontSize:16, fontWeight:700 }}>ℹ️ Справочная информация</span>
