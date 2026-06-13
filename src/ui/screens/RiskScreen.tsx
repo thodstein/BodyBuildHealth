@@ -54,6 +54,7 @@ export const RiskScreen: React.FC = () => {
   const readinessData = linked.readiness;
   const [mainTab, setMainTab] = useState<'hero' | 'calculations' | 'clinical' | 'info'>('hero');
   const [subTab, setSubTab] = useState<'overview' | 'dynamics' | 'mechanisms' | 'v7' | 'model' | 'info' | 'mdss' | 'compliance' | 'clinical' | 'labs_risks'>('overview');
+  const [calcPage, setCalcPage] = useState<'hero' | 'basic' | 'montecarlo' | 'mdss'>('hero');
   const [tick, setTick] = useState(0);
   const [selectedWeek, setSelectedWeek] = useState<number | null>(null);
   const [weekMode, setWeekMode] = useState<'week' | 'average'>('average');
@@ -342,11 +343,11 @@ export const RiskScreen: React.FC = () => {
     <div className="screen risk" style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden', padding: 0 }}>
       {/* ─── HERO PAGE ─── */}
       {mainTab === 'hero' && (
-        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '0 16px 70px' }}>
+        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '0 0 70px' }}>
           {/* Hero image */}
-          <div style={{ position: 'relative', marginBottom: 12 }}>
+          <div style={{ position: 'relative', marginBottom: 10 }}>
             <img src="/risk-hero.png" alt="" style={{
-              width: '100%', height: 'auto', maxHeight: '55vh', display: 'block',
+              width: '100%', height: 'auto', maxHeight: '60vh', display: 'block',
               objectFit: 'cover', objectPosition: 'center top',
               marginBottom: -4,
             }} />
@@ -357,7 +358,7 @@ export const RiskScreen: React.FC = () => {
               </p>
             </div>
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: '0 16px' }}>
             {[
               { id: 'calculations', icon: '🧮', title: 'Комплексные расчеты', desc: 'Базовый расчёт, Монте Карло (V7), MDSS — все аналитические модели рисков.', color: '#22c55e' },
               { id: 'clinical', icon: '🏥', title: 'Клиника', desc: '3D модель, комплаенс, клинические риски и анализы.', color: '#3b82f6' },
@@ -396,21 +397,104 @@ export const RiskScreen: React.FC = () => {
       {/* ─── SCROLLABLE CONTENT ─── */}
       {mainTab !== 'hero' && (
         <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '0 12px 70px' }}>
-          {/* Sub-tab pills */}
-          <div style={{ display: 'flex', gap: 4, overflowX: 'auto', padding: '8px 0 4px', scrollbarWidth: 'none' }}>
-            {(mainTab === 'calculations' ? CALC_SUBTABS : mainTab === 'clinical' ? CLINICAL_SUBTABS : ['info'] as const).map(t => (
-              <button key={t} onClick={() => setSubTab(t as any)} style={{
-                padding: '6px 14px', borderRadius: 16, fontSize: 11, fontWeight: 600,
-                whiteSpace: 'nowrap', cursor: 'pointer', transition: 'all 0.2s', flexShrink: 0,
-                background: subTab === t ? 'var(--accent)' : 'var(--bg-secondary)',
-                color: subTab === t ? '#000' : 'var(--text-dim)',
-                border: `1px solid ${subTab === t ? 'var(--accent)' : 'var(--border)'}`,
-              }}>
-                {SUBTAB_LABELS[t] || t}
-              </button>
-            ))}
-          </div>
-          {renderContent()}
+
+          {/* ───── COMPLEX CALCULATIONS SUB-HERO ───── */}
+          {mainTab === 'calculations' && calcPage === 'hero' && (
+            <div>
+              {/* Summary card "Общая оценка среднего риска курса" */}
+              <div className="card" style={{ marginTop: 10, padding: 14, border: '1px solid rgba(0,230,138,0.2)' }}>
+                <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--accent)', marginBottom: 12, textAlign: 'center' }}>
+                  📊 Общая оценка среднего риска курса
+                </div>
+                <div style={{ display: 'grid', gap: 8 }}>
+                  {[
+                    { label: 'Базовый расчёт', icon: '📋', risk: riskResult?.overallNet ?? 0, riskRaw: riskResult?.overallRaw ?? 0 },
+                    { label: 'Монте Карло (V7)', icon: '🎲', risk: v7Result ? Math.round(v7Result.globalRiskNet * 100) : 0, riskRaw: v7Result ? Math.round(v7Result.globalRiskRaw * 100) : 0 },
+                    { label: 'MDSS', icon: '🏥', risk: 0, riskRaw: 0 },
+                  ].map((item, i) => {
+                    const c = getRiskColor(item.risk);
+                    return (
+                      <div key={i} style={{
+                        display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 10,
+                        background: 'var(--bg-secondary)', border: `1px solid ${c}33`,
+                      }}>
+                        <span style={{ fontSize: 18 }}>{item.icon}</span>
+                        <span style={{ flex: 1, fontSize: 12, fontWeight: 600 }}>{item.label}</span>
+                        <div style={{ textAlign: 'right' }}>
+                          <div style={{ fontSize: 18, fontWeight: 800, color: c }}>{item.risk}%</div>
+                          <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>базовый: {item.riskRaw}%</div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+                <div style={{ fontSize: 9, color: 'var(--text-dim)', textAlign: 'center', marginTop: 10, lineHeight: 1.4 }}>
+                  💡 Первая цифра — средний риск с учётом поддержки • Вторая — без учёта фармподдержки
+                </div>
+              </div>
+
+              {/* 3 Nav cards */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 10 }}>
+                {[
+                  { id: 'basic', icon: '📋', title: 'Базовый расчёт', desc: 'Обзор, динамика и механизмы рисков по системам организма.', color: '#22c55e', subs: 'Обзор • Динамика • Механизмы' },
+                  { id: 'montecarlo', icon: '🎲', title: 'Монте Карло (V7)', desc: 'Органы, матрица рисков, временной ряд, чувствительность, фармакокинетика.', color: '#8b5cf6', subs: '5 подвкладок' },
+                  { id: 'mdss', icon: '🏥', title: 'MDSS', desc: 'Medical Decision Support System — Hill+MC+Sigmoid модель прогнозирования.', color: '#f97316', subs: '' },
+                ].map(card => (
+                  <button key={card.id} onClick={() => {
+                    setCalcPage(card.id as any);
+                    if (card.id === 'basic') setSubTab('overview');
+                    else if (card.id === 'montecarlo') setSubTab('v7');
+                    else setSubTab('mdss');
+                  }} style={{
+                    display: 'flex', alignItems: 'center', gap: 12, padding: '14px 14px', borderRadius: 14, cursor: 'pointer', textAlign: 'left', width: '100%',
+                    background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', color: 'var(--text)', transition: 'all 0.2s',
+                  }}>
+                    <div style={{ width: 44, height: 44, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                      background: card.color + '18', fontSize: 22 }}>
+                      {card.icon}
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 2, color: card.color }}>{card.title}</div>
+                      <div style={{ fontSize: 10, color: 'var(--text-dim)', lineHeight: 1.3 }}>{card.desc}</div>
+                      {card.subs && <div style={{ fontSize: 9, color: card.color, marginTop: 3, opacity: 0.7 }}>{card.subs}</div>}
+                    </div>
+                    <span style={{ color: card.color, fontSize: 16, opacity: 0.6 }}>→</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* ───── REGULAR SUB-TAB NAVIGATION ───── */}
+          {(mainTab !== 'calculations' || calcPage !== 'hero') && (
+            <>
+              {/* Sub-tab pills + back button for calculations */}
+              <div style={{ display: 'flex', gap: 4, overflowX: 'auto', padding: '8px 0 4px', scrollbarWidth: 'none', alignItems: 'center' }}>
+                {mainTab === 'calculations' && (
+                  <button onClick={() => { setCalcPage('hero'); setSubTab('overview'); }} style={{
+                    padding: '4px 8px', borderRadius: 6, fontSize: 10, cursor: 'pointer', flexShrink: 0,
+                    background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text-dim)', fontWeight: 600,
+                  }}>← Назад</button>
+                )}
+                {(mainTab === 'calculations'
+                  ? (calcPage === 'basic' ? ['overview','dynamics','mechanisms'] : calcPage === 'montecarlo' ? ['v7'] : ['mdss']) as readonly string[]
+                  : mainTab === 'clinical' ? CLINICAL_SUBTABS as readonly string[]
+                  : ['info'] as readonly string[]
+                ).map(t => (
+                  <button key={t} onClick={() => setSubTab(t as any)} style={{
+                    padding: '6px 14px', borderRadius: 16, fontSize: 11, fontWeight: 600,
+                    whiteSpace: 'nowrap', cursor: 'pointer', transition: 'all 0.2s', flexShrink: 0,
+                    background: subTab === t ? 'var(--accent)' : 'var(--bg-secondary)',
+                    color: subTab === t ? '#000' : 'var(--text-dim)',
+                    border: `1px solid ${subTab === t ? 'var(--accent)' : 'var(--border)'}`,
+                  }}>
+                    {SUBTAB_LABELS[t] || t}
+                  </button>
+                ))}
+              </div>
+              {renderContent()}
+            </>
+          )}
         </div>
       )}
     </div>

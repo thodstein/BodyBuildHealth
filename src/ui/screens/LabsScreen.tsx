@@ -478,7 +478,7 @@ export const LabsScreen: React.FC = () => {
 
       {/* ─── HERO PAGE ─── */}
       {mainTab === 'hero' && (
-        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '40px 16px 70px' }}>
+        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '0 0 70px' }}>
           {/* Hero section with image */}
           <div style={{ position: 'relative', marginBottom: 12 }}>
             <img src="/lab-hero.png" alt="" style={{
@@ -489,13 +489,13 @@ export const LabsScreen: React.FC = () => {
             <div style={{ position: 'absolute', bottom: 10, left: 16, right: 16 }}>
               <h1 style={{ fontSize: 20, fontWeight: 800, color: '#fff', margin: '0 0 2px', textShadow: '0 2px 12px rgba(0,0,0,0.8)' }}>Лаборатория</h1>
               <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.85)', margin: 0, lineHeight: 1.3, textShadow: '0 1px 6px rgba(0,0,0,0.7)' }}>
-                Контролируйте своё здоровье — анализы, обследования и оценка рисков
+                Контролируйте своё здоровье — анализы и обследования
               </p>
             </div>
           </div>
 
           {/* 3 cards */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: '0 16px' }}>
             {[
               { id: 'lab', icon: '🔬', title: 'Анализы', desc: 'Ввод, просмотр и динамика лабораторных показателей. Каталог маркеров и графики.', color: 'var(--accent)' },
               { id: 'investigations', icon: '🩺', title: 'Обследования', desc: 'Плановые чекапы, инструментальная диагностика и частота прохождения.', color: '#3b82f6' },
