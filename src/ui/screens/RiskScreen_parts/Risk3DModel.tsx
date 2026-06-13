@@ -255,19 +255,25 @@ export const Risk3DModel: React.FC<Props> = ({ result, mcEnabled, onToggleMC, or
     
     const colorMesh = (mesh: THREE.Mesh, colorHex: string, pct: number) => {
       const color = new THREE.Color(colorHex);
-      const factor = Math.min(1, Math.max(0.1, pct / 100));
+      // Keep existing material colors, just tint with risk color
+      const factor = Math.min(1, Math.max(0.05, pct / 100)) * 0.5;
       if (Array.isArray(mesh.material)) {
         mesh.material.forEach(m => {
           if (m instanceof THREE.MeshStandardMaterial) {
-            m.color.lerp(color, 0.7);
-            m.emissive.copy(color).multiplyScalar(0.4 * factor);
-            m.roughness = 0.6 - factor * 0.3;
+            // Preserve original color, add subtle risk tint
+            const orig = new THREE.Color('#8899aa');
+            m.color.copy(orig).lerp(color, factor);
+            m.emissive.copy(color).multiplyScalar(0.15);
+            m.roughness = 0.5;
+            m.metalness = 0.05;
           }
         });
       } else if (mesh.material instanceof THREE.MeshStandardMaterial) {
-        mesh.material.color.lerp(color, 0.7);
-        mesh.material.emissive.copy(color).multiplyScalar(0.4 * factor);
-        mesh.material.roughness = 0.6 - factor * 0.3;
+        const orig = new THREE.Color('#8899aa');
+        mesh.material.color.copy(orig).lerp(color, factor);
+        mesh.material.emissive.copy(color).multiplyScalar(0.15);
+        mesh.material.roughness = 0.5;
+        mesh.material.metalness = 0.05;
       }
     };
 

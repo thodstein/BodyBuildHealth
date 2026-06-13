@@ -401,40 +401,39 @@ export const RiskScreen: React.FC = () => {
           {/* ───── COMPLEX CALCULATIONS SUB-HERO ───── */}
           {mainTab === 'calculations' && calcPage === 'hero' && (
             <div>
-              {/* Summary card "Общая оценка среднего риска курса" */}
-              <div className="card" style={{ marginTop: 10, padding: 14, border: '1px solid rgba(0,230,138,0.2)' }}>
-                <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--accent)', marginBottom: 12, textAlign: 'center' }}>
-                  📊 Общая оценка среднего риска курса
+              {/* Summary card */}
+              <div style={{ marginTop: 10, padding: 16, borderRadius: 18, background: 'var(--glass-bg)', border: '1px solid var(--glass-border)' }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--accent)', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontSize: 20 }}>📊</span> Общая оценка среднего риска курса
                 </div>
-                <div style={{ display: 'grid', gap: 8 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
                   {[
-                    { label: 'Базовый расчёт', icon: '📋', risk: riskResult?.overallNet ?? 0, riskRaw: riskResult?.overallRaw ?? 0 },
-                    { label: 'Монте Карло (V7)', icon: '🎲', risk: v7Result ? Math.round(v7Result.globalRiskNet * 100) : 0, riskRaw: v7Result ? Math.round(v7Result.globalRiskRaw * 100) : 0 },
-                    { label: 'MDSS', icon: '🏥', risk: 0, riskRaw: 0 },
-                  ].map((item, i) => {
-                    const c = getRiskColor(item.risk);
-                    return (
-                      <div key={i} style={{
-                        display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 10,
-                        background: 'var(--bg-secondary)', border: `1px solid ${c}33`,
-                      }}>
-                        <span style={{ fontSize: 18 }}>{item.icon}</span>
-                        <span style={{ flex: 1, fontSize: 12, fontWeight: 600 }}>{item.label}</span>
-                        <div style={{ textAlign: 'right' }}>
-                          <div style={{ fontSize: 18, fontWeight: 800, color: c }}>{item.risk}%</div>
-                          <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>базовый: {item.riskRaw}%</div>
-                        </div>
+                    { label: 'Базовый', sub: 'расчёт', icon: '📋', risk: riskResult?.overallNet ?? 0, raw: riskResult?.overallRaw ?? 0, color: '#22c55e' },
+                    { label: 'Монте', sub: 'Карло V7', icon: '🎲', risk: v7Result ? Math.round(v7Result.globalRiskNet * 100) : '-', raw: v7Result ? Math.round(v7Result.globalRiskRaw * 100) : '-', color: '#8b5cf6' },
+                    { label: 'MDSS', sub: '', icon: '🏥', risk: '-', raw: '-', color: '#f97316' },
+                  ].map((item, i) => (
+                    <div key={i} style={{
+                      textAlign: 'center', padding: '12px 8px', borderRadius: 12,
+                      background: item.color + '10', border: `1px solid ${item.color}22`,
+                    }}>
+                      <div style={{ fontSize: 10, color: item.color, fontWeight: 600, marginBottom: 2 }}>{item.icon} {item.label}</div>
+                      {item.sub && <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 6 }}>{item.sub}</div>}
+                      <div style={{ fontSize: 26, fontWeight: 800, color: 'var(--accent)' }}>
+                        {typeof item.risk === 'number' ? `${item.risk}%` : item.risk}
                       </div>
-                    );
-                  })}
+                      <div style={{ fontSize: 9, color: 'var(--text-dim)', marginTop: 2 }}>
+                        сырой: {typeof item.raw === 'number' ? `${item.raw}%` : item.raw}
+                      </div>
+                    </div>
+                  ))}
                 </div>
-                <div style={{ fontSize: 9, color: 'var(--text-dim)', textAlign: 'center', marginTop: 10, lineHeight: 1.4 }}>
-                  💡 Первая цифра — средний риск с учётом поддержки • Вторая — без учёта фармподдержки
+                <div style={{ fontSize: 9, color: 'var(--text-dim)', textAlign: 'center', marginTop: 12 }}>
+                  Цветной % — с учётом поддержки • Серый — без учёта
                 </div>
               </div>
 
               {/* 3 Nav cards */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 10 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 12 }}>
                 {[
                   { id: 'basic', icon: '📋', title: 'Базовый расчёт', desc: 'Обзор, динамика и механизмы рисков по системам организма.', color: '#22c55e', subs: 'Обзор • Динамика • Механизмы' },
                   { id: 'montecarlo', icon: '🎲', title: 'Монте Карло (V7)', desc: 'Органы, матрица рисков, временной ряд, чувствительность, фармакокинетика.', color: '#8b5cf6', subs: '5 подвкладок' },
