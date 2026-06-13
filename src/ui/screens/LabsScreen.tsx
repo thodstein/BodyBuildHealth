@@ -480,17 +480,15 @@ export const LabsScreen: React.FC = () => {
       {mainTab === 'hero' && (
         <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '40px 16px 70px' }}>
           {/* Hero section with image */}
-          <div style={{
-            position: 'relative', marginBottom: 20, borderRadius: 20, overflow: 'hidden',
-            background: 'linear-gradient(180deg, rgba(5,5,14,0) 40%, var(--bg) 100%)',
-          }}>
-            <img src="/lab-hero.png" alt="Лаборатория" style={{
-              width: '100%', height: 'auto', maxHeight: 260, display: 'block',
-              objectFit: 'cover', objectPosition: 'center top', borderRadius: 16,
+          <div style={{ position: 'relative', marginBottom: 16 }}>
+            <img src="/lab-hero.png" alt="" style={{
+              width: '100%', height: 'auto', maxHeight: '40vh', display: 'block',
+              objectFit: 'contain', objectPosition: 'center top',
+              borderRadius: 0, marginBottom: -4,
             }} />
-            <div style={{ position: 'absolute', bottom: 8, left: 16, right: 16 }}>
-              <h1 style={{ fontSize: 22, fontWeight: 800, color: '#fff', margin: '0 0 4px', textShadow: '0 2px 12px rgba(0,0,0,0.7)' }}>Лаборатория</h1>
-              <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.8)', margin: 0, lineHeight: 1.4, textShadow: '0 1px 6px rgba(0,0,0,0.6)' }}>
+            <div style={{ position: 'absolute', bottom: 12, left: 16, right: 16 }}>
+              <h1 style={{ fontSize: 20, fontWeight: 800, color: '#fff', margin: '0 0 2px', textShadow: '0 2px 12px rgba(0,0,0,0.8)' }}>Лаборатория</h1>
+              <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.85)', margin: 0, lineHeight: 1.3, textShadow: '0 1px 6px rgba(0,0,0,0.7)' }}>
                 Контролируйте своё здоровье — анализы, обследования и оценка рисков
               </p>
             </div>
@@ -504,21 +502,21 @@ export const LabsScreen: React.FC = () => {
               { id: 'risks', icon: '⚠️', title: 'Риски и индексы', desc: 'Агрегированные риски по системам, композитные индексы здоровья и отклонения.', color: '#f97316' },
             ].map(card => (
               <button key={card.id} onClick={() => setMainTab(card.id as MainLabTab)} style={{
-                display: 'flex', alignItems: 'center', gap: 16, padding: '18px 16px', borderRadius: 16, cursor: 'pointer', textAlign: 'left', width: '100%',
+                display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', borderRadius: 14, cursor: 'pointer', textAlign: 'left', width: '100%',
                 background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', color: 'var(--text)',
                 transition: 'all 0.2s',
               }}>
                 <div style={{
-                  width: 52, height: 52, borderRadius: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-                  background: card.color + '18', fontSize: 26,
+                  width: 40, height: 40, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                  background: card.color + '18', fontSize: 20,
                 }}>
                   {card.icon}
                 </div>
                 <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 4, color: card.color }}>{card.title}</div>
-                  <div style={{ fontSize: 11, color: 'var(--text-dim)', lineHeight: 1.4 }}>{card.desc}</div>
+                  <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 2, color: card.color }}>{card.title}</div>
+                  <div style={{ fontSize: 10, color: 'var(--text-dim)', lineHeight: 1.3 }}>{card.desc}</div>
                 </div>
-                <span style={{ color: card.color, fontSize: 18, opacity: 0.6 }}>→</span>
+                <span style={{ color: card.color, fontSize: 16, opacity: 0.6 }}>→</span>
               </button>
             ))}
           </div>

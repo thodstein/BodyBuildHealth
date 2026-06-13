@@ -73,7 +73,7 @@ export const Risk3DModel: React.FC<Props> = ({ result, mcEnabled, onToggleMC, or
   const [riskMode, setRiskMode] = useState<'net' | 'raw'>('net');
   const [loading, setLoading] = useState(true);
   const [organList, setOrganList] = useState<OrganInfo[]>([]);
-  const sceneRef = useRef<{ scene: THREE.Scene; meshes: Map<string, THREE.Mesh>; controls: OrbitControls; animate: () => void } | null>(null);
+  const sceneRef = useRef<{ scene: THREE.Scene; meshes: Map<string, THREE.Mesh | THREE.Mesh[]>; controls: OrbitControls; animate: () => void } | null>(null);
 
   // Compute organ info list
   useEffect(() => {
@@ -106,7 +106,7 @@ export const Risk3DModel: React.FC<Props> = ({ result, mcEnabled, onToggleMC, or
     if (!container) return;
 
     const w = container.clientWidth;
-    const h = Math.min(container.clientHeight, 500);
+    const h = container.clientHeight || 500;
 
     // Scene
     const scene = new THREE.Scene();
@@ -163,7 +163,6 @@ export const Risk3DModel: React.FC<Props> = ({ result, mcEnabled, onToggleMC, or
     loader.load('/hulk.glb', (gltf) => {
       setLoading(false);
       const model = gltf.scene;
-      let modelScale = 1;
       model.position.set(0, -0.15, 0);
       
       // Add to scene and collect meshes
@@ -171,14 +170,31 @@ export const Risk3DModel: React.FC<Props> = ({ result, mcEnabled, onToggleMC, or
         if (child instanceof THREE.Mesh) {
           child.castShadow = true;
           child.receiveShadow = true;
-          // Try to match mesh name to organ
-          const meshName = child.name.toLowerCase().replace(/[^a-z_]/g, '');
-          if (meshName) {
-            const organ = MESH_TO_ORGAN[meshName] || 
-              Object.entries(MESH_TO_ORGAN).find(([k]) => meshName.includes(k))?.[1];
+          const meshName = child.name.toLowerCase().replace(/[^a-z0-9_]/g, '');
+          if (meshName && meshName.length > 1) {
+            // Direct match
+            let organ = MESH_TO_ORGAN[meshName];
+            // Try partial match
+            if (!organ) {
+              for (const [key, val] of Object.entries(MESH_TO_ORGAN)) {
+                if (meshName.includes(key) || key.includes(meshName)) { organ = val; break; }
+              }
+            }
             if (organ) {
               meshes.set(organ, child);
+              // Log for debugging
+              console.log('[3D] Matched mesh:', child.name, '→ organ:', organ);
+            } else {
+              // Unmatched — store under 'body' for default coloring
+              if (!meshes.has('__body__')) meshes.set('__body__', [] as unknown as THREE.Mesh);
+              const body = meshes.get('__body__') as unknown as THREE.Mesh[];
+              body.push(child);
             }
+          } else {
+            // Unnamed mesh
+            if (!meshes.has('__body__')) meshes.set('__body__', [] as unknown as THREE.Mesh);
+            const body2 = meshes.get('__body__') as unknown as THREE.Mesh[];
+            body2.push(child);
           }
         }
       });
@@ -200,7 +216,7 @@ export const Risk3DModel: React.FC<Props> = ({ result, mcEnabled, onToggleMC, or
     // Resize
     const onResize = () => {
       const cw = container.clientWidth;
-      const ch = Math.min(container.clientHeight, 500);
+      const ch = container.clientHeight || 500;
       camera.aspect = cw / ch;
       camera.updateProjectionMatrix();
       renderer.setSize(cw, ch);
@@ -220,32 +236,54 @@ export const Risk3DModel: React.FC<Props> = ({ result, mcEnabled, onToggleMC, or
 
   // Update colors when risk data changes
   const updateOrganColors = useCallback((
-    meshes: Map<string, THREE.Mesh>,
+    meshes: Map<string, THREE.Mesh | THREE.Mesh[]>,
     res: V7RiskResult,
     week: number,
     mode: string
   ) => {
-    for (const [organKey, mesh] of meshes.entries()) {
-      const pct = Math.round(getOrganRisk(organKey, res, week, mode) * 100);
-      const color = new THREE.Color(getRiskColor(pct));
-      const riskFactor = Math.min(1, pct / 100);
-      
+    // Calculate average risk for body
+    let totalRisk = 0;
+    let count = 0;
+    meshes.forEach((mesh, key) => {
+      if (key !== '__body__' && !Array.isArray(mesh)) {
+        const pct = Math.round(getOrganRisk(key, res, week, mode) * 100);
+        totalRisk += pct;
+        count++;
+      }
+    });
+    const avgRisk = count > 0 ? totalRisk / count : 15;
+    
+    const colorMesh = (mesh: THREE.Mesh, colorHex: string, pct: number) => {
+      const color = new THREE.Color(colorHex);
+      const factor = Math.min(1, Math.max(0.1, pct / 100));
       if (Array.isArray(mesh.material)) {
         mesh.material.forEach(m => {
           if (m instanceof THREE.MeshStandardMaterial) {
-            m.color.copy(color);
-            m.emissive.copy(color).multiplyScalar(0.35 * riskFactor);
-            m.roughness = 0.5 - riskFactor * 0.3;
-            m.metalness = 0.1 + riskFactor * 0.3;
+            m.color.lerp(color, 0.7);
+            m.emissive.copy(color).multiplyScalar(0.4 * factor);
+            m.roughness = 0.6 - factor * 0.3;
           }
         });
       } else if (mesh.material instanceof THREE.MeshStandardMaterial) {
-        mesh.material.color.copy(color);
-        mesh.material.emissive.copy(color).multiplyScalar(0.35 * riskFactor);
-        mesh.material.roughness = 0.5 - riskFactor * 0.3;
-        mesh.material.metalness = 0.1 + riskFactor * 0.3;
+        mesh.material.color.lerp(color, 0.7);
+        mesh.material.emissive.copy(color).multiplyScalar(0.4 * factor);
+        mesh.material.roughness = 0.6 - factor * 0.3;
       }
+    };
+
+    // Color body meshes with average risk tint
+    const bodyRaw = meshes.get('__body__') as unknown as THREE.Mesh[] | undefined;
+    if (bodyRaw && Array.isArray(bodyRaw)) {
+      const avgColor = getRiskColor(Math.round(avgRisk));
+      bodyRaw.forEach((m: THREE.Mesh) => colorMesh(m, avgColor, avgRisk));
     }
+
+    // Color organ meshes
+    meshes.forEach((mesh, key) => {
+      if (key === '__body__' || Array.isArray(mesh)) return;
+      const pct = Math.round(getOrganRisk(key, res, week, mode) * 100);
+      colorMesh(mesh as THREE.Mesh, getRiskColor(pct), pct);
+    });
   }, []);
 
   // Update colors when props change
@@ -259,14 +297,12 @@ export const Risk3DModel: React.FC<Props> = ({ result, mcEnabled, onToggleMC, or
   useEffect(() => {
     const ref = sceneRef.current;
     if (!ref) return;
-    // Reset all
-    for (const mesh of ref.meshes.values()) {
-      mesh.userData.selected = false;
-    }
+    ref.meshes.forEach((mesh) => {
+      if (!Array.isArray(mesh)) (mesh as THREE.Mesh).userData.selected = false;
+    });
     if (selectedOrgan && ref.meshes.has(selectedOrgan)) {
       const mesh = ref.meshes.get(selectedOrgan)!;
-      mesh.userData.selected = true;
-      // Pulse animation would go here
+      if (!Array.isArray(mesh)) (mesh as THREE.Mesh).userData.selected = true;
     }
   }, [selectedOrgan]);
 
@@ -324,7 +360,7 @@ export const Risk3DModel: React.FC<Props> = ({ result, mcEnabled, onToggleMC, or
       <div
         ref={containerRef}
         style={{
-          width: '100%', height: '85vh', maxHeight: 'calc(100vh - 60px)',
+          width: '100%', height: 'min(70vh, 550px)',
           borderRadius: 16, overflow: 'hidden',
           background: 'transparent',
           border: '1px solid var(--border)',
