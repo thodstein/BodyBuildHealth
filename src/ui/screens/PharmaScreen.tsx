@@ -172,7 +172,7 @@ export const PharmaScreen: React.FC = () => {
                   flexShrink:0, background:c.color+'18', fontSize:22 }}>{c.icon}</div>
                 <div style={{ flex:1 }}>
                   <div style={{ fontSize:14, fontWeight:700, marginBottom:2, color:c.color }}>{c.title}</div>
-                  <div style={{ fontSize:11, color:'var(--text-dim)', lineHeight:1.3 }}>{c.desc}</div>
+                  <div style={{ fontSize:11, color:'rgba(255,255,255,0.85)', lineHeight:1.3 }}>{c.desc}</div>
                 </div>
                 <span style={{ color:c.color, fontSize:18, opacity:0.6 }}>→</span>
               </button>

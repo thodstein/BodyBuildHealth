@@ -892,7 +892,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
                   <div style={{ width:40, height:40, borderRadius:12, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, background:card.color+'18', fontSize:20 }}>{card.icon}</div>
                   <div style={{ flex:1 }}>
                     <div style={{ fontSize:13, fontWeight:700, marginBottom:2, color:card.color }}>{card.title}</div>
-                    <div style={{ fontSize:10, color:'var(--text-dim)', lineHeight:1.3 }}>{card.desc}</div>
+                    <div style={{ fontSize:10, color:'rgba(255,255,255,0.85)', lineHeight:1.3 }}>{card.desc}</div>
                   </div>
                   <span style={{ color:card.color, fontSize:16, opacity:0.6 }}>→</span>
                 </div>
@@ -971,7 +971,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
                   <div style={{ width:40, height:40, borderRadius:12, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, background:card.color+'18', fontSize:20 }}>{card.icon}</div>
                   <div style={{ flex:1 }}>
                     <div style={{ fontSize:13, fontWeight:700, marginBottom:2, color:card.color }}>{card.title}</div>
-                    <div style={{ fontSize:10, color:'var(--text-dim)', lineHeight:1.3 }}>{card.desc}</div>
+                    <div style={{ fontSize:10, color:'rgba(255,255,255,0.85)', lineHeight:1.3 }}>{card.desc}</div>
                   </div>
                   <span style={{ color:card.color, fontSize:16, opacity:0.6 }}>→</span>
                 </div>

@@ -450,7 +450,7 @@ export const RiskScreen: React.FC = () => {
                   flexShrink:0, background:c.color+'18', fontSize:20 }}>{c.icon}</div>
                 <div style={{ flex:1 }}>
                   <div style={{ fontSize:13, fontWeight:700, marginBottom:2, color:c.color }}>{c.title}</div>
-                  <div style={{ fontSize:10, color:'var(--text-dim)', lineHeight:1.3 }}>{c.desc}</div>
+                  <div style={{ fontSize:10, color:'rgba(255,255,255,0.85)', lineHeight:1.3 }}>{c.desc}</div>
                 </div>
                 <span style={{ color:c.color, fontSize:16, opacity:0.6 }}>→</span>
               </button>
@@ -616,7 +616,7 @@ export const RiskScreen: React.FC = () => {
                   flexShrink:0, background:c.color+'18', fontSize:20 }}>{c.icon}</div>
                 <div style={{ flex:1 }}>
                   <div style={{ fontSize:13, fontWeight:700, marginBottom:2, color:c.color }}>{c.title}</div>
-                  <div style={{ fontSize:10, color:'var(--text-dim)', lineHeight:1.3 }}>{c.desc}</div>
+                  <div style={{ fontSize:10, color:'rgba(255,255,255,0.85)', lineHeight:1.3 }}>{c.desc}</div>
                 </div>
                 <span style={{ color:c.color, fontSize:16, opacity:0.6 }}>→</span>
               </button>
@@ -663,7 +663,7 @@ export const RiskScreen: React.FC = () => {
                   </div>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 2, color: card.color }}>{card.title}</div>
-                    <div style={{ fontSize: 10, color: 'var(--text-dim)', lineHeight: 1.3 }}>{card.desc}</div>
+                    <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', lineHeight: 1.3 }}>{card.desc}</div>
                   </div>
                   <span style={{ color: card.color, fontSize: 16, opacity: 0.6 }}>→</span>
                 </button>
@@ -744,7 +744,7 @@ export const RiskScreen: React.FC = () => {
                     </div>
                     <div style={{ flex: 1 }}>
                       <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 2, color: card.color }}>{card.title}</div>
-                      <div style={{ fontSize: 10, color: 'var(--text-dim)', lineHeight: 1.3 }}>{card.desc}</div>
+                      <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', lineHeight: 1.3 }}>{card.desc}</div>
                       {card.subs && <div style={{ fontSize: 9, color: card.color, marginTop: 3, opacity: 0.7 }}>{card.subs}</div>}
                     </div>
                     <span style={{ color: card.color, fontSize: 16, opacity: 0.6 }}>→</span>
