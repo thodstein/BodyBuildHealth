@@ -434,7 +434,7 @@ export const RiskScreen: React.FC = () => {
 
       {/* ─── SCROLLABLE CONTENT ─── */}
       {mainTab !== 'hero' && (
-        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '0 12px 70px' }}>
+        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '0 12px 70px', backgroundImage: mainTab==='calculations'&&calcPage==='hero'?'linear-gradient(rgba(5,5,14,0.78),rgba(5,5,14,0.82)),url(/calc-hero.png)':'none', backgroundSize:'cover', backgroundPosition:'center', backgroundAttachment:'scroll' }}>
 
           {/* ───── COMPLEX CALCULATIONS SUB-HERO ───── */}
           {mainTab === 'calculations' && calcPage === 'hero' && (
