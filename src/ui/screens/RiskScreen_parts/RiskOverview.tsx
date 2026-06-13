@@ -38,12 +38,13 @@ export const RiskOverview: React.FC<{
   labRiskContributions: LabRiskContribution | null;
   aggregatedRisk?: AggregatedRisk | null;
   weeklyDynamics?: WeeklyRiskDynamics | null;
-}> = ({ riskResult, globalNoLabs, noLabsSystems, riskHistory, labRiskContributions, aggregatedRisk, weeklyDynamics }) => {
+  hideRecs?: boolean;
+}> = ({ riskResult, globalNoLabs, noLabsSystems, riskHistory, labRiskContributions, aggregatedRisk, weeklyDynamics, hideRecs }) => {
   const [chartWeek, setChartWeek] = useState<number | null>(null);
   const [chartMode, setChartMode] = useState<'week' | 'average'>('average');
   const [showSections, setShowSections] = useState<Record<string, boolean>>({
-    overall:true, dynamics:!!weeklyDynamics, systems:true, key:false, sources:false,
-    recs:false, history:false, thresholds:false,
+    overall:true, dynamics:!!weeklyDynamics, systems:true, key:true, sources:true,
+    recs:true, history:true, thresholds:true,
   });
   const toggle = (k: string) => setShowSections(s => ({ ...s, [k]: !s[k] }));
 
@@ -197,6 +198,8 @@ export const RiskOverview: React.FC<{
       )}
 
       {/* Recommendations */}
+      {/* Recommendations */}
+      {!hideRecs && (
       <Section id="recs" icon="✅" title="Рекомендации">
         {recommendations.length > 0 ? (
           <div style={{ display:'grid', gap:4 }}>
@@ -208,6 +211,7 @@ export const RiskOverview: React.FC<{
           </div>
         ) : <div style={{ color:'var(--text-dim)', textAlign:'center', padding:12, fontSize:12 }}>Нет специфических рекомендаций</div>}
       </Section>
+      )}
 
       {/* History */}
       {riskHistory && riskHistory.length > 0 && (
