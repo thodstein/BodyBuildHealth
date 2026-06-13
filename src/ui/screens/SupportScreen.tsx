@@ -833,7 +833,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
       {/* ===== MAIN HERO (like LabsScreen) ===== */}
       {tab === 'main' && supportView === 'main' && (
         <div style={{ flex: 1, minHeight: 0, display:'flex', flexDirection:'column', overflow:'hidden' }}>
-          <div style={{ flex:'0 0 42vh', position:'relative', maxHeight:'50vh' }}>
+          <div style={{ flex:'0 0 42vh', height:'42vh', minHeight:'200px', position:'relative', maxHeight:'50vh' }}>
             <img src="/support-hero.png" alt="" style={{ width:'100%', height:'100%', display:'block', objectFit:'cover', objectPosition:'center top' }} />
             <div style={{ position: 'absolute', bottom: 14, left: 20, right: 20 }}>
               <h1 style={{ fontSize: 22, fontWeight: 800, color: '#fff', margin: '0 0 2px', textShadow: '0 2px 14px rgba(0,0,0,0.9)' }}>Поддержка</h1>
@@ -873,6 +873,15 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
       {tab === 'main' && supportView === 'calc' && calcView === 'main' && (
         <div>
           <button onClick={() => setSupportView('main')} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', marginBottom:8, background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← Назад</button>
+          <div style={{ height:'25vh', minHeight:160, position:'relative', borderRadius:14, overflow:'hidden', marginBottom:10 }}>
+            <img src="/calc-hero.png" alt="" style={{ width:'100%', height:'100%', display:'block', objectFit:'cover', objectPosition:'center top' }} />
+            <div style={{ position:'absolute', bottom:12, left:16, right:16 }}>
+              <h2 style={{ fontSize:18, fontWeight:800, color:'#fff', margin:0, textShadow:'0 2px 10px rgba(0,0,0,0.9)' }}>Расчет поддержки</h2>
+              <p style={{ fontSize:10, color:'rgba(255,255,255,0.9)', margin:'2px 0 0', textShadow:'0 1px 6px rgba(0,0,0,0.8)' }}>
+                Калькулятор поддержки, пептидный калькулятор и общая информация
+              </p>
+            </div>
+          </div>
           <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
             {[
               { icon:'🧮', title:'Калькулятор поддержки', desc:'Расчёт рисков, покрытия систем и недельного протокола', action:() => { setSupportView('main'); setTab('calculator'); }, color:'var(--accent)' },
@@ -895,27 +904,96 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
         </div>
       )}
 
-      {tab === 'main' && supportView === 'calc' && calcView === 'info' && infoView === 'main' && (
+      {tab === 'main' && supportView === 'calc' && calcView === 'info' && (
         <div>
-          <button onClick={() => setCalcView('main')} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', marginBottom:8, background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← Назад</button>
-          <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
-            {[
-              { icon:'📖', title:'Каталог', desc:'Справочник препаратов поддержки и БАДов', action:() => { setSupportView('main'); setTab('catalog'); }, color:'var(--accent)' },
-              { icon:'🔗', title:'Синергии и взаимодействия', desc:'Синергии поддержки и проверка взаимодействий', action:() => { setSupportView('main'); setTab('interactions'); }, color:'#3b82f6' },
-              { icon:'📦', title:'Готовые стеки', desc:'Готовые протоколы и комбинации поддержки', action:() => { setSupportView('main'); setTab('stacks'); }, color:'#8b5cf6' },
-            ].map((card, i) => (
-              <div key={i} onClick={card.action} style={{
-                display:'flex', alignItems:'center', gap:12, padding:'12px 14px', borderRadius:14, cursor:'pointer', textAlign:'left', width:'100%',
-                background:'var(--glass-bg)', border:'1px solid var(--glass-border)',
-              }}>
-                <div style={{ width:40, height:40, borderRadius:12, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, background:card.color+'18', fontSize:20 }}>{card.icon}</div>
-                <div style={{ flex:1 }}>
-                  <div style={{ fontSize:13, fontWeight:700, marginBottom:2, color:card.color }}>{card.title}</div>
-                  <div style={{ fontSize:10, color:'var(--text-dim)', lineHeight:1.3 }}>{card.desc}</div>
-                </div>
-                <span style={{ color:card.color, fontSize:16, opacity:0.6 }}>→</span>
+          {infoView === 'main' ? (
+            <>
+              <button onClick={() => setCalcView('main')} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', marginBottom:8, background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← Назад</button>
+              <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+                {[
+                  { icon:'📖', title:'Каталог', desc:'Справочник препаратов поддержки и БАДов', action:() => setInfoView('catalog'), color:'var(--accent)' },
+                  { icon:'🔗', title:'Синергии и взаимодействия', desc:'Синергии поддержки и проверка взаимодействий', action:() => setInfoView('synergies'), color:'#3b82f6' },
+                  { icon:'📦', title:'Готовые стеки', desc:'Готовые протоколы и комбинации поддержки', action:() => setInfoView('stacks'), color:'#8b5cf6' },
+                ].map((card, i) => (
+                  <div key={i} onClick={card.action} style={{
+                    display:'flex', alignItems:'center', gap:12, padding:'12px 14px', borderRadius:14, cursor:'pointer', textAlign:'left', width:'100%',
+                    background:'var(--glass-bg)', border:'1px solid var(--glass-border)',
+                  }}>
+                    <div style={{ width:40, height:40, borderRadius:12, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, background:card.color+'18', fontSize:20 }}>{card.icon}</div>
+                    <div style={{ flex:1 }}>
+                      <div style={{ fontSize:13, fontWeight:700, marginBottom:2, color:card.color }}>{card.title}</div>
+                      <div style={{ fontSize:10, color:'var(--text-dim)', lineHeight:1.3 }}>{card.desc}</div>
+                    </div>
+                    <span style={{ color:card.color, fontSize:16, opacity:0.6 }}>→</span>
+                  </div>
+                ))}
               </div>
-            ))}
+            </>
+          ) : (
+            <>
+              <button onClick={() => setInfoView('main')} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', marginBottom:8, background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← Назад</button>
+              {/* Sub-tab pills */}
+              <div style={{ display:'flex', gap:4, marginBottom:10, overflowX:'auto', scrollbarWidth:'none' }}>
+                {(['catalog','synergies','stacks'] as const).map(t => (
+                  <button key={t} onClick={() => setInfoView(t)} style={{
+                    padding:'7px 16px', borderRadius:20, fontSize:11, fontWeight:700, whiteSpace:'nowrap', cursor:'pointer', flexShrink:0,
+                    background: infoView === t ? 'var(--accent)' : 'var(--bg-secondary)',
+                    color: infoView === t ? '#000' : 'var(--text-dim)',
+                    border: `1px solid ${infoView === t ? 'var(--accent)' : 'var(--border)'}`,
+                  }}>{t === 'catalog' ? '📖 Каталог' : t === 'synergies' ? '🔗 Синергии и взаимодействия' : '📦 Стеки'}</button>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+      )}
+      {tab === 'main' && supportView === 'calc' && calcView === 'info' && infoView === 'catalog' && (
+        <div>
+          <div style={{ marginTop:8, padding:'10px 12px', borderRadius:12, background:'var(--glass-bg)', border:'1px solid var(--glass-border)',
+            fontSize:11, color:'var(--text-dim)', lineHeight:1.5, maxHeight:'60vh', overflowY:'auto' }}>
+            <div style={{ fontWeight:700, fontSize:13, color:'var(--accent)', marginBottom:8 }}>📖 Каталог</div>
+            <p>Полный справочник препаратов поддержки, витаминов и БАДов. Используйте поиск и фильтр по системам.</p>
+            <div style={{ marginTop:8 }}>
+              <button onClick={() => { setSupportView('main'); setTab('catalog'); }} style={{
+                width:'100%', padding:'10px 0', borderRadius:8, border:'1px solid var(--accent)',
+                background:'rgba(0,230,138,0.1)', color:'var(--accent)', fontSize:12, fontWeight:700, cursor:'pointer',
+              }}>📖 Открыть каталог →</button>
+            </div>
+            <div style={{ marginTop:8, display:'flex', flexWrap:'wrap', gap:4 }}>
+              {Object.entries(SUPPORT_CLASS_LABELS).map(([k, v]) => (
+                <span key={k} style={{ fontSize:9, padding:'3px 8px', borderRadius:12, background:'rgba(0,230,138,0.1)', color:'#00e68a' }}>{v}</span>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+      {tab === 'main' && supportView === 'calc' && calcView === 'info' && infoView === 'synergies' && (
+        <div>
+          <div style={{ marginTop:8, padding:'10px 12px', borderRadius:12, background:'var(--glass-bg)', border:'1px solid var(--glass-border)',
+            fontSize:11, color:'var(--text-dim)', lineHeight:1.5, maxHeight:'60vh', overflowY:'auto' }}>
+            <div style={{ fontWeight:700, fontSize:13, color:'#3b82f6', marginBottom:8 }}>🔗 Синергии и взаимодействия</div>
+            <p>Проверка синергий и конфликтов между препаратами поддержки. Две подвкладки: синергии и взаимодействия.</p>
+            <div style={{ marginTop:8 }}>
+              <button onClick={() => { setSupportView('main'); setTab('interactions'); }} style={{
+                width:'100%', padding:'10px 0', borderRadius:8, border:'1px solid #3b82f6',
+                background:'rgba(59,130,246,0.1)', color:'#3b82f6', fontSize:12, fontWeight:700, cursor:'pointer',
+              }}>🔗 Открыть взаимодействия →</button>
+            </div>
+          </div>
+        </div>
+      )}
+      {tab === 'main' && supportView === 'calc' && calcView === 'info' && infoView === 'stacks' && (
+        <div>
+          <div style={{ marginTop:8, padding:'10px 12px', borderRadius:12, background:'var(--glass-bg)', border:'1px solid var(--glass-border)',
+            fontSize:11, color:'var(--text-dim)', lineHeight:1.5, maxHeight:'60vh', overflowY:'auto' }}>
+            <div style={{ fontWeight:700, fontSize:13, color:'#8b5cf6', marginBottom:8 }}>📦 Готовые стеки</div>
+            <p>Готовые протоколы и комбинации поддержки по целям: кардио, печень, почки, суставы и другие системы.</p>
+            <div style={{ marginTop:8 }}>
+              <button onClick={() => { setSupportView('main'); setTab('stacks'); }} style={{
+                width:'100%', padding:'10px 0', borderRadius:8, border:'1px solid #8b5cf6',
+                background:'rgba(139,92,246,0.1)', color:'#8b5cf6', fontSize:12, fontWeight:700, cursor:'pointer',
+              }}>📦 Открыть стеки →</button>
+            </div>
           </div>
         </div>
       )}
