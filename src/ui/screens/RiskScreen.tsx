@@ -442,7 +442,7 @@ export const RiskScreen: React.FC = () => {
 
           {/* ───── COMPLEX CALCULATIONS SUB-HERO ───── */}
           {mainTab === 'calculations' && calcPage === 'hero' && (
-            <div style={{ padding:12, borderRadius:16, background:'linear-gradient(rgba(5,5,14,0.8),rgba(5,5,14,0.85)),url(/calc-hero.png) center/cover no-repeat', border:'1px solid var(--border)' }}>
+            <div style={{ padding:12, borderRadius:16, backgroundImage:'linear-gradient(rgba(5,5,14,0.82),rgba(5,5,14,0.82)),url(/calc-hero.png)', backgroundSize:'cover', backgroundPosition:'center', border:'1px solid var(--border)' }}>
               {/* Summary card */}
               <div style={{ marginTop: 10, padding: 14, borderRadius: 16, background: 'var(--glass-bg)', border: '1px solid var(--glass-border)' }}>
                 <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--accent)', marginBottom: 10, textAlign: 'center' }}>
