@@ -124,7 +124,7 @@ const PHARMA_CORE_CLASSES = [
 type PharmaClass = typeof PHARMA_CLASSES[number];
 
 type PharmaPage = 'main' | 'course' | 'calculators' | 'info';
-type SubTab = 'catalog' | 'pkpd' | 'dosage' | 'interactions' | 'androgen' | 'course-risk' | 'synergies';
+type SubTab = 'catalog' | 'pkpd' | 'dosage' | 'interactions';
 
 export const PharmaScreen: React.FC = () => {
   const [page, setPage] = useState<PharmaPage>('main');
@@ -201,14 +201,14 @@ export const PharmaScreen: React.FC = () => {
             border: `1px solid ${subTab === t ? 'var(--accent)' : 'var(--border)'}`,
           }}>{t === 'pkpd' ? '⚙️ PK/PD' : '💊 Дозировки'}</button>
         ))}
-        {page === 'info' && (['catalog','interactions','pkpd','dosage','course-risk'] as const).map(t => (
+        {page === 'info' && (['catalog','interactions'] as const).map(t => (
           <button key={t} onClick={() => setSubTab(t)} style={{
             padding:'6px 14px', borderRadius:16, fontSize:11, fontWeight:600, whiteSpace:'nowrap',
             cursor:'pointer', flexShrink:0,
             background: subTab === t ? 'var(--accent)' : 'var(--bg-secondary)',
             color: subTab === t ? '#000' : 'var(--text-dim)',
             border: `1px solid ${subTab === t ? 'var(--accent)' : 'var(--border)'}`,
-          }}>{t === 'catalog' ? '📖 Каталог' : t === 'interactions' ? '⚡ Взаимодействия' : t === 'pkpd' ? '⚙️ PK/PD' : t === 'dosage' ? '💊 Дозировки' : '📋 Риск курса'}</button>
+          }}>{t === 'catalog' ? '📖 Каталог' : '⚡ Взаимодействия'}</button>
         ))}
       </div>
       {page === 'course' && courseSub === 'course' && <PharmaCourseScreen />}
@@ -218,9 +218,6 @@ export const PharmaScreen: React.FC = () => {
       {page === 'calculators' && subTab === 'dosage' && <DosageCalculatorTab />}
       {page === 'info' && subTab === 'catalog' && <CatalogTab />}
       {page === 'info' && subTab === 'interactions' && <InteractionCheckerTab />}
-      {page === 'info' && subTab === 'pkpd' && <PKPDSimulationTab />}
-      {page === 'info' && subTab === 'dosage' && <DosageCalculatorTab />}
-      {page === 'info' && subTab === 'course-risk' && <CourseRiskTab />}
     </div>
   );
 };
@@ -389,91 +386,88 @@ const CatalogTab: React.FC = () => {
   const detail = selectedId ? PHARMA_DETAILS[selectedId] : undefined;
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.2fr', gap: 12 }}>
-      <div style={{ maxHeight: 'calc(100vh - 160px)', overflowY: 'auto', paddingRight: 4 }}>
-        <input type="text" placeholder="Поиск по названию..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
-          style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border)',
-            background: 'var(--bg-secondary)', color: 'var(--text)', fontSize: 13, marginBottom: 8, boxSizing: 'border-box' }} />
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, marginBottom: 8 }}>
-          <button onClick={() => setFilterClass('all')} style={{
+    <div>
+      <input type="text" placeholder="Поиск по названию..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
+        style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border)',
+          background: 'var(--bg-secondary)', color: 'var(--text)', fontSize: 13, marginBottom: 8, boxSizing: 'border-box' }} />
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, marginBottom: 8 }}>
+        <button onClick={() => setFilterClass('all')} style={{
+          padding: '4px 10px', borderRadius: 14, fontSize: 10, cursor: 'pointer',
+          background: filterClass === 'all' ? 'rgba(0,230,138,0.15)' : 'transparent',
+          color: filterClass === 'all' ? 'var(--accent)' : 'var(--text-dim)',
+          border: `1px solid ${filterClass === 'all' ? 'var(--accent)' : 'var(--border)'}`,
+          fontWeight: filterClass === 'all' ? 700 : 400,
+        }}>Все</button>
+        {PHARMA_CLASSES.map(cls => (
+          <button key={cls} onClick={() => setFilterClass(cls)} style={{
             padding: '4px 10px', borderRadius: 14, fontSize: 10, cursor: 'pointer',
-            background: filterClass === 'all' ? 'rgba(0,230,138,0.15)' : 'transparent',
-            color: filterClass === 'all' ? 'var(--accent)' : 'var(--text-dim)',
-            border: `1px solid ${filterClass === 'all' ? 'var(--accent)' : 'var(--border)'}`,
-            fontWeight: filterClass === 'all' ? 700 : 400,
-          }}>Все</button>
-          {PHARMA_CLASSES.map(cls => (
-            <button key={cls} onClick={() => setFilterClass(cls)} style={{
-              padding: '4px 10px', borderRadius: 14, fontSize: 10, cursor: 'pointer',
-              background: filterClass === cls ? 'rgba(0,230,138,0.15)' : 'transparent',
-              color: filterClass === cls ? 'var(--accent)' : 'var(--text-dim)',
-              border: `1px solid ${filterClass === cls ? 'var(--accent)' : 'var(--border)'}`,
-              fontWeight: filterClass === cls ? 700 : 400,
-            }}>{CLASS_LABELS[cls] || cls}</button>
-          ))}
-        </div>
+            background: filterClass === cls ? 'rgba(0,230,138,0.15)' : 'transparent',
+            color: filterClass === cls ? 'var(--accent)' : 'var(--text-dim)',
+            border: `1px solid ${filterClass === cls ? 'var(--accent)' : 'var(--border)'}`,
+            fontWeight: filterClass === cls ? 700 : 400,
+          }}>{CLASS_LABELS[cls] || cls}</button>
+        ))}
+      </div>
 
-        {/* Grouped view when "Все" */}
-        {filteredGrouped ? (
-          <div>
-            {Object.entries(filteredGrouped).map(([cls, substances]) => {
-              const isCollapsed = collapsedClasses[cls] ?? false;
-              return (
-                <div key={cls} style={{ marginBottom: 6 }}>
-                  <div onClick={() => toggleClass(cls)} style={{
-                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                    padding: '6px 10px', borderRadius: 6, cursor: 'pointer',
-                    background: 'var(--bg-secondary)', marginBottom: 2,
-                  }}>
-                    <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--accent)' }}>
-                      {CLASS_LABELS[cls] || cls}
-                      <span style={{ fontSize: 9, color: 'var(--text-dim)', marginLeft: 6, fontWeight: 400 }}>
-                        {substances.length}
-                      </span>
+      {/* Grouped view when "Все" */}
+      {filteredGrouped ? (
+        <div>
+          {Object.entries(filteredGrouped).map(([cls, substances]) => {
+            const isCollapsed = collapsedClasses[cls] ?? false;
+            return (
+              <div key={cls} style={{ marginBottom: 6 }}>
+                <div onClick={() => toggleClass(cls)} style={{
+                  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                  padding: '6px 10px', borderRadius: 6, cursor: 'pointer',
+                  background: 'var(--bg-secondary)', marginBottom: 2,
+                }}>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--accent)' }}>
+                    {CLASS_LABELS[cls] || cls}
+                    <span style={{ fontSize: 9, color: 'var(--text-dim)', marginLeft: 6, fontWeight: 400 }}>
+                      {substances.length}
                     </span>
-                    <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>{isCollapsed ? '▸' : '▾'}</span>
-                  </div>
-                  {!isCollapsed && substances.map(s => (
-                    <div key={s.id} onClick={() => setSelectedId(s.id)} style={{
-                      padding: '5px 10px 5px 16px', borderRadius: 4, cursor: 'pointer',
-                      background: selectedId === s.id ? 'rgba(0,230,138,0.12)' : 'transparent',
-                      borderLeft: selectedId === s.id ? '3px solid var(--accent)' : '3px solid transparent',
-                      marginBottom: 1,
-                    }}>
-                      <div style={{ fontWeight: 600, fontSize: 12 }}>{s.name}</div>
-                    </div>
-                  ))}
+                  </span>
+                  <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>{isCollapsed ? '▸' : '▾'}</span>
                 </div>
-              );
-            })}
+                {!isCollapsed && substances.map(s => (
+                  <div key={s.id} onClick={() => setSelectedId(s.id)} style={{
+                    padding: '5px 10px 5px 16px', borderRadius: 4, cursor: 'pointer',
+                    background: selectedId === s.id ? 'rgba(0,230,138,0.12)' : 'transparent',
+                    borderLeft: selectedId === s.id ? '3px solid var(--accent)' : '3px solid transparent',
+                    marginBottom: 1,
+                  }}>
+                    <div style={{ fontWeight: 600, fontSize: 12 }}>{s.name}</div>
+                  </div>
+                ))}
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        /* Flat list when filter is specific class or search is active */
+        filteredList.map(s => (
+          <div key={s.id} onClick={() => setSelectedId(s.id)} style={{
+            padding: '7px 10px', borderRadius: 6, cursor: 'pointer', marginBottom: 3,
+            background: selectedId === s.id ? 'rgba(0,230,138,0.12)' : 'var(--bg-secondary)',
+            border: selectedId === s.id ? '1px solid var(--accent)' : '1px solid transparent',
+          }}>
+            <div style={{ fontWeight: 600, fontSize: 12 }}>{s.name}</div>
+            <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>{CLASS_LABELS[s.class] || s.class}</div>
           </div>
-        ) : (
-          /* Flat list when filter is specific class or search is active */
-          filteredList.map(s => (
-            <div key={s.id} onClick={() => setSelectedId(s.id)} style={{
-              padding: '7px 10px', borderRadius: 6, cursor: 'pointer', marginBottom: 3,
-              background: selectedId === s.id ? 'rgba(0,230,138,0.12)' : 'var(--bg-secondary)',
-              border: selectedId === s.id ? '1px solid var(--accent)' : '1px solid transparent',
-            }}>
-              <div style={{ fontWeight: 600, fontSize: 12 }}>{s.name}</div>
-              <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>{CLASS_LABELS[s.class] || s.class}</div>
-            </div>
-          ))
-        )}
-        {filteredList.length === 0 && (
-          <div style={{ padding: 20, textAlign: 'center', color: 'var(--text-dim)', fontSize: 12 }}>
-            {searchQuery ? 'Ничего не найдено' : ''}
-          </div>
-        )}
-      </div>
-      <div style={{ maxHeight: 'calc(100vh - 160px)', overflowY: 'auto' }}>
-        {selected ? <DrugDetailCard sub={selected} detail={detail} /> : (
-          <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-dim)' }}>
-            <div style={{ fontSize: 40, marginBottom: 12 }}>💊</div>
-            <div style={{ fontSize: 13 }}>Выберите препарат из списка</div>
-          </div>
-        )}
-      </div>
+        ))
+      )}
+      {filteredList.length === 0 && (
+        <div style={{ padding: 20, textAlign: 'center', color: 'var(--text-dim)', fontSize: 12 }}>
+          {searchQuery ? 'Ничего не найдено' : ''}
+        </div>
+      )}
+
+      {/* Detail card below list */}
+      {selected && (
+        <div style={{ marginTop: 8 }}>
+          <DrugDetailCard sub={selected} detail={detail} />
+        </div>
+      )}
     </div>
   );
 };
@@ -2555,77 +2549,3 @@ const DiagnosticsTab: React.FC = () => {
 };
 
 /* ─── Course Risk Tab (Info Page) ─── */
-const CourseRiskTab: React.FC = () => {
-  const linked = useDataLink();
-  const profile = linked.profile;
-  const risk = linked.risk;
-  const settings = profile?.settings;
-  const weight = settings?.weight || 0;
-  const height = settings?.height || 0;
-  const bmi = weight && height ? weight / Math.pow(height / 100, 2) : 0;
-
-  return (
-    <div>
-      <div className="card" style={{ marginBottom: 12 }}>
-        <div style={{ fontSize: 20, fontWeight: 800, marginBottom: 4 }}>📊 Риск курса</div>
-        <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>Агрегированный риск из всех источников (фарма, анализы, тренировки, питание)</div>
-      </div>
-
-      {settings && (
-        <div className="card" style={{ marginBottom: 12 }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-            <div style={{ textAlign: 'center', padding: '10px 6px', borderRadius: 12, background: 'rgba(0,230,138,0.08)' }}>
-              <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Вес</div>
-              <div style={{ fontSize: 18, fontWeight: 800 }}>{weight || '—'} кг</div>
-            </div>
-            <div style={{ textAlign: 'center', padding: '10px 6px', borderRadius: 12, background: 'rgba(0,230,138,0.08)' }}>
-              <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>ИМТ</div>
-              <div style={{ fontSize: 18, fontWeight: 800, color: bmi > 30 ? '#ef4444' : bmi > 25 ? '#f59e0b' : '#00e68a' }}>{bmi ? bmi.toFixed(1) : '—'}</div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {risk && (
-        <div className="card" style={{ marginBottom: 12 }}>
-          <div style={{ fontSize: 12, color: 'var(--accent)', fontWeight: 700, marginBottom: 8, textAlign: 'center' }}>Общий риск</div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, textAlign: 'center' }}>
-            <div style={{ padding: '10px 6px', borderRadius: 12, background: 'rgba(34,197,94,0.08)' }}>
-              <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Raw</div>
-              <div style={{ fontSize: 22, fontWeight: 800, color: risk.overallRaw >= 60 ? '#ef4444' : risk.overallRaw >= 30 ? '#f59e0b' : '#00e68a' }}>{Math.round(risk.overallRaw)}%</div>
-            </div>
-            <div style={{ padding: '10px 6px', borderRadius: 12, background: 'rgba(34,197,94,0.08)' }}>
-              <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Net (с поддержкой)</div>
-              <div style={{ fontSize: 22, fontWeight: 800, color: risk.overallNet >= 60 ? '#ef4444' : risk.overallNet >= 30 ? '#f59e0b' : '#00e68a' }}>{Math.round(risk.overallNet)}%</div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {risk?.systemBreakdown && (
-        <div className="card">
-          <div style={{ fontSize: 12, color: 'var(--accent)', fontWeight: 700, marginBottom: 8, textAlign: 'center' }}>По системам</div>
-          {Object.entries(risk.systemBreakdown).map(([sys, v]) => (
-            <div key={sys} style={{ marginBottom: 6 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11 }}>
-                <span>{SYSTEM_LABELS_INVEST[sys] || sys}</span>
-                <span style={{ fontWeight: 600, color: v.net >= 60 ? '#ef4444' : v.net >= 30 ? '#f59e0b' : '#00e68a' }}>{Math.round(v.net)}%</span>
-              </div>
-              <div style={{ height: 6, borderRadius: 3, background: 'var(--border)', overflow: 'hidden' }}>
-                <div style={{ height: '100%', borderRadius: 3, width: `${v.net}%`, background: v.net >= 60 ? '#ef4444' : v.net >= 30 ? '#f59e0b' : '#00e68a', transition: 'width 0.3s' }} />
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {!risk && (
-        <div className="card" style={{ textAlign: 'center', padding: 20 }}>
-          <div style={{ fontSize: 24, marginBottom: 4 }}>📋</div>
-          <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>Нет данных для расчёта риска</div>
-          <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 2 }}>Добавьте информацию в профиль, фармакологию и анализы</div>
-        </div>
-      )}
-    </div>
-  );
-};
