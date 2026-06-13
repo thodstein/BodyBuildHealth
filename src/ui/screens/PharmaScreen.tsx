@@ -153,8 +153,8 @@ export const PharmaScreen: React.FC = () => {
       { key:'info' as const, icon:'📖', title:'Общая информация', desc:'Каталог веществ и проверка взаимодействий', color:'#22c55e' },
     ];
     return (
-      <div className="screen pharma" style={{ flex:1, minHeight:0, display:'flex', flexDirection:'column', overflow:'hidden', padding:0 }}>
-        <div style={{ flex:'0 0 55vh', position:'relative', maxHeight:'65vh' }}>
+      <div className="screen pharma" style={{ flex:1, minHeight:0, display:'flex', flexDirection:'column', overflow:'auto', padding:0 }}>
+        <div style={{ flex:'0 0 48vh', position:'relative', maxHeight:'57vh' }}>
           <img src="/pharma-hero.png" alt="" style={{ width:'100%', height:'100%', display:'block', objectFit:'cover', objectPosition:'center top' }} />
           <div style={{ position:'absolute', bottom:14, left:20, right:20 }}>
             <h1 style={{ fontSize:22, fontWeight:800, color:'#fff', margin:'0 0 2px', textShadow:'0 2px 14px rgba(0,0,0,0.9)' }}>Фармакология</h1>
