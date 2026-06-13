@@ -362,6 +362,23 @@ export const RiskScreen: React.FC = () => {
     labs_risks: '🩸 Анализы',
   };
 
+  // Basic Calc inline view — reused sub-components as cards
+  const BasicCalcView: React.FC<{
+    riskResult: RiskResult; aggregatedRisk: AggregatedRisk | null; weeklyDynamics: WeeklyRiskDynamics | null;
+    globalNoLabs: boolean; noLabsSystems: string[]; riskHistory: any[]; labRiskContributions: any; syntheticLabContrib: any;
+    hasLabs: boolean; shouldApplyPenalty: boolean;
+    selectedWeek: number | null; weekMode: string; setSelectedWeek: any; setWeekMode: any;
+  }> = ({ riskResult, aggregatedRisk, weeklyDynamics, globalNoLabs, noLabsSystems, riskHistory, labRiskContributions, syntheticLabContrib, hasLabs, shouldApplyPenalty, selectedWeek, weekMode, setSelectedWeek, setWeekMode }) => {
+    const effectiveLabContrib = labRiskContributions || syntheticLabContrib;
+    const isSyntheticLab = !hasLabs && shouldApplyPenalty;
+    return (
+      <div>
+        <RiskOverview riskResult={riskResult} globalNoLabs={globalNoLabs} noLabsSystems={noLabsSystems} labRiskContributions={effectiveLabContrib} riskHistory={riskHistory} aggregatedRisk={aggregatedRisk} weeklyDynamics={weeklyDynamics} />
+        <RiskDetails riskResult={riskResult} labRiskContributions={effectiveLabContrib} isSyntheticLab={isSyntheticLab} />
+      </div>
+    );
+  };
+
   const mainTabLabel = mainTab === 'calculations' ? 'Комплексные расчеты' :
     mainTab === 'clinical' ? 'Клиника' : mainTab === 'info' ? 'Общая информация' : '';
 
@@ -515,7 +532,15 @@ export const RiskScreen: React.FC = () => {
                   </button>
                 ))}
               </div>
-              {renderContent()}
+              {/* BASIC CALC — all content inline on one page */}
+              {mainTab === 'calculations' && calcPage === 'basic' && riskResult && (
+                <BasicCalcView riskResult={riskResult} aggregatedRisk={aggregatedRisk} weeklyDynamics={weeklyDynamics}
+                  globalNoLabs={globalNoLabs} noLabsSystems={noLabsSystems} riskHistory={riskHistory}
+                  labRiskContributions={labRiskContributions} syntheticLabContrib={syntheticLabContrib}
+                  hasLabs={hasLabs} shouldApplyPenalty={shouldApplyPenalty}
+                  selectedWeek={selectedWeek} weekMode={weekMode} setSelectedWeek={setSelectedWeek} setWeekMode={setWeekMode} />
+              )}
+              {!(mainTab === 'calculations' && calcPage === 'basic') && renderContent()}
             </>
           )}
         </div>
