@@ -669,8 +669,8 @@ const SUPPORT_MED_DETAIL: Record<string, {
   },
 };
 
-class InfoErrorBoundary extends React.Component<{children:React.ReactNode;label:string},{hasError:boolean;err:string}> {
-  constructor(p:{children:React.ReactNode;label:string}){super(p);this.state={hasError:false,err:''};}
+class InfoErrorBoundary extends React.Component<{children?:React.ReactNode;label:string},{hasError:boolean;err:string}> {
+  constructor(p:{children?:React.ReactNode;label:string}){super(p);this.state={hasError:false,err:''};}
   static getDerivedStateFromError(e:Error){return{hasError:true,err:String(e)};}
   render(){if(this.state.hasError)return <div style={{padding:16,textAlign:'center',color:'#ef4444',fontSize:10,background:'rgba(239,68,68,0.06)',borderRadius:8,border:'1px solid rgba(239,68,68,0.2)'}}>⚠ {this.props.label}: {this.state.err}</div>;return this.props.children;}
 }
@@ -957,6 +957,28 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
 
   // Group ALL_SUBSTANCES by primary category for catalog
   const groupedSubstances = useMemo(() => {
+    const normCat = (cat: string): string => {
+      const m: Record<string,string> = {
+        amino_acid:'amino_acids',aminoacids:'amino_acids',
+        vitamin:'vitamins',vitamin_:'vitamins',
+        mineral:'minerals',mineral_:'minerals',
+        herb:'herbs',herbal:'herbs',
+        antioxidant:'antioxidants',antioxid:'antioxidants',
+        peptide:'peptides',peptid:'peptides',
+        nootropic:'nootropics',nootrop:'nootropics',
+        adaptogen:'adaptogens',adaptog:'adaptogens',
+        hormone:'hormones',hormon:'hormones',
+        enzyme:'enzymes',
+        probiotic:'probiotics',prebiot:'probiotics',
+        fatty_acid:'fatty_acids',lipids:'fatty_acids',
+        mushroom:'mushrooms',fungus:'mushrooms',fungi:'mushrooms',
+        electrolyte:'electrolytes',
+      };
+      const c = (cat||'').toLowerCase().replace(/[^a-z0-9_]/g,'');
+      if (m[c]) return m[c];
+      for (const [k,v] of Object.entries(m)) if (c.includes(k)||k.includes(c)) return v;
+      return cat;
+    };
     const groups: Record<string, SupportSubstance[]> = {};
     const filtered = searchQuery
       ? ALL_SUBSTANCES.filter(s =>
@@ -968,7 +990,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
         )
         : ALL_SUBSTANCES;
     for (const sub of filtered) {
-      const primaryCat = (sub.categories||[])[0] || 'other';
+      const primaryCat = normCat((sub.categories||[])[0] || 'other');
       if (!groups[primaryCat]) groups[primaryCat] = [];
       groups[primaryCat].push(sub);
     }
@@ -1098,8 +1120,11 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
 
   const renderView = (current: string, target: string, contentFn: () => React.ReactNode): React.ReactNode => {
     if (current !== target) return null;
-    try { return contentFn(); }
-    catch (e) { return <div style={{ padding:16, textAlign:'center', color:'#ef4444', fontSize:10, background:'rgba(239,68,68,0.06)', borderRadius:8, border:'1px solid rgba(239,68,68,0.2)' }}>⚠ {target}: {String(e)}</div>; }
+    try {
+      return React.createElement(InfoErrorBoundary, {label:target}, contentFn());
+    } catch(e) {
+      return <div style={{padding:16,textAlign:'center',color:'#ef4444',fontSize:10}}>⚠ {target}: {String(e)}</div>;
+    }
   };
 
   const catDetailInteractions = (sub: SupportSubstance, interactions: any[]): React.ReactNode => {
