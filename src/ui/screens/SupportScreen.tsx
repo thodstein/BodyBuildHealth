@@ -37,7 +37,7 @@ import type { CourseEntry } from '../../core/types';
 type SupportTab = 'main' | 'catalog' | 'synergies' | 'calculator' | 'interactions' | 'stacks' | 'peptides' | 'fertility-pct';
 type SupportView = 'main' | 'calc' | 'fertility';
 type CalcView = 'main' | 'calculator' | 'peptides' | 'info';
-type InfoView = 'main' | 'catalog' | 'synergies' | 'stacks' | 'interactions';
+type InfoView = 'main' | 'catalog' | 'synergies' | 'stacks' | 'interactions' | 'stackcalc';
 
 const INTERACTION_TYPE_LABELS: Record<string, { label: string; emoji: string; color: string }> = {
   synergy: { label: 'Синергия', emoji: '🔗', color: '#22c55e' },
@@ -669,6 +669,12 @@ const SUPPORT_MED_DETAIL: Record<string, {
   },
 };
 
+class InfoErrorBoundary extends React.Component<{children:React.ReactNode;label:string},{hasError:boolean;err:string}> {
+  constructor(p:{children:React.ReactNode;label:string}){super(p);this.state={hasError:false,err:''};}
+  static getDerivedStateFromError(e:Error){return{hasError:true,err:String(e)};}
+  render(){if(this.state.hasError)return <div style={{padding:16,textAlign:'center',color:'#ef4444',fontSize:10,background:'rgba(239,68,68,0.06)',borderRadius:8,border:'1px solid rgba(239,68,68,0.2)'}}>⚠ {this.props.label}: {this.state.err}</div>;return this.props.children;}
+}
+
 export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTab }) => {
   const linked = useDataLink();
   const [tab, setTab] = useState<SupportTab>(initialTab || 'main');
@@ -824,6 +830,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   const [interactionSearchIdx, setInteractionSearchIdx] = useState<number>(0);
   const [pharmaInteractIds, setPharmaInteractIds] = useState<string[]>(['', '']);
   const [pharmaInteractSearch, setPharmaInteractSearch] = useState('');
+  const [stackCalcSize, setStackCalcSize] = useState<string>('5-7');
 
   // Combine SUPPLEMENT_DESCRIPTIONS with support substances from PHARMA_DB
   const supplementList = useMemo(() => {
@@ -1268,13 +1275,13 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
           <button onClick={() => setCalcView('main')} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', marginBottom:6, background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600, alignSelf:'flex-start' }}>← Назад</button>
           {/* Pills */}
           <div style={{ display:'flex', gap:4, marginBottom:8, overflowX:'auto', scrollbarWidth:'none', flexShrink:0 }}>
-            {(['catalog','synergies','stacks','interactions'] as const).map(t => (
+            {(['catalog','synergies','stacks','interactions','stackcalc'] as const).map(t => (
               <button key={t} onClick={() => setInfoView(t)} style={{
                 padding:'7px 14px', borderRadius:20, fontSize:10, fontWeight:700, whiteSpace:'nowrap', cursor:'pointer', flexShrink:0,
                 background: infoView === t ? 'var(--accent)' : 'var(--bg-secondary)',
                 color: infoView === t ? '#000' : 'var(--text-dim)',
                 border: `1px solid ${infoView === t ? 'var(--accent)' : 'var(--border)'}`,
-              }}>{t === 'catalog' ? '📖 Каталог' : t === 'synergies' ? '🔗 Синергии' : t === 'stacks' ? '📦 Стеки' : '⚡ Взаимодействия'}</button>
+              }}>{t === 'catalog' ? '📖 Каталог' : t === 'synergies' ? '🔗 Синергии' : t === 'stacks' ? '📦 Стеки' : t === 'stackcalc' ? '🧮 Кальк.стеков' : '⚡ Взаимодействия'}</button>
             ))}
           </div>
           {/* Content */}
@@ -1601,10 +1608,36 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
                         })()}
                       </div>
                     </div>
+            )}
+            {renderView(infoView, 'stackcalc', () =>
+              <div>
+                <div style={{fontSize:12,fontWeight:700,color:'var(--accent)',marginBottom:8}}>🧮 Калькулятор стеков</div>
+                <div style={{fontSize:9,color:'var(--text-dim)',lineHeight:1.4,marginBottom:8}}>Подбор стеков по размеру. Все стеки с описаниями.</div>
+                <div style={{display:'flex',flexWrap:'wrap',gap:3,marginBottom:8}}>
+                  {['2-4','5-7','8-10','11-15','15-20','20-25','30-35'].map(s =>
+                    <button key={s} onClick={()=>setStackCalcSize(s)} style={{
+                      padding:'4px 8px',borderRadius:12,fontSize:9,fontWeight:600,cursor:'pointer',
+                      background:stackCalcSize===s?'var(--accent)':'var(--bg-secondary)',
+                      color:stackCalcSize===s?'#000':'var(--text-dim)',
+                      border:`1px solid ${stackCalcSize===s?'var(--accent)':'var(--border)'}`}}>{s} веществ</button>
                   )}
+                </div>
+                <div style={{display:'flex',flexDirection:'column',gap:4}}>
+                  {ALL_STACKS.filter(s=>{const[lo,hi]=stackCalcSize.split('-').map(Number);return s.substances.length>=lo&&s.substances.length<=hi;}).slice(0,50).map(stack=>(
+                    <div key={stack.id} style={{background:'var(--bg-secondary)',borderRadius:8,padding:'8px',border:'1px solid var(--border)'}}>
+                      {stack.description && <div style={{fontSize:9,color:'var(--text-dim)',lineHeight:1.3,marginBottom:3}}>{stack.description}</div>}
+                      <div style={{display:'flex',gap:2,flexWrap:'wrap'}}>
+                        {stack.effects.map(e=><span key={e} style={{fontSize:7,padding:'1px 5px',borderRadius:3,background:'rgba(0,230,138,0.08)',color:'#00e68a'}}>{EFFECT_LABELS_ru[e]||e}</span>)}
+                        <span style={{fontSize:10,fontWeight:700,color:stack.synergyScore>15?'#22c55e':'#eab308'}}>{(stack.synergyScore||0).toFixed(1)}</span>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
             )}
+          </div>
+        </div>
+      )}
           </div>
         </div>
       )}

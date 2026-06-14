@@ -3,6 +3,7 @@ export interface SupportStack {
   effects: string[];
   substances: string[];
   synergyScore: number;
+  description: string;
 }
 
 export const EFFECT_LABELS_ru: Record<string, string> = {
@@ -231,6 +232,17 @@ function generateStacks(): SupportStack[] {
     return `${base}_${idCounter++}`;
   };
 
+  const genDesc = (effects: string[], substances: string[], score: number): string => {
+    const effStr = effects.map(e => (EFFECT_LABELS_ru[e]||e).replace(/^.{1,2}\s/,'')).join(', ');
+    const subStr = substances.map(s => getSubstanceLabel(s)).join(', ');
+    let desc = `Стек для ${effStr}. Состав: ${subStr}.`;
+    if (score > 15) desc += ' Высокая синергия компонентов.';
+    else if (score > 10) desc += ' Хорошая совместимость компонентов.';
+    else desc += ' Сбалансированная базовая комбинация.';
+    if (substances.length >= 8) desc += ' Расширенный комплекс.';
+    return desc;
+  };
+
   // Phase 1: For each effect, generate 3-substance combos (every combination of 3 from pool)
   for (const [effect, subs] of Object.entries(EFFECT_SUBSTANCES)) {
     if (subs.length < 3) continue;
@@ -247,6 +259,7 @@ function generateStacks(): SupportStack[] {
             effects: [effect],
             substances: combo,
             synergyScore: score,
+            description: genDesc([effect], combo, score),
           });
         }
       }
@@ -284,6 +297,7 @@ function generateStacks(): SupportStack[] {
         effects: groupEffects,
         substances: combo,
         synergyScore: score,
+        description: genDesc(groupEffects, combo, score),
       });
     }
   }
@@ -324,11 +338,13 @@ function generateStacks(): SupportStack[] {
 
   for (const ps of premiumSets) {
     if (stacks.length >= 200) break;
+    const pscore = calcSynergy(ps.substances, ps.effects);
     stacks.push({
       id: safeId([...ps.effects]),
       effects: ps.effects,
       substances: ps.substances,
-      synergyScore: calcSynergy(ps.substances, ps.effects),
+      synergyScore: pscore,
+      description: genDesc(ps.effects, ps.substances, pscore),
     });
   }
 
@@ -339,11 +355,13 @@ function generateStacks(): SupportStack[] {
     const shuffled = [...allSubs].sort(() => Math.random() - 0.5).slice(0, size);
     const effectCount = 1 + (stacks.length % 3);
     const shuffledEffects = [...effectGroups].sort(() => Math.random() - 0.5).slice(0, effectCount);
+    const fscore = calcSynergy(shuffled, shuffledEffects);
     stacks.push({
       id: safeId([...shuffledEffects, ...shuffled]),
       effects: shuffledEffects,
       substances: shuffled,
-      synergyScore: calcSynergy(shuffled, shuffledEffects),
+      synergyScore: fscore,
+      description: genDesc(shuffledEffects, shuffled, fscore),
     });
   }
 
