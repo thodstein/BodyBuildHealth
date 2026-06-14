@@ -23,8 +23,8 @@ export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
   const [hoveredId, setHoveredId] = useState<string | null>(null);
 
   return (
-    <div style={{ position:'fixed', inset:0, zIndex:100, display:'flex', flexDirection:'column', background:'#08080d' }}>
-      <img src="/main-hero.png" alt="" style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'contain', objectPosition:'center center' }} />
+    <div style={{ position:'fixed', inset:0, zIndex:100, display:'flex', flexDirection:'column' }}>
+      <img src="/main-hero.png" alt="" style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'cover', objectPosition:'center center' }} />
       <div style={{ position:'absolute', inset:0, background:'linear-gradient(transparent 50%, rgba(0,0,0,0.85))' }} />
       <div style={{ position:'relative', zIndex:2, flex:1, display:'flex', flexDirection:'column', justifyContent:'flex-end', padding:'16px 16px 80px' }}>
         <div style={{ marginBottom:16 }}>
