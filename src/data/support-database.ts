@@ -117,7 +117,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CAROTENOID_PATHWAY', 'OXIDATIVE_STRESS_REDUCTION'],
     organs: ['EYES', 'SKIN', 'VESSELS'],
     deficiency: 'LOW_CAROTENOIDS',
-    description: 'Предшественник витамина A',
+    description: 'Витамин (carotenoid, antioxidant), необходимый для защиты клеток от окислительного стресса',
     type: 'vitamin'
   },
   {
@@ -127,7 +127,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['RETINOID_SIGNALING', 'COLLAGEN_SUPPORT'],
     organs: ['SKIN', 'EYES', 'IMMUNE_SYSTEM'],
     deficiency: 'LOW_VITA',
-    description: 'Форма ретинола',
+    description: 'Витамин (retinoid), необходимый для обменных процессов и общего здоровья',
     type: 'vitamin'
   },
   {
@@ -137,7 +137,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['TPP_PATHWAY', 'CARB_METABOLISM'],
     organs: ['BRAIN', 'HEART', 'LIVER'],
     deficiency: 'FATIGUE;LOW_B1',
-    description: 'Энергетический витамин',
+    description: 'Витамин (energy), необходимый для энергетического обмена',
     type: 'vitamin'
   },
   {
@@ -147,7 +147,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ANTI_GLYCATION', 'NERVE_PROTECTION'],
     organs: ['BRAIN', 'NERVES', 'VESSELS'],
     deficiency: 'DIABETES',
-    description: 'Липофильная форма B1',
+    description: 'Витамин (anti_glycation), необходимый для обменных процессов и общего здоровья',
     type: 'vitamin'
   },
   {
@@ -157,7 +157,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['FLAVIN_PATHWAY', 'MITO_REPAIR'],
     organs: ['BRAIN', 'LIVER', 'SKIN'],
     deficiency: 'LOW_B2',
-    description: 'Кофермент FAD/FMN',
+    description: 'Витамин (enzyme), необходимый для обменных процессов и общего здоровья',
     type: 'vitamin'
   },
   {
@@ -167,7 +167,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['FLAVIN_PATHWAY', 'OXIDATIVE_STRESS_REDUCTION'],
     organs: ['BRAIN', 'LIVER'],
     deficiency: 'LOW_B2',
-    description: 'Активная форма B2',
+    description: 'Витамин (enzyme), необходимый для обменных процессов и общего здоровья',
     type: 'vitamin'
   },
   {
@@ -177,7 +177,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NAD_PATHWAY', 'LIPID_BALANCE'],
     organs: ['BRAIN', 'HEART', 'LIVER'],
     deficiency: 'HIGH_LIPIDS',
-    description: 'Ниацин',
+    description: 'Витамин (energy), необходимый для энергетического обмена',
     type: 'vitamin'
   },
   {
@@ -187,7 +187,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NAD_PATHWAY', 'SIRT1_ACTIVATION'],
     organs: ['SKIN', 'BRAIN', 'LIVER'],
     deficiency: 'INFLAMMATION',
-    description: 'Форма без приливов',
+    description: 'Витамин (antiinflammatory), необходимый для противовоспалительной защиты',
     type: 'vitamin'
   },
   {
@@ -197,7 +197,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NAD_SYNTHESIS', 'MITO_REPAIR'],
     organs: ['BRAIN', 'HEART', 'LIVER'],
     deficiency: 'AGING',
-    description: 'Предшественник NAD+',
+    description: 'Витамин (antiaging), необходимый для антивозрастных процессов',
     type: 'vitamin'
   },
   {
@@ -207,7 +207,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NAD_SYNTHESIS', 'MITO_REPAIR'],
     organs: ['BRAIN', 'HEART', 'LIVER'],
     deficiency: 'AGING',
-    description: 'Предшественник NAD+',
+    description: 'Витамин (antiaging), необходимый для антивозрастных процессов',
     type: 'vitamin'
   },
   {
@@ -217,7 +217,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['COA_PATHWAY', 'HORMONE_SYNTHESIS'],
     organs: ['ADRENALS', 'LIVER', 'SKIN'],
     deficiency: 'FATIGUE',
-    description: 'Витамин коэнзима A',
+    description: 'Витамин (energy), необходимый для энергетического обмена',
     type: 'vitamin'
   },
   {
@@ -227,7 +227,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['LIPID_METABOLISM', 'COA_PATHWAY'],
     organs: ['HEART', 'LIVER'],
     deficiency: 'HIGH_LIPIDS',
-    description: 'Активная форма B5',
+    description: 'Витамин (lipids), необходимый для обменных процессов и общего здоровья',
     type: 'vitamin'
   },
   {
@@ -237,7 +237,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NEUROTRANSMITTER_SUPPORT', 'HOMOCYSTEINE_REDUCTION'],
     organs: ['BRAIN', 'LIVER', 'HORMONES'],
     deficiency: 'LOW_B6',
-    description: 'Классическая форма B6',
+    description: 'Витамин (enzyme), необходимый для обменных процессов и общего здоровья',
     type: 'vitamin'
   },
   {
@@ -247,7 +247,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NEUROTRANSMITTER_SUPPORT', 'HOMOCYSTEINE_REDUCTION'],
     organs: ['BRAIN', 'LIVER', 'HORMONES'],
     deficiency: 'LOW_B6',
-    description: 'Активная форма B6',
+    description: 'Витамин (enzyme), необходимый для обменных процессов и общего здоровья',
     type: 'vitamin'
   },
   {
@@ -257,7 +257,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CARBOXYLASE_SUPPORT', 'SKIN_HEALTH'],
     organs: ['SKIN', 'HAIR', 'LIVER'],
     deficiency: 'LOW_B7',
-    description: 'Витамин кожи и волос',
+    description: 'Витамин (enzyme), необходимый для обменных процессов и общего здоровья',
     type: 'vitamin'
   },
   {
@@ -267,7 +267,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['METHYLATION', 'CELL_DIVISION'],
     organs: ['BLOOD', 'LIVER', 'BRAIN'],
     deficiency: 'LOW_B9',
-    description: 'Синтетическая форма B9',
+    description: 'Витамин (DNA), необходимый для обменных процессов и общего здоровья',
     type: 'vitamin'
   },
   {
@@ -277,7 +277,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['METHYLATION', 'NEUROTRANSMITTER_SUPPORT'],
     organs: ['BRAIN', 'BLOOD', 'LIVER'],
     deficiency: 'LOW_B9',
-    description: 'Активная форма фолата',
+    description: 'Витамин (DNA), необходимый для обменных процессов и общего здоровья',
     type: 'vitamin'
   },
   {
@@ -287,7 +287,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['METHYLATION', 'CELL_REPAIR'],
     organs: ['BLOOD', 'LIVER'],
     deficiency: 'LOW_B9',
-    description: 'Фолиновая кислота',
+    description: 'Витамин (DNA), необходимый для обменных процессов и общего здоровья',
     type: 'vitamin'
   },
   {
@@ -297,7 +297,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MYELIN_REPAIR', 'METHYLATION'],
     organs: ['NERVES', 'BLOOD'],
     deficiency: 'LOW_B12',
-    description: 'Синтетическая форма B12',
+    description: 'Витамин (nerve), необходимый для нервной ткани',
     type: 'vitamin'
   },
   {
@@ -307,7 +307,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MYELIN_REPAIR', 'METHYLATION'],
     organs: ['BRAIN', 'NERVES', 'BLOOD'],
     deficiency: 'LOW_B12',
-    description: 'Активная форма B12',
+    description: 'Витамин (nerve), необходимый для нервной ткани',
     type: 'vitamin'
   },
   {
@@ -317,7 +317,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MITO_REPAIR', 'ENERGY'],
     organs: ['NERVES', 'LIVER'],
     deficiency: 'FATIGUE',
-    description: 'Митохондриальная форма B12',
+    description: 'Витамин (mitochondria), необходимый для работы митохондрий',
     type: 'vitamin'
   },
   {
@@ -327,7 +327,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NITRIC_OXIDE_BINDING', 'METHYLATION'],
     organs: ['BLOOD', 'LIVER'],
     deficiency: 'LOW_B12',
-    description: 'Длительная форма B12',
+    description: 'Витамин (detox), необходимый для детоксикации',
     type: 'vitamin'
   },
   {
@@ -337,7 +337,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['OXIDATIVE_STRESS_REDUCTION', 'COLLAGEN_SUPPORT', 'IMMUNE_SUPPORT'],
     organs: ['SKIN', 'IMMUNE_SYSTEM', 'VESSELS'],
     deficiency: 'LOW_VITC',
-    description: 'Аскорбиновая кислота',
+    description: 'Витамин (antioxidant, immune), необходимый для защиты клеток от окислительного стресса, иммунной системы',
     type: 'vitamin'
   },
   {
@@ -347,7 +347,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['LIPOSOMAL_DELIVERY', 'OXIDATIVE_STRESS_REDUCTION'],
     organs: ['IMMUNE_SYSTEM', 'SKIN', 'VESSELS'],
     deficiency: 'LOW_VITC',
-    description: 'Усиленная биодоступность',
+    description: 'Витамин (antioxidant, immune), необходимый для защиты клеток от окислительного стресса, иммунной системы',
     type: 'vitamin'
   },
   {
@@ -357,7 +357,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['OXIDATIVE_STRESS_REDUCTION', 'COLLAGEN_SUPPORT'],
     organs: ['GI', 'SKIN'],
     deficiency: 'LOW_VITC',
-    description: 'Щадящая форма витамина C',
+    description: 'Витамин (antioxidant, alkaline), необходимый для защиты клеток от окислительного стресса',
     type: 'vitamin'
   },
   {
@@ -367,7 +367,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['IMMUNE_MODULATION', 'CALCIUM_HOMEOSTASIS'],
     organs: ['BONES', 'IMMUNE_SYSTEM', 'HORMONES'],
     deficiency: 'LOW_VITD',
-    description: 'Гормоноподобный витамин',
+    description: 'Витамин (hormone), необходимый для гормонального баланса',
     type: 'vitamin'
   },
   {
@@ -377,7 +377,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CALCIUM_HOMEOSTASIS', 'IMMUNE_SUPPORT'],
     organs: ['BONES', 'IMMUNE_SYSTEM'],
     deficiency: 'LOW_VITD',
-    description: 'Растительная форма D',
+    description: 'Витамин (hormone), необходимый для гормонального баланса',
     type: 'vitamin'
   },
   {
@@ -387,7 +387,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CALCIUM_DISTRIBUTION', 'BONE_MINERALIZATION'],
     organs: ['BONES', 'VESSELS'],
     deficiency: 'LOW_VITD',
-    description: 'Комбинация D3+K2',
+    description: 'Витамин (vascular, bone), необходимый для костной ткани',
     type: 'vitamin'
   },
   {
@@ -397,7 +397,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MEMBRANE_PROTECTION', 'OXIDATIVE_STRESS_REDUCTION'],
     organs: ['SKIN', 'VESSELS', 'HEART'],
     deficiency: 'LOW_VITE',
-    description: 'Антиоксидант мембран',
+    description: 'Витамин (antioxidant), необходимый для защиты клеток от окислительного стресса',
     type: 'vitamin'
   },
   {
@@ -407,7 +407,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MEMBRANE_PROTECTION', 'OXIDATIVE_STRESS_REDUCTION'],
     organs: ['SKIN', 'VESSELS', 'HEART'],
     deficiency: 'LOW_VITE',
-    description: 'Смесь токоферолов',
+    description: 'Витамин (antioxidant), необходимый для защиты клеток от окислительного стресса',
     type: 'vitamin'
   },
   {
@@ -417,7 +417,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SIRT1_ACTIVATION', 'MEMBRANE_PROTECTION'],
     organs: ['BRAIN', 'HEART', 'VESSELS'],
     deficiency: 'AGING',
-    description: 'Усиленная форма витамина E',
+    description: 'Витамин (antioxidant, antiinflammatory), необходимый для защиты клеток от окислительного стресса, противовоспалительной защиты',
     type: 'vitamin'
   },
   {
@@ -427,7 +427,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CLOTTING_PATHWAY', 'CALCIUM_DISTRIBUTION'],
     organs: ['BLOOD', 'BONES'],
     deficiency: 'LOW_VITK',
-    description: 'Классическая форма K',
+    description: 'Витамин (coagulation), необходимый для обменных процессов и общего здоровья',
     type: 'vitamin'
   },
   {
@@ -437,7 +437,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CALCIUM_DISTRIBUTION', 'BONE_MINERALIZATION'],
     organs: ['BONES', 'VESSELS'],
     deficiency: 'LOW_VITK',
-    description: 'Короткая форма K2',
+    description: 'Витамин (bone, vascular), необходимый для костной ткани',
     type: 'vitamin'
   },
   {
@@ -447,7 +447,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CALCIUM_DISTRIBUTION', 'ANTI_CALCIFICATION'],
     organs: ['BONES', 'VESSELS'],
     deficiency: 'CALCIFICATION',
-    description: 'Длительная форма K2',
+    description: 'Витамин (bone, vascular), необходимый для костной ткани',
     type: 'vitamin'
   },
   {
@@ -457,7 +457,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NAD_PATHWAY', 'METHYLATION', 'NEURO_SUPPORT'],
     organs: ['BRAIN', 'LIVER', 'BLOOD'],
     deficiency: 'LOW_B_VITAMINS',
-    description: 'Полный комплекс витаминов B',
+    description: 'Витамин (energy, enzyme), необходимый для энергетического обмена',
     type: 'vitamin'
   },
   {
@@ -467,7 +467,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NAD_PATHWAY', 'METHYLATION', 'NEURO_SUPPORT'],
     organs: ['BRAIN', 'LIVER', 'BLOOD'],
     deficiency: 'LOW_B_VITAMINS',
-    description: 'Активные формы B‑группы',
+    description: 'Витамин (energy, enzyme), необходимый для энергетического обмена',
     type: 'vitamin'
   },
   {
@@ -477,7 +477,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ACH_SYNTHESIS', 'LIVER_SUPPORT'],
     organs: ['BRAIN', 'LIVER'],
     deficiency: 'LOW_CHOLINE',
-    description: 'Предшественник ацетилхолина',
+    description: 'Витамин (nootropic), необходимый для когнитивных функций',
     type: 'vitamin'
   },
   {
@@ -487,7 +487,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ACH_SYNTHESIS', 'MITO_REPAIR'],
     organs: ['BRAIN', 'NERVES'],
     deficiency: 'COGNITION',
-    description: 'Нейротропная форма холина',
+    description: 'Витамин (nootropic), необходимый для когнитивных функций',
     type: 'vitamin'
   },
   {
@@ -497,7 +497,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ACH_SYNTHESIS', 'GH_STIMULATION'],
     organs: ['BRAIN', 'HORMONES'],
     deficiency: 'COGNITION',
-    description: 'Высокая биодоступность холина',
+    description: 'Витамин (nootropic), необходимый для когнитивных функций',
     type: 'vitamin'
   },
   {
@@ -507,7 +507,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['INSULIN_SIGNALING', 'SEROTONIN_SUPPORT'],
     organs: ['BRAIN', 'OVARIES'],
     deficiency: 'PCOS;ANXIETY',
-    description: 'Витаминоподобное вещество',
+    description: 'Витамин (hormone, neuro), необходимый для гормонального баланса, нервной системы',
     type: 'vitamin'
   },
   {
@@ -537,7 +537,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SKIN_REPAIR', 'ANTI_INFLAMMATION'],
     organs: ['SKIN'],
     deficiency: 'LOW_PABA',
-    description: 'Парааминобензойная кислота',
+    description: 'Витамин (skin), необходимый для здоровья кожи',
     type: 'vitamin'
   },
   {
@@ -557,7 +557,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['METHYL_DONOR', 'HOMOCYSTEINE_REDUCTION'],
     organs: ['LIVER', 'BLOOD'],
     deficiency: 'HIGH_HOMOCYSTEINE',
-    description: 'Метильная поддержка',
+    description: 'Витамин (methylation), необходимый для метилирования',
     type: 'vitamin'
   },
   {
@@ -567,7 +567,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['FATTY_ACID_TRANSPORT', 'ATP_PRODUCTION'],
     organs: ['HEART', 'MUSCLES', 'BRAIN'],
     deficiency: 'FATIGUE',
-    description: 'Транспорт жирных кислот',
+    description: 'Витамин (mitochondria), необходимый для работы митохондрий',
     type: 'vitamin'
   },
   {
@@ -577,7 +577,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MITO_REPAIR', 'ACH_SUPPORT'],
     organs: ['BRAIN', 'NERVES'],
     deficiency: 'COGNITION',
-    description: 'Нейромитохондриальная форма',
+    description: 'Витамин (nootropic, mitochondria), необходимый для когнитивных функций, работы митохондрий',
     type: 'vitamin'
   },
   {
@@ -587,7 +587,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['OXIDATIVE_STRESS_REDUCTION', 'COLLAGEN_SUPPORT'],
     organs: ['IMMUNE_SYSTEM', 'SKIN'],
     deficiency: 'LOW_VITC',
-    description: 'Буферная форма витамина C',
+    description: 'Витамин (antioxidant, immune), необходимый для защиты клеток от окислительного стресса, иммунной системы',
     type: 'vitamin'
   },
   {
@@ -597,7 +597,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['OXIDATIVE_STRESS_REDUCTION', 'COLLAGEN_SUPPORT'],
     organs: ['GI', 'SKIN'],
     deficiency: 'LOW_VITC',
-    description: 'Щадящая форма витамина C',
+    description: 'Витамин (antioxidant), необходимый для защиты клеток от окислительного стресса',
     type: 'vitamin'
   },
   {
@@ -607,7 +607,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['OXIDATIVE_STRESS_REDUCTION', 'GLUTATHIONE_RECYCLING'],
     organs: ['BRAIN', 'LIVER', 'VESSELS'],
     deficiency: 'OXIDATIVE_STRESS',
-    description: 'Синергия C+R-ALA',
+    description: 'Витамин (antioxidant, synergy), необходимый для защиты клеток от окислительного стресса',
     type: 'vitamin'
   },
   {
@@ -617,7 +617,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['LIPOSOMAL_DELIVERY', 'IMMUNE_MODULATION'],
     organs: ['BONES', 'IMMUNE_SYSTEM'],
     deficiency: 'LOW_VITD',
-    description: 'Усиленная форма D3',
+    description: 'Витамин (hormone), необходимый для гормонального баланса',
     type: 'vitamin'
   },
   {
@@ -627,7 +627,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CALCIUM_HOMEOSTASIS', 'IMMUNE_SUPPORT'],
     organs: ['BONES', 'IMMUNE_SYSTEM'],
     deficiency: 'LOW_VITD',
-    description: 'Жирорастворимая форма D3',
+    description: 'Витамин (hormone), необходимый для гормонального баланса',
     type: 'vitamin'
   },
   {
@@ -637,7 +637,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['IMMUNE_MODULATION', 'CALCIUM_HOMEOSTASIS'],
     organs: ['BONES', 'IMMUNE_SYSTEM'],
     deficiency: 'LOW_VITD',
-    description: 'Высокодозовая форма',
+    description: 'Витамин (hormone), необходимый для гормонального баланса',
     type: 'vitamin'
   },
   {
@@ -647,7 +647,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NITROGEN_SCAVENGING', 'MEMBRANE_PROTECTION'],
     organs: ['HEART', 'VESSELS'],
     deficiency: 'OXIDATIVE_STRESS',
-    description: 'Гамма-форма витамина E',
+    description: 'Витамин (antioxidant), необходимый для защиты клеток от окислительного стресса',
     type: 'vitamin'
   },
   {
@@ -657,7 +657,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SIRT1_ACTIVATION', 'MEMBRANE_PROTECTION'],
     organs: ['BRAIN', 'HEART', 'VESSELS'],
     deficiency: 'AGING',
-    description: 'Мощная форма токотриенолов',
+    description: 'Витамин (antioxidant, antiinflammatory), необходимый для защиты клеток от окислительного стресса, противовоспалительной защиты',
     type: 'vitamin'
   },
   {
@@ -667,7 +667,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['OXIDATIVE_STRESS_REDUCTION', 'MEMBRANE_PROTECTION'],
     organs: ['SKIN', 'VESSELS'],
     deficiency: 'OXIDATIVE_STRESS',
-    description: 'Синергия витаминов E и C',
+    description: 'Витамин (antioxidant), необходимый для защиты клеток от окислительного стресса',
     type: 'vitamin'
   },
   {
@@ -677,7 +677,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['LIPOSOMAL_DELIVERY', 'CALCIUM_DISTRIBUTION'],
     organs: ['VESSELS', 'BONES'],
     deficiency: 'CALCIFICATION',
-    description: 'Усиленная форма K2',
+    description: 'Витамин (vascular), необходимый для обменных процессов и общего здоровья',
     type: 'vitamin'
   },
   {
@@ -687,7 +687,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CALCIUM_DISTRIBUTION', 'ANTI_CALCIFICATION'],
     organs: ['VESSELS', 'BONES'],
     deficiency: 'CALCIFICATION',
-    description: 'Комбинация форм K2',
+    description: 'Витамин (vascular, bone), необходимый для костной ткани',
     type: 'vitamin'
   },
   {
@@ -697,7 +697,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['TPP_PATHWAY', 'NERVE_REPAIR'],
     organs: ['BRAIN', 'NERVES'],
     deficiency: 'FATIGUE',
-    description: 'Липофильная форма B1',
+    description: 'Витамин (energy, nootropic), необходимый для энергетического обмена, когнитивных функций',
     type: 'vitamin'
   },
   {
@@ -707,7 +707,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['FLAVIN_PATHWAY', 'MITO_REPAIR'],
     organs: ['BRAIN', 'LIVER'],
     deficiency: 'LOW_B2',
-    description: 'Комплекс FMN+FAD',
+    description: 'Витамин (enzyme), необходимый для обменных процессов и общего здоровья',
     type: 'vitamin'
   },
   {
@@ -717,7 +717,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NAD_PATHWAY', 'LIPID_BALANCE'],
     organs: ['HEART', 'LIVER'],
     deficiency: 'HIGH_LIPIDS',
-    description: 'Классическая форма ниацина',
+    description: 'Витамин (lipids), необходимый для обменных процессов и общего здоровья',
     type: 'vitamin'
   },
   {
@@ -737,7 +737,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['COA_PATHWAY', 'FATTY_ACID_OXIDATION'],
     organs: ['LIVER', 'ADRENALS'],
     deficiency: 'FATIGUE',
-    description: 'Предшественник коэнзима A',
+    description: 'Витамин (energy), необходимый для энергетического обмена',
     type: 'vitamin'
   },
   {
@@ -747,7 +747,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NEUROTRANSMITTER_SUPPORT', 'HOMOCYSTEINE_REDUCTION'],
     organs: ['BRAIN', 'LIVER'],
     deficiency: 'LOW_B6',
-    description: 'Смесь пиридоксина и P5P',
+    description: 'Витамин (enzyme), необходимый для обменных процессов и общего здоровья',
     type: 'vitamin'
   },
   {
@@ -757,7 +757,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CARBOXYLASE_SUPPORT', 'SKIN_HEALTH'],
     organs: ['SKIN', 'HAIR'],
     deficiency: 'LOW_B7',
-    description: 'Высокодозовая форма биотина',
+    description: 'Витамин (enzyme), необходимый для обменных процессов и общего здоровья',
     type: 'vitamin'
   },
   {
@@ -767,7 +767,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['METHYLATION', 'CELL_REPAIR'],
     organs: ['BLOOD', 'LIVER'],
     deficiency: 'LOW_B9',
-    description: 'Смесь MTHF+фолинат',
+    description: 'Витамин (DNA), необходимый для обменных процессов и общего здоровья',
     type: 'vitamin'
   },
   {
@@ -777,7 +777,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MYELIN_REPAIR', 'MITO_REPAIR'],
     organs: ['NERVES', 'BRAIN', 'BLOOD'],
     deficiency: 'LOW_B12',
-    description: 'Смесь метил+адено+гидроксо',
+    description: 'Витамин (nerve, energy), необходимый для нервной ткани, энергетического обмена',
     type: 'vitamin'
   },
   {
@@ -787,7 +787,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['OXIDATIVE_STRESS_REDUCTION', 'CAPILLARY_STRENGTH'],
     organs: ['VESSELS', 'SKIN'],
     deficiency: 'FRAGILITY',
-    description: 'Сосудистая форма витамина C',
+    description: 'Витамин (antioxidant, vascular), необходимый для защиты клеток от окислительного стресса',
     type: 'vitamin'
   },
   {
@@ -797,7 +797,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['OXIDATIVE_STRESS_REDUCTION', 'COLLAGEN_SUPPORT'],
     organs: ['VESSELS', 'SKIN'],
     deficiency: 'LOW_VITC',
-    description: 'Синергия C+биофлавоноиды',
+    description: 'Витамин (antioxidant, vascular), необходимый для защиты клеток от окислительного стресса',
     type: 'vitamin'
   },
   {
@@ -807,7 +807,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CALCIUM_HOMEOSTASIS', 'IMMUNE_SUPPORT'],
     organs: ['BONES', 'IMMUNE_SYSTEM'],
     deficiency: 'LOW_VITD',
-    description: 'Форма на MCT масле',
+    description: 'Витамин (hormone), необходимый для гормонального баланса',
     type: 'vitamin'
   },
   {
@@ -827,7 +827,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CALCIUM_DISTRIBUTION', 'ANTI_CALCIFICATION'],
     organs: ['VESSELS', 'BONES'],
     deficiency: 'CALCIFICATION',
-    description: 'Комбинация K1+K2',
+    description: 'Витамин (vascular, bone), необходимый для костной ткани',
     type: 'vitamin'
   },
   {
@@ -837,7 +837,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ACH_SYNTHESIS', 'LIVER_SUPPORT'],
     organs: ['BRAIN', 'LIVER'],
     deficiency: 'LOW_CHOLINE',
-    description: 'Смесь холиновых форм',
+    description: 'Витамин (nootropic), необходимый для когнитивных функций',
     type: 'vitamin'
   },
   {
@@ -847,7 +847,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['INSULIN_SIGNALING', 'SEROTONIN_SUPPORT'],
     organs: ['BRAIN', 'OVARIES'],
     deficiency: 'PCOS',
-    description: 'Смесь мио+ди-хиро',
+    description: 'Витамин (hormone), необходимый для гормонального баланса',
     type: 'vitamin'
   },
   {
@@ -857,7 +857,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MITO_BIOGENESIS', 'MITO_REPAIR'],
     organs: ['BRAIN', 'HEART', 'LIVER'],
     deficiency: 'AGING',
-    description: 'Кофактор митохондрий',
+    description: 'Витамин (mitochondria), необходимый для работы митохондрий',
     type: 'vitamin'
   },
   {
@@ -867,7 +867,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ELECTRON_TRANSPORT_CHAIN', 'ANTIOXIDANT'],
     organs: ['HEART', 'BRAIN', 'VESSELS'],
     deficiency: 'FATIGUE',
-    description: 'Кофермент Q10',
+    description: 'Витамин (mitochondria), необходимый для работы митохондрий',
     type: 'vitamin'
   },
   {
@@ -877,7 +877,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ELECTRON_TRANSPORT_CHAIN', 'ANTIOXIDANT'],
     organs: ['HEART', 'BRAIN', 'VESSELS'],
     deficiency: 'AGING',
-    description: 'Активная форма Q10',
+    description: 'Витамин (mitochondria), необходимый для работы митохондрий',
     type: 'vitamin'
   },
   {
@@ -887,7 +887,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GLUTATHIONE_RECYCLING', 'MITO_REPAIR'],
     organs: ['LIVER', 'BRAIN', 'VESSELS'],
     deficiency: 'OXIDATIVE_STRESS',
-    description: 'Активная форма ALA',
+    description: 'Витамин (antioxidant, mitochondria), необходимый для защиты клеток от окислительного стресса, работы митохондрий',
     type: 'vitamin'
   },
   {
@@ -897,7 +897,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['OXIDATIVE_STRESS_REDUCTION', 'GLUCOSE_REGULATION'],
     organs: ['LIVER', 'VESSELS'],
     deficiency: 'DIABETES',
-    description: 'Синтетическая форма ALA',
+    description: 'Витамин (antioxidant), необходимый для защиты клеток от окислительного стресса',
     type: 'vitamin'
   },
   {
@@ -907,7 +907,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GLUTATHIONE_RECYCLING', 'MITO_REPAIR'],
     organs: ['LIVER', 'BRAIN'],
     deficiency: 'OXIDATIVE_STRESS',
-    description: 'Смесь R+S ALA',
+    description: 'Витамин (antioxidant, mitochondria), необходимый для защиты клеток от окислительного стресса, работы митохондрий',
     type: 'vitamin'
   },
   {
@@ -917,7 +917,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['COA_PATHWAY', 'FATTY_ACID_OXIDATION'],
     organs: ['LIVER', 'ADRENALS'],
     deficiency: 'FATIGUE',
-    description: 'Предшественник коэнзима A',
+    description: 'Витамин (energy), необходимый для энергетического обмена',
     type: 'vitamin'
   },
   {
@@ -927,7 +927,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CALCIUM_DISTRIBUTION', 'ANTI_CALCIFICATION'],
     organs: ['VESSELS', 'BONES'],
     deficiency: 'CALCIFICATION',
-    description: 'Биоактивная форма K2',
+    description: 'Витамин (vascular, bone), необходимый для костной ткани',
     type: 'vitamin'
   },
   {
@@ -937,7 +937,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NAD_PATHWAY', 'MITO_REPAIR'],
     organs: ['BRAIN', 'HEART', 'LIVER'],
     deficiency: 'FATIGUE',
-    description: 'Митохондриальный B-комплекс',
+    description: 'Витамин (mitochondria), необходимый для работы митохондрий',
     type: 'vitamin'
   },
   {
@@ -947,7 +947,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ELECTRON_TRANSPORT_CHAIN', 'ANTIOXIDANT'],
     organs: ['HEART', 'BRAIN'],
     deficiency: 'FATIGUE',
-    description: 'Классическая форма Q10',
+    description: 'Витамин (mitochondria), необходимый для работы митохондрий',
     type: 'vitamin'
   },
   {
@@ -967,7 +967,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NAD_PATHWAY', 'ATP_PRODUCTION'],
     organs: ['BRAIN', 'HEART'],
     deficiency: 'FATIGUE',
-    description: 'Активная форма NAD+',
+    description: 'Витамин (energy, mitochondria), необходимый для энергетического обмена, работы митохондрий',
     type: 'vitamin'
   },
   {
@@ -977,7 +977,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['FLAVIN_PATHWAY', 'MITO_REPAIR'],
     organs: ['BRAIN', 'LIVER'],
     deficiency: 'LOW_B2',
-    description: 'Коферментная форма B2',
+    description: 'Витамин (enzyme), необходимый для обменных процессов и общего здоровья',
     type: 'vitamin'
   },
   {
@@ -987,7 +987,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['FLAVIN_PATHWAY', 'OXIDATIVE_STRESS_REDUCTION'],
     organs: ['BRAIN', 'LIVER'],
     deficiency: 'LOW_B2',
-    description: 'Флавинмононуклеотид',
+    description: 'Витамин (enzyme), необходимый для обменных процессов и общего здоровья',
     type: 'vitamin'
   },
   {
@@ -997,7 +997,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['METHYLATION', 'CELL_REPAIR'],
     organs: ['BLOOD', 'LIVER'],
     deficiency: 'LOW_B9',
-    description: 'Активная форма фолата',
+    description: 'Витамин (DNA, enzyme), необходимый для обменных процессов и общего здоровья',
     type: 'vitamin'
   },
   {
@@ -1007,7 +1007,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['METHYL_DONOR', 'HOMOCYSTEINE_REDUCTION'],
     organs: ['LIVER', 'BLOOD'],
     deficiency: 'HIGH_HOMOCYSTEINE',
-    description: 'Комплекс метильных доноров',
+    description: 'Витамин (methylation), необходимый для метилирования',
     type: 'vitamin'
   },
   {
@@ -1017,7 +1017,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['INSULIN_SENSITIVITY', 'GLUCOSE_REGULATION'],
     organs: ['PANCREAS', 'LIVER'],
     deficiency: 'INSULIN_RESISTANCE',
-    description: 'Форма хрома для сахара',
+    description: 'Витамин (insulin), необходимый для обменных процессов и общего здоровья',
     type: 'vitamin'
   },
   {
@@ -1027,7 +1027,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['INSULIN_SENSITIVITY', 'GLUCOSE_REGULATION'],
     organs: ['PANCREAS', 'LIVER'],
     deficiency: 'INSULIN_RESISTANCE',
-    description: 'Ниациновая форма хрома',
+    description: 'Витамин (insulin), необходимый для обменных процессов и общего здоровья',
     type: 'vitamin'
   },
   {
@@ -1037,7 +1037,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SULFITE_OXIDASE', 'DETOX'],
     organs: ['LIVER', 'KIDNEYS'],
     deficiency: 'LOW_MOLY',
-    description: 'Минерал детоксикации',
+    description: 'Витамин (enzyme), необходимый для обменных процессов и общего здоровья',
     type: 'vitamin'
   },
   {
@@ -1047,7 +1047,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['BONE_METABOLISM', 'TESTOSTERONE_SUPPORT'],
     organs: ['BONES', 'HORMONES'],
     deficiency: 'LOW_BORON',
-    description: 'Минерал гормонального баланса',
+    description: 'Витамин (hormone), необходимый для гормонального баланса',
     type: 'vitamin'
   },
   {
@@ -1057,7 +1057,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['COLLAGEN_SUPPORT', 'BONE_MINERALIZATION'],
     organs: ['SKIN', 'BONES'],
     deficiency: 'LOW_SILICON',
-    description: 'Минерал кожи и костей',
+    description: 'Витамин (skin, bone), необходимый для здоровья кожи, костной ткани',
     type: 'vitamin'
   },
   {
@@ -1067,7 +1067,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NEUROPROTECTION', 'MOOD_SUPPORT'],
     organs: ['BRAIN'],
     deficiency: 'MOOD_ISSUES',
-    description: 'Низкодозовый нейромодулятор',
+    description: 'Витамин (neuro), необходимый для нервной системы',
     type: 'vitamin'
   },
   {
@@ -1077,7 +1077,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['VASCULAR_RELAXATION', 'ATP_PRODUCTION'],
     organs: ['HEART', 'MUSCLES', 'BRAIN'],
     deficiency: 'LOW_MAG',
-    description: 'Форма магния для расслабления',
+    description: 'Минерал (relax, energy), участвующий в энергетического обмена',
     type: 'minerals'
   },
   {
@@ -1087,7 +1087,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GABA_SUPPORT', 'VASCULAR_RELAXATION'],
     organs: ['BRAIN', 'HEART', 'MUSCLES'],
     deficiency: 'ANXIETY',
-    description: 'Самая мягкая форма магния',
+    description: 'Минерал (calming, relax), участвующий в успокоения',
     type: 'minerals'
   },
   {
@@ -1097,7 +1097,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ATP_PRODUCTION', 'MITO_REPAIR'],
     organs: ['MUSCLES', 'BRAIN'],
     deficiency: 'FATIGUE',
-    description: 'Энергетическая форма магния',
+    description: 'Минерал (energy), участвующий в энергетического обмена',
     type: 'minerals'
   },
   {
@@ -1107,7 +1107,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['VASCULAR_RELAXATION', 'CALCIUM_REGULATION'],
     organs: ['HEART', 'VESSELS'],
     deficiency: 'HYPERTENSION',
-    description: 'Кардиоформа магния',
+    description: 'Минерал (cardio), участвующий в ССС',
     type: 'minerals'
   },
   {
@@ -1117,7 +1117,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SYNAPTIC_PLASTICITY', 'NMDA_MODULATION'],
     organs: ['BRAIN'],
     deficiency: 'COGNITION',
-    description: 'Форма магния для мозга',
+    description: 'Минерал (nootropic), участвующий в когнитивных функций',
     type: 'minerals'
   },
   {
@@ -1127,7 +1127,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GI_MOTILITY', 'ALKALINE'],
     organs: ['GI'],
     deficiency: 'CONSTIPATION',
-    description: 'Классическая форма магния',
+    description: 'Минерал (GI), участвующий в обменных процессах и поддержании здоровья',
     type: 'minerals'
   },
   {
@@ -1137,7 +1137,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SULFATE_PATHWAY', 'RELAXATION'],
     organs: ['LIVER', 'MUSCLES'],
     deficiency: 'LOW_MAG',
-    description: 'Сульфат магния',
+    description: 'Минерал (detox), участвующий в детоксикации',
     type: 'minerals'
   },
   {
@@ -1147,7 +1147,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ELECTROLYTE_BALANCE', 'HYDRATION'],
     organs: ['GI', 'MUSCLES'],
     deficiency: 'LOW_MAG',
-    description: 'Хорошая абсорбция',
+    description: 'Минерал (electrolyte), участвующий в электролитного баланса',
     type: 'minerals'
   },
   {
@@ -1157,7 +1157,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['IMMUNE_SUPPORT', 'TESTOSTERONE_SUPPORT'],
     organs: ['IMMUNE_SYSTEM', 'HORMONES'],
     deficiency: 'LOW_ZINC',
-    description: 'Лучшая форма цинка',
+    description: 'Минерал (immune, hormone), участвующий в иммунной системы, гормонального баланса',
     type: 'minerals'
   },
   {
@@ -1167,7 +1167,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['IMMUNE_SUPPORT', 'ANTIVIRAL'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'LOW_ZINC',
-    description: 'Глюконат цинка',
+    description: 'Минерал (immune), участвующий в иммунной системы',
     type: 'minerals'
   },
   {
@@ -1177,7 +1177,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['IMMUNE_SUPPORT', 'ANTIOXIDANT'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'LOW_ZINC',
-    description: 'Цитрат цинка',
+    description: 'Минерал (immune), участвующий в иммунной системы',
     type: 'minerals'
   },
   {
@@ -1187,7 +1187,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['TESTOSTERONE_SUPPORT', 'IMMUNE_SUPPORT'],
     organs: ['HORMONES', 'IMMUNE_SYSTEM'],
     deficiency: 'LOW_ZINC',
-    description: 'Хелатная форма цинка',
+    description: 'Минерал (hormone, immune), участвующий в гормонального баланса, иммунной системы',
     type: 'minerals'
   },
   {
@@ -1197,7 +1197,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GPX_ACTIVITY', 'THYROID_SUPPORT'],
     organs: ['THYROID', 'LIVER'],
     deficiency: 'LOW_SELEN',
-    description: 'Лучшая форма селена',
+    description: 'Минерал (antioxidant), участвующий в защиты клеток от окислительного стресса',
     type: 'minerals'
   },
   {
@@ -1207,7 +1207,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GPX_ACTIVITY', 'IMMUNE_SUPPORT'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'LOW_SELEN',
-    description: 'Неорганическая форма селена',
+    description: 'Минерал (antioxidant), участвующий в защиты клеток от окислительного стресса',
     type: 'minerals'
   },
   {
@@ -1217,7 +1217,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GPX_ACTIVITY', 'IMMUNE_SUPPORT'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'LOW_SELEN',
-    description: 'Органическая форма селена',
+    description: 'Минерал (antioxidant), участвующий в защиты клеток от окислительного стресса',
     type: 'minerals'
   },
   {
@@ -1227,7 +1227,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['BONE_MINERALIZATION', 'CALCIUM_HOMEOSTASIS'],
     organs: ['BONES'],
     deficiency: 'LOW_CALCIUM',
-    description: 'Лучшая форма кальция',
+    description: 'Минерал (bone), участвующий в костной ткани',
     type: 'minerals'
   },
   {
@@ -1237,7 +1237,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['BONE_MINERALIZATION', 'ALKALINE'],
     organs: ['BONES'],
     deficiency: 'LOW_CALCIUM',
-    description: 'Классическая форма кальция',
+    description: 'Минерал (bone), участвующий в костной ткани',
     type: 'minerals'
   },
   {
@@ -1247,7 +1247,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['BONE_MINERALIZATION', 'COLLAGEN_SUPPORT'],
     organs: ['BONES'],
     deficiency: 'LOW_CALCIUM',
-    description: 'Минерал костной ткани',
+    description: 'Минерал (bone), участвующий в костной ткани',
     type: 'minerals'
   },
   {
@@ -1257,7 +1257,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ELECTROLYTE_BALANCE', 'BLOOD_PRESSURE'],
     organs: ['HEART', 'KIDNEYS'],
     deficiency: 'HYPERTENSION',
-    description: 'Калий цитрат',
+    description: 'Минерал (electrolyte), участвующий в электролитного баланса',
     type: 'minerals'
   },
   {
@@ -1267,7 +1267,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ELECTROLYTE_BALANCE', 'HYDRATION'],
     organs: ['HEART', 'MUSCLES'],
     deficiency: 'LOW_POTASSIUM',
-    description: 'Хлорид калия',
+    description: 'Минерал (electrolyte), участвующий в электролитного баланса',
     type: 'minerals'
   },
   {
@@ -1277,7 +1277,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['PH_BALANCE', 'HYDRATION'],
     organs: ['GI', 'KIDNEYS'],
     deficiency: 'ACIDOSIS',
-    description: 'Сода пищевая',
+    description: 'Минерал (alkaline), участвующий в обменных процессах и поддержании здоровья',
     type: 'minerals'
   },
   {
@@ -1287,7 +1287,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ELECTROLYTE_BALANCE', 'HYDRATION'],
     organs: ['GI', 'MUSCLES'],
     deficiency: 'DEHYDRATION',
-    description: 'Соль',
+    description: 'Минерал (electrolyte), участвующий в электролитного баланса',
     type: 'minerals'
   },
   {
@@ -1297,7 +1297,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CUPROENZYME_SUPPORT', 'COLLAGEN_SUPPORT'],
     organs: ['BLOOD', 'SKIN'],
     deficiency: 'LOW_COPPER',
-    description: 'Глюконат меди',
+    description: 'Минерал (enzyme), участвующий в обменных процессах и поддержании здоровья',
     type: 'minerals'
   },
   {
@@ -1307,7 +1307,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CUPROENZYME_SUPPORT', 'IRON_METABOLISM'],
     organs: ['BLOOD', 'LIVER'],
     deficiency: 'LOW_COPPER',
-    description: 'Хелатная форма меди',
+    description: 'Минерал (enzyme), участвующий в обменных процессах и поддержании здоровья',
     type: 'minerals'
   },
   {
@@ -1317,7 +1317,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SOD_SUPPORT', 'BONE_METABOLISM'],
     organs: ['BONES', 'LIVER'],
     deficiency: 'LOW_MANGANESE',
-    description: 'Сульфат марганца',
+    description: 'Минерал (enzyme), участвующий в обменных процессах и поддержании здоровья',
     type: 'minerals'
   },
   {
@@ -1327,7 +1327,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SOD_SUPPORT', 'CARTILAGE_SUPPORT'],
     organs: ['BONES', 'JOINTS'],
     deficiency: 'LOW_MANGANESE',
-    description: 'Хелатная форма марганца',
+    description: 'Минерал (enzyme), участвующий в обменных процессах и поддержании здоровья',
     type: 'minerals'
   },
   {
@@ -1337,7 +1337,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['INSULIN_SENSITIVITY', 'GLUCOSE_REGULATION'],
     organs: ['PANCREAS', 'LIVER'],
     deficiency: 'INSULIN_RESISTANCE',
-    description: 'Пиколинат хрома',
+    description: 'Минерал (insulin), участвующий в обменных процессах и поддержании здоровья',
     type: 'minerals'
   },
   {
@@ -1347,7 +1347,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['INSULIN_SENSITIVITY', 'GLUCOSE_REGULATION'],
     organs: ['PANCREAS', 'LIVER'],
     deficiency: 'INSULIN_RESISTANCE',
-    description: 'Никотинат хрома',
+    description: 'Минерал (insulin), участвующий в обменных процессах и поддержании здоровья',
     type: 'minerals'
   },
   {
@@ -1357,7 +1357,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SULFITE_OXIDASE', 'DETOX'],
     organs: ['LIVER', 'KIDNEYS'],
     deficiency: 'LOW_MOLY',
-    description: 'Хелат молибдена',
+    description: 'Минерал (detox), участвующий в детоксикации',
     type: 'minerals'
   },
   {
@@ -1377,7 +1377,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['THYROID_HORMONE_SYNTHESIS', 'IODINE_UPTAKE'],
     organs: ['THYROID'],
     deficiency: 'LOW_IODINE',
-    description: 'Йодид калия',
+    description: 'Минерал (thyroid), участвующий в щитовидной железы',
     type: 'minerals'
   },
   {
@@ -1387,7 +1387,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['THYROID_SUPPORT', 'IODINE_UPTAKE'],
     organs: ['THYROID'],
     deficiency: 'LOW_IODINE',
-    description: 'Йод из водорослей',
+    description: 'Минерал (thyroid), участвующий в щитовидной железы',
     type: 'minerals'
   },
   {
@@ -1397,7 +1397,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['THYROID_HORMONE_SYNTHESIS', 'ANTIMICROBIAL'],
     organs: ['THYROID'],
     deficiency: 'LOW_IODINE',
-    description: 'Раствор Люголя',
+    description: 'Минерал (thyroid), участвующий в щитовидной железы',
     type: 'minerals'
   },
   {
@@ -1407,7 +1407,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['HEMOGLOBIN_SYNTHESIS', 'IRON_UPTAKE'],
     organs: ['BLOOD', 'LIVER'],
     deficiency: 'ANEMIA',
-    description: 'Хелатная форма железа',
+    description: 'Минерал (blood), участвующий в кроветворения',
     type: 'minerals'
   },
   {
@@ -1417,7 +1417,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['HEMOGLOBIN_SYNTHESIS', 'IRON_UPTAKE'],
     organs: ['BLOOD'],
     deficiency: 'ANEMIA',
-    description: 'Сульфат железа',
+    description: 'Минерал (blood), участвующий в кроветворения',
     type: 'minerals'
   },
   {
@@ -1427,7 +1427,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['HEMOGLOBIN_SYNTHESIS', 'IRON_UPTAKE'],
     organs: ['BLOOD'],
     deficiency: 'ANEMIA',
-    description: 'Цитрат железа',
+    description: 'Минерал (blood), участвующий в кроветворения',
     type: 'minerals'
   },
   {
@@ -1437,7 +1437,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['HEMOGLOBIN_SYNTHESIS', 'IRON_UPTAKE'],
     organs: ['BLOOD'],
     deficiency: 'ANEMIA',
-    description: 'Легкая форма железа',
+    description: 'Минерал (blood), участвующий в кроветворения',
     type: 'minerals'
   },
   {
@@ -1447,7 +1447,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NEUROPROTECTION', 'MOOD_SUPPORT'],
     organs: ['BRAIN'],
     deficiency: 'MOOD_ISSUES',
-    description: 'Низкодозовый литий',
+    description: 'Минерал (neuro), участвующий в нервной системы',
     type: 'minerals'
   },
   {
@@ -1457,7 +1457,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['BONE_METABOLISM', 'TESTOSTERONE_SUPPORT'],
     organs: ['BONES', 'HORMONES'],
     deficiency: 'LOW_BORON',
-    description: 'Хелат бора',
+    description: 'Минерал (hormone), участвующий в гормонального баланса',
     type: 'minerals'
   },
   {
@@ -1467,7 +1467,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['BONE_METABOLIZATION', 'ESTROGEN_BALANCE'],
     organs: ['BONES', 'HORMONES'],
     deficiency: 'LOW_BORON',
-    description: 'Глицинат бора',
+    description: 'Минерал (hormone), участвующий в гормонального баланса',
     type: 'minerals'
   },
   {
@@ -1477,7 +1477,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['COLLAGEN_SUPPORT', 'BONE_MINERALIZATION'],
     organs: ['SKIN', 'BONES'],
     deficiency: 'LOW_SILICON',
-    description: 'Лучшая форма кремния',
+    description: 'Минерал (skin, bone), участвующий в здоровья кожи, костной ткани',
     type: 'minerals'
   },
   {
@@ -1487,7 +1487,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['COLLAGEN_SUPPORT', 'SKIN_HEALTH'],
     organs: ['SKIN', 'HAIR'],
     deficiency: 'LOW_SILICON',
-    description: 'Кремний из хвоща',
+    description: 'Минерал (skin, hair), участвующий в здоровья кожи, здоровья волос',
     type: 'minerals'
   },
   {
@@ -1497,7 +1497,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['INSULIN_MIMETIC', 'GLUCOSE_REGULATION'],
     organs: ['PANCREAS', 'LIVER'],
     deficiency: 'INSULIN_RESISTANCE',
-    description: 'Ванадий',
+    description: 'Минерал (insulin), участвующий в обменных процессах и поддержании здоровья',
     type: 'minerals'
   },
   {
@@ -1507,7 +1507,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ATP_PRODUCTION', 'BONE_MINERALIZATION'],
     organs: ['BONES', 'MUSCLES'],
     deficiency: 'LOW_PHOSPHORUS',
-    description: 'Фосфор',
+    description: 'Минерал (energy), участвующий в энергетического обмена',
     type: 'minerals'
   },
   {
@@ -1517,7 +1517,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SULFUR_PATHWAY', 'COLLAGEN_SUPPORT'],
     organs: ['JOINTS', 'SKIN'],
     deficiency: 'INFLAMMATION',
-    description: 'Органическая сера',
+    description: 'Минерал (joints, detox), участвующий в детоксикации',
     type: 'minerals'
   },
   {
@@ -1527,7 +1527,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ELECTROLYTE_BALANCE', 'HYDRATION'],
     organs: ['MUSCLES', 'HEART'],
     deficiency: 'DEHYDRATION',
-    description: 'Комплекс электролитов',
+    description: 'Минерал (hydration), участвующий в гидратации',
     type: 'minerals'
   },
   {
@@ -1537,7 +1537,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MICRONUTRIENT_SUPPORT', 'ANTIOXIDANT'],
     organs: ['LIVER', 'BLOOD'],
     deficiency: 'DEFICIENCY',
-    description: 'Комплекс микроэлементов',
+    description: 'Минерал (enzyme), участвующий в обменных процессах и поддержании здоровья',
     type: 'minerals'
   },
   {
@@ -1547,7 +1547,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ATP_PRODUCTION', 'VASCULAR_RELAXATION'],
     organs: ['MUSCLES', 'HEART'],
     deficiency: 'FATIGUE',
-    description: 'Лактат магния',
+    description: 'Минерал (energy, relax), участвующий в энергетического обмена',
     type: 'minerals'
   },
   {
@@ -1557,7 +1557,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ATP_PRODUCTION', 'NMDA_MODULATION'],
     organs: ['BRAIN', 'MUSCLES'],
     deficiency: 'FATIGUE',
-    description: 'Аспартат магния',
+    description: 'Минерал (energy), участвующий в энергетического обмена',
     type: 'minerals'
   },
   {
@@ -1567,7 +1567,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['FUMARATE_CYCLE', 'ATP_PRODUCTION'],
     organs: ['MUSCLES', 'HEART'],
     deficiency: 'FATIGUE',
-    description: 'Фумарат магния',
+    description: 'Минерал (energy), участвующий в энергетического обмена',
     type: 'minerals'
   },
   {
@@ -1577,7 +1577,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SUCCINATE_PATHWAY', 'ATP_PRODUCTION'],
     organs: ['MUSCLES', 'BRAIN'],
     deficiency: 'FATIGUE',
-    description: 'Сукцинат магния',
+    description: 'Минерал (energy), участвующий в энергетического обмена',
     type: 'minerals'
   },
   {
@@ -1587,7 +1587,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['OROTATE_PATHWAY', 'ATP_PRODUCTION'],
     organs: ['HEART', 'MUSCLES'],
     deficiency: 'HEART_STRESS',
-    description: 'Оротат магния',
+    description: 'Минерал (cardio, energy), участвующий в ССС, энергетического обмена',
     type: 'minerals'
   },
   {
@@ -1597,7 +1597,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ATP_SYNTHESIS', 'ELECTROLYTE_BALANCE'],
     organs: ['MUSCLES', 'HEART'],
     deficiency: 'LOW_MAG',
-    description: 'Фосфат магния',
+    description: 'Минерал (energy), участвующий в энергетического обмена',
     type: 'minerals'
   },
   {
@@ -1607,7 +1607,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['IMMUNE_SUPPORT', 'ANTIVIRAL'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'LOW_ZINC',
-    description: 'Ацетат цинка',
+    description: 'Минерал (immune, antiviral), участвующий в иммунной системы, противовирусной защиты',
     type: 'minerals'
   },
   {
@@ -1617,7 +1617,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['IMMUNE_SUPPORT', 'SKIN_HEALTH'],
     organs: ['SKIN', 'IMMUNE_SYSTEM'],
     deficiency: 'LOW_ZINC',
-    description: 'Сульфат цинка',
+    description: 'Минерал (immune), участвующий в иммунной системы',
     type: 'minerals'
   },
   {
@@ -1627,7 +1627,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['LIPOSOMAL_DELIVERY', 'IMMUNE_SUPPORT'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'LOW_ZINC',
-    description: 'Липосомальная форма цинка',
+    description: 'Минерал (immune, absorption), участвующий в иммунной системы',
     type: 'minerals'
   },
   {
@@ -1637,7 +1637,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['LIPOSOMAL_DELIVERY', 'GPX_ACTIVITY'],
     organs: ['LIVER', 'IMMUNE_SYSTEM'],
     deficiency: 'LOW_SELEN',
-    description: 'Липосомальный селен',
+    description: 'Минерал (antioxidant), участвующий в защиты клеток от окислительного стресса',
     type: 'minerals'
   },
   {
@@ -1647,7 +1647,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GPX_ACTIVITY', 'THYROID_SUPPORT'],
     organs: ['THYROID', 'LIVER'],
     deficiency: 'LOW_SELEN',
-    description: 'Комплекс форм селена',
+    description: 'Минерал (antioxidant), участвующий в защиты клеток от окислительного стресса',
     type: 'minerals'
   },
   {
@@ -1657,7 +1657,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['BONE_MINERALIZATION', 'ALKALINE'],
     organs: ['BONES'],
     deficiency: 'LOW_CALCIUM',
-    description: 'Лактат кальция',
+    description: 'Минерал (bone), участвующий в костной ткани',
     type: 'minerals'
   },
   {
@@ -1667,7 +1667,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['BONE_MINERALIZATION', 'COLLAGEN_SUPPORT'],
     organs: ['BONES'],
     deficiency: 'LOW_CALCIUM',
-    description: 'Хелат кальция',
+    description: 'Минерал (bone, absorption), участвующий в костной ткани',
     type: 'minerals'
   },
   {
@@ -1677,7 +1677,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['PH_BALANCE', 'ELECTROLYTE_BALANCE'],
     organs: ['HEART', 'KIDNEYS'],
     deficiency: 'ACIDOSIS',
-    description: 'Бикарбонат калия',
+    description: 'Минерал (alkaline), участвующий в обменных процессах и поддержании здоровья',
     type: 'minerals'
   },
   {
@@ -1687,7 +1687,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['OROTATE_PATHWAY', 'ELECTROLYTE_BALANCE'],
     organs: ['HEART', 'MUSCLES'],
     deficiency: 'HYPERTENSION',
-    description: 'Оротат калия',
+    description: 'Минерал (cardio, energy), участвующий в ССС, энергетического обмена',
     type: 'minerals'
   },
   {
@@ -1697,7 +1697,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['OROTATE_PATHWAY', 'HYDRATION'],
     organs: ['MUSCLES', 'HEART'],
     deficiency: 'DEHYDRATION',
-    description: 'Оротат натрия',
+    description: 'Минерал (energy), участвующий в энергетического обмена',
     type: 'minerals'
   },
   {
@@ -1707,7 +1707,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CUPROENZYME_SUPPORT', 'IRON_METABOLISM'],
     organs: ['BLOOD', 'LIVER'],
     deficiency: 'LOW_COPPER',
-    description: 'Хелат меди',
+    description: 'Минерал (enzyme), участвующий в обменных процессах и поддержании здоровья',
     type: 'minerals'
   },
   {
@@ -1717,7 +1717,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['LIPOSOMAL_DELIVERY', 'CUPROENZYME_SUPPORT'],
     organs: ['LIVER', 'BLOOD'],
     deficiency: 'LOW_COPPER',
-    description: 'Липосомальная медь',
+    description: 'Минерал (enzyme), участвующий в обменных процессах и поддержании здоровья',
     type: 'minerals'
   },
   {
@@ -1727,7 +1727,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SOD_SUPPORT', 'CARTILAGE_SUPPORT'],
     organs: ['JOINTS', 'BONES'],
     deficiency: 'LOW_MANGANESE',
-    description: 'Хелат марганца',
+    description: 'Минерал (enzyme), участвующий в обменных процессах и поддержании здоровья',
     type: 'minerals'
   },
   {
@@ -1737,7 +1737,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['INSULIN_SENSITIVITY', 'GLUCOSE_REGULATION'],
     organs: ['PANCREAS', 'LIVER'],
     deficiency: 'INSULIN_RESISTANCE',
-    description: 'Форма GTF',
+    description: 'Минерал (insulin), участвующий в обменных процессах и поддержании здоровья',
     type: 'minerals'
   },
   {
@@ -1747,7 +1747,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SULFITE_OXIDASE', 'DETOX'],
     organs: ['LIVER', 'KIDNEYS'],
     deficiency: 'LOW_MOLY',
-    description: 'Комплекс молибдена',
+    description: 'Минерал (detox), участвующий в детоксикации',
     type: 'minerals'
   },
   {
@@ -1757,7 +1757,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['THYROID_HORMONE_SYNTHESIS', 'IODINE_UPTAKE'],
     organs: ['THYROID'],
     deficiency: 'LOW_IODINE',
-    description: 'Атомарный йод',
+    description: 'Минерал (thyroid), участвующий в щитовидной железы',
     type: 'minerals'
   },
   {
@@ -1767,7 +1767,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['THYROID_SUPPORT', 'IODINE_UPTAKE'],
     organs: ['THYROID'],
     deficiency: 'LOW_IODINE',
-    description: 'Насцент-йод',
+    description: 'Минерал (thyroid), участвующий в щитовидной железы',
     type: 'minerals'
   },
   {
@@ -1777,7 +1777,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['HEMOGLOBIN_SYNTHESIS', 'IRON_UPTAKE'],
     organs: ['BLOOD'],
     deficiency: 'ANEMIA',
-    description: 'Гемовое железо',
+    description: 'Минерал (blood), участвующий в кроветворения',
     type: 'minerals'
   },
   {
@@ -1787,7 +1787,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['LIPOSOMAL_DELIVERY', 'IRON_UPTAKE'],
     organs: ['BLOOD'],
     deficiency: 'ANEMIA',
-    description: 'Липосомальное железо',
+    description: 'Минерал (blood), участвующий в кроветворения',
     type: 'minerals'
   },
   {
@@ -1797,7 +1797,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['HEMOGLOBIN_SYNTHESIS', 'IRON_UPTAKE'],
     organs: ['BLOOD'],
     deficiency: 'ANEMIA',
-    description: 'Фумарат железа',
+    description: 'Минерал (blood), участвующий в кроветворения',
     type: 'minerals'
   },
   {
@@ -1807,7 +1807,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NEUROPROTECTION', 'MOOD_SUPPORT'],
     organs: ['BRAIN'],
     deficiency: 'MOOD_ISSUES',
-    description: 'Аспартат лития',
+    description: 'Минерал (neuro), участвующий в нервной системы',
     type: 'minerals'
   },
   {
@@ -1817,7 +1817,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['BONE_METABOLISM', 'TESTOSTERONE_SUPPORT'],
     organs: ['BONES', 'HORMONES'],
     deficiency: 'LOW_BORON',
-    description: 'Фруктоборная форма',
+    description: 'Минерал (hormone), участвующий в гормонального баланса',
     type: 'minerals'
   },
   {
@@ -1827,7 +1827,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['COLLAGEN_SUPPORT', 'SKIN_HEALTH'],
     organs: ['SKIN', 'HAIR'],
     deficiency: 'LOW_SILICON',
-    description: 'Кремний из бамбука',
+    description: 'Минерал (skin, hair), участвующий в здоровья кожи, здоровья волос',
     type: 'minerals'
   },
   {
@@ -1837,7 +1837,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['INSULIN_MIMETIC', 'GLUCOSE_REGULATION'],
     organs: ['PANCREAS', 'LIVER'],
     deficiency: 'INSULIN_RESISTANCE',
-    description: 'Оротат ванадия',
+    description: 'Минерал (insulin), участвующий в обменных процессах и поддержании здоровья',
     type: 'minerals'
   },
   {
@@ -1847,7 +1847,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ATP_PRODUCTION', 'BONE_MINERALIZATION'],
     organs: ['BONES', 'MUSCLES'],
     deficiency: 'LOW_PHOSPHORUS',
-    description: 'Органический фосфор',
+    description: 'Минерал (energy), участвующий в энергетического обмена',
     type: 'minerals'
   },
   {
@@ -1857,7 +1857,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SULFUR_PATHWAY', 'ANTI_INFLAMMATION'],
     organs: ['SKIN', 'JOINTS'],
     deficiency: 'INFLAMMATION',
-    description: 'Диметилсульфоксид',
+    description: 'Минерал (detox, antiinflammatory), участвующий в детоксикации, противовоспалительной защиты',
     type: 'minerals'
   },
   {
@@ -1867,7 +1867,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ELECTROLYTE_BALANCE', 'HYDRATION'],
     organs: ['MUSCLES', 'HEART'],
     deficiency: 'DEHYDRATION',
-    description: 'Минералы морской соли',
+    description: 'Минерал (hydration), участвующий в гидратации',
     type: 'minerals'
   },
   {
@@ -1877,7 +1877,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['IONIC_ABSORPTION', 'ELECTROLYTE_BALANCE'],
     organs: ['MUSCLES', 'HEART'],
     deficiency: 'DEHYDRATION',
-    description: 'Ионные электролиты',
+    description: 'Минерал (hydration), участвующий в гидратации',
     type: 'minerals'
   },
   {
@@ -1887,7 +1887,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['FULVIC_TRANSPORT', 'MICRONUTRIENT_SUPPORT'],
     organs: ['LIVER', 'BLOOD'],
     deficiency: 'DEFICIENCY',
-    description: 'Фульватные минералы',
+    description: 'Минерал (enzyme), участвующий в обменных процессах и поддержании здоровья',
     type: 'minerals'
   },
   {
@@ -1897,7 +1897,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['HUMIC_BINDING', 'MICRONUTRIENT_SUPPORT'],
     organs: ['GI', 'LIVER'],
     deficiency: 'DEFICIENCY',
-    description: 'Гуминовые минералы',
+    description: 'Минерал (detox), участвующий в детоксикации',
     type: 'minerals'
   },
   {
@@ -1907,7 +1907,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SILVER_ION_ACTION', 'IMMUNE_SUPPORT'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'INFECTION',
-    description: 'Коллоидное серебро',
+    description: 'Минерал (antimicrobial), участвующий в противомикробной защиты',
     type: 'minerals'
   },
   {
@@ -1917,7 +1917,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NEURO_MODULATION', 'MOOD_SUPPORT'],
     organs: ['BRAIN'],
     deficiency: 'MOOD_ISSUES',
-    description: 'Коллоидное золото',
+    description: 'Минерал (neuro), участвующий в нервной системы',
     type: 'minerals'
   },
   {
@@ -1927,7 +1927,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NEURO_ENHANCEMENT', 'CELL_SIGNALING'],
     organs: ['BRAIN'],
     deficiency: 'COGNITION',
-    description: 'Коллоидная платина',
+    description: 'Минерал (neuro), участвующий в нервной системы',
     type: 'minerals'
   },
   {
@@ -1937,7 +1937,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['OXYGEN_UTILIZATION', 'IMMUNE_SUPPORT'],
     organs: ['IMMUNE_SYSTEM', 'HEART'],
     deficiency: 'LOW_OXYGEN',
-    description: 'Органический германий',
+    description: 'Минерал (oxygen), участвующий в обменных процессах и поддержании здоровья',
     type: 'minerals'
   },
   {
@@ -1947,7 +1947,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SEMICONDUCTOR_EFFECT', 'CELL_SIGNALING'],
     organs: ['BRAIN', 'HEART'],
     deficiency: 'LOW_OXYGEN',
-    description: 'Редкая форма германия',
+    description: 'Минерал (energy), участвующий в энергетического обмена',
     type: 'minerals'
   },
   {
@@ -1957,7 +1957,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ELECTROLYTE_BALANCE', 'NEURO_MODULATION'],
     organs: ['BRAIN', 'HEART'],
     deficiency: 'LOW_RUBIDIUM',
-    description: 'Редкий щелочной металл',
+    description: 'Минерал (electrolyte), участвующий в электролитного баланса',
     type: 'minerals'
   },
   {
@@ -1967,7 +1967,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['PH_BALANCE', 'CELL_REGULATION'],
     organs: ['CELLS'],
     deficiency: 'ACIDOSIS',
-    description: 'Щелочной элемент',
+    description: 'Минерал (alkaline), участвующий в обменных процессах и поддержании здоровья',
     type: 'minerals'
   },
   {
@@ -1977,7 +1977,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['BONE_MINERALIZATION', 'OSTEOBLAST_STIMULATION'],
     organs: ['BONES'],
     deficiency: 'OSTEOPOROSIS',
-    description: 'Минерал костной ткани',
+    description: 'Минерал (bone), участвующий в костной ткани',
     type: 'minerals'
   },
   {
@@ -1987,7 +1987,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['BONE_MINERALIZATION', 'OSTEOBLAST_STIMULATION'],
     organs: ['BONES'],
     deficiency: 'OSTEOPOROSIS',
-    description: 'Цитрат стронция',
+    description: 'Минерал (bone), участвующий в костной ткани',
     type: 'minerals'
   },
   {
@@ -1997,7 +1997,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ION_EXCHANGE', 'HEAVY_METAL_BINDING'],
     organs: ['GI', 'LIVER'],
     deficiency: 'TOXINS',
-    description: 'Природный цеолит',
+    description: 'Минерал (detox), участвующий в детоксикации',
     type: 'minerals'
   },
   {
@@ -2007,7 +2007,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ADSORPTION', 'GI_BINDING'],
     organs: ['GI', 'LIVER'],
     deficiency: 'TOXINS',
-    description: 'Бентонит',
+    description: 'Минерал (detox), участвующий в детоксикации',
     type: 'minerals'
   },
   {
@@ -2017,7 +2017,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['BONE_MINERALIZATION', 'PH_BALANCE'],
     organs: ['BONES', 'GI'],
     deficiency: 'LOW_CALCIUM',
-    description: 'Коралловый кальций',
+    description: 'Минерал (bone, alkaline), участвующий в костной ткани',
     type: 'minerals'
   },
   {
@@ -2027,7 +2027,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MICRONUTRIENT_SUPPORT', 'ANTIOXIDANT'],
     organs: ['BLOOD', 'LIVER'],
     deficiency: 'DEFICIENCY',
-    description: 'Минералы красной глины',
+    description: 'Минерал, участвующий в обменных процессах и поддержании здоровья',
     type: 'minerals'
   },
   {
@@ -2037,7 +2037,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['FULVIC_TRANSPORT', 'ANTIOXIDANT'],
     organs: ['LIVER', 'BLOOD'],
     deficiency: 'DEFICIENCY',
-    description: 'Минералы черного сланца',
+    description: 'Минерал, участвующий в обменных процессах и поддержании здоровья',
     type: 'minerals'
   },
   {
@@ -2047,7 +2047,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['IONIC_ABSORPTION', 'MICRONUTRIENT_SUPPORT'],
     organs: ['BLOOD', 'LIVER'],
     deficiency: 'DEFICIENCY',
-    description: 'Минералы голубой глины',
+    description: 'Минерал, участвующий в обменных процессах и поддержании здоровья',
     type: 'minerals'
   },
   {
@@ -2057,7 +2057,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GI_REPAIR', 'IMMUNE_SUPPORT'],
     organs: ['GI', 'IMMUNE_SYSTEM'],
     deficiency: 'LEAKY_GUT',
-    description: 'Аминокислота для кишечника',
+    description: 'Аминокислота, участвующая в иммунной системы',
     type: 'amino'
   },
   {
@@ -2067,7 +2067,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GABA_SUPPORT', 'COLLAGEN_SUPPORT'],
     organs: ['BRAIN', 'SKIN', 'LIVER'],
     deficiency: 'INSOMNIA',
-    description: 'Успокаивающая аминокислота',
+    description: 'Аминокислота, участвующая в успокоения, детоксикации',
     type: 'amino'
   },
   {
@@ -2077,7 +2077,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CALCIUM_REGULATION', 'GABA_SUPPORT'],
     organs: ['HEART', 'BRAIN', 'VESSELS'],
     deficiency: 'HYPERTENSION',
-    description: 'Аминокислота сердца',
+    description: 'Аминокислота, участвующая в ССС, нервной системы',
     type: 'amino'
   },
   {
@@ -2087,7 +2087,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ALPHA_WAVE_UP', 'GABA_SUPPORT'],
     organs: ['BRAIN'],
     deficiency: 'ANXIETY',
-    description: 'Аминокислота расслабления',
+    description: 'Аминокислота, участвующая в когнитивных функций, успокоения',
     type: 'amino'
   },
   {
@@ -2097,7 +2097,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['DOPAMINE_SYNTHESIS', 'THYROID_SUPPORT'],
     organs: ['BRAIN', 'THYROID'],
     deficiency: 'LOW_DOPAMINE',
-    description: 'Предшественник дофамина',
+    description: 'Аминокислота, участвующая в когнитивных функций, гормонального баланса',
     type: 'amino'
   },
   {
@@ -2107,7 +2107,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['DOPAMINE_UP', 'NEURO_SUPPORT'],
     organs: ['BRAIN'],
     deficiency: 'PARKINSON',
-    description: 'Источник L-DOPA',
+    description: 'Аминокислота, участвующая в когнитивных функций',
     type: 'amino'
   },
   {
@@ -2117,7 +2117,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SEROTONIN_SYNTHESIS', 'MELATONIN_PATHWAY'],
     organs: ['BRAIN'],
     deficiency: 'INSOMNIA',
-    description: 'Предшественник серотонина',
+    description: 'Аминокислота, участвующая в нервной системы',
     type: 'amino'
   },
   {
@@ -2127,7 +2127,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SEROTONIN_UP', 'MOOD_SUPPORT'],
     organs: ['BRAIN'],
     deficiency: 'DEPRESSION',
-    description: 'Серотониновый прекурсор',
+    description: 'Аминокислота, участвующая в нервной системы',
     type: 'amino'
   },
   {
@@ -2137,7 +2137,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['FATTY_ACID_TRANSPORT', 'ATP_PRODUCTION'],
     organs: ['HEART', 'MUSCLES'],
     deficiency: 'FATIGUE',
-    description: 'Транспорт жирных кислот',
+    description: 'Аминокислота, участвующая в работы митохондрий',
     type: 'amino'
   },
   {
@@ -2147,7 +2147,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MITO_REPAIR', 'ACH_SUPPORT'],
     organs: ['BRAIN', 'NERVES'],
     deficiency: 'COGNITION',
-    description: 'Нейромитохондриальная форма',
+    description: 'Аминокислота, участвующая в когнитивных функций, работы митохондрий',
     type: 'amino'
   },
   {
@@ -2157,7 +2157,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['FATTY_ACID_TRANSPORT', 'ATP_PRODUCTION'],
     organs: ['MUSCLES'],
     deficiency: 'ATHLETES',
-    description: 'Форма для спорта',
+    description: 'Аминокислота, участвующая в производительности',
     type: 'amino'
   },
   {
@@ -2167,7 +2167,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NO_PRODUCTION', 'VASCULAR_DILATION'],
     organs: ['VESSELS', 'HEART'],
     deficiency: 'LOW_NO',
-    description: 'Предшественник аргинина',
+    description: 'Аминокислота, участвующая в синтезе белка и метаболических процессах',
     type: 'amino'
   },
   {
@@ -2177,7 +2177,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NO_PRODUCTION', 'VASCULAR_DILATION'],
     organs: ['VESSELS', 'HEART'],
     deficiency: 'LOW_NO',
-    description: 'NO-донор',
+    description: 'Аминокислота, участвующая в синтезе белка и метаболических процессах',
     type: 'amino'
   },
   {
@@ -2187,7 +2187,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NMDA_MODULATION', 'NO_MODULATION'],
     organs: ['BRAIN', 'VESSELS'],
     deficiency: 'ANXIETY',
-    description: 'Модулятор NO и NMDA',
+    description: 'Аминокислота, участвующая в когнитивных функций',
     type: 'amino'
   },
   {
@@ -2197,7 +2197,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['HISTAMINE_PATHWAY', 'HEMOGLOBIN_SUPPORT'],
     organs: ['BLOOD', 'IMMUNE_SYSTEM'],
     deficiency: 'LOW_HISTIDINE',
-    description: 'Предшественник гистидина',
+    description: 'Аминокислота, участвующая в кроветворения, иммунной системы',
     type: 'amino'
   },
   {
@@ -2207,7 +2207,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['METHYL_DONOR', 'LIVER_SUPPORT'],
     organs: ['LIVER', 'BLOOD'],
     deficiency: 'HIGH_HOMOCYSTEINE',
-    description: 'Метильная аминокислота',
+    description: 'Аминокислота, участвующая в метилирования',
     type: 'amino'
   },
   {
@@ -2217,7 +2217,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GLUTATHIONE_SYNTHESIS', 'DETOX'],
     organs: ['LIVER', 'IMMUNE_SYSTEM'],
     deficiency: 'LOW_GSH',
-    description: 'Предшественник глутатиона',
+    description: 'Аминокислота, участвующая в защиты клеток от окислительного стресса',
     type: 'amino'
   },
   {
@@ -2227,7 +2227,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GLUTATHIONE_UP', 'MUCUS_BREAKDOWN'],
     organs: ['LUNGS', 'LIVER'],
     deficiency: 'OXIDATIVE_STRESS',
-    description: 'Источник глутатиона',
+    description: 'Аминокислота, участвующая в защиты клеток от окислительного стресса, легких',
     type: 'amino'
   },
   {
@@ -2237,7 +2237,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['PHOSPHOLIPID_SYNTHESIS', 'NMDA_SUPPORT'],
     organs: ['BRAIN'],
     deficiency: 'COGNITION',
-    description: 'Аминокислота мозга',
+    description: 'Аминокислота, участвующая в нервной системы',
     type: 'amino'
   },
   {
@@ -2257,7 +2257,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GLUCOSE_CYCLE', 'MUSCLE_SUPPORT'],
     organs: ['MUSCLES'],
     deficiency: 'FATIGUE',
-    description: 'Аланин',
+    description: 'Аминокислота, участвующая в энергетического обмена',
     type: 'amino'
   },
   {
@@ -2267,7 +2267,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CARNOSINE_SYNTHESIS', 'LACTATE_BUFFER'],
     organs: ['MUSCLES'],
     deficiency: 'ATHLETES',
-    description: 'Предшественник карнозина',
+    description: 'Аминокислота, участвующая в производительности',
     type: 'amino'
   },
   {
@@ -2277,7 +2277,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['COLLAGEN_SYNTHESIS', 'SKIN_REPAIR'],
     organs: ['SKIN', 'JOINTS'],
     deficiency: 'LOW_COLLAGEN',
-    description: 'Аминокислота коллагена',
+    description: 'Аминокислота, участвующая в здоровья кожи, соединительной ткани',
     type: 'amino'
   },
   {
@@ -2287,7 +2287,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['COLLAGEN_SUPPORT', 'SKIN_REPAIR'],
     organs: ['SKIN', 'JOINTS'],
     deficiency: 'LOW_COLLAGEN',
-    description: 'Компонент коллагена',
+    description: 'Аминокислота, участвующая в здоровья кожи, соединительной ткани',
     type: 'amino'
   },
   {
@@ -2297,7 +2297,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MUSCLE_ENERGY', 'RECOVERY'],
     organs: ['MUSCLES'],
     deficiency: 'FATIGUE',
-    description: 'Валин',
+    description: 'Аминокислота, участвующая в синтезе белка и метаболических процессах',
     type: 'amino'
   },
   {
@@ -2307,7 +2307,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MTOR_ACTIVATION', 'MUSCLE_GROWTH'],
     organs: ['MUSCLES'],
     deficiency: 'LOW_MUSCLE',
-    description: 'Главный BCAA',
+    description: 'Аминокислота, участвующая в синтезе белка и метаболических процессах',
     type: 'amino'
   },
   {
@@ -2317,7 +2317,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GLUCOSE_UPTAKE', 'RECOVERY'],
     organs: ['MUSCLES'],
     deficiency: 'FATIGUE',
-    description: 'Изолейцин',
+    description: 'Аминокислота, участвующая в синтезе белка и метаболических процессах',
     type: 'amino'
   },
   {
@@ -2327,7 +2327,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MTOR_ACTIVATION', 'MUSCLE_ENERGY'],
     organs: ['MUSCLES'],
     deficiency: 'ATHLETES',
-    description: 'Комплекс BCAA',
+    description: 'Аминокислота, участвующая в производительности',
     type: 'amino'
   },
   {
@@ -2337,7 +2337,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NMDA_SUPPORT', 'NEURO_SIGNALING'],
     organs: ['BRAIN'],
     deficiency: 'LOW_GLU',
-    description: 'Глутамат',
+    description: 'Аминокислота, участвующая в нервной системы',
     type: 'amino'
   },
   {
@@ -2347,7 +2347,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ATP_PRODUCTION', 'HORMONE_SUPPORT'],
     organs: ['MUSCLES', 'HORMONES'],
     deficiency: 'LOW_TESTOSTERONE',
-    description: 'Аспарагиновая кислота',
+    description: 'Аминокислота, участвующая в энергетического обмена',
     type: 'amino'
   },
   {
@@ -2357,7 +2357,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['UREA_CYCLE', 'AMMONIA_CLEARANCE'],
     organs: ['LIVER', 'MUSCLES'],
     deficiency: 'AMMONIA',
-    description: 'Орнитин',
+    description: 'Аминокислота, участвующая в детоксикации',
     type: 'amino'
   },
   {
@@ -2367,7 +2367,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NO_PRODUCTION', 'VASCULAR_DILATION'],
     organs: ['VESSELS'],
     deficiency: 'LOW_NO',
-    description: 'Смешанная форма цитруллина',
+    description: 'Аминокислота, участвующая в синтезе белка и метаболических процессах',
     type: 'amino'
   },
   {
@@ -2377,7 +2377,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CELL_GROWTH', 'PROTEIN_SYNTHESIS'],
     organs: ['CELLS'],
     deficiency: 'LOW_PROTEIN',
-    description: 'Аспарагин',
+    description: 'Аминокислота, участвующая в клеточного здоровья',
     type: 'amino'
   },
   {
@@ -2387,7 +2387,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GI_MUCUS_SUPPORT', 'IMMUNE_SUPPORT'],
     organs: ['GI', 'IMMUNE_SYSTEM'],
     deficiency: 'LOW_THREONINE',
-    description: 'Треонин',
+    description: 'Аминокислота, участвующая в иммунной системы',
     type: 'amino'
   },
   {
@@ -2397,7 +2397,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['COLLAGEN_SUPPORT', 'ANTIVIRAL'],
     organs: ['SKIN', 'IMMUNE_SYSTEM'],
     deficiency: 'HERPES',
-    description: 'Лизин',
+    description: 'Аминокислота, участвующая в иммунной системы, здоровья кожи',
     type: 'amino'
   },
   {
@@ -2407,7 +2407,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['COLLAGEN_SUPPORT', 'SKIN_REPAIR'],
     organs: ['SKIN', 'JOINTS'],
     deficiency: 'LOW_COLLAGEN',
-    description: 'Компонент коллагена',
+    description: 'Аминокислота, участвующая в соединительной ткани',
     type: 'amino'
   },
   {
@@ -2417,7 +2417,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['DOPAMINE_SYNTHESIS', 'NEURO_SUPPORT'],
     organs: ['BRAIN'],
     deficiency: 'LOW_DOPAMINE',
-    description: 'Предшественник тирозина',
+    description: 'Аминокислота, участвующая в нервной системы',
     type: 'amino'
   },
   {
@@ -2427,7 +2427,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ENDORPHIN_UP', 'PAIN_MODULATION'],
     organs: ['BRAIN', 'NERVES'],
     deficiency: 'PAIN',
-    description: 'Анальгетическая форма',
+    description: 'Аминокислота, участвующая в синтезе белка и метаболических процессах',
     type: 'amino'
   },
   {
@@ -2437,7 +2437,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['DOPAMINE_UP', 'ENDORPHIN_UP'],
     organs: ['BRAIN', 'NERVES'],
     deficiency: 'PAIN',
-    description: 'Комбинированная форма',
+    description: 'Аминокислота, участвующая в нервной системы',
     type: 'amino'
   },
   {
@@ -2447,7 +2447,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['HOMOCYSTEINE_PATHWAY', 'METHYLATION'],
     organs: ['BLOOD', 'LIVER'],
     deficiency: 'HIGH_HOMOCYSTEINE',
-    description: 'Метаболит метионина',
+    description: 'Аминокислота, участвующая в метилирования',
     type: 'amino'
   },
   {
@@ -2457,7 +2457,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GABA_UP', 'STRESS_REDUCTION'],
     organs: ['BRAIN'],
     deficiency: 'ANXIETY',
-    description: 'ГАМК',
+    description: 'Аминокислота, участвующая в успокоения',
     type: 'amino'
   },
   {
@@ -2467,7 +2467,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GABA_B_AGONIST', 'ANXIOLYTIC'],
     organs: ['BRAIN'],
     deficiency: 'ANXIETY',
-    description: 'Производное ГАМК',
+    description: 'Аминокислота, участвующая в успокоения, когнитивных функций',
     type: 'amino'
   },
   {
@@ -2477,7 +2477,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['METHYL_DONOR', 'HOMOCYSTEINE_REDUCTION'],
     organs: ['LIVER', 'BLOOD'],
     deficiency: 'HIGH_HOMOCYSTEINE',
-    description: 'Бетаин',
+    description: 'Аминокислота, участвующая в метилирования',
     type: 'amino'
   },
   {
@@ -2487,7 +2487,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ANTI_GLYCATION', 'ANTIOXIDANT'],
     organs: ['MUSCLES', 'BRAIN'],
     deficiency: 'AGING',
-    description: 'Карнозин',
+    description: 'Аминокислота, участвующая в защиты клеток от окислительного стресса',
     type: 'amino'
   },
   {
@@ -2497,7 +2497,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ANTIOXIDANT', 'CELL_PROTECTION'],
     organs: ['BRAIN', 'MUSCLES'],
     deficiency: 'OXIDATIVE_STRESS',
-    description: 'Ансерин',
+    description: 'Аминокислота, участвующая в защиты клеток от окислительного стресса',
     type: 'amino'
   },
   {
@@ -2507,7 +2507,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NMDA_COAGONIST', 'NEURO_SUPPORT'],
     organs: ['BRAIN'],
     deficiency: 'COGNITION',
-    description: 'Саркозин',
+    description: 'Аминокислота, участвующая в когнитивных функций',
     type: 'amino'
   },
   {
@@ -2517,7 +2517,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NMDA_COAGONIST', 'NEURO_SUPPORT'],
     organs: ['BRAIN'],
     deficiency: 'COGNITION',
-    description: 'Активатор NMDA',
+    description: 'Аминокислота, участвующая в когнитивных функций',
     type: 'amino'
   },
   {
@@ -2527,7 +2527,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['STOMACH_ACID_UP', 'DIGESTION'],
     organs: ['GI'],
     deficiency: 'LOW_STOMACH_ACID',
-    description: 'Бетаин HCL',
+    description: 'Аминокислота, участвующая в синтезе белка и метаболических процессах',
     type: 'amino'
   },
   {
@@ -2537,7 +2537,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GI_REPAIR', 'PROTEIN_SYNTHESIS'],
     organs: ['GI', 'MUSCLES'],
     deficiency: 'LEAKY_GUT',
-    description: 'Пептидная форма глутамина',
+    description: 'Аминокислота, участвующая в восстановления',
     type: 'amino'
   },
   {
@@ -2547,7 +2547,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['COLLAGEN_SUPPORT', 'SKIN_REPAIR'],
     organs: ['SKIN', 'JOINTS'],
     deficiency: 'LOW_COLLAGEN',
-    description: 'Аминокислоты коллагена',
+    description: 'Аминокислота, участвующая в здоровья кожи, суставов',
     type: 'amino'
   },
   {
@@ -2557,7 +2557,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ARGINASE_INHIBITION', 'NO_UP'],
     organs: ['VESSELS', 'HEART'],
     deficiency: 'LOW_NO',
-    description: 'Ингибитор аргиназы',
+    description: 'Аминокислота, участвующая в синтезе белка и метаболических процессах',
     type: 'amino'
   },
   {
@@ -2567,7 +2567,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CELL_SIGNALING', 'PROTEIN_SYNTHESIS'],
     organs: ['CELLS'],
     deficiency: 'LOW_PROTEIN',
-    description: 'Редкая аминокислота',
+    description: 'Аминокислота, участвующая в клеточного здоровья',
     type: 'amino'
   },
   {
@@ -2577,7 +2577,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NO_UP', 'VASCULAR_DILATION'],
     organs: ['VESSELS'],
     deficiency: 'LOW_NO',
-    description: 'Усиленная форма цитруллина',
+    description: 'Аминокислота, участвующая в синтезе белка и метаболических процессах',
     type: 'amino'
   },
   {
@@ -2587,7 +2587,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NO_UP', 'ATP_PRODUCTION'],
     organs: ['VESSELS', 'MUSCLES'],
     deficiency: 'LOW_NO',
-    description: 'AKG-комплекс аргинина',
+    description: 'Аминокислота, участвующая в производительности',
     type: 'amino'
   },
   {
@@ -2597,7 +2597,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MTOR_UP', 'MUSCLE_PRESERVATION'],
     organs: ['MUSCLES'],
     deficiency: 'CATABOLISM',
-    description: 'Метаболит лейцина',
+    description: 'Аминокислота, участвующая в синтезе белка и метаболических процессах',
     type: 'amino'
   },
   {
@@ -2607,7 +2607,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ANTI_CATABOLIC', 'MTOR_UP'],
     organs: ['MUSCLES'],
     deficiency: 'CATABOLISM',
-    description: 'Метаболит лейцина',
+    description: 'Аминокислота, участвующая в синтезе белка и метаболических процессах',
     type: 'amino'
   },
   {
@@ -2617,7 +2617,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GI_REPAIR', 'ATP_PRODUCTION'],
     organs: ['GI', 'MUSCLES'],
     deficiency: 'LEAKY_GUT',
-    description: 'Глутамин + AKG',
+    description: 'Аминокислота, участвующая в энергетического обмена',
     type: 'amino'
   },
   {
@@ -2627,7 +2627,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GLUTATHIONE_UP', 'DETOX'],
     organs: ['LIVER', 'IMMUNE_SYSTEM'],
     deficiency: 'OXIDATIVE_STRESS',
-    description: 'Глутатион',
+    description: 'Аминокислота, участвующая в защиты клеток от окислительного стресса',
     type: 'amino'
   },
   {
@@ -2637,7 +2637,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['LIPOSOMAL_DELIVERY', 'GLUTATHIONE_UP'],
     organs: ['LIVER', 'IMMUNE_SYSTEM'],
     deficiency: 'OXIDATIVE_STRESS',
-    description: 'Липосомальный глутатион',
+    description: 'Аминокислота, участвующая в защиты клеток от окислительного стресса',
     type: 'amino'
   },
   {
@@ -2647,7 +2647,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ATP_PRODUCTION', 'NO_UP'],
     organs: ['HEART', 'VESSELS'],
     deficiency: 'FATIGUE',
-    description: 'PLC форма карнитина',
+    description: 'Аминокислота, участвующая в работы митохондрий',
     type: 'amino'
   },
   {
@@ -2657,7 +2657,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GABA_SUPPORT', 'NEURO_SUPPORT'],
     organs: ['BRAIN'],
     deficiency: 'ANXIETY',
-    description: 'Производное глицина',
+    description: 'Аминокислота, участвующая в нервной системы',
     type: 'amino'
   },
   {
@@ -2667,7 +2667,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MUSCLE_RECOVERY', 'ANTIOXIDANT'],
     organs: ['MUSCLES'],
     deficiency: 'FATIGUE',
-    description: 'Метаболит гистидина',
+    description: 'Аминокислота, участвующая в мышц',
     type: 'amino'
   },
   {
@@ -2677,7 +2677,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['FUMARATE_CYCLE', 'ATP_PRODUCTION'],
     organs: ['HEART', 'MUSCLES'],
     deficiency: 'FATIGUE',
-    description: 'Фумарат карнитина',
+    description: 'Аминокислота, участвующая в работы митохондрий',
     type: 'amino'
   },
   {
@@ -2687,7 +2687,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CARNITINE_PRECURSOR', 'FAT_OXIDATION'],
     organs: ['HEART', 'MUSCLES'],
     deficiency: 'LOW_CARNITINE',
-    description: 'Предшественник карнитина',
+    description: 'Аминокислота, участвующая в работы митохондрий',
     type: 'amino'
   },
   {
@@ -2697,7 +2697,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NITRATE_PATHWAY', 'NO_UP'],
     organs: ['VESSELS', 'HEART'],
     deficiency: 'LOW_NO',
-    description: 'Нитрат аргинина',
+    description: 'Аминокислота, участвующая в синтезе белка и метаболических процессах',
     type: 'amino'
   },
   {
@@ -2707,7 +2707,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NITRATE_PATHWAY', 'NO_UP'],
     organs: ['VESSELS', 'HEART'],
     deficiency: 'LOW_NO',
-    description: 'Нитрат цитруллина',
+    description: 'Аминокислота, участвующая в синтезе белка и метаболических процессах',
     type: 'amino'
   },
   {
@@ -2717,7 +2717,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['HISTAMINE_MODULATION', 'IMMUNE_SUPPORT'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'ALLERGY',
-    description: 'Регуляция гистамина',
+    description: 'Аминокислота, участвующая в иммунной системы',
     type: 'amino'
   },
   {
@@ -2727,7 +2727,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NO_UP', 'ATP_PRODUCTION'],
     organs: ['HEART', 'VESSELS'],
     deficiency: 'FATIGUE',
-    description: 'ГПЛК',
+    description: 'Аминокислота, участвующая в работы митохондрий',
     type: 'amino'
   },
   {
@@ -2737,7 +2737,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['METHYL_DONOR', 'HOMOCYSTEINE_REDUCTION'],
     organs: ['LIVER', 'BLOOD'],
     deficiency: 'HIGH_HOMOCYSTEINE',
-    description: 'Бетаин безводный',
+    description: 'Аминокислота, участвующая в метилирования',
     type: 'amino'
   },
   {
@@ -2747,7 +2747,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GLUTATHIONE_UP', 'CELL_PROTECTION'],
     organs: ['LIVER', 'BRAIN'],
     deficiency: 'OXIDATIVE_STRESS',
-    description: 'Усиленная форма NAC',
+    description: 'Аминокислота, участвующая в защиты клеток от окислительного стресса',
     type: 'amino'
   },
   {
@@ -2757,7 +2757,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GABA_UP', 'STRESS_REDUCTION'],
     organs: ['BRAIN'],
     deficiency: 'ANXIETY',
-    description: 'Фармакологически чистая ГАМК',
+    description: 'Аминокислота, участвующая в успокоения',
     type: 'amino'
   },
   {
@@ -2767,7 +2767,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GABA_SUPPORT', 'VASCULAR_RELAXATION'],
     organs: ['BRAIN', 'HEART'],
     deficiency: 'ANXIETY',
-    description: 'Глицин + магний',
+    description: 'Аминокислота, участвующая в синтезе белка и метаболических процессах',
     type: 'amino'
   },
   {
@@ -2777,7 +2777,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CALCIUM_REGULATION', 'VASCULAR_RELAXATION'],
     organs: ['HEART', 'VESSELS'],
     deficiency: 'HYPERTENSION',
-    description: 'Таурин + магний',
+    description: 'Аминокислота, участвующая в ССС',
     type: 'amino'
   },
   {
@@ -2787,7 +2787,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['IMMUNE_SUPPORT', 'ANTIOXIDANT'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'LOW_ZINC',
-    description: 'Таурин + цинк',
+    description: 'Аминокислота, участвующая в иммунной системы',
     type: 'amino'
   },
   {
@@ -2797,7 +2797,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['IMMUNE_SUPPORT', 'SKIN_HEALTH'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'LOW_ZINC',
-    description: 'Глицин + цинк',
+    description: 'Аминокислота, участвующая в иммунной системы',
     type: 'amino'
   },
   {
@@ -2807,7 +2807,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['METHYL_DONOR', 'SEROTONIN_SUPPORT'],
     organs: ['BRAIN', 'LIVER'],
     deficiency: 'DEPRESSION',
-    description: 'Метаболит метионина',
+    description: 'Аминокислота, участвующая в нормализации настроения, метилирования',
     type: 'amino'
   },
   {
@@ -2817,7 +2817,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['HOMOCYSTEINE_PATHWAY', 'DETOX'],
     organs: ['LIVER', 'BLOOD'],
     deficiency: 'HIGH_HOMOCYSTEINE',
-    description: 'Промежуточный метаболит',
+    description: 'Аминокислота, участвующая в метилирования',
     type: 'amino'
   },
   {
@@ -2827,7 +2827,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CELL_GROWTH', 'PROTEIN_SYNTHESIS'],
     organs: ['CELLS'],
     deficiency: 'LOW_PROTEIN',
-    description: 'Гомосерин',
+    description: 'Аминокислота, участвующая в клеточного здоровья',
     type: 'amino'
   },
   {
@@ -2837,7 +2837,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GPX_ACTIVITY', 'THYROID_SUPPORT'],
     organs: ['THYROID', 'LIVER'],
     deficiency: 'LOW_SELEN',
-    description: 'Аминокислота селена',
+    description: 'Аминокислота, участвующая в защиты клеток от окислительного стресса',
     type: 'amino'
   },
   {
@@ -2847,7 +2847,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['PROTEIN_SYNTHESIS', 'CELL_REGULATION'],
     organs: ['CELLS'],
     deficiency: 'LOW_PROTEIN',
-    description: '21-я аминокислота',
+    description: 'Аминокислота, участвующая в клеточного здоровья',
     type: 'amino'
   },
   {
@@ -2857,7 +2857,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['UREA_CYCLE', 'ATP_PRODUCTION'],
     organs: ['LIVER', 'MUSCLES'],
     deficiency: 'AMMONIA',
-    description: 'Орнитин + AKG',
+    description: 'Аминокислота, участвующая в детоксикации, производительности',
     type: 'amino'
   },
   {
@@ -2867,7 +2867,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NO_UP', 'COLLAGEN_SUPPORT'],
     organs: ['VESSELS', 'SKIN'],
     deficiency: 'LOW_NO',
-    description: 'Аргинин + кремний',
+    description: 'Аминокислота, участвующая в здоровья кожи',
     type: 'amino'
   },
   {
@@ -2877,7 +2877,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['COLLAGEN_SUPPORT', 'BONE_MINERALIZATION'],
     organs: ['SKIN', 'BONES'],
     deficiency: 'LOW_SILICON',
-    description: 'Глицин + кремний',
+    description: 'Аминокислота, участвующая в здоровья кожи, костной ткани',
     type: 'amino'
   },
   {
@@ -2887,7 +2887,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ANTIOXIDANT', 'IMMUNE_SUPPORT'],
     organs: ['SKIN', 'IMMUNE_SYSTEM'],
     deficiency: 'LOW_ZINC',
-    description: 'Гистидин + цинк',
+    description: 'Аминокислота, участвующая в иммунной системы, здоровья кожи',
     type: 'amino'
   },
   {
@@ -2897,7 +2897,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GLUTATHIONE_UP', 'IMMUNE_SUPPORT'],
     organs: ['LIVER', 'IMMUNE_SYSTEM'],
     deficiency: 'LOW_ZINC',
-    description: 'Цистеин + цинк',
+    description: 'Аминокислота, участвующая в защиты клеток от окислительного стресса, иммунной системы',
     type: 'amino'
   },
   {
@@ -2907,7 +2907,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['IRON_UPTAKE', 'HEMOGLOBIN_SUPPORT'],
     organs: ['BLOOD'],
     deficiency: 'ANEMIA',
-    description: 'Глицин + железо',
+    description: 'Аминокислота, участвующая в кроветворения',
     type: 'amino'
   },
   {
@@ -2917,7 +2917,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['IRON_UPTAKE', 'HEMOGLOBIN_SUPPORT'],
     organs: ['BLOOD'],
     deficiency: 'ANEMIA',
-    description: 'Гистидин + железо',
+    description: 'Аминокислота, участвующая в кроветворения',
     type: 'amino'
   },
   {
@@ -2927,7 +2927,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['TESTOSTERONE_SUPPORT', 'ATP_PRODUCTION'],
     organs: ['HORMONES', 'MUSCLES'],
     deficiency: 'LOW_TESTOSTERONE',
-    description: 'Карнитин + цинк',
+    description: 'Аминокислота, участвующая в гормонального баланса, энергетического обмена',
     type: 'amino'
   },
   {
@@ -2937,7 +2937,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ATP_PRODUCTION', 'VASCULAR_RELAXATION'],
     organs: ['MUSCLES', 'HEART'],
     deficiency: 'FATIGUE',
-    description: 'Карнитин + магний',
+    description: 'Аминокислота, участвующая в энергетического обмена',
     type: 'amino'
   },
   {
@@ -2947,7 +2947,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['COLLAGEN_SUPPORT', 'BONE_MINERALIZATION'],
     organs: ['BONES', 'SKIN'],
     deficiency: 'LOW_CALCIUM',
-    description: 'Глицин + кальций',
+    description: 'Аминокислота, участвующая в костной ткани, здоровья кожи',
     type: 'amino'
   },
   {
@@ -2957,7 +2957,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ELECTROLYTE_BALANCE', 'HYDRATION'],
     organs: ['HEART', 'MUSCLES'],
     deficiency: 'LOW_POTASSIUM',
-    description: 'Глицин + калий',
+    description: 'Аминокислота, участвующая в электролитного баланса',
     type: 'amino'
   },
   {
@@ -2967,7 +2967,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SOD_SUPPORT', 'CARTILAGE_SUPPORT'],
     organs: ['JOINTS', 'BONES'],
     deficiency: 'LOW_MANGANESE',
-    description: 'Глицин + марганец',
+    description: 'Аминокислота, участвующая в синтезе белка и метаболических процессах',
     type: 'amino'
   },
   {
@@ -2977,7 +2977,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CUPROENZYME_SUPPORT', 'IRON_METABOLISM'],
     organs: ['BLOOD', 'LIVER'],
     deficiency: 'LOW_COPPER',
-    description: 'Глицин + медь',
+    description: 'Аминокислота, участвующая в синтезе белка и метаболических процессах',
     type: 'amino'
   },
   {
@@ -2987,7 +2987,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SULFITE_OXIDASE', 'DETOX'],
     organs: ['LIVER', 'KIDNEYS'],
     deficiency: 'LOW_MOLY',
-    description: 'Глицин + молибден',
+    description: 'Аминокислота, участвующая в детоксикации',
     type: 'amino'
   },
   {
@@ -2997,7 +2997,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['INSULIN_SENSITIVITY', 'GLUCOSE_REGULATION'],
     organs: ['PANCREAS', 'LIVER'],
     deficiency: 'INSULIN_RESISTANCE',
-    description: 'Глицин + хром',
+    description: 'Аминокислота, участвующая в синтезе белка и метаболических процессах',
     type: 'amino'
   },
   {
@@ -3007,7 +3007,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['BONE_METABOLISM', 'TESTOSTERONE_SUPPORT'],
     organs: ['BONES', 'HORMONES'],
     deficiency: 'LOW_BORON',
-    description: 'Глицин + бор',
+    description: 'Аминокислота, участвующая в гормонального баланса',
     type: 'amino'
   },
   {
@@ -3017,7 +3017,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SILVER_ION_ACTION', 'IMMUNE_SUPPORT'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'INFECTION',
-    description: 'Глицин + серебро',
+    description: 'Аминокислота, участвующая в противомикробной защиты',
     type: 'amino'
   },
   {
@@ -3027,7 +3027,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NEURO_MODULATION', 'MOOD_SUPPORT'],
     organs: ['BRAIN'],
     deficiency: 'MOOD_ISSUES',
-    description: 'Глицин + золото',
+    description: 'Аминокислота, участвующая в нервной системы',
     type: 'amino'
   },
   {
@@ -3037,7 +3037,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NEURO_ENHANCEMENT', 'CELL_SIGNALING'],
     organs: ['BRAIN'],
     deficiency: 'COGNITION',
-    description: 'Глицин + платина',
+    description: 'Аминокислота, участвующая в нервной системы',
     type: 'amino'
   },
   {
@@ -3047,7 +3047,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['OXYGEN_UTILIZATION', 'IMMUNE_SUPPORT'],
     organs: ['IMMUNE_SYSTEM', 'HEART'],
     deficiency: 'LOW_OXYGEN',
-    description: 'Глицин + германий',
+    description: 'Аминокислота, участвующая в синтезе белка и метаболических процессах',
     type: 'amino'
   },
   {
@@ -3057,7 +3057,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['INSULIN_MIMETIC', 'GLUCOSE_REGULATION'],
     organs: ['PANCREAS', 'LIVER'],
     deficiency: 'INSULIN_RESISTANCE',
-    description: 'Глицин + ванадий',
+    description: 'Аминокислота, участвующая в синтезе белка и метаболических процессах',
     type: 'amino'
   },
   {
@@ -3077,7 +3077,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NEUROPROTECTION', 'MEMBRANE_FLUIDITY'],
     organs: ['BRAIN', 'EYES'],
     deficiency: 'LOW_DHA',
-    description: 'Главная омега‑3 для мозга',
+    description: 'Жирная кислота, необходимая для работы мозга, зрения',
     type: 'fatty_acid'
   },
   {
@@ -3087,7 +3087,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ANTI_INFLAMMATION', 'VASCULAR_HEALTH'],
     organs: ['VESSELS', 'HEART'],
     deficiency: 'LOW_OMEGA3',
-    description: 'Редкая омега‑3',
+    description: 'Жирная кислота, необходимая для здоровья сердца, мозга и клеточных мембран',
     type: 'fatty_acid'
   },
   {
@@ -3097,7 +3097,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['OMEGA3_CONVERSION', 'ANTIOXIDANT'],
     organs: ['HEART', 'VESSELS'],
     deficiency: 'LOW_OMEGA3',
-    description: 'Растительная омега‑3',
+    description: 'Жирная кислота, необходимая для противовоспалительной защиты',
     type: 'fatty_acid'
   },
   {
@@ -3127,7 +3127,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['TRIGLYCERIDE_FORM', 'VASCULAR_HEALTH'],
     organs: ['VESSELS', 'HEART'],
     deficiency: 'LOW_OMEGA3',
-    description: 'Триглицеридная форма омега‑3',
+    description: 'Жирная кислота, необходимая для здоровья сердца, мозга и клеточных мембран',
     type: 'fatty_acid'
   },
   {
@@ -3137,7 +3137,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['TRIGLYCERIDE_REDUCTION', 'VASCULAR_HEALTH'],
     organs: ['HEART', 'VESSELS'],
     deficiency: 'HIGH_TG',
-    description: 'Этиловый эфир омега‑3',
+    description: 'Жирная кислота, необходимая для ССС',
     type: 'fatty_acid'
   },
   {
@@ -3147,7 +3147,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['PHOSPHOLIPID_DELIVERY', 'NEUROPROTECTION'],
     organs: ['BRAIN', 'VESSELS'],
     deficiency: 'LOW_OMEGA3',
-    description: 'Фосфолипидная форма омега‑3',
+    description: 'Жирная кислота, необходимая для работы мозга',
     type: 'fatty_acid'
   },
   {
@@ -3157,7 +3157,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NEUROPROTECTION', 'MEMBRANE_FLUIDITY'],
     organs: ['BRAIN', 'EYES'],
     deficiency: 'LOW_DHA',
-    description: 'Веганская DHA',
+    description: 'Жирная кислота, необходимая для работы мозга',
     type: 'fatty_acid'
   },
   {
@@ -3167,7 +3167,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ANTI_INFLAMMATION', 'VASCULAR_HEALTH'],
     organs: ['VESSELS', 'HEART'],
     deficiency: 'LOW_OMEGA3',
-    description: 'Веганская EPA',
+    description: 'Жирная кислота, необходимая для противовоспалительной защиты',
     type: 'fatty_acid'
   },
   {
@@ -3177,7 +3177,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ANTI_INFLAMMATION', 'HORMONE_BALANCE'],
     organs: ['SKIN', 'HORMONES'],
     deficiency: 'INFLAMMATION',
-    description: 'Противовоспалительная омега‑6',
+    description: 'Жирная кислота, необходимая для противовоспалительной защиты',
     type: 'fatty_acid'
   },
   {
@@ -3187,7 +3187,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CELL_MEMBRANE_SUPPORT', 'SKIN_HEALTH'],
     organs: ['SKIN', 'CELLS'],
     deficiency: 'LOW_LA',
-    description: 'Линолевая кислота',
+    description: 'Жирная кислота, необходимая для здоровья кожи, клеточного здоровья',
     type: 'fatty_acid'
   },
   {
@@ -3197,7 +3197,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ANABOLIC_SIGNALING', 'CELL_GROWTH'],
     organs: ['MUSCLES', 'CELLS'],
     deficiency: 'ATHLETES',
-    description: 'Арахидоновая кислота',
+    description: 'Жирная кислота, необходимая для производительности',
     type: 'fatty_acid'
   },
   {
@@ -3207,7 +3207,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['INSULIN_SENSITIVITY', 'SKIN_REPAIR'],
     organs: ['SKIN', 'LIVER'],
     deficiency: 'INSULIN_RESISTANCE',
-    description: 'Омега‑7',
+    description: 'Жирная кислота, необходимая для здоровья кожи, метаболизма',
     type: 'fatty_acid'
   },
   {
@@ -3217,7 +3217,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ANTI_INFLAMMATION', 'LIPID_BALANCE'],
     organs: ['HEART', 'VESSELS'],
     deficiency: 'HIGH_LIPIDS',
-    description: 'Олеиновая кислота',
+    description: 'Жирная кислота, необходимая для ССС',
     type: 'fatty_acid'
   },
   {
@@ -3237,7 +3237,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['KETONE_PRODUCTION', 'ATP_UP'],
     organs: ['BRAIN', 'MUSCLES'],
     deficiency: 'FATIGUE',
-    description: 'Каприловая кислота',
+    description: 'Жирная кислота, необходимая для энергетического обмена',
     type: 'fatty_acid'
   },
   {
@@ -3247,7 +3247,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['KETONE_PRODUCTION', 'ATP_UP'],
     organs: ['BRAIN', 'MUSCLES'],
     deficiency: 'FATIGUE',
-    description: 'Каприновая кислота',
+    description: 'Жирная кислота, необходимая для энергетического обмена',
     type: 'fatty_acid'
   },
   {
@@ -3257,7 +3257,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['KETONE_PRODUCTION', 'FAT_OXIDATION'],
     organs: ['BRAIN', 'MUSCLES'],
     deficiency: 'FATIGUE',
-    description: 'Комплекс MCT',
+    description: 'Жирная кислота, необходимая для энергетического обмена',
     type: 'fatty_acid'
   },
   {
@@ -3267,7 +3267,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['PHOSPHOLIPID_SUPPORT', 'LIVER_REPAIR'],
     organs: ['LIVER', 'BRAIN'],
     deficiency: 'FATTY_LIVER',
-    description: 'Фосфатидилхолин',
+    description: 'Жирная кислота, необходимая для функции печени, клеточного здоровья',
     type: 'fatty_acid'
   },
   {
@@ -3277,7 +3277,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NEUROPROTECTION', 'CORTISOL_REDUCTION'],
     organs: ['BRAIN'],
     deficiency: 'STRESS',
-    description: 'Фосфатидилсерин',
+    description: 'Жирная кислота, необходимая для когнитивных функций',
     type: 'fatty_acid'
   },
   {
@@ -3287,7 +3287,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CELL_MEMBRANE_SUPPORT', 'MITO_REPAIR'],
     organs: ['CELLS', 'BRAIN'],
     deficiency: 'LOW_PE',
-    description: 'Фосфатидилэтаноламин',
+    description: 'Жирная кислота, необходимая для клеточного здоровья',
     type: 'fatty_acid'
   },
   {
@@ -3297,7 +3297,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SIGNALING_PATHWAYS', 'MEMBRANE_SUPPORT'],
     organs: ['CELLS', 'BRAIN'],
     deficiency: 'LOW_PI',
-    description: 'Фосфатидилинозитол',
+    description: 'Жирная кислота, необходимая для клеточного здоровья',
     type: 'fatty_acid'
   },
   {
@@ -3307,7 +3307,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CELL_SIGNALING', 'MEMBRANE_STABILITY'],
     organs: ['BRAIN', 'SKIN'],
     deficiency: 'AGING',
-    description: 'Сфинголипиды',
+    description: 'Жирная кислота, необходимая для клеточного здоровья',
     type: 'fatty_acid'
   },
   {
@@ -3317,7 +3317,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SKIN_BARRIER', 'HYDRATION'],
     organs: ['SKIN'],
     deficiency: 'DRY_SKIN',
-    description: 'Керамиды',
+    description: 'Жирная кислота, необходимая для здоровья кожи',
     type: 'fatty_acid'
   },
   {
@@ -3327,7 +3327,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['LIPOSOMAL_DELIVERY', 'NEUROPROTECTION'],
     organs: ['BRAIN', 'EYES'],
     deficiency: 'LOW_DHA',
-    description: 'Липосомальная DHA',
+    description: 'Жирная кислота, необходимая для работы мозга',
     type: 'fatty_acid'
   },
   {
@@ -3337,7 +3337,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['LIPOSOMAL_DELIVERY', 'ANTI_INFLAMMATION'],
     organs: ['VESSELS', 'HEART'],
     deficiency: 'LOW_OMEGA3',
-    description: 'Липосомальная EPA',
+    description: 'Жирная кислота, необходимая для здоровья сердца, мозга и клеточных мембран',
     type: 'fatty_acid'
   },
   {
@@ -3347,7 +3347,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['PHOSPHOLIPID_DELIVERY', 'NEUROPROTECTION'],
     organs: ['BRAIN', 'VESSELS'],
     deficiency: 'LOW_OMEGA3',
-    description: 'Омега‑3 из криля',
+    description: 'Жирная кислота, необходимая для работы мозга',
     type: 'fatty_acid'
   },
   {
@@ -3357,7 +3357,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NEUROPROTECTION', 'VASCULAR_HEALTH'],
     organs: ['BRAIN', 'HEART'],
     deficiency: 'LOW_OMEGA3',
-    description: 'Омега‑3 из кальмара',
+    description: 'Жирная кислота, необходимая для работы мозга, ССС',
     type: 'fatty_acid'
   },
   {
@@ -3367,7 +3367,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ANTI_INFLAMMATION', 'LIPID_BALANCE'],
     organs: ['HEART', 'VESSELS'],
     deficiency: 'LOW_OMEGA3',
-    description: 'Омега‑3 из лосося',
+    description: 'Жирная кислота, необходимая для ССС',
     type: 'fatty_acid'
   },
   {
@@ -3377,7 +3377,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NEUROPROTECTION', 'VASCULAR_HEALTH'],
     organs: ['BRAIN', 'HEART'],
     deficiency: 'LOW_OMEGA3',
-    description: 'Омега‑3 из тунца',
+    description: 'Жирная кислота, необходимая для работы мозга, ССС',
     type: 'fatty_acid'
   },
   {
@@ -3387,7 +3387,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ANTI_INFLAMMATION', 'VASCULAR_HEALTH'],
     organs: ['VESSELS', 'HEART'],
     deficiency: 'LOW_OMEGA3',
-    description: 'Омега‑3 из моллюсков',
+    description: 'Жирная кислота, необходимая для здоровья сердца, мозга и клеточных мембран',
     type: 'fatty_acid'
   },
   {
@@ -3397,7 +3397,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['OMEGA3_CONVERSION', 'ANTI_INFLAMMATION'],
     organs: ['HEART', 'VESSELS'],
     deficiency: 'LOW_OMEGA3',
-    description: 'Растительный комплекс омега‑3',
+    description: 'Жирная кислота, необходимая для здоровья сердца, мозга и клеточных мембран',
     type: 'fatty_acid'
   },
   {
@@ -3407,7 +3407,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ANTI_INFLAMMATION', 'HORMONE_BALANCE'],
     organs: ['SKIN', 'HORMONES'],
     deficiency: 'INFLAMMATION',
-    description: 'Масло примулы',
+    description: 'Жирная кислота, необходимая для гормонального баланса, здоровья кожи',
     type: 'fatty_acid'
   },
   {
@@ -3417,7 +3417,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ANTI_INFLAMMATION', 'SKIN_HEALTH'],
     organs: ['SKIN', 'HORMONES'],
     deficiency: 'INFLAMMATION',
-    description: 'Масло огуречника',
+    description: 'Жирная кислота, необходимая для противовоспалительной защиты',
     type: 'fatty_acid'
   },
   {
@@ -3427,7 +3427,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ANTI_INFLAMMATION', 'IMMUNE_SUPPORT'],
     organs: ['SKIN', 'IMMUNE_SYSTEM'],
     deficiency: 'INFLAMMATION',
-    description: 'Масло чёрной смородины',
+    description: 'Жирная кислота, необходимая для иммунной системы, здоровья кожи',
     type: 'fatty_acid'
   },
   {
@@ -3437,7 +3437,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ANTI_INFLAMMATION', 'MEMBRANE_SUPPORT'],
     organs: ['SKIN', 'HEART'],
     deficiency: 'DRY_SKIN',
-    description: 'Омега‑9 из авокадо',
+    description: 'Жирная кислота, необходимая для здоровья кожи, ССС',
     type: 'fatty_acid'
   },
   {
@@ -3447,7 +3447,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ANTI_INFLAMMATION', 'LIPID_BALANCE'],
     organs: ['HEART', 'VESSELS'],
     deficiency: 'HIGH_LIPIDS',
-    description: 'Омега‑9 из оливок',
+    description: 'Жирная кислота, необходимая для ССС',
     type: 'fatty_acid'
   },
   {
@@ -3457,7 +3457,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['FAT_OXIDATION', 'METABOLISM_UP'],
     organs: ['MUSCLES', 'LIVER'],
     deficiency: 'OBESITY',
-    description: 'CLA премиум',
+    description: 'Жирная кислота, необходимая для жиросжигания',
     type: 'fatty_acid'
   },
   {
@@ -3467,7 +3467,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ANTI_INFLAMMATION', 'MEMBRANE_SUPPORT'],
     organs: ['HEART', 'VESSELS'],
     deficiency: 'HIGH_LIPIDS',
-    description: 'Комплекс MUFA',
+    description: 'Жирная кислота, необходимая для ССС',
     type: 'fatty_acid'
   },
   {
@@ -3477,7 +3477,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MEMBRANE_SUPPORT', 'ANTI_INFLAMMATION'],
     organs: ['CELLS', 'VESSELS'],
     deficiency: 'LOW_PUFA',
-    description: 'Комплекс ПНЖК',
+    description: 'Жирная кислота, необходимая для клеточного здоровья',
     type: 'fatty_acid'
   },
   {
@@ -3487,7 +3487,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['KETONE_PRODUCTION', 'ATP_UP'],
     organs: ['BRAIN', 'MUSCLES'],
     deficiency: 'FATIGUE',
-    description: 'Кетоновые эфиры',
+    description: 'Жирная кислота, необходимая для энергетического обмена',
     type: 'fatty_acid'
   },
   {
@@ -3497,7 +3497,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GUT_HEALTH', 'ANTI_INFLAMMATION'],
     organs: ['GI', 'IMMUNE_SYSTEM'],
     deficiency: 'LEAKY_GUT',
-    description: 'Масляная кислота',
+    description: 'Жирная кислота, необходимая для иммунной системы',
     type: 'fatty_acid'
   },
   {
@@ -3507,7 +3507,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GUT_HEALTH', 'GLUCOSE_REGULATION'],
     organs: ['GI', 'LIVER'],
     deficiency: 'INSULIN_RESISTANCE',
-    description: 'Пропионат',
+    description: 'Жирная кислота, необходимая для метаболизма',
     type: 'fatty_acid'
   },
   {
@@ -3517,7 +3517,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GUT_HEALTH', 'CELL_SIGNALING'],
     organs: ['GI', 'CELLS'],
     deficiency: 'LOW_SCFA',
-    description: 'Ацетат',
+    description: 'Жирная кислота, необходимая для клеточного здоровья',
     type: 'fatty_acid'
   },
   {
@@ -3527,7 +3527,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MEMBRANE_REPAIR', 'NEUROPROTECTION'],
     organs: ['BRAIN', 'NERVES'],
     deficiency: 'AGING',
-    description: 'Плазмалогены мозга',
+    description: 'Жирная кислота, необходимая для работы мозга, антивозрастных процессов',
     type: 'fatty_acid'
   },
   {
@@ -3537,7 +3537,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MEMBRANE_REPAIR', 'VASCULAR_HEALTH'],
     organs: ['BRAIN', 'VESSELS'],
     deficiency: 'AGING',
-    description: 'Морские плазмалогены',
+    description: 'Жирная кислота, необходимая для работы мозга',
     type: 'fatty_acid'
   },
   {
@@ -3547,7 +3547,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MITO_MEMBRANE_SUPPORT', 'ATP_PRODUCTION'],
     organs: ['HEART', 'MITOCHONDRIA'],
     deficiency: 'FATIGUE',
-    description: 'Кардиолипин митохондрий',
+    description: 'Жирная кислота, необходимая для работы митохондрий',
     type: 'fatty_acid'
   },
   {
@@ -3567,7 +3567,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MYELIN_SUPPORT', 'CELL_SIGNALING'],
     organs: ['BRAIN', 'NERVES'],
     deficiency: 'NEURO_DEGEN',
-    description: 'Сфингомиелин',
+    description: 'Жирная кислота, необходимая для работы мозга, клеточного здоровья',
     type: 'fatty_acid'
   },
   {
@@ -3577,7 +3577,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['PHOSPHOLIPID_DELIVERY', 'NEUROPROTECTION'],
     organs: ['BRAIN', 'EYES'],
     deficiency: 'LOW_DHA',
-    description: 'Фосфолипидная DHA',
+    description: 'Жирная кислота, необходимая для работы мозга',
     type: 'fatty_acid'
   },
   {
@@ -3587,7 +3587,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['PHOSPHOLIPID_DELIVERY', 'ANTI_INFLAMMATION'],
     organs: ['VESSELS', 'HEART'],
     deficiency: 'LOW_OMEGA3',
-    description: 'Фосфолипидная EPA',
+    description: 'Жирная кислота, необходимая для здоровья сердца, мозга и клеточных мембран',
     type: 'fatty_acid'
   },
   {
@@ -3597,7 +3597,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MONOGLYCERIDE_FORM', 'VASCULAR_HEALTH'],
     organs: ['VESSELS', 'HEART'],
     deficiency: 'LOW_OMEGA3',
-    description: 'Моноглицеридная форма омега‑3',
+    description: 'Жирная кислота, необходимая для здоровья сердца, мозга и клеточных мембран',
     type: 'fatty_acid'
   },
   {
@@ -3607,7 +3607,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['DIGLYCERIDE_FORM', 'LIPID_BALANCE'],
     organs: ['HEART', 'VESSELS'],
     deficiency: 'HIGH_TG',
-    description: 'Диглицеридная форма омега‑3',
+    description: 'Жирная кислота, необходимая для здоровья сердца, мозга и клеточных мембран',
     type: 'fatty_acid'
   },
   {
@@ -3627,7 +3627,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['OXIDATIVE_STRESS_REDUCTION', 'MEMBRANE_PROTECTION'],
     organs: ['BRAIN', 'HEART'],
     deficiency: 'OXIDATIVE_STRESS',
-    description: 'Омега‑3 + астаксантин',
+    description: 'Жирная кислота, необходимая для защиты клеток от окислительного стресса',
     type: 'fatty_acid'
   },
   {
@@ -3637,7 +3637,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SKIN_BARRIER', 'HYDRATION'],
     organs: ['SKIN'],
     deficiency: 'DRY_SKIN',
-    description: 'Керамидная омега‑3',
+    description: 'Жирная кислота, необходимая для здоровья кожи',
     type: 'fatty_acid'
   },
   {
@@ -3647,7 +3647,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['OMEGA3_CONVERSION', 'ANTI_INFLAMMATION'],
     organs: ['VESSELS', 'HEART'],
     deficiency: 'LOW_OMEGA3',
-    description: 'Редкая растительная омега‑3',
+    description: 'Жирная кислота, необходимая для здоровья сердца, мозга и клеточных мембран',
     type: 'fatty_acid'
   },
   {
@@ -3657,7 +3657,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ANTI_INFLAMMATION', 'CARTILAGE_SUPPORT'],
     organs: ['JOINTS'],
     deficiency: 'ARTHRITIS',
-    description: 'Омега‑3 с гарпагозидом',
+    description: 'Жирная кислота, необходимая для суставов',
     type: 'fatty_acid'
   },
   {
@@ -3667,7 +3667,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NEUROPROTECTION', 'MEMBRANE_FLUIDITY'],
     organs: ['BRAIN'],
     deficiency: 'COGNITION',
-    description: 'Нейро‑омега‑3',
+    description: 'Жирная кислота, необходимая для работы мозга',
     type: 'fatty_acid'
   },
   {
@@ -3677,7 +3677,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ANTI_INFLAMMATION', 'TRIGLYCERIDE_REDUCTION'],
     organs: ['HEART', 'VESSELS'],
     deficiency: 'HIGH_TG',
-    description: 'Кардио‑омега‑3',
+    description: 'Жирная кислота, необходимая для ССС',
     type: 'fatty_acid'
   },
   {
@@ -3687,7 +3687,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['FAT_METABOLISM', 'ANTI_INFLAMMATION'],
     organs: ['LIVER'],
     deficiency: 'FATTY_LIVER',
-    description: 'Печёночная омега‑3',
+    description: 'Жирная кислота, необходимая для функции печени',
     type: 'fatty_acid'
   },
   {
@@ -3697,7 +3697,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ANTI_INFLAMMATION', 'IMMUNE_SUPPORT'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'INFLAMMATION',
-    description: 'Иммунная омега‑3',
+    description: 'Жирная кислота, необходимая для иммунной системы',
     type: 'fatty_acid'
   },
   {
@@ -3707,7 +3707,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SKIN_REPAIR', 'HYDRATION'],
     organs: ['SKIN'],
     deficiency: 'DRY_SKIN',
-    description: 'Кожная омега‑3',
+    description: 'Жирная кислота, необходимая для здоровья кожи',
     type: 'fatty_acid'
   },
   {
@@ -3717,7 +3717,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['RETINA_SUPPORT', 'NEUROPROTECTION'],
     organs: ['EYES'],
     deficiency: 'LOW_DHA',
-    description: 'Омега‑3 для сетчатки',
+    description: 'Жирная кислота, необходимая для зрения',
     type: 'fatty_acid'
   },
   {
@@ -3727,7 +3727,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NEURODEVELOPMENT', 'MEMBRANE_SUPPORT'],
     organs: ['BRAIN', 'FETUS'],
     deficiency: 'PREGNANCY',
-    description: 'Омега‑3 для беременности',
+    description: 'Жирная кислота, необходимая для здоровья сердца, мозга и клеточных мембран',
     type: 'fatty_acid'
   },
   {
@@ -3737,7 +3737,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NEURODEVELOPMENT', 'MEMBRANE_SUPPORT'],
     organs: ['BRAIN', 'NERVOUS_SYSTEM'],
     deficiency: 'CHILD_DEV',
-    description: 'Омега‑3 для детей',
+    description: 'Жирная кислота, необходимая для здоровья сердца, мозга и клеточных мембран',
     type: 'fatty_acid'
   },
   {
@@ -3747,7 +3747,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ANTI_INFLAMMATION', 'TRIGLYCERIDE_REDUCTION'],
     organs: ['HEART', 'VESSELS'],
     deficiency: 'HIGH_TG',
-    description: 'Высокая EPA',
+    description: 'Жирная кислота, необходимая для противовоспалительной защиты',
     type: 'fatty_acid'
   },
   {
@@ -3757,7 +3757,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NEUROPROTECTION', 'MEMBRANE_FLUIDITY'],
     organs: ['BRAIN', 'EYES'],
     deficiency: 'LOW_DHA',
-    description: 'Высокая DHA',
+    description: 'Жирная кислота, необходимая для работы мозга',
     type: 'fatty_acid'
   },
   {
@@ -3767,7 +3767,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ANTI_INFLAMMATION', 'NEUROPROTECTION'],
     organs: ['HEART', 'BRAIN'],
     deficiency: 'LOW_OMEGA3',
-    description: 'Сбалансированная омега‑3',
+    description: 'Жирная кислота, необходимая для ССС, работы мозга',
     type: 'fatty_acid'
   },
   {
@@ -3777,7 +3777,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ANTI_INFLAMMATION', 'MEMBRANE_SUPPORT'],
     organs: ['HEART', 'BRAIN'],
     deficiency: 'LOW_OMEGA3',
-    description: 'Антарктическая омега‑3',
+    description: 'Жирная кислота, необходимая для здоровья сердца, мозга и клеточных мембран',
     type: 'fatty_acid'
   },
   {
@@ -3787,7 +3787,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ANTI_INFLAMMATION', 'VASCULAR_HEALTH'],
     organs: ['VESSELS', 'HEART'],
     deficiency: 'LOW_OMEGA3',
-    description: 'Гренландская омега‑3',
+    description: 'Жирная кислота, необходимая для здоровья сердца, мозга и клеточных мембран',
     type: 'fatty_acid'
   },
   {
@@ -3797,7 +3797,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ANTI_INFLAMMATION', 'MEMBRANE_SUPPORT'],
     organs: ['HEART', 'BRAIN'],
     deficiency: 'LOW_OMEGA3',
-    description: 'Глубоководная омега‑3',
+    description: 'Жирная кислота, необходимая для здоровья сердца, мозга и клеточных мембран',
     type: 'fatty_acid'
   },
   {
@@ -3807,7 +3807,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NEUROPROTECTION', 'ANTI_INFLAMMATION'],
     organs: ['BRAIN', 'VESSELS'],
     deficiency: 'LOW_OMEGA3',
-    description: 'Микроводорослевая омега‑3',
+    description: 'Жирная кислота, необходимая для здоровья сердца, мозга и клеточных мембран',
     type: 'fatty_acid'
   },
   {
@@ -3817,7 +3817,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['POLAR_LIPID_FORM', 'MEMBRANE_SUPPORT'],
     organs: ['BRAIN', 'HEART'],
     deficiency: 'LOW_OMEGA3',
-    description: 'Полярные липиды омега‑3',
+    description: 'Жирная кислота, необходимая для здоровья сердца, мозга и клеточных мембран',
     type: 'fatty_acid'
   },
   {
@@ -3827,7 +3827,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['LIPOSOMAL_DELIVERY', 'VASCULAR_HEALTH'],
     organs: ['VESSELS', 'HEART'],
     deficiency: 'LOW_OMEGA3',
-    description: 'Липосомальная омега‑3',
+    description: 'Жирная кислота, необходимая для здоровья сердца, мозга и клеточных мембран',
     type: 'fatty_acid'
   },
   {
@@ -3837,7 +3837,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NANO_DELIVERY', 'MEMBRANE_SUPPORT'],
     organs: ['BRAIN', 'HEART'],
     deficiency: 'LOW_OMEGA3',
-    description: 'Нано‑омега‑3',
+    description: 'Жирная кислота, необходимая для здоровья сердца, мозга и клеточных мембран',
     type: 'fatty_acid'
   },
   {
@@ -3847,7 +3847,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['EMULSION_TECH', 'VASCULAR_HEALTH'],
     organs: ['VESSELS', 'HEART'],
     deficiency: 'LOW_OMEGA3',
-    description: 'Эмульгированная омега‑3',
+    description: 'Жирная кислота, необходимая для здоровья сердца, мозга и клеточных мембран',
     type: 'fatty_acid'
   },
   {
@@ -3857,7 +3857,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['KETONE_PRODUCTION', 'FAT_OXIDATION'],
     organs: ['BRAIN', 'MUSCLES'],
     deficiency: 'KETO',
-    description: 'Кето‑омега‑3',
+    description: 'Жирная кислота, необходимая для энергетического обмена',
     type: 'fatty_acid'
   },
   {
@@ -3867,7 +3867,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MITO_REPAIR', 'MEMBRANE_SUPPORT'],
     organs: ['MITOCHONDRIA', 'HEART'],
     deficiency: 'FATIGUE',
-    description: 'Митохондриальная омега‑3',
+    description: 'Жирная кислота, необходимая для работы митохондрий',
     type: 'fatty_acid'
   },
   {
@@ -3877,7 +3877,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SIRT1_UP', 'MEMBRANE_REPAIR'],
     organs: ['BRAIN', 'HEART'],
     deficiency: 'AGING',
-    description: 'Антиэйдж омега‑3',
+    description: 'Жирная кислота, необходимая для антивозрастных процессов',
     type: 'fatty_acid'
   },
   {
@@ -3887,7 +3887,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ANTI_INFLAMMATION', 'CARTILAGE_SUPPORT'],
     organs: ['JOINTS'],
     deficiency: 'ARTHRITIS',
-    description: 'Омега‑3 для суставов',
+    description: 'Жирная кислота, необходимая для суставов',
     type: 'fatty_acid'
   },
   {
@@ -3897,7 +3897,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SKIN_BARRIER', 'HYDRATION'],
     organs: ['SKIN'],
     deficiency: 'DRY_SKIN',
-    description: 'Омега‑3 + керамиды',
+    description: 'Жирная кислота, необходимая для здоровья кожи',
     type: 'fatty_acid'
   },
   {
@@ -3907,7 +3907,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['HAIR_FOLLICLE_SUPPORT', 'ANTI_INFLAMMATION'],
     organs: ['HAIR'],
     deficiency: 'HAIR_LOSS',
-    description: 'Омега‑3 для волос',
+    description: 'Жирная кислота, необходимая для здоровья волос',
     type: 'fatty_acid'
   },
   {
@@ -3917,7 +3917,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['PHOSPHOLIPID_DELIVERY', 'NEUROPROTECTION'],
     organs: ['BRAIN'],
     deficiency: 'COGNITION',
-    description: 'Омега‑3 + PC',
+    description: 'Жирная кислота, необходимая для работы мозга',
     type: 'fatty_acid'
   },
   {
@@ -3927,7 +3927,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['PHOSPHOLIPID_SUPPORT', 'FAT_METABOLISM'],
     organs: ['LIVER'],
     deficiency: 'FATTY_LIVER',
-    description: 'Омега‑3 + PC для печени',
+    description: 'Жирная кислота, необходимая для функции печени',
     type: 'fatty_acid'
   },
   {
@@ -3937,7 +3937,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['PHOSPHOLIPID_DELIVERY', 'IMMUNE_SUPPORT'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'INFLAMMATION',
-    description: 'Омега‑3 + PC для иммунитета',
+    description: 'Жирная кислота, необходимая для иммунной системы',
     type: 'fatty_acid'
   },
   {
@@ -3947,7 +3947,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['PHOSPHOLIPID_SUPPORT', 'VASCULAR_HEALTH'],
     organs: ['VESSELS'],
     deficiency: 'LOW_OMEGA3',
-    description: 'Омега‑3 + PC для сосудов',
+    description: 'Жирная кислота, необходимая для здоровья сердца, мозга и клеточных мембран',
     type: 'fatty_acid'
   },
   {
@@ -3957,7 +3957,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ANTI_INFLAMMATION', 'MEMBRANE_SUPPORT'],
     organs: ['HEART', 'BRAIN', 'VESSELS'],
     deficiency: 'LOW_OMEGA3',
-    description: 'Полный спектр омега‑3',
+    description: 'Жирная кислота, необходимая для здоровья сердца, мозга и клеточных мембран',
     type: 'fatty_acid'
   },
   {
@@ -3967,7 +3967,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ANTI_INFLAMMATION', 'NEUROPROTECTION'],
     organs: ['HEART', 'BRAIN'],
     deficiency: 'LOW_OMEGA3',
-    description: 'Продвинутая омега‑3 формула',
+    description: 'Жирная кислота, необходимая для здоровья сердца, мозга и клеточных мембран',
     type: 'fatty_acid'
   },
   {
@@ -3977,7 +3977,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ANTI_INFLAMMATION', 'MEMBRANE_SUPPORT'],
     organs: ['HEART', 'BRAIN'],
     deficiency: 'LOW_OMEGA3',
-    description: 'Ультра‑омега‑3',
+    description: 'Жирная кислота, необходимая для здоровья сердца, мозга и клеточных мембран',
     type: 'fatty_acid'
   },
   {
@@ -4007,7 +4007,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GLUTATHIONE_UP', 'CELL_PROTECTION'],
     organs: ['LIVER', 'BRAIN'],
     deficiency: 'OXIDATIVE_STRESS',
-    description: 'Стабильная форма глутатиона',
+    description: 'Антиоксидант, защищающий клетки от окислительного стресса и защиты клеток от окислительного стресса, детоксикации',
     type: 'antioxidant'
   },
   {
@@ -4017,7 +4017,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GLUTATHIONE_SYNTHESIS', 'MUCUS_BREAKDOWN'],
     organs: ['LUNGS', 'LIVER'],
     deficiency: 'OXIDATIVE_STRESS',
-    description: 'Предшественник глутатиона',
+    description: 'Антиоксидант, защищающий клетки от окислительного стресса и защиты клеток от окислительного стресса, легких',
     type: 'antioxidant'
   },
   {
@@ -4027,7 +4027,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GLUTATHIONE_UP', 'CELL_PROTECTION'],
     organs: ['LIVER', 'BRAIN'],
     deficiency: 'OXIDATIVE_STRESS',
-    description: 'Усиленная форма NAC',
+    description: 'Антиоксидант, защищающий клетки от окислительного стресса и защиты клеток от окислительного стресса',
     type: 'antioxidant'
   },
   {
@@ -4037,7 +4037,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GLUTATHIONE_RECYCLING', 'MITO_REPAIR'],
     organs: ['LIVER', 'BRAIN'],
     deficiency: 'OXIDATIVE_STRESS',
-    description: 'Активная форма ALA',
+    description: 'Антиоксидант, защищающий клетки от окислительного стресса и защиты клеток от окислительного стресса, работы митохондрий',
     type: 'antioxidant'
   },
   {
@@ -4047,7 +4047,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['OXIDATIVE_STRESS_REDUCTION', 'GLUCOSE_REGULATION'],
     organs: ['LIVER', 'VESSELS'],
     deficiency: 'DIABETES',
-    description: 'Классическая ALA',
+    description: 'Антиоксидант, защищающий клетки от окислительного стресса и защиты клеток от окислительного стресса',
     type: 'antioxidant'
   },
   {
@@ -4057,7 +4057,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ELECTRON_TRANSPORT_CHAIN', 'ANTIOXIDANT'],
     organs: ['HEART', 'BRAIN'],
     deficiency: 'FATIGUE',
-    description: 'Кофермент Q10',
+    description: 'Антиоксидант, защищающий клетки от окислительного стресса и защиты клеток от окислительного стресса, работы митохондрий',
     type: 'antioxidant'
   },
   {
@@ -4067,7 +4067,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ELECTRON_TRANSPORT_CHAIN', 'ANTIOXIDANT'],
     organs: ['HEART', 'BRAIN'],
     deficiency: 'AGING',
-    description: 'Активная форма Q10',
+    description: 'Антиоксидант, защищающий клетки от окислительного стресса и защиты клеток от окислительного стресса, работы митохондрий',
     type: 'antioxidant'
   },
   {
@@ -4077,7 +4077,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MITO_BIOGENESIS', 'MITO_REPAIR'],
     organs: ['BRAIN', 'HEART'],
     deficiency: 'AGING',
-    description: 'Кофактор митохондрий',
+    description: 'Антиоксидант, защищающий клетки от окислительного стресса и защиты клеток от окислительного стресса, работы митохондрий',
     type: 'antioxidant'
   },
   {
@@ -4087,7 +4087,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GPX_ACTIVITY', 'THYROID_SUPPORT'],
     organs: ['LIVER', 'THYROID'],
     deficiency: 'LOW_SELEN',
-    description: 'Кофактор GPx',
+    description: 'Антиоксидант, защищающий клетки от окислительного стресса и защиты клеток от окислительного стресса',
     type: 'antioxidant'
   },
   {
@@ -4097,7 +4097,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CATALASE_ACTIVITY', 'H2O2_BREAKDOWN'],
     organs: ['CELLS', 'LIVER'],
     deficiency: 'OXIDATIVE_STRESS',
-    description: 'Каталаза',
+    description: 'Антиоксидант, защищающий клетки от окислительного стресса и защиты клеток от окислительного стресса',
     type: 'antioxidant'
   },
   {
@@ -4107,7 +4107,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SOD_ACTIVITY', 'FREE_RADICAL_NEUTRALIZATION'],
     organs: ['CELLS', 'BRAIN'],
     deficiency: 'OXIDATIVE_STRESS',
-    description: 'Супероксиддисмутаза',
+    description: 'Антиоксидант, защищающий клетки от окислительного стресса и защиты клеток от окислительного стресса',
     type: 'antioxidant'
   },
   {
@@ -4117,7 +4117,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MEMBRANE_PROTECTION', 'OXIDATIVE_STRESS_REDUCTION'],
     organs: ['SKIN', 'EYES', 'HEART'],
     deficiency: 'OXIDATIVE_STRESS',
-    description: 'Мощный каротиноид',
+    description: 'Антиоксидант, защищающий клетки от окислительного стресса и защиты клеток от окислительного стресса, здоровья кожи, работы митохондрий',
     type: 'antioxidant'
   },
   {
@@ -4127,7 +4127,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['RETINA_PROTECTION', 'BLUE_LIGHT_FILTER'],
     organs: ['EYES'],
     deficiency: 'LOW_LUTEIN',
-    description: 'Лютеин',
+    description: 'Антиоксидант, защищающий клетки от окислительного стресса и защиты клеток от окислительного стресса, зрения',
     type: 'antioxidant'
   },
   {
@@ -4137,7 +4137,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['RETINA_PROTECTION', 'MACULA_SUPPORT'],
     organs: ['EYES'],
     deficiency: 'LOW_ZEAX',
-    description: 'Зеаксантин',
+    description: 'Антиоксидант, защищающий клетки от окислительного стресса и защиты клеток от окислительного стресса, зрения',
     type: 'antioxidant'
   },
   {
@@ -4147,7 +4147,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['OXIDATIVE_STRESS_REDUCTION', 'VESSEL_PROTECTION'],
     organs: ['VESSELS', 'PROSTATE'],
     deficiency: 'OXIDATIVE_STRESS',
-    description: 'Ликопин',
+    description: 'Антиоксидант, защищающий клетки от окислительного стресса и защиты клеток от окислительного стресса',
     type: 'antioxidant'
   },
   {
@@ -4157,7 +4157,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CAROTENOID_PATHWAY', 'OXIDATIVE_STRESS_REDUCTION'],
     organs: ['EYES', 'SKIN'],
     deficiency: 'LOW_CAROTENOIDS',
-    description: 'Бета-каротин',
+    description: 'Антиоксидант, защищающий клетки от окислительного стресса и защиты клеток от окислительного стресса',
     type: 'antioxidant'
   },
   {
@@ -4167,7 +4167,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SIRT1_UP', 'ANTI_INFLAMMATION'],
     organs: ['BRAIN', 'HEART'],
     deficiency: 'AGING',
-    description: 'Ресвератрол',
+    description: 'Антиоксидант, защищающий клетки от окислительного стресса и защиты клеток от окислительного стресса, антивозрастных процессов',
     type: 'antioxidant'
   },
   {
@@ -4177,7 +4177,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SIRT1_UP', 'CELL_PROTECTION'],
     organs: ['BRAIN', 'HEART'],
     deficiency: 'AGING',
-    description: 'Птеростильбен',
+    description: 'Антиоксидант, защищающий клетки от окислительного стресса и защиты клеток от окислительного стресса, антивозрастных процессов',
     type: 'antioxidant'
   },
   {
@@ -4187,7 +4187,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MAST_CELL_STABILIZATION', 'ANTI_INFLAMMATION'],
     organs: ['IMMUNE_SYSTEM', 'LUNGS'],
     deficiency: 'ALLERGY',
-    description: 'Кверцетин',
+    description: 'Антиоксидант, защищающий клетки от окислительного стресса и защиты клеток от окислительного стресса, иммунной системы',
     type: 'antioxidant'
   },
   {
@@ -4197,7 +4197,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CAPILLARY_STRENGTH', 'OXIDATIVE_STRESS_REDUCTION'],
     organs: ['VESSELS', 'SKIN'],
     deficiency: 'FRAGILITY',
-    description: 'Рутин',
+    description: 'Антиоксидант, защищающий клетки от окислительного стресса и защиты клеток от окислительного стресса',
     type: 'antioxidant'
   },
   {
@@ -4207,7 +4207,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NF_KB_BLOCK', 'COX2_INHIBITION'],
     organs: ['LIVER', 'BRAIN', 'JOINTS'],
     deficiency: 'INFLAMMATION',
-    description: 'Куркумин',
+    description: 'Антиоксидант, защищающий клетки от окислительного стресса и защиты клеток от окислительного стресса, противовоспалительной защиты',
     type: 'antioxidant'
   },
   {
@@ -4217,7 +4217,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NF_KB_BLOCK', 'BIOAVAILABILITY_UP'],
     organs: ['BRAIN', 'LIVER'],
     deficiency: 'INFLAMMATION',
-    description: 'Усиленная форма куркумина',
+    description: 'Антиоксидант, защищающий клетки от окислительного стресса и защиты клеток от окислительного стресса',
     type: 'antioxidant'
   },
   {
@@ -4227,7 +4227,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['AMPK_UP', 'ANTI_INFLAMMATION'],
     organs: ['BRAIN', 'LIVER'],
     deficiency: 'OBESITY',
-    description: 'Катехин зелёного чая',
+    description: 'Антиоксидант, защищающий клетки от окислительного стресса и защиты клеток от окислительного стресса, метаболизма',
     type: 'antioxidant'
   },
   {
@@ -4237,7 +4237,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ANTI_INFLAMMATION', 'LIPID_BALANCE'],
     organs: ['HEART', 'VESSELS'],
     deficiency: 'HIGH_LIPIDS',
-    description: 'Катехины',
+    description: 'Антиоксидант, защищающий клетки от окислительного стресса и защиты клеток от окислительного стресса',
     type: 'antioxidant'
   },
   {
@@ -4247,7 +4247,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CAPILLARY_STRENGTH', 'OXIDATIVE_STRESS_REDUCTION'],
     organs: ['VESSELS', 'EYES'],
     deficiency: 'OXIDATIVE_STRESS',
-    description: 'Антоцианы',
+    description: 'Антиоксидант, защищающий клетки от окислительного стресса и защиты клеток от окислительного стресса',
     type: 'antioxidant'
   },
   {
@@ -4257,7 +4257,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['RETINA_SUPPORT', 'CAPILLARY_STRENGTH'],
     organs: ['EYES', 'VESSELS'],
     deficiency: 'LOW_VISION',
-    description: 'Черника',
+    description: 'Антиоксидант, защищающий клетки от окислительного стресса и защиты клеток от окислительного стресса, зрения',
     type: 'antioxidant'
   },
   {
@@ -4267,7 +4267,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['OPC_ACTIVITY', 'CAPILLARY_STRENGTH'],
     organs: ['VESSELS', 'SKIN'],
     deficiency: 'OXIDATIVE_STRESS',
-    description: 'Экстракт виноградных косточек',
+    description: 'Антиоксидант, защищающий клетки от окислительного стресса и защиты клеток от окислительного стресса',
     type: 'antioxidant'
   },
   {
@@ -4277,7 +4277,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NO_UP', 'CAPILLARY_STRENGTH'],
     organs: ['VESSELS', 'SKIN'],
     deficiency: 'OXIDATIVE_STRESS',
-    description: 'Пикногенол',
+    description: 'Антиоксидант, защищающий клетки от окислительного стресса и защиты клеток от окислительного стресса',
     type: 'antioxidant'
   },
   {
@@ -4287,7 +4287,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NO_UP', 'ANTI_INFLAMMATION'],
     organs: ['VESSELS', 'BRAIN'],
     deficiency: 'LOW_NO',
-    description: 'Флаванолы какао',
+    description: 'Антиоксидант, защищающий клетки от окислительного стресса и защиты клеток от окислительного стресса',
     type: 'antioxidant'
   },
   {
@@ -4297,7 +4297,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['Nrf2_UP', 'PHASE2_DETOX'],
     organs: ['LIVER', 'CELLS'],
     deficiency: 'TOXINS',
-    description: 'Сульфорафан',
+    description: 'Антиоксидант, защищающий клетки от окислительного стресса и защиты клеток от окислительного стресса, детоксикации',
     type: 'antioxidant'
   },
   {
@@ -4307,7 +4307,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['Nrf2_UP', 'ANTI_INFLAMMATION'],
     organs: ['LIVER', 'CELLS'],
     deficiency: 'TOXINS',
-    description: 'Проростки брокколи',
+    description: 'Антиоксидант, защищающий клетки от окислительного стресса и защиты клеток от окислительного стресса, детоксикации',
     type: 'antioxidant'
   },
   {
@@ -4317,7 +4317,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SLEEP_REGULATION', 'ANTIOXIDANT'],
     organs: ['BRAIN', 'MITOCHONDRIA'],
     deficiency: 'INSOMNIA',
-    description: 'Мелатонин',
+    description: 'Антиоксидант, защищающий клетки от окислительного стресса и защиты клеток от окислительного стресса, нервной системы',
     type: 'antioxidant'
   },
   {
@@ -4337,7 +4337,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CAROTENOID_PATHWAY', 'RETINA_SUPPORT'],
     organs: ['EYES'],
     deficiency: 'LOW_CAROTENOIDS',
-    description: 'Комплекс каротиноидов',
+    description: 'Антиоксидант, защищающий клетки от окислительного стресса и защиты клеток от окислительного стресса, зрения',
     type: 'antioxidant'
   },
   {
@@ -4347,7 +4347,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SIRT1_UP', 'MEMBRANE_PROTECTION'],
     organs: ['HEART', 'BRAIN'],
     deficiency: 'AGING',
-    description: 'Токотриенолы',
+    description: 'Антиоксидант, защищающий клетки от окислительного стресса и защиты клеток от окислительного стресса, антивозрастных процессов',
     type: 'antioxidant'
   },
   {
@@ -4357,7 +4357,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MEMBRANE_PROTECTION', 'OXIDATIVE_STRESS_REDUCTION'],
     organs: ['HEART', 'VESSELS'],
     deficiency: 'LOW_VITE',
-    description: 'Смесь токоферолов',
+    description: 'Антиоксидант, защищающий клетки от окислительного стресса и защиты клеток от окислительного стресса',
     type: 'antioxidant'
   },
   {
@@ -4367,7 +4367,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MITO_REPAIR', 'OXIDATIVE_STRESS_REDUCTION'],
     organs: ['LIVER', 'BRAIN'],
     deficiency: 'OXIDATIVE_STRESS',
-    description: 'Липоамид',
+    description: 'Антиоксидант, защищающий клетки от окислительного стресса и защиты клеток от окислительного стресса, работы митохондрий',
     type: 'antioxidant'
   },
   {
@@ -4377,7 +4377,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SUPEROXIDE_SCAVENGING', 'CELL_PROTECTION'],
     organs: ['CELLS', 'BRAIN'],
     deficiency: 'AGING',
-    description: 'Фуллерен C60',
+    description: 'Антиоксидант, защищающий клетки от окислительного стресса и защиты клеток от окислительного стресса, антивозрастных процессов',
     type: 'antioxidant'
   },
   {
@@ -4387,7 +4387,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MITO_TARGETED', 'OXIDATIVE_STRESS_REDUCTION'],
     organs: ['MITOCHONDRIA', 'HEART'],
     deficiency: 'AGING',
-    description: 'Митохондриальный Q10',
+    description: 'Антиоксидант, защищающий клетки от окислительного стресса и защиты клеток от окислительного стресса, работы митохондрий',
     type: 'antioxidant'
   },
   {
@@ -4397,7 +4397,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MITO_TARGETED', 'MEMBRANE_PROTECTION'],
     organs: ['EYES', 'BRAIN'],
     deficiency: 'AGING',
-    description: 'Митохондриальный антиоксидант',
+    description: 'Антиоксидант, защищающий клетки от окислительного стресса и защиты клеток от окислительного стресса, работы митохондрий',
     type: 'antioxidant'
   },
   {
@@ -4407,7 +4407,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GLUTATHIONE_SYNTHESIS', 'CELL_PROTECTION'],
     organs: ['LIVER', 'IMMUNE_SYSTEM'],
     deficiency: 'OXIDATIVE_STRESS',
-    description: 'Предшественники GSH',
+    description: 'Антиоксидант, защищающий клетки от окислительного стресса и защиты клеток от окислительного стресса, детоксикации',
     type: 'antioxidant'
   },
   {
@@ -4417,7 +4417,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['Nrf2_UP', 'PHASE2_DETOX'],
     organs: ['LIVER', 'CELLS'],
     deficiency: 'TOXINS',
-    description: 'Комплекс активаторов Nrf2',
+    description: 'Антиоксидант, защищающий клетки от окислительного стресса и защиты клеток от окислительного стресса, детоксикации',
     type: 'antioxidant'
   },
   {
@@ -4427,7 +4427,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['OXIDATIVE_STRESS_REDUCTION', 'VESSEL_PROTECTION'],
     organs: ['VESSELS', 'HEART'],
     deficiency: 'OXIDATIVE_STRESS',
-    description: 'Антиоксидант оливок',
+    description: 'Антиоксидант, защищающий клетки от окислительного стресса и защиты клеток от окислительного стресса',
     type: 'antioxidant'
   },
   {
@@ -4437,7 +4437,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ANTI_INFLAMMATION', 'IMMUNE_SUPPORT'],
     organs: ['IMMUNE_SYSTEM', 'VESSELS'],
     deficiency: 'INFECTION',
-    description: 'Олеуропеин',
+    description: 'Антиоксидант, защищающий клетки от окислительного стресса и защиты клеток от окислительного стресса, иммунной системы',
     type: 'antioxidant'
   },
   {
@@ -4447,7 +4447,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['UV_PROTECTION', 'COLLAGEN_SUPPORT'],
     organs: ['SKIN'],
     deficiency: 'UV_DAMAGE',
-    description: 'Феруловая кислота',
+    description: 'Антиоксидант, защищающий клетки от окислительного стресса и защиты клеток от окислительного стресса, здоровья кожи',
     type: 'antioxidant'
   },
   {
@@ -4457,7 +4457,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['OXIDATIVE_STRESS_REDUCTION', 'CELL_PROTECTION'],
     organs: ['CELLS'],
     deficiency: 'OXIDATIVE_STRESS',
-    description: 'Кофейная кислота',
+    description: 'Антиоксидант, защищающий клетки от окислительного стресса и защиты клеток от окислительного стресса, клеточного здоровья',
     type: 'antioxidant'
   },
   {
@@ -4467,7 +4467,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GLUCOSE_REGULATION', 'ANTI_INFLAMMATION'],
     organs: ['LIVER', 'VESSELS'],
     deficiency: 'DIABETES',
-    description: 'Хлорогеновая кислота',
+    description: 'Антиоксидант, защищающий клетки от окислительного стресса и защиты клеток от окислительного стресса, метаболизма',
     type: 'antioxidant'
   },
   {
@@ -4477,7 +4477,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CAPILLARY_STRENGTH', 'ANTI_INFLAMMATION'],
     organs: ['VESSELS', 'SKIN'],
     deficiency: 'FRAGILITY',
-    description: 'Гесперидин',
+    description: 'Антиоксидант, защищающий клетки от окислительного стресса и защиты клеток от окислительного стресса',
     type: 'antioxidant'
   },
   {
@@ -4487,7 +4487,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['AMPK_UP', 'ANTI_INFLAMMATION'],
     organs: ['LIVER', 'VESSELS'],
     deficiency: 'OBESITY',
-    description: 'Нарингин',
+    description: 'Антиоксидант, защищающий клетки от окислительного стресса и защиты клеток от окислительного стресса, метаболизма',
     type: 'antioxidant'
   },
   {
@@ -4497,7 +4497,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NF_KB_BLOCK', 'CELL_PROTECTION'],
     organs: ['BRAIN', 'LIVER'],
     deficiency: 'INFLAMMATION',
-    description: 'Апигенин',
+    description: 'Антиоксидант, защищающий клетки от окислительного стресса и защиты клеток от окислительного стресса, противовоспалительной защиты',
     type: 'antioxidant'
   },
   {
@@ -4507,7 +4507,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MAST_CELL_STABILIZATION', 'ANTI_INFLAMMATION'],
     organs: ['IMMUNE_SYSTEM', 'BRAIN'],
     deficiency: 'ALLERGY',
-    description: 'Лютеолин',
+    description: 'Антиоксидант, защищающий клетки от окислительного стресса и защиты клеток от окислительного стресса, противовоспалительной защиты',
     type: 'antioxidant'
   },
   {
@@ -4517,7 +4517,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['OXIDATIVE_STRESS_REDUCTION', 'VESSEL_PROTECTION'],
     organs: ['VESSELS', 'HEART'],
     deficiency: 'OXIDATIVE_STRESS',
-    description: 'Мирицетин',
+    description: 'Антиоксидант, защищающий клетки от окислительного стресса и защиты клеток от окислительного стресса',
     type: 'antioxidant'
   },
   {
@@ -4527,7 +4527,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NF_KB_BLOCK', 'CELL_PROTECTION'],
     organs: ['CELLS', 'LIVER'],
     deficiency: 'INFLAMMATION',
-    description: 'Кемпферол',
+    description: 'Антиоксидант, защищающий клетки от окислительного стресса и защиты клеток от окислительного стресса, противовоспалительной защиты',
     type: 'antioxidant'
   },
   {
@@ -4537,7 +4537,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['PHASE2_DETOX', 'CELL_PROTECTION'],
     organs: ['LIVER', 'GI'],
     deficiency: 'TOXINS',
-    description: 'Эллаговая кислота',
+    description: 'Антиоксидант, защищающий клетки от окислительного стресса и защиты клеток от окислительного стресса, детоксикации',
     type: 'antioxidant'
   },
   {
@@ -4547,7 +4547,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ANTI_INFLAMMATION', 'VESSEL_PROTECTION'],
     organs: ['VESSELS', 'HEART'],
     deficiency: 'OXIDATIVE_STRESS',
-    description: 'Эллагитаннины',
+    description: 'Антиоксидант, защищающий клетки от окислительного стресса и защиты клеток от окислительного стресса',
     type: 'antioxidant'
   },
   {
@@ -4557,7 +4557,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ELECTRON_TRANSPORT_CHAIN', 'ANTIOXIDANT'],
     organs: ['HEART', 'BRAIN'],
     deficiency: 'FATIGUE',
-    description: 'Форма QH',
+    description: 'Антиоксидант, защищающий клетки от окислительного стресса и защиты клеток от окислительного стресса, работы митохондрий',
     type: 'antioxidant'
   },
   {
@@ -4567,7 +4567,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MITO_BIOGENESIS', 'ELECTRON_TRANSPORT_CHAIN'],
     organs: ['BRAIN', 'HEART'],
     deficiency: 'AGING',
-    description: 'Комплекс PQQ+Q10',
+    description: 'Антиоксидант, защищающий клетки от окислительного стресса и защиты клеток от окислительного стресса, работы митохондрий',
     type: 'antioxidant'
   },
   {
@@ -4577,7 +4577,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MITO_TARGETED', 'SUPEROXIDE_SCAVENGING'],
     organs: ['MITOCHONDRIA', 'HEART'],
     deficiency: 'OXIDATIVE_STRESS',
-    description: 'Митохондриальный антиоксидант',
+    description: 'Антиоксидант, защищающий клетки от окислительного стресса и защиты клеток от окислительного стресса, работы митохондрий',
     type: 'antioxidant'
   },
   {
@@ -4587,7 +4587,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CAROTENOID_PATHWAY', 'RETINA_SUPPORT'],
     organs: ['EYES'],
     deficiency: 'LOW_CAROTENOIDS',
-    description: 'Комплекс каротинов',
+    description: 'Антиоксидант, защищающий клетки от окислительного стресса и защиты клеток от окислительного стресса, зрения',
     type: 'antioxidant'
   },
   {
@@ -4607,7 +4607,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GI_PROTECTION', 'ANTIMICROBIAL'],
     organs: ['GI'],
     deficiency: 'INFECTION',
-    description: 'Танины',
+    description: 'Антиоксидант, защищающий клетки от окислительного стресса и защиты клеток от окислительного стресса',
     type: 'antioxidant'
   },
   {
@@ -4617,7 +4617,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ANTI_INFLAMMATION', 'ANABOLIC_SIGNALING'],
     organs: ['MUSCLES', 'LIVER'],
     deficiency: 'OBESITY',
-    description: 'Урсоловая кислота',
+    description: 'Антиоксидант, защищающий клетки от окислительного стресса и защиты клеток от окислительного стресса, мышц',
     type: 'antioxidant'
   },
   {
@@ -4627,7 +4627,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ANTI_INFLAMMATION', 'LIVER_PROTECTION'],
     organs: ['LIVER'],
     deficiency: 'HEPATIC_STRESS',
-    description: 'Олеаноловая кислота',
+    description: 'Антиоксидант, защищающий клетки от окислительного стресса и защиты клеток от окислительного стресса, функции печени',
     type: 'antioxidant'
   },
   {
@@ -4637,7 +4637,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['OXIDATIVE_STRESS_REDUCTION', 'VESSEL_PROTECTION'],
     organs: ['VESSELS'],
     deficiency: 'OXIDATIVE_STRESS',
-    description: 'Гидроксикоричные кислоты',
+    description: 'Антиоксидант, защищающий клетки от окислительного стресса и защиты клеток от окислительного стресса',
     type: 'antioxidant'
   },
   {
@@ -4647,7 +4647,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NEUROPROTECTION', 'CIRCULATION_UP'],
     organs: ['BRAIN', 'VESSELS'],
     deficiency: 'COGNITION',
-    description: 'Флавоны гинкго',
+    description: 'Антиоксидант, защищающий клетки от окислительного стресса и защиты клеток от окислительного стресса, работы мозга',
     type: 'antioxidant'
   },
   {
@@ -4657,7 +4657,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ANTI_INFLAMMATION', 'ENERGY_UP'],
     organs: ['BRAIN', 'ADRENALS'],
     deficiency: 'FATIGUE',
-    description: 'Гинзенозиды',
+    description: 'Антиоксидант, защищающий клетки от окислительного стресса и защиты клеток от окислительного стресса, адаптации к стрессу',
     type: 'antioxidant'
   },
   {
@@ -4667,7 +4667,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MITO_REPAIR', 'LIVER_PROTECTION'],
     organs: ['LIVER'],
     deficiency: 'HEPATIC_STRESS',
-    description: 'Шизандрин',
+    description: 'Антиоксидант, защищающий клетки от окислительного стресса и защиты клеток от окислительного стресса, функции печени',
     type: 'antioxidant'
   },
   {
@@ -4677,7 +4677,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MITO_REPAIR', 'ANTIOXIDANT'],
     organs: ['MITOCHONDRIA', 'LIVER'],
     deficiency: 'OXIDATIVE_STRESS',
-    description: 'Шизандрин B',
+    description: 'Антиоксидант, защищающий клетки от окислительного стресса и защиты клеток от окислительного стресса, работы митохондрий',
     type: 'antioxidant'
   },
   {
@@ -4697,7 +4697,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GABA_UP', 'ANTI_INFLAMMATION'],
     organs: ['BRAIN', 'NERVES'],
     deficiency: 'ANXIETY',
-    description: 'Гонокиол',
+    description: 'Антиоксидант, защищающий клетки от окислительного стресса и защиты клеток от окислительного стресса, нервной системы',
     type: 'antioxidant'
   },
   {
@@ -4707,7 +4707,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NF_KB_BLOCK', 'CELL_PROTECTION'],
     organs: ['BRAIN', 'LUNGS'],
     deficiency: 'INFLAMMATION',
-    description: 'Магнолин',
+    description: 'Антиоксидант, защищающий клетки от окислительного стресса и защиты клеток от окислительного стресса, противовоспалительной защиты',
     type: 'antioxidant'
   },
   {
@@ -4717,7 +4717,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['LIVER_PROTECTION', 'ANTI_INFLAMMATION'],
     organs: ['LIVER'],
     deficiency: 'HEPATIC_STRESS',
-    description: 'Пикрориза',
+    description: 'Антиоксидант, защищающий клетки от окислительного стресса и защиты клеток от окислительного стресса, функции печени',
     type: 'antioxidant'
   },
   {
@@ -4727,7 +4727,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['LIVER_REGEN', 'ANTI_INFLAMMATION'],
     organs: ['LIVER'],
     deficiency: 'HEPATIC_STRESS',
-    description: 'Силимарин',
+    description: 'Антиоксидант, защищающий клетки от окислительного стресса и защиты клеток от окислительного стресса, функции печени',
     type: 'antioxidant'
   },
   {
@@ -4737,7 +4737,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['LIVER_REGEN', 'CELL_PROTECTION'],
     organs: ['LIVER'],
     deficiency: 'HEPATIC_STRESS',
-    description: 'Силибинин',
+    description: 'Антиоксидант, защищающий клетки от окислительного стресса и защиты клеток от окислительного стресса, функции печени',
     type: 'antioxidant'
   },
   {
@@ -4747,7 +4747,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['BILE_FLOW_UP', 'LIVER_PROTECTION'],
     organs: ['LIVER'],
     deficiency: 'HEPATIC_STRESS',
-    description: 'Артишок',
+    description: 'Антиоксидант, защищающий клетки от окислительного стресса и защиты клеток от окислительного стресса, функции печени',
     type: 'antioxidant'
   },
   {
@@ -4757,7 +4757,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NEUROPROTECTION', 'ANTI_INFLAMMATION'],
     organs: ['BRAIN'],
     deficiency: 'COGNITION',
-    description: 'Турмероны',
+    description: 'Антиоксидант, защищающий клетки от окислительного стресса и защиты клеток от окислительного стресса, работы мозга',
     type: 'antioxidant'
   },
   {
@@ -4777,7 +4777,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CAROTENOID_PATHWAY', 'RETINA_SUPPORT'],
     organs: ['EYES'],
     deficiency: 'LOW_CAROTENOIDS',
-    description: 'Альфа-каротин',
+    description: 'Антиоксидант, защищающий клетки от окислительного стресса и защиты клеток от окислительного стресса, зрения',
     type: 'antioxidant'
   },
   {
@@ -4787,7 +4787,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CAROTENOID_PATHWAY', 'RETINA_SUPPORT'],
     organs: ['EYES'],
     deficiency: 'LOW_CAROTENOIDS',
-    description: 'Гамма-каротин',
+    description: 'Антиоксидант, защищающий клетки от окислительного стресса и защиты клеток от окислительного стресса, зрения',
     type: 'antioxidant'
   },
   {
@@ -4797,7 +4797,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['OXIDATIVE_STRESS_REDUCTION', 'CELL_PROTECTION'],
     organs: ['PROSTATE', 'VESSELS'],
     deficiency: 'OXIDATIVE_STRESS',
-    description: 'Ликопин томатный',
+    description: 'Антиоксидант, защищающий клетки от окислительного стресса и защиты клеток от окислительного стресса, простаты',
     type: 'antioxidant'
   },
   {
@@ -4807,7 +4807,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ANTI_INFLAMMATION', 'VESSEL_PROTECTION'],
     organs: ['VESSELS', 'HEART'],
     deficiency: 'OXIDATIVE_STRESS',
-    description: 'Пунникалагин',
+    description: 'Антиоксидант, защищающий клетки от окислительного стресса и защиты клеток от окислительного стресса',
     type: 'antioxidant'
   },
   {
@@ -4817,7 +4817,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ANTI_INFLAMMATION', 'CELL_PROTECTION'],
     organs: ['IMMUNE_SYSTEM', 'LIVER'],
     deficiency: 'INFLAMMATION',
-    description: 'Ксантоны манго',
+    description: 'Антиоксидант, защищающий клетки от окислительного стресса и защиты клеток от окислительного стресса, иммунной системы',
     type: 'antioxidant'
   },
   {
@@ -4827,7 +4827,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ANTI_INFLAMMATION', 'CELL_PROTECTION'],
     organs: ['CELLS', 'BRAIN'],
     deficiency: 'OXIDATIVE_STRESS',
-    description: 'Ксантоны мангустина',
+    description: 'Антиоксидант, защищающий клетки от окислительного стресса и защиты клеток от окислительного стресса, противовоспалительной защиты',
     type: 'antioxidant'
   },
   {
@@ -4847,7 +4847,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['OXIDATIVE_STRESS_REDUCTION', 'CELL_PROTECTION'],
     organs: ['CELLS', 'BRAIN', 'LIVER'],
     deficiency: 'OXIDATIVE_STRESS',
-    description: 'Полный спектр антиоксидантов',
+    description: 'Антиоксидант, защищающий клетки от окислительного стресса и защиты клеток от окислительного стресса',
     type: 'antioxidant'
   },
   {
@@ -4857,7 +4857,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MAST_CELL_STABILIZATION', 'ANTI_INFLAMMATION'],
     organs: ['IMMUNE_SYSTEM', 'VESSELS'],
     deficiency: 'ALLERGY',
-    description: 'Кверцетин',
+    description: 'Полифенол с антиоксидантными свойствами для иммунной системы',
     type: 'polyphenol'
   },
   {
@@ -4867,7 +4867,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CAPILLARY_STRENGTH', 'OXIDATIVE_STRESS_REDUCTION'],
     organs: ['VESSELS', 'SKIN'],
     deficiency: 'FRAGILITY',
-    description: 'Рутин',
+    description: 'Полифенол с антиоксидантными свойствами для поддержки ССС и обмена веществ',
     type: 'polyphenol'
   },
   {
@@ -4877,7 +4877,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CAPILLARY_STRENGTH', 'ANTI_INFLAMMATION'],
     organs: ['VESSELS', 'SKIN'],
     deficiency: 'FRAGILITY',
-    description: 'Гесперидин',
+    description: 'Полифенол с антиоксидантными свойствами для поддержки ССС и обмена веществ',
     type: 'polyphenol'
   },
   {
@@ -4887,7 +4887,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['AMPK_UP', 'ANTI_INFLAMMATION'],
     organs: ['LIVER', 'VESSELS'],
     deficiency: 'OBESITY',
-    description: 'Нарингин',
+    description: 'Полифенол с антиоксидантными свойствами для метаболизма',
     type: 'polyphenol'
   },
   {
@@ -4897,7 +4897,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NF_KB_BLOCK', 'CELL_PROTECTION'],
     organs: ['BRAIN', 'LIVER'],
     deficiency: 'INFLAMMATION',
-    description: 'Апигенин',
+    description: 'Полифенол с антиоксидантными свойствами для противовоспалительной защиты',
     type: 'polyphenol'
   },
   {
@@ -4907,7 +4907,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MAST_CELL_STABILIZATION', 'ANTI_INFLAMMATION'],
     organs: ['IMMUNE_SYSTEM', 'BRAIN'],
     deficiency: 'ALLERGY',
-    description: 'Лютеолин',
+    description: 'Полифенол с антиоксидантными свойствами для противовоспалительной защиты',
     type: 'polyphenol'
   },
   {
@@ -4917,7 +4917,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['OXIDATIVE_STRESS_REDUCTION', 'VESSEL_PROTECTION'],
     organs: ['VESSELS', 'HEART'],
     deficiency: 'OXIDATIVE_STRESS',
-    description: 'Мирицетин',
+    description: 'Полифенол с антиоксидантными свойствами для поддержки ССС и обмена веществ',
     type: 'polyphenol'
   },
   {
@@ -4927,7 +4927,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NF_KB_BLOCK', 'CELL_PROTECTION'],
     organs: ['CELLS', 'LIVER'],
     deficiency: 'INFLAMMATION',
-    description: 'Кемпферол',
+    description: 'Полифенол с антиоксидантными свойствами для противовоспалительной защиты',
     type: 'polyphenol'
   },
   {
@@ -4937,7 +4937,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['PHASE2_DETOX', 'CELL_PROTECTION'],
     organs: ['LIVER', 'GI'],
     deficiency: 'TOXINS',
-    description: 'Эллаговая кислота',
+    description: 'Полифенол с антиоксидантными свойствами для детоксикации',
     type: 'polyphenol'
   },
   {
@@ -4947,7 +4947,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['OXIDATIVE_STRESS_REDUCTION', 'CELL_PROTECTION'],
     organs: ['CELLS'],
     deficiency: 'OXIDATIVE_STRESS',
-    description: 'Галловая кислота',
+    description: 'Полифенол с антиоксидантными свойствами для защиты клеток от окислительного стресса',
     type: 'polyphenol'
   },
   {
@@ -4957,7 +4957,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['OXIDATIVE_STRESS_REDUCTION', 'CELL_PROTECTION'],
     organs: ['CELLS'],
     deficiency: 'OXIDATIVE_STRESS',
-    description: 'Кофейная кислота',
+    description: 'Полифенол с антиоксидантными свойствами для клеточного здоровья',
     type: 'polyphenol'
   },
   {
@@ -4967,7 +4967,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GLUCOSE_REGULATION', 'ANTI_INFLAMMATION'],
     organs: ['LIVER', 'VESSELS'],
     deficiency: 'DIABETES',
-    description: 'Хлорогеновая кислота',
+    description: 'Полифенол с антиоксидантными свойствами для метаболизма',
     type: 'polyphenol'
   },
   {
@@ -4977,7 +4977,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GI_PROTECTION', 'ANTIMICROBIAL'],
     organs: ['GI'],
     deficiency: 'INFECTION',
-    description: 'Танины',
+    description: 'Полифенол с антиоксидантными свойствами для поддержки ССС и обмена веществ',
     type: 'polyphenol'
   },
   {
@@ -4987,7 +4987,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ANTI_INFLAMMATION', 'VESSEL_PROTECTION'],
     organs: ['VESSELS', 'HEART'],
     deficiency: 'OXIDATIVE_STRESS',
-    description: 'Эллагитаннины',
+    description: 'Полифенол с антиоксидантными свойствами для поддержки ССС и обмена веществ',
     type: 'polyphenol'
   },
   {
@@ -4997,7 +4997,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['OPC_ACTIVITY', 'CAPILLARY_STRENGTH'],
     organs: ['VESSELS', 'SKIN'],
     deficiency: 'OXIDATIVE_STRESS',
-    description: 'Олигомерные проантоцианидины',
+    description: 'Полифенол с антиоксидантными свойствами для поддержки ССС и обмена веществ',
     type: 'polyphenol'
   },
   {
@@ -5007,7 +5007,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NO_UP', 'CAPILLARY_STRENGTH'],
     organs: ['VESSELS', 'SKIN'],
     deficiency: 'OXIDATIVE_STRESS',
-    description: 'Пикногенол',
+    description: 'Полифенол с антиоксидантными свойствами для поддержки ССС и обмена веществ',
     type: 'polyphenol'
   },
   {
@@ -5017,7 +5017,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SIRT1_UP', 'ANTI_INFLAMMATION'],
     organs: ['BRAIN', 'HEART'],
     deficiency: 'AGING',
-    description: 'Ресвератрол',
+    description: 'Полифенол с антиоксидантными свойствами для антивозрастных процессов',
     type: 'polyphenol'
   },
   {
@@ -5027,7 +5027,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SIRT1_UP', 'CELL_PROTECTION'],
     organs: ['BRAIN', 'HEART'],
     deficiency: 'AGING',
-    description: 'Птеростильбен',
+    description: 'Полифенол с антиоксидантными свойствами для антивозрастных процессов',
     type: 'polyphenol'
   },
   {
@@ -5037,7 +5037,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SIRT1_UP', 'ANTI_INFLAMMATION'],
     organs: ['BRAIN', 'HEART'],
     deficiency: 'AGING',
-    description: 'Источник ресвератрола',
+    description: 'Полифенол с антиоксидантными свойствами для антивозрастных процессов',
     type: 'polyphenol'
   },
   {
@@ -5047,7 +5047,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['AMPK_UP', 'ANTI_INFLAMMATION'],
     organs: ['LIVER', 'BRAIN'],
     deficiency: 'OBESITY',
-    description: 'Катехин зелёного чая',
+    description: 'Полифенол с антиоксидантными свойствами для метаболизма',
     type: 'polyphenol'
   },
   {
@@ -5057,7 +5057,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ANTI_INFLAMMATION', 'LIPID_BALANCE'],
     organs: ['HEART', 'VESSELS'],
     deficiency: 'HIGH_LIPIDS',
-    description: 'Катехины',
+    description: 'Полифенол с антиоксидантными свойствами для поддержки ССС и обмена веществ',
     type: 'polyphenol'
   },
   {
@@ -5067,7 +5067,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CAPILLARY_STRENGTH', 'OXIDATIVE_STRESS_REDUCTION'],
     organs: ['VESSELS', 'EYES'],
     deficiency: 'OXIDATIVE_STRESS',
-    description: 'Антоцианы',
+    description: 'Полифенол с антиоксидантными свойствами для поддержки ССС и обмена веществ',
     type: 'polyphenol'
   },
   {
@@ -5077,7 +5077,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['RETINA_SUPPORT', 'CAPILLARY_STRENGTH'],
     organs: ['EYES', 'VESSELS'],
     deficiency: 'LOW_VISION',
-    description: 'Черника',
+    description: 'Полифенол с антиоксидантными свойствами для зрения',
     type: 'polyphenol'
   },
   {
@@ -5087,7 +5087,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ANTI_ADHESION', 'ANTIMICROBIAL'],
     organs: ['URINARY'],
     deficiency: 'UTI',
-    description: 'Клюквенные полифенолы',
+    description: 'Полифенол с антиоксидантными свойствами для мочевыводящей системы',
     type: 'polyphenol'
   },
   {
@@ -5097,7 +5097,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ANTI_INFLAMMATION', 'VESSEL_PROTECTION'],
     organs: ['VESSELS', 'HEART'],
     deficiency: 'OXIDATIVE_STRESS',
-    description: 'Полифенолы граната',
+    description: 'Полифенол с антиоксидантными свойствами для поддержки ССС и обмена веществ',
     type: 'polyphenol'
   },
   {
@@ -5107,7 +5107,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ANTI_INFLAMMATION', 'VESSEL_PROTECTION'],
     organs: ['VESSELS', 'HEART'],
     deficiency: 'OXIDATIVE_STRESS',
-    description: 'Пунникалагин',
+    description: 'Полифенол с антиоксидантными свойствами для поддержки ССС и обмена веществ',
     type: 'polyphenol'
   },
   {
@@ -5117,7 +5117,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ANTI_INFLAMMATION', 'CELL_PROTECTION'],
     organs: ['IMMUNE_SYSTEM', 'LIVER'],
     deficiency: 'INFLAMMATION',
-    description: 'Ксантоны манго',
+    description: 'Полифенол с антиоксидантными свойствами для иммунной системы',
     type: 'polyphenol'
   },
   {
@@ -5127,7 +5127,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ANTI_INFLAMMATION', 'CELL_PROTECTION'],
     organs: ['CELLS', 'BRAIN'],
     deficiency: 'OXIDATIVE_STRESS',
-    description: 'Ксантоны мангустина',
+    description: 'Полифенол с антиоксидантными свойствами для противовоспалительной защиты',
     type: 'polyphenol'
   },
   {
@@ -5137,7 +5137,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GABA_UP', 'ANTI_INFLAMMATION'],
     organs: ['BRAIN', 'NERVES'],
     deficiency: 'ANXIETY',
-    description: 'Гонокиол',
+    description: 'Полифенол с антиоксидантными свойствами для нервной системы',
     type: 'polyphenol'
   },
   {
@@ -5147,7 +5147,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NF_KB_BLOCK', 'CELL_PROTECTION'],
     organs: ['BRAIN', 'LUNGS'],
     deficiency: 'INFLAMMATION',
-    description: 'Магнолин',
+    description: 'Полифенол с антиоксидантными свойствами для противовоспалительной защиты',
     type: 'polyphenol'
   },
   {
@@ -5157,7 +5157,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MITO_REPAIR', 'LIVER_PROTECTION'],
     organs: ['LIVER'],
     deficiency: 'HEPATIC_STRESS',
-    description: 'Шизандрин',
+    description: 'Полифенол с антиоксидантными свойствами для функции печени',
     type: 'polyphenol'
   },
   {
@@ -5167,7 +5167,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MITO_REPAIR', 'ANTIOXIDANT'],
     organs: ['MITOCHONDRIA', 'LIVER'],
     deficiency: 'OXIDATIVE_STRESS',
-    description: 'Шизандрин B',
+    description: 'Полифенол с антиоксидантными свойствами для работы митохондрий',
     type: 'polyphenol'
   },
   {
@@ -5177,7 +5177,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ANTI_INFLAMMATION', 'ENERGY_UP'],
     organs: ['BRAIN', 'ADRENALS'],
     deficiency: 'FATIGUE',
-    description: 'Гинзенозиды',
+    description: 'Полифенол с антиоксидантными свойствами для адаптации к стрессу',
     type: 'polyphenol'
   },
   {
@@ -5187,7 +5187,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NEUROPROTECTION', 'CIRCULATION_UP'],
     organs: ['BRAIN', 'VESSELS'],
     deficiency: 'COGNITION',
-    description: 'Флавоны гинкго',
+    description: 'Полифенол с антиоксидантными свойствами для работы мозга',
     type: 'polyphenol'
   },
   {
@@ -5197,7 +5197,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['BILE_FLOW_UP', 'LIVER_PROTECTION'],
     organs: ['LIVER'],
     deficiency: 'HEPATIC_STRESS',
-    description: 'Артишок',
+    description: 'Полифенол с антиоксидантными свойствами для функции печени',
     type: 'polyphenol'
   },
   {
@@ -5207,7 +5207,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NEUROPROTECTION', 'ANTI_INFLAMMATION'],
     organs: ['BRAIN'],
     deficiency: 'COGNITION',
-    description: 'Турмероны',
+    description: 'Полифенол с антиоксидантными свойствами для работы мозга',
     type: 'polyphenol'
   },
   {
@@ -5217,7 +5217,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NO_UP', 'ANTI_INFLAMMATION'],
     organs: ['VESSELS', 'HEART'],
     deficiency: 'HIGH_BP',
-    description: 'Полифенолы чеснока',
+    description: 'Полифенол с антиоксидантными свойствами для поддержки ССС и обмена веществ',
     type: 'polyphenol'
   },
   {
@@ -5227,7 +5227,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GLUCOSE_REGULATION', 'INSULIN_SENSITIVITY'],
     organs: ['PANCREAS', 'LIVER'],
     deficiency: 'DIABETES',
-    description: 'Полифенолы корицы',
+    description: 'Полифенол с антиоксидантными свойствами для метаболизма',
     type: 'polyphenol'
   },
   {
@@ -5237,7 +5237,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ANTIMICROBIAL', 'ANTI_INFLAMMATION'],
     organs: ['GI', 'IMMUNE_SYSTEM'],
     deficiency: 'INFECTION',
-    description: 'Полифенолы гвоздики',
+    description: 'Полифенол с антиоксидантными свойствами для противомикробной защиты',
     type: 'polyphenol'
   },
   {
@@ -5247,7 +5247,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NEUROPROTECTION', 'ANTIOXIDANT'],
     organs: ['BRAIN', 'LIVER'],
     deficiency: 'OXIDATIVE_STRESS',
-    description: 'Карнозиновая кислота',
+    description: 'Полифенол с антиоксидантными свойствами для работы мозга',
     type: 'polyphenol'
   },
   {
@@ -5257,7 +5257,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NF_KB_BLOCK', 'CELL_PROTECTION'],
     organs: ['LIVER', 'BRAIN'],
     deficiency: 'INFLAMMATION',
-    description: 'Карнозол',
+    description: 'Полифенол с антиоксидантными свойствами для противовоспалительной защиты',
     type: 'polyphenol'
   },
   {
@@ -5267,7 +5267,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ANTIMICROBIAL', 'ANTI_INFLAMMATION'],
     organs: ['GI', 'IMMUNE_SYSTEM'],
     deficiency: 'INFECTION',
-    description: 'Полифенолы тимьяна',
+    description: 'Полифенол с антиоксидантными свойствами для противомикробной защиты',
     type: 'polyphenol'
   },
   {
@@ -5277,7 +5277,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ANTIMICROBIAL', 'IMMUNE_SUPPORT'],
     organs: ['GI', 'IMMUNE_SYSTEM'],
     deficiency: 'INFECTION',
-    description: 'Полифенолы орегано',
+    description: 'Полифенол с антиоксидантными свойствами для противомикробной защиты',
     type: 'polyphenol'
   },
   {
@@ -5287,7 +5287,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NEUROPROTECTION', 'ANTI_INFLAMMATION'],
     organs: ['BRAIN', 'NERVES'],
     deficiency: 'COGNITION',
-    description: 'Полифенолы шалфея',
+    description: 'Полифенол с антиоксидантными свойствами для работы мозга',
     type: 'polyphenol'
   },
   {
@@ -5297,7 +5297,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GI_SOOTHING', 'ANTI_INFLAMMATION'],
     organs: ['GI'],
     deficiency: 'GI_IRRITATION',
-    description: 'Полифенолы мяты',
+    description: 'Полифенол с антиоксидантными свойствами для поддержки ССС и обмена веществ',
     type: 'polyphenol'
   },
   {
@@ -5307,7 +5307,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ANTI_INFLAMMATION', 'CELL_PROTECTION'],
     organs: ['CELLS', 'BRAIN', 'LIVER'],
     deficiency: 'OXIDATIVE_STRESS',
-    description: 'Полный спектр полифенолов',
+    description: 'Полифенол с антиоксидантными свойствами для поддержки ССС и обмена веществ',
     type: 'polyphenol'
   },
   {
@@ -5317,7 +5317,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SENOLYTIC', 'SIRT1_UP'],
     organs: ['BRAIN', 'CELLS'],
     deficiency: 'AGING',
-    description: 'Фисетин — сенолитик',
+    description: 'Полифенол с антиоксидантными свойствами для антивозрастных процессов',
     type: 'polyphenol'
   },
   {
@@ -5327,7 +5327,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MAST_CELL_STABILIZATION', 'BIOAVAILABILITY_UP'],
     organs: ['IMMUNE_SYSTEM', 'VESSELS'],
     deficiency: 'ALLERGY',
-    description: 'Фитосомная форма кверцетина',
+    description: 'Полифенол с антиоксидантными свойствами для иммунной системы',
     type: 'polyphenol'
   },
   {
@@ -5337,7 +5337,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SIRT1_UP', 'ANTI_INFLAMMATION'],
     organs: ['BRAIN', 'HEART'],
     deficiency: 'AGING',
-    description: 'Транс-ресвератрол',
+    description: 'Полифенол с антиоксидантными свойствами для антивозрастных процессов',
     type: 'polyphenol'
   },
   {
@@ -5347,7 +5347,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['LIPOSOMAL_DELIVERY', 'SIRT1_UP'],
     organs: ['BRAIN', 'HEART'],
     deficiency: 'AGING',
-    description: 'Липосомный птеростильбен',
+    description: 'Полифенол с антиоксидантными свойствами для антивозрастных процессов',
     type: 'polyphenol'
   },
   {
@@ -5357,7 +5357,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NF_KB_BLOCK', 'NEUROPROTECTION'],
     organs: ['BRAIN', 'LUNGS'],
     deficiency: 'INFLAMMATION',
-    description: 'Байкалин',
+    description: 'Полифенол с антиоксидантными свойствами для противовоспалительной защиты',
     type: 'polyphenol'
   },
   {
@@ -5367,7 +5367,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ANTI_INFLAMMATION', 'CELL_PROTECTION'],
     organs: ['LIVER', 'BRAIN'],
     deficiency: 'INFLAMMATION',
-    description: 'Байкалин гликозид',
+    description: 'Полифенол с антиоксидантными свойствами для противовоспалительной защиты',
     type: 'polyphenol'
   },
   {
@@ -5377,7 +5377,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GABA_UP', 'ANTI_INFLAMMATION'],
     organs: ['BRAIN', 'NERVES'],
     deficiency: 'ANXIETY',
-    description: 'Вогонин',
+    description: 'Полифенол с антиоксидантными свойствами для нервной системы',
     type: 'polyphenol'
   },
   {
@@ -5387,7 +5387,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NO_UP', 'VESSEL_PROTECTION'],
     organs: ['VESSELS', 'BRAIN'],
     deficiency: 'LOW_NO',
-    description: 'Скутелларин',
+    description: 'Полифенол с антиоксидантными свойствами для поддержки ССС и обмена веществ',
     type: 'polyphenol'
   },
   {
@@ -5397,7 +5397,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GABA_UP', 'ANTI_INFLAMMATION'],
     organs: ['BRAIN', 'NERVES'],
     deficiency: 'ANXIETY',
-    description: 'Премиальный гонокиол',
+    description: 'Полифенол с антиоксидантными свойствами для нервной системы',
     type: 'polyphenol'
   },
   {
@@ -5407,7 +5407,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NF_KB_BLOCK', 'CELL_PROTECTION'],
     organs: ['BRAIN', 'LUNGS'],
     deficiency: 'INFLAMMATION',
-    description: 'Магнолон',
+    description: 'Полифенол с антиоксидантными свойствами для противовоспалительной защиты',
     type: 'polyphenol'
   },
   {
@@ -5417,7 +5417,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CAPILLARY_STRENGTH', 'ANTI_INFLAMMATION'],
     organs: ['VESSELS', 'HEART'],
     deficiency: 'OXIDATIVE_STRESS',
-    description: 'Таксифолин',
+    description: 'Полифенол с антиоксидантными свойствами для поддержки ССС и обмена веществ',
     type: 'polyphenol'
   },
   {
@@ -5427,7 +5427,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ANTIOXIDANT', 'VESSEL_PROTECTION'],
     organs: ['VESSELS', 'HEART'],
     deficiency: 'OXIDATIVE_STRESS',
-    description: 'ДГК',
+    description: 'Полифенол с антиоксидантными свойствами для поддержки ССС и обмена веществ',
     type: 'polyphenol'
   },
   {
@@ -5437,7 +5437,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NF_KB_BLOCK', 'CELL_PROTECTION'],
     organs: ['LIVER', 'GI'],
     deficiency: 'INFLAMMATION',
-    description: 'Гарцинол',
+    description: 'Полифенол с антиоксидантными свойствами для противовоспалительной защиты',
     type: 'polyphenol'
   },
   {
@@ -5447,7 +5447,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CELL_SIGNALING', 'ANTI_INFLAMMATION'],
     organs: ['CELLS'],
     deficiency: 'OXIDATIVE_STRESS',
-    description: 'Гамбоговая кислота',
+    description: 'Полифенол с антиоксидантными свойствами для клеточного здоровья',
     type: 'polyphenol'
   },
   {
@@ -5457,7 +5457,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GI_PROTECTION', 'ANTIMICROBIAL'],
     organs: ['GI'],
     deficiency: 'INFECTION',
-    description: 'Дубильная кислота',
+    description: 'Полифенол с антиоксидантными свойствами для поддержки ССС и обмена веществ',
     type: 'polyphenol'
   },
   {
@@ -5467,7 +5467,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['OPC_ACTIVITY', 'CAPILLARY_STRENGTH'],
     organs: ['VESSELS', 'SKIN'],
     deficiency: 'OXIDATIVE_STRESS',
-    description: 'Проантоцианидины',
+    description: 'Полифенол с антиоксидантными свойствами для поддержки ССС и обмена веществ',
     type: 'polyphenol'
   },
   {
@@ -5477,7 +5477,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NO_UP', 'MITO_REPAIR'],
     organs: ['MUSCLES', 'HEART'],
     deficiency: 'FATIGUE',
-    description: 'Эпикатехин',
+    description: 'Полифенол с антиоксидантными свойствами для мышц',
     type: 'polyphenol'
   },
   {
@@ -5487,7 +5487,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ANTI_INFLAMMATION', 'VESSEL_PROTECTION'],
     organs: ['VESSELS', 'HEART'],
     deficiency: 'OXIDATIVE_STRESS',
-    description: 'Эпикатехин галлат',
+    description: 'Полифенол с антиоксидантными свойствами для поддержки ССС и обмена веществ',
     type: 'polyphenol'
   },
   {
@@ -5497,7 +5497,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ANTI_INFLAMMATION', 'LIPID_BALANCE'],
     organs: ['HEART', 'VESSELS'],
     deficiency: 'HIGH_LIPIDS',
-    description: 'Теафлавины чая',
+    description: 'Полифенол с антиоксидантными свойствами для поддержки ССС и обмена веществ',
     type: 'polyphenol'
   },
   {
@@ -5507,7 +5507,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GI_SUPPORT', 'ANTIOXIDANT'],
     organs: ['GI'],
     deficiency: 'GI_IRRITATION',
-    description: 'Теарубигины чая',
+    description: 'Полифенол с антиоксидантными свойствами для поддержки ССС и обмена веществ',
     type: 'polyphenol'
   },
   {
@@ -5517,7 +5517,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CAPILLARY_STRENGTH', 'OXIDATIVE_STRESS_REDUCTION'],
     organs: ['VESSELS', 'EYES'],
     deficiency: 'OXIDATIVE_STRESS',
-    description: 'Комплекс антоцианов',
+    description: 'Полифенол с антиоксидантными свойствами для поддержки ССС и обмена веществ',
     type: 'polyphenol'
   },
   {
@@ -5527,7 +5527,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NEUROPROTECTION', 'ANTIOXIDANT'],
     organs: ['BRAIN', 'EYES'],
     deficiency: 'COGNITION',
-    description: 'Полифенолы черники',
+    description: 'Полифенол с антиоксидантными свойствами для работы мозга',
     type: 'polyphenol'
   },
   {
@@ -5537,7 +5537,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ANTI_INFLAMMATION', 'CAPILLARY_STRENGTH'],
     organs: ['VESSELS', 'EYES'],
     deficiency: 'OXIDATIVE_STRESS',
-    description: 'Полифенолы смородины',
+    description: 'Полифенол с антиоксидантными свойствами для поддержки ССС и обмена веществ',
     type: 'polyphenol'
   },
   {
@@ -5547,7 +5547,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ANTI_INFLAMMATION', 'VESSEL_PROTECTION'],
     organs: ['VESSELS', 'HEART'],
     deficiency: 'OXIDATIVE_STRESS',
-    description: 'Полифенолы виноградной кожицы',
+    description: 'Полифенол с антиоксидантными свойствами для поддержки ССС и обмена веществ',
     type: 'polyphenol'
   },
   {
@@ -5567,7 +5567,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NO_UP', 'ANTI_INFLAMMATION'],
     organs: ['VESSELS', 'BRAIN'],
     deficiency: 'LOW_NO',
-    description: 'Полифенолы какао',
+    description: 'Полифенол с антиоксидантными свойствами для поддержки ССС и обмена веществ',
     type: 'polyphenol'
   },
   {
@@ -5577,7 +5577,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['OXIDATIVE_STRESS_REDUCTION', 'VESSEL_PROTECTION'],
     organs: ['VESSELS', 'HEART'],
     deficiency: 'OXIDATIVE_STRESS',
-    description: 'Полифенолы оливы',
+    description: 'Полифенол с антиоксидантными свойствами для поддержки ССС и обмена веществ',
     type: 'polyphenol'
   },
   {
@@ -5587,7 +5587,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['AMPK_UP', 'GLUCOSE_REGULATION'],
     organs: ['LIVER', 'PANCREAS'],
     deficiency: 'DIABETES',
-    description: 'Полифенолы кофе',
+    description: 'Полифенол с антиоксидантными свойствами для метаболизма',
     type: 'polyphenol'
   },
   {
@@ -5597,7 +5597,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ANTI_INFLAMMATION', 'LIPID_BALANCE'],
     organs: ['HEART', 'VESSELS'],
     deficiency: 'HIGH_LIPIDS',
-    description: 'Полифенолы чая',
+    description: 'Полифенол с антиоксидантными свойствами для поддержки ССС и обмена веществ',
     type: 'polyphenol'
   },
   {
@@ -5607,7 +5607,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['BP_REDUCTION', 'ANTI_INFLAMMATION'],
     organs: ['HEART', 'VESSELS'],
     deficiency: 'HIGH_BP',
-    description: 'Полифенолы гибискуса',
+    description: 'Полифенол с антиоксидантными свойствами для поддержки ССС и обмена веществ',
     type: 'polyphenol'
   },
   {
@@ -5617,7 +5617,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ANTIVIRAL', 'IMMUNE_SUPPORT'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'INFECTION',
-    description: 'Полифенолы бузины',
+    description: 'Полифенол с антиоксидантными свойствами для иммунной системы',
     type: 'polyphenol'
   },
   {
@@ -5627,7 +5627,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ANTI_INFLAMMATION', 'CAPILLARY_STRENGTH'],
     organs: ['VESSELS', 'HEART'],
     deficiency: 'OXIDATIVE_STRESS',
-    description: 'Полифенолы аронии',
+    description: 'Полифенол с антиоксидантными свойствами для поддержки ССС и обмена веществ',
     type: 'polyphenol'
   },
   {
@@ -5637,7 +5637,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ANTI_INFLAMMATION', 'CARTILAGE_SUPPORT'],
     organs: ['JOINTS'],
     deficiency: 'ARTHRITIS',
-    description: 'Полифенолы шиповника',
+    description: 'Полифенол с антиоксидантными свойствами для суставов',
     type: 'polyphenol'
   },
   {
@@ -5647,7 +5647,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SKIN_REPAIR', 'ANTI_INFLAMMATION'],
     organs: ['SKIN'],
     deficiency: 'DRY_SKIN',
-    description: 'Полифенолы облепихи',
+    description: 'Полифенол с антиоксидантными свойствами для здоровья кожи',
     type: 'polyphenol'
   },
   {
@@ -5657,7 +5657,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NF_KB_BLOCK', 'ANTI_INFLAMMATION'],
     organs: ['LIVER', 'BRAIN'],
     deficiency: 'INFLAMMATION',
-    description: 'Полифенолы куркумы',
+    description: 'Полифенол с антиоксидантными свойствами для противовоспалительной защиты',
     type: 'polyphenol'
   },
   {
@@ -5667,7 +5667,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GI_SOOTHING', 'ANTI_INFLAMMATION'],
     organs: ['GI', 'LIVER'],
     deficiency: 'GI_IRRITATION',
-    description: 'Полифенолы имбиря',
+    description: 'Полифенол с антиоксидантными свойствами для поддержки ССС и обмена веществ',
     type: 'polyphenol'
   },
   {
@@ -5677,7 +5677,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ESTROGEN_MODULATION', 'ANTI_INFLAMMATION'],
     organs: ['HORMONES', 'BONES'],
     deficiency: 'MENOPAUSE',
-    description: 'Полифенолы красного клевера',
+    description: 'Полифенол с антиоксидантными свойствами для гормонального баланса',
     type: 'polyphenol'
   },
   {
@@ -5687,7 +5687,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ESTROGEN_MODULATION', 'BONE_SUPPORT'],
     organs: ['HORMONES', 'BONES'],
     deficiency: 'MENOPAUSE',
-    description: 'Соевые изофлавоны',
+    description: 'Полифенол с антиоксидантными свойствами для гормонального баланса',
     type: 'polyphenol'
   },
   {
@@ -5697,7 +5697,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ESTROGEN_MODULATION', 'CELL_PROTECTION'],
     organs: ['HORMONES', 'BONES'],
     deficiency: 'MENOPAUSE',
-    description: 'Генистеин',
+    description: 'Полифенол с антиоксидантными свойствами для гормонального баланса',
     type: 'polyphenol'
   },
   {
@@ -5707,7 +5707,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ESTROGEN_MODULATION', 'CELL_PROTECTION'],
     organs: ['HORMONES', 'BONES'],
     deficiency: 'MENOPAUSE',
-    description: 'Дайдзеин',
+    description: 'Полифенол с антиоксидантными свойствами для гормонального баланса',
     type: 'polyphenol'
   },
   {
@@ -5727,7 +5727,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ADRENAL_SUPPORT', 'ATP_UP'],
     organs: ['ADRENALS', 'BRAIN'],
     deficiency: 'FATIGUE',
-    description: 'Корейский женьшень',
+    description: 'Адаптоген, помогающий адаптироваться к стрессу и поддерживающий адаптации к стрессу, энергетического обмена, гормонального баланса',
     type: 'adaptogen'
   },
   {
@@ -5737,7 +5737,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ADRENAL_STIMULATION', 'NO_UP'],
     organs: ['ADRENALS', 'HEART'],
     deficiency: 'FATIGUE',
-    description: 'Красный женьшень',
+    description: 'Адаптоген, помогающий адаптироваться к стрессу и поддерживающий адаптации к стрессу, энергетического обмена, гормонального баланса',
     type: 'adaptogen'
   },
   {
@@ -5747,7 +5747,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ADRENAL_TONIC', 'IMMUNE_UP'],
     organs: ['ADRENALS', 'IMMUNE_SYSTEM'],
     deficiency: 'FATIGUE',
-    description: 'Элеутерококк',
+    description: 'Адаптоген, помогающий адаптироваться к стрессу и поддерживающий адаптации к стрессу, энергетического обмена',
     type: 'adaptogen'
   },
   {
@@ -5757,7 +5757,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ADRENAL_BALANCE', 'CORTISOL_MOD'],
     organs: ['BRAIN', 'ADRENALS'],
     deficiency: 'STRESS',
-    description: 'Американский женьшень',
+    description: 'Адаптоген, помогающий адаптироваться к стрессу и поддерживающий адаптации к стрессу, успокоения',
     type: 'adaptogen'
   },
   {
@@ -5767,7 +5767,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CORTISOL_MOD', 'ATP_UP'],
     organs: ['BRAIN', 'ADRENALS'],
     deficiency: 'STRESS',
-    description: 'Родиола розовая',
+    description: 'Адаптоген, помогающий адаптироваться к стрессу и поддерживающий адаптации к стрессу, адаптации к стрессу, энергетического обмена',
     type: 'adaptogen'
   },
   {
@@ -5777,7 +5777,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NEUROPROTECTION', 'CORTISOL_MOD'],
     organs: ['BRAIN', 'NERVES'],
     deficiency: 'STRESS',
-    description: 'Салидрозид',
+    description: 'Адаптоген, помогающий адаптироваться к стрессу и поддерживающий адаптации к стрессу, нервной системы',
     type: 'adaptogen'
   },
   {
@@ -5787,7 +5787,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ATP_UP', 'CORTISOL_MOD'],
     organs: ['ADRENALS', 'BRAIN'],
     deficiency: 'FATIGUE',
-    description: 'Розавины',
+    description: 'Адаптоген, помогающий адаптироваться к стрессу и поддерживающий адаптации к стрессу, энергетического обмена',
     type: 'adaptogen'
   },
   {
@@ -5797,7 +5797,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CORTISOL_REDUCTION', 'TESTOSTERONE_UP'],
     organs: ['HORMONES', 'BRAIN'],
     deficiency: 'STRESS',
-    description: 'Ашваганда KSM-66',
+    description: 'Адаптоген, помогающий адаптироваться к стрессу и поддерживающий адаптации к стрессу, гормонального баланса, адаптации к стрессу',
     type: 'adaptogen'
   },
   {
@@ -5807,7 +5807,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CORTISOL_REDUCTION', 'GABA_UP'],
     organs: ['BRAIN', 'ADRENALS'],
     deficiency: 'ANXIETY',
-    description: 'Ашваганда Sensoril',
+    description: 'Адаптоген, помогающий адаптироваться к стрессу и поддерживающий адаптации к стрессу, успокоения',
     type: 'adaptogen'
   },
   {
@@ -5817,7 +5817,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CORTISOL_MOD', 'IMMUNE_UP'],
     organs: ['ADRENALS', 'BRAIN'],
     deficiency: 'STRESS',
-    description: 'Классическая ашваганда',
+    description: 'Адаптоген, помогающий адаптироваться к стрессу и поддерживающий адаптации к стрессу, адаптации к стрессу',
     type: 'adaptogen'
   },
   {
@@ -5827,7 +5827,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['LIVER_PROTECTION', 'MITO_UP'],
     organs: ['LIVER', 'BRAIN'],
     deficiency: 'FATIGUE',
-    description: 'Шизандра',
+    description: 'Адаптоген, помогающий адаптироваться к стрессу и поддерживающий адаптации к стрессу, функции печени, энергетического обмена',
     type: 'adaptogen'
   },
   {
@@ -5837,7 +5837,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MITO_REPAIR', 'LIVER_REGEN'],
     organs: ['LIVER'],
     deficiency: 'HEPATIC_STRESS',
-    description: 'Шизандрин',
+    description: 'Адаптоген, помогающий адаптироваться к стрессу и поддерживающий адаптации к стрессу, работы митохондрий',
     type: 'adaptogen'
   },
   {
@@ -5847,7 +5847,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ATP_UP', 'OXYGEN_UP'],
     organs: ['LUNGS', 'MUSCLES'],
     deficiency: 'FATIGUE',
-    description: 'Кордицепс CS-4',
+    description: 'Адаптоген, помогающий адаптироваться к стрессу и поддерживающий адаптации к стрессу, энергетического обмена, легких',
     type: 'adaptogen'
   },
   {
@@ -5857,7 +5857,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ATP_UP', 'TESTOSTERONE_UP'],
     organs: ['MUSCLES', 'HORMONES'],
     deficiency: 'FATIGUE',
-    description: 'Кордицепс милитарис',
+    description: 'Адаптоген, помогающий адаптироваться к стрессу и поддерживающий адаптации к стрессу, энергетического обмена, тестостерона',
     type: 'adaptogen'
   },
   {
@@ -5867,7 +5867,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ATP_UP', 'ANTI_INFLAMMATION'],
     organs: ['MUSCLES', 'BRAIN'],
     deficiency: 'FATIGUE',
-    description: 'Кордицепин',
+    description: 'Адаптоген, помогающий адаптироваться к стрессу и поддерживающий адаптации к стрессу, работы митохондрий',
     type: 'adaptogen'
   },
   {
@@ -5877,7 +5877,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['IMMUNE_MOD', 'CORTISOL_MOD'],
     organs: ['IMMUNE_SYSTEM', 'BRAIN'],
     deficiency: 'STRESS',
-    description: 'Рейши',
+    description: 'Адаптоген, помогающий адаптироваться к стрессу и поддерживающий адаптации к стрессу, иммунной системы, успокоения',
     type: 'adaptogen'
   },
   {
@@ -5887,7 +5887,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['IMMUNE_UP', 'ANTI_INFLAMMATION'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'INFECTION',
-    description: 'Тритерпены рейши',
+    description: 'Адаптоген, помогающий адаптироваться к стрессу и поддерживающий адаптации к стрессу, иммунной системы',
     type: 'adaptogen'
   },
   {
@@ -5897,7 +5897,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['Nrf2_UP', 'IMMUNE_UP'],
     organs: ['IMMUNE_SYSTEM', 'LIVER'],
     deficiency: 'OXIDATIVE_STRESS',
-    description: 'Чага',
+    description: 'Адаптоген, помогающий адаптироваться к стрессу и поддерживающий адаптации к стрессу, защиты клеток от окислительного стресса, иммунной системы',
     type: 'adaptogen'
   },
   {
@@ -5907,7 +5907,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['BETA_GLU_CAN_UP', 'IMMUNE_STIM'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'INFECTION',
-    description: 'Бета-глюканы чаги',
+    description: 'Адаптоген, помогающий адаптироваться к стрессу и поддерживающий адаптации к стрессу, иммунной системы',
     type: 'adaptogen'
   },
   {
@@ -5917,7 +5917,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NGF_UP', 'NEURO_REGEN'],
     organs: ['BRAIN', 'NERVES'],
     deficiency: 'COGNITION',
-    description: 'Гриб Ежовик',
+    description: 'Адаптоген, помогающий адаптироваться к стрессу и поддерживающий адаптации к стрессу, когнитивных функций',
     type: 'adaptogen'
   },
   {
@@ -5927,7 +5927,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NGF_UP', 'NEURO_REPAIR'],
     organs: ['BRAIN', 'NERVES'],
     deficiency: 'NEURO_DEGEN',
-    description: 'Эринацины',
+    description: 'Адаптоген, помогающий адаптироваться к стрессу и поддерживающий адаптации к стрессу, когнитивных функций',
     type: 'adaptogen'
   },
   {
@@ -5937,7 +5937,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NGF_UP', 'NEURO_SUPPORT'],
     organs: ['BRAIN'],
     deficiency: 'COGNITION',
-    description: 'Гериценоны',
+    description: 'Адаптоген, помогающий адаптироваться к стрессу и поддерживающий адаптации к стрессу, когнитивных функций',
     type: 'adaptogen'
   },
   {
@@ -5947,7 +5947,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['BETA_GLU_CAN_UP', 'IMMUNE_UP'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'INFECTION',
-    description: 'Мейтаке',
+    description: 'Адаптоген, помогающий адаптироваться к стрессу и поддерживающий адаптации к стрессу, иммунной системы',
     type: 'adaptogen'
   },
   {
@@ -5957,7 +5957,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['LENTINAN_UP', 'IMMUNE_SUPPORT'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'INFECTION',
-    description: 'Шиитаке',
+    description: 'Адаптоген, помогающий адаптироваться к стрессу и поддерживающий адаптации к стрессу, иммунной системы',
     type: 'adaptogen'
   },
   {
@@ -5967,7 +5967,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CORTISOL_MOD', 'ANTI_INFLAMMATION'],
     organs: ['BRAIN', 'IMMUNE_SYSTEM'],
     deficiency: 'STRESS',
-    description: 'Тулси',
+    description: 'Адаптоген, помогающий адаптироваться к стрессу и поддерживающий адаптации к стрессу, адаптации к стрессу, иммунной системы',
     type: 'adaptogen'
   },
   {
@@ -5977,7 +5977,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NEUROPROTECTION', 'COLLAGEN_UP'],
     organs: ['BRAIN', 'VESSELS'],
     deficiency: 'COGNITION',
-    description: 'Готу кола',
+    description: 'Адаптоген, помогающий адаптироваться к стрессу и поддерживающий адаптации к стрессу, работы мозга',
     type: 'adaptogen'
   },
   {
@@ -5987,7 +5987,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SYNAPSE_UP', 'NEUROPROTECTION'],
     organs: ['BRAIN'],
     deficiency: 'COGNITION',
-    description: 'Бакопа',
+    description: 'Адаптоген, помогающий адаптироваться к стрессу и поддерживающий адаптации к стрессу, когнитивных функций',
     type: 'adaptogen'
   },
   {
@@ -5997,7 +5997,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NEURO_REPAIR', 'ANTIOXIDANT'],
     organs: ['BRAIN'],
     deficiency: 'COGNITION',
-    description: 'Бакозиды',
+    description: 'Адаптоген, помогающий адаптироваться к стрессу и поддерживающий адаптации к стрессу, когнитивных функций',
     type: 'adaptogen'
   },
   {
@@ -6007,7 +6007,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['HORMONE_BALANCE', 'ATP_UP'],
     organs: ['HORMONES', 'ADRENALS'],
     deficiency: 'FATIGUE',
-    description: 'Мака',
+    description: 'Адаптоген, помогающий адаптироваться к стрессу и поддерживающий адаптации к стрессу, гормонального баланса, энергетического обмена',
     type: 'adaptogen'
   },
   {
@@ -6017,7 +6017,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['TESTOSTERONE_UP', 'ATP_UP'],
     organs: ['HORMONES', 'MUSCLES'],
     deficiency: 'LOW_TESTOSTERONE',
-    description: 'Чёрная мака',
+    description: 'Адаптоген, помогающий адаптироваться к стрессу и поддерживающий адаптации к стрессу, мужского здоровья, энергетического обмена',
     type: 'adaptogen'
   },
   {
@@ -6027,7 +6027,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ESTROGEN_BALANCE', 'HORMONE_SUPPORT'],
     organs: ['HORMONES', 'BONES'],
     deficiency: 'MENOPAUSE',
-    description: 'Красная мака',
+    description: 'Адаптоген, помогающий адаптироваться к стрессу и поддерживающий адаптации к стрессу, женского здоровья, гормонального баланса',
     type: 'adaptogen'
   },
   {
@@ -6037,7 +6037,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ATP_UP', 'ANABOLIC_SIGNALING'],
     organs: ['MUSCLES'],
     deficiency: 'FATIGUE',
-    description: 'Сума',
+    description: 'Адаптоген, помогающий адаптироваться к стрессу и поддерживающий адаптации к стрессу, энергетического обмена',
     type: 'adaptogen'
   },
   {
@@ -6047,7 +6047,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ECdYSTERONE_UP', 'ATP_UP'],
     organs: ['MUSCLES'],
     deficiency: 'ATHLETES',
-    description: 'Сафлоровый женьшень',
+    description: 'Адаптоген, помогающий адаптироваться к стрессу и поддерживающий адаптации к стрессу',
     type: 'adaptogen'
   },
   {
@@ -6057,7 +6057,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MTOR_UP', 'PROTEIN_SYNTHESIS'],
     organs: ['MUSCLES'],
     deficiency: 'ATHLETES',
-    description: 'Экдистерон',
+    description: 'Адаптоген, помогающий адаптироваться к стрессу и поддерживающий адаптации к стрессу',
     type: 'adaptogen'
   },
   {
@@ -6067,7 +6067,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MITO_UP', 'MINERAL_UP'],
     organs: ['MITOCHONDRIA', 'MUSCLES'],
     deficiency: 'FATIGUE',
-    description: 'Шиладжит',
+    description: 'Адаптоген, помогающий адаптироваться к стрессу и поддерживающий адаптации к стрессу, работы митохондрий',
     type: 'adaptogen'
   },
   {
@@ -6077,7 +6077,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['FULVIC_TRANSPORT', 'CELL_PROTECTION'],
     organs: ['CELLS', 'LIVER'],
     deficiency: 'TOXINS',
-    description: 'Фульвовая кислота',
+    description: 'Адаптоген, помогающий адаптироваться к стрессу и поддерживающий адаптации к стрессу, детоксикации',
     type: 'adaptogen'
   },
   {
@@ -6087,7 +6087,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SEROTONIN_UP', 'NEUROPROTECTION'],
     organs: ['BRAIN'],
     deficiency: 'DEPRESSION',
-    description: 'Шафран',
+    description: 'Адаптоген, помогающий адаптироваться к стрессу и поддерживающий адаптации к стрессу, нормализации настроения',
     type: 'adaptogen'
   },
   {
@@ -6097,7 +6097,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NEUROPROTECTION', 'ANTI_INFLAMMATION'],
     organs: ['BRAIN'],
     deficiency: 'COGNITION',
-    description: 'Кроцин',
+    description: 'Адаптоген, помогающий адаптироваться к стрессу и поддерживающий адаптации к стрессу, нервной системы',
     type: 'adaptogen'
   },
   {
@@ -6107,7 +6107,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SEROTONIN_UP', 'GABA_UP'],
     organs: ['BRAIN'],
     deficiency: 'ANXIETY',
-    description: 'Сафранал',
+    description: 'Адаптоген, помогающий адаптироваться к стрессу и поддерживающий адаптации к стрессу, нормализации настроения',
     type: 'adaptogen'
   },
   {
@@ -6117,7 +6117,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['IMMUNE_UP', 'TELOMERASE_UP'],
     organs: ['IMMUNE_SYSTEM', 'CELLS'],
     deficiency: 'IMMUNE_WEAK',
-    description: 'Астрагал',
+    description: 'Адаптоген, помогающий адаптироваться к стрессу и поддерживающий адаптации к стрессу, иммунной системы',
     type: 'adaptogen'
   },
   {
@@ -6127,7 +6127,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['TELOMERASE_UP', 'CELL_PROTECTION'],
     organs: ['CELLS', 'HEART'],
     deficiency: 'AGING',
-    description: 'Астрагалозид IV',
+    description: 'Адаптоген, помогающий адаптироваться к стрессу и поддерживающий адаптации к стрессу, антивозрастных процессов',
     type: 'adaptogen'
   },
   {
@@ -6137,7 +6137,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ANTI_INFLAMMATION', 'NUTRIENT_UP'],
     organs: ['LIVER', 'IMMUNE_SYSTEM'],
     deficiency: 'DEFICIENCY',
-    description: 'Моринга',
+    description: 'Адаптоген, помогающий адаптироваться к стрессу и поддерживающий адаптации к стрессу',
     type: 'adaptogen'
   },
   {
@@ -6147,7 +6147,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['Nrf2_UP', 'IMMUNE_UP'],
     organs: ['IMMUNE_SYSTEM', 'LIVER'],
     deficiency: 'OXIDATIVE_STRESS',
-    description: 'Амла',
+    description: 'Адаптоген, помогающий адаптироваться к стрессу и поддерживающий адаптации к стрессу, защиты клеток от окислительного стресса',
     type: 'adaptogen'
   },
   {
@@ -6157,7 +6157,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GI_SOOTHING', 'ANTI_INFLAMMATION'],
     organs: ['GI', 'LIVER'],
     deficiency: 'GI_IRRITATION',
-    description: 'Имбирь',
+    description: 'Адаптоген, помогающий адаптироваться к стрессу и поддерживающий адаптации к стрессу, противовоспалительной защиты',
     type: 'adaptogen'
   },
   {
@@ -6167,7 +6167,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NF_KB_BLOCK', 'ANTI_INFLAMMATION'],
     organs: ['LIVER', 'BRAIN'],
     deficiency: 'INFLAMMATION',
-    description: 'Куркума',
+    description: 'Адаптоген, помогающий адаптироваться к стрессу и поддерживающий адаптации к стрессу, противовоспалительной защиты',
     type: 'adaptogen'
   },
   {
@@ -6177,7 +6177,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CORTISOL_MOD', 'IMMUNE_UP'],
     organs: ['BRAIN', 'IMMUNE_SYSTEM'],
     deficiency: 'STRESS',
-    description: 'Священный базилик',
+    description: 'Адаптоген, помогающий адаптироваться к стрессу и поддерживающий адаптации к стрессу, адаптации к стрессу',
     type: 'adaptogen'
   },
   {
@@ -6187,7 +6187,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CORTISOL_MOD', 'ENERGY_UP'],
     organs: ['ADRENALS', 'BRAIN'],
     deficiency: 'STRESS',
-    description: 'Полный комплекс адаптогенов',
+    description: 'Адаптоген, помогающий адаптироваться к стрессу и поддерживающий адаптации к стрессу',
     type: 'adaptogen'
   },
   {
@@ -6197,7 +6197,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CORTISOL_MOD', 'ATP_UP'],
     organs: ['ADRENALS', 'BRAIN'],
     deficiency: 'STRESS',
-    description: 'Арктическая родиола',
+    description: 'Адаптоген, помогающий адаптироваться к стрессу и поддерживающий адаптации к стрессу, энергетического обмена, адаптации к стрессу',
     type: 'adaptogen'
   },
   {
@@ -6207,7 +6207,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CORTISOL_REDUCTION', 'MITO_UP'],
     organs: ['BRAIN', 'ADRENALS'],
     deficiency: 'FATIGUE',
-    description: 'Премиальная родиола',
+    description: 'Адаптоген, помогающий адаптироваться к стрессу и поддерживающий адаптации к стрессу, адаптации к стрессу, энергетического обмена',
     type: 'adaptogen'
   },
   {
@@ -6217,7 +6217,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CORTISOL_MOD', 'TESTOSTERONE_UP'],
     organs: ['HORMONES', 'BRAIN'],
     deficiency: 'STRESS',
-    description: 'Полный спектр ашваганды',
+    description: 'Адаптоген, помогающий адаптироваться к стрессу и поддерживающий адаптации к стрессу, гормонального баланса, адаптации к стрессу',
     type: 'adaptogen'
   },
   {
@@ -6227,7 +6227,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['LIPOSOMAL_DELIVERY', 'CORTISOL_REDUCTION'],
     organs: ['BRAIN', 'ADRENALS'],
     deficiency: 'STRESS',
-    description: 'Липосомная ашваганда',
+    description: 'Адаптоген, помогающий адаптироваться к стрессу и поддерживающий адаптации к стрессу, адаптации к стрессу',
     type: 'adaptogen'
   },
   {
@@ -6237,7 +6237,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ADRENAL_STIMULATION', 'ATP_UP'],
     organs: ['ADRENALS', 'BRAIN'],
     deficiency: 'FATIGUE',
-    description: 'Дикий женьшень',
+    description: 'Адаптоген, помогающий адаптироваться к стрессу и поддерживающий адаптации к стрессу, энергетического обмена, гормонального баланса',
     type: 'adaptogen'
   },
   {
@@ -6247,7 +6247,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ATP_UP', 'BIOAVAILABILITY_UP'],
     organs: ['ADRENALS', 'BRAIN'],
     deficiency: 'FATIGUE',
-    description: 'Ферментированный женьшень',
+    description: 'Адаптоген, помогающий адаптироваться к стрессу и поддерживающий адаптации к стрессу, энергетического обмена',
     type: 'adaptogen'
   },
   {
@@ -6257,7 +6257,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['OXYGEN_UP', 'ATP_UP'],
     organs: ['LUNGS', 'MUSCLES'],
     deficiency: 'FATIGUE',
-    description: 'Гималайский кордицепс',
+    description: 'Адаптоген, помогающий адаптироваться к стрессу и поддерживающий адаптации к стрессу, энергетического обмена, легких',
     type: 'adaptogen'
   },
   {
@@ -6267,7 +6267,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MITO_UP', 'ATP_UP'],
     organs: ['MUSCLES', 'HEART'],
     deficiency: 'FATIGUE',
-    description: 'Биоактивный кордицепс',
+    description: 'Адаптоген, помогающий адаптироваться к стрессу и поддерживающий адаптации к стрессу, работы митохондрий',
     type: 'adaptogen'
   },
   {
@@ -6277,7 +6277,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['IMMUNE_MOD', 'CORTISOL_MOD'],
     organs: ['IMMUNE_SYSTEM', 'BRAIN'],
     deficiency: 'STRESS',
-    description: 'Красный рейши',
+    description: 'Адаптоген, помогающий адаптироваться к стрессу и поддерживающий адаптации к стрессу, иммунной системы, успокоения',
     type: 'adaptogen'
   },
   {
@@ -6287,7 +6287,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['IMMUNE_UP', 'ANTI_INFLAMMATION'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'INFECTION',
-    description: 'Чёрный рейши',
+    description: 'Адаптоген, помогающий адаптироваться к стрессу и поддерживающий адаптации к стрессу, иммунной системы',
     type: 'adaptogen'
   },
   {
@@ -6297,7 +6297,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['Nrf2_UP', 'IMMUNE_UP'],
     organs: ['IMMUNE_SYSTEM', 'LIVER'],
     deficiency: 'OXIDATIVE_STRESS',
-    description: 'Премиальная чага',
+    description: 'Адаптоген, помогающий адаптироваться к стрессу и поддерживающий адаптации к стрессу, защиты клеток от окислительного стресса',
     type: 'adaptogen'
   },
   {
@@ -6307,7 +6307,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MELANIN_UP', 'IMMUNE_SUPPORT'],
     organs: ['SKIN', 'IMMUNE_SYSTEM'],
     deficiency: 'OXIDATIVE_STRESS',
-    description: 'Меланиновый комплекс чаги',
+    description: 'Адаптоген, помогающий адаптироваться к стрессу и поддерживающий адаптации к стрессу, здоровья кожи, иммунной системы',
     type: 'adaptogen'
   },
   {
@@ -6317,7 +6317,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['LIPOSOMAL_DELIVERY', 'NGF_UP'],
     organs: ['BRAIN', 'NERVES'],
     deficiency: 'COGNITION',
-    description: 'Липосомный ежовик',
+    description: 'Адаптоген, помогающий адаптироваться к стрессу и поддерживающий адаптации к стрессу, когнитивных функций',
     type: 'adaptogen'
   },
   {
@@ -6327,7 +6327,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NGF_UP', 'NEURO_REGEN'],
     organs: ['BRAIN', 'NERVES'],
     deficiency: 'NEURO_DEGEN',
-    description: 'Полный спектр ежовика',
+    description: 'Адаптоген, помогающий адаптироваться к стрессу и поддерживающий адаптации к стрессу, когнитивных функций',
     type: 'adaptogen'
   },
   {
@@ -6337,7 +6337,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['BETA_GLU_CAN_UP', 'IMMUNE_STIM'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'INFECTION',
-    description: 'Лентинан шиитаке',
+    description: 'Адаптоген, помогающий адаптироваться к стрессу и поддерживающий адаптации к стрессу, иммунной системы',
     type: 'adaptogen'
   },
   {
@@ -6347,7 +6347,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['IMMUNE_UP', 'NK_CELL_UP'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'INFECTION',
-    description: 'Фракция D мейтаке',
+    description: 'Адаптоген, помогающий адаптироваться к стрессу и поддерживающий адаптации к стрессу, иммунной системы',
     type: 'adaptogen'
   },
   {
@@ -6357,7 +6357,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CORTISOL_MOD', 'ANTI_INFLAMMATION'],
     organs: ['BRAIN', 'IMMUNE_SYSTEM'],
     deficiency: 'STRESS',
-    description: 'Премиальный тулси',
+    description: 'Адаптоген, помогающий адаптироваться к стрессу и поддерживающий адаптации к стрессу, адаптации к стрессу',
     type: 'adaptogen'
   },
   {
@@ -6367,7 +6367,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['COLLAGEN_UP', 'VESSEL_REPAIR'],
     organs: ['SKIN', 'VESSELS'],
     deficiency: 'AGING',
-    description: 'Азиатикозид',
+    description: 'Адаптоген, помогающий адаптироваться к стрессу и поддерживающий адаптации к стрессу, здоровья кожи',
     type: 'adaptogen'
   },
   {
@@ -6377,7 +6377,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['COLLAGEN_UP', 'ANTI_INFLAMMATION'],
     organs: ['SKIN', 'VESSELS'],
     deficiency: 'AGING',
-    description: 'Мадекассосид',
+    description: 'Адаптоген, помогающий адаптироваться к стрессу и поддерживающий адаптации к стрессу, здоровья кожи',
     type: 'adaptogen'
   },
   {
@@ -6387,7 +6387,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['LIPOSOMAL_DELIVERY', 'NEURO_REPAIR'],
     organs: ['BRAIN'],
     deficiency: 'COGNITION',
-    description: 'Липосомная бакопа',
+    description: 'Адаптоген, помогающий адаптироваться к стрессу и поддерживающий адаптации к стрессу, когнитивных функций',
     type: 'adaptogen'
   },
   {
@@ -6397,7 +6397,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SYNAPSE_UP', 'NEUROPROTECTION'],
     organs: ['BRAIN'],
     deficiency: 'COGNITION',
-    description: 'Синаптическая бакопа',
+    description: 'Адаптоген, помогающий адаптироваться к стрессу и поддерживающий адаптации к стрессу, когнитивных функций',
     type: 'adaptogen'
   },
   {
@@ -6407,7 +6407,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['HORMONE_BALANCE', 'ATP_UP'],
     organs: ['HORMONES', 'ADRENALS'],
     deficiency: 'FATIGUE',
-    description: 'Гелатинизированная мака',
+    description: 'Адаптоген, помогающий адаптироваться к стрессу и поддерживающий адаптации к стрессу, гормонального баланса, энергетического обмена',
     type: 'adaptogen'
   },
   {
@@ -6417,7 +6417,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['HORMONE_BALANCE', 'ATP_UP'],
     organs: ['HORMONES', 'ADRENALS'],
     deficiency: 'FATIGUE',
-    description: 'Жёлтая мака',
+    description: 'Адаптоген, помогающий адаптироваться к стрессу и поддерживающий адаптации к стрессу, энергетического обмена, гормонального баланса',
     type: 'adaptogen'
   },
   {
@@ -6427,7 +6427,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MITO_UP', 'MINERAL_UP'],
     organs: ['MITOCHONDRIA', 'MUSCLES'],
     deficiency: 'FATIGUE',
-    description: 'Очищенный шиладжит',
+    description: 'Адаптоген, помогающий адаптироваться к стрессу и поддерживающий адаптации к стрессу, работы митохондрий',
     type: 'adaptogen'
   },
   {
@@ -6437,7 +6437,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ATP_UP', 'TESTOSTERONE_UP'],
     organs: ['HORMONES', 'ADRENALS'],
     deficiency: 'FATIGUE',
-    description: 'Золотой шиладжит',
+    description: 'Адаптоген, помогающий адаптироваться к стрессу и поддерживающий адаптации к стрессу, энергетического обмена, гормонального баланса',
     type: 'adaptogen'
   },
   {
@@ -6447,7 +6447,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['TELOMERASE_UP', 'CELL_PROTECTION'],
     organs: ['CELLS', 'HEART'],
     deficiency: 'AGING',
-    description: 'Мембранный экстракт астрагала',
+    description: 'Адаптоген, помогающий адаптироваться к стрессу и поддерживающий адаптации к стрессу, антивозрастных процессов',
     type: 'adaptogen'
   },
   {
@@ -6457,7 +6457,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['TELOMERASE_UP', 'CELL_REPAIR'],
     organs: ['CELLS'],
     deficiency: 'AGING',
-    description: 'Циклоастрагенол',
+    description: 'Адаптоген, помогающий адаптироваться к стрессу и поддерживающий адаптации к стрессу, антивозрастных процессов',
     type: 'adaptogen'
   },
   {
@@ -6467,7 +6467,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ANABOLIC_SIGNALING', 'ATP_UP'],
     organs: ['MUSCLES'],
     deficiency: 'ATHLETES',
-    description: 'Премиальная сума',
+    description: 'Адаптоген, помогающий адаптироваться к стрессу и поддерживающий адаптации к стрессу',
     type: 'adaptogen'
   },
   {
@@ -6477,7 +6477,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MTOR_UP', 'PROTEIN_SYNTHESIS'],
     organs: ['MUSCLES'],
     deficiency: 'ATHLETES',
-    description: 'Экдистероидный комплекс',
+    description: 'Адаптоген, помогающий адаптироваться к стрессу и поддерживающий адаптации к стрессу',
     type: 'adaptogen'
   },
   {
@@ -6487,7 +6487,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ADRENAL_SUPPORT', 'ATP_UP'],
     organs: ['ADRENALS', 'BRAIN'],
     deficiency: 'FATIGUE',
-    description: 'Комплекс гинзенозидов',
+    description: 'Адаптоген, помогающий адаптироваться к стрессу и поддерживающий адаптации к стрессу, энергетического обмена, гормонального баланса',
     type: 'adaptogen'
   },
   {
@@ -6497,7 +6497,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['LIVER_REGEN', 'MITO_REPAIR'],
     organs: ['LIVER'],
     deficiency: 'HEPATIC_STRESS',
-    description: 'Лигнаны шизандры',
+    description: 'Адаптоген, помогающий адаптироваться к стрессу и поддерживающий адаптации к стрессу, функции печени',
     type: 'adaptogen'
   },
   {
@@ -6507,7 +6507,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ATP_UP', 'OXYGEN_UP'],
     organs: ['MUSCLES', 'HEART'],
     deficiency: 'FATIGUE',
-    description: 'Кордицепс с аденозином',
+    description: 'Адаптоген, помогающий адаптироваться к стрессу и поддерживающий адаптации к стрессу, энергетического обмена',
     type: 'adaptogen'
   },
   {
@@ -6517,7 +6517,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['IMMUNE_UP', 'SIRT1_UP'],
     organs: ['IMMUNE_SYSTEM', 'BRAIN'],
     deficiency: 'AGING',
-    description: 'Масло спор рейши',
+    description: 'Адаптоген, помогающий адаптироваться к стрессу и поддерживающий адаптации к стрессу, иммунной системы, антивозрастных процессов',
     type: 'adaptogen'
   },
   {
@@ -6527,7 +6527,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['Nrf2_UP', 'IMMUNE_UP'],
     organs: ['IMMUNE_SYSTEM', 'LIVER'],
     deficiency: 'OXIDATIVE_STRESS',
-    description: 'Полифенольная чага',
+    description: 'Адаптоген, помогающий адаптироваться к стрессу и поддерживающий адаптации к стрессу, защиты клеток от окислительного стресса',
     type: 'adaptogen'
   },
   {
@@ -6537,7 +6537,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NGF_UP', 'NEURO_SUPPORT'],
     organs: ['BRAIN', 'NERVES'],
     deficiency: 'COGNITION',
-    description: 'Мицелий ежовика',
+    description: 'Адаптоген, помогающий адаптироваться к стрессу и поддерживающий адаптации к стрессу, когнитивных функций',
     type: 'adaptogen'
   },
   {
@@ -6547,7 +6547,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['IMMUNE_UP', 'ANTIVIRAL'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'INFECTION',
-    description: 'Полисахариды шиитаке',
+    description: 'Адаптоген, помогающий адаптироваться к стрессу и поддерживающий адаптации к стрессу, иммунной системы',
     type: 'adaptogen'
   },
   {
@@ -6557,7 +6557,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['BETA_GLU_CAN_UP', 'IMMUNE_STIM'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'INFECTION',
-    description: 'Полисахариды мейтаке',
+    description: 'Адаптоген, помогающий адаптироваться к стрессу и поддерживающий адаптации к стрессу, иммунной системы',
     type: 'adaptogen'
   },
   {
@@ -6567,7 +6567,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['IMMUNE_UP', 'CORTISOL_MOD'],
     organs: ['IMMUNE_SYSTEM', 'BRAIN'],
     deficiency: 'STRESS',
-    description: 'Тулси + крапива',
+    description: 'Адаптоген, помогающий адаптироваться к стрессу и поддерживающий адаптации к стрессу, иммунной системы, адаптации к стрессу',
     type: 'adaptogen'
   },
   {
@@ -6577,7 +6577,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NEUROPROTECTION', 'CIRCULATION_UP'],
     organs: ['BRAIN'],
     deficiency: 'COGNITION',
-    description: 'Нейро‑готу кола',
+    description: 'Адаптоген, помогающий адаптироваться к стрессу и поддерживающий адаптации к стрессу, работы мозга',
     type: 'adaptogen'
   },
   {
@@ -6587,7 +6587,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SYNAPSE_UP', 'NEURO_REPAIR'],
     organs: ['BRAIN'],
     deficiency: 'COGNITION',
-    description: 'Памятная бакопа',
+    description: 'Адаптоген, помогающий адаптироваться к стрессу и поддерживающий адаптации к стрессу, когнитивных функций',
     type: 'adaptogen'
   },
   {
@@ -6597,7 +6597,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['IMMUNE_UP', 'NK_CELL_UP'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'INFECTION',
-    description: 'Иммунный астрагал',
+    description: 'Адаптоген, помогающий адаптироваться к стрессу и поддерживающий адаптации к стрессу, иммунной системы',
     type: 'adaptogen'
   },
   {
@@ -6607,7 +6607,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MITO_UP', 'ATP_UP'],
     organs: ['MITOCHONDRIA', 'MUSCLES'],
     deficiency: 'FATIGUE',
-    description: 'Митохондриальный шиладжит',
+    description: 'Адаптоген, помогающий адаптироваться к стрессу и поддерживающий адаптации к стрессу, работы митохондрий',
     type: 'adaptogen'
   },
   {
@@ -6627,7 +6627,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['IMMUNE_MOD', 'CORTISOL_MOD'],
     organs: ['IMMUNE_SYSTEM', 'BRAIN'],
     deficiency: 'STRESS',
-    description: 'Гриб рейши',
+    description: 'Функциональный гриб для иммунной системы, успокоения',
     type: 'fungi'
   },
   {
@@ -6637,7 +6637,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['IMMUNE_UP', 'ANTI_INFLAMMATION'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'INFECTION',
-    description: 'Тритерпены рейши',
+    description: 'Функциональный гриб для иммунной системы',
     type: 'fungi'
   },
   {
@@ -6647,7 +6647,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['BETA_GLU_CAN_UP', 'IMMUNE_STIM'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'INFECTION',
-    description: 'Полисахариды рейши',
+    description: 'Функциональный гриб для иммунной системы',
     type: 'fungi'
   },
   {
@@ -6657,7 +6657,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ATP_UP', 'OXYGEN_UP'],
     organs: ['LUNGS', 'MUSCLES'],
     deficiency: 'FATIGUE',
-    description: 'Кордицепс',
+    description: 'Функциональный гриб для энергетического обмена, легких',
     type: 'fungi'
   },
   {
@@ -6667,7 +6667,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ATP_UP', 'TESTOSTERONE_UP'],
     organs: ['MUSCLES', 'HORMONES'],
     deficiency: 'FATIGUE',
-    description: 'Кордицепс милитарис',
+    description: 'Функциональный гриб для энергетического обмена, гормонального баланса',
     type: 'fungi'
   },
   {
@@ -6677,7 +6677,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ATP_UP', 'ANTI_INFLAMMATION'],
     organs: ['MUSCLES', 'BRAIN'],
     deficiency: 'FATIGUE',
-    description: 'Кордицепин',
+    description: 'Функциональный гриб для работы митохондрий',
     type: 'fungi'
   },
   {
@@ -6687,7 +6687,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NGF_UP', 'NEURO_REGEN'],
     organs: ['BRAIN', 'NERVES'],
     deficiency: 'COGNITION',
-    description: 'Ежовик',
+    description: 'Функциональный гриб для когнитивных функций',
     type: 'fungi'
   },
   {
@@ -6697,7 +6697,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NGF_UP', 'NEURO_REPAIR'],
     organs: ['BRAIN', 'NERVES'],
     deficiency: 'NEURO_DEGEN',
-    description: 'Эринацины',
+    description: 'Функциональный гриб для когнитивных функций',
     type: 'fungi'
   },
   {
@@ -6707,7 +6707,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NGF_UP', 'NEURO_SUPPORT'],
     organs: ['BRAIN'],
     deficiency: 'COGNITION',
-    description: 'Гериценоны',
+    description: 'Функциональный гриб для когнитивных функций',
     type: 'fungi'
   },
   {
@@ -6717,7 +6717,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['Nrf2_UP', 'IMMUNE_UP'],
     organs: ['IMMUNE_SYSTEM', 'LIVER'],
     deficiency: 'OXIDATIVE_STRESS',
-    description: 'Чага',
+    description: 'Функциональный гриб для защиты клеток от окислительного стресса, иммунной системы',
     type: 'fungi'
   },
   {
@@ -6727,7 +6727,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MELANIN_UP', 'IMMUNE_SUPPORT'],
     organs: ['SKIN', 'IMMUNE_SYSTEM'],
     deficiency: 'OXIDATIVE_STRESS',
-    description: 'Меланин чаги',
+    description: 'Функциональный гриб для здоровья кожи, иммунной системы',
     type: 'fungi'
   },
   {
@@ -6737,7 +6737,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['Nrf2_UP', 'CELL_PROTECTION'],
     organs: ['LIVER', 'IMMUNE_SYSTEM'],
     deficiency: 'OXIDATIVE_STRESS',
-    description: 'Полифенолы чаги',
+    description: 'Функциональный гриб для защиты клеток от окислительного стресса',
     type: 'fungi'
   },
   {
@@ -6747,7 +6747,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['LENTINAN_UP', 'IMMUNE_SUPPORT'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'INFECTION',
-    description: 'Шиитаке',
+    description: 'Функциональный гриб для иммунной системы',
     type: 'fungi'
   },
   {
@@ -6757,7 +6757,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['BETA_GLU_CAN_UP', 'IMMUNE_STIM'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'INFECTION',
-    description: 'Лентинан',
+    description: 'Функциональный гриб для иммунной системы',
     type: 'fungi'
   },
   {
@@ -6767,7 +6767,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['IMMUNE_UP', 'ANTIVIRAL'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'INFECTION',
-    description: 'Полисахариды шиитаке',
+    description: 'Функциональный гриб для иммунной системы',
     type: 'fungi'
   },
   {
@@ -6777,7 +6777,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['BETA_GLU_CAN_UP', 'IMMUNE_UP'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'INFECTION',
-    description: 'Мейтаке',
+    description: 'Функциональный гриб для иммунной системы',
     type: 'fungi'
   },
   {
@@ -6787,7 +6787,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NK_CELL_UP', 'IMMUNE_STIM'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'INFECTION',
-    description: 'Фракция D',
+    description: 'Функциональный гриб для иммунной системы',
     type: 'fungi'
   },
   {
@@ -6797,7 +6797,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['BETA_GLU_CAN_UP', 'IMMUNE_UP'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'INFECTION',
-    description: 'Полисахариды мейтаке',
+    description: 'Функциональный гриб для иммунной системы',
     type: 'fungi'
   },
   {
@@ -6807,7 +6807,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['BETA_GLU_CAN_UP', 'IMMUNE_STIM'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'INFECTION',
-    description: 'Агарикус',
+    description: 'Функциональный гриб для иммунной системы',
     type: 'fungi'
   },
   {
@@ -6817,7 +6817,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['IMMUNE_UP', 'ANTIVIRAL'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'INFECTION',
-    description: 'Полисахариды агарикуса',
+    description: 'Функциональный гриб для иммунной системы',
     type: 'fungi'
   },
   {
@@ -6827,7 +6827,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['PSK_UP', 'IMMUNE_STIM'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'INFECTION',
-    description: 'Траметес',
+    description: 'Функциональный гриб для иммунной системы',
     type: 'fungi'
   },
   {
@@ -6837,7 +6837,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['IMMUNE_UP', 'ANTIVIRAL'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'INFECTION',
-    description: 'PSK',
+    description: 'Функциональный гриб для иммунной системы',
     type: 'fungi'
   },
   {
@@ -6847,7 +6847,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['IMMUNE_UP', 'CELL_PROTECTION'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'INFECTION',
-    description: 'PSP',
+    description: 'Функциональный гриб для иммунной системы',
     type: 'fungi'
   },
   {
@@ -6857,7 +6857,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GABA_UP', 'IMMUNE_MOD'],
     organs: ['BRAIN', 'IMMUNE_SYSTEM'],
     deficiency: 'ANXIETY',
-    description: 'Пория',
+    description: 'Функциональный гриб для успокоения, иммунной системы',
     type: 'fungi'
   },
   {
@@ -6867,7 +6867,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['IMMUNE_UP', 'ANTI_INFLAMMATION'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'INFECTION',
-    description: 'Полисахариды пории',
+    description: 'Функциональный гриб для иммунной системы',
     type: 'fungi'
   },
   {
@@ -6877,7 +6877,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['OXYGEN_UP', 'ATP_UP'],
     organs: ['LUNGS', 'MUSCLES'],
     deficiency: 'FATIGUE',
-    description: 'Чёрный кордицепс',
+    description: 'Функциональный гриб для энергетического обмена, легких',
     type: 'fungi'
   },
   {
@@ -6887,7 +6887,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['IMMUNE_UP', 'SIRT1_UP'],
     organs: ['IMMUNE_SYSTEM', 'BRAIN'],
     deficiency: 'AGING',
-    description: 'Споры рейши',
+    description: 'Функциональный гриб для иммунной системы, антивозрастных процессов',
     type: 'fungi'
   },
   {
@@ -6897,7 +6897,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['IMMUNE_UP', 'MEMBRANE_PROTECTION'],
     organs: ['IMMUNE_SYSTEM', 'BRAIN'],
     deficiency: 'AGING',
-    description: 'Масло спор рейши',
+    description: 'Функциональный гриб для иммунной системы, антивозрастных процессов',
     type: 'fungi'
   },
   {
@@ -6907,7 +6907,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ATP_UP', 'OXYGEN_UP'],
     organs: ['MUSCLES', 'HEART'],
     deficiency: 'FATIGUE',
-    description: 'Кордицепс с аденозином',
+    description: 'Функциональный гриб для энергетического обмена',
     type: 'fungi'
   },
   {
@@ -6917,7 +6917,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NGF_UP', 'NEURO_SUPPORT'],
     organs: ['BRAIN', 'NERVES'],
     deficiency: 'COGNITION',
-    description: 'Мицелий ежовика',
+    description: 'Функциональный гриб для когнитивных функций',
     type: 'fungi'
   },
   {
@@ -6927,7 +6927,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['BETA_GLU_CAN_UP', 'IMMUNE_STIM'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'INFECTION',
-    description: 'Бета-глюканы чаги',
+    description: 'Функциональный гриб для иммунной системы',
     type: 'fungi'
   },
   {
@@ -6937,7 +6937,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ANTI_INFLAMMATION', 'IMMUNE_UP'],
     organs: ['IMMUNE_SYSTEM', 'VESSELS'],
     deficiency: 'OXIDATIVE_STRESS',
-    description: 'Полифенолы рейши',
+    description: 'Функциональный гриб для иммунной системы',
     type: 'fungi'
   },
   {
@@ -6947,7 +6947,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GI_SUPPORT', 'IMMUNE_UP'],
     organs: ['GI', 'IMMUNE_SYSTEM'],
     deficiency: 'GI_IRRITATION',
-    description: 'Сморчок',
+    description: 'Функциональный гриб для иммунной системы',
     type: 'fungi'
   },
   {
@@ -6957,7 +6957,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['IMMUNE_UP', 'ANTIOXIDANT'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'INFECTION',
-    description: 'Эноки',
+    description: 'Функциональный гриб для иммунной системы',
     type: 'fungi'
   },
   {
@@ -6967,7 +6967,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['IMMUNE_UP', 'CELL_PROTECTION'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'INFECTION',
-    description: 'Шимеджи',
+    description: 'Функциональный гриб для иммунной системы',
     type: 'fungi'
   },
   {
@@ -6977,7 +6977,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['LIPID_BALANCE', 'ANTI_INFLAMMATION'],
     organs: ['HEART', 'VESSELS'],
     deficiency: 'HIGH_LIPIDS',
-    description: 'Вёшенки',
+    description: 'Функциональный гриб для поддержки иммунитета и энергии',
     type: 'fungi'
   },
   {
@@ -6987,7 +6987,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ERGOTHIONEINE_UP', 'CELL_PROTECTION'],
     organs: ['BRAIN', 'LIVER'],
     deficiency: 'AGING',
-    description: 'Эрготионеин',
+    description: 'Функциональный гриб для защиты клеток от окислительного стресса, работы митохондрий',
     type: 'fungi'
   },
   {
@@ -6997,7 +6997,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GLUCOSE_REGULATION', 'INSULIN_SENSITIVITY'],
     organs: ['PANCREAS', 'LIVER'],
     deficiency: 'DIABETES',
-    description: 'Копринус',
+    description: 'Функциональный гриб для поддержки иммунитета и энергии',
     type: 'fungi'
   },
   {
@@ -7007,7 +7007,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['LYMPH_FLOW_UP', 'ANTI_INFLAMMATION'],
     organs: ['KIDNEYS', 'LYMPH'],
     deficiency: 'LYMPH_STASIS',
-    description: 'Полифорус',
+    description: 'Функциональный гриб для поддержки иммунитета и энергии',
     type: 'fungi'
   },
   {
@@ -7017,7 +7017,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['LIVER_REGEN', 'ANTI_INFLAMMATION'],
     organs: ['LIVER'],
     deficiency: 'HEPATIC_STRESS',
-    description: 'Антродия',
+    description: 'Функциональный гриб для функции печени, противовоспалительной защиты',
     type: 'fungi'
   },
   {
@@ -7027,7 +7027,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['HYALURONIC_UP', 'SKIN_REPAIR'],
     organs: ['SKIN'],
     deficiency: 'DRY_SKIN',
-    description: 'Тремелла',
+    description: 'Функциональный гриб для здоровья кожи, гидратации',
     type: 'fungi'
   },
   {
@@ -7037,7 +7037,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['HYDRATION_UP', 'IMMUNE_SUPPORT'],
     organs: ['SKIN', 'IMMUNE_SYSTEM'],
     deficiency: 'DRY_SKIN',
-    description: 'Полисахариды тремеллы',
+    description: 'Функциональный гриб для здоровья кожи, иммунной системы',
     type: 'fungi'
   },
   {
@@ -7047,7 +7047,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ANTICOAGULATION', 'VESSEL_PROTECTION'],
     organs: ['VESSELS', 'HEART'],
     deficiency: 'CLOTTING',
-    description: 'Аурикулярия',
+    description: 'Функциональный гриб для поддержки иммунитета и энергии',
     type: 'fungi'
   },
   {
@@ -7057,7 +7057,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['IMMUNE_UP', 'ANTI_INFLAMMATION'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'INFECTION',
-    description: 'Феллинус',
+    description: 'Функциональный гриб для иммунной системы, противовоспалительной защиты',
     type: 'fungi'
   },
   {
@@ -7067,7 +7067,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ATP_UP', 'MITO_REPAIR'],
     organs: ['MUSCLES', 'HEART'],
     deficiency: 'FATIGUE',
-    description: 'Премиальный кордицепс',
+    description: 'Функциональный гриб для энергетического обмена, работы митохондрий',
     type: 'fungi'
   },
   {
@@ -7077,7 +7077,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['IMMUNE_UP', 'MITO_UP'],
     organs: ['IMMUNE_SYSTEM', 'BRAIN', 'LIVER'],
     deficiency: 'OXIDATIVE_STRESS',
-    description: 'Полный комплекс грибов',
+    description: 'Функциональный гриб для поддержки иммунитета и энергии',
     type: 'fungi'
   },
   {
@@ -7087,7 +7087,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['IMMUNE_UP', 'SIRT1_UP'],
     organs: ['IMMUNE_SYSTEM', 'BRAIN'],
     deficiency: 'AGING',
-    description: 'Премиальный рейши',
+    description: 'Функциональный гриб для иммунной системы, антивозрастных процессов',
     type: 'fungi'
   },
   {
@@ -7097,7 +7097,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['IMMUNE_MOD', 'CORTISOL_MOD'],
     organs: ['IMMUNE_SYSTEM', 'BRAIN'],
     deficiency: 'STRESS',
-    description: 'Ганодерма люцидум',
+    description: 'Функциональный гриб для иммунной системы, успокоения',
     type: 'fungi'
   },
   {
@@ -7107,7 +7107,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['IMMUNE_UP', 'MEMBRANE_PROTECTION'],
     organs: ['IMMUNE_SYSTEM', 'BRAIN'],
     deficiency: 'AGING',
-    description: 'Треснутые споры рейши',
+    description: 'Функциональный гриб для иммунной системы, антивозрастных процессов',
     type: 'fungi'
   },
   {
@@ -7117,7 +7117,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['OXYGEN_UP', 'ATP_UP'],
     organs: ['LUNGS', 'MUSCLES'],
     deficiency: 'FATIGUE',
-    description: 'Элитный кордицепс',
+    description: 'Функциональный гриб для энергетического обмена, легких',
     type: 'fungi'
   },
   {
@@ -7127,7 +7127,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['IMMUNE_UP', 'ATP_UP'],
     organs: ['IMMUNE_SYSTEM', 'MUSCLES'],
     deficiency: 'FATIGUE',
-    description: 'Полисахариды кордицепса',
+    description: 'Функциональный гриб для иммунной системы, энергетического обмена',
     type: 'fungi'
   },
   {
@@ -7137,7 +7137,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ATP_UP', 'MITO_REPAIR'],
     organs: ['MUSCLES', 'HEART'],
     deficiency: 'FATIGUE',
-    description: 'Мицелий кордицепса',
+    description: 'Функциональный гриб для энергетического обмена, работы митохондрий',
     type: 'fungi'
   },
   {
@@ -7147,7 +7147,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NGF_UP', 'NEURO_REGEN'],
     organs: ['BRAIN', 'NERVES'],
     deficiency: 'COGNITION',
-    description: 'Премиальный ежовик',
+    description: 'Функциональный гриб для когнитивных функций',
     type: 'fungi'
   },
   {
@@ -7157,7 +7157,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NGF_UP', 'NEURO_SUPPORT'],
     organs: ['BRAIN', 'NERVES'],
     deficiency: 'NEURO_DEGEN',
-    description: 'Полный спектр ежовика',
+    description: 'Функциональный гриб для когнитивных функций',
     type: 'fungi'
   },
   {
@@ -7167,7 +7167,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['LIPOSOMAL_DELIVERY', 'NGF_UP'],
     organs: ['BRAIN'],
     deficiency: 'COGNITION',
-    description: 'Липосомный ежовик',
+    description: 'Функциональный гриб для когнитивных функций',
     type: 'fungi'
   },
   {
@@ -7177,7 +7177,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['Nrf2_UP', 'IMMUNE_UP'],
     organs: ['IMMUNE_SYSTEM', 'LIVER'],
     deficiency: 'OXIDATIVE_STRESS',
-    description: 'Премиальная чага',
+    description: 'Функциональный гриб для защиты клеток от окислительного стресса, иммунной системы',
     type: 'fungi'
   },
   {
@@ -7187,7 +7187,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['IMMUNE_UP', 'CELL_PROTECTION'],
     organs: ['IMMUNE_SYSTEM', 'LIVER'],
     deficiency: 'OXIDATIVE_STRESS',
-    description: 'Полный спектр чаги',
+    description: 'Функциональный гриб для иммунной системы, защиты клеток от окислительного стресса',
     type: 'fungi'
   },
   {
@@ -7197,7 +7197,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['OXIDATIVE_STRESS_REDUCTION', 'CELL_PROTECTION'],
     organs: ['LIVER', 'IMMUNE_SYSTEM'],
     deficiency: 'OXIDATIVE_STRESS',
-    description: 'Хромогенный комплекс чаги',
+    description: 'Функциональный гриб для защиты клеток от окислительного стресса',
     type: 'fungi'
   },
   {
@@ -7207,7 +7207,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['LENTINAN_UP', 'IMMUNE_UP'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'INFECTION',
-    description: 'Премиальный шиитаке',
+    description: 'Функциональный гриб для иммунной системы',
     type: 'fungi'
   },
   {
@@ -7217,7 +7217,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['IMMUNE_UP', 'ANTIVIRAL'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'INFECTION',
-    description: 'Полный спектр шиитаке',
+    description: 'Функциональный гриб для иммунной системы, противовирусной защиты',
     type: 'fungi'
   },
   {
@@ -7227,7 +7227,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['BETA_GLU_CAN_UP', 'IMMUNE_STIM'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'INFECTION',
-    description: 'Премиальный мейтаке',
+    description: 'Функциональный гриб для иммунной системы',
     type: 'fungi'
   },
   {
@@ -7237,7 +7237,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['IMMUNE_UP', 'GLUCOSE_REGULATION'],
     organs: ['IMMUNE_SYSTEM', 'LIVER'],
     deficiency: 'DIABETES',
-    description: 'Синергия мейтаке',
+    description: 'Функциональный гриб для иммунной системы, метаболизма',
     type: 'fungi'
   },
   {
@@ -7247,7 +7247,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['PSK_UP', 'IMMUNE_STIM'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'INFECTION',
-    description: 'Премиальный траметес',
+    description: 'Функциональный гриб для иммунной системы',
     type: 'fungi'
   },
   {
@@ -7257,7 +7257,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['IMMUNE_UP', 'CELL_PROTECTION'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'INFECTION',
-    description: 'Полный спектр траметеса',
+    description: 'Функциональный гриб для иммунной системы, защиты клеток от окислительного стресса',
     type: 'fungi'
   },
   {
@@ -7267,7 +7267,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['BETA_GLU_CAN_UP', 'IMMUNE_STIM'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'INFECTION',
-    description: 'Премиальный агарикус',
+    description: 'Функциональный гриб для иммунной системы',
     type: 'fungi'
   },
   {
@@ -7277,7 +7277,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['IMMUNE_UP', 'ANTIVIRAL'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'INFECTION',
-    description: 'Полный спектр агарикуса',
+    description: 'Функциональный гриб для иммунной системы, противовирусной защиты',
     type: 'fungi'
   },
   {
@@ -7287,7 +7287,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['HYALURONIC_UP', 'SKIN_REPAIR'],
     organs: ['SKIN'],
     deficiency: 'DRY_SKIN',
-    description: 'Премиальная тремелла',
+    description: 'Функциональный гриб для здоровья кожи, гидратации',
     type: 'fungi'
   },
   {
@@ -7297,7 +7297,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['HYDRATION_UP', 'IMMUNE_SUPPORT'],
     organs: ['SKIN', 'IMMUNE_SYSTEM'],
     deficiency: 'DRY_SKIN',
-    description: 'Полный спектр тремеллы',
+    description: 'Функциональный гриб для здоровья кожи, иммунной системы',
     type: 'fungi'
   },
   {
@@ -7307,7 +7307,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['LIVER_REGEN', 'ANTI_INFLAMMATION'],
     organs: ['LIVER'],
     deficiency: 'HEPATIC_STRESS',
-    description: 'Премиальная антродия',
+    description: 'Функциональный гриб для функции печени, противовоспалительной защиты',
     type: 'fungi'
   },
   {
@@ -7317,7 +7317,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['LIVER_REGEN', 'IMMUNE_UP'],
     organs: ['LIVER', 'IMMUNE_SYSTEM'],
     deficiency: 'HEPATIC_STRESS',
-    description: 'Полный спектр антродии',
+    description: 'Функциональный гриб для функции печени, иммунной системы',
     type: 'fungi'
   },
   {
@@ -7327,7 +7327,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['LYMPH_FLOW_UP', 'ANTI_INFLAMMATION'],
     organs: ['LYMPH', 'KIDNEYS'],
     deficiency: 'LYMPH_STASIS',
-    description: 'Премиальный полипорус',
+    description: 'Функциональный гриб для поддержки иммунитета и энергии',
     type: 'fungi'
   },
   {
@@ -7337,7 +7337,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['LYMPH_FLOW_UP', 'IMMUNE_UP'],
     organs: ['LYMPH', 'IMMUNE_SYSTEM'],
     deficiency: 'LYMPH_STASIS',
-    description: 'Полный спектр полипоруса',
+    description: 'Функциональный гриб для иммунной системы',
     type: 'fungi'
   },
   {
@@ -7347,7 +7347,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GI_SUPPORT', 'IMMUNE_UP'],
     organs: ['GI', 'IMMUNE_SYSTEM'],
     deficiency: 'GI_IRRITATION',
-    description: 'Премиальный сморчок',
+    description: 'Функциональный гриб для иммунной системы',
     type: 'fungi'
   },
   {
@@ -7357,7 +7357,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GI_SUPPORT', 'CELL_PROTECTION'],
     organs: ['GI', 'IMMUNE_SYSTEM'],
     deficiency: 'GI_IRRITATION',
-    description: 'Полный спектр сморчка',
+    description: 'Функциональный гриб для иммунной системы',
     type: 'fungi'
   },
   {
@@ -7367,7 +7367,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['IMMUNE_UP', 'CELL_PROTECTION'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'INFECTION',
-    description: 'Премиальный эноки',
+    description: 'Функциональный гриб для иммунной системы, защиты клеток от окислительного стресса',
     type: 'fungi'
   },
   {
@@ -7377,7 +7377,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['IMMUNE_UP', 'CELL_PROTECTION'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'INFECTION',
-    description: 'Премиальный шимеджи',
+    description: 'Функциональный гриб для иммунной системы, клеточного здоровья',
     type: 'fungi'
   },
   {
@@ -7387,7 +7387,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['LIPID_BALANCE', 'ANTI_INFLAMMATION'],
     organs: ['HEART', 'VESSELS'],
     deficiency: 'HIGH_LIPIDS',
-    description: 'Премиальные вёшенки',
+    description: 'Функциональный гриб для поддержки иммунитета и энергии',
     type: 'fungi'
   },
   {
@@ -7397,7 +7397,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ERGOTHIONEINE_UP', 'CELL_PROTECTION'],
     organs: ['BRAIN', 'LIVER'],
     deficiency: 'AGING',
-    description: 'Премиальный эрготионеин',
+    description: 'Функциональный гриб для защиты клеток от окислительного стресса, работы митохондрий',
     type: 'fungi'
   },
   {
@@ -7407,7 +7407,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GLUCOSE_REGULATION', 'INSULIN_SENSITIVITY'],
     organs: ['PANCREAS', 'LIVER'],
     deficiency: 'DIABETES',
-    description: 'Премиальный копринус',
+    description: 'Функциональный гриб для поддержки иммунитета и энергии',
     type: 'fungi'
   },
   {
@@ -7417,7 +7417,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ANTICOAGULATION', 'VESSEL_PROTECTION'],
     organs: ['VESSELS', 'HEART'],
     deficiency: 'CLOTTING',
-    description: 'Премиальная аурикулярия',
+    description: 'Функциональный гриб для поддержки иммунитета и энергии',
     type: 'fungi'
   },
   {
@@ -7427,7 +7427,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ANTICOAGULATION', 'IMMUNE_UP'],
     organs: ['VESSELS', 'IMMUNE_SYSTEM'],
     deficiency: 'CLOTTING',
-    description: 'Полный спектр аурикулярии',
+    description: 'Функциональный гриб для иммунной системы',
     type: 'fungi'
   },
   {
@@ -7437,7 +7437,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['IMMUNE_UP', 'ANTI_INFLAMMATION'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'INFECTION',
-    description: 'Премиальный феллинус',
+    description: 'Функциональный гриб для иммунной системы, противовоспалительной защиты',
     type: 'fungi'
   },
   {
@@ -7447,7 +7447,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['IMMUNE_UP', 'CELL_PROTECTION'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'INFECTION',
-    description: 'Полный спектр феллинуса',
+    description: 'Функциональный гриб для иммунной системы, защиты клеток от окислительного стресса',
     type: 'fungi'
   },
   {
@@ -7457,7 +7457,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['IMMUNE_UP', 'ANTI_INFLAMMATION'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'INFECTION',
-    description: 'Ганодерма аппланатум',
+    description: 'Функциональный гриб для иммунной системы, противовоспалительной защиты',
     type: 'fungi'
   },
   {
@@ -7467,7 +7467,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['IMMUNE_UP', 'VESSEL_PROTECTION'],
     organs: ['IMMUNE_SYSTEM', 'VESSELS'],
     deficiency: 'OXIDATIVE_STRESS',
-    description: 'Ганодерма цугае',
+    description: 'Функциональный гриб для иммунной системы',
     type: 'fungi'
   },
   {
@@ -7477,7 +7477,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['Nrf2_UP', 'IMMUNE_UP'],
     organs: ['IMMUNE_SYSTEM', 'LIVER'],
     deficiency: 'OXIDATIVE_STRESS',
-    description: 'Инонотус обликвус',
+    description: 'Функциональный гриб для защиты клеток от окислительного стресса, иммунной системы',
     type: 'fungi'
   },
   {
@@ -7487,7 +7487,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['IMMUNE_UP', 'CELL_PROTECTION'],
     organs: ['IMMUNE_SYSTEM', 'LIVER'],
     deficiency: 'OXIDATIVE_STRESS',
-    description: 'Полный спектр инонотуса',
+    description: 'Функциональный гриб для иммунной системы, защиты клеток от окислительного стресса',
     type: 'fungi'
   },
   {
@@ -7497,7 +7497,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ATP_UP', 'MITO_REPAIR'],
     organs: ['MUSCLES', 'HEART'],
     deficiency: 'FATIGUE',
-    description: 'Синергия кордицепса',
+    description: 'Функциональный гриб для энергетического обмена, работы митохондрий',
     type: 'fungi'
   },
   {
@@ -7507,7 +7507,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['IMMUNE_UP', 'SIRT1_UP'],
     organs: ['IMMUNE_SYSTEM', 'BRAIN'],
     deficiency: 'AGING',
-    description: 'Синергия рейши',
+    description: 'Функциональный гриб для иммунной системы, антивозрастных процессов',
     type: 'fungi'
   },
   {
@@ -7517,7 +7517,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['IMMUNE_UP', 'MITO_UP'],
     organs: ['IMMUNE_SYSTEM', 'BRAIN', 'LIVER'],
     deficiency: 'OXIDATIVE_STRESS',
-    description: 'Премиальный комплекс грибов',
+    description: 'Функциональный гриб для поддержки иммунитета и энергии',
     type: 'fungi'
   },
   {
@@ -7527,7 +7527,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['LACTIC_ACID_UP', 'GI_BARRIER_UP'],
     organs: ['GI', 'IMMUNE_SYSTEM'],
     deficiency: 'DYSBIOSIS',
-    description: 'Классический пробиотик ЖКТ',
+    description: 'Пробиотик, поддерживающий микробиома, иммунной системы',
     type: 'probiotic'
   },
   {
@@ -7537,7 +7537,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['IMMUNE_UP', 'GI_BARRIER_UP'],
     organs: ['GI', 'IMMUNE_SYSTEM'],
     deficiency: 'INFECTION',
-    description: 'LGG штамм',
+    description: 'Пробиотик, поддерживающий микробиома, иммунной системы',
     type: 'probiotic'
   },
   {
@@ -7547,7 +7547,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GI_BARRIER_UP', 'ANTI_INFLAMMATION'],
     organs: ['GI', 'IMMUNE_SYSTEM'],
     deficiency: 'IBS',
-    description: 'Плантарум',
+    description: 'Пробиотик, поддерживающий микробиома, противовоспалительной защиты',
     type: 'probiotic'
   },
   {
@@ -7557,7 +7557,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['REUTERIN_UP', 'GI_BALANCE'],
     organs: ['GI', 'HORMONES'],
     deficiency: 'LOW_TESTOSTERONE',
-    description: 'Рейтера',
+    description: 'Пробиотик, поддерживающий микробиома, гормонального баланса',
     type: 'probiotic'
   },
   {
@@ -7567,7 +7567,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['IMMUNE_UP', 'GI_BALANCE'],
     organs: ['GI', 'IMMUNE_SYSTEM'],
     deficiency: 'INFECTION',
-    description: 'Кейзи',
+    description: 'Пробиотик, поддерживающий микробиома, иммунной системы',
     type: 'probiotic'
   },
   {
@@ -7577,7 +7577,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GABA_UP', 'GI_BRAIN_AXIS'],
     organs: ['BRAIN', 'GI'],
     deficiency: 'ANXIETY',
-    description: 'ГАМК‑пробиотик',
+    description: 'Пробиотик, поддерживающий микробиома, адаптации к стрессу, работы мозга',
     type: 'probiotic'
   },
   {
@@ -7587,7 +7587,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ORAL_MICROBIOME_UP', 'IMMUNE_UP'],
     organs: ['MOUTH', 'IMMUNE_SYSTEM'],
     deficiency: 'INFECTION',
-    description: 'Оральный пробиотик',
+    description: 'Пробиотик, поддерживающий микробиома, иммунной системы',
     type: 'probiotic'
   },
   {
@@ -7597,7 +7597,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['FAT_METABOLISM', 'GI_BALANCE'],
     organs: ['GI', 'LIVER'],
     deficiency: 'OBESITY',
-    description: 'Гассери',
+    description: 'Пробиотик, поддерживающий микробиома, жиросжигания',
     type: 'probiotic'
   },
   {
@@ -7607,7 +7607,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GI_BARRIER_UP', 'ANTI_INFLAMMATION'],
     organs: ['GI', 'IMMUNE_SYSTEM'],
     deficiency: 'INFECTION',
-    description: 'Ферментум',
+    description: 'Пробиотик, поддерживающий микробиома, иммунной системы',
     type: 'probiotic'
   },
   {
@@ -7617,7 +7617,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['IMMUNE_UP', 'GI_BALANCE'],
     organs: ['GI', 'IMMUNE_SYSTEM'],
     deficiency: 'ALLERGY',
-    description: 'Паракейзи',
+    description: 'Пробиотик, поддерживающий микробиома, иммунной системы',
     type: 'probiotic'
   },
   {
@@ -7627,7 +7627,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GI_BARRIER_UP', 'NEURO_SUPPORT'],
     organs: ['GI', 'BRAIN'],
     deficiency: 'IBS',
-    description: 'Лонгум',
+    description: 'Пробиотик, поддерживающий микробиома, работы мозга',
     type: 'probiotic'
   },
   {
@@ -7637,7 +7637,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GI_BARRIER_UP', 'IMMUNE_UP'],
     organs: ['GI', 'IMMUNE_SYSTEM'],
     deficiency: 'INFECTION',
-    description: 'Бифидум',
+    description: 'Пробиотик, поддерживающий микробиома, иммунной системы',
     type: 'probiotic'
   },
   {
@@ -7647,7 +7647,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['IMMUNE_UP', 'GI_BALANCE'],
     organs: ['GI', 'IMMUNE_SYSTEM'],
     deficiency: 'ALLERGY',
-    description: 'Лактис',
+    description: 'Пробиотик, поддерживающий микробиома, иммунной системы',
     type: 'probiotic'
   },
   {
@@ -7657,7 +7657,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SKIN_IMMUNE_UP', 'GI_BALANCE'],
     organs: ['SKIN', 'GI'],
     deficiency: 'ECZEMA',
-    description: 'Бреве',
+    description: 'Пробиотик, поддерживающий микробиома, здоровья кожи',
     type: 'probiotic'
   },
   {
@@ -7667,7 +7667,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GI_BARRIER_UP', 'ANTI_INFLAMMATION'],
     organs: ['GI', 'IMMUNE_SYSTEM'],
     deficiency: 'IBD',
-    description: 'Инфантис',
+    description: 'Пробиотик, поддерживающий микробиома, иммунной системы',
     type: 'probiotic'
   },
   {
@@ -7677,7 +7677,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GI_BALANCE', 'IMMUNE_UP'],
     organs: ['GI', 'IMMUNE_SYSTEM'],
     deficiency: 'INFECTION',
-    description: 'Анималис',
+    description: 'Пробиотик, поддерживающий микробиома, иммунной системы',
     type: 'probiotic'
   },
   {
@@ -7687,7 +7687,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ANTI_PATHOGEN', 'GI_REPAIR'],
     organs: ['GI', 'IMMUNE_SYSTEM'],
     deficiency: 'DIARRHEA',
-    description: 'Сахаромицеты буларди',
+    description: 'Пробиотик, поддерживающий микробиома, иммунной системы',
     type: 'probiotic'
   },
   {
@@ -7697,7 +7697,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GI_BALANCE', 'ANTI_PATHOGEN'],
     organs: ['GI'],
     deficiency: 'DYSBIOSIS',
-    description: 'Пекарские дрожжи‑пробиотик',
+    description: 'Пробиотик, поддерживающий микробиома',
     type: 'probiotic'
   },
   {
@@ -7707,7 +7707,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SPORE_FORM', 'GI_BALANCE'],
     organs: ['GI', 'IMMUNE_SYSTEM'],
     deficiency: 'INFECTION',
-    description: 'Споровый пробиотик',
+    description: 'Пробиотик, поддерживающий микробиома, иммунной системы',
     type: 'probiotic'
   },
   {
@@ -7717,7 +7717,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SPORE_FORM', 'GI_BARRIER_UP'],
     organs: ['GI', 'IMMUNE_SYSTEM'],
     deficiency: 'INFECTION',
-    description: 'Субтилис',
+    description: 'Пробиотик, поддерживающий микробиома, иммунной системы',
     type: 'probiotic'
   },
   {
@@ -7727,7 +7727,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['IMMUNE_UP', 'ANTI_PATHOGEN'],
     organs: ['GI', 'IMMUNE_SYSTEM'],
     deficiency: 'INFECTION',
-    description: 'Клаусии',
+    description: 'Пробиотик, поддерживающий микробиома, иммунной системы',
     type: 'probiotic'
   },
   {
@@ -7737,7 +7737,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ENZYME_UP', 'GI_BALANCE'],
     organs: ['GI'],
     deficiency: 'DYSBIOSIS',
-    description: 'Лихениформис',
+    description: 'Пробиотик, поддерживающий микробиома',
     type: 'probiotic'
   },
   {
@@ -7747,7 +7747,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GI_BARRIER_UP', 'IMMUNE_UP'],
     organs: ['GI', 'IMMUNE_SYSTEM'],
     deficiency: 'IBS',
-    description: 'NCFM штамм',
+    description: 'Пробиотик, поддерживающий микробиома, иммунной системы',
     type: 'probiotic'
   },
   {
@@ -7757,7 +7757,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['IMMUNE_UP', 'ANTI_INFLAMMATION'],
     organs: ['IMMUNE_SYSTEM', 'SKIN'],
     deficiency: 'ALLERGY',
-    description: 'HN001',
+    description: 'Пробиотик, поддерживающий микробиома, иммунной системы, здоровья кожи',
     type: 'probiotic'
   },
   {
@@ -7767,7 +7767,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GI_BARRIER_UP', 'GI_BRAIN_AXIS'],
     organs: ['GI', 'BRAIN'],
     deficiency: 'IBS',
-    description: '299v',
+    description: 'Пробиотик, поддерживающий микробиома, работы мозга',
     type: 'probiotic'
   },
   {
@@ -7777,7 +7777,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['REUTERIN_UP', 'GI_BALANCE'],
     organs: ['GI', 'IMMUNE_SYSTEM'],
     deficiency: 'INFECTION',
-    description: 'ATCC55730',
+    description: 'Пробиотик, поддерживающий микробиома, иммунной системы',
     type: 'probiotic'
   },
   {
@@ -7787,7 +7787,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ANTI_INFLAMMATION', 'GI_BARRIER_UP'],
     organs: ['GI', 'IMMUNE_SYSTEM'],
     deficiency: 'IBD',
-    description: '35624',
+    description: 'Пробиотик, поддерживающий микробиома, иммунной системы',
     type: 'probiotic'
   },
   {
@@ -7797,7 +7797,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['IMMUNE_UP', 'GI_BALANCE'],
     organs: ['GI', 'IMMUNE_SYSTEM'],
     deficiency: 'INFECTION',
-    description: 'HN019',
+    description: 'Пробиотик, поддерживающий микробиома, иммунной системы',
     type: 'probiotic'
   },
   {
@@ -7807,7 +7807,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SKIN_IMMUNE_UP', 'GI_BALANCE'],
     organs: ['SKIN', 'GI'],
     deficiency: 'ECZEMA',
-    description: 'M16V',
+    description: 'Пробиотик, поддерживающий микробиома, здоровья кожи',
     type: 'probiotic'
   },
   {
@@ -7817,7 +7817,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ANTI_PATHOGEN', 'GI_REPAIR'],
     organs: ['GI', 'IMMUNE_SYSTEM'],
     deficiency: 'DIARRHEA',
-    description: 'CNCM I‑745',
+    description: 'Пробиотик, поддерживающий микробиома, иммунной системы',
     type: 'probiotic'
   },
   {
@@ -7827,7 +7827,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GI_BALANCE', 'IMMUNE_UP'],
     organs: ['GI', 'IMMUNE_SYSTEM'],
     deficiency: 'DYSBIOSIS',
-    description: 'Кефирный штамм',
+    description: 'Пробиотик, поддерживающий микробиома, иммунной системы',
     type: 'probiotic'
   },
   {
@@ -7837,7 +7837,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GI_BARRIER_UP', 'ANTI_PATHOGEN'],
     organs: ['GI', 'IMMUNE_SYSTEM'],
     deficiency: 'INFECTION',
-    description: 'Джонсонни',
+    description: 'Пробиотик, поддерживающий микробиома, иммунной системы',
     type: 'probiotic'
   },
   {
@@ -7847,7 +7847,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['LACTIC_ACID_UP', 'GI_BALANCE'],
     organs: ['GI'],
     deficiency: 'DYSBIOSIS',
-    description: 'Дельбрюкки',
+    description: 'Пробиотик, поддерживающий микробиома',
     type: 'probiotic'
   },
   {
@@ -7857,7 +7857,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GI_BALANCE', 'GLUCOSE_REGULATION'],
     organs: ['GI', 'LIVER'],
     deficiency: 'DIABETES',
-    description: 'Адолесцентис',
+    description: 'Пробиотик, поддерживающий микробиома, метаболизма',
     type: 'probiotic'
   },
   {
@@ -7867,7 +7867,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GI_BARRIER_UP', 'IMMUNE_UP'],
     organs: ['GI', 'IMMUNE_SYSTEM'],
     deficiency: 'INFECTION',
-    description: 'Псевдокатенулатум',
+    description: 'Пробиотик, поддерживающий микробиома, иммунной системы',
     type: 'probiotic'
   },
   {
@@ -7877,7 +7877,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CAROTENOID_PRODUCTION', 'GI_BALANCE'],
     organs: ['GI', 'IMMUNE_SYSTEM'],
     deficiency: 'OXIDATIVE_STRESS',
-    description: 'Каротиноидный бациллус',
+    description: 'Пробиотик, поддерживающий микробиома, защиты клеток от окислительного стресса',
     type: 'probiotic'
   },
   {
@@ -7887,7 +7887,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ENZYME_UP', 'GI_BALANCE'],
     organs: ['GI'],
     deficiency: 'DYSBIOSIS',
-    description: 'Мегатериум',
+    description: 'Пробиотик, поддерживающий микробиома',
     type: 'probiotic'
   },
   {
@@ -7897,7 +7897,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ANTI_PATHOGEN', 'IMMUNE_UP'],
     organs: ['URINARY', 'GI'],
     deficiency: 'UTI',
-    description: 'GR‑1',
+    description: 'Пробиотик, поддерживающий микробиома',
     type: 'probiotic'
   },
   {
@@ -7907,7 +7907,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ANTI_PATHOGEN', 'GI_BALANCE'],
     organs: ['URINARY', 'GI'],
     deficiency: 'UTI',
-    description: 'RC‑14',
+    description: 'Пробиотик, поддерживающий микробиома',
     type: 'probiotic'
   },
   {
@@ -7917,7 +7917,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CORTISOL_MOD', 'IMMUNE_UP'],
     organs: ['BRAIN', 'IMMUNE_SYSTEM'],
     deficiency: 'STRESS',
-    description: 'LPC‑37',
+    description: 'Пробиотик, поддерживающий микробиома, адаптации к стрессу, иммунной системы',
     type: 'probiotic'
   },
   {
@@ -7927,7 +7927,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GABA_UP', 'GI_BRAIN_AXIS'],
     organs: ['BRAIN', 'GI'],
     deficiency: 'ANXIETY',
-    description: 'R0052',
+    description: 'Пробиотик, поддерживающий микробиома, адаптации к стрессу, работы мозга',
     type: 'probiotic'
   },
   {
@@ -7937,7 +7937,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GI_BRAIN_AXIS', 'NEURO_SUPPORT'],
     organs: ['BRAIN', 'GI'],
     deficiency: 'ANXIETY',
-    description: 'R0175',
+    description: 'Пробиотик, поддерживающий микробиома, адаптации к стрессу, работы мозга',
     type: 'probiotic'
   },
   {
@@ -7947,7 +7947,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GI_BALANCE', 'IMMUNE_UP'],
     organs: ['GI', 'IMMUNE_SYSTEM'],
     deficiency: 'DYSBIOSIS',
-    description: 'Комплекс пробиотиков',
+    description: 'Пробиотик, поддерживающий микробиома',
     type: 'probiotic'
   },
   {
@@ -7967,7 +7967,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['BUTYRATE_UP', 'GI_REPAIR'],
     organs: ['GI', 'IMMUNE_SYSTEM'],
     deficiency: 'LEAKY_GUT',
-    description: 'Бутират натрия',
+    description: 'Постбиотик для иммунной системы',
     type: 'postbiotic'
   },
   {
@@ -7977,7 +7977,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['BUTYRATE_UP', 'GI_BARRIER_UP'],
     organs: ['GI'],
     deficiency: 'LEAKY_GUT',
-    description: 'Кальций бутират',
+    description: 'Постбиотик для поддержки обменных процессов и здоровья',
     type: 'postbiotic'
   },
   {
@@ -7987,7 +7987,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SCFA_UP', 'GLUCOSE_REGULATION'],
     organs: ['LIVER', 'GI'],
     deficiency: 'DIABETES',
-    description: 'Пропионат',
+    description: 'Постбиотик для метаболизма',
     type: 'postbiotic'
   },
   {
@@ -7997,7 +7997,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SCFA_UP', 'CELL_SIGNALING'],
     organs: ['GI', 'CELLS'],
     deficiency: 'DYSBIOSIS',
-    description: 'Ацетат',
+    description: 'Постбиотик для клеточного здоровья',
     type: 'postbiotic'
   },
   {
@@ -8007,7 +8007,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['IMMUNE_UP', 'ANTI_PATHOGEN'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'INFECTION',
-    description: 'Парапробиотик LGG',
+    description: 'Парапробиотик для иммунной системы',
     type: 'paraprobiotic'
   },
   {
@@ -8017,7 +8017,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GI_BARRIER_UP', 'IMMUNE_UP'],
     organs: ['GI', 'IMMUNE_SYSTEM'],
     deficiency: 'IBS',
-    description: 'Парапробиотик плантарум',
+    description: 'Парапробиотик для иммунной системы',
     type: 'paraprobiotic'
   },
   {
@@ -8027,7 +8027,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['IMMUNE_UP', 'ANTI_INFLAMMATION'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'ALLERGY',
-    description: 'Парапробиотик лактис',
+    description: 'Парапробиотик для иммунной системы',
     type: 'paraprobiotic'
   },
   {
@@ -8037,7 +8037,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ANTI_PATHOGEN', 'GI_REPAIR'],
     organs: ['GI'],
     deficiency: 'DIARRHEA',
-    description: 'Парапробиотик буларди',
+    description: 'Парапробиотик для поддержки обменных процессов и здоровья',
     type: 'paraprobiotic'
   },
   {
@@ -8047,7 +8047,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['IMMUNE_SIGNALING_UP', 'GI_BARRIER_UP'],
     organs: ['GI', 'IMMUNE_SYSTEM'],
     deficiency: 'INFECTION',
-    description: 'Метабиотик LGG',
+    description: 'Метабиотик для иммунной системы',
     type: 'metabiotic'
   },
   {
@@ -8057,7 +8057,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['REUTERIN_UP', 'GI_BALANCE'],
     organs: ['GI', 'HORMONES'],
     deficiency: 'LOW_TESTOSTERONE',
-    description: 'Метабиотик рейтера',
+    description: 'Метабиотик для гормонального баланса',
     type: 'metabiotic'
   },
   {
@@ -8067,7 +8067,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GI_BRAIN_AXIS', 'NEURO_SUPPORT'],
     organs: ['BRAIN', 'GI'],
     deficiency: 'ANXIETY',
-    description: 'Метабиотик лонгум',
+    description: 'Метабиотик для работы мозга',
     type: 'metabiotic'
   },
   {
@@ -8077,7 +8077,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ANTI_PATHOGEN', 'GI_REPAIR'],
     organs: ['GI'],
     deficiency: 'DIARRHEA',
-    description: 'Метабиотик буларди',
+    description: 'Метабиотик для поддержки обменных процессов и здоровья',
     type: 'metabiotic'
   },
   {
@@ -8087,7 +8087,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ANTI_PATHOGEN', 'PH_BALANCE'],
     organs: ['URINARY', 'GI'],
     deficiency: 'UTI',
-    description: 'Криспатус',
+    description: 'Пробиотик, поддерживающий микробиома',
     type: 'probiotic'
   },
   {
@@ -8097,7 +8097,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ANTI_PATHOGEN', 'IMMUNE_UP'],
     organs: ['URINARY'],
     deficiency: 'UTI',
-    description: 'Йенсении',
+    description: 'Пробиотик, поддерживающий микробиома',
     type: 'probiotic'
   },
   {
@@ -8107,7 +8107,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GI_BARRIER_UP', 'ANTI_INFLAMMATION'],
     organs: ['GI', 'IMMUNE_SYSTEM'],
     deficiency: 'IBD',
-    description: 'Мукоcа',
+    description: 'Пробиотик, поддерживающий микробиома, иммунной системы',
     type: 'probiotic'
   },
   {
@@ -8117,7 +8117,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['FAT_METABOLISM', 'GI_BALANCE'],
     organs: ['GI', 'LIVER'],
     deficiency: 'OBESITY',
-    description: 'Амиловорус',
+    description: 'Пробиотик, поддерживающий микробиома, жиросжигания',
     type: 'probiotic'
   },
   {
@@ -8127,7 +8127,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['IMMUNE_UP', 'ANTI_PATHOGEN'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'INFECTION',
-    description: 'Курашиге',
+    description: 'Пробиотик, поддерживающий микробиома, иммунной системы',
     type: 'probiotic'
   },
   {
@@ -8137,7 +8137,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GI_BALANCE', 'ANTI_INFLAMMATION'],
     organs: ['GI'],
     deficiency: 'DYSBIOSIS',
-    description: 'Пентозус',
+    description: 'Пробиотик, поддерживающий микробиома',
     type: 'probiotic'
   },
   {
@@ -8147,7 +8147,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GI_BARRIER_UP', 'IMMUNE_UP'],
     organs: ['GI', 'IMMUNE_SYSTEM'],
     deficiency: 'INFECTION',
-    description: 'Термофилум',
+    description: 'Пробиотик, поддерживающий микробиома, иммунной системы',
     type: 'probiotic'
   },
   {
@@ -8157,7 +8157,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GI_BALANCE', 'ANTI_INFLAMMATION'],
     organs: ['GI', 'IMMUNE_SYSTEM'],
     deficiency: 'IBS',
-    description: 'Катенулатум',
+    description: 'Пробиотик, поддерживающий микробиома, иммунной системы',
     type: 'probiotic'
   },
   {
@@ -8167,7 +8167,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ENZYME_UP', 'GI_BALANCE'],
     organs: ['GI'],
     deficiency: 'DYSBIOSIS',
-    description: 'Велезенсис',
+    description: 'Пробиотик, поддерживающий микробиома',
     type: 'probiotic'
   },
   {
@@ -8177,7 +8177,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SPORE_FORM', 'IMMUNE_UP'],
     organs: ['GI', 'IMMUNE_SYSTEM'],
     deficiency: 'INFECTION',
-    description: 'Пумилис',
+    description: 'Пробиотик, поддерживающий микробиома, иммунной системы',
     type: 'probiotic'
   },
   {
@@ -8187,7 +8187,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ENZYME_UP', 'GI_BALANCE'],
     organs: ['GI'],
     deficiency: 'DYSBIOSIS',
-    description: 'Флексус',
+    description: 'Пробиотик, поддерживающий микробиома',
     type: 'probiotic'
   },
   {
@@ -8197,7 +8197,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['LACTIC_ACID_UP', 'GI_BALANCE'],
     organs: ['GI'],
     deficiency: 'DYSBIOSIS',
-    description: 'Термофилус',
+    description: 'Пробиотик, поддерживающий микробиома',
     type: 'probiotic'
   },
   {
@@ -8207,7 +8207,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ORAL_IMMUNE_UP', 'ANTI_PATHOGEN'],
     organs: ['MOUTH', 'THROAT'],
     deficiency: 'INFECTION',
-    description: 'K12',
+    description: 'Пробиотик, поддерживающий микробиома, иммунной системы',
     type: 'probiotic'
   },
   {
@@ -8217,7 +8217,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ORAL_MICROBIOME_UP', 'ANTI_PATHOGEN'],
     organs: ['MOUTH', 'TEETH'],
     deficiency: 'CARIES',
-    description: 'M18',
+    description: 'Пробиотик, поддерживающий микробиома',
     type: 'probiotic'
   },
   {
@@ -8227,7 +8227,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['IMMUNE_UP', 'GI_BARRIER_UP'],
     organs: ['GI', 'IMMUNE_SYSTEM'],
     deficiency: 'INFECTION',
-    description: 'GG2',
+    description: 'Пробиотик, поддерживающий микробиома, иммунной системы',
     type: 'probiotic'
   },
   {
@@ -8237,7 +8237,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['IMMUNE_UP', 'ANTI_INFLAMMATION'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'ALLERGY',
-    description: 'Термолизированный плантарум',
+    description: 'Парапробиотик для иммунной системы',
     type: 'paraprobiotic'
   },
   {
@@ -8247,7 +8247,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['REUTERIN_UP', 'GI_BALANCE'],
     organs: ['GI', 'IMMUNE_SYSTEM'],
     deficiency: 'INFECTION',
-    description: 'DSM17938',
+    description: 'Пробиотик, поддерживающий микробиома, иммунной системы',
     type: 'probiotic'
   },
   {
@@ -8257,7 +8257,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GI_REPAIR', 'ANTI_PATHOGEN'],
     organs: ['GI', 'INFANT'],
     deficiency: 'DIARRHEA',
-    description: 'Protectis',
+    description: 'Пробиотик, поддерживающий микробиома',
     type: 'probiotic'
   },
   {
@@ -8267,7 +8267,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['IMMUNE_UP', 'GI_BARRIER_UP'],
     organs: ['GI', 'IMMUNE_SYSTEM'],
     deficiency: 'INFECTION',
-    description: 'BB536',
+    description: 'Пробиотик, поддерживающий микробиома, иммунной системы',
     type: 'probiotic'
   },
   {
@@ -8277,7 +8277,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GI_BALANCE', 'IMMUNE_UP'],
     organs: ['GI', 'IMMUNE_SYSTEM'],
     deficiency: 'IBS',
-    description: 'BGN4',
+    description: 'Пробиотик, поддерживающий микробиома, иммунной системы',
     type: 'probiotic'
   },
   {
@@ -8287,7 +8287,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ANTI_PATHOGEN', 'GI_REPAIR'],
     organs: ['GI', 'IMMUNE_SYSTEM'],
     deficiency: 'DIARRHEA',
-    description: 'Усиленная форма буларди',
+    description: 'Пробиотик, поддерживающий микробиома, иммунной системы',
     type: 'probiotic'
   },
   {
@@ -8297,7 +8297,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['IMMUNE_UP', 'ANTI_PATHOGEN'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'INFECTION',
-    description: 'Термолизированный ацидофилус',
+    description: 'Парапробиотик для иммунной системы',
     type: 'paraprobiotic'
   },
   {
@@ -8307,7 +8307,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['IMMUNE_UP', 'ANTI_INFLAMMATION'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'ALLERGY',
-    description: 'Термолизированный лактис',
+    description: 'Парапробиотик для иммунной системы',
     type: 'paraprobiotic'
   },
   {
@@ -8317,7 +8317,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GI_REPAIR', 'IMMUNE_SIGNALING_UP'],
     organs: ['GI', 'IMMUNE_SYSTEM'],
     deficiency: 'DYSBIOSIS',
-    description: 'Аминокислотные постбиотики',
+    description: 'Постбиотик для иммунной системы',
     type: 'postbiotic'
   },
   {
@@ -8327,7 +8327,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['IMMUNE_SIGNALING_UP', 'ANTI_INFLAMMATION'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'INFECTION',
-    description: 'Пептидные постбиотики',
+    description: 'Постбиотик для иммунной системы',
     type: 'postbiotic'
   },
   {
@@ -8337,7 +8337,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SCFA_UP', 'GI_BARRIER_UP'],
     organs: ['GI', 'IMMUNE_SYSTEM'],
     deficiency: 'LEAKY_GUT',
-    description: 'SCFA метабиотик',
+    description: 'Метабиотик для иммунной системы',
     type: 'metabiotic'
   },
   {
@@ -8347,7 +8347,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['IMMUNE_SIGNALING_UP', 'ANTI_INFLAMMATION'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'INFLAMMATION',
-    description: 'Полифенольный метабиотик',
+    description: 'Метабиотик для иммунной системы, противовоспалительной защиты',
     type: 'metabiotic'
   },
   {
@@ -8367,7 +8367,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['BUTYRATE_UP', 'GI_REPAIR'],
     organs: ['GI'],
     deficiency: 'LEAKY_GUT',
-    description: 'Бустер бутирата',
+    description: 'Постбиотик для поддержки обменных процессов и здоровья',
     type: 'postbiotic'
   },
   {
@@ -8377,7 +8377,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MUCIN_UP', 'GI_BARRIER_UP'],
     organs: ['GI'],
     deficiency: 'LEAKY_GUT',
-    description: 'Бустер муцина',
+    description: 'Пробиотик, поддерживающий микробиома',
     type: 'probiotic'
   },
   {
@@ -8387,7 +8387,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GI_BALANCE', 'IMMUNE_UP'],
     organs: ['GI', 'IMMUNE_SYSTEM'],
     deficiency: 'DYSBIOSIS',
-    description: 'Премиальный симбиотик',
+    description: 'Симбиотик для поддержки обменных процессов и здоровья',
     type: 'symbiotic'
   },
   {
@@ -8397,7 +8397,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GI_DIVERSITY_UP', 'IMMUNE_UP'],
     organs: ['GI', 'IMMUNE_SYSTEM'],
     deficiency: 'DYSBIOSIS',
-    description: 'Полный спектр симбиотика',
+    description: 'Симбиотик для поддержки обменных процессов и здоровья',
     type: 'symbiotic'
   },
   {
@@ -8407,7 +8407,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['FERMENTATION', 'SCFA_UP'],
     organs: ['GI', 'MICROBIOME'],
     deficiency: 'DYSBIOSIS',
-    description: 'Инулин',
+    description: 'Пребиотик, поддерживающий микробиома',
     type: 'prebiotic'
   },
   {
@@ -8417,7 +8417,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['FERMENTATION', 'BIFIDO_UP'],
     organs: ['GI', 'IMMUNE_SYSTEM'],
     deficiency: 'DYSBIOSIS',
-    description: 'ФОС',
+    description: 'Пребиотик, поддерживающий микробиома, иммунной системы',
     type: 'prebiotic'
   },
   {
@@ -8427,7 +8427,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['BIFIDO_UP', 'GI_BARRIER_UP'],
     organs: ['GI', 'IMMUNE_SYSTEM'],
     deficiency: 'IBS',
-    description: 'ГОС',
+    description: 'Пребиотик, поддерживающий микробиома, иммунной системы',
     type: 'prebiotic'
   },
   {
@@ -8437,7 +8437,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SCFA_UP', 'GI_BALANCE'],
     organs: ['GI', 'IMMUNE_SYSTEM'],
     deficiency: 'DYSBIOSIS',
-    description: 'КСОС',
+    description: 'Пребиотик, поддерживающий микробиома, иммунной системы',
     type: 'prebiotic'
   },
   {
@@ -8447,7 +8447,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SCFA_UP', 'IMMUNE_UP'],
     organs: ['GI', 'IMMUNE_SYSTEM'],
     deficiency: 'INFLAMMATION',
-    description: 'Арабиноксиланы',
+    description: 'Пребиотик, поддерживающий микробиома, иммунной системы',
     type: 'prebiotic'
   },
   {
@@ -8457,7 +8457,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['BUTYRATE_UP', 'GI_REPAIR'],
     organs: ['GI', 'LIVER'],
     deficiency: 'LEAKY_GUT',
-    description: 'Резистентный крахмал RS2',
+    description: 'Пребиотик, поддерживающий микробиома, метаболизма',
     type: 'prebiotic'
   },
   {
@@ -8467,7 +8467,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SCFA_UP', 'GI_BARRIER_UP'],
     organs: ['GI', 'IMMUNE_SYSTEM'],
     deficiency: 'DYSBIOSIS',
-    description: 'RS3',
+    description: 'Пребиотик, поддерживающий микробиома, иммунной системы',
     type: 'prebiotic'
   },
   {
@@ -8477,7 +8477,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SCFA_UP', 'GLUCOSE_REGULATION'],
     organs: ['GI', 'LIVER'],
     deficiency: 'DIABETES',
-    description: 'RS4',
+    description: 'Пребиотик, поддерживающий микробиома, метаболизма',
     type: 'prebiotic'
   },
   {
@@ -8487,7 +8487,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['IMMUNE_UP', 'SCFA_UP'],
     organs: ['GI', 'IMMUNE_SYSTEM'],
     deficiency: 'INFECTION',
-    description: 'Арабиногалактан',
+    description: 'Пребиотик, поддерживающий микробиома, иммунной системы',
     type: 'prebiotic'
   },
   {
@@ -8497,7 +8497,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['BETA_GLU_CAN_UP', 'IMMUNE_STIM'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'INFECTION',
-    description: 'Бета-глюканы',
+    description: 'Пребиотик, поддерживающий микробиома, иммунной системы',
     type: 'prebiotic'
   },
   {
@@ -8507,7 +8507,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['FERMENTATION', 'SCFA_UP'],
     organs: ['GI', 'IMMUNE_SYSTEM'],
     deficiency: 'DYSBIOSIS',
-    description: 'Пектин',
+    description: 'Пребиотик, поддерживающий микробиома, иммунной системы',
     type: 'prebiotic'
   },
   {
@@ -8517,7 +8517,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GI_BINDING', 'SCFA_UP'],
     organs: ['GI', 'LIVER'],
     deficiency: 'TOXINS',
-    description: 'Яблочный пектин',
+    description: 'Пребиотик, поддерживающий микробиома, детоксикации',
     type: 'prebiotic'
   },
   {
@@ -8527,7 +8527,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GI_BARRIER_UP', 'SCFA_UP'],
     organs: ['GI', 'IMMUNE_SYSTEM'],
     deficiency: 'INFLAMMATION',
-    description: 'Цитрусовый пектин',
+    description: 'Пребиотик, поддерживающий микробиома, иммунной системы',
     type: 'prebiotic'
   },
   {
@@ -8537,7 +8537,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['DETOX_UP', 'CELL_PROTECTION'],
     organs: ['LIVER', 'CELLS'],
     deficiency: 'TOXINS',
-    description: 'Модифицированный пектин',
+    description: 'Пребиотик, поддерживающий микробиома, детоксикации, иммунной системы',
     type: 'prebiotic'
   },
   {
@@ -8547,7 +8547,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SCFA_UP', 'IMMUNE_UP'],
     organs: ['GI', 'IMMUNE_SYSTEM'],
     deficiency: 'INFECTION',
-    description: 'Лиственничное волокно',
+    description: 'Пребиотик, поддерживающий микробиома, иммунной системы',
     type: 'prebiotic'
   },
   {
@@ -8557,7 +8557,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['FERMENTATION', 'GI_BALANCE'],
     organs: ['GI'],
     deficiency: 'DYSBIOSIS',
-    description: 'ИМО',
+    description: 'Пребиотик, поддерживающий микробиома',
     type: 'prebiotic'
   },
   {
@@ -8567,7 +8567,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['FIBER_UP', 'SCFA_UP'],
     organs: ['GI'],
     deficiency: 'DYSBIOSIS',
-    description: 'Полидекстроза',
+    description: 'Пребиотик, поддерживающий микробиома',
     type: 'prebiotic'
   },
   {
@@ -8577,7 +8577,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['FERMENTATION', 'AMMONIA_CLEARANCE'],
     organs: ['GI', 'LIVER'],
     deficiency: 'CONSTIPATION',
-    description: 'Лактулоза',
+    description: 'Пребиотик, поддерживающий микробиома, детоксикации',
     type: 'prebiotic'
   },
   {
@@ -8587,7 +8587,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['BIFIDO_UP', 'GI_BARRIER_UP'],
     organs: ['GI', 'INFANT'],
     deficiency: 'IMMUNE_WEAK',
-    description: '2FL',
+    description: 'Пребиотик, поддерживающий микробиома, иммунной системы',
     type: 'prebiotic'
   },
   {
@@ -8597,7 +8597,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GI_BALANCE', 'IMMUNE_UP'],
     organs: ['GI', 'INFANT'],
     deficiency: 'IBS',
-    description: '3GL',
+    description: 'Пребиотик, поддерживающий микробиома',
     type: 'prebiotic'
   },
   {
@@ -8607,7 +8607,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GI_BARRIER_UP', 'SCFA_UP'],
     organs: ['GI', 'INFANT'],
     deficiency: 'DYSBIOSIS',
-    description: 'LNnT',
+    description: 'Пребиотик, поддерживающий микробиома',
     type: 'prebiotic'
   },
   {
@@ -8617,7 +8617,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['FIBER_UP', 'GLUCOSE_REGULATION'],
     organs: ['GI', 'LIVER'],
     deficiency: 'OBESITY',
-    description: 'Глюкоманнан',
+    description: 'Пребиотик, поддерживающий микробиома, метаболизма',
     type: 'prebiotic'
   },
   {
@@ -8627,7 +8627,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['FERMENTATION', 'SCFA_UP'],
     organs: ['GI', 'IMMUNE_SYSTEM'],
     deficiency: 'DYSBIOSIS',
-    description: 'Акациевое волокно',
+    description: 'Пребиотик, поддерживающий микробиома, иммунной системы',
     type: 'prebiotic'
   },
   {
@@ -8637,7 +8637,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GI_BARRIER_UP', 'SCFA_UP'],
     organs: ['GI', 'IMMUNE_SYSTEM'],
     deficiency: 'IBS',
-    description: 'Гуаровая камедь PHGG',
+    description: 'Пребиотик, поддерживающий микробиома, противовоспалительной защиты',
     type: 'prebiotic'
   },
   {
@@ -8647,7 +8647,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['FERMENTATION', 'SCFA_UP'],
     organs: ['GI', 'IMMUNE_SYSTEM'],
     deficiency: 'DYSBIOSIS',
-    description: 'Инулин HP',
+    description: 'Пребиотик, поддерживающий микробиома, иммунной системы',
     type: 'prebiotic'
   },
   {
@@ -8657,7 +8657,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['FERMENTATION', 'BIFIDO_UP'],
     organs: ['GI'],
     deficiency: 'DYSBIOSIS',
-    description: 'Короткие ФОС',
+    description: 'Пребиотик, поддерживающий микробиома',
     type: 'prebiotic'
   },
   {
@@ -8667,7 +8667,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SCFA_UP', 'GI_BARRIER_UP'],
     organs: ['GI', 'IMMUNE_SYSTEM'],
     deficiency: 'IBD',
-    description: 'Длинные ФОС',
+    description: 'Пребиотик, поддерживающий микробиома, иммунной системы',
     type: 'prebiotic'
   },
   {
@@ -8677,7 +8677,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['BIFIDO_UP', 'GI_BARRIER_UP'],
     organs: ['GI', 'IMMUNE_SYSTEM'],
     deficiency: 'ALLERGY',
-    description: 'Синергия ГОС',
+    description: 'Пребиотик, поддерживающий микробиома, иммунной системы',
     type: 'prebiotic'
   },
   {
@@ -8687,7 +8687,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SCFA_UP', 'GI_BALANCE'],
     organs: ['GI', 'IMMUNE_SYSTEM'],
     deficiency: 'DYSBIOSIS',
-    description: 'Синергия КСОС',
+    description: 'Пребиотик, поддерживающий микробиома, иммунной системы',
     type: 'prebiotic'
   },
   {
@@ -8697,7 +8697,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['IMMUNE_UP', 'SCFA_UP'],
     organs: ['GI', 'IMMUNE_SYSTEM'],
     deficiency: 'INFLAMMATION',
-    description: 'Синергия AXOS',
+    description: 'Пребиотик, поддерживающий микробиома, иммунной системы',
     type: 'prebiotic'
   },
   {
@@ -8707,7 +8707,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['FIBER_UP', 'SCFA_UP'],
     organs: ['GI', 'LIVER'],
     deficiency: 'OBESITY',
-    description: 'Резистентный декстрин',
+    description: 'Пребиотик, поддерживающий микробиома, метаболизма',
     type: 'prebiotic'
   },
   {
@@ -8717,7 +8717,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['FOS_UP', 'GLUCOSE_REGULATION'],
     organs: ['GI', 'LIVER'],
     deficiency: 'DIABETES',
-    description: 'Якон',
+    description: 'Пребиотик, поддерживающий микробиома, метаболизма',
     type: 'prebiotic'
   },
   {
@@ -8727,7 +8727,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['RS_UP', 'SCFA_UP'],
     organs: ['GI', 'LIVER'],
     deficiency: 'LEAKY_GUT',
-    description: 'Зелёный банан RS',
+    description: 'Пребиотик, поддерживающий микробиома, метаболизма',
     type: 'prebiotic'
   },
   {
@@ -8737,7 +8737,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['FIBER_UP', 'GI_REPAIR'],
     organs: ['GI', 'LIVER'],
     deficiency: 'CONSTIPATION',
-    description: 'Псиллиум',
+    description: 'Пребиотик, поддерживающий микробиома, метаболизма',
     type: 'prebiotic'
   },
   {
@@ -8747,7 +8747,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['BETA_GLU_CAN_UP', 'LIPID_BALANCE'],
     organs: ['HEART', 'GI'],
     deficiency: 'HIGH_LIPIDS',
-    description: 'Овсяные β‑глюканы',
+    description: 'Пребиотик, поддерживающий микробиома',
     type: 'prebiotic'
   },
   {
@@ -8757,7 +8757,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['BETA_GLU_CAN_UP', 'SCFA_UP'],
     organs: ['HEART', 'GI'],
     deficiency: 'HIGH_LIPIDS',
-    description: 'Ячменные β‑глюканы',
+    description: 'Пребиотик, поддерживающий микробиома',
     type: 'prebiotic'
   },
   {
@@ -8767,7 +8767,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GI_BARRIER_UP', 'ANTI_INFLAMMATION'],
     organs: ['GI', 'IMMUNE_SYSTEM'],
     deficiency: 'INFLAMMATION',
-    description: 'Полифенольный пребиотик',
+    description: 'Пребиотик, поддерживающий микробиома, иммунной системы',
     type: 'prebiotic'
   },
   {
@@ -8777,7 +8777,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['FIBER_UP', 'SCFA_UP'],
     organs: ['GI', 'IMMUNE_SYSTEM'],
     deficiency: 'DYSBIOSIS',
-    description: 'Морские волокна',
+    description: 'Пребиотик, поддерживающий микробиома, иммунной системы',
     type: 'prebiotic'
   },
   {
@@ -8787,7 +8787,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GI_GEL_FORM', 'GI_PROTECTION'],
     organs: ['GI'],
     deficiency: 'GI_IRRITATION',
-    description: 'Альгинат',
+    description: 'Пребиотик, поддерживающий микробиома',
     type: 'prebiotic'
   },
   {
@@ -8797,7 +8797,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GI_BALANCE', 'ANTI_INFLAMMATION'],
     organs: ['GI', 'IMMUNE_SYSTEM'],
     deficiency: 'INFECTION',
-    description: 'Хитозан олигомеры',
+    description: 'Пребиотик, поддерживающий микробиома, иммунной системы',
     type: 'prebiotic'
   },
   {
@@ -8807,7 +8807,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SCFA_UP', 'GI_BALANCE'],
     organs: ['GI', 'IMMUNE_SYSTEM'],
     deficiency: 'DYSBIOSIS',
-    description: 'ГОС (глюко‑)',
+    description: 'Пребиотик, поддерживающий микробиома, иммунной системы',
     type: 'prebiotic'
   },
   {
@@ -8817,7 +8817,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['BIFIDO_UP', 'GI_BARRIER_UP'],
     organs: ['GI', 'INFANT'],
     deficiency: 'IMMUNE_WEAK',
-    description: 'Комплекс HMO',
+    description: 'Пребиотик, поддерживающий микробиома, иммунной системы',
     type: 'prebiotic'
   },
   {
@@ -8827,7 +8827,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['FIBER_UP', 'SCFA_UP'],
     organs: ['GI', 'IMMUNE_SYSTEM'],
     deficiency: 'DYSBIOSIS',
-    description: 'Полный комплекс клетчатки',
+    description: 'Пребиотик, поддерживающий микробиома',
     type: 'prebiotic'
   },
   {
@@ -8837,7 +8837,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['FERMENTATION', 'SCFA_UP'],
     organs: ['GI', 'IMMUNE_SYSTEM'],
     deficiency: 'DYSBIOSIS',
-    description: 'Премиальный инулин',
+    description: 'Пребиотик, поддерживающий микробиома, иммунной системы',
     type: 'prebiotic'
   },
   {
@@ -8847,7 +8847,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SCFA_UP', 'GI_BARRIER_UP'],
     organs: ['GI', 'IMMUNE_SYSTEM'],
     deficiency: 'IBD',
-    description: 'Длинноцепочечный инулин',
+    description: 'Пребиотик, поддерживающий микробиома, иммунной системы',
     type: 'prebiotic'
   },
   {
@@ -8857,7 +8857,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['FERMENTATION', 'GI_BALANCE'],
     organs: ['GI'],
     deficiency: 'DYSBIOSIS',
-    description: 'Короткоцепочечный инулин',
+    description: 'Пребиотик, поддерживающий микробиома',
     type: 'prebiotic'
   },
   {
@@ -8867,7 +8867,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['BIFIDO_UP', 'SCFA_UP'],
     organs: ['GI', 'IMMUNE_SYSTEM'],
     deficiency: 'DYSBIOSIS',
-    description: 'Премиальные ФОС',
+    description: 'Пребиотик, поддерживающий микробиома, иммунной системы',
     type: 'prebiotic'
   },
   {
@@ -8877,7 +8877,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GI_BARRIER_UP', 'BIFIDO_UP'],
     organs: ['GI', 'IMMUNE_SYSTEM'],
     deficiency: 'ALLERGY',
-    description: 'Премиальные ГОС',
+    description: 'Пребиотик, поддерживающий микробиома, иммунной системы',
     type: 'prebiotic'
   },
   {
@@ -8887,7 +8887,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SCFA_UP', 'GI_BALANCE'],
     organs: ['GI', 'IMMUNE_SYSTEM'],
     deficiency: 'DYSBIOSIS',
-    description: 'Премиальные КСОС',
+    description: 'Пребиотик, поддерживающий микробиома, иммунной системы',
     type: 'prebiotic'
   },
   {
@@ -8897,7 +8897,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['IMMUNE_UP', 'SCFA_UP'],
     organs: ['GI', 'IMMUNE_SYSTEM'],
     deficiency: 'INFLAMMATION',
-    description: 'Премиальные AXOS',
+    description: 'Пребиотик, поддерживающий микробиома, иммунной системы',
     type: 'prebiotic'
   },
   {
@@ -8907,7 +8907,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['BIFIDO_UP', 'GI_BARRIER_UP'],
     organs: ['GI', 'INFANT'],
     deficiency: 'IMMUNE_WEAK',
-    description: 'Премиальный 2FL',
+    description: 'Пребиотик, поддерживающий микробиома, иммунной системы',
     type: 'prebiotic'
   },
   {
@@ -8917,7 +8917,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GI_BALANCE', 'IMMUNE_UP'],
     organs: ['GI', 'INFANT'],
     deficiency: 'IBS',
-    description: 'Премиальный 3GL',
+    description: 'Пребиотик, поддерживающий микробиома',
     type: 'prebiotic'
   },
   {
@@ -8927,7 +8927,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GI_BARRIER_UP', 'SCFA_UP'],
     organs: ['GI', 'INFANT'],
     deficiency: 'DYSBIOSIS',
-    description: 'Премиальный LNnT',
+    description: 'Пребиотик, поддерживающий микробиома',
     type: 'prebiotic'
   },
   {
@@ -8937,7 +8937,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['IMMUNE_UP', 'GI_BARRIER_UP'],
     organs: ['GI', 'INFANT'],
     deficiency: 'IMMUNE_WEAK',
-    description: '6SL',
+    description: 'Пребиотик, поддерживающий микробиома, иммунной системы',
     type: 'prebiotic'
   },
   {
@@ -8947,7 +8947,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GI_BALANCE', 'SCFA_UP'],
     organs: ['GI', 'INFANT'],
     deficiency: 'DYSBIOSIS',
-    description: '3SL',
+    description: 'Пребиотик, поддерживающий микробиома',
     type: 'prebiotic'
   },
   {
@@ -8957,7 +8957,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['BIFIDO_UP', 'IMMUNE_UP'],
     organs: ['GI', 'INFANT'],
     deficiency: 'INFECTION',
-    description: 'Фукозилированный HMO',
+    description: 'Пребиотик, поддерживающий микробиома, иммунной системы',
     type: 'prebiotic'
   },
   {
@@ -8967,7 +8967,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['FIBER_UP', 'SCFA_UP'],
     organs: ['GI', 'IMMUNE_SYSTEM'],
     deficiency: 'DYSBIOSIS',
-    description: 'Галактоманнан',
+    description: 'Пребиотик, поддерживающий микробиома, иммунной системы',
     type: 'prebiotic'
   },
   {
@@ -8977,7 +8977,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ANTI_PATHOGEN', 'IMMUNE_UP'],
     organs: ['GI', 'IMMUNE_SYSTEM'],
     deficiency: 'INFECTION',
-    description: 'МОС',
+    description: 'Пребиотик, поддерживающий микробиома, иммунной системы',
     type: 'prebiotic'
   },
   {
@@ -8987,7 +8987,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['FERMENTATION', 'SCFA_UP'],
     organs: ['GI', 'IMMUNE_SYSTEM'],
     deficiency: 'DYSBIOSIS',
-    description: 'Комплекс фруктанов',
+    description: 'Пребиотик, поддерживающий микробиома, иммунной системы',
     type: 'prebiotic'
   },
   {
@@ -8997,7 +8997,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SCFA_UP', 'GI_BALANCE'],
     organs: ['GI', 'IMMUNE_SYSTEM'],
     deficiency: 'DYSBIOSIS',
-    description: 'ГОС (глюко‑)',
+    description: 'Пребиотик, поддерживающий микробиома, иммунной системы',
     type: 'prebiotic'
   },
   {
@@ -9007,7 +9007,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GI_BARRIER_UP', 'ANTI_INFLAMMATION'],
     organs: ['GI', 'IMMUNE_SYSTEM'],
     deficiency: 'INFLAMMATION',
-    description: 'Полифенольные волокна',
+    description: 'Пребиотик, поддерживающий микробиома, иммунной системы',
     type: 'prebiotic'
   },
   {
@@ -9017,7 +9017,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SCFA_UP', 'GI_BALANCE'],
     organs: ['GI', 'IMMUNE_SYSTEM'],
     deficiency: 'DYSBIOSIS',
-    description: 'Морские олигосахариды',
+    description: 'Пребиотик, поддерживающий микробиома, иммунной системы',
     type: 'prebiotic'
   },
   {
@@ -9027,7 +9027,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GI_GEL_FORM', 'GI_PROTECTION'],
     organs: ['GI'],
     deficiency: 'GI_IRRITATION',
-    description: 'Премиальный альгинат',
+    description: 'Пребиотик, поддерживающий микробиома',
     type: 'prebiotic'
   },
   {
@@ -9037,7 +9037,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GI_BALANCE', 'ANTI_INFLAMMATION'],
     organs: ['GI', 'IMMUNE_SYSTEM'],
     deficiency: 'INFECTION',
-    description: 'Премиальный хитозан',
+    description: 'Пребиотик, поддерживающий микробиома, иммунной системы',
     type: 'prebiotic'
   },
   {
@@ -9047,7 +9047,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['FIBER_UP', 'GLUCOSE_REGULATION'],
     organs: ['GI', 'LIVER'],
     deficiency: 'OBESITY',
-    description: 'Премиальный глюкоманнан',
+    description: 'Пребиотик, поддерживающий микробиома, метаболизма',
     type: 'prebiotic'
   },
   {
@@ -9057,7 +9057,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['FIBER_UP', 'GI_REPAIR'],
     organs: ['GI', 'LIVER'],
     deficiency: 'CONSTIPATION',
-    description: 'Премиальный псиллиум',
+    description: 'Пребиотик, поддерживающий микробиома, метаболизма',
     type: 'prebiotic'
   },
   {
@@ -9067,7 +9067,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['FIBER_UP', 'LIPID_BALANCE'],
     organs: ['HEART', 'GI'],
     deficiency: 'HIGH_LIPIDS',
-    description: 'Премиальные овсяные волокна',
+    description: 'Пребиотик, поддерживающий микробиома',
     type: 'prebiotic'
   },
   {
@@ -9077,7 +9077,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['FIBER_UP', 'SCFA_UP'],
     organs: ['HEART', 'GI'],
     deficiency: 'HIGH_LIPIDS',
-    description: 'Премиальные ячменные волокна',
+    description: 'Пребиотик, поддерживающий микробиома',
     type: 'prebiotic'
   },
   {
@@ -9097,7 +9097,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SCFA_UP', 'IMMUNE_UP'],
     organs: ['GI', 'IMMUNE_SYSTEM'],
     deficiency: 'INFLAMMATION',
-    description: 'Пшеничные арабиноксиланы',
+    description: 'Пребиотик, поддерживающий микробиома, иммунной системы',
     type: 'prebiotic'
   },
   {
@@ -9107,7 +9107,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['FIBER_UP', 'GI_BALANCE'],
     organs: ['GI'],
     deficiency: 'DYSBIOSIS',
-    description: 'Рисовые волокна',
+    description: 'Пребиотик, поддерживающий микробиома',
     type: 'prebiotic'
   },
   {
@@ -9117,7 +9117,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['RS_UP', 'SCFA_UP'],
     organs: ['GI', 'LIVER'],
     deficiency: 'LEAKY_GUT',
-    description: 'Крахмал кассавы',
+    description: 'Пребиотик, поддерживающий микробиома, метаболизма',
     type: 'prebiotic'
   },
   {
@@ -9127,7 +9127,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['RS_UP', 'GI_REPAIR'],
     organs: ['GI', 'LIVER'],
     deficiency: 'LEAKY_GUT',
-    description: 'Тапиока RS',
+    description: 'Пребиотик, поддерживающий микробиома, метаболизма',
     type: 'prebiotic'
   },
   {
@@ -9137,7 +9137,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['RS_UP', 'SCFA_UP'],
     organs: ['GI', 'LIVER'],
     deficiency: 'LEAKY_GUT',
-    description: 'Зелёный плантайн RS',
+    description: 'Пребиотик, поддерживающий микробиома, метаболизма',
     type: 'prebiotic'
   },
   {
@@ -9147,7 +9147,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['FOS_UP', 'SCFA_UP'],
     organs: ['GI', 'IMMUNE_SYSTEM'],
     deficiency: 'DYSBIOSIS',
-    description: 'Топинамбур',
+    description: 'Пребиотик, поддерживающий микробиома, иммунной системы',
     type: 'prebiotic'
   },
   {
@@ -9157,7 +9157,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['FIBER_UP', 'GI_BALANCE'],
     organs: ['GI'],
     deficiency: 'DYSBIOSIS',
-    description: 'Морковные волокна',
+    description: 'Пребиотик, поддерживающий микробиома',
     type: 'prebiotic'
   },
   {
@@ -9167,7 +9167,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['FIBER_UP', 'GI_BINDING'],
     organs: ['GI', 'LIVER'],
     deficiency: 'TOXINS',
-    description: 'Свекольные волокна',
+    description: 'Пребиотик, поддерживающий микробиома, детоксикации',
     type: 'prebiotic'
   },
   {
@@ -9177,7 +9177,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['RS_UP', 'SCFA_UP'],
     organs: ['GI', 'LIVER'],
     deficiency: 'LEAKY_GUT',
-    description: 'Картофельный RS',
+    description: 'Пребиотик, поддерживающий микробиома, метаболизма',
     type: 'prebiotic'
   },
   {
@@ -9187,7 +9187,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['FIBER_UP', 'SCFA_UP'],
     organs: ['GI', 'IMMUNE_SYSTEM'],
     deficiency: 'DYSBIOSIS',
-    description: 'Цитрусовые волокна',
+    description: 'Пребиотик, поддерживающий микробиома, иммунной системы',
     type: 'prebiotic'
   },
   {
@@ -9197,7 +9197,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['FIBER_UP', 'GI_BALANCE'],
     organs: ['GI'],
     deficiency: 'DYSBIOSIS',
-    description: 'Бамбуковые волокна',
+    description: 'Пребиотик, поддерживающий микробиома',
     type: 'prebiotic'
   },
   {
@@ -9207,7 +9207,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['FIBER_UP', 'GLUCOSE_REGULATION'],
     organs: ['GI', 'LIVER'],
     deficiency: 'OBESITY',
-    description: 'Премиальный конжак',
+    description: 'Пребиотик, поддерживающий микробиома, метаболизма',
     type: 'prebiotic'
   },
   {
@@ -9217,7 +9217,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['FIBER_UP', 'SCFA_UP'],
     organs: ['GI', 'IMMUNE_SYSTEM'],
     deficiency: 'DYSBIOSIS',
-    description: 'Премиальный комплекс волокон',
+    description: 'Пребиотик, поддерживающий микробиома',
     type: 'prebiotic'
   },
   {
@@ -9227,7 +9227,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GI_BARRIER_UP', 'SCFA_UP'],
     organs: ['GI', 'IMMUNE_SYSTEM'],
     deficiency: 'LEAKY_GUT',
-    description: 'Комплекс для GI‑барьера',
+    description: 'Пребиотик, поддерживающий микробиома, иммунной системы',
     type: 'prebiotic'
   },
   {
@@ -9237,7 +9237,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MUCIN_UP', 'GI_BARRIER_UP'],
     organs: ['GI'],
     deficiency: 'LEAKY_GUT',
-    description: 'Пребиотик для муцина',
+    description: 'Пребиотик, поддерживающий микробиома',
     type: 'prebiotic'
   },
   {
@@ -9247,7 +9247,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ANTI_INFLAMMATION', 'SCFA_UP'],
     organs: ['GI', 'IMMUNE_SYSTEM'],
     deficiency: 'INFLAMMATION',
-    description: 'Противовоспалительные волокна',
+    description: 'Пребиотик, поддерживающий микробиома, иммунной системы',
     type: 'prebiotic'
   },
   {
@@ -9257,7 +9257,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SCFA_UP', 'GI_BARRIER_UP'],
     organs: ['GI', 'IMMUNE_SYSTEM'],
     deficiency: 'DYSBIOSIS',
-    description: 'Полная синергия пребиотиков',
+    description: 'Пребиотик, поддерживающий микробиома',
     type: 'prebiotic'
   },
   {
@@ -9267,7 +9267,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['BUTYRATE_UP', 'GI_REPAIR'],
     organs: ['GI', 'IMMUNE_SYSTEM'],
     deficiency: 'LEAKY_GUT',
-    description: 'Бутират натрия',
+    description: 'Постбиотик для иммунной системы',
     type: 'postbiotic'
   },
   {
@@ -9277,7 +9277,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['BUTYRATE_UP', 'GI_BARRIER_UP'],
     organs: ['GI'],
     deficiency: 'LEAKY_GUT',
-    description: 'Кальций бутират',
+    description: 'Постбиотик для поддержки обменных процессов и здоровья',
     type: 'postbiotic'
   },
   {
@@ -9287,7 +9287,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['BUTYRATE_UP', 'GI_REPAIR'],
     organs: ['GI', 'BRAIN'],
     deficiency: 'GI_IRRITATION',
-    description: 'Магний бутират',
+    description: 'Постбиотик для успокоения',
     type: 'postbiotic'
   },
   {
@@ -9297,7 +9297,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SCFA_UP', 'GLUCOSE_REGULATION'],
     organs: ['LIVER', 'GI'],
     deficiency: 'DIABETES',
-    description: 'Пропионат',
+    description: 'Постбиотик для метаболизма',
     type: 'postbiotic'
   },
   {
@@ -9307,7 +9307,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SCFA_UP', 'CELL_SIGNALING'],
     organs: ['GI', 'CELLS'],
     deficiency: 'DYSBIOSIS',
-    description: 'Ацетат',
+    description: 'Постбиотик для клеточного здоровья',
     type: 'postbiotic'
   },
   {
@@ -9317,7 +9317,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SCFA_UP', 'GI_BALANCE'],
     organs: ['GI', 'IMMUNE_SYSTEM'],
     deficiency: 'DYSBIOSIS',
-    description: 'Изобутират',
+    description: 'Постбиотик для иммунной системы',
     type: 'postbiotic'
   },
   {
@@ -9327,7 +9327,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SCFA_UP', 'GUT_BRAIN_AXIS'],
     organs: ['GI', 'BRAIN'],
     deficiency: 'ANXIETY',
-    description: 'Валерат',
+    description: 'Постбиотик для нервной системы',
     type: 'postbiotic'
   },
   {
@@ -9337,7 +9337,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['LACTATE_UP', 'GI_BALANCE'],
     organs: ['GI', 'IMMUNE_SYSTEM'],
     deficiency: 'DYSBIOSIS',
-    description: 'Лактат',
+    description: 'Постбиотик для иммунной системы',
     type: 'postbiotic'
   },
   {
@@ -9347,7 +9347,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GI_BALANCE', 'SCFA_UP'],
     organs: ['GI'],
     deficiency: 'DYSBIOSIS',
-    description: 'Л‑лактат',
+    description: 'Постбиотик для поддержки обменных процессов и здоровья',
     type: 'postbiotic'
   },
   {
@@ -9357,7 +9357,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GI_BALANCE', 'CELL_SIGNALING'],
     organs: ['GI'],
     deficiency: 'DYSBIOSIS',
-    description: 'Д‑лактат',
+    description: 'Постбиотик для поддержки обменных процессов и здоровья',
     type: 'postbiotic'
   },
   {
@@ -9367,7 +9367,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ANTI_PATHOGEN', 'GI_BALANCE'],
     organs: ['GI', 'IMMUNE_SYSTEM'],
     deficiency: 'INFECTION',
-    description: 'Рейтерин',
+    description: 'Постбиотик для противомикробной защиты',
     type: 'postbiotic'
   },
   {
@@ -9377,7 +9377,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ANTI_PATHOGEN', 'IMMUNE_UP'],
     organs: ['GI', 'IMMUNE_SYSTEM'],
     deficiency: 'INFECTION',
-    description: 'Бактерицины',
+    description: 'Постбиотик для противомикробной защиты',
     type: 'postbiotic'
   },
   {
@@ -9387,7 +9387,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['INNATE_IMMUNE_UP', 'CELL_SIGNALING'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'INFECTION',
-    description: 'МДП',
+    description: 'Постбиотик для иммунной системы',
     type: 'postbiotic'
   },
   {
@@ -9407,7 +9407,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['IMMUNE_SIGNALING_UP', 'GI_BARRIER_UP'],
     organs: ['GI', 'IMMUNE_SYSTEM'],
     deficiency: 'INFECTION',
-    description: 'Пептидогликановые фрагменты',
+    description: 'Постбиотик для иммунной системы',
     type: 'postbiotic'
   },
   {
@@ -9417,7 +9417,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['EPS_UP', 'GI_BARRIER_UP'],
     organs: ['GI', 'IMMUNE_SYSTEM'],
     deficiency: 'IBD',
-    description: 'Экзополисахариды',
+    description: 'Постбиотик для иммунной системы',
     type: 'postbiotic'
   },
   {
@@ -9427,7 +9427,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GABA_UP', 'GI_BRAIN_AXIS'],
     organs: ['BRAIN', 'GI'],
     deficiency: 'ANXIETY',
-    description: 'Микробная ГАМК',
+    description: 'Постбиотик для нервной системы',
     type: 'postbiotic'
   },
   {
@@ -9437,7 +9437,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SEROTONIN_UP', 'GI_BRAIN_AXIS'],
     organs: ['BRAIN', 'GI'],
     deficiency: 'MOOD_ISSUES',
-    description: 'Микробный серотонин',
+    description: 'Постбиотик для нервной системы',
     type: 'postbiotic'
   },
   {
@@ -9447,7 +9447,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['DOPAMINE_UP', 'GI_BRAIN_AXIS'],
     organs: ['BRAIN', 'GI'],
     deficiency: 'MOOD_ISSUES',
-    description: 'Микробный дофамин',
+    description: 'Постбиотик для нервной системы',
     type: 'postbiotic'
   },
   {
@@ -9457,7 +9457,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ANTIOXIDANT', 'GI_BARRIER_UP'],
     organs: ['GI', 'BRAIN'],
     deficiency: 'OXIDATIVE_STRESS',
-    description: 'IPA',
+    description: 'Постбиотик для защиты клеток от окислительного стресса, нервной системы',
     type: 'postbiotic'
   },
   {
@@ -9467,7 +9467,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ANTI_INFLAMMATION', 'GI_BALANCE'],
     organs: ['GI', 'IMMUNE_SYSTEM'],
     deficiency: 'INFLAMMATION',
-    description: 'Индол‑3‑лактат',
+    description: 'Постбиотик для иммунной системы',
     type: 'postbiotic'
   },
   {
@@ -9477,7 +9477,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GI_BARRIER_UP', 'IMMUNE_SIGNALING_UP'],
     organs: ['GI', 'IMMUNE_SYSTEM'],
     deficiency: 'DYSBIOSIS',
-    description: 'Индол‑3‑ацетат',
+    description: 'Постбиотик для иммунной системы',
     type: 'postbiotic'
   },
   {
@@ -9487,7 +9487,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MITOPHAGY_UP', 'CELL_REPAIR'],
     organs: ['CELLS', 'MUSCLES'],
     deficiency: 'AGING',
-    description: 'Уролитин A',
+    description: 'Постбиотик для работы митохондрий',
     type: 'postbiotic'
   },
   {
@@ -9497,7 +9497,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ANABOLIC_SIGNALING', 'CELL_PROTECTION'],
     organs: ['MUSCLES'],
     deficiency: 'AGING',
-    description: 'Уролитин B',
+    description: 'Постбиотик для мышц',
     type: 'postbiotic'
   },
   {
@@ -9507,7 +9507,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SCFA_UP', 'GLUCOSE_REGULATION'],
     organs: ['GI', 'LIVER'],
     deficiency: 'DIABETES',
-    description: 'Комплекс пропионат‑сукцинат',
+    description: 'Постбиотик для метаболизма',
     type: 'postbiotic'
   },
   {
@@ -9517,7 +9517,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ENERGY_SIGNALING', 'GLUCOSE_REGULATION'],
     organs: ['LIVER', 'GI'],
     deficiency: 'DIABETES',
-    description: 'Сукцинат',
+    description: 'Постбиотик для метаболизма',
     type: 'postbiotic'
   },
   {
@@ -9527,7 +9527,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ATP_UP', 'CELL_SIGNALING'],
     organs: ['CELLS', 'MUSCLES'],
     deficiency: 'FATIGUE',
-    description: 'Пируват',
+    description: 'Постбиотик для энергетического обмена',
     type: 'postbiotic'
   },
   {
@@ -9537,7 +9537,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GI_BALANCE', 'IMMUNE_UP'],
     organs: ['GI', 'IMMUNE_SYSTEM'],
     deficiency: 'INFECTION',
-    description: 'Ацетоин',
+    description: 'Постбиотик для иммунной системы',
     type: 'postbiotic'
   },
   {
@@ -9547,7 +9547,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GI_BALANCE', 'ANTI_PATHOGEN'],
     organs: ['GI', 'IMMUNE_SYSTEM'],
     deficiency: 'INFECTION',
-    description: 'Диацетил',
+    description: 'Постбиотик для иммунной системы',
     type: 'postbiotic'
   },
   {
@@ -9557,7 +9557,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ANTI_INFLAMMATION', 'SKIN_BARRIER'],
     organs: ['SKIN', 'IMMUNE_SYSTEM'],
     deficiency: 'ECZEMA',
-    description: 'Гидрокси‑жирные кислоты',
+    description: 'Постбиотик для иммунной системы, здоровья кожи',
     type: 'postbiotic'
   },
   {
@@ -9567,7 +9567,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['FAT_OXIDATION', 'METABOLISM_UP'],
     organs: ['MUSCLES', 'LIVER'],
     deficiency: 'OBESITY',
-    description: 'Микробная CLA',
+    description: 'Постбиотик для жиросжигания',
     type: 'postbiotic'
   },
   {
@@ -9577,7 +9577,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SKIN_BARRIER', 'CELL_SIGNALING'],
     organs: ['SKIN', 'CELLS'],
     deficiency: 'DRY_SKIN',
-    description: 'Микробные сфинголипиды',
+    description: 'Постбиотик для здоровья кожи, клеточного здоровья',
     type: 'postbiotic'
   },
   {
@@ -9587,7 +9587,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['BILE_ACID_SIGNALING', 'FAT_METABOLISM'],
     organs: ['LIVER', 'GI'],
     deficiency: 'IBD',
-    description: 'Дезоксихолевая кислота',
+    description: 'Постбиотик для метаболизма',
     type: 'postbiotic'
   },
   {
@@ -9597,7 +9597,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['BILE_ACID_SIGNALING', 'IMMUNE_MOD'],
     organs: ['GI', 'IMMUNE_SYSTEM'],
     deficiency: 'INFLAMMATION',
-    description: 'Литохолевая кислота',
+    description: 'Постбиотик для иммунной системы',
     type: 'postbiotic'
   },
   {
@@ -9607,7 +9607,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['BILE_FLOW_UP', 'ANTI_INFLAMMATION'],
     organs: ['LIVER', 'GI'],
     deficiency: 'HEPATIC_STRESS',
-    description: 'Микробная УДХК',
+    description: 'Постбиотик для функции печени',
     type: 'postbiotic'
   },
   {
@@ -9617,7 +9617,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ANTI_INFLAMMATION', 'GI_BARRIER_UP'],
     organs: ['GI', 'IMMUNE_SYSTEM'],
     deficiency: 'INFLAMMATION',
-    description: 'Метаболиты полифенолов',
+    description: 'Постбиотик для иммунной системы',
     type: 'postbiotic'
   },
   {
@@ -9627,7 +9627,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GI_SIGNALING', 'IMMUNE_UP'],
     organs: ['GI', 'IMMUNE_SYSTEM'],
     deficiency: 'DYSBIOSIS',
-    description: 'Короткоцепочечные амины',
+    description: 'Постбиотик для иммунной системы',
     type: 'postbiotic'
   },
   {
@@ -9637,7 +9637,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ANTI_PATHOGEN', 'IMMUNE_UP'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'INFECTION',
-    description: 'Антимикробные пептиды',
+    description: 'Постбиотик для иммунной системы',
     type: 'postbiotic'
   },
   {
@@ -9647,7 +9647,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['IMMUNE_SIGNALING_UP', 'ANTI_INFLAMMATION'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'INFLAMMATION',
-    description: 'Иммуномодулирующие пептиды',
+    description: 'Постбиотик для иммунной системы',
     type: 'postbiotic'
   },
   {
@@ -9657,7 +9657,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GI_REPAIR', 'GI_BARRIER_UP'],
     organs: ['GI'],
     deficiency: 'LEAKY_GUT',
-    description: 'Пептиды восстановления ЖКТ',
+    description: 'Постбиотик для поддержки обменных процессов и здоровья',
     type: 'postbiotic'
   },
   {
@@ -9667,7 +9667,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GI_BALANCE', 'CELL_SIGNALING'],
     organs: ['GI', 'IMMUNE_SYSTEM'],
     deficiency: 'DYSBIOSIS',
-    description: 'Аминокислотные метаболиты',
+    description: 'Постбиотик для иммунной системы',
     type: 'postbiotic'
   },
   {
@@ -9677,7 +9677,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['IMMUNE_UP', 'GI_REPAIR'],
     organs: ['GI', 'IMMUNE_SYSTEM'],
     deficiency: 'INFECTION',
-    description: 'Микробные нуклеотиды',
+    description: 'Постбиотик для иммунной системы',
     type: 'postbiotic'
   },
   {
@@ -9687,7 +9687,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['IMMUNE_UP', 'CELL_PROTECTION'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'INFECTION',
-    description: 'Полисахаридные фракции',
+    description: 'Постбиотик для иммунной системы',
     type: 'postbiotic'
   },
   {
@@ -9697,7 +9697,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SCFA_UP', 'IMMUNE_UP'],
     organs: ['GI', 'IMMUNE_SYSTEM'],
     deficiency: 'DYSBIOSIS',
-    description: 'Полный спектр постбиотиков',
+    description: 'Постбиотик для поддержки обменных процессов и здоровья',
     type: 'postbiotic'
   },
   {
@@ -9707,7 +9707,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GABA_UP', 'GI_BRAIN_AXIS'],
     organs: ['BRAIN', 'GI'],
     deficiency: 'ANXIETY',
-    description: 'Комплекс микробной ГАМК',
+    description: 'Постбиотик для нервной системы',
     type: 'postbiotic'
   },
   {
@@ -9727,7 +9727,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['DOPAMINE_UP', 'NEURO_SIGNALING'],
     organs: ['BRAIN', 'GI'],
     deficiency: 'MOOD_ISSUES',
-    description: 'Комплекс микробного дофамина',
+    description: 'Постбиотик для нервной системы',
     type: 'postbiotic'
   },
   {
@@ -9737,7 +9737,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NEURO_SIGNALING', 'GI_BRAIN_AXIS'],
     organs: ['BRAIN', 'GI'],
     deficiency: 'MOOD_ISSUES',
-    description: 'Триптамин',
+    description: 'Постбиотик для нервной системы',
     type: 'postbiotic'
   },
   {
@@ -9747,7 +9747,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['PEA_UP', 'NEURO_SIGNALING'],
     organs: ['BRAIN', 'GI'],
     deficiency: 'MOOD_ISSUES',
-    description: 'Фенэтиламин',
+    description: 'Постбиотик для нервной системы',
     type: 'postbiotic'
   },
   {
@@ -9757,7 +9757,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['IL10_UP', 'ANTI_INFLAMMATION'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'INFLAMMATION',
-    description: 'Метаболиты IL‑10',
+    description: 'Постбиотик для иммунной системы',
     type: 'postbiotic'
   },
   {
@@ -9767,7 +9767,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['IFN_MOD', 'IMMUNE_UP'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'INFECTION',
-    description: 'Интерфероновые метаболиты',
+    description: 'Постбиотик для иммунной системы',
     type: 'postbiotic'
   },
   {
@@ -9777,7 +9777,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['TREG_UP', 'ANTI_INFLAMMATION'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'AUTOIMMUNE',
-    description: 'Метаболиты T‑регуляции',
+    description: 'Постбиотик для иммунной системы',
     type: 'postbiotic'
   },
   {
@@ -9787,7 +9787,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NF_KB_BLOCK', 'ANTI_INFLAMMATION'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'INFLAMMATION',
-    description: 'Блокаторы NF‑κB',
+    description: 'Постбиотик для иммунной системы',
     type: 'postbiotic'
   },
   {
@@ -9797,7 +9797,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['COX2_MOD', 'ANTI_INFLAMMATION'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'INFLAMMATION',
-    description: 'Модуляторы COX‑2',
+    description: 'Постбиотик для иммунной системы',
     type: 'postbiotic'
   },
   {
@@ -9807,7 +9807,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MUCIN_UP', 'GI_BARRIER_UP'],
     organs: ['GI'],
     deficiency: 'LEAKY_GUT',
-    description: 'Метаболиты муцина',
+    description: 'Постбиотик для поддержки обменных процессов и здоровья',
     type: 'postbiotic'
   },
   {
@@ -9817,7 +9817,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['TJ_UP', 'GI_BARRIER_UP'],
     organs: ['GI'],
     deficiency: 'LEAKY_GUT',
-    description: 'Активаторы плотных контактов',
+    description: 'Постбиотик для поддержки обменных процессов и здоровья',
     type: 'postbiotic'
   },
   {
@@ -9827,7 +9827,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ANTI_PATHOGEN', 'GI_BALANCE'],
     organs: ['GI'],
     deficiency: 'INFECTION',
-    description: 'Антипатогенные метаболиты',
+    description: 'Постбиотик для поддержки обменных процессов и здоровья',
     type: 'postbiotic'
   },
   {
@@ -9837,7 +9837,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['UREASE_INHIBITION', 'ANTI_PATHOGEN'],
     organs: ['GI'],
     deficiency: 'INFECTION',
-    description: 'Блокаторы уреазы',
+    description: 'Постбиотик для поддержки обменных процессов и здоровья',
     type: 'postbiotic'
   },
   {
@@ -9847,7 +9847,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['AMPK_UP', 'GLUCOSE_REGULATION'],
     organs: ['LIVER', 'MUSCLES'],
     deficiency: 'DIABETES',
-    description: 'Метаболиты AMPK',
+    description: 'Постбиотик для метаболизма',
     type: 'postbiotic'
   },
   {
@@ -9857,7 +9857,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['PPAR_UP', 'FAT_METABOLISM'],
     organs: ['LIVER', 'MUSCLES'],
     deficiency: 'OBESITY',
-    description: 'Метаболиты PPAR',
+    description: 'Постбиотик для метаболизма',
     type: 'postbiotic'
   },
   {
@@ -9867,7 +9867,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['FGF21_UP', 'ENERGY_SIGNALING'],
     organs: ['LIVER', 'MUSCLES'],
     deficiency: 'OBESITY',
-    description: 'Метаболиты FGF21',
+    description: 'Постбиотик для метаболизма',
     type: 'postbiotic'
   },
   {
@@ -9877,7 +9877,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['Nrf2_UP', 'CELL_PROTECTION'],
     organs: ['LIVER', 'CELLS'],
     deficiency: 'OXIDATIVE_STRESS',
-    description: 'Метаболиты Nrf2',
+    description: 'Постбиотик для защиты клеток от окислительного стресса',
     type: 'postbiotic'
   },
   {
@@ -9887,7 +9887,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GLUTATHIONE_UP', 'CELL_PROTECTION'],
     organs: ['LIVER', 'CELLS'],
     deficiency: 'OXIDATIVE_STRESS',
-    description: 'Метаболиты GSH',
+    description: 'Постбиотик для защиты клеток от окислительного стресса',
     type: 'postbiotic'
   },
   {
@@ -9897,7 +9897,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['BILE_FLOW_UP', 'LIVER_REPAIR'],
     organs: ['LIVER'],
     deficiency: 'HEPATIC_STRESS',
-    description: 'Метаболиты желчного тока',
+    description: 'Постбиотик для функции печени',
     type: 'postbiotic'
   },
   {
@@ -9907,7 +9907,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['FIBROSIS_DOWN', 'LIVER_REGEN'],
     organs: ['LIVER'],
     deficiency: 'HEPATIC_STRESS',
-    description: 'Антифибротические метаболиты',
+    description: 'Постбиотик для функции печени',
     type: 'postbiotic'
   },
   {
@@ -9917,7 +9917,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NO_UP', 'VESSEL_PROTECTION'],
     organs: ['VESSELS', 'HEART'],
     deficiency: 'HIGH_BP',
-    description: 'Метаболиты NO',
+    description: 'Постбиотик для поддержки обменных процессов и здоровья',
     type: 'postbiotic'
   },
   {
@@ -9927,7 +9927,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ANTICOAGULATION', 'VESSEL_PROTECTION'],
     organs: ['VESSELS', 'HEART'],
     deficiency: 'CLOTTING',
-    description: 'Антитромботические метаболиты',
+    description: 'Постбиотик для поддержки обменных процессов и здоровья',
     type: 'postbiotic'
   },
   {
@@ -9937,7 +9937,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SKIN_BARRIER', 'HYDRATION'],
     organs: ['SKIN'],
     deficiency: 'DRY_SKIN',
-    description: 'Метаболиты керамидов',
+    description: 'Постбиотик для здоровья кожи',
     type: 'postbiotic'
   },
   {
@@ -9947,7 +9947,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['COLLAGEN_UP', 'SKIN_REPAIR'],
     organs: ['SKIN'],
     deficiency: 'AGING',
-    description: 'Метаболиты коллагена',
+    description: 'Постбиотик для здоровья кожи',
     type: 'postbiotic'
   },
   {
@@ -9957,7 +9957,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MELANIN_MOD', 'SKIN_PROTECTION'],
     organs: ['SKIN'],
     deficiency: 'PIGMENTATION',
-    description: 'Метаболиты меланина',
+    description: 'Постбиотик для здоровья кожи',
     type: 'postbiotic'
   },
   {
@@ -9987,7 +9987,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['BDNF_UP', 'NEURO_REPAIR'],
     organs: ['BRAIN'],
     deficiency: 'COGNITION',
-    description: 'Метаболиты BDNF',
+    description: 'Постбиотик для нервной системы',
     type: 'postbiotic'
   },
   {
@@ -9997,7 +9997,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NGF_UP', 'NEURO_REGEN'],
     organs: ['BRAIN'],
     deficiency: 'NEURO_DEGEN',
-    description: 'Метаболиты NGF',
+    description: 'Постбиотик для нервной системы',
     type: 'postbiotic'
   },
   {
@@ -10007,7 +10007,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['IGA_UP', 'GI_BARRIER_UP'],
     organs: ['GI', 'IMMUNE_SYSTEM'],
     deficiency: 'INFECTION',
-    description: 'Метаболиты IgA',
+    description: 'Постбиотик для иммунной системы',
     type: 'postbiotic'
   },
   {
@@ -10017,7 +10017,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ANTIVIRAL', 'IMMUNE_UP'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'INFECTION',
-    description: 'Противовирусные метаболиты',
+    description: 'Постбиотик для иммунной системы',
     type: 'postbiotic'
   },
   {
@@ -10027,7 +10027,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MOTILITY_UP', 'GI_BALANCE'],
     organs: ['GI'],
     deficiency: 'CONSTIPATION',
-    description: 'Метаболиты моторики ЖКТ',
+    description: 'Постбиотик для поддержки обменных процессов и здоровья',
     type: 'postbiotic'
   },
   {
@@ -10037,7 +10037,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SMOOTH_MUSCLE_MOD', 'GI_SOOTHING'],
     organs: ['GI'],
     deficiency: 'IBS',
-    description: 'Антиспастические метаболиты',
+    description: 'Постбиотик для поддержки обменных процессов и здоровья',
     type: 'postbiotic'
   },
   {
@@ -10047,7 +10047,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['KETONE_UP', 'ATP_UP'],
     organs: ['BRAIN', 'MUSCLES'],
     deficiency: 'KETO',
-    description: 'Кетоновые метаболиты',
+    description: 'Постбиотик для энергетического обмена',
     type: 'postbiotic'
   },
   {
@@ -10097,7 +10097,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MTOR_UP', 'PROTEIN_SYNTHESIS'],
     organs: ['MUSCLES'],
     deficiency: 'LOW_MUSCLE',
-    description: 'Лейцин',
+    description: 'Аминокислота, участвующая в синтезе белка и метаболических процессах',
     type: 'aminoacid'
   },
   {
@@ -10107,7 +10107,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GLUCOSE_UP', 'MUSCLE_FUEL'],
     organs: ['MUSCLES'],
     deficiency: 'FATIGUE',
-    description: 'Изолейцин',
+    description: 'Аминокислота, участвующая в энергетического обмена',
     type: 'aminoacid'
   },
   {
@@ -10117,7 +10117,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MUSCLE_FUEL', 'ANTI_FATIGUE'],
     organs: ['MUSCLES'],
     deficiency: 'FATIGUE',
-    description: 'Валин',
+    description: 'Аминокислота, участвующая в энергетического обмена',
     type: 'aminoacid'
   },
   {
@@ -10127,7 +10127,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['COLLAGEN_UP', 'IMMUNE_UP'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'LOW_LYSINE',
-    description: 'Лизин',
+    description: 'Аминокислота, участвующая в иммунной системы',
     type: 'aminoacid'
   },
   {
@@ -10137,7 +10137,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['METHYL_DONOR', 'LIVER_SUPPORT'],
     organs: ['LIVER', 'CELLS'],
     deficiency: 'LOW_METHIONINE',
-    description: 'Метионин',
+    description: 'Аминокислота, участвующая в метилирования',
     type: 'aminoacid'
   },
   {
@@ -10147,7 +10147,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['DOPAMINE_UP', 'NEURO_SIGNALING'],
     organs: ['BRAIN'],
     deficiency: 'LOW_DOPA',
-    description: 'Фенилаланин',
+    description: 'Аминокислота, участвующая в нервной системы',
     type: 'aminoacid'
   },
   {
@@ -10157,7 +10157,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MUCIN_UP', 'GI_BARRIER_UP'],
     organs: ['GI'],
     deficiency: 'LEAKY_GUT',
-    description: 'Треонин',
+    description: 'Аминокислота, участвующая в синтезе белка и метаболических процессах',
     type: 'aminoacid'
   },
   {
@@ -10167,7 +10167,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SEROTONIN_UP', 'SLEEP_UP'],
     organs: ['BRAIN'],
     deficiency: 'INSOMNIA',
-    description: 'Триптофан',
+    description: 'Аминокислота, участвующая в нервной системы',
     type: 'aminoacid'
   },
   {
@@ -10177,7 +10177,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['HEME_UP', 'CELL_PROTECTION'],
     organs: ['BLOOD'],
     deficiency: 'ANEMIA',
-    description: 'Гистидин',
+    description: 'Аминокислота, участвующая в кроветворения',
     type: 'aminoacid'
   },
   {
@@ -10187,7 +10187,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CALMING', 'ELECTROLYTE_BALANCE'],
     organs: ['HEART', 'BRAIN'],
     deficiency: 'STRESS',
-    description: 'Таурин',
+    description: 'Аминокислота, участвующая в ССС, нервной системы',
     type: 'aminoacid'
   },
   {
@@ -10197,7 +10197,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['FAT_OXIDATION', 'MITO_UP'],
     organs: ['MUSCLES', 'HEART'],
     deficiency: 'FATIGUE',
-    description: 'Карнитин',
+    description: 'Аминокислота, участвующая в жиросжигания',
     type: 'aminoacid'
   },
   {
@@ -10207,7 +10207,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MITO_UP', 'NEUROPROTECTION'],
     organs: ['BRAIN'],
     deficiency: 'FATIGUE',
-    description: 'АЛКАР',
+    description: 'Аминокислота, участвующая в нервной системы, работы митохондрий',
     type: 'aminoacid'
   },
   {
@@ -10217,7 +10217,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NO_UP', 'VESSEL_HEALTH'],
     organs: ['VESSELS'],
     deficiency: 'HIGH_BP',
-    description: 'Пропионил‑карнитин',
+    description: 'Аминокислота, участвующая в синтезе белка и метаболических процессах',
     type: 'aminoacid'
   },
   {
@@ -10227,7 +10227,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NO_UP', 'BLOOD_FLOW'],
     organs: ['MUSCLES', 'HEART'],
     deficiency: 'FATIGUE',
-    description: 'Цитруллин',
+    description: 'Аминокислота, участвующая в синтезе белка и метаболических процессах',
     type: 'aminoacid'
   },
   {
@@ -10237,7 +10237,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ATP_UP', 'NO_UP'],
     organs: ['MUSCLES'],
     deficiency: 'FATIGUE',
-    description: 'Цитруллин малат',
+    description: 'Аминокислота, участвующая в энергетического обмена',
     type: 'aminoacid'
   },
   {
@@ -10247,7 +10247,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NO_UP', 'GROWTH_HORMONE_UP'],
     organs: ['VESSELS', 'MUSCLES'],
     deficiency: 'HIGH_BP',
-    description: 'Аргинин',
+    description: 'Аминокислота, участвующая в синтезе белка и метаболических процессах',
     type: 'aminoacid'
   },
   {
@@ -10257,7 +10257,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CARNOSINE_UP', 'ANTI_FATIGUE'],
     organs: ['MUSCLES'],
     deficiency: 'FATIGUE',
-    description: 'Бета‑аланин',
+    description: 'Аминокислота, участвующая в производительности',
     type: 'aminoacid'
   },
   {
@@ -10267,7 +10267,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CELL_PROTECTION', 'GLYCATION_DOWN'],
     organs: ['CELLS', 'MUSCLES'],
     deficiency: 'AGING',
-    description: 'Карнозин',
+    description: 'Аминокислота, участвующая в антивозрастных процессов, мышц',
     type: 'aminoacid'
   },
   {
@@ -10277,7 +10277,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GABA_UP', 'COLLAGEN_UP'],
     organs: ['BRAIN', 'SKIN'],
     deficiency: 'STRESS',
-    description: 'Глицин',
+    description: 'Аминокислота, участвующая в успокоения',
     type: 'aminoacid'
   },
   {
@@ -10287,7 +10287,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['PHOSPHOLIPID_UP', 'NEURO_SUPPORT'],
     organs: ['BRAIN'],
     deficiency: 'COGNITION',
-    description: 'Серин',
+    description: 'Аминокислота, участвующая в работы мозга, клеточного здоровья',
     type: 'aminoacid'
   },
   {
@@ -10297,7 +10297,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['COLLAGEN_UP', 'SKIN_REPAIR'],
     organs: ['SKIN'],
     deficiency: 'AGING',
-    description: 'Пролин',
+    description: 'Аминокислота, участвующая в здоровья кожи',
     type: 'aminoacid'
   },
   {
@@ -10307,7 +10307,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GLUCOSE_REGULATION', 'MUSCLE_FUEL'],
     organs: ['MUSCLES'],
     deficiency: 'FATIGUE',
-    description: 'Аланин',
+    description: 'Аминокислота, участвующая в энергетического обмена',
     type: 'aminoacid'
   },
   {
@@ -10317,7 +10317,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['PROTEIN_SYNTHESIS', 'CELL_REPAIR'],
     organs: ['CELLS'],
     deficiency: 'DEFICIENCY',
-    description: 'Аспарагин',
+    description: 'Аминокислота, участвующая в клеточного здоровья',
     type: 'aminoacid'
   },
   {
@@ -10327,7 +10327,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ATP_UP', 'CELL_SIGNALING'],
     organs: ['CELLS'],
     deficiency: 'FATIGUE',
-    description: 'Аспартат',
+    description: 'Аминокислота, участвующая в энергетического обмена',
     type: 'aminoacid'
   },
   {
@@ -10337,7 +10337,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NEURO_SIGNALING', 'ENERGY_UP'],
     organs: ['BRAIN'],
     deficiency: 'COGNITION',
-    description: 'Глутамат',
+    description: 'Аминокислота, участвующая в работы мозга',
     type: 'aminoacid'
   },
   {
@@ -10347,7 +10347,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GI_REPAIR', 'IMMUNE_UP'],
     organs: ['GI', 'IMMUNE_SYSTEM'],
     deficiency: 'LEAKY_GUT',
-    description: 'Глутамин',
+    description: 'Аминокислота, участвующая в иммунной системы',
     type: 'aminoacid'
   },
   {
@@ -10357,7 +10357,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GI_REPAIR', 'PROTEIN_SYNTHESIS'],
     organs: ['GI', 'MUSCLES'],
     deficiency: 'LEAKY_GUT',
-    description: 'Пептиды глутамина',
+    description: 'Аминокислота, участвующая в мышц',
     type: 'aminoacid'
   },
   {
@@ -10367,7 +10367,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ANTI_CATABOLIC', 'MTOR_UP'],
     organs: ['MUSCLES'],
     deficiency: 'LOW_MUSCLE',
-    description: 'HMB',
+    description: 'Аминокислота, участвующая в синтезе белка и метаболических процессах',
     type: 'aminoacid'
   },
   {
@@ -10377,7 +10377,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ANTI_CATABOLIC', 'RECOVERY_UP'],
     organs: ['MUSCLES'],
     deficiency: 'FATIGUE',
-    description: 'Лейциновая кислота',
+    description: 'Аминокислота, участвующая в синтезе белка и метаболических процессах',
     type: 'aminoacid'
   },
   {
@@ -10387,7 +10387,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MTOR_UP', 'ANTI_FATIGUE'],
     organs: ['MUSCLES'],
     deficiency: 'LOW_MUSCLE',
-    description: 'Комплекс BCAA',
+    description: 'Аминокислота, участвующая в синтезе белка и метаболических процессах',
     type: 'aminoacid'
   },
   {
@@ -10397,7 +10397,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['PROTEIN_SYNTHESIS', 'RECOVERY_UP'],
     organs: ['MUSCLES'],
     deficiency: 'LOW_MUSCLE',
-    description: 'Комплекс EAA',
+    description: 'Аминокислота, участвующая в синтезе белка и метаболических процессах',
     type: 'aminoacid'
   },
   {
@@ -10407,7 +10407,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GLUTATHIONE_UP', 'CELL_PROTECTION'],
     organs: ['LIVER', 'CELLS'],
     deficiency: 'OXIDATIVE_STRESS',
-    description: 'Цистеин',
+    description: 'Аминокислота, участвующая в детоксикации',
     type: 'aminoacid'
   },
   {
@@ -10417,7 +10417,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GLUTATHIONE_UP', 'ANTI_INFLAMMATION'],
     organs: ['LIVER', 'LUNGS'],
     deficiency: 'OXIDATIVE_STRESS',
-    description: 'NAC',
+    description: 'Аминокислота, участвующая в детоксикации',
     type: 'aminoacid'
   },
   {
@@ -10427,7 +10427,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['DOPAMINE_UP', 'THYROID_SUPPORT'],
     organs: ['BRAIN', 'THYROID'],
     deficiency: 'LOW_DOPA',
-    description: 'Тирозин',
+    description: 'Аминокислота, участвующая в нервной системы',
     type: 'aminoacid'
   },
   {
@@ -10437,7 +10437,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['DOPAMINE_UP', 'NEURO_SIGNALING'],
     organs: ['BRAIN'],
     deficiency: 'PARKINSON',
-    description: 'Л‑ДОФА',
+    description: 'Аминокислота, участвующая в нервной системы',
     type: 'aminoacid'
   },
   {
@@ -10447,7 +10447,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['METHYL_DONOR', 'HOMOCYSTEINE_DOWN'],
     organs: ['LIVER', 'BLOOD'],
     deficiency: 'HIGH_HOMOCYSTEINE',
-    description: 'Бетаин',
+    description: 'Аминокислота, участвующая в метилирования',
     type: 'aminoacid'
   },
   {
@@ -10457,7 +10457,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['HOMOCYSTEINE_DOWN', 'METHYL_UP'],
     organs: ['BLOOD', 'HEART'],
     deficiency: 'HIGH_HOMOCYSTEINE',
-    description: 'Модуляторы гомоцистеина',
+    description: 'Аминокислота, участвующая в метилирования',
     type: 'aminoacid'
   },
   {
@@ -10467,7 +10467,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['UREA_CYCLE_UP', 'AMMONIA_CLEARANCE'],
     organs: ['LIVER', 'MUSCLES'],
     deficiency: 'FATIGUE',
-    description: 'Орнитин',
+    description: 'Аминокислота, участвующая в детоксикации',
     type: 'aminoacid'
   },
   {
@@ -10477,7 +10477,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['UREA_CYCLE_UP', 'ATP_UP'],
     organs: ['LIVER', 'MUSCLES'],
     deficiency: 'FATIGUE',
-    description: 'Цитруллин‑орнитин',
+    description: 'Аминокислота, участвующая в детоксикации, энергетического обмена',
     type: 'aminoacid'
   },
   {
@@ -10487,7 +10487,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GABA_UP', 'ALPHA_WAVES_UP'],
     organs: ['BRAIN'],
     deficiency: 'ANXIETY',
-    description: 'Теанин',
+    description: 'Аминокислота, участвующая в успокоения',
     type: 'aminoacid'
   },
   {
@@ -10497,7 +10497,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['HEME_UP', 'CELL_PROTECTION'],
     organs: ['BLOOD'],
     deficiency: 'ANEMIA',
-    description: 'Гистидин комплекс',
+    description: 'Аминокислота, участвующая в кроветворения',
     type: 'aminoacid'
   },
   {
@@ -10507,7 +10507,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GLUTATHIONE_UP', 'METHYLATION_UP'],
     organs: ['LIVER', 'CELLS'],
     deficiency: 'OXIDATIVE_STRESS',
-    description: 'Серосодержащие аминокислоты',
+    description: 'Аминокислота, участвующая в детоксикации',
     type: 'aminoacid'
   },
   {
@@ -10517,7 +10517,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['COLLAGEN_UP', 'SKIN_REPAIR'],
     organs: ['SKIN', 'JOINTS'],
     deficiency: 'AGING',
-    description: 'Амино‑комплекс коллагена',
+    description: 'Аминокислота, участвующая в здоровья кожи, суставов',
     type: 'aminoacid'
   },
   {
@@ -10527,7 +10527,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NEURO_SIGNALING', 'NEURO_REPAIR'],
     organs: ['BRAIN'],
     deficiency: 'COGNITION',
-    description: 'Нейро‑аминокомплекс',
+    description: 'Аминокислота, участвующая в нервной системы',
     type: 'aminoacid'
   },
   {
@@ -10547,7 +10547,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['TESTOSTERONE_UP', 'LH_UP'],
     organs: ['HORMONES', 'MUSCLES'],
     deficiency: 'LOW_TESTOSTERONE',
-    description: 'ДАА',
+    description: 'Аминокислота, участвующая в гормонального баланса',
     type: 'aminoacid'
   },
   {
@@ -10557,7 +10557,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NMDA_MOD', 'NEURO_SIGNALING'],
     organs: ['BRAIN'],
     deficiency: 'COGNITION',
-    description: 'Д-серин',
+    description: 'Аминокислота, участвующая в нервной системы',
     type: 'aminoacid'
   },
   {
@@ -10567,7 +10567,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ENERGY_UP', 'CELL_SIGNALING'],
     organs: ['CELLS'],
     deficiency: 'FATIGUE',
-    description: 'Д-аланин',
+    description: 'Аминокислота, участвующая в клеточного здоровья',
     type: 'aminoacid'
   },
   {
@@ -10577,7 +10577,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GABA_UP', 'RELAXATION'],
     organs: ['BRAIN'],
     deficiency: 'ANXIETY',
-    description: 'ГАМК',
+    description: 'Аминокислота, участвующая в успокоения',
     type: 'aminoacid'
   },
   {
@@ -10587,7 +10587,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GABA_UP', 'ALPHA_WAVES_UP'],
     organs: ['BRAIN'],
     deficiency: 'STRESS',
-    description: 'Усиленная ГАМК',
+    description: 'Аминокислота, участвующая в успокоения',
     type: 'aminoacid'
   },
   {
@@ -10597,7 +10597,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['DOPAMINE_UP', 'NEURO_SIGNALING'],
     organs: ['BRAIN'],
     deficiency: 'PARKINSON',
-    description: 'Предшественники L‑DOPA',
+    description: 'Аминокислота, участвующая в нервной системы',
     type: 'aminoacid'
   },
   {
@@ -10607,7 +10607,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['COLLAGEN_UP', 'SKIN_REPAIR'],
     organs: ['SKIN', 'JOINTS'],
     deficiency: 'AGING',
-    description: 'Гидроксипролин',
+    description: 'Аминокислота, участвующая в здоровья кожи, суставов',
     type: 'aminoacid'
   },
   {
@@ -10617,7 +10617,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['COLLAGEN_UP', 'SKIN_REPAIR'],
     organs: ['SKIN'],
     deficiency: 'AGING',
-    description: 'Гидроксилизин',
+    description: 'Аминокислота, участвующая в здоровья кожи',
     type: 'aminoacid'
   },
   {
@@ -10627,7 +10627,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NMDA_MOD', 'COGNITION_UP'],
     organs: ['BRAIN'],
     deficiency: 'COGNITION',
-    description: 'Саркозин',
+    description: 'Аминокислота, участвующая в нервной системы',
     type: 'aminoacid'
   },
   {
@@ -10637,7 +10637,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['STOMACH_ACID_UP', 'DIGESTION_UP'],
     organs: ['GI'],
     deficiency: 'LOW_ACID',
-    description: 'Бетаин HCl',
+    description: 'Аминокислота, участвующая в синтезе белка и метаболических процессах',
     type: 'aminoacid'
   },
   {
@@ -10647,7 +10647,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['AMMONIA_CLEARANCE', 'LIVER_SUPPORT'],
     organs: ['LIVER'],
     deficiency: 'HEPATIC_STRESS',
-    description: 'Орнитин аспартат',
+    description: 'Аминокислота, участвующая в детоксикации',
     type: 'aminoacid'
   },
   {
@@ -10657,7 +10657,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NO_UP', 'ATP_UP'],
     organs: ['MUSCLES'],
     deficiency: 'FATIGUE',
-    description: 'Аргинин AKG',
+    description: 'Аминокислота, участвующая в синтезе белка и метаболических процессах',
     type: 'aminoacid'
   },
   {
@@ -10667,7 +10667,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NO_UP', 'RECOVERY_UP'],
     organs: ['MUSCLES'],
     deficiency: 'FATIGUE',
-    description: 'Пептиды цитруллина',
+    description: 'Аминокислота, участвующая в синтезе белка и метаболических процессах',
     type: 'aminoacid'
   },
   {
@@ -10677,7 +10677,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['METHYL_DONOR', 'HOMOCYSTEINE_DOWN'],
     organs: ['BLOOD', 'HEART'],
     deficiency: 'HIGH_HOMOCYSTEINE',
-    description: 'Глицин-бетаин',
+    description: 'Аминокислота, участвующая в метилирования',
     type: 'aminoacid'
   },
   {
@@ -10687,7 +10687,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MAGNESIUM_UP', 'GABA_UP'],
     organs: ['BRAIN'],
     deficiency: 'STRESS',
-    description: 'Магний глицинат',
+    description: 'Аминокислота, участвующая в успокоения',
     type: 'aminoacid'
   },
   {
@@ -10697,7 +10697,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CALMING', 'ELECTROLYTE_BALANCE'],
     organs: ['HEART', 'BRAIN'],
     deficiency: 'STRESS',
-    description: 'Премиальный таурин',
+    description: 'Аминокислота, участвующая в ССС, нервной системы',
     type: 'aminoacid'
   },
   {
@@ -10707,7 +10707,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['FAT_OXIDATION', 'RECOVERY_UP'],
     organs: ['MUSCLES'],
     deficiency: 'FATIGUE',
-    description: 'LCLT',
+    description: 'Аминокислота, участвующая в жиросжигания',
     type: 'aminoacid'
   },
   {
@@ -10717,7 +10717,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MITO_UP', 'ATP_UP'],
     organs: ['MUSCLES'],
     deficiency: 'FATIGUE',
-    description: 'Фумарат карнитина',
+    description: 'Аминокислота, участвующая в энергетического обмена',
     type: 'aminoacid'
   },
   {
@@ -10727,7 +10727,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MITO_UP', 'NO_UP'],
     organs: ['BRAIN', 'MUSCLES'],
     deficiency: 'FATIGUE',
-    description: 'АЛКАР+Аргинин',
+    description: 'Аминокислота, участвующая в нервной системы',
     type: 'aminoacid'
   },
   {
@@ -10737,7 +10737,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GI_REPAIR', 'IMMUNE_UP'],
     organs: ['GI', 'IMMUNE_SYSTEM'],
     deficiency: 'LEAKY_GUT',
-    description: 'Синергия глутамина',
+    description: 'Аминокислота, участвующая в иммунной системы',
     type: 'aminoacid'
   },
   {
@@ -10747,7 +10747,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NEURO_SIGNALING', 'ENERGY_UP'],
     organs: ['BRAIN'],
     deficiency: 'COGNITION',
-    description: 'Глутаминовая кислота',
+    description: 'Аминокислота, участвующая в работы мозга',
     type: 'aminoacid'
   },
   {
@@ -10757,7 +10757,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ATP_UP', 'CELL_SIGNALING'],
     organs: ['CELLS'],
     deficiency: 'FATIGUE',
-    description: 'Аспарагиновая кислота',
+    description: 'Аминокислота, участвующая в энергетического обмена',
     type: 'aminoacid'
   },
   {
@@ -10767,7 +10767,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['HISTAMINE_UP', 'IMMUNE_SIGNALING'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'ALLERGY',
-    description: 'Предшественники гистамина',
+    description: 'Аминокислота, участвующая в иммунной системы',
     type: 'aminoacid'
   },
   {
@@ -10777,7 +10777,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GLUTATHIONE_UP', 'CELL_PROTECTION'],
     organs: ['LIVER', 'CELLS'],
     deficiency: 'OXIDATIVE_STRESS',
-    description: 'Цистин',
+    description: 'Аминокислота, участвующая в детоксикации',
     type: 'aminoacid'
   },
   {
@@ -10787,7 +10787,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GPX_UP', 'THYROID_SUPPORT'],
     organs: ['THYROID', 'LIVER'],
     deficiency: 'LOW_SELEN',
-    description: 'Селенометионин',
+    description: 'Аминокислота, участвующая в защиты клеток от окислительного стресса',
     type: 'aminoacid'
   },
   {
@@ -10797,7 +10797,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GI_REPAIR', 'ANTI_INFLAMMATION'],
     organs: ['GI'],
     deficiency: 'ULCER',
-    description: 'Метилметионин',
+    description: 'Аминокислота, участвующая в синтезе белка и метаболических процессах',
     type: 'aminoacid'
   },
   {
@@ -10807,7 +10807,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['HOMOCYSTEINE_DOWN', 'METHYL_UP'],
     organs: ['BLOOD', 'HEART'],
     deficiency: 'HIGH_HOMOCYSTEINE',
-    description: 'Блокатор гомоцистеина',
+    description: 'Аминокислота, участвующая в метилирования',
     type: 'aminoacid'
   },
   {
@@ -10817,7 +10817,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GLUCOSE_REGULATION', 'INSULIN_SENSITIVITY'],
     organs: ['LIVER', 'PANCREAS'],
     deficiency: 'DIABETES',
-    description: 'Амино-комплекс глюкозы',
+    description: 'Аминокислота, участвующая в метаболизма',
     type: 'aminoacid'
   },
   {
@@ -10837,7 +10837,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['THYROID_UP', 'METABOLISM_UP'],
     organs: ['THYROID', 'CELLS'],
     deficiency: 'HYPOTHYROID',
-    description: 'Амино-комплекс щитовидки',
+    description: 'Аминокислота, участвующая в гормонального баланса',
     type: 'aminoacid'
   },
   {
@@ -10847,7 +10847,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ADRENAL_SUPPORT', 'CORTISOL_MOD'],
     organs: ['ADRENALS'],
     deficiency: 'STRESS',
-    description: 'Амино-комплекс надпочечников',
+    description: 'Аминокислота, участвующая в гормонального баланса',
     type: 'aminoacid'
   },
   {
@@ -10857,7 +10857,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['LIVER_REPAIR', 'DETOX_UP'],
     organs: ['LIVER'],
     deficiency: 'HEPATIC_STRESS',
-    description: 'Амино-комплекс печени',
+    description: 'Аминокислота, участвующая в функции печени',
     type: 'aminoacid'
   },
   {
@@ -10867,7 +10867,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['UREA_CYCLE_UP', 'CELL_PROTECTION'],
     organs: ['KIDNEYS'],
     deficiency: 'UREMIC_RISK',
-    description: 'Амино-комплекс почек',
+    description: 'Аминокислота, участвующая в почек',
     type: 'aminoacid'
   },
   {
@@ -10877,7 +10877,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NO_UP', 'VESSEL_PROTECTION'],
     organs: ['HEART'],
     deficiency: 'HIGH_BP',
-    description: 'Амино-комплекс сердца',
+    description: 'Аминокислота, участвующая в ССС',
     type: 'aminoacid'
   },
   {
@@ -10887,7 +10887,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NEURO_SIGNALING', 'BDNF_UP'],
     organs: ['BRAIN'],
     deficiency: 'COGNITION',
-    description: 'Амино-комплекс мозга',
+    description: 'Аминокислота, участвующая в нервной системы',
     type: 'aminoacid'
   },
   {
@@ -10897,7 +10897,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['COLLAGEN_UP', 'SKIN_REPAIR'],
     organs: ['SKIN'],
     deficiency: 'AGING',
-    description: 'Амино-комплекс кожи',
+    description: 'Аминокислота, участвующая в здоровья кожи',
     type: 'aminoacid'
   },
   {
@@ -10907,7 +10907,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CARTILAGE_UP', 'ANTI_INFLAMMATION'],
     organs: ['JOINTS'],
     deficiency: 'ARTHRITIS',
-    description: 'Амино-комплекс суставов',
+    description: 'Аминокислота, участвующая в суставов',
     type: 'aminoacid'
   },
   {
@@ -10917,7 +10917,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GI_REPAIR', 'GI_BARRIER_UP'],
     organs: ['GI'],
     deficiency: 'LEAKY_GUT',
-    description: 'Амино-комплекс ЖКТ',
+    description: 'Аминокислота, участвующая в синтезе белка и метаболических процессах',
     type: 'aminoacid'
   },
   {
@@ -10927,7 +10927,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MITO_UP', 'ATP_UP'],
     organs: ['MITOCHONDRIA'],
     deficiency: 'FATIGUE',
-    description: 'Амино-комплекс митохондрий',
+    description: 'Аминокислота, участвующая в работы митохондрий',
     type: 'aminoacid'
   },
   {
@@ -10937,7 +10937,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SIRT1_UP', 'CELL_REPAIR'],
     organs: ['CELLS'],
     deficiency: 'AGING',
-    description: 'Антивозрастные аминокислоты',
+    description: 'Аминокислота, участвующая в антивозрастных процессов',
     type: 'aminoacid'
   },
   {
@@ -10947,7 +10947,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['OXIDATIVE_STRESS_REDUCTION', 'CELL_PROTECTION'],
     organs: ['CELLS'],
     deficiency: 'OXIDATIVE_STRESS',
-    description: 'Антиоксидантные аминокислоты',
+    description: 'Аминокислота, участвующая в защиты клеток от окислительного стресса',
     type: 'aminoacid'
   },
   {
@@ -10957,7 +10957,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['IMMUNE_UP', 'ANTI_INFLAMMATION'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'INFECTION',
-    description: 'Иммунные аминокислоты',
+    description: 'Аминокислота, участвующая в иммунной системы',
     type: 'aminoacid'
   },
   {
@@ -10967,7 +10967,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['HORMONE_BALANCE', 'CELL_SIGNALING'],
     organs: ['HORMONES'],
     deficiency: 'IMBALANCE',
-    description: 'Гормональные аминокислоты',
+    description: 'Аминокислота, участвующая в гормонального баланса',
     type: 'aminoacid'
   },
   {
@@ -10977,7 +10977,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['PROTEIN_SYNTHESIS', 'RECOVERY_UP'],
     organs: ['MUSCLES', 'CELLS'],
     deficiency: 'DEFICIENCY',
-    description: 'Полный спектр аминокислот',
+    description: 'Аминокислота, участвующая в синтезе белка и метаболических процессах',
     type: 'aminoacid'
   },
   {
@@ -10987,7 +10987,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['PROTEIN_SYNTHESIS', 'CELL_REPAIR'],
     organs: ['MUSCLES', 'CELLS'],
     deficiency: 'DEFICIENCY',
-    description: 'Премиальный аминокомплекс II',
+    description: 'Аминокислота, участвующая в синтезе белка и метаболических процессах',
     type: 'aminoacid'
   },
   {
@@ -10997,7 +10997,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ATP_UP', 'CELL_REPAIR'],
     organs: ['MITOCHONDRIA'],
     deficiency: 'FATIGUE',
-    description: 'Альфа-кетоглутарат',
+    description: 'Аминокислота, участвующая в работы митохондрий',
     type: 'aminoacid'
   },
   {
@@ -11007,7 +11007,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MTOR_MOD', 'MITO_UP'],
     organs: ['CELLS'],
     deficiency: 'AGING',
-    description: 'Кальций АКГ',
+    description: 'Аминокислота, участвующая в антивозрастных процессов',
     type: 'aminoacid'
   },
   {
@@ -11017,7 +11017,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NO_UP', 'ATP_UP'],
     organs: ['MUSCLES'],
     deficiency: 'FATIGUE',
-    description: 'Аргинин АКГ',
+    description: 'Аминокислота, участвующая в синтезе белка и метаболических процессах',
     type: 'aminoacid'
   },
   {
@@ -11027,7 +11027,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['COLLAGEN_UP', 'MITO_UP'],
     organs: ['SKIN', 'CELLS'],
     deficiency: 'AGING',
-    description: 'Глицин АКГ',
+    description: 'Аминокислота, участвующая в антивозрастных процессов',
     type: 'aminoacid'
   },
   {
@@ -11037,7 +11037,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['COLLAGEN_UP', 'BONE_STRENGTH'],
     organs: ['BONES'],
     deficiency: 'OSTEOPENIA',
-    description: 'Лизин АКГ',
+    description: 'Аминокислота, участвующая в костной ткани',
     type: 'aminoacid'
   },
   {
@@ -11047,7 +11047,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MTOR_UP', 'ANTI_CATABOLIC'],
     organs: ['MUSCLES'],
     deficiency: 'LOW_MUSCLE',
-    description: 'Свободный HMB',
+    description: 'Аминокислота, участвующая в синтезе белка и метаболических процессах',
     type: 'aminoacid'
   },
   {
@@ -11057,7 +11057,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MTOR_UP', 'RECOVERY_UP'],
     organs: ['MUSCLES'],
     deficiency: 'LOW_MUSCLE',
-    description: 'Кальциевый HMB',
+    description: 'Аминокислота, участвующая в синтезе белка и метаболических процессах',
     type: 'aminoacid'
   },
   {
@@ -11067,7 +11067,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['PROTEIN_SYNTHESIS', 'RECOVERY_UP'],
     organs: ['MUSCLES'],
     deficiency: 'DEFICIENCY',
-    description: 'Премиальный комплекс EAA',
+    description: 'Аминокислота, участвующая в синтезе белка и метаболических процессах',
     type: 'aminoacid'
   },
   {
@@ -11077,7 +11077,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MTOR_UP', 'ANTI_FATIGUE'],
     organs: ['MUSCLES'],
     deficiency: 'LOW_MUSCLE',
-    description: 'BCAA 4:1:1',
+    description: 'Аминокислота, участвующая в синтезе белка и метаболических процессах',
     type: 'aminoacid'
   },
   {
@@ -11087,7 +11087,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MTOR_UP', 'RECOVERY_UP'],
     organs: ['MUSCLES'],
     deficiency: 'LOW_MUSCLE',
-    description: 'BCAA 8:1:1',
+    description: 'Аминокислота, участвующая в синтезе белка и метаболических процессах',
     type: 'aminoacid'
   },
   {
@@ -11097,7 +11097,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['HEME_UP', 'CELL_PROTECTION'],
     organs: ['BLOOD'],
     deficiency: 'ANEMIA',
-    description: 'Премиальный гистидин',
+    description: 'Аминокислота, участвующая в кроветворения',
     type: 'aminoacid'
   },
   {
@@ -11107,7 +11107,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['DOPAMINE_UP', 'THYROID_SUPPORT'],
     organs: ['BRAIN'],
     deficiency: 'LOW_DOPA',
-    description: 'Премиальный тирозин',
+    description: 'Аминокислота, участвующая в нервной системы',
     type: 'aminoacid'
   },
   {
@@ -11117,7 +11117,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SEROTONIN_UP', 'SLEEP_UP'],
     organs: ['BRAIN'],
     deficiency: 'INSOMNIA',
-    description: 'Премиальный триптофан',
+    description: 'Аминокислота, участвующая в нервной системы',
     type: 'aminoacid'
   },
   {
@@ -11127,7 +11127,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GABA_UP', 'ALPHA_WAVES_UP'],
     organs: ['BRAIN'],
     deficiency: 'STRESS',
-    description: 'Премиальный теанин',
+    description: 'Аминокислота, участвующая в успокоения',
     type: 'aminoacid'
   },
   {
@@ -11137,7 +11137,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GABA_UP', 'RELAXATION'],
     organs: ['BRAIN'],
     deficiency: 'ANXIETY',
-    description: 'Чистая ГАМК',
+    description: 'Аминокислота, участвующая в успокоения',
     type: 'aminoacid'
   },
   {
@@ -11147,7 +11147,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['LIPOSOMAL_DELIVERY', 'GABA_UP'],
     organs: ['BRAIN'],
     deficiency: 'STRESS',
-    description: 'Липосомная ГАМК',
+    description: 'Аминокислота, участвующая в успокоения',
     type: 'aminoacid'
   },
   {
@@ -11157,7 +11157,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['FAT_OXIDATION', 'MITO_UP'],
     organs: ['MUSCLES'],
     deficiency: 'FATIGUE',
-    description: 'Синергия карнитина',
+    description: 'Аминокислота, участвующая в жиросжигания',
     type: 'aminoacid'
   },
   {
@@ -11167,7 +11167,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CALMING', 'ELECTROLYTE_BALANCE'],
     organs: ['HEART', 'BRAIN'],
     deficiency: 'STRESS',
-    description: 'Синергия таурина',
+    description: 'Аминокислота, участвующая в ССС, нервной системы',
     type: 'aminoacid'
   },
   {
@@ -11177,7 +11177,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GLUTATHIONE_UP', 'CELL_PROTECTION'],
     organs: ['LIVER', 'CELLS'],
     deficiency: 'OXIDATIVE_STRESS',
-    description: 'Премиальный цистеин',
+    description: 'Аминокислота, участвующая в детоксикации',
     type: 'aminoacid'
   },
   {
@@ -11187,7 +11187,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GLUTATHIONE_UP', 'ANTI_INFLAMMATION'],
     organs: ['LIVER', 'LUNGS'],
     deficiency: 'OXIDATIVE_STRESS',
-    description: 'Премиальный NAC',
+    description: 'Аминокислота, участвующая в детоксикации',
     type: 'aminoacid'
   },
   {
@@ -11197,7 +11197,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['METHYL_DONOR', 'HOMOCYSTEINE_DOWN'],
     organs: ['LIVER', 'BLOOD'],
     deficiency: 'HIGH_HOMOCYSTEINE',
-    description: 'Премиальный метионин',
+    description: 'Аминокислота, участвующая в метилирования',
     type: 'aminoacid'
   },
   {
@@ -11207,7 +11207,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['METHYL_DONOR', 'HOMOCYSTEINE_DOWN'],
     organs: ['BLOOD', 'HEART'],
     deficiency: 'HIGH_HOMOCYSTEINE',
-    description: 'Премиальный TMG',
+    description: 'Аминокислота, участвующая в метилирования',
     type: 'aminoacid'
   },
   {
@@ -11217,7 +11217,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GABA_UP', 'COLLAGEN_UP'],
     organs: ['BRAIN', 'SKIN'],
     deficiency: 'STRESS',
-    description: 'Премиальный глицин',
+    description: 'Аминокислота, участвующая в успокоения, здоровья кожи',
     type: 'aminoacid'
   },
   {
@@ -11227,7 +11227,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['COLLAGEN_UP', 'SKIN_REPAIR'],
     organs: ['SKIN'],
     deficiency: 'AGING',
-    description: 'Премиальный пролин',
+    description: 'Аминокислота, участвующая в здоровья кожи',
     type: 'aminoacid'
   },
   {
@@ -11237,7 +11237,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['PHOSPHOLIPID_UP', 'NEURO_SUPPORT'],
     organs: ['BRAIN'],
     deficiency: 'COGNITION',
-    description: 'Премиальный серин',
+    description: 'Аминокислота, участвующая в работы мозга',
     type: 'aminoacid'
   },
   {
@@ -11247,7 +11247,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['LIPOSOMAL_DELIVERY', 'GI_REPAIR'],
     organs: ['GI'],
     deficiency: 'LEAKY_GUT',
-    description: 'Липосомный глутамин',
+    description: 'Аминокислота, участвующая в синтезе белка и метаболических процессах',
     type: 'aminoacid'
   },
   {
@@ -11257,7 +11257,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GI_REPAIR', 'IMMUNE_UP'],
     organs: ['GI'],
     deficiency: 'LEAKY_GUT',
-    description: 'Премиальный глутамин',
+    description: 'Аминокислота, участвующая в иммунной системы',
     type: 'aminoacid'
   },
   {
@@ -11267,7 +11267,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ATP_UP', 'CELL_SIGNALING'],
     organs: ['CELLS'],
     deficiency: 'FATIGUE',
-    description: 'Премиальный аспартат',
+    description: 'Аминокислота, участвующая в энергетического обмена',
     type: 'aminoacid'
   },
   {
@@ -11277,7 +11277,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GLUCOSE_REGULATION', 'MUSCLE_FUEL'],
     organs: ['MUSCLES'],
     deficiency: 'FATIGUE',
-    description: 'Премиальный аланин',
+    description: 'Аминокислота, участвующая в энергетического обмена',
     type: 'aminoacid'
   },
   {
@@ -11287,7 +11287,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['UREA_CYCLE_UP', 'AMMONIA_CLEARANCE'],
     organs: ['LIVER'],
     deficiency: 'FATIGUE',
-    description: 'Премиальный орнитин',
+    description: 'Аминокислота, участвующая в детоксикации',
     type: 'aminoacid'
   },
   {
@@ -11297,7 +11297,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NO_UP', 'BLOOD_FLOW'],
     organs: ['VESSELS'],
     deficiency: 'HIGH_BP',
-    description: 'Премиальный аргинин',
+    description: 'Аминокислота, участвующая в синтезе белка и метаболических процессах',
     type: 'aminoacid'
   },
   {
@@ -11307,7 +11307,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NO_UP', 'ATP_UP'],
     organs: ['MUSCLES'],
     deficiency: 'FATIGUE',
-    description: 'Премиальный цитруллин',
+    description: 'Аминокислота, участвующая в синтезе белка и метаболических процессах',
     type: 'aminoacid'
   },
   {
@@ -11317,7 +11317,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ANTI_CATABOLIC', 'RECOVERY_UP'],
     organs: ['MUSCLES'],
     deficiency: 'FATIGUE',
-    description: 'Премиальный HICA',
+    description: 'Аминокислота, участвующая в синтезе белка и метаболических процессах',
     type: 'aminoacid'
   },
   {
@@ -11327,7 +11327,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MTOR_UP', 'ANTI_CATABOLIC'],
     organs: ['MUSCLES'],
     deficiency: 'LOW_MUSCLE',
-    description: 'Синергия HMB',
+    description: 'Аминокислота, участвующая в синтезе белка и метаболических процессах',
     type: 'aminoacid'
   },
   {
@@ -11337,7 +11337,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NEURO_SIGNALING', 'BDNF_UP'],
     organs: ['BRAIN'],
     deficiency: 'COGNITION',
-    description: 'Премиальный нейро-комплекс',
+    description: 'Аминокислота, участвующая в нервной системы',
     type: 'aminoacid'
   },
   {
@@ -11357,7 +11357,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SIRT1_UP', 'CELL_REPAIR'],
     organs: ['CELLS'],
     deficiency: 'AGING',
-    description: 'Премиальный антиэйдж-комплекс',
+    description: 'Аминокислота, участвующая в антивозрастных процессов',
     type: 'aminoacid'
   },
   {
@@ -11367,7 +11367,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['OXIDATIVE_STRESS_REDUCTION', 'CELL_PROTECTION'],
     organs: ['CELLS'],
     deficiency: 'OXIDATIVE_STRESS',
-    description: 'Премиальный антиокс-комплекс',
+    description: 'Аминокислота, участвующая в защиты клеток от окислительного стресса',
     type: 'aminoacid'
   },
   {
@@ -11377,7 +11377,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['IMMUNE_UP', 'ANTI_INFLAMMATION'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'INFECTION',
-    description: 'Премиальный иммунокомплекс',
+    description: 'Аминокислота, участвующая в иммунной системы',
     type: 'aminoacid'
   },
   {
@@ -11397,7 +11397,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GI_REPAIR', 'GI_BARRIER_UP'],
     organs: ['GI'],
     deficiency: 'LEAKY_GUT',
-    description: 'Премиальный ЖКТ-комплекс',
+    description: 'Аминокислота, участвующая в синтезе белка и метаболических процессах',
     type: 'aminoacid'
   },
   {
@@ -11417,7 +11417,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['COLLAGEN_UP', 'SKIN_REPAIR'],
     organs: ['SKIN'],
     deficiency: 'AGING',
-    description: 'Премиальный кожный комплекс',
+    description: 'Аминокислота, участвующая в здоровья кожи',
     type: 'aminoacid'
   },
   {
@@ -11427,7 +11427,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['PROTEIN_SYNTHESIS', 'CELL_REPAIR'],
     organs: ['MUSCLES', 'CELLS'],
     deficiency: 'DEFICIENCY',
-    description: 'Ультра-спектр аминокислот',
+    description: 'Аминокислота, участвующая в синтезе белка и метаболических процессах',
     type: 'aminoacid'
   },
   {
@@ -11447,7 +11447,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['COLLAGEN_UP', 'SKIN_REPAIR'],
     organs: ['SKIN', 'JOINTS'],
     deficiency: 'AGING',
-    description: 'Коллаген тип I',
+    description: 'Пептид для здоровья кожи, суставов',
     type: 'peptide'
   },
   {
@@ -11457,7 +11457,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CARTILAGE_UP', 'ANTI_INFLAMMATION'],
     organs: ['JOINTS'],
     deficiency: 'ARTHRITIS',
-    description: 'Коллаген тип II',
+    description: 'Пептид для суставов',
     type: 'peptide'
   },
   {
@@ -11467,7 +11467,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['COLLAGEN_UP', 'SKIN_ELASTICITY'],
     organs: ['SKIN'],
     deficiency: 'AGING',
-    description: 'Коллаген тип III',
+    description: 'Пептид для здоровья кожи',
     type: 'peptide'
   },
   {
@@ -11477,7 +11477,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ELASTIN_UP', 'SKIN_REPAIR'],
     organs: ['SKIN'],
     deficiency: 'AGING',
-    description: 'Эластин',
+    description: 'Пептид для здоровья кожи',
     type: 'peptide'
   },
   {
@@ -11487,7 +11487,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['HAIR_STRENGTH', 'SKIN_BARRIER'],
     organs: ['HAIR', 'SKIN'],
     deficiency: 'HAIR_LOSS',
-    description: 'Кератиновые пептиды',
+    description: 'Пептид для здоровья волос, здоровья кожи',
     type: 'peptide'
   },
   {
@@ -11497,7 +11497,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SKIN_REPAIR', 'HAIR_STRENGTH'],
     organs: ['SKIN', 'HAIR'],
     deficiency: 'DRY_SKIN',
-    description: 'Шёлковые пептиды',
+    description: 'Пептид для здоровья кожи, здоровья волос',
     type: 'peptide'
   },
   {
@@ -11517,7 +11517,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['COLLAGEN_UP', 'WOUND_HEALING'],
     organs: ['SKIN', 'CELLS'],
     deficiency: 'AGING',
-    description: 'GHK‑Cu',
+    description: 'Пептид для здоровья кожи, антивозрастных процессов',
     type: 'peptide'
   },
   {
@@ -11527,7 +11527,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['COLLAGEN_UP', 'ANTI_INFLAMMATION'],
     organs: ['SKIN'],
     deficiency: 'AGING',
-    description: 'GHK',
+    description: 'Пептид для здоровья кожи, антивозрастных процессов',
     type: 'peptide'
   },
   {
@@ -11537,7 +11537,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['WRINKLE_REDUCTION', 'MUSCLE_RELAX'],
     organs: ['SKIN'],
     deficiency: 'AGING',
-    description: 'Аргирелин',
+    description: 'Пептид для здоровья кожи',
     type: 'peptide'
   },
   {
@@ -11547,7 +11547,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['COLLAGEN_UP', 'SKIN_REPAIR'],
     organs: ['SKIN'],
     deficiency: 'AGING',
-    description: 'Матриксил',
+    description: 'Пептид для здоровья кожи',
     type: 'peptide'
   },
   {
@@ -11557,7 +11557,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['COLLAGEN_UP', 'SKIN_REGEN'],
     organs: ['SKIN'],
     deficiency: 'AGING',
-    description: 'Трипептид‑1',
+    description: 'Пептид для здоровья кожи',
     type: 'peptide'
   },
   {
@@ -11567,7 +11567,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ANTI_INFLAMMATION', 'SKIN_REPAIR'],
     organs: ['SKIN'],
     deficiency: 'AGING',
-    description: 'Тетрапептид‑7',
+    description: 'Пептид для здоровья кожи',
     type: 'peptide'
   },
   {
@@ -11577,7 +11577,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['COLLAGEN_UP', 'WOUND_HEALING'],
     organs: ['SKIN'],
     deficiency: 'AGING',
-    description: 'Медный трипептид',
+    description: 'Пептид для здоровья кожи, заживления ран',
     type: 'peptide'
   },
   {
@@ -11587,7 +11587,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GI_REPAIR', 'TENDON_HEALING'],
     organs: ['GI', 'JOINTS'],
     deficiency: 'INJURY',
-    description: 'BPC‑157',
+    description: 'Пептид для суставов',
     type: 'peptide'
   },
   {
@@ -11597,7 +11597,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['REGEN_UP', 'ANTI_INFLAMMATION'],
     organs: ['MUSCLES', 'TENDONS'],
     deficiency: 'INJURY',
-    description: 'TB‑500',
+    description: 'Пептид для мышц',
     type: 'peptide'
   },
   {
@@ -11607,7 +11607,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['IMMUNE_UP', 'ANTI_INFLAMMATION'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'INFECTION',
-    description: 'Тимозин α1',
+    description: 'Пептид для иммунной системы',
     type: 'peptide'
   },
   {
@@ -11617,7 +11617,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['REGEN_UP', 'ANTI_INFLAMMATION'],
     organs: ['CELLS', 'MUSCLES'],
     deficiency: 'INJURY',
-    description: 'Тимозин β4',
+    description: 'Пептид для поддержки обменных процессов и здоровья',
     type: 'peptide'
   },
   {
@@ -11627,7 +11627,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MOTILITY_UP', 'GI_REPAIR'],
     organs: ['GI'],
     deficiency: 'CONSTIPATION',
-    description: 'Мотилин',
+    description: 'Пептид для поддержки обменных процессов и здоровья',
     type: 'peptide'
   },
   {
@@ -11637,7 +11637,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['STOMACH_ACID_UP', 'DIGESTION_UP'],
     organs: ['GI'],
     deficiency: 'LOW_ACID',
-    description: 'Гастрин',
+    description: 'Пептид для поддержки обменных процессов и здоровья',
     type: 'peptide'
   },
   {
@@ -11647,7 +11647,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['BILE_FLOW_UP', 'SATIETY_UP'],
     organs: ['GI', 'LIVER'],
     deficiency: 'OBESITY',
-    description: 'Холецистокинин',
+    description: 'Пептид для метаболизма',
     type: 'peptide'
   },
   {
@@ -11657,7 +11657,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NEURO_SIGNALING', 'PAIN_MOD'],
     organs: ['BRAIN'],
     deficiency: 'PAIN',
-    description: 'Нейротензин',
+    description: 'Пептид для нервной системы',
     type: 'peptide'
   },
   {
@@ -11667,7 +11667,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NEURO_SIGNALING', 'PAIN_SIGNALING'],
     organs: ['BRAIN'],
     deficiency: 'PAIN',
-    description: 'Субстанция P',
+    description: 'Пептид для нервной системы',
     type: 'peptide'
   },
   {
@@ -11677,7 +11677,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NO_UP', 'GI_REPAIR'],
     organs: ['VESSELS', 'GI'],
     deficiency: 'HIGH_BP',
-    description: 'VIP',
+    description: 'Пептид для поддержки обменных процессов и здоровья',
     type: 'peptide'
   },
   {
@@ -11687,7 +11687,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SOCIAL_BOND', 'STRESS_DOWN'],
     organs: ['BRAIN', 'HORMONES'],
     deficiency: 'STRESS',
-    description: 'Окситоцин',
+    description: 'Пептид для гормонального баланса',
     type: 'peptide'
   },
   {
@@ -11697,7 +11697,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MELANIN_UP', 'SKIN_PROTECTION'],
     organs: ['SKIN'],
     deficiency: 'PIGMENTATION',
-    description: 'Меланотан‑1',
+    description: 'Пептид для здоровья кожи',
     type: 'peptide'
   },
   {
@@ -11707,7 +11707,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MELANIN_UP', 'LIBIDO_UP'],
     organs: ['SKIN', 'HORMONES'],
     deficiency: 'PIGMENTATION',
-    description: 'Меланотан‑2',
+    description: 'Пептид для здоровья кожи, гормонального баланса',
     type: 'peptide'
   },
   {
@@ -11717,7 +11717,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['LIBIDO_UP', 'NEURO_SIGNALING'],
     organs: ['HORMONES', 'BRAIN'],
     deficiency: 'LOW_LIBIDO',
-    description: 'PT‑141',
+    description: 'Пептид для гормонального баланса',
     type: 'peptide'
   },
   {
@@ -11727,7 +11727,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GROWTH_HORMONE_UP', 'IGF1_UP'],
     organs: ['HORMONES', 'MUSCLES'],
     deficiency: 'LOW_GH',
-    description: 'CJC‑1295',
+    description: 'Пептид для гормонального баланса',
     type: 'peptide'
   },
   {
@@ -11737,7 +11737,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GROWTH_HORMONE_UP', 'IGF1_UP'],
     organs: ['HORMONES', 'MUSCLES'],
     deficiency: 'LOW_GH',
-    description: 'CJC‑DAC',
+    description: 'Пептид для гормонального баланса',
     type: 'peptide'
   },
   {
@@ -11747,7 +11747,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GROWTH_HORMONE_UP', 'GH_PULSE_UP'],
     organs: ['HORMONES', 'MUSCLES'],
     deficiency: 'LOW_GH',
-    description: 'Ипаморелин',
+    description: 'Пептид для гормонального баланса',
     type: 'peptide'
   },
   {
@@ -11757,7 +11757,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GH_UP', 'HUNGER_UP'],
     organs: ['HORMONES', 'BRAIN'],
     deficiency: 'LOW_GH',
-    description: 'GHRP‑2',
+    description: 'Пептид для гормонального баланса',
     type: 'peptide'
   },
   {
@@ -11767,7 +11767,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GH_UP', 'HUNGER_UP'],
     organs: ['HORMONES', 'BRAIN'],
     deficiency: 'LOW_GH',
-    description: 'GHRP‑6',
+    description: 'Пептид для гормонального баланса',
     type: 'peptide'
   },
   {
@@ -11777,7 +11777,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MYOSTATIN_DOWN', 'MUSCLE_GROWTH'],
     organs: ['MUSCLES'],
     deficiency: 'LOW_MUSCLE',
-    description: 'Фоллистатин‑344',
+    description: 'Пептид для поддержки обменных процессов и здоровья',
     type: 'peptide'
   },
   {
@@ -11787,7 +11787,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MYOSTATIN_DOWN', 'CELL_REPAIR'],
     organs: ['MUSCLES'],
     deficiency: 'LOW_MUSCLE',
-    description: 'Фоллистатин‑315',
+    description: 'Пептид для поддержки обменных процессов и здоровья',
     type: 'peptide'
   },
   {
@@ -11797,7 +11797,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NF_KB_BLOCK', 'ANTI_INFLAMMATION'],
     organs: ['GI', 'SKIN'],
     deficiency: 'INFLAMMATION',
-    description: 'KPV',
+    description: 'Пептид для противовоспалительной защиты',
     type: 'peptide'
   },
   {
@@ -11807,7 +11807,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['THYROID_UP', 'METABOLISM_UP'],
     organs: ['THYROID'],
     deficiency: 'HYPOTHYROID',
-    description: 'ТРГ',
+    description: 'Пептид для гормонального баланса',
     type: 'peptide'
   },
   {
@@ -11817,7 +11817,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['WATER_BALANCE', 'BP_UP'],
     organs: ['KIDNEYS', 'VESSELS'],
     deficiency: 'LOW_BP',
-    description: 'АДГ',
+    description: 'Пептид для гормонального баланса',
     type: 'peptide'
   },
   {
@@ -11827,7 +11827,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['BP_UP', 'VASOCONSTRICTION'],
     organs: ['VESSELS'],
     deficiency: 'LOW_BP',
-    description: 'Ангиотензин',
+    description: 'Пептид для поддержки обменных процессов и здоровья',
     type: 'peptide'
   },
   {
@@ -11837,7 +11837,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NO_UP', 'VASODILATION'],
     organs: ['VESSELS'],
     deficiency: 'HIGH_BP',
-    description: 'Брадикинин',
+    description: 'Пептид для поддержки обменных процессов и здоровья',
     type: 'peptide'
   },
   {
@@ -11847,7 +11847,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['APPETITE_UP', 'STRESS_UP'],
     organs: ['BRAIN'],
     deficiency: 'OBESITY',
-    description: 'NPY',
+    description: 'Пептид для нервной системы',
     type: 'peptide'
   },
   {
@@ -11857,7 +11857,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NEUROPROTECTION', 'NEURO_SIGNALING'],
     organs: ['BRAIN'],
     deficiency: 'COGNITION',
-    description: 'PACAP',
+    description: 'Пептид для нервной системы',
     type: 'peptide'
   },
   {
@@ -11867,7 +11867,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['DOPAMINE_UP', 'NEURO_SIGNALING'],
     organs: ['BRAIN'],
     deficiency: 'LOW_MOTIVATION',
-    description: 'Пептид мотивации',
+    description: 'Пептид для нервной системы',
     type: 'peptide'
   },
   {
@@ -11877,7 +11877,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SLEEP_UP', 'MELATONIN_UP'],
     organs: ['BRAIN'],
     deficiency: 'INSOMNIA',
-    description: 'Пептид сна',
+    description: 'Пептид для нервной системы',
     type: 'peptide'
   },
   {
@@ -11897,7 +11897,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['IMMUNE_UP', 'ANTI_INFLAMMATION'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'INFECTION',
-    description: 'Иммунный пептидный комплекс',
+    description: 'Пептид для иммунной системы',
     type: 'peptide'
   },
   {
@@ -11907,7 +11907,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CELL_REPAIR', 'ANTI_INFLAMMATION'],
     organs: ['CELLS', 'ORGANS'],
     deficiency: 'AGING',
-    description: 'Полный спектр пептидов',
+    description: 'Пептид для поддержки обменных процессов и здоровья',
     type: 'peptide'
   },
   {
@@ -11917,7 +11917,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['BDNF_UP', 'NEUROPROTECTION'],
     organs: ['BRAIN'],
     deficiency: 'COGNITION',
-    description: 'Семакс',
+    description: 'Пептид для нервной системы',
     type: 'peptide'
   },
   {
@@ -11927,7 +11927,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GABA_UP', 'NEURO_SIGNALING'],
     organs: ['BRAIN'],
     deficiency: 'ANXIETY',
-    description: 'Селанк',
+    description: 'Пептид для нервной системы, снижения тревоги',
     type: 'peptide'
   },
   {
@@ -11937,7 +11937,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SLEEP_UP', 'CORTISOL_DOWN'],
     organs: ['BRAIN'],
     deficiency: 'INSOMNIA',
-    description: 'ДСИП',
+    description: 'Пептид для сна',
     type: 'peptide'
   },
   {
@@ -11947,7 +11947,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NEURO_REGEN', 'BDNF_UP'],
     organs: ['BRAIN'],
     deficiency: 'NEURO_DEGEN',
-    description: 'P21',
+    description: 'Пептид для нервной системы',
     type: 'peptide'
   },
   {
@@ -11957,7 +11957,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CELL_REPAIR', 'COLLAGEN_UP'],
     organs: ['CELLS', 'SKIN'],
     deficiency: 'AGING',
-    description: 'Морские пептиды',
+    description: 'Пептид для антивозрастных процессов',
     type: 'peptide'
   },
   {
@@ -11967,7 +11967,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MITO_UP', 'GLUCOSE_REGULATION'],
     organs: ['MUSCLES', 'CELLS'],
     deficiency: 'AGING',
-    description: 'МOTS‑c',
+    description: 'Пептид для работы митохондрий',
     type: 'peptide'
   },
   {
@@ -11977,7 +11977,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ANTI_APOPTOSIS', 'CELL_PROTECTION'],
     organs: ['CELLS'],
     deficiency: 'AGING',
-    description: 'Хьюманин',
+    description: 'Пептид для работы митохондрий',
     type: 'peptide'
   },
   {
@@ -11987,7 +11987,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MITO_REPAIR', 'ATP_UP'],
     organs: ['MITOCHONDRIA'],
     deficiency: 'FATIGUE',
-    description: 'SS‑31',
+    description: 'Пептид для работы митохондрий',
     type: 'peptide'
   },
   {
@@ -11997,7 +11997,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['IMMUNE_UP', 'ANTI_INFLAMMATION'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'INFECTION',
-    description: 'Тимулин',
+    description: 'Пептид для иммунной системы',
     type: 'peptide'
   },
   {
@@ -12007,7 +12007,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['T_CELL_UP', 'IMMUNE_REGEN'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'IMMUNE_WEAK',
-    description: 'Тимопентин',
+    description: 'Пептид для иммунной системы',
     type: 'peptide'
   },
   {
@@ -12017,7 +12017,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['IGF1_UP', 'MUSCLE_GROWTH'],
     organs: ['MUSCLES'],
     deficiency: 'LOW_MUSCLE',
-    description: 'IGF‑1 LR3',
+    description: 'Пептид для поддержки обменных процессов и здоровья',
     type: 'peptide'
   },
   {
@@ -12027,7 +12027,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['IGF1_UP', 'CELL_REPAIR'],
     organs: ['MUSCLES'],
     deficiency: 'LOW_MUSCLE',
-    description: 'Des‑IGF1',
+    description: 'Пептид для поддержки обменных процессов и здоровья',
     type: 'peptide'
   },
   {
@@ -12037,7 +12037,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MYOSTATIN_DOWN', 'MUSCLE_GROWTH'],
     organs: ['MUSCLES'],
     deficiency: 'LOW_MUSCLE',
-    description: 'Синергия фоллистатина',
+    description: 'Пептид для поддержки обменных процессов и здоровья',
     type: 'peptide'
   },
   {
@@ -12047,7 +12047,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MUSCLE_REPAIR', 'IGF1_UP'],
     organs: ['MUSCLES'],
     deficiency: 'INJURY',
-    description: 'MGF',
+    description: 'Пептид для поддержки обменных процессов и здоровья',
     type: 'peptide'
   },
   {
@@ -12057,7 +12057,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MUSCLE_REPAIR', 'CELL_SIGNALING'],
     organs: ['MUSCLES'],
     deficiency: 'INJURY',
-    description: 'MGF‑C',
+    description: 'Пептид для поддержки обменных процессов и здоровья',
     type: 'peptide'
   },
   {
@@ -12067,7 +12067,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['LH_UP', 'FSH_UP'],
     organs: ['HORMONES'],
     deficiency: 'LOW_TESTOSTERONE',
-    description: 'Гонадорелин',
+    description: 'Пептид для гормонального баланса',
     type: 'peptide'
   },
   {
@@ -12077,7 +12077,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GNRH_UP', 'LH_UP'],
     organs: ['HORMONES'],
     deficiency: 'LOW_LIBIDO',
-    description: 'Кисс-пептин‑10',
+    description: 'Пептид для гормонального баланса',
     type: 'peptide'
   },
   {
@@ -12087,7 +12087,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GNRH_MOD', 'HORMONE_RESET'],
     organs: ['HORMONES'],
     deficiency: 'IMBALANCE',
-    description: 'Трипторелин',
+    description: 'Пептид для гормонального баланса',
     type: 'peptide'
   },
   {
@@ -12097,7 +12097,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['INSULIN_UP', 'APPETITE_DOWN'],
     organs: ['PANCREAS', 'BRAIN'],
     deficiency: 'DIABETES',
-    description: 'GLP‑1',
+    description: 'Пептид для метаболизма',
     type: 'peptide'
   },
   {
@@ -12107,7 +12107,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['INSULIN_MOD', 'GLUCOSE_REGULATION'],
     organs: ['PANCREAS'],
     deficiency: 'DIABETES',
-    description: 'GIP',
+    description: 'Пептид для метаболизма',
     type: 'peptide'
   },
   {
@@ -12117,7 +12117,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['APPETITE_DOWN', 'ENERGY_UP'],
     organs: ['BRAIN', 'GI'],
     deficiency: 'OBESITY',
-    description: 'Оксинтомодулин',
+    description: 'Пептид для метаболизма',
     type: 'peptide'
   },
   {
@@ -12127,7 +12127,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['APPETITE_DOWN', 'GI_SIGNALING'],
     organs: ['GI', 'BRAIN'],
     deficiency: 'OBESITY',
-    description: 'PYY',
+    description: 'Пептид для метаболизма',
     type: 'peptide'
   },
   {
@@ -12137,7 +12137,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['APPETITE_DOWN', 'ENERGY_SIGNALING'],
     organs: ['BRAIN'],
     deficiency: 'OBESITY',
-    description: 'Лептин',
+    description: 'Пептид для метаболизма',
     type: 'peptide'
   },
   {
@@ -12147,7 +12147,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['FAT_OXIDATION', 'INSULIN_SENSITIVITY'],
     organs: ['LIVER', 'MUSCLES'],
     deficiency: 'DIABETES',
-    description: 'Адипонектин',
+    description: 'Пептид для метаболизма',
     type: 'peptide'
   },
   {
@@ -12157,7 +12157,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MELANIN_UP', 'LIBIDO_UP'],
     organs: ['BRAIN', 'SKIN'],
     deficiency: 'LOW_LIBIDO',
-    description: 'Меланокортин',
+    description: 'Пептид для гормонального баланса, нервной системы',
     type: 'peptide'
   },
   {
@@ -12167,7 +12167,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GI_REPAIR', 'ANTI_INFLAMMATION'],
     organs: ['GI'],
     deficiency: 'LEAKY_GUT',
-    description: 'Пептиды восстановления ЖКТ',
+    description: 'Пептид для поддержки обменных процессов и здоровья',
     type: 'peptide'
   },
   {
@@ -12187,7 +12187,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['OXIDATIVE_STRESS_REDUCTION', 'CELL_PROTECTION'],
     organs: ['CELLS'],
     deficiency: 'OXIDATIVE_STRESS',
-    description: 'Антиоксидантные пептиды',
+    description: 'Пептид для защиты клеток от окислительного стресса',
     type: 'peptide'
   },
   {
@@ -12197,7 +12197,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MITO_UP', 'ATP_UP'],
     organs: ['MITOCHONDRIA'],
     deficiency: 'FATIGUE',
-    description: 'Премиальный митопептид',
+    description: 'Пептид для работы митохондрий',
     type: 'peptide'
   },
   {
@@ -12207,7 +12207,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['BDNF_UP', 'NEURO_SIGNALING'],
     organs: ['BRAIN'],
     deficiency: 'COGNITION',
-    description: 'Премиальный нейропептид',
+    description: 'Пептид для нервной системы',
     type: 'peptide'
   },
   {
@@ -12217,7 +12217,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['COLLAGEN_UP', 'SKIN_REPAIR'],
     organs: ['SKIN'],
     deficiency: 'AGING',
-    description: 'Премиальный кожный пептид',
+    description: 'Пептид для здоровья кожи',
     type: 'peptide'
   },
   {
@@ -12227,7 +12227,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CARTILAGE_UP', 'ANTI_INFLAMMATION'],
     organs: ['JOINTS'],
     deficiency: 'ARTHRITIS',
-    description: 'Премиальный суставной пептид',
+    description: 'Пептид для суставов',
     type: 'peptide'
   },
   {
@@ -12237,7 +12237,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['LIVER_REPAIR', 'DETOX_UP'],
     organs: ['LIVER'],
     deficiency: 'HEPATIC_STRESS',
-    description: 'Премиальный печёночный пептид',
+    description: 'Пептид для функции печени',
     type: 'peptide'
   },
   {
@@ -12247,7 +12247,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NO_UP', 'VESSEL_PROTECTION'],
     organs: ['HEART'],
     deficiency: 'HIGH_BP',
-    description: 'Премиальный сердечный пептид',
+    description: 'Пептид для ССС',
     type: 'peptide'
   },
   {
@@ -12257,7 +12257,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CELL_PROTECTION', 'UREA_CYCLE_UP'],
     organs: ['KIDNEYS'],
     deficiency: 'UREMIC_RISK',
-    description: 'Премиальный почечный пептид',
+    description: 'Пептид для почек',
     type: 'peptide'
   },
   {
@@ -12277,7 +12277,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['THYROID_UP', 'METABOLISM_UP'],
     organs: ['THYROID'],
     deficiency: 'HYPOTHYROID',
-    description: 'Премиальный тиреоидный пептид',
+    description: 'Пептид для гормонального баланса',
     type: 'peptide'
   },
   {
@@ -12287,7 +12287,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NEURO_SIGNALING', 'BDNF_UP'],
     organs: ['BRAIN'],
     deficiency: 'COGNITION',
-    description: 'Комплекс мозговых пептидов',
+    description: 'Пептид для нервной системы',
     type: 'peptide'
   },
   {
@@ -12297,7 +12297,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CELL_REPAIR', 'ANTI_INFLAMMATION'],
     organs: ['CELLS', 'ORGANS'],
     deficiency: 'AGING',
-    description: 'Премиальный спектр пептидов',
+    description: 'Пептид для поддержки обменных процессов и здоровья',
     type: 'peptide'
   },
   {
@@ -12307,7 +12307,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NO_UP', 'VESSEL_REPAIR'],
     organs: ['VESSELS'],
     deficiency: 'HIGH_BP',
-    description: 'Пептиды для сосудов',
+    description: 'Пептид для поддержки обменных процессов и здоровья',
     type: 'peptide'
   },
   {
@@ -12317,7 +12317,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ELASTIN_UP', 'SKIN_REPAIR'],
     organs: ['SKIN'],
     deficiency: 'AGING',
-    description: 'Эластиновый комплекс',
+    description: 'Пептид для здоровья кожи',
     type: 'peptide'
   },
   {
@@ -12327,7 +12327,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CARTILAGE_UP', 'ANTI_INFLAMMATION'],
     organs: ['JOINTS'],
     deficiency: 'ARTHRITIS',
-    description: 'Пептид восстановления хряща',
+    description: 'Пептид для суставов',
     type: 'peptide'
   },
   {
@@ -12347,7 +12347,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MUSCLE_REPAIR', 'IGF1_UP'],
     organs: ['MUSCLES'],
     deficiency: 'INJURY',
-    description: 'Пептид восстановления мышц',
+    description: 'Пептид для мышц',
     type: 'peptide'
   },
   {
@@ -12357,7 +12357,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['REGEN_UP', 'CELL_REPAIR'],
     organs: ['CELLS'],
     deficiency: 'INJURY',
-    description: 'Полный регенеративный пептид',
+    description: 'Пептид для поддержки обменных процессов и здоровья',
     type: 'peptide'
   },
   {
@@ -12367,7 +12367,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['COLLAGEN_UP', 'CELL_REPAIR'],
     organs: ['SKIN', 'CELLS'],
     deficiency: 'AGING',
-    description: 'Комплекс GHK клеточный',
+    description: 'Пептид для здоровья кожи, антивозрастных процессов',
     type: 'peptide'
   },
   {
@@ -12377,7 +12377,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['COLLAGEN_UP', 'WOUND_HEALING'],
     organs: ['SKIN'],
     deficiency: 'AGING',
-    description: 'Медный клеточный комплекс',
+    description: 'Пептид для здоровья кожи',
     type: 'peptide'
   },
   {
@@ -12387,7 +12387,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['HAIR_FOLLICLE_UP', 'KERATIN_UP'],
     organs: ['HAIR'],
     deficiency: 'HAIR_LOSS',
-    description: 'Пептид роста ресниц',
+    description: 'Пептид для здоровья волос',
     type: 'peptide'
   },
   {
@@ -12397,7 +12397,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['HAIR_FOLLICLE_UP', 'ANTI_INFLAMMATION'],
     organs: ['HAIR'],
     deficiency: 'HAIR_LOSS',
-    description: 'Пептид роста волос',
+    description: 'Пептид для здоровья волос',
     type: 'peptide'
   },
   {
@@ -12407,7 +12407,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['HAIR_STRENGTH', 'SKIN_REPAIR'],
     organs: ['HAIR', 'SKIN'],
     deficiency: 'HAIR_LOSS',
-    description: 'Биотиновый пептид',
+    description: 'Пептид для здоровья волос, здоровья кожи',
     type: 'peptide'
   },
   {
@@ -12417,7 +12417,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CARTILAGE_UP', 'ANTI_INFLAMMATION'],
     organs: ['JOINTS'],
     deficiency: 'ARTHRITIS',
-    description: 'Пептид хрящевой матрицы',
+    description: 'Пептид для суставов',
     type: 'peptide'
   },
   {
@@ -12427,7 +12427,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['TENDON_HEALING', 'COLLAGEN_UP'],
     organs: ['TENDONS'],
     deficiency: 'INJURY',
-    description: 'Пептид сухожильной матрицы',
+    description: 'Пептид для поддержки обменных процессов и здоровья',
     type: 'peptide'
   },
   {
@@ -12437,7 +12437,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['BONE_REGEN', 'COLLAGEN_UP'],
     organs: ['BONES'],
     deficiency: 'OSTEOPENIA',
-    description: 'Костный пептид',
+    description: 'Пептид для костной ткани',
     type: 'peptide'
   },
   {
@@ -12447,7 +12447,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CARTILAGE_UP', 'ANTI_INFLAMMATION'],
     organs: ['JOINTS'],
     deficiency: 'ARTHRITIS',
-    description: 'Синергия хрящевых пептидов',
+    description: 'Пептид для суставов',
     type: 'peptide'
   },
   {
@@ -12457,7 +12457,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['T_CELL_UP', 'IMMUNE_REGEN'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'IMMUNE_WEAK',
-    description: 'Тимусный комплекс',
+    description: 'Пептид для иммунной системы',
     type: 'peptide'
   },
   {
@@ -12467,7 +12467,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['IMMUNE_UP', 'ANTI_INFLAMMATION'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'INFECTION',
-    description: 'Селезёночный пептид',
+    description: 'Пептид для иммунной системы',
     type: 'peptide'
   },
   {
@@ -12477,7 +12477,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['LIVER_REPAIR', 'DETOX_UP'],
     organs: ['LIVER'],
     deficiency: 'HEPATIC_STRESS',
-    description: 'Печёночный пептид',
+    description: 'Пептид для функции печени',
     type: 'peptide'
   },
   {
@@ -12487,7 +12487,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['INSULIN_MOD', 'CELL_REPAIR'],
     organs: ['PANCREAS'],
     deficiency: 'DIABETES',
-    description: 'Панкреатический пептид',
+    description: 'Пептид для метаболизма',
     type: 'peptide'
   },
   {
@@ -12497,7 +12497,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NO_UP', 'VESSEL_PROTECTION'],
     organs: ['HEART'],
     deficiency: 'HIGH_BP',
-    description: 'Сердечный пептид',
+    description: 'Пептид для ССС',
     type: 'peptide'
   },
   {
@@ -12507,7 +12507,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['VESSEL_REPAIR', 'NO_UP'],
     organs: ['VESSELS'],
     deficiency: 'HIGH_BP',
-    description: 'Сосудистый пептид',
+    description: 'Пептид для поддержки обменных процессов и здоровья',
     type: 'peptide'
   },
   {
@@ -12517,7 +12517,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ANTI_INFLAMMATION', 'CELL_REPAIR'],
     organs: ['LUNGS'],
     deficiency: 'ASTHMA',
-    description: 'Лёгочный пептид',
+    description: 'Пептид для легких',
     type: 'peptide'
   },
   {
@@ -12527,7 +12527,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CELL_PROTECTION', 'UREA_CYCLE_UP'],
     organs: ['KIDNEYS'],
     deficiency: 'UREMIC_RISK',
-    description: 'Почечный пептид',
+    description: 'Пептид для почек',
     type: 'peptide'
   },
   {
@@ -12537,7 +12537,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GI_REPAIR', 'MUCIN_UP'],
     organs: ['GI'],
     deficiency: 'ULCER',
-    description: 'Желудочный пептид',
+    description: 'Пептид для поддержки обменных процессов и здоровья',
     type: 'peptide'
   },
   {
@@ -12547,7 +12547,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GI_BARRIER_UP', 'ANTI_INFLAMMATION'],
     organs: ['GI'],
     deficiency: 'LEAKY_GUT',
-    description: 'Кишечный пептид',
+    description: 'Пептид для поддержки обменных процессов и здоровья',
     type: 'peptide'
   },
   {
@@ -12557,7 +12557,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['BDNF_UP', 'NEURO_SIGNALING'],
     organs: ['BRAIN'],
     deficiency: 'COGNITION',
-    description: 'Мозговой пептид',
+    description: 'Пептид для нервной системы',
     type: 'peptide'
   },
   {
@@ -12567,7 +12567,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NEURO_REGEN', 'CELL_REPAIR'],
     organs: ['BRAIN'],
     deficiency: 'NEURO_DEGEN',
-    description: 'Пептид нейрорегенерации',
+    description: 'Пептид для нервной системы',
     type: 'peptide'
   },
   {
@@ -12577,7 +12577,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['RETINA_REPAIR', 'ANTIOXIDANT'],
     organs: ['EYES'],
     deficiency: 'VISION_LOSS',
-    description: 'Ретинальный пептид',
+    description: 'Пептид для зрения',
     type: 'peptide'
   },
   {
@@ -12587,7 +12587,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MELATONIN_UP', 'SLEEP_UP'],
     organs: ['BRAIN', 'HORMONES'],
     deficiency: 'INSOMNIA',
-    description: 'Пинеальный пептид',
+    description: 'Пептид для нервной системы, гормонального баланса',
     type: 'peptide'
   },
   {
@@ -12597,7 +12597,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['PITUITARY_UP', 'HORMONE_BALANCE'],
     organs: ['HORMONES'],
     deficiency: 'IMBALANCE',
-    description: 'Гипофизарный пептид',
+    description: 'Пептид для гормонального баланса',
     type: 'peptide'
   },
   {
@@ -12607,7 +12607,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ADRENAL_SUPPORT', 'CORTISOL_MOD'],
     organs: ['ADRENALS'],
     deficiency: 'STRESS',
-    description: 'Кортикальный пептид',
+    description: 'Пептид для гормонального баланса',
     type: 'peptide'
   },
   {
@@ -12617,7 +12617,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['THYROID_UP', 'METABOLISM_UP'],
     organs: ['THYROID'],
     deficiency: 'HYPOTHYROID',
-    description: 'Тиреоидный пептид',
+    description: 'Пептид для гормонального баланса',
     type: 'peptide'
   },
   {
@@ -12627,7 +12627,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ESTROGEN_MOD', 'CELL_REPAIR'],
     organs: ['OVARIES'],
     deficiency: 'MENOPAUSE',
-    description: 'Овариальный пептид',
+    description: 'Пептид для гормонального баланса',
     type: 'peptide'
   },
   {
@@ -12637,7 +12637,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['TESTOSTERONE_UP', 'LH_UP'],
     organs: ['TESTES'],
     deficiency: 'LOW_TESTOSTERONE',
-    description: 'Тестикулярный пептид',
+    description: 'Пептид для гормонального баланса',
     type: 'peptide'
   },
   {
@@ -12647,7 +12647,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ANTI_INFLAMMATION', 'CELL_REPAIR'],
     organs: ['PROSTATE'],
     deficiency: 'BPH',
-    description: 'Простатический пептид',
+    description: 'Пептид для мужского здоровья',
     type: 'peptide'
   },
   {
@@ -12657,7 +12657,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ENDOMETRIUM_REPAIR', 'HORMONE_BALANCE'],
     organs: ['UTERUS'],
     deficiency: 'ENDOMETRIOSIS',
-    description: 'Маточный пептид',
+    description: 'Пептид для женского здоровья',
     type: 'peptide'
   },
   {
@@ -12667,7 +12667,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MELANIN_DOWN', 'SKIN_TONE'],
     organs: ['SKIN'],
     deficiency: 'PIGMENTATION',
-    description: 'Осветляющий пептид',
+    description: 'Пептид для здоровья кожи',
     type: 'peptide'
   },
   {
@@ -12677,7 +12677,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SCAR_REPAIR', 'COLLAGEN_MOD'],
     organs: ['SKIN'],
     deficiency: 'SCARS',
-    description: 'Пептид против рубцов',
+    description: 'Пептид для здоровья кожи',
     type: 'peptide'
   },
   {
@@ -12687,7 +12687,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['WOUND_HEALING', 'CELL_REPAIR'],
     organs: ['SKIN'],
     deficiency: 'INJURY',
-    description: 'Пептид заживления ран',
+    description: 'Пептид для здоровья кожи',
     type: 'peptide'
   },
   {
@@ -12697,7 +12697,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ANTI_PATHOGEN', 'ANTI_INFLAMMATION'],
     organs: ['SKIN'],
     deficiency: 'ACNE',
-    description: 'Пептид против акне',
+    description: 'Пептид для здоровья кожи',
     type: 'peptide'
   },
   {
@@ -12707,7 +12707,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['COLLAGEN_UP', 'SKIN_REPAIR'],
     organs: ['SKIN'],
     deficiency: 'AGING',
-    description: 'Пептид против морщин',
+    description: 'Пептид для здоровья кожи',
     type: 'peptide'
   },
   {
@@ -12717,7 +12717,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MELANIN_MOD', 'SKIN_TONE'],
     organs: ['SKIN'],
     deficiency: 'PIGMENTATION',
-    description: 'Пептид против пигментации',
+    description: 'Пептид для здоровья кожи',
     type: 'peptide'
   },
   {
@@ -12727,7 +12727,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ANTI_INFLAMMATION', 'SKIN_BARRIER'],
     organs: ['SKIN'],
     deficiency: 'ROSACEA',
-    description: 'Пептид против покраснений',
+    description: 'Пептид для здоровья кожи',
     type: 'peptide'
   },
   {
@@ -12737,7 +12737,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GLYCATION_DOWN', 'COLLAGEN_PROTECT'],
     organs: ['SKIN'],
     deficiency: 'AGING',
-    description: 'Пептид против гликации',
+    description: 'Пептид для здоровья кожи',
     type: 'peptide'
   },
   {
@@ -12747,7 +12747,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['FAT_BREAKDOWN', 'CIRCULATION_UP'],
     organs: ['SKIN'],
     deficiency: 'CELLULITE',
-    description: 'Пептид против целлюлита',
+    description: 'Пептид для здоровья кожи',
     type: 'peptide'
   },
   {
@@ -12757,7 +12757,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['IGF1_UP', 'MUSCLE_REPAIR'],
     organs: ['MUSCLES'],
     deficiency: 'LOW_MUSCLE',
-    description: 'Пептид роста мышц',
+    description: 'Пептид для мышц',
     type: 'peptide'
   },
   {
@@ -12767,7 +12767,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ATP_UP', 'MITO_UP'],
     organs: ['MUSCLES'],
     deficiency: 'FATIGUE',
-    description: 'Пептид выносливости',
+    description: 'Пептид для мышц',
     type: 'peptide'
   },
   {
@@ -12777,7 +12777,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['FAT_OXIDATION', 'MITO_UP'],
     organs: ['MUSCLES'],
     deficiency: 'OBESITY',
-    description: 'Пептид жиросжигания',
+    description: 'Пептид для жиросжигания',
     type: 'peptide'
   },
   {
@@ -12787,7 +12787,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ORGAN_REPAIR', 'CELL_REGEN'],
     organs: ['ORGANS'],
     deficiency: 'AGING',
-    description: 'Полный органный пептид',
+    description: 'Пептид для поддержки обменных процессов и здоровья',
     type: 'peptide'
   },
   {
@@ -12797,7 +12797,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['REGEN_UP', 'CELL_REPAIR'],
     organs: ['CELLS'],
     deficiency: 'INJURY',
-    description: 'Полный репаративный пептид',
+    description: 'Пептид для поддержки обменных процессов и здоровья',
     type: 'peptide'
   },
   {
@@ -12807,7 +12807,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CELL_SIGNALING', 'REGEN_UP'],
     organs: ['CELLS'],
     deficiency: 'AGING',
-    description: 'Полный сигнальный пептид',
+    description: 'Пептид для клеточного здоровья',
     type: 'peptide'
   },
   {
@@ -12817,7 +12817,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NEURO_REPAIR', 'BDNF_UP'],
     organs: ['BRAIN'],
     deficiency: 'NEURO_DEGEN',
-    description: 'Церебролизин',
+    description: 'Пептид для нервной системы',
     type: 'peptide'
   },
   {
@@ -12827,7 +12827,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NEURO_SIGNALING', 'NEURO_REGEN'],
     organs: ['BRAIN'],
     deficiency: 'COGNITION',
-    description: 'Кортексин',
+    description: 'Пептид для нервной системы',
     type: 'peptide'
   },
   {
@@ -12837,7 +12837,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['RETINA_REPAIR', 'ANTIOXIDANT'],
     organs: ['EYES'],
     deficiency: 'VISION_LOSS',
-    description: 'Ретинолин',
+    description: 'Пептид для зрения',
     type: 'peptide'
   },
   {
@@ -12847,7 +12847,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['VESSEL_REPAIR', 'NO_UP'],
     organs: ['VESSELS'],
     deficiency: 'VARICOSE',
-    description: 'Вентфорт',
+    description: 'Пептид для поддержки обменных процессов и здоровья',
     type: 'peptide'
   },
   {
@@ -12857,7 +12857,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NO_UP', 'VESSEL_PROTECTION'],
     organs: ['HEART'],
     deficiency: 'HIGH_BP',
-    description: 'Кардиоген',
+    description: 'Пептид для здоровья сердца',
     type: 'peptide'
   },
   {
@@ -12867,7 +12867,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MELATONIN_UP', 'ANTIAGING'],
     organs: ['BRAIN', 'HORMONES'],
     deficiency: 'AGING',
-    description: 'Эндолутен',
+    description: 'Пептид для поддержки обменных процессов и здоровья',
     type: 'peptide'
   },
   {
@@ -12877,7 +12877,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CARTILAGE_UP', 'ANTI_INFLAMMATION'],
     organs: ['JOINTS'],
     deficiency: 'ARTHRITIS',
-    description: 'Сигумир',
+    description: 'Пептид для суставов',
     type: 'peptide'
   },
   {
@@ -12887,7 +12887,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['INSULIN_MOD', 'CELL_REPAIR'],
     organs: ['PANCREAS'],
     deficiency: 'DIABETES',
-    description: 'Супрефорт',
+    description: 'Пептид для метаболизма',
     type: 'peptide'
   },
   {
@@ -12897,7 +12897,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GI_REPAIR', 'MUCIN_UP'],
     organs: ['GI'],
     deficiency: 'ULCER',
-    description: 'Вентрамин',
+    description: 'Пептид для поддержки обменных процессов и здоровья',
     type: 'peptide'
   },
   {
@@ -12907,7 +12907,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['LIVER_REPAIR', 'DETOX_UP'],
     organs: ['LIVER'],
     deficiency: 'HEPATIC_STRESS',
-    description: 'Таксорен',
+    description: 'Пептид для функции печени',
     type: 'peptide'
   },
   {
@@ -12917,7 +12917,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['IMMUNE_UP', 'ANTI_INFLAMMATION'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'INFECTION',
-    description: 'Кристаген',
+    description: 'Пептид для иммунной системы',
     type: 'peptide'
   },
   {
@@ -12927,7 +12927,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['THYROID_UP', 'METABOLISM_UP'],
     organs: ['THYROID'],
     deficiency: 'HYPOTHYROID',
-    description: 'Тиреоген',
+    description: 'Пептид для гормонального баланса',
     type: 'peptide'
   },
   {
@@ -12937,7 +12937,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ANTI_INFLAMMATION', 'CELL_REPAIR'],
     organs: ['LUNGS'],
     deficiency: 'ASTHMA',
-    description: 'Бронхоген',
+    description: 'Пептид для легких',
     type: 'peptide'
   },
   {
@@ -12947,7 +12947,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CARTILAGE_UP', 'ANTI_INFLAMMATION'],
     organs: ['JOINTS'],
     deficiency: 'ARTHRITIS',
-    description: 'Хондрамин',
+    description: 'Пептид для суставов',
     type: 'peptide'
   },
   {
@@ -12957,7 +12957,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GI_REPAIR', 'GI_BARRIER_UP'],
     organs: ['GI'],
     deficiency: 'LEAKY_GUT',
-    description: 'Гастроген',
+    description: 'Пептид для поддержки обменных процессов и здоровья',
     type: 'peptide'
   },
   {
@@ -12967,7 +12967,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['LIVER_REPAIR', 'DETOX_UP'],
     organs: ['LIVER'],
     deficiency: 'HEPATIC_STRESS',
-    description: 'Гепатоген',
+    description: 'Пептид для функции печени',
     type: 'peptide'
   },
   {
@@ -12977,7 +12977,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NEURO_REGEN', 'BDNF_UP'],
     organs: ['BRAIN'],
     deficiency: 'NEURO_DEGEN',
-    description: 'Нейроген',
+    description: 'Пептид для нервной системы',
     type: 'peptide'
   },
   {
@@ -12987,7 +12987,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NO_UP', 'VESSEL_REPAIR'],
     organs: ['HEART'],
     deficiency: 'HIGH_BP',
-    description: 'Кардиоген премиум',
+    description: 'Пептид для здоровья сердца',
     type: 'peptide'
   },
   {
@@ -12997,7 +12997,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['VESSEL_REPAIR', 'NO_UP'],
     organs: ['VESSELS'],
     deficiency: 'HIGH_BP',
-    description: 'Премиальный сосудистый пептид',
+    description: 'Пептид для поддержки обменных процессов и здоровья',
     type: 'peptide'
   },
   {
@@ -13007,7 +13007,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MITO_SIGNAL', 'ATP_UP'],
     organs: ['MITOCHONDRIA'],
     deficiency: 'FATIGUE',
-    description: 'Митосигнальный пептид',
+    description: 'Пептид для работы митохондрий',
     type: 'peptide'
   },
   {
@@ -13017,7 +13017,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MITO_REPAIR', 'CELL_REPAIR'],
     organs: ['MITOCHONDRIA'],
     deficiency: 'AGING',
-    description: 'Миторепаративный пептид',
+    description: 'Пептид для работы митохондрий',
     type: 'peptide'
   },
   {
@@ -13027,7 +13027,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NF_KB_BLOCK', 'IL6_DOWN'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'INFLAMMATION',
-    description: 'Пептид блокировки цитокинов',
+    description: 'Пептид для иммунной системы',
     type: 'peptide'
   },
   {
@@ -13037,7 +13037,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['IL10_UP', 'ANTI_INFLAMMATION'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'AUTOIMMUNE',
-    description: 'Пептид IL‑10',
+    description: 'Пептид для иммунной системы',
     type: 'peptide'
   },
   {
@@ -13047,7 +13047,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['IGF1_UP', 'MUSCLE_REPAIR'],
     organs: ['MUSCLES'],
     deficiency: 'LOW_MUSCLE',
-    description: 'Пептид IGF‑сигнала',
+    description: 'Пептид для поддержки обменных процессов и здоровья',
     type: 'peptide'
   },
   {
@@ -13057,7 +13057,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GH_UP', 'IGF1_UP'],
     organs: ['HORMONES'],
     deficiency: 'LOW_GH',
-    description: 'Пептид GH‑сигнала',
+    description: 'Пептид для гормонального баланса',
     type: 'peptide'
   },
   {
@@ -13067,7 +13067,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['VEGF_UP', 'VESSEL_REPAIR'],
     organs: ['VESSELS'],
     deficiency: 'ISCHEMIA',
-    description: 'Ангиогенный пептид',
+    description: 'Пептид для поддержки обменных процессов и здоровья',
     type: 'peptide'
   },
   {
@@ -13077,7 +13077,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['VEGF_DOWN', 'CELL_PROTECTION'],
     organs: ['VESSELS'],
     deficiency: 'CANCER_RISK',
-    description: 'Антиангиогенный пептид',
+    description: 'Пептид для поддержки обменных процессов и здоровья',
     type: 'peptide'
   },
   {
@@ -13087,7 +13087,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['COLLAGEN_UP', 'SKIN_REPAIR'],
     organs: ['SKIN'],
     deficiency: 'AGING',
-    description: 'Премиальная регенерация кожи',
+    description: 'Пептид для здоровья кожи',
     type: 'peptide'
   },
   {
@@ -13097,7 +13097,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SKIN_BARRIER', 'HYDRATION'],
     organs: ['SKIN'],
     deficiency: 'DRY_SKIN',
-    description: 'Пептид кожного барьера',
+    description: 'Пептид для здоровья кожи',
     type: 'peptide'
   },
   {
@@ -13117,7 +13117,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['KERATIN_UP', 'CELL_REPAIR'],
     organs: ['NAILS'],
     deficiency: 'BRITTLE_NAILS',
-    description: 'Пептид ногтей',
+    description: 'Пептид для поддержки обменных процессов и здоровья',
     type: 'peptide'
   },
   {
@@ -13127,7 +13127,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CARTILAGE_UP', 'ANTI_INFLAMMATION'],
     organs: ['JOINTS'],
     deficiency: 'ARTHRITIS',
-    description: 'Премиальный хрящевой пептид',
+    description: 'Пептид для суставов',
     type: 'peptide'
   },
   {
@@ -13147,7 +13147,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['BONE_REGEN', 'COLLAGEN_UP'],
     organs: ['BONES'],
     deficiency: 'OSTEOPENIA',
-    description: 'Премиальный костный пептид',
+    description: 'Пептид для костной ткани',
     type: 'peptide'
   },
   {
@@ -13157,7 +13157,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ORGAN_REPAIR', 'CELL_REGEN'],
     organs: ['ORGANS'],
     deficiency: 'AGING',
-    description: 'Полная органная матрица',
+    description: 'Пептид для поддержки обменных процессов и здоровья',
     type: 'peptide'
   },
   {
@@ -13167,7 +13167,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CELL_SIGNALING', 'REGEN_UP'],
     organs: ['CELLS'],
     deficiency: 'AGING',
-    description: 'Премиальный сигнальный пептид',
+    description: 'Пептид для клеточного здоровья',
     type: 'peptide'
   },
   {
@@ -13187,7 +13187,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CELL_REPAIR', 'ANTI_INFLAMMATION'],
     organs: ['CELLS', 'ORGANS'],
     deficiency: 'AGING',
-    description: 'Ультра‑спектр пептидов',
+    description: 'Пептид для поддержки обменных процессов и здоровья',
     type: 'peptide'
   },
   {
@@ -13207,7 +13207,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ORGAN_REPAIR', 'CELL_REGEN'],
     organs: ['ORGANS'],
     deficiency: 'AGING',
-    description: 'Синергия органных пептидов',
+    description: 'Пептид для поддержки обменных процессов и здоровья',
     type: 'peptide'
   },
   {
@@ -13217,7 +13217,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MITO_UP', 'ATP_UP'],
     organs: ['MITOCHONDRIA'],
     deficiency: 'FATIGUE',
-    description: 'Синергия митопептидов',
+    description: 'Пептид для работы митохондрий',
     type: 'peptide'
   },
   {
@@ -13227,7 +13227,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['BDNF_UP', 'NEURO_SIGNALING'],
     organs: ['BRAIN'],
     deficiency: 'COGNITION',
-    description: 'Синергия нейропептидов',
+    description: 'Пептид для нервной системы',
     type: 'peptide'
   },
   {
@@ -13237,7 +13237,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['IMMUNE_UP', 'ANTI_INFLAMMATION'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'INFECTION',
-    description: 'Синергия иммунных пептидов',
+    description: 'Пептид для иммунной системы',
     type: 'peptide'
   },
   {
@@ -13257,7 +13257,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['REGEN_UP', 'CELL_REPAIR'],
     organs: ['CELLS'],
     deficiency: 'INJURY',
-    description: 'Ультра‑репаративный пептид',
+    description: 'Пептид для поддержки обменных процессов и здоровья',
     type: 'peptide'
   },
   {
@@ -13267,7 +13267,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NEURO_SIGNALING', 'MOOD_UP'],
     organs: ['BRAIN'],
     deficiency: 'MOOD_ISSUES',
-    description: 'MelC',
+    description: 'Пептид для нервной системы',
     type: 'peptide'
   },
   {
@@ -13277,7 +13277,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['Nrf2_UP', 'CELL_PROTECTION'],
     organs: ['CELLS'],
     deficiency: 'OXIDATIVE_STRESS',
-    description: 'Nrf2-пептид',
+    description: 'Пептид для защиты клеток от окислительного стресса',
     type: 'peptide'
   },
   {
@@ -13287,7 +13287,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SIRT1_UP', 'CELL_REPAIR'],
     organs: ['CELLS'],
     deficiency: 'AGING',
-    description: 'SIRT1-пептид',
+    description: 'Пептид для антивозрастных процессов',
     type: 'peptide'
   },
   {
@@ -13297,7 +13297,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SIRT6_UP', 'DNA_REPAIR'],
     organs: ['CELLS'],
     deficiency: 'AGING',
-    description: 'SIRT6-пептид',
+    description: 'Пептид для антивозрастных процессов',
     type: 'peptide'
   },
   {
@@ -13307,7 +13307,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['TELOMERASE_UP', 'CELL_REGEN'],
     organs: ['CELLS'],
     deficiency: 'AGING',
-    description: 'Теломеразный пептид',
+    description: 'Пептид для антивозрастных процессов',
     type: 'peptide'
   },
   {
@@ -13317,7 +13317,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['DNA_REPAIR', 'CELL_PROTECTION'],
     organs: ['CELLS'],
     deficiency: 'AGING',
-    description: 'Пептид восстановления ДНК',
+    description: 'Пептид для клеточного здоровья',
     type: 'peptide'
   },
   {
@@ -13327,7 +13327,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MITO_FISSION', 'MITO_FUSION'],
     organs: ['MITOCHONDRIA'],
     deficiency: 'FATIGUE',
-    description: 'Пептид митодинамики',
+    description: 'Пептид для работы митохондрий',
     type: 'peptide'
   },
   {
@@ -13337,7 +13337,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MITO_PROTECTION', 'ROS_DOWN'],
     organs: ['MITOCHONDRIA'],
     deficiency: 'OXIDATIVE_STRESS',
-    description: 'Мито-антиоксидант',
+    description: 'Пептид для работы митохондрий',
     type: 'peptide'
   },
   {
@@ -13347,7 +13347,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ATP_UP', 'MITO_UP'],
     organs: ['MUSCLES', 'CELLS'],
     deficiency: 'FATIGUE',
-    description: 'Пептид АТФ-синтазы',
+    description: 'Пептид для энергетического обмена',
     type: 'peptide'
   },
   {
@@ -13357,7 +13357,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NAD_UP', 'MITO_UP'],
     organs: ['CELLS'],
     deficiency: 'AGING',
-    description: 'Пептид NAD+',
+    description: 'Пептид для антивозрастных процессов',
     type: 'peptide'
   },
   {
@@ -13367,7 +13367,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NAD_UP', 'CELL_REPAIR'],
     organs: ['CELLS'],
     deficiency: 'AGING',
-    description: 'Пептид NMN-сигнала',
+    description: 'Пептид для антивозрастных процессов',
     type: 'peptide'
   },
   {
@@ -13377,7 +13377,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['AMPK_UP', 'GLUCOSE_REGULATION'],
     organs: ['LIVER', 'MUSCLES'],
     deficiency: 'DIABETES',
-    description: 'Пептид AMPK',
+    description: 'Пептид для метаболизма',
     type: 'peptide'
   },
   {
@@ -13387,7 +13387,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['PPAR_DELTA_UP', 'FAT_OXIDATION'],
     organs: ['MUSCLES'],
     deficiency: 'OBESITY',
-    description: 'Пептид PPAR‑δ',
+    description: 'Пептид для жиросжигания',
     type: 'peptide'
   },
   {
@@ -13397,7 +13397,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['PPAR_GAMMA_MOD', 'INSULIN_SENSITIVITY'],
     organs: ['LIVER', 'PANCREAS'],
     deficiency: 'DIABETES',
-    description: 'Пептид PPAR‑γ',
+    description: 'Пептид для метаболизма',
     type: 'peptide'
   },
   {
@@ -13407,7 +13407,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['LEPTIN_UP', 'APPETITE_DOWN'],
     organs: ['BRAIN'],
     deficiency: 'OBESITY',
-    description: 'Пептид лептинового сигнала',
+    description: 'Пептид для метаболизма',
     type: 'peptide'
   },
   {
@@ -13417,7 +13417,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['FAT_OXIDATION', 'INSULIN_SENSITIVITY'],
     organs: ['LIVER'],
     deficiency: 'DIABETES',
-    description: 'Пептид адипонектина',
+    description: 'Пептид для метаболизма',
     type: 'peptide'
   },
   {
@@ -13427,7 +13427,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GLUCOSE_REGULATION', 'INSULIN_MOD'],
     organs: ['PANCREAS'],
     deficiency: 'DIABETES',
-    description: 'Пептид глюкозного сенсора',
+    description: 'Пептид для метаболизма',
     type: 'peptide'
   },
   {
@@ -13437,7 +13437,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['KETONE_UP', 'ATP_UP'],
     organs: ['BRAIN', 'MUSCLES'],
     deficiency: 'KETO',
-    description: 'Кетоновый пептид',
+    description: 'Пептид для энергетического обмена',
     type: 'peptide'
   },
   {
@@ -13447,7 +13447,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['FAT_BREAKDOWN', 'MITO_UP'],
     organs: ['FAT'],
     deficiency: 'OBESITY',
-    description: 'Пептид липолиза',
+    description: 'Пептид для жиросжигания',
     type: 'peptide'
   },
   {
@@ -13457,7 +13457,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['BAT_UP', 'THERMOGENESIS'],
     organs: ['FAT'],
     deficiency: 'OBESITY',
-    description: 'Пептид бурого жира',
+    description: 'Пептид для жиросжигания',
     type: 'peptide'
   },
   {
@@ -13467,7 +13467,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['APPETITE_DOWN', 'GLUCOSE_REGULATION'],
     organs: ['BRAIN'],
     deficiency: 'OBESITY',
-    description: 'Пептид блокировки аппетита',
+    description: 'Пептид для метаболизма',
     type: 'peptide'
   },
   {
@@ -13477,7 +13477,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GI_BARRIER_UP', 'ANTI_INFLAMMATION'],
     organs: ['GI'],
     deficiency: 'LEAKY_GUT',
-    description: 'Пептид кишечного барьера',
+    description: 'Пептид для поддержки обменных процессов и здоровья',
     type: 'peptide'
   },
   {
@@ -13487,7 +13487,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MUCIN_UP', 'GI_REPAIR'],
     organs: ['GI'],
     deficiency: 'ULCER',
-    description: 'Пептид муцина',
+    description: 'Пептид для поддержки обменных процессов и здоровья',
     type: 'peptide'
   },
   {
@@ -13497,7 +13497,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ANTI_PATHOGEN', 'IMMUNE_UP'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'INFECTION',
-    description: 'Антипатогенный пептид',
+    description: 'Пептид для иммунной системы',
     type: 'peptide'
   },
   {
@@ -13507,7 +13507,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['IGA_UP', 'GI_BARRIER_UP'],
     organs: ['GI', 'IMMUNE_SYSTEM'],
     deficiency: 'INFECTION',
-    description: 'Пептид IgA',
+    description: 'Пептид для иммунной системы',
     type: 'peptide'
   },
   {
@@ -13517,7 +13517,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['TREG_UP', 'ANTI_INFLAMMATION'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'AUTOIMMUNE',
-    description: 'Пептид T‑регуляции',
+    description: 'Пептид для иммунной системы',
     type: 'peptide'
   },
   {
@@ -13527,7 +13527,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['IL6_DOWN', 'ANTI_INFLAMMATION'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'INFLAMMATION',
-    description: 'Пептид IL‑6 блок',
+    description: 'Пептид для иммунной системы',
     type: 'peptide'
   },
   {
@@ -13537,7 +13537,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['TNF_DOWN', 'ANTI_INFLAMMATION'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'INFLAMMATION',
-    description: 'Пептид TNF‑α блок',
+    description: 'Пептид для иммунной системы',
     type: 'peptide'
   },
   {
@@ -13547,7 +13547,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ANTIVIRAL', 'IMMUNE_UP'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'INFECTION',
-    description: 'Противовирусный пептид',
+    description: 'Пептид для иммунной системы',
     type: 'peptide'
   },
   {
@@ -13557,7 +13557,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ANTI_PATHOGEN', 'CELL_PROTECTION'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'INFECTION',
-    description: 'Антибактериальный пептид',
+    description: 'Пептид для иммунной системы',
     type: 'peptide'
   },
   {
@@ -13567,7 +13567,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ANTI_FUNGAL', 'IMMUNE_UP'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'INFECTION',
-    description: 'Противогрибковый пептид',
+    description: 'Пептид для иммунной системы',
     type: 'peptide'
   },
   {
@@ -13577,7 +13577,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ANTI_PARASITE', 'IMMUNE_UP'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'INFECTION',
-    description: 'Антипаразитарный пептид',
+    description: 'Пептид для иммунной системы',
     type: 'peptide'
   },
   {
@@ -13597,7 +13597,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['STEMCELL_UP', 'HAIR_REGEN'],
     organs: ['HAIR'],
     deficiency: 'HAIR_LOSS',
-    description: 'Пептид стволовых клеток волос',
+    description: 'Пептид для здоровья волос',
     type: 'peptide'
   },
   {
@@ -13607,7 +13607,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MELANIN_MOD', 'SKIN_TONE'],
     organs: ['SKIN'],
     deficiency: 'PIGMENTATION',
-    description: 'Пептид сброса меланина',
+    description: 'Пептид для здоровья кожи',
     type: 'peptide'
   },
   {
@@ -13617,7 +13617,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SCAR_REPAIR', 'COLLAGEN_MOD'],
     organs: ['SKIN'],
     deficiency: 'SCARS',
-    description: 'Пептид рассасывания рубцов',
+    description: 'Пептид для здоровья кожи',
     type: 'peptide'
   },
   {
@@ -13637,7 +13637,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['LYMPH_FLOW_UP', 'ANTI_INFLAMMATION'],
     organs: ['LYMPH'],
     deficiency: 'LYMPH_STASIS',
-    description: 'Пептид лимфодренажа',
+    description: 'Пептид для поддержки обменных процессов и здоровья',
     type: 'peptide'
   },
   {
@@ -13647,7 +13647,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ORGAN_REPAIR', 'CELL_REGEN'],
     organs: ['ORGANS'],
     deficiency: 'AGING',
-    description: 'Мастер‑пептид органов',
+    description: 'Пептид для поддержки обменных процессов и здоровья',
     type: 'peptide'
   },
   {
@@ -13657,7 +13657,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CELL_SIGNALING', 'REGEN_UP'],
     organs: ['CELLS'],
     deficiency: 'AGING',
-    description: 'Ультра‑сигнальный пептид',
+    description: 'Пептид для клеточного здоровья',
     type: 'peptide'
   },
   {
@@ -13667,7 +13667,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['REGEN_UP', 'CELL_REPAIR'],
     organs: ['CELLS'],
     deficiency: 'INJURY',
-    description: 'Ультра‑регенеративный пептид',
+    description: 'Пептид для поддержки обменных процессов и здоровья',
     type: 'peptide'
   },
   {
@@ -13677,7 +13677,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CELL_REPAIR', 'ANTI_INFLAMMATION'],
     organs: ['CELLS', 'ORGANS'],
     deficiency: 'AGING',
-    description: 'Пептид бесконечного спектра',
+    description: 'Пептид для поддержки обменных процессов и здоровья',
     type: 'peptide'
   },
   {
@@ -13687,7 +13687,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NRF1_UP', 'MITO_REPAIR'],
     organs: ['MITOCHONDRIA'],
     deficiency: 'AGING',
-    description: 'Пептид NRF1',
+    description: 'Пептид для работы митохондрий',
     type: 'peptide'
   },
   {
@@ -13697,7 +13697,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['Nrf2_UP', 'ROS_DOWN'],
     organs: ['MITOCHONDRIA'],
     deficiency: 'OXIDATIVE_STRESS',
-    description: 'Пептид NRF2',
+    description: 'Пептид для работы митохондрий',
     type: 'peptide'
   },
   {
@@ -13707,7 +13707,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['PGC1A_UP', 'MITO_BIOGENESIS'],
     organs: ['MITOCHONDRIA'],
     deficiency: 'FATIGUE',
-    description: 'Пептид PGC‑1α',
+    description: 'Пептид для работы митохондрий',
     type: 'peptide'
   },
   {
@@ -13717,7 +13717,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['UCP1_UP', 'THERMOGENESIS'],
     organs: ['FAT'],
     deficiency: 'OBESITY',
-    description: 'Пептид UCP‑1',
+    description: 'Пептид для жиросжигания',
     type: 'peptide'
   },
   {
@@ -13727,7 +13727,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CARDIOLIPIN_REPAIR', 'ATP_UP'],
     organs: ['MITOCHONDRIA'],
     deficiency: 'AGING',
-    description: 'Пептид кардиолипина',
+    description: 'Пептид для работы митохондрий',
     type: 'peptide'
   },
   {
@@ -13737,7 +13737,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MEMBRANE_STABILITY', 'ROS_DOWN'],
     organs: ['MITOCHONDRIA'],
     deficiency: 'OXIDATIVE_STRESS',
-    description: 'Пептид мембран митохондрий',
+    description: 'Пептид для работы митохондрий',
     type: 'peptide'
   },
   {
@@ -13747,7 +13747,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['AUTOPHAGY_UP', 'CELL_REPAIR'],
     organs: ['CELLS'],
     deficiency: 'AGING',
-    description: 'Пептид аутофагии',
+    description: 'Пептид для клеточного здоровья',
     type: 'peptide'
   },
   {
@@ -13757,7 +13757,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MITOPHAGY_UP', 'CELL_REPAIR'],
     organs: ['MITOCHONDRIA'],
     deficiency: 'AGING',
-    description: 'Пептид митофагии',
+    description: 'Пептид для работы митохондрий',
     type: 'peptide'
   },
   {
@@ -13767,7 +13767,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['METHYLATION_MOD', 'GENE_EXPRESSION'],
     organs: ['CELLS'],
     deficiency: 'AGING',
-    description: 'Пептид метилирования ДНК',
+    description: 'Пептид для поддержки обменных процессов и здоровья',
     type: 'peptide'
   },
   {
@@ -13777,7 +13777,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ACETYLATION_UP', 'GENE_EXPRESSION'],
     organs: ['CELLS'],
     deficiency: 'AGING',
-    description: 'Пептид ацетилирования ДНК',
+    description: 'Пептид для поддержки обменных процессов и здоровья',
     type: 'peptide'
   },
   {
@@ -13807,7 +13807,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['STEMCELL_UP', 'SKIN_REPAIR'],
     organs: ['SKIN'],
     deficiency: 'AGING',
-    description: 'Пептид стволовых клеток кожи',
+    description: 'Пептид для здоровья кожи',
     type: 'peptide'
   },
   {
@@ -13827,7 +13827,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NEURO_STEMCELL_UP', 'NEURO_REGEN'],
     organs: ['BRAIN'],
     deficiency: 'NEURO_DEGEN',
-    description: 'Пептид нейростволовых клеток',
+    description: 'Пептид для нервной системы',
     type: 'peptide'
   },
   {
@@ -13837,7 +13837,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['VEGF_UP', 'VESSEL_REPAIR'],
     organs: ['VESSELS'],
     deficiency: 'ISCHEMIA',
-    description: 'Мастер‑ангиопептид',
+    description: 'Пептид для поддержки обменных процессов и здоровья',
     type: 'peptide'
   },
   {
@@ -13847,7 +13847,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['VEGF_MOD', 'VESSEL_PROTECTION'],
     organs: ['VESSELS'],
     deficiency: 'VARICOSE',
-    description: 'Пептид баланса ангиогенеза',
+    description: 'Пептид для поддержки обменных процессов и здоровья',
     type: 'peptide'
   },
   {
@@ -13857,7 +13857,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CARTILAGE_UP', 'ANTI_INFLAMMATION'],
     organs: ['JOINTS'],
     deficiency: 'ARTHRITIS',
-    description: 'Мастер‑хрящевой пептид',
+    description: 'Пептид для суставов',
     type: 'peptide'
   },
   {
@@ -13867,7 +13867,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['TENDON_HEALING', 'COLLAGEN_UP'],
     organs: ['TENDONS'],
     deficiency: 'INJURY',
-    description: 'Мастер‑сухожильный пептид',
+    description: 'Пептид для поддержки обменных процессов и здоровья',
     type: 'peptide'
   },
   {
@@ -13877,7 +13877,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['BONE_REGEN', 'COLLAGEN_UP'],
     organs: ['BONES'],
     deficiency: 'OSTEOPENIA',
-    description: 'Мастер‑костный пептид',
+    description: 'Пептид для костной ткани',
     type: 'peptide'
   },
   {
@@ -13887,7 +13887,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['COLLAGEN_UP', 'SKIN_REPAIR'],
     organs: ['SKIN'],
     deficiency: 'AGING',
-    description: 'Мастер‑кожный пептид',
+    description: 'Пептид для здоровья кожи',
     type: 'peptide'
   },
   {
@@ -13897,7 +13897,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['HAIR_FOLLICLE_UP', 'KERATIN_UP'],
     organs: ['HAIR'],
     deficiency: 'HAIR_LOSS',
-    description: 'Мастер‑волосяной пептид',
+    description: 'Пептид для здоровья волос',
     type: 'peptide'
   },
   {
@@ -13907,7 +13907,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['LIVER_REPAIR', 'DETOX_UP'],
     organs: ['LIVER'],
     deficiency: 'HEPATIC_STRESS',
-    description: 'Мастер‑печёночный пептид',
+    description: 'Пептид для функции печени',
     type: 'peptide'
   },
   {
@@ -13917,7 +13917,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['INSULIN_MOD', 'CELL_REPAIR'],
     organs: ['PANCREAS'],
     deficiency: 'DIABETES',
-    description: 'Мастер‑панкреатический пептид',
+    description: 'Пептид для метаболизма',
     type: 'peptide'
   },
   {
@@ -13927,7 +13927,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NO_UP', 'VESSEL_PROTECTION'],
     organs: ['HEART'],
     deficiency: 'HIGH_BP',
-    description: 'Мастер‑сердечный пептид',
+    description: 'Пептид для ССС',
     type: 'peptide'
   },
   {
@@ -13937,7 +13937,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ANTI_INFLAMMATION', 'CELL_REPAIR'],
     organs: ['LUNGS'],
     deficiency: 'ASTHMA',
-    description: 'Мастер‑лёгочный пептид',
+    description: 'Пептид для легких',
     type: 'peptide'
   },
   {
@@ -13947,7 +13947,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CELL_PROTECTION', 'UREA_CYCLE_UP'],
     organs: ['KIDNEYS'],
     deficiency: 'UREMIC_RISK',
-    description: 'Мастер‑почечный пептид',
+    description: 'Пептид для почек',
     type: 'peptide'
   },
   {
@@ -13957,7 +13957,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['BDNF_UP', 'NEURO_SIGNALING'],
     organs: ['BRAIN'],
     deficiency: 'COGNITION',
-    description: 'Мастер‑мозговой пептид',
+    description: 'Пептид для нервной системы',
     type: 'peptide'
   },
   {
@@ -13967,7 +13967,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['THYROID_UP', 'METABOLISM_UP'],
     organs: ['THYROID'],
     deficiency: 'HYPOTHYROID',
-    description: 'Мастер‑тиреоидный пептид',
+    description: 'Пептид для гормонального баланса',
     type: 'peptide'
   },
   {
@@ -13977,7 +13977,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ADRENAL_SUPPORT', 'CORTISOL_MOD'],
     organs: ['ADRENALS'],
     deficiency: 'STRESS',
-    description: 'Мастер‑надпочечниковый пептид',
+    description: 'Пептид для гормонального баланса',
     type: 'peptide'
   },
   {
@@ -13987,7 +13987,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ESTROGEN_MOD', 'CELL_REPAIR'],
     organs: ['OVARIES'],
     deficiency: 'MENOPAUSE',
-    description: 'Мастер‑овариальный пептид',
+    description: 'Пептид для женского здоровья',
     type: 'peptide'
   },
   {
@@ -13997,7 +13997,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['TESTOSTERONE_UP', 'LH_UP'],
     organs: ['TESTES'],
     deficiency: 'LOW_TESTOSTERONE',
-    description: 'Мастер‑тестикулярный пептид',
+    description: 'Пептид для мужского здоровья',
     type: 'peptide'
   },
   {
@@ -14007,7 +14007,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ANTI_INFLAMMATION', 'CELL_REPAIR'],
     organs: ['PROSTATE'],
     deficiency: 'BPH',
-    description: 'Мастер‑простатический пептид',
+    description: 'Пептид для мужского здоровья',
     type: 'peptide'
   },
   {
@@ -14017,7 +14017,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ENDOMETRIUM_REPAIR', 'HORMONE_BALANCE'],
     organs: ['UTERUS'],
     deficiency: 'ENDOMETRIOSIS',
-    description: 'Мастер‑маточный пептид',
+    description: 'Пептид для женского здоровья',
     type: 'peptide'
   },
   {
@@ -14027,7 +14027,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['RETINA_REPAIR', 'ANTIOXIDANT'],
     organs: ['EYES'],
     deficiency: 'VISION_LOSS',
-    description: 'Мастер‑ретинальный пептид',
+    description: 'Пептид для зрения',
     type: 'peptide'
   },
   {
@@ -14037,7 +14037,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MELATONIN_UP', 'SLEEP_UP'],
     organs: ['BRAIN', 'HORMONES'],
     deficiency: 'INSOMNIA',
-    description: 'Мастер‑пинеальный пептид',
+    description: 'Пептид для нервной системы, гормонального баланса',
     type: 'peptide'
   },
   {
@@ -14047,7 +14047,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['PITUITARY_UP', 'HORMONE_BALANCE'],
     organs: ['HORMONES'],
     deficiency: 'IMBALANCE',
-    description: 'Мастер‑гипофизарный пептид',
+    description: 'Пептид для гормонального баланса',
     type: 'peptide'
   },
   {
@@ -14057,7 +14057,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ORGAN_REPAIR', 'CELL_REGEN'],
     organs: ['ORGANS'],
     deficiency: 'AGING',
-    description: 'Ультра‑органный пептид',
+    description: 'Пептид для поддержки обменных процессов и здоровья',
     type: 'peptide'
   },
   {
@@ -14067,7 +14067,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CELL_SIGNALING', 'REGEN_UP'],
     organs: ['CELLS'],
     deficiency: 'AGING',
-    description: 'Мастер‑сигнальный пептид',
+    description: 'Пептид для клеточного здоровья',
     type: 'peptide'
   },
   {
@@ -14077,7 +14077,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['REGEN_UP', 'CELL_REPAIR'],
     organs: ['CELLS'],
     deficiency: 'INJURY',
-    description: 'Мастер‑регенеративный пептид',
+    description: 'Пептид для поддержки обменных процессов и здоровья',
     type: 'peptide'
   },
   {
@@ -14097,7 +14097,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['COQ10_UP', 'ATP_UP'],
     organs: ['MITOCHONDRIA'],
     deficiency: 'FATIGUE',
-    description: 'Пептид CoQ10',
+    description: 'Пептид для работы митохондрий',
     type: 'peptide'
   },
   {
@@ -14107,7 +14107,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ETC_UP', 'ATP_UP'],
     organs: ['MITOCHONDRIA'],
     deficiency: 'AGING',
-    description: 'Пептид ETC',
+    description: 'Пептид для работы митохондрий',
     type: 'peptide'
   },
   {
@@ -14117,7 +14117,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['COMPLEX1_UP', 'ATP_UP'],
     organs: ['MITOCHONDRIA'],
     deficiency: 'OXIDATIVE_STRESS',
-    description: 'Пептид комплекса I',
+    description: 'Пептид для работы митохондрий',
     type: 'peptide'
   },
   {
@@ -14127,7 +14127,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['COMPLEX2_UP', 'ATP_UP'],
     organs: ['MITOCHONDRIA'],
     deficiency: 'FATIGUE',
-    description: 'Пептид комплекса II',
+    description: 'Пептид для работы митохондрий',
     type: 'peptide'
   },
   {
@@ -14137,7 +14137,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['COMPLEX3_UP', 'ATP_UP'],
     organs: ['MITOCHONDRIA'],
     deficiency: 'AGING',
-    description: 'Пептид комплекса III',
+    description: 'Пептид для работы митохондрий',
     type: 'peptide'
   },
   {
@@ -14147,7 +14147,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['COMPLEX4_UP', 'ATP_UP'],
     organs: ['MITOCHONDRIA'],
     deficiency: 'AGING',
-    description: 'Пептид комплекса IV',
+    description: 'Пептид для работы митохондрий',
     type: 'peptide'
   },
   {
@@ -14157,7 +14157,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['COMPLEX5_UP', 'ATP_UP'],
     organs: ['MITOCHONDRIA'],
     deficiency: 'FATIGUE',
-    description: 'Пептид комплекса V',
+    description: 'Пептид для работы митохондрий',
     type: 'peptide'
   },
   {
@@ -14167,7 +14167,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SOD_UP', 'ROS_DOWN'],
     organs: ['CELLS'],
     deficiency: 'OXIDATIVE_STRESS',
-    description: 'Пептид супероксидного детокса',
+    description: 'Пептид для защиты клеток от окислительного стресса',
     type: 'peptide'
   },
   {
@@ -14177,7 +14177,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GPX_UP', 'CELL_PROTECTION'],
     organs: ['CELLS'],
     deficiency: 'OXIDATIVE_STRESS',
-    description: 'Пептид GPx',
+    description: 'Пептид для защиты клеток от окислительного стресса',
     type: 'peptide'
   },
   {
@@ -14187,7 +14187,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CATALASE_UP', 'ROS_DOWN'],
     organs: ['CELLS'],
     deficiency: 'OXIDATIVE_STRESS',
-    description: 'Пептид каталазы',
+    description: 'Пептид для защиты клеток от окислительного стресса',
     type: 'peptide'
   },
   {
@@ -14197,7 +14197,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MEMBRANE_REPAIR', 'ROS_DOWN'],
     organs: ['MITOCHONDRIA'],
     deficiency: 'AGING',
-    description: 'Пептид восстановления мембран',
+    description: 'Пептид для работы митохондрий',
     type: 'peptide'
   },
   {
@@ -14207,7 +14207,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MITO_PROTECTION', 'ATP_UP'],
     organs: ['MITOCHONDRIA'],
     deficiency: 'FATIGUE',
-    description: 'Мито‑щит',
+    description: 'Пептид для работы митохондрий',
     type: 'peptide'
   },
   {
@@ -14217,7 +14217,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MITO_FUSION', 'MITO_REPAIR'],
     organs: ['MITOCHONDRIA'],
     deficiency: 'AGING',
-    description: 'Пептид слияния митохондрий',
+    description: 'Пептид для работы митохондрий',
     type: 'peptide'
   },
   {
@@ -14227,7 +14227,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MITO_FISSION', 'MITO_CLEANUP'],
     organs: ['MITOCHONDRIA'],
     deficiency: 'AGING',
-    description: 'Пептид деления митохондрий',
+    description: 'Пептид для работы митохондрий',
     type: 'peptide'
   },
   {
@@ -14237,7 +14237,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MITO_BIOGENESIS', 'ATP_UP'],
     organs: ['MITOCHONDRIA'],
     deficiency: 'FATIGUE',
-    description: 'Пептид биогенеза',
+    description: 'Пептид для работы митохондрий',
     type: 'peptide'
   },
   {
@@ -14257,7 +14257,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CYTOCHROME_UP', 'ATP_UP'],
     organs: ['MITOCHONDRIA'],
     deficiency: 'AGING',
-    description: 'Пептид цитохрома',
+    description: 'Пептид для работы митохондрий',
     type: 'peptide'
   },
   {
@@ -14267,7 +14267,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ATP_UP', 'MITO_UP'],
     organs: ['MUSCLES'],
     deficiency: 'FATIGUE',
-    description: 'Пептид АТФазы',
+    description: 'Пептид для энергетического обмена',
     type: 'peptide'
   },
   {
@@ -14277,7 +14277,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NADH_UP', 'ATP_UP'],
     organs: ['CELLS'],
     deficiency: 'FATIGUE',
-    description: 'Пептид NADH',
+    description: 'Пептид для энергетического обмена',
     type: 'peptide'
   },
   {
@@ -14287,7 +14287,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['FAD_UP', 'ATP_UP'],
     organs: ['CELLS'],
     deficiency: 'FATIGUE',
-    description: 'Пептид FAD',
+    description: 'Пептид для энергетического обмена',
     type: 'peptide'
   },
   {
@@ -14307,7 +14307,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['STRESS_RESIST_UP', 'CELL_PROTECTION'],
     organs: ['CELLS'],
     deficiency: 'AGING',
-    description: 'Пептид стрессоустойчивости',
+    description: 'Пептид для клеточного здоровья',
     type: 'peptide'
   },
   {
@@ -14317,7 +14317,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['LONGEVITY_GENES_UP', 'CELL_REPAIR'],
     organs: ['CELLS'],
     deficiency: 'AGING',
-    description: 'Пептид долголетия',
+    description: 'Пептид для антивозрастных процессов',
     type: 'peptide'
   },
   {
@@ -14327,7 +14327,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['TELOMERE_PROTECT', 'CELL_REGEN'],
     organs: ['CELLS'],
     deficiency: 'AGING',
-    description: 'Пептид теломерной защиты',
+    description: 'Пептид для антивозрастных процессов',
     type: 'peptide'
   },
   {
@@ -14357,7 +14357,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['PROTEOSTASIS_UP', 'CELL_REPAIR'],
     organs: ['CELLS'],
     deficiency: 'AGING',
-    description: 'Пептид протеостаза',
+    description: 'Пептид для клеточного здоровья',
     type: 'peptide'
   },
   {
@@ -14367,7 +14367,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['HSP_UP', 'CELL_PROTECTION'],
     organs: ['CELLS'],
     deficiency: 'STRESS',
-    description: 'Пептид теплового шока',
+    description: 'Пептид для клеточного здоровья',
     type: 'peptide'
   },
   {
@@ -14377,7 +14377,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CSP_UP', 'CELL_REPAIR'],
     organs: ['CELLS'],
     deficiency: 'STRESS',
-    description: 'Пептид холодового шока',
+    description: 'Пептид для клеточного здоровья',
     type: 'peptide'
   },
   {
@@ -14387,7 +14387,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GLYCATION_DOWN', 'CELL_PROTECTION'],
     organs: ['CELLS'],
     deficiency: 'AGING',
-    description: 'Пептид антигликации',
+    description: 'Пептид для антивозрастных процессов',
     type: 'peptide'
   },
   {
@@ -14397,7 +14397,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['FIBROSIS_DOWN', 'CELL_REPAIR'],
     organs: ['ORGANS'],
     deficiency: 'FIBROSIS',
-    description: 'Пептид антифиброза',
+    description: 'Пептид для поддержки обменных процессов и здоровья',
     type: 'peptide'
   },
   {
@@ -14407,7 +14407,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['APOPTOSIS_DOWN', 'CELL_PROTECTION'],
     organs: ['CELLS'],
     deficiency: 'AGING',
-    description: 'Пептид антиапоптоза',
+    description: 'Пептид для клеточного здоровья',
     type: 'peptide'
   },
   {
@@ -14417,7 +14417,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SENESCENCE_DOWN', 'CELL_REGEN'],
     organs: ['CELLS'],
     deficiency: 'AGING',
-    description: 'Пептид антистарения',
+    description: 'Пептид для антивозрастных процессов',
     type: 'peptide'
   },
   {
@@ -14427,7 +14427,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MITO_CLEARANCE', 'CELL_REPAIR'],
     organs: ['MITOCHONDRIA'],
     deficiency: 'AGING',
-    description: 'Пептид очистки митохондрий',
+    description: 'Пептид для работы митохондрий',
     type: 'peptide'
   },
   {
@@ -14447,7 +14447,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ATP_UP', 'MITO_UP'],
     organs: ['MUSCLES'],
     deficiency: 'FATIGUE',
-    description: 'Пептид суперзаряда',
+    description: 'Пептид для энергетического обмена',
     type: 'peptide'
   },
   {
@@ -14457,7 +14457,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ATP_UP', 'CELL_REPAIR'],
     organs: ['CELLS'],
     deficiency: 'FATIGUE',
-    description: 'Пептид гиперзаряда',
+    description: 'Пептид для энергетического обмена',
     type: 'peptide'
   },
   {
@@ -14467,7 +14467,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MITO_UP', 'ATP_UP'],
     organs: ['MITOCHONDRIA'],
     deficiency: 'FATIGUE',
-    description: 'Ультра‑митопептид',
+    description: 'Пептид для работы митохондрий',
     type: 'peptide'
   },
   {
@@ -14487,7 +14487,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MITO_PROTECTION', 'ATP_UP'],
     organs: ['MITOCHONDRIA'],
     deficiency: 'AGING',
-    description: 'Омега‑митопептид',
+    description: 'Пептид для работы митохондрий',
     type: 'peptide'
   },
   {
@@ -14497,7 +14497,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MITO_UP', 'CELL_REPAIR'],
     organs: ['MITOCHONDRIA'],
     deficiency: 'FATIGUE',
-    description: 'Прайм‑митопептид',
+    description: 'Пептид для работы митохондрий',
     type: 'peptide'
   },
   {
@@ -14507,7 +14507,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MITO_CORE_UP', 'ATP_UP'],
     organs: ['MITOCHONDRIA'],
     deficiency: 'AGING',
-    description: 'Кор‑митопептид',
+    description: 'Пептид для работы митохондрий',
     type: 'peptide'
   },
   {
@@ -14517,7 +14517,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MATRIX_REPAIR', 'ATP_UP'],
     organs: ['MITOCHONDRIA'],
     deficiency: 'AGING',
-    description: 'Матрикс‑митопептид',
+    description: 'Пептид для работы митохондрий',
     type: 'peptide'
   },
   {
@@ -14527,7 +14527,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MITO_SIGNAL', 'CELL_REGEN'],
     organs: ['MITOCHONDRIA'],
     deficiency: 'AGING',
-    description: 'Ультра‑митосигнал',
+    description: 'Пептид для работы митохондрий',
     type: 'peptide'
   },
   {
@@ -14537,7 +14537,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MITO_REGEN', 'CELL_REPAIR'],
     organs: ['MITOCHONDRIA'],
     deficiency: 'AGING',
-    description: 'Ультра‑миторегенерация',
+    description: 'Пептид для работы митохондрий',
     type: 'peptide'
   },
   {
@@ -14547,7 +14547,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MITO_UP', 'CELL_REPAIR'],
     organs: ['MITOCHONDRIA'],
     deficiency: 'AGING',
-    description: 'Полный спектр митопептидов',
+    description: 'Пептид для работы митохондрий',
     type: 'peptide'
   },
   {
@@ -14567,7 +14567,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['HDAC_DOWN', 'CHROMATIN_OPEN'],
     organs: ['CELLS'],
     deficiency: 'AGING',
-    description: 'Пептид HDAC‑ингибитор',
+    description: 'Пептид для поддержки обменных процессов и здоровья',
     type: 'peptide'
   },
   {
@@ -14577,7 +14577,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['HAT_UP', 'GENE_EXPRESSION'],
     organs: ['CELLS'],
     deficiency: 'AGING',
-    description: 'Пептид HAT‑активатор',
+    description: 'Пептид для поддержки обменных процессов и здоровья',
     type: 'peptide'
   },
   {
@@ -14587,7 +14587,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['METHYLATION_MOD', 'CELL_REPAIR'],
     organs: ['CELLS'],
     deficiency: 'AGING',
-    description: 'Пептид баланса метилирования',
+    description: 'Пептид для поддержки обменных процессов и здоровья',
     type: 'peptide'
   },
   {
@@ -14597,7 +14597,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['DNMT_DOWN', 'GENE_REACTIVATION'],
     organs: ['CELLS'],
     deficiency: 'AGING',
-    description: 'Пептид DNMT‑блок',
+    description: 'Пептид для поддержки обменных процессов и здоровья',
     type: 'peptide'
   },
   {
@@ -14607,7 +14607,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['TELOMERASE_UP', 'CELL_REGEN'],
     organs: ['CELLS'],
     deficiency: 'AGING',
-    description: 'Пептид удлинения теломер',
+    description: 'Пептид для антивозрастных процессов',
     type: 'peptide'
   },
   {
@@ -14617,7 +14617,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['TELOMERE_PROTECT', 'DNA_REPAIR'],
     organs: ['CELLS'],
     deficiency: 'AGING',
-    description: 'Пептид защиты теломер',
+    description: 'Пептид для антивозрастных процессов',
     type: 'peptide'
   },
   {
@@ -14627,7 +14627,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SENESCENT_CELL_CLEAR', 'CELL_REGEN'],
     organs: ['CELLS'],
     deficiency: 'AGING',
-    description: 'Сенолитический пептид',
+    description: 'Пептид для антивозрастных процессов',
     type: 'peptide'
   },
   {
@@ -14637,7 +14637,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SASP_DOWN', 'CELL_PROTECTION'],
     organs: ['CELLS'],
     deficiency: 'AGING',
-    description: 'Сеномодулирующий пептид',
+    description: 'Пептид для антивозрастных процессов',
     type: 'peptide'
   },
   {
@@ -14647,7 +14647,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['LONGEVITY_GENES_UP', 'CELL_REPAIR'],
     organs: ['CELLS'],
     deficiency: 'AGING',
-    description: 'Пептид пути долголетия',
+    description: 'Пептид для антивозрастных процессов',
     type: 'peptide'
   },
   {
@@ -14657,7 +14657,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['FOXO_UP', 'CELL_PROTECTION'],
     organs: ['CELLS'],
     deficiency: 'AGING',
-    description: 'Пептид FOXO',
+    description: 'Пептид для антивозрастных процессов',
     type: 'peptide'
   },
   {
@@ -14667,7 +14667,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SIRT3_UP', 'MITO_UP'],
     organs: ['MITOCHONDRIA'],
     deficiency: 'AGING',
-    description: 'Пептид SIRT3',
+    description: 'Пептид для работы митохондрий',
     type: 'peptide'
   },
   {
@@ -14677,7 +14677,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SIRT5_UP', 'ENERGY_UP'],
     organs: ['MITOCHONDRIA'],
     deficiency: 'FATIGUE',
-    description: 'Пептид SIRT5',
+    description: 'Пептид для работы митохондрий',
     type: 'peptide'
   },
   {
@@ -14687,7 +14687,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['P53_RESTORE', 'DNA_REPAIR'],
     organs: ['CELLS'],
     deficiency: 'CANCER_RISK',
-    description: 'Пептид восстановления p53',
+    description: 'Пептид для клеточного здоровья',
     type: 'peptide'
   },
   {
@@ -14697,7 +14697,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['P21_UP', 'CELL_CYCLE_CONTROL'],
     organs: ['CELLS'],
     deficiency: 'AGING',
-    description: 'Пептид p21',
+    description: 'Пептид для клеточного здоровья',
     type: 'peptide'
   },
   {
@@ -14707,7 +14707,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['AUTOPHAGY_UP', 'CELL_REPAIR'],
     organs: ['CELLS'],
     deficiency: 'AGING',
-    description: 'Мастер‑аутофагии',
+    description: 'Пептид для клеточного здоровья',
     type: 'peptide'
   },
   {
@@ -14717,7 +14717,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['LYSOSOME_UP', 'CELL_CLEANUP'],
     organs: ['CELLS'],
     deficiency: 'AGING',
-    description: 'Пептид лизосомного апгрейда',
+    description: 'Пептид для клеточного здоровья',
     type: 'peptide'
   },
   {
@@ -14727,7 +14727,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CHAPERONE_UP', 'PROTEOSTASIS'],
     organs: ['CELLS'],
     deficiency: 'AGING',
-    description: 'Пептид шаперонов',
+    description: 'Пептид для клеточного здоровья',
     type: 'peptide'
   },
   {
@@ -14737,7 +14737,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ER_STRESS_DOWN', 'CELL_PROTECTION'],
     organs: ['CELLS'],
     deficiency: 'STRESS',
-    description: 'Пептид ER‑стресса',
+    description: 'Пептид для клеточного здоровья',
     type: 'peptide'
   },
   {
@@ -14757,7 +14757,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['DOPAMINE_MOD', 'NEURO_SIGNALING'],
     organs: ['BRAIN'],
     deficiency: 'MOOD_ISSUES',
-    description: 'Пептид сброса дофамина',
+    description: 'Пептид для нервной системы',
     type: 'peptide'
   },
   {
@@ -14767,7 +14767,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SEROTONIN_MOD', 'MOOD_UP'],
     organs: ['BRAIN'],
     deficiency: 'MOOD_ISSUES',
-    description: 'Пептид сброса серотонина',
+    description: 'Пептид для нервной системы',
     type: 'peptide'
   },
   {
@@ -14777,7 +14777,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GABA_MOD', 'CALMING'],
     organs: ['BRAIN'],
     deficiency: 'ANXIETY',
-    description: 'Пептид сброса ГАМК',
+    description: 'Пептид для нервной системы',
     type: 'peptide'
   },
   {
@@ -14787,7 +14787,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NEUROPLASTICITY_UP', 'BDNF_UP'],
     organs: ['BRAIN'],
     deficiency: 'COGNITION',
-    description: 'Пептид нейропластичности',
+    description: 'Пептид для нервной системы',
     type: 'peptide'
   },
   {
@@ -14797,7 +14797,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['AXON_REPAIR', 'NEURO_REGEN'],
     organs: ['BRAIN'],
     deficiency: 'NEURO_DEGEN',
-    description: 'Пептид восстановления аксонов',
+    description: 'Пептид для нервной системы',
     type: 'peptide'
   },
   {
@@ -14807,7 +14807,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MYELIN_UP', 'NEURO_SIGNALING'],
     organs: ['BRAIN'],
     deficiency: 'MS',
-    description: 'Пептид миелина',
+    description: 'Пептид для нервной системы',
     type: 'peptide'
   },
   {
@@ -14827,7 +14827,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NEURO_PROTECTION', 'BDNF_UP'],
     organs: ['BRAIN'],
     deficiency: 'STRESS',
-    description: 'Пептид нейрощита',
+    description: 'Пептид для нервной системы',
     type: 'peptide'
   },
   {
@@ -14837,7 +14837,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NEURO_RESET', 'NEURO_SIGNALING'],
     organs: ['BRAIN'],
     deficiency: 'COGNITION',
-    description: 'Пептид нейроперезагрузки',
+    description: 'Пептид для нервной системы',
     type: 'peptide'
   },
   {
@@ -14847,7 +14847,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NEURO_REGEN', 'BDNF_UP'],
     organs: ['BRAIN'],
     deficiency: 'NEURO_DEGEN',
-    description: 'Ультра‑нейропептид',
+    description: 'Пептид для нервной системы',
     type: 'peptide'
   },
   {
@@ -14857,7 +14857,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ORGAN_RESET', 'CELL_REGEN'],
     organs: ['ORGANS'],
     deficiency: 'AGING',
-    description: 'Пептид перезагрузки органов',
+    description: 'Пептид для поддержки обменных процессов и здоровья',
     type: 'peptide'
   },
   {
@@ -14877,7 +14877,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['EXTRACELLULAR_MATRIX_UP', 'CELL_REPAIR'],
     organs: ['ORGANS'],
     deficiency: 'AGING',
-    description: 'Пептид органной матрицы',
+    description: 'Пептид для поддержки обменных процессов и здоровья',
     type: 'peptide'
   },
   {
@@ -14887,7 +14887,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ORGAN_SIGNALING', 'CELL_REGEN'],
     organs: ['ORGANS'],
     deficiency: 'AGING',
-    description: 'Пептид органного сигнала',
+    description: 'Пептид для поддержки обменных процессов и здоровья',
     type: 'peptide'
   },
   {
@@ -14897,7 +14897,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ORGAN_REPAIR', 'CELL_REGEN'],
     organs: ['ORGANS'],
     deficiency: 'AGING',
-    description: 'Ультра‑органный пептид',
+    description: 'Пептид для поддержки обменных процессов и здоровья',
     type: 'peptide'
   },
   {
@@ -14907,7 +14907,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['EPIGENETIC_MOD', 'GENE_EXPRESSION'],
     organs: ['CELLS'],
     deficiency: 'AGING',
-    description: 'Полный эпигенетический пептид',
+    description: 'Пептид для поддержки обменных процессов и здоровья',
     type: 'peptide'
   },
   {
@@ -14917,7 +14917,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['LONGEVITY_GENES_UP', 'CELL_REPAIR'],
     organs: ['CELLS'],
     deficiency: 'AGING',
-    description: 'Полный пептид долголетия',
+    description: 'Пептид для антивозрастных процессов',
     type: 'peptide'
   },
   {
@@ -14927,7 +14927,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NEURO_REGEN', 'BDNF_UP'],
     organs: ['BRAIN'],
     deficiency: 'COGNITION',
-    description: 'Полный нейропептид',
+    description: 'Пептид для нервной системы',
     type: 'peptide'
   },
   {
@@ -14937,7 +14937,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MITO_UP', 'ATP_UP'],
     organs: ['MITOCHONDRIA'],
     deficiency: 'AGING',
-    description: 'Полный митопептид',
+    description: 'Пептид для работы митохондрий',
     type: 'peptide'
   },
   {
@@ -14947,7 +14947,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['REGEN_UP', 'CELL_REPAIR'],
     organs: ['CELLS'],
     deficiency: 'INJURY',
-    description: 'Полный регенеративный пептид',
+    description: 'Пептид для поддержки обменных процессов и здоровья',
     type: 'peptide'
   },
   {
@@ -14957,7 +14957,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CELL_SIGNALING', 'REGEN_UP'],
     organs: ['CELLS'],
     deficiency: 'AGING',
-    description: 'Пептид бесконечного сигнала',
+    description: 'Пептид для клеточного здоровья',
     type: 'peptide'
   },
   {
@@ -14987,7 +14987,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MITO_SIGNAL', 'ATP_UP'],
     organs: ['MITOCHONDRIA'],
     deficiency: 'AGING',
-    description: 'Мито‑сигнал ядро',
+    description: 'Пептид для работы митохондрий',
     type: 'peptide'
   },
   {
@@ -14997,7 +14997,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MITO_SIGNAL', 'CELL_REGEN'],
     organs: ['MITOCHONDRIA'],
     deficiency: 'FATIGUE',
-    description: 'Мито‑сигнал прайм',
+    description: 'Пептид для работы митохондрий',
     type: 'peptide'
   },
   {
@@ -15007,7 +15007,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MITO_REPAIR', 'CELL_REPAIR'],
     organs: ['MITOCHONDRIA'],
     deficiency: 'AGING',
-    description: 'Мито‑репейр ядро',
+    description: 'Пептид для работы митохондрий',
     type: 'peptide'
   },
   {
@@ -15017,7 +15017,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MITO_REPAIR', 'ATP_UP'],
     organs: ['MITOCHONDRIA'],
     deficiency: 'FATIGUE',
-    description: 'Мито‑репейр прайм',
+    description: 'Пептид для работы митохондрий',
     type: 'peptide'
   },
   {
@@ -15027,7 +15027,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ROS_DOWN', 'CELL_PROTECTION'],
     organs: ['MITOCHONDRIA'],
     deficiency: 'OXIDATIVE_STRESS',
-    description: 'Мито‑антиокс ядро',
+    description: 'Пептид для работы митохондрий',
     type: 'peptide'
   },
   {
@@ -15037,7 +15037,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ANTIOX_UP', 'MITO_PROTECTION'],
     organs: ['MITOCHONDRIA'],
     deficiency: 'AGING',
-    description: 'Мито‑антиокс прайм',
+    description: 'Пептид для работы митохондрий',
     type: 'peptide'
   },
   {
@@ -15047,7 +15047,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MITO_FUSION', 'MITO_FISSION'],
     organs: ['MITOCHONDRIA'],
     deficiency: 'AGING',
-    description: 'Мито‑динамика ядро',
+    description: 'Пептид для работы митохондрий',
     type: 'peptide'
   },
   {
@@ -15057,7 +15057,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MITO_FUSION', 'MITO_REPAIR'],
     organs: ['MITOCHONDRIA'],
     deficiency: 'FATIGUE',
-    description: 'Мито‑динамика прайм',
+    description: 'Пептид для работы митохондрий',
     type: 'peptide'
   },
   {
@@ -15067,7 +15067,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MITO_QC_UP', 'CELL_REPAIR'],
     organs: ['MITOCHONDRIA'],
     deficiency: 'AGING',
-    description: 'Мито‑QC ядро',
+    description: 'Пептид для работы митохондрий',
     type: 'peptide'
   },
   {
@@ -15077,7 +15077,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MITO_QC_UP', 'MITO_REGEN'],
     organs: ['MITOCHONDRIA'],
     deficiency: 'FATIGUE',
-    description: 'Мито‑QC прайм',
+    description: 'Пептид для работы митохондрий',
     type: 'peptide'
   },
   {
@@ -15087,7 +15087,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['TELOMERE_PROTECT', 'MITO_REPAIR'],
     organs: ['CELLS'],
     deficiency: 'AGING',
-    description: 'Мито‑теломер ядро',
+    description: 'Пептид для антивозрастных процессов',
     type: 'peptide'
   },
   {
@@ -15097,7 +15097,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['TELOMERE_UP', 'CELL_REGEN'],
     organs: ['CELLS'],
     deficiency: 'AGING',
-    description: 'Мито‑теломер прайм',
+    description: 'Пептид для антивозрастных процессов',
     type: 'peptide'
   },
   {
@@ -15107,7 +15107,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['STEMCELL_UP', 'MITO_REPAIR'],
     organs: ['CELLS'],
     deficiency: 'AGING',
-    description: 'Мито‑ствол ядро',
+    description: 'Пептид для регенерации',
     type: 'peptide'
   },
   {
@@ -15117,7 +15117,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['STEMCELL_UP', 'CELL_REGEN'],
     organs: ['CELLS'],
     deficiency: 'AGING',
-    description: 'Мито‑ствол прайм',
+    description: 'Пептид для регенерации',
     type: 'peptide'
   },
   {
@@ -15127,7 +15127,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['LONGEVITY_GENES_UP', 'CELL_PROTECTION'],
     organs: ['CELLS'],
     deficiency: 'AGING',
-    description: 'Мито‑лонгевити ядро',
+    description: 'Пептид для антивозрастных процессов',
     type: 'peptide'
   },
   {
@@ -15137,7 +15137,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['LONGEVITY_GENES_UP', 'MITO_REGEN'],
     organs: ['CELLS'],
     deficiency: 'AGING',
-    description: 'Мито‑лонгевити прайм',
+    description: 'Пептид для антивозрастных процессов',
     type: 'peptide'
   },
   {
@@ -15147,7 +15147,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MITO_RESET', 'ATP_UP'],
     organs: ['MITOCHONDRIA'],
     deficiency: 'FATIGUE',
-    description: 'Мито‑ребут ядро',
+    description: 'Пептид для работы митохондрий',
     type: 'peptide'
   },
   {
@@ -15157,7 +15157,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MITO_RESET', 'CELL_REPAIR'],
     organs: ['MITOCHONDRIA'],
     deficiency: 'AGING',
-    description: 'Мито‑ребут прайм',
+    description: 'Пептид для работы митохондрий',
     type: 'peptide'
   },
   {
@@ -15167,7 +15167,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MITO_UP', 'ATP_UP'],
     organs: ['MITOCHONDRIA'],
     deficiency: 'FATIGUE',
-    description: 'Мито‑ультра ядро',
+    description: 'Пептид для работы митохондрий',
     type: 'peptide'
   },
   {
@@ -15177,7 +15177,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MITO_UP', 'CELL_REGEN'],
     organs: ['MITOCHONDRIA'],
     deficiency: 'AGING',
-    description: 'Мито‑ультра прайм',
+    description: 'Пептид для работы митохондрий',
     type: 'peptide'
   },
   {
@@ -15187,7 +15187,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MITO_REPAIR', 'CELL_REGEN'],
     organs: ['MITOCHONDRIA'],
     deficiency: 'AGING',
-    description: 'Мито‑инфинити ядро',
+    description: 'Пептид для работы митохондрий',
     type: 'peptide'
   },
   {
@@ -15197,7 +15197,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MITO_REGEN', 'ATP_UP'],
     organs: ['MITOCHONDRIA'],
     deficiency: 'FATIGUE',
-    description: 'Мито‑инфинити прайм',
+    description: 'Пептид для работы митохондрий',
     type: 'peptide'
   },
   {
@@ -15207,7 +15207,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ORGAN_SIGNALING', 'CELL_REPAIR'],
     organs: ['ORGANS'],
     deficiency: 'AGING',
-    description: 'Орган‑сигнал ядро',
+    description: 'Пептид для поддержки обменных процессов и здоровья',
     type: 'peptide'
   },
   {
@@ -15217,7 +15217,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ORGAN_SIGNALING', 'CELL_REGEN'],
     organs: ['ORGANS'],
     deficiency: 'AGING',
-    description: 'Орган‑сигнал прайм',
+    description: 'Пептид для поддержки обменных процессов и здоровья',
     type: 'peptide'
   },
   {
@@ -15227,7 +15227,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ORGAN_REPAIR', 'CELL_REPAIR'],
     organs: ['ORGANS'],
     deficiency: 'AGING',
-    description: 'Орган‑репейр ядро',
+    description: 'Пептид для поддержки обменных процессов и здоровья',
     type: 'peptide'
   },
   {
@@ -15237,7 +15237,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ORGAN_REPAIR', 'CELL_REGEN'],
     organs: ['ORGANS'],
     deficiency: 'AGING',
-    description: 'Орган‑репейр прайм',
+    description: 'Пептид для поддержки обменных процессов и здоровья',
     type: 'peptide'
   },
   {
@@ -15247,7 +15247,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['STEMCELL_UP', 'ORGAN_REPAIR'],
     organs: ['ORGANS'],
     deficiency: 'AGING',
-    description: 'Орган‑ствол ядро',
+    description: 'Пептид для поддержки обменных процессов и здоровья',
     type: 'peptide'
   },
   {
@@ -15257,7 +15257,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['STEMCELL_UP', 'CELL_REGEN'],
     organs: ['ORGANS'],
     deficiency: 'AGING',
-    description: 'Орган‑ствол прайм',
+    description: 'Пептид для поддержки обменных процессов и здоровья',
     type: 'peptide'
   },
   {
@@ -15267,7 +15267,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['EXTRACELLULAR_MATRIX_UP', 'CELL_REPAIR'],
     organs: ['ORGANS'],
     deficiency: 'AGING',
-    description: 'Орган‑матрица ядро',
+    description: 'Пептид для поддержки обменных процессов и здоровья',
     type: 'peptide'
   },
   {
@@ -15277,7 +15277,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ECM_UP', 'CELL_REGEN'],
     organs: ['ORGANS'],
     deficiency: 'AGING',
-    description: 'Орган‑матрица прайм',
+    description: 'Пептид для поддержки обменных процессов и здоровья',
     type: 'peptide'
   },
   {
@@ -15287,7 +15287,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['LONGEVITY_GENES_UP', 'CELL_PROTECTION'],
     organs: ['ORGANS'],
     deficiency: 'AGING',
-    description: 'Орган‑лонгевити ядро',
+    description: 'Пептид для антивозрастных процессов',
     type: 'peptide'
   },
   {
@@ -15297,7 +15297,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['LONGEVITY_GENES_UP', 'CELL_REGEN'],
     organs: ['ORGANS'],
     deficiency: 'AGING',
-    description: 'Орган‑лонгевити прайм',
+    description: 'Пептид для антивозрастных процессов',
     type: 'peptide'
   },
   {
@@ -15307,7 +15307,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ORGAN_RESET', 'CELL_REPAIR'],
     organs: ['ORGANS'],
     deficiency: 'AGING',
-    description: 'Орган‑ребут ядро',
+    description: 'Пептид для поддержки обменных процессов и здоровья',
     type: 'peptide'
   },
   {
@@ -15317,7 +15317,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ORGAN_RESET', 'CELL_REGEN'],
     organs: ['ORGANS'],
     deficiency: 'AGING',
-    description: 'Орган‑ребут прайм',
+    description: 'Пептид для поддержки обменных процессов и здоровья',
     type: 'peptide'
   },
   {
@@ -15327,7 +15327,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ORGAN_REPAIR', 'CELL_REGEN'],
     organs: ['ORGANS'],
     deficiency: 'AGING',
-    description: 'Орган‑ультра ядро',
+    description: 'Пептид для поддержки обменных процессов и здоровья',
     type: 'peptide'
   },
   {
@@ -15337,7 +15337,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ORGAN_REPAIR', 'CELL_REGEN'],
     organs: ['ORGANS'],
     deficiency: 'AGING',
-    description: 'Орган‑ультра прайм',
+    description: 'Пептид для поддержки обменных процессов и здоровья',
     type: 'peptide'
   },
   {
@@ -15347,7 +15347,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ORGAN_REPAIR', 'CELL_REGEN'],
     organs: ['ORGANS'],
     deficiency: 'AGING',
-    description: 'Орган‑инфинити ядро',
+    description: 'Пептид для поддержки обменных процессов и здоровья',
     type: 'peptide'
   },
   {
@@ -15357,7 +15357,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ORGAN_REPAIR', 'CELL_REGEN'],
     organs: ['ORGANS'],
     deficiency: 'AGING',
-    description: 'Орган‑инфинити прайм',
+    description: 'Пептид для поддержки обменных процессов и здоровья',
     type: 'peptide'
   },
   {
@@ -15367,7 +15367,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CELL_SIGNALING', 'CELL_REPAIR'],
     organs: ['CELLS'],
     deficiency: 'AGING',
-    description: 'Полный сигнал ядро',
+    description: 'Пептид для клеточного здоровья',
     type: 'peptide'
   },
   {
@@ -15377,7 +15377,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CELL_SIGNALING', 'CELL_REGEN'],
     organs: ['CELLS'],
     deficiency: 'AGING',
-    description: 'Полный сигнал прайм',
+    description: 'Пептид для клеточного здоровья',
     type: 'peptide'
   },
   {
@@ -15387,7 +15387,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['REGEN_UP', 'CELL_REPAIR'],
     organs: ['CELLS'],
     deficiency: 'INJURY',
-    description: 'Полная регенерация ядро',
+    description: 'Пептид для поддержки обменных процессов и здоровья',
     type: 'peptide'
   },
   {
@@ -15397,7 +15397,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['REGEN_UP', 'CELL_REGEN'],
     organs: ['CELLS'],
     deficiency: 'INJURY',
-    description: 'Полная регенерация прайм',
+    description: 'Пептид для поддержки обменных процессов и здоровья',
     type: 'peptide'
   },
   {
@@ -15407,7 +15407,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['LONGEVITY_GENES_UP', 'CELL_PROTECTION'],
     organs: ['CELLS'],
     deficiency: 'AGING',
-    description: 'Полное долголетие ядро',
+    description: 'Пептид для антивозрастных процессов',
     type: 'peptide'
   },
   {
@@ -15417,7 +15417,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['LONGEVITY_GENES_UP', 'CELL_REGEN'],
     organs: ['CELLS'],
     deficiency: 'AGING',
-    description: 'Полное долголетие прайм',
+    description: 'Пептид для антивозрастных процессов',
     type: 'peptide'
   },
   {
@@ -15427,7 +15427,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CELL_REPAIR', 'CELL_REGEN'],
     organs: ['CELLS'],
     deficiency: 'AGING',
-    description: 'Инфинити ядро',
+    description: 'Пептид для поддержки обменных процессов и здоровья',
     type: 'peptide'
   },
   {
@@ -15437,7 +15437,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CELL_REPAIR', 'CELL_REGEN'],
     organs: ['CELLS'],
     deficiency: 'AGING',
-    description: 'Инфинити прайм',
+    description: 'Пептид для поддержки обменных процессов и здоровья',
     type: 'peptide'
   },
   {
@@ -15447,7 +15447,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MITO_QUANTUM_UP', 'ATP_UP'],
     organs: ['MITOCHONDRIA'],
     deficiency: 'AGING',
-    description: 'Квантовый митопептид',
+    description: 'Пептид для работы митохондрий',
     type: 'peptide'
   },
   {
@@ -15457,7 +15457,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['PHOTON_TRANSFER_UP', 'ENERGY_UP'],
     organs: ['MITOCHONDRIA'],
     deficiency: 'FATIGUE',
-    description: 'Фотонный митопептид',
+    description: 'Пептид для работы митохондрий',
     type: 'peptide'
   },
   {
@@ -15467,7 +15467,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ELECTRON_FLOW_UP', 'ATP_UP'],
     organs: ['MITOCHONDRIA'],
     deficiency: 'AGING',
-    description: 'Пептид электронного потока',
+    description: 'Пептид для работы митохондрий',
     type: 'peptide'
   },
   {
@@ -15477,7 +15477,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['PROTON_GRADIENT_UP', 'ATP_UP'],
     organs: ['MITOCHONDRIA'],
     deficiency: 'FATIGUE',
-    description: 'Пептид протонного градиента',
+    description: 'Пептид для работы митохондрий',
     type: 'peptide'
   },
   {
@@ -15487,7 +15487,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['OXPHOS_UP', 'ATP_UP'],
     organs: ['MITOCHONDRIA'],
     deficiency: 'AGING',
-    description: 'Пептид OXPHOS',
+    description: 'Пептид для работы митохондрий',
     type: 'peptide'
   },
   {
@@ -15497,7 +15497,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['RESP_CHAIN_UP', 'ENERGY_UP'],
     organs: ['MITOCHONDRIA'],
     deficiency: 'FATIGUE',
-    description: 'Пептид дыхательной цепи',
+    description: 'Пептид для работы митохондрий',
     type: 'peptide'
   },
   {
@@ -15507,7 +15507,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ROS_DOWN', 'CELL_PROTECTION'],
     organs: ['CELLS'],
     deficiency: 'OXIDATIVE_STRESS',
-    description: 'Супер-антиоксидантный пептид',
+    description: 'Пептид для защиты клеток от окислительного стресса',
     type: 'peptide'
   },
   {
@@ -15517,7 +15517,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NANO_ANTIOX_UP', 'CELL_PROTECTION'],
     organs: ['CELLS'],
     deficiency: 'AGING',
-    description: 'Нано-антиоксидантный пептид',
+    description: 'Пептид для защиты клеток от окислительного стресса',
     type: 'peptide'
   },
   {
@@ -15527,7 +15527,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NANO_REPAIR_UP', 'CELL_REGEN'],
     organs: ['MITOCHONDRIA'],
     deficiency: 'AGING',
-    description: 'Нано-репаративный пептид',
+    description: 'Пептид для работы митохондрий',
     type: 'peptide'
   },
   {
@@ -15537,7 +15537,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NANO_SIGNAL_UP', 'CELL_REPAIR'],
     organs: ['MITOCHONDRIA'],
     deficiency: 'AGING',
-    description: 'Нано-сигнальный пептид',
+    description: 'Пептид для работы митохондрий',
     type: 'peptide'
   },
   {
@@ -15547,7 +15547,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NANO_STEMCELL_UP', 'CELL_REGEN'],
     organs: ['CELLS'],
     deficiency: 'AGING',
-    description: 'Нано-стволовой пептид',
+    description: 'Пептид для регенерации',
     type: 'peptide'
   },
   {
@@ -15557,7 +15557,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NANO_LONGEVITY_UP', 'CELL_PROTECTION'],
     organs: ['CELLS'],
     deficiency: 'AGING',
-    description: 'Нано-долголетие',
+    description: 'Пептид для антивозрастных процессов',
     type: 'peptide'
   },
   {
@@ -15567,7 +15567,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NANO_TELOMERE_UP', 'CELL_REGEN'],
     organs: ['CELLS'],
     deficiency: 'AGING',
-    description: 'Нано-теломерный пептид',
+    description: 'Пептид для антивозрастных процессов',
     type: 'peptide'
   },
   {
@@ -15577,7 +15577,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['QUANTUM_REPAIR_UP', 'CELL_REGEN'],
     organs: ['CELLS'],
     deficiency: 'AGING',
-    description: 'Квантовый репаративный пептид',
+    description: 'Пептид для клеточного здоровья',
     type: 'peptide'
   },
   {
@@ -15587,7 +15587,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['QUANTUM_SIGNAL_UP', 'CELL_REPAIR'],
     organs: ['CELLS'],
     deficiency: 'AGING',
-    description: 'Квантовый сигнальный пептид',
+    description: 'Пептид для клеточного здоровья',
     type: 'peptide'
   },
   {
@@ -15597,7 +15597,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['QUANTUM_LONGEVITY_UP', 'CELL_PROTECTION'],
     organs: ['CELLS'],
     deficiency: 'AGING',
-    description: 'Квантовый пептид долголетия',
+    description: 'Пептид для антивозрастных процессов',
     type: 'peptide'
   },
   {
@@ -15607,7 +15607,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['QUANTUM_STEMCELL_UP', 'CELL_REGEN'],
     organs: ['CELLS'],
     deficiency: 'AGING',
-    description: 'Квантовый стволовой пептид',
+    description: 'Пептид для регенерации',
     type: 'peptide'
   },
   {
@@ -15617,7 +15617,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['QUANTUM_TELOMERE_UP', 'DNA_REPAIR'],
     organs: ['CELLS'],
     deficiency: 'AGING',
-    description: 'Квантовый теломерный пептид',
+    description: 'Пептид для антивозрастных процессов',
     type: 'peptide'
   },
   {
@@ -15627,7 +15627,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ORGAN_REPAIR', 'CELL_REGEN'],
     organs: ['ORGANS'],
     deficiency: 'AGING',
-    description: 'Квантовый органный пептид',
+    description: 'Пептид для поддержки обменных процессов и здоровья',
     type: 'peptide'
   },
   {
@@ -15637,7 +15637,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ORGAN_SIGNALING', 'CELL_REPAIR'],
     organs: ['ORGANS'],
     deficiency: 'AGING',
-    description: 'Квантовый органный сигнал',
+    description: 'Пептид для поддержки обменных процессов и здоровья',
     type: 'peptide'
   },
   {
@@ -15667,7 +15667,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ORGAN_RESET', 'CELL_REGEN'],
     organs: ['ORGANS'],
     deficiency: 'AGING',
-    description: 'Квантовый органный ребут',
+    description: 'Пептид для поддержки обменных процессов и здоровья',
     type: 'peptide'
   },
   {
@@ -15677,7 +15677,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ORGAN_REPAIR', 'CELL_REGEN'],
     organs: ['ORGANS'],
     deficiency: 'AGING',
-    description: 'Квантовый органный ультра',
+    description: 'Пептид для поддержки обменных процессов и здоровья',
     type: 'peptide'
   },
   {
@@ -15687,7 +15687,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ORGAN_REPAIR', 'CELL_REGEN'],
     organs: ['ORGANS'],
     deficiency: 'AGING',
-    description: 'Квантовый органный инфинити',
+    description: 'Пептид для поддержки обменных процессов и здоровья',
     type: 'peptide'
   },
   {
@@ -15707,7 +15707,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['EPIGENETIC_MOD', 'CELL_REPAIR'],
     organs: ['CELLS'],
     deficiency: 'AGING',
-    description: 'Прайм-эпигенетический пептид',
+    description: 'Пептид для поддержки обменных процессов и здоровья',
     type: 'peptide'
   },
   {
@@ -15717,7 +15717,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CHROMATIN_OPEN', 'GENE_EXPRESSION'],
     organs: ['CELLS'],
     deficiency: 'AGING',
-    description: 'Ядро-эпигенетический пептид',
+    description: 'Пептид для поддержки обменных процессов и здоровья',
     type: 'peptide'
   },
   {
@@ -15727,7 +15727,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['EPIGENETIC_UP', 'CELL_REGEN'],
     organs: ['CELLS'],
     deficiency: 'AGING',
-    description: 'Ультра-эпигенетический пептид',
+    description: 'Пептид для поддержки обменных процессов и здоровья',
     type: 'peptide'
   },
   {
@@ -15747,7 +15747,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CELL_SIGNALING', 'CELL_REGEN'],
     organs: ['CELLS'],
     deficiency: 'AGING',
-    description: 'Квантовый сигнальный пептид',
+    description: 'Пептид для клеточного здоровья',
     type: 'peptide'
   },
   {
@@ -15757,7 +15757,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CELL_SIGNALING', 'CELL_REPAIR'],
     organs: ['CELLS'],
     deficiency: 'AGING',
-    description: 'Ультра-сигнальный пептид',
+    description: 'Пептид для клеточного здоровья',
     type: 'peptide'
   },
   {
@@ -15767,7 +15767,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CELL_SIGNALING', 'CELL_REGEN'],
     organs: ['CELLS'],
     deficiency: 'AGING',
-    description: 'Инфинити-сигнал',
+    description: 'Пептид для клеточного здоровья',
     type: 'peptide'
   },
   {
@@ -15787,7 +15787,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['REGEN_UP', 'CELL_REGEN'],
     organs: ['CELLS'],
     deficiency: 'INJURY',
-    description: 'Ультра-регенерация',
+    description: 'Пептид для поддержки обменных процессов и здоровья',
     type: 'peptide'
   },
   {
@@ -15797,7 +15797,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['REGEN_UP', 'CELL_REPAIR'],
     organs: ['CELLS'],
     deficiency: 'INJURY',
-    description: 'Инфинити-регенерация',
+    description: 'Пептид для поддержки обменных процессов и здоровья',
     type: 'peptide'
   },
   {
@@ -15807,7 +15807,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['LONGEVITY_GENES_UP', 'CELL_PROTECTION'],
     organs: ['CELLS'],
     deficiency: 'AGING',
-    description: 'Квантовое долголетие',
+    description: 'Пептид для антивозрастных процессов',
     type: 'peptide'
   },
   {
@@ -15817,7 +15817,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['LONGEVITY_GENES_UP', 'CELL_REGEN'],
     organs: ['CELLS'],
     deficiency: 'AGING',
-    description: 'Ультра-долголетие',
+    description: 'Пептид для антивозрастных процессов',
     type: 'peptide'
   },
   {
@@ -15827,7 +15827,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['LONGEVITY_GENES_UP', 'CELL_REPAIR'],
     organs: ['CELLS'],
     deficiency: 'AGING',
-    description: 'Инфинити-долголетие',
+    description: 'Пептид для антивозрастных процессов',
     type: 'peptide'
   },
   {
@@ -15837,7 +15837,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CELL_REPAIR', 'CELL_REGEN'],
     organs: ['CELLS'],
     deficiency: 'AGING',
-    description: 'Полный квантовый пептид',
+    description: 'Пептид для поддержки обменных процессов и здоровья',
     type: 'peptide'
   },
   {
@@ -15847,7 +15847,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CELL_REPAIR', 'ANTI_INFLAMMATION'],
     organs: ['CELLS'],
     deficiency: 'AGING',
-    description: 'Полный ультра-пептид',
+    description: 'Пептид для поддержки обменных процессов и здоровья',
     type: 'peptide'
   },
   {
@@ -15857,7 +15857,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CELL_REPAIR', 'CELL_REGEN'],
     organs: ['CELLS'],
     deficiency: 'AGING',
-    description: 'Полный инфинити-пептид',
+    description: 'Пептид для поддержки обменных процессов и здоровья',
     type: 'peptide'
   },
   {
@@ -15867,7 +15867,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CHROMATIN_OPEN', 'GENE_EXPRESSION'],
     organs: ['CELLS'],
     deficiency: 'AGING',
-    description: 'Пептид открытия хроматина',
+    description: 'Пептид для поддержки обменных процессов и здоровья',
     type: 'peptide'
   },
   {
@@ -15877,7 +15877,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CHROMATIN_CLOSE', 'GENE_SILENCING'],
     organs: ['CELLS'],
     deficiency: 'CANCER_RISK',
-    description: 'Пептид закрытия хроматина',
+    description: 'Пептид для поддержки обменных процессов и здоровья',
     type: 'peptide'
   },
   {
@@ -15887,7 +15887,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['HDAC_DOWN', 'CHROMATIN_OPEN'],
     organs: ['CELLS'],
     deficiency: 'AGING',
-    description: 'Пептид подавления HDAC',
+    description: 'Пептид для поддержки обменных процессов и здоровья',
     type: 'peptide'
   },
   {
@@ -15897,7 +15897,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['HDAC_MOD', 'GENE_STABILITY'],
     organs: ['CELLS'],
     deficiency: 'AGING',
-    description: 'Пептид баланса HDAC',
+    description: 'Пептид для поддержки обменных процессов и здоровья',
     type: 'peptide'
   },
   {
@@ -15907,7 +15907,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['HAT_UP', 'GENE_EXPRESSION'],
     organs: ['CELLS'],
     deficiency: 'AGING',
-    description: 'Пептид супер‑HAT',
+    description: 'Пептид для поддержки обменных процессов и здоровья',
     type: 'peptide'
   },
   {
@@ -15917,7 +15917,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['HAT_MOD', 'GENE_STABILITY'],
     organs: ['CELLS'],
     deficiency: 'AGING',
-    description: 'Пептид баланса HAT',
+    description: 'Пептид для поддержки обменных процессов и здоровья',
     type: 'peptide'
   },
   {
@@ -15927,7 +15927,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['DNMT_DOWN', 'GENE_REACTIVATION'],
     organs: ['CELLS'],
     deficiency: 'AGING',
-    description: 'Пептид подавления DNMT',
+    description: 'Пептид для поддержки обменных процессов и здоровья',
     type: 'peptide'
   },
   {
@@ -15937,7 +15937,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['DNMT_MOD', 'METHYLATION_STABILITY'],
     organs: ['CELLS'],
     deficiency: 'AGING',
-    description: 'Пептид баланса DNMT',
+    description: 'Пептид для поддержки обменных процессов и здоровья',
     type: 'peptide'
   },
   {
@@ -15947,7 +15947,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['METHYLATION_RESET', 'GENE_REBOOT'],
     organs: ['CELLS'],
     deficiency: 'AGING',
-    description: 'Пептид сброса метилирования',
+    description: 'Пептид для поддержки обменных процессов и здоровья',
     type: 'peptide'
   },
   {
@@ -15967,7 +15967,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ACETYLATION_UP', 'GENE_EXPRESSION'],
     organs: ['CELLS'],
     deficiency: 'AGING',
-    description: 'Пептид ацетилирования',
+    description: 'Пептид для поддержки обменных процессов и здоровья',
     type: 'peptide'
   },
   {
@@ -15977,7 +15977,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ACETYLATION_RESET', 'GENE_REBOOT'],
     organs: ['CELLS'],
     deficiency: 'AGING',
-    description: 'Пептид сброса ацетилирования',
+    description: 'Пептид для поддержки обменных процессов и здоровья',
     type: 'peptide'
   },
   {
@@ -15997,7 +15997,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['HISTONE_MOD', 'GENE_EXPRESSION'],
     organs: ['CELLS'],
     deficiency: 'AGING',
-    description: 'Пептид модификации гистонов',
+    description: 'Пептид для поддержки обменных процессов и здоровья',
     type: 'peptide'
   },
   {
@@ -16007,7 +16007,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['TELOMERE_REPAIR', 'DNA_REPAIR'],
     organs: ['CELLS'],
     deficiency: 'AGING',
-    description: 'Пептид восстановления теломер',
+    description: 'Пептид для антивозрастных процессов',
     type: 'peptide'
   },
   {
@@ -16017,7 +16017,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['TELOMERASE_UP', 'CELL_REGEN'],
     organs: ['CELLS'],
     deficiency: 'AGING',
-    description: 'Пептид расширения теломер',
+    description: 'Пептид для антивозрастных процессов',
     type: 'peptide'
   },
   {
@@ -16027,7 +16027,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['TELOMERE_PROTECT', 'CELL_PROTECTION'],
     organs: ['CELLS'],
     deficiency: 'AGING',
-    description: 'Теломерный щит 2.0',
+    description: 'Пептид для антивозрастных процессов',
     type: 'peptide'
   },
   {
@@ -16047,7 +16047,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SENESCENCE_DOWN', 'CELL_REPAIR'],
     organs: ['CELLS'],
     deficiency: 'AGING',
-    description: 'Пептид реверсии сенесценции',
+    description: 'Пептид для антивозрастных процессов',
     type: 'peptide'
   },
   {
@@ -16057,7 +16057,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SASP_DOWN', 'ANTI_INFLAMMATION'],
     organs: ['CELLS'],
     deficiency: 'AGING',
-    description: 'Пептид блокировки SASP',
+    description: 'Пептид для антивозрастных процессов',
     type: 'peptide'
   },
   {
@@ -16067,7 +16067,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['P53_RESTORE', 'DNA_REPAIR'],
     organs: ['CELLS'],
     deficiency: 'CANCER_RISK',
-    description: 'Пептид восстановления p53 2.0',
+    description: 'Пептид для клеточного здоровья',
     type: 'peptide'
   },
   {
@@ -16077,7 +16077,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['P21_UP', 'CELL_CYCLE_CONTROL'],
     organs: ['CELLS'],
     deficiency: 'AGING',
-    description: 'Пептид восстановления p21 2.0',
+    description: 'Пептид для клеточного здоровья',
     type: 'peptide'
   },
   {
@@ -16087,7 +16087,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['FOXO_UP', 'CELL_PROTECTION'],
     organs: ['CELLS'],
     deficiency: 'AGING',
-    description: 'Пептид FOXO мастер',
+    description: 'Пептид для антивозрастных процессов',
     type: 'peptide'
   },
   {
@@ -16097,7 +16097,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['FOXO_MOD', 'CELL_STABILITY'],
     organs: ['CELLS'],
     deficiency: 'AGING',
-    description: 'Пептид FOXO баланс',
+    description: 'Пептид для антивозрастных процессов',
     type: 'peptide'
   },
   {
@@ -16107,7 +16107,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SIRT1_UP', 'CELL_REPAIR'],
     organs: ['CELLS'],
     deficiency: 'AGING',
-    description: 'Пептид SIRT1 мастер',
+    description: 'Пептид для антивозрастных процессов',
     type: 'peptide'
   },
   {
@@ -16117,7 +16117,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SIRT6_UP', 'DNA_REPAIR'],
     organs: ['CELLS'],
     deficiency: 'AGING',
-    description: 'Пептид SIRT6 мастер',
+    description: 'Пептид для антивозрастных процессов',
     type: 'peptide'
   },
   {
@@ -16127,7 +16127,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SIRT7_UP', 'CHROMATIN_STABILITY'],
     organs: ['CELLS'],
     deficiency: 'AGING',
-    description: 'Пептид SIRT7',
+    description: 'Пептид для поддержки обменных процессов и здоровья',
     type: 'peptide'
   },
   {
@@ -16157,7 +16157,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NUCLEAR_STABILITY', 'CELL_PROTECTION'],
     organs: ['CELLS'],
     deficiency: 'AGING',
-    description: 'Пептид ядерной стабильности',
+    description: 'Пептид для клеточного здоровья',
     type: 'peptide'
   },
   {
@@ -16177,7 +16177,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['DNA_UNFOLD', 'GENE_EXPRESSION'],
     organs: ['CELLS'],
     deficiency: 'AGING',
-    description: 'Пептид развёртки ДНК',
+    description: 'Пептид для поддержки обменных процессов и здоровья',
     type: 'peptide'
   },
   {
@@ -16187,7 +16187,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['DNA_REFOLD', 'GENE_SILENCING'],
     organs: ['CELLS'],
     deficiency: 'AGING',
-    description: 'Пептид свёртки ДНК',
+    description: 'Пептид для поддержки обменных процессов и здоровья',
     type: 'peptide'
   },
   {
@@ -16197,7 +16197,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['RNA_REPAIR', 'CELL_REGEN'],
     organs: ['CELLS'],
     deficiency: 'AGING',
-    description: 'Пептид восстановления РНК',
+    description: 'Пептид для клеточного здоровья',
     type: 'peptide'
   },
   {
@@ -16207,7 +16207,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['RNA_STABILITY', 'CELL_PROTECTION'],
     organs: ['CELLS'],
     deficiency: 'AGING',
-    description: 'Пептид стабильности РНК',
+    description: 'Пептид для клеточного здоровья',
     type: 'peptide'
   },
   {
@@ -16217,7 +16217,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['TRANSCRIPTION_UP', 'GENE_EXPRESSION'],
     organs: ['CELLS'],
     deficiency: 'AGING',
-    description: 'Пептид усиления транскрипции',
+    description: 'Пептид для поддержки обменных процессов и здоровья',
     type: 'peptide'
   },
   {
@@ -16227,7 +16227,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['TRANSCRIPTION_RESET', 'GENE_REBOOT'],
     organs: ['CELLS'],
     deficiency: 'AGING',
-    description: 'Пептид сброса транскрипции',
+    description: 'Пептид для поддержки обменных процессов и здоровья',
     type: 'peptide'
   },
   {
@@ -16237,7 +16237,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['TRANSLATION_UP', 'PROTEIN_SYNTHESIS'],
     organs: ['CELLS'],
     deficiency: 'AGING',
-    description: 'Пептид усиления трансляции',
+    description: 'Пептид для клеточного здоровья',
     type: 'peptide'
   },
   {
@@ -16247,7 +16247,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['TRANSLATION_RESET', 'CELL_REBOOT'],
     organs: ['CELLS'],
     deficiency: 'AGING',
-    description: 'Пептид сброса трансляции',
+    description: 'Пептид для клеточного здоровья',
     type: 'peptide'
   },
   {
@@ -16267,7 +16267,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CHROMOSOME_STABILITY', 'CELL_PROTECTION'],
     organs: ['CELLS'],
     deficiency: 'AGING',
-    description: 'Пептид стабильности хромосом',
+    description: 'Пептид для клеточного здоровья',
     type: 'peptide'
   },
   {
@@ -16277,7 +16277,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GENE_REBOOT', 'CELL_REGEN'],
     organs: ['CELLS'],
     deficiency: 'AGING',
-    description: 'Пептид перезагрузки генов',
+    description: 'Пептид для поддержки обменных процессов и здоровья',
     type: 'peptide'
   },
   {
@@ -16287,7 +16287,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GENE_PROTECTION', 'DNA_REPAIR'],
     organs: ['CELLS'],
     deficiency: 'AGING',
-    description: 'Пептид защиты генов',
+    description: 'Пептид для поддержки обменных процессов и здоровья',
     type: 'peptide'
   },
   {
@@ -16297,7 +16297,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['EPIGENETIC_RESET', 'GENE_REBOOT'],
     organs: ['CELLS'],
     deficiency: 'AGING',
-    description: 'Полный эпигенетический сброс',
+    description: 'Пептид для поддержки обменных процессов и здоровья',
     type: 'peptide'
   },
   {
@@ -16307,7 +16307,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['EPIGENETIC_REPAIR', 'CELL_REGEN'],
     organs: ['CELLS'],
     deficiency: 'AGING',
-    description: 'Полный эпигенетический ремонт',
+    description: 'Пептид для поддержки обменных процессов и здоровья',
     type: 'peptide'
   },
   {
@@ -16387,7 +16387,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['LAMIN_NETWORK_RESET', 'CELL_REBOOT'],
     organs: ['CELLS'],
     deficiency: 'AGING',
-    description: 'Пептид сброса ламинарной сети',
+    description: 'Пептид для поддержки обменных процессов и здоровья',
     type: 'peptide'
   },
   {
@@ -16397,7 +16397,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NUCLEAR_SCAFFOLD_UP', 'GENOME_STABILITY'],
     organs: ['CELLS'],
     deficiency: 'AGING',
-    description: 'Пептид ядерного каркаса',
+    description: 'Пептид для поддержки обменных процессов и здоровья',
     type: 'peptide'
   },
   {
@@ -16417,7 +16417,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['TAD_BOUNDARY_UP', 'GENE_BOUNDARY'],
     organs: ['CELLS'],
     deficiency: 'AGING',
-    description: 'Пептид границ TAD',
+    description: 'Пептид для поддержки обменных процессов и здоровья',
     type: 'peptide'
   },
   {
@@ -16437,7 +16437,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['LOOP_EXTRUSION_UP', 'GENE_EXPRESSION'],
     organs: ['CELLS'],
     deficiency: 'AGING',
-    description: 'Пептид экструзии петель',
+    description: 'Пептид для поддержки обменных процессов и здоровья',
     type: 'peptide'
   },
   {
@@ -16457,7 +16457,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CTCF_STABLE', 'CHROMATIN_ORGANIZATION'],
     organs: ['CELLS'],
     deficiency: 'AGING',
-    description: 'Пептид стабилизации CTCF',
+    description: 'Пептид для поддержки обменных процессов и здоровья',
     type: 'peptide'
   },
   {
@@ -16467,7 +16467,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CTCF_REBUILD', 'GENE_BOUNDARY'],
     organs: ['CELLS'],
     deficiency: 'AGING',
-    description: 'Пептид восстановления CTCF',
+    description: 'Пептид для поддержки обменных процессов и здоровья',
     type: 'peptide'
   },
   {
@@ -16477,7 +16477,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['COHESIN_STABLE', 'CHROMATIN_LOOPING'],
     organs: ['CELLS'],
     deficiency: 'AGING',
-    description: 'Пептид стабилизации когезина',
+    description: 'Пептид для поддержки обменных процессов и здоровья',
     type: 'peptide'
   },
   {
@@ -16497,7 +16497,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SMC_STABLE', 'CHROMATIN_STRUCTURE'],
     organs: ['CELLS'],
     deficiency: 'AGING',
-    description: 'Пептид стабилизации SMC',
+    description: 'Пептид для поддержки обменных процессов и здоровья',
     type: 'peptide'
   },
   {
@@ -16507,7 +16507,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SMC_REBUILD', 'CELL_PROTECTION'],
     organs: ['CELLS'],
     deficiency: 'AGING',
-    description: 'Пептид восстановления SMC',
+    description: 'Пептид для поддержки обменных процессов и здоровья',
     type: 'peptide'
   },
   {
@@ -16707,7 +16707,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['EPIGENETIC_RESET', 'GENE_REBOOT'],
     organs: ['CELLS'],
     deficiency: 'AGING',
-    description: 'Полный эпиген‑сброс 3.0',
+    description: 'Пептид для поддержки обменных процессов и здоровья',
     type: 'peptide'
   },
   {
@@ -16717,7 +16717,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CHROMATIN_STRUCTURE_UP', 'CELL_REGEN'],
     organs: ['CELLS'],
     deficiency: 'AGING',
-    description: 'Инфинити структурный 2.0',
+    description: 'Пептид для поддержки обменных процессов и здоровья',
     type: 'peptide'
   },
   {
@@ -16727,7 +16727,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['EPIGENETIC_RESET', 'CELL_REPAIR'],
     organs: ['CELLS'],
     deficiency: 'AGING',
-    description: 'Инфинити эпиген‑сброс 3.0',
+    description: 'Пептид для поддержки обменных процессов и здоровья',
     type: 'peptide'
   },
   {
@@ -16737,7 +16737,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GI_REPAIR', 'TENDON_HEALING'],
     organs: ['GI', 'TENDONS', 'MUSCLES'],
     deficiency: 'INJURY',
-    description: 'BPC‑157',
+    description: 'Пептид для мышц',
     type: 'peptide'
   },
   {
@@ -16747,7 +16747,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['REGEN_UP', 'ANTI_INFLAMMATION'],
     organs: ['MUSCLES', 'TENDONS'],
     deficiency: 'INJURY',
-    description: 'TB‑500',
+    description: 'Пептид для мышц',
     type: 'peptide'
   },
   {
@@ -16757,7 +16757,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['REGEN_UP', 'ANTI_INFLAMMATION'],
     organs: ['CELLS', 'MUSCLES'],
     deficiency: 'INJURY',
-    description: 'Тимозин β4',
+    description: 'Пептид для поддержки обменных процессов и здоровья',
     type: 'peptide'
   },
   {
@@ -16767,7 +16767,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['IMMUNE_UP', 'ANTI_INFLAMMATION'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'INFECTION',
-    description: 'Тимозин α1',
+    description: 'Пептид для иммунной системы',
     type: 'peptide'
   },
   {
@@ -16777,7 +16777,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['IMMUNE_UP', 'ANTI_INFLAMMATION'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'INFECTION',
-    description: 'Тимулин',
+    description: 'Пептид для иммунной системы',
     type: 'peptide'
   },
   {
@@ -16787,7 +16787,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['T_CELL_UP', 'IMMUNE_REGEN'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'IMMUNE_WEAK',
-    description: 'Тимопентин',
+    description: 'Пептид для иммунной системы',
     type: 'peptide'
   },
   {
@@ -16797,7 +16797,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['COLLAGEN_UP', 'WOUND_HEALING'],
     organs: ['SKIN', 'CELLS'],
     deficiency: 'AGING',
-    description: 'GHK‑Cu',
+    description: 'Пептид для здоровья кожи, антивозрастных процессов',
     type: 'peptide'
   },
   {
@@ -16807,7 +16807,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['COLLAGEN_UP', 'ANTI_INFLAMMATION'],
     organs: ['SKIN'],
     deficiency: 'AGING',
-    description: 'GHK',
+    description: 'Пептид для здоровья кожи, антивозрастных процессов',
     type: 'peptide'
   },
   {
@@ -16817,7 +16817,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GROWTH_HORMONE_UP', 'IGF1_UP'],
     organs: ['HORMONES', 'MUSCLES'],
     deficiency: 'LOW_GH',
-    description: 'CJC‑1295',
+    description: 'Пептид для гормонального баланса',
     type: 'peptide'
   },
   {
@@ -16827,7 +16827,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GROWTH_HORMONE_UP', 'IGF1_UP'],
     organs: ['HORMONES', 'MUSCLES'],
     deficiency: 'LOW_GH',
-    description: 'CJC‑DAC',
+    description: 'Пептид для гормонального баланса',
     type: 'peptide'
   },
   {
@@ -16837,7 +16837,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GROWTH_HORMONE_UP', 'GH_PULSE_UP'],
     organs: ['HORMONES', 'MUSCLES'],
     deficiency: 'LOW_GH',
-    description: 'Ипаморелин',
+    description: 'Пептид для гормонального баланса',
     type: 'peptide'
   },
   {
@@ -16847,7 +16847,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GH_UP', 'HUNGER_UP'],
     organs: ['HORMONES', 'BRAIN'],
     deficiency: 'LOW_GH',
-    description: 'GHRP‑2',
+    description: 'Пептид для гормонального баланса',
     type: 'peptide'
   },
   {
@@ -16857,7 +16857,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GH_UP', 'HUNGER_UP'],
     organs: ['HORMONES', 'BRAIN'],
     deficiency: 'LOW_GH',
-    description: 'GHRP‑6',
+    description: 'Пептид для гормонального баланса',
     type: 'peptide'
   },
   {
@@ -16867,7 +16867,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GH_UP', 'GH_PULSE_UP'],
     organs: ['HORMONES'],
     deficiency: 'LOW_GH',
-    description: 'Гексарелин',
+    description: 'Пептид для гормонального баланса',
     type: 'peptide'
   },
   {
@@ -16877,7 +16877,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['IGF1_UP', 'MUSCLE_GROWTH'],
     organs: ['MUSCLES'],
     deficiency: 'LOW_MUSCLE',
-    description: 'IGF‑1 LR3',
+    description: 'Пептид для поддержки обменных процессов и здоровья',
     type: 'peptide'
   },
   {
@@ -16887,7 +16887,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['IGF1_UP', 'CELL_REPAIR'],
     organs: ['MUSCLES'],
     deficiency: 'LOW_MUSCLE',
-    description: 'Des‑IGF1',
+    description: 'Пептид для поддержки обменных процессов и здоровья',
     type: 'peptide'
   },
   {
@@ -16897,7 +16897,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['LIBIDO_UP', 'NEURO_SIGNALING'],
     organs: ['HORMONES', 'BRAIN'],
     deficiency: 'LOW_LIBIDO',
-    description: 'PT‑141',
+    description: 'Пептид для гормонального баланса',
     type: 'peptide'
   },
   {
@@ -16907,7 +16907,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MELANIN_UP', 'SKIN_PROTECTION'],
     organs: ['SKIN'],
     deficiency: 'PIGMENTATION',
-    description: 'Меланотан‑1',
+    description: 'Пептид для здоровья кожи',
     type: 'peptide'
   },
   {
@@ -16917,7 +16917,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MELANIN_UP', 'LIBIDO_UP'],
     organs: ['SKIN', 'HORMONES'],
     deficiency: 'PIGMENTATION',
-    description: 'Меланотан‑2',
+    description: 'Пептид для здоровья кожи, гормонального баланса',
     type: 'peptide'
   },
   {
@@ -16927,7 +16927,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GNRH_UP', 'LH_UP'],
     organs: ['HORMONES'],
     deficiency: 'LOW_LIBIDO',
-    description: 'Кисс-пептин‑10',
+    description: 'Пептид для гормонального баланса',
     type: 'peptide'
   },
   {
@@ -16937,7 +16937,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['LH_UP', 'FSH_UP'],
     organs: ['HORMONES'],
     deficiency: 'LOW_TESTOSTERONE',
-    description: 'Гонадорелин',
+    description: 'Пептид для гормонального баланса',
     type: 'peptide'
   },
   {
@@ -16947,7 +16947,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GNRH_MOD', 'HORMONE_RESET'],
     organs: ['HORMONES'],
     deficiency: 'IMBALANCE',
-    description: 'Трипторелин',
+    description: 'Пептид для гормонального баланса',
     type: 'peptide'
   },
   {
@@ -16957,7 +16957,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['BDNF_UP', 'NEUROPROTECTION'],
     organs: ['BRAIN'],
     deficiency: 'COGNITION',
-    description: 'Семакс',
+    description: 'Пептид для нервной системы',
     type: 'peptide'
   },
   {
@@ -16967,7 +16967,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GABA_UP', 'NEURO_SIGNALING'],
     organs: ['BRAIN'],
     deficiency: 'ANXIETY',
-    description: 'Селанк',
+    description: 'Пептид для нервной системы, снижения тревоги',
     type: 'peptide'
   },
   {
@@ -16977,7 +16977,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SLEEP_UP', 'CORTISOL_DOWN'],
     organs: ['BRAIN'],
     deficiency: 'INSOMNIA',
-    description: 'ДСИП',
+    description: 'Пептид для сна',
     type: 'peptide'
   },
   {
@@ -16987,7 +16987,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NEURO_REGEN', 'BDNF_UP'],
     organs: ['BRAIN'],
     deficiency: 'NEURO_DEGEN',
-    description: 'P21',
+    description: 'Пептид для нервной системы',
     type: 'peptide'
   },
   {
@@ -16997,7 +16997,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['FAT_BREAKDOWN', 'GH_FRAGMENT'],
     organs: ['METABOLISM'],
     deficiency: 'OBESITY',
-    description: 'AOD‑9604',
+    description: 'Пептид для жиросжигания',
     type: 'peptide'
   },
   {
@@ -17007,7 +17007,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['FAT_BREAKDOWN', 'GH_FRAGMENT'],
     organs: ['METABOLISM'],
     deficiency: 'OBESITY',
-    description: 'HGH‑Frag',
+    description: 'Пептид для жиросжигания',
     type: 'peptide'
   },
   {
@@ -17017,7 +17017,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SOCIAL_BOND', 'STRESS_DOWN'],
     organs: ['BRAIN', 'HORMONES'],
     deficiency: 'STRESS',
-    description: 'Окситоцин',
+    description: 'Пептид для гормонального баланса',
     type: 'peptide'
   },
   {
@@ -17027,7 +17027,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NO_UP', 'GI_REPAIR'],
     organs: ['VESSELS', 'GI'],
     deficiency: 'HIGH_BP',
-    description: 'VIP',
+    description: 'Пептид для поддержки обменных процессов и здоровья',
     type: 'peptide'
   },
   {
@@ -17037,7 +17037,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NEUROPROTECTION', 'NEURO_SIGNALING'],
     organs: ['BRAIN'],
     deficiency: 'COGNITION',
-    description: 'PACAP',
+    description: 'Пептид для нервной системы',
     type: 'peptide'
   },
   {
@@ -17047,7 +17047,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NEURO_SIGNALING', 'PAIN_MOD'],
     organs: ['BRAIN'],
     deficiency: 'PAIN',
-    description: 'Нейротензин',
+    description: 'Пептид для нервной системы',
     type: 'peptide'
   },
   {
@@ -17057,7 +17057,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NEURO_SIGNALING', 'PAIN_SIGNALING'],
     organs: ['BRAIN'],
     deficiency: 'PAIN',
-    description: 'Субстанция P',
+    description: 'Пептид для нервной системы',
     type: 'peptide'
   },
   {
@@ -17067,7 +17067,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CORTISOL_UP', 'STRESS_RESPONSE'],
     organs: ['ADRENALS'],
     deficiency: 'STRESS',
-    description: 'Кортизол',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -17077,7 +17077,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CORTISONE_UP', 'ANTI_INFLAMMATION'],
     organs: ['ADRENALS'],
     deficiency: 'INFLAMMATION',
-    description: 'Кортизон',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -17087,7 +17087,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ADRENALINE_UP', 'ALERTNESS'],
     organs: ['ADRENALS', 'BRAIN'],
     deficiency: 'STRESS',
-    description: 'Адреналин',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -17097,7 +17097,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NORADRENALINE_UP', 'FOCUS'],
     organs: ['BRAIN', 'ADRENALS'],
     deficiency: 'FOCUS',
-    description: 'Норадреналин',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -17107,7 +17107,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['DHEA_UP', 'ANDROGEN_UP'],
     organs: ['ADRENALS'],
     deficiency: 'LOW_DHEA',
-    description: 'ДГЭА',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -17117,7 +17117,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['DHEAS_UP', 'ANDROGEN_UP'],
     organs: ['ADRENALS'],
     deficiency: 'LOW_DHEA',
-    description: 'ДГЭА‑S',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -17127,7 +17127,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CRH_UP', 'ACTH_UP'],
     organs: ['HYPOTHALAMUS'],
     deficiency: 'STRESS',
-    description: 'КРГ',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -17137,7 +17137,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ACTH_UP', 'CORTISOL_UP'],
     organs: ['PITUITARY'],
     deficiency: 'ADRENAL_FATIGUE',
-    description: 'АКТГ',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -17147,7 +17147,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['TSH_UP', 'T3_T4_UP'],
     organs: ['PITUITARY'],
     deficiency: 'HYPOTHYROIDISM',
-    description: 'ТТГ',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -17157,7 +17157,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['T3_UP', 'METABOLISM_UP'],
     organs: ['THYROID'],
     deficiency: 'HYPOTHYROIDISM',
-    description: 'Т3',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -17167,7 +17167,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['T4_UP', 'METABOLISM_UP'],
     organs: ['THYROID'],
     deficiency: 'HYPOTHYROIDISM',
-    description: 'Т4',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -17177,7 +17177,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['RT3_UP', 'METABOLISM_DOWN'],
     organs: ['THYROID'],
     deficiency: 'LOW_ENERGY',
-    description: 'rT3',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -17187,7 +17187,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['TRH_UP', 'TSH_UP'],
     organs: ['HYPOTHALAMUS'],
     deficiency: 'HYPOTHYROIDISM',
-    description: 'ТРГ',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -17197,7 +17197,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['LH_UP', 'TESTOSTERONE_UP'],
     organs: ['PITUITARY'],
     deficiency: 'LOW_TESTOSTERONE',
-    description: 'ЛГ',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -17207,7 +17207,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['FSH_UP', 'SPERM_UP'],
     organs: ['PITUITARY'],
     deficiency: 'INFERTILITY',
-    description: 'ФСГ',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -17217,7 +17217,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['TESTOSTERONE_UP', 'ANABOLISM'],
     organs: ['TESTES'],
     deficiency: 'LOW_TESTOSTERONE',
-    description: 'Тестостерон',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -17227,7 +17227,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['DHT_UP', 'ANDROGENIC_EFFECTS'],
     organs: ['SKIN', 'PROSTATE'],
     deficiency: 'HAIR_LOSS',
-    description: 'ДГТ',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -17237,7 +17237,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['E2_UP', 'FERTILITY'],
     organs: ['OVARIES', 'BRAIN'],
     deficiency: 'HORMONAL_IMBALANCE',
-    description: 'Эстрадиол',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -17247,7 +17247,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['PROGESTERONE_UP', 'CALMING'],
     organs: ['OVARIES', 'BRAIN'],
     deficiency: 'ANXIETY',
-    description: 'Прогестерон',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -17257,7 +17257,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GNRH_UP', 'LH_FSH_UP'],
     organs: ['HYPOTHALAMUS'],
     deficiency: 'LOW_LIBIDO',
-    description: 'ГнРГ',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -17267,7 +17267,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['INSULIN_UP', 'GLUCOSE_DOWN'],
     organs: ['PANCREAS'],
     deficiency: 'DIABETES',
-    description: 'Инсулин',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -17277,7 +17277,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GLUCAGON_UP', 'GLUCOSE_UP'],
     organs: ['PANCREAS'],
     deficiency: 'HYPOGLYCEMIA',
-    description: 'Глюкагон',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -17287,7 +17287,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GH_UP', 'IGF1_UP'],
     organs: ['PITUITARY'],
     deficiency: 'LOW_GH',
-    description: 'Гормон роста',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -17297,7 +17297,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['IGF1_UP', 'ANABOLISM'],
     organs: ['LIVER'],
     deficiency: 'LOW_IGF1',
-    description: 'ИФР‑1',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -17307,7 +17307,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['PROLACTIN_UP', 'MILK_UP'],
     organs: ['PITUITARY'],
     deficiency: 'HYPERPROLACTINEMIA',
-    description: 'Пролактин',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -17317,7 +17317,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['OXYTOCIN_UP', 'BONDING'],
     organs: ['HYPOTHALAMUS', 'BRAIN'],
     deficiency: 'STRESS',
-    description: 'Окситоцин',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -17327,7 +17327,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ADH_UP', 'WATER_RETAIN'],
     organs: ['HYPOTHALAMUS'],
     deficiency: 'KIDNEY_ISSUES',
-    description: 'АДГ',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -17337,7 +17337,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MELATONIN_UP', 'SLEEP_UP'],
     organs: ['PINEAL_GLAND'],
     deficiency: 'INSOMNIA',
-    description: 'Мелатонин',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -17347,7 +17347,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['LEPTIN_UP', 'SATIETY'],
     organs: ['FAT_TISSUE'],
     deficiency: 'OBESITY',
-    description: 'Лептин',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -17357,7 +17357,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ADIPONECTIN_UP', 'INSULIN_SENSITIVITY'],
     organs: ['FAT_TISSUE'],
     deficiency: 'METABOLIC_SYNDROME',
-    description: 'Адипонектин',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -17367,7 +17367,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['RESISTIN_UP', 'INSULIN_RESISTANCE'],
     organs: ['FAT_TISSUE'],
     deficiency: 'DIABETES',
-    description: 'Резистин',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -17377,7 +17377,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GHRELIN_UP', 'HUNGER_UP'],
     organs: ['STOMACH'],
     deficiency: 'HUNGER',
-    description: 'Грелин',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -17387,7 +17387,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['PYY_UP', 'HUNGER_DOWN'],
     organs: ['GI'],
     deficiency: 'OBESITY',
-    description: 'PYY',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -17397,7 +17397,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GLP1_UP', 'INSULIN_UP'],
     organs: ['GI'],
     deficiency: 'DIABETES',
-    description: 'ГПП‑1',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -17407,7 +17407,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GIP_UP', 'INSULIN_UP'],
     organs: ['GI'],
     deficiency: 'DIABETES',
-    description: 'GIP',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -17417,7 +17417,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CCK_UP', 'DIGESTION_UP'],
     organs: ['GI'],
     deficiency: 'DIGESTION',
-    description: 'ХЦК',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -17427,7 +17427,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SECRETIN_UP', 'DIGESTION_UP'],
     organs: ['GI'],
     deficiency: 'DIGESTION',
-    description: 'Секретин',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -17437,7 +17437,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MOTILIN_UP', 'MOTILITY_UP'],
     organs: ['GI'],
     deficiency: 'SLOW_GUT',
-    description: 'Мотилин',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -17447,7 +17447,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['EPO_UP', 'RBC_UP'],
     organs: ['KIDNEYS'],
     deficiency: 'ANEMIA',
-    description: 'ЭПО',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -17457,7 +17457,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CALCIUM_DOWN', 'BONE_PROTECT'],
     organs: ['THYROID'],
     deficiency: 'HIGH_CALCIUM',
-    description: 'Кальцитонин',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -17467,7 +17467,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CALCIUM_UP', 'BONE_RESORB'],
     organs: ['PARATHYROID'],
     deficiency: 'LOW_CALCIUM',
-    description: 'ПТГ',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -17477,7 +17477,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CALCITRIOL_UP', 'CALCIUM_UP'],
     organs: ['KIDNEYS'],
     deficiency: 'LOW_VITD',
-    description: 'Кальцитриол',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -17487,7 +17487,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ALDOSTERONE_UP', 'SODIUM_RETAIN'],
     organs: ['ADRENALS'],
     deficiency: 'HIGH_BP',
-    description: 'Альдостерон',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -17497,7 +17497,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ANP_UP', 'SODIUM_DOWN'],
     organs: ['HEART'],
     deficiency: 'HIGH_BP',
-    description: 'АНП',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -17507,7 +17507,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['BNP_UP', 'HEART_STRESS'],
     organs: ['HEART'],
     deficiency: 'HEART_FAILURE',
-    description: 'БНП',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -17517,7 +17517,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['KISSPEPTIN_UP', 'GNRH_UP'],
     organs: ['HYPOTHALAMUS'],
     deficiency: 'LOW_LIBIDO',
-    description: 'Кисс-пептин',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -17527,7 +17527,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NPY_UP', 'HUNGER_UP'],
     organs: ['BRAIN'],
     deficiency: 'OBESITY',
-    description: 'Нейропептид Y',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -17537,7 +17537,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['AGRP_UP', 'HUNGER_UP'],
     organs: ['HYPOTHALAMUS'],
     deficiency: 'OBESITY',
-    description: 'AgRP',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -17547,7 +17547,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['POMC_UP', 'SATIETY_UP'],
     organs: ['HYPOTHALAMUS'],
     deficiency: 'OBESITY',
-    description: 'POMC',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -17557,7 +17557,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ENDORPHIN_UP', 'PAIN_DOWN'],
     organs: ['BRAIN'],
     deficiency: 'PAIN',
-    description: 'Бета‑эндорфин',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -17567,7 +17567,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ENKEPHALIN_UP', 'PAIN_DOWN'],
     organs: ['BRAIN'],
     deficiency: 'PAIN',
-    description: 'Энкефалин',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -17577,7 +17577,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['DYNORPHIN_UP', 'STRESS_UP'],
     organs: ['BRAIN'],
     deficiency: 'STRESS',
-    description: 'Динорфин',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -17587,7 +17587,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SOMATOSTATIN_UP', 'DIGESTION_DOWN'],
     organs: ['PANCREAS', 'GI'],
     deficiency: 'DIABETES',
-    description: 'Соматостатин',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -17597,7 +17597,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GASTRIN_UP', 'ACID_UP'],
     organs: ['STOMACH'],
     deficiency: 'DIGESTION',
-    description: 'Гастрин',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -17607,7 +17607,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NEUROTENSIN_UP', 'MOTILITY_UP'],
     organs: ['GI'],
     deficiency: 'SLOW_GUT',
-    description: 'Нейротензин',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -17617,7 +17617,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SECRETIN_UP', 'BICARB_UP'],
     organs: ['GI'],
     deficiency: 'DIGESTION',
-    description: 'Секретин',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -17627,7 +17627,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GLP2_UP', 'GI_REPAIR'],
     organs: ['GI'],
     deficiency: 'IBD',
-    description: 'ГПП‑2',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -17637,7 +17637,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GIP_UP', 'INSULIN_UP'],
     organs: ['GI'],
     deficiency: 'DIABETES',
-    description: 'GIP',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -17647,7 +17647,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MSH_UP', 'MELANIN_UP'],
     organs: ['PITUITARY'],
     deficiency: 'PIGMENTATION',
-    description: 'α‑МСГ',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -17657,7 +17657,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MSH_UP', 'ENERGY_UP'],
     organs: ['PITUITARY'],
     deficiency: 'METABOLISM',
-    description: 'β‑МСГ',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -17667,7 +17667,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MSH_UP', 'BP_DOWN'],
     organs: ['PITUITARY'],
     deficiency: 'HIGH_BP',
-    description: 'γ‑МСГ',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -17677,7 +17677,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['INHIBIN_UP', 'FSH_DOWN'],
     organs: ['GONADS'],
     deficiency: 'INFERTILITY',
-    description: 'Ингибин',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -17687,7 +17687,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ACTIVIN_UP', 'FSH_UP'],
     organs: ['GONADS'],
     deficiency: 'INFERTILITY',
-    description: 'Активин',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -17697,7 +17697,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['RELAXIN_UP', 'LIGAMENT_LOOSEN'],
     organs: ['OVARIES'],
     deficiency: 'PREGNANCY',
-    description: 'Релаксин',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -17707,7 +17707,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['HCG_UP', 'PROGESTERONE_UP'],
     organs: ['PLACENTA'],
     deficiency: 'PREGNANCY',
-    description: 'ХГЧ',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -17717,7 +17717,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['PL_UP', 'MILK_UP'],
     organs: ['PLACENTA'],
     deficiency: 'PREGNANCY',
-    description: 'Плацентарный лактоген',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -17727,7 +17727,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['HEPCIDIN_UP', 'IRON_DOWN'],
     organs: ['LIVER'],
     deficiency: 'ANEMIA',
-    description: 'Гепцидин',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -17737,7 +17737,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ANG2_UP', 'BP_UP'],
     organs: ['KIDNEYS'],
     deficiency: 'HIGH_BP',
-    description: 'Ангиотензин II',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -17747,7 +17747,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['RENIN_UP', 'ANG2_UP'],
     organs: ['KIDNEYS'],
     deficiency: 'HIGH_BP',
-    description: 'Ренин',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -17757,7 +17757,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['FGF21_UP', 'METABOLISM_UP'],
     organs: ['LIVER'],
     deficiency: 'METABOLIC_SYNDROME',
-    description: 'FGF‑21',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -17767,7 +17767,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['FGF23_UP', 'PHOSPHATE_DOWN'],
     organs: ['BONES'],
     deficiency: 'KIDNEY_ISSUES',
-    description: 'FGF‑23',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -17777,7 +17777,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['OSTEOCALCIN_UP', 'INSULIN_SENSITIVITY'],
     organs: ['BONES'],
     deficiency: 'METABOLIC_SYNDROME',
-    description: 'Остеокальцин',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -17787,7 +17787,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['OPG_UP', 'BONE_PROTECT'],
     organs: ['BONES'],
     deficiency: 'OSTEOPOROSIS',
-    description: 'Остеопротегерин',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -17797,7 +17797,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GDF15_UP', 'APPETITE_DOWN'],
     organs: ['CELLS'],
     deficiency: 'OBESITY',
-    description: 'GDF‑15',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -17807,7 +17807,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['IL6_UP', 'INFLAMMATION_UP'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'INFLAMMATION',
-    description: 'ИЛ‑6',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -17817,7 +17817,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['IL1B_UP', 'INFLAMMATION_UP'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'INFLAMMATION',
-    description: 'ИЛ‑1β',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -17827,7 +17827,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['TNF_UP', 'INFLAMMATION_UP'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'INFLAMMATION',
-    description: 'TNF‑α',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -17837,7 +17837,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['IFNG_UP', 'IMMUNE_UP'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'INFECTION',
-    description: 'ИФН‑γ',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -17847,7 +17847,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['IL10_UP', 'ANTI_INFLAMMATION'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'AUTOIMMUNE',
-    description: 'ИЛ‑10',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -17857,7 +17857,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NT_PROBNP_UP', 'HEART_STRESS'],
     organs: ['HEART'],
     deficiency: 'HEART_FAILURE',
-    description: 'NT‑proBNP',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -17867,7 +17867,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ENDOTHELIN_UP', 'VASOCONSTRICTION'],
     organs: ['VESSELS'],
     deficiency: 'HIGH_BP',
-    description: 'Эндотелин‑1',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -17877,7 +17877,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NO_UP', 'VASODILATION'],
     organs: ['VESSELS'],
     deficiency: 'ERECTILE_DYSFUNCTION',
-    description: 'NO',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -17887,7 +17887,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['PGE2_UP', 'PAIN_UP'],
     organs: ['TISSUES'],
     deficiency: 'PAIN',
-    description: 'ПГЕ2',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -17897,7 +17897,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['PGF2A_UP', 'UTERUS_CONTRACT'],
     organs: ['UTERUS'],
     deficiency: 'PMS',
-    description: 'ПГF2α',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -17907,7 +17907,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SEROTONIN_UP', 'MOTILITY_UP'],
     organs: ['GI'],
     deficiency: 'SLOW_GUT',
-    description: 'Серотонин ЖКТ',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -17917,7 +17917,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['DOPAMINE_UP', 'PROLACTIN_DOWN'],
     organs: ['PITUITARY'],
     deficiency: 'HYPERPROLACTINEMIA',
-    description: 'Дофамин гипофиз',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -17927,7 +17927,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['HISTAMINE_UP', 'ALLERGY_UP'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'ALLERGY',
-    description: 'Гистамин',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -17937,7 +17937,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['BRADYKININ_UP', 'VASODILATION'],
     organs: ['VESSELS'],
     deficiency: 'INFLAMMATION',
-    description: 'Брадикинин',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -17947,7 +17947,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NPB_UP', 'STRESS_UP'],
     organs: ['BRAIN'],
     deficiency: 'STRESS',
-    description: 'NPB',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -17957,7 +17957,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NPW_UP', 'ENERGY_UP'],
     organs: ['BRAIN'],
     deficiency: 'FATIGUE',
-    description: 'NPW',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -17967,7 +17967,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GALANIN_UP', 'APPETITE_UP'],
     organs: ['BRAIN'],
     deficiency: 'OBESITY',
-    description: 'Галанин',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -17977,7 +17977,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['OREXIN_UP', 'WAKE_UP'],
     organs: ['BRAIN'],
     deficiency: 'SLEEPINESS',
-    description: 'Орексин‑A',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -17987,7 +17987,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['OREXIN_UP', 'ENERGY_UP'],
     organs: ['BRAIN'],
     deficiency: 'FATIGUE',
-    description: 'Орексин‑B',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -17997,7 +17997,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['LIPOCALIN2_UP', 'INFLAMMATION_UP'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'INFLAMMATION',
-    description: 'Липокалин‑2',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -18007,7 +18007,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['LTB4_UP', 'INFLAMMATION_UP'],
     organs: ['TISSUES'],
     deficiency: 'ASTHMA',
-    description: 'Лейкотриен B4',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -18017,7 +18017,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['LTC4_UP', 'BRONCHO_CONSTRICT'],
     organs: ['LUNGS'],
     deficiency: 'ASTHMA',
-    description: 'Лейкотриен C4',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -18027,7 +18027,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['PGI2_UP', 'VASODILATION'],
     organs: ['VESSELS'],
     deficiency: 'CLOT_RISK',
-    description: 'Простациклин',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -18037,7 +18037,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['TXA2_UP', 'CLOT_UP'],
     organs: ['PLATELETS'],
     deficiency: 'THROMBOSIS',
-    description: 'Тромбоксан A2',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -18047,7 +18047,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['AEA_UP', 'RELAX'],
     organs: ['BRAIN'],
     deficiency: 'ANXIETY',
-    description: 'Анандамид',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -18057,7 +18057,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['2AG_UP', 'PAIN_DOWN'],
     organs: ['BRAIN'],
     deficiency: 'PAIN',
-    description: '2‑AG',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -18067,7 +18067,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ALLOPREG_UP', 'GABA_UP'],
     organs: ['BRAIN'],
     deficiency: 'ANXIETY',
-    description: 'Аллопрегнанолон',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -18077,7 +18077,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['PREGNENOLONE_UP', 'NEUROPROTECTION'],
     organs: ['BRAIN'],
     deficiency: 'COGNITION',
-    description: 'Прегненолон',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -18087,7 +18087,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GABA_UP', 'MOTILITY_DOWN'],
     organs: ['GI'],
     deficiency: 'IBS',
-    description: 'GABA ЖКТ',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -18097,7 +18097,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ACH_UP', 'MOTILITY_UP'],
     organs: ['GI'],
     deficiency: 'SLOW_GUT',
-    description: 'Ацетилхолин ЖКТ',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -18107,7 +18107,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SEROTONIN_UP', 'CLOT_UP'],
     organs: ['PLATELETS'],
     deficiency: 'MIGRAINE',
-    description: 'Серотонин тромбоцитов',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -18117,7 +18117,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NO_UP', 'VASODILATION'],
     organs: ['VESSELS'],
     deficiency: 'HIGH_BP',
-    description: 'NO‑синтаза',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -18127,7 +18127,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ADM_UP', 'VASODILATION'],
     organs: ['VESSELS'],
     deficiency: 'HEART_FAILURE',
-    description: 'Адреномедуллин',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -18137,7 +18137,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['VISFATIN_UP', 'INSULIN_MIMETIC'],
     organs: ['FAT_TISSUE'],
     deficiency: 'DIABETES',
-    description: 'Висфатин',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -18147,7 +18147,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['APELIN_UP', 'CARDIO_PROTECT'],
     organs: ['HEART'],
     deficiency: 'HEART_FAILURE',
-    description: 'Апелин',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -18157,7 +18157,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['IRISIN_UP', 'BROWN_FAT_UP'],
     organs: ['MUSCLES'],
     deficiency: 'OBESITY',
-    description: 'Иризин',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -18167,7 +18167,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MYOSTATIN_UP', 'MUSCLE_DOWN'],
     organs: ['MUSCLES'],
     deficiency: 'LOW_MUSCLE',
-    description: 'Миостатин',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -18177,7 +18177,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['FOLLISTATIN_UP', 'MYOSTATIN_DOWN'],
     organs: ['MUSCLES'],
     deficiency: 'MUSCLE_GROWTH',
-    description: 'Фоллистатин',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -18187,7 +18187,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ANG1_7_UP', 'VASODILATION'],
     organs: ['KIDNEYS'],
     deficiency: 'HIGH_BP',
-    description: 'Ангиотензин 1‑7',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -18197,7 +18197,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ANG3_UP', 'BP_UP'],
     organs: ['KIDNEYS'],
     deficiency: 'HIGH_BP',
-    description: 'Ангиотензин III',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -18207,7 +18207,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['DES_GHRELIN_UP', 'HUNGER_MOD'],
     organs: ['GI'],
     deficiency: 'OBESITY',
-    description: 'Дес‑грелин',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -18217,7 +18217,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ANGPTL4_UP', 'LIPOLYSIS'],
     organs: ['LIVER'],
     deficiency: 'FAT_METABOLISM',
-    description: 'ANGPTL4',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -18227,7 +18227,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['FETUIN_A_UP', 'INSULIN_RESISTANCE'],
     organs: ['LIVER'],
     deficiency: 'DIABETES',
-    description: 'Фетуин‑A',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -18237,7 +18237,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['FETUIN_B_UP', 'INSULIN_RESISTANCE'],
     organs: ['LIVER'],
     deficiency: 'DIABETES',
-    description: 'Фетуин‑B',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -18247,7 +18247,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SHBG_UP', 'SEX_HORM_BIND'],
     organs: ['LIVER'],
     deficiency: 'HORMONAL_IMBALANCE',
-    description: 'ГСПГ',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -18257,7 +18257,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['HGF_UP', 'REGEN_UP'],
     organs: ['LIVER'],
     deficiency: 'LIVER_DAMAGE',
-    description: 'HGF',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -18267,7 +18267,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SCLEROSTIN_UP', 'BONE_DOWN'],
     organs: ['BONES'],
     deficiency: 'OSTEOPOROSIS',
-    description: 'Склеростин',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -18277,7 +18277,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['RANKL_UP', 'BONE_RESORB'],
     organs: ['BONES'],
     deficiency: 'OSTEOPOROSIS',
-    description: 'RANKL',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -18287,7 +18287,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['OPN_UP', 'INFLAMMATION_UP'],
     organs: ['BONES'],
     deficiency: 'INFLAMMATION',
-    description: 'Остеопонтин',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -18297,7 +18297,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MSH_UP', 'PIGMENT_UP'],
     organs: ['SKIN'],
     deficiency: 'PIGMENTATION',
-    description: 'МСГ кожа',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -18307,7 +18307,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['VEGF_UP', 'ANGIOGENESIS'],
     organs: ['SKIN'],
     deficiency: 'WOUND_HEALING',
-    description: 'VEGF кожа',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -18317,7 +18317,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['TGFb_UP', 'SCAR_UP'],
     organs: ['SKIN'],
     deficiency: 'FIBROSIS',
-    description: 'TGF‑β кожа',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -18327,7 +18327,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['IL33_UP', 'INFLAMMATION_UP'],
     organs: ['SKIN'],
     deficiency: 'DERMATITIS',
-    description: 'ИЛ‑33 кожа',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -18337,7 +18337,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SURFACTANT_UP', 'BREATHING_UP'],
     organs: ['LUNGS'],
     deficiency: 'ARDS',
-    description: 'Сурфактант',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -18347,7 +18347,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ENDOTHELIN_UP', 'BRONCHO_CONSTRICT'],
     organs: ['LUNGS'],
     deficiency: 'ASTHMA',
-    description: 'Эндотелин лёгкие',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -18357,7 +18357,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SST_UP', 'DIGESTION_DOWN'],
     organs: ['GI'],
     deficiency: 'IBS',
-    description: 'Соматостатин ЖКТ',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -18367,7 +18367,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NT_UP', 'MOTILITY_UP'],
     organs: ['GI'],
     deficiency: 'SLOW_GUT',
-    description: 'Нейротензин ЖКТ',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -18377,7 +18377,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['OXYNTOMODULIN_UP', 'HUNGER_DOWN'],
     organs: ['GI'],
     deficiency: 'OBESITY',
-    description: 'Оксинтомодулин',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -18387,7 +18387,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GIP_UP', 'INSULIN_UP'],
     organs: ['GI'],
     deficiency: 'DIABETES',
-    description: 'GIP ЖКТ',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -18397,7 +18397,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NMU_UP', 'MOTILITY_UP'],
     organs: ['GI'],
     deficiency: 'SLOW_GUT',
-    description: 'Нейромедин‑U',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -18407,7 +18407,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NMB_UP', 'DIGESTION_UP'],
     organs: ['GI'],
     deficiency: 'DIGESTION',
-    description: 'Нейромедин‑B',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -18417,7 +18417,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['PACAP_UP', 'MOTILITY_UP'],
     organs: ['GI'],
     deficiency: 'SLOW_GUT',
-    description: 'PACAP ЖКТ',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -18427,7 +18427,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ADM_UP', 'VASODILATION'],
     organs: ['HEART'],
     deficiency: 'HEART_FAILURE',
-    description: 'Адреномедуллин сердце',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -18437,7 +18437,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NPC_UP', 'SODIUM_DOWN'],
     organs: ['HEART'],
     deficiency: 'HIGH_BP',
-    description: 'NP‑C',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -18447,7 +18447,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['KLOTHO_UP', 'ANTIAGING'],
     organs: ['KIDNEYS'],
     deficiency: 'AGING',
-    description: 'Клото',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -18457,7 +18457,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['EPO_UP', 'RBC_UP'],
     organs: ['KIDNEYS'],
     deficiency: 'ANEMIA',
-    description: 'ЭПО почки',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -18467,7 +18467,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['TSLP_UP', 'ALLERGY_UP'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'ASTHMA',
-    description: 'TSLP',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -18477,7 +18477,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['IL17_UP', 'AUTOIMMUNE_UP'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'AUTOIMMUNE',
-    description: 'ИЛ‑17',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -18487,7 +18487,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['LXA4_UP', 'RESOLUTION_UP'],
     organs: ['TISSUES'],
     deficiency: 'INFLAMMATION',
-    description: 'Липоксин A4',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -18497,7 +18497,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['LXB4_UP', 'ANTI_INFLAMMATION'],
     organs: ['TISSUES'],
     deficiency: 'INFLAMMATION',
-    description: 'Липоксин B4',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -18507,7 +18507,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['RVD1_UP', 'RESOLUTION_UP'],
     organs: ['TISSUES'],
     deficiency: 'INFLAMMATION',
-    description: 'Резолвин D1',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -18517,7 +18517,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['RVE1_UP', 'ANTI_INFLAMMATION'],
     organs: ['TISSUES'],
     deficiency: 'INFLAMМATION',
-    description: 'Резолвин E1',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -18527,7 +18527,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['PD1_UP', 'NEUROPROTECTION'],
     organs: ['BRAIN'],
     deficiency: 'NEURO_INFLAMMATION',
-    description: 'Протектин D1',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -18537,7 +18537,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MARESIN1_UP', 'RESOLUTION_UP'],
     organs: ['TISSUES'],
     deficiency: 'INFLAMMATION',
-    description: 'Марезин‑1',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -18547,7 +18547,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['S1P_UP', 'LYMPH_FLOW'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'AUTOIMMUNE',
-    description: 'S1P',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -18557,7 +18557,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CERAMIDE_UP', 'APOPTOSIS'],
     organs: ['CELLS'],
     deficiency: 'AGING',
-    description: 'Церамид',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -18567,7 +18567,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['LPA_UP', 'CELL_GROWTH'],
     organs: ['TISSUES'],
     deficiency: 'FIBROSIS',
-    description: 'LPA',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -18577,7 +18577,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['PAF_UP', 'CLOT_UP'],
     organs: ['BLOOD'],
     deficiency: 'INFLAMMATION',
-    description: 'PAF',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -18587,7 +18587,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ET2_UP', 'VASOCONSTRICTION'],
     organs: ['VESSELS'],
     deficiency: 'HIGH_BP',
-    description: 'Эндотелин‑2',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -18597,7 +18597,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ET3_UP', 'NEURO_MOD'],
     organs: ['BRAIN'],
     deficiency: 'STRESS',
-    description: 'Эндотелин‑3',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -18607,7 +18607,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['VEGFB_UP', 'ANGIOGENESIS'],
     organs: ['VESSELS'],
     deficiency: 'ISCHEMIA',
-    description: 'VEGF‑B',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -18617,7 +18617,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['VEGFC_UP', 'LYMPH_FLOW'],
     organs: ['LYMPHATIC'],
     deficiency: 'LYMPHEDEMA',
-    description: 'VEGF‑C',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -18627,7 +18627,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['VEGFD_UP', 'LYMPH_FLOW'],
     organs: ['LYMPHATIC'],
     deficiency: 'LYMPHEDEMA',
-    description: 'VEGF‑D',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -18637,7 +18637,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['PDGFA_UP', 'FIBROBLAST_UP'],
     organs: ['TISSUES'],
     deficiency: 'SCARRING',
-    description: 'PDGF‑A',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -18647,7 +18647,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['PDGFB_UP', 'ANGIOGENESIS'],
     organs: ['TISSUES'],
     deficiency: 'WOUND_HEALING',
-    description: 'PDGF‑B',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -18657,7 +18657,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['TGFb1_UP', 'FIBROSIS'],
     organs: ['TISSUES'],
     deficiency: 'FIBROSIS',
-    description: 'TGF‑β1',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -18667,7 +18667,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['TGFb2_UP', 'IMMUNE_MOD'],
     organs: ['TISSUES'],
     deficiency: 'AUTOIMMUNE',
-    description: 'TGF‑β2',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -18677,7 +18677,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['TGFb3_UP', 'SCAR_DOWN'],
     organs: ['TISSUES'],
     deficiency: 'SCARRING',
-    description: 'TGF‑β3',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -18687,7 +18687,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['IL18_UP', 'INFLAMMATION_UP'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'AUTOIMMUNE',
-    description: 'ИЛ‑18',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -18697,7 +18697,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['IL22_UP', 'BARRIER_UP'],
     organs: ['SKIN', 'GI'],
     deficiency: 'DERMATITIS',
-    description: 'ИЛ‑22',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -18707,7 +18707,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['IL23_UP', 'TH17_UP'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'AUTOIMMUNE',
-    description: 'ИЛ‑23',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -18717,7 +18717,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CSF1_UP', 'MACROPHAGE_UP'],
     organs: ['BONE_MARROW'],
     deficiency: 'IMMUNE_WEAK',
-    description: 'CSF‑1',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -18727,7 +18727,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GCSF_UP', 'NEUTROPHIL_UP'],
     organs: ['BONE_MARROW'],
     deficiency: 'IMMUNE_WEAK',
-    description: 'G‑CSF',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -18737,7 +18737,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GMCSF_UP', 'WBC_UP'],
     organs: ['BONE_MARROW'],
     deficiency: 'IMMUNE_WEAK',
-    description: 'GM‑CSF',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -18747,7 +18747,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ERFE_UP', 'IRON_UP'],
     organs: ['BONE_MARROW'],
     deficiency: 'ANEMIA',
-    description: 'Эритроферрон',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -18757,7 +18757,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['HEPCIDIN_UP', 'IRON_DOWN'],
     organs: ['LIVER'],
     deficiency: 'ANEMIA',
-    description: 'Гепцидин печень',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -18767,7 +18767,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ANGPT1_UP', 'VESSEL_STABILITY'],
     organs: ['VESSELS'],
     deficiency: 'ISCHEMIA',
-    description: 'ANGPT‑1',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -18777,7 +18777,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ANGPT2_UP', 'VESSEL_LEAK'],
     organs: ['VESSELS'],
     deficiency: 'INFLAMMATION',
-    description: 'ANGPT‑2',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -18787,7 +18787,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['LEPTIN_SIGNAL', 'SATIETY'],
     organs: ['FAT_TISSUE'],
     deficiency: 'OBESITY',
-    description: 'Лептин‑сигнал',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -18797,7 +18797,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['RETNLB_UP', 'INFLAMMATION_UP'],
     organs: ['FAT_TISSUE'],
     deficiency: 'OBESITY',
-    description: 'RETNLB',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -18807,7 +18807,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CHEMERIN_UP', 'INFLAMMATION_UP'],
     organs: ['FAT_TISSUE'],
     deficiency: 'METABOLIC_SYNDROME',
-    description: 'Хемерин',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -18817,7 +18817,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['OMENTIN_UP', 'INSULIN_SENSITIVITY'],
     organs: ['FAT_TISSUE'],
     deficiency: 'DIABETES',
-    description: 'Оментин',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -18827,7 +18827,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ZAG_UP', 'LIPOLYSIS'],
     organs: ['FAT_TISSUE'],
     deficiency: 'OBESITY',
-    description: 'ZAG',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -18837,7 +18837,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['IL6_UP', 'ENERGY_UP'],
     organs: ['MUSCLES'],
     deficiency: 'EXERCISE',
-    description: 'ИЛ‑6 мышечный',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -18847,7 +18847,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['IL15_UP', 'MUSCLE_UP'],
     organs: ['MUSCLES'],
     deficiency: 'LOW_MUSCLE',
-    description: 'ИЛ‑15',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -18857,7 +18857,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['BDNF_UP', 'FAT_BURN'],
     organs: ['MUSCLES'],
     deficiency: 'FATIGUE',
-    description: 'BDNF мышечный',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -18867,7 +18867,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NGF_UP', 'NEUROREGEN'],
     organs: ['BRAIN'],
     deficiency: 'NEURO_DEGEN',
-    description: 'NGF',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -18877,7 +18877,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['BDNF_UP', 'NEUROPLASTICITY'],
     organs: ['BRAIN'],
     deficiency: 'DEPRESSION',
-    description: 'BDNF',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -18887,7 +18887,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GDNF_UP', 'DOPAMINE_UP'],
     organs: ['BRAIN'],
     deficiency: 'PARKINSON',
-    description: 'GDNF',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -18897,7 +18897,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NTS_UP', 'PAIN_DOWN'],
     organs: ['BRAIN'],
     deficiency: 'PAIN',
-    description: 'Нейротензин мозг',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -18907,7 +18907,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CRF_UP', 'STRESS_UP'],
     organs: ['BRAIN'],
     deficiency: 'STRESS',
-    description: 'CRF мозг',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -18917,7 +18917,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ENDORPHIN_UP', 'PAIN_DOWN'],
     organs: ['SKIN'],
     deficiency: 'DERMATITIS',
-    description: 'Эндорфин кожа',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -18927,7 +18927,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CGRP_UP', 'VASODILATION'],
     organs: ['SKIN'],
     deficiency: 'MIGRAINE',
-    description: 'CGRP кожа',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -18937,7 +18937,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GALANIN_UP', 'MOTILITY_DOWN'],
     organs: ['GI'],
     deficiency: 'IBS',
-    description: 'Галанин ЖКТ',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -18947,7 +18947,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SP_UP', 'PAIN_UP'],
     organs: ['GI'],
     deficiency: 'IBS',
-    description: 'Субстанция P ЖКТ',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -18957,7 +18957,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ANGPTL8_UP', 'LIPID_MOD'],
     organs: ['LIVER'],
     deficiency: 'FATTY_LIVER',
-    description: 'ANGPTL8',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -18967,7 +18967,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['FGF19_UP', 'BILE_FLOW'],
     organs: ['LIVER'],
     deficiency: 'GI_ISSUES',
-    description: 'FGF‑19',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -18977,7 +18977,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['DKK1_UP', 'BONE_DOWN'],
     organs: ['BONES'],
     deficiency: 'OSTEOPOROSIS',
-    description: 'DKK‑1',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -18987,7 +18987,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['WNT_UP', 'BONE_UP'],
     organs: ['BONES'],
     deficiency: 'OSTEOPOROSIS',
-    description: 'WNT',
+    description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
   {
@@ -18997,7 +18997,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ACH_UP', 'NEUROPLASTICITY'],
     organs: ['BRAIN'],
     deficiency: 'COGNITION',
-    description: 'Пирацетам',
+    description: 'Фармсредство для когнитивных функций',
     type: 'pharma'
   },
   {
@@ -19007,7 +19007,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['AMPA_UP', 'ANXIOLYTIC'],
     organs: ['BRAIN'],
     deficiency: 'ANXIETY',
-    description: 'Анирацетам',
+    description: 'Фармсредство для когнитивных функций',
     type: 'pharma'
   },
   {
@@ -19017,7 +19017,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GLUTAMATE_UP', 'MEMORY_UP'],
     organs: ['BRAIN'],
     deficiency: 'COGNITION',
-    description: 'Оксирацетам',
+    description: 'Фармсредство для когнитивных функций',
     type: 'pharma'
   },
   {
@@ -19027,7 +19027,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ACH_UP', 'FOCUS_UP'],
     organs: ['BRAIN'],
     deficiency: 'FOCUS',
-    description: 'Прамирацетам',
+    description: 'Фармсредство для когнитивных функций',
     type: 'pharma'
   },
   {
@@ -19037,7 +19037,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GABA_UP', 'AMPA_MOD'],
     organs: ['BRAIN'],
     deficiency: 'ANXIETY',
-    description: 'Фасорацетам',
+    description: 'Фармсредство для когнитивных функций',
     type: 'pharma'
   },
   {
@@ -19047,7 +19047,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ACH_SYNTHESIS_UP'],
     organs: ['BRAIN'],
     deficiency: 'COGNITION',
-    description: 'Колурацетам',
+    description: 'Фармсредство для когнитивных функций',
     type: 'pharma'
   },
   {
@@ -19057,7 +19057,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['BDNF_UP', 'NGF_UP'],
     organs: ['BRAIN'],
     deficiency: 'COGNITION',
-    description: 'Ноопепт',
+    description: 'Фармсредство для когнитивных функций',
     type: 'pharma'
   },
   {
@@ -19067,7 +19067,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['BDNF_UP', 'NEUROPROTECTION'],
     organs: ['BRAIN'],
     deficiency: 'COGNITION',
-    description: 'Семакс',
+    description: 'Фармсредство для когнитивных функций',
     type: 'pharma'
   },
   {
@@ -19077,7 +19077,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GABA_UP', 'NEURO_SIGNALING'],
     organs: ['BRAIN'],
     deficiency: 'ANXIETY',
-    description: 'Селанк',
+    description: 'Фармсредство для когнитивных функций, снижения тревоги',
     type: 'pharma'
   },
   {
@@ -19087,7 +19087,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ACH_UP', 'PHOSPHOLIPIDS_UP'],
     organs: ['BRAIN'],
     deficiency: 'COGNITION',
-    description: 'Цитиколин',
+    description: 'Фармсредство для когнитивных функций',
     type: 'pharma'
   },
   {
@@ -19097,7 +19097,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ACH_UP', 'GH_UP'],
     organs: ['BRAIN'],
     deficiency: 'COGNITION',
-    description: 'Альфа‑GPC',
+    description: 'Фармсредство для когнитивных функций',
     type: 'pharma'
   },
   {
@@ -19107,7 +19107,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['BLOOD_FLOW_UP', 'NEUROPROTECTION'],
     organs: ['BRAIN'],
     deficiency: 'HEADACHE',
-    description: 'Винпоцетин',
+    description: 'Фармсредство для когнитивных функций',
     type: 'pharma'
   },
   {
@@ -19117,7 +19117,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['BLOOD_FLOW_UP'],
     organs: ['BRAIN'],
     deficiency: 'VERTIGO',
-    description: 'Винкамин',
+    description: 'Фармсредство для когнитивных функций',
     type: 'pharma'
   },
   {
@@ -19127,7 +19127,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ALPHA_BLOCK', 'BLOOD_FLOW_UP'],
     organs: ['BRAIN'],
     deficiency: 'MIGRAINE',
-    description: 'Ницерголин',
+    description: 'Фармсредство для когнитивных функций',
     type: 'pharma'
   },
   {
@@ -19137,7 +19137,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CALCIUM_BLOCK', 'VESTIBULAR_MOD'],
     organs: ['BRAIN'],
     deficiency: 'VERTIGO',
-    description: 'Циннаризин',
+    description: 'Фармсредство для когнитивных функций',
     type: 'pharma'
   },
   {
@@ -19147,7 +19147,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CALCIUM_BLOCK', 'MIGRAINE_DOWN'],
     organs: ['BRAIN'],
     deficiency: 'MIGRAINE',
-    description: 'Флунаразин',
+    description: 'Фармсредство для когнитивных функций',
     type: 'pharma'
   },
   {
@@ -19157,7 +19157,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['DOPAMINE_UP', 'OREXIN_UP'],
     organs: ['BRAIN'],
     deficiency: 'FATIGUE',
-    description: 'Модафинил',
+    description: 'Фармсредство для когнитивных функций',
     type: 'pharma'
   },
   {
@@ -19167,7 +19167,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['DOPAMINE_UP', 'WAKE_UP'],
     organs: ['BRAIN'],
     deficiency: 'FATIGUE',
-    description: 'Адрафинил',
+    description: 'Фармсредство для когнитивных функций',
     type: 'pharma'
   },
   {
@@ -19177,7 +19177,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['DOPAMINE_UP', 'NEUROPROTECTION'],
     organs: ['BRAIN'],
     deficiency: 'LOW_MOOD',
-    description: 'Селегилин',
+    description: 'Фармсредство для когнитивных функций',
     type: 'pharma'
   },
   {
@@ -19187,7 +19187,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['DOPAMINE_UP'],
     organs: ['BRAIN'],
     deficiency: 'PARKINSON',
-    description: 'Разагилин',
+    description: 'Фармсредство для когнитивных функций',
     type: 'pharma'
   },
   {
@@ -19197,7 +19197,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NMDA_BLOCK', 'NEUROPROTECTION'],
     organs: ['BRAIN'],
     deficiency: 'COGNITION',
-    description: 'Мемантин',
+    description: 'Фармсредство для когнитивных функций',
     type: 'pharma'
   },
   {
@@ -19207,7 +19207,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NMDA_BLOCK', 'DOPAMINE_UP'],
     organs: ['BRAIN'],
     deficiency: 'FATIGUE',
-    description: 'Амантадин',
+    description: 'Фармсредство для когнитивных функций',
     type: 'pharma'
   },
   {
@@ -19217,7 +19217,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['DOPAMINE_UP', 'IMMUNE_UP'],
     organs: ['BRAIN'],
     deficiency: 'FATIGUE',
-    description: 'Бромантан',
+    description: 'Фармсредство для когнитивных функций, адаптации к стрессу',
     type: 'pharma'
   },
   {
@@ -19227,7 +19227,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GLUTAMATE_MOD', 'MOOD_UP'],
     organs: ['BRAIN'],
     deficiency: 'ANXIETY',
-    description: 'Тианептин',
+    description: 'Фармсредство для когнитивных функций, снижения тревоги',
     type: 'pharma'
   },
   {
@@ -19237,7 +19237,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ACH_INHIBITOR', 'NEUROPROTECTION'],
     organs: ['BRAIN'],
     deficiency: 'COGNITION',
-    description: 'Гуперзин‑A',
+    description: 'Фармсредство для когнитивных функций',
     type: 'pharma'
   },
   {
@@ -19247,7 +19247,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['AMPA_UP', 'NEUROPLASTICITY'],
     organs: ['BRAIN'],
     deficiency: 'COGNITION',
-    description: 'Ампакин SUN‑11602',
+    description: 'Фармсредство для когнитивных функций',
     type: 'pharma'
   },
   {
@@ -19257,7 +19257,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['AMPA_UP', 'MEMORY_UP'],
     organs: ['BRAIN'],
     deficiency: 'COGNITION',
-    description: 'Ампакин FAR',
+    description: 'Фармсредство для когнитивных функций',
     type: 'pharma'
   },
   {
@@ -19267,7 +19267,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['COX_BLOCK', 'PAIN_DOWN'],
     organs: ['BRAIN'],
     deficiency: 'HEADACHE',
-    description: 'Проглуметацин',
+    description: 'Фармсредство для когнитивных функций, противовоспалительной защиты',
     type: 'pharma'
   },
   {
@@ -19277,7 +19277,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NEUROTROPHIC_UP', 'BDNF_UP'],
     organs: ['BRAIN'],
     deficiency: 'STROKE',
-    description: 'Церебролизин',
+    description: 'Фармсредство для когнитивных функций',
     type: 'pharma'
   },
   {
@@ -19287,7 +19287,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NEUROPEPTIDE_UP', 'NEUROPROTECTION'],
     organs: ['BRAIN'],
     deficiency: 'COGNITION',
-    description: 'Кортексин',
+    description: 'Фармсредство для когнитивных функций',
     type: 'pharma'
   },
   {
@@ -19297,7 +19297,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['BLOOD_FLOW_UP', 'CELL_METABOLISM_UP'],
     organs: ['BRAIN'],
     deficiency: 'STROKE',
-    description: 'Актовегин',
+    description: 'Фармсредство для когнитивных функций',
     type: 'pharma'
   },
   {
@@ -19307,7 +19307,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ANTIOX_UP', 'GABA_UP'],
     organs: ['BRAIN'],
     deficiency: 'STRESS',
-    description: 'Мексидол',
+    description: 'Фармсредство для когнитивных функций, защиты клеток от окислительного стресса',
     type: 'pharma'
   },
   {
@@ -19317,7 +19317,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ANTIOX_UP', 'NEUROPROTECTION'],
     organs: ['BRAIN'],
     deficiency: 'STRESS',
-    description: 'Эмоксипин',
+    description: 'Фармсредство для когнитивных функций, защиты клеток от окислительного стресса',
     type: 'pharma'
   },
   {
@@ -19327,7 +19327,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GABA_UP', 'BLOOD_FLOW_UP'],
     organs: ['BRAIN'],
     deficiency: 'ANXIETY',
-    description: 'Пикамилон',
+    description: 'Фармсредство для когнитивных функций',
     type: 'pharma'
   },
   {
@@ -19337,7 +19337,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GABA_UP', 'NEUROPROTECTION'],
     organs: ['BRAIN'],
     deficiency: 'ADHD',
-    description: 'Пантогам',
+    description: 'Фармсредство для когнитивных функций',
     type: 'pharma'
   },
   {
@@ -19347,7 +19347,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GABA_UP', 'CALMING'],
     organs: ['BRAIN'],
     deficiency: 'ANXIETY',
-    description: 'Пантокальцин',
+    description: 'Фармсредство для когнитивных функций',
     type: 'pharma'
   },
   {
@@ -19357,7 +19357,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GABA_UP', 'CALMING'],
     organs: ['BRAIN'],
     deficiency: 'ANXIETY',
-    description: 'Фенибут',
+    description: 'Фармсредство для когнитивных функций, снижения тревоги',
     type: 'pharma'
   },
   {
@@ -19367,7 +19367,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GABA_B_UP', 'SPASM_DOWN'],
     organs: ['BRAIN'],
     deficiency: 'SPASTICITY',
-    description: 'Баклофен',
+    description: 'Фармсредство для когнитивных функций',
     type: 'pharma'
   },
   {
@@ -19377,7 +19377,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ATP_UP', 'BLOOD_FLOW_UP'],
     organs: ['BRAIN'],
     deficiency: 'FATIGUE',
-    description: 'Цитофлавин',
+    description: 'Фармсредство для когнитивных функций',
     type: 'pharma'
   },
   {
@@ -19387,7 +19387,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CARNITINE_MOD', 'ENERGY_UP'],
     organs: ['CELLS'],
     deficiency: 'FATIGUE',
-    description: 'Мельдоний',
+    description: 'Фармсредство для когнитивных функций',
     type: 'pharma'
   },
   {
@@ -19397,7 +19397,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['METABOLISM_SHIFT', 'ATP_UP'],
     organs: ['HEART'],
     deficiency: 'ANGINA',
-    description: 'Триметазидин',
+    description: 'Фармсредство для когнитивных функций, ССС',
     type: 'pharma'
   },
   {
@@ -19407,7 +19407,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NAD_UP', 'ENERGY_UP'],
     organs: ['CELLS'],
     deficiency: 'FATIGUE',
-    description: 'Никотинамид',
+    description: 'Фармсредство для когнитивных функций',
     type: 'pharma'
   },
   {
@@ -19417,7 +19417,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NAD_UP', 'MITO_UP'],
     organs: ['CELLS'],
     deficiency: 'AGING',
-    description: 'NMN',
+    description: 'Фармсредство для когнитивных функций',
     type: 'pharma'
   },
   {
@@ -19427,7 +19427,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NAD_UP', 'MITO_UP'],
     organs: ['CELLS'],
     deficiency: 'AGING',
-    description: 'NR',
+    description: 'Фармсредство для когнитивных функций',
     type: 'pharma'
   },
   {
@@ -19437,7 +19437,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['BDNF_UP', 'MOOD_STABILIZE'],
     organs: ['BRAIN'],
     deficiency: 'MOOD_SWINGS',
-    description: 'Литий оротат',
+    description: 'Фармсредство для когнитивных функций',
     type: 'pharma'
   },
   {
@@ -19447,7 +19447,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GABA_UP', 'ALPHA_WAVES_UP'],
     organs: ['BRAIN'],
     deficiency: 'ANXIETY',
-    description: 'Теанин',
+    description: 'Фармсредство для когнитивных функций',
     type: 'pharma'
   },
   {
@@ -19457,7 +19457,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ADENOSINE_BLOCK', 'WAKE_UP'],
     organs: ['BRAIN'],
     deficiency: 'FATIGUE',
-    description: 'Кофеин',
+    description: 'Фармсредство для поддержки обменных процессов и здоровья',
     type: 'pharma'
   },
   {
@@ -19467,7 +19467,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ADENOSINE_BLOCK', 'BLOOD_FLOW_UP'],
     organs: ['BRAIN'],
     deficiency: 'FATIGUE',
-    description: 'Теобромин',
+    description: 'Фармсредство для поддержки обменных процессов и здоровья',
     type: 'pharma'
   },
   {
@@ -19477,7 +19477,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['DOPAMINE_UP', 'ENERGY_UP'],
     organs: ['BRAIN'],
     deficiency: 'FATIGUE',
-    description: 'Сульбутиамин',
+    description: 'Фармсредство для когнитивных функций',
     type: 'pharma'
   },
   {
@@ -19487,7 +19487,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['DOPAMINE_UP', 'NEUROTRANSMITTER_UP'],
     organs: ['BRAIN'],
     deficiency: 'STRESS',
-    description: 'Тирозин',
+    description: 'Фармсредство для когнитивных функций',
     type: 'pharma'
   },
   {
@@ -19497,7 +19497,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SSRI', 'SEROTONIN_UP'],
     organs: ['BRAIN'],
     deficiency: 'DEPRESSION',
-    description: 'Сертралин',
+    description: 'Фармсредство для поддержки обменных процессов и здоровья',
     type: 'pharma'
   },
   {
@@ -19507,7 +19507,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SSRI', 'SEROTONIN_UP'],
     organs: ['BRAIN'],
     deficiency: 'DEPRESSION',
-    description: 'Флуоксетин',
+    description: 'Фармсредство для поддержки обменных процессов и здоровья',
     type: 'pharma'
   },
   {
@@ -19517,7 +19517,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SSRI', 'SEROTONIN_UP'],
     organs: ['BRAIN'],
     deficiency: 'ANXIETY',
-    description: 'Пароксетин',
+    description: 'Фармсредство для поддержки обменных процессов и здоровья',
     type: 'pharma'
   },
   {
@@ -19527,7 +19527,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SSRI', 'SEROTONIN_UP'],
     organs: ['BRAIN'],
     deficiency: 'DEPRESSION',
-    description: 'Эсциталопрам',
+    description: 'Фармсредство для поддержки обменных процессов и здоровья',
     type: 'pharma'
   },
   {
@@ -19537,7 +19537,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SSRI', 'SEROTONIN_UP'],
     organs: ['BRAIN'],
     deficiency: 'DEPRESSION',
-    description: 'Циталопрам',
+    description: 'Фармсредство для поддержки обменных процессов и здоровья',
     type: 'pharma'
   },
   {
@@ -19547,7 +19547,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SSRI', 'SEROTONIN_UP'],
     organs: ['BRAIN'],
     deficiency: 'DEPRESSION',
-    description: 'Сертралин',
+    description: 'Фармсредство для поддержки обменных процессов и здоровья',
     type: 'pharma'
   },
   {
@@ -19557,7 +19557,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SSRI', 'SEROTONIN_UP'],
     organs: ['BRAIN'],
     deficiency: 'OCD',
-    description: 'Флувоксамин',
+    description: 'Фармсредство для поддержки обменных процессов и здоровья',
     type: 'pharma'
   },
   {
@@ -19567,7 +19567,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SNRI', 'SEROTONIN_UP', 'NE_UP'],
     organs: ['BRAIN'],
     deficiency: 'DEPRESSION',
-    description: 'Венлафаксин',
+    description: 'Фармсредство для поддержки обменных процессов и здоровья',
     type: 'pharma'
   },
   {
@@ -19577,7 +19577,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SNRI', 'NE_UP'],
     organs: ['BRAIN'],
     deficiency: 'DEPRESSION',
-    description: 'Десвенлафаксин',
+    description: 'Фармсредство для поддержки обменных процессов и здоровья',
     type: 'pharma'
   },
   {
@@ -19587,7 +19587,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SNRI', 'PAIN_DOWN'],
     organs: ['BRAIN'],
     deficiency: 'ANXIETY',
-    description: 'Дулоксетин',
+    description: 'Фармсредство для поддержки обменных процессов и здоровья',
     type: 'pharma'
   },
   {
@@ -19597,7 +19597,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SNRI', 'PAIN_DOWN'],
     organs: ['BRAIN'],
     deficiency: 'FIBROMYALGIA',
-    description: 'Милнаципран',
+    description: 'Фармсредство для поддержки обменных процессов и здоровья',
     type: 'pharma'
   },
   {
@@ -19607,7 +19607,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['DOPAMINE_UP', 'NE_UP'],
     organs: ['BRAIN'],
     deficiency: 'LOW_MOTIVATION',
-    description: 'Бупропион',
+    description: 'Фармсредство для поддержки обменных процессов и здоровья',
     type: 'pharma'
   },
   {
@@ -19617,7 +19617,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ALPHA2_BLOCK', 'SEROTONIN_UP', 'HUNGER_UP'],
     organs: ['BRAIN'],
     deficiency: 'INSOMNIA',
-    description: 'Миртазапин',
+    description: 'Фармсредство для поддержки обменных процессов и здоровья',
     type: 'pharma'
   },
   {
@@ -19627,7 +19627,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SEROTONIN_MOD', 'SLEEP_UP'],
     organs: ['BRAIN'],
     deficiency: 'INSOMNIA',
-    description: 'Тразодон',
+    description: 'Фармсредство для поддержки обменных процессов и здоровья',
     type: 'pharma'
   },
   {
@@ -19637,7 +19637,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MELATONIN_AGONIST', 'BDNF_UP'],
     organs: ['BRAIN'],
     deficiency: 'DEPRESSION',
-    description: 'Агомелатин',
+    description: 'Фармсредство для поддержки обменных процессов и здоровья',
     type: 'pharma'
   },
   {
@@ -19647,7 +19647,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SEROTONIN_MOD', 'COGNITION_UP'],
     organs: ['BRAIN'],
     deficiency: 'DEPRESSION',
-    description: 'Вортиоксетин',
+    description: 'Фармсредство для поддержки обменных процессов и здоровья',
     type: 'pharma'
   },
   {
@@ -19657,7 +19657,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GLUTAMATE_MOD', 'MOOD_UP'],
     organs: ['BRAIN'],
     deficiency: 'ANXIETY',
-    description: 'Тианептин',
+    description: 'Фармсредство для поддержки обменных процессов и здоровья',
     type: 'pharma'
   },
   {
@@ -19667,7 +19667,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['TCA', 'SEROTONIN_UP', 'NE_UP'],
     organs: ['BRAIN'],
     deficiency: 'PAIN',
-    description: 'Амитриптилин',
+    description: 'Фармсредство для поддержки обменных процессов и здоровья',
     type: 'pharma'
   },
   {
@@ -19677,7 +19677,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['TCA', 'SEROTONIN_UP'],
     organs: ['BRAIN'],
     deficiency: 'DEPRESSION',
-    description: 'Имипрамин',
+    description: 'Фармсредство для поддержки обменных процессов и здоровья',
     type: 'pharma'
   },
   {
@@ -19687,7 +19687,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['TCA', 'SEROTONIN_UP'],
     organs: ['BRAIN'],
     deficiency: 'OCD',
-    description: 'Кломипрамин',
+    description: 'Фармсредство для поддержки обменных процессов и здоровья',
     type: 'pharma'
   },
   {
@@ -19697,7 +19697,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MAO_B_INHIBITOR', 'DOPAMINE_UP'],
     organs: ['BRAIN'],
     deficiency: 'DEPRESSION',
-    description: 'Селегилин МАО',
+    description: 'Фармсредство для поддержки обменных процессов и здоровья',
     type: 'pharma'
   },
   {
@@ -19707,7 +19707,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MAO_INHIBITOR', 'MONOAMINES_UP'],
     organs: ['BRAIN'],
     deficiency: 'DEPRESSION',
-    description: 'Транилципромин',
+    description: 'Фармсредство для поддержки обменных процессов и здоровья',
     type: 'pharma'
   },
   {
@@ -19717,7 +19717,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['5HT1A_AGONIST', 'ANXIETY_DOWN'],
     organs: ['BRAIN'],
     deficiency: 'ANXIETY',
-    description: 'Буспирон',
+    description: 'Фармсредство для снижения тревоги',
     type: 'pharma'
   },
   {
@@ -19727,7 +19727,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['H1_BLOCK', 'CALMING'],
     organs: ['BRAIN'],
     deficiency: 'ANXIETY',
-    description: 'Гидроксизин',
+    description: 'Фармсредство для снижения тревоги',
     type: 'pharma'
   },
   {
@@ -19737,7 +19737,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CALCIUM_MOD', 'ANXIETY_DOWN'],
     organs: ['BRAIN'],
     deficiency: 'ANXIETY',
-    description: 'Прегабалин',
+    description: 'Фармсредство для снижения тревоги',
     type: 'pharma'
   },
   {
@@ -19747,7 +19747,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CALCIUM_MOD', 'PAIN_DOWN'],
     organs: ['BRAIN'],
     deficiency: 'ANXIETY',
-    description: 'Габапентин',
+    description: 'Фармсредство для снижения тревоги',
     type: 'pharma'
   },
   {
@@ -19757,7 +19757,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GABA_A_UP', 'CALMING'],
     organs: ['BRAIN'],
     deficiency: 'ANXIETY',
-    description: 'Диазепам',
+    description: 'Фармсредство для снижения тревоги',
     type: 'pharma'
   },
   {
@@ -19767,7 +19767,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GABA_A_UP', 'SEDATION'],
     organs: ['BRAIN'],
     deficiency: 'ANXIETY',
-    description: 'Лоразепам',
+    description: 'Фармсредство для снижения тревоги',
     type: 'pharma'
   },
   {
@@ -19777,7 +19777,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GABA_A_UP', 'CALMING'],
     organs: ['BRAIN'],
     deficiency: 'PANIC',
-    description: 'Алпразолам',
+    description: 'Фармсредство для снижения тревоги',
     type: 'pharma'
   },
   {
@@ -19787,7 +19787,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GABA_A_UP', 'SEIZURE_DOWN'],
     organs: ['BRAIN'],
     deficiency: 'ANXIETY',
-    description: 'Клоназепам',
+    description: 'Фармсредство для снижения тревоги',
     type: 'pharma'
   },
   {
@@ -19797,7 +19797,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GABA_A_UP', 'CALMING'],
     organs: ['BRAIN'],
     deficiency: 'ANXIETY',
-    description: 'Этизолам',
+    description: 'Фармсредство для снижения тревоги',
     type: 'pharma'
   },
   {
@@ -19807,7 +19807,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['BETA_BLOCK', 'ADRENALINE_DOWN'],
     organs: ['HEART'],
     deficiency: 'ANXIETY',
-    description: 'Пропранолол',
+    description: 'Фармсредство для снижения тревоги',
     type: 'pharma'
   },
   {
@@ -19817,7 +19817,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['H1_BLOCK', 'SEROTONIN_MOD'],
     organs: ['BRAIN'],
     deficiency: 'INSOMNIA',
-    description: 'Кветиапин низкие дозы',
+    description: 'Фармсредство для снижения тревоги, успокоения',
     type: 'pharma'
   },
   {
@@ -19827,7 +19827,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['D2_BLOCK', 'SEROTONIN_BLOCK'],
     organs: ['BRAIN'],
     deficiency: 'AGITATION',
-    description: 'Оланзапин',
+    description: 'Фармсредство для снижения тревоги',
     type: 'pharma'
   },
   {
@@ -19837,7 +19837,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['D2_BLOCK', 'SEROTONIN_BLOCK'],
     organs: ['BRAIN'],
     deficiency: 'AGITATION',
-    description: 'Рисперидон',
+    description: 'Фармсредство для поддержки обменных процессов и здоровья',
     type: 'pharma'
   },
   {
@@ -19847,7 +19847,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['D2_PARTIAL', 'SEROTONIN_MOD'],
     organs: ['BRAIN'],
     deficiency: 'DEPRESSION',
-    description: 'Арипипразол',
+    description: 'Фармсредство для поддержки обменных процессов и здоровья',
     type: 'pharma'
   },
   {
@@ -19857,7 +19857,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GLUTAMATE_DOWN', 'MOOD_STABILIZE'],
     organs: ['BRAIN'],
     deficiency: 'BIPOLAR',
-    description: 'Ламотриджин',
+    description: 'Фармсредство для поддержки обменных процессов и здоровья',
     type: 'pharma'
   },
   {
@@ -19867,7 +19867,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GABA_UP', 'MOOD_STABILIZE'],
     organs: ['BRAIN'],
     deficiency: 'BIPOLAR',
-    description: 'Вальпроат',
+    description: 'Фармсредство для поддержки обменных процессов и здоровья',
     type: 'pharma'
   },
   {
@@ -19877,7 +19877,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['BDNF_UP', 'MOOD_STABILIZE'],
     organs: ['BRAIN'],
     deficiency: 'BIPOLAR',
-    description: 'Литий',
+    description: 'Фармсредство для поддержки обменных процессов и здоровья',
     type: 'pharma'
   },
   {
@@ -19887,7 +19887,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NMDA_BLOCK', 'BDNF_UP'],
     organs: ['BRAIN'],
     deficiency: 'DEPRESSION',
-    description: 'Кетамин низкие дозы',
+    description: 'Фармсредство для поддержки обменных процессов и здоровья',
     type: 'pharma'
   },
   {
@@ -19897,7 +19897,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NMDA_BLOCK', 'RAPID_ANTIDEPRESSANT'],
     organs: ['BRAIN'],
     deficiency: 'DEPRESSION',
-    description: 'Эскетамин',
+    description: 'Фармсредство для поддержки обменных процессов и здоровья',
     type: 'pharma'
   },
   {
@@ -19907,7 +19907,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SODIUM_BLOCK', 'MOOD_STABILIZE'],
     organs: ['BRAIN'],
     deficiency: 'BIPOLAR',
-    description: 'Карбамазепин',
+    description: 'Фармсредство для поддержки обменных процессов и здоровья',
     type: 'pharma'
   },
   {
@@ -19917,7 +19917,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GABA_UP', 'GLUTAMATE_DOWN'],
     organs: ['BRAIN'],
     deficiency: 'MOOD_SWINGS',
-    description: 'Топирамат',
+    description: 'Фармсредство для поддержки обменных процессов и здоровья',
     type: 'pharma'
   },
   {
@@ -19927,7 +19927,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['D2_BLOCK', 'ANTI_NAUSEA'],
     organs: ['BRAIN'],
     deficiency: 'ANXIETY',
-    description: 'Прохлорперазин',
+    description: 'Фармсредство для поддержки обменных процессов и здоровья',
     type: 'pharma'
   },
   {
@@ -19937,7 +19937,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SEROTONIN_BLOCK', 'HISTAMINE_UP'],
     organs: ['BRAIN'],
     deficiency: 'SEROTONIN_SYNDROME',
-    description: 'Ципрогептадин',
+    description: 'Фармсредство для поддержки обменных процессов и здоровья',
     type: 'pharma'
   },
   {
@@ -19947,7 +19947,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['HISTAMINE_MOD', 'BLOOD_FLOW_UP'],
     organs: ['BRAIN'],
     deficiency: 'VERTIGO',
-    description: 'Бетагистин',
+    description: 'Фармсредство для поддержки обменных процессов и здоровья',
     type: 'pharma'
   },
   {
@@ -19957,7 +19957,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GABA_UP', 'MUSCLE_RELAX'],
     organs: ['BRAIN'],
     deficiency: 'ANXIETY',
-    description: 'Мианесин',
+    description: 'Фармсредство для снижения тревоги',
     type: 'pharma'
   },
   {
@@ -19967,7 +19967,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ALPHA2_AGONIST', 'SPASM_DOWN'],
     organs: ['SPINE'],
     deficiency: 'SPASTICITY',
-    description: 'Тизанидин',
+    description: 'Фармсредство для снижения тревоги',
     type: 'pharma'
   },
   {
@@ -19977,7 +19977,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['AMPK_UP', 'GLUCOSE_DOWN'],
     organs: ['PANCREAS', 'LIVER'],
     deficiency: 'DIABETES',
-    description: 'Метформин',
+    description: 'Фармсредство для поддержки обменных процессов и здоровья',
     type: 'pharma'
   },
   {
@@ -19987,7 +19987,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ALPHA_GLUCO_INHIBIT', 'GLUCOSE_DOWN'],
     organs: ['GI'],
     deficiency: 'DIABETES',
-    description: 'Акарбоза',
+    description: 'Фармсредство для поддержки обменных процессов и здоровья',
     type: 'pharma'
   },
   {
@@ -19997,7 +19997,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['PPAR_GAMMA_UP', 'INSULIN_SENSITIVITY'],
     organs: ['FAT_TISSUE'],
     deficiency: 'DIABETES',
-    description: 'Пиоглитазон',
+    description: 'Фармсредство для поддержки обменных процессов и здоровья',
     type: 'pharma'
   },
   {
@@ -20007,7 +20007,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['PPAR_GAMMA_UP', 'INSULIN_SENSITIVITY'],
     organs: ['FAT_TISSUE'],
     deficiency: 'DIABETES',
-    description: 'Розиглитазон',
+    description: 'Фармсредство для поддержки обменных процессов и здоровья',
     type: 'pharma'
   },
   {
@@ -20017,7 +20017,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['DPP4_INHIBIT', 'GLP1_UP'],
     organs: ['PANCREAS'],
     deficiency: 'DIABETES',
-    description: 'Ситаглиптин',
+    description: 'Фармсредство для поддержки обменных процессов и здоровья',
     type: 'pharma'
   },
   {
@@ -20027,7 +20027,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['DPP4_INHIBIT', 'GLP1_UP'],
     organs: ['PANCREAS'],
     deficiency: 'DIABETES',
-    description: 'Вилдаглиптин',
+    description: 'Фармсредство для поддержки обменных процессов и здоровья',
     type: 'pharma'
   },
   {
@@ -20037,7 +20037,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['DPP4_INHIBIT', 'GLP1_UP'],
     organs: ['PANCREAS'],
     deficiency: 'DIABETES',
-    description: 'Линаглиптин',
+    description: 'Фармсредство для поддержки обменных процессов и здоровья',
     type: 'pharma'
   },
   {
@@ -20047,7 +20047,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GLP1_AGONIST', 'INSULIN_UP'],
     organs: ['PANCREAS'],
     deficiency: 'DIABETES',
-    description: 'Эксенатид',
+    description: 'Фармсредство для поддержки обменных процессов и здоровья',
     type: 'pharma'
   },
   {
@@ -20057,7 +20057,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GLP1_AGONIST', 'HUNGER_DOWN'],
     organs: ['PANCREAS'],
     deficiency: 'OBESITY',
-    description: 'Лираглутид',
+    description: 'Фармсредство для поддержки обменных процессов и здоровья',
     type: 'pharma'
   },
   {
@@ -20067,7 +20067,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GLP1_AGONIST', 'HUNGER_DOWN'],
     organs: ['PANCREAS'],
     deficiency: 'OBESITY',
-    description: 'Семаглутид',
+    description: 'Фармсредство для поддержки обменных процессов и здоровья',
     type: 'pharma'
   },
   {
@@ -20077,7 +20077,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['INSULIN_UP', 'GLUCOSE_DOWN'],
     organs: ['PANCREAS'],
     deficiency: 'DIABETES',
-    description: 'Инсулин человеческий',
+    description: 'Фармсредство для поддержки обменных процессов и здоровья',
     type: 'pharma'
   },
   {
@@ -20087,7 +20087,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['INSULIN_UP', 'GLUCOSE_DOWN'],
     organs: ['PANCREAS'],
     deficiency: 'DIABETES',
-    description: 'Инсулин аспарт',
+    description: 'Фармсредство для поддержки обменных процессов и здоровья',
     type: 'pharma'
   },
   {
@@ -20097,7 +20097,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['INSULIN_UP', 'GLUCOSE_DOWN'],
     organs: ['PANCREAS'],
     deficiency: 'DIABETES',
-    description: 'Инсулин гларгин',
+    description: 'Фармсредство для поддержки обменных процессов и здоровья',
     type: 'pharma'
   },
   {
@@ -20107,7 +20107,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['T4_UP', 'METABOLISM_UP'],
     organs: ['THYROID'],
     deficiency: 'HYPOTHYROIDISM',
-    description: 'Левотироксин',
+    description: 'Фармсредство для поддержки обменных процессов и здоровья',
     type: 'pharma'
   },
   {
@@ -20117,7 +20117,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['T3_UP', 'METABOLISM_UP'],
     organs: ['THYROID'],
     deficiency: 'HYPOTHYROIDISM',
-    description: 'Лиотиронин',
+    description: 'Фармсредство для поддержки обменных процессов и здоровья',
     type: 'pharma'
   },
   {
@@ -20127,7 +20127,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['T4_BLOCK', 'T3_BLOCK'],
     organs: ['THYROID'],
     deficiency: 'HYPERTHYROIDISM',
-    description: 'ПТУ',
+    description: 'Фармсредство для поддержки обменных процессов и здоровья',
     type: 'pharma'
   },
   {
@@ -20137,7 +20137,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['T4_BLOCK', 'T3_BLOCK'],
     organs: ['THYROID'],
     deficiency: 'HYPERTHYROIDISM',
-    description: 'Метимазол',
+    description: 'Фармсредство для поддержки обменных процессов и здоровья',
     type: 'pharma'
   },
   {
@@ -20147,7 +20147,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CORTISOL_UP', 'ANTI_INFLAMMATION'],
     organs: ['ADRENALS'],
     deficiency: 'ADRENAL_INSUFF',
-    description: 'Гидрокортизон',
+    description: 'Фармсредство для поддержки обменных процессов и здоровья',
     type: 'pharma'
   },
   {
@@ -20157,7 +20157,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CORTISOL_ANALOG', 'ANTI_INFLAMMATION'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'AUTOIMMUNE',
-    description: 'Преднизолон',
+    description: 'Фармсредство для поддержки обменных процессов и здоровья',
     type: 'pharma'
   },
   {
@@ -20167,7 +20167,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CORTISOL_ANALOG', 'ANTI_INFLAMMATION'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'INFLAMMATION',
-    description: 'Дексаметазон',
+    description: 'Фармсредство для поддержки обменных процессов и здоровья',
     type: 'pharma'
   },
   {
@@ -20177,7 +20177,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ALDOSTERONE_UP', 'SODIUM_RETAIN'],
     organs: ['ADRENALS'],
     deficiency: 'ADDISON',
-    description: 'Флудрокортизон',
+    description: 'Фармсредство для поддержки обменных процессов и здоровья',
     type: 'pharma'
   },
   {
@@ -20187,7 +20187,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['TESTOSTERONE_UP', 'ANABOLISM'],
     organs: ['TESTES'],
     deficiency: 'LOW_TESTOSTERONE',
-    description: 'Тестостерон фарм',
+    description: 'Фармсредство для поддержки обменных процессов и здоровья',
     type: 'pharma'
   },
   {
@@ -20197,7 +20197,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['TESTOSTERONE_UP', 'ANABOLISM'],
     organs: ['SKIN'],
     deficiency: 'LOW_TESTOSTERONE',
-    description: 'Тестостерон гель',
+    description: 'Фармсредство для поддержки обменных процессов и здоровья',
     type: 'pharma'
   },
   {
@@ -20207,7 +20207,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['TESTOSTERONE_UP', 'ANABOLISM'],
     organs: ['TESTES'],
     deficiency: 'LOW_TESTOSTERONE',
-    description: 'Тестостерон У',
+    description: 'Фармсредство для поддержки обменных процессов и здоровья',
     type: 'pharma'
   },
   {
@@ -20217,7 +20217,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['DHT_UP', 'ANDROGENIC_EFFECTS'],
     organs: ['SKIN'],
     deficiency: 'LOW_LIBIDO',
-    description: 'ДГТ гель',
+    description: 'Фармсредство для поддержки обменных процессов и здоровья',
     type: 'pharma'
   },
   {
@@ -20227,7 +20227,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['E2_UP', 'FERTILITY'],
     organs: ['OVARIES'],
     deficiency: 'LOW_E2',
-    description: 'Эстрадиол фарм',
+    description: 'Фармсредство для поддержки обменных процессов и здоровья',
     type: 'pharma'
   },
   {
@@ -20237,7 +20237,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['E2_UP', 'MENOPAUSE'],
     organs: ['SKIN'],
     deficiency: 'MENOPAUSE',
-    description: 'Эстрадиол пластырь',
+    description: 'Фармсредство для поддержки обменных процессов и здоровья',
     type: 'pharma'
   },
   {
@@ -20247,7 +20247,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['PROGESTERONE_UP', 'CALMING'],
     organs: ['OVARIES'],
     deficiency: 'ANXIETY',
-    description: 'Прогестерон фарм',
+    description: 'Фармсредство для поддержки обменных процессов и здоровья',
     type: 'pharma'
   },
   {
@@ -20257,7 +20257,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['PROGESTERONE_UP', 'UTERUS_SUPPORT'],
     organs: ['UTERUS'],
     deficiency: 'PMS',
-    description: 'Дидрогестерон',
+    description: 'Фармсредство для поддержки обменных процессов и здоровья',
     type: 'pharma'
   },
   {
@@ -20267,7 +20267,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['DOPAMINE_UP', 'PROLACTIN_DOWN'],
     organs: ['PITUITARY'],
     deficiency: 'HYPERPROLACTINEMIA',
-    description: 'Каберголин',
+    description: 'Фармсредство для поддержки обменных процессов и здоровья',
     type: 'pharma'
   },
   {
@@ -20277,7 +20277,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['DOPAMINE_UP', 'PROLACTIN_DOWN'],
     organs: ['PITUITARY'],
     deficiency: 'HYPERPROLACTINEMIA',
-    description: 'Бромокриптин',
+    description: 'Фармсредство для поддержки обменных процессов и здоровья',
     type: 'pharma'
   },
   {
@@ -20287,7 +20287,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['HCG_UP', 'TESTOSTERONE_UP'],
     organs: ['TESTES'],
     deficiency: 'INFERTILITY',
-    description: 'ХГЧ фарм',
+    description: 'Фармсредство для поддержки обменных процессов и здоровья',
     type: 'pharma'
   },
   {
@@ -20297,7 +20297,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GNRH_AGONIST', 'LH_FSH_DOWN'],
     organs: ['PITUITARY'],
     deficiency: 'PCOS',
-    description: 'Лейпрорелин',
+    description: 'Фармсредство для поддержки обменных процессов и здоровья',
     type: 'pharma'
   },
   {
@@ -20307,7 +20307,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GNRH_BLOCK', 'LH_FSH_DOWN'],
     organs: ['PITUITARY'],
     deficiency: 'IVF',
-    description: 'Цетрореликс',
+    description: 'Фармсредство для поддержки обменных процессов и здоровья',
     type: 'pharma'
   },
   {
@@ -20317,7 +20317,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GH_UP', 'IGF1_UP'],
     organs: ['PITUITARY'],
     deficiency: 'LOW_GH',
-    description: 'Соматропин',
+    description: 'Фармсредство для поддержки обменных процессов и здоровья',
     type: 'pharma'
   },
   {
@@ -20327,7 +20327,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['IGF1_UP', 'ANABOLISM'],
     organs: ['LIVER'],
     deficiency: 'LOW_IGF1',
-    description: 'ИФР‑1 фарм',
+    description: 'Фармсредство для поддержки обменных процессов и здоровья',
     type: 'pharma'
   },
   {
@@ -20337,7 +20337,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ADH_UP', 'WATER_RETAIN'],
     organs: ['KIDNEYS'],
     deficiency: 'DIABETES_INSIPIDUS',
-    description: 'Десмопрессин',
+    description: 'Фармсредство для поддержки обменных процессов и здоровья',
     type: 'pharma'
   },
   {
@@ -20347,7 +20347,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ALDOSTERONE_BLOCK', 'ANDROGEN_BLOCK'],
     organs: ['KIDNEYS'],
     deficiency: 'ACNE',
-    description: 'Спиронолактон',
+    description: 'Фармсредство для поддержки обменных процессов и здоровья',
     type: 'pharma'
   },
   {
@@ -20357,7 +20357,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['DHT_BLOCK', 'HAIR_PROTECT'],
     organs: ['SKIN'],
     deficiency: 'HAIR_LOSS',
-    description: 'Финастерид',
+    description: 'Фармсредство для поддержки обменных процессов и здоровья',
     type: 'pharma'
   },
   {
@@ -20367,7 +20367,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['DHT_BLOCK', 'PROSTATE_PROTECT'],
     organs: ['PROSTATE'],
     deficiency: 'BPH',
-    description: 'Дутастерид',
+    description: 'Фармсредство для поддержки обменных процессов и здоровья',
     type: 'pharma'
   },
   {
@@ -20377,7 +20377,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['LIPASE_BLOCK', 'FAT_ABSORB_DOWN'],
     organs: ['GI'],
     deficiency: 'OBESITY',
-    description: 'Орлистат',
+    description: 'Фармсредство для поддержки обменных процессов и здоровья',
     type: 'pharma'
   },
   {
@@ -20387,7 +20387,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CARBONIC_ANHYDRASE_BLOCK', 'PH_MOD'],
     organs: ['KIDNEYS'],
     deficiency: 'ALTITUDE',
-    description: 'Ацетазоламид',
+    description: 'Фармсредство для поддержки обменных процессов и здоровья',
     type: 'pharma'
   },
   {
@@ -20397,7 +20397,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['T3_T4_UP', 'METABOLISM_UP'],
     organs: ['THYROID'],
     deficiency: 'HYPOTHYROIDISM',
-    description: 'Тиреоэкстракт',
+    description: 'Фармсредство для поддержки обменных процессов и здоровья',
     type: 'pharma'
   },
   {
@@ -20407,7 +20407,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['PROGESTERONE_BLOCK', 'CORTISOL_BLOCK'],
     organs: ['UTERUS'],
     deficiency: 'CUSHING',
-    description: 'Мифепристон',
+    description: 'Фармсредство для поддержки обменных процессов и здоровья',
     type: 'pharma'
   },
   {
@@ -20417,7 +20417,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CORTISOL_BLOCK', 'ANDROGEN_BLOCK'],
     organs: ['ADRENALS'],
     deficiency: 'CUSHING',
-    description: 'Кетоконазол гормон',
+    description: 'Фармсредство для поддержки обменных процессов и здоровья',
     type: 'pharma'
   },
   {
@@ -20427,7 +20427,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ADRENAL_SUPPRESS', 'CORTISOL_DOWN'],
     organs: ['ADRENALS'],
     deficiency: 'CUSHING',
-    description: 'Митотан',
+    description: 'Фармсредство для поддержки обменных процессов и здоровья',
     type: 'pharma'
   },
   {
@@ -20437,7 +20437,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['HMGCR_BLOCK', 'LDL_DOWN'],
     organs: ['LIVER'],
     deficiency: 'HIGH_LDL',
-    description: 'Аторвастатин',
+    description: 'Фармсредство для ССС',
     type: 'pharma'
   },
   {
@@ -20447,7 +20447,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['HMGCR_BLOCK', 'LDL_DOWN'],
     organs: ['LIVER'],
     deficiency: 'HIGH_LDL',
-    description: 'Розувастатин',
+    description: 'Фармсредство для ССС',
     type: 'pharma'
   },
   {
@@ -20457,7 +20457,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['HMGCR_BLOCK', 'LDL_DOWN'],
     organs: ['LIVER'],
     deficiency: 'HIGH_LDL',
-    description: 'Симвастатин',
+    description: 'Фармсредство для ССС',
     type: 'pharma'
   },
   {
@@ -20467,7 +20467,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CHOLESTEROL_ABSORB_BLOCK', 'LDL_DOWN'],
     organs: ['GI'],
     deficiency: 'HIGH_LDL',
-    description: 'Эзетимиб',
+    description: 'Фармсредство для ССС',
     type: 'pharma'
   },
   {
@@ -20477,7 +20477,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['PPAR_ALPHA_UP', 'TRIGLYCERIDES_DOWN'],
     organs: ['LIVER'],
     deficiency: 'HIGH_TG',
-    description: 'Фенофибрат',
+    description: 'Фармсредство для ССС',
     type: 'pharma'
   },
   {
@@ -20487,7 +20487,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['PPAR_ALPHA_UP', 'TRIGLYCERIDES_DOWN'],
     organs: ['LIVER'],
     deficiency: 'HIGH_TG',
-    description: 'Гемфиброзил',
+    description: 'Фармсредство для ССС',
     type: 'pharma'
   },
   {
@@ -20497,7 +20497,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['HDL_UP', 'LDL_DOWN'],
     organs: ['LIVER'],
     deficiency: 'HIGH_LIPIDS',
-    description: 'Ниацин',
+    description: 'Фармсредство для ССС',
     type: 'pharma'
   },
   {
@@ -20507,7 +20507,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['TRIGLYCERIDES_DOWN', 'ANTI_INFLAMMATION'],
     organs: ['BLOOD'],
     deficiency: 'HIGH_TG',
-    description: 'Омега‑3 Rx',
+    description: 'Фармсредство для ССС',
     type: 'pharma'
   },
   {
@@ -20517,7 +20517,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['PLATELET_BLOCK', 'CLOT_DOWN'],
     organs: ['BLOOD'],
     deficiency: 'THROMBOSIS',
-    description: 'Клопидогрел',
+    description: 'Фармсредство для ССС',
     type: 'pharma'
   },
   {
@@ -20527,7 +20527,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['PLATELET_BLOCK', 'CLOT_DOWN'],
     organs: ['BLOOD'],
     deficiency: 'THROMBOSIS',
-    description: 'Тикагрелор',
+    description: 'Фармсредство для ССС',
     type: 'pharma'
   },
   {
@@ -20537,7 +20537,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['PLATELET_BLOCK', 'CLOT_DOWN'],
     organs: ['BLOOD'],
     deficiency: 'THROMBOSIS',
-    description: 'Прасугрел',
+    description: 'Фармсредство для ССС',
     type: 'pharma'
   },
   {
@@ -20547,7 +20547,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['VITK_BLOCK', 'CLOT_DOWN'],
     organs: ['BLOOD'],
     deficiency: 'THROMBOSIS',
-    description: 'Варфарин',
+    description: 'Фармсредство для ССС',
     type: 'pharma'
   },
   {
@@ -20557,7 +20557,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['FACTOR_XA_BLOCK', 'CLOT_DOWN'],
     organs: ['BLOOD'],
     deficiency: 'THROMBOSIS',
-    description: 'Апиксабан',
+    description: 'Фармсредство для ССС',
     type: 'pharma'
   },
   {
@@ -20567,7 +20567,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['FACTOR_XA_BLOCK', 'CLOT_DOWN'],
     organs: ['BLOOD'],
     deficiency: 'THROMBOSIS',
-    description: 'Ривароксабан',
+    description: 'Фармсредство для ССС',
     type: 'pharma'
   },
   {
@@ -20577,7 +20577,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ACE_BLOCK', 'BP_DOWN'],
     organs: ['VESSELS'],
     deficiency: 'HIGH_BP',
-    description: 'Эналаприл',
+    description: 'Фармсредство для ССС',
     type: 'pharma'
   },
   {
@@ -20587,7 +20587,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ACE_BLOCK', 'BP_DOWN'],
     organs: ['VESSELS'],
     deficiency: 'HIGH_BP',
-    description: 'Лизиноприл',
+    description: 'Фармсредство для ССС',
     type: 'pharma'
   },
   {
@@ -20597,7 +20597,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ACE_BLOCK', 'BP_DOWN'],
     organs: ['VESSELS'],
     deficiency: 'HIGH_BP',
-    description: 'Рамиприл',
+    description: 'Фармсредство для ССС',
     type: 'pharma'
   },
   {
@@ -20607,7 +20607,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ANG2_BLOCK', 'BP_DOWN'],
     organs: ['VESSELS'],
     deficiency: 'HIGH_BP',
-    description: 'Лозартан',
+    description: 'Фармсредство для ССС',
     type: 'pharma'
   },
   {
@@ -20617,7 +20617,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ANG2_BLOCK', 'BP_DOWN'],
     organs: ['VESSELS'],
     deficiency: 'HIGH_BP',
-    description: 'Валсартан',
+    description: 'Фармсредство для ССС',
     type: 'pharma'
   },
   {
@@ -20627,7 +20627,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ANG2_BLOCK', 'PPAR_UP'],
     organs: ['VESSELS'],
     deficiency: 'HIGH_BP',
-    description: 'Телмисартан',
+    description: 'Фармсредство для ССС',
     type: 'pharma'
   },
   {
@@ -20637,7 +20637,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CALCIUM_BLOCK', 'VASODILATION'],
     organs: ['VESSELS'],
     deficiency: 'HIGH_BP',
-    description: 'Амлодипин',
+    description: 'Фармсредство для ССС',
     type: 'pharma'
   },
   {
@@ -20647,7 +20647,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CALCIUM_BLOCK', 'VASODILATION'],
     organs: ['VESSELS'],
     deficiency: 'HIGH_BP',
-    description: 'Нифедипин',
+    description: 'Фармсредство для ССС',
     type: 'pharma'
   },
   {
@@ -20657,7 +20657,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CALCIUM_BLOCK', 'HEART_RATE_DOWN'],
     organs: ['HEART'],
     deficiency: 'ARRHYTHMIA',
-    description: 'Верапамил',
+    description: 'Фармсредство для ССС',
     type: 'pharma'
   },
   {
@@ -20667,7 +20667,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['BETA1_BLOCK', 'BP_DOWN'],
     organs: ['HEART'],
     deficiency: 'HIGH_BP',
-    description: 'Метопролол',
+    description: 'Фармсредство для ССС',
     type: 'pharma'
   },
   {
@@ -20677,7 +20677,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['BETA1_BLOCK', 'BP_DOWN'],
     organs: ['HEART'],
     deficiency: 'HIGH_BP',
-    description: 'Бисопролол',
+    description: 'Фармсредство для ССС',
     type: 'pharma'
   },
   {
@@ -20687,7 +20687,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['BETA_BLOCK', 'ALPHA_BLOCK'],
     organs: ['HEART'],
     deficiency: 'HEART_FAILURE',
-    description: 'Карведилол',
+    description: 'Фармсредство для ССС',
     type: 'pharma'
   },
   {
@@ -20697,7 +20697,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NAK_ATPASE_BLOCK', 'HEART_FORCE_UP'],
     organs: ['HEART'],
     deficiency: 'HEART_FAILURE',
-    description: 'Дигоксин',
+    description: 'Фармсредство для ССС',
     type: 'pharma'
   },
   {
@@ -20707,7 +20707,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['LOOP_DIURETIC', 'SODIUM_DOWN'],
     organs: ['KIDNEYS'],
     deficiency: 'EDEMA',
-    description: 'Фуросемид',
+    description: 'Фармсредство для ССС',
     type: 'pharma'
   },
   {
@@ -20717,7 +20717,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['THIAZIDE', 'BP_DOWN'],
     organs: ['KIDNEYS'],
     deficiency: 'HIGH_BP',
-    description: 'Гидрохлоротиазид',
+    description: 'Фармсредство для ССС',
     type: 'pharma'
   },
   {
@@ -20727,7 +20727,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ALDOSTERONE_BLOCK', 'BP_DOWN'],
     organs: ['KIDNEYS'],
     deficiency: 'HIGH_BP',
-    description: 'Спиронолактон кардио',
+    description: 'Фармсредство для ССС',
     type: 'pharma'
   },
   {
@@ -20737,7 +20737,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['PPI', 'ACID_DOWN'],
     organs: ['STOMACH'],
     deficiency: 'GERD',
-    description: 'Омепразол',
+    description: 'Фармсредство для поддержки обменных процессов и здоровья',
     type: 'pharma'
   },
   {
@@ -20747,7 +20747,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['PPI', 'ACID_DOWN'],
     organs: ['STOMACH'],
     deficiency: 'GERD',
-    description: 'Эзомепразол',
+    description: 'Фармсредство для поддержки обменных процессов и здоровья',
     type: 'pharma'
   },
   {
@@ -20757,7 +20757,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['PPI', 'ACID_DOWN'],
     organs: ['STOMACH'],
     deficiency: 'GERD',
-    description: 'Пантопразол',
+    description: 'Фармсредство для поддержки обменных процессов и здоровья',
     type: 'pharma'
   },
   {
@@ -20767,7 +20767,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['H2_BLOCK', 'ACID_DOWN'],
     organs: ['STOMACH'],
     deficiency: 'GERD',
-    description: 'Ранитидин',
+    description: 'Фармсредство для поддержки обменных процессов и здоровья',
     type: 'pharma'
   },
   {
@@ -20777,7 +20777,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['H2_BLOCK', 'ACID_DOWN'],
     organs: ['STOMACH'],
     deficiency: 'GERD',
-    description: 'Фамотидин',
+    description: 'Фармсредство для поддержки обменных процессов и здоровья',
     type: 'pharma'
   },
   {
@@ -20787,7 +20787,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['D2_BLOCK', 'MOTILITY_UP'],
     organs: ['GI'],
     deficiency: 'NAUSEA',
-    description: 'Домперидон',
+    description: 'Фармсредство для поддержки обменных процессов и здоровья',
     type: 'pharma'
   },
   {
@@ -20797,7 +20797,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['D2_BLOCK', 'MOTILITY_UP'],
     organs: ['GI'],
     deficiency: 'NAUSEA',
-    description: 'Метоклопрамид',
+    description: 'Фармсредство для поддержки обменных процессов и здоровья',
     type: 'pharma'
   },
   {
@@ -20807,7 +20807,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ACH_UP', 'MOTILITY_UP'],
     organs: ['GI'],
     deficiency: 'NAUSEA',
-    description: 'Итоприд',
+    description: 'Фармсредство для поддержки обменных процессов и здоровья',
     type: 'pharma'
   },
   {
@@ -20817,7 +20817,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['OPIOID_MOD', 'MOTILITY_BALANCE'],
     organs: ['GI'],
     deficiency: 'IBS',
-    description: 'Тримебутин',
+    description: 'Фармсредство для поддержки обменных процессов и здоровья',
     type: 'pharma'
   },
   {
@@ -20827,7 +20827,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['OSMOTIC_LAX', 'MOTILITY_UP'],
     organs: ['GI'],
     deficiency: 'CONSTIPATION',
-    description: 'Лактулоза',
+    description: 'Фармсредство для поддержки обменных процессов и здоровья',
     type: 'pharma'
   },
   {
@@ -20837,7 +20837,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['OSMOTIC_LAX', 'MOTILITY_UP'],
     organs: ['GI'],
     deficiency: 'CONSTIPATION',
-    description: 'Макрогол',
+    description: 'Фармсредство для поддержки обменных процессов и здоровья',
     type: 'pharma'
   },
   {
@@ -20847,7 +20847,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ANTI_INFLAMMATION'],
     organs: ['GI'],
     deficiency: 'IBD',
-    description: 'Месалазин',
+    description: 'Фармсредство для иммунной системы',
     type: 'pharma'
   },
   {
@@ -20857,7 +20857,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ANTI_INFLAMMATION'],
     organs: ['GI'],
     deficiency: 'IBD',
-    description: 'Сульфасалазин',
+    description: 'Фармсредство для иммунной системы',
     type: 'pharma'
   },
   {
@@ -20867,7 +20867,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CORTISOL_ANALOG', 'ANTI_INFLAMMATION'],
     organs: ['GI'],
     deficiency: 'IBD',
-    description: 'Преднизон ЖКТ',
+    description: 'Фармсредство для иммунной системы',
     type: 'pharma'
   },
   {
@@ -20877,7 +20877,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['IMMUNE_SUPPRESS', 'AUTOIMMUNE_DOWN'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'IBD',
-    description: 'Азатиоприн',
+    description: 'Фармсредство для иммунной системы',
     type: 'pharma'
   },
   {
@@ -20887,7 +20887,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['IMMUNE_SUPPRESS', 'ANTI_INFLAMMATION'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'AUTOIMMUNE',
-    description: 'Метотрексат',
+    description: 'Фармсредство для иммунной системы',
     type: 'pharma'
   },
   {
@@ -20897,7 +20897,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CALCINEURIN_BLOCK', 'IMMUNE_SUPPRESS'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'AUTOIMMUNE',
-    description: 'Циклоспорин',
+    description: 'Фармсредство для иммунной системы',
     type: 'pharma'
   },
   {
@@ -20907,7 +20907,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CALCINEURIN_BLOCK', 'IMMUNE_SUPPRESS'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'AUTOIMMUNE',
-    description: 'Такролимус',
+    description: 'Фармсредство для иммунной системы',
     type: 'pharma'
   },
   {
@@ -20917,7 +20917,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['TNF_BLOCK', 'INFLAMMATION_DOWN'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'AUTOIMMUNE',
-    description: 'Адалимумаб',
+    description: 'Фармсредство для иммунной системы',
     type: 'pharma'
   },
   {
@@ -20927,7 +20927,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['TNF_BLOCK', 'INFLAMMATION_DOWN'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'AUTOIMMUNE',
-    description: 'Инфликсимаб',
+    description: 'Фармсредство для иммунной системы',
     type: 'pharma'
   },
   {
@@ -20937,7 +20937,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['TNF_BLOCK', 'INFLAMMATION_DOWN'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'AUTOIMMUNE',
-    description: 'Этанерцепт',
+    description: 'Фармсредство для иммунной системы',
     type: 'pharma'
   },
   {
@@ -20947,7 +20947,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['JAK_BLOCK', 'INFLAMMATION_DOWN'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'AUTOIMMUNE',
-    description: 'Тоfacitinib',
+    description: 'Фармсредство для иммунной системы',
     type: 'pharma'
   },
   {
@@ -20957,7 +20957,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['JAK_BLOCK', 'INFLAMMATION_DOWN'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'AUTOIMMUNE',
-    description: 'Барицитиниб',
+    description: 'Фармсредство для иммунной системы',
     type: 'pharma'
   },
   {
@@ -20967,7 +20967,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['H1_BLOCK', 'ALLERGY_DOWN'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'ALLERGY',
-    description: 'Цетиризин',
+    description: 'Фармсредство для поддержки обменных процессов и здоровья',
     type: 'pharma'
   },
   {
@@ -20977,7 +20977,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['H1_BLOCK', 'ALLERGY_DOWN'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'ALLERGY',
-    description: 'Левоцетиризин',
+    description: 'Фармсредство для поддержки обменных процессов и здоровья',
     type: 'pharma'
   },
   {
@@ -20987,7 +20987,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['H1_BLOCK', 'ALLERGY_DOWN'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'ALLERGY',
-    description: 'Лоратадин',
+    description: 'Фармсредство для поддержки обменных процессов и здоровья',
     type: 'pharma'
   },
   {
@@ -20997,7 +20997,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['H1_BLOCK', 'ALLERGY_DOWN'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'ALLERGY',
-    description: 'Дезлоратадин',
+    description: 'Фармсредство для поддержки обменных процессов и здоровья',
     type: 'pharma'
   },
   {
@@ -21007,7 +21007,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['H1_BLOCK', 'ALLERGY_DOWN'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'ALLERGY',
-    description: 'Фексофенадин',
+    description: 'Фармсредство для поддержки обменных процессов и здоровья',
     type: 'pharma'
   },
   {
@@ -21017,7 +21017,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['H1_BLOCK', 'PAF_BLOCK'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'ALLERGY',
-    description: 'Рупатадин',
+    description: 'Фармсредство для поддержки обменных процессов и здоровья',
     type: 'pharma'
   },
   {
@@ -21027,7 +21027,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['H1_BLOCK', 'MAST_CELL_STABILIZE'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'ASTHMA',
-    description: 'Кетотифен',
+    description: 'Фармсредство для поддержки обменных процессов и здоровья',
     type: 'pharma'
   },
   {
@@ -21037,7 +21037,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['H1_BLOCK', 'LOCAL_EFFECT'],
     organs: ['NOSE'],
     deficiency: 'ALLERGY',
-    description: 'Азеластин',
+    description: 'Фармсредство для поддержки обменных процессов и здоровья',
     type: 'pharma'
   },
   {
@@ -21047,7 +21047,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['LT_BLOCK', 'BRONCHO_RELAX'],
     organs: ['LUNGS'],
     deficiency: 'ASTHMA',
-    description: 'Монтелукаст',
+    description: 'Фармсредство для поддержки обменных процессов и здоровья',
     type: 'pharma'
   },
   {
@@ -21057,7 +21057,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['LT_BLOCK', 'INFLAMMATION_DOWN'],
     organs: ['LUNGS'],
     deficiency: 'ASTHMA',
-    description: 'Зафирлукаст',
+    description: 'Фармсредство для поддержки обменных процессов и здоровья',
     type: 'pharma'
   },
   {
@@ -21067,7 +21067,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['COX_BLOCK', 'PAIN_DOWN'],
     organs: ['TISSUES'],
     deficiency: 'PAIN',
-    description: 'Ибупрофен',
+    description: 'Фармсредство для противовоспалительной защиты',
     type: 'pharma'
   },
   {
@@ -21077,7 +21077,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['COX_BLOCK', 'PAIN_DOWN'],
     organs: ['TISSUES'],
     deficiency: 'PAIN',
-    description: 'Напроксен',
+    description: 'Фармсредство для противовоспалительной защиты',
     type: 'pharma'
   },
   {
@@ -21087,7 +21087,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['COX_BLOCK', 'PAIN_DOWN'],
     organs: ['TISSUES'],
     deficiency: 'PAIN',
-    description: 'Кетопрофен',
+    description: 'Фармсредство для противовоспалительной защиты',
     type: 'pharma'
   },
   {
@@ -21097,7 +21097,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['COX_BLOCK', 'PAIN_DOWN'],
     organs: ['TISSUES'],
     deficiency: 'PAIN',
-    description: 'Диклофенак',
+    description: 'Фармсредство для противовоспалительной защиты',
     type: 'pharma'
   },
   {
@@ -21107,7 +21107,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['COX2_BLOCK', 'PAIN_DOWN'],
     organs: ['TISSUES'],
     deficiency: 'ARTHRITIS',
-    description: 'Мелоксикам',
+    description: 'Фармсредство для противовоспалительной защиты',
     type: 'pharma'
   },
   {
@@ -21117,7 +21117,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['COX2_BLOCK', 'PAIN_DOWN'],
     organs: ['TISSUES'],
     deficiency: 'ARTHRITIS',
-    description: 'Целекоксиб',
+    description: 'Фармсредство для противовоспалительной защиты',
     type: 'pharma'
   },
   {
@@ -21127,7 +21127,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['COX2_BLOCK', 'PAIN_DOWN'],
     organs: ['TISSUES'],
     deficiency: 'ARTHRITIS',
-    description: 'Эторикоксиб',
+    description: 'Фармсредство для противовоспалительной защиты',
     type: 'pharma'
   },
   {
@@ -21137,7 +21137,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['COX2_BLOCK', 'PAIN_DOWN'],
     organs: ['TISSUES'],
     deficiency: 'PAIN',
-    description: 'Нимесулид',
+    description: 'Фармсредство для противовоспалительной защиты',
     type: 'pharma'
   },
   {
@@ -21147,7 +21147,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['COX_CNS_BLOCK', 'PAIN_DOWN'],
     organs: ['BRAIN'],
     deficiency: 'FEVER',
-    description: 'Парацетамол',
+    description: 'Фармсредство для поддержки обменных процессов и здоровья',
     type: 'pharma'
   },
   {
@@ -21157,7 +21157,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SPASMOLYTIC', 'PAIN_DOWN'],
     organs: ['TISSUES'],
     deficiency: 'PAIN',
-    description: 'Метамизол',
+    description: 'Фармсредство для поддержки обменных процессов и здоровья',
     type: 'pharma'
   },
   {
@@ -21167,7 +21167,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['COX_BLOCK', 'PAIN_DOWN'],
     organs: ['TISSUES'],
     deficiency: 'PAIN',
-    description: 'Кеторолак',
+    description: 'Фармсредство для поддержки обменных процессов и здоровья',
     type: 'pharma'
   },
   {
@@ -21177,7 +21177,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CORTISOL_ANALOG', 'ANTI_INFLAMMATION'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'AUTOIMMUNE',
-    description: 'Преднизон',
+    description: 'Фармсредство для поддержки обменных процессов и здоровья',
     type: 'pharma'
   },
   {
@@ -21187,7 +21187,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CORTISOL_ANALOG', 'ANTI_INFLAMMATION'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'INFLAMMATION',
-    description: 'Метилпреднизолон',
+    description: 'Фармсредство для поддержки обменных процессов и здоровья',
     type: 'pharma'
   },
   {
@@ -21197,7 +21197,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['IMMUNE_SUPPRESS', 'AUTOIMMUNE_DOWN'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'AUTOIMMUNE',
-    description: 'Циклофосфамид',
+    description: 'Фармсредство для иммунной системы',
     type: 'pharma'
   },
   {
@@ -21207,7 +21207,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['IMMUNE_SUPPRESS', 'AUTOIMMUNE_DOWN'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'AUTOIMMUNE',
-    description: 'Микофенолат',
+    description: 'Фармсредство для иммунной системы',
     type: 'pharma'
   },
   {
@@ -21217,7 +21217,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['IFN_UP', 'ANTIVIRAL'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'INFECTION',
-    description: 'Интерферон‑α',
+    description: 'Фармсредство для иммунной системы',
     type: 'pharma'
   },
   {
@@ -21227,7 +21227,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['IFN_UP', 'IMMUNE_MOD'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'MS',
-    description: 'Интерферон‑β',
+    description: 'Фармсредство для иммунной системы',
     type: 'pharma'
   },
   {
@@ -21237,7 +21237,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NEURAMINIDASE_BLOCK', 'VIRUS_REPLICATION_DOWN'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'FLU',
-    description: 'Осельтамивир',
+    description: 'Фармсредство для противовирусной защиты',
     type: 'pharma'
   },
   {
@@ -21247,7 +21247,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NEURAMINIDASE_BLOCK', 'VIRUS_REPLICATION_DOWN'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'FLU',
-    description: 'Занамивир',
+    description: 'Фармсредство для противовирусной защиты',
     type: 'pharma'
   },
   {
@@ -21257,7 +21257,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['DNA_POL_BLOCK', 'VIRUS_DOWN'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'HERPES',
-    description: 'Ацикловир',
+    description: 'Фармсредство для противовирусной защиты',
     type: 'pharma'
   },
   {
@@ -21267,7 +21267,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['DNA_POL_BLOCK', 'VIRUS_DOWN'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'HERPES',
-    description: 'Валацикловир',
+    description: 'Фармсредство для противовирусной защиты',
     type: 'pharma'
   },
   {
@@ -21277,7 +21277,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['BETA_LACTAM', 'BACTERIA_DOWN'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'INFECTION',
-    description: 'Амоксициллин',
+    description: 'Фармсредство для поддержки обменных процессов и здоровья',
     type: 'pharma'
   },
   {
@@ -21287,7 +21287,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['BETA_LACTAM', 'BACTERIA_DOWN'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'INFECTION',
-    description: 'Аугментин',
+    description: 'Фармсредство для поддержки обменных процессов и здоровья',
     type: 'pharma'
   },
   {
@@ -21297,7 +21297,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['BETA_LACTAM', 'BACTERIA_DOWN'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'INFECTION',
-    description: 'Ампициллин',
+    description: 'Фармсредство для поддержки обменных процессов и здоровья',
     type: 'pharma'
   },
   {
@@ -21307,7 +21307,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CEPHALOSPORIN', 'BACTERIA_DOWN'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'INFECTION',
-    description: 'Цефтриаксон',
+    description: 'Фармсредство для поддержки обменных процессов и здоровья',
     type: 'pharma'
   },
   {
@@ -21317,7 +21317,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CEPHALOSPORIN', 'BACTERIA_DOWN'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'INFECTION',
-    description: 'Цефиксим',
+    description: 'Фармсредство для поддержки обменных процессов и здоровья',
     type: 'pharma'
   },
   {
@@ -21327,7 +21327,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CEPHALOSPORIN', 'BACTERIA_DOWN'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'INFECTION',
-    description: 'Цефуроксим',
+    description: 'Фармсредство для поддержки обменных процессов и здоровья',
     type: 'pharma'
   },
   {
@@ -21337,7 +21337,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MACROLIDE', 'BACTERIA_DOWN'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'INFECTION',
-    description: 'Азитромицин',
+    description: 'Фармсредство для поддержки обменных процессов и здоровья',
     type: 'pharma'
   },
   {
@@ -21347,7 +21347,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MACROLIDE', 'BACTERIA_DOWN'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'INFECTION',
-    description: 'Кларитромицин',
+    description: 'Фармсредство для поддержки обменных процессов и здоровья',
     type: 'pharma'
   },
   {
@@ -21357,7 +21357,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['TETRACYCLINE', 'BACTERIA_DOWN'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'INFECTION',
-    description: 'Доксициклин',
+    description: 'Фармсредство для поддержки обменных процессов и здоровья',
     type: 'pharma'
   },
   {
@@ -21367,7 +21367,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['TETRACYCLINE', 'BACTERIA_DOWN'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'INFECTION',
-    description: 'Тетрациклин',
+    description: 'Фармсредство для поддержки обменных процессов и здоровья',
     type: 'pharma'
   },
   {
@@ -21377,7 +21377,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['FLUOROQUINOLONE', 'BACTERIA_DOWN'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'INFECTION',
-    description: 'Ципрофлоксацин',
+    description: 'Фармсредство для поддержки обменных процессов и здоровья',
     type: 'pharma'
   },
   {
@@ -21387,7 +21387,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['FLUOROQUINOLONE', 'BACTERIA_DOWN'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'INFECTION',
-    description: 'Левофлоксацин',
+    description: 'Фармсредство для поддержки обменных процессов и здоровья',
     type: 'pharma'
   },
   {
@@ -21397,7 +21397,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['FLUOROQUINOLONE', 'BACTERIA_DOWN'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'INFECTION',
-    description: 'Моксифлоксацин',
+    description: 'Фармсредство для поддержки обменных процессов и здоровья',
     type: 'pharma'
   },
   {
@@ -21407,7 +21407,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NITROIMIDAZOLE', 'ANAEROBES_DOWN'],
     organs: ['GI'],
     deficiency: 'INFECTION',
-    description: 'Метронидазол',
+    description: 'Фармсредство для поддержки обменных процессов и здоровья',
     type: 'pharma'
   },
   {
@@ -21417,7 +21417,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NITROIMIDAZOLE', 'ANAEROBES_DOWN'],
     organs: ['GI'],
     deficiency: 'INFECTION',
-    description: 'Тинидазол',
+    description: 'Фармсредство для поддержки обменных процессов и здоровья',
     type: 'pharma'
   },
   {
@@ -21427,7 +21427,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['OXAZOLIDINONE', 'GRAM_POS_DOWN'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'INFECTION',
-    description: 'Линезолид',
+    description: 'Фармсредство для поддержки обменных процессов и здоровья',
     type: 'pharma'
   },
   {
@@ -21437,7 +21437,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GLYCOPEPTIDE', 'GRAM_POS_DOWN'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'INFECTION',
-    description: 'Ванкомицин',
+    description: 'Фармсредство для поддержки обменных процессов и здоровья',
     type: 'pharma'
   },
   {
@@ -21447,7 +21447,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['RNA_POL_BLOCK', 'BACTERIA_DOWN'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'TB',
-    description: 'Рифампицин',
+    description: 'Фармсредство для поддержки обменных процессов и здоровья',
     type: 'pharma'
   },
   {
@@ -21457,7 +21457,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MYCOLIC_ACID_BLOCK', 'TB_DOWN'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'TB',
-    description: 'Изониазид',
+    description: 'Фармсредство для поддержки обменных процессов и здоровья',
     type: 'pharma'
   },
   {
@@ -21467,7 +21467,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['IRON_UP', 'RBC_UP'],
     organs: ['BLOOD'],
     deficiency: 'ANEMIA',
-    description: 'Айрон Гард',
+    description: 'Комплекс для поддержки обменных процессов и здоровья',
     type: 'complex'
   },
   {
@@ -21477,7 +21477,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CARTILAGE_UP', 'ANTI_INFLAMMATION'],
     organs: ['JOINTS'],
     deficiency: 'ARTHRITIS',
-    description: 'Джоин Хелс',
+    description: 'Комплекс для поддержки обменных процессов и здоровья',
     type: 'complex'
   },
   {
@@ -21487,7 +21487,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MITO_UP', 'ATP_UP'],
     organs: ['CELLS'],
     deficiency: 'FATIGUE',
-    description: 'АТФ Оптимайзер',
+    description: 'Комплекс для энергетического обмена',
     type: 'complex'
   },
   {
@@ -21497,7 +21497,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['T3_T4_UP', 'METABOLISM_UP'],
     organs: ['THYROID'],
     deficiency: 'HYPOTHYROIDISM',
-    description: 'Дио Макс',
+    description: 'Комплекс для щитовидной железы',
     type: 'complex'
   },
   {
@@ -21507,7 +21507,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ADRENAL_UP', 'CORTISOL_BALANCE'],
     organs: ['ADRENALS'],
     deficiency: 'LOW_ENERGY',
-    description: 'Зенкай Буст',
+    description: 'Комплекс для энергетического обмена',
     type: 'complex'
   },
   {
@@ -21517,7 +21517,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['POTASSIUM_UP', 'ELECTROLYTES_UP'],
     organs: ['CELLS'],
     deficiency: 'CRAMPS',
-    description: 'К‑Элемент',
+    description: 'Комплекс для поддержки обменных процессов и здоровья',
     type: 'complex'
   },
   {
@@ -21527,7 +21527,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NO_UP', 'STRENGTH_UP'],
     organs: ['MUSCLES'],
     deficiency: 'LOW_STRENGTH',
-    description: 'Геркулес Поушн',
+    description: 'Комплекс для производительности',
     type: 'complex'
   },
   {
@@ -21537,7 +21537,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['FAT_BURN_UP', 'THERMOGENESIS'],
     organs: ['FAT_TISSUE'],
     deficiency: 'OBESITY',
-    description: 'Файр Фьюз',
+    description: 'Комплекс для поддержки обменных процессов и здоровья',
     type: 'complex'
   },
   {
@@ -21547,7 +21547,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['TESTOSTERONE_UP', 'DRIVE_UP'],
     organs: ['TESTES'],
     deficiency: 'LOW_LIBIDO',
-    description: 'Пусси Бой Антидот',
+    description: 'Комплекс для поддержки обменных процессов и здоровья',
     type: 'complex'
   },
   {
@@ -21557,7 +21557,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['BP_DOWN', 'VESSELS_UP'],
     organs: ['VESSELS'],
     deficiency: 'HIGH_BP',
-    description: 'БП Оптимайзер',
+    description: 'Комплекс для ССС',
     type: 'complex'
   },
   {
@@ -21567,7 +21567,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['B_VITAMINS_UP', 'ENERGY_UP'],
     organs: ['CELLS'],
     deficiency: 'FATIGUE',
-    description: 'Б‑Реал',
+    description: 'Комплекс для поддержки обменных процессов и здоровья',
     type: 'complex'
   },
   {
@@ -21577,7 +21577,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['LUTEIN_UP', 'ANTIOX_UP'],
     organs: ['EYES'],
     deficiency: 'VISION_LOSS',
-    description: 'Фалкон Вижн',
+    description: 'Комплекс для зрения',
     type: 'complex'
   },
   {
@@ -21587,7 +21587,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['LIVER_UP', 'GI_UP'],
     organs: ['LIVER'],
     deficiency: 'TOXINS',
-    description: 'Процесс Ремеди',
+    description: 'Комплекс для детоксикации',
     type: 'complex'
   },
   {
@@ -21597,7 +21597,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GLYCOGEN_UP', 'ENDURANCE_UP'],
     organs: ['MUSCLES'],
     deficiency: 'LOW_ENDURANCE',
-    description: 'Карб Лоадер',
+    description: 'Комплекс для производительности',
     type: 'complex'
   },
   {
@@ -21607,7 +21607,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CARTILAGE_UP', 'INFLAMMATION_DOWN'],
     organs: ['JOINTS'],
     deficiency: 'ARTHRITIS',
-    description: 'Джоинт Хелс Оптимайзер',
+    description: 'Комплекс для поддержки обменных процессов и здоровья',
     type: 'complex'
   },
   {
@@ -21617,7 +21617,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SEROTONIN_UP', 'MOOD_UP'],
     organs: ['BRAIN'],
     deficiency: 'LOW_MOOD',
-    description: 'Зверобой',
+    description: 'Комплекс для нормализации настроения',
     type: 'complex'
   },
   {
@@ -21627,7 +21627,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['BLOOD_FLOW_UP', 'OXYGEN_UP'],
     organs: ['BLOOD'],
     deficiency: 'FATIGUE',
-    description: 'Фаст Блад',
+    description: 'Комплекс для кровообращения',
     type: 'complex'
   },
   {
@@ -21637,7 +21637,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['LUTEIN_UP', 'ANTIOX_UP'],
     organs: ['EYES'],
     deficiency: 'VISION_LOSS',
-    description: 'Бриллиант Сайт',
+    description: 'Комплекс для зрения',
     type: 'complex'
   },
   {
@@ -21647,7 +21647,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ACH_UP', 'BDNF_UP'],
     organs: ['BRAIN'],
     deficiency: 'FOCUS',
-    description: 'Крейзи Брейн',
+    description: 'Комплекс для когнитивных функций',
     type: 'complex'
   },
   {
@@ -21657,7 +21657,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['DOPAMINE_UP', 'NE_UP'],
     organs: ['BRAIN'],
     deficiency: 'ENERGY',
-    description: 'Дэнджерос',
+    description: 'Комплекс для поддержки обменных процессов и здоровья',
     type: 'complex'
   },
   {
@@ -21667,7 +21667,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MITO_UP', 'NEURO_UP'],
     organs: ['BRAIN'],
     deficiency: 'FOCUS',
-    description: 'Блейз Брейн',
+    description: 'Комплекс для когнитивных функций',
     type: 'complex'
   },
   {
@@ -21677,7 +21677,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['IMMUNE_UP', 'ANTIOX_UP'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'LOW_IMMUNITY',
-    description: 'Сальвус',
+    description: 'Комплекс для иммунной системы',
     type: 'complex'
   },
   {
@@ -21687,7 +21687,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ATP_UP', 'MITO_UP'],
     organs: ['CELLS'],
     deficiency: 'FATIGUE',
-    description: 'Энерджи Рейп',
+    description: 'Комплекс для энергетического обмена',
     type: 'complex'
   },
   {
@@ -21697,7 +21697,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['TESTOSTERONE_UP', 'DRIVE_UP'],
     organs: ['TESTES'],
     deficiency: 'LOW_LIBIDO',
-    description: 'Ай Эм Либидо',
+    description: 'Комплекс для поддержки обменных процессов и здоровья',
     type: 'complex'
   },
   {
@@ -21707,7 +21707,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['DOPAMINE_UP', 'SEROTONIN_UP'],
     organs: ['BRAIN'],
     deficiency: 'LOW_MOOD',
-    description: 'Гет Хай',
+    description: 'Комплекс для нормализации настроения',
     type: 'complex'
   },
   {
@@ -21717,7 +21717,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CORTISOL_BALANCE', 'STRESS_DOWN'],
     organs: ['BRAIN'],
     deficiency: 'STRESS',
-    description: 'Тайм Релиз',
+    description: 'Комплекс для адаптации к стрессу',
     type: 'complex'
   },
   {
@@ -21727,7 +21727,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['FIBRIN_DOWN', 'INFLAMMATION_DOWN'],
     organs: ['BLOOD'],
     deficiency: 'CLOTS',
-    description: 'Серрапептаза+Наттокиназа',
+    description: 'Комплекс для поддержки обменных процессов и здоровья',
     type: 'complex'
   },
   {
@@ -21737,7 +21737,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NEUROPROTECTION', 'MEMBRANE_UP'],
     organs: ['BRAIN'],
     deficiency: 'COGNITION',
-    description: 'Фосфатидилсерин+UMC+PC',
+    description: 'Комплекс для работы мозга',
     type: 'complex'
   },
   {
@@ -21747,7 +21747,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ACH_UP', 'MEMORY_UP'],
     organs: ['BRAIN'],
     deficiency: 'FOCUS',
-    description: 'Альфа GPC+CDP+Гуперзин',
+    description: 'Комплекс для поддержки обменных процессов и здоровья',
     type: 'complex'
   },
 ];
@@ -22069,7 +22069,7 @@ ALL_HORMONAL_AXES.forEach(a => { HORMONAL_AXIS_MAP[a.axisId] = a; });
 // INTERACTIONS
 // ═══════════════════════════════════════════════════════════════════════════
 
-export const ALL_INTERACTIONS: SupportInteraction[] = [
+export const ALL_INTERACTIONS = ([
   { interactionId: 'INT_CAFFEINE_LTHEANINE', substanceA: 'CAFFEINE', substanceB: 'L_THEANINE', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'SMOOTH_FOCUS', mechanisms: ['ADENOSINE_BLOCK', 'GABA_MOD'], severity: 'LOW', notes: 'Теанин сглаживает стимуляцию кофеина и уменьшает тревожность' },
   { interactionId: 'INT_CAFFEINE_NICOTINE', substanceA: 'CAFFEINE', substanceB: 'NICOTINE', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'OVERSTIMULATION', mechanisms: ['ADRENALINE_UP', 'DA_UP'], severity: 'MEDIUM', notes: 'Суммарная стимуляция ЦНС и сердечно-сосудистой системы' },
   { interactionId: 'INT_CAFFEINE_SYNEPHRINE', substanceA: 'CAFFEINE', substanceB: 'SYNEPHRINE', type: 'conflict' as 'synergy' | 'conflict' | 'caution', effect: 'HEART_STRAIN', mechanisms: ['HR_UP', 'BP_UP'], severity: 'HIGH', notes: 'Риск тахикардии и повышения давления' },
@@ -22207,7 +22207,51 @@ export const ALL_INTERACTIONS: SupportInteraction[] = [
   { interactionId: 'INT_ADAPTOGENS_STIMULANTS', substanceA: 'ADAPTOGENS', substanceB: 'STIMULANTS', type: 'caution' as 'synergy' | 'conflict' | 'caution', effect: 'STRESS_AXIS_MOD', mechanisms: ['HPA_MOD'], severity: 'LOW', notes: 'Может менять реакцию на стимуляторы' },
   { interactionId: 'INT_ADAPTOGENS_BENZOS', substanceA: 'ADAPTOGENS', substanceB: 'BENZODIAZEPINES', type: 'caution' as 'synergy' | 'conflict' | 'caution', effect: 'SEDATION_MOD', mechanisms: ['GABA_MOD'], severity: 'LOW', notes: 'Суммарная релаксация' },
   { interactionId: 'INT_ADAPTOGENS_SSRI', substanceA: 'ADAPTOGENS', substanceB: 'SSRIs', type: 'caution' as 'synergy' | 'conflict' | 'caution', effect: 'SEROTONIN_MOD', mechanisms: ['SEROTONIN_UP'], severity: 'LOW', notes: 'Мягкая серотонинергическая модуляция' },
-];
+,
+  { interactionId: 'SYNERGY_AUTO_001', substanceA: '', substanceB: '', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Vitamin D усиливает всасывание кальция в кишечнике, направляя его в костную ткань', mechanisms: ['Усиление абсорбции кальция', 'Активация кальций-связывающих белков'], severity: 'HIGH', notes: 'Без D3 кальций усваивается на 10-15% хуже; дефицит ведет к остеопорозу' },
+  { interactionId: 'SYNERGY_AUTO_002', substanceA: '', substanceB: '', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Магний и витамин B6 синергично поддерживают нервную систему: B6 улучшает внутриклеточный транспорт магния', mechanisms: ['Усиление транспорта магния', 'Коферментная активация B6'], severity: 'HIGH', notes: 'Магний B6 - классическая комбинация для снижения тревоги и улучшения сна' },
+  { interactionId: 'SYNERGY_AUTO_003', substanceA: '', substanceB: '', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'B-витамины работают как команда коферментов, усиливая метаболизм энергии и работу нервной системы', mechanisms: ['Коферментное взаимодействие', 'Цикл Кребса', 'Синергия метилирования'], severity: 'HIGH', notes: 'Комплекс B-витаминов эффективнее чем прием по отдельности' },
+  { interactionId: 'SYNERGY_AUTO_004', substanceA: '', substanceB: '', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Vitamin C увеличивает всасывание негемового железа в 2-3 раза за счет восстановления Fe3+ до Fe2+', mechanisms: ['Восстановление Fe3+ до Fe2+', 'Хелатирование железа'], severity: 'HIGH', notes: 'Принимать витамин C вместе с железом при анемии' },
+  { interactionId: 'SYNERGY_AUTO_005', substanceA: '', substanceB: '', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Пиперин (черный перец) увеличивает биодоступность куркумина на 2000 процентов через ингибирование глюкуронизации', mechanisms: ['Ингибирование глюкуронизации', 'Усиление абсорбции'], severity: 'HIGH', notes: 'Куркумин без пиперина практически не усваивается организмом' },
+  { interactionId: 'SYNERGY_AUTO_006', substanceA: '', substanceB: '', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Vitamin K2 направляет кальций в костную ткань, предотвращая его отложение в сосудах при приеме D3', mechanisms: ['Активация остеокальцина', 'Регуляция кальциевого гомеостаза', 'Сосудистая защита'], severity: 'HIGH', notes: 'Критическая комбинация при приеме высоких доз витамина D3' },
+  { interactionId: 'SYNERGY_AUTO_007', substanceA: '', substanceB: '', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'B12 и фолат (B9) работают вместе в цикле метилирования: фолат передает метильные группы, B12 их акцептирует', mechanisms: ['Цикл метионина', 'Синтез SAMe', 'Эритропоэз'], severity: 'HIGH', notes: 'Дефицит B12 маскирует фолатодефицитную анемию' },
+  { interactionId: 'SYNERGY_AUTO_008', substanceA: '', substanceB: '', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Пребиотики (клетчатка, инулин) служат пищей для пробиотиков, увеличивая их выживаемость в 10 раз', mechanisms: ['Синбиотическое действие', 'Продукция КЦЖК', 'Поддержка микробиома'], severity: 'HIGH', notes: 'Синбиотики - комбинация про- и пребиотиков' },
+  { interactionId: 'SYNERGY_AUTO_009', substanceA: '', substanceB: '', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Селен и йод синергично поддерживают щитовидную железу: селен защищает тиреоциты, йод - субстрат для гормонов', mechanisms: ['Синтез дейодиназ', 'Антиоксидантная защита тиреоцитов', 'Йодирование тиреоглобулина'], severity: 'HIGH', notes: 'Для синтеза T3 и T4 необходимы оба микроэлемента' },
+  { interactionId: 'SYNERGY_AUTO_010', substanceA: '', substanceB: '', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Глюкозамин и хондроитин восстанавливают хрящевую ткань: хондроитин удерживает воду, глюкозамин стимулирует синтез протеогликанов', mechanisms: ['Синтез протеогликанов', 'Гидратация хряща', 'Ингибирование разрушения матрикса'], severity: 'HIGH', notes: 'Классическая комбинация для суставов, эффект через 2-3 месяца' },
+  { interactionId: 'SYNERGY_AUTO_011', substanceA: '', substanceB: '', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'ZMA (цинк + магний + B6): тройная синергия для анаболизма, сна и восстановления', mechanisms: ['Андрогенная поддержка', 'ГАМК-ергическая передача', 'Коферментная активация'], severity: 'HIGH', notes: 'Оптимально принимать перед сном натощак' },
+  { interactionId: 'SYNERGY_AUTO_012', substanceA: '', substanceB: '', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Омега-3 жирные кислоты улучшают транспорт CoQ10 в митохондрии через липидный матрикс', mechanisms: ['Липидный транспорт', 'Митохондриальная синергия', 'Мембранная интеграция'], severity: 'MEDIUM', notes: 'CoQ10 на омега-3 основе имеет в 2 раза лучшую биодоступность' },
+  { interactionId: 'SYNERGY_AUTO_013', substanceA: '', substanceB: '', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Креатин и бета-аланин синергично усиливают силовые показатели и выносливость', mechanisms: ['Буферизация pH мышц', 'Увеличение фосфокреатина', 'Анаэробный метаболизм'], severity: 'MEDIUM', notes: 'Принимать 3-5 г креатина + 2-4 г бета-аланина в день' },
+  { interactionId: 'SYNERGY_AUTO_014', substanceA: '', substanceB: '', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Куркумин и имбирь синергично подавляют воспаление через ингибирование NF-kB и COX/LOX путей', mechanisms: ['Ингибирование NF-kB', 'Блокировка COX-2', 'Синергия антиоксидантов'], severity: 'MEDIUM', notes: 'Усиливает противовоспалительный эффект в 2-3 раза' },
+  { interactionId: 'SYNERGY_AUTO_015', substanceA: '', substanceB: '', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'L-теанин усиливает ГАМК-ергическую передачу, потенцируя расслабляющий эффект магния и GABA', mechanisms: ['Увеличение альфа-волн', 'Синергия ГАМК', 'Модуляция глутамата'], severity: 'MEDIUM', notes: 'Безопасная комбинация для релаксации без сонливости' },
+  { interactionId: 'SYNERGY_AUTO_016', substanceA: '', substanceB: '', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Цинк необходим для синтеза ретинол-связывающего белка, транспортирующего витамин A', mechanisms: ['Активация RBP', 'Синергия зрения', 'Кофактор ретинол-дегидрогеназы'], severity: 'MEDIUM', notes: 'Цинк + витамин A особенно важны для ночного зрения' },
+  { interactionId: 'SYNERGY_AUTO_017', substanceA: '', substanceB: '', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Расторопша и артишок синергично усиливают детоксикацию печени: фаза I + фаза II', mechanisms: ['Усиление фазы I детоксикации', 'Активация фазы II', 'Желчегонное действие', 'Антиоксидантная защита'], severity: 'MEDIUM', notes: 'Комбинация для восстановления печени после нагрузок' },
+  { interactionId: 'SYNERGY_AUTO_018', substanceA: '', substanceB: '', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Цинк и витамин C синергично поддерживают иммунитет: стимулируют фагоцитоз и синтез коллагена', mechanisms: ['Иммуномодуляция', 'Стимуляция фагоцитоза', 'Коллагеногенез'], severity: 'MEDIUM', notes: 'Базовая комбинация для профилактики ОРВИ' },
+  { interactionId: 'SYNERGY_AUTO_019', substanceA: '', substanceB: '', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Таурин и магний синергично защищают сердце: стабилизируют мембраны кардиомиоцитов и ритм', mechanisms: ['Кардиопротекция', 'Стабилизация мембран', 'Антиаритмическое действие'], severity: 'MEDIUM', notes: 'Полезна при гипертонии, аритмиях, сердечной недостаточности' },
+  { interactionId: 'SYNERGY_AUTO_020', substanceA: '', substanceB: '', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Омега-3 улучшает всасывание витамина D и усиливает его связывание с рецепторами VDR', mechanisms: ['Улучшение мембранной текучести', 'Рецепторная синергия', 'Липидный транспорт'], severity: 'MEDIUM', notes: 'D3+K2 с омега-3 для максимального усвоения' },
+  { interactionId: 'SYNERGY_AUTO_021', substanceA: '', substanceB: '', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Гинкго билоба и бакопа монье синергично улучшают память и когнитивные функции', mechanisms: ['Усиление мозгового кровотока', 'Ацетилхолиновая модуляция', 'Нейропротекция'], severity: 'MEDIUM', notes: 'Ноотропная комбинация с накопительным эффектом' },
+  { interactionId: 'SYNERGY_AUTO_022', substanceA: '', substanceB: '', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Ашваганда и родиола розовая синергично модулируют ось HPA: родиола стимулирует, ашваганда восстанавливает', mechanisms: ['Модуляция кортизола', 'Адаптация HPA', 'Синергия адаптогенов'], severity: 'MEDIUM', notes: 'Родиола утром для энергии, ашваганда вечером для восстановления' },
+  { interactionId: 'SYNERGY_AUTO_023', substanceA: '', substanceB: '', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Эхинацея и бузина синергично стимулируют иммунный ответ: активируют макрофаги и NK-клетки', mechanisms: ['Стимуляция фагоцитоза', 'Активация NK-клеток', 'Синтез цитокинов'], severity: 'MEDIUM', notes: 'Профилактический прием снижает риск ОРВИ на 30-40 процентов' },
+  { interactionId: 'SYNERGY_AUTO_024', substanceA: '', substanceB: '', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Железо и медь синергично участвуют в кроветворении: медь необходима для транспорта железа', mechanisms: ['Церулоплазминовый транспорт', 'Синтез гема', 'Синергия гемопоэза'], severity: 'MEDIUM', notes: 'При анемии проверять также уровень меди и ферритина' },
+  { interactionId: 'SYNERGY_AUTO_025', substanceA: '', substanceB: '', type: 'caution' as 'synergy' | 'conflict' | 'caution', effect: 'Цинк и медь конкурируют за всасывание: высокие дозы цинка (>30 мг) подавляют абсорбцию меди', mechanisms: ['Конкуренция за транспортеры MT1/2', 'Антагонизм металлов'], severity: 'MEDIUM', notes: 'При длительном приеме цинка добавлять 1-2 мг меди' },
+  { interactionId: 'SYNERGY_AUTO_026', substanceA: '', substanceB: '', type: 'caution' as 'synergy' | 'conflict' | 'caution', effect: 'Кальций и магний конкурируют за общие транспортеры в тонком кишечнике', mechanisms: ['Конкуренция за каналы TRPV6/TRPM6', 'Антагонизм ионов'], severity: 'MEDIUM', notes: 'Принимать кальций и магний в разное время дня (4-6 ч интервал)' },
+  { interactionId: 'SYNERGY_AUTO_027', substanceA: '', substanceB: '', type: 'caution' as 'synergy' | 'conflict' | 'caution', effect: 'Кальций снижает всасывание железа на 50 процентов при совместном приеме', mechanisms: ['Конкуренция за DMT1', 'Антагонизм двухвалентных катионов'], severity: 'MEDIUM', notes: 'Не принимать железо с молочными продуктами или кальцием' },
+  { interactionId: 'SYNERGY_AUTO_028', substanceA: '', substanceB: '', type: 'caution' as 'synergy' | 'conflict' | 'caution', effect: 'Зверобой индуцирует CYP3A4, снижая эффективность многих лекарств', mechanisms: ['Индукция цитохрома P450', 'Ускорение метаболизма ксенобиотиков'], severity: 'LOW', notes: 'Избегать с гормональными препаратами и антидепрессантами' },
+  { interactionId: 'SYNERGY_AUTO_029', substanceA: '', substanceB: '', type: 'caution' as 'synergy' | 'conflict' | 'caution', effect: 'Высокие дозы витамина E (>400 МЕ) могут снижать свертываемость крови', mechanisms: ['Антивитамин K', 'Ингибирование агрегации тромбоцитов'], severity: 'LOW', notes: 'Осторожно при приеме антикоагулянтов' },
+  { interactionId: 'SYNERGY_AUTO_030', substanceA: '', substanceB: '', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Гинкго + женьшень синергично улучшают память, концентрацию и мозговой кровоток', mechanisms: ['Вазодилатация', 'Ацетилхолиновая поддержка', 'Нейропротекция'], severity: 'MEDIUM', notes: 'Ноотропный эффект через 2-4 недели регулярного приема' },
+  { interactionId: 'SYNERGY_AUTO_031', substanceA: '', substanceB: '', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: '5-HTP и магний синергично улучшают качество сна: 5-HTP - предшественник мелатонина, магний - ГАМК-агонист', mechanisms: ['Серотониновый путь', 'ГАМК-ергическая седация', 'Синергия сна'], severity: 'MEDIUM', notes: 'За 30-60 мин до сна; не сочетать с антидепрессантами' },
+  { interactionId: 'SYNERGY_AUTO_032', substanceA: '', substanceB: '', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Ацетил-L-карнитин и альфа-липоевая кислота синергично защищают митохондрии и улучшают энергообмен', mechanisms: ['Митохондриальная защита', 'Антиоксидантная синергия', 'Энергетический метаболизм'], severity: 'MEDIUM', notes: 'Антивозрастная и нейропротективная комбинация' },
+  { interactionId: 'SYNERGY_AUTO_033', substanceA: '', substanceB: '', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Берберин и корица синергично улучшают чувствительность к инсулину и метаболизм глюкозы', mechanisms: ['Активация AMPK', 'Улучшение утилизации глюкозы', 'Ингибирование альфа-глюкозидазы'], severity: 'MEDIUM', notes: 'Для контроля сахара крови и метаболического здоровья' },
+  { interactionId: 'SYNERGY_AUTO_034', substanceA: '', substanceB: '', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Коллаген и витамин C необходимы для синтеза коллагеновых волокон: C - кофактор гидроксилирования пролина', mechanisms: ['Гидроксилирование пролина', 'Синтез тропоколлагена', 'Формирование фибрилл'], severity: 'MEDIUM', notes: 'Витамин C обязателен для синтеза коллагена' },
+  { interactionId: 'SYNERGY_AUTO_035', substanceA: '', substanceB: '', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'МСМ и глюкозамин синергично уменьшают боль и воспаление в суставах', mechanisms: ['Синтез соединительной ткани', 'Противовоспалительное действие', 'Серный обмен'], severity: 'MEDIUM', notes: 'МСМ усиливает действие глюкозамина на 40-60 процентов' },
+  { interactionId: 'SYNERGY_AUTO_036', substanceA: '', substanceB: '', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Ликопин и бета-каротин синергично защищают простату и ССС от окислительного стресса', mechanisms: ['Каротиноидная синергия', 'Антиоксидантная защита', 'Простато-протекция'], severity: 'MEDIUM', notes: 'Ликопин лучше усваивается с жирами (оливковое масло)' },
+  { interactionId: 'SYNERGY_AUTO_037', substanceA: '', substanceB: '', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Силимарин и N-ацетилцистеин синергично защищают печень и повышают глутатион', mechanisms: ['Увеличение GSH', 'Антиоксидантная синергия', 'Гепатопротекция'], severity: 'MEDIUM', notes: 'Эффективны при токсических нагрузках на печень' },
+  { interactionId: 'SYNERGY_AUTO_038', substanceA: '', substanceB: '', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Кальций D-глюкарат и индол-3-карбинол синергично поддерживают эстрогеновый метаболизм', mechanisms: ['Бета-глюкуронидазная модуляция', 'CYP-регуляция', 'Детоксикация эстрогенов'], severity: 'MEDIUM', notes: 'Для профилактики эстроген-зависимых состояний' },
+  { interactionId: 'SYNERGY_AUTO_039', substanceA: '', substanceB: '', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Лецитин и омега-3 синергично поддерживают когнитивные функции и мембранную структуру', mechanisms: ['Мембранная интеграция', 'Холинергическая поддержка', 'Липидный обмен'], severity: 'MEDIUM', notes: 'Фосфолипиды + омега-3 = строительный материал для мозга' },
+  { interactionId: 'SYNERGY_AUTO_040', substanceA: '', substanceB: '', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Цинк и селен синергично усиливают антиоксидантную защиту (СОД + глутатионпероксидаза)', mechanisms: ['Кофактор СОД', 'Кофактор GPX', 'Антиоксидантная синергия'], severity: 'MEDIUM', notes: 'Важны для тиреоидного и репродуктивного здоровья' },
+  { interactionId: 'SYNERGY_AUTO_041', substanceA: '', substanceB: '', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Экстракт зеленого чая (EGCG) и витамин D синергично модулируют иммунный ответ', mechanisms: ['Иммуномодуляция', 'Антиоксидантная синергия', 'Эпигенетическая регуляция'], severity: 'MEDIUM', notes: 'EGCG усиливает рецепцию витамина D' },
+  { interactionId: 'SYNERGY_AUTO_042', substanceA: '', substanceB: '', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Глицин и магний синергично улучшают качество сна через ГАМК-ергическую систему', mechanisms: ['ГАМК-модуляция', 'Синергия нейротрансмиттеров', 'Расслабление мышц'], severity: 'LOW', notes: 'Мягкая седативная комбинация без привыкания' },
+  { interactionId: 'SYNERGY_AUTO_043', substanceA: '', substanceB: '', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Пиколинат цинка и хелат магния - наиболее биодоступные формы для синергии минералов', mechanisms: ['Максимальная абсорбция', 'Минеральная синергия', 'Аминокислотный транспорт'], severity: 'HIGH', notes: 'Хелатные формы усваиваются на 40-60 процентов лучше оксидов' }
+] as SupportInteraction[]);
 
 export const INTERACTION_MAP: Record<string, SupportInteraction> = {};
 ALL_INTERACTIONS.forEach(i => { INTERACTION_MAP[i.interactionId] = i; });
