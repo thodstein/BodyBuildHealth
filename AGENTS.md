@@ -175,9 +175,47 @@ if (shouldApplyPenalty && finalResult.systemBreakdown) {
 - `src/ui/screens/SupportScreen.tsx` — ~2793 lines, all detail views enhanced
 - `C:\Users\thods\AppData\Local\Temp\opencode\enhance-db-simple.js` — database generation script
 
-## Phase 6 (Planned): Remaining Items
+## Phase 6 (Completed): Extra Synergy Pairs — **DONE**
+
+### Day 78: 25 synergy pairs — anti-aging, women/men health, nootropics
+
+**Implementation:**
+- ✅ **25 новых пар** (SYNERGY_AUTO_044..068) добавлены в ALL_INTERACTIONS
+- ✅ **Anti-aging (7 пар)**:
+  - NMN + Resveratrol (SIRT1/NAD+)
+  - CoQ10 + PQQ (митохондриальный биогенез)
+  - Astaxanthin + Lycopene (фотостарение)
+  - Collagen + Hyaluronic Acid (гидратация кожи)
+  - Spermidine + Resveratrol (аутофагия)
+  - Glutathione + ALA (антиоксидантный каскад)
+  - NR + Pterostilbene (NAD+/сиртуины)
+- ✅ **Женское здоровье (6 пар)**:
+  - Vitex + B6 (пролактин/ПМС)
+  - Evening Primrose + Borage Oil (GLA)
+  - Black Cohosh + Red Clover (менопауза)
+  - Cranberry + D-Mannose (ИМП)
+  - Probiotics + Cranberry (вагинальный микробиом)
+  - Folate + B12 + B6 (метилирование/беременность)
+- ✅ **Мужское здоровье (5 пар)**:
+  - DAA + Zinc (тестостерон)
+  - Saw Palmetto + Beta-Sitosterol + Pumpkin Seed (простата)
+  - L-Citrulline + L-Arginine (NO/эрекция)
+  - Tribulus + Maca (либидо)
+  - Boron + Vitamin D + Zinc (свободный тестостерон)
+- ✅ **Ноотропы (7 пар)**:
+  - Lion's Mane + ALCAR (NGF)
+  - Ginkgo + Vinpocetine (церебральный кровоток)
+  - Citicoline + Alpha-GPC (ацетилхолин)
+  - Rhodiola + L-Tyrosine (стресс/фокус)
+  - Noopept + Citicoline (память)
+  - Magnesium L-Threonate + L-Theanine (сон/когниция)
+  - Phosphatidylserine + Bacopa (кортизол/память)
+- ✅ **ALL_INTERACTIONS: 181 → 206**
+- ✅ `npx tsc --noEmit` ✓
+- ✅ `npx vite build` ✓
+
+## Phase 7 (Planned): Remaining Items
 - [ ] Barcode search improvements (Open Food Facts cache) — Phase 3 item 17
-- [ ] Continue expanding synergy pairs (20-30 more, esp. anti-aging, women/men health, nootropics)
 
 ## Build Commands
 ```bash
