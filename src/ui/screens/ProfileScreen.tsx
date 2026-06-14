@@ -98,7 +98,7 @@ const MOVEMENT_LIMITS: { id: InjuryRecord['movementLimit']; label: string }[] = 
 ];
 
 const s: Record<string, React.CSSProperties> = {
-  card: { background: 'rgba(20,22,30,0.15)', backdropFilter:'blur(6px)', WebkitBackdropFilter:'blur(6px)', borderRadius: 12, padding: 16, marginBottom: 12, position:'relative', zIndex:1 },
+  card: { background: 'rgba(20,22,30,0.08)', backdropFilter:'blur(8px)', WebkitBackdropFilter:'blur(8px)', borderRadius: 12, padding: 16, marginBottom: 12, border:'1px solid rgba(255,255,255,0.06)' },
   row: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 8 },
   row3: { display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginBottom: 8 },
   label: { fontSize: 12, opacity: 0.7, marginBottom: 4 },
@@ -240,9 +240,9 @@ export const ProfileScreen: React.FC = () => {
           </div>
         </div>
       ) : (
-        <div style={{ position:'fixed', inset:0, zIndex:100, display:'flex', flexDirection:'column' }}>
-          <img src="/bg-profile.png" alt="" style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'fill' }} />
-          <div style={{ position:'relative', zIndex:2, flex:1, display:'flex', flexDirection:'column', padding:'10px 16px 80px', overflow:'auto' }}>
+        <div style={{ position:'relative', minHeight:'100vh', background:'#08080d' }}>
+          <img src="/bg-profile.png" alt="" style={{ position:'fixed', inset:0, width:'100%', height:'100%', objectFit:'fill', zIndex:0 }} />
+          <div style={{ position:'relative', zIndex:1, padding:'10px 12px 80px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0, marginBottom: 8 }}>
             <button onClick={() => setPage('hero')} style={{
               padding:'6px 10px', borderRadius:8, cursor:'pointer', fontSize:12, fontWeight:600,
