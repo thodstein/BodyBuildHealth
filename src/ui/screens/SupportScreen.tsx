@@ -1157,9 +1157,58 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
                                 {selectedSub === sub.id && (
                                   <div style={{ padding:'6px 10px 8px 14px', background:'rgba(0,0,0,0.15)', borderBottom:'1px solid var(--border)' }}>
                                     <div style={{ fontSize:9, color:'rgba(255,255,255,0.85)', lineHeight:1.3, marginBottom:4 }}>{sub.description}</div>
-                                    {sub.organs.length > 0 && <div style={{ display:'flex', gap:2, flexWrap:'wrap' }}>
-                                      {sub.organs.map(o => <span key={o} style={{ fontSize:7, padding:'1px 4px', borderRadius:2, background:'rgba(59,130,246,0.08)', color:'#60a5fa' }}>{o}</span>)}
-                                    </div>}
+                                    {/* Type badge */}
+                                    <div style={{ fontSize:7, color:'var(--accent-green, #00e68a)', marginBottom:3 }}>
+                                      {sub.type} · {sub.categories.slice(0,2).join(', ')}
+                                    </div>
+                                    {/* All mechanisms */}
+                                    {sub.mechanisms.length > 0 && (
+                                      <div style={{ marginBottom:3 }}>
+                                        <div style={{ fontSize:7, color:'var(--text-dim)', marginBottom:1 }}>Механизмы действия:</div>
+                                        <div style={{ display:'flex', gap:2, flexWrap:'wrap' }}>
+                                          {sub.mechanisms.map((m,i) => (
+                                            <span key={i} style={{ fontSize:7, padding:'1px 5px', borderRadius:3, background:'rgba(0,230,138,0.06)', color:'#00e68a' }}>{m}</span>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    )}
+                                    {/* Organs */}
+                                    {sub.organs.length > 0 && (
+                                      <div style={{ marginBottom:3 }}>
+                                        <div style={{ fontSize:7, color:'var(--text-dim)', marginBottom:1 }}>Органы-мишени:</div>
+                                        <div style={{ display:'flex', gap:2, flexWrap:'wrap' }}>
+                                          {sub.organs.map(o => <span key={o} style={{ fontSize:7, padding:'1px 5px', borderRadius:3, background:'rgba(59,130,246,0.08)', color:'#60a5fa' }}>{o}</span>)}
+                                        </div>
+                                      </div>
+                                    )}
+                                    {/* Deficiency */}
+                                    {sub.deficiency && sub.deficiency !== 'NONE' && (
+                                      <div style={{ fontSize:8, color:'#f59e0b', marginTop:2 }}>Дефицит: {sub.deficiency}</div>
+                                    )}
+                                    {/* Cross-referenced interactions with this substance */}
+                                    {(() => {
+                                      const subsInteractions = mergedInteractions.filter(i =>
+                                        i.substanceA === sub.id || i.substanceB === sub.id
+                                      ).slice(0, 5);
+                                      return subsInteractions.length > 0 ? (
+                                        <div style={{ marginTop:4 }}>
+                                          <div style={{ fontSize:7, color:'var(--text-dim)', marginBottom:1 }}>Взаимодействия:</div>
+                                          {subsInteractions.map(i => {
+                                            const isA = i.substanceA === sub.id;
+                                            const partner = isA ? i.substanceB : i.substanceA;
+                                            const pName = resolveSubName(partner);
+                                            const tColor = i.type === 'synergy' ? '#22c55e' : i.type === 'conflict' ? '#ef4444' : '#f59e0b';
+                                            return (
+                                              <div key={i.interactionId} style={{ fontSize:7, color:'var(--text-dim)', padding:'1px 0', lineHeight:1.3 }}>
+                                                <span style={{ color:tColor, fontWeight:600 }}>{i.type === 'synergy' ? '⊕' : i.type === 'conflict' ? '⊖' : '⚡'}</span>
+                                                {' '}{pName} — {i.type === 'synergy' ? 'синергия' : i.type === 'conflict' ? 'конфликт' : 'осторожно'}
+                                                {i.notes && <span style={{ opacity:0.6 }}>: {i.notes.slice(0,40)}</span>}
+                                              </div>
+                                            );
+                                          })}
+                                        </div>
+                                      ) : null;
+                                    })()}
                                   </div>
                                 )}
                               </div>
@@ -1544,18 +1593,64 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
                           {selectedSub === sub.id && (
                             <div style={{ padding: '8px 12px 10px 16px', background: 'rgba(0,0,0,0.15)', borderBottom: '1px solid var(--border)' }}>
                               <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', lineHeight: 1.4, marginBottom: 6 }}>{sub.description}</div>
+                              {/* Type badge */}
+                              <div style={{ fontSize: 8, color: 'var(--accent-green, #00e68a)', marginBottom: 4 }}>
+                                {sub.type} · {sub.categories.slice(0, 3).join(', ')}
+                              </div>
+                              {/* All mechanisms */}
+                              {sub.mechanisms.length > 0 && (
+                                <div style={{ marginBottom: 4 }}>
+                                  <div style={{ fontSize: 8, color: 'var(--text-dim)', marginBottom: 2 }}>Механизмы действия:</div>
+                                  <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
+                                    {sub.mechanisms.map((m, i) => (
+                                      <span key={i} style={{ fontSize: 8, padding: '2px 6px', borderRadius: 4, background: 'rgba(0,230,138,0.06)', color: '#00e68a' }}>{m}</span>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                              {/* Organs */}
                               {sub.organs.length > 0 && (
-                                <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap', marginBottom: 4 }}>
-                                  {sub.organs.map(o => (
-                                    <span key={o} style={{ fontSize: 8, padding: '1px 5px', borderRadius: 3, background: 'rgba(59,130,246,0.08)', color: '#60a5fa' }}>{o}</span>
-                                  ))}
+                                <div style={{ marginBottom: 4 }}>
+                                  <div style={{ fontSize: 8, color: 'var(--text-dim)', marginBottom: 2 }}>Органы-мишени:</div>
+                                  <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
+                                    {sub.organs.map(o => (
+                                      <span key={o} style={{ fontSize: 8, padding: '2px 6px', borderRadius: 4, background: 'rgba(59,130,246,0.08)', color: '#60a5fa' }}>{o}</span>
+                                    ))}
+                                  </div>
                                 </div>
                               )}
                               {sub.deficiency && sub.deficiency !== 'NONE' && (
-                                <div style={{ fontSize: 9, color: '#f59e0b', marginTop: 2 }}>
+                                <div style={{ fontSize: 9, color: '#f59e0b', marginTop: 2, marginBottom: 4 }}>
                                   Дефицит: {sub.deficiency}
                                 </div>
                               )}
+                              {/* Cross-referenced interactions with this substance */}
+                              {(() => {
+                                const subsInteractions = mergedInteractions.filter(i =>
+                                  i.substanceA === sub.id || i.substanceB === sub.id
+                                ).slice(0, 6);
+                                return subsInteractions.length > 0 ? (
+                                  <div style={{ marginTop: 4 }}>
+                                    <div style={{ fontSize: 8, color: 'var(--text-dim)', marginBottom: 2 }}>Взаимодействия:</div>
+                                    {subsInteractions.map(i => {
+                                      const isA = i.substanceA === sub.id;
+                                      const partner = isA ? i.substanceB : i.substanceA;
+                                      const pName = resolveSubName(partner);
+                                      const tColor = i.type === 'synergy' ? '#22c55e' : i.type === 'conflict' ? '#ef4444' : '#f59e0b';
+                                      return (
+                                        <div key={i.interactionId} style={{ fontSize: 8, color: 'var(--text-dim)', padding: '1px 0', lineHeight: 1.3 }}>
+                                          <span style={{ color: tColor, fontWeight: 600 }}>
+                                            {i.type === 'synergy' ? '⊕' : i.type === 'conflict' ? '⊖' : '⚡'}
+                                          </span>
+                                          {' '}{pName} — {i.type === 'synergy' ? 'синергия' : i.type === 'conflict' ? 'конфликт' : 'осторожно'}
+                                          {i.severity && <span style={{ opacity: 0.6 }}> · {i.severity}</span>}
+                                          {i.notes && <div style={{ opacity: 0.5 }}>{i.notes.slice(0, 60)}</div>}
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                ) : null;
+                              })()}
                             </div>
                           )}
                         </div>
@@ -1610,37 +1705,41 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
               const aName = resolveSubName(interaction.substanceA);
               const bName = resolveSubName(interaction.substanceB);
               return (
-                <div key={interaction.interactionId} style={{
-                  background: 'var(--bg-secondary)', borderRadius: 10, padding: '9px 10px',
-                  borderLeft: `3px solid ${typeInfo.color}`,
-                }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'wrap', flex: 1, minWidth: 0 }}>
-                      <span style={{ fontWeight: 600, fontSize: 11, color: 'var(--text-light)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '35%' }}>{aName}</span>
-                      <span style={{ fontSize: 12, color: typeInfo.color, fontWeight: 700 }}>
-                        {interaction.type === 'synergy' ? '+' : interaction.type === 'conflict' ? '×' : '?'}
-                      </span>
-                      <span style={{ fontWeight: 600, fontSize: 11, color: 'var(--text-light)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '35%' }}>{bName}</span>
+                  <div key={interaction.interactionId} style={{
+                    background: 'var(--bg-secondary)', borderRadius: 10, padding: '9px 10px',
+                    borderLeft: `3px solid ${typeInfo.color}`,
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'wrap', flex: 1, minWidth: 0 }}>
+                        <span style={{ fontWeight: 600, fontSize: 11, color: 'var(--text-light)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '35%' }}>{aName}</span>
+                        <span style={{ fontSize: 12, color: typeInfo.color, fontWeight: 700 }}>
+                          {interaction.type === 'synergy' ? '+' : interaction.type === 'conflict' ? '×' : '?'}
+                        </span>
+                        <span style={{ fontWeight: 600, fontSize: 11, color: 'var(--text-light)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '35%' }}>{bName}</span>
+                      </div>
+                      <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+                        <span style={{ fontSize: 8, padding: '1px 5px', borderRadius: 4, background: typeInfo.color + '22', color: typeInfo.color, fontWeight: 600 }}>{typeInfo.label}</span>
+                        <span style={{ fontSize: 8, padding: '1px 5px', borderRadius: 4, background: sevInfo.color + '22', color: sevInfo.color }}>{sevInfo.label}</span>
+                      </div>
                     </div>
-                    <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
-                      <span style={{ fontSize: 8, padding: '1px 5px', borderRadius: 4, background: typeInfo.color + '22', color: typeInfo.color, fontWeight: 600 }}>{typeInfo.label}</span>
-                      <span style={{ fontSize: 8, padding: '1px 5px', borderRadius: 4, background: sevInfo.color + '22', color: sevInfo.color }}>{sevInfo.label}</span>
+                    <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', lineHeight: 1.3, marginBottom: 4 }}>
+                      {interaction.type === 'synergy' ? '⊕ ' : interaction.type === 'conflict' ? '⊖ ' : ''}
+                      {interaction.effect}
                     </div>
+                    {interaction.mechanisms.length > 0 && (
+                      <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap', marginBottom: 2 }}>
+                        {interaction.mechanisms.map(m => {
+                          const mColor = m.toLowerCase().includes('toxic') || m.toLowerCase().includes('hepatic') ? '#ef4444' :
+                            m.toLowerCase().includes('kidney') || m.toLowerCase().includes('renal') ? '#f59e0b' :
+                            m.toLowerCase().includes('synerg') || m.toLowerCase().includes('enhanc') || m.toLowerCase().includes('potent') ? '#22c55e' : '#a78bfa';
+                          return <span key={m} style={{ fontSize: 8, padding: '1px 5px', borderRadius: 3, background: mColor + '18', color: mColor, border: `1px solid ${mColor}22`, fontWeight: 500 }}>{m}</span>;
+                        })}
+                      </div>
+                    )}
+                    {interaction.notes && (
+                      <div style={{ fontSize: 9, color: 'var(--text-dim)', fontStyle: 'italic', lineHeight: 1.3 }}>{interaction.notes}</div>
+                    )}
                   </div>
-                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', lineHeight: 1.3, marginBottom: 4 }}>
-                    {interaction.effect}
-                  </div>
-                  {interaction.mechanisms.length > 0 && (
-                    <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap', marginBottom: 2 }}>
-                      {interaction.mechanisms.map(m => (
-                        <span key={m} style={{ fontSize: 8, padding: '1px 4px', borderRadius: 3, background: 'rgba(255,255,255,0.04)', color: 'var(--text-dim)' }}>{m}</span>
-                      ))}
-                    </div>
-                  )}
-                  {interaction.notes && (
-                    <div style={{ fontSize: 9, color: 'var(--text-dim)', fontStyle: 'italic', lineHeight: 1.3 }}>{interaction.notes}</div>
-                  )}
-                </div>
               );
             })}
             {filteredInteractions.length === 0 && (
