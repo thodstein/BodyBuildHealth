@@ -688,6 +688,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({});
   const [interactionTypeFilter, setInteractionTypeFilter] = useState<string>('all');
   const [interactionSeverityFilter, setInteractionSeverityFilter] = useState<string>('all');
+  const [renderError, setRenderError] = useState<string | null>(null);
   const [activeSystems, setActiveSystems] = useState<Record<string, boolean>>({
     cardio: true, hepatic: true, renal: true, neuro: true, endocrine: true, hematologic: true, reproductive: true, musculoskeletal: true,
   });
@@ -1038,6 +1039,143 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
     return id;
   };
 
+  const safeRender = (label: string, fn: () => React.ReactNode): React.ReactNode => {
+    try { return fn(); }
+    catch (e) { setRenderError(`${label}: ${e}`); return <div style={{ padding:16, textAlign:'center', color:'#ef4444', fontSize:10 }}>⚠ {label}: {String(e)}</div>; }
+  };
+
+  const renderView = (current: string, target: string, contentFn: () => React.ReactNode): React.ReactNode => {
+    if (current !== target) return null;
+    try { return contentFn(); }
+    catch (e) { setRenderError(`${target}: ${e}`); return <div style={{ padding:16, textAlign:'center', color:'#ef4444', fontSize:10 }}>⚠ {target}: {String(e)}</div>; }
+  };
+
+  const catDetailInteractions = (sub: SupportSubstance, interactions: any[]): React.ReactNode => {
+    try {
+      const subsInteractions = (interactions||[]).filter(i =>
+        i&&(i.substanceA === sub.id || i.substanceB === sub.id)
+      ).slice(0, 5);
+      return subsInteractions.length > 0 ? (
+        <div style={{ marginTop:4 }}>
+          <div style={{ fontSize:7, color:'var(--text-dim)', marginBottom:1 }}>Взаимодействия:</div>
+          {subsInteractions.map(i => {
+            if (!i) return null;
+            const isA = i.substanceA === sub.id;
+            const partner = isA ? i.substanceB : i.substanceA;
+            const pName = resolveSubName(partner);
+            const tColor = i.type === 'synergy' ? '#22c55e' : i.type === 'conflict' ? '#ef4444' : '#f59e0b';
+            return (
+              <div key={i.interactionId} style={{ fontSize:7, color:'var(--text-dim)', padding:'1px 0', lineHeight:1.3 }}>
+                <span style={{ color:tColor, fontWeight:600 }}>{i.type === 'synergy' ? '⊕' : i.type === 'conflict' ? '⊖' : '⚡'}</span>
+                {' '}{pName||''} — {i.type === 'synergy' ? 'синергия' : i.type === 'conflict' ? 'конфликт' : 'осторожно'}
+                {i.notes && <span style={{ opacity:0.6 }}>: {(i.notes||'').slice(0,40)}</span>}
+              </div>
+            );
+          })}
+        </div>
+      ) : null;
+    } catch (e) { return null; }
+  };
+
+  const synergiesContent = (filtered: any[], merged: any[], cats: Record<string, boolean>): React.ReactNode => {
+    return safeRender('synergies_content', () => {
+      const list = filtered || [];
+      const synergies = list.filter((i:any) => i?.type === 'synergy');
+      const conflicts = list.filter((i:any) => i?.type === 'conflict' || i?.type === 'caution');
+      const showEffect = (interaction: any) => {
+        const eff = interaction?.effect;
+        if (eff && /^[A-Z0-9_]+$/.test(eff) && interaction?.notes) return interaction.notes;
+        return eff || '';
+      };
+      return (<>
+        <div style={{ marginBottom:10 }}>
+          <div onClick={() => setExpandedCategories(prev => ({ ...prev, syn_synergies: !(prev?.syn_synergies ?? true) }))} style={{ display:'flex', alignItems:'center', gap:6, padding:'6px 8px', cursor:'pointer', userSelect:'none', background:'var(--bg-secondary)', borderRadius:8, marginBottom:4 }}>
+            <span style={{ fontSize:13 }}>⊕</span>
+            <div style={{ flex:1, fontSize:10, fontWeight:700, color:'#22c55e' }}>Синергии ({synergies.length})</div>
+            <span style={{ fontSize:9, color:'var(--text-dim)', transform:cats?.syn_synergies !== false ? 'rotate(180deg)' : 'none', transition:'transform 0.2s' }}>▼</span>
+          </div>
+          {cats?.syn_synergies !== false && (
+            <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
+              {synergies.slice(0, 30).map((interaction: any, i: number) => {
+                const sevInfo = INTERACTION_SEVERITY_LABELS[interaction?.severity] || { label:interaction?.severity, color:'#888' };
+                const aName = resolveSubName(interaction?.substanceA);
+                const bName = resolveSubName(interaction?.substanceB);
+                return (
+                  <div key={interaction?.interactionId||i} style={{ background:'var(--bg-secondary)', borderRadius:8, padding:'7px 8px', borderLeft:'3px solid #22c55e' }}>
+                    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:2 }}>
+                      <div style={{ display:'flex', alignItems:'center', gap:4, flexWrap:'wrap', flex:1, minWidth:0 }}>
+                        <span style={{ fontWeight:600, fontSize:10, color:'var(--text-light)', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', maxWidth:'40%' }}>{aName}</span>
+                        <span style={{ fontSize:10, color:'#22c55e', fontWeight:700 }}>+</span>
+                        <span style={{ fontWeight:600, fontSize:10, color:'var(--text-light)', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', maxWidth:'40%' }}>{bName}</span>
+                      </div>
+                      <span style={{ fontSize:7, padding:'1px 4px', borderRadius:3, background:sevInfo.color+'22', color:sevInfo.color, flexShrink:0 }}>{sevInfo.label}</span>
+                    </div>
+                    <div style={{ fontSize:9, color:'rgba(255,255,255,0.85)', lineHeight:1.3 }}>⊕ {showEffect(interaction)}</div>
+                    {(interaction?.mechanisms||[]).length > 0 && (
+                      <div style={{ display:'flex', flexWrap:'wrap', gap:2, marginTop:2 }}>
+                        {(interaction.mechanisms||[]).map((m: any, mi: number) => (
+                          <span key={mi} style={{ fontSize:6, padding:'1px 4px', borderRadius:3, background:'rgba(34,197,94,0.1)', color:'#22c55e', border:'1px solid rgba(34,197,94,0.15)', fontWeight:500 }}>{(m||'')}</span>
+                        ))}
+                      </div>
+                    )}
+                    {interaction?.notes && !(/^[A-Z0-9_]+$/.test(interaction?.effect||'')) && <div style={{ fontSize:8, color:'var(--text-dim)', fontStyle:'italic', lineHeight:1.2, marginTop:2 }}>{interaction.notes}</div>}
+                  </div>
+                );
+              })}
+              {synergies.length === 0 && <div style={{ padding:12, textAlign:'center', color:'var(--text-dim)', fontSize:10 }}>Нет синергий</div>}
+            </div>
+          )}
+        </div>
+        <div>
+          <div onClick={() => setExpandedCategories(prev => ({ ...prev, syn_conflicts: !(prev?.syn_conflicts ?? true) }))} style={{ display:'flex', alignItems:'center', gap:6, padding:'6px 8px', cursor:'pointer', userSelect:'none', background:'var(--bg-secondary)', borderRadius:8, marginBottom:4 }}>
+            <span style={{ fontSize:13 }}>⊖</span>
+            <div style={{ flex:1, fontSize:10, fontWeight:700, color:'#ef4444' }}>Конфликты и осторожность ({conflicts.length})</div>
+            <span style={{ fontSize:9, color:'var(--text-dim)', transform:cats?.syn_conflicts !== false ? 'rotate(180deg)' : 'none', transition:'transform 0.2s' }}>▼</span>
+          </div>
+          {cats?.syn_conflicts !== false && (
+            <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
+              {conflicts.slice(0, 30).map((interaction: any, i: number) => {
+                const typeInfo = INTERACTION_TYPE_LABELS[interaction?.type] || { label:interaction?.type, emoji:'🔗', color:'#888' };
+                const sevInfo = INTERACTION_SEVERITY_LABELS[interaction?.severity] || { label:interaction?.severity, color:'#888' };
+                const aName = resolveSubName(interaction?.substanceA);
+                const bName = resolveSubName(interaction?.substanceB);
+                return (
+                  <div key={interaction?.interactionId||i} style={{ background:'var(--bg-secondary)', borderRadius:8, padding:'7px 8px', borderLeft:`3px solid ${typeInfo.color}` }}>
+                    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:2 }}>
+                      <div style={{ display:'flex', alignItems:'center', gap:4, flexWrap:'wrap', flex:1, minWidth:0 }}>
+                        <span style={{ fontWeight:600, fontSize:10, color:'var(--text-light)', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', maxWidth:'35%' }}>{aName}</span>
+                        <span style={{ fontSize:10, color:typeInfo.color, fontWeight:700 }}>{interaction?.type === 'conflict' ? '×' : '?'}</span>
+                        <span style={{ fontWeight:600, fontSize:10, color:'var(--text-light)', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', maxWidth:'35%' }}>{bName}</span>
+                      </div>
+                      <div style={{ display:'flex', gap:3, flexShrink:0 }}>
+                        <span style={{ fontSize:7, padding:'1px 4px', borderRadius:3, background:typeInfo.color+'22', color:typeInfo.color, fontWeight:600 }}>{typeInfo.label}</span>
+                        <span style={{ fontSize:7, padding:'1px 4px', borderRadius:3, background:sevInfo.color+'22', color:sevInfo.color }}>{sevInfo.label}</span>
+                      </div>
+                    </div>
+                    <div style={{ fontSize:9, color:'rgba(255,255,255,0.85)', lineHeight:1.3 }}>⊖ {showEffect(interaction)}</div>
+                    {(interaction?.mechanisms||[]).length > 0 && (
+                      <div style={{ display:'flex', flexWrap:'wrap', gap:2, marginTop:2 }}>
+                        {(interaction.mechanisms||[]).map((m: any, mi: number) => {
+                          const ms = (m||'');
+                          const mColor = ms.toLowerCase().includes('toxic') || ms.toLowerCase().includes('hepatic') ? '#ef4444' :
+                            ms.toLowerCase().includes('kidney') || ms.toLowerCase().includes('renal') ? '#f59e0b' :
+                            ms.toLowerCase().includes('synerg') || ms.toLowerCase().includes('enhanc') || ms.toLowerCase().includes('potent') ? '#22c55e' : '#8b5cf6';
+                          return <span key={mi} style={{ fontSize:6, padding:'1px 4px', borderRadius:3, background:mColor+'18', color:mColor, border:`1px solid ${mColor}22`, fontWeight:500 }}>{(m||'')}</span>;
+                        })}
+                      </div>
+                    )}
+                    {interaction?.notes && !(/^[A-Z0-9_]+$/.test(interaction?.effect||'')) && <div style={{ fontSize:8, color:'var(--text-dim)', fontStyle:'italic', lineHeight:1.2, marginTop:2 }}>{interaction?.notes}</div>}
+                  </div>
+                );
+              })}
+              {conflicts.length === 0 && <div style={{ padding:12, textAlign:'center', color:'var(--text-dim)', fontSize:10 }}>Нет конфликтов</div>}
+            </div>
+          )}
+        </div>
+      </>);
+    });
+  };
+
   return (
     <div className="screen support-screen">
       {/* ===== MAIN HERO ===== */}
@@ -1128,7 +1266,13 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
           </div>
           {/* Content */}
           <div style={{ flex:1, overflowY:'auto', paddingRight:4 }}>
-            {infoView === 'catalog' && (
+            {renderError && (
+              <div style={{ padding:12, marginBottom:8, background:'rgba(255,0,0,0.1)', borderRadius:8, border:'1px solid #ef4444' }}>
+                <div style={{ fontSize:10, color:'#ef4444', fontWeight:700, marginBottom:4 }}>⚠ Ошибка рендера:</div>
+                <div style={{ fontSize:9, color:'#f87171', whiteSpace:'pre-wrap' }}>{renderError}</div>
+              </div>
+            )}
+            {renderView(infoView, 'catalog', () =>
               <div>
                 <div style={{ display:'flex', gap:6, marginBottom:8, alignItems:'center' }}>
                   <input value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Поиск по названию, категориям, механизмам" style={{ flex:1, padding:'8px 10px', borderRadius:8, border:'1px solid var(--border-color)', background:'var(--bg-secondary)', color:'var(--text-light)', fontSize:12 }} />
@@ -1137,7 +1281,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
                   {searchQuery ? `Найдено: ${groupedSubstances.reduce((a, g) => a + g.count, 0)} из ${ALL_SUBSTANCES.length}` : `Всего: ${ALL_SUBSTANCES.length} веществ`}
                 </div>
                 <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
-                  {groupedSubstances.map(group => {
+                  {(groupedSubstances||[]).map(group => {
                     const catInfo = getCategoryInfo(group.cat);
                     const isExpanded = expandedCategories[group.cat] ?? (group.count <= 5);
                     return (
@@ -1150,73 +1294,46 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
                         </div>
                         {isExpanded && (
                           <div style={{ borderTop:'1px solid var(--border)' }}>
-                            {group.items.map(sub => (
-                              <div key={sub.id}>
-                                <div onClick={() => setSelectedSub(selectedSub === sub.id ? null : sub.id)} style={{ display:'flex', alignItems:'flex-start', gap:4, padding:'6px 10px 6px 14px', cursor:'pointer', borderBottom:'1px solid var(--border)' }}>
+                            {(group.items||[]).map(sub => (
+                              <div key={sub?.id||'x'}>
+                                <div onClick={() => setSelectedSub(selectedSub === sub?.id ? null : (sub?.id||null))} style={{ display:'flex', alignItems:'flex-start', gap:4, padding:'6px 10px 6px 14px', cursor:'pointer', borderBottom:'1px solid var(--border)' }}>
                                   <div style={{ flex:1 }}>
-                                    <div style={{ fontSize:10, fontWeight:600, color:'var(--text-light)', lineHeight:1.3 }}>{sub.name}</div>
+                                    <div style={{ fontSize:10, fontWeight:600, color:'var(--text-light)', lineHeight:1.3 }}>{sub?.name||''}</div>
                                     <div style={{ display:'flex', gap:2, flexWrap:'wrap', marginTop:1 }}>
-                                      {(sub.categories||[]).slice(0,2).map(c => <span key={c} style={{ fontSize:7, padding:'1px 3px', borderRadius:2, background:'rgba(255,255,255,0.04)', color:'var(--text-dim)' }}>{c}</span>)}
-                                      {(sub.mechanisms||[]).slice(0,1).map(m => <span key={m} style={{ fontSize:7, padding:'1px 3px', borderRadius:2, background:'rgba(0,230,138,0.06)', color:'var(--accent-green)' }}>{m.slice(0,25)}</span>)}
+                                      {(sub?.categories||[]).slice(0,2).map(c => <span key={c} style={{ fontSize:7, padding:'1px 3px', borderRadius:2, background:'rgba(255,255,255,0.04)', color:'var(--text-dim)' }}>{c||''}</span>)}
+                                      {(sub?.mechanisms||[]).slice(0,1).map(m => <span key={m||''} style={{ fontSize:7, padding:'1px 3px', borderRadius:2, background:'rgba(0,230,138,0.06)', color:'var(--accent-green)' }}>{(m||'').slice(0,25)}</span>)}
                                     </div>
                                   </div>
-                                  <span style={{ fontSize:9, color:'var(--text-dim)', transform:selectedSub === sub.id ? 'rotate(180deg)' : 'none' }}>▼</span>
+                                  <span style={{ fontSize:9, color:'var(--text-dim)', transform:selectedSub === sub?.id ? 'rotate(180deg)' : 'none' }}>▼</span>
                                 </div>
-                                {selectedSub === sub.id && (
+                                {selectedSub === sub?.id && sub && (
                                   <div style={{ padding:'6px 10px 8px 14px', background:'rgba(0,0,0,0.15)', borderBottom:'1px solid var(--border)' }}>
-                                    <div style={{ fontSize:9, color:'rgba(255,255,255,0.85)', lineHeight:1.3, marginBottom:4 }}>{sub.description}</div>
-                                    {/* Type badge */}
+                                    <div style={{ fontSize:9, color:'rgba(255,255,255,0.85)', lineHeight:1.3, marginBottom:4 }}>{sub.description||''}</div>
                                     <div style={{ fontSize:7, color:'var(--accent-green, #00e68a)', marginBottom:3 }}>
-                                      {sub.type}{(sub.categories||[]).length > 0 ? ' · ' + (sub.categories||[]).slice(0,2).join(', ') : ''}
+                                      {(sub.type||'')}{(sub.categories||[]).length > 0 ? ' · ' + (sub.categories||[]).slice(0,2).join(', ') : ''}
                                     </div>
-                                    {/* All mechanisms */}
-                                    {sub.mechanisms && sub.mechanisms.length > 0 && (
+                                    {(sub.mechanisms||[]).length > 0 && (
                                       <div style={{ marginBottom:3 }}>
                                         <div style={{ fontSize:7, color:'var(--text-dim)', marginBottom:1 }}>Механизмы действия:</div>
                                         <div style={{ display:'flex', gap:2, flexWrap:'wrap' }}>
-                                          {sub.mechanisms.map((m,i) => (
-                                            <span key={i} style={{ fontSize:7, padding:'1px 5px', borderRadius:3, background:'rgba(0,230,138,0.06)', color:'#00e68a' }}>{m}</span>
+                                          {(sub.mechanisms||[]).map((m,i) => (
+                                            <span key={i} style={{ fontSize:7, padding:'1px 5px', borderRadius:3, background:'rgba(0,230,138,0.06)', color:'#00e68a' }}>{(m||'')}</span>
                                           ))}
                                         </div>
                                       </div>
                                     )}
-                                    {/* Organs */}
-                                    {sub.organs && sub.organs.length > 0 && (
+                                    {(sub.organs||[]).length > 0 && (
                                       <div style={{ marginBottom:3 }}>
                                         <div style={{ fontSize:7, color:'var(--text-dim)', marginBottom:1 }}>Органы-мишени:</div>
                                         <div style={{ display:'flex', gap:2, flexWrap:'wrap' }}>
-                                          {sub.organs.map(o => <span key={o} style={{ fontSize:7, padding:'1px 5px', borderRadius:3, background:'rgba(59,130,246,0.08)', color:'#60a5fa' }}>{o}</span>)}
+                                          {(sub.organs||[]).map(o => <span key={o||''} style={{ fontSize:7, padding:'1px 5px', borderRadius:3, background:'rgba(59,130,246,0.08)', color:'#60a5fa' }}>{o||''}</span>)}
                                         </div>
                                       </div>
                                     )}
-                                    {/* Deficiency */}
                                     {sub.deficiency && sub.deficiency !== 'NONE' && (
                                       <div style={{ fontSize:8, color:'#f59e0b', marginTop:2 }}>Дефицит: {sub.deficiency}</div>
                                     )}
-                                    {/* Cross-referenced interactions with this substance */}
-                                    {(() => {
-                                      const subsInteractions = mergedInteractions.filter(i =>
-                                        i.substanceA === sub.id || i.substanceB === sub.id
-                                      ).slice(0, 5);
-                                      return subsInteractions.length > 0 ? (
-                                        <div style={{ marginTop:4 }}>
-                                          <div style={{ fontSize:7, color:'var(--text-dim)', marginBottom:1 }}>Взаимодействия:</div>
-                                          {subsInteractions.map(i => {
-                                            const isA = i.substanceA === sub.id;
-                                            const partner = isA ? i.substanceB : i.substanceA;
-                                            const pName = resolveSubName(partner);
-                                            const tColor = i.type === 'synergy' ? '#22c55e' : i.type === 'conflict' ? '#ef4444' : '#f59e0b';
-                                            return (
-                                              <div key={i.interactionId} style={{ fontSize:7, color:'var(--text-dim)', padding:'1px 0', lineHeight:1.3 }}>
-                                                <span style={{ color:tColor, fontWeight:600 }}>{i.type === 'synergy' ? '⊕' : i.type === 'conflict' ? '⊖' : '⚡'}</span>
-                                                {' '}{pName} — {i.type === 'synergy' ? 'синергия' : i.type === 'conflict' ? 'конфликт' : 'осторожно'}
-                                                {i.notes && <span style={{ opacity:0.6 }}>: {i.notes.slice(0,40)}</span>}
-                                              </div>
-                                            );
-                                          })}
-                                        </div>
-                                      ) : null;
-                                    })()}
+                                    {catDetailInteractions(sub, mergedInteractions)}
                                   </div>
                                 )}
                               </div>
@@ -1226,11 +1343,11 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
                       </div>
                     );
                   })}
-                  {groupedSubstances.length === 0 && <div style={{ padding:20, textAlign:'center', color:'var(--text-dim)', fontSize:11 }}>Ничего не найдено</div>}
+                  {(groupedSubstances||[]).length === 0 && <div style={{ padding:20, textAlign:'center', color:'var(--text-dim)', fontSize:11 }}>Ничего не найдено</div>}
                 </div>
               </div>
             )}
-            {infoView === 'synergies' && (
+            {renderView(infoView, 'synergies', () =>
               <div>
                 <div style={{ display:'flex', gap:4, marginBottom:8, overflowX:'auto', scrollbarWidth:'none', flexWrap:'wrap' }}>
                   {(['all','LOW','MEDIUM','HIGH'] as const).map(s => (
@@ -1243,106 +1360,10 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
                   ))}
                   <div style={{ fontSize:9, color:'var(--text-dim)', display:'flex', alignItems:'center', marginLeft:2, whiteSpace:'nowrap' }}>{filteredInteractions.length} из {mergedInteractions.length}</div>
                 </div>
-                {(() => {
-                  const synergies = filteredInteractions.filter(i => i.type === 'synergy');
-                  const conflicts = filteredInteractions.filter(i => i.type === 'conflict' || i.type === 'caution');
-                  const showEffect = (interaction: typeof mergedInteractions[0]) => {
-                    const eff = interaction.effect;
-                    if (/^[A-Z0-9_]+$/.test(eff) && interaction.notes) return interaction.notes;
-                    return eff;
-                  };
-                  return (<>
-                    {/* ===== СИНЕРГИИ ===== */}
-                    <div style={{ marginBottom:10 }}>
-                      <div onClick={() => setExpandedCategories(prev => ({ ...prev, syn_synergies: !(prev.syn_synergies ?? true) }))} style={{ display:'flex', alignItems:'center', gap:6, padding:'6px 8px', cursor:'pointer', userSelect:'none', background:'var(--bg-secondary)', borderRadius:8, marginBottom:4 }}>
-                        <span style={{ fontSize:13 }}>⊕</span>
-                        <div style={{ flex:1, fontSize:10, fontWeight:700, color:'#22c55e' }}>Синергии ({synergies.length})</div>
-                        <span style={{ fontSize:9, color:'var(--text-dim)', transform:expandedCategories.syn_synergies !== false ? 'rotate(180deg)' : 'none', transition:'transform 0.2s' }}>▼</span>
-                      </div>
-                      {expandedCategories.syn_synergies !== false && (
-                        <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
-                          {synergies.slice(0, 30).map((interaction, i) => {
-                            const sevInfo = INTERACTION_SEVERITY_LABELS[interaction.severity] || { label:interaction.severity, color:'#888' };
-                            const aName = resolveSubName(interaction.substanceA);
-                            const bName = resolveSubName(interaction.substanceB);
-                            return (
-                              <div key={interaction.interactionId} style={{ background:'var(--bg-secondary)', borderRadius:8, padding:'7px 8px', borderLeft:'3px solid #22c55e' }}>
-                                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:2 }}>
-                                  <div style={{ display:'flex', alignItems:'center', gap:4, flexWrap:'wrap', flex:1, minWidth:0 }}>
-                                    <span style={{ fontWeight:600, fontSize:10, color:'var(--text-light)', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', maxWidth:'40%' }}>{aName}</span>
-                                    <span style={{ fontSize:10, color:'#22c55e', fontWeight:700 }}>+</span>
-                                    <span style={{ fontWeight:600, fontSize:10, color:'var(--text-light)', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', maxWidth:'40%' }}>{bName}</span>
-                                  </div>
-                                  <span style={{ fontSize:7, padding:'1px 4px', borderRadius:3, background:sevInfo.color+'22', color:sevInfo.color, flexShrink:0 }}>{sevInfo.label}</span>
-                                </div>
-                                <div style={{ fontSize:9, color:'rgba(255,255,255,0.85)', lineHeight:1.3 }}>⊕ {showEffect(interaction)}</div>
-                                {interaction.mechanisms && interaction.mechanisms.length > 0 && (
-                                  <div style={{ display:'flex', flexWrap:'wrap', gap:2, marginTop:2 }}>
-                                    {interaction.mechanisms.map((m, mi) => (
-                                      <span key={mi} style={{ fontSize:6, padding:'1px 4px', borderRadius:3, background:'rgba(34,197,94,0.1)', color:'#22c55e', border:'1px solid rgba(34,197,94,0.15)', fontWeight:500 }}>{m}</span>
-                                    ))}
-                                  </div>
-                                )}
-                                {interaction.notes && !(/^[A-Z0-9_]+$/.test(interaction.effect)) && <div style={{ fontSize:8, color:'var(--text-dim)', fontStyle:'italic', lineHeight:1.2, marginTop:2 }}>{interaction.notes}</div>}
-                              </div>
-                            );
-                          })}
-                          {synergies.length === 0 && <div style={{ padding:12, textAlign:'center', color:'var(--text-dim)', fontSize:10 }}>Нет синергий</div>}
-                        </div>
-                      )}
-                    </div>
-                    {/* ===== КОНФЛИКТЫ ===== */}
-                    <div>
-                      <div onClick={() => setExpandedCategories(prev => ({ ...prev, syn_conflicts: !(prev.syn_conflicts ?? true) }))} style={{ display:'flex', alignItems:'center', gap:6, padding:'6px 8px', cursor:'pointer', userSelect:'none', background:'var(--bg-secondary)', borderRadius:8, marginBottom:4 }}>
-                        <span style={{ fontSize:13 }}>⊖</span>
-                        <div style={{ flex:1, fontSize:10, fontWeight:700, color:'#ef4444' }}>Конфликты и осторожность ({conflicts.length})</div>
-                        <span style={{ fontSize:9, color:'var(--text-dim)', transform:expandedCategories.syn_conflicts !== false ? 'rotate(180deg)' : 'none', transition:'transform 0.2s' }}>▼</span>
-                      </div>
-                      {expandedCategories.syn_conflicts !== false && (
-                        <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
-                          {conflicts.slice(0, 30).map((interaction, i) => {
-                            const typeInfo = INTERACTION_TYPE_LABELS[interaction.type] || { label:interaction.type, emoji:'🔗', color:'#888' };
-                            const sevInfo = INTERACTION_SEVERITY_LABELS[interaction.severity] || { label:interaction.severity, color:'#888' };
-                            const aName = resolveSubName(interaction.substanceA);
-                            const bName = resolveSubName(interaction.substanceB);
-                            return (
-                              <div key={interaction.interactionId} style={{ background:'var(--bg-secondary)', borderRadius:8, padding:'7px 8px', borderLeft:`3px solid ${typeInfo.color}` }}>
-                                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:2 }}>
-                                  <div style={{ display:'flex', alignItems:'center', gap:4, flexWrap:'wrap', flex:1, minWidth:0 }}>
-                                    <span style={{ fontWeight:600, fontSize:10, color:'var(--text-light)', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', maxWidth:'35%' }}>{aName}</span>
-                                    <span style={{ fontSize:10, color:typeInfo.color, fontWeight:700 }}>{interaction.type === 'conflict' ? '×' : '?'}</span>
-                                    <span style={{ fontWeight:600, fontSize:10, color:'var(--text-light)', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', maxWidth:'35%' }}>{bName}</span>
-                                  </div>
-                                  <div style={{ display:'flex', gap:3, flexShrink:0 }}>
-                                    <span style={{ fontSize:7, padding:'1px 4px', borderRadius:3, background:typeInfo.color+'22', color:typeInfo.color, fontWeight:600 }}>{typeInfo.label}</span>
-                                    <span style={{ fontSize:7, padding:'1px 4px', borderRadius:3, background:sevInfo.color+'22', color:sevInfo.color }}>{sevInfo.label}</span>
-                                  </div>
-                                </div>
-                                <div style={{ fontSize:9, color:'rgba(255,255,255,0.85)', lineHeight:1.3 }}>⊖ {showEffect(interaction)}</div>
-                                {interaction.mechanisms && interaction.mechanisms.length > 0 && (
-                                  <div style={{ display:'flex', flexWrap:'wrap', gap:2, marginTop:2 }}>
-                                    {interaction.mechanisms.map((m, mi) => {
-                                      const ms = (m||'');
-                                      const mColor = ms.toLowerCase().includes('toxic') || ms.toLowerCase().includes('hepatic') ? '#ef4444' :
-                                        ms.toLowerCase().includes('kidney') || ms.toLowerCase().includes('renal') ? '#f59e0b' :
-                                        ms.toLowerCase().includes('synerg') || ms.toLowerCase().includes('enhanc') || ms.toLowerCase().includes('potent') ? '#22c55e' : '#8b5cf6';
-                                      return <span key={mi} style={{ fontSize:6, padding:'1px 4px', borderRadius:3, background:mColor+'18', color:mColor, border:`1px solid ${mColor}22`, fontWeight:500 }}>{m}</span>;
-                                    })}
-                                  </div>
-                                )}
-                                {interaction.notes && !(/^[A-Z0-9_]+$/.test(interaction.effect)) && <div style={{ fontSize:8, color:'var(--text-dim)', fontStyle:'italic', lineHeight:1.2, marginTop:2 }}>{interaction.notes}</div>}
-                              </div>
-                            );
-                          })}
-                          {conflicts.length === 0 && <div style={{ padding:12, textAlign:'center', color:'var(--text-dim)', fontSize:10 }}>Нет конфликтов</div>}
-                        </div>
-                      )}
-                    </div>
-                  </>);
-                })()}
+                {synergiesContent(filteredInteractions, mergedInteractions, expandedCategories)}
               </div>
             )}
-            {infoView === 'stacks' && (
+            {renderView(infoView, 'stacks', () =>
               <div>
                 <input value={stackSearch} onChange={e => setStackSearch(e.target.value)} placeholder="🔍 Поиск по эффекту или веществу..." style={{ width:'100%', padding:'8px 10px', borderRadius:8, border:'1px solid var(--border)', background:'var(--bg-secondary)', color:'var(--text)', fontSize:11, boxSizing:'border-box', marginBottom:8 }} />
                 <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
@@ -1434,7 +1455,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
                 </div>
               </div>
             )}
-            {infoView === 'interactions' && (
+            {renderView(infoView, 'interactions', () =>
               <div>
                 <div style={{ marginBottom:8 }}>
                   <div style={{ display:'flex', gap:4, marginBottom:8 }}>
