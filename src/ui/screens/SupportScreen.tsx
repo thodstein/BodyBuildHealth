@@ -958,9 +958,25 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
       .sort((a, b) => b.count - a.count);
   }, [searchQuery]);
 
-  // Filter ALL_INTERACTIONS for synergies tab
+  // Merge ALL_INTERACTIONS + SYNERGY_PAIRS for synergies tab
+  const mergedInteractions = useMemo(() => {
+    const fromDB = ALL_INTERACTIONS.map(i => ({ ...i, source: 'db' as const }));
+    const fromEngine = SYNERGY_PAIRS.map((p, idx) => ({
+      interactionId: `synergy_pair_${idx}`,
+      substanceA: p.substanceA,
+      substanceB: p.substanceB,
+      type: 'synergy' as const,
+      effect: p.mechanism || `Синергия: ${p.synergyType}`,
+      mechanisms: p.affectedSystems || [],
+      severity: (p.strength > 0.7 ? 'HIGH' : p.strength > 0.4 ? 'MEDIUM' : 'LOW') as 'LOW' | 'MEDIUM' | 'HIGH',
+      notes: p.clinicalNote || '',
+      source: 'engine' as const,
+    }));
+    return [...fromDB, ...fromEngine];
+  }, []);
+
   const filteredInteractions = useMemo(() => {
-    let list = ALL_INTERACTIONS;
+    let list = mergedInteractions;
     if (interactionTypeFilter !== 'all') {
       list = list.filter(i => i.type === interactionTypeFilter);
     }
@@ -968,7 +984,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
       list = list.filter(i => i.severity === interactionSeverityFilter);
     }
     return list;
-  }, [interactionTypeFilter, interactionSeverityFilter]);
+  }, [interactionTypeFilter, interactionSeverityFilter, mergedInteractions]);
 
   // Grouped stacks by size
   const groupedStacks = useMemo(() => {
@@ -1270,7 +1286,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
               </button>
             ))}
             <div style={{ fontSize: 10, color: 'var(--text-dim)', display: 'flex', alignItems: 'center', marginLeft: 4, whiteSpace: 'nowrap' }}>
-              {filteredInteractions.length} из {ALL_INTERACTIONS.length}
+              {filteredInteractions.length} из {mergedInteractions.length}
             </div>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 5, maxHeight: '65vh', overflowY: 'auto', paddingRight: 2 }}>

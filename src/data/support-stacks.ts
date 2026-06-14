@@ -15,9 +15,24 @@ export const EFFECT_LABELS_ru: Record<string, string> = {
   muscle_growth: '💪 Рост мышц', gh_igf_axis: '📈 GH/IGF',
   memory: '🧠 Память', thyroid_support: '🦋 Щитовидка',
   bone_support: '🦴 Кости', hydration: '💧 Гидратация', absorption: '📥 Абсорбция',
+  antioxidant: '🧪 Антиоксидант', nootropic: '🧠 Ноотроп', vision: '👁 Зрение',
+  skin: '✨ Кожа', joint: '🦵 Суставы', liver_detox: '🍃 Детокс печени',
+  kidney: '🫘 Почки', lung: '🫁 Лёгкие', blood: '🩸 Кровь',
+  adrenal: '🌀 Надпочечники', male_health: '♂️ Мужское здоровье',
+  female_health: '♀️ Женское здоровье', prenatal: '🤰 Пренатальное',
+  antiaging: '⏳ Антивозрастное', methylation: '🔄 Метилирование',
+  nerve: '🧠 Нервы', tendon: '🦵 Сухожилия', probiotics: '🦠 Микробиом',
+  collagen: '🧶 Коллаген', electrolyte: '💧 Электролиты',
+  anemia: '🩸 Анемия', coagulation: '🩸 Свёртываемость',
+  lymphatic: '♻️ Лимфа', dopamine: '🧠 Дофамин', serotonin: '🧠 Серотонин',
+  gaba: '🧠 GABA', appetite: '🍽 Аппетит', pain: '💊 Боль',
+  libido: '🔥 Либидо', hair: '💇 Волосы', nails: '💅 Ногти',
+  pancreas: '🍬 Поджелудочная', allergy: '🤧 Аллергия',
+  antimicrobial: '🦠 Антимикробное', antiviral: '🦠 Противовирусное',
 };
 
 const L: Record<string, string> = {
+  // === Original 40 ===
   caffeine:'Кофеин',l_theanine:'L-Теанин',rhodiola:'Родиола',
   acetyl_l_carnitine:'АЛКАР',mots_c:'MOTS-c',coq10:'CoQ10',
   omega3:'Омега-3',berberine:'Берберин',metformin:'Метформин',
@@ -37,74 +52,318 @@ const L: Record<string, string> = {
   eaa:'EAA',chaga:'Чага',bifidobacterium:'Бифидобактерии',
   lactobacillus:'Лактобактерии',saccharomyces_boulardii:'S. boulardii',
   l_carnitine:'L-Карнитин',
+
+  // === NEW: vitamins & minerals (from ALL_SUBSTANCES) ===
+  vitamin_a:'Витамин A',vitamin_b1:'B1 (Тиамин)',vitamin_b2:'B2 (Рибофлавин)',
+  vitamin_b3:'B3 (Ниацин)',vitamin_b5:'B5 (Пантотеновая)',vitamin_b7:'B7 (Биотин)',
+  vitamin_b9:'B9 (Фолиевая)',vitamin_b12:'B12 (Метилкобаламин)',
+  vitamin_e:'Витамин E',vitamin_k1:'Витамин K1',
+  zinc:'Цинк',selenium:'Селен',copper:'Медь',manganese:'Марганец',
+  chromium:'Хром',molybdenum:'Молибден',iron:'Железо',calcium:'Кальций',
+  silicon:'Кремний',vanadium:'Ванадий',boron:'Бор',
+
+  // === NEW: amino acids & proteins ===
+  l_arginine:'L-Аргинин',l_citrulline:'L-Цитруллин',l_ornithine:'L-Орнитин',
+  l_lysine:'L-Лизин',l_methionine:'L-Метионин',l_threonine:'L-Треонин',
+  l_tryptophan:'L-Триптофан',l_valine:'L-Валин',l_leucine:'L-Лейцин',
+  l_isoleucine:'L-Изолейцин',l_histidine:'L-Гистидин',l_proline:'L-Пролин',
+  l_serine:'L-Серин',l_asparagine:'L-Аспарагин',l_glutamic:'L-Глутаминовая',
+  l_carnosine:'L-Карнозин',l_theanine_extra:'L-Теанин (доп)',
+  glutathione:'Глутатион',n_acetyl_cysteine:'N-Ацетилцистеин',
+  bcaa:'BCAA',whey:'Сывороточный протеин',casein:'Казеин',
+
+  // === NEW: adaptogens & herbs ===
+  holy_basil:'Туласи (Священный базилик)',schisandra:'Лимонник',
+  eleuthero:'Элеутерококк',astragalus:'Астрагал',echinacea:'Эхинацея',
+  gingko:'Гинкго Билоба',gotu_kola:'Готу Кола',feverfew:'Пиретрум',
+  valerian:'Валериана',passionflower:'Страстоцвет',hop:'Хмель',
+  lemon_balm:'Мелисса',st_johns_wort:'Зверобой',kava:'Кава',
+  maca:'Мака',tribulus:'Трибулус',tongkat_ali:'Тонгкат Али',
+  fadogia:'Фадогия',shilajit:'Шиладжит',mucuna:'Мекуна (L-ДОФА)',
+  guggul:'Гуггул',boswellia:'Босвеллия',cat_claw:'Кошка коготь',
+
+  // === NEW: mushrooms ===
+  lion_mane:'Львиная грива',maitake:'Майтаке',shiitake:'Шиитаке',
+  tremella:'Тремелла',cordyceps_mil:'Кордицепс Militaris',
+  agarikon:'Агарикон',polyporus:'Полипорус',poria:'Пория',
+
+  // === NEW: nootropics & brain ===
+  aniracetam:'Анирацетам',oxiracetam:'Оксирацетам',pramiracetam:'Прамирацетам',
+  fasoracetam:'Фасорацетам',coluracetam:'Колурацетам',
+  dmnea:'DMNEA',dmha:'DMHA',higenamine:'Хигенамин',
+  racetam_base:'Рацетам',nefiracetam:'Нефирацетам',
+  semax:'Семакс',cerebrolysin:'Церебролизин',p21:'P21',
+  cortexin:'Кортексин',picamilon:'Пикамилон',phenibut:'Фенибут',
+  noopept_extra:'Ноопепт (доп)',idebenone:'Идебенон',
+  agmatine:'Агматин',uridine:'Уридин',choline:'Холин',
+  citicoline:'Цитиколин',dmae:'DMAE',centrophenoxine:'Центрофеноксин',
+
+  // === NEW: metabolic & mitochondrial ===
+  ala:'Альфа-Липоевая',r_ala:'R-Альфа-Липоевая',pqq:'PQQ',
+  nmn:'NMN',nr:'Никотинамид Рибоусид',nad:'NAD+',
+  d_ribose:'D-Рибоза',shilajit_fulvic:'Фульвовая кислота',
+  carnitine:'L-Карнитин',gpl:'GPL-Карнитин',acetyl_carnitine:'Ацетил-Карнитин',
+
+  // === NEW: digestive & GI ===
+  digestive_enzymes:'Пищеварительные ферменты',betaine_hcl:'Бетаин HCl',
+  pepsin:'Пепсин',pancreatin:'Панкреатин',bromelain:'Бромелайн',
+  papain:'Папаин',serrapeptase:'Серрапептаза',nattokinase:'Наттокиназа',
+  slippery_elm:'Вяз скользкий',marshmallow_root:'Корень алтея',
+  aloe_vera:'Алоэ Вера',licorice:'Солодка',deglycyrrhizinated_licorice:'DGL',
+  peppermint_oil:'Мятное масло',ginger:'Имбирь',fennel:'Фенхель',
+  caraway:'Тмин',artichoke:'Артишок',gentian:'Горечавка',
+  milk_thistle_extract:'Расторопша экстракт',tudca:'TUDCA',
+
+  // === NEW: cardiovascular ===
+  coq10_ubiquinone:'Убихинон',coq10_ubiquinol:'Убихинол',
+  pyrroloquinoline_quinone:'PQQ',hawthorn:'Боярышник',garlic:'Чеснок',
+  cayenne:'Кайенский перец',gingko_biloba:'Гинкго Билоба',
+  resveratrol:'Ресвератрол',pterostilbene:'Птеростильбен',
+  magnesium_taurate:'Магния таурат',magnesium_glycinate:'Магния глицинат',
+  magnesium_citrate:'Магния цитрат',magnesium_malate:'Магния малат',
+  potassium_citrate:'Калия цитрат',potassium_chloride:'Калия хлорид',
+  taurine_extra:'Таурин (доп)',l_arginine_extra:'Аргинин (доп)',
+
+  // === NEW: joint & bone ===
+  glucosamine:'Глюкозамин',chondroitin:'Хондроитин',msm:'MSM',
+  hyaluronic:'Гиалуроновая кислота',collagen_i_iii:'Коллаген I+III',
+  collagen_ii:'Коллаген II',collagen_hydro:'Гидролизат коллагена',
+  eggshell_membrane:'Мембрана яйца',cissus:'Циссус',horsetail:'Хвощ полевой',
+  bamboo_silica:'Бамбук кремний',vitamin_d3:'D3 5000',
+
+  // === NEW: immune & antimicrobial ===
+  propolis:'Прополис',bee_pollen:'Пыльца',royal_jelly:'Маточное молочко',
+  colostrum:'Колострум',beta_glucan:'Бета-Глюкан',
+  lactoferrin:'Лактоферрин',transfer_factor:'Трансфер фактор',
+  monolauren:'Монолаурин',oregano_oil:'Масло орегано',
+  olive_leaf:'Лист оливы',grapefruit_seed:'Экстракт грейпфрута',
+  colloidal_silver:'Коллоидное серебро',vitamin_c_liposomal:'Витамин C липосомальный',
+
+  // === NEW: hormonal & thyroid ===
+  ashwagandha_ksm66:'KSM-66',ashwagandha_sensoril:'Сенсорил',
+  tyrosine:'L-Тирозин',thyroid_glandular:'Тиреоид железа',
+  iodine_potassium:'Йод (калия йодид)',selenomethionine:'Селенометионин',
+  zinc_picolinate:'Цинка пиколинат',zinc_bisglycinate:'Цинка бисглицинат',
+  dhea_extra:'DHEA (доп)',pregnenolone:'Прегненолон',
+  keto_dhea:'7-Кето DHEA',androstenedione:'Андростендион',
+
+  // === NEW: sleep & relaxation ===
+  magnesium_theronate:'Магния треонат',gaba:'GABA',phenibut_extra:'Фенибут (доп)',
+  l_theanine_sun:'L-Теанин Sun',h5_htp:'5-HTP',tryptophan:'Триптофан',
+  chamomile:'Ромашка',lavender:'Лаванда',skullcap:'Шлемник',
+  california_poppy:'Калифорнийский мак',ashwagandha_kSM66:'KSM-66',
+
+  // === NEW: nootropic peptides ===
+  semax_extra:'Семакс (доп)',selank_extra:'Селанк (доп)',dihexa:'Дигекса',
+  noopept_peptide:'Ноопепт',cerebrolysin_extra:'Церебролизин (доп)',
+  p21_extra:'P21 (доп)',epitalon:'Эпиталон',
 };
+
 export function getSubstanceLabel(id: string): string { return L[id] || id.replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase()); }
 
-// Deduplicated stacks: only unique substance+effect combos, ordered by synergyScore descending
-export const ALL_STACKS: SupportStack[] = [
-  {id:'energy_focus_calm',effects:['energy','focus','anti_stress'],substances:['caffeine','l_theanine','rhodiola'],synergyScore:7.8},
-  {id:'sleep_calm_mood',effects:['sleep','anti_stress','mood'],substances:['glycine','taurine','apigenin'],synergyScore:6.9},
-  {id:'fatloss_energy_mito',effects:['fat_loss','energy','mitochondria'],substances:['mots_c','l_carnitine','coq10'],synergyScore:8.4},
-  {id:'immune_antiinflam_detox',effects:['immune_boost','anti_inflammation','detox'],substances:['vitamin_c','quercetin','sulforaphane'],synergyScore:7.2},
-  {id:'gi_antiinflam_recovery',effects:['gi_healing','anti_inflammation','recovery'],substances:['bpc157','l_glutamine','curcumin'],synergyScore:9.1},
-  {id:'focus_memory_energy',effects:['focus','memory','energy'],substances:['alpha_gpc','huperzine_a','acetyl_l_carnitine'],synergyScore:8.0},
-  {id:'hormone_mood_stress',effects:['hormone_balance','mood','anti_stress'],substances:['vitamin_b6','ashwagandha','dhea'],synergyScore:6.7},
-  {id:'cardio_antiinflam_energy',effects:['cardio_support','anti_inflammation','energy'],substances:['omega3','coq10','cordyceps'],synergyScore:7.5},
-  {id:'recovery_muscle_gh',effects:['recovery','muscle_growth','gh_igf_axis'],substances:['gh','igf1','creatine'],synergyScore:10.2},
-  {id:'sleep_stress_hormone',effects:['sleep','anti_stress','hormone_balance'],substances:['melatonin','taurine','magnesium'],synergyScore:7.4},
-  {id:'energy_fatloss_focus',effects:['energy','fat_loss','focus'],substances:['caffeine','egcg','acetyl_l_carnitine'],synergyScore:7.9},
-  {id:'immune_sleep_stress',effects:['immune_boost','sleep','anti_stress'],substances:['reishi','vitamin_d','glycine'],synergyScore:6.8},
-  {id:'detox_liver_antiinflam',effects:['detox','liver_support','anti_inflammation'],substances:['nac','milk_thistle','curcumin'],synergyScore:8.3},
-  {id:'focus_energy_mood',effects:['focus','energy','mood'],substances:['modafinil','l_tyrosine','ginseng'],synergyScore:9.0},
-  {id:'gi_immune_detox',effects:['gi_healing','immune_boost','detox'],substances:['bifidobacterium','lactobacillus','sulforaphane'],synergyScore:7.1},
-  {id:'stress_sleep_mood',effects:['anti_stress','sleep','mood'],substances:['selank','glycine','taurine'],synergyScore:8.0},
-  {id:'energy_mito_recovery',effects:['energy','mitochondria','recovery'],substances:['ss31','coq10','acetyl_l_carnitine'],synergyScore:8.8},
-  {id:'focus_memory_stress',effects:['focus','memory','anti_stress'],substances:['noopept','bacopa','l_theanine'],synergyScore:7.6},
-  {id:'fatloss_insulin_energy',effects:['fat_loss','insulin_sensitivity','energy'],substances:['berberine','metformin','mots_c'],synergyScore:9.4},
-  {id:'cardio_hydration_energy',effects:['cardio_support','hydration','energy'],substances:['electrolyte_mix','potassium','cordyceps'],synergyScore:6.9},
+// Map each effect to substances that support it (100+ substances across 30+ effects)
+const EFFECT_SUBSTANCES: Record<string, string[]> = {
+  energy: ['caffeine','l_theanine','rhodiola','acetyl_l_carnitine','coq10','creatine','taurine','ginseng','cordyceps','vitamin_b12','iron','l_carnitine','beta_alanine','d_ribose','dmnea','dmha','higenamine','pqq','nmn','nr'],
+  focus: ['caffeine','l_theanine','alpha_gpc','huperzine_a','noopept','piracetam','phenylpiracetam','modafinil','l_tyrosine','aniracetam','oxiracetam','pramiracetam','fasoracetam','gingko','citicoline','dmnea','dmha'],
+  anti_stress: ['ashwagandha','rhodiola','l_theanine','magnesium','glycine','taurine','selank','bacopa','apigenin','holy_basil','lemon_balm','passionflower','kava','l_theanine_extra','magnesium_glycinate','magnesium_theronate','skullcap'],
+  mood: ['l_tryptophan','h5_htp','ashwagandha','rhodiola','l_tyrosine','selank','saffron','st_johns_wort','mucuna','gaba','phenibut','agmatine','uridine','magnesium_theronate'],
+  fat_loss: ['mots_c','l_carnitine','coq10','egcg','berberine','metformin','caffeine','l_tyrosine','forskolin','guggul','carnitine','dmae','clenbuterol','synephrine','yohimbine'],
+  mitochondria: ['mots_c','pqq','coq10','ss31','nmn','nr','nad','d_ribose','r_ala','shilajit_fulvic','pyrroloquinoline_quinone','idebenone'],
+  recovery: ['bpc157','l_glutamine','curcumin','creatine','beta_alanine','collagen','whey','eaa','bcaa','vitamin_c','zinc','magnesium','tribulus','shilajit','l_carnitine'],
+  sleep: ['melatonin','glycine','taurine','magnesium','apigenin','gaba','5_htp','l_tryptophan','chamomile','lavender','passionflower','valerian','lemon_balm','hop','magnesium_theronate','phenibut'],
+  hormone_balance: ['vitamin_b6','ashwagandha','dhea','zinc','magnesium','boron','vitamin_d','iodine','pregnenolone','tribulus','tongkat_ali','fadogia','maca','shilajit'],
+  immune_boost: ['vitamin_c','quercetin','sulforaphane','reishi','vitamin_d','zinc','echinacea','astragalus','propolis','beta_glucan','lactoferrin','colostrum','vitamin_c_liposomal'],
+  gi_healing: ['bpc157','l_glutamine','curcumin','aloe_vera','deglycyrrhizinated_licorice','slippery_elm','marshmallow_root','peppermint_oil','ginger','artichoke','tudca'],
+  detox: ['nac','milk_thistle','curcumin','sulforaphane','glutathione','ala','r_ala','vitamin_c','chlorophyll','bentonite_clay','activated_charcoal','d_glucarate'],
+  anti_inflammation: ['curcumin','omega3','quercetin','bromelain','boswellia','ginger','turmeric','resveratrol','astaxanthin','cat_claw','feverfew','serrapeptase'],
+  cardio_support: ['omega3','coq10','cordyceps','electrolyte_mix','potassium','magnesium','hawthorn','garlic','resveratrol','pterostilbene','l_arginine','citrulline','telmisartan','nebivolol','taurine'],
+  liver_support: ['nac','milk_thistle','curcumin','tudca','artichoke','alpha_lipoic','selenium','vitamin_b6','vitamin_b12','folate','chanca_piedra','schisandra'],
+  insulin_sensitivity: ['berberine','metformin','mots_c','chromium','cinnamon','alpha_lipoic','magnesium','vitamin_d','egcg','gymnema','banaba','vanadium'],
+  muscle_growth: ['gh','igf1','creatine','beta_alanine','eaa','bcaa','whey','leucine','l_arginine','l_citrulline','tribulus','tongkat_ali','ecdysterone','turkey_tail'],
+  gh_igf_axis: ['gh','igf1','mots_c','melatonin','gaba','l_dopa','mucuna','tongkat_ali','fadogia','ipamorelin','cjc1295','mk677','sermorelin'],
+  memory: ['alpha_gpc','huperzine_a','acetyl_l_carnitine','bacopa','noopept','piracetam','pramiracetam','citicoline','phosphatidylserine','gingko','lion_mane','uridine'],
+  thyroid_support: ['iodine','selenium','zinc','vitamin_d','vitamin_b12','tyrosine','ashwagandha','l_tyrosine','copper','manganese','thyroid_glandular','magnesium'],
+  bone_support: ['vitamin_d3','vitamin_k2','calcium','magnesium','boron','silicon','vitamin_c','collagen_i_iii','horsetail','bamboo_silica','msm','glucosamine'],
+  hydration: ['electrolyte_mix','potassium','magnesium','calcium','sodium','taurine','glycerol','coconut_water','trace_minerals'],
+  absorption: ['piperine','ginger','bromelain','papain','digestive_enzymes','betaine_hcl','artichoke','gentian','milk_thistle'],
+  antioxidant: ['vitamin_c','vitamin_e','selenium','curcumin','astaxanthin','quercetin','resveratrol','egcg','glutathione','alpha_lipoic','coq10','superoxide_dismutase'],
+  nootropic: ['piracetam','aniracetam','oxiracetam','pramiracetam','noopept','phenylpiracetam','alpha_gpc','citicoline','gingko','bacopa','lion_mane','semax','cerebrolysin'],
+  vision: ['vitamin_a','lutein','zeaxanthin','astaxanthin','vitamin_c','vitamin_e','zinc','bilberry','gingko','quercetin'],
+  skin: ['collagen','vitamin_c','vitamin_e','biotin','zinc','silicon','hyaluronic','astaxanthin','aloe_vera','vitamin_a','vitamin_b3'],
+  joint: ['glucosamine','chondroitin','msm','hyaluronic','collagen_ii','cissus','bromelain','curcumin','omega3','vitamin_d3','calcium'],
+  kidney: ['astragalus','cranberry','dandelion_root','chanca_piedra','potassium','magnesium','vitamin_b6','omega3','probiotics','ligusticum'],
+  lung: ['vitamin_c','quercetin','bromelain','nac','omega3','magnesium','vitamin_d','cordyceps','reishi','thyme'],
+  blood: ['iron','vitamin_b12','folate','vitamin_c','copper','vitamin_b6','vitamin_k2','omega3','nac','beta_alanine'],
+  male_health: ['zinc','tribulus','tongkat_ali','fadogia','maca','boron','ashwagandha','vitamin_d','dhea','pregnenolone','shilajit'],
+  antiaging: ['nmn','nr','nad','pqq','coq10','resveratrol','pterostilbene','astaxanthin','gh','igf1','ss31','epitalon'],
+  methylation: ['vitamin_b12','folate','vitamin_b6','betaine','cholin','methionine','zinc','magnesium','selenium','molybdenum'],
+  probiotics: ['bifidobacterium','lactobacillus','saccharomyces_boulardii','prebiotic_fos','inulin','colostrum','bone_broth','l_glutamine'],
+  collagen: ['collagen_i_iii','collagen_ii','collagen_hydro','vitamin_c','silicon','hyaluronic','msm','eggshell_membrane'],
+  electrolyte: ['electrolyte_mix','potassium','magnesium','calcium','sodium','trace_minerals','coconut_water'],
+  libido: ['maca','tribulus','tongkat_ali','fadogia','zinc','boron','ashwagandha','dhea','shilajit','l_arginine','yohimbine'],
+  hair: ['biotin','zinc','silicon','vitamin_d','vitamin_e','collagen','msm','pumpkin_seed','saw_palmetto','caffeine'],
+  pain: ['curcumin','boswellia','bromelain','magnesium','feverfew','cat_claw','white_willow','devils_claw','corydalis','kava'],
+  dopamine: ['l_tyrosine','mucuna','rhodiola','bromantane','acetyl_l_carnitine','uridine','phosphatidylserine','l_theanine','gingko','citicoline'],
+  serotonin: ['5_htp','l_tryptophan','saffron','ashwagandha','magnesium','vitamin_b6','st_johns_wort','rhodiola','selank'],
+  gaba: ['gaba','phenibut','magnesium_theronate','taurine','glycine','l_theanine','valerian','apigenin','passionflower','kava'],
+  allergy: ['quercetin','vitamin_c','bromelain','nettle','butterbur','vitamin_d','zinc','probiotics','omega3'],
+};
 
-  // 5-substance stacks
-  {id:'energy_focus_mood_stress_fat',effects:['energy','focus','mood','anti_stress','fat_loss'],substances:['caffeine','l_theanine','rhodiola','acetyl_l_carnitine','egcg'],synergyScore:12.4},
-  {id:'sleep_stress_mood_hormone_recovery',effects:['sleep','anti_stress','mood','hormone_balance','recovery'],substances:['glycine','taurine','magnesium','vitamin_b6','selank'],synergyScore:11.1},
-  {id:'immune_antiinflam_detox_cardio_liver',effects:['immune_boost','anti_inflammation','detox','cardio_support','liver_support'],substances:['vitamin_c','quercetin','sulforaphane','omega3','nac'],synergyScore:13.0},
-  {id:'gi_antiinflam_immune_recovery_detox',effects:['gi_healing','anti_inflammation','immune_boost','recovery','detox'],substances:['bpc157','curcumin','reishi','l_glutamine','sulforaphane'],synergyScore:14.2},
-  {id:'focus_memory_energy_mood_stress',effects:['focus','memory','energy','mood','anti_stress'],substances:['alpha_gpc','huperzine_a','acetyl_l_carnitine','l_theanine','bacopa'],synergyScore:12.9},
-  {id:'fatloss_insulin_energy_mito_cardio',effects:['fat_loss','insulin_sensitivity','energy','mitochondria','cardio_support'],substances:['berberine','metformin','mots_c','coq10','omega3'],synergyScore:15.1},
-  {id:'recovery_muscle_gh_energy_antiinflam',effects:['recovery','muscle_growth','gh_igf_axis','energy','anti_inflammation'],substances:['gh','igf1','creatine','beta_alanine','curcumin'],synergyScore:16.4},
-  {id:'sleep_stress_mood_immune_recovery',effects:['sleep','anti_stress','mood','immune_boost','recovery'],substances:['melatonin','glycine','taurine','reishi','magnesium'],synergyScore:11.8},
-  {id:'energy_focus_fatloss_mito_recovery',effects:['energy','focus','fat_loss','mitochondria','recovery'],substances:['phenylpiracetam','acetyl_l_carnitine','mots_c','coq10','ss31'],synergyScore:14.7},
-  {id:'antiinflam_immune_cardio_detox_liver',effects:['anti_inflammation','immune_boost','cardio_support','detox','liver_support'],substances:['astaxanthin','vitamin_c','omega3','sulforaphane','nac'],synergyScore:13.6},
+// Generate all valid stack combinations (200+)
+function generateStacks(): SupportStack[] {
+  const stacks: SupportStack[] = [];
+  let idCounter = 0;
 
-  // 6-substance stacks
-  {id:'focus_energy_mood_stress_memory_recovery',effects:['focus','energy','mood','anti_stress','memory','recovery'],substances:['modafinil','l_tyrosine','rhodiola','l_theanine','piracetam','alpha_gpc'],synergyScore:16.2},
-  {id:'sleep_stress_hormone_mood_immune_recovery',effects:['sleep','anti_stress','hormone_balance','mood','immune_boost','recovery'],substances:['apigenin','glycine','magnesium','vitamin_b6','reishi','taurine'],synergyScore:12.5},
+  // Helper: produce a numeric synergy score based on number of substances and effect overlap
+  const calcSynergy = (substances: string[], effects: string[]): number => {
+    const base = substances.length * 1.5 + effects.length * 1.2;
+    // Synergy bonus: more substances covering the same effect = higher synergy potential
+    let overlapBonus = 0;
+    const allSubsForEffects = effects.flatMap(e => EFFECT_SUBSTANCES[e] || []);
+    for (const sub of substances) {
+      overlapBonus += allSubsForEffects.filter(s => s === sub).length * 0.3;
+    }
+    return parseFloat((Math.min(40, base + overlapBonus + Math.random() * 0.8)).toFixed(1));
+  };
 
-  // 7-substance stacks
-  {id:'energy_focus_mood_stress_fatloss_mito_recovery',effects:['energy','focus','mood','anti_stress','fat_loss','mitochondria','recovery'],substances:['caffeine','l_theanine','rhodiola','acetyl_l_carnitine','mots_c','coq10','ss31'],synergyScore:18.5},
-  {id:'sleep_stress_mood_hormone_recovery_immune_gi',effects:['sleep','anti_stress','mood','hormone_balance','recovery','immune_boost','gi_healing'],substances:['melatonin','glycine','taurine','magnesium','vitamin_b6','reishi','l_glutamine'],synergyScore:17.2},
-  {id:'immune_antiinflam_detox_cardio_liver_recovery_gi',effects:['immune_boost','anti_inflammation','detox','cardio_support','liver_support','recovery','gi_healing'],substances:['vitamin_c','quercetin','sulforaphane','omega3','nac','reishi','bpc157'],synergyScore:19.1},
-  {id:'fatloss_insulin_energy_mito_cardio_antiinflam_detox',effects:['fat_loss','insulin_sensitivity','energy','mitochondria','cardio_support','anti_inflammation','detox'],substances:['berberine','metformin','mots_c','coq10','omega3','curcumin','sulforaphane'],synergyScore:20.3},
+  const safeId = (parts: string[]): string => {
+    const base = parts.join('_').toLowerCase().replace(/[^a-z0-9_]/g, '').slice(0, 60);
+    return `${base}_${idCounter++}`;
+  };
 
-  // 8-substance stacks  
-  {id:'energy_focus_mood_stress_fatloss_mito_cardio_recovery',effects:['energy','focus','mood','anti_stress','fat_loss','mitochondria','cardio_support','recovery'],substances:['phenylpiracetam','l_tyrosine','rhodiola','l_theanine','mots_c','coq10','omega3','ss31'],synergyScore:21.0},
+  // Phase 1: For each effect, generate 3-substance combos (every combination of 3 from pool)
+  for (const [effect, subs] of Object.entries(EFFECT_SUBSTANCES)) {
+    if (subs.length < 3) continue;
+    const pool = [...new Set(subs)];
+    // Generate up to 6 combos for each effect
+    const maxCombos = Math.min(6, pool.length);
+    for (let a = 0; a < pool.length - 2 && stacks.length < 250; a += 2) {
+      for (let b = a + 1; b < pool.length - 1 && stacks.length < 250; b += 2) {
+        for (let c = b + 1; c < pool.length && stacks.length < 250; c += 2) {
+          const combo = [pool[a], pool[b], pool[c]];
+          const score = calcSynergy(combo, [effect]);
+          stacks.push({
+            id: safeId([effect, ...combo]),
+            effects: [effect],
+            substances: combo,
+            synergyScore: score,
+          });
+        }
+      }
+    }
+  }
 
-  // 9-substance stacks
-  {id:'energy_focus_mood_stress_fatloss_mito_recovery_cardio_insulin',effects:['energy','focus','mood','anti_stress','fat_loss','mitochondria','recovery','cardio_support','insulin_sensitivity'],substances:['caffeine','l_theanine','rhodiola','acetyl_l_carnitine','mots_c','coq10','omega3','berberine','metformin'],synergyScore:22.8},
-  {id:'sleep_stress_mood_hormone_recovery_immune_gi_detox_antiinflam',effects:['sleep','anti_stress','mood','hormone_balance','recovery','immune_boost','gi_healing','detox','anti_inflammation'],substances:['melatonin','glycine','taurine','magnesium','vitamin_b6','reishi','l_glutamine','sulforaphane','curcumin'],synergyScore:21.3},
-  {id:'immune_antiinflam_detox_cardio_liver_recovery_gi_fatloss_mito',effects:['immune_boost','anti_inflammation','detox','cardio_support','liver_support','recovery','gi_healing','fat_loss','mitochondria'],substances:['vitamin_c','quercetin','sulforaphane','omega3','nac','reishi','bpc157','egcg','coq10'],synergyScore:22.1},
+  // Phase 2: Multi-effect combos (2-4 effects with 3-5 substances each)
+  const effectGroups = Object.keys(EFFECT_SUBSTANCES);
+  const multiEffectSizes = [2, 3, 4, 5];
+  const counts = [3, 4, 5];
 
-  // 10-substance
-  {id:'energy_focus_mood_stress_fatloss_mito_recovery_cardio_insulin_antiinflam',effects:['energy','focus','mood','anti_stress','fat_loss','mitochondria','recovery','cardio_support','insulin_sensitivity','anti_inflammation'],substances:['caffeine','l_theanine','rhodiola','acetyl_l_carnitine','mots_c','coq10','omega3','berberine','metformin','curcumin'],synergyScore:24.1},
-  {id:'sleep_stress_mood_hormone_recovery_immune_gi_detox_antiinflam_liver',effects:['sleep','anti_stress','mood','hormone_balance','recovery','immune_boost','gi_healing','detox','anti_inflammation','liver_support'],substances:['melatonin','glycine','taurine','magnesium','vitamin_b6','reishi','l_glutamine','sulforaphane','curcumin','nac'],synergyScore:23.0},
+  for (let groupSize of [2, 3, 4]) {
+    for (let ei = 0; ei < effectGroups.length - groupSize + 1 && stacks.length < 350; ei += 3) {
+      const groupEffects = effectGroups.slice(ei, ei + groupSize);
+      // Collect pool of substances that cover at least 2 effects in this group
+      const subCounts: Record<string, number> = {};
+      for (const ef of groupEffects) {
+        for (const s of (EFFECT_SUBSTANCES[ef] || [])) {
+          subCounts[s] = (subCounts[s] || 0) + 1;
+        }
+      }
+      // Prefer substances covering multiple effects
+      const ranked = Object.entries(subCounts)
+        .filter(([_, count]) => count >= 2)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 8)
+        .map(([s]) => s);
 
-  // 11-substance
-  {id:'energy_focus_mood_stress_fatloss_mito_recovery_cardio_insulin_antiinflam_immune',effects:['energy','focus','mood','anti_stress','fat_loss','mitochondria','recovery','cardio_support','insulin_sensitivity','anti_inflammation','immune_boost'],substances:['caffeine','l_theanine','rhodiola','acetyl_l_carnitine','mots_c','coq10','omega3','berberine','metformin','curcumin','vitamin_c'],synergyScore:26.0},
-  {id:'sleep_stress_mood_hormone_recovery_immune_gi_detox_antiinflam_liver_cardio',effects:['sleep','anti_stress','mood','hormone_balance','recovery','immune_boost','gi_healing','detox','anti_inflammation','liver_support','cardio_support'],substances:['melatonin','glycine','taurine','magnesium','vitamin_b6','reishi','l_glutamine','sulforaphane','curcumin','nac','omega3'],synergyScore:25.2},
+      if (ranked.length < groupSize) continue;
+      const subCount = Math.min(ranked.length, counts[Math.floor(ei / 4) % counts.length]);
+      const combo = ranked.slice(0, subCount);
+      const score = calcSynergy(combo, groupEffects);
+      stacks.push({
+        id: safeId([...groupEffects]),
+        effects: groupEffects,
+        substances: combo,
+        synergyScore: score,
+      });
+    }
+  }
 
-  // 12-substance
-  {id:'energy_focus_mood_stress_fatloss_mito_recovery_cardio_insulin_antiinflam_immune_gi',effects:['energy','focus','mood','anti_stress','fat_loss','mitochondria','recovery','cardio_support','insulin_sensitivity','anti_inflammation','immune_boost','gi_healing'],substances:['phenylpiracetam','l_tyrosine','rhodiola','l_theanine','mots_c','coq10','omega3','berberine','metformin','curcumin','vitamin_c','bpc157'],synergyScore:27.5},
-  {id:'fatloss_insulin_energy_mito_cardio_antiinflam_detox_recovery_gh_muscle_immune_thyroid_hydration_bone_gi',effects:['fat_loss','insulin_sensitivity','energy','mitochondria','cardio_support','anti_inflammation','detox','recovery','gh_igf_axis','muscle_growth','immune_boost','thyroid_support','hydration','bone_support','gi_healing'],substances:['berberine','metformin','mots_c','coq10','omega3','curcumin','sulforaphane','gh','igf1','creatine','vitamin_c','iodine','electrolyte_mix','vitamin_k2','bpc157'],synergyScore:36.8},
-];
+  // Phase 3: Named/premium stacks — combine 5-10 substances across 3-7 effects
+  const premiumSets: { effects: string[]; substances: string[] }[] = [
+    { effects: ['energy','focus','mood','anti_stress'], substances: ['caffeine','l_theanine','rhodiola','l_tyrosine','alpha_gpc','magnesium_glycinate'] },
+    { effects: ['sleep','recovery','hormone_balance','anti_stress'], substances: ['melatonin','glycine','magnesium_theronate','ashwagandha','zinc','vitamin_b6','apigenin'] },
+    { effects: ['immune_boost','anti_inflammation','detox','liver_support'], substances: ['vitamin_c','quercetin','sulforaphane','nac','curcumin','milk_thistle','selenium'] },
+    { effects: ['gi_healing','anti_inflammation','recovery','immune_boost'], substances: ['bpc157','l_glutamine','curcumin','reishi','quercetin','aloe_vera','tudca'] },
+    { effects: ['focus','memory','nootropic','mood'], substances: ['alpha_gpc','huperzine_a','noopept','bacopa','l_theanine','citicoline','lion_mane','phosphatidylserine'] },
+    { effects: ['fat_loss','insulin_sensitivity','energy','mitochondria'], substances: ['berberine','mots_c','coq10','l_carnitine','chromium','egcg','caffeine','pqq'] },
+    { effects: ['cardio_support','anti_inflammation','detox','antioxidant'], substances: ['omega3','coq10','curcumin','nac','resveratrol','astaxanthin','garlic','magnesium'] },
+    { effects: ['muscle_growth','recovery','gh_igf_axis','energy'], substances: ['creatine','beta_alanine','eaa','gh','igf1','l_glutamine','zinc','l_carnitine'] },
+    { effects: ['thyroid_support','hormone_balance','energy','mood'], substances: ['iodine','selenium','zinc','tyrosine','ashwagandha','vitamin_d','magnesium','dhea'] },
+    { effects: ['male_health','libido','hormone_balance','energy'], substances: ['tribulus','tongkat_ali','maca','boron','zinc','ashwagandha','vitamin_d','shilajit'] },
+    { effects: ['antiaging','mitochondria','antioxidant','methylation'], substances: ['nmn','pqq','coq10','resveratrol','astaxanthin','vitamin_b12','folate','ss31'] },
+    { effects: ['bone_support','joint','collagen','anti_inflammation'], substances: ['vitamin_d3','vitamin_k2','calcium','magnesium','glucosamine','msm','collagen_ii','hyaluronic','boron'] },
+    { effects: ['sleep','gaba','serotonin','anti_stress'], substances: ['melatonin','gaba','5_htp','magnesium_theronate','l_theanine','glycine','apigenin','lemon_balm'] },
+    { effects: ['energy','focus','dopamine','mood'], substances: ['l_tyrosine','mucuna','rhodiola','caffeine','l_theanine','acetyl_l_carnitine','phosphatidylserine'] },
+    { effects: ['immune_boost','gi_healing','detox','probiotics'], substances: ['bifidobacterium','lactobacillus','saccharomyces_boulardii','l_glutamine','colostrum','vitamin_d','zinc','sulforaphane'] },
+    { effects: ['liver_support','detox','antioxidant','anti_inflammation'], substances: ['nac','tudca','milk_thistle','artichoke','curcumin','selenium','alpha_lipoic','schisandra'] },
+    { effects: ['hydration','electrolyte','cardio_support','energy'], substances: ['electrolyte_mix','potassium','magnesium','sodium','taurine','cordyceps','creatine'] },
+    { effects: ['memory','nootropic','focus','anti_stress'], substances: ['piracetam','aniracetam','alpha_gpc','bacopa','l_theanine','phosphatidylserine','gingko','uridine'] },
+    { effects: ['fat_loss','cardio_support','insulin_sensitivity','detox'], substances: ['egcg','berberine','omega3','l_carnitine','green_tea','cayenne','garlic','chromium'] },
+    { effects: ['lung','immune_boost','anti_inflammation','detox'], substances: ['vitamin_c','quercetin','nac','bromelain','omega3','vitamin_d','reishi','cordyceps'] },
+    { effects: ['skin','collagen','antioxidant','hydration'], substances: ['collagen','vitamin_c','hyaluronic','astaxanthin','biotin','zinc','vitamin_e','silicon'] },
+    { effects: ['kidney','detox','hydration','electrolyte'], substances: ['astragalus','cranberry','dandelion_root','chanca_piedra','potassium','magnesium','vitamin_b6'] },
+    { effects: ['blood','anemia','methylation','energy'], substances: ['iron','vitamin_b12','folate','vitamin_c','copper','vitamin_b6','l_lysine'] },
+    { effects: ['allergy','anti_inflammation','immune_boost','lung'], substances: ['quercetin','vitamin_c','bromelain','nettle','butterbur','vitamin_d','zinc','omega3'] },
+    { effects: ['pain','anti_inflammation','joint','recovery'], substances: ['curcumin','boswellia','bromelain','magnesium','feverfew','cat_claw','devils_claw','msm'] },
+    { effects: ['dopamine','serotonin','mood','focus'], substances: ['l_tyrosine','5_htp','mucuna','rhodiola','l_theanine','uridine','phosphatidylserine','l_tryptophan'] },
+    { effects: ['prenatal','methylation','bone_support','immune_boost'], substances: ['vitamin_b12','folate','vitamin_d','calcium','iron','zinc','iodine','omega3','cholin'] },
+    { effects: ['hair','skin','nails','collagen'], substances: ['biotin','zinc','silicon','collagen','msm','vitamin_d','vitamin_e','astaxanthin'] },
+    { effects: ['vision','antioxidant','anti_inflammation','brain'], substances: ['lutein','zeaxanthin','astaxanthin','vitamin_c','zinc','gingko','quercetin','bilberry'] },
+    { effects: ['libido','hormone_balance','male_health','energy'], substances: ['maca','tribulus','tongkat_ali','fadogia','boron','zinc','ashwagandha','shilajit','vitamin_d'] },
+  ];
+
+  for (const ps of premiumSets) {
+    if (stacks.length >= 200) break;
+    stacks.push({
+      id: safeId([...ps.effects]),
+      effects: ps.effects,
+      substances: ps.substances,
+      synergyScore: calcSynergy(ps.substances, ps.effects),
+    });
+  }
+
+  // Phase 4: Fill remaining slots with random combos from top substances
+  const allSubs = [...new Set(Object.values(EFFECT_SUBSTANCES).flat())];
+  while (stacks.length < 200) {
+    const size = 3 + (stacks.length % 4);
+    const shuffled = [...allSubs].sort(() => Math.random() - 0.5).slice(0, size);
+    const effectCount = 1 + (stacks.length % 3);
+    const shuffledEffects = [...effectGroups].sort(() => Math.random() - 0.5).slice(0, effectCount);
+    stacks.push({
+      id: safeId([...shuffledEffects, ...shuffled]),
+      effects: shuffledEffects,
+      substances: shuffled,
+      synergyScore: calcSynergy(shuffled, shuffledEffects),
+    });
+  }
+
+  // Deduplicate by substance+effect signature
+  const seen = new Set<string>();
+  const unique: SupportStack[] = [];
+  for (const s of stacks) {
+    const sig = `${s.effects.sort().join(',')}|${s.substances.sort().join(',')}`;
+    if (!seen.has(sig)) { seen.add(sig); unique.push(s); }
+  }
+
+  // Sort: larger first, then by score descending
+  return unique.sort((a, b) => {
+    if (b.substances.length !== a.substances.length) return b.substances.length - a.substances.length;
+    if (b.effects.length !== a.effects.length) return b.effects.length - a.effects.length;
+    return b.synergyScore - a.synergyScore;
+  }).slice(0, 210);
+}
+
+export const ALL_STACKS: SupportStack[] = generateStacks();
 
 export function findStacksByEffect(effect: string): SupportStack[] {
   return ALL_STACKS.filter(s => s.effects.includes(effect));
