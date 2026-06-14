@@ -156,7 +156,10 @@ export default function App() {
     <div className="app" >
       <DarkBg />
       <main ref={mainRef} style={{ position: 'relative', zIndex: 1, flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+        <img src="/bg-profile.png" alt="" style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'fill', zIndex:0, pointerEvents:'none', opacity:0.3 }} />
+        <div style={{ position:'relative', zIndex:1, flex:1, display:'flex', flexDirection:'column', overflow:'hidden' }}>
         {renderContent()}
+        </div>
       </main>
       <ToastContainer />
       <nav className="tabs">

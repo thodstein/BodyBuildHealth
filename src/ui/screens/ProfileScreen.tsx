@@ -240,8 +240,7 @@ export const ProfileScreen: React.FC = () => {
           </div>
         </div>
       ) : (
-        <div style={{ position:'relative', minHeight:'100vh', background:'#08080d' }}>
-          <img src="/bg-profile.png" alt="" style={{ position:'fixed', inset:0, width:'100%', height:'100%', objectFit:'fill', zIndex:0 }} />
+        <div style={{ position:'relative', minHeight:'100vh' }}>
           <div style={{ position:'relative', zIndex:1, padding:'10px 12px 80px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0, marginBottom: 8 }}>
             <button onClick={() => setPage('hero')} style={{
