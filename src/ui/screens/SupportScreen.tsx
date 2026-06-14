@@ -1214,7 +1214,21 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
                             <span style={{ fontSize:7, padding:'1px 4px', borderRadius:3, background:sevInfo.color+'22', color:sevInfo.color }}>{sevInfo.label}</span>
                           </div>
                         </div>
-                        <div style={{ fontSize:9, color:'rgba(255,255,255,0.85)', lineHeight:1.3 }}>{interaction.effect}</div>
+                        <div style={{ fontSize:9, color:'rgba(255,255,255,0.85)', lineHeight:1.3 }}>
+                          {interaction.type === 'synergy' ? '⊕ ' : interaction.type === 'conflict' ? '⊖ ' : ''}
+                          {interaction.effect}
+                        </div>
+                        {/* Mechanisms */}
+                        {interaction.mechanisms && interaction.mechanisms.length > 0 && (
+                          <div style={{ display:'flex', flexWrap:'wrap', gap:2, marginTop:2 }}>
+                            {interaction.mechanisms.map((m, mi) => {
+                              const mColor = m.toLowerCase().includes('toxic') || m.toLowerCase().includes('hepatic') ? '#ef4444' :
+                                m.toLowerCase().includes('kidney') || m.toLowerCase().includes('renal') ? '#f59e0b' :
+                                m.toLowerCase().includes('synerg') || m.toLowerCase().includes('enhanc') || m.toLowerCase().includes('potent') ? '#22c55e' : '#8b5cf6';
+                              return <span key={mi} style={{ fontSize:6, padding:'1px 4px', borderRadius:3, background:mColor+'18', color:mColor, border:`1px solid ${mColor}22`, fontWeight:500 }}>{m}</span>;
+                            })}
+                          </div>
+                        )}
                         {interaction.notes && <div style={{ fontSize:8, color:'var(--text-dim)', fontStyle:'italic', lineHeight:1.2, marginTop:2 }}>{interaction.notes}</div>}
                       </div>
                     );
@@ -1253,12 +1267,55 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
                                 </div>
                                 <div style={{ fontSize:7, color:'var(--text-dim)' }}>{stack.substances.length} веществ</div>
                                 {expandedMed === stack.id && (
-                                  <div style={{ marginTop:4, padding:'4px 6px', background:'rgba(0,0,0,0.15)', borderRadius:6 }}>
-                                    {stack.effects.map(e => {
-                                      const related = ALL_STACKS.filter(s => s.id!==stack.id && s.effects.includes(e));
-                                      return <div key={e} style={{ fontSize:7, color:'var(--text-dim)', marginBottom:1 }}><span style={{ color:'#00e68a' }}>{EFFECT_LABELS_ru[e]||e}</span> — ещё в {related.length} стеках</div>;
-                                    })}
-                                    <div style={{ fontSize:7, color:'var(--text-dim)', marginTop:2 }}>Синергия: {stack.synergyScore.toFixed(1)} · {stack.substances.length} компонентов</div>
+                                  <div style={{ marginTop:4, padding:'6px 8px', background:'rgba(0,0,0,0.15)', borderRadius:8 }}>
+                                    {/* Positive effects */}
+                                    <div style={{ marginBottom:4 }}>
+                                      <div style={{ fontSize:8, fontWeight:700, color:'#22c55e', marginBottom:3 }}>⊕ Положительные эффекты</div>
+                                      <div style={{ display:'flex', flexWrap:'wrap', gap:2 }}>
+                                        {stack.effects.map(e => (
+                                          <span key={e} style={{ fontSize:7, padding:'2px 6px', borderRadius:4, background:'rgba(34,197,94,0.1)', color:'#4ade80', fontWeight:600 }}>
+                                            {EFFECT_LABELS_ru[e] || e}
+                                          </span>
+                                        ))}
+                                      </div>
+                                    </div>
+                                    {/* Substance breakdown */}
+                                    <div style={{ marginBottom:4 }}>
+                                      <div style={{ fontSize:8, fontWeight:700, color:'var(--text-light)', marginBottom:2 }}>🧬 Компоненты</div>
+                                      {stack.substances.map(sid => {
+                                        const subInfo = ALL_SUBSTANCES.find(s => s.id === sid);
+                                        const cat = subInfo?.categories?.[0];
+                                        return (
+                                          <div key={sid} style={{ fontSize:7, color:'var(--text-dim)', padding:'2px 0', borderBottom:'1px solid rgba(255,255,255,0.04)', lineHeight:1.4 }}>
+                                            <b style={{ color:'#a78bfa' }}>{getStackSubLabel(sid)}</b>
+                                            {cat && <span style={{ marginLeft:4, opacity:0.6 }}>· {getCategoryInfo(cat).label}</span>}
+                                            {subInfo?.description && <div style={{ opacity:0.7 }}>{subInfo.description.slice(0, 80)}</div>}
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                    {/* Potential conflicts warning */}
+                                    {(() => {
+                                      const conflictPairs: string[] = [];
+                                      for (let a = 0; a < stack.substances.length; a++) {
+                                        for (let b = a + 1; b < stack.substances.length; b++) {
+                                          const found = ALL_INTERACTIONS.find(i =>
+                                            (i.substanceA === stack.substances[a] && i.substanceB === stack.substances[b]) ||
+                                            (i.substanceA === stack.substances[b] && i.substanceB === stack.substances[a])
+                                          );
+                                          if (found && found.type !== 'synergy') conflictPairs.push(`${getStackSubLabel(stack.substances[a])} + ${getStackSubLabel(stack.substances[b])}: ${found.effect} (${found.severity})`);
+                                        }
+                                      }
+                                      return conflictPairs.length > 0 ? (
+                                        <div>
+                                          <div style={{ fontSize:8, fontWeight:700, color:'#ef4444', marginBottom:2 }}>⚠ Возможные конфликты</div>
+                                          {conflictPairs.map((p, i) => <div key={i} style={{ fontSize:7, color:'#f87171', padding:'1px 0', lineHeight:1.3 }}>{p}</div>)}
+                                        </div>
+                                      ) : (
+                                        <div style={{ fontSize:7, color:'#4ade80', opacity:0.6 }}>✓ Конфликтов между компонентами не обнаружено</div>
+                                      );
+                                    })()}
+                                    <div style={{ fontSize:7, color:'var(--text-dim)', marginTop:3 }}>Оценка синергии: <b style={{ color: synergyColor }}>{stack.synergyScore.toFixed(1)}</b> · {stack.substances.length} веществ</div>
                                   </div>
                                 )}
                               </div>
@@ -1319,13 +1376,35 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
                       {hasSupportInteractions && (
                         <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
                           {[
-                            { list: supportSynergiesList, label:'⊕ Синергия', color:'#22c55e' },
-                            { list: supportConflicts, label:'⚠ Конфликт', color:'#ef4444' },
-                            { list: supportCautions, label:'⚡ Осторожность', color:'#f59e0b' },
+                            { list: supportSynergiesList, label:'⊕ Синергия — положительное взаимодействие', color:'#22c55e' },
+                            { list: supportConflicts, label:'⊖ Конфликт — отрицательное взаимодействие', color:'#ef4444' },
+                            { list: supportCautions, label:'⚡ Осторожность — потенциальный риск', color:'#f59e0b' },
                           ].filter(s => s.list.length>0).map(section => (
                             <div key={section.label} style={{ background:'var(--bg-secondary)', borderRadius:10, padding:'8px 10px', border:'1px solid var(--border)' }}>
                               <div style={{ fontSize:10, fontWeight:700, color:section.color, marginBottom:4 }}>{section.label} ({section.list.length})</div>
-                              {section.list.map(i => <div key={i.id} style={{ display:'flex', justifyContent:'space-between', padding:'3px 0', borderBottom:'1px solid var(--border)', fontSize:9, color:'var(--text-light)' }}><span style={{ color:section.color, fontWeight:600, fontSize:9 }}>{i.substanceA} + {i.substanceB}</span><span style={{ fontSize:8, color:'var(--text-dim)', textAlign:'right', maxWidth:'50%' }}>{i.notes}</span></div>)}
+                              {section.list.map(i => {
+                                const sevColor = i.severity === 'HIGH' ? '#ef4444' : i.severity === 'MEDIUM' ? '#f59e0b' : '#22c55e';
+                                return (
+                                  <div key={i.id} style={{ padding:'4px 0', borderBottom:'1px solid var(--border)' }}>
+                                    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                                      <span style={{ color:section.color, fontWeight:700, fontSize:9 }}>{i.substanceA} + {i.substanceB}</span>
+                                      <div style={{ display:'flex', gap:3 }}>
+                                        <span style={{ fontSize:7, padding:'1px 4px', borderRadius:3, background:section.color+'22', color:section.color, fontWeight:600 }}>{section.list[0].type === 'synergy' ? 'Синергия' : section.list[0].type === 'conflict' ? 'Конфликт' : 'Осторожно'}</span>
+                                        {i.severity && <span style={{ fontSize:7, padding:'1px 4px', borderRadius:3, background:sevColor+'22', color:sevColor }}>{i.severity}</span>}
+                                      </div>
+                                    </div>
+                                    <div style={{ fontSize:9, color:'rgba(255,255,255,0.85)', lineHeight:1.3, marginTop:2 }}>{i.effect || ''}</div>
+                                    {i.mechanisms && i.mechanisms.length > 0 && (
+                                      <div style={{ display:'flex', flexWrap:'wrap', gap:2, marginTop:2 }}>
+                                        {i.mechanisms.map((m: string, mi: number) => (
+                                          <span key={mi} style={{ fontSize:6, padding:'1px 4px', borderRadius:3, background:'rgba(139,92,246,0.12)', color:'#a78bfa', border:'1px solid rgba(139,92,246,0.15)' }}>{m}</span>
+                                        ))}
+                                      </div>
+                                    )}
+                                    {i.notes && <div style={{ fontSize:8, color:'var(--text-dim)', fontStyle:'italic', lineHeight:1.2, marginTop:1 }}>{i.notes}</div>}
+                                  </div>
+                                );
+                              })}
                             </div>
                           ))}
                         </div>
@@ -2136,18 +2215,34 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
               {hasSupportInteractions && (
                 <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
                   {[
-                    { list: supportSynergiesList, label: '⊕ Синергия', color: '#22c55e', bg: 'rgba(34,197,94,0.06)', borderC: 'rgba(34,197,94,0.2)' },
-                    { list: supportConflicts, label: '⚠ Конфликт', color: '#ef4444', bg: 'rgba(239,68,68,0.06)', borderC: 'rgba(239,68,68,0.2)' },
-                    { list: supportCautions, label: '⚡ Осторожность', color: '#f59e0b', bg: 'rgba(245,158,11,0.06)', borderC: 'rgba(245,158,11,0.2)' },
+                    { list: supportSynergiesList, label: '⊕ Синергия — положительное взаимодействие', color: '#22c55e' },
+                    { list: supportConflicts, label: '⊖ Конфликт — отрицательное взаимодействие', color: '#ef4444' },
+                    { list: supportCautions, label: '⚡ Осторожность — потенциальный риск', color: '#f59e0b' },
                   ].filter(s => s.list.length > 0).map(section => (
                     <div key={section.label} style={{ background:'var(--bg-secondary)', borderRadius:12, padding:'10px 12px', border:'1px solid var(--border)' }}>
                       <div style={{ fontSize:11, fontWeight:700, color:section.color, marginBottom:6 }}>{section.label} ({section.list.length})</div>
-                      {section.list.map(i => (
-                        <div key={i.id} style={{ display:'flex', justifyContent:'space-between', padding:'4px 0', borderBottom:'1px solid var(--border)', fontSize:10, color:'var(--text-light)' }}>
-                          <span style={{ color:section.color, fontWeight:600, fontSize:10 }}>{i.substanceA} + {i.substanceB}</span>
-                          <span style={{ fontSize:9, color:'var(--text-dim)', textAlign:'right', maxWidth:'50%' }}>{i.notes}</span>
-                        </div>
-                      ))}
+                      {section.list.map(i => {
+                        const sevColor = i.severity === 'HIGH' ? '#ef4444' : i.severity === 'MEDIUM' ? '#f59e0b' : '#22c55e';
+                        return (
+                          <div key={i.id} style={{ padding:'4px 0', borderBottom:'1px solid var(--border)' }}>
+                            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                              <span style={{ color:section.color, fontWeight:700, fontSize:10 }}>{i.substanceA} + {i.substanceB}</span>
+                              <div style={{ display:'flex', gap:3 }}>
+                                {i.severity && <span style={{ fontSize:8, padding:'1px 5px', borderRadius:3, background:sevColor+'22', color:sevColor, fontWeight:600 }}>{i.severity}</span>}
+                              </div>
+                            </div>
+                            <div style={{ fontSize:10, color:'rgba(255,255,255,0.85)', lineHeight:1.3, marginTop:2 }}>{i.effect || ''}</div>
+                            {i.mechanisms && i.mechanisms.length > 0 && (
+                              <div style={{ display:'flex', flexWrap:'wrap', gap:2, marginTop:2 }}>
+                                {i.mechanisms.map((m: string, mi: number) => (
+                                  <span key={mi} style={{ fontSize:7, padding:'1px 5px', borderRadius:3, background:'rgba(139,92,246,0.12)', color:'#a78bfa', border:'1px solid rgba(139,92,246,0.15)' }}>{m}</span>
+                                ))}
+                              </div>
+                            )}
+                            {i.notes && <div style={{ fontSize:9, color:'var(--text-dim)', fontStyle:'italic', lineHeight:1.2, marginTop:1 }}>{i.notes}</div>}
+                          </div>
+                        );
+                      })}
                     </div>
                   ))}
                 </div>
@@ -2295,19 +2390,54 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
                           </div>
                           {expandedMed === stack.id && (
                             <div style={{ marginTop:6, padding:'6px 8px', background:'rgba(0,0,0,0.15)', borderRadius:8 }}>
-                              <div style={{ fontSize:9, color:'rgba(255,255,255,0.85)', marginBottom:4 }}>Детали стека</div>
-                              {stack.effects.map(e => {
-                                const fullLabel = EFFECT_LABELS_ru[e] || e;
-                                const related = ALL_STACKS.filter(s => s.id !== stack.id && s.effects.includes(e));
-                                return (
-                                  <div key={e} style={{ fontSize:8, color:'var(--text-dim)', marginBottom:2, lineHeight:1.4 }}>
-                                    <span style={{ color:'#00e68a' }}>{fullLabel}</span> — также в {related.length} других стеках
-                                  </div>
-                                );
-                              })}
-                              <div style={{ fontSize:8, color:'var(--text-dim)', marginTop:4 }}>
-                                Синергия: {stack.synergyScore.toFixed(1)} · {stack.substances.length} компонентов
+                              {/* Positive effects */}
+                              <div style={{ marginBottom:4 }}>
+                                <div style={{ fontSize:9, fontWeight:700, color:'#22c55e', marginBottom:3 }}>⊕ Положительные эффекты</div>
+                                <div style={{ display:'flex', flexWrap:'wrap', gap:2 }}>
+                                  {stack.effects.map(e => (
+                                    <span key={e} style={{ fontSize:8, padding:'2px 6px', borderRadius:4, background:'rgba(34,197,94,0.1)', color:'#4ade80', fontWeight:600 }}>
+                                      {EFFECT_LABELS_ru[e] || e}
+                                    </span>
+                                  ))}
+                                </div>
                               </div>
+                              {/* Substance breakdown */}
+                              <div style={{ marginBottom:4 }}>
+                                <div style={{ fontSize:9, fontWeight:700, color:'var(--text-light)', marginBottom:2 }}>🧬 Компоненты</div>
+                                {stack.substances.map(sid => {
+                                  const subInfo = ALL_SUBSTANCES.find(s => s.id === sid);
+                                  const cat = subInfo?.categories?.[0];
+                                  return (
+                                    <div key={sid} style={{ fontSize:8, color:'var(--text-dim)', padding:'2px 0', borderBottom:'1px solid rgba(255,255,255,0.04)', lineHeight:1.4 }}>
+                                      <b style={{ color:'#a78bfa' }}>{getStackSubLabel(sid)}</b>
+                                      {cat && <span style={{ marginLeft:4, opacity:0.6 }}>· {getCategoryInfo(cat).label}</span>}
+                                      {subInfo?.description && <div style={{ opacity:0.7 }}>{subInfo.description.slice(0, 100)}</div>}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                              {/* Potential conflicts warning */}
+                              {(() => {
+                                const conflictPairs: string[] = [];
+                                for (let a = 0; a < stack.substances.length; a++) {
+                                  for (let b = a + 1; b < stack.substances.length; b++) {
+                                    const found = ALL_INTERACTIONS.find(i =>
+                                      (i.substanceA === stack.substances[a] && i.substanceB === stack.substances[b]) ||
+                                      (i.substanceA === stack.substances[b] && i.substanceB === stack.substances[a])
+                                    );
+                                    if (found && found.type !== 'synergy') conflictPairs.push(`${getStackSubLabel(stack.substances[a])} + ${getStackSubLabel(stack.substances[b])}: ${found.effect} (${found.severity})`);
+                                  }
+                                }
+                                return conflictPairs.length > 0 ? (
+                                  <div>
+                                    <div style={{ fontSize:9, fontWeight:700, color:'#ef4444', marginBottom:2 }}>⚠ Возможные конфликты</div>
+                                    {conflictPairs.map((p, i) => <div key={i} style={{ fontSize:8, color:'#f87171', padding:'1px 0', lineHeight:1.3 }}>{p}</div>)}
+                                  </div>
+                                ) : (
+                                  <div style={{ fontSize:8, color:'#4ade80', opacity:0.6 }}>✓ Конфликтов между компонентами не обнаружено</div>
+                                );
+                              })()}
+                              <div style={{ fontSize:8, color:'var(--text-dim)', marginTop:3 }}>Оценка синергии: <b style={{ color: synergyColor }}>{stack.synergyScore.toFixed(1)}</b> · {stack.substances.length} веществ</div>
                             </div>
                           )}
                         </div>
