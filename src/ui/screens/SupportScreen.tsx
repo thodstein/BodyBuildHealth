@@ -1113,6 +1113,13 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
     return id;
   };
 
+  // Resolve interaction effect to readable text
+  const showEffect = (interaction: any): string => {
+    const eff = interaction?.effect;
+    if (eff && /^[A-Z0-9_]+$/.test(eff) && interaction?.notes) return interaction.notes;
+    return eff || '';
+  };
+
   const safeRender = (label: string, fn: () => React.ReactNode): React.ReactNode => {
     try { return fn(); }
     catch (e) { return <div style={{ padding:12, margin:4, borderRadius:6, background:'rgba(239,68,68,0.08)', border:'1px solid rgba(239,68,68,0.2)', textAlign:'center', color:'#f87171', fontSize:9 }}>⚠ {label}: {String(e)}</div>; }
@@ -1159,11 +1166,6 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
       const list = filtered || [];
       const synergies = list.filter((i:any) => i?.type === 'synergy');
       const conflicts = list.filter((i:any) => i?.type === 'conflict' || i?.type === 'caution');
-      const showEffect = (interaction: any) => {
-        const eff = interaction?.effect;
-        if (eff && /^[A-Z0-9_]+$/.test(eff) && interaction?.notes) return interaction.notes;
-        return eff || '';
-      };
       return (<>
         <div style={{ marginBottom:10 }}>
           <div onClick={() => setExpandedCategories(prev => ({ ...prev, syn_synergies: !(prev?.syn_synergies ?? true) }))} style={{ display:'flex', alignItems:'center', gap:6, padding:'6px 8px', cursor:'pointer', userSelect:'none', background:'var(--bg-secondary)', borderRadius:8, marginBottom:4 }}>
@@ -1595,20 +1597,23 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
                               <div style={{ fontSize:10, fontWeight:700, color:section.color, marginBottom:4 }}>{section.label} ({section.list.length})</div>
                               {section.list.map(i => {
                                 const sevColor = i.severity === 'HIGH' ? '#ef4444' : i.severity === 'MEDIUM' ? '#f59e0b' : '#22c55e';
+                                const aName = resolveSubName(i.substanceA) || i.substanceA;
+                                const bName = resolveSubName(i.substanceB) || i.substanceB;
+                                const effDesc = showEffect(i);
                                 return (
-                                  <div key={i.id} style={{ padding:'4px 0', borderBottom:'1px solid var(--border)' }}>
+                                  <div key={i.id} style={{ padding:'5px 0', borderBottom:'1px solid var(--border)' }}>
                                     <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-                                      <span style={{ color:section.color, fontWeight:700, fontSize:9 }}>{i.substanceA} + {i.substanceB}</span>
+                                      <span style={{ color:section.color, fontWeight:700, fontSize:9 }}>{aName} + {bName}</span>
                                       <div style={{ display:'flex', gap:3 }}>
-                                        <span style={{ fontSize:7, padding:'1px 4px', borderRadius:3, background:section.color+'22', color:section.color, fontWeight:600 }}>{i.type === 'synergy' ? 'Синергия' : i.type === 'conflict' ? 'Конфликт' : 'Осторожно'}</span>
-                                        {i.severity && <span style={{ fontSize:7, padding:'1px 4px', borderRadius:3, background:sevColor+'22', color:sevColor }}>{i.severity}</span>}
+                                        <span style={{ fontSize:7, padding:'1px 4px', borderRadius:3, background:section.color+'22', color:section.color, fontWeight:600 }}>{i.type === 'synergy' ? '⊕ Синергия' : i.type === 'conflict' ? '⊖ Конфликт' : '⚡ Осторожно'}</span>
+                                        {i.severity && <span style={{ fontSize:7, padding:'1px 4px', borderRadius:3, background:sevColor+'22', color:sevColor }}>{i.severity==='HIGH'?'Высокий':i.severity==='MEDIUM'?'Средний':'Низкий'}</span>}
                                       </div>
                                     </div>
-                                    <div style={{ fontSize:9, color:'rgba(255,255,255,0.85)', lineHeight:1.3, marginTop:2 }}>{i.effect || ''}</div>
+                                    {effDesc && <div style={{ fontSize:9, color:'rgba(255,255,255,0.85)', lineHeight:1.3, marginTop:2 }}>{effDesc}</div>}
                                     {i.mechanisms && i.mechanisms.length > 0 && (
                                       <div style={{ display:'flex', flexWrap:'wrap', gap:2, marginTop:2 }}>
                                         {i.mechanisms.map((m: string, mi: number) => (
-                                          <span key={mi} style={{ fontSize:6, padding:'1px 4px', borderRadius:3, background:'rgba(139,92,246,0.12)', color:'#a78bfa', border:'1px solid rgba(139,92,246,0.15)' }}>{m}</span>
+                                          <span key={mi} style={{ fontSize:6, padding:'1px 5px', borderRadius:3, background:'rgba(139,92,246,0.12)', color:'#a78bfa', border:'1px solid rgba(139,92,246,0.15)' }}>{m}</span>
                                         ))}
                                       </div>
                                     )}
@@ -2821,15 +2826,19 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
                       <div style={{ fontSize:11, fontWeight:700, color:section.color, marginBottom:6 }}>{section.label} ({section.list.length})</div>
                       {section.list.map(i => {
                         const sevColor = i.severity === 'HIGH' ? '#ef4444' : i.severity === 'MEDIUM' ? '#f59e0b' : '#22c55e';
+                        const aName = resolveSubName(i.substanceA) || i.substanceA;
+                        const bName = resolveSubName(i.substanceB) || i.substanceB;
+                        const effDesc = showEffect(i);
                         return (
-                          <div key={i.id} style={{ padding:'4px 0', borderBottom:'1px solid var(--border)' }}>
+                          <div key={i.id} style={{ padding:'5px 0', borderBottom:'1px solid var(--border)' }}>
                             <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-                              <span style={{ color:section.color, fontWeight:700, fontSize:10 }}>{i.substanceA} + {i.substanceB}</span>
+                              <span style={{ color:section.color, fontWeight:700, fontSize:10 }}>{aName} + {bName}</span>
                               <div style={{ display:'flex', gap:3 }}>
-                                {i.severity && <span style={{ fontSize:8, padding:'1px 5px', borderRadius:3, background:sevColor+'22', color:sevColor, fontWeight:600 }}>{i.severity}</span>}
+                                <span style={{ fontSize:8, padding:'1px 5px', borderRadius:3, background:section.color+'22', color:section.color, fontWeight:600 }}>{i.type === 'synergy' ? '⊕' : i.type === 'conflict' ? '⊖' : '⚡'}</span>
+                                {i.severity && <span style={{ fontSize:8, padding:'1px 5px', borderRadius:3, background:sevColor+'22', color:sevColor, fontWeight:600 }}>{i.severity==='HIGH'?'Высокий':i.severity==='MEDIUM'?'Средний':'Низкий'}</span>}
                               </div>
                             </div>
-                            <div style={{ fontSize:10, color:'rgba(255,255,255,0.85)', lineHeight:1.3, marginTop:2 }}>{i.effect || ''}</div>
+                            {effDesc && <div style={{ fontSize:10, color:'rgba(255,255,255,0.85)', lineHeight:1.3, marginTop:2 }}>{effDesc}</div>}
                             {i.mechanisms && i.mechanisms.length > 0 && (
                               <div style={{ display:'flex', flexWrap:'wrap', gap:2, marginTop:2 }}>
                                 {i.mechanisms.map((m: string, mi: number) => (
@@ -2837,7 +2846,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
                                 ))}
                               </div>
                             )}
-                            {i.notes && <div style={{ fontSize:9, color:'var(--text-dim)', fontStyle:'italic', lineHeight:1.2, marginTop:1 }}>{i.notes}</div>}
+                            {i.notes && <div style={{ fontSize:8, color:'var(--text-dim)', fontStyle:'italic', lineHeight:1.2, marginTop:1 }}>{i.notes}</div>}
                           </div>
                         );
                       })}

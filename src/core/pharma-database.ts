@@ -115,6 +115,49 @@ export const PHARMA_DB: Record<string, PharmaSubstance> = {
   foxo4_dri:  { id:'foxo4_dri', name:'FOXO4-DRI', class:'peptide_other', pk:{ka:0.35,k10:0.02,k12:0.01,k21:0.007,Vd:25,bioavailability:0.2,halfLifeHours:5}, pd:{AR_affinity:0,aromatization:0,five_alpha_reduction:0,progestogenic:0,hepatotoxicity:0,lipid_impact:0,hct_impact:0,neuro_toxicity:0}, ec50:300,n_hill:1.4,maxEffect:0.85, description:'Сенолитический пептид — ингибирует взаимодействие FOXO4-p53, вызывая апоптоз стареющих (SEN) клеток. Противовозрастной, улучшение функции тканей.' },
 };
 
+const CLASS_DEFAULTS: Record<string, Partial<PharmaSubstance>> = {
+  testosterone:{ description:'Натуральный андроген, основа всех ААС курсов. Связывается с AR-рецепторами, стимулирует синтез белка, эритропоэз, минерализацию костей. Ароматизируется в эстрадиол.', mechanisms:['AR_AGONISM','PROTEIN_SYNTHESIS','NITROGEN_RETENTION','ERYTHROPOIESIS'], sideEffects:[{effect:'Эстрогенные — гинекомастия, задержка воды',frequency:'common'},{effect:'Андрогенные — акне, алопеция',frequency:'common'},{effect:'Подавление HPTA',frequency:'common'},{effect:'Дислипидемия',frequency:'common'}], contraindications:['Рак простаты','Рак молочной железы','Полицитемия'], dosageRange:{min:250,max:1000,unit:'mg/wk',frequency:'2x/week'} },
+  trenbolone:{ description:'Мощный неароматизирующийся ААС. Прогестогенная активность, нейротоксичность, гепатотоксичность.', mechanisms:['AR_AGONISM','PROGESTIN_ACTIVITY','CORTISOL_SUPPRESSION'], sideEffects:[{effect:'Нейротоксичность — агрессия, бессонница',frequency:'common'},{effect:'Гепатотоксичность',frequency:'common'},{effect:'Прогестиновые — пролактин↑',frequency:'common'}], contraindications:['Психиатрические заболевания','Заболевания печени'], dosageRange:{min:150,max:400,unit:'mg/wk',frequency:'2x/week'} },
+  nandrolone:{ description:'Нандролон (19-нортестостерон). Анаболический индекс 12:1. Увеличивает синтез коллагена, минерализацию костей.', mechanisms:['AR_AGONISM','COLLAGEN_SYNTHESIS','PROGESTIN_ACTIVITY','NITROGEN_RETENTION'], sideEffects:[{effect:'Прогестиновые — пролактин↑',frequency:'common'},{effect:'Дислипидемия',frequency:'common'},{effect:'Подавление HPTA',frequency:'common'}], contraindications:['Рак простаты','Беременность'], dosageRange:{min:200,max:600,unit:'mg/wk',frequency:'1-2x/week'} },
+  boldenone:{ description:'Болденон (Equipoise). Увеличивает эритропоэтин, HCT. Дозозависимая гепатотоксичность.', mechanisms:['AR_AGONISM','ERYTHROPOIESIS','PROTEIN_SYNTHESIS'], sideEffects:[{effect:'Полицитемия',frequency:'common'},{effect:'Эстрогенные — ароматизация 50%',frequency:'common'},{effect:'Гепатотоксичность при высоких дозах',frequency:'rare'}], contraindications:['Полицитемия','Рак простаты'], dosageRange:{min:300,max:800,unit:'mg/wk',frequency:'2x/week'} },
+  primobolan:{ description:'Метенолон. Не ароматизируется. Минимальная гепатотоксичность. Сохраняет мышцы при дефиците калорий.', mechanisms:['AR_AGONISM','ANTI_CATABOLIC'], sideEffects:[{effect:'Андрогенные — акне, алопеция',frequency:'rare'},{effect:'Подавление HPTA',frequency:'common'}], contraindications:['Рак простаты'], dosageRange:{min:400,max:800,unit:'mg/wk',frequency:'2x/week'} },
+  oral_17aa:{ description:'Оральный 17-α-алкилированный ААС. Высокая гепатотоксичность. Короткий период действия (4-16 ч).', mechanisms:['AR_AGONISM','GLYCOGEN_SYNTHESIS'], sideEffects:[{effect:'Гепатотоксичность — АЛТ/АСТ↑↑',frequency:'common'},{effect:'Дислипидемия — ЛПВП↓↓',frequency:'common'},{effect:'Подавление HPTA',frequency:'common'}], contraindications:['Заболевания печени','Гепатит','Беременность'], dosageRange:{min:20,max:100,unit:'mg/d',frequency:'1-3x/d'} },
+  sarm:{ description:'Селективный модулятор андрогенных рецепторов. Анаболический эффект без воздействия на простату.', mechanisms:['AR_SELECTIVE_AGONISM'], sideEffects:[{effect:'Подавление LH/FSH',frequency:'common'},{effect:'Дислипидемия',frequency:'common'},{effect:'Гепатотоксичность при высоких дозах',frequency:'rare'}], contraindications:['Рак простаты','Беременность'], dosageRange:{min:5,max:30,unit:'mg/d',frequency:'1x/d'} },
+  drostanolone:{ description:'Дростанолон (мастерон). Производное ДГТ. Не ароматизируется. Антиэстроген.', mechanisms:['AR_AGONISM','AROMATASE_INHIBITION','ANTI_ESTROGENIC'], sideEffects:[{effect:'Андрогенные — акне, алопеция',frequency:'common'},{effect:'Подавление HPTA',frequency:'common'}], contraindications:['Рак простаты'], dosageRange:{min:300,max:600,unit:'mg/wk',frequency:'2x/week'} },
+  dht_derivative:{ description:'Производное дигидротестостерона. Не ароматизируется. Конкурирует за SHBG.', mechanisms:['AR_AGONISM','SHBG_BINDING'], sideEffects:[{effect:'Андрогенные — акне, алопеция',frequency:'common'}], contraindications:['Рак простаты'], dosageRange:{min:25,max:100,unit:'mg/d',frequency:'1-2x/d'} },
+  peptide_ghrh:{ description:'Аналог GHRH. Стимулирует ГР из гипофиза → IGF-1↑.', mechanisms:['GHSR_AGONISM','GH_RELEASE','IGF1_UP'], sideEffects:[{effect:'Повышение аппетита',frequency:'common'},{effect:'Пролактин↑',frequency:'rare'},{effect:'Отёки',frequency:'rare'}], contraindications:['Активный рак','Диабетическая ретинопатия'] },
+  peptide_ghrp:{ description:'Грелин-миметик. Стимулирует ГР через GHS-R. Комбинируется с GHRH.', mechanisms:['GHSR_AGONISM','GH_RELEASE'], sideEffects:[{effect:'Повышение аппетита',frequency:'common'},{effect:'Кортизол/пролактин↑',frequency:'rare'}], contraindications:['Активный рак','Беременность'] },
+  peptide_nootropic:{ description:'Нейротропный пептид. Улучшает когнитивные функции, снижает тревожность.', mechanisms:['NEUROPEPTIDE_MOD','GABA_MOD'], sideEffects:[], contraindications:['Индивидуальная непереносимость'] },
+  peptide_regenerative:{ description:'Регенеративный пептид. Стимулирует восстановление тканей, синтез коллагена.', mechanisms:['TISSUE_REPAIR','COLLAGEN_SYNTHESIS'], sideEffects:[], contraindications:['Активный рак'] },
+  peptide_fat_loss:{ description:'Липолитический пептид. Стимулирует расщепление жировой ткани через HSL.', mechanisms:['LIPOLYSIS_ACTIVATION','HSL_STIMULATION'], sideEffects:[], contraindications:['Беременность'] },
+  peptide_other:{ description:'Специализированный пептид — загар, сенолиз, метаболическая регуляция.', mechanisms:['PEPTIDE_MOD'], sideEffects:[], contraindications:['По назначению'] },
+  pct_serm:{ description:'SERM — блокирует ER в гипоталамусе. Стимулирует ГнРГ для восстановления HPTA.', mechanisms:['ER_ANTAGONISM','GNRH_UP','LH_UP'], sideEffects:[{effect:'Приливы',frequency:'common'},{effect:'Зрительные нарушения (редко)',frequency:'very_rare'}], contraindications:['Тромбоэмболия','Тяжёлые заболевания печени'] },
+  pct_aromatase:{ description:'Ингибитор ароматазы. Подавляет конверсию тестостерона → эстрадиол.', mechanisms:['AROMATASE_INHIBITION','E2_SUPPRESSION'], sideEffects:[{effect:'Боли в суставах',frequency:'common'},{effect:'Дислипидемия',frequency:'common'}], contraindications:['Беременность','Остеопороз'] },
+  pct_dopamine:{ description:'Агонист дофамина D2. Снижает пролактин.', mechanisms:['D2_AGONISM','PROLACTIN_SUPPRESSION'], sideEffects:[{effect:'Тошнота',frequency:'common'},{effect:'Ортостатическая гипотензия',frequency:'rare'}], contraindications:['Психозы','Тяжёлая гипертензия'] },
+  pct_gonadotropin:{ description:'ХГЧ — аналог ЛГ. Стимулирует клетки Лейдига → тестостерон.', mechanisms:['LH_MIMETIC','TESTOSTERONE_PRODUCTION'], sideEffects:[{effect:'Эстрогенные',frequency:'common'},{effect:'Подавление HPTA при высоких дозах',frequency:'rare'}], contraindications:['Рак простаты','Рак яичка'] },
+  peptide_gnrh:{ description:'Аналог ГнРГ. Стимулирует ЛГ и ФСГ. Восстанавливает HPTA.', mechanisms:['GNRH_AGONISM','LH_UP','FSH_UP'], sideEffects:[], contraindications:['Рак простаты (flare)'] },
+  igf1:{ description:'IGF-1 — анаболический гормон. Стимулирует пролиферацию клеток, гиперплазию мышц.', mechanisms:['IGF1R_AGONISM','CELL_PROLIFERATION'], sideEffects:[{effect:'Гипогликемия',frequency:'common'},{effect:'Гиперплазия органов',frequency:'rare'}], contraindications:['Активный рак','Беременность'] },
+  mgf:{ description:'MGF — активирует сателлитные клетки. Вызывает гиперплазию мышц после нагрузки.', mechanisms:['SATELLITE_CELL_ACTIVATION'], sideEffects:[], contraindications:['Активный рак'] },
+  insulin:{ description:'Инсулин — анаболический гормон. Мощный но опасный анаболик.', mechanisms:['GLUCOSE_TRANSPORT','AMINO_ACID_UPTAKE','GLYCOGEN_SYNTHESIS'], sideEffects:[{effect:'Гипогликемия — смертельно опасна',frequency:'common'},{effect:'Жиронакопление',frequency:'common'}], contraindications:['Без надзора — смертельно'] },
+  support:{ description:'Нутрицевтик для поддержки здоровья и восполнения дефицитов.', mechanisms:['NUTRITIONAL_SUPPORT'], sideEffects:[], contraindications:['Индивидуальная непереносимость'] },
+};
+
+export function getPharmaDetail(id: string): PharmaSubstance | null {
+  const raw = PHARMA_DB[id];
+  if (!raw) return null;
+  const defaults = CLASS_DEFAULTS[raw.class];
+  if (!defaults) return raw;
+  return {
+    ...defaults,
+    ...raw,
+    mechanisms: raw.mechanisms || defaults.mechanisms,
+    sideEffects: raw.sideEffects || defaults.sideEffects,
+    contraindications: raw.contraindications || defaults.contraindications,
+    description: raw.description || defaults.description,
+    dosageRange: raw.dosageRange || defaults.dosageRange,
+  };
+}
+
 export const SUBSTANCE_LIST = Object.values(PHARMA_DB);
 export const SUBSTANCES_BY_CLASS: Record<string, PharmaSubstance[]> = {};
 SUBSTANCE_LIST.forEach(s => {

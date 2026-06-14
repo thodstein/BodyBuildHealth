@@ -1,5 +1,5 @@
 ﻿import React, { useState, useMemo, useEffect } from 'react';
-import { PHARMA_DB, SUBSTANCES_BY_CLASS } from '../../core/pharma-database';
+import { PHARMA_DB, SUBSTANCES_BY_CLASS, getPharmaDetail } from '../../core/pharma-database';
 import { calculateDose } from '../../engines/dosage.engine';
 import { simulateCourse, steadyStatePeak, steadyStateTrough, eliminationConstant } from '../../engines/pk-pd.engine';
 import { calculateMultiSubstancePKPD } from '../../engines/pkpd-superposition.engine';
@@ -419,7 +419,7 @@ const CatalogTab: React.FC = () => {
     return groupedByClass;
   }, [filterClass, searchQuery, groupedByClass]);
 
-  const selected = selectedId ? PHARMA_DB[selectedId] : null;
+  const selected = selectedId ? getPharmaDetail(selectedId) : null;
   const detail = selectedId ? PHARMA_DETAILS[selectedId] : undefined;
 
   return (
@@ -1118,7 +1118,7 @@ const DosageCalculatorTab: React.FC = () => {
   const [doseResult, setDoseResult] = useState<ReturnType<typeof calculateDose> | null>(null);
   const [esterPopup, setEsterPopup] = useState<{ baseClass: string; label: string } | null>(null);
 
-  const subDetail = drug ? PHARMA_DB[drug] : null;
+  const subDetail = drug ? getPharmaDetail(drug) : null;
   const handleDrugChange = (id: string) => {
     setDrug(id);
     setEsterPopup(null);
@@ -1561,7 +1561,7 @@ const PeptideCalcTab: React.FC = () => {
     setPepResult({ dilution, effective, pk });
   };
 
-  const growthSel = growthId ? PHARMA_DB[growthId] : null;
+  const growthSel = growthId ? getPharmaDetail(growthId) : null;
 
   return (
     <div>
