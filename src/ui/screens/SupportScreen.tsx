@@ -874,7 +874,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
     let list = supplementList;
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
-      list = list.filter(s => s.name.toLowerCase().includes(q) || s.id.toLowerCase().includes(q) || s.description.toLowerCase().includes(q));
+      list = list.filter(s => (s.name||'').toLowerCase().includes(q) || (s.id||'').toLowerCase().includes(q) || (s.description||'').toLowerCase().includes(q));
     }
     if (systemFilter !== 'all') {
       list = list.filter(s => s.targets?.systems?.includes(systemFilter));
@@ -949,15 +949,15 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
     const groups: Record<string, SupportSubstance[]> = {};
     const filtered = searchQuery
       ? ALL_SUBSTANCES.filter(s =>
-          s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          s.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          s.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          (s.categories||[]).some(c => c.toLowerCase().includes(searchQuery.toLowerCase())) ||
-          (s.mechanisms||[]).some(m => m.toLowerCase().includes(searchQuery.toLowerCase()))
+          (s.name||'').toLowerCase().includes(searchQuery.toLowerCase()) ||
+          (s.id||'').toLowerCase().includes(searchQuery.toLowerCase()) ||
+          (s.description||'').toLowerCase().includes(searchQuery.toLowerCase()) ||
+          (s.categories||[]).some(c => (c||'').toLowerCase().includes(searchQuery.toLowerCase())) ||
+          (s.mechanisms||[]).some(m => (m||'').toLowerCase().includes(searchQuery.toLowerCase()))
         )
         : ALL_SUBSTANCES;
     for (const sub of filtered) {
-      const primaryCat = sub.categories[0] || 'other';
+      const primaryCat = (sub.categories||[])[0] || 'other';
       if (!groups[primaryCat]) groups[primaryCat] = [];
       groups[primaryCat].push(sub);
     }
@@ -1024,8 +1024,8 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
     if (!stackSearch) return ALL_STACKS;
     const q = stackSearch.toLowerCase();
     return ALL_STACKS.filter(s =>
-      s.effects.some(e => (EFFECT_LABELS_ru[e] || e).toLowerCase().includes(q)) ||
-      s.substances.some(sid => getStackSubLabel(sid).toLowerCase().includes(q))
+      (s.effects||[]).some(e => ((EFFECT_LABELS_ru[e] || e)||'').toLowerCase().includes(q)) ||
+      (s.substances||[]).some(sid => (getStackSubLabel(sid)||'').toLowerCase().includes(q))
     );
   }, [stackSearch]);
 
@@ -1461,7 +1461,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
                                 <input value={interactionSearchIdx===idx ? interactionSearch : selectedName} placeholder="🔍 Поиск..." onFocus={() => { setInteractionSearchIdx(idx); setInteractionSearch(''); }} onChange={e => { setInteractionSearchIdx(idx); setInteractionSearch(e.target.value); if (!e.target.value) updateInteraction(idx, ''); }} style={{ width:'100%', padding:'7px 8px', borderRadius:6, background:'rgba(0,0,0,0.2)', border:'1px solid var(--border)', color:'var(--text)', fontSize:10, boxSizing:'border-box' }} />
                                 {interactionSearch && interactionSearchIdx===idx && (
                                   <div style={{ position:'absolute', top:'100%', left:0, right:0, zIndex:10, background:'var(--bg)', border:'1px solid var(--border)', borderRadius:6, maxHeight:120, overflowY:'auto', marginTop:1 }}>
-                                    {allSupport.filter(s => s.name.toLowerCase().includes(interactionSearch.toLowerCase())).slice(0,8).map(s => (
+                                    {allSupport.filter(s => (s.name||'').toLowerCase().includes(interactionSearch.toLowerCase())).slice(0,8).map(s => (
                                       <div key={s.id} onClick={() => { updateInteraction(idx, s.id); setInteractionSearch(''); }} style={{ padding:'5px 8px', cursor:'pointer', fontSize:10, borderBottom:'1px solid var(--border)' }}>
                                         <span style={{ fontWeight:id===s.id?700:400, color:id===s.id?'var(--accent)':'var(--text)' }}>{s.name}</span>
                                         <span style={{ fontSize:8, color:'var(--text-dim)', marginLeft:4 }}>{s.id}</span>
@@ -1520,7 +1520,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
                         {(() => {
                           const PHARMA_CORE_FILTER = new Set(['testosterone','trenbolone','nandrolone','boldenone','primobolan','oral_17aa','sarm','drostanolone','dht_derivative','igf1','mgf','insulin','pct_serm','pct_aromatase','pct_dopamine','pct_gonadotropin']);
                           const pharmaAll = Object.values(PHARMA_DB).filter((s): s is (typeof PHARMA_DB)[string] => !!s?.name && PHARMA_CORE_FILTER.has(s.class));
-                          const pharmaFiltered = pharmaInteractSearch ? pharmaAll.filter(s => s.name.toLowerCase().includes(pharmaInteractSearch.toLowerCase())) : pharmaAll;
+                          const pharmaFiltered = pharmaInteractSearch ? pharmaAll.filter(s => (s.name||'').toLowerCase().includes(pharmaInteractSearch.toLowerCase())) : pharmaAll;
                           const pharmaValid = pharmaInteractIds.filter(Boolean);
                           return (<>
                             {pharmaInteractIds.map((id, idx) => {
@@ -1893,12 +1893,12 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
                   .filter(s => {
                     if (manualFilter === 'all') return true;
                     const filterL = manualFilter.toLowerCase();
-                    const catMatch = (s.categories||[]).some(c => c.toLowerCase().includes(filterL));
-                    const typeMatch = s.type?.toLowerCase().includes(filterL);
+                    const catMatch = (s.categories||[]).some(c => (c||'').toLowerCase().includes(filterL));
+                    const typeMatch = (s.type||'').toLowerCase().includes(filterL);
                     const aliasMatch = filterL === 'vitamin' && s.type === 'vitamin';
-                    const aaMatch = filterL === 'amino_acid' && ['amino','aminoacid'].includes(s.type?.toLowerCase());
+                    const aaMatch = filterL === 'amino_acid' && ['amino','aminoacid'].includes((s.type||'').toLowerCase());
                     if (!catMatch && !typeMatch && !aliasMatch && !aaMatch) return false;
-                    if (manualSearch && !s.name.toLowerCase().includes(manualSearch.toLowerCase()) && !s.id.toLowerCase().includes(manualSearch.toLowerCase())) return false;
+                    if (manualSearch && !(s.name||'').toLowerCase().includes(manualSearch.toLowerCase()) && !(s.id||'').toLowerCase().includes(manualSearch.toLowerCase())) return false;
                     return true;
                   })
                   .slice(0, 40)
@@ -1921,12 +1921,12 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
                 {ALL_SUBSTANCES.filter(s => {
                   if (manualFilter === 'all') return true;
                   const filterL = manualFilter.toLowerCase();
-                  const catMatch = (s.categories||[]).some(c => c.toLowerCase().includes(filterL));
-                  const typeMatch = s.type?.toLowerCase().includes(filterL);
+                  const catMatch = (s.categories||[]).some(c => (c||'').toLowerCase().includes(filterL));
+                  const typeMatch = (s.type||'').toLowerCase().includes(filterL);
                   const aliasMatch = filterL === 'vitamin' && s.type === 'vitamin';
-                  const aaMatch = filterL === 'amino_acid' && ['amino','aminoacid'].includes(s.type?.toLowerCase());
+                  const aaMatch = filterL === 'amino_acid' && ['amino','aminoacid'].includes((s.type||'').toLowerCase());
                   if (!catMatch && !typeMatch && !aliasMatch && !aaMatch) return false;
-                  if (manualSearch && !s.name.toLowerCase().includes(manualSearch.toLowerCase()) && !s.id.toLowerCase().includes(manualSearch.toLowerCase())) return false;
+                  if (manualSearch && !(s.name||'').toLowerCase().includes(manualSearch.toLowerCase()) && !(s.id||'').toLowerCase().includes(manualSearch.toLowerCase())) return false;
                   return true;
                 }).length > 40 && <div style={{ fontSize:9, color:'var(--text-dim)', textAlign:'center', padding:6 }}>Показаны 40 из большего числа. Уточните поиск.</div>}
               </div>
@@ -2563,7 +2563,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
                           />
                           {interactionSearch && interactionSearchIdx === idx && (
                             <div style={{ position:'absolute', top:'100%', left:0, right:0, zIndex:10, background:'var(--bg)', border:'1px solid var(--border)', borderRadius:8, maxHeight:160, overflowY:'auto', marginTop:2 }}>
-                              {allSupport.filter(s => s.name.toLowerCase().includes(interactionSearch.toLowerCase()) || s.id.toLowerCase().includes(interactionSearch.toLowerCase())).slice(0, 10).map(s => (
+                              {allSupport.filter(s => (s.name||'').toLowerCase().includes(interactionSearch.toLowerCase()) || (s.id||'').toLowerCase().includes(interactionSearch.toLowerCase())).slice(0, 10).map(s => (
                                 <div key={s.id} onClick={() => { updateInteraction(idx, s.id); setInteractionSearch(''); }}
                                   style={{ padding:'7px 10px', cursor:'pointer', fontSize:11, borderBottom:'1px solid var(--border)' }}>
                                   <span style={{ fontWeight: id === s.id ? 700 : 400, color: id === s.id ? 'var(--accent)' : 'var(--text)' }}>{s.name}</span>
@@ -2650,7 +2650,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
                 {(() => {
                   const PHARMA_CORE_FILTER = new Set(['testosterone','trenbolone','nandrolone','boldenone','primobolan','oral_17aa','sarm','drostanolone','dht_derivative','igf1','mgf','insulin','pct_serm','pct_aromatase','pct_dopamine','pct_gonadotropin']);
                   const pharmaAll = Object.values(PHARMA_DB).filter((s): s is (typeof PHARMA_DB)[string] => !!s?.name && PHARMA_CORE_FILTER.has(s.class));
-                  const pharmaFiltered = pharmaInteractSearch ? pharmaAll.filter(s => s.name.toLowerCase().includes(pharmaInteractSearch.toLowerCase())) : pharmaAll;
+                  const pharmaFiltered = pharmaInteractSearch ? pharmaAll.filter(s => (s.name||'').toLowerCase().includes(pharmaInteractSearch.toLowerCase())) : pharmaAll;
                   const pharmaValid = pharmaInteractIds.filter(Boolean);
                   return (
                     <>

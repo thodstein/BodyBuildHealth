@@ -1385,10 +1385,10 @@ export function findSupportForGoal(
     let score = 0;
     for (const risk of goalRisks) {
       const riskLower = risk.toLowerCase();
-      if (sub.deficiency && sub.deficiency.toLowerCase().includes(riskLower)) score += 3;
-      if (sub.organs.some(o => riskLower.includes(o.toLowerCase()))) score += 1;
-      if (sub.mechanisms.some(m => riskLower.includes(m.toLowerCase()))) score += 1;
-      if (sub.description && sub.description.toLowerCase().includes(riskLower)) score += 1;
+      if (sub.deficiency && (sub.deficiency||'').toLowerCase().includes(riskLower)) score += 3;
+      if ((sub.organs||[]).some(o => riskLower.includes((o||'').toLowerCase()))) score += 1;
+      if ((sub.mechanisms||[]).some(m => riskLower.includes((m||'').toLowerCase()))) score += 1;
+      if (sub.description && (sub.description||'').toLowerCase().includes(riskLower)) score += 1;
     }
     if (score > 0) scored.push({ substance: sub, score });
   }

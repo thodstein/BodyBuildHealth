@@ -21804,7 +21804,7 @@ export function findSubstancesByOrgan(organ: string): SupportSubstance[] {
 
 /** Find substances by category */
 export function findSubstancesByCategory(category: string): SupportSubstance[] {
-  return ALL_SUBSTANCES.filter(s => s.categories.includes(category));
+  return ALL_SUBSTANCES.filter(s => (s.categories||[]).includes(category));
 }
 
 /** Find substances by type */
@@ -21820,7 +21820,7 @@ export function findInteractionsForSubstance(substanceId: string): SupportIntera
 /** Find risks for a specific organ */
 export function findRisksForOrgan(organ: string): SupportRisk[] {
   const upper = organ.toUpperCase();
-  return ALL_RISKS.filter(r => r.organs.some(o => o.toUpperCase() === upper));
+  return ALL_RISKS.filter(r => (r.organs||[]).some(o => (o||'').toUpperCase() === upper));
 }
 
 /** Find risks for a system */
@@ -21878,7 +21878,7 @@ export function getSubstancesByType(): Record<string, SupportSubstance[]> {
 /** Search substances by name (case-insensitive partial match) */
 export function searchSubstances(query: string): SupportSubstance[] {
   const lower = query.toLowerCase();
-  return ALL_SUBSTANCES.filter(s => s.name.toLowerCase().includes(lower) || s.description.toLowerCase().includes(lower));
+  return ALL_SUBSTANCES.filter(s => (s.name||'').toLowerCase().includes(lower) || (s.description||'').toLowerCase().includes(lower));
 }
 
 /** Get all brands by country */
