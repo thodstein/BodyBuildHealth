@@ -925,14 +925,16 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
       if (s) subs[id] = s.name;
     });
     try {
+      const norm = (s: string) => s.replace(/_/g,'').toLowerCase();
       return INTERACTIONS_DB.filter(i => {
-        const a = i.substanceA.toUpperCase();
-        const b = i.substanceB.toUpperCase();
+        if (!i || !i.substanceA || !i.substanceB) return false;
+        const a = norm(i.substanceA);
+        const b = norm(i.substanceB);
         return validInteractionIds.some(id => {
-          const up = id.toUpperCase();
+          const up = norm(id);
           return a === up || a.includes(up) || up.includes(a);
         }) && validInteractionIds.some(id => {
-          const up = id.toUpperCase();
+          const up = norm(id);
           return b === up || b.includes(up) || up.includes(b);
         });
       });
@@ -965,6 +967,18 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
       .map(([cat, items]) => ({ cat, items, count: items.length }))
       .sort((a, b) => b.count - a.count);
   }, [searchQuery]);
+
+  // Pre-build conflict lookup map for O(1) pair checking in stacks (avoid iterating ALL_INTERACTIONS in render)
+  const conflictLookup = useMemo(() => {
+    const map = new Map<string, { effect: string; severity: string; type: string }>();
+    for (const i of ALL_INTERACTIONS) {
+      if (!i || !i.substanceA || !i.substanceB) continue;
+      const val = { effect: i.effect||'', severity: i.severity||'', type: i.type||'' };
+      map.set(`${i.substanceA}||${i.substanceB}`, val);
+      map.set(`${i.substanceB}||${i.substanceA}`, val);
+    }
+    return map;
+  }, []);
 
   // Merge ALL_INTERACTIONS + SYNERGY_PAIRS for synergies tab
   const mergedInteractions = useMemo(() => {
@@ -1415,26 +1429,24 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
                                     </div>
                                     {/* Potential conflicts warning */}
                                     {(() => {
-                                      const conflictPairs: string[] = [];
-                                      for (let a = 0; a < stack.substances.length; a++) {
-                                        for (let b = a + 1; b < stack.substances.length; b++) {
-                                          const found = ALL_INTERACTIONS.find(i =>
-                                            (i.substanceA === stack.substances[a] && i.substanceB === stack.substances[b]) ||
-                                            (i.substanceA === stack.substances[b] && i.substanceB === stack.substances[a])
-                                          );
-                                          if (found && found.type !== 'synergy') conflictPairs.push(`${getStackSubLabel(stack.substances[a])} + ${getStackSubLabel(stack.substances[b])}: ${found.effect} (${found.severity})`);
+                                      const pairs: string[] = [];
+                                      for (let a = 0; a < (stack.substances||[]).length; a++) {
+                                        for (let b = a + 1; b < (stack.substances||[]).length; b++) {
+                                          const key = `${stack.substances[a]||''}||${stack.substances[b]||''}`;
+                                          const found = conflictLookup.get(key);
+                                          if (found && found.type !== 'synergy') pairs.push(`${getStackSubLabel(stack.substances[a])} + ${getStackSubLabel(stack.substances[b])}: ${found.effect} (${found.severity})`);
                                         }
                                       }
-                                      return conflictPairs.length > 0 ? (
+                                      return pairs.length > 0 ? (
                                         <div>
                                           <div style={{ fontSize:8, fontWeight:700, color:'#ef4444', marginBottom:2 }}>⚠ Возможные конфликты</div>
-                                          {conflictPairs.map((p, i) => <div key={i} style={{ fontSize:7, color:'#f87171', padding:'1px 0', lineHeight:1.3 }}>{p}</div>)}
+                                          {pairs.map((p, i) => <div key={i} style={{ fontSize:7, color:'#f87171', padding:'1px 0', lineHeight:1.3 }}>{p}</div>)}
                                         </div>
                                       ) : (
                                         <div style={{ fontSize:7, color:'#4ade80', opacity:0.6 }}>✓ Конфликтов между компонентами не обнаружено</div>
                                       );
                                     })()}
-                                    <div style={{ fontSize:7, color:'var(--text-dim)', marginTop:3 }}>Оценка синергии: <b style={{ color: synergyColor }}>{(stack.synergyScore||0).toFixed(1)}</b> · {stack.substances.length} веществ</div>
+                                    <div style={{ fontSize:7, color:'var(--text-dim)', marginTop:3 }}>Оценка синергии: <b style={{ color: synergyColor }}>{(stack.synergyScore||0).toFixed(1)}</b> · {(stack.substances||[]).length} веществ</div>
                                   </div>
                                 )}
                               </div>
@@ -2838,26 +2850,24 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
                               </div>
                               {/* Potential conflicts warning */}
                               {(() => {
-                                const conflictPairs: string[] = [];
-                                for (let a = 0; a < stack.substances.length; a++) {
-                                  for (let b = a + 1; b < stack.substances.length; b++) {
-                                    const found = ALL_INTERACTIONS.find(i =>
-                                      (i.substanceA === stack.substances[a] && i.substanceB === stack.substances[b]) ||
-                                      (i.substanceA === stack.substances[b] && i.substanceB === stack.substances[a])
-                                    );
-                                    if (found && found.type !== 'synergy') conflictPairs.push(`${getStackSubLabel(stack.substances[a])} + ${getStackSubLabel(stack.substances[b])}: ${found.effect} (${found.severity})`);
+                                const pairs: string[] = [];
+                                for (let a = 0; a < (stack.substances||[]).length; a++) {
+                                  for (let b = a + 1; b < (stack.substances||[]).length; b++) {
+                                    const key = `${stack.substances[a]||''}||${stack.substances[b]||''}`;
+                                    const found = conflictLookup.get(key);
+                                    if (found && found.type !== 'synergy') pairs.push(`${getStackSubLabel(stack.substances[a])} + ${getStackSubLabel(stack.substances[b])}: ${found.effect} (${found.severity})`);
                                   }
                                 }
-                                return conflictPairs.length > 0 ? (
+                                return pairs.length > 0 ? (
                                   <div>
                                     <div style={{ fontSize:9, fontWeight:700, color:'#ef4444', marginBottom:2 }}>⚠ Возможные конфликты</div>
-                                    {conflictPairs.map((p, i) => <div key={i} style={{ fontSize:8, color:'#f87171', padding:'1px 0', lineHeight:1.3 }}>{p}</div>)}
+                                    {pairs.map((p, i) => <div key={i} style={{ fontSize:8, color:'#f87171', padding:'1px 0', lineHeight:1.3 }}>{p}</div>)}
                                   </div>
                                 ) : (
                                   <div style={{ fontSize:8, color:'#4ade80', opacity:0.6 }}>✓ Конфликтов между компонентами не обнаружено</div>
                                 );
                               })()}
-                              <div style={{ fontSize:8, color:'var(--text-dim)', marginTop:3 }}>Оценка синергии: <b style={{ color: synergyColor }}>{(stack.synergyScore||0).toFixed(1)}</b> · {stack.substances.length} веществ</div>
+                              <div style={{ fontSize:8, color:'var(--text-dim)', marginTop:3 }}>Оценка синергии: <b style={{ color: synergyColor }}>{(stack.synergyScore||0).toFixed(1)}</b> · {(stack.substances||[]).length} веществ</div>
                             </div>
                           )}
                         </div>
