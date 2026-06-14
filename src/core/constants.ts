@@ -327,6 +327,24 @@ export const SUPPORT_BASE_COVERAGE: Record<string, Record<string, number>> = {
   diclofenac:      { musculoskeletal_3: 0.55, musculoskeletal_5: 0.50, renal_1: -0.15, hepatic_3: -0.20, cardio_5: -0.15, hematologic_4: -0.10 },
 } as const;
 
+/** Maps prefixed substance IDs to SUPPORT_BASE_COVERAGE keys where fuzzy matching fails */
+export const COVERAGE_ID_ALIAS: Record<string, string> = {
+  VIT_Q10: 'coq10',
+  VIT_Q10_UBIQUINOL: 'coq10',
+  VIT_D3: 'vitamin_d3',
+  VIT_D3_LIP: 'vitamin_d3',
+  VIT_LIPOIC_R: 'alpha_lipoic',
+  VIT_K2_MK7: 'vitamin_k2',
+  VIT_K2_MK4: 'vitamin_k2',
+  VIT_B6: 'vitamin_b6',
+  VIT_B12_METHYL: 'vitamin_b12',
+  VIT_B12_CYANO: 'vitamin_b12',
+  VIT_B12_ADENO: 'vitamin_b12',
+  VIT_B12_HYDROXO: 'vitamin_b12',
+  VIT_C: 'vitamin_c',
+  VIT_CARNITINE_LC: 'l_carnitine',
+};
+
 export const TRUST_WEIGHTS = { diaryFillRate: 20, nutritionAdherence: 30, labMatchRate: 30, trainerFeedback: 20 } as const;
 export const TRUST_LEVELS = {
   conservative: { min: 0, max: 39, multiplier: 0.8 },

@@ -14,7 +14,8 @@ import {
   BASE_RISK,
   DRUG_THRESHOLDS,
   GENETIC_MULTIPLIERS,
-  SUPPORT_BASE_COVERAGE
+  SUPPORT_BASE_COVERAGE,
+  COVERAGE_ID_ALIAS
 } from '../core/constants';
 import { MASTER_DB } from '../core/master-db';
 import {
@@ -473,7 +474,7 @@ function calculateSupportCoverage(
 
   for (const [supKey, coverage] of Object.entries(SUPPORT_BASE_COVERAGE)) {
     const isInStack = substanceIds.some(sid =>
-      sid === supKey || sid.toLowerCase().includes(supKey) || supKey.includes(sid.toLowerCase())
+      COVERAGE_ID_ALIAS[sid] === supKey || sid === supKey || sid.toLowerCase().includes(supKey) || supKey.includes(sid.toLowerCase())
     );
     if (!isInStack) continue;
 
@@ -498,7 +499,7 @@ function calculateSupportCoverage(
   if (substances.length > 0) {
     for (const substance of substances) {
       const supKey = Object.keys(SUPPORT_BASE_COVERAGE).find(k =>
-        substance.id === k || substance.id.toLowerCase().includes(k) || k.includes(substance.id.toLowerCase())
+        COVERAGE_ID_ALIAS[substance.id] === k || substance.id === k || substance.id.toLowerCase().includes(k) || k.includes(substance.id.toLowerCase())
       );
       if (!supKey) continue;
       const coverage = SUPPORT_BASE_COVERAGE[supKey];
@@ -514,6 +515,7 @@ function calculateSupportCoverage(
   }
 
   totalSupport += (substanceIds.filter(sid =>
+    (COVERAGE_ID_ALIAS[sid] && Object.keys(SUPPORT_BASE_COVERAGE).includes(COVERAGE_ID_ALIAS[sid])) ||
     Object.keys(SUPPORT_BASE_COVERAGE).some(k => sid === k || sid.toLowerCase().includes(k) || k.includes(sid.toLowerCase()))
   ).length) * 5;
 

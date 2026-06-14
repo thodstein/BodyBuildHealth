@@ -941,6 +941,16 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     type: 'vitamin'
   },
   {
+    id: 'VIT_UBIDECARENONE',
+    name: 'Ubidecarenone (CoQ10)',
+    categories: ['vitamin', 'mitochondria'],
+    mechanisms: ['ELECTRON_TRANSPORT_CHAIN', 'ANTIOXIDANT'],
+    organs: ['HEART', 'BRAIN'],
+    deficiency: 'FATIGUE',
+    description: 'Витамин (mitochondria), необходимый для работы митохондрий',
+    type: 'vitamin'
+  },
+  {
     id: 'VIT_PTEROSTILBENE',
     name: 'Pterostilbene + Niacin',
     categories: ['vitamin', 'antioxidant', 'antiaging'],
@@ -1048,6 +1058,16 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     organs: ['SKIN', 'BONES'],
     deficiency: 'LOW_SILICON',
     description: 'Витамин (skin, bone), необходимый для здоровья кожи, костной ткани',
+    type: 'vitamin'
+  },
+  {
+    id: 'VIT_LITHIUM_OROTATE',
+    name: 'Lithium Orotate',
+    categories: ['vitamin', 'neuro'],
+    mechanisms: ['NEUROPROTECTION', 'MOOD_SUPPORT'],
+    organs: ['BRAIN'],
+    deficiency: 'MOOD_ISSUES',
+    description: 'Витамин (neuro), необходимый для нервной системы',
     type: 'vitamin'
   },
   {
@@ -1308,6 +1328,26 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     organs: ['BONES', 'JOINTS'],
     deficiency: 'LOW_MANGANESE',
     description: 'Минерал (enzyme), участвующий в обменных процессах и поддержании здоровья',
+    type: 'minerals'
+  },
+  {
+    id: 'MIN_CHROMIUM_PICOLINATE',
+    name: 'Chromium Picolinate',
+    categories: ['minerals', 'insulin'],
+    mechanisms: ['INSULIN_SENSITIVITY', 'GLUCOSE_REGULATION'],
+    organs: ['PANCREAS', 'LIVER'],
+    deficiency: 'INSULIN_RESISTANCE',
+    description: 'Минерал (insulin), участвующий в обменных процессах и поддержании здоровья',
+    type: 'minerals'
+  },
+  {
+    id: 'MIN_CHROMIUM_NICOTINATE',
+    name: 'Chromium Nicotinate',
+    categories: ['minerals', 'insulin'],
+    mechanisms: ['INSULIN_SENSITIVITY', 'GLUCOSE_REGULATION'],
+    organs: ['PANCREAS', 'LIVER'],
+    deficiency: 'INSULIN_RESISTANCE',
+    description: 'Минерал (insulin), участвующий в обменных процессах и поддержании здоровья',
     type: 'minerals'
   },
   {
@@ -2088,6 +2128,26 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     organs: ['BRAIN'],
     deficiency: 'DEPRESSION',
     description: 'Аминокислота, участвующая в нервной системы',
+    type: 'amino'
+  },
+  {
+    id: 'AA_L_CARNITINE',
+    name: 'L-Carnitine',
+    categories: ['amino', 'mitochondria'],
+    mechanisms: ['FATTY_ACID_TRANSPORT', 'ATP_PRODUCTION'],
+    organs: ['HEART', 'MUSCLES'],
+    deficiency: 'FATIGUE',
+    description: 'Аминокислота, участвующая в работы митохондрий',
+    type: 'amino'
+  },
+  {
+    id: 'AA_ALCAR',
+    name: 'Acetyl-L-Carnitine',
+    categories: ['amino', 'nootropic', 'mitochondria'],
+    mechanisms: ['MITO_REPAIR', 'ACH_SUPPORT'],
+    organs: ['BRAIN', 'NERVES'],
+    deficiency: 'COGNITION',
+    description: 'Аминокислота, участвующая в когнитивных функций, работы митохондрий',
     type: 'amino'
   },
   {
@@ -3921,6 +3981,16 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     type: 'fatty_acid'
   },
   {
+    id: 'AO_GSH',
+    name: 'Glutathione (Reduced)',
+    categories: ['antioxidant', 'detox'],
+    mechanisms: ['GLUTATHIONE_UP', 'OXIDATIVE_STRESS_REDUCTION'],
+    organs: ['LIVER', 'IMMUNE_SYSTEM'],
+    deficiency: 'OXIDATIVE_STRESS',
+    description: 'Главный антиоксидант организма',
+    type: 'antioxidant'
+  },
+  {
     id: 'AO_GSH_LIP',
     name: 'Liposomal Glutathione',
     categories: ['antioxidant', 'detox'],
@@ -3951,6 +4021,26 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     type: 'antioxidant'
   },
   {
+    id: 'AO_NACET',
+    name: 'NACET (Ethyl NAC)',
+    categories: ['antioxidant', 'premium'],
+    mechanisms: ['GLUTATHIONE_UP', 'CELL_PROTECTION'],
+    organs: ['LIVER', 'BRAIN'],
+    deficiency: 'OXIDATIVE_STRESS',
+    description: 'Антиоксидант, защищающий клетки от окислительного стресса и защиты клеток от окислительного стресса',
+    type: 'antioxidant'
+  },
+  {
+    id: 'AO_RALA',
+    name: 'R-Lipoic Acid',
+    categories: ['antioxidant', 'mitochondria'],
+    mechanisms: ['GLUTATHIONE_RECYCLING', 'MITO_REPAIR'],
+    organs: ['LIVER', 'BRAIN'],
+    deficiency: 'OXIDATIVE_STRESS',
+    description: 'Антиоксидант, защищающий клетки от окислительного стресса и защиты клеток от окислительного стресса, работы митохондрий',
+    type: 'antioxidant'
+  },
+  {
     id: 'AO_ALA',
     name: 'Alpha-Lipoic Acid',
     categories: ['antioxidant', 'glucose'],
@@ -3958,6 +4048,36 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     organs: ['LIVER', 'VESSELS'],
     deficiency: 'DIABETES',
     description: 'Антиоксидант, защищающий клетки от окислительного стресса и защиты клеток от окислительного стресса',
+    type: 'antioxidant'
+  },
+  {
+    id: 'AO_COQ10',
+    name: 'CoQ10 (Ubiquinone)',
+    categories: ['antioxidant', 'mitochondria'],
+    mechanisms: ['ELECTRON_TRANSPORT_CHAIN', 'ANTIOXIDANT'],
+    organs: ['HEART', 'BRAIN'],
+    deficiency: 'FATIGUE',
+    description: 'Антиоксидант, защищающий клетки от окислительного стресса и защиты клеток от окислительного стресса, работы митохондрий',
+    type: 'antioxidant'
+  },
+  {
+    id: 'AO_UBIQUINOL',
+    name: 'Ubiquinol',
+    categories: ['antioxidant', 'mitochondria'],
+    mechanisms: ['ELECTRON_TRANSPORT_CHAIN', 'ANTIOXIDANT'],
+    organs: ['HEART', 'BRAIN'],
+    deficiency: 'AGING',
+    description: 'Антиоксидант, защищающий клетки от окислительного стресса и защиты клеток от окислительного стресса, работы митохондрий',
+    type: 'antioxidant'
+  },
+  {
+    id: 'AO_PQQ',
+    name: 'PQQ',
+    categories: ['antioxidant', 'mitochondria'],
+    mechanisms: ['MITO_BIOGENESIS', 'MITO_REPAIR'],
+    organs: ['BRAIN', 'HEART'],
+    deficiency: 'AGING',
+    description: 'Антиоксидант, защищающий клетки от окислительного стресса и защиты клеток от окислительного стресса, работы митохондрий',
     type: 'antioxidant'
   },
   {
@@ -4027,6 +4147,16 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['OXIDATIVE_STRESS_REDUCTION', 'VESSEL_PROTECTION'],
     organs: ['VESSELS', 'PROSTATE'],
     deficiency: 'OXIDATIVE_STRESS',
+    description: 'Антиоксидант, защищающий клетки от окислительного стресса и защиты клеток от окислительного стресса',
+    type: 'antioxidant'
+  },
+  {
+    id: 'AO_BETA_CAROTENE',
+    name: 'Beta-Carotene',
+    categories: ['antioxidant', 'vitamin_A'],
+    mechanisms: ['CAROTENOID_PATHWAY', 'OXIDATIVE_STRESS_REDUCTION'],
+    organs: ['EYES', 'SKIN'],
+    deficiency: 'LOW_CAROTENOIDS',
     description: 'Антиоксидант, защищающий клетки от окислительного стресса и защиты клеток от окислительного стресса',
     type: 'antioxidant'
   },
@@ -4208,6 +4338,26 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     organs: ['EYES'],
     deficiency: 'LOW_CAROTENOIDS',
     description: 'Антиоксидант, защищающий клетки от окислительного стресса и защиты клеток от окислительного стресса, зрения',
+    type: 'antioxidant'
+  },
+  {
+    id: 'AO_TOCOTRIENOLS',
+    name: 'Tocotrienols',
+    categories: ['antioxidant', 'antiaging'],
+    mechanisms: ['SIRT1_UP', 'MEMBRANE_PROTECTION'],
+    organs: ['HEART', 'BRAIN'],
+    deficiency: 'AGING',
+    description: 'Антиоксидант, защищающий клетки от окислительного стресса и защиты клеток от окислительного стресса, антивозрастных процессов',
+    type: 'antioxidant'
+  },
+  {
+    id: 'AO_TOCOPHEROLS',
+    name: 'Mixed Tocopherols',
+    categories: ['antioxidant', 'vascular'],
+    mechanisms: ['MEMBRANE_PROTECTION', 'OXIDATIVE_STRESS_REDUCTION'],
+    organs: ['HEART', 'VESSELS'],
+    deficiency: 'LOW_VITE',
+    description: 'Антиоксидант, защищающий клетки от окислительного стресса и защиты клеток от окислительного стресса',
     type: 'antioxidant'
   },
   {
@@ -4701,6 +4851,96 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     type: 'antioxidant'
   },
   {
+    id: 'PP_QUERCETIN',
+    name: 'Quercetin',
+    categories: ['polyphenol', 'immune', 'vascular'],
+    mechanisms: ['MAST_CELL_STABILIZATION', 'ANTI_INFLAMMATION'],
+    organs: ['IMMUNE_SYSTEM', 'VESSELS'],
+    deficiency: 'ALLERGY',
+    description: 'Полифенол с антиоксидантными свойствами для иммунной системы',
+    type: 'polyphenol'
+  },
+  {
+    id: 'PP_RUTIN',
+    name: 'Rutin',
+    categories: ['polyphenol', 'vascular'],
+    mechanisms: ['CAPILLARY_STRENGTH', 'OXIDATIVE_STRESS_REDUCTION'],
+    organs: ['VESSELS', 'SKIN'],
+    deficiency: 'FRAGILITY',
+    description: 'Полифенол с антиоксидантными свойствами для поддержки ССС и обмена веществ',
+    type: 'polyphenol'
+  },
+  {
+    id: 'PP_HESPERIDIN',
+    name: 'Hesperidin',
+    categories: ['polyphenol', 'vascular'],
+    mechanisms: ['CAPILLARY_STRENGTH', 'ANTI_INFLAMMATION'],
+    organs: ['VESSELS', 'SKIN'],
+    deficiency: 'FRAGILITY',
+    description: 'Полифенол с антиоксидантными свойствами для поддержки ССС и обмена веществ',
+    type: 'polyphenol'
+  },
+  {
+    id: 'PP_NARINGIN',
+    name: 'Naringin',
+    categories: ['polyphenol', 'metabolism'],
+    mechanisms: ['AMPK_UP', 'ANTI_INFLAMMATION'],
+    organs: ['LIVER', 'VESSELS'],
+    deficiency: 'OBESITY',
+    description: 'Полифенол с антиоксидантными свойствами для метаболизма',
+    type: 'polyphenol'
+  },
+  {
+    id: 'PP_APIGENIN',
+    name: 'Apigenin',
+    categories: ['polyphenol', 'antiinflammatory'],
+    mechanisms: ['NF_KB_BLOCK', 'CELL_PROTECTION'],
+    organs: ['BRAIN', 'LIVER'],
+    deficiency: 'INFLAMMATION',
+    description: 'Полифенол с антиоксидантными свойствами для противовоспалительной защиты',
+    type: 'polyphenol'
+  },
+  {
+    id: 'PP_LUTEOLIN',
+    name: 'Luteolin',
+    categories: ['polyphenol', 'antiinflammatory'],
+    mechanisms: ['MAST_CELL_STABILIZATION', 'ANTI_INFLAMMATION'],
+    organs: ['IMMUNE_SYSTEM', 'BRAIN'],
+    deficiency: 'ALLERGY',
+    description: 'Полифенол с антиоксидантными свойствами для противовоспалительной защиты',
+    type: 'polyphenol'
+  },
+  {
+    id: 'PP_MYRICETIN',
+    name: 'Myricetin',
+    categories: ['polyphenol', 'vascular'],
+    mechanisms: ['OXIDATIVE_STRESS_REDUCTION', 'VESSEL_PROTECTION'],
+    organs: ['VESSELS', 'HEART'],
+    deficiency: 'OXIDATIVE_STRESS',
+    description: 'Полифенол с антиоксидантными свойствами для поддержки ССС и обмена веществ',
+    type: 'polyphenol'
+  },
+  {
+    id: 'PP_KAEMPFEROL',
+    name: 'Kaempferol',
+    categories: ['polyphenol', 'antiinflammatory'],
+    mechanisms: ['NF_KB_BLOCK', 'CELL_PROTECTION'],
+    organs: ['CELLS', 'LIVER'],
+    deficiency: 'INFLAMMATION',
+    description: 'Полифенол с антиоксидантными свойствами для противовоспалительной защиты',
+    type: 'polyphenol'
+  },
+  {
+    id: 'PP_ELLAGIC',
+    name: 'Ellagic Acid',
+    categories: ['polyphenol', 'detox'],
+    mechanisms: ['PHASE2_DETOX', 'CELL_PROTECTION'],
+    organs: ['LIVER', 'GI'],
+    deficiency: 'TOXINS',
+    description: 'Полифенол с антиоксидантными свойствами для детоксикации',
+    type: 'polyphenol'
+  },
+  {
     id: 'PP_GALLIC',
     name: 'Gallic Acid',
     categories: ['polyphenol', 'antioxidant'],
@@ -4708,6 +4948,46 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     organs: ['CELLS'],
     deficiency: 'OXIDATIVE_STRESS',
     description: 'Полифенол с антиоксидантными свойствами для защиты клеток от окислительного стресса',
+    type: 'polyphenol'
+  },
+  {
+    id: 'PP_CAFFEIC',
+    name: 'Caffeic Acid',
+    categories: ['polyphenol', 'cell'],
+    mechanisms: ['OXIDATIVE_STRESS_REDUCTION', 'CELL_PROTECTION'],
+    organs: ['CELLS'],
+    deficiency: 'OXIDATIVE_STRESS',
+    description: 'Полифенол с антиоксидантными свойствами для клеточного здоровья',
+    type: 'polyphenol'
+  },
+  {
+    id: 'PP_CHLOROGENIC',
+    name: 'Chlorogenic Acid',
+    categories: ['polyphenol', 'metabolism'],
+    mechanisms: ['GLUCOSE_REGULATION', 'ANTI_INFLAMMATION'],
+    organs: ['LIVER', 'VESSELS'],
+    deficiency: 'DIABETES',
+    description: 'Полифенол с антиоксидантными свойствами для метаболизма',
+    type: 'polyphenol'
+  },
+  {
+    id: 'PP_TANNINS',
+    name: 'Tannins',
+    categories: ['polyphenol', 'GI'],
+    mechanisms: ['GI_PROTECTION', 'ANTIMICROBIAL'],
+    organs: ['GI'],
+    deficiency: 'INFECTION',
+    description: 'Полифенол с антиоксидантными свойствами для поддержки ССС и обмена веществ',
+    type: 'polyphenol'
+  },
+  {
+    id: 'PP_ELLAGITANNINS',
+    name: 'Ellagitannins',
+    categories: ['polyphenol', 'vascular'],
+    mechanisms: ['ANTI_INFLAMMATION', 'VESSEL_PROTECTION'],
+    organs: ['VESSELS', 'HEART'],
+    deficiency: 'OXIDATIVE_STRESS',
+    description: 'Полифенол с антиоксидантными свойствами для поддержки ССС и обмена веществ',
     type: 'polyphenol'
   },
   {
@@ -4721,6 +5001,36 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     type: 'polyphenol'
   },
   {
+    id: 'PP_PYCNOGENOL',
+    name: 'Pycnogenol',
+    categories: ['polyphenol', 'vascular'],
+    mechanisms: ['NO_UP', 'CAPILLARY_STRENGTH'],
+    organs: ['VESSELS', 'SKIN'],
+    deficiency: 'OXIDATIVE_STRESS',
+    description: 'Полифенол с антиоксидантными свойствами для поддержки ССС и обмена веществ',
+    type: 'polyphenol'
+  },
+  {
+    id: 'PP_RESVERATROL',
+    name: 'Resveratrol',
+    categories: ['polyphenol', 'antiaging'],
+    mechanisms: ['SIRT1_UP', 'ANTI_INFLAMMATION'],
+    organs: ['BRAIN', 'HEART'],
+    deficiency: 'AGING',
+    description: 'Полифенол с антиоксидантными свойствами для антивозрастных процессов',
+    type: 'polyphenol'
+  },
+  {
+    id: 'PP_PTEROSTILBENE',
+    name: 'Pterostilbene',
+    categories: ['polyphenol', 'antiaging'],
+    mechanisms: ['SIRT1_UP', 'CELL_PROTECTION'],
+    organs: ['BRAIN', 'HEART'],
+    deficiency: 'AGING',
+    description: 'Полифенол с антиоксидантными свойствами для антивозрастных процессов',
+    type: 'polyphenol'
+  },
+  {
     id: 'PP_POLYGONUM',
     name: 'Polygonum Cuspidatum Extract',
     categories: ['polyphenol', 'antiaging'],
@@ -4728,6 +5038,46 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     organs: ['BRAIN', 'HEART'],
     deficiency: 'AGING',
     description: 'Полифенол с антиоксидантными свойствами для антивозрастных процессов',
+    type: 'polyphenol'
+  },
+  {
+    id: 'PP_EGCG',
+    name: 'EGCG',
+    categories: ['polyphenol', 'metabolism'],
+    mechanisms: ['AMPK_UP', 'ANTI_INFLAMMATION'],
+    organs: ['LIVER', 'BRAIN'],
+    deficiency: 'OBESITY',
+    description: 'Полифенол с антиоксидантными свойствами для метаболизма',
+    type: 'polyphenol'
+  },
+  {
+    id: 'PP_CATECHINS',
+    name: 'Catechins',
+    categories: ['polyphenol', 'vascular'],
+    mechanisms: ['ANTI_INFLAMMATION', 'LIPID_BALANCE'],
+    organs: ['HEART', 'VESSELS'],
+    deficiency: 'HIGH_LIPIDS',
+    description: 'Полифенол с антиоксидантными свойствами для поддержки ССС и обмена веществ',
+    type: 'polyphenol'
+  },
+  {
+    id: 'PP_ANTHOCYANINS',
+    name: 'Anthocyanins',
+    categories: ['polyphenol', 'vascular'],
+    mechanisms: ['CAPILLARY_STRENGTH', 'OXIDATIVE_STRESS_REDUCTION'],
+    organs: ['VESSELS', 'EYES'],
+    deficiency: 'OXIDATIVE_STRESS',
+    description: 'Полифенол с антиоксидантными свойствами для поддержки ССС и обмена веществ',
+    type: 'polyphenol'
+  },
+  {
+    id: 'PP_BILBERRY',
+    name: 'Bilberry Extract',
+    categories: ['polyphenol', 'vision'],
+    mechanisms: ['RETINA_SUPPORT', 'CAPILLARY_STRENGTH'],
+    organs: ['EYES', 'VESSELS'],
+    deficiency: 'LOW_VISION',
+    description: 'Полифенол с антиоксидантными свойствами для зрения',
     type: 'polyphenol'
   },
   {
@@ -4747,6 +5097,126 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ANTI_INFLAMMATION', 'VESSEL_PROTECTION'],
     organs: ['VESSELS', 'HEART'],
     deficiency: 'OXIDATIVE_STRESS',
+    description: 'Полифенол с антиоксидантными свойствами для поддержки ССС и обмена веществ',
+    type: 'polyphenol'
+  },
+  {
+    id: 'PP_PUNICALAGIN',
+    name: 'Punicalagin',
+    categories: ['polyphenol', 'vascular'],
+    mechanisms: ['ANTI_INFLAMMATION', 'VESSEL_PROTECTION'],
+    organs: ['VESSELS', 'HEART'],
+    deficiency: 'OXIDATIVE_STRESS',
+    description: 'Полифенол с антиоксидантными свойствами для поддержки ССС и обмена веществ',
+    type: 'polyphenol'
+  },
+  {
+    id: 'PP_MANGO_XANTHONES',
+    name: 'Mango Xanthones',
+    categories: ['polyphenol', 'immune'],
+    mechanisms: ['ANTI_INFLAMMATION', 'CELL_PROTECTION'],
+    organs: ['IMMUNE_SYSTEM', 'LIVER'],
+    deficiency: 'INFLAMMATION',
+    description: 'Полифенол с антиоксидантными свойствами для иммунной системы',
+    type: 'polyphenol'
+  },
+  {
+    id: 'PP_MANGOSTEEN_XANTHONES',
+    name: 'Mangosteen Xanthones',
+    categories: ['polyphenol', 'antiinflammatory'],
+    mechanisms: ['ANTI_INFLAMMATION', 'CELL_PROTECTION'],
+    organs: ['CELLS', 'BRAIN'],
+    deficiency: 'OXIDATIVE_STRESS',
+    description: 'Полифенол с антиоксидантными свойствами для противовоспалительной защиты',
+    type: 'polyphenol'
+  },
+  {
+    id: 'PP_HONOKIOL',
+    name: 'Honokiol',
+    categories: ['polyphenol', 'neuro'],
+    mechanisms: ['GABA_UP', 'ANTI_INFLAMMATION'],
+    organs: ['BRAIN', 'NERVES'],
+    deficiency: 'ANXIETY',
+    description: 'Полифенол с антиоксидантными свойствами для нервной системы',
+    type: 'polyphenol'
+  },
+  {
+    id: 'PP_MAGNOLIN',
+    name: 'Magnolin',
+    categories: ['polyphenol', 'antiinflammatory'],
+    mechanisms: ['NF_KB_BLOCK', 'CELL_PROTECTION'],
+    organs: ['BRAIN', 'LUNGS'],
+    deficiency: 'INFLAMMATION',
+    description: 'Полифенол с антиоксидантными свойствами для противовоспалительной защиты',
+    type: 'polyphenol'
+  },
+  {
+    id: 'PP_SCHISANDRIN',
+    name: 'Schisandrin',
+    categories: ['polyphenol', 'liver'],
+    mechanisms: ['MITO_REPAIR', 'LIVER_PROTECTION'],
+    organs: ['LIVER'],
+    deficiency: 'HEPATIC_STRESS',
+    description: 'Полифенол с антиоксидантными свойствами для функции печени',
+    type: 'polyphenol'
+  },
+  {
+    id: 'PP_SCHISANDRIN_B',
+    name: 'Schisandrin B',
+    categories: ['polyphenol', 'mitochondria'],
+    mechanisms: ['MITO_REPAIR', 'ANTIOXIDANT'],
+    organs: ['MITOCHONDRIA', 'LIVER'],
+    deficiency: 'OXIDATIVE_STRESS',
+    description: 'Полифенол с антиоксидантными свойствами для работы митохондрий',
+    type: 'polyphenol'
+  },
+  {
+    id: 'PP_GINSENOSIDES',
+    name: 'Ginsenosides',
+    categories: ['polyphenol', 'adaptogen'],
+    mechanisms: ['ANTI_INFLAMMATION', 'ENERGY_UP'],
+    organs: ['BRAIN', 'ADRENALS'],
+    deficiency: 'FATIGUE',
+    description: 'Полифенол с антиоксидантными свойствами для адаптации к стрессу',
+    type: 'polyphenol'
+  },
+  {
+    id: 'PP_GINKGO_FLAVONES',
+    name: 'Ginkgo Flavones',
+    categories: ['polyphenol', 'brain'],
+    mechanisms: ['NEUROPROTECTION', 'CIRCULATION_UP'],
+    organs: ['BRAIN', 'VESSELS'],
+    deficiency: 'COGNITION',
+    description: 'Полифенол с антиоксидантными свойствами для работы мозга',
+    type: 'polyphenol'
+  },
+  {
+    id: 'PP_ARTICHOKE',
+    name: 'Artichoke Polyphenols',
+    categories: ['polyphenol', 'liver'],
+    mechanisms: ['BILE_FLOW_UP', 'LIVER_PROTECTION'],
+    organs: ['LIVER'],
+    deficiency: 'HEPATIC_STRESS',
+    description: 'Полифенол с антиоксидантными свойствами для функции печени',
+    type: 'polyphenol'
+  },
+  {
+    id: 'PP_TURMERONES',
+    name: 'Turmerones',
+    categories: ['polyphenol', 'brain'],
+    mechanisms: ['NEUROPROTECTION', 'ANTI_INFLAMMATION'],
+    organs: ['BRAIN'],
+    deficiency: 'COGNITION',
+    description: 'Полифенол с антиоксидантными свойствами для работы мозга',
+    type: 'polyphenol'
+  },
+  {
+    id: 'PP_GARLIC_SULFUR',
+    name: 'Garlic Polyphenols',
+    categories: ['polyphenol', 'vascular'],
+    mechanisms: ['NO_UP', 'ANTI_INFLAMMATION'],
+    organs: ['VESSELS', 'HEART'],
+    deficiency: 'HIGH_BP',
     description: 'Полифенол с антиоксидантными свойствами для поддержки ССС и обмена веществ',
     type: 'polyphenol'
   },
@@ -5358,6 +5828,16 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     organs: ['LIVER', 'BRAIN'],
     deficiency: 'FATIGUE',
     description: 'Адаптоген, помогающий адаптироваться к стрессу и поддерживающий адаптации к стрессу, функции печени, энергетического обмена',
+    type: 'adaptogen'
+  },
+  {
+    id: 'AD_SCHISANDRIN',
+    name: 'Schisandrin',
+    categories: ['adaptogen', 'mitochondria'],
+    mechanisms: ['MITO_REPAIR', 'LIVER_REGEN'],
+    organs: ['LIVER'],
+    deficiency: 'HEPATIC_STRESS',
+    description: 'Адаптоген, помогающий адаптироваться к стрессу и поддерживающий адаптации к стрессу, работы митохондрий',
     type: 'adaptogen'
   },
   {
@@ -6141,6 +6621,26 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     type: 'adaptogen'
   },
   {
+    id: 'FUNG_REISHI',
+    name: 'Reishi Mushroom',
+    categories: ['fungi', 'immune', 'calming'],
+    mechanisms: ['IMMUNE_MOD', 'CORTISOL_MOD'],
+    organs: ['IMMUNE_SYSTEM', 'BRAIN'],
+    deficiency: 'STRESS',
+    description: 'Функциональный гриб для иммунной системы, успокоения',
+    type: 'fungi'
+  },
+  {
+    id: 'FUNG_REISHI_TRITERPENES',
+    name: 'Reishi Triterpenes',
+    categories: ['fungi', 'immune'],
+    mechanisms: ['IMMUNE_UP', 'ANTI_INFLAMMATION'],
+    organs: ['IMMUNE_SYSTEM'],
+    deficiency: 'INFECTION',
+    description: 'Функциональный гриб для иммунной системы',
+    type: 'fungi'
+  },
+  {
     id: 'FUNG_REISHI_POLYSAC',
     name: 'Reishi Polysaccharides',
     categories: ['fungi', 'immune'],
@@ -6161,6 +6661,76 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     type: 'fungi'
   },
   {
+    id: 'FUNG_CORDYCEPS_MILITARIS',
+    name: 'Cordyceps Militaris',
+    categories: ['fungi', 'energy', 'hormone'],
+    mechanisms: ['ATP_UP', 'TESTOSTERONE_UP'],
+    organs: ['MUSCLES', 'HORMONES'],
+    deficiency: 'FATIGUE',
+    description: 'Функциональный гриб для энергетического обмена, гормонального баланса',
+    type: 'fungi'
+  },
+  {
+    id: 'FUNG_CORDYCEPIN',
+    name: 'Cordycepin',
+    categories: ['fungi', 'mitochondria'],
+    mechanisms: ['ATP_UP', 'ANTI_INFLAMMATION'],
+    organs: ['MUSCLES', 'BRAIN'],
+    deficiency: 'FATIGUE',
+    description: 'Функциональный гриб для работы митохондрий',
+    type: 'fungi'
+  },
+  {
+    id: 'FUNG_LIONS_MANE',
+    name: 'Lion’s Mane',
+    categories: ['fungi', 'nootropic'],
+    mechanisms: ['NGF_UP', 'NEURO_REGEN'],
+    organs: ['BRAIN', 'NERVES'],
+    deficiency: 'COGNITION',
+    description: 'Функциональный гриб для когнитивных функций',
+    type: 'fungi'
+  },
+  {
+    id: 'FUNG_LIONS_MANE_ERINACINES',
+    name: 'Erinacines',
+    categories: ['fungi', 'nootropic'],
+    mechanisms: ['NGF_UP', 'NEURO_REPAIR'],
+    organs: ['BRAIN', 'NERVES'],
+    deficiency: 'NEURO_DEGEN',
+    description: 'Функциональный гриб для когнитивных функций',
+    type: 'fungi'
+  },
+  {
+    id: 'FUNG_LIONS_MANE_HERICENONES',
+    name: 'Hericenones',
+    categories: ['fungi', 'nootropic'],
+    mechanisms: ['NGF_UP', 'NEURO_SUPPORT'],
+    organs: ['BRAIN'],
+    deficiency: 'COGNITION',
+    description: 'Функциональный гриб для когнитивных функций',
+    type: 'fungi'
+  },
+  {
+    id: 'FUNG_CHAGA',
+    name: 'Chaga Mushroom',
+    categories: ['fungi', 'antioxidant', 'immune'],
+    mechanisms: ['Nrf2_UP', 'IMMUNE_UP'],
+    organs: ['IMMUNE_SYSTEM', 'LIVER'],
+    deficiency: 'OXIDATIVE_STRESS',
+    description: 'Функциональный гриб для защиты клеток от окислительного стресса, иммунной системы',
+    type: 'fungi'
+  },
+  {
+    id: 'FUNG_CHAGA_MELANIN',
+    name: 'Chaga Melanin',
+    categories: ['fungi', 'skin', 'immune'],
+    mechanisms: ['MELANIN_UP', 'IMMUNE_SUPPORT'],
+    organs: ['SKIN', 'IMMUNE_SYSTEM'],
+    deficiency: 'OXIDATIVE_STRESS',
+    description: 'Функциональный гриб для здоровья кожи, иммунной системы',
+    type: 'fungi'
+  },
+  {
     id: 'FUNG_CHAGA_POLYPHENOLS',
     name: 'Chaga Polyphenols',
     categories: ['fungi', 'antioxidant'],
@@ -6168,6 +6738,66 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     organs: ['LIVER', 'IMMUNE_SYSTEM'],
     deficiency: 'OXIDATIVE_STRESS',
     description: 'Функциональный гриб для защиты клеток от окислительного стресса',
+    type: 'fungi'
+  },
+  {
+    id: 'FUNG_SHIITAKE',
+    name: 'Shiitake Mushroom',
+    categories: ['fungi', 'immune'],
+    mechanisms: ['LENTINAN_UP', 'IMMUNE_SUPPORT'],
+    organs: ['IMMUNE_SYSTEM'],
+    deficiency: 'INFECTION',
+    description: 'Функциональный гриб для иммунной системы',
+    type: 'fungi'
+  },
+  {
+    id: 'FUNG_SHIITAKE_LENTINAN',
+    name: 'Lentinan',
+    categories: ['fungi', 'immune'],
+    mechanisms: ['BETA_GLU_CAN_UP', 'IMMUNE_STIM'],
+    organs: ['IMMUNE_SYSTEM'],
+    deficiency: 'INFECTION',
+    description: 'Функциональный гриб для иммунной системы',
+    type: 'fungi'
+  },
+  {
+    id: 'FUNG_SHIITAKE_POLYSAC',
+    name: 'Shiitake Polysaccharides',
+    categories: ['fungi', 'immune'],
+    mechanisms: ['IMMUNE_UP', 'ANTIVIRAL'],
+    organs: ['IMMUNE_SYSTEM'],
+    deficiency: 'INFECTION',
+    description: 'Функциональный гриб для иммунной системы',
+    type: 'fungi'
+  },
+  {
+    id: 'FUNG_MAITAKE',
+    name: 'Maitake Mushroom',
+    categories: ['fungi', 'immune'],
+    mechanisms: ['BETA_GLU_CAN_UP', 'IMMUNE_UP'],
+    organs: ['IMMUNE_SYSTEM'],
+    deficiency: 'INFECTION',
+    description: 'Функциональный гриб для иммунной системы',
+    type: 'fungi'
+  },
+  {
+    id: 'FUNG_MAITAKE_D_FRACTION',
+    name: 'Maitake D-Fraction',
+    categories: ['fungi', 'immune'],
+    mechanisms: ['NK_CELL_UP', 'IMMUNE_STIM'],
+    organs: ['IMMUNE_SYSTEM'],
+    deficiency: 'INFECTION',
+    description: 'Функциональный гриб для иммунной системы',
+    type: 'fungi'
+  },
+  {
+    id: 'FUNG_MAITAKE_POLYSAC',
+    name: 'Maitake Polysaccharides',
+    categories: ['fungi', 'immune'],
+    mechanisms: ['BETA_GLU_CAN_UP', 'IMMUNE_UP'],
+    organs: ['IMMUNE_SYSTEM'],
+    deficiency: 'INFECTION',
+    description: 'Функциональный гриб для иммунной системы',
     type: 'fungi'
   },
   {
@@ -6261,6 +6891,26 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     type: 'fungi'
   },
   {
+    id: 'FUNG_REISHI_SPORE_OIL',
+    name: 'Reishi Spore Oil',
+    categories: ['fungi', 'immune', 'antiaging'],
+    mechanisms: ['IMMUNE_UP', 'MEMBRANE_PROTECTION'],
+    organs: ['IMMUNE_SYSTEM', 'BRAIN'],
+    deficiency: 'AGING',
+    description: 'Функциональный гриб для иммунной системы, антивозрастных процессов',
+    type: 'fungi'
+  },
+  {
+    id: 'FUNG_CORDYCEPS_ADENOSINE',
+    name: 'Adenosine-Rich Cordyceps',
+    categories: ['fungi', 'energy'],
+    mechanisms: ['ATP_UP', 'OXYGEN_UP'],
+    organs: ['MUSCLES', 'HEART'],
+    deficiency: 'FATIGUE',
+    description: 'Функциональный гриб для энергетического обмена',
+    type: 'fungi'
+  },
+  {
     id: 'FUNG_LIONS_MANE_MYCELIUM',
     name: 'Lion’s Mane Mycelium',
     categories: ['fungi', 'nootropic'],
@@ -6268,6 +6918,16 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     organs: ['BRAIN', 'NERVES'],
     deficiency: 'COGNITION',
     description: 'Функциональный гриб для когнитивных функций',
+    type: 'fungi'
+  },
+  {
+    id: 'FUNG_CHAGA_BETA',
+    name: 'Chaga Beta-Glucans',
+    categories: ['fungi', 'immune'],
+    mechanisms: ['BETA_GLU_CAN_UP', 'IMMUNE_STIM'],
+    organs: ['IMMUNE_SYSTEM'],
+    deficiency: 'INFECTION',
+    description: 'Функциональный гриб для иммунной системы',
     type: 'fungi'
   },
   {
@@ -6488,6 +7148,36 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     organs: ['BRAIN', 'NERVES'],
     deficiency: 'COGNITION',
     description: 'Функциональный гриб для когнитивных функций',
+    type: 'fungi'
+  },
+  {
+    id: 'FUNG_LIONS_MANE_FULLSPEC',
+    name: 'Lion’s Mane Full Spectrum',
+    categories: ['fungi', 'nootropic'],
+    mechanisms: ['NGF_UP', 'NEURO_SUPPORT'],
+    organs: ['BRAIN', 'NERVES'],
+    deficiency: 'NEURO_DEGEN',
+    description: 'Функциональный гриб для когнитивных функций',
+    type: 'fungi'
+  },
+  {
+    id: 'FUNG_LIONS_MANE_LIPOSOMAL',
+    name: 'Lion’s Mane Liposomal',
+    categories: ['fungi', 'nootropic'],
+    mechanisms: ['LIPOSOMAL_DELIVERY', 'NGF_UP'],
+    organs: ['BRAIN'],
+    deficiency: 'COGNITION',
+    description: 'Функциональный гриб для когнитивных функций',
+    type: 'fungi'
+  },
+  {
+    id: 'FUNG_CHAGA_PREMIUM',
+    name: 'Chaga Premium',
+    categories: ['fungi', 'antioxidant', 'immune'],
+    mechanisms: ['Nrf2_UP', 'IMMUNE_UP'],
+    organs: ['IMMUNE_SYSTEM', 'LIVER'],
+    deficiency: 'OXIDATIVE_STRESS',
+    description: 'Функциональный гриб для защиты клеток от окислительного стресса, иммунной системы',
     type: 'fungi'
   },
   {
@@ -8301,6 +8991,16 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     type: 'prebiotic'
   },
   {
+    id: 'PRE_GLUCO_OLIGO',
+    name: 'Gluco-Oligosaccharides',
+    categories: ['prebiotic', 'GI', 'immune'],
+    mechanisms: ['SCFA_UP', 'GI_BALANCE'],
+    organs: ['GI', 'IMMUNE_SYSTEM'],
+    deficiency: 'DYSBIOSIS',
+    description: 'Пребиотик, поддерживающий микробиома, иммунной системы',
+    type: 'prebiotic'
+  },
+  {
     id: 'PRE_POLYPHENOL_FIBER',
     name: 'Polyphenol Fiber Complex',
     categories: ['prebiotic', 'immune', 'GI'],
@@ -9481,6 +10181,16 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     type: 'aminoacid'
   },
   {
+    id: 'AA_TAURINE',
+    name: 'Taurine',
+    categories: ['aminoacid', 'cardio', 'neuro'],
+    mechanisms: ['CALMING', 'ELECTROLYTE_BALANCE'],
+    organs: ['HEART', 'BRAIN'],
+    deficiency: 'STRESS',
+    description: 'Аминокислота, участвующая в ССС, нервной системы',
+    type: 'aminoacid'
+  },
+  {
     id: 'AA_CARNITINE',
     name: 'Carnitine',
     categories: ['aminoacid', 'fat_loss'],
@@ -9538,6 +10248,26 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     organs: ['VESSELS', 'MUSCLES'],
     deficiency: 'HIGH_BP',
     description: 'Аминокислота, участвующая в синтезе белка и метаболических процессах',
+    type: 'aminoacid'
+  },
+  {
+    id: 'AA_CARNOSINE',
+    name: 'Carnosine',
+    categories: ['aminoacid', 'antiaging', 'muscle'],
+    mechanisms: ['CELL_PROTECTION', 'GLYCATION_DOWN'],
+    organs: ['CELLS', 'MUSCLES'],
+    deficiency: 'AGING',
+    description: 'Аминокислота, участвующая в антивозрастных процессов, мышц',
+    type: 'aminoacid'
+  },
+  {
+    id: 'AA_GLYCINE',
+    name: 'Glycine',
+    categories: ['aminoacid', 'calming', 'GI'],
+    mechanisms: ['GABA_UP', 'COLLAGEN_UP'],
+    organs: ['BRAIN', 'SKIN'],
+    deficiency: 'STRESS',
+    description: 'Аминокислота, участвующая в успокоения',
     type: 'aminoacid'
   },
   {
@@ -9631,6 +10361,16 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     type: 'aminoacid'
   },
   {
+    id: 'AA_HICA',
+    name: 'HICA (Leucic Acid)',
+    categories: ['aminoacid', 'anabolic'],
+    mechanisms: ['ANTI_CATABOLIC', 'RECOVERY_UP'],
+    organs: ['MUSCLES'],
+    deficiency: 'FATIGUE',
+    description: 'Аминокислота, участвующая в синтезе белка и метаболических процессах',
+    type: 'aminoacid'
+  },
+  {
     id: 'AA_EAA_COMPLEX',
     name: 'EAA Complex',
     categories: ['aminoacid', 'multi'],
@@ -9661,6 +10401,16 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     type: 'aminoacid'
   },
   {
+    id: 'AA_BETAINE',
+    name: 'Betaine (TMG)',
+    categories: ['aminoacid', 'methylation'],
+    mechanisms: ['METHYL_DONOR', 'HOMOCYSTEINE_DOWN'],
+    organs: ['LIVER', 'BLOOD'],
+    deficiency: 'HIGH_HOMOCYSTEINE',
+    description: 'Аминокислота, участвующая в метилирования',
+    type: 'aminoacid'
+  },
+  {
     id: 'AA_HOMOCYSTEINE_MOD',
     name: 'Homocysteine Modulators',
     categories: ['aminoacid', 'methylation'],
@@ -9688,6 +10438,16 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     organs: ['LIVER', 'MUSCLES'],
     deficiency: 'FATIGUE',
     description: 'Аминокислота, участвующая в детоксикации, энергетического обмена',
+    type: 'aminoacid'
+  },
+  {
+    id: 'AA_THEANINE',
+    name: 'L‑Theanine',
+    categories: ['aminoacid', 'calming'],
+    mechanisms: ['GABA_UP', 'ALPHA_WAVES_UP'],
+    organs: ['BRAIN'],
+    deficiency: 'ANXIETY',
+    description: 'Аминокислота, участвующая в успокоения',
     type: 'aminoacid'
   },
   {
@@ -9751,6 +10511,16 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     type: 'aminoacid'
   },
   {
+    id: 'AA_D_SERINE',
+    name: 'D-Serine',
+    categories: ['aminoacid', 'neuro'],
+    mechanisms: ['NMDA_MOD', 'NEURO_SIGNALING'],
+    organs: ['BRAIN'],
+    deficiency: 'COGNITION',
+    description: 'Аминокислота, участвующая в нервной системы',
+    type: 'aminoacid'
+  },
+  {
     id: 'AA_D_ALANINE',
     name: 'D-Alanine',
     categories: ['aminoacid', 'cell'],
@@ -9788,6 +10558,46 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     organs: ['BRAIN'],
     deficiency: 'PARKINSON',
     description: 'Аминокислота, участвующая в нервной системы',
+    type: 'aminoacid'
+  },
+  {
+    id: 'AA_HYDROXYPROLINE',
+    name: 'Hydroxyproline',
+    categories: ['aminoacid', 'skin', 'joint'],
+    mechanisms: ['COLLAGEN_UP', 'SKIN_REPAIR'],
+    organs: ['SKIN', 'JOINTS'],
+    deficiency: 'AGING',
+    description: 'Аминокислота, участвующая в здоровья кожи, суставов',
+    type: 'aminoacid'
+  },
+  {
+    id: 'AA_HYDROXYLYSINE',
+    name: 'Hydroxylysine',
+    categories: ['aminoacid', 'skin'],
+    mechanisms: ['COLLAGEN_UP', 'SKIN_REPAIR'],
+    organs: ['SKIN'],
+    deficiency: 'AGING',
+    description: 'Аминокислота, участвующая в здоровья кожи',
+    type: 'aminoacid'
+  },
+  {
+    id: 'AA_SARCOSINE',
+    name: 'Sarcosine',
+    categories: ['aminoacid', 'neuro'],
+    mechanisms: ['NMDA_MOD', 'COGNITION_UP'],
+    organs: ['BRAIN'],
+    deficiency: 'COGNITION',
+    description: 'Аминокислота, участвующая в нервной системы',
+    type: 'aminoacid'
+  },
+  {
+    id: 'AA_BETAINE_HCL',
+    name: 'Betaine HCl',
+    categories: ['aminoacid', 'GI'],
+    mechanisms: ['STOMACH_ACID_UP', 'DIGESTION_UP'],
+    organs: ['GI'],
+    deficiency: 'LOW_ACID',
+    description: 'Аминокислота, участвующая в синтезе белка и метаболических процессах',
     type: 'aminoacid'
   },
   {
@@ -9831,6 +10641,16 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     type: 'aminoacid'
   },
   {
+    id: 'AA_GLYCINE_MAGNESIUM',
+    name: 'Glycine Magnesium Chelate',
+    categories: ['aminoacid', 'calming'],
+    mechanisms: ['MAGNESIUM_UP', 'GABA_UP'],
+    organs: ['BRAIN'],
+    deficiency: 'STRESS',
+    description: 'Аминокислота, участвующая в успокоения',
+    type: 'aminoacid'
+  },
+  {
     id: 'AA_TAURINE_PREMIUM',
     name: 'Taurine Premium',
     categories: ['aminoacid', 'cardio', 'neuro'],
@@ -9848,6 +10668,16 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     organs: ['MUSCLES'],
     deficiency: 'FATIGUE',
     description: 'Аминокислота, участвующая в жиросжигания',
+    type: 'aminoacid'
+  },
+  {
+    id: 'AA_CARNITINE_FUMARATE',
+    name: 'L-Carnitine Fumarate',
+    categories: ['aminoacid', 'energy'],
+    mechanisms: ['MITO_UP', 'ATP_UP'],
+    organs: ['MUSCLES'],
+    deficiency: 'FATIGUE',
+    description: 'Аминокислота, участвующая в энергетического обмена',
     type: 'aminoacid'
   },
   {
@@ -10141,6 +10971,16 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     type: 'aminoacid'
   },
   {
+    id: 'AA_ARG_AKG',
+    name: 'Arginine Alpha-Ketoglutarate',
+    categories: ['aminoacid', 'vascular'],
+    mechanisms: ['NO_UP', 'ATP_UP'],
+    organs: ['MUSCLES'],
+    deficiency: 'FATIGUE',
+    description: 'Аминокислота, участвующая в синтезе белка и метаболических процессах',
+    type: 'aminoacid'
+  },
+  {
     id: 'AA_GLYCINE_AKG',
     name: 'Glycine AKG',
     categories: ['aminoacid', 'antiaging'],
@@ -10238,6 +11078,16 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     organs: ['BRAIN'],
     deficiency: 'INSOMNIA',
     description: 'Аминокислота, участвующая в нервной системы',
+    type: 'aminoacid'
+  },
+  {
+    id: 'AA_THEANINE_PREMIUM',
+    name: 'Theanine Premium',
+    categories: ['aminoacid', 'calming'],
+    mechanisms: ['GABA_UP', 'ALPHA_WAVES_UP'],
+    organs: ['BRAIN'],
+    deficiency: 'STRESS',
+    description: 'Аминокислота, участвующая в успокоения',
     type: 'aminoacid'
   },
   {
@@ -13491,6 +14341,16 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     type: 'peptide'
   },
   {
+    id: 'PEP_MITO_ANTIGLYCATION',
+    name: 'Anti‑Glycation Peptide',
+    categories: ['peptide', 'antiaging'],
+    mechanisms: ['GLYCATION_DOWN', 'CELL_PROTECTION'],
+    organs: ['CELLS'],
+    deficiency: 'AGING',
+    description: 'Пептид для антивозрастных процессов',
+    type: 'peptide'
+  },
+  {
     id: 'PEP_MITO_ANTIFIBROSIS',
     name: 'Anti‑Fibrosis Peptide',
     categories: ['peptide', 'repair'],
@@ -16141,6 +17001,16 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     type: 'hormone'
   },
   {
+    id: 'HORM_MELATONIN',
+    name: 'Melatonin',
+    categories: ['hormone', 'PINEAL'],
+    mechanisms: ['MELATONIN_UP', 'SLEEP_UP'],
+    organs: ['PINEAL_GLAND'],
+    deficiency: 'INSOMNIA',
+    description: 'Гормон для гормонального баланса',
+    type: 'hormone'
+  },
+  {
     id: 'HORM_LEPTIN',
     name: 'Leptin',
     categories: ['hormone', 'METABOLIC'],
@@ -16407,6 +17277,16 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NEUROTENSIN_UP', 'MOTILITY_UP'],
     organs: ['GI'],
     deficiency: 'SLOW_GUT',
+    description: 'Гормон для гормонального баланса',
+    type: 'hormone'
+  },
+  {
+    id: 'HORM_SCT',
+    name: 'Secretin',
+    categories: ['hormone', 'GI'],
+    mechanisms: ['SECRETIN_UP', 'BICARB_UP'],
+    organs: ['GI'],
+    deficiency: 'DIGESTION',
     description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
@@ -16717,6 +17597,16 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['HISTAMINE_UP', 'ALLERGY_UP'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'ALLERGY',
+    description: 'Гормон для гормонального баланса',
+    type: 'hormone'
+  },
+  {
+    id: 'HORM_BRADYKININ',
+    name: 'Bradykinin',
+    categories: ['hormone', 'VESSELS'],
+    mechanisms: ['BRADYKININ_UP', 'VASODILATION'],
+    organs: ['VESSELS'],
+    deficiency: 'INFLAMMATION',
     description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
@@ -17147,6 +18037,16 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NT_UP', 'MOTILITY_UP'],
     organs: ['GI'],
     deficiency: 'SLOW_GUT',
+    description: 'Гормон для гормонального баланса',
+    type: 'hormone'
+  },
+  {
+    id: 'HORM_GUT_OXYNTOMODULIN',
+    name: 'Oxyntomodulin',
+    categories: ['hormone', 'GI'],
+    mechanisms: ['OXYNTOMODULIN_UP', 'HUNGER_DOWN'],
+    organs: ['GI'],
+    deficiency: 'OBESITY',
     description: 'Гормон для гормонального баланса',
     type: 'hormone'
   },
@@ -18197,6 +19097,26 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NAD_UP', 'MITO_UP'],
     organs: ['CELLS'],
     deficiency: 'AGING',
+    description: 'Фармсредство для когнитивных функций',
+    type: 'pharma'
+  },
+  {
+    id: 'PHARMA_LYTHIUM_OROTATE',
+    name: 'Lithium Orotate',
+    categories: ['pharma', 'nootropic'],
+    mechanisms: ['BDNF_UP', 'MOOD_STABILIZE'],
+    organs: ['BRAIN'],
+    deficiency: 'MOOD_SWINGS',
+    description: 'Фармсредство для когнитивных функций',
+    type: 'pharma'
+  },
+  {
+    id: 'PHARMA_THEANINE',
+    name: 'L‑Theanine (pharma)',
+    categories: ['pharma', 'nootropic'],
+    mechanisms: ['GABA_UP', 'ALPHA_WAVES_UP'],
+    organs: ['BRAIN'],
+    deficiency: 'ANXIETY',
     description: 'Фармсредство для когнитивных функций',
     type: 'pharma'
   },
@@ -19547,6 +20467,16 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['OPIOID_MOD', 'MOTILITY_BALANCE'],
     organs: ['GI'],
     deficiency: 'IBS',
+    description: 'Фармсредство для поддержки обменных процессов и здоровья',
+    type: 'pharma'
+  },
+  {
+    id: 'PHARMA_LACTULOSE',
+    name: 'Lactulose',
+    categories: ['pharma', 'GI'],
+    mechanisms: ['OSMOTIC_LAX', 'MOTILITY_UP'],
+    organs: ['GI'],
+    deficiency: 'CONSTIPATION',
     description: 'Фармсредство для поддержки обменных процессов и здоровья',
     type: 'pharma'
   },
@@ -20997,7 +21927,7 @@ export const ALL_INTERACTIONS = ([
   { interactionId: 'SYNERGY_AUTO_067', substanceA: 'MAGNESIUM_L_THREONATE', substanceB: 'L_THEANINE', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Магний L-треонат и L-теанин синергично улучшают качество сна и когнитивные функции через ГАМК', mechanisms: ['Повышение магния в мозге', 'ГАМК-модуляция', 'Снижение глутамата', 'Улучшение синаптической пластичности'], severity: 'LOW', notes: 'Магний-треонат 2000 мг + теанин 100-200 мг; за 30-60 мин до сна' },
   { interactionId: 'SYNERGY_AUTO_068', substanceA: 'PHOSPHATIDYLSERINE', substanceB: 'BACOPA', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Фосфатидилсерин и бакопа монье синергично снижают кортизол и улучшают память у пожилых', mechanisms: ['Снижение кортизола', 'Ацетилхолиновая модуляция', 'Синаптическая защита', 'Улучшение межполушарной связи'], severity: 'LOW', notes: 'Фосфатидилсерин 200-400 мг + бакопа 300-600 мг; утром и днем' },
 ,
-  { interactionId: 'SYNERGY_AUTO_069', substanceA: 'VIT_A_BETA', substanceB: 'VIT_A_BETA', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Beta-Carotene и Beta-Carotene синергично действуют через общие механизмы (CAROTENOID_PATHWAY, OXIDATIVE_STRESS_REDUCTION). Покрытие: EYES, SKIN. Комбинация усиливает взаимный эффект за счёт совпадающих путей регуляции.', mechanisms: ['CAROTENOID_PATHWAY', 'OXIDATIVE_STRESS_REDUCTION', 'TARGET_EYES', 'SYNERGY_AUTO'], severity: 'LOW', notes: 'Авто-синергия по механизмам: CAROTENOID_PATHWAY, OXIDATIVE_STRESS_REDUCTION' },
+  { interactionId: 'SYNERGY_AUTO_069', substanceA: 'VIT_A_BETA', substanceB: 'AO_BETA_CAROTENE', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Beta-Carotene и Beta-Carotene синергично действуют через общие механизмы (CAROTENOID_PATHWAY, OXIDATIVE_STRESS_REDUCTION). Покрытие: EYES, SKIN. Комбинация усиливает взаимный эффект за счёт совпадающих путей регуляции.', mechanisms: ['CAROTENOID_PATHWAY', 'OXIDATIVE_STRESS_REDUCTION', 'TARGET_EYES', 'SYNERGY_AUTO'], severity: 'LOW', notes: 'Авто-синергия по механизмам: CAROTENOID_PATHWAY, OXIDATIVE_STRESS_REDUCTION' },
   { interactionId: 'SYNERGY_AUTO_070', substanceA: 'AO_CAROTENOID_COMPLEX', substanceB: 'AO_CAROTENE_COMPLEX', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Carotenoid Complex и Carotene Complex синергично действуют через общие механизмы (CAROTENOID_PATHWAY, RETINA_SUPPORT). Покрытие: EYES. Комбинация усиливает взаимный эффект за счёт совпадающих путей регуляции.', mechanisms: ['CAROTENOID_PATHWAY', 'RETINA_SUPPORT', 'TARGET_EYES', 'SYNERGY_AUTO'], severity: 'LOW', notes: 'Авто-синергия по механизмам: CAROTENOID_PATHWAY, RETINA_SUPPORT' },
   { interactionId: 'SYNERGY_AUTO_071', substanceA: 'AO_CAROTENOID_COMPLEX', substanceB: 'AO_ALPHA_CAROTENE', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Carotenoid Complex и Alpha-Carotene синергично действуют через общие механизмы (CAROTENOID_PATHWAY, RETINA_SUPPORT). Покрытие: EYES. Комбинация усиливает взаимный эффект за счёт совпадающих путей регуляции.', mechanisms: ['CAROTENOID_PATHWAY', 'RETINA_SUPPORT', 'TARGET_EYES', 'SYNERGY_AUTO'], severity: 'LOW', notes: 'Авто-синергия по механизмам: CAROTENOID_PATHWAY, RETINA_SUPPORT' },
   { interactionId: 'SYNERGY_AUTO_072', substanceA: 'AO_CAROTENOID_COMPLEX', substanceB: 'AO_GAMMA_CAROTENE', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Carotenoid Complex и Gamma-Carotene синергично действуют через общие механизмы (CAROTENOID_PATHWAY, RETINA_SUPPORT). Покрытие: EYES. Комбинация усиливает взаимный эффект за счёт совпадающих путей регуляции.', mechanisms: ['CAROTENOID_PATHWAY', 'RETINA_SUPPORT', 'TARGET_EYES', 'SYNERGY_AUTO'], severity: 'LOW', notes: 'Авто-синергия по механизмам: CAROTENOID_PATHWAY, RETINA_SUPPORT' },
@@ -21020,35 +21950,35 @@ export const ALL_INTERACTIONS = ([
   { interactionId: 'SYNERGY_AUTO_089', substanceA: 'VIT_E_ALPHA', substanceB: 'VIT_E_COMPLEX', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Vitamin E (Alpha-Tocopherol) и Full Spectrum E синергично действуют через общие механизмы (OXIDATIVE_STRESS_REDUCTION, MEMBRANE_PROTECTION). Покрытие: SKIN, VESSELS, HEART. Комбинация усиливает взаимный эффект за счёт совпадающих путей регуляции.', mechanisms: ['OXIDATIVE_STRESS_REDUCTION', 'MEMBRANE_PROTECTION', 'TARGET_SKIN', 'SYNERGY_AUTO'], severity: 'LOW', notes: 'Авто-синергия по механизмам: OXIDATIVE_STRESS_REDUCTION, MEMBRANE_PROTECTION' },
   { interactionId: 'SYNERGY_AUTO_090', substanceA: 'VIT_E_ALPHA', substanceB: 'FA_OMEGA3_ASTAX', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Vitamin E (Alpha-Tocopherol) и Astaxanthin Omega-3 Complex синергично действуют через общие механизмы (OXIDATIVE_STRESS_REDUCTION, MEMBRANE_PROTECTION). Покрытие: HEART. Комбинация усиливает взаимный эффект за счёт совпадающих путей регуляции.', mechanisms: ['OXIDATIVE_STRESS_REDUCTION', 'MEMBRANE_PROTECTION', 'TARGET_HEART', 'SYNERGY_AUTO'], severity: 'LOW', notes: 'Авто-синергия по механизмам: OXIDATIVE_STRESS_REDUCTION, MEMBRANE_PROTECTION' },
   { interactionId: 'SYNERGY_AUTO_091', substanceA: 'VIT_E_ALPHA', substanceB: 'AO_ASTAX', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Vitamin E (Alpha-Tocopherol) и Astaxanthin синергично действуют через общие механизмы (OXIDATIVE_STRESS_REDUCTION, MEMBRANE_PROTECTION). Покрытие: SKIN, HEART. Комбинация усиливает взаимный эффект за счёт совпадающих путей регуляции.', mechanisms: ['OXIDATIVE_STRESS_REDUCTION', 'MEMBRANE_PROTECTION', 'TARGET_SKIN', 'SYNERGY_AUTO'], severity: 'LOW', notes: 'Авто-синергия по механизмам: OXIDATIVE_STRESS_REDUCTION, MEMBRANE_PROTECTION' },
-  { interactionId: 'SYNERGY_AUTO_092', substanceA: 'VIT_E_ALPHA', substanceB: 'VIT_E_MIXED', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Vitamin E (Alpha-Tocopherol) и Mixed Tocopherols синергично действуют через общие механизмы (OXIDATIVE_STRESS_REDUCTION, MEMBRANE_PROTECTION). Покрытие: VESSELS, HEART. Комбинация усиливает взаимный эффект за счёт совпадающих путей регуляции.', mechanisms: ['OXIDATIVE_STRESS_REDUCTION', 'MEMBRANE_PROTECTION', 'TARGET_VESSELS', 'SYNERGY_AUTO'], severity: 'LOW', notes: 'Авто-синергия по механизмам: OXIDATIVE_STRESS_REDUCTION, MEMBRANE_PROTECTION' },
+  { interactionId: 'SYNERGY_AUTO_092', substanceA: 'VIT_E_ALPHA', substanceB: 'AO_TOCOPHEROLS', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Vitamin E (Alpha-Tocopherol) и Mixed Tocopherols синергично действуют через общие механизмы (OXIDATIVE_STRESS_REDUCTION, MEMBRANE_PROTECTION). Покрытие: VESSELS, HEART. Комбинация усиливает взаимный эффект за счёт совпадающих путей регуляции.', mechanisms: ['OXIDATIVE_STRESS_REDUCTION', 'MEMBRANE_PROTECTION', 'TARGET_VESSELS', 'SYNERGY_AUTO'], severity: 'LOW', notes: 'Авто-синергия по механизмам: OXIDATIVE_STRESS_REDUCTION, MEMBRANE_PROTECTION' },
   { interactionId: 'SYNERGY_AUTO_093', substanceA: 'VIT_E_MIXED', substanceB: 'VIT_E_SYNERGY', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Mixed Tocopherols и E + C Synergy синергично действуют через общие механизмы (OXIDATIVE_STRESS_REDUCTION, MEMBRANE_PROTECTION). Покрытие: SKIN, VESSELS. Комбинация усиливает взаимный эффект за счёт совпадающих путей регуляции.', mechanisms: ['OXIDATIVE_STRESS_REDUCTION', 'MEMBRANE_PROTECTION', 'TARGET_SKIN', 'SYNERGY_AUTO'], severity: 'LOW', notes: 'Авто-синергия по механизмам: OXIDATIVE_STRESS_REDUCTION, MEMBRANE_PROTECTION' },
   { interactionId: 'SYNERGY_AUTO_094', substanceA: 'VIT_E_MIXED', substanceB: 'VIT_E_COMPLEX', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Mixed Tocopherols и Full Spectrum E синергично действуют через общие механизмы (OXIDATIVE_STRESS_REDUCTION, MEMBRANE_PROTECTION). Покрытие: SKIN, VESSELS, HEART. Комбинация усиливает взаимный эффект за счёт совпадающих путей регуляции.', mechanisms: ['OXIDATIVE_STRESS_REDUCTION', 'MEMBRANE_PROTECTION', 'TARGET_SKIN', 'SYNERGY_AUTO'], severity: 'LOW', notes: 'Авто-синергия по механизмам: OXIDATIVE_STRESS_REDUCTION, MEMBRANE_PROTECTION' },
   { interactionId: 'SYNERGY_AUTO_095', substanceA: 'VIT_E_MIXED', substanceB: 'FA_OMEGA3_ASTAX', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Mixed Tocopherols и Astaxanthin Omega-3 Complex синергично действуют через общие механизмы (OXIDATIVE_STRESS_REDUCTION, MEMBRANE_PROTECTION). Покрытие: HEART. Комбинация усиливает взаимный эффект за счёт совпадающих путей регуляции.', mechanisms: ['OXIDATIVE_STRESS_REDUCTION', 'MEMBRANE_PROTECTION', 'TARGET_HEART', 'SYNERGY_AUTO'], severity: 'LOW', notes: 'Авто-синергия по механизмам: OXIDATIVE_STRESS_REDUCTION, MEMBRANE_PROTECTION' },
   { interactionId: 'SYNERGY_AUTO_096', substanceA: 'VIT_E_MIXED', substanceB: 'AO_ASTAX', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Mixed Tocopherols и Astaxanthin синергично действуют через общие механизмы (OXIDATIVE_STRESS_REDUCTION, MEMBRANE_PROTECTION). Покрытие: SKIN, HEART. Комбинация усиливает взаимный эффект за счёт совпадающих путей регуляции.', mechanisms: ['OXIDATIVE_STRESS_REDUCTION', 'MEMBRANE_PROTECTION', 'TARGET_SKIN', 'SYNERGY_AUTO'], severity: 'LOW', notes: 'Авто-синергия по механизмам: OXIDATIVE_STRESS_REDUCTION, MEMBRANE_PROTECTION' },
-  { interactionId: 'SYNERGY_AUTO_097', substanceA: 'VIT_E_MIXED', substanceB: 'VIT_E_MIXED', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Mixed Tocopherols и Mixed Tocopherols синергично действуют через общие механизмы (OXIDATIVE_STRESS_REDUCTION, MEMBRANE_PROTECTION). Покрытие: VESSELS, HEART. Комбинация усиливает взаимный эффект за счёт совпадающих путей регуляции.', mechanisms: ['OXIDATIVE_STRESS_REDUCTION', 'MEMBRANE_PROTECTION', 'TARGET_VESSELS', 'SYNERGY_AUTO'], severity: 'LOW', notes: 'Авто-синергия по механизмам: OXIDATIVE_STRESS_REDUCTION, MEMBRANE_PROTECTION' },
+  { interactionId: 'SYNERGY_AUTO_097', substanceA: 'VIT_E_MIXED', substanceB: 'AO_TOCOPHEROLS', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Mixed Tocopherols и Mixed Tocopherols синергично действуют через общие механизмы (OXIDATIVE_STRESS_REDUCTION, MEMBRANE_PROTECTION). Покрытие: VESSELS, HEART. Комбинация усиливает взаимный эффект за счёт совпадающих путей регуляции.', mechanisms: ['OXIDATIVE_STRESS_REDUCTION', 'MEMBRANE_PROTECTION', 'TARGET_VESSELS', 'SYNERGY_AUTO'], severity: 'LOW', notes: 'Авто-синергия по механизмам: OXIDATIVE_STRESS_REDUCTION, MEMBRANE_PROTECTION' },
   { interactionId: 'SYNERGY_AUTO_098', substanceA: 'VIT_E_SYNERGY', substanceB: 'VIT_E_COMPLEX', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'E + C Synergy и Full Spectrum E синергично действуют через общие механизмы (OXIDATIVE_STRESS_REDUCTION, MEMBRANE_PROTECTION). Покрытие: SKIN, VESSELS. Комбинация усиливает взаимный эффект за счёт совпадающих путей регуляции.', mechanisms: ['OXIDATIVE_STRESS_REDUCTION', 'MEMBRANE_PROTECTION', 'TARGET_SKIN', 'SYNERGY_AUTO'], severity: 'LOW', notes: 'Авто-синергия по механизмам: OXIDATIVE_STRESS_REDUCTION, MEMBRANE_PROTECTION' },
   { interactionId: 'SYNERGY_AUTO_099', substanceA: 'VIT_E_SYNERGY', substanceB: 'FA_OMEGA3_ASTAX', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'E + C Synergy и Astaxanthin Omega-3 Complex синергично действуют через общие механизмы (OXIDATIVE_STRESS_REDUCTION, MEMBRANE_PROTECTION). Комбинация усиливает взаимный эффект за счёт совпадающих путей регуляции.', mechanisms: ['OXIDATIVE_STRESS_REDUCTION', 'MEMBRANE_PROTECTION', 'SYNERGY_AUTO'], severity: 'LOW', notes: 'Авто-синергия по механизмам: OXIDATIVE_STRESS_REDUCTION, MEMBRANE_PROTECTION' },
   { interactionId: 'SYNERGY_AUTO_100', substanceA: 'VIT_E_SYNERGY', substanceB: 'AO_ASTAX', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'E + C Synergy и Astaxanthin синергично действуют через общие механизмы (OXIDATIVE_STRESS_REDUCTION, MEMBRANE_PROTECTION). Покрытие: SKIN. Комбинация усиливает взаимный эффект за счёт совпадающих путей регуляции.', mechanisms: ['OXIDATIVE_STRESS_REDUCTION', 'MEMBRANE_PROTECTION', 'TARGET_SKIN', 'SYNERGY_AUTO'], severity: 'LOW', notes: 'Авто-синергия по механизмам: OXIDATIVE_STRESS_REDUCTION, MEMBRANE_PROTECTION' },
-  { interactionId: 'SYNERGY_AUTO_101', substanceA: 'VIT_E_SYNERGY', substanceB: 'VIT_E_MIXED', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'E + C Synergy и Mixed Tocopherols синергично действуют через общие механизмы (OXIDATIVE_STRESS_REDUCTION, MEMBRANE_PROTECTION). Покрытие: VESSELS. Комбинация усиливает взаимный эффект за счёт совпадающих путей регуляции.', mechanisms: ['OXIDATIVE_STRESS_REDUCTION', 'MEMBRANE_PROTECTION', 'TARGET_VESSELS', 'SYNERGY_AUTO'], severity: 'LOW', notes: 'Авто-синергия по механизмам: OXIDATIVE_STRESS_REDUCTION, MEMBRANE_PROTECTION' },
+  { interactionId: 'SYNERGY_AUTO_101', substanceA: 'VIT_E_SYNERGY', substanceB: 'AO_TOCOPHEROLS', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'E + C Synergy и Mixed Tocopherols синергично действуют через общие механизмы (OXIDATIVE_STRESS_REDUCTION, MEMBRANE_PROTECTION). Покрытие: VESSELS. Комбинация усиливает взаимный эффект за счёт совпадающих путей регуляции.', mechanisms: ['OXIDATIVE_STRESS_REDUCTION', 'MEMBRANE_PROTECTION', 'TARGET_VESSELS', 'SYNERGY_AUTO'], severity: 'LOW', notes: 'Авто-синергия по механизмам: OXIDATIVE_STRESS_REDUCTION, MEMBRANE_PROTECTION' },
   { interactionId: 'SYNERGY_AUTO_102', substanceA: 'VIT_E_COMPLEX', substanceB: 'FA_OMEGA3_ASTAX', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Full Spectrum E и Astaxanthin Omega-3 Complex синергично действуют через общие механизмы (OXIDATIVE_STRESS_REDUCTION, MEMBRANE_PROTECTION). Покрытие: HEART. Комбинация усиливает взаимный эффект за счёт совпадающих путей регуляции.', mechanisms: ['OXIDATIVE_STRESS_REDUCTION', 'MEMBRANE_PROTECTION', 'TARGET_HEART', 'SYNERGY_AUTO'], severity: 'LOW', notes: 'Авто-синергия по механизмам: OXIDATIVE_STRESS_REDUCTION, MEMBRANE_PROTECTION' },
   { interactionId: 'SYNERGY_AUTO_103', substanceA: 'VIT_E_COMPLEX', substanceB: 'AO_ASTAX', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Full Spectrum E и Astaxanthin синергично действуют через общие механизмы (OXIDATIVE_STRESS_REDUCTION, MEMBRANE_PROTECTION). Покрытие: HEART, SKIN. Комбинация усиливает взаимный эффект за счёт совпадающих путей регуляции.', mechanisms: ['OXIDATIVE_STRESS_REDUCTION', 'MEMBRANE_PROTECTION', 'TARGET_HEART', 'SYNERGY_AUTO'], severity: 'LOW', notes: 'Авто-синергия по механизмам: OXIDATIVE_STRESS_REDUCTION, MEMBRANE_PROTECTION' },
-  { interactionId: 'SYNERGY_AUTO_104', substanceA: 'VIT_E_COMPLEX', substanceB: 'VIT_E_MIXED', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Full Spectrum E и Mixed Tocopherols синергично действуют через общие механизмы (OXIDATIVE_STRESS_REDUCTION, MEMBRANE_PROTECTION). Покрытие: HEART, VESSELS. Комбинация усиливает взаимный эффект за счёт совпадающих путей регуляции.', mechanisms: ['OXIDATIVE_STRESS_REDUCTION', 'MEMBRANE_PROTECTION', 'TARGET_HEART', 'SYNERGY_AUTO'], severity: 'LOW', notes: 'Авто-синергия по механизмам: OXIDATIVE_STRESS_REDUCTION, MEMBRANE_PROTECTION' },
+  { interactionId: 'SYNERGY_AUTO_104', substanceA: 'VIT_E_COMPLEX', substanceB: 'AO_TOCOPHEROLS', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Full Spectrum E и Mixed Tocopherols синергично действуют через общие механизмы (OXIDATIVE_STRESS_REDUCTION, MEMBRANE_PROTECTION). Покрытие: HEART, VESSELS. Комбинация усиливает взаимный эффект за счёт совпадающих путей регуляции.', mechanisms: ['OXIDATIVE_STRESS_REDUCTION', 'MEMBRANE_PROTECTION', 'TARGET_HEART', 'SYNERGY_AUTO'], severity: 'LOW', notes: 'Авто-синергия по механизмам: OXIDATIVE_STRESS_REDUCTION, MEMBRANE_PROTECTION' },
   { interactionId: 'SYNERGY_AUTO_105', substanceA: 'FA_OMEGA3_ASTAX', substanceB: 'AO_ASTAX', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Astaxanthin Omega-3 Complex и Astaxanthin синергично действуют через общие механизмы (OXIDATIVE_STRESS_REDUCTION, MEMBRANE_PROTECTION). Покрытие: HEART. Комбинация усиливает взаимный эффект за счёт совпадающих путей регуляции.', mechanisms: ['OXIDATIVE_STRESS_REDUCTION', 'MEMBRANE_PROTECTION', 'TARGET_HEART', 'SYNERGY_AUTO'], severity: 'LOW', notes: 'Авто-синергия по механизмам: OXIDATIVE_STRESS_REDUCTION, MEMBRANE_PROTECTION' },
-  { interactionId: 'SYNERGY_AUTO_106', substanceA: 'FA_OMEGA3_ASTAX', substanceB: 'VIT_E_MIXED', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Astaxanthin Omega-3 Complex и Mixed Tocopherols синергично действуют через общие механизмы (OXIDATIVE_STRESS_REDUCTION, MEMBRANE_PROTECTION). Покрытие: HEART. Комбинация усиливает взаимный эффект за счёт совпадающих путей регуляции.', mechanisms: ['OXIDATIVE_STRESS_REDUCTION', 'MEMBRANE_PROTECTION', 'TARGET_HEART', 'SYNERGY_AUTO'], severity: 'LOW', notes: 'Авто-синергия по механизмам: OXIDATIVE_STRESS_REDUCTION, MEMBRANE_PROTECTION' },
-  { interactionId: 'SYNERGY_AUTO_107', substanceA: 'AO_ASTAX', substanceB: 'VIT_E_MIXED', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Astaxanthin и Mixed Tocopherols синергично действуют через общие механизмы (OXIDATIVE_STRESS_REDUCTION, MEMBRANE_PROTECTION). Покрытие: HEART. Комбинация усиливает взаимный эффект за счёт совпадающих путей регуляции.', mechanisms: ['OXIDATIVE_STRESS_REDUCTION', 'MEMBRANE_PROTECTION', 'TARGET_HEART', 'SYNERGY_AUTO'], severity: 'LOW', notes: 'Авто-синергия по механизмам: OXIDATIVE_STRESS_REDUCTION, MEMBRANE_PROTECTION' },
+  { interactionId: 'SYNERGY_AUTO_106', substanceA: 'FA_OMEGA3_ASTAX', substanceB: 'AO_TOCOPHEROLS', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Astaxanthin Omega-3 Complex и Mixed Tocopherols синергично действуют через общие механизмы (OXIDATIVE_STRESS_REDUCTION, MEMBRANE_PROTECTION). Покрытие: HEART. Комбинация усиливает взаимный эффект за счёт совпадающих путей регуляции.', mechanisms: ['OXIDATIVE_STRESS_REDUCTION', 'MEMBRANE_PROTECTION', 'TARGET_HEART', 'SYNERGY_AUTO'], severity: 'LOW', notes: 'Авто-синергия по механизмам: OXIDATIVE_STRESS_REDUCTION, MEMBRANE_PROTECTION' },
+  { interactionId: 'SYNERGY_AUTO_107', substanceA: 'AO_ASTAX', substanceB: 'AO_TOCOPHEROLS', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Astaxanthin и Mixed Tocopherols синергично действуют через общие механизмы (OXIDATIVE_STRESS_REDUCTION, MEMBRANE_PROTECTION). Покрытие: HEART. Комбинация усиливает взаимный эффект за счёт совпадающих путей регуляции.', mechanisms: ['OXIDATIVE_STRESS_REDUCTION', 'MEMBRANE_PROTECTION', 'TARGET_HEART', 'SYNERGY_AUTO'], severity: 'LOW', notes: 'Авто-синергия по механизмам: OXIDATIVE_STRESS_REDUCTION, MEMBRANE_PROTECTION' },
   { interactionId: 'SYNERGY_AUTO_108', substanceA: 'VIT_C_RUTIN', substanceB: 'AO_RUTIN', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'C + Rutin и Rutin синергично действуют через общие механизмы (OXIDATIVE_STRESS_REDUCTION, CAPILLARY_STRENGTH). Покрытие: VESSELS, SKIN. Комбинация усиливает взаимный эффект за счёт совпадающих путей регуляции.', mechanisms: ['OXIDATIVE_STRESS_REDUCTION', 'CAPILLARY_STRENGTH', 'TARGET_VESSELS', 'SYNERGY_AUTO'], severity: 'LOW', notes: 'Авто-синергия по механизмам: OXIDATIVE_STRESS_REDUCTION, CAPILLARY_STRENGTH' },
   { interactionId: 'SYNERGY_AUTO_109', substanceA: 'VIT_C_RUTIN', substanceB: 'AO_ANTHOCYANINS', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'C + Rutin и Anthocyanins синергично действуют через общие механизмы (OXIDATIVE_STRESS_REDUCTION, CAPILLARY_STRENGTH). Покрытие: VESSELS. Комбинация усиливает взаимный эффект за счёт совпадающих путей регуляции.', mechanisms: ['OXIDATIVE_STRESS_REDUCTION', 'CAPILLARY_STRENGTH', 'TARGET_VESSELS', 'SYNERGY_AUTO'], severity: 'LOW', notes: 'Авто-синергия по механизмам: OXIDATIVE_STRESS_REDUCTION, CAPILLARY_STRENGTH' },
   { interactionId: 'SYNERGY_AUTO_110', substanceA: 'VIT_C_RUTIN', substanceB: 'PP_ANTHOCYANIN_COMPLEX', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'C + Rutin и Anthocyanin Complex синергично действуют через общие механизмы (OXIDATIVE_STRESS_REDUCTION, CAPILLARY_STRENGTH). Покрытие: VESSELS. Комбинация усиливает взаимный эффект за счёт совпадающих путей регуляции.', mechanisms: ['OXIDATIVE_STRESS_REDUCTION', 'CAPILLARY_STRENGTH', 'TARGET_VESSELS', 'SYNERGY_AUTO'], severity: 'LOW', notes: 'Авто-синергия по механизмам: OXIDATIVE_STRESS_REDUCTION, CAPILLARY_STRENGTH' },
   { interactionId: 'SYNERGY_AUTO_111', substanceA: 'AO_RUTIN', substanceB: 'AO_ANTHOCYANINS', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Rutin и Anthocyanins синергично действуют через общие механизмы (OXIDATIVE_STRESS_REDUCTION, CAPILLARY_STRENGTH). Покрытие: VESSELS. Комбинация усиливает взаимный эффект за счёт совпадающих путей регуляции.', mechanisms: ['OXIDATIVE_STRESS_REDUCTION', 'CAPILLARY_STRENGTH', 'TARGET_VESSELS', 'SYNERGY_AUTO'], severity: 'LOW', notes: 'Авто-синергия по механизмам: OXIDATIVE_STRESS_REDUCTION, CAPILLARY_STRENGTH' },
-  { interactionId: 'SYNERGY_AUTO_112', substanceA: 'AO_RUTIN', substanceB: 'AO_RUTIN', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Rutin и Rutin синергично действуют через общие механизмы (OXIDATIVE_STRESS_REDUCTION, CAPILLARY_STRENGTH). Покрытие: VESSELS, SKIN. Комбинация усиливает взаимный эффект за счёт совпадающих путей регуляции.', mechanisms: ['OXIDATIVE_STRESS_REDUCTION', 'CAPILLARY_STRENGTH', 'TARGET_VESSELS', 'SYNERGY_AUTO'], severity: 'LOW', notes: 'Авто-синергия по механизмам: OXIDATIVE_STRESS_REDUCTION, CAPILLARY_STRENGTH' },
+  { interactionId: 'SYNERGY_AUTO_112', substanceA: 'AO_RUTIN', substanceB: 'PP_RUTIN', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Rutin и Rutin синергично действуют через общие механизмы (OXIDATIVE_STRESS_REDUCTION, CAPILLARY_STRENGTH). Покрытие: VESSELS, SKIN. Комбинация усиливает взаимный эффект за счёт совпадающих путей регуляции.', mechanisms: ['OXIDATIVE_STRESS_REDUCTION', 'CAPILLARY_STRENGTH', 'TARGET_VESSELS', 'SYNERGY_AUTO'], severity: 'LOW', notes: 'Авто-синергия по механизмам: OXIDATIVE_STRESS_REDUCTION, CAPILLARY_STRENGTH' },
   { interactionId: 'SYNERGY_AUTO_113', substanceA: 'AO_RUTIN', substanceB: 'PP_ANTHOCYANIN_COMPLEX', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Rutin и Anthocyanin Complex синергично действуют через общие механизмы (OXIDATIVE_STRESS_REDUCTION, CAPILLARY_STRENGTH). Покрытие: VESSELS. Комбинация усиливает взаимный эффект за счёт совпадающих путей регуляции.', mechanisms: ['OXIDATIVE_STRESS_REDUCTION', 'CAPILLARY_STRENGTH', 'TARGET_VESSELS', 'SYNERGY_AUTO'], severity: 'LOW', notes: 'Авто-синергия по механизмам: OXIDATIVE_STRESS_REDUCTION, CAPILLARY_STRENGTH' },
-  { interactionId: 'SYNERGY_AUTO_114', substanceA: 'AO_ANTHOCYANINS', substanceB: 'AO_ANTHOCYANINS', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Anthocyanins и Anthocyanins синергично действуют через общие механизмы (OXIDATIVE_STRESS_REDUCTION, CAPILLARY_STRENGTH). Покрытие: VESSELS, EYES. Комбинация усиливает взаимный эффект за счёт совпадающих путей регуляции.', mechanisms: ['OXIDATIVE_STRESS_REDUCTION', 'CAPILLARY_STRENGTH', 'TARGET_VESSELS', 'SYNERGY_AUTO'], severity: 'LOW', notes: 'Авто-синергия по механизмам: OXIDATIVE_STRESS_REDUCTION, CAPILLARY_STRENGTH' },
+  { interactionId: 'SYNERGY_AUTO_114', substanceA: 'AO_ANTHOCYANINS', substanceB: 'PP_ANTHOCYANINS', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Anthocyanins и Anthocyanins синергично действуют через общие механизмы (OXIDATIVE_STRESS_REDUCTION, CAPILLARY_STRENGTH). Покрытие: VESSELS, EYES. Комбинация усиливает взаимный эффект за счёт совпадающих путей регуляции.', mechanisms: ['OXIDATIVE_STRESS_REDUCTION', 'CAPILLARY_STRENGTH', 'TARGET_VESSELS', 'SYNERGY_AUTO'], severity: 'LOW', notes: 'Авто-синергия по механизмам: OXIDATIVE_STRESS_REDUCTION, CAPILLARY_STRENGTH' },
   { interactionId: 'SYNERGY_AUTO_115', substanceA: 'AO_ANTHOCYANINS', substanceB: 'PP_ANTHOCYANIN_COMPLEX', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Anthocyanins и Anthocyanin Complex синергично действуют через общие механизмы (OXIDATIVE_STRESS_REDUCTION, CAPILLARY_STRENGTH). Покрытие: VESSELS, EYES. Комбинация усиливает взаимный эффект за счёт совпадающих путей регуляции.', mechanisms: ['OXIDATIVE_STRESS_REDUCTION', 'CAPILLARY_STRENGTH', 'TARGET_VESSELS', 'SYNERGY_AUTO'], severity: 'LOW', notes: 'Авто-синергия по механизмам: OXIDATIVE_STRESS_REDUCTION, CAPILLARY_STRENGTH' },
   { interactionId: 'SYNERGY_AUTO_116', substanceA: 'VIT_LIPOIC_S', substanceB: 'AO_ALA', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'S-Lipoic Acid и Alpha-Lipoic Acid синергично действуют через общие механизмы (OXIDATIVE_STRESS_REDUCTION, GLUCOSE_REGULATION). Покрытие: LIVER, VESSELS. Комбинация усиливает взаимный эффект за счёт совпадающих путей регуляции.', mechanisms: ['OXIDATIVE_STRESS_REDUCTION', 'GLUCOSE_REGULATION', 'TARGET_LIVER', 'SYNERGY_AUTO'], severity: 'LOW', notes: 'Авто-синергия по механизмам: OXIDATIVE_STRESS_REDUCTION, GLUCOSE_REGULATION' },
   { interactionId: 'SYNERGY_AUTO_117', substanceA: 'AO_CAFFEIC', substanceB: 'AO_TOMATO_LYCOPENE', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Caffeic Acid и Tomato Lycopene Complex синергично действуют через общие механизмы (OXIDATIVE_STRESS_REDUCTION, CELL_PROTECTION). Комбинация усиливает взаимный эффект за счёт совпадающих путей регуляции.', mechanisms: ['OXIDATIVE_STRESS_REDUCTION', 'CELL_PROTECTION', 'SYNERGY_AUTO'], severity: 'LOW', notes: 'Авто-синергия по механизмам: OXIDATIVE_STRESS_REDUCTION, CELL_PROTECTION' },
   { interactionId: 'SYNERGY_AUTO_118', substanceA: 'AO_CAFFEIC', substanceB: 'AO_ANTIOX_COMPLEX_FULL', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Caffeic Acid и Full Spectrum Antioxidant Complex синергично действуют через общие механизмы (OXIDATIVE_STRESS_REDUCTION, CELL_PROTECTION). Покрытие: CELLS. Комбинация усиливает взаимный эффект за счёт совпадающих путей регуляции.', mechanisms: ['OXIDATIVE_STRESS_REDUCTION', 'CELL_PROTECTION', 'TARGET_CELLS', 'SYNERGY_AUTO'], severity: 'LOW', notes: 'Авто-синергия по механизмам: OXIDATIVE_STRESS_REDUCTION, CELL_PROTECTION' },
   { interactionId: 'SYNERGY_AUTO_119', substanceA: 'AO_CAFFEIC', substanceB: 'PP_GALLIC', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Caffeic Acid и Gallic Acid синергично действуют через общие механизмы (OXIDATIVE_STRESS_REDUCTION, CELL_PROTECTION). Покрытие: CELLS. Комбинация усиливает взаимный эффект за счёт совпадающих путей регуляции.', mechanisms: ['OXIDATIVE_STRESS_REDUCTION', 'CELL_PROTECTION', 'TARGET_CELLS', 'SYNERGY_AUTO'], severity: 'LOW', notes: 'Авто-синергия по механизмам: OXIDATIVE_STRESS_REDUCTION, CELL_PROTECTION' },
-  { interactionId: 'SYNERGY_AUTO_120', substanceA: 'AO_CAFFEIC', substanceB: 'AO_CAFFEIC', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Caffeic Acid и Caffeic Acid синергично действуют через общие механизмы (OXIDATIVE_STRESS_REDUCTION, CELL_PROTECTION). Покрытие: CELLS. Комбинация усиливает взаимный эффект за счёт совпадающих путей регуляции.', mechanisms: ['OXIDATIVE_STRESS_REDUCTION', 'CELL_PROTECTION', 'TARGET_CELLS', 'SYNERGY_AUTO'], severity: 'LOW', notes: 'Авто-синергия по механизмам: OXIDATIVE_STRESS_REDUCTION, CELL_PROTECTION' },
+  { interactionId: 'SYNERGY_AUTO_120', substanceA: 'AO_CAFFEIC', substanceB: 'PP_CAFFEIC', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Caffeic Acid и Caffeic Acid синергично действуют через общие механизмы (OXIDATIVE_STRESS_REDUCTION, CELL_PROTECTION). Покрытие: CELLS. Комбинация усиливает взаимный эффект за счёт совпадающих путей регуляции.', mechanisms: ['OXIDATIVE_STRESS_REDUCTION', 'CELL_PROTECTION', 'TARGET_CELLS', 'SYNERGY_AUTO'], severity: 'LOW', notes: 'Авто-синергия по механизмам: OXIDATIVE_STRESS_REDUCTION, CELL_PROTECTION' },
   { interactionId: 'SYNERGY_AUTO_121', substanceA: 'AO_CAFFEIC', substanceB: 'FUNG_CHAGA_CHROMOGEN', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Caffeic Acid и Chaga Chromogenic Complex синергично действуют через общие механизмы (OXIDATIVE_STRESS_REDUCTION, CELL_PROTECTION). Комбинация усиливает взаимный эффект за счёт совпадающих путей регуляции.', mechanisms: ['OXIDATIVE_STRESS_REDUCTION', 'CELL_PROTECTION', 'SYNERGY_AUTO'], severity: 'LOW', notes: 'Авто-синергия по механизмам: OXIDATIVE_STRESS_REDUCTION, CELL_PROTECTION' },
   { interactionId: 'SYNERGY_AUTO_122', substanceA: 'AO_CAFFEIC', substanceB: 'AA_ANTIOX_AMINO', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Caffeic Acid и Antioxidant Amino Complex синергично действуют через общие механизмы (OXIDATIVE_STRESS_REDUCTION, CELL_PROTECTION). Покрытие: CELLS. Комбинация усиливает взаимный эффект за счёт совпадающих путей регуляции.', mechanisms: ['OXIDATIVE_STRESS_REDUCTION', 'CELL_PROTECTION', 'TARGET_CELLS', 'SYNERGY_AUTO'], severity: 'LOW', notes: 'Авто-синергия по механизмам: OXIDATIVE_STRESS_REDUCTION, CELL_PROTECTION' },
   { interactionId: 'SYNERGY_AUTO_123', substanceA: 'AO_CAFFEIC', substanceB: 'AA_ANTIOX_AMINO_PREMIUM', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Caffeic Acid и Antioxidant Amino Premium синергично действуют через общие механизмы (OXIDATIVE_STRESS_REDUCTION, CELL_PROTECTION). Покрытие: CELLS. Комбинация усиливает взаимный эффект за счёт совпадающих путей регуляции.', mechanisms: ['OXIDATIVE_STRESS_REDUCTION', 'CELL_PROTECTION', 'TARGET_CELLS', 'SYNERGY_AUTO'], severity: 'LOW', notes: 'Авто-синергия по механизмам: OXIDATIVE_STRESS_REDUCTION, CELL_PROTECTION' },
@@ -21082,7 +22012,7 @@ export const ALL_INTERACTIONS = ([
   { interactionId: 'SYNERGY_AUTO_151', substanceA: 'AO_HYDROXYTYROSOL', substanceB: 'AO_HYDROXYCINNAMIC', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Hydroxytyrosol и Hydroxycinnamic Acids синергично действуют через общие механизмы (OXIDATIVE_STRESS_REDUCTION, VESSEL_PROTECTION). Покрытие: VESSELS. Комбинация усиливает взаимный эффект за счёт совпадающих путей регуляции.', mechanisms: ['OXIDATIVE_STRESS_REDUCTION', 'VESSEL_PROTECTION', 'TARGET_VESSELS', 'SYNERGY_AUTO'], severity: 'LOW', notes: 'Авто-синергия по механизмам: OXIDATIVE_STRESS_REDUCTION, VESSEL_PROTECTION' },
   { interactionId: 'SYNERGY_AUTO_152', substanceA: 'AO_HYDROXYTYROSOL', substanceB: 'PP_OLIVE_POLYPHENOLS', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Hydroxytyrosol и Olive Polyphenols синергично действуют через общие механизмы (OXIDATIVE_STRESS_REDUCTION, VESSEL_PROTECTION). Покрытие: VESSELS, HEART. Комбинация усиливает взаимный эффект за счёт совпадающих путей регуляции.', mechanisms: ['OXIDATIVE_STRESS_REDUCTION', 'VESSEL_PROTECTION', 'TARGET_VESSELS', 'SYNERGY_AUTO'], severity: 'LOW', notes: 'Авто-синергия по механизмам: OXIDATIVE_STRESS_REDUCTION, VESSEL_PROTECTION' },
   { interactionId: 'SYNERGY_AUTO_153', substanceA: 'AO_MYRICETIN', substanceB: 'AO_HYDROXYCINNAMIC', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Myricetin и Hydroxycinnamic Acids синергично действуют через общие механизмы (OXIDATIVE_STRESS_REDUCTION, VESSEL_PROTECTION). Покрытие: VESSELS. Комбинация усиливает взаимный эффект за счёт совпадающих путей регуляции.', mechanisms: ['OXIDATIVE_STRESS_REDUCTION', 'VESSEL_PROTECTION', 'TARGET_VESSELS', 'SYNERGY_AUTO'], severity: 'LOW', notes: 'Авто-синергия по механизмам: OXIDATIVE_STRESS_REDUCTION, VESSEL_PROTECTION' },
-  { interactionId: 'SYNERGY_AUTO_154', substanceA: 'AO_MYRICETIN', substanceB: 'AO_MYRICETIN', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Myricetin и Myricetin синергично действуют через общие механизмы (OXIDATIVE_STRESS_REDUCTION, VESSEL_PROTECTION). Покрытие: VESSELS, HEART. Комбинация усиливает взаимный эффект за счёт совпадающих путей регуляции.', mechanisms: ['OXIDATIVE_STRESS_REDUCTION', 'VESSEL_PROTECTION', 'TARGET_VESSELS', 'SYNERGY_AUTO'], severity: 'LOW', notes: 'Авто-синергия по механизмам: OXIDATIVE_STRESS_REDUCTION, VESSEL_PROTECTION' },
+  { interactionId: 'SYNERGY_AUTO_154', substanceA: 'AO_MYRICETIN', substanceB: 'PP_MYRICETIN', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Myricetin и Myricetin синергично действуют через общие механизмы (OXIDATIVE_STRESS_REDUCTION, VESSEL_PROTECTION). Покрытие: VESSELS, HEART. Комбинация усиливает взаимный эффект за счёт совпадающих путей регуляции.', mechanisms: ['OXIDATIVE_STRESS_REDUCTION', 'VESSEL_PROTECTION', 'TARGET_VESSELS', 'SYNERGY_AUTO'], severity: 'LOW', notes: 'Авто-синергия по механизмам: OXIDATIVE_STRESS_REDUCTION, VESSEL_PROTECTION' },
   { interactionId: 'SYNERGY_AUTO_155', substanceA: 'AO_MYRICETIN', substanceB: 'PP_OLIVE_POLYPHENOLS', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Myricetin и Olive Polyphenols синергично действуют через общие механизмы (OXIDATIVE_STRESS_REDUCTION, VESSEL_PROTECTION). Покрытие: VESSELS, HEART. Комбинация усиливает взаимный эффект за счёт совпадающих путей регуляции.', mechanisms: ['OXIDATIVE_STRESS_REDUCTION', 'VESSEL_PROTECTION', 'TARGET_VESSELS', 'SYNERGY_AUTO'], severity: 'LOW', notes: 'Авто-синергия по механизмам: OXIDATIVE_STRESS_REDUCTION, VESSEL_PROTECTION' },
   { interactionId: 'SYNERGY_AUTO_156', substanceA: 'AO_HYDROXYCINNAMIC', substanceB: 'PP_OLIVE_POLYPHENOLS', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Hydroxycinnamic Acids и Olive Polyphenols синергично действуют через общие механизмы (OXIDATIVE_STRESS_REDUCTION, VESSEL_PROTECTION). Покрытие: VESSELS. Комбинация усиливает взаимный эффект за счёт совпадающих путей регуляции.', mechanisms: ['OXIDATIVE_STRESS_REDUCTION', 'VESSEL_PROTECTION', 'TARGET_VESSELS', 'SYNERGY_AUTO'], severity: 'LOW', notes: 'Авто-синергия по механизмам: OXIDATIVE_STRESS_REDUCTION, VESSEL_PROTECTION' },
   { interactionId: 'SYNERGY_AUTO_157', substanceA: 'MIN_SILICON_HORS', substanceB: 'MIN_SILICON_BAMBOO', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Silica (Horsetail) и Bamboo Silica синергично действуют через общие механизмы (COLLAGEN_SUPPORT, SKIN_HEALTH). Покрытие: SKIN, HAIR. Комбинация усиливает взаимный эффект за счёт совпадающих путей регуляции.', mechanisms: ['COLLAGEN_SUPPORT', 'SKIN_HEALTH', 'TARGET_SKIN', 'SYNERGY_AUTO'], severity: 'LOW', notes: 'Авто-синергия по механизмам: COLLAGEN_SUPPORT, SKIN_HEALTH' },
@@ -21109,12 +22039,12 @@ export const ALL_INTERACTIONS = ([
   { interactionId: 'SYNERGY_AUTO_178', substanceA: 'VIT_B2_COMPLEX', substanceB: 'VIT_FAD', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'B2 Complex и FAD (Riboflavin Cofactor) синергично действуют через общие механизмы (FLAVIN_PATHWAY, MITO_REPAIR). Покрытие: BRAIN, LIVER. Комбинация усиливает взаимный эффект за счёт совпадающих путей регуляции.', mechanisms: ['FLAVIN_PATHWAY', 'MITO_REPAIR', 'TARGET_BRAIN', 'SYNERGY_AUTO'], severity: 'LOW', notes: 'Авто-синергия по механизмам: FLAVIN_PATHWAY, MITO_REPAIR' },
   { interactionId: 'SYNERGY_AUTO_179', substanceA: 'VIT_B3_NMN', substanceB: 'VIT_B3_NR', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'NMN (Nicotinamide Mononucleotide) и Nicotinamide Riboside (NR) синергично действуют через общие механизмы (MITO_REPAIR, NAD_SYNTHESIS). Покрытие: BRAIN, HEART, LIVER. Комбинация усиливает взаимный эффект за счёт совпадающих путей регуляции.', mechanisms: ['MITO_REPAIR', 'NAD_SYNTHESIS', 'TARGET_BRAIN', 'SYNERGY_AUTO'], severity: 'LOW', notes: 'Авто-синергия по механизмам: MITO_REPAIR, NAD_SYNTHESIS' },
   { interactionId: 'SYNERGY_AUTO_180', substanceA: 'PEP_MITOCHONDRIAL_REPAIR', substanceB: 'PEP_MITO_REPAIR_CORE', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Mitochondrial Repair Peptide и Mito Repair Core Peptide синергично действуют через общие механизмы (MITO_REPAIR, CELL_REPAIR). Покрытие: MITOCHONDRIA. Комбинация усиливает взаимный эффект за счёт совпадающих путей регуляции.', mechanisms: ['MITO_REPAIR', 'CELL_REPAIR', 'TARGET_MITOCHONDRIA', 'SYNERGY_AUTO'], severity: 'LOW', notes: 'Авто-синергия по механизмам: MITO_REPAIR, CELL_REPAIR' },
-  { interactionId: 'SYNERGY_AUTO_181', substanceA: 'VIT_CARNITINE_ALCAR', substanceB: 'VIT_CARNITINE_ALCAR', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Acetyl-L-Carnitine и Acetyl-L-Carnitine синергично действуют через общие механизмы (MITO_REPAIR, ACH_SUPPORT). Покрытие: BRAIN, NERVES. Комбинация усиливает взаимный эффект за счёт совпадающих путей регуляции.', mechanisms: ['MITO_REPAIR', 'ACH_SUPPORT', 'TARGET_BRAIN', 'SYNERGY_AUTO'], severity: 'LOW', notes: 'Авто-синергия по механизмам: MITO_REPAIR, ACH_SUPPORT' },
+  { interactionId: 'SYNERGY_AUTO_181', substanceA: 'VIT_CARNITINE_ALCAR', substanceB: 'AA_ALCAR', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Acetyl-L-Carnitine и Acetyl-L-Carnitine синергично действуют через общие механизмы (MITO_REPAIR, ACH_SUPPORT). Покрытие: BRAIN, NERVES. Комбинация усиливает взаимный эффект за счёт совпадающих путей регуляции.', mechanisms: ['MITO_REPAIR', 'ACH_SUPPORT', 'TARGET_BRAIN', 'SYNERGY_AUTO'], severity: 'LOW', notes: 'Авто-синергия по механизмам: MITO_REPAIR, ACH_SUPPORT' },
   { interactionId: 'SYNERGY_AUTO_182', substanceA: 'VIT_LIPOIC_R', substanceB: 'VIT_LIPOIC_COMPLEX', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'R-Lipoic Acid и ALA Complex синергично действуют через общие механизмы (MITO_REPAIR, GLUTATHIONE_RECYCLING). Покрытие: LIVER, BRAIN. Комбинация усиливает взаимный эффект за счёт совпадающих путей регуляции.', mechanisms: ['MITO_REPAIR', 'GLUTATHIONE_RECYCLING', 'TARGET_LIVER', 'SYNERGY_AUTO'], severity: 'LOW', notes: 'Авто-синергия по механизмам: MITO_REPAIR, GLUTATHIONE_RECYCLING' },
-  { interactionId: 'SYNERGY_AUTO_183', substanceA: 'VIT_LIPOIC_R', substanceB: 'VIT_LIPOIC_R', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'R-Lipoic Acid и R-Lipoic Acid синергично действуют через общие механизмы (MITO_REPAIR, GLUTATHIONE_RECYCLING). Покрытие: LIVER, BRAIN. Комбинация усиливает взаимный эффект за счёт совпадающих путей регуляции.', mechanisms: ['MITO_REPAIR', 'GLUTATHIONE_RECYCLING', 'TARGET_LIVER', 'SYNERGY_AUTO'], severity: 'LOW', notes: 'Авто-синергия по механизмам: MITO_REPAIR, GLUTATHIONE_RECYCLING' },
-  { interactionId: 'SYNERGY_AUTO_184', substanceA: 'VIT_LIPOIC_COMPLEX', substanceB: 'VIT_LIPOIC_R', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'ALA Complex и R-Lipoic Acid синергично действуют через общие механизмы (MITO_REPAIR, GLUTATHIONE_RECYCLING). Покрытие: LIVER, BRAIN. Комбинация усиливает взаимный эффект за счёт совпадающих путей регуляции.', mechanisms: ['MITO_REPAIR', 'GLUTATHIONE_RECYCLING', 'TARGET_LIVER', 'SYNERGY_AUTO'], severity: 'LOW', notes: 'Авто-синергия по механизмам: MITO_REPAIR, GLUTATHIONE_RECYCLING' },
-  { interactionId: 'SYNERGY_AUTO_185', substanceA: 'VIT_PQQ', substanceB: 'VIT_PQQ', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'PQQ и PQQ синергично действуют через общие механизмы (MITO_REPAIR, MITO_BIOGENESIS). Покрытие: BRAIN, HEART. Комбинация усиливает взаимный эффект за счёт совпадающих путей регуляции.', mechanisms: ['MITO_REPAIR', 'MITO_BIOGENESIS', 'TARGET_BRAIN', 'SYNERGY_AUTO'], severity: 'LOW', notes: 'Авто-синергия по механизмам: MITO_REPAIR, MITO_BIOGENESIS' },
-  { interactionId: 'SYNERGY_AUTO_186', substanceA: 'AO_SCHISANDRIN_B', substanceB: 'AO_SCHISANDRIN_B', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Schisandrin B и Schisandrin B синергично действуют через общие механизмы (MITO_REPAIR, ANTIOXIDANT). Покрытие: MITOCHONDRIA, LIVER. Комбинация усиливает взаимный эффект за счёт совпадающих путей регуляции.', mechanisms: ['MITO_REPAIR', 'ANTIOXIDANT', 'TARGET_MITOCHONDRIA', 'SYNERGY_AUTO'], severity: 'LOW', notes: 'Авто-синергия по механизмам: MITO_REPAIR, ANTIOXIDANT' },
+  { interactionId: 'SYNERGY_AUTO_183', substanceA: 'VIT_LIPOIC_R', substanceB: 'AO_RALA', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'R-Lipoic Acid и R-Lipoic Acid синергично действуют через общие механизмы (MITO_REPAIR, GLUTATHIONE_RECYCLING). Покрытие: LIVER, BRAIN. Комбинация усиливает взаимный эффект за счёт совпадающих путей регуляции.', mechanisms: ['MITO_REPAIR', 'GLUTATHIONE_RECYCLING', 'TARGET_LIVER', 'SYNERGY_AUTO'], severity: 'LOW', notes: 'Авто-синергия по механизмам: MITO_REPAIR, GLUTATHIONE_RECYCLING' },
+  { interactionId: 'SYNERGY_AUTO_184', substanceA: 'VIT_LIPOIC_COMPLEX', substanceB: 'AO_RALA', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'ALA Complex и R-Lipoic Acid синергично действуют через общие механизмы (MITO_REPAIR, GLUTATHIONE_RECYCLING). Покрытие: LIVER, BRAIN. Комбинация усиливает взаимный эффект за счёт совпадающих путей регуляции.', mechanisms: ['MITO_REPAIR', 'GLUTATHIONE_RECYCLING', 'TARGET_LIVER', 'SYNERGY_AUTO'], severity: 'LOW', notes: 'Авто-синергия по механизмам: MITO_REPAIR, GLUTATHIONE_RECYCLING' },
+  { interactionId: 'SYNERGY_AUTO_185', substanceA: 'VIT_PQQ', substanceB: 'AO_PQQ', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'PQQ и PQQ синергично действуют через общие механизмы (MITO_REPAIR, MITO_BIOGENESIS). Покрытие: BRAIN, HEART. Комбинация усиливает взаимный эффект за счёт совпадающих путей регуляции.', mechanisms: ['MITO_REPAIR', 'MITO_BIOGENESIS', 'TARGET_BRAIN', 'SYNERGY_AUTO'], severity: 'LOW', notes: 'Авто-синергия по механизмам: MITO_REPAIR, MITO_BIOGENESIS' },
+  { interactionId: 'SYNERGY_AUTO_186', substanceA: 'AO_SCHISANDRIN_B', substanceB: 'PP_SCHISANDRIN_B', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Schisandrin B и Schisandrin B синергично действуют через общие механизмы (MITO_REPAIR, ANTIOXIDANT). Покрытие: MITOCHONDRIA, LIVER. Комбинация усиливает взаимный эффект за счёт совпадающих путей регуляции.', mechanisms: ['MITO_REPAIR', 'ANTIOXIDANT', 'TARGET_MITOCHONDRIA', 'SYNERGY_AUTO'], severity: 'LOW', notes: 'Авто-синергия по механизмам: MITO_REPAIR, ANTIOXIDANT' },
   { interactionId: 'SYNERGY_AUTO_187', substanceA: 'FUNG_CORDYCEPS_PREMIUM', substanceB: 'FUNG_CORDYCEPS_MYCO', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Cordyceps Premium Complex и Cordyceps Mycelium синергично действуют через общие механизмы (MITO_REPAIR, ATP_UP). Покрытие: MUSCLES, HEART. Комбинация усиливает взаимный эффект за счёт совпадающих путей регуляции.', mechanisms: ['MITO_REPAIR', 'ATP_UP', 'TARGET_MUSCLES', 'SYNERGY_AUTO'], severity: 'LOW', notes: 'Авто-синергия по механизмам: MITO_REPAIR, ATP_UP' },
   { interactionId: 'SYNERGY_AUTO_188', substanceA: 'FUNG_CORDYCEPS_PREMIUM', substanceB: 'FUNG_CORDYCEPS_SYNERGY', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Cordyceps Premium Complex и Cordyceps Synergy Complex синергично действуют через общие механизмы (MITO_REPAIR, ATP_UP). Покрытие: MUSCLES, HEART. Комбинация усиливает взаимный эффект за счёт совпадающих путей регуляции.', mechanisms: ['MITO_REPAIR', 'ATP_UP', 'TARGET_MUSCLES', 'SYNERGY_AUTO'], severity: 'LOW', notes: 'Авто-синергия по механизмам: MITO_REPAIR, ATP_UP' },
   { interactionId: 'SYNERGY_AUTO_189', substanceA: 'FUNG_CORDYCEPS_PREMIUM', substanceB: 'PEP_SS31', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Cordyceps Premium Complex и SS‑31 (Elamipretide) синергично действуют через общие механизмы (MITO_REPAIR, ATP_UP). Комбинация усиливает взаимный эффект за счёт совпадающих путей регуляции.', mechanisms: ['MITO_REPAIR', 'ATP_UP', 'SYNERGY_AUTO'], severity: 'LOW', notes: 'Авто-синергия по механизмам: MITO_REPAIR, ATP_UP' },
@@ -21125,8 +22055,8 @@ export const ALL_INTERACTIONS = ([
   { interactionId: 'SYNERGY_AUTO_194', substanceA: 'FUNG_CORDYCEPS_SYNERGY', substanceB: 'PEP_SS31', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Cordyceps Synergy Complex и SS‑31 (Elamipretide) синергично действуют через общие механизмы (MITO_REPAIR, ATP_UP). Комбинация усиливает взаимный эффект за счёт совпадающих путей регуляции.', mechanisms: ['MITO_REPAIR', 'ATP_UP', 'SYNERGY_AUTO'], severity: 'LOW', notes: 'Авто-синергия по механизмам: MITO_REPAIR, ATP_UP' },
   { interactionId: 'SYNERGY_AUTO_195', substanceA: 'FUNG_CORDYCEPS_SYNERGY', substanceB: 'PEP_MITO_REPAIR_PRIME', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Cordyceps Synergy Complex и Mito Repair Prime Peptide синергично действуют через общие механизмы (MITO_REPAIR, ATP_UP). Комбинация усиливает взаимный эффект за счёт совпадающих путей регуляции.', mechanisms: ['MITO_REPAIR', 'ATP_UP', 'SYNERGY_AUTO'], severity: 'LOW', notes: 'Авто-синергия по механизмам: MITO_REPAIR, ATP_UP' },
   { interactionId: 'SYNERGY_AUTO_196', substanceA: 'PEP_SS31', substanceB: 'PEP_MITO_REPAIR_PRIME', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'SS‑31 (Elamipretide) и Mito Repair Prime Peptide синергично действуют через общие механизмы (MITO_REPAIR, ATP_UP). Покрытие: MITOCHONDRIA. Комбинация усиливает взаимный эффект за счёт совпадающих путей регуляции.', mechanisms: ['MITO_REPAIR', 'ATP_UP', 'TARGET_MITOCHONDRIA', 'SYNERGY_AUTO'], severity: 'LOW', notes: 'Авто-синергия по механизмам: MITO_REPAIR, ATP_UP' },
-  { interactionId: 'SYNERGY_AUTO_197', substanceA: 'AO_SCHISANDRIN', substanceB: 'AO_SCHISANDRIN', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Schisandrin и Schisandrin синергично действуют через общие механизмы (MITO_REPAIR, LIVER_PROTECTION). Покрытие: LIVER. Комбинация усиливает взаимный эффект за счёт совпадающих путей регуляции.', mechanisms: ['MITO_REPAIR', 'LIVER_PROTECTION', 'TARGET_LIVER', 'SYNERGY_AUTO'], severity: 'LOW', notes: 'Авто-синергия по механизмам: MITO_REPAIR, LIVER_PROTECTION' },
-  { interactionId: 'SYNERGY_AUTO_198', substanceA: 'AO_SCHISANDRIN', substanceB: 'AD_SCHISANDRA_LIGNANS', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Schisandrin и Schisandra Lignans синергично действуют через общие механизмы (MITO_REPAIR, LIVER_REGEN). Покрытие: LIVER. Комбинация усиливает взаимный эффект за счёт совпадающих путей регуляции.', mechanisms: ['MITO_REPAIR', 'LIVER_REGEN', 'TARGET_LIVER', 'SYNERGY_AUTO'], severity: 'LOW', notes: 'Авто-синергия по механизмам: MITO_REPAIR, LIVER_REGEN' },
+  { interactionId: 'SYNERGY_AUTO_197', substanceA: 'AO_SCHISANDRIN', substanceB: 'PP_SCHISANDRIN', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Schisandrin и Schisandrin синергично действуют через общие механизмы (MITO_REPAIR, LIVER_PROTECTION). Покрытие: LIVER. Комбинация усиливает взаимный эффект за счёт совпадающих путей регуляции.', mechanisms: ['MITO_REPAIR', 'LIVER_PROTECTION', 'TARGET_LIVER', 'SYNERGY_AUTO'], severity: 'LOW', notes: 'Авто-синергия по механизмам: MITO_REPAIR, LIVER_PROTECTION' },
+  { interactionId: 'SYNERGY_AUTO_198', substanceA: 'AD_SCHISANDRIN', substanceB: 'AD_SCHISANDRA_LIGNANS', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Schisandrin и Schisandra Lignans синергично действуют через общие механизмы (MITO_REPAIR, LIVER_REGEN). Покрытие: LIVER. Комбинация усиливает взаимный эффект за счёт совпадающих путей регуляции.', mechanisms: ['MITO_REPAIR', 'LIVER_REGEN', 'TARGET_LIVER', 'SYNERGY_AUTO'], severity: 'LOW', notes: 'Авто-синергия по механизмам: MITO_REPAIR, LIVER_REGEN' },
   { interactionId: 'SYNERGY_AUTO_199', substanceA: 'PEP_MITO_INFINITY', substanceB: 'PEP_MITO_INFINITY_CORE', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Infinity Mito Peptide и Mito Infinity Core синергично действуют через общие механизмы (MITO_REPAIR, CELL_REGEN). Покрытие: MITOCHONDRIA. Комбинация усиливает взаимный эффект за счёт совпадающих путей регуляции.', mechanisms: ['MITO_REPAIR', 'CELL_REGEN', 'TARGET_MITOCHONDRIA', 'SYNERGY_AUTO'], severity: 'LOW', notes: 'Авто-синергия по механизмам: MITO_REPAIR, CELL_REGEN' },
   { interactionId: 'SYNERGY_AUTO_200', substanceA: 'PEP_MITO_FUSION', substanceB: 'PEP_MITO_DYNAMICS_PRIME', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Fusion Peptide и Mito Dynamics Prime синергично действуют через общие механизмы (MITO_REPAIR, MITO_FUSION). Покрытие: MITOCHONDRIA. Комбинация усиливает взаимный эффект за счёт совпадающих путей регуляции.', mechanisms: ['MITO_REPAIR', 'MITO_FUSION', 'TARGET_MITOCHONDRIA', 'SYNERGY_AUTO'], severity: 'LOW', notes: 'Авто-синергия по механизмам: MITO_REPAIR, MITO_FUSION' },
   { interactionId: 'SYNERGY_AUTO_201', substanceA: 'VIT_B3_NIACIN', substanceB: 'VIT_B3_NICOTINIC', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Niacin (B3) и Nicotinic Acid синергично действуют через общие механизмы (NAD_PATHWAY, LIPID_BALANCE). Покрытие: HEART, LIVER. Комбинация усиливает взаимный эффект за счёт совпадающих путей регуляции.', mechanisms: ['NAD_PATHWAY', 'LIPID_BALANCE', 'TARGET_HEART', 'SYNERGY_AUTO'], severity: 'LOW', notes: 'Авто-синергия по механизмам: NAD_PATHWAY, LIPID_BALANCE' },
@@ -21152,7 +22082,7 @@ export const ALL_INTERACTIONS = ([
   { interactionId: 'SYNERGY_AUTO_221', substanceA: 'FA_OMEGA9_OLIVE', substanceB: 'PP_TEA_POLYPHENOLS', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Olive Oil (Oleic Acid) и Tea Polyphenols синергично действуют через общие механизмы (LIPID_BALANCE, ANTI_INFLAMMATION). Покрытие: HEART, VESSELS. Комбинация усиливает взаимный эффект за счёт совпадающих путей регуляции.', mechanisms: ['LIPID_BALANCE', 'ANTI_INFLAMMATION', 'TARGET_HEART', 'SYNERGY_AUTO'], severity: 'LOW', notes: 'Авто-синергия по механизмам: LIPID_BALANCE, ANTI_INFLAMMATION' },
   { interactionId: 'SYNERGY_AUTO_222', substanceA: 'FA_OMEGA9_OLIVE', substanceB: 'FUNG_OYSTER', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Olive Oil (Oleic Acid) и Oyster Mushroom синергично действуют через общие механизмы (LIPID_BALANCE, ANTI_INFLAMMATION). Покрытие: HEART, VESSELS. Комбинация усиливает взаимный эффект за счёт совпадающих путей регуляции.', mechanisms: ['LIPID_BALANCE', 'ANTI_INFLAMMATION', 'TARGET_HEART', 'SYNERGY_AUTO'], severity: 'LOW', notes: 'Авто-синергия по механизмам: LIPID_BALANCE, ANTI_INFLAMMATION' },
   { interactionId: 'SYNERGY_AUTO_223', substanceA: 'FA_OMEGA9_OLIVE', substanceB: 'FUNG_OYSTER_PREMIUM', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Olive Oil (Oleic Acid) и Oyster Mushroom Premium синергично действуют через общие механизмы (LIPID_BALANCE, ANTI_INFLAMMATION). Покрытие: HEART, VESSELS. Комбинация усиливает взаимный эффект за счёт совпадающих путей регуляции.', mechanisms: ['LIPID_BALANCE', 'ANTI_INFLAMMATION', 'TARGET_HEART', 'SYNERGY_AUTO'], severity: 'LOW', notes: 'Авто-синергия по механизмам: LIPID_BALANCE, ANTI_INFLAMMATION' },
-  { interactionId: 'SYNERGY_AUTO_224', substanceA: 'AO_CATECHINS', substanceB: 'AO_CATECHINS', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Green Tea Catechins и Catechins синергично действуют через общие механизмы (LIPID_BALANCE, ANTI_INFLAMMATION). Покрытие: HEART, VESSELS. Комбинация усиливает взаимный эффект за счёт совпадающих путей регуляции.', mechanisms: ['LIPID_BALANCE', 'ANTI_INFLAMMATION', 'TARGET_HEART', 'SYNERGY_AUTO'], severity: 'LOW', notes: 'Авто-синергия по механизмам: LIPID_BALANCE, ANTI_INFLAMMATION' },
+  { interactionId: 'SYNERGY_AUTO_224', substanceA: 'AO_CATECHINS', substanceB: 'PP_CATECHINS', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Green Tea Catechins и Catechins синергично действуют через общие механизмы (LIPID_BALANCE, ANTI_INFLAMMATION). Покрытие: HEART, VESSELS. Комбинация усиливает взаимный эффект за счёт совпадающих путей регуляции.', mechanisms: ['LIPID_BALANCE', 'ANTI_INFLAMMATION', 'TARGET_HEART', 'SYNERGY_AUTO'], severity: 'LOW', notes: 'Авто-синергия по механизмам: LIPID_BALANCE, ANTI_INFLAMMATION' },
   { interactionId: 'SYNERGY_AUTO_225', substanceA: 'AO_CATECHINS', substanceB: 'PP_THEAFLAVINS', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Green Tea Catechins и Theaflavins синергично действуют через общие механизмы (LIPID_BALANCE, ANTI_INFLAMMATION). Покрытие: HEART, VESSELS. Комбинация усиливает взаимный эффект за счёт совпадающих путей регуляции.', mechanisms: ['LIPID_BALANCE', 'ANTI_INFLAMMATION', 'TARGET_HEART', 'SYNERGY_AUTO'], severity: 'LOW', notes: 'Авто-синергия по механизмам: LIPID_BALANCE, ANTI_INFLAMMATION' },
   { interactionId: 'SYNERGY_AUTO_226', substanceA: 'AO_CATECHINS', substanceB: 'PP_TEA_POLYPHENOLS', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Green Tea Catechins и Tea Polyphenols синергично действуют через общие механизмы (LIPID_BALANCE, ANTI_INFLAMMATION). Покрытие: HEART, VESSELS. Комбинация усиливает взаимный эффект за счёт совпадающих путей регуляции.', mechanisms: ['LIPID_BALANCE', 'ANTI_INFLAMMATION', 'TARGET_HEART', 'SYNERGY_AUTO'], severity: 'LOW', notes: 'Авто-синергия по механизмам: LIPID_BALANCE, ANTI_INFLAMMATION' },
   { interactionId: 'SYNERGY_AUTO_227', substanceA: 'AO_CATECHINS', substanceB: 'FUNG_OYSTER', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Green Tea Catechins и Oyster Mushroom синергично действуют через общие механизмы (LIPID_BALANCE, ANTI_INFLAMMATION). Покрытие: HEART, VESSELS. Комбинация усиливает взаимный эффект за счёт совпадающих путей регуляции.', mechanisms: ['LIPID_BALANCE', 'ANTI_INFLAMMATION', 'TARGET_HEART', 'SYNERGY_AUTO'], severity: 'LOW', notes: 'Авто-синергия по механизмам: LIPID_BALANCE, ANTI_INFLAMMATION' },
@@ -21323,7 +22253,7 @@ export const ALL_INTERACTIONS = ([
   { interactionId: 'SYNERGY_AUTO_392', substanceA: 'VIT_A_PALMITATE', substanceB: 'AO_ASTAX', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Retinyl Palmitate (RETINOID_SIGNALING, COLLAGEN_SUPPORT) и Astaxanthin (MEMBRANE_PROTECTION, OXIDATIVE_STRESS_REDUCTION) — комплементарная синергия для EYES. Разные механизмы дополняют друг друга, обеспечивая комплексное воздействие на орган/систему.', mechanisms: ['RETINOID_SIGNALING', 'COLLAGEN_SUPPORT', 'MEMBRANE_PROTECTION', 'OXIDATIVE_STRESS_REDUCTION', 'TARGET_EYES', 'COMPLEMENTARY'], severity: 'LOW', notes: 'Комплементарная синергия: Retinyl Palmitate → RETINOID_SIGNALING, COLLAGEN_SUPPORT, Astaxanthin → MEMBRANE_PROTECTION, OXIDATIVE_STRESS_REDUCTION' },
   { interactionId: 'SYNERGY_AUTO_393', substanceA: 'VIT_A_PALMITATE', substanceB: 'AO_LUTEIN', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Retinyl Palmitate (RETINOID_SIGNALING, COLLAGEN_SUPPORT) и Lutein (RETINA_PROTECTION, BLUE_LIGHT_FILTER) — комплементарная синергия для EYES. Разные механизмы дополняют друг друга, обеспечивая комплексное воздействие на орган/систему.', mechanisms: ['RETINOID_SIGNALING', 'COLLAGEN_SUPPORT', 'RETINA_PROTECTION', 'BLUE_LIGHT_FILTER', 'TARGET_EYES', 'COMPLEMENTARY'], severity: 'LOW', notes: 'Комплементарная синергия: Retinyl Palmitate → RETINOID_SIGNALING, COLLAGEN_SUPPORT, Lutein → RETINA_PROTECTION, BLUE_LIGHT_FILTER' },
   { interactionId: 'SYNERGY_AUTO_394', substanceA: 'VIT_A_PALMITATE', substanceB: 'AO_ZEAXANTHIN', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Retinyl Palmitate (RETINOID_SIGNALING, COLLAGEN_SUPPORT) и Zeaxanthin (RETINA_PROTECTION, MACULA_SUPPORT) — комплементарная синергия для EYES. Разные механизмы дополняют друг друга, обеспечивая комплексное воздействие на орган/систему.', mechanisms: ['RETINOID_SIGNALING', 'COLLAGEN_SUPPORT', 'RETINA_PROTECTION', 'MACULA_SUPPORT', 'TARGET_EYES', 'COMPLEMENTARY'], severity: 'LOW', notes: 'Комплементарная синергия: Retinyl Palmitate → RETINOID_SIGNALING, COLLAGEN_SUPPORT, Zeaxanthin → RETINA_PROTECTION, MACULA_SUPPORT' },
-  { interactionId: 'SYNERGY_AUTO_395', substanceA: 'VIT_A_PALMITATE', substanceB: 'VIT_A_BETA', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Retinyl Palmitate (RETINOID_SIGNALING, COLLAGEN_SUPPORT) и Beta-Carotene (CAROTENOID_PATHWAY, OXIDATIVE_STRESS_REDUCTION) — комплементарная синергия для EYES. Разные механизмы дополняют друг друга, обеспечивая комплексное воздействие на орган/систему.', mechanisms: ['RETINOID_SIGNALING', 'COLLAGEN_SUPPORT', 'CAROTENOID_PATHWAY', 'OXIDATIVE_STRESS_REDUCTION', 'TARGET_EYES', 'COMPLEMENTARY'], severity: 'LOW', notes: 'Комплементарная синергия: Retinyl Palmitate → RETINOID_SIGNALING, COLLAGEN_SUPPORT, Beta-Carotene → CAROTENOID_PATHWAY, OXIDATIVE_STRESS_REDUCTION' },
+  { interactionId: 'SYNERGY_AUTO_395', substanceA: 'VIT_A_PALMITATE', substanceB: 'AO_BETA_CAROTENE', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Retinyl Palmitate (RETINOID_SIGNALING, COLLAGEN_SUPPORT) и Beta-Carotene (CAROTENOID_PATHWAY, OXIDATIVE_STRESS_REDUCTION) — комплементарная синергия для EYES. Разные механизмы дополняют друг друга, обеспечивая комплексное воздействие на орган/систему.', mechanisms: ['RETINOID_SIGNALING', 'COLLAGEN_SUPPORT', 'CAROTENOID_PATHWAY', 'OXIDATIVE_STRESS_REDUCTION', 'TARGET_EYES', 'COMPLEMENTARY'], severity: 'LOW', notes: 'Комплементарная синергия: Retinyl Palmitate → RETINOID_SIGNALING, COLLAGEN_SUPPORT, Beta-Carotene → CAROTENOID_PATHWAY, OXIDATIVE_STRESS_REDUCTION' },
   { interactionId: 'SYNERGY_AUTO_396', substanceA: 'VIT_A_PALMITATE', substanceB: 'AO_ANTHOCYANINS', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Retinyl Palmitate (RETINOID_SIGNALING, COLLAGEN_SUPPORT) и Anthocyanins (CAPILLARY_STRENGTH, OXIDATIVE_STRESS_REDUCTION) — комплементарная синергия для EYES. Разные механизмы дополняют друг друга, обеспечивая комплексное воздействие на орган/систему.', mechanisms: ['RETINOID_SIGNALING', 'COLLAGEN_SUPPORT', 'CAPILLARY_STRENGTH', 'OXIDATIVE_STRESS_REDUCTION', 'TARGET_EYES', 'COMPLEMENTARY'], severity: 'LOW', notes: 'Комплементарная синергия: Retinyl Palmitate → RETINOID_SIGNALING, COLLAGEN_SUPPORT, Anthocyanins → CAPILLARY_STRENGTH, OXIDATIVE_STRESS_REDUCTION' },
   { interactionId: 'SYNERGY_AUTO_397', substanceA: 'VIT_A_PALMITATE', substanceB: 'AO_BILBERRY', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Retinyl Palmitate (RETINOID_SIGNALING, COLLAGEN_SUPPORT) и Bilberry Extract (RETINA_SUPPORT, CAPILLARY_STRENGTH) — комплементарная синергия для EYES. Разные механизмы дополняют друг друга, обеспечивая комплексное воздействие на орган/систему.', mechanisms: ['RETINOID_SIGNALING', 'COLLAGEN_SUPPORT', 'RETINA_SUPPORT', 'CAPILLARY_STRENGTH', 'TARGET_EYES', 'COMPLEMENTARY'], severity: 'LOW', notes: 'Комплементарная синергия: Retinyl Palmitate → RETINOID_SIGNALING, COLLAGEN_SUPPORT, Bilberry Extract → RETINA_SUPPORT, CAPILLARY_STRENGTH' },
   { interactionId: 'SYNERGY_AUTO_398', substanceA: 'VIT_A_PALMITATE', substanceB: 'AO_CAROTENOID_COMPLEX', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Retinyl Palmitate (RETINOID_SIGNALING, COLLAGEN_SUPPORT) и Carotenoid Complex (CAROTENOID_PATHWAY, RETINA_SUPPORT) — комплементарная синергия для EYES. Разные механизмы дополняют друг друга, обеспечивая комплексное воздействие на орган/систему.', mechanisms: ['RETINOID_SIGNALING', 'COLLAGEN_SUPPORT', 'CAROTENOID_PATHWAY', 'RETINA_SUPPORT', 'TARGET_EYES', 'COMPLEMENTARY'], severity: 'LOW', notes: 'Комплементарная синергия: Retinyl Palmitate → RETINOID_SIGNALING, COLLAGEN_SUPPORT, Carotenoid Complex → CAROTENOID_PATHWAY, RETINA_SUPPORT' },
@@ -21346,7 +22276,7 @@ export const ALL_INTERACTIONS = ([
   { interactionId: 'SYNERGY_AUTO_415', substanceA: 'FA_OMEGA3_DHA', substanceB: 'AO_ASTAX', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'DHA (Docosahexaenoic Acid) (NEUROPROTECTION, MEMBRANE_FLUIDITY) и Astaxanthin (MEMBRANE_PROTECTION, OXIDATIVE_STRESS_REDUCTION) — комплементарная синергия для EYES. Разные механизмы дополняют друг друга, обеспечивая комплексное воздействие на орган/систему.', mechanisms: ['NEUROPROTECTION', 'MEMBRANE_FLUIDITY', 'MEMBRANE_PROTECTION', 'OXIDATIVE_STRESS_REDUCTION', 'TARGET_EYES', 'COMPLEMENTARY'], severity: 'LOW', notes: 'Комплементарная синергия: DHA (Docosahexaenoic Acid) → NEUROPROTECTION, MEMBRANE_FLUIDITY, Astaxanthin → MEMBRANE_PROTECTION, OXIDATIVE_STRESS_REDUCTION' },
   { interactionId: 'SYNERGY_AUTO_416', substanceA: 'FA_OMEGA3_DHA', substanceB: 'AO_LUTEIN', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'DHA (Docosahexaenoic Acid) (NEUROPROTECTION, MEMBRANE_FLUIDITY) и Lutein (RETINA_PROTECTION, BLUE_LIGHT_FILTER) — комплементарная синергия для EYES. Разные механизмы дополняют друг друга, обеспечивая комплексное воздействие на орган/систему.', mechanisms: ['NEUROPROTECTION', 'MEMBRANE_FLUIDITY', 'RETINA_PROTECTION', 'BLUE_LIGHT_FILTER', 'TARGET_EYES', 'COMPLEMENTARY'], severity: 'LOW', notes: 'Комплементарная синергия: DHA (Docosahexaenoic Acid) → NEUROPROTECTION, MEMBRANE_FLUIDITY, Lutein → RETINA_PROTECTION, BLUE_LIGHT_FILTER' },
   { interactionId: 'SYNERGY_AUTO_417', substanceA: 'FA_OMEGA3_DHA', substanceB: 'AO_ZEAXANTHIN', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'DHA (Docosahexaenoic Acid) (NEUROPROTECTION, MEMBRANE_FLUIDITY) и Zeaxanthin (RETINA_PROTECTION, MACULA_SUPPORT) — комплементарная синергия для EYES. Разные механизмы дополняют друг друга, обеспечивая комплексное воздействие на орган/систему.', mechanisms: ['NEUROPROTECTION', 'MEMBRANE_FLUIDITY', 'RETINA_PROTECTION', 'MACULA_SUPPORT', 'TARGET_EYES', 'COMPLEMENTARY'], severity: 'LOW', notes: 'Комплементарная синергия: DHA (Docosahexaenoic Acid) → NEUROPROTECTION, MEMBRANE_FLUIDITY, Zeaxanthin → RETINA_PROTECTION, MACULA_SUPPORT' },
-  { interactionId: 'SYNERGY_AUTO_418', substanceA: 'FA_OMEGA3_DHA', substanceB: 'VIT_A_BETA', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'DHA (Docosahexaenoic Acid) (NEUROPROTECTION, MEMBRANE_FLUIDITY) и Beta-Carotene (CAROTENOID_PATHWAY, OXIDATIVE_STRESS_REDUCTION) — комплементарная синергия для EYES. Разные механизмы дополняют друг друга, обеспечивая комплексное воздействие на орган/систему.', mechanisms: ['NEUROPROTECTION', 'MEMBRANE_FLUIDITY', 'CAROTENOID_PATHWAY', 'OXIDATIVE_STRESS_REDUCTION', 'TARGET_EYES', 'COMPLEMENTARY'], severity: 'LOW', notes: 'Комплементарная синергия: DHA (Docosahexaenoic Acid) → NEUROPROTECTION, MEMBRANE_FLUIDITY, Beta-Carotene → CAROTENOID_PATHWAY, OXIDATIVE_STRESS_REDUCTION' },
+  { interactionId: 'SYNERGY_AUTO_418', substanceA: 'FA_OMEGA3_DHA', substanceB: 'AO_BETA_CAROTENE', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'DHA (Docosahexaenoic Acid) (NEUROPROTECTION, MEMBRANE_FLUIDITY) и Beta-Carotene (CAROTENOID_PATHWAY, OXIDATIVE_STRESS_REDUCTION) — комплементарная синергия для EYES. Разные механизмы дополняют друг друга, обеспечивая комплексное воздействие на орган/систему.', mechanisms: ['NEUROPROTECTION', 'MEMBRANE_FLUIDITY', 'CAROTENOID_PATHWAY', 'OXIDATIVE_STRESS_REDUCTION', 'TARGET_EYES', 'COMPLEMENTARY'], severity: 'LOW', notes: 'Комплементарная синергия: DHA (Docosahexaenoic Acid) → NEUROPROTECTION, MEMBRANE_FLUIDITY, Beta-Carotene → CAROTENOID_PATHWAY, OXIDATIVE_STRESS_REDUCTION' },
   { interactionId: 'SYNERGY_AUTO_419', substanceA: 'FA_OMEGA3_DHA', substanceB: 'AO_ANTHOCYANINS', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'DHA (Docosahexaenoic Acid) (NEUROPROTECTION, MEMBRANE_FLUIDITY) и Anthocyanins (CAPILLARY_STRENGTH, OXIDATIVE_STRESS_REDUCTION) — комплементарная синергия для EYES. Разные механизмы дополняют друг друга, обеспечивая комплексное воздействие на орган/систему.', mechanisms: ['NEUROPROTECTION', 'MEMBRANE_FLUIDITY', 'CAPILLARY_STRENGTH', 'OXIDATIVE_STRESS_REDUCTION', 'TARGET_EYES', 'COMPLEMENTARY'], severity: 'LOW', notes: 'Комплементарная синергия: DHA (Docosahexaenoic Acid) → NEUROPROTECTION, MEMBRANE_FLUIDITY, Anthocyanins → CAPILLARY_STRENGTH, OXIDATIVE_STRESS_REDUCTION' },
   { interactionId: 'SYNERGY_AUTO_420', substanceA: 'FA_OMEGA3_DHA', substanceB: 'AO_BILBERRY', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'DHA (Docosahexaenoic Acid) (NEUROPROTECTION, MEMBRANE_FLUIDITY) и Bilberry Extract (RETINA_SUPPORT, CAPILLARY_STRENGTH) — комплементарная синергия для EYES. Разные механизмы дополняют друг друга, обеспечивая комплексное воздействие на орган/систему.', mechanisms: ['NEUROPROTECTION', 'MEMBRANE_FLUIDITY', 'RETINA_SUPPORT', 'CAPILLARY_STRENGTH', 'TARGET_EYES', 'COMPLEMENTARY'], severity: 'LOW', notes: 'Комплементарная синергия: DHA (Docosahexaenoic Acid) → NEUROPROTECTION, MEMBRANE_FLUIDITY, Bilberry Extract → RETINA_SUPPORT, CAPILLARY_STRENGTH' },
   { interactionId: 'SYNERGY_AUTO_421', substanceA: 'FA_OMEGA3_DHA', substanceB: 'AO_CAROTENOID_COMPLEX', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'DHA (Docosahexaenoic Acid) (NEUROPROTECTION, MEMBRANE_FLUIDITY) и Carotenoid Complex (CAROTENOID_PATHWAY, RETINA_SUPPORT) — комплементарная синергия для EYES. Разные механизмы дополняют друг друга, обеспечивая комплексное воздействие на орган/систему.', mechanisms: ['NEUROPROTECTION', 'MEMBRANE_FLUIDITY', 'CAROTENOID_PATHWAY', 'RETINA_SUPPORT', 'TARGET_EYES', 'COMPLEMENTARY'], severity: 'LOW', notes: 'Комплементарная синергия: DHA (Docosahexaenoic Acid) → NEUROPROTECTION, MEMBRANE_FLUIDITY, Carotenoid Complex → CAROTENOID_PATHWAY, RETINA_SUPPORT' },
@@ -21369,7 +22299,7 @@ export const ALL_INTERACTIONS = ([
   { interactionId: 'SYNERGY_AUTO_438', substanceA: 'FA_OMEGA3_ALGAE_DHA', substanceB: 'AO_ASTAX', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Algae DHA (NEUROPROTECTION, MEMBRANE_FLUIDITY) и Astaxanthin (MEMBRANE_PROTECTION, OXIDATIVE_STRESS_REDUCTION) — комплементарная синергия для EYES. Разные механизмы дополняют друг друга, обеспечивая комплексное воздействие на орган/систему.', mechanisms: ['NEUROPROTECTION', 'MEMBRANE_FLUIDITY', 'MEMBRANE_PROTECTION', 'OXIDATIVE_STRESS_REDUCTION', 'TARGET_EYES', 'COMPLEMENTARY'], severity: 'LOW', notes: 'Комплементарная синергия: Algae DHA → NEUROPROTECTION, MEMBRANE_FLUIDITY, Astaxanthin → MEMBRANE_PROTECTION, OXIDATIVE_STRESS_REDUCTION' },
   { interactionId: 'SYNERGY_AUTO_439', substanceA: 'FA_OMEGA3_ALGAE_DHA', substanceB: 'AO_LUTEIN', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Algae DHA (NEUROPROTECTION, MEMBRANE_FLUIDITY) и Lutein (RETINA_PROTECTION, BLUE_LIGHT_FILTER) — комплементарная синергия для EYES. Разные механизмы дополняют друг друга, обеспечивая комплексное воздействие на орган/систему.', mechanisms: ['NEUROPROTECTION', 'MEMBRANE_FLUIDITY', 'RETINA_PROTECTION', 'BLUE_LIGHT_FILTER', 'TARGET_EYES', 'COMPLEMENTARY'], severity: 'LOW', notes: 'Комплементарная синергия: Algae DHA → NEUROPROTECTION, MEMBRANE_FLUIDITY, Lutein → RETINA_PROTECTION, BLUE_LIGHT_FILTER' },
   { interactionId: 'SYNERGY_AUTO_440', substanceA: 'FA_OMEGA3_ALGAE_DHA', substanceB: 'AO_ZEAXANTHIN', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Algae DHA (NEUROPROTECTION, MEMBRANE_FLUIDITY) и Zeaxanthin (RETINA_PROTECTION, MACULA_SUPPORT) — комплементарная синергия для EYES. Разные механизмы дополняют друг друга, обеспечивая комплексное воздействие на орган/систему.', mechanisms: ['NEUROPROTECTION', 'MEMBRANE_FLUIDITY', 'RETINA_PROTECTION', 'MACULA_SUPPORT', 'TARGET_EYES', 'COMPLEMENTARY'], severity: 'LOW', notes: 'Комплементарная синергия: Algae DHA → NEUROPROTECTION, MEMBRANE_FLUIDITY, Zeaxanthin → RETINA_PROTECTION, MACULA_SUPPORT' },
-  { interactionId: 'SYNERGY_AUTO_441', substanceA: 'FA_OMEGA3_ALGAE_DHA', substanceB: 'VIT_A_BETA', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Algae DHA (NEUROPROTECTION, MEMBRANE_FLUIDITY) и Beta-Carotene (CAROTENOID_PATHWAY, OXIDATIVE_STRESS_REDUCTION) — комплементарная синергия для EYES. Разные механизмы дополняют друг друга, обеспечивая комплексное воздействие на орган/систему.', mechanisms: ['NEUROPROTECTION', 'MEMBRANE_FLUIDITY', 'CAROTENOID_PATHWAY', 'OXIDATIVE_STRESS_REDUCTION', 'TARGET_EYES', 'COMPLEMENTARY'], severity: 'LOW', notes: 'Комплементарная синергия: Algae DHA → NEUROPROTECTION, MEMBRANE_FLUIDITY, Beta-Carotene → CAROTENOID_PATHWAY, OXIDATIVE_STRESS_REDUCTION' },
+  { interactionId: 'SYNERGY_AUTO_441', substanceA: 'FA_OMEGA3_ALGAE_DHA', substanceB: 'AO_BETA_CAROTENE', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Algae DHA (NEUROPROTECTION, MEMBRANE_FLUIDITY) и Beta-Carotene (CAROTENOID_PATHWAY, OXIDATIVE_STRESS_REDUCTION) — комплементарная синергия для EYES. Разные механизмы дополняют друг друга, обеспечивая комплексное воздействие на орган/систему.', mechanisms: ['NEUROPROTECTION', 'MEMBRANE_FLUIDITY', 'CAROTENOID_PATHWAY', 'OXIDATIVE_STRESS_REDUCTION', 'TARGET_EYES', 'COMPLEMENTARY'], severity: 'LOW', notes: 'Комплементарная синергия: Algae DHA → NEUROPROTECTION, MEMBRANE_FLUIDITY, Beta-Carotene → CAROTENOID_PATHWAY, OXIDATIVE_STRESS_REDUCTION' },
   { interactionId: 'SYNERGY_AUTO_442', substanceA: 'FA_OMEGA3_ALGAE_DHA', substanceB: 'AO_ANTHOCYANINS', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Algae DHA (NEUROPROTECTION, MEMBRANE_FLUIDITY) и Anthocyanins (CAPILLARY_STRENGTH, OXIDATIVE_STRESS_REDUCTION) — комплементарная синергия для EYES. Разные механизмы дополняют друг друга, обеспечивая комплексное воздействие на орган/систему.', mechanisms: ['NEUROPROTECTION', 'MEMBRANE_FLUIDITY', 'CAPILLARY_STRENGTH', 'OXIDATIVE_STRESS_REDUCTION', 'TARGET_EYES', 'COMPLEMENTARY'], severity: 'LOW', notes: 'Комплементарная синергия: Algae DHA → NEUROPROTECTION, MEMBRANE_FLUIDITY, Anthocyanins → CAPILLARY_STRENGTH, OXIDATIVE_STRESS_REDUCTION' },
   { interactionId: 'SYNERGY_AUTO_443', substanceA: 'FA_OMEGA3_ALGAE_DHA', substanceB: 'AO_BILBERRY', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Algae DHA (NEUROPROTECTION, MEMBRANE_FLUIDITY) и Bilberry Extract (RETINA_SUPPORT, CAPILLARY_STRENGTH) — комплементарная синергия для EYES. Разные механизмы дополняют друг друга, обеспечивая комплексное воздействие на орган/систему.', mechanisms: ['NEUROPROTECTION', 'MEMBRANE_FLUIDITY', 'RETINA_SUPPORT', 'CAPILLARY_STRENGTH', 'TARGET_EYES', 'COMPLEMENTARY'], severity: 'LOW', notes: 'Комплементарная синергия: Algae DHA → NEUROPROTECTION, MEMBRANE_FLUIDITY, Bilberry Extract → RETINA_SUPPORT, CAPILLARY_STRENGTH' },
   { interactionId: 'SYNERGY_AUTO_444', substanceA: 'FA_OMEGA3_ALGAE_DHA', substanceB: 'AO_CAROTENOID_COMPLEX', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Algae DHA (NEUROPROTECTION, MEMBRANE_FLUIDITY) и Carotenoid Complex (CAROTENOID_PATHWAY, RETINA_SUPPORT) — комплементарная синергия для EYES. Разные механизмы дополняют друг друга, обеспечивая комплексное воздействие на орган/систему.', mechanisms: ['NEUROPROTECTION', 'MEMBRANE_FLUIDITY', 'CAROTENOID_PATHWAY', 'RETINA_SUPPORT', 'TARGET_EYES', 'COMPLEMENTARY'], severity: 'LOW', notes: 'Комплементарная синергия: Algae DHA → NEUROPROTECTION, MEMBRANE_FLUIDITY, Carotenoid Complex → CAROTENOID_PATHWAY, RETINA_SUPPORT' },
@@ -21392,7 +22322,7 @@ export const ALL_INTERACTIONS = ([
   { interactionId: 'SYNERGY_AUTO_461', substanceA: 'FA_DHA_LIPOSOMAL', substanceB: 'AO_ASTAX', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Liposomal DHA (LIPOSOMAL_DELIVERY, NEUROPROTECTION) и Astaxanthin (MEMBRANE_PROTECTION, OXIDATIVE_STRESS_REDUCTION) — комплементарная синергия для EYES. Разные механизмы дополняют друг друга, обеспечивая комплексное воздействие на орган/систему.', mechanisms: ['LIPOSOMAL_DELIVERY', 'NEUROPROTECTION', 'MEMBRANE_PROTECTION', 'OXIDATIVE_STRESS_REDUCTION', 'TARGET_EYES', 'COMPLEMENTARY'], severity: 'LOW', notes: 'Комплементарная синергия: Liposomal DHA → LIPOSOMAL_DELIVERY, NEUROPROTECTION, Astaxanthin → MEMBRANE_PROTECTION, OXIDATIVE_STRESS_REDUCTION' },
   { interactionId: 'SYNERGY_AUTO_462', substanceA: 'FA_DHA_LIPOSOMAL', substanceB: 'AO_LUTEIN', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Liposomal DHA (LIPOSOMAL_DELIVERY, NEUROPROTECTION) и Lutein (RETINA_PROTECTION, BLUE_LIGHT_FILTER) — комплементарная синергия для EYES. Разные механизмы дополняют друг друга, обеспечивая комплексное воздействие на орган/систему.', mechanisms: ['LIPOSOMAL_DELIVERY', 'NEUROPROTECTION', 'RETINA_PROTECTION', 'BLUE_LIGHT_FILTER', 'TARGET_EYES', 'COMPLEMENTARY'], severity: 'LOW', notes: 'Комплементарная синергия: Liposomal DHA → LIPOSOMAL_DELIVERY, NEUROPROTECTION, Lutein → RETINA_PROTECTION, BLUE_LIGHT_FILTER' },
   { interactionId: 'SYNERGY_AUTO_463', substanceA: 'FA_DHA_LIPOSOMAL', substanceB: 'AO_ZEAXANTHIN', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Liposomal DHA (LIPOSOMAL_DELIVERY, NEUROPROTECTION) и Zeaxanthin (RETINA_PROTECTION, MACULA_SUPPORT) — комплементарная синергия для EYES. Разные механизмы дополняют друг друга, обеспечивая комплексное воздействие на орган/систему.', mechanisms: ['LIPOSOMAL_DELIVERY', 'NEUROPROTECTION', 'RETINA_PROTECTION', 'MACULA_SUPPORT', 'TARGET_EYES', 'COMPLEMENTARY'], severity: 'LOW', notes: 'Комплементарная синергия: Liposomal DHA → LIPOSOMAL_DELIVERY, NEUROPROTECTION, Zeaxanthin → RETINA_PROTECTION, MACULA_SUPPORT' },
-  { interactionId: 'SYNERGY_AUTO_464', substanceA: 'FA_DHA_LIPOSOMAL', substanceB: 'VIT_A_BETA', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Liposomal DHA (LIPOSOMAL_DELIVERY, NEUROPROTECTION) и Beta-Carotene (CAROTENOID_PATHWAY, OXIDATIVE_STRESS_REDUCTION) — комплементарная синергия для EYES. Разные механизмы дополняют друг друга, обеспечивая комплексное воздействие на орган/систему.', mechanisms: ['LIPOSOMAL_DELIVERY', 'NEUROPROTECTION', 'CAROTENOID_PATHWAY', 'OXIDATIVE_STRESS_REDUCTION', 'TARGET_EYES', 'COMPLEMENTARY'], severity: 'LOW', notes: 'Комплементарная синергия: Liposomal DHA → LIPOSOMAL_DELIVERY, NEUROPROTECTION, Beta-Carotene → CAROTENOID_PATHWAY, OXIDATIVE_STRESS_REDUCTION' },
+  { interactionId: 'SYNERGY_AUTO_464', substanceA: 'FA_DHA_LIPOSOMAL', substanceB: 'AO_BETA_CAROTENE', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Liposomal DHA (LIPOSOMAL_DELIVERY, NEUROPROTECTION) и Beta-Carotene (CAROTENOID_PATHWAY, OXIDATIVE_STRESS_REDUCTION) — комплементарная синергия для EYES. Разные механизмы дополняют друг друга, обеспечивая комплексное воздействие на орган/систему.', mechanisms: ['LIPOSOMAL_DELIVERY', 'NEUROPROTECTION', 'CAROTENOID_PATHWAY', 'OXIDATIVE_STRESS_REDUCTION', 'TARGET_EYES', 'COMPLEMENTARY'], severity: 'LOW', notes: 'Комплементарная синергия: Liposomal DHA → LIPOSOMAL_DELIVERY, NEUROPROTECTION, Beta-Carotene → CAROTENOID_PATHWAY, OXIDATIVE_STRESS_REDUCTION' },
   { interactionId: 'SYNERGY_AUTO_465', substanceA: 'FA_DHA_LIPOSOMAL', substanceB: 'AO_ANTHOCYANINS', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Liposomal DHA (LIPOSOMAL_DELIVERY, NEUROPROTECTION) и Anthocyanins (CAPILLARY_STRENGTH, OXIDATIVE_STRESS_REDUCTION) — комплементарная синергия для EYES. Разные механизмы дополняют друг друга, обеспечивая комплексное воздействие на орган/систему.', mechanisms: ['LIPOSOMAL_DELIVERY', 'NEUROPROTECTION', 'CAPILLARY_STRENGTH', 'OXIDATIVE_STRESS_REDUCTION', 'TARGET_EYES', 'COMPLEMENTARY'], severity: 'LOW', notes: 'Комплементарная синергия: Liposomal DHA → LIPOSOMAL_DELIVERY, NEUROPROTECTION, Anthocyanins → CAPILLARY_STRENGTH, OXIDATIVE_STRESS_REDUCTION' },
   { interactionId: 'SYNERGY_AUTO_466', substanceA: 'FA_DHA_LIPOSOMAL', substanceB: 'AO_BILBERRY', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Liposomal DHA (LIPOSOMAL_DELIVERY, NEUROPROTECTION) и Bilberry Extract (RETINA_SUPPORT, CAPILLARY_STRENGTH) — комплементарная синергия для EYES. Разные механизмы дополняют друг друга, обеспечивая комплексное воздействие на орган/систему.', mechanisms: ['LIPOSOMAL_DELIVERY', 'NEUROPROTECTION', 'RETINA_SUPPORT', 'CAPILLARY_STRENGTH', 'TARGET_EYES', 'COMPLEMENTARY'], severity: 'LOW', notes: 'Комплементарная синергия: Liposomal DHA → LIPOSOMAL_DELIVERY, NEUROPROTECTION, Bilberry Extract → RETINA_SUPPORT, CAPILLARY_STRENGTH' },
   { interactionId: 'SYNERGY_AUTO_467', substanceA: 'FA_DHA_LIPOSOMAL', substanceB: 'AO_CAROTENOID_COMPLEX', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Liposomal DHA (LIPOSOMAL_DELIVERY, NEUROPROTECTION) и Carotenoid Complex (CAROTENOID_PATHWAY, RETINA_SUPPORT) — комплементарная синергия для EYES. Разные механизмы дополняют друг друга, обеспечивая комплексное воздействие на орган/систему.', mechanisms: ['LIPOSOMAL_DELIVERY', 'NEUROPROTECTION', 'CAROTENOID_PATHWAY', 'RETINA_SUPPORT', 'TARGET_EYES', 'COMPLEMENTARY'], severity: 'LOW', notes: 'Комплементарная синергия: Liposomal DHA → LIPOSOMAL_DELIVERY, NEUROPROTECTION, Carotenoid Complex → CAROTENOID_PATHWAY, RETINA_SUPPORT' },
@@ -21414,7 +22344,7 @@ export const ALL_INTERACTIONS = ([
   { interactionId: 'SYNERGY_AUTO_483', substanceA: 'FA_DHA_PHOSPHO', substanceB: 'AO_ASTAX', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Phospholipid DHA (PHOSPHOLIPID_DELIVERY, NEUROPROTECTION) и Astaxanthin (MEMBRANE_PROTECTION, OXIDATIVE_STRESS_REDUCTION) — комплементарная синергия для EYES. Разные механизмы дополняют друг друга, обеспечивая комплексное воздействие на орган/систему.', mechanisms: ['PHOSPHOLIPID_DELIVERY', 'NEUROPROTECTION', 'MEMBRANE_PROTECTION', 'OXIDATIVE_STRESS_REDUCTION', 'TARGET_EYES', 'COMPLEMENTARY'], severity: 'LOW', notes: 'Комплементарная синергия: Phospholipid DHA → PHOSPHOLIPID_DELIVERY, NEUROPROTECTION, Astaxanthin → MEMBRANE_PROTECTION, OXIDATIVE_STRESS_REDUCTION' },
   { interactionId: 'SYNERGY_AUTO_484', substanceA: 'FA_DHA_PHOSPHO', substanceB: 'AO_LUTEIN', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Phospholipid DHA (PHOSPHOLIPID_DELIVERY, NEUROPROTECTION) и Lutein (RETINA_PROTECTION, BLUE_LIGHT_FILTER) — комплементарная синергия для EYES. Разные механизмы дополняют друг друга, обеспечивая комплексное воздействие на орган/систему.', mechanisms: ['PHOSPHOLIPID_DELIVERY', 'NEUROPROTECTION', 'RETINA_PROTECTION', 'BLUE_LIGHT_FILTER', 'TARGET_EYES', 'COMPLEMENTARY'], severity: 'LOW', notes: 'Комплементарная синергия: Phospholipid DHA → PHOSPHOLIPID_DELIVERY, NEUROPROTECTION, Lutein → RETINA_PROTECTION, BLUE_LIGHT_FILTER' },
   { interactionId: 'SYNERGY_AUTO_485', substanceA: 'FA_DHA_PHOSPHO', substanceB: 'AO_ZEAXANTHIN', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Phospholipid DHA (PHOSPHOLIPID_DELIVERY, NEUROPROTECTION) и Zeaxanthin (RETINA_PROTECTION, MACULA_SUPPORT) — комплементарная синергия для EYES. Разные механизмы дополняют друг друга, обеспечивая комплексное воздействие на орган/систему.', mechanisms: ['PHOSPHOLIPID_DELIVERY', 'NEUROPROTECTION', 'RETINA_PROTECTION', 'MACULA_SUPPORT', 'TARGET_EYES', 'COMPLEMENTARY'], severity: 'LOW', notes: 'Комплементарная синергия: Phospholipid DHA → PHOSPHOLIPID_DELIVERY, NEUROPROTECTION, Zeaxanthin → RETINA_PROTECTION, MACULA_SUPPORT' },
-  { interactionId: 'SYNERGY_AUTO_486', substanceA: 'FA_DHA_PHOSPHO', substanceB: 'VIT_A_BETA', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Phospholipid DHA (PHOSPHOLIPID_DELIVERY, NEUROPROTECTION) и Beta-Carotene (CAROTENOID_PATHWAY, OXIDATIVE_STRESS_REDUCTION) — комплементарная синергия для EYES. Разные механизмы дополняют друг друга, обеспечивая комплексное воздействие на орган/систему.', mechanisms: ['PHOSPHOLIPID_DELIVERY', 'NEUROPROTECTION', 'CAROTENOID_PATHWAY', 'OXIDATIVE_STRESS_REDUCTION', 'TARGET_EYES', 'COMPLEMENTARY'], severity: 'LOW', notes: 'Комплементарная синергия: Phospholipid DHA → PHOSPHOLIPID_DELIVERY, NEUROPROTECTION, Beta-Carotene → CAROTENOID_PATHWAY, OXIDATIVE_STRESS_REDUCTION' },
+  { interactionId: 'SYNERGY_AUTO_486', substanceA: 'FA_DHA_PHOSPHO', substanceB: 'AO_BETA_CAROTENE', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Phospholipid DHA (PHOSPHOLIPID_DELIVERY, NEUROPROTECTION) и Beta-Carotene (CAROTENOID_PATHWAY, OXIDATIVE_STRESS_REDUCTION) — комплементарная синергия для EYES. Разные механизмы дополняют друг друга, обеспечивая комплексное воздействие на орган/систему.', mechanisms: ['PHOSPHOLIPID_DELIVERY', 'NEUROPROTECTION', 'CAROTENOID_PATHWAY', 'OXIDATIVE_STRESS_REDUCTION', 'TARGET_EYES', 'COMPLEMENTARY'], severity: 'LOW', notes: 'Комплементарная синергия: Phospholipid DHA → PHOSPHOLIPID_DELIVERY, NEUROPROTECTION, Beta-Carotene → CAROTENOID_PATHWAY, OXIDATIVE_STRESS_REDUCTION' },
   { interactionId: 'SYNERGY_AUTO_487', substanceA: 'FA_DHA_PHOSPHO', substanceB: 'AO_ANTHOCYANINS', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Phospholipid DHA (PHOSPHOLIPID_DELIVERY, NEUROPROTECTION) и Anthocyanins (CAPILLARY_STRENGTH, OXIDATIVE_STRESS_REDUCTION) — комплементарная синергия для EYES. Разные механизмы дополняют друг друга, обеспечивая комплексное воздействие на орган/систему.', mechanisms: ['PHOSPHOLIPID_DELIVERY', 'NEUROPROTECTION', 'CAPILLARY_STRENGTH', 'OXIDATIVE_STRESS_REDUCTION', 'TARGET_EYES', 'COMPLEMENTARY'], severity: 'LOW', notes: 'Комплементарная синергия: Phospholipid DHA → PHOSPHOLIPID_DELIVERY, NEUROPROTECTION, Anthocyanins → CAPILLARY_STRENGTH, OXIDATIVE_STRESS_REDUCTION' },
   { interactionId: 'SYNERGY_AUTO_488', substanceA: 'FA_DHA_PHOSPHO', substanceB: 'AO_BILBERRY', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Phospholipid DHA (PHOSPHOLIPID_DELIVERY, NEUROPROTECTION) и Bilberry Extract (RETINA_SUPPORT, CAPILLARY_STRENGTH) — комплементарная синергия для EYES. Разные механизмы дополняют друг друга, обеспечивая комплексное воздействие на орган/систему.', mechanisms: ['PHOSPHOLIPID_DELIVERY', 'NEUROPROTECTION', 'RETINA_SUPPORT', 'CAPILLARY_STRENGTH', 'TARGET_EYES', 'COMPLEMENTARY'], severity: 'LOW', notes: 'Комплементарная синергия: Phospholipid DHA → PHOSPHOLIPID_DELIVERY, NEUROPROTECTION, Bilberry Extract → RETINA_SUPPORT, CAPILLARY_STRENGTH' },
   { interactionId: 'SYNERGY_AUTO_489', substanceA: 'FA_DHA_PHOSPHO', substanceB: 'AO_CAROTENOID_COMPLEX', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Phospholipid DHA (PHOSPHOLIPID_DELIVERY, NEUROPROTECTION) и Carotenoid Complex (CAROTENOID_PATHWAY, RETINA_SUPPORT) — комплементарная синергия для EYES. Разные механизмы дополняют друг друга, обеспечивая комплексное воздействие на орган/систему.', mechanisms: ['PHOSPHOLIPID_DELIVERY', 'NEUROPROTECTION', 'CAROTENOID_PATHWAY', 'RETINA_SUPPORT', 'TARGET_EYES', 'COMPLEMENTARY'], severity: 'LOW', notes: 'Комплементарная синергия: Phospholipid DHA → PHOSPHOLIPID_DELIVERY, NEUROPROTECTION, Carotenoid Complex → CAROTENOID_PATHWAY, RETINA_SUPPORT' },
@@ -21435,7 +22365,7 @@ export const ALL_INTERACTIONS = ([
   { interactionId: 'SYNERGY_AUTO_504', substanceA: 'FA_OMEGA3_LYSO_PC', substanceB: 'AO_ASTAX', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Lyso-PC Omega-3 (LYSO_PC_TRANSPORT, NEUROPROTECTION) и Astaxanthin (MEMBRANE_PROTECTION, OXIDATIVE_STRESS_REDUCTION) — комплементарная синергия для EYES. Разные механизмы дополняют друг друга, обеспечивая комплексное воздействие на орган/систему.', mechanisms: ['LYSO_PC_TRANSPORT', 'NEUROPROTECTION', 'MEMBRANE_PROTECTION', 'OXIDATIVE_STRESS_REDUCTION', 'TARGET_EYES', 'COMPLEMENTARY'], severity: 'LOW', notes: 'Комплементарная синергия: Lyso-PC Omega-3 → LYSO_PC_TRANSPORT, NEUROPROTECTION, Astaxanthin → MEMBRANE_PROTECTION, OXIDATIVE_STRESS_REDUCTION' },
   { interactionId: 'SYNERGY_AUTO_505', substanceA: 'FA_OMEGA3_LYSO_PC', substanceB: 'AO_LUTEIN', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Lyso-PC Omega-3 (LYSO_PC_TRANSPORT, NEUROPROTECTION) и Lutein (RETINA_PROTECTION, BLUE_LIGHT_FILTER) — комплементарная синергия для EYES. Разные механизмы дополняют друг друга, обеспечивая комплексное воздействие на орган/систему.', mechanisms: ['LYSO_PC_TRANSPORT', 'NEUROPROTECTION', 'RETINA_PROTECTION', 'BLUE_LIGHT_FILTER', 'TARGET_EYES', 'COMPLEMENTARY'], severity: 'LOW', notes: 'Комплементарная синергия: Lyso-PC Omega-3 → LYSO_PC_TRANSPORT, NEUROPROTECTION, Lutein → RETINA_PROTECTION, BLUE_LIGHT_FILTER' },
   { interactionId: 'SYNERGY_AUTO_506', substanceA: 'FA_OMEGA3_LYSO_PC', substanceB: 'AO_ZEAXANTHIN', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Lyso-PC Omega-3 (LYSO_PC_TRANSPORT, NEUROPROTECTION) и Zeaxanthin (RETINA_PROTECTION, MACULA_SUPPORT) — комплементарная синергия для EYES. Разные механизмы дополняют друг друга, обеспечивая комплексное воздействие на орган/систему.', mechanisms: ['LYSO_PC_TRANSPORT', 'NEUROPROTECTION', 'RETINA_PROTECTION', 'MACULA_SUPPORT', 'TARGET_EYES', 'COMPLEMENTARY'], severity: 'LOW', notes: 'Комплементарная синергия: Lyso-PC Omega-3 → LYSO_PC_TRANSPORT, NEUROPROTECTION, Zeaxanthin → RETINA_PROTECTION, MACULA_SUPPORT' },
-  { interactionId: 'SYNERGY_AUTO_507', substanceA: 'FA_OMEGA3_LYSO_PC', substanceB: 'VIT_A_BETA', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Lyso-PC Omega-3 (LYSO_PC_TRANSPORT, NEUROPROTECTION) и Beta-Carotene (CAROTENOID_PATHWAY, OXIDATIVE_STRESS_REDUCTION) — комплементарная синергия для EYES. Разные механизмы дополняют друг друга, обеспечивая комплексное воздействие на орган/систему.', mechanisms: ['LYSO_PC_TRANSPORT', 'NEUROPROTECTION', 'CAROTENOID_PATHWAY', 'OXIDATIVE_STRESS_REDUCTION', 'TARGET_EYES', 'COMPLEMENTARY'], severity: 'LOW', notes: 'Комплементарная синергия: Lyso-PC Omega-3 → LYSO_PC_TRANSPORT, NEUROPROTECTION, Beta-Carotene → CAROTENOID_PATHWAY, OXIDATIVE_STRESS_REDUCTION' },
+  { interactionId: 'SYNERGY_AUTO_507', substanceA: 'FA_OMEGA3_LYSO_PC', substanceB: 'AO_BETA_CAROTENE', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Lyso-PC Omega-3 (LYSO_PC_TRANSPORT, NEUROPROTECTION) и Beta-Carotene (CAROTENOID_PATHWAY, OXIDATIVE_STRESS_REDUCTION) — комплементарная синергия для EYES. Разные механизмы дополняют друг друга, обеспечивая комплексное воздействие на орган/систему.', mechanisms: ['LYSO_PC_TRANSPORT', 'NEUROPROTECTION', 'CAROTENOID_PATHWAY', 'OXIDATIVE_STRESS_REDUCTION', 'TARGET_EYES', 'COMPLEMENTARY'], severity: 'LOW', notes: 'Комплементарная синергия: Lyso-PC Omega-3 → LYSO_PC_TRANSPORT, NEUROPROTECTION, Beta-Carotene → CAROTENOID_PATHWAY, OXIDATIVE_STRESS_REDUCTION' },
   { interactionId: 'SYNERGY_AUTO_508', substanceA: 'FA_OMEGA3_LYSO_PC', substanceB: 'AO_ANTHOCYANINS', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Lyso-PC Omega-3 (LYSO_PC_TRANSPORT, NEUROPROTECTION) и Anthocyanins (CAPILLARY_STRENGTH, OXIDATIVE_STRESS_REDUCTION) — комплементарная синергия для EYES. Разные механизмы дополняют друг друга, обеспечивая комплексное воздействие на орган/систему.', mechanisms: ['LYSO_PC_TRANSPORT', 'NEUROPROTECTION', 'CAPILLARY_STRENGTH', 'OXIDATIVE_STRESS_REDUCTION', 'TARGET_EYES', 'COMPLEMENTARY'], severity: 'LOW', notes: 'Комплементарная синергия: Lyso-PC Omega-3 → LYSO_PC_TRANSPORT, NEUROPROTECTION, Anthocyanins → CAPILLARY_STRENGTH, OXIDATIVE_STRESS_REDUCTION' },
   { interactionId: 'SYNERGY_AUTO_509', substanceA: 'FA_OMEGA3_LYSO_PC', substanceB: 'AO_BILBERRY', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Lyso-PC Omega-3 (LYSO_PC_TRANSPORT, NEUROPROTECTION) и Bilberry Extract (RETINA_SUPPORT, CAPILLARY_STRENGTH) — комплементарная синергия для EYES. Разные механизмы дополняют друг друга, обеспечивая комплексное воздействие на орган/систему.', mechanisms: ['LYSO_PC_TRANSPORT', 'NEUROPROTECTION', 'RETINA_SUPPORT', 'CAPILLARY_STRENGTH', 'TARGET_EYES', 'COMPLEMENTARY'], severity: 'LOW', notes: 'Комплементарная синергия: Lyso-PC Omega-3 → LYSO_PC_TRANSPORT, NEUROPROTECTION, Bilberry Extract → RETINA_SUPPORT, CAPILLARY_STRENGTH' },
   { interactionId: 'SYNERGY_AUTO_510', substanceA: 'FA_OMEGA3_LYSO_PC', substanceB: 'AO_CAROTENOID_COMPLEX', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Lyso-PC Omega-3 (LYSO_PC_TRANSPORT, NEUROPROTECTION) и Carotenoid Complex (CAROTENOID_PATHWAY, RETINA_SUPPORT) — комплементарная синергия для EYES. Разные механизмы дополняют друг друга, обеспечивая комплексное воздействие на орган/систему.', mechanisms: ['LYSO_PC_TRANSPORT', 'NEUROPROTECTION', 'CAROTENOID_PATHWAY', 'RETINA_SUPPORT', 'TARGET_EYES', 'COMPLEMENTARY'], severity: 'LOW', notes: 'Комплементарная синергия: Lyso-PC Omega-3 → LYSO_PC_TRANSPORT, NEUROPROTECTION, Carotenoid Complex → CAROTENOID_PATHWAY, RETINA_SUPPORT' },

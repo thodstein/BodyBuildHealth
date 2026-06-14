@@ -28,7 +28,7 @@ import {
 } from '../../engines/weekly-plan.engine';
 import { generateRecommendations, quickRec, type Recommendation, type RecInput } from '../../engines/recommendation-engine-v2';
 import { fuseDecisions, shouldTrainToday, type FusedDecision } from '../../engines/decision-fusion.engine';
-import { optimizeStack, type StackInput as OptStackInput } from '../../engines/supplement-optimizer.engine';
+import { optimizeStack as newOptimizeStack, deriveSystemCoverage, getSubstanceName, describeStack, type StackResult as OptimizerStackResult, type StackSynergyInfo } from '../../engines/stack-optimizer.engine';
 import { generateStack, selectBestStack, type StackResult } from '../../engines/stack-builder.engine';
 import { ReportEngine, type ReportInput } from '../../engines/report-engine';
 import { checkDrugInteractions } from '../../engines/pharma-interactions.engine';
@@ -723,6 +723,14 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   const [modelRiskResult, setModelRiskResult] = useState<Record<string, { raw: number; net: number }> | null>(null);
   const [riskCalcMethod, setRiskCalcMethod] = useState<RiskCalcMethod>('basic');
   const [weeklyPlan, setWeeklyPlan] = useState<WeeklyPlan | null>(null);
+
+  // Manual stack builder state
+  const [showManualBuilder, setShowManualBuilder] = useState(false);
+  const [manualSubs, setManualSubs] = useState<string[]>([]);
+  const [manualDoses, setManualDoses] = useState<Record<string, number>>({});
+  const [manualSearch, setManualSearch] = useState('');
+  const [manualFilter, setManualFilter] = useState<string>('all');
+  const [manualResult, setManualResult] = useState<OptimizerStackResult | null>(null);
 
   const SUPPORT_LEVELS: Record<string, { label: string; desc: string; subs: string[] }> = {
     basic: { label: 'Базовый', desc: 'Минимум для здоровья', subs: ['nac', 'omega3', 'vitamin_d3'] },
@@ -1842,6 +1850,215 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
             </div>
           </div>
 
+          {/* ===== MANUAL STACK BUILDER ===== */}
+          <div className="card" style={{ marginBottom: 12 }}>
+            <div onClick={() => setShowManualBuilder(!showManualBuilder)} style={{ cursor:'pointer', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+              <h4 style={{ margin: 0, fontSize: 12 }}>💊 Ручной подбор стека</h4>
+              <span style={{ fontSize:16, color:'var(--accent)', transform: showManualBuilder ? 'rotate(180deg)' : 'none' }}>▾</span>
+            </div>
+            {showManualBuilder && <>
+              {/* Search */}
+              <input value={manualSearch} onChange={e => setManualSearch(e.target.value)}
+                placeholder="Поиск по названию или ID..."
+                style={{ width:'100%', padding:'6px 10px', borderRadius:8, border:'1px solid var(--border-color)', background:'var(--bg-secondary)', color:'var(--text-light)', fontSize:11, marginTop:6, boxSizing:'border-box' }} />
+              
+              {/* Category filter */}
+              <div style={{ display:'flex', flexWrap:'wrap', gap:3, marginTop:6 }}>
+                {['all','vitamin','mineral','amino_acid','herb','adaptogen','antioxidant','prebiotic','probiotic','enzyme','peptide','fatty_acid'].map(c => (
+                  <button key={c} onClick={() => setManualFilter(c)}
+                    style={{ padding:'2px 6px', borderRadius:4, fontSize:9, cursor:'pointer', border:'none',
+                      background: manualFilter === c ? 'var(--accent)' : 'var(--bg-secondary)',
+                      color: manualFilter === c ? '#000' : 'var(--text-dim)', fontWeight: manualFilter === c ? 700 : 400 }}>{c.replace(/_/g,' ')}</button>
+                ))}
+              </div>
+
+              {/* Substance list */}
+              <div style={{ maxHeight:200, overflowY:'auto', marginTop:6, border:'1px solid var(--border-color)', borderRadius:6 }}>
+                {ALL_SUBSTANCES
+                  .filter(s => {
+                    if (manualFilter !== 'all' && !s.categories.some(c => c.includes(manualFilter) || s.type === manualFilter)) return false;
+                    if (manualSearch && !s.name.toLowerCase().includes(manualSearch.toLowerCase()) && !s.id.toLowerCase().includes(manualSearch.toLowerCase())) return false;
+                    return true;
+                  })
+                  .slice(0, 40)
+                  .map(s => {
+                    const sel = manualSubs.includes(s.id);
+                    return (
+                      <div key={s.id} onClick={() => setManualSubs(prev => sel ? prev.filter(id => id !== s.id) : [...prev, s.id])}
+                        style={{ display:'flex', alignItems:'center', gap:6, padding:'3px 6px', cursor:'pointer', fontSize:10,
+                          background: sel ? 'rgba(0,230,138,0.08)' : 'transparent', borderBottom:'1px solid var(--border-color)',
+                          color: sel ? '#00e68a' : 'var(--text-light)' }}>
+                        <span style={{ width:14, height:14, borderRadius:3, display:'inline-flex', alignItems:'center', justifyContent:'center',
+                          border:`1px solid ${sel ? '#00e68a' : 'var(--border)'}`,
+                          background: sel ? '#00e68a' : 'transparent', color:'#000', fontSize:9, fontWeight:700 }}>{sel ? '✓' : ''}</span>
+                        <span style={{ fontWeight:500 }}>{s.name}</span>
+                        <span style={{ color:'var(--text-dim)', fontSize:8 }}>{s.id}</span>
+                        <span style={{ color:'var(--text-dim)', fontSize:8, marginLeft:'auto' }}>{s.type}</span>
+                      </div>
+                    );
+                  })}
+                {ALL_SUBSTANCES.filter(s => {
+                  if (manualFilter !== 'all' && !s.categories.some(c => c.includes(manualFilter) || s.type === manualFilter)) return false;
+                  if (manualSearch && !s.name.toLowerCase().includes(manualSearch.toLowerCase()) && !s.id.toLowerCase().includes(manualSearch.toLowerCase())) return false;
+                  return true;
+                }).length > 40 && <div style={{ fontSize:9, color:'var(--text-dim)', textAlign:'center', padding:6 }}>Показаны 40 из большего числа. Уточните поиск.</div>}
+              </div>
+
+              {/* Selected substances with doses */}
+              {manualSubs.length > 0 && (
+                <div style={{ marginTop:6 }}>
+                  <div style={{ fontSize:10, fontWeight:600, marginBottom:4 }}>Выбрано ({manualSubs.length}):</div>
+                  <div style={{ display:'flex', flexWrap:'wrap', gap:3 }}>
+                    {manualSubs.map(id => {
+                      const sub = ALL_SUBSTANCES.find(s => s.id === id);
+                      return (
+                        <div key={id} style={{ display:'flex', alignItems:'center', gap:4, padding:'3px 6px', borderRadius:6,
+                          background:'rgba(0,230,138,0.06)', border:'1px solid rgba(0,230,138,0.2)', fontSize:10 }}>
+                          <span>{sub?.name || id}</span>
+                          <input type="number" min={0} max={5000} step={50} value={manualDoses[id] || ''}
+                            onChange={e => setManualDoses(prev => ({...prev, [id]: Number(e.target.value) || 0}))}
+                            placeholder="мг"
+                            style={{ width:50, padding:'2px 4px', borderRadius:4, border:'1px solid var(--border)', background:'var(--bg-secondary)', color:'var(--text-light)', fontSize:9 }} />
+                          <span onClick={() => setManualSubs(prev => prev.filter(x => x !== id))}
+                            style={{ color:'#ef4444', cursor:'pointer', fontSize:12, fontWeight:700 }}>×</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Presets */}
+              <div style={{ marginTop:6 }}>
+                <div style={{ fontSize:9, color:'var(--text-dim)', marginBottom:3 }}>Быстрые пресеты:</div>
+                <div style={{ display:'flex', flexWrap:'wrap', gap:3 }}>
+                  {[
+                    { label:'Масса', ids:['AA_NAC','VIT_D3','MIN_MAGNESIUM','MIN_ZINC','VIT_Q10','VIT_C','MIN_SELENIUM'] },
+                    { label:'Сушка', ids:['AA_L_CARNITINE','AO_GREEN_TEA','AO_EGCG','VIT_B_COMPLEX','VIT_C','AA_NAC','AO_MELATONIN'] },
+                    { label:'Печень', ids:['AA_NAC','AD_MILK_THISTLE','AA_TUDCA','VIT_LIPOIC_R','VIT_CHOLINE'] },
+                    { label:'Сердце', ids:['VIT_Q10','MIN_MAGNESIUM','VIT_OMEGA3','AA_TAURINE','AO_CURCUMIN','VIT_K2_MK7'] },
+                    { label:'Суставы', ids:['AA_GLUCOSAMINE','AA_CHONDROITIN','AA_MSM','AA_COLLAGEN','AA_HYALURONIC','AO_BOSWELLIA'] },
+                    { label:'Мозг', ids:['AA_L_THEANINE','AO_GINKGO','AD_LIONS_MANE','VIT_B12_METHYL','VIT_D3','VIT_OMEGA3','MIN_MAGNESIUM'] },
+                    { label:'Сон', ids:['AO_MELATONIN','MIN_MAGNESIUM','AA_L_THEANINE','AA_L_GLYCINE','AO_ASHWAGANDHA','VIT_B6'] },
+                    { label:'Иммунитет', ids:['VIT_C','MIN_ZINC','VIT_D3','AO_ELDERBERRY','AO_ECHINACEA','AO_QUERCETIN','PRE_PROBIOTICS'] },
+                  ].map(p => (
+                    <button key={p.label} onClick={() => { setManualSubs(p.ids); setManualResult(null); }}
+                      style={{ padding:'3px 8px', borderRadius:4, fontSize:9, cursor:'pointer', border:'none',
+                        background:'rgba(139,92,246,0.1)', color:'#8b5cf6', fontWeight:500 }}>{p.label}</button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Build button */}
+              <button onClick={() => {
+                if (manualSubs.length === 0) return;
+                const result = newOptimizeStack(manualSubs);
+                setManualResult(result);
+              }} style={{
+                width:'100%', padding:'10px', borderRadius:6, border:'none', cursor:'pointer', marginTop:8,
+                background: 'linear-gradient(135deg, #00e68a, #00c853)', color:'#000', fontWeight:700, fontSize:13,
+                boxShadow: '0 2px 8px rgba(0,230,138,0.3)', opacity: manualSubs.length === 0 ? 0.5 : 1,
+              }} disabled={manualSubs.length === 0}>
+                🧬 Построить стек ({manualSubs.length} веществ)
+              </button>
+
+              {/* Results */}
+              {manualResult && (
+                <div style={{ marginTop:8 }}>
+                  {/* System coverage */}
+                  <div style={{ fontSize:10, fontWeight:600, marginBottom:4 }}>🛡 Покрытие систем</div>
+                  <div style={{ display:'flex', flexDirection:'column', gap:2, marginBottom:6 }}>
+                    {Object.entries(manualResult.systemCoverage).map(([sys, cov]) => (
+                      <div key={sys} style={{ display:'flex', alignItems:'center', gap:4, fontSize:9 }}>
+                        <span style={{ width:70, textTransform:'capitalize' }}>{sys}</span>
+                        <div style={{ flex:1, height:6, background:'rgba(255,255,255,0.06)', borderRadius:3, overflow:'hidden' }}>
+                          <div style={{ width:`${Math.min(100, cov*100)}%`, height:'100%', borderRadius:3,
+                            background: cov > 0.6 ? '#22c55e' : cov > 0.3 ? '#eab308' : '#ef4444' }} />
+                        </div>
+                        <span style={{ width:30, textAlign:'right', color:'var(--text-dim)' }}>{(cov*100).toFixed(0)}%</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Per-substance breakdown */}
+                  <div style={{ fontSize:10, fontWeight:600, marginBottom:4 }}>📦 Повещественный разбор</div>
+                  <div style={{ display:'flex', flexDirection:'column', gap:2 }}>
+                    {manualResult.perSubstance.slice(0, 10).map(ps => (
+                      <div key={ps.id} style={{ fontSize:9, padding:'3px 6px', background:'rgba(139,92,246,0.04)', borderRadius:4 }}>
+                        <div style={{ fontWeight:600 }}>{ps.name}</div>
+                        <div style={{ color:'var(--text-dim)', fontSize:8 }}>
+                          Системы: {Object.entries(ps.systems).filter(([_,v]) => v > 0).map(([s,v]) => `${s}:${(v*100).toFixed(0)}%`).join(', ') || '—'}
+                          <span style={{ marginLeft:6 }}>Категории: {ps.categories.join(', ')}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Synergies */}
+                  {manualResult.synergiesInStack.length > 0 && (
+                    <div style={{ marginTop:6 }}>
+                      <div style={{ fontSize:10, fontWeight:600, color:'#22c55e', marginBottom:3 }}>✅ Синергии ({manualResult.synergiesInStack.length})</div>
+                      <div style={{ display:'flex', flexWrap:'wrap', gap:3 }}>
+                        {manualResult.synergiesInStack.map((s, i) => (
+                          <span key={i} style={{ fontSize:8, padding:'2px 5px', borderRadius:3, background:'rgba(34,197,94,0.08)', color:'#22c55e', border:'1px solid rgba(34,197,94,0.2)' }}>
+                            {s.aName} + {s.bName}: {s.mechanism}
+                            <span style={{ color:'var(--text-dim)', marginLeft:3 }}>({s.severity})</span>
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Conflicts */}
+                  {manualResult.conflictsInStack.length > 0 && (
+                    <div style={{ marginTop:6 }}>
+                      <div style={{ fontSize:10, fontWeight:600, color:'#ef4444', marginBottom:3 }}>⚠ Конфликты ({manualResult.conflictsInStack.length})</div>
+                      <div style={{ display:'flex', flexWrap:'wrap', gap:3 }}>
+                        {manualResult.conflictsInStack.map((c, i) => (
+                          <span key={i} style={{ fontSize:8, padding:'2px 5px', borderRadius:3, background:'rgba(239,68,68,0.08)', color:'#ef4444', border:'1px solid rgba(239,68,68,0.2)' }}>
+                            {c.aName} + {c.bName}: {c.mechanism}
+                            <span style={{ color:'var(--text-dim)', marginLeft:3 }}>({c.severity})</span>
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Ranked substances */}
+                  <div style={{ marginTop:6 }}>
+                    <div style={{ fontSize:10, fontWeight:600, color:'var(--text-dim)', marginBottom:3 }}>📊 Ранжирование (set cover)</div>
+                    <div style={{ fontSize:8, color:'var(--text-dim)' }}>
+                      {manualResult.rankedSubstances.map((r, i) => (
+                        <div key={r.id} style={{ padding:'1px 4px', display:'flex', justifyContent:'space-between' }}>
+                          <span>{i+1}. {r.name}</span>
+                          <span>+{(r.incrementalCoverage*100).toFixed(0)}% → {(r.totalCoverage*100).toFixed(0)}% [{r.systemsGained.join(', ')}]</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Generate weekly plan from manual stack */}
+                  <button onClick={() => {
+                    const baseWeights: Record<string, number> = {};
+                    const drugLoads: Record<string, number> = {};
+                    for (const sys of ['cardio','hepatic','renal','neuro','endocrine','hematologic','reproductive','musculoskeletal']) {
+                      baseWeights[sys] = 15;
+                      drugLoads[sys] = linked.course.length * 2;
+                    }
+                    const plan = generateWeeklyPlan(manualSubs, riskCalcMethod, baseWeights, drugLoads, {}, manualResult.systemCoverage);
+                    setWeeklyPlan(plan);
+                  }} style={{
+                    width:'100%', padding:'10px', borderRadius:6, border:'none', cursor:'pointer', marginTop:8,
+                    background: 'linear-gradient(135deg, #8b5cf6, #6366f1)', color:'#fff', fontWeight:700, fontSize:13,
+                    boxShadow: '0 2px 8px rgba(139,92,246,0.3)',
+                  }}>
+                    📅 Недельный план для этого стека
+                  </button>
+                </div>
+              )}
+            </>}
+          </div>
+
           {supportResult && (
             <>
               <div className="card" style={{ marginBottom: 12, textAlign: 'center' }}>
@@ -2924,18 +3141,45 @@ const RecsTab: React.FC<{ profile: any; labs: any; readiness: any; course: any }
 };
 
 const OptimizerSection: React.FC<{ drugs: string[] }> = ({ drugs }) => {
-  const [optResult, setOptResult] = React.useState<any>(null);
+  const [optResult, setOptResult] = React.useState<OptimizerStackResult | null>(null);
   const run = () => {
-    const input: OptStackInput = { compounds: drugs.length > 0 ? drugs : ['testosterone'], riskLevels: { hepatic:'medium',renal:'low',cardiac:'low',lipids:'medium',bp:'low',prostate:'low',cns:'low',blood:'low',joints:'low' }, hasOrals: false, has19nor: false, hasTren: false, hasGH: false, hasInsulin: false, goal: 'strength' };
-    setOptResult(optimizeStack(input));
+    const available = drugs.length > 0 ? drugs : ['testosterone'];
+    const result = newOptimizeStack(available);
+    setOptResult(result);
   };
   React.useEffect(() => { if (drugs.length > 0) run(); }, [drugs]);
   return (<div>
     {optResult && <div style={{ maxHeight:250,overflowY:'auto' }}>
-      {optResult.essential?.length > 0 && <div style={{ marginBottom:4 }}><div style={{ fontSize:9,fontWeight:600,color:'#ef4444' }}>🔴 Обязательно</div>{optResult.essential.map((r:any,i:number)=><div key={i} style={{ fontSize:8,padding:'2px 6px' }}>{r.name} — {r.dosage} {r.timing}</div>)}</div>}
-      {optResult.recommended?.length > 0 && <div style={{ marginBottom:4 }}><div style={{ fontSize:9,fontWeight:600,color:'#f59e0b' }}>🟠 Рекомендовано</div>{optResult.recommended.map((r:any,i:number)=><div key={i} style={{ fontSize:8,padding:'2px 6px' }}>{r.name} — {r.dosage} {r.timing}</div>)}</div>}
-      {optResult.optional?.length > 0 && <div><div style={{ fontSize:9,fontWeight:600,color:'#22c55e' }}>🟢 Опционально</div>{optResult.optional.map((r:any,i:number)=><div key={i} style={{ fontSize:8,padding:'2px 6px' }}>{r.name} — {r.dosage} {r.timing}</div>)}</div>}
-      {optResult.totalMonthlyCost && <div style={{ fontSize:8,color:'var(--text-dim)',marginTop:4 }}>💰 {optResult.totalMonthlyCost}</div>}
+      {optResult.rankedSubstances.length > 0 && (
+        <div>
+          <div style={{ fontSize:9,fontWeight:600,color:'var(--text-dim)',marginBottom:4 }}>📊 Ранжированные вещества ({optResult.rankedSubstances.length})</div>
+          {optResult.rankedSubstances.slice(0,15).map((r,i) => (
+            <div key={i} style={{ fontSize:8,padding:'2px 6px',display:'flex',justifyContent:'space-between' }}>
+              <span>{r.name}</span>
+              <span style={{ color:'var(--text-dim)' }}>+{r.incrementalCoverage.toFixed(2)} ({r.systemsGained.join(', ')})</span>
+            </div>
+          ))}
+        </div>
+      )}
+      {optResult.synergiesInStack.length > 0 && (
+        <div style={{ marginTop:4 }}>
+          <div style={{ fontSize:9,fontWeight:600,color:'#22c55e' }}>✅ Синергии ({optResult.synergiesInStack.length})</div>
+          {optResult.synergiesInStack.slice(0,5).map((s,i) => (
+            <div key={i} style={{ fontSize:8,padding:'1px 6px',color:'#22c55e' }}>{s.aName}+{s.bName}: {s.mechanism}</div>
+          ))}
+        </div>
+      )}
+      {optResult.conflictsInStack.length > 0 && (
+        <div style={{ marginTop:4 }}>
+          <div style={{ fontSize:9,fontWeight:600,color:'#ef4444' }}>⚠ Конфликты ({optResult.conflictsInStack.length})</div>
+          {optResult.conflictsInStack.slice(0,5).map((c,i) => (
+            <div key={i} style={{ fontSize:8,padding:'1px 6px',color:'#ef4444' }}>{c.aName}+{c.bName}: {c.mechanism}</div>
+          ))}
+        </div>
+      )}
+      <div style={{ fontSize:8,color:'var(--text-dim)',marginTop:4 }}>
+        Покрытие: {Object.entries(optResult.systemCoverage).map(([s,v]) => `${s}:${(v*100).toFixed(0)}%`).join(', ')}
+      </div>
     </div>}
   </div>);
 };
