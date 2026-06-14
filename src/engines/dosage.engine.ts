@@ -2,14 +2,16 @@ import { SYRINGE_SPECS } from '../core/constants';
 import { DoseRequest, DoseResult } from '../core/types';
 
 export function calculateDose(req: DoseRequest): DoseResult {
+  if (!req) return { volumeMl: 0, divisions: 0, dosesPerVial: 0, flags: ['invalid_input'] };
   const flags: string[] = [];
   let dose = req.targetDoseMg ?? 0;
   if (req.bodyWeightKg && req.targetDosePerKg) dose = req.targetDosePerKg * req.bodyWeightKg;
-  if (dose <= 0 || req.concentrationMgPerMl <= 0) {
+  const conc = req.concentrationMgPerMl;
+  if (dose <= 0 || !conc || typeof conc !== 'number' || conc <= 0) {
     flags.push('invalid_input');
     return { volumeMl: 0, divisions: 0, dosesPerVial: 0, flags };
   }
-  let vol = dose / req.concentrationMgPerMl;
+  let vol = dose / conc;
   if ((req.roundingStepMl ?? 0) > 0) vol = Math.round(vol / req.roundingStepMl!) * req.roundingStepMl!;
   const syr = SYRINGE_SPECS[req.syringeVolumeMl];
   if (!syr) flags.push('unknown_syringe');

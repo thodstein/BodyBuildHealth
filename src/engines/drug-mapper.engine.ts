@@ -315,6 +315,7 @@ const GENERIC_PATTERNS: [RegExp, string][] = [
  * Returns the original name if no match found.
  */
 function resolveDrugName(input: string): string {
+  if (input == null) return '';
   const name = input.toLowerCase().trim();
 
   // 1. Exact match in DRUG_DATABASE
@@ -361,11 +362,18 @@ interface PathologyAgg {
  * @returns MapperResult with sorted pathologies, unique biomarkers, and unknown drugs.
  */
 export function mapStackToPathologies(drugs: DrugEntry[]): MapperResult {
+  if (!drugs || !Array.isArray(drugs)) {
+    return { activePathologies: [], requiredBiomarkers: [], unknownDrugs: [], totalDrugs: 0, knownDrugs: 0 };
+  }
   const pathologyAgg: Record<string, PathologyAgg> = {};
   const allMarkers = new Set<string>();
   const unknownDrugs: string[] = [];
 
   for (const drug of drugs) {
+    if (!drug || !drug.name) {
+      unknownDrugs.push(String(drug || 'null'));
+      continue;
+    }
     const rawName = drug.name.toLowerCase().trim();
     const name = resolveDrugName(rawName);
     const record = DRUG_DATABASE[name];
@@ -375,11 +383,13 @@ export function mapStackToPathologies(drugs: DrugEntry[]): MapperResult {
       continue;
     }
 
+    if (!record.pathologies) continue;
     for (const path of record.pathologies) {
       const pid = path.id;
       const strength = path.triggerStrength || 0;
 
       // Collect all markers
+      if (!path.requiredMarkers) continue;
       for (const m of path.requiredMarkers) {
         allMarkers.add(m);
       }

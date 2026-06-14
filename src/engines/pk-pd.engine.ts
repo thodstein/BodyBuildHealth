@@ -30,15 +30,17 @@ export function concentrationAtTime({ dose, bioavailability = 100, Vd, tHalfHour
   return (dose * F / Vd) * Math.exp(-k * timeSinceDose);
 }
 
-export function simulateCourse(params: { dose: number; bio: number; tHalfHours: number; scheduleDays: number[]; totalDays: number }) {
+export function simulateCourse(params: { dose: number; bio: number; tHalfHours: number; scheduleDays?: number[]; totalDays: number }) {
+  if (!params) return [];
   const kDay = eliminationConstant(params.tHalfHours) * 24;
   const F = params.bio / 100;
   const D = params.dose * F;
+  const scheduleDays = params.scheduleDays || [];
   let C = 0;
   const days: Array<{ day: number; inject: boolean; concentration: number }> = [];
 
-  for (let day = 1; day <= params.totalDays; day++) {
-    const inject = params.scheduleDays.includes(day);
+  for (let day = 1; day <= (params.totalDays || 0); day++) {
+    const inject = scheduleDays.includes(day);
     C = C * Math.exp(-kDay * 1);
     if (inject) C += D;
     days.push({ day, inject, concentration: C });

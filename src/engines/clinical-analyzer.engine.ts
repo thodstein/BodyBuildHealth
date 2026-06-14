@@ -117,6 +117,7 @@ function stratify(pct: number): { status: string; alertLevel: number } {
 // ═══════════════════════════════════════════════════════════════════════════
 
 function normalizeCompoundName(name: string): string {
+  if (!name) return '';
   const n = name.toLowerCase().trim();
   // Direct matches in COMPOUND_RISK_MAP
   if (COMPOUND_RISK_MAP[n]) return n;
@@ -139,7 +140,6 @@ function normalizeCompoundName(name: string): string {
   if (n.includes('ghrp') || n.includes('hexarelin') || n.includes('ipamorelin')) return 'peptides_ghrp';
   if (n.includes('cjc') || n.includes('sermorelin') || n.includes('tesamorelin') || n.includes('mk677')) return 'peptides_ghrh';
   if (n.includes('igf')) return 'igf1';
-  // SARMs → no clinical mapping, skip
   return n;
 }
 
@@ -148,28 +148,33 @@ function normalizeCompoundName(name: string): string {
 // ═══════════════════════════════════════════════════════════════════════════
 
 export function analyzeClinicalRisks(input: ClinicalAnalysisInput): ClinicalAnalysisOutput {
+  if (!input) {
+    return { results: [], systems: [], overallMaxRisk: 0, requiredLabPanel: [], requiredInstrumental: [], markersAnalyzed: 0, markersMissing: [], summary: 'Нет данных для анализа.' };
+  }
   const results: PathologyResult[] = [];
-  const allMarkerCodes = new Set(input.markers.map(m => m.code));
-  const markerValueMap = new Map(input.markers.map(m => [m.code, m.value]));
+  const markers = input.markers || [];
+  const allMarkerCodes = new Set(markers.map(m => m.code));
+  const markerValueMap = new Map(markers.map(m => [m.code, m.value]));
 
   // Collect required panels from user's compounds
   const requiredLab = new Set<string>();
   const requiredInst = new Set<string>();
-  const normalizedCompounds = input.compounds.map(normalizeCompoundName).filter(n => COMPOUND_RISK_MAP[n]);
+  const rawCompounds = input.compounds || [];
+  const normalizedCompounds = rawCompounds.map(normalizeCompoundName).filter(n => n && COMPOUND_RISK_MAP[n]);
 
   for (const c of normalizedCompounds) {
     const map = COMPOUND_RISK_MAP[c];
     if (map) {
-      map.labPanel.forEach(l => requiredLab.add(l));
-      map.instrumentalPanel.forEach(i => requiredInst.add(i));
+      (map.labPanel || []).forEach(l => requiredLab.add(l));
+      (map.instrumentalPanel || []).forEach(i => requiredInst.add(i));
     }
   }
 
   // Analyze each pathology
-  for (const [id, pathology] of Object.entries(CLINICAL_PATHOLOGIES)) {
+  for (const [id, pathology] of Object.entries(CLINICAL_PATHOLOGIES || {})) {
     // Find which markers the user has for this pathology
     const userMarkers: { code: string; value: number }[] = [];
-    for (const mc of pathology.linkedMarkers) {
+    for (const mc of (pathology?.linkedMarkers || [])) {
       const val = markerValueMap.get(mc);
       if (val !== undefined) userMarkers.push({ code: mc, value: val });
     }
@@ -194,42 +199,47 @@ export function analyzeClinicalRisks(input: ClinicalAnalysisInput): ClinicalAnal
 
     // Genetic factor
     let genFactor = 1.0;
-    for (const g of input.genetics) {
-      const gf = pathology.genetics[g];
+    const genetics = input.genetics || [];
+    for (const g of genetics) {
+      const gf = (pathology?.genetics || {})[g];
       if (gf) genFactor = Math.max(genFactor, gf);
     }
 
     // Compliance penalty
-    const compliancePenalty = input.weeksSinceLab > 4
-      ? Math.min(3.0, 1.0 + (input.weeksSinceLab - 4) * 0.15)
+    const wsl = input.weeksSinceLab ?? 0;
+    const compliancePenalty = wsl > 4
+      ? Math.min(3.0, 1.0 + (wsl - 4) * 0.15)
       : 1.0;
 
     // Z_total
-    const zTotal = sev95 * Math.max(1, input.tWeeks) * genFactor * compliancePenalty;
+    const tw = input.tWeeks ?? 0;
+    const zTotal = sev95 * Math.max(1, tw) * genFactor * compliancePenalty;
 
     // Sigmoid
-    const riskPct = logisticRisk(zTotal, pathology.kAggression, pathology.zCrit);
+    const kAgg = pathology?.kAggression ?? 1;
+    const zCrit = (pathology?.zCrit && pathology.zCrit > 0) ? pathology.zCrit : 1;
+    const riskPct = logisticRisk(zTotal, kAgg, zCrit);
     const { status, alertLevel } = stratify(riskPct);
 
     // Which user compounds trigger this pathology
     const contributingCompounds = normalizedCompounds.filter(c => {
       const map = COMPOUND_RISK_MAP[c];
-      return map?.riskIds.includes(id);
+      return map?.riskIds?.includes(id);
     });
 
     results.push({
       pathologyId: id,
-      pathologyName: pathology.name,
-      systemName: pathology.systemName,
-      systemIcon: pathology.systemIcon,
+      pathologyName: pathology?.name || id,
+      systemName: pathology?.systemName || '',
+      systemIcon: pathology?.systemIcon || '',
       hillScore: Math.round(maxHill * 100) / 100,
       severity95: Math.round(sev95 * 100) / 100,
       riskPercent: Math.round(riskPct * 10) / 10,
       status,
       alertLevel,
       markersUsed: userMarkers.map(m => m.code),
-      pharmaTriggers: pathology.pharmaTriggers,
-      instrumental: pathology.instrumentalVerification,
+      pharmaTriggers: pathology?.pharmaTriggers || [],
+      instrumental: pathology?.instrumentalVerification || '',
       contributingCompounds,
     });
   }
@@ -239,41 +249,43 @@ export function analyzeClinicalRisks(input: ClinicalAnalysisInput): ClinicalAnal
 
   // ── Add drug-only pathologies (from compound mapping, no lab markers needed) ──
   const seenPathologyIds = new Set(results.map(r => r.pathologyId));
-  const compliancePenalty = input.weeksSinceLab > 4
-    ? Math.min(3.0, 1.0 + (input.weeksSinceLab - 4) * 0.15)
+  const wsl2 = input.weeksSinceLab ?? 0;
+  const compliancePenalty2 = wsl2 > 4
+    ? Math.min(3.0, 1.0 + (wsl2 - 4) * 0.15)
     : 1.0;
 
   for (const compoundName of normalizedCompounds) {
     const riskMap = COMPOUND_RISK_MAP[compoundName];
     if (!riskMap) continue;
 
-    for (const riskId of riskMap.riskIds) {
+    for (const riskId of (riskMap.riskIds || [])) {
       if (seenPathologyIds.has(riskId)) continue;
       seenPathologyIds.add(riskId);
 
       const pathology = CLINICAL_PATHOLOGIES[riskId];
       if (!pathology) continue;
 
-      // Estimate risk from drug exposure only
-      const baseRisk = Math.min(40, Math.max(10, (15 / pathology.zCrit) * 50));
-      const exposureMod = Math.min(1.5, 1 + (input.tWeeks - 4) * 0.02);
-      const drugRisk = Math.min(95, Math.round(baseRisk * exposureMod * compliancePenalty * 10) / 10);
+      const zCrit2 = (pathology.zCrit && pathology.zCrit > 0) ? pathology.zCrit : 1;
+      const baseRisk = Math.min(40, Math.max(10, (15 / zCrit2) * 50));
+      const tw2 = input.tWeeks ?? 0;
+      const exposureMod = Math.min(1.5, 1 + (tw2 - 4) * 0.02);
+      const drugRisk = Math.min(95, Math.round(baseRisk * exposureMod * compliancePenalty2 * 10) / 10);
 
       const { status, alertLevel } = stratify(drugRisk);
 
       results.push({
         pathologyId: riskId,
-        pathologyName: pathology.name,
-        systemName: pathology.systemName,
-        systemIcon: pathology.systemIcon,
+        pathologyName: pathology.name || riskId,
+        systemName: pathology.systemName || '',
+        systemIcon: pathology.systemIcon || '',
         hillScore: 0,
         severity95: 0,
         riskPercent: drugRisk,
         status,
         alertLevel,
         markersUsed: [],
-        pharmaTriggers: pathology.pharmaTriggers,
-        instrumental: pathology.instrumentalVerification,
+        pharmaTriggers: pathology.pharmaTriggers || [],
+        instrumental: pathology.instrumentalVerification || '',
         contributingCompounds: [compoundName],
       });
     }
@@ -285,12 +297,12 @@ export function analyzeClinicalRisks(input: ClinicalAnalysisInput): ClinicalAnal
   // Group by system
   const systemMap = new Map<string, PathologyResult[]>();
   for (const r of results) {
-    const sysKey = SYSTEM_GROUPS.find(g => g.pathologyIds.includes(r.pathologyId))?.systemKey || 'other';
+    const sysKey = (SYSTEM_GROUPS || []).find(g => (g.pathologyIds || []).includes(r.pathologyId))?.systemKey || 'other';
     if (!systemMap.has(sysKey)) systemMap.set(sysKey, []);
     systemMap.get(sysKey)!.push(r);
   }
 
-  const systems = SYSTEM_GROUPS.map(g => ({
+  const systems = (SYSTEM_GROUPS || []).map(g => ({
     systemKey: g.systemKey,
     systemName: g.systemName,
     icon: g.icon,
@@ -300,8 +312,8 @@ export function analyzeClinicalRisks(input: ClinicalAnalysisInput): ClinicalAnal
 
   // Markers missing (in DB but not in user's labs)
   const allLabMarkers = new Set<string>();
-  for (const [, p] of Object.entries(CLINICAL_PATHOLOGIES)) {
-    p.linkedMarkers.forEach(m => allLabMarkers.add(m));
+  for (const [, p] of Object.entries(CLINICAL_PATHOLOGIES || {})) {
+    (p?.linkedMarkers || []).forEach(m => allLabMarkers.add(m));
   }
   const markersMissing = [...allLabMarkers].filter(m => !allMarkerCodes.has(m)).sort();
 
@@ -323,7 +335,7 @@ export function analyzeClinicalRisks(input: ClinicalAnalysisInput): ClinicalAnal
     overallMaxRisk: results.length > 0 ? results[0].riskPercent : 0,
     requiredLabPanel: [...requiredLab].sort(),
     requiredInstrumental: [...requiredInst].sort(),
-    markersAnalyzed: new Set(results.flatMap(r => r.markersUsed)).size,
+    markersAnalyzed: new Set(results.flatMap(r => r.markersUsed || [])).size,
     markersMissing,
     summary,
   };

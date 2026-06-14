@@ -63,11 +63,13 @@ export interface PKPDOutput {
  * Peak/trough delta > 40% → hormonal swing flag.
  */
 export function computePKPD(drugs: DrugDoseInput[]): PKPDOutput[] {
-  return drugs.map((drug) => {
-    const tHalf = ESTER_HALF_LIFE_DAYS[drug.ester] || (7.0 / drug.injectionsPerWeek);
+  if (!Array.isArray(drugs)) return [];
+  return drugs.filter(Boolean).map((drug) => {
+    const injPerWeek = Math.max(drug.injectionsPerWeek || 0, 0.1);
+    const tHalf = ESTER_HALF_LIFE_DAYS[drug.ester] || (7.0 / injPerWeek);
     const k = Math.log(2) / Math.max(tHalf, 0.01);
-    const dosePerInjection = drug.mgPerWeek / Math.max(drug.injectionsPerWeek, 1);
-    const intervalDays = 7.0 / drug.injectionsPerWeek;
+    const dosePerInjection = (drug.mgPerWeek || 0) / Math.max(drug.injectionsPerWeek || 0, 1);
+    const intervalDays = 7.0 / injPerWeek;
 
     const dailyProfile: number[] = new Array(30).fill(0);
     let currentConc = 0;
@@ -152,8 +154,9 @@ const INTERACTION_RULES: InteractionRule[] = [
 ];
 
 export function computeInteractions(drugNames: string[]): InteractionOutput[] {
+  if (!Array.isArray(drugNames)) return [];
   const results: InteractionOutput[] = [];
-  const lower = drugNames.map(n => n.toLowerCase().trim());
+  const lower = drugNames.filter(n => n != null).map(n => n.toLowerCase().trim());
   const seen = new Set<string>();
 
   for (const rule of INTERACTION_RULES) {
@@ -189,16 +192,21 @@ export interface VitalsOutput {
 }
 
 export function computeVitals(v: VitalsInput): VitalsOutput {
+  if (!v) return { hrv: 0, rhr: 0, bpSys: 0, bpDia: 0, alerts: ['Ошибка: нет данных по витальным показателям'] };
+  const hrv = v.hrv ?? 0;
+  const rhr = v.rhr ?? 0;
+  const bpSys = v.bpSys ?? 0;
+  const bpDia = v.bpDia ?? 0;
   const alerts: string[] = [];
 
-  if (v.hrv < 35) {
+  if (hrv < 35) {
     alerts.push(
-      `ВНИМАНИЕ: Истощение ЦНС (Симпатический овердрайв). HRV = ${v.hrv} мс < 35 мс. Рекомендация: делод-неделя, магний 400 мг, мелатонин 3-5 мг.`
+      `ВНИМАНИЕ: Истощение ЦНС (Симпатический овердрайв). HRV = ${hrv} мс < 35 мс. Рекомендация: делод-неделя, магний 400 мг, мелатонин 3-5 мг.`
     );
   }
-  if (v.rhr > 75) {
+  if (rhr > 75) {
     alerts.push(
-      `ВНИМАНИЕ: Перегрузка миокарда или гиперволемия. RHR = ${v.rhr} уд/мин > 75. Рекомендация: проверка HCT, флеботомия при >52%, гидратация.`
+      `ВНИМАНИЕ: Перегрузка миокарда или гиперволемия. RHR = ${rhr} уд/мин > 75. Рекомендация: проверка HCT, флеботомия при >52%, гидратация.`
     );
   }
   if (v.bpSys > 140 || v.bpDia > 90) {
@@ -237,16 +245,21 @@ export interface BioAgeOutput {
  * Toxic_Load  = total_weekly_mg / 200
  */
 export function computeBioAge(input: BioAgeInput): BioAgeOutput {
-  const bpPenalty = Math.max(0, (input.vitals.bpSys - 120) * 0.15);
-  const hrvPenalty = Math.max(0, (60 - input.vitals.hrv) * 0.2);
-  const toxicPenalty = input.totalWeeklyMg / 200;
+  if (!input || !input.vitals) return { chronologicalAge: 0, biologicalAge: 0, ageAcceleration: 0, bpPenalty: 0, hrvPenalty: 0, toxicLoadPenalty: 0, agingRate: 'Нет данных' };
+  const bpSys = input.vitals.bpSys ?? 120;
+  const hrv = input.vitals.hrv ?? 60;
+  const totalMg = input.totalWeeklyMg ?? 0;
+  const age = input.chronologicalAge ?? 0;
+  const bpPenalty = Math.max(0, (bpSys - 120) * 0.15);
+  const hrvPenalty = Math.max(0, (60 - hrv) * 0.2);
+  const toxicPenalty = totalMg / 200;
 
-  const bioAge = input.chronologicalAge + bpPenalty + hrvPenalty + toxicPenalty;
-  const acceleration = bioAge - input.chronologicalAge;
+  const bioAge = age + bpPenalty + hrvPenalty + toxicPenalty;
+  const acceleration = bioAge - age;
   const agingRate = `Вы стареете на ${(1 + Math.max(0, acceleration)).toFixed(2)} лет за календарный год.`;
 
   return {
-    chronologicalAge: Math.round(input.chronologicalAge * 10) / 10,
+    chronologicalAge: Math.round(age * 10) / 10,
     biologicalAge: Math.round(bioAge * 100) / 100,
     ageAcceleration: Math.round(acceleration * 100) / 100,
     bpPenalty: Math.round(bpPenalty * 100) / 100,
@@ -276,14 +289,14 @@ export interface PCTRebootOutput {
 }
 
 export function computePCTReboot(input: PCTRebootInput): PCTRebootOutput {
-  if (input.drugs.length === 0) {
+  if (!input || !Array.isArray(input.drugs) || input.drugs.length === 0) {
     return {
       pctStartDay: 0,
       longestHalfLifeDrug: 'none',
       longestHalfLifeDays: 0,
       levelsAtPctStart: 0,
-      has19Nor: input.has19NorInHistory,
-      rebootSuccessProbability: input.has19NorInHistory ? 60 : 100,
+      has19Nor: !!(input?.has19NorInHistory),
+      rebootSuccessProbability: input?.has19NorInHistory ? 60 : 100,
       recommendation: 'Нет активных препаратов. ПКТ не требуется.',
     };
   }
@@ -293,6 +306,7 @@ export function computePCTReboot(input: PCTRebootInput): PCTRebootOutput {
   let longestTH = 0;
 
   for (const drug of input.drugs) {
+    if (!drug) continue;
     const th = ESTER_HALF_LIFE_DAYS[drug.ester] || 7.0;
     if (th > longestTH) {
       longestTH = th;
@@ -301,8 +315,8 @@ export function computePCTReboot(input: PCTRebootInput): PCTRebootOutput {
   }
 
   const k = Math.log(2) / Math.max(longestTH, 0.01);
-  const dosePerInj = longestDrug.mgPerWeek / Math.max(longestDrug.injectionsPerWeek, 1);
-  const intervalDays = 7.0 / Math.max(longestDrug.injectionsPerWeek, 1);
+  const dosePerInj = (longestDrug?.mgPerWeek || 0) / Math.max(longestDrug?.injectionsPerWeek || 0, 1);
+  const intervalDays = 7.0 / Math.max(longestDrug?.injectionsPerWeek || 0, 1);
   const accFactor = 1.0 / (1.0 - Math.exp(-k * intervalDays));
   const initialConc = dosePerInj * accFactor;
 
@@ -319,7 +333,7 @@ export function computePCTReboot(input: PCTRebootInput): PCTRebootOutput {
   if (pctDay === 0) pctDay = Math.max(3, Math.round(3.0 * longestTH));
 
   // 19-nor check
-  const has19NorNow = input.drugs.some(d => NINETEEN_NOR_DRUGS.includes(d.name.toLowerCase()));
+  const has19NorNow = !!(input.drugs.some(d => d && d.name && NINETEEN_NOR_DRUGS.includes((d.name || '').toLowerCase())));
   const effective19Nor = has19NorNow || input.has19NorInHistory;
 
   let baseProb = 85;
@@ -368,14 +382,15 @@ export function runAdvancedDiagnostics(
   vitals: VitalsInput,
   has19NorHistory: boolean,
 ): AdvancedDiagnosticsResult {
-  const pkpd = computePKPD(drugs);
-  const interactions = computeInteractions(drugs.map(d => d.name));
+  const safeDrugs = Array.isArray(drugs) ? drugs : [];
+  const pkpd = computePKPD(safeDrugs);
+  const interactions = computeInteractions(safeDrugs.filter(Boolean).map(d => d.name || ''));
   const vitalsResult = computeVitals(vitals);
 
-  const totalMg = drugs.reduce((sum, d) => sum + d.mgPerWeek, 0);
+  const totalMg = safeDrugs.reduce((sum, d) => sum + (d?.mgPerWeek || 0), 0);
   const bioage = computeBioAge({ chronologicalAge: age, vitals, totalWeeklyMg: totalMg });
 
-  const pctReboot = computePCTReboot({ drugs, has19NorInHistory: has19NorHistory });
+  const pctReboot = computePCTReboot({ drugs: safeDrugs, has19NorInHistory: has19NorHistory });
 
   // Build summary
   const parts: string[] = [];

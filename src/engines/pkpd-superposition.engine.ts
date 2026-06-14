@@ -12,16 +12,22 @@ export function calculateMultiSubstancePKPD(
   weeks: number = 52,
   bayesian: BayesianState = { clearanceK: 1, ec50Shift: 1, lastUpdateWeek: 0 }
 ): ConcentrationPoint[] {
+  if (!course || !Array.isArray(course) || !course.length) return [];
   const result: ConcentrationPoint[] = [];
   const dt = PKPD_DEFAULTS.dt_hours;
   const stepsPerWeek = Math.round(7 * 24 / dt);
   const totalTol: number[] = Array(weeks + 1).fill(0);
+  const b = bayesian ?? { clearanceK: 1, ec50Shift: 1, lastUpdateWeek: 0 };
+  // Allowed values for when PK data is missing
+  const FALLBACK_PK = { bioavailability: 0.8, ka: 0.02, k10: 0.03, k12: 0.01, k21: 0.005, Vd: 50 };
 
   // Группировка и инициализация веществ + расписание болюсов
   const substances = new Map<string, SubstanceState>();
   course.forEach(c => {
+    if (!c) return;
     const sub = PHARMA_DB[c.substanceId];
-    if (!sub) return;
+    if (!sub || !sub.pk) return;
+    const pk = sub.pk;
     const freqStr = String(c.frequency ?? '');
     const freqMatch = freqStr.match(/(\d+)x\/week/);
     const injectionsPerWeek = freqMatch ? parseInt(freqMatch[1]) : 2;
@@ -33,14 +39,15 @@ export function calculateMultiSubstancePKPD(
     if (!substances.has(c.substanceId)) {
       substances.set(c.substanceId, {
         A1: 0, A2: 0, A3: 0,
-        dosePerDay: dosePerInjection * injectionsPerWeek / 7, bio: sub.pk.bioavailability, ka: sub.pk.ka,
-        k10: sub.pk.k10, k12: sub.pk.k12, k21: sub.pk.k21, Vd: sub.pk.Vd,
-        injSchedule: schedule, injDose: dosePerInjection * sub.pk.bioavailability
+        dosePerDay: dosePerInjection * injectionsPerWeek / 7, bio: pk.bioavailability ?? FALLBACK_PK.bioavailability, ka: pk.ka ?? FALLBACK_PK.ka,
+        k10: pk.k10 ?? FALLBACK_PK.k10, k12: pk.k12 ?? FALLBACK_PK.k12, k21: pk.k21 ?? FALLBACK_PK.k21, Vd: (pk.Vd && pk.Vd > 0) ? pk.Vd : FALLBACK_PK.Vd,
+        injSchedule: schedule, injDose: dosePerInjection * (pk.bioavailability ?? FALLBACK_PK.bioavailability)
       });
     } else {
       const ex = substances.get(c.substanceId)!;
+      if (!ex) return;
       schedule.forEach(s => ex.injSchedule.add(s));
-      ex.injDose += dosePerInjection * sub.pk.bioavailability;
+      ex.injDose += dosePerInjection * (pk.bioavailability ?? FALLBACK_PK.bioavailability);
     }
   });
 
@@ -77,7 +84,8 @@ export function calculateMultiSubstancePKPD(
         state.A2 = Math.max(0, state.A2 + (f12 + 2*f22 + 2*f32 + f42) * dt / 6);
         state.A3 = Math.max(0, state.A3 + (f13 + 2*f23 + 2*f33 + f43) * dt / 6);
 
-        const cp = (state.A2 / state.Vd) * (bayesian.clearanceK ?? 1);
+        const vd = (state.Vd > 0) ? state.Vd : FALLBACK_PK.Vd;
+        const cp = (state.A2 / vd) * (b.clearanceK ?? 1);
         weekTotalCp += cp;
         weekIntegralCp += cp * dt;
       });
@@ -85,9 +93,9 @@ export function calculateMultiSubstancePKPD(
       totalTol[w] = Math.min(PKPD_DEFAULTS.maxTol, totalTol[w] + kTol * weekTotalCp * dt);
     }
 
-    const avgCp = weekTotalCp / stepsPerWeek;
-    const combinedEC50 = 400 * (bayesian.ec50Shift ?? 1) * (1 + 0.01 * weekIntegralCp);
-    const effect = Math.max(0, Math.min(100, (avgCp ** 2.5) / (combinedEC50 ** 2.5 + avgCp ** 2.5))) * (1 - totalTol[w]) * 100;
+    const avgCp = weekTotalCp / Math.max(stepsPerWeek, 1);
+    const combinedEC50 = 400 * (b.ec50Shift ?? 1) * (1 + 0.01 * (weekIntegralCp || 0));
+    const effect = Math.max(0, Math.min(100, (isFinite(avgCp) ? avgCp : 0) ** 2.5 / ((isFinite(combinedEC50) ? combinedEC50 : 400) ** 2.5 + (isFinite(avgCp) ? avgCp : 0) ** 2.5))) * (1 - (totalTol[w] || 0)) * 100;
 
     result.push({
       week: w,

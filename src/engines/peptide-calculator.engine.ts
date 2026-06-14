@@ -107,12 +107,15 @@ export const ROUTE_LABELS: Record<string, string> = {
 };
 
 export function computeDilution(input: DilutionInput): DilutionResult {
+  if (!input) return { amountMcg: 0, doseMcg: 0, concentrationMcgPerMl: 0, doseVolumeMl: 0, syringeUnits: 0, syringeUnitsDisplay: '—', dosesPerVial: 0 };
+  const syringe = SYRINGE_TYPES[input.syringeType];
+  if (!syringe) return { amountMcg: 0, doseMcg: 0, concentrationMcgPerMl: 0, doseVolumeMl: 0, syringeUnits: 0, syringeUnitsDisplay: '—', dosesPerVial: 0 };
   const amountMcg = input.amountValue * (input.amountUnit === 'mg' ? 1000 : 1);
   const doseMcg = input.doseValue * (input.doseUnit === 'mg' ? 1000 : 1);
-  const concentrationMcgPerMl = amountMcg / input.dilutionVolumeMl;
+  const dilVol = input.dilutionVolumeMl > 0 ? input.dilutionVolumeMl : 1;
+  const concentrationMcgPerMl = amountMcg / dilVol;
   const doseVolumeMl = doseMcg / concentrationMcgPerMl;
 
-  const syringe = SYRINGE_TYPES[input.syringeType];
   const syringeUnits = doseVolumeMl * syringe.unitsPerMl;
 
   let syringeUnitsDisplay = '';
@@ -122,7 +125,7 @@ export function computeDilution(input: DilutionInput): DilutionResult {
     syringeUnitsDisplay = `${syringeUnits.toFixed(1)} ед (${((syringeUnits / syringe.maxUnits) * 100).toFixed(0)}% шкалы)`;
   }
 
-  const dosesPerVial = doseVolumeMl > 0 ? input.dilutionVolumeMl / doseVolumeMl : 0;
+  const dosesPerVial = doseVolumeMl > 0 ? dilVol / doseVolumeMl : 0;
 
   return {
     amountMcg,
@@ -136,26 +139,30 @@ export function computeDilution(input: DilutionInput): DilutionResult {
 }
 
 export function computeEffectiveDose(doseMcg: number, bio: { min: number; max: number; avg: number }): BioavailabilityResult {
+  if (!bio) return { effectiveMinMcg: doseMcg, effectiveAvgMcg: doseMcg, effectiveMaxMcg: doseMcg };
   return {
-    effectiveMinMcg: doseMcg * (bio.min / 100),
-    effectiveAvgMcg: doseMcg * (bio.avg / 100),
-    effectiveMaxMcg: doseMcg * (bio.max / 100),
+    effectiveMinMcg: doseMcg * ((bio.min || 0) / 100),
+    effectiveAvgMcg: doseMcg * ((bio.avg || 0) / 100),
+    effectiveMaxMcg: doseMcg * ((bio.max || 0) / 100),
   };
 }
 
 export function computePK(input: PKInput): PKResult {
-  const kDay = (0.693 / input.tHalfHours) * 24;
+  if (!input) return { days: [], maxConcentration: 0, avgConcentration: 0, steadyStateDay: 0, eliminationRateDay: 0, halfLifeDays: 0 };
+  const kDay = input.tHalfHours > 0 ? (0.693 / input.tHalfHours) * 24 : 0;
   const F = (input.bioAvg || 100) / 100;
-  const D = input.doseMcg * F;
+  const D = (input.doseMcg || 0) * F;
+  const scheduleDays = input.scheduleDays || [];
 
   let C = 0;
   const days: PKDay[] = [];
   let maxC = 0;
   let sumC = 0;
+  const totalDays = Math.max(1, input.totalDays || 30);
 
-  for (let day = 1; day <= input.totalDays; day++) {
+  for (let day = 1; day <= totalDays; day++) {
     const weekday = WEEK[(day - 1) % 7];
-    const inject = input.scheduleDays.includes(weekday);
+    const inject = scheduleDays.includes(weekday);
 
     C = C * Math.exp(-kDay * 1);
     if (inject) C += D;
@@ -165,8 +172,8 @@ export function computePK(input: PKInput): PKResult {
     days.push({ day, weekday, inject, concentration: C });
   }
 
-  const avgC = sumC / input.totalDays;
-  const steadyStateDay = Math.min(input.totalDays, Math.ceil(5 * input.tHalfHours / 24));
+  const avgC = sumC / totalDays;
+  const steadyStateDay = Math.min(totalDays, Math.ceil(5 * (input.tHalfHours || 0) / 24));
 
   return {
     days,
@@ -174,18 +181,19 @@ export function computePK(input: PKInput): PKResult {
     avgConcentration: avgC,
     steadyStateDay,
     eliminationRateDay: kDay,
-    halfLifeDays: input.tHalfHours / 24,
+    halfLifeDays: (input.tHalfHours || 0) / 24,
   };
 }
 
 export function computePeptideRisks(peptide: PeptideInfo): PeptideRisk[] {
+  if (!peptide) return [];
   const riskPercent = peptide.riskLevel === 'high' ? 35 : peptide.riskLevel === 'medium' ? 20 : 10;
-  return peptide.riskNotes.map(noteKey => {
+  return (peptide.riskNotes || []).map(noteKey => {
     const mapped = RISK_SYSTEM_MAP[noteKey];
     if (mapped) {
       return { system: mapped.system, label: mapped.label, riskPercent, notes: [noteKey] };
     }
-    return { system: 'neuro', label: noteKey.replace(/_/g, ' '), riskPercent: riskPercent / 2, notes: [noteKey] };
+    return { system: 'neuro', label: String(noteKey || '').replace(/_/g, ' '), riskPercent: riskPercent / 2, notes: [noteKey] };
   });
 }
 
@@ -372,14 +380,15 @@ export const PEPTIDE_GOAL_PROFILES: Record<string, {
 };
 
 export function scorePeptideStack(peptideIds: string[], goal: string): number {
+  if (!Array.isArray(peptideIds)) return 0;
   const profile = PEPTIDE_GOAL_PROFILES[goal];
   if (!profile) return 0;
   let score = 0;
   for (const id of peptideIds) {
     const p = PEPTIDE_DB[id];
     if (!p) continue;
-    for (const eff of p.effects) {
-      if (profile.effectPriority[eff]) score += profile.effectPriority[eff];
+    for (const eff of (p.effects || [])) {
+      score += profile.effectPriority?.[eff] ?? 0;
     }
   }
   for (let i = 0; i < peptideIds.length; i++) {
