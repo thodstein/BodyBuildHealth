@@ -37,7 +37,7 @@ import type { CourseEntry } from '../../core/types';
 type SupportTab = 'main' | 'catalog' | 'synergies' | 'calculator' | 'interactions' | 'stacks' | 'peptides' | 'fertility-pct';
 type SupportView = 'main' | 'calc' | 'fertility';
 type CalcView = 'main' | 'calculator' | 'peptides' | 'info';
-type InfoView = 'main' | 'catalog' | 'synergies' | 'stacks';
+type InfoView = 'main' | 'catalog' | 'synergies' | 'stacks' | 'interactions';
 
 const INTERACTION_TYPE_LABELS: Record<string, { label: string; emoji: string; color: string }> = {
   synergy: { label: 'Синергия', emoji: '🔗', color: '#22c55e' },
@@ -1105,48 +1105,283 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
       )}
 
       {tab === 'main' && supportView === 'calc' && calcView === 'info' && (
-        <div>
-          <button onClick={() => setCalcView('main')} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', marginBottom:8, background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← Назад</button>
-          <div style={{ display:'flex', gap:4, marginBottom:10, overflowX:'auto', scrollbarWidth:'none' }}>
-            {(['catalog','synergies','stacks'] as const).map(t => (
+        <div style={{ padding:'0 0 70px', height:'100vh', display:'flex', flexDirection:'column' }}>
+          <button onClick={() => setCalcView('main')} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', marginBottom:6, background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600, alignSelf:'flex-start' }}>← Назад</button>
+          {/* Pills */}
+          <div style={{ display:'flex', gap:4, marginBottom:8, overflowX:'auto', scrollbarWidth:'none', flexShrink:0 }}>
+            {(['catalog','synergies','stacks','interactions'] as const).map(t => (
               <button key={t} onClick={() => setInfoView(t)} style={{
-                padding:'7px 16px', borderRadius:20, fontSize:11, fontWeight:700, whiteSpace:'nowrap', cursor:'pointer', flexShrink:0,
+                padding:'7px 14px', borderRadius:20, fontSize:10, fontWeight:700, whiteSpace:'nowrap', cursor:'pointer', flexShrink:0,
                 background: infoView === t ? 'var(--accent)' : 'var(--bg-secondary)',
                 color: infoView === t ? '#000' : 'var(--text-dim)',
                 border: `1px solid ${infoView === t ? 'var(--accent)' : 'var(--border)'}`,
-              }}>{t === 'catalog' ? '📖 Каталог' : t === 'synergies' ? '🔗 Синергии и взаимодействия' : '📦 Стеки'}</button>
+              }}>{t === 'catalog' ? '📖 Каталог' : t === 'synergies' ? '🔗 Синергии' : t === 'stacks' ? '📦 Стеки' : '⚡ Взаимодействия'}</button>
             ))}
           </div>
-          {infoView === 'catalog' && (
-            <div style={{ padding:'10px 12px', borderRadius:12, background:'var(--glass-bg)', border:'1px solid var(--glass-border)', fontSize:11, color:'var(--text-dim)', lineHeight:1.5 }}>
-              <div style={{ fontWeight:700, fontSize:13, color:'var(--accent)', marginBottom:8 }}>📖 Каталог</div>
-              <p>Справочник препаратов поддержки, витаминов и БАДов. Поиск, фильтры по системам и классам.</p>
-              <button onClick={() => { setSupportView('main'); setTab('catalog'); }} style={{
-                width:'100%', padding:'10px 0', borderRadius:8, border:'1px solid var(--accent)',
-                background:'rgba(0,230,138,0.1)', color:'var(--accent)', fontSize:12, fontWeight:700, cursor:'pointer', marginTop:8,
-              }}>📖 Открыть каталог →</button>
-            </div>
-          )}
-          {infoView === 'synergies' && (
-            <div style={{ padding:'10px 12px', borderRadius:12, background:'var(--glass-bg)', border:'1px solid var(--glass-border)', fontSize:11, color:'var(--text-dim)', lineHeight:1.5 }}>
-              <div style={{ fontWeight:700, fontSize:13, color:'#3b82f6', marginBottom:8 }}>🔗 Синергии и взаимодействия</div>
-              <p>Проверка синергий и конфликтов между препаратами поддержки. Две подвкладки: синергии и взаимодействия.</p>
-              <button onClick={() => { setSupportView('main'); setTab('synergies'); }} style={{
-                width:'100%', padding:'10px 0', borderRadius:8, border:'1px solid #3b82f6',
-                background:'rgba(59,130,246,0.1)', color:'#3b82f6', fontSize:12, fontWeight:700, cursor:'pointer', marginTop:8,
-              }}>🔗 Открыть синергии →</button>
-            </div>
-          )}
-          {infoView === 'stacks' && (
-            <div style={{ padding:'10px 12px', borderRadius:12, background:'var(--glass-bg)', border:'1px solid var(--glass-border)', fontSize:11, color:'var(--text-dim)', lineHeight:1.5 }}>
-              <div style={{ fontWeight:700, fontSize:13, color:'#8b5cf6', marginBottom:8 }}>📦 Готовые стеки</div>
-              <p>Готовые протоколы и комбинации поддержки по целям: кардио, печень, почки, суставы и другие системы.</p>
-              <button onClick={() => { setSupportView('main'); setTab('stacks'); }} style={{
-                width:'100%', padding:'10px 0', borderRadius:8, border:'1px solid #8b5cf6',
-                background:'rgba(139,92,246,0.1)', color:'#8b5cf6', fontSize:12, fontWeight:700, cursor:'pointer', marginTop:8,
-              }}>📦 Открыть стеки →</button>
-            </div>
-          )}
+          {/* Content */}
+          <div style={{ flex:1, overflowY:'auto', paddingRight:4 }}>
+            {infoView === 'catalog' && (
+              <div>
+                <div style={{ display:'flex', gap:6, marginBottom:8, alignItems:'center' }}>
+                  <input value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Поиск по названию, категориям, механизмам" style={{ flex:1, padding:'8px 10px', borderRadius:8, border:'1px solid var(--border-color)', background:'var(--bg-secondary)', color:'var(--text-light)', fontSize:12 }} />
+                </div>
+                <div style={{ fontSize:9, color:'var(--text-dim)', marginBottom:6 }}>
+                  {searchQuery ? `Найдено: ${groupedSubstances.reduce((a, g) => a + g.count, 0)} из ${ALL_SUBSTANCES.length}` : `Всего: ${ALL_SUBSTANCES.length} веществ`}
+                </div>
+                <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
+                  {groupedSubstances.map(group => {
+                    const catInfo = getCategoryInfo(group.cat);
+                    const isExpanded = expandedCategories[group.cat] ?? (group.count <= 5);
+                    return (
+                      <div key={group.cat} style={{ background:'var(--bg-secondary)', borderRadius:10, overflow:'hidden', border:'1px solid var(--border)' }}>
+                        <div onClick={() => setExpandedCategories(prev => ({ ...prev, [group.cat]: !isExpanded }))} style={{ display:'flex', alignItems:'center', gap:6, padding:'8px 10px', cursor:'pointer', userSelect:'none' }}>
+                          <span style={{ fontSize:14 }}>{catInfo.emoji}</span>
+                          <div style={{ flex:1, fontSize:11, fontWeight:700, color:'var(--text-light)' }}>{catInfo.label}</div>
+                          <span style={{ fontSize:9, color:'var(--text-dim)', fontWeight:600, marginRight:2 }}>{group.count}</span>
+                          <span style={{ fontSize:9, color:'var(--text-dim)', transform:isExpanded ? 'rotate(180deg)' : 'none', transition:'transform 0.2s' }}>▼</span>
+                        </div>
+                        {isExpanded && (
+                          <div style={{ borderTop:'1px solid var(--border)' }}>
+                            {group.items.map(sub => (
+                              <div key={sub.id}>
+                                <div onClick={() => setSelectedSub(selectedSub === sub.id ? null : sub.id)} style={{ display:'flex', alignItems:'flex-start', gap:4, padding:'6px 10px 6px 14px', cursor:'pointer', borderBottom:'1px solid var(--border)' }}>
+                                  <div style={{ flex:1 }}>
+                                    <div style={{ fontSize:10, fontWeight:600, color:'var(--text-light)', lineHeight:1.3 }}>{sub.name}</div>
+                                    <div style={{ display:'flex', gap:2, flexWrap:'wrap', marginTop:1 }}>
+                                      {sub.categories.slice(0,2).map(c => <span key={c} style={{ fontSize:7, padding:'1px 3px', borderRadius:2, background:'rgba(255,255,255,0.04)', color:'var(--text-dim)' }}>{c}</span>)}
+                                      {sub.mechanisms.slice(0,1).map(m => <span key={m} style={{ fontSize:7, padding:'1px 3px', borderRadius:2, background:'rgba(0,230,138,0.06)', color:'var(--accent-green)' }}>{m.slice(0,25)}</span>)}
+                                    </div>
+                                  </div>
+                                  <span style={{ fontSize:9, color:'var(--text-dim)', transform:selectedSub === sub.id ? 'rotate(180deg)' : 'none' }}>▼</span>
+                                </div>
+                                {selectedSub === sub.id && (
+                                  <div style={{ padding:'6px 10px 8px 14px', background:'rgba(0,0,0,0.15)', borderBottom:'1px solid var(--border)' }}>
+                                    <div style={{ fontSize:9, color:'rgba(255,255,255,0.85)', lineHeight:1.3, marginBottom:4 }}>{sub.description}</div>
+                                    {sub.organs.length > 0 && <div style={{ display:'flex', gap:2, flexWrap:'wrap' }}>
+                                      {sub.organs.map(o => <span key={o} style={{ fontSize:7, padding:'1px 4px', borderRadius:2, background:'rgba(59,130,246,0.08)', color:'#60a5fa' }}>{o}</span>)}
+                                    </div>}
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                  {groupedSubstances.length === 0 && <div style={{ padding:20, textAlign:'center', color:'var(--text-dim)', fontSize:11 }}>Ничего не найдено</div>}
+                </div>
+              </div>
+            )}
+            {infoView === 'synergies' && (
+              <div>
+                <div style={{ display:'flex', gap:4, marginBottom:8, overflowX:'auto', scrollbarWidth:'none', flexWrap:'wrap' }}>
+                  {(['all','synergy','conflict','caution'] as const).map(t => (
+                    <button key={t} onClick={() => setInteractionTypeFilter(t)} style={{
+                      padding:'4px 10px', borderRadius:14, fontSize:9, fontWeight:700, whiteSpace:'nowrap', cursor:'pointer', flexShrink:0,
+                      background: interactionTypeFilter === t ? (INTERACTION_TYPE_LABELS[t]?.color || 'var(--accent)') : 'var(--bg-secondary)',
+                      color: interactionTypeFilter === t ? '#000' : 'var(--text-dim)',
+                      border: `1px solid ${interactionTypeFilter === t ? (INTERACTION_TYPE_LABELS[t]?.color || 'var(--accent)') : 'var(--border)'}`,
+                    }}>{t === 'all' ? '🧲 Все' : `${INTERACTION_TYPE_LABELS[t]?.emoji||''} ${INTERACTION_TYPE_LABELS[t]?.label||t}`}</button>
+                  ))}
+                  <span style={{ width:1, height:16, background:'var(--border)', margin:'0 2px', alignSelf:'center' }} />
+                  {(['all','LOW','MEDIUM','HIGH'] as const).map(s => (
+                    <button key={s} onClick={() => setInteractionSeverityFilter(s)} style={{
+                      padding:'4px 8px', borderRadius:10, fontSize:8, fontWeight:600, whiteSpace:'nowrap', cursor:'pointer', flexShrink:0,
+                      background: interactionSeverityFilter === s ? (INTERACTION_SEVERITY_LABELS[s]?.color || 'var(--accent)') : 'transparent',
+                      color: interactionSeverityFilter === s ? '#000' : 'var(--text-dim)',
+                      border: `1px solid ${interactionSeverityFilter === s ? (INTERACTION_SEVERITY_LABELS[s]?.color || 'var(--accent)') : 'var(--border)'}`,
+                    }}>{s === 'all' ? 'Любая' : `${INTERACTION_SEVERITY_LABELS[s]?.label||s}`}</button>
+                  ))}
+                  <div style={{ fontSize:9, color:'var(--text-dim)', display:'flex', alignItems:'center', marginLeft:2, whiteSpace:'nowrap' }}>{filteredInteractions.length} из {mergedInteractions.length}</div>
+                </div>
+                <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
+                  {filteredInteractions.slice(0, 50).map((interaction, i) => {
+                    const typeInfo = INTERACTION_TYPE_LABELS[interaction.type] || { label:interaction.type, emoji:'🔗', color:'#888' };
+                    const sevInfo = INTERACTION_SEVERITY_LABELS[interaction.severity] || { label:interaction.severity, color:'#888' };
+                    const aName = resolveSubName(interaction.substanceA);
+                    const bName = resolveSubName(interaction.substanceB);
+                    return (
+                      <div key={interaction.interactionId} style={{ background:'var(--bg-secondary)', borderRadius:8, padding:'7px 8px', borderLeft:`3px solid ${typeInfo.color}` }}>
+                        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:2 }}>
+                          <div style={{ display:'flex', alignItems:'center', gap:4, flexWrap:'wrap', flex:1, minWidth:0 }}>
+                            <span style={{ fontWeight:600, fontSize:10, color:'var(--text-light)', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', maxWidth:'35%' }}>{aName}</span>
+                            <span style={{ fontSize:10, color:typeInfo.color, fontWeight:700 }}>{interaction.type === 'synergy' ? '+' : interaction.type === 'conflict' ? '×' : '?'}</span>
+                            <span style={{ fontWeight:600, fontSize:10, color:'var(--text-light)', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', maxWidth:'35%' }}>{bName}</span>
+                          </div>
+                          <div style={{ display:'flex', gap:3, flexShrink:0 }}>
+                            <span style={{ fontSize:7, padding:'1px 4px', borderRadius:3, background:typeInfo.color+'22', color:typeInfo.color, fontWeight:600 }}>{typeInfo.label}</span>
+                            <span style={{ fontSize:7, padding:'1px 4px', borderRadius:3, background:sevInfo.color+'22', color:sevInfo.color }}>{sevInfo.label}</span>
+                          </div>
+                        </div>
+                        <div style={{ fontSize:9, color:'rgba(255,255,255,0.85)', lineHeight:1.3 }}>{interaction.effect}</div>
+                        {interaction.notes && <div style={{ fontSize:8, color:'var(--text-dim)', fontStyle:'italic', lineHeight:1.2, marginTop:2 }}>{interaction.notes}</div>}
+                      </div>
+                    );
+                  })}
+                  {filteredInteractions.length === 0 && <div style={{ padding:20, textAlign:'center', color:'var(--text-dim)', fontSize:11 }}>Нет взаимодействий</div>}
+                </div>
+              </div>
+            )}
+            {infoView === 'stacks' && (
+              <div>
+                <input value={stackSearch} onChange={e => setStackSearch(e.target.value)} placeholder="🔍 Поиск по эффекту или веществу..." style={{ width:'100%', padding:'8px 10px', borderRadius:8, border:'1px solid var(--border)', background:'var(--bg-secondary)', color:'var(--text)', fontSize:11, boxSizing:'border-box', marginBottom:8 }} />
+                <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
+                  {(stackSearch ? [{ key:'search', label:`Результаты (${filteredStacks.length})`, stacks:filteredStacks }] : groupedStacks).map(group => (
+                    <div key={group.key} style={{ background:'var(--bg-secondary)', borderRadius:10, overflow:'hidden', border:'1px solid var(--border)' }}>
+                      <div onClick={() => setExpandedCategories(prev => ({ ...prev, ['stack_'+group.key]: !(prev['stack_'+group.key] ?? true) }))} style={{ display:'flex', alignItems:'center', gap:6, padding:'8px 10px', cursor:'pointer', userSelect:'none' }}>
+                        <span style={{ fontSize:13 }}>📋</span>
+                        <div style={{ flex:1, fontSize:10, fontWeight:700, color:'var(--text-light)' }}>{group.label}</div>
+                        <span style={{ fontSize:9, color:'var(--text-dim)', fontWeight:600, marginRight:2 }}>{group.stacks.length}</span>
+                        <span style={{ fontSize:9, color:'var(--text-dim)', transform:expandedCategories['stack_'+group.key] !== false ? 'rotate(180deg)' : 'none', transition:'transform 0.2s' }}>▼</span>
+                      </div>
+                      {expandedCategories['stack_'+group.key] !== false && (
+                        <div style={{ borderTop:'1px solid var(--border)' }}>
+                          {group.stacks.map(stack => {
+                            const synergyColor = stack.synergyScore > 20 ? '#22c55e' : stack.synergyScore > 12 ? '#eab308' : '#f59e0b';
+                            return (
+                              <div key={stack.id} style={{ padding:'6px 10px 8px', borderBottom:'1px solid var(--border)', cursor:'pointer' }}
+                                onClick={() => setExpandedMed(expandedMed === stack.id ? null : stack.id)}>
+                                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:3 }}>
+                                  <div style={{ display:'flex', flexWrap:'wrap', gap:2, flex:1 }}>
+                                    {stack.effects.map(e => <span key={e} style={{ fontSize:7, padding:'1px 5px', borderRadius:3, background:'rgba(0,230,138,0.08)', color:'#00e68a', fontWeight:500 }}>{EFFECT_LABELS_ru[e]||e}</span>)}
+                                  </div>
+                                  <span style={{ fontSize:11, fontWeight:800, color:synergyColor, marginLeft:4 }}>{stack.synergyScore.toFixed(1)}</span>
+                                </div>
+                                <div style={{ display:'flex', flexWrap:'wrap', gap:2, marginBottom:expandedMed === stack.id ? 4 : 0 }}>
+                                  {stack.substances.map(sid => <span key={sid} style={{ fontSize:8, padding:'1px 6px', borderRadius:6, background:'rgba(139,92,246,0.08)', border:'1px solid rgba(139,92,246,0.12)', color:'#a78bfa', fontWeight:600 }}>{getStackSubLabel(sid)}</span>)}
+                                </div>
+                                <div style={{ fontSize:7, color:'var(--text-dim)' }}>{stack.substances.length} веществ</div>
+                                {expandedMed === stack.id && (
+                                  <div style={{ marginTop:4, padding:'4px 6px', background:'rgba(0,0,0,0.15)', borderRadius:6 }}>
+                                    {stack.effects.map(e => {
+                                      const related = ALL_STACKS.filter(s => s.id!==stack.id && s.effects.includes(e));
+                                      return <div key={e} style={{ fontSize:7, color:'var(--text-dim)', marginBottom:1 }}><span style={{ color:'#00e68a' }}>{EFFECT_LABELS_ru[e]||e}</span> — ещё в {related.length} стеках</div>;
+                                    })}
+                                    <div style={{ fontSize:7, color:'var(--text-dim)', marginTop:2 }}>Синергия: {stack.synergyScore.toFixed(1)} · {stack.substances.length} компонентов</div>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                  {stackSearch && filteredStacks.length === 0 && <div style={{ padding:20, textAlign:'center', color:'var(--text-dim)', fontSize:11 }}>Ничего не найдено</div>}
+                </div>
+              </div>
+            )}
+            {infoView === 'interactions' && (
+              <div>
+                <div style={{ marginBottom:8 }}>
+                  <div style={{ display:'flex', gap:4, marginBottom:8 }}>
+                    {(['support','pharma'] as const).map(t => (
+                      <button key={t} onClick={() => setInteractTab(t)} style={{
+                        flex:1, padding:'7px 0', borderRadius:8, fontSize:10, fontWeight:700, cursor:'pointer', transition:'all 0.15s',
+                        background: interactTab === t ? 'var(--accent)' : 'var(--bg-secondary)',
+                        color: interactTab === t ? '#000' : 'var(--text-dim)',
+                        border: 'none',
+                      }}>{t === 'support' ? '💊 Поддержка' : '💉 Фарма'}</button>
+                    ))}
+                  </div>
+                  {interactTab === 'support' ? (
+                    <div>
+                      <div style={{ display:'flex', flexDirection:'column', gap:6, marginBottom:8 }}>
+                        {interactionIds.map((id, idx) => {
+                          const selectedName = id ? (allSupport.find(s => s.id === id)?.name || id) : '';
+                          return (
+                            <div key={idx} style={{ background:'var(--bg-secondary)', borderRadius:10, padding:'8px 10px', border:'1px solid var(--border)' }}>
+                              <div style={{ display:'flex', alignItems:'center', gap:4, marginBottom:4 }}>
+                                <span style={{ fontSize:8, color:'var(--text-dim)', fontWeight:600, background:'rgba(255,255,255,0.04)', padding:'1px 5px', borderRadius:3 }}>#{idx+1}</span>
+                                <span style={{ fontSize:9, color:'var(--text-dim)' }}>Препарат</span>
+                              </div>
+                              <div style={{ position:'relative' }}>
+                                <input value={interactionSearchIdx===idx ? interactionSearch : selectedName} placeholder="🔍 Поиск..." onFocus={() => { setInteractionSearchIdx(idx); setInteractionSearch(''); }} onChange={e => { setInteractionSearchIdx(idx); setInteractionSearch(e.target.value); if (!e.target.value) updateInteraction(idx, ''); }} style={{ width:'100%', padding:'7px 8px', borderRadius:6, background:'rgba(0,0,0,0.2)', border:'1px solid var(--border)', color:'var(--text)', fontSize:10, boxSizing:'border-box' }} />
+                                {interactionSearch && interactionSearchIdx===idx && (
+                                  <div style={{ position:'absolute', top:'100%', left:0, right:0, zIndex:10, background:'var(--bg)', border:'1px solid var(--border)', borderRadius:6, maxHeight:120, overflowY:'auto', marginTop:1 }}>
+                                    {allSupport.filter(s => s.name.toLowerCase().includes(interactionSearch.toLowerCase())).slice(0,8).map(s => (
+                                      <div key={s.id} onClick={() => { updateInteraction(idx, s.id); setInteractionSearch(''); }} style={{ padding:'5px 8px', cursor:'pointer', fontSize:10, borderBottom:'1px solid var(--border)' }}>
+                                        <span style={{ fontWeight:id===s.id?700:400, color:id===s.id?'var(--accent)':'var(--text)' }}>{s.name}</span>
+                                        <span style={{ fontSize:8, color:'var(--text-dim)', marginLeft:4 }}>{s.id}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                        <button onClick={addInteraction} style={{ padding:'8px', borderRadius:8, fontSize:10, fontWeight:600, cursor:'pointer', background:'rgba(0,230,138,0.06)', border:'1px dashed rgba(0,230,138,0.3)', color:'#00e68a' }}>+ Добавить препарат</button>
+                      </div>
+                      {validInteractionIds.length<2 && <div style={{ textAlign:'center', padding:'20px 12px', background:'var(--bg-secondary)', borderRadius:10, border:'1px solid var(--border)' }}><div style={{ fontSize:20, marginBottom:4 }}>⚡</div><div style={{ fontSize:10, color:'var(--text-dim)' }}>Выберите минимум 2 препарата</div></div>}
+                      {validInteractionIds.length>=2 && !hasSupportInteractions && <div style={{ textAlign:'center', padding:'10px', borderRadius:8, background:'rgba(0,230,138,0.06)', border:'1px solid rgba(0,230,138,0.2)' }}><span style={{ fontSize:10, color:'#4caf50', fontWeight:600 }}>✓ Конфликтов не обнаружено</span></div>}
+                      {hasSupportInteractions && (
+                        <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
+                          {[
+                            { list: supportSynergiesList, label:'⊕ Синергия', color:'#22c55e' },
+                            { list: supportConflicts, label:'⚠ Конфликт', color:'#ef4444' },
+                            { list: supportCautions, label:'⚡ Осторожность', color:'#f59e0b' },
+                          ].filter(s => s.list.length>0).map(section => (
+                            <div key={section.label} style={{ background:'var(--bg-secondary)', borderRadius:10, padding:'8px 10px', border:'1px solid var(--border)' }}>
+                              <div style={{ fontSize:10, fontWeight:700, color:section.color, marginBottom:4 }}>{section.label} ({section.list.length})</div>
+                              {section.list.map(i => <div key={i.id} style={{ display:'flex', justifyContent:'space-between', padding:'3px 0', borderBottom:'1px solid var(--border)', fontSize:9, color:'var(--text-light)' }}><span style={{ color:section.color, fontWeight:600, fontSize:9 }}>{i.substanceA} + {i.substanceB}</span><span style={{ fontSize:8, color:'var(--text-dim)', textAlign:'right', maxWidth:'50%' }}>{i.notes}</span></div>)}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div>
+                      <div style={{ display:'flex', flexDirection:'column', gap:6, marginBottom:8 }}>
+                        {(() => {
+                          const PHARMA_CORE_FILTER = new Set(['testosterone','trenbolone','nandrolone','boldenone','primobolan','oral_17aa','sarm','drostanolone','dht_derivative','igf1','mgf','insulin','pct_serm','pct_aromatase','pct_dopamine','pct_gonadotropin']);
+                          const pharmaAll = Object.values(PHARMA_DB).filter((s): s is (typeof PHARMA_DB)[string] => !!s?.name && PHARMA_CORE_FILTER.has(s.class));
+                          const pharmaFiltered = pharmaInteractSearch ? pharmaAll.filter(s => s.name.toLowerCase().includes(pharmaInteractSearch.toLowerCase())) : pharmaAll;
+                          const pharmaValid = pharmaInteractIds.filter(Boolean);
+                          return (<>
+                            {pharmaInteractIds.map((id, idx) => {
+                              const selectedName = id ? (PHARMA_DB[id]?.name || '') : '';
+                              return (
+                                <div key={idx} style={{ background:'var(--bg-secondary)', borderRadius:10, padding:'8px 10px', border:'1px solid var(--border)' }}>
+                                  <div style={{ display:'flex', alignItems:'center', gap:4, marginBottom:4 }}>
+                                    <span style={{ fontSize:8, color:'var(--text-dim)', fontWeight:600, background:'rgba(255,255,255,0.04)', padding:'1px 5px', borderRadius:3 }}>#{idx+1}</span>
+                                    <span style={{ fontSize:9, color:'var(--text-dim)' }}>Препарат</span>
+                                  </div>
+                                  <div style={{ position:'relative' }}>
+                                    <input value={id ? selectedName : pharmaInteractSearch} onChange={e => { setPharmaInteractSearch(e.target.value); if (!e.target.value) { const next=[...pharmaInteractIds]; next[idx]=''; setPharmaInteractIds(next); }}} placeholder="🔍 Поиск..." style={{ width:'100%', padding:'7px 8px', borderRadius:6, background:'rgba(0,0,0,0.2)', border:'1px solid var(--border)', color:'var(--text)', fontSize:10, boxSizing:'border-box' }} />
+                                    {!id && pharmaInteractSearch && (
+                                      <div style={{ position:'absolute', zIndex:10, background:'var(--bg)', border:'1px solid var(--border)', borderRadius:6, maxHeight:120, overflowY:'auto', marginTop:1, width:'calc(100% - 2px)' }}>
+                                        {pharmaFiltered.slice(0,8).map(s => <div key={s.id} onClick={() => { const next=[...pharmaInteractIds]; next[idx]=s.id; setPharmaInteractIds(next); setPharmaInteractSearch(''); }} style={{ padding:'5px 8px', cursor:'pointer', fontSize:9, borderBottom:'1px solid var(--border)' }}><span style={{ fontWeight:600 }}>{s.name}</span><span style={{ marginLeft:4, color:'var(--text-dim)', fontSize:8 }}>{s.class}</span></div>)}
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                            <button onClick={() => setPharmaInteractIds([...pharmaInteractIds, ''])} style={{ padding:'8px', borderRadius:8, fontSize:10, fontWeight:600, cursor:'pointer', background:'rgba(0,230,138,0.06)', border:'1px dashed rgba(0,230,138,0.3)', color:'#00e68a' }}>+ Добавить препарат</button>
+                            {pharmaValid.length>=2 && checkDrugInteractions(pharmaValid.map((id,i)=>({id:`${id}-${i}`,substanceId:id,doseValue:300,doseUnit:'mg/wk',frequency:'2x/week',startWeek:0,endWeek:12}))).length===0 && (
+                              <div style={{ padding:'10px', borderRadius:8, background:'rgba(0,230,138,0.06)', border:'1px solid rgba(0,230,138,0.2)', textAlign:'center' }}><span style={{ fontSize:10, color:'#4caf50', fontWeight:600 }}>✓ Конфликтов не обнаружено</span></div>
+                            )}
+                            {pharmaValid.length>=2 && checkDrugInteractions(pharmaValid.map((id,i)=>({id:`${id}-${i}`,substanceId:id,doseValue:300,doseUnit:'mg/wk',frequency:'2x/week',startWeek:0,endWeek:12}))).map((alert,i)=>{
+                              const c = alert.type==='critical'?'#ff1744':alert.type==='warning'?'#ff9100':'#2979ff';
+                              const icon = alert.type==='critical'?'🚫':alert.type==='warning'?'⚠️':'ℹ️';
+                              return <div key={i} style={{ background:'var(--bg-secondary)', borderRadius:10, padding:'10px', marginBottom:4, borderLeft:`3px solid ${c}`, border:'1px solid var(--border)' }}>
+                                <div style={{ display:'flex', alignItems:'center', gap:4, marginBottom:3 }}><span style={{ fontSize:12 }}>{icon}</span><span style={{ fontWeight:700, fontSize:9, color:c }}>{alert.type==='critical'?'КРИТИЧЕСКОЕ':alert.type==='warning'?'ПРЕДУПРЕЖДЕНИЕ':'ИНФО'}</span></div>
+                                <div style={{ fontSize:10, fontWeight:600, color:'var(--text-light)', marginBottom:2 }}>{alert.drugs.join(' + ')}</div>
+                                <div style={{ fontSize:9, color:'var(--text-dim)', lineHeight:1.3 }}><b>Механизм:</b> {alert.mechanism}</div>
+                                <div style={{ fontSize:9, color:'var(--text-dim)', lineHeight:1.3 }}><b>Рекомендация:</b> {alert.recommendation}</div>
+                              </div>;
+                            })}
+                          </>);
+                        })()}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       )}
 
