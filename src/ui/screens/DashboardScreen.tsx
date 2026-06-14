@@ -22,7 +22,7 @@ const NAV_CARDS: { id: ScreenId; icon: string; label: string; desc: string }[] =
 export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
   return (
     <div style={{ position:'fixed', inset:0, zIndex:100, display:'flex', flexDirection:'column' }}>
-      <img src="/main-hero.png" alt="" style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'fill' }} />
+      <img src="/main-hero.png?v=2" alt="" style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'fill' }} />
       <div style={{ position:'absolute', inset:0, background:'linear-gradient(transparent 50%, rgba(0,0,0,0.85))' }} />
       <div style={{ position:'relative', zIndex:2, flex:1, display:'flex', flexDirection:'column', justifyContent:'flex-end', padding:'0 16px 80px' }}>
         <h1 style={{ fontSize:22, fontWeight:800, color:'#fff', margin:'0 0 14px', textShadow:'0 2px 14px rgba(0,0,0,0.9)' }}>Главная</h1>
