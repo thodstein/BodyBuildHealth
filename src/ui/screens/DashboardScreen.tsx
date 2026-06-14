@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+﻿import React from 'react';
 
 type ScreenId =
   | 'dashboard' | 'pharma' | 'course' | 'peptides'
@@ -12,19 +12,17 @@ interface Props {
   onNavigate?: (screen: ScreenId) => void;
 }
 
-const NAV_PILLS: { id: ScreenId; icon: string; label: string }[] = [
-  { id: 'profile', icon: '👤', label: 'Профиль' },
-  { id: 'training', icon: '🏋️', label: 'Тренировки' },
-  { id: 'nutrition', icon: '🥗', label: 'Питание' },
-  { id: 'articles', icon: '📚', label: 'Статьи' },
+const NAV_CARDS: { id: ScreenId; icon: string; label: string; desc: string }[] = [
+  { id: 'profile', icon: '👤', label: 'Профиль', desc: 'Управляйте своими данными, целями и настройками' },
+  { id: 'training', icon: '🏋️', label: 'Тренировки', desc: 'Планируйте занятия, отслеживайте прогресс' },
+  { id: 'nutrition', icon: '🥗', label: 'Питание', desc: 'Ведите дневник питания, контролируйте КБЖУ' },
+  { id: 'articles', icon: '📚', label: 'Статьи', desc: 'База знаний по фармакологии и здоровью' },
 ];
 
 export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
-  const [hoveredId, setHoveredId] = useState<string | null>(null);
-
   return (
-    <div style={{ position:'fixed', inset:0, zIndex:100, display:'flex', flexDirection:'column' }}>
-      <img src="/main-hero.png" alt="" style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'cover', objectPosition:'center center' }} />
+    <div style={{ position:'fixed', inset:0, zIndex:100, display:'flex', flexDirection:'column', background:'#000' }}>
+      <img src="/main-hero.png" alt="" style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'fill' }} />
       <div style={{ position:'absolute', inset:0, background:'linear-gradient(transparent 50%, rgba(0,0,0,0.85))' }} />
       <div style={{ position:'relative', zIndex:2, flex:1, display:'flex', flexDirection:'column', justifyContent:'flex-end', padding:'16px 16px 80px' }}>
         <div style={{ marginBottom:16 }}>
@@ -33,27 +31,18 @@ export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
             Управляйте здоровьем, тренировками, питанием и фармакологией
           </p>
         </div>
-        <div style={{ display:'flex', gap:8, overflowX:'auto', scrollbarWidth:'none', paddingBottom:4 }}>
-          {NAV_PILLS.map(p => {
-            const hovered = hoveredId === p.id;
-            return (
-              <button key={p.id} onClick={() => onNavigate?.(p.id)}
-                onMouseEnter={() => setHoveredId(p.id)} onMouseLeave={() => setHoveredId(null)}
-                style={{
-                  display:'flex', alignItems:'center', gap:8, flexShrink:0, cursor:'pointer',
-                  padding:'10px 16px', borderRadius:20, border:'1px solid',
-                  background: hovered ? 'rgba(200,245,96,0.12)' : 'rgba(20,22,30,0.35)',
-                  borderColor: hovered ? 'rgba(200,245,96,0.3)' : 'rgba(255,255,255,0.08)',
-                  transition:'all 0.2s',
-                  color: hovered ? '#C8F560' : 'rgba(255,255,255,0.9)',
-                  fontSize:13, fontWeight:600, whiteSpace:'nowrap',
-                }}
-              >
-                <span style={{ fontSize:16 }}>{p.icon}</span>
-                <span>{p.label}</span>
-              </button>
-            );
-          })}
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+          {NAV_CARDS.map(card => (
+            <button key={card.id} onClick={() => onNavigate?.(card.id)} style={{
+              display:'flex', flexDirection:'column', gap:8, padding:'14px', borderRadius:14, cursor:'pointer',
+              background:'rgba(20,22,30,0.35)', border:'1px solid rgba(255,255,255,0.08)', textAlign:'left',
+              transition:'all 0.2s',
+            }}>
+              <span style={{ fontSize:22 }}>{card.icon}</span>
+              <span style={{ fontWeight:700, fontSize:14, color:'rgba(255,255,255,0.95)' }}>{card.label}</span>
+              <span style={{ fontSize:10, color:'rgba(255,255,255,0.85)', lineHeight:1.3 }}>{card.desc}</span>
+            </button>
+          ))}
         </div>
       </div>
     </div>
