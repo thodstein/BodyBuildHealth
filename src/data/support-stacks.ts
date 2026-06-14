@@ -159,7 +159,7 @@ const L: Record<string, string> = {
   p21_extra:'P21 (доп)',epitalon:'Эпиталон',
 };
 
-export function getSubstanceLabel(id: string): string { return L[id] || id.replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase()); }
+export function getSubstanceLabel(id: string): string { if (!id) return '—'; return L[id] || id.replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase()); }
 
 // Map each effect to substances that support it (100+ substances across 30+ effects)
 const EFFECT_SUBSTANCES: Record<string, string[]> = {

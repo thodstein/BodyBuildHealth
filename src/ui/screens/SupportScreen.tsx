@@ -844,7 +844,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
     const supportSupplements = supportSubstances.map(s => ({
       id: s.id,
       name: s.name,
-      description: s.description || '' + SUPPORT_CLASS_LABELS[s.class] || s.class,
+      description: s.description || SUPPORT_CLASS_LABELS[s.class] || s.class,
       targets: undefined,
       research: s.research || [],
       isSupportSubstance: true,
@@ -1156,8 +1156,8 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
                                   <div style={{ flex:1 }}>
                                     <div style={{ fontSize:10, fontWeight:600, color:'var(--text-light)', lineHeight:1.3 }}>{sub.name}</div>
                                     <div style={{ display:'flex', gap:2, flexWrap:'wrap', marginTop:1 }}>
-                                      {sub.categories.slice(0,2).map(c => <span key={c} style={{ fontSize:7, padding:'1px 3px', borderRadius:2, background:'rgba(255,255,255,0.04)', color:'var(--text-dim)' }}>{c}</span>)}
-                                      {sub.mechanisms.slice(0,1).map(m => <span key={m} style={{ fontSize:7, padding:'1px 3px', borderRadius:2, background:'rgba(0,230,138,0.06)', color:'var(--accent-green)' }}>{m.slice(0,25)}</span>)}
+                                      {(sub.categories||[]).slice(0,2).map(c => <span key={c} style={{ fontSize:7, padding:'1px 3px', borderRadius:2, background:'rgba(255,255,255,0.04)', color:'var(--text-dim)' }}>{c}</span>)}
+                                      {(sub.mechanisms||[]).slice(0,1).map(m => <span key={m} style={{ fontSize:7, padding:'1px 3px', borderRadius:2, background:'rgba(0,230,138,0.06)', color:'var(--accent-green)' }}>{m.slice(0,25)}</span>)}
                                     </div>
                                   </div>
                                   <span style={{ fontSize:9, color:'var(--text-dim)', transform:selectedSub === sub.id ? 'rotate(180deg)' : 'none' }}>▼</span>
@@ -1167,10 +1167,10 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
                                     <div style={{ fontSize:9, color:'rgba(255,255,255,0.85)', lineHeight:1.3, marginBottom:4 }}>{sub.description}</div>
                                     {/* Type badge */}
                                     <div style={{ fontSize:7, color:'var(--accent-green, #00e68a)', marginBottom:3 }}>
-                                      {sub.type} · {sub.categories.slice(0,2).join(', ')}
+                                      {sub.type}{(sub.categories||[]).length > 0 ? ' · ' + (sub.categories||[]).slice(0,2).join(', ') : ''}
                                     </div>
                                     {/* All mechanisms */}
-                                    {sub.mechanisms.length > 0 && (
+                                    {sub.mechanisms && sub.mechanisms.length > 0 && (
                                       <div style={{ marginBottom:3 }}>
                                         <div style={{ fontSize:7, color:'var(--text-dim)', marginBottom:1 }}>Механизмы действия:</div>
                                         <div style={{ display:'flex', gap:2, flexWrap:'wrap' }}>
@@ -1181,7 +1181,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
                                       </div>
                                     )}
                                     {/* Organs */}
-                                    {sub.organs.length > 0 && (
+                                    {sub.organs && sub.organs.length > 0 && (
                                       <div style={{ marginBottom:3 }}>
                                         <div style={{ fontSize:7, color:'var(--text-dim)', marginBottom:1 }}>Органы-мишени:</div>
                                         <div style={{ display:'flex', gap:2, flexWrap:'wrap' }}>
@@ -1493,7 +1493,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
                                     <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
                                       <span style={{ color:section.color, fontWeight:700, fontSize:9 }}>{i.substanceA} + {i.substanceB}</span>
                                       <div style={{ display:'flex', gap:3 }}>
-                                        <span style={{ fontSize:7, padding:'1px 4px', borderRadius:3, background:section.color+'22', color:section.color, fontWeight:600 }}>{section.list[0].type === 'synergy' ? 'Синергия' : section.list[0].type === 'conflict' ? 'Конфликт' : 'Осторожно'}</span>
+                                        <span style={{ fontSize:7, padding:'1px 4px', borderRadius:3, background:section.color+'22', color:section.color, fontWeight:600 }}>{i.type === 'synergy' ? 'Синергия' : i.type === 'conflict' ? 'Конфликт' : 'Осторожно'}</span>
                                         {i.severity && <span style={{ fontSize:7, padding:'1px 4px', borderRadius:3, background:sevColor+'22', color:sevColor }}>{i.severity}</span>}
                                       </div>
                                     </div>
@@ -1635,10 +1635,10 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
                             <div style={{ flex: 1 }}>
                               <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-light)', lineHeight: 1.3 }}>{sub.name}</div>
                               <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap', marginTop: 2 }}>
-                                {sub.categories.slice(0, 3).map(c => (
+                                {(sub.categories||[]).slice(0, 3).map(c => (
                                   <span key={c} style={{ fontSize: 8, padding: '1px 4px', borderRadius: 3, background: 'rgba(255,255,255,0.04)', color: 'var(--text-dim)' }}>{c}</span>
                                 ))}
-                                {sub.mechanisms.slice(0, 2).map(m => (
+                                {(sub.mechanisms||[]).slice(0, 2).map(m => (
                                   <span key={m} style={{ fontSize: 8, padding: '1px 4px', borderRadius: 3, background: 'rgba(0,230,138,0.06)', color: 'var(--accent-green, #00e68a)' }}>{m.slice(0, 30)}</span>
                                 ))}
                               </div>
@@ -1650,10 +1650,10 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
                               <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', lineHeight: 1.4, marginBottom: 6 }}>{sub.description}</div>
                               {/* Type badge */}
                               <div style={{ fontSize: 8, color: 'var(--accent-green, #00e68a)', marginBottom: 4 }}>
-                                {sub.type} · {sub.categories.slice(0, 3).join(', ')}
+                                {sub.type}{(sub.categories||[]).length > 0 ? ' · ' + (sub.categories||[]).slice(0, 3).join(', ') : ''}
                               </div>
                               {/* All mechanisms */}
-                              {sub.mechanisms.length > 0 && (
+                              {sub.mechanisms && sub.mechanisms.length > 0 && (
                                 <div style={{ marginBottom: 4 }}>
                                   <div style={{ fontSize: 8, color: 'var(--text-dim)', marginBottom: 2 }}>Механизмы действия:</div>
                                   <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
@@ -1664,7 +1664,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
                                 </div>
                               )}
                               {/* Organs */}
-                              {sub.organs.length > 0 && (
+                              {sub.organs && sub.organs.length > 0 && (
                                 <div style={{ marginBottom: 4 }}>
                                   <div style={{ fontSize: 8, color: 'var(--text-dim)', marginBottom: 2 }}>Органы-мишени:</div>
                                   <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
@@ -1778,10 +1778,13 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
                       </div>
                     </div>
                     <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', lineHeight: 1.3, marginBottom: 4 }}>
-                      {interaction.type === 'synergy' ? '⊕ ' : interaction.type === 'conflict' ? '⊖ ' : ''}
-                      {interaction.effect}
+                      {(() => {
+                        const eff = interaction.effect;
+                        const displayEff = (/^[A-Z0-9_]+$/.test(eff) && interaction.notes) ? interaction.notes : eff;
+                        return <>{interaction.type === 'synergy' ? '⊕ ' : interaction.type === 'conflict' ? '⊖ ' : ''}{displayEff}</>;
+                      })()}
                     </div>
-                    {interaction.mechanisms.length > 0 && (
+                    {interaction.mechanisms && interaction.mechanisms.length > 0 && (
                       <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap', marginBottom: 2 }}>
                         {interaction.mechanisms.map(m => {
                           const mColor = m.toLowerCase().includes('toxic') || m.toLowerCase().includes('hepatic') ? '#ef4444' :
@@ -1864,11 +1867,23 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
               
               {/* Category filter */}
               <div style={{ display:'flex', flexWrap:'wrap', gap:3, marginTop:6 }}>
-                {['all','vitamin','mineral','amino_acid','herb','adaptogen','antioxidant','prebiotic','probiotic','enzyme','peptide','fatty_acid'].map(c => (
-                  <button key={c} onClick={() => setManualFilter(c)}
+                {[
+                  { key:'all', label:'🧲 Все' },
+                  { key:'vitamin', label:'Витамины' },
+                  { key:'mineral', label:'Минералы' },
+                  { key:'amino_acid', label:'Аминокислоты' },
+                  { key:'antioxidant', label:'Антиоксиданты' },
+                  { key:'adaptogen', label:'Адаптогены' },
+                  { key:'peptide', label:'Пептиды' },
+                  { key:'fatty_acid', label:'Жирные кислоты' },
+                  { key:'prebiotic', label:'Пребиотики' },
+                  { key:'probiotic', label:'Пробиотики' },
+                  { key:'enzyme', label:'Ферменты' },
+                ].map(({ key, label }) => (
+                  <button key={key} onClick={() => setManualFilter(key)}
                     style={{ padding:'2px 6px', borderRadius:4, fontSize:9, cursor:'pointer', border:'none',
-                      background: manualFilter === c ? 'var(--accent)' : 'var(--bg-secondary)',
-                      color: manualFilter === c ? '#000' : 'var(--text-dim)', fontWeight: manualFilter === c ? 700 : 400 }}>{c.replace(/_/g,' ')}</button>
+                      background: manualFilter === key ? 'var(--accent)' : 'var(--bg-secondary)',
+                      color: manualFilter === key ? '#000' : 'var(--text-dim)', fontWeight: manualFilter === key ? 700 : 400 }}>{label}</button>
                 ))}
               </div>
 
@@ -1876,7 +1891,13 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
               <div style={{ maxHeight:200, overflowY:'auto', marginTop:6, border:'1px solid var(--border-color)', borderRadius:6 }}>
                 {ALL_SUBSTANCES
                   .filter(s => {
-                    if (manualFilter !== 'all' && !s.categories.some(c => c.includes(manualFilter) || s.type === manualFilter)) return false;
+                    if (manualFilter === 'all') return true;
+                    const filterL = manualFilter.toLowerCase();
+                    const catMatch = s.categories.some(c => c.toLowerCase().includes(filterL));
+                    const typeMatch = s.type?.toLowerCase().includes(filterL);
+                    const aliasMatch = filterL === 'vitamin' && s.type === 'vitamin';
+                    const aaMatch = filterL === 'amino_acid' && ['amino','aminoacid'].includes(s.type?.toLowerCase());
+                    if (!catMatch && !typeMatch && !aliasMatch && !aaMatch) return false;
                     if (manualSearch && !s.name.toLowerCase().includes(manualSearch.toLowerCase()) && !s.id.toLowerCase().includes(manualSearch.toLowerCase())) return false;
                     return true;
                   })
@@ -1898,7 +1919,13 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
                     );
                   })}
                 {ALL_SUBSTANCES.filter(s => {
-                  if (manualFilter !== 'all' && !s.categories.some(c => c.includes(manualFilter) || s.type === manualFilter)) return false;
+                  if (manualFilter === 'all') return true;
+                  const filterL = manualFilter.toLowerCase();
+                  const catMatch = s.categories.some(c => c.toLowerCase().includes(filterL));
+                  const typeMatch = s.type?.toLowerCase().includes(filterL);
+                  const aliasMatch = filterL === 'vitamin' && s.type === 'vitamin';
+                  const aaMatch = filterL === 'amino_acid' && ['amino','aminoacid'].includes(s.type?.toLowerCase());
+                  if (!catMatch && !typeMatch && !aliasMatch && !aaMatch) return false;
                   if (manualSearch && !s.name.toLowerCase().includes(manualSearch.toLowerCase()) && !s.id.toLowerCase().includes(manualSearch.toLowerCase())) return false;
                   return true;
                 }).length > 40 && <div style={{ fontSize:9, color:'var(--text-dim)', textAlign:'center', padding:6 }}>Показаны 40 из большего числа. Уточните поиск.</div>}
@@ -1933,14 +1960,14 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
                 <div style={{ fontSize:9, color:'var(--text-dim)', marginBottom:3 }}>Быстрые пресеты:</div>
                 <div style={{ display:'flex', flexWrap:'wrap', gap:3 }}>
                   {[
-                    { label:'Масса', ids:['AA_NAC','VIT_D3','MIN_MAGNESIUM','MIN_ZINC','VIT_Q10','VIT_C','MIN_SELENIUM'] },
-                    { label:'Сушка', ids:['AA_L_CARNITINE','AO_GREEN_TEA','AO_EGCG','VIT_B_COMPLEX','VIT_C','AA_NAC','AO_MELATONIN'] },
-                    { label:'Печень', ids:['AA_NAC','AD_MILK_THISTLE','AA_TUDCA','VIT_LIPOIC_R','VIT_CHOLINE'] },
-                    { label:'Сердце', ids:['VIT_Q10','MIN_MAGNESIUM','VIT_OMEGA3','AA_TAURINE','AO_CURCUMIN','VIT_K2_MK7'] },
-                    { label:'Суставы', ids:['AA_GLUCOSAMINE','AA_CHONDROITIN','AA_MSM','AA_COLLAGEN','AA_HYALURONIC','AO_BOSWELLIA'] },
-                    { label:'Мозг', ids:['AA_L_THEANINE','AO_GINKGO','AD_LIONS_MANE','VIT_B12_METHYL','VIT_D3','VIT_OMEGA3','MIN_MAGNESIUM'] },
-                    { label:'Сон', ids:['AO_MELATONIN','MIN_MAGNESIUM','AA_L_THEANINE','AA_L_GLYCINE','AO_ASHWAGANDHA','VIT_B6'] },
-                    { label:'Иммунитет', ids:['VIT_C','MIN_ZINC','VIT_D3','AO_ELDERBERRY','AO_ECHINACEA','AO_QUERCETIN','PRE_PROBIOTICS'] },
+                    { label:'Масса', ids:['AA_NAC','VIT_D3','MIN_MAG_GLYCINATE','MIN_ZINC_PICOLINATE','VIT_Q10','VIT_C','AO_SELENIUM'] },
+                    { label:'Сушка', ids:['AA_L_CARNITINE_TARTRATE','AO_EGCG','VIT_B_COMPLEX','VIT_C','AA_NAC','AO_MELATONIN'] },
+                    { label:'Печень', ids:['AA_NAC','AO_SILYMARIN','VIT_LIPOIC_R','VIT_CHOLINE'] },
+                    { label:'Сердце', ids:['VIT_Q10','MIN_MAG_GLYCINATE','FA_OMEGA3_EPA','AA_L_TAURINE','AO_CURCUMIN','VIT_K2_MK7'] },
+                    { label:'Суставы', ids:['MIN_SULFUR_MSM','AA_L_COLLAGEN_AMINO','AO_CURCUMIN','VIT_D3'] },
+                    { label:'Мозг', ids:['AA_L_THEANINE','AO_GINKGO_FLAVONES','AD_LIONS_MANE','VIT_B12_METHYL','VIT_D3','FA_OMEGA3_DHA','MIN_MAG_THREONATE'] },
+                    { label:'Сон', ids:['AO_MELATONIN','MIN_MAG_GLYCINATE','AA_L_THEANINE','AA_L_GLYCINE','AD_ASHWAGANDHA_KSM','VIT_B6'] },
+                    { label:'Иммунитет', ids:['VIT_C','MIN_ZINC_PICOLINATE','VIT_D3','PP_ELDERBERRY_POLYPHENOLS','AO_QUERCETIN','PRE_FOS'] },
                   ].map(p => (
                     <button key={p.label} onClick={() => { setManualSubs(p.ids); setManualResult(null); }}
                       style={{ padding:'3px 8px', borderRadius:4, fontSize:9, cursor:'pointer', border:'none',
@@ -3143,7 +3170,7 @@ const RecsTab: React.FC<{ profile: any; labs: any; readiness: any; course: any }
 const OptimizerSection: React.FC<{ drugs: string[] }> = ({ drugs }) => {
   const [optResult, setOptResult] = React.useState<OptimizerStackResult | null>(null);
   const run = () => {
-    const available = drugs.length > 0 ? drugs : ['testosterone'];
+    const available = drugs.length > 0 ? drugs : ['AA_NAC'];
     const result = newOptimizeStack(available);
     setOptResult(result);
   };
