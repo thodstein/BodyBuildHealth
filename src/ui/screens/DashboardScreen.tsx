@@ -24,17 +24,20 @@ export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
     <div style={{ position:'fixed', inset:0, zIndex:100, display:'flex', flexDirection:'column' }}>
       <img src="/main-hero.png?v=2" alt="" style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'fill' }} />
       <div style={{ position:'absolute', inset:0, background:'linear-gradient(transparent 50%, rgba(0,0,0,0.85))' }} />
-      <div style={{ position:'relative', zIndex:2, flex:1, display:'flex', flexDirection:'column', justifyContent:'flex-end', padding:'0 16px 80px' }}>
-        <h1 style={{ fontSize:22, fontWeight:800, color:'#fff', margin:'0 0 14px', textShadow:'0 2px 14px rgba(0,0,0,0.9)' }}>Главная</h1>
-        <div style={{ display:'flex', gap:6, overflowX:'auto', scrollbarWidth:'none', paddingBottom:2 }}>
+      <div style={{ position:'relative', zIndex:2, flex:1, display:'flex', flexDirection:'column', justifyContent:'flex-end', padding:'0 16px 100px' }}>
+        <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
           {NAV_CARDS.map(card => (
             <button key={card.id} onClick={() => onNavigate?.(card.id)} style={{
-              display:'flex', alignItems:'center', gap:6, padding:'5px 12px', borderRadius:16, cursor:'pointer', flexShrink:0, whiteSpace:'nowrap',
-              background:'rgba(20,22,30,0.35)', border:'1px solid rgba(255,255,255,0.08)',
-              fontSize:10, fontWeight:600, color:'rgba(255,255,255,0.9)',
+              display:'flex', alignItems:'center', gap:12, padding:'12px 14px', borderRadius:14, cursor:'pointer', textAlign:'left',
+              background:'rgba(20,22,30,0.4)', border:'1px solid rgba(255,255,255,0.1)',
+              transition:'all 0.2s',
             }}>
-              <span>{card.icon}</span>
-              <span>{card.label}</span>
+              <div style={{ width:36, height:36, borderRadius:10, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, background:'rgba(0,230,138,0.1)', fontSize:18 }}>{card.icon}</div>
+              <div style={{ flex:1 }}>
+                <div style={{ fontWeight:700, fontSize:14, color:'rgba(255,255,255,0.95)' }}>{card.label}</div>
+                <div style={{ fontSize:10, color:'rgba(255,255,255,0.75)', lineHeight:1.3, marginTop:2 }}>{card.desc}</div>
+              </div>
+              <span style={{ color:'rgba(255,255,255,0.3)', fontSize:14 }}>→</span>
             </button>
           ))}
         </div>
