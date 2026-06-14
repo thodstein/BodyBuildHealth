@@ -98,17 +98,17 @@ const MOVEMENT_LIMITS: { id: InjuryRecord['movementLimit']; label: string }[] = 
 ];
 
 const s: Record<string, React.CSSProperties> = {
-  card: { background: 'rgba(20,22,30,0.08)', backdropFilter:'blur(8px)', WebkitBackdropFilter:'blur(8px)', borderRadius: 12, padding: 16, marginBottom: 12, border:'1px solid rgba(255,255,255,0.06)' },
+  card: { background: 'var(--bg-secondary)', borderRadius: 12, padding: 16, marginBottom: 12 },
   row: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 8 },
   row3: { display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginBottom: 8 },
   label: { fontSize: 12, opacity: 0.7, marginBottom: 4 },
   slider: { width: '100%', accentColor: '#00e68a' },
-  input: { width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(20,22,30,0.1)', color: 'inherit', fontSize: 14, boxSizing: 'border-box' as const, backdropFilter:'blur(4px)', WebkitBackdropFilter:'blur(4px)' },
+  input: { width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg-primary)', color: 'inherit', fontSize: 14, boxSizing: 'border-box' as const },
   btnGroup: { display: 'flex', flexWrap: 'wrap' as const, gap: 6, marginBottom: 8 },
-  btn: { padding: '6px 12px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(20,22,30,0.3)', color: 'rgba(255,255,255,0.85)', fontSize: 12, cursor: 'pointer' },
+  btn: { padding: '6px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg-primary)', color: 'inherit', fontSize: 12, cursor: 'pointer' },
   btnActive: { padding: '6px 12px', borderRadius: 8, border: '1px solid #00e68a', background: 'rgba(0,230,138,0.15)', color: '#00e68a', fontSize: 12, cursor: 'pointer' },
   chipActive: { padding: '4px 10px', borderRadius: 16, border: '1px solid #00e68a', background: 'rgba(0,230,138,0.15)', color: '#00e68a', fontSize: 11, cursor: 'pointer' },
-  chip: { padding: '4px 10px', borderRadius: 16, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(20,22,30,0.3)', color: 'rgba(255,255,255,0.8)', fontSize: 11, cursor: 'pointer' },
+  chip: { padding: '4px 10px', borderRadius: 16, border: '1px solid var(--border)', background: 'var(--bg-primary)', color: 'inherit', fontSize: 11, cursor: 'pointer' },
   saveBtn: { padding: '10px 20px', borderRadius: 8, border: 'none', background: '#00e68a', color: '#000', fontWeight: 600, fontSize: 14, cursor: 'pointer', width: '100%', marginTop: 8 },
   delBtn: { padding: '4px 8px', borderRadius: 6, border: '1px solid #f44336', background: 'transparent', color: '#f44336', fontSize: 11, cursor: 'pointer' },
   section: { fontSize: 13, fontWeight: 600, marginBottom: 8, marginTop: 4, opacity: 0.8 },
