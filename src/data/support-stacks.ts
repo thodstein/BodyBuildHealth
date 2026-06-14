@@ -365,6 +365,64 @@ function generateStacks(): SupportStack[] {
     });
   }
 
+  // Phase 5: Organ & system stacks (various sizes: 2-4 to 30-35)
+  const organGroups: { key: string; label: string; effects: string[]; sizeRange: [number,number] }[] = [
+    { key:'organ_cardio',label:'Сердце и сосуды',effects:['cardio_support','hydration','electrolyte','anti_inflammation','antioxidant'], sizeRange:[3,12] },
+    { key:'organ_liver',label:'Печень и детокс',effects:['liver_support','liver_detox','detox','antioxidant','anti_inflammation'], sizeRange:[3,12] },
+    { key:'organ_kidney',label:'Почки',effects:['kidney','hydration','electrolyte','detox','anti_inflammation'], sizeRange:[2,8] },
+    { key:'organ_lung',label:'Лёгкие и дыхание',effects:['lung','immune_boost','anti_inflammation','detox','antioxidant'], sizeRange:[2,8] },
+    { key:'organ_brain',label:'Мозг и когниция',effects:['nootropic','memory','focus','mood','dopamine','serotonin','gaba','anti_stress'], sizeRange:[3,15] },
+    { key:'organ_bones',label:'Кости и суставы',effects:['bone_support','joint','collagen','anti_inflammation','antioxidant'], sizeRange:[3,10] },
+    { key:'organ_skin',label:'Кожа, волосы, ногти',effects:['skin','hair','nails','collagen','hydration','antioxidant'], sizeRange:[2,8] },
+    { key:'organ_thyroid',label:'Щитовидная железа',effects:['thyroid_support','hormone_balance','energy','mood','antioxidant'], sizeRange:[2,7] },
+    { key:'organ_pancreas',label:'Поджелудочная и инсулин',effects:['pancreas','insulin_sensitivity','fat_loss','mitochondria','energy'], sizeRange:[2,7] },
+    { key:'organ_blood',label:'Кровь и анемия',effects:['blood','anemia','coagulation','methylation','energy'], sizeRange:[2,8] },
+    { key:'organ_immune',label:'Иммунная система',effects:['immune_boost','antimicrobial','antiviral','allergy','lung','antioxidant'], sizeRange:[3,12] },
+    { key:'organ_gi',label:'ЖКТ и микробиом',effects:['gi_healing','probiotics','detox','anti_inflammation','immuneboost'], sizeRange:[3,10] },
+    { key:'organ_hormones',label:'Гормональный баланс',effects:['hormone_balance','adrenal','thyroid_support','mood','energy','libido'], sizeRange:[3,12] },
+    { key:'organ_male',label:'Мужское здоровье',effects:['male_health','libido','hormone_balance','energy','recovery','muscle_growth'], sizeRange:[3,12] },
+    { key:'organ_female',label:'Женское здоровье',effects:['female_health','prenatal','hormone_balance','mood','bone_support','skin'], sizeRange:[3,12] },
+    { key:'organ_multi_metab',label:'Метаболизм и энергия',effects:['energy','mitochondria','fat_loss','insulin_sensitivity','thyroid_support','muscle_growth'], sizeRange:[5,20] },
+    { key:'organ_multi_antiaging',label:'Антивозрастной комплекс',effects:['antiaging','mitochondria','antioxidant','methylation','skin','bone_support','nootropic','hormone_balance'], sizeRange:[8,35] },
+    { key:'organ_multi_recovery',label:'Восстановление и сон',effects:['recovery','sleep','gaba','serotonin','anti_stress','anti_inflammation','joint','muscle_growth'], sizeRange:[5,20] },
+  ];
+
+  for (const og of organGroups) {
+    // Collect all substances for these effects, weighted by how many effects they cover
+    const subWeight: Record<string, number> = {};
+    for (const ef of og.effects) {
+      for (const s of (EFFECT_SUBSTANCES[ef] || [])) {
+        subWeight[s] = (subWeight[s] || 0) + 1;
+      }
+    }
+    const ranked = Object.entries(subWeight).sort((a,b) => b[1]-a[1]).map(([s]) => s);
+    if (ranked.length < 2) continue;
+
+    // Generate stacks of different sizes for this organ
+    const sizeSteps = [[2,4],[5,7],[8,10],[11,15],[15,20],[20,25],[30,35]];
+    for (const [lo,hi] of sizeSteps) {
+      if (hi > ranked.length) continue;
+      if (lo < og.sizeRange[0] || hi > og.sizeRange[1]) continue;
+      // Create 2-3 stacks per size range
+      for (let r = 0; r < 2 && stacks.length < 800; r++) {
+        const count = lo + Math.floor(Math.random() * (hi - lo + 1));
+        const size = Math.min(count, ranked.length);
+        // Pick substances: top-ranked for the effects
+        const selected = ranked.slice(0, Math.floor(size * 0.7))
+          .concat([...ranked.slice(Math.floor(size * 0.7))].sort(() => Math.random() - 0.5).slice(0, size - Math.floor(size * 0.7)));
+        const uniq = [...new Set(selected)];
+        const score = calcSynergy(uniq, og.effects);
+        stacks.push({
+          id: safeId([og.key, String(lo), String(hi)]),
+          effects: og.effects.slice(0, r===0?og.effects.length:Math.min(og.effects.length,3+Math.floor(Math.random()*3))),
+          substances: uniq,
+          synergyScore: score,
+          description: `Стек для ${og.label}. ${uniq.length} веществ. Состав: ${uniq.map(s=>getSubstanceLabel(s)).join(', ')}.`,
+        });
+      }
+    }
+  }
+
   // Deduplicate by substance+effect signature
   const seen = new Set<string>();
   const unique: SupportStack[] = [];
@@ -378,7 +436,7 @@ function generateStacks(): SupportStack[] {
     if (b.substances.length !== a.substances.length) return b.substances.length - a.substances.length;
     if (b.effects.length !== a.effects.length) return b.effects.length - a.effects.length;
     return b.synergyScore - a.synergyScore;
-  }).slice(0, 210);
+  }).slice(0, 600);
 }
 
 export const ALL_STACKS: SupportStack[] = generateStacks();
