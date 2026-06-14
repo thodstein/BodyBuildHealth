@@ -952,10 +952,10 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
           s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
           s.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
           s.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          s.categories.some(c => c.toLowerCase().includes(searchQuery.toLowerCase())) ||
-          s.mechanisms.some(m => m.toLowerCase().includes(searchQuery.toLowerCase()))
+          (s.categories||[]).some(c => c.toLowerCase().includes(searchQuery.toLowerCase())) ||
+          (s.mechanisms||[]).some(m => m.toLowerCase().includes(searchQuery.toLowerCase()))
         )
-      : ALL_SUBSTANCES;
+        : ALL_SUBSTANCES;
     for (const sub of filtered) {
       const primaryCat = sub.categories[0] || 'other';
       if (!groups[primaryCat]) groups[primaryCat] = [];
@@ -1893,7 +1893,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
                   .filter(s => {
                     if (manualFilter === 'all') return true;
                     const filterL = manualFilter.toLowerCase();
-                    const catMatch = s.categories.some(c => c.toLowerCase().includes(filterL));
+                    const catMatch = (s.categories||[]).some(c => c.toLowerCase().includes(filterL));
                     const typeMatch = s.type?.toLowerCase().includes(filterL);
                     const aliasMatch = filterL === 'vitamin' && s.type === 'vitamin';
                     const aaMatch = filterL === 'amino_acid' && ['amino','aminoacid'].includes(s.type?.toLowerCase());
@@ -1921,7 +1921,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
                 {ALL_SUBSTANCES.filter(s => {
                   if (manualFilter === 'all') return true;
                   const filterL = manualFilter.toLowerCase();
-                  const catMatch = s.categories.some(c => c.toLowerCase().includes(filterL));
+                  const catMatch = (s.categories||[]).some(c => c.toLowerCase().includes(filterL));
                   const typeMatch = s.type?.toLowerCase().includes(filterL);
                   const aliasMatch = filterL === 'vitamin' && s.type === 'vitamin';
                   const aaMatch = filterL === 'amino_acid' && ['amino','aminoacid'].includes(s.type?.toLowerCase());
@@ -2503,7 +2503,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
                         background: 'var(--bg-secondary)', border: '1px solid var(--border-color)',
                       }}>
                         <span style={{ fontWeight: 600 }}>{sub.name}</span>
-                        <span style={{ color: 'var(--text-dim)', marginLeft: 6, fontSize: 10 }}>{sub.type} · {sub.categories.slice(0, 2).join(', ')}</span>
+                        <span style={{ color: 'var(--text-dim)', marginLeft: 6, fontSize: 10 }}>{sub.type}{(sub.categories||[]).length > 0 ? ' · ' + (sub.categories||[]).slice(0, 2).join(', ') : ''}</span>
                         <div style={{ fontSize: 9, color: 'var(--text-dim)', marginTop: 2 }}>{sub.description}</div>
                       </div>
                     ))}
@@ -2880,7 +2880,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
                 });
               })()}
             </div>
-            {PEPTIDE_DB[peptideId] && (
+            {PEPTIDE_DB[peptideId] && PEPTIDE_DB[peptideId].effects && (
               <div style={{ display:'flex', flexWrap:'wrap', gap:4, marginTop:6 }}>
                 {PEPTIDE_DB[peptideId].effects.map(e => (
                   <span key={e} style={{ fontSize:9, padding:'2px 6px', borderRadius:4, background:'rgba(0,230,138,0.1)', color:'#00e68a' }}>{e}</span>
