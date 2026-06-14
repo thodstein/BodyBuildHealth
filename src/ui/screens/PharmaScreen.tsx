@@ -404,7 +404,7 @@ const CatalogTab: React.FC = () => {
   const filteredList = useMemo(() => {
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
-      return pharmaSubstances.filter(s => s.name.toLowerCase().includes(q) || s.id.toLowerCase().includes(q) || (s.class && s.class.toLowerCase().includes(q)));
+      return pharmaSubstances.filter(s => (s.name||'').toLowerCase().includes(q) || (s.id||'').toLowerCase().includes(q) || (s.class && s.class.toLowerCase().includes(q)));
     }
     if (filterClass === 'all') return pharmaSubstances;
     return pharmaSubstances.filter(s => s.class === filterClass);
@@ -714,7 +714,7 @@ const PKPDSimulationTab: React.FC = () => {
       const q = pkSearch.toLowerCase();
       let list = allSubstances;
       if (pkClass) list = list.filter(s => s.class === pkClass);
-      if (pkSearch.trim()) list = list.filter(s => s.name.toLowerCase().includes(q) || s.id.toLowerCase().includes(q));
+      if (pkSearch.trim()) list = list.filter(s => (s.name||'').toLowerCase().includes(q) || (s.id||'').toLowerCase().includes(q));
       return list;
     }
     return unusedSubstances;
@@ -1584,8 +1584,8 @@ const PeptideCalcTab: React.FC = () => {
           })}
           {(() => {
             const GROWTH_CLASSES = new Set(['peptide_ghrh','peptide_ghrp','igf1','mgf','insulin','peptide_gnrh','peptide_fat_loss','peptide_other','peptide_regenerative','peptide_immune','peptide_nootropic','pct_gonadotropin']);
-            const inPeptideDb = new Set(PEPTIDE_LIST.map(p => PEPTIDE_DB[p.id]?.name.toLowerCase()));
-            return Object.values(PHARMA_DB).filter(s => !!s?.name && GROWTH_CLASSES.has(s.class) && s.id !== 'mk677' && !inPeptideDb.has(s.name.toLowerCase())).map(s => {
+            const inPeptideDb = new Set(PEPTIDE_LIST.map(p => (PEPTIDE_DB[p.id]?.name||'').toLowerCase()));
+            return Object.values(PHARMA_DB).filter(s => !!s?.name && GROWTH_CLASSES.has(s.class) && s.id !== 'mk677' && !inPeptideDb.has((s.name||'').toLowerCase())).map(s => {
               const sel = growthId === s.id;
               return <div key={s.id} onClick={() => { setGrowthId(s.id); setPepResult(null); }} style={{
                 padding:'6px 10px', borderRadius:8, cursor:'pointer', fontSize:10,
@@ -1860,7 +1860,7 @@ const InteractionCheckerTab: React.FC = () => {
   const validIds = selectedIds.filter(Boolean);
 
   const interactFiltered = interactSearch
-    ? allSubstances.filter(p => p.name.toLowerCase().includes(interactSearch.toLowerCase()) || p.class.toLowerCase().includes(interactSearch.toLowerCase()))
+    ? allSubstances.filter(p => (p.name||'').toLowerCase().includes(interactSearch.toLowerCase()) || (p.class||'').toLowerCase().includes(interactSearch.toLowerCase()))
     : allSubstances;
 
   const unusedSubstances = useMemo(() => {
@@ -2176,7 +2176,7 @@ const MapperTab: React.FC = () => {
   useEffect(() => {
     if (course.length > 0) {
       const drugs: DrugEntry[] = course.map(c => ({
-        name: c.substanceId.toLowerCase(),
+        name: (c.substanceId||'').toLowerCase(),
         dosageMg: c.doseUnit === 'mg/wk'
           ? c.doseValue
           : c.doseUnit === 'mg' ? c.doseValue : c.doseValue * 1000,
@@ -2187,7 +2187,7 @@ const MapperTab: React.FC = () => {
 
   const handleRunManual = () => {
     const drugs = useCourse && course.length > 0
-      ? course.map(c => ({ name: c.substanceId.toLowerCase(), dosageMg: c.doseValue }))
+      ? course.map(c => ({ name: (c.substanceId||'').toLowerCase(), dosageMg: c.doseValue }))
       : [...manualDrugs];
     if (drugs.length === 0) return;
     setMapperResult(mapStackToPathologies(drugs));
@@ -2195,7 +2195,7 @@ const MapperTab: React.FC = () => {
     // Lazy-load clinical analysis
     import('../../engines/clinical-analyzer.engine').then(({ analyzeClinicalRisks }) => {
       const compoundNames = course.length > 0
-        ? course.map(c => c.substanceId.toLowerCase())
+        ? course.map(c => (c.substanceId||'').toLowerCase())
         : manualDrugs.map(d => d.name);
       const markers = (linked.labs || []).map(l => ({ code: l.code || l.name, value: l.value }));
       const s2 = linked.profile?.settings;

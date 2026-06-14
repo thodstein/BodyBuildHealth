@@ -1322,9 +1322,10 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
                                 {interaction.mechanisms && interaction.mechanisms.length > 0 && (
                                   <div style={{ display:'flex', flexWrap:'wrap', gap:2, marginTop:2 }}>
                                     {interaction.mechanisms.map((m, mi) => {
-                                      const mColor = m.toLowerCase().includes('toxic') || m.toLowerCase().includes('hepatic') ? '#ef4444' :
-                                        m.toLowerCase().includes('kidney') || m.toLowerCase().includes('renal') ? '#f59e0b' :
-                                        m.toLowerCase().includes('synerg') || m.toLowerCase().includes('enhanc') || m.toLowerCase().includes('potent') ? '#22c55e' : '#8b5cf6';
+                                      const ms = (m||'');
+                                      const mColor = ms.toLowerCase().includes('toxic') || ms.toLowerCase().includes('hepatic') ? '#ef4444' :
+                                        ms.toLowerCase().includes('kidney') || ms.toLowerCase().includes('renal') ? '#f59e0b' :
+                                        ms.toLowerCase().includes('synerg') || ms.toLowerCase().includes('enhanc') || ms.toLowerCase().includes('potent') ? '#22c55e' : '#8b5cf6';
                                       return <span key={mi} style={{ fontSize:6, padding:'1px 4px', borderRadius:3, background:mColor+'18', color:mColor, border:`1px solid ${mColor}22`, fontWeight:500 }}>{m}</span>;
                                     })}
                                   </div>
@@ -1787,9 +1788,10 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
                     {interaction.mechanisms && interaction.mechanisms.length > 0 && (
                       <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap', marginBottom: 2 }}>
                         {interaction.mechanisms.map(m => {
-                          const mColor = m.toLowerCase().includes('toxic') || m.toLowerCase().includes('hepatic') ? '#ef4444' :
-                            m.toLowerCase().includes('kidney') || m.toLowerCase().includes('renal') ? '#f59e0b' :
-                            m.toLowerCase().includes('synerg') || m.toLowerCase().includes('enhanc') || m.toLowerCase().includes('potent') ? '#22c55e' : '#a78bfa';
+                          const ms = (m||'');
+                          const mColor = ms.toLowerCase().includes('toxic') || ms.toLowerCase().includes('hepatic') ? '#ef4444' :
+                            ms.toLowerCase().includes('kidney') || ms.toLowerCase().includes('renal') ? '#f59e0b' :
+                            ms.toLowerCase().includes('synerg') || ms.toLowerCase().includes('enhanc') || ms.toLowerCase().includes('potent') ? '#22c55e' : '#a78bfa';
                           return <span key={m} style={{ fontSize: 8, padding: '1px 5px', borderRadius: 3, background: mColor + '18', color: mColor, border: `1px solid ${mColor}22`, fontWeight: 500 }}>{m}</span>;
                         })}
                       </div>

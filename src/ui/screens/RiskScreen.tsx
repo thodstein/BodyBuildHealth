@@ -1223,7 +1223,7 @@ const ClinicalRiskDisplay: React.FC = () => {
         import('../../data/clinical-pathology-db'),
       ]);
 
-      const compounds = course.map(c => c.substanceId.toLowerCase());
+      const compounds = course.map(c => (c.substanceId||'').toLowerCase());
       const markers = labs.map(l => ({ code: l.code || l.name, value: l.value }));
       const genetics = Object.keys(s?.genetics || {}).filter(k => !!(s?.genetics as any)?.[k]);
       const labDates = labs.map(l => l.date).filter(Boolean).sort().reverse();
@@ -1234,7 +1234,7 @@ const ClinicalRiskDisplay: React.FC = () => {
       const clinical = analyzeClinicalRisks({ compounds, markers, tWeeks: Math.max(1, tWeeks), weeksSinceLab, genetics });
 
       // Also run drug mapper to capture ALL drug-based pathologies
-      const mapperDrugs = course.map(c => ({ name: c.substanceId.toLowerCase(), dosageMg: c.doseValue }));
+      const mapperDrugs = course.map(c => ({ name: (c.substanceId||'').toLowerCase(), dosageMg: c.doseValue }));
       const mapper = mapStackToPathologies(mapperDrugs);
 
       // Merge mapper pathologies into clinical results
