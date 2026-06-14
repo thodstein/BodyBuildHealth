@@ -510,7 +510,7 @@ const CatalogTab: React.FC = () => {
 };
 
 const DrugDetailCard: React.FC<{ sub: PharmaSubstance; detail?: PharmaDetail }> = ({ sub, detail }) => {
-  const pd = sub.pd;
+  const pd = sub.pd || {} as PharmaSubstance['pd'];
   const pdEntries = Object.entries(pd) as [keyof PD, number][];
   const [expandedPD, setExpandedPD] = useState<string | null>(null);
 
@@ -534,9 +534,9 @@ const DrugDetailCard: React.FC<{ sub: PharmaSubstance; detail?: PharmaDetail }> 
       <h3 style={{ margin: '0 0 8px', color: 'var(--accent)' }}>{sub.name}</h3>
       <div className="pharma-detail-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 16px', marginBottom: 8 }}>
         <span>Класс:</span><span style={{ fontWeight: 600 }}>{CLASS_LABELS[sub.class] || sub.class}</span>
-        <span>T½:</span><span style={{ fontWeight: 600 }}>{formatHalfLife(sub.pk.halfLifeHours)}</span>
-        <span>Биодоступность:</span><span style={{ fontWeight: 600 }}>{(sub.pk.bioavailability * 100).toFixed(0)}%</span>
-        <span>Vd:</span><span style={{ fontWeight: 600 }}>{sub.pk.Vd} л</span>
+        <span>T½:</span><span style={{ fontWeight: 600 }}>{sub.pk ? formatHalfLife(sub.pk.halfLifeHours) : '—'}</span>
+        <span>Биодоступность:</span><span style={{ fontWeight: 600 }}>{sub.pk ? (sub.pk.bioavailability * 100).toFixed(0) : '—'}%</span>
+        <span>Vd:</span><span style={{ fontWeight: 600 }}>{sub.pk ? sub.pk.Vd + ' л' : '—'}</span>
         <span>Эстеры:</span><span style={{ fontWeight: 600 }}>{sub.esters?.join(', ') || '—'}</span>
       </div>
 
@@ -768,7 +768,7 @@ const PKPDSimulationTab: React.FC = () => {
   };
 
   const runSimulation = () => {
-    const maxWeeks = Math.max(...drugDoses.map(d => d.totalWeeks));
+    const maxWeeks = Math.max(...drugDoses.map(d => d.totalWeeks), 1);
     const allEntries = buildEntries(drugDoses);
     if (allEntries.length === 0) return;
 
@@ -833,7 +833,7 @@ const PKPDSimulationTab: React.FC = () => {
     const PAD = 40;
     const pts = simResult.points;
     const visiblePerDrug = simResult.perDrug.filter(d => showAllDrugs || visibleDrugs.has(d.substanceId));
-    const allCp = [...pts.map(p => p.cp), ...visiblePerDrug.flatMap(d => d.points.map(p => p.cp))];
+    const allCp = [...pts.map(p => p.cp), ...visiblePerDrug.flatMap(d => (d.points || []).map(p => p.cp))];
     const maxCp = Math.max(...allCp, 1);
     const maxWeek = pts[pts.length - 1].week;
 
@@ -849,7 +849,7 @@ const PKPDSimulationTab: React.FC = () => {
     const perDrugPaths = visiblePerDrug.map((drug, di) => {
       const idx = simResult.perDrug.findIndex(d => d.substanceId === drug.substanceId);
       const color = DRUG_COLORS[idx % DRUG_COLORS.length];
-      const d = drug.points.map((p, i) => `${i === 0 ? 'M' : 'L'}${toX(p.week).toFixed(1)},${toY(p.cp).toFixed(1)}`).join(' ');
+      const d = (drug.points || []).map((p, i) => `${i === 0 ? 'M' : 'L'}${toX(p.week).toFixed(1)},${toY(p.cp).toFixed(1)}`).join(' ');
       return { substanceId: drug.substanceId, name: drug.name, d, color };
     });
 
@@ -932,10 +932,11 @@ const PKPDSimulationTab: React.FC = () => {
                 <label style={{ fontSize: 9, color: 'var(--text-dim)', display: 'block', marginBottom: 3 }}>Дни инъекций:</label>
                 <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
                   {[1,2,3,4,5,6,7].map(d => {
-                    const active = dd.frequencyDays.includes(d);
+                    const active = (dd.frequencyDays || []).includes(d);
                     return (
                       <button key={d} type="button" onClick={() => {
-                        const next = active ? dd.frequencyDays.filter(x => x !== d) : [...dd.frequencyDays, d].sort();
+                        const fDays = dd.frequencyDays || [];
+                        const next = active ? fDays.filter(x => x !== d) : [...fDays, d].sort();
                         updateDrug(idx, 'frequencyDays', next);
                       }} style={{
                         flex: 1, minWidth: 36, height: 28, borderRadius: 6, fontSize: 9, fontWeight: 700, cursor: 'pointer',
@@ -1595,7 +1596,7 @@ const PeptideCalcTab: React.FC = () => {
             });
           })()}
         </div>
-        {PEPTIDE_DB[peptideId] && (
+        {PEPTIDE_DB[peptideId] && PEPTIDE_DB[peptideId].effects && (
           <div style={{ display:'flex', flexWrap:'wrap', gap:4, marginTop:6 }}>
             {PEPTIDE_DB[peptideId].effects.map(e => (
               <span key={e} style={{ fontSize:9, padding:'2px 6px', borderRadius:4, background:'rgba(0,230,138,0.1)', color:'#00e68a' }}>{e}</span>
@@ -2294,15 +2295,15 @@ const MapperTab: React.FC = () => {
         <>
           <div className="card" style={{ marginBottom: 12, display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, textAlign: 'center' }}>
             <div>
-              <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--accent)' }}>{mapperResult.activePathologies.length}</div>
+              <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--accent)' }}>{mapperResult.activePathologies?.length ?? 0}</div>
               <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Патологии</div>
             </div>
             <div>
-              <div style={{ fontSize: 20, fontWeight: 800, color: '#60a5fa' }}>{mapperResult.requiredBiomarkers.length}</div>
+              <div style={{ fontSize: 20, fontWeight: 800, color: '#60a5fa' }}>{mapperResult.requiredBiomarkers?.length ?? 0}</div>
               <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Биомаркеры</div>
             </div>
             <div>
-              <div style={{ fontSize: 20, fontWeight: 800, color: mapperResult.unknownDrugs.length > 0 ? '#f97316' : 'var(--text-dim)' }}>
+              <div style={{ fontSize: 20, fontWeight: 800, color: (mapperResult.unknownDrugs?.length ?? 0) > 0 ? '#f97316' : 'var(--text-dim)' }}>
                 {mapperResult.knownDrugs}/{mapperResult.totalDrugs}
               </div>
               <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Распознано</div>
@@ -2310,7 +2311,7 @@ const MapperTab: React.FC = () => {
           </div>
 
           <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 6, color: 'var(--text-dim)' }}>Активные патологии (по убыванию тяжести)</div>
-          {mapperResult.activePathologies.map(p => {
+          {(mapperResult.activePathologies || []).map(p => {
             const sev = getSeverityClass(p.cumulativeTriggerStrength);
             const ZONE_COLORS: Record<string, string> = { high: '#ef4444', medium: '#f97316', low: '#eab308' };
             return (
@@ -2323,7 +2324,7 @@ const MapperTab: React.FC = () => {
                     </span>
                   </div>
                   <div style={{ display: 'flex', gap: 4 }}>
-                    {p.contributingDrugs.map(d => (
+                    {(p.contributingDrugs || []).map(d => (
                       <span key={d} style={{ padding: '2px 6px', borderRadius: 4, background: 'rgba(139,92,246,0.12)', color: '#a78bfa', fontSize: 10 }}>{d}</span>
                     ))}
                   </div>
@@ -2332,7 +2333,7 @@ const MapperTab: React.FC = () => {
                   <div style={{ width: `${Math.min(100, p.cumulativeTriggerStrength * 35)}%`, height: '100%', background: ZONE_COLORS[sev], borderRadius: 4, transition: 'width 0.5s' }} />
                 </div>
                 <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>
-                  {p.contributingDrugs.length > 1
+                  {(p.contributingDrugs?.length ?? 0) > 1
                     ? ``
                     : ``}
                 </div>
@@ -2342,13 +2343,13 @@ const MapperTab: React.FC = () => {
 
           <div className="card" style={{ marginBottom: 12 }}>
             <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 4, color: 'var(--text-dim)' }}>
-              🧪 Требуемые биомаркеры ({mapperResult.requiredBiomarkers.length})
+              🧪 Требуемые биомаркеры ({mapperResult.requiredBiomarkers?.length ?? 0})
             </div>
             <div style={{ fontSize: 10, color: 'var(--accent)', marginBottom: 6 }}>
               Зелёные — есть в ваших анализах, серые — необходимо сдать
             </div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-              {mapperResult.requiredBiomarkers.map(m => {
+              {(mapperResult.requiredBiomarkers || []).map(m => {
                 const has = markerInLabs(m);
                 return (
                   <span key={m} style={{
@@ -2362,10 +2363,10 @@ const MapperTab: React.FC = () => {
             </div>
           </div>
 
-          {mapperResult.unknownDrugs.length > 0 && (
+          {(mapperResult.unknownDrugs?.length ?? 0) > 0 && (
             <div className="card" style={{ marginBottom: 12, borderLeft: '4px solid #f97316' }}>
               <div style={{ fontSize: 11, color: '#f97316', fontWeight: 600 }}>
-                Неизвестные препараты: {mapperResult.unknownDrugs.join(', ')}
+                Неизвестные препараты: {(mapperResult.unknownDrugs || []).join(', ')}
               </div>
               <div style={{ fontSize: 9, color: 'var(--text-dim)', marginTop: 2 }}>
                 Эти препараты отсутствуют в графе знаний. Они исключены из расчёта.
@@ -2376,7 +2377,7 @@ const MapperTab: React.FC = () => {
       )}
 
       {/* ── Clinical Pathology Analysis ── */}
-      {clinicalResult && clinicalResult.results.length > 0 && (
+      {clinicalResult?.results?.length > 0 && (
         <div style={{ marginTop: 8 }}>
           <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6, color: '#ec4899' }}>
             🏥 Клинические патологии ({clinicalResult.results.length})
@@ -2385,60 +2386,60 @@ const MapperTab: React.FC = () => {
           {/* Summary */}
           <div className="card" style={{
             marginBottom: 10, padding: '8px 12px',
-            background: clinicalResult.overallMaxRisk >= 80 ? 'rgba(239,68,68,0.08)' :
-              clinicalResult.overallMaxRisk >= 50 ? 'rgba(249,115,22,0.06)' : 'rgba(0,230,138,0.04)',
-            borderLeft: `3px solid ${clinicalResult.overallMaxRisk >= 80 ? '#ef4444' : clinicalResult.overallMaxRisk >= 50 ? '#f97316' : '#00e68a'}`,
+            background: (clinicalResult.overallMaxRisk ?? 0) >= 80 ? 'rgba(239,68,68,0.08)' :
+              (clinicalResult.overallMaxRisk ?? 0) >= 50 ? 'rgba(249,115,22,0.06)' : 'rgba(0,230,138,0.04)',
+            borderLeft: `3px solid ${(clinicalResult.overallMaxRisk ?? 0) >= 80 ? '#ef4444' : (clinicalResult.overallMaxRisk ?? 0) >= 50 ? '#f97316' : '#00e68a'}`,
           }}>
             <div style={{ fontSize: 11 }}>{clinicalResult.summary}</div>
             <div style={{ display: 'flex', gap: 10, marginTop: 2, fontSize: 9, color: 'var(--text-dim)' }}>
-              <span>🧪 {clinicalResult.markersAnalyzed} маркеров</span>
-              <span>📋 {clinicalResult.requiredLabPanel.length} в панели</span>
-              <span>🔬 {clinicalResult.requiredInstrumental.length} исследований</span>
+              <span>🧪 {clinicalResult.markersAnalyzed ?? 0} маркеров</span>
+              <span>📋 {(clinicalResult.requiredLabPanel?.length ?? 0)} в панели</span>
+              <span>🔬 {(clinicalResult.requiredInstrumental?.length ?? 0)} исследований</span>
             </div>
           </div>
 
           {/* Per-system accordion */}
-          {clinicalResult.systems.map((system: any) => (
-            <details key={system.systemKey} style={{ marginBottom: 6 }}>
+          {(clinicalResult.systems || []).map((system: any) => (
+            <details key={system?.systemKey || Math.random()} style={{ marginBottom: 6 }}>
               <summary style={{
                 padding: '6px 10px', borderRadius: 8, cursor: 'pointer',
                 background: 'var(--bg-secondary)', border: '1px solid var(--border)',
                 fontSize: 11, fontWeight: 600, listStyle: 'none',
                 display: 'flex', alignItems: 'center', gap: 6,
               }}>
-                {system.icon} {system.systemName}
+                {system?.icon || ''} {system?.systemName || ''}
                 <span style={{
                   marginLeft: 'auto', padding: '1px 6px', borderRadius: 4, fontSize: 10,
-                  background: system.maxRisk >= 80 ? 'rgba(239,68,68,0.15)' :
-                    system.maxRisk >= 50 ? 'rgba(249,115,22,0.15)' : 'rgba(0,230,138,0.10)',
-                  color: system.maxRisk >= 80 ? '#ef4444' : system.maxRisk >= 50 ? '#f97316' : '#00e68a',
-                }}>{Math.round(system.maxRisk)}%</span>
-                <span style={{ fontSize: 9, color: 'var(--text-dim)' }}>({system.pathologies.length})</span>
+                  background: (system?.maxRisk ?? 0) >= 80 ? 'rgba(239,68,68,0.15)' :
+                    (system?.maxRisk ?? 0) >= 50 ? 'rgba(249,115,22,0.15)' : 'rgba(0,230,138,0.10)',
+                  color: (system?.maxRisk ?? 0) >= 80 ? '#ef4444' : (system?.maxRisk ?? 0) >= 50 ? '#f97316' : '#00e68a',
+                }}>{Math.round(system?.maxRisk ?? 0)}%</span>
+                <span style={{ fontSize: 9, color: 'var(--text-dim)' }}>({(system?.pathologies?.length ?? 0)})</span>
               </summary>
               <div style={{ padding: '4px 0 0 8px' }}>
-                {system.pathologies.map((r: any) => {
-                  const zoneColor = r.alertLevel >= 3 ? '#ef4444' : r.alertLevel >= 2 ? '#f97316' : r.alertLevel >= 1 ? '#eab308' : '#22c55e';
+                {(system?.pathologies || []).map((r: any) => {
+                  const zoneColor = (r?.alertLevel ?? 0) >= 3 ? '#ef4444' : (r?.alertLevel ?? 0) >= 2 ? '#f97316' : (r?.alertLevel ?? 0) >= 1 ? '#eab308' : '#22c55e';
                   return (
-                    <div key={r.pathologyId} style={{
+                    <div key={r?.pathologyId || Math.random()} style={{
                       marginBottom: 6, padding: '6px 8px', borderRadius: 6,
                       background: 'rgba(255,255,255,0.02)', borderLeft: `3px solid ${zoneColor}`,
                     }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, marginBottom: 3 }}>
-                        <span style={{ fontWeight: 600 }}>{r.pathologyName}</span>
+                        <span style={{ fontWeight: 600 }}>{r?.pathologyName || ''}</span>
                         <span style={{ padding: '1px 5px', borderRadius: 3, background: `${zoneColor}20`, color: zoneColor, fontWeight: 600, fontSize: 9 }}>
-                          {r.riskPercent}% — {r.status.split('(')[0].trim()}
+                          {(r?.riskPercent ?? 0)}% — {(r?.status || '').split('(')[0].trim()}
                         </span>
                       </div>
                       <div style={{ display: 'flex', gap: 8, fontSize: 8, color: 'var(--text-dim)' }}>
-                        <span>Hill: {r.hillScore}</span>
-                        <span>MC95: {r.severity95}</span>
-                        {r.contributingCompounds.length > 0 && (
-                          <span>Препараты: {r.contributingCompounds.join(', ')}</span>
+                        <span>Hill: {r?.hillScore ?? '—'}</span>
+                        <span>MC95: {r?.severity95 ?? '—'}</span>
+                        {(r?.contributingCompounds?.length ?? 0) > 0 && (
+                          <span>Препараты: {(r?.contributingCompounds || []).join(', ')}</span>
                         )}
                       </div>
-                      {r.alertLevel >= 2 && (
+                      {(r?.alertLevel ?? 0) >= 2 && (
                         <div style={{ marginTop: 3, fontSize: 9, color: '#f97316' }}>
-                          🔬 {r.instrumental}
+                          🔬 {r?.instrumental || ''}
                         </div>
                       )}
                     </div>
