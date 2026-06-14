@@ -831,6 +831,8 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   const [pharmaInteractIds, setPharmaInteractIds] = useState<string[]>(['', '']);
   const [pharmaInteractSearch, setPharmaInteractSearch] = useState('');
   const [stackCalcSize, setStackCalcSize] = useState<string>('5-7');
+  const [stackCalcOrgans, setStackCalcOrgans] = useState<string[]>([]);
+  const [stackCalcMech, setStackCalcMech] = useState<string[]>([]);
 
   // Combine SUPPLEMENT_DESCRIPTIONS with support substances from PHARMA_DB
   const supplementList = useMemo(() => {
@@ -1609,32 +1611,88 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
                       </div>
                     </div>
             )}
-            {renderView(infoView, 'stackcalc', () =>
-              <div>
-                <div style={{fontSize:12,fontWeight:700,color:'var(--accent)',marginBottom:8}}>🧮 Калькулятор стеков</div>
-                <div style={{fontSize:9,color:'var(--text-dim)',lineHeight:1.4,marginBottom:8}}>Подбор стеков по размеру. Все стеки с описаниями.</div>
+            {renderView(infoView, 'stackcalc', () => {
+              const organList = [
+                {key:'cardio',label:'❤️ Сердце/Сосуды',eff:['cardio_support','electrolyte','hydration']},
+                {key:'liver',label:'🫁 Печень',eff:['liver_support','liver_detox','detox']},
+                {key:'kidney',label:'🫘 Почки',eff:['kidney','detox','hydration']},
+                {key:'lung',label:'🫁 Лёгкие',eff:['lung','immune_boost','allergy']},
+                {key:'brain',label:'🧠 Мозг/Когниция',eff:['nootropic','memory','focus','dopamine','serotonin','gaba']},
+                {key:'bones',label:'🦴 Кости/Суставы',eff:['bone_support','joint','collagen']},
+                {key:'skin',label:'✨ Кожа/Волосы',eff:['skin','hair','nails','collagen']},
+                {key:'thyroid',label:'🦋 Щитовидка',eff:['thyroid_support','hormone_balance']},
+                {key:'pancreas',label:'🍬 Поджелудочная',eff:['pancreas','insulin_sensitivity']},
+                {key:'blood',label:'🩸 Кровь',eff:['blood','anemia','coagulation','methylation']},
+                {key:'immune',label:'🛡 Иммунитет',eff:['immune_boost','antimicrobial','antiviral']},
+                {key:'gi',label:'🫃 ЖКТ',eff:['gi_healing','probiotics','absorption']},
+                {key:'hormones',label:'⚖ Гормоны',eff:['hormone_balance','adrenal','libido']},
+                {key:'male',label:'♂️ Мужское',eff:['male_health','libido','muscle_growth','gh_igf_axis']},
+                {key:'female',label:'♀️ Женское',eff:['female_health','prenatal','hormone_balance']},
+                {key:'antiaging',label:'⏳ Антивозраст',eff:['antiaging','mitochondria','methylation','antioxidant']},
+                {key:'energy',label:'⚡ Энергия',eff:['energy','mitochondria','fat_loss']},
+                {key:'recovery',label:'🔄 Восстановление',eff:['recovery','sleep','anti_stress','anti_inflammation']},
+              ];
+              const toggleOrgan = (key:string) => setStackCalcOrgans(prev=>prev.includes(key)?prev.filter(k=>k!==key):[...prev,key]);
+              const selectAll = () => setStackCalcOrgans(organList.map(o=>o.key));
+              const clearAll = () => setStackCalcOrgans([]);
+              const targetEffects = stackCalcOrgans.length===0 ? [] : organList.filter(o=>stackCalcOrgans.includes(o.key)).flatMap(o=>o.eff);
+              const [lo,hi]=stackCalcSize.split('-').map(Number);
+              const filtered = ALL_STACKS.filter(s=>{
+                if(s.substances.length<lo||s.substances.length>hi)return false;
+                if(targetEffects.length>0&&!s.effects.some(e=>targetEffects.includes(e)))return false;
+                return true;
+              });
+              return <div>
+                <div style={{fontSize:12,fontWeight:700,color:'var(--accent)',marginBottom:4}}>🧮 Калькулятор стеков</div>
+                <div style={{fontSize:8,color:'var(--text-dim)',marginBottom:8}}>Выберите органы/системы и размер стека — получите подходящие стеки</div>
+                {/* Organ/System selector */}
+                <div style={{marginBottom:8}}>
+                  <div style={{display:'flex',alignItems:'center',gap:4,marginBottom:4}}>
+                    <span style={{fontSize:9,fontWeight:600,color:'var(--text-light)'}}>Органы и системы:</span>
+                    <button onClick={selectAll} style={{fontSize:7,padding:'1px 5px',borderRadius:3,cursor:'pointer',background:'rgba(0,230,138,0.08)',border:'1px solid rgba(0,230,138,0.15)',color:'#00e68a'}}>Выбрать все</button>
+                    {stackCalcOrgans.length>0&&<button onClick={clearAll} style={{fontSize:7,padding:'1px 5px',borderRadius:3,cursor:'pointer',background:'rgba(239,68,68,0.06)',border:'1px solid rgba(239,68,68,0.12)',color:'#f87171'}}>✕ Сброс</button>}
+                    <span style={{fontSize:8,color:'var(--text-dim)',marginLeft:4}}>{stackCalcOrgans.length}/{organList.length}</span>
+                  </div>
+                  <div style={{display:'flex',flexWrap:'wrap',gap:3,maxHeight:100,overflowY:'auto'}}>
+                    {organList.map(o=><button key={o.key} onClick={()=>toggleOrgan(o.key)} style={{
+                      padding:'3px 7px',borderRadius:8,fontSize:8,cursor:'pointer',whiteSpace:'nowrap',
+                      background:stackCalcOrgans.includes(o.key)?'var(--accent)':'var(--bg-secondary)',
+                      color:stackCalcOrgans.includes(o.key)?'#000':'var(--text-dim)',
+                      border:`1px solid ${stackCalcOrgans.includes(o.key)?'var(--accent)':'var(--border)'}`}}>{o.label}</button>)}
+                  </div>
+                </div>
+                {/* Size selector */}
                 <div style={{display:'flex',flexWrap:'wrap',gap:3,marginBottom:8}}>
-                  {['2-4','5-7','8-10','11-15','15-20','20-25','30-35'].map(s =>
+                  <span style={{fontSize:9,fontWeight:600,color:'var(--text-light)',marginRight:2}}>Размер:</span>
+                  {['2-4','5-7','8-10','11-15','15-20','20-25','30-35'].map(s=>
                     <button key={s} onClick={()=>setStackCalcSize(s)} style={{
-                      padding:'4px 8px',borderRadius:12,fontSize:9,fontWeight:600,cursor:'pointer',
+                      padding:'3px 7px',borderRadius:8,fontSize:8,cursor:'pointer',
                       background:stackCalcSize===s?'var(--accent)':'var(--bg-secondary)',
                       color:stackCalcSize===s?'#000':'var(--text-dim)',
-                      border:`1px solid ${stackCalcSize===s?'var(--accent)':'var(--border)'}`}}>{s} веществ</button>
+                      border:`1px solid ${stackCalcSize===s?'var(--accent)':'var(--border)'}`}}>{s}</button>
                   )}
                 </div>
+                {/* Results */}
+                <div style={{fontSize:8,color:'var(--text-dim)',marginBottom:6}}>Найдено: {filtered.length} стеков</div>
                 <div style={{display:'flex',flexDirection:'column',gap:4}}>
-                  {ALL_STACKS.filter(s=>{const[lo,hi]=stackCalcSize.split('-').map(Number);return s.substances.length>=lo&&s.substances.length<=hi;}).slice(0,50).map(stack=>(
-                    <div key={stack.id} style={{background:'var(--bg-secondary)',borderRadius:8,padding:'8px',border:'1px solid var(--border)'}}>
-                      {stack.description && <div style={{fontSize:9,color:'var(--text-dim)',lineHeight:1.3,marginBottom:3}}>{stack.description}</div>}
-                      <div style={{display:'flex',gap:2,flexWrap:'wrap'}}>
+                  {filtered.slice(0,40).map(stack=>{
+                    const sc=stack.synergyScore>20?'#22c55e':stack.synergyScore>12?'#eab308':'#f59e0b';
+                    return <div key={stack.id} style={{background:'var(--bg-secondary)',borderRadius:8,padding:'8px',border:'1px solid var(--border)',cursor:'pointer'}} onClick={()=>setExpandedMed(expandedMed===stack.id?null:stack.id)}>
+                      {stack.description&&<div style={{fontSize:8,color:'var(--text-dim)',lineHeight:1.3,marginBottom:3}}>{stack.description}</div>}
+                      <div style={{display:'flex',flexWrap:'wrap',gap:2,alignItems:'center'}}>
                         {stack.effects.map(e=><span key={e} style={{fontSize:7,padding:'1px 5px',borderRadius:3,background:'rgba(0,230,138,0.08)',color:'#00e68a'}}>{EFFECT_LABELS_ru[e]||e}</span>)}
-                        <span style={{fontSize:10,fontWeight:700,color:stack.synergyScore>15?'#22c55e':'#eab308'}}>{(stack.synergyScore||0).toFixed(1)}</span>
+                        <span style={{fontSize:10,fontWeight:800,color:sc,marginLeft:'auto'}}>{(stack.synergyScore||0).toFixed(1)}</span>
                       </div>
-                    </div>
-                  ))}
+                      <div style={{display:'flex',flexWrap:'wrap',gap:2,marginTop:3}}>
+                        {stack.substances.map(sid=><span key={sid} style={{fontSize:7,padding:'1px 4px',borderRadius:3,background:'rgba(139,92,246,0.06)',color:'#a78bfa'}}>{getStackSubLabel(sid)}</span>)}
+                      </div>
+                      {expandedMed===stack.id&&<div style={{marginTop:4,padding:'6px 8px',background:'rgba(0,0,0,0.15)',borderRadius:6,fontSize:7,color:'var(--text-dim)',lineHeight:1.4}}>{stack.substances.map(sid=>{const sub=ALL_SUBSTANCES.find(s=>s.id===sid);return sub?`${sub.name}: ${(sub.description||'').slice(0,80)}`:'';}).filter(Boolean).join('\n')}</div>}
+                    </div>;
+                  })}
+                  {filtered.length===0&&<div style={{padding:20,textAlign:'center',color:'var(--text-dim)',fontSize:10}}>Нет стеков по выбранным фильтрам</div>}
                 </div>
-              </div>
-            )}
+              </div>;
+            })}
           </div>
         </div>
       )}
