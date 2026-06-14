@@ -989,6 +989,36 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
     return map;
   }, []);
 
+  // Pre-compute mechanisms & synergies for every stack
+  const stackDetailMap = useMemo(() => {
+    const map = new Map<string, { mechs: string[]; synergies: Array<{a:string;b:string;aName:string;bName:string;effect:string;mechs:string[];notes:string}> }>();
+    for (const stack of ALL_STACKS) {
+      const allMechs = new Set<string>();
+      const synergies: any[] = [];
+      for (let a = 0; a < stack.substances.length; a++) {
+        const sa = stack.substances[a];
+        const subA = ALL_SUBSTANCES.find(s => s.id === sa);
+        if (subA?.mechanisms) subA.mechanisms.forEach(m => allMechs.add(m));
+        for (let b = a + 1; b < stack.substances.length; b++) {
+          const sb = stack.substances[b];
+          const key = `${sa}||${sb}`;
+          const intx = conflictLookup.get(key);
+          if (intx && intx.type === 'synergy') {
+            const aName = getStackSubLabel(sa);
+            const bName = getStackSubLabel(sb);
+            // Get detailed interaction from ALL_INTERACTIONS for mechanisms/notes
+            const full = ALL_INTERACTIONS.find(i => 
+              (i.substanceA === sa && i.substanceB === sb) || (i.substanceA === sb && i.substanceB === sa)
+            );
+            synergies.push({ a:sa, b:sb, aName, bName, effect:intx.effect, mechs:full?.mechanisms||[], notes:full?.notes||'' });
+          }
+        }
+      }
+      map.set(stack.id, { mechs: [...allMechs].slice(0, 30), synergies: synergies.slice(0, 10) });
+    }
+    return map;
+  }, [conflictLookup]);
+
   // Merge ALL_INTERACTIONS + SYNERGY_PAIRS for synergies tab
   const mergedInteractions = useMemo(() => {
     const fromDB = ALL_INTERACTIONS.map(i => ({ ...i, source: 'db' as const }));
@@ -1455,6 +1485,15 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
                                         <div style={{ fontSize:7, color:'#4ade80', opacity:0.6 }}>✓ Конфликтов между компонентами не обнаружено</div>
                                       );
                                     })()}
+                                    {/* Stack mechanisms & synergies */}
+                                    {(()=>{
+                                      const d=stackDetailMap.get(stack.id);
+                                      if(!d)return null;
+                                      return <>
+                                        {d.mechs.length>0&&<div style={{marginTop:3}}><div style={{fontSize:7,fontWeight:600,color:'var(--text-dim)',marginBottom:1}}>⚙️ Механизмы действия:</div><div style={{display:'flex',flexWrap:'wrap',gap:2}}>{d.mechs.map((m,i)=><span key={i} style={{fontSize:6,padding:'1px 4px',borderRadius:3,background:'rgba(139,92,246,0.08)',color:'#a78bfa',border:'1px solid rgba(139,92,246,0.12)'}}>{m}</span>)}</div></div>}
+                                        {d.synergies.length>0&&<div style={{marginTop:3}}><div style={{fontSize:7,fontWeight:600,color:'#22c55e',marginBottom:1}}>⊕ Синергии в стеке ({d.synergies.length}):</div>{d.synergies.map((s,i)=><div key={i} style={{fontSize:7,color:'var(--text-dim)',padding:'1px 0',lineHeight:1.2}}><b style={{color:'#4ade80'}}>{s.aName}+{s.bName}</b>: {s.effect}{s.notes?`: ${s.notes.slice(0,60)}`:''}{s.mechs.length>0&&<span style={{marginLeft:2,opacity:.5}}>[{s.mechs.join(', ')}]</span>}</div>)}</div>}
+                                      </>;
+                                    })()}
                                     <div style={{ fontSize:7, color:'var(--text-dim)', marginTop:3 }}>Оценка синергии: <b style={{ color: synergyColor }}>{(stack.synergyScore||0).toFixed(1)}</b> · {(stack.substances||[]).length} веществ</div>
                                   </div>
                                 )}
@@ -1686,7 +1725,18 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
                       <div style={{display:'flex',flexWrap:'wrap',gap:2,marginTop:3}}>
                         {stack.substances.map(sid=><span key={sid} style={{fontSize:7,padding:'1px 4px',borderRadius:3,background:'rgba(139,92,246,0.06)',color:'#a78bfa'}}>{getStackSubLabel(sid)}</span>)}
                       </div>
-                      {expandedMed===stack.id&&<div style={{marginTop:4,padding:'6px 8px',background:'rgba(0,0,0,0.15)',borderRadius:6,fontSize:7,color:'var(--text-dim)',lineHeight:1.4}}>{stack.substances.map(sid=>{const sub=ALL_SUBSTANCES.find(s=>s.id===sid);return sub?`${sub.name}: ${(sub.description||'').slice(0,80)}`:'';}).filter(Boolean).join('\n')}</div>}
+                      {expandedMed===stack.id&&<div style={{marginTop:4,padding:'6px 8px',background:'rgba(0,0,0,0.15)',borderRadius:6,fontSize:7,color:'var(--text-dim)',lineHeight:1.4}}>
+                        {(()=>{
+                          const d=stackDetailMap.get(stack.id);
+                          if(!d)return null;
+                          const parts:any[]=[];
+                          if(d.mechs.length>0)parts.push(<div key="mechs"><div style={{fontWeight:600,color:'var(--text-light)',marginBottom:2}}>⚙️ Механизмы стека:</div><div style={{display:'flex',flexWrap:'wrap',gap:2,marginBottom:4}}>{d.mechs.map((m,i)=><span key={i} style={{fontSize:6,padding:'1px 4px',borderRadius:3,background:'rgba(139,92,246,0.1)',color:'#a78bfa'}}>{m}</span>)}</div></div>);
+                          if(d.synergies.length>0){const synParts=d.synergies.map((s,i)=><div key={i} style={{marginBottom:2,borderBottom:'1px solid rgba(255,255,255,0.04)',paddingBottom:2}}><b style={{color:'#4ade80'}}>{s.aName}+{s.bName}</b>: {s.effect}{s.notes?`: ${s.notes.slice(0,80)}`:''}{s.mechs.length>0&&<div style={{marginTop:1,opacity:.6}}>[{s.mechs.join(', ')}]</div>}</div>);parts.push(<div key="syn"><div style={{fontWeight:600,color:'#22c55e',marginBottom:2}}>⊕ Синергии ({d.synergies.length}):</div>{synParts}</div>);}
+                          return parts;
+                        })()}
+                        <div style={{fontWeight:600,color:'var(--text-light)',marginTop:4,marginBottom:2}}>📦 Вещества:</div>
+                        {stack.substances.map(sid=>{const sub=ALL_SUBSTANCES.find(s=>s.id===sid);return sub?<div key={sid} style={{marginBottom:2}}><b>{sub.name}</b>: {(sub.description||'').slice(0,80)}{sub.mechanisms&&sub.mechanisms.length>0&&<div style={{opacity:.6,marginTop:1}}>⚙ {sub.mechanisms.slice(0,3).join(', ')}</div>}</div>:null;})}
+                      </div>}
                     </div>;
                   })}
                   {filtered.length===0&&<div style={{padding:20,textAlign:'center',color:'var(--text-dim)',fontSize:10}}>Нет стеков по выбранным фильтрам</div>}
@@ -2957,6 +3007,15 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
                                 ) : (
                                   <div style={{ fontSize:8, color:'#4ade80', opacity:0.6 }}>✓ Конфликтов между компонентами не обнаружено</div>
                                 );
+                              })()}
+                              {/* Stack mechanisms & synergies */}
+                              {(()=>{
+                                const d=stackDetailMap.get(stack.id);
+                                if(!d)return null;
+                                return <>
+                                  {d.mechs.length>0&&<div style={{marginTop:4}}><div style={{fontSize:8,fontWeight:600,color:'var(--text-dim)',marginBottom:1}}>⚙️ Механизмы действия:</div><div style={{display:'flex',flexWrap:'wrap',gap:2}}>{d.mechs.map((m,i)=><span key={i} style={{fontSize:7,padding:'1px 5px',borderRadius:3,background:'rgba(139,92,246,0.08)',color:'#a78bfa',border:'1px solid rgba(139,92,246,0.12)'}}>{m}</span>)}</div></div>}
+                                  {d.synergies.length>0&&<div style={{marginTop:4}}><div style={{fontSize:8,fontWeight:600,color:'#22c55e',marginBottom:1}}>⊕ Синергии в стеке ({d.synergies.length}):</div>{d.synergies.map((s,i)=><div key={i} style={{fontSize:8,color:'var(--text-dim)',padding:'1px 0',lineHeight:1.3}}><b style={{color:'#4ade80'}}>{s.aName}+{s.bName}</b>: {s.effect}{s.notes?`: ${s.notes.slice(0,80)}`:''}{s.mechs.length>0&&<span style={{marginLeft:2,opacity:.5}}>[{s.mechs.join(', ')}]</span>}</div>)}</div>}
+                                </>;
                               })()}
                               <div style={{ fontSize:8, color:'var(--text-dim)', marginTop:3 }}>Оценка синергии: <b style={{ color: synergyColor }}>{(stack.synergyScore||0).toFixed(1)}</b> · {(stack.substances||[]).length} веществ</div>
                             </div>
