@@ -1225,65 +1225,112 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
             {infoView === 'synergies' && (
               <div>
                 <div style={{ display:'flex', gap:4, marginBottom:8, overflowX:'auto', scrollbarWidth:'none', flexWrap:'wrap' }}>
-                  {(['all','synergy','conflict','caution'] as const).map(t => (
-                    <button key={t} onClick={() => setInteractionTypeFilter(t)} style={{
-                      padding:'4px 10px', borderRadius:14, fontSize:9, fontWeight:700, whiteSpace:'nowrap', cursor:'pointer', flexShrink:0,
-                      background: interactionTypeFilter === t ? (INTERACTION_TYPE_LABELS[t]?.color || 'var(--accent)') : 'var(--bg-secondary)',
-                      color: interactionTypeFilter === t ? '#000' : 'var(--text-dim)',
-                      border: `1px solid ${interactionTypeFilter === t ? (INTERACTION_TYPE_LABELS[t]?.color || 'var(--accent)') : 'var(--border)'}`,
-                    }}>{t === 'all' ? '🧲 Все' : `${INTERACTION_TYPE_LABELS[t]?.emoji||''} ${INTERACTION_TYPE_LABELS[t]?.label||t}`}</button>
-                  ))}
-                  <span style={{ width:1, height:16, background:'var(--border)', margin:'0 2px', alignSelf:'center' }} />
                   {(['all','LOW','MEDIUM','HIGH'] as const).map(s => (
                     <button key={s} onClick={() => setInteractionSeverityFilter(s)} style={{
                       padding:'4px 8px', borderRadius:10, fontSize:8, fontWeight:600, whiteSpace:'nowrap', cursor:'pointer', flexShrink:0,
                       background: interactionSeverityFilter === s ? (INTERACTION_SEVERITY_LABELS[s]?.color || 'var(--accent)') : 'transparent',
                       color: interactionSeverityFilter === s ? '#000' : 'var(--text-dim)',
                       border: `1px solid ${interactionSeverityFilter === s ? (INTERACTION_SEVERITY_LABELS[s]?.color || 'var(--accent)') : 'var(--border)'}`,
-                    }}>{s === 'all' ? 'Любая' : `${INTERACTION_SEVERITY_LABELS[s]?.label||s}`}</button>
+                    }}>{s === 'all' ? '♾️ Все' : `${INTERACTION_SEVERITY_LABELS[s]?.label||s}`}</button>
                   ))}
                   <div style={{ fontSize:9, color:'var(--text-dim)', display:'flex', alignItems:'center', marginLeft:2, whiteSpace:'nowrap' }}>{filteredInteractions.length} из {mergedInteractions.length}</div>
                 </div>
-                <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
-                  {filteredInteractions.slice(0, 50).map((interaction, i) => {
-                    const typeInfo = INTERACTION_TYPE_LABELS[interaction.type] || { label:interaction.type, emoji:'🔗', color:'#888' };
-                    const sevInfo = INTERACTION_SEVERITY_LABELS[interaction.severity] || { label:interaction.severity, color:'#888' };
-                    const aName = resolveSubName(interaction.substanceA);
-                    const bName = resolveSubName(interaction.substanceB);
-                    return (
-                      <div key={interaction.interactionId} style={{ background:'var(--bg-secondary)', borderRadius:8, padding:'7px 8px', borderLeft:`3px solid ${typeInfo.color}` }}>
-                        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:2 }}>
-                          <div style={{ display:'flex', alignItems:'center', gap:4, flexWrap:'wrap', flex:1, minWidth:0 }}>
-                            <span style={{ fontWeight:600, fontSize:10, color:'var(--text-light)', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', maxWidth:'35%' }}>{aName}</span>
-                            <span style={{ fontSize:10, color:typeInfo.color, fontWeight:700 }}>{interaction.type === 'synergy' ? '+' : interaction.type === 'conflict' ? '×' : '?'}</span>
-                            <span style={{ fontWeight:600, fontSize:10, color:'var(--text-light)', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', maxWidth:'35%' }}>{bName}</span>
-                          </div>
-                          <div style={{ display:'flex', gap:3, flexShrink:0 }}>
-                            <span style={{ fontSize:7, padding:'1px 4px', borderRadius:3, background:typeInfo.color+'22', color:typeInfo.color, fontWeight:600 }}>{typeInfo.label}</span>
-                            <span style={{ fontSize:7, padding:'1px 4px', borderRadius:3, background:sevInfo.color+'22', color:sevInfo.color }}>{sevInfo.label}</span>
-                          </div>
-                        </div>
-                        <div style={{ fontSize:9, color:'rgba(255,255,255,0.85)', lineHeight:1.3 }}>
-                          {interaction.type === 'synergy' ? '⊕ ' : interaction.type === 'conflict' ? '⊖ ' : ''}
-                          {interaction.effect}
-                        </div>
-                        {/* Mechanisms */}
-                        {interaction.mechanisms && interaction.mechanisms.length > 0 && (
-                          <div style={{ display:'flex', flexWrap:'wrap', gap:2, marginTop:2 }}>
-                            {interaction.mechanisms.map((m, mi) => {
-                              const mColor = m.toLowerCase().includes('toxic') || m.toLowerCase().includes('hepatic') ? '#ef4444' :
-                                m.toLowerCase().includes('kidney') || m.toLowerCase().includes('renal') ? '#f59e0b' :
-                                m.toLowerCase().includes('synerg') || m.toLowerCase().includes('enhanc') || m.toLowerCase().includes('potent') ? '#22c55e' : '#8b5cf6';
-                              return <span key={mi} style={{ fontSize:6, padding:'1px 4px', borderRadius:3, background:mColor+'18', color:mColor, border:`1px solid ${mColor}22`, fontWeight:500 }}>{m}</span>;
-                            })}
-                          </div>
-                        )}
-                        {interaction.notes && <div style={{ fontSize:8, color:'var(--text-dim)', fontStyle:'italic', lineHeight:1.2, marginTop:2 }}>{interaction.notes}</div>}
+                {(() => {
+                  const synergies = filteredInteractions.filter(i => i.type === 'synergy');
+                  const conflicts = filteredInteractions.filter(i => i.type === 'conflict' || i.type === 'caution');
+                  const showEffect = (interaction: typeof mergedInteractions[0]) => {
+                    const eff = interaction.effect;
+                    if (/^[A-Z0-9_]+$/.test(eff) && interaction.notes) return interaction.notes;
+                    return eff;
+                  };
+                  return (<>
+                    {/* ===== СИНЕРГИИ ===== */}
+                    <div style={{ marginBottom:10 }}>
+                      <div onClick={() => setExpandedCategories(prev => ({ ...prev, syn_synergies: !(prev.syn_synergies ?? true) }))} style={{ display:'flex', alignItems:'center', gap:6, padding:'6px 8px', cursor:'pointer', userSelect:'none', background:'var(--bg-secondary)', borderRadius:8, marginBottom:4 }}>
+                        <span style={{ fontSize:13 }}>⊕</span>
+                        <div style={{ flex:1, fontSize:10, fontWeight:700, color:'#22c55e' }}>Синергии ({synergies.length})</div>
+                        <span style={{ fontSize:9, color:'var(--text-dim)', transform:expandedCategories.syn_synergies !== false ? 'rotate(180deg)' : 'none', transition:'transform 0.2s' }}>▼</span>
                       </div>
-                    );
-                  })}
-                  {filteredInteractions.length === 0 && <div style={{ padding:20, textAlign:'center', color:'var(--text-dim)', fontSize:11 }}>Нет взаимодействий</div>}
-                </div>
+                      {expandedCategories.syn_synergies !== false && (
+                        <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
+                          {synergies.slice(0, 30).map((interaction, i) => {
+                            const sevInfo = INTERACTION_SEVERITY_LABELS[interaction.severity] || { label:interaction.severity, color:'#888' };
+                            const aName = resolveSubName(interaction.substanceA);
+                            const bName = resolveSubName(interaction.substanceB);
+                            return (
+                              <div key={interaction.interactionId} style={{ background:'var(--bg-secondary)', borderRadius:8, padding:'7px 8px', borderLeft:'3px solid #22c55e' }}>
+                                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:2 }}>
+                                  <div style={{ display:'flex', alignItems:'center', gap:4, flexWrap:'wrap', flex:1, minWidth:0 }}>
+                                    <span style={{ fontWeight:600, fontSize:10, color:'var(--text-light)', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', maxWidth:'40%' }}>{aName}</span>
+                                    <span style={{ fontSize:10, color:'#22c55e', fontWeight:700 }}>+</span>
+                                    <span style={{ fontWeight:600, fontSize:10, color:'var(--text-light)', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', maxWidth:'40%' }}>{bName}</span>
+                                  </div>
+                                  <span style={{ fontSize:7, padding:'1px 4px', borderRadius:3, background:sevInfo.color+'22', color:sevInfo.color, flexShrink:0 }}>{sevInfo.label}</span>
+                                </div>
+                                <div style={{ fontSize:9, color:'rgba(255,255,255,0.85)', lineHeight:1.3 }}>⊕ {showEffect(interaction)}</div>
+                                {interaction.mechanisms && interaction.mechanisms.length > 0 && (
+                                  <div style={{ display:'flex', flexWrap:'wrap', gap:2, marginTop:2 }}>
+                                    {interaction.mechanisms.map((m, mi) => (
+                                      <span key={mi} style={{ fontSize:6, padding:'1px 4px', borderRadius:3, background:'rgba(34,197,94,0.1)', color:'#22c55e', border:'1px solid rgba(34,197,94,0.15)', fontWeight:500 }}>{m}</span>
+                                    ))}
+                                  </div>
+                                )}
+                                {interaction.notes && !(/^[A-Z0-9_]+$/.test(interaction.effect)) && <div style={{ fontSize:8, color:'var(--text-dim)', fontStyle:'italic', lineHeight:1.2, marginTop:2 }}>{interaction.notes}</div>}
+                              </div>
+                            );
+                          })}
+                          {synergies.length === 0 && <div style={{ padding:12, textAlign:'center', color:'var(--text-dim)', fontSize:10 }}>Нет синергий</div>}
+                        </div>
+                      )}
+                    </div>
+                    {/* ===== КОНФЛИКТЫ ===== */}
+                    <div>
+                      <div onClick={() => setExpandedCategories(prev => ({ ...prev, syn_conflicts: !(prev.syn_conflicts ?? true) }))} style={{ display:'flex', alignItems:'center', gap:6, padding:'6px 8px', cursor:'pointer', userSelect:'none', background:'var(--bg-secondary)', borderRadius:8, marginBottom:4 }}>
+                        <span style={{ fontSize:13 }}>⊖</span>
+                        <div style={{ flex:1, fontSize:10, fontWeight:700, color:'#ef4444' }}>Конфликты и осторожность ({conflicts.length})</div>
+                        <span style={{ fontSize:9, color:'var(--text-dim)', transform:expandedCategories.syn_conflicts !== false ? 'rotate(180deg)' : 'none', transition:'transform 0.2s' }}>▼</span>
+                      </div>
+                      {expandedCategories.syn_conflicts !== false && (
+                        <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
+                          {conflicts.slice(0, 30).map((interaction, i) => {
+                            const typeInfo = INTERACTION_TYPE_LABELS[interaction.type] || { label:interaction.type, emoji:'🔗', color:'#888' };
+                            const sevInfo = INTERACTION_SEVERITY_LABELS[interaction.severity] || { label:interaction.severity, color:'#888' };
+                            const aName = resolveSubName(interaction.substanceA);
+                            const bName = resolveSubName(interaction.substanceB);
+                            return (
+                              <div key={interaction.interactionId} style={{ background:'var(--bg-secondary)', borderRadius:8, padding:'7px 8px', borderLeft:`3px solid ${typeInfo.color}` }}>
+                                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:2 }}>
+                                  <div style={{ display:'flex', alignItems:'center', gap:4, flexWrap:'wrap', flex:1, minWidth:0 }}>
+                                    <span style={{ fontWeight:600, fontSize:10, color:'var(--text-light)', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', maxWidth:'35%' }}>{aName}</span>
+                                    <span style={{ fontSize:10, color:typeInfo.color, fontWeight:700 }}>{interaction.type === 'conflict' ? '×' : '?'}</span>
+                                    <span style={{ fontWeight:600, fontSize:10, color:'var(--text-light)', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', maxWidth:'35%' }}>{bName}</span>
+                                  </div>
+                                  <div style={{ display:'flex', gap:3, flexShrink:0 }}>
+                                    <span style={{ fontSize:7, padding:'1px 4px', borderRadius:3, background:typeInfo.color+'22', color:typeInfo.color, fontWeight:600 }}>{typeInfo.label}</span>
+                                    <span style={{ fontSize:7, padding:'1px 4px', borderRadius:3, background:sevInfo.color+'22', color:sevInfo.color }}>{sevInfo.label}</span>
+                                  </div>
+                                </div>
+                                <div style={{ fontSize:9, color:'rgba(255,255,255,0.85)', lineHeight:1.3 }}>⊖ {showEffect(interaction)}</div>
+                                {interaction.mechanisms && interaction.mechanisms.length > 0 && (
+                                  <div style={{ display:'flex', flexWrap:'wrap', gap:2, marginTop:2 }}>
+                                    {interaction.mechanisms.map((m, mi) => {
+                                      const mColor = m.toLowerCase().includes('toxic') || m.toLowerCase().includes('hepatic') ? '#ef4444' :
+                                        m.toLowerCase().includes('kidney') || m.toLowerCase().includes('renal') ? '#f59e0b' :
+                                        m.toLowerCase().includes('synerg') || m.toLowerCase().includes('enhanc') || m.toLowerCase().includes('potent') ? '#22c55e' : '#8b5cf6';
+                                      return <span key={mi} style={{ fontSize:6, padding:'1px 4px', borderRadius:3, background:mColor+'18', color:mColor, border:`1px solid ${mColor}22`, fontWeight:500 }}>{m}</span>;
+                                    })}
+                                  </div>
+                                )}
+                                {interaction.notes && !(/^[A-Z0-9_]+$/.test(interaction.effect)) && <div style={{ fontSize:8, color:'var(--text-dim)', fontStyle:'italic', lineHeight:1.2, marginTop:2 }}>{interaction.notes}</div>}
+                              </div>
+                            );
+                          })}
+                          {conflicts.length === 0 && <div style={{ padding:12, textAlign:'center', color:'var(--text-dim)', fontSize:10 }}>Нет конфликтов</div>}
+                        </div>
+                      )}
+                    </div>
+                  </>);
+                })()}
               </div>
             )}
             {infoView === 'stacks' && (
