@@ -688,7 +688,6 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({});
   const [interactionTypeFilter, setInteractionTypeFilter] = useState<string>('all');
   const [interactionSeverityFilter, setInteractionSeverityFilter] = useState<string>('all');
-  const [renderError, setRenderError] = useState<string | null>(null);
   const [activeSystems, setActiveSystems] = useState<Record<string, boolean>>({
     cardio: true, hepatic: true, renal: true, neuro: true, endocrine: true, hematologic: true, reproductive: true, musculoskeletal: true,
   });
@@ -1041,13 +1040,13 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
 
   const safeRender = (label: string, fn: () => React.ReactNode): React.ReactNode => {
     try { return fn(); }
-    catch (e) { setRenderError(`${label}: ${e}`); return <div style={{ padding:16, textAlign:'center', color:'#ef4444', fontSize:10 }}>⚠ {label}: {String(e)}</div>; }
+    catch (e) { return <div style={{ padding:12, margin:4, borderRadius:6, background:'rgba(239,68,68,0.08)', border:'1px solid rgba(239,68,68,0.2)', textAlign:'center', color:'#f87171', fontSize:9 }}>⚠ {label}: {String(e)}</div>; }
   };
 
   const renderView = (current: string, target: string, contentFn: () => React.ReactNode): React.ReactNode => {
     if (current !== target) return null;
     try { return contentFn(); }
-    catch (e) { setRenderError(`${target}: ${e}`); return <div style={{ padding:16, textAlign:'center', color:'#ef4444', fontSize:10 }}>⚠ {target}: {String(e)}</div>; }
+    catch (e) { return <div style={{ padding:16, textAlign:'center', color:'#ef4444', fontSize:10, background:'rgba(239,68,68,0.06)', borderRadius:8, border:'1px solid rgba(239,68,68,0.2)' }}>⚠ {target}: {String(e)}</div>; }
   };
 
   const catDetailInteractions = (sub: SupportSubstance, interactions: any[]): React.ReactNode => {
@@ -1266,12 +1265,6 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
           </div>
           {/* Content */}
           <div style={{ flex:1, overflowY:'auto', paddingRight:4 }}>
-            {renderError && (
-              <div style={{ padding:12, marginBottom:8, background:'rgba(255,0,0,0.1)', borderRadius:8, border:'1px solid #ef4444' }}>
-                <div style={{ fontSize:10, color:'#ef4444', fontWeight:700, marginBottom:4 }}>⚠ Ошибка рендера:</div>
-                <div style={{ fontSize:9, color:'#f87171', whiteSpace:'pre-wrap' }}>{renderError}</div>
-              </div>
-            )}
             {renderView(infoView, 'catalog', () =>
               <div>
                 <div style={{ display:'flex', gap:6, marginBottom:8, alignItems:'center' }}>
@@ -1386,13 +1379,13 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
                                   <div style={{ display:'flex', flexWrap:'wrap', gap:2, flex:1 }}>
                                     {stack.effects.map(e => <span key={e} style={{ fontSize:7, padding:'1px 5px', borderRadius:3, background:'rgba(0,230,138,0.08)', color:'#00e68a', fontWeight:500 }}>{EFFECT_LABELS_ru[e]||e}</span>)}
                                   </div>
-                                  <span style={{ fontSize:11, fontWeight:800, color:synergyColor, marginLeft:4 }}>{stack.synergyScore.toFixed(1)}</span>
+                                  <span style={{ fontSize:11, fontWeight:800, color:synergyColor, marginLeft:4 }}>{(stack.synergyScore||0).toFixed(1)}</span>
                                 </div>
                                 <div style={{ display:'flex', flexWrap:'wrap', gap:2, marginBottom:expandedMed === stack.id ? 4 : 0 }}>
                                   {stack.substances.map(sid => <span key={sid} style={{ fontSize:8, padding:'1px 6px', borderRadius:6, background:'rgba(139,92,246,0.08)', border:'1px solid rgba(139,92,246,0.12)', color:'#a78bfa', fontWeight:600 }}>{getStackSubLabel(sid)}</span>)}
                                 </div>
                                 <div style={{ fontSize:7, color:'var(--text-dim)' }}>{stack.substances.length} веществ</div>
-                                {expandedMed === stack.id && (
+                                {expandedMed === stack.id && safeRender('stack_'+stack.id, () =>
                                   <div style={{ marginTop:4, padding:'6px 8px', background:'rgba(0,0,0,0.15)', borderRadius:8 }}>
                                     {/* Positive effects */}
                                     <div style={{ marginBottom:4 }}>
@@ -1441,7 +1434,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
                                         <div style={{ fontSize:7, color:'#4ade80', opacity:0.6 }}>✓ Конфликтов между компонентами не обнаружено</div>
                                       );
                                     })()}
-                                    <div style={{ fontSize:7, color:'var(--text-dim)', marginTop:3 }}>Оценка синергии: <b style={{ color: synergyColor }}>{stack.synergyScore.toFixed(1)}</b> · {stack.substances.length} веществ</div>
+                                    <div style={{ fontSize:7, color:'var(--text-dim)', marginTop:3 }}>Оценка синергии: <b style={{ color: synergyColor }}>{(stack.synergyScore||0).toFixed(1)}</b> · {stack.substances.length} веществ</div>
                                   </div>
                                 )}
                               </div>
@@ -1477,19 +1470,26 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
                             <div key={idx} style={{ background:'var(--bg-secondary)', borderRadius:10, padding:'8px 10px', border:'1px solid var(--border)' }}>
                               <div style={{ display:'flex', alignItems:'center', gap:4, marginBottom:4 }}>
                                 <span style={{ fontSize:8, color:'var(--text-dim)', fontWeight:600, background:'rgba(255,255,255,0.04)', padding:'1px 5px', borderRadius:3 }}>#{idx+1}</span>
-                                <span style={{ fontSize:9, color:'var(--text-dim)' }}>Препарат</span>
+                                <span style={{ flex:1, fontSize:9, color:'var(--text-dim)' }}>{id ? selectedName : 'Препарат'}</span>
+                                {id && <button onClick={() => { updateInteraction(idx, ''); setInteractionSearch(''); }} style={{ padding:'2px 6px', borderRadius:4, fontSize:8, cursor:'pointer', background:'rgba(239,68,68,0.1)', border:'1px solid rgba(239,68,68,0.2)', color:'#ef4444' }}>✕</button>}
                               </div>
                               <div style={{ position:'relative' }}>
-                                <input value={interactionSearchIdx===idx ? interactionSearch : selectedName} placeholder="🔍 Поиск..." onFocus={() => { setInteractionSearchIdx(idx); setInteractionSearch(''); }} onChange={e => { setInteractionSearchIdx(idx); setInteractionSearch(e.target.value); if (!e.target.value) updateInteraction(idx, ''); }} style={{ width:'100%', padding:'7px 8px', borderRadius:6, background:'rgba(0,0,0,0.2)', border:'1px solid var(--border)', color:'var(--text)', fontSize:10, boxSizing:'border-box' }} />
-                                {interactionSearch && interactionSearchIdx===idx && (
-                                  <div style={{ position:'absolute', top:'100%', left:0, right:0, zIndex:10, background:'var(--bg)', border:'1px solid var(--border)', borderRadius:6, maxHeight:120, overflowY:'auto', marginTop:1 }}>
-                                    {allSupport.filter(s => (s.name||'').toLowerCase().includes(interactionSearch.toLowerCase())).slice(0,8).map(s => (
-                                      <div key={s.id} onClick={() => { updateInteraction(idx, s.id); setInteractionSearch(''); }} style={{ padding:'5px 8px', cursor:'pointer', fontSize:10, borderBottom:'1px solid var(--border)' }}>
-                                        <span style={{ fontWeight:id===s.id?700:400, color:id===s.id?'var(--accent)':'var(--text)' }}>{s.name}</span>
-                                        <span style={{ fontSize:8, color:'var(--text-dim)', marginLeft:4 }}>{s.id}</span>
+                                {id ? (
+                                  <div style={{ padding:'7px 8px', borderRadius:6, background:'rgba(0,230,138,0.06)', border:'1px solid rgba(0,230,138,0.15)', color:'#00e68a', fontSize:10, fontWeight:600 }}>{selectedName}</div>
+                                ) : (
+                                  <>
+                                    <input value={interactionSearchIdx===idx ? interactionSearch : ''} placeholder="🔍 Введите название..." onFocus={() => { setInteractionSearchIdx(idx); setInteractionSearch(''); }} onChange={e => { setInteractionSearchIdx(idx); setInteractionSearch(e.target.value); }} style={{ width:'100%', padding:'7px 8px', borderRadius:6, background:'rgba(0,0,0,0.2)', border:'1px solid var(--border)', color:'var(--text)', fontSize:10, boxSizing:'border-box' }} />
+                                    {interactionSearch && interactionSearchIdx===idx && (
+                                      <div style={{ position:'absolute', top:'100%', left:0, right:0, zIndex:10, background:'var(--bg)', border:'1px solid var(--border)', borderRadius:6, maxHeight:150, overflowY:'auto', marginTop:1 }}>
+                                        {allSupport.filter(s => (s.name||'').toLowerCase().includes(interactionSearch.toLowerCase())).slice(0,10).map(s => (
+                                          <div key={s.id} onClick={() => { updateInteraction(idx, s.id); setInteractionSearch(''); setInteractionSearchIdx(-1); }} style={{ padding:'7px 10px', cursor:'pointer', fontSize:10, borderBottom:'1px solid var(--border)' }}>
+                                            <span style={{ fontWeight:600, color:'var(--text)' }}>{s.name}</span>
+                                            <span style={{ fontSize:8, color:'var(--text-dim)', marginLeft:4 }}>{s.id}</span>
+                                          </div>
+                                        ))}
                                       </div>
-                                    ))}
-                                  </div>
+                                    )}
+                                  </>
                                 )}
                               </div>
                             </div>
@@ -1551,14 +1551,21 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
                                 <div key={idx} style={{ background:'var(--bg-secondary)', borderRadius:10, padding:'8px 10px', border:'1px solid var(--border)' }}>
                                   <div style={{ display:'flex', alignItems:'center', gap:4, marginBottom:4 }}>
                                     <span style={{ fontSize:8, color:'var(--text-dim)', fontWeight:600, background:'rgba(255,255,255,0.04)', padding:'1px 5px', borderRadius:3 }}>#{idx+1}</span>
-                                    <span style={{ fontSize:9, color:'var(--text-dim)' }}>Препарат</span>
+                                    <span style={{ flex:1, fontSize:9, color:'var(--text-dim)' }}>{id ? selectedName : 'Препарат'}</span>
+                                    {id && <button onClick={() => { const next=[...pharmaInteractIds]; next[idx]=''; setPharmaInteractIds(next); setPharmaInteractSearch(''); }} style={{ padding:'2px 6px', borderRadius:4, fontSize:8, cursor:'pointer', background:'rgba(239,68,68,0.1)', border:'1px solid rgba(239,68,68,0.2)', color:'#ef4444' }}>✕</button>}
                                   </div>
                                   <div style={{ position:'relative' }}>
-                                    <input value={id ? selectedName : pharmaInteractSearch} onChange={e => { setPharmaInteractSearch(e.target.value); if (!e.target.value) { const next=[...pharmaInteractIds]; next[idx]=''; setPharmaInteractIds(next); }}} placeholder="🔍 Поиск..." style={{ width:'100%', padding:'7px 8px', borderRadius:6, background:'rgba(0,0,0,0.2)', border:'1px solid var(--border)', color:'var(--text)', fontSize:10, boxSizing:'border-box' }} />
-                                    {!id && pharmaInteractSearch && (
-                                      <div style={{ position:'absolute', zIndex:10, background:'var(--bg)', border:'1px solid var(--border)', borderRadius:6, maxHeight:120, overflowY:'auto', marginTop:1, width:'calc(100% - 2px)' }}>
-                                        {pharmaFiltered.slice(0,8).map(s => <div key={s.id} onClick={() => { const next=[...pharmaInteractIds]; next[idx]=s.id; setPharmaInteractIds(next); setPharmaInteractSearch(''); }} style={{ padding:'5px 8px', cursor:'pointer', fontSize:9, borderBottom:'1px solid var(--border)' }}><span style={{ fontWeight:600 }}>{s.name}</span><span style={{ marginLeft:4, color:'var(--text-dim)', fontSize:8 }}>{s.class}</span></div>)}
-                                      </div>
+                                    {id ? (
+                                      <div style={{ padding:'7px 8px', borderRadius:6, background:'rgba(139,92,246,0.06)', border:'1px solid rgba(139,92,246,0.15)', color:'#a78bfa', fontSize:10, fontWeight:600 }}>{selectedName}</div>
+                                    ) : (
+                                      <>
+                                        <input value={pharmaInteractSearch} onChange={e => { setPharmaInteractSearch(e.target.value); }} placeholder="🔍 Введите название..." style={{ width:'100%', padding:'7px 8px', borderRadius:6, background:'rgba(0,0,0,0.2)', border:'1px solid var(--border)', color:'var(--text)', fontSize:10, boxSizing:'border-box' }} />
+                                        {pharmaInteractSearch && (
+                                          <div style={{ position:'absolute', zIndex:10, background:'var(--bg)', border:'1px solid var(--border)', borderRadius:6, maxHeight:150, overflowY:'auto', marginTop:1, width:'calc(100% - 2px)' }}>
+                                            {pharmaFiltered.slice(0,10).map(s => <div key={s.id} onClick={() => { const next=[...pharmaInteractIds]; next[idx]=s.id; setPharmaInteractIds(next); setPharmaInteractSearch(''); }} style={{ padding:'7px 10px', cursor:'pointer', fontSize:10, borderBottom:'1px solid var(--border)' }}><span style={{ fontWeight:600, color:'var(--text)' }}>{s.name}</span><span style={{ marginLeft:4, color:'var(--text-dim)', fontSize:8 }}>{s.class}</span></div>)}
+                                          </div>
+                                        )}
+                                      </>
                                     )}
                                   </div>
                                 </div>
@@ -2801,7 +2808,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
                           <div style={{ fontSize:8, color:'var(--text-dim)' }}>
                             {stack.substances.length} веществ
                           </div>
-                          {expandedMed === stack.id && (
+                          {expandedMed === stack.id && safeRender('stack2_'+stack.id, () =>
                             <div style={{ marginTop:6, padding:'6px 8px', background:'rgba(0,0,0,0.15)', borderRadius:8 }}>
                               {/* Positive effects */}
                               <div style={{ marginBottom:4 }}>
@@ -2850,7 +2857,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
                                   <div style={{ fontSize:8, color:'#4ade80', opacity:0.6 }}>✓ Конфликтов между компонентами не обнаружено</div>
                                 );
                               })()}
-                              <div style={{ fontSize:8, color:'var(--text-dim)', marginTop:3 }}>Оценка синергии: <b style={{ color: synergyColor }}>{stack.synergyScore.toFixed(1)}</b> · {stack.substances.length} веществ</div>
+                              <div style={{ fontSize:8, color:'var(--text-dim)', marginTop:3 }}>Оценка синергии: <b style={{ color: synergyColor }}>{(stack.synergyScore||0).toFixed(1)}</b> · {stack.substances.length} веществ</div>
                             </div>
                           )}
                         </div>
