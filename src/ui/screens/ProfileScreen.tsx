@@ -240,8 +240,10 @@ export const ProfileScreen: React.FC = () => {
           </div>
         </div>
       ) : (
-        <>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '6px 0px', flexShrink: 0, borderBottom: '1px solid var(--border)', marginBottom: 8, width: '100%' }}>
+        <div style={{ position:'fixed', inset:0, zIndex:100, display:'flex', flexDirection:'column' }}>
+          <img src="/bg-profile.png" alt="" style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'fill' }} />
+          <div style={{ position:'relative', zIndex:2, flex:1, display:'flex', flexDirection:'column', padding:'10px 16px 80px', overflow:'auto' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0, marginBottom: 8 }}>
             <button onClick={() => setPage('hero')} style={{
               padding: '6px 8px', cursor: 'pointer', fontSize: 14,
               color: 'var(--text-dim)', border: 'none', background: 'transparent',
@@ -862,7 +864,8 @@ export const ProfileScreen: React.FC = () => {
       )}
 
       {tab === 'reports' && <ReportsScreen />}
-        </>
+        </div>
+      </div>
       )}
     </div>
   );
