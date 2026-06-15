@@ -1422,8 +1422,8 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
                                   <div style={{ flex:1 }}>
                                     <div style={{ fontSize:10, fontWeight:600, color:'var(--text-light)', lineHeight:1.3 }}>{sub?.name||''}</div>
                                     <div style={{ display:'flex', gap:2, flexWrap:'wrap', marginTop:1 }}>
-                                      {(sub?.categories||[]).slice(0,2).map(c => <span key={c} style={{ fontSize:7, padding:'1px 3px', borderRadius:2, background:'rgba(255,255,255,0.04)', color:'var(--text-dim)' }}>{c||''}</span>)}
-                                      {(sub?.mechanisms||[]).slice(0,1).map(m => <span key={m||''} style={{ fontSize:7, padding:'1px 3px', borderRadius:2, background:'rgba(0,230,138,0.06)', color:'var(--accent-green)' }}>{(m||'').slice(0,25)}</span>)}
+                                      {(sub?.categories||[]).slice(0,3).map(c => <span key={c} style={{ fontSize:7, padding:'1px 3px', borderRadius:2, background:'rgba(255,255,255,0.04)', color:'var(--text-dim)' }}>{c||''}</span>)}
+                                      {(sub?.mechanisms||[]).slice(0,3).map(m => <span key={m||''} style={{ fontSize:7, padding:'1px 3px', borderRadius:2, background:'rgba(0,230,138,0.06)', color:'var(--accent-green)' }}>{m||''}</span>)}
                                     </div>
                                   </div>
                                   <span style={{ fontSize:9, color:'var(--text-dim)', transform:selectedSub === sub?.id ? 'rotate(180deg)' : 'none' }}>▼</span>
