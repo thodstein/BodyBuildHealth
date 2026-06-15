@@ -155,8 +155,8 @@ export const NutritionOverview: React.FC<{
             {Object.keys(microsIntake).length > 0 && (
               <div style={{ marginTop: 10, borderTop: '1px solid var(--border)', paddingTop: 8 }}>
                 <div style={{ fontSize: 11, fontWeight: 600, marginBottom: 6 }}>🧪 Микронутриенты (дневная норма)</div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 4 }}>
-                  {Object.entries(MICRONUTRIENT_TARGETS).slice(0, 9).map(([key, target]) => {
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 4, maxHeight: '220px', overflowY: 'auto' }}>
+                  {Object.entries(MICRONUTRIENT_TARGETS).map(([key, target]) => {
                     const microMap: Record<string, string> = {
                       Mg: 'Mg', Zn: 'Zn', VitD: 'VitD', VitC: 'VitC', VitB12: 'VitB12',
                       Omega3_EPA_DHA: 'Omega3', Potassium: 'K', Sodium: 'Na', Iron: 'Fe',

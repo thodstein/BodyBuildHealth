@@ -418,6 +418,20 @@ export const RiskScreen: React.FC = () => {
             <div style={{ fontSize:9, color:'var(--text-dim)' }}>
               {riskResult.overallNet < 25 ? 'Низкий риск' : riskResult.overallNet < 50 ? 'Умеренный риск' : riskResult.overallNet < 75 ? 'Высокий риск' : 'Критический риск'}
             </div>
+            {/* ── Penalty toggle button ── */}
+            <button onClick={toggleForceNoLabs} style={{
+              marginTop: 8, padding: '6px 14px', borderRadius: 20, fontSize: 10, fontWeight: 700, cursor: 'pointer',
+              background: forceNoLabs ? 'rgba(239,68,68,0.15)' : 'rgba(59,130,246,0.08)',
+              border: forceNoLabs ? '1px solid rgba(239,68,68,0.4)' : '1px solid rgba(59,130,246,0.2)',
+              color: forceNoLabs ? '#f87171' : '#60a5fa', transition: 'all 0.2s'
+            }}>
+              {forceNoLabs ? '✅ Штраф без анализов' : '🚫 БЕЗ АНАЛИЗОВ (Штраф)'}
+            </button>
+            {forceNoLabs && (
+              <div style={{ fontSize: 8, color: '#f87171', marginTop: 4, background: 'rgba(239,68,68,0.06)', padding: '4px 8px', borderRadius: 6 }}>
+                ⚠ Применён штраф к расчёту рисков. Введите данные анализов для точной оценки.
+              </div>
+            )}
           </div>
 
           {/* Источники рисков */}

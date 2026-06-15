@@ -144,6 +144,7 @@ export const ProfileScreen: React.FC = () => {
   const bmi = s_.height && s_.weight ? (s_.weight / Math.pow(s_.height / 100, 2)).toFixed(1) : null;
   const bmiText = bmi ? `${bmi} кг/м²` : '';
   const lbm = s_.weight && s_.bodyFat ? (s_.weight * (1 - s_.bodyFat / 100)).toFixed(1) : null;
+  const ffmi = lbm && s_.height ? (parseFloat(lbm) / Math.pow(s_.height / 100, 2) + 6.1 * (1.8 - s_.height / 100)).toFixed(1) : null;
   const navyBf = (() => {
     if (!s_.waistCm || !s_.neckCm || !s_.height) return null;
     const f = NAVY_BF_FORMULAS[s_.sex] ?? NAVY_BF_FORMULAS.male;
@@ -348,6 +349,7 @@ export const ProfileScreen: React.FC = () => {
             </div>
             {bmi && <div style={s.computed}>BMI: {bmiText} - {parseFloat(bmi) < 18.5 ? '' : parseFloat(bmi) < 25 ? '' : parseFloat(bmi) < 30 ? '' : ''}</div>}
             {lbm && <div style={s.computed}>LBM (сухая масса): {lbm} кг</div>}
+            {ffmi && <div style={{...s.computed, fontSize:10, fontWeight:500}}>FFMI (безжировой индекс): <b style={{color:'var(--accent)'}}>{ffmi}</b></div>}
             {navyBf && <div style={s.computed}>Navy BF%: {navyBfText} - {parseFloat(navyBf) < 6 ? '' : parseFloat(navyBf) < 18 ? '' : parseFloat(navyBf) < 25 ? '' : ''}</div>}
           </div>
           <div style={s.card}>

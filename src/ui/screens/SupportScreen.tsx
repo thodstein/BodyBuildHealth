@@ -35,9 +35,9 @@ import { checkDrugInteractions } from '../../engines/pharma-interactions.engine'
 import type { CourseEntry } from '../../core/types';
 import { searchPubMed, type PubMedArticle } from '../../engines/pubmed-search.engine';
 
-type SupportTab = 'main' | 'catalog' | 'synergies' | 'calculator' | 'interactions' | 'stacks' | 'peptides' | 'fertility-pct' | 'stackcalc' | 'mystacks';
+type SupportTab = 'main' | 'catalog' | 'synergies' | 'calculator' | 'interactions' | 'stacks' | 'peptides' | 'fertility-pct';
 type SupportView = 'main' | 'calc' | 'fertility';
-type CalcView = 'main' | 'calculator' | 'peptides' | 'info';
+type CalcView = 'main' | 'calculator' | 'peptides' | 'info' | 'stackcalc' | 'mystacks';
 type InfoView = 'main' | 'catalog' | 'synergies' | 'stacks' | 'interactions' | 'research';
 
 const INTERACTION_TYPE_LABELS: Record<string, { label: string; emoji: string; color: string }> = {
@@ -1523,32 +1523,10 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
                   <div style={{ fontSize:10, color:'rgba(255,255,255,0.85)', lineHeight:1.3 }}>Анализы, план ПКТ и восстановление фертильности</div>
                 </div>
                 <span style={{ color:'#8b5cf6', fontSize:16, opacity:0.6 }}>→</span>
-              </div>
-              <div onClick={() => setTab('stackcalc')} style={{
-                display:'flex', alignItems:'center', gap:12, padding:'12px 14px', borderRadius:14, cursor:'pointer', textAlign:'left', width:'100%',
-                background:'rgba(20,22,30,0.35)', border:'1px solid var(--glass-border)', color:'var(--text)', transition:'all 0.2s',
-              }}>
-                <div style={{ width:40, height:40, borderRadius:12, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, background:'rgba(139,92,246,0.1)', fontSize:20 }}>📦</div>
-                <div style={{ flex:1 }}>
-                  <div style={{ fontSize:13, fontWeight:700, marginBottom:2, color:'#8b5cf6' }}>Генератор стеков</div>
-                  <div style={{ fontSize:10, color:'rgba(255,255,255,0.85)', lineHeight:1.3 }}>Подбор стека поддержки по органам и механизмам</div>
-                </div>
-                <span style={{ color:'#8b5cf6', fontSize:16, opacity:0.6 }}>→</span>
-              </div>
-              <div onClick={() => setTab('mystacks')} style={{
-                display:'flex', alignItems:'center', gap:12, padding:'12px 14px', borderRadius:14, cursor:'pointer', textAlign:'left', width:'100%',
-                background:'rgba(20,22,30,0.35)', border:'1px solid var(--glass-border)', color:'var(--text)', transition:'all 0.2s',
-              }}>
-                <div style={{ width:40, height:40, borderRadius:12, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, background:'rgba(245,158,11,0.1)', fontSize:20 }}>📂</div>
-                <div style={{ flex:1 }}>
-                  <div style={{ fontSize:13, fontWeight:700, marginBottom:2, color:'#f59e0b' }}>Мои стеки</div>
-                  <div style={{ fontSize:10, color:'rgba(255,255,255,0.85)', lineHeight:1.3 }}>Сохранённые стеки поддержки и протоколы приёма</div>
-                </div>
-                <span style={{ color:'#f59e0b', fontSize:16, opacity:0.6 }}>→</span>
-              </div>
             </div>
           </div>
         </div>
+      </div>
       )}
 
       {/* ===== SUB-NAVIGATION (calc / fertility menus) ===== */}
@@ -1567,8 +1545,6 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
 { icon:'🧮', title:'Калькулятор поддержки', desc:'Расчёт рисков, покрытия систем и недельного протокола', action:() => { setSupportView('main'); setTab('calculator'); }, color:'var(--accent)' },
                 { icon:'🧬', title:'Пептидный калькулятор', desc:'Разведение, дозировки, PK модель и протоколы', action:() => { setSupportView('main'); setTab('peptides'); }, color:'var(--accent)' },
                 { icon:'ℹ️', title:'Общая информация', desc:'Каталог, синергии, стеки', action:() => { setCalcView('info'); setInfoView('catalog'); }, color:'#3b82f6' },
-                { icon:'📦', title:'Генератор стеков', desc:'Автоматический подбор стека поддержки по органам и механизмам', action:() => { setSupportView('main'); setTab('stackcalc'); }, color:'#8b5cf6' },
-                { icon:'📂', title:'Мои стеки', desc:'Сохранённые стеки поддержки и протоколы приёма', action:() => { setSupportView('main'); setTab('mystacks'); }, color:'#f59e0b' },
               ].map((card, i) => (
                 <div key={i} onClick={card.action} style={{
                   display:'flex', alignItems:'center', gap:12, padding:'12px 14px', borderRadius:14, cursor:'pointer', textAlign:'left', width:'100%',
@@ -1582,6 +1558,10 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
                   <span style={{ color:card.color, fontSize:16, opacity:0.6 }}>→</span>
                 </div>
               ))}
+            </div>
+            <div style={{ display:'flex', gap:6, marginTop:12, overflowX:'auto', scrollbarWidth:'none' }}>
+              <button onClick={() => setCalcView('stackcalc')} style={{ padding:'6px 12px', borderRadius:16, fontSize:9, fontWeight:700, whiteSpace:'nowrap', cursor:'pointer', flexShrink:0, background:'var(--bg-secondary)', color:'var(--text-dim)', border:'1px solid var(--border)' }}>🧮 Генератор</button>
+              <button onClick={() => setCalcView('mystacks')} style={{ padding:'6px 12px', borderRadius:16, fontSize:9, fontWeight:700, whiteSpace:'nowrap', cursor:'pointer', flexShrink:0, background:'var(--bg-secondary)', color:'var(--text-dim)', border:'1px solid var(--border)' }}>📂 Мои стеки</button>
             </div>
           </div>
         </div>
@@ -2308,7 +2288,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
 
           {/* Stack Generator Link */}
           <div className="card" style={{ marginBottom: 12 }}>
-            <button onClick={() => setTab('stackcalc')} style={{ width:'100%', padding: '12px', borderRadius: 10, border: '1px solid #8b5cf6', background: 'rgba(139,92,246,0.08)', cursor:'pointer', display:'flex', alignItems:'center', gap:10, textAlign:'left' }}>
+            <button onClick={() => { setSupportView('calc'); setCalcView('stackcalc'); }} style={{ width:'100%', padding: '12px', borderRadius: 10, border: '1px solid #8b5cf6', background: 'rgba(139,92,246,0.08)', cursor:'pointer', display:'flex', alignItems:'center', gap:10, textAlign:'left' }}>
               <span style={{ fontSize:20 }}>🧮</span>
               <div>
                 <div style={{ fontSize:13, fontWeight:700, color:'#8b5cf6' }}>Генератор стеков</div>
@@ -2327,7 +2307,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
               {(['basic', 'mid', 'max', 'boost'] as const).map(l => {
                 const active = supportLevel === l;
-                const colors: Record<string, string> = { basic: '#22c55e', standard: '#eab308', enhanced: '#f97316', maximum: '#ef4444' };
+                const colors: Record<string, string> = { basic: '#22c55e', mid: '#eab308', max: '#f97316', boost: '#ef4444' };
                 return (
                   <button key={l} onClick={() => { setSupportLevel(l); }} style={{
                     padding: '10px 8px', borderRadius: 10, border: `2px solid ${active ? colors[l] : 'var(--border)'}`,
@@ -3673,11 +3653,11 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
       </>
       )}
 
-      {/* ===== STACK CALCULATOR TAB ===== */}
-      {tab === 'stackcalc' && (
+      {/* ===== STACKCALC IN CALC VIEW ===== */}
+      {tab === 'main' && supportView === 'calc' && calcView === 'stackcalc' && (
         <div style={{ padding:'0 0 70px' }}>
-          <button onClick={() => setTab('main')} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', marginBottom:8, background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← На главную</button>
-          {safeRender('stackcalc_tab', () => {
+          <button onClick={() => setCalcView('main')} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', marginBottom:6, background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← Назад</button>
+          {safeRender('calc_stackcalc', () => {
             const organList = [
               {key:'cardio',label:'❤️ Сердце/Сосуды',organs:['heart','vessels','cardiovascular']},
               {key:'liver',label:'🫁 Печень',organs:['liver','hepatobiliary']},
@@ -3764,56 +3744,56 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
              };
             return <div>
               <div style={{fontSize:13,fontWeight:700,color:'var(--accent)',marginBottom:4}}>🧮 Генератор стеков</div>
-              <div style={{fontSize:9,color:'var(--text-dim)',marginBottom:8}}>Выберите органы, механизмы и размер — стек генерируется из базы веществ поддержки с учётом синергий и конфликтов</div>
-              <div style={{marginBottom:8}}>
-                <div style={{display:'flex',alignItems:'center',gap:4,marginBottom:4}}>
-                  <span style={{fontSize:9,fontWeight:600,color:'var(--text-light)'}}>Органы/системы:</span>
+              <div style={{fontSize:9,color:'var(--text-dim)',marginBottom:6}}>Выберите органы, механизмы и размер — стек генерируется из базы веществ поддержки с учётом синергий и конфликтов</div>
+              <div style={{marginBottom:6}}>
+                <div style={{display:'flex',alignItems:'center',gap:4,marginBottom:3}}>
+                  <span style={{fontSize:9,fontWeight:600,color:'var(--text-light)'}}>Органы:</span>
                   <button onClick={selectAll} style={{fontSize:7,padding:'2px 6px',borderRadius:4,cursor:'pointer',background:'rgba(0,230,138,0.1)',border:'1px solid rgba(0,230,138,0.2)',color:'#00e68a'}}>Все</button>
                   {stackCalcOrgans.length>0&&<button onClick={clearAll} style={{fontSize:7,padding:'2px 6px',borderRadius:4,cursor:'pointer',background:'rgba(239,68,68,0.08)',border:'1px solid rgba(239,68,68,0.15)',color:'#f87171'}}>✕</button>}
                   <span style={{fontSize:8,color:'var(--text-dim)',marginLeft:4}}>{stackCalcOrgans.length}/{organList.length}</span>
                 </div>
-                <div style={{display:'flex',flexWrap:'wrap',gap:3,maxHeight:90,overflowY:'auto'}}>
-                  {organList.map(o=><button key={o.key} onClick={()=>toggleOrgan(o.key)} style={{padding:'3px 7px',borderRadius:8,fontSize:8,cursor:'pointer',whiteSpace:'nowrap',background:stackCalcOrgans.includes(o.key)?'var(--accent)':'var(--bg-secondary)',color:stackCalcOrgans.includes(o.key)?'#000':'var(--text-dim)',border:`1px solid ${stackCalcOrgans.includes(o.key)?'var(--accent)':'var(--border)'}`}}>{o.label}</button>)}
+                <div style={{display:'flex',flexWrap:'wrap',gap:3,maxHeight:70,overflowY:'auto'}}>
+                  {organList.map(o=><button key={o.key} onClick={()=>toggleOrgan(o.key)} style={{padding:'2px 5px',borderRadius:6,fontSize:7,cursor:'pointer',whiteSpace:'nowrap',background:stackCalcOrgans.includes(o.key)?'var(--accent)':'var(--bg-secondary)',color:stackCalcOrgans.includes(o.key)?'#000':'var(--text-dim)',border:`1px solid ${stackCalcOrgans.includes(o.key)?'var(--accent)':'var(--border)'}`}}>{o.label}</button>)}
                 </div>
               </div>
-              {availableMechs.length>0&&<div style={{marginBottom:8}}>
-                <div style={{fontSize:9,fontWeight:600,color:'var(--text-light)',marginBottom:4}}>Механизмы ({availableMechs.length}):</div>
-                <div style={{display:'flex',flexWrap:'wrap',gap:3,maxHeight:80,overflowY:'auto'}}>
-                  {availableMechs.slice(0,40).map(m=><button key={m} onClick={()=>toggleMech(m)} style={{padding:'2px 6px',borderRadius:6,fontSize:7,cursor:'pointer',whiteSpace:'nowrap',background:stackCalcMech.includes(m)?'#8b5cf6':'var(--bg-secondary)',color:stackCalcMech.includes(m)?'#fff':'var(--text-dim)',border:`1px solid ${stackCalcMech.includes(m)?'#8b5cf6':'var(--border)'}`}}>{m}</button>)}
+              {availableMechs.length>0&&<div style={{marginBottom:6}}>
+                <div style={{fontSize:9,fontWeight:600,color:'var(--text-light)',marginBottom:3}}>Механизмы ({availableMechs.length}):</div>
+                <div style={{display:'flex',flexWrap:'wrap',gap:3,maxHeight:60,overflowY:'auto'}}>
+                  {availableMechs.slice(0,40).map(m=><button key={m} onClick={()=>toggleMech(m)} style={{padding:'1px 4px',borderRadius:6,fontSize:6,cursor:'pointer',whiteSpace:'nowrap',background:stackCalcMech.includes(m)?'#8b5cf6':'var(--bg-secondary)',color:stackCalcMech.includes(m)?'#fff':'var(--text-dim)',border:`1px solid ${stackCalcMech.includes(m)?'#8b5cf6':'var(--border)'}`}}>{m}</button>)}
                 </div>
               </div>}
-              <div style={{display:'flex',gap:8,alignItems:'center',marginBottom:8}}>
+              <div style={{display:'flex',gap:6,alignItems:'center',marginBottom:6}}>
                 <span style={{fontSize:9,fontWeight:600,color:'var(--text-light)'}}>Размер:</span>
-                {['2-4','5-7','8-10','11-15','15-20','20-25','30-35'].map(s=><button key={s} onClick={()=>setStackCalcSize(s)} style={{padding:'3px 7px',borderRadius:8,fontSize:8,cursor:'pointer',background:stackCalcSize===s?'var(--accent)':'var(--bg-secondary)',color:stackCalcSize===s?'#000':'var(--text-dim)',border:`1px solid ${stackCalcSize===s?'var(--accent)':'var(--border)'}`}}>{s}</button>)}
-                <button onClick={generate} style={{padding:'6px 16px',borderRadius:10,fontSize:10,fontWeight:700,cursor:'pointer',background:'var(--accent)',border:'none',color:'#000',marginLeft:'auto'}}>⚡ Сгенерировать</button>
+                {['2-4','5-7','8-10','11-15','15-20','20-25','30-35'].map(s=><button key={s} onClick={()=>setStackCalcSize(s)} style={{padding:'2px 5px',borderRadius:6,fontSize:7,cursor:'pointer',background:stackCalcSize===s?'var(--accent)':'var(--bg-secondary)',color:stackCalcSize===s?'#000':'var(--text-dim)',border:`1px solid ${stackCalcSize===s?'var(--accent)':'var(--border)'}`}}>{s}</button>)}
+                <button onClick={generate} style={{padding:'5px 12px',borderRadius:10,fontSize:9,fontWeight:700,cursor:'pointer',background:'var(--accent)',border:'none',color:'#000',marginLeft:'auto'}}>⚡ Сгенерировать</button>
               </div>
               {generatedStacks.length > 0 && (
-                <div style={{marginBottom:8}}>
-                  <div style={{display:'flex',gap:4,overflowX:'auto',marginBottom:6}}>
+                <div style={{marginBottom:6}}>
+                  <div style={{display:'flex',gap:4,overflowX:'auto',marginBottom:4}}>
                     {generatedStacks.map((st:any,si:number)=>(
-                      <button key={si} onClick={()=>setGeneratedStack(st)} style={{padding:'4px 10px',borderRadius:8,fontSize:9,fontWeight:600,cursor:'pointer',whiteSpace:'nowrap',background:generatedStack===st?'var(--accent)':'var(--bg-secondary)',color:generatedStack===st?'#000':'var(--text-dim)',border:`1px solid ${generatedStack===st?'var(--accent)':'var(--border)'}`}}>
+                      <button key={si} onClick={()=>setGeneratedStack(st)} style={{padding:'3px 8px',borderRadius:8,fontSize:8,fontWeight:600,cursor:'pointer',whiteSpace:'nowrap',background:generatedStack===st?'var(--accent)':'var(--bg-secondary)',color:generatedStack===st?'#000':'var(--text-dim)',border:`1px solid ${generatedStack===st?'var(--accent)':'var(--border)'}`}}>
                         {st.tag} · {st.substances.length} шт
                       </button>
                     ))}
                   </div>
                 </div>
               )}
-              {generatedStack&&<div style={{background:'rgba(0,230,138,0.04)',borderRadius:10,padding:10,border:'1px solid rgba(0,230,138,0.12)'}}>
-                <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:4}}>
+              {generatedStack&&<div style={{background:'rgba(0,230,138,0.04)',borderRadius:10,padding:8,border:'1px solid rgba(0,230,138,0.12)'}}>
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:3}}>
                   <div style={{fontSize:11,fontWeight:700,color:'var(--accent)'}}>{generatedStack.tag || 'Стек'} · {generatedStack.substances.length} веществ</div>
                   <div style={{fontSize:10,fontWeight:700,padding:'2px 8px',borderRadius:6,background:generatedStack.totalScore>=70?'rgba(34,197,94,0.12)':generatedStack.totalScore>=40?'rgba(234,179,8,0.12)':'rgba(239,68,68,0.12)',color:generatedStack.totalScore>=70?'#4ade80':generatedStack.totalScore>=40?'#facc15':'#f87171'}}>{generatedStack.totalScore}/100</div>
                 </div>
-                {generatedStack.stackDesc && <div style={{fontSize:8,color:'var(--text-dim)',marginBottom:6,lineHeight:1.4}}>{generatedStack.stackDesc}</div>}
-                <div style={{display:'flex',flexWrap:'wrap',gap:3,marginBottom:6}}>
+                {generatedStack.stackDesc && <div style={{fontSize:8,color:'var(--text-dim)',marginBottom:4,lineHeight:1.4}}>{generatedStack.stackDesc}</div>}
+                <div style={{display:'flex',flexWrap:'wrap',gap:3,marginBottom:4}}>
                   {generatedStack.descriptions.map((n:string,i:number)=><span key={i} style={{fontSize:8,padding:'2px 8px',borderRadius:6,background:'rgba(139,92,246,0.1)',color:'#a78bfa',border:'1px solid rgba(139,92,246,0.15)'}}>{n}<span style={{marginLeft:3,opacity:0.5,fontSize:7}}>+{generatedStack.scores[i]}</span></span>)}
                 </div>
                 {generatedStack.subDetails && generatedStack.subDetails.length > 0 && (
-                  <details style={{marginBottom:6}}>
-                    <summary style={{fontSize:8,fontWeight:600,color:'var(--text-light)',cursor:'pointer',marginBottom:4}}>📋 Детали веществ ({generatedStack.subDetails.length})</summary>
-                    <div style={{display:'flex',flexDirection:'column',gap:4}}>
+                  <details style={{marginBottom:4}}>
+                    <summary style={{fontSize:8,fontWeight:600,color:'var(--text-light)',cursor:'pointer',marginBottom:3}}>📋 Детали веществ ({generatedStack.subDetails.length})</summary>
+                    <div style={{display:'flex',flexDirection:'column',gap:3}}>
                       {generatedStack.subDetails.map((sd:any,si:number)=>(
-                        <div key={si} style={{padding:'4px 6px',borderRadius:6,background:'var(--bg-secondary)',border:'1px solid var(--border)'}}>
-                          <div style={{fontSize:9,fontWeight:600,color:'var(--text-light)'}}>{sd.name} <span style={{fontSize:7,color:'var(--text-dim)',fontWeight:400}}>{sd.id}</span></div>
+                        <div key={si} style={{padding:'3px 6px',borderRadius:6,background:'var(--bg-secondary)',border:'1px solid var(--border)'}}>
+                          <div style={{fontSize:8,fontWeight:600,color:'var(--text-light)'}}>{sd.name} <span style={{fontSize:7,color:'var(--text-dim)',fontWeight:400}}>{sd.id}</span></div>
                           {sd.description && <div style={{fontSize:7,color:'var(--text-dim)',lineHeight:1.3}}>{sd.description}</div>}
                           {sd.mechanisms && sd.mechanisms.length > 0 && <div style={{display:'flex',flexWrap:'wrap',gap:2,marginTop:2}}>{sd.mechanisms.slice(0,5).map((m:string,mi:number)=><span key={mi} style={{fontSize:6,padding:'1px 3px',borderRadius:3,background:'rgba(139,92,246,0.08)',color:'#a78bfa'}}>{m}</span>)}</div>}
                         </div>
@@ -3821,8 +3801,8 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
                     </div>
                   </details>
                 )}
-                {generatedStack.mechs.length>0&&<div style={{marginBottom:4}}><div style={{fontSize:7,fontWeight:600,color:'var(--text-dim)',marginBottom:2}}>⚙️ Механизмы:</div><div style={{display:'flex',flexWrap:'wrap',gap:2}}>{generatedStack.mechs.map((m:string,i:number)=><span key={i} style={{fontSize:6,padding:'1px 4px',borderRadius:3,background:'rgba(139,92,246,0.08)',color:'#a78bfa'}}>{m}</span>)}</div></div>}
-                {generatedStack.synergies.length>0&&<details style={{marginBottom:4}}><summary style={{fontSize:7,fontWeight:600,color:'#22c55e',cursor:'pointer'}}>⊕ Синергии ({generatedStack.synergies.length})</summary>{generatedStack.synergies.map((s:any,i:number)=><div key={i} style={{fontSize:7,color:'var(--text-dim)',padding:'2px 0'}}><b style={{color:'#4ade80'}}>{getStackSubLabel(s.a)} + {getStackSubLabel(s.b)}</b>: {s.effect} [{s.severity}]{s.mechanisms&&s.mechanisms.length>0&&<span style={{fontSize:6,color:'#a78bfa',marginLeft:4}}>→ {s.mechanisms.join(', ')}</span>}</div>)}</details>}
+                {generatedStack.mechs.length>0&&<div style={{marginBottom:3}}><div style={{fontSize:7,fontWeight:600,color:'var(--text-dim)',marginBottom:2}}>⚙️ Механизмы:</div><div style={{display:'flex',flexWrap:'wrap',gap:2}}>{generatedStack.mechs.map((m:string,i:number)=><span key={i} style={{fontSize:6,padding:'1px 4px',borderRadius:3,background:'rgba(139,92,246,0.08)',color:'#a78bfa'}}>{m}</span>)}</div></div>}
+                {generatedStack.synergies.length>0&&<details style={{marginBottom:3}}><summary style={{fontSize:7,fontWeight:600,color:'#22c55e',cursor:'pointer'}}>⊕ Синергии ({generatedStack.synergies.length})</summary>{generatedStack.synergies.map((s:any,i:number)=><div key={i} style={{fontSize:7,color:'var(--text-dim)',padding:'2px 0'}}><b style={{color:'#4ade80'}}>{getStackSubLabel(s.a)} + {getStackSubLabel(s.b)}</b>: {s.effect} [{s.severity}]{s.mechanisms&&s.mechanisms.length>0&&<span style={{fontSize:6,color:'#a78bfa',marginLeft:4}}>→ {s.mechanisms.join(', ')}</span>}</div>)}</details>}
                 {generatedStack.conflicts.length>0&&<details><summary style={{fontSize:7,fontWeight:600,color:'#ef4444',cursor:'pointer'}}>⚠ Конфликты ({generatedStack.conflicts.length})</summary>{generatedStack.conflicts.map((c:any,i:number)=><div key={i} style={{fontSize:7,color:'#f87171',padding:'2px 0'}}><b>{getStackSubLabel(c.a)} + {getStackSubLabel(c.b)}</b>: {c.effect} [{c.severity}]</div>)}</details>}
               </div>}
               {!generatedStack&&stackCalcOrgans.length===0&&<div style={{padding:20,textAlign:'center',color:'var(--text-dim)',fontSize:10,background:'var(--bg-secondary)',borderRadius:10,border:'1px solid var(--border)'}}>Выберите органы/системы и нажмите «Сгенерировать»</div>}
@@ -3830,56 +3810,53 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
           })}
         </div>
       )}
-      {/* ===== MY STACKS TAB ===== */}
-      {tab === 'mystacks' && (
-        <div style={{ padding: '0 12px 80px' }}>
-          <button onClick={() => setTab('main')} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', marginBottom:8, background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← На главную</button>
-          <h2 style={{ margin:'0 0 8px', fontSize:18, fontWeight:800, color:'var(--accent)' }}>📂 Мои стеки</h2>
-          <p style={{ fontSize:11, color:'var(--text-dim)', margin:'0 0 16px' }}>Сохранённые стеки поддержки из калькулятора. Выберите уровень, рассчитайте и сохраните.</p>
 
-          {/* Save current selection */}
-          <div className="card" style={{ marginBottom:12 }}>
-            <h4 style={{ margin:'0 0 8px', fontSize:13, color:'var(--text)' }}>💾 Сохранить текущий стек</h4>
-            <div style={{ display:'flex', gap:8 }}>
+      {/* ===== MYSTACKS IN CALC VIEW ===== */}
+      {tab === 'main' && supportView === 'calc' && calcView === 'mystacks' && (
+        <div style={{ padding:'0 0 80px' }}>
+          <button onClick={() => setCalcView('main')} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', marginBottom:6, background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← Назад</button>
+          <h2 style={{ margin:'0 0 6px', fontSize:16, fontWeight:800, color:'var(--accent)' }}>📂 Мои стеки</h2>
+          <p style={{ fontSize:10, color:'var(--text-dim)', margin:'0 0 12px' }}>Сохранённые стеки поддержки из калькулятора. Выберите уровень, рассчитайте и сохраните.</p>
+          <div className="card" style={{ marginBottom:10, padding:10 }}>
+            <h4 style={{ margin:'0 0 6px', fontSize:12, color:'var(--text)' }}>💾 Сохранить текущий стек</h4>
+            <div style={{ display:'flex', gap:6 }}>
               <input value={stackName} onChange={e=>setStackName(e.target.value)} placeholder="Название стека..."
-                style={{ flex:1, padding:'8px 12px', borderRadius:8, border:'1px solid var(--border)', background:'var(--bg-secondary)', color:'var(--text)', fontSize:11 }} />
-              <button onClick={saveCurrentStack} style={{ padding:'8px 16px', borderRadius:8, border:'none', cursor:'pointer', background:'linear-gradient(135deg, #00e68a, #00c853)', color:'#000', fontWeight:700, fontSize:11 }}>
-                Сохранить ({SUPPORT_LEVELS[supportLevel]?.subs?.length || 0} добавок)
+                style={{ flex:1, padding:'6px 10px', borderRadius:8, border:'1px solid var(--border)', background:'var(--bg-secondary)', color:'var(--text)', fontSize:10 }} />
+              <button onClick={saveCurrentStack} style={{ padding:'6px 12px', borderRadius:8, border:'none', cursor:'pointer', background:'linear-gradient(135deg, #00e68a, #00c853)', color:'#000', fontWeight:700, fontSize:10 }}>
+                Сохранить ({SUPPORT_LEVELS[supportLevel]?.subs?.length || 0} шт)
               </button>
             </div>
           </div>
-
-          {/* Saved stacks list */}
           {savedStacks.length === 0 ? (
-            <div className="card" style={{ textAlign:'center', padding:30 }}>
-              <div style={{ fontSize:32, marginBottom:8 }}>📂</div>
-              <div style={{ fontSize:13, color:'var(--text-dim)' }}>Нет сохранённых стеков</div>
-              <div style={{ fontSize:10, color:'var(--text-dim)', marginTop:4 }}>Рассчитайте стек в калькуляторе и нажмите «Сохранить»</div>
+            <div className="card" style={{ textAlign:'center', padding:24 }}>
+              <div style={{ fontSize:28, marginBottom:6 }}>📂</div>
+              <div style={{ fontSize:12, color:'var(--text-dim)' }}>Нет сохранённых стеков</div>
+              <div style={{ fontSize:9, color:'var(--text-dim)', marginTop:4 }}>Рассчитайте стек в калькуляторе и нажмите «Сохранить»</div>
             </div>
           ) : (
             savedStacks.map(stack => (
-              <div key={stack.id} className="card" style={{ marginBottom:8 }}>
-                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:6 }}>
+              <div key={stack.id} className="card" style={{ marginBottom:6, padding:10 }}>
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:4 }}>
                   <div>
-                    <div style={{ fontSize:13, fontWeight:700, color:'var(--accent)' }}>{stack.name}</div>
-                    <div style={{ fontSize:9, color:'var(--text-dim)' }}>{new Date(stack.date).toLocaleDateString('ru')} · {stack.subs.length} добавок</div>
+                    <div style={{ fontSize:12, fontWeight:700, color:'var(--accent)' }}>{stack.name}</div>
+                    <div style={{ fontSize:8, color:'var(--text-dim)' }}>{new Date(stack.date).toLocaleDateString('ru')} · {stack.subs.length} добавок</div>
                   </div>
-                  <button onClick={() => deleteStack(stack.id)} style={{ padding:'4px 8px', borderRadius:6, border:'1px solid rgba(239,68,68,0.3)', background:'rgba(239,68,68,0.08)', color:'#f87171', fontSize:9, cursor:'pointer' }}>Удалить</button>
+                  <button onClick={() => deleteStack(stack.id)} style={{ padding:'3px 6px', borderRadius:6, border:'1px solid rgba(239,68,68,0.3)', background:'rgba(239,68,68,0.08)', color:'#f87171', fontSize:8, cursor:'pointer' }}>Удалить</button>
                 </div>
-                <div style={{ display:'flex', flexWrap:'wrap', gap:3 }}>
+                <div style={{ display:'flex', flexWrap:'wrap', gap:2 }}>
                   {stack.subs.slice(0, 20).map(id => {
                     const sub = ALL_SUBSTANCES.find(s => s.id === id);
                     const pharma = PHARMA_DB[id];
                     const name = sub?.name || pharma?.name || id.replace(/_/g, ' ');
                     const dosage = stack.dosages?.[id];
                     return (
-                      <div key={id} style={{ padding:'3px 8px', borderRadius:6, background:'rgba(139,92,246,0.08)', border:'1px solid rgba(139,92,246,0.15)', fontSize:9 }}>
+                      <div key={id} style={{ padding:'2px 6px', borderRadius:5, background:'rgba(139,92,246,0.08)', border:'1px solid rgba(139,92,246,0.15)', fontSize:8 }}>
                         <span style={{ fontWeight:500 }}>{name}</span>
-                        {dosage && <span style={{ color:'var(--text-dim)', marginLeft:4 }}>{dosage.mg >= 1000 && id !== 'omega3' ? `${(dosage.mg/1000).toFixed(dosage.mg%1000===0?0:1)}г` : `${dosage.mg}мг`}</span>}
+                        {dosage && <span style={{ color:'var(--text-dim)', marginLeft:3 }}>{dosage.mg >= 1000 && id !== 'omega3' ? `${(dosage.mg/1000).toFixed(dosage.mg%1000===0?0:1)}г` : `${dosage.mg}мг`}</span>}
                       </div>
                     );
                   })}
-                  {stack.subs.length > 20 && <span style={{ fontSize:9, color:'var(--text-dim)' }}>+{stack.subs.length - 20} ещё</span>}
+                  {stack.subs.length > 20 && <span style={{ fontSize:8, color:'var(--text-dim)' }}>+{stack.subs.length - 20} ещё</span>}
                 </div>
               </div>
             ))
