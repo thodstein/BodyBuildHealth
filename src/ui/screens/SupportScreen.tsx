@@ -1469,14 +1469,10 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
             {renderView(infoView, 'synergies', () =>
               <div>
                 <div style={{ display:'flex', gap:4, marginBottom:8, overflowX:'auto', scrollbarWidth:'none', flexWrap:'wrap' }}>
-                  {(['all','LOW','MEDIUM','HIGH'] as const).map(s => (
-                    <button key={s} onClick={() => setInteractionSeverityFilter(s)} style={{
-                      padding:'4px 8px', borderRadius:10, fontSize:8, fontWeight:600, whiteSpace:'nowrap', cursor:'pointer', flexShrink:0,
-                      background: interactionSeverityFilter === s ? (INTERACTION_SEVERITY_LABELS[s]?.color || 'var(--accent)') : 'transparent',
-                      color: interactionSeverityFilter === s ? '#000' : 'var(--text-dim)',
-                      border: `1px solid ${interactionSeverityFilter === s ? (INTERACTION_SEVERITY_LABELS[s]?.color || 'var(--accent)') : 'var(--border)'}`,
-                    }}>{s === 'all' ? '♾️ Все' : `${INTERACTION_SEVERITY_LABELS[s]?.label||s}`}</button>
-                  ))}
+                  <button onClick={() => setInteractionSeverityFilter('all')} style={{padding:'4px 8px',borderRadius:10,fontSize:8,fontWeight:600,whiteSpace:'nowrap',cursor:'pointer',flexShrink:0,background:interactionSeverityFilter==='all'?'var(--accent)':'transparent',color:interactionSeverityFilter==='all'?'#000':'var(--text-dim)',border:`1px solid ${interactionSeverityFilter==='all'?'var(--accent)':'var(--border)'}`}}>♾️ Все</button>
+                  <button onClick={() => setInteractionSeverityFilter('LOW')} style={{padding:'4px 8px',borderRadius:10,fontSize:8,fontWeight:600,whiteSpace:'nowrap',cursor:'pointer',flexShrink:0,background:interactionSeverityFilter==='LOW'?'#84cc16':'transparent',color:interactionSeverityFilter==='LOW'?'#000':'var(--text-dim)',border:`1px solid ${interactionSeverityFilter==='LOW'?'#84cc16':'var(--border)'}`}}>Низкая</button>
+                  <button onClick={() => setInteractionSeverityFilter('MEDIUM')} style={{padding:'4px 8px',borderRadius:10,fontSize:8,fontWeight:600,whiteSpace:'nowrap',cursor:'pointer',flexShrink:0,background:interactionSeverityFilter==='MEDIUM'?'#f59e0b':'transparent',color:interactionSeverityFilter==='MEDIUM'?'#000':'var(--text-dim)',border:`1px solid ${interactionSeverityFilter==='MEDIUM'?'#f59e0b':'var(--border)'}`}}>Средняя</button>
+                  <button onClick={() => setInteractionSeverityFilter('HIGH')} style={{padding:'4px 8px',borderRadius:10,fontSize:8,fontWeight:600,whiteSpace:'nowrap',cursor:'pointer',flexShrink:0,background:interactionSeverityFilter==='HIGH'?'#ef4444':'transparent',color:interactionSeverityFilter==='HIGH'?'#000':'var(--text-dim)',border:`1px solid ${interactionSeverityFilter==='HIGH'?'#ef4444':'var(--border)'}`}}>Высокая</button>
                   <div style={{ fontSize:9, color:'var(--text-dim)', display:'flex', alignItems:'center', marginLeft:2, whiteSpace:'nowrap' }}>{filteredInteractions.length} из {mergedInteractions.length}</div>
                 </div>
                 {synergiesContent(filteredInteractions, mergedInteractions, expandedCategories)}
