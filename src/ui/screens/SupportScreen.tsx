@@ -876,6 +876,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   const [stackCalcSize, setStackCalcSize] = useState<string>('5-7');
   const [stackCalcOrgans, setStackCalcOrgans] = useState<string[]>([]);
   const [stackCalcMech, setStackCalcMech] = useState<string[]>([]);
+  const [generatedStack, setGeneratedStack] = useState<any>(null);
 
   const availableMechs = useMemo(() => {
     if (stackCalcOrgans.length===0) return [];
@@ -1781,7 +1782,6 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
               const clearAll = () => { setStackCalcOrgans([]); setStackCalcMech([]); };
               const selectedOrgans = organList.filter(o=>stackCalcOrgans.includes(o.key)).flatMap(o=>o.organs);
               const toggleMech = (m:string) => setStackCalcMech(prev=>prev.includes(m)?prev.filter(x=>x!==m):[...prev,m]);
-              const [generatedStack,setGeneratedStack] = React.useState<any>(null);
               const [lo,hi]=stackCalcSize.split('-').map(Number);
               const generate = () => {
                 const candidates:Array<{sub:typeof ALL_SUBSTANCES[0];score:number}> = [];
