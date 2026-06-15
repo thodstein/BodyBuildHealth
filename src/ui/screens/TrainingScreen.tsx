@@ -1,10 +1,10 @@
 ﻿import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { EXERCISE_CATALOG } from '../../core/exercise-catalog';
-import { calcTraining, EXERCISE_DB } from '../../engines/training.engine';
+import { calcTraining, calcExercisePrescription, EXERCISE_DB } from '../../engines/training.engine';
 import { generateMacrocycle, getCurrentWeekPlan, MESOCYCLE_PARAMS, type MacrocyclePlan, type Microcycle, type MacrocycleInput } from '../../engines/training-periodization.engine';
 import { selectSplit, getSplitOptions, type SplitCandidate } from '../../engines/split-selector.engine';
 import { selectProgressionRule, calcSuggestedWeight, estimate1RM, getDeloadRecommendation } from '../../engines/progression.engine';
-import { RIR_MATRIX } from '../../engines/rir-matrix.engine';
+import { RIR_MATRIX, generateWeeklyPlan } from '../../engines/rir-matrix.engine';
 import { StrengthDiary, type StrengthStats, type WeeklyProgress, type ProgressionAlert } from '../../engines/strength-diary.engine';
 import type { WorkoutLog } from '../../core/types';
 import { generateWarmup } from '../../engines/warmup.engine';
@@ -66,7 +66,7 @@ const PHASE_HINTS: Record<string, string> = {
   deload: 'Разгрузка: снижаем объём и интенсивность, восстанавливаем суставы и нервную систему.',
 };
 
-type TrainingTab = 'plan' | 'runtime' | 'exercises' | 'calculators' | 'diary' | 'cycles' | 'history' | 'analytics' | 'methods' | 'visual' | 'programs' | 'timers' | 'progress';
+type TrainingTab = 'plan' | 'runtime' | 'exercises' | 'calculators' | 'diary' | 'cycles' | 'history' | 'analytics' | 'methods' | 'visual' | 'programs' | 'timers' | 'progress' | 'mytraining';
 type TrainingPage = 'hero' | 'tabs';
 
 export const TrainingScreen: React.FC = () => {
@@ -136,6 +136,11 @@ export const TrainingScreen: React.FC = () => {
   const [gripResult, setGripResult] = useState<{ percentile: number; level: string } | null>(null);
   const [hrvValue, setHrvValue] = useState(50);
   const [stressResult, setStressResult] = useState<{ stress: number; level: string } | null>(null);
+
+  // Exercise Calculator state
+  const [exCalcGroup, setExCalcGroup] = useState('');
+  const [exCalcType, setExCalcType] = useState('');
+  const [exCalcEquip, setExCalcEquip] = useState('');
 
   // Diary state
   const [diaryStats, setDiaryStats] = useState<StrengthStats[]>([]);
@@ -403,7 +408,7 @@ export const TrainingScreen: React.FC = () => {
           ['history', '📜 История'], ['analytics', '📊 Аналитика'],
           ['methods', '🧠 Методики'], ['visual', '📈 Визуализация'],
           ['programs', '📚 Программы'], ['timers', '⏱ Таймеры'],
-          ['progress', '📏 Прогресс'],
+          ['progress', '📏 Прогресс'], ['mytraining', '⭐ Мои'],
         ] as [TrainingTab, string][]).map(([k, l]) => (
           <button key={k} onClick={() => setTab(k)} style={{
             padding: '7px 12px', borderRadius: 8, fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap',
@@ -1806,6 +1811,139 @@ export const TrainingScreen: React.FC = () => {
               </div>
             )}
           </div>
+
+          {/* ═══════ PROGRAM CALCULATOR ═══════ */}
+          <div className="card" style={{ padding: '10px 12px' }}>
+            <h3 style={{ margin: '0 0 8px', fontSize: 13 }}>📚 Калькулятор программы</h3>
+            <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 6 }}>Подберите оптимальную сплит-программу по вашим параметрам</div>
+            {(() => {
+              const input = { goal, level, daysPerWeek, recovery, fatigue, nutrition: 7, weakPoints, sessionDuration: 60, exercises: [] } as any;
+              const bestSplit = selectSplit(input);
+              const topSplits = getSplitOptions(input);
+              return (<>
+                <div style={{ background:'rgba(0,230,138,0.06)', borderRadius:8, padding:10, marginBottom:6, border:'1px solid rgba(0,230,138,0.12)' }}>
+                  <div style={{ fontSize:11, fontWeight:700, color:'var(--accent)' }}>🏆 {bestSplit[0]?.name || 'Не определён'}</div>
+                  <div style={{ fontSize:9, color:'var(--text-light)', marginTop:2 }}>{bestSplit[0]?.desc || ''}</div>
+                  <div style={{ fontSize:9, color:'var(--accent)', marginTop:2 }}>Score: {bestSplit[0]?.score?.toFixed(0) || '—'}</div>
+                  {bestSplit[0]?.rationale && <div style={{ fontSize:8, color:'var(--text-dim)', marginTop:2 }}>{bestSplit[0].rationale.join(' · ')}</div>}
+                </div>
+                <details style={{ marginTop:4 }}>
+                  <summary style={{ fontSize:9, fontWeight:600, color:'var(--text-light)', cursor:'pointer' }}>Топ-5 сплитов ({topSplits.length})</summary>
+                  <div style={{ display:'flex', flexDirection:'column', gap:4, marginTop:4 }}>
+                    {topSplits.slice(0,5).map((s,i) => (
+                      <div key={i} style={{ padding:'4px 8px', borderRadius:6, background:i===0?'rgba(0,230,138,0.06)':'var(--bg-secondary)', border:`1px solid ${i===0?'rgba(0,230,138,0.12)':'var(--border)'}` }}>
+                        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                          <span style={{ fontSize:10, fontWeight:600, color:i===0?'var(--accent)':'var(--text-light)' }}>{s.name}</span>
+                          <span style={{ fontSize:9, fontWeight:700, color:i===0?'var(--accent)':'var(--text-dim)' }}>{s.score?.toFixed(0)}</span>
+                        </div>
+                        <div style={{ fontSize:8, color:'var(--text-dim)', marginTop:1 }}>{s.desc}</div>
+                        {s.rationale && <div style={{ fontSize:7, color:'rgba(0,230,138,0.7)', marginTop:1 }}>{s.rationale.join(' · ')}</div>}
+                      </div>
+                    ))}
+                  </div>
+                </details>
+              </>);
+            })()}
+          </div>
+
+          {/* ═══════ CYCLE CALCULATOR ═══════ */}
+          <div className="card" style={{ padding: '10px 12px' }}>
+            <h3 style={{ margin: '0 0 8px', fontSize: 13 }}>🔄 Калькулятор цикла</h3>
+            <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 6 }}>Рассчитайте мезоцикл с прогрессией, разгрузкой и фазами</div>
+            {(() => {
+              const totalWeeks = mesoLength || 6;
+              const plan = generateWeeklyPlan({ goal, level, daysPerWeek, recovery, fatigue, nutrition: 7, weakPoints, sessionDuration: 60, exercises: [] } as any, totalWeeks);
+              const rule = selectProgressionRule(level);
+              return (<>
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:4, marginBottom:6 }}>
+                  <div style={{ background:'var(--bg-secondary)', borderRadius:6, padding:6, textAlign:'center' }}>
+                    <div style={{ fontSize:8, color:'var(--text-dim)' }}>Недель</div>
+                    <div style={{ fontSize:16, fontWeight:800, color:'var(--accent)' }}>{totalWeeks}</div>
+                  </div>
+                  <div style={{ background:'var(--bg-secondary)', borderRadius:6, padding:6, textAlign:'center' }}>
+                    <div style={{ fontSize:8, color:'var(--text-dim)' }}>Прогрессия</div>
+                    <div style={{ fontSize:11, fontWeight:700, color:'var(--text-light)' }}>{rule.name}</div>
+                    <div style={{ fontSize:7, color:'var(--text-dim)' }}>+{rule.weeklyWeightIncrement}кг/нед</div>
+                  </div>
+                </div>
+                <div style={{ display:'flex', flexDirection:'column', gap:3, maxHeight:200, overflowY:'auto' }}>
+                  {plan.map((w,i) => {
+                    const phaseColors: Record<string,string> = { base:'#3b82f6', build:'#f59e0b', peak:'#ef4444', deload:'#22c55e' };
+                    const col = phaseColors[w.phase] || '#888';
+                    return (
+                      <div key={i} style={{ display:'flex', alignItems:'center', gap:6, padding:'4px 6px', borderRadius:4, background:'var(--bg-secondary)' }}>
+                        <span style={{ fontSize:9, fontWeight:700, width:20, textAlign:'center' }}>Н{w.weekNumber}</span>
+                        <span style={{ fontSize:8, padding:'1px 5px', borderRadius:3, background:col+'22', color:col, fontWeight:600, whiteSpace:'nowrap' }}>{w.phaseName}</span>
+                        <span style={{ fontSize:8, color:'var(--text-dim)' }}>RIR {w.rir}</span>
+                        <span style={{ fontSize:7, color:'rgba(255,255,255,0.4)' }}>Vol: {typeof w.volumePerGroup === 'number' ? w.volumePerGroup : JSON.stringify(w.volumePerGroup)}</span>
+                        {w.deloadWeek && <span style={{ fontSize:7, color:'#22c55e', fontWeight:600 }}>⚡Deload</span>}
+                        {w.recoveryFocus && <span style={{ fontSize:7, color:'#f59e0b' }}>🔄{w.recoveryFocus}</span>}
+                      </div>
+                    );
+                  })}
+                </div>
+                {rule.deloadTrigger && <div style={{ marginTop:4, fontSize:8, color:'var(--text-dim)' }}>⚠ Разгрузка: плато {rule.deloadTrigger.plateauWeeks} нед, RPE ≥ {rule.deloadTrigger.rpeFloor}</div>}
+              </>);
+            })()}
+          </div>
+
+          {/* ═══════ EXERCISE CALCULATOR ═══════ */}
+          <div className="card" style={{ padding: '10px 12px' }}>
+            <h3 style={{ margin: '0 0 8px', fontSize: 13 }}>🏋️ Калькулятор упражнения</h3>
+            <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 6 }}>Подберите упражнение по группе мышц, типу и оборудованию</div>
+            {(() => {
+              const groups = [...new Set(EXERCISE_DB.map(e => e.group || '').filter(Boolean))].sort();
+              const types = [...new Set(EXERCISE_DB.map(e => (e as any).type || '').filter(Boolean))].sort();
+              const equipList = [...new Set(EXERCISE_DB.map(e => e.equipment || '').filter(Boolean))].sort();
+              const filtered = EXERCISE_DB.filter(e => {
+                if (exCalcGroup && (e.group || '') !== exCalcGroup) return false;
+                if (exCalcType && ((e as any).type || '') !== exCalcType) return false;
+                if (exCalcEquip && (e.equipment || '') !== exCalcEquip) return false;
+                return true;
+              }).slice(0, 20);
+              return (<>
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:4, marginBottom:6 }}>
+                  <div>
+                    <label style={{ fontSize:9, color:'var(--text-dim)' }}>Группа</label>
+                    <select value={exCalcGroup} onChange={e=>setExCalcGroup(e.target.value)} style={{ width:'100%', padding:'4px', borderRadius:4, background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text)', fontSize:10, boxSizing:'border-box' }}>
+                      <option value="">Все</option>
+                      {groups.map(g=><option key={g} value={g}>{g}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label style={{ fontSize:9, color:'var(--text-dim)' }}>Тип</label>
+                    <select value={exCalcType} onChange={e=>setExCalcType(e.target.value)} style={{ width:'100%', padding:'4px', borderRadius:4, background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text)', fontSize:10, boxSizing:'border-box' }}>
+                      <option value="">Все</option>
+                      {types.map(t=><option key={t} value={t}>{t}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label style={{ fontSize:9, color:'var(--text-dim)' }}>Оборудование</label>
+                    <select value={exCalcEquip} onChange={e=>setExCalcEquip(e.target.value)} style={{ width:'100%', padding:'4px', borderRadius:4, background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text)', fontSize:10, boxSizing:'border-box' }}>
+                      <option value="">Все</option>
+                      {equipList.map(eq=><option key={eq} value={eq}>{eq}</option>)}
+                    </select>
+                  </div>
+                </div>
+                <div style={{ fontSize:8, color:'var(--text-dim)', marginBottom:4 }}>Найдено: {filtered.length}</div>
+                <div style={{ display:'flex', flexDirection:'column', gap:3, maxHeight:200, overflowY:'auto' }}>
+                  {filtered.map((ex,i) => {
+                    const presc = calcExercisePrescription(ex, goal, level, false, false, 1);
+                    return (
+                      <div key={i} style={{ padding:'4px 8px', borderRadius:6, background:'var(--bg-secondary)', border:'1px solid var(--border)' }}>
+                        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                          <span style={{ fontSize:10, fontWeight:600, color:'var(--text-light)' }}>{ex.name || ex.id}</span>
+                          <span style={{ fontSize:7, padding:'1px 4px', borderRadius:3, background:'rgba(0,230,138,0.1)', color:'var(--accent)' }}>{ex.group}</span>
+                        </div>
+                        <div style={{ fontSize:8, color:'var(--text-dim)', marginTop:1 }}>{ex.type} · {ex.equipment}</div>
+                        {presc && <div style={{ fontSize:8, color:'rgba(255,255,255,0.5)', marginTop:1 }}>{presc.sets}×{presc.reps} @ RIR {presc.rir} · Отдых {presc.rest}с{presc.progressionNote ? ` · ${presc.progressionNote}` : ''}</div>}
+                      </div>
+                    );
+                  })}
+                </div>
+              </>);
+            })()}
+          </div>
         </div>
       )}
 
@@ -2127,7 +2265,168 @@ export const TrainingScreen: React.FC = () => {
       {tab === 'programs' && <ProgramsTab />}
       {tab === 'timers' && <TimersTab />}
       {tab === 'progress' && <ProgressTab historyWorkouts={historyWorkouts} />}
+
+      {/* ═══════════ MY TRAINING TAB ═══════════ */}
+      {tab === 'mytraining' && (
+        <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+          <MyTrainingTab customExercises={customExercises} setCustomExercises={setCustomExercises} />
+        </div>
+      )}
     </div>
+      )}
+    </div>
+  );
+};
+
+const MyTrainingTab: React.FC<{ customExercises: { name: string; sets: number; reps: number; rir: number }[]; setCustomExercises: React.Dispatch<React.SetStateAction<{ name: string; sets: number; reps: number; rir: number }[]>> }> = ({ customExercises, setCustomExercises }) => {
+  const [newExName, setNewExName] = useState('');
+  const [newExSets, setNewExSets] = useState(3);
+  const [newExReps, setNewExReps] = useState(10);
+  const [newExRir, setNewExRir] = useState(2);
+  const [savedPlans, setSavedPlans] = useState<{ id: string; name: string; date: string; exercises: { name: string; sets: number; reps: number; rir: number }[] }[]>(() => { try { return JSON.parse(localStorage.getItem('myTrainingPlans') || '[]'); } catch { return []; } });
+  const [planName, setPlanName] = useState('');
+  const [savedCycles, setSavedCycles] = useState<{ id: string; name: string; date: string; weeks: number; goal: string; level: string; days: number }[]>(() => { try { return JSON.parse(localStorage.getItem('myTrainingCycles') || '[]'); } catch { return []; } });
+  const [cycleName, setCycleName] = useState('');
+  const [subTab, setSubTab] = useState<'exercises'|'plans'|'cycles'>('exercises');
+
+  const addExercise = () => {
+    if (!newExName.trim()) return;
+    setCustomExercises(prev => [...prev, { name: newExName.trim(), sets: newExSets, reps: newExReps, rir: newExRir }]);
+    setNewExName('');
+  };
+
+  const savePlan = () => {
+    if (customExercises.length === 0) return;
+    const plan = { id: 'plan_' + Date.now(), name: planName || 'План ' + new Date().toLocaleDateString('ru'), date: new Date().toISOString(), exercises: [...customExercises] };
+    const updated = [...savedPlans, plan];
+    setSavedPlans(updated);
+    localStorage.setItem('myTrainingPlans', JSON.stringify(updated));
+    setPlanName('');
+  };
+
+  const deletePlan = (id: string) => {
+    const updated = savedPlans.filter(p => p.id !== id);
+    setSavedPlans(updated);
+    localStorage.setItem('myTrainingPlans', JSON.stringify(updated));
+  };
+
+  const loadPlan = (plan: { exercises: { name: string; sets: number; reps: number; rir: number }[] }) => {
+    setCustomExercises(plan.exercises);
+  };
+
+  const saveCycle = () => {
+    const cycle = { id: 'cycle_' + Date.now(), name: cycleName || 'Цикл ' + new Date().toLocaleDateString('ru'), date: new Date().toISOString(), weeks: 6, goal: 'bulk', level: 'intermediate', days: 4 };
+    const updated = [...savedCycles, cycle];
+    setSavedCycles(updated);
+    localStorage.setItem('myTrainingCycles', JSON.stringify(updated));
+    setCycleName('');
+  };
+
+  const deleteCycle = (id: string) => {
+    const updated = savedCycles.filter(c => c.id !== id);
+    setSavedCycles(updated);
+    localStorage.setItem('myTrainingCycles', JSON.stringify(updated));
+  };
+
+  const groupOptions = [...new Set(EXERCISE_DB.map(e => e.group || '').filter(Boolean))].sort();
+
+  return (
+    <div>
+      <div style={{fontSize:14,fontWeight:700,color:'var(--accent)',marginBottom:4}}>⭐ Моя тренировка</div>
+      <div style={{fontSize:9,color:'var(--text-dim)',marginBottom:8}}>Пользовательские упражнения, планы и циклы</div>
+
+      <div style={{display:'flex',gap:4,marginBottom:8}}>
+        {(['exercises','plans','cycles'] as const).map(t => (
+          <button key={t} onClick={()=>setSubTab(t)} style={{padding:'6px 12px',borderRadius:8,fontSize:10,fontWeight:600,cursor:'pointer',background:subTab===t?'var(--accent)':'var(--bg-secondary)',color:subTab===t?'#000':'var(--text-dim)',border:subTab===t?'1px solid var(--accent)':'1px solid var(--border)'}}>
+            {t==='exercises'?'🏋️ Упражнения':t==='plans'?'📋 Планы':'🔄 Циклы'}
+          </button>
+        ))}
+      </div>
+
+      {subTab === 'exercises' ? (
+        <div>
+          <div className="card" style={{padding:10,marginBottom:8}}>
+            <h4 style={{margin:'0 0 6px',fontSize:12}}>➕ Добавить упражнение</h4>
+            <div style={{display:'grid',gridTemplateColumns:'2fr 1fr 1fr 1fr',gap:4,marginBottom:6}}>
+              <input value={newExName} onChange={e=>setNewExName(e.target.value)} onKeyDown={e=>e.key==='Enter'&&addExercise()} placeholder="Название упражнения" style={{padding:'6px 8px',borderRadius:6,border:'1px solid var(--border)',background:'var(--bg-secondary)',color:'var(--text)',fontSize:11,boxSizing:'border-box'}} />
+              <input type="number" value={newExSets} onChange={e=>setNewExSets(+e.target.value)} placeholder="Подходы" style={{padding:'6px 8px',borderRadius:6,border:'1px solid var(--border)',background:'var(--bg-secondary)',color:'var(--text)',fontSize:11,boxSizing:'border-box'}} />
+              <input type="number" value={newExReps} onChange={e=>setNewExReps(+e.target.value)} placeholder="Повторы" style={{padding:'6px 8px',borderRadius:6,border:'1px solid var(--border)',background:'var(--bg-secondary)',color:'var(--text)',fontSize:11,boxSizing:'border-box'}} />
+              <input type="number" value={newExRir} onChange={e=>setNewExRir(+e.target.value)} placeholder="RIR" style={{padding:'6px 8px',borderRadius:6,border:'1px solid var(--border)',background:'var(--bg-secondary)',color:'var(--text)',fontSize:11,boxSizing:'border-box'}} />
+            </div>
+            <div style={{display:'flex',flexWrap:'wrap',gap:3,marginBottom:6}}>
+              {groupOptions.slice(0,12).map(g=><button key={g} onClick={()=>setNewExName(g+' → ')} style={{padding:'2px 6px',borderRadius:4,fontSize:7,cursor:'pointer',background:'var(--bg-secondary)',border:'1px solid var(--border)',color:'var(--text-dim)'}}>{g}</button>)}
+            </div>
+            <button onClick={addExercise} style={{width:'100%',padding:6,borderRadius:6,border:'none',cursor:'pointer',background:'var(--accent)',color:'#000',fontWeight:600,fontSize:11}}>Добавить</button>
+          </div>
+
+          {customExercises.length > 0 ? (
+            <div className="card" style={{padding:10,marginBottom:8}}>
+              <h4 style={{margin:'0 0 6px',fontSize:12}}>📝 Мои упражнения ({customExercises.length})</h4>
+              <div style={{display:'flex',flexDirection:'column',gap:4}}>
+                {customExercises.map((ex,i) => (
+                  <div key={i} style={{display:'flex',alignItems:'center',gap:6,padding:'4px 8px',borderRadius:6,background:'var(--bg-secondary)',border:'1px solid var(--border)'}}>
+                    <div style={{flex:1}}>
+                      <div style={{fontSize:10,fontWeight:600,color:'var(--text-light)'}}>{ex.name}</div>
+                      <div style={{fontSize:8,color:'var(--text-dim)'}}>{ex.sets}×{ex.reps} @ RIR {ex.rir}</div>
+                    </div>
+                    <button onClick={()=>setCustomExercises(prev=>prev.filter((_,j)=>j!==i))} style={{padding:'2px 6px',borderRadius:4,border:'1px solid rgba(239,68,68,0.2)',background:'rgba(239,68,68,0.08)',color:'#f87171',fontSize:9,cursor:'pointer'}}>✕</button>
+                  </div>
+                ))}
+              </div>
+              <div style={{display:'flex',gap:4,marginTop:6}}>
+                <input value={planName} onChange={e=>setPlanName(e.target.value)} placeholder="Название плана..." style={{flex:1,padding:'6px 8px',borderRadius:6,border:'1px solid var(--border)',background:'var(--bg-secondary)',color:'var(--text)',fontSize:10,boxSizing:'border-box'}} />
+                <button onClick={savePlan} style={{padding:'6px 12px',borderRadius:6,border:'none',cursor:'pointer',background:'var(--accent)',color:'#000',fontWeight:600,fontSize:10}}>💾 Сохранить план</button>
+                <button onClick={()=>setCustomExercises([])} style={{padding:'6px 12px',borderRadius:6,border:'1px solid rgba(239,68,68,0.2)',background:'rgba(239,68,68,0.08)',color:'#f87171',fontSize:10,cursor:'pointer'}}>Очистить</button>
+              </div>
+            </div>
+          ) : null}
+        </div>
+      ) : subTab === 'plans' ? (
+        <div>
+          {savedPlans.length === 0 && <div className="card" style={{padding:20,textAlign:'center',color:'var(--text-dim)',fontSize:11}}>Нет сохранённых планов</div>}
+          {savedPlans.map(plan => (
+            <div key={plan.id} className="card" style={{padding:10,marginBottom:6}}>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:4}}>
+                <div>
+                  <div style={{fontSize:11,fontWeight:700,color:'var(--text-light)'}}>{plan.name}</div>
+                  <div style={{fontSize:8,color:'var(--text-dim)'}}>{new Date(plan.date).toLocaleDateString('ru')} · {plan.exercises.length} упр.</div>
+                </div>
+                <div style={{display:'flex',gap:4}}>
+                  <button onClick={()=>loadPlan(plan)} style={{padding:'3px 8px',borderRadius:4,border:'1px solid rgba(0,230,138,0.2)',background:'rgba(0,230,138,0.08)',color:'var(--accent)',fontSize:8,cursor:'pointer'}}>Загрузить</button>
+                  <button onClick={()=>deletePlan(plan.id)} style={{padding:'3px 8px',borderRadius:4,border:'1px solid rgba(239,68,68,0.2)',background:'rgba(239,68,68,0.08)',color:'#f87171',fontSize:8,cursor:'pointer'}}>Удалить</button>
+                </div>
+              </div>
+              <div style={{display:'flex',flexWrap:'wrap',gap:3}}>
+                {plan.exercises.map((ex,i) => (
+                  <span key={i} style={{fontSize:7,padding:'2px 6px',borderRadius:4,background:'rgba(0,230,138,0.06)',border:'1px solid rgba(0,230,138,0.12)',color:'var(--text-light)'}}>{ex.name} {ex.sets}×{ex.reps}</span>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div>
+          <div className="card" style={{padding:10,marginBottom:8}}>
+            <h4 style={{margin:'0 0 6px',fontSize:12}}>🔄 Новый цикл</h4>
+            <div style={{display:'flex',gap:4,marginBottom:6}}>
+              <input value={cycleName} onChange={e=>setCycleName(e.target.value)} placeholder="Название цикла..." style={{flex:1,padding:'6px 8px',borderRadius:6,border:'1px solid var(--border)',background:'var(--bg-secondary)',color:'var(--text)',fontSize:11,boxSizing:'border-box'}} />
+              <button onClick={saveCycle} style={{padding:'6px 12px',borderRadius:6,border:'none',cursor:'pointer',background:'var(--accent)',color:'#000',fontWeight:600,fontSize:10}}>💾 Сохранить</button>
+            </div>
+            <div style={{fontSize:8,color:'var(--text-dim)'}}>Цикл создаётся на основе текущих настроек плана</div>
+          </div>
+          {savedCycles.length === 0 && <div className="card" style={{padding:20,textAlign:'center',color:'var(--text-dim)',fontSize:11}}>Нет сохранённых циклов</div>}
+          {savedCycles.map(cycle => (
+            <div key={cycle.id} className="card" style={{padding:10,marginBottom:6}}>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                <div>
+                  <div style={{fontSize:11,fontWeight:700,color:'var(--text-light)'}}>{cycle.name}</div>
+                  <div style={{fontSize:8,color:'var(--text-dim)'}}>{new Date(cycle.date).toLocaleDateString('ru')} · {cycle.weeks} нед · {cycle.days} д/н</div>
+                </div>
+                <button onClick={()=>deleteCycle(cycle.id)} style={{padding:'3px 8px',borderRadius:4,border:'1px solid rgba(239,68,68,0.2)',background:'rgba(239,68,68,0.08)',color:'#f87171',fontSize:8,cursor:'pointer'}}>Удалить</button>
+              </div>
+            </div>
+          ))}
+        </div>
       )}
     </div>
   );
