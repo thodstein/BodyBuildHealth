@@ -740,6 +740,10 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   const [activeSystems, setActiveSystems] = useState<Record<string, boolean>>({
     cardio: true, hepatic: true, renal: true, neuro: true, endocrine: true, hematologic: true, reproductive: true, musculoskeletal: true,
   });
+  const [synergyPage, setSynergyPage] = useState<number>(1);
+  const SYNERGY_PAGE_SIZE = 30;
+  const [interactionPage, setInteractionPage] = useState<number>(1);
+  const INTERACTION_PAGE_SIZE = 40;
   const [supportResult, setSupportResult] = useState<ReturnType<typeof calculateSupport> | null>(null);
 
   const [dbInteractions, setDbInteractions] = useState<ReturnType<typeof checkSupportInteractions> | null>(null);
@@ -1111,9 +1115,16 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
     return map;
   }, [conflictLookup]);
 
-  // Merge ALL_INTERACTIONS + SYNERGY_PAIRS for synergies tab
+  // Merge ALL_INTERACTIONS + SYNERGY_PAIRS for synergies tab (with null filter + dedup)
   const mergedInteractions = useMemo(() => {
-    const fromDB = ALL_INTERACTIONS.map(i => ({ ...i, source: 'db' as const }));
+    const seen = new Set<string>();
+    const fromDB = ALL_INTERACTIONS
+      .filter(i => i && i.interactionId && i.substanceA && i.substanceB && i.substanceA !== i.substanceB)
+      .map(i => ({ ...i, source: 'db' as const }));
+    for (const item of fromDB) {
+      seen.add(item.interactionId);
+      seen.add(`${item.substanceA}|${item.substanceB}`);
+    }
     const fromEngine = SYNERGY_PAIRS.map((p, idx) => ({
       interactionId: `synergy_pair_${idx}`,
       substanceA: p.substanceA,
@@ -1125,7 +1136,8 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
       notes: p.clinicalNote || '',
       source: 'engine' as const,
     }));
-    return [...fromDB, ...fromEngine];
+    const dedupedEngine = fromEngine.filter(e => !seen.has(`${e.substanceA}|${e.substanceB}`) && !seen.has(e.interactionId));
+    return [...fromDB, ...dedupedEngine];
   }, []);
 
   const filteredInteractions = useMemo(() => {
@@ -1174,10 +1186,15 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
     );
   }, [stackSearch]);
 
-  // Resolve substance name from ID (used in interactions)
+  // Resolve substance name from ID (used in interactions) — Map for O(1)
+  const substanceNameMap = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const s of ALL_SUBSTANCES) m.set(s.id, s.name);
+    return m;
+  }, []);
   const resolveSubName = (id: string): string => {
-    const sub = ALL_SUBSTANCES.find(s => s.id === id);
-    if (sub) return sub.name;
+    const fromMap = substanceNameMap.get(id);
+    if (fromMap) return fromMap;
     const pharma = PHARMA_DB[id];
     if (pharma) return pharma.name;
     return id;
@@ -1236,6 +1253,11 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
       const list = filtered || [];
       const synergies = list.filter((i:any) => i?.type === 'synergy');
       const conflicts = list.filter((i:any) => i?.type === 'conflict' || i?.type === 'caution');
+      const synTotal = synergies.length;
+      const confTotal = conflicts.length;
+      const maxItems = synergyPage * SYNERGY_PAGE_SIZE;
+      const synPage = synergies.slice(0, maxItems);
+      const confPage = conflicts.slice(0, maxItems);
       const safeItem = (fn:()=>React.ReactNode, key:string|number):React.ReactNode => {
         try{return fn();}catch(e){return <div key={key} style={{padding:4,color:'#f87171',fontSize:7}}>⚠ Item {key}: {String(e)}</div>;}
       };
@@ -1243,12 +1265,12 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
         <div style={{ marginBottom:10 }}>
           <div onClick={() => setExpandedCategories(prev => ({ ...prev, syn_synergies: !(prev?.syn_synergies ?? true) }))} style={{ display:'flex', alignItems:'center', gap:6, padding:'6px 8px', cursor:'pointer', userSelect:'none', background:'var(--bg-secondary)', borderRadius:8, marginBottom:4 }}>
             <span style={{ fontSize:13 }}>⊕</span>
-            <div style={{ flex:1, fontSize:10, fontWeight:700, color:'#22c55e' }}>Синергии ({synergies.length})</div>
+            <div style={{ flex:1, fontSize:10, fontWeight:700, color:'#22c55e' }}>Синергии ({synTotal})</div>
             <span style={{ fontSize:9, color:'var(--text-dim)', transform:cats?.syn_synergies !== false ? 'rotate(180deg)' : 'none', transition:'transform 0.2s' }}>▼</span>
           </div>
           {cats?.syn_synergies !== false && (
             <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
-              {synergies.map((interaction: any, i: number) => safeItem(() => {
+              {synPage.map((interaction: any, i: number) => safeItem(() => {
                 const sevInfo = INTERACTION_SEVERITY_LABELS[interaction?.severity] || { label:interaction?.severity, color:'#888' };
                 const aName = resolveSubName(interaction?.substanceA);
                 const bName = resolveSubName(interaction?.substanceB);
@@ -1274,19 +1296,20 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
                   </div>
                 );
               }, i))}
-              {synergies.length === 0 && <div style={{ padding:12, textAlign:'center', color:'var(--text-dim)', fontSize:10 }}>Нет синергий</div>}
+              {synTotal === 0 && <div style={{ padding:12, textAlign:'center', color:'var(--text-dim)', fontSize:10 }}>Нет синергий</div>}
+              {synPage.length < synTotal && <button onClick={() => setSynergyPage(p => p + 1)} style={{ width:'100%', padding:'8px', marginTop:4, borderRadius:8, border:'1px solid var(--border)', background:'var(--bg-secondary)', color:'var(--text-dim)', fontSize:10, cursor:'pointer' }}>Показать ещё ({synTotal - synPage.length} из {synTotal})</button>}
             </div>
           )}
         </div>
         <div>
           <div onClick={() => setExpandedCategories(prev => ({ ...prev, syn_conflicts: !(prev?.syn_conflicts ?? true) }))} style={{ display:'flex', alignItems:'center', gap:6, padding:'6px 8px', cursor:'pointer', userSelect:'none', background:'var(--bg-secondary)', borderRadius:8, marginBottom:4 }}>
             <span style={{ fontSize:13 }}>⊖</span>
-            <div style={{ flex:1, fontSize:10, fontWeight:700, color:'#ef4444' }}>Конфликты и осторожность ({conflicts.length})</div>
+            <div style={{ flex:1, fontSize:10, fontWeight:700, color:'#ef4444' }}>Конфликты и осторожность ({confTotal})</div>
             <span style={{ fontSize:9, color:'var(--text-dim)', transform:cats?.syn_conflicts !== false ? 'rotate(180deg)' : 'none', transition:'transform 0.2s' }}>▼</span>
           </div>
           {cats?.syn_conflicts !== false && (
             <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
-              {conflicts.map((interaction: any, i: number) => safeItem(() => {
+              {confPage.map((interaction: any, i: number) => safeItem(() => {
                 const typeInfo = INTERACTION_TYPE_LABELS[interaction?.type] || { label:interaction?.type, emoji:'🔗', color:'#888' };
                 const sevInfo = INTERACTION_SEVERITY_LABELS[interaction?.severity] || { label:interaction?.severity, color:'#888' };
                 const aName = resolveSubName(interaction?.substanceA);
@@ -1320,7 +1343,8 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
                   </div>
                 );
               }, i))}
-              {conflicts.length === 0 && <div style={{ padding:12, textAlign:'center', color:'var(--text-dim)', fontSize:10 }}>Нет конфликтов</div>}
+              {confTotal === 0 && <div style={{ padding:12, textAlign:'center', color:'var(--text-dim)', fontSize:10 }}>Нет конфликтов</div>}
+              {confPage.length < confTotal && <button onClick={() => setSynergyPage(p => p + 1)} style={{ width:'100%', padding:'8px', marginTop:4, borderRadius:8, border:'1px solid var(--border)', background:'var(--bg-secondary)', color:'var(--text-dim)', fontSize:10, cursor:'pointer' }}>Показать ещё ({confTotal - confPage.length} из {confTotal})</button>}
             </div>
           )}
         </div>
@@ -1408,7 +1432,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
           {/* Pills */}
           <div style={{ display:'flex', gap:4, marginBottom:8, overflowX:'auto', scrollbarWidth:'none', flexShrink:0 }}>
             {(['catalog','synergies','stacks','interactions','stackcalc'] as const).map(t => (
-              <button key={t} onClick={() => setInfoView(t)} style={{
+              <button key={t} onClick={() => { setInfoView(t); setSynergyPage(1); }} style={{
                 padding:'7px 14px', borderRadius:20, fontSize:10, fontWeight:700, whiteSpace:'nowrap', cursor:'pointer', flexShrink:0,
                 background: infoView === t ? 'var(--accent)' : 'var(--bg-secondary)',
                 color: infoView === t ? '#000' : 'var(--text-dim)',
@@ -1500,7 +1524,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
               <div>
                 <div style={{ display:'flex', gap:4, marginBottom:8, overflowX:'auto', scrollbarWidth:'none', flexWrap:'wrap' }}>
                   {(['all','LOW','MEDIUM','HIGH'] as const).map(s => (
-                    <button key={s} onClick={() => setInteractionSeverityFilter(s)} style={{
+                    <button key={s} onClick={() => { setInteractionSeverityFilter(s); setSynergyPage(1); }} style={{
                       padding:'4px 8px', borderRadius:10, fontSize:8, fontWeight:600, whiteSpace:'nowrap', cursor:'pointer', flexShrink:0,
                       background: interactionSeverityFilter === s ? (INTERACTION_SEVERITY_LABELS[s]?.color || 'var(--accent)') : 'transparent',
                       color: interactionSeverityFilter === s ? '#000' : 'var(--text-dim)',
@@ -1509,7 +1533,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
                   ))}
                   <div style={{ fontSize:9, color:'var(--text-dim)', display:'flex', alignItems:'center', marginLeft:2, whiteSpace:'nowrap' }}>{filteredInteractions.length} из {mergedInteractions.length}</div>
                 </div>
-                {synergiesContent(filteredInteractions, mergedInteractions, expandedCategories)}
+                 <div style={{ maxHeight:'calc(70vh)', overflowY:'auto', paddingRight:4 }}>{synergiesContent(filteredInteractions, mergedInteractions, expandedCategories)}</div>
               </div>
             )}
             {renderView(infoView, 'stacks', () =>
@@ -2031,7 +2055,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
         <div>
           <div style={{ display: 'flex', gap: 6, marginBottom: 10, overflowX: 'auto', scrollbarWidth: 'none', flexWrap: 'wrap' }}>
             {(['all', 'synergy', 'conflict', 'caution'] as const).map(t => (
-              <button key={t} onClick={() => setInteractionTypeFilter(t)} style={{
+              <button key={t} onClick={() => { setInteractionTypeFilter(t); setInteractionPage(1); setSynergyPage(1); }} style={{
                 padding: '5px 12px', borderRadius: 16, fontSize: 10, fontWeight: 700, whiteSpace: 'nowrap', cursor: 'pointer', flexShrink: 0,
                 background: interactionTypeFilter === t ? (INTERACTION_TYPE_LABELS[t]?.color || 'var(--accent)') : 'var(--bg-secondary)',
                 color: interactionTypeFilter === t ? '#000' : 'var(--text-dim)',
@@ -2042,7 +2066,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
             ))}
             <span style={{ width: 1, height: 20, background: 'var(--border)', margin: '0 2px' }} />
             {(['all', 'LOW', 'MEDIUM', 'HIGH'] as const).map(s => (
-              <button key={s} onClick={() => setInteractionSeverityFilter(s)} style={{
+              <button key={s} onClick={() => { setInteractionSeverityFilter(s); setSynergyPage(1); setInteractionPage(1); }} style={{
                 padding: '5px 10px', borderRadius: 12, fontSize: 9, fontWeight: 600, whiteSpace: 'nowrap', cursor: 'pointer', flexShrink: 0,
                 background: interactionSeverityFilter === s ? (INTERACTION_SEVERITY_LABELS[s]?.color || 'var(--accent)') : 'transparent',
                 color: interactionSeverityFilter === s ? '#000' : 'var(--text-dim)',
@@ -2056,7 +2080,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
             </div>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 5, maxHeight: '65vh', overflowY: 'auto', paddingRight: 2 }}>
-            {filteredInteractions.map((interaction, i) => {
+            {filteredInteractions.slice(0, interactionPage * INTERACTION_PAGE_SIZE).map((interaction, i) => {
               const typeInfo = INTERACTION_TYPE_LABELS[interaction.type] || { label: interaction.type, emoji: '🔗', color: '#888' };
               const sevInfo = INTERACTION_SEVERITY_LABELS[interaction.severity] || { label: interaction.severity, color: '#888' };
               const aName = resolveSubName(interaction.substanceA);
@@ -2103,6 +2127,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
                   </div>
               );
             })}
+            {filteredInteractions.length > interactionPage * INTERACTION_PAGE_SIZE && <button onClick={() => setInteractionPage(p => p + 1)} style={{ width:'100%', padding:'8px', marginTop:4, borderRadius:8, border:'1px solid var(--border)', background:'var(--bg-secondary)', color:'var(--text-dim)', fontSize:10, cursor:'pointer' }}>Показать ещё ({filteredInteractions.length - interactionPage * INTERACTION_PAGE_SIZE} из {filteredInteractions.length})</button>}
             {filteredInteractions.length === 0 && (
               <div style={{ padding: 30, textAlign: 'center', color: 'var(--text-dim)', fontSize: 12 }}>
                 Нет взаимодействий по выбранным фильтрам
