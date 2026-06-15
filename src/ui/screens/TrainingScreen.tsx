@@ -1,9 +1,9 @@
 ﻿import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { EXERCISE_CATALOG } from '../../core/exercise-catalog';
 import { calcTraining, calcExercisePrescription, EXERCISE_DB } from '../../engines/training.engine';
-import { generateMacrocycle, getCurrentWeekPlan, MESOCYCLE_PARAMS, type MacrocyclePlan, type Microcycle, type MacrocycleInput } from '../../engines/training-periodization.engine';
+import { generateMacrocycle, getCurrentWeekPlan, type MacrocyclePlan, type Microcycle, type MacrocycleInput } from '../../engines/training-periodization.engine';
 import { selectSplit, getSplitOptions, type SplitCandidate } from '../../engines/split-selector.engine';
-import { selectProgressionRule, calcSuggestedWeight, estimate1RM, getDeloadRecommendation } from '../../engines/progression.engine';
+import { selectProgressionRule } from '../../engines/progression.engine';
 import { RIR_MATRIX, generateWeeklyPlan } from '../../engines/rir-matrix.engine';
 import { StrengthDiary, type StrengthStats, type WeeklyProgress, type ProgressionAlert } from '../../engines/strength-diary.engine';
 import type { WorkoutLog } from '../../core/types';
@@ -11,13 +11,11 @@ import { generateWarmup } from '../../engines/warmup.engine';
 import { generateCooldown } from '../../engines/cooldown.engine';
 import { selectSetScheme } from '../../engines/set-scheme.engine';
 import { selectTempo, formatTempo } from '../../engines/tempo.engine';
-import { findSubstitute } from '../../engines/exercise-substitution.engine';
 import { useDataLink } from '../../core/data-link';
 import type { TrainingInput, TrainingOutput, Exercise, MovementPattern } from '../../core/types';
 import { computeAnalytics, type AnalyticsSnapshot, type WeeklyBreakdown } from '../../engines/analytics-engine';
 import { computeConstraints } from '../../engines/training-constraints.engine';
 import { generatePeriodization, getPhaseParams } from '../../engines/cycle-periodization.engine';
-import { selectBestProgram } from '../../engines/consolidated-engines';
 import { getTrainingMethods, getMethodsByCategory, getVolumeReferences, getVolumeByMuscle, getSplitVisuals } from '../../engines/training-methodology.engine';
 import { buildVisualDashboard, computeWeeklyChart, computeMuscleVolume, computeProgression, type VizSessionData } from '../../engines/training-visualization.engine';
 import { getProgramById, getProgramsByGoal, FULL_PROGRAM_LIBRARY } from '../../engines/complete-program-library.engine';
@@ -92,7 +90,7 @@ export const TrainingScreen: React.FC = () => {
   const [bodyWeight, setBodyWeight] = useState(80);
   const [sleepHours, setSleepHours] = useState(linked.profile?.settings?.baselineSleepHours ?? 7);
   const [stressLevel, setStressLevel] = useState(linked.profile?.settings?.baselineStressLevel ?? 5);
-  const [customExercises, setCustomExercises] = useState<{ name: string; sets: number; reps: number; rir: number }[]>([]);
+  const [customExercises, setCustomExercises] = useState<{ name: string; sets: number; reps: number; rir: number }[]>(() => { try { return JSON.parse(localStorage.getItem('myTrainingExercises') || '[]'); } catch { return []; } });
   const [trainingOutput, setTrainingOutput] = useState<TrainingOutput | null>(null);
   const [macrocycle, setMacrocycle] = useState<MacrocyclePlan | null>(null);
   const [selectedWeek, setSelectedWeek] = useState(1);
@@ -164,11 +162,11 @@ export const TrainingScreen: React.FC = () => {
   const [runtimeSetRP, setRuntimeSetRP] = useState(7);
   const [runtimeSetRI, setRuntimeSetRI] = useState(2);
 
-  const generatePlan = useCallback(() => {
+  const generatePlan = useCallback((overrideSplitType?: string) => {
     const input: TrainingInput = {
       goal, level, daysPerWeek, recovery, fatigue, nutrition: 7,
       weakPoints, sessionDuration: 60, exercises: [],
-      splitType,
+      splitType: overrideSplitType || splitType,
     };
     const output = calcTraining(input);
     setTrainingOutput(output);
@@ -188,7 +186,7 @@ export const TrainingScreen: React.FC = () => {
     setMacrocycle(macro);
     setSelectedWeek(1);
     setCurrentMicrocycle(getCurrentWeekPlan(macro, 1));
-  }, [goal, level, daysPerWeek, recovery, fatigue, weakPoints]);
+  }, [goal, level, daysPerWeek, recovery, fatigue, weakPoints, splitType]);
 
   // Auto-regenerate when days/sparse
   const loadDiaryStats = async () => {
@@ -207,6 +205,7 @@ export const TrainingScreen: React.FC = () => {
   const prevDays = useRef(daysPerWeek);
   useEffect(() => { loadDiaryStats(); }, []);
   useEffect(() => { if (prevDays.current !== daysPerWeek) { prevDays.current = daysPerWeek; generatePlan(); } }, [daysPerWeek]);
+  useEffect(() => { localStorage.setItem('myTrainingExercises', JSON.stringify(customExercises)); }, [customExercises]);
 
   useEffect(() => {
     if (macrocycle && selectedWeek > 0) {
@@ -481,7 +480,7 @@ export const TrainingScreen: React.FC = () => {
               </button>
               {showSplitPicker && (
                 <div style={{ marginTop: 4, display: 'flex', flexDirection: 'column', gap: 3, maxHeight: 220, overflowY: 'auto', background: 'var(--bg-secondary)', borderRadius: 8, padding: '4px 6px', border: '1px solid var(--border)' }}>
-                  <div key="auto" onClick={() => { setSplitType('auto'); setShowSplitPicker(false); }} style={{
+                  <div key="auto" onClick={() => { setSplitType('auto'); setShowSplitPicker(false); setTimeout(() => generatePlan(), 50); }} style={{
                     padding: '5px 8px', borderRadius: 6, cursor: 'pointer', fontSize: 11,
                     background: splitType === 'auto' ? 'rgba(0,230,138,0.1)' : 'transparent',
                     border: splitType === 'auto' ? '1px solid var(--accent)' : '1px solid transparent',
@@ -489,8 +488,8 @@ export const TrainingScreen: React.FC = () => {
                     <div style={{ fontWeight: 600 }}>🤖 Авто-выбор</div>
                     <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Движок сам подберёт оптимальный сплит</div>
                   </div>
-                  {splitCandidates.map(c => (
-                    <div key={c.id || c.name} onClick={() => { setSplitType(c.id || c.name); setShowSplitPicker(false); }} style={{
+                   {splitCandidates.map(c => (
+                     <div key={c.id || c.name} onClick={() => { const newType = c.id || c.name; setSplitType(newType); setShowSplitPicker(false); setTimeout(() => generatePlan(newType), 50); }} style={{
                       padding: '5px 8px', borderRadius: 6, cursor: 'pointer', fontSize: 11,
                       background: splitType === (c.id || c.name) ? 'rgba(0,230,138,0.1)' : 'transparent',
                       border: splitType === (c.id || c.name) ? '1px solid var(--accent)' : '1px solid transparent',
@@ -590,7 +589,7 @@ export const TrainingScreen: React.FC = () => {
                 })}
               </div>
             </div>
-            <button onClick={generatePlan} style={{
+            <button onClick={() => generatePlan()} style={{
               width: '100%', padding: 10, borderRadius: 8, border: 'none', cursor: 'pointer',
               background: 'linear-gradient(135deg, #00e68a, #00c853)', color: '#000', fontWeight: 700, fontSize: 13,
             }}>▶ Сгенерировать план</button>
@@ -612,7 +611,7 @@ export const TrainingScreen: React.FC = () => {
                 });
                 if (constraints.recommendations.length === 0) return null;
                 return (
-                  <div className="card" style={{
+                  <div key="constraints" className="card" style={{
                     marginBottom: 8, padding: '6px 10px',
                     background: 'rgba(249,115,22,0.06)', borderLeft: '3px solid #f97316',
                   }}>
@@ -636,7 +635,7 @@ export const TrainingScreen: React.FC = () => {
                 if (recovery > 8 && fatigue < 3) tips.push({ icon: '✅', text: 'Готовность высокая: можно добавить один качественный подход в приоритетную группу.', color: '#22c55e' });
                 if (tips.length === 0) tips.push({ icon: '✅', text: 'Параметры выглядят сбалансированно: выполняйте план без лишних изменений.', color: '#00e68a' });
                 return (
-                  <div className="card" style={{ padding: '10px 12px', border: '1px solid rgba(0,230,138,0.2)' }}>
+                  <div key="recommendations" className="card" style={{ padding: '10px 12px', border: '1px solid rgba(0,230,138,0.2)' }}>
                     <h4 style={{ margin: '0 0 6px', fontSize: 12, color: 'var(--accent)' }}>💡 Рекомендации</h4>
                     {tips.map((t, i) => (
                       <div key={i} style={{ fontSize: 10, color: 'var(--text-dim)', padding: '2px 0', display: 'flex', gap: 6, alignItems: 'flex-start' }}>
@@ -696,7 +695,7 @@ export const TrainingScreen: React.FC = () => {
                 };
                 const warmup = generateWarmup(wuInput);
                 return (
-                  <div className="card" style={{ padding: '8px 10px', border: '1px solid rgba(255,145,0,0.2)' }}>
+                  <div key="warmup" className="card" style={{ padding: '8px 10px', border: '1px solid rgba(255,145,0,0.2)' }}>
                     <div style={{ fontWeight: 600, fontSize: 12, color: '#ff9100', marginBottom: 4 }}>🔥 Разминка</div>
                     {warmup.map((b, bi) => (
                       <div key={bi} style={{ fontSize: 10, marginBottom: 2, color: 'var(--text-dim)' }}>
@@ -869,7 +868,7 @@ export const TrainingScreen: React.FC = () => {
                     const totalMin = days.reduce((s: number, d: any) => s + (d.duration || 0), 0);
                     const density = totalMin > 0 ? Math.round(totalTonnage / totalMin) : 0;
                     return (
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr 1fr', gap: 4, fontSize: 10 }}>
+                      <div key="week-summary" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr 1fr', gap: 4, fontSize: 10 }}>
                         <div style={{ textAlign: 'center', padding: '4px', background: 'rgba(0,230,138,0.05)', borderRadius: 4 }}>
                           <div style={{ color: 'var(--text-dim)' }}>Дней</div>
                           <div style={{ fontWeight: 700, color: 'var(--accent)' }}>{days.length}</div>
@@ -931,7 +930,7 @@ export const TrainingScreen: React.FC = () => {
                 };
                 const cooldown = generateCooldown(cdInput);
                 return (
-                  <div className="card" style={{ padding: '8px 10px', border: '1px solid rgba(59,130,246,0.2)' }}>
+                  <div key="cooldown" className="card" style={{ padding: '8px 10px', border: '1px solid rgba(59,130,246,0.2)' }}>
                     <div style={{ fontWeight: 600, fontSize: 12, color: '#3b82f6', marginBottom: 4 }}>🧊 Заминка</div>
                     {cooldown.map((b, bi) => (
                       <div key={bi} style={{ fontSize: 10, marginBottom: 2, color: 'var(--text-dim)' }}>
@@ -976,7 +975,7 @@ export const TrainingScreen: React.FC = () => {
                     const end = reps.filter(r => r >= 13).length;
                     const total = reps.length || 1;
                     return (
-                      <div>
+                      <div key="intensity-zones">
                         <div style={{ display: 'flex', gap: 2, height: 18, borderRadius: 6, overflow: 'hidden', marginBottom: 4 }}>
                           <div style={{ flex: str || 0.1, background: '#ef4444', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 8, color: '#fff', fontWeight: 600, minWidth: str > 0 ? 20 : 0 }}>
                             {str > 0 ? `${Math.round((str/total)*100)}%` : ''}
@@ -1017,7 +1016,7 @@ export const TrainingScreen: React.FC = () => {
                 const ratio = pullVol > 0 ? (pushVol / pullVol).toFixed(1) : '—';
                 const balanced = parseFloat(ratio as string) >= 0.8 && parseFloat(ratio as string) <= 1.2;
                 return (
-                  <div className="card" style={{ padding: '8px 10px', border: '1px solid rgba(139,92,246,0.2)' }}>
+                  <div key="strength-balance" className="card" style={{ padding: '8px 10px', border: '1px solid rgba(139,92,246,0.2)' }}>
                     <div style={{ fontWeight: 600, fontSize: 11, color: '#8b5cf6', marginBottom: 4 }}>⚖️ Баланс нагрузки</div>
                     <div style={{ display: 'flex', gap: 8, fontSize: 10, color: 'var(--text-dim)' }}>
                       <span>Push/Pull: <b style={{ color: balanced ? '#22c55e' : '#ff9100' }}>{ratio}</b> {balanced ? '✓' : '⚠'}</span>
@@ -1034,7 +1033,7 @@ export const TrainingScreen: React.FC = () => {
                 const riskLabel = riskScore >= 5 ? '🚨 Высокий риск перегрузки' : riskScore >= 3 ? '⚠️ Умеренный риск' : riskScore >= 1 ? '⚡ Повышенная нагрузка' : '';
                 if (!riskLabel) return null;
                 return (
-                  <div className="card" style={{ padding: '6px 10px', border: `1px solid ${riskScore >= 5 ? 'rgba(239,68,68,0.3)' : 'rgba(255,145,0,0.3)'}`, background: riskScore >= 5 ? 'rgba(239,68,68,0.05)' : 'rgba(255,145,0,0.05)' }}>
+                  <div key="overtraining-risk" className="card" style={{ padding: '6px 10px', border: `1px solid ${riskScore >= 5 ? 'rgba(239,68,68,0.3)' : 'rgba(255,145,0,0.3)'}`, background: riskScore >= 5 ? 'rgba(239,68,68,0.05)' : 'rgba(255,145,0,0.05)' }}>
                     <div style={{ fontSize: 10, color: riskScore >= 5 ? '#ef4444' : '#ff9100', fontWeight: 600 }}>
                       {riskLabel} — {riskScore >= 5 ? 'снизьте объём и добавьте отдых' : riskScore >= 3 ? 'контролируйте сон, стресс и RPE' : 'следите за восстановлением'}
                     </div>
@@ -1489,7 +1488,7 @@ export const TrainingScreen: React.FC = () => {
                   <span style={{ fontWeight: 600, color: '#ff9100' }}>💡 </span>{selectedEx.comments}
                 </div>
               )}
-              {(() => { const bio = getExerciseBio(selectedEx.id); if (!bio) return null; const js = bio.jointStress; const strs = Object.entries(js||{}).map(([k,v])=>`${k} ${v}/10`); return <div style={{ marginBottom: 6, background: 'rgba(59,130,246,0.05)', borderRadius: 6, padding: '5px 8px', fontSize: 9 }}>
+              {(() => { const bio = getExerciseBio(selectedEx.id); if (!bio) return null; const js = bio.jointStress; const strs = Object.entries(js||{}).map(([k,v])=>`${k} ${v}/10`); return <div key="exercise-bio" style={{ marginBottom: 6, background: 'rgba(59,130,246,0.05)', borderRadius: 6, padding: '5px 8px', fontSize: 9 }}>
                 <span style={{ fontWeight: 600, color: '#3b82f6' }}>🔬 Биомеханика:</span> Суставы: {strs.join(', ')} | Сложность: {bio.difficulty}/10 | ЦНС: {bio.cnsDemand || 5}/10
               </div>; })()}
               {selectedEx.canReplace && selectedEx.canReplace.length > 0 && (
@@ -2077,7 +2076,7 @@ export const TrainingScreen: React.FC = () => {
                 }}>{g.icon} {g.label}</button>
               ))}
             </div>
-            <button onClick={generatePlan} style={{
+            <button onClick={() => generatePlan()} style={{
               width: '100%', padding: 8, borderRadius: 8, border: 'none', cursor: 'pointer',
               background: 'var(--accent)', color: '#000', fontWeight: 600, fontSize: 12,
             }}>▶ Сгенерировать макроцикл</button>
@@ -2169,20 +2168,26 @@ export const TrainingScreen: React.FC = () => {
 
               <div className="card" style={{ padding: '10px 12px' }}>
                 <h4 style={{ margin: '0 0 6px', fontSize: 12 }}>📊 Параметры фаз</h4>
-                {(['accumulation', 'intensification', 'peaking', 'deload'] as const).map(phase => {
-                  const params = MESOCYCLE_PARAMS[phase];
-                  if (!params) return null;
+                {macrocycle?.mesocycles?.map((mc, mi) => {
+                  const firstMicro = mc.microcycles?.[0];
+                  const vol = firstMicro?.volumeMultiplier || 1;
+                  const rirLo = firstMicro?.rirRange?.[0] ?? 1;
+                  const rirHi = firstMicro?.rirRange?.[1] ?? 3;
+                  const rpe = firstMicro?.rpeTarget || 7;
                   return (
-                    <div key={phase} style={{ marginBottom: 4, padding: '4px 6px', background: 'var(--bg-secondary)', borderRadius: 4, fontSize: 10 }}>
+                    <div key={mi} style={{ marginBottom: 4, padding: '4px 6px', background: 'var(--bg-secondary)', borderRadius: 4, fontSize: 10 }}>
                       <span style={{ fontWeight: 600 }}>
-                        {PHASE_LABELS[phase] || 'Разгрузка'}
+                        {PHASE_LABELS[mc.type] || mc.type || 'Фаза'} — Мезо {mi + 1}
                       </span>
                       <span style={{ color: 'var(--text-dim)', marginLeft: 6 }}>
-                        Объём: {params.volumeMultiplier}× | RIR: {params.rirRange[0]}-{params.rirRange[1]} | RPE: {params.rpeTarget}
+                        Объём: {vol}× | RIR: {rirLo}-{rirHi} | RPE: {rpe} | {mc.weeks} нед
                       </span>
                     </div>
                   );
                 })}
+                {!macrocycle && (
+                  <div style={{ fontSize: 9, color: 'var(--text-dim)', textAlign: 'center', padding: 8 }}>Сгенерируйте макроцикл для отображения параметров</div>
+                )}
               </div>
             </>
           )}
@@ -2199,7 +2204,7 @@ export const TrainingScreen: React.FC = () => {
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                {diaryProgress.sort((a, b) => b.week - a.week).map((w, wi) => (
+                {[...diaryProgress].sort((a, b) => b.week - a.week).map((w, wi) => (
                   <div key={wi} style={{
                     background: 'var(--bg-secondary)', borderRadius: 8, padding: '8px 10px',
                     border: historyExpanded === `w${wi}` ? '1px solid var(--accent)' : '1px solid transparent',
@@ -2212,7 +2217,7 @@ export const TrainingScreen: React.FC = () => {
                       </div>
                       <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
                         {(() => {
-                          const sorted = diaryProgress.sort((a, b) => b.week - a.week);
+                          const sorted = [...diaryProgress].sort((a, b) => b.week - a.week);
                           const prev = sorted[wi + 1];
                           const delta = prev ? Math.round((w.totalVolume - prev.totalVolume) / Math.max(1, prev.totalVolume) * 100) : 0;
                           const arrow = prev ? (delta > 5 ? '↑' : delta < -5 ? '↓' : '→') : '';
@@ -2269,7 +2274,7 @@ export const TrainingScreen: React.FC = () => {
       {/* ═══════════ MY TRAINING TAB ═══════════ */}
       {tab === 'mytraining' && (
         <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-          <MyTrainingTab customExercises={customExercises} setCustomExercises={setCustomExercises} />
+          <MyTrainingTab customExercises={customExercises} setCustomExercises={setCustomExercises} goal={goal} level={level} daysPerWeek={daysPerWeek} mesoLength={mesoLength} />
         </div>
       )}
     </div>
@@ -2278,7 +2283,7 @@ export const TrainingScreen: React.FC = () => {
   );
 };
 
-const MyTrainingTab: React.FC<{ customExercises: { name: string; sets: number; reps: number; rir: number }[]; setCustomExercises: React.Dispatch<React.SetStateAction<{ name: string; sets: number; reps: number; rir: number }[]>> }> = ({ customExercises, setCustomExercises }) => {
+const MyTrainingTab: React.FC<{ customExercises: { name: string; sets: number; reps: number; rir: number }[]; setCustomExercises: React.Dispatch<React.SetStateAction<{ name: string; sets: number; reps: number; rir: number }[]>>; goal?: string; level?: string; daysPerWeek?: number; mesoLength?: number }> = ({ customExercises, setCustomExercises, goal = 'bulk', level = 'intermediate', daysPerWeek = 4, mesoLength = 6 }) => {
   const [newExName, setNewExName] = useState('');
   const [newExSets, setNewExSets] = useState(3);
   const [newExReps, setNewExReps] = useState(10);
@@ -2315,7 +2320,7 @@ const MyTrainingTab: React.FC<{ customExercises: { name: string; sets: number; r
   };
 
   const saveCycle = () => {
-    const cycle = { id: 'cycle_' + Date.now(), name: cycleName || 'Цикл ' + new Date().toLocaleDateString('ru'), date: new Date().toISOString(), weeks: 6, goal: 'bulk', level: 'intermediate', days: 4 };
+    const cycle = { id: 'cycle_' + Date.now(), name: cycleName || 'Цикл ' + new Date().toLocaleDateString('ru'), date: new Date().toISOString(), weeks: mesoLength, goal, level, days: daysPerWeek };
     const updated = [...savedCycles, cycle];
     setSavedCycles(updated);
     localStorage.setItem('myTrainingCycles', JSON.stringify(updated));
