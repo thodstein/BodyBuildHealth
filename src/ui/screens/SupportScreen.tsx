@@ -1332,36 +1332,35 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
       {/* ===== MAIN HERO ===== */}
       {tab === 'main' && supportView === 'main' && (
         <div style={{ position:'fixed', inset:0, zIndex:100, display:'flex', flexDirection:'column' }}>
-          <img src="/hero-main.png" alt="" style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'cover', objectPosition:'center top' }} />
-          <div style={{ position:'absolute', inset:0, background:'linear-gradient(transparent 40%, rgba(0,0,0,0.7) 75%, rgba(0,0,0,0.95))' }} />
-          <div style={{ position:'relative', zIndex:2, flex:1, display:'flex', flexDirection:'column', justifyContent:'flex-end', padding:'48px 16px 24px' }}>
-            <h1 style={{ fontSize:26, fontWeight:800, color:'#fff', margin:'0 0 4px', textShadow:'0 2px 16px rgba(0,0,0,0.95)', letterSpacing:'-0.5px' }}>Body Build Health</h1>
-            <p style={{ fontSize:12, color:'rgba(255,255,255,0.75)', margin:'0 0 24px', lineHeight:1.4, textShadow:'0 1px 8px rgba(0,0,0,0.8)', maxWidth:280 }}>
-              Фармакологическая поддержка, пептиды, анализы и персональные рекомендации
+          <img src="/support-hero.jpg" alt="" style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'cover', objectPosition:'center top' }} />
+          <div style={{ position:'absolute', inset:0, background:'linear-gradient(transparent 50%, rgba(0,0,0,0.85))' }} />
+          <div style={{ position:'relative', zIndex:2, flex:1, display:'flex', flexDirection:'column', justifyContent:'flex-end', padding:'16px 16px 80px' }}>
+            <h1 style={{ fontSize:22, fontWeight:800, color:'#fff', margin:'0 0 2px', textShadow:'0 2px 14px rgba(0,0,0,0.9)' }}>Поддержка</h1>
+            <p style={{ fontSize:11, color:'rgba(255,255,255,0.9)', margin:'0 0 16px', lineHeight:1.3, textShadow:'0 1px 8px rgba(0,0,0,0.8)' }}>
+              Фармакологическая поддержка, пептиды и предлагаемые препараты поддержки для уменьшения рисков
             </p>
-            {/* Apple-style square cards in a row */}
-            <div style={{ display:'flex', gap:12, justifyContent:'center' }}>
+            <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
               <div onClick={() => setSupportView('calc')} style={{
-                width:'48%', aspectRatio:'1', borderRadius:20, cursor:'pointer',
-                background:'rgba(255,255,255,0.08)', backdropFilter:'blur(20px)',
-                border:'1px solid rgba(255,255,255,0.12)',
-                display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center',
-                gap:8, padding:16, transition:'all 0.2s',
+                display:'flex', alignItems:'center', gap:12, padding:'12px 14px', borderRadius:14, cursor:'pointer', textAlign:'left', width:'100%',
+                background:'rgba(20,22,30,0.35)', border:'1px solid var(--glass-border)', color:'var(--text)', transition:'all 0.2s',
               }}>
-                <div style={{ width:44, height:44, borderRadius:14, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(0,230,138,0.15)', fontSize:22 }}>🧮</div>
-                <div style={{ fontSize:12, fontWeight:700, color:'#fff', textAlign:'center' }}>Поддержка</div>
-                <div style={{ fontSize:9, color:'rgba(255,255,255,0.5)', textAlign:'center', lineHeight:1.3 }}>Каталог, стеки, синергии</div>
+                <div style={{ width:40, height:40, borderRadius:12, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, background:'rgba(0,230,138,0.1)', fontSize:20 }}>🧮</div>
+                <div style={{ flex:1 }}>
+                  <div style={{ fontSize:13, fontWeight:700, marginBottom:2, color:'var(--accent)' }}>Расчет поддержки</div>
+                  <div style={{ fontSize:10, color:'rgba(255,255,255,0.85)', lineHeight:1.3 }}>Калькулятор поддержки, пептидный калькулятор, каталог, синергии и готовые стеки</div>
+                </div>
+                <span style={{ color:'var(--accent)', fontSize:16, opacity:0.6 }}>→</span>
               </div>
               <div onClick={() => setSupportView('fertility')} style={{
-                width:'48%', aspectRatio:'1', borderRadius:20, cursor:'pointer',
-                background:'rgba(255,255,255,0.08)', backdropFilter:'blur(20px)',
-                border:'1px solid rgba(255,255,255,0.12)',
-                display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center',
-                gap:8, padding:16, transition:'all 0.2s',
+                display:'flex', alignItems:'center', gap:12, padding:'12px 14px', borderRadius:14, cursor:'pointer', textAlign:'left', width:'100%',
+                background:'rgba(20,22,30,0.35)', border:'1px solid var(--glass-border)', color:'var(--text)', transition:'all 0.2s',
               }}>
-                <div style={{ width:44, height:44, borderRadius:14, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(139,92,246,0.15)', fontSize:22 }}>🧬</div>
-                <div style={{ fontSize:12, fontWeight:700, color:'#fff', textAlign:'center' }}>ПКТ / Фертильность</div>
-                <div style={{ fontSize:9, color:'rgba(255,255,255,0.5)', textAlign:'center', lineHeight:1.3 }}>Анализы, протоколы, таймер</div>
+                <div style={{ width:40, height:40, borderRadius:12, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, background:'rgba(139,92,246,0.1)', fontSize:20 }}>🧬</div>
+                <div style={{ flex:1 }}>
+                  <div style={{ fontSize:13, fontWeight:700, marginBottom:2, color:'#8b5cf6' }}>ПКТ и Фертильность</div>
+                  <div style={{ fontSize:10, color:'rgba(255,255,255,0.85)', lineHeight:1.3 }}>Анализы, план ПКТ и восстановление фертильности</div>
+                </div>
+                <span style={{ color:'#8b5cf6', fontSize:16, opacity:0.6 }}>→</span>
               </div>
             </div>
           </div>
