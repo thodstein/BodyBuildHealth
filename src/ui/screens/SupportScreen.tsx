@@ -1391,7 +1391,9 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
           </div>
           {/* Content */}
           <div style={{ flex:1, overflowY:'auto', paddingRight:4 }}>
-            <div style={{fontSize:7,color:'rgba(255,255,255,0.15)',textAlign:'right',marginBottom:2}}>v{new Date().toISOString().slice(0,10)}</div>
+            <div style={{fontSize:7,color:'rgba(255,255,255,0.2)',textAlign:'center',marginBottom:4}}>
+              build:2026-06-15 | subs:{ALL_SUBSTANCES.length} | int:{ALL_INTERACTIONS.length} | stacks:{ALL_STACKS.length} | tab:{calcView}/{infoView}
+            </div>
             {renderView(infoView, 'catalog', () =>
               <div>
                 <div style={{ display:'flex', gap:6, marginBottom:8, alignItems:'center' }}>
@@ -1470,10 +1472,14 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
             {renderView(infoView, 'synergies', () =>
               <div>
                 <div style={{ display:'flex', gap:4, marginBottom:8, overflowX:'auto', scrollbarWidth:'none', flexWrap:'wrap' }}>
-                  <button onClick={() => setInteractionSeverityFilter('all')} style={{padding:'4px 8px',borderRadius:10,fontSize:8,fontWeight:600,whiteSpace:'nowrap',cursor:'pointer',flexShrink:0,background:interactionSeverityFilter==='all'?'var(--accent)':'transparent',color:interactionSeverityFilter==='all'?'#000':'var(--text-dim)',border:`1px solid ${interactionSeverityFilter==='all'?'var(--accent)':'var(--border)'}`}}>♾️ Все</button>
-                  <button onClick={() => setInteractionSeverityFilter('LOW')} style={{padding:'4px 8px',borderRadius:10,fontSize:8,fontWeight:600,whiteSpace:'nowrap',cursor:'pointer',flexShrink:0,background:interactionSeverityFilter==='LOW'?'#84cc16':'transparent',color:interactionSeverityFilter==='LOW'?'#000':'var(--text-dim)',border:`1px solid ${interactionSeverityFilter==='LOW'?'#84cc16':'var(--border)'}`}}>Низкая</button>
-                  <button onClick={() => setInteractionSeverityFilter('MEDIUM')} style={{padding:'4px 8px',borderRadius:10,fontSize:8,fontWeight:600,whiteSpace:'nowrap',cursor:'pointer',flexShrink:0,background:interactionSeverityFilter==='MEDIUM'?'#f59e0b':'transparent',color:interactionSeverityFilter==='MEDIUM'?'#000':'var(--text-dim)',border:`1px solid ${interactionSeverityFilter==='MEDIUM'?'#f59e0b':'var(--border)'}`}}>Средняя</button>
-                  <button onClick={() => setInteractionSeverityFilter('HIGH')} style={{padding:'4px 8px',borderRadius:10,fontSize:8,fontWeight:600,whiteSpace:'nowrap',cursor:'pointer',flexShrink:0,background:interactionSeverityFilter==='HIGH'?'#ef4444':'transparent',color:interactionSeverityFilter==='HIGH'?'#000':'var(--text-dim)',border:`1px solid ${interactionSeverityFilter==='HIGH'?'#ef4444':'var(--border)'}`}}>Высокая</button>
+                  {(['all','LOW','MEDIUM','HIGH'] as const).map(s => (
+                    <button key={s} onClick={() => setInteractionSeverityFilter(s)} style={{
+                      padding:'4px 8px', borderRadius:10, fontSize:8, fontWeight:600, whiteSpace:'nowrap', cursor:'pointer', flexShrink:0,
+                      background: interactionSeverityFilter === s ? (INTERACTION_SEVERITY_LABELS[s]?.color || 'var(--accent)') : 'transparent',
+                      color: interactionSeverityFilter === s ? '#000' : 'var(--text-dim)',
+                      border: `1px solid ${interactionSeverityFilter === s ? (INTERACTION_SEVERITY_LABELS[s]?.color || 'var(--accent)') : 'var(--border)'}`,
+                    }}>{s === 'all' ? '♾️ Все' : `${INTERACTION_SEVERITY_LABELS[s]?.label||s}`}</button>
+                  ))}
                   <div style={{ fontSize:9, color:'var(--text-dim)', display:'flex', alignItems:'center', marginLeft:2, whiteSpace:'nowrap' }}>{filteredInteractions.length} из {mergedInteractions.length}</div>
                 </div>
                 {synergiesContent(filteredInteractions, mergedInteractions, expandedCategories)}
@@ -1591,7 +1597,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
                       }}>{t === 'support' ? '💊 Поддержка' : '💉 Фарма'}</button>
                     ))}
                   </div>
-                  {interactTab === 'support' ? safeRender('calc_support', () => (
+                  {interactTab === 'support' ? (
                     <div>
                       <div style={{ display:'flex', flexDirection:'column', gap:6, marginBottom:8 }}>
                         {interactionIds.map((id, idx) => {
@@ -1669,7 +1675,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
                         </div>
                       )}
                     </div>
-                  )) : safeRender('calc_pharma', () => (
+                  ) : (
                     <div>
                       <div style={{ display:'flex', flexDirection:'column', gap:6, marginBottom:8 }}>
                         {(() => {
@@ -1722,9 +1728,8 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
                         })()}
                       </div>
                     </div>
-                  ))}
+            )}
             {renderView(infoView, 'stackcalc', () => {
-              if (!ALL_STACKS || ALL_STACKS.length === 0) return <div style={{padding:20,textAlign:'center',color:'#f87171',fontSize:10}}>⚠ База стеков не загружена</div>;
               const organList = [
                 {key:'cardio',label:'❤️ Сердце/Сосуды',eff:['cardio_support','electrolyte','hydration']},
                 {key:'liver',label:'🫁 Печень',eff:['liver_support','liver_detox','detox']},
