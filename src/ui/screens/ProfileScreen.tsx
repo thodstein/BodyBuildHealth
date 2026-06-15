@@ -8,7 +8,7 @@ import { computeLabIndices, interpretLabIndices } from '../../engines/labs-indic
 import { calculateIndices } from '../../engines/clinical-indices.engine';
 import { NAVY_BF_FORMULAS, MUSCLE_GROUPS_FULL, INJURY_LOCATIONS } from '../../core/constants';
 
-type ProfileTab = 'overview' | 'anthropometry' | 'sleep' | 'lifestyle' | 'diet' | 'nutrition_v7' | 'genetics' | 'injuries' | 'progress' | 'reports';
+type ProfileTab = 'overview' | 'anthropometry' | 'sleep' | 'lifestyle' | 'diet' | 'nutrition_v7' | 'genetics' | 'injuries' | 'progress' | 'reports' | 'friends';
 type ProfilePage = 'hero' | 'tabs';
 
 const GOALS = [
@@ -123,6 +123,80 @@ export const ProfileScreen: React.FC = () => {
   const [editInjury, setEditInjury] = useState<InjuryRecord | null>(null);
   const [weightLog, setWeightLog] = useState<WeightEntry[]>(getWeightLog);
 
+  interface TelegramFriend { id: string; name: string; username: string; avatar?: string; addedAt: string; }
+  const TELEGRAM_FRIENDS_KEY = 'telegramFriends';
+  const getFriends = (): TelegramFriend[] => { try { return JSON.parse(localStorage.getItem(TELEGRAM_FRIENDS_KEY) || '[]'); } catch { return []; } };
+  const [friends, setFriends] = useState<TelegramFriend[]>(getFriends);
+  const saveFriends = (f: TelegramFriend[]) => { localStorage.setItem(TELEGRAM_FRIENDS_KEY, JSON.stringify(f)); setFriends(f); };
+
+  const addFriend = () => {
+    const tg = (window as any).Telegram?.WebApp;
+    if (tg?.switchInlineQuery) {
+      tg.switchInlineQuery('bodybuildhealth_friend_add', ['users', 'groups']);
+    }
+    // Manual fallback: open inline query
+    try {
+      const name = prompt('Имя друга (если не через Telegram)');
+      if (!name || !name.trim()) return;
+      const username = prompt('Username (без @)') || 'user';
+      const newFriend: TelegramFriend = {
+        id: crypto.randomUUID(), name: name.trim(), username,
+        addedAt: new Date().toISOString().split('T')[0],
+      };
+      saveFriends([...friends, newFriend]);
+    } catch {}
+  };
+
+  const removeFriend = (id: string) => { saveFriends(friends.filter(f => f.id !== id)); };
+
+  const shareReport = () => {
+    const tg = (window as any).Telegram?.WebApp;
+    const s = s_;
+    const bmiVal = s.weight && s.height ? (s.weight / Math.pow(s.height / 100, 2)).toFixed(1) : '—';
+    const ffmiVal = (() => {
+      if (!s.weight || !s.height || !s.bodyFat) return '—';
+      const lbm = s.weight * (1 - s.bodyFat / 100);
+      return (lbm / Math.pow(s.height / 100, 2) + 6.1 * (1.8 - s.height / 100)).toFixed(1);
+    })();
+    const riskRaw = localStorage.getItem('he_last_risk');
+    const riskPct = riskRaw ? JSON.parse(riskRaw).overallNet || '—' : '—';
+    const supps = (s.currentSupplements || []).slice(0, 3).map((x: any) => x.name).join(', ') || 'нет';
+
+    const report = [
+      `📊 *Отчёт BodyBuildHealth*`,
+      `👤 ${profile.name || 'Пользователь'}`,
+      `⚖️ Вес: ${s.weight || '—'} кг | Рост: ${s.height || '—'} см`,
+      `📐 BMI: ${bmiVal} | FFMI: ${ffmiVal}`,
+      `🔥 Текущий риск: ${riskPct}%`,
+      `💊 Поддержка: ${supps}`,
+      `📅 ${new Date().toLocaleDateString('ru')}`,
+    ].join('\n');
+
+    if (tg?.sendData) {
+      tg.sendData(JSON.stringify({ type: 'share_report', report }));
+    } else if (tg?.openTelegramLink) {
+      tg.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent('https://body-build-health.vercel.app')}&text=${encodeURIComponent(report)}`);
+    } else {
+      // Fallback: copy to clipboard
+      navigator.clipboard?.writeText(report).then(() => alert('Отчёт скопирован в буфер обмена'));
+    }
+  };
+
+  const openTrainingForFriend = () => {
+    const tg = (window as any).Telegram?.WebApp;
+    const username = prompt('Username друга (без @)') || '';
+    if (!username.trim()) return;
+    const deepLink = `https://t.me/BodyBuildHealthBot?start=training_view_${username.trim()}`;
+    localStorage.setItem('he_shared_training_for', username.trim());
+    if (tg?.openTelegramLink) {
+      tg.openTelegramLink(deepLink);
+    } else if (tg?.openLink) {
+      tg.openLink(deepLink);
+    } else {
+      navigator.clipboard?.writeText(deepLink).then(() => alert('Ссылка скопирована в буфер'));
+    }
+  };
+
   const s_ = profile.settings;
   const readinessScores = calcReadiness({
     sleepHours: s_.baselineSleepHours ?? 7,
@@ -202,7 +276,7 @@ export const ProfileScreen: React.FC = () => {
     { id: 'overview', label: 'Обзор' }, { id: 'anthropometry', label: 'Антропометрия' },
     { id: 'sleep', label: 'Сон' }, { id: 'lifestyle', label: 'Образ жизни' },
     { id: 'diet', label: 'Питание' }, { id: 'injuries', label: 'Травмы' },
-    { id: 'progress', label: 'Прогресс' }, { id: 'reports', label: '📊 Отчёты' }
+    { id: 'progress', label: 'Прогресс' }, { id: 'friends', label: '👥 Друзья' }, { id: 'reports', label: '📊 Отчёты' }
   ];
 
   return (
@@ -221,6 +295,7 @@ export const ProfileScreen: React.FC = () => {
             <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
               {[
                 { id: 'overview', icon: '📋', title: 'Сведения о пользователе', desc: 'Обзор, антропометрия, сон, образ жизни, питание, травмы', color: '#00e68a' },
+                { id: 'friends', icon: '👥', title: 'Друзья и Telegram', desc: 'Управление друзьями, шаринг отчётов и тренировок', color: '#f59e0b' },
                 { id: 'reports', icon: '📊', title: 'Отчеты', desc: 'Прогресс и отчёты', color: '#3b82f6' },
                 { id: 'progress', icon: '📞', title: 'Контакты', desc: 'Сведения о разработчике, друзья, магазины, тренера и врачи', color: '#8b5cf6' },
               ].map(card => (
@@ -866,6 +941,87 @@ export const ProfileScreen: React.FC = () => {
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {tab === 'friends' && (
+        <div>
+          <div className="card" style={{ padding: 14, marginBottom: 12 }}>
+            <h3 style={{ margin: '0 0 8px 0', fontSize: 14 }}>👥 Друзья и Telegram</h3>
+            <p style={{ fontSize: 10, color: 'var(--text-dim)', margin: '0 0 12px 0', lineHeight: 1.4 }}>
+              Управление списком друзей, обмен отчётами и доступ к тренировкам через Telegram WebApp.
+            </p>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 12 }}>
+              <button onClick={addFriend} style={{
+                padding: '10px 8px', borderRadius: 14, cursor: 'pointer',
+                background: 'linear-gradient(135deg, #3b82f6, #6366f1)',
+                border: 'none', color: '#fff', fontWeight: 700, fontSize: 12,
+              }}>➕ Добавить друга</button>
+              <button onClick={shareReport} style={{
+                padding: '10px 8px', borderRadius: 14, cursor: 'pointer',
+                background: 'linear-gradient(135deg, #f59e0b, #f97316)',
+                border: 'none', color: '#000', fontWeight: 700, fontSize: 12,
+              }}>📤 Поделиться отчётом</button>
+            </div>
+
+            <button onClick={openTrainingForFriend} style={{
+              width: '100%', padding: '10px 8px', borderRadius: 14, cursor: 'pointer', marginBottom: 12,
+              background: 'linear-gradient(135deg, #8b5cf6, #a855f7)',
+              border: 'none', color: '#fff', fontWeight: 700, fontSize: 12,
+            }}>🏋️ Открыть тренировку другу</button>
+
+            {friends.length > 0 && (
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--accent)', marginBottom: 8 }}>
+                  Список друзей ({friends.length})
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {friends.map(f => (
+                    <div key={f.id} style={{
+                      display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 12,
+                      background: 'var(--bg-secondary)', border: '1px solid var(--border)',
+                    }}>
+                      <div style={{
+                        width: 36, height: 36, borderRadius: '50%', flexShrink: 0,
+                        background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        fontSize: 14, color: '#fff', fontWeight: 700,
+                      }}>
+                        {f.name.charAt(0).toUpperCase()}
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)' }}>{f.name}</div>
+                        <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>
+                          @{f.username} · {f.addedAt}
+                        </div>
+                      </div>
+                      <button onClick={() => removeFriend(f.id)} style={{
+                        padding: '4px 10px', borderRadius: 8, fontSize: 10, cursor: 'pointer',
+                        background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)',
+                        color: '#ef4444', fontWeight: 600,
+                      }}>Удалить</button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {friends.length === 0 && (
+              <div style={{ textAlign: 'center', padding: '20px 0', color: 'var(--text-dim)', fontSize: 11 }}>
+                Нет добавленных друзей. Нажмите «Добавить друга» чтобы начать.
+              </div>
+            )}
+          </div>
+
+          <div className="card" style={{ padding: 14 }}>
+            <h4 style={{ margin: '0 0 6px', fontSize: 12, color: 'var(--text-dim)' }}>💡 Быстрые действия</h4>
+            <div style={{ fontSize: 10, color: 'var(--text-dim)', lineHeight: 1.6 }}>
+              <div>• <b>Добавить друга</b> — открывает Telegram UserPicker для выбора контакта</div>
+              <div>• <b>Поделиться отчётом</b> — отправляет сводку профиля в чат</div>
+              <div>• <b>Открыть тренировку</b> — генерирует deep-link для доступа друга к программе</div>
+            </div>
+          </div>
         </div>
       )}
 

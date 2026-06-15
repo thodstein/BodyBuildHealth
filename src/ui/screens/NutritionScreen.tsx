@@ -17,7 +17,7 @@ import { NutritionDiary } from './NutritionScreen_parts/NutritionDiary';
 import { NutritionCharts } from './NutritionScreen_parts/NutritionCharts';
 import { NutritionMealGen } from './NutritionScreen_parts/NutritionMealGen';
 import { NutritionCustomFood } from './NutritionScreen_parts/NutritionCustomFood';
-import { generateRegimeAdvice, generateLabsBasedAdvice } from '../../engines/meal-tier-generator.engine';
+import { generateTierMealPlan, generateRegimeAdvice, generateLabsBasedAdvice, type MealTier, type MealPlanResult } from '../../engines/meal-tier-generator.engine';
 
 interface DiaryEntry {
   name: string;
@@ -119,7 +119,7 @@ export const NutritionScreen: React.FC = () => {
       case 'overview': return <><NutritionOverview profile={linked.profile} avgWeeklyKcal={avgWeeklyKcal} avgWeeklyProtein={avgWeeklyProtein} avgWeeklyFat={avgWeeklyFat} avgWeeklyCarbs={avgWeeklyCarbs} microsIntake={microsIntake} />{labAnalysis && <NutritionLabContext labAnalysis={labAnalysis} />}<QuickAdviceCard /></>;
       case 'diary': return <NutritionDiary foodEntries={foodEntries} />;
       case 'charts': return <NutritionCharts kcalData={[avgWeeklyKcal]} proteinData={[avgWeeklyProtein]} labels={['']} dailyLogs={dailyLogs} />;
-      case 'mealplan': return <MealPlanExtended tKcal={tKcal} tProt={tProt} tFat={tFat} tCarbs={tCarbs} />;
+      case 'mealplan': return <MealPlanExtended tKcal={tKcal} tProt={tProt} tFat={tFat} tCarbs={tCarbs} profile={linked.profile} />;
       case 'grocery': return <GroceryTab tKcal={tKcal} tProt={tProt} />;
       case 'restaurant': return <RestaurantTab />;
       case 'calc': return <NutritionCalculators />;
@@ -288,15 +288,108 @@ const MealPlan: React.FC<{ profile: UserProfile | null }> = ({ profile }) => {
   );
 };
 
-const MealPlanExtended: React.FC<{ tKcal: number; tProt: number; tFat: number; tCarbs: number }> = ({ tKcal, tProt, tFat, tCarbs }) => {
+const MealPlanExtended: React.FC<{ tKcal: number; tProt: number; tFat: number; tCarbs: number; profile: UserProfile | null }> = ({ tKcal, tProt, tFat, tCarbs, profile }) => {
   const [planDays, setPlanDays] = React.useState(3);
   const [mealPlan, setMealPlan] = React.useState<DailyMealPlan[] | null>(null);
   const [weeklyPlan, setWeeklyPlan] = React.useState<any[] | null>(null);
+  const [tierResult, setTierResult] = React.useState<MealPlanResult | null>(null);
+  const [activeTier, setActiveTier] = React.useState<MealTier | null>(null);
   const recipes = React.useMemo(() => getRecipes(), []);
   const timings = React.useMemo(() => getSupplementTimings(), []);
 
+  const TIER_BTNS: { tier: MealTier; label: string; color: string; gradient: string }[] = [
+    { tier: 'basic', label: 'База', color: '#22c55e', gradient: 'linear-gradient(135deg, #22c55e44, #22c55e08)' },
+    { tier: 'mid', label: 'Средний', color: '#f59e0b', gradient: 'linear-gradient(135deg, #f59e0b44, #f59e0b08)' },
+    { tier: 'max', label: 'Усиление', color: '#f97316', gradient: 'linear-gradient(135deg, #f9731644, #f9731608)' },
+    { tier: 'boost', label: 'Максимум', color: '#ef4444', gradient: 'linear-gradient(135deg, #ef444444, #ef444408)' },
+  ];
+
+  const handleTierGenerate = (tier: MealTier) => {
+    const s = profile?.settings;
+    const input = {
+      weightKg: s?.weight ?? 80,
+      heightCm: s?.height ?? 180,
+      age: s?.age ?? 30,
+      sex: s?.sex ?? 'male',
+      goal: (s?.primaryGoal as any) || (s?.goal as any) || 'maintenance',
+      tier,
+      trainingDaysPerWeek: s?.workoutsPerWeek ?? 3,
+      avgWorkoutMinutes: s?.avgWorkoutMinutes ?? 60,
+      includeWorkoutMeals: true,
+    };
+    const result = generateTierMealPlan(input as any);
+    setTierResult(result);
+    setActiveTier(tier);
+  };
+
   return (
     <div>
+      <div className="card" style={{ marginBottom: 8, padding: 14 }}>
+        <h4 style={{ margin: '0 0 8px', fontSize: 12 }}>🏷️ Выберите уровень питания</h4>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+          {TIER_BTNS.map(tb => (
+            <button key={tb.tier} onClick={() => handleTierGenerate(tb.tier)} style={{
+              background: activeTier === tb.tier ? tb.gradient : 'var(--bg-secondary)',
+              border: activeTier === tb.tier ? `1.5px solid ${tb.color}` : '1px solid var(--border)',
+              borderRadius: 20, padding: '8px 12px', cursor: 'pointer', textAlign: 'center',
+              transition: 'all 0.2s', color: activeTier === tb.tier ? tb.color : 'var(--text-dim)',
+              fontWeight: activeTier === tb.tier ? 700 : 500, fontSize: 12,
+            }}>
+              {tb.label}
+            </button>
+          ))}
+        </div>
+        {tierResult && (
+          <div style={{ marginTop: 10, padding: 12, borderRadius: 10, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.15)' }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--accent)', marginBottom: 6 }}>
+              {tierResult.summary.tier === 'basic' ? 'База' : tierResult.summary.tier === 'mid' ? 'Средний' : tierResult.summary.tier === 'max' ? 'Усиление' : 'Максимум'} — {tierResult.summary.avgKcal} ккал
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 6, textAlign: 'center', marginBottom: 8, fontSize: 10 }}>
+              <div><span style={{ color: 'var(--text-dim)' }}>Белки</span><div style={{ fontWeight: 700, color: '#3b82f6' }}>{tierResult.summary.avgProtein}г</div></div>
+              <div><span style={{ color: 'var(--text-dim)' }}>Жиры</span><div style={{ fontWeight: 700, color: '#f59e0b' }}>{tierResult.summary.avgFat}г</div></div>
+              <div><span style={{ color: 'var(--text-dim)' }}>Углеводы</span><div style={{ fontWeight: 700, color: '#f97316' }}>{tierResult.summary.avgCarbs}г</div></div>
+              <div><span style={{ color: 'var(--text-dim)' }}>Порций</span><div style={{ fontWeight: 700, color: '#a855f7' }}>{tierResult.dayPlans[0]?.meals.length || '-'}</div></div>
+            </div>
+            {tierResult.dayPlans.length > 0 && (
+              <div style={{ fontSize: 9, maxHeight: 180, overflowY: 'auto' }}>
+                <div style={{ fontWeight: 600, marginBottom: 4, color: 'var(--text-light)' }}>
+                  {tierResult.dayPlans[0].isTrainingDay ? 'Тренировочный день' : 'День отдыха'}
+                </div>
+                {tierResult.dayPlans[0].meals.map((m, mi) => (
+                  <div key={mi} style={{ marginBottom: 4, padding: '4px 8px', borderRadius: 6, background: 'var(--bg-secondary)' }}>
+                    <div style={{ fontWeight: 600, color: 'var(--accent)' }}>{m.name} ({m.time})</div>
+                    <div style={{ color: 'var(--text-dim)', marginLeft: 4 }}>
+                      {m.items.slice(0, 3).map(it => `${it.foodName} ${it.amount}г`).join(' | ')}
+                      {m.items.length > 3 && ` + ещё ${m.items.length - 3}`}
+                    </div>
+                  </div>
+                ))}
+                {tierResult.dayPlans[0].totals && (
+                  <div style={{ textAlign: 'right', fontSize: 9, color: 'var(--text-dim)' }}>
+                    Итого: {tierResult.dayPlans[0].totals.kcal}ккал Б:{tierResult.dayPlans[0].totals.protein}г Ж:{tierResult.dayPlans[0].totals.fat}г У:{tierResult.dayPlans[0].totals.carbs}г
+                  </div>
+                )}
+              </div>
+            )}
+            {tierResult.workoutMealPlan && (
+              <div style={{ marginTop: 8, padding: '8px 10px', borderRadius: 8, background: 'rgba(139,92,246,0.06)', border: '1px solid rgba(139,92,246,0.15)' }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: '#8b5cf6', marginBottom: 4 }}>🏋️ Питание вокруг тренировки</div>
+                <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 6 }}>{tierResult.workoutMealPlan.description}</div>
+                {tierResult.workoutMealPlan.meals.map((m, mi) => (
+                  <div key={mi} style={{ fontSize: 9, marginBottom: 2 }}>
+                    <b>{m.name}</b> ({m.time}): {m.items.map(i => `${i.foodName} ${i.amount}г`).join(', ')}
+                  </div>
+                ))}
+                {tierResult.workoutMealPlan.supplements.length > 0 && (
+                  <div style={{ fontSize: 9, color: 'var(--text-dim)', marginTop: 4 }}>
+                    <b>Добавки:</b> {tierResult.workoutMealPlan.supplements.map(s => `${s.name} ${s.dose} (${s.timing})`).join(' | ')}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
       <div className="card" style={{ marginBottom: 8 }}>
         <h4 style={{ margin: '0 0 6px', fontSize: 12 }}>🍽️ Генератор плана питания</h4>
         <div style={{ display: 'flex', gap: 4, marginBottom: 8 }}>
