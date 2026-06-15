@@ -4656,7 +4656,7 @@ const ReportSummaryCard: React.FC<{ supportResult: any }> = ({ supportResult }) 
     <h4 style={{ margin:'0 0 4px',fontSize:12 }}>📋 Сводка</h4>
     <div style={{ fontSize:10 }}>Риск: {report.summary.total_risk}% → {report.summary.risk_after_support}% ({report.summary.risk_level})</div>
     <div style={{ fontSize:9,color:'var(--text-dim)',marginTop:2 }}>Топ систем: {(report.summary as any).top_systems?.map((s:any)=>s.name).join(', ')}</div>
-  </div>);
+      </div>);
 };
 
 const StackBuilderSection: React.FC = () => {
