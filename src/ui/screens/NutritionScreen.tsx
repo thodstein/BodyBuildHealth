@@ -29,6 +29,22 @@ interface DiaryEntry {
 }
 
 type NutritionPage = 'hero' | 'tabs';
+type NutritionSection = 'overview' | 'diary' | 'planning' | 'tools' | 'all';
+
+const SECTION_TABS: Record<NutritionSection, string[]> = {
+  overview: ['overview', 'grocery', 'restaurant', 'regime', 'custom'],
+  diary: ['diary', 'charts'],
+  planning: ['mealplan', 'cycling'],
+  tools: ['calc'],
+  all: ['overview', 'diary', 'charts', 'mealplan', 'grocery', 'restaurant', 'calc', 'cycling', 'regime', 'custom'],
+};
+
+const TAB_LABELS: Record<string, string> = {
+  overview: '📊 Обзор', diary: '📝 Дневник', charts: '📈 Графики',
+  mealplan: '🥗 План', grocery: '🛒 Список', restaurant: '🍽 Ресторан',
+  calc: '📐 Калькуляторы', cycling: '🔄 Циклирование',
+  regime: '⏰ Режим', custom: '🍎 Своё',
+};
 
 const NutritionLabContext: React.FC<{ labAnalysis: LabCompositeResult }> = ({ labAnalysis }) => (
   <div style={{ background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', borderRadius: 10, padding: '8px 10px', marginTop: 8 }}>
@@ -51,6 +67,7 @@ export const NutritionScreen: React.FC = () => {
   const labAnalysis = linked.labAnalysis;
   const [tab, setTab] = useState<'overview' | 'diary' | 'charts' | 'mealplan' | 'grocery' | 'restaurant' | 'cycling' | 'calc' | 'regime' | 'custom'>('overview');
   const [page, setPage] = useState<NutritionPage>('hero');
+  const [nutritionSection, setNutritionSection] = useState<NutritionSection>('all');
   const [foodEntries, setFoodEntries] = useState<DiaryEntry[]>([]);
   const [dailyLogs, setDailyLogs] = useState<Record<string, DiaryEntry[]>>({});
 
@@ -145,10 +162,12 @@ export const NutritionScreen: React.FC = () => {
             </p>
             <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
               {[
-                { id: 'overview', icon: '📋', title: 'Общие сведения', desc: 'Обзор, дневник, графики, список, ресторан, калькуляторы', color: 'var(--accent)' },
-                { id: 'cycling', icon: '📅', title: 'Планирование', desc: 'Циклирование, план питания', color: '#3b82f6' },
+                { section: 'diary' as NutritionSection, tab: 'diary', icon: '📝', title: 'Дневник питания', desc: 'Запись продуктов, OCR, штрих-коды', color: '#22c55e' },
+                { section: 'planning' as NutritionSection, tab: 'mealplan', icon: '🥗', title: 'План питания', desc: 'Генератор рациона, уровни, циклирование', color: '#3b82f6' },
+                { section: 'overview' as NutritionSection, tab: 'overview', icon: '📊', title: 'Обзор и списки', desc: 'Сводка, список покупок, рестораны, режим', color: 'var(--accent)' },
+                { section: 'tools' as NutritionSection, tab: 'calc', icon: '📐', title: 'Калькуляторы', desc: 'КБЖУ, дефицит, HOMA-IR', color: '#a855f7' },
               ].map(card => (
-                <button key={card.id} onClick={() => { setPage('tabs'); setTab(card.id as any); }} style={{
+                <button key={card.section} onClick={() => { setPage('tabs'); setNutritionSection(card.section); setTab(card.tab as any); }} style={{
                   display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', borderRadius: 14, cursor: 'pointer', textAlign: 'left', width: '100%',
                   background: 'rgba(20,22,30,0.35)', border: '1px solid var(--glass-border)', color: 'var(--text)',
                   transition: 'all 0.2s',
@@ -173,13 +192,16 @@ export const NutritionScreen: React.FC = () => {
 
       {/* ─── TOP NAV BAR (only when not on hero) ─── */}
       {page !== 'hero' && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '6px 12px', flexShrink: 0, borderBottom: '1px solid var(--border)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', flexShrink: 0, borderBottom: '1px solid var(--border)' }}>
           <button onClick={() => setPage('hero')} style={{
             padding: '6px 8px', cursor: 'pointer', fontSize: 14,
             color: 'var(--text-dim)', border: 'none', background: 'transparent',
             display: 'flex', alignItems: 'center', gap: 4,
             fontWeight: 600,
           }}>← На главную</button>
+          <span style={{ fontSize: 9, color: 'var(--text-dim)', marginLeft: 'auto' }}>
+            {nutritionSection === 'diary' ? 'Дневник' : nutritionSection === 'planning' ? 'Планирование' : nutritionSection === 'overview' ? 'Обзор' : nutritionSection === 'tools' ? 'Инструменты' : 'Всё'}
+          </span>
         </div>
       )}
 
@@ -187,9 +209,9 @@ export const NutritionScreen: React.FC = () => {
       {page !== 'hero' && (
         <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '0 12px 70px' }}>
           <div className="tab-bar">
-            {(['overview', 'diary', 'charts', 'mealplan', 'grocery', 'restaurant', 'calc', 'cycling', 'regime', 'custom'] as const).map(t => (
-              <button key={t} className={`tab-btn ${tab === t ? 'active' : ''}`} onClick={() => setTab(t)}>
-                {t === 'overview' ? '📊 Обзор' : t === 'diary' ? '📝 Дневник' : t === 'charts' ? '📈 Графики' : t === 'mealplan' ? '🥗 План' : t === 'grocery' ? '🛒 Список' : t === 'restaurant' ? '🍽 Ресторан' : t === 'calc' ? '📐 Калькуляторы' : t === 'regime' ? '⏰ Режим' : t === 'custom' ? '🍎 Своё' : '🔄 Циклирование'}
+            {(SECTION_TABS[nutritionSection] || SECTION_TABS.all).map(t => (
+              <button key={t} className={`tab-btn ${tab === t ? 'active' : ''}`} onClick={() => setTab(t as any)}>
+                {TAB_LABELS[t] || t}
               </button>
             ))}
           </div>
@@ -294,6 +316,10 @@ const MealPlanExtended: React.FC<{ tKcal: number; tProt: number; tFat: number; t
   const [weeklyPlan, setWeeklyPlan] = React.useState<any[] | null>(null);
   const [tierResult, setTierResult] = React.useState<MealPlanResult | null>(null);
   const [activeTier, setActiveTier] = React.useState<MealTier | null>(null);
+  const [variantPlans, setVariantPlans] = React.useState<MealPlanResult[]>([]);
+  const [activeVariant, setActiveVariant] = React.useState(0);
+  const [swapPopup, setSwapPopup] = React.useState<{ mealIdx: number; foodIdx: number } | null>(null);
+  const [planSaved, setPlanSaved] = React.useState(false);
   const recipes = React.useMemo(() => getRecipes(), []);
   const timings = React.useMemo(() => getSupplementTimings(), []);
 
@@ -313,8 +339,8 @@ const MealPlanExtended: React.FC<{ tKcal: number; tProt: number; tFat: number; t
   ];
 
   const RECOMMENDED_FOODS: Record<string, { items: string[]; color: string; bg: string }> = {
-    'Белки': { items: ['Филе индейки', 'Филе курицы', 'Яйца', 'Красное мясо ≤10% жирности', 'Фарш говяжий', 'Красная рыба (≤2 р/нед)', 'Креветки (≤1 р/нед)', 'Белая рыба (треска, палтус, минтай)'], color: '#3b82f6', bg: 'rgba(59,130,246,0.1)' },
-    'Жиры': { items: ['Авокадо/гуакамоле', 'Яйца', 'Кокосовое масло', 'Кокосовый урбеч', 'Красная икра', 'Оливковое масло extra virgin'], color: '#f59e0b', bg: 'rgba(245,158,11,0.1)' },
+    'Белки': { items: ['Филе индейки', 'Филе курицы', 'Яйца', 'Говядина постная', 'Фарш говяжий', 'Лосось (2 р/нед)', 'Креветки (1 р/нед)', 'Треска', 'Палтус', 'Минтай'], color: '#3b82f6', bg: 'rgba(59,130,246,0.1)' },
+    'Жиры': { items: ['Авокадо', 'Гуакамоле', 'Кокосовое масло', 'Кокосовый урбеч', 'Красная икра', 'Оливковое масло extra virgin'], color: '#f59e0b', bg: 'rgba(245,158,11,0.1)' },
     'Углеводы': { items: ['Рис (кроме бурого)', 'Макароны твёрдых сортов', 'Рисовые макароны', 'Рисовая каша/cream of rice', 'Картофель', 'Батат', 'Хлеб цельнозерновой'], color: '#f97316', bg: 'rgba(249,115,22,0.1)' },
     'С ограничением': { items: ['Кукурузные хлопья (без пшеницы)', 'Цитрусовые', 'Зелёные яблоки', 'Финики', 'Ягоды', 'Мармелад (желатин+сахар)', 'Томатный сок', 'Амилопектин/декстрин/декстроза'], color: '#ef4444', bg: 'rgba(239,68,68,0.1)' },
     'Клетчатка': { items: ['Морковь', 'Свёкла', 'Огурцы', 'Помидоры', 'Лук', 'Квашеная капуста'], color: '#22c55e', bg: 'rgba(34,197,94,0.1)' },
@@ -476,9 +502,17 @@ const MealPlanExtended: React.FC<{ tKcal: number; tProt: number; tFat: number; t
     { tier: 'boost', label: 'Максимум', color: '#ef4444', gradient: 'linear-gradient(135deg, #ef444444, #ef444408)' },
   ];
 
+  const getSwapsForItem = (foodName: string, category: string): any[] => {
+    const candidates = FOOD_DB.filter(f => f.category === category && f.name !== foodName).sort(() => Math.random() - 0.5).slice(0, 3);
+    return candidates.map(f => ({
+      foodName: f.name, foodId: f.id, amount: 100,
+      kcal: f.kcal, protein: f.protein, fat: f.fat, carbs: f.carbs,
+    }));
+  };
+
   const handleTierGenerate = (tier: MealTier) => {
     const s = profile?.settings;
-    const input = {
+    const baseInput = {
       weightKg: s?.weight ?? 80,
       heightCm: s?.height ?? 180,
       age: s?.age ?? 30,
@@ -489,9 +523,32 @@ const MealPlanExtended: React.FC<{ tKcal: number; tProt: number; tFat: number; t
       avgWorkoutMinutes: s?.avgWorkoutMinutes ?? 60,
       includeWorkoutMeals: true,
     };
-    const result = generateTierMealPlan(input as any);
+    const result = generateTierMealPlan(baseInput as any);
     setTierResult(result);
     setActiveTier(tier);
+    setActiveVariant(0);
+    setPlanSaved(false);
+    const a = generateTierMealPlan(baseInput as any);
+    const b = generateTierMealPlan(baseInput as any);
+    setVariantPlans([a, b]);
+  };
+
+  const saveMealPlan = () => {
+    if (!tierResult) return;
+    try {
+      const key = 'savedMealPlans';
+      const existing = JSON.parse(localStorage.getItem(key) || '[]');
+      const plan = {
+        id: Date.now(),
+        tier: activeTier,
+        date: new Date().toISOString().split('T')[0],
+        result: tierResult,
+      };
+      existing.unshift(plan);
+      localStorage.setItem(key, JSON.stringify(existing.slice(0, 10)));
+      setPlanSaved(true);
+      setTimeout(() => setPlanSaved(false), 2000);
+    } catch {}
   };
 
   return (
@@ -522,27 +579,111 @@ const MealPlanExtended: React.FC<{ tKcal: number; tProt: number; tFat: number; t
               <div><span style={{ color: 'var(--text-dim)' }}>Углеводы</span><div style={{ fontWeight: 700, color: '#f97316' }}>{tierResult.summary.avgCarbs}г</div></div>
               <div><span style={{ color: 'var(--text-dim)' }}>Порций</span><div style={{ fontWeight: 700, color: '#a855f7' }}>{tierResult.dayPlans[0]?.meals.length || '-'}</div></div>
             </div>
-            {tierResult.dayPlans.length > 0 && (
-              <div style={{ fontSize: 9, maxHeight: 180, overflowY: 'auto' }}>
-                <div style={{ fontWeight: 600, marginBottom: 4, color: 'var(--text-light)' }}>
-                  {tierResult.dayPlans[0].isTrainingDay ? 'Тренировочный день' : 'День отдыха'}
-                </div>
-                {tierResult.dayPlans[0].meals.map((m, mi) => (
-                  <div key={mi} style={{ marginBottom: 4, padding: '4px 8px', borderRadius: 6, background: 'var(--bg-secondary)' }}>
-                    <div style={{ fontWeight: 600, color: 'var(--accent)' }}>{m.name} ({m.time})</div>
-                    <div style={{ color: 'var(--text-dim)', marginLeft: 4 }}>
-                      {m.items.slice(0, 3).map(it => `${it.foodName} ${it.amount}г`).join(' | ')}
-                      {m.items.length > 3 && ` + ещё ${m.items.length - 3}`}
+
+            {/* ─── Variant tabs ─── */}
+            <div style={{ display: 'flex', gap: 4, marginBottom: 8 }}>
+              {['А', 'Б', 'В'].map((vl, v) => (
+                <button key={v} onClick={() => setActiveVariant(v)} style={{
+                  flex: 1, padding: '4px 8px', borderRadius: 6, fontSize: 10, cursor: 'pointer', fontWeight: 600,
+                  background: activeVariant === v ? 'var(--accent)' : 'var(--bg-secondary)',
+                  color: activeVariant === v ? '#000' : 'var(--text-dim)',
+                  border: activeVariant === v ? 'none' : '1px solid var(--border)',
+                }}>Вариант {vl}</button>
+              ))}
+            </div>
+
+            {/* Get display plan */}
+            {(() => {
+              const displayPlan = activeVariant === 0 ? tierResult : variantPlans[activeVariant - 1] || tierResult;
+              return displayPlan ? (
+                <div>
+                  {displayPlan.dayPlans.length > 0 && (
+                    <div style={{ fontSize: 9 }}>
+                      <div style={{ fontWeight: 600, marginBottom: 4, color: 'var(--text-light)' }}>
+                        {displayPlan.dayPlans[0].isTrainingDay ? 'Тренировочный день' : 'День отдыха'}
+                      </div>
+                      {displayPlan.dayPlans[0].meals.map((m, mi) => (
+                        <div key={mi} style={{ marginBottom: 5, padding: '6px 8px', borderRadius: 8, background: 'var(--bg-secondary)', position: 'relative' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                            <div style={{ fontWeight: 600, color: 'var(--accent)' }}>{m.name} ({m.time})</div>
+                            <button onClick={() => setSwapPopup({ mealIdx: mi, foodIdx: -1 })} style={{
+                              padding: '2px 6px', borderRadius: 4, fontSize: 8, cursor: 'pointer',
+                              background: 'rgba(139,92,246,0.1)', border: '1px solid rgba(139,92,246,0.2)',
+                              color: '#8b5cf6', fontWeight: 500, flexShrink: 0,
+                            }}>🔄 Заменить блюдо</button>
+                          </div>
+                          <div style={{ color: 'var(--text-dim)', marginTop: 2 }}>
+                            {m.items.map((it, ii) => (
+                              <span key={ii} style={{
+                                display: 'inline-block', margin: '1px 2px', padding: '1px 6px',
+                                borderRadius: 4, fontSize: 8,
+                                background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)',
+                              }}>{it.foodName} {it.amount}г</span>
+                            ))}
+                          </div>
+                          {/* Swap popup */}
+                          {swapPopup && swapPopup.mealIdx === mi && (
+                            <div style={{
+                              marginTop: 6, padding: 8, borderRadius: 8,
+                              background: 'rgba(139,92,246,0.06)', border: '1px solid rgba(139,92,246,0.15)',
+                            }}>
+                              <div style={{ fontSize: 9, fontWeight: 600, color: '#8b5cf6', marginBottom: 4 }}>
+                                Выберите замену для «{m.name}»:
+                              </div>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                                {(() => {
+                                  const mainItemCategory = m.items[0] ? (FOOD_DB.find(f => f.name === m.items[0].foodName)?.category || 'protein') : 'protein';
+                                  const swaps = getSwapsForItem(m.items[0]?.foodName || '', mainItemCategory);
+                                  return swaps.map((sw, si) => (
+                                    <button key={si} onClick={() => {
+                                      if (displayPlan.dayPlans[0].meals[mi].items.length > 0) {
+                                        displayPlan.dayPlans[0].meals[mi].items[0] = { ...sw };
+                                        setTierResult({ ...tierResult, dayPlans: [...(activeVariant === 0 ? tierResult : variantPlans[activeVariant - 1] || tierResult).dayPlans] });
+                                      }
+                                      setSwapPopup(null);
+                                    }} style={{
+                                      display: 'flex', justifyContent: 'space-between', padding: '4px 8px',
+                                      borderRadius: 6, fontSize: 9, cursor: 'pointer',
+                                      background: 'var(--bg-secondary)', border: '1px solid var(--border)',
+                                      color: 'var(--text)', textAlign: 'left',
+                                    }}>
+                                      <span>{sw.foodName} {sw.amount}г</span>
+                                      <span style={{ color: 'var(--text-dim)' }}>{sw.kcal}ккал Б{sw.protein} Ж{sw.fat} У{sw.carbs}</span>
+                                    </button>
+                                  ));
+                                })()}
+                              </div>
+                              <button onClick={() => setSwapPopup(null)} style={{
+                                marginTop: 4, padding: '3px 8px', borderRadius: 4, fontSize: 9, cursor: 'pointer',
+                                background: 'transparent', border: '1px solid rgba(255,255,255,0.1)',
+                                color: 'var(--text-dim)',
+                              }}>Отмена</button>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                      {displayPlan.dayPlans[0].totals && (
+                        <div style={{ textAlign: 'right', fontSize: 9, color: 'var(--text-dim)', marginTop: 4 }}>
+                          Итого: {displayPlan.dayPlans[0].totals.kcal}ккал Б:{displayPlan.dayPlans[0].totals.protein}г Ж:{displayPlan.dayPlans[0].totals.fat}г У:{displayPlan.dayPlans[0].totals.carbs}г
+                        </div>
+                      )}
                     </div>
-                  </div>
-                ))}
-                {tierResult.dayPlans[0].totals && (
-                  <div style={{ textAlign: 'right', fontSize: 9, color: 'var(--text-dim)' }}>
-                    Итого: {tierResult.dayPlans[0].totals.kcal}ккал Б:{tierResult.dayPlans[0].totals.protein}г Ж:{tierResult.dayPlans[0].totals.fat}г У:{tierResult.dayPlans[0].totals.carbs}г
-                  </div>
-                )}
-              </div>
-            )}
+                  )}
+                </div>
+              ) : null;
+            })()}
+
+            {/* Save button */}
+            <div style={{ display: 'flex', gap: 6, marginTop: 10 }}>
+              <button onClick={saveMealPlan} style={{
+                flex: 1, padding: 8, borderRadius: 8, border: 'none', cursor: 'pointer',
+                background: planSaved ? '#22c55e' : 'linear-gradient(135deg, #3b82f6, #8b5cf6)',
+                color: '#fff', fontWeight: 700, fontSize: 11,
+              }}>
+                {planSaved ? '✅ Сохранено!' : '💾 Сохранить рацион'}
+              </button>
+            </div>
+
             {tierResult.workoutMealPlan && (
               <div style={{ marginTop: 8, padding: '8px 10px', borderRadius: 8, background: 'rgba(139,92,246,0.06)', border: '1px solid rgba(139,92,246,0.15)' }}>
                 <div style={{ fontSize: 10, fontWeight: 700, color: '#8b5cf6', marginBottom: 4 }}>🏋️ Питание вокруг тренировки</div>
@@ -622,6 +763,26 @@ const MealPlanExtended: React.FC<{ tKcal: number; tProt: number; tFat: number; t
                     whiteSpace: 'nowrap',
                   }}>{item}</span>
                 ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="card" style={{ marginBottom: 8, padding: 14, border: '1px solid rgba(239,68,68,0.2)', background: 'rgba(239,68,68,0.04)' }}>
+        <h4 style={{ margin: '0 0 8px', fontSize: 13, color: '#ef4444' }}>⚠️ Ограничить</h4>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {[
+            { item: 'Молочные продукты', note: 'лактоза → воспаление, застой желчи, акне' },
+            { item: 'Соления', note: 'грибки + натрий → отёки, нагрузка на почки' },
+            { item: 'Бурый рис', note: 'фитиновая кислота, антинутриенты → хуже усвоение' },
+            { item: 'Сладкие фрукты', note: 'фруктоза → жировое депо при полном гликогене' },
+          ].map((w, j) => (
+            <div key={j} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 10, color: 'rgba(255,255,255,0.75)', lineHeight: 1.4 }}>
+              <span style={{ color: '#ef4444', flexShrink: 0 }}>✕</span>
+              <div>
+                <span style={{ fontWeight: 600, color: '#ef4444' }}>{w.item}</span>
+                <span style={{ color: 'var(--text-dim)', marginLeft: 4 }}>— {w.note}</span>
               </div>
             </div>
           ))}

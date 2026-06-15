@@ -1,6 +1,6 @@
 ﻿import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
-import { EXERCISE_CATALOG } from '../../core/exercise-catalog';
-import { calcTraining, calcExercisePrescription, EXERCISE_DB } from '../../engines/training.engine';
+import { EXERCISE_CATALOG, getExercisesByGroup } from '../../core/exercise-catalog';
+import { calcTraining, calcExercisePrescription, EXERCISE_DB, TRAINING_SPLITS } from '../../engines/training.engine';
 import { generateMacrocycle, getCurrentWeekPlan, type MacrocyclePlan, type Microcycle, type MacrocycleInput } from '../../engines/training-periodization.engine';
 import { selectSplit, getSplitOptions, type SplitCandidate } from '../../engines/split-selector.engine';
 import { selectProgressionRule } from '../../engines/progression.engine';
@@ -19,7 +19,6 @@ import { generatePeriodization, getPhaseParams } from '../../engines/cycle-perio
 import { getTrainingMethods, getMethodsByCategory, getVolumeReferences, getVolumeByMuscle, getSplitVisuals } from '../../engines/training-methodology.engine';
 import { buildVisualDashboard, computeWeeklyChart, computeMuscleVolume, computeProgression, type VizSessionData } from '../../engines/training-visualization.engine';
 import { getProgramById, getProgramsByGoal, FULL_PROGRAM_LIBRARY } from '../../engines/complete-program-library.engine';
-import { getWorkoutTimers, getOptimalRest, getGymChecklists, getBPMGuide } from '../../engines/goal-timer-checklist.engine';
 import { generateWeeklyReport, analyzeMeasurements, loadMeasurements, saveMeasurement, type BodyMeasurement } from '../../engines/log-analytics-progression.engine';
 import { getExerciseBio } from '../../data/exercise-biomechanics-db';
 import { getStrengthLevel, getNextLevelTarget } from '../../engines/performance-analytics.engine';
@@ -154,6 +153,14 @@ export const TrainingScreen: React.FC = () => {
   const [exCalcGroup, setExCalcGroup] = useState('');
   const [exCalcType, setExCalcType] = useState('');
   const [exCalcEquip, setExCalcEquip] = useState('');
+
+  // Unified program builder state
+  const [builderStep, setBuilderStep] = useState(1);
+  const [builderSplit, setBuilderSplit] = useState<SplitCandidate | null>(null);
+  const [builderDayExercises, setBuilderDayExercises] = useState<Record<number, { name: string; sets: number; reps: string; rir: number; rest: number; group: string }[]>>({});
+  const [builderMacroResult, setBuilderMacroResult] = useState<any[] | null>(null);
+  const [builderShowSubs, setBuilderShowSubs] = useState<string | null>(null);
+  const [builderAddExDay, setBuilderAddExDay] = useState<number | null>(null);
 
   // Diary state
   const [diaryStats, setDiaryStats] = useState<StrengthStats[]>([]);
@@ -1839,137 +1846,259 @@ export const TrainingScreen: React.FC = () => {
             )}
           </div>
 
-          {/* ═══════ PROGRAM CALCULATOR ═══════ */}
+          {/* ═══════ UNIFIED PROGRAM BUILDER ═══════ */}
           <div className="card" style={{ padding: '10px 12px' }}>
-            <h3 style={{ margin: '0 0 8px', fontSize: 13 }}>📚 Калькулятор программы</h3>
-            <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 6 }}>Подберите оптимальную сплит-программу по вашим параметрам</div>
-            {(() => {
-              const input = { goal, level, daysPerWeek, recovery, fatigue, nutrition: 7, weakPoints, sessionDuration: 60, exercises: [] } as any;
-              const bestSplit = selectSplit(input);
-              const topSplits = getSplitOptions(input);
-              return (<>
-                <div style={{ background:'rgba(0,230,138,0.06)', borderRadius:8, padding:10, marginBottom:6, border:'1px solid rgba(0,230,138,0.12)' }}>
-                  <div style={{ fontSize:11, fontWeight:700, color:'var(--accent)' }}>🏆 {bestSplit[0]?.name || 'Не определён'}</div>
-                  <div style={{ fontSize:9, color:'var(--text-light)', marginTop:2 }}>{bestSplit[0]?.desc || ''}</div>
-                  <div style={{ fontSize:9, color:'var(--accent)', marginTop:2 }}>Score: {bestSplit[0]?.score?.toFixed(0) || '—'}</div>
-                  {bestSplit[0]?.rationale && <div style={{ fontSize:8, color:'var(--text-dim)', marginTop:2 }}>{bestSplit[0].rationale.join(' · ')}</div>}
-                </div>
-                <details style={{ marginTop:4 }}>
-                  <summary style={{ fontSize:9, fontWeight:600, color:'var(--text-light)', cursor:'pointer' }}>Топ-5 сплитов ({topSplits.length})</summary>
-                  <div style={{ display:'flex', flexDirection:'column', gap:4, marginTop:4 }}>
-                    {topSplits.slice(0,5).map((s,i) => (
-                      <div key={i} style={{ padding:'4px 8px', borderRadius:6, background:i===0?'rgba(0,230,138,0.06)':'var(--bg-secondary)', border:`1px solid ${i===0?'rgba(0,230,138,0.12)':'var(--border)'}` }}>
-                        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-                          <span style={{ fontSize:10, fontWeight:600, color:i===0?'var(--accent)':'var(--text-light)' }}>{s.name}</span>
-                          <span style={{ fontSize:9, fontWeight:700, color:i===0?'var(--accent)':'var(--text-dim)' }}>{s.score?.toFixed(0)}</span>
-                        </div>
-                        <div style={{ fontSize:8, color:'var(--text-dim)', marginTop:1 }}>{s.desc}</div>
-                        {s.rationale && <div style={{ fontSize:7, color:'rgba(0,230,138,0.7)', marginTop:1 }}>{s.rationale.join(' · ')}</div>}
-                      </div>
-                    ))}
-                  </div>
-                </details>
-              </>);
-            })()}
-          </div>
+            <h3 style={{ margin: '0 0 8px', fontSize: 13 }}>🧬 Конструктор программы</h3>
+            <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 8 }}>4 шага: параметры → сплит → упражнения → цикл</div>
 
-          {/* ═══════ CYCLE CALCULATOR ═══════ */}
-          <div className="card" style={{ padding: '10px 12px' }}>
-            <h3 style={{ margin: '0 0 8px', fontSize: 13 }}>🔄 Калькулятор цикла</h3>
-            <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 6 }}>Рассчитайте мезоцикл с прогрессией, разгрузкой и фазами</div>
-            {(() => {
-              const totalWeeks = mesoLength || 6;
-              const plan = generateWeeklyPlan({ goal, level, daysPerWeek, recovery, fatigue, nutrition: 7, weakPoints, sessionDuration: 60, exercises: [] } as any, totalWeeks);
-              const rule = selectProgressionRule(level);
-              return (<>
-                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:4, marginBottom:6 }}>
-                  <div style={{ background:'var(--bg-secondary)', borderRadius:6, padding:6, textAlign:'center' }}>
-                    <div style={{ fontSize:8, color:'var(--text-dim)' }}>Недель</div>
-                    <div style={{ fontSize:16, fontWeight:800, color:'var(--accent)' }}>{totalWeeks}</div>
-                  </div>
-                  <div style={{ background:'var(--bg-secondary)', borderRadius:6, padding:6, textAlign:'center' }}>
-                    <div style={{ fontSize:8, color:'var(--text-dim)' }}>Прогрессия</div>
-                    <div style={{ fontSize:11, fontWeight:700, color:'var(--text-light)' }}>{rule.name}</div>
-                    <div style={{ fontSize:7, color:'var(--text-dim)' }}>+{rule.weeklyWeightIncrement}кг/нед</div>
-                  </div>
+            {/* Step indicators */}
+            <div style={{ display: 'flex', gap: 4, marginBottom: 10 }}>
+              {[1,2,3,4].map(s => (
+                <div key={s} onClick={() => setBuilderStep(s)} style={{
+                  flex: 1, padding: '4px 2px', borderRadius: 6, textAlign: 'center', cursor: 'pointer', fontSize: 9,
+                  background: builderStep === s ? 'rgba(0,230,138,0.15)' : 'var(--bg-secondary)',
+                  border: builderStep === s ? '1px solid var(--accent)' : '1px solid var(--border)',
+                  color: builderStep === s ? 'var(--accent)' : 'var(--text-dim)', fontWeight: builderStep === s ? 700 : 400,
+                }}>
+                  Шаг {s}
                 </div>
-                <div style={{ display:'flex', flexDirection:'column', gap:3, maxHeight:200, overflowY:'auto' }}>
-                  {plan.map((w,i) => {
-                    const phaseColors: Record<string,string> = { base:'#3b82f6', build:'#f59e0b', peak:'#ef4444', deload:'#22c55e' };
-                    const col = phaseColors[w.phase] || '#888';
-                    return (
-                      <div key={i} style={{ display:'flex', alignItems:'center', gap:6, padding:'4px 6px', borderRadius:4, background:'var(--bg-secondary)' }}>
-                        <span style={{ fontSize:9, fontWeight:700, width:20, textAlign:'center' }}>Н{w.weekNumber}</span>
-                        <span style={{ fontSize:8, padding:'1px 5px', borderRadius:3, background:col+'22', color:col, fontWeight:600, whiteSpace:'nowrap' }}>{w.phaseName}</span>
-                        <span style={{ fontSize:8, color:'var(--text-dim)' }}>RIR {w.rir}</span>
-                        <span style={{ fontSize:7, color:'rgba(255,255,255,0.4)' }}>Vol: {typeof w.volumePerGroup === 'number' ? w.volumePerGroup : JSON.stringify(w.volumePerGroup)}</span>
-                        {w.deloadWeek && <span style={{ fontSize:7, color:'#22c55e', fontWeight:600 }}>⚡Deload</span>}
-                        {w.recoveryFocus && <span style={{ fontSize:7, color:'#f59e0b' }}>🔄{w.recoveryFocus}</span>}
-                      </div>
-                    );
-                  })}
-                </div>
-                {rule.deloadTrigger && <div style={{ marginTop:4, fontSize:8, color:'var(--text-dim)' }}>⚠ Разгрузка: плато {rule.deloadTrigger.plateauWeeks} нед, RPE ≥ {rule.deloadTrigger.rpeFloor}</div>}
-              </>);
-            })()}
-          </div>
+              ))}
+            </div>
 
-          {/* ═══════ EXERCISE CALCULATOR ═══════ */}
-          <div className="card" style={{ padding: '10px 12px' }}>
-            <h3 style={{ margin: '0 0 8px', fontSize: 13 }}>🏋️ Калькулятор упражнения</h3>
-            <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 6 }}>Подберите упражнение по группе мышц, типу и оборудованию</div>
-            {(() => {
-              const groups = [...new Set(EXERCISE_DB.map(e => e.group || '').filter(Boolean))].sort();
-              const types = [...new Set(EXERCISE_DB.map(e => (e as any).type || '').filter(Boolean))].sort();
-              const equipList = [...new Set(EXERCISE_DB.map(e => e.equipment || '').filter(Boolean))].sort();
-              const filtered = EXERCISE_DB.filter(e => {
-                if (exCalcGroup && (e.group || '') !== exCalcGroup) return false;
-                if (exCalcType && ((e as any).type || '') !== exCalcType) return false;
-                if (exCalcEquip && (e.equipment || '') !== exCalcEquip) return false;
-                return true;
-              }).slice(0, 20);
-              return (<>
-                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:4, marginBottom:6 }}>
-                  <div>
-                    <label style={{ fontSize:9, color:'var(--text-dim)' }}>Группа</label>
-                    <select value={exCalcGroup} onChange={e=>setExCalcGroup(e.target.value)} style={{ width:'100%', padding:'4px', borderRadius:4, background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text)', fontSize:10, boxSizing:'border-box' }}>
-                      <option value="">Все</option>
-                      {groups.map(g=><option key={g} value={g}>{g}</option>)}
-                    </select>
-                  </div>
-                  <div>
-                    <label style={{ fontSize:9, color:'var(--text-dim)' }}>Тип</label>
-                    <select value={exCalcType} onChange={e=>setExCalcType(e.target.value)} style={{ width:'100%', padding:'4px', borderRadius:4, background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text)', fontSize:10, boxSizing:'border-box' }}>
-                      <option value="">Все</option>
-                      {types.map(t=><option key={t} value={t}>{t}</option>)}
-                    </select>
-                  </div>
-                  <div>
-                    <label style={{ fontSize:9, color:'var(--text-dim)' }}>Оборудование</label>
-                    <select value={exCalcEquip} onChange={e=>setExCalcEquip(e.target.value)} style={{ width:'100%', padding:'4px', borderRadius:4, background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text)', fontSize:10, boxSizing:'border-box' }}>
-                      <option value="">Все</option>
-                      {equipList.map(eq=><option key={eq} value={eq}>{eq}</option>)}
-                    </select>
-                  </div>
+            {/* STEP 1: Параметры */}
+            {builderStep === 1 && (<>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 8 }}>
+                <div>
+                  <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Цель</label>
+                  <select value={goal} onChange={e => setGoal(e.target.value)} style={{ width: '100%', padding: '6px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 11, boxSizing: 'border-box' }}>
+                    {GOALS.map(g => <option key={g.value} value={g.value}>{g.icon} {g.label}</option>)}
+                  </select>
                 </div>
-                <div style={{ fontSize:8, color:'var(--text-dim)', marginBottom:4 }}>Найдено: {filtered.length}</div>
-                <div style={{ display:'flex', flexDirection:'column', gap:3, maxHeight:200, overflowY:'auto' }}>
-                  {filtered.map((ex,i) => {
-                    const presc = calcExercisePrescription(ex, goal, level, false, false, 1);
-                    return (
-                      <div key={i} style={{ padding:'4px 8px', borderRadius:6, background:'var(--bg-secondary)', border:'1px solid var(--border)' }}>
-                        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-                          <span style={{ fontSize:10, fontWeight:600, color:'var(--text-light)' }}>{ex.name || ex.id}</span>
-                          <span style={{ fontSize:7, padding:'1px 4px', borderRadius:3, background:'rgba(0,230,138,0.1)', color:'var(--accent)' }}>{ex.group}</span>
+                <div>
+                  <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Уровень</label>
+                  <select value={level} onChange={e => setLevel(e.target.value)} style={{ width: '100%', padding: '6px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 11, boxSizing: 'border-box' }}>
+                    {LEVELS.map(l => <option key={l.value} value={l.value}>{l.icon} {l.label}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Дней/нед</label>
+                  <select value={daysPerWeek} onChange={e => setDaysPerWeek(parseInt(e.target.value))} style={{ width: '100%', padding: '6px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 11, boxSizing: 'border-box' }}>
+                    {[2,3,4,5,6].map(d => <option key={d} value={d}>{d} дн/нед</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Длит. (недель)</label>
+                  <input type="number" min={4} max={20} value={mesoLength} onChange={e => setMesoLength(parseInt(e.target.value) || 12)} style={{ width: '100%', padding: '6px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 11, boxSizing: 'border-box' }} />
+                </div>
+              </div>
+              <button onClick={() => {
+                const inp = { goal, level, daysPerWeek, recovery, fatigue, nutrition: 7, weakPoints, sessionDuration: 60, exercises: [] } as TrainingInput;
+                const best = selectSplit(inp);
+                setBuilderSplit(best[0] || null);
+                const s = best[0];
+                if (s) {
+                  const dayKeys = Object.keys(TRAINING_SPLITS);
+                  const matchKey = dayKeys.find(k => TRAINING_SPLITS[k].name === s.name);
+                  const sp = matchKey ? TRAINING_SPLITS[matchKey] : null;
+                  const exByDay: Record<number, any[]> = {};
+                  if (sp) {
+                    const totalDays = Math.min(sp.groupsPerDay.length, daysPerWeek);
+                    const cycle: string[][] = [];
+                    while (cycle.length < daysPerWeek) {
+                      for (const g of sp.groupsPerDay) { cycle.push(g); if (cycle.length >= daysPerWeek) break; }
+                    }
+                    cycle.forEach((groups, di) => {
+                      const dayExs: any[] = [];
+                      groups.forEach(g => {
+                        const catalogExs = getExercisesByGroup(g);
+                        const chosen = catalogExs.slice(0, g === 'core' ? 2 : g === 'arms' ? 2 : 3);
+                        chosen.forEach((ex, i) => {
+                          const presc = calcExercisePrescription(ex, goal, level, g === (weakPoints[0] || ''), false, i === 0 ? 1 : 0.9);
+                          dayExs.push({ name: ex.name, sets: presc.sets, reps: presc.reps, rir: presc.rir, rest: presc.rest, group: g });
+                        });
+                      });
+                      exByDay[di] = dayExs;
+                    });
+                  }
+                  setBuilderDayExercises(exByDay);
+                }
+                setBuilderStep(2);
+              }} style={{ width: '100%', padding: 8, borderRadius: 8, border: 'none', cursor: 'pointer', background: 'var(--accent)', color: '#000', fontWeight: 600, fontSize: 12 }}>Далее: Подобрать сплит</button>
+            </>)}
+
+            {/* STEP 2: Сплит */}
+            {builderStep === 2 && (<>
+              {builderSplit ? (
+                <div style={{ background: 'rgba(0,230,138,0.06)', borderRadius: 8, padding: 10, marginBottom: 8, border: '1px solid rgba(0,230,138,0.12)' }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--accent)' }}>🏆 {builderSplit.name}</div>
+                  <div style={{ fontSize: 9, color: 'var(--text-light)', marginTop: 3 }}>{builderSplit.desc}</div>
+                  <div style={{ fontSize: 9, color: 'var(--accent)', marginTop: 3 }}>Score: {builderSplit.score?.toFixed(0) || '—'}</div>
+                  {builderSplit.rationale && <div style={{ fontSize: 8, color: 'var(--text-dim)', marginTop: 3 }}>{builderSplit.rationale.join(' · ')}</div>}
+                </div>
+              ) : (
+                <div style={{ fontSize: 10, color: 'var(--text-dim)', textAlign: 'center', padding: 20 }}>Вернитесь на шаг 1 для подбора сплита</div>
+              )}
+              {(() => {
+                const inp = { goal, level, daysPerWeek, recovery, fatigue, nutrition: 7, weakPoints, sessionDuration: 60, exercises: [] } as TrainingInput;
+                const topSplits = getSplitOptions(inp);
+                return (
+                  <details style={{ marginBottom: 8 }}>
+                    <summary style={{ fontSize: 9, fontWeight: 600, color: 'var(--text-light)', cursor: 'pointer' }}>Все варианты сплитов ({topSplits.length})</summary>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 3, marginTop: 4, maxHeight: 160, overflowY: 'auto' }}>
+                      {topSplits.map((s, i) => (
+                        <div key={i} onClick={() => { setBuilderSplit(s); setSplitType(s.id || 'auto'); }} style={{ padding: '4px 8px', borderRadius: 6, cursor: 'pointer', background: builderSplit?.name === s.name ? 'rgba(0,230,138,0.08)' : 'var(--bg-secondary)', border: builderSplit?.name === s.name ? '1px solid var(--accent)' : '1px solid var(--border)' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-light)' }}>{s.name}</span>
+                            <span style={{ fontSize: 8, fontWeight: 700, color: 'var(--accent)' }}>{s.score?.toFixed(0)}</span>
+                          </div>
+                          <div style={{ fontSize: 7, color: 'var(--text-dim)', marginTop: 1 }}>{s.desc}</div>
                         </div>
-                        <div style={{ fontSize:8, color:'var(--text-dim)', marginTop:1 }}>{ex.type} · {ex.equipment}</div>
-                        {presc && <div style={{ fontSize:8, color:'rgba(255,255,255,0.5)', marginTop:1 }}>{presc.sets}×{presc.reps} @ RIR {presc.rir} · Отдых {presc.rest}с{presc.progressionNote ? ` · ${presc.progressionNote}` : ''}</div>}
+                      ))}
+                    </div>
+                  </details>
+                );
+              })()}
+              <div style={{ display: 'flex', gap: 6 }}>
+                <button onClick={() => setBuilderStep(1)} style={{ flex: 1, padding: 8, borderRadius: 8, border: '1px solid var(--border)', cursor: 'pointer', background: 'var(--bg-secondary)', color: 'var(--text-dim)', fontSize: 12 }}>← Назад</button>
+                <button onClick={() => setBuilderStep(3)} style={{ flex: 1, padding: 8, borderRadius: 8, border: 'none', cursor: 'pointer', background: 'var(--accent)', color: '#000', fontWeight: 600, fontSize: 12 }}>Далее: Упражнения</button>
+              </div>
+            </>)}
+
+            {/* STEP 3: Упражнения */}
+            {builderStep === 3 && (<>
+              <div style={{ maxHeight: 380, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 8 }}>
+                {Object.entries(builderDayExercises).sort(([a],[b]) => parseInt(a) - parseInt(b)).map(([dayKey, exs]) => (
+                  <div key={dayKey} style={{ background: 'var(--bg-secondary)', borderRadius: 8, padding: 8, border: '1px solid var(--border)' }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-light)', marginBottom: 6 }}>День {parseInt(dayKey) + 1}</div>
+                    {exs.map((ex, ei) => (<div key={ei}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '3px 6px', borderRadius: 4, marginBottom: 2, background: 'rgba(255,255,255,0.02)' }}>
+                        <span style={{ fontSize: 10, fontWeight: 600, flex: 1 }}>{ex.name}</span>
+                        <span style={{ fontSize: 9, color: 'var(--accent)' }}>{ex.sets}×{ex.reps}</span>
+                        <span style={{ fontSize: 8, color: 'var(--text-dim)' }}>RIR{ex.rir}</span>
+                        <button onClick={() => {
+                          setBuilderShowSubs(builderShowSubs === `${dayKey}_${ei}` ? null : `${dayKey}_${ei}`);
+                        }} style={{ fontSize: 9, padding: '2px 6px', borderRadius: 4, border: '1px solid var(--border)', cursor: 'pointer', background: 'transparent', color: 'var(--text-dim)' }}>↔</button>
+                        <button onClick={() => {
+                          const subs = getExercisesByGroup(ex.group || '');
+                          if (subs.length > 0) {
+                            const alt = subs[0];
+                            const newExs = { ...builderDayExercises };
+                            const name = alt.name || alt.id;
+                            newExs[parseInt(dayKey)] = newExs[parseInt(dayKey)].map((e, j) => j === ei ? { ...e, name } : e);
+                            setBuilderDayExercises(newExs);
+                          }
+                        }} style={{ fontSize: 9, padding: '2px 6px', borderRadius: 4, border: '1px solid var(--border)', cursor: 'pointer', background: 'transparent', color: 'var(--accent)' }}>↻</button>
+                        <button onClick={() => {
+                          const newExs = { ...builderDayExercises };
+                          newExs[parseInt(dayKey)] = newExs[parseInt(dayKey)].filter((_, j) => j !== ei);
+                          setBuilderDayExercises(newExs);
+                        }} style={{ fontSize: 9, padding: '2px 4px', borderRadius: 4, border: '1px solid rgba(239,68,68,0.3)', cursor: 'pointer', background: 'transparent', color: '#ef4444' }}>✕</button>
                       </div>
-                    );
-                  })}
-                </div>
-              </>);
-            })()}
+                      {builderShowSubs === `${dayKey}_${ei}` && (<>
+                        <div style={{ fontSize: 8, color: 'var(--text-dim)', marginLeft: 8, marginBottom: 2 }}>Альтернативы:</div>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, marginLeft: 8, marginBottom: 4 }}>
+                          {getExercisesByGroup(ex.group || '').slice(0, 3).map((alt, ai: number) => {
+                            const altName = alt.name || alt.id;
+                            return (
+                              <button key={ai} onClick={() => {
+                                const newExs = { ...builderDayExercises };
+                                newExs[parseInt(dayKey)] = newExs[parseInt(dayKey)].map((e, j) => j === ei ? { ...e, name: altName } : e);
+                                setBuilderDayExercises(newExs);
+                                setBuilderShowSubs(null);
+                              }} style={{ fontSize: 8, padding: '2px 6px', borderRadius: 4, border: '1px solid var(--border)', cursor: 'pointer', background: 'rgba(0,230,138,0.06)', color: 'var(--text-dim)' }}>
+                                {altName}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </>)}
+                    </div>))}
+                    <button onClick={() => { setBuilderAddExDay(builderAddExDay === parseInt(dayKey) ? null : parseInt(dayKey)); }} style={{ marginTop: 4, fontSize: 9, padding: '3px 8px', borderRadius: 4, border: '1px dashed rgba(0,230,138,0.3)', cursor: 'pointer', background: 'transparent', color: 'var(--accent)' }}>+ Добавить упражнение</button>
+                    {builderAddExDay === parseInt(dayKey) && (
+                      <div style={{ marginTop: 4, maxHeight: 150, overflowY: 'auto' }}>
+                        {EXERCISE_CATALOG.slice(0, 25).map((catEx, ci) => (
+                          <div key={ci} onClick={() => {
+                            const newExs = { ...builderDayExercises };
+                            const presc = calcExercisePrescription(catEx, goal, level, false, false, 1);
+                            newExs[parseInt(dayKey)] = [...(newExs[parseInt(dayKey)] || []), { name: catEx.name, sets: presc.sets, reps: presc.reps, rir: presc.rir, rest: presc.rest, group: catEx.group }];
+                            setBuilderDayExercises(newExs);
+                            setBuilderAddExDay(null);
+                          }} style={{ fontSize: 9, padding: '3px 6px', cursor: 'pointer', borderRadius: 4, marginBottom: 1, background: 'rgba(255,255,255,0.02)' }}>
+                            {catEx.name} <span style={{ color: 'var(--accent)', fontSize: 7 }}>{catEx.group}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+              <div style={{ display: 'flex', gap: 6 }}>
+                <button onClick={() => setBuilderStep(2)} style={{ flex: 1, padding: 8, borderRadius: 8, border: '1px solid var(--border)', cursor: 'pointer', background: 'var(--bg-secondary)', color: 'var(--text-dim)', fontSize: 12 }}>← Назад</button>
+                <button onClick={() => {
+                  const plan = generateWeeklyPlan({ goal, level, daysPerWeek, recovery, fatigue, nutrition: 7, weakPoints, sessionDuration: 60, exercises: [] } as TrainingInput, mesoLength || 8);
+                  setBuilderMacroResult(plan);
+                  setBuilderStep(4);
+                }} style={{ flex: 1, padding: 8, borderRadius: 8, border: 'none', cursor: 'pointer', background: 'var(--accent)', color: '#000', fontWeight: 600, fontSize: 12 }}>Далее: Цикл</button>
+              </div>
+            </>)}
+
+            {/* STEP 4: Цикл */}
+            {builderStep === 4 && (<>
+              {builderMacroResult ? (
+                <>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, marginBottom: 6 }}>
+                    <div style={{ background: 'var(--bg-secondary)', borderRadius: 6, padding: 6, textAlign: 'center' }}>
+                      <div style={{ fontSize: 8, color: 'var(--text-dim)' }}>Недель</div>
+                      <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--accent)' }}>{builderMacroResult.length}</div>
+                    </div>
+                    <div style={{ background: 'var(--bg-secondary)', borderRadius: 6, padding: 6, textAlign: 'center' }}>
+                      <div style={{ fontSize: 8, color: 'var(--text-dim)' }}>Прогрессия</div>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-light)' }}>{selectProgressionRule(level).name}</div>
+                      <div style={{ fontSize: 7, color: 'var(--text-dim)' }}>+{selectProgressionRule(level).weeklyWeightIncrement}кг/нед</div>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 3, maxHeight: 200, overflowY: 'auto', marginBottom: 8 }}>
+                    {builderMacroResult.map((w: any, i: number) => {
+                      const phaseColors: Record<string, string> = { base: '#3b82f6', build: '#f59e0b', peak: '#ef4444', deload: '#22c55e' };
+                      const col = phaseColors[w.phase] || '#888';
+                      return (
+                        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 6px', borderRadius: 4, background: 'var(--bg-secondary)' }}>
+                          <span style={{ fontSize: 9, fontWeight: 700, width: 20, textAlign: 'center' }}>Н{w.weekNumber}</span>
+                          <span style={{ fontSize: 8, padding: '1px 5px', borderRadius: 3, background: col + '22', color: col, fontWeight: 600, whiteSpace: 'nowrap' }}>{w.phaseName}</span>
+                          <span style={{ fontSize: 8, color: 'var(--text-dim)' }}>RIR {w.rir}</span>
+                          <span style={{ fontSize: 7, color: 'rgba(255,255,255,0.4)' }}>Vol: {typeof w.volumePerGroup === 'number' ? w.volumePerGroup : JSON.stringify(w.volumePerGroup)}</span>
+                          {w.deloadWeek && <span style={{ fontSize: 7, color: '#22c55e', fontWeight: 600 }}>Deload</span>}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </>
+              ) : (
+                <div style={{ fontSize: 10, color: 'var(--text-dim)', textAlign: 'center', padding: 20 }}>Цикл не сгенерирован. Вернитесь на шаг 3.</div>
+              )}
+              <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
+                <button onClick={() => setBuilderStep(3)} style={{ flex: 1, padding: 8, borderRadius: 8, border: '1px solid var(--border)', cursor: 'pointer', background: 'var(--bg-secondary)', color: 'var(--text-dim)', fontSize: 12 }}>← Назад</button>
+              </div>
+              <button onClick={() => {
+                try {
+                  const prog = {
+                    name: builderSplit?.name || 'Моя программа',
+                    goal, level, daysPerWeek, mesoLength,
+                    split: builderSplit,
+                    exercises: builderDayExercises,
+                    macrocycle: builderMacroResult,
+                    createdAt: new Date().toISOString(),
+                  };
+                  const existing = JSON.parse(localStorage.getItem('customPrograms') || '[]');
+                  existing.push(prog);
+                  localStorage.setItem('customPrograms', JSON.stringify(existing));
+                  localStorage.setItem('activeProgram', JSON.stringify(prog));
+                  alert('✅ Программа сохранена!');
+                } catch {}
+              }} style={{ width: '100%', padding: 10, borderRadius: 8, border: 'none', cursor: 'pointer', background: 'var(--accent)', color: '#000', fontWeight: 600, fontSize: 12 }}>
+                📋 Сохранить программу
+              </button>
+            </>)}
           </div>
         </div>
       )}
@@ -2708,30 +2837,308 @@ const AnalyticsTab: React.FC<{ sessions: WorkoutLog[] }> = ({ sessions }) => {
   );
 };
 
+const GOAL_FILTER_OPTIONS: { value: string; label: string; goal?: string }[] = [
+  { value: 'all', label: 'Все' },
+  { value: 'strength', label: 'Сила' },
+  { value: 'hypertrophy', label: 'Масса' },
+  { value: 'peaking', label: 'Сушка' },
+];
+
 const ProgramsTab: React.FC = () => {
   const [selectedId, setSelectedId] = React.useState<string | null>(null);
   const [goalFilter, setGoalFilter] = React.useState('all');
+  const [detailWeek, setDetailWeek] = React.useState(1);
   const programs = goalFilter === 'all' ? FULL_PROGRAM_LIBRARY : getProgramsByGoal(goalFilter);
   const selected = selectedId ? getProgramById(selectedId) : null;
+
+  const handleLoadProgram = () => {
+    if (!selected) return;
+    try {
+      const prog = {
+        id: selected.id, name: selected.name, goal: selected.goal, level: selected.level,
+        daysPerWeek: selected.daysPerWeek, durationWeeks: selected.durationWeeks,
+        description: selected.description, weeks: selected.weeks,
+        loadedAt: new Date().toISOString(),
+      };
+      localStorage.setItem('activeProgram', JSON.stringify(prog));
+      alert('✅ Программа загружена! Перейдите на вкладку "План" для генерации.');
+    } catch {}
+  };
+
   return (<div>
-    <div style={{ display:'flex', gap:4, marginBottom:8 }}>
-      {['all','strength','hypertrophy','peaking'].map(g => <button key={g} onClick={()=>{setGoalFilter(g);setSelectedId(null);}} style={{ padding:'4px 10px',borderRadius:6,fontSize:10,cursor:'pointer',background:goalFilter===g?'var(--accent)':'var(--bg-secondary)',color:goalFilter===g?'#000':'var(--text-dim)',border:'none' }}>{g==='all'?'Все':g==='strength'?'Сила':g==='hypertrophy'?'Гипертрофия':'Пик'}</button>)}
+    <div style={{ display: 'flex', gap: 4, marginBottom: 10, flexWrap: 'wrap' }}>
+      {GOAL_FILTER_OPTIONS.map(g => (
+        <button key={g.value} onClick={() => { setGoalFilter(g.value); setSelectedId(null); }}
+          style={{
+            padding: '6px 14px', borderRadius: 20, fontSize: 11, cursor: 'pointer',
+            background: goalFilter === g.value ? 'var(--accent)' : 'var(--bg-secondary)',
+            color: goalFilter === g.value ? '#000' : 'var(--text-dim)', border: 'none',
+            fontWeight: goalFilter === g.value ? 600 : 400,
+          }}>{g.label}</button>
+      ))}
     </div>
-    {!selected && <div style={{ display:'grid', gap:6 }}>{programs.map(p => <div key={p.id} onClick={()=>setSelectedId(p.id)} className="card" style={{ padding:10, cursor:'pointer' }}><div style={{ fontWeight:600, fontSize:13 }}>{p.name} <span style={{ fontSize:9, color:'var(--text-dim)' }}>{p.level}</span></div><div style={{ fontSize:9, color:'var(--text-light)', marginTop:2 }}>{p.description}</div></div>)}</div>}
-    {selected && <div className="card" style={{ padding:12 }}><button onClick={()=>setSelectedId(null)} style={{ background:'var(--bg-secondary)',border:'none',color:'var(--text-dim)',cursor:'pointer',fontSize:11,marginBottom:8 }}>Назад</button>
-      {(()=>{const s:any=selected; return <><h3 style={{margin:'0 0 4px',fontSize:14}}>{s.name}</h3><p style={{fontSize:10,color:'var(--text-dim)'}}>{s.description}</p><div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:4,fontSize:10,marginTop:8}}><span>Уровень: <b>{s.level}</b></span><span>Цель: <b>{s.goal}</b></span><span>Дней/нед: <b>{s.daysPerWeek}</b></span></div></>;})()}
-    </div>}
+
+    {!selected && (
+      <div style={{ display: 'grid', gap: 8 }}>
+        {programs.map(p => (
+          <div key={p.id} onClick={() => setSelectedId(p.id)}
+            style={{
+              padding: 12, borderRadius: 14, cursor: 'pointer',
+              background: 'rgba(20,22,30,0.5)', border: '1px solid var(--glass-border)',
+              backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)',
+            }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+              <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--text)' }}>{p.name}</div>
+              <span style={{ fontSize: 9, padding: '2px 8px', borderRadius: 10, background: 'rgba(0,230,138,0.1)', color: 'var(--accent)', fontWeight: 600 }}>
+                {p.goal === 'strength' ? 'Сила' : p.goal === 'hypertrophy' ? 'Масса' : p.goal === 'peaking' ? 'Сушка' : p.goal}
+              </span>
+            </div>
+            <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 6 }}>{p.description}</div>
+            <div style={{ display: 'flex', gap: 10, fontSize: 9, color: 'var(--text-light)' }}>
+              <span>Автор: <b>{p.author}</b></span>
+              <span>Уровень: <b style={{ color: 'var(--accent)' }}>{p.level}</b></span>
+              <span>{p.daysPerWeek} дн/нед</span>
+              <span>{p.durationWeeks} нед</span>
+            </div>
+          </div>
+        ))}
+      </div>
+    )}
+
+    {selected && (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <button onClick={() => setSelectedId(null)}
+          style={{
+            alignSelf: 'flex-start', padding: '6px 14px', borderRadius: 8, border: '1px solid var(--border)',
+            cursor: 'pointer', background: 'var(--bg-secondary)', color: 'var(--text-dim)', fontSize: 11,
+          }}>← К списку</button>
+
+        <div style={{
+          padding: 14, borderRadius: 14, background: 'rgba(20,22,30,0.5)',
+          border: '1px solid var(--glass-border)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)',
+        }}>
+          <h3 style={{ margin: '0 0 4px', fontSize: 16, color: 'var(--text)' }}>{selected.name}</h3>
+          <p style={{ fontSize: 10, color: 'var(--text-dim)', margin: '0 0 8px' }}>{selected.description}</p>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 4, fontSize: 10, marginBottom: 8 }}>
+            <div style={{ background: 'rgba(0,230,138,0.05)', borderRadius: 8, padding: 8, textAlign: 'center' }}>
+              <div style={{ color: 'var(--text-dim)', fontSize: 8 }}>Уровень</div>
+              <div style={{ fontWeight: 700, color: 'var(--accent)' }}>{selected.level}</div>
+            </div>
+            <div style={{ background: 'rgba(0,230,138,0.05)', borderRadius: 8, padding: 8, textAlign: 'center' }}>
+              <div style={{ color: 'var(--text-dim)', fontSize: 8 }}>Цель</div>
+              <div style={{ fontWeight: 700, color: 'var(--accent)' }}>{selected.goal}</div>
+            </div>
+            <div style={{ background: 'rgba(0,230,138,0.05)', borderRadius: 8, padding: 8, textAlign: 'center' }}>
+              <div style={{ color: 'var(--text-dim)', fontSize: 8 }}>Дней/нед</div>
+              <div style={{ fontWeight: 700, color: 'var(--accent)' }}>{selected.daysPerWeek}</div>
+            </div>
+          </div>
+
+          <div style={{ fontSize: 10, color: 'var(--text-light)', marginBottom: 4 }}>
+            <b>Снаряжение:</b> {selected.equipmentNeeded.join(', ')}
+          </div>
+          <div style={{ fontSize: 10, color: 'var(--text-light)', marginBottom: 4 }}>
+            <b>Прогрессия:</b> {selected.progressionModel}
+          </div>
+          <div style={{ fontSize: 10, color: 'var(--text-light)', marginBottom: 8 }}>
+            <b>Разгрузка:</b> {selected.deloadProtocol}
+          </div>
+          {selected.warnings.length > 0 && (
+            <div style={{ fontSize: 9, color: '#f59e0b', background: 'rgba(245,158,11,0.08)', borderRadius: 8, padding: 8, marginBottom: 8 }}>
+              {selected.warnings.map((w, i) => <div key={i}>⚠ {w}</div>)}
+            </div>
+          )}
+          <div style={{ fontSize: 10, color: 'var(--accent)', background: 'rgba(0,230,138,0.06)', borderRadius: 8, padding: 8, marginBottom: 8 }}>
+            <b>Ожидаемый результат:</b> {selected.expectedResults}
+          </div>
+
+          <button onClick={handleLoadProgram}
+            style={{
+              width: '100%', padding: 10, borderRadius: 10, border: 'none', cursor: 'pointer',
+              background: 'var(--accent)', color: '#000', fontWeight: 700, fontSize: 12, marginBottom: 10,
+            }}>
+            📋 Загрузить программу
+          </button>
+
+          {/* Week-by-week detail */}
+          <h4 style={{ margin: '0 0 6px', fontSize: 12, color: 'var(--text)' }}>Программа по неделям</h4>
+          <div style={{ display: 'flex', gap: 4, marginBottom: 8, flexWrap: 'wrap' }}>
+            {selected.weeks.map((w, i) => (
+              <button key={i} onClick={() => setDetailWeek(i + 1)}
+                style={{
+                  padding: '4px 10px', borderRadius: 12, fontSize: 10, cursor: 'pointer',
+                  background: detailWeek === i + 1 ? 'rgba(0,230,138,0.12)' : 'var(--bg-secondary)',
+                  border: detailWeek === i + 1 ? '1px solid var(--accent)' : '1px solid var(--border)',
+                  color: detailWeek === i + 1 ? 'var(--accent)' : 'var(--text-dim)',
+                  fontWeight: detailWeek === i + 1 ? 600 : 400,
+                }}>
+                Нед {w.week}{w.deload ? ' 🟢' : ''}
+              </button>
+            ))}
+          </div>
+
+          {selected.weeks[detailWeek - 1] && (() => {
+            const wk = selected.weeks[detailWeek - 1];
+            return (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 2 }}>
+                  Фаза: <b>{wk.phase}</b> | Объём: {wk.volumeMultiplier}× | Интенсивность: {wk.intensityMultiplier}×
+                  {wk.deload ? ' | 🟢 Разгрузка' : ''}
+                </div>
+                {wk.days.map((day, di) => (
+                  <div key={di} style={{
+                    padding: 10, borderRadius: 10, background: 'rgba(255,255,255,0.02)',
+                    border: '1px solid var(--border)',
+                  }}>
+                    <div style={{ fontWeight: 700, fontSize: 11, color: 'var(--accent)', marginBottom: 4 }}>
+                      День {day.day}: {day.name} — {day.focus}
+                    </div>
+                    <div style={{ fontSize: 8, color: 'var(--text-dim)', marginBottom: 6 }}>
+                      Разминка: {day.warmup} | Заминка: {day.cooldown}
+                    </div>
+                    {day.exercises.map((ex, ei) => (
+                      <div key={ei} style={{
+                        display: 'flex', alignItems: 'center', gap: 6, padding: '4px 8px',
+                        borderRadius: 6, marginBottom: 2, background: 'rgba(255,255,255,0.03)',
+                        fontSize: 9,
+                      }}>
+                        <span style={{ flex: 1, fontWeight: 600 }}>{ex.name}</span>
+                        <span style={{ color: 'var(--accent)' }}>{ex.sets}×{ex.reps}</span>
+                        <span style={{ color: 'var(--text-dim)' }}>RPE {ex.rpe}</span>
+                        <span style={{ color: 'var(--text-dim)' }}>RIR {ex.rir}</span>
+                        <span style={{ color: 'var(--text-dim)' }}>Отд {ex.restSec}с</span>
+                        {ex.notes ? <span style={{ fontSize: 8, color: 'var(--text-dim)' }}>{ex.notes}</span> : null}
+                      </div>
+                    ))}
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
+        </div>
+      </div>
+    )}
   </div>);
 };
 
 const TimersTab: React.FC = () => {
-  const timers = React.useMemo(() => getWorkoutTimers(), []);
-  const checklists = React.useMemo(() => getGymChecklists(), []);
-  const bpm = React.useMemo(() => getBPMGuide(), []);
-  return (<div>
-    <div className="card" style={{ marginBottom:8, padding:10 }}><h4 style={{ margin:'0 0 6px',fontSize:12 }}>⏱ Таймеры ({timers.length})</h4>{timers.map((t,i)=><div key={i} style={{ marginBottom:4,fontSize:10 }}><b>{t.name}</b> ({t.type}): работа {t.workSec}с / отдых {t.restSec}с × {t.rounds} раундов</div>)}</div>
-    <div className="card" style={{ marginBottom:8, padding:10 }}><h4 style={{ margin:'0 0 6px',fontSize:12 }}>🎵 BPM</h4>{bpm.map((b:any,i)=><div key={i} style={{ fontSize:9, display:'flex',justifyContent:'space-between' }}><span>{b.phase || b.name}</span><span style={{ fontWeight:600 }}>{b.bpmRange} BPM</span></div>)}</div>
-    <div className="card" style={{ padding:10 }}><h4 style={{ margin:'0 0 6px',fontSize:12 }}>✅ Чек-листы</h4>{checklists.map((c,i)=><div key={i} style={{ marginBottom:6 }}><div style={{ fontWeight:600,fontSize:11 }}>{(c as any).name || (c as any).title}</div>{c.items?.map((item:any,ii:number)=><div key={ii} style={{ fontSize:8,color:'var(--text-light)',marginLeft:6 }}>✓ {item}</div>)}</div>)}</div>
+  const [totalSec, setTotalSec] = React.useState(60);
+  const [restSec, setRestSec] = React.useState(30);
+  const [rounds, setRounds] = React.useState(3);
+  const [isRunning, setIsRunning] = React.useState(false);
+  const [currentRound, setCurrentRound] = React.useState(0);
+  const [phase, setPhase] = React.useState<'work' | 'rest'>('work');
+  const [timeLeft, setTimeLeft] = React.useState(0);
+  const intervalRef = React.useRef<number | null>(null);
+
+  const start = () => {
+    if (isRunning) return;
+    setIsRunning(true);
+    setCurrentRound(1);
+    setPhase('work');
+    setTimeLeft(totalSec);
+  };
+
+  const stop = () => {
+    setIsRunning(false);
+    if (intervalRef.current) { clearInterval(intervalRef.current); intervalRef.current = null; }
+  };
+
+  const reset = () => {
+    stop();
+    setCurrentRound(0);
+    setPhase('work');
+    setTimeLeft(0);
+  };
+
+  React.useEffect(() => {
+    if (!isRunning) return;
+    intervalRef.current = window.setInterval(() => {
+      setTimeLeft(prev => {
+        if (prev <= 1) {
+          if (phase === 'work') {
+            if (currentRound >= rounds) { stop(); return 0; }
+            setPhase('rest');
+            return restSec;
+          } else {
+            setPhase('work');
+            setCurrentRound(r => r + 1);
+            return totalSec;
+          }
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => { if (intervalRef.current) { clearInterval(intervalRef.current); intervalRef.current = null; } };
+  }, [isRunning, phase, currentRound, rounds, totalSec, restSec]);
+
+  const pct = phase === 'work' ? (timeLeft / totalSec) * 100 : (timeLeft / restSec) * 100;
+
+  return (<div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+    <div style={{
+      padding: 16, borderRadius: 16, textAlign: 'center',
+      background: 'rgba(20,22,30,0.5)', border: '1px solid var(--glass-border)',
+      backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)',
+    }}>
+      <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 4 }}>
+        {phase === 'work' ? 'РАБОТА' : 'ОТДЫХ'} · Раунд {currentRound}/{rounds}
+      </div>
+      <div style={{
+        fontSize: 64, fontWeight: 800, lineHeight: 1,
+        background: 'linear-gradient(135deg, #00e68a, #00c853)',
+        WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
+      }}>
+        {String(Math.floor(timeLeft / 60)).padStart(2, '0')}:{String(timeLeft % 60).padStart(2, '0')}
+      </div>
+      <div style={{
+        marginTop: 8, height: 6, borderRadius: 3, background: 'rgba(255,255,255,0.08)', overflow: 'hidden',
+      }}>
+        <div style={{
+          height: '100%', width: `${pct}%`, borderRadius: 3,
+          background: phase === 'work' ? 'var(--accent)' : '#3b82f6',
+          transition: 'width 1s linear',
+        }} />
+      </div>
+    </div>
+
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
+      <div>
+        <label style={{ fontSize: 9, color: 'var(--text-dim)' }}>Работа (с)</label>
+        <input type="number" min={5} max={600} value={totalSec || ''} onChange={e => setTotalSec(parseInt(e.target.value) || 60)} disabled={isRunning}
+          style={{ width: '100%', padding: '8px', borderRadius: 8, textAlign: 'center', background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 14, boxSizing: 'border-box' }} />
+      </div>
+      <div>
+        <label style={{ fontSize: 9, color: 'var(--text-dim)' }}>Отдых (с)</label>
+        <input type="number" min={5} max={600} value={restSec || ''} onChange={e => setRestSec(parseInt(e.target.value) || 30)} disabled={isRunning}
+          style={{ width: '100%', padding: '8px', borderRadius: 8, textAlign: 'center', background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 14, boxSizing: 'border-box' }} />
+      </div>
+      <div>
+        <label style={{ fontSize: 9, color: 'var(--text-dim)' }}>Раунды</label>
+        <input type="number" min={1} max={20} value={rounds || ''} onChange={e => setRounds(parseInt(e.target.value) || 3)} disabled={isRunning}
+          style={{ width: '100%', padding: '8px', borderRadius: 8, textAlign: 'center', background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 14, boxSizing: 'border-box' }} />
+      </div>
+    </div>
+
+    <div style={{ display: 'flex', gap: 8 }}>
+      {!isRunning ? (
+        <button onClick={start}
+          style={{ flex: 1, padding: 12, borderRadius: 12, border: 'none', cursor: 'pointer',
+            background: 'var(--accent)', color: '#000', fontWeight: 700, fontSize: 14 }}>
+          ▶ Старт
+        </button>
+      ) : (
+        <button onClick={stop}
+          style={{ flex: 1, padding: 12, borderRadius: 12, border: 'none', cursor: 'pointer',
+            background: '#ef4444', color: '#fff', fontWeight: 700, fontSize: 14 }}>
+          ⏸ Стоп
+        </button>
+      )}
+      <button onClick={reset}
+        style={{ padding: '12px 20px', borderRadius: 12, border: '1px solid var(--border)', cursor: 'pointer',
+          background: 'var(--bg-secondary)', color: 'var(--text-dim)', fontSize: 14 }}>
+        ↺ Сброс
+      </button>
+    </div>
   </div>);
 };
 

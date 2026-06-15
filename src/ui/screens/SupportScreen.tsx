@@ -35,7 +35,7 @@ import { checkDrugInteractions } from '../../engines/pharma-interactions.engine'
 import type { CourseEntry } from '../../core/types';
 import { searchPubMed, type PubMedArticle } from '../../engines/pubmed-search.engine';
 
-type SupportTab = 'main' | 'catalog' | 'synergies' | 'calculator' | 'interactions' | 'stacks' | 'peptides' | 'fertility-pct' | 'research';
+type SupportTab = 'main' | 'catalog' | 'synergies' | 'calculator' | 'interactions' | 'stacks' | 'peptides' | 'fertility-pct';
 type SupportView = 'main' | 'calc' | 'fertility';
 type CalcView = 'main' | 'calculator' | 'peptides' | 'info' | 'stackcalc' | 'mystacks' | 'mixcalc' | 'plan';
 type InfoView = 'main' | 'catalog' | 'synergies' | 'stacks' | 'interactions' | 'research';
@@ -97,16 +97,22 @@ const INTERACTION_SEVERITY_LABELS: Record<string, { label: string; color: string
 
 const CATEGORY_LABELS: Record<string, { label: string; emoji: string }> = {
   vitamin: { label: 'Витамины', emoji: '🧪' },
+  vitamins: { label: 'Витамины', emoji: '🧪' },
   minerals: { label: 'Минералы', emoji: '⚡' },
   mineral: { label: 'Минералы', emoji: '⚡' },
   amino: { label: 'Аминокислоты', emoji: '🧬' },
   aminoacid: { label: 'Аминокислоты', emoji: '🧬' },
+  amino_acids: { label: 'Аминокислоты', emoji: '🧬' },
   peptide: { label: 'Пептиды', emoji: '🔬' },
+  peptides: { label: 'Пептиды', emoji: '🔬' },
   antioxidant: { label: 'Антиоксиданты', emoji: '🛡' },
+  antioxidants: { label: 'Антиоксиданты', emoji: '🛡' },
   immune: { label: 'Иммунитет', emoji: '🛡' },
   hormone: { label: 'Гормоны', emoji: '⚕️' },
+  hormones: { label: 'Гормоны', emoji: '⚕️' },
   hormonal: { label: 'Гормоны', emoji: '⚕️' },
   fatty_acid: { label: 'Жирные кислоты', emoji: '💧' },
+  fatty_acids: { label: 'Жирные кислоты', emoji: '💧' },
   lipids: { label: 'Липиды', emoji: '💧' },
   nootropic: { label: 'Ноотропы', emoji: '🧠' },
   neuro: { label: 'Нервная система', emoji: '🧠' },
@@ -183,6 +189,13 @@ const CATEGORY_LABELS: Record<string, { label: string; emoji: string }> = {
   anti_glycation: { label: 'Антигликация', emoji: '🍬' },
   enzyme: { label: 'Ферменты', emoji: '🧪' },
   enzymes: { label: 'Ферменты', emoji: '🧪' },
+  herbs: { label: 'Растения и травы', emoji: '🌿' },
+  nootropics: { label: 'Ноотропы', emoji: '🧠' },
+  adaptogens: { label: 'Адаптогены', emoji: '🌿' },
+  probiotics: { label: 'Пробиотики', emoji: '🦠' },
+  mushrooms: { label: 'Грибы', emoji: '🍄' },
+  electrolytes: { label: 'Электролиты', emoji: '⚡' },
+  other: { label: 'Другое', emoji: '📦' },
 };
 
 const MECH_TRANSLATIONS_RU: Record<string, string> = {
@@ -232,7 +245,7 @@ const ORGAN_MECHANISMS: Record<string, string[]> = {
 };
 
 const getCategoryInfo = (cat: string): { label: string; emoji: string } =>
-  CATEGORY_LABELS[cat] || { label: cat, emoji: '📦' };
+  CATEGORY_LABELS[cat] || (TYPE_LABELS_RU[cat] ? { label: TYPE_LABELS_RU[cat], emoji: '📦' } : { label: cat, emoji: '📦' });
 
 const TYPE_LABELS_RU: Record<string, string> = {
   vitamin: 'Витамины', mineral: 'Минералы', minerals: 'Минералы', amino_acid: 'Аминокислоты', amino: 'Аминокислоты',
@@ -1047,6 +1060,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   const [pubMedError, setPubMedError] = useState('');
   const [pharmaSearchQ, setPharmaSearchQ] = useState('');
   const [pharmaSearchResults, setPharmaSearchResults] = useState<{ name: string; id: string; cls: string; desc: string }[]>([]);
+  const [stackBuilder, setStackBuilder] = useState<string[]>([]);
   const [savedStacks, setSavedStacks] = useState<{ id: string; name: string; date: string; subs: string[]; dosages: Record<string, { mg: number; timing: string }> }[]>(() => { try { return JSON.parse(localStorage.getItem('savedStacks') || '[]'); } catch { return []; } });
   const [stackName, setStackName] = useState('');
   const [researchSource, setResearchSource] = useState<'pubmed' | 'pubchem' | 'scholar' | 'fda' | 'pharma'>('pubmed');
@@ -1155,6 +1169,17 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
     setSavedStacks(updated);
     localStorage.setItem('savedStacks', JSON.stringify(updated));
     setStackName('');
+  };
+
+  const saveBuilderStack = () => {
+    if (stackBuilder.length === 0) return;
+    const id = 'build_' + Date.now();
+    const label = stackBuilder.slice(0, 3).map(sid => resolveSubName(sid)).join(', ') + (stackBuilder.length > 3 ? ` +${stackBuilder.length - 3}` : '');
+    const newStack = { id, name: `Стек: ${label}`, date: new Date().toISOString(), subs: stackBuilder, dosages: {} };
+    const updated = [...savedStacks, newStack];
+    setSavedStacks(updated);
+    localStorage.setItem('savedStacks', JSON.stringify(updated));
+    setStackBuilder([]);
   };
 
   const deleteStack = (id: string) => {
@@ -1613,9 +1638,11 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
                   <div key={interaction?.interactionId||i} style={{ background:'var(--bg-secondary)', borderRadius:8, padding:'7px 8px', borderLeft:'3px solid #22c55e' }}>
                     <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:2 }}>
                       <div style={{ display:'flex', alignItems:'center', gap:4, flexWrap:'wrap', flex:1, minWidth:0 }}>
-                        <span style={{ fontWeight:600, fontSize:10, color:'var(--text-light)', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', maxWidth:'40%' }}>{aName}</span>
+                        <span style={{ fontWeight:600, fontSize:10, color:'var(--text-light)', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', maxWidth:'35%' }}>{aName}</span>
+                        <button onClick={(e) => { e.stopPropagation(); setStackBuilder(prev => prev.includes(interaction?.substanceA) ? prev : [...prev, interaction?.substanceA]); }} style={{ padding:'1px 4px', borderRadius:4, fontSize:7, cursor:'pointer', background:'rgba(0,230,138,0.08)', border:'1px solid rgba(0,230,138,0.2)', color:'#00e68a', fontWeight:700, lineHeight:'12px' }}>+</button>
                         <span style={{ fontSize:10, color:'#22c55e', fontWeight:700 }}>+</span>
-                        <span style={{ fontWeight:600, fontSize:10, color:'var(--text-light)', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', maxWidth:'40%' }}>{bName}</span>
+                        <span style={{ fontWeight:600, fontSize:10, color:'var(--text-light)', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', maxWidth:'35%' }}>{bName}</span>
+                        <button onClick={(e) => { e.stopPropagation(); setStackBuilder(prev => prev.includes(interaction?.substanceB) ? prev : [...prev, interaction?.substanceB]); }} style={{ padding:'1px 4px', borderRadius:4, fontSize:7, cursor:'pointer', background:'rgba(0,230,138,0.08)', border:'1px solid rgba(0,230,138,0.2)', color:'#00e68a', fontWeight:700, lineHeight:'12px' }}>+</button>
                       </div>
                       <span style={{ fontSize:7, padding:'1px 4px', borderRadius:3, background:sevInfo.color+'22', color:sevInfo.color, flexShrink:0 }}>{sevInfo.label}</span>
                     </div>
@@ -1792,7 +1819,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
               ))}
             </div>
             <div style={{ display:'flex', gap:6, marginTop:12, overflowX:'auto', scrollbarWidth:'none' }}>
-              <button onClick={() => { setTab('research'); }} style={{ padding:'6px 12px', borderRadius:16, fontSize:9, fontWeight:700, whiteSpace:'nowrap', cursor:'pointer', flexShrink:0, background:'var(--bg-secondary)', color:'var(--text-dim)', border:'1px solid var(--border)' }}>🔬 Исследования</button>
+              <button onClick={() => { setCalcView('info'); setInfoView('research'); }} style={{ padding:'6px 12px', borderRadius:16, fontSize:9, fontWeight:700, whiteSpace:'nowrap', cursor:'pointer', flexShrink:0, background:'var(--bg-secondary)', color:'var(--text-dim)', border:'1px solid var(--border)' }}>🔬 Исследования</button>
               <button onClick={() => setCalcView('stackcalc')} style={{ padding:'6px 12px', borderRadius:16, fontSize:9, fontWeight:700, whiteSpace:'nowrap', cursor:'pointer', flexShrink:0, background:'var(--bg-secondary)', color:'var(--text-dim)', border:'1px solid var(--border)' }}>🧮 Генератор</button>
               <button onClick={() => setCalcView('mystacks')} style={{ padding:'6px 12px', borderRadius:16, fontSize:9, fontWeight:700, whiteSpace:'nowrap', cursor:'pointer', flexShrink:0, background:'var(--bg-secondary)', color:'var(--text-dim)', border:'1px solid var(--border)' }}>📂 Мои стеки</button>
               <button onClick={() => setCalcView('mixcalc')} style={{ padding:'6px 12px', borderRadius:16, fontSize:9, fontWeight:700, whiteSpace:'nowrap', cursor:'pointer', flexShrink:0, background:'var(--bg-secondary)', color:'var(--text-dim)', border:'1px solid var(--border)' }}>⚡ Миксы</button>
@@ -1959,7 +1986,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
                                   <span style={{ fontSize:11, fontWeight:800, color:synergyColor, marginLeft:4 }}>{(stack.synergyScore||0).toFixed(1)}</span>
                                 </div>
                                 <div style={{ display:'flex', flexWrap:'wrap', gap:2, marginBottom:expandedMed === stack.id ? 4 : 0 }}>
-                                  {stack.substances.map(sid => <span key={sid} style={{ fontSize:8, padding:'1px 6px', borderRadius:6, background:'rgba(139,92,246,0.08)', border:'1px solid rgba(139,92,246,0.12)', color:'#a78bfa', fontWeight:600 }}>{getStackSubLabel(sid)}</span>)}
+                                  {stack.substances.map(sid => <span key={sid} style={{ fontSize:8, padding:'1px 6px', borderRadius:6, background:'rgba(139,92,246,0.08)', border:'1px solid rgba(139,92,246,0.12)', color:'#a78bfa', fontWeight:600 }}>{getStackSubLabel(sid)}<button onClick={(e) => { e.stopPropagation(); setStackBuilder(prev => prev.includes(sid) ? prev : [...prev, sid]); }} style={{ padding:'0px 3px', borderRadius:3, fontSize:7, cursor:'pointer', background:'rgba(0,230,138,0.1)', border:'none', color:'#00e68a', fontWeight:700, marginLeft:2, lineHeight:'14px' }}>+</button></span>)}
                                 </div>
                                 <div style={{ fontSize:7, color:'var(--text-dim)' }}>{stack.substances.length} веществ</div>
                                 {expandedMed === stack.id && safeRender('stack_'+stack.id, () =>
@@ -2177,7 +2204,48 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
                       </div>
                     </div>
             )}
-            
+                    {/* Hardcoded drug interaction cards */}
+                    <div style={{ marginTop:8 }}>
+                      <div onClick={() => setExpandedCategories(prev => ({ ...prev, drug_combo_ref: !prev.drug_combo_ref }))} style={{ display:'flex', alignItems:'center', gap:6, padding:'7px 10px', cursor:'pointer', userSelect:'none', background:'var(--bg-secondary)', borderRadius:8 }}>
+                        <span style={{ fontSize:13 }}>💊</span>
+                        <div style={{ flex:1, fontSize:10, fontWeight:700, color:'var(--text-light)' }}>Фармакологические взаимодействия</div>
+                        <span style={{ fontSize:9, color:'var(--text-dim)', marginRight:2 }}>13</span>
+                        <span style={{ fontSize:9, color:'var(--text-dim)', transform: expandedCategories.drug_combo_ref !== false ? 'rotate(180deg)' : 'none', transition:'transform 0.2s' }}>▼</span>
+                      </div>
+                      {expandedCategories.drug_combo_ref !== false && (
+                        <div style={{ display:'flex', flexDirection:'column', gap:3, marginTop:4 }}>
+                          {([
+                            { a:'Тестостерон', b:'Тренболон', effect:'Усиление андрогенного эффекта', risk:'Агрессия, акне, липиды', control:'Липидограмма каждые 4 нед.', type:'warning' },
+                            { a:'Тестостерон', b:'Мастерон', effect:'Синергия. Мастерон снижает ароматизацию тестостерона', risk:'Подавление Е2', control:'Контроль Е2', type:'synergy' },
+                            { a:'Тестостерон', b:'Болденон', effect:'Медленный набор массы', risk:'Повышение гематокрита', control:'ОАК', type:'caution' },
+                            { a:'Тренболон', b:'Болденон', effect:'Оба повышают гематокрит и АД', risk:'Тромбоз', control:'ОАК + АД еженедельно', type:'critical' },
+                            { a:'Телмисартан', b:'Небиволол', effect:'Усиление гипотензивного эффекта (БРА + бета-блокатор)', risk:'Брадикардия, гипотония', control:'АД и ЧСС 2x/день. Коррекция дозы при ЧСС <50', type:'caution' },
+                            { a:'Телмисартан', b:'Амлодипин', effect:'Синергия. БРА + блокатор кальциевых каналов', risk:'Меньше отёков чем амлодипин отдельно', control:'Контроль АД', type:'synergy' },
+                            { a:'Метформин', b:'Берберин', effect:'Оба снижают глюкозу', risk:'Гипогликемия', control:'Глюкометр', type:'warning' },
+                            { a:'Инсулин', b:'Метформин', effect:'Метформин снижает потребность в инсулине на 20-30%', risk:'Гипогликемия', control:'Коррекция дозы инсулина', type:'caution' },
+                            { a:'Станазолол', b:'Оксандролон', effect:'Оба 17α-алкилированные гепатотоксичные', risk:'Холестаз', control:'АЛТ/АСТ/ГГТ каждые 2 нед. НЕ комбинировать!', type:'critical' },
+                            { a:'Оксандролон', b:'Тестостерон', effect:'Синергия. Оксандролон снижает ГСПГ', risk:'Больше свободного тестостерона', control:'Контроль ГСПГ', type:'synergy' },
+                            { a:'Тамоксифен', b:'Кломифен', effect:'Оба СЕРМ. Синергия в ПКТ', risk:'Тамоксифен для Е2, кломифен для ЛГ/ФСГ', control:'Гормональная панель', type:'synergy' },
+                            { a:'Анастрозол', b:'Тамоксифен', effect:'Анастрозол снижает Е2, тамоксифен блокирует рецепторы', risk:'Синергия при гинекомастии', control:'Контроль Е2', type:'synergy' },
+                            { a:'Дексаметазон', b:'Тестостерон', effect:'Глюкокортикоид + андроген', risk:'Гипергликемия, катаболизм', control:'Глюкоза', type:'warning' },
+                          ] as const).map((combo, ci) => {
+                            const typeColor = combo.type === 'critical' ? '#ff1744' : combo.type === 'warning' ? '#ff9100' : combo.type === 'synergy' ? '#22c55e' : '#f59e0b';
+                            const typeLabel = combo.type === 'critical' ? '🚫 КРИТИЧНО' : combo.type === 'warning' ? '⚡ ОСТОРОЖНО' : combo.type === 'synergy' ? '⊕ СИНЕРГИЯ' : 'ℹ УМЕРЕННО';
+                            return (
+                              <div key={ci} style={{ background:'var(--bg-secondary)', borderRadius:8, padding:'6px 8px', borderLeft:`3px solid ${typeColor}`, border:'1px solid var(--border)' }}>
+                                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:2 }}>
+                                  <span style={{ fontSize:9, fontWeight:700, color:'var(--text-light)' }}>{combo.a} + {combo.b}</span>
+                                  <span style={{ fontSize:7, padding:'1px 5px', borderRadius:3, background:typeColor+'22', color:typeColor, fontWeight:600 }}>{typeLabel}</span>
+                                </div>
+                                <div style={{ fontSize:8, color:'rgba(255,255,255,0.85)', lineHeight:1.3 }}>{combo.effect}</div>
+                                <div style={{ fontSize:7, color:'#f87171', lineHeight:1.2, marginTop:1 }}>⚠ Риск: {combo.risk}</div>
+                                <div style={{ fontSize:7, color:'#60a5fa', lineHeight:1.2 }}>📋 Контроль: {combo.control}</div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
 
              {/* ===== RESEARCH: Multi-Source ===== */}
               {renderView(infoView, 'research', () => (
@@ -3650,7 +3718,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
                           <div style={{ display:'flex', flexWrap:'wrap', gap:3, marginBottom:expandedMed === stack.id ? 6 : 0 }}>
                             {stack.substances.map(sid => (
                               <span key={sid} style={{ fontSize:9, padding:'2px 7px', borderRadius:8, background:'rgba(139,92,246,0.08)', border:'1px solid rgba(139,92,246,0.15)', color:'#a78bfa', fontWeight:600 }}>
-                                {getStackSubLabel(sid)}
+                                {getStackSubLabel(sid)}<button onClick={(e) => { e.stopPropagation(); setStackBuilder(prev => prev.includes(sid) ? prev : [...prev, sid]); }} style={{ padding:'0px 4px', borderRadius:4, fontSize:8, cursor:'pointer', background:'rgba(0,230,138,0.1)', border:'none', color:'#00e68a', fontWeight:700, marginLeft:2, lineHeight:'16px' }}>+</button>
                               </span>
                             ))}
                           </div>
@@ -4056,7 +4124,7 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
                  } else { mechHits = 1; score += 1; }
                  if (score>0) candidates.push({sub,score,organHits,mechHits});
                }
-               candidates.sort((a,b)=>b.score-a.score);
+               candidates.sort((a,b)=>(b.score-a.score) || (Math.random()-0.5));
                const allCandidates = candidates.slice(0, Math.min(50, candidates.length));
                const findSynergies = (subs: string[]) => {
                  const synergies:any[] = []; const conflicts:any[] = [];
@@ -4548,94 +4616,20 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
         </div>
       )}
 
-      {/* ===== STANDALONE RESEARCH TAB ===== */}
-      {tab === 'research' && (
-        <div style={{ padding:'0 12px 80px', height:'100vh', overflowY:'auto' }}>
-          <button onClick={() => setTab('main')} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', marginBottom:8, background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← На главную</button>
-          <h2 style={{ margin:'0 0 8px', fontSize:18, fontWeight:800, color:'var(--accent)' }}>🔬 Исследования</h2>
-
-          <div className="card" style={{marginBottom:10,padding:'8px 10px'}}>
-            <div style={{display:'flex',gap:4,marginBottom:8,overflowX:'auto'}}>
-              {([{k:'pubmed',l:'📚 PubMed',c:'#3b82f6'},{k:'pubchem',l:'🧪 PubChem',c:'#8b5cf6'},{k:'scholar',l:'🎓 Scholar',c:'#f59e0b'},{k:'fda',l:'💊 OpenFDA',c:'#ef4444'},{k:'pharma',l:'📋 Каталог',c:'#00e68a'}] as const).map(s=>(
-                <button key={s.k} onClick={()=>{setResearchSource(s.k);if(s.k==='pubchem')handlePubchemSearch();if(s.k==='fda')handleFDASearch();}} style={{padding:'4px 10px',borderRadius:14,fontSize:9,fontWeight:700,whiteSpace:'nowrap',cursor:'pointer',background:researchSource===s.k?s.c:'var(--bg-secondary)',color:researchSource===s.k?'#fff':'var(--text-dim)',border:`1px solid ${researchSource===s.k?s.c:'var(--border)'}`}}>{s.l}</button>
-              ))}
-            </div>
-            <div style={{display:'flex',gap:6}}>
-              <input value={pubMedQuery} onChange={e=>setPubMedQuery(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'){if(researchSource==='pubmed')handlePubMedSearch();if(researchSource==='pubchem')handlePubchemSearch();if(researchSource==='fda')handleFDASearch();}}}
-                placeholder={researchSource==='pubmed'?'creatine muscle, NAC liver...':researchSource==='pubchem'?'caffeine, curcumin...':'aspirin, metformin...'}
-                style={{flex:1,padding:'8px 10px',borderRadius:8,border:'1px solid var(--border)',background:'var(--bg-secondary)',color:'var(--text)',fontSize:11,boxSizing:'border-box'}} />
-              <button onClick={()=>{if(researchSource==='pubmed')handlePubMedSearch();if(researchSource==='pubchem')handlePubchemSearch();if(researchSource==='fda')handleFDASearch();}} disabled={pubMedLoading||pubchemLoading} style={{padding:'8px 14px',borderRadius:8,border:'none',cursor:'pointer',background:'linear-gradient(135deg,#3b82f6,#2563eb)',color:'#fff',fontWeight:700,fontSize:11}}>{(pubMedLoading||pubchemLoading)?'⏳':'🔍'}</button>
-            </div>
-          </div>
-
-          {researchSource==='pubmed'&&(
-            <div className="card" style={{marginBottom:10}}>
-              <h4 style={{margin:'0 0 6px',fontSize:11}}>📚 PubMed</h4>
-              <div style={{display:'flex',gap:4,marginBottom:6,flexWrap:'wrap'}}>
-                {['креатин','бета-аланин','сывороточный протеин','цитруллин','NAC печень'].map(l=><button key={l} onClick={()=>{setPubMedQuery(l);handlePubMedSearch();}} style={{padding:'2px 7px',borderRadius:4,fontSize:8,cursor:'pointer',border:'1px solid var(--border)',background:'var(--bg-secondary)',color:'var(--text-dim)'}}>{l}</button>)}
-              </div>
-              {pubMedError&&<div style={{padding:6,background:'rgba(239,68,68,0.06)',borderRadius:6,color:'#f87171',fontSize:9,marginBottom:6}}>⚠ {pubMedError}</div>}
-              {pubMedResults.length>0&&<div style={{fontSize:8,color:'var(--text-dim)',marginBottom:4}}>Найдено: {pubMedResults.length}</div>}
-              <div style={{display:'flex',flexDirection:'column',gap:4,maxHeight:300,overflowY:'auto'}}>
-                {pubMedResults.map(a=><a key={a.pmid} href={a.url} target="_blank" rel="noopener" style={{display:'block',padding:'6px 8px',borderRadius:6,background:'var(--bg-secondary)',border:'1px solid var(--border)',textDecoration:'none',color:'inherit'}}><div style={{fontSize:10,fontWeight:600,color:'var(--text-light)',lineHeight:1.3,marginBottom:1}}>{a.title}</div>{a.authors.length>0&&<div style={{fontSize:8,color:'var(--text-dim)'}}>{a.authors.slice(0,3).join(', ')}{a.authors.length>3?' et al.':''}</div>}<div style={{fontSize:8,color:'var(--text-dim)'}}>{a.journal}{a.pubDate?' · '+a.pubDate:''}</div></a>)}
-              </div>
-              {pubMedResults.length===0&&!pubMedLoading&&<div style={{padding:16,textAlign:'center',color:'var(--text-dim)',fontSize:10}}>Введите запрос и нажмите 🔍</div>}
-            </div>
-          )}
-
-          {researchSource==='pubchem'&&(
-            <div className="card" style={{marginBottom:10}}>
-              <h4 style={{margin:'0 0 6px',fontSize:11}}>🧪 PubChem</h4>
-              <div style={{display:'flex',gap:4,marginBottom:6,flexWrap:'wrap'}}>
-                {['caffeine','curcumin','creatine','taurine','citrulline'].map(l=><button key={l} onClick={()=>{setPubMedQuery(l);handlePubchemSearch();}} style={{padding:'2px 7px',borderRadius:4,fontSize:8,cursor:'pointer',border:'1px solid var(--border)',background:'var(--bg-secondary)',color:'var(--text-dim)'}}>{l}</button>)}
-              </div>
-              {pubchemError&&<div style={{padding:6,background:'rgba(239,68,68,0.06)',borderRadius:6,color:'#f87171',fontSize:9,marginBottom:6}}>⚠ {pubchemError}</div>}
-              {pubchemLoading&&<div style={{padding:12,textAlign:'center',color:'var(--text-dim)',fontSize:10}}>⏳ Поиск в PubChem...</div>}
-              {pubchemResults.map((r,i)=><div key={i} style={{padding:'6px 8px',borderRadius:6,background:'rgba(139,92,246,0.04)',border:'1px solid rgba(139,92,246,0.15)',marginBottom:4,fontSize:10}}><div style={{fontWeight:600,color:'var(--text-light)'}}>{r.name}</div><div style={{fontSize:8,color:'var(--text-dim)'}}>{r.formula}{r.mass?' · Мол.масса: '+r.mass+' г/моль':''}</div>{r.iupac&&<div style={{fontSize:8,color:'rgba(255,255,255,0.4)',lineHeight:1.3,marginTop:2}}>{r.iupac}</div>}</div>)}
-            </div>
-          )}
-
-          {researchSource==='scholar'&&(
-            <div className="card" style={{marginBottom:10}}>
-              <h4 style={{margin:'0 0 6px',fontSize:11}}>🎓 Google Scholar</h4>
-              <p style={{fontSize:10,color:'var(--text-dim)',marginBottom:8}}>Поиск научных публикаций через Google Scholar</p>
-              <a href={`https://scholar.google.com/scholar?q=${encodeURIComponent(pubMedQuery||'спортивное питание')}`} target="_blank" rel="noopener" style={{display:'block',padding:'8px 12px',borderRadius:8,background:'rgba(245,158,11,0.08)',border:'1px solid rgba(245,158,11,0.2)',color:'#f59e0b',fontSize:11,fontWeight:600,textDecoration:'none',textAlign:'center'}}>🔍 Открыть в Google Scholar: {pubMedQuery||'(введите запрос)'}</a>
-            </div>
-          )}
-
-          {researchSource==='fda'&&(
-            <div className="card" style={{marginBottom:10}}>
-              <h4 style={{margin:'0 0 6px',fontSize:11}}>💊 OpenFDA — лекарства</h4>
-              {fdaLoading&&<div style={{padding:12,textAlign:'center',color:'var(--text-dim)',fontSize:10}}>⏳ Поиск...</div>}
-              {fdaResults.map((r,i)=><div key={i} style={{padding:'6px 8px',borderRadius:6,background:'rgba(239,68,68,0.04)',border:'1px solid rgba(239,68,68,0.15)',marginBottom:4}}><div style={{fontSize:10,fontWeight:600,color:'var(--text-light)'}}>{r.brandName}</div><div style={{fontSize:8,color:'var(--text-dim)'}}>{r.genericName}{r.manufacturer!=='-'?' · '+r.manufacturer:''}</div>{r.indications!=='-'&&<div style={{fontSize:8,color:'rgba(255,255,255,0.4)',lineHeight:1.3,marginTop:2}}>{r.indications}</div>}</div>)}
-              {fdaResults.length===0&&!fdaLoading&&<div style={{padding:12,textAlign:'center',color:'var(--text-dim)',fontSize:10}}>Введите название препарата</div>}
-            </div>
-          )}
-
-          {researchSource==='pharma'&&(
-            <div className="card" style={{marginBottom:10}}>
-              <h4 style={{margin:'0 0 6px',fontSize:11}}>📋 Поиск по каталогу</h4>
-              <input value={pubMedQuery} onChange={e=>{doPharmaSearch(e.target.value)}} placeholder="Название, класс, категория..." style={{width:'100%',padding:'8px 10px',borderRadius:8,border:'1px solid var(--border)',background:'var(--bg-secondary)',color:'var(--text)',fontSize:11,boxSizing:'border-box',marginBottom:6}} />
-              <div style={{display:'flex',flexDirection:'column',gap:3,maxHeight:300,overflowY:'auto'}}>
-                {(pubMedQuery.length>2?(pharmaSearchResults||[]):[]).map((r:any)=><div key={r.id} style={{padding:'5px 8px',borderRadius:6,background:'var(--bg-secondary)',border:'1px solid var(--border)',fontSize:9}}><div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}><span style={{fontWeight:600,color:r.cls==='supplement'?'#00e68a':'#a78bfa'}}>{r.name}</span><span style={{fontSize:7,padding:'1px 4px',borderRadius:3,background:r.cls==='supplement'?'rgba(0,230,138,0.1)':'rgba(139,92,246,0.1)',color:r.cls==='supplement'?'#00e68a':'#a78bfa'}}>{r.cls}</span></div>{r.desc&&<div style={{fontSize:7,color:'var(--text-dim)',marginTop:1}}>{r.desc}</div>}</div>)}
-              </div>
-            </div>
-          )}
-
-          <div className="card" style={{marginBottom:10}}>
-            <h4 style={{margin:'0 0 6px',fontSize:11}}>📚 Быстрый поиск</h4>
-            <div style={{display:'flex',flexWrap:'wrap',gap:3}}>
-              {['тестостерон мышечная масса','креатин сила производительность','сывороточный протеин гипертрофия','NAC печень гепатопротекция','омега-3 сердце','витамин D тестостерон','ашваганда кортизол стресс','BPC-157 заживление','куркумин воспаление','мелатонин сон','L-цитруллин оксид азота','бета-аланин карнозин'].map(p=><button key={p} onClick={()=>{setPubMedQuery(p);handlePubMedSearch();}} style={{padding:'3px 8px',borderRadius:4,fontSize:8,cursor:'pointer',border:'1px solid var(--border)',background:'var(--bg-secondary)',color:'var(--text-dim)'}}>{p}</button>)}
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* ===== FERTILITY/PCT TAB (with back button) ===== */}
       {tab === 'fertility-pct' && (
         <div>
           <button onClick={() => setTab('main')} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', marginBottom:8, background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← На главную</button>
           <FertilityPCTScreen />
+        </div>
+      )}
+
+      {/* ===== STACK BUILDER FLOATING BADGE ===== */}
+      {stackBuilder.length > 0 && (
+        <div style={{ position:'fixed', bottom:16, left:'50%', transform:'translateX(-50%)', zIndex:100, display:'flex', alignItems:'center', gap:8, padding:'8px 14px', borderRadius:16, background:'rgba(0,0,0,0.9)', backdropFilter:'blur(12px)', border:'1px solid rgba(0,230,138,0.3)', boxShadow:'0 4px 20px rgba(0,0,0,0.5)' }}>
+          <span style={{ fontSize:10, fontWeight:700, color:'#00e68a' }}>🧮 Стек: {stackBuilder.length} веществ</span>
+          <button onClick={() => setStackBuilder([])} style={{ padding:'4px 10px', borderRadius:8, fontSize:9, cursor:'pointer', background:'rgba(239,68,68,0.1)', border:'1px solid rgba(239,68,68,0.2)', color:'#f87171', fontWeight:600 }}>Очистить</button>
+          <button onClick={saveBuilderStack} style={{ padding:'4px 10px', borderRadius:8, fontSize:9, cursor:'pointer', background:'linear-gradient(135deg,#00e68a,#00c853)', border:'none', color:'#000', fontWeight:700 }}>Сохранить</button>
         </div>
       )}
     </div>

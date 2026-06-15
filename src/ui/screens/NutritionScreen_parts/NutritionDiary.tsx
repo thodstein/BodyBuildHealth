@@ -120,12 +120,12 @@ export const NutritionDiary: React.FC<{
         {/* Quick food search */}
         <div style={{ position: 'relative', marginBottom: 10 }}>
           <input type="text" value={foodSearch} onChange={e => setFoodSearch(e.target.value)}
-            placeholder=""
+            placeholder="Поиск продуктов..."
             style={{ width: '100%', padding: '8px 10px', borderRadius: 8, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, boxSizing: 'border-box' }} />
-          <div style={{ display: 'flex', gap: 3, marginTop: 4 }}>
-            {['', '', '', '', '', ''].map(mt => (
-              <button key={mt} onClick={() => setMealType(mt)} style={{
-                padding: '2px 6px', borderRadius: 4, fontSize: 9, cursor: 'pointer',
+          <div style={{ display: 'flex', gap: 3, marginTop: 4, flexWrap: 'wrap' }}>
+            {['Завтрак', 'Обед', 'Ужин', 'Перекус', 'До тренировки', 'После тренировки'].map(mt => (
+              <button key={mt} onClick={() => setMealType(mealType === mt ? '' : mt)} style={{
+                padding: '3px 7px', borderRadius: 6, fontSize: 9, cursor: 'pointer',
                 background: mealType === mt ? 'rgba(0,230,138,0.15)' : 'var(--bg-secondary)',
                 border: mealType === mt ? '1px solid var(--accent)' : '1px solid var(--border)',
                 color: mealType === mt ? '#00e68a' : 'var(--text-dim)', fontWeight: mealType === mt ? 600 : 400,
@@ -157,7 +157,7 @@ export const NutritionDiary: React.FC<{
                   padding: '3px 8px', borderRadius: 6, fontSize: 10, cursor: 'pointer',
                   background: 'rgba(139,92,246,0.1)', border: '1px solid rgba(139,92,246,0.3)', color: '#8b5cf6',
                   fontWeight: 500, whiteSpace: 'nowrap',
-                }}>в­ђ {f.name.slice(0, 15)}</button>
+                }}>⭐ {f.name.slice(0, 15)}</button>
               ))}
             </div>
           </div>
@@ -169,7 +169,7 @@ export const NutritionDiary: React.FC<{
           background: showBarcode ? 'rgba(0,230,138,0.15)' : 'var(--bg-secondary)',
           color: showBarcode ? '#00e68a' : 'var(--text-dim)', fontWeight: 600, cursor: 'pointer', marginBottom: 12,
         }}>
-          {showBarcode ? '' : ''}
+          {showBarcode ? '🔽 Скрыть сканер' : '📱 Сканер штрих-кода'}
         </button>
         {showBarcode && (
                     <BarcodeScanner onProductFound={handleBarcodeProduct} onClose={() => setShowBarcode(false)} />
@@ -178,7 +178,7 @@ export const NutritionDiary: React.FC<{
         {/* File/Camera upload for nutrition OCR */}
         <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
           <button onClick={() => ocrFileRef.current?.click()} disabled={ocrFileLoading} style={{ flex: 1, padding: 10, borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg-secondary)', color: 'var(--accent)', fontWeight: 600, fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, opacity: ocrFileLoading ? 0.5 : 1 }}>
-            {ocrFileLoading ? '⏳' : ''} {ocrFileLoading ? '' : ''}
+            {ocrFileLoading ? '⏳ Загрузка...' : '📁 Загрузить файл'}
           </button>
           <button onClick={() => { if (ocrCameraRef.current) ocrCameraRef.current.click(); }} disabled={ocrFileLoading} style={{ flex: 1, padding: 10, borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg-secondary)', color: 'var(--accent)', fontWeight: 600, fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, opacity: ocrFileLoading ? 0.5 : 1 }}>
             📸 Снимок
@@ -193,7 +193,7 @@ export const NutritionDiary: React.FC<{
           background: showOCR ? 'rgba(0,230,138,0.15)' : 'var(--bg-secondary)',
           color: showOCR ? '#00e68a' : 'var(--text-dim)', fontWeight: 600, cursor: 'pointer', marginBottom: 12,
         }}>
-          {showOCR ? '' : ''}
+          {showOCR ? '🔽 Скрыть OCR' : '📋 Вставить текст (OCR)'}
         </button>
 
         {showOCR && (
@@ -205,7 +205,7 @@ export const NutritionDiary: React.FC<{
             <textarea
               value={ocrText}
               onChange={e => setOcrText(e.target.value)}
-              placeholder=""
+              placeholder="Вставьте текст из FatSecret / MyFitnessPal..."
               style={{
                 width: '100%', minHeight: 120, padding: 10, borderRadius: 8,
                 border: '1px solid var(--border)', background: 'var(--bg-primary)',
@@ -259,10 +259,10 @@ export const NutritionDiary: React.FC<{
               <div style={{ fontWeight: 600, fontSize: 11, color: 'var(--accent)', marginBottom: 4 }}>📊 Сводка за неделю (~{days} дн)</div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 4, fontSize: 9 }}>
                 {[
-                  { l: '', v: Math.round(totalKcal / days), c: '#22c55e' },
-                  { l: '', v: Math.round(totalP / days) + '', c: '#3b82f6' },
-                  { l: '', v: Math.round(totalF / days) + '', c: '#f97316' },
-                  { l: '', v: Math.round(totalC / days) + '', c: '#a855f7' },
+                  { l: 'Ккал', v: Math.round(totalKcal / days), c: '#22c55e' },
+                  { l: 'Белки', v: Math.round(totalP / days) + 'г', c: '#3b82f6' },
+                  { l: 'Жиры', v: Math.round(totalF / days) + 'г', c: '#f97316' },
+                  { l: 'Углеводы', v: Math.round(totalC / days) + 'г', c: '#a855f7' },
                 ].map(m => (
                   <div key={m.l} style={{ textAlign: 'center', background: 'rgba(0,230,138,0.05)', borderRadius: 4, padding: '3px 2px' }}>
                     <div style={{ color: 'var(--text-dim)' }}>{m.l}</div>
@@ -274,23 +274,76 @@ export const NutritionDiary: React.FC<{
           );
         })()}
 
-        {/* Existing diary entries */}
-        {foodEntries.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: 20, color: 'var(--text-dim)' }}>
-            Нет записей в дневнике
-          </div>
-        ) : (
-          <div className="list">
-            {foodEntries.slice(-10).map((entry, i) => (
-              <div key={i} style={{ padding: 8, borderBottom: '1px solid var(--border)' }}>
-                <div style={{ fontWeight: 600 }}>{entry.name}</div>
-                <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>
-                  {entry.kcal} ккал | {entry.p}г белки | {entry.f}г жиры | {entry.c}г углеводы
+      {/* Existing diary entries */}
+      {foodEntries.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: 20, color: 'var(--text-dim)' }}>
+          Нет записей в дневнике
+        </div>
+      ) : (
+        <div className="list" style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {foodEntries.slice(-20).map((entry, i) => (
+            <div key={i} style={{
+              display: 'flex', alignItems: 'center', gap: 10,
+              padding: '10px 12px',
+              borderRadius: 12,
+              background: 'rgba(255,255,255,0.04)',
+              border: '1px solid rgba(255,255,255,0.06)',
+              transition: 'all 0.2s',
+            }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{
+                  fontWeight: 600, fontSize: 13,
+                  color: 'var(--text-light)',
+                  whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                  marginBottom: 2,
+                }}>
+                  {entry.name}
+                  {(entry as any).date && <span style={{ marginLeft: 6, fontSize: 9, color: 'var(--text-dim)', fontWeight: 400 }}>{(entry as any).date}</span>}
                 </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, fontSize: 10, marginBottom: 1 }}>
+                  <span style={{ color: 'var(--accent)', fontWeight: 700 }}>{entry.kcal} ккал</span>
+                  <span style={{ color: '#3b82f6' }}>Б: {entry.p}г</span>
+                  <span style={{ color: '#f59e0b' }}>Ж: {entry.f}г</span>
+                  <span style={{ color: '#a855f7' }}>У: {entry.c}г</span>
+                </div>
+                {(entry as any).serving && (
+                  <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>{(entry as any).serving}</div>
+                )}
               </div>
-            ))}
-          </div>
-        )}
+              <button onClick={() => {
+                // Remove this entry from diary
+                try {
+                  const raw = localStorage.getItem('nutrition_diary');
+                  if (raw) {
+                    const diary = JSON.parse(raw);
+                    const allDates = Object.keys(diary);
+                    for (const date of allDates) {
+                      const meals = diary[date].meals || {};
+                      for (const mt of Object.keys(meals)) {
+                        meals[mt] = meals[mt].filter((m: any) =>
+                          !(m.name === entry.name && m.kcal === entry.kcal && m.p === entry.p && m.f === entry.f && m.c === entry.c)
+                        );
+                        if (meals[mt].length === 0) delete meals[mt];
+                      }
+                      if (Object.keys(diary[date].meals || {}).length === 0) delete diary[date];
+                    }
+                    localStorage.setItem('nutrition_diary', JSON.stringify(diary));
+                  }
+                } catch {}
+              }} style={{
+                flexShrink: 0,
+                width: 28, height: 28, borderRadius: 8,
+                border: '1px solid rgba(255,255,255,0.08)',
+                background: 'rgba(239,68,68,0.08)',
+                color: '#ef4444',
+                cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: 12, fontWeight: 700,
+              }} title="Удалить">✕</button>
+            </div>
+          ))}
+        </div>
+      )}
       </div>
     </div>
   );
