@@ -22,13 +22,9 @@ const NAV_CARDS: { id: ScreenId; icon: string; label: string; color: string }[] 
 export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
   return (
     <div style={{ position:'fixed', inset:0, zIndex:100, display:'flex', flexDirection:'column' }}>
-      <img src="/hero-main.png" alt="" style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'cover', objectPosition:'center top' }} />
-      <div style={{ position:'absolute', inset:0, background:'linear-gradient(transparent 35%, rgba(0,0,0,0.65) 70%, rgba(0,0,0,0.92))' }} />
+      <img src="/hero-main.png" alt="" style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'contain', objectPosition:'center' }} />
+      <div style={{ position:'absolute', inset:0, background:'linear-gradient(transparent 60%, rgba(0,0,0,0.6))' }} />
       <div style={{ position:'relative', zIndex:2, flex:1, display:'flex', flexDirection:'column', justifyContent:'flex-end', padding:'60px 16px 32px' }}>
-        <h1 style={{ fontSize:28, fontWeight:800, color:'#fff', margin:'0 0 2px', textShadow:'0 2px 20px rgba(0,0,0,0.95)', letterSpacing:'-0.5px', lineHeight:1.1 }}>Body Build{'\n'}Health</h1>
-        <p style={{ fontSize:12, color:'rgba(255,255,255,0.65)', margin:'4px 0 20px', lineHeight:1.4, textShadow:'0 1px 8px rgba(0,0,0,0.8)', maxWidth:260 }}>
-          Фармакология, тренировки, анализы и персональные рекомендации
-        </p>
         <div style={{ display:'grid', gridTemplateColumns:'repeat(4, 1fr)', gap:10 }}>
           {NAV_CARDS.map(card => (
             <button key={card.id} onClick={() => onNavigate?.(card.id)} style={{
