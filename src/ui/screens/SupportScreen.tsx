@@ -1408,8 +1408,8 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
                 { icon:'🧮', title:'Калькулятор поддержки', desc:'Расчёт рисков, покрытия систем и недельного протокола', action:() => { setSupportView('main'); setTab('calculator'); }, color:'var(--accent)' },
                 { icon:'🧬', title:'Пептидный калькулятор', desc:'Разведение, дозировки, PK модель и протоколы', action:() => { setSupportView('main'); setTab('peptides'); }, color:'var(--accent)' },
                 { icon:'ℹ️', title:'Общая информация', desc:'Каталог, синергии и взаимодействия, готовые стеки', action:() => { setCalcView('info'); setInfoView('catalog'); }, color:'#3b82f6' },
-              ].map((card, i) => (
                 { icon:'📦', title:'Генератор стеков', desc:'Автоматический подбор стека поддержки по органам и механизмам', action:() => { setSupportView('main'); setTab('stackcalc'); }, color:'#8b5cf6' },
+              ].map((card, i) => (
                 <div key={i} onClick={card.action} style={{
                   display:'flex', alignItems:'center', gap:12, padding:'12px 14px', borderRadius:14, cursor:'pointer', textAlign:'left', width:'100%',
                   background:'rgba(20,22,30,0.35)', border:'1px solid var(--glass-border)',
@@ -3696,3 +3696,4 @@ const StackBuilderSection: React.FC = () => {
     </div>}
   </div>);
 };
+
