@@ -646,33 +646,7 @@ const DrugDetailCard: React.FC<{ sub: PharmaSubstance; detail?: PharmaDetail }> 
           ))}
         </div>
       )}
-      {sub.research && sub.research.length > 0 && (
-        <div style={{ borderTop: '1px solid var(--border)', paddingTop: 8, marginBottom: 8 }}>
-          <div style={{ fontWeight: 600, marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
-            <span>📚</span><span>Исследования</span>
-          </div>
-          {sub.research.map((r, i) => (
-            <div key={i} style={{ marginBottom: 8, padding: '8px 10px', background: 'var(--bg-secondary)', borderRadius: 6 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                <span style={{ fontSize: 12, fontWeight: 600 }}>{r.study}</span>
-                <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 4, background: 'rgba(0,230,138,0.1)', color: '#00e68a' }}>{r.year}</span>
-              </div>
-              <div style={{ fontSize: 11, color: 'var(--text-dim)', lineHeight: 1.5 }}>{r.conclusion}</div>
-            </div>
-          ))}
-        </div>
-      )}
-      {detail?.researchLinks && detail.researchLinks.length > 0 && (
-        <div style={{ borderTop: '1px solid var(--border)', paddingTop: 8, marginBottom: 8 }}>
-          <div style={{ fontWeight: 600, marginBottom: 4 }}>Ссылки на исследования</div>
-          {detail.researchLinks.map((r, i) => (
-            <div key={i} style={{ marginBottom: 4, fontSize: 10 }}>
-              <a href={r.url} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)', textDecoration: 'none' }}>{r.title}</a>
-              <span style={{ color: 'var(--text-dim)', marginLeft: 4 }}>({r.source})</span>
-            </div>
-          ))}
-        </div>
-      )}
+
     </div>
   );
 };
@@ -1840,11 +1814,7 @@ const PeptideCalcTab: React.FC = () => {
             <span><b>Биодоступность:</b> {growthSel.pk?.bioavailability ? `${(growthSel.pk.bioavailability * 100).toFixed(0)}%` : '—'}</span>
             <span><b>Vd:</b> {growthSel.pk?.Vd ? `${growthSel.pk.Vd} л` : '—'}</span>
           </div>
-          {growthSel.research && growthSel.research.length > 0 && (
-            <div style={{ fontSize:9, color:'var(--text-dim)', marginTop:6 }}>
-              <b>Исследования:</b> {growthSel.research.map(r => r.study).join('; ')}
-            </div>
-          )}
+
         </div>
       )}
     </div>

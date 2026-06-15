@@ -368,7 +368,6 @@ export interface PharmaSubstance {
   ec50: number;
   n_hill: number;
   maxEffect: number;
-  research?: { study: string; conclusion: string; year: number }[];
   synergies?: PharmaSynergy[];
   contraindications?: string[];
   sideEffects?: SideEffect[];

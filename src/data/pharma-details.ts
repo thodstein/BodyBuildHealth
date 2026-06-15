@@ -8,7 +8,6 @@ export interface PharmaDetail {
   contraindications: string[];
   sideEffects: SideEffect[];
   dosageRange?: { min: number; max: number; unit: string; frequency: string };
-  researchLinks?: { title: string; url: string; source: string }[];
 }
 
 export const PHARMA_DETAILS: Record<string, PharmaDetail> = {
@@ -33,11 +32,6 @@ export const PHARMA_DETAILS: Record<string, PharmaDetail> = {
       { effect: 'Задержка натрия и воды', frequency: 'common' },
     ],
     dosageRange: { min: 100, max: 500, unit: 'мг/нед', frequency: '1 раз в 5-7 дней' },
-    researchLinks: [
-      { title: 'Androgen Receptor Signaling and Anabolic Steroids', url: 'https://pubmed.ncbi.nlm.nih.gov/25675555/', source: 'PubMed' },
-      { title: 'Testosterone and Cardiovascular Risk', url: 'https://pubmed.ncbi.nlm.nih.gov/29059068/', source: 'PubMed' },
-      { title: 'HPTA Suppression and Recovery', url: 'https://pubmed.ncbi.nlm.nih.gov/31537912/', source: 'PubMed' },
-    ],
   },
 
   tren_acet: {
@@ -60,11 +54,6 @@ export const PHARMA_DETAILS: Record<string, PharmaDetail> = {
       { effect: 'Психозоподобные состояния', frequency: 'very_rare' },
     ],
     dosageRange: { min: 50, max: 350, unit: 'мг/нед', frequency: 'через день ( acetate)' },
-    researchLinks: [
-      { title: 'Trenbolone and Androgen Receptor Activation', url: 'https://pubmed.ncbi.nlm.nih.gov/15845332/', source: 'PubMed' },
-      { title: 'Trenbolone and Prolactin Secretion', url: 'https://pubmed.ncbi.nlm.nih.gov/8336952/', source: 'PubMed' },
-      { title: 'Cardiovascular Risks of Trenbolone', url: 'https://pubmed.ncbi.nlm.nih.gov/25465822/', source: 'PubMed' },
-    ],
   },
 
   oxan: {
@@ -83,11 +72,6 @@ export const PHARMA_DETAILS: Record<string, PharmaDetail> = {
       { effect: 'Снижение либидо при высоких дозах', frequency: 'rare' },
     ],
     dosageRange: { min: 20, max: 80, unit: 'мг/день', frequency: 'ежедневно' },
-    researchLinks: [
-      { title: 'Oxandrin Mechanism of Action', url: 'https://pubmed.ncbi.nlm.nih.gov/6144577/', source: 'PubMed' },
-      { title: 'Oxandrolone and Protein Synthesis', url: 'https://pubmed.ncbi.nlm.nih.gov/6424762/', source: 'PubMed' },
-      { title: 'Oxandrolone Safety Profile', url: 'https://pubmed.ncbi.nlm.nih.gov/3530858/', source: 'PubMed' },
-    ],
   },
 
   anastro: {
@@ -108,11 +92,6 @@ export const PHARMA_DETAILS: Record<string, PharmaDetail> = {
       { effect: 'Депрессия и раздражительность', frequency: 'common' },
     ],
     dosageRange: { min: 0.25, max: 1, unit: 'мг/день', frequency: '2-3 раза в неделю' },
-    researchLinks: [
-      { title: 'Anastrozole Mechanism of Action', url: 'https://pubmed.ncbi.nlm.nih.gov/10800321/', source: 'PubMed' },
-      { title: 'Anastrozole and Cardiovascular Risk', url: 'https://pubmed.ncbi.nlm.nih.gov/15159357/', source: 'PubMed' },
-      { title: 'Anastrozole and Bone Health', url: 'https://pubmed.ncbi.nlm.nih.gov/12826530/', source: 'PubMed' },
-    ],
   },
 
   caberg: {
@@ -132,11 +111,6 @@ export const PHARMA_DETAILS: Record<string, PharmaDetail> = {
       { effect: 'Фиброз клапанов сердца при длительном применении', frequency: 'very_rare' },
     ],
     dosageRange: { min: 0.25, max: 1, unit: 'мг/нед', frequency: '1-2 раза в неделю' },
-    researchLinks: [
-      { title: 'Cabergoline and Prolactin Suppression', url: 'https://pubmed.ncbi.nlm.nih.gov/18282412/', source: 'PubMed' },
-      { title: 'Cabergoline and Cardiac Valvulopathy', url: 'https://pubmed.ncbi.nlm.nih.gov/17925128/', source: 'PubMed' },
-      { title: 'Cabergoline and Impulse Control Disorders', url: 'https://pubmed.ncbi.nlm.nih.gov/19617025/', source: 'PubMed' },
-    ],
   },
 
   clomi: {
@@ -156,11 +130,6 @@ export const PHARMA_DETAILS: Record<string, PharmaDetail> = {
       { effect: 'Головные боли', frequency: 'common' },
     ],
     dosageRange: { min: 25, max: 100, unit: 'мг/день', frequency: 'ежедневно на ПКТ' },
-    researchLinks: [
-      { title: 'Clomiphene Mechanism of Action', url: 'https://pubmed.ncbi.nlm.nih.gov/6372424/', source: 'PubMed' },
-      { title: 'Clomiphene and HPTA Recovery', url: 'https://pubmed.ncbi.nlm.nih.gov/21241681/', source: 'PubMed' },
-      { title: 'Clomiphene Safety Profile', url: 'https://pubmed.ncbi.nlm.nih.gov/3400345/', source: 'PubMed' },
-    ],
   },
 
   bpc157: {
@@ -177,11 +146,6 @@ export const PHARMA_DETAILS: Record<string, PharmaDetail> = {
       { effect: 'Лёгкая тошнота при пероральном приёме', frequency: 'rare' },
     ],
     dosageRange: { min: 200, max: 500, unit: 'мкг/день', frequency: '1-2 раза в день, 2-4 недели' },
-    researchLinks: [
-      { title: 'BPC-157 and Angiogenesis', url: 'https://pubmed.ncbi.nlm.nih.gov/23975201/', source: 'PubMed' },
-      { title: 'BPC-157 and Tendon Healing', url: 'https://pubmed.ncbi.nlm.nih.gov/25428112/', source: 'PubMed' },
-      { title: 'BPC-157 and Organ Protection', url: 'https://pubmed.ncbi.nlm.nih.gov/26878560/', source: 'PubMed' },
-    ],
   },
 
   semax: {
@@ -198,11 +162,6 @@ export const PHARMA_DETAILS: Record<string, PharmaDetail> = {
       { effect: 'Головная боль при высоких дозах', frequency: 'rare' },
     ],
     dosageRange: { min: 500, max: 2000, unit: 'мкг/день', frequency: '2 раза в день (назальный спрей)' },
-    researchLinks: [
-      { title: 'Semax and Neuroprotection', url: 'https://pubmed.ncbi.nlm.nih.gov/16217856/', source: 'PubMed' },
-      { title: 'Semax and BDNF Expression', url: 'https://pubmed.ncbi.nlm.nih.gov/19174090/', source: 'PubMed' },
-      { title: 'Semax and Cognitive Function', url: 'https://pubmed.ncbi.nlm.nih.gov/24022628/', source: 'PubMed' },
-    ],
   },
 
   selank: {
@@ -219,11 +178,6 @@ export const PHARMA_DETAILS: Record<string, PharmaDetail> = {
       { effect: 'Головная боль при высоких дозах', frequency: 'rare' },
     ],
     dosageRange: { min: 500, max: 2000, unit: 'мкг/день', frequency: '2 раза в день (назальный спрей)' },
-    researchLinks: [
-      { title: 'Selank and Anxiety Reduction', url: 'https://pubmed.ncbi.nlm.nih.gov/16217855/', source: 'PubMed' },
-      { title: 'Selank and BDNF Expression', url: 'https://pubmed.ncbi.nlm.nih.gov/19174091/', source: 'PubMed' },
-      { title: 'Selank and Cognitive Function', url: 'https://pubmed.ncbi.nlm.nih.gov/24022629/', source: 'PubMed' },
-    ],
   },
 
   mk677: {
@@ -278,11 +232,6 @@ export const PHARMA_DETAILS: Record<string, PharmaDetail> = {
       { effect: 'Синдром «Дека-дика» (эректильная дисфункция после курса)', frequency: 'common' },
     ],
     dosageRange: { min: 200, max: 600, unit: 'мг/нед', frequency: '1 раз в 7-10 дней' },
-    researchLinks: [
-      { title: 'Nandrolone and Androgen Receptor Activation', url: 'https://pubmed.ncbi.nlm.nih.gov/6341585/', source: 'PubMed' },
-      { title: 'Nandrolone and Collagen Synthesis', url: 'https://pubmed.ncbi.nlm.nih.gov/8464492/', source: 'PubMed' },
-      { title: 'Nandrolone and Bone Mineral Density', url: 'https://pubmed.ncbi.nlm.nih.gov/15795288/', source: 'PubMed' },
-    ],
   },
 
   stan: {
@@ -302,11 +251,6 @@ export const PHARMA_DETAILS: Record<string, PharmaDetail> = {
       { effect: 'Сухость связок → риск разрыва', frequency: 'rare' },
     ],
     dosageRange: { min: 20, max: 50, unit: 'мг/день', frequency: 'ежедневно (орал) / через день (инъекция)' },
-    researchLinks: [
-      { title: 'Stanozolol and Androgen Receptor', url: 'https://pubmed.ncbi.nlm.nih.gov/6146658/', source: 'PubMed' },
-      { title: 'Stanozolol and SHBG Binding', url: 'https://pubmed.ncbi.nlm.nih.gov/6266415/', source: 'PubMed' },
-      { title: 'Stanozolol and Hepatotoxicity', url: 'https://pubmed.ncbi.nlm.nih.gov/6594892/', source: 'PubMed' },
-    ],
   },
 
   telmi: {
@@ -324,11 +268,6 @@ export const PHARMA_DETAILS: Record<string, PharmaDetail> = {
       { effect: 'Гиперкалиемия (редко)', frequency: 'rare' },
     ],
     dosageRange: { min: 20, max: 80, unit: 'мг/день', frequency: 'ежедневно' },
-    researchLinks: [
-      { title: 'Telmisartan and PPAR-γ Activation', url: 'https://pubmed.ncbi.nlm.nih.gov/12820537/', source: 'PubMed' },
-      { title: 'Telmisartan and Cardiovascular Protection', url: 'https://pubmed.ncbi.nlm.nih.gov/15187125/', source: 'PubMed' },
-      { title: 'Telmisartan and Nephroprotection', url: 'https://pubmed.ncbi.nlm.nih.gov/16382164/', source: 'PubMed' },
-    ],
   },
 
   nac: {
@@ -346,11 +285,6 @@ export const PHARMA_DETAILS: Record<string, PharmaDetail> = {
       { effect: 'Аллергические реакции (редко)', frequency: 'very_rare' },
     ],
     dosageRange: { min: 600, max: 1800, unit: 'мг/день', frequency: '1-2 раза в день' },
-    researchLinks: [
-      { title: 'NAC and Glutathione Synthesis', url: 'https://pubmed.ncbi.nlm.nih.gov/8204534/', source: 'PubMed' },
-      { title: 'NAC and Hepatoprotection', url: 'https://pubmed.ncbi.nlm.nih.gov/23348647/', source: 'PubMed' },
-      { title: 'NAC and Neuroprotection', url: 'https://pubmed.ncbi.nlm.nih.gov/25462598/', source: 'PubMed' },
-    ],
   },
 
   omega3: {
@@ -368,11 +302,6 @@ export const PHARMA_DETAILS: Record<string, PharmaDetail> = {
       { effect: 'ЖК дискомфорт', frequency: 'common' },
     ],
     dosageRange: { min: 1000, max: 3000, unit: 'мг/день EPA+DHA', frequency: 'с едой 1-2 раза' },
-    researchLinks: [
-      { title: 'Omega-3 and Cardiovascular Protection', url: 'https://pubmed.ncbi.nlm.nih.gov/29254754/', source: 'PubMed' },
-      { title: 'Omega-3 and Inflammation Resolution', url: 'https://pubmed.ncbi.nlm.nih.gov/28404804/', source: 'PubMed' },
-      { title: 'Omega-3 and Brain Health', url: 'https://pubmed.ncbi.nlm.nih.gov/26589695/', source: 'PubMed' },
-    ],
   },
 
   vitamin_d3: {
@@ -389,10 +318,5 @@ export const PHARMA_DETAILS: Record<string, PharmaDetail> = {
       { effect: 'Тошнота при высоких дозах', frequency: 'rare' },
     ],
     dosageRange: { min: 2000, max: 5000, unit: 'МЕ/день', frequency: 'ежедневно с едой' },
-    researchLinks: [
-      { title: 'Vitamin D3 and Immune Function', url: 'https://pubmed.ncbi.nlm.nih.gov/25226464/', source: 'PubMed' },
-      { title: 'Vitamin D3 and Testosterone Regulation', url: 'https://pubmed.ncbi.nlm.nih.gov/23613061/', source: 'PubMed' },
-      { title: 'Vitamin D3 and Calcium Homeostasis', url: 'https://pubmed.ncbi.nlm.nih.gov/22893626/', source: 'PubMed' },
-    ],
   },
 };
