@@ -33,11 +33,12 @@ import { generateStack, selectBestStack, type StackResult } from '../../engines/
 import { ReportEngine, type ReportInput } from '../../engines/report-engine';
 import { checkDrugInteractions } from '../../engines/pharma-interactions.engine';
 import type { CourseEntry } from '../../core/types';
+import { searchPubMed, type PubMedArticle } from '../../engines/pubmed-search.engine';
 
-type SupportTab = 'main' | 'catalog' | 'synergies' | 'calculator' | 'interactions' | 'stacks' | 'peptides' | 'fertility-pct' | 'stackcalc';
+type SupportTab = 'main' | 'catalog' | 'synergies' | 'calculator' | 'interactions' | 'stacks' | 'peptides' | 'fertility-pct' | 'stackcalc' | 'mystacks' | 'pubmed';
 type SupportView = 'main' | 'calc' | 'fertility';
 type CalcView = 'main' | 'calculator' | 'peptides' | 'info';
-type InfoView = 'main' | 'catalog' | 'synergies' | 'stacks' | 'interactions' | 'stackcalc';
+type InfoView = 'main' | 'catalog' | 'synergies' | 'stacks' | 'interactions' | 'stackcalc' | 'pubmed';
 
 const INTERACTION_TYPE_LABELS: Record<string, { label: string; emoji: string; color: string }> = {
   synergy: { label: 'Синергия', emoji: '🔗', color: '#22c55e' },
@@ -882,6 +883,44 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   const [stackCalcOrgans, setStackCalcOrgans] = useState<string[]>([]);
   const [stackCalcMech, setStackCalcMech] = useState<string[]>([]);
   const [generatedStack, setGeneratedStack] = useState<any>(null);
+  const [pubMedQuery, setPubMedQuery] = useState('');
+  const [pubMedResults, setPubMedResults] = useState<PubMedArticle[]>([]);
+  const [pubMedLoading, setPubMedLoading] = useState(false);
+  const [pubMedError, setPubMedError] = useState('');
+  const [savedStacks, setSavedStacks] = useState<{ id: string; name: string; date: string; subs: string[]; dosages: Record<string, { mg: number; timing: string }> }[]>(() => { try { return JSON.parse(localStorage.getItem('savedStacks') || '[]'); } catch { return []; } });
+  const [stackName, setStackName] = useState('');
+
+  const saveCurrentStack = () => {
+    const level = SUPPORT_LEVELS[supportLevel];
+    if (!level) return;
+    const id = 'stack_' + Date.now();
+    const newStack = { id, name: stackName || level.label + ' ' + new Date().toLocaleDateString('ru'), date: new Date().toISOString(), subs: level.subs, dosages: level.dosages || {} };
+    const updated = [...savedStacks, newStack];
+    setSavedStacks(updated);
+    localStorage.setItem('savedStacks', JSON.stringify(updated));
+    setStackName('');
+  };
+
+  const deleteStack = (id: string) => {
+    const updated = savedStacks.filter(s => s.id !== id);
+    setSavedStacks(updated);
+    localStorage.setItem('savedStacks', JSON.stringify(updated));
+  };
+
+  const handlePubMedSearch = async () => {
+    if (!pubMedQuery.trim()) return;
+    setPubMedLoading(true);
+    setPubMedError('');
+    try {
+      const result = await searchPubMed(pubMedQuery, 20);
+      setPubMedResults(result.articles);
+    } catch (e: any) {
+      setPubMedError(e.message || 'Ошибка поиска');
+      setPubMedResults([]);
+    } finally {
+      setPubMedLoading(false);
+    }
+  };
 
   const availableMechs = useMemo(() => {
     if (stackCalcOrgans.length===0) return [];
@@ -1419,8 +1458,9 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
               {[
                 { icon:'🧮', title:'Калькулятор поддержки', desc:'Расчёт рисков, покрытия систем и недельного протокола', action:() => { setSupportView('main'); setTab('calculator'); }, color:'var(--accent)' },
                 { icon:'🧬', title:'Пептидный калькулятор', desc:'Разведение, дозировки, PK модель и протоколы', action:() => { setSupportView('main'); setTab('peptides'); }, color:'var(--accent)' },
-                { icon:'ℹ️', title:'Общая информация', desc:'Каталог, синергии и взаимодействия, готовые стеки', action:() => { setCalcView('info'); setInfoView('catalog'); }, color:'#3b82f6' },
+                { icon:'ℹ️', title:'Общая информация', desc:'Каталог, синергии, стеки, PubMed', action:() => { setCalcView('info'); setInfoView('catalog'); }, color:'#3b82f6' },
                 { icon:'📦', title:'Генератор стеков', desc:'Автоматический подбор стека поддержки по органам и механизмам', action:() => { setSupportView('main'); setTab('stackcalc'); }, color:'#8b5cf6' },
+                { icon:'📂', title:'Мои стеки', desc:'Сохранённые стеки поддержки и протоколы приёма', action:() => { setSupportView('main'); setTab('mystacks'); }, color:'#f59e0b' },
               ].map((card, i) => (
                 <div key={i} onClick={card.action} style={{
                   display:'flex', alignItems:'center', gap:12, padding:'12px 14px', borderRadius:14, cursor:'pointer', textAlign:'left', width:'100%',
@@ -1444,13 +1484,13 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
           <button onClick={() => setCalcView('main')} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', marginBottom:6, background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600, alignSelf:'flex-start' }}>← Назад</button>
           {/* Pills */}
           <div style={{ display:'flex', gap:4, marginBottom:8, overflowX:'auto', scrollbarWidth:'none', flexShrink:0 }}>
-            {(['catalog','synergies','stacks','interactions','stackcalc'] as const).map(t => (
+            {(['catalog','synergies','stacks','interactions','stackcalc','pubmed'] as const).map(t => (
               <button key={t} onClick={() => { setInfoView(t); setSynergyPage(1); }} style={{
                 padding:'7px 14px', borderRadius:20, fontSize:10, fontWeight:700, whiteSpace:'nowrap', cursor:'pointer', flexShrink:0,
                 background: infoView === t ? 'var(--accent)' : 'var(--bg-secondary)',
                 color: infoView === t ? '#000' : 'var(--text-dim)',
                 border: `1px solid ${infoView === t ? 'var(--accent)' : 'var(--border)'}`,
-              }}>{t === 'catalog' ? '📖 Каталог' : t === 'synergies' ? '🔗 Синергии' : t === 'stacks' ? '📦 Стеки' : t === 'stackcalc' ? '🧮 Кальк.стеков' : '⚡ Взаимодействия'}</button>
+              }}>{t === 'catalog' ? '📖 Каталог' : t === 'synergies' ? '🔗 Синергии' : t === 'stacks' ? '📦 Стеки' : t === 'stackcalc' ? '🧮 Кальк.стеков' : t === 'pubmed' ? '🔬 PubMed' : '⚡ Взаимодействия'}</button>
             ))}
           </div>
           {/* Content */}
@@ -1897,12 +1937,42 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
                   {generatedStack.synergies.length>0&&<div style={{marginBottom:4}}><div style={{fontSize:7,fontWeight:600,color:'#22c55e',marginBottom:2}}>⊕ Синергии ({generatedStack.synergies.length}):</div>{generatedStack.synergies.map((s:any,i:number)=><div key={i} style={{fontSize:7,color:'var(--text-dim)',padding:'1px 0'}}><b style={{color:'#4ade80'}}>{getStackSubLabel(s.a)}+{getStackSubLabel(s.b)}</b>: {s.effect} [{s.severity}]</div>)}</div>}
                   {generatedStack.conflicts.length>0&&<div><div style={{fontSize:7,fontWeight:600,color:'#ef4444',marginBottom:2}}>⚠ Конфликты ({generatedStack.conflicts.length}):</div>{generatedStack.conflicts.map((c:any,i:number)=><div key={i} style={{fontSize:7,color:'#f87171',padding:'1px 0'}}><b>{getStackSubLabel(c.a)}+{getStackSubLabel(c.b)}</b>: {c.effect} [{c.severity}]</div>)}</div>}
                 </div>}
-                {!generatedStack&&stackCalcOrgans.length===0&&<div style={{padding:20,textAlign:'center',color:'var(--text-dim)',fontSize:10,background:'var(--bg-secondary)',borderRadius:10,border:'1px solid var(--border)'}}>Выберите органы/системы и нажмите «Сгенерировать»</div>}
-              </div>;
-            })}
-          </div>
-        </div>
-      )}
+{!generatedStack&&stackCalcOrgans.length===0&&<div style={{padding:20,textAlign:'center',color:'var(--text-dim)',fontSize:10,background:'var(--bg-secondary)',borderRadius:10,border:'1px solid var(--border)'}}>Выберите органы/системы и нажмите «Сгенерировать»</div>}
+               </div>;
+             })}
+
+             {/* ===== PubMed Research ===== */}
+             {renderView(infoView, 'pubmed', () => (
+               <div>
+                 <div style={{fontSize:13,fontWeight:700,color:'var(--accent)',marginBottom:4}}>🔬 Поиск исследований PubMed</div>
+                 <div style={{fontSize:9,color:'var(--text-dim)',marginBottom:8}}>Свободный доступ к базе медицинских публикаций NCBI. Поиск статей по препаратам, методам и исследованиям.</div>
+                 <div style={{display:'flex',gap:6,marginBottom:12}}>
+                   <input value={pubMedQuery} onChange={e=>setPubMedQuery(e.target.value)}
+                     onKeyDown={e=>e.key==='Enter'&&handlePubMedSearch()}
+                     placeholder="Например: creatine muscle strength, NAC liver protection..."
+                     style={{flex:1,padding:'8px 12px',borderRadius:8,border:'1px solid var(--border)',background:'var(--bg-secondary)',color:'var(--text)',fontSize:11,boxSizing:'border-box'}} />
+                   <button onClick={handlePubMedSearch} disabled={pubMedLoading} style={{padding:'8px 16px',borderRadius:8,border:'none',cursor:pubMedLoading?'not-allowed':'pointer',background:'linear-gradient(135deg,#3b82f6,#2563eb)',color:'#fff',fontWeight:700,fontSize:11,opacity:pubMedLoading?0.6:1}}>
+                     {pubMedLoading?'⏳':'🔍'} Искать
+                   </button>
+                 </div>
+                 {pubMedError&&<div style={{padding:10,background:'rgba(239,68,68,0.06)',borderRadius:8,border:'1px solid rgba(239,68,68,0.2)',color:'#f87171',fontSize:10,marginBottom:8}}>⚠ {pubMedError}</div>}
+                 {pubMedResults.length>0&&<div style={{fontSize:10,color:'var(--text-dim)',marginBottom:8}}>Найдено: {pubMedResults.length} публикаций</div>}
+                 <div style={{display:'flex',flexDirection:'column',gap:8}}>
+                   {pubMedResults.map((a,i)=>(
+                     <a key={a.pmid} href={a.url} target="_blank" rel="noopener noreferrer" style={{display:'block',padding:'10px 12px',borderRadius:10,background:'var(--bg-secondary)',border:'1px solid var(--border)',textDecoration:'none',color:'inherit'}}>
+                       <div style={{fontSize:12,fontWeight:600,color:'var(--text-light)',lineHeight:1.4,marginBottom:4}}>{a.title}</div>
+                       {a.authors.length>0&&<div style={{fontSize:9,color:'var(--text-dim)',marginBottom:2}}>{a.authors.slice(0,4).join(', ')}{a.authors.length>4?' et al.':''}</div>}
+                       <div style={{fontSize:9,color:'var(--text-dim)',marginBottom:4}}>{a.journal}{a.pubDate?` · ${a.pubDate}`:''}</div>
+                       {a.abstract&&<div style={{fontSize:9,color:'rgba(255,255,255,0.6)',lineHeight:1.4,display:'-webkit-box',WebkitLineClamp:3,WebkitBoxOrient:'vertical',overflow:'hidden',maxHeight:42}}>{a.abstract}</div>}
+                     </a>
+                   ))}
+                   {pubMedResults.length===0&&!pubMedLoading&&!pubMedError&&<div style={{padding:20,textAlign:'center',color:'var(--text-dim)',fontSize:10}}>Введите запрос для поиска медицинских публикаций</div>}
+                 </div>
+               </div>
+             ))}
+           </div>
+         </div>
+       )}
           </div>
         </div>
       )}
