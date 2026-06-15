@@ -1594,7 +1594,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
                       }}>{t === 'support' ? '💊 Поддержка' : '💉 Фарма'}</button>
                     ))}
                   </div>
-                  {interactTab === 'support' ? (
+                  {interactTab === 'support' ? safeRender('calc_support', () => (
                     <div>
                       <div style={{ display:'flex', flexDirection:'column', gap:6, marginBottom:8 }}>
                         {interactionIds.map((id, idx) => {
@@ -1672,7 +1672,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
                         </div>
                       )}
                     </div>
-                  ) : (
+                  )) : safeRender('calc_pharma', () => (
                     <div>
                       <div style={{ display:'flex', flexDirection:'column', gap:6, marginBottom:8 }}>
                         {(() => {
@@ -1725,8 +1725,9 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
                         })()}
                       </div>
                     </div>
-            )}
+                  ))}
             {renderView(infoView, 'stackcalc', () => {
+              if (!ALL_STACKS || ALL_STACKS.length === 0) return <div style={{padding:20,textAlign:'center',color:'#f87171',fontSize:10}}>⚠ База стеков не загружена</div>;
               const organList = [
                 {key:'cardio',label:'❤️ Сердце/Сосуды',eff:['cardio_support','electrolyte','hydration']},
                 {key:'liver',label:'🫁 Печень',eff:['liver_support','liver_detox','detox']},
