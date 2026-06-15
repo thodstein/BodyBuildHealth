@@ -359,7 +359,7 @@ const ReadinessForecastBlock: React.FC<{ initialHistory?: number[] }> = ({ initi
     <div>
       <div style={{ display: 'flex', gap: 6, marginBottom: 8, flexWrap: 'wrap' }}>
         {history.map((v, i) => (
-          <input key={i} type="number" value={v} onChange={e => { const h = [...history]; h[i] = +e.target.value; setHistory(h); }} style={{ width: 48, padding: '4px 6px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', fontSize: 12, textAlign: 'center' }} />
+          <input key={i} type="number" value={v} onChange={e => { const h = [...history]; h[i] = parseFloat(e.target.value) || 0; setHistory(h); }} style={{ width: 48, padding: '4px 6px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', fontSize: 12, textAlign: 'center' }} />
         ))}
       </div>
       <button onClick={calc} style={{ background: 'var(--accent-blue)', color: '#fff', border: 'none', borderRadius: 8, padding: '6px 14px', fontSize: 12, cursor: 'pointer' }}>Рассчитать прогноз</button>
@@ -393,7 +393,7 @@ const LabTrendBlock: React.FC<{ initialPoints?: number[] }> = ({ initialPoints }
     <div>
       <div style={{ display: 'flex', gap: 6, marginBottom: 8, flexWrap: 'wrap' }}>
         {points.map((v, i) => (
-          <input key={i} type="number" value={v} onChange={e => { const p = [...points]; p[i] = +e.target.value; setPoints(p); }} style={{ width: 48, padding: '4px 6px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', fontSize: 12, textAlign: 'center' }} />
+          <input key={i} type="number" value={v} onChange={e => { const p = [...points]; p[i] = parseFloat(e.target.value) || 0; setPoints(p); }} style={{ width: 48, padding: '4px 6px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', fontSize: 12, textAlign: 'center' }} />
         ))}
       </div>
       <button onClick={calc} style={{ background: 'var(--accent-blue)', color: '#fff', border: 'none', borderRadius: 8, padding: '6px 14px', fontSize: 12, cursor: 'pointer' }}>Спрогнозировать тренд</button>

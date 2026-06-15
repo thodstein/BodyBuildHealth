@@ -632,7 +632,7 @@ const TelegramTab: React.FC = () => {
             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
               <select
                 value={checkupDay}
-                onChange={e => setCheckupDay(Number(e.target.value))}
+                onChange={e => setCheckupDay(parseFloat(e.target.value) || 0)}
                 style={{ flex: 1, marginBottom: 0 }}
               >
                 {DAYS.map((d, i) => (

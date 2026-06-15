@@ -278,7 +278,7 @@ export const SmartAssistantScreen: React.FC = () => {
                       min={q.min}
                       max={q.max}
                       value={checkupValues[q.key]}
-                      onChange={e => setCheckupValues(prev => ({ ...prev, [q.key]: Number(e.target.value) }))}
+                      onChange={e => setCheckupValues(prev => ({ ...prev, [q.key]: parseFloat(e.target.value) || 0 }))}
                       className="checkup-slider"
                     />
                     <div className="checkup-range-labels">

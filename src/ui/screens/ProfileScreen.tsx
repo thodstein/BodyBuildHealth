@@ -8,8 +8,27 @@ import { computeLabIndices, interpretLabIndices } from '../../engines/labs-indic
 import { calculateIndices } from '../../engines/clinical-indices.engine';
 import { NAVY_BF_FORMULAS, MUSCLE_GROUPS_FULL, INJURY_LOCATIONS } from '../../core/constants';
 
-type ProfileTab = 'overview' | 'anthropometry' | 'sleep' | 'lifestyle' | 'diet' | 'nutrition_v7' | 'genetics' | 'injuries' | 'progress' | 'reports' | 'friends';
+type ProfileTab = 'overview' | 'anthropometry' | 'sleep' | 'lifestyle' | 'diet' | 'nutrition_v7' | 'genetics' | 'injuries' | 'progress' | 'reports' | 'contacts';
 type ProfilePage = 'hero' | 'tabs';
+
+const SPORT_TYPES = [
+  { id: 'bodybuilding', label: 'Бодибилдинг' }, { id: 'powerlifting', label: 'Пауэрлифтинг' },
+  { id: 'crossfit', label: 'Кроссфит' }, { id: 'fitness', label: 'Фитнес' }, { id: 'other', label: 'Другое' },
+] as const;
+
+const CHRONIC_CONDITIONS = [
+  { id: 'hypertension', label: 'Гипертония' }, { id: 'diabetes', label: 'Диабет' },
+  { id: 'asthma', label: 'Астма' }, { id: 'thyroid', label: 'Щитовидная железа' },
+  { id: 'heart', label: 'Сердечно-сосудистые' }, { id: 'liver', label: 'Заболевания печени' },
+  { id: 'kidney', label: 'Заболевания почек' }, { id: 'joints', label: 'Заболевания суставов' },
+] as const;
+
+const BLOOD_TYPES = [
+  { id: 'I+', label: 'I (Rh+)' }, { id: 'I-', label: 'I (Rh−)' },
+  { id: 'II+', label: 'II (Rh+)' }, { id: 'II-', label: 'II (Rh−)' },
+  { id: 'III+', label: 'III (Rh+)' }, { id: 'III-', label: 'III (Rh−)' },
+  { id: 'IV+', label: 'IV (Rh+)' }, { id: 'IV-', label: 'IV (Rh−)' },
+] as const;
 
 const GOALS = [
   { id: 'bulk', label: 'Масса' }, { id: 'cut', label: 'Сушка' },
@@ -276,7 +295,7 @@ export const ProfileScreen: React.FC = () => {
     { id: 'overview', label: 'Обзор' }, { id: 'anthropometry', label: 'Антропометрия' },
     { id: 'sleep', label: 'Сон' }, { id: 'lifestyle', label: 'Образ жизни' },
     { id: 'diet', label: 'Питание' }, { id: 'injuries', label: 'Травмы' },
-    { id: 'progress', label: 'Прогресс' }, { id: 'friends', label: '👥 Друзья' }, { id: 'reports', label: '📊 Отчёты' }
+    { id: 'progress', label: 'Прогресс' }, { id: 'reports', label: '📊 Отчёты' }, { id: 'contacts', label: '📞 Контакты' }
   ];
 
   return (
@@ -287,17 +306,30 @@ export const ProfileScreen: React.FC = () => {
           <div style={{ position:'absolute', inset:0, background:'linear-gradient(transparent 50%, rgba(0,0,0,0.85))' }} />
           <div style={{ position:'relative', zIndex:2, flex:1, display:'flex', flexDirection:'column', justifyContent:'flex-end', padding:'16px 16px 80px' }}>
             <div style={{ marginBottom:16 }}>
-              <h1 style={{ fontSize:24, fontWeight:800, color:'#fff', margin:0, textShadow:'0 2px 14px rgba(0,0,0,0.9)' }}>Профиль</h1>
-              <p style={{ fontSize:12, color:'rgba(255,255,255,0.9)', margin:'4px 0 0', textShadow:'0 1px 8px rgba(0,0,0,0.8)' }}>
-                Управление профилем, отчёты и контакты
-              </p>
+              <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:12 }}>
+                <div style={{
+                  width:56, height:56, borderRadius:'50%',
+                  background:'linear-gradient(135deg, #00e68a, #00c853)',
+                  display:'flex', alignItems:'center', justifyContent:'center',
+                  fontSize:22, fontWeight:800, color:'#000',
+                  border:'2px solid rgba(255,255,255,0.2)',
+                }}>
+                  {(profile.name || 'П').charAt(0).toUpperCase()}
+                </div>
+                <div>
+                  <h1 style={{ fontSize:22, fontWeight:800, color:'#fff', margin:0, textShadow:'0 2px 14px rgba(0,0,0,0.9)' }}>Профиль</h1>
+                  <p style={{ fontSize:12, color:'rgba(255,255,255,0.9)', margin:'4px 0 0', textShadow:'0 1px 8px rgba(0,0,0,0.8)' }}>
+                    {profile.name || 'Пользователь'} • {s_.age || '—'} лет
+                  </p>
+                </div>
+              </div>
             </div>
             <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
               {[
                 { id: 'overview', icon: '📋', title: 'Сведения о пользователе', desc: 'Обзор, антропометрия, сон, образ жизни, питание, травмы', color: '#00e68a' },
-                { id: 'friends', icon: '👥', title: 'Друзья и Telegram', desc: 'Управление друзьями, шаринг отчётов и тренировок', color: '#f59e0b' },
-                { id: 'reports', icon: '📊', title: 'Отчеты', desc: 'Прогресс и отчёты', color: '#3b82f6' },
-                { id: 'progress', icon: '📞', title: 'Контакты', desc: 'Сведения о разработчике, друзья, магазины, тренера и врачи', color: '#8b5cf6' },
+                { id: 'reports', icon: '📊', title: 'Отчёты', desc: 'Для тренера, врача и общий отчёт с копированием и отправкой', color: '#3b82f6' },
+                { id: 'progress', icon: '📈', title: 'Прогресс', desc: 'Отслеживание веса, замеров и целей', color: '#f59e0b' },
+                { id: 'contacts', icon: '📞', title: 'Контакты и друзья', desc: 'Список друзей, шаринг, поддержка и контакты', color: '#8b5cf6' },
               ].map(card => (
                 <button key={card.id} onClick={() => { setPage('tabs'); setTab(card.id as ProfileTab); }} style={{
                   display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', borderRadius: 14, cursor: 'pointer', textAlign: 'left', width: '100%',
@@ -329,11 +361,12 @@ export const ProfileScreen: React.FC = () => {
           <div style={{ display:'flex', gap:4, overflowX:'auto', scrollbarWidth:'none', marginBottom:10, paddingBottom:2 }}>
             {tabs.map(t => (
               <button key={t.id} onClick={() => setTab(t.id)} style={{
-                padding:'6px 14px', borderRadius:16, fontSize:11, fontWeight:700, whiteSpace:'nowrap', cursor:'pointer', flexShrink:0,
+                padding:'6px 14px', borderRadius:20, fontSize:11, fontWeight:700, whiteSpace:'nowrap', cursor:'pointer', flexShrink:0,
                 background: tab === t.id ? 'rgba(0,230,138,0.2)' : 'rgba(20,22,30,0.3)',
                 border: tab === t.id ? '1px solid rgba(0,230,138,0.4)' : '1px solid rgba(255,255,255,0.06)',
                 color: tab === t.id ? '#00e68a' : 'rgba(255,255,255,0.8)',
                 backdropFilter:'blur(4px)', WebkitBackdropFilter:'blur(4px)',
+                transition:'all 0.2s',
               }}>{t.label}</button>
             ))}
           </div>
@@ -380,13 +413,47 @@ export const ProfileScreen: React.FC = () => {
               <div><span style={s.label}>Email</span><input style={s.input} value={s_.email ?? ''} disabled placeholder="Email" /></div>
             </div>
             <div style={s.row}>
-              <div><span style={s.label}>Возраст</span><input style={s.input} type="number" value={s_.age ?? ''} onChange={e => save({ age: +e.target.value })} placeholder="30" /></div>
+              <div><span style={s.label}>Возраст</span><input style={s.input} type="number" value={s_.age || ''} onChange={e => save({ age: parseFloat(e.target.value) || 0 })} placeholder="30" /></div>
               <div><span style={s.label}>Пол</span>
                 <div style={s.btnGroup}>
                   <button style={s_.sex === 'male' ? s.btnActive : s.btn} onClick={() => save({ sex: 'male' })}>Муж</button>
                   <button style={s_.sex === 'female' ? s.btnActive : s.btn} onClick={() => save({ sex: 'female' })}>Жен</button>
                 </div>
               </div>
+            </div>
+          </div>
+          <div style={s.card}>
+            <h4 style={{ margin: '0 0 8px' }}>Расширенная информация</h4>
+            <div style={s.row}>
+              <div>
+                <span style={s.label}>Вид спорта</span>
+                <div style={s.btnGroup}>
+                  {SPORT_TYPES.map(st => <button key={st.id} style={(s_.sportType ?? 'bodybuilding') === st.id ? s.btnActive : s.btn} onClick={() => save({ sportType: st.id })}>{st.label}</button>)}
+                </div>
+              </div>
+              <div><span style={s.label}>Стаж тренировок (лет)</span><input style={s.input} type="number" value={(s_.trainingExperience ?? 0) || ''} onChange={e => save({ trainingExperience: parseFloat(e.target.value) || 0 })} placeholder="" /></div>
+            </div>
+            <div style={s.row}>
+              <div><span style={s.label}>Группа крови</span>
+                <select style={s.input} value={s_.bloodType ?? ''} onChange={e => save({ bloodType: e.target.value })}>
+                  <option value="">Не указано</option>
+                  {BLOOD_TYPES.map(bt => <option key={bt.id} value={bt.id}>{bt.label}</option>)}
+                </select>
+              </div>
+              <div><span style={s.label}>Аллергии (текст)</span><input style={s.input} value={s_.allergyNotes ?? ''} onChange={e => save({ allergyNotes: e.target.value })} placeholder="" /></div>
+            </div>
+            <div style={{ marginBottom: 8 }}>
+              <span style={s.label}>Хронические заболевания</span>
+              <div style={{ display:'flex', flexWrap:'wrap', gap:4, marginTop:4 }}>
+                {CHRONIC_CONDITIONS.map(c => {
+                  const active = (s_.chronicConditions ?? []).includes(c.id);
+                  return <button key={c.id} onClick={() => { const cur = s_.chronicConditions ?? []; save({ chronicConditions: active ? cur.filter(x => x !== c.id) : [...cur, c.id] }); }} style={active ? s.chipActive : s.chip}>{c.label}</button>;
+                })}
+              </div>
+            </div>
+            <div style={s.row}>
+              <div><span style={s.label}>Экстренный контакт (имя)</span><input style={s.input} value={s_.emergencyName ?? ''} onChange={e => save({ emergencyName: e.target.value })} placeholder="" /></div>
+              <div><span style={s.label}>Экстренный телефон</span><input style={s.input} value={s_.emergencyPhone ?? ''} onChange={e => save({ emergencyPhone: e.target.value })} placeholder="" /></div>
             </div>
           </div>
           {clinicalIndices && (
@@ -410,11 +477,11 @@ export const ProfileScreen: React.FC = () => {
           <div style={s.card}>
             <h4 style={{ margin: '0 0 8px' }}>Основные параметры</h4>
             <div style={s.row}>
-              <div><span style={s.label}>Рост (см)</span><input style={s.input} type="number" value={s_.height ?? ''} onChange={e => save({ height: +e.target.value })} /></div>
-              <div><span style={s.label}>Вес (кг)</span><input style={s.input} type="number" step="0.1" value={s_.weight} onChange={e => save({ weight: +e.target.value })} /></div>
+              <div><span style={s.label}>Рост (см)</span><input style={s.input} type="number" value={s_.height || ''} onChange={e => save({ height: parseFloat(e.target.value) || 0 })} /></div>
+              <div><span style={s.label}>Вес (кг)</span><input style={s.input} type="number" step="0.1" value={s_.weight} onChange={e => save({ weight: parseFloat(e.target.value) || 0 })} /></div>
             </div>
             <div style={s.row}>
-              <div><span style={s.label}>% жира (ручной)</span><input style={s.input} type="number" step="0.1" value={s_.bodyFat ?? ''} onChange={e => save({ bodyFat: e.target.value ? +e.target.value : undefined })} placeholder="Optional" /></div>
+              <div><span style={s.label}>% жира (ручной)</span><input style={s.input} type="number" step="0.1" value={s_.bodyFat || ''} onChange={e => save({ bodyFat: e.target.value ? parseFloat(e.target.value) || 0 : undefined })} placeholder="Optional" /></div>
               <div><span style={s.label}>Пол</span>
                 <div style={s.btnGroup}>
                   <button style={s_.sex === 'male' ? s.btnActive : s.btn} onClick={() => save({ sex: 'male' })}>М</button>
@@ -437,7 +504,7 @@ export const ProfileScreen: React.FC = () => {
               ].map(c => (
                 <div key={c.k}>
                   <span style={s.label}>{c.l}</span>
-                  <input style={s.input} type="number" step="0.5" value={(s_ as any)[c.k] ?? ''} onChange={e => save({ [c.k]: e.target.value ? +e.target.value : undefined } as any)} />
+                  <input style={s.input} type="number" step="0.5" value={(s_ as any)[c.k] ?? ''} onChange={e => save({ [c.k]: e.target.value ? parseFloat(e.target.value) || 0 : undefined } as any)} />
                 </div>
               ))}
             </div>
@@ -476,15 +543,15 @@ export const ProfileScreen: React.FC = () => {
           <h4 style={{ margin: '0 0 8px' }}>Параметры сна</h4>
           <div>
             <span style={s.label}>Длительность сна: {s_.baselineSleepHours ?? 7} ч</span>
-            <input style={s.slider} type="range" min="0" max="12" step="0.5" value={s_.baselineSleepHours ?? 7} onChange={e => save({ baselineSleepHours: +e.target.value })} />
+            <input style={s.slider} type="range" min="0" max="12" step="0.5" value={s_.baselineSleepHours ?? 7} onChange={e => save({ baselineSleepHours: parseFloat(e.target.value) || 0 })} />
           </div>
           <div>
             <span style={s.label}>Качество сна: {s_.baselineSleepQuality ?? 5}/10</span>
-            <input style={s.slider} type="range" min="1" max="10" step="1" value={s_.baselineSleepQuality ?? 5} onChange={e => save({ baselineSleepQuality: +e.target.value })} />
+            <input style={s.slider} type="range" min="1" max="10" step="1" value={s_.baselineSleepQuality ?? 5} onChange={e => save({ baselineSleepQuality: parseFloat(e.target.value) || 0 })} />
           </div>
           <div>
             <span style={s.label}>Пробуждения ночью: {s_.nightAwakenings ?? 1}</span>
-            <input style={s.slider} type="range" min="0" max="10" step="1" value={s_.nightAwakenings ?? 1} onChange={e => save({ nightAwakenings: +e.target.value })} />
+            <input style={s.slider} type="range" min="0" max="10" step="1" value={s_.nightAwakenings ?? 1} onChange={e => save({ nightAwakenings: parseFloat(e.target.value) || 0 })} />
           </div>
           <div style={s.row}>
             <div><span style={s.label}>Время засыпания</span><input style={s.input} type="time" value={s_.bedtime ?? '23:00'} onChange={e => save({ bedtime: e.target.value })} /></div>
@@ -505,26 +572,26 @@ export const ProfileScreen: React.FC = () => {
             <h4 style={{ margin: '0 0 8px' }}>Стресс и усталость</h4>
             <div>
               <span style={s.label}>Стресс: {s_.baselineStressLevel ?? 3}/10</span>
-              <input style={s.slider} type="range" min="1" max="10" value={s_.baselineStressLevel ?? 3} onChange={e => save({ baselineStressLevel: +e.target.value })} />
+              <input style={s.slider} type="range" min="1" max="10" value={s_.baselineStressLevel ?? 3} onChange={e => save({ baselineStressLevel: parseFloat(e.target.value) || 0 })} />
             </div>
             <div>
               <span style={s.label}>Усталость: {s_.fatigueLevel ?? 3}/10</span>
-              <input style={s.slider} type="range" min="1" max="10" value={s_.fatigueLevel ?? 3} onChange={e => save({ fatigueLevel: +e.target.value })} />
+              <input style={s.slider} type="range" min="1" max="10" value={s_.fatigueLevel ?? 3} onChange={e => save({ fatigueLevel: parseFloat(e.target.value) || 0 })} />
             </div>
           </div>
           <div style={s.card}>
             <h4 style={{ margin: '0 0 8px' }}>Активность</h4>
             <div>
               <span style={s.label}>Шаги/день: {s_.dailySteps ?? 6000}</span>
-              <input style={s.slider} type="range" min="0" max="30000" step="500" value={s_.dailySteps ?? 6000} onChange={e => save({ dailySteps: +e.target.value })} />
+              <input style={s.slider} type="range" min="0" max="30000" step="500" value={s_.dailySteps ?? 6000} onChange={e => save({ dailySteps: parseFloat(e.target.value) || 0 })} />
             </div>
             <div>
               <span style={s.label}>Вода/день (л): {s_.dailyWaterLiters ?? 2}</span>
-              <input style={s.slider} type="range" min="0" max="6" step="0.1" value={s_.dailyWaterLiters ?? 2} onChange={e => save({ dailyWaterLiters: +e.target.value })} />
+              <input style={s.slider} type="range" min="0" max="6" step="0.1" value={s_.dailyWaterLiters ?? 2} onChange={e => save({ dailyWaterLiters: parseFloat(e.target.value) || 0 })} />
             </div>
             <div style={s.row}>
-              <div><span style={s.label}>Тренировок/нед</span><input style={s.input} type="number" min="0" max="7" value={s_.workoutsPerWeek ?? 3} onChange={e => save({ workoutsPerWeek: +e.target.value })} /></div>
-              <div><span style={s.label}>Мин/тренировку</span><input style={s.input} type="number" min="15" max="180" value={s_.avgWorkoutMinutes ?? 60} onChange={e => save({ avgWorkoutMinutes: +e.target.value })} /></div>
+              <div><span style={s.label}>Тренировок/нед</span><input style={s.input} type="number" min="0" max="7" value={s_.workoutsPerWeek || ''} onChange={e => save({ workoutsPerWeek: parseFloat(e.target.value) || 0 })} /></div>
+              <div><span style={s.label}>Мин/тренировку</span><input style={s.input} type="number" min="15" max="180" value={s_.avgWorkoutMinutes || ''} onChange={e => save({ avgWorkoutMinutes: parseFloat(e.target.value) || 0 })} /></div>
             </div>
           </div>
           <div style={s.card}>
@@ -665,7 +732,7 @@ export const ProfileScreen: React.FC = () => {
           <div className="card" style={{ marginBottom: 12 }}>
             <h3 style={{ margin: '0 0 12px 0' }}>Приёмов пищи в день</h3>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <input type="range" min={2} max={7} value={s_.mealsPerDay ?? 4} onChange={e => save({ mealsPerDay: parseInt(e.target.value) })} style={{ flex: 1, accentColor: '#00e68a' }} />
+              <input type="range" min={2} max={7} value={s_.mealsPerDay ?? 4} onChange={e => save({ mealsPerDay: parseFloat(e.target.value) || 0 })} style={{ flex: 1, accentColor: '#00e68a' }} />
               <span style={{ fontSize: 18, fontWeight: 700, minWidth: 24, textAlign: 'center' }}>{s_.mealsPerDay ?? 4}</span>
             </div>
           </div>
@@ -704,27 +771,27 @@ export const ProfileScreen: React.FC = () => {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}>
               <div>
                 <label style={{ fontSize: 12, opacity: 0.7, display: 'block', marginBottom: 4 }}>Белок, г/кг</label>
-                <input style={s.input} type="number" step="0.1" min="0.5" max="4" value={s_.proteinPerKg ?? 1.8} onChange={e => save({ proteinPerKg: e.target.value ? +e.target.value : undefined })} placeholder="1.8" />
+                <input style={s.input} type="number" step="0.1" min="0.5" max="4" value={s_.proteinPerKg || ''} onChange={e => save({ proteinPerKg: e.target.value ? parseFloat(e.target.value) || 0 : undefined })} placeholder="1.8" />
                 <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>Рекомендация: 1.6–2.2 г/кг</div>
               </div>
               <div>
                 <label style={{ fontSize: 12, opacity: 0.7, display: 'block', marginBottom: 4 }}>Клетчатка, г/день</label>
-                <input style={s.input} type="number" step="1" min="10" max="60" value={s_.fiberG ?? 25} onChange={e => save({ fiberG: e.target.value ? +e.target.value : undefined })} placeholder="25" />
+                <input style={s.input} type="number" step="1" min="10" max="60" value={s_.fiberG || ''} onChange={e => save({ fiberG: e.target.value ? parseFloat(e.target.value) || 0 : undefined })} placeholder="25" />
                 <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>Рекомендация: 25–35 г/день</div>
               </div>
               <div>
                 <label style={{ fontSize: 12, opacity: 0.7, display: 'block', marginBottom: 4 }}>Омега-3, г/день</label>
-                <input style={s.input} type="number" step="0.1" min="0" max="5" value={s_.omega3G ?? 1.5} onChange={e => save({ omega3G: e.target.value ? +e.target.value : undefined })} placeholder="1.5" />
+                <input style={s.input} type="number" step="0.1" min="0" max="5" value={s_.omega3G || ''} onChange={e => save({ omega3G: e.target.value ? parseFloat(e.target.value) || 0 : undefined })} placeholder="1.5" />
                 <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>Рекомендация: 1.5–3 г EPA+DHA</div>
               </div>
               <div>
                 <label style={{ fontSize: 12, opacity: 0.7, display: 'block', marginBottom: 4 }}>Натрий, г/день</label>
-                <input style={s.input} type="number" step="0.1" min="0.5" max="8" value={s_.sodiumG ?? 3.5} onChange={e => save({ sodiumG: e.target.value ? +e.target.value : undefined })} placeholder="3.5" />
+                <input style={s.input} type="number" step="0.1" min="0.5" max="8" value={s_.sodiumG || ''} onChange={e => save({ sodiumG: e.target.value ? parseFloat(e.target.value) || 0 : undefined })} placeholder="3.5" />
                 <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>Норма: 2.3–4 г/день</div>
               </div>
               <div>
                 <label style={{ fontSize: 12, opacity: 0.7, display: 'block', marginBottom: 4 }}>Калий, г/день</label>
-                <input style={s.input} type="number" step="0.1" min="1" max="6" value={s_.potassiumG ?? 3.0} onChange={e => save({ potassiumG: e.target.value ? +e.target.value : undefined })} placeholder="3.0" />
+                <input style={s.input} type="number" step="0.1" min="1" max="6" value={s_.potassiumG || ''} onChange={e => save({ potassiumG: e.target.value ? parseFloat(e.target.value) || 0 : undefined })} placeholder="3.0" />
                 <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>Норма: 2.6–3.4 г/день</div>
               </div>
             </div>
@@ -735,19 +802,19 @@ export const ProfileScreen: React.FC = () => {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}>
               <div>
                 <label style={{ fontSize: 12, opacity: 0.7, display: 'block', marginBottom: 4 }}>Алкоголь, доз/неделю</label>
-                <input style={s.input} type="number" step="1" min="0" max="30" value={s_.alcoholPerWeek ?? 0} onChange={e => save({ alcoholPerWeek: e.target.value ? +e.target.value : undefined })} placeholder="0" />
+                <input style={s.input} type="number" step="1" min="0" max="30" value={s_.alcoholPerWeek || ''} onChange={e => save({ alcoholPerWeek: e.target.value ? parseFloat(e.target.value) || 0 : undefined })} placeholder="0" />
               </div>
               <div>
                 <label style={{ fontSize: 12, opacity: 0.7, display: 'block', marginBottom: 4 }}>Уровень стресса (1-10)</label>
-                <input style={s.input} type="number" step="1" min="1" max="10" value={s_.stressLevel ?? 5} onChange={e => save({ stressLevel: e.target.value ? +e.target.value : undefined })} placeholder="5" />
+                <input style={s.input} type="number" step="1" min="1" max="10" value={s_.stressLevel || ''} onChange={e => save({ stressLevel: e.target.value ? parseFloat(e.target.value) || 0 : undefined })} placeholder="5" />
               </div>
               <div>
                 <label style={{ fontSize: 12, opacity: 0.7, display: 'block', marginBottom: 4 }}>Уровень активности (1-10)</label>
-                <input style={s.input} type="number" step="1" min="1" max="10" value={s_.activityLevel ?? 5} onChange={e => save({ activityLevel: e.target.value ? +e.target.value : undefined })} placeholder="5" />
+                <input style={s.input} type="number" step="1" min="1" max="10" value={s_.activityLevel || ''} onChange={e => save({ activityLevel: e.target.value ? parseFloat(e.target.value) || 0 : undefined })} placeholder="5" />
               </div>
               <div>
                 <label style={{ fontSize: 12, opacity: 0.7, display: 'block', marginBottom: 4 }}>Сон, часов/ночь</label>
-                <input style={s.input} type="number" step="0.5" min="3" max="12" value={s_.sleepHours ?? s_.baselineSleepHours ?? 7} onChange={e => save({ sleepHours: e.target.value ? +e.target.value : undefined })} placeholder="7" />
+                <input style={s.input} type="number" step="0.5" min="3" max="12" value={s_.sleepHours || ''} onChange={e => save({ sleepHours: e.target.value ? parseFloat(e.target.value) || 0 : undefined })} placeholder="7" />
               </div>
             </div>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
@@ -779,15 +846,15 @@ export const ProfileScreen: React.FC = () => {
               </div>
               <div>
                 <label style={{ fontSize: 12, opacity: 0.7, display: 'block', marginBottom: 4 }}>Объём, тонн/нед</label>
-                <input style={s.input} type="number" step="500" min="0" max="30000" value={s_.volumeTonnes ?? 8000} onChange={e => save({ volumeTonnes: e.target.value ? +e.target.value : undefined })} placeholder="8000" />
+                <input style={s.input} type="number" step="500" min="0" max="30000" value={s_.volumeTonnes || ''} onChange={e => save({ volumeTonnes: e.target.value ? parseFloat(e.target.value) || 0 : undefined })} placeholder="8000" />
               </div>
               <div>
                 <label style={{ fontSize: 12, opacity: 0.7, display: 'block', marginBottom: 4 }}>LISS, мин/неделю</label>
-                <input style={s.input} type="number" step="10" min="0" max="300" value={s_.lissMinutesPerWeek ?? 90} onChange={e => save({ lissMinutesPerWeek: e.target.value ? +e.target.value : undefined })} placeholder="90" />
+                <input style={s.input} type="number" step="10" min="0" max="300" value={s_.lissMinutesPerWeek || ''} onChange={e => save({ lissMinutesPerWeek: e.target.value ? parseFloat(e.target.value) || 0 : undefined })} placeholder="90" />
               </div>
               <div>
                 <label style={{ fontSize: 12, opacity: 0.7, display: 'block', marginBottom: 4 }}>Завершённых курсов ААС</label>
-                <input style={s.input} type="number" step="1" min="0" max="50" value={s_.totalCycles ?? 0} onChange={e => save({ totalCycles: e.target.value ? +e.target.value : undefined })} placeholder="0" />
+                <input style={s.input} type="number" step="1" min="0" max="50" value={s_.totalCycles || ''} onChange={e => save({ totalCycles: e.target.value ? parseFloat(e.target.value) || 0 : undefined })} placeholder="0" />
               </div>
             </div>
           </div>
@@ -872,7 +939,7 @@ export const ProfileScreen: React.FC = () => {
               </div>
               <div>
                 <span style={s.label}>Боль: {editInjury.painLevel}/10</span>
-                <input style={s.slider} type="range" min="1" max="10" value={editInjury.painLevel} onChange={e => setEditInjury({ ...editInjury, painLevel: +e.target.value })} />
+                <input style={s.slider} type="range" min="1" max="10" value={editInjury.painLevel} onChange={e => setEditInjury({ ...editInjury, painLevel: parseFloat(e.target.value) || 0 })} />
               </div>
               <div>
                 <span style={s.label}>Ограничение движений</span>
@@ -906,7 +973,7 @@ export const ProfileScreen: React.FC = () => {
           <h4 style={{ margin: '0 0 8px' }}>Прогресс к цели</h4>
           <div style={s.row}>
             <div><span style={s.label}>Текущий вес</span><div style={{ fontSize: 20, fontWeight: 700 }}>{s_.weight} кг</div></div>
-            <div><span style={s.label}>Целевой вес</span><input style={s.input} type="number" value={s_.targetWeight ?? ''} onChange={e => save({ targetWeight: e.target.value ? +e.target.value : undefined })} placeholder="" /></div>
+            <div><span style={s.label}>Целевой вес</span><input style={s.input} type="number" value={s_.targetWeight || ''} onChange={e => save({ targetWeight: e.target.value ? parseFloat(e.target.value) || 0 : undefined })} placeholder="" /></div>
           </div>
           {s_.targetWeight && (
             <div>
@@ -918,7 +985,7 @@ export const ProfileScreen: React.FC = () => {
           )}
           <div style={{ marginTop: 12 }}>
             <span style={s.label}>Целевой % жира</span>
-            <input style={s.input} type="number" step="0.1" value={s_.targetBodyFat ?? ''} onChange={e => save({ targetBodyFat: e.target.value ? +e.target.value : undefined })} placeholder="" />
+            <input style={s.input} type="number" step="0.1" value={s_.targetBodyFat || ''} onChange={e => save({ targetBodyFat: e.target.value ? parseFloat(e.target.value) || 0 : undefined })} placeholder="" />
           </div>
           {labIndices && labIndexText && (
             <div style={{ marginTop: 12 }}>
@@ -944,10 +1011,10 @@ export const ProfileScreen: React.FC = () => {
         </div>
       )}
 
-      {tab === 'friends' && (
+      {tab === 'contacts' && (
         <div>
           <div className="card" style={{ padding: 14, marginBottom: 12 }}>
-            <h3 style={{ margin: '0 0 8px 0', fontSize: 14 }}>👥 Друзья и Telegram</h3>
+            <h3 style={{ margin: '0 0 8px 0', fontSize: 14 }}>📞 Контакты и друзья</h3>
             <p style={{ fontSize: 10, color: 'var(--text-dim)', margin: '0 0 12px 0', lineHeight: 1.4 }}>
               Управление списком друзей, обмен отчётами и доступ к тренировкам через Telegram WebApp.
             </p>
@@ -955,21 +1022,32 @@ export const ProfileScreen: React.FC = () => {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 12 }}>
               <button onClick={addFriend} style={{
                 padding: '10px 8px', borderRadius: 14, cursor: 'pointer',
-                background: 'linear-gradient(135deg, #3b82f6, #6366f1)',
+                background: 'linear-gradient(135deg, #3b82f6, #6366f1)', transition:'all 0.2s',
                 border: 'none', color: '#fff', fontWeight: 700, fontSize: 12,
               }}>➕ Добавить друга</button>
               <button onClick={shareReport} style={{
                 padding: '10px 8px', borderRadius: 14, cursor: 'pointer',
-                background: 'linear-gradient(135deg, #f59e0b, #f97316)',
+                background: 'linear-gradient(135deg, #f59e0b, #f97316)', transition:'all 0.2s',
                 border: 'none', color: '#000', fontWeight: 700, fontSize: 12,
               }}>📤 Поделиться отчётом</button>
             </div>
 
             <button onClick={openTrainingForFriend} style={{
               width: '100%', padding: '10px 8px', borderRadius: 14, cursor: 'pointer', marginBottom: 12,
-              background: 'linear-gradient(135deg, #8b5cf6, #a855f7)',
+              background: 'linear-gradient(135deg, #8b5cf6, #a855f7)', transition:'all 0.2s',
               border: 'none', color: '#fff', fontWeight: 700, fontSize: 12,
             }}>🏋️ Открыть тренировку другу</button>
+
+            <button onClick={() => {
+              const tg = (window as any).Telegram?.WebApp;
+              if (tg?.openTelegramLink) tg.openTelegramLink('https://t.me/BodyBuildHealthBot');
+              else if (tg?.openLink) tg.openLink('https://t.me/BodyBuildHealthBot');
+              else window.open('https://t.me/BodyBuildHealthBot', '_blank');
+            }} style={{
+              width: '100%', padding: '10px 8px', borderRadius: 14, cursor: 'pointer', marginBottom: 12,
+              background: 'linear-gradient(135deg, #00e68a, #00c853)', transition:'all 0.2s',
+              border: 'none', color: '#000', fontWeight: 700, fontSize: 12,
+            }}>💬 Связаться с поддержкой</button>
 
             {friends.length > 0 && (
               <div>
@@ -1025,7 +1103,99 @@ export const ProfileScreen: React.FC = () => {
         </div>
       )}
 
-      {tab === 'reports' && <ReportsScreen />}
+      {tab === 'reports' && (() => {
+        const bmiVal = s_.weight && s_.height ? (s_.weight / Math.pow(s_.height / 100, 2)).toFixed(1) : '—';
+        const lbmVal = s_.weight && s_.bodyFat ? (s_.weight * (1 - s_.bodyFat / 100)).toFixed(1) : '—';
+        const ffmiVal = lbmVal !== '—' && s_.height ? (parseFloat(lbmVal) / Math.pow(s_.height / 100, 2) + 6.1 * (1.8 - s_.height / 100)).toFixed(1) : '—';
+        const riskData = (() => { try { return JSON.parse(localStorage.getItem('he_last_risk') || 'null'); } catch { return null; } })();
+        const suppsList = (s_.currentSupplements || []).map((x: any) => x.name || x.label).join(', ') || 'нет';
+        const medsList = (s_.currentMedications || []).map((x: any) => x.name).join(', ') || 'нет';
+        const chronicList = (s_.chronicConditions || []).map(c => CHRONIC_CONDITIONS.find(cc => cc.id === c)?.label || c).join(', ') || 'нет';
+        const sportLabel = SPORT_TYPES.find(s => s.id === s_.sportType)?.label || 'не указан';
+        const goalLabel = GOALS.find(g => g.id === (s_.primaryGoal || s_.goal))?.label || 'не указана';
+        const labsList = labs.map(l => `${l.code}: ${l.value} ${l.unit}`).join(', ') || 'нет';
+
+        const trainerReport = [
+          `📊 Отчёт для тренера`,
+          `👤 Имя: ${profile.name || '—'}`,
+          `📅 Возраст: ${s_.age || '—'} лет`,
+          `⚖️ Вес: ${s_.weight || '—'} кг | Рост: ${s_.height || '—'} см`,
+          `📐 BMI: ${bmiVal} | FFMI: ${ffmiVal}`,
+          `⏳ Стаж: ${s_.trainingExperience || '—'} лет`,
+          `🎯 Цель: ${goalLabel}`,
+          `🏋️ Тренировки: ${s_.workoutsPerWeek || '—'} дн/нед`,
+          `📊 Недельный объём: ${s_.workoutsPerWeek || '—'} трен/нед × ${s_.avgWorkoutMinutes || '—'} мин`,
+          `🏋️ Основные 1RM — Присед: —, Жим: —, Тяга: —`,
+          `📅 ${new Date().toLocaleDateString('ru')}`,
+        ].join('\n');
+
+        const doctorReport = [
+          `🏥 Отчёт для врача`,
+          `👤 ${profile.name || '—'}, ${s_.age || '—'} лет, ${s_.sex === 'male' ? 'муж' : 'жен'}`,
+          `🩸 Группа крови: ${s_.bloodType || '—'}`,
+          ``,
+          `🧪 Анализы: ${labsList}`,
+          ``,
+          `⚠️ Риски по системам:`,
+          ...(riskData?.systemBreakdown ? Object.entries(riskData.systemBreakdown as Record<string,any>).map(([k,v]) => `  • ${k}: ${(v as any)?.net || '—'}%`) : ['  — нет данных']),
+          ``,
+          `💊 Препараты на курсе: ${medsList}`,
+          `🧬 БАДы: ${suppsList}`,
+          `🩺 Хронические: ${chronicList}`,
+          `🤧 Аллергии: ${s_.allergyNotes || 'нет'}`,
+          `📞 Экстренный: ${s_.emergencyName || '—'} / ${s_.emergencyPhone || '—'}`,
+          `📅 ${new Date().toLocaleDateString('ru')}`,
+        ].join('\n');
+
+        const generalReport = [
+          `📋 Общий отчёт BodyBuildHealth`,
+          `👤 ${profile.name || '—'} | ${s_.age || '—'} лет | ${s_.sex === 'male' ? 'М' : 'Ж'}`,
+          `⚖️ Вес: ${s_.weight || '—'} кг | Рост: ${s_.height || '—'} см | BMI: ${bmiVal} | FFMI: ${ffmiVal}`,
+          `🏃 Спорт: ${sportLabel} | Стаж: ${s_.trainingExperience || '—'} лет`,
+          `🎯 Цель: ${goalLabel} | Уровень: ${s_.trainingLevel || '—'}`,
+          `🔀 Тренировки: ${s_.workoutsPerWeek || '—'} дн/нед × ${s_.avgWorkoutMinutes || '—'} мин`,
+          ``,
+          `🧪 Анализы: ${labsList}`,
+          `💊 Курс: ${medsList} | БАДы: ${suppsList}`,
+          `🩺 Хроника: ${chronicList} | Аллергии: ${s_.allergyNotes || 'нет'}`,
+          `🩸 Кровь: ${s_.bloodType || '—'} | 📞 Экстр.: ${s_.emergencyName || '—'}`,
+          ``,
+          `⚠️ Риск: ${riskData?.overallNet || '—'}%`,
+          `📅 ${new Date().toLocaleDateString('ru')}`,
+        ].join('\n');
+
+        const copyReport = (text: string) => {
+          navigator.clipboard?.writeText(text).then(() => {
+            const tg = (window as any).Telegram?.WebApp;
+            if (tg?.showPopup) tg.showPopup({ title: 'Скопировано', message: 'Отчёт скопирован в буфер обмена' });
+          });
+        };
+        const sendReport = (text: string) => {
+          const tg = (window as any).Telegram?.WebApp;
+          if (tg?.sendData) {
+            tg.sendData(JSON.stringify({ type: 'share_report', report: text }));
+          } else {
+            copyReport(text);
+          }
+        };
+
+        return (<div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+          {[
+            { title: '📊 Отчёт для тренера', text: trainerReport, color: '#3b82f6' },
+            { title: '🏥 Отчёт для врача', text: doctorReport, color: '#ef4444' },
+            { title: '📋 Общий отчёт', text: generalReport, color: '#00e68a' },
+          ].map(r => (
+            <div key={r.title} className="card" style={{ padding:'10px 12px', border:`1px solid ${r.color}22`, background:`${r.color}08` }}>
+              <h4 style={{ margin:'0 0 8px', fontSize:13, color:r.color }}>{r.title}</h4>
+              <pre style={{ fontSize:10, color:'var(--text-dim)', whiteSpace:'pre-wrap', fontFamily:'monospace', margin:'0 0 8px', background:'var(--bg-secondary)', borderRadius:8, padding:8, maxHeight:200, overflowY:'auto' }}>{r.text}</pre>
+              <div style={{ display:'flex', gap:6 }}>
+                <button onClick={() => copyReport(r.text)} style={{ flex:1, padding:'6px 12px', borderRadius:8, border:'1px solid var(--border)', background:'var(--bg-secondary)', color:'var(--text)', fontSize:11, cursor:'pointer', fontWeight:600, transition:'all 0.2s' }}>📋 Копировать</button>
+                <button onClick={() => sendReport(r.text)} style={{ flex:1, padding:'6px 12px', borderRadius:8, border:'none', background:r.color, color:'#000', fontSize:11, cursor:'pointer', fontWeight:600, transition:'all 0.2s' }}>📤 Отправить</button>
+              </div>
+            </div>
+          ))}
+        </div>);
+      })()}
         </div>
       </div>
       )}

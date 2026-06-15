@@ -522,7 +522,7 @@ export const PlanScreen: React.FC<{ goal: string }> = ({ goal }) => {
 
                 <label>Дней/неделю: {daysPerWeek}</label>
 
-                <input type="range" min={2} max={6} value={daysPerWeek} onChange={e => setDaysPerWeek(Number(e.target.value))} />
+                <input type="range" min={2} max={6} value={daysPerWeek} onChange={e => setDaysPerWeek(parseFloat(e.target.value) || 0)} />
 
               </div>
 
@@ -530,7 +530,7 @@ export const PlanScreen: React.FC<{ goal: string }> = ({ goal }) => {
 
                 <label>Восстановление: {recovery}%</label>
 
-                <input type="range" min={0} max={100} value={recovery} onChange={e => setRecovery(Number(e.target.value))} />
+                <input type="range" min={0} max={100} value={recovery} onChange={e => setRecovery(parseFloat(e.target.value) || 0)} />
 
               </div>
 
@@ -538,7 +538,7 @@ export const PlanScreen: React.FC<{ goal: string }> = ({ goal }) => {
 
                 <label>Утомлённость: {fatigue}%</label>
 
-                <input type="range" min={0} max={100} value={fatigue} onChange={e => setFatigue(Number(e.target.value))} />
+                <input type="range" min={0} max={100} value={fatigue} onChange={e => setFatigue(parseFloat(e.target.value) || 0)} />
 
               </div>
 
@@ -546,7 +546,7 @@ export const PlanScreen: React.FC<{ goal: string }> = ({ goal }) => {
 
                 <label>Питание: {nutrition}%</label>
 
-                <input type="range" min={0} max={100} value={nutrition} onChange={e => setNutrition(Number(e.target.value))} />
+                <input type="range" min={0} max={100} value={nutrition} onChange={e => setNutrition(parseFloat(e.target.value) || 0)} />
 
               </div>
 
@@ -1074,25 +1074,25 @@ export const PlanScreen: React.FC<{ goal: string }> = ({ goal }) => {
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
 
-              <div className="form-group"><label>Сон: {sleepHours}ч</label><input type="range" min={0} max={12} step={0.5} value={sleepHours} onChange={e => setSleepHours(Number(e.target.value))} /></div>
+              <div className="form-group"><label>Сон: {sleepHours}ч</label><input type="range" min={0} max={12} step={0.5} value={sleepHours} onChange={e => setSleepHours(parseFloat(e.target.value) || 0)} /></div>
 
-              <div className="form-group"><label>Качество: {sleepQuality}/10</label><input type="range" min={1} max={10} value={sleepQuality} onChange={e => setSleepQuality(Number(e.target.value))} /></div>
+              <div className="form-group"><label>Качество: {sleepQuality}/10</label><input type="range" min={1} max={10} value={sleepQuality} onChange={e => setSleepQuality(parseFloat(e.target.value) || 0)} /></div>
 
-              <div className="form-group"><label>Пробуждения: {nightAwakenings}</label><input type="range" min={0} max={5} value={nightAwakenings} onChange={e => setNightAwakenings(Number(e.target.value))} /></div>
+              <div className="form-group"><label>Пробуждения: {nightAwakenings}</label><input type="range" min={0} max={5} value={nightAwakenings} onChange={e => setNightAwakenings(parseFloat(e.target.value) || 0)} /></div>
 
-              <div className="form-group"><label>HRV: {hrvRatio}</label><input type="range" min={0.5} max={1.5} step={0.05} value={hrvRatio} onChange={e => setHrvRatio(Number(e.target.value))} /></div>
+              <div className="form-group"><label>HRV: {hrvRatio}</label><input type="range" min={0.5} max={1.5} step={0.05} value={hrvRatio} onChange={e => setHrvRatio(parseFloat(e.target.value) || 0)} /></div>
 
-              <div className="form-group"><label>DOMS: {doms}/10</label><input type="range" min={0} max={10} value={doms} onChange={e => setDoms(Number(e.target.value))} /></div>
+              <div className="form-group"><label>DOMS: {doms}/10</label><input type="range" min={0} max={10} value={doms} onChange={e => setDoms(parseFloat(e.target.value) || 0)} /></div>
 
-              <div className="form-group"><label>Стресс: {stress}/10</label><input type="range" min={0} max={10} value={stress} onChange={e => setStress(Number(e.target.value))} /></div>
+              <div className="form-group"><label>Стресс: {stress}/10</label><input type="range" min={0} max={10} value={stress} onChange={e => setStress(parseFloat(e.target.value) || 0)} /></div>
 
-              <div className="form-group"><label>Калории: {calRatio}</label><input type="range" min={0.5} max={1.5} step={0.05} value={calRatio} onChange={e => setCalRatio(Number(e.target.value))} /></div>
+              <div className="form-group"><label>Калории: {calRatio}</label><input type="range" min={0.5} max={1.5} step={0.05} value={calRatio} onChange={e => setCalRatio(parseFloat(e.target.value) || 0)} /></div>
 
-              <div className="form-group"><label>Белок: {proteinRatio}</label><input type="range" min={0.5} max={1.5} step={0.05} value={proteinRatio} onChange={e => setProteinRatio(Number(e.target.value))} /></div>
+              <div className="form-group"><label>Белок: {proteinRatio}</label><input type="range" min={0.5} max={1.5} step={0.05} value={proteinRatio} onChange={e => setProteinRatio(parseFloat(e.target.value) || 0)} /></div>
 
-              <div className="form-group"><label>Нагрузка: {trainingLoadRatio}</label><input type="range" min={0} max={2} step={0.05} value={trainingLoadRatio} onChange={e => setTrainingLoadRatio(Number(e.target.value))} /></div>
+              <div className="form-group"><label>Нагрузка: {trainingLoadRatio}</label><input type="range" min={0} max={2} step={0.05} value={trainingLoadRatio} onChange={e => setTrainingLoadRatio(parseFloat(e.target.value) || 0)} /></div>
 
-              <div className="form-group"><label>Усталость: {subjFatigue}/10</label><input type="range" min={0} max={10} value={subjFatigue} onChange={e => setSubjFatigue(Number(e.target.value))} /></div>
+              <div className="form-group"><label>Усталость: {subjFatigue}/10</label><input type="range" min={0} max={10} value={subjFatigue} onChange={e => setSubjFatigue(parseFloat(e.target.value) || 0)} /></div>
 
             </div>
 

@@ -2741,7 +2741,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
                           background:'rgba(0,230,138,0.06)', border:'1px solid rgba(0,230,138,0.2)', fontSize:10 }}>
                           <span>{sub?.name || id}</span>
                           <input type="number" min={0} max={5000} step={50} value={manualDoses[id] || ''}
-                            onChange={e => setManualDoses(prev => ({...prev, [id]: Number(e.target.value) || 0}))}
+                            onChange={e => setManualDoses(prev => ({...prev, [id]: parseFloat(e.target.value) || 0 || 0}))}
                             placeholder="мг"
                             style={{ width:50, padding:'2px 4px', borderRadius:4, border:'1px solid var(--border)', background:'var(--bg-secondary)', color:'var(--text-light)', fontSize:9 }} />
                           <span onClick={() => setManualSubs(prev => prev.filter(x => x !== id))}
@@ -3710,21 +3710,21 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
               <div>
                 <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Во флаконе</label>
                 <div style={{ display: 'flex', gap: 4 }}>
-                  <input type="number" value={pepAmount} onChange={e => setPepAmount(Number(e.target.value))} style={{ width: '60%', padding: '6px 8px', borderRadius: 6, border: '1px solid var(--border-color)', background: 'var(--bg-secondary)', color: 'var(--text-light)', fontSize: 12 }} />
-                  <select value={pepAmountUnit} onChange={e => setPepAmountUnit(e.target.value as 'mg' | 'mcg')} style={{ flex: 1, padding: '6px', borderRadius: 6, border: '1px solid var(--border-color)', background: 'var(--bg-secondary)', color: 'var(--text-light)', fontSize: 11 }}>
+                  <input type="number" value={pepAmount} onChange={e => setPepAmount(parseFloat(e.target.value) || 0)} style={{ width: '60%', padding: '6px 8px', borderRadius: 6, border: '1px solid var(--border-color)', background: 'var(--bg-secondary)', color: 'var(--text-light)', fontSize: 12 }} />
+                  <select value={pepAmountUnit || ''} onChange={e => setPepAmountUnit(e.target.value as 'mg' | 'mcg')} style={{ flex: 1, padding: '6px', borderRadius: 6, border: '1px solid var(--border-color)', background: 'var(--bg-secondary)', color: 'var(--text-light)', fontSize: 11 }}>
                     <option value="mg">мг</option><option value="mcg">мкг</option>
                   </select>
                 </div>
               </div>
               <div>
                 <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Растворитель (мл)</label>
-                <input type="number" step="0.1" value={pepDilution} onChange={e => setPepDilution(Number(e.target.value))} style={{ width: '100%', padding: '6px 8px', borderRadius: 6, border: '1px solid var(--border-color)', background: 'var(--bg-secondary)', color: 'var(--text-light)', fontSize: 12, boxSizing: 'border-box' }} />
+                <input type="number" step="0.1" value={pepDilution} onChange={e => setPepDilution(parseFloat(e.target.value) || 0)} style={{ width: '100%', padding: '6px 8px', borderRadius: 6, border: '1px solid var(--border-color)', background: 'var(--bg-secondary)', color: 'var(--text-light)', fontSize: 12, boxSizing: 'border-box' }} />
               </div>
               <div>
                 <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Доза</label>
                 <div style={{ display: 'flex', gap: 4 }}>
-                  <input type="number" value={pepDose} onChange={e => setPepDose(Number(e.target.value))} style={{ width: '60%', padding: '6px 8px', borderRadius: 6, border: '1px solid var(--border-color)', background: 'var(--bg-secondary)', color: 'var(--text-light)', fontSize: 12 }} />
-                  <select value={pepDoseUnit} onChange={e => setPepDoseUnit(e.target.value as 'mg' | 'mcg')} style={{ flex: 1, padding: '6px', borderRadius: 6, border: '1px solid var(--border-color)', background: 'var(--bg-secondary)', color: 'var(--text-light)', fontSize: 11 }}>
+                  <input type="number" value={pepDose} onChange={e => setPepDose(parseFloat(e.target.value) || 0)} style={{ width: '60%', padding: '6px 8px', borderRadius: 6, border: '1px solid var(--border-color)', background: 'var(--bg-secondary)', color: 'var(--text-light)', fontSize: 12 }} />
+                  <select value={pepDoseUnit || ''} onChange={e => setPepDoseUnit(e.target.value as 'mg' | 'mcg')} style={{ flex: 1, padding: '6px', borderRadius: 6, border: '1px solid var(--border-color)', background: 'var(--bg-secondary)', color: 'var(--text-light)', fontSize: 11 }}>
                     <option value="mcg">мкг</option><option value="mg">мг</option>
                   </select>
                 </div>
@@ -3759,7 +3759,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
             </div>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
               <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Длительность (дни):</label>
-              <input type="number" value={pepTotalDays} onChange={e => setPepTotalDays(Number(e.target.value))} style={{ width: 60, padding: '4px 8px', borderRadius: 6, border: '1px solid var(--border-color)', background: 'var(--bg-secondary)', color: 'var(--text-light)', fontSize: 12 }} />
+              <input type="number" value={pepTotalDays} onChange={e => setPepTotalDays(parseFloat(e.target.value) || 0)} style={{ width: 60, padding: '4px 8px', borderRadius: 6, border: '1px solid var(--border-color)', background: 'var(--bg-secondary)', color: 'var(--text-light)', fontSize: 12 }} />
               <span style={{ fontSize: 9, color: 'var(--text-dim)' }}>Инъекций: {pepSchedule.length}/нед</span>
             </div>
           </div>

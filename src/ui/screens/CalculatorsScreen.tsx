@@ -218,8 +218,8 @@ export const CalculatorsScreen: React.FC<CalcProps> = ({ initialTab = 'fitness' 
               <h4>Индекс массы тела (BMI)</h4>
               <p className="description">Вес / Рост² — оценка массы тела</p>
               <div className="input-group">
-                <label>Вес (кг): <input type="number" value={bmiWeight} onChange={e => setBmiWeight(Number(e.target.value))} /></label>
-                <label>Рост (см): <input type="number" value={bmiHeight} onChange={e => setBmiHeight(Number(e.target.value))} /></label>
+                <label>Вес (кг): <input type="number" value={bmiWeight} onChange={e => setBmiWeight(parseFloat(e.target.value) || 0)} /></label>
+                <label>Рост (см): <input type="number" value={bmiHeight} onChange={e => setBmiHeight(parseFloat(e.target.value) || 0)} /></label>
                 <button onClick={calcBMI}>Рассчитать</button>
               </div>
               {bmiResult !== null && (
@@ -234,11 +234,11 @@ export const CalculatorsScreen: React.FC<CalcProps> = ({ initialTab = 'fitness' 
               <h4>BMR (Миффлин-Сан Жеор)</h4>
               <p className="description">Базовый метаболизм: 10×вес + 6.25×рост − 5×возраст ± 161</p>
               <div className="input-group">
-                <label>Вес (кг): <input type="number" value={bmrWeight} onChange={e => setBmrWeight(Number(e.target.value))} /></label>
-                <label>Рост (см): <input type="number" value={bmrHeight} onChange={e => setBmrHeight(Number(e.target.value))} /></label>
-                <label>Возраст: <input type="number" value={bmrAge} onChange={e => setBmrAge(Number(e.target.value))} /></label>
+                <label>Вес (кг): <input type="number" value={bmrWeight} onChange={e => setBmrWeight(parseFloat(e.target.value) || 0)} /></label>
+                <label>Рост (см): <input type="number" value={bmrHeight} onChange={e => setBmrHeight(parseFloat(e.target.value) || 0)} /></label>
+                <label>Возраст: <input type="number" value={bmrAge} onChange={e => setBmrAge(parseFloat(e.target.value) || 0)} /></label>
                 <label>Пол:
-                  <select value={bmrSex} onChange={e => setBmrSex(e.target.value as 'male' | 'female')}>
+                  <select value={bmrSex || ''} onChange={e => setBmrSex(e.target.value as 'male' | 'female')}>
                     <option value="male">Мужской</option>
                     <option value="female">Женский</option>
                   </select>
@@ -256,8 +256,8 @@ export const CalculatorsScreen: React.FC<CalcProps> = ({ initialTab = 'fitness' 
               <h4>BMR (Кэтч-Мкардл)</h4>
               <p className="description">370 + 21.6 × LBM — для людей с известным % жира</p>
               <div className="input-group">
-                <label>Вес (кг): <input type="number" value={bmrKmWeight} onChange={e => setBmrKmWeight(Number(e.target.value))} /></label>
-                <label>Толщина жира (%): <input type="number" step="0.1" value={bmrKmBodyFat} onChange={e => setBmrKmBodyFat(Number(e.target.value))} /></label>
+                <label>Вес (кг): <input type="number" value={bmrKmWeight} onChange={e => setBmrKmWeight(parseFloat(e.target.value) || 0)} /></label>
+                <label>Толщина жира (%): <input type="number" step="0.1" value={bmrKmBodyFat} onChange={e => setBmrKmBodyFat(parseFloat(e.target.value) || 0)} /></label>
                 <button onClick={calcBMR_KM}>Рассчитать</button>
               </div>
               {bmrKmResult !== null && (
@@ -272,9 +272,9 @@ export const CalculatorsScreen: React.FC<CalcProps> = ({ initialTab = 'fitness' 
               <h4>TDEE</h4>
               <p className="description">BMR × PAL — общий дневной расход энергии</p>
               <div className="input-group">
-                <label>BMR (ккал): <input type="number" value={tdeeBmr} onChange={e => setTdeeBmr(Number(e.target.value))} /></label>
+                <label>BMR (ккал): <input type="number" value={tdeeBmr} onChange={e => setTdeeBmr(parseFloat(e.target.value) || 0)} /></label>
                 <label>Уровень активности:
-                  <select value={tdeePal} onChange={e => setTdeePal(Number(e.target.value))}>
+                  <select value={tdeePal} onChange={e => setTdeePal(parseFloat(e.target.value) || 0)}>
                     {PAL_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
                   </select>
                 </label>
@@ -291,10 +291,10 @@ export const CalculatorsScreen: React.FC<CalcProps> = ({ initialTab = 'fitness' 
               <h4>Дозировка препарата</h4>
               <p className="description">Расчёт объёма инъекции по дозе и концентрации</p>
               <div className="input-group">
-                <label>Целевая доза (мг): <input type="number" value={doseTarget} onChange={e => setDoseTarget(Number(e.target.value))} /></label>
-                <label>Концентрация (мг/мл): <input type="number" value={doseConcentration} onChange={e => setDoseConcentration(Number(e.target.value))} /></label>
+                <label>Целевая доза (мг): <input type="number" value={doseTarget} onChange={e => setDoseTarget(parseFloat(e.target.value) || 0)} /></label>
+                <label>Концентрация (мг/мл): <input type="number" value={doseConcentration} onChange={e => setDoseConcentration(parseFloat(e.target.value) || 0)} /></label>
                 <label>Шприц (мл):
-                  <select value={doseSyringe} onChange={e => setDoseSyringe(Number(e.target.value))}>
+                  <select value={doseSyringe} onChange={e => setDoseSyringe(parseFloat(e.target.value) || 0)}>
                     {Object.keys(SYRINGE_SPECS).map(k => <option key={k} value={k}>{k} мл</option>)}
                   </select>
                 </label>
@@ -319,7 +319,7 @@ export const CalculatorsScreen: React.FC<CalcProps> = ({ initialTab = 'fitness' 
                     <select value={entry.drug} onChange={e => updateAiEntry(i, 'drug', e.target.value)}>
                       {DRUG_OPTIONS.map(d => <option key={d} value={d}>{d}</option>)}
                     </select>
-                    <input type="number" value={entry.doseMgWeek} onChange={e => updateAiEntry(i, 'doseMgWeek', Number(e.target.value))} placeholder="" style={{ width: 80 }} />
+                    <input type="number" value={entry.doseMgWeek} onChange={e => updateAiEntry(i, 'doseMgWeek', parseFloat(e.target.value) || 0)} placeholder="" style={{ width: 80 }} />
                     <span>мг/нед</span>
                     {aiEntries.length > 1 && <button onClick={() => removeAiEntry(i)}>✕</button>}
                   </div>
@@ -348,8 +348,8 @@ export const CalculatorsScreen: React.FC<CalcProps> = ({ initialTab = 'fitness' 
               <h4>Калорийный дефицит</h4>
               <p className="description">TDEE − целевые ккал → скорость потери веса</p>
               <div className="input-group">
-                <label>TDEE (ккал/день): <input type="number" value={deficitTdee} onChange={e => setDeficitTdee(Number(e.target.value))} /></label>
-                <label>Целевые ккал/день: <input type="number" value={deficitTarget} onChange={e => setDeficitTarget(Number(e.target.value))} /></label>
+                <label>TDEE (ккал/день): <input type="number" value={deficitTdee} onChange={e => setDeficitTdee(parseFloat(e.target.value) || 0)} /></label>
+                <label>Целевые ккал/день: <input type="number" value={deficitTarget} onChange={e => setDeficitTarget(parseFloat(e.target.value) || 0)} /></label>
                 <button onClick={calcDeficit}>Рассчитать</button>
               </div>
               {deficitResult !== null && (
@@ -369,17 +369,17 @@ export const CalculatorsScreen: React.FC<CalcProps> = ({ initialTab = 'fitness' 
               <h4>Макросы (расчёт БЖУ)</h4>
               <p className="description">Полный расчёт БЖУ и микроэлементов по двигу nutrition</p>
               <div className="input-group">
-                <label>Вес (кг): <input type="number" value={macroWeight} onChange={e => setMacroWeight(Number(e.target.value))} /></label>
-                <label>Рост (см): <input type="number" value={macroHeight} onChange={e => setMacroHeight(Number(e.target.value))} /></label>
-                <label>Возраст: <input type="number" value={macroAge} onChange={e => setMacroAge(Number(e.target.value))} /></label>
+                <label>Вес (кг): <input type="number" value={macroWeight} onChange={e => setMacroWeight(parseFloat(e.target.value) || 0)} /></label>
+                <label>Рост (см): <input type="number" value={macroHeight} onChange={e => setMacroHeight(parseFloat(e.target.value) || 0)} /></label>
+                <label>Возраст: <input type="number" value={macroAge} onChange={e => setMacroAge(parseFloat(e.target.value) || 0)} /></label>
                 <label>Пол:
-                  <select value={macroSex} onChange={e => setMacroSex(e.target.value as 'male' | 'female')}>
+                  <select value={macroSex || ''} onChange={e => setMacroSex(e.target.value as 'male' | 'female')}>
                     <option value="male">Мужской</option>
                     <option value="female">Женский</option>
                   </select>
                 </label>
                 <label>PAL:
-                  <select value={macroPal} onChange={e => setMacroPal(Number(e.target.value))}>
+                  <select value={macroPal} onChange={e => setMacroPal(parseFloat(e.target.value) || 0)}>
                     {PAL_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
                   </select>
                 </label>
@@ -410,8 +410,8 @@ export const CalculatorsScreen: React.FC<CalcProps> = ({ initialTab = 'fitness' 
               <h4>HOMA-IR</h4>
               <p className="description">(Глюкоза × Инсулин) / 22.5 — индекс инсулинорезистентности</p>
               <div className="input-group">
-                <label>Глюкоза (ммоль/л): <input type="number" step="0.1" value={homaGlucose} onChange={e => setHomaGlucose(Number(e.target.value))} /></label>
-                <label>Инсулин (μЕ/мл): <input type="number" step="0.1" value={homaInsulin} onChange={e => setHomaInsulin(Number(e.target.value))} /></label>
+                <label>Глюкоза (ммоль/л): <input type="number" step="0.1" value={homaGlucose} onChange={e => setHomaGlucose(parseFloat(e.target.value) || 0)} /></label>
+                <label>Инсулин (μЕ/мл): <input type="number" step="0.1" value={homaInsulin} onChange={e => setHomaInsulin(parseFloat(e.target.value) || 0)} /></label>
                 <button onClick={calcHOMA}>Рассчитать</button>
               </div>
               {homaResult !== null && (
@@ -435,8 +435,8 @@ export const CalculatorsScreen: React.FC<CalcProps> = ({ initialTab = 'fitness' 
               <h4>Кальций скорректированный</h4>
               <p className="description">Ca_общ + 0.8 × (4.0 − альбумин) — коррекция на белок</p>
               <div className="input-group">
-                <label>Общий Ca (ммоль/л): <input type="number" step="0.01" value={caTotal} onChange={e => setCaTotal(Number(e.target.value))} /></label>
-                <label>Альбумин (г/дл): <input type="number" step="0.1" value={caAlbumin} onChange={e => setCaAlbumin(Number(e.target.value))} /></label>
+                <label>Общий Ca (ммоль/л): <input type="number" step="0.01" value={caTotal} onChange={e => setCaTotal(parseFloat(e.target.value) || 0)} /></label>
+                <label>Альбумин (г/дл): <input type="number" step="0.1" value={caAlbumin} onChange={e => setCaAlbumin(parseFloat(e.target.value) || 0)} /></label>
                 <button onClick={calcCa}>Рассчитать</button>
               </div>
               {caResult !== null && (
@@ -451,8 +451,8 @@ export const CalculatorsScreen: React.FC<CalcProps> = ({ initialTab = 'fitness' 
               <h4>Атерогенный индекс</h4>
               <p className="description">(Общий холестерин − HDL) / HDL — риск атеросклероза</p>
               <div className="input-group">
-                <label>Общий холестерин (ммоль/л): <input type="number" step="0.01" value={aiTotalChol} onChange={e => setAiTotalChol(Number(e.target.value))} /></label>
-                <label>HDL (ммоль/л): <input type="number" step="0.01" value={aiHdl} onChange={e => setAiHdl(Number(e.target.value))} /></label>
+                <label>Общий холестерин (ммоль/л): <input type="number" step="0.01" value={aiTotalChol} onChange={e => setAiTotalChol(parseFloat(e.target.value) || 0)} /></label>
+                <label>HDL (ммоль/л): <input type="number" step="0.01" value={aiHdl} onChange={e => setAiHdl(parseFloat(e.target.value) || 0)} /></label>
                 <button onClick={calcAtherogenic}>Рассчитать</button>
               </div>
               {aiResult2 !== null && (
@@ -467,14 +467,14 @@ export const CalculatorsScreen: React.FC<CalcProps> = ({ initialTab = 'fitness' 
               <h4>Сила хвата</h4>
               <p className="description">Оценка общей силы по кистевой динамометрии</p>
               <div className="input-group">
-                <label>Сила хвата (кг): <input type="number" value={gripKg} onChange={e => setGripKg(Number(e.target.value))} /></label>
+                <label>Сила хвата (кг): <input type="number" value={gripKg} onChange={e => setGripKg(parseFloat(e.target.value) || 0)} /></label>
                 <label>Пол:
-                  <select value={gripSex} onChange={e => setGripSex(e.target.value as 'male' | 'female')}>
+                  <select value={gripSex || ''} onChange={e => setGripSex(e.target.value as 'male' | 'female')}>
                     <option value="male">Мужской</option>
                     <option value="female">Женский</option>
                   </select>
                 </label>
-                <label>Возраст: <input type="number" value={gripAge} onChange={e => setGripAge(Number(e.target.value))} /></label>
+                <label>Возраст: <input type="number" value={gripAge} onChange={e => setGripAge(parseFloat(e.target.value) || 0)} /></label>
                 <button onClick={calcGrip}>Оценить</button>
               </div>
               {gripResult !== null && (
@@ -489,7 +489,7 @@ export const CalculatorsScreen: React.FC<CalcProps> = ({ initialTab = 'fitness' 
               <h4>Стресс (HRV)</h4>
               <p className="description">Оценка стресса по вариабельности сердечного ритма</p>
               <div className="input-group">
-                <label>RMSSD / HRV (мс): <input type="number" value={hrvValue} onChange={e => setHrvValue(Number(e.target.value))} /></label>
+                <label>RMSSD / HRV (мс): <input type="number" value={hrvValue} onChange={e => setHrvValue(parseFloat(e.target.value) || 0)} /></label>
                 <button onClick={calcStress}>Оценить</button>
               </div>
               {stressResult !== null && (

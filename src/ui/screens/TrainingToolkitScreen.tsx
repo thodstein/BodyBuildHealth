@@ -74,10 +74,10 @@ const PeakingTab: React.FC = () => {
     </div>
     {type==='pl' && <div className="card" style={{ padding:10 }}>
       <div style={{ display:'grid',gridTemplateColumns:'1fr 1fr',gap:4 }}>
-        <div><label style={{ fontSize:9 }}>Присед</label><input type="number" value={pl.squat} onChange={e=>setPl({...pl,squat:+e.target.value})} style={{ width:'100%',padding:'4px',borderRadius:4,background:'var(--bg-secondary)',border:'1px solid var(--border)',color:'var(--text)',fontSize:11,boxSizing:'border-box' }} /></div>
-        <div><label style={{ fontSize:9 }}>Жим</label><input type="number" value={pl.bench} onChange={e=>setPl({...pl,bench:+e.target.value})} style={{ width:'100%',padding:'4px',borderRadius:4,background:'var(--bg-secondary)',border:'1px solid var(--border)',color:'var(--text)',fontSize:11,boxSizing:'border-box' }} /></div>
-        <div><label style={{ fontSize:9 }}>Тяга</label><input type="number" value={pl.deadlift} onChange={e=>setPl({...pl,deadlift:+e.target.value})} style={{ width:'100%',padding:'4px',borderRadius:4,background:'var(--bg-secondary)',border:'1px solid var(--border)',color:'var(--text)',fontSize:11,boxSizing:'border-box' }} /></div>
-        <div><label style={{ fontSize:9 }}>Вес тела</label><input type="number" value={pl.bw} onChange={e=>setPl({...pl,bw:+e.target.value})} style={{ width:'100%',padding:'4px',borderRadius:4,background:'var(--bg-secondary)',border:'1px solid var(--border)',color:'var(--text)',fontSize:11,boxSizing:'border-box' }} /></div>
+        <div><label style={{ fontSize:9 }}>Присед</label><input type="number" value={pl.squat} onChange={e=>setPl({...pl,squat:parseFloat(e.target.value) || 0})} style={{ width:'100%',padding:'4px',borderRadius:4,background:'var(--bg-secondary)',border:'1px solid var(--border)',color:'var(--text)',fontSize:11,boxSizing:'border-box' }} /></div>
+        <div><label style={{ fontSize:9 }}>Жим</label><input type="number" value={pl.bench} onChange={e=>setPl({...pl,bench:parseFloat(e.target.value) || 0})} style={{ width:'100%',padding:'4px',borderRadius:4,background:'var(--bg-secondary)',border:'1px solid var(--border)',color:'var(--text)',fontSize:11,boxSizing:'border-box' }} /></div>
+        <div><label style={{ fontSize:9 }}>Тяга</label><input type="number" value={pl.deadlift} onChange={e=>setPl({...pl,deadlift:parseFloat(e.target.value) || 0})} style={{ width:'100%',padding:'4px',borderRadius:4,background:'var(--bg-secondary)',border:'1px solid var(--border)',color:'var(--text)',fontSize:11,boxSizing:'border-box' }} /></div>
+        <div><label style={{ fontSize:9 }}>Вес тела</label><input type="number" value={pl.bw} onChange={e=>setPl({...pl,bw:parseFloat(e.target.value) || 0})} style={{ width:'100%',padding:'4px',borderRadius:4,background:'var(--bg-secondary)',border:'1px solid var(--border)',color:'var(--text)',fontSize:11,boxSizing:'border-box' }} /></div>
       </div>
       {plResult && <div style={{ marginTop:6,fontSize:10 }}>
         <div>Тотал: <b>{(plResult as any).projectedTotal || pl.squat+pl.bench+pl.deadlift} кг</b></div>
@@ -86,8 +86,8 @@ const PeakingTab: React.FC = () => {
     </div>}
     {type==='bb' && <div className="card" style={{ padding:10 }}>
       <div style={{ display:'grid',gridTemplateColumns:'1fr 1fr',gap:4 }}>
-        <div><label style={{ fontSize:9 }}>Вес</label><input type="number" value={bb.weight} onChange={e=>setBb({...bb,weight:+e.target.value})} style={{ width:'100%',padding:'4px',borderRadius:4,background:'var(--bg-secondary)',border:'1px solid var(--border)',color:'var(--text)',fontSize:11,boxSizing:'border-box' }} /></div>
-        <div><label style={{ fontSize:9 }}>BF%</label><input type="number" value={bb.bf} onChange={e=>setBb({...bb,bf:+e.target.value})} style={{ width:'100%',padding:'4px',borderRadius:4,background:'var(--bg-secondary)',border:'1px solid var(--border)',color:'var(--text)',fontSize:11,boxSizing:'border-box' }} /></div>
+        <div><label style={{ fontSize:9 }}>Вес</label><input type="number" value={bb.weight} onChange={e=>setBb({...bb,weight:parseFloat(e.target.value) || 0})} style={{ width:'100%',padding:'4px',borderRadius:4,background:'var(--bg-secondary)',border:'1px solid var(--border)',color:'var(--text)',fontSize:11,boxSizing:'border-box' }} /></div>
+        <div><label style={{ fontSize:9 }}>BF%</label><input type="number" value={bb.bf} onChange={e=>setBb({...bb,bf:parseFloat(e.target.value) || 0})} style={{ width:'100%',padding:'4px',borderRadius:4,background:'var(--bg-secondary)',border:'1px solid var(--border)',color:'var(--text)',fontSize:11,boxSizing:'border-box' }} /></div>
       </div>
       {bbResult && <div style={{ marginTop:6,fontSize:10 }}>
         {(bbResult as any).weeklyPlan?.slice(0,6).map((w:any,i:number)=><div key={i} style={{ marginTop:2 }}>Нед {i+1}: {w.phase || ''}</div>)}
@@ -134,9 +134,9 @@ const AutoregTab: React.FC = () => {
   return (<div className="card" style={{ padding:10 }}>
     <h4 style={{ margin:'0 0 6px',fontSize:12 }}>⚙ Авторегуляция</h4>
     <div style={{ display:'grid',gridTemplateColumns:'1fr 1fr',gap:4 }}>
-      <div><label style={{ fontSize:9 }}>PRI</label><input type="range" min={0} max={100} value={pri} onChange={e=>setPri(+e.target.value)} /><span style={{ fontSize:9 }}>{pri}%</span></div>
-      <div><label style={{ fontSize:9 }}>Усталость</label><input type="range" min={0} max={100} value={fatigue} onChange={e=>setFatigue(+e.target.value)} /><span style={{ fontSize:9 }}>{fatigue}%</span></div>
-      <div><label style={{ fontSize:9 }}>Восстановление</label><input type="range" min={0} max={100} value={recovery} onChange={e=>setRecovery(+e.target.value)} /><span style={{ fontSize:9 }}>{recovery}%</span></div>
+      <div><label style={{ fontSize:9 }}>PRI</label><input type="range" min={0} max={100} value={pri} onChange={e=>setPri(parseFloat(e.target.value) || 0)} /><span style={{ fontSize:9 }}>{pri}%</span></div>
+      <div><label style={{ fontSize:9 }}>Усталость</label><input type="range" min={0} max={100} value={fatigue} onChange={e=>setFatigue(parseFloat(e.target.value) || 0)} /><span style={{ fontSize:9 }}>{fatigue}%</span></div>
+      <div><label style={{ fontSize:9 }}>Восстановление</label><input type="range" min={0} max={100} value={recovery} onChange={e=>setRecovery(parseFloat(e.target.value) || 0)} /><span style={{ fontSize:9 }}>{recovery}%</span></div>
     </div>
     <button onClick={run} style={{ width:'100%',padding:8,borderRadius:6,border:'none',cursor:'pointer',marginTop:6,background:'var(--accent)',color:'#000',fontWeight:600,fontSize:12 }}>Рассчитать</button>
     {result && <div style={{ marginTop:6,fontSize:10 }}>
@@ -193,7 +193,7 @@ const GymTab: React.FC = () => {
   return (<div>
     <div className="card" style={{ marginBottom:8,padding:10 }}>
       <h4 style={{ margin:'0 0 6px',fontSize:12 }}>🏋️ Калькулятор блинов</h4>
-      <div><label style={{ fontSize:10 }}>Рабочий вес (кг)</label><input type="number" value={target} onChange={e=>setTarget(+e.target.value)} style={{ width:'100%',padding:'6px',borderRadius:6,background:'var(--bg-secondary)',border:'1px solid var(--border)',color:'var(--text)',fontSize:14,boxSizing:'border-box',textAlign:'center' }} /></div>
+      <div><label style={{ fontSize:10 }}>Рабочий вес (кг)</label><input type="number" value={target} onChange={e=>setTarget(parseFloat(e.target.value) || 0)} style={{ width:'100%',padding:'6px',borderRadius:6,background:'var(--bg-secondary)',border:'1px solid var(--border)',color:'var(--text)',fontSize:14,boxSizing:'border-box',textAlign:'center' }} /></div>
       <div style={{ fontSize:12,marginTop:4 }}>Блины: <b style={{color:'var(--accent)'}}>{plateDisplay}</b></div>
       <div style={{ fontSize:9,color:'var(--text-dim)',marginTop:2 }}>Порядок: {order.join(' + ')}</div>
     </div>
@@ -233,8 +233,8 @@ const LoggerTab: React.FC = () => {
   return (<div className="card" style={{ padding:10 }}>
     <h4 style={{ margin:'0 0 6px',fontSize:12 }}>📝 Логгер тренировки</h4>
     <div style={{ display:'flex',gap:4,marginBottom:6 }}>
-      <select value={focus} onChange={e=>setFocus(e.target.value)} style={{ flex:1,padding:'4px',borderRadius:4,background:'var(--bg-secondary)',border:'1px solid var(--border)',color:'var(--text)',fontSize:11 }}><option value="push">Push</option><option value="pull">Pull</option><option value="legs">Legs</option></select>
-      <input type="number" value={wk} onChange={e=>setWk(+e.target.value)} style={{ width:50,padding:'4px',borderRadius:4,background:'var(--bg-secondary)',border:'1px solid var(--border)',color:'var(--text)',fontSize:11 }} />
+      <select value={focus || ''} onChange={e=>setFocus(e.target.value)} style={{ flex:1,padding:'4px',borderRadius:4,background:'var(--bg-secondary)',border:'1px solid var(--border)',color:'var(--text)',fontSize:11 }}><option value="push">Push</option><option value="pull">Pull</option><option value="legs">Legs</option></select>
+      <input type="number" value={wk} onChange={e=>setWk(parseFloat(e.target.value) || 0)} style={{ width:50,padding:'4px',borderRadius:4,background:'var(--bg-secondary)',border:'1px solid var(--border)',color:'var(--text)',fontSize:11 }} />
     </div>
     {!session && <button onClick={start} style={{ width:'100%',padding:8,borderRadius:6,border:'none',cursor:'pointer',background:'var(--accent)',color:'#000',fontWeight:600,fontSize:12 }}>▶ Начать тренировку</button>}
     {session && <div>
@@ -258,10 +258,10 @@ const OrthoTab: React.FC = () => {
     <div className="card" style={{ marginBottom:8,padding:10 }}>
       <h4 style={{ margin:'0 0 6px',fontSize:12 }}>🦴 Ортопедические ограничения</h4>
       <div style={{ display:'grid',gridTemplateColumns:'1fr 1fr',gap:4 }}>
-        <div><label style={{ fontSize:9 }}>Вес</label><input type="number" value={wt} onChange={e=>setWt(+e.target.value)} style={{ width:'100%',padding:'4px',borderRadius:4,background:'var(--bg-secondary)',border:'1px solid var(--border)',color:'var(--text)',fontSize:11,boxSizing:'border-box' }} /></div>
-        <div><label style={{ fontSize:9 }}>Рост</label><input type="number" value={ht} onChange={e=>setHt(+e.target.value)} style={{ width:'100%',padding:'4px',borderRadius:4,background:'var(--bg-secondary)',border:'1px solid var(--border)',color:'var(--text)',fontSize:11,boxSizing:'border-box' }} /></div>
+        <div><label style={{ fontSize:9 }}>Вес</label><input type="number" value={wt} onChange={e=>setWt(parseFloat(e.target.value) || 0)} style={{ width:'100%',padding:'4px',borderRadius:4,background:'var(--bg-secondary)',border:'1px solid var(--border)',color:'var(--text)',fontSize:11,boxSizing:'border-box' }} /></div>
+        <div><label style={{ fontSize:9 }}>Рост</label><input type="number" value={ht} onChange={e=>setHt(parseFloat(e.target.value) || 0)} style={{ width:'100%',padding:'4px',borderRadius:4,background:'var(--bg-secondary)',border:'1px solid var(--border)',color:'var(--text)',fontSize:11,boxSizing:'border-box' }} /></div>
       </div>
-      <select value={ex} onChange={e=>setEx(e.target.value)} style={{ width:'100%',padding:'4px',marginTop:4,borderRadius:4,background:'var(--bg-secondary)',border:'1px solid var(--border)',color:'var(--text)',fontSize:11 }}><option value="squat">Присед</option><option value="deadlift">Тяга</option><option value="bench">Жим</option></select>
+      <select value={ex || ''} onChange={e=>setEx(e.target.value)} style={{ width:'100%',padding:'4px',marginTop:4,borderRadius:4,background:'var(--bg-secondary)',border:'1px solid var(--border)',color:'var(--text)',fontSize:11 }}><option value="squat">Присед</option><option value="deadlift">Тяга</option><option value="bench">Жим</option></select>
       {(ortho as any).flags?.map((f:any,i:number)=><div key={i} style={{ fontSize:9,color:'#f59e0b',marginTop:3 }}>⚠ {f}</div>)}
     </div>
     <div className="card" style={{ padding:10 }}>

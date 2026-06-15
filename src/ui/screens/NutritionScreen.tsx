@@ -297,6 +297,178 @@ const MealPlanExtended: React.FC<{ tKcal: number; tProt: number; tFat: number; t
   const recipes = React.useMemo(() => getRecipes(), []);
   const timings = React.useMemo(() => getSupplementTimings(), []);
 
+  const [expandedRules, setExpandedRules] = React.useState<Set<number>>(new Set());
+  const toggleRule = (i: number) => setExpandedRules(prev => { const s = new Set(prev); s.has(i) ? s.delete(i) : s.add(i); return s; });
+
+  const NUTRITION_RULES = [
+    { title: 'Осторожность с молочкой', body: 'Лактоза повышает воспалительные маркеры (СРБ) и провоцирует застой желчи. Может влиять на акне.', color: '#f59e0b' },
+    { title: 'Нормы клетчатки', body: '3-30 г/сутки индивидуально. Избыток → диарея. Польза для ССЗ.', color: '#22c55e' },
+    { title: 'Питание до тренировки', body: 'За 1-2 часа до. Реально показывает профит.', color: '#3b82f6' },
+    { title: 'Контроль фруктозы', body: 'Фруктоза → жировое депо если гликогеновое полно. Следить за сладкими фруктами.', color: '#ef4444' },
+    { title: 'Качество продуктов', body: 'Основа — свежая пища. Джанк ≤ 15-20%.', color: '#22c55e' },
+    { title: 'Белковая оптимизация', body: 'Не >50 г белка за приём. Распределение эффективнее.', color: '#3b82f6' },
+    { title: 'Естественный аппетит', body: 'Только при чувстве голода. Не давиться через силу.', color: '#a855f7' },
+    { title: 'Баланс нутриентов', body: 'Каждый приём: белки+жиры+углеводы. Исключение: до/после тренировки (без жиров).', color: '#8b5cf6' },
+    { title: 'Комфортное пищеварение', body: 'Без вздутия/диареи. При симптомах → пересмотреть рацион или ЖКТ.', color: '#06b6d4' },
+  ];
+
+  const RECOMMENDED_FOODS: Record<string, { items: string[]; color: string; bg: string }> = {
+    'Белки': { items: ['Филе индейки', 'Филе курицы', 'Яйца', 'Красное мясо ≤10% жирности', 'Фарш говяжий', 'Красная рыба (≤2 р/нед)', 'Креветки (≤1 р/нед)', 'Белая рыба (треска, палтус, минтай)'], color: '#3b82f6', bg: 'rgba(59,130,246,0.1)' },
+    'Жиры': { items: ['Авокадо/гуакамоле', 'Яйца', 'Кокосовое масло', 'Кокосовый урбеч', 'Красная икра', 'Оливковое масло extra virgin'], color: '#f59e0b', bg: 'rgba(245,158,11,0.1)' },
+    'Углеводы': { items: ['Рис (кроме бурого)', 'Макароны твёрдых сортов', 'Рисовые макароны', 'Рисовая каша/cream of rice', 'Картофель', 'Батат', 'Хлеб цельнозерновой'], color: '#f97316', bg: 'rgba(249,115,22,0.1)' },
+    'С ограничением': { items: ['Кукурузные хлопья (без пшеницы)', 'Цитрусовые', 'Зелёные яблоки', 'Финики', 'Ягоды', 'Мармелад (желатин+сахар)', 'Томатный сок', 'Амилопектин/декстрин/декстроза'], color: '#ef4444', bg: 'rgba(239,68,68,0.1)' },
+    'Клетчатка': { items: ['Морковь', 'Свёкла', 'Огурцы', 'Помидоры', 'Лук', 'Квашеная капуста'], color: '#22c55e', bg: 'rgba(34,197,94,0.1)' },
+    'Специи': { items: ['Томатная паста', 'Гималайская соль', 'Любые травы'], color: '#a855f7', bg: 'rgba(168,85,247,0.1)' },
+  };
+
+  const s = profile?.settings;
+  const [indivPlan, setIndivPlan] = React.useState<any>(null);
+  const [indivKcal, setIndivKcal] = React.useState(tKcal);
+  const [indivProt, setIndivProt] = React.useState(tProt);
+  const [indivFat, setIndivFat] = React.useState(tFat);
+  const [indivCarbs, setIndivCarbs] = React.useState(tCarbs);
+  const [indivMeals, setIndivMeals] = React.useState(s?.mealsPerDay || 4);
+  const [indivTrainTime, setIndivTrainTime] = React.useState('16:00');
+  const [indivDairyFree, setIndivDairyFree] = React.useState(s?.dietRestrictions?.includes('dairy') || false);
+  const [indivGlutenFree, setIndivGlutenFree] = React.useState(s?.dietRestrictions?.includes('gluten') || false);
+  const [indivFishFree, setIndivFishFree] = React.useState(false);
+
+  const RECOMMENDED_IDS: Record<string, string[]> = {
+    'protein': ['turkey_breast', 'chicken_breast', 'egg_whole', 'egg_white', 'beef_lean', 'salmon', 'shrimp', 'tuna_steak'],
+    'fat': ['avocado', 'egg_whole', 'olive_oil', 'fish_oil_food'],
+    'carb': ['rice_white', 'pasta_durum', 'rice_noodles', 'potato_boiled', 'sweet_potato', 'bread_rye'],
+    'veg': ['cucumber', 'tomato', 'carrot', 'beetroot', 'apple', 'berries', 'grapefruit', 'broccoli'],
+    'grain': ['rice_white', 'pasta_durum', 'rice_noodles', 'oats', 'bread_rye'],
+  };
+
+  const generateIndividualPlan = () => {
+    const dairyIds = ['cottage_cheese_5', 'kefir', 'yogurt_greek', 'milk', 'cheese_hard', 'kefir_2', 'yogurt_natural', 'ryazhenka', 'sour_cream_15', 'greek_yogurt'];
+    let proteinFoods = FOOD_DB.filter(f => RECOMMENDED_IDS.protein.includes(f.id) && f.category === 'protein');
+    if (indivDairyFree) proteinFoods = proteinFoods.filter(f => !dairyIds.includes(f.id));
+    if (indivFishFree) proteinFoods = proteinFoods.filter(f => !['salmon', 'shrimp', 'tuna_canned', 'tuna_steak', 'sardines', 'mackerel'].includes(f.id));
+    let carbFoods = FOOD_DB.filter(f => [...RECOMMENDED_IDS.carb, ...RECOMMENDED_IDS.grain].includes(f.id) && (f.category === 'carb' || f.category === 'grain'));
+    if (indivGlutenFree) carbFoods = carbFoods.filter(f => !['pasta_durum', 'bread_rye', 'tortilla_wheat'].includes(f.id));
+    const fatFoods = FOOD_DB.filter(f => RECOMMENDED_IDS.fat.includes(f.id) && f.category === 'fat');
+    const vegFoods = FOOD_DB.filter(f => RECOMMENDED_IDS.veg.includes(f.id) && f.category === 'veg_fruit');
+
+    const trainHour = parseInt(indivTrainTime.split(':')[0]);
+
+    const mealTimes = (() => {
+      const n = indivMeals;
+      const times: string[] = [];
+      if (n === 3) { times.push('08:00', '13:00', '19:00'); }
+      else if (n === 4) { times.push('07:00', '11:00', '15:00', '19:00'); }
+      else if (n === 5) { times.push('07:00', '10:00', '13:00', '16:00', '20:00'); }
+      else { times.push('07:00', '10:00', '13:00', '15:30', '18:00', '21:00'); }
+      return times;
+    })();
+
+    const labels = indivMeals === 3 ? ['Завтрак', 'Обед', 'Ужин']
+      : indivMeals === 4 ? ['Завтрак', 'Перекус', 'Обед', 'Ужин']
+      : indivMeals === 5 ? ['Завтрак', 'Перекус 1', 'Обед', 'Предтрен', 'Ужин']
+      : ['Завтрак', 'Перекус 1', 'Обед', 'Предтрен', 'Пост-трен', 'Ужин'];
+
+    const meals: any[] = mealTimes.map((time, i) => {
+      const h = parseInt(time.split(':')[0]);
+      const isPreWorkout = trainHour > 0 && (h === trainHour - 2 || h === trainHour - 1);
+      const isPostWorkout = trainHour > 0 && (h === trainHour + 1 || h === trainHour + 2);
+      const isMorning = h < 11;
+      const isEvening = h >= 18;
+
+      const targetP = Math.round(indivProt / indivMeals);
+      const targetC = isPreWorkout || isPostWorkout ? Math.round(indivCarbs * 0.25) : isEvening ? Math.round(indivCarbs * 0.1) : Math.round(indivCarbs * 0.15);
+      const targetF = isPreWorkout || isPostWorkout ? 0 : isMorning ? Math.round(indivFat * 0.25) : Math.round(indivFat * 0.15);
+
+      const items: { foodName: string; amount: number; kcal: number; p: number; f: number; c: number }[] = [];
+
+      let remainingP = Math.min(targetP, 50);
+      const shuffledProt = [...proteinFoods].sort(() => Math.random() - 0.5);
+      for (const pf of shuffledProt) {
+        if (remainingP <= 0) break;
+        const portions = Math.min(1.5, remainingP / pf.protein);
+        const grams = Math.round(portions * 100);
+        items.push({
+          foodName: pf.name,
+          amount: grams,
+          kcal: Math.round(pf.kcal * portions),
+          p: Math.round(pf.protein * portions),
+          f: Math.round(pf.fat * portions),
+          c: Math.round(pf.carbs * portions),
+        });
+        remainingP -= Math.round(pf.protein * portions);
+      }
+
+      if (targetC > 0) {
+        const shuffledCarb = [...carbFoods].sort(() => Math.random() - 0.5);
+        for (const cf of shuffledCarb) {
+          const cRemaining = targetC - items.reduce((s, it) => s + it.c, 0);
+          if (cRemaining <= 5) break;
+          const portions = Math.min(1.5, cRemaining / Math.max(1, cf.carbs));
+          const grams = Math.round(portions * 100);
+          items.push({
+            foodName: cf.name,
+            amount: grams,
+            kcal: Math.round(cf.kcal * portions),
+            p: Math.round(cf.protein * portions),
+            f: Math.round(cf.fat * portions),
+            c: Math.round(cf.carbs * portions),
+          });
+        }
+      }
+
+      if (targetF > 0 && !isPreWorkout && !isPostWorkout) {
+        const shuffledFat = [...fatFoods].sort(() => Math.random() - 0.5);
+        for (const ff of shuffledFat) {
+          const fRemaining = targetF - items.reduce((s, it) => s + it.f, 0);
+          if (fRemaining <= 3) break;
+          const portions = Math.min(0.3, fRemaining / Math.max(1, ff.fat));
+          const grams = Math.round(portions * 100);
+          items.push({
+            foodName: ff.name,
+            amount: Math.max(5, grams),
+            kcal: Math.round(ff.kcal * portions),
+            p: Math.round(ff.protein * portions),
+            f: Math.round(ff.fat * portions),
+            c: Math.round(ff.carbs * portions),
+          });
+        }
+      }
+
+      const veg = vegFoods[i % vegFoods.length];
+      if (veg) {
+        items.push({
+          foodName: veg.name,
+          amount: 100,
+          kcal: veg.kcal,
+          p: veg.protein,
+          f: veg.fat,
+          c: veg.carbs,
+        });
+      }
+
+      return {
+        time, label: labels[i] || `Приём ${i + 1}`,
+        items,
+        totals: {
+          kcal: items.reduce((s, it) => s + it.kcal, 0),
+          protein: items.reduce((s, it) => s + it.p, 0),
+          fat: items.reduce((s, it) => s + it.f, 0),
+          carbs: items.reduce((s, it) => s + it.c, 0),
+        },
+        isPreWorkout, isPostWorkout,
+      };
+    });
+
+    const dayTotals = {
+      kcal: meals.reduce((s: number, m: any) => s + m.totals.kcal, 0),
+      protein: meals.reduce((s: number, m: any) => s + m.totals.protein, 0),
+      fat: meals.reduce((s: number, m: any) => s + m.totals.fat, 0),
+      carbs: meals.reduce((s: number, m: any) => s + m.totals.carbs, 0),
+    };
+
+    setIndivPlan({ meals, dayTotals });
+  };
+
   const TIER_BTNS: { tier: MealTier; label: string; color: string; gradient: string }[] = [
     { tier: 'basic', label: 'База', color: '#22c55e', gradient: 'linear-gradient(135deg, #22c55e44, #22c55e08)' },
     { tier: 'mid', label: 'Средний', color: '#f59e0b', gradient: 'linear-gradient(135deg, #f59e0b44, #f59e0b08)' },
@@ -390,10 +562,202 @@ const MealPlanExtended: React.FC<{ tKcal: number; tProt: number; tFat: number; t
           </div>
         )}
       </div>
+
+      <div className="card" style={{ marginBottom: 8, padding: 14 }}>
+        <h4 style={{ margin: '0 0 8px', fontSize: 13, color: 'var(--accent)' }}>📋 Правила питания</h4>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          {NUTRITION_RULES.map((rule, i) => (
+            <div key={i} style={{
+              borderRadius: 10, overflow: 'hidden',
+              border: '1px solid rgba(255,255,255,0.06)',
+              transition: 'all 0.25s ease',
+            }}>
+              <button
+                onClick={() => toggleRule(i)}
+                style={{
+                  width: '100%', padding: '8px 12px', cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', gap: 8,
+                  background: expandedRules.has(i) ? `${rule.color}10` : 'var(--bg-secondary)',
+                  border: 'none', color: 'var(--text)', textAlign: 'left',
+                  fontSize: 11, fontWeight: 600,
+                  transition: 'background 0.2s',
+                }}
+              >
+                <span style={{
+                  width: 20, height: 20, borderRadius: 6,
+                  background: rule.color + '20', color: rule.color,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  flexShrink: 0, fontSize: 13, fontWeight: 700,
+                  transition: 'transform 0.2s',
+                  transform: expandedRules.has(i) ? 'rotate(90deg)' : 'rotate(0deg)',
+                }}>›</span>
+                <span>{rule.title}</span>
+              </button>
+              {expandedRules.has(i) && (
+                <div style={{
+                  padding: '8px 12px 8px 40px',
+                  fontSize: 10, color: 'rgba(255,255,255,0.7)',
+                  lineHeight: 1.5, borderTop: '1px solid rgba(255,255,255,0.04)',
+                  background: 'rgba(0,0,0,0.15)',
+                }}>
+                  {rule.body}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="card" style={{ marginBottom: 8, padding: 14 }}>
+        <h4 style={{ margin: '0 0 10px', fontSize: 13, color: 'var(--accent)' }}>🍽 Рекомендуемые продукты</h4>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {Object.entries(RECOMMENDED_FOODS).map(([cat, { items, color, bg }]) => (
+            <div key={cat}>
+              <div style={{ fontSize: 10, fontWeight: 700, color, marginBottom: 5 }}>{cat}</div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                {items.map((item, j) => (
+                  <span key={j} style={{
+                    padding: '3px 8px', borderRadius: 14, fontSize: 9,
+                    background: bg, color, border: `1px solid ${color}20`,
+                    whiteSpace: 'nowrap',
+                  }}>{item}</span>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="card" style={{ marginBottom: 8, padding: 14 }}>
+        <h4 style={{ margin: '0 0 8px', fontSize: 13, color: 'var(--accent)' }}>🎯 Индивидуальный план</h4>
+        <p style={{ fontSize: 10, color: 'var(--text-dim)', margin: '0 0 8px' }}>
+          План питания на основе ваших параметров, времени тренировки и ограничений
+        </p>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 8 }}>
+          <div>
+            <label style={{ fontSize: 9, color: 'var(--text-dim)' }}>Ккал/день</label>
+            <input type="number" value={indivKcal} onChange={e => setIndivKcal(parseFloat(e.target.value) || 0)} style={{ width: '100%', padding: '5px 8px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 11, boxSizing: 'border-box' }} />
+          </div>
+          <div>
+            <label style={{ fontSize: 9, color: 'var(--text-dim)' }}>Белок (г)</label>
+            <input type="number" value={indivProt} onChange={e => setIndivProt(parseFloat(e.target.value) || 0)} style={{ width: '100%', padding: '5px 8px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 11, boxSizing: 'border-box' }} />
+          </div>
+          <div>
+            <label style={{ fontSize: 9, color: 'var(--text-dim)' }}>Жиры (г)</label>
+            <input type="number" value={indivFat} onChange={e => setIndivFat(parseFloat(e.target.value) || 0)} style={{ width: '100%', padding: '5px 8px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 11, boxSizing: 'border-box' }} />
+          </div>
+          <div>
+            <label style={{ fontSize: 9, color: 'var(--text-dim)' }}>Углеводы (г)</label>
+            <input type="number" value={indivCarbs} onChange={e => setIndivCarbs(parseFloat(e.target.value) || 0)} style={{ width: '100%', padding: '5px 8px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 11, boxSizing: 'border-box' }} />
+          </div>
+          <div>
+            <label style={{ fontSize: 9, color: 'var(--text-dim)' }}>Приёмов в день</label>
+            <select value={indivMeals} onChange={e => setIndivMeals(parseFloat(e.target.value) || 0)} style={{ width: '100%', padding: '5px 6px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 11, boxSizing: 'border-box' }}>
+              {[3,4,5,6].map(n => <option key={n} value={n}>{n}</option>)}
+            </select>
+          </div>
+          <div>
+            <label style={{ fontSize: 9, color: 'var(--text-dim)' }}>Время тренировки</label>
+            <input type="time" value={indivTrainTime} onChange={e => setIndivTrainTime(e.target.value)} style={{ width: '100%', padding: '5px 8px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 11, boxSizing: 'border-box' }} />
+          </div>
+        </div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
+          <label style={{ fontSize: 10, display: 'flex', alignItems: 'center', gap: 4, color: 'var(--text-dim)' }}>
+            <input type="checkbox" checked={indivDairyFree} onChange={e => setIndivDairyFree(e.target.checked)} style={{ accentColor: 'var(--accent)' }} />
+            Без молочки
+          </label>
+          <label style={{ fontSize: 10, display: 'flex', alignItems: 'center', gap: 4, color: 'var(--text-dim)' }}>
+            <input type="checkbox" checked={indivGlutenFree} onChange={e => setIndivGlutenFree(e.target.checked)} style={{ accentColor: 'var(--accent)' }} />
+            Без глютена
+          </label>
+          <label style={{ fontSize: 10, display: 'flex', alignItems: 'center', gap: 4, color: 'var(--text-dim)' }}>
+            <input type="checkbox" checked={indivFishFree} onChange={e => setIndivFishFree(e.target.checked)} style={{ accentColor: 'var(--accent)' }} />
+            Без рыбы
+          </label>
+        </div>
+        <button onClick={generateIndividualPlan} style={{
+          width: '100%', padding: 10, borderRadius: 10, border: 'none', cursor: 'pointer',
+          background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)', color: '#fff',
+          fontWeight: 700, fontSize: 13, marginBottom: 10,
+        }}>✨ Сгенерировать план питания</button>
+
+        {indivPlan && (
+          <div>
+            <div style={{
+              position: 'relative', paddingLeft: 16, borderLeft: '2px solid var(--accent)', marginBottom: 10,
+            }}>
+              {indivPlan.meals.map((meal: any, mi: number) => (
+                <div key={mi} style={{
+                  position: 'relative', marginBottom: 10, paddingLeft: 16,
+                }}>
+                  <div style={{
+                    position: 'absolute', left: -22, top: 8, width: 10, height: 10,
+                    borderRadius: '50%', background: meal.isPreWorkout ? '#8b5cf6' : meal.isPostWorkout ? '#3b82f6' : 'var(--accent)',
+                    border: '2px solid var(--bg-primary)',
+                  }} />
+                  <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 1 }}>{meal.time}</div>
+                  <div style={{
+                    fontSize: 11, fontWeight: 700, marginBottom: 3,
+                    color: meal.isPreWorkout ? '#8b5cf6' : meal.isPostWorkout ? '#3b82f6' : 'var(--text)',
+                  }}>
+                    {meal.label}
+                    {meal.isPreWorkout && <span style={{ fontSize: 8, color: '#8b5cf6', marginLeft: 6 }}>🏋️ предтрен</span>}
+                    {meal.isPostWorkout && <span style={{ fontSize: 8, color: '#3b82f6', marginLeft: 6 }}>💪 пост-трен</span>}
+                  </div>
+                  <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 1 }}>
+                    Б:{meal.totals.protein}г Ж:{meal.totals.fat}г У:{meal.totals.carbs}г | {meal.totals.kcal} ккал
+                  </div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
+                    {meal.items.map((it: any, ii: number) => (
+                      <span key={ii} style={{
+                        padding: '2px 7px', borderRadius: 10, fontSize: 8,
+                        background: 'var(--bg-secondary)', color: 'var(--text-light)',
+                        border: '1px solid var(--border)',
+                      }}>
+                        {it.foodName} {it.amount}г
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div style={{
+              padding: 12, borderRadius: 10,
+              background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.15)',
+              marginBottom: 8,
+            }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--accent)', marginBottom: 8 }}>📊 Итого за день</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 6, textAlign: 'center', fontSize: 10 }}>
+                {[
+                  { l: 'Ккал', v: indivPlan.dayTotals.kcal, t: indivKcal, c: '#00e68a' },
+                  { l: 'Белок', v: indivPlan.dayTotals.protein, t: indivProt, c: '#3b82f6' },
+                  { l: 'Жиры', v: indivPlan.dayTotals.fat, t: indivFat, c: '#f59e0b' },
+                  { l: 'Углеводы', v: indivPlan.dayTotals.carbs, t: indivCarbs, c: '#f97316' },
+                ].map(m => {
+                  const diff = m.v - m.t;
+                  const diffPct = m.t > 0 ? Math.round((diff / m.t) * 100) : 0;
+                  const deltaColor = Math.abs(diffPct) <= 10 ? '#22c55e' : diffPct > 0 ? '#ef4444' : '#f59e0b';
+                  return (
+                    <div key={m.l} style={{ background: m.c + '10', borderRadius: 8, padding: 8 }}>
+                      <div style={{ fontSize: 8, color: 'var(--text-dim)' }}>{m.l}</div>
+                      <div style={{ fontWeight: 700, color: m.c, fontSize: 14 }}>{m.v}</div>
+                      <div style={{ fontSize: 8, color: 'var(--text-dim)' }}>цель: {m.t}</div>
+                      <div style={{ fontSize: 9, fontWeight: 600, color: deltaColor }}>
+                        {diff >= 0 ? '+' : ''}{diff} ({diffPct >= 0 ? '+' : ''}{diffPct}%)
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
       <div className="card" style={{ marginBottom: 8 }}>
         <h4 style={{ margin: '0 0 6px', fontSize: 12 }}>🍽️ Генератор плана питания</h4>
         <div style={{ display: 'flex', gap: 4, marginBottom: 8 }}>
-          <input type="number" value={planDays} onChange={e => setPlanDays(+e.target.value)} style={{ width: 50, padding: '4px 6px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12 }} />
+          <input type="number" value={planDays} onChange={e => setPlanDays(parseFloat(e.target.value) || 0)} style={{ width: 50, padding: '4px 6px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12 }} />
           <span style={{ fontSize: 10, color: 'var(--text-dim)', alignSelf: 'center' }}>дней</span>
           <button onClick={() => setMealPlan(generateMealPlan({ targetKcal: tKcal, targetProtein: tProt, targetFat: tFat, targetCarbs: tCarbs, days: planDays, preferences: { excludePork: false, excludeFish: false, excludeDairy: false, highCarb: false, keto: false } }))} style={{ padding: '6px 12px', borderRadius: 6, background: 'var(--accent)', color: '#000', border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: 11 }}>Сгенерировать</button>
           <button onClick={() => setWeeklyPlan(generateWeeklyMealPlan([1,3,5], 'bulk', tKcal, tProt))} style={{ padding: '6px 12px', borderRadius: 6, background: '#8b5cf6', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: 11 }}>Недельный</button>
@@ -532,11 +896,11 @@ const NutritionCalculators: React.FC = () => {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 8 }}>
           <div>
             <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>TDEE (ккал/день)</label>
-            <input type="number" value={dTdee} onChange={e => setDTdee(+e.target.value)} style={{ width: '100%', padding: '6px 8px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, boxSizing: 'border-box' }} />
+            <input type="number" value={dTdee} onChange={e => setDTdee(parseFloat(e.target.value) || 0)} style={{ width: '100%', padding: '6px 8px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, boxSizing: 'border-box' }} />
           </div>
           <div>
             <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Целевые ккал/день</label>
-            <input type="number" value={dTarget} onChange={e => setDTarget(+e.target.value)} style={{ width: '100%', padding: '6px 8px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, boxSizing: 'border-box' }} />
+            <input type="number" value={dTarget} onChange={e => setDTarget(parseFloat(e.target.value) || 0)} style={{ width: '100%', padding: '6px 8px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, boxSizing: 'border-box' }} />
           </div>
         </div>
         <button onClick={calcDeficit} style={{ width: '100%', padding: 6, borderRadius: 6, border: 'none', cursor: 'pointer', background: 'var(--accent)', color: '#000', fontWeight: 600, fontSize: 11, marginBottom: 8 }}>Рассчитать</button>
@@ -553,15 +917,15 @@ const NutritionCalculators: React.FC = () => {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 8 }}>
           <div>
             <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Вес (кг)</label>
-            <input type="number" value={mWeight} onChange={e => setMWeight(+e.target.value)} style={{ width: '100%', padding: '6px 8px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, boxSizing: 'border-box' }} />
+            <input type="number" value={mWeight} onChange={e => setMWeight(parseFloat(e.target.value) || 0)} style={{ width: '100%', padding: '6px 8px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, boxSizing: 'border-box' }} />
           </div>
           <div>
             <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Рост (см)</label>
-            <input type="number" value={mHeight} onChange={e => setMHeight(+e.target.value)} style={{ width: '100%', padding: '6px 8px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, boxSizing: 'border-box' }} />
+            <input type="number" value={mHeight} onChange={e => setMHeight(parseFloat(e.target.value) || 0)} style={{ width: '100%', padding: '6px 8px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, boxSizing: 'border-box' }} />
           </div>
           <div>
             <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Возраст</label>
-            <input type="number" value={mAge} onChange={e => setMAge(+e.target.value)} style={{ width: '100%', padding: '6px 8px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, boxSizing: 'border-box' }} />
+            <input type="number" value={mAge} onChange={e => setMAge(parseFloat(e.target.value) || 0)} style={{ width: '100%', padding: '6px 8px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, boxSizing: 'border-box' }} />
           </div>
           <div>
             <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Пол</label>
@@ -578,7 +942,7 @@ const NutritionCalculators: React.FC = () => {
           </div>
           <div>
             <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>PAL</label>
-            <select value={mPal} onChange={e => setMPal(+e.target.value)} style={{ width: '100%', padding: '6px 4px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 11, boxSizing: 'border-box' }}>
+            <select value={mPal} onChange={e => setMPal(parseFloat(e.target.value) || 0)} style={{ width: '100%', padding: '6px 4px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 11, boxSizing: 'border-box' }}>
               {PAL_OPTS.map(o => <option key={o.v} value={o.v}>{o.l}</option>)}
             </select>
           </div>
@@ -613,11 +977,11 @@ const NutritionCalculators: React.FC = () => {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 8 }}>
           <div>
             <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Глюкоза (ммоль/л)</label>
-            <input type="number" step="0.1" value={hGlucose} onChange={e => setHGlucose(+e.target.value)} style={{ width: '100%', padding: '6px 8px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, boxSizing: 'border-box' }} />
+            <input type="number" step="0.1" value={hGlucose} onChange={e => setHGlucose(parseFloat(e.target.value) || 0)} style={{ width: '100%', padding: '6px 8px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, boxSizing: 'border-box' }} />
           </div>
           <div>
             <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Инсулин (μЕ/мл)</label>
-            <input type="number" step="0.1" value={hInsulin} onChange={e => setHInsulin(+e.target.value)} style={{ width: '100%', padding: '6px 8px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, boxSizing: 'border-box' }} />
+            <input type="number" step="0.1" value={hInsulin} onChange={e => setHInsulin(parseFloat(e.target.value) || 0)} style={{ width: '100%', padding: '6px 8px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, boxSizing: 'border-box' }} />
           </div>
         </div>
         <button onClick={calcHOMA} style={{ width: '100%', padding: 6, borderRadius: 6, border: 'none', cursor: 'pointer', background: 'var(--accent)', color: '#000', fontWeight: 600, fontSize: 11, marginBottom: 8 }}>Рассчитать</button>

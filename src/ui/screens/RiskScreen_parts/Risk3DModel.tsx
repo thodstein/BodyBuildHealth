@@ -344,7 +344,7 @@ export const Risk3DModel: React.FC<Props> = ({ result, mcEnabled, onToggleMC, or
         <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 6, minWidth: 140 }}>
           <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>Неделя</span>
           <input type="range" min={0} max={weeks.length} value={organWeek}
-            onChange={e => onWeekChange(Number(e.target.value))}
+            onChange={e => onWeekChange(parseFloat(e.target.value) || 0)}
             style={{ flex: 1, height: 4, accentColor: 'var(--accent)' }} />
           <span style={{ fontSize: 10, color: 'var(--accent)', fontWeight: 600, minWidth: 18 }}>
             {organWeek === 0 ? '0' : organWeek}

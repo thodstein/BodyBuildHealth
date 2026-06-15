@@ -83,15 +83,15 @@ export const PeptidesScreen: React.FC = () => {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
           <div>
             <label style={{ fontSize: 11, color: 'var(--text-dim)', display: 'block', marginBottom: 2 }}>Доза (мкг)</label>
-            <input type="number" value={doseMcg} onChange={e => setDoseMcg(Number(e.target.value))} placeholder="" min={0} />
+            <input type="number" value={doseMcg} onChange={e => setDoseMcg(parseFloat(e.target.value) || 0)} placeholder="" min={0} />
           </div>
           <div>
             <label style={{ fontSize: 11, color: 'var(--text-dim)', display: 'block', marginBottom: 2 }}>Концентрация (мг/мл)</label>
-            <input type="number" value={concentration} onChange={e => setConcentration(Number(e.target.value))} placeholder="" min={0} step={0.1} />
+            <input type="number" value={concentration} onChange={e => setConcentration(parseFloat(e.target.value) || 0)} placeholder="" min={0} step={0.1} />
           </div>
           <div>
             <label style={{ fontSize: 11, color: 'var(--text-dim)', display: 'block', marginBottom: 2 }}>Объём флакона (мл)</label>
-            <input type="number" value={vialVol} onChange={e => setVialVol(Number(e.target.value))} placeholder="" min={0.5} step={0.5} />
+            <input type="number" value={vialVol} onChange={e => setVialVol(parseFloat(e.target.value) || 0)} placeholder="" min={0.5} step={0.5} />
           </div>
         </div>
 

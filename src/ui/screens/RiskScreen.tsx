@@ -928,7 +928,7 @@ const MDSSRiskDisplay: React.FC = () => {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
             <div>
               <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Недель экспозиции</label>
-              <input type="number" min={0} max={100} value={tWeeks} onChange={e => { setTWeeks(+e.target.value); }}
+              <input type="number" min={0} max={100} value={tWeeks} onChange={e => { setTWeeks(parseFloat(e.target.value) || 0); }}
                 style={{ width: '100%', padding: '6px 8px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 13, boxSizing: 'border-box' }} />
             </div>
             <div>

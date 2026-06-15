@@ -1468,7 +1468,7 @@ export const LabsScreen: React.FC = () => {
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                 <label style={{ fontSize: 9, color: 'var(--text-dim)', fontWeight: 600 }}>Значение</label>
-                <input type="number" value={inputValue} onChange={e => setInputValue(e.target.value)} placeholder="40" style={{ width: '100%', padding: '8px 10px', background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', fontSize: 13 }} />
+                <input type="number" value={inputValue || ''} onChange={e => setInputValue(e.target.value)} placeholder="40" style={{ width: '100%', padding: '8px 10px', background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', fontSize: 13 }} />
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                 <label style={{ fontSize: 9, color: 'var(--text-dim)', fontWeight: 600 }}>Единица</label>

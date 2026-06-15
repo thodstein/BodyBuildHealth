@@ -473,7 +473,7 @@ export const PharmaCourseScreen: React.FC = () => {
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
                   <div style={{ display: 'flex', gap: 4 }}>
-                    <input type="number" value={dose} onChange={e => setDose(e.target.value)} placeholder="200"
+                    <input type="number" value={dose || ''} onChange={e => setDose(e.target.value)} placeholder="200"
                       className="pc-input" style={{
                         flex: 2, padding: '7px 8px', background: 'rgba(255,255,255,0.04)',
                         border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8,
@@ -506,7 +506,7 @@ export const PharmaCourseScreen: React.FC = () => {
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, marginTop: 6 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                     <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', whiteSpace: 'nowrap' }}>c нед</span>
-                    <input type="number" value={startWeek} onChange={e => setStartWeek(parseInt(e.target.value) || 0)} min={0} placeholder="0"
+                    <input type="number" value={startWeek} onChange={e => setStartWeek(parseFloat(e.target.value) || 0 || 0)} min={0} placeholder="0"
                       className="pc-input" style={{
                         flex: 1, padding: '7px 8px', background: 'rgba(255,255,255,0.04)',
                         border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8,
@@ -515,7 +515,7 @@ export const PharmaCourseScreen: React.FC = () => {
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                     <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', whiteSpace: 'nowrap' }}>по нед</span>
-                    <input type="number" value={endWeek} onChange={e => setEndWeek(parseInt(e.target.value) || 12)} min={1} placeholder="12"
+                    <input type="number" value={endWeek} onChange={e => setEndWeek(parseFloat(e.target.value) || 0 || 12)} min={1} placeholder="12"
                       className="pc-input" style={{
                         flex: 1, padding: '7px 8px', background: 'rgba(255,255,255,0.04)',
                         border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8,

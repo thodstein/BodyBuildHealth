@@ -199,7 +199,7 @@ export const V7RiskDisplay: React.FC<{
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <span style={{ fontSize: 9, color: 'var(--text-dim)', whiteSpace: 'nowrap', minWidth: 22, textAlign: 'right' }}>в€…</span>
-              <input type="range" min={0} max={12} value={organWeek} onChange={e => setOrganWeek(Number(e.target.value))}
+              <input type="range" min={0} max={12} value={organWeek} onChange={e => setOrganWeek(parseFloat(e.target.value) || 0)}
                 style={{ flex: 1, accentColor: '#00e68a', height: 4, cursor: 'pointer' }} />
               <span style={{ fontSize: 9, color: 'var(--text-dim)', whiteSpace: 'nowrap', minWidth: 22 }}>12</span>
             </div>
@@ -384,7 +384,7 @@ export const V7RiskDisplay: React.FC<{
           <p style={{ fontSize: 11, color: 'var(--text-dim)', margin: '0 0 10px 0' }}>Динамика рисков по органным системам</p>
           <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 8 }}>
             <span style={{ fontSize: 10, color: 'var(--text-dim)', whiteSpace: 'nowrap' }}>{(selectedDay / 7).toFixed(1)} нед</span>
-            <input type="range" min={0} max={maxDay} value={selectedDay} onChange={e => setSelectedDay(Number(e.target.value))}
+            <input type="range" min={0} max={maxDay} value={selectedDay} onChange={e => setSelectedDay(parseFloat(e.target.value) || 0)}
               style={{ flex: 1, accentColor: 'var(--accent)' }} />
             <span style={{ fontSize: 10, color: 'var(--text-dim)', whiteSpace: 'nowrap' }}>{((maxDay - selectedDay) / 7).toFixed(1)} нед</span>
           </div>
@@ -607,7 +607,7 @@ export const V7RiskDisplay: React.FC<{
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 }}>
                 <span style={{ fontSize: 9, color: 'var(--text-dim)' }}>{organWeek === 0 ? '∅ Среднее' : `Нед ${organWeek}`}</span>
               </div>
-              <input type="range" min={0} max={12} value={organWeek} onChange={e => setOrganWeek(Number(e.target.value))}
+              <input type="range" min={0} max={12} value={organWeek} onChange={e => setOrganWeek(parseFloat(e.target.value) || 0)}
                 style={{ width: '100%', accentColor: '#00e68a', height: 3, cursor: 'pointer' }} />
               <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 1 }}>
                 <span style={{ fontSize: 8, color: 'var(--text-dim)' }}>в€…</span>
@@ -815,7 +815,7 @@ export const V7RiskDisplay: React.FC<{
       <p style={{ fontSize: 11, color: 'var(--text-dim)', margin: '0 0 10px 0' }}>Недельная динамика концентраций препаратов</p>
       <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 10 }}>
         <span style={{ fontSize: 10, color: 'var(--text-dim)', whiteSpace: 'nowrap' }}>{(pkDay / 7).toFixed(1)} нед</span>
-        <input type="range" min={0} max={83} value={pkDay} onChange={e => setPkDay(Number(e.target.value))} style={{ flex: 1, accentColor: 'var(--accent)' }} />
+        <input type="range" min={0} max={83} value={pkDay} onChange={e => setPkDay(parseFloat(e.target.value) || 0)} style={{ flex: 1, accentColor: 'var(--accent)' }} />
         <span style={{ fontSize: 10, color: 'var(--text-dim)', whiteSpace: 'nowrap' }}>{((83 - pkDay) / 7).toFixed(1)} нед ост.</span>
       </div>
       {Object.entries(pkTimeSeries).map(([subId, concs]: [string, any]) => {

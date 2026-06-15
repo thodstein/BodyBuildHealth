@@ -914,13 +914,13 @@ const PKPDSimulationTab: React.FC = () => {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 6 }}>
                 <div>
                   <label style={{ fontSize: 9, color: 'var(--text-dim)', display: 'block', marginBottom: 2 }}>Доза (мг)</label>
-                  <input type="number" value={dd.doseMg} onChange={(e) => updateDrug(idx, 'doseMg', Number(e.target.value))}
+                  <input type="number" value={dd.doseMg} onChange={(e) => updateDrug(idx, 'doseMg', parseFloat(e.target.value) || 0)}
                     style={{ width: '100%', padding: '5px 8px', borderRadius: 6, background: 'var(--bg-secondary)',
                       border: '1px solid var(--border)', color: 'var(--text)', fontSize: 11, boxSizing: 'border-box' }} />
                 </div>
                 <div>
                   <label style={{ fontSize: 9, color: 'var(--text-dim)', display: 'block', marginBottom: 2 }}>Недель</label>
-                  <input type="number" value={dd.totalWeeks} onChange={(e) => updateDrug(idx, 'totalWeeks', Number(e.target.value))}
+                  <input type="number" value={dd.totalWeeks} onChange={(e) => updateDrug(idx, 'totalWeeks', parseFloat(e.target.value) || 0)}
                     style={{ width: '100%', padding: '5px 8px', borderRadius: 6, background: 'var(--bg-secondary)',
                       border: '1px solid var(--border)', color: 'var(--text)', fontSize: 11, boxSizing: 'border-box' }} />
                 </div>
@@ -1252,42 +1252,42 @@ const DosageCalculatorTab: React.FC = () => {
             <>
               <div>
                 <label style={{ fontSize: 9, color: 'var(--text-dim)', display: 'block', marginBottom: 3 }}>мг/кг/нед</label>
-                <input type="number" value={mgKg} onChange={(e) => setMgKg(Number(e.target.value))}
+                <input type="number" value={mgKg} onChange={(e) => setMgKg(parseFloat(e.target.value) || 0)}
                   style={{ width: '100%', padding: '7px 10px', borderRadius: 8, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, boxSizing: 'border-box' }} />
               </div>
               <div>
                 <label style={{ fontSize: 9, color: 'var(--text-dim)', display: 'block', marginBottom: 3 }}>Вес (кг)</label>
-                <input type="number" value={weight} onChange={(e) => setWeight(Number(e.target.value))}
+                <input type="number" value={weight} onChange={(e) => setWeight(parseFloat(e.target.value) || 0)}
                   style={{ width: '100%', padding: '7px 10px', borderRadius: 8, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, boxSizing: 'border-box' }} />
               </div>
             </>
           ) : (
             <div style={{ gridColumn: '1 / -1' }}>
               <label style={{ fontSize: 9, color: 'var(--text-dim)', display: 'block', marginBottom: 3 }}>Недельная доза (мг/нед)</label>
-              <input type="number" value={weeklyMg} onChange={(e) => setWeeklyMg(Number(e.target.value))}
+              <input type="number" value={weeklyMg} onChange={(e) => setWeeklyMg(parseFloat(e.target.value) || 0)}
                 style={{ width: '100%', padding: '7px 10px', borderRadius: 8, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, boxSizing: 'border-box' }} />
             </div>
           )}
           <div>
             <label style={{ fontSize: 9, color: 'var(--text-dim)', display: 'block', marginBottom: 3 }}>Инъекций/нед</label>
-            <select value={injectionsPerWeek} onChange={(e) => setInjectionsPerWeek(Number(e.target.value))}
+            <select value={injectionsPerWeek} onChange={(e) => setInjectionsPerWeek(parseFloat(e.target.value) || 0)}
               style={{ width: '100%', padding: '7px 10px', borderRadius: 8, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12 }}>
               {[1, 2, 3, 4, 5, 6, 7].map(v => <option key={v} value={v}>{v}x/нед</option>)}
             </select>
           </div>
           <div>
             <label style={{ fontSize: 9, color: 'var(--text-dim)', display: 'block', marginBottom: 3 }}>Конц-ция (мг/мл)</label>
-            <input type="number" value={concentration} onChange={(e) => setConcentration(Number(e.target.value))}
+            <input type="number" value={concentration} onChange={(e) => setConcentration(parseFloat(e.target.value) || 0)}
               style={{ width: '100%', padding: '7px 10px', borderRadius: 8, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, boxSizing: 'border-box' }} />
           </div>
           <div>
             <label style={{ fontSize: 9, color: 'var(--text-dim)', display: 'block', marginBottom: 3 }}>Флакон (мл)</label>
-            <input type="number" value={vialMl} onChange={(e) => setVialMl(Number(e.target.value))}
+            <input type="number" value={vialMl} onChange={(e) => setVialMl(parseFloat(e.target.value) || 0)}
               style={{ width: '100%', padding: '7px 10px', borderRadius: 8, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, boxSizing: 'border-box' }} />
           </div>
           <div>
             <label style={{ fontSize: 9, color: 'var(--text-dim)', display: 'block', marginBottom: 3 }}>Шприц (мл)</label>
-            <select value={syringeMl} onChange={(e) => setSyringeMl(Number(e.target.value))}
+            <select value={syringeMl} onChange={(e) => setSyringeMl(parseFloat(e.target.value) || 0)}
               style={{ width: '100%', padding: '7px 10px', borderRadius: 8, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12 }}>
               {[0.3, 0.5, 1, 3, 5, 10, 20].map(v => <option key={v} value={v}>{v} мл</option>)}
             </select>
@@ -1467,7 +1467,7 @@ const AndrogenicIndexCalculator: React.FC = () => {
             )}
           </div>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            <input type="number" value={entry.doseMgWeek} onChange={e => setDoseFor(i, +e.target.value)}
+            <input type="number" value={entry.doseMgWeek} onChange={e => setDoseFor(i, parseFloat(e.target.value) || 0)}
               style={{ flex: 1, padding: '6px 10px', borderRadius: 8, background: 'var(--bg-secondary)',
                 border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12,
                 boxSizing: 'border-box' }} />
@@ -1615,21 +1615,21 @@ const PeptideCalcTab: React.FC = () => {
             <div>
               <label style={{ fontSize:9, color:'var(--text-dim)' }}>Во флаконе</label>
               <div style={{ display:'flex', gap:4 }}>
-                <input type="number" value={pepAmount} onChange={e => setPepAmount(Number(e.target.value))} style={{ width:'60%', padding:'6px 8px', borderRadius:6, border:'1px solid var(--border)', background:'var(--bg-secondary)', color:'var(--text)', fontSize:12 }} />
-                <select value={pepAmountUnit} onChange={e => setPepAmountUnit(e.target.value as 'mg'|'mcg')} style={{ flex:1, padding:'6px', borderRadius:6, border:'1px solid var(--border)', background:'var(--bg-secondary)', color:'var(--text)', fontSize:11 }}>
+                <input type="number" value={pepAmount} onChange={e => setPepAmount(parseFloat(e.target.value) || 0)} style={{ width:'60%', padding:'6px 8px', borderRadius:6, border:'1px solid var(--border)', background:'var(--bg-secondary)', color:'var(--text)', fontSize:12 }} />
+                <select value={pepAmountUnit || ''} onChange={e => setPepAmountUnit(e.target.value as 'mg'|'mcg')} style={{ flex:1, padding:'6px', borderRadius:6, border:'1px solid var(--border)', background:'var(--bg-secondary)', color:'var(--text)', fontSize:11 }}>
                   <option value="mg">мг</option><option value="mcg">мкг</option>
                 </select>
               </div>
             </div>
             <div>
               <label style={{ fontSize:9, color:'var(--text-dim)' }}>Растворитель (мл)</label>
-              <input type="number" step="0.1" value={pepDilution} onChange={e => setPepDilution(Number(e.target.value))} style={{ width:'100%', padding:'6px 8px', borderRadius:6, border:'1px solid var(--border)', background:'var(--bg-secondary)', color:'var(--text)', fontSize:12, boxSizing:'border-box' }} />
+              <input type="number" step="0.1" value={pepDilution} onChange={e => setPepDilution(parseFloat(e.target.value) || 0)} style={{ width:'100%', padding:'6px 8px', borderRadius:6, border:'1px solid var(--border)', background:'var(--bg-secondary)', color:'var(--text)', fontSize:12, boxSizing:'border-box' }} />
             </div>
             <div>
               <label style={{ fontSize:9, color:'var(--text-dim)' }}>Доза</label>
               <div style={{ display:'flex', gap:4 }}>
-                <input type="number" value={pepDose} onChange={e => setPepDose(Number(e.target.value))} style={{ width:'60%', padding:'6px 8px', borderRadius:6, border:'1px solid var(--border)', background:'var(--bg-secondary)', color:'var(--text)', fontSize:12 }} />
-                <select value={pepDoseUnit} onChange={e => setPepDoseUnit(e.target.value as 'mg'|'mcg')} style={{ flex:1, padding:'6px', borderRadius:6, border:'1px solid var(--border)', background:'var(--bg-secondary)', color:'var(--text)', fontSize:11 }}>
+                <input type="number" value={pepDose} onChange={e => setPepDose(parseFloat(e.target.value) || 0)} style={{ width:'60%', padding:'6px 8px', borderRadius:6, border:'1px solid var(--border)', background:'var(--bg-secondary)', color:'var(--text)', fontSize:12 }} />
+                <select value={pepDoseUnit || ''} onChange={e => setPepDoseUnit(e.target.value as 'mg'|'mcg')} style={{ flex:1, padding:'6px', borderRadius:6, border:'1px solid var(--border)', background:'var(--bg-secondary)', color:'var(--text)', fontSize:11 }}>
                   <option value="mcg">мкг</option><option value="mg">мг</option>
                 </select>
               </div>
@@ -1664,7 +1664,7 @@ const PeptideCalcTab: React.FC = () => {
           </div>
           <div>
             <label style={{ fontSize:9, color:'var(--text-dim)' }}>Длительность (дней)</label>
-            <input type="number" value={pepTotalDays} onChange={e => setPepTotalDays(Number(e.target.value))} style={{ width:'100%', padding:'6px 8px', borderRadius:6, border:'1px solid var(--border)', background:'var(--bg-secondary)', color:'var(--text)', fontSize:12, boxSizing:'border-box' }} />
+            <input type="number" value={pepTotalDays} onChange={e => setPepTotalDays(parseFloat(e.target.value) || 0)} style={{ width:'100%', padding:'6px 8px', borderRadius:6, border:'1px solid var(--border)', background:'var(--bg-secondary)', color:'var(--text)', fontSize:12, boxSizing:'border-box' }} />
           </div>
         </div>
 
@@ -2260,7 +2260,7 @@ const MapperTab: React.FC = () => {
                 {knownNames.map(n => (<option key={n} value={n}>{n}</option>))}
               </select>
               <input type="number" placeholder="" value={newDrugDose || ''}
-                onChange={e => setNewDrugDose(+e.target.value)}
+                onChange={e => setNewDrugDose(parseFloat(e.target.value) || 0)}
                 style={{ width: 80, padding: '6px 8px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12 }} />
               <button onClick={addManualDrug} style={{
                 padding: '6px 12px', borderRadius: 6, border: 'none', background: 'var(--accent)', color: '#000', fontWeight: 700, fontSize: 12, cursor: 'pointer',
@@ -2572,8 +2572,8 @@ const DiagnosticsTab: React.FC = () => {
             <select value={manEster} onChange={e => setManEster(e.target.value)} style={{ width: 110, padding: '5px 4px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 11 }}>
               {esterOptions.map(e => (<option key={e} value={e}>{e} ({ESTER_HALF_LIFE_DAYS[e]}д)</option>))}
             </select>
-            <input type="number" value={manMg} onChange={e => setManMg(+e.target.value)} placeholder="" style={{ width: 70, padding: '5px 6px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 11 }} />
-            <input type="number" value={manFreq} onChange={e => setManFreq(+e.target.value)} placeholder="" style={{ width: 60, padding: '5px 6px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 11 }} />
+            <input type="number" value={manMg} onChange={e => setManMg(parseFloat(e.target.value) || 0)} placeholder="" style={{ width: 70, padding: '5px 6px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 11 }} />
+            <input type="number" value={manFreq} onChange={e => setManFreq(parseFloat(e.target.value) || 0)} placeholder="" style={{ width: 60, padding: '5px 6px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 11 }} />
             <button onClick={addManual} style={{ padding: '5px 12px', borderRadius: 6, border: 'none', background: 'var(--accent)', color: '#000', fontWeight: 700, fontSize: 11, cursor: 'pointer' }}>+</button>
           </div>
         )}
@@ -2598,29 +2598,29 @@ const DiagnosticsTab: React.FC = () => {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 6, marginBottom: 8 }}>
           <div>
             <label style={{ fontSize: 9, color: 'var(--text-dim)' }}>HRV (мс)</label>
-            <input type="number" value={hrv} onChange={e => setHrv(+e.target.value)}
+            <input type="number" value={hrv} onChange={e => setHrv(parseFloat(e.target.value) || 0)}
               style={{ width: '100%', padding: '5px 6px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, boxSizing: 'border-box' }} />
           </div>
           <div>
             <label style={{ fontSize: 9, color: 'var(--text-dim)' }}>RHR (уд/мин)</label>
-            <input type="number" value={rhr} onChange={e => setRhr(+e.target.value)}
+            <input type="number" value={rhr} onChange={e => setRhr(parseFloat(e.target.value) || 0)}
               style={{ width: '100%', padding: '5px 6px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, boxSizing: 'border-box' }} />
           </div>
           <div>
             <label style={{ fontSize: 9, color: 'var(--text-dim)' }}>АД сист.</label>
-            <input type="number" value={bpSys} onChange={e => setBpSys(+e.target.value)}
+            <input type="number" value={bpSys} onChange={e => setBpSys(parseFloat(e.target.value) || 0)}
               style={{ width: '100%', padding: '5px 6px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, boxSizing: 'border-box' }} />
           </div>
           <div>
             <label style={{ fontSize: 9, color: 'var(--text-dim)' }}>АД диаст.</label>
-            <input type="number" value={bpDia} onChange={e => setBpDia(+e.target.value)}
+            <input type="number" value={bpDia} onChange={e => setBpDia(parseFloat(e.target.value) || 0)}
               style={{ width: '100%', padding: '5px 6px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, boxSizing: 'border-box' }} />
           </div>
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           <div>
             <label style={{ fontSize: 9, color: 'var(--text-dim)' }}>Возраст (лет)</label>
-            <input type="number" value={age} onChange={e => setAge(+e.target.value)}
+            <input type="number" value={age} onChange={e => setAge(parseFloat(e.target.value) || 0)}
               style={{ width: 80, padding: '5px 6px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, boxSizing: 'border-box' }} />
           </div>
           <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--text-dim)', cursor: 'pointer', marginTop: 14 }}>

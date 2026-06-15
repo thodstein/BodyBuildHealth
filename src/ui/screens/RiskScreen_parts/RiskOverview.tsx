@@ -126,7 +126,7 @@ export const RiskOverview: React.FC<{
               {chartWeek != null ? `Неделя ${chartWeek+1}` : 'Все недели'}
             </span>
             <input type="range" min={0} max={Math.max(0,(weeklyDynamics.weeks?.length||12)-1)} value={chartWeek??0}
-              onChange={e => setChartWeek(Number(e.target.value))} style={{ flex:1, accentColor:'var(--accent)' }}/>
+              onChange={e => setChartWeek(parseFloat(e.target.value) || 0)} style={{ flex:1, accentColor:'var(--accent)' }}/>
             <button onClick={() => setChartWeek(null)} style={{
               fontSize:9, color:'var(--accent)', background:'none', border:'1px solid var(--border)', borderRadius:4, padding:'2px 6px', cursor:'pointer', whiteSpace:'nowrap',
             }}>Все</button>

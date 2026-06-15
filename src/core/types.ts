@@ -538,6 +538,15 @@ export interface UserProfile {
       // Penalty override flags (manual user choice)
       forceNoLabsPenalty?: boolean; // Force apply penalty when no labs are entered
       mcRuns?: number; // Monte Carlo simulation runs (0 = disabled, 50+ = enabled)
+      
+      // Extended profile fields
+      sportType?: string;           // bodybuilding, powerlifting, crossfit, fitness, other
+      trainingExperience?: number;  // years of training
+      bloodType?: string;          // I+, I-, II+, II-, III+, III-, IV+, IV-
+      allergyNotes?: string;       // free-text allergies
+      chronicConditions?: string[]; // hypertension, diabetes, asthma, etc
+      emergencyName?: string;      // emergency contact name
+      emergencyPhone?: string;     // emergency contact phone
     };
 }
 

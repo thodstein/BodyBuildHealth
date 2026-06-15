@@ -147,7 +147,7 @@ export const FertilityPCTScreen: React.FC = () => {
   const field = (label: string, val: string, set: React.Dispatch<React.SetStateAction<string>>, placeholder: string, step = '0.1') => (
     <div className="form-group">
       <label>{label}</label>
-      <input type="number" step={step} value={val} onChange={e => set(e.target.value)} placeholder={placeholder} />
+      <input type="number" step={step} value={val || ''} onChange={e => set(e.target.value)} placeholder={placeholder} />
     </div>
   );
 
