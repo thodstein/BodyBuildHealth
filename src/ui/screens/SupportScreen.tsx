@@ -34,7 +34,7 @@ import { ReportEngine, type ReportInput } from '../../engines/report-engine';
 import { checkDrugInteractions } from '../../engines/pharma-interactions.engine';
 import type { CourseEntry } from '../../core/types';
 
-type SupportTab = 'main' | 'catalog' | 'synergies' | 'calculator' | 'interactions' | 'stacks' | 'peptides' | 'fertility-pct';
+type SupportTab = 'main' | 'catalog' | 'synergies' | 'calculator' | 'interactions' | 'stacks' | 'peptides' | 'fertility-pct' | 'stackcalc';
 type SupportView = 'main' | 'calc' | 'fertility';
 type CalcView = 'main' | 'calculator' | 'peptides' | 'info';
 type InfoView = 'main' | 'catalog' | 'synergies' | 'stacks' | 'interactions' | 'stackcalc';
@@ -1409,6 +1409,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
                 { icon:'🧬', title:'Пептидный калькулятор', desc:'Разведение, дозировки, PK модель и протоколы', action:() => { setSupportView('main'); setTab('peptides'); }, color:'var(--accent)' },
                 { icon:'ℹ️', title:'Общая информация', desc:'Каталог, синергии и взаимодействия, готовые стеки', action:() => { setCalcView('info'); setInfoView('catalog'); }, color:'#3b82f6' },
               ].map((card, i) => (
+                { icon:'📦', title:'Генератор стеков', desc:'Автоматический подбор стека поддержки по органам и механизмам', action:() => { setSupportView('main'); setTab('stackcalc'); }, color:'#8b5cf6' },
                 <div key={i} onClick={card.action} style={{
                   display:'flex', alignItems:'center', gap:12, padding:'12px 14px', borderRadius:14, cursor:'pointer', textAlign:'left', width:'100%',
                   background:'rgba(20,22,30,0.35)', border:'1px solid var(--glass-border)',
@@ -3460,6 +3461,119 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
       </>
       )}
 
+      {/* ===== STACK CALCULATOR TAB ===== */}
+      {tab === 'stackcalc' && (
+        <div style={{ padding:'0 0 70px' }}>
+          <button onClick={() => setTab('main')} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', marginBottom:8, background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← На главную</button>
+          {safeRender('stackcalc_tab', () => {
+            const organList = [
+              {key:'cardio',label:'❤️ Сердце/Сосуды',organs:['heart','vessels','cardiovascular']},
+              {key:'liver',label:'🫁 Печень',organs:['liver','hepatobiliary']},
+              {key:'kidney',label:'🫘 Почки',organs:['kidney','renal','urinary']},
+              {key:'lung',label:'🫁 Лёгкие',organs:['lung','respiratory']},
+              {key:'brain',label:'🧠 Мозг',organs:['brain','cns','neurons','cognitive']},
+              {key:'bones',label:'🦴 Кости/Суставы',organs:['bone','joint','skeletal']},
+              {key:'skin',label:'✨ Кожа/Волосы',organs:['skin','hair','nails','dermal']},
+              {key:'thyroid',label:'🦋 Щитовидка',organs:['thyroid','endocrine']},
+              {key:'pancreas',label:'🍬 Поджелудочная',organs:['pancreas','insulin','glucose']},
+              {key:'blood',label:'🩸 Кровь',organs:['blood','hematologic','marrow']},
+              {key:'immune',label:'🛡 Иммунитет',organs:['immune','lymphatic','thymus']},
+              {key:'gi',label:'🫃 ЖКТ',organs:['gi','stomach','intestine','colon','microbiome']},
+              {key:'hormones',label:'⚖ Гормоны',organs:['endocrine','adrenal','pituitary','gonads']},
+              {key:'male',label:'♂️ Мужское',organs:['prostate','testes','male_reproductive']},
+              {key:'female',label:'♀️ Женское',organs:['ovary','uterus','female_reproductive']},
+              {key:'antiaging',label:'⏳ Антивозраст',organs:['cells','mitochondria','telomere']},
+              {key:'energy',label:'⚡ Энергия',organs:['mitochondria','muscle','metabolic']},
+              {key:'recovery',label:'🔄 Восстановление',organs:['muscle','tendon','soft_tissue']},
+            ];
+            const toggleOrgan = (key:string) => setStackCalcOrgans(prev=>prev.includes(key)?prev.filter(k=>k!==key):[...prev,key]);
+            const selectAll = () => setStackCalcOrgans(organList.map(o=>o.key));
+            const clearAll = () => { setStackCalcOrgans([]); setStackCalcMech([]); };
+            const selectedOrgans = organList.filter(o=>stackCalcOrgans.includes(o.key)).flatMap(o=>o.organs);
+            const toggleMech = (m:string) => setStackCalcMech(prev=>prev.includes(m)?prev.filter(x=>x!==m):[...prev,m]);
+            const [lo,hi]=stackCalcSize.split('-').map(Number);
+            const generate = () => {
+              const candidates:Array<{sub:typeof ALL_SUBSTANCES[0];score:number}> = [];
+              for (const sub of ALL_SUBSTANCES) {
+                if (!sub.name||!sub.mechanisms) continue;
+                let score = 0;
+                const subOrgans = ((sub.organs||[]) as string[]).map((o:any)=>(o||'').toLowerCase());
+                if (selectedOrgans.length>0) {
+                  for (const o of selectedOrgans) {
+                    if (subOrgans.some(so=>so.includes(o.toLowerCase())||o.toLowerCase().includes(so))) score+=2;
+                  }
+                }
+                if (stackCalcMech.length>0) {
+                  for (const m of stackCalcMech) {
+                    if ((sub.mechanisms||[]).some(sm=>(sm||'').toLowerCase().includes(m.toLowerCase()))) score+=1;
+                  }
+                }
+                if (score>0) candidates.push({sub,score});
+              }
+              candidates.sort((a,b)=>b.score-a.score);
+              const size = Math.min(hi,Math.max(lo,Math.ceil(candidates.length*0.4)));
+              const selected = candidates.slice(0,size);
+              const subs = selected.map(s=>s.sub.id);
+              const synergies:any[]=[];
+              const conflicts:any[]=[];
+              for (let a=0;a<subs.length;a++) {
+                for (let b=a+1;b<subs.length;b++) {
+                  const key = `${subs[a]}||${subs[b]}`;
+                  const found = conflictLookup.get(key);
+                  if (found&&found.type==='synergy') synergies.push({a:subs[a],b:subs[b],effect:found.effect,severity:found.severity});
+                  else if (found&&found.type!=='synergy') conflicts.push({a:subs[a],b:subs[b],effect:found.effect,severity:found.severity});
+                }
+              }
+              const allMechs = new Set<string>();
+              selected.forEach(s=>((s.sub.mechanisms||[]) as string[]).forEach((m:any)=>allMechs.add(m)));
+              setGeneratedStack({
+                substances:subs,
+                descriptions:selected.map(s=>s.sub.name||s.sub.id),
+                scores:selected.map(s=>s.score),
+                synergies,conflicts,
+                mechs:[...allMechs],
+                totalScore:candidates.length>0?Math.min(100,Math.round(size*3+synergies.length*5-conflicts.length*3)):0
+              });
+            };
+            return <div>
+              <div style={{fontSize:13,fontWeight:700,color:'var(--accent)',marginBottom:4}}>🧮 Генератор стеков</div>
+              <div style={{fontSize:9,color:'var(--text-dim)',marginBottom:8}}>Выберите органы, механизмы и размер — стек генерируется из базы веществ поддержки с учётом синергий и конфликтов</div>
+              <div style={{marginBottom:8}}>
+                <div style={{display:'flex',alignItems:'center',gap:4,marginBottom:4}}>
+                  <span style={{fontSize:9,fontWeight:600,color:'var(--text-light)'}}>Органы/системы:</span>
+                  <button onClick={selectAll} style={{fontSize:7,padding:'2px 6px',borderRadius:4,cursor:'pointer',background:'rgba(0,230,138,0.1)',border:'1px solid rgba(0,230,138,0.2)',color:'#00e68a'}}>Все</button>
+                  {stackCalcOrgans.length>0&&<button onClick={clearAll} style={{fontSize:7,padding:'2px 6px',borderRadius:4,cursor:'pointer',background:'rgba(239,68,68,0.08)',border:'1px solid rgba(239,68,68,0.15)',color:'#f87171'}}>✕</button>}
+                  <span style={{fontSize:8,color:'var(--text-dim)',marginLeft:4}}>{stackCalcOrgans.length}/{organList.length}</span>
+                </div>
+                <div style={{display:'flex',flexWrap:'wrap',gap:3,maxHeight:90,overflowY:'auto'}}>
+                  {organList.map(o=><button key={o.key} onClick={()=>toggleOrgan(o.key)} style={{padding:'3px 7px',borderRadius:8,fontSize:8,cursor:'pointer',whiteSpace:'nowrap',background:stackCalcOrgans.includes(o.key)?'var(--accent)':'var(--bg-secondary)',color:stackCalcOrgans.includes(o.key)?'#000':'var(--text-dim)',border:`1px solid ${stackCalcOrgans.includes(o.key)?'var(--accent)':'var(--border)'}`}}>{o.label}</button>)}
+                </div>
+              </div>
+              {availableMechs.length>0&&<div style={{marginBottom:8}}>
+                <div style={{fontSize:9,fontWeight:600,color:'var(--text-light)',marginBottom:4}}>Механизмы ({availableMechs.length}):</div>
+                <div style={{display:'flex',flexWrap:'wrap',gap:3,maxHeight:80,overflowY:'auto'}}>
+                  {availableMechs.slice(0,40).map(m=><button key={m} onClick={()=>toggleMech(m)} style={{padding:'2px 6px',borderRadius:6,fontSize:7,cursor:'pointer',whiteSpace:'nowrap',background:stackCalcMech.includes(m)?'#8b5cf6':'var(--bg-secondary)',color:stackCalcMech.includes(m)?'#fff':'var(--text-dim)',border:`1px solid ${stackCalcMech.includes(m)?'#8b5cf6':'var(--border)'}`}}>{m}</button>)}
+                </div>
+              </div>}
+              <div style={{display:'flex',gap:8,alignItems:'center',marginBottom:8}}>
+                <span style={{fontSize:9,fontWeight:600,color:'var(--text-light)'}}>Размер:</span>
+                {['2-4','5-7','8-10','11-15','15-20','20-25','30-35'].map(s=><button key={s} onClick={()=>setStackCalcSize(s)} style={{padding:'3px 7px',borderRadius:8,fontSize:8,cursor:'pointer',background:stackCalcSize===s?'var(--accent)':'var(--bg-secondary)',color:stackCalcSize===s?'#000':'var(--text-dim)',border:`1px solid ${stackCalcSize===s?'var(--accent)':'var(--border)'}`}}>{s}</button>)}
+                <button onClick={generate} style={{padding:'6px 16px',borderRadius:10,fontSize:10,fontWeight:700,cursor:'pointer',background:'var(--accent)',border:'none',color:'#000',marginLeft:'auto'}}>⚡ Сгенерировать</button>
+              </div>
+              {generatedStack&&<div style={{background:'rgba(0,230,138,0.04)',borderRadius:10,padding:10,border:'1px solid rgba(0,230,138,0.12)'}}>
+                <div style={{fontSize:10,fontWeight:700,color:'var(--accent)',marginBottom:6}}>Сгенерированный стек · {generatedStack.substances.length} веществ · Score {generatedStack.totalScore}</div>
+                <div style={{display:'flex',flexWrap:'wrap',gap:3,marginBottom:6}}>
+                  {generatedStack.descriptions.map((n:string,i:number)=><span key={i} style={{fontSize:8,padding:'2px 8px',borderRadius:6,background:'rgba(139,92,246,0.1)',color:'#a78bfa',border:'1px solid rgba(139,92,246,0.15)'}}>{n}<span style={{marginLeft:3,opacity:0.5,fontSize:7}}>+{generatedStack.scores[i]}</span></span>)}
+                </div>
+                {generatedStack.mechs.length>0&&<div style={{marginBottom:4}}><div style={{fontSize:7,fontWeight:600,color:'var(--text-dim)',marginBottom:2}}>⚙️ Механизмы:</div><div style={{display:'flex',flexWrap:'wrap',gap:2}}>{generatedStack.mechs.map((m:string,i:number)=><span key={i} style={{fontSize:6,padding:'1px 4px',borderRadius:3,background:'rgba(139,92,246,0.08)',color:'#a78bfa'}}>{m}</span>)}</div></div>}
+                {generatedStack.synergies.length>0&&<div style={{marginBottom:4}}><div style={{fontSize:7,fontWeight:600,color:'#22c55e',marginBottom:2}}>⊕ Синергии ({generatedStack.synergies.length}):</div>{generatedStack.synergies.map((s:any,i:number)=><div key={i} style={{fontSize:7,color:'var(--text-dim)',padding:'1px 0'}}><b style={{color:'#4ade80'}}>{getStackSubLabel(s.a)}+{getStackSubLabel(s.b)}</b>: {s.effect} [{s.severity}]</div>)}</div>}
+                {generatedStack.conflicts.length>0&&<div><div style={{fontSize:7,fontWeight:600,color:'#ef4444',marginBottom:2}}>⚠ Конфликты ({generatedStack.conflicts.length}):</div>{generatedStack.conflicts.map((c:any,i:number)=><div key={i} style={{fontSize:7,color:'#f87171',padding:'1px 0'}}><b>{getStackSubLabel(c.a)}+{getStackSubLabel(c.b)}</b>: {c.effect} [{c.severity}]</div>)}</div>}
+              </div>}
+              {!generatedStack&&stackCalcOrgans.length===0&&<div style={{padding:20,textAlign:'center',color:'var(--text-dim)',fontSize:10,background:'var(--bg-secondary)',borderRadius:10,border:'1px solid var(--border)'}}>Выберите органы/системы и нажмите «Сгенерировать»</div>}
+            </div>;
+          })}
+        </div>
+      )}
       {/* ===== FERTILITY/PCT TAB (with back button) ===== */}
       {tab === 'fertility-pct' && (
         <div>
