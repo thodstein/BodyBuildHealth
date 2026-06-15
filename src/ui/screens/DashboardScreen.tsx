@@ -13,14 +13,10 @@ interface Props {
 }
 
 const NAV_CARDS: { id: ScreenId; icon: string; label: string; color: string }[] = [
-  { id: 'pharma',   icon: '💉', label: 'Фарма',     color: '#ef4444' },
-  { id: 'support',  icon: '🧬', label: 'Поддержка', color: '#8b5cf6' },
-  { id: 'training', icon: '🏋️', label: 'Тренировки',color: '#22c55e' },
-  { id: 'nutrition',icon: '🥗', label: 'Питание',   color: '#f59e0b' },
-  { id: 'labs',     icon: '🧪', label: 'Анализы',   color: '#3b82f6' },
-  { id: 'risks',    icon: '📊', label: 'Риски',      color: '#ec4899' },
-  { id: 'profile',  icon: '👤', label: 'Профиль',    color: '#14b8a6' },
-  { id: 'articles', icon: '📚', label: 'Статьи',     color: '#a855f7' },
+  { id: 'profile',  icon: '👤', label: 'Профиль',     color: '#14b8a6' },
+  { id: 'training', icon: '🏋️', label: 'Тренировки', color: '#22c55e' },
+  { id: 'nutrition',icon: '🥗', label: 'Питание',     color: '#f59e0b' },
+  { id: 'articles', icon: '📚', label: 'Статьи',      color: '#a855f7' },
 ];
 
 export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
