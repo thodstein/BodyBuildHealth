@@ -287,7 +287,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['METHYLATION', 'CELL_REPAIR'],
     organs: ['BLOOD', 'LIVER'],
     deficiency: 'LOW_B9',
-    description: 'Витамин (DNA), необходимый для обменных процессов и общего здоровья',
+    description: 'Folinic Acid (B9) — витамин. Обеспечивает метилирование ДНК, гомоцистеина и нейромедиаторов через SAM; Активирует механизмы репарации клеток через PARP и ATM/ATR. Мишени: кровь, печень. Дефицит: low b9.',
     type: 'vitamin'
   },
   {
@@ -317,7 +317,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MITO_REPAIR', 'ENERGY'],
     organs: ['NERVES', 'LIVER'],
     deficiency: 'FATIGUE',
-    description: 'Витамин (mitochondria), необходимый для работы митохондрий',
+    description: 'Adenosylcobalamin (B12) — витамин. Поддерживает функцию митохондрий и стимулирует митохондриальный биогенез. Мишени: нервы, печень. Дефицит: fatigue.',
     type: 'vitamin'
   },
   {
@@ -327,7 +327,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NITRIC_OXIDE_BINDING', 'METHYLATION'],
     organs: ['BLOOD', 'LIVER'],
     deficiency: 'LOW_B12',
-    description: 'Витамин (detox), необходимый для детоксикации',
+    description: 'Hydroxocobalamin (B12) — витамин. Обеспечивает метилирование ДНК, гомоцистеина и нейромедиаторов через SAM. Мишени: кровь, печень. Дефицит: low b12.',
     type: 'vitamin'
   },
   {
@@ -347,7 +347,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['LIPOSOMAL_DELIVERY', 'OXIDATIVE_STRESS_REDUCTION'],
     organs: ['IMMUNE_SYSTEM', 'SKIN', 'VESSELS'],
     deficiency: 'LOW_VITC',
-    description: 'Витамин (antioxidant, immune), необходимый для защиты клеток от окислительного стресса, иммунной системы',
+    description: 'Liposomal Vitamin C — витамин. Нейтрализует свободные радикалы и снижает оксидативный стресс в клетках. Мишени: иммунная система, кожа, сосуды. Дефицит: low vitc.',
     type: 'vitamin'
   },
   {
@@ -357,7 +357,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['OXIDATIVE_STRESS_REDUCTION', 'COLLAGEN_SUPPORT'],
     organs: ['GI', 'SKIN'],
     deficiency: 'LOW_VITC',
-    description: 'Витамин (antioxidant, alkaline), необходимый для защиты клеток от окислительного стресса',
+    description: 'Calcium Ascorbate — витамин. Нейтрализует свободные радикалы и снижает оксидативный стресс в клетках; Стимулирует синтез коллагена I и III типов, укрепляя соединительную ткань. Мишени: ЖКТ, кожа. Дефицит: low vitc.',
     type: 'vitamin'
   },
   {
@@ -377,7 +377,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CALCIUM_HOMEOSTASIS', 'IMMUNE_SUPPORT'],
     organs: ['BONES', 'IMMUNE_SYSTEM'],
     deficiency: 'LOW_VITD',
-    description: 'Витамин (hormone), необходимый для гормонального баланса',
+    description: 'Vitamin D2 (Ergocalciferol) — витамин. Укрепляет иммунную защиту через модуляцию T-клеток и NK-клеток. Мишени: кости, иммунная система. Дефицит: low vitd.',
     type: 'vitamin'
   },
   {
@@ -387,7 +387,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CALCIUM_DISTRIBUTION', 'BONE_MINERALIZATION'],
     organs: ['BONES', 'VESSELS'],
     deficiency: 'LOW_VITD',
-    description: 'Витамин (vascular, bone), необходимый для костной ткани',
+    description: 'D3 + K2 Complex — витамин. Усиливает минерализацию костной ткани и поддерживает плотность костей. Мишени: кости, сосуды. Дефицит: low vitd.',
     type: 'vitamin'
   },
   {
@@ -407,7 +407,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MEMBRANE_PROTECTION', 'OXIDATIVE_STRESS_REDUCTION'],
     organs: ['SKIN', 'VESSELS', 'HEART'],
     deficiency: 'LOW_VITE',
-    description: 'Витамин (antioxidant), необходимый для защиты клеток от окислительного стресса',
+    description: 'Mixed Tocopherols — витамин. Нейтрализует свободные радикалы и снижает оксидативный стресс в клетках. Мишени: кожа, сосуды, сердце. Дефицит: low vite.',
     type: 'vitamin'
   },
   {
@@ -417,7 +417,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SIRT1_ACTIVATION', 'MEMBRANE_PROTECTION'],
     organs: ['BRAIN', 'HEART', 'VESSELS'],
     deficiency: 'AGING',
-    description: 'Витамин (antioxidant, antiinflammatory), необходимый для защиты клеток от окислительного стресса, противовоспалительной защиты',
+    description: 'Tocotrienols — витамин. Активирует сиртуин SIRT1, запуская антивозрастные и метаболические программы. Мишени: мозг, сердце, сосуды. Дефицит: aging.',
     type: 'vitamin'
   },
   {
@@ -427,7 +427,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CLOTTING_PATHWAY', 'CALCIUM_DISTRIBUTION'],
     organs: ['BLOOD', 'BONES'],
     deficiency: 'LOW_VITK',
-    description: 'Витамин (coagulation), необходимый для обменных процессов и общего здоровья',
+    description: 'Vitamin K1 (Phylloquinone) — витамин. Мишени: кровь, кости. Дефицит: low vitk.',
     type: 'vitamin'
   },
   {
@@ -437,7 +437,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CALCIUM_DISTRIBUTION', 'BONE_MINERALIZATION'],
     organs: ['BONES', 'VESSELS'],
     deficiency: 'LOW_VITK',
-    description: 'Витамин (bone, vascular), необходимый для костной ткани',
+    description: 'Vitamin K2 MK-4 — витамин. Усиливает минерализацию костной ткани и поддерживает плотность костей. Мишени: кости, сосуды. Дефицит: low vitk.',
     type: 'vitamin'
   },
   {
@@ -457,7 +457,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NAD_PATHWAY', 'METHYLATION', 'NEURO_SUPPORT'],
     organs: ['BRAIN', 'LIVER', 'BLOOD'],
     deficiency: 'LOW_B_VITAMINS',
-    description: 'Витамин (energy, enzyme), необходимый для энергетического обмена',
+    description: 'B-Complex Full Spectrum — витамин. Является предшественником NAD+/NADH — центрального кофермента клеточного метаболизма; Обеспечивает метилирование ДНК, гомоцистеина и нейромедиаторов через SAM. Мишени: мозг, печень, кровь. Дефицит: low b vitamins.',
     type: 'vitamin'
   },
   {
@@ -467,7 +467,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NAD_PATHWAY', 'METHYLATION', 'NEURO_SUPPORT'],
     organs: ['BRAIN', 'LIVER', 'BLOOD'],
     deficiency: 'LOW_B_VITAMINS',
-    description: 'Витамин (energy, enzyme), необходимый для энергетического обмена',
+    description: 'B-Complex Active — витамин. Является предшественником NAD+/NADH — центрального кофермента клеточного метаболизма; Обеспечивает метилирование ДНК, гомоцистеина и нейромедиаторов через SAM. Мишени: мозг, печень, кровь. Дефицит: low b vitamins.',
     type: 'vitamin'
   },
   {
@@ -477,7 +477,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ACH_SYNTHESIS', 'LIVER_SUPPORT'],
     organs: ['BRAIN', 'LIVER'],
     deficiency: 'LOW_CHOLINE',
-    description: 'Витамин (nootropic), необходимый для когнитивных функций',
+    description: 'Choline — витамин. Участвует в синтезе ацетилхолина — нейромедиатора памяти и внимания. Мишени: мозг, печень. Дефицит: low choline.',
     type: 'vitamin'
   },
   {
@@ -487,7 +487,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ACH_SYNTHESIS', 'MITO_REPAIR'],
     organs: ['BRAIN', 'NERVES'],
     deficiency: 'COGNITION',
-    description: 'Витамин (nootropic), необходимый для когнитивных функций',
+    description: 'CDP-Choline (Citicoline) — витамин. Участвует в синтезе ацетилхолина — нейромедиатора памяти и внимания; Поддерживает функцию митохондрий и стимулирует митохондриальный биогенез. Мишени: мозг, нервы. Дефицит: cognition.',
     type: 'vitamin'
   },
   {
@@ -497,7 +497,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ACH_SYNTHESIS', 'GH_STIMULATION'],
     organs: ['BRAIN', 'HORMONES'],
     deficiency: 'COGNITION',
-    description: 'Витамин (nootropic), необходимый для когнитивных функций',
+    description: 'Alpha-GPC — витамин. Участвует в синтезе ацетилхолина — нейромедиатора памяти и внимания. Мишени: мозг, гормоны. Дефицит: cognition.',
     type: 'vitamin'
   },
   {
@@ -507,7 +507,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['INSULIN_SIGNALING', 'SEROTONIN_SUPPORT'],
     organs: ['BRAIN', 'OVARIES'],
     deficiency: 'PCOS;ANXIETY',
-    description: 'Витамин (hormone, neuro), необходимый для гормонального баланса, нервной системы',
+    description: 'Inositol (B8) — витамин. Мишени: мозг, яичники. Дефицит: pcos;anxiety.',
     type: 'vitamin'
   },
   {
@@ -537,7 +537,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SKIN_REPAIR', 'ANTI_INFLAMMATION'],
     organs: ['SKIN'],
     deficiency: 'LOW_PABA',
-    description: 'Витамин (skin), необходимый для здоровья кожи',
+    description: 'PABA (B10) — витамин. Мишени: кожа. Дефицит: low paba.',
     type: 'vitamin'
   },
   {
@@ -557,7 +557,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['METHYL_DONOR', 'HOMOCYSTEINE_REDUCTION'],
     organs: ['LIVER', 'BLOOD'],
     deficiency: 'HIGH_HOMOCYSTEINE',
-    description: 'Витамин (methylation), необходимый для метилирования',
+    description: 'TMG (Trimethylglycine) — витамин. Снижает уровень гомоцистеина через реметилирование до метионина. Мишени: печень, кровь. Дефицит: high homocysteine.',
     type: 'vitamin'
   },
   {
@@ -567,7 +567,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['FATTY_ACID_TRANSPORT', 'ATP_PRODUCTION'],
     organs: ['HEART', 'MUSCLES', 'BRAIN'],
     deficiency: 'FATIGUE',
-    description: 'Витамин (mitochondria), необходимый для работы митохондрий',
+    description: 'L-Carnitine — витамин. Усиливает продукцию АТФ в митохондриях. Мишени: сердце, мышцы, мозг. Дефицит: fatigue.',
     type: 'vitamin'
   },
   {
@@ -587,7 +587,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['OXIDATIVE_STRESS_REDUCTION', 'COLLAGEN_SUPPORT'],
     organs: ['IMMUNE_SYSTEM', 'SKIN'],
     deficiency: 'LOW_VITC',
-    description: 'Витамин (antioxidant, immune), необходимый для защиты клеток от окислительного стресса, иммунной системы',
+    description: 'Ester-C — витамин. Нейтрализует свободные радикалы и снижает оксидативный стресс в клетках; Стимулирует синтез коллагена I и III типов, укрепляя соединительную ткань. Мишени: иммунная система, кожа. Дефицит: low vitc.',
     type: 'vitamin'
   },
   {
@@ -597,7 +597,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['OXIDATIVE_STRESS_REDUCTION', 'COLLAGEN_SUPPORT'],
     organs: ['GI', 'SKIN'],
     deficiency: 'LOW_VITC',
-    description: 'Витамин (antioxidant), необходимый для защиты клеток от окислительного стресса',
+    description: 'Sodium Ascorbate — витамин. Нейтрализует свободные радикалы и снижает оксидативный стресс в клетках; Стимулирует синтез коллагена I и III типов, укрепляя соединительную ткань. Мишени: ЖКТ, кожа. Дефицит: low vitc.',
     type: 'vitamin'
   },
   {
@@ -607,7 +607,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['OXIDATIVE_STRESS_REDUCTION', 'GLUTATHIONE_RECYCLING'],
     organs: ['BRAIN', 'LIVER', 'VESSELS'],
     deficiency: 'OXIDATIVE_STRESS',
-    description: 'Витамин (antioxidant, synergy), необходимый для защиты клеток от окислительного стресса',
+    description: 'R-Lipoic Acid + C — витамин. Нейтрализует свободные радикалы и снижает оксидативный стресс в клетках. Мишени: мозг, печень, сосуды. Дефицит: oxidative stress.',
     type: 'vitamin'
   },
   {
@@ -617,7 +617,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['LIPOSOMAL_DELIVERY', 'IMMUNE_MODULATION'],
     organs: ['BONES', 'IMMUNE_SYSTEM'],
     deficiency: 'LOW_VITD',
-    description: 'Витамин (hormone), необходимый для гормонального баланса',
+    description: 'Liposomal D3 — витамин. Модулирует иммунный ответ через T-клетки, макрофаги и цитокиновый профиль. Мишени: кости, иммунная система. Дефицит: low vitd.',
     type: 'vitamin'
   },
   {
@@ -627,7 +627,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CALCIUM_HOMEOSTASIS', 'IMMUNE_SUPPORT'],
     organs: ['BONES', 'IMMUNE_SYSTEM'],
     deficiency: 'LOW_VITD',
-    description: 'Витамин (hormone), необходимый для гормонального баланса',
+    description: 'D3 Softgel — витамин. Укрепляет иммунную защиту через модуляцию T-клеток и NK-клеток. Мишени: кости, иммунная система. Дефицит: low vitd.',
     type: 'vitamin'
   },
   {
@@ -637,7 +637,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['IMMUNE_MODULATION', 'CALCIUM_HOMEOSTASIS'],
     organs: ['BONES', 'IMMUNE_SYSTEM'],
     deficiency: 'LOW_VITD',
-    description: 'Витамин (hormone), необходимый для гормонального баланса',
+    description: 'D3 High Dose — витамин. Модулирует иммунный ответ через T-клетки, макрофаги и цитокиновый профиль. Мишени: кости, иммунная система. Дефицит: low vitd.',
     type: 'vitamin'
   },
   {
@@ -647,7 +647,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NITROGEN_SCAVENGING', 'MEMBRANE_PROTECTION'],
     organs: ['HEART', 'VESSELS'],
     deficiency: 'OXIDATIVE_STRESS',
-    description: 'Витамин (antioxidant), необходимый для защиты клеток от окислительного стресса',
+    description: 'Gamma-Tocopherol — витамин. Мишени: сердце, сосуды. Дефицит: oxidative stress.',
     type: 'vitamin'
   },
   {
@@ -657,7 +657,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SIRT1_ACTIVATION', 'MEMBRANE_PROTECTION'],
     organs: ['BRAIN', 'HEART', 'VESSELS'],
     deficiency: 'AGING',
-    description: 'Витамин (antioxidant, antiinflammatory), необходимый для защиты клеток от окислительного стресса, противовоспалительной защиты',
+    description: 'Delta-Tocotrienol — витамин. Активирует сиртуин SIRT1, запуская антивозрастные и метаболические программы. Мишени: мозг, сердце, сосуды. Дефицит: aging.',
     type: 'vitamin'
   },
   {
@@ -667,7 +667,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['OXIDATIVE_STRESS_REDUCTION', 'MEMBRANE_PROTECTION'],
     organs: ['SKIN', 'VESSELS'],
     deficiency: 'OXIDATIVE_STRESS',
-    description: 'Витамин (antioxidant), необходимый для защиты клеток от окислительного стресса',
+    description: 'E + C Synergy — витамин. Нейтрализует свободные радикалы и снижает оксидативный стресс в клетках. Мишени: кожа, сосуды. Дефицит: oxidative stress.',
     type: 'vitamin'
   },
   {
@@ -677,7 +677,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['LIPOSOMAL_DELIVERY', 'CALCIUM_DISTRIBUTION'],
     organs: ['VESSELS', 'BONES'],
     deficiency: 'CALCIFICATION',
-    description: 'Витамин (vascular), необходимый для обменных процессов и общего здоровья',
+    description: 'Liposomal K2 — витамин. Мишени: сосуды, кости. Дефицит: calcification.',
     type: 'vitamin'
   },
   {
@@ -687,7 +687,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CALCIUM_DISTRIBUTION', 'ANTI_CALCIFICATION'],
     organs: ['VESSELS', 'BONES'],
     deficiency: 'CALCIFICATION',
-    description: 'Витамин (vascular, bone), необходимый для костной ткани',
+    description: 'K2 Complex MK4+MK7 — витамин. Мишени: сосуды, кости. Дефицит: calcification.',
     type: 'vitamin'
   },
   {
@@ -697,7 +697,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['TPP_PATHWAY', 'NERVE_REPAIR'],
     organs: ['BRAIN', 'NERVES'],
     deficiency: 'FATIGUE',
-    description: 'Витамин (energy, nootropic), необходимый для энергетического обмена, когнитивных функций',
+    description: 'TTFD (B1) — витамин. Служит коферментом ТДФ в пентозофосфатном пути и пируватдегидрогеназном комплексе. Мишени: мозг, нервы. Дефицит: fatigue.',
     type: 'vitamin'
   },
   {
@@ -707,7 +707,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['FLAVIN_PATHWAY', 'MITO_REPAIR'],
     organs: ['BRAIN', 'LIVER'],
     deficiency: 'LOW_B2',
-    description: 'Витамин (enzyme), необходимый для обменных процессов и общего здоровья',
+    description: 'B2 Complex — витамин. Является предшественником ФАД и ФМН — коферментов дыхательной цепи и цикла Кребса; Поддерживает функцию митохондрий и стимулирует митохондриальный биогенез. Мишени: мозг, печень. Дефицит: low b2.',
     type: 'vitamin'
   },
   {
@@ -717,7 +717,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NAD_PATHWAY', 'LIPID_BALANCE'],
     organs: ['HEART', 'LIVER'],
     deficiency: 'HIGH_LIPIDS',
-    description: 'Витамин (lipids), необходимый для обменных процессов и общего здоровья',
+    description: 'Nicotinic Acid — витамин. Является предшественником NAD+/NADH — центрального кофермента клеточного метаболизма; Модулирует липидный профиль: снижает ЛПНП и триглицериды, повышает ЛПВП. Мишени: сердце, печень. Дефицит: high lipids.',
     type: 'vitamin'
   },
   {
@@ -737,7 +737,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['COA_PATHWAY', 'FATTY_ACID_OXIDATION'],
     organs: ['LIVER', 'ADRENALS'],
     deficiency: 'FATIGUE',
-    description: 'Витамин (energy), необходимый для энергетического обмена',
+    description: 'CoA Precursor — витамин. Мишени: печень, надпочечники. Дефицит: fatigue.',
     type: 'vitamin'
   },
   {
@@ -747,7 +747,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NEUROTRANSMITTER_SUPPORT', 'HOMOCYSTEINE_REDUCTION'],
     organs: ['BRAIN', 'LIVER'],
     deficiency: 'LOW_B6',
-    description: 'Витамин (enzyme), необходимый для обменных процессов и общего здоровья',
+    description: 'B6 Complex — витамин. Снижает уровень гомоцистеина через реметилирование до метионина. Мишени: мозг, печень. Дефицит: low b6.',
     type: 'vitamin'
   },
   {
@@ -757,7 +757,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CARBOXYLASE_SUPPORT', 'SKIN_HEALTH'],
     organs: ['SKIN', 'HAIR'],
     deficiency: 'LOW_B7',
-    description: 'Витамин (enzyme), необходимый для обменных процессов и общего здоровья',
+    description: 'Biotin High Dose — витамин. Мишени: кожа, волосы. Дефицит: low b7.',
     type: 'vitamin'
   },
   {
@@ -767,7 +767,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['METHYLATION', 'CELL_REPAIR'],
     organs: ['BLOOD', 'LIVER'],
     deficiency: 'LOW_B9',
-    description: 'Витамин (DNA), необходимый для обменных процессов и общего здоровья',
+    description: 'Folate Complex — витамин. Обеспечивает метилирование ДНК, гомоцистеина и нейромедиаторов через SAM; Активирует механизмы репарации клеток через PARP и ATM/ATR. Мишени: кровь, печень. Дефицит: low b9.',
     type: 'vitamin'
   },
   {
@@ -777,7 +777,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MYELIN_REPAIR', 'MITO_REPAIR'],
     organs: ['NERVES', 'BRAIN', 'BLOOD'],
     deficiency: 'LOW_B12',
-    description: 'Витамин (nerve, energy), необходимый для нервной ткани, энергетического обмена',
+    description: 'B12 Complex — витамин. Поддерживает функцию митохондрий и стимулирует митохондриальный биогенез. Мишени: нервы, мозг, кровь. Дефицит: low b12.',
     type: 'vitamin'
   },
   {
@@ -787,7 +787,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['OXIDATIVE_STRESS_REDUCTION', 'CAPILLARY_STRENGTH'],
     organs: ['VESSELS', 'SKIN'],
     deficiency: 'FRAGILITY',
-    description: 'Витамин (antioxidant, vascular), необходимый для защиты клеток от окислительного стресса',
+    description: 'C + Rutin — витамин. Нейтрализует свободные радикалы и снижает оксидативный стресс в клетках. Мишени: сосуды, кожа. Дефицит: fragility.',
     type: 'vitamin'
   },
   {
@@ -797,7 +797,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['OXIDATIVE_STRESS_REDUCTION', 'COLLAGEN_SUPPORT'],
     organs: ['VESSELS', 'SKIN'],
     deficiency: 'LOW_VITC',
-    description: 'Витамин (antioxidant, vascular), необходимый для защиты клеток от окислительного стресса',
+    description: 'C + Bioflavonoids — витамин. Нейтрализует свободные радикалы и снижает оксидативный стресс в клетках; Стимулирует синтез коллагена I и III типов, укрепляя соединительную ткань. Мишени: сосуды, кожа. Дефицит: low vitc.',
     type: 'vitamin'
   },
   {
@@ -807,7 +807,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CALCIUM_HOMEOSTASIS', 'IMMUNE_SUPPORT'],
     organs: ['BONES', 'IMMUNE_SYSTEM'],
     deficiency: 'LOW_VITD',
-    description: 'Витамин (hormone), необходимый для гормонального баланса',
+    description: 'D3 in MCT Oil — витамин. Укрепляет иммунную защиту через модуляцию T-клеток и NK-клеток. Мишени: кости, иммунная система. Дефицит: low vitd.',
     type: 'vitamin'
   },
   {
@@ -827,7 +827,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CALCIUM_DISTRIBUTION', 'ANTI_CALCIFICATION'],
     organs: ['VESSELS', 'BONES'],
     deficiency: 'CALCIFICATION',
-    description: 'Витамин (vascular, bone), необходимый для костной ткани',
+    description: 'K1 + K2 — витамин. Мишени: сосуды, кости. Дефицит: calcification.',
     type: 'vitamin'
   },
   {
@@ -837,7 +837,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ACH_SYNTHESIS', 'LIVER_SUPPORT'],
     organs: ['BRAIN', 'LIVER'],
     deficiency: 'LOW_CHOLINE',
-    description: 'Витамин (nootropic), необходимый для когнитивных функций',
+    description: 'Choline Complex — витамин. Участвует в синтезе ацетилхолина — нейромедиатора памяти и внимания. Мишени: мозг, печень. Дефицит: low choline.',
     type: 'vitamin'
   },
   {
@@ -847,7 +847,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['INSULIN_SIGNALING', 'SEROTONIN_SUPPORT'],
     organs: ['BRAIN', 'OVARIES'],
     deficiency: 'PCOS',
-    description: 'Витамин (hormone), необходимый для гормонального баланса',
+    description: 'Inositol Complex — витамин. Мишени: мозг, яичники. Дефицит: pcos.',
     type: 'vitamin'
   },
   {
@@ -857,7 +857,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MITO_BIOGENESIS', 'MITO_REPAIR'],
     organs: ['BRAIN', 'HEART', 'LIVER'],
     deficiency: 'AGING',
-    description: 'Витамин (mitochondria), необходимый для работы митохондрий',
+    description: 'PQQ — витамин. Стимулирует биогенез митохондрий через PGC-1a/NRF-1/Tfam каскад; Поддерживает функцию митохондрий и стимулирует митохондриальный биогенез. Мишени: мозг, сердце, печень. Дефицит: aging.',
     type: 'vitamin'
   },
   {
@@ -867,7 +867,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ELECTRON_TRANSPORT_CHAIN', 'ANTIOXIDANT'],
     organs: ['HEART', 'BRAIN', 'VESSELS'],
     deficiency: 'FATIGUE',
-    description: 'Витамин (mitochondria), необходимый для работы митохондрий',
+    description: 'CoQ10 — витамин. Нейтрализует свободные радикалы и реактивные формы кислорода. Мишени: сердце, мозг, сосуды. Дефицит: fatigue.',
     type: 'vitamin'
   },
   {
@@ -877,7 +877,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ELECTRON_TRANSPORT_CHAIN', 'ANTIOXIDANT'],
     organs: ['HEART', 'BRAIN', 'VESSELS'],
     deficiency: 'AGING',
-    description: 'Витамин (mitochondria), необходимый для работы митохондрий',
+    description: 'Ubiquinol — витамин. Нейтрализует свободные радикалы и реактивные формы кислорода. Мишени: сердце, мозг, сосуды. Дефицит: aging.',
     type: 'vitamin'
   },
   {
@@ -887,7 +887,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GLUTATHIONE_RECYCLING', 'MITO_REPAIR'],
     organs: ['LIVER', 'BRAIN', 'VESSELS'],
     deficiency: 'OXIDATIVE_STRESS',
-    description: 'Витамин (antioxidant, mitochondria), необходимый для защиты клеток от окислительного стресса, работы митохондрий',
+    description: 'R-Lipoic Acid — витамин. Поддерживает функцию митохондрий и стимулирует митохондриальный биогенез. Мишени: печень, мозг, сосуды. Дефицит: oxidative stress.',
     type: 'vitamin'
   },
   {
@@ -897,7 +897,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['OXIDATIVE_STRESS_REDUCTION', 'GLUCOSE_REGULATION'],
     organs: ['LIVER', 'VESSELS'],
     deficiency: 'DIABETES',
-    description: 'Витамин (antioxidant), необходимый для защиты клеток от окислительного стресса',
+    description: 'S-Lipoic Acid — витамин. Нейтрализует свободные радикалы и снижает оксидативный стресс в клетках. Мишени: печень, сосуды. Дефицит: diabetes.',
     type: 'vitamin'
   },
   {
@@ -907,7 +907,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GLUTATHIONE_RECYCLING', 'MITO_REPAIR'],
     organs: ['LIVER', 'BRAIN'],
     deficiency: 'OXIDATIVE_STRESS',
-    description: 'Витамин (antioxidant, mitochondria), необходимый для защиты клеток от окислительного стресса, работы митохондрий',
+    description: 'ALA Complex — витамин. Поддерживает функцию митохондрий и стимулирует митохондриальный биогенез. Мишени: печень, мозг. Дефицит: oxidative stress.',
     type: 'vitamin'
   },
   {
@@ -917,7 +917,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['COA_PATHWAY', 'FATTY_ACID_OXIDATION'],
     organs: ['LIVER', 'ADRENALS'],
     deficiency: 'FATIGUE',
-    description: 'Витамин (energy), необходимый для энергетического обмена',
+    description: 'Pantetheine — витамин. Мишени: печень, надпочечники. Дефицит: fatigue.',
     type: 'vitamin'
   },
   {
@@ -927,7 +927,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CALCIUM_DISTRIBUTION', 'ANTI_CALCIFICATION'],
     organs: ['VESSELS', 'BONES'],
     deficiency: 'CALCIFICATION',
-    description: 'Витамин (vascular, bone), необходимый для костной ткани',
+    description: 'MenaQ7 (K2 MK-7) — витамин. Мишени: сосуды, кости. Дефицит: calcification.',
     type: 'vitamin'
   },
   {
@@ -937,7 +937,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NAD_PATHWAY', 'MITO_REPAIR'],
     organs: ['BRAIN', 'HEART', 'LIVER'],
     deficiency: 'FATIGUE',
-    description: 'Витамин (mitochondria), необходимый для работы митохондрий',
+    description: 'Mitotropic B-Complex — витамин. Является предшественником NAD+/NADH — центрального кофермента клеточного метаболизма; Поддерживает функцию митохондрий и стимулирует митохондриальный биогенез. Мишени: мозг, сердце, печень. Дефицит: fatigue.',
     type: 'vitamin'
   },
   {
@@ -957,7 +957,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NAD_PATHWAY', 'ATP_PRODUCTION'],
     organs: ['BRAIN', 'HEART'],
     deficiency: 'FATIGUE',
-    description: 'Витамин (energy, mitochondria), необходимый для энергетического обмена, работы митохондрий',
+    description: 'NADH — витамин. Является предшественником NAD+/NADH — центрального кофермента клеточного метаболизма; Усиливает продукцию АТФ в митохондриях. Мишени: мозг, сердце. Дефицит: fatigue.',
     type: 'vitamin'
   },
   {
@@ -967,7 +967,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['FLAVIN_PATHWAY', 'MITO_REPAIR'],
     organs: ['BRAIN', 'LIVER'],
     deficiency: 'LOW_B2',
-    description: 'Витамин (enzyme), необходимый для обменных процессов и общего здоровья',
+    description: 'FAD (Riboflavin Cofactor) — витамин. Является предшественником ФАД и ФМН — коферментов дыхательной цепи и цикла Кребса; Поддерживает функцию митохондрий и стимулирует митохондриальный биогенез. Мишени: мозг, печень. Дефицит: low b2.',
     type: 'vitamin'
   },
   {
@@ -977,7 +977,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['FLAVIN_PATHWAY', 'OXIDATIVE_STRESS_REDUCTION'],
     organs: ['BRAIN', 'LIVER'],
     deficiency: 'LOW_B2',
-    description: 'Витамин (enzyme), необходимый для обменных процессов и общего здоровья',
+    description: 'FMN (Riboflavin Cofactor) — витамин. Является предшественником ФАД и ФМН — коферментов дыхательной цепи и цикла Кребса; Нейтрализует свободные радикалы и снижает оксидативный стресс в клетках. Мишени: мозг, печень. Дефицит: low b2.',
     type: 'vitamin'
   },
   {
@@ -987,7 +987,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['METHYLATION', 'CELL_REPAIR'],
     organs: ['BLOOD', 'LIVER'],
     deficiency: 'LOW_B9',
-    description: 'Витамин (DNA, enzyme), необходимый для обменных процессов и общего здоровья',
+    description: 'Tetrahydrofolate — витамин. Обеспечивает метилирование ДНК, гомоцистеина и нейромедиаторов через SAM; Активирует механизмы репарации клеток через PARP и ATM/ATR. Мишени: кровь, печень. Дефицит: low b9.',
     type: 'vitamin'
   },
   {
@@ -997,7 +997,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['METHYL_DONOR', 'HOMOCYSTEINE_REDUCTION'],
     organs: ['LIVER', 'BLOOD'],
     deficiency: 'HIGH_HOMOCYSTEINE',
-    description: 'Витамин (methylation), необходимый для метилирования',
+    description: 'Methyl Donor Complex — витамин. Снижает уровень гомоцистеина через реметилирование до метионина. Мишени: печень, кровь. Дефицит: high homocysteine.',
     type: 'vitamin'
   },
   {
@@ -1017,7 +1017,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['INSULIN_SENSITIVITY', 'GLUCOSE_REGULATION'],
     organs: ['PANCREAS', 'LIVER'],
     deficiency: 'INSULIN_RESISTANCE',
-    description: 'Витамин (insulin), необходимый для обменных процессов и общего здоровья',
+    description: 'Chromium Nicotinate — витамин. Повышает чувствительность к инсулину через AMPK и PPAR-путь. Мишени: поджелудочная железа, печень. Дефицит: insulin resistance.',
     type: 'vitamin'
   },
   {
@@ -1027,7 +1027,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SULFITE_OXIDASE', 'DETOX'],
     organs: ['LIVER', 'KIDNEYS'],
     deficiency: 'LOW_MOLY',
-    description: 'Витамин (enzyme), необходимый для обменных процессов и общего здоровья',
+    description: 'Molybdenum — витамин. Мишени: печень, почек. Дефицит: low moly.',
     type: 'vitamin'
   },
   {
@@ -1037,7 +1037,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['BONE_METABOLISM', 'TESTOSTERONE_SUPPORT'],
     organs: ['BONES', 'HORMONES'],
     deficiency: 'LOW_BORON',
-    description: 'Витамин (hormone), необходимый для гормонального баланса',
+    description: 'Boron — витамин. Мишени: кости, гормоны. Дефицит: low boron.',
     type: 'vitamin'
   },
   {
@@ -1047,7 +1047,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['COLLAGEN_SUPPORT', 'BONE_MINERALIZATION'],
     organs: ['SKIN', 'BONES'],
     deficiency: 'LOW_SILICON',
-    description: 'Витамин (skin, bone), необходимый для здоровья кожи, костной ткани',
+    description: 'Silicon (Orthosilicic Acid) — витамин. Стимулирует синтез коллагена I и III типов, укрепляя соединительную ткань; Усиливает минерализацию костной ткани и поддерживает плотность костей. Мишени: кожа, кости. Дефицит: low silicon.',
     type: 'vitamin'
   },
   {
@@ -1087,7 +1087,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['VASCULAR_RELAXATION', 'CALCIUM_REGULATION'],
     organs: ['HEART', 'VESSELS'],
     deficiency: 'HYPERTENSION',
-    description: 'Минерал (cardio), участвующий в ССС',
+    description: 'Magnesium Taurate — минерал. Регулирует кальциевый гомеостаз через рецепторы VDR и кишечную абсорбцию. Мишени: сердце, сосуды. Дефицит: hypertension.',
     type: 'minerals'
   },
   {
@@ -1107,7 +1107,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GI_MOTILITY', 'ALKALINE'],
     organs: ['GI'],
     deficiency: 'CONSTIPATION',
-    description: 'Минерал (GI), участвующий в обменных процессах и поддержании здоровья',
+    description: 'Magnesium Oxide — минерал. Мишени: ЖКТ. Дефицит: constipation.',
     type: 'minerals'
   },
   {
@@ -1127,7 +1127,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ELECTROLYTE_BALANCE', 'HYDRATION'],
     organs: ['GI', 'MUSCLES'],
     deficiency: 'LOW_MAG',
-    description: 'Минерал (electrolyte), участвующий в электролитного баланса',
+    description: 'Magnesium Chloride — минерал. Мишени: ЖКТ, мышцы. Дефицит: low mag.',
     type: 'minerals'
   },
   {
@@ -1147,7 +1147,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['IMMUNE_SUPPORT', 'ANTIVIRAL'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'LOW_ZINC',
-    description: 'Минерал (immune), участвующий в иммунной системы',
+    description: 'Zinc Gluconate — минерал. Укрепляет иммунную защиту через модуляцию T-клеток и NK-клеток. Мишени: иммунная система. Дефицит: low zinc.',
     type: 'minerals'
   },
   {
@@ -1157,7 +1157,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['IMMUNE_SUPPORT', 'ANTIOXIDANT'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'LOW_ZINC',
-    description: 'Минерал (immune), участвующий в иммунной системы',
+    description: 'Zinc Citrate — минерал. Укрепляет иммунную защиту через модуляцию T-клеток и NK-клеток; Нейтрализует свободные радикалы и реактивные формы кислорода. Мишени: иммунная система. Дефицит: low zinc.',
     type: 'minerals'
   },
   {
@@ -1167,7 +1167,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['TESTOSTERONE_SUPPORT', 'IMMUNE_SUPPORT'],
     organs: ['HORMONES', 'IMMUNE_SYSTEM'],
     deficiency: 'LOW_ZINC',
-    description: 'Минерал (hormone, immune), участвующий в гормонального баланса, иммунной системы',
+    description: 'Zinc Methionine — минерал. Укрепляет иммунную защиту через модуляцию T-клеток и NK-клеток. Мишени: гормоны, иммунная система. Дефицит: low zinc.',
     type: 'minerals'
   },
   {
@@ -1177,7 +1177,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GPX_ACTIVITY', 'THYROID_SUPPORT'],
     organs: ['THYROID', 'LIVER'],
     deficiency: 'LOW_SELEN',
-    description: 'Минерал (antioxidant), участвующий в защиты клеток от окислительного стресса',
+    description: 'Selenium Methionine — минерал. Мишени: щитовидная железа, печень. Дефицит: low selen.',
     type: 'minerals'
   },
   {
@@ -1187,7 +1187,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GPX_ACTIVITY', 'IMMUNE_SUPPORT'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'LOW_SELEN',
-    description: 'Минерал (antioxidant), участвующий в защиты клеток от окислительного стресса',
+    description: 'Sodium Selenite — минерал. Укрепляет иммунную защиту через модуляцию T-клеток и NK-клеток. Мишени: иммунная система. Дефицит: low selen.',
     type: 'minerals'
   },
   {
@@ -1197,7 +1197,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GPX_ACTIVITY', 'IMMUNE_SUPPORT'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'LOW_SELEN',
-    description: 'Минерал (antioxidant), участвующий в защиты клеток от окислительного стресса',
+    description: 'Selenium Yeast — минерал. Укрепляет иммунную защиту через модуляцию T-клеток и NK-клеток. Мишени: иммунная система. Дефицит: low selen.',
     type: 'minerals'
   },
   {
@@ -1217,7 +1217,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['BONE_MINERALIZATION', 'ALKALINE'],
     organs: ['BONES'],
     deficiency: 'LOW_CALCIUM',
-    description: 'Минерал (bone), участвующий в костной ткани',
+    description: 'Calcium Carbonate — минерал. Усиливает минерализацию костной ткани и поддерживает плотность костей. Мишени: кости. Дефицит: low calcium.',
     type: 'minerals'
   },
   {
@@ -1227,7 +1227,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['BONE_MINERALIZATION', 'COLLAGEN_SUPPORT'],
     organs: ['BONES'],
     deficiency: 'LOW_CALCIUM',
-    description: 'Минерал (bone), участвующий в костной ткани',
+    description: 'Hydroxyapatite — минерал. Усиливает минерализацию костной ткани и поддерживает плотность костей; Стимулирует синтез коллагена I и III типов, укрепляя соединительную ткань. Мишени: кости. Дефицит: low calcium.',
     type: 'minerals'
   },
   {
@@ -1237,7 +1237,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ELECTROLYTE_BALANCE', 'BLOOD_PRESSURE'],
     organs: ['HEART', 'KIDNEYS'],
     deficiency: 'HYPERTENSION',
-    description: 'Минерал (electrolyte), участвующий в электролитного баланса',
+    description: 'Potassium Citrate — минерал. Регулирует артериальное давление через NO и ренин-ангиотензиновую систему. Мишени: сердце, почек. Дефицит: hypertension.',
     type: 'minerals'
   },
   {
@@ -1247,7 +1247,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ELECTROLYTE_BALANCE', 'HYDRATION'],
     organs: ['HEART', 'MUSCLES'],
     deficiency: 'LOW_POTASSIUM',
-    description: 'Минерал (electrolyte), участвующий в электролитного баланса',
+    description: 'Potassium Chloride — минерал. Мишени: сердце, мышцы. Дефицит: low potassium.',
     type: 'minerals'
   },
   {
@@ -1257,7 +1257,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['PH_BALANCE', 'HYDRATION'],
     organs: ['GI', 'KIDNEYS'],
     deficiency: 'ACIDOSIS',
-    description: 'Минерал (alkaline), участвующий в обменных процессах и поддержании здоровья',
+    description: 'Sodium Bicarbonate — минерал. Мишени: ЖКТ, почек. Дефицит: acidosis.',
     type: 'minerals'
   },
   {
@@ -1267,7 +1267,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ELECTROLYTE_BALANCE', 'HYDRATION'],
     organs: ['GI', 'MUSCLES'],
     deficiency: 'DEHYDRATION',
-    description: 'Минерал (electrolyte), участвующий в электролитного баланса',
+    description: 'Sodium Chloride — минерал. Мишени: ЖКТ, мышцы. Дефицит: dehydration.',
     type: 'minerals'
   },
   {
@@ -1277,7 +1277,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CUPROENZYME_SUPPORT', 'COLLAGEN_SUPPORT'],
     organs: ['BLOOD', 'SKIN'],
     deficiency: 'LOW_COPPER',
-    description: 'Минерал (enzyme), участвующий в обменных процессах и поддержании здоровья',
+    description: 'Copper Gluconate — минерал. Стимулирует синтез коллагена I и III типов, укрепляя соединительную ткань. Мишени: кровь, кожа. Дефицит: low copper.',
     type: 'minerals'
   },
   {
@@ -1287,7 +1287,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CUPROENZYME_SUPPORT', 'IRON_METABOLISM'],
     organs: ['BLOOD', 'LIVER'],
     deficiency: 'LOW_COPPER',
-    description: 'Минерал (enzyme), участвующий в обменных процессах и поддержании здоровья',
+    description: 'Copper Bisglycinate — минерал. Мишени: кровь, печень. Дефицит: low copper.',
     type: 'minerals'
   },
   {
@@ -1297,7 +1297,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SOD_SUPPORT', 'BONE_METABOLISM'],
     organs: ['BONES', 'LIVER'],
     deficiency: 'LOW_MANGANESE',
-    description: 'Минерал (enzyme), участвующий в обменных процессах и поддержании здоровья',
+    description: 'Manganese Sulfate — минерал. Мишени: кости, печень. Дефицит: low manganese.',
     type: 'minerals'
   },
   {
@@ -1307,7 +1307,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SOD_SUPPORT', 'CARTILAGE_SUPPORT'],
     organs: ['BONES', 'JOINTS'],
     deficiency: 'LOW_MANGANESE',
-    description: 'Минерал (enzyme), участвующий в обменных процессах и поддержании здоровья',
+    description: 'Manganese Bisglycinate — минерал. Поддерживает хрящевую ткань через синтез протеогликанов и хондроитинсульфата. Мишени: кости, суставы. Дефицит: low manganese.',
     type: 'minerals'
   },
   {
@@ -1317,7 +1317,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SULFITE_OXIDASE', 'DETOX'],
     organs: ['LIVER', 'KIDNEYS'],
     deficiency: 'LOW_MOLY',
-    description: 'Минерал (detox), участвующий в детоксикации',
+    description: 'Molybdenum Glycinate — минерал. Мишени: печень, почек. Дефицит: low moly.',
     type: 'minerals'
   },
   {
@@ -1337,7 +1337,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['THYROID_HORMONE_SYNTHESIS', 'IODINE_UPTAKE'],
     organs: ['THYROID'],
     deficiency: 'LOW_IODINE',
-    description: 'Минерал (thyroid), участвующий в щитовидной железы',
+    description: 'Potassium Iodide — минерал. Мишени: щитовидная железа. Дефицит: low iodine.',
     type: 'minerals'
   },
   {
@@ -1347,7 +1347,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['THYROID_SUPPORT', 'IODINE_UPTAKE'],
     organs: ['THYROID'],
     deficiency: 'LOW_IODINE',
-    description: 'Минерал (thyroid), участвующий в щитовидной железы',
+    description: 'Kelp Iodine — минерал. Мишени: щитовидная железа. Дефицит: low iodine.',
     type: 'minerals'
   },
   {
@@ -1367,7 +1367,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['HEMOGLOBIN_SYNTHESIS', 'IRON_UPTAKE'],
     organs: ['BLOOD', 'LIVER'],
     deficiency: 'ANEMIA',
-    description: 'Железа бисглицинат — хелатная форма железа с минимальным раздражением ЖКТ. Железо — центральный атом гема, необходимый для транспорта кислорода (гемоглобин) и окислительного фосфорилирования (цитохромы). Дефицит ведёт к железодефицитной анемии.',
+    description: 'Iron Bisglycinate — минерал. Мишени: кровь, печень. Дефицит: anemia.',
     type: 'minerals'
   },
   {
@@ -1377,7 +1377,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['HEMOGLOBIN_SYNTHESIS', 'IRON_UPTAKE'],
     organs: ['BLOOD'],
     deficiency: 'ANEMIA',
-    description: 'Минерал (blood), участвующий в кроветворения',
+    description: 'Ferrous Sulfate — минерал. Мишени: кровь. Дефицит: anemia.',
     type: 'minerals'
   },
   {
@@ -1387,7 +1387,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['HEMOGLOBIN_SYNTHESIS', 'IRON_UPTAKE'],
     organs: ['BLOOD'],
     deficiency: 'ANEMIA',
-    description: 'Минерал (blood), участвующий в кроветворения',
+    description: 'Ferric Citrate — минерал. Мишени: кровь. Дефицит: anemia.',
     type: 'minerals'
   },
   {
@@ -1397,7 +1397,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['HEMOGLOBIN_SYNTHESIS', 'IRON_UPTAKE'],
     organs: ['BLOOD'],
     deficiency: 'ANEMIA',
-    description: 'Минерал (blood), участвующий в кроветворения',
+    description: 'Polysaccharide Iron — минерал. Мишени: кровь. Дефицит: anemia.',
     type: 'minerals'
   },
   {
@@ -1407,7 +1407,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NEUROPROTECTION', 'MOOD_SUPPORT'],
     organs: ['BRAIN'],
     deficiency: 'MOOD_ISSUES',
-    description: 'Минерал (neuro), участвующий в нервной системы',
+    description: 'Lithium Orotate — минерал. Мишени: мозг. Дефицит: mood issues.',
     type: 'minerals'
   },
   {
@@ -1417,7 +1417,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['BONE_METABOLISM', 'TESTOSTERONE_SUPPORT'],
     organs: ['BONES', 'HORMONES'],
     deficiency: 'LOW_BORON',
-    description: 'Минерал (hormone), участвующий в гормонального баланса',
+    description: 'Boron Chelate — минерал. Мишени: кости, гормоны. Дефицит: low boron.',
     type: 'minerals'
   },
   {
@@ -1427,7 +1427,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['BONE_METABOLIZATION', 'ESTROGEN_BALANCE'],
     organs: ['BONES', 'HORMONES'],
     deficiency: 'LOW_BORON',
-    description: 'Минерал (hormone), участвующий в гормонального баланса',
+    description: 'Boron Glycinate — минерал. Мишени: кости, гормоны. Дефицит: low boron.',
     type: 'minerals'
   },
   {
@@ -1437,7 +1437,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['COLLAGEN_SUPPORT', 'BONE_MINERALIZATION'],
     organs: ['SKIN', 'BONES'],
     deficiency: 'LOW_SILICON',
-    description: 'Минерал (skin, bone), участвующий в здоровья кожи, костной ткани',
+    description: 'Choline-Stabilized Orthosilicic Acid — минерал. Стимулирует синтез коллагена I и III типов, укрепляя соединительную ткань; Усиливает минерализацию костной ткани и поддерживает плотность костей. Мишени: кожа, кости. Дефицит: low silicon.',
     type: 'minerals'
   },
   {
@@ -1447,7 +1447,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['COLLAGEN_SUPPORT', 'SKIN_HEALTH'],
     organs: ['SKIN', 'HAIR'],
     deficiency: 'LOW_SILICON',
-    description: 'Минерал (skin, hair), участвующий в здоровья кожи, здоровья волос',
+    description: 'Silica (Horsetail) — минерал. Стимулирует синтез коллагена I и III типов, укрепляя соединительную ткань. Мишени: кожа, волосы. Дефицит: low silicon.',
     type: 'minerals'
   },
   {
@@ -1457,7 +1457,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['INSULIN_MIMETIC', 'GLUCOSE_REGULATION'],
     organs: ['PANCREAS', 'LIVER'],
     deficiency: 'INSULIN_RESISTANCE',
-    description: 'Минерал (insulin), участвующий в обменных процессах и поддержании здоровья',
+    description: 'Vanadium Sulfate — минерал. Мишени: поджелудочная железа, печень. Дефицит: insulin resistance.',
     type: 'minerals'
   },
   {
@@ -1467,7 +1467,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ATP_PRODUCTION', 'BONE_MINERALIZATION'],
     organs: ['BONES', 'MUSCLES'],
     deficiency: 'LOW_PHOSPHORUS',
-    description: 'Минерал (energy), участвующий в энергетического обмена',
+    description: 'Phosphorus — минерал. Усиливает продукцию АТФ в митохондриях; Усиливает минерализацию костной ткани и поддерживает плотность костей. Мишени: кости, мышцы. Дефицит: low phosphorus.',
     type: 'minerals'
   },
   {
@@ -1477,7 +1477,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SULFUR_PATHWAY', 'COLLAGEN_SUPPORT'],
     organs: ['JOINTS', 'SKIN'],
     deficiency: 'INFLAMMATION',
-    description: 'Минерал (joints, detox), участвующий в детоксикации',
+    description: 'MSM (Sulfur) — минерал. Стимулирует синтез коллагена I и III типов, укрепляя соединительную ткань. Мишени: суставы, кожа. Дефицит: inflammation.',
     type: 'minerals'
   },
   {
@@ -1487,7 +1487,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ELECTROLYTE_BALANCE', 'HYDRATION'],
     organs: ['MUSCLES', 'HEART'],
     deficiency: 'DEHYDRATION',
-    description: 'Минерал (hydration), участвующий в гидратации',
+    description: 'Electrolyte Complex — минерал. Мишени: мышцы, сердце. Дефицит: dehydration.',
     type: 'minerals'
   },
   {
@@ -1497,7 +1497,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['MICRONUTRIENT_SUPPORT', 'ANTIOXIDANT'],
     organs: ['LIVER', 'BLOOD'],
     deficiency: 'DEFICIENCY',
-    description: 'Минерал (enzyme), участвующий в обменных процессах и поддержании здоровья',
+    description: 'Trace Mineral Complex — минерал. Нейтрализует свободные радикалы и реактивные формы кислорода. Мишени: печень, кровь. Дефицит: deficiency.',
     type: 'minerals'
   },
   {
@@ -1507,7 +1507,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ATP_PRODUCTION', 'VASCULAR_RELAXATION'],
     organs: ['MUSCLES', 'HEART'],
     deficiency: 'FATIGUE',
-    description: 'Минерал (energy, relax), участвующий в энергетического обмена',
+    description: 'Magnesium Lactate — минерал. Усиливает продукцию АТФ в митохондриях. Мишени: мышцы, сердце. Дефицит: fatigue.',
     type: 'minerals'
   },
   {
@@ -1517,7 +1517,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ATP_PRODUCTION', 'NMDA_MODULATION'],
     organs: ['BRAIN', 'MUSCLES'],
     deficiency: 'FATIGUE',
-    description: 'Минерал (energy), участвующий в энергетического обмена',
+    description: 'Magnesium Aspartate — минерал. Усиливает продукцию АТФ в митохондриях. Мишени: мозг, мышцы. Дефицит: fatigue.',
     type: 'minerals'
   },
   {
@@ -1527,7 +1527,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['FUMARATE_CYCLE', 'ATP_PRODUCTION'],
     organs: ['MUSCLES', 'HEART'],
     deficiency: 'FATIGUE',
-    description: 'Минерал (energy), участвующий в энергетического обмена',
+    description: 'Magnesium Fumarate — минерал. Усиливает продукцию АТФ в митохондриях. Мишени: мышцы, сердце. Дефицит: fatigue.',
     type: 'minerals'
   },
   {
@@ -1537,7 +1537,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SUCCINATE_PATHWAY', 'ATP_PRODUCTION'],
     organs: ['MUSCLES', 'BRAIN'],
     deficiency: 'FATIGUE',
-    description: 'Минерал (energy), участвующий в энергетического обмена',
+    description: 'Magnesium Succinate — минерал. Усиливает продукцию АТФ в митохондриях. Мишени: мышцы, мозг. Дефицит: fatigue.',
     type: 'minerals'
   },
   {
@@ -1547,7 +1547,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['OROTATE_PATHWAY', 'ATP_PRODUCTION'],
     organs: ['HEART', 'MUSCLES'],
     deficiency: 'HEART_STRESS',
-    description: 'Минерал (cardio, energy), участвующий в ССС, энергетического обмена',
+    description: 'Magnesium Orotate — минерал. Усиливает продукцию АТФ в митохондриях. Мишени: сердце, мышцы. Дефицит: heart stress.',
     type: 'minerals'
   },
   {
@@ -1557,7 +1557,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ATP_SYNTHESIS', 'ELECTROLYTE_BALANCE'],
     organs: ['MUSCLES', 'HEART'],
     deficiency: 'LOW_MAG',
-    description: 'Минерал (energy), участвующий в энергетического обмена',
+    description: 'Magnesium Phosphate — минерал. Усиливает синтез АТФ через F1F0-АТФ-синтазу. Мишени: мышцы, сердце. Дефицит: low mag.',
     type: 'minerals'
   },
   {
@@ -1567,7 +1567,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['IMMUNE_SUPPORT', 'ANTIVIRAL'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'LOW_ZINC',
-    description: 'Минерал (immune, antiviral), участвующий в иммунной системы, противовирусной защиты',
+    description: 'Zinc Acetate — минерал. Укрепляет иммунную защиту через модуляцию T-клеток и NK-клеток. Мишени: иммунная система. Дефицит: low zinc.',
     type: 'minerals'
   },
   {
@@ -1577,7 +1577,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['IMMUNE_SUPPORT', 'SKIN_HEALTH'],
     organs: ['SKIN', 'IMMUNE_SYSTEM'],
     deficiency: 'LOW_ZINC',
-    description: 'Минерал (immune), участвующий в иммунной системы',
+    description: 'Zinc Sulfate — минерал. Укрепляет иммунную защиту через модуляцию T-клеток и NK-клеток. Мишени: кожа, иммунная система. Дефицит: low zinc.',
     type: 'minerals'
   },
   {
@@ -1587,7 +1587,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['LIPOSOMAL_DELIVERY', 'IMMUNE_SUPPORT'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'LOW_ZINC',
-    description: 'Минерал (immune, absorption), участвующий в иммунной системы',
+    description: 'Liposomal Zinc — минерал. Укрепляет иммунную защиту через модуляцию T-клеток и NK-клеток. Мишени: иммунная система. Дефицит: low zinc.',
     type: 'minerals'
   },
   {
@@ -1597,7 +1597,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['LIPOSOMAL_DELIVERY', 'GPX_ACTIVITY'],
     organs: ['LIVER', 'IMMUNE_SYSTEM'],
     deficiency: 'LOW_SELEN',
-    description: 'Минерал (antioxidant), участвующий в защиты клеток от окислительного стресса',
+    description: 'Liposomal Selenium — минерал. Мишени: печень, иммунная система. Дефицит: low selen.',
     type: 'minerals'
   },
   {
@@ -1607,7 +1607,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['GPX_ACTIVITY', 'THYROID_SUPPORT'],
     organs: ['THYROID', 'LIVER'],
     deficiency: 'LOW_SELEN',
-    description: 'Минерал (antioxidant), участвующий в защиты клеток от окислительного стресса',
+    description: 'Enhanced Selenium Complex — минерал. Мишени: щитовидная железа, печень. Дефицит: low selen.',
     type: 'minerals'
   },
   {
@@ -1617,7 +1617,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['BONE_MINERALIZATION', 'ALKALINE'],
     organs: ['BONES'],
     deficiency: 'LOW_CALCIUM',
-    description: 'Минерал (bone), участвующий в костной ткани',
+    description: 'Calcium Lactate — минерал. Усиливает минерализацию костной ткани и поддерживает плотность костей. Мишени: кости. Дефицит: low calcium.',
     type: 'minerals'
   },
   {
@@ -1627,7 +1627,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['BONE_MINERALIZATION', 'COLLAGEN_SUPPORT'],
     organs: ['BONES'],
     deficiency: 'LOW_CALCIUM',
-    description: 'Минерал (bone, absorption), участвующий в костной ткани',
+    description: 'Calcium Amino Acid Chelate — минерал. Усиливает минерализацию костной ткани и поддерживает плотность костей; Стимулирует синтез коллагена I и III типов, укрепляя соединительную ткань. Мишени: кости. Дефицит: low calcium.',
     type: 'minerals'
   },
   {
@@ -1637,7 +1637,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['PH_BALANCE', 'ELECTROLYTE_BALANCE'],
     organs: ['HEART', 'KIDNEYS'],
     deficiency: 'ACIDOSIS',
-    description: 'Минерал (alkaline), участвующий в обменных процессах и поддержании здоровья',
+    description: 'Potassium Bicarbonate — минерал. Мишени: сердце, почек. Дефицит: acidosis.',
     type: 'minerals'
   },
   {
@@ -1647,7 +1647,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['OROTATE_PATHWAY', 'ELECTROLYTE_BALANCE'],
     organs: ['HEART', 'MUSCLES'],
     deficiency: 'HYPERTENSION',
-    description: 'Минерал (cardio, energy), участвующий в ССС, энергетического обмена',
+    description: 'Potassium Orotate — минерал. Мишени: сердце, мышцы. Дефицит: hypertension.',
     type: 'minerals'
   },
   {
@@ -1657,7 +1657,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['OROTATE_PATHWAY', 'HYDRATION'],
     organs: ['MUSCLES', 'HEART'],
     deficiency: 'DEHYDRATION',
-    description: 'Минерал (energy), участвующий в энергетического обмена',
+    description: 'Sodium Orotate — минерал. Мишени: мышцы, сердце. Дефицит: dehydration.',
     type: 'minerals'
   },
   {
@@ -1667,7 +1667,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['CUPROENZYME_SUPPORT', 'IRON_METABOLISM'],
     organs: ['BLOOD', 'LIVER'],
     deficiency: 'LOW_COPPER',
-    description: 'Минерал (enzyme), участвующий в обменных процессах и поддержании здоровья',
+    description: 'Copper Chelate — минерал. Мишени: кровь, печень. Дефицит: low copper.',
     type: 'minerals'
   },
   {
@@ -1677,7 +1677,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['LIPOSOMAL_DELIVERY', 'CUPROENZYME_SUPPORT'],
     organs: ['LIVER', 'BLOOD'],
     deficiency: 'LOW_COPPER',
-    description: 'Минерал (enzyme), участвующий в обменных процессах и поддержании здоровья',
+    description: 'Liposomal Copper — минерал. Мишени: печень, кровь. Дефицит: low copper.',
     type: 'minerals'
   },
   {
@@ -1687,7 +1687,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SOD_SUPPORT', 'CARTILAGE_SUPPORT'],
     organs: ['JOINTS', 'BONES'],
     deficiency: 'LOW_MANGANESE',
-    description: 'Минерал (enzyme), участвующий в обменных процессах и поддержании здоровья',
+    description: 'Manganese Chelate — минерал. Поддерживает хрящевую ткань через синтез протеогликанов и хондроитинсульфата. Мишени: суставы, кости. Дефицит: low manganese.',
     type: 'minerals'
   },
   {
@@ -1697,7 +1697,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['INSULIN_SENSITIVITY', 'GLUCOSE_REGULATION'],
     organs: ['PANCREAS', 'LIVER'],
     deficiency: 'INSULIN_RESISTANCE',
-    description: 'Минерал (insulin), участвующий в обменных процессах и поддержании здоровья',
+    description: 'GTF Chromium — минерал. Повышает чувствительность к инсулину через AMPK и PPAR-путь. Мишени: поджелудочная железа, печень. Дефицит: insulin resistance.',
     type: 'minerals'
   },
   {
@@ -1707,7 +1707,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SULFITE_OXIDASE', 'DETOX'],
     organs: ['LIVER', 'KIDNEYS'],
     deficiency: 'LOW_MOLY',
-    description: 'Минерал (detox), участвующий в детоксикации',
+    description: 'Molybdenum Complex — минерал. Мишени: печень, почек. Дефицит: low moly.',
     type: 'minerals'
   },
   {
@@ -1717,7 +1717,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['THYROID_HORMONE_SYNTHESIS', 'IODINE_UPTAKE'],
     organs: ['THYROID'],
     deficiency: 'LOW_IODINE',
-    description: 'Минерал (thyroid), участвующий в щитовидной железы',
+    description: 'Atomic Iodine — минерал. Мишени: щитовидная железа. Дефицит: low iodine.',
     type: 'minerals'
   },
   {
@@ -1727,7 +1727,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['THYROID_SUPPORT', 'IODINE_UPTAKE'],
     organs: ['THYROID'],
     deficiency: 'LOW_IODINE',
-    description: 'Минерал (thyroid), участвующий в щитовидной железы',
+    description: 'Nascent Iodine — минерал. Мишени: щитовидная железа. Дефицит: low iodine.',
     type: 'minerals'
   },
   {
@@ -1737,7 +1737,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['HEMOGLOBIN_SYNTHESIS', 'IRON_UPTAKE'],
     organs: ['BLOOD'],
     deficiency: 'ANEMIA',
-    description: 'Минерал (blood), участвующий в кроветворения',
+    description: 'Heme Iron — минерал. Мишени: кровь. Дефицит: anemia.',
     type: 'minerals'
   },
   {
@@ -1747,7 +1747,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['LIPOSOMAL_DELIVERY', 'IRON_UPTAKE'],
     organs: ['BLOOD'],
     deficiency: 'ANEMIA',
-    description: 'Минерал (blood), участвующий в кроветворения',
+    description: 'Liposomal Iron — минерал. Мишени: кровь. Дефицит: anemia.',
     type: 'minerals'
   },
   {
@@ -1757,7 +1757,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['HEMOGLOBIN_SYNTHESIS', 'IRON_UPTAKE'],
     organs: ['BLOOD'],
     deficiency: 'ANEMIA',
-    description: 'Минерал (blood), участвующий в кроветворения',
+    description: 'Ferrous Fumarate — минерал. Мишени: кровь. Дефицит: anemia.',
     type: 'minerals'
   },
   {
@@ -1767,7 +1767,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NEUROPROTECTION', 'MOOD_SUPPORT'],
     organs: ['BRAIN'],
     deficiency: 'MOOD_ISSUES',
-    description: 'Минерал (neuro), участвующий в нервной системы',
+    description: 'Lithium Aspartate — минерал. Мишени: мозг. Дефицит: mood issues.',
     type: 'minerals'
   },
   {
@@ -1777,7 +1777,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['BONE_METABOLISM', 'TESTOSTERONE_SUPPORT'],
     organs: ['BONES', 'HORMONES'],
     deficiency: 'LOW_BORON',
-    description: 'Минерал (hormone), участвующий в гормонального баланса',
+    description: 'Boron Calcium Fructoborate — минерал. Мишени: кости, гормоны. Дефицит: low boron.',
     type: 'minerals'
   },
   {
@@ -1787,7 +1787,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['COLLAGEN_SUPPORT', 'SKIN_HEALTH'],
     organs: ['SKIN', 'HAIR'],
     deficiency: 'LOW_SILICON',
-    description: 'Минерал (skin, hair), участвующий в здоровья кожи, здоровья волос',
+    description: 'Bamboo Silica — минерал. Стимулирует синтез коллагена I и III типов, укрепляя соединительную ткань. Мишени: кожа, волосы. Дефицит: low silicon.',
     type: 'minerals'
   },
   {
@@ -1797,7 +1797,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['INSULIN_MIMETIC', 'GLUCOSE_REGULATION'],
     organs: ['PANCREAS', 'LIVER'],
     deficiency: 'INSULIN_RESISTANCE',
-    description: 'Минерал (insulin), участвующий в обменных процессах и поддержании здоровья',
+    description: 'Vanadium Orotate — минерал. Мишени: поджелудочная железа, печень. Дефицит: insulin resistance.',
     type: 'minerals'
   },
   {
@@ -1807,7 +1807,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ATP_PRODUCTION', 'BONE_MINERALIZATION'],
     organs: ['BONES', 'MUSCLES'],
     deficiency: 'LOW_PHOSPHORUS',
-    description: 'Минерал (energy), участвующий в энергетического обмена',
+    description: 'Organic Phosphorus — минерал. Усиливает продукцию АТФ в митохондриях; Усиливает минерализацию костной ткани и поддерживает плотность костей. Мишени: кости, мышцы. Дефицит: low phosphorus.',
     type: 'minerals'
   },
   {
@@ -1817,7 +1817,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SULFUR_PATHWAY', 'ANTI_INFLAMMATION'],
     organs: ['SKIN', 'JOINTS'],
     deficiency: 'INFLAMMATION',
-    description: 'Минерал (detox, antiinflammatory), участвующий в детоксикации, противовоспалительной защиты',
+    description: 'DMSO (Sulfur) — минерал. Мишени: кожа, суставы. Дефицит: inflammation.',
     type: 'minerals'
   },
   {
@@ -1827,7 +1827,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ELECTROLYTE_BALANCE', 'HYDRATION'],
     organs: ['MUSCLES', 'HEART'],
     deficiency: 'DEHYDRATION',
-    description: 'Минерал (hydration), участвующий в гидратации',
+    description: 'Sea Electrolytes — минерал. Мишени: мышцы, сердце. Дефицит: dehydration.',
     type: 'minerals'
   },
   {
@@ -1837,7 +1837,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['IONIC_ABSORPTION', 'ELECTROLYTE_BALANCE'],
     organs: ['MUSCLES', 'HEART'],
     deficiency: 'DEHYDRATION',
-    description: 'Минерал (hydration), участвующий в гидратации',
+    description: 'Ionic Electrolytes — минерал. Мишени: мышцы, сердце. Дефицит: dehydration.',
     type: 'minerals'
   },
   {
@@ -1847,7 +1847,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['FULVIC_TRANSPORT', 'MICRONUTRIENT_SUPPORT'],
     organs: ['LIVER', 'BLOOD'],
     deficiency: 'DEFICIENCY',
-    description: 'Минерал (enzyme), участвующий в обменных процессах и поддержании здоровья',
+    description: 'Fulvic Trace Minerals — минерал. Мишени: печень, кровь. Дефицит: deficiency.',
     type: 'minerals'
   },
   {
@@ -1857,7 +1857,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['HUMIC_BINDING', 'MICRONUTRIENT_SUPPORT'],
     organs: ['GI', 'LIVER'],
     deficiency: 'DEFICIENCY',
-    description: 'Минерал (detox), участвующий в детоксикации',
+    description: 'Humic Trace Minerals — минерал. Мишени: ЖКТ, печень. Дефицит: deficiency.',
     type: 'minerals'
   },
   {
@@ -1867,7 +1867,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SILVER_ION_ACTION', 'IMMUNE_SUPPORT'],
     organs: ['IMMUNE_SYSTEM'],
     deficiency: 'INFECTION',
-    description: 'Минерал (antimicrobial), участвующий в противомикробной защиты',
+    description: 'Colloidal Silver — минерал. Укрепляет иммунную защиту через модуляцию T-клеток и NK-клеток. Мишени: иммунная система. Дефицит: infection.',
     type: 'minerals'
   },
   {
@@ -1877,7 +1877,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NEURO_MODULATION', 'MOOD_SUPPORT'],
     organs: ['BRAIN'],
     deficiency: 'MOOD_ISSUES',
-    description: 'Минерал (neuro), участвующий в нервной системы',
+    description: 'Colloidal Gold — минерал. Мишени: мозг. Дефицит: mood issues.',
     type: 'minerals'
   },
   {
@@ -1887,7 +1887,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['NEURO_ENHANCEMENT', 'CELL_SIGNALING'],
     organs: ['BRAIN'],
     deficiency: 'COGNITION',
-    description: 'Минерал (neuro), участвующий в нервной системы',
+    description: 'Colloidal Platinum — минерал. Модулирует клеточную сигнализацию (MAPK, PI3K/Akt, NF-kB). Мишени: мозг. Дефицит: cognition.',
     type: 'minerals'
   },
   {
@@ -1897,7 +1897,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['OXYGEN_UTILIZATION', 'IMMUNE_SUPPORT'],
     organs: ['IMMUNE_SYSTEM', 'HEART'],
     deficiency: 'LOW_OXYGEN',
-    description: 'Минерал (oxygen), участвующий в обменных процессах и поддержании здоровья',
+    description: 'Organic Germanium — минерал. Укрепляет иммунную защиту через модуляцию T-клеток и NK-клеток. Мишени: иммунная система, сердце. Дефицит: low oxygen.',
     type: 'minerals'
   },
   {
@@ -1907,7 +1907,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['SEMICONDUCTOR_EFFECT', 'CELL_SIGNALING'],
     organs: ['BRAIN', 'HEART'],
     deficiency: 'LOW_OXYGEN',
-    description: 'Минерал (energy), участвующий в энергетического обмена',
+    description: 'Semiconductor Germanium — минерал. Модулирует клеточную сигнализацию (MAPK, PI3K/Akt, NF-kB). Мишени: мозг, сердце. Дефицит: low oxygen.',
     type: 'minerals'
   },
   {
@@ -1917,7 +1917,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ELECTROLYTE_BALANCE', 'NEURO_MODULATION'],
     organs: ['BRAIN', 'HEART'],
     deficiency: 'LOW_RUBIDIUM',
-    description: 'Минерал (electrolyte), участвующий в электролитного баланса',
+    description: 'Rubidium — минерал. Мишени: мозг, сердце. Дефицит: low rubidium.',
     type: 'minerals'
   },
   {
@@ -1927,7 +1927,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['PH_BALANCE', 'CELL_REGULATION'],
     organs: ['CELLS'],
     deficiency: 'ACIDOSIS',
-    description: 'Минерал (alkaline), участвующий в обменных процессах и поддержании здоровья',
+    description: 'Cesium — минерал. Мишени: клетки. Дефицит: acidosis.',
     type: 'minerals'
   },
   {
@@ -1937,7 +1937,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['BONE_MINERALIZATION', 'OSTEOBLAST_STIMULATION'],
     organs: ['BONES'],
     deficiency: 'OSTEOPOROSIS',
-    description: 'Минерал (bone), участвующий в костной ткани',
+    description: 'Strontium — минерал. Усиливает минерализацию костной ткани и поддерживает плотность костей. Мишени: кости. Дефицит: osteoporosis.',
     type: 'minerals'
   },
   {
@@ -1947,7 +1947,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['BONE_MINERALIZATION', 'OSTEOBLAST_STIMULATION'],
     organs: ['BONES'],
     deficiency: 'OSTEOPOROSIS',
-    description: 'Минерал (bone), участвующий в костной ткани',
+    description: 'Strontium Citrate — минерал. Усиливает минерализацию костной ткани и поддерживает плотность костей. Мишени: кости. Дефицит: osteoporosis.',
     type: 'minerals'
   },
   {
@@ -1957,7 +1957,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ION_EXCHANGE', 'HEAVY_METAL_BINDING'],
     organs: ['GI', 'LIVER'],
     deficiency: 'TOXINS',
-    description: 'Минерал (detox), участвующий в детоксикации',
+    description: 'Zeolite — минерал. Мишени: ЖКТ, печень. Дефицит: toxins.',
     type: 'minerals'
   },
   {
@@ -1967,7 +1967,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['ADSORPTION', 'GI_BINDING'],
     organs: ['GI', 'LIVER'],
     deficiency: 'TOXINS',
-    description: 'Минерал (detox), участвующий в детоксикации',
+    description: 'Bentonite Clay — минерал. Мишени: ЖКТ, печень. Дефицит: toxins.',
     type: 'minerals'
   },
   {
@@ -1977,7 +1977,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['BONE_MINERALIZATION', 'PH_BALANCE'],
     organs: ['BONES', 'GI'],
     deficiency: 'LOW_CALCIUM',
-    description: 'Минерал (bone, alkaline), участвующий в костной ткани',
+    description: 'Coral Calcium — минерал. Усиливает минерализацию костной ткани и поддерживает плотность костей. Мишени: кости, ЖКТ. Дефицит: low calcium.',
     type: 'minerals'
   },
   {
@@ -14837,7 +14837,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['EPIGENETIC_RESET', 'CELL_REPAIR'],
     organs: ['CELLS'],
     deficiency: 'AGING',
-    description: '�?нфинити-эпигенетический пептид',
+    description: 'Инфинити-эпигенетический пептид',
     type: 'peptide'
   },
   {
@@ -15427,7 +15427,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['EPIGENETIC_RESET', 'CELL_REGEN'],
     organs: ['CELLS'],
     deficiency: 'AGING',
-    description: '�?нфинити эпигенетический сброс',
+    description: 'Инфинити эпигенетический сброс',
     type: 'peptide'
   },
   {
@@ -15437,7 +15437,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['EPIGENETIC_REPAIR', 'CELL_REPAIR'],
     organs: ['CELLS'],
     deficiency: 'AGING',
-    description: '�?нфинити эпигенетический ремонт',
+    description: 'Инфинити эпигенетический ремонт',
     type: 'peptide'
   },
   {
@@ -15447,7 +15447,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
     mechanisms: ['LONGEVITY_GENES_UP', 'CELL_REGEN'],
     organs: ['CELLS'],
     deficiency: 'AGING',
-    description: '�?нфинити эпигенетическое долголетие',
+    description: 'Инфинити эпигенетическое долголетие',
     type: 'peptide'
   },
   {
@@ -20536,7 +20536,7 @@ export const ALL_CATEGORIES: SupportCategory[] = [
   { catId: 'CAT_RISK_JOINTS', type: 'RISK', name: 'Суставы', description: 'Опорно‑двигательные риски.' },
   { catId: 'CAT_RISK_SKIN', type: 'RISK', name: 'Кожа', description: 'Дерматологические риски.' },
   { catId: 'CAT_RISK_VISION', type: 'RISK', name: 'Зрение', description: 'Офтальмологические риски.' },
-  { catId: 'CAT_RISK_IMMUNE', type: 'RISK', name: '�?ммунитет', description: '�?ммунные риски.' },
+  { catId: 'CAT_RISK_IMMUNE', type: 'RISK', name: 'Иммунитет', description: 'Иммунные риски.' },
   { catId: 'CAT_MECH_INFLAMMATION', type: 'MECHANISM', name: 'Воспаление', description: 'Уровень системного воспаления.' },
   { catId: 'CAT_MECH_CORTISOL', type: 'MECHANISM', name: 'Кортизол', description: 'Стресс‑ось.' },
   { catId: 'CAT_MECH_THYROID', type: 'MECHANISM', name: 'Щитовидка', description: 'Гормоны T3/T4.' },
@@ -20554,7 +20554,7 @@ export const ALL_CATEGORIES: SupportCategory[] = [
   { catId: 'CAT_ORGAN_GUT', type: 'ORGAN', name: 'ЖКТ', description: 'Пищеварение и микробиота.' },
   { catId: 'CAT_ORGAN_BRAIN', type: 'ORGAN', name: 'Мозг', description: 'ЦНС и когнитивные функции.' },
   { catId: 'CAT_ORGAN_HORMONES', type: 'ORGAN', name: 'Гормоны', description: 'Эндокринная система.' },
-  { catId: 'CAT_ORGAN_IMMUNE', type: 'ORGAN', name: '�?ммунитет', description: 'Защитные функции.' },
+  { catId: 'CAT_ORGAN_IMMUNE', type: 'ORGAN', name: 'Иммунитет', description: 'Защитные функции.' },
   { catId: 'CAT_ORGAN_BLOOD', type: 'ORGAN', name: 'Кровь', description: 'Гемостаз и перенос кислорода.' },
   { catId: 'CAT_ORGAN_JOINTS', type: 'ORGAN', name: 'Суставы', description: 'Опорно‑двигательная система.' },
   { catId: 'CAT_ORGAN_SKIN', type: 'ORGAN', name: 'Кожа', description: 'Барьер и воспаление.' },
@@ -20564,7 +20564,7 @@ export const ALL_CATEGORIES: SupportCategory[] = [
   { catId: 'CAT_AXIS_ADRENAL_GONAD', type: 'AXIS', name: 'Надпочечники–Гонады', description: 'Кортизол и половые гормоны.' },
   { catId: 'CAT_AXIS_HEART_KIDNEY', type: 'AXIS', name: 'Сердце–Почки', description: 'Давление и фильтрация.' },
   { catId: 'CAT_AXIS_LIVER_GUT', type: 'AXIS', name: 'Печень–ЖКТ', description: 'Желчь и микробиота.' },
-  { catId: 'CAT_AXIS_GUT_IMMUNE', type: 'AXIS', name: 'ЖКТ–�?ммунитет', description: 'Барьер и воспаление.' },
+  { catId: 'CAT_AXIS_GUT_IMMUNE', type: 'AXIS', name: 'ЖКТ–Иммунитет', description: 'Барьер и воспаление.' },
   { catId: 'CAT_AXIS_BRAIN_ADRENAL', type: 'AXIS', name: 'Мозг–Надпочечники', description: 'Стресс‑ось.' },
   { catId: 'CAT_AXIS_LIVER_SKIN', type: 'AXIS', name: 'Печень–Кожа', description: 'Детокс и воспаление.' },
   { catId: 'CAT_AXIS_EYES_BRAIN', type: 'AXIS', name: 'Глаза–Мозг', description: 'Нагрузка и когнитивная связь.' },
@@ -20574,7 +20574,7 @@ export const ALL_CATEGORIES: SupportCategory[] = [
   { catId: 'CAT_SYSTEM_GUT', type: 'SYSTEM', name: 'ЖКТ', description: 'Состояние пищеварения.' },
   { catId: 'CAT_SYSTEM_BRAIN', type: 'SYSTEM', name: 'Мозг', description: 'Состояние ЦНС.' },
   { catId: 'CAT_SYSTEM_HORMONES', type: 'SYSTEM', name: 'Гормоны', description: 'Состояние эндокринной системы.' },
-  { catId: 'CAT_SYSTEM_IMMUNE', type: 'SYSTEM', name: '�?ммунитет', description: 'Состояние иммунной системы.' },
+  { catId: 'CAT_SYSTEM_IMMUNE', type: 'SYSTEM', name: 'Иммунитет', description: 'Состояние иммунной системы.' },
   { catId: 'CAT_GLOBAL_SLEEP', type: 'GLOBAL', name: 'Сон', description: 'Гигиена сна.' },
   { catId: 'CAT_GLOBAL_STRESS', type: 'GLOBAL', name: 'Стресс', description: 'Уровень стресса.' },
   { catId: 'CAT_GLOBAL_DIET', type: 'GLOBAL', name: 'Питание', description: 'Качество рациона.' },
@@ -20604,7 +20604,7 @@ export const ALL_TAGS: SupportTag[] = [
   { tagId: 'TAG_GUT_SUPPORT', type: 'SUBSTANCE', name: 'ЖКТ' },
   { tagId: 'TAG_BRAIN_SUPPORT', type: 'SUBSTANCE', name: 'Мозг' },
   { tagId: 'TAG_HORMONE_SUPPORT', type: 'SUBSTANCE', name: 'Гормоны' },
-  { tagId: 'TAG_IMMUNE_SUPPORT', type: 'SUBSTANCE', name: '�?ммунитет' },
+  { tagId: 'TAG_IMMUNE_SUPPORT', type: 'SUBSTANCE', name: 'Иммунитет' },
   { tagId: 'TAG_SLEEP', type: 'SUBSTANCE', name: 'Сон' },
   { tagId: 'TAG_STRESS', type: 'SUBSTANCE', name: 'Стресс' },
   { tagId: 'TAG_ENERGY', type: 'SUBSTANCE', name: 'Энергия' },
@@ -20635,7 +20635,7 @@ export const ALL_TAGS: SupportTag[] = [
   { tagId: 'TAG_RISK_CARDIO', type: 'RISK', name: 'Кардио' },
   { tagId: 'TAG_RISK_NEURO', type: 'RISK', name: 'Нейро' },
   { tagId: 'TAG_RISK_GUT', type: 'RISK', name: 'ЖКТ' },
-  { tagId: 'TAG_RISK_IMMUNE', type: 'RISK', name: '�?ммунный' },
+  { tagId: 'TAG_RISK_IMMUNE', type: 'RISK', name: 'Иммунный' },
   { tagId: 'TAG_RISK_DETOX', type: 'RISK', name: 'Детокс' },
   { tagId: 'TAG_RISK_LIPIDS', type: 'RISK', name: 'Липиды' },
   { tagId: 'TAG_RISK_GLUCOSE', type: 'RISK', name: 'Глюкоза' },
@@ -20751,7 +20751,7 @@ export const ALL_AXES: SupportAxis[] = [
   { axisId: 'AXIS_KIDNEY_HEART', name: 'Kidney в†’ Heart Axis', organs: 'KIDNEYS;HEART', description: 'Электролиты управляют ритмом сердца', mechUp: 'ELECTROLYTES_UP', mechDown: 'ELECTROLYTES_DOWN', highRisks: 'KIDNEY_CKD;KIDNEY_ELECTROLYTE_IMBALANCE', lowRisks: 'HEART_ARRHYTHMIA' },
   { axisId: 'AXIS_LIVER_HORMONES', name: 'Liver в†’ Hormones Axis', organs: 'LIVER;HORMONES', description: 'Печень очищает эстрогены и гормоны', mechUp: 'DETOX_UP', mechDown: 'CLEARANCE_DOWN', highRisks: 'LIVER_FATTY;LIVER_CHOLESTASIS', lowRisks: 'HORMONE_HIGH_E2' },
   { axisId: 'AXIS_HORMONES_LIVER', name: 'Hormones в†’ Liver Axis', organs: 'HORMONES;LIVER', description: 'Эстрогены влияют на желчь и липиды', mechUp: 'ESTROGEN_UP', mechDown: 'BILE_STASIS', highRisks: 'HORMONE_HIGH_E2', lowRisks: 'LIVER_CHOLESTASIS' },
-  { axisId: 'AXIS_IMMUNE_GUT', name: 'Immune в†’ Gut Axis', organs: 'IMMUNE_SYSTEM;GI', description: '�?ммунитет управляет барьером кишечника', mechUp: 'IMMUNE_UP', mechDown: 'INFLAMMATION_UP', highRisks: 'IMMUNE_AUTOIMMUNE', lowRisks: 'GI_IBD' },
+  { axisId: 'AXIS_IMMUNE_GUT', name: 'Immune в†’ Gut Axis', organs: 'IMMUNE_SYSTEM;GI', description: 'Иммунитет управляет барьером кишечника', mechUp: 'IMMUNE_UP', mechDown: 'INFLAMMATION_UP', highRisks: 'IMMUNE_AUTOIMMUNE', lowRisks: 'GI_IBD' },
   { axisId: 'AXIS_GUT_IMMUNE', name: 'Gut в†’ Immune Axis', organs: 'GI;IMMUNE_SYSTEM', description: 'Микробиота регулирует иммунитет', mechUp: 'SCFA_UP', mechDown: 'DYSBIOSIS', highRisks: 'GI_DYSBIOSIS', lowRisks: 'IMMUNE_LOW;IMMUNE_ALLERGY' },
   { axisId: 'AXIS_BRAIN_ADRENAL', name: 'Brain в†’ Adrenal Axis', organs: 'BRAIN;ADRENALS', description: 'Стресс → кортизол', mechUp: 'CORTISOL_UP', mechDown: 'HPA_DYSREGULATION', highRisks: 'BRAIN_ANXIETY;BRAIN_BURNOUT', lowRisks: 'HORMONE_HIGH_CORTISOL' },
   { axisId: 'AXIS_ADRENAL_BRAIN', name: 'Adrenal в†’ Brain Axis', organs: 'ADRENALS;BRAIN', description: 'Кортизол влияет на настроение', mechUp: 'CORTISOL_UP', mechDown: 'SEROTONIN_DOWN', highRisks: 'HORMONE_HIGH_CORTISOL', lowRisks: 'BRAIN_DEPRESSION;BRAIN_BRAIN_FOG' },
@@ -20802,7 +20802,7 @@ export const ALL_INTERACTIONS = ([
   { interactionId: 'INT_CALCIUM_VITD', substanceA: 'CALCIUM', substanceB: 'VITAMIN_D', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'BONE_SUPPORT', mechanisms: ['CALCIUM_UP', 'VITD_UP'], severity: 'LOW', notes: 'Витамин D улучшает усвоение кальция' },
   { interactionId: 'INT_VITD_K2', substanceA: 'VITAMIN_D', substanceB: 'VITAMIN_K2', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'CALCIUM_TARGETING', mechanisms: ['VITD_UP', 'K2_UP'], severity: 'LOW', notes: 'К2 направляет кальций в кости' },
   { interactionId: 'INT_VITD_MAGNESIUM', substanceA: 'VITAMIN_D', substanceB: 'MAGNESIUM', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'VITD_ACTIVATION', mechanisms: ['VDR_UP', 'MAG_UP'], severity: 'LOW', notes: 'Магний нужен для активации витамина D' },
-  { interactionId: 'INT_VITD_A', substanceA: 'VITAMIN_D', substanceB: 'VITAMIN_A', type: 'caution' as 'synergy' | 'conflict' | 'caution', effect: 'IMMUNE_BALANCE', mechanisms: ['NUCLEAR_RECEPTORS'], severity: 'MEDIUM', notes: '�?збыток A+D может смещать иммунный баланс' },
+  { interactionId: 'INT_VITD_A', substanceA: 'VITAMIN_D', substanceB: 'VITAMIN_A', type: 'caution' as 'synergy' | 'conflict' | 'caution', effect: 'IMMUNE_BALANCE', mechanisms: ['NUCLEAR_RECEPTORS'], severity: 'MEDIUM', notes: 'Избыток A+D может смещать иммунный баланс' },
   { interactionId: 'INT_VITK_ANTICOAG', substanceA: 'VITAMIN_K2', substanceB: 'ANTICOAGULANTS', type: 'conflict' as 'synergy' | 'conflict' | 'caution', effect: 'COAGULATION_SHIFT', mechanisms: ['COAGULATION_UP'], severity: 'HIGH', notes: 'К2 может ослаблять эффект антикоагулянтов' },
   { interactionId: 'INT_OMEGA3_ANTICOAG', substanceA: 'OMEGA3', substanceB: 'ANTICOAGULANTS', type: 'caution' as 'synergy' | 'conflict' | 'caution', effect: 'BLEED_RISK', mechanisms: ['PLATELETS_DOWN'], severity: 'MEDIUM', notes: 'Высокие дозы омега‑3 усиливают риск кровотечений' },
   { interactionId: 'INT_OMEGA3_NSAIDS', substanceA: 'OMEGA3', substanceB: 'NSAIDS', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'ANTIINFLAMMATION_UP', mechanisms: ['COX_DOWN'], severity: 'LOW', notes: 'Суммарный противовоспалительный эффект' },
@@ -20811,9 +20811,9 @@ export const ALL_INTERACTIONS = ([
   { interactionId: 'INT_MG_GABA', substanceA: 'MAGNESIUM', substanceB: 'GABA', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'CALMING', mechanisms: ['GABA_UP', 'NMDA_DOWN'], severity: 'LOW', notes: 'Суммарный анксиолитический эффект' },
   { interactionId: 'INT_MG_STIMULANTS', substanceA: 'MAGNESIUM', substanceB: 'STIMULANTS', type: 'caution' as 'synergy' | 'conflict' | 'caution', effect: 'HEART_MOD', mechanisms: ['HR_MOD', 'ELECTROLYTES'], severity: 'LOW', notes: 'Магний частично смягчает стимуляторы' },
   { interactionId: 'INT_5HTP_SSRIS', substanceA: '5HTP', substanceB: 'SSRIs', type: 'conflict' as 'synergy' | 'conflict' | 'caution', effect: 'SEROTONIN_SYNDROME', mechanisms: ['SEROTONIN_UP'], severity: 'HIGH', notes: 'Риск серотонинового синдрома' },
-  { interactionId: 'INT_5HTP_TRYPTOPHAN', substanceA: '5HTP', substanceB: 'TRYPTOPHAN', type: 'caution' as 'synergy' | 'conflict' | 'caution', effect: 'SEROTONIN_EXCESS', mechanisms: ['SEROTONIN_UP'], severity: 'MEDIUM', notes: '�?збыточная серотонинергическая нагрузка' },
+  { interactionId: 'INT_5HTP_TRYPTOPHAN', substanceA: '5HTP', substanceB: 'TRYPTOPHAN', type: 'caution' as 'synergy' | 'conflict' | 'caution', effect: 'SEROTONIN_EXCESS', mechanisms: ['SEROTONIN_UP'], severity: 'MEDIUM', notes: 'Избыточная серотонинергическая нагрузка' },
   { interactionId: 'INT_TRYPTOPHAN_MAOI', substanceA: 'TRYPTOPHAN', substanceB: 'MAOI', type: 'conflict' as 'synergy' | 'conflict' | 'caution', effect: 'SEROTONIN_CRISIS', mechanisms: ['SEROTONIN_UP'], severity: 'HIGH', notes: 'Опасное повышение серотонина' },
-  { interactionId: 'INT_STJOHNSWORT_SSRIS', substanceA: 'ST_JOHNS_WORT', substanceB: 'SSRIs', type: 'conflict' as 'synergy' | 'conflict' | 'caution', effect: 'SEROTONIN_SYNDROME', mechanisms: ['SERT_INHIBIT', 'SEROTONIN_UP'], severity: 'HIGH', notes: 'Комбо с С�?ОЗС опасно' },
+  { interactionId: 'INT_STJOHNSWORT_SSRIS', substanceA: 'ST_JOHNS_WORT', substanceB: 'SSRIs', type: 'conflict' as 'synergy' | 'conflict' | 'caution', effect: 'SEROTONIN_SYNDROME', mechanisms: ['SERT_INHIBIT', 'SEROTONIN_UP'], severity: 'HIGH', notes: 'Комбо с СИОЗС опасно' },
   { interactionId: 'INT_STJOHNSWORT_OCP', substanceA: 'ST_JOHNS_WORT', substanceB: 'ORAL_CONTRACEPTIVES', type: 'conflict' as 'synergy' | 'conflict' | 'caution', effect: 'DRUG_CLEARANCE_UP', mechanisms: ['CYP3A4_UP'], severity: 'MEDIUM', notes: 'Может снижать эффективность ОК' },
   { interactionId: 'INT_STJOHNSWORT_WARFARIN', substanceA: 'ST_JOHNS_WORT', substanceB: 'WARFARIN', type: 'conflict' as 'synergy' | 'conflict' | 'caution', effect: 'ANTICOAG_DOWN', mechanisms: ['CYP_UP'], severity: 'MEDIUM', notes: 'Ускоряет метаболизм варфарина' },
   { interactionId: 'INT_NAC_PARACETAMOL', substanceA: 'NAC', substanceB: 'PARACETAMOL', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'LIVER_PROTECT', mechanisms: ['GLUTATHIONE_UP'], severity: 'MEDIUM', notes: 'NAC снижает гепатотоксичность парацетамола' },
@@ -20821,7 +20821,7 @@ export const ALL_INTERACTIONS = ([
   { interactionId: 'INT_NAC_NITROGLYCERIN', substanceA: 'NAC', substanceB: 'NITRATES', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'NO_UP', mechanisms: ['NO_UP'], severity: 'MEDIUM', notes: 'NAC усиливает вазодилатацию' },
   { interactionId: 'INT_CURCUMIN_NSAIDS', substanceA: 'CURCUMIN', substanceB: 'NSAIDS', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'ANTIINFLAMMATION_UP', mechanisms: ['COX_DOWN', 'NFkB_DOWN'], severity: 'MEDIUM', notes: 'Суммарный противовоспалительный эффект' },
   { interactionId: 'INT_CURCUMIN_ANTICOAG', substanceA: 'CURCUMIN', substanceB: 'ANTICOAGULANTS', type: 'caution' as 'synergy' | 'conflict' | 'caution', effect: 'BLEED_RISK', mechanisms: ['PLATELETS_DOWN'], severity: 'MEDIUM', notes: 'Повышение риска кровотечений' },
-  { interactionId: 'INT_CURCUMIN_PPI', substanceA: 'CURCUMIN', substanceB: 'PPI', type: 'caution' as 'synergy' | 'conflict' | 'caution', effect: 'ABSORB_MOD', mechanisms: ['PH_MOD'], severity: 'LOW', notes: '�?зменение pH и всасывания' },
+  { interactionId: 'INT_CURCUMIN_PPI', substanceA: 'CURCUMIN', substanceB: 'PPI', type: 'caution' as 'synergy' | 'conflict' | 'caution', effect: 'ABSORB_MOD', mechanisms: ['PH_MOD'], severity: 'LOW', notes: 'Изменение pH и всасывания' },
   { interactionId: 'INT_RESVERATROL_STATINS', substanceA: 'RESVERATROL', substanceB: 'STATINS', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'LIPIDS_UP;ENDOTHELIUM_UP', mechanisms: ['AMPK_UP', 'SIRT1_UP'], severity: 'LOW', notes: 'Потенциальная синергия по липидам и сосудам' },
   { interactionId: 'INT_RESVERATROL_WARFARIN', substanceA: 'RESVERATROL', substanceB: 'WARFARIN', type: 'caution' as 'synergy' | 'conflict' | 'caution', effect: 'BLEED_RISK', mechanisms: ['PLATELETS_DOWN'], severity: 'MEDIUM', notes: 'Усиление антикоагуляции' },
   { interactionId: 'INT_PROBIOTICS_ANTIBIOTICS', substanceA: 'PROBIOTICS', substanceB: 'ANTIBIOTICS', type: 'conflict' as 'synergy' | 'conflict' | 'caution', effect: 'BUGS_KILLED', mechanisms: ['ABX_KILL', 'MICROBIOME'], severity: 'HIGH', notes: 'Антибиотики убивают пробиотические штаммы' },
@@ -20842,7 +20842,7 @@ export const ALL_INTERACTIONS = ([
   { interactionId: 'INT_ASHWAGANDHA_THYROID', substanceA: 'ASHWAGANDHA', substanceB: 'THYROID_DRUGS', type: 'caution' as 'synergy' | 'conflict' | 'caution', effect: 'THYROID_MOD', mechanisms: ['T3_T4_MOD'], severity: 'MEDIUM', notes: 'Может усиливать или менять эффект тиреоидных препаратов' },
   { interactionId: 'INT_RHODIOLA_STIMULANTS', substanceA: 'RHODIOLA', substanceB: 'STIMULANTS', type: 'caution' as 'synergy' | 'conflict' | 'caution', effect: 'OVERSTIMULATION', mechanisms: ['NE_UP', 'DA_UP'], severity: 'MEDIUM', notes: 'Риск тревоги и тахикардии' },
   { interactionId: 'INT_RHODIOLA_SSRIS', substanceA: 'RHODIOLA', substanceB: 'SSRIs', type: 'caution' as 'synergy' | 'conflict' | 'caution', effect: 'SEROTONIN_UP', mechanisms: ['SEROTONIN_MOD'], severity: 'MEDIUM', notes: 'Потенциальное усиление серотонинергики' },
-  { interactionId: 'INT_LITHIUM_SODIUM', substanceA: 'LITHIUM', substanceB: 'SODIUM', type: 'conflict' as 'synergy' | 'conflict' | 'caution', effect: 'LITHIUM_LEVEL_SHIFT', mechanisms: ['RENAL_CLEARANCE'], severity: 'HIGH', notes: '�?зменение натрия меняет уровень лития' },
+  { interactionId: 'INT_LITHIUM_SODIUM', substanceA: 'LITHIUM', substanceB: 'SODIUM', type: 'conflict' as 'synergy' | 'conflict' | 'caution', effect: 'LITHIUM_LEVEL_SHIFT', mechanisms: ['RENAL_CLEARANCE'], severity: 'HIGH', notes: 'Изменение натрия меняет уровень лития' },
   { interactionId: 'INT_LITHIUM_NSAIDS', substanceA: 'LITHIUM', substanceB: 'NSAIDS', type: 'conflict' as 'synergy' | 'conflict' | 'caution', effect: 'LITHIUM_UP', mechanisms: ['RENAL_CLEARANCE_DOWN'], severity: 'HIGH', notes: 'НПВС могут повышать концентрацию лития' },
   { interactionId: 'INT_STATINS_GRAPEFRUIT', substanceA: 'STATINS', substanceB: 'GRAPEFRUIT', type: 'conflict' as 'synergy' | 'conflict' | 'caution', effect: 'DRUG_LEVEL_UP', mechanisms: ['CYP3A4_INHIBIT'], severity: 'HIGH', notes: 'Грейпфрут повышает уровень статинов' },
   { interactionId: 'INT_STATINS_COQ10', substanceA: 'STATINS', substanceB: 'COQ10', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'MUSCLE_PROTECT', mechanisms: ['MITO_UP'], severity: 'LOW', notes: 'КоQ10 снижает риск миопатии' },
@@ -20865,7 +20865,7 @@ export const ALL_INTERACTIONS = ([
   { interactionId: 'INT_GABA_ASHWAGANDHA', substanceA: 'GABA', substanceB: 'ASHWAGANDHA', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'CALMING_UP', mechanisms: ['GABA_MOD'], severity: 'LOW', notes: 'Усиление расслабления' },
   { interactionId: 'INT_TYROSINE_STIMULANTS', substanceA: 'TYROSINE', substanceB: 'STIMULANTS', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'DA_NE_UP', mechanisms: ['DA_UP', 'NE_UP'], severity: 'MEDIUM', notes: 'Усиление стимуляции' },
   { interactionId: 'INT_TYROSINE_MAOI', substanceA: 'TYROSINE', substanceB: 'MAOI', type: 'conflict' as 'synergy' | 'conflict' | 'caution', effect: 'HYPERTENSIVE_CRISIS', mechanisms: ['NE_UP'], severity: 'HIGH', notes: 'Риск гипертонического криза' },
-  { interactionId: 'INT_TYROSINE_LDOPA', substanceA: 'TYROSINE', substanceB: 'L_DOPA', type: 'caution' as 'synergy' | 'conflict' | 'caution', effect: 'DA_EXCESS', mechanisms: ['DA_UP'], severity: 'MEDIUM', notes: '�?збыток дофамина' },
+  { interactionId: 'INT_TYROSINE_LDOPA', substanceA: 'TYROSINE', substanceB: 'L_DOPA', type: 'caution' as 'synergy' | 'conflict' | 'caution', effect: 'DA_EXCESS', mechanisms: ['DA_UP'], severity: 'MEDIUM', notes: 'Избыток дофамина' },
   { interactionId: 'INT_CHOLINE_RACETAMS', substanceA: 'CHOLINE', substanceB: 'RACETAMS', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'ACH_UP', mechanisms: ['ACH_UP'], severity: 'LOW', notes: 'Холин усиливает эффект рацетамов' },
   { interactionId: 'INT_CHOLINE_HUPERZINE', substanceA: 'CHOLINE', substanceB: 'HUPERZINE_A', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'ACH_OVERLOAD', mechanisms: ['ACH_UP', 'ACHE_INHIBIT'], severity: 'MEDIUM', notes: 'Сильная холинергическая нагрузка' },
   { interactionId: 'INT_CHOLINE_ANTICHOLINERGICS', substanceA: 'CHOLINE', substanceB: 'ANTICHOLINERGICS', type: 'conflict' as 'synergy' | 'conflict' | 'caution', effect: 'OPPOSITE_EFFECTS', mechanisms: ['ACH_UP', 'ACH_BLOCK'], severity: 'MEDIUM', notes: 'Противонаправленные эффекты' },
@@ -20918,9 +20918,9 @@ export const ALL_INTERACTIONS = ([
   { interactionId: 'INT_CALCIUM_VITK2', substanceA: 'CALCIUM', substanceB: 'VITAMIN_K2', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'BONE_UP', mechanisms: ['K2_UP'], severity: 'LOW', notes: 'К2 направляет кальций в кости' },
   { interactionId: 'INT_CALCIUM_PPI', substanceA: 'CALCIUM', substanceB: 'PPI', type: 'conflict' as 'synergy' | 'conflict' | 'caution', effect: 'ABSORB_DOWN', mechanisms: ['PH_UP'], severity: 'MEDIUM', notes: 'Снижение всасывания кальция' },
   { interactionId: 'INT_CALCIUM_IRON', substanceA: 'CALCIUM', substanceB: 'IRON', type: 'conflict' as 'synergy' | 'conflict' | 'caution', effect: 'ABSORB_DOWN', mechanisms: ['COMPETE_ABSORB'], severity: 'MEDIUM', notes: 'Кальций мешает железу' },
-  { interactionId: 'INT_SELENIUM_VITC', substanceA: 'SELENIUM', substanceB: 'VITAMIN_C', type: 'caution' as 'synergy' | 'conflict' | 'caution', effect: 'REDOX_SHIFT', mechanisms: ['ANTIOX_MOD'], severity: 'LOW', notes: '�?зменение антиоксидантного баланса' },
+  { interactionId: 'INT_SELENIUM_VITC', substanceA: 'SELENIUM', substanceB: 'VITAMIN_C', type: 'caution' as 'synergy' | 'conflict' | 'caution', effect: 'REDOX_SHIFT', mechanisms: ['ANTIOX_MOD'], severity: 'LOW', notes: 'Изменение антиоксидантного баланса' },
   { interactionId: 'INT_SELENIUM_THYROID', substanceA: 'SELENIUM', substanceB: 'THYROID_DRUGS', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'THYROID_UP', mechanisms: ['T3_T4_UP'], severity: 'LOW', notes: 'Поддержка щитовидки' },
-  { interactionId: 'INT_SELENIUM_ZINC', substanceA: 'SELENIUM', substanceB: 'ZINC', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'IMMUNE_UP', mechanisms: ['ANTIOX_UP'], severity: 'LOW', notes: '�?ммунная синергия' },
+  { interactionId: 'INT_SELENIUM_ZINC', substanceA: 'SELENIUM', substanceB: 'ZINC', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'IMMUNE_UP', mechanisms: ['ANTIOX_UP'], severity: 'LOW', notes: 'Иммунная синергия' },
   { interactionId: 'INT_IODINE_THYROID', substanceA: 'IODINE', substanceB: 'THYROID_DRUGS', type: 'caution' as 'synergy' | 'conflict' | 'caution', effect: 'THYROID_SHIFT', mechanisms: ['T3_T4_MOD'], severity: 'MEDIUM', notes: 'Может менять дозировку гормонов' },
   { interactionId: 'INT_IODINE_LITHIUM', substanceA: 'IODINE', substanceB: 'LITHIUM', type: 'conflict' as 'synergy' | 'conflict' | 'caution', effect: 'THYROID_MOD', mechanisms: ['THYROID_UP'], severity: 'MEDIUM', notes: 'Йод влияет на щитовидку при литии' },
   { interactionId: 'INT_IODINE_ANTITHYROID', substanceA: 'IODINE', substanceB: 'ANTITHYROID_DRUGS', type: 'conflict' as 'synergy' | 'conflict' | 'caution', effect: 'OPPOSITE_EFFECTS', mechanisms: ['T3_T4_UP', 'T3_T4_DOWN'], severity: 'MEDIUM', notes: 'Противонаправленные эффекты' },
@@ -20932,35 +20932,35 @@ export const ALL_INTERACTIONS = ([
   { interactionId: 'SYNERGY_AUTO_002', substanceA: 'MAGNESIUM', substanceB: 'VITAMIN_B6', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Магний и витамин B6 синергично поддерживают нервную систему: B6 улучшает внутриклеточный транспорт магния', mechanisms: ['Усиление транспорта магния', 'Коферментная активация B6'], severity: 'HIGH', notes: 'Магний B6 - классическая комбинация для снижения тревоги и улучшения сна' },
   { interactionId: 'SYNERGY_AUTO_003', substanceA: 'B_COMPLEX', substanceB: 'METHYLATION_CYCLE', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'B-витамины работают как команда коферментов, усиливая метаболизм энергии и работу нервной системы', mechanisms: ['Коферментное взаимодействие', 'Цикл Кребса', 'Синергия метилирования'], severity: 'HIGH', notes: 'Комплекс B-витаминов эффективнее чем прием по отдельности' },
   { interactionId: 'SYNERGY_AUTO_004', substanceA: 'VITAMIN_C', substanceB: 'IRON', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Vitamin C увеличивает всасывание негемового железа в 2-3 раза за счет восстановления Fe3+ до Fe2+', mechanisms: ['Восстановление Fe3+ до Fe2+', 'Хелатирование железа'], severity: 'HIGH', notes: 'Принимать витамин C вместе с железом при анемии' },
-  { interactionId: 'SYNERGY_AUTO_005', substanceA: 'CURCUMIN', substanceB: 'PIPERINE', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Пиперин (черный перец) увеличивает биодоступность куркумина на 2000% через ингибирование глюкуронизации', mechanisms: ['�?нгибирование глюкуронизации', 'Усиление абсорбции'], severity: 'HIGH', notes: 'Куркумин без пиперина практически не усваивается организмом' },
+  { interactionId: 'SYNERGY_AUTO_005', substanceA: 'CURCUMIN', substanceB: 'PIPERINE', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Пиперин (черный перец) увеличивает биодоступность куркумина на 2000% через ингибирование глюкуронизации', mechanisms: ['Ингибирование глюкуронизации', 'Усиление абсорбции'], severity: 'HIGH', notes: 'Куркумин без пиперина практически не усваивается организмом' },
   { interactionId: 'SYNERGY_AUTO_006', substanceA: 'VITAMIN_D', substanceB: 'VITAMIN_K2', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Vitamin K2 направляет кальций в костную ткань, предотвращая его отложение в сосудах при приеме D3', mechanisms: ['Активация остеокальцина', 'Регуляция кальциевого гомеостаза', 'Сосудистая защита'], severity: 'HIGH', notes: 'Критическая комбинация при приеме высоких доз витамина D3' },
   { interactionId: 'SYNERGY_AUTO_007', substanceA: 'VITAMIN_B12', substanceB: 'VITAMIN_B9_FOLIC', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'B12 и фолат (B9) работают вместе в цикле метилирования: фолат передает метильные группы, B12 их акцептирует', mechanisms: ['Цикл метионина', 'Синтез SAMe', 'Эритропоэз'], severity: 'HIGH', notes: 'Дефицит B12 маскирует фолатодефицитную анемию' },
   { interactionId: 'SYNERGY_AUTO_008', substanceA: 'PREBIOTIC_FIBER', substanceB: 'PROBIOTICS', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Пребиотики (клетчатка, инулин) служат пищей для пробиотиков, увеличивая их выживаемость в 10 раз', mechanisms: ['Синбиотическое действие', 'Продукция КЦЖК', 'Поддержка микробиома'], severity: 'HIGH', notes: 'Синбиотики - комбинация про- и пребиотиков' },
   { interactionId: 'SYNERGY_AUTO_009', substanceA: 'SELENIUM', substanceB: 'IODINE', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Селен и йод синергично поддерживают щитовидную железу: селен защищает тиреоциты, йод - субстрат для гормонов', mechanisms: ['Синтез дейодиназ', 'Антиоксидантная защита тиреоцитов', 'Йодирование тиреоглобулина'], severity: 'HIGH', notes: 'Для синтеза T3 и T4 необходимы оба микроэлемента' },
-  { interactionId: 'SYNERGY_AUTO_010', substanceA: 'GLUCOSAMINE', substanceB: 'CHONDROITIN', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Глюкозамин и хондроитин восстанавливают хрящевую ткань: хондроитин удерживает воду, глюкозамин стимулирует синтез протеогликанов', mechanisms: ['Синтез протеогликанов', 'Гидратация хряща', '�?нгибирование разрушения матрикса'], severity: 'HIGH', notes: 'Классическая комбинация для суставов, эффект через 2-3 месяца' },
+  { interactionId: 'SYNERGY_AUTO_010', substanceA: 'GLUCOSAMINE', substanceB: 'CHONDROITIN', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Глюкозамин и хондроитин восстанавливают хрящевую ткань: хондроитин удерживает воду, глюкозамин стимулирует синтез протеогликанов', mechanisms: ['Синтез протеогликанов', 'Гидратация хряща', 'Ингибирование разрушения матрикса'], severity: 'HIGH', notes: 'Классическая комбинация для суставов, эффект через 2-3 месяца' },
   { interactionId: 'SYNERGY_AUTO_011', substanceA: 'ZINC', substanceB: 'MAGNESIUM', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'ZMA (цинк + магний + B6): тройная синергия для анаболизма, сна и восстановления', mechanisms: ['Андрогенная поддержка', 'ГАМК-ергическая передача', 'Коферментная активация'], severity: 'HIGH', notes: 'Оптимально принимать перед сном натощак' },
   { interactionId: 'SYNERGY_AUTO_012', substanceA: 'OMEGA3', substanceB: 'COQ10', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Омега-3 жирные кислоты улучшают транспорт CoQ10 в митохондрии через липидный матрикс', mechanisms: ['Липидный транспорт', 'Митохондриальная синергия', 'Мембранная интеграция'], severity: 'MEDIUM', notes: 'CoQ10 на омега-3 основе имеет в 2 раза лучшую биодоступность' },
   { interactionId: 'SYNERGY_AUTO_013', substanceA: 'CREATINE', substanceB: 'BETA_ALANINE', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Креатин и бета-аланин синергично усиливают силовые показатели и выносливость', mechanisms: ['Буферизация pH мышц', 'Увеличение фосфокреатина', 'Анаэробный метаболизм'], severity: 'MEDIUM', notes: 'Принимать 3-5 г креатина + 2-4 г бета-аланина в день' },
-  { interactionId: 'SYNERGY_AUTO_014', substanceA: 'CURCUMIN', substanceB: 'GINGER', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Куркумин и имбирь синергично подавляют воспаление через ингибирование NF-kB и COX/LOX путей', mechanisms: ['�?нгибирование NF-kB', 'Блокировка COX-2', 'Синергия антиоксидантов'], severity: 'MEDIUM', notes: 'Усиливает противовоспалительный эффект в 2-3 раза' },
+  { interactionId: 'SYNERGY_AUTO_014', substanceA: 'CURCUMIN', substanceB: 'GINGER', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Куркумин и имбирь синергично подавляют воспаление через ингибирование NF-kB и COX/LOX путей', mechanisms: ['Ингибирование NF-kB', 'Блокировка COX-2', 'Синергия антиоксидантов'], severity: 'MEDIUM', notes: 'Усиливает противовоспалительный эффект в 2-3 раза' },
   { interactionId: 'SYNERGY_AUTO_015', substanceA: 'L_THEANINE', substanceB: 'GABA', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'L-теанин усиливает ГАМК-ергическую передачу, потенцируя расслабляющий эффект магния и GABA', mechanisms: ['Увеличение альфа-волн', 'Синергия ГАМК', 'Модуляция глутамата'], severity: 'MEDIUM', notes: 'Безопасная комбинация для релаксации без сонливости' },
   { interactionId: 'SYNERGY_AUTO_016', substanceA: 'ZINC', substanceB: 'VITAMIN_A', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Цинк необходим для синтеза ретинол-связывающего белка, транспортирующего витамин A', mechanisms: ['Активация RBP', 'Синергия зрения', 'Кофактор ретинол-дегидрогеназы'], severity: 'MEDIUM', notes: 'Цинк + витамин A особенно важны для ночного зрения' },
   { interactionId: 'SYNERGY_AUTO_017', substanceA: 'SILYMARIN', substanceB: 'ARTICHOKE', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Расторопша и артишок синергично усиливают детоксикацию печени: фаза I + фаза II', mechanisms: ['Усиление фазы I детоксикации', 'Активация фазы II', 'Желчегонное действие', 'Антиоксидантная защита'], severity: 'MEDIUM', notes: 'Комбинация для восстановления печени после нагрузок' },
-  { interactionId: 'SYNERGY_AUTO_018', substanceA: 'ZINC', substanceB: 'VITAMIN_C', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Цинк и витамин C синергично поддерживают иммунитет: стимулируют фагоцитоз и синтез коллагена', mechanisms: ['�?ммуномодуляция', 'Стимуляция фагоцитоза', 'Коллагеногенез'], severity: 'MEDIUM', notes: 'Базовая комбинация для профилактики ОРВ�?' },
+  { interactionId: 'SYNERGY_AUTO_018', substanceA: 'ZINC', substanceB: 'VITAMIN_C', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Цинк и витамин C синергично поддерживают иммунитет: стимулируют фагоцитоз и синтез коллагена', mechanisms: ['Иммуномодуляция', 'Стимуляция фагоцитоза', 'Коллагеногенез'], severity: 'MEDIUM', notes: 'Базовая комбинация для профилактики ОРВИ' },
   { interactionId: 'SYNERGY_AUTO_019', substanceA: 'TAURINE', substanceB: 'MAGNESIUM', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Таурин и магний синергично защищают сердце: стабилизируют мембраны кардиомиоцитов и ритм', mechanisms: ['Кардиопротекция', 'Стабилизация мембран', 'Антиаритмическое действие'], severity: 'MEDIUM', notes: 'Полезна при гипертонии, аритмиях, сердечной недостаточности' },
   { interactionId: 'SYNERGY_AUTO_020', substanceA: 'OMEGA3', substanceB: 'VITAMIN_D', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Омега-3 улучшает всасывание витамина D и усиливает его связывание с рецепторами VDR', mechanisms: ['Улучшение мембранной текучести', 'Рецепторная синергия', 'Липидный транспорт'], severity: 'MEDIUM', notes: 'D3+K2 с омега-3 для максимального усвоения' },
   { interactionId: 'SYNERGY_AUTO_021', substanceA: 'GINKGO', substanceB: 'BACOPA', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Гинкго билоба и бакопа монье синергично улучшают память и когнитивные функции', mechanisms: ['Усиление мозгового кровотока', 'Ацетилхолиновая модуляция', 'Нейропротекция'], severity: 'MEDIUM', notes: 'Ноотропная комбинация с накопительным эффектом' },
   { interactionId: 'SYNERGY_AUTO_022', substanceA: 'ASHWAGANDHA', substanceB: 'RHODIOLA', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Ашваганда и родиола розовая синергично модулируют ось HPA: родиола стимулирует, ашваганда восстанавливает', mechanisms: ['Модуляция кортизола', 'Адаптация HPA', 'Синергия адаптогенов'], severity: 'MEDIUM', notes: 'Родиола утром для энергии, ашваганда вечером для восстановления' },
-  { interactionId: 'SYNERGY_AUTO_023', substanceA: 'ECHINACEA', substanceB: 'ELDERBERRY', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Эхинацея и бузина синергично стимулируют иммунный ответ: активируют макрофаги и NK-клетки', mechanisms: ['Стимуляция фагоцитоза', 'Активация NK-клеток', 'Синтез цитокинов'], severity: 'MEDIUM', notes: 'Профилактический прием снижает риск ОРВ�? на 30-40%' },
+  { interactionId: 'SYNERGY_AUTO_023', substanceA: 'ECHINACEA', substanceB: 'ELDERBERRY', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Эхинацея и бузина синергично стимулируют иммунный ответ: активируют макрофаги и NK-клетки', mechanisms: ['Стимуляция фагоцитоза', 'Активация NK-клеток', 'Синтез цитокинов'], severity: 'MEDIUM', notes: 'Профилактический прием снижает риск ОРВИ на 30-40%' },
   { interactionId: 'SYNERGY_AUTO_024', substanceA: 'IRON', substanceB: 'COPPER', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Железо и медь синергично участвуют в кроветворении: медь необходима для транспорта железа', mechanisms: ['Церулоплазминовый транспорт', 'Синтез гема', 'Синергия гемопоэза'], severity: 'MEDIUM', notes: 'При анемии проверять также уровень меди и ферритина' },
   { interactionId: 'SYNERGY_AUTO_025', substanceA: 'ZINC', substanceB: 'COPPER', type: 'caution' as 'synergy' | 'conflict' | 'caution', effect: 'Цинк и медь конкурируют за всасывание: высокие дозы цинка (>30 мг) подавляют абсорбцию меди', mechanisms: ['Конкуренция за транспортеры MT1/2', 'Антагонизм металлов'], severity: 'MEDIUM', notes: 'При длительном приеме цинка добавлять 1-2 мг меди' },
   { interactionId: 'SYNERGY_AUTO_026', substanceA: 'CALCIUM', substanceB: 'MAGNESIUM', type: 'caution' as 'synergy' | 'conflict' | 'caution', effect: 'Кальций и магний конкурируют за общие транспортеры в тонком кишечнике', mechanisms: ['Конкуренция за каналы TRPV6/TRPM6', 'Антагонизм ионов'], severity: 'MEDIUM', notes: 'Принимать кальций и магний в разное время дня (4-6 ч интервал)' },
   { interactionId: 'SYNERGY_AUTO_027', substanceA: 'CALCIUM', substanceB: 'IRON', type: 'caution' as 'synergy' | 'conflict' | 'caution', effect: 'Кальций снижает всасывание железа на 50% при совместном приеме', mechanisms: ['Конкуренция за DMT1', 'Антагонизм двухвалентных катионов'], severity: 'MEDIUM', notes: 'Не принимать железо с молочными продуктами или кальцием' },
-  { interactionId: 'SYNERGY_AUTO_028', substanceA: 'ST_JOHNS_WORT', substanceB: 'CYP450_INDUCER', type: 'caution' as 'synergy' | 'conflict' | 'caution', effect: 'Зверобой индуцирует CYP3A4, снижая эффективность многих лекарств', mechanisms: ['�?ндукция цитохрома P450', 'Ускорение метаболизма ксенобиотиков'], severity: 'LOW', notes: '�?збегать с гормональными препаратами и антидепрессантами' },
-  { interactionId: 'SYNERGY_AUTO_029', substanceA: 'VITAMIN_E', substanceB: 'ANTICOAGULANT_WARNING', type: 'caution' as 'synergy' | 'conflict' | 'caution', effect: 'Высокие дозы витамина E (>400 МЕ) могут снижать свертываемость крови', mechanisms: ['Антивитамин K', '�?нгибирование агрегации тромбоцитов'], severity: 'LOW', notes: 'Осторожно при приеме антикоагулянтов' },
+  { interactionId: 'SYNERGY_AUTO_028', substanceA: 'ST_JOHNS_WORT', substanceB: 'CYP450_INDUCER', type: 'caution' as 'synergy' | 'conflict' | 'caution', effect: 'Зверобой индуцирует CYP3A4, снижая эффективность многих лекарств', mechanisms: ['Индукция цитохрома P450', 'Ускорение метаболизма ксенобиотиков'], severity: 'LOW', notes: 'Избегать с гормональными препаратами и антидепрессантами' },
+  { interactionId: 'SYNERGY_AUTO_029', substanceA: 'VITAMIN_E', substanceB: 'ANTICOAGULANT_WARNING', type: 'caution' as 'synergy' | 'conflict' | 'caution', effect: 'Высокие дозы витамина E (>400 МЕ) могут снижать свертываемость крови', mechanisms: ['Антивитамин K', 'Ингибирование агрегации тромбоцитов'], severity: 'LOW', notes: 'Осторожно при приеме антикоагулянтов' },
   { interactionId: 'SYNERGY_AUTO_030', substanceA: 'GINKGO', substanceB: 'GINSENG', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Гинкго + женьшень синергично улучшают память, концентрацию и мозговой кровоток', mechanisms: ['Вазодилатация', 'Ацетилхолиновая поддержка', 'Нейропротекция'], severity: 'MEDIUM', notes: 'Ноотропный эффект через 2-4 недели регулярного приема' },
   { interactionId: 'SYNERGY_AUTO_031', substanceA: '5HTP', substanceB: 'MAGNESIUM', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: '5-HTP и магний синергично улучшают качество сна: 5-HTP - предшественник мелатонина, магний - ГАМК-агонист', mechanisms: ['Серотониновый путь', 'ГАМК-ергическая седация', 'Синергия сна'], severity: 'MEDIUM', notes: 'За 30-60 мин до сна; не сочетать с антидепрессантами' },
   { interactionId: 'SYNERGY_AUTO_032', substanceA: 'ALCAR', substanceB: 'ALPHA_LIPOIC', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Ацетил-L-карнитин и альфа-липоевая кислота синергично защищают митохондрии и улучшают энергообмен', mechanisms: ['Митохондриальная защита', 'Антиоксидантная синергия', 'Энергетический метаболизм'], severity: 'MEDIUM', notes: 'Антивозрастная и нейропротективная комбинация' },
-  { interactionId: 'SYNERGY_AUTO_033', substanceA: 'BERBERINE', substanceB: 'CINNAMON', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Берберин и корица синергично улучшают чувствительность к инсулину и метаболизм глюкозы', mechanisms: ['Активация AMPK', 'Улучшение утилизации глюкозы', '�?нгибирование альфа-глюкозидазы'], severity: 'MEDIUM', notes: 'Для контроля сахара крови и метаболического здоровья' },
+  { interactionId: 'SYNERGY_AUTO_033', substanceA: 'BERBERINE', substanceB: 'CINNAMON', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Берберин и корица синергично улучшают чувствительность к инсулину и метаболизм глюкозы', mechanisms: ['Активация AMPK', 'Улучшение утилизации глюкозы', 'Ингибирование альфа-глюкозидазы'], severity: 'MEDIUM', notes: 'Для контроля сахара крови и метаболического здоровья' },
   { interactionId: 'SYNERGY_AUTO_034', substanceA: 'COLLAGEN', substanceB: 'VITAMIN_C', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Коллаген и витамин C необходимы для синтеза коллагеновых волокон: C - кофактор гидроксилирования пролина', mechanisms: ['Гидроксилирование пролина', 'Синтез тропоколлагена', 'Формирование фибрилл'], severity: 'MEDIUM', notes: 'Витамин C обязателен для синтеза коллагена' },
   { interactionId: 'SYNERGY_AUTO_035', substanceA: 'MSM', substanceB: 'GLUCOSAMINE', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'МСМ и глюкозамин синергично уменьшают боль и воспаление в суставах', mechanisms: ['Синтез соединительной ткани', 'Противовоспалительное действие', 'Серный обмен'], severity: 'MEDIUM', notes: 'МСМ усиливает действие глюкозамина на 40-60%' },
   { interactionId: 'SYNERGY_AUTO_036', substanceA: 'LYCOPENE', substanceB: 'BETA_CAROTENE', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Ликопин и бета-каротин синергично защищают простату и ССС от окислительного стресса', mechanisms: ['Каротиноидная синергия', 'Антиоксидантная защита', 'Простато-протекция'], severity: 'MEDIUM', notes: 'Ликопин лучше усваивается с жирами (оливковое масло)' },
@@ -20968,31 +20968,31 @@ export const ALL_INTERACTIONS = ([
   { interactionId: 'SYNERGY_AUTO_038', substanceA: 'CALCIUM_D_GLUCARATE', substanceB: 'I3C', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Кальций D-глюкарат и индол-3-карбинол синергично поддерживают эстрогеновый метаболизм', mechanisms: ['Бета-глюкуронидазная модуляция', 'CYP-регуляция', 'Детоксикация эстрогенов'], severity: 'MEDIUM', notes: 'Для профилактики эстроген-зависимых состояний' },
   { interactionId: 'SYNERGY_AUTO_039', substanceA: 'LECITHIN', substanceB: 'OMEGA3', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Лецитин и омега-3 синергично поддерживают когнитивные функции и мембранную структуру', mechanisms: ['Мембранная интеграция', 'Холинергическая поддержка', 'Липидный обмен'], severity: 'MEDIUM', notes: 'Фосфолипиды + омега-3 = строительный материал для мозга' },
   { interactionId: 'SYNERGY_AUTO_040', substanceA: 'ZINC', substanceB: 'SELENIUM', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Цинк и селен синергично усиливают антиоксидантную защиту (СОД + глутатионпероксидаза)', mechanisms: ['Кофактор СОД', 'Кофактор GPX', 'Антиоксидантная синергия'], severity: 'MEDIUM', notes: 'Важны для тиреоидного и репродуктивного здоровья' },
-  { interactionId: 'SYNERGY_AUTO_041', substanceA: 'EGCG', substanceB: 'VITAMIN_D', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Экстракт зеленого чая (EGCG) и витамин D синергично модулируют иммунный ответ', mechanisms: ['�?ммуномодуляция', 'Антиоксидантная синергия', 'Эпигенетическая регуляция'], severity: 'MEDIUM', notes: 'EGCG усиливает рецепцию витамина D' },
+  { interactionId: 'SYNERGY_AUTO_041', substanceA: 'EGCG', substanceB: 'VITAMIN_D', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Экстракт зеленого чая (EGCG) и витамин D синергично модулируют иммунный ответ', mechanisms: ['Иммуномодуляция', 'Антиоксидантная синергия', 'Эпигенетическая регуляция'], severity: 'MEDIUM', notes: 'EGCG усиливает рецепцию витамина D' },
   { interactionId: 'SYNERGY_AUTO_042', substanceA: 'GLYCINE', substanceB: 'MAGNESIUM', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Глицин и магний синергично улучшают качество сна через ГАМК-ергическую систему', mechanisms: ['ГАМК-модуляция', 'Синергия нейротрансмиттеров', 'Расслабление мышц'], severity: 'LOW', notes: 'Мягкая седативная комбинация без привыкания' },
   { interactionId: 'SYNERGY_AUTO_043', substanceA: 'MIN_ZINC_PICOLINATE', substanceB: 'MIN_MAGNESIUM_CHELATE', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Пиколинат цинка и хелат магния - наиболее биодоступные формы для синергии минералов', mechanisms: ['Максимальная абсорбция', 'Минеральная синергия', 'Аминокислотный транспорт'], severity: 'HIGH', notes: 'Хелатные формы усваиваются на 40-60% лучше оксидов' },
   { interactionId: 'SYNERGY_AUTO_044', substanceA: 'NMN', substanceB: 'RESVERATROL', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'NMN и ресвератрол синергично активируют SIRT1 и повышают уровень NAD+, замедляя клеточное старение', mechanisms: ['Активация SIRT1', 'Повышение NAD+', 'Аутофагия', 'Митохондриальный биогенез'], severity: 'LOW', notes: 'Оптимально утром натощак; NMN 250-500 мг + ресвератрол 200-500 мг' },
   { interactionId: 'SYNERGY_AUTO_045', substanceA: 'COQ10', substanceB: 'PQQ', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'CoQ10 и PQQ синергично стимулируют митохондриальный биогенез и энергопродукцию', mechanisms: ['Митохондриальный биогенез', 'Электрон-транспортная цепь', 'Антиоксидантная защита митохондрий'], severity: 'LOW', notes: 'PQQ 10-20 мг + CoQ10 100-200 мг; принимать с жирами' },
   { interactionId: 'SYNERGY_AUTO_046', substanceA: 'ASTAXANTHIN', substanceB: 'LYCOPENE', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Астаксантин и ликопин синергично защищают кожу от фотостарения и нейтрализуют АФК', mechanisms: ['Нейтрализация синглетного кислорода', 'Фотопротекция', 'Антиоксидантный каскад'], severity: 'LOW', notes: 'Астаксантин 4-12 мг + ликопин 10-30 мг; с жирами для усвоения' },
   { interactionId: 'SYNERGY_AUTO_047', substanceA: 'COLLAGEN', substanceB: 'HYALURONIC_ACID', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Коллаген и гиалуроновая кислота синергично улучшают гидратацию кожи и антивозрастной эффект', mechanisms: ['Синтез внеклеточного матрикса', 'Гидратация дермы', 'Стимуляция фибробластов'], severity: 'LOW', notes: 'Гидролизованный коллаген 10 г + гиалуроновая к-та 100-200 мг; эффект через 4-8 недель' },
-  { interactionId: 'SYNERGY_AUTO_048', substanceA: 'SPERMIDINE', substanceB: 'RESVERATROL', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Спермидин и ресвератрол синергично индуцируют аутофагию и продлевают клеточную жизнь', mechanisms: ['�?ндукция аутофагии', 'Активация SIRT1', 'Эпигенетическая модуляция', '�?нгибирование mTOR'], severity: 'LOW', notes: 'Спермидин 5-10 мг + ресвератрол 200-500 мг; курсами 3-6 месяцев' },
+  { interactionId: 'SYNERGY_AUTO_048', substanceA: 'SPERMIDINE', substanceB: 'RESVERATROL', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Спермидин и ресвератрол синергично индуцируют аутофагию и продлевают клеточную жизнь', mechanisms: ['Индукция аутофагии', 'Активация SIRT1', 'Эпигенетическая модуляция', 'Ингибирование mTOR'], severity: 'LOW', notes: 'Спермидин 5-10 мг + ресвератрол 200-500 мг; курсами 3-6 месяцев' },
   { interactionId: 'SYNERGY_AUTO_049', substanceA: 'GLUTATHIONE', substanceB: 'ALPHA_LIPOIC', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Глутатион и альфа-липоевая кислота рециклируют друг друга, усиливая общий антиоксидантный потенциал', mechanisms: ['Рециклинг глутатиона', 'Антиоксидантный каскад', 'Хелатирование тяжелых металлов', 'Регенерация витаминов C и E'], severity: 'LOW', notes: 'АЛК 300-600 мг + глутатион 250-500 мг; натощак' },
   { interactionId: 'SYNERGY_AUTO_050', substanceA: 'NR', substanceB: 'PTEROSTILBENE', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Никотинамидрибозид (NR) и птеростильбен синергично повышают NAD+ и активируют сиртуины', mechanisms: ['Повышение NAD+', 'Активация SIRT1/SIRT3', 'Митохондриальное дыхание', 'Метилирование'], severity: 'LOW', notes: 'NR 300 мг + птеростильбен 50-100 мг; утром с жирной пищей' },
-  { interactionId: 'SYNERGY_AUTO_051', substanceA: 'VITEX', substanceB: 'VITAMIN_B6', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'В�?ТЕКС (прутняк) и витамин B6 синергично модулируют пролактин и облегчают симптомы ПМС', mechanisms: ['Дофаминовая модуляция D2', 'Снижение пролактина', 'Синтез нейротрансмиттеров', 'Баланс прогестерона'], severity: 'LOW', notes: 'Витекс 400-600 мг (циклом) + B6 50-100 мг; эффект через 2-3 цикла' },
-  { interactionId: 'SYNERGY_AUTO_052', substanceA: 'EVENING_PRIMROSE', substanceB: 'BORAGE', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Масло примулы вечерней и масло бурачника синергично обеспечивают GLA для гормонального баланса', mechanisms: ['�?сточник GLA', 'Метаболизм простагландинов', 'Противовоспалительная модуляция'], severity: 'LOW', notes: 'Примула 1000-2000 мг + бурачник 500-1000 мг; 1-3 месяца' },
+  { interactionId: 'SYNERGY_AUTO_051', substanceA: 'VITEX', substanceB: 'VITAMIN_B6', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'ВИТЕКС (прутняк) и витамин B6 синергично модулируют пролактин и облегчают симптомы ПМС', mechanisms: ['Дофаминовая модуляция D2', 'Снижение пролактина', 'Синтез нейротрансмиттеров', 'Баланс прогестерона'], severity: 'LOW', notes: 'Витекс 400-600 мг (циклом) + B6 50-100 мг; эффект через 2-3 цикла' },
+  { interactionId: 'SYNERGY_AUTO_052', substanceA: 'EVENING_PRIMROSE', substanceB: 'BORAGE', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Масло примулы вечерней и масло бурачника синергично обеспечивают GLA для гормонального баланса', mechanisms: ['Источник GLA', 'Метаболизм простагландинов', 'Противовоспалительная модуляция'], severity: 'LOW', notes: 'Примула 1000-2000 мг + бурачник 500-1000 мг; 1-3 месяца' },
   { interactionId: 'SYNERGY_AUTO_053', substanceA: 'BLACK_COHOSH', substanceB: 'RED_CLOVER', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Цимицифуга (воронец) и красный клевер синергично облегчают симптомы менопаузы и приливы', mechanisms: ['Фитоэстрогенная активность', 'Серотониновая модуляция', 'Терморегуляция гипоталамуса', 'Баланс эстрадиола'], severity: 'LOW', notes: 'Воронец 80-160 мг + клевер 40-80 мг; принимать вечером' },
-  { interactionId: 'SYNERGY_AUTO_054', substanceA: 'CRANBERRY', substanceB: 'D_MANNOSE', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Клюква и D-манноза синергично предотвращают �?МП: манноза блокирует адгезию E.coli, проантоцианидины - бактерицидны', mechanisms: ['Блокация адгезии FimH', 'Антибактериальный барьер', 'Подкисление мочи', 'Синерическое подавление'], severity: 'LOW', notes: 'D-манноза 1000 мг + клюква 500-1000 мг; профилактика 1-2 капс/день' },
-  { interactionId: 'SYNERGY_AUTO_055', substanceA: 'PROBIOTICS', substanceB: 'CRANBERRY', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Пробиотики (Lactobacillus) и клюква синергично поддерживают вагинальный микробиом', mechanisms: ['Поддержка лактофлоры', 'Антиадгезия патогенов', 'Снижение pH', '�?ммунная модуляция слизистой'], severity: 'LOW', notes: 'Пробиотики 10-30 млрд КОЕ + клюква 500 мг; вагинальный/пероральный приём' },
+  { interactionId: 'SYNERGY_AUTO_054', substanceA: 'CRANBERRY', substanceB: 'D_MANNOSE', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Клюква и D-манноза синергично предотвращают ИМП: манноза блокирует адгезию E.coli, проантоцианидины - бактерицидны', mechanisms: ['Блокация адгезии FimH', 'Антибактериальный барьер', 'Подкисление мочи', 'Синерическое подавление'], severity: 'LOW', notes: 'D-манноза 1000 мг + клюква 500-1000 мг; профилактика 1-2 капс/день' },
+  { interactionId: 'SYNERGY_AUTO_055', substanceA: 'PROBIOTICS', substanceB: 'CRANBERRY', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Пробиотики (Lactobacillus) и клюква синергично поддерживают вагинальный микробиом', mechanisms: ['Поддержка лактофлоры', 'Антиадгезия патогенов', 'Снижение pH', 'Иммунная модуляция слизистой'], severity: 'LOW', notes: 'Пробиотики 10-30 млрд КОЕ + клюква 500 мг; вагинальный/пероральный приём' },
   { interactionId: 'SYNERGY_AUTO_056', substanceA: 'VITAMIN_B9_FOLIC', substanceB: 'VITAMIN_B12', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Фолат (B9), метилкобаламин (B12) и пиридоксин (B6) синергично необходимы для метилирования и здоровья беременности', mechanisms: ['Цикл метилирования', 'Снижение гомоцистеина', 'Синтез нейротрансмиттеров', 'Формирование нервной трубки плода'], severity: 'HIGH', notes: 'Фолат 400-800 мкг + B12 200-500 мкг + B6 25-50 мг; за 3 мес до зачатия' },
-  { interactionId: 'SYNERGY_AUTO_057', substanceA: 'DAA', substanceB: 'ZINC', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'D-аспарагиновая кислота и цинк синергично стимулируют эндогенную выработку тестостерона', mechanisms: ['Стимуляция LH', 'Кофактор 5-альфа-редуктазы', '�?нгибирование ароматазы', 'Синтез стероидов'], severity: 'LOW', notes: 'DAA 2000-3000 мг + цинк 15-30 мг; 4-6 недель, затем перерыв' },
-  { interactionId: 'SYNERGY_AUTO_058', substanceA: 'SAW_PALMETTO', substanceB: 'BETA_SITOSTEROL', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Пальма сабаль (Serenoa), бета-ситостерин и тыква синергично блокируют DHT и поддерживают простату', mechanisms: ['�?нгибирование 5-альфа-редуктазы', 'Антагонизм андрогенных рецепторов', 'Противовоспалительное действие', 'Улучшение уродинамики'], severity: 'LOW', notes: 'Сабаль 320 мг + ситостерин 60-130 мг + тыква 500 мг; 3-6 месяцев' },
+  { interactionId: 'SYNERGY_AUTO_057', substanceA: 'DAA', substanceB: 'ZINC', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'D-аспарагиновая кислота и цинк синергично стимулируют эндогенную выработку тестостерона', mechanisms: ['Стимуляция LH', 'Кофактор 5-альфа-редуктазы', 'Ингибирование ароматазы', 'Синтез стероидов'], severity: 'LOW', notes: 'DAA 2000-3000 мг + цинк 15-30 мг; 4-6 недель, затем перерыв' },
+  { interactionId: 'SYNERGY_AUTO_058', substanceA: 'SAW_PALMETTO', substanceB: 'BETA_SITOSTEROL', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Пальма сабаль (Serenoa), бета-ситостерин и тыква синергично блокируют DHT и поддерживают простату', mechanisms: ['Ингибирование 5-альфа-редуктазы', 'Антагонизм андрогенных рецепторов', 'Противовоспалительное действие', 'Улучшение уродинамики'], severity: 'LOW', notes: 'Сабаль 320 мг + ситостерин 60-130 мг + тыква 500 мг; 3-6 месяцев' },
   { interactionId: 'SYNERGY_AUTO_059', substanceA: 'L_CITRULLINE', substanceB: 'L_ARGININE', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'L-цитруллин и L-аргинин синергично повышают оксид азота (NO) и улучшают кровоток и эректильную функцию', mechanisms: ['Цикл NO-синтазы', 'Вазодилатация', 'Повышение cGMP', 'Снижение ADMA'], severity: 'LOW', notes: 'Цитруллин 3000-6000 мг + аргинин 1000-2000 мг; натощак за 30-45 мин до тренировки' },
   { interactionId: 'SYNERGY_AUTO_060', substanceA: 'TRIBULUS', substanceB: 'MACA', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Трибулус и мака перуанская синергично повышают либидо и общую витальность у мужчин', mechanisms: ['Стимуляция LH/FSH', 'Адаптогенная поддержка HPA', 'Повышение энергии', 'Нейромедиаторная модуляция'], severity: 'LOW', notes: 'Трибулус 500-1500 мг + мака 2000-3000 мг; курсами 8-12 недель' },
-  { interactionId: 'SYNERGY_AUTO_061', substanceA: 'BORON', substanceB: 'ZINC', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Бор, витамин D и цинк синергично повышают свободный тестостерон через SHBG и ароматазу', mechanisms: ['Снижение SHBG', '�?нгибирование ароматазы', 'Кофактор стероидогенеза', 'Рецепция витамина D'], severity: 'LOW', notes: 'Бор 3-10 мг + D3 2000-5000 МЕ + цинк 15-30 мг; 3 месяца' },
+  { interactionId: 'SYNERGY_AUTO_061', substanceA: 'BORON', substanceB: 'ZINC', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Бор, витамин D и цинк синергично повышают свободный тестостерон через SHBG и ароматазу', mechanisms: ['Снижение SHBG', 'Ингибирование ароматазы', 'Кофактор стероидогенеза', 'Рецепция витамина D'], severity: 'LOW', notes: 'Бор 3-10 мг + D3 2000-5000 МЕ + цинк 15-30 мг; 3 месяца' },
   { interactionId: 'SYNERGY_AUTO_062', substanceA: 'LIONS_MANE', substanceB: 'ALCAR', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Ежовик гребенчатый (Lion s Mane) и ацетил-L-карнитин синергично стимулируют NGF и нейропластичность', mechanisms: ['Стимуляция NGF', 'Митохондриальная энергия', 'Нейрогенез гиппокампа', 'Миелинизация'], severity: 'LOW', notes: 'Ежовик 500-1000 мг + ALCAR 500-1000 мг; утром до еды' },
-  { interactionId: 'SYNERGY_AUTO_063', substanceA: 'GINKGO', substanceB: 'VINPOCETINE', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Гинкго билоба и винпоцетин синергично улучшают церебральный кровоток и когнитивные функции', mechanisms: ['Вазодилатация сосудов мозга', '�?нгибирование ФДЭ', 'Антиагрегация тромбоцитов', 'Повышение захвата глюкозы'], severity: 'LOW', notes: 'Гинкго 120-240 мг + винпоцетин 10-20 мг; 2-3 месяца' },
+  { interactionId: 'SYNERGY_AUTO_063', substanceA: 'GINKGO', substanceB: 'VINPOCETINE', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Гинкго билоба и винпоцетин синергично улучшают церебральный кровоток и когнитивные функции', mechanisms: ['Вазодилатация сосудов мозга', 'Ингибирование ФДЭ', 'Антиагрегация тромбоцитов', 'Повышение захвата глюкозы'], severity: 'LOW', notes: 'Гинкго 120-240 мг + винпоцетин 10-20 мг; 2-3 месяца' },
   { interactionId: 'SYNERGY_AUTO_064', substanceA: 'CITICOLINE', substanceB: 'ALPHA_GPC', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Цитиколин (CDP-холин) и альфа-GPC синергично повышают ацетилхолин и фосфолипиды мозга', mechanisms: ['Синтез ацетилхолина', 'Фосфолипидный синтез', 'Доставка холина через ГЭБ', 'Синаптическая пластичность'], severity: 'LOW', notes: 'CDP-холин 500-1000 мг + альфа-GPC 300-600 мг; раздельно утром и днем' },
-  { interactionId: 'SYNERGY_AUTO_065', substanceA: 'RHODIOLA', substanceB: 'L_TYROSINE', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Родиола розовая и L-тирозин синергично повышают стрессоустойчивость и когнитивную фокусировку', mechanisms: ['�?нгибирование КОМТ', 'Повышение дофамина/норадреналина', 'Модуляция HPA оси', 'Антиадаптогенный эффект'], severity: 'LOW', notes: 'Родиола 200-400 мг + тирозин 500-1000 мг; утром в стрессовые дни' },
+  { interactionId: 'SYNERGY_AUTO_065', substanceA: 'RHODIOLA', substanceB: 'L_TYROSINE', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Родиола розовая и L-тирозин синергично повышают стрессоустойчивость и когнитивную фокусировку', mechanisms: ['Ингибирование КОМТ', 'Повышение дофамина/норадреналина', 'Модуляция HPA оси', 'Антиадаптогенный эффект'], severity: 'LOW', notes: 'Родиола 200-400 мг + тирозин 500-1000 мг; утром в стрессовые дни' },
   { interactionId: 'SYNERGY_AUTO_066', substanceA: 'NOOPEPT', substanceB: 'CITICOLINE', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Ноопепт и цитиколин синергично улучшают память, обучение и вербальную беглость', mechanisms: ['Модуляция AMPA/BDNF', 'Ацетилхолиновая поддержка', 'Нейропептидная регуляция', 'Усиление синаптической передачи'], severity: 'LOW', notes: 'Ноопепт 10-20 мг + CDP-холин 500-1000 мг; цикл 4-8 недель' },
   { interactionId: 'SYNERGY_AUTO_067', substanceA: 'MAGNESIUM_L_THREONATE', substanceB: 'L_THEANINE', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Магний L-треонат и L-теанин синергично улучшают качество сна и когнитивные функции через ГАМК', mechanisms: ['Повышение магния в мозге', 'ГАМК-модуляция', 'Снижение глутамата', 'Улучшение синаптической пластичности'], severity: 'LOW', notes: 'Магний-треонат 2000 мг + теанин 100-200 мг; за 30-60 мин до сна' },
   { interactionId: 'SYNERGY_AUTO_068', substanceA: 'PHOSPHATIDYLSERINE', substanceB: 'BACOPA', type: 'synergy' as 'synergy' | 'conflict' | 'caution', effect: 'Фосфатидилсерин и бакопа монье синергично снижают кортизол и улучшают память у пожилых', mechanisms: ['Снижение кортизола', 'Ацетилхолиновая модуляция', 'Синаптическая защита', 'Улучшение межполушарной связи'], severity: 'LOW', notes: 'Фосфатидилсерин 200-400 мг + бакопа 300-600 мг; утром и днем' },
@@ -21464,7 +21464,7 @@ export const ALL_RISKS: SupportRisk[] = [
   { riskId: 'KIDNEY_HYPERTENSION', name: 'Renal Hypertension', system: 'vascular', organs: ['KIDNEYS'], symptoms: ['HIGH_BP', 'HEADACHE', 'NOCTURIA'], levels: 'LOW;MEDIUM;HIGH', description: 'Почечная гипертензия' },
   { riskId: 'KIDNEY_DRUG_TOXICITY', name: 'Drug-Induced Nephrotoxicity', system: 'toxic', organs: ['KIDNEYS'], symptoms: ['LOW_URINE', 'EDEMA', 'NAUSEA'], levels: 'LOW;MEDIUM;HIGH', description: 'Нефротоксичность' },
   { riskId: 'KIDNEY_DEHYDRATION', name: 'Dehydration', system: 'functional', organs: ['KIDNEYS'], symptoms: ['THIRST', 'DARK_URINE', 'CRAMPS'], levels: 'LOW;MEDIUM;HIGH', description: 'Обезвоживание' },
-  { riskId: 'KIDNEY_UTI', name: 'UTI', system: 'infectious', organs: ['BLADDER'], symptoms: ['PAIN_URINATION', 'FREQUENCY', 'BURNING'], levels: 'LOW;MEDIUM;HIGH', description: '�?нфекция мочевых путей' },
+  { riskId: 'KIDNEY_UTI', name: 'UTI', system: 'infectious', organs: ['BLADDER'], symptoms: ['PAIN_URINATION', 'FREQUENCY', 'BURNING'], levels: 'LOW;MEDIUM;HIGH', description: 'Инфекция мочевых путей' },
   { riskId: 'KIDNEY_GFR_LOW', name: 'Low GFR', system: 'lab', organs: ['KIDNEYS'], symptoms: ['FATIGUE', 'EDEMA', 'LOW_URINE'], levels: 'LOW;MEDIUM;HIGH', description: 'Снижение СКФ' },
   { riskId: 'KIDNEY_ELECTROLYTE_IMBALANCE', name: 'Electrolyte Imbalance', system: 'lab', organs: ['KIDNEYS'], symptoms: ['CRAMPS', 'WEAKNESS', 'ARRHYTHMIA'], levels: 'LOW;MEDIUM;HIGH', description: 'Дисбаланс электролитов' },
   { riskId: 'HEART_HYPERTENSION', name: 'Hypertension', system: 'vascular', organs: ['HEART', 'VESSELS'], symptoms: ['HIGH_BP', 'HEADACHE', 'NOSEBLEEDS'], levels: 'LOW;MEDIUM;HIGH', description: 'Гипертония' },
@@ -21506,7 +21506,7 @@ export const ALL_RISKS: SupportRisk[] = [
   { riskId: 'HORMONE_PCOS', name: 'PCOS', system: 'women', organs: ['OVARIES'], symptoms: ['ACNE', 'IRREGULAR_PERIODS', 'WEIGHT_GAIN'], levels: 'LOW;MEDIUM;HIGH', description: 'СПКЯ' },
   { riskId: 'HORMONE_HIGH_CORTISOL', name: 'High Cortisol', system: 'stress', organs: ['ADRENALS'], symptoms: ['ANXIETY', 'INSOMNIA', 'BELLY_FAT'], levels: 'LOW;MEDIUM;HIGH', description: 'Высокий кортизол' },
   { riskId: 'HORMONE_LOW_CORTISOL', name: 'Low Cortisol', system: 'stress', organs: ['ADRENALS'], symptoms: ['FATIGUE', 'LOW_BP', 'WEAKNESS'], levels: 'LOW;MEDIUM;HIGH', description: 'Низкий кортизол' },
-  { riskId: 'HORMONE_INSULIN_RESISTANCE', name: 'Insulin Resistance', system: 'metabolic', organs: ['PANCREAS'], symptoms: ['FATIGUE', 'CRAVINGS', 'WEIGHT_GAIN'], levels: 'LOW;MEDIUM;HIGH', description: '�?нсулинорезистентность' },
+  { riskId: 'HORMONE_INSULIN_RESISTANCE', name: 'Insulin Resistance', system: 'metabolic', organs: ['PANCREAS'], symptoms: ['FATIGUE', 'CRAVINGS', 'WEIGHT_GAIN'], levels: 'LOW;MEDIUM;HIGH', description: 'Инсулинорезистентность' },
   { riskId: 'HORMONE_DIABETES2', name: 'Type 2 Diabetes', system: 'metabolic', organs: ['PANCREAS'], symptoms: ['THIRST', 'FREQUENT_URINATION', 'FATIGUE'], levels: 'LOW;MEDIUM;HIGH', description: 'Диабет 2 типа' },
   { riskId: 'IMMUNE_LOW', name: 'Low Immunity', system: 'immune', organs: ['IMMUNE_SYSTEM'], symptoms: ['FREQUENT_ILLNESS', 'FATIGUE', 'SORE_THROAT'], levels: 'LOW;MEDIUM;HIGH', description: 'Сниженный иммунитет' },
   { riskId: 'IMMUNE_AUTOIMMUNE', name: 'Autoimmune Risk', system: 'autoimmune', organs: ['IMMUNE_SYSTEM'], symptoms: ['RASH', 'JOINT_PAIN', 'FATIGUE'], levels: 'LOW;MEDIUM;HIGH', description: 'Аутоиммунные риски' },
@@ -21633,7 +21633,7 @@ export const ALL_RECOMMENDATIONS: SupportRecommendation[] = [
   { recId: 'REC_KIDNEY_CKD_HIGH', type: 'RISK', relatedId: 'KIDNEY_CKD', level: 'HIGH', label: 'Выраженная ХБП', text: 'Срочно к нефрологу' },
   { recId: 'REC_KIDNEY_STONES_LOW', type: 'RISK', relatedId: 'KIDNEY_STONES', level: 'LOW', label: 'Риск камней', text: 'Пей воду' },
   { recId: 'REC_KIDNEY_STONES_MED', type: 'RISK', relatedId: 'KIDNEY_STONES', level: 'MEDIUM', label: 'Камни', text: 'Убери оксалаты' },
-  { recId: 'REC_KIDNEY_STONES_HIGH', type: 'RISK', relatedId: 'KIDNEY_STONES', level: 'HIGH', label: 'Крупные камни', text: 'Требуется УЗ�? и терапия.' },
+  { recId: 'REC_KIDNEY_STONES_HIGH', type: 'RISK', relatedId: 'KIDNEY_STONES', level: 'HIGH', label: 'Крупные камни', text: 'Требуется УЗИ и терапия.' },
   { recId: 'REC_HEART_HYPERTENSION_LOW', type: 'RISK', relatedId: 'HEART_HYPERTENSION', level: 'LOW', label: 'Повышенное давление', text: 'Уменьши соль' },
   { recId: 'REC_HEART_HYPERTENSION_MED', type: 'RISK', relatedId: 'HEART_HYPERTENSION', level: 'MEDIUM', label: 'Гипертензия', text: 'Добавь калий' },
   { recId: 'REC_HEART_HYPERTENSION_HIGH', type: 'RISK', relatedId: 'HEART_HYPERTENSION', level: 'HIGH', label: 'Высокое давление', text: 'Требуется медикаментозная терапия.' },
@@ -21710,19 +21710,19 @@ export const ALL_RECOMMENDATIONS: SupportRecommendation[] = [
   { recId: 'REC_INT_IRON_ZINC', type: 'INTERACTION', relatedId: 'INT_IRON_ZINC', level: 'MEDIUM', label: 'Железо + Цинк', text: 'Снижают всасывание друг друга.' },
   { recId: 'REC_INT_ZINC_COPPER', type: 'INTERACTION', relatedId: 'INT_ZINC_COPPER', level: 'MEDIUM', label: 'Цинк + Медь', text: 'Длительный цинк снижает медь.' },
   { recId: 'REC_INT_CALCIUM_MAGNESIUM', type: 'INTERACTION', relatedId: 'INT_CALCIUM_MAGNESIUM', level: 'LOW', label: 'Кальций + Магний', text: 'Лучше разнести по времени.' },
-  { recId: 'REC_INT_VITD_K2', type: 'INTERACTION', relatedId: 'INT_VITD_K2', level: 'LOW', label: 'Витамин D + K2', text: '�?деальная пара для костей.' },
+  { recId: 'REC_INT_VITD_K2', type: 'INTERACTION', relatedId: 'INT_VITD_K2', level: 'LOW', label: 'Витамин D + K2', text: 'Идеальная пара для костей.' },
   { recId: 'REC_INT_OMEGA3_ANTICOAG', type: 'INTERACTION', relatedId: 'INT_OMEGA3_ANTICOAG', level: 'MEDIUM', label: 'Омега‑3 + Антикоагулянты', text: 'Риск кровотечений.' },
   { recId: 'REC_INT_OMEGA3_NSAIDS', type: 'INTERACTION', relatedId: 'INT_OMEGA3_NSAIDS', level: 'LOW', label: 'Омега‑3 + НПВС', text: 'Сильный противовоспалительный эффект.' },
-  { recId: 'REC_INT_5HTP_SSRIS', type: 'INTERACTION', relatedId: 'INT_5HTP_SSRIS', level: 'HIGH', label: '5-HTP + С�?ОЗС', text: 'Риск серотонинового синдрома.' },
-  { recId: 'REC_INT_5HTP_TRYPTOPHAN', type: 'INTERACTION', relatedId: 'INT_5HTP_TRYPTOPHAN', level: 'MEDIUM', label: '5-HTP + Триптофан', text: '�?збыток серотонина.' },
-  { recId: 'REC_INT_STJOHNSWORT_SSRIS', type: 'INTERACTION', relatedId: 'INT_STJOHNSWORT_SSRIS', level: 'HIGH', label: 'Зверобой + С�?ОЗС', text: 'Опасная комбинация.' },
+  { recId: 'REC_INT_5HTP_SSRIS', type: 'INTERACTION', relatedId: 'INT_5HTP_SSRIS', level: 'HIGH', label: '5-HTP + СИОЗС', text: 'Риск серотонинового синдрома.' },
+  { recId: 'REC_INT_5HTP_TRYPTOPHAN', type: 'INTERACTION', relatedId: 'INT_5HTP_TRYPTOPHAN', level: 'MEDIUM', label: '5-HTP + Триптофан', text: 'Избыток серотонина.' },
+  { recId: 'REC_INT_STJOHNSWORT_SSRIS', type: 'INTERACTION', relatedId: 'INT_STJOHNSWORT_SSRIS', level: 'HIGH', label: 'Зверобой + СИОЗС', text: 'Опасная комбинация.' },
   { recId: 'REC_INT_STJOHNSWORT_OCP', type: 'INTERACTION', relatedId: 'INT_STJOHNSWORT_OCP', level: 'MEDIUM', label: 'Зверобой + ОК', text: 'Снижает эффективность контрацепции.' },
   { recId: 'REC_INT_NAC_PARACETAMOL', type: 'INTERACTION', relatedId: 'INT_NAC_PARACETAMOL', level: 'MEDIUM', label: 'NAC + Парацетамол', text: 'Защищает печень.' },
   { recId: 'REC_INT_NAC_CHEMO', type: 'INTERACTION', relatedId: 'INT_NAC_CHEMO', level: 'MEDIUM', label: 'NAC + Химиотерапия', text: 'Может мешать лечению.' },
   { recId: 'REC_INT_CURCUMIN_ANTICOAG', type: 'INTERACTION', relatedId: 'INT_CURCUMIN_ANTICOAG', level: 'MEDIUM', label: 'Куркумин + Антикоагулянты', text: 'Риск кровотечений.' },
   { recId: 'REC_INT_CURCUMIN_NSAIDS', type: 'INTERACTION', relatedId: 'INT_CURCUMIN_NSAIDS', level: 'LOW', label: 'Куркумин + НПВС', text: 'Сильный противовоспалительный эффект.' },
   { recId: 'REC_INT_PROBIOTICS_ANTIBIOTICS', type: 'INTERACTION', relatedId: 'INT_PROBIOTICS_ANTIBIOTICS', level: 'HIGH', label: 'Пробиотики + Антибиотики', text: 'Принимай раздельно.' },
-  { recId: 'REC_INT_PROBIOTICS_FIBER', type: 'INTERACTION', relatedId: 'INT_PROBIOTICS_FIBER', level: 'LOW', label: 'Пробиотики + Клетчатка', text: '�?деальная синергия.' },
+  { recId: 'REC_INT_PROBIOTICS_FIBER', type: 'INTERACTION', relatedId: 'INT_PROBIOTICS_FIBER', level: 'LOW', label: 'Пробиотики + Клетчатка', text: 'Идеальная синергия.' },
   { recId: 'REC_SYSTEM_LIVER_HIGH', type: 'SYSTEM', relatedId: 'LIVER', level: 'HIGH', label: 'Печень перегружена', text: 'Убери алкоголь' },
   { recId: 'REC_SYSTEM_LIVER_MED', type: 'SYSTEM', relatedId: 'LIVER', level: 'MEDIUM', label: 'Печень под нагрузкой', text: 'Снизь жирное' },
   { recId: 'REC_SYSTEM_LIVER_LOW', type: 'SYSTEM', relatedId: 'LIVER', level: 'LOW', label: 'Печень стабильна', text: 'Поддерживай режим питания.' },
@@ -21741,9 +21741,9 @@ export const ALL_RECOMMENDATIONS: SupportRecommendation[] = [
   { recId: 'REC_SYSTEM_HORMONES_HIGH', type: 'SYSTEM', relatedId: 'HORMONES', level: 'HIGH', label: 'Гормональная система перегружена', text: 'Снизь стресс' },
   { recId: 'REC_SYSTEM_HORMONES_MED', type: 'SYSTEM', relatedId: 'HORMONES', level: 'MEDIUM', label: 'Гормоны под нагрузкой', text: 'Добавь адаптогены.' },
   { recId: 'REC_SYSTEM_HORMONES_LOW', type: 'SYSTEM', relatedId: 'HORMONES', level: 'LOW', label: 'Гормоны стабильны', text: 'Поддерживай баланс питания.' },
-  { recId: 'REC_SYSTEM_IMMUNE_HIGH', type: 'SYSTEM', relatedId: 'IMMUNE_SYSTEM', level: 'HIGH', label: '�?ммунитет перегружен', text: 'Снизь стресс' },
-  { recId: 'REC_SYSTEM_IMMUNE_MED', type: 'SYSTEM', relatedId: 'IMMUNE_SYSTEM', level: 'MEDIUM', label: '�?ммунитет под нагрузкой', text: 'Добавь цинк и пробиотики.' },
-  { recId: 'REC_SYSTEM_IMMUNE_LOW', type: 'SYSTEM', relatedId: 'IMMUNE_SYSTEM', level: 'LOW', label: '�?ммунитет стабилен', text: 'Поддерживай режим.' },
+  { recId: 'REC_SYSTEM_IMMUNE_HIGH', type: 'SYSTEM', relatedId: 'IMMUNE_SYSTEM', level: 'HIGH', label: 'Иммунитет перегружен', text: 'Снизь стресс' },
+  { recId: 'REC_SYSTEM_IMMUNE_MED', type: 'SYSTEM', relatedId: 'IMMUNE_SYSTEM', level: 'MEDIUM', label: 'Иммунитет под нагрузкой', text: 'Добавь цинк и пробиотики.' },
+  { recId: 'REC_SYSTEM_IMMUNE_LOW', type: 'SYSTEM', relatedId: 'IMMUNE_SYSTEM', level: 'LOW', label: 'Иммунитет стабилен', text: 'Поддерживай режим.' },
   { recId: 'REC_GLOBAL_SLEEP_LOW', type: 'GLOBAL', relatedId: 'SLEEP', level: 'LOW', label: 'Недостаток сна', text: 'Ложись раньше' },
   { recId: 'REC_GLOBAL_SLEEP_MED', type: 'GLOBAL', relatedId: 'SLEEP', level: 'MEDIUM', label: 'Хронический недосып', text: 'Добавь магний и режим.' },
   { recId: 'REC_GLOBAL_SLEEP_HIGH', type: 'GLOBAL', relatedId: 'SLEEP', level: 'HIGH', label: 'Сильная бессонница', text: 'Снизь стимуляторы' },

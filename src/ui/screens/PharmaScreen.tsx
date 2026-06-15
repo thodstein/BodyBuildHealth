@@ -580,73 +580,98 @@ const DrugDetailCard: React.FC<{ sub: PharmaSubstance; detail?: PharmaDetail }> 
         </div>
       )}
 
-      {detail && (
-        <>
-          {detail.description && (
-            <div style={{ borderTop: '1px solid var(--border)', paddingTop: 8, marginBottom: 8 }}>
-              <div style={{ fontWeight: 600, marginBottom: 4 }}>Описание</div>
-              <div style={{ color: 'var(--text-dim)', lineHeight: 1.5 }}>{detail.description}</div>
+      {(sub.description || (detail?.description)) && (
+        <div style={{ borderTop: '1px solid var(--border)', paddingTop: 8, marginBottom: 8 }}>
+          <div style={{ fontWeight: 600, marginBottom: 4 }}>Описание</div>
+          <div style={{ color: 'var(--text-dim)', lineHeight: 1.5 }}>{detail?.description || sub.description}</div>
+        </div>
+      )}
+      {(detail?.mechanism || sub.mechanisms?.length) && (
+        <div style={{ borderTop: '1px solid var(--border)', paddingTop: 8, marginBottom: 8 }}>
+          <div style={{ fontWeight: 600, marginBottom: 4 }}>Механизм действия</div>
+          {detail?.mechanism ? (
+            <div style={{ color: 'var(--text-dim)', lineHeight: 1.5 }}>{detail.mechanism}</div>
+          ) : sub.mechanisms?.length ? (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
+              {sub.mechanisms.map((m, i) => (
+                <span key={i} style={{ fontSize: 9, padding: '2px 6px', borderRadius: 4, background: 'rgba(139,92,246,0.1)', color: '#8b5cf6', fontWeight: 500 }}>{m}</span>
+              ))}
             </div>
-          )}
-          {detail.mechanism && (
-            <div style={{ borderTop: '1px solid var(--border)', paddingTop: 8, marginBottom: 8 }}>
-              <div style={{ fontWeight: 600, marginBottom: 4 }}>Механизм действия</div>
-              <div style={{ color: 'var(--text-dim)', lineHeight: 1.5 }}>{detail.mechanism}</div>
+          ) : null}
+        </div>
+      )}
+      {(detail?.dosageRange || sub.dosageRange) && (
+        <div style={{ borderTop: '1px solid var(--border)', paddingTop: 8, marginBottom: 8 }}>
+          <div style={{ fontWeight: 600, marginBottom: 4 }}>Диапазон дозировок</div>
+          <div className="pharma-detail-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2px 12px' }}>
+            {(() => { const dr = detail?.dosageRange || sub.dosageRange; if (!dr) return null; return <>
+              <span>Минимум:</span><span>{dr.min} {dr.unit}</span>
+              <span>Максимум:</span><span style={{ color: '#ff9100' }}>{dr.max} {dr.unit}</span>
+              <span>Частота:</span><span>{dr.frequency}</span>
+            </>; })()}
+          </div>
+        </div>
+      )}
+      {(detail?.synergies && detail.synergies.length > 0) && (
+        <div style={{ borderTop: '1px solid var(--border)', paddingTop: 8, marginBottom: 8 }}>
+          <div style={{ fontWeight: 600, marginBottom: 4 }}>Синергия и комбинации</div>
+          {detail.synergies.map((s, i) => (
+            <div key={i} style={{ marginBottom: 4, padding: '4px 8px', borderRadius: 4, background: s.type === 'synergistic' ? 'rgba(0,230,138,0.08)' : s.type === 'antagonistic' ? 'rgba(255,23,68,0.08)' : 'rgba(41,121,255,0.08)' }}>
+              <span style={{ fontWeight: 600, color: s.type === 'synergistic' ? '#00e68a' : s.type === 'antagonistic' ? '#ff1744' : '#2979ff' }}>
+                {s.type === 'synergistic' ? '⊕' : s.type === 'antagonistic' ? '⊖' : '→'} {PHARMA_DB[s.with]?.name || s.with}
+              </span>
+              <span style={{ color: 'var(--text-dim)', marginLeft: 6 }}>{s.desc}</span>
             </div>
-          )}
-          {detail.dosageRange && (
-            <div style={{ borderTop: '1px solid var(--border)', paddingTop: 8, marginBottom: 8 }}>
-              <div style={{ fontWeight: 600, marginBottom: 4 }}>Диапазон дозировок</div>
-              <div className="pharma-detail-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2px 12px' }}>
-                <span>Минимум:</span><span>{detail.dosageRange.min} {detail.dosageRange.unit}</span>
-                <span>Максимум:</span><span style={{ color: '#ff9100' }}>{detail.dosageRange.max} {detail.dosageRange.unit}</span>
-                <span>Частота:</span><span>{detail.dosageRange.frequency}</span>
+          ))}
+        </div>
+      )}
+      {((detail?.sideEffects && detail.sideEffects.length > 0) || (sub.sideEffects && sub.sideEffects.length > 0)) && (
+        <div style={{ borderTop: '1px solid var(--border)', paddingTop: 8, marginBottom: 8 }}>
+          <div style={{ fontWeight: 600, marginBottom: 4 }}>Побочные эффекты</div>
+          {(detail?.sideEffects || sub.sideEffects || []).map((se, i) => (
+            <div key={i} style={{ marginBottom: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span>{se.effect}</span>
+              <span style={{ color: se.frequency === 'common' ? '#ff9100' : se.frequency === 'rare' ? '#2979ff' : '#ff1744', fontWeight: 600, fontSize: 11 }}>
+                {se.frequency === 'common' ? 'часто' : se.frequency === 'rare' ? 'редко' : se.frequency === 'very_rare' ? 'очень редко' : se.frequency}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+      {sub.contraindications && sub.contraindications.length > 0 && (
+        <div style={{ borderTop: '1px solid var(--border)', paddingTop: 8, marginBottom: 8 }}>
+          <div style={{ fontWeight: 600, marginBottom: 4 }}>Противопоказания</div>
+          {sub.contraindications.map((c, i) => (
+            <div key={i} style={{ fontSize: 11, color: '#ff5252', marginBottom: 2 }}>• {c}</div>
+          ))}
+        </div>
+      )}
+      {sub.research && sub.research.length > 0 && (
+        <div style={{ borderTop: '1px solid var(--border)', paddingTop: 8, marginBottom: 8 }}>
+          <div style={{ fontWeight: 600, marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span>📚</span><span>Исследования</span>
+          </div>
+          {sub.research.map((r, i) => (
+            <div key={i} style={{ marginBottom: 8, padding: '8px 10px', background: 'var(--bg-secondary)', borderRadius: 6 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                <span style={{ fontSize: 12, fontWeight: 600 }}>{r.study}</span>
+                <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 4, background: 'rgba(0,230,138,0.1)', color: '#00e68a' }}>{r.year}</span>
               </div>
+              <div style={{ fontSize: 11, color: 'var(--text-dim)', lineHeight: 1.5 }}>{r.conclusion}</div>
             </div>
-          )}
-          {detail.synergies && detail.synergies.length > 0 && (
-            <div style={{ borderTop: '1px solid var(--border)', paddingTop: 8, marginBottom: 8 }}>
-              <div style={{ fontWeight: 600, marginBottom: 4 }}>Синергия и комбинации</div>
-              {detail.synergies.map((s, i) => (
-                <div key={i} style={{ marginBottom: 4, padding: '4px 8px', borderRadius: 4, background: s.type === 'synergistic' ? 'rgba(0,230,138,0.08)' : s.type === 'antagonistic' ? 'rgba(255,23,68,0.08)' : 'rgba(41,121,255,0.08)' }}>
-                  <span style={{ fontWeight: 600, color: s.type === 'synergistic' ? '#00e68a' : s.type === 'antagonistic' ? '#ff1744' : '#2979ff' }}>
-                    {s.type === 'synergistic' ? '⊕' : s.type === 'antagonistic' ? '⊖' : '→'} {PHARMA_DB[s.with]?.name || s.with}
-                  </span>
-                  <span style={{ color: 'var(--text-dim)', marginLeft: 6 }}>{s.desc}</span>
-                </div>
-              ))}
+          ))}
+        </div>
+      )}
+      {detail?.researchLinks && detail.researchLinks.length > 0 && (
+        <div style={{ borderTop: '1px solid var(--border)', paddingTop: 8, marginBottom: 8 }}>
+          <div style={{ fontWeight: 600, marginBottom: 4 }}>Ссылки на исследования</div>
+          {detail.researchLinks.map((r, i) => (
+            <div key={i} style={{ marginBottom: 4, fontSize: 10 }}>
+              <a href={r.url} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)', textDecoration: 'none' }}>{r.title}</a>
+              <span style={{ color: 'var(--text-dim)', marginLeft: 4 }}>({r.source})</span>
             </div>
-          )}
-          {detail.sideEffects && detail.sideEffects.length > 0 && (
-            <div style={{ borderTop: '1px solid var(--border)', paddingTop: 8, marginBottom: 8 }}>
-              <div style={{ fontWeight: 600, marginBottom: 4 }}>Побочные эффекты</div>
-              {detail.sideEffects.map((se, i) => (
-                <div key={i} style={{ marginBottom: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span>{se.effect}</span>
-                  <span style={{ color: se.frequency === 'common' ? '#ff9100' : se.frequency === 'rare' ? '#2979ff' : '#ff1744', fontWeight: 600, fontSize: 11 }}>
-                    {se.frequency === 'common' ? '' : se.frequency === 'rare' ? '' : ''}
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
-          {sub.research && sub.research.length > 0 && (
-            <div style={{ borderTop: '1px solid var(--border)', paddingTop: 8, marginBottom: 8 }}>
-              <div style={{ fontWeight: 600, marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
-                <span>📚</span><span>Исследования</span>
-              </div>
-              {sub.research.map((r, i) => (
-                <div key={i} style={{ marginBottom: 8, padding: '8px 10px', background: 'var(--bg-secondary)', borderRadius: 6 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                    <span style={{ fontSize: 12, fontWeight: 600 }}>{r.study}</span>
-                    <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 4, background: 'rgba(0,230,138,0.1)', color: '#00e68a' }}>{r.year}</span>
-                  </div>
-                  <div style={{ fontSize: 11, color: 'var(--text-dim)', lineHeight: 1.5 }}>{r.conclusion}</div>
-                </div>
-              ))}
-            </div>
-          )}
-        </>
+          ))}
+        </div>
       )}
     </div>
   );
