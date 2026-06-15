@@ -22,9 +22,9 @@ const NAV_CARDS: { id: ScreenId; icon: string; label: string; color: string }[] 
 export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
   return (
     <div style={{ position:'fixed', inset:0, zIndex:100, display:'flex', flexDirection:'column' }}>
-      <img src="/hero-main.png" alt="" style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'contain', objectPosition:'center' }} />
-      <div style={{ position:'absolute', inset:0, background:'linear-gradient(transparent 60%, rgba(0,0,0,0.6))' }} />
-      <div style={{ position:'relative', zIndex:2, flex:1, display:'flex', flexDirection:'column', justifyContent:'flex-end', padding:'60px 16px 32px' }}>
+      <img src="/hero-main.png" alt="" style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'cover', objectPosition:'center' }} />
+      <div style={{ position:'absolute', inset:0, background:'linear-gradient(transparent 70%, rgba(0,0,0,0.5) 90%, rgba(0,0,0,0.8))' }} />
+      <div style={{ position:'relative', zIndex:2, flex:1, display:'flex', flexDirection:'column', justifyContent:'flex-end', padding:'20px 16px 4px' }}>
         <div style={{ display:'grid', gridTemplateColumns:'repeat(4, 1fr)', gap:10 }}>
           {NAV_CARDS.map(card => (
             <button key={card.id} onClick={() => onNavigate?.(card.id)} style={{
