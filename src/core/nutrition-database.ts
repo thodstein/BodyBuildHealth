@@ -437,6 +437,30 @@ export const FOOD_DB: FoodItem[] = [
   { id: 'green_tea', name: 'Зелёный чай', category: 'other', kcal: 1, protein: 0.2, fat: 0, carbs: 0.2, fiber: 0, gi: 0, servingSize: '200 мл',
     bestFor: ['cut', 'maintenance', 'rehab'], timing: 'any', pharmaNote: 'EGCG — антиоксидант, термогенный. Ингибирует COMT.', tier: 'mid',
     micros: { Ca: 2, Mg: 2, P: 1, K: 9, Na: 1, Fe: 0 } },
+  // === User-specified nutrition items ===
+  { id: 'beef_minced', name: 'Фарш говяжий', category: 'protein', kcal: 190, protein: 17, fat: 12, carbs: 0, fiber: 0, gi: 0, servingSize: '100 г', description: 'Говяжий фарш до 10% жирности', tier: 'mid', allergens: [], isVegetarian: false, isVegan: false, isGlutenFree: true, isDairyFree: true, dietTags: [] },
+  { id: 'red_fish', name: 'Красная рыба', category: 'protein', kcal: 200, protein: 20, fat: 13, carbs: 0, fiber: 0, gi: 0, servingSize: '100 г', description: 'Лосось/форель/семга. Не чаще 2р/нед', tier: 'max', allergens: ['fish'], isVegetarian: false, isVegan: false, isGlutenFree: true, isDairyFree: true, dietTags: ['omega3'] },
+  { id: 'white_fish_cod', name: 'Треска', category: 'protein', kcal: 82, protein: 18, fat: 1, carbs: 0, fiber: 0, gi: 0, servingSize: '100 г', description: 'Белая рыба, обезжиренный белок', tier: 'basic', allergens: ['fish'], isVegetarian: false, isVegan: false, isGlutenFree: true, isDairyFree: true, dietTags: [] },
+  { id: 'white_fish_halibut', name: 'Палтус', category: 'protein', kcal: 110, protein: 21, fat: 3, carbs: 0, fiber: 0, gi: 0, servingSize: '100 г', description: 'Белая рыба, плотная', tier: 'mid', allergens: ['fish'], isVegetarian: false, isVegan: false, isGlutenFree: true, isDairyFree: true, dietTags: [] },
+  { id: 'white_fish_mintai', name: 'Минтай', category: 'protein', kcal: 72, protein: 16, fat: 1, carbs: 0, fiber: 0, gi: 0, servingSize: '100 г', description: 'Белая рыба, бюджетный вариант', tier: 'basic', allergens: ['fish'], isVegetarian: false, isVegan: false, isGlutenFree: true, isDairyFree: true, dietTags: [] },
+  { id: 'coconut_oil', name: 'Кокосовое масло', category: 'fat', kcal: 862, protein: 0, fat: 99, carbs: 0, fiber: 0, gi: 0, servingSize: '15 мл', description: 'MCT-жиры, быстрая энергия', tier: 'mid', allergens: [], isVegetarian: true, isVegan: true, isGlutenFree: true, isDairyFree: true, dietTags: [] },
+  { id: 'coconut_urbec', name: 'Кокосовый урбеч', category: 'fat', kcal: 570, protein: 13, fat: 45, carbs: 27, fiber: 10, gi: 35, servingSize: '30 г', description: 'Паста из кокоса, MCT + клетчатка', tier: 'mid', allergens: [], isVegetarian: true, isVegan: true, isGlutenFree: true, isDairyFree: true, dietTags: [] },
+  { id: 'red_caviar', name: 'Красная икра', category: 'fat', kcal: 250, protein: 30, fat: 14, carbs: 1, fiber: 0, gi: 0, servingSize: '30 г', description: 'Омега-3, витамин D, B12', tier: 'max', allergens: ['fish'], isVegetarian: false, isVegan: false, isGlutenFree: true, isDairyFree: true, dietTags: ['omega3'] },
+  { id: 'cream_of_rice', name: 'Cream of Rice', category: 'carb', kcal: 380, protein: 7, fat: 1, carbs: 82, fiber: 1, gi: 80, servingSize: '50 г', description: 'Рисовая каша, быстрые углеводы', tier: 'basic', allergens: [], isVegetarian: true, isVegan: true, isGlutenFree: true, isDairyFree: true, dietTags: [] },
+  { id: 'whole_grain_bread', name: 'Хлеб цельнозерновой', category: 'carb', kcal: 250, protein: 9, fat: 3, carbs: 47, fiber: 7, gi: 50, servingSize: '40г', description: 'Сложные углеводы + клетчатка', tier: 'mid', allergens: ['gluten'], isVegetarian: true, isVegan: true, isGlutenFree: false, isDairyFree: true, dietTags: [] },
+  { id: 'corn_flakes', name: 'Кукурузные хлопья', category: 'carb', kcal: 360, protein: 7, fat: 1, carbs: 80, fiber: 3, gi: 80, servingSize: '30 г', description: 'Ограниченно. Без пшеницы', tier: 'mid', allergens: [], isVegetarian: true, isVegan: true, isGlutenFree: true, isDairyFree: true, dietTags: ['limited'] },
+  { id: 'citrus', name: 'Цитрусовые', category: 'veg_fruit', kcal: 40, protein: 1, fat: 0, carbs: 10, fiber: 2, gi: 40, servingSize: '150г', description: 'Ограниченно. Витамин C', tier: 'mid', allergens: [], isVegetarian: true, isVegan: true, isGlutenFree: true, isDairyFree: true, dietTags: ['limited'] },
+  { id: 'green_apple', name: 'Зелёное яблоко', category: 'veg_fruit', kcal: 52, protein: 0, fat: 0, carbs: 14, fiber: 2, gi: 35, servingSize: '180г', description: 'Ограниченно. Низкий ГИ, пектин', tier: 'mid', allergens: [], isVegetarian: true, isVegan: true, isGlutenFree: true, isDairyFree: true, dietTags: ['limited'] },
+  { id: 'dates', name: 'Финики', category: 'carb', kcal: 280, protein: 2, fat: 0, carbs: 70, fiber: 7, gi: 55, servingSize: '60г', description: 'Ограниченно. Высокая калорийность', tier: 'mid', allergens: [], isVegetarian: true, isVegan: true, isGlutenFree: true, isDairyFree: true, dietTags: ['limited'] },
+  { id: 'marmalade', name: 'Мармелад', category: 'carb', kcal: 300, protein: 1, fat: 0, carbs: 75, fiber: 0, gi: 70, servingSize: '30 г', description: 'Ограниченно. Желатин + сахар', tier: 'mid', allergens: [], isVegetarian: true, isVegan: false, isGlutenFree: true, isDairyFree: true, dietTags: ['limited'] },
+  { id: 'tomato_juice', name: 'Томатный сок', category: 'veg_fruit', kcal: 18, protein: 1, fat: 0, carbs: 4, fiber: 1, gi: 38, servingSize: '200 мл', description: 'Ограниченно. Ликопин, калий', tier: 'mid', allergens: [], isVegetarian: true, isVegan: true, isGlutenFree: true, isDairyFree: true, dietTags: ['limited'] },
+  { id: 'amylopectin', name: 'Амилопектин', category: 'supplement', kcal: 380, protein: 0, fat: 0, carbs: 95, fiber: 0, gi: 95, servingSize: '30 г', description: 'Ограниченно. Периоркоут углеводы', tier: 'max', allergens: [], isVegetarian: true, isVegan: true, isGlutenFree: true, isDairyFree: true, dietTags: ['limited', 'peri-workout'] },
+  { id: 'dextrose', name: 'Декстроза', category: 'supplement', kcal: 370, protein: 0, fat: 0, carbs: 93, fiber: 0, gi: 100, servingSize: '20 г', description: 'Ограниченно. Посттренинговые углеводы', tier: 'max', allergens: [], isVegetarian: true, isVegan: true, isGlutenFree: true, isDairyFree: true, dietTags: ['limited', 'peri-workout'] },
+  { id: 'onion', name: 'Лук', category: 'veg_fruit', kcal: 40, protein: 1, fat: 0, carbs: 9, fiber: 2, gi: 15, servingSize: '80г', description: 'Клетчатка. Кверцетин', tier: 'basic', allergens: [], isVegetarian: true, isVegan: true, isGlutenFree: true, isDairyFree: true, dietTags: [] },
+  { id: 'sauerkraut', name: 'Квашеная капуста', category: 'veg_fruit', kcal: 20, protein: 1, fat: 0, carbs: 4, fiber: 3, gi: 15, servingSize: '100 г', description: 'Пробиотик. Не ежедневно!', tier: 'mid', allergens: [], isVegetarian: true, isVegan: true, isGlutenFree: true, isDairyFree: true, dietTags: ['fermented'] },
+  { id: 'tomato_paste', name: 'Томатная паста', category: 'veg_fruit', kcal: 80, protein: 4, fat: 1, carbs: 17, fiber: 3, gi: 50, servingSize: '30 г', description: 'Специя. Концентрированный ликопин', tier: 'basic', allergens: [], isVegetarian: true, isVegan: true, isGlutenFree: true, isDairyFree: true, dietTags: [] },
+  { id: 'himalayan_salt', name: 'Гималайская соль', category: 'other', kcal: 0, protein: 0, fat: 0, carbs: 0, fiber: 0, gi: 0, servingSize: '2 г', description: 'Специя. Минералы', tier: 'basic', allergens: [], isVegetarian: true, isVegan: true, isGlutenFree: true, isDairyFree: true, dietTags: [] },
+
 ];
 
 export const FOOD_ALLERGEN_DIET: Record<string, { allergens: string[]; isVegetarian: boolean; isVegan: boolean; isGlutenFree: boolean; isDairyFree: boolean; dietTags: string[] }> = {
@@ -543,12 +567,36 @@ function applyDietTags(foods: FoodItem[]): FoodItem[] {
 }
 
 const RATION_TIERS: Record<string, { basic: string[]; mid: string[]; max: string[] }> = {
-  protein: { basic: [' chicken_breast', 'egg_whole', 'egg_white', 'whey_protein'], mid: ['turkey_breast', 'tuna_canned', 'pork_tenderloin', 'casein'], max: ['beef_lean', 'salmon'] },
-  carb: { basic: ['rice_white', 'oats', 'potato_boiled', 'banana'], mid: ['rice_brown', 'buckwheat', 'pasta_durum', 'sweet_potato'], max: ['quinoa', 'berries'] },
-  fat: { basic: ['olive_oil', 'butter'], mid: ['avocado', 'nuts_mix', 'yogurt_greek'], max: ['seeds', 'fish_oil_food'] },
-  dairy: { basic: ['cottage_cheese_5', 'kefir', 'milk'], mid: ['cheese_hard', 'yogurt_greek'], max: [] },
-  veg_fruit: { basic: ['broccoli', 'cucumber', 'tomato', 'apple'], mid: ['spinach', 'pepper', 'berries', 'sweet_potato'], max: [] },
-  supplement: { basic: ['creatine', 'fish_oil', 'vitamin_complex'], mid: ['bcaa', 'glutamine', 'casein'], max: [] },
+  protein: {
+    basic: ['chicken_breast', 'egg_whole', 'egg_white', 'whey_protein', 'white_fish_cod', 'white_fish_mintai'],
+    mid: ['turkey_breast', 'tuna_canned', 'pork_tenderloin', 'casein', 'beef_minced', 'white_fish_halibut'],
+    max: ['beef_lean', 'salmon', 'red_fish'],
+  },
+  carb: {
+    basic: ['rice_white', 'oats', 'potato_boiled', 'banana', 'cream_of_rice'],
+    mid: ['rice_brown', 'buckwheat', 'pasta_durum', 'sweet_potato', 'rice_noodles', 'whole_grain_bread'],
+    max: ['quinoa', 'berries'],
+  },
+  fat: {
+    basic: ['olive_oil', 'butter'],
+    mid: ['avocado', 'nuts_mix', 'yogurt_greek', 'coconut_oil', 'coconut_urbec'],
+    max: ['seeds', 'fish_oil_food', 'red_caviar'],
+  },
+  dairy: {
+    basic: ['cottage_cheese_5', 'kefir', 'milk'],
+    mid: ['cheese_hard', 'yogurt_greek'],
+    max: [],
+  },
+  veg_fruit: {
+    basic: ['broccoli', 'cucumber', 'tomato', 'carrot', 'onion', 'tomato_paste'],
+    mid: ['spinach', 'pepper', 'berries', 'beetroot', 'sauerkraut', 'green_apple', 'citrus', 'tomato_juice'],
+    max: [],
+  },
+  supplement: {
+    basic: ['creatine', 'fish_oil', 'vitamin_complex'],
+    mid: ['bcaa', 'glutamine', 'casein', 'marmalade', 'corn_flakes', 'dates'],
+    max: ['amylopectin', 'dextrose'],
+  },
 };
 
 export interface FoodFilter {

@@ -15,6 +15,8 @@ import { generateNutritionAdvice } from '../../engines/nutrition-full.engine';
 import { NutritionOverview } from './NutritionScreen_parts/NutritionOverview';
 import { NutritionDiary } from './NutritionScreen_parts/NutritionDiary';
 import { NutritionCharts } from './NutritionScreen_parts/NutritionCharts';
+import { NutritionMealGen } from './NutritionScreen_parts/NutritionMealGen';
+import { NutritionCustomFood } from './NutritionScreen_parts/NutritionCustomFood';
 
 interface DiaryEntry {
   name: string;
@@ -46,7 +48,7 @@ const NutritionLabContext: React.FC<{ labAnalysis: LabCompositeResult }> = ({ la
 export const NutritionScreen: React.FC = () => {
   const linked = useDataLink();
   const labAnalysis = linked.labAnalysis;
-  const [tab, setTab] = useState<'overview' | 'diary' | 'charts' | 'mealplan' | 'grocery' | 'restaurant' | 'cycling' | 'calc'>('overview');
+  const [tab, setTab] = useState<'overview' | 'diary' | 'charts' | 'mealplan' | 'grocery' | 'restaurant' | 'cycling' | 'calc' | 'regime' | 'custom'>('overview');
   const [page, setPage] = useState<NutritionPage>('hero');
   const [foodEntries, setFoodEntries] = useState<DiaryEntry[]>([]);
   const [dailyLogs, setDailyLogs] = useState<Record<string, DiaryEntry[]>>({});
@@ -182,9 +184,9 @@ export const NutritionScreen: React.FC = () => {
       {page !== 'hero' && (
         <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '0 12px 70px' }}>
           <div className="tab-bar">
-            {(['overview', 'diary', 'charts', 'mealplan', 'grocery', 'restaurant', 'calc', 'cycling'] as const).map(t => (
+            {(['overview', 'diary', 'charts', 'mealplan', 'grocery', 'restaurant', 'calc', 'cycling', 'regime', 'custom'] as const).map(t => (
               <button key={t} className={`tab-btn ${tab === t ? 'active' : ''}`} onClick={() => setTab(t)}>
-                {t === 'overview' ? '📊 Обзор' : t === 'diary' ? '📝 Дневник' : t === 'charts' ? '📈 Графики' : t === 'mealplan' ? '🥗 План' : t === 'grocery' ? '🛒 Список' : t === 'restaurant' ? '🍽 Ресторан' : t === 'calc' ? '📐 Калькуляторы' : '🔄 Циклирование'}
+                {t === 'overview' ? '📊 Обзор' : t === 'diary' ? '📝 Дневник' : t === 'charts' ? '📈 Графики' : t === 'mealplan' ? '🥗 План' : t === 'grocery' ? '🛒 Список' : t === 'restaurant' ? '🍽 Ресторан' : t === 'calc' ? '📐 Калькуляторы' : t === 'regime' ? '⏰ Режим' : t === 'custom' ? '🍎 Своё' : '🔄 Циклирование'}
               </button>
             ))}
           </div>
