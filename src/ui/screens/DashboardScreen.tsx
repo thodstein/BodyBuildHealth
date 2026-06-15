@@ -22,9 +22,9 @@ const NAV_CARDS: { id: ScreenId; icon: string; label: string; color: string }[] 
 export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
   return (
     <div style={{ position:'fixed', inset:0, zIndex:100, display:'flex', flexDirection:'column' }}>
-      <img src="/hero-main.png" alt="" style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'cover', objectPosition:'center' }} />
-      <div style={{ position:'absolute', inset:0, background:'linear-gradient(transparent 70%, rgba(0,0,0,0.5) 90%, rgba(0,0,0,0.8))' }} />
-      <div style={{ position:'relative', zIndex:2, flex:1, display:'flex', flexDirection:'column', justifyContent:'flex-end', padding:'20px 16px 4px' }}>
+      <img src="/hero-main.png" alt="" style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'contain', objectPosition:'center', background:'#0a0a0a' }} />
+      <div style={{ position:'absolute', left:0, right:0, bottom:'15%', top:'70%', background:'linear-gradient(to top, #0a0a0a 0%, transparent 100%)', zIndex:1 }} />
+      <div style={{ position:'absolute', bottom:0, left:0, right:0, zIndex:2, padding:'8px 16px 24px', background:'linear-gradient(to top, rgba(10,10,10,0.95) 0%, rgba(10,10,10,0.7) 60%, transparent 100%)' }}>
         <div style={{ display:'grid', gridTemplateColumns:'repeat(4, 1fr)', gap:10 }}>
           {NAV_CARDS.map(card => (
             <button key={card.id} onClick={() => onNavigate?.(card.id)} style={{
