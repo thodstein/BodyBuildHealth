@@ -1221,7 +1221,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
           </div>
           {cats?.syn_synergies !== false && (
             <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
-              {synergies.slice(0, 30).map((interaction: any, i: number) => safeItem(() => {
+              {synergies.map((interaction: any, i: number) => safeItem(() => {
                 const sevInfo = INTERACTION_SEVERITY_LABELS[interaction?.severity] || { label:interaction?.severity, color:'#888' };
                 const aName = resolveSubName(interaction?.substanceA);
                 const bName = resolveSubName(interaction?.substanceB);
@@ -1259,7 +1259,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
           </div>
           {cats?.syn_conflicts !== false && (
             <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
-              {conflicts.slice(0, 30).map((interaction: any, i: number) => safeItem(() => {
+              {conflicts.map((interaction: any, i: number) => safeItem(() => {
                 const typeInfo = INTERACTION_TYPE_LABELS[interaction?.type] || { label:interaction?.type, emoji:'🔗', color:'#888' };
                 const sevInfo = INTERACTION_SEVERITY_LABELS[interaction?.severity] || { label:interaction?.severity, color:'#888' };
                 const aName = resolveSubName(interaction?.substanceA);
@@ -1793,9 +1793,9 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
                 {/* Results */}
                 <div style={{fontSize:8,color:'var(--text-dim)',marginBottom:6}}>Найдено: {filtered.length} стеков</div>
                 <div style={{display:'flex',flexDirection:'column',gap:4}}>
-                  {filtered.slice(0,40).map(stack=>{
+                  {filtered.map(stack=>{
                     const sc=stack.synergyScore>20?'#22c55e':stack.synergyScore>12?'#eab308':'#f59e0b';
-                    return <div key={stack.id} style={{background:'var(--bg-secondary)',borderRadius:8,padding:'8px',border:'1px solid var(--border)',cursor:'pointer'}} onClick={()=>setExpandedMed(expandedMed===stack.id?null:stack.id)}>
+                    return <div key={stack.id} style={{background:'rgba(0,230,138,0.03)',borderRadius:8,padding:'8px',border:'1px solid rgba(0,230,138,0.1)',cursor:'pointer'}} onClick={()=>setExpandedMed(expandedMed===stack.id?null:stack.id)}>
                       {stack.description&&<div style={{fontSize:8,color:'var(--text-dim)',lineHeight:1.3,marginBottom:3}}>{stack.description}</div>}
                       <div style={{display:'flex',flexWrap:'wrap',gap:2,alignItems:'center'}}>
                         {stack.effects.map(e=><span key={e} style={{fontSize:7,padding:'1px 5px',borderRadius:3,background:'rgba(0,230,138,0.08)',color:'#00e68a'}}>{EFFECT_LABELS_ru[e]||e}</span>)}
