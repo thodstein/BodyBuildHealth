@@ -53,7 +53,6 @@ const CLASS_LABELS: Record<string, string> = {
   peptide_gnrh: 'GnRH',
   peptide_fat_loss: 'Жиросжигающие',
   peptide_other: 'Прочие',
-  support: 'Поддержка',
   peptide_regenerative: 'Регенеративные',
   peptide_immune: 'Иммунные',
   peptide_nootropic: 'Ноотропы',
@@ -115,7 +114,7 @@ const PHARMA_CLASSES = [
   'testosterone', 'trenbolone', 'nandrolone', 'boldenone', 'primobolan', 'oral_17aa',
   'sarm', 'peptide_ghrh', 'peptide_ghrp', 'igf1', 'mgf', 'insulin', 'pct_serm',
   'pct_aromatase', 'pct_dopamine', 'pct_gonadotropin', 'drostanolone', 'peptide_gnrh',
-  'peptide_fat_loss', 'peptide_other', 'support', 'peptide_regenerative', 'peptide_immune',
+  'peptide_fat_loss', 'peptide_other', 'peptide_regenerative', 'peptide_immune',
   'peptide_nootropic', 'dht_derivative'
 ] as const;
 

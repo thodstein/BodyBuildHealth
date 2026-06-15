@@ -3,8 +3,8 @@
   --bg-secondary: #141414;
   --bg-tertiary: #1A1A1A;
   --text: #FFFFFF;
-  --text-dim: #888888;
-  --text-light: #AAAAAA;
+  --text-dim: rgba(255,255,255,0.85);
+  --text-light: rgba(255,255,255,0.92);
   --card-bg: #1A1A1A;
   --card-bg-hover: #222222;
   --card-bg-active: #2A2A2A;
@@ -43,8 +43,8 @@
   --transition-fast: 0.15s ease;
   --transition-medium: 0.25s ease;
   --transition-slow: 0.4s ease;
-  --glass-bg: rgba(26,26,26,0.85);
-  --glass-border: rgba(200,245,96,0.1);
+  --glass-bg: rgba(255,255,255,0.06);
+  --glass-border: rgba(255,255,255,0.1);
   --glass-shadow: 0 8px 32px rgba(0,0,0,0.4);
   --organ-3d-size: 200px;
   --organ-3d-bg: rgba(0,0,0,0.2);
@@ -1362,8 +1362,8 @@ body { overscroll-behavior: none; position: fixed; width: 100%; height: 100%; ov
   --bg-secondary: #141414;
   --bg-tertiary: #1A1A1A;
   --text: #FFFFFF;
-  --text-dim: #888888;
-  --text-light: #AAAAAA;
+  --text-dim: rgba(255,255,255,0.85);
+  --text-light: rgba(255,255,255,0.92);
   --accent: #C8F560;
   --accent-dim: rgba(200,245,96,0.12);
   --accent-glow: rgba(200,245,96,0.35);

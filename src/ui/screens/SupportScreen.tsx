@@ -38,7 +38,7 @@ import { searchPubMed, type PubMedArticle } from '../../engines/pubmed-search.en
 type SupportTab = 'main' | 'catalog' | 'synergies' | 'calculator' | 'interactions' | 'stacks' | 'peptides' | 'fertility-pct' | 'stackcalc' | 'mystacks';
 type SupportView = 'main' | 'calc' | 'fertility';
 type CalcView = 'main' | 'calculator' | 'peptides' | 'info';
-type InfoView = 'main' | 'catalog' | 'synergies' | 'stacks' | 'interactions' | 'stackcalc' | 'research';
+type InfoView = 'main' | 'catalog' | 'synergies' | 'stacks' | 'interactions' | 'research';
 
 const INTERACTION_TYPE_LABELS: Record<string, { label: string; emoji: string; color: string }> = {
   synergy: { label: 'Синергия', emoji: '🔗', color: '#22c55e' },
@@ -1551,13 +1551,13 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
           <button onClick={() => setCalcView('main')} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', marginBottom:6, background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600, alignSelf:'flex-start' }}>← Назад</button>
           {/* Pills */}
           <div style={{ display:'flex', gap:4, marginBottom:8, overflowX:'auto', scrollbarWidth:'none', flexShrink:0 }}>
-            {(['catalog','synergies','stacks','interactions','stackcalc','research'] as const).map(t => (
+            {(['catalog','synergies','stacks','interactions','research'] as const).map(t => (
               <button key={t} onClick={() => { setInfoView(t); setSynergyPage(1); }} style={{
                 padding:'7px 14px', borderRadius:20, fontSize:10, fontWeight:700, whiteSpace:'nowrap', cursor:'pointer', flexShrink:0,
                 background: infoView === t ? 'var(--accent)' : 'var(--bg-secondary)',
                 color: infoView === t ? '#000' : 'var(--text-dim)',
                 border: `1px solid ${infoView === t ? 'var(--accent)' : 'var(--border)'}`,
-              }}>{t === 'catalog' ? '📖 Каталог' : t === 'synergies' ? '🔗 Синергии' : t === 'stacks' ? '📦 Стеки' : t === 'stackcalc' ? '🧮 Генератор' : t === 'research' ? '🔬 Исследования' : '⚡ Взаимодействия'}</button>
+              }}>{t === 'catalog' ? '📖 Каталог' : t === 'synergies' ? '🔗 Синергии' : t === 'stacks' ? '📦 Стеки' : t === 'research' ? '🔬 Исследования' : '⚡ Взаимодействия'}</button>
             ))}
           </div>
           {/* Content */}
@@ -1593,38 +1593,44 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
                                   <div style={{ flex:1 }}>
                                     <div style={{ fontSize:10, fontWeight:600, color:'var(--text-light)', lineHeight:1.3 }}>{sub?.name||''}</div>
                                     <div style={{ display:'flex', gap:2, flexWrap:'wrap', marginTop:1 }}>
-                                      {(sub?.categories||[]).slice(0,3).map(c => <span key={c} style={{ fontSize:7, padding:'1px 3px', borderRadius:2, background:'rgba(255,255,255,0.04)', color:'var(--text-dim)' }}>{c||''}</span>)}
-                                      {(sub?.mechanisms||[]).slice(0,3).map(m => <span key={m||''} style={{ fontSize:7, padding:'1px 3px', borderRadius:2, background:'rgba(0,230,138,0.06)', color:'var(--accent-green)' }}>{m||''}</span>)}
+                                      {(sub?.categories||[]).slice(0,3).map(c => <span key={c} style={{ fontSize:8, padding:'1px 4px', borderRadius:3, background:'rgba(255,255,255,0.06)', color:'rgba(255,255,255,0.85)' }}>{c||''}</span>)}
+                                      {(sub?.mechanisms||[]).slice(0,4).map(m => <span key={m||''} style={{ fontSize:8, padding:'1px 4px', borderRadius:3, background:'rgba(0,230,138,0.08)', color:'#00e68a' }}>{m||''}</span>)}
                                     </div>
                                   </div>
                                   <span style={{ fontSize:9, color:'var(--text-dim)', transform:selectedSub === sub?.id ? 'rotate(180deg)' : 'none' }}>▼</span>
                                 </div>
                                 {selectedSub === sub?.id && sub && (
                                   <div style={{ padding:'6px 10px 8px 14px', background:'rgba(0,0,0,0.15)', borderBottom:'1px solid var(--border)' }}>
-                                    <div style={{ fontSize:9, color:'rgba(255,255,255,0.85)', lineHeight:1.3, marginBottom:4 }}>{sub.description||''}</div>
+                                    <div style={{ fontSize:10, color:'rgba(255,255,255,0.9)', lineHeight:1.4, marginBottom:4 }}>{sub.description||''}</div>
                                     <div style={{ fontSize:7, color:'var(--accent-green, #00e68a)', marginBottom:3 }}>
-                                      {(sub.type||'')}{(sub.categories||[]).length > 0 ? ' · ' + (sub.categories||[]).slice(0,2).join(', ') : ''}
+                                      {(sub.type||'')}{(sub.categories||[]).length > 0 ? ' · ' + (sub.categories||[]).slice(0,3).join(', ') : ''}
                                     </div>
                                     {(sub.mechanisms||[]).length > 0 && (
                                       <div style={{ marginBottom:3 }}>
-                                        <div style={{ fontSize:7, color:'var(--text-dim)', marginBottom:1 }}>Механизмы действия:</div>
+                                        <div style={{ fontSize:8, color:'rgba(255,255,255,0.85)', marginBottom:1 }}>Механизмы действия:</div>
                                         <div style={{ display:'flex', gap:2, flexWrap:'wrap' }}>
                                           {(sub.mechanisms||[]).map((m,i) => (
-                                            <span key={i} style={{ fontSize:7, padding:'1px 5px', borderRadius:3, background:'rgba(0,230,138,0.06)', color:'#00e68a' }}>{(m||'')}</span>
+                                            <span key={i} style={{ fontSize:8, padding:'2px 6px', borderRadius:4, background:'rgba(0,230,138,0.08)', color:'#00e68a', border:'1px solid rgba(0,230,138,0.15)' }}>{(m||'')}</span>
                                           ))}
                                         </div>
                                       </div>
                                     )}
                                     {(sub.organs||[]).length > 0 && (
                                       <div style={{ marginBottom:3 }}>
-                                        <div style={{ fontSize:7, color:'var(--text-dim)', marginBottom:1 }}>Органы-мишени:</div>
+                                        <div style={{ fontSize:8, color:'rgba(255,255,255,0.85)', marginBottom:1 }}>Органы-мишени:</div>
                                         <div style={{ display:'flex', gap:2, flexWrap:'wrap' }}>
-                                          {(sub.organs||[]).map(o => <span key={o||''} style={{ fontSize:7, padding:'1px 5px', borderRadius:3, background:'rgba(59,130,246,0.08)', color:'#60a5fa' }}>{o||''}</span>)}
+                                          {(sub.organs||[]).map(o => <span key={o||''} style={{ fontSize:8, padding:'2px 6px', borderRadius:4, background:'rgba(59,130,246,0.1)', color:'#60a5fa', border:'1px solid rgba(59,130,246,0.15)' }}>{o||''}</span>)}
                                         </div>
                                       </div>
                                     )}
                                     {sub.deficiency && sub.deficiency !== 'NONE' && (
-                                      <div style={{ fontSize:8, color:'#f59e0b', marginTop:2 }}>Дефицит: {sub.deficiency}</div>
+                                      <div style={{ fontSize:9, color:'#f59e0b', marginTop:2 }}>⚠ Дефицит: {sub.deficiency}</div>
+                                    )}
+                                    {SUPPLEMENT_DESCRIPTIONS[sub.id] && (
+                                      <div style={{ marginTop:4, padding:'4px 6px', background:'rgba(0,230,138,0.05)', borderRadius:4, border:'1px solid rgba(0,230,138,0.1)' }}>
+                                        <div style={{ fontSize:7, color:'#00e68a', fontWeight:600, marginBottom:1 }}>📋 Подробнее:</div>
+                                        <div style={{ fontSize:8, color:'rgba(255,255,255,0.85)', lineHeight:1.4 }}>{SUPPLEMENT_DESCRIPTIONS[sub.id]}</div>
+                                      </div>
                                     )}
                                     {catDetailInteractions(sub, mergedInteractions)}
                                   </div>
@@ -2459,6 +2465,18 @@ const generate = () => {
             <p style={{ fontSize: 11, color: 'var(--text-dim)', margin: '0 0 12px 0' }}>
               Расчёт индекса поддержки и снижения рисков на основе всех источников: препараты, анализы, питание, тренировки, генетика
             </p>
+          </div>
+
+          {/* Stack Generator Link */}
+          <div className="card" style={{ marginBottom: 12 }}>
+            <button onClick={() => setTab('stackcalc')} style={{ width:'100%', padding: '12px', borderRadius: 10, border: '1px solid #8b5cf6', background: 'rgba(139,92,246,0.08)', cursor:'pointer', display:'flex', alignItems:'center', gap:10, textAlign:'left' }}>
+              <span style={{ fontSize:20 }}>🧮</span>
+              <div>
+                <div style={{ fontSize:13, fontWeight:700, color:'#8b5cf6' }}>Генератор стеков</div>
+                <div style={{ fontSize:10, color:'rgba(255,255,255,0.6)' }}>Автоматический подбор стека по органам и механизмам</div>
+              </div>
+              <span style={{ marginLeft:'auto', color:'#8b5cf6', fontSize:14 }}>→</span>
+            </button>
           </div>
 
           {/* 4 Level Buttons */}

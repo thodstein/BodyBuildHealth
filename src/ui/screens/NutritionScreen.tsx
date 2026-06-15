@@ -17,6 +17,7 @@ import { NutritionDiary } from './NutritionScreen_parts/NutritionDiary';
 import { NutritionCharts } from './NutritionScreen_parts/NutritionCharts';
 import { NutritionMealGen } from './NutritionScreen_parts/NutritionMealGen';
 import { NutritionCustomFood } from './NutritionScreen_parts/NutritionCustomFood';
+import { generateRegimeAdvice, generateLabsBasedAdvice } from '../../engines/meal-tier-generator.engine';
 
 interface DiaryEntry {
   name: string;
@@ -123,6 +124,8 @@ export const NutritionScreen: React.FC = () => {
       case 'restaurant': return <RestaurantTab />;
       case 'calc': return <NutritionCalculators />;
       case 'cycling': return <CyclingTab tKcal={tKcal} tProt={tProt} />;
+      case 'regime': return <NutritionRegime />;
+      case 'custom': return <NutritionCustomFood />;
       default: return <NutritionOverview profile={linked.profile} avgWeeklyKcal={avgWeeklyKcal} avgWeeklyProtein={avgWeeklyProtein} avgWeeklyFat={avgWeeklyFat} avgWeeklyCarbs={avgWeeklyCarbs} microsIntake={microsIntake} />;
     }
   };
@@ -351,6 +354,36 @@ const CyclingTab: React.FC<{ tKcal: number; tProt: number }> = ({ tKcal, tProt }
       <div style={{ fontSize:9,color:'var(--text-light)' }}>Б:{d.targets.p}г Ж:{d.targets.f}г У:{d.targets.c}г</div>
     </div>)}</div>}
   </div>);
+};
+
+const NutritionRegime: React.FC = () => {
+  const [advice] = React.useState(() => generateRegimeAdvice());
+  const [labsAdvice] = React.useState(() => generateLabsBasedAdvice());
+  return (
+    <div style={{ padding: 12 }}>
+      <div className="card" style={{ padding: 14, marginBottom: 10 }}>
+        <h3 style={{ margin: '0 0 8px', fontSize: 14, color: 'var(--accent)' }}>⏰ Режим питания</h3>
+        <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', margin: '0 0 10px', lineHeight: 1.5 }}>
+          Основные принципы режима питания для максимальной эффективности тренировок и здоровья.
+        </p>
+        {advice.map((a, i) => (
+          <div key={i} style={{ fontSize: 11, color: 'rgba(255,255,255,0.85)', padding: '6px 0', borderBottom: i < advice.length - 1 ? '1px solid rgba(255,255,255,0.06)' : 'none', lineHeight: 1.5 }}>
+            {a}
+          </div>
+        ))}
+      </div>
+      {labsAdvice.length > 0 && (
+        <div className="card" style={{ padding: 14 }}>
+          <h3 style={{ margin: '0 0 8px', fontSize: 14, color: '#f59e0b' }}>🧪 Рекомендации по анализам</h3>
+          {labsAdvice.map((a, i) => (
+            <div key={i} style={{ fontSize: 11, color: 'rgba(255,255,255,0.85)', padding: '6px 0', borderBottom: i < labsAdvice.length - 1 ? '1px solid rgba(255,255,255,0.06)' : 'none', lineHeight: 1.5 }}>
+              {a}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 };
 
 const QuickAdviceCard: React.FC = () => {
