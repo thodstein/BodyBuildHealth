@@ -6,15 +6,29 @@
 
 
 // === TYPE DEFINITIONS ===
+export interface SubstanceForm {
+  id: string;
+  name: string;
+  dose: string;
+  best: boolean;
+}
+
 export interface SupportSubstance {
   id: string;
   name: string;
+  nameRu?: string;
+  nameEn?: string;
   categories: string[];
   mechanisms: string[];
   organs: string[];
   deficiency: string;
   description: string;
   type: string;
+  forms?: SubstanceForm[];
+  recommendedForm?: string;
+  dosage?: string;
+  contraindications?: string[];
+  sideEffects?: string[];
 }
 
 export interface SupportInteraction {

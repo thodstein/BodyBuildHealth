@@ -1,5 +1,5 @@
 ﻿import React, { useState, useMemo, useEffect } from 'react';
-import { SYNERGY_PAIRS, SUPPLEMENT_DESCRIPTIONS, SUPPLEMENT_TARGETS, SUPPORT_RESEARCH, calculateSupport, checkSupportInteractions, findSupportForGoal, searchSupport, getSubstanceInfo, getSupportDatabaseStats, type SupportInput, type SynergyPair, type SupplementTarget } from '../../engines/support.engine';
+import { SYNERGY_PAIRS, ORGAN_SYNERGIES, SUPPLEMENT_DESCRIPTIONS, SUPPLEMENT_TARGETS, SUPPORT_RESEARCH, calculateSupport, checkSupportInteractions, findSupportForGoal, searchSupport, getSubstanceInfo, getSupportDatabaseStats, type SupportInput, type SynergyPair, type SupplementTarget, type OrganSynergy } from '../../engines/support.engine';
 import { RISK_SYSTEMS, ALL_RISK_SYSTEMS } from '../../core/constants';
 import { PHARMA_DB, getPharmaDetail } from '../../core/pharma-database';
 import { useDataLink } from '../../core/data-link';
@@ -1321,6 +1321,47 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
       const synPage = synergies.slice(0, maxItems);
       const confPage = conflicts.slice(0, maxItems);
       const safeItem = (fn:()=>React.ReactNode, key:string|number):React.ReactNode => {
+          {/* Organ-based synergies */}
+          <div style={{ marginBottom: 12 }}>
+            <h4 style={{ margin: '0 0 6px', fontSize: 13, fontWeight: 700, color: 'var(--accent)' }}>🧬 Синергии по системам</h4>
+            <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', margin: '0 0 8px', lineHeight: 1.4 }}>
+              Научно обоснованные комбинации добавок, организованные по системам организма
+            </p>
+            {ORGAN_SYNERGIES.map(og => (
+              <div key={og.id} style={{ marginBottom: 8, background: 'rgba(255,255,255,0.06)', borderRadius: 10, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.1)' }}>
+                <div style={{ padding: '8px 10px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
+                  onClick={() => setExpandedCategories(prev => ({ ...prev, ['organ_'+og.id]: !(prev['organ_'+og.id] ?? false) }))}>
+                  <span style={{ fontSize: 13 }}>{og.organLabel.split(' ')[0]}</span>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,0.9)', flex: 1 }}>{og.organLabel.substring(og.organLabel.indexOf(' ')+1)}</span>
+                  <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', background: 'rgba(255,255,255,0.08)', padding: '1px 6px', borderRadius: 8 }}>{og.pairs.length}</span>
+                  <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', transform: expandedCategories['organ_'+og.id] !== false ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}>▼</span>
+                </div>
+                {expandedCategories['organ_'+og.id] !== false && og.pairs.map((p, pi) => (
+                  <div key={pi} style={{ padding: '6px 10px', borderTop: '1px solid rgba(255,255,255,0.06)', background: pi % 2 === 0 ? 'rgba(0,0,0,0.1)' : 'transparent' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
+                        <span style={{ fontWeight: 600, fontSize: 10, color: 'rgba(255,255,255,0.9)' }}>{p.nameA}</span>
+                        <span style={{ fontSize: 10, color: p.type === 'synergy' ? '#22c55e' : p.type === 'conflict' ? '#ef4444' : '#f59e0b', fontWeight: 700 }}>
+                          {p.type === 'synergy' ? '+' : p.type === 'conflict' ? '×' : '⚠'}
+                        </span>
+                        <span style={{ fontWeight: 600, fontSize: 10, color: 'rgba(255,255,255,0.9)' }}>{p.nameB}</span>
+                      </div>
+                      <span style={{ fontSize: 7, padding: '1px 5px', borderRadius: 3, fontWeight: 600,
+                        background: p.severity === 'HIGH' ? (p.type === 'conflict' ? '#ef444422' : '#22c55e22') : p.severity === 'MEDIUM' ? '#f59e0b22' : '#60a5fa22',
+                        color: p.severity === 'HIGH' ? (p.type === 'conflict' ? '#ef4444' : '#22c55e') : p.severity === 'MEDIUM' ? '#f59e0b' : '#60a5fa' }}>
+                        {p.severity}
+                      </span>
+                    </div>
+                    <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', lineHeight: 1.3, marginBottom: 2 }}>
+                      {p.type === 'synergy' ? '⊕' : p.type === 'conflict' ? '⊖' : '⚠'} {p.effect}
+                    </div>
+                    <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.65)', lineHeight: 1.3, fontStyle: 'italic' }}>{p.mechanism}</div>
+                  </div>
+                ))}
+              </div>
+            ))}
+          </div>
+
         try{return fn();}catch(e){return <div key={key} style={{padding:4,color:'#f87171',fontSize:7}}>⚠ Item {key}: {String(e)}</div>;}
       };
       return (<>
@@ -1628,8 +1669,20 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
                                     )}
                                     {SUPPLEMENT_DESCRIPTIONS[sub.id] && (
                                       <div style={{ marginTop:4, padding:'4px 6px', background:'rgba(0,230,138,0.05)', borderRadius:4, border:'1px solid rgba(0,230,138,0.1)' }}>
-                                        <div style={{ fontSize:7, color:'#00e68a', fontWeight:600, marginBottom:1 }}>📋 Подробнее:</div>
-                                        <div style={{ fontSize:8, color:'rgba(255,255,255,0.85)', lineHeight:1.4 }}>{SUPPLEMENT_DESCRIPTIONS[sub.id]}</div>
+                                        <div style={{ fontSize:8, color:'#00e68a', fontWeight:600, marginBottom:1 }}>📋 Подробнее:</div>
+                                        <div style={{ fontSize:9, color:'rgba(255,255,255,0.9)', lineHeight:1.4 }}>{SUPPLEMENT_DESCRIPTIONS[sub.id]}</div>
+                                      </div>
+                                    )}
+                                    {(sub as any).forms && (sub as any).forms.length > 0 && (
+                                      <div style={{ marginTop:4, padding:'4px 6px', background:'rgba(59,130,246,0.05)', borderRadius:4, border:'1px solid rgba(59,130,246,0.1)' }}>
+                                        <div style={{ fontSize:8, color:'#60a5fa', fontWeight:600, marginBottom:2 }}>💊 Формы выпуска:</div>
+                                        {((sub as any).forms as any[]).map((f, fi) => (
+                                          <div key={fi} style={{ display:'flex', alignItems:'center', gap:4, marginBottom:2 }}>
+                                            <span style={{ fontSize:9, fontWeight: f.best ? 700 : 400, color: f.best ? '#00e68a' : 'rgba(255,255,255,0.85)' }}>{f.best ? '★' : '○'} {f.name}</span>
+                                            <span style={{ fontSize:8, color:'rgba(255,255,255,0.6)' }}>{f.dose}</span>
+                                            {f.best && <span style={{ fontSize:7, padding:'0px 4px', borderRadius:3, background:'rgba(0,230,138,0.1)', color:'#00e68a', border:'1px solid rgba(0,230,138,0.2)' }}>Рекоменд.</span>}
+                                          </div>
+                                        ))}
                                       </div>
                                     )}
                                     {catDetailInteractions(sub, mergedInteractions)}

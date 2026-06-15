@@ -749,6 +749,119 @@ export const SUPPLEMENT_DESCRIPTIONS: Record<string, string> = {
   boron: 'Бор — микроэлемент, усиливающий полураспад витамина D и снижающий экскрецию кальция и магния. Модулирует экспрессию остеокальцина и иммунный ответ; повышает уровень свободного тестостерона через снижение SHBG.',
 };
 
+
+// ═══════════════════════════════════════════════════════════════
+// ORGAN-BASED SYNERGY SYSTEM
+// Organized by body system with Russian descriptions and clinical logic
+// ═══════════════════════════════════════════════════════════════
+export interface OrganSynergy {
+  id: string;
+  organ: string;
+  organLabel: string;
+  pairs: {
+    substanceA: string;
+    substanceB: string;
+    nameA: string;
+    nameB: string;
+    effect: string;
+    mechanism: string;
+    severity: 'LOW' | 'MEDIUM' | 'HIGH';
+    type: 'synergy' | 'conflict' | 'caution';
+  }[];
+}
+
+export const ORGAN_SYNERGIES: OrganSynergy[] = [
+  {
+    id: 'liver',
+    organ: 'liver',
+    organLabel: '🫁 Печень',
+    pairs: [
+      { substanceA: 'nac', substanceB: 'tudca', nameA: 'НАК', nameB: 'ТУДКА', effect: 'Двойной гепатопротектор: НАК → глутатион, ТУДКА → желчеотток', mechanism: 'НАК восстанавливает глутатион (антиоксидантный путь), ТУДКА стимулирует bile flow и защищает от холестаза. Покрытие обоих путей повреждения печени.', severity: 'HIGH', type: 'synergy' },
+      { substanceA: 'nac', substanceB: 'milk_thistle', nameA: 'НАК', nameB: 'Расторопша', effect: 'НАК + силимарин: комплексная гепатопротекция', mechanism: 'НАК восстанавливает глутатион, силимарин стабилизирует мембраны гепатоцитов и активирует GST. Двойной механизм защиты.', severity: 'HIGH', type: 'synergy' },
+      { substanceA: 'tudca', substanceB: 'milk_thistle', nameA: 'ТУДКА', nameB: 'Расторопша', effect: 'Антихолестаз + мембранная защита печени', mechanism: 'ТУДКА покрывает холестатический путь, силимарин — цитотоксический путь. Комплексная гепатопротекция при ААС.', severity: 'MEDIUM', type: 'synergy' },
+      { substanceA: 'nac', substanceB: 'vit_c', nameA: 'НАК', nameB: 'Витамин C', effect: 'Каскадная антиоксидантная защита печени', mechanism: 'НАК → глутатион (водная фаза), витамин C → прямая нейтрализация ROS + регенерация витамина E (липидная фаза).', severity: 'MEDIUM', type: 'synergy' },
+      { substanceA: 'nac', substanceB: 'alpha_lipoic_acid', nameA: 'НАК', nameB: 'Альфа-липоевая кислота', effect: 'Антиоксидантный каскад: НАК → глутатион, АЛК → регенерация витаминов C/E', mechanism: 'НАК предоставляет цистеин для синтеза глутатиона, АЛК напрямую нейтрализует ROS и регенерирует витамины C и E. Полная антиоксидантная защита.', severity: 'HIGH', type: 'synergy' },
+      { substanceA: 'berberine', substanceB: 'milk_thistle', nameA: 'Берберин', nameB: 'Расторопша', effect: 'Метаболическая + гепатопротекторная поддержка', mechanism: 'Берберин (AMPK-активация) снижает сахар и липиды, силимарин защищает печень от берберин-индуцированного метаболического стресса.', severity: 'MEDIUM', type: 'synergy' },
+    ]
+  },
+  {
+    id: 'cardio',
+    organ: 'cardio',
+    organLabel: '❤️ Сердце и сосуды',
+    pairs: [
+      { substanceA: 'omega3', substanceB: 'coq10', nameA: 'Омега-3', nameB: 'CoQ10', effect: 'Максимальная кардиопротекция: омега-3 + коэнзим Q10', mechanism: 'Омега-3 встраивается в мембраны кардиомиоцитов (стабилизация), CoQ10 переносит электроны в ETC (энергия). Комбинация оптимизирует митохондриальную функцию.', severity: 'HIGH', type: 'synergy' },
+      { substanceA: 'vit_d3', substanceB: 'vit_k2', nameA: 'Витамин D3', nameB: 'Витамин K2', effect: 'D3+K2: кальций в кости, не в сосуды', mechanism: 'D3 обеспечивает абсорбцию кальция, K2 активирует остеокальцин (направляет Ca в кости) и матриксный Gla-белок (предотвращает кальцификацию сосудов).', severity: 'HIGH', type: 'synergy' },
+      { substanceA: 'omega3', substanceB: 'magnesium', nameA: 'Омега-3', nameB: 'Магний', effect: 'Омега-3 + магний: антиаритмический + противовоспалительный', mechanism: 'Омега-3 снижает ТГ и воспаление, магний стабилизирует электрическую активность миокарда (блокада Ca2+ каналов). Комбинация снижает риск аритмий.', severity: 'MEDIUM', type: 'synergy' },
+      { substanceA: 'vit_d3', substanceB: 'magnesium', nameA: 'Витамин D3', nameB: 'Магний', effect: 'D3+Mg: активация витамина D и минерализация костей', mechanism: 'Магний — кофактор 1α-гидроксилазы (конвертирует 25-OH-D → 1,25-(OH)2-D). Без магния витамин D не активируется полностью.', severity: 'HIGH', type: 'synergy' },
+    ]
+  },
+  {
+    id: 'brain',
+    organ: 'brain',
+    organLabel: '🧠 Мозг и нервы',
+    pairs: [
+      { substanceA: 'magnesium', substanceB: 'ashwagandha', nameA: 'Магний', nameB: 'Ашваганда', effect: 'Мощный анксиолитический синергизм', mechanism: 'Магний потенцирует GABA-A рецепторы и блокирует NMDA, ашваганда снижает кортизол через HPA-ось и усиливает GABA-ергическую передачу. Комбинация эффективно купирует тревожность.', severity: 'HIGH', type: 'synergy' },
+      { substanceA: 'vit_b6', substanceB: 'magnesium', nameA: 'Витамин B6', nameB: 'Магний', effect: 'B6+Mg: кофакторы синтеза серотонина и GABA', mechanism: 'P5P (активный B6) — кофакмент декарбоксилазы (серотонин, GABA, дофамин), магний — кофакмент всех киназных реакций. Магний активирует пиридоксалькиназу.', severity: 'MEDIUM', type: 'synergy' },
+      { substanceA: 'vit_b9', substanceB: 'vit_b12', nameA: 'Фолат', nameB: 'Витамин B12', effect: 'Фолат+B12: метилирование и гомоцистеин', mechanism: 'Фолат — донор метильных групп для реметиляции гомоцистеина в метионин, B12 — кофактор метионинсинтазы. B12-дефицит блокирует фолатный цикл (фолатная ловушка).', severity: 'HIGH', type: 'synergy' },
+      { substanceA: 'magnesium', substanceB: 'melatonin', nameA: 'Магний', nameB: 'Мелатонин', effect: 'Улучшение качества сна', mechanism: 'Магний расслабляет мышцы и потенцирует GABA, мелатонин регулирует циркадные ритмы. Комбинация улучшает onset и глубину сна.', severity: 'MEDIUM', type: 'synergy' },
+    ]
+  },
+  {
+    id: 'immune',
+    organ: 'immune',
+    organLabel: '🛡 Иммунитет',
+    pairs: [
+      { substanceA: 'vit_d3', substanceB: 'zinc', nameA: 'Витамин D3', nameB: 'Цинк', effect: 'D3+цинк: синергичная иммунная поддержка', mechanism: 'D3 модулирует врождённый и адаптивный иммунитет через VDR, цинк критичен для T-клеток и тимуса. Цинк повышает активность витамин D-связывающего белка.', severity: 'HIGH', type: 'synergy' },
+      { substanceA: 'vit_c', substanceB: 'zinc', nameA: 'Витамин C', nameB: 'Цинк', effect: 'Комплексная иммунная защита', mechanism: 'Витамин C — антимикробный, нейтрализует ROS в фагоцитах. Цинк — T-клеточный иммунитет и функция тимуса. Комбинация сокращает длительность ОРВИ.', severity: 'MEDIUM', type: 'synergy' },
+      { substanceA: 'vit_d3', substanceB: 'vit_c', nameA: 'Витамин D3', nameB: 'Витамин C', effect: 'Иммуномодуляция + антиоксидант', mechanism: 'D3 модулирует иммунный ответ (VDR), витамин C поддерживает функцию нейтрофилов и макрофагов. Синергичная защита от инфекций.', severity: 'MEDIUM', type: 'synergy' },
+    ]
+  },
+  {
+    id: 'bones',
+    organ: 'bones',
+    organLabel: '🦴 Кости и суставы',
+    pairs: [
+      { substanceA: 'bpc157', substanceB: 'tb500', nameA: 'BPC-157', nameB: 'TB-500', effect: 'Максимальная регенерация связок и сухожилий', mechanism: 'BPC-157 стимулирует VEGF/FGF (ангиогенез), TB-500 стимулирует миграцию эндотелиальных клеток и актин-полимеризацию. Комбинация ускоряет восстановление в 3-5 раз.', severity: 'HIGH', type: 'synergy' },
+      { substanceA: 'bpc157', substanceB: 'vit_c', nameA: 'BPC-157', nameB: 'Витамин C', effect: 'Регенерация + синтез коллагена', mechanism: 'BPC-157 стимулирует ангиогенез и пролиферацию фибробластов, витамин C — кофактор пролил/лизил-гидроксилаз для синтеза коллагена. Структурная + сигнальная поддержка.', severity: 'MEDIUM', type: 'synergy' },
+      { substanceA: 'vit_d3', substanceB: 'vit_k2', nameA: 'Витамин D3', nameB: 'Витамин K2', effect: 'Минерализация костей без кальцификации сосудов', mechanism: 'D3 → абсорбция кальция, K2 → активация остеокальцина (направляет Ca в кости) и MGP (предотвращает кальцификацию сосудов).', severity: 'HIGH', type: 'synergy' },
+      { substanceA: 'glucosamine', substanceB: 'chondroitin', nameA: 'Глюкозамин', nameB: 'Хондроитин', effect: 'Синергичная защита суставного хряща', mechanism: 'Глюкозамин — строительный блок гликозаминогликанов, хондроитин — удерживает воду и обеспечивает упругость хряща. Комбинация эффективнее монотерапии.', severity: 'MEDIUM', type: 'synergy' },
+    ]
+  },
+  {
+    id: 'hormones',
+    organ: 'hormones',
+    organLabel: '⚖️ Гормоны',
+    pairs: [
+      { substanceA: 'zinc', substanceB: 'vit_d3', nameA: 'Цинк', nameB: 'Витамин D3', effect: 'Повышение свободного тестостерона', mechanism: 'Бор усиливает полураспад витамина D и повышает активность 1α-гидроксилазы. Цинк снижает SHBG → больше свободного тестостерона. D3 → рецепция в клетках Лейдига.', severity: 'HIGH', type: 'synergy' },
+      { substanceA: 'ashwagandha', substanceB: 'magnesium', nameA: 'Ашваганда', nameB: 'Магний', effect: 'Снижение кортизола + повышение тестостерона', mechanism: 'Ашваганда снижает кортизол и повышает DHEA-S (антистресс), магний снижает кортизол через GABA-ергический путь. Синергичный антикортизоловый эффект.', severity: 'MEDIUM', type: 'synergy' },
+      { substanceA: 'ashwagandha', substanceB: 'tongkat_ali', nameA: 'Ашваганда', nameB: 'Тонгкат Али', effect: 'Двойной путь повышения тестостерона', mechanism: 'Ашваганда снижает кортизол (антистресс-путь), тонгкат али стимулирует высвобождение LH и увеличивает 17-кетостероиды (HPTA-путь). Покрытие обоих уровней.', severity: 'HIGH', type: 'synergy' },
+    ]
+  },
+  {
+    id: 'gut',
+    organ: 'gut',
+    organLabel: '🫃 ЖКТ и микробиом',
+    pairs: [
+      { substanceA: 'curcumin', substanceB: 'piperine', nameA: 'Куркумин', nameB: 'Пиперин', effect: '10-кратное увеличение биодоступности куркумина', mechanism: 'Пиперин ингибирует UGT и CYP3A4 в кишечнике и печени, повышая абсорбцию куркумина в 10 раз. Также ингибирует P-гликопротеин.', severity: 'HIGH', type: 'synergy' },
+      { substanceA: 'probiotics', substanceB: 'prebiotic_fiber', nameA: 'Пробиотики', nameB: 'Пребиотическая клетчатка', effect: 'Синбиотик: пробиотики + пребиотики = максимальный микробиомный эффект', mechanism: 'Пребиотики предоставляют субстрат для ферментации пробиотиков, увеличивая их выживаемость и продукцию короткоцепочечных жирных кислот.', severity: 'HIGH', type: 'synergy' },
+    ]
+  },
+  {
+    id: 'conflicts',
+    organ: 'conflicts',
+    organLabel: '⚠️ Конфликты и осторожность',
+    pairs: [
+      { substanceA: 'zinc', substanceB: 'copper', nameA: 'Цинк', nameB: 'Медь', effect: 'Высокие дозы цинка истощают медь', mechanism: 'Цинк ≥50 мг индунцирует металлотионеин, который связывает медь и снижает её абсорбцию. Рекомендация: 2 мг меди на каждые 30 мг цинка.', severity: 'HIGH', type: 'caution' },
+      { substanceA: 'iron', substanceB: 'calcium', nameA: 'Железо', nameB: 'Кальций', effect: 'Конкуренция за абсорбцию', mechanism: 'Кальций и железо конкурируют за DMT1-транспортёр. Принимать отдельно: железо натощак, кальций с едой.', severity: 'MEDIUM', type: 'conflict' },
+      { substanceA: 'iron', substanceB: 'zinc', nameA: 'Железо', nameB: 'Цинк', effect: 'Конкуренция за абсорбцию', mechanism: 'Высокие дозы железа конкурируют с цинком за DMT1. Принимать с интервалом 2+ часа.', severity: 'MEDIUM', type: 'conflict' },
+      { substanceA: 'calcium', substanceB: 'magnesium', nameA: 'Кальций', nameB: 'Магний', effect: 'Конкуренция за абсорбцию при высоких дозах', mechanism: 'Высокие дозы кальция могут снижать абсорбцию магния. Рекомендуемое соотношение Ca:Mg = 2:1.', severity: 'LOW', type: 'caution' },
+      { substanceA: 'curcumin', substanceB: 'berberine', nameA: 'Куркумин', nameB: 'Берберин', effect: 'Двойное ингибирование CYP3A4', mechanism: 'Оба ингибируют CYP3A4. Комбинация может повысить концентрацию других препаратов. Осторожность при приёме лекарств.', severity: 'MEDIUM', type: 'caution' },
+      { substanceA: 'vit_d3', substanceB: 'calcium', nameA: 'Витамин D3', nameB: 'Кальций', effect: 'Риск гиперкальциемии при высоких дозах', mechanism: 'D3 увеличивает абсорбцию кальция. При дозах D3 >10000 МЕ + кальций >1000 мг возможна гиперкальциемия. Мониторить уровень Ca.', severity: 'LOW', type: 'caution' },
+    ]
+  },
+];
+
+
 export const SYNERGY_PAIRS: SynergyPair[] = [
   {
     substanceA: 'nac',
