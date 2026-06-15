@@ -7,7 +7,7 @@ import { getProfile } from '../../core/profile-manager';
 import { generatePCTPlan } from '../../engines/pct-planner.engine';
 import { PHARMA_DB } from '../../core/pharma-database';
 
-type FertTab = 'semen' | 'hormones' | 'structure' | 'pct-plan';
+type FertTab = 'semen' | 'hormones' | 'structure' | 'pct-plan' | 'analyses';
 
 const s: Record<string, React.CSSProperties> = {
   card: { background: 'var(--bg-secondary)', borderRadius: 12, padding: 16, marginBottom: 12 },
@@ -66,6 +66,7 @@ export const FertilityPCTScreen: React.FC = () => {
     db.init().then(() => db.getAll<CourseEntry>('course_log')).then(data => setPctCourse(data)).catch(() => {});
   }, []);
 
+  const [allLabs, setAllLabs] = useState<Record<string, string>>({});
   useEffect(() => {
     const loadLabs = async () => {
       try {
@@ -76,13 +77,16 @@ export const FertilityPCTScreen: React.FC = () => {
           PRL: setPrl, SHBG: setShbg, INHB: setInhb, AMH: setAmh
         };
         const codeToKey: Record<string, string> = { TT: 'ng/dL', FT: 'pg/mL', E2: 'pg/mL', LH: 'mIU/mL', FSH: 'mIU/mL', PRL: 'ng/mL', SHBG: 'nmol/L', INHB: 'pg/mL', AMH: 'ng/mL' };
+        const labData: Record<string, string> = {};
         entries
           .filter(e => e.patientId === (profile.id || 'current-user'))
           .sort((a, b) => (b.date || '').localeCompare(a.date || ''))
           .forEach(e => {
             const setter = codeMap[e.code];
             if (setter && e.value !== undefined) setter(String(e.value));
+            if (e.value !== undefined) labData[e.code] = String(e.value);
           });
+        setAllLabs(labData);
       } catch {}
     };
     loadLabs();
@@ -148,7 +152,7 @@ export const FertilityPCTScreen: React.FC = () => {
   );
 
   const fertTabs: { id: FertTab; label: string }[] = [
-    { id: 'semen', label: 'Спермограмма' }, { id: 'hormones', label: 'Гормоны' }, { id: 'structure', label: 'DFI/Структура' }, { id: 'pct-plan', label: 'ПКТ план' }
+    { id: 'semen', label: 'Спермограмма' }, { id: 'hormones', label: 'Гормоны' }, { id: 'structure', label: 'DFI/Структура' }, { id: 'pct-plan', label: 'ПКТ план' }, { id: 'analyses', label: '🧪 Анализы' }
   ];
 
   return (
@@ -349,6 +353,109 @@ export const FertilityPCTScreen: React.FC = () => {
               </div>
             </>
           )}
+        </div>
+      )}
+
+      {tab === 'analyses' && (
+        <div>
+          {(() => {
+            const BEFORE_PCT = [
+              { code:'LH', name:'LH', range:'1.7-8.6 mIU/mL' },
+              { code:'FSH', name:'FSH (Фолликулостимулирующий гормон)', range:'1.5-12.4 mIU/mL' },
+              { code:'TT', name:'Тестостерон общий', range:'300-1000 ng/dL' },
+              { code:'FT', name:'Тестостерон свободный', range:'5.0-21.0 pg/mL' },
+              { code:'E2', name:'Эстрадиол (E2)', range:'11-44 pg/mL' },
+              { code:'PRL', name:'Пролактин', range:'4.0-15.2 ng/mL' },
+              { code:'SHBG', name:'SHBG (ГСПГ)', range:'18-54 nmol/L' },
+              { code:'TSH', name:'TSH (ТТГ)', range:'0.4-4.0 mIU/L' },
+              { code:'FT4', name:'Свободный T4', range:'0.8-1.8 ng/dL' },
+              { code:'FT3', name:'Свободный T3', range:'2.3-4.2 pg/mL' },
+              { code:'CORT', name:'Кортизол (утро)', range:'6.2-19.4 mkg/dL' },
+              { code:'DHEAS', name:'DHEA-S (ДГЭА-С)', range:'80-560 mkg/dL' },
+              { code:'CBC', name:'Общий анализ крови (CBC)', range:'Гемоглобин/лейкоциты/тромбоциты' },
+              { code:'ALT', name:'АЛТ (ALT)', range:'< 45 U/L' },
+              { code:'AST', name:'АСТ (AST)', range:'< 40 U/L' },
+              { code:'GGT', name:'ГГТ (GGT)', range:'< 60 U/L' },
+              { code:'CREAT', name:'Креатинин', range:'0.7-1.3 mg/dL' },
+              { code:'EGFR', name:'eGFR (СКФ)', range:'> 90 mL/min' },
+              { code:'LIPID', name:'Липидный профиль', range:'ХС/ЛПНП/ЛПВП/ТГ' },
+              { code:'PSA', name:'ПСА (простат-специфический антиген)', range:'< 4.0 ng/mL' },
+              { code:'VITD', name:'25-OH Витамин D', range:'30-100 ng/mL' },
+              { code:'FERR', name:'Ферритин', range:'30-400 ng/mL' },
+            ];
+            const AFTER_PCT = [
+              { code:'LH', name:'LH (повторно)', range:'1.7-8.6 mIU/mL' },
+              { code:'FSH', name:'FSH (повторно)', range:'1.5-12.4 mIU/mL' },
+              { code:'TT', name:'Тестостерон общий (повторно)', range:'300-1000 ng/dL' },
+              { code:'FT', name:'Тестостерон свободный (повторно)', range:'5.0-21.0 pg/mL' },
+              { code:'E2', name:'Эстрадиол E2 (повторно)', range:'11-44 pg/mL' },
+              { code:'PRL', name:'Пролактин (повторно)', range:'4.0-15.2 ng/mL' },
+              { code:'SHBG', name:'SHBG (повторно)', range:'18-54 nmol/L' },
+              { code:'TSH', name:'TSH (повторно)', range:'0.4-4.0 mIU/L' },
+              { code:'FT4', name:'Свободный T4 (повторно)', range:'0.8-1.8 ng/dL' },
+              { code:'FT3', name:'Свободный T3 (повторно)', range:'2.3-4.2 pg/mL' },
+              { code:'CORT', name:'Кортизол (повторно)', range:'6.2-19.4 mkg/dL' },
+              { code:'DHEAS', name:'DHEA-S (повторно)', range:'80-560 mkg/dL' },
+              { code:'CBC', name:'Общий анализ крови (повторно)', range:'Гемоглобин/лейкоциты/тромбоциты' },
+              { code:'ALT', name:'АЛТ ALT (повторно)', range:'< 45 U/L' },
+              { code:'AST', name:'АСТ AST (повторно)', range:'< 40 U/L' },
+              { code:'GGT', name:'ГГТ GGT (повторно)', range:'< 60 U/L' },
+              { code:'CREAT', name:'Креатинин (повторно)', range:'0.7-1.3 mg/dL' },
+              { code:'EGFR', name:'eGFR СКФ (повторно)', range:'> 90 mL/min' },
+              { code:'LIPID', name:'Липидный профиль (повторно)', range:'ХС/ЛПНП/ЛПВП/ТГ' },
+              { code:'PSA', name:'ПСА (повторно)', range:'< 4.0 ng/mL' },
+              { code:'VITD', name:'25-OH Витамин D (повторно)', range:'30-100 ng/mL' },
+              { code:'FERR', name:'Ферритин (повторно)', range:'30-400 ng/mL' },
+              { code:'SPERM', name:'Спермограмма', range:'Объём ≥1.5 мл, конц. ≥15 млн/мл, PR ≥32%' },
+            ];
+            const renderChecklist = (title: string, subtitle: string, items: typeof BEFORE_PCT, borderColor: string) => {
+              const has = items.filter(i => allLabs[i.code]);
+              const total = items.length;
+              return (
+                <div style={{ ...s.card, borderLeft: `3px solid ${borderColor}` }}>
+                  <h4 style={{ margin:'0 0 2px', fontSize:13, color:borderColor }}>{title}</h4>
+                  <div style={{ fontSize:10, color:'var(--text-dim)', marginBottom:8 }}>{subtitle} · {has.length}/{total} сдано</div>
+                  <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
+                    {items.map(item => {
+                      const hasData = !!allLabs[item.code];
+                      const val = allLabs[item.code];
+                      return (
+                        <div key={item.code} style={{
+                          display:'flex', alignItems:'center', gap:8, padding:'6px 8px',
+                          borderRadius:8, background: hasData ? 'rgba(0,230,138,0.06)' : 'var(--bg-secondary)',
+                          border: `1px solid ${hasData ? 'rgba(0,230,138,0.2)' : 'var(--border)'}`,
+                        }}>
+                          <div style={{
+                            width:20, height:20, borderRadius:6, display:'flex', alignItems:'center', justifyContent:'center',
+                            background: hasData ? 'rgba(0,230,138,0.15)' : 'rgba(255,255,255,0.05)',
+                            fontSize:12, flexShrink:0,
+                          }}>{hasData ? '✓' : '○'}</div>
+                          <div style={{ flex:1 }}>
+                            <div style={{ fontSize:11, fontWeight: hasData ? 600 : 400, color: hasData ? 'var(--text-light)' : 'var(--text-dim)' }}>
+                              {item.name}
+                            </div>
+                            <div style={{ fontSize:8, color:'var(--text-dim)' }}>
+                              {hasData ? (val && val !== 'true' ? `Значение: ${val}` : 'Есть данные') : `Норма: ${item.range}`}
+                            </div>
+                          </div>
+                          {hasData && <div style={{ fontSize:9, color:'#00e68a', fontWeight:600 }}>✓</div>}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            };
+            return (
+              <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                <div style={{ fontSize:11, color:'var(--text-dim)', marginBottom:2 }}>
+                  Автоматическая проверка по данным из LabsScreen. Заполните анализы во вкладке Анализы главного экрана.
+                </div>
+                {renderChecklist('До ПКТ', 'Обязательный минимум перед началом ПКТ', BEFORE_PCT, '#f59e0b')}
+                {renderChecklist('После ПКТ (4-6 нед)', 'Контроль через 4-6 недель после завершения ПКТ', AFTER_PCT, '#22c55e')}
+              </div>
+            );
+          })()}
         </div>
       )}
 

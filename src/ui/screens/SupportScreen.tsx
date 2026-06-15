@@ -37,7 +37,7 @@ import { searchPubMed, type PubMedArticle } from '../../engines/pubmed-search.en
 
 type SupportTab = 'main' | 'catalog' | 'synergies' | 'calculator' | 'interactions' | 'stacks' | 'peptides' | 'fertility-pct';
 type SupportView = 'main' | 'calc' | 'fertility';
-type CalcView = 'main' | 'calculator' | 'peptides' | 'info' | 'stackcalc' | 'mystacks';
+type CalcView = 'main' | 'calculator' | 'peptides' | 'info' | 'stackcalc' | 'mystacks' | 'mixcalc' | 'plan';
 type InfoView = 'main' | 'catalog' | 'synergies' | 'stacks' | 'interactions' | 'research';
 
 const INTERACTION_TYPE_LABELS: Record<string, { label: string; emoji: string; color: string }> = {
@@ -185,8 +185,86 @@ const CATEGORY_LABELS: Record<string, { label: string; emoji: string }> = {
   enzymes: { label: 'Ферменты', emoji: '🧪' },
 };
 
+const MECH_TRANSLATIONS_RU: Record<string, string> = {
+  'antioxidant': 'Антиоксидант', 'anti_inflammatory': 'Противовоспалительное', 'hepatoprotective': 'Гепатопротектор',
+  'nephroprotective': 'Нефропротектор', 'cardioprotective': 'Кардиопротектор', 'neuroprotective': 'Нейропротектор',
+  'immunomodulator': 'Иммуномодулятор', 'adaptogen': 'Адаптоген', 'nootropic': 'Ноотроп',
+  'vasodilator': 'Вазодилататор', 'antiplatelet': 'Антиагрегант', 'hypolipidemic': 'Гиполипидемическое',
+  'hypoglycemic': 'Гипогликемическое', 'anabolic': 'Анаболическое', 'anticatabolic': 'Антикатаболическое',
+  'ergogenic': 'Эргогенное', 'lipotropic': 'Липотропное', 'thermogenic': 'Термогенное',
+  'estrogenic': 'Эстрогенное', 'antiestrogenic': 'Антиэстрогенное', 'androgenic': 'Андрогенное',
+  'antiandrogenic': 'Антиандрогенное', 'progestogenic': 'Прогестогенное', 'antioxidant_enzymatic': 'Ферментативный антиоксидант',
+  'mitochondrial': 'Митохондриальное', 'neurotransmitter': 'Нейротрансмиттер', 'hormone_precursor': 'Предшественник гормонов',
+  'collagen_synthesis': 'Синтез коллагена', 'bone_mineralization': 'Минерализация костей',
+  'insulin_sensitizer': 'Сенситизатор инсулина', 'cortisol_modulator': 'Модулятор кортизола',
+  'sleep_aid': 'Снотворное', 'anxiolytic': 'Анксиолитик', 'antidepressant': 'Антидепрессант',
+  'analgesic': 'Анальгетик', 'anti_spasmodic': 'Спазмолитик', 'digestive': 'Пищеварительное',
+  'probiotic': 'Пробиотик', 'prebiotic': 'Пребиотик', 'enzyme': 'Фермент',
+  'electrolyte': 'Электролит', 'diuretic': 'Диуретик', 'detox': 'Детокс',
+  'chelator': 'Хелатор', 'methylation': 'Метилирование', 'energy_production': 'Производство энергии',
+  'protein_synthesis': 'Синтез белка', 'glucose_metabolism': 'Метаболизм глюкозы', 'lipid_metabolism': 'Метаболизм липидов',
+  'calcium_metabolism': 'Метаболизм кальция', 'thyroid_function': 'Функция щитовидной',
+  'adrenal_support': 'Поддержка надпочечников', 'pituitary_support': 'Поддержка гипофиза',
+  'cofactor': 'Кофактор', 'coenzyme': 'Коэнзим', 'electron_transport': 'Транспорт электронов',
+  'oxygen_transport': 'Транспорт кислорода', 'wound_healing': 'Заживление ран',
+  'tissue_repair': 'Регенерация тканей', 'anti_fibrotic': 'Антифибротическое',
+};
+
+const ORGAN_MECHANISMS: Record<string, string[]> = {
+  cardio: ['cardioprotective', 'vasodilator', 'antiplatelet', 'hypolipidemic', 'electrolyte', 'oxygen_transport', 'anticoagulant'],
+  liver: ['hepatoprotective', 'detox', 'antioxidant', 'antioxidant_enzymatic', 'lipid_metabolism', 'glucose_metabolism', 'insulin_sensitizer', 'anti_fibrotic', 'lipotropic'],
+  kidney: ['nephroprotective', 'diuretic', 'electrolyte', 'detox', 'chelator', 'anti_fibrotic'],
+  lung: ['anti_inflammatory', 'antioxidant', 'vasodilator', 'anti_spasmodic'],
+  brain: ['neuroprotective', 'nootropic', 'neurotransmitter', 'antidepressant', 'anxiolytic', 'sleep_aid', 'analgesic', 'anti_spasmodic'],
+  bones: ['bone_mineralization', 'collagen_synthesis', 'calcium_metabolism', 'tissue_repair', 'anti_inflammatory'],
+  skin: ['collagen_synthesis', 'antioxidant', 'wound_healing', 'tissue_repair', 'anti_inflammatory'],
+  thyroid: ['thyroid_function', 'hormone_precursor', 'energy_production', 'metabolic'],
+  pancreas: ['hypoglycemic', 'insulin_sensitizer', 'glucose_metabolism', 'anti_inflammatory'],
+  blood: ['oxygen_transport', 'antiplatelet', 'hypolipidemic', 'methylation', 'cofactor'],
+  immune: ['immunomodulator', 'antioxidant', 'anti_inflammatory', 'probiotic', 'prebiotic'],
+  gi: ['digestive', 'probiotic', 'prebiotic', 'enzyme', 'anti_inflammatory', 'hepatoprotective'],
+  hormones: ['hormone_precursor', 'estrogenic', 'antiestrogenic', 'androgenic', 'antiandrogenic', 'progestogenic', 'adrenal_support', 'pituitary_support', 'cortisol_modulator'],
+  male: ['androgenic', 'antiestrogenic', 'anabolic', 'protein_synthesis', 'hormone_precursor'],
+  female: ['estrogenic', 'progestogenic', 'antiandrogenic', 'antiestrogenic', 'bone_mineralization', 'calcium_metabolism'],
+  antiaging: ['mitochondrial', 'antioxidant', 'antioxidant_enzymatic', 'collagen_synthesis', 'methylation', 'energy_production'],
+  energy: ['energy_production', 'ergogenic', 'thermogenic', 'mitochondrial', 'electron_transport', 'lipid_metabolism', 'glucose_metabolism'],
+  recovery: ['tissue_repair', 'wound_healing', 'collagen_synthesis', 'anti_inflammatory', 'protein_synthesis', 'anticatabolic', 'anabolic'],
+};
+
 const getCategoryInfo = (cat: string): { label: string; emoji: string } =>
   CATEGORY_LABELS[cat] || { label: cat, emoji: '📦' };
+
+const TYPE_LABELS_RU: Record<string, string> = {
+  vitamin: 'Витамины', mineral: 'Минералы', amino_acid: 'Аминокислоты',
+  herb: 'Растения и травы', hormone: 'Гормоны', peptide: 'Пептиды',
+  antioxidant: 'Антиоксиданты', enzyme: 'Ферменты', probiotic: 'Пробиотики',
+  fatty_acid: 'Жирные кислоты', nootropic: 'Ноотропы', adaptogen: 'Адаптогены',
+  joint: 'Суставы и кости', liver: 'Защита печени', kidney: 'Защита почек',
+  heart: 'Сердце и сосуды', immune: 'Иммунитет', energy: 'Энергия',
+  sleep: 'Сон', antiaging: 'Антивозраст', male: 'Мужское здоровье',
+  female: 'Женское здоровье', sports: 'Спорт', digestion: 'Пищеварение',
+  other: 'Другое', supplement: 'Добавки'
+};
+
+// Class base-name grouping for catalog badges
+const CLASS_BASE_NAMES: Record<string, { label: string; emoji: string; match: RegExp }> = {
+  magnesium: { label: 'Магний', emoji: '⚡', match: /magnesium|магний/i },
+  zinc: { label: 'Цинк', emoji: '🛡', match: /zinc|цинк/i },
+  vitamin_d: { label: 'Витамин D', emoji: '☀️', match: /vitamin\s*d|витамин\s*d|cholecalciferol|кальциферол/i },
+  omega: { label: 'Омега-3/6/9', emoji: '🐟', match: /omega|омега|epa|dha|ala/i },
+  creatine: { label: 'Креатин', emoji: '💪', match: /creatine|креатин/i },
+  collagen: { label: 'Коллаген', emoji: '🧶', match: /collagen|коллаген/i },
+  ashwagandha: { label: 'Ашваганда', emoji: '🌿', match: /ashwagandha|ашваганд/i },
+  curcumin: { label: 'Куркумин', emoji: '🟡', match: /curcumin|куркум|turmeric/i },
+  coq10: { label: 'Коэнзим Q10', emoji: '🔋', match: /coq10|коэнзим|убихинон|ubiquinone|ubiquinol/i },
+  vitamin_c: { label: 'Витамин C', emoji: '🍊', match: /vitamin\s*c|витамин\s*c|ascorb|аскорб/i },
+  vitamin_b: { label: 'Витамины B', emoji: '🧪', match: /vitamin\s*b[123569]|b12|b6|b3|b1|b2|b5|b9|b7|thiamine|riboflavin|niacin|pyridoxine|folate|cobalamin|тиамин|рибофлавин|ниацин|пантотен|пиридоксин|фолат|биотин|кобаламин/i },
+  iron: { label: 'Железо', emoji: '🩸', match: /iron|желез|ferrous|ferric|ferrum/i },
+  calcium: { label: 'Кальций', emoji: '🦴', match: /calcium|кальци/i },
+  melatonin: { label: 'Мелатонин', emoji: '😴', match: /melatonin|мелатонин/i },
+  berberine: { label: 'Берберин', emoji: '🌿', match: /berberine|берберин/i },
+  ginseng: { label: 'Женьшень', emoji: '🌱', match: /ginseng|женьшен/i },
+};
 
 const SYNERGY_COLORS: Record<string, string> = {
   synergistic: '#22c55e',
@@ -887,11 +965,23 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   const [pubMedQuery, setPubMedQuery] = useState('');
   const [pubMedResults, setPubMedResults] = useState<PubMedArticle[]>([]);
   const [pubMedLoading, setPubMedLoading] = useState(false);
+  const [planView, setPlanView] = useState<'daily' | 'weekly' | 'monthly'>('daily');
+  const [planSaved, setPlanSaved] = useState(false);
   const [pubMedError, setPubMedError] = useState('');
   const [pharmaSearchQ, setPharmaSearchQ] = useState('');
   const [pharmaSearchResults, setPharmaSearchResults] = useState<{ name: string; id: string; cls: string; desc: string }[]>([]);
   const [savedStacks, setSavedStacks] = useState<{ id: string; name: string; date: string; subs: string[]; dosages: Record<string, { mg: number; timing: string }> }[]>(() => { try { return JSON.parse(localStorage.getItem('savedStacks') || '[]'); } catch { return []; } });
   const [stackName, setStackName] = useState('');
+  const [researchSource, setResearchSource] = useState<'pubmed' | 'pubchem' | 'scholar' | 'fda' | 'pharma'>('pubmed');
+  const [pubchemResults, setPubchemResults] = useState<any[]>([]);
+  const [pubchemLoading, setPubchemLoading] = useState(false);
+  const [pubchemError, setPubchemError] = useState('');
+  const [fdaResults, setFdaResults] = useState<any[]>([]);
+  const [fdaLoading, setFdaLoading] = useState(false);
+  const [fdaError, setFdaError] = useState('');
+  const [mixGoal, setMixGoal] = useState<string>('pump');
+  const [mixTiming, setMixTiming] = useState<string>('pre');
+  const [mixCompoundTimings, setMixCompoundTimings] = useState<Record<string, number>>({});
 
   const handlePubMedSearch = async () => {
     if (!pubMedQuery.trim()) return;
@@ -927,6 +1017,58 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
     setPharmaSearchResults(results.slice(0, 30));
   };
 
+  const handlePubchemSearch = async () => {
+    if (!pubMedQuery.trim()) return;
+    setPubchemLoading(true);
+    setPubchemError('');
+    try {
+      const res = await fetch(`https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/${encodeURIComponent(pubMedQuery)}/JSON`);
+      if (!res.ok) throw new Error('PubChem: соединение не найдено');
+      const data = await res.json();
+      const pc = data?.PC_Compounds?.[0];
+      if (!pc) throw new Error('PubChem: нет данных');
+      const props: Record<string, any> = {};
+      (pc.props || []).forEach((p: any) => {
+        if (p.urn?.label) props[p.urn.label] = p.value;
+      });
+      setPubchemResults([{
+        name: props['IUPAC Name']?.sval || props['Title']?.sval || pubMedQuery,
+        mw: props['Molecular Weight']?.fval || props['Molecular Formula']?.sval || '—',
+        iupac: props['IUPAC Name']?.sval || '—',
+        formula: props['Molecular Formula']?.sval || '—',
+        description: props['Title']?.sval || '',
+      }]);
+    } catch (e: any) {
+      setPubchemError(e.message || 'Ошибка поиска PubChem');
+      setPubchemResults([]);
+    } finally {
+      setPubchemLoading(false);
+    }
+  };
+
+  const handleFDASearch = async () => {
+    if (!pubMedQuery.trim()) return;
+    setFdaLoading(true);
+    setFdaError('');
+    try {
+      const res = await fetch(`https://api.fda.gov/drug/label.json?search=${encodeURIComponent(pubMedQuery)}&limit=5`);
+      if (!res.ok) throw new Error('OpenFDA: препарат не найден');
+      const data = await res.json();
+      const items = (data.results || []).map((r: any) => ({
+        brandName: r.openfda?.brand_name?.[0] || '—',
+        genericName: r.openfda?.generic_name?.[0] || '—',
+        indications: r.indications_and_usage?.[0]?.slice(0, 300) || '—',
+        manufacturer: r.openfda?.manufacturer_name?.[0] || '—',
+      }));
+      setFdaResults(items);
+    } catch (e: any) {
+      setFdaError(e.message || 'Ошибка поиска FDA');
+      setFdaResults([]);
+    } finally {
+      setFdaLoading(false);
+    }
+  };
+
   const saveCurrentStack = () => {
     const level = SUPPORT_LEVELS[supportLevel];
     if (!level) return;
@@ -945,29 +1087,21 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   };
 
   const availableMechs = useMemo(() => {
-    if (stackCalcOrgans.length===0) return [];
-    const organList = [
-      {key:'cardio',organs:['heart','vessels','cardiovascular']},{key:'liver',organs:['liver','hepatobiliary']},
-      {key:'kidney',organs:['kidney','renal','urinary']},{key:'lung',organs:['lung','respiratory']},
-      {key:'brain',organs:['brain','cns','neurons','cognitive']},{key:'bones',organs:['bone','joint','skeletal']},
-      {key:'skin',organs:['skin','hair','nails','dermal']},{key:'thyroid',organs:['thyroid','endocrine']},
-      {key:'pancreas',organs:['pancreas','insulin','glucose']},{key:'blood',organs:['blood','hematologic','marrow']},
-      {key:'immune',organs:['immune','lymphatic','thymus']},{key:'gi',organs:['gi','stomach','intestine','colon','microbiome']},
-      {key:'hormones',organs:['endocrine','adrenal','pituitary','gonads']},{key:'male',organs:['prostate','testes','male_reproductive']},
-      {key:'female',organs:['ovary','uterus','female_reproductive']},{key:'antiaging',organs:['cells','mitochondria','telomere']},
-      {key:'energy',organs:['mitochondria','muscle','metabolic']},{key:'recovery',organs:['muscle','tendon','soft_tissue']},
-    ];
-    const selectedOrgans = organList.filter(o=>stackCalcOrgans.includes(o.key)).flatMap(o=>o.organs);
-    if (selectedOrgans.length===0) return [];
-    const mechs = new Set<string>();
-    for (const sub of ALL_SUBSTANCES) {
-      if (!sub.organs||!sub.mechanisms) continue;
-      const subOrgans = (sub.organs||[]).map(o=>(o||'').toLowerCase());
-      if (selectedOrgans.some(o=>subOrgans.some(so=>so.includes(o)||o.includes(so)))) {
-        (sub.mechanisms||[]).forEach(m=>mechs.add(m));
+    if (stackCalcOrgans.length === 0) {
+      const allMechs = new Set<string>();
+      for (const sub of ALL_SUBSTANCES) {
+        if (sub.mechanisms) {
+          (sub.mechanisms as string[]).forEach(m => allMechs.add(m));
+        }
       }
+      return [...allMechs].sort();
     }
-    return [...mechs].sort();
+    const mechSet = new Set<string>();
+    for (const key of stackCalcOrgans) {
+      const mechs = ORGAN_MECHANISMS[key];
+      if (mechs) { mechs.forEach(m => mechSet.add(m)); }
+    }
+    return [...mechSet].sort();
   }, [stackCalcOrgans]);
 
   // Combine SUPPLEMENT_DESCRIPTIONS with support substances from PHARMA_DB
@@ -1130,8 +1264,29 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
       if (!groups[primaryCat]) groups[primaryCat] = [];
       groups[primaryCat].push(sub);
     }
+    // Compute class-based sub-groups for badges
+    const getSubstanceClass = (sub: SupportSubstance): string | null => {
+      const searchStr = ((sub.name||'') + ' ' + (sub.id||'')).toLowerCase();
+      for (const [key, info] of Object.entries(CLASS_BASE_NAMES)) {
+        if (info.match.test(searchStr)) return key;
+      }
+      return null;
+    };
     return Object.entries(groups)
-      .map(([cat, items]) => ({ cat, items, count: items.length }))
+      .map(([cat, items]) => {
+        const classMap: Record<string, SupportSubstance[]> = {};
+        for (const sub of items) {
+          const cls = getSubstanceClass(sub);
+          if (cls) {
+            if (!classMap[cls]) classMap[cls] = [];
+            classMap[cls].push(sub);
+          }
+        }
+        const classBadges = Object.entries(classMap)
+          .map(([clsKey, clsItems]) => ({ clsKey, label: CLASS_BASE_NAMES[clsKey]?.label || clsKey, emoji: CLASS_BASE_NAMES[clsKey]?.emoji || '📦', count: clsItems.length }))
+          .sort((a, b) => b.count - a.count);
+        return { cat, items, count: items.length, classBadges };
+      })
       .sort((a, b) => b.count - a.count);
   }, [searchQuery]);
 
@@ -1563,6 +1718,8 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
               <button onClick={() => { setCalcView('info'); setInfoView('research'); }} style={{ padding:'6px 12px', borderRadius:16, fontSize:9, fontWeight:700, whiteSpace:'nowrap', cursor:'pointer', flexShrink:0, background:'var(--bg-secondary)', color:'var(--text-dim)', border:'1px solid var(--border)' }}>🔬 Исследования</button>
               <button onClick={() => setCalcView('stackcalc')} style={{ padding:'6px 12px', borderRadius:16, fontSize:9, fontWeight:700, whiteSpace:'nowrap', cursor:'pointer', flexShrink:0, background:'var(--bg-secondary)', color:'var(--text-dim)', border:'1px solid var(--border)' }}>🧮 Генератор</button>
               <button onClick={() => setCalcView('mystacks')} style={{ padding:'6px 12px', borderRadius:16, fontSize:9, fontWeight:700, whiteSpace:'nowrap', cursor:'pointer', flexShrink:0, background:'var(--bg-secondary)', color:'var(--text-dim)', border:'1px solid var(--border)' }}>📂 Мои стеки</button>
+              <button onClick={() => setCalcView('mixcalc')} style={{ padding:'6px 12px', borderRadius:16, fontSize:9, fontWeight:700, whiteSpace:'nowrap', cursor:'pointer', flexShrink:0, background:'var(--bg-secondary)', color:'var(--text-dim)', border:'1px solid var(--border)' }}>⚡ Миксы</button>
+              <button onClick={() => setCalcView('plan')} style={{ padding:'6px 12px', borderRadius:16, fontSize:9, fontWeight:700, whiteSpace:'nowrap', cursor:'pointer', flexShrink:0, background:'var(--bg-secondary)', color:'var(--text-dim)', border:'1px solid var(--border)' }}>📅 План</button>
             </div>
           </div>
         </div>
@@ -1605,6 +1762,9 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
                           <span style={{ fontSize:14 }}>{catInfo.emoji}</span>
                           <div style={{ flex:1, fontSize:11, fontWeight:700, color:'var(--text-light)' }}>{catInfo.label}</div>
                           <span style={{ fontSize:9, color:'var(--text-dim)', fontWeight:600, marginRight:2 }}>{group.count}</span>
+                          {(group.classBadges||[]).slice(0,4).map(b => (
+                            <span key={b.clsKey} style={{ fontSize:7, padding:'0px 4px', borderRadius:3, background:'rgba(0,230,138,0.08)', color:'#00e68a', fontWeight:600, marginRight:2 }}>{b.emoji}{b.count}</span>
+                          ))}
                           <span style={{ fontSize:9, color:'var(--text-dim)', transform:isExpanded ? 'rotate(180deg)' : 'none', transition:'transform 0.2s' }}>▼</span>
                         </div>
                         {isExpanded && (
@@ -1625,7 +1785,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
                                   <div style={{ padding:'6px 10px 8px 14px', background:'rgba(0,0,0,0.15)', borderBottom:'1px solid var(--border)' }}>
                                     <div style={{ fontSize:10, color:'rgba(255,255,255,0.9)', lineHeight:1.4, marginBottom:4 }}>{sub.description||''}</div>
                                     <div style={{ fontSize:7, color:'var(--accent-green, #00e68a)', marginBottom:3 }}>
-                                      {(sub.type||'')}{(sub.categories||[]).length > 0 ? ' · ' + (sub.categories||[]).slice(0,3).join(', ') : ''}
+                                      {TYPE_LABELS_RU[sub.type] || (sub.type||'')}{(sub.categories||[]).length > 0 ? ' · ' + (sub.categories||[]).slice(0,3).join(', ') : ''}
                                     </div>
                                     {(sub.mechanisms||[]).length > 0 && (
                                       <div style={{ marginBottom:3 }}>
@@ -1942,88 +2102,201 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
             )}
             
 
-             {/* ===== RESEARCH: PubMed + Pharma Search ===== */}
-             {renderView(infoView, 'research', () => (
-               <div>
-                 <div style={{fontSize:13,fontWeight:700,color:'var(--accent)',marginBottom:4}}>🔬 Поиск исследований</div>
-                 <div style={{fontSize:9,color:'var(--text-dim)',marginBottom:8}}>PubMed — база медицинских публикаций и поиск препаратов по каталогу</div>
+             {/* ===== RESEARCH: Multi-Source ===== */}
+              {renderView(infoView, 'research', () => (
+                <div>
+                  <div style={{fontSize:13,fontWeight:700,color:'var(--accent)',marginBottom:4}}>🔬 Поиск исследований</div>
+                  <div style={{fontSize:9,color:'var(--text-dim)',marginBottom:8}}>PubMed, PubChem, Google Scholar, OpenFDA и каталог препаратов</div>
 
-                 {/* PubMed Search */}
-                 <div className="card" style={{marginBottom:12}}>
-                   <h4 style={{margin:'0 0 6px',fontSize:12}}>🔎 PubMed — научные статьи</h4>
-                   <div style={{display:'flex',gap:6,marginBottom:8}}>
-                     <input value={pubMedQuery} onChange={e=>setPubMedQuery(e.target.value)}
-                       onKeyDown={e=>e.key==='Enter'&&handlePubMedSearch()}
-                       placeholder="creatine muscle strength, NAC liver, trenbolone cardiotoxicity..."
-                       style={{flex:1,padding:'8px 12px',borderRadius:8,border:'1px solid var(--border)',background:'var(--bg-secondary)',color:'var(--text)',fontSize:11,boxSizing:'border-box'}} />
-                     <button onClick={handlePubMedSearch} disabled={pubMedLoading} style={{padding:'8px 14px',borderRadius:8,border:'none',cursor:pubMedLoading?'not-allowed':'pointer',background:'linear-gradient(135deg,#3b82f6,#2563eb)',color:'#fff',fontWeight:700,fontSize:11,opacity:pubMedLoading?0.6:1}}>
-                       {pubMedLoading?'⏳':'🔍'}
-                     </button>
-                   </div>
-                   {pubMedError&&<div style={{padding:8,background:'rgba(239,68,68,0.06)',borderRadius:6,border:'1px solid rgba(239,68,68,0.2)',color:'#f87171',fontSize:10,marginBottom:8}}>⚠ {pubMedError}</div>}
-                   {pubMedResults.length>0&&<div style={{fontSize:9,color:'var(--text-dim)',marginBottom:6}}>Найдено: {pubMedResults.length} публикаций</div>}
-                   <div style={{display:'flex',flexDirection:'column',gap:6,maxHeight:400,overflowY:'auto'}}>
-                     {pubMedResults.map(a=>(
-                       <a key={a.pmid} href={a.url} target="_blank" rel="noopener noreferrer" style={{display:'block',padding:'8px 10px',borderRadius:8,background:'var(--bg-secondary)',border:'1px solid var(--border)',textDecoration:'none',color:'inherit'}}>
-                         <div style={{fontSize:11,fontWeight:600,color:'var(--text-light)',lineHeight:1.3,marginBottom:2}}>{a.title}</div>
-                         {a.authors.length > 0 && <div style={{fontSize:9,color:'var(--text-dim)'}}>{a.authors.slice(0, 3).join(', ')}{a.authors.length > 3 ? ' et al.' : ''}</div>}
-                         <div style={{fontSize:9,color:'var(--text-dim)'}}>{a.journal}{a.pubDate ? ` · ${a.pubDate}` : ''}</div>
-                         {a.abstract&&<div style={{fontSize:9,color:'rgba(255,255,255,0.5)',lineHeight:1.3,marginTop:2,display:'-webkit-box',WebkitLineClamp:3,WebkitBoxOrient:'vertical',overflow:'hidden'}}>{a.abstract}</div>}
-                       </a>
-                     ))}
-                     {pubMedResults.length===0&&!pubMedLoading&&!pubMedError&&<div style={{padding:16,textAlign:'center',color:'var(--text-dim)',fontSize:10}}>Введите запрос для поиска публикаций</div>}
-                   </div>
-                 </div>
+                  {/* Source Pills */}
+                  <div style={{display:'flex',gap:4,marginBottom:10,overflowX:'auto',scrollbarWidth:'none',flexShrink:0}}>
+                    {([
+                      {key:'pubmed',label:'📚 PubMed',color:'#3b82f6'},
+                      {key:'pubchem',label:'🧪 PubChem',color:'#8b5cf6'},
+                      {key:'scholar',label:'🎓 Scholar',color:'#f59e0b'},
+                      {key:'fda',label:'💊 OpenFDA',color:'#ef4444'},
+                      {key:'pharma',label:'📋 Каталог',color:'#00e68a'},
+                    ] as const).map(s => (
+                      <button key={s.key} onClick={() => {setResearchSource(s.key);if(s.key==='pubchem')handlePubchemSearch();if(s.key==='fda')handleFDASearch();}} style={{
+                        padding:'7px 14px',borderRadius:20,fontSize:10,fontWeight:700,whiteSpace:'nowrap',cursor:'pointer',flexShrink:0,
+                        background: researchSource===s.key ? s.color : 'var(--bg-secondary)',
+                        color: researchSource===s.key ? '#fff' : 'var(--text-dim)',
+                        border: `1px solid ${researchSource===s.key ? s.color : 'var(--border)'}`,
+                      }}>{s.label}</button>
+                    ))}
+                  </div>
 
-                 {/* Pharma/Supplement Search */}
-                 <div className="card" style={{marginBottom:12}}>
-                   <h4 style={{margin:'0 0 6px',fontSize:12}}>💊 Поиск препаратов и добавок</h4>
-                   <div style={{display:'flex',gap:6,marginBottom:8}}>
-                     <input value={pharmaSearchQ} onChange={e=>doPharmaSearch(e.target.value)}
-                       placeholder="Поиск по названию, классу или категории..."
-                       style={{flex:1,padding:'8px 12px',borderRadius:8,border:'1px solid var(--border)',background:'var(--bg-secondary)',color:'var(--text)',fontSize:11,boxSizing:'border-box'}} />
-                   </div>
-                   <div style={{display:'flex',flexDirection:'column',gap:4,maxHeight:300,overflowY:'auto'}}>
-                     {pharmaSearchResults.map(r=>(
-                       <div key={r.id} style={{padding:'6px 10px',borderRadius:6,background:r.cls==='supplement'?'rgba(0,230,138,0.04)':'rgba(139,92,246,0.04)',border:`1px solid ${r.cls==='supplement'?'rgba(0,230,138,0.15)':'rgba(139,92,246,0.15)'}`,cursor:'pointer',fontSize:10}} onClick={()=>{
-                         if(PHARMA_DB[r.id]) { setTab('catalog' as any); /* navigate to pharma catalog if possible */ }
-                       }}>
-                         <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-                           <span style={{fontWeight:600,color:r.cls==='supplement'?'#00e68a':'#a78bfa'}}>{r.name}</span>
-                           <span style={{fontSize:8,padding:'1px 5px',borderRadius:4,background:r.cls==='supplement'?'rgba(0,230,138,0.1)':'rgba(139,92,246,0.1)',color:r.cls==='supplement'?'#00e68a':'#a78bfa'}}>{r.cls}</span>
-                         </div>
-                         {r.desc&&<div style={{fontSize:8,color:'var(--text-dim)',marginTop:2,lineHeight:1.3}}>{r.desc}</div>}
-                       </div>
-                     ))}
-                     {pharmaSearchResults.length===0&&pharmaSearchQ.length>2&&<div style={{padding:12,textAlign:'center',color:'var(--text-dim)',fontSize:10}}>Ничего не найдено</div>}
-                     {pharmaSearchQ.length<=2&&<div style={{padding:12,textAlign:'center',color:'var(--text-dim)',fontSize:10}}>Введите минимум 3 символа</div>}
-                   </div>
-                 </div>
+                  {/* Shared search input */}
+                  <div style={{display:'flex',gap:6,marginBottom:10}}>
+                    <input value={pubMedQuery} onChange={e=>setPubMedQuery(e.target.value)}
+                      onKeyDown={e=>{if(e.key==='Enter'){if(researchSource==='pubmed')handlePubMedSearch();if(researchSource==='pubchem')handlePubchemSearch();if(researchSource==='fda')handleFDASearch();}}}
+                      placeholder={researchSource==='pubmed'?'creatine muscle, NAC liver...':researchSource==='pubchem'?'caffeine, creatine, NAC...':researchSource==='fda'?'aspirin, metformin...':'Поиск по названию, классу...'}
+                      style={{flex:1,padding:'8px 12px',borderRadius:8,border:'1px solid var(--border)',background:'var(--bg-secondary)',color:'var(--text)',fontSize:11,boxSizing:'border-box'}} />
+                    <button onClick={()=>{if(researchSource==='pubmed')handlePubMedSearch();if(researchSource==='pubchem')handlePubchemSearch();if(researchSource==='fda')handleFDASearch();}}
+                      disabled={(researchSource==='pubmed'&&pubMedLoading)||(researchSource==='pubchem'&&pubchemLoading)||(researchSource==='fda'&&fdaLoading)}
+                      style={{padding:'8px 14px',borderRadius:8,border:'none',cursor:'pointer',background:`linear-gradient(135deg,${researchSource==='pubmed'?'#3b82f6,#2563eb':researchSource==='pubchem'?'#8b5cf6,#7c3aed':researchSource==='fda'?'#ef4444,#dc2626':researchSource==='pharma'?'#00e68a,#00c853':'#3b82f6,#2563eb'})`,color:'#fff',fontWeight:700,fontSize:11,opacity:(researchSource==='pubmed'&&pubMedLoading)||(researchSource==='pubchem'&&pubchemLoading)||(researchSource==='fda'&&fdaLoading)?0.6:1}}>
+                      {((researchSource==='pubmed'&&pubMedLoading)||(researchSource==='pubchem'&&pubchemLoading)||(researchSource==='fda'&&fdaLoading))?'⏳':researchSource==='scholar'?'🔗':'🔍'}
+                    </button>
+                  </div>
 
-                 {/* Quick Research Links */}
-                 <div className="card" style={{marginBottom:12}}>
-                   <h4 style={{margin:'0 0 6px',fontSize:12}}>📚 Быстрый поиск по темам</h4>
-                   <div style={{display:'flex',flexWrap:'wrap',gap:4}}>
-                     {[
-                       {label:'Тестостерон и мышечная масса',q:'testosterone muscle mass hypertrophy'},
-                       {label:'NAC и печень',q:'NAC liver hepatoprotection'},
-                       {label:'Омега-3 и сердце',q:'omega-3 cardiovascular protection'},
-                       {label:'Тренболон токсичность',q:'trenbolone cardiotoxicity hepatotoxicity'},
-                       {label:'Креатин эффективность',q:'creatine supplementation strength performance'},
-                       {label:'Витамин D и тестостерон',q:'vitamin D testosterone men'},
-                       {label:'Ашваганда кортизол',q:'ashwagandha cortisol stress'},
-                       {label:'BPC-157 заживление',q:'BPC-157 tendon healing angiogenesis'},
-                       {label:'Селен и щитовидная',q:'selenium thyroid function'},
-                       {label:'Коэнзим Q10 сердце',q:'coenzyme Q10 heart failure cardioprotection'},
-                       {label:'Сон и мелатонин',q:'melatonin sleep quality circadian'},
-                       {label:'Куркумин воспаление',q:'curcumin inflammation NF-kB'},
-                     ].map(preset=>(
-                       <button key={preset.q} onClick={()=>{setPubMedQuery(preset.q);handlePubMedSearch();}} style={{padding:'5px 10px',borderRadius:6,fontSize:9,cursor:'pointer',border:'1px solid var(--border)',background:'var(--bg-secondary)',color:'var(--text-light)'}}>{preset.label}</button>
-                     ))}
-                   </div>
-                 </div>
-               </div>
-             ))}
+                  {/* === PUBMED === */}
+                  {researchSource === 'pubmed' && (
+                    <div className="card" style={{marginBottom:12}}>
+                      <h4 style={{margin:'0 0 6px',fontSize:12}}>📚 PubMed — научные статьи</h4>
+                      <div style={{display:'flex',gap:4,marginBottom:6}}>
+                        <button onClick={()=>{setPubMedQuery('creatine supplementation strength performance');handlePubMedSearch();}} style={{padding:'3px 8px',borderRadius:4,fontSize:8,cursor:'pointer',border:'1px solid var(--border)',background:'var(--bg-secondary)',color:'var(--text-light)'}}>Креатин</button>
+                        <button onClick={()=>{setPubMedQuery('whey protein muscle hypertrophy');handlePubMedSearch();}} style={{padding:'3px 8px',borderRadius:4,fontSize:8,cursor:'pointer',border:'1px solid var(--border)',background:'var(--bg-secondary)',color:'var(--text-light)'}}>Протеин</button>
+                        <button onClick={()=>{setPubMedQuery('beta-alanine carnosine performance');handlePubMedSearch();}} style={{padding:'3px 8px',borderRadius:4,fontSize:8,cursor:'pointer',border:'1px solid var(--border)',background:'var(--bg-secondary)',color:'var(--text-light)'}}>Бета-аланин</button>
+                      </div>
+                      {pubMedError&&<div style={{padding:8,background:'rgba(239,68,68,0.06)',borderRadius:6,border:'1px solid rgba(239,68,68,0.2)',color:'#f87171',fontSize:10,marginBottom:8}}>⚠ {pubMedError}</div>}
+                      {pubMedResults.length>0&&<div style={{fontSize:9,color:'var(--text-dim)',marginBottom:6}}>Найдено: {pubMedResults.length} публикаций</div>}
+                      <div style={{display:'flex',flexDirection:'column',gap:6,maxHeight:400,overflowY:'auto'}}>
+                        {pubMedResults.map(a=>(
+                          <a key={a.pmid} href={a.url} target="_blank" rel="noopener noreferrer" style={{display:'block',padding:'8px 10px',borderRadius:8,background:'var(--bg-secondary)',border:'1px solid var(--border)',textDecoration:'none',color:'inherit'}}>
+                            <div style={{fontSize:11,fontWeight:600,color:'var(--text-light)',lineHeight:1.3,marginBottom:2}}>{a.title}</div>
+                            {a.authors.length > 0 && <div style={{fontSize:9,color:'var(--text-dim)'}}>{a.authors.slice(0, 3).join(', ')}{a.authors.length > 3 ? ' et al.' : ''}</div>}
+                            <div style={{fontSize:9,color:'var(--text-dim)'}}>{a.journal}{a.pubDate ? ` · ${a.pubDate}` : ''}</div>
+                            {a.abstract&&<div style={{fontSize:9,color:'rgba(255,255,255,0.5)',lineHeight:1.3,marginTop:2,display:'-webkit-box',WebkitLineClamp:3,WebkitBoxOrient:'vertical',overflow:'hidden'}}>{a.abstract}</div>}
+                          </a>
+                        ))}
+                        {pubMedResults.length===0&&!pubMedLoading&&!pubMedError&&<div style={{padding:16,textAlign:'center',color:'var(--text-dim)',fontSize:10}}>Введите запрос для поиска публикаций</div>}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* === PUBCHEM === */}
+                  {researchSource === 'pubchem' && (
+                    <div className="card" style={{marginBottom:12}}>
+                      <h4 style={{margin:'0 0 6px',fontSize:12}}>🧪 PubChem — химическая информация</h4>
+                      <div style={{display:'flex',gap:4,marginBottom:6,flexWrap:'wrap'}}>
+                        {[{label:'Кофеин',q:'caffeine'},{label:'Креатин',q:'creatine'},{label:'L-цитруллин',q:'L-citrulline'},{label:'Таурин',q:'taurine'},{label:'L-тирозин',q:'L-tyrosine'},{label:'Бета-аланин',q:'beta-alanine'}].map(p=>(
+                          <button key={p.q} onClick={()=>{setPubMedQuery(p.q);handlePubchemSearch();}} style={{padding:'3px 8px',borderRadius:4,fontSize:8,cursor:'pointer',border:'1px solid var(--border)',background:'var(--bg-secondary)',color:'var(--text-light)'}}>{p.label}</button>
+                        ))}
+                      </div>
+                      {pubchemError&&<div style={{padding:8,background:'rgba(239,68,68,0.06)',borderRadius:6,border:'1px solid rgba(239,68,68,0.2)',color:'#f87171',fontSize:10,marginBottom:8}}>⚠ {pubchemError}</div>}
+                      {pubchemLoading&&<div style={{padding:12,textAlign:'center',color:'var(--text-dim)',fontSize:10}}>⏳ Поиск в PubChem...</div>}
+                      {pubchemResults.map((r,i)=>(
+                        <div key={i} style={{padding:'10px 12px',borderRadius:10,background:'var(--bg-secondary)',border:'1px solid var(--border)',marginBottom:8}}>
+                          <div style={{fontSize:12,fontWeight:700,color:'#8b5cf6',marginBottom:4}}>{r.name}</div>
+                          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:4,fontSize:9,color:'var(--text-dim)'}}>
+                            <div><b>Формула:</b> {r.formula}</div>
+                            <div><b>Мол. масса:</b> {typeof r.mw === 'number' ? r.mw.toFixed(2) + ' г/моль' : r.mw}</div>
+                            <div style={{gridColumn:'1/-1'}}><b>IUPAC:</b> {r.iupac}</div>
+                          </div>
+                        </div>
+                      ))}
+                      {pubchemResults.length===0&&!pubchemLoading&&!pubchemError&&<div style={{padding:12,textAlign:'center',color:'var(--text-dim)',fontSize:10}}>Введите название соединения (на английском) и нажмите 🔍</div>}
+                    </div>
+                  )}
+
+                  {/* === GOOGLE SCHOLAR === */}
+                  {researchSource === 'scholar' && (
+                    <div className="card" style={{marginBottom:12}}>
+                      <h4 style={{margin:'0 0 6px',fontSize:12}}>🎓 Google Scholar — научные публикации</h4>
+                      <div style={{display:'flex',gap:4,marginBottom:6,flexWrap:'wrap'}}>
+                        {[
+                          {label:'Тестостерон и гипертрофия',q:'тестостерон мышечная гипертрофия'},
+                          {label:'NAC гепатопротекция',q:'NAC гепатопротекция печень'},
+                          {label:'Омега-3 кардио',q:'омега-3 сердечно-сосудистая система'},
+                          {label:'Креатин сила',q:'креатин силовые показатели'},
+                          {label:'Метформин anti-aging',q:'metformin anti-aging longevity'},
+                          {label:'Витамин D спортсмены',q:'витамин D спортсмены дефицит'},
+                        ].map(p=>(
+                          <button key={p.q} onClick={()=>{setPubMedQuery(p.q);}} style={{padding:'3px 8px',borderRadius:4,fontSize:8,cursor:'pointer',border:'1px solid var(--border)',background:'var(--bg-secondary)',color:'var(--text-light)'}}>{p.label}</button>
+                        ))}
+                      </div>
+                      <div style={{fontSize:10,color:'var(--text-dim)',marginBottom:8}}>Поиск откроется в новой вкладке Google Scholar</div>
+                      <a href={`https://scholar.google.com/scholar?q=${encodeURIComponent(pubMedQuery)}`} target="_blank" rel="noopener noreferrer"
+                        style={{display:'inline-block',padding:'10px 20px',borderRadius:10,border:'none',cursor:'pointer',background:'linear-gradient(135deg,#f59e0b,#d97706)',color:'#000',fontWeight:700,fontSize:12,textDecoration:'none',textAlign:'center'}}>
+                        🎓 Искать в Google Scholar: {pubMedQuery || '(введите запрос)'}
+                      </a>
+                    </div>
+                  )}
+
+                  {/* === OPENFDA === */}
+                  {researchSource === 'fda' && (
+                    <div className="card" style={{marginBottom:12}}>
+                      <h4 style={{margin:'0 0 6px',fontSize:12}}>💊 OpenFDA — официальные инструкции препаратов</h4>
+                      <div style={{display:'flex',gap:4,marginBottom:6,flexWrap:'wrap'}}>
+                        {[{label:'Аспирин',q:'aspirin'},{label:'Метформин',q:'metformin'},{label:'Тестостерон',q:'testosterone'},{label:'Тамоксифен',q:'tamoxifen'},{label:'Кломифен',q:'clomiphene'}].map(p=>(
+                          <button key={p.q} onClick={()=>{setPubMedQuery(p.q);handleFDASearch();}} style={{padding:'3px 8px',borderRadius:4,fontSize:8,cursor:'pointer',border:'1px solid var(--border)',background:'var(--bg-secondary)',color:'var(--text-light)'}}>{p.label}</button>
+                        ))}
+                      </div>
+                      {fdaError&&<div style={{padding:8,background:'rgba(239,68,68,0.06)',borderRadius:6,border:'1px solid rgba(239,68,68,0.2)',color:'#f87171',fontSize:10,marginBottom:8}}>⚠ {fdaError}</div>}
+                      {fdaLoading&&<div style={{padding:12,textAlign:'center',color:'var(--text-dim)',fontSize:10}}>⏳ Поиск в OpenFDA...</div>}
+                      <div style={{display:'flex',flexDirection:'column',gap:6,maxHeight:400,overflowY:'auto'}}>
+                        {fdaResults.map((r,i)=>(
+                          <div key={i} style={{padding:'8px 10px',borderRadius:8,background:'var(--bg-secondary)',border:'1px solid var(--border)'}}>
+                            <div style={{fontSize:11,fontWeight:700,color:'#ef4444',marginBottom:2}}>{r.brandName}</div>
+                            <div style={{fontSize:9,color:'var(--text-dim)',marginBottom:2}}>{r.genericName}</div>
+                            <div style={{fontSize:9,color:'rgba(255,255,255,0.5)',lineHeight:1.3,display:'-webkit-box',WebkitLineClamp:4,WebkitBoxOrient:'vertical',overflow:'hidden'}}>{r.indications}</div>
+                            {r.manufacturer !== '—' && <div style={{fontSize:8,color:'var(--text-dim)',marginTop:2}}>Производитель: {r.manufacturer}</div>}
+                          </div>
+                        ))}
+                        {fdaResults.length===0&&!fdaLoading&&!fdaError&&<div style={{padding:12,textAlign:'center',color:'var(--text-dim)',fontSize:10}}>Введите название препарата (на английском) и нажмите 🔍</div>}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* === PHARMA CATALOG SEARCH === */}
+                  {researchSource === 'pharma' && (
+                    <div className="card" style={{marginBottom:12}}>
+                      <h4 style={{margin:'0 0 6px',fontSize:12}}>💊 Поиск препаратов и добавок</h4>
+                      <div style={{display:'flex',gap:6,marginBottom:8}}>
+                        <input value={pharmaSearchQ} onChange={e=>doPharmaSearch(e.target.value)}
+                          placeholder="Поиск по названию, классу или категории..."
+                          style={{flex:1,padding:'8px 12px',borderRadius:8,border:'1px solid var(--border)',background:'var(--bg-secondary)',color:'var(--text)',fontSize:11,boxSizing:'border-box'}} />
+                      </div>
+                      <div style={{display:'flex',flexDirection:'column',gap:4,maxHeight:300,overflowY:'auto'}}>
+                        {pharmaSearchResults.map(r=>(
+                          <div key={r.id} style={{padding:'6px 10px',borderRadius:6,background:r.cls==='supplement'?'rgba(0,230,138,0.04)':'rgba(139,92,246,0.04)',border:`1px solid ${r.cls==='supplement'?'rgba(0,230,138,0.15)':'rgba(139,92,246,0.15)'}`,cursor:'pointer',fontSize:10}} onClick={()=>{
+                            if(PHARMA_DB[r.id]) { setTab('catalog' as any); }
+                          }}>
+                            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                              <span style={{fontWeight:600,color:r.cls==='supplement'?'#00e68a':'#a78bfa'}}>{r.name}</span>
+                              <span style={{fontSize:8,padding:'1px 5px',borderRadius:4,background:r.cls==='supplement'?'rgba(0,230,138,0.1)':'rgba(139,92,246,0.1)',color:r.cls==='supplement'?'#00e68a':'#a78bfa'}}>{r.cls}</span>
+                            </div>
+                            {r.desc&&<div style={{fontSize:8,color:'var(--text-dim)',marginTop:2,lineHeight:1.3}}>{r.desc}</div>}
+                          </div>
+                        ))}
+                        {pharmaSearchResults.length===0&&pharmaSearchQ.length>2&&<div style={{padding:12,textAlign:'center',color:'var(--text-dim)',fontSize:10}}>Ничего не найдено</div>}
+                        {pharmaSearchQ.length<=2&&<div style={{padding:12,textAlign:'center',color:'var(--text-dim)',fontSize:10}}>Введите минимум 3 символа</div>}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Quick Research Links — expanded Russian presets */}
+                  <div className="card" style={{marginBottom:12}}>
+                    <h4 style={{margin:'0 0 6px',fontSize:12}}>📚 Быстрый поиск по темам</h4>
+                    <div style={{display:'flex',flexWrap:'wrap',gap:4}}>
+                      {[
+                        {label:'Тестостерон и мышечная масса',q:'testosterone muscle mass hypertrophy'},
+                        {label:'NAC и печень',q:'NAC liver hepatoprotection'},
+                        {label:'Омега-3 и сердце',q:'omega-3 cardiovascular protection'},
+                        {label:'Тренболон токсичность',q:'trenbolone cardiotoxicity hepatotoxicity'},
+                        {label:'Креатин эффективность',q:'creatine supplementation strength performance'},
+                        {label:'Витамин D и тестостерон',q:'vitamin D testosterone men'},
+                        {label:'Ашваганда кортизол',q:'ashwagandha cortisol stress'},
+                        {label:'BPC-157 заживление',q:'BPC-157 tendon healing angiogenesis'},
+                        {label:'Селен и щитовидная',q:'selenium thyroid function'},
+                        {label:'Коэнзим Q10 сердце',q:'coenzyme Q10 heart failure cardioprotection'},
+                        {label:'Сон и мелатонин',q:'melatonin sleep quality circadian'},
+                        {label:'Куркумин воспаление',q:'curcumin inflammation NF-kB'},
+                        {label:'Бета-аланин выносливость',q:'beta-alanine carnosine endurance performance'},
+                        {label:'Цитруллин и NO',q:'citrulline malate nitric oxide blood flow'},
+                        {label:'Магний и сон',q:'magnesium glycinate sleep quality anxiety'},
+                        {label:'Цинк и иммунитет',q:'zinc supplementation immune function testosterone'},
+                        {label:'L-карнитин жиросжигание',q:'L-carnitine fat oxidation exercise performance'},
+                        {label:'HMB и катаболизм',q:'HMB beta-hydroxy beta-methylbutyrate muscle protein breakdown'},
+                        {label:'Глютамин и кишечник',q:'glutamine intestinal permeability gut health'},
+                        {label:'Коллаген и суставы',q:'collagen peptides joint pain osteoarthritis'},
+                      ].map(preset=>(
+                        <button key={preset.q} onClick={()=>{setPubMedQuery(preset.q);handlePubMedSearch();}} style={{padding:'5px 10px',borderRadius:6,fontSize:9,cursor:'pointer',border:'1px solid var(--border)',background:'var(--bg-secondary)',color:'var(--text-light)'}}>{preset.label}</button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              ))}
 
 
 
@@ -2091,6 +2364,9 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
                     <span style={{ fontSize: 16 }}>{catInfo.emoji}</span>
                     <div style={{ flex: 1, fontSize: 12, fontWeight: 700, color: 'var(--text-light)' }}>{catInfo.label}</div>
                     <span style={{ fontSize: 10, color: 'var(--text-dim)', fontWeight: 600, marginRight: 4 }}>{group.count}</span>
+                    {(group.classBadges||[]).slice(0,4).map(b => (
+                      <span key={b.clsKey} style={{ fontSize:7, padding:'0px 4px', borderRadius:3, background:'rgba(0,230,138,0.08)', color:'#00e68a', fontWeight:600, marginRight:2 }}>{b.emoji}{b.count}</span>
+                    ))}
                     <span style={{ fontSize: 10, color: 'var(--text-dim)', transform: isExpanded ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}>▼</span>
                   </div>
                   {isExpanded && (
@@ -2116,7 +2392,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
                               <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', lineHeight: 1.4, marginBottom: 6 }}>{sub.description}</div>
                               {/* Type badge */}
                               <div style={{ fontSize: 8, color: 'var(--accent-green, #00e68a)', marginBottom: 4 }}>
-                                {sub.type}{(sub.categories||[]).length > 0 ? ' · ' + (sub.categories||[]).slice(0, 3).join(', ') : ''}
+                                {TYPE_LABELS_RU[sub.type] || sub.type}{(sub.categories||[]).length > 0 ? ' · ' + (sub.categories||[]).slice(0, 3).join(', ') : ''}
                               </div>
                               {/* All mechanisms */}
                               {sub.mechanisms && sub.mechanisms.length > 0 && (
@@ -2436,7 +2712,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
                           background: sel ? '#00e68a' : 'transparent', color:'#000', fontSize:9, fontWeight:700 }}>{sel ? '✓' : ''}</span>
                         <span style={{ fontWeight:500 }}>{s.name}</span>
                         <span style={{ color:'var(--text-dim)', fontSize:8 }}>{s.id}</span>
-                        <span style={{ color:'var(--text-dim)', fontSize:8, marginLeft:'auto' }}>{s.type}</span>
+                        <span style={{ color:'var(--text-dim)', fontSize:8, marginLeft:'auto' }}>{TYPE_LABELS_RU[s.type] || s.type}</span>
                       </div>
                     );
                   })}
@@ -3025,7 +3301,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
                         background: 'var(--bg-secondary)', border: '1px solid var(--border-color)',
                       }}>
                         <span style={{ fontWeight: 600 }}>{sub.name}</span>
-                        <span style={{ color: 'var(--text-dim)', marginLeft: 6, fontSize: 10 }}>{sub.type}{(sub.categories||[]).length > 0 ? ' · ' + (sub.categories||[]).slice(0, 2).join(', ') : ''}</span>
+                        <span style={{ color: 'var(--text-dim)', marginLeft: 6, fontSize: 10 }}>{TYPE_LABELS_RU[sub.type] || sub.type}{(sub.categories||[]).length > 0 ? ' · ' + (sub.categories||[]).slice(0, 2).join(', ') : ''}</span>
                         <div style={{ fontSize: 9, color: 'var(--text-dim)', marginTop: 2 }}>{sub.description}</div>
                       </div>
                     ))}
@@ -3753,21 +4029,21 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
                   {stackCalcOrgans.length>0&&<button onClick={clearAll} style={{fontSize:7,padding:'2px 6px',borderRadius:4,cursor:'pointer',background:'rgba(239,68,68,0.08)',border:'1px solid rgba(239,68,68,0.15)',color:'#f87171'}}>✕</button>}
                   <span style={{fontSize:8,color:'var(--text-dim)',marginLeft:4}}>{stackCalcOrgans.length}/{organList.length}</span>
                 </div>
-                <div style={{display:'flex',flexWrap:'wrap',gap:3,maxHeight:70,overflowY:'auto'}}>
+                <div style={{display:'flex',flexWrap:'wrap',gap:3}}>
                   {organList.map(o=><button key={o.key} onClick={()=>toggleOrgan(o.key)} style={{padding:'2px 5px',borderRadius:6,fontSize:7,cursor:'pointer',whiteSpace:'nowrap',background:stackCalcOrgans.includes(o.key)?'var(--accent)':'var(--bg-secondary)',color:stackCalcOrgans.includes(o.key)?'#000':'var(--text-dim)',border:`1px solid ${stackCalcOrgans.includes(o.key)?'var(--accent)':'var(--border)'}`}}>{o.label}</button>)}
                 </div>
               </div>
               {availableMechs.length>0&&<div style={{marginBottom:6}}>
                 <div style={{fontSize:9,fontWeight:600,color:'var(--text-light)',marginBottom:3}}>Механизмы ({availableMechs.length}):</div>
-                <div style={{display:'flex',flexWrap:'wrap',gap:3,maxHeight:60,overflowY:'auto'}}>
-                  {availableMechs.slice(0,40).map(m=><button key={m} onClick={()=>toggleMech(m)} style={{padding:'1px 4px',borderRadius:6,fontSize:6,cursor:'pointer',whiteSpace:'nowrap',background:stackCalcMech.includes(m)?'#8b5cf6':'var(--bg-secondary)',color:stackCalcMech.includes(m)?'#fff':'var(--text-dim)',border:`1px solid ${stackCalcMech.includes(m)?'#8b5cf6':'var(--border)'}`}}>{m}</button>)}
+                <div style={{display:'flex',flexWrap:'wrap',gap:3}}>
+                  {availableMechs.slice(0,40).map(m=><button key={m} onClick={()=>toggleMech(m)} style={{padding:'1px 4px',borderRadius:6,fontSize:6,cursor:'pointer',whiteSpace:'nowrap',background:stackCalcMech.includes(m)?'#8b5cf6':'var(--bg-secondary)',color:stackCalcMech.includes(m)?'#fff':'var(--text-dim)',border:`1px solid ${stackCalcMech.includes(m)?'#8b5cf6':'var(--border)'}`}}>{MECH_TRANSLATIONS_RU[m] || m}</button>)}
                 </div>
               </div>}
-              <div style={{display:'flex',gap:6,alignItems:'center',marginBottom:6}}>
+              <div style={{display:'flex',gap:6,alignItems:'center',marginBottom:4}}>
                 <span style={{fontSize:9,fontWeight:600,color:'var(--text-light)'}}>Размер:</span>
                 {['2-4','5-7','8-10','11-15','15-20','20-25','30-35'].map(s=><button key={s} onClick={()=>setStackCalcSize(s)} style={{padding:'2px 5px',borderRadius:6,fontSize:7,cursor:'pointer',background:stackCalcSize===s?'var(--accent)':'var(--bg-secondary)',color:stackCalcSize===s?'#000':'var(--text-dim)',border:`1px solid ${stackCalcSize===s?'var(--accent)':'var(--border)'}`}}>{s}</button>)}
-                <button onClick={generate} style={{padding:'5px 12px',borderRadius:10,fontSize:9,fontWeight:700,cursor:'pointer',background:'var(--accent)',border:'none',color:'#000',marginLeft:'auto'}}>⚡ Сгенерировать</button>
               </div>
+              <button onClick={generate} style={{width:'100%',padding:'10px',borderRadius:12,fontWeight:800,fontSize:14,cursor:'pointer',background:'var(--accent)',border:'none',color:'#000',marginBottom:6}}>⚡ Сгенерировать</button>
               {generatedStacks.length > 0 && (
                 <div style={{marginBottom:6}}>
                   <div style={{display:'flex',gap:4,overflowX:'auto',marginBottom:4}}>
@@ -3796,13 +4072,13 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
                         <div key={si} style={{padding:'3px 6px',borderRadius:6,background:'var(--bg-secondary)',border:'1px solid var(--border)'}}>
                           <div style={{fontSize:8,fontWeight:600,color:'var(--text-light)'}}>{sd.name} <span style={{fontSize:7,color:'var(--text-dim)',fontWeight:400}}>{sd.id}</span></div>
                           {sd.description && <div style={{fontSize:7,color:'var(--text-dim)',lineHeight:1.3}}>{sd.description}</div>}
-                          {sd.mechanisms && sd.mechanisms.length > 0 && <div style={{display:'flex',flexWrap:'wrap',gap:2,marginTop:2}}>{sd.mechanisms.slice(0,5).map((m:string,mi:number)=><span key={mi} style={{fontSize:6,padding:'1px 3px',borderRadius:3,background:'rgba(139,92,246,0.08)',color:'#a78bfa'}}>{m}</span>)}</div>}
+                          {sd.mechanisms && sd.mechanisms.length > 0 && <div style={{display:'flex',flexWrap:'wrap',gap:2,marginTop:2}}>{sd.mechanisms.slice(0,5).map((m:string,mi:number)=><span key={mi} style={{fontSize:6,padding:'1px 3px',borderRadius:3,background:'rgba(139,92,246,0.08)',color:'#a78bfa'}}>{MECH_TRANSLATIONS_RU[m] || m}</span>)}</div>}
                         </div>
                       ))}
                     </div>
                   </details>
                 )}
-                {generatedStack.mechs.length>0&&<div style={{marginBottom:3}}><div style={{fontSize:7,fontWeight:600,color:'var(--text-dim)',marginBottom:2}}>⚙️ Механизмы:</div><div style={{display:'flex',flexWrap:'wrap',gap:2}}>{generatedStack.mechs.map((m:string,i:number)=><span key={i} style={{fontSize:6,padding:'1px 4px',borderRadius:3,background:'rgba(139,92,246,0.08)',color:'#a78bfa'}}>{m}</span>)}</div></div>}
+                {generatedStack.mechs.length>0&&<div style={{marginBottom:3}}><div style={{fontSize:7,fontWeight:600,color:'var(--text-dim)',marginBottom:2}}>⚙️ Механизмы:</div><div style={{display:'flex',flexWrap:'wrap',gap:2}}>{generatedStack.mechs.map((m:string,i:number)=><span key={i} style={{fontSize:6,padding:'1px 4px',borderRadius:3,background:'rgba(139,92,246,0.08)',color:'#a78bfa'}}>{MECH_TRANSLATIONS_RU[m] || m}</span>)}</div></div>}
                 {generatedStack.synergies.length>0&&<details style={{marginBottom:3}}><summary style={{fontSize:7,fontWeight:600,color:'#22c55e',cursor:'pointer'}}>⊕ Синергии ({generatedStack.synergies.length})</summary>{generatedStack.synergies.map((s:any,i:number)=><div key={i} style={{fontSize:7,color:'var(--text-dim)',padding:'2px 0'}}><b style={{color:'#4ade80'}}>{getStackSubLabel(s.a)} + {getStackSubLabel(s.b)}</b>: {s.effect} [{s.severity}]{s.mechanisms&&s.mechanisms.length>0&&<span style={{fontSize:6,color:'#a78bfa',marginLeft:4}}>→ {s.mechanisms.join(', ')}</span>}</div>)}</details>}
                 {generatedStack.conflicts.length>0&&<details><summary style={{fontSize:7,fontWeight:600,color:'#ef4444',cursor:'pointer'}}>⚠ Конфликты ({generatedStack.conflicts.length})</summary>{generatedStack.conflicts.map((c:any,i:number)=><div key={i} style={{fontSize:7,color:'#f87171',padding:'2px 0'}}><b>{getStackSubLabel(c.a)} + {getStackSubLabel(c.b)}</b>: {c.effect} [{c.severity}]</div>)}</details>}
               </div>}
@@ -3862,6 +4138,336 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
               </div>
             ))
           )}
+        </div>
+      )}
+
+      {/* ===== MIX CALCULATOR: Training Mix ===== */}
+      {tab === 'main' && supportView === 'calc' && calcView === 'mixcalc' && (
+        <div style={{ padding:'0 0 80px', height:'100vh', display:'flex', flexDirection:'column' }}>
+          <button onClick={() => setCalcView('main')} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', marginBottom:6, background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600, alignSelf:'flex-start' }}>← Назад</button>
+          <div style={{ flex:1, overflowY:'auto', paddingRight:4 }}>
+            <h2 style={{ margin:'0 0 2px', fontSize:16, fontWeight:800, color:'var(--accent)' }}>⚡ Миксы для тренировки</h2>
+            <p style={{ fontSize:10, color:'var(--text-dim)', margin:'0 0 12px' }}>Калькулятор пре-/интра-/пост-тренировочных стеков</p>
+
+            {/* --- Parameters --- */}
+            <div className="card" style={{ marginBottom:10, padding:10 }}>
+              <h4 style={{ margin:'0 0 8px', fontSize:11, color:'var(--text)' }}>🎯 Параметры</h4>
+              <div style={{ display:'flex', gap:6, marginBottom:8, flexWrap:'wrap' }}>
+                <div style={{ flex:'1 1 45%', minWidth:100 }}>
+                  <div style={{ fontSize:8, color:'var(--text-dim)', marginBottom:3 }}>Цель</div>
+                  <select value={mixGoal} onChange={e=>setMixGoal(e.target.value)} style={{ width:'100%', padding:'6px 8px', borderRadius:6, border:'1px solid var(--border)', background:'var(--bg-secondary)', color:'var(--text)', fontSize:10 }}>
+                    <option value="pump">💪 Памп</option>
+                    <option value="endurance">🏃 Выносливость</option>
+                    <option value="strength">🏋️ Сила</option>
+                    <option value="recovery">🔄 Восстановление</option>
+                    <option value="focus">🧠 Фокус</option>
+                  </select>
+                </div>
+                <div style={{ flex:'1 1 45%', minWidth:100 }}>
+                  <div style={{ fontSize:8, color:'var(--text-dim)', marginBottom:3 }}>Время приёма</div>
+                  <select value={mixTiming} onChange={e=>setMixTiming(e.target.value)} style={{ width:'100%', padding:'6px 8px', borderRadius:6, border:'1px solid var(--border)', background:'var(--bg-secondary)', color:'var(--text)', fontSize:10 }}>
+                    <option value="pre">⚡ Пре-тренировка</option>
+                    <option value="intra">💧 Интра-тренировка</option>
+                    <option value="post">🍗 Пост-тренировка</option>
+                  </select>
+                </div>
+              </div>
+              <div style={{ marginBottom:8 }}>
+                <div style={{ fontSize:8, color:'var(--text-dim)', marginBottom:3 }}>Вес тела (кг)</div>
+                <input type="number" value={linked.profile?.settings?.weight ?? 80} readOnly
+                  style={{ width:'100%', padding:'6px 8px', borderRadius:6, border:'1px solid var(--border)', background:'var(--bg-secondary)', color:'var(--text)', fontSize:10, boxSizing:'border-box' }} />
+              </div>
+              {(() => {
+                const hasCourse = (linked.course || []).length > 0;
+                const isOnCycle = hasCourse;
+                const bw = linked.profile?.settings?.weight ?? 80;
+                const multiplier = isOnCycle ? 1.25 : 1.0;
+                const isPre = mixTiming === 'pre';
+                const isIntra = mixTiming === 'intra';
+                const isPost = mixTiming === 'post';
+
+                const preStack = [
+                  { name:'Кофеин (безводный)', dose: `${(Math.min(6, 3 + (mixGoal==='focus'?3:0) + (mixGoal==='endurance'?1:0)) * bw * multiplier / 1000).toFixed(2)} г`, note:'За 30-45 мин до. Стимуляция ЦНС, липолиз' },
+                  { name:'L-Цитруллин малат', dose: `${(8 * multiplier).toFixed(1)} г`, note:'За 45-60 мин до. Оксид азота, памп' },
+                  { name:'Бета-аланин', dose:'3.2 г', note:'За 30 мин до. Буфер молочной кислоты' },
+                  { name:'L-Аргинин (опционально)', dose:`${(5 * multiplier).toFixed(1)} г`, note:'За 30 мин до. Усиливает памп' },
+                  { name:'L-Тирозин', dose:`${(2 * multiplier).toFixed(1)} г`, note:'За 30 мин до. Фокус, дофамин' },
+                  { name:'Таурин', dose:`${(2 * multiplier).toFixed(1)} г`, note:'За 30 мин до. Осморегуляция, антиоксидант' },
+                ];
+
+                const durationHrs = mixGoal === 'endurance' ? 2 : 1.5;
+                const intraStack = [
+                  { name:'Натрий (Na⁺)', dose: `${Math.round(750 * durationHrs)} мг`, note:'Каждые 15-20 мин с водой. Гидратация' },
+                  { name:'Калий (K⁺)', dose: `${Math.round(300 * durationHrs)} мг`, note:'Каждые 15-20 мин. Предотвращение судорог' },
+                  { name:'Магний (Mg²⁺)', dose: `${Math.round(150 * durationHrs)} мг`, note:'Каждые 30 мин. Судороги, расслабление' },
+                  { name:'Циклический декстрин (HBCD)', dose: `${Math.round(45 * durationHrs)} г`, note:'Каждые 15-20 мин. Быстрый углевод, низкий GI' },
+                  { name:'EAA (BCAA 2:1:1)', dose: `${(10 * multiplier).toFixed(1)} г`, note:'Каждые 30 мин. Анти-катаболизм' },
+                  { name:'L-Глютамин', dose:`${(5 * multiplier).toFixed(1)} г`, note:'Каждые 30 мин. Кишечник, иммунитет' },
+                ];
+
+                const postStack = [
+                  { name:'Сывороточный протеин (изолят)', dose: `${(0.4 * bw).toFixed(0)} г`, note:'Сразу после. Быстрое усвоение' },
+                  { name:'Креатин моногидрат', dose:'5 г', note:'Сразу после. Восполнение фосфокреатина' },
+                  { name:'HMB (β-гидрокси-β-метилбутират)', dose: isOnCycle ? '3 г' : '— (натуральный тренинг)', note:'Сразу после. Анти-катаболизм' },
+                  { name:'L-Глютамин', dose:`${(5 * multiplier).toFixed(0)} г`, note:'Сразу после. Иммунитет, гликоген' },
+                  { name:'Цинк + Магний (ZMA)', dose:'30 мг Zn + 450 мг Mg', note:'За 30-60 мин до сна. Тестостерон, сон' },
+                  { name:'Витамин C', dose:'500 мг', note:'Сразу после. Кортизол, антиоксидант' },
+                ];
+
+                const activeStack = isPre ? preStack : isIntra ? intraStack : postStack;
+                const stackTitle = isPre ? '⚡ Пре-тренировочный стек' : isIntra ? '💧 Интра-тренировочный стек' : '🍗 Пост-тренировочный стек';
+                const timingLabel = isPre ? 'За 30-60 мин до тренировки' : isIntra ? 'Во время тренировки (каждые 15-20 мин)' : 'Сразу после тренировки';
+
+                const glycemicCompounds = ['HGH','insulin','metformin','berberine','semaglutide','tirzepatide'];
+                const userGlycemic = (linked.course || []).filter(c => glycemicCompounds.some(g => (c.substanceId||'').toLowerCase().includes(g.toLowerCase())));
+                const hasGlycemic = userGlycemic.length > 0;
+
+                return (<>
+                  {isOnCycle && (
+                    <div style={{ padding:'6px 8px', borderRadius:6, background:'rgba(139,92,246,0.08)', border:'1px solid rgba(139,92,246,0.2)', fontSize:9, color:'#a78bfa', marginBottom:8 }}>
+                      🔬 На курсе: дозы повышены ×{multiplier}. Активные вещества: {(linked.course||[]).map(c=>c.substanceId).join(', ')}
+                    </div>
+                  )}
+
+                  {/* Stack Card */}
+                  <div className="card" style={{ marginBottom:10, padding:12, background:'linear-gradient(135deg, rgba(0,230,138,0.04), rgba(139,92,246,0.04))', border:'1px solid var(--glass-border)' }}>
+                    <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:8 }}>
+                      <span style={{ fontSize:18 }}>{isPre ? '⚡' : isIntra ? '💧' : '🍗'}</span>
+                      <div>
+                        <div style={{ fontSize:12, fontWeight:700, color:'var(--accent)' }}>{stackTitle}</div>
+                        <div style={{ fontSize:8, color:'var(--text-dim)' }}>{timingLabel}</div>
+                      </div>
+                      {isOnCycle && <span style={{ marginLeft:'auto', fontSize:8, padding:'2px 6px', borderRadius:4, background:'rgba(139,92,246,0.15)', color:'#a78bfa' }}>×{multiplier}</span>}
+                    </div>
+
+                    <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
+                      {activeStack.map((item,i)=>(
+                        <div key={i} style={{ display:'flex', alignItems:'center', gap:8 }}>
+                          <div style={{ width:6, height:6, borderRadius:'50%', background:'var(--accent)', flexShrink:0 }} />
+                          <div style={{ flex:1, fontSize:10 }}>
+                            <span style={{ color:'var(--text-light)' }}>{item.name}</span>
+                            <span style={{ color:'var(--text-dim)', fontSize:8, marginLeft:4 }}>— {item.note}</span>
+                          </div>
+                          <span style={{ fontSize:10, fontWeight:600, color:'#00e68a', whiteSpace:'nowrap' }}>{item.dose}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Glycemic interactions note */}
+                  {hasGlycemic && isIntra && (
+                    <div className="card" style={{ padding:10, marginBottom:8, background:'rgba(239,68,68,0.04)', border:'1px solid rgba(239,68,68,0.15)' }}>
+                      <div style={{ fontSize:10, fontWeight:700, color:'#f87171', marginBottom:4 }}>⚠ Внимание: гликемические взаимодействия</div>
+                      <div style={{ fontSize:9, color:'var(--text-dim)', lineHeight:1.4 }}>
+                        У вас на курсе: <b>{userGlycemic.map(c=>c.substanceId).join(', ')}</b>. Эти вещества влияют на уровень глюкозы в крови.
+                        Контролируйте глюкометром уровень сахара каждые 30 мин. При гипогликемии — увеличьте дозу HBCD на 15-20 г.
+                        Рассмотрите замену HBCD на мальтодекстрин с более высоким GI для быстрого подъёма глюкозы.
+                      </div>
+                    </div>
+                  )}
+
+                  {/* All stacks overview */}
+                  <div className="card" style={{ padding:10, marginBottom:8 }}>
+                    <h4 style={{ margin:'0 0 6px', fontSize:11, color:'var(--text)' }}>📋 Все три стека (обзор)</h4>
+                    <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+                      {[
+                        { label:'⚡ Пре', items:preStack.slice(0,4).map(i=>`${i.name.split('(')[0].trim()}: ${i.dose}`).join(' · ') },
+                        { label:'💧 Интра', items:intraStack.slice(0,4).map(i=>`${i.name.split('(')[0].trim()}: ${i.dose}`).join(' · ') },
+                        { label:'🍗 Пост', items:postStack.slice(0,4).map(i=>`${i.name.split('(')[0].trim()}: ${i.dose}`).join(' · ') },
+                      ].map((grp, gi) => (
+                        <div key={gi} style={{ padding:'8px 10px', borderRadius:8, background:'var(--bg-secondary)', border:'1px solid var(--border)' }}>
+                          <div style={{ fontSize:10, fontWeight:700, color:'var(--accent)', marginBottom:3 }}>{grp.label}-тренировочный</div>
+                          <div style={{ fontSize:8, color:'var(--text-dim)', lineHeight:1.4 }}>{grp.items}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Notes */}
+                  <div className="card" style={{ padding:10 }}>
+                    <h4 style={{ margin:'0 0 4px', fontSize:10, color:'var(--text-dim)' }}>📝 Рекомендации</h4>
+                    <div style={{ fontSize:8, color:'var(--text-dim)', lineHeight:1.4 }}>
+                      • Все дозы рассчитаны на вес <b>{bw} кг</b>{isOnCycle ? ' (на курсе ×1.25)' : ' (натуральный тренинг ×1.0)'}.<br/>
+                      • Пейте воду: 500 мл за 2 ч до + 200-300 мл каждые 15-20 мин во время тренировки.<br/>
+                      • Общий объём жидкости интра-тренировки: ~{(durationHrs * 0.9).toFixed(1)} л для {bw} кг.<br/>
+                      • Избегайте жиров и клетчатки за 2 ч до тренировки — замедляют всасывание.<br/>
+                      • Пост-тренировочный приём — в течение 30 мин после завершения (анаболическое окно).<br/>
+                      • При использовании инсулина/метформина: обязательно глюкометр + быстрые углеводы под рукой.
+                    </div>
+                  </div>
+                </>);
+              })()}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ===== SUPPORT PLAN VIEW ===== */}
+      {tab === 'main' && supportView === 'calc' && calcView === 'plan' && (
+        <div style={{ padding:'0 0 80px' }}>
+          <button onClick={() => setCalcView('main')} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', marginBottom:6, background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← Назад</button>
+          <h2 style={{ margin:'0 0 2px', fontSize:16, fontWeight:800, color:'var(--accent)' }}>📅 План поддержки</h2>
+          <p style={{ fontSize:10, color:'var(--text-dim)', margin:'0 0 12px' }}>Сгенерирован из уровня: {SUPPORT_LEVELS[supportLevel]?.label || supportLevel}</p>
+          <div style={{ display:'flex', gap:6, marginBottom:10 }}>
+            {(['daily','weekly','monthly'] as const).map(p => (
+              <button key={p} onClick={() => { setPlanView(p); setPlanSaved(false); }} style={{
+                padding:'8px 18px', borderRadius:20, fontSize:11, fontWeight:700, cursor:'pointer',
+                background: planView === p ? 'var(--accent)' : 'var(--bg-secondary)',
+                color: planView === p ? '#000' : 'var(--text-dim)',
+                border: `1px solid ${planView === p ? 'var(--accent)' : 'var(--border)'}`,
+              }}>{p === 'daily' ? '☀️ Дневной' : p === 'weekly' ? '📆 Недельный' : '🗓 Месячный'}</button>
+            ))}
+          </div>
+          {(() => {
+            const level = SUPPORT_LEVELS[supportLevel];
+            const subs = level?.subs || [];
+            const dosages = level?.dosages || {};
+            const TIME_SLOTS = [
+              { key:'morning', label:'🌅 Утро', timeHint:'натощак или с завтраком' },
+              { key:'afternoon', label:'☀️ День', timeHint:'с обедом' },
+              { key:'evening', label:'🌙 Вечер', timeHint:'на ночь, перед сном' },
+            ];
+            const getInfo = (id: string) => {
+              const sub = ALL_SUBSTANCES.find(s => s.id === id);
+              const d = dosages[id];
+              const name = sub?.name || id.replace(/_/g, ' ');
+              return { id, name, mg: d?.mg ?? 0, timing: d?.timing || '' };
+            };
+            const distributeDaily = () => {
+              const slots: Record<string, Array<{id:string,name:string,mg:number,timing:string}>> = { morning:[], afternoon:[], evening:[] };
+              for (const id of subs) {
+                const info = getInfo(id);
+                const t = info.timing.toLowerCase();
+                if (t.includes('вечер') || t.includes('ночь')) slots.evening.push(info);
+                else if (t.includes('день') || t.includes('обед')) slots.afternoon.push(info);
+                else slots.morning.push(info);
+              }
+              return slots;
+            };
+            const genDailyPlan = distributeDaily();
+            if (planView === 'daily') return (
+              <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+                {TIME_SLOTS.map(slot => (
+                  <div key={slot.key} style={{ background:'var(--bg-secondary)', borderRadius:12, padding:'10px 12px', border:'1px solid var(--border)' }}>
+                    <div style={{ fontSize:12, fontWeight:700, color:'var(--accent)', marginBottom:6 }}>{slot.label} <span style={{ fontSize:9, fontWeight:400, color:'var(--text-dim)' }}>— {slot.timeHint}</span></div>
+                    {genDailyPlan[slot.key].length > 0 ? (
+                      genDailyPlan[slot.key].map((item, idx) => (
+                        <div key={idx} style={{ display:'flex', alignItems:'center', gap:8, padding:'6px 0', borderBottom: idx < genDailyPlan[slot.key].length - 1 ? '1px solid var(--border)' : 'none' }}>
+                          <div style={{ width:6, height:6, borderRadius:'50%', background:'var(--accent)', flexShrink:0 }} />
+                          <div style={{ flex:1 }}>
+                            <div style={{ fontSize:11, fontWeight:600, color:'var(--text-light)' }}>{item.name}</div>
+                            <div style={{ fontSize:9, color:'var(--text-dim)' }}>{item.mg >= 1000 && item.id !== 'omega3' ? `${(item.mg/1000).toFixed(item.mg%1000===0?0:1)}г` : `${item.mg}мг`} · {item.timing}</div>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <div style={{ fontSize:9, color:'var(--text-dim)', padding:'4px 0' }}>Нет добавок</div>
+                    )}
+                  </div>
+                ))}
+                <button onClick={() => {
+                  const plan = { period:'daily', date:new Date().toISOString(), level:supportLevel, plan:genDailyPlan, levelLabel:level?.label };
+                  localStorage.setItem('supportPlans', JSON.stringify([...(JSON.parse(localStorage.getItem('supportPlans') || '[]')), plan]));
+                  setPlanSaved(true);
+                }} style={{ width:'100%', padding:'12px', borderRadius:10, border:'none', cursor:'pointer', marginTop:4, background:'linear-gradient(135deg,#00e68a,#00c853)', color:'#000', fontWeight:800, fontSize:13 }}>💾 Сохранить план</button>
+                {planSaved && <div style={{ textAlign:'center', fontSize:10, color:'#22c55e', marginTop:4 }}>✅ План сохранён</div>}
+              </div>
+            );
+            if (planView === 'weekly') return (
+              <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+                {[0,1,2,3,4,5,6].map(dayIdx => {
+                  const dayNames = ['Пн','Вт','Ср','Чт','Пт','Сб','Вс'];
+                  const isRestDay = dayIdx === 6;
+                  const daySlots = distributeDaily();
+                  return (
+                    <div key={dayIdx} style={{ background:'var(--bg-secondary)', borderRadius:12, padding:'8px 12px', border: isRestDay ? '1px solid rgba(139,92,246,0.3)' : '1px solid var(--border)' }}>
+                      <div style={{ fontSize:12, fontWeight:700, marginBottom:4, color: isRestDay ? '#8b5cf6' : 'var(--accent)' }}>
+                        {dayNames[dayIdx]} {isRestDay ? '🔄 Восстановление' : '🏋️ Тренировка'}
+                      </div>
+                      {TIME_SLOTS.map(slot => {
+                        const items = daySlots[slot.key];
+                        if (items.length === 0) return null;
+                        return (
+                          <div key={slot.key} style={{ marginBottom:3, paddingLeft:8 }}>
+                            <div style={{ fontSize:9, color:'var(--text-dim)', marginBottom:1 }}>{slot.label}</div>
+                            {items.map((item, idx) => (
+                              <div key={idx} style={{ display:'flex', alignItems:'center', gap:6, padding:'2px 0' }}>
+                                <div style={{ width:4, height:4, borderRadius:'50%', background:'var(--accent)', flexShrink:0 }} />
+                                <span style={{ fontSize:9, color:'var(--text-light)' }}>{item.name}</span>
+                                <span style={{ fontSize:8, color:'var(--text-dim)' }}>{item.mg >= 1000 && item.id !== 'omega3' ? `${(item.mg/1000).toFixed(item.mg%1000===0?0:1)}г` : `${item.mg}мг`}</span>
+                              </div>
+                            ))}
+                          </div>
+                        );
+                      })}
+                      {subs.length === 0 && <div style={{ fontSize:9, color:'var(--text-dim)' }}>Нет добавок</div>}
+                    </div>
+                  );
+                })}
+                <button onClick={() => {
+                  const plan = { period:'weekly', date:new Date().toISOString(), level:supportLevel, plan: distributeDaily(), levelLabel:level?.label };
+                  localStorage.setItem('supportPlans', JSON.stringify([...(JSON.parse(localStorage.getItem('supportPlans') || '[]')), plan]));
+                  setPlanSaved(true);
+                }} style={{ width:'100%', padding:'12px', borderRadius:10, border:'none', cursor:'pointer', marginTop:4, background:'linear-gradient(135deg,#00e68a,#00c853)', color:'#000', fontWeight:800, fontSize:13 }}>💾 Сохранить план</button>
+                {planSaved && <div style={{ textAlign:'center', fontSize:10, color:'#22c55e', marginTop:4 }}>✅ План сохранён</div>}
+              </div>
+            );
+            if (planView === 'monthly') {
+              const isMaxLevel = supportLevel === 'boost';
+              return (
+                <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+                  {[1,2,3,4].map(weekIdx => {
+                    const isDeload = isMaxLevel && weekIdx === 4;
+                    return (
+                      <div key={weekIdx} style={{ background: isDeload ? 'rgba(139,92,246,0.08)' : 'var(--bg-secondary)', borderRadius:12, padding:'10px 12px', border: isDeload ? '1px solid rgba(139,92,246,0.3)' : '1px solid var(--border)' }}>
+                        <div style={{ fontSize:13, fontWeight:700, marginBottom:6, color: isDeload ? '#8b5cf6' : 'var(--accent)' }}>
+                          Неделя {weekIdx}{isDeload ? ' 🔄 Делоад' : ''}
+                        </div>
+                        {isDeload ? (
+                          <div style={{ fontSize:10, color:'var(--text-dim)', lineHeight:1.5 }}>
+                            <div>📉 Снижение дозировок до 50% базовых</div>
+                            <div>🛌 Акцент на восстановление</div>
+                            <div>🧘 Минимальная поддержка: только базовые антиоксиданты</div>
+                            {['nac','omega3','magnesium','vitamin_d3'].map(id => {
+                              const info = getInfo(id);
+                              const halfMg = Math.round(info.mg / 2);
+                              return (
+                                <div key={id} style={{ display:'flex', gap:6, padding:'2px 0', marginLeft:8 }}>
+                                  <span style={{ color:'var(--text-light)', fontSize:10 }}>{info.name}</span>
+                                  <span style={{ fontSize:9, color:'var(--text-dim)' }}>{halfMg >= 1000 ? `${(halfMg/1000).toFixed(0)}г` : `${halfMg}мг`}</span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          <div style={{ display:'flex', flexDirection:'column', gap:3 }}>
+                            {subs.map(id => {
+                              const info = getInfo(id);
+                              return (
+                                <div key={id} style={{ display:'flex', alignItems:'center', gap:6, padding:'2px 0' }}>
+                                  <div style={{ width:5, height:5, borderRadius:'50%', background:'var(--accent)', flexShrink:0 }} />
+                                  <span style={{ fontSize:10, fontWeight:500, color:'var(--text-light)', flex:1 }}>{info.name}</span>
+                                  <span style={{ fontSize:9, color:'var(--text-dim)' }}>{info.mg >= 1000 && id !== 'omega3' ? `${(info.mg/1000).toFixed(info.mg%1000===0?0:1)}г` : `${info.mg}мг`}</span>
+                                </div>
+                              );
+                            })}
+                            {subs.length === 0 && <div style={{ fontSize:9, color:'var(--text-dim)' }}>Нет добавок</div>}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                  <button onClick={() => {
+                    const plan = { period:'monthly', date:new Date().toISOString(), level:supportLevel, subs, dosages, levelLabel:level?.label };
+                    localStorage.setItem('supportPlans', JSON.stringify([...(JSON.parse(localStorage.getItem('supportPlans') || '[]')), plan]));
+                    setPlanSaved(true);
+                  }} style={{ width:'100%', padding:'12px', borderRadius:10, border:'none', cursor:'pointer', marginTop:4, background:'linear-gradient(135deg,#00e68a,#00c853)', color:'#000', fontWeight:800, fontSize:13 }}>💾 Сохранить план</button>
+                  {planSaved && <div style={{ textAlign:'center', fontSize:10, color:'#22c55e', marginTop:4 }}>✅ План сохранён</div>}
+                </div>
+              );
+            }
+            return null;
+          })()}
         </div>
       )}
 
