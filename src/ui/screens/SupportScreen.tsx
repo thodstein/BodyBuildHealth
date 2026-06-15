@@ -1391,6 +1391,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
           </div>
           {/* Content */}
           <div style={{ flex:1, overflowY:'auto', paddingRight:4 }}>
+            <div style={{fontSize:7,color:'rgba(255,255,255,0.15)',textAlign:'right',marginBottom:2}}>v{new Date().toISOString().slice(0,10)}</div>
             {renderView(infoView, 'catalog', () =>
               <div>
                 <div style={{ display:'flex', gap:6, marginBottom:8, alignItems:'center' }}>
