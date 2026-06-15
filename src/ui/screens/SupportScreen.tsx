@@ -45,6 +45,49 @@ const INTERACTION_TYPE_LABELS: Record<string, { label: string; emoji: string; co
   caution: { label: 'Предупреждение', emoji: 'ℹ️', color: '#f59e0b' },
 };
 
+const EFFECT_LABELS: Record<string, string> = {
+  SMOOTH_FOCUS:'Плавная фокусировка — кофеин стимулирует, теанин сглаживает',
+  OVERSTIMULATION:'Перевозбуждение — суммарная стимуляция ЦНС',
+  HEART_STRAIN:'Нагрузка на сердце — риск тахикардии и гипертензии',
+  ANXIETY_SPIKE:'Резкая тревога — выброс норадреналина и адреналина',
+  IRON_ABSORB_UP:'Усиление всасывания железа',
+  IRON_ABSORB_DOWN:'Снижение всасывания железа',
+  MINERAL_COMPETE:'Конкуренция минералов за транспорт',
+  COPPER_DEPLETION:'Истощение меди при высоком цинке',
+  ABSORB_COMPETE:'Конкуренция за всасывание',
+  BONE_SUPPORT:'Поддержка костной ткани — кальций + D3',
+  CALCIUM_TARGETING:'Направление кальция в кости (К2)',
+  VITD_ACTIVATION:'Активация витамина D магнием',
+  IMMUNE_BALANCE:'Баланс иммунного ответа',
+  COAGULATION_SHIFT:'Сдвиг свёртываемости крови',
+  BLEED_RISK:'Повышенный риск кровотечений',
+  ANTIINFLAMMATION_UP:'Усиление противовоспалительного эффекта',
+  IMMUNE_MOD:'Иммуномодуляция',
+  SLEEP_UP:'Улучшение качества сна',
+  CALMING:'Успокаивающий эффект',
+  HEART_MOD:'Модуляция сердечного ритма',
+  SEROTONIN_SYNDROME:'Риск серотонинового синдрома',
+  SEROTONIN_EXCESS:'Избыток серотонина',
+  SEROTONIN_CRISIS:'Серотониновый криз',
+  DRUG_CLEARANCE_UP:'Ускорение клиренса лекарств',
+  ANTICOAG_DOWN:'Снижение антикоагулянтного эффекта',
+  LIVER_PROTECT:'Защита печени — глутатион',
+  ANTIOX_INTERFERE:'Интерференция с антиоксидантной терапией',
+  NO_UP:'Повышение оксида азота',
+  ABSORB_MOD:'Изменение всасывания',
+  LIPIDS_UP:'Улучшение липидного профиля',
+  BUGS_KILLED:'Уничтожение пробиотиков антибиотиками',
+  MICROBIOME_UP:'Улучшение микробиома',
+  SURVIVAL_UP:'Повышение выживаемости пробиотиков',
+  ABSORB_DOWN:'Снижение всасывания',
+  SEDATION_UP:'Усиление седации',
+  SLEEP_ARCH_DISRUPT:'Нарушение архитектуры сна',
+  LIVER_TOX:'Гепатотоксичность — токсические метаболиты',
+  CNS_DEPRESSION:'Угнетение ЦНС',
+  MOOD_INSTABILITY:'Нестабильность настроения',
+  DRUG_EFFECT_DOWN:'Снижение эффекта препарата',
+};
+
 const INTERACTION_SEVERITY_LABELS: Record<string, { label: string; color: string }> = {
   LOW: { label: 'Низкая', color: '#84cc16' },
   MEDIUM: { label: 'Средняя', color: '#f59e0b' },
@@ -1116,7 +1159,11 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   // Resolve interaction effect to readable text
   const showEffect = (interaction: any): string => {
     const eff = interaction?.effect;
-    if (eff && /^[A-Z0-9_]+$/.test(eff) && interaction?.notes) return interaction.notes;
+    if (!eff) return '';
+    if (/^[A-Z0-9_]+$/.test(eff)) {
+      if (interaction?.notes) return interaction.notes;
+      if (EFFECT_LABELS[eff]) return EFFECT_LABELS[eff];
+    }
     return eff || '';
   };
 
@@ -1127,11 +1174,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
 
   const renderView = (current: string, target: string, contentFn: () => React.ReactNode): React.ReactNode => {
     if (current !== target) return null;
-    try {
-      return React.createElement(InfoErrorBoundary, {label:target}, contentFn());
-    } catch(e) {
-      return <div style={{padding:16,textAlign:'center',color:'#ef4444',fontSize:10}}>⚠ {target}: {String(e)}</div>;
-    }
+    return safeRender(target, contentFn);
   };
 
   const catDetailInteractions = (sub: SupportSubstance, interactions: any[]): React.ReactNode => {
@@ -1166,6 +1209,9 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
       const list = filtered || [];
       const synergies = list.filter((i:any) => i?.type === 'synergy');
       const conflicts = list.filter((i:any) => i?.type === 'conflict' || i?.type === 'caution');
+      const safeItem = (fn:()=>React.ReactNode, key:string|number):React.ReactNode => {
+        try{return fn();}catch(e){return <div key={key} style={{padding:4,color:'#f87171',fontSize:7}}>⚠ Item {key}: {String(e)}</div>;}
+      };
       return (<>
         <div style={{ marginBottom:10 }}>
           <div onClick={() => setExpandedCategories(prev => ({ ...prev, syn_synergies: !(prev?.syn_synergies ?? true) }))} style={{ display:'flex', alignItems:'center', gap:6, padding:'6px 8px', cursor:'pointer', userSelect:'none', background:'var(--bg-secondary)', borderRadius:8, marginBottom:4 }}>
@@ -1175,7 +1221,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
           </div>
           {cats?.syn_synergies !== false && (
             <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
-              {synergies.slice(0, 30).map((interaction: any, i: number) => {
+              {synergies.slice(0, 30).map((interaction: any, i: number) => safeItem(() => {
                 const sevInfo = INTERACTION_SEVERITY_LABELS[interaction?.severity] || { label:interaction?.severity, color:'#888' };
                 const aName = resolveSubName(interaction?.substanceA);
                 const bName = resolveSubName(interaction?.substanceB);
@@ -1200,7 +1246,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
                     {interaction?.notes && !(/^[A-Z0-9_]+$/.test(interaction?.effect||'')) && <div style={{ fontSize:8, color:'var(--text-dim)', fontStyle:'italic', lineHeight:1.2, marginTop:2 }}>{interaction.notes}</div>}
                   </div>
                 );
-              })}
+              }, i))}
               {synergies.length === 0 && <div style={{ padding:12, textAlign:'center', color:'var(--text-dim)', fontSize:10 }}>Нет синергий</div>}
             </div>
           )}
@@ -1213,7 +1259,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
           </div>
           {cats?.syn_conflicts !== false && (
             <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
-              {conflicts.slice(0, 30).map((interaction: any, i: number) => {
+              {conflicts.slice(0, 30).map((interaction: any, i: number) => safeItem(() => {
                 const typeInfo = INTERACTION_TYPE_LABELS[interaction?.type] || { label:interaction?.type, emoji:'🔗', color:'#888' };
                 const sevInfo = INTERACTION_SEVERITY_LABELS[interaction?.severity] || { label:interaction?.severity, color:'#888' };
                 const aName = resolveSubName(interaction?.substanceA);
@@ -1246,7 +1292,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
                     {interaction?.notes && !(/^[A-Z0-9_]+$/.test(interaction?.effect||'')) && <div style={{ fontSize:8, color:'var(--text-dim)', fontStyle:'italic', lineHeight:1.2, marginTop:2 }}>{interaction?.notes}</div>}
                   </div>
                 );
-              })}
+              }, i))}
               {conflicts.length === 0 && <div style={{ padding:12, textAlign:'center', color:'var(--text-dim)', fontSize:10 }}>Нет конфликтов</div>}
             </div>
           )}
