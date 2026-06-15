@@ -35,7 +35,7 @@ import { checkDrugInteractions } from '../../engines/pharma-interactions.engine'
 import type { CourseEntry } from '../../core/types';
 import { searchPubMed, type PubMedArticle } from '../../engines/pubmed-search.engine';
 
-type SupportTab = 'main' | 'catalog' | 'synergies' | 'calculator' | 'interactions' | 'stacks' | 'peptides' | 'fertility-pct';
+type SupportTab = 'main' | 'catalog' | 'synergies' | 'calculator' | 'interactions' | 'stacks' | 'peptides' | 'fertility-pct' | 'research';
 type SupportView = 'main' | 'calc' | 'fertility';
 type CalcView = 'main' | 'calculator' | 'peptides' | 'info' | 'stackcalc' | 'mystacks' | 'mixcalc' | 'plan';
 type InfoView = 'main' | 'catalog' | 'synergies' | 'stacks' | 'interactions' | 'research';
@@ -1715,7 +1715,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
               ))}
             </div>
             <div style={{ display:'flex', gap:6, marginTop:12, overflowX:'auto', scrollbarWidth:'none' }}>
-              <button onClick={() => { setCalcView('info'); setInfoView('research'); }} style={{ padding:'6px 12px', borderRadius:16, fontSize:9, fontWeight:700, whiteSpace:'nowrap', cursor:'pointer', flexShrink:0, background:'var(--bg-secondary)', color:'var(--text-dim)', border:'1px solid var(--border)' }}>🔬 Исследования</button>
+              <button onClick={() => { setTab('research'); }} style={{ padding:'6px 12px', borderRadius:16, fontSize:9, fontWeight:700, whiteSpace:'nowrap', cursor:'pointer', flexShrink:0, background:'var(--bg-secondary)', color:'var(--text-dim)', border:'1px solid var(--border)' }}>🔬 Исследования</button>
               <button onClick={() => setCalcView('stackcalc')} style={{ padding:'6px 12px', borderRadius:16, fontSize:9, fontWeight:700, whiteSpace:'nowrap', cursor:'pointer', flexShrink:0, background:'var(--bg-secondary)', color:'var(--text-dim)', border:'1px solid var(--border)' }}>🧮 Генератор</button>
               <button onClick={() => setCalcView('mystacks')} style={{ padding:'6px 12px', borderRadius:16, fontSize:9, fontWeight:700, whiteSpace:'nowrap', cursor:'pointer', flexShrink:0, background:'var(--bg-secondary)', color:'var(--text-dim)', border:'1px solid var(--border)' }}>📂 Мои стеки</button>
               <button onClick={() => setCalcView('mixcalc')} style={{ padding:'6px 12px', borderRadius:16, fontSize:9, fontWeight:700, whiteSpace:'nowrap', cursor:'pointer', flexShrink:0, background:'var(--bg-secondary)', color:'var(--text-dim)', border:'1px solid var(--border)' }}>⚡ Миксы</button>
@@ -4468,6 +4468,89 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
             }
             return null;
           })()}
+        </div>
+      )}
+
+      {/* ===== STANDALONE RESEARCH TAB ===== */}
+      {tab === 'research' && (
+        <div style={{ padding:'0 12px 80px', height:'100vh', overflowY:'auto' }}>
+          <button onClick={() => setTab('main')} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', marginBottom:8, background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← На главную</button>
+          <h2 style={{ margin:'0 0 8px', fontSize:18, fontWeight:800, color:'var(--accent)' }}>🔬 Исследования</h2>
+
+          <div className="card" style={{marginBottom:10,padding:'8px 10px'}}>
+            <div style={{display:'flex',gap:4,marginBottom:8,overflowX:'auto'}}>
+              {([{k:'pubmed',l:'📚 PubMed',c:'#3b82f6'},{k:'pubchem',l:'🧪 PubChem',c:'#8b5cf6'},{k:'scholar',l:'🎓 Scholar',c:'#f59e0b'},{k:'fda',l:'💊 OpenFDA',c:'#ef4444'},{k:'pharma',l:'📋 Каталог',c:'#00e68a'}] as const).map(s=>(
+                <button key={s.k} onClick={()=>{setResearchSource(s.k);if(s.k==='pubchem')handlePubchemSearch();if(s.k==='fda')handleFDASearch();}} style={{padding:'4px 10px',borderRadius:14,fontSize:9,fontWeight:700,whiteSpace:'nowrap',cursor:'pointer',background:researchSource===s.k?s.c:'var(--bg-secondary)',color:researchSource===s.k?'#fff':'var(--text-dim)',border:`1px solid ${researchSource===s.k?s.c:'var(--border)'}`}}>{s.l}</button>
+              ))}
+            </div>
+            <div style={{display:'flex',gap:6}}>
+              <input value={pubMedQuery} onChange={e=>setPubMedQuery(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'){if(researchSource==='pubmed')handlePubMedSearch();if(researchSource==='pubchem')handlePubchemSearch();if(researchSource==='fda')handleFDASearch();}}}
+                placeholder={researchSource==='pubmed'?'creatine muscle, NAC liver...':researchSource==='pubchem'?'caffeine, curcumin...':'aspirin, metformin...'}
+                style={{flex:1,padding:'8px 10px',borderRadius:8,border:'1px solid var(--border)',background:'var(--bg-secondary)',color:'var(--text)',fontSize:11,boxSizing:'border-box'}} />
+              <button onClick={()=>{if(researchSource==='pubmed')handlePubMedSearch();if(researchSource==='pubchem')handlePubchemSearch();if(researchSource==='fda')handleFDASearch();}} disabled={pubMedLoading||pubchemLoading} style={{padding:'8px 14px',borderRadius:8,border:'none',cursor:'pointer',background:'linear-gradient(135deg,#3b82f6,#2563eb)',color:'#fff',fontWeight:700,fontSize:11}}>{(pubMedLoading||pubchemLoading)?'⏳':'🔍'}</button>
+            </div>
+          </div>
+
+          {researchSource==='pubmed'&&(
+            <div className="card" style={{marginBottom:10}}>
+              <h4 style={{margin:'0 0 6px',fontSize:11}}>📚 PubMed</h4>
+              <div style={{display:'flex',gap:4,marginBottom:6,flexWrap:'wrap'}}>
+                {['креатин','бета-аланин','сывороточный протеин','цитруллин','NAC печень'].map(l=><button key={l} onClick={()=>{setPubMedQuery(l);handlePubMedSearch();}} style={{padding:'2px 7px',borderRadius:4,fontSize:8,cursor:'pointer',border:'1px solid var(--border)',background:'var(--bg-secondary)',color:'var(--text-dim)'}}>{l}</button>)}
+              </div>
+              {pubMedError&&<div style={{padding:6,background:'rgba(239,68,68,0.06)',borderRadius:6,color:'#f87171',fontSize:9,marginBottom:6}}>⚠ {pubMedError}</div>}
+              {pubMedResults.length>0&&<div style={{fontSize:8,color:'var(--text-dim)',marginBottom:4}}>Найдено: {pubMedResults.length}</div>}
+              <div style={{display:'flex',flexDirection:'column',gap:4,maxHeight:300,overflowY:'auto'}}>
+                {pubMedResults.map(a=><a key={a.pmid} href={a.url} target="_blank" rel="noopener" style={{display:'block',padding:'6px 8px',borderRadius:6,background:'var(--bg-secondary)',border:'1px solid var(--border)',textDecoration:'none',color:'inherit'}}><div style={{fontSize:10,fontWeight:600,color:'var(--text-light)',lineHeight:1.3,marginBottom:1}}>{a.title}</div>{a.authors.length>0&&<div style={{fontSize:8,color:'var(--text-dim)'}}>{a.authors.slice(0,3).join(', ')}{a.authors.length>3?' et al.':''}</div>}<div style={{fontSize:8,color:'var(--text-dim)'}}>{a.journal}{a.pubDate?' · '+a.pubDate:''}</div></a>)}
+              </div>
+              {pubMedResults.length===0&&!pubMedLoading&&<div style={{padding:16,textAlign:'center',color:'var(--text-dim)',fontSize:10}}>Введите запрос и нажмите 🔍</div>}
+            </div>
+          )}
+
+          {researchSource==='pubchem'&&(
+            <div className="card" style={{marginBottom:10}}>
+              <h4 style={{margin:'0 0 6px',fontSize:11}}>🧪 PubChem</h4>
+              <div style={{display:'flex',gap:4,marginBottom:6,flexWrap:'wrap'}}>
+                {['caffeine','curcumin','creatine','taurine','citrulline'].map(l=><button key={l} onClick={()=>{setPubMedQuery(l);handlePubchemSearch();}} style={{padding:'2px 7px',borderRadius:4,fontSize:8,cursor:'pointer',border:'1px solid var(--border)',background:'var(--bg-secondary)',color:'var(--text-dim)'}}>{l}</button>)}
+              </div>
+              {pubchemError&&<div style={{padding:6,background:'rgba(239,68,68,0.06)',borderRadius:6,color:'#f87171',fontSize:9,marginBottom:6}}>⚠ {pubchemError}</div>}
+              {pubchemLoading&&<div style={{padding:12,textAlign:'center',color:'var(--text-dim)',fontSize:10}}>⏳ Поиск в PubChem...</div>}
+              {pubchemResults.map((r,i)=><div key={i} style={{padding:'6px 8px',borderRadius:6,background:'rgba(139,92,246,0.04)',border:'1px solid rgba(139,92,246,0.15)',marginBottom:4,fontSize:10}}><div style={{fontWeight:600,color:'var(--text-light)'}}>{r.name}</div><div style={{fontSize:8,color:'var(--text-dim)'}}>{r.formula}{r.mass?' · Мол.масса: '+r.mass+' г/моль':''}</div>{r.iupac&&<div style={{fontSize:8,color:'rgba(255,255,255,0.4)',lineHeight:1.3,marginTop:2}}>{r.iupac}</div>}</div>)}
+            </div>
+          )}
+
+          {researchSource==='scholar'&&(
+            <div className="card" style={{marginBottom:10}}>
+              <h4 style={{margin:'0 0 6px',fontSize:11}}>🎓 Google Scholar</h4>
+              <p style={{fontSize:10,color:'var(--text-dim)',marginBottom:8}}>Поиск научных публикаций через Google Scholar</p>
+              <a href={`https://scholar.google.com/scholar?q=${encodeURIComponent(pubMedQuery||'спортивное питание')}`} target="_blank" rel="noopener" style={{display:'block',padding:'8px 12px',borderRadius:8,background:'rgba(245,158,11,0.08)',border:'1px solid rgba(245,158,11,0.2)',color:'#f59e0b',fontSize:11,fontWeight:600,textDecoration:'none',textAlign:'center'}}>🔍 Открыть в Google Scholar: {pubMedQuery||'(введите запрос)'}</a>
+            </div>
+          )}
+
+          {researchSource==='fda'&&(
+            <div className="card" style={{marginBottom:10}}>
+              <h4 style={{margin:'0 0 6px',fontSize:11}}>💊 OpenFDA — лекарства</h4>
+              {fdaLoading&&<div style={{padding:12,textAlign:'center',color:'var(--text-dim)',fontSize:10}}>⏳ Поиск...</div>}
+              {fdaResults.map((r,i)=><div key={i} style={{padding:'6px 8px',borderRadius:6,background:'rgba(239,68,68,0.04)',border:'1px solid rgba(239,68,68,0.15)',marginBottom:4}}><div style={{fontSize:10,fontWeight:600,color:'var(--text-light)'}}>{r.brandName}</div><div style={{fontSize:8,color:'var(--text-dim)'}}>{r.genericName}{r.manufacturer!=='-'?' · '+r.manufacturer:''}</div>{r.indications!=='-'&&<div style={{fontSize:8,color:'rgba(255,255,255,0.4)',lineHeight:1.3,marginTop:2}}>{r.indications}</div>}</div>)}
+              {fdaResults.length===0&&!fdaLoading&&<div style={{padding:12,textAlign:'center',color:'var(--text-dim)',fontSize:10}}>Введите название препарата</div>}
+            </div>
+          )}
+
+          {researchSource==='pharma'&&(
+            <div className="card" style={{marginBottom:10}}>
+              <h4 style={{margin:'0 0 6px',fontSize:11}}>📋 Поиск по каталогу</h4>
+              <input value={pubMedQuery} onChange={e=>{doPharmaSearch(e.target.value)}} placeholder="Название, класс, категория..." style={{width:'100%',padding:'8px 10px',borderRadius:8,border:'1px solid var(--border)',background:'var(--bg-secondary)',color:'var(--text)',fontSize:11,boxSizing:'border-box',marginBottom:6}} />
+              <div style={{display:'flex',flexDirection:'column',gap:3,maxHeight:300,overflowY:'auto'}}>
+                {(pubMedQuery.length>2?(pharmaSearchResults||[]):[]).map((r:any)=><div key={r.id} style={{padding:'5px 8px',borderRadius:6,background:'var(--bg-secondary)',border:'1px solid var(--border)',fontSize:9}}><div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}><span style={{fontWeight:600,color:r.cls==='supplement'?'#00e68a':'#a78bfa'}}>{r.name}</span><span style={{fontSize:7,padding:'1px 4px',borderRadius:3,background:r.cls==='supplement'?'rgba(0,230,138,0.1)':'rgba(139,92,246,0.1)',color:r.cls==='supplement'?'#00e68a':'#a78bfa'}}>{r.cls}</span></div>{r.desc&&<div style={{fontSize:7,color:'var(--text-dim)',marginTop:1}}>{r.desc}</div>}</div>)}
+              </div>
+            </div>
+          )}
+
+          <div className="card" style={{marginBottom:10}}>
+            <h4 style={{margin:'0 0 6px',fontSize:11}}>📚 Быстрый поиск</h4>
+            <div style={{display:'flex',flexWrap:'wrap',gap:3}}>
+              {['тестостерон мышечная масса','креатин сила производительность','сывороточный протеин гипертрофия','NAC печень гепатопротекция','омега-3 сердце','витамин D тестостерон','ашваганда кортизол стресс','BPC-157 заживление','куркумин воспаление','мелатонин сон','L-цитруллин оксид азота','бета-аланин карнозин'].map(p=><button key={p} onClick={()=>{setPubMedQuery(p);handlePubMedSearch();}} style={{padding:'3px 8px',borderRadius:4,fontSize:8,cursor:'pointer',border:'1px solid var(--border)',background:'var(--bg-secondary)',color:'var(--text-dim)'}}>{p}</button>)}
+            </div>
+          </div>
         </div>
       )}
 
