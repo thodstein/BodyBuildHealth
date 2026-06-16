@@ -8,6 +8,7 @@ import { getRiskColor } from '../../core/utils/risk-colors';
 import { SUPPORT_BASE_COVERAGE } from '../../core/constants';
 import { INTERACTIONS_DB } from '../../data/interactions';
 import { ALL_SUBSTANCES, ALL_INTERACTIONS, type SupportSubstance, type SupportInteraction } from '../../data/support-database';
+import { SUBSTANCE_ANALOGS, SUBSTANCE_ENHANCERS, PHASE_MODS, DEFAULT_DOSAGES, getPhaseLevel, type SupportPhase } from '../../data/support-levels';
 import { FertilityPCTScreen } from './FertilityPCTScreen';
 import { ALL_STACKS, EFFECT_LABELS_ru, findStacksByEffect, getSubstanceLabel as getStackSubLabel, type SupportStack } from '../../data/support-stacks';
 import {
@@ -901,6 +902,9 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   const [systemFilter, setSystemFilter] = useState<string>('all');
   const [supportClassFilter, setSupportClassFilter] = useState<string>('all');
   const [supportLevel, setSupportLevel] = useState<'basic' | 'mid' | 'max' | 'boost'>('mid');
+  const [supportPhase, setSupportPhase] = useState<SupportPhase>('course');
+  const [selectedAnalogs, setSelectedAnalogs] = useState<Record<string, string>>({});
+  const [enhancedSubs, setEnhancedSubs] = useState<string[]>([]);
   const [supportGoal, setSupportGoal] = useState('muscle_gain');
   const [supportDrugs, setSupportDrugs] = useState<string[]>([]);
   const [autoLevel, setAutoLevel] = useState<'basic' | 'mid' | 'max' | 'boost'>('mid');
@@ -1023,8 +1027,8 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   const SUPPORT_LEVELS: Record<string, { label: string; desc: string; subs: string[]; dosages: Record<string, { mg: number; timing: string }> }> = {
     basic: { label: '🟢 База', desc: 'Бюджетный минимум — 5 добавок для базового покрытия рисков', subs: ['nac', 'omega3', 'vitamin_d3', 'zinc', 'magnesium'], dosages: { nac: { mg: 600, timing: 'утро, натощак' }, omega3: { mg: 2000, timing: 'с едой, завтрак' }, vitamin_d3: { mg: 5000, timing: 'с едой, завтрак (МЕ)' }, zinc: { mg: 15, timing: 'на ночь' }, magnesium: { mg: 200, timing: 'на ночь' } } },
     mid: { label: '🟡 Средний', desc: 'Стандартная поддержка курса — 11 добавок', subs: ['nac', 'omega3', 'tudca', 'magnesium', 'vitamin_d3', 'coq10', 'zinc', 'vitamin_k2', 'vitamin_b12', 'glucosamine', 'collagen'], dosages: { nac: { mg: 1200, timing: 'утро, натощак' }, omega3: { mg: 3000, timing: 'с едой, завтрак' }, tudca: { mg: 500, timing: 'перед едой' }, magnesium: { mg: 400, timing: 'на ночь' }, vitamin_d3: { mg: 5000, timing: 'с едой, завтрак (МЕ)' }, coq10: { mg: 200, timing: 'с едой, завтрак' }, zinc: { mg: 30, timing: 'на ночь, натощак' }, vitamin_k2: { mg: 200, timing: 'с едой, обед (мкг)' }, vitamin_b12: { mg: 1000, timing: 'утро (мкг)' }, glucosamine: { mg: 1500, timing: 'с едой' }, collagen: { mg: 10000, timing: 'с едой, утро (мг)' } } },
-    max: { label: '🟠 Усиление', desc: 'Полная поддержка курса — 21 добавка', subs: ['nac', 'omega3', 'tudca', 'magnesium', 'vitamin_d3', 'coq10', 'zinc', 'berberine', 'ashwagandha', 'alpha_lipoic', 'vitamin_k2', 'selenium', 'milk_thistle', 'vitamin_b12', 'folate', 'taurine', 'glucosamine', 'msm', 'collagen', 'vitamin_c', 'bpc157'], dosages: { nac: { mg: 1800, timing: 'утро/вечер, натощак' }, omega3: { mg: 3000, timing: 'с едой, завтрак' }, tudca: { mg: 1000, timing: 'перед едой, 2x/д' }, magnesium: { mg: 600, timing: 'на ночь' }, vitamin_d3: { mg: 5000, timing: 'с едой, завтрак (МЕ)' }, coq10: { mg: 300, timing: 'с едой, завтрак' }, zinc: { mg: 50, timing: 'на ночь' }, berberine: { mg: 500, timing: 'с едой, 2x/д' }, ashwagandha: { mg: 600, timing: 'вечер' }, alpha_lipoic: { mg: 600, timing: 'натощак' }, vitamin_k2: { mg: 200, timing: 'с едой (мкг)' }, selenium: { mg: 200, timing: 'с едой (мкг)' }, milk_thistle: { mg: 600, timing: 'с едой' }, vitamin_b12: { mg: 2000, timing: 'утро (мкг)' }, folate: { mg: 800, timing: 'с едой (мкг)' }, taurine: { mg: 2000, timing: 'натощак' }, glucosamine: { mg: 1500, timing: 'с едой' }, msm: { mg: 2000, timing: 'с едой' }, collagen: { mg: 15000, timing: 'с едой (мг)' }, vitamin_c: { mg: 1000, timing: 'натощак' }, bpc157: { mg: 500, timing: 'натощак (мкг)' } } },
-    boost: { label: '🔴 Максимум', desc: 'Максимальная защита и регенерация — 41 добавка', subs: ['nac', 'omega3', 'tudca', 'magnesium', 'vitamin_d3', 'coq10', 'zinc', 'berberine', 'ashwagandha', 'alpha_lipoic', 'telmisartan', 'nebivolol', 'saw_palmetto', 'hcg', 'vitamin_k2', 'selenium', 'milk_thistle', 'probiotics', 'vitamin_b12', 'folate', 'iron', 'copper', 'astragalus', 'taurine', 'melatonin', 'ginseng', 'egcg', 'curcumin', 'phosphatidylcholine', 'l_carnitine', 'glucosamine', 'chondroitin', 'msm', 'collagen', 'hyaluronic', 'boswellia', 'vitamin_c', 'bromelain', 'bpc157', 'tb500'], dosages: { nac: { mg: 2400, timing: 'натощак, 2-3x/д' }, omega3: { mg: 4000, timing: 'с едой, 2x/д' }, tudca: { mg: 1500, timing: 'перед едой, 2-3x/д' }, magnesium: { mg: 800, timing: 'на ночь' }, vitamin_d3: { mg: 10000, timing: 'с едой (МЕ)' }, coq10: { mg: 400, timing: 'с едой' }, zinc: { mg: 50, timing: 'на ночь' }, berberine: { mg: 500, timing: 'с едой, 2x/д' }, ashwagandha: { mg: 900, timing: 'вечер' }, alpha_lipoic: { mg: 900, timing: 'натощак, 2x/д' }, telmisartan: { mg: 40, timing: 'утро' }, nebivolol: { mg: 5, timing: 'утро' }, saw_palmetto: { mg: 640, timing: 'с едой, 2x/д' }, hcg: { mg: 5000, timing: '2x/нед (МЕ)' }, vitamin_k2: { mg: 400, timing: 'с едой (мкг)' }, selenium: { mg: 400, timing: 'с едой (мкг)' }, milk_thistle: { mg: 900, timing: 'с едой, 2x/д' }, probiotics: { mg: 20, timing: 'натощак (млрд КОЕ)' }, vitamin_b12: { mg: 5000, timing: 'утро (мкг)' }, folate: { mg: 1000, timing: 'с едой (мкг)' }, iron: { mg: 18, timing: 'натощак' }, copper: { mg: 2, timing: 'отдельно от цинка (мг)' }, astragalus: { mg: 1500, timing: 'с едой' }, taurine: { mg: 3000, timing: 'натощак, 2x/д' }, melatonin: { mg: 5, timing: 'на ночь' }, ginseng: { mg: 400, timing: 'утро' }, egcg: { mg: 400, timing: 'натощак' }, curcumin: { mg: 1000, timing: 'с пиперином, с едой' }, phosphatidylcholine: { mg: 1200, timing: 'с едой' }, l_carnitine: { mg: 2000, timing: 'натощак' }, glucosamine: { mg: 1500, timing: 'с едой' }, chondroitin: { mg: 1200, timing: 'с едой' }, msm: { mg: 3000, timing: 'с едой' }, collagen: { mg: 20000, timing: 'с едой (мг)' }, hyaluronic: { mg: 200, timing: 'с едой (мг)' }, boswellia: { mg: 500, timing: 'с едой, 2x/д' }, vitamin_c: { mg: 2000, timing: 'натощак, 2x/д' }, bromelain: { mg: 500, timing: 'натощак' }, bpc157: { mg: 500, timing: 'натощак (мкг)' }, tb500: { mg: 500, timing: 'натощак (мкг)' } } },
+    max: { label: '🟠 Максимум', desc: 'Полная поддержка курса — 21 добавка', subs: ['nac', 'omega3', 'tudca', 'magnesium', 'vitamin_d3', 'coq10', 'zinc', 'berberine', 'ashwagandha', 'alpha_lipoic', 'vitamin_k2', 'selenium', 'milk_thistle', 'vitamin_b12', 'folate', 'taurine', 'glucosamine', 'msm', 'collagen', 'vitamin_c', 'bpc157'], dosages: { nac: { mg: 1800, timing: 'утро/вечер, натощак' }, omega3: { mg: 3000, timing: 'с едой, завтрак' }, tudca: { mg: 1000, timing: 'перед едой, 2x/д' }, magnesium: { mg: 600, timing: 'на ночь' }, vitamin_d3: { mg: 5000, timing: 'с едой, завтрак (МЕ)' }, coq10: { mg: 300, timing: 'с едой, завтрак' }, zinc: { mg: 50, timing: 'на ночь' }, berberine: { mg: 500, timing: 'с едой, 2x/д' }, ashwagandha: { mg: 600, timing: 'вечер' }, alpha_lipoic: { mg: 600, timing: 'натощак' }, vitamin_k2: { mg: 200, timing: 'с едой (мкг)' }, selenium: { mg: 200, timing: 'с едой (мкг)' }, milk_thistle: { mg: 600, timing: 'с едой' }, vitamin_b12: { mg: 2000, timing: 'утро (мкг)' }, folate: { mg: 800, timing: 'с едой (мкг)' }, taurine: { mg: 2000, timing: 'натощак' }, glucosamine: { mg: 1500, timing: 'с едой' }, msm: { mg: 2000, timing: 'с едой' }, collagen: { mg: 15000, timing: 'с едой (мг)' }, vitamin_c: { mg: 1000, timing: 'натощак' }, bpc157: { mg: 500, timing: 'натощак (мкг)' } } },
+    boost: { label: '🔴 Усиление', desc: 'Усиленная защита + рецептурные препараты — 41 добавка', subs: ['nac', 'omega3', 'tudca', 'magnesium', 'vitamin_d3', 'coq10', 'zinc', 'berberine', 'ashwagandha', 'alpha_lipoic', 'telmisartan', 'nebivolol', 'saw_palmetto', 'hcg', 'vitamin_k2', 'selenium', 'milk_thistle', 'probiotics', 'vitamin_b12', 'folate', 'iron', 'copper', 'astragalus', 'taurine', 'melatonin', 'ginseng', 'egcg', 'curcumin', 'phosphatidylcholine', 'l_carnitine', 'glucosamine', 'chondroitin', 'msm', 'collagen', 'hyaluronic', 'boswellia', 'vitamin_c', 'bromelain', 'bpc157', 'tb500'], dosages: { nac: { mg: 2400, timing: 'натощак, 2-3x/д' }, omega3: { mg: 4000, timing: 'с едой, 2x/д' }, tudca: { mg: 1500, timing: 'перед едой, 2-3x/д' }, magnesium: { mg: 800, timing: 'на ночь' }, vitamin_d3: { mg: 10000, timing: 'с едой (МЕ)' }, coq10: { mg: 400, timing: 'с едой' }, zinc: { mg: 50, timing: 'на ночь' }, berberine: { mg: 500, timing: 'с едой, 2x/д' }, ashwagandha: { mg: 900, timing: 'вечер' }, alpha_lipoic: { mg: 900, timing: 'натощак, 2x/д' }, telmisartan: { mg: 40, timing: 'утро' }, nebivolol: { mg: 5, timing: 'утро' }, saw_palmetto: { mg: 640, timing: 'с едой, 2x/д' }, hcg: { mg: 5000, timing: '2x/нед (МЕ)' }, vitamin_k2: { mg: 400, timing: 'с едой (мкг)' }, selenium: { mg: 400, timing: 'с едой (мкг)' }, milk_thistle: { mg: 900, timing: 'с едой, 2x/д' }, probiotics: { mg: 20, timing: 'натощак (млрд КОЕ)' }, vitamin_b12: { mg: 5000, timing: 'утро (мкг)' }, folate: { mg: 1000, timing: 'с едой (мкг)' }, iron: { mg: 18, timing: 'натощак' }, copper: { mg: 2, timing: 'отдельно от цинка (мг)' }, astragalus: { mg: 1500, timing: 'с едой' }, taurine: { mg: 3000, timing: 'натощак, 2x/д' }, melatonin: { mg: 5, timing: 'на ночь' }, ginseng: { mg: 400, timing: 'утро' }, egcg: { mg: 400, timing: 'натощак' }, curcumin: { mg: 1000, timing: 'с пиперином, с едой' }, phosphatidylcholine: { mg: 1200, timing: 'с едой' }, l_carnitine: { mg: 2000, timing: 'натощак' }, glucosamine: { mg: 1500, timing: 'с едой' }, chondroitin: { mg: 1200, timing: 'с едой' }, msm: { mg: 3000, timing: 'с едой' }, collagen: { mg: 20000, timing: 'с едой (мг)' }, hyaluronic: { mg: 200, timing: 'с едой (мг)' }, boswellia: { mg: 500, timing: 'с едой, 2x/д' }, vitamin_c: { mg: 2000, timing: 'натощак, 2x/д' }, bromelain: { mg: 500, timing: 'натощак' }, bpc157: { mg: 500, timing: 'натощак (мкг)' }, tb500: { mg: 500, timing: 'натощак (мкг)' } } },
   };
 
   useEffect(() => {
@@ -1067,12 +1071,38 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
     setSupportLevel(level);
   }, [supportDrugs, linked.risk, linked.labAnalysis]);
 
+  // Compute effective level considering phase, analogs, and enhancers
+  const effectiveLevel = useMemo(() => {
+    const phaseResult = getPhaseLevel(supportLevel, supportPhase, SUPPORT_LEVELS);
+    const subs = [...phaseResult.subs];
+    const dosages = { ...phaseResult.dosages };
+    // Replace substances with selected analogs
+    for (const [originalId, analogId] of Object.entries(selectedAnalogs)) {
+      const idx = subs.indexOf(originalId);
+      if (idx >= 0 && analogId !== originalId) {
+        subs[idx] = analogId;
+        // Replace dosage if analog has one, otherwise use default
+        const analogDosage = SUPPORT_LEVELS[supportLevel]?.dosages?.[analogId] || DEFAULT_DOSAGES[analogId] || { mg: 500, timing: 'с едой' };
+        delete dosages[originalId];
+        dosages[analogId] = analogDosage;
+      }
+    }
+    // Add enhancers
+    for (const enhId of enhancedSubs) {
+      if (!subs.includes(enhId)) {
+        subs.push(enhId);
+        dosages[enhId] = DEFAULT_DOSAGES[enhId] || { mg: 500, timing: 'с едой' };
+      }
+    }
+    return { ...phaseResult, subs, dosages };
+  }, [supportLevel, supportPhase, selectedAnalogs, enhancedSubs]);
+
   const calcSupport = (overrideLevel?: 'basic' | 'mid' | 'max' | 'boost') => {
     const s = linked.profile?.settings;
     const level = overrideLevel || supportLevel;
     const input: SupportInput = {
       userId: linked.profile?.id || 'current',
-      substances: SUPPORT_LEVELS[level]?.subs || [],
+      substances: effectiveLevel?.subs || SUPPORT_LEVELS[level]?.subs || [],
       goals: [supportGoal],
       labs: (linked.labs || []).map(l => ({ code: l.code, value: l.value })),
       demographics: { age: s?.age ?? 30, weight: s?.weight ?? 80, sex: (s?.sex ?? 'male') as 'male' | 'female' },
@@ -1085,7 +1115,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
     setSupportResult(calcResultData);
     setCalcResult(calcResultData);
     setCalcDone(true);
-    const allSubs = [...supportDrugs, ...SUPPORT_LEVELS[level]?.subs || []].filter(Boolean);
+    const allSubs = [...supportDrugs, ...(effectiveLevel?.subs || SUPPORT_LEVELS[level]?.subs || [])].filter(Boolean);
     setDbInteractions(checkSupportInteractions(allSubs));
     const goalRisks = supportGoal === 'muscle_gain' ? ['muscle', 'protein', 'testosterone'] : supportGoal === 'fat_loss' ? ['fat', 'metabolism', 'insulin'] : supportGoal === 'strength' ? ['strength', 'power', 'testosterone'] : supportGoal === 'endurance' ? ['endurance', 'oxygen', 'atp'] : supportGoal === 'recomp' ? ['muscle', 'fat', 'metabolism'] : ['health', 'vitamin', 'mineral'];
     setGoalRecommendations(findSupportForGoal(goalRisks, 20));
@@ -3329,6 +3359,38 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
             </button>
           </div>
 
+          {/* Phase selector */}
+          <div className="card" style={{ marginBottom: 12 }}>
+            <h4 style={{ margin: '0 0 6px 0', fontSize: 13, color: 'var(--text)' }}>🔄 Фаза курса</h4>
+            <p style={{ fontSize: 10, color: 'var(--text-dim)', margin: '0 0 8px 0' }}>
+              {PHASE_MODS[supportPhase]?.desc}
+            </p>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 6 }}>
+              {([
+                { v: 'course', l: '💉 Курс', d: 'На курсе' },
+                { v: 'bridge', l: '🌉 Мост', d: 'Мост' },
+                { v: 'pct', l: '🔄 ПКТ', d: 'Восстановление' },
+                { v: 'fertility', l: '⚧ Фертильность', d: 'Сперматогенез' },
+              ] as const).map(p => (
+                <button key={p.v} onClick={() => setSupportPhase(p.v)} style={{
+                  padding: '8px 4px', borderRadius: 8, fontSize: 10, cursor: 'pointer',
+                  background: supportPhase === p.v ? 'rgba(0,230,138,0.15)' : 'var(--bg-secondary)',
+                  border: supportPhase === p.v ? '1px solid var(--accent)' : '1px solid var(--border)',
+                  color: supportPhase === p.v ? '#00e68a' : 'var(--text-dim)',
+                  fontWeight: supportPhase === p.v ? 700 : 400, textAlign: 'center',
+                }}>
+                  <div style={{ fontSize: 14 }}>{p.l}</div>
+                  <div style={{ fontSize: 8, marginTop: 2 }}>{p.d}</div>
+                </button>
+              ))}
+            </div>
+            {supportPhase !== 'course' && (
+              <div style={{ marginTop: 6, padding: '6px 10px', borderRadius: 6, background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.15)', fontSize: 9, color: '#f59e0b' }}>
+                ⚡ Фаза «{PHASE_MODS[supportPhase]?.label}»: {PHASE_MODS[supportPhase]?.addSubs?.length || 0} добавок добавлено, {PHASE_MODS[supportPhase]?.removeSubs?.length || 0} удалено
+              </div>
+            )}
+          </div>
+
           {/* 4 Level Buttons */}
           <div className="card" style={{ marginBottom: 12 }}>
             <h4 style={{ margin: '0 0 8px 0', fontSize: 13, color: 'var(--text)' }}>Выберите уровень поддержки</h4>
@@ -3387,16 +3449,52 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
               </div>
               {expandedCategories.dosageTable !== false && (
                 <div style={{ marginTop: 6 }}>
-                  {SUPPORT_LEVELS[supportLevel].subs.map(id => {
+                  {(effectiveLevel?.subs || SUPPORT_LEVELS[supportLevel]?.subs || []).map(id => {
                     const pharmaSub = PHARMA_DB[id];
-                    const name = pharmaSub?.name || id.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-                    const dosage = SUPPORT_LEVELS[supportLevel].dosages?.[id];
-                    if (!dosage) return null;
+                    const actualId = selectedAnalogs[id] || id;
+                    const name = pharmaSub?.name || actualId.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+                    const dosage = (effectiveLevel?.dosages || SUPPORT_LEVELS[supportLevel]?.dosages || {})[id] || DEFAULT_DOSAGES[id] || { mg: 500, timing: 'с едой' };
+                    const isEnhanced = enhancedSubs.includes(id);
+                    const isReplaced = selectedAnalogs[id] && selectedAnalogs[id] !== id;
+                    const analogs = SUBSTANCE_ANALOGS[id] || [];
+                    const enhancers = SUBSTANCE_ENHANCERS[id] || [];
                     return (
-                      <div key={id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 0', borderBottom: '1px solid rgba(255,255,255,0.04)', fontSize: 10 }}>
-                        <span style={{ fontWeight: 500, flex: 1 }}>{name}</span>
-                        <span style={{ color: 'var(--accent)', fontWeight: 600, minWidth: 60, textAlign: 'right' }}>{dosage.mg >= 1000 && id !== 'omega3' ? `${(dosage.mg/1000).toFixed(dosage.mg % 1000 === 0 ? 0 : 1)} г` : `${dosage.mg} мг`}</span>
-                        <span style={{ color: 'var(--text-dim)', fontSize: 9, marginLeft: 8, minWidth: 90, textAlign: 'right' }}>{dosage.timing}</span>
+                      <div key={id} style={{ padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,0.06)', fontSize: 10 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span style={{ fontWeight: 500 }}>{name}{isReplaced ? ' ↩️' : ''}{isEnhanced ? ' ⚡' : ''}</span>
+                          <div style={{ display: 'flex', gap: 3 }}>
+                            <span style={{ color: 'var(--accent)', fontWeight: 600 }}>{dosage.mg >= 1000 && id !== 'omega3' ? `${(dosage.mg/1000).toFixed(dosage.mg % 1000 === 0 ? 0 : 1)} г` : `${dosage.mg} мг`}</span>
+                            <span style={{ color: 'var(--text-dim)', fontSize: 9 }}>{dosage.timing}</span>
+                          </div>
+                        </div>
+                        <div style={{ display: 'flex', gap: 3, marginTop: 2 }}>
+                          {analogs.length > 1 && (
+                            <button onClick={() => {
+                              const currentIdx = analogs.findIndex(a => a.id === (selectedAnalogs[id] || id));
+                              const nextIdx = (currentIdx + 1) % analogs.length;
+                              setSelectedAnalogs(prev => ({ ...prev, [id]: analogs[nextIdx].id }));
+                              calcSupport(supportLevel);
+                            }} style={{ padding: '1px 6px', borderRadius: 4, fontSize: 8, cursor: 'pointer', border: '1px solid rgba(96,165,250,0.3)', background: 'rgba(96,165,250,0.08)', color: '#60a5fa', fontWeight: 500 }}>
+                              🔄 Заменить
+                            </button>
+                          )}
+                          {enhancers.length > 0 && !isEnhanced && (
+                            <button onClick={() => {
+                              setEnhancedSubs(prev => [...prev, enhancers[0].id]);
+                              calcSupport(supportLevel);
+                            }} style={{ padding: '1px 6px', borderRadius: 4, fontSize: 8, cursor: 'pointer', border: '1px solid rgba(0,230,138,0.3)', background: 'rgba(0,230,138,0.08)', color: '#00e68a', fontWeight: 500 }}>
+                              ⚡ Усилить
+                            </button>
+                          )}
+                          {isEnhanced && (
+                            <button onClick={() => {
+                              setEnhancedSubs(prev => prev.filter(s => s !== id));
+                              calcSupport(supportLevel);
+                            }} style={{ padding: '1px 6px', borderRadius: 4, fontSize: 8, cursor: 'pointer', border: '1px solid rgba(239,68,68,0.3)', background: 'rgba(239,68,68,0.08)', color: '#ef4444', fontWeight: 500 }}>
+                              ✕ Убрать
+                            </button>
+                          )}
+                        </div>
                       </div>
                     );
                   })}
@@ -4070,7 +4168,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
         {/* ===== DAILY SCHEDULE ===== */}
           {supportResult && (
             <div className="card" style={{ marginBottom: 12 }}>
-              <h4 style={{ margin: '0 0 6px 0', fontSize: 12 }}>📅 Дневное расписание ({SUPPORT_LEVELS[supportLevel]?.label})</h4>
+              <h4 style={{ margin: '0 0 6px 0', fontSize: 12 }}>📅 Дневное расписание ({effectiveLevel?.label || SUPPORT_LEVELS[supportLevel]?.label})</h4>
               {(() => {
                 const levelData = SUPPORT_LEVELS[supportLevel];
                 if (!levelData) return <p style={{ fontSize: 10, color: 'var(--text-dim)', margin: 0 }}>Выберите уровень поддержки.</p>;
@@ -5587,8 +5685,8 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
         };
 
         // Auto schedule builder
-        const buildDailySchedule = (level: string) => {
-          const levelData = SUPPORT_LEVELS[level];
+        const buildDailySchedule = (level: string, overrideLevel?: { subs: string[]; dosages: Record<string, { mg: number; timing: string }> }) => {
+          const levelData = overrideLevel || SUPPORT_LEVELS[level];
           if (!levelData) return [];
           const subs = levelData.subs || [];
           const dosages = levelData.dosages || {};
@@ -5640,7 +5738,7 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
           return slots.filter(s => s.items.length > 0);
         };
 
-        const dailySchedule = buildDailySchedule(supportLevel);
+        const dailySchedule = buildDailySchedule(supportLevel, effectiveLevel?.subs ? { subs: effectiveLevel.subs, dosages: effectiveLevel.dosages } : undefined);
 
         const SYSTEM_ORDER = ['cardio', 'hepatic', 'renal', 'neuro', 'endocrine', 'hematologic', 'reproductive', 'musculoskeletal'];
         const riskColorFn = (v: number) => v > 60 ? '#ef4444' : v > 30 ? '#f59e0b' : '#22c55e';
@@ -5924,12 +6022,41 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
               )}
             </div>
 
+            {/* ==================== PHASE SELECTOR ==================== */}
+            <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:12, border:'1px solid var(--border)' }}>
+              <h4 style={{ margin:'0 0 8px', fontSize:12, color:'var(--text)' }}>🔄 Фаза курса</h4>
+              <p style={{ fontSize:9, color:'var(--text-dim)', margin:'0 0 8px' }}>{PHASE_MODS[supportPhase]?.desc}</p>
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr', gap:4 }}>
+                {([
+                  { v: 'course' as SupportPhase, l: '💉 Курс', d: 'На курсе' },
+                  { v: 'bridge' as SupportPhase, l: '🌉 Мост', d: 'Мост' },
+                  { v: 'pct' as SupportPhase, l: '🔄 ПКТ', d: 'Восстановление' },
+                  { v: 'fertility' as SupportPhase, l: '⚧ Фертильность', d: 'Сперматогенез' },
+                ]).map(p => (
+                  <button key={p.v} onClick={() => setSupportPhase(p.v)} style={{
+                    padding:'6px 2px', borderRadius:8, fontSize:9, cursor:'pointer', textAlign:'center',
+                    background: supportPhase === p.v ? 'rgba(0,230,138,0.15)' : 'var(--bg-secondary)',
+                    border: supportPhase === p.v ? '1px solid var(--accent)' : '1px solid var(--border)',
+                    color: supportPhase === p.v ? '#00e68a' : 'var(--text-dim)', fontWeight: supportPhase === p.v ? 700 : 400,
+                  }}>
+                    <div style={{ fontSize:13 }}>{p.l}</div>
+                    <div style={{ fontSize:7 }}>{p.d}</div>
+                  </button>
+                ))}
+              </div>
+              {supportPhase !== 'course' && (
+                <div style={{ marginTop:4, fontSize:8, color:'#f59e0b' }}>
+                  ⚡ +{PHASE_MODS[supportPhase]?.addSubs?.length || 0} / -{PHASE_MODS[supportPhase]?.removeSubs?.length || 0} веществ
+                </div>
+              )}
+            </div>
+
             {/* ==================== ADD 2: AUTO-TIER DETECTION WITH VISUAL INDICATOR ==================== */}
             <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:12, border:'1px solid var(--border)' }}>
               <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
                 <h4 style={{ margin:0, fontSize:12, fontWeight:700, color:'var(--text)' }}>🎯 Уровень поддержки</h4>
                 <span style={{ fontSize:9, padding:'3px 10px', borderRadius:10, background:'rgba(139,92,246,0.12)', color:'#8b5cf6', fontWeight:600, whiteSpace:'nowrap' }}>
-                  ⚡ Авто-выбор: <b>{SUPPORT_LEVELS[autoLevel as string]?.label || autoLevel}</b>
+                  ⚡ Авто-выбор: <b>{effectiveLevel?.label || SUPPORT_LEVELS[autoLevel as string]?.label || autoLevel}</b>
                 </span>
               </div>
               <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:6 }}>
@@ -6152,7 +6279,7 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
                   const active = supportLevel === l;
                   const autoActive = autoLevel === l;
                   const colors: Record<string, string> = { basic: '#22c55e', mid: '#eab308', max: '#f97316', boost: '#ef4444' };
-                  const levelNames: Record<string, string> = { basic: '🟢 База', mid: '🟡 Средний', max: '🟠 Усиление', boost: '🔴 Максимум' };
+                  const levelNames: Record<string, string> = { basic: '🟢 База', mid: '🟡 Средний', max: '🟠 Максимум', boost: '🔴 Усиление' };
                   return (
                     <button key={l} onClick={() => { setSupportLevel(l); calcSupport(l); }} style={{
                       padding:'10px 6px', borderRadius:10, border: `2px solid ${active ? colors[l] : 'var(--border)'}`,
@@ -6188,7 +6315,7 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
                 background:'linear-gradient(135deg,#00e68a,#00c853)', color:'#000', fontWeight:800, fontSize:13,
                 boxShadow:'0 2px 8px rgba(0,230,138,0.3)',
               }}>
-                🧮 Рассчитать ({SUPPORT_LEVELS[supportLevel]?.subs?.length || 0} добавок)
+                🧮 Рассчитать ({(effectiveLevel?.subs || SUPPORT_LEVELS[supportLevel]?.subs || []).length} добавок)
               </button>
 
               {calcDone && calcResult && (
@@ -6205,7 +6332,7 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
 
             {/* ==================== 3c: ДНЕВНОЕ РАСПИСАНИЕ ==================== */}
             <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:12, border:'1px solid var(--border)' }}>
-              <h4 style={{ margin:'0 0 8px', fontSize:12, color:'var(--accent)' }}>📅 Дневное расписание ({SUPPORT_LEVELS[supportLevel]?.label})</h4>
+              <h4 style={{ margin:'0 0 8px', fontSize:12, color:'var(--accent)' }}>📅 Дневное расписание ({effectiveLevel?.label || SUPPORT_LEVELS[supportLevel]?.label})</h4>
               {dailySchedule.length === 0 ? (
                 <p style={{ fontSize:9, color:'var(--text-dim)', margin:0 }}>Выберите уровень поддержки.</p>
               ) : (
@@ -6297,24 +6424,41 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
 
             {/* ==================== ДОЗИРОВКИ С РАСЧЁТОМ ПО ВЕСУ ==================== */}
             <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:12, border:'1px solid var(--border)' }}>
-              <h4 style={{ margin:'0 0 8px', fontSize:12, color:'#22c55e' }}>💊 Дозировки ({SUPPORT_LEVELS[supportLevel]?.label})</h4>
+              <h4 style={{ margin:'0 0 8px', fontSize:12, color:'#22c55e' }}>💊 Дозировки ({effectiveLevel?.label || SUPPORT_LEVELS[supportLevel]?.label}) {supportPhase !== 'course' && <span style={{ fontSize:9, color:'#f59e0b', fontWeight:400 }}> · {PHASE_MODS[supportPhase]?.emoji} {PHASE_MODS[supportPhase]?.label}</span>}</h4>
               <div style={{ fontSize:8, color:'var(--text-dim)', marginBottom:6 }}>
-                💡 Дозы рассчитаны на вес {weightKg} кг. В скобках показан расчёт мг/кг.
+                💡 Дозы рассчитаны на вес {weightKg} кг. В скобках — расчёт мг/кг. 🔄 Заменить · ⚡ Усилить
               </div>
               <div style={{ display:'flex', flexDirection:'column', gap:3 }}>
-                {SUPPORT_LEVELS[supportLevel]?.subs?.map(id => {
-                  const dosage = SUPPORT_LEVELS[supportLevel]?.dosages?.[id];
+                {(effectiveLevel?.subs || SUPPORT_LEVELS[supportLevel]?.subs || []).map(id => {
+                  const dosage = (effectiveLevel?.dosages || SUPPORT_LEVELS[supportLevel]?.dosages || {})[id] || DEFAULT_DOSAGES[id] || { mg: 500, timing: 'с едой' };
                   const subInfo = ALL_SUBSTANCES.find(s => s.id === id);
+                  const isEnhanced = enhancedSubs.includes(id);
+                  const isReplaced = selectedAnalogs[id] && selectedAnalogs[id] !== id;
+                  const analogs = SUBSTANCE_ANALOGS[id] || [];
+                  const enhancers = SUBSTANCE_ENHANCERS[id] || [];
                   const wbStr = getWeightDosing(id, dosage?.mg || 0);
                   return (
-                    <div key={id} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'5px 8px', borderRadius:6, background:'rgba(0,230,138,0.04)', border:'1px solid rgba(0,230,138,0.1)' }}>
-                      <span style={{ fontSize:9, fontWeight:600, color:'var(--text-light)' }}>{subInfo?.name || id}</span>
-                      <div style={{ textAlign:'right' }}>
-                        <div style={{ fontSize:9, fontWeight:700, color:'#00e68a' }}>
-                          {dosage?.mg >= 5000 ? `${dosage?.mg/1000}г` : dosage?.mg >= 1000 ? `${(dosage?.mg/1000).toFixed(1)}г` : `${dosage?.mg} мг`}
+                    <div key={id} style={{ padding:'5px 8px', borderRadius:6, background: isEnhanced ? 'rgba(0,230,138,0.08)' : isReplaced ? 'rgba(96,165,250,0.06)' : 'rgba(0,230,138,0.04)', border: isEnhanced ? '1px solid rgba(0,230,138,0.2)' : isReplaced ? '1px solid rgba(96,165,250,0.2)' : '1px solid rgba(0,230,138,0.1)' }}>
+                      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                        <span style={{ fontSize:9, fontWeight:600, color:'var(--text-light)' }}>{subInfo?.name || id}{isReplaced ? ' ↩️' : ''}{isEnhanced ? ' ⚡' : ''}</span>
+                        <div style={{ textAlign:'right' }}>
+                          <div style={{ fontSize:9, fontWeight:700, color:'#00e68a' }}>
+                            {dosage?.mg >= 5000 ? `${dosage?.mg/1000}г` : dosage?.mg >= 1000 ? `${(dosage?.mg/1000).toFixed(1)}г` : `${dosage?.mg} мг`}
+                          </div>
+                          {wbStr && <div style={{ fontSize:7, color:'var(--text-dim)' }}>{wbStr}</div>}
+                          <div style={{ fontSize:7, color:'var(--text-dim)' }}>{dosage?.timing}</div>
                         </div>
-                        {wbStr && <div style={{ fontSize:7, color:'var(--text-dim)' }}>{wbStr}</div>}
-                        <div style={{ fontSize:7, color:'var(--text-dim)' }}>{dosage?.timing}</div>
+                      </div>
+                      <div style={{ display:'flex', gap:3, marginTop:2, flexWrap:'wrap' }}>
+                        {analogs.length > 1 && (
+                          <button onClick={() => { const ci = analogs.findIndex(a => a.id === (selectedAnalogs[id] || id)); setSelectedAnalogs(prev => ({ ...prev, [id]: analogs[(ci + 1) % analogs.length].id })); calcSupport(supportLevel); }} style={{ padding:'1px 5px', borderRadius:3, fontSize:7, cursor:'pointer', border:'1px solid rgba(96,165,250,0.3)', background:'rgba(96,165,250,0.08)', color:'#60a5fa', fontWeight:500 }}>🔄 Заменить</button>
+                        )}
+                        {enhancers.length > 0 && !isEnhanced && (
+                          <button onClick={() => { setEnhancedSubs(prev => [...prev, enhancers[0].id]); calcSupport(supportLevel); }} style={{ padding:'1px 5px', borderRadius:3, fontSize:7, cursor:'pointer', border:'1px solid rgba(0,230,138,0.3)', background:'rgba(0,230,138,0.08)', color:'#00e68a', fontWeight:500 }}>⚡ Усилить</button>
+                        )}
+                        {isEnhanced && (
+                          <button onClick={() => { setEnhancedSubs(prev => prev.filter(s => s !== id)); calcSupport(supportLevel); }} style={{ padding:'1px 5px', borderRadius:3, fontSize:7, cursor:'pointer', border:'1px solid rgba(239,68,68,0.3)', background:'rgba(239,68,68,0.08)', color:'#ef4444', fontWeight:500 }}>✕ Убрать</button>
+                        )}
                       </div>
                     </div>
                   );
