@@ -238,13 +238,14 @@ function generateWeekDays(
         const groupExercises = getExercisesByGroup(group);
 
         const isWeak = weakPoints.includes(group);
-        const compounds = groupExercises
+        const shuffleArr = <T,>(arr: T[]): T[] => [...arr].sort(() => Math.random() - 0.5);
+        const compounds = shuffleArr(groupExercises
           .filter(e => e.type === 'compound' && (!avoidHighJoint || e.jointStress !== 'high') && (!isDeload || e.fatigueCost <= 6) && (level === 'beginner' ? e.difficulty !== 'advanced' : true))
-          .sort((a, b) => (a.order ?? 2) - (b.order ?? 2))
+          .sort((a, b) => (a.order ?? 2) - (b.order ?? 2)))
           .slice(0, isDeload ? 1 : 2);
-        const isolations = groupExercises
+        const isolations = shuffleArr(groupExercises
           .filter(e => e.type === 'isolation' && (!avoidHighJoint || e.jointStress !== 'high') && (!isDeload || e.fatigueCost <= 4))
-          .sort((a, b) => (a.order ?? 3) - (b.order ?? 3))
+          .sort((a, b) => (a.order ?? 3) - (b.order ?? 3)))
           .slice(0, isWeak && !isDeload ? 2 : 1);
 
         for (const ex of [...compounds, ...isolations]) {

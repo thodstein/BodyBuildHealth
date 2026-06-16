@@ -7,7 +7,7 @@ import { getProfile } from '../../core/profile-manager';
 import { generatePCTPlan } from '../../engines/pct-planner.engine';
 import { PHARMA_DB } from '../../core/pharma-database';
 
-type FertTab = 'semen' | 'hormones' | 'structure' | 'pct-plan' | 'analyses' | 'brain';
+type FertTab = 'semen' | 'hormones' | 'structure' | 'pct-plan' | 'hrt' | 'analyses' | 'brain';
 
 const s: Record<string, React.CSSProperties> = {
   card: { background: 'var(--bg-secondary)', borderRadius: 12, padding: 16, marginBottom: 12 },
@@ -152,12 +152,12 @@ export const FertilityPCTScreen: React.FC = () => {
   );
 
   const fertTabs: { id: FertTab; label: string }[] = [
-    { id: 'semen', label: 'Спермограмма' }, { id: 'hormones', label: 'Гормоны' }, { id: 'structure', label: 'DFI/Структура' }, { id: 'pct-plan', label: 'ПКТ план' }, { id: 'analyses', label: '🧪 Анализы' }, { id: 'brain', label: '🧠 Гайд' }
+    { id: 'semen', label: 'Спермограмма' }, { id: 'hormones', label: 'Гормоны' }, { id: 'structure', label: 'DFI/Структура' }, { id: 'pct-plan', label: 'ПКТ план' }, { id: 'hrt', label: '⚕️ ГЗТ' }, { id: 'analyses', label: '🧪 Анализы' }, { id: 'brain', label: '🧠 Гайд' }
   ];
 
   return (
     <div className="screen fertility-pct">
-      <h2>Фертильность и ПКТ</h2>
+      <h2>ПКТ и гормональное здоровье</h2>
       <div style={{ display: 'flex', gap: 4, marginBottom: 12 }}>
         {fertTabs.map(t => <button key={t.id} className={`tab-button ${tab === t.id ? 'active' : ''}`} onClick={() => setTab(t.id)}>{t.label}</button>)}
       </div>
@@ -353,6 +353,115 @@ export const FertilityPCTScreen: React.FC = () => {
               </div>
             </>
           )}
+        </div>
+      )}
+
+      {tab === 'hrt' && (
+        <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+          <div style={{ ...s.card, borderLeft:'3px solid #8b5cf6' }}>
+            <h4 style={{ margin:'0 0 8px', fontSize:13, color:'#8b5cf6' }}>⚕️ Гормонозаместительная терапия</h4>
+            <p style={{ fontSize:10, color:'var(--text-dim)', margin:'0 0 10px', lineHeight:1.4 }}>
+              Научно обоснованные протоколы ТЗТ/ГЗТ, мониторинг и адъювантная терапия.
+            </p>
+
+            <h5 style={{ margin:'0 0 6px', fontSize:11, color:'#22c55e' }}>💉 Протоколы ТЗТ (тестостерон-заместительная терапия)</h5>
+            <div style={{ display:'flex', flexDirection:'column', gap:5, marginBottom:10 }}>
+              {[
+                { name:'Тестостерон энантат/ципионат', dose:'100-200 мг/нед', freq:'Инъекция 1 раз/нед', note:'Базовый протокол, стабильный уровень' },
+                { name:'Тестостерон ундеканоат (Nebido)', dose:'1000 мг', freq:'Каждые 10-14 недель', note:'Длительное действие, редкие инъекции' },
+                { name:'Тестостерон гель', dose:'50-100 мг/день', freq:'Ежедневно на кожу', note:'Физиологичные уровни, меньше колебаний' },
+                { name:'ХГЧ (hCG)', dose:'250-500 МЕ', freq:'2-3 раза/нед', note:'Сохранение фертильности, стимуляция Лейдигов' },
+              ].map((r, i) => (
+                <div key={i} style={{ padding:'8px 10px', borderRadius:8, background:'rgba(0,230,138,0.04)', border:'1px solid rgba(0,230,138,0.1)' }}>
+                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                    <span style={{ fontSize:10, fontWeight:600, color:'var(--text-light)' }}>{r.name}</span>
+                    <span style={{ fontSize:9, fontWeight:700, color:'#00e68a' }}>{r.dose}</span>
+                  </div>
+                  <div style={{ display:'flex', justifyContent:'space-between', marginTop:2 }}>
+                    <span style={{ fontSize:8, color:'var(--text-dim)' }}>{r.freq}</span>
+                    <span style={{ fontSize:8, color:'rgba(0,230,138,0.7)', fontStyle:'italic' }}>{r.note}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <h5 style={{ margin:'0 0 6px', fontSize:11, color:'#60a5fa' }}>📊 Параметры мониторинга</h5>
+            <div style={{ display:'flex', flexDirection:'column', gap:4, marginBottom:10 }}>
+              {[
+                { param:'Общий тестостерон (TT)', target:'500-900 нг/дл', freq:'Каждые 3-6 мес' },
+                { param:'Свободный тестостерон (FT)', target:'15-25 пг/мл', freq:'Каждые 3-6 мес' },
+                { param:'Эстрадиол E2 (чувствительный)', target:'20-40 пг/мл', freq:'Каждые 3-6 мес' },
+                { param:'SHBG (ГСПГ)', target:'20-40 нмоль/л', freq:'Каждые 6 мес' },
+                { param:'Гематокрит (Hct)', target:'< 50%', freq:'Каждые 3 мес' },
+                { param:'ПСА (простат-специфический антиген)', target:'< 4.0 нг/мл', freq:'Каждые 6-12 мес (мужчины >40)' },
+                { param:'Липидный профиль', target:'ЛПНП < 100, ЛПВП > 40', freq:'Каждые 6-12 мес' },
+              ].map((m, i) => (
+                <div key={i} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'6px 8px', borderRadius:6, background:'rgba(59,130,246,0.06)', border:'1px solid rgba(59,130,246,0.1)' }}>
+                  <div>
+                    <div style={{ fontSize:10, fontWeight:600, color:'var(--text-light)' }}>{m.param}</div>
+                    <div style={{ fontSize:8, color:'var(--text-dim)' }}>{m.freq}</div>
+                  </div>
+                  <span style={{ fontSize:9, fontWeight:700, color:'#60a5fa' }}>{m.target}</span>
+                </div>
+              ))}
+            </div>
+
+            <h5 style={{ margin:'0 0 6px', fontSize:11, color:'#f59e0b' }}>💊 Адъювантная терапия</h5>
+            <div style={{ display:'flex', flexDirection:'column', gap:5, marginBottom:10 }}>
+              {[
+                { name:'Анастрозол', dose:'0.25-0.5 мг 2×/нед', note:'Только при E2 > 50 пг/мл + симптомы' },
+                { name:'ХГЧ (hCG)', dose:'250-500 МЕ 2×/нед', note:'При желании сохранить фертильность' },
+                { name:'Донаторы NO (цитруллин)', dose:'3-6 г/день', note:'Поддержка эндотелиальной функции' },
+              ].map((r, i) => (
+                <div key={i} style={{ padding:'6px 8px', borderRadius:6, background:'rgba(245,158,11,0.06)', border:'1px solid rgba(245,158,11,0.1)' }}>
+                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                    <span style={{ fontSize:10, fontWeight:600, color:'var(--text-light)' }}>{r.name}</span>
+                    <span style={{ fontSize:9, fontWeight:700, color:'#f59e0b' }}>{r.dose}</span>
+                  </div>
+                  <div style={{ fontSize:8, color:'var(--text-dim)', marginTop:1 }}>{r.note}</div>
+                </div>
+              ))}
+            </div>
+
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+              <div style={{ background:'var(--bg-primary)', borderRadius:8, padding:12, border:'1px solid var(--border)' }}>
+                <h5 style={{ margin:'0 0 6px', fontSize:10, color:'#22c55e' }}>✅ Кому нужна ГЗТ</h5>
+                {['Пост-курсовой гипогонадизм >6 мес','Возрастной гипогонадизм (TT <300)','Первичный гипогонадизм','Симптоматический гипогонадизм с TT <400'].map((item, i) => (
+                  <div key={i} style={{ fontSize:9, color:'var(--text-light)', padding:'2px 0', display:'flex', alignItems:'center', gap:4 }}>
+                    <span style={{ color:'#22c55e' }}>•</span> {item}
+                  </div>
+                ))}
+              </div>
+              <div style={{ background:'var(--bg-primary)', borderRadius:8, padding:12, border:'1px solid var(--border)' }}>
+                <h5 style={{ margin:'0 0 6px', fontSize:10, color:'#ef4444' }}>🚫 Противопоказания</h5>
+                {['Рак простаты (активный)','Рак молочной железы (мужчины)','Нелеченное апноэ сна','Гематокрит > 54%','Тяжёлая сердечная недостаточность'].map((item, i) => (
+                  <div key={i} style={{ fontSize:9, color:'var(--text-light)', padding:'2px 0', display:'flex', alignItems:'center', gap:4 }}>
+                    <span style={{ color:'#ef4444' }}>×</span> {item}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div style={{ ...s.card, borderLeft:'3px solid #ef4444' }}>
+            <h4 style={{ margin:'0 0 8px', fontSize:12, color:'#ef4444' }}>⚠ Риски и мифы</h4>
+            <div style={{ display:'flex', flexDirection:'column', gap:5 }}>
+              {[
+                { name:'Полицитемия', real:'Реальный риск: Hct > 54% — терапевтическая флеботомия или снижение дозы', myth:false },
+                { name:'Апноэ сна', real:'Реальный риск: ухудшение или манифестация обструктивного апноэ сна', myth:false },
+                { name:'Рак простаты', real:'Нет доказательств причинно-следственной связи. Риск прогрессии существующего рака.', myth:true },
+                { name:'Сердечно-сосудистый риск', real:'Противоречивые данные. Физиологические дозы ТЗТ: нет повышения риска MACE (TRAVERSE trial, 2023)', myth:false },
+              ].map((r, i) => (
+                <div key={i} style={{ padding:'8px 10px', borderRadius:8, background:'rgba(239,68,68,0.06)', border:`1px solid ${r.myth ? 'rgba(34,197,94,0.2)' : 'rgba(239,68,68,0.15)'}` }}>
+                  <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                    <span style={{ fontSize:10, fontWeight:600, color:'var(--text-light)' }}>{r.name}</span>
+                    {r.myth ? <span style={{ fontSize:8, padding:'2px 6px', borderRadius:4, background:'rgba(34,197,94,0.15)', color:'#22c55e' }}>МИФ</span> : <span style={{ fontSize:8, padding:'2px 6px', borderRadius:4, background:'rgba(239,68,68,0.15)', color:'#ef4444' }}>РЕАЛЬНО</span>}
+                  </div>
+                  <div style={{ fontSize:9, color:'var(--text-dim)', marginTop:3, lineHeight:1.3 }}>{r.real}</div>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       )}
 

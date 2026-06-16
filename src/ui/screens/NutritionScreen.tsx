@@ -341,6 +341,9 @@ const MealPlanExtended: React.FC<{ tKcal: number; tProt: number; tFat: number; t
     { title: 'Пост-тренировочное окно', body: 'Белок + углеводы в первые 60-90 минут после тренировки. Соотношение 1:3 для набора, 1:1 для сушки.', color: '#3b82f6' },
     { title: 'Циклирование калорий', body: 'Тренировочные дни +10-15% ккал, дни отдыха -5-10%.', color: '#f59e0b' },
     { title: 'Контроль натрия', body: '3-5 г соли/день. При высоком АД — снизить до 2-3 г. Задержка воды от избытка соли маскирует результат.', color: '#ef4444' },
+    { title: 'Читмил', body: 'Один приём пищи в неделю без ограничений. Правила:\n- Не на голодный желудок (съешьте белок за 30 мин до)\n- Лучше после тренировки (чувствительность к инсулину выше)\n- Не перед сном (нарушит сон и пищеварение)\n- Не более 1500 ккал за один читмил\n- Пейте воду до и после', color: '#f59e0b' },
+    { title: 'Углеводная загрузка', body: 'За 2-3 дня до соревнований/фотосессии:\n- День 1-2: истощение гликогена (низкоуглеводно + тренировка)\n- День 3: загрузка 8-10 г/кг углеводов, минимум жиров\n- Вода: много в дни истощения, ограничить в день загрузки\n- Натрий: увеличить в день загрузки для удержания воды в мышцах', color: '#f97316' },
+    { title: 'Белково-углеводное чередование (БУЧ)', body: 'Высокоуглеводные дни: тренировочные дни, +30% к базовым углеводам\nНизкоуглеводные дни: дни отдыха, -50% к базовым углеводам\nБелок: постоянно высокий (2-2.5 г/кг) все дни\nЖиры: выше в низкоуглеводные дни, ниже в высокоуглеводные\nЦикл: 3 тренировочных (высоко) + 1 отдых (низко) или 2+1', color: '#3b82f6' },
   ];
 
   const RECOMMENDED_FOODS: Record<string, { items: string[]; color: string; bg: string }> = {
@@ -529,7 +532,57 @@ const MealPlanExtended: React.FC<{ tKcal: number; tProt: number; tFat: number; t
       carbs: meals.reduce((s: number, m: any) => s + m.totals.carbs, 0),
     };
 
-    setIndivPlan({ meals, dayTotals });
+    // Insulin warnings and glucose impact
+    const insulinWarnings: string[] = [];
+    const glucoseEstimates: { mealIdx: number; label: string; glucoseImpact: number; risk: 'low' | 'medium' | 'high'; note: string }[] = [];
+
+    meals.forEach((meal: any, mi: number) => {
+      const h = parseInt(meal.time.split(':')[0]);
+      const mealCarbs = meal.totals.carbs;
+      const mealKcal = meal.totals.kcal;
+      const matchingInsulin = insulinShots.filter(s => Math.abs(h - s.hour) <= 1);
+      const hasShortInsulin = matchingInsulin.some(s => s.type === 'короткий' || s.type === 'сверхбыстрый');
+      const hasLongInsulin = matchingInsulin.some(s => s.type === 'длинный');
+
+      // Glucose impact estimate: carbs × 3.5-5 mg/dL per gram, modulated by insulin
+      let giFactor = 4.0;
+      if (hasShortInsulin) giFactor = 2.0;
+      else if (hasLongInsulin) giFactor = 3.0;
+      const glucoseImpact = Math.round(mealCarbs * giFactor);
+
+      let risk: 'low' | 'medium' | 'high' = 'low';
+      let note = 'Стабильный уровень глюкозы';
+      if (hasShortInsulin && mealCarbs < 20) {
+        risk = 'high';
+        note = '⚠ Риск гипогликемии: мало углеводов при коротком инсулине';
+        insulinWarnings.push(`Приём ${meal.label} (${meal.time}): мало углеводов (${mealCarbs}г) для короткого инсулина — риск гипогликемии!`);
+      } else if (hasShortInsulin && mealCarbs >= 40) {
+        risk = 'low';
+        note = '✓ Адекватное покрытие углеводами';
+      } else if (hasShortInsulin) {
+        risk = 'medium';
+        note = '⚡ Добавьте 15-20г быстрых углеводов';
+      } else if (glucoseImpact > 150) {
+        risk = 'medium';
+        note = 'Высокая гликемическая нагрузка';
+      }
+
+      glucoseEstimates.push({ mealIdx: mi, label: meal.label, glucoseImpact, risk, note });
+
+      // IGF-1/MGF protein timing suggestion
+      const igfShots = indivIGFShots.map(s => ({ ...s, hour: parseInt(s.time.split(':')[0]) }));
+      const nearIGF = igfShots.some(s => Math.abs(h - s.hour) <= 1);
+      if (nearIGF && meal.totals.protein < 30) {
+        insulinWarnings.push(`Приём ${meal.label} (${meal.time}): в окне ИФР-1/MGF рекомендуется ≥30г белка (сейчас ${meal.totals.protein}г)`);
+      }
+
+      // Attach glucose impact to meal
+      meal.glucoseImpact = glucoseImpact;
+      meal.glucoseRisk = risk;
+      meal.glucoseNote = note;
+    });
+
+    setIndivPlan({ meals, dayTotals, insulinWarnings, glucoseEstimates });
   };
 
   const TIER_BTNS: { tier: MealTier; label: string; color: string; gradient: string }[] = [
@@ -1072,6 +1125,43 @@ const MealPlanExtended: React.FC<{ tKcal: number; tProt: number; tFat: number; t
 
         {indivPlan && (
           <div>
+            {/* Insulin warnings banner */}
+            {indivPlan.insulinWarnings && indivPlan.insulinWarnings.length > 0 && (
+              <div style={{
+                padding: '8px 10px', marginBottom: 10, borderRadius: 8,
+                background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)',
+              }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: '#ef4444', marginBottom: 4 }}>⚠ Предупреждения инсулина/ИФР-1</div>
+                {indivPlan.insulinWarnings.map((w: string, wi: number) => (
+                  <div key={wi} style={{ fontSize: 9, color: 'rgba(255,255,255,0.8)', lineHeight: 1.4, padding: '1px 0' }}>{w}</div>
+                ))}
+              </div>
+            )}
+            {/* Global glucose overview */}
+            {indivPlan.glucoseEstimates && indivPlan.glucoseEstimates.length > 0 && indivInsulinShots.length > 0 && (
+              <div style={{
+                padding: '8px 10px', marginBottom: 10, borderRadius: 8,
+                background: 'rgba(6,182,212,0.06)', border: '1px solid rgba(6,182,212,0.15)',
+              }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: '#06b6d4', marginBottom: 4 }}>📈 Оценка влияния на глюкозу</div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                  {indivPlan.glucoseEstimates.map((ge: any, gi: number) => {
+                    const barColor = ge.risk === 'high' ? '#ef4444' : ge.risk === 'medium' ? '#f59e0b' : '#22c55e';
+                    return (
+                      <div key={gi} style={{
+                        flex: '1 0 auto', minWidth: 60, textAlign: 'center',
+                        padding: '4px 6px', borderRadius: 6, fontSize: 8,
+                        background: barColor + '12', border: '1px solid ' + barColor + '30',
+                      }}>
+                        <div style={{ fontWeight: 600, color: 'var(--text-light)' }}>{ge.label}</div>
+                        <div style={{ fontSize: 11, fontWeight: 700, color: barColor }}>~{ge.glucoseImpact} мг/дл</div>
+                        <div style={{ color: 'var(--text-dim)' }}>{ge.note}</div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
             <div style={{
               position: 'relative', paddingLeft: 16, borderLeft: '2px solid var(--accent)', marginBottom: 10,
             }}>
@@ -1098,6 +1188,14 @@ const MealPlanExtended: React.FC<{ tKcal: number; tProt: number; tFat: number; t
                   </div>
                   <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 1 }}>
                     Б:{meal.totals.protein}г Ж:{meal.totals.fat}г У:{meal.totals.carbs}г | {meal.totals.kcal} ккал
+                    {meal.glucoseImpact !== undefined && indivInsulinShots.length > 0 && (
+                      <span style={{
+                        marginLeft: 6, fontSize: 8, fontWeight: 600,
+                        color: meal.glucoseRisk === 'high' ? '#ef4444' : meal.glucoseRisk === 'medium' ? '#f59e0b' : '#22c55e',
+                      }}>
+                        🩸~{meal.glucoseImpact} мг/дл
+                      </span>
+                    )}
                   </div>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
                     {meal.items.map((it: any, ii: number) => (

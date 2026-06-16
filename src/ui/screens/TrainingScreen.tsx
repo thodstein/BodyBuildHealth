@@ -185,8 +185,10 @@ export const TrainingScreen: React.FC = () => {
   const [runtimeSetRI, setRuntimeSetRI] = useState(2);
 
   const generatePlan = useCallback((overrideSplitType?: string) => {
+    const seed = Math.random();
+    const jitter = (v: number, range: number) => Math.max(0, Math.min(100, v + (seed - 0.5) * range * 2));
     const input: TrainingInput = {
-      goal, level, daysPerWeek, recovery, fatigue, nutrition: 7,
+      goal, level, daysPerWeek, recovery: jitter(recovery, 6), fatigue: jitter(fatigue, 6), nutrition: jitter(7, 1),
       weakPoints, sessionDuration: 60, exercises: [],
       splitType: overrideSplitType || splitType,
     };
@@ -623,10 +625,19 @@ export const TrainingScreen: React.FC = () => {
                 })}
               </div>
             </div>
-            <button onClick={() => generatePlan()} style={{
-              width: '100%', padding: 10, borderRadius: 8, border: 'none', cursor: 'pointer',
-              background: 'linear-gradient(135deg, #00e68a, #00c853)', color: '#000', fontWeight: 700, fontSize: 13,
-            }}>▶ Сгенерировать план</button>
+            <div style={{ display: 'flex', gap: 6 }}>
+              <button onClick={() => generatePlan()} style={{
+                flex: 1, padding: 10, borderRadius: 8, border: 'none', cursor: 'pointer',
+                background: 'linear-gradient(135deg, #00e68a, #00c853)', color: '#000', fontWeight: 700, fontSize: 13,
+              }}>▶ Сгенерировать план</button>
+              {trainingOutput && (
+                <button onClick={() => { generatePlan(); }} style={{
+                  padding: 10, borderRadius: 8, border: '1px solid var(--accent)', cursor: 'pointer',
+                  background: 'rgba(0,230,138,0.08)', color: 'var(--accent)', fontWeight: 600, fontSize: 12,
+                  whiteSpace: 'nowrap',
+                }}>🔄 Заново</button>
+              )}
+            </div>
           </div>
 
           {trainingOutput && (
@@ -1906,20 +1917,44 @@ export const TrainingScreen: React.FC = () => {
                   const matchKey = dayKeys.find(k => TRAINING_SPLITS[k].name === s.name);
                   const sp = matchKey ? TRAINING_SPLITS[matchKey] : null;
                   const exByDay: Record<number, any[]> = {};
-                  if (sp) {
+                   if (sp) {
                     const totalDays = Math.min(sp.groupsPerDay.length, daysPerWeek);
                     const cycle: string[][] = [];
                     while (cycle.length < daysPerWeek) {
                       for (const g of sp.groupsPerDay) { cycle.push(g); if (cycle.length >= daysPerWeek) break; }
                     }
+                    const isWeak = (group: string) => weakPoints.includes(group);
+                    const getReps = (ex: any, g: string): string => {
+                      if (goal === 'strength') return ex.type === 'compound' ? '3-5' : '5-8';
+                      if (goal === 'bulk') return ex.type === 'compound' ? '6-10' : '8-15';
+                      if (goal === 'cut') return '10-15';
+                      return ex.type === 'compound' ? '6-10' : '8-12';
+                    };
+                    const getRIR = (g: string, isFirst: boolean): number => {
+                      if (isWeak(g)) return 1;
+                      if (goal === 'strength') return isFirst ? 2 : 3;
+                      if (goal === 'bulk') return isFirst ? 1 : 2;
+                      if (goal === 'cut') return 2;
+                      return isFirst ? 1 : 2;
+                    };
+                    const getSetsMult = (ex: any, g: string): number => {
+                      let m = 1.0;
+                      if (isWeak(g)) m *= 1.2;
+                      if (ex.type === 'compound') m *= 0.85;
+                      if (ex.type === 'isolation') m *= 1.15;
+                      return m;
+                    };
                     cycle.forEach((groups, di) => {
                       const dayExs: any[] = [];
                       groups.forEach(g => {
-                        const catalogExs = getExercisesByGroup(g);
-                        const chosen = catalogExs.slice(0, g === 'core' ? 2 : g === 'arms' ? 2 : 3);
+                        const catalogExs = [...getExercisesByGroup(g)].sort(() => Math.random() - 0.5);
+                        const countCap = g === 'core' ? 2 : g === 'arms' ? 2 : 3;
+                        const chosen = catalogExs.slice(0, countCap);
                         chosen.forEach((ex, i) => {
-                          const presc = calcExercisePrescription(ex, goal, level, g === (weakPoints[0] || ''), false, i === 0 ? 1 : 0.9);
-                          dayExs.push({ name: ex.name, sets: presc.sets, reps: presc.reps, rir: presc.rir, rest: presc.rest, group: g });
+                          const mult = getSetsMult(ex, g);
+                          const baseSets = level === 'beginner' ? 3 : level === 'enhanced' ? 4 : 3;
+                          const sets = Math.max(2, Math.round(baseSets * mult));
+                          dayExs.push({ name: ex.name, sets, reps: getReps(ex, g), rir: getRIR(g, i === 0), rest: ex.type === 'compound' ? (goal === 'strength' ? 180 : 120) : 60, group: g });
                         });
                       });
                       exByDay[di] = dayExs;
@@ -1989,6 +2024,53 @@ export const TrainingScreen: React.FC = () => {
 
             {/* STEP 3: Упражнения */}
             {builderStep === 3 && (<>
+              <button onClick={() => {
+                // Regenerate all exercises with new randomization
+                const s = builderSplit;
+                if (s) {
+                  const dayKeys = Object.keys(TRAINING_SPLITS);
+                  const matchKey = dayKeys.find(k => TRAINING_SPLITS[k].name === s.name);
+                  const sp = matchKey ? TRAINING_SPLITS[matchKey] : null;
+                  const exByDay: Record<number, any[]> = {};
+                  if (sp) {
+                    const cycle: string[][] = [];
+                    while (cycle.length < daysPerWeek) {
+                      for (const g of sp.groupsPerDay) { cycle.push(g); if (cycle.length >= daysPerWeek) break; }
+                    }
+                    const isWeak = (group: string) => weakPoints.includes(group);
+                    const getReps = (ex: any, g: string): string => {
+                      if (goal === 'strength') return ex.type === 'compound' ? '3-5' : '5-8';
+                      if (goal === 'bulk') return ex.type === 'compound' ? '6-10' : '8-15';
+                      return ex.type === 'compound' ? '6-10' : '8-12';
+                    };
+                    const getRIR = (g: string, isFirst: boolean): number => {
+                      if (isWeak(g)) return 1;
+                      if (goal === 'strength') return isFirst ? 2 : 3;
+                      if (goal === 'bulk') return isFirst ? 1 : 2;
+                      return isFirst ? 1 : 2;
+                    };
+                    cycle.forEach((groups, di) => {
+                      const dayExs: any[] = [];
+                      groups.forEach(g => {
+                        const catalogExs = [...getExercisesByGroup(g)].sort(() => Math.random() - 0.5);
+                        const countCap = g === 'core' ? 2 : g === 'arms' ? 2 : 3;
+                        const chosen = catalogExs.slice(0, countCap);
+                        chosen.forEach((ex, i) => {
+                          const mult = ex.type === 'compound' ? 0.85 : ex.type === 'isolation' ? 1.15 : 1.0;
+                          const baseSets = level === 'beginner' ? 3 : level === 'enhanced' ? 4 : 3;
+                          const sets = Math.max(2, Math.round(baseSets * mult * (isWeak(g) ? 1.2 : 1.0)));
+                          dayExs.push({ name: ex.name, sets, reps: getReps(ex, g), rir: getRIR(g, i === 0), rest: ex.type === 'compound' ? (goal === 'strength' ? 180 : 120) : 60, group: g });
+                        });
+                      });
+                      exByDay[di] = dayExs;
+                    });
+                  }
+                  setBuilderDayExercises(exByDay);
+                }
+              }} style={{
+                width: '100%', padding: 8, borderRadius: 8, border: '1px solid var(--accent)', cursor: 'pointer',
+                background: 'rgba(0,230,138,0.08)', color: 'var(--accent)', fontWeight: 600, fontSize: 12, marginBottom: 8,
+              }}>🔄 Сгенерировать заново</button>
               <div style={{ maxHeight: 380, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 8 }}>
                 {Object.entries(builderDayExercises).sort(([a],[b]) => parseInt(a) - parseInt(b)).map(([dayKey, exs]) => (
                   <div key={dayKey} style={{ background: 'var(--bg-secondary)', borderRadius: 8, padding: 8, border: '1px solid var(--border)' }}>
@@ -2039,7 +2121,7 @@ export const TrainingScreen: React.FC = () => {
                     <button onClick={() => { setBuilderAddExDay(builderAddExDay === parseInt(dayKey) ? null : parseInt(dayKey)); }} style={{ marginTop: 4, fontSize: 9, padding: '3px 8px', borderRadius: 4, border: '1px dashed rgba(0,230,138,0.3)', cursor: 'pointer', background: 'transparent', color: 'var(--accent)' }}>+ Добавить упражнение</button>
                     {builderAddExDay === parseInt(dayKey) && (
                       <div style={{ marginTop: 4, maxHeight: 150, overflowY: 'auto' }}>
-                        {EXERCISE_CATALOG.slice(0, 25).map((catEx, ci) => (
+                        {[...EXERCISE_CATALOG].sort(() => Math.random() - 0.5).slice(0, 25).map((catEx, ci) => (
                           <div key={ci} onClick={() => {
                             const newExs = { ...builderDayExercises };
                             const presc = calcExercisePrescription(catEx, goal, level, false, false, 1);
