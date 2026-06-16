@@ -1045,9 +1045,18 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
     if (hasHighRisk || (hasOral && count >= 2)) level = 'boost';
     else if (hasOral || count >= 3) level = 'max';
     else if (count >= 1) level = 'mid';
+    // 1c: Risk-based level adjustment
+    const riskNet = linked.risk?.overallNet ?? 0;
+    if (riskNet > 50) level = 'boost';
+    else if (riskNet > 30 && level !== 'boost') level = 'max';
+    // 1c: Lab abnormality count
+    const abnormalCount = (linked.labAnalysis?.interpretations || []).filter(
+      i => i.status === 'high' || i.status === 'critical_high'
+    ).length;
+    if (abnormalCount > 2) level = 'boost';
     setAutoLevel(level);
     setSupportLevel(level);
-  }, [supportDrugs]);
+  }, [supportDrugs, linked.risk, linked.labAnalysis]);
 
   const calcSupport = () => {
     const s = linked.profile?.settings;
@@ -2166,7 +2175,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
                 <div style={{ fontSize:9, color:'var(--text-dim)', marginBottom:6 }}>
                   {searchQuery ? `Найдено: ${groupedSubstances.reduce((a, g) => a + g.count, 0)} из ${ALL_SUBSTANCES.length}` : `Всего: ${ALL_SUBSTANCES.length} веществ`}
                 </div>
-                {catalogSubTab === 'organ' ? (
+                {catalogSubTab === 'organ' && (
                   /* По органам */
                   <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
                     {(OrganGroupedSubstances||[]).map(group => {
@@ -2231,7 +2240,8 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
                       );
                     })}
                   </div>
-                ) : catalogSubTab === 'tier' ? (
+                )}
+                {catalogSubTab === 'tier' && (
                   /* По уровням */
                   <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
                     {SUPPORT_TIER_GROUPS.map((tg, tgi) => {
@@ -2281,7 +2291,8 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
                       );
                     })}
                   </div>
-                ) : (
+                )}
+                {(catalogSubTab === 'type' || !catalogSubTab) && (
                 /* По типам (default) */
                 <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
                   {(groupedSubstances||[]).map(group => {
@@ -5241,7 +5252,16 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
                 </div>
                 <button onClick={() => {
                   try {
-                    const input: SupportInput = { substances: SUPPORT_LEVELS[supportLevel]?.subs || [], goals: [supportGoal], drugDoses: {}, labs: [] };
+                    const s = linked.profile?.settings;
+                    const input: SupportInput = {
+                      substances: SUPPORT_LEVELS[supportLevel]?.subs || [],
+                      goals: [supportGoal],
+                      drugDoses: linked.course.reduce((acc, c) => { acc[c.substanceId] = c.doseValue || 300; return acc; }, {} as Record<string, number>),
+                      labs: (linked.labs || []).map(l => ({ code: l.code, value: l.value })),
+                      demographics: { age: s?.age ?? 30, weight: s?.weight ?? 80, sex: (s?.sex ?? 'male') as 'male' | 'female' },
+                      nutritionFactor: s?.nutritionFactor ?? 0.8,
+                      trainingFactor: s?.trainingFactor ?? 0.7,
+                    };
                     const result = calculateSupport(input);
                     setSupportResult(result);
                   } catch { }
@@ -5253,6 +5273,59 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
                 <h4 style={{ margin:'0 0 8px', fontSize:12, color:'var(--accent)' }}>📊 Результат</h4>
                 <div style={{ fontSize:10, color:'var(--text-dim)' }}>
                   <div>Риск до: {supportResult.riskBeforeSupport}% → После: {supportResult.riskAfterSupport}%</div>
+                  {/* 1d: Risk-before/after bar visualization */}
+                  <div style={{ marginTop:8, display:'flex', gap:8, alignItems:'center' }}>
+                    <div style={{ flex:1 }}>
+                      <div style={{ fontSize:7, color:'var(--text-dim)', marginBottom:2 }}>До поддержки</div>
+                      {(() => {
+                        const riskColor = (v: number) => v > 60 ? '#ef4444' : v > 30 ? '#f59e0b' : '#22c55e';
+                        const beforePct = Math.min(100, Math.max(0, supportResult.riskBeforeSupport));
+                        return (
+                          <div style={{ height:10, borderRadius:5, background:'var(--bg-secondary)', overflow:'hidden', border:'1px solid var(--border)' }}>
+                            <div style={{ height:'100%', width:`${beforePct}%`, borderRadius:5, background: riskColor(beforePct), transition:'width 0.4s' }} />
+                          </div>
+                        );
+                      })()}
+                      <div style={{ fontSize:8, fontWeight:700, color:'#ef4444', marginTop:1 }}>{Math.round(supportResult.riskBeforeSupport)}%</div>
+                    </div>
+                    <span style={{ fontSize:14, color:'var(--accent)' }}>→</span>
+                    <div style={{ flex:1 }}>
+                      <div style={{ fontSize:7, color:'var(--text-dim)', marginBottom:2 }}>После поддержки</div>
+                      {(() => {
+                        const riskColor = (v: number) => v > 60 ? '#ef4444' : v > 30 ? '#f59e0b' : '#22c55e';
+                        const afterPct = Math.min(100, Math.max(0, supportResult.riskAfterSupport));
+                        return (
+                          <div style={{ height:10, borderRadius:5, background:'var(--bg-secondary)', overflow:'hidden', border:'1px solid var(--border)' }}>
+                            <div style={{ height:'100%', width:`${afterPct}%`, borderRadius:5, background: riskColor(afterPct), transition:'width 0.4s' }} />
+                          </div>
+                        );
+                      })()}
+                      <div style={{ fontSize:8, fontWeight:700, color: supportResult.riskAfterSupport > 60 ? '#ef4444' : supportResult.riskAfterSupport > 30 ? '#f59e0b' : '#22c55e', marginTop:1 }}>{Math.round(supportResult.riskAfterSupport)}%</div>
+                    </div>
+                  </div>
+                  {/* 1d: System-by-system risk comparison bars */}
+                  {linked.risk?.systemBreakdown && Object.keys(linked.risk.systemBreakdown).length > 0 && (
+                    <div style={{ marginTop:8 }}>
+                      <div style={{ fontSize:8, color:'var(--text-dim)', marginBottom:4 }}>Сравнение по системам:</div>
+                      {Object.entries(linked.risk.systemBreakdown).map(([sysKey, sysData]) => {
+                        const supportCov = (supportResult.systemSupport || {})[sysKey] || 0;
+                        const afterRisk = Math.max(0, sysData.net * (1 - supportCov / 100));
+                        const riskColor = (v: number) => v > 60 ? '#ef4444' : v > 30 ? '#f59e0b' : '#22c55e';
+                        return (
+                          <div key={sysKey} style={{ marginBottom:3 }}>
+                            <div style={{ display:'flex', justifyContent:'space-between', fontSize:7, marginBottom:1 }}>
+                              <span style={{ color:'rgba(255,255,255,0.7)' }}>{sysKey}</span>
+                              <span style={{ color:'var(--text-dim)' }}>{Math.round(sysData.net)}% → {Math.round(afterRisk)}%</span>
+                            </div>
+                            <div style={{ display:'flex', gap:2, height:6 }}>
+                              <div style={{ flex:1, borderRadius:3, background: riskColor(sysData.net), opacity:0.6, minWidth:2 }} title={`До: ${Math.round(sysData.net)}%`} />
+                              <div style={{ width: Math.max(2, afterRisk * 0.8), borderRadius:3, background: riskColor(afterRisk), minWidth:2 }} title={`После: ${Math.round(afterRisk)}%`} />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                   <div style={{ marginTop:6 }}>
                     <div style={{ fontWeight:600, color:'var(--text)', marginBottom:4 }}>Системное покрытие:</div>
                     {Object.entries(supportResult.systemSupport || {}).map(([k,v]) => (
@@ -5282,6 +5355,76 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
                     })}
                   </div>
                 </div>
+                {/* 1b: Risk-linked analysis */}
+                <div style={{ marginTop:10, paddingTop:10, borderTop:'1px solid var(--border)' }}>
+                  <h4 style={{ margin:'0 0 8px', fontSize:12, color:'#f59e0b' }}>📊 Связь с рисками</h4>
+                  {linked.risk?.systemBreakdown && Object.keys(linked.risk.systemBreakdown).length > 0 ? (
+                    <div style={{ display:'flex', flexDirection:'column', gap:3 }}>
+                      {Object.entries(linked.risk.systemBreakdown).map(([sysKey, sysData]) => {
+                        const supportCov = (supportResult.systemSupport || {})[sysKey] || 0;
+                        const reduction = Math.round(supportCov);
+                        const riskColor = sysData.net > 60 ? '#ef4444' : sysData.net > 30 ? '#f59e0b' : '#22c55e';
+                        const SYSTEM_LABELS: Record<string, string> = {
+                          cardio: 'Сердечно-сосудистая', hepatic: 'Печень', renal: 'Почки', neuro: 'Нервная',
+                          endocrine: 'Эндокринная', hematologic: 'Кровь', reproductive: 'Репродуктивная', musculoskeletal: 'Опорно-двигательная',
+                        };
+                        return (
+                          <div key={sysKey} style={{ display:'flex', alignItems:'center', gap:6, padding:'4px 6px', borderRadius:6, background:'rgba(0,0,0,0.1)' }}>
+                            <div style={{ width:8, height:8, borderRadius:'50%', flexShrink:0, background: riskColor }} />
+                            <span style={{ fontSize:9, fontWeight:600, color:'var(--text-light)', flex:1, minWidth:0 }}>{SYSTEM_LABELS[sysKey] || sysKey}</span>
+                            <span style={{ fontSize:9, fontWeight:700, color: riskColor }}>{Math.round(sysData.net)}%</span>
+                            {reduction > 0 && (
+                              <>
+                                <span style={{ fontSize:7, color:'var(--text-dim)' }}>→</span>
+                                <span style={{ fontSize:8, color:'#22c55e' }}>-{reduction}% покр.</span>
+                              </>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div style={{ fontSize:9, color:'var(--text-dim)', padding:'6px 0' }}>Нет данных о рисках. Добавьте курс или анализы для расчёта.</div>
+                  )}
+                </div>
+                {/* 1b: Lab-based recommendations */}
+                {linked.labAnalysis && linked.labAnalysis.interpretations.length > 0 && (
+                  <div style={{ marginTop:10, paddingTop:10, borderTop:'1px solid var(--border)' }}>
+                    <h4 style={{ margin:'0 0 8px', fontSize:12, color:'#60a5fa' }}>🧪 На основе анализов</h4>
+                    <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
+                      {linked.labAnalysis.interpretations.filter(l => l.status === 'high' || l.status === 'critical_high').slice(0, 10).map(l => {
+                        const MARKER_TO_SUPPORT: Record<string, string[]> = {
+                          ALT: ['nac', 'tudca', 'milk_thistle'], AST: ['nac', 'tudca', 'milk_thistle'],
+                          GGT: ['tudca', 'milk_thistle', 'alpha_lipoic'], CREATININE: ['astragalus', 'omega3'],
+                          LDL: ['omega3', 'berberine', 'coq10'], TRIGLYCERIDES: ['omega3', 'berberine'],
+                          GLUCOSE: ['berberine', 'alpha_lipoic'], CRP: ['omega3', 'curcumin', 'boswellia'],
+                          HEMOGLOBIN: ['omega3', 'nattokinase'], HEMATOCRIT: ['omega3', 'nattokinase'],
+                          ESTRADIOL: ['zinc', 'dim', 'calcium_d_glucarate'], PROLACTIN: ['vitamin_b6', 'ashwagandha'],
+                        };
+                        const recs = MARKER_TO_SUPPORT[l.code] || [];
+                        const supportNames = recs.map(id => {
+                          const sub = SUPPORT_LEVELS[supportLevel]?.subs?.includes(id) ? ALL_SUBSTANCES.find(s => s.id === id) : null;
+                          return sub?.name || id;
+                        });
+                        return (
+                          <div key={l.code} style={{ display:'flex', alignItems:'center', gap:4, padding:'3px 6px', borderRadius:4, background:'rgba(59,130,246,0.06)', border:'1px solid rgba(59,130,246,0.15)' }}>
+                            <span style={{ fontSize:8, color: l.status === 'critical_high' ? '#ef4444' : '#f59e0b', fontWeight:700, minWidth:50 }}>{l.code}</span>
+                            <span style={{ fontSize:8, color: l.status === 'critical_high' ? '#ef4444' : '#f59e0b' }}>{l.status === 'critical_high' ? 'КРИТ' : 'ПОВЫШ'}</span>
+                            {supportNames.length > 0 && (
+                              <span style={{ fontSize:7, color:'#22c55e', marginLeft:4 }}>→ {supportNames.slice(0, 3).join(', ')}</span>
+                            )}
+                            {supportNames.length === 0 && (
+                              <span style={{ fontSize:7, color:'var(--text-dim)', marginLeft:4 }}>— нет в текущем уровне</span>
+                            )}
+                          </div>
+                        );
+                      })}
+                      {linked.labAnalysis.interpretations.filter(l => l.status === 'high' || l.status === 'critical_high').length === 0 && (
+                        <div style={{ fontSize:9, color:'var(--text-dim)' }}>Все показатели в норме ✅</div>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
             <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:14, marginTop:10, border:'1px solid var(--border)' }}>
