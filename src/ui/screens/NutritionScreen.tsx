@@ -326,15 +326,58 @@ const MealPlanExtended: React.FC<{ tKcal: number; tProt: number; tFat: number; t
 
   const [qualityFromDB, setQualityFromDB] = React.useState(false);
 
-  const dbQualityScores = React.useMemo(() => {
-    const proteinFoods = FOOD_DB.filter(f => f.category === 'protein' && f.tier && f.kcal > 0)
-      .map(f => ({ name: f.name, score: f.tier === 'max' ? 10 : f.tier === 'mid' ? 8 : f.tier === 'basic' ? 6 : 5, desc: f.description || '', tier: f.tier || 'basic' }));
-    const carbFoods = FOOD_DB.filter(f => (f.category === 'carb' || f.category === 'grain') && f.tier && f.kcal > 0)
-      .map(f => ({ name: f.name, score: f.tier === 'max' ? 9 : f.tier === 'mid' ? 7 : f.tier === 'basic' ? 5 : 4, desc: f.description || '', tier: f.tier || 'basic' }));
-    const fatFoods = FOOD_DB.filter(f => f.category === 'fat' && f.tier && f.kcal > 0)
-      .map(f => ({ name: f.name, score: f.tier === 'max' ? 10 : f.tier === 'mid' ? 8 : f.tier === 'basic' ? 6 : 5, desc: f.description || '', tier: f.tier || 'basic' }));
-    return { proteins: proteinFoods.sort((a, b) => b.score - a.score).slice(0, 15), carbs: carbFoods.sort((a, b) => b.score - a.score).slice(0, 14), fats: fatFoods.sort((a, b) => b.score - a.score).slice(0, 12) };
+  const computeFoodScore = React.useCallback((f: typeof FOOD_DB[number]): number => {
+    if (f.tier === 'max') return 10;
+    if (f.tier === 'mid') return 8;
+    if (f.tier === 'basic') return 6;
+    if (f.kcal === 0) return 5;
+    let score = 5;
+    const proteinDensity = (f.protein * 4) / Math.max(f.kcal, 1);
+    if (proteinDensity > 0.6) score += 2;
+    else if (proteinDensity > 0.3) score += 1;
+    if (f.fiber >= 3) score += 1;
+    if (f.fiber >= 6) score += 1;
+    if (f.category === 'carb' || f.category === 'grain') {
+      if (f.gi <= 50) score += 2;
+      else if (f.gi <= 70) score += 1;
+      else if (f.gi >= 85) score -= 1;
+    }
+    if (f.micros?.Omega3 && f.micros.Omega3 > 0.5) score += 1;
+    return Math.max(1, Math.min(10, score));
   }, []);
+  const computeFoodPros = React.useCallback((f: typeof FOOD_DB[number]): string[] => {
+    const pros: string[] = [];
+    if (f.bestFor && f.bestFor.length) pros.push(...f.bestFor.slice(0, 2).map(g => ({bulk:'Набор',cut:'Сушка',strength:'Сила',maintenance:'Поддержание',recomp:'Рекомпозиция',rehab:'Реабилитация'}[g]||g)));
+    if (f.fiber >= 5) pros.push('Клетчатка');
+    if (f.gi > 0 && f.gi <= 50) pros.push('Низкий ГИ');
+    if (f.micros?.Omega3 && f.micros.Omega3 > 0.3) pros.push('Омега-3');
+    if (f.micros?.Fe && f.micros.Fe >= 2) pros.push('Железо');
+    if (f.micros?.Ca && f.micros.Ca >= 100) pros.push('Кальций');
+    if (f.micros?.Zn && f.micros.Zn >= 2) pros.push('Цинк');
+    if (f.protein > 20) pros.push('Высокий белок');
+    if (pros.length === 0) pros.push(f.tier === 'max' ? 'Премиум' : f.tier === 'mid' ? 'Средний+' : 'Базовый');
+    return pros.slice(0, 3);
+  }, []);
+  const computeFoodCons = React.useCallback((f: typeof FOOD_DB[number]): string[] => {
+    const cons: string[] = [];
+    if (f.allergens && f.allergens.length) cons.push(...f.allergens.slice(0, 1));
+    if (f.gi >= 80) cons.push('Высокий ГИ');
+    if (f.category === 'fast_food') cons.push('Фастфуд');
+    if (f.fat > 15) cons.push('Высокий жир');
+    if (f.kcal > 350) cons.push('Калорийно');
+    if (cons.length === 0) cons.push('Особых нет');
+    return cons.slice(0, 2);
+  }, []);
+  const dbQualityScores = React.useMemo(() => {
+    const allFoods = FOOD_DB.filter(f => f.kcal > 0);
+    const proteinFoods = allFoods.filter(f => f.category === 'protein' || f.category === 'dairy' || f.category === 'supplement')
+      .map(f => ({ name: f.name, score: computeFoodScore(f), desc: f.description || '', tier: f.tier || 'none', pros: computeFoodPros(f), cons: computeFoodCons(f) }));
+    const carbFoods = allFoods.filter(f => f.category === 'carb' || f.category === 'grain' || f.category === 'veg_fruit')
+      .map(f => ({ name: f.name, score: computeFoodScore(f), desc: f.description || '', tier: f.tier || 'none', pros: computeFoodPros(f), cons: computeFoodCons(f) }));
+    const fatFoods = allFoods.filter(f => f.category === 'fat')
+      .map(f => ({ name: f.name, score: computeFoodScore(f), desc: f.description || '', tier: f.tier || 'none', pros: computeFoodPros(f), cons: computeFoodCons(f) }));
+    return { proteins: proteinFoods.sort((a, b) => b.score - a.score).slice(0, 20), carbs: carbFoods.sort((a, b) => b.score - a.score).slice(0, 20), fats: fatFoods.sort((a, b) => b.score - a.score).slice(0, 15) };
+  }, [computeFoodScore, computeFoodPros, computeFoodCons]);
 
   const NUTRITION_RULES = [
     { title: 'Осторожность с молочкой', body: 'Лактоза повышает воспалительные маркеры (СРБ) и провоцирует застой желчи. Может влиять на акне.', color: '#f59e0b' },
@@ -982,51 +1025,60 @@ const MealPlanExtended: React.FC<{ tKcal: number; tProt: number; tFat: number; t
           </button>
         </div>
         <p style={{ fontSize: 9, color: 'var(--text-dim)', margin: '0 0 8px' }}>
-          {qualityFromDB ? 'Авто-оценка из базы продуктов (по tier: max=высший балл, mid=средний, basic=базовый)' : 'Оценка источников белка, углеводов и жиров по шкале 1–10'}
+          {qualityFromDB ? 'Авто-оценка всей БД: tier (max=10, mid=8, basic=6) или анализ плотности белка, клетчатки, ГИ, омега-3' : 'Оценка источников белка, углеводов и жиров по шкале 1–10'}
         </p>
         {qualityFromDB ? (
-          // ── DB-generated quality scores ──
+          // ── DB-generated quality scores (all foods, auto-scored) ──
           <>
             <h5 style={{ margin: '8px 0 6px', fontSize: 11, color: '#3b82f6' }}>Белки (из БД, {dbQualityScores.proteins.length})</h5>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 8 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 3, marginBottom: 8 }}>
               {dbQualityScores.proteins.map((p, j) => {
                 const scoreColor = p.score >= 9 ? '#22c55e' : p.score >= 7 ? '#f59e0b' : p.score >= 5 ? '#f97316' : '#ef4444';
                 return (
-                  <div key={j} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0', borderBottom: j < dbQualityScores.proteins.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none' }}>
-                    <div style={{ minWidth: 32, height: 22, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', background: scoreColor + '15', color: scoreColor, fontWeight: 800, fontSize: 11 }}>{p.score}/10</div>
-                    <div style={{ flex: 1 }}>
-                      <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--text)' }}>{p.name}</span>
-                      <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.35)', marginLeft: 6 }}>tier: {p.tier}</span>
+                  <div key={j} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '3px 0', borderBottom: j < dbQualityScores.proteins.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none' }}>
+                    <div style={{ minWidth: 28, height: 20, borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', background: scoreColor + '15', color: scoreColor, fontWeight: 800, fontSize: 10 }}>{p.score}/10</div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <span style={{ fontSize: 9, fontWeight: 600, color: 'var(--text)' }}>{p.name}</span>
+                      <div style={{ display: 'flex', gap: 4, marginTop: 1, flexWrap: 'wrap' }}>
+                        {p.pros.map((pr, i) => <span key={i} style={{ fontSize: 7, color: '#22c55e', background: 'rgba(34,197,94,0.08)', padding: '0 4px', borderRadius: 4 }}>+{pr}</span>)}
+                        {p.cons.map((cn, i) => <span key={i} style={{ fontSize: 7, color: '#ef4444', background: 'rgba(239,68,68,0.06)', padding: '0 4px', borderRadius: 4 }}>−{cn}</span>)}
+                      </div>
                     </div>
                   </div>
                 );
               })}
             </div>
             <h5 style={{ margin: '8px 0 6px', fontSize: 11, color: '#f97316' }}>Углеводы (из БД, {dbQualityScores.carbs.length})</h5>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 8 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 3, marginBottom: 8 }}>
               {dbQualityScores.carbs.map((p, j) => {
                 const scoreColor = p.score >= 9 ? '#22c55e' : p.score >= 7 ? '#f59e0b' : p.score >= 5 ? '#f97316' : '#ef4444';
                 return (
-                  <div key={j} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0', borderBottom: j < dbQualityScores.carbs.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none' }}>
-                    <div style={{ minWidth: 32, height: 22, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', background: scoreColor + '15', color: scoreColor, fontWeight: 800, fontSize: 11 }}>{p.score}/10</div>
-                    <div style={{ flex: 1 }}>
-                      <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--text)' }}>{p.name}</span>
-                      <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.35)', marginLeft: 6 }}>tier: {p.tier}</span>
+                  <div key={j} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '3px 0', borderBottom: j < dbQualityScores.carbs.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none' }}>
+                    <div style={{ minWidth: 28, height: 20, borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', background: scoreColor + '15', color: scoreColor, fontWeight: 800, fontSize: 10 }}>{p.score}/10</div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <span style={{ fontSize: 9, fontWeight: 600, color: 'var(--text)' }}>{p.name}</span>
+                      <div style={{ display: 'flex', gap: 4, marginTop: 1, flexWrap: 'wrap' }}>
+                        {p.pros.map((pr, i) => <span key={i} style={{ fontSize: 7, color: '#22c55e', background: 'rgba(34,197,94,0.08)', padding: '0 4px', borderRadius: 4 }}>+{pr}</span>)}
+                        {p.cons.map((cn, i) => <span key={i} style={{ fontSize: 7, color: '#ef4444', background: 'rgba(239,68,68,0.06)', padding: '0 4px', borderRadius: 4 }}>−{cn}</span>)}
+                      </div>
                     </div>
                   </div>
                 );
               })}
             </div>
             <h5 style={{ margin: '8px 0 6px', fontSize: 11, color: '#f59e0b' }}>Жиры (из БД, {dbQualityScores.fats.length})</h5>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
               {dbQualityScores.fats.map((p, j) => {
                 const scoreColor = p.score >= 9 ? '#22c55e' : p.score >= 7 ? '#f59e0b' : p.score >= 5 ? '#f97316' : '#ef4444';
                 return (
-                  <div key={j} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0', borderBottom: j < dbQualityScores.fats.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none' }}>
-                    <div style={{ minWidth: 32, height: 22, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', background: scoreColor + '15', color: scoreColor, fontWeight: 800, fontSize: 11 }}>{p.score}/10</div>
-                    <div style={{ flex: 1 }}>
-                      <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--text)' }}>{p.name}</span>
-                      <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.35)', marginLeft: 6 }}>tier: {p.tier}</span>
+                  <div key={j} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '3px 0', borderBottom: j < dbQualityScores.fats.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none' }}>
+                    <div style={{ minWidth: 28, height: 20, borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', background: scoreColor + '15', color: scoreColor, fontWeight: 800, fontSize: 10 }}>{p.score}/10</div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <span style={{ fontSize: 9, fontWeight: 600, color: 'var(--text)' }}>{p.name}</span>
+                      <div style={{ display: 'flex', gap: 4, marginTop: 1, flexWrap: 'wrap' }}>
+                        {p.pros.map((pr, i) => <span key={i} style={{ fontSize: 7, color: '#22c55e', background: 'rgba(34,197,94,0.08)', padding: '0 4px', borderRadius: 4 }}>+{pr}</span>)}
+                        {p.cons.map((cn, i) => <span key={i} style={{ fontSize: 7, color: '#ef4444', background: 'rgba(239,68,68,0.06)', padding: '0 4px', borderRadius: 4 }}>−{cn}</span>)}
+                      </div>
                     </div>
                   </div>
                 );
@@ -1130,6 +1182,41 @@ const MealPlanExtended: React.FC<{ tKcal: number; tProt: number; tFat: number; t
         </div>
         </>
         )}
+      </div>
+
+      <div className="card" style={{ marginBottom: 8, padding: 14, border: '1px solid rgba(139,92,246,0.2)', background: 'rgba(139,92,246,0.03)' }}>
+        <h4 style={{ margin: '0 0 8px', fontSize: 13, color: '#8b5cf6' }}>🍽 Сочетаемость продуктов</h4>
+        <p style={{ fontSize: 9, color: 'var(--text-dim)', margin: '0 0 8px' }}>
+          Научно обоснованные комбинации: синергии (усиление) и конфликты (снижение усвоения)
+        </p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+          {[
+            { pair: 'Железо + Витамин C', effect: '+200% всасывания', note: 'Мясо/печень + лимон, перец, томаты, цитрусовые. Витамин C восстанавливает Fe³⁺ → Fe²⁺.', type: 'synergy' as const },
+            { pair: 'Куркумин + Чёрный перец', effect: '+2000% биодоступности', note: 'Пиперин ингибирует глюкуронидацию куркумина в печени.', type: 'synergy' as const },
+            { pair: 'Кальций + Кофеин', effect: '−30% всасывания Ca', note: 'Не запивать молочные продукты кофе/чаем. Интервал 1-2 часа.', type: 'conflict' as const },
+            { pair: 'Цинк + Фитиновая кислота', effect: '−50% всасывания Zn', note: 'Не есть мясо с хлебом/овсянкой. Фитиновая кислота связывает цинк.', type: 'conflict' as const },
+            { pair: 'Омега-3 + Витамин E', effect: 'Защита от окисления', note: 'Витамин E предотвращает перекисное окисление ПНЖК в мембранах.', type: 'synergy' as const },
+            { pair: 'D3 + K2 (MK-7)', effect: 'Синергия Ca-обмена', note: 'D3 повышает всасывание Ca, K2 направляет его в кости, а не в сосуды.', type: 'synergy' as const },
+            { pair: 'Белок + Клетчатка', effect: 'Замедление усвоения', note: 'Полезно на ночь: пролонгированный аминокислотный поток (казеин + овощи).', type: 'neutral' as const },
+            { pair: 'Углеводы + Корица', effect: '−20-30% гликемии', note: 'Корица замедляет опорожнение желудка и повышает чувствительность к инсулину.', type: 'synergy' as const },
+          ].map((p, j) => {
+            const typeColor = p.type === 'synergy' ? '#22c55e' : p.type === 'conflict' ? '#ef4444' : '#f59e0b';
+            const typeIcon = p.type === 'synergy' ? '⊕' : p.type === 'conflict' ? '⊖' : '○';
+            const bg = p.type === 'synergy' ? 'rgba(34,197,94,0.06)' : p.type === 'conflict' ? 'rgba(239,68,68,0.05)' : 'rgba(245,158,11,0.05)';
+            return (
+              <div key={j} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '6px 8px', background: bg, borderRadius: 8, border: '1px solid rgba(255,255,255,0.04)' }}>
+                <div style={{ minWidth: 22, height: 22, borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', background: typeColor + '15', color: typeColor, fontWeight: 800, fontSize: 13 }}>{typeIcon}</div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2, flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--text)' }}>{p.pair}</span>
+                    <span style={{ fontSize: 9, fontWeight: 700, color: typeColor, background: typeColor + '12', padding: '1px 6px', borderRadius: 8, whiteSpace: 'nowrap' }}>{p.effect}</span>
+                  </div>
+                  <div style={{ fontSize: 8, color: 'var(--text-dim)', lineHeight: 1.4 }}>{p.note}</div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
       </div>
 
       <div className="card" style={{ marginBottom: 8, padding: 14, border: '1px solid rgba(239,68,68,0.2)', background: 'rgba(239,68,68,0.04)' }}>
