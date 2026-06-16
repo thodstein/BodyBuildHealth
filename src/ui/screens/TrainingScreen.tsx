@@ -109,6 +109,8 @@ export const TrainingScreen: React.FC = () => {
   const [macrocycle, setMacrocycle] = useState<MacrocyclePlan | null>(null);
   const [selectedWeek, setSelectedWeek] = useState(1);
   const [currentMicrocycle, setCurrentMicrocycle] = useState<Microcycle | null>(null);
+  const [selectedProgram, setSelectedProgram] = useState<string | null>(null);
+  const [expandedMeso, setExpandedMeso] = useState<number | null>(null);
 
   // Exercise DB state
   const [exSearch, setExSearch] = useState('');
@@ -2698,10 +2700,12 @@ export const TrainingScreen: React.FC = () => {
                   {GOALS.find(g => g.value === macrocycle.goal)?.label} • {LEVELS.find(l => l.value === macrocycle.level)?.label}
                 </div>
                 {macrocycle.mesocycles.map((mc, mi) => (
-                  <div key={mi} style={{ marginBottom: 6, background: 'var(--bg-secondary)', borderRadius: 6, padding: '8px' }}>
+                  <div key={mi} style={{ marginBottom: 6, background: 'var(--bg-secondary)', borderRadius: 6, padding: '8px', cursor: 'pointer' }}
+                    onClick={() => setExpandedMeso(expandedMeso === mi ? null : mi)}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
                       <span style={{ fontWeight: 600, fontSize: 12 }}>
                         {PHASE_LABELS[mc.type] || 'Рабочая фаза'} — Мезоцикл {mi + 1}
+                        <span style={{ fontSize: 9, color: 'var(--text-dim)', marginLeft: 6 }}>{expandedMeso === mi ? '▴' : '▾'}</span>
                       </span>
                       <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>{mc.weeks} нед (нед {mc.weekStart + 1}–{mc.weekStart + mc.weeks})</span>
                     </div>
@@ -2716,11 +2720,50 @@ export const TrainingScreen: React.FC = () => {
                           border: selectedWeek === mc.weekStart + wi + 1 ? '1px solid var(--accent)' : '1px solid var(--border)',
                           fontSize: 9, color: selectedWeek === mc.weekStart + wi + 1 ? '#000' : 'var(--text-dim)',
                           cursor: 'pointer',
-                        }} onClick={() => { setSelectedWeek(mc.weekStart + wi + 1); setTab('plan'); }}>
+                        }} onClick={(e) => { e.stopPropagation(); setSelectedWeek(mc.weekStart + wi + 1); setTab('plan'); }}>
                           {mc.weekStart + wi + 1}
                         </div>
                       ))}
                     </div>
+                    {expandedMeso === mi && (
+                      <div style={{ marginTop: 6, borderTop: '1px solid var(--border)', paddingTop: 6 }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 4, marginBottom: 6, fontSize: 9 }}>
+                          <div style={{ background: 'rgba(0,230,138,0.05)', borderRadius: 4, padding: 4, textAlign: 'center' }}>
+                            <div style={{ color: 'var(--text-dim)' }}>Тип мезоцикла</div>
+                            <div style={{ fontWeight: 600, color: 'var(--accent)' }}>{mc.type || 'Рабочий'}</div>
+                          </div>
+                          <div style={{ background: 'rgba(0,230,138,0.05)', borderRadius: 4, padding: 4, textAlign: 'center' }}>
+                            <div style={{ color: 'var(--text-dim)' }}>Объём</div>
+                            <div style={{ fontWeight: 600, color: 'var(--accent)' }}>{(mc.microcycles?.[0]?.volumeMultiplier ?? 1).toFixed(1)}×</div>
+                          </div>
+                          <div style={{ background: 'rgba(0,230,138,0.05)', borderRadius: 4, padding: 4, textAlign: 'center' }}>
+                            <div style={{ color: 'var(--text-dim)' }}>RIR</div>
+                            <div style={{ fontWeight: 600, color: 'var(--accent)' }}>{mc.microcycles?.[0]?.rirRange?.[0] ?? 1}-{mc.microcycles?.[0]?.rirRange?.[1] ?? 3}</div>
+                          </div>
+                        </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 4, fontSize: 9, marginBottom: 6 }}>
+                          <div style={{ background: 'rgba(0,230,138,0.05)', borderRadius: 4, padding: 4, textAlign: 'center' }}>
+                            <div style={{ color: 'var(--text-dim)' }}>RPE</div>
+                            <div style={{ fontWeight: 600, color: 'var(--accent)' }}>{mc.microcycles?.[0]?.rpeTarget ?? 7}</div>
+                          </div>
+                          <div style={{ background: 'rgba(0,230,138,0.05)', borderRadius: 4, padding: 4, textAlign: 'center' }}>
+                            <div style={{ color: 'var(--text-dim)' }}>Сплит</div>
+                            <div style={{ fontWeight: 600, color: 'var(--accent)' }}>{goal === 'bulk' ? 'Гипертрофия' : goal === 'strength' ? 'Сила' : goal === 'cut' ? 'Сушка' : 'Баланс'}</div>
+                          </div>
+                          <div style={{ background: 'rgba(0,230,138,0.05)', borderRadius: 4, padding: 4, textAlign: 'center' }}>
+                            <div style={{ color: 'var(--text-dim)' }}>Дней/нед</div>
+                            <div style={{ fontWeight: 600, color: 'var(--accent)' }}>{daysPerWeek}</div>
+                          </div>
+                        </div>
+                        {mc.microcycles && mc.microcycles.length > 0 && (
+                          <div style={{ fontSize: 9, color: 'var(--text-dim)', marginTop: 4 }}>
+                            Микроциклов: <b>{mc.microcycles.length}</b> |
+                            Дней/нед: <b>{daysPerWeek}</b> |
+                            Прогрессия: <b style={{ color: 'var(--accent)' }}>{mc.type === 'accumulation' ? '+объём' : mc.type === 'intensification' ? '+интенсивность' : mc.type === 'peaking' ? 'пик' : 'разгрузка'}</b>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -2846,7 +2889,7 @@ export const TrainingScreen: React.FC = () => {
       {tab === 'analytics' && <><AnalyticsTab sessions={historyWorkouts} /><StructuredAnalyticsCard sessions={historyWorkouts} /></>}
       {tab === 'methods' && <MethodsTab linked={linked} trainingOutput={trainingOutput} diaryStats={diaryStats} historyWorkouts={historyWorkouts} goal={goal} level={level} daysPerWeek={daysPerWeek} recovery={recovery} fatigue={fatigue} />}
       {tab === 'visual' && <VisualTab sessions={historyWorkouts} />}
-      {tab === 'programs' && <ProgramsTab />}
+      {tab === 'programs' && <ProgramsTab selectedProgram={selectedProgram} setSelectedProgram={setSelectedProgram} />}
       {tab === 'timers' && <TimersTab />}
       {tab === 'progress' && <ProgressTab historyWorkouts={historyWorkouts} />}
 
@@ -4882,8 +4925,7 @@ const PROGRAM_EQUIP_MAP: Record<string, string> = {
   barbell: 'Штанга', dumbbell: 'Гантели', machine: 'Тренажёр', cable: 'Блок', bodyweight: 'Вес тела', bench: 'Скамья', rack: 'Стойка', kettlebell: 'Гиря', band: 'Резинка',
 };
 
-const ProgramsTab: React.FC = () => {
-  const [selectedId, setSelectedId] = React.useState<string | null>(null);
+const ProgramsTab: React.FC<{ selectedProgram: string | null; setSelectedProgram: (id: string | null) => void }> = ({ selectedProgram: selectedId, setSelectedProgram: setSelectedId }) => {
   const [goalFilter, setGoalFilter] = React.useState('all');
   const [detailWeek, setDetailWeek] = React.useState(1);
 
