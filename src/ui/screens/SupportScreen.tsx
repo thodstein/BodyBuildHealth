@@ -956,6 +956,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   const [manualSearch, setManualSearch] = useState('');
   const [manualFilter, setManualFilter] = useState<string>('all');
   const [manualResult, setManualResult] = useState<OptimizerStackResult | null>(null);
+  const [calcExpandedSubs, setCalcExpandedSubs] = useState<Record<string, boolean>>({});
 
   // Neurotoxicity calculator state
   const courseCompounds = useMemo(() => (linked.course || []).map(c => {
@@ -5664,6 +5665,312 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
               ) : (
                 <p style={{ fontSize:9, color:'var(--text-dim)', margin:0 }}>Нет данных о рисках. Нажмите «Рассчитать» ниже.</p>
               )}
+            </div>
+
+            {/* ==================== ADD 1: REAL CALCULATESUPPORT INTEGRATION ==================== */}
+            <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:12, border:'2px solid rgba(0,230,138,0.25)', position:'relative', overflow:'hidden' }}>
+              <div style={{ position:'absolute', top:0, left:0, right:0, bottom:0, background:'linear-gradient(135deg, rgba(0,230,138,0.02), rgba(0,198,83,0.02))', pointerEvents:'none' }} />
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
+                <h4 style={{ margin:0, fontSize:13, color:'#00e68a' }}>🧮 Интеллектуальный расчёт поддержки</h4>
+                <span style={{ fontSize:9, fontWeight:400, color:'var(--text-dim)', background:'rgba(0,230,138,0.08)', padding:'2px 8px', borderRadius:10 }}>v2.0</span>
+              </div>
+              <p style={{ fontSize:9, color:'var(--text-dim)', margin:'0 0 10px', lineHeight:1.5 }}>
+                Анализ: <b style={{ color:'var(--accent)' }}>{uniqCourse.length}</b> препаратов · <b style={{ color:'#60a5fa' }}>{labs.length}</b> анализов · <b style={{ color:'#f59e0b' }}>{Object.keys(riskData?.systemBreakdown || {}).length}</b> систем рисков · <b style={{ color:'#a78bfa' }}>{weightKg}</b>кг {age}лет {sex === 'male' ? '♂' : '♀'}
+              </p>
+              <button onClick={() => {
+                try {
+                  const s = linked.profile?.settings;
+                  const input: SupportInput = {
+                    substances: supportDrugs.length > 0 ? supportDrugs : (linked.course?.map(c => c.substanceId) || []),
+                    goals: [supportGoal],
+                    labs: (linked.labs || []).map(l => ({ code: l.code, value: l.value })),
+                    demographics: { age: s?.age ?? age, weight: s?.weight ?? weightKg, sex: (s?.sex ?? sex) as 'male' | 'female' },
+                    drugDoses: Object.fromEntries((linked.course || []).map(c => [c.substanceId, c.doseValue])),
+                    nutritionFactor: s?.nutritionFactor ?? 0.8,
+                    trainingFactor: s?.trainingFactor ?? 0.7,
+                  };
+                  const result = calculateSupport(input);
+                  setCalcResult(result as any);
+                  setCalcDone(true);
+                } catch { }
+              }} style={{
+                width:'100%', padding:'14px', borderRadius:10, border:'none', cursor:'pointer',
+                background:'linear-gradient(135deg,#00e68a,#00c853)', color:'#000', fontWeight:800, fontSize:14,
+                boxShadow:'0 4px 20px rgba(0,230,138,0.35)', letterSpacing:'0.3px',
+              }}>
+                🧮 Рассчитать поддержку
+              </button>
+              {calcDone && calcResult && (
+                <div style={{ marginTop:10, padding:'12px', borderRadius:10, background:'rgba(0,230,138,0.03)', border:'1px solid rgba(0,230,138,0.1)' }}>
+                  <div style={{ fontSize:11, fontWeight:700, color:'var(--text-light)', marginBottom:10, display:'flex', alignItems:'center', gap:6 }}>
+                    📊 Результат расчёта
+                    {calcResult.supportScore > 50 ? <span style={{ fontSize:9, padding:'1px 6px', borderRadius:4, background:'rgba(34,197,94,0.12)', color:'#22c55e' }}>Оптимально</span> : calcResult.supportScore > 25 ? <span style={{ fontSize:9, padding:'1px 6px', borderRadius:4, background:'rgba(245,158,11,0.12)', color:'#f59e0b' }}>Средне</span> : <span style={{ fontSize:9, padding:'1px 6px', borderRadius:4, background:'rgba(239,68,68,0.12)', color:'#ef4444' }}>Недостаточно</span>}
+                  </div>
+                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8, padding:'8px 10px', borderRadius:8, background:'rgba(0,0,0,0.08)', border:'1px solid var(--border)' }}>
+                    <div style={{ display:'flex', alignItems:'center', gap:4 }}>
+                      <span style={{ fontSize:9, color:'var(--text-dim)' }}>Риск до</span>
+                      <span style={{ fontSize:13, fontWeight:800, color:'#ef4444' }}>{Math.round(calcResult.riskBeforeSupport)}%</span>
+                    </div>
+                    <div style={{ display:'flex', alignItems:'center', gap:4 }}>
+                      <span style={{ fontSize:10, color:'var(--accent)', fontWeight:700 }}>→</span>
+                    </div>
+                    <div style={{ display:'flex', alignItems:'center', gap:4 }}>
+                      <span style={{ fontSize:9, color:'var(--text-dim)' }}>После</span>
+                      <span style={{ fontSize:13, fontWeight:800, color:'#22c55e' }}>{Math.round(calcResult.riskAfterSupport)}%</span>
+                    </div>
+                    <div style={{ padding:'2px 8px', borderRadius:6, background:'rgba(34,197,94,0.1)' }}>
+                      <span style={{ fontSize:10, fontWeight:700, color:'#22c55e' }}>−{Math.round(calcResult.riskBeforeSupport - calcResult.riskAfterSupport)}%</span>
+                    </div>
+                  </div>
+                  <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:8, padding:'6px 10px', borderRadius:6, background:'rgba(139,92,246,0.05)', border:'1px solid rgba(139,92,246,0.1)' }}>
+                    <span style={{ fontSize:9, color:'var(--text-dim)', minWidth:90 }}>Оценка поддержки</span>
+                    <div style={{ flex:1, height:6, borderRadius:3, background:'var(--bg-secondary)', overflow:'hidden', border:'1px solid var(--border)' }}>
+                      <div style={{ height:'100%', width:`${Math.min(100, calcResult.supportScore)}%`, borderRadius:3, background: calcResult.supportScore > 50 ? 'linear-gradient(90deg,#22c55e,#4ade80)' : calcResult.supportScore > 25 ? 'linear-gradient(90deg,#eab308,#f59e0b)' : 'linear-gradient(90deg,#ef4444,#f97316)', transition:'width 0.6s' }} />
+                    </div>
+                    <span style={{ fontSize:12, fontWeight:800, color:'#8b5cf6', minWidth:40, textAlign:'right' }}>{Math.round(calcResult.supportScore)}/100</span>
+                  </div>
+                  {calcResult.systemSupport && Object.keys(calcResult.systemSupport).length > 0 && (
+                    <div style={{ marginBottom:8 }}>
+                      <div style={{ fontSize:9, fontWeight:600, color:'var(--text-dim)', marginBottom:4 }}>📈 Покрытие по системам:</div>
+                      <div style={{ display:'flex', flexDirection:'column', gap:2 }}>
+                        {SYSTEM_ORDER.filter(k => (calcResult.systemSupport || {})[k] !== undefined).map(sysKey => {
+                          const cov = (calcResult.systemSupport || {})[sysKey] || 0;
+                          const sysInfo = SYSTEM_LABELS_RU[sysKey] || { name: sysKey, emoji: '📌' };
+                          const barColor = cov > 60 ? '#22c55e' : cov > 30 ? '#f59e0b' : '#ef4444';
+                          return (
+                            <div key={sysKey} style={{ display:'flex', alignItems:'center', gap:5 }}>
+                              <span style={{ fontSize:9, color:'var(--text-light)', minWidth:85 }}>{sysInfo.emoji} {sysInfo.name}</span>
+                              <div style={{ flex:1, height:4, borderRadius:2, background:'var(--bg-secondary)', overflow:'hidden' }}>
+                                <div style={{ height:'100%', width:`${Math.min(100, cov)}%`, borderRadius:2, background: barColor, transition:'width 0.5s' }} />
+                              </div>
+                              <span style={{ fontSize:9, fontWeight:600, color: barColor, minWidth:28, textAlign:'right' }}>{Math.round(cov)}%</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                  <div style={{ padding:'6px 10px', borderRadius:6, background:'rgba(139,92,246,0.06)', border:'1px solid rgba(139,92,246,0.12)', fontSize:10 }}>
+                    <span style={{ color:'#8b5cf6', fontWeight:600 }}>⚡ Рекомендованный уровень:</span>{' '}
+                    <b style={{ color:'#8b5cf6' }}>{SUPPORT_LEVELS[autoLevel as string]?.label || autoLevel}</b>
+                    <span style={{ color:'var(--text-dim)', fontSize:9 }}> — {SUPPORT_LEVELS[autoLevel as string]?.desc?.slice(0, 60) || 'Автоматически определённый уровень поддержки'}</span>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* ==================== ADD 2: AUTO-TIER DETECTION WITH VISUAL INDICATOR ==================== */}
+            <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:12, border:'1px solid var(--border)' }}>
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
+                <h4 style={{ margin:0, fontSize:12, fontWeight:700, color:'var(--text)' }}>🎯 Уровень поддержки</h4>
+                <span style={{ fontSize:9, padding:'3px 10px', borderRadius:10, background:'rgba(139,92,246,0.12)', color:'#8b5cf6', fontWeight:600, whiteSpace:'nowrap' }}>
+                  ⚡ Авто-выбор: <b>{SUPPORT_LEVELS[autoLevel as string]?.label || autoLevel}</b>
+                </span>
+              </div>
+              <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:6 }}>
+                {(['basic','mid','max','boost'] as const).map(l => {
+                  const active = supportLevel === l;
+                  const autoActive = autoLevel === l;
+                  const colors: Record<string, string> = { basic: '#22c55e', mid: '#eab308', max: '#f97316', boost: '#ef4444' };
+                  const labels: Record<string, string> = { basic: 'База', mid: 'Средний', max: 'Усиление', boost: 'Максимум' };
+                  const em: Record<string, string> = { basic: '🟢', mid: '🟡', max: '🟠', boost: '🔴' };
+                  const count = SUPPORT_LEVELS[l as string]?.subs?.length || 0;
+                  return (
+                    <button key={l} onClick={() => setSupportLevel(l)} style={{
+                      padding:'8px 4px', borderRadius:10, border: `2px solid ${active ? colors[l] : autoActive ? `${colors[l]}88` : 'var(--border)'}`,
+                      background: active ? `${colors[l]}15` : autoActive ? `${colors[l]}06` : 'var(--bg-secondary)',
+                      cursor:'pointer', textAlign:'center', position:'relative', transition:'all 0.15s',
+                    }}>
+                      <div style={{ fontSize:17, marginBottom:1 }}>{em[l]}</div>
+                      <div style={{ fontSize:9, fontWeight:700, color: active ? colors[l] : 'var(--text-light)' }}>{labels[l]}</div>
+                      <div style={{ fontSize:8, color:'var(--text-dim)', marginTop:1 }}>{count} веществ</div>
+                      {autoActive && (
+                        <div style={{ position:'absolute', top:-5, right:-6, fontSize:7, padding:'1px 5px', borderRadius:6, background:'#8b5cf6', color:'#fff', fontWeight:600, whiteSpace:'nowrap', boxShadow:'0 1px 4px rgba(139,92,246,0.4)' }}>⚡Авто</div>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* ==================== ADD 3: COLLAPSIBLE SUBSTANCE DETAILS ==================== */}
+            {(() => {
+              const levelData = SUPPORT_LEVELS[supportLevel];
+              if (!levelData) return null;
+              const subs = levelData.subs || [];
+              const dosages = levelData.dosages || {};
+              if (subs.length === 0) return null;
+              const toggleSub = (id: string) => setCalcExpandedSubs(prev => ({ ...prev, [id]: !prev[id] }));
+              const getSubRiskLevel = (id: string): 'high' | 'moderate' | 'baseline' => {
+                const highRiskSubs = ['telmisartan','nebivolol','hcg','bpc157','tb500','tudca','nac'];
+                const modRiskSubs = ['omega3','coq10','berberine','alpha_lipoic','milk_thistle','curcumin','astragalus','saw_palmetto','phosphatidylcholine','ashwagandha'];
+                if (highRiskSubs.includes(id)) return 'high';
+                if (modRiskSubs.includes(id)) return 'moderate';
+                return 'baseline';
+              };
+              const riskBadgeColors = { high: { bg: 'rgba(239,68,68,0.1)', border: 'rgba(239,68,68,0.2)', text: '#ef4444', label: 'Критический риск' }, moderate: { bg: 'rgba(245,158,11,0.08)', border: 'rgba(245,158,11,0.15)', text: '#f59e0b', label: 'Умеренный риск' }, baseline: { bg: 'rgba(34,197,94,0.06)', border: 'rgba(34,197,94,0.1)', text: '#22c55e', label: 'Базовая защита' } };
+              const getSubSystemReason = (id: string): string[] => {
+                const map: Record<string, string[]> = {
+                  nac: ['Печень (гепатопротекция, глутатион)', 'Почки (антиоксидант)'],
+                  tudca: ['Печень (желчеотток, апоптоз гепатоцитов)'],
+                  omega3: ['Сердце (липидный профиль)', 'Сосуды (эндотелий)', 'Мозг (нейропротекция)'],
+                  coq10: ['Сердце (митохондрии миокарда)', 'Сосуды (NO-синтез)'],
+                  magnesium: ['Сердце (ритм)', 'Нейро (NMDA-модуляция)', 'Мышцы (расслабление)'],
+                  zinc: ['Эндокринная (ароматаза, тестостерон)', 'Иммунитет'],
+                  vitamin_d3: ['Кости', 'Иммунитет', 'Эндокринная'],
+                  vitamin_k2: ['Сосуды (кальцификация)', 'Кости (остеокальцин)'],
+                  berberine: ['Печень (AMPK)', 'Сердце (липиды, глюкоза)', 'Почки'],
+                  ashwagandha: ['Эндокринная (кортизол)', 'Нейро (ГАМК)', 'Репродуктивная'],
+                  alpha_lipoic: ['Печень', 'Нейро (миелинизация)', 'Поджелудочная'],
+                  milk_thistle: ['Печень (силимарин, регенерация)'],
+                  telmisartan: ['Сердце (АД, гипертрофия ЛЖ)', 'Почки (PPAR-γ)'],
+                  nebivolol: ['Сердце (ЧСС, β1 + NO)'],
+                  saw_palmetto: ['Репродуктивная (простата, DHT)'],
+                  hcg: ['Репродуктивная (тестостерон, фертильность)'],
+                  astragalus: ['Почки (СКФ, фиброз)', 'Иммунитет'],
+                  taurine: ['Сердце (сократимость)', 'Печень', 'Нейро'],
+                  curcumin: ['Печень', 'Суставы (COX-2)', 'Сердце'],
+                  phosphatidylcholine: ['Печень (мембраны гепатоцитов)'],
+                  l_carnitine: ['Сердце (энергия миокарда)', 'Мышцы'],
+                  glucosamine: ['Опорно-двиг. (хрящи)'],
+                  collagen: ['Опорно-двиг. (сухожилия, связки)', 'Кожа'],
+                  bpc157: ['Опорно-двиг. (регенерация)', 'ЖКТ (заживление)'],
+                  tb500: ['Опорно-двиг. (ангиогенез, регенерация)'],
+                  melatonin: ['Нейро (сон, антиоксидант)', 'Эндокринная'],
+                  probiotics: ['ЖКТ', 'Иммунитет'],
+                  selenium: ['Щитовидная', 'Антиоксидант'],
+                  vitamin_b12: ['Нейро (миелин)', 'Кровь (эритропоэз)'],
+                  folate: ['Кровь (гомоцистеин)', 'Нейро'],
+                  vitamin_c: ['Антиоксидант', 'Коллаген', 'Иммунитет'],
+                  msm: ['Опорно-двиг. (суставы, сера)'],
+                  chondroitin: ['Опорно-двиг. (хрящи)'],
+                  hyaluronic: ['Опорно-двиг. (синовия)', 'Кожа'],
+                  boswellia: ['Опорно-двиг. (5-LOX)', 'ЖКТ'],
+                  bromelain: ['Опорно-двиг. (отёк, воспаление)'],
+                  egcg: ['Печень', 'Антиоксидант'],
+                  ginseng: ['Эндокринная (адаптоген)', 'Иммунитет'],
+                  iron: ['Кровь (гемоглобин)'],
+                  copper: ['Кровь (церулоплазмин)', 'Сосуды'],
+                };
+                return map[id] || ['Общая поддержка организма'];
+              };
+              let totalPills = 0;
+              let totalPowders = 0;
+              let totalInjections = 0;
+              const powders = ['collagen', 'msm', 'taurine', 'l_carnitine', 'glucosamine', 'creatine'];
+              const injections = ['hcg', 'bpc157', 'tb500'];
+              subs.forEach(id => {
+                const dosage = dosages[id];
+                if (!dosage) { totalPills++; return; }
+                if (injections.includes(id)) { totalInjections += 1; return; }
+                if (powders.includes(id)) { totalPowders += dosage.mg >= 3000 ? 2 : 1; return; }
+                totalPills += dosage.mg >= 800 ? 2 : 1;
+              });
+              return (
+                <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:12, border:'1px solid var(--border)' }}>
+                  <h4 style={{ margin:'0 0 4px', fontSize:12, color:'var(--accent)', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                    <span>💊 Состав: {levelData.label}</span>
+                    <span style={{ fontSize:9, fontWeight:400, color:'var(--text-dim)' }}>
+                      Всего: {totalPills > 0 ? `${totalPills} капс` : ''}{totalPills > 0 && totalPowders > 0 ? ' / ' : ''}{totalPowders > 0 ? `${totalPowders} порош.` : ''}{((totalPills > 0 || totalPowders > 0) && totalInjections > 0) ? ' / ' : ''}{totalInjections > 0 ? `${totalInjections} инъекц.` : ''} в день
+                    </span>
+                  </h4>
+                  <div style={{ display:'flex', flexDirection:'column', gap:4, marginTop:6 }}>
+                    {subs.map(id => {
+                      const dosage = dosages[id];
+                      const subInfo = ALL_SUBSTANCES?.find((s: any) => s.id === id) as any;
+                      const subName = subInfo?.name || id;
+                      const wbStr = getWeightDosing(id, dosage?.mg || 0);
+                      const doseStr = dosage?.mg ? (dosage.mg >= 5000 ? `${dosage.mg / 1000} г` : `${dosage.mg} мг`) : '—';
+                      const riskLevel = getSubRiskLevel(id);
+                      const badge = riskBadgeColors[riskLevel];
+                      const reasons = getSubSystemReason(id);
+                      const isExpanded = calcExpandedSubs[id] || false;
+                      return (
+                        <div key={id} style={{ borderRadius:8, border:'1px solid var(--border)', overflow:'hidden' }}>
+                          <div onClick={() => toggleSub(id)} style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'7px 10px', cursor:'pointer', background:'rgba(0,0,0,0.1)' }}>
+                            <div style={{ display:'flex', alignItems:'center', gap:6, flex:1, minWidth:0 }}>
+                              <span style={{ fontSize:9, fontWeight:600, color:'var(--text-light)' }}>{subName}</span>
+                              <span style={{ fontSize:8, color:'var(--text-dim)' }}>{dosage?.timing || ''}</span>
+                            </div>
+                            <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                              <span style={{ fontSize:9, fontWeight:700, color:'#00e68a' }}>{doseStr}</span>
+                              {wbStr && <span style={{ fontSize:7, color:'var(--text-dim)' }}>{wbStr.replace(/[()]/g, '')}</span>}
+                              <span style={{ fontSize:8, padding:'1px 5px', borderRadius:4, background:badge.bg, border:`1px solid ${badge.border}`, color:badge.text, whiteSpace:'nowrap' }}>
+                                {riskLevel === 'high' ? '❗Выс.' : riskLevel === 'moderate' ? '⚠ Умер.' : '✓ Баз.'}
+                              </span>
+                              <span style={{ fontSize:8, color:'var(--text-dim)', transform: isExpanded ? 'rotate(90deg)' : 'rotate(0)', transition:'transform 0.2s' }}>▶</span>
+                            </div>
+                          </div>
+                          {isExpanded && (
+                            <div style={{ padding:'8px 10px', background:'rgba(0,0,0,0.04)', borderTop:'1px solid var(--border)' }}>
+                              <div style={{ fontSize:8, fontWeight:600, color:'var(--text-dim)', marginBottom:3 }}>📋 Почему это вещество?</div>
+                              <div style={{ display:'flex', flexDirection:'column', gap:2 }}>
+                                {reasons.map((r, i) => (
+                                  <div key={i} style={{ fontSize:8, color:'var(--text-dim)', paddingLeft:10, position:'relative' }}>
+                                    <span style={{ position:'absolute', left:0, top:4, width:4, height:4, borderRadius:'50%', background: badge.text }} />
+                                    {r}
+                                  </div>
+                                ))}
+                              </div>
+                              <div style={{ marginTop:4, fontSize:7, color:'var(--text-dim)', fontStyle:'italic' }}>
+                                Доза: {doseStr}{wbStr ? ` (≈${wbStr.replace(/[()]/g, '')})` : ''} · Приём: {dosage?.timing || 'с едой'}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* ==================== ADD 4: QUICK-ACTIONS ROW ==================== */}
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:6 }}>
+              <button onClick={() => {
+                setSupportLevel(autoLevel);
+                try { execCalculate(); } catch {}
+              }} style={{
+                padding:'12px 6px', borderRadius:10, border:'1px solid #8b5cf6', background:'rgba(139,92,246,0.08)',
+                cursor:'pointer', fontSize:10, fontWeight:700, color:'#8b5cf6', textAlign:'center',
+              }}>
+                <div style={{ fontSize:16, marginBottom:2 }}>⚡</div>
+                Быстрый старт
+                <div style={{ fontSize:8, fontWeight:400, color:'var(--text-dim)', marginTop:2 }}>{SUPPORT_LEVELS[autoLevel as string]?.label || 'Авто'}</div>
+              </button>
+              <button onClick={() => {
+                setSupportLevel('basic');
+                try { execCalculate(); } catch {}
+              }} style={{
+                padding:'12px 6px', borderRadius:10, border:'1px solid #22c55e', background:'rgba(34,197,94,0.06)',
+                cursor:'pointer', fontSize:10, fontWeight:700, color:'#22c55e', textAlign:'center',
+              }}>
+                <div style={{ fontSize:16, marginBottom:2 }}>📋</div>
+                Минимальный
+                <div style={{ fontSize:8, fontWeight:400, color:'var(--text-dim)', marginTop:2 }}>5 веществ</div>
+              </button>
+              <button onClick={() => {
+                setSupportLevel('boost');
+                try { execCalculate(); } catch {}
+              }} style={{
+                padding:'12px 6px', borderRadius:10, border:'1px solid #ef4444', background:'rgba(239,68,68,0.06)',
+                cursor:'pointer', fontSize:10, fontWeight:700, color:'#ef4444', textAlign:'center',
+              }}>
+                <div style={{ fontSize:16, marginBottom:2 }}>🛡</div>
+                Максимальная защита
+                <div style={{ fontSize:8, fontWeight:400, color:'var(--text-dim)', marginTop:2 }}>41 вещество</div>
+              </button>
+            </div>
+
+            {/* ==================== ADD 5: INTEGRATION NOTICE ==================== */}
+            <div style={{ padding:'10px 12px', borderRadius:10, background:'rgba(96,165,250,0.05)', border:'1px solid rgba(96,165,250,0.12)', display:'flex', alignItems:'flex-start', gap:8 }}>
+              <span style={{ fontSize:14, flexShrink:0 }}>🔄</span>
+              <div>
+                <div style={{ fontSize:9, fontWeight:600, color:'#60a5fa', marginBottom:2 }}>Автоматическая синхронизация</div>
+                <div style={{ fontSize:8, color:'var(--text-dim)', lineHeight:1.4 }}>
+                  Данные обновляются автоматически из вашего профиля, курса и анализов. Измените параметры в Профиле или Анализах для пересчёта.
+                </div>
+              </div>
             </div>
 
             {/* ==================== 3a: ВЫБОР УРОВНЯ ==================== */}
