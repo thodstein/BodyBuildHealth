@@ -904,6 +904,8 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   const [supportClassFilter, setSupportClassFilter] = useState<string>('all');
   const [supportLevel, setSupportLevel] = useState<'basic' | 'mid' | 'max' | 'boost'>('mid');
   const [manualLevelSelected, setManualLevelSelected] = useState(false);
+  const [boostEnabled, setBoostEnabled] = useState(false);
+  const [jointMode, setJointMode] = useState(false);
   const [supportPhase, setSupportPhase] = useState<SupportPhase>('course');
   const [selectedAnalogs, setSelectedAnalogs] = useState<Record<string, string>>({});
   const [enhancedSubs, setEnhancedSubs] = useState<string[]>([]);
@@ -1033,6 +1035,35 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
     boost: { label: '🔴 Усиление', desc: 'Максимальная защита + рецептурные', subs: ['nac', 'tudca', 'magnesium', 'vitamin_d3', 'vitamin_k2', 'coq10', 'folate', 'taurine', 'selenium', 'milk_thistle', 'alpha_lipoic', 'curcumin', 'vitamin_b12', 'vitamin_c', 'ashwagandha', 'berberine', 'probiotics', 'glucosamine', 'collagen', 'vitamin_e', 'phosphatidylcholine', 'telmisartan', 'nebivolol', 'saw_palmetto', 'hcg', 'iron', 'copper', 'astragalus', 'melatonin', 'ginseng', 'egcg', 'l_carnitine', 'chondroitin', 'msm', 'hyaluronic', 'boswellia', 'bromelain', 'bpc157', 'tb500', 'omega3', 'zinc'], dosages: { nac: { mg: 2400, timing: 'натощак, 2-3x/д' }, tudca: { mg: 1500, timing: 'перед едой, 2-3x/д' }, magnesium: { mg: 800, timing: 'на ночь (L-треонат)' }, vitamin_d3: { mg: 10000, timing: 'с едой (МЕ)' }, vitamin_k2: { mg: 400, timing: 'с едой (мкг, MK-7)' }, coq10: { mg: 400, timing: 'с едой (убихинол)' }, folate: { mg: 1000, timing: 'с едой (мкг, 5-MTHF)' }, taurine: { mg: 3000, timing: 'натощак, 2x/д' }, selenium: { mg: 400, timing: 'с едой (мкг, селен метионин)' }, milk_thistle: { mg: 900, timing: 'с едой, 2x/д (силимарин 80%)' }, alpha_lipoic: { mg: 900, timing: 'натощак, 2x/д (R-форма)' }, curcumin: { mg: 1000, timing: 'с пиперином, с едой' }, vitamin_b12: { mg: 5000, timing: 'утро (мкг, метилкобаламин)' }, vitamin_c: { mg: 2000, timing: 'натощак, 2x/д' }, ashwagandha: { mg: 900, timing: 'вечер (KSM-66)' }, berberine: { mg: 500, timing: 'с едой, 2x/д' }, probiotics: { mg: 20, timing: 'натощак (млрд КОЕ)' }, glucosamine: { mg: 1500, timing: 'с едой' }, collagen: { mg: 20000, timing: 'с едой (мг, гидролизат + вит.C)' }, vitamin_e: { mg: 400, timing: 'с едой (МЕ, смесь токоферолов)' }, phosphatidylcholine: { mg: 1200, timing: 'с едой' }, telmisartan: { mg: 40, timing: 'утро (КАД и ЧСС контроль!)' }, nebivolol: { mg: 5, timing: 'утро (ЧСС контроль!)' }, saw_palmetto: { mg: 640, timing: 'с едой, 2x/д' }, hcg: { mg: 5000, timing: '2x/нед (МЕ)' }, iron: { mg: 18, timing: 'натощак (контроль ферритина!)' }, copper: { mg: 2, timing: 'отдельно от цинка (мг)' }, astragalus: { mg: 1500, timing: 'с едой' }, melatonin: { mg: 5, timing: 'на ночь' }, ginseng: { mg: 400, timing: 'утро' }, egcg: { mg: 400, timing: 'натощак' }, l_carnitine: { mg: 2000, timing: 'натощак' }, chondroitin: { mg: 1200, timing: 'с едой' }, msm: { mg: 3000, timing: 'с едой' }, hyaluronic: { mg: 200, timing: 'с едой (мг)' }, boswellia: { mg: 500, timing: 'с едой, 2x/д' }, bromelain: { mg: 500, timing: 'натощак' }, bpc157: { mg: 500, timing: 'натощак (мкг)' }, tb500: { mg: 500, timing: 'натощак (мкг)' }, omega3: { mg: 4000, timing: 'с едой, 2x/д (EPA+DHA 60%)' }, zinc: { mg: 50, timing: 'на ночь (пиколинат, контроль СЖК!)' } } },
   };
 
+  const BOOST_SUBS = ['telmisartan','nebivolol','omega3','iron','copper','zinc',
+    'bpc157','tb500','chondroitin','msm','hyaluronic','boswellia','bromelain',
+    'saw_palmetto','hcg','astragalus','melatonin','ginseng','egcg','l_carnitine'];
+
+  const JOINT_SUBS = ['glucosamine','chondroitin','msm','collagen','hyaluronic','boswellia','bromelain','bpc157','tb500','vitamin_c'];
+
+  const BOOST_DOSAGES: Record<string, { mg: number; timing: string }> = {
+    telmisartan: { mg: 40, timing: 'утро (КАД и ЧСС контроль!)' },
+    nebivolol: { mg: 5, timing: 'утро (ЧСС контроль!)' },
+    omega3: { mg: 4000, timing: 'с едой, 2x/д (EPA+DHA 60%)' },
+    iron: { mg: 27, timing: 'натощак (контроль ферритина!)' },
+    copper: { mg: 2, timing: 'отдельно от цинка (мг)' },
+    zinc: { mg: 50, timing: 'на ночь (пиколинат, контроль СЖК!)' },
+    bpc157: { mg: 500, timing: 'натощак (мкг)' },
+    tb500: { mg: 10, timing: 'натощак (мкг)' },
+    chondroitin: { mg: 1200, timing: 'с едой' },
+    msm: { mg: 3000, timing: 'с едой' },
+    hyaluronic: { mg: 200, timing: 'с едой (мг)' },
+    boswellia: { mg: 500, timing: 'с едой, 2x/д' },
+    bromelain: { mg: 500, timing: 'натощак' },
+    saw_palmetto: { mg: 640, timing: 'с едой, 2x/д' },
+    hcg: { mg: 5000, timing: '2x/нед (МЕ)' },
+    astragalus: { mg: 1500, timing: 'с едой' },
+    melatonin: { mg: 5, timing: 'на ночь' },
+    ginseng: { mg: 400, timing: 'утро' },
+    egcg: { mg: 400, timing: 'натощак' },
+    l_carnitine: { mg: 2000, timing: 'натощак' },
+  };
+
   useEffect(() => {
     const s = linked.profile?.settings;
     if (!s) return;
@@ -1096,8 +1127,27 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
         dosages[enhId] = DEFAULT_DOSAGES[enhId] || { mg: 500, timing: 'с едой' };
       }
     }
-    return { ...phaseResult, subs, dosages };
-  }, [supportLevel, supportPhase, selectedAnalogs, enhancedSubs]);
+    // Boost mode: add boost substances to the current stack
+    if (boostEnabled) {
+      for (const bs of BOOST_SUBS) {
+        if (!subs.includes(bs)) {
+          subs.push(bs);
+          dosages[bs] = BOOST_DOSAGES[bs] || DEFAULT_DOSAGES[bs] || { mg: 500, timing: 'с едой' };
+        }
+      }
+    }
+    // Joint mode: filter to only joint-related substances
+    let finalSubs = subs;
+    let finalDosages = dosages;
+    if (jointMode) {
+      finalSubs = subs.filter(s => JOINT_SUBS.includes(s));
+      finalDosages = {};
+      for (const s of finalSubs) {
+        finalDosages[s] = dosages[s] || DEFAULT_DOSAGES[s] || { mg: 500, timing: 'с едой' };
+      }
+    }
+    return { ...phaseResult, subs: finalSubs, dosages: finalDosages };
+  }, [supportLevel, supportPhase, selectedAnalogs, enhancedSubs, boostEnabled, jointMode]);
 
   const calcSupport = (overrideLevel?: 'basic' | 'mid' | 'max' | 'boost') => {
     const s = linked.profile?.settings;
@@ -4968,7 +5018,22 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
               }}>
                 🧮 Рассчитать поддержку
               </button>
-              {calcDone && calcResult && (
+              
+              <button onClick={() => { setJointMode(!jointMode); if (!jointMode) setBoostEnabled(false); calcSupport(); }}
+                style={{width:'100%',padding:10,borderRadius:8,marginTop:6,
+                border: (jointMode ? '1px solid #8b5cf6' : '1px solid var(--border)'),
+                background:jointMode?'rgba(139,92,246,0.1)':'var(--bg-secondary)',
+                color:jointMode?'#8b5cf6':'var(--text-dim)',fontWeight:700,cursor:'pointer'}}>
+                🦴 {jointMode ? '✅ Режим суставов включён' : 'Рассчитать суставы и связки'}
+              </button>
+              <button onClick={() => { setBoostEnabled(!boostEnabled); if (!boostEnabled) setJointMode(false); calcSupport(); }}
+                style={{width:'100%',padding:10,borderRadius:8,marginTop:4,
+                border: (boostEnabled ? '1px solid #ef4444' : '1px solid var(--border)'),
+                background:boostEnabled?'rgba(239,68,68,0.1)':'var(--bg-secondary)',
+                color:boostEnabled?'#ef4444':'var(--text-dim)',fontWeight:700,cursor:'pointer'}}>
+                🔴 {boostEnabled ? '✅ Усиление стека включено' : 'Усилить стек (+20 препаратов)'}
+              </button>
+{calcDone && calcResult && (
                 <div style={{ marginTop:10, padding:'12px', borderRadius:10, background:'rgba(0,230,138,0.03)', border:'1px solid rgba(0,230,138,0.1)' }}>
                   <div style={{ fontSize:11, fontWeight:700, color:'var(--text-light)', marginBottom:10, display:'flex', alignItems:'center', gap:6 }}>
                     📊 Результат расчёта
@@ -5016,6 +5081,36 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
                           );
                         })}
                       </div>
+                    </div>
+                  )}
+                  {/* Recommendations based on low coverage */}
+                  {calcResult && (calcResult.systemSupport || {}).cardio !== undefined && (
+                    <div style={{ marginTop:6, padding:'8px 10px', borderRadius:8, background:'rgba(0,0,0,0.12)', border:'1px solid var(--border)' }}>
+                      <div style={{ fontSize:9, fontWeight:700, color:'#f59e0b', marginBottom:4 }}>💡 Рекомендации по покрытию:</div>
+                      {((calcResult.systemSupport || {}).cardio || 0) < 30 && (
+                        <div style={{ fontSize:8, color:'var(--text-light)', marginBottom:2 }}>💊 <b>Давление/ЧСС:</b> небилетол 5 мг или тельмисартан 40 мг</div>
+                      )}
+                      {((calcResult.systemSupport || {}).hepatic || 0) < 30 && (
+                        <div style={{ fontSize:8, color:'var(--text-light)', marginBottom:2 }}>🫁 <b>Печень:</b> NAC 1200 мг + TUDCA 500 мг (до еды)</div>
+                      )}
+                      {((calcResult.systemSupport || {}).renal || 0) < 30 && (
+                        <div style={{ fontSize:8, color:'var(--text-light)', marginBottom:2 }}>🫘 <b>Почки:</b> астрагал 1000 мг + таурин 2000 мг</div>
+                      )}
+                      {((calcResult.systemSupport || {}).neuro || 0) < 30 && (
+                        <div style={{ fontSize:8, color:'var(--text-light)', marginBottom:2 }}>🧠 <b>Нервная:</b> магний 400 мг + ашваганда 600 мг</div>
+                      )}
+                      {((calcResult.systemSupport || {}).endocrine || 0) < 30 && (
+                        <div style={{ fontSize:8, color:'var(--text-light)', marginBottom:2 }}>⚗️ <b>Эндокринная:</b> витамин D3 5000 МЕ + цинк 30 мг</div>
+                      )}
+                      {((calcResult.systemSupport || {}).reproductive || 0) < 30 && (
+                        <div style={{ fontSize:8, color:'var(--text-light)', marginBottom:2 }}>⚧ <b>Репродуктивная:</b> ХГЧ 2500 МЕ 2x/нед + сабаль 640 мг</div>
+                      )}
+                      {((calcResult.systemSupport || {}).hematologic || 0) < 30 && (
+                        <div style={{ fontSize:8, color:'var(--text-light)', marginBottom:2 }}>🩸 <b>Кроветворение:</b> фолат 800 мкг + B12 1000 мкг + железо (по анализам)</div>
+                      )}
+                      {((calcResult.systemSupport || {}).musculoskeletal || 0) < 30 && (
+                        <div style={{ fontSize:8, color:'var(--text-light)', marginBottom:2 }}>🦴 <b>Опорно-двигательная:</b> коллаген 10 г + витамин C 1000 мг + глюкозамин 1500 мг</div>
+                      )}
                     </div>
                   )}
                   <div style={{ padding:'6px 10px', borderRadius:6, background:'rgba(139,92,246,0.06)', border:'1px solid rgba(139,92,246,0.12)', fontSize:10 }}>
@@ -5117,6 +5212,19 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
                 boxShadow:'0 2px 8px rgba(0,230,138,0.3)',
               }}>
                 🧮 Рассчитать ({(effectiveLevel?.subs || SUPPORT_LEVELS[supportLevel]?.subs || []).length} добавок)
+              </button>              <button onClick={() => { setJointMode(!jointMode); if (!jointMode) setBoostEnabled(false); calcSupport(); }}
+                style={{width:'100%',padding:10,borderRadius:8,marginTop:6,
+                border:`1px solid ${jointMode?'#8b5cf6':'var(--border)'}`,
+                background:jointMode?'rgba(139,92,246,0.1)':'var(--bg-secondary)',
+                color:jointMode?'#8b5cf6':'var(--text-dim)',fontWeight:700,cursor:'pointer'}}>
+                🦴 {jointMode ? '✅ Режим суставов включён' : 'Рассчитать суставы и связки'}
+              </button>
+              <button onClick={() => { setBoostEnabled(!boostEnabled); if (!boostEnabled) setJointMode(false); calcSupport(); }}
+                style={{width:'100%',padding:10,borderRadius:8,marginTop:4,
+                border:`1px solid ${boostEnabled?'#ef4444':'var(--border)'}`,
+                background:boostEnabled?'rgba(239,68,68,0.1)':'var(--bg-secondary)',
+                color:boostEnabled?'#ef4444':'var(--text-dim)',fontWeight:700,cursor:'pointer'}}>
+                🔴 {boostEnabled ? '✅ Усиление стека включено' : 'Усилить стек (+20 препаратов)'}
               </button>
 
               {calcDone && calcResult && (

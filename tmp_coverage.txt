@@ -1,0 +1,101 @@
+﻿
+function calculateSupportCoverage(
+  substances: SubstanceEntry[],
+  substanceIds: string[],
+  supportDoses?: Record<string, number>
+): { totalSupport: number; systemSupport: Record<string, number>; organSupport: Record<string, number> } {
+  const systemSupport: Record<string, number> = {};
+  const organSupport: Record<string, number> = {};
+  let totalSupport = 0;
+
+  for (const system of ALL_RISK_SYSTEMS) {
+    systemSupport[system] = 0;
+  }
+
+  for (const [supKey, coverage] of Object.entries(SUPPORT_BASE_COVERAGE)) {
+    const isInStack = substanceIds.some(sid =>
+      COVERAGE_ID_ALIAS[sid] === supKey || sid === supKey || sid.toLowerCase().includes(supKey) || supKey.includes(sid.toLowerCase())
+    );
+    if (!isInStack) continue;
+
+    const dose = supportDoses?.[supKey] ?? supportDoses?.[substanceIds.find(sid => sid === supKey || sid.toLowerCase().includes(supKey)) ?? ''] ?? SUPPORT_DEFAULT_DOSE[supKey] ?? 100;
+    const ec50 = SUPPORT_EC50[supKey] ?? 100;
+
+    for (const [coverageKey, emax] of Object.entries(coverage)) {
+      const adjustedCoverage = sigmoidEmax(emax, dose, ec50);
+      const system = getCoverageSystem(coverageKey);
+      if (system) {
+        systemSupport[system] = (systemSupport[system] ?? 0) + adjustedCoverage;
+      }
+
+      const organPrefix = coverageKey.split('_')[0];
+      const organs = COVERAGE_ORGAN_MAP[organPrefix] ?? [];
+      for (const organ of organs) {
+        organSupport[organ] = (organSupport[organ] ?? 0) + adjustedCoverage;
+      }
+    }
+  }
+
+  if (substances.length > 0) {
+    for (const substance of substances) {
+      const supKey = Object.keys(SUPPORT_BASE_COVERAGE).find(k =>
+        COVERAGE_ID_ALIAS[substance.id] === k || substance.id === k || substance.id.toLowerCase().includes(k) || k.includes(substance.id.toLowerCase())
+      );
+      if (!supKey) continue;
+      const coverage = SUPPORT_BASE_COVERAGE[supKey];
+      const dose = supportDoses?.[supKey] ?? supportDoses?.[substance.id] ?? SUPPORT_DEFAULT_DOSE[supKey] ?? 100;
+      const ec50 = SUPPORT_EC50[supKey] ?? 100;
+      let substanceTotal = 0;
+
+      for (const [coverageKey, emax] of Object.entries(coverage)) {
+        substanceTotal += sigmoidEmax(emax, dose, ec50);
+      }
+      totalSupport += substanceTotal;
+    }
+  }
+
+  totalSupport += (substanceIds.filter(sid =>
+    (COVERAGE_ID_ALIAS[sid] && Object.keys(SUPPORT_BASE_COVERAGE).includes(COVERAGE_ID_ALIAS[sid])) ||
+    Object.keys(SUPPORT_BASE_COVERAGE).some(k => sid === k || sid.toLowerCase().includes(k) || k.includes(sid.toLowerCase()))
+  ).length) * 5;
+
+  for (const system of ALL_RISK_SYSTEMS) {
+    systemSupport[system] = Math.min(100, systemSupport[system]);
+  }
+  for (const organ of Object.keys(organSupport)) {
+    organSupport[organ] = Math.min(100, organSupport[organ]);
+  }
+
+  return { totalSupport: Math.min(35, totalSupport), systemSupport, organSupport };
+}
+
+function calculateSupportScore(
+  input: SupportInput,
+  substances: SubstanceEntry[],
+  substanceIds: string[]
+): { score: number; systemSupport: Record<string, number>; organSupport: Record<string, number> } {
+  const coverage = calculateSupportCoverage(substances, substanceIds, input.supportDoses);
+  // Lifestyle factors (nutrition, training) are already priced into base risk.
+  // Only actual supplement coverage reduces risk. lifestyleSupport removed to avoid
+  // auto-reducing risk by ~27% when user has selected NO support items.
+
+  const totalScore = Math.min(100, Math.max(0, coverage.totalSupport));
+
+  return { score: totalScore, systemSupport: coverage.systemSupport, organSupport: coverage.organSupport };
+}
+
+function generateRecommendations(riskResult: RiskResult, input: SupportInput): RecommendationEntry[] {
+  const recommendations: RecommendationEntry[] = [];
+
+  for (const [system, riskData] of Object.entries(riskResult.systemBreakdown)) {
+    if (riskData.net > 50) {
+      const systemRecs = MASTER_DB.recommendations.filter(r => 
+        r.riskId && MASTER_DB.risks.some(risk => 
+          risk.id === r.riskId && 
+          risk.title.toLowerCase().includes(system.toLowerCase())
+        )
+      );
+
+      for (const rec of systemRecs.slice(0, 2)) {
+        if (!recommendations.some(r => r.recId === rec.recId)) {
+          recommendations.push(rec);
