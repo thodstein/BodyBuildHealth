@@ -5751,8 +5751,31 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
 
           {neuroTab === 'mechanisms' && (
             <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+              {/* NEW: 3 detailed mechanism cards */}
               <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:14, border:'1px solid var(--border)' }}>
-                <h4 style={{ margin:'0 0 10px', fontSize:13, color:'#ec4899' }}>🔬 Механизмы нейротоксичности ААС</h4>
+                <h4 style={{ margin:'0 0 10px', fontSize:13, color:'#ec4899' }}>🧠 Фундаментальные механизмы нейротоксичности ААС</h4>
+                <div style={{ padding:'10px 12px', borderRadius:8, marginBottom:8, background:'rgba(236,72,153,0.06)', border:'1px solid rgba(236,72,153,0.15)' }}>
+                  <div style={{ fontSize:11, fontWeight:700, color:'#f472b6', marginBottom:4 }}>🔬 Гематоэнцефалический барьер (ГЭБ)</div>
+                  <div style={{ fontSize:9, color:'var(--text-dim)', lineHeight:1.5 }}>ГЭБ — тонко настроенный фильтр между кровью и мозгом. Пропускает молекулы по двум правилам: небольшой размер и низкая полярность. Стероиды, эстрогены, кортикоиды соответствуют ОБОИМ правилам → свободно проникают в мозг. При нормальных концентрациях гормонов это полезно (развитие мозга). При супрафизиологических дозах ААС — нейротоксический каскад.</div>
+                </div>
+                <div style={{ padding:'10px 12px', borderRadius:8, marginBottom:8, background:'rgba(236,72,153,0.06)', border:'1px solid rgba(236,72,153,0.15)' }}>
+                  <div style={{ fontSize:11, fontWeight:700, color:'#f472b6', marginBottom:4 }}>🎯 Андрогенные и эстрогенные рецепторы мозга</div>
+                  <div style={{ fontSize:9, color:'var(--text-dim)', lineHeight:1.5 }}>Мозг насыщен андрогенными (AR) и эстрогенными (ER) рецепторами. Тестостерон → эстрадиол (через ароматазу в мозге) → ER-опосредованная нейропротекция (в норме). При гипер-дозах: AR-гиперстимуляция → окислительный стресс нейронов. Без контроля Е2 — ER-дисфункция → потеря нейропротекции.</div>
+                </div>
+                <div style={{ padding:'10px 12px', borderRadius:8, marginBottom:8, background:'rgba(236,72,153,0.06)', border:'1px solid rgba(236,72,153,0.15)' }}>
+                  <div style={{ fontSize:11, fontWeight:700, color:'#f472b6', marginBottom:4 }}>⚡ Негормональные механизмы</div>
+                  <div style={{ fontSize:9, color:'var(--text-dim)', lineHeight:1.5 }}>ААС действуют не только через рецепторы: ГАМК-рецепторы (тормозная система) — подавление → тревога/судороги. NMDA-рецепторы (память/обучение) — эксайтотоксичность. Митохондриальная дисфункция → энергодефицит нейронов. Ионные каналы (Ca²+) → кальциевый шторм. Факторы роста (BDNF, NGF) — подавление → нейродегенерация.</div>
+                </div>
+              </div>
+
+              {/* WARNING BANNER */}
+              <div style={{ background:'linear-gradient(135deg, rgba(239,68,68,0.12), rgba(236,72,153,0.12))', borderRadius:12, padding:12, border:'2px solid rgba(239,68,68,0.35)', textAlign:'center' }}>
+                <div style={{ fontSize:10, fontWeight:800, color:'#f87171', lineHeight:1.5 }}>⚠️ ЭТО НЕ ПРОСТО ИСТОРИЯ ПРО «СТАЛ БОЛЕЕ ЗЛОЙ НА КУРСЕ». ЭТО ПРО ТО, ЧТО ТЫ ХИМИЕЙ ЛЕЗЕШЬ В ТОНКО НАСТРОЕННУЮ НЕЙРОБИОЛОГИЮ.</div>
+              </div>
+
+              {/* EXISTING: Detailed mechanism cards */}
+              <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:14, border:'1px solid var(--border)' }}>
+                <h4 style={{ margin:'0 0 10px', fontSize:13, color:'#ec4899' }}>🔬 Детальные механизмы нейротоксичности ААС</h4>
                 {[
                   { title:'ГАМК-ергическая дисфункция', desc:'ААС повышают ГАМК-ергический тормозной тон в гипоталамусе через нейростероиды (аллопрегнанолон) → подавление пульсирующей секреции ГнРГ. Дисрегуляция GABA-A рецепторов вызывает тревожность, депрессию и когнитивные нарушения при отмене.' },
                   { title:'Окислительный стресс', desc:'Истощение глутатиона в нейронах гиппокампа, перекисное окисление липидов мембран. Супероксид-дисмутаза и каталаза снижены при применении нандролона и станозолола. Митохондриальная дисфункция → снижение АТФ → апоптоз.' },
@@ -5766,6 +5789,37 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
                   <div key={i} style={{ padding:'10px 12px', borderRadius:8, marginBottom:6, background:'rgba(236,72,153,0.04)', border:'1px solid rgba(236,72,153,0.12)' }}>
                     <div style={{ fontSize:11, fontWeight:700, color:'#f472b6', marginBottom:4 }}>{m.title}</div>
                     <div style={{ fontSize:9, color:'var(--text-dim)', lineHeight:1.5 }}>{m.desc}</div>
+                  </div>
+                ))}
+              </div>
+
+              {/* AAS Risk Classification Table */}
+              <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:14, border:'1px solid var(--border)' }}>
+                <h4 style={{ margin:'0 0 10px', fontSize:13, color:'#f97316' }}>⚠️ Классификация нейротоксичности ААС</h4>
+                <p style={{ fontSize:9, color:'var(--text-dim)', margin:'0 0 10px', lineHeight:1.4 }}>Относительный риск (1-10) на основе проницаемости ГЭБ, окислительного стресса, глутаматной токсичности и подавления нейротрофических факторов.</p>
+                {[
+                  { name:'Тренболон', score:10, color:'#ef4444', desc:'ГЭБ проницаемость + окислительный стресс + глутаматная токсичность' },
+                  { name:'Нандролон', score:8, color:'#ef4444', desc:'Снижение BDNF, нейровоспаление' },
+                  { name:'Станозолол', score:7, color:'#f97316', desc:'ГАМК-дисфункция, BDNF подавление' },
+                  { name:'Метандиенон', score:6, color:'#f97316', desc:'Эстрогеновая активность, гепатотоксичность' },
+                  { name:'Болденон', score:5, color:'#f59e0b', desc:'Гематокрит + эритроцитоз → гипоксия мозга' },
+                  { name:'Тестостерон (>500 мг)', score:4, color:'#f59e0b', desc:'Дозозависимая AR-гиперстимуляция' },
+                  { name:'Оксандролон', score:3, color:'#22c55e', desc:'Низкая андрогенность, ГЭБ ограничен' },
+                  { name:'Мастерон', score:3, color:'#22c55e', desc:'DHT-нейростероидные эффекты' },
+                  { name:'Примоболан', score:2, color:'#22c55e', desc:'Минимальная нейротоксичность' },
+                ].map((drug, di) => (
+                  <div key={di} style={{ display:'flex', alignItems:'center', gap:8, padding:'6px 8px', borderRadius:6, marginBottom:4, background:'rgba(255,255,255,0.02)', border:'1px solid var(--border)' }}>
+                    <div style={{ flex:1 }}>
+                      <div style={{ fontSize:10, fontWeight:600, color:'var(--text-light)' }}>{drug.name}</div>
+                      <div style={{ fontSize:8, color:'var(--text-dim)', marginTop:1 }}>{drug.desc}</div>
+                    </div>
+                    <div style={{ width:80, textAlign:'center' }}>
+                      <span style={{ fontSize:16, fontWeight:800, color:drug.color }}>{drug.score}</span>
+                      <span style={{ fontSize:10, fontWeight:600, color:'var(--text-dim)' }}>/10</span>
+                    </div>
+                    <div style={{ width:80, height:4, borderRadius:2, background:'rgba(255,255,255,0.06)', overflow:'hidden' }}>
+                      <div style={{ width:`${drug.score * 10}%`, height:'100%', borderRadius:2, background:drug.color }} />
+                    </div>
                   </div>
                 ))}
               </div>
@@ -5784,24 +5838,33 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
                     { name:'NAC', dose:'1200-2400 мг/день', note:'Предшественник глутатиона, мощный антиоксидант, защищает нейроны от окислительного стресса' },
                     { name:'Omega-3 (EPA+DHA)', dose:'3-5 г/день', note:'Нейропротекция через резолвины, антивоспалительное, поддержка мембран нейронов' },
                     { name:'Magnesium L-Threonate', dose:'1000-2000 мг/день', note:'Единственная форма магния, эффективно преодолевающая ГЭБ, NMDA-модуляция, защита от эксайтотоксичности' },
+                    { name:'Таурин', dose:'2-3 г/день', note:'ГАМК-агонист, осморегуляция нейронов, защита от эксайтотоксичности' },
+                    { name:'Глицин', dose:'3 г/день', note:'Тормозной нейромедиатор, улучшение качества сна, модуляция NMDA-рецепторов' },
                   ]},
                   { tier:'БАЗА', label:'При дозах >500 мг/нед', color:'#f59e0b', items:[
                     { name:'Alpha-Lipoic Acid (ALA)', dose:'600 мг/день', note:'Митохондриальный антиоксидант, хелатор металлов, регенерирует глутатион и витамины C/E' },
                     { name:'CoQ10 (убихинол)', dose:'200-400 мг/день', note:'Защита митохондрий нейронов, электрон-транспортная цепь, снижение перекисного окисления' },
                     { name:'Pregnenolone', dose:'10-30 мг/день', note:'Нейростероид-предшественник. Восполняет подавленный синтез нейростероидов при ААС. Улучшает когницию и настроение.' },
+                    { name:'Агмантин', dose:'1-2 г/день', note:'Модулятор NMDA-рецепторов, NO-донатор, нейропротекция через полиаминовый путь' },
+                    { name:'Альфа-GPC', dose:'300-600 мг/день', note:'Высокобиодоступный источник холина, синтез ацетилхолина, когнитивная поддержка' },
                   ]},
                   { tier:'УСИЛЕНИЕ', label:'При тренболоне/нандролоне', color:'#f97316', items:[
                     { name:'Lion\'s Mane (ежовик)', dose:'1-3 г/день', note:'Стимулирует NGF (фактор роста нервов), нейрогенез в гиппокампе, миелинизацию' },
                     { name:'DHEA', dose:'25-50 мг/день', note:'Нейростероид, восстанавливает GABA-A модуляцию, снижает депрессивные симптомы' },
                     { name:'Phosphatidylserine', dose:'300-600 мг/день', note:'Фосфолипид мембран нейронов, поддерживает текучесть мембран, снижает кортизол' },
                     { name:'Ginkgo Biloba', dose:'120-240 мг/день', note:'Церебральный кровоток, антиоксидант, ингибитор PAF' },
+                    { name:'Бромантан', dose:'50-100 мг/день', note:'Актопротектор с нейропротективным действием, повышение физической и умственной работоспособности' },
+                    { name:'Фасорацетам', dose:'100-200 мг/день', note:'AMPA-модулятор, нейропротекция через глутаматную регуляцию, улучшение памяти' },
+                    { name:'Гуперзин А', dose:'50-100 мкг/день', note:'Ингибитор ацетилхолинэстеразы, повышение уровня ацетилхолина, когнитивная поддержка' },
                   ]},
                   { tier:'МАКСИМУМ', label:'При нейросимптомах', color:'#ef4444', items:[
                     { name:'Bacopa Monnieri', dose:'300-600 мг/день', note:'Улучшение памяти и когниции, дендритное ветвление, антиоксидант' },
                     { name:'L-Theanine', dose:'200-400 мг/день', note:'ГАМК-модуляция без седации, повышение альфа-волн мозга, снижение тревожности' },
                     { name:'Citicoline', dose:'500-1000 мг/день', note:'Источник цитидина и холина, синтез ацетилхолина, стабилизация мембран нейронов' },
                     { name:'Noopept', dose:'10-30 мг/день', note:'Повышение BDNF и NGF, улучшение памяти и когнитивных функций' },
-                    { name:'Cerebrolysin (инъекционно)', dose:'5-10 мл/день', note:'Нейропептидный комплекс, нейрогенез, нейропротекция, нейропластичность. Только под медицинским контролем.' },
+                    { name:'Семакс', dose:'1-3 мг/день', note:'Нейропептид, повышение BDNF, нейрогенез, ноотропное и нейропротективное действие' },
+                    { name:'Кортексин', dose:'10 мг/день', note:'Полипептидный комплекс коры головного мозга, нейропротекция, нейрорепарация' },
+                    { name:'Церебролизин (инъекционно)', dose:'5-10 мл/день', note:'Мультимодальная нейропротекция: нейрогенез, нейропластичность, нейротрофический каскад. Под мед. контролем.' },
                   ]},
                 ].map((tier, ti) => (
                   <div key={ti} style={{ padding:'10px 12px', borderRadius:10, marginBottom:8, background:`${tier.color}0a`, border:`1px solid ${tier.color}22` }}>
