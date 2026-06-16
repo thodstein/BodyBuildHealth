@@ -365,6 +365,11 @@ const MealPlanExtended: React.FC<{ tKcal: number; tProt: number; tFat: number; t
   const [indivDairyFree, setIndivDairyFree] = React.useState(s?.dietRestrictions?.includes('dairy') || false);
   const [indivGlutenFree, setIndivGlutenFree] = React.useState(s?.dietRestrictions?.includes('gluten') || false);
   const [indivFishFree, setIndivFishFree] = React.useState(false);
+  const [indivInsulinBinding, setIndivInsulinBinding] = React.useState(false);
+  const [indivGHBinding, setIndivGHBinding] = React.useState(false);
+  const [indivIGFBinding, setIndivIGFBinding] = React.useState(false);
+  const [indivInsulinTime, setIndivInsulinTime] = React.useState('12:00');
+  const [indivGHTime, setIndivGHTime] = React.useState('08:00');
 
   const RECOMMENDED_IDS: Record<string, string[]> = {
     'protein': ['turkey_breast', 'chicken_breast', 'egg_whole', 'egg_white', 'beef_lean', 'salmon', 'shrimp', 'tuna_steak'],
@@ -385,6 +390,8 @@ const MealPlanExtended: React.FC<{ tKcal: number; tProt: number; tFat: number; t
     const vegFoods = FOOD_DB.filter(f => RECOMMENDED_IDS.veg.includes(f.id) && f.category === 'veg_fruit');
 
     const trainHour = parseInt(indivTrainTime.split(':')[0]);
+    const insulinHour = indivInsulinBinding ? parseInt(indivInsulinTime.split(':')[0]) : -1;
+    const ghHour = indivGHBinding ? parseInt(indivGHTime.split(':')[0]) : -1;
 
     const mealTimes = (() => {
       const n = indivMeals;
@@ -408,9 +415,19 @@ const MealPlanExtended: React.FC<{ tKcal: number; tProt: number; tFat: number; t
       const isMorning = h < 11;
       const isEvening = h >= 18;
 
+      // GH/insulin/IGF binding flags
+      const isInsulinMeal = indivInsulinBinding && (h === insulinHour || h === insulinHour + 1);
+      const isGHNoCarb = indivGHBinding && Math.abs(h - ghHour) <= 1;
+      const isIGFProtein = indivIGFBinding && Math.abs(h - ghHour) <= 1;
+
       const targetP = Math.round(indivProt / indivMeals);
-      const targetC = isPreWorkout || isPostWorkout ? Math.round(indivCarbs * 0.25) : isEvening ? Math.round(indivCarbs * 0.1) : Math.round(indivCarbs * 0.15);
-      const targetF = isPreWorkout || isPostWorkout ? 0 : isMorning ? Math.round(indivFat * 0.25) : Math.round(indivFat * 0.15);
+      const targetC = isGHNoCarb ? 0 : (isInsulinMeal ? Math.round(indivCarbs * 0.4) : isPreWorkout || isPostWorkout ? Math.round(indivCarbs * 0.25) : isEvening ? Math.round(indivCarbs * 0.1) : Math.round(indivCarbs * 0.15));
+      const targetF = isGHNoCarb || isPreWorkout || isPostWorkout ? 0 : isMorning ? Math.round(indivFat * 0.25) : Math.round(indivFat * 0.15);
+
+      const bindingTags: string[] = [];
+      if (isInsulinMeal) bindingTags.push('инсулин');
+      if (isGHNoCarb) bindingTags.push('ГР');
+      if (isIGFProtein) bindingTags.push('ИФР-1/MGF');
 
       const items: { foodName: string; amount: number; kcal: number; p: number; f: number; c: number }[] = [];
 
@@ -489,6 +506,8 @@ const MealPlanExtended: React.FC<{ tKcal: number; tProt: number; tFat: number; t
           carbs: items.reduce((s, it) => s + it.c, 0),
         },
         isPreWorkout, isPostWorkout,
+        isInsulinMeal, isGHNoCarb, isIGFProtein,
+        bindingTags,
       };
     });
 
@@ -812,6 +831,39 @@ const MealPlanExtended: React.FC<{ tKcal: number; tProt: number; tFat: number; t
         </div>
       </div>
 
+      <div className="card" style={{ marginBottom: 8, padding: 14 }}>
+        <h4 style={{ margin: '0 0 10px', fontSize: 13, color: 'var(--accent)' }}>📊 Качество белка</h4>
+        <p style={{ fontSize: 9, color: 'var(--text-dim)', margin: '0 0 8px' }}>
+          Оценка источников белка по шкале 1–10 (аминокислотный профиль, биодоступность, содержание жира, универсальность)
+        </p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          {[
+            { name: 'Куриная грудка', score: 9, desc: 'Чистый белок, минимум жира, нейтральный вкус, универсальна' },
+            { name: 'Индейка', score: 9, desc: 'Как курица, чуть суше, больше цинка' },
+            { name: 'Яйца', score: 10, desc: 'Эталонный белок, полный аминокислотный профиль, биодоступность 98%' },
+            { name: 'Говядина постная', score: 8, desc: 'Креатин, железо, цинк, витамины B. Минус: насыщенные жиры' },
+            { name: 'Свинина (вырезка)', score: 7, desc: 'Хороший белок, витамин B1. Минус: больше жира, возможны добавки при выращивании' },
+            { name: 'Лосось', score: 9, desc: 'Омега-3, витамин D, высокий белок. Минус: цена, тяжёлые металлы при низком качестве' },
+            { name: 'Тунец', score: 8, desc: 'Отличный белок, низкий жир. Минус: ртуть (ограничивать до 2–3 порций/нед)' },
+            { name: 'Творог', score: 8, desc: 'Медленный казеин, кальций. Минус: лактоза (при непереносимости замена на безлактозный)' },
+            { name: 'Протеин сывороточный', score: 9, desc: 'Быстрое усвоение, полный профиль. Минус: искусственные подсластители в некоторых' },
+            { name: 'Соевый белок', score: 6, desc: 'Полный растительный профиль. Минус: фитоэстрогены, антинутриенты, ГМО в неорганическом' },
+            { name: 'Баранина', score: 7, desc: 'Хороший белок, цинк, B12. Минус: высокий насыщенный жир, специфичный вкус' },
+          ].map((p, j) => {
+            const scoreColor = p.score >= 9 ? '#22c55e' : p.score >= 7 ? '#f59e0b' : p.score >= 5 ? '#f97316' : '#ef4444';
+            return (
+              <div key={j} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0', borderBottom: j < 10 ? '1px solid rgba(255,255,255,0.04)' : 'none' }}>
+                <div style={{ minWidth: 32, height: 22, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', background: scoreColor + '15', color: scoreColor, fontWeight: 800, fontSize: 11 }}>{p.score}/10</div>
+                <div style={{ flex: 1 }}>
+                  <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--text)' }}>{p.name}</span>
+                  <span style={{ fontSize: 8, color: 'var(--text-dim)', marginLeft: 6 }}>— {p.desc}</span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
       <div className="card" style={{ marginBottom: 8, padding: 14, border: '1px solid rgba(239,68,68,0.2)', background: 'rgba(239,68,68,0.04)' }}>
         <h4 style={{ margin: '0 0 8px', fontSize: 13, color: '#ef4444' }}>⚠️ Ограничить</h4>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -879,6 +931,27 @@ const MealPlanExtended: React.FC<{ tKcal: number; tProt: number; tFat: number; t
             Без рыбы
           </label>
         </div>
+        <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-light)', margin: '8px 0 4px' }}>💉 Привязка к гормонам (GH/Инсулин)</div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
+          <label style={{ fontSize: 10, display: 'flex', alignItems: 'center', gap: 4, color: 'var(--text-dim)' }}>
+            <input type="checkbox" checked={indivInsulinBinding} onChange={e => setIndivInsulinBinding(e.target.checked)} style={{ accentColor: 'var(--accent)' }} />
+            Привязка к инсулину
+          </label>
+          {indivInsulinBinding && (
+            <input type="time" value={indivInsulinTime} onChange={e => setIndivInsulinTime(e.target.value)} style={{ padding: '3px 6px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 10, boxSizing: 'border-box' }} />
+          )}
+          <label style={{ fontSize: 10, display: 'flex', alignItems: 'center', gap: 4, color: 'var(--text-dim)' }}>
+            <input type="checkbox" checked={indivGHBinding} onChange={e => setIndivGHBinding(e.target.checked)} style={{ accentColor: 'var(--accent)' }} />
+            Привязка к ГР (GH)
+          </label>
+          {indivGHBinding && (
+            <input type="time" value={indivGHTime} onChange={e => setIndivGHTime(e.target.value)} style={{ padding: '3px 6px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 10, boxSizing: 'border-box' }} />
+          )}
+          <label style={{ fontSize: 10, display: 'flex', alignItems: 'center', gap: 4, color: 'var(--text-dim)' }}>
+            <input type="checkbox" checked={indivIGFBinding} onChange={e => setIndivIGFBinding(e.target.checked)} style={{ accentColor: 'var(--accent)' }} />
+            Привязка к ИФР-1/MGF
+          </label>
+        </div>
         <button onClick={generateIndividualPlan} style={{
           width: '100%', padding: 10, borderRadius: 10, border: 'none', cursor: 'pointer',
           background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)', color: '#fff',
@@ -907,6 +980,9 @@ const MealPlanExtended: React.FC<{ tKcal: number; tProt: number; tFat: number; t
                     {meal.label}
                     {meal.isPreWorkout && <span style={{ fontSize: 8, color: '#8b5cf6', marginLeft: 6 }}>🏋️ предтрен</span>}
                     {meal.isPostWorkout && <span style={{ fontSize: 8, color: '#3b82f6', marginLeft: 6 }}>💪 пост-трен</span>}
+                    {meal.isInsulinMeal && <span style={{ fontSize: 8, color: '#06b6d4', marginLeft: 6 }}>💉 инсулин</span>}
+                    {meal.isGHNoCarb && <span style={{ fontSize: 8, color: '#a855f7', marginLeft: 6 }}>🧬 ГР (без угл)</span>}
+                    {meal.isIGFProtein && <span style={{ fontSize: 8, color: '#ec4899', marginLeft: 6 }}>🧪 ИФР-1/MGF</span>}
                   </div>
                   <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 1 }}>
                     Б:{meal.totals.protein}г Ж:{meal.totals.fat}г У:{meal.totals.carbs}г | {meal.totals.kcal} ккал

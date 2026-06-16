@@ -2865,6 +2865,246 @@ const GOAL_FILTER_OPTIONS: { value: string; label: string; goal?: string }[] = [
   { value: 'strength', label: 'Сила' },
   { value: 'hypertrophy', label: 'Масса' },
   { value: 'peaking', label: 'Сушка' },
+  { value: 'women', label: 'Женские' },
+  { value: 'custom', label: 'Авторские' },
+];
+
+const WOMENS_PROGRAMS: import('../../engines/complete-program-library.engine').FullProgram[] = [
+  {
+    id: 'women_glutes_hips', name: 'Ягодицы и бёдра (Женский)', author: 'Health Engine',
+    type: 'Lower Body 4x/week', goal: 'hypertrophy', level: 'intermediate',
+    durationWeeks: 8, daysPerWeek: 4, sessionTimeMin: '50-65',
+    description: 'Специализированная программа для женщин с акцентом на ягодицы и бёдра. 4 дня в неделю: два нижних дня (тяжёлый и пампинг), один верхний лёгкий, один фулбоди.',
+    targetAudience: 'Женщины со средним опытом тренировок, которые хотят акцентировать ягодицы и бёдра, сохраняя баланс верха.',
+    equipmentNeeded: ['barbell', 'dumbbell', 'cable', 'band'],
+    warnings: ['Прогрессируйте постепенно в hip thrust.', 'Следите за техникой в Bulgarian split squat.', 'Не пропускайте разминку тазобедренных суставов.'],
+    expectedResults: 'Рост ягодичных мышц, улучшение формы бёдер, подтянутый верх тела.',
+    progressionModel: 'Линейная: +2.5 кг/нед базовые упражнения, +1 повтор/нед изоляция.',
+    deloadProtocol: 'Каждые 4 недели: снижение объёма на 40%, RPE 6-7.',
+    customization: ['Заменить cable kickback на banded glute bridge при отсутствии блока.', 'Добавить abductor если отстаёт средняя ягодичная.', 'Заменить sumo deadlift на RDL при проблемах с поясницей.'],
+    weeks: [{
+      week: 1, phase: 'accumulation', volumeMultiplier: 1.0, intensityMultiplier: 1.0, deload: false,
+      days: [
+        { day: 1, name: 'День 1: Ягодицы (тяжёлый)', focus: 'Glutes + Hamstrings', warmup: 'Hip circles, glute activation band',
+          exercises: [
+            { name: 'Hip Thrust', sets: 5, reps: '8-12', rpe: 8, rir: 2, restSec: 120, notes: 'Прогрессия веса', progression: '+2.5 кг/нед' },
+            { name: 'Bulgarian Split Squat', sets: 4, reps: '10-12', rpe: 7.5, rir: 2.5, restSec: 90, notes: 'На каждую ногу', progression: '+1 повтор/нед' },
+            { name: 'Romanian Deadlift', sets: 4, reps: '10-12', rpe: 7.5, rir: 2.5, restSec: 90, notes: 'Контроль эксцентрики', progression: '+2.5 кг/нед' },
+            { name: 'Cable Kickback', sets: 4, reps: '15', rpe: 7, rir: 3, restSec: 60, notes: 'Пиковое сокращение', progression: '+2.5 кг/нед' },
+            { name: 'Abductor Machine', sets: 4, reps: '15-20', rpe: 7, rir: 3, restSec: 45, notes: 'Медленно, с задержкой', progression: '+5 кг/нед' },
+            { name: 'Glute Bridge', sets: 3, reps: '15', rpe: 6, rir: 4, restSec: 45, notes: 'Завершающее', progression: 'Вес тела → резинка' },
+          ], cooldown: 'Stretch hip flexors, hamstrings, glutes' },
+        { day: 2, name: 'День 2: Верх (лёгкий)', focus: 'Upper Body Light', warmup: 'Arm circles, shoulder dislocators',
+          exercises: [
+            { name: 'Lat Pulldown', sets: 3, reps: '12', rpe: 7, rir: 3, restSec: 75, notes: 'Широкий хват', progression: '+2.5 кг/нед' },
+            { name: 'Seated Cable Row', sets: 3, reps: '12', rpe: 7, rir: 3, restSec: 75, notes: 'V-образная рукоять', progression: '+2.5 кг/нед' },
+            { name: 'Lateral Raise', sets: 4, reps: '15', rpe: 7, rir: 3, restSec: 60, notes: 'Лёгкий вес, много повторений', progression: '+1 кг/нед' },
+            { name: 'Face Pull', sets: 3, reps: '15', rpe: 6.5, rir: 3.5, restSec: 60, notes: 'Здоровье плеч', progression: '+2.5 кг/нед' },
+            { name: 'Tricep Pushdown', sets: 3, reps: '15', rpe: 7, rir: 3, restSec: 45, notes: 'Верёвка или прямая рукоять', progression: '+2.5 кг/нед' },
+            { name: 'Bicep Curl', sets: 3, reps: '15', rpe: 7, rir: 3, restSec: 45, notes: 'Гантели или штанга', progression: '+1 кг/нед' },
+          ], cooldown: 'Stretch chest, shoulders, triceps' },
+        { day: 3, name: 'День 3: Ягодицы (пампинг)', focus: 'Glutes Pump', warmup: 'Banded glute activation, hip mobility',
+          exercises: [
+            { name: 'Hip Thrust (Heavy)', sets: 5, reps: '6-10', rpe: 8.5, rir: 1.5, restSec: 120, notes: 'Тяжелее дня 1', progression: '+2.5 кг/нед' },
+            { name: 'Sumo Deadlift', sets: 4, reps: '8-10', rpe: 8, rir: 2, restSec: 120, notes: 'Широкая постановка', progression: '+5 кг/нед' },
+            { name: 'Walking Lunge', sets: 4, reps: '12/leg', rpe: 7.5, rir: 2.5, restSec: 60, notes: 'Гантели в руках', progression: '+1 повтор/нед' },
+            { name: 'Leg Press (High)', sets: 4, reps: '12', rpe: 7, rir: 3, restSec: 90, notes: 'Высокая постановка ног', progression: '+5 кг/нед' },
+            { name: 'Cable Pull-Through', sets: 4, reps: '15', rpe: 7, rir: 3, restSec: 60, notes: 'Шарнир таза', progression: '+2.5 кг/нед' },
+          ], cooldown: 'Stretch glutes, hamstrings, adductors' },
+        { day: 4, name: 'День 4: Фулбоди', focus: 'Full Body Toning', warmup: 'Dynamic stretching, light cardio',
+          exercises: [
+            { name: 'Goblet Squat', sets: 3, reps: '12', rpe: 7, rir: 3, restSec: 75, notes: 'Гантель/гиря у груди', progression: '+2.5 кг/нед' },
+            { name: 'Dumbbell Press', sets: 3, reps: '12', rpe: 7, rir: 3, restSec: 75, notes: 'Лёгкий жим на плечи/грудь', progression: '+1 кг/нед' },
+            { name: 'Single Leg RDL', sets: 3, reps: '12', rpe: 7, rir: 3, restSec: 60, notes: 'Баланс + задняя цепь', progression: '+1 кг/нед' },
+            { name: 'Banded Glute Bridge', sets: 4, reps: '20', rpe: 6, rir: 4, restSec: 45, notes: 'Пампинг', progression: 'Толще резинка' },
+            { name: 'Plank', sets: 3, reps: '60s', rpe: 6, rir: 4, restSec: 45, notes: 'Удержание', progression: '+5 сек/нед' },
+          ], cooldown: 'Full body stretch' },
+      ],
+    }],
+  },
+  {
+    id: 'women_hourglass', name: 'Песочные часы (Женский)', author: 'Health Engine',
+    type: 'Glutes + Shoulders 4x/week', goal: 'hypertrophy', level: 'intermediate',
+    durationWeeks: 8, daysPerWeek: 4, sessionTimeMin: '50-60',
+    description: 'Программа для создания пропорций "песочные часы": акцент на ягодицы и плечи для визуального сужения талии. 4 дня: тяжёлые ягодицы, плечи+спина, пампинг ягодиц, фулбоди тонинг.',
+    targetAudience: 'Женщины, которые хотят визуально расширить плечи и ягодицы для пропорции песочных часов.',
+    equipmentNeeded: ['barbell', 'dumbbell', 'cable', 'band'],
+    warnings: ['Не перегружайте плечи — они получают объём и в день спины.', 'Следите за осанкой в жимах над головой.', 'Пампинг-день должен быть с коротким отдыхом.'],
+    expectedResults: 'Визуальное расширение плечевого пояса и ягодиц, сужение талии за счёт пропорций.',
+    progressionModel: 'Двойная: +2.5 кг базовые/нед, +1 повтор изоляция/нед.',
+    deloadProtocol: 'Каждые 5 недель: снижение объёма на 50%, RPE 5-6.',
+    customization: ['Заменить OHP на Arnold press при проблемах с плечами.', 'Добавить abductor в пампинг-день.', 'Заменить hip thrust на glute bridge при дискомфорте.'],
+    weeks: [{
+      week: 1, phase: 'accumulation', volumeMultiplier: 1.0, intensityMultiplier: 1.0, deload: false,
+      days: [
+        { day: 1, name: 'День 1: Ягодицы (тяжёлый)', focus: 'Glutes Heavy', warmup: 'Hip activation, glute bridges',
+          exercises: [
+            { name: 'Hip Thrust', sets: 5, reps: '6-10', rpe: 8.5, rir: 1.5, restSec: 120, notes: 'Основное движение', progression: '+2.5 кг/нед' },
+            { name: 'Bulgarian Split Squat', sets: 4, reps: '8-10', rpe: 8, rir: 2, restSec: 90, notes: 'На каждую ногу', progression: '+2.5 кг/нед' },
+            { name: 'Sumo Deadlift', sets: 4, reps: '8-10', rpe: 8, rir: 2, restSec: 120, notes: 'Широкая стойка', progression: '+5 кг/нед' },
+            { name: 'Leg Press (High)', sets: 4, reps: '10-12', rpe: 7.5, rir: 2.5, restSec: 90, notes: 'Высокие ноги', progression: '+5 кг/нед' },
+            { name: 'Cable Kickback', sets: 3, reps: '15', rpe: 7, rir: 3, restSec: 60, notes: 'Пик сокращения', progression: '+2.5 кг/нед' },
+          ], cooldown: 'Stretch glutes, hip flexors, hamstrings' },
+        { day: 2, name: 'День 2: Плечи + спина', focus: 'Shoulders + Back', warmup: 'Arm circles, band pull-aparts',
+          exercises: [
+            { name: 'Overhead Press', sets: 4, reps: '8-10', rpe: 8, rir: 2, restSec: 90, notes: 'Штанга или гантели', progression: '+2.5 кг/нед' },
+            { name: 'Lateral Raise', sets: 5, reps: '12-15', rpe: 7.5, rir: 2.5, restSec: 60, notes: 'Много объёма', progression: '+1 повтор/нед' },
+            { name: 'Lat Pulldown', sets: 4, reps: '10-12', rpe: 7.5, rir: 2.5, restSec: 75, notes: 'Широкий хват', progression: '+2.5 кг/нед' },
+            { name: 'Face Pull', sets: 4, reps: '15', rpe: 7, rir: 3, restSec: 60, notes: 'Задняя дельта + здоровье', progression: '+2.5 кг/нед' },
+            { name: 'Seated Cable Row', sets: 3, reps: '12', rpe: 7, rir: 3, restSec: 75, notes: 'Толщина спины', progression: '+2.5 кг/нед' },
+            { name: 'Rear Delt Fly', sets: 3, reps: '15', rpe: 6.5, rir: 3.5, restSec: 60, notes: 'Лёгкий вес', progression: '+1 кг/нед' },
+          ], cooldown: 'Stretch shoulders, lats, traps' },
+        { day: 3, name: 'День 3: Ягодицы (пампинг)', focus: 'Glutes Pump', warmup: 'Banded activation, hip mobility',
+          exercises: [
+            { name: 'Hip Thrust', sets: 4, reps: '12-15', rpe: 7, rir: 3, restSec: 60, notes: 'Пампинг-вес', progression: '+2.5 кг/нед' },
+            { name: 'Abductor Machine', sets: 5, reps: '15-20', rpe: 7, rir: 3, restSec: 45, notes: 'Много объёма', progression: '+5 кг/нед' },
+            { name: 'Cable Pull-Through', sets: 4, reps: '15', rpe: 7, rir: 3, restSec: 60, notes: 'Шарнир', progression: '+2.5 кг/нед' },
+            { name: 'Banded Glute Bridge', sets: 4, reps: '20', rpe: 6, rir: 4, restSec: 30, notes: 'Пампинг до жжения', progression: 'Толще резинка' },
+            { name: 'Step-Up', sets: 3, reps: '12', rpe: 7, rir: 3, restSec: 60, notes: 'На каждую ногу', progression: '+2.5 кг/нед' },
+          ], cooldown: 'Stretch glutes, adductors, calves' },
+        { day: 4, name: 'День 4: Фулбоди тонинг', focus: 'Full Body Toning', warmup: 'Dynamic stretching, light cardio',
+          exercises: [
+            { name: 'Goblet Squat', sets: 3, reps: '12', rpe: 7, rir: 3, restSec: 75, notes: 'Гантель/гиря', progression: '+2.5 кг/нед' },
+            { name: 'Dumbbell Press', sets: 3, reps: '12', rpe: 7, rir: 3, restSec: 75, notes: 'Верх тела', progression: '+1 кг/нед' },
+            { name: 'Romanian Deadlift', sets: 3, reps: '12', rpe: 7, rir: 3, restSec: 90, notes: 'Лёгкий вес', progression: '+2.5 кг/нед' },
+            { name: 'Plank', sets: 3, reps: '60s', rpe: 6, rir: 4, restSec: 45, notes: 'Кор', progression: '+5 сек/нед' },
+            { name: 'Bird Dog', sets: 3, reps: '10/side', rpe: 5, rir: 5, restSec: 30, notes: 'Стабильность кора', progression: '' },
+          ], cooldown: 'Full body stretch' },
+      ],
+    }],
+  },
+  {
+    id: 'women_start', name: 'Старт (Женский, начинающие)', author: 'Health Engine',
+    type: 'Full Body 3x/week', goal: 'hypertrophy', level: 'beginner',
+    durationWeeks: 6, daysPerWeek: 3, sessionTimeMin: '40-50',
+    description: 'Программа для начинающих женщин. 3 тренировки в неделю на всё тело. Простые, безопасные упражнения с акцентом на технику и привыкание к нагрузкам.',
+    targetAudience: 'Женщины, которые только начинают заниматься в зале (0-3 месяца опыта).',
+    equipmentNeeded: ['dumbbell', 'cable', 'band'],
+    warnings: ['Начинайте с малых весов — техника важнее.', 'Если чувствуете боль в пояснице в RDL — уменьшите вес.', 'Не стесняйтесь использовать тренажёры для привыкания.'],
+    expectedResults: 'Освоение базовых движений, тонус мышц, привычка к режиму 3 раза в неделю.',
+    progressionModel: 'Линейная: +2.5 кг/нед верх, +5 кг/нед низ (первые 6 недель).',
+    deloadProtocol: 'Неделя 6: снижение объёма на 30%, работа над техникой.',
+    customization: ['Заменить DB Press на Smith Machine Press для уверенности.', 'Добавить cardio 10-15 мин после тренировки.', 'Заменить plank на dead bug при дискомфорте в пояснице.'],
+    weeks: [{
+      week: 1, phase: 'accumulation', volumeMultiplier: 1.0, intensityMultiplier: 1.0, deload: false,
+      days: [
+        { day: 1, name: 'День 1: Фулбоди', focus: 'Full Body', warmup: 'Light cardio 5 min, dynamic stretching',
+          exercises: [
+            { name: 'Goblet Squat', sets: 3, reps: '12', rpe: 6, rir: 4, restSec: 90, notes: 'Техника в приоритете', progression: '+2.5 кг/нед' },
+            { name: 'Dumbbell Press', sets: 3, reps: '12', rpe: 6, rir: 4, restSec: 75, notes: 'Гантели или Smith', progression: '+1 кг/нед' },
+            { name: 'Lat Pulldown', sets: 3, reps: '12', rpe: 6, rir: 4, restSec: 75, notes: 'Широкий хват', progression: '+2.5 кг/нед' },
+            { name: 'Romanian Deadlift', sets: 3, reps: '12', rpe: 6, rir: 4, restSec: 90, notes: 'Лёгкий вес, шарнир', progression: '+2.5 кг/нед' },
+            { name: 'Hip Thrust', sets: 3, reps: '15', rpe: 6, rir: 4, restSec: 75, notes: 'Техника тазового моста', progression: '+2.5 кг/нед' },
+            { name: 'Plank', sets: 3, reps: '30s', rpe: 5, rir: 5, restSec: 45, notes: 'Удержание', progression: '+5 сек/нед' },
+          ], cooldown: 'Full body stretch 5 min' },
+        { day: 2, name: 'День 2: Фулбоди', focus: 'Full Body', warmup: 'Light cardio 5 min, dynamic stretching',
+          exercises: [
+            { name: 'Goblet Squat', sets: 3, reps: '12', rpe: 6.5, rir: 3.5, restSec: 90, notes: '+2.5 кг от дня 1', progression: '+2.5 кг/нед' },
+            { name: 'Dumbbell Press', sets: 3, reps: '12', rpe: 6.5, rir: 3.5, restSec: 75, notes: 'Повторение дня 1', progression: '+1 кг/нед' },
+            { name: 'Lat Pulldown', sets: 3, reps: '12', rpe: 6.5, rir: 3.5, restSec: 75, notes: 'Узкий хват (вариант)', progression: '+2.5 кг/нед' },
+            { name: 'Romanian Deadlift', sets: 3, reps: '12', rpe: 6.5, rir: 3.5, restSec: 90, notes: 'Техника', progression: '+2.5 кг/нед' },
+            { name: 'Hip Thrust', sets: 3, reps: '15', rpe: 6, rir: 4, restSec: 75, notes: 'На полу', progression: '+2.5 кг/нед' },
+            { name: 'Plank', sets: 3, reps: '30s', rpe: 5, rir: 5, restSec: 45, notes: 'Кор', progression: '+5 сек/нед' },
+          ], cooldown: 'Full body stretch 5 min' },
+        { day: 3, name: 'День 3: Фулбоди', focus: 'Full Body', warmup: 'Light cardio 5 min, dynamic stretching',
+          exercises: [
+            { name: 'Goblet Squat', sets: 3, reps: '12', rpe: 7, rir: 3, restSec: 90, notes: 'Немного тяжелее', progression: '+2.5 кг/нед' },
+            { name: 'Dumbbell Press', sets: 3, reps: '12', rpe: 7, rir: 3, restSec: 75, notes: 'Увереннее вес', progression: '+1 кг/нед' },
+            { name: 'Lat Pulldown', sets: 3, reps: '12', rpe: 7, rir: 3, restSec: 75, notes: 'Обратный хват', progression: '+2.5 кг/нед' },
+            { name: 'Romanian Deadlift', sets: 3, reps: '12', rpe: 7, rir: 3, restSec: 90, notes: 'Контроль эксцентрики', progression: '+2.5 кг/нед' },
+            { name: 'Hip Thrust', sets: 3, reps: '15', rpe: 7, rir: 3, restSec: 75, notes: 'Скамья вариант', progression: '+2.5 кг/нед' },
+            { name: 'Plank', sets: 3, reps: '30s', rpe: 6, rir: 4, restSec: 45, notes: 'Боковая планка опционально', progression: '+5 сек/нед' },
+          ], cooldown: 'Full body stretch 5 min' },
+      ],
+    }],
+  },
+];
+
+const CUSTOM_PROGRAMS: import('../../engines/complete-program-library.engine').FullProgram[] = [
+  {
+    id: 'split_8day_advanced', name: '8-дневный сплит (Продвинутый)', author: 'Health Engine',
+    type: '8-Day Rotating Split', goal: 'hypertrophy', level: 'advanced',
+    durationWeeks: 8, daysPerWeek: 8, sessionTimeMin: '60-75',
+    description: 'Продвинутый 8-дневный сплит с чередованием тяжёлых и пампинговых тренировок. Дни: квадрицепс тяжёлый, грудь пампинг, спина тяжёлая, кардио/восстановление, бицепс бедра тяжёлый, грудь тяжёлая, спина пампинг, полный отдых. Каждая мышечная группа прорабатывается дважды за цикл с разной интенсивностью.',
+    targetAudience: 'Продвинутые атлеты (2+ года опыта), использующие фармакологическую поддержку.',
+    equipmentNeeded: ['barbell', 'dumbbell', 'cable', 'machine', 'rack', 'bench'],
+    warnings: ['Только для опытных атлетов.', 'Строго соблюдайте дни отдыха.', 'При признаках перетренированности — добавьте день восстановления.', 'Контролируйте объём: не более 20-25 рабочих подходов за тренировку.'],
+    expectedResults: 'Максимальная гипертрофия при достаточном восстановлении. Специализация на отстающих группах через двойную частоту.',
+    progressionModel: 'Волновая: тяжёлые дни +2.5 кг/цикл, пампинг-дни +1 повтор/цикл.',
+    deloadProtocol: 'После 2 полных циклов (16 дней): снижение объёма на 50%, RPE 5-6, активное восстановление.',
+    customization: ['Менять порядок дней под свой график.', 'Заменять кардио-день на активное восстановление (йога, плавание).', 'Регулировать RIR в тяжёлых днях: 1-2 для базы, 2-3 для изоляции.'],
+    weeks: [{
+      week: 1, phase: 'accumulation', volumeMultiplier: 1.0, intensityMultiplier: 1.0, deload: false,
+      days: [
+        { day: 1, name: 'Д1: Квадрицепс Heavy + бицепс бедра', focus: 'Quadriceps Heavy + Hamstrings', warmup: 'Leg extensions (ramp-up), light squats',
+          exercises: [
+            { name: 'Barbell Squat', sets: 4, reps: '5-8', rpe: 8.5, rir: 1.5, restSec: 180, notes: 'Основное движение', progression: '+2.5 кг/цикл' },
+            { name: 'Leg Press', sets: 4, reps: '8-10', rpe: 8, rir: 2, restSec: 120, notes: 'Высокая постановка', progression: '+5 кг/цикл' },
+            { name: 'Leg Extension', sets: 3, reps: '12', rpe: 7.5, rir: 2.5, restSec: 75, notes: 'Пиковое сокращение', progression: '+2.5 кг/цикл' },
+            { name: 'Romanian Deadlift', sets: 4, reps: '8-10', rpe: 8, rir: 2, restSec: 120, notes: 'Бицепс бедра', progression: '+2.5 кг/цикл' },
+            { name: 'Lying Leg Curl', sets: 3, reps: '12', rpe: 7.5, rir: 2.5, restSec: 75, notes: 'Изоляция', progression: '+2.5 кг/цикл' },
+            { name: 'Standing Calf Raise', sets: 4, reps: '15', rpe: 7, rir: 3, restSec: 60, notes: 'Икры', progression: '+5 кг/цикл' },
+          ], cooldown: 'Stretch quads, hamstrings, calves' },
+        { day: 2, name: 'Д2: Грудь Pump + дельта + трицепс', focus: 'Chest Pump + Delts + Triceps', warmup: 'Cable fly light, band pull-aparts',
+          exercises: [
+            { name: 'Incline Dumbbell Press', sets: 4, reps: '12-15', rpe: 7.5, rir: 2.5, restSec: 75, notes: 'Пампинг-вес', progression: '+1 повтор/цикл' },
+            { name: 'Pec Deck Fly', sets: 4, reps: '15', rpe: 7, rir: 3, restSec: 60, notes: 'Растяжка + сокращение', progression: '+2.5 кг/цикл' },
+            { name: 'Cable Crossover', sets: 3, reps: '15', rpe: 7, rir: 3, restSec: 45, notes: 'Нижний/средний/верхний блок', progression: '+2.5 кг/цикл' },
+            { name: 'Lateral Raise', sets: 4, reps: '15-20', rpe: 7.5, rir: 2.5, restSec: 60, notes: 'Много объёма', progression: '+1 повтор/цикл' },
+            { name: 'Overhead Tricep Extension', sets: 3, reps: '12-15', rpe: 7.5, rir: 2.5, restSec: 60, notes: 'Длинная головка', progression: '+2.5 кг/цикл' },
+            { name: 'Tricep Pushdown', sets: 3, reps: '15', rpe: 7, rir: 3, restSec: 45, notes: 'Верёвка', progression: '+2.5 кг/цикл' },
+          ], cooldown: 'Stretch chest, shoulders, triceps' },
+        { day: 3, name: 'Д3: Спина Heavy + задняя дельта + бицепс', focus: 'Back Heavy + Rear Delts + Biceps', warmup: 'Lat pulldown ramp-up, band pull-aparts',
+          exercises: [
+            { name: 'Deadlift', sets: 3, reps: '3-5', rpe: 9, rir: 1, restSec: 240, notes: 'Тяжёлая работа', progression: '+5 кг/цикл' },
+            { name: 'Barbell Row', sets: 4, reps: '6-8', rpe: 8.5, rir: 1.5, restSec: 150, notes: 'Строгий торс', progression: '+2.5 кг/цикл' },
+            { name: 'Weighted Pull-Up', sets: 4, reps: '5-8', rpe: 8.5, rir: 1.5, restSec: 120, notes: 'С доп. весом', progression: '+1.25 кг/цикл' },
+            { name: 'T-Bar Row', sets: 3, reps: '8-10', rpe: 8, rir: 2, restSec: 120, notes: 'Толщина спины', progression: '+2.5 кг/цикл' },
+            { name: 'Rear Delt Fly', sets: 4, reps: '12-15', rpe: 7.5, rir: 2.5, restSec: 60, notes: 'Задняя дельта', progression: '+1 кг/цикл' },
+            { name: 'Barbell Curl', sets: 3, reps: '8-10', rpe: 8, rir: 2, restSec: 75, notes: 'Бицепс тяжёлый', progression: '+2.5 кг/цикл' },
+            { name: 'Hammer Curl', sets: 3, reps: '12', rpe: 7.5, rir: 2.5, restSec: 60, notes: 'Брахиалис', progression: '+1 кг/цикл' },
+          ], cooldown: 'Stretch back, rear delts, biceps' },
+        { day: 4, name: 'Д4: Кардио/Восстановление', focus: 'Cardio / Recovery', warmup: 'Light dynamic stretching',
+          exercises: [
+            { name: 'LISS Cardio', sets: 1, reps: '30-40 min', rpe: 4, rir: 6, restSec: 0, notes: 'Пульс 120-140 уд/мин', progression: '' },
+            { name: 'Stretching / Mobility', sets: 1, reps: '15-20 min', rpe: 3, rir: 7, restSec: 0, notes: 'Растяжка всего тела', progression: '' },
+            { name: 'Foam Rolling', sets: 1, reps: '10-15 min', rpe: 3, rir: 7, restSec: 0, notes: 'МФР проблемных зон', progression: '' },
+          ], cooldown: 'Deep breathing, meditation optional' },
+        { day: 5, name: 'Д5: Бицепс бедра Heavy + квадрицепс', focus: 'Hamstrings Heavy + Quadriceps', warmup: 'Lying leg curl ramp-up, leg extensions light',
+          exercises: [
+            { name: 'Stiff-Leg Deadlift', sets: 4, reps: '6-8', rpe: 8.5, rir: 1.5, restSec: 180, notes: 'Основное движение', progression: '+2.5 кг/цикл' },
+            { name: 'Lying Leg Curl', sets: 4, reps: '8-10', rpe: 8.5, rir: 1.5, restSec: 90, notes: 'Тяжёлая изоляция', progression: '+2.5 кг/цикл' },
+            { name: 'Glute-Ham Raise', sets: 3, reps: '6-10', rpe: 8, rir: 2, restSec: 120, notes: 'Вес тела или резинка', progression: '+1 повтор/цикл' },
+            { name: 'Hack Squat', sets: 4, reps: '8-10', rpe: 8, rir: 2, restSec: 120, notes: 'Квадрицепс', progression: '+5 кг/цикл' },
+            { name: 'Walking Lunge', sets: 3, reps: '12/leg', rpe: 7.5, rir: 2.5, restSec: 90, notes: 'Добивка', progression: '+1 повтор/цикл' },
+            { name: 'Seated Calf Raise', sets: 4, reps: '12-15', rpe: 7.5, rir: 2.5, restSec: 60, notes: 'Икры', progression: '+5 кг/цикл' },
+          ], cooldown: 'Stretch hamstrings, quads, glutes' },
+        { day: 6, name: 'Д6: Грудь Heavy + дельта + трицепс', focus: 'Chest Heavy + Delts + Triceps', warmup: 'Bench ramp-up, band shoulder warmup',
+          exercises: [
+            { name: 'Barbell Bench Press', sets: 4, reps: '5-8', rpe: 8.5, rir: 1.5, restSec: 180, notes: 'Основное движение', progression: '+2.5 кг/цикл' },
+            { name: 'Incline Barbell Press', sets: 4, reps: '6-8', rpe: 8.5, rir: 1.5, restSec: 150, notes: 'Верх груди', progression: '+2.5 кг/цикл' },
+            { name: 'Weighted Dip', sets: 3, reps: '6-10', rpe: 8, rir: 2, restSec: 120, notes: 'С доп. весом', progression: '+2.5 кг/цикл' },
+            { name: 'Overhead Press', sets: 4, reps: '6-8', rpe: 8, rir: 2, restSec: 120, notes: 'Дельта тяжёлая', progression: '+2.5 кг/цикл' },
+            { name: 'Close-Grip Bench Press', sets: 3, reps: '8-10', rpe: 8, rir: 2, restSec: 90, notes: 'Трицепс тяжёлый', progression: '+2.5 кг/цикл' },
+            { name: 'Skull Crusher', sets: 3, reps: '10-12', rpe: 7.5, rir: 2.5, restSec: 75, notes: 'Длинная головка', progression: '+2.5 кг/цикл' },
+          ], cooldown: 'Stretch chest, shoulders, triceps' },
+        { day: 7, name: 'Д7: Спина Pump + задняя дельта + бицепс', focus: 'Back Pump + Rear Delts + Biceps', warmup: 'Straight-arm pulldown light, face pulls',
+          exercises: [
+            { name: 'Lat Pulldown', sets: 4, reps: '12-15', rpe: 7.5, rir: 2.5, restSec: 75, notes: 'Пампинг-вес, разный хват', progression: '+1 повтор/цикл' },
+            { name: 'Seated Cable Row', sets: 4, reps: '12-15', rpe: 7.5, rir: 2.5, restSec: 75, notes: 'V-рукоять', progression: '+2.5 кг/цикл' },
+            { name: 'Straight-Arm Pulldown', sets: 3, reps: '15', rpe: 7, rir: 3, restSec: 60, notes: 'Широчайшие', progression: '+2.5 кг/цикл' },
+            { name: 'Face Pull', sets: 4, reps: '15-20', rpe: 7, rir: 3, restSec: 60, notes: 'Задняя дельта + здоровье плеч', progression: '+2.5 кг/цикл' },
+            { name: 'Machine Row', sets: 3, reps: '12-15', rpe: 7, rir: 3, restSec: 75, notes: 'Изоляция', progression: '+5 кг/цикл' },
+            { name: 'Preacher Curl', sets: 3, reps: '12-15', rpe: 7.5, rir: 2.5, restSec: 60, notes: 'Бицепс пампинг', progression: '+1 кг/цикл' },
+            { name: 'Concentration Curl', sets: 3, reps: '15', rpe: 7, rir: 3, restSec: 45, notes: 'Пик бицепса', progression: '+1 кг/цикл' },
+          ], cooldown: 'Stretch back, rear delts, biceps' },
+        { day: 8, name: 'Д8: Полный отдых', focus: 'Full Rest', warmup: '',
+          exercises: [
+            { name: 'Полный отдых', sets: 0, reps: '0', rpe: 0, rir: 0, restSec: 0, notes: 'Восстановление, сон, питание', progression: '' },
+          ], cooldown: '' },
+      ],
+    }],
+  },
 ];
 
 const PROGRAM_LEVEL_MAP: Record<string, string> = {
@@ -2881,8 +3121,15 @@ const ProgramsTab: React.FC = () => {
   const [selectedId, setSelectedId] = React.useState<string | null>(null);
   const [goalFilter, setGoalFilter] = React.useState('all');
   const [detailWeek, setDetailWeek] = React.useState(1);
-  const programs = goalFilter === 'all' ? FULL_PROGRAM_LIBRARY : getProgramsByGoal(goalFilter);
-  const selected = selectedId ? getProgramById(selectedId) : null;
+
+  const allPrograms = React.useMemo(() => [...FULL_PROGRAM_LIBRARY, ...WOMENS_PROGRAMS, ...CUSTOM_PROGRAMS], []);
+  const programs = React.useMemo(() => {
+    if (goalFilter === 'all') return allPrograms;
+    if (goalFilter === 'women') return WOMENS_PROGRAMS;
+    if (goalFilter === 'custom') return CUSTOM_PROGRAMS;
+    return allPrograms.filter(p => p.goal === goalFilter);
+  }, [goalFilter, allPrograms]);
+  const selected = selectedId ? allPrograms.find(p => p.id === selectedId) || null : null;
 
   const handleLoadProgram = () => {
     if (!selected) return;

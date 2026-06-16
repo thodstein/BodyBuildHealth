@@ -37,7 +37,7 @@ import { searchPubMed, type PubMedArticle } from '../../engines/pubmed-search.en
 
 type SupportTab = 'main' | 'catalog' | 'synergies' | 'calculator' | 'interactions' | 'stacks' | 'peptides' | 'fertility-pct';
 type SupportView = 'main' | 'calc' | 'fertility';
-type CalcView = 'main' | 'calculator' | 'peptides' | 'info' | 'stackcalc' | 'mystacks' | 'mixcalc' | 'plan';
+type CalcView = 'main' | 'calculator' | 'peptides' | 'info' | 'stackcalc' | 'mystacks' | 'mixcalc' | 'plan' | 'neuro' | 'hrt';
 type InfoView = 'main' | 'catalog' | 'synergies' | 'stacks' | 'interactions' | 'research';
 
 const INTERACTION_TYPE_LABELS: Record<string, { label: string; emoji: string; color: string }> = {
@@ -1190,13 +1190,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
 
   const availableMechs = useMemo(() => {
     if (stackCalcOrgans.length === 0) {
-      const allMechs = new Set<string>();
-      for (const sub of ALL_SUBSTANCES) {
-        if (sub.mechanisms) {
-          (sub.mechanisms as string[]).forEach(m => allMechs.add(m));
-        }
-      }
-      return [...allMechs].sort();
+      return [];
     }
     const mechSet = new Set<string>();
     for (const key of stackCalcOrgans) {
@@ -1802,31 +1796,14 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
             <p style={{ fontSize:10, color:'rgba(255,255,255,0.9)', margin:'0 0 16px', textShadow:'0 1px 6px rgba(0,0,0,0.8)' }}>
               Калькулятор поддержки, пептидный калькулятор и общая информация
             </p>
-            <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
-              {[
-{ icon:'🧮', title:'Калькулятор поддержки', desc:'Расчёт рисков, покрытия систем и недельного протокола', action:() => { setSupportView('main'); setTab('calculator'); }, color:'var(--accent)' },
-                { icon:'🧬', title:'Пептидный калькулятор', desc:'Разведение, дозировки, PK модель и протоколы', action:() => { setSupportView('main'); setTab('peptides'); }, color:'var(--accent)' },
-                { icon:'ℹ️', title:'Общая информация', desc:'Каталог, синергии, стеки', action:() => { setCalcView('info'); setInfoView('catalog'); }, color:'#3b82f6' },
-              ].map((card, i) => (
-                <div key={i} onClick={card.action} style={{
-                  display:'flex', alignItems:'center', gap:12, padding:'12px 14px', borderRadius:14, cursor:'pointer', textAlign:'left', width:'100%',
-                  background:'rgba(20,22,30,0.35)', border:'1px solid var(--glass-border)',
-                }}>
-                  <div style={{ width:40, height:40, borderRadius:12, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, background:card.color+'18', fontSize:20 }}>{card.icon}</div>
-                  <div style={{ flex:1 }}>
-                    <div style={{ fontSize:13, fontWeight:700, marginBottom:2, color:card.color }}>{card.title}</div>
-                    <div style={{ fontSize:10, color:'rgba(255,255,255,0.85)', lineHeight:1.3 }}>{card.desc}</div>
-                  </div>
-                  <span style={{ color:card.color, fontSize:16, opacity:0.6 }}>→</span>
-                </div>
-              ))}
-            </div>
-            <div style={{ display:'flex', gap:6, marginTop:12, overflowX:'auto', scrollbarWidth:'none' }}>
+            <div style={{ display:'flex', gap:6, marginTop:12, overflowX:'auto', scrollbarWidth:'none', flexWrap:'wrap' }}>
               <button onClick={() => { setCalcView('info'); setInfoView('research'); }} style={{ padding:'6px 12px', borderRadius:16, fontSize:9, fontWeight:700, whiteSpace:'nowrap', cursor:'pointer', flexShrink:0, background:'var(--bg-secondary)', color:'var(--text-dim)', border:'1px solid var(--border)' }}>🔬 Исследования</button>
               <button onClick={() => setCalcView('stackcalc')} style={{ padding:'6px 12px', borderRadius:16, fontSize:9, fontWeight:700, whiteSpace:'nowrap', cursor:'pointer', flexShrink:0, background:'var(--bg-secondary)', color:'var(--text-dim)', border:'1px solid var(--border)' }}>🧮 Генератор</button>
               <button onClick={() => setCalcView('mystacks')} style={{ padding:'6px 12px', borderRadius:16, fontSize:9, fontWeight:700, whiteSpace:'nowrap', cursor:'pointer', flexShrink:0, background:'var(--bg-secondary)', color:'var(--text-dim)', border:'1px solid var(--border)' }}>📂 Мои стеки</button>
               <button onClick={() => setCalcView('mixcalc')} style={{ padding:'6px 12px', borderRadius:16, fontSize:9, fontWeight:700, whiteSpace:'nowrap', cursor:'pointer', flexShrink:0, background:'var(--bg-secondary)', color:'var(--text-dim)', border:'1px solid var(--border)' }}>⚡ Миксы</button>
               <button onClick={() => setCalcView('plan')} style={{ padding:'6px 12px', borderRadius:16, fontSize:9, fontWeight:700, whiteSpace:'nowrap', cursor:'pointer', flexShrink:0, background:'var(--bg-secondary)', color:'var(--text-dim)', border:'1px solid var(--border)' }}>📅 План</button>
+              <button onClick={() => setCalcView('neuro')} style={{ padding:'6px 12px', borderRadius:16, fontSize:9, fontWeight:700, whiteSpace:'nowrap', cursor:'pointer', flexShrink:0, background:'var(--bg-secondary)', color:'var(--text-dim)', border:'1px solid var(--border)' }}>🧠 Нейро</button>
+              <button onClick={() => setCalcView('hrt')} style={{ padding:'6px 12px', borderRadius:16, fontSize:9, fontWeight:700, whiteSpace:'nowrap', cursor:'pointer', flexShrink:0, background:'var(--bg-secondary)', color:'var(--text-dim)', border:'1px solid var(--border)' }}>⚕️ ГЗТ</button>
             </div>
           </div>
         </div>
@@ -2130,8 +2107,8 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
                                       const d=stackDetailMap.get(stack.id);
                                       if(!d)return null;
                                       return <>
-                                        {d.mechs.length>0&&<div style={{marginTop:3}}><div style={{fontSize:7,fontWeight:600,color:'var(--text-dim)',marginBottom:1}}>⚙️ Механизмы действия:</div><div style={{display:'flex',flexWrap:'wrap',gap:2}}>{d.mechs.map((m,i)=><span key={i} style={{fontSize:6,padding:'1px 4px',borderRadius:3,background:'rgba(139,92,246,0.08)',color:'#a78bfa',border:'1px solid rgba(139,92,246,0.12)'}}>{m}</span>)}</div></div>}
-                                        {d.synergies.length>0&&<div style={{marginTop:3}}><div style={{fontSize:7,fontWeight:600,color:'#22c55e',marginBottom:1}}>⊕ Синергии в стеке ({d.synergies.length}):</div>{d.synergies.map((s,i)=><div key={i} style={{fontSize:7,color:'var(--text-dim)',padding:'1px 0',lineHeight:1.2}}><b style={{color:'#4ade80'}}>{s.aName}+{s.bName}</b>: {s.effect}{s.notes?`: ${s.notes.slice(0,60)}`:''}{s.mechs.length>0&&<span style={{marginLeft:2,opacity:.5}}>[{s.mechs.join(', ')}]</span>}</div>)}</div>}
+                                        {d.mechs.length>0&&<div style={{marginTop:3}}><div style={{fontSize:7,fontWeight:600,color:'var(--text-dim)',marginBottom:1}}>⚙️ Механизмы действия:</div><div style={{display:'flex',flexWrap:'wrap',gap:2}}>{d.mechs.map((m,i)=><span key={i} style={{fontSize:6,padding:'1px 4px',borderRadius:3,background:'rgba(139,92,246,0.08)',color:'#a78bfa',border:'1px solid rgba(139,92,246,0.12)'}}>{MECH_TRANSLATIONS_RU[m as string] || m}</span>)}</div></div>}
+                                        {d.synergies.length>0&&<div style={{marginTop:3}}><div style={{fontSize:7,fontWeight:600,color:'#22c55e',marginBottom:1}}>⊕ Синергии в стеке ({d.synergies.length}):</div>{d.synergies.map((s,i)=><div key={i} style={{fontSize:7,color:'var(--text-dim)',padding:'1px 0',lineHeight:1.2}}><b style={{color:'#4ade80'}}>{s.aName}+{s.bName}</b>: {s.effect}{s.notes?`: ${s.notes.slice(0,60)}`:''}{s.mechs.length>0&&<span style={{marginLeft:2,opacity:.5}}>[{s.mechs.map((mx: string) => MECH_TRANSLATIONS_RU[mx] || mx).join(', ')}]</span>}</div>)}</div>}
                                       </>;
                                     })()}
                                     <div style={{ fontSize:7, color:'var(--text-dim)', marginTop:3 }}>Оценка синергии: <b style={{ color: synergyColor }}>{(stack.synergyScore||0).toFixed(1)}</b> · {(stack.substances||[]).length} веществ</div>
@@ -3876,8 +3853,8 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
                                 const d=stackDetailMap.get(stack.id);
                                 if(!d)return null;
                                 return <>
-                                  {d.mechs.length>0&&<div style={{marginTop:4}}><div style={{fontSize:8,fontWeight:600,color:'var(--text-dim)',marginBottom:1}}>⚙️ Механизмы действия:</div><div style={{display:'flex',flexWrap:'wrap',gap:2}}>{d.mechs.map((m,i)=><span key={i} style={{fontSize:7,padding:'1px 5px',borderRadius:3,background:'rgba(139,92,246,0.08)',color:'#a78bfa',border:'1px solid rgba(139,92,246,0.12)'}}>{m}</span>)}</div></div>}
-                                  {d.synergies.length>0&&<div style={{marginTop:4}}><div style={{fontSize:8,fontWeight:600,color:'#22c55e',marginBottom:1}}>⊕ Синергии в стеке ({d.synergies.length}):</div>{d.synergies.map((s,i)=><div key={i} style={{fontSize:8,color:'var(--text-dim)',padding:'1px 0',lineHeight:1.3}}><b style={{color:'#4ade80'}}>{s.aName}+{s.bName}</b>: {s.effect}{s.notes?`: ${s.notes.slice(0,80)}`:''}{s.mechs.length>0&&<span style={{marginLeft:2,opacity:.5}}>[{s.mechs.join(', ')}]</span>}</div>)}</div>}
+                                  {d.mechs.length>0&&<div style={{marginTop:4}}><div style={{fontSize:8,fontWeight:600,color:'var(--text-dim)',marginBottom:1}}>⚙️ Механизмы действия:</div><div style={{display:'flex',flexWrap:'wrap',gap:2}}>{d.mechs.map((m,i)=><span key={i} style={{fontSize:7,padding:'1px 5px',borderRadius:3,background:'rgba(139,92,246,0.08)',color:'#a78bfa',border:'1px solid rgba(139,92,246,0.12)'}}>{MECH_TRANSLATIONS_RU[m as string] || m}</span>)}</div></div>}
+                                  {d.synergies.length>0&&<div style={{marginTop:4}}><div style={{fontSize:8,fontWeight:600,color:'#22c55e',marginBottom:1}}>⊕ Синергии в стеке ({d.synergies.length}):</div>{d.synergies.map((s,i)=><div key={i} style={{fontSize:8,color:'var(--text-dim)',padding:'1px 0',lineHeight:1.3}}><b style={{color:'#4ade80'}}>{s.aName}+{s.bName}</b>: {s.effect}{s.notes?`: ${s.notes.slice(0,80)}`:''}{s.mechs.length>0&&<span style={{marginLeft:2,opacity:.5}}>[{s.mechs.map((mx: string) => MECH_TRANSLATIONS_RU[mx] || mx).join(', ')}]</span>}</div>)}</div>}
                                 </>;
                               })()}
                               <div style={{ fontSize:8, color:'var(--text-dim)', marginTop:3 }}>Оценка синергии: <b style={{ color: synergyColor }}>{(stack.synergyScore||0).toFixed(1)}</b> · {(stack.substances||[]).length} веществ</div>
@@ -4277,12 +4254,17 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
                   {organList.map(o=><button key={o.key} onClick={()=>toggleOrgan(o.key)} style={{padding:'2px 5px',borderRadius:6,fontSize:7,cursor:'pointer',whiteSpace:'nowrap',background:stackCalcOrgans.includes(o.key)?'var(--accent)':'var(--bg-secondary)',color:stackCalcOrgans.includes(o.key)?'#000':'var(--text-dim)',border:`1px solid ${stackCalcOrgans.includes(o.key)?'var(--accent)':'var(--border)'}`}}>{o.label}</button>)}
                 </div>
               </div>
-              {availableMechs.length>0&&<div style={{marginBottom:6}}>
+              {stackCalcOrgans.length > 0 && availableMechs.length>0&&<div style={{marginBottom:6}}>
                 <div style={{fontSize:9,fontWeight:600,color:'var(--text-light)',marginBottom:3}}>Механизмы ({availableMechs.length}):</div>
                 <div style={{display:'flex',flexWrap:'wrap',gap:3}}>
                   {availableMechs.slice(0,40).map(m=><button key={m} onClick={()=>toggleMech(m)} style={{padding:'1px 4px',borderRadius:6,fontSize:6,cursor:'pointer',whiteSpace:'nowrap',background:stackCalcMech.includes(m)?'#8b5cf6':'var(--bg-secondary)',color:stackCalcMech.includes(m)?'#fff':'var(--text-dim)',border:`1px solid ${stackCalcMech.includes(m)?'#8b5cf6':'var(--border)'}`}}>{MECH_TRANSLATIONS_RU[m] || m}</button>)}
                 </div>
               </div>}
+              {stackCalcOrgans.length === 0 && (
+                <div style={{marginBottom:6,padding:8,borderRadius:8,background:'rgba(255,255,255,0.03)',border:'1px solid rgba(255,255,255,0.06)',textAlign:'center',fontSize:9,color:'var(--text-dim)'}}>
+                  Выберите орган для отображения механизмов
+                </div>
+              )}
               <div style={{display:'flex',gap:6,alignItems:'center',marginBottom:4}}>
                 <span style={{fontSize:9,fontWeight:600,color:'var(--text-light)'}}>Размер:</span>
                 {['2-4','5-7','8-10','11-15','15-20','20-25','30-35'].map(s=><button key={s} onClick={()=>setStackCalcSize(s)} style={{padding:'2px 5px',borderRadius:6,fontSize:7,cursor:'pointer',background:stackCalcSize===s?'var(--accent)':'var(--bg-secondary)',color:stackCalcSize===s?'#000':'var(--text-dim)',border:`1px solid ${stackCalcSize===s?'var(--accent)':'var(--border)'}`}}>{s}</button>)}
@@ -4323,7 +4305,7 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
                   </details>
                 )}
                 {generatedStack.mechs.length>0&&<div style={{marginBottom:3}}><div style={{fontSize:7,fontWeight:600,color:'var(--text-dim)',marginBottom:2}}>⚙️ Механизмы:</div><div style={{display:'flex',flexWrap:'wrap',gap:2}}>{generatedStack.mechs.map((m:string,i:number)=><span key={i} style={{fontSize:6,padding:'1px 4px',borderRadius:3,background:'rgba(139,92,246,0.08)',color:'#a78bfa'}}>{MECH_TRANSLATIONS_RU[m] || m}</span>)}</div></div>}
-                {generatedStack.synergies.length>0&&<details style={{marginBottom:3}}><summary style={{fontSize:7,fontWeight:600,color:'#22c55e',cursor:'pointer'}}>⊕ Синергии ({generatedStack.synergies.length})</summary>{generatedStack.synergies.map((s:any,i:number)=><div key={i} style={{fontSize:7,color:'var(--text-dim)',padding:'2px 0'}}><b style={{color:'#4ade80'}}>{getStackSubLabel(s.a)} + {getStackSubLabel(s.b)}</b>: {s.effect} [{s.severity}]{s.mechanisms&&s.mechanisms.length>0&&<span style={{fontSize:6,color:'#a78bfa',marginLeft:4}}>→ {s.mechanisms.join(', ')}</span>}</div>)}</details>}
+                {generatedStack.synergies.length>0&&<details style={{marginBottom:3}}><summary style={{fontSize:7,fontWeight:600,color:'#22c55e',cursor:'pointer'}}>⊕ Синергии ({generatedStack.synergies.length})</summary>{generatedStack.synergies.map((s:any,i:number)=><div key={i} style={{fontSize:7,color:'var(--text-dim)',padding:'2px 0'}}><b style={{color:'#4ade80'}}>{getStackSubLabel(s.a)} + {getStackSubLabel(s.b)}</b>: {s.effect} [{s.severity}]{s.mechanisms&&s.mechanisms.length>0&&<span style={{fontSize:6,color:'#a78bfa',marginLeft:4}}>→ {s.mechanisms.map((mx: string) => MECH_TRANSLATIONS_RU[mx] || mx).join(', ')}</span>}</div>)}</details>}
                 {generatedStack.conflicts.length>0&&<details><summary style={{fontSize:7,fontWeight:600,color:'#ef4444',cursor:'pointer'}}>⚠ Конфликты ({generatedStack.conflicts.length})</summary>{generatedStack.conflicts.map((c:any,i:number)=><div key={i} style={{fontSize:7,color:'#f87171',padding:'2px 0'}}><b>{getStackSubLabel(c.a)} + {getStackSubLabel(c.b)}</b>: {c.effect} [{c.severity}]</div>)}</details>}
               </div>}
               {!generatedStack&&stackCalcOrgans.length===0&&<div style={{padding:20,textAlign:'center',color:'var(--text-dim)',fontSize:10,background:'var(--bg-secondary)',borderRadius:10,border:'1px solid var(--border)'}}>Выберите органы/системы и нажмите «Сгенерировать»</div>}
@@ -4712,6 +4694,210 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
             }
             return null;
           })()}
+        </div>
+      )}
+
+      {/* ===== NEUROTOXICITY CALCULATOR ===== */}
+      {tab === 'main' && supportView === 'calc' && calcView === 'neuro' && (
+        <div style={{ padding:'0 0 80px' }}>
+          <button onClick={() => setCalcView('main')} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', marginBottom:6, background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← Назад</button>
+          <h2 style={{ margin:'0 0 4px', fontSize:16, fontWeight:800, color:'#ec4899' }}>🧠 Нейротоксичность ААС</h2>
+          <p style={{ fontSize:10, color:'var(--text-dim)', margin:'0 0 10px', lineHeight:1.4 }}>
+            Анаболические стероиды повреждают нейроны гипоталамуса, нарушают GnRH-нейроны, GABA-рецепторы и сигнализацию кисспептина, вызывая депрессию, агрессию и когнитивные нарушения.
+          </p>
+
+          <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:14, marginBottom:10, border:'1px solid var(--border)' }}>
+            <h4 style={{ margin:'0 0 8px', fontSize:12, color:'#f59e0b' }}>⚠ Уровень риска по веществам</h4>
+            <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+              {[
+                { name:'Тренболон', level:'Чрезвычайно высокий', color:'#ef4444', bg:'rgba(239,68,68,0.1)' },
+                { name:'Нандролон', level:'Очень высокий', color:'#f97316', bg:'rgba(249,115,22,0.1)' },
+                { name:'Станозолол', level:'Высокий', color:'#f59e0b', bg:'rgba(245,158,11,0.1)' },
+                { name:'Тестостерон (>500 мг/нед)', level:'Высокий (дозозависимый)', color:'#f59e0b', bg:'rgba(245,158,11,0.1)' },
+                { name:'Тестостерон (ТЗТ дозы)', level:'Низкий', color:'#22c55e', bg:'rgba(34,197,94,0.1)' },
+                { name:'Оксандролон', level:'Средний', color:'#eab308', bg:'rgba(234,179,8,0.1)' },
+                { name:'Примоболан', level:'Низкий', color:'#22c55e', bg:'rgba(34,197,94,0.1)' },
+                { name:'Мастерон', level:'Низкий', color:'#22c55e', bg:'rgba(34,197,94,0.1)' },
+              ].map((r, i) => (
+                <div key={i} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'8px 10px', borderRadius:8, background:r.bg, border:`1px solid ${r.color}22` }}>
+                  <span style={{ fontSize:11, fontWeight:600, color:'var(--text-light)' }}>{r.name}</span>
+                  <span style={{ fontSize:10, fontWeight:700, color:r.color }}>{r.level}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:14, marginBottom:10, border:'1px solid var(--border)' }}>
+            <h4 style={{ margin:'0 0 8px', fontSize:12, color:'#22c55e' }}>🛡 Нейропротекция — рекомендации</h4>
+            <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+              {[
+                { name:'NAC (N-ацетилцистеин)', dose:'1200-2400 мг/день', desc:'Предшественник глутатиона, защищает нейроны от оксидативного стресса' },
+                { name:'Альфа-липоевая кислота (ALA)', dose:'600 мг/день', desc:'Универсальный антиоксидант, проникает через ГЭБ, регенерирует глутатион' },
+                { name:'Омега-3 (EPA+DHA)', dose:'3-5 г/день', desc:'Структурный компонент нейромембран, противовоспалительный, нейропротектор' },
+                { name:'Коэнзим Q10', dose:'200-400 мг/день', desc:'Митохондриальная защита нейронов, АТФ-синтез, антиоксидант' },
+                { name:'Магний L-треонат', dose:'1000-2000 мг/день', desc:'Единственная форма магния, проникающая через ГЭБ, NMDA-антагонист' },
+                { name:'Ежовик гребенчатый (Lion\'s Mane)', dose:'1-3 г/день', desc:'Стимулирует NGF (фактор роста нервов), нейрогенез' },
+                { name:'Прегненолон', dose:'10-30 мг/день', desc:'Нейростероид-предшественник, восстанавливает нейростероидогенез после ААС' },
+                { name:'DHEA', dose:'25-50 мг/день', desc:'Нейростероид, модулятор GABA-A и NMDA, восстанавливает нейропластичность' },
+              ].map((r, i) => (
+                <div key={i} style={{ padding:'8px 10px', borderRadius:8, background:'rgba(0,230,138,0.04)', border:'1px solid rgba(0,230,138,0.1)' }}>
+                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                    <span style={{ fontSize:11, fontWeight:600, color:'var(--text-light)' }}>{r.name}</span>
+                    <span style={{ fontSize:9, fontWeight:700, color:'#00e68a' }}>{r.dose}</span>
+                  </div>
+                  <div style={{ fontSize:9, color:'var(--text-dim)', marginTop:2, lineHeight:1.3 }}>{r.desc}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:14, marginBottom:10, border:'1px solid var(--border)' }}>
+            <h4 style={{ margin:'0 0 8px', fontSize:12, color:'#ef4444' }}>🩺 Симптомы нейротоксичности</h4>
+            <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
+              {['Депрессия','Тревожность','Агрессия/раздражительность','Нарушение сна','Когнитивное снижение','Потеря памяти','Ангедония','Импульсивность','Спутанность сознания','Эмоциональная нестабильность'].map((s, i) => (
+                <span key={i} style={{ fontSize:9, padding:'4px 8px', borderRadius:12, background:'rgba(239,68,68,0.08)', color:'#fca5a5', border:'1px solid rgba(239,68,68,0.15)' }}>⚠ {s}</span>
+              ))}
+            </div>
+          </div>
+
+          <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:14, border:'1px solid var(--border)' }}>
+            <h4 style={{ margin:'0 0 8px', fontSize:12, color:'#60a5fa' }}>📊 Мониторинг</h4>
+            <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+              {[
+                { label:'BDNF (нейротрофический фактор мозга)', desc:'Маркер нейропластичности, снижен при ААС-нейротоксичности', target:'> 20 нг/мл' },
+                { label:'Нейропсихологическая оценка', desc:'Тесты памяти, внимания, исполнительных функций', target:'Каждые 3-6 мес' },
+                { label:'Кортизол (утренний)', desc:'Гиперкортизолемия усугубляет нейротоксичность', target:'10-20 мкг/дл' },
+                { label:'Пролактин', desc:'Гиперпролактинемия ассоциирована с депрессией', target:'< 15 нг/мл' },
+              ].map((m, i) => (
+                <div key={i} style={{ padding:'6px 8px', borderRadius:6, background:'rgba(59,130,246,0.06)', border:'1px solid rgba(59,130,246,0.1)' }}>
+                  <div style={{ fontSize:10, fontWeight:600, color:'var(--text-light)' }}>{m.label}</div>
+                  <div style={{ display:'flex', justifyContent:'space-between', marginTop:2 }}>
+                    <span style={{ fontSize:9, color:'var(--text-dim)' }}>{m.desc}</span>
+                    <span style={{ fontSize:9, fontWeight:600, color:'#60a5fa' }}>{m.target}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ===== HRT/TRT CALCULATOR ===== */}
+      {tab === 'main' && supportView === 'calc' && calcView === 'hrt' && (
+        <div style={{ padding:'0 0 80px' }}>
+          <button onClick={() => setCalcView('main')} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', marginBottom:6, background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← Назад</button>
+          <h2 style={{ margin:'0 0 4px', fontSize:16, fontWeight:800, color:'#8b5cf6' }}>⚕️ Гормонозаместительная терапия</h2>
+          <p style={{ fontSize:10, color:'var(--text-dim)', margin:'0 0 10px', lineHeight:1.4 }}>
+            Научно обоснованные протоколы ТЗТ/ГЗТ, мониторинг и адъювантная терапия.
+          </p>
+
+          <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:14, marginBottom:10, border:'1px solid var(--border)' }}>
+            <h4 style={{ margin:'0 0 8px', fontSize:12, color:'#22c55e' }}>💉 Протоколы ТЗТ (тестостерон-заместительная терапия)</h4>
+            <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+              {[
+                { name:'Тестостерон энантат/ципионат', dose:'100-200 мг/нед', freq:'Инъекция 1 раз/нед', note:'Базовый протокол, стабильный уровень' },
+                { name:'Тестостерон ундеканоат (Nebido)', dose:'1000 мг', freq:'Каждые 10-14 недель', note:'Длительное действие, редкие инъекции' },
+                { name:'Тестостерон гель', dose:'50-100 мг/день', freq:'Ежедневно на кожу', note:'Физиологичные уровни, меньше колебаний' },
+                { name:'ХГЧ (hCG)', dose:'250-500 МЕ', freq:'2-3 раза/нед', note:'Сохранение фертильности, стимуляция Лейдигов' },
+              ].map((r, i) => (
+                <div key={i} style={{ padding:'8px 10px', borderRadius:8, background:'rgba(0,230,138,0.04)', border:'1px solid rgba(0,230,138,0.1)' }}>
+                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                    <span style={{ fontSize:11, fontWeight:600, color:'var(--text-light)' }}>{r.name}</span>
+                    <span style={{ fontSize:9, fontWeight:700, color:'#00e68a' }}>{r.dose}</span>
+                  </div>
+                  <div style={{ display:'flex', justifyContent:'space-between', marginTop:2 }}>
+                    <span style={{ fontSize:9, color:'var(--text-dim)' }}>{r.freq}</span>
+                    <span style={{ fontSize:9, color:'rgba(0,230,138,0.7)', fontStyle:'italic' }}>{r.note}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:14, marginBottom:10, border:'1px solid var(--border)' }}>
+            <h4 style={{ margin:'0 0 8px', fontSize:12, color:'#60a5fa' }}>📊 Параметры мониторинга</h4>
+            <div style={{ display:'flex', flexDirection:'column', gap:5 }}>
+              {[
+                { param:'Общий тестостерон (TT)', target:'500-900 нг/дл', freq:'Каждые 3-6 мес' },
+                { param:'Свободный тестостерон (FT)', target:'15-25 пг/мл', freq:'Каждые 3-6 мес' },
+                { param:'Эстрадиол E2 (чувствительный)', target:'20-40 пг/мл', freq:'Каждые 3-6 мес' },
+                { param:'SHBG (ГСПГ)', target:'20-40 нмоль/л', freq:'Каждые 6 мес' },
+                { param:'Гематокрит (Hct)', target:'< 50%', freq:'Каждые 3 мес' },
+                { param:'ПСА (простат-специфический антиген)', target:'< 4.0 нг/мл', freq:'Каждые 6-12 мес (мужчины >40)' },
+                { param:'Липидный профиль', target:'ЛПНП < 100, ЛПВП > 40', freq:'Каждые 6-12 мес' },
+              ].map((m, i) => (
+                <div key={i} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'6px 8px', borderRadius:6, background:'rgba(59,130,246,0.06)', border:'1px solid rgba(59,130,246,0.1)' }}>
+                  <div>
+                    <div style={{ fontSize:10, fontWeight:600, color:'var(--text-light)' }}>{m.param}</div>
+                    <div style={{ fontSize:8, color:'var(--text-dim)' }}>{m.freq}</div>
+                  </div>
+                  <span style={{ fontSize:9, fontWeight:700, color:'#60a5fa' }}>{m.target}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:14, marginBottom:10, border:'1px solid var(--border)' }}>
+            <h4 style={{ margin:'0 0 8px', fontSize:12, color:'#f59e0b' }}>💊 Адъювантная терапия</h4>
+            <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+              {[
+                { name:'Анастрозол', dose:'0.25-0.5 мг 2×/нед', note:'Только при E2 > 50 пг/мл + симптомы' },
+                { name:'ХГЧ (hCG)', dose:'250-500 МЕ 2×/нед', note:'При желании сохранить фертильность' },
+                { name:'Донаторы NO (цитруллин)', dose:'3-6 г/день', note:'Поддержка эндотелиальной функции' },
+              ].map((r, i) => (
+                <div key={i} style={{ padding:'6px 8px', borderRadius:6, background:'rgba(245,158,11,0.06)', border:'1px solid rgba(245,158,11,0.1)' }}>
+                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                    <span style={{ fontSize:10, fontWeight:600, color:'var(--text-light)' }}>{r.name}</span>
+                    <span style={{ fontSize:9, fontWeight:700, color:'#f59e0b' }}>{r.dose}</span>
+                  </div>
+                  <div style={{ fontSize:9, color:'var(--text-dim)', marginTop:1 }}>{r.note}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:14, marginBottom:10, border:'1px solid var(--border)' }}>
+            <h4 style={{ margin:'0 0 8px', fontSize:12, color:'#ef4444' }}>⚠ Риски и мифы</h4>
+            <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+              {[
+                { name:'Полицитемия', real:'Реальный риск: Hct > 54% → терапевтическая флеботомия или снижение дозы', myth:false },
+                { name:'Апноэ сна', real:'Реальный риск: ухудшение или манифестация обструктивного апноэ сна', myth:false },
+                { name:'Рак простаты', real:'Нет доказательств причинно-следственной связи. Риск прогрессии существующего рака.', myth:true },
+                { name:'Сердечно-сосудистый риск', real:'Противоречивые данные. Физиологические дозы ТЗТ: нет повышения риска MACE (TRAVERSE trial, 2023)', myth:false },
+              ].map((r, i) => (
+                <div key={i} style={{ padding:'8px 10px', borderRadius:8, background:'rgba(239,68,68,0.06)', border:`1px solid ${r.myth ? 'rgba(34,197,94,0.2)' : 'rgba(239,68,68,0.15)'}` }}>
+                  <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                    <span style={{ fontSize:11, fontWeight:600, color:'var(--text-light)' }}>{r.name}</span>
+                    {r.myth ? <span style={{ fontSize:8, padding:'2px 6px', borderRadius:4, background:'rgba(34,197,94,0.15)', color:'#22c55e' }}>МИФ</span> : <span style={{ fontSize:8, padding:'2px 6px', borderRadius:4, background:'rgba(239,68,68,0.15)', color:'#ef4444' }}>РЕАЛЬНО</span>}
+                  </div>
+                  <div style={{ fontSize:9, color:'var(--text-dim)', marginTop:3, lineHeight:1.3 }}>{r.real}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+            <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:14, border:'1px solid var(--border)' }}>
+              <h4 style={{ margin:'0 0 8px', fontSize:12, color:'#22c55e' }}>✅ Кому нужна ГЗТ</h4>
+              <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
+                {['Пост-курсовой гипогонадизм >6 мес','Возрастной гипогонадизм (TT <300)','Первичный гипогонадизм','Симптоматический гипогонадизм с TT <400'].map((s, i) => (
+                  <div key={i} style={{ fontSize:9, color:'var(--text-light)', padding:'3px 0', display:'flex', alignItems:'center', gap:4 }}>
+                    <span style={{ color:'#22c55e' }}>•</span> {s}
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:14, border:'1px solid var(--border)' }}>
+              <h4 style={{ margin:'0 0 8px', fontSize:12, color:'#ef4444' }}>🚫 Противопоказания</h4>
+              <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
+                {['Рак простаты (активный)','Рак молочной железы (мужчины)','Нелеченное апноэ сна','Гематокрит > 54%','Тяжёлая сердечная недостаточность'].map((s, i) => (
+                  <div key={i} style={{ fontSize:9, color:'var(--text-light)', padding:'3px 0', display:'flex', alignItems:'center', gap:4 }}>
+                    <span style={{ color:'#ef4444' }}>×</span> {s}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
         </div>
       )}
 

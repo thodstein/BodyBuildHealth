@@ -7,7 +7,7 @@ import { getProfile } from '../../core/profile-manager';
 import { generatePCTPlan } from '../../engines/pct-planner.engine';
 import { PHARMA_DB } from '../../core/pharma-database';
 
-type FertTab = 'semen' | 'hormones' | 'structure' | 'pct-plan' | 'analyses';
+type FertTab = 'semen' | 'hormones' | 'structure' | 'pct-plan' | 'analyses' | 'brain';
 
 const s: Record<string, React.CSSProperties> = {
   card: { background: 'var(--bg-secondary)', borderRadius: 12, padding: 16, marginBottom: 12 },
@@ -152,7 +152,7 @@ export const FertilityPCTScreen: React.FC = () => {
   );
 
   const fertTabs: { id: FertTab; label: string }[] = [
-    { id: 'semen', label: 'Спермограмма' }, { id: 'hormones', label: 'Гормоны' }, { id: 'structure', label: 'DFI/Структура' }, { id: 'pct-plan', label: 'ПКТ план' }, { id: 'analyses', label: '🧪 Анализы' }
+    { id: 'semen', label: 'Спермограмма' }, { id: 'hormones', label: 'Гормоны' }, { id: 'structure', label: 'DFI/Структура' }, { id: 'pct-plan', label: 'ПКТ план' }, { id: 'analyses', label: '🧪 Анализы' }, { id: 'brain', label: '🧠 Гайд' }
   ];
 
   return (
@@ -456,6 +456,116 @@ export const FertilityPCTScreen: React.FC = () => {
               </div>
             );
           })()}
+        </div>
+      )}
+
+      {tab === 'brain' && (
+        <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+          <div style={s.card}>
+            <h4 style={{ margin:'0 0 6px', fontSize:14, color:'#ec4899' }}>🧠 Мозг и фертильность</h4>
+            <p style={{ fontSize:11, color:'var(--text-dim)', lineHeight:1.5, margin:0 }}>
+              Анаболические стероиды напрямую повреждают гипоталамо-гипофизарно-тестикулярную ось (HPTA). Андрогены подавляют GnRH-нейроны гипоталамуса через андрогеновые рецепторы → снижение секреции гонадотропин-рилизинг-гормона → падение ЛГ и ФСГ. Нейростероиды (аллопрегнанолон, андростандиол) модулируют GABA-A рецепторы, вызывая депрессию и тревожность. Кисспептин-нейроны повреждаются нандролоном и тренболоном, блокируя половое поведение и сперматогенез. Восстановление оси занимает от 6 до 18+ месяцев.
+            </p>
+          </div>
+
+          <div style={s.card}>
+            <h4 style={{ margin:'0 0 8px', fontSize:13, color:'#f59e0b' }}>💊 Степень вреда ААС для HPTA</h4>
+            <div style={{ display:'flex', flexDirection:'column', gap:5 }}>
+              {[
+                { name:'Тренболон', level:'Чрезвычайно высокий', detail:'Полное выключение оси за 2-3 дня. Глубокое подавление кисспептина и GnRH. Восстановление 12-18+ мес.', color:'#ef4444', bg:'rgba(239,68,68,0.1)' },
+                { name:'Нандролон', level:'Очень высокий', detail:'Прогестиновое подавление + андрогеновое. Ось выключается за 5-7 дней. Восстановление 9-15 мес.', color:'#ef4444', bg:'rgba(239,68,68,0.1)' },
+                { name:'Станозолол', level:'Высокий', detail:'Сильное подавление ГСПГ + андрогеновое выключение. Восстановление 6-12 мес.', color:'#f97316', bg:'rgba(249,115,22,0.1)' },
+                { name:'Оксандролон', level:'Средний', detail:'Умеренное подавление оси при дозировках >20 мг/день. Восстановление 4-8 нед.', color:'#f59e0b', bg:'rgba(245,158,11,0.1)' },
+                { name:'Тестостерон', level:'Дозозависимый', detail:'Физиологические дозы (ТЗТ): минимальное подавление ЛГ. Супрафизиологические: полное выключение. Восстановление 6-18 мес.', color:'#eab308', bg:'rgba(234,179,8,0.1)' },
+                { name:'Примоболан', level:'Низкий', detail:'Метил-ДГТ, слабое подавление. Частичное сохранение ЛГ. Восстановление 4-8 нед.', color:'#22c55e', bg:'rgba(34,197,94,0.1)' },
+                { name:'Мастерон', level:'Низкий', detail:'Дростанолон, слабое подавление оси. Восстановление 4-8 нед.', color:'#22c55e', bg:'rgba(34,197,94,0.1)' },
+                { name:'Туринабол', level:'Средне-высокий', detail:'17α-алкилирован, гепатотоксичен + подавление оси. Восстановление 6-10 нед.', color:'#f59e0b', bg:'rgba(245,158,11,0.1)' },
+              ].map((r, i) => (
+                <div key={i} style={{ padding:'8px 10px', borderRadius:8, background:r.bg, border:`1px solid ${r.color}22` }}>
+                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                    <span style={{ fontSize:11, fontWeight:600, color:'var(--text-light)' }}>{r.name}</span>
+                    <span style={{ fontSize:9, fontWeight:700, color:r.color }}>{r.level}</span>
+                  </div>
+                  <div style={{ fontSize:9, color:'var(--text-dim)', marginTop:2, lineHeight:1.3 }}>{r.detail}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div style={s.card}>
+            <h4 style={{ margin:'0 0 8px', fontSize:13, color:'#22c55e' }}>🛡 Универсальные добавки для восстановления</h4>
+            <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+              {[
+                { name:'Коэнзим Q10', dose:'200-600 мг/день', note:'Митохондриальная поддержка сперматозоидов, антиоксидант' },
+                { name:'Омега-3 (EPA+DHA)', dose:'3-5 г/день', note:'Мембраны сперматозоидов, противовоспалительный' },
+                { name:'Цинк пиколинат', dose:'30-50 мг/день', note:'Кофактор 5α-редуктазы, сперматогенез, тестостерон' },
+                { name:'Селен (селексен)', dose:'200 мкг/день', note:'Глутатионпероксидаза, подвижность сперматозоидов' },
+                { name:'Витамин D3', dose:'4000-5000 МЕ/день', note:'Рецепторы VDR в яичках, ↑ тестостерон через ЛГ' },
+                { name:'Витамин E', dose:'400-800 МЕ/день', note:'Мембранный антиоксидант, защита сперматозоидов' },
+                { name:'L-карнитин', dose:'2-3 г/день', note:'Энергетика митохондрий сперматозоидов, подвижность' },
+                { name:'NAC', dose:'1200 мг/день', note:'Предшественник глутатиона, защита клеток Лейдига' },
+              ].map((s, i) => (
+                <div key={i} style={{ padding:'6px 8px', borderRadius:6, background:'rgba(0,230,138,0.04)', border:'1px solid rgba(0,230,138,0.1)' }}>
+                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                    <span style={{ fontSize:10, fontWeight:600, color:'var(--text-light)' }}>{s.name}</span>
+                    <span style={{ fontSize:9, fontWeight:700, color:'#00e68a' }}>{s.dose}</span>
+                  </div>
+                  <div style={{ fontSize:8, color:'var(--text-dim)', marginTop:1 }}>{s.note}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div style={s.card}>
+            <h4 style={{ margin:'0 0 8px', fontSize:13, color:'#8b5cf6' }}>💉 Протокол ПКТ</h4>
+            <div style={{ fontSize:11, color:'var(--text-dim)', marginBottom:8, lineHeight:1.4 }}>
+              Восстановление HPTA после курса ААС: 2-фазный подход с гонадотропинами и СЕРМами.
+            </div>
+            <div style={{ background:'rgba(139,92,246,0.08)', borderRadius:8, padding:10, border:'1px solid rgba(139,92,246,0.15)', marginBottom:8 }}>
+              <div style={{ fontSize:10, fontWeight:700, color:'#8b5cf6', marginBottom:4 }}>Фаза 1: hCG (стимуляция Лейдигов)</div>
+              <div style={{ fontSize:10, color:'var(--text-light)', lineHeight:1.4 }}>
+                hCG 2000-3000 МЕ через день (EOD) × 2-3 недели.<br/>
+                Цель: восстановление объёма яичек, подготовка к СЕРМ-терапии.
+              </div>
+            </div>
+            <div style={{ background:'rgba(34,197,94,0.08)', borderRadius:8, padding:10, border:'1px solid rgba(34,197,94,0.15)', marginBottom:8 }}>
+              <div style={{ fontSize:10, fontWeight:700, color:'#22c55e', marginBottom:4 }}>Фаза 2: СЕРМ (стимуляция оси)</div>
+              <div style={{ fontSize:10, color:'var(--text-light)', lineHeight:1.4 }}>
+                <b>Вариант A:</b> Кломифен 50 мг/день 2 нед + Тамоксифен 20 мг/день 4-6 нед<br/>
+                <b>Вариант B:</b> Энкломифен 25 мг/день 4-6 нед<br/>
+                Цель: ЛГ, ФСГ &gt; 5; тестостерон &gt; 15 нмоль/л.
+              </div>
+            </div>
+            <div style={{ background:'rgba(245,158,11,0.08)', borderRadius:8, padding:10, border:'1px solid rgba(245,158,11,0.15)' }}>
+              <div style={{ fontSize:10, fontWeight:700, color:'#f59e0b', marginBottom:4 }}>⏱ Тайминг</div>
+              <div style={{ fontSize:10, color:'var(--text-light)', lineHeight:1.4 }}>
+                • Эфиры тестостерона (эн/цип): через 14-21 день после последней инъекции<br/>
+                • Ундеканоат: через 4-6 недель<br/>
+                • Нандролон: через 21-28 дней (деканоат), через 7-10 дней (фенилпропионат)<br/>
+                • Тренболон: через 14-21 день (энантат), через 5-7 дней (ацетат)
+              </div>
+            </div>
+          </div>
+
+          <div style={s.card}>
+            <h4 style={{ margin:'0 0 8px', fontSize:13, color:'#3b82f6' }}>🧬 Пептиды для восстановления</h4>
+            <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+              {[
+                { name:'Гонадорелин (GnRH)', dose:'100 мкг 2-3×/день', note:'Синтетический GnRH, непосредственно стимулирует гипофиз → ↑ЛГ/ФСГ. Пульсаторный режим обязателен.' },
+                { name:'Кисспептин-10', dose:'1-3 мкг/кг', note:'Активатор GnRH-нейронов. Критичен при подавлении тренболоном/нандролоном. Восстанавливает половое поведение.' },
+                { name:'hMG (менопаузный гонадотропин)', dose:'75-150 МЕ/день', note:'Содержит ЛГ и ФСГ. Стимулирует сперматогенез напрямую. 3-6 мес курс.' },
+                { name:'рФСГ (рекомбинантный ФСГ)', dose:'75-150 МЕ 3×/нед', note:'Чистый ФСГ, стимуляция клеток Сертоли → сперматогенез. При азооспермии.' },
+              ].map((p, i) => (
+                <div key={i} style={{ padding:'8px 10px', borderRadius:8, background:'rgba(59,130,246,0.04)', border:'1px solid rgba(59,130,246,0.12)' }}>
+                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                    <span style={{ fontSize:10, fontWeight:600, color:'var(--text-light)' }}>{p.name}</span>
+                    <span style={{ fontSize:9, fontWeight:700, color:'#3b82f6' }}>{p.dose}</span>
+                  </div>
+                  <div style={{ fontSize:9, color:'var(--text-dim)', marginTop:2, lineHeight:1.3 }}>{p.note}</div>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       )}
 
