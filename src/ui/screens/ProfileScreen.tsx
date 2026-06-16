@@ -1461,6 +1461,8 @@ export const ProfileScreen: React.FC = () => {
               `  Фаза: ${COURSE_PHASES.find(p => p.id === settings.phase)?.label || 'База'}`,
               `  Препараты: ${medsList}`,
               `  БАДы: ${suppsList}`,
+              ...(riskData?.systemSupport ? RISK_SYSTEMS.filter(sys => riskData.systemSupport[sys] !== undefined).map(sys => `    ${sysLabels[sys] || sys}: покрытие ${Math.round(riskData.systemSupport[sys])}%`) : []),
+              `  Покрытие поддержки: ${riskData?.totalSupport ? Math.round(riskData.totalSupport) + '%' : '—'}`,
               ``,
               `АНАЛИЗЫ`,
               `  ${labsList}`,
