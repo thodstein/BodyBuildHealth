@@ -10,6 +10,7 @@ import { SUPPORT_BASE_COVERAGE } from '../../core/constants';
 import { INTERACTIONS_DB } from '../../data/interactions';
 import { ALL_SUBSTANCES, ALL_INTERACTIONS, type SupportSubstance, type SupportInteraction } from '../../data/support-database';
 import { getSubstanceTier, TIER_LABELS } from '../../data/substance-tiers';
+import { SUPPORT_CATALOG_DATA, ORGAN_LABELS as CATALOG_ORGAN_LABELS, SYSTEM_LABELS_CATALOG, CATEGORY_LABELS as CATALOG_CATEGORY_LABELS, TIER_LABELS_CATALOG, type SupportCatalogEntry } from '../../data/support-catalog';
 import { SUBSTANCE_ANALOGS, SUBSTANCE_ENHANCERS, PHASE_MODS, DEFAULT_DOSAGES, getPhaseLevel, type SupportPhase } from '../../data/support-levels';
 import { FertilityPCTScreen } from './FertilityPCTScreen';
 import { ALL_STACKS, EFFECT_LABELS_ru, findStacksByEffect, getSubstanceLabel as getStackSubLabel, type SupportStack } from '../../data/support-stacks';
