@@ -244,8 +244,10 @@ const ORGAN_MECHANISMS: Record<string, string[]> = {
   recovery: ['tissue_repair', 'wound_healing', 'collagen_synthesis', 'anti_inflammatory', 'protein_synthesis', 'anticatabolic', 'anabolic'],
 };
 
-const getCategoryInfo = (cat: string): { label: string; emoji: string } =>
-  CATEGORY_LABELS[cat] || (TYPE_LABELS_RU[cat] ? { label: TYPE_LABELS_RU[cat], emoji: '📦' } : { label: cat, emoji: '📦' });
+const getCategoryInfo = (cat: string): { label: string; emoji: string } => {
+  const safeCat = cat || 'Без категории';
+  return CATEGORY_LABELS[safeCat] || (TYPE_LABELS_RU[safeCat] ? { label: TYPE_LABELS_RU[safeCat], emoji: '📦' } : { label: safeCat, emoji: '📦' });
+};
 
 const TYPE_LABELS_RU: Record<string, string> = {
   vitamin: 'Витамины', mineral: 'Минералы', minerals: 'Минералы', amino_acid: 'Аминокислоты', amino: 'Аминокислоты',
@@ -1565,8 +1567,11 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
           groups[mapping.key].items.push(sub);
           groups[mapping.key].count++;
         } else {
-          const key = 'other';
-          if (!groups[key]) groups[key] = { key, label:'Прочее', emoji:'📦', items:[], count:0 };
+          const formattedName = normOrg.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase());
+          const key = `org_${normOrg.toLowerCase()}`;
+          if (usedKeys.has(key)) continue;
+          usedKeys.add(key);
+          if (!groups[key]) groups[key] = { key, label: formattedName || normOrg || 'Прочее', emoji: '🫀', items: [], count: 0 };
           groups[key].items.push(sub);
           groups[key].count++;
         }
@@ -2180,7 +2185,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
                               <div key={sub?.id||'x'}>
                                 <div onClick={() => setSelectedSub(isSelected ? null : (sub?.id||null))} style={{ display:'flex', alignItems:'flex-start', gap:4, padding:'6px 10px 6px 18px', cursor:'pointer', borderBottom:'1px solid var(--border)' }}>
                                   <div style={{ flex:1 }}>
-                                    <div style={{ fontSize:10, fontWeight:600, color:'var(--text-light)', lineHeight:1.3 }}>{sub?.name||''}</div>
+                                    <div style={{ fontSize:10, fontWeight:600, color:'var(--text-light)', lineHeight:1.3 }}>{sub?.name||(sub?.id||'').replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase())}</div>
                                     <div style={{ display:'flex', gap:2, flexWrap:'wrap', marginTop:1 }}>
                                       {(sub?.categories||[]).slice(0,3).map(c => <span key={c} style={{ fontSize:8, padding:'1px 4px', borderRadius:3, background:'rgba(255,255,255,0.06)', color:'rgba(255,255,255,0.85)' }}>{c||''}</span>)}
                                       {(sub?.mechanisms||[]).slice(0,4).map(m => <span key={m||''} style={{ fontSize:8, padding:'1px 4px', borderRadius:3, background:'rgba(0,230,138,0.08)', color:'#00e68a' }}>{m||''}</span>)}
@@ -2192,7 +2197,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
                                   <div style={{ padding:'6px 10px 8px 18px', background:'rgba(0,0,0,0.15)', borderBottom:'1px solid var(--border)' }}>
                                     <div style={{ fontSize:10, color:'rgba(255,255,255,0.9)', lineHeight:1.4, marginBottom:4 }}>{sub.description||''}</div>
                                     <div style={{ fontSize:7, color:'var(--accent-green, #00e68a)', marginBottom:3 }}>
-                                      {TYPE_LABELS_RU[sub.type] || (sub.type||'')}{(sub.categories||[]).length > 0 ? ' · ' + (sub.categories||[]).slice(0,3).join(', ') : ''}
+                                      {TYPE_LABELS_RU[sub.type] || sub.type || 'Без категории'}{(sub.categories||[]).length > 0 ? ' · ' + (sub.categories||[]).slice(0,3).join(', ') : ''}
                                     </div>
                                     {(sub.mechanisms||[]).length > 0 && (
                                       <div style={{ marginBottom:3 }}>
@@ -2249,7 +2254,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
                                   <div key={id}>
                                     <div onClick={() => setSelectedSub(isSelected ? null : id)} style={{ display:'flex', alignItems:'center', gap:4, padding:'6px 10px 6px 18px', cursor:'pointer', borderBottom:'1px solid var(--border)' }}>
                                       <div style={{ flex:1 }}>
-                                        <div style={{ fontSize:10, fontWeight:600, color:'var(--text-light)' }}>{sub.name}</div>
+                                        <div style={{ fontSize:10, fontWeight:600, color:'var(--text-light)' }}>{sub.name||(sub.id||'').replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase())}</div>
                                         <div style={{ fontSize:8, color:'var(--text-dim)' }}>{(sub.categories||[]).slice(0,2).join(', ')}</div>
                                       </div>
                                       <span style={{ fontSize:9, color:'var(--text-dim)', transform:isSelected ? 'rotate(180deg)' : 'none' }}>▼</span>
@@ -2311,7 +2316,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
                                     <div key={sub?.id||'x'}>
                                       <div onClick={() => setSelectedSub(selectedSub === sub?.id ? null : (sub?.id||null))} style={{ display:'flex', alignItems:'flex-start', gap:4, padding:'6px 10px 6px 22px', cursor:'pointer', borderBottom:'1px solid var(--border)' }}>
                                         <div style={{ flex:1 }}>
-                                          <div style={{ fontSize:10, fontWeight:600, color:'var(--text-light)', lineHeight:1.3 }}>{sub?.name||''}</div>
+                                          <div style={{ fontSize:10, fontWeight:600, color:'var(--text-light)', lineHeight:1.3 }}>{sub?.name||(sub?.id||'').replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase())}</div>
                                           <div style={{ display:'flex', gap:2, flexWrap:'wrap', marginTop:1 }}>
                                             {(sub?.categories||[]).slice(0,3).map(c => <span key={c} style={{ fontSize:8, padding:'1px 4px', borderRadius:3, background:'rgba(255,255,255,0.06)', color:'rgba(255,255,255,0.85)' }}>{c||''}</span>)}
                                             {(sub?.mechanisms||[]).slice(0,4).map(m => <span key={m||''} style={{ fontSize:8, padding:'1px 4px', borderRadius:3, background:'rgba(0,230,138,0.08)', color:'#00e68a' }}>{m||''}</span>)}
@@ -2323,7 +2328,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
                                         <div style={{ padding:'6px 10px 8px 22px', background:'rgba(0,0,0,0.15)', borderBottom:'1px solid var(--border)' }}>
                                           <div style={{ fontSize:10, color:'rgba(255,255,255,0.9)', lineHeight:1.4, marginBottom:4 }}>{sub.description||''}</div>
                                           <div style={{ fontSize:7, color:'var(--accent-green, #00e68a)', marginBottom:3 }}>
-                                            {TYPE_LABELS_RU[sub.type] || (sub.type||'')}{(sub.categories||[]).length > 0 ? ' · ' + (sub.categories||[]).slice(0,3).join(', ') : ''}
+                                            {TYPE_LABELS_RU[sub.type] || sub.type || 'Без категории'}{(sub.categories||[]).length > 0 ? ' · ' + (sub.categories||[]).slice(0,3).join(', ') : ''}
                                           </div>
                                           {(sub.mechanisms||[]).length > 0 && (
                                             <div style={{ marginBottom:3 }}>
@@ -2384,7 +2389,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
                                 <div key={sub?.id||'x'}>
                                   <div onClick={() => setSelectedSub(selectedSub === sub?.id ? null : (sub?.id||null))} style={{ display:'flex', alignItems:'flex-start', gap:4, padding:'6px 10px 6px 14px', cursor:'pointer', borderBottom:'1px solid var(--border)' }}>
                                     <div style={{ flex:1 }}>
-                                      <div style={{ fontSize:10, fontWeight:600, color:'var(--text-light)', lineHeight:1.3 }}>{sub?.name||''}</div>
+                                      <div style={{ fontSize:10, fontWeight:600, color:'var(--text-light)', lineHeight:1.3 }}>{sub?.name||(sub?.id||'').replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase())}</div>
                                       <div style={{ display:'flex', gap:2, flexWrap:'wrap', marginTop:1 }}>
                                         {(sub?.categories||[]).slice(0,3).map(c => <span key={c} style={{ fontSize:8, padding:'1px 4px', borderRadius:3, background:'rgba(255,255,255,0.06)', color:'rgba(255,255,255,0.85)' }}>{c||''}</span>)}
                                         {(sub?.mechanisms||[]).slice(0,4).map(m => <span key={m||''} style={{ fontSize:8, padding:'1px 4px', borderRadius:3, background:'rgba(0,230,138,0.08)', color:'#00e68a' }}>{m||''}</span>)}
@@ -2396,7 +2401,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
                                     <div style={{ padding:'6px 10px 8px 14px', background:'rgba(0,0,0,0.15)', borderBottom:'1px solid var(--border)' }}>
                                       <div style={{ fontSize:10, color:'rgba(255,255,255,0.9)', lineHeight:1.4, marginBottom:4 }}>{sub.description||''}</div>
                                       <div style={{ fontSize:7, color:'var(--accent-green, #00e68a)', marginBottom:3 }}>
-                                        {TYPE_LABELS_RU[sub.type] || (sub.type||'')}{(sub.categories||[]).length > 0 ? ' · ' + (sub.categories||[]).slice(0,3).join(', ') : ''}
+                                        {TYPE_LABELS_RU[sub.type] || sub.type || 'Без категории'}{(sub.categories||[]).length > 0 ? ' · ' + (sub.categories||[]).slice(0,3).join(', ') : ''}
                                       </div>
                                       {(sub.mechanisms||[]).length > 0 && (
                                         <div style={{ marginBottom:3 }}>
@@ -3066,7 +3071,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
                         <div key={sub.id}>
                           <div onClick={() => setSelectedSub(selectedSub === sub.id ? null : sub.id)} style={{ display: 'flex', alignItems: 'flex-start', gap: 6, padding: '7px 12px 7px 16px', cursor: 'pointer', borderBottom: '1px solid var(--border)' }}>
                             <div style={{ flex: 1 }}>
-                              <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-light)', lineHeight: 1.3 }}>{sub.name}</div>
+                              <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-light)', lineHeight: 1.3 }}>{sub.name||(sub.id||'').replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase())}</div>
                               <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap', marginTop: 2 }}>
                                 {(sub.categories||[]).slice(0, 3).map(c => (
                                   <span key={c} style={{ fontSize: 8, padding: '1px 4px', borderRadius: 3, background: 'rgba(255,255,255,0.04)', color: 'var(--text-dim)' }}>{c}</span>
@@ -3083,7 +3088,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
                               <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', lineHeight: 1.4, marginBottom: 6 }}>{sub.description}</div>
                               {/* Type badge */}
                               <div style={{ fontSize: 8, color: 'var(--accent-green, #00e68a)', marginBottom: 4 }}>
-                                {TYPE_LABELS_RU[sub.type] || sub.type}{(sub.categories||[]).length > 0 ? ' · ' + (sub.categories||[]).slice(0, 3).join(', ') : ''}
+                                {TYPE_LABELS_RU[sub.type] || sub.type || 'Без категории'}{(sub.categories||[]).length > 0 ? ' · ' + (sub.categories||[]).slice(0, 3).join(', ') : ''}
                               </div>
                               {/* All mechanisms */}
                               {sub.mechanisms && sub.mechanisms.length > 0 && (
@@ -3403,7 +3408,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
                           background: sel ? '#00e68a' : 'transparent', color:'#000', fontSize:9, fontWeight:700 }}>{sel ? '✓' : ''}</span>
                         <span style={{ fontWeight:500 }}>{s.name}</span>
                         <span style={{ color:'var(--text-dim)', fontSize:8 }}>{s.id}</span>
-                        <span style={{ color:'var(--text-dim)', fontSize:8, marginLeft:'auto' }}>{TYPE_LABELS_RU[s.type] || s.type}</span>
+                        <span style={{ color:'var(--text-dim)', fontSize:8, marginLeft:'auto' }}>{TYPE_LABELS_RU[s.type] || s.type || 'Без категории'}</span>
                       </div>
                     );
                   })}
@@ -3991,8 +3996,8 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
                         padding: '6px 8px', borderRadius: 6, fontSize: 11, cursor: 'pointer',
                         background: 'var(--bg-secondary)', border: '1px solid var(--border-color)',
                       }}>
-                        <span style={{ fontWeight: 600 }}>{sub.name}</span>
-                        <span style={{ color: 'var(--text-dim)', marginLeft: 6, fontSize: 10 }}>{TYPE_LABELS_RU[sub.type] || sub.type}{(sub.categories||[]).length > 0 ? ' · ' + (sub.categories||[]).slice(0, 2).join(', ') : ''}</span>
+                        <span style={{ fontWeight: 600 }}>{sub.name||(sub.id||'').replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase())}</span>
+                        <span style={{ color: 'var(--text-dim)', marginLeft: 6, fontSize: 10 }}>{TYPE_LABELS_RU[sub.type] || sub.type || 'Без категории'}{(sub.categories||[]).length > 0 ? ' · ' + (sub.categories||[]).slice(0, 2).join(', ') : ''}</span>
                         <div style={{ fontSize: 9, color: 'var(--text-dim)', marginTop: 2 }}>{sub.description}</div>
                       </div>
                     ))}
@@ -4380,11 +4385,29 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
                 });
               })()}
             </div>
-            {PEPTIDE_DB[peptideId] && PEPTIDE_DB[peptideId].effects && (
-              <div style={{ display:'flex', flexWrap:'wrap', gap:4, marginTop:6 }}>
-                {PEPTIDE_DB[peptideId].effects.map(e => (
-                  <span key={e} style={{ fontSize:9, padding:'2px 6px', borderRadius:4, background:'rgba(0,230,138,0.1)', color:'#00e68a' }}>{e}</span>
-                ))}
+            {PEPTIDE_DB[peptideId] && (
+              <div style={{ marginTop:6, padding:'8px 10px', borderRadius:8, background:'rgba(0,230,138,0.04)', border:'1px solid rgba(0,230,138,0.1)', fontSize:9, lineHeight:1.4 }}>
+                <div style={{ fontWeight:700, color:'#00e68a', marginBottom:3 }}>{PEPTIDE_DB[peptideId].name || PEPTIDE_DB[peptideId].shortName || peptideId}</div>
+                {(PEPTIDE_DB[peptideId].effects||[]).length > 0 && (
+                  <div style={{ marginBottom:2 }}><b>Эффекты:</b> {(PEPTIDE_DB[peptideId].effects||[]).join(', ')}</div>
+                )}
+                <div style={{ color:'var(--text-dim)' }}>
+                  <b>T½:</b> {PEPTIDE_DB[peptideId].tHalfHours || '—'} ч · <b>Класс:</b> {PEPTIDE_DB[peptideId].className || '—'} · <b>Пути:</b> {(PEPTIDE_DB[peptideId].routes||[]).map(r => ROUTE_LABELS[r]||r).join(', ') || '—'}
+                </div>
+                {(PEPTIDE_DB[peptideId].mechanisms||[]).length > 0 && (
+                  <div style={{ marginTop:1, color:'rgba(255,255,255,0.7)' }}><b>Механизмы:</b> {(PEPTIDE_DB[peptideId].mechanisms||[]).join(', ') || '—'}</div>
+                )}
+                <div style={{ marginTop:1, display:'flex', gap:8, flexWrap:'wrap' }}>
+                  <span style={{ color:'var(--text-dim)' }}><b>Флакон:</b> {PEPTIDE_DB[peptideId].amountMg || '—'} мг</span>
+                  {PEPTIDE_DB[peptideId].riskLevel && (
+                    <span style={{ color: PEPTIDE_DB[peptideId].riskLevel === 'high' ? '#ef4444' : PEPTIDE_DB[peptideId].riskLevel === 'medium' ? '#f59e0b' : '#22c55e', fontWeight:600 }}>
+                      <b>Риск:</b> {PEPTIDE_DB[peptideId].riskLevel === 'high' ? 'Высокий' : PEPTIDE_DB[peptideId].riskLevel === 'medium' ? 'Средний' : 'Низкий'}
+                    </span>
+                  )}
+                </div>
+                {(PEPTIDE_DB[peptideId].riskNotes||[]).length > 0 && (
+                  <div style={{ fontSize:7, color:'#f59e0b', marginTop:1 }}>⚠ {(PEPTIDE_DB[peptideId].riskNotes||[]).slice(0,3).join('; ') || '—'}</div>
+                )}
               </div>
             )}
             {growthId && PHARMA_DB[growthId] && (
@@ -5285,7 +5308,7 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
             <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:14, marginBottom:10, border:'1px solid var(--border)' }}>
               <h4 style={{ margin:'0 0 8px', fontSize:12, color:'var(--text)' }}>🧪 Выберите пептид</h4>
               <div style={{ display:'flex', flexWrap:'wrap', gap:4, marginBottom:12 }}>
-                {PEPTIDE_LIST.slice(0, 16).map(p => (
+                {PEPTIDE_LIST.map(p => (
                   <button key={p.id} onClick={() => { setPeptideId(p.id); setPepAmount(2); setPepDose(100); }} style={{
                     padding:'6px 10px', borderRadius:16, fontSize:9, fontWeight:600, whiteSpace:'nowrap', cursor:'pointer',
                     background: peptideId === p.id ? 'var(--accent)' : 'var(--bg-secondary)',
@@ -5297,11 +5320,37 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
               {peptideId && (() => {
                 const sel = PEPTIDE_LIST.find(p => p.id === peptideId);
                 if (!sel) return null;
+                const routesStr = (sel.routes||[]).map(r => ROUTE_LABELS[r]||r).join(', ') || '—';
+                const riskColor = sel.riskLevel === 'high' ? '#ef4444' : sel.riskLevel === 'medium' ? '#f59e0b' : '#22c55e';
+                const riskLabel = sel.riskLevel === 'high' ? 'Высокий' : sel.riskLevel === 'medium' ? 'Средний' : sel.riskLevel === 'low' ? 'Низкий' : '—';
                 return (
                   <div style={{ padding:'8px 10px', borderRadius:8, background:'rgba(167,139,250,0.06)', border:'1px solid rgba(167,139,250,0.15)' }}>
-                    <div style={{ fontSize:11, fontWeight:700, color:'#a78bfa', marginBottom:2 }}>{sel.name}</div>
-                    <div style={{ fontSize:9, color:'var(--text-dim)', lineHeight:1.4 }}>{(sel.effects || []).join(', ') || 'Нет описания'}</div>
-                    <div style={{ fontSize:8, color:'#a78bfa', marginTop:2 }}>T½: {sel.tHalfHours} ч</div>
+                    <div style={{ fontSize:11, fontWeight:700, color:'#a78bfa', marginBottom:2 }}>{sel.name || sel.shortName || '—'}</div>
+                    <div style={{ fontSize:9, color:'var(--text-dim)', lineHeight:1.4, marginBottom:3 }}>
+                      <b>Эффекты:</b> {(sel.effects || []).join(', ') || '—'}
+                    </div>
+                    <div style={{ fontSize:8, color:'#a78bfa', marginBottom:2 }}>
+                      <b>T½:</b> {sel.tHalfHours || '—'} ч · <b>Класс:</b> {sel.className || '—'} · <b>Пути:</b> {routesStr}
+                    </div>
+                    {(sel.mechanisms||[]).length > 0 && (
+                      <div style={{ fontSize:8, color:'rgba(255,255,255,0.7)', marginBottom:2, lineHeight:1.3 }}>
+                        <b>Механизмы:</b> {(sel.mechanisms||[]).join(', ') || '—'}
+                      </div>
+                    )}
+                    <div style={{ fontSize:8, marginTop:2, display:'flex', gap:8, flexWrap:'wrap' }}>
+                      <span style={{ color: 'var(--text-dim)' }}><b>Во флаконе:</b> {sel.amountMg || '—'} мг</span>
+                      <span style={{ color: riskColor, fontWeight:600 }}><b>Риск:</b> {riskLabel}</span>
+                      {(sel.riskNotes||[]).length > 0 && (
+                        <span style={{ color:'#f59e0b', fontSize:7, maxWidth:180, lineHeight:1.2, display:'inline-block' }}>
+                          ⚠ {(sel.riskNotes||[]).slice(0,3).join('; ') || '—'}
+                        </span>
+                      )}
+                    </div>
+                    {sel.bioavailability && Object.keys(sel.bioavailability).length > 0 && (
+                      <div style={{ fontSize:7, color:'var(--text-dim)', marginTop:2 }}>
+                        <b>Биодоступность:</b> {Object.entries(sel.bioavailability).map(([k,v]) => `${ROUTE_LABELS[k]||k}: ${v.avg}%`).join(', ') || '—'}
+                      </div>
+                    )}
                   </div>
                 );
               })()}
