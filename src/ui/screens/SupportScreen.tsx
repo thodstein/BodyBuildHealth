@@ -1,8 +1,9 @@
-﻿import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { SYNERGY_PAIRS, ORGAN_SYNERGIES, SUPPLEMENT_DESCRIPTIONS, SUPPLEMENT_TARGETS, SUPPORT_RESEARCH, calculateSupport, checkSupportInteractions, findSupportForGoal, searchSupport, getSubstanceInfo, getSupportDatabaseStats, type SupportInput, type SynergyPair, type SupplementTarget, type OrganSynergy } from '../../engines/support.engine';
 import { RISK_SYSTEMS, ALL_RISK_SYSTEMS } from '../../core/constants';
 import { PHARMA_DB, getPharmaDetail } from '../../core/pharma-database';
 import { useDataLink, notifyDataChange } from '../../core/data-link';
+import { updateProfile, getProfile } from '../../core/profile-manager';
 import { SYSTEM_INFO_ALL } from '../../core/risk-info';
 import { getRiskColor } from '../../core/utils/risk-colors';
 import { SUPPORT_BASE_COVERAGE } from '../../core/constants';
@@ -1150,6 +1151,18 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
     }
     const plan = generateWeeklyPlan(allSubs, riskCalcMethod, baseWeights, drugLoads, labStress, calcResultData?.systemSupport ?? {});
     setWeeklyPlan(plan);
+
+    // Save support results back to profile for integration
+    try {
+      const supps = (effectiveLevel?.subs || SUPPORT_LEVELS[level]?.subs || []).map(id => {
+        const dos = (effectiveLevel?.dosages || SUPPORT_LEVELS[level]?.dosages || {})[id] || DEFAULT_DOSAGES[id] || { mg: 500, timing: 'с едой' };
+        const subInfo = ALL_SUBSTANCES.find(s => s.id === id);
+        const doseUnit = dos.mg >= 5000 ? 'g' : 'mg';
+        return { id, name: subInfo?.name || id, doseMg: dos.mg, doseUnit: doseUnit as 'mg' | 'g' | 'mcg' | 'IU', notes: dos.timing };
+      });
+      updateProfile({ settings: { ...(getProfile().settings || {}), currentSupplements: supps } });
+      notifyDataChange();
+    } catch (e2) { /* ignore profile save errors */ }
   };
 
   useEffect(() => { calcSupport(); }, [supportDrugs, supportGoal, supportLevel]);
@@ -5069,7 +5082,7 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
                   const colors: Record<string, string> = { basic: '#22c55e', mid: '#eab308', max: '#f97316', boost: '#ef4444' };
                   const levelNames: Record<string, string> = { basic: '🟢 База', mid: '🟡 Средний', max: '🟠 Максимум', boost: '🔴 Усиление' };
                   return (
-                    <button key={l} onClick={() => { setManualLevelSelected(true); setSupportLevel(l); calcSupport(l); }} style={{
+                    <button key={l} onClick={() => { setManualLevelSelected(true); setManualLevelSelected(true); setSupportLevel(l); calcSupport(l); }} style={{
                       padding:'10px 6px', borderRadius:10, border: `2px solid ${active ? colors[l] : 'var(--border)'}`,
                       background: active ? `${colors[l]}12` : 'var(--bg-secondary)', cursor:'pointer', textAlign:'center', position:'relative',
                     }}>
