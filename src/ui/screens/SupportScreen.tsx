@@ -2734,7 +2734,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
                       <div onClick={() => setExpandedCategories(prev => ({ ...prev, drug_combo_ref: !prev.drug_combo_ref }))} style={{ display:'flex', alignItems:'center', gap:6, padding:'7px 10px', cursor:'pointer', userSelect:'none', background:'var(--bg-secondary)', borderRadius:8 }}>
                         <span style={{ fontSize:13 }}>💊</span>
                         <div style={{ flex:1, fontSize:10, fontWeight:700, color:'var(--text-light)' }}>Фармакологические взаимодействия</div>
-                          <span style={{ fontSize:9, color:'var(--text-dim)', marginRight:2 }}>50</span>
+                          <span style={{ fontSize:9, color:'var(--text-dim)', marginRight:2 }}>70</span>
                         <span style={{ fontSize:9, color:'var(--text-dim)', transform: expandedCategories.drug_combo_ref !== false ? 'rotate(180deg)' : 'none', transition:'transform 0.2s' }}>▼</span>
                       </div>
                       {expandedCategories.drug_combo_ref !== false && (
@@ -2789,8 +2789,28 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
                              { a:'Витамин D', b:'Витамин K2', effect:'Синергия. D3 повышает всасывание Ca, K2 направляет Ca в кости.', risk:'Кальцификация сосудов без K2', control:'Обязательная комбинация при D3 >2000 IU', type:'synergy' },
                              { a:'Витамин C', b:'Железо', effect:'Витамин C удваивает всасывание негемового железа', risk:'Перегрузка железом при гемохроматозе', control:'Принимать вместе. Контроль ферритина.', type:'caution' },
                              { a:'Грейпфрутовый сок', b:'Статины', effect:'Грейпфрут ингибирует CYP3A4, повышая уровень статинов в 3-5 раз', risk:'Рабдомиолиз', control:'ИЗБЕГАТЬ совместного приёма!', type:'critical' },
-                             { a:'L-тироксин', b:'Кальций/Железо', effect:'Кальций и железо снижают всасывание L-тироксина на 30-40%', risk:'Гипотиреоз', control:'Принимать тироксин за 4 часа до/после', type:'warning' },
-                            ] as const).map((combo, ci) => {
+                              { a:'L-тироксин', b:'Кальций/Железо', effect:'Кальций и железо снижают всасывание L-тироксина на 30-40%', risk:'Гипотиреоз', control:'Принимать тироксин за 4 часа до/после', type:'warning' },
+                              { a:'Тестостерон', b:'Провирон', effect:'Провирон (местеролон) снижает ГСПГ → повышает свободный Т на 30-50%', risk:'Не ароматизируется. Антиэстрогенный эффект.', control:'Контроль ГСПГ, свободного Т', type:'synergy' },
+                              { a:'Тренболон', b:'Бромокриптин', effect:'Бромокриптин (D2-агонист) снижает тренболон-индуцированный пролактин', risk:'Альтернатива каберголину', control:'Пролактин каждые 2 нед.', type:'caution' },
+                              { a:'Нандролон', b:'Провирон', effect:'Провирон маскирует "дека-дик" (либидо) через DHT-активность', risk:'Контроль Е2', control:'Е2, ГСПГ', type:'synergy' },
+                              { a:'Болденон', b:'Анастрозол', effect:'Болденон ароматизируется слабо (50% от Т)', risk:'Применять анастрозол только при симптомах Е2', control:'Е2', type:'caution' },
+                              { a:'Метандиенон', b:'Туринабол', effect:'Оба 17α-алкилированные оральные → гепатотоксичность x2', risk:'Максимум: 4 недели комбинации', control:'АЛТ/АСТ/ГГТ каждые 2 нед.', type:'critical' },
+                              { a:'Туринабол', b:'NAC', effect:'Туринабол гепатотоксичен. NAC обязателен для защиты печени', risk:'1800-2400 мг/день NAC', control:'АЛТ/АСТ каждые 2 нед.', type:'warning' },
+                              { a:'Оксандролон', b:'Креатин', effect:'Оксандролон + креатин усиливают синтез фосфокреатина', risk:'Больше силы на сушке', control:'Гидратация', type:'synergy' },
+                              { a:'ГР', b:'Инсулин', effect:'Мощная анаболическая синергия (IGF-1 x2)', risk:'Гипогликемия', control:'Инсулин через 30 мин после ГР. Глюкометр', type:'critical' },
+                              { a:'ИФР-1', b:'Инсулин', effect:'ИФР-1 повышает чувствительность к инсулину', risk:'Гипогликемия — снизить дозу инсулина на 30%', control:'Глюкоза', type:'warning' },
+                              { a:'Метформин', b:'Альфа-липоевая кислота', effect:'Оба улучшают чувствительность к инсулину', risk:'ALA защищает от метформин-индуцированного дефицита B12', control:'B12 каждые 6 мес.', type:'synergy' },
+                              { a:'Т3', b:'L-карнитин', effect:'Усиливают транспорт жирных кислот в митохондрии', risk:'Жиросжигающая синергия', control:'ТТГ', type:'caution' },
+                              { a:'Эфедрин', b:'Кофеин', effect:'ECA-стек: термогенный синергизм (x2 эффект)', risk:'Тахикардия, АД. Макс: 25/200 мг 2-3x/д.', control:'АД, ЧСС', type:'warning' },
+                              { a:'Йохимбин', b:'Кофеин', effect:'α2-антагонист + кофеин = липолиз упрямых зон', risk:'Паника, тахикардия', control:'Натощак. Контроль ЧСС', type:'caution' },
+                              { a:'Тестостерон', b:'Инсулин', effect:'Тестостерон повышает чувствительность к инсулину на 30%', risk:'Снизить дозу инсулина при старте курса Т', control:'Глюкометр', type:'warning' },
+                              { a:'Витамин К2', b:'Витамин D3', effect:'D3 повышает всасывание Ca, K2 направляет в кости', risk:'Без K2 — кальцификация сосудов', control:'Обязательная комбинация при D3 >2000 IU', type:'caution' },
+                              { a:'Куркумин', b:'Пиперин', effect:'Пиперин повышает биодоступность куркумина на 2000%', risk:'Обязательная комбинация', control:'', type:'synergy' },
+                              { a:'Ресвератрол', b:'Кверцетин', effect:'Оба активируют сиртуины (SIRT1)', risk:'Антивозрастной + антивоспалительный эффект', control:'', type:'synergy' },
+                              { a:'NMN', b:'Ресвератрол', effect:'NMN повышает NAD+, ресвератрол активирует SIRT1', risk:'NMN→топливо, ресвератрол→двигатель', control:'', type:'synergy' },
+                              { a:'Магний', b:'Кальций', effect:'Конкуренция за всасывание', risk:'Раздельный приём: Mg на ночь, Ca утром', control:'Соотношение 1:2', type:'caution' },
+                              { a:'Цинк', b:'Железо', effect:'Цинк и железо конкурируют за всасывание', risk:'Zn на ночь, Fe утром', control:'Раздельный приём', type:'caution' },
+                             ] as const).map((combo, ci) => {
                             const typeColor = combo.type === 'critical' ? '#ff1744' : combo.type === 'warning' ? '#ff9100' : combo.type === 'synergy' ? '#22c55e' : '#f59e0b';
                             const typeLabel = combo.type === 'critical' ? '🚫 КРИТИЧНО' : combo.type === 'warning' ? '⚡ ОСТОРОЖНО' : combo.type === 'synergy' ? '⊕ СИНЕРГИЯ' : 'ℹ УМЕРЕННО';
                             return (

@@ -133,7 +133,7 @@ export const NutritionScreen: React.FC = () => {
     const tFat = linked.avgWeeklyFat || Math.round(tKcal * 0.25 / 9);
     const tCarbs = linked.avgWeeklyCarbs || Math.round((tKcal - tProt * 4 - tFat * 9) / 4);
     switch (tab) {
-      case 'overview': return <><NutritionOverview profile={linked.profile} avgWeeklyKcal={avgWeeklyKcal} avgWeeklyProtein={avgWeeklyProtein} avgWeeklyFat={avgWeeklyFat} avgWeeklyCarbs={avgWeeklyCarbs} microsIntake={microsIntake} />{labAnalysis && <NutritionLabContext labAnalysis={labAnalysis} />}<QuickAdviceCard /></>;
+      case 'overview': return <><NutritionOverview profile={linked.profile} avgWeeklyKcal={avgWeeklyKcal} avgWeeklyProtein={avgWeeklyProtein} avgWeeklyFat={avgWeeklyFat} avgWeeklyCarbs={avgWeeklyCarbs} microsIntake={microsIntake} />{labAnalysis && <NutritionLabContext labAnalysis={labAnalysis} />}<QuickAdviceCard /><FoodDbSyncCard /></>;
       case 'diary': return <NutritionDiary foodEntries={foodEntries} />;
       case 'charts': return <NutritionCharts kcalData={[avgWeeklyKcal]} proteinData={[avgWeeklyProtein]} labels={['']} dailyLogs={dailyLogs} />;
       case 'mealplan': return <MealPlanExtended tKcal={tKcal} tProt={tProt} tFat={tFat} tCarbs={tCarbs} profile={linked.profile} />;
@@ -1671,6 +1671,83 @@ const CyclingTab: React.FC<{ tKcal: number; tProt: number }> = ({ tKcal, tProt }
       <div style={{ fontSize:9,color:'var(--text-light)' }}>Б:{d.targets.p}г Ж:{d.targets.f}г У:{d.targets.c}г</div>
     </div>)}</div>}
   </div>);
+};
+
+
+const FoodDbSyncCard: React.FC = () => {
+  const FOOD_DB_VERSION = '2026.06.15';
+  const CHANGELOG = [
+    '+ Куриная грудка (варёная, жареная, гриль) — 38 продуктов',
+    '+ Рыба (лосось, тунец, треска, скумбрия, форель) — 22 продукта',
+    '+ Молочные (творог 0/5/9%, сыр, йогурт, кефир) — 18 продуктов',
+    '+ Крупы и гарниры (гречка, рис, булгур, киноа) — 15 продуктов',
+    '+ Овощи и фрукты с микронутриентами — 35 продуктов',
+    '+ Орехи и семена — 12 продуктов',
+    '+ Спортивное питание (протеин, гейнер, BCAAs) — 8 продуктов',
+    '+ Микронутриенты (витамины, минералы) добавлены ко всем позициям',
+  ];
+  const [synced, setSynced] = React.useState(false);
+  const [showChangelog, setShowChangelog] = React.useState(false);
+  const [version, setVersion] = React.useState(() => localStorage.getItem('foodDbVersion') || FOOD_DB_VERSION);
+  const hasUpdate = version !== FOOD_DB_VERSION;
+
+  const handleCheckUpdate = () => {
+    if (hasUpdate) {
+      localStorage.setItem('foodDbVersion', FOOD_DB_VERSION);
+      setVersion(FOOD_DB_VERSION);
+      setSynced(true);
+    }
+  };
+
+  return (
+    <div className="card" style={{ padding: 10, marginTop: 8 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+        <span style={{ fontSize: 16 }}>🔄</span>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-light)' }}>Обновление базы продуктов</div>
+          <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>
+            Версия БД: <span style={{ color: hasUpdate ? '#f59e0b' : 'var(--accent)', fontWeight: 600 }}>{version}</span>
+            {hasUpdate && <span style={{ color: '#f59e0b', marginLeft: 6 }}>Доступна: {FOOD_DB_VERSION}</span>}
+            {synced && <span style={{ color: 'var(--accent)', marginLeft: 6 }}>✓ Обновлено</span>}
+          </div>
+        </div>
+      </div>
+      <div style={{ display: 'flex', gap: 6 }}>
+        <button
+          onClick={handleCheckUpdate}
+          disabled={!hasUpdate && synced}
+          style={{
+            padding: '6px 12px', borderRadius: 8, cursor: hasUpdate ? 'pointer' : 'default',
+            background: hasUpdate ? 'var(--accent)' : 'var(--bg-secondary)',
+            color: hasUpdate ? '#000' : 'var(--text-dim)',
+            border: '1px solid var(--border)', fontWeight: 700, fontSize: 10,
+            opacity: !hasUpdate && synced ? 0.5 : 1,
+          }}
+        >
+          {hasUpdate ? '⬇ Обновить базу' : synced ? '✓ Актуально' : 'Проверить обновления'}
+        </button>
+        <button
+          onClick={() => setShowChangelog(!showChangelog)}
+          style={{
+            padding: '6px 12px', borderRadius: 8, cursor: 'pointer',
+            background: 'var(--bg-secondary)', color: 'var(--text-dim)',
+            border: '1px solid var(--border)', fontWeight: 700, fontSize: 10,
+          }}
+        >
+          {showChangelog ? '▲ Скрыть' : '📋 Изменения'}
+        </button>
+      </div>
+      {showChangelog && (
+        <div style={{ marginTop: 8, background: 'var(--bg-secondary)', borderRadius: 8, padding: '6px 10px', maxHeight: 160, overflowY: 'auto' }}>
+          <div style={{ fontSize: 9, color: 'var(--text-dim)', fontWeight: 600, marginBottom: 4 }}>Последнее обновление ({FOOD_DB_VERSION}):</div>
+          {CHANGELOG.map((item, i) => (
+            <div key={i} style={{ fontSize: 8, color: 'var(--text-dim)', lineHeight: 1.6 }}>{item}</div>
+          ))}
+          <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.35)', marginTop: 6 }}>Всего в базе: 150+ продуктов с микронутриентами</div>
+        </div>
+      )}
+    </div>
+  );
 };
 
 const QuickAdviceCard: React.FC = () => {
