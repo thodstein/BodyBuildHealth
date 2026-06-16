@@ -37,7 +37,7 @@ import { searchPubMed, type PubMedArticle } from '../../engines/pubmed-search.en
 
 type SupportTab = 'main' | 'catalog' | 'synergies' | 'calculator' | 'interactions' | 'stacks' | 'peptides' | 'fertility-pct';
 type SupportView = 'main' | 'calc' | 'fertility';
-type CalcView = 'main' | 'calculator' | 'peptides' | 'info' | 'stackcalc' | 'mystacks' | 'mixcalc' | 'plan' | 'neuro' | 'joints';
+type CalcView = 'main' | 'calculator' | 'peptides' | 'info' | 'stackcalc' | 'mystacks' | 'mixcalc' | 'plan' | 'neuro' | 'joints' | 'acne';
 type InfoView = 'main' | 'catalog' | 'synergies' | 'stacks' | 'interactions' | 'research';
 
 const INTERACTION_TYPE_LABELS: Record<string, { label: string; emoji: string; color: string }> = {
@@ -2114,6 +2114,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
                   { icon:'📅', title:'План поддержки', desc:'Дневной, недельный и месячный план приёма по тайм-слотам', color:'#84cc16', action:() => setCalcView('plan') },
                   { icon:'🧠', title:'Нейротоксичность', desc:'Детальные механизмы нейротоксичности ААС и протокол нейропротекции', color:'#ec4899', action:() => setCalcView('neuro') },
                   { icon:'🦴', title:'Суставы и связки', desc:'Калькулятор поддержки суставов, анализы и протоколы', color:'#f59e0b', action:() => setCalcView('joints') },
+                  { icon:'🔴', title:'Акне', desc:'Анти-прыщ протокол: ниацинамид, ретиноиды, солярий, гигиена', color:'#ef4444', action:() => setCalcView('acne') },
                 ].map((card, i) => (
                   <div key={i} onClick={card.action} style={{
                     display:'flex', alignItems:'center', gap:12, padding:'12px 14px', borderRadius:14, cursor:'pointer',
@@ -6014,11 +6015,83 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
               </div>
             ))}
           </div>
-        </div>
+
+            {/* Elbow Recovery Protocol */}
+            <details style={{ marginTop:10 }}>
+              <summary style={{ fontSize:11, fontWeight:700, color:'#f59e0b', cursor:'pointer', padding:'6px 0' }}>🔄 Протокол восстановления локтя (6 недель)</summary>
+              <div style={{ padding:'6px 0' }}>
+                <div style={{ fontSize:9, color:'var(--text-dim)', marginBottom:6, lineHeight:1.4 }}>
+                  <b>Подготовка:</b> УЗИ/МРТ локтя → полный отдых 2 недели → стерильные шприцы/инсулинки
+                </div>
+                <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+                  {[
+                    { name:'BPC-157', w1:'400 мкг (2×200 у локтя)', w3:'250 мкг (1 инъекция)', time:'Утро+вечер локально' },
+                    { name:'TB-500', w1:'10 мг (4×2,5 мг)', w3:'5 мг (2×2,5 мг)', time:'Пн/Вт/Чт/Пт в живот' },
+                    { name:'GHK-Cu', w1:'2 мг (2×1 мг)', w3:'1 мг', time:'Пн/Чт в живот' },
+                    { name:'Босвеллия 65% AKBA', w1:'600 мг (3×200)', w3:'400 мг', time:'С едой' },
+                    { name:'MSM', w1:'4 г (2×2 г)', w3:'2 г', time:'В воде утром/вечер' },
+                    { name:'Куркумин 95%+пиперин', w1:'1500 мг (3×500)', w3:'1000 мг', time:'Вечер с едой' },
+                    { name:'Коллаген I+II+III + вит.C', w1:'20 г + 1,5 г C', w3:'15 г + 1 г C', time:'Утро порошок' },
+                    { name:'A4 Хавинсон (хрящ)', w1:'1-2 капс/день', w3:'1-2 капс/день', time:'Утро' },
+                    { name:'A19 Хавинсон (сосуды)', w1:'1-2 капс/день', w3:'1-2 капс/день', time:'Вечер' },
+                    { name:'LigamenTIDE PLUS', w1:'2 капс', w3:'1 капс', time:'Утро' },
+                  ].map((r, i) => (
+                    <div key={i} style={{ padding:'6px 8px', borderRadius:6, background:'rgba(245,158,11,0.04)', border:'1px solid rgba(245,158,11,0.12)', fontSize:10 }}>
+                      <div style={{ display:'flex', justifyContent:'space-between', marginBottom:2 }}>
+                        <span style={{ fontWeight:700, color:'#f59e0b' }}>{r.name}</span>
+                        <span style={{ fontSize:8, color:'var(--text-dim)' }}>{r.time}</span>
+                      </div>
+                      <div style={{ display:'flex', gap:8, fontSize:8, color:'var(--text-dim)' }}>
+                        <span>Нед 1-2: <b style={{ color:'var(--text-light)' }}>{r.w1}</b></span>
+                        <span>Нед 3-6: <b style={{ color:'var(--text-light)' }}>{r.w3}</b></span>
+                      </div>
+                    </div>
+                  ))}
+                  <div style={{ padding:'6px 8px', borderRadius:6, background:'rgba(59,130,246,0.04)', border:'1px solid rgba(59,130,246,0.12)' }}>
+                    <div style={{ fontSize:9, fontWeight:700, color:'#3b82f6', marginBottom:4 }}>Дополнительно:</div>
+                    <div style={{ fontSize:8, color:'var(--text-dim)', lineHeight:1.4 }}>
+                      Нед 1: Мелоксикам 7,5 мг/день (5-7 дней)<br/>
+                      Весь курс: Артра/Терафлекс 1 таб×2, Неовитин 1-2 мл/день<br/>
+                      Вольтарен гель 2-3 раза/день локально<br/>
+                      УЗТ/лазер 10 сеансов + вибромассаж 15 мин/день<br/>
+                      <br/>
+                      <b style={{ color:'var(--text-light)' }}>Контроль:</b> УЗИ на 14-й и 28-й день. Перерыв после курса — 6 недель.<br/>
+                      <b style={{ color:'var(--text-light)' }}>Ожидание:</b> щелчок уходит за 7-10 дней, полное восстановление — 3-4 недели.
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </details>
+           </div>
+
         ));
       })()}
 
-      {/* ===== FERTILITY/PCT TAB (with back button) ===== */}
+      {/* ===== ACNE TAB ===== */}
+      {tab === 'main' && supportView === 'calc' && calcView === 'acne' && (
+        <div style={{ padding:'0 0 80px' }}>
+          <button onClick={() => setCalcView('main')} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', marginBottom:6, background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← Назад</button>
+          <button onClick={() => setSupportView('main')} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', marginBottom:4, marginLeft:6, background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← На главную Поддержки</button>
+          <h2 style={{ margin:'0 0 4px', fontSize:16, fontWeight:800, color:'#ef4444' }}>🔴 Анти-прыщ протокол</h2>
+          <p style={{ fontSize:10, color:'var(--text-dim)', margin:'0 0 12px' }}>Протокол борьбы с акне на курсе ААС: системная и локальная терапия.</p>
+          <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:14, marginBottom:10, border:'1px solid var(--border)' }}>
+            <h4 style={{ margin:'0 0 10px', fontSize:12 }}>⚙️ Ежедневный протокол</h4>
+            {[{n:'Ниацинамид',d:'500-1000 мг',t:'На ночь',note:'Витамин B3. Регулирует себум, антивоспалительное.'},{n:'Медь',d:'1 мг',t:'На ночь',note:'Кофактор лизил-оксидазы. Сшивка коллагена.'},{n:'Солярий',d:'2 раза/нед × 5 мин',t:'День',note:'UV-B подсушивает акне. Не более 5 минут.'},{n:'Клендовит гель',d:'Тонкий слой',t:'Утро локально',note:'Клиндамицин+адапален. Только на зону акне.'},{n:'Клензит-С',d:'Тонкий слой',t:'На ночь локально',note:'Антибактериальный+комедонолитический.'},{n:'Верошпирон',d:'50 мг',t:'Утро',note:'Спиронолактон. Антиандроген. Контроль калия!'}].map((r,i)=>(<div key={i} style={{padding:'8px 10px',borderRadius:8,background:'rgba(239,68,68,0.04)',border:'1px solid rgba(239,68,68,0.12)',fontSize:10,marginBottom:6}}><div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:2}}><span style={{fontWeight:700,color:'var(--text-light)'}}>{r.n}</span><div style={{display:'flex',gap:8}}><span style={{fontSize:9,fontWeight:700,color:'#ef4444'}}>{r.d}</span><span style={{fontSize:8,color:'var(--text-dim)',padding:'1px 6px',borderRadius:4,background:'rgba(255,255,255,0.04)'}}>{r.t}</span></div></div><div style={{fontSize:8,color:'var(--text-dim)',lineHeight:1.3}}>{r.note}</div></div>))}
+          </div>
+          <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:14, marginBottom:10, border:'1px solid var(--border)' }}>
+            <h4 style={{ margin:'0 0 6px', fontSize:11 }}>🧼 Гигиена и уход</h4>
+            <p style={{ fontSize:10, color:'var(--text-light)', lineHeight:1.6, margin:'0 0 6px' }}>Минимум <b style={{color:'#ef4444'}}>1 раз в день</b> тщательное мытьё с очищением пор от себума. На курсе ААС выработка кожного сала резко возрастает → поры забиваются → закупорка → благоприятная среда для бактерий → акне.</p>
+            <p style={{ fontSize:10, color:'var(--text-light)', lineHeight:1.6, margin:'0 0 6px' }}><b style={{color:'#ef4444'}}>Клензит-С</b> содержит антибактериальный компонент + адапален для открытия комедонов.</p>
+            <p style={{ fontSize:10, color:'var(--text-light)', lineHeight:1.6 }}><b style={{color:'#f59e0b'}}>Верошпирон:</b> калий-сберегающий диуретик+антиандроген. Блокирует AR в коже. <b style={{color:'#ef4444'}}>СЛЕДИ ЗА КАЛИЕМ!</b></p>
+          </div>
+          <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:14, border:'1px solid var(--border)' }}>
+            <h4 style={{ margin:'0 0 6px', fontSize:11, color:'#f59e0b' }}>⚠️ Важно</h4>
+            <div style={{ fontSize:9, color:'var(--text-dim)', lineHeight:1.5 }}>• При Верошпироне — исключить добавки калия<br/>• Солярий ≤ 2 раза/нед по 5 мин<br/>• Клендовит+Клензит-С только локально<br/>• При сильном акне — дерматолог, системные ретиноиды</div>
+          </div>
+        </div>
+      )}
+
+      {/* ===== FERTILITY/PCT TAB ===== */}
       {tab === 'fertility-pct' && (
         <div>
           <button onClick={() => setTab('main')} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', marginBottom:8, background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← На главную</button>
