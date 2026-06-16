@@ -2,7 +2,7 @@
 import { SYNERGY_PAIRS, ORGAN_SYNERGIES, SUPPLEMENT_DESCRIPTIONS, SUPPLEMENT_TARGETS, SUPPORT_RESEARCH, calculateSupport, checkSupportInteractions, findSupportForGoal, searchSupport, getSubstanceInfo, getSupportDatabaseStats, type SupportInput, type SynergyPair, type SupplementTarget, type OrganSynergy } from '../../engines/support.engine';
 import { RISK_SYSTEMS, ALL_RISK_SYSTEMS } from '../../core/constants';
 import { PHARMA_DB, getPharmaDetail } from '../../core/pharma-database';
-import { useDataLink } from '../../core/data-link';
+import { useDataLink, notifyDataChange } from '../../core/data-link';
 import { SYSTEM_INFO_ALL } from '../../core/risk-info';
 import { getRiskColor } from '../../core/utils/risk-colors';
 import { SUPPORT_BASE_COVERAGE } from '../../core/constants';
@@ -1033,8 +1033,14 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
     const goalMap: Record<string, string> = { bulk: 'muscle_gain', cut: 'fat_loss', strength: 'strength', endurance: 'endurance', recomp: 'recomp', maintenance: 'maintenance' };
     const goal = s.goal || s.primaryGoal || 'maintenance';
     if (goalMap[goal]) setSupportGoal(goalMap[goal]);
-    if (linked.course.length > 0) setSupportDrugs(linked.course.map(c => c.substanceId));
   }, []);
+
+  // Sync supportDrugs with linked.course
+  useEffect(() => {
+    if (linked.course && linked.course.length > 0) {
+      setSupportDrugs(linked.course.map(c => c.substanceId));
+    }
+  }, [linked.course]);
 
   useEffect(() => {
     const HIGH_RISK = ['trenbolone_acetate', 'trenbolone_enanthate', 'methandienone', 'stanozolol', 'oxandrolone'];
@@ -1061,11 +1067,12 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
     setSupportLevel(level);
   }, [supportDrugs, linked.risk, linked.labAnalysis]);
 
-  const calcSupport = () => {
+  const calcSupport = (overrideLevel?: 'basic' | 'mid' | 'max' | 'boost') => {
     const s = linked.profile?.settings;
+    const level = overrideLevel || supportLevel;
     const input: SupportInput = {
       userId: linked.profile?.id || 'current',
-      substances: supportDrugs.length > 0 ? supportDrugs : (linked.course?.map(c => c.substanceId) || []),
+      substances: SUPPORT_LEVELS[level]?.subs || [],
       goals: [supportGoal],
       labs: (linked.labs || []).map(l => ({ code: l.code, value: l.value })),
       demographics: { age: s?.age ?? 30, weight: s?.weight ?? 80, sex: (s?.sex ?? 'male') as 'male' | 'female' },
@@ -1074,9 +1081,11 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
       trainingFactor: s?.trainingFactor ?? 0.7,
       drugDoses: Object.fromEntries((linked.course || []).map(c => [c.substanceId, c.doseValue])),
     };
-    const supportResult = calculateSupport(input);
-    setSupportResult(supportResult);
-    const allSubs = [...supportDrugs, ...SUPPORT_LEVELS[supportLevel]?.subs || []].filter(Boolean);
+    const calcResultData = calculateSupport(input);
+    setSupportResult(calcResultData);
+    setCalcResult(calcResultData);
+    setCalcDone(true);
+    const allSubs = [...supportDrugs, ...SUPPORT_LEVELS[level]?.subs || []].filter(Boolean);
     setDbInteractions(checkSupportInteractions(allSubs));
     const goalRisks = supportGoal === 'muscle_gain' ? ['muscle', 'protein', 'testosterone'] : supportGoal === 'fat_loss' ? ['fat', 'metabolism', 'insulin'] : supportGoal === 'strength' ? ['strength', 'power', 'testosterone'] : supportGoal === 'endurance' ? ['endurance', 'oxygen', 'atp'] : supportGoal === 'recomp' ? ['muscle', 'fat', 'metabolism'] : ['health', 'vitamin', 'mineral'];
     setGoalRecommendations(findSupportForGoal(goalRisks, 20));
@@ -1089,9 +1098,9 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
     setTimedPlan(generateTimedPlan(mechRep.mechanisms, supportGoal));
 
     const modelRisk = computeRiskByModel(riskModel, labRes,
-      Object.fromEntries(['cardio','hepatic','renal','neuro','endocrine','hematologic','reproductive','musculoskeletal'].map(s => [s, supportResult?.riskAssessment?.systemBreakdown?.[s]?.raw ?? 15])),
+      Object.fromEntries(['cardio','hepatic','renal','neuro','endocrine','hematologic','reproductive','musculoskeletal'].map(s => [s, calcResultData?.riskAssessment?.systemBreakdown?.[s]?.raw ?? 15])),
       Object.fromEntries(supportDrugs.map(() => [0, 5]).map((v, i) => [['cardio','hepatic','renal','neuro','endocrine','hematologic','reproductive','musculoskeletal'][i], 5])),
-      supportResult?.systemSupport ?? {}
+      calcResultData?.systemSupport ?? {}
     );
     setModelRiskResult(modelRisk);
 
@@ -1099,7 +1108,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
     const baseWeights: Record<string, number> = {};
     const drugLoads: Record<string, number> = {};
     for (const sys of ['cardio','hepatic','renal','neuro','endocrine','hematologic','reproductive','musculoskeletal']) {
-      baseWeights[sys] = supportResult?.riskAssessment?.systemBreakdown?.[sys]?.raw ?? 15;
+      baseWeights[sys] = calcResultData?.riskAssessment?.systemBreakdown?.[sys]?.raw ?? 15;
       drugLoads[sys] = supportDrugs.length * 2;
     }
     const labStress: Record<string, number> = {};
@@ -1108,11 +1117,11 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
       labStress.renal = labRes.kidneyStress; labStress.endocrine = labRes.hormoneScore;
       labStress.hematologic = labRes.inflammation * 5;
     }
-    const plan = generateWeeklyPlan(allSubs, riskCalcMethod, baseWeights, drugLoads, labStress, supportResult?.systemSupport ?? {});
+    const plan = generateWeeklyPlan(allSubs, riskCalcMethod, baseWeights, drugLoads, labStress, calcResultData?.systemSupport ?? {});
     setWeeklyPlan(plan);
   };
 
-  useEffect(() => { if (supportDrugs.length > 0) calcSupport(); }, [supportDrugs, supportGoal, supportLevel]);
+  useEffect(() => { calcSupport(); }, [supportDrugs, supportGoal, supportLevel]);
 
   // Interaction checker state
   const [interactTab, setInteractTab] = useState<'support' | 'pharma'>('support');
@@ -3292,6 +3301,20 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
             <p style={{ fontSize: 11, color: 'var(--text-dim)', margin: '0 0 12px 0' }}>
               Расчёт индекса поддержки и снижения рисков на основе всех источников: препараты, анализы, питание, тренировки, генетика
             </p>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              {linked.course.length === 0 && (
+                <span style={{ fontSize: 9, padding: '3px 8px', borderRadius: 6, background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)', color: '#f59e0b' }}>⚠ Нет курса — расчёт по умолчанию</span>
+              )}
+              {linked.labs.length === 0 && (
+                <span style={{ fontSize: 9, padding: '3px 8px', borderRadius: 6, background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.15)', color: '#ef4444' }}>🚫 Без анализов — штраф к риску</span>
+              )}
+              {linked.labs.length > 0 && (
+                <span style={{ fontSize: 9, padding: '3px 8px', borderRadius: 6, background: 'rgba(34,197,94,0.06)', border: '1px solid rgba(34,197,94,0.15)', color: '#22c55e' }}>✅ Анализы: {linked.labs.length}</span>
+              )}
+              {calcDone && supportResult && (
+                <span style={{ fontSize: 9, padding: '3px 8px', borderRadius: 6, background: 'rgba(0,230,138,0.08)', border: '1px solid rgba(0,230,138,0.2)', color: '#00e68a' }}>📊 Рассчитано: {Math.round(supportResult.supportScore ?? 0)}%</span>
+              )}
+            </div>
           </div>
 
           {/* Stack Generator Link */}
@@ -3317,7 +3340,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
                 const active = supportLevel === l;
                 const colors: Record<string, string> = { basic: '#22c55e', mid: '#eab308', max: '#f97316', boost: '#ef4444' };
                 return (
-                  <button key={l} onClick={() => { setSupportLevel(l); }} style={{
+                  <button key={l} onClick={() => { setSupportLevel(l); calcSupport(l); }} style={{
                     padding: '10px 8px', borderRadius: 10, border: `2px solid ${active ? colors[l] : 'var(--border)'}`,
                     background: active ? `${colors[l]}15` : 'var(--bg-secondary)', cursor: 'pointer', textAlign: 'center',
                     transition: 'all 0.2s',
@@ -3345,7 +3368,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
               </div>
             </div>
 
-            <button onClick={calcSupport} style={{
+            <button onClick={() => calcSupport()} style={{
               width: '100%', padding: '14px', borderRadius: 8, border: 'none', cursor: 'pointer', marginTop: 12,
               background: 'linear-gradient(135deg, #00e68a, #00c853)', color: '#000', fontWeight: 700, fontSize: 15,
               boxShadow: '0 2px 8px rgba(0,230,138,0.3)',
@@ -3716,7 +3739,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
               </div>
 
               {/* ===== GENERATE WEEKLY PLAN ===== */}
-              <button onClick={calcSupport} style={{
+              <button onClick={() => calcSupport()} style={{
                 width: '100%', padding: 14, borderRadius: 8, border: 'none', cursor: 'pointer', marginBottom: 12,
                 background: 'linear-gradient(135deg, #8b5cf6, #6366f1)', color: '#fff', fontWeight: 700, fontSize: 15,
                 boxShadow: '0 2px 8px rgba(139,92,246,0.3)',
@@ -4043,6 +4066,173 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
                 )}
               </div>
             </>
+          )}
+        {/* ===== DAILY SCHEDULE ===== */}
+          {supportResult && (
+            <div className="card" style={{ marginBottom: 12 }}>
+              <h4 style={{ margin: '0 0 6px 0', fontSize: 12 }}>📅 Дневное расписание ({SUPPORT_LEVELS[supportLevel]?.label})</h4>
+              {(() => {
+                const levelData = SUPPORT_LEVELS[supportLevel];
+                if (!levelData) return <p style={{ fontSize: 10, color: 'var(--text-dim)', margin: 0 }}>Выберите уровень поддержки.</p>;
+                const subs = levelData.subs || [];
+                const dosages = levelData.dosages || {};
+                const slots: { time: string; label: string; items: { id: string; name: string; dose: string; with: string; note: string }[] }[] = [
+                  { time: '07:00', label: 'Натощак', items: [] },
+                  { time: '08:00', label: 'Завтрак', items: [] },
+                  { time: '12:00', label: 'Обед', items: [] },
+                  { time: '16:00', label: 'Перекус', items: [] },
+                  { time: '19:00', label: 'Ужин', items: [] },
+                  { time: '21:00', label: 'На ночь', items: [] },
+                ];
+                const timingMap: Record<string, { slot: number; with: string; note: string }> = {
+                  nac: { slot: 0, with: 'Вода', note: 'За 30 мин до еды' },
+                  omega3: { slot: 1, with: 'С жирной пищей', note: 'Для усвоения EPA/DHA' },
+                  vitamin_d3: { slot: 1, with: 'С жирной пищей', note: 'Жирорастворимый' },
+                  vitamin_k2: { slot: 1, with: 'С жирной пищей', note: 'С D3 для синергии' },
+                  coq10: { slot: 1, with: 'С жирной пищей', note: 'Для биодоступности' },
+                  magnesium: { slot: 5, with: 'Вода', note: 'Перед сном' },
+                  zinc: { slot: 5, with: 'На пустой желудок', note: 'Не с кальцием/железом' },
+                  tudca: { slot: 0, with: 'Вода', note: 'За 30 мин до еды, 1-2x/д' },
+                  ashwagandha: { slot: 5, with: 'Вода', note: 'Снижает кортизол' },
+                  alpha_lipoic: { slot: 0, with: 'Вода', note: 'За 30 мин до еды' },
+                  berberine: { slot: 2, with: 'С едой', note: 'Контроль глюкозы' },
+                  milk_thistle: { slot: 2, with: 'С едой', note: 'Гепатопротекция' },
+                  selenium: { slot: 1, with: 'С едой', note: 'Антиоксидант' },
+                  vitamin_b12: { slot: 1, with: 'С водой', note: 'Утром для энергии' },
+                  folate: { slot: 1, with: 'С едой', note: 'Метилирование' },
+                  taurine: { slot: 0, with: 'Вода', note: 'Кардиопротекция' },
+                  glucosamine: { slot: 2, with: 'С едой', note: 'Суставы' },
+                  collagen: { slot: 2, with: 'С едой', note: 'Соединительная ткань' },
+                  vitamin_c: { slot: 0, with: 'Вода', note: 'Синтез коллагена' },
+                  melatonin: { slot: 5, with: 'Вода', note: 'За 30 мин до сна' },
+                };
+                const weightKg = linked.profile?.settings?.weight ?? 80;
+                const getWeightDosing = (id: string, baseMg: number): string => {
+                  const perKg: Record<string, number> = { nac: 25, tudca: 12, omega3: 40, coq10: 4, magnesium: 6.5, zinc: 0.4, berberine: 6, astragalus: 25, taurine: 25, alpha_lipoic: 8, milk_thistle: 10, curcumin: 12, ashwagandha: 8 };
+                  if (!perKg[id]) return '';
+                  const calcMg = Math.max(baseMg * 0.5, Math.min(baseMg * 3, Math.round(perKg[id] * weightKg)));
+                  if (Math.abs(calcMg - baseMg) / baseMg < 0.1) return '';
+                  return `(${weightKg} кг × ${perKg[id]} мг/кг = ${calcMg} мг)`;
+                };
+                subs.forEach(id => {
+                  const dosing = dosages[id];
+                  if (!dosing) return;
+                  const subInfo = ALL_SUBSTANCES.find(s => s.id === id);
+                  const t = timingMap[id] || { slot: 2, with: 'С едой', note: dosing.timing || '' };
+                  const wbDose = getWeightDosing(id, dosing.mg);
+                  const doseStr = dosing.mg >= 5000 ? `${dosing.mg / 1000} г` : `${dosing.mg} мг`;
+                  slots[t.slot].items.push({ id, name: subInfo?.name || id, dose: wbDose ? `${doseStr} ${wbDose}` : doseStr, with: t.with, note: t.note });
+                });
+                const filled = slots.filter(s => s.items.length > 0);
+                if (filled.length === 0) return <p style={{ fontSize: 10, color: 'var(--text-dim)', margin: 0 }}>Выберите уровень поддержки.</p>;
+                return (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    {filled.map(slot => (
+                      <div key={slot.time} style={{ padding: '8px 10px', borderRadius: 8, background: 'rgba(0,0,0,0.15)', border: '1px solid var(--border)' }}>
+                        <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--accent)', marginBottom: 4 }}>{slot.time} — {slot.label}</div>
+                        {slot.items.map(item => (
+                          <div key={item.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 6, padding: '3px 0', fontSize: 9, color: 'var(--text-light)' }}>
+                            <div style={{ width: 4, height: 4, borderRadius: '50%', background: 'var(--accent)', marginTop: 4, flexShrink: 0 }} />
+                            <div style={{ flex: 1 }}>
+                              <span style={{ fontWeight: 600 }}>{item.name}</span>
+                              <span style={{ color: '#00e68a', marginLeft: 4 }}>{item.dose}</span>
+                              <div style={{ fontSize: 7, color: 'var(--text-dim)' }}>{item.with} · {item.note}</div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
+            </div>
+          )}
+
+          {/* ===== SAVE / COPY / EXPORT ===== */}
+          {supportResult && (
+            <div className="card" style={{ marginBottom: 12 }}>
+              <h4 style={{ margin: '0 0 6px 0', fontSize: 12 }}>💾 Сохранить и поделиться</h4>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+                <button onClick={() => {
+                  const plan = {
+                    date: new Date().toISOString(),
+                    level: supportLevel,
+                    levelLabel: SUPPORT_LEVELS[supportLevel]?.label,
+                    goal: supportGoal,
+                    courseSummary: linked.course.map(c => ({ name: c.substanceId, dose: c.doseValue })),
+                  };
+                  const key = `supportPlan_${new Date().toISOString().slice(0, 10)}`;
+                  localStorage.setItem(key, JSON.stringify(plan));
+                  try { notifyDataChange(); } catch {}
+                  alert('✅ План сохранён в localStorage');
+                }} style={{
+                  padding: '10px', borderRadius: 8, border: '1px solid var(--accent)', background: 'rgba(0,230,138,0.08)',
+                  cursor: 'pointer', fontSize: 10, fontWeight: 700, color: 'var(--accent)',
+                }}>💾 Сохранить план</button>
+                <button onClick={() => {
+                  const levelLabel = SUPPORT_LEVELS[supportLevel]?.label || supportLevel;
+                  let text = `🧮 ПЛАН ПОДДЕРЖКИ — BodyBuildHealth\n═══════════════════════════════\n\n`;
+                  text += `📊 Уровень: ${levelLabel}\n`;
+                  text += `🎯 Цель: ${supportGoal}\n`;
+                  text += `💊 Препаратов на курсе: ${linked.course.length}\n\n`;
+                  text += `📋 Добавки:\n`;
+                  (SUPPORT_LEVELS[supportLevel]?.subs || []).forEach(id => {
+                    const dosage = SUPPORT_LEVELS[supportLevel]?.dosages?.[id];
+                    const subInfo = ALL_SUBSTANCES.find(s => s.id === id);
+                    text += `  • ${subInfo?.name || id}: ${dosage?.mg >= 5000 ? (dosage.mg/1000)+'г' : dosage?.mg+'мг'} ${dosage?.timing || ''}\n`;
+                  });
+                  if (supportResult) {
+                    text += `\n📉 Риски: ${Math.round(supportResult.riskBeforeSupport ?? 0)}% → ${Math.round(supportResult.riskAfterSupport ?? 0)}%\n`;
+                    Object.entries(supportResult.systemSupport || {}).forEach(([k, v]) => {
+                      text += `  ${k}: покрытие ${v}%\n`;
+                    });
+                  }
+                  text += `\nСгенерировано: ${new Date().toLocaleDateString('ru-RU')}\nbody-build-health.vercel.app\n`;
+                  navigator.clipboard.writeText(text).catch(() => { alert('Не удалось скопировать'); });
+                }} style={{
+                  padding: '10px', borderRadius: 8, border: '1px solid #60a5fa', background: 'rgba(96,165,250,0.08)',
+                  cursor: 'pointer', fontSize: 10, fontWeight: 700, color: '#60a5fa',
+                }}>📋 Копировать</button>
+                <button onClick={() => {
+                  let text = `👨‍⚕️ ОТЧЕТ ДЛЯ ВРАЧА — BodyBuildHealth\n═══════════════════════════════════\n`;
+                  text += `Дата: ${new Date().toLocaleDateString('ru-RU')}\n`;
+                  const s = linked.profile?.settings;
+                  text += `Пациент: ${s?.age ?? '?'} лет, ${s?.weight ?? '?'} кг, ${(s?.sex ?? 'male') === 'male' ? 'м' : 'ж'}\n\n`;
+                  text += `🚑 АНАЛИЗ КУРСА:\n`;
+                  linked.course.forEach(c => { text += `- ${c.substanceId}: ${c.doseValue || '?'} мг\n`; });
+                  text += `\n💊 ПОДДЕРЖКА (${SUPPORT_LEVELS[supportLevel]?.label}):\n`;
+                  (SUPPORT_LEVELS[supportLevel]?.subs || []).forEach(id => {
+                    const dosage = SUPPORT_LEVELS[supportLevel]?.dosages?.[id];
+                    const subInfo = ALL_SUBSTANCES.find(s => s.id === id);
+                    text += `  • ${subInfo?.name || id}: ${dosage?.mg >= 5000 ? (dosage.mg/1000)+'г' : dosage?.mg+'мг'} — ${dosage?.timing || ''}\n`;
+                  });
+                  if (supportResult) {
+                    text += `\n📊 РИСКИ:\n`;
+                    text += `Общий: ${Math.round(supportResult.riskBeforeSupport ?? 0)}% → ${Math.round(supportResult.riskAfterSupport ?? 0)}%\n`;
+                    Object.entries(supportResult.systemSupport || {}).forEach(([k, v]) => { text += `  ${k}: покрытие ${v}%\n`; });
+                  }
+                  text += `\n═══════════════════════════════════\n`;
+                  navigator.clipboard.writeText(text).catch(() => {});
+                }} style={{
+                  padding: '10px', borderRadius: 8, border: '1px solid #f59e0b', background: 'rgba(245,158,11,0.08)',
+                  cursor: 'pointer', fontSize: 10, fontWeight: 700, color: '#f59e0b',
+                }}>👨‍⚕️ Экспорт врачу</button>
+                <button onClick={() => {
+                  const key = `supportPlan_${new Date().toISOString().slice(0, 10)}`;
+                  const plan = { date: new Date().toISOString(), level: supportLevel, goal: supportGoal, result: supportResult };
+                  localStorage.setItem(key, JSON.stringify(plan));
+                  try { notifyDataChange(); } catch {}
+                  const blob = new Blob([JSON.stringify(plan, null, 2)], { type: 'application/json' });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = url; a.download = `support-plan-${new Date().toISOString().slice(0, 10)}.json`;
+                  a.click(); URL.revokeObjectURL(url);
+                }} style={{
+                  padding: '10px', borderRadius: 8, border: '1px solid #a78bfa', background: 'rgba(167,139,250,0.08)',
+                  cursor: 'pointer', fontSize: 10, fontWeight: 700, color: '#a78bfa',
+                }}>📤 Скачать JSON</button>
+              </div>
+            </div>
           )}
         </div>
       )}
@@ -5462,19 +5652,7 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
 
         const execCalculate = () => {
           try {
-            const s = linked.profile?.settings;
-            const input: SupportInput = {
-              substances: SUPPORT_LEVELS[supportLevel]?.subs || [],
-              goals: [supportGoal],
-              drugDoses: linked.course.reduce((acc, c) => { acc[c.substanceId] = c.doseValue || 300; return acc; }, {} as Record<string, number>),
-              labs: (linked.labs || []).map(l => ({ code: l.code, value: l.value })),
-              demographics: { age: s?.age ?? 30, weight: s?.weight ?? 80, sex: (s?.sex ?? 'male') as 'male' | 'female' },
-              nutritionFactor: s?.nutritionFactor ?? 0.8,
-              trainingFactor: s?.trainingFactor ?? 0.7,
-            };
-            const result = calculateSupport(input);
-            setCalcResult(result);
-            setCalcDone(true);
+            calcSupport(supportLevel);
           } catch { }
         };
 
@@ -5493,6 +5671,7 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
           };
           const key = `supportPlan_${new Date().toISOString().slice(0, 10)}`;
           localStorage.setItem(key, JSON.stringify(plan));
+          try { notifyDataChange(); } catch {}
           setPlanSaved(true);
           setTimeout(() => setPlanSaved(false), 3000);
         };
@@ -5677,19 +5856,7 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
               </p>
               <button onClick={() => {
                 try {
-                  const s = linked.profile?.settings;
-                  const input: SupportInput = {
-                    substances: supportDrugs.length > 0 ? supportDrugs : (linked.course?.map(c => c.substanceId) || []),
-                    goals: [supportGoal],
-                    labs: (linked.labs || []).map(l => ({ code: l.code, value: l.value })),
-                    demographics: { age: s?.age ?? age, weight: s?.weight ?? weightKg, sex: (s?.sex ?? sex) as 'male' | 'female' },
-                    drugDoses: Object.fromEntries((linked.course || []).map(c => [c.substanceId, c.doseValue])),
-                    nutritionFactor: s?.nutritionFactor ?? 0.8,
-                    trainingFactor: s?.trainingFactor ?? 0.7,
-                  };
-                  const result = calculateSupport(input);
-                  setCalcResult(result as any);
-                  setCalcDone(true);
+                  calcSupport();
                 } catch { }
               }} style={{
                 width:'100%', padding:'14px', borderRadius:10, border:'none', cursor:'pointer',
@@ -5774,7 +5941,7 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
                   const em: Record<string, string> = { basic: '🟢', mid: '🟡', max: '🟠', boost: '🔴' };
                   const count = SUPPORT_LEVELS[l as string]?.subs?.length || 0;
                   return (
-                    <button key={l} onClick={() => setSupportLevel(l)} style={{
+                    <button key={l} onClick={() => { setSupportLevel(l); calcSupport(l); }} style={{
                       padding:'8px 4px', borderRadius:10, border: `2px solid ${active ? colors[l] : autoActive ? `${colors[l]}88` : 'var(--border)'}`,
                       background: active ? `${colors[l]}15` : autoActive ? `${colors[l]}06` : 'var(--bg-secondary)',
                       cursor:'pointer', textAlign:'center', position:'relative', transition:'all 0.15s',
@@ -5927,7 +6094,7 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
             <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:6 }}>
               <button onClick={() => {
                 setSupportLevel(autoLevel);
-                try { execCalculate(); } catch {}
+                try { calcSupport(autoLevel); } catch {}
               }} style={{
                 padding:'12px 6px', borderRadius:10, border:'1px solid #8b5cf6', background:'rgba(139,92,246,0.08)',
                 cursor:'pointer', fontSize:10, fontWeight:700, color:'#8b5cf6', textAlign:'center',
@@ -5938,7 +6105,7 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
               </button>
               <button onClick={() => {
                 setSupportLevel('basic');
-                try { execCalculate(); } catch {}
+                try { calcSupport('basic'); } catch {}
               }} style={{
                 padding:'12px 6px', borderRadius:10, border:'1px solid #22c55e', background:'rgba(34,197,94,0.06)',
                 cursor:'pointer', fontSize:10, fontWeight:700, color:'#22c55e', textAlign:'center',
@@ -5949,7 +6116,7 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
               </button>
               <button onClick={() => {
                 setSupportLevel('boost');
-                try { execCalculate(); } catch {}
+                try { calcSupport('boost'); } catch {}
               }} style={{
                 padding:'12px 6px', borderRadius:10, border:'1px solid #ef4444', background:'rgba(239,68,68,0.06)',
                 cursor:'pointer', fontSize:10, fontWeight:700, color:'#ef4444', textAlign:'center',
@@ -5987,7 +6154,7 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
                   const colors: Record<string, string> = { basic: '#22c55e', mid: '#eab308', max: '#f97316', boost: '#ef4444' };
                   const levelNames: Record<string, string> = { basic: '🟢 База', mid: '🟡 Средний', max: '🟠 Усиление', boost: '🔴 Максимум' };
                   return (
-                    <button key={l} onClick={() => setSupportLevel(l)} style={{
+                    <button key={l} onClick={() => { setSupportLevel(l); calcSupport(l); }} style={{
                       padding:'10px 6px', borderRadius:10, border: `2px solid ${active ? colors[l] : 'var(--border)'}`,
                       background: active ? `${colors[l]}12` : 'var(--bg-secondary)', cursor:'pointer', textAlign:'center', position:'relative',
                     }}>
