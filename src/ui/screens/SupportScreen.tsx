@@ -2563,7 +2563,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
                       <div onClick={() => setExpandedCategories(prev => ({ ...prev, drug_combo_ref: !prev.drug_combo_ref }))} style={{ display:'flex', alignItems:'center', gap:6, padding:'7px 10px', cursor:'pointer', userSelect:'none', background:'var(--bg-secondary)', borderRadius:8 }}>
                         <span style={{ fontSize:13 }}>💊</span>
                         <div style={{ flex:1, fontSize:10, fontWeight:700, color:'var(--text-light)' }}>Фармакологические взаимодействия</div>
-                         <span style={{ fontSize:9, color:'var(--text-dim)', marginRight:2 }}>33</span>
+                          <span style={{ fontSize:9, color:'var(--text-dim)', marginRight:2 }}>50</span>
                         <span style={{ fontSize:9, color:'var(--text-dim)', transform: expandedCategories.drug_combo_ref !== false ? 'rotate(180deg)' : 'none', transition:'transform 0.2s' }}>▼</span>
                       </div>
                       {expandedCategories.drug_combo_ref !== false && (
@@ -2602,7 +2602,24 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
                              { a:'Спиронолактон', b:'Калий', effect:'Калий-сберегающий диуретик', risk:'Гиперкалиемия. НЕ добавлять калий!', control:'Калий сыворотки', type:'critical' },
                              { a:'Статины', b:'Убихинол (CoQ10)', effect:'Статины блокируют синтез CoQ10', risk:'Миопатия, слабость', control:'CoQ10 100-200 мг/день обязательно', type:'warning' },
                              { a:'Финастерид', b:'Цинк', effect:'Оба снижают DHT — усиление эффекта против выпадения волос', risk:'Снижение либидо', control:'DHT, контроль симптомов', type:'synergy' },
-                           ] as const).map((combo, ci) => {
+                             { a:'Тестостерон', b:'Дутастерид', effect:'Полная защита от DHT (оба типа 5α-редуктазы)', risk:'Депрессия либидо (пост-финастеридный синдром)', control:'PSA, DHT', type:'warning' },
+                             { a:'Нандролон', b:'Прамипексол', effect:'Прамипексол (D2-агонист) снижает пролактин от нандролона', risk:'Избыточное снижение пролактина', control:'Пролактин каждые 2 нед.', type:'caution' },
+                             { a:'Тестостерон', b:'Финастерид', effect:'Финастерид блокирует 5α-редуктазу II типа. Защита от DHT на простату и волосы.', risk:'Пост-финастеридный синдром', control:'DHT, простата', type:'caution' },
+                             { a:'Метформин', b:'Витамин B12', effect:'Метформин истощает B12 через 6-12 мес приёма', risk:'Дефицит B12', control:'B12 каждые 6 мес. Добавка 500-1000 мкг/день.', type:'warning' },
+                             { a:'Кленбутерол', b:'Таурин', effect:'Кленбутерол истощает таурин в миокарде', risk:'Судороги, аритмия', control:'Таурин 3-5 г/день обязательно', type:'warning' },
+                             { a:'Аспирин', b:'Омепразол', effect:'Омепразол защищает желудок от НПВС-гастропатии', risk:'Симптомы гастрита', control:'Контроль симптомов гастрита', type:'caution' },
+                             { a:'Ибупрофен', b:'Телмисартан', effect:'НПВС снижают антигипертензивный эффект БРА', risk:'Задержка натрия и воды', control:'Контроль АД', type:'caution' },
+                             { a:'Эналаприл', b:'Калий', effect:'иАПФ задерживают калий. Добавка калия может вызвать гиперкалиемию.', risk:'Гиперкалиемия', control:'Калий сыворотки', type:'warning' },
+                             { a:'Тамоксифен', b:'Варфарин', effect:'Тамоксифен усиливает действие варфарина (ингибирует CYP2C9)', risk:'Кровотечения', control:'МНО', type:'critical' },
+                             { a:'Анастрозол', b:'Витамин D', effect:'Анастрозол снижает Е2, ухудшая усвоение витамина D и кальция', risk:'Остеопороз, дефицит витамина D', control:'D3 повысить до 4000-5000 IU', type:'caution' },
+                             { a:'Мифепристон', b:'Кортизол', effect:'Мифепристон блокирует рецепторы кортизола. При синдроме Кушинга.', risk:'Недостаточность надпочечников', control:'Кортизол', type:'warning' },
+                             { a:'Цинк', b:'Медь', effect:'Цинк конкурирует с медью за всасывание. Соотношение Zn:Cu = 10:1.', risk:'Дефицит меди', control:'Добавка меди при длительном приёме цинка', type:'caution' },
+                             { a:'Кальций', b:'Магний', effect:'Кальций и магний конкурируют за транспорт', risk:'Снижение усвоения', control:'Принимать раздельно: Ca утром, Mg вечером.', type:'caution' },
+                             { a:'Витамин D', b:'Витамин K2', effect:'Синергия. D3 повышает всасывание Ca, K2 направляет Ca в кости.', risk:'Кальцификация сосудов без K2', control:'Обязательная комбинация при D3 >2000 IU', type:'synergy' },
+                             { a:'Витамин C', b:'Железо', effect:'Витамин C удваивает всасывание негемового железа', risk:'Перегрузка железом при гемохроматозе', control:'Принимать вместе. Контроль ферритина.', type:'caution' },
+                             { a:'Грейпфрутовый сок', b:'Статины', effect:'Грейпфрут ингибирует CYP3A4, повышая уровень статинов в 3-5 раз', risk:'Рабдомиолиз', control:'ИЗБЕГАТЬ совместного приёма!', type:'critical' },
+                             { a:'L-тироксин', b:'Кальций/Железо', effect:'Кальций и железо снижают всасывание L-тироксина на 30-40%', risk:'Гипотиреоз', control:'Принимать тироксин за 4 часа до/после', type:'warning' },
+                            ] as const).map((combo, ci) => {
                             const typeColor = combo.type === 'critical' ? '#ff1744' : combo.type === 'warning' ? '#ff9100' : combo.type === 'synergy' ? '#22c55e' : '#f59e0b';
                             const typeLabel = combo.type === 'critical' ? '🚫 КРИТИЧНО' : combo.type === 'warning' ? '⚡ ОСТОРОЖНО' : combo.type === 'synergy' ? '⊕ СИНЕРГИЯ' : 'ℹ УМЕРЕННО';
                             return (

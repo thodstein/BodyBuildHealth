@@ -324,6 +324,18 @@ const MealPlanExtended: React.FC<{ tKcal: number; tProt: number; tFat: number; t
   const [expandedRules, setExpandedRules] = React.useState<Set<number>>(new Set());
   const toggleRule = (i: number) => setExpandedRules(prev => { const s = new Set(prev); s.has(i) ? s.delete(i) : s.add(i); return s; });
 
+  const [qualityFromDB, setQualityFromDB] = React.useState(false);
+
+  const dbQualityScores = React.useMemo(() => {
+    const proteinFoods = FOOD_DB.filter(f => f.category === 'protein' && f.tier && f.kcal > 0)
+      .map(f => ({ name: f.name, score: f.tier === 'max' ? 10 : f.tier === 'mid' ? 8 : f.tier === 'basic' ? 6 : 5, desc: f.description || '', tier: f.tier || 'basic' }));
+    const carbFoods = FOOD_DB.filter(f => (f.category === 'carb' || f.category === 'grain') && f.tier && f.kcal > 0)
+      .map(f => ({ name: f.name, score: f.tier === 'max' ? 9 : f.tier === 'mid' ? 7 : f.tier === 'basic' ? 5 : 4, desc: f.description || '', tier: f.tier || 'basic' }));
+    const fatFoods = FOOD_DB.filter(f => f.category === 'fat' && f.tier && f.kcal > 0)
+      .map(f => ({ name: f.name, score: f.tier === 'max' ? 10 : f.tier === 'mid' ? 8 : f.tier === 'basic' ? 6 : 5, desc: f.description || '', tier: f.tier || 'basic' }));
+    return { proteins: proteinFoods.sort((a, b) => b.score - a.score).slice(0, 15), carbs: carbFoods.sort((a, b) => b.score - a.score).slice(0, 14), fats: fatFoods.sort((a, b) => b.score - a.score).slice(0, 12) };
+  }, []);
+
   const NUTRITION_RULES = [
     { title: 'Осторожность с молочкой', body: 'Лактоза повышает воспалительные маркеры (СРБ) и провоцирует застой желчи. Может влиять на акне.', color: '#f59e0b' },
     { title: 'Нормы клетчатки', body: '3-30 г/сутки индивидуально. Избыток → диарея. Польза для ССЗ.', color: '#22c55e' },
@@ -342,6 +354,9 @@ const MealPlanExtended: React.FC<{ tKcal: number; tProt: number; tFat: number; t
     { title: 'Читмил и тяжёлая тренировка', body: 'Лучшее время: сразу ПОСЛЕ тяжёлой тренировки (гликогеновые депо опустошены, чувствительность к инсулину максимальна)\n- Перед тренировкой: лёгкий белковый приём за 1.5-2 часа\n- После читмила: вернуться к обычному рациону без компенсации (не голодать!)\n- Частота: 1 раз в 7-10 дней\n- Не более 1500 ккал за читмил', color: '#f59e0b' },
     { title: 'Углеводная загрузка (вокруг тяжёлой тренировки)', body: 'За 24-48 часов ДО тяжёлой тренировки: увеличить углеводы до 6-8 г/кг\n- В день тренировки: 1-1.5 г/кг углеводов за 2-3 часа до\n- Сразу после: 1 г/кг быстрых углеводов + 0.3 г/кг белка\n- Следующие 24 часа: поддерживать повышенные углеводы\n- Вода: увеличить потребление на 1-1.5 л в дни загрузки', color: '#f97316' },
     { title: 'Белково-углеводное чередование (БУЧ)', body: 'Высокоуглеводные дни: тренировочные дни, +30% к базовым углеводам\nНизкоуглеводные дни: дни отдыха, -50% к базовым углеводам\nБелок: постоянно высокий (2-2.5 г/кг) все дни\nЖиры: выше в низкоуглеводные дни, ниже в высокоуглеводные\nЦикл: 3 тренировочных (высоко) + 1 отдых (низко) или 2+1', color: '#3b82f6' },
+    { title: 'Водный баланс и электролиты', body: '30-40 мл воды на кг веса в день\n+ 500-750 мл за каждый час тренировки\nНа курсе ААС: увеличить до 40-50 мл/кг (повышенный гематокрит)\nНатрий: 3-5 г/день (при повышенном АД → 2-3 г)\nКалий: 4-5 г/день из продуктов (бананы, картофель, авокадо)\nМагний: 400-600 мг/день дополнительно', color: '#06b6d4' },
+    { title: 'Периодизация питания', body: 'Фаза набора: профицит 300-500 ккал, белок 2-2.5 г/кг\nФаза сушки: дефицит 300-500 ккал, белок 2.5-3 г/кг\nПоддержание: баланс калорий, белок 1.8-2 г/кг\nМенять фазы каждые 8-12 недель\nМетаболическая адаптация: при плато ±200 ккал', color: '#a855f7' },
+    { title: 'Нутритивное окно и анаболический отклик', body: '30 г белка каждые 3-4 часа для максимального синтеза белка\nЛейцин 3-4 г на приём для активации mTOR\nУглеводы вокруг тренировки повышают анаболический отклик на 30-40%\nКазеин (30-40 г) перед сном для ночного анти-катаболизма\nОмега-3 (2-3 г EPA/DHA) улучшает чувствительность к инсулину на 25%', color: '#22c55e' },
   ];
 
   const RECOMMENDED_FOODS: Record<string, { items: string[]; color: string; bg: string }> = {
@@ -925,10 +940,76 @@ const MealPlanExtended: React.FC<{ tKcal: number; tProt: number; tFat: number; t
       </div>
 
       <div className="card" style={{ marginBottom: 8, padding: 14 }}>
-        <h4 style={{ margin: '0 0 10px', fontSize: 13, color: 'var(--accent)' }}>📊 Качество продуктов</h4>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+          <h4 style={{ margin: 0, fontSize: 13, color: 'var(--accent)' }}>📊 Качество продуктов</h4>
+          <button
+            onClick={() => setQualityFromDB(!qualityFromDB)}
+            style={{
+              padding: '4px 10px', borderRadius: 14, fontSize: 9, fontWeight: 600, cursor: 'pointer',
+              background: qualityFromDB ? 'rgba(0,230,138,0.12)' : 'var(--bg-secondary)',
+              border: qualityFromDB ? '1px solid rgba(0,230,138,0.3)' : '1px solid var(--border)',
+              color: qualityFromDB ? 'var(--accent)' : 'var(--text-dim)',
+              transition: 'all 0.2s',
+            }}
+          >
+            {qualityFromDB ? '🗄 Из БД' : '📋 Ручной'}
+          </button>
+        </div>
         <p style={{ fontSize: 9, color: 'var(--text-dim)', margin: '0 0 8px' }}>
-          Оценка источников белка, углеводов и жиров по шкале 1–10
+          {qualityFromDB ? 'Авто-оценка из базы продуктов (по tier: max=высший балл, mid=средний, basic=базовый)' : 'Оценка источников белка, углеводов и жиров по шкале 1–10'}
         </p>
+        {qualityFromDB ? (
+          // ── DB-generated quality scores ──
+          <>
+            <h5 style={{ margin: '8px 0 6px', fontSize: 11, color: '#3b82f6' }}>Белки (из БД, {dbQualityScores.proteins.length})</h5>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 8 }}>
+              {dbQualityScores.proteins.map((p, j) => {
+                const scoreColor = p.score >= 9 ? '#22c55e' : p.score >= 7 ? '#f59e0b' : p.score >= 5 ? '#f97316' : '#ef4444';
+                return (
+                  <div key={j} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0', borderBottom: j < dbQualityScores.proteins.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none' }}>
+                    <div style={{ minWidth: 32, height: 22, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', background: scoreColor + '15', color: scoreColor, fontWeight: 800, fontSize: 11 }}>{p.score}/10</div>
+                    <div style={{ flex: 1 }}>
+                      <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--text)' }}>{p.name}</span>
+                      <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.35)', marginLeft: 6 }}>tier: {p.tier}</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <h5 style={{ margin: '8px 0 6px', fontSize: 11, color: '#f97316' }}>Углеводы (из БД, {dbQualityScores.carbs.length})</h5>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 8 }}>
+              {dbQualityScores.carbs.map((p, j) => {
+                const scoreColor = p.score >= 9 ? '#22c55e' : p.score >= 7 ? '#f59e0b' : p.score >= 5 ? '#f97316' : '#ef4444';
+                return (
+                  <div key={j} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0', borderBottom: j < dbQualityScores.carbs.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none' }}>
+                    <div style={{ minWidth: 32, height: 22, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', background: scoreColor + '15', color: scoreColor, fontWeight: 800, fontSize: 11 }}>{p.score}/10</div>
+                    <div style={{ flex: 1 }}>
+                      <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--text)' }}>{p.name}</span>
+                      <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.35)', marginLeft: 6 }}>tier: {p.tier}</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <h5 style={{ margin: '8px 0 6px', fontSize: 11, color: '#f59e0b' }}>Жиры (из БД, {dbQualityScores.fats.length})</h5>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              {dbQualityScores.fats.map((p, j) => {
+                const scoreColor = p.score >= 9 ? '#22c55e' : p.score >= 7 ? '#f59e0b' : p.score >= 5 ? '#f97316' : '#ef4444';
+                return (
+                  <div key={j} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0', borderBottom: j < dbQualityScores.fats.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none' }}>
+                    <div style={{ minWidth: 32, height: 22, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', background: scoreColor + '15', color: scoreColor, fontWeight: 800, fontSize: 11 }}>{p.score}/10</div>
+                    <div style={{ flex: 1 }}>
+                      <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--text)' }}>{p.name}</span>
+                      <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.35)', marginLeft: 6 }}>tier: {p.tier}</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </>
+        ) : (
+          // ── Manual curated quality scores ──
+          <>
         <h5 style={{ margin: '8px 0 6px', fontSize: 11, color: '#3b82f6' }}>Белки (оценка 1–10)</h5>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
           {[
@@ -1021,6 +1102,8 @@ const MealPlanExtended: React.FC<{ tKcal: number; tProt: number; tFat: number; t
             );
           })}
         </div>
+        </>
+        )}
       </div>
 
       <div className="card" style={{ marginBottom: 8, padding: 14, border: '1px solid rgba(239,68,68,0.2)', background: 'rgba(239,68,68,0.04)' }}>
