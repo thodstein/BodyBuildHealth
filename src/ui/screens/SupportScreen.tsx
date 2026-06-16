@@ -5234,229 +5234,622 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
         </div>
       )}
 
-      {/* ===== SUPPORT CALCULATOR (redirect to info catalog) ===== */}
-      {tab === 'main' && supportView === 'calc' && calcView === 'calculator' && (
+      {/* ===== SUPPORT CALCULATOR — FULL DATA-INTEGRATED OVERHAUL ===== */}
+      {tab === 'main' && supportView === 'calc' && calcView === 'calculator' && (() => {
+        const weightKg = linked.profile?.settings?.weight ?? 80;
+        const age = linked.profile?.settings?.age ?? 30;
+        const sex = linked.profile?.settings?.sex ?? 'male';
+        const course = linked.course || [];
+        const labs = linked.labs || [];
+        const riskData = linked.risk;
+        const labAnalysis = linked.labAnalysis;
+        const planSavedLocal = planSaved;
+
+        const SYSTEM_LABELS_RU: Record<string, { name: string; emoji: string; rec: string }> = {
+          cardio: { name: 'Сердце', emoji: '❤️', rec: 'Тельмисартан, Небиволол, CoQ10, Omega-3, L-карнитин' },
+          hepatic: { name: 'Печень', emoji: '🫁', rec: 'NAC, TUDCA, Силимарин, Альфа-липоевая, Фосфатидилхолин' },
+          renal: { name: 'Почки', emoji: '🫘', rec: 'Астрагал, Кордицепс, Omega-3, гидратация' },
+          neuro: { name: 'Нейро', emoji: '🧠', rec: 'Mg L-треонат, Lion\'s Mane, Theanine, Omega-3, B-комплекс' },
+          endocrine: { name: 'Эндокринная', emoji: '🔄', rec: 'DIM, Цинк, Ашваганда, Витекс, Бор' },
+          hematologic: { name: 'Кровь', emoji: '🩸', rec: 'Omega-3, Наттокиназа, Ипидофлавин, гидратация, Кардио' },
+          reproductive: { name: 'Репродуктивная', emoji: '⚧', rec: 'HCG, Кломифен, Цинк, D-Aspartic Acid, Сабаль пальметто' },
+          musculoskeletal: { name: 'Опорно-двиг.', emoji: '🦴', rec: 'Глюкозамин, Коллаген, MSM, Босвеллия, Витамин D3+K2' },
+        };
+
+        const calcWeeklyDose = (c: CourseEntry): number => {
+          const freq = typeof c.frequency === 'number' ? c.frequency : parseFloat(String(c.frequency)) || 0;
+          const val = c.doseValue || 0;
+          return val * (freq > 0 ? freq : 1);
+        };
+
+        const getPharmaClass = (substanceId: string): string => {
+          const ph = PHARMA_DB[substanceId] as any;
+          return ph?.class || 'other';
+        };
+
+        const getPharmaName = (substanceId: string): string => {
+          const ph = PHARMA_DB[substanceId] as any;
+          return ph?.name || substanceId;
+        };
+
+        const getAndrogenicity = (substanceId: string): number => {
+          const mapping: Record<string, number> = {
+            test_prop: 1.0, test_enan: 1.0, test_cyp: 1.0, test_undec: 1.0,
+            tren_acet: 1.5, tren_enan: 1.5, tren_hex: 1.5, trena: 1.5,
+            npp: 0.8, deca: 0.8,
+            bold_undec: 0.7, prim_enan: 0.6,
+            oxan: 0.6, stan: 1.0, methand: 1.1, halo: 1.8,
+            ostarine: 0.05, lgd: 0.1, rad140: 0.15, s23: 0.2,
+          };
+          return mapping[substanceId] ?? 0.5;
+        };
+
+        const getHepatotoxicity = (substanceId: string): number => {
+          const ph = PHARMA_DB[substanceId] as any;
+          return ph?.pd?.hepatotoxicity ?? 0;
+        };
+
+        const getAromatization = (substanceId: string): number => {
+          const ph = PHARMA_DB[substanceId] as any;
+          return ph?.pd?.aromatization ?? 0;
+        };
+
+        const is19Nor = (substanceId: string): boolean => {
+          const cls = getPharmaClass(substanceId);
+          return cls === 'trenbolone' || cls === 'nandrolone';
+        };
+
+        const is17aaOral = (substanceId: string): boolean => {
+          const cls = getPharmaClass(substanceId);
+          return cls === 'oral_17aa';
+        };
+
+        const uniqCourse = useMemo(() => {
+          const seen = new Map<string, { substanceId: string; name: string; cls: string; totalDose: number; hep: number; arom: number; andro: number; is19: boolean; is17aa: boolean }>();
+          course.forEach(c => {
+            const id = c.substanceId;
+            const weekly = calcWeeklyDose(c);
+            if (seen.has(id)) {
+              const ex = seen.get(id)!;
+              ex.totalDose += weekly;
+            } else {
+              seen.set(id, {
+                substanceId: id, name: getPharmaName(id), cls: getPharmaClass(id),
+                totalDose: weekly, hep: getHepatotoxicity(id), arom: getAromatization(id),
+                andro: getAndrogenicity(id), is19: is19Nor(id), is17aa: is17aaOral(id),
+              });
+            }
+          });
+          return Array.from(seen.values());
+        }, [course]);
+
+        const count17aa = uniqCourse.filter(c => c.is17aa).length;
+        const hasTren = uniqCourse.some(c => c.cls === 'trenbolone');
+        const hasNandrolone = uniqCourse.some(c => c.cls === 'nandrolone');
+        const countAromatizing = uniqCourse.filter(c => c.arom > 0).length;
+        const avgToxicity = uniqCourse.length > 0 ? uniqCourse.reduce((s, c) => s + c.hep, 0) / uniqCourse.length : 0;
+        const totalAndrogenicity = uniqCourse.reduce((s, c) => s + c.andro * (c.totalDose / 300), 0);
+
+        const toxicityLabel =
+          avgToxicity >= 2.5 ? 'Критический' : avgToxicity >= 1.5 ? 'Высокий' : avgToxicity >= 0.5 ? 'Средний' : 'Низкий';
+        const toxicityColor =
+          avgToxicity >= 2.5 ? '#ef4444' : avgToxicity >= 1.5 ? '#f97316' : avgToxicity >= 0.5 ? '#f59e0b' : '#22c55e';
+        const androLabel = totalAndrogenicity > 3 ? 'высокий риск андрогенных побочек' : totalAndrogenicity > 1.5 ? 'средний риск' : 'низкий риск';
+
+        const getLabStatus = (code: string): { value: number; refHigh: number; status: 'high' | 'critical' | 'normal' } | null => {
+          const refs: Record<string, number> = {
+            ALT: 40, AST: 35, GGT: 55, CREATININE: 110, LDL: 3.0, TRIGLYCERIDES: 1.7,
+            GLUCOSE: 5.6, CRP: 5, HEMOGLOBIN: 175, HEMATOCRIT: 50,
+            ESTRADIOL: 50, PROLACTIN: 15, SHBG: 55, TOTAL_TESTOSTERONE: 35,
+          };
+          for (const l of labs) {
+            if (l.code === code) {
+              const refHigh = refs[code] || 100;
+              return { value: l.value, refHigh, status: l.value > refHigh * 1.3 ? 'critical' : l.value > refHigh ? 'high' : 'normal' };
+            }
+          }
+          return null;
+        };
+
+        const LAB_REC_MAP: Record<string, { rec: string; dose: string }> = {
+          ALT: { rec: 'NAC 1200-2400 мг, TUDCA 500-1500 мг, Силимарин 600-900 мг', dose: 'NAC 20-30 мг/кг, TUDCA 10-15 мг/кг' },
+          AST: { rec: 'дополнительно NAC 600-1200 мг', dose: 'NAC 20-30 мг/кг' },
+          GGT: { rec: 'TUDCA 1000-1500 мг, Силимарин 900 мг, Альфа-липоевая 600 мг', dose: 'TUDCA 10-15 мг/кг' },
+          CREATININE: { rec: 'Астрагал 1500-3000 мг, Кордицепс 1000-2000 мг', dose: 'Астрагал 20-40 мг/кг' },
+          LDL: { rec: 'Omega-3 3-5г, Бергамот 1000 мг, Берберин 500 мг', dose: 'Omega-3 30-50 мг/кг' },
+          TRIGLYCERIDES: { rec: 'Omega-3 3-5г, Берберин 500-1000 мг', dose: 'Omega-3 30-50 мг/кг' },
+          GLUCOSE: { rec: 'Берберин 500 мг 2x/д, Альфа-липоевая 600 мг', dose: 'Берберин по назначению' },
+          CRP: { rec: 'Omega-3 3-5г, Куркумин 1000 мг, Босвеллия 600 мг', dose: 'Omega-3 30-50 мг/кг, Куркумин 15 мг/кг' },
+          HEMOGLOBIN: { rec: 'Omega-3 2-3г, Наттокиназа 100 мг, гидратация', dose: 'Omega-3 30-50 мг/кг' },
+          HEMATOCRIT: { rec: 'Ипидофлавин 50 мг, Наттокиназа 100 мг, гидратация 3+ л/д', dose: 'Гидратация 40 мл/кг' },
+          ESTRADIOL: { rec: 'Анастрозол (коррекция), Цинк 50 мг, DIM 200 мг', dose: 'Цинк 0.3-0.6 мг/кг' },
+          PROLACTIN: { rec: 'Каберголин/Бромокриптин, Витамин B6 200-300 мг', dose: 'B6 2-4 мг/кг' },
+          SHBG: { rec: 'Бор 10 мг, Магний 400-600 мг', dose: 'Бор 0.1-0.15 мг/кг, Mg 5-8 мг/кг' },
+        };
+
+        const abnormalLabs = (
+          labAnalysis?.interpretations?.filter(i => i.status === 'high' || i.status === 'critical_high') ||
+          Object.keys(LAB_REC_MAP).map(code => getLabStatus(code)).filter(Boolean).filter(s => s!.status !== 'normal')
+        );
+
+        const weightBasedDose = (baseMg: number, perKg: number, weight: number): number => {
+          const calc = Math.round(perKg * weight);
+          return Math.max(baseMg * 0.5, Math.min(baseMg * 3, calc));
+        };
+
+        const getWeightDosing = (id: string, baseMg: number): string => {
+          const perKg: Record<string, number> = {
+            nac: 25, tudca: 12, omega3: 40, coq10: 4, magnesium: 6.5,
+            zinc: 0.4, berberine: 6, astragalus: 25, taurine: 25,
+            alpha_lipoic: 8, milk_thistle: 10, curcumin: 12, ashwagandha: 8,
+          };
+          if (!perKg[id]) return '';
+          const calcMg = weightBasedDose(baseMg, perKg[id], weightKg);
+          if (Math.abs(calcMg - baseMg) / baseMg < 0.1) return '';
+          return `(${weightKg} кг × ${perKg[id]} мг/кг = ${calcMg} мг)`;
+        };
+
+        // Auto schedule builder
+        const buildDailySchedule = (level: string) => {
+          const levelData = SUPPORT_LEVELS[level];
+          if (!levelData) return [];
+          const subs = levelData.subs || [];
+          const dosages = levelData.dosages || {};
+          const slots: { time: string; label: string; items: { id: string; name: string; dose: string; with: string; note: string }[] }[] = [
+            { time: '07:00', label: 'Натощак', items: [] },
+            { time: '08:00', label: 'Завтрак', items: [] },
+            { time: '12:00', label: 'Обед', items: [] },
+            { time: '16:00', label: 'Перекус', items: [] },
+            { time: '19:00', label: 'Ужин', items: [] },
+            { time: '21:00', label: 'На ночь', items: [] },
+          ];
+
+          const timingMap: Record<string, { slot: number; with: string; note: string }> = {
+            nac: { slot: 0, with: 'Вода', note: 'За 30 мин до еды' },
+            omega3: { slot: 1, with: 'С жирной пищей', note: 'Для усвоения EPA/DHA' },
+            vitamin_d3: { slot: 1, with: 'С жирной пищей', note: 'Жирорастворимый' },
+            vitamin_k2: { slot: 1, with: 'С жирной пищей', note: 'С D3 для синергии' },
+            coq10: { slot: 1, with: 'С жирной пищей', note: 'Для биодоступности' },
+            magnesium: { slot: 5, with: 'Вода', note: 'Перед сном' },
+            zinc: { slot: 5, with: 'На пустой желудок', note: 'Не с кальцием/железом' },
+            tudca: { slot: 0, with: 'Вода', note: 'За 30 мин до еды, 1-2x/д' },
+            ashwagandha: { slot: 5, with: 'Вода', note: 'Снижает кортизол' },
+            alpha_lipoic: { slot: 0, with: 'Вода', note: 'За 30 мин до еды' },
+            berberine: { slot: 2, with: 'С едой', note: 'Контроль глюкозы' },
+            milk_thistle: { slot: 2, with: 'С едой', note: 'Гепатопротекция' },
+            selenium: { slot: 1, with: 'С едой', note: 'Антиоксидант' },
+            vitamin_b12: { slot: 1, with: 'С водой', note: 'Утром для энергии' },
+            folate: { slot: 1, with: 'С едой', note: 'Метилирование' },
+            taurine: { slot: 0, with: 'Вода', note: 'Кардиопротекция' },
+            glucosamine: { slot: 2, with: 'С едой', note: 'Суставы' },
+            collagen: { slot: 2, with: 'С едой', note: 'Соединительная ткань' },
+            vitamin_c: { slot: 0, with: 'Вода', note: 'Синтез коллагена' },
+            melatonin: { slot: 5, with: 'Вода', note: 'За 30 мин до сна' },
+          };
+
+          subs.forEach(id => {
+            const dosing = dosages[id];
+            if (!dosing) return;
+            const subInfo = ALL_SUBSTANCES.find(s => s.id === id);
+            const t = timingMap[id] || { slot: 2, with: 'С едой', note: dosing.timing || '' };
+            const wbDose = getWeightDosing(id, dosing.mg);
+            const doseStr = dosing.mg >= 5000 ? `${dosing.mg / 1000} г` : `${dosing.mg} мг`;
+            slots[t.slot].items.push({
+              id, name: subInfo?.name || id,
+              dose: wbDose ? `${doseStr} ${wbDose}` : doseStr,
+              with: t.with, note: t.note,
+            });
+          });
+          return slots.filter(s => s.items.length > 0);
+        };
+
+        const [dailySchedule, setDailySchedule] = useState<any[]>(() => buildDailySchedule(supportLevel));
+        const [calcResult, setCalcResult] = useState<ReturnType<typeof calculateSupport> | null>(null);
+        const [calcDone, setCalcDone] = useState(false);
+
+        useEffect(() => { setDailySchedule(buildDailySchedule(supportLevel)); }, [supportLevel]);
+
+        const SYSTEM_ORDER = ['cardio', 'hepatic', 'renal', 'neuro', 'endocrine', 'hematologic', 'reproductive', 'musculoskeletal'];
+        const riskColorFn = (v: number) => v > 60 ? '#ef4444' : v > 30 ? '#f59e0b' : '#22c55e';
+
+        const calcRiskReduction = (_sysKey: string, currentNet: number): number => {
+          const levelCov = { basic: 15, mid: 30, max: 45, boost: 60 }[supportLevel] || 30;
+          return Math.round(currentNet * (levelCov / 100));
+        };
+
+        const execCalculate = () => {
+          try {
+            const s = linked.profile?.settings;
+            const input: SupportInput = {
+              substances: SUPPORT_LEVELS[supportLevel]?.subs || [],
+              goals: [supportGoal],
+              drugDoses: linked.course.reduce((acc, c) => { acc[c.substanceId] = c.doseValue || 300; return acc; }, {} as Record<string, number>),
+              labs: (linked.labs || []).map(l => ({ code: l.code, value: l.value })),
+              demographics: { age: s?.age ?? 30, weight: s?.weight ?? 80, sex: (s?.sex ?? 'male') as 'male' | 'female' },
+              nutritionFactor: s?.nutritionFactor ?? 0.8,
+              trainingFactor: s?.trainingFactor ?? 0.7,
+            };
+            const result = calculateSupport(input);
+            setCalcResult(result);
+            setCalcDone(true);
+          } catch { }
+        };
+
+        const savePlan = () => {
+          const plan = {
+            date: new Date().toISOString(),
+            level: supportLevel,
+            levelLabel: SUPPORT_LEVELS[supportLevel]?.label,
+            goal: supportGoal,
+            schedule: dailySchedule,
+            riskBefore: calcResult?.riskBeforeSupport ?? 0,
+            riskAfter: calcResult?.riskAfterSupport ?? 0,
+            systemSupport: calcResult?.systemSupport ?? {},
+            courseSummary: uniqCourse.map(c => ({ name: c.name, dose: c.totalDose, cls: c.cls })),
+            weightKg, age, sex,
+          };
+          const key = `supportPlan_${new Date().toISOString().slice(0, 10)}`;
+          localStorage.setItem(key, JSON.stringify(plan));
+          setPlanSaved(true);
+          setTimeout(() => setPlanSaved(false), 3000);
+        };
+
+        const copyPlan = () => {
+          const schedule = dailySchedule || [];
+          let text = '🧮 ПЛАН ПОДДЕРЖКИ — BodyBuildHealth\n';
+          text += '═══════════════════════════════\n\n';
+          text += `📊 Анализ курса:\n`;
+          text += `- Активных в-в: ${uniqCourse.length}\n`;
+          text += `- Уровень токсичности: ${toxicityLabel}\n`;
+          text += `- 17α-алкил. оральных: ${count17aa} шт\n`;
+          text += `- Тренболон: ${hasTren ? 'ДА' : 'НЕТ'} | Нандролон: ${hasNandrolone ? 'ДА' : 'НЕТ'}\n`;
+          text += `- Ароматизирующихся: ${countAromatizing} шт\n`;
+          text += `- Андрогенный индекс: ${totalAndrogenicity.toFixed(2)} — ${androLabel}\n\n`;
+          text += `📅 ДНЕВНОЕ РАСПИСАНИЕ (${SUPPORT_LEVELS[supportLevel]?.label}):\n`;
+          schedule.forEach(s => {
+            text += `\n${s.time} (${s.label}):\n`;
+            s.items.forEach((i: any) => {
+              text += `  • ${i.name} — ${i.dose} | ${i.with} | ${i.note}\n`;
+            });
+          });
+          text += `\n═══════════════════════════════\n`;
+          if (calcDone && calcResult) {
+            text += `\n📉 Риски: ${Math.round(calcResult.riskBeforeSupport)}% → ${Math.round(calcResult.riskAfterSupport)}%\n`;
+          }
+          text += `\nСгенерировано: ${new Date().toLocaleDateString('ru-RU')}\n`;
+          text += `body-build-health.vercel.app\n`;
+          navigator.clipboard.writeText(text).catch(() => {
+            alert('Не удалось скопировать. Проверьте права буфера обмена.');
+          });
+        };
+
+        const exportForDoctor = () => {
+          const schedule = dailySchedule || [];
+          let text = '👨‍⚕️ ОТЧЕТ ДЛЯ ВРАЧА — BodyBuildHealth\n';
+          text += '═══════════════════════════════════\n';
+          text += `Дата: ${new Date().toLocaleDateString('ru-RU')}\n`;
+          text += `Пациент: ${age} лет, ${weightKg} кг, ${sex === 'male' ? 'м' : 'ж'}\n\n`;
+          text += `🚑 АНАЛИЗ КУРСА:\n`;
+          uniqCourse.forEach(c => {
+            text += `- ${c.name}: ~${c.totalDose} мг/нед (класс: ${c.cls})\n`;
+          });
+          text += `\n⚠ Токсичность: ${toxicityLabel} | Андрогенный индекс: ${totalAndrogenicity.toFixed(2)}\n`;
+          text += `\n💊 НАЗНАЧЕННАЯ ПОДДЕРЖКА:\n`;
+          schedule.forEach(s => {
+            text += `\n${s.time} (${s.label}):\n`;
+            s.items.forEach((i: any) => { text += `  • ${i.name}: ${i.dose} — ${i.note}\n`; });
+          });
+          if (calcDone && calcResult) {
+            text += `\n📊 РИСКИ:\n`;
+            text += `Общий: ${Math.round(calcResult.riskBeforeSupport)}% → ${Math.round(calcResult.riskAfterSupport)}%\n`;
+            Object.entries(calcResult.systemSupport || {}).forEach(([k, v]) => {
+              const sysInfo = SYSTEM_LABELS_RU[k] || { name: k };
+              text += `  ${sysInfo.name}: покрытие ${v}%\n`;
+            });
+          }
+          text += `\n═══════════════════════════════════\n`;
+          navigator.clipboard.writeText(text).catch(() => {});
+        };
+
+        return (
         <div style={{ padding:'0 0 80px', height:'100vh', display:'flex', flexDirection:'column' }}>
-          <div style={{ display:'flex', gap:6, marginBottom:6 }}>
+          <div style={{ display:'flex', gap:6, marginBottom:6, flexWrap:'wrap' }}>
             <button onClick={() => setCalcView('main')} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← Назад</button>
-            <button onClick={() => setSupportView('main')} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← На главную Поддержки</button>
+            <button onClick={() => setSupportView('main')} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← На главную</button>
           </div>
-          <h2 style={{ margin:'0 0 4px', fontSize:16, fontWeight:800, color:'var(--accent)' }}>🧮 Калькулятор поддержки</h2>
-          <p style={{ fontSize:10, color:'var(--text-dim)', margin:'0 0 12px' }}>Персонализированный расчёт поддержки по курсу, рискам и целям.</p>
-          <div style={{ flex:1, overflowY:'auto', paddingRight:4 }}>
-            <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:14, marginBottom:10, border:'1px solid var(--border)' }}>
-              <h4 style={{ margin:'0 0 8px', fontSize:12, color:'var(--text)' }}>⚙️ Параметры расчёта</h4>
-              <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-                <div>
-                  <div style={{ fontSize:9, color:'var(--text-dim)', marginBottom:4 }}>Уровень поддержки</div>
-                  <div style={{ display:'flex', gap:4, flexWrap:'wrap' }}>
-                    {(['basic','mid','max','boost'] as const).map(l => (
-                      <button key={l} onClick={() => setSupportLevel(l)} style={{
-                        padding:'6px 14px', borderRadius:16, fontSize:10, fontWeight:700, cursor:'pointer',
-                        background: supportLevel === l ? 'var(--accent)' : 'var(--bg-secondary)',
-                        color: supportLevel === l ? '#000' : 'var(--text-dim)',
-                        border: `1px solid ${supportLevel === l ? 'var(--accent)' : 'var(--border)'}`,
-                      }}>{l === 'basic' ? 'Базовый' : l === 'mid' ? 'Средний' : l === 'max' ? 'Максимум' : 'Boost'}</button>
-                    ))}
+          <h2 style={{ margin:'0 0 2px', fontSize:16, fontWeight:800, color:'var(--accent)' }}>🧮 Калькулятор поддержки</h2>
+          <p style={{ fontSize:10, color:'var(--text-dim)', margin:'0 0 10px' }}>Анализ курса + анализов + рисков → персонализированный план</p>
+
+          <div style={{ flex:1, overflowY:'auto', paddingRight:4, display:'flex', flexDirection:'column', gap:8 }}>
+
+            {/* ==================== 2a: АНАЛИЗ КУРСА ==================== */}
+            <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:12, border:'1px solid var(--border)' }}>
+              <h4 style={{ margin:'0 0 8px', fontSize:12, color:'var(--accent)' }}>📊 Анализ курса</h4>
+              {uniqCourse.length === 0 ? (
+                <p style={{ fontSize:9, color:'var(--text-dim)', margin:0 }}>Нет активного курса. Добавьте препараты в Профиль → Курс.</p>
+              ) : (
+                <div style={{ display:'flex', flexDirection:'column', gap:4, fontSize:9, color:'var(--text-light)', lineHeight:1.6 }}>
+                  <div>Препараты: <b style={{ color:'var(--accent)' }}>{uniqCourse.length}</b> активных веществ</div>
+                  {uniqCourse.map(c => (
+                    <div key={c.substanceId} style={{ display:'flex', gap:6, paddingLeft:6 }}>
+                      <span style={{ color:'var(--text-dim)' }}>• {c.name}</span>
+                      <span style={{ color:'var(--text-dim)', fontSize:8 }}>~{c.totalDose}мг/нед</span>
+                    </div>
+                  ))}
+                  <div style={{ marginTop:4, paddingTop:6, borderTop:'1px solid var(--border)' }}>
+                    <div>Уровень токсичности: <b style={{ color: toxicityColor }}>{toxicityLabel}</b></div>
+                    {count17aa > 0 && (
+                      <div>17α-алкилированные оральные: <b style={{ color:'#ef4444' }}>{count17aa} шт</b> → требуется усиленная защита печени</div>
+                    )}
+                    {(hasTren || hasNandrolone) && (
+                      <div>Тренболон/Нандролон: <b style={{ color:'#f97316' }}>{[hasTren ? 'Тренболон' : '', hasNandrolone ? 'Нандролон' : ''].filter(Boolean).join(' + ')}</b> → требуется нейропротекция + контроль пролактина</div>
+                    )}
+                    {countAromatizing > 0 && (
+                      <div>Ароматизирующиеся: <b style={{ color:'#f59e0b' }}>{countAromatizing} шт</b> → требуется контроль Е2</div>
+                    )}
+                    <div>Андрогенный индекс: <b style={{ color: totalAndrogenicity > 3 ? '#ef4444' : totalAndrogenicity > 1.5 ? '#f59e0b' : '#22c55e' }}>{totalAndrogenicity.toFixed(2)}</b> → {androLabel}</div>
                   </div>
                 </div>
-                <div>
-                  <div style={{ fontSize:9, color:'var(--text-dim)', marginBottom:4 }}>Цель цикла</div>
-                  <select value={supportGoal} onChange={e => setSupportGoal(e.target.value)} style={{ width:'100%', padding:'8px 10px', borderRadius:8, border:'1px solid var(--border)', background:'rgba(0,0,0,0.2)', color:'var(--text)', fontSize:11 }}>
-                    <option value="muscle_gain">💪 Набор массы</option>
-                    <option value="fat_loss">🔥 Жиросжигание</option>
-                    <option value="recomp">🔄 Рекомпозиция</option>
-                    <option value="strength">🏋️ Сила</option>
-                    <option value="endurance">🏃 Выносливость</option>
-                    <option value="health">❤️ Здоровье</option>
-                  </select>
-                </div>
-                <button onClick={() => {
-                  try {
-                    const s = linked.profile?.settings;
-                    const input: SupportInput = {
-                      substances: SUPPORT_LEVELS[supportLevel]?.subs || [],
-                      goals: [supportGoal],
-                      drugDoses: linked.course.reduce((acc, c) => { acc[c.substanceId] = c.doseValue || 300; return acc; }, {} as Record<string, number>),
-                      labs: (linked.labs || []).map(l => ({ code: l.code, value: l.value })),
-                      demographics: { age: s?.age ?? 30, weight: s?.weight ?? 80, sex: (s?.sex ?? 'male') as 'male' | 'female' },
-                      nutritionFactor: s?.nutritionFactor ?? 0.8,
-                      trainingFactor: s?.trainingFactor ?? 0.7,
-                    };
-                    const result = calculateSupport(input);
-                    setSupportResult(result);
-                  } catch { }
-                }} style={{ padding:'10px', borderRadius:8, border:'none', cursor:'pointer', background:'linear-gradient(135deg,#00e68a,#00c853)', color:'#000', fontWeight:800, fontSize:12 }}>📐 Рассчитать</button>
-              </div>
+              )}
             </div>
-            {supportResult && (
-              <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:14, border:'1px solid var(--border)' }}>
-                <h4 style={{ margin:'0 0 8px', fontSize:12, color:'var(--accent)' }}>📊 Результат</h4>
-                <div style={{ fontSize:10, color:'var(--text-dim)' }}>
-                  <div>Риск до: {supportResult.riskBeforeSupport}% → После: {supportResult.riskAfterSupport}%</div>
-                  {/* 1d: Risk-before/after bar visualization */}
-                  <div style={{ marginTop:8, display:'flex', gap:8, alignItems:'center' }}>
-                    <div style={{ flex:1 }}>
-                      <div style={{ fontSize:7, color:'var(--text-dim)', marginBottom:2 }}>До поддержки</div>
-                      {(() => {
-                        const riskColor = (v: number) => v > 60 ? '#ef4444' : v > 30 ? '#f59e0b' : '#22c55e';
-                        const beforePct = Math.min(100, Math.max(0, supportResult.riskBeforeSupport));
-                        return (
-                          <div style={{ height:10, borderRadius:5, background:'var(--bg-secondary)', overflow:'hidden', border:'1px solid var(--border)' }}>
-                            <div style={{ height:'100%', width:`${beforePct}%`, borderRadius:5, background: riskColor(beforePct), transition:'width 0.4s' }} />
-                          </div>
-                        );
-                      })()}
-                      <div style={{ fontSize:8, fontWeight:700, color:'#ef4444', marginTop:1 }}>{Math.round(supportResult.riskBeforeSupport)}%</div>
-                    </div>
-                    <span style={{ fontSize:14, color:'var(--accent)' }}>→</span>
-                    <div style={{ flex:1 }}>
-                      <div style={{ fontSize:7, color:'var(--text-dim)', marginBottom:2 }}>После поддержки</div>
-                      {(() => {
-                        const riskColor = (v: number) => v > 60 ? '#ef4444' : v > 30 ? '#f59e0b' : '#22c55e';
-                        const afterPct = Math.min(100, Math.max(0, supportResult.riskAfterSupport));
-                        return (
-                          <div style={{ height:10, borderRadius:5, background:'var(--bg-secondary)', overflow:'hidden', border:'1px solid var(--border)' }}>
-                            <div style={{ height:'100%', width:`${afterPct}%`, borderRadius:5, background: riskColor(afterPct), transition:'width 0.4s' }} />
-                          </div>
-                        );
-                      })()}
-                      <div style={{ fontSize:8, fontWeight:700, color: supportResult.riskAfterSupport > 60 ? '#ef4444' : supportResult.riskAfterSupport > 30 ? '#f59e0b' : '#22c55e', marginTop:1 }}>{Math.round(supportResult.riskAfterSupport)}%</div>
-                    </div>
-                  </div>
-                  {/* 1d: System-by-system risk comparison bars */}
-                  {linked.risk?.systemBreakdown && Object.keys(linked.risk.systemBreakdown).length > 0 && (
-                    <div style={{ marginTop:8 }}>
-                      <div style={{ fontSize:8, color:'var(--text-dim)', marginBottom:4 }}>Сравнение по системам:</div>
-                      {Object.entries(linked.risk.systemBreakdown).map(([sysKey, sysData]) => {
-                        const supportCov = (supportResult.systemSupport || {})[sysKey] || 0;
-                        const afterRisk = Math.max(0, sysData.net * (1 - supportCov / 100));
-                        const riskColor = (v: number) => v > 60 ? '#ef4444' : v > 30 ? '#f59e0b' : '#22c55e';
-                        return (
-                          <div key={sysKey} style={{ marginBottom:3 }}>
-                            <div style={{ display:'flex', justifyContent:'space-between', fontSize:7, marginBottom:1 }}>
-                              <span style={{ color:'rgba(255,255,255,0.7)' }}>{sysKey}</span>
-                              <span style={{ color:'var(--text-dim)' }}>{Math.round(sysData.net)}% → {Math.round(afterRisk)}%</span>
-                            </div>
-                            <div style={{ display:'flex', gap:2, height:6 }}>
-                              <div style={{ flex:1, borderRadius:3, background: riskColor(sysData.net), opacity:0.6, minWidth:2 }} title={`До: ${Math.round(sysData.net)}%`} />
-                              <div style={{ width: Math.max(2, afterRisk * 0.8), borderRadius:3, background: riskColor(afterRisk), minWidth:2 }} title={`После: ${Math.round(afterRisk)}%`} />
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                  <div style={{ marginTop:6 }}>
-                    <div style={{ fontWeight:600, color:'var(--text)', marginBottom:4 }}>Системное покрытие:</div>
-                    {Object.entries(supportResult.systemSupport || {}).map(([k,v]) => (
-                      <div key={k} style={{ display:'flex', justifyContent:'space-between', fontSize:9, marginBottom:2 }}>
-                        <span>{k}</span>
-                        <span style={{ color:v > 50 ? '#22c55e' : v > 30 ? '#f59e0b' : '#ef4444' }}>{v}%</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-                {/* Dosage table */}
-                <div style={{ marginTop:10 }}>
-                  <h4 style={{ margin:'0 0 8px', fontSize:12, color:'#22c55e' }}>💊 Рекомендуемые дозировки ({SUPPORT_LEVELS[supportLevel]?.label})</h4>
-                  <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
-                    {SUPPORT_LEVELS[supportLevel]?.subs?.map(id => {
-                      const dosage = SUPPORT_LEVELS[supportLevel]?.dosages?.[id];
-                      const subInfo = ALL_SUBSTANCES.find(s => s.id === id);
+
+            {/* ==================== 2b: АНАЛИЗ АНАЛИЗОВ ==================== */}
+            <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:12, border:'1px solid var(--border)' }}>
+              <h4 style={{ margin:'0 0 8px', fontSize:12, color:'#60a5fa' }}>🧪 Анализы — требуется поддержка</h4>
+              {labs.length === 0 ? (
+                <p style={{ fontSize:9, color:'var(--text-dim)', margin:0 }}>Нет анализов. <span style={{ color:'#60a5fa', cursor:'pointer', textDecoration:'underline' }} onClick={() => setSupportView('main')}>Добавьте анализы</span> для персональных рекомендаций.</p>
+              ) : (() => {
+                const allLabResults = Object.keys(LAB_REC_MAP).map(code => getLabStatus(code)).filter(Boolean).filter(s => s!.status !== 'normal');
+                if (allLabResults.length === 0) return <p style={{ fontSize:9, color:'#22c55e', margin:0 }}>Все показатели в норме ✅</p>;
+                return (
+                  <div style={{ display:'flex', flexDirection:'column', gap:3 }}>
+                    {allLabResults.map(s => {
+                      const rec = LAB_REC_MAP[s!.status === 'critical' ? 'LDL' : 'LDL'] || {};
+                      const code = Object.keys(LAB_REC_MAP).find(k => getLabStatus(k)?.value === s!.value) || '';
+                      const recData = LAB_REC_MAP[code];
+                      if (!recData) return null;
                       return (
-                        <div key={id} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'6px 8px', borderRadius:6, background:'rgba(0,230,138,0.04)', border:'1px solid rgba(0,230,138,0.1)' }}>
-                          <span style={{ fontSize:10, fontWeight:600, color:'var(--text-light)' }}>{subInfo?.name || id}</span>
-                          <div style={{ textAlign:'right' }}>
-                            <div style={{ fontSize:10, fontWeight:700, color:'#00e68a' }}>{dosage?.mg}{dosage?.mg > 50 && dosage?.mg < 5000 ? ' мг' : dosage?.mg >= 5000 ? ' МЕ' : ''}</div>
-                            <div style={{ fontSize:8, color:'var(--text-dim)' }}>{dosage?.timing}</div>
-                          </div>
+                        <div key={code} style={{ padding:'4px 8px', borderRadius:6, background: s!.status === 'critical' ? 'rgba(239,68,68,0.06)' : 'rgba(245,158,11,0.04)', border: `1px solid ${s!.status === 'critical' ? 'rgba(239,68,68,0.15)' : 'rgba(245,158,11,0.1)'}`, fontSize:9 }}>
+                          <span style={{ fontWeight:700, color: s!.status === 'critical' ? '#ef4444' : '#f59e0b' }}>{code} {s!.value}</span>
+                          <span style={{ color: s!.status === 'critical' ? '#ef4444' : '#f59e0b' }}> {s!.status === 'critical' ? 'КРИТ' : ''} выше нормы</span>
+                          <span style={{ color:'var(--text-dim)', fontSize:8 }}> → {recData.rec}</span>
+                          <div style={{ color:'var(--text-dim)', fontSize:7, marginTop:1 }}>💡 Расчёт: {recData.dose} при весе {weightKg} кг</div>
                         </div>
                       );
                     })}
                   </div>
-                </div>
-                {/* 1b: Risk-linked analysis */}
-                <div style={{ marginTop:10, paddingTop:10, borderTop:'1px solid var(--border)' }}>
-                  <h4 style={{ margin:'0 0 8px', fontSize:12, color:'#f59e0b' }}>📊 Связь с рисками</h4>
-                  {linked.risk?.systemBreakdown && Object.keys(linked.risk.systemBreakdown).length > 0 ? (
-                    <div style={{ display:'flex', flexDirection:'column', gap:3 }}>
-                      {Object.entries(linked.risk.systemBreakdown).map(([sysKey, sysData]) => {
-                        const supportCov = (supportResult.systemSupport || {})[sysKey] || 0;
-                        const reduction = Math.round(supportCov);
-                        const riskColor = sysData.net > 60 ? '#ef4444' : sysData.net > 30 ? '#f59e0b' : '#22c55e';
-                        const SYSTEM_LABELS: Record<string, string> = {
-                          cardio: 'Сердечно-сосудистая', hepatic: 'Печень', renal: 'Почки', neuro: 'Нервная',
-                          endocrine: 'Эндокринная', hematologic: 'Кровь', reproductive: 'Репродуктивная', musculoskeletal: 'Опорно-двигательная',
-                        };
-                        return (
-                          <div key={sysKey} style={{ display:'flex', alignItems:'center', gap:6, padding:'4px 6px', borderRadius:6, background:'rgba(0,0,0,0.1)' }}>
-                            <div style={{ width:8, height:8, borderRadius:'50%', flexShrink:0, background: riskColor }} />
-                            <span style={{ fontSize:9, fontWeight:600, color:'var(--text-light)', flex:1, minWidth:0 }}>{SYSTEM_LABELS[sysKey] || sysKey}</span>
-                            <span style={{ fontSize:9, fontWeight:700, color: riskColor }}>{Math.round(sysData.net)}%</span>
-                            {reduction > 0 && (
-                              <>
-                                <span style={{ fontSize:7, color:'var(--text-dim)' }}>→</span>
-                                <span style={{ fontSize:8, color:'#22c55e' }}>-{reduction}% покр.</span>
-                              </>
-                            )}
+                );
+              })()}
+            </div>
+
+            {/* ==================== 2c: РИСКИ ПО СИСТЕМАМ ==================== */}
+            <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:12, border:'1px solid var(--border)' }}>
+              <h4 style={{ margin:'0 0 8px', fontSize:12, color:'#f59e0b' }}>📈 Риски по системам</h4>
+              {riskData?.systemBreakdown && Object.keys(riskData.systemBreakdown).length > 0 ? (
+                <div style={{ display:'flex', flexDirection:'column', gap:5 }}>
+                  {SYSTEM_ORDER.filter(k => riskData.systemBreakdown[k]).map(sysKey => {
+                    const sysData = riskData.systemBreakdown[sysKey];
+                    const sysInfo = SYSTEM_LABELS_RU[sysKey] || { name: sysKey, emoji: '📌', rec: '' };
+                    const color = riskColorFn(sysData.net);
+                    const levelData = SUPPORT_LEVELS[supportLevel];
+                    const coveragePct = levelData ? Math.min(100, levelData.subs.length * 3) : 25;
+                    const afterRisk = Math.max(0, Math.round(sysData.net * (1 - coveragePct / 100)));
+                    return (
+                      <div key={sysKey}>
+                        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:2 }}>
+                          <span style={{ fontSize:9, fontWeight:600, color:'var(--text-light)' }}>{sysInfo.emoji} {sysInfo.name}</span>
+                          <span style={{ fontSize:9, fontWeight:700, color }}>{Math.round(sysData.net)}%</span>
+                        </div>
+                        <div style={{ height:6, borderRadius:3, background:'var(--bg-secondary)', overflow:'hidden', border:'1px solid var(--border)' }}>
+                          <div style={{ height:'100%', width:`${Math.min(100, sysData.net)}%`, borderRadius:3, background: color, transition:'width 0.4s' }} />
+                        </div>
+                        {sysData.net > 25 && (
+                          <div style={{ fontSize:7, color:'var(--text-dim)', marginTop:1, paddingLeft:18 }}>
+                            → требуется {sysInfo.rec}
                           </div>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    <div style={{ fontSize:9, color:'var(--text-dim)', padding:'6px 0' }}>Нет данных о рисках. Добавьте курс или анализы для расчёта.</div>
-                  )}
-                </div>
-                {/* 1b: Lab-based recommendations */}
-                {linked.labAnalysis && linked.labAnalysis.interpretations.length > 0 && (
-                  <div style={{ marginTop:10, paddingTop:10, borderTop:'1px solid var(--border)' }}>
-                    <h4 style={{ margin:'0 0 8px', fontSize:12, color:'#60a5fa' }}>🧪 На основе анализов</h4>
-                    <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
-                      {linked.labAnalysis.interpretations.filter(l => l.status === 'high' || l.status === 'critical_high').slice(0, 10).map(l => {
-                        const MARKER_TO_SUPPORT: Record<string, string[]> = {
-                          ALT: ['nac', 'tudca', 'milk_thistle'], AST: ['nac', 'tudca', 'milk_thistle'],
-                          GGT: ['tudca', 'milk_thistle', 'alpha_lipoic'], CREATININE: ['astragalus', 'omega3'],
-                          LDL: ['omega3', 'berberine', 'coq10'], TRIGLYCERIDES: ['omega3', 'berberine'],
-                          GLUCOSE: ['berberine', 'alpha_lipoic'], CRP: ['omega3', 'curcumin', 'boswellia'],
-                          HEMOGLOBIN: ['omega3', 'nattokinase'], HEMATOCRIT: ['omega3', 'nattokinase'],
-                          ESTRADIOL: ['zinc', 'dim', 'calcium_d_glucarate'], PROLACTIN: ['vitamin_b6', 'ashwagandha'],
-                        };
-                        const recs = MARKER_TO_SUPPORT[l.code] || [];
-                        const supportNames = recs.map(id => {
-                          const sub = SUPPORT_LEVELS[supportLevel]?.subs?.includes(id) ? ALL_SUBSTANCES.find(s => s.id === id) : null;
-                          return sub?.name || id;
-                        });
-                        return (
-                          <div key={l.code} style={{ display:'flex', alignItems:'center', gap:4, padding:'3px 6px', borderRadius:4, background:'rgba(59,130,246,0.06)', border:'1px solid rgba(59,130,246,0.15)' }}>
-                            <span style={{ fontSize:8, color: l.status === 'critical_high' ? '#ef4444' : '#f59e0b', fontWeight:700, minWidth:50 }}>{l.code}</span>
-                            <span style={{ fontSize:8, color: l.status === 'critical_high' ? '#ef4444' : '#f59e0b' }}>{l.status === 'critical_high' ? 'КРИТ' : 'ПОВЫШ'}</span>
-                            {supportNames.length > 0 && (
-                              <span style={{ fontSize:7, color:'#22c55e', marginLeft:4 }}>→ {supportNames.slice(0, 3).join(', ')}</span>
-                            )}
-                            {supportNames.length === 0 && (
-                              <span style={{ fontSize:7, color:'var(--text-dim)', marginLeft:4 }}>— нет в текущем уровне</span>
-                            )}
+                        )}
+                        {calcDone && calcResult && (
+                          <div style={{ fontSize:7, color:'#22c55e', marginTop:1, paddingLeft:18 }}>
+                            После поддержки: ~{afterRisk}% (-{Math.round(sysData.net - afterRisk)}%)
                           </div>
-                        );
-                      })}
-                      {linked.labAnalysis.interpretations.filter(l => l.status === 'high' || l.status === 'critical_high').length === 0 && (
-                        <div style={{ fontSize:9, color:'var(--text-dim)' }}>Все показатели в норме ✅</div>
-                      )}
-                    </div>
-                  </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p style={{ fontSize:9, color:'var(--text-dim)', margin:0 }}>Нет данных о рисках. Нажмите «Рассчитать» ниже.</p>
+              )}
+            </div>
+
+            {/* ==================== 3a: ВЫБОР УРОВНЯ ==================== */}
+            <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:12, border:'1px solid var(--border)' }}>
+              <h4 style={{ margin:'0 0 8px', fontSize:12, color:'var(--text)' }}>🎯 Уровень поддержки</h4>
+              <div style={{ fontSize:9, color:'var(--text-dim)', marginBottom:8 }}>
+                Авто-выбран: <b style={{ color:'#8b5cf6' }}>{SUPPORT_LEVELS[autoLevel]?.label || autoLevel}</b>
+                {autoLevel !== supportLevel && (
+                  <span style={{ color:'#f59e0b', marginLeft:4 }}>(изменён вручную)</span>
                 )}
               </div>
-            )}
-            <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:14, marginTop:10, border:'1px solid var(--border)' }}>
-              <h4 style={{ margin:'0 0 6px', fontSize:12, color:'#60a5fa' }}>💡 Подсказки</h4>
-              <p style={{ fontSize:9, color:'var(--text-dim)', lineHeight:1.5, margin:0 }}>
-                Для детального просмотра каталога, синергий, стеков и плана используйте соответствующие разделы в меню.
-              </p>
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
+                {(['basic','mid','max','boost'] as const).map(l => {
+                  const active = supportLevel === l;
+                  const autoActive = autoLevel === l;
+                  const colors: Record<string, string> = { basic: '#22c55e', mid: '#eab308', max: '#f97316', boost: '#ef4444' };
+                  const levelNames: Record<string, string> = { basic: '🟢 База', mid: '🟡 Средний', max: '🟠 Усиление', boost: '🔴 Максимум' };
+                  return (
+                    <button key={l} onClick={() => setSupportLevel(l)} style={{
+                      padding:'10px 6px', borderRadius:10, border: `2px solid ${active ? colors[l] : 'var(--border)'}`,
+                      background: active ? `${colors[l]}12` : 'var(--bg-secondary)', cursor:'pointer', textAlign:'center', position:'relative',
+                    }}>
+                      <div style={{ fontSize:15, fontWeight:800, color: active ? colors[l] : 'var(--text-dim)', marginBottom:1 }}>{levelNames[l]}</div>
+                      <div style={{ fontSize:8, color: active ? 'var(--text-light)' : 'var(--text-dim)' }}>{SUPPORT_LEVELS[l]?.desc?.slice(0, 40)}...</div>
+                      <div style={{ fontSize:9, color:'var(--text-dim)', marginTop:3 }}>{SUPPORT_LEVELS[l]?.subs?.length} добавок</div>
+                      {autoActive && (
+                        <div style={{ position:'absolute', top:-4, right:-4, fontSize:8, padding:'1px 4px', borderRadius:4, background:'#8b5cf6', color:'#fff', fontWeight:600 }}>Авто</div>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div style={{ marginTop:8 }}>
+                <div style={{ fontSize:9, color:'var(--text-dim)', marginBottom:4 }}>Цель</div>
+                <div style={{ display:'flex', flexWrap:'wrap', gap:4 }}>
+                  {[{ v:'muscle_gain', l:'💪 Масса' },{ v:'fat_loss', l:'🔥 Сушка' },{ v:'strength', l:'🏋️ Сила' },{ v:'endurance', l:'🏃 Выносливость' },{ v:'recomp', l:'⚖️ Рекомп' },{ v:'maintenance', l:'🔄 Поддержание' }].map(g => (
+                    <button key={g.v} onClick={() => setSupportGoal(g.v)} style={{
+                      padding:'5px 8px', borderRadius:6, fontSize:10, cursor:'pointer',
+                      background: supportGoal === g.v ? 'rgba(0,230,138,0.15)' : 'var(--bg-secondary)',
+                      border: supportGoal === g.v ? '1px solid var(--accent)' : '1px solid var(--border)',
+                      color: supportGoal === g.v ? '#00e68a' : 'var(--text-dim)', fontWeight: supportGoal === g.v ? 700 : 400,
+                    }}>{g.l}</button>
+                  ))}
+                </div>
+              </div>
+
+              <button onClick={execCalculate} style={{
+                width:'100%', padding:'12px', borderRadius:8, border:'none', cursor:'pointer', marginTop:8,
+                background:'linear-gradient(135deg,#00e68a,#00c853)', color:'#000', fontWeight:800, fontSize:13,
+                boxShadow:'0 2px 8px rgba(0,230,138,0.3)',
+              }}>
+                🧮 Рассчитать ({SUPPORT_LEVELS[supportLevel]?.subs?.length || 0} добавок)
+              </button>
+
+              {calcDone && calcResult && (
+                <div style={{ marginTop:8, padding:'10px 12px', borderRadius:8, background:'rgba(0,230,138,0.06)', border:'1px solid rgba(0,230,138,0.15)' }}>
+                  <div style={{ display:'flex', justifyContent:'space-between', fontSize:11, fontWeight:600, color:'var(--text-light)', marginBottom:6 }}>
+                    <span>Риск до: <b style={{ color:'#ef4444' }}>{Math.round(calcResult.riskBeforeSupport)}%</b></span>
+                    <span style={{ color:'var(--accent)' }}>→</span>
+                    <span>После: <b style={{ color:'#22c55e' }}>{Math.round(calcResult.riskAfterSupport)}%</b></span>
+                    <span style={{ color:'#22c55e', fontSize:12 }}>(-{Math.round(calcResult.riskBeforeSupport - calcResult.riskAfterSupport)}%)</span>
+                  </div>
+                </div>
+              )}
             </div>
+
+            {/* ==================== 3c: ДНЕВНОЕ РАСПИСАНИЕ ==================== */}
+            <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:12, border:'1px solid var(--border)' }}>
+              <h4 style={{ margin:'0 0 8px', fontSize:12, color:'var(--accent)' }}>📅 Дневное расписание ({SUPPORT_LEVELS[supportLevel]?.label})</h4>
+              {dailySchedule.length === 0 ? (
+                <p style={{ fontSize:9, color:'var(--text-dim)', margin:0 }}>Выберите уровень поддержки.</p>
+              ) : (
+                <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+                  {dailySchedule.map(slot => (
+                    <div key={slot.time} style={{ padding:'8px 10px', borderRadius:8, background:'rgba(0,0,0,0.15)', border:'1px solid var(--border)' }}>
+                      <div style={{ fontSize:10, fontWeight:700, color:'var(--accent)', marginBottom:4 }}>
+                        {slot.time} — {slot.label}
+                      </div>
+                      {slot.items.map((item: any) => (
+                        <div key={item.id} style={{ display:'flex', alignItems:'flex-start', gap:6, padding:'3px 0', fontSize:9, color:'var(--text-light)' }}>
+                          <div style={{ width:4, height:4, borderRadius:'50%', background:'var(--accent)', marginTop:4, flexShrink:0 }} />
+                          <div style={{ flex:1 }}>
+                            <span style={{ fontWeight:600 }}>{item.name}</span>
+                            <span style={{ color:'#00e68a', marginLeft:4 }}>{item.dose}</span>
+                            <div style={{ fontSize:7, color:'var(--text-dim)' }}>{item.with} · {item.note}</div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* ==================== 3d: ПРОГНОЗ СНИЖЕНИЯ РИСКОВ ==================== */}
+            {calcDone && calcResult && riskData?.systemBreakdown && (
+              <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:12, border:'1px solid var(--border)' }}>
+                <h4 style={{ margin:'0 0 8px', fontSize:12, color:'#22c55e' }}>📉 Прогноз снижения рисков</h4>
+                <div style={{ display:'flex', flexDirection:'column', gap:4, fontSize:9 }}>
+                  <div style={{ padding:'6px 8px', borderRadius:6, background:'rgba(34,197,94,0.06)', border:'1px solid rgba(34,197,94,0.1)', display:'flex', justifyContent:'space-between', fontWeight:600 }}>
+                    <span style={{ color:'var(--text-light)' }}>Общий риск</span>
+                    <span>
+                      <span style={{ color:'#ef4444' }}>{Math.round(calcResult.riskBeforeSupport)}%</span>
+                      <span style={{ color:'var(--text-dim)', margin:'0 4px' }}>→</span>
+                      <span style={{ color:'#22c55e' }}>{Math.round(calcResult.riskAfterSupport)}%</span>
+                      <span style={{ color:'#22c55e', marginLeft:4 }}>(-{Math.round(calcResult.riskBeforeSupport - calcResult.riskAfterSupport)}%)</span>
+                    </span>
+                  </div>
+                  {SYSTEM_ORDER.filter(k => riskData.systemBreakdown[k] && (calcResult.systemSupport || {})[k] !== undefined).map(sysKey => {
+                    const sysData = riskData.systemBreakdown[sysKey];
+                    const sysInfo = SYSTEM_LABELS_RU[sysKey] || { name: sysKey, emoji: '' };
+                    const supportCov = (calcResult.systemSupport || {})[sysKey] || 0;
+                    const afterRisk = Math.round(Math.max(0, sysData.net * (1 - supportCov / 100)));
+                    const reduction = Math.round(sysData.net - afterRisk);
+                    return (
+                      <div key={sysKey} style={{ display:'flex', justifyContent:'space-between', padding:'3px 8px', borderRadius:4, background:'rgba(0,0,0,0.08)' }}>
+                        <span style={{ color:'var(--text-light)' }}>{sysInfo.emoji} {sysInfo.name}</span>
+                        <span>
+                          <span style={{ color: riskColorFn(sysData.net) }}>{Math.round(sysData.net)}%</span>
+                          <span style={{ color:'var(--text-dim)', margin:'0 3px' }}>→</span>
+                          <span style={{ color: riskColorFn(afterRisk) }}>{afterRisk}%</span>
+                          {reduction > 0 && (
+                            <span style={{ color:'#22c55e', marginLeft:3 }}>(-{reduction}%)</span>
+                          )}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* ==================== PHASE 4: SAVE & SHARE ==================== */}
+            <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:12, border:'1px solid var(--border)' }}>
+              <h4 style={{ margin:'0 0 8px', fontSize:12, color:'var(--text)' }}>💾 Сохранить и поделиться</h4>
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
+                <button onClick={savePlan} style={{
+                  padding:'10px', borderRadius:8, border:'1px solid var(--accent)', background:'rgba(0,230,138,0.08)',
+                  cursor:'pointer', fontSize:10, fontWeight:700, color:'var(--accent)',
+                }}>💾 Сохранить план</button>
+                <button onClick={copyPlan} style={{
+                  padding:'10px', borderRadius:8, border:'1px solid #60a5fa', background:'rgba(96,165,250,0.08)',
+                  cursor:'pointer', fontSize:10, fontWeight:700, color:'#60a5fa',
+                }}>📋 Копировать</button>
+                <button onClick={() => alert('Напоминания через Telegram Mini App будут доступны в следующем обновлении.')} style={{
+                  padding:'10px', borderRadius:8, border:'1px solid #a78bfa', background:'rgba(167,139,250,0.08)',
+                  cursor:'pointer', fontSize:10, fontWeight:700, color:'#a78bfa',
+                }}>📅 Напомнить</button>
+                <button onClick={exportForDoctor} style={{
+                  padding:'10px', borderRadius:8, border:'1px solid #f59e0b', background:'rgba(245,158,11,0.08)',
+                  cursor:'pointer', fontSize:10, fontWeight:700, color:'#f59e0b',
+                }}>👨‍⚕️ Экспорт врачу</button>
+              </div>
+              {planSavedLocal && (
+                <div style={{ textAlign:'center', fontSize:10, color:'#22c55e', marginTop:6, padding:'4px', borderRadius:6, background:'rgba(34,197,94,0.06)' }}>✅ План сохранён в localStorage</div>
+              )}
+            </div>
+
+            {/* ==================== ДОЗИРОВКИ С РАСЧЁТОМ ПО ВЕСУ ==================== */}
+            <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:12, border:'1px solid var(--border)' }}>
+              <h4 style={{ margin:'0 0 8px', fontSize:12, color:'#22c55e' }}>💊 Дозировки ({SUPPORT_LEVELS[supportLevel]?.label})</h4>
+              <div style={{ fontSize:8, color:'var(--text-dim)', marginBottom:6 }}>
+                💡 Дозы рассчитаны на вес {weightKg} кг. В скобках показан расчёт мг/кг.
+              </div>
+              <div style={{ display:'flex', flexDirection:'column', gap:3 }}>
+                {SUPPORT_LEVELS[supportLevel]?.subs?.map(id => {
+                  const dosage = SUPPORT_LEVELS[supportLevel]?.dosages?.[id];
+                  const subInfo = ALL_SUBSTANCES.find(s => s.id === id);
+                  const wbStr = getWeightDosing(id, dosage?.mg || 0);
+                  return (
+                    <div key={id} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'5px 8px', borderRadius:6, background:'rgba(0,230,138,0.04)', border:'1px solid rgba(0,230,138,0.1)' }}>
+                      <span style={{ fontSize:9, fontWeight:600, color:'var(--text-light)' }}>{subInfo?.name || id}</span>
+                      <div style={{ textAlign:'right' }}>
+                        <div style={{ fontSize:9, fontWeight:700, color:'#00e68a' }}>
+                          {dosage?.mg >= 5000 ? `${dosage?.mg/1000}г` : dosage?.mg >= 1000 ? `${(dosage?.mg/1000).toFixed(1)}г` : `${dosage?.mg} мг`}
+                        </div>
+                        {wbStr && <div style={{ fontSize:7, color:'var(--text-dim)' }}>{wbStr}</div>}
+                        <div style={{ fontSize:7, color:'var(--text-dim)' }}>{dosage?.timing}</div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
           </div>
         </div>
-      )}
+        );
+      })()}
 
       {/* ===== PEPTIDE CALCULATOR ===== */}
       {tab === 'main' && supportView === 'calc' && calcView === 'peptides' && (
