@@ -381,9 +381,15 @@ const MealPlanExtended: React.FC<{ tKcal: number; tProt: number; tFat: number; t
   const [indivDairyFree, setIndivDairyFree] = React.useState(s?.dietRestrictions?.includes('dairy') || false);
   const [indivGlutenFree, setIndivGlutenFree] = React.useState(s?.dietRestrictions?.includes('gluten') || false);
   const [indivFishFree, setIndivFishFree] = React.useState(false);
+  const [indivNutFree, setIndivNutFree] = React.useState(false);
+  const [indivEggFree, setIndivEggFree] = React.useState(false);
   const [indivInsulinShots, setIndivInsulinShots] = React.useState<{ time: string; dose: number; type: string }[]>([]);
   const [indivGHShots, setIndivGHShots] = React.useState<{ time: string; dose: number }[]>([]);
   const [indivIGFShots, setIndivIGFShots] = React.useState<{ time: string; dose: number }[]>([]);
+  const [expandedMeals, setExpandedMeals] = React.useState<Set<number>>(new Set());
+  const [mealNotes, setMealNotes] = React.useState<Record<number, string>>({});
+  const [regenerateCount, setRegenerateCount] = React.useState(0);
+  const [selectedPreset, setSelectedPreset] = React.useState<string | null>(null);
   const [newInsulinTime, setNewInsulinTime] = React.useState('12:00');
   const [newInsulinDose, setNewInsulinDose] = React.useState(5);
   const [newInsulinType, setNewInsulinType] = React.useState('короткий');
@@ -405,9 +411,11 @@ const MealPlanExtended: React.FC<{ tKcal: number; tProt: number; tFat: number; t
     let proteinFoods = FOOD_DB.filter(f => RECOMMENDED_IDS.protein.includes(f.id) && f.category === 'protein');
     if (indivDairyFree) proteinFoods = proteinFoods.filter(f => !dairyIds.includes(f.id));
     if (indivFishFree) proteinFoods = proteinFoods.filter(f => !['salmon', 'shrimp', 'tuna_canned', 'tuna_steak', 'sardines', 'mackerel'].includes(f.id));
+    if (indivEggFree) proteinFoods = proteinFoods.filter(f => !['egg_whole', 'egg_white'].includes(f.id));
     let carbFoods = FOOD_DB.filter(f => [...RECOMMENDED_IDS.carb, ...RECOMMENDED_IDS.grain].includes(f.id) && (f.category === 'carb' || f.category === 'grain'));
     if (indivGlutenFree) carbFoods = carbFoods.filter(f => !['pasta_durum', 'bread_rye', 'tortilla_wheat'].includes(f.id));
-    const fatFoods = FOOD_DB.filter(f => RECOMMENDED_IDS.fat.includes(f.id) && f.category === 'fat');
+    let fatFoods = FOOD_DB.filter(f => RECOMMENDED_IDS.fat.includes(f.id) && f.category === 'fat');
+    if (indivNutFree) fatFoods = fatFoods.filter(f => !(f.allergens || []).includes('nuts'));
     const vegFoods = FOOD_DB.filter(f => RECOMMENDED_IDS.veg.includes(f.id) && f.category === 'veg_fruit');
 
     const trainHour = parseInt(indivTrainTime.split(':')[0]);
@@ -546,6 +554,15 @@ const MealPlanExtended: React.FC<{ tKcal: number; tProt: number; tFat: number; t
         isPreWorkout, isPostWorkout,
         isInsulinMeal, isGHNoCarb: isGHWindow, isIGFProtein: isIGFWindow,
         bindingTags,
+        prepTime: (() => {
+          const names = items.map(it => (it.foodName || '').toLowerCase());
+          if (names.some(n => n.includes('говядин') || n.includes('свинин') || n.includes('баранин'))) return 30;
+          if (names.some(n => n.includes('куриц') || n.includes('индейк') || n.includes('лосос') || n.includes('треск') || n.includes('палтус'))) return 20;
+          if (names.some(n => n.includes('рыб') || n.includes('тунец') || n.includes('креветк'))) return 15;
+          if (names.some(n => n.includes('яйц') || n.includes('творог') || n.includes('йогурт') || n.includes('сыр'))) return 10;
+          if (names.some(n => n.includes('рис') || n.includes('макарон') || n.includes('картоф') || n.includes('гречк') || n.includes('плов'))) return 20;
+          return 15;
+        })(),
       };
     });
 
@@ -1131,6 +1148,36 @@ const MealPlanExtended: React.FC<{ tKcal: number; tProt: number; tFat: number; t
         <p style={{ fontSize: 10, color: 'var(--text-dim)', margin: '0 0 8px' }}>
           План питания на основе ваших параметров, времени тренировки и ограничений
         </p>
+
+        {/* ─── Dietary presets ─── */}
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 10 }}>
+          {[
+            { id: 'classic', icon: '🥩', label: 'Классический', kcal: tKcal, p: tProt, f: tFat, c: tCarbs, desc: 'Стандарт' },
+            { id: 'keto', icon: '🥑', label: 'Кето', kcal: tKcal, p: Math.round(tProt * 1.1), f: Math.round(tFat * 2.5), c: 45, desc: 'Низкоуглеводный' },
+            { id: 'highcarb', icon: '🍚', label: 'Высоко-углеводный', kcal: tKcal, p: Math.round(tKcal * 0.25 / 4), f: Math.round(tKcal * 0.15 / 9), c: Math.round(tKcal * 0.6 / 4), desc: 'У 60%' },
+            { id: 'mediterranean', icon: '⚖️', label: 'Средиземноморский', kcal: tKcal, p: Math.round(tProt * 0.85), f: Math.round(tKcal * 0.35 / 9), c: Math.round(tKcal * 0.45 / 4), desc: 'Рыба, оливки' },
+            { id: 'vegetarian', icon: '🌱', label: 'Вегетарианский', kcal: tKcal, p: Math.round(tProt * 0.8), f: Math.round(tFat * 1.2), c: Math.round(tKcal * 0.55 / 4), desc: 'Растительный' },
+          ].map(p => (
+            <button key={p.id} onClick={() => {
+              setSelectedPreset(p.id);
+              setIndivKcal(p.kcal);
+              setIndivProt(p.p);
+              setIndivFat(p.f);
+              setIndivCarbs(p.c);
+              if (p.id === 'keto') { setIndivDairyFree(false); setIndivGlutenFree(true); }
+              if (p.id === 'mediterranean') { setIndivFishFree(false); }
+              if (p.id === 'vegetarian') { setIndivFishFree(true); setIndivEggFree(false); }
+            }} style={{
+              padding: '5px 10px', borderRadius: 16, fontSize: 9, cursor: 'pointer', fontWeight: 600,
+              background: selectedPreset === p.id ? 'rgba(0,230,138,0.15)' : 'var(--glass-bg)',
+              color: selectedPreset === p.id ? '#00e68a' : 'var(--text-dim)',
+              border: selectedPreset === p.id ? '1px solid rgba(0,230,138,0.3)' : '1px solid var(--glass-border)',
+              transition: 'all 0.2s',
+            }}>
+              {p.icon} {p.label}
+            </button>
+          ))}
+        </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 8 }}>
           <div>
             <label style={{ fontSize: 9, color: 'var(--text-dim)' }}>Ккал/день</label>
@@ -1171,6 +1218,14 @@ const MealPlanExtended: React.FC<{ tKcal: number; tProt: number; tFat: number; t
           <label style={{ fontSize: 10, display: 'flex', alignItems: 'center', gap: 4, color: 'var(--text-dim)' }}>
             <input type="checkbox" checked={indivFishFree} onChange={e => setIndivFishFree(e.target.checked)} style={{ accentColor: 'var(--accent)' }} />
             Без рыбы
+          </label>
+          <label style={{ fontSize: 10, display: 'flex', alignItems: 'center', gap: 4, color: 'var(--text-dim)' }}>
+            <input type="checkbox" checked={indivNutFree} onChange={e => setIndivNutFree(e.target.checked)} style={{ accentColor: 'var(--accent)' }} />
+            Без орехов
+          </label>
+          <label style={{ fontSize: 10, display: 'flex', alignItems: 'center', gap: 4, color: 'var(--text-dim)' }}>
+            <input type="checkbox" checked={indivEggFree} onChange={e => setIndivEggFree(e.target.checked)} style={{ accentColor: 'var(--accent)' }} />
+            Без яиц
           </label>
         </div>
         <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-light)', margin: '8px 0 4px' }}>💉 Инъекции инсулина</div>
@@ -1289,54 +1344,110 @@ const MealPlanExtended: React.FC<{ tKcal: number; tProt: number; tFat: number; t
                 </div>
               </div>
             )}
-            <div style={{
-              position: 'relative', paddingLeft: 16, borderLeft: '2px solid var(--accent)', marginBottom: 10,
-            }}>
-              {indivPlan.meals.map((meal: any, mi: number) => (
-                <div key={mi} style={{
-                  position: 'relative', marginBottom: 10, paddingLeft: 16,
-                }}>
-                  <div style={{
-                    position: 'absolute', left: -22, top: 8, width: 10, height: 10,
-                    borderRadius: '50%', background: meal.isPreWorkout ? '#8b5cf6' : meal.isPostWorkout ? '#3b82f6' : 'var(--accent)',
-                    border: '2px solid var(--bg-primary)',
-                  }} />
-                  <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 1 }}>{meal.time}</div>
-                  <div style={{
-                    fontSize: 11, fontWeight: 700, marginBottom: 3,
-                    color: meal.isPreWorkout ? '#8b5cf6' : meal.isPostWorkout ? '#3b82f6' : 'var(--text)',
+            <div style={{ marginBottom: 10 }}>
+              {/* Regenerate button */}
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 8 }}>
+                <button onClick={() => { setRegenerateCount(regenerateCount + 1); generateIndividualPlan(); }} style={{
+                  padding: '4px 12px', borderRadius: 16, fontSize: 9, cursor: 'pointer', fontWeight: 600,
+                  background: 'var(--glass-bg)', border: '1px solid var(--glass-border)',
+                  color: 'var(--text-dim)', transition: 'all 0.2s',
+                }}>🔄 Перегенерировать день</button>
+              </div>
+
+              {indivPlan.meals.map((meal: any, mi: number) => {
+                const isExpanded = expandedMeals.has(mi);
+                const isBreakfast = meal.label?.toLowerCase().includes('завтрак');
+                const isLunch = meal.label?.toLowerCase().includes('обед');
+                const isDinner = meal.label?.toLowerCase().includes('ужин');
+                let mealColor = 'var(--accent)';
+                if (meal.isPreWorkout) mealColor = '#f97316';
+                else if (meal.isPostWorkout) mealColor = '#a855f7';
+                else if (isBreakfast) mealColor = '#f59e0b';
+                else if (isLunch) mealColor = '#22c55e';
+                else if (isDinner) mealColor = '#3b82f6';
+                else if (meal.label?.toLowerCase().includes('перекус')) mealColor = '#06b6d4';
+
+                return (
+                  <div key={mi} style={{
+                    marginBottom: 8, borderRadius: 12, overflow: 'hidden',
+                    border: `1px solid ${mealColor}22`,
+                    background: `${mealColor}08`,
                   }}>
-                    {meal.label}
-                    {meal.isPreWorkout && <span style={{ fontSize: 8, color: '#8b5cf6', marginLeft: 6 }}>🏋️ предтрен</span>}
-                    {meal.isPostWorkout && <span style={{ fontSize: 8, color: '#3b82f6', marginLeft: 6 }}>💪 пост-трен</span>}
-                    {meal.isInsulinMeal && <span style={{ fontSize: 8, color: '#06b6d4', marginLeft: 6 }}>💉 инсулин</span>}
-                    {meal.isGHNoCarb && <span style={{ fontSize: 8, color: '#a855f7', marginLeft: 6 }}>🧬 ГР (без угл)</span>}
-                    {meal.isIGFProtein && <span style={{ fontSize: 8, color: '#ec4899', marginLeft: 6 }}>🧪 ИФР-1/MGF</span>}
-                  </div>
-                  <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 1 }}>
-                    Б:{meal.totals.protein}г Ж:{meal.totals.fat}г У:{meal.totals.carbs}г | {meal.totals.kcal} ккал
-                    {meal.glucoseImpact !== undefined && indivInsulinShots.length > 0 && (
+                    <button
+                      onClick={() => setExpandedMeals(prev => { const s = new Set(prev); s.has(mi) ? s.delete(mi) : s.add(mi); return s; })}
+                      style={{
+                        width: '100%', padding: '10px 12px', cursor: 'pointer',
+                        display: 'flex', alignItems: 'center', gap: 8,
+                        background: 'transparent', border: 'none', color: 'var(--text)', textAlign: 'left' as const,
+                        fontSize: 11, fontWeight: 600,
+                        borderLeft: `3px solid ${mealColor}`,
+                      }}
+                    >
                       <span style={{
-                        marginLeft: 6, fontSize: 8, fontWeight: 600,
-                        color: meal.glucoseRisk === 'high' ? '#ef4444' : meal.glucoseRisk === 'medium' ? '#f59e0b' : '#22c55e',
-                      }}>
-                        🩸~{meal.glucoseImpact} мг/дл
-                      </span>
+                        width: 24, height: 24, borderRadius: 8,
+                        background: mealColor + '20', color: mealColor,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        flexShrink: 0, fontSize: 11,
+                        transition: 'transform 0.2s',
+                        transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)',
+                      }}>›</span>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ color: mealColor, fontSize: 11 }}>{meal.label}</div>
+                        <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>{meal.time} · ~{meal.prepTime || 15} мин подготовки</div>
+                      </div>
+                      <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                        <div style={{ fontSize: 9, fontWeight: 700, color: mealColor }}>{meal.totals.kcal} ккал</div>
+                        <div style={{ fontSize: 8, color: 'var(--text-dim)' }}>
+                          Б:{meal.totals.protein}г Ж:{meal.totals.fat}г У:{meal.totals.carbs}г
+                        </div>
+                      </div>
+                    </button>
+                    {isExpanded && (
+                      <div style={{ padding: '8px 12px 10px', borderTop: `1px solid ${mealColor}11` }}>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 8 }}>
+                          {meal.items.map((it: any, ii: number) => (
+                            <span key={ii} style={{
+                              padding: '3px 8px', borderRadius: 12, fontSize: 9,
+                              background: `${mealColor}10`, color: 'var(--text-light)',
+                              border: `1px solid ${mealColor}18`,
+                            }}>
+                              {it.foodName} {it.amount}г
+                              <span style={{ color: 'var(--text-dim)', marginLeft: 4, fontSize: 8 }}>~{it.kcal}ккал</span>
+                            </span>
+                          ))}
+                        </div>
+                        {/* Tags */}
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 6 }}>
+                          {meal.isPreWorkout && <span style={{ padding:'1px 6px', borderRadius:6, fontSize:8, background:'rgba(249,115,22,0.12)', color:'#f97316' }}>🏋️ предтрен</span>}
+                          {meal.isPostWorkout && <span style={{ padding:'1px 6px', borderRadius:6, fontSize:8, background:'rgba(168,85,247,0.12)', color:'#a855f7' }}>💪 пост-трен</span>}
+                          {meal.isInsulinMeal && <span style={{ padding:'1px 6px', borderRadius:6, fontSize:8, background:'rgba(6,182,212,0.12)', color:'#06b6d4' }}>💉 инсулин</span>}
+                          {meal.isGHNoCarb && <span style={{ padding:'1px 6px', borderRadius:6, fontSize:8, background:'rgba(168,85,247,0.12)', color:'#a855f7' }}>🧬 ГР</span>}
+                          {meal.isIGFProtein && <span style={{ padding:'1px 6px', borderRadius:6, fontSize:8, background:'rgba(236,72,153,0.12)', color:'#ec4899' }}>🧪 ИФР-1</span>}
+                          {meal.glucoseImpact !== undefined && indivInsulinShots.length > 0 && (
+                            <span style={{
+                              padding:'1px 6px', borderRadius:6, fontSize:8, fontWeight:600,
+                              background: meal.glucoseRisk === 'high' ? 'rgba(239,68,68,0.12)' : meal.glucoseRisk === 'medium' ? 'rgba(245,158,11,0.12)' : 'rgba(34,197,94,0.12)',
+                              color: meal.glucoseRisk === 'high' ? '#ef4444' : meal.glucoseRisk === 'medium' ? '#f59e0b' : '#22c55e',
+                            }}>🩸~{meal.glucoseImpact} мг/дл</span>
+                          )}
+                        </div>
+                        {/* Notes textarea */}
+                        <textarea
+                          placeholder="📝 Заметки к этому приёму..."
+                          value={mealNotes[mi] || ''}
+                          onChange={e => setMealNotes({ ...mealNotes, [mi]: e.target.value })}
+                          style={{
+                            width: '100%', padding: '6px 8px', borderRadius: 8,
+                            background: 'var(--bg-secondary)', border: '1px solid var(--border)',
+                            color: 'var(--text)', fontSize: 9, boxSizing: 'border-box' as const,
+                            resize: 'vertical' as const, minHeight: 28,
+                          }}
+                        />
+                      </div>
                     )}
                   </div>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
-                    {meal.items.map((it: any, ii: number) => (
-                      <span key={ii} style={{
-                        padding: '2px 7px', borderRadius: 10, fontSize: 8,
-                        background: 'var(--bg-secondary)', color: 'var(--text-light)',
-                        border: '1px solid var(--border)',
-                      }}>
-                        {it.foodName} {it.amount}г
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
             <div style={{
               padding: 12, borderRadius: 10,

@@ -7,12 +7,11 @@ import { getProfile } from '../../core/profile-manager';
 import { generatePCTPlan } from '../../engines/pct-planner.engine';
 import { PHARMA_DB } from '../../core/pharma-database';
 
-type FertTab = 'semen' | 'hormones' | 'structure' | 'pct-plan' | 'hrt' | 'analyses' | 'brain';
+type FertTab = 'overview' | 'semen' | 'hormones' | 'structure' | 'pct-plan' | 'hrt' | 'analyses' | 'brain';
 
 const s: Record<string, React.CSSProperties> = {
   card: { background: 'var(--bg-secondary)', borderRadius: 12, padding: 16, marginBottom: 12 },
   row: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 8 },
-  row3: { display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginBottom: 8 },
   label: { fontSize: 11, opacity: 0.7, marginBottom: 2 },
   input: { width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg-primary)', color: 'inherit', fontSize: 14, boxSizing: 'border-box' as const },
   btn: { padding: '6px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg-primary)', color: 'inherit', fontSize: 12, cursor: 'pointer' },
@@ -27,7 +26,7 @@ const VARICOCELE = [
 ] as const;
 
 export const FertilityPCTScreen: React.FC = () => {
-  const [tab, setTab] = useState<FertTab>('semen');
+  const [tab, setTab] = useState<FertTab>('overview');
 
   const [volume, setVolume] = useState('');
   const [concentration, setConcentration] = useState('');
@@ -57,7 +56,6 @@ export const FertilityPCTScreen: React.FC = () => {
   const [inhb, setInhb] = useState('');
   const [amh, setAmh] = useState('');
 
-  // ─── PCT Plan ───
   const [pctCourse, setPctCourse] = useState<CourseEntry[]>([]);
   const [pctPlan, setPctPlan] = useState<ReturnType<typeof generatePCTPlan> | null>(null);
   const CLASS_COLORS: Record<string, string> = { pct_serm: '#22c55e', pct_aromatase: '#ef4444', pct_dopamine: '#eab308', pct_gonadotropin: '#3b82f6' };
@@ -67,26 +65,26 @@ export const FertilityPCTScreen: React.FC = () => {
   }, []);
 
   const [allLabs, setAllLabs] = useState<Record<string, string>>({});
+  const [labEntries, setLabEntries] = useState<LabPoint[]>([]);
   useEffect(() => {
     const loadLabs = async () => {
       try {
         const profile = getProfile();
         const entries = await db.getAll<LabPoint>('labs_log');
+        setLabEntries(entries);
         const codeMap: Record<string, React.Dispatch<React.SetStateAction<string>>> = {
           TT: setTt, FT: setFt, E2: setE2, LH: setLh, FSH: setFsh,
           PRL: setPrl, SHBG: setShbg, INHB: setInhb, AMH: setAmh
         };
-        const codeToKey: Record<string, string> = { TT: 'ng/dL', FT: 'pg/mL', E2: 'pg/mL', LH: 'mIU/mL', FSH: 'mIU/mL', PRL: 'ng/mL', SHBG: 'nmol/L', INHB: 'pg/mL', AMH: 'ng/mL' };
-        const labData: Record<string, string> = {};
         entries
           .filter(e => e.patientId === (profile.id || 'current-user'))
           .sort((a, b) => (b.date || '').localeCompare(a.date || ''))
           .forEach(e => {
             const setter = codeMap[e.code];
             if (setter && e.value !== undefined) setter(String(e.value));
-            if (e.value !== undefined) labData[e.code] = String(e.value);
+            if (e.value !== undefined) allLabs[e.code] = String(e.value);
           });
-        setAllLabs(labData);
+        setAllLabs({ ...allLabs });
       } catch {}
     };
     loadLabs();
@@ -152,57 +150,355 @@ export const FertilityPCTScreen: React.FC = () => {
   );
 
   const fertTabs: { id: FertTab; label: string }[] = [
-    { id: 'semen', label: 'Спермограмма' }, { id: 'hormones', label: 'Гормоны' }, { id: 'structure', label: 'DFI/Структура' }, { id: 'pct-plan', label: 'ПКТ план' }, { id: 'hrt', label: '⚕️ ГЗТ' }, { id: 'analyses', label: '🧪 Анализы' }, { id: 'brain', label: '🧠 Гайд' }
+    { id: 'overview', label: '📋 Обзор' },
+    { id: 'semen', label: 'Спермограмма' }, { id: 'hormones', label: 'Гормоны' }, { id: 'structure', label: 'DFI/Структура' },
+    { id: 'pct-plan', label: 'ПКТ план' }, { id: 'hrt', label: '⚕️ ГЗТ' }, { id: 'analyses', label: '🧪 Анализы' }, { id: 'brain', label: '🧠 Гайд' }
   ];
+
+  const lastLabDate = labEntries.length > 0
+    ? labEntries.filter(e => e.date).sort((a, b) => (b.date || '').localeCompare(a.date || ''))[0]?.date?.split('T')[0]
+    : null;
+
+  const fertilityLabs = ['LH', 'FSH', 'TT', 'FT', 'E2', 'PRL', 'SHBG'];
+  const checkedCount = fertilityLabs.filter(c => allLabs[c]).length;
+
+  const [labChecklist, setLabChecklist] = useState<Record<string, boolean>>({});
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('fertility_lab_checklist');
+      if (saved) setLabChecklist(JSON.parse(saved));
+    } catch {}
+  }, []);
+  const toggleLabCheck = (code: string) => {
+    const next = { ...labChecklist, [code]: !labChecklist[code] };
+    setLabChecklist(next);
+    localStorage.setItem('fertility_lab_checklist', JSON.stringify(next));
+  };
+
+  const generateDoctorReport = () => {
+    const lines: string[] = [];
+    lines.push('=== ОТЧЁТ ДЛЯ ВРАЧА ===');
+    lines.push(`Дата: ${new Date().toLocaleDateString('ru-RU')}`);
+    lines.push('');
+    lines.push('📊 Индекс фертильности IF: ' + result.ifScore);
+    lines.push('Интерпретация: ' + result.interpretation);
+    if (result.spermIndex !== undefined) lines.push('Суб-индекс спермы: ' + result.spermIndex);
+    if (result.hormonalIndex !== undefined) lines.push('Суб-индекс гормонов: ' + result.hormonalIndex);
+    if (result.structuralIndex !== undefined) lines.push('Суб-индекс структуры: ' + result.structuralIndex);
+    lines.push('');
+    lines.push('💉 Гормоны:');
+    if (lh) lines.push('  LH: ' + lh + ' mIU/mL');
+    if (fsh) lines.push('  FSH: ' + fsh + ' mIU/mL');
+    if (tt) lines.push('  TT: ' + tt + ' ng/dL');
+    if (ft) lines.push('  FT: ' + ft + ' pg/mL');
+    if (e2) lines.push('  E2: ' + e2 + ' pg/mL');
+    if (prl) lines.push('  PRL: ' + prl + ' ng/mL');
+    if (shbg) lines.push('  SHBG: ' + shbg + ' nmol/L');
+    if (amh) lines.push('  AMH: ' + amh + ' ng/mL');
+    lines.push('');
+    if (pctPlan) {
+      lines.push('💊 ПКТ протокол:');
+      lines.push('  Начало: неделя ' + pctPlan.pctStartWeek);
+      pctPlan.pctProtocol.forEach((p: any) => {
+        lines.push(`  ${PHARMA_DB[p.substanceId]?.name || p.substanceId}: ${p.doseValue}${p.doseUnit}, нед ${p.startWeek}-${p.endWeek}`);
+      });
+    }
+    lines.push('');
+    lines.push('Прогноз 6 нед: ' + result.forecast6w);
+    lines.push('Прогноз 12 нед: ' + result.forecast12w);
+    if (result.warnings && result.warnings.length > 0) {
+      lines.push('');
+      lines.push('⚠ Предупреждения:');
+      result.warnings.forEach(w => lines.push('  - ' + w));
+    }
+    alert(lines.join('\n'));
+  };
 
   return (
     <div className="screen fertility-pct">
-      <h2>ПКТ и гормональное здоровье</h2>
-      <div style={{ display: 'flex', gap: 4, marginBottom: 12, overflowX: 'auto', scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch', paddingBottom: 4 }}>
-        {fertTabs.map(t => (
-          <button
-            key={t.id}
-            className={`tab-button ${tab === t.id ? 'active' : ''}`}
-            onClick={() => setTab(t.id)}
-            style={{ flexShrink: 0, whiteSpace: 'nowrap', padding: '8px 12px', fontSize: 11 }}
-          >{t.label}</button>
-        ))}
+      <h2 style={{ fontSize: 18, fontWeight: 800, margin: '0 0 6px' }}>ПКТ и гормональное здоровье</h2>
+
+      <div style={{
+        display: 'flex', gap: 5, marginBottom: 10, overflowX: 'auto', scrollbarWidth: 'none' as const,
+        WebkitOverflowScrolling: 'touch', paddingBottom: 4, msOverflowStyle: 'none' as const,
+      }}>
+        {fertTabs.map(t => {
+          const isActive = tab === t.id;
+          return (
+            <button
+              key={t.id}
+              onClick={() => setTab(t.id)}
+              style={{
+                flexShrink: 0, whiteSpace: 'nowrap',
+                padding: '8px 16px', borderRadius: 24, fontSize: 11,
+                fontWeight: isActive ? 700 : 500,
+                background: isActive ? 'var(--accent)' : 'var(--glass-bg)',
+                color: isActive ? '#000' : 'var(--text-dim)',
+                border: isActive ? 'none' : '1px solid var(--glass-border)',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease',
+              }}
+            >{t.label}</button>
+          );
+        })}
       </div>
 
       <div style={{ maxWidth: '100%', overflowX: 'hidden', wordBreak: 'break-word' }}>
 
+      {/* ─── OVERVIEW TAB ─── */}
+      {tab === 'overview' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {/* Quick-reference cards */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+            <div style={{ background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', borderRadius: 12, padding: 12 }}>
+              <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 4 }}>🧬 Фертильность</div>
+              <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)', marginBottom: 6 }}>Статус гормонов</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 2, fontSize: 9 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: 'var(--text-dim)' }}>LH</span>
+                  <span style={{ fontWeight: 600, color: lh ? (parseFloat(lh) >= 1.7 ? '#22c55e' : '#ef4444') : '#666' }}>{lh || '—'}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: 'var(--text-dim)' }}>FSH</span>
+                  <span style={{ fontWeight: 600, color: fsh ? (parseFloat(fsh) >= 1.5 ? '#22c55e' : '#ef4444') : '#666' }}>{fsh || '—'}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: 'var(--text-dim)' }}>TT</span>
+                  <span style={{ fontWeight: 600, color: tt ? (parseFloat(tt) >= 300 ? '#22c55e' : '#ff9800') : '#666' }}>{tt || '—'}</span>
+                </div>
+              </div>
+            </div>
+            <div style={{ background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', borderRadius: 12, padding: 12 }}>
+              <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 4 }}>💊 ПКТ</div>
+              <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)', marginBottom: 6 }}>Протокол</div>
+              <div style={{ fontSize: 9 }}>
+                {pctPlan ? (
+                  <div style={{ color: '#22c55e', fontWeight: 600 }}>
+                    Активен: {pctPlan.pctProtocol.length} преп., старт нед {pctPlan.pctStartWeek}
+                  </div>
+                ) : pctCourse.length > 0 ? (
+                  <div style={{ color: '#ff9800', fontWeight: 600 }}>Курс найден, ПКТ не сгенерирован</div>
+                ) : (
+                  <div style={{ color: 'var(--text-dim)' }}>Нет активного курса</div>
+                )}
+              </div>
+            </div>
+            <div style={{ background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', borderRadius: 12, padding: 12 }}>
+              <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 4 }}>⚕️ ГЗТ</div>
+              <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)', marginBottom: 6 }}>ТРТ статус</div>
+              <div style={{ fontSize: 9 }}>
+                {tt ? (parseFloat(tt) < 300 ? (
+                  <div style={{ color: '#ff9800', fontWeight: 600 }}>Уровень TT низкий. Возможна необходимость ТРТ.</div>
+                ) : (
+                  <div style={{ color: '#22c55e', fontWeight: 600 }}>Уровень TT в норме</div>
+                )) : (
+                  <div style={{ color: 'var(--text-dim)' }}>Нет данных TT</div>
+                )}
+              </div>
+            </div>
+            <div style={{ background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', borderRadius: 12, padding: 12 }}>
+              <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 4 }}>📊 Анализы</div>
+              <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)', marginBottom: 6 }}>
+                {lastLabDate || 'Нет данных'}
+              </div>
+              <div style={{ display: 'flex', gap: 3, fontSize: 9 }}>
+                <span style={{
+                  width: 8, height: 8, borderRadius: '50%',
+                  background: checkedCount >= 6 ? '#22c55e' : checkedCount >= 3 ? '#ff9800' : '#ef4444',
+                  display: 'inline-block',
+                }} />
+                <span style={{ color: 'var(--text-dim)' }}>Гормоны: {checkedCount}/{fertilityLabs.length}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Action cards */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <button onClick={() => setTab('pct-plan')} style={{
+              width: '100%', padding: 12, borderRadius: 14, cursor: 'pointer', textAlign: 'left' as const,
+              background: 'var(--glass-bg)', border: '1px solid rgba(0,230,138,0.2)',
+              color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 10,
+              transition: 'all 0.2s',
+            }}>
+              <span style={{ fontSize: 20, flexShrink: 0 }}>🔄</span>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: '#00e68a' }}>Запустить ПКТ</div>
+                <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>Генерация протокола восстановления</div>
+              </div>
+              <span style={{ color: '#00e68a', fontSize: 14 }}>→</span>
+            </button>
+
+            <button onClick={() => setTab('analyses')} style={{
+              width: '100%', padding: 12, borderRadius: 14, cursor: 'pointer', textAlign: 'left' as const,
+              background: 'var(--glass-bg)', border: '1px solid rgba(245,158,11,0.2)',
+              color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 10,
+              transition: 'all 0.2s',
+            }}>
+              <span style={{ fontSize: 20, flexShrink: 0 }}>🧪</span>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: '#f59e0b' }}>Заказать анализы</div>
+                <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>
+                  {Object.values(labChecklist).filter(Boolean).length > 0
+                    ? `Выбрано: ${Object.values(labChecklist).filter(Boolean).length} тестов`
+                    : 'Список рекомендуемых анализов'}
+                </div>
+              </div>
+              <span style={{ color: '#f59e0b', fontSize: 14 }}>→</span>
+            </button>
+
+            <button onClick={generateDoctorReport} style={{
+              width: '100%', padding: 12, borderRadius: 14, cursor: 'pointer', textAlign: 'left' as const,
+              background: 'var(--glass-bg)', border: '1px solid rgba(59,130,246,0.2)',
+              color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 10,
+              transition: 'all 0.2s',
+            }}>
+              <span style={{ fontSize: 20, flexShrink: 0 }}>👨‍⚕️</span>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: '#3b82f6' }}>Отчёт для врача</div>
+                <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>Генерация сводки по фертильности</div>
+              </div>
+              <span style={{ color: '#3b82f6', fontSize: 14 }}>→</span>
+            </button>
+          </div>
+
+          {/* Lab checklist (shown inline on overview) */}
+          <div style={{ background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', borderRadius: 12, padding: 14 }}>
+            <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 8, color: '#f59e0b' }}>🧪 Рекомендуемые анализы для заказа</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, marginBottom: 4 }}>
+              {[
+                { code: 'LH', name: 'LH' }, { code: 'FSH', name: 'FSH' }, { code: 'TT', name: 'Тестостерон общий' },
+                { code: 'FT', name: 'Тестостерон своб.' }, { code: 'E2', name: 'Эстрадиол' }, { code: 'PRL', name: 'Пролактин' },
+                { code: 'SHBG', name: 'SHBG' }, { code: 'TSH', name: 'TSH' }, { code: 'FT4', name: 'T4 своб.' },
+                { code: 'CORT', name: 'Кортизол' }, { code: 'PSA', name: 'ПСА' }, { code: 'VITD', name: 'Витамин D' },
+                { code: 'SPERM', name: 'Спермограмма' }, { code: 'CBC', name: 'ОАК' },
+              ].map(item => (
+                <label key={item.code} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 9, color: 'var(--text)', padding: '3px 0', cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={!!labChecklist[item.code]}
+                    onChange={() => toggleLabCheck(item.code)}
+                    style={{ width: 14, height: 14, accentColor: '#f59e0b', cursor: 'pointer' }}
+                  />
+                  {item.name}
+                </label>
+              ))}
+            </div>
+          </div>
+
+          {/* IF Score card */}
+          <div style={{ ...s.card, borderColor: scoreColor, background: scoreBg, border: `1px solid ${scoreColor}` }}>
+            <h3 style={{ color: scoreColor, margin: '0 0 8px', fontSize: 16 }}>Индекс фертильности: {result.ifScore}</h3>
+            <p style={{ color: scoreColor, margin: '0 0 4px', fontSize: 11 }}>{result.interpretation}</p>
+            <div style={s.barTrack}>
+              <div style={{ height: '100%', borderRadius: 5, background: scoreColor, width: `${result.ifScore}%`, transition: 'width 0.3s' }} />
+            </div>
+
+            {result.spermIndex !== undefined && (
+              <div style={{ marginTop: 12 }}>
+                <h4 style={{ margin: '0 0 6px', fontSize: 13 }}>Суб-индексы IF v2</h4>
+                {[
+                  { label: 'Сперма', value: result.spermIndex },
+                  { label: 'Гормоны', value: result.hormonalIndex ?? 0 },
+                  { label: 'Структура', value: result.structuralIndex ?? 0 },
+                ].map(si => (
+                  <div key={si.label} style={{ marginBottom: 6 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
+                      <span>{si.label}</span>
+                      <span style={{ fontWeight: 600 }}>{si.value}</span>
+                    </div>
+                    <div style={s.barTrack}>
+                      <div style={{ height: '100%', borderRadius: 5, background: si.value >= 60 ? '#00e68a' : si.value >= 30 ? '#ff9800' : '#f44336', width: `${si.value}%` }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {result.warnings && result.warnings.length > 0 && (
+              <div style={{ marginTop: 8, padding: '8px 12px', borderRadius: 8, background: 'rgba(244,67,54,0.15)', border: '1px solid #f44336' }}>
+                {result.warnings.map(w => <div key={w} style={{ fontSize: 12, color: '#f44336' }}>{w}</div>)}
+              </div>
+            )}
+
+            <div style={{ display: 'flex', gap: 16, marginTop: 12 }}>
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: 18, fontWeight: 700, color: result.forecast6w >= 60 ? '#00e68a' : '#ff9800' }}>{result.forecast6w}</div>
+                <div style={{ fontSize: 11, opacity: 0.6 }}>Прогноз 6 нед</div>
+              </div>
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: 18, fontWeight: 700, color: result.forecast12w >= 60 ? '#00e68a' : '#ff9800' }}>{result.forecast12w}</div>
+                <div style={{ fontSize: 11, opacity: 0.6 }}>Прогноз 12 нед</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Recovery chart */}
+          <div style={s.card}>
+            <h4 style={{ margin: '0 0 8px', fontSize: 14 }}>Прогноз восстановления</h4>
+            <svg viewBox={`0 0 ${chartW} ${chartH}`} style={{ width: '100%', maxWidth: 380 }}>
+              {[0, 25, 50, 75, 100].map(v => <line key={v} x1={padL} y1={toY(v)} x2={padL + plotW} y2={toY(v)} stroke="var(--border)" strokeWidth={0.5} />)}
+              {[0, 6, 12, 18, 24].map(w => <text key={w} x={toX(w)} y={chartH - 4} textAnchor="middle" fill="var(--text-secondary)" fontSize={10}>{w}</text>)}
+              <text x={chartW / 2} y={chartH} textAnchor="middle" fill="var(--text-secondary)" fontSize={10}>Недели</text>
+              <polygon points={areaPoints} fill={scoreColor} opacity={0.15} />
+              <polyline points={polyline} fill="none" stroke={scoreColor} strokeWidth={2} />
+              <line x1={padL} y1={toY(60)} x2={padL + plotW} y2={toY(60)} stroke="#00e68a" strokeWidth={1} strokeDasharray="4,3" />
+              <line x1={padL} y1={toY(30)} x2={padL + plotW} y2={toY(30)} stroke="#ff9800" strokeWidth={1} strokeDasharray="4,3" />
+              <circle cx={toX(0)} cy={toY(result.ifScore)} r={4} fill={scoreColor} />
+              <circle cx={toX(12)} cy={toY(result.forecast12w)} r={4} fill={scoreColor} />
+            </svg>
+          </div>
+
+          {/* Recommendations */}
+          <div style={s.card}>
+            <h4 style={{ margin: '0 0 8px', fontSize: 14 }}>Рекомендации по ПКТ и восстановлению</h4>
+            <div style={{ fontSize: 12, lineHeight: 1.6 }}>
+              <h5 style={{ fontSize: 12, margin: '0 0 4px' }}>HCG на цикле</h5>
+              <p style={{ fontSize: 11, margin: '0 0 8px' }}>500–1000 МЕ 2–3 раза в неделю начиная с 3-й недели цикла.</p>
+              <h5 style={{ fontSize: 12, margin: '0 0 4px' }}>ПКТ: Кломифен</h5>
+              <p style={{ fontSize: 11, margin: '0 0 8px' }}>50 мг/день — 2 нед, затем 25 мг/день — 2 нед.</p>
+              <h5 style={{ fontSize: 12, margin: '0 0 4px' }}>ПКТ: Тамоксифен (альтернатива)</h5>
+              <p style={{ fontSize: 11, margin: '0 0 8px' }}>20 мг/день — 4 недели.</p>
+              <h5 style={{ fontSize: 12, margin: '0 0 4px' }}>Нутритивная поддержка</h5>
+              <ul style={{ fontSize: 11, margin: '0 0 8px', paddingLeft: 16 }}>
+                <li>Цинк 30 мг/день</li><li>Селен 100 мкг/день</li><li>L-карнитин 1 г/день</li><li>CoQ10 200 мг/день</li><li>Витамин E 400 МЕ/день</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      )}
+
       {tab === 'semen' && (
         <div style={s.card}>
-          <h4 style={{ margin: '0 0 8px' }}>Спермограмма расширенная</h4>
+          <h4 style={{ margin: '0 0 8px', fontSize: 14 }}>Спермограмма расширенная</h4>
           <div style={s.row}>
-            <div>{field('', volume, setVolume, '1.5')}</div>
-            <div>{field('', concentration, setConcentration, '16')}</div>
+            <div>{field('Объём (мл) ≥1.5', volume, setVolume, '1.5')}</div>
+            <div>{field('Концентрация (млн/мл) ≥16', concentration, setConcentration, '16')}</div>
           </div>
           <div style={s.row}>
-            <div>{field('', totalCount, setTotalCount, '39')}</div>
+            <div>{field('Общее кол-во (млн) ≥39', totalCount, setTotalCount, '39')}</div>
             <div>{field('PR подвижность (%) ≥30', pr, setPr, '30')}</div>
           </div>
           <div style={s.row}>
             <div>{field('NP подвижность (%)', np, setNp, '10')}</div>
-            <div>{field('', immotile, setImmotile, '0')}</div>
+            <div>{field('Неподвижные (%)', immotile, setImmotile, '0')}</div>
           </div>
           <div style={s.row}>
-            <div>{field('', morphology, setMorphology, '4')}</div>
-            <div>{field('', viability, setViability, '58')}</div>
+            <div>{field('Морфология (%) ≥4', morphology, setMorphology, '4')}</div>
+            <div>{field('Жизнеспособность (%) ≥58', viability, setViability, '58')}</div>
           </div>
           <div style={s.row}>
             <div>{field('pH 7.2–8.0', ph, setPh, '7.4')}</div>
-            <div>{field('', fructose, setFructose, '13')}</div>
+            <div>{field('Фруктоза (ммоль/л)', fructose, setFructose, '13')}</div>
           </div>
           <div style={s.row}>
-            <div>{field('', zincMmol, setZincMmol, '2')}</div>
+            <div>{field('Цинк (ммоль/л)', zincMmol, setZincMmol, '2')}</div>
             <div>{field('MAR-тест (%) <50', mar, setMar, '0')}</div>
           </div>
           <div style={s.row}>
-            <div>{field('', leukocytes, setLeukocytes, '0')}</div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <label><input type="checkbox" style={s.check} checked={viscosity} onChange={e => setViscosity(e.target.checked)} /> Вязкость</label>
-              <label><input type="checkbox" style={s.check} checked={agglutination} onChange={e => setAgglutination(e.target.checked)} /> Агглютинация</label>
+            <div>{field('Лейкоциты (млн/мл)', leukocytes, setLeukocytes, '0')}</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              <label style={{ fontSize: 10 }}><input type="checkbox" style={s.check} checked={viscosity} onChange={e => setViscosity(e.target.checked)} /> Вязкость</label>
+              <label style={{ fontSize: 10 }}><input type="checkbox" style={s.check} checked={agglutination} onChange={e => setAgglutination(e.target.checked)} /> Агглютинация</label>
             </div>
           </div>
         </div>
@@ -210,26 +506,26 @@ export const FertilityPCTScreen: React.FC = () => {
 
       {tab === 'hormones' && (
         <div style={s.card}>
-          <h4 style={{ margin: '0 0 8px' }}>Гормоны крови (10 маркеров)</h4>
-          <p style={{ fontSize: 11, opacity: 0.6, margin: '0 0 8px' }}>Автозаполнение из LabsScreen</p>
+          <h4 style={{ margin: '0 0 8px', fontSize: 14 }}>Гормоны крови (10 маркеров)</h4>
+          <p style={{ fontSize: 10, opacity: 0.6, margin: '0 0 8px' }}>Автозаполнение из LabsScreen</p>
           <div style={s.row}>
-            <div>{field('', lh, setLh, '5')}</div>
-            <div>{field('', fsh, setFsh, '4')}</div>
+            <div>{field('LH (mIU/mL)', lh, setLh, '5')}</div>
+            <div>{field('FSH (mIU/mL)', fsh, setFsh, '4')}</div>
           </div>
           <div style={s.row}>
-            <div>{field('', tt, setTt, '500')}</div>
-            <div>{field('', ft, setFt, '15')}</div>
+            <div>{field('TT общ. (ng/dL)', tt, setTt, '500')}</div>
+            <div>{field('FT своб. (pg/mL)', ft, setFt, '15')}</div>
           </div>
           <div style={s.row}>
-            <div>{field('', e2, setE2, '25')}</div>
-            <div>{field('', prl, setPrl, '8')}</div>
+            <div>{field('E2 (pg/mL)', e2, setE2, '25')}</div>
+            <div>{field('Пролактин (ng/mL)', prl, setPrl, '8')}</div>
           </div>
           <div style={s.row}>
-            <div>{field('', shbg, setShbg, '30')}</div>
-            <div>{field('', inhb, setInhb, '150')}</div>
+            <div>{field('SHBG (nmol/L)', shbg, setShbg, '30')}</div>
+            <div>{field('Ингибин B (pg/mL)', inhb, setInhb, '150')}</div>
           </div>
           <div style={s.row}>
-            <div>{field('', amh, setAmh, '4')}</div>
+            <div>{field('AMH (ng/mL)', amh, setAmh, '4')}</div>
             <div></div>
           </div>
         </div>
@@ -237,7 +533,7 @@ export const FertilityPCTScreen: React.FC = () => {
 
       {tab === 'structure' && (
         <div style={s.card}>
-          <h4 style={{ margin: '0 0 8px' }}>DFI и структурные факторы</h4>
+          <h4 style={{ margin: '0 0 8px', fontSize: 14 }}>DFI и структурные факторы</h4>
           <div style={s.row}>
             <div>{field('DFI (%) ≤15 норма', dfi, setDfi, '0')}</div>
             <div>
@@ -250,7 +546,6 @@ export const FertilityPCTScreen: React.FC = () => {
         </div>
       )}
 
-      {/* ─── PCT TIMER ─── */}
       {tab === 'pct-plan' && pctPlan && (
         <div className="card" style={{ marginBottom: 12 }}>
           <div style={{ textAlign: 'center', padding: '8px 0' }}>
@@ -282,15 +577,14 @@ export const FertilityPCTScreen: React.FC = () => {
         </div>
       )}
 
-      {/* ─── PCT PLAN TAB ─── */}
       {tab === 'pct-plan' && (
         <div>
           {pctCourse.length === 0 ? (
             <div style={s.card}>
               <div style={{ textAlign: 'center', padding: 20, color: 'var(--text-dim)' }}>
                 <div style={{ fontSize: 28, marginBottom: 8 }}>💊</div>
-                <div>Курс не найден</div>
-                <div style={{ fontSize: 11, marginTop: 4 }}>Добавьте препараты во вкладке Фармакология {'>'} Курс</div>
+                <div style={{ fontSize: 12 }}>Курс не найден</div>
+                <div style={{ fontSize: 10, marginTop: 4 }}>Добавьте препараты во вкладке Фармакология → Курс</div>
               </div>
             </div>
           ) : !pctPlan ? (
@@ -310,7 +604,7 @@ export const FertilityPCTScreen: React.FC = () => {
           ) : (
             <>
               <div style={s.card}>
-                <h4 style={{ margin: '0 0 8px' }}>План ПКТ</h4>
+                <h4 style={{ margin: '0 0 8px', fontSize: 14 }}>План ПКТ</h4>
                 <div style={{ fontSize: 12, marginBottom: 6 }}>
                   Начало: <b>неделя {pctPlan.pctStartWeek}</b>
                 </div>
@@ -326,12 +620,12 @@ export const FertilityPCTScreen: React.FC = () => {
                     background: 'var(--bg-secondary)', borderRadius: 8, padding: '10px 12px', marginBottom: 6,
                     borderLeft: `3px solid ${CLASS_COLORS[p.class] || '#666'}`,
                   }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <div>
-                        <span style={{ fontWeight: 600, fontSize: 13 }}>{PHARMA_DB[p.substanceId]?.name || p.substanceId}</span>
-                        <span style={{ fontSize: 9, marginLeft: 6, padding: '2px 6px', borderRadius: 4, background: `${CLASS_COLORS[p.class] || '#666'}22`, color: CLASS_COLORS[p.class] || '#666' }}>{CLASS_LABEL_PCT[p.class] || p.class}</span>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 4 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
+                        <span style={{ fontWeight: 600, fontSize: 12 }}>{PHARMA_DB[p.substanceId]?.name || p.substanceId}</span>
+                        <span style={{ fontSize: 9, padding: '2px 6px', borderRadius: 4, background: `${CLASS_COLORS[p.class] || '#666'}22`, color: CLASS_COLORS[p.class] || '#666' }}>{CLASS_LABEL_PCT[p.class] || p.class}</span>
                       </div>
-                      <span style={{ fontWeight: 700, fontSize: 13 }}>{p.doseValue}{p.doseUnit}</span>
+                      <span style={{ fontWeight: 700, fontSize: 12 }}>{p.doseValue}{p.doseUnit}</span>
                     </div>
                     <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 4 }}>
                       {p.timing || `${p.frequency}`} | Нед {p.startWeek}-{p.endWeek}
@@ -341,7 +635,7 @@ export const FertilityPCTScreen: React.FC = () => {
                 <button onClick={() => setPctPlan(null)} style={{ marginTop: 8, padding: '6px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-dim)', cursor: 'pointer', fontSize: 11 }}>✕ Сбросить</button>
               </div>
               <div style={s.card}>
-                <h4 style={{ margin: '0 0 8px' }}>Восстановление фертильности</h4>
+                <h4 style={{ margin: '0 0 8px', fontSize: 14 }}>Восстановление фертильности</h4>
                 <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 8 }}>Рекомендации для восстановления после курса</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                   {[
@@ -382,11 +676,11 @@ export const FertilityPCTScreen: React.FC = () => {
                 { name:'ХГЧ (hCG)', dose:'250-500 МЕ', freq:'2-3 раза/нед', note:'Сохранение фертильности, стимуляция Лейдигов' },
               ].map((r, i) => (
                 <div key={i} style={{ padding:'8px 10px', borderRadius:8, background:'rgba(0,230,138,0.04)', border:'1px solid rgba(0,230,138,0.1)' }}>
-                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', gap:4 }}>
                     <span style={{ fontSize:10, fontWeight:600, color:'var(--text-light)' }}>{r.name}</span>
                     <span style={{ fontSize:9, fontWeight:700, color:'#00e68a' }}>{r.dose}</span>
                   </div>
-                  <div style={{ display:'flex', justifyContent:'space-between', marginTop:2 }}>
+                  <div style={{ display:'flex', justifyContent:'space-between', marginTop:2, flexWrap:'wrap', gap:4 }}>
                     <span style={{ fontSize:8, color:'var(--text-dim)' }}>{r.freq}</span>
                     <span style={{ fontSize:8, color:'rgba(0,230,138,0.7)', fontStyle:'italic' }}>{r.note}</span>
                   </div>
@@ -405,7 +699,7 @@ export const FertilityPCTScreen: React.FC = () => {
                 { param:'ПСА (простат-специфический антиген)', target:'< 4.0 нг/мл', freq:'Каждые 6-12 мес (мужчины >40)' },
                 { param:'Липидный профиль', target:'ЛПНП < 100, ЛПВП > 40', freq:'Каждые 6-12 мес' },
               ].map((m, i) => (
-                <div key={i} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'6px 8px', borderRadius:6, background:'rgba(59,130,246,0.06)', border:'1px solid rgba(59,130,246,0.1)' }}>
+                <div key={i} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'6px 8px', borderRadius:6, background:'rgba(59,130,246,0.06)', border:'1px solid rgba(59,130,246,0.1)', flexWrap:'wrap', gap:4 }}>
                   <div>
                     <div style={{ fontSize:10, fontWeight:600, color:'var(--text-light)' }}>{m.param}</div>
                     <div style={{ fontSize:8, color:'var(--text-dim)' }}>{m.freq}</div>
@@ -423,7 +717,7 @@ export const FertilityPCTScreen: React.FC = () => {
                 { name:'Донаторы NO (цитруллин)', dose:'3-6 г/день', note:'Поддержка эндотелиальной функции' },
               ].map((r, i) => (
                 <div key={i} style={{ padding:'6px 8px', borderRadius:6, background:'rgba(245,158,11,0.06)', border:'1px solid rgba(245,158,11,0.1)' }}>
-                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', gap:4 }}>
                     <span style={{ fontSize:10, fontWeight:600, color:'var(--text-light)' }}>{r.name}</span>
                     <span style={{ fontSize:9, fontWeight:700, color:'#f59e0b' }}>{r.dose}</span>
                   </div>
@@ -542,14 +836,15 @@ export const FertilityPCTScreen: React.FC = () => {
                           display:'flex', alignItems:'center', gap:8, padding:'6px 8px',
                           borderRadius:8, background: hasData ? 'rgba(0,230,138,0.06)' : 'var(--bg-secondary)',
                           border: `1px solid ${hasData ? 'rgba(0,230,138,0.2)' : 'var(--border)'}`,
+                          flexWrap:'wrap',
                         }}>
                           <div style={{
                             width:20, height:20, borderRadius:6, display:'flex', alignItems:'center', justifyContent:'center',
                             background: hasData ? 'rgba(0,230,138,0.15)' : 'rgba(255,255,255,0.05)',
                             fontSize:12, flexShrink:0,
                           }}>{hasData ? '✓' : '○'}</div>
-                          <div style={{ flex:1 }}>
-                            <div style={{ fontSize:11, fontWeight: hasData ? 600 : 400, color: hasData ? 'var(--text-light)' : 'var(--text-dim)' }}>
+                          <div style={{ flex:1, minWidth: 0 }}>
+                            <div style={{ fontSize:11, fontWeight: hasData ? 600 : 400, color: hasData ? 'var(--text-light)' : 'var(--text-dim)', wordBreak:'break-word' }}>
                               {item.name}
                             </div>
                             <div style={{ fontSize:8, color:'var(--text-dim)' }}>
@@ -600,7 +895,7 @@ export const FertilityPCTScreen: React.FC = () => {
                 { name:'Туринабол', level:'Средне-высокий', detail:'17α-алкилирован, гепатотоксичен + подавление оси. Восстановление 6-10 нед.', color:'#f59e0b', bg:'rgba(245,158,11,0.1)' },
               ].map((r, i) => (
                 <div key={i} style={{ padding:'8px 10px', borderRadius:8, background:r.bg, border:`1px solid ${r.color}22` }}>
-                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', gap:4 }}>
                     <span style={{ fontSize:11, fontWeight:600, color:'var(--text-light)' }}>{r.name}</span>
                     <span style={{ fontSize:9, fontWeight:700, color:r.color }}>{r.level}</span>
                   </div>
@@ -622,13 +917,13 @@ export const FertilityPCTScreen: React.FC = () => {
                 { name:'Витамин E', dose:'400-800 МЕ/день', note:'Мембранный антиоксидант, защита сперматозоидов' },
                 { name:'L-карнитин', dose:'2-3 г/день', note:'Энергетика митохондрий сперматозоидов, подвижность' },
                 { name:'NAC', dose:'1200 мг/день', note:'Предшественник глутатиона, защита клеток Лейдига' },
-              ].map((s, i) => (
+              ].map((sup, i) => (
                 <div key={i} style={{ padding:'6px 8px', borderRadius:6, background:'rgba(0,230,138,0.04)', border:'1px solid rgba(0,230,138,0.1)' }}>
-                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-                    <span style={{ fontSize:10, fontWeight:600, color:'var(--text-light)' }}>{s.name}</span>
-                    <span style={{ fontSize:9, fontWeight:700, color:'#00e68a' }}>{s.dose}</span>
+                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', gap:4 }}>
+                    <span style={{ fontSize:10, fontWeight:600, color:'var(--text-light)' }}>{sup.name}</span>
+                    <span style={{ fontSize:9, fontWeight:700, color:'#00e68a' }}>{sup.dose}</span>
                   </div>
-                  <div style={{ fontSize:8, color:'var(--text-dim)', marginTop:1 }}>{s.note}</div>
+                  <div style={{ fontSize:8, color:'var(--text-dim)', marginTop:1 }}>{sup.note}</div>
                 </div>
               ))}
             </div>
@@ -675,7 +970,7 @@ export const FertilityPCTScreen: React.FC = () => {
                 { name:'рФСГ (рекомбинантный ФСГ)', dose:'75-150 МЕ 3×/нед', note:'Чистый ФСГ, стимуляция клеток Сертоли → сперматогенез. При азооспермии.' },
               ].map((p, i) => (
                 <div key={i} style={{ padding:'8px 10px', borderRadius:8, background:'rgba(59,130,246,0.04)', border:'1px solid rgba(59,130,246,0.12)' }}>
-                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', gap:4 }}>
                     <span style={{ fontSize:10, fontWeight:600, color:'var(--text-light)' }}>{p.name}</span>
                     <span style={{ fontSize:9, fontWeight:700, color:'#3b82f6' }}>{p.dose}</span>
                   </div>
@@ -687,80 +982,6 @@ export const FertilityPCTScreen: React.FC = () => {
         </div>
       )}
 
-      <div style={{ ...s.card, borderColor: scoreColor, background: scoreBg, border: `1px solid ${scoreColor}` }}>
-        <h3 style={{ color: scoreColor, margin: '0 0 8px' }}>Индекс фертильности: {result.ifScore}</h3>
-        <p style={{ color: scoreColor, margin: '0 0 4px' }}>{result.interpretation}</p>
-        <div style={s.barTrack}>
-          <div style={{ height: '100%', borderRadius: 5, background: scoreColor, width: `${result.ifScore}%`, transition: 'width 0.3s' }} />
-        </div>
-
-        {result.spermIndex !== undefined && (
-          <div style={{ marginTop: 12 }}>
-            <h4 style={{ margin: '0 0 6px', fontSize: 13 }}>Суб-индексы IF v2</h4>
-            {[
-              { label: 'Сперма', value: result.spermIndex },
-              { label: 'Гормоны', value: result.hormonalIndex ?? 0 },
-              { label: 'Структура', value: result.structuralIndex ?? 0 },
-            ].map(si => (
-              <div key={si.label} style={{ marginBottom: 6 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
-                  <span>{si.label}</span>
-                  <span style={{ fontWeight: 600 }}>{si.value}</span>
-                </div>
-                <div style={s.barTrack}>
-                  <div style={{ height: '100%', borderRadius: 5, background: si.value >= 60 ? '#00e68a' : si.value >= 30 ? '#ff9800' : '#f44336', width: `${si.value}%` }} />
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {result.warnings && result.warnings.length > 0 && (
-          <div style={{ marginTop: 8, padding: '8px 12px', borderRadius: 8, background: 'rgba(244,67,54,0.15)', border: '1px solid #f44336' }}>
-            {result.warnings.map(w => <div key={w} style={{ fontSize: 12, color: '#f44336' }}>{w}</div>)}
-          </div>
-        )}
-
-        <div style={{ display: 'flex', gap: 16, marginTop: 12 }}>
-          <div style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: 18, fontWeight: 700, color: result.forecast6w >= 60 ? '#00e68a' : '#ff9800' }}>{result.forecast6w}</div>
-            <div style={{ fontSize: 11, opacity: 0.6 }}>Прогноз 6 нед</div>
-          </div>
-          <div style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: 18, fontWeight: 700, color: result.forecast12w >= 60 ? '#00e68a' : '#ff9800' }}>{result.forecast12w}</div>
-            <div style={{ fontSize: 11, opacity: 0.6 }}>Прогноз 12 нед</div>
-          </div>
-        </div>
-      </div>
-
-      <div style={s.card}>
-        <h4 style={{ margin: '0 0 8px' }}>Прогноз восстановления</h4>
-        <svg viewBox={`0 0 ${chartW} ${chartH}`} style={{ width: '100%', maxWidth: 380 }}>
-          {[0, 25, 50, 75, 100].map(v => <line key={v} x1={padL} y1={toY(v)} x2={padL + plotW} y2={toY(v)} stroke="var(--border)" strokeWidth={0.5} />)}
-          {[0, 6, 12, 18, 24].map(w => <text key={w} x={toX(w)} y={chartH - 4} textAnchor="middle" fill="var(--text-secondary)" fontSize={10}>{w}</text>)}
-          <text x={chartW / 2} y={chartH} textAnchor="middle" fill="var(--text-secondary)" fontSize={10}>Недели</text>
-          <polygon points={areaPoints} fill={scoreColor} opacity={0.15} />
-          <polyline points={polyline} fill="none" stroke={scoreColor} strokeWidth={2} />
-          <line x1={padL} y1={toY(60)} x2={padL + plotW} y2={toY(60)} stroke="#00e68a" strokeWidth={1} strokeDasharray="4,3" />
-          <line x1={padL} y1={toY(30)} x2={padL + plotW} y2={toY(30)} stroke="#ff9800" strokeWidth={1} strokeDasharray="4,3" />
-          <circle cx={toX(0)} cy={toY(result.ifScore)} r={4} fill={scoreColor} />
-          <circle cx={toX(12)} cy={toY(result.forecast12w)} r={4} fill={scoreColor} />
-        </svg>
-      </div>
-
-      <div style={s.card}>
-        <h4 style={{ margin: '0 0 8px' }}>Рекомендации по ПКТ и восстановлению</h4>
-        <div style={{ fontSize: 13, lineHeight: 1.6 }}>
-          <h5>HCG на цикле</h5>
-          <p>500–1000 МЕ 2–3 раза в неделю начиная с 3-й недели цикла.</p>
-          <h5>ПКТ: Кломифен</h5>
-          <p>50 мг/день — 2 нед, затем 25 мг/день — 2 нед.</p>
-          <h5>ПКТ: Тамоксифен (альтернатива)</h5>
-          <p>20 мг/день — 4 недели.</p>
-          <h5>Нутритивная поддержка</h5>
-          <ul><li>Цинк 30 мг/день</li><li>Селен 100 мкг/день</li><li>L-карнитин 1 г/день</li><li>CoQ10 200 мг/день</li><li>Витамин E 400 МЕ/день</li></ul>
-        </div>
-      </div>
       </div>
     </div>
   );
