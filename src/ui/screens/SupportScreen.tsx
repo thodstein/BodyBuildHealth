@@ -1464,10 +1464,81 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   }, [searchQuery]);
 
   // Organ-based grouping for catalog sub-tab
-  const ORGAN_EMOJI: Record<string, string> = { heart:'❤️', liver:'🫁', kidney:'🫘', brain:'🧠', bone:'🦴', joint:'🦵', skin:'✨', hair:'💇', eye:'👁', gut:'🫃', lung:'🫁', thyroid:'🦋', pancreas:'🍬', adrenal:'🌀', immune:'🛡', blood:'🩸', muscle:'💪', nerve:'🧠', prostate:'♂️', ovary:'♀️', liver_kidney:'🫁🫘' };
-  const ORGAN_LABELS: Record<string, string> = { heart:'Сердце', liver:'Печень', kidney:'Почки', brain:'Мозг', bone:'Кости', joint:'Суставы', skin:'Кожа', hair:'Волосы', eye:'Зрение', gut:'ЖКТ', lung:'Лёгкие', thyroid:'Щитовидная', pancreas:'Поджелудочная', adrenal:'Надпочечники', immune:'Иммунитет', blood:'Кровь', muscle:'Мышцы', nerve:'Нервы', prostate:'Простата', ovary:'Яичники', liver_kidney:'Печень/Почки' };
+  // Phase 5.12: Comprehensive 16-category organ mapping
+  const ORGAN_CATEGORY_MAP: Record<string, { key: string; label: string; emoji: string }> = {
+    HEART: { key: 'heart_vessels', label: 'Сердце и сосуды', emoji: '❤️' },
+    VESSELS: { key: 'heart_vessels', label: 'Сердце и сосуды', emoji: '❤️' },
+    LIVER: { key: 'liver', label: 'Печень', emoji: '🫁' },
+    BILE_DUCTS: { key: 'liver', label: 'Печень', emoji: '🫁' },
+    GALLBLADDER: { key: 'liver', label: 'Печень', emoji: '🫁' },
+    gallbladder: { key: 'liver', label: 'Печень', emoji: '🫁' },
+    KIDNEYS: { key: 'kidneys', label: 'Почки', emoji: '🫘' },
+    kidney: { key: 'kidneys', label: 'Почки', emoji: '🫘' },
+    BLADDER: { key: 'kidneys', label: 'Почки', emoji: '🫘' },
+    URINARY: { key: 'kidneys', label: 'Почки', emoji: '🫘' },
+    BRAIN: { key: 'brain_nerves', label: 'Мозг и нервная система', emoji: '🧠' },
+    NERVES: { key: 'brain_nerves', label: 'Мозг и нервная система', emoji: '🧠' },
+    NERVOUS_SYSTEM: { key: 'brain_nerves', label: 'Мозг и нервная система', emoji: '🧠' },
+    HYPOTHALAMUS: { key: 'brain_nerves', label: 'Мозг и нервная система', emoji: '🧠' },
+    BONES: { key: 'joints_bones', label: 'Суставы и кости', emoji: '🦴' },
+    bone: { key: 'joints_bones', label: 'Суставы и кости', emoji: '🦴' },
+    JOINTS: { key: 'joints_bones', label: 'Суставы и кости', emoji: '🦴' },
+    joint: { key: 'joints_bones', label: 'Суставы и кости', emoji: '🦴' },
+    LIGAMENTS: { key: 'joints_bones', label: 'Суставы и кости', emoji: '🦴' },
+    TENDONS: { key: 'joints_bones', label: 'Суставы и кости', emoji: '🦴' },
+    SPINE: { key: 'joints_bones', label: 'Суставы и кости', emoji: '🦴' },
+    BONE_MARROW: { key: 'joints_bones', label: 'Суставы и кости', emoji: '🦴' },
+    TEETH: { key: 'joints_bones', label: 'Суставы и кости', emoji: '🦴' },
+    IMMUNE_SYSTEM: { key: 'immune', label: 'Иммунная система', emoji: '🛡️' },
+    immune: { key: 'immune', label: 'Иммунная система', emoji: '🛡️' },
+    LYMPH: { key: 'immune', label: 'Иммунная система', emoji: '🛡️' },
+    LYMPHATIC: { key: 'immune', label: 'Иммунная система', emoji: '🛡️' },
+    GI: { key: 'gi', label: 'ЖКТ и пищеварение', emoji: '🫃' },
+    STOMACH: { key: 'gi', label: 'ЖКТ и пищеварение', emoji: '🫃' },
+    intestine: { key: 'gi', label: 'ЖКТ и пищеварение', emoji: '🫃' },
+    MICROBIOME: { key: 'gi', label: 'ЖКТ и пищеварение', emoji: '🫃' },
+    ESOPHAGUS: { key: 'gi', label: 'ЖКТ и пищеварение', emoji: '🫃' },
+    MOUTH: { key: 'gi', label: 'ЖКТ и пищеварение', emoji: '🫃' },
+    THYROID: { key: 'endocrine', label: 'Эндокринная система', emoji: '🦋' },
+    PANCREAS: { key: 'endocrine', label: 'Эндокринная система', emoji: '🦋' },
+    ADRENALS: { key: 'endocrine', label: 'Эндокринная система', emoji: '🦋' },
+    adrenal: { key: 'endocrine', label: 'Эндокринная система', emoji: '🦋' },
+    PITUITARY: { key: 'endocrine', label: 'Эндокринная система', emoji: '🦋' },
+    PARATHYROID: { key: 'endocrine', label: 'Эндокринная система', emoji: '🦋' },
+    HORMONES: { key: 'endocrine', label: 'Эндокринная система', emoji: '🦋' },
+    GONADS: { key: 'endocrine', label: 'Эндокринная система', emoji: '🦋' },
+    OVARIES: { key: 'endocrine', label: 'Эндокринная система', emoji: '🦋' },
+    UTERUS: { key: 'endocrine', label: 'Эндокринная система', emoji: '🦋' },
+    PLACENTA: { key: 'endocrine', label: 'Эндокринная система', emoji: '🦋' },
+    SKIN: { key: 'skin_hair', label: 'Кожа и волосы', emoji: '✨' },
+    HAIR: { key: 'skin_hair', label: 'Кожа и волосы', emoji: '✨' },
+    SCALP: { key: 'skin_hair', label: 'Кожа и волосы', emoji: '✨' },
+    NAILS: { key: 'skin_hair', label: 'Кожа и волосы', emoji: '✨' },
+    EYES: { key: 'eyes', label: 'Глаза', emoji: '👁️' },
+    eye: { key: 'eyes', label: 'Глаза', emoji: '👁️' },
+    PROSTATE: { key: 'male_repro', label: 'Мужская репродуктивная', emoji: '♂️' },
+    TESTES: { key: 'male_repro', label: 'Мужская репродуктивная', emoji: '♂️' },
+    BLOOD: { key: 'blood', label: 'Кровь и кроветворение', emoji: '🩸' },
+    PLATELETS: { key: 'blood', label: 'Кровь и кроветворение', emoji: '🩸' },
+    LUNGS: { key: 'lungs', label: 'Лёгкие и дыхание', emoji: '🫁' },
+    lung: { key: 'lungs', label: 'Лёгкие и дыхание', emoji: '🫁' },
+    THROAT: { key: 'lungs', label: 'Лёгкие и дыхание', emoji: '🫁' },
+    NOSE: { key: 'lungs', label: 'Лёгкие и дыхание', emoji: '🫁' },
+    MUSCLES: { key: 'muscles', label: 'Мышцы и восстановление', emoji: '💪' },
+    muscle: { key: 'muscles', label: 'Мышцы и восстановление', emoji: '💪' },
+    MITOCHONDRIA: { key: 'mitochondria', label: 'Митохондрии и энергия', emoji: '⚡' },
+    CELLS: { key: 'mitochondria', label: 'Митохондрии и энергия', emoji: '⚡' },
+    METABOLISM: { key: 'mitochondria', label: 'Митохондрии и энергия', emoji: '⚡' },
+    FAT_TISSUE: { key: 'mitochondria', label: 'Митохондрии и энергия', emoji: '⚡' },
+    FAT: { key: 'mitochondria', label: 'Митохондрии и энергия', emoji: '⚡' },
+    FETUS: { key: 'other', label: 'Прочее', emoji: '📦' },
+    INFANT: { key: 'other', label: 'Прочее', emoji: '📦' },
+    TISSUES: { key: 'other', label: 'Прочее', emoji: '📦' },
+    ORGANS: { key: 'other', label: 'Прочее', emoji: '📦' },
+  };
   const OrganGroupedSubstances = useMemo(() => {
     const groups: Record<string, { key: string; label: string; emoji: string; items: SupportSubstance[]; count: number }> = {};
+    const usedKeys = new Set<string>();
     const filtered = searchQuery
       ? ALL_SUBSTANCES.filter(s =>
           (s.name||'').toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -1476,6 +1547,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
       : ALL_SUBSTANCES;
     for (const sub of filtered) {
       const organs = sub.organs || [];
+      usedKeys.clear();
       if (organs.length === 0) {
         const key = 'other';
         if (!groups[key]) groups[key] = { key, label:'Прочее', emoji:'📦', items:[], count:0 };
@@ -1484,31 +1556,114 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
         continue;
       }
       for (const org of organs) {
-        const normOrg = (org||'').toLowerCase().trim();
-        const key = normOrg || 'other';
-        if (!groups[key]) groups[key] = { key, label:ORGAN_LABELS[key]||key, emoji:ORGAN_EMOJI[key]||'🫀', items:[], count:0 };
-        groups[key].items.push(sub);
-        groups[key].count++;
+        const normOrg = (org||'').trim();
+        const mapping = ORGAN_CATEGORY_MAP[normOrg];
+        if (mapping) {
+          if (usedKeys.has(mapping.key)) continue;
+          usedKeys.add(mapping.key);
+          if (!groups[mapping.key]) groups[mapping.key] = { key: mapping.key, label: mapping.label, emoji: mapping.emoji, items: [], count: 0 };
+          groups[mapping.key].items.push(sub);
+          groups[mapping.key].count++;
+        } else {
+          const key = 'other';
+          if (!groups[key]) groups[key] = { key, label:'Прочее', emoji:'📦', items:[], count:0 };
+          groups[key].items.push(sub);
+          groups[key].count++;
+        }
       }
     }
     return Object.values(groups).sort((a, b) => b.count - a.count);
   }, [searchQuery]);
 
-  // Tier-based grouping for catalog sub-tab
-  const SUPPORT_TIER_GROUPS = useMemo(() => [
-    { key:'core', label:'Ядро', emoji:'🟢', color:'#22c55e', substances:[
-      'vitamin_d3','vitamin_c','vitamin_b_complex','magnesium','zinc','omega3','coq10',
-    ]},
-    { key:'base', label:'База', emoji:'🟡', color:'#f59e0b', substances:[
-      'nac','alpha_lipoic','curcumin','probiotics','vitamin_e','selenium','milk_thistle','berberine',
-    ]},
-    { key:'boost', label:'Усиление', emoji:'🟠', color:'#f97316', substances:[
-      'lion_mane','ashwagandha','rhodiola','gingko','bacopa','collagen','creatine','l_carnitine','taurine','glycine',
-    ]},
-    { key:'max', label:'Максимум', emoji:'🔴', color:'#ef4444', substances:[
-      'noopept','tudca','glutathione','phosphatidylserine','citicoline','pqq','nmn','alpha_gpc','huperzine_a',
-    ]},
-  ], []);
+  // Phase 5.12: Auto-classify all substances into 4 tiers
+  const classifyTier = (sub: SupportSubstance): 'core' | 'base' | 'boost' | 'max' => {
+    const type = (sub.type || '').toLowerCase();
+    const cats = (sub.categories || []).map(c => c.toLowerCase());
+    const mechs = (sub.mechanisms || []).map(m => m.toLowerCase());
+    const id = (sub.id || '').toLowerCase();
+    const name = (sub.name || '').toLowerCase();
+    const searchStr = type + ' ' + cats.join(' ') + ' ' + mechs.join(' ') + ' ' + id + ' ' + name;
+
+    // MAX: peptides, injection-only, experimental
+    if (cats.some(c => c === 'peptide' || c === 'peptides')) return 'max';
+    if (type === 'peptide') return 'max';
+    if (mechs.some(m => m.includes('peptide') || m.includes('injection'))) return 'max';
+    if (['semax', 'selank', 'cerebrolysin', 'cortexin', 'epithalon', 'thymalin', 'bpc_157_inj', 'tb_500'].some(s => searchStr.includes(s))) return 'max';
+
+    // CORE: essential vitamins/minerals that everyone needs always
+    const corePatterns = ['vitamin_d3', 'vitamin_d', 'cholecalciferol', 'vitamin_k2', 'mk7', 'menaquinone',
+      'vitamin_c', 'ascorbic', 'ascorbate', 'b_complex', 'methylcobalamin', 'cyanocobalamin', 'methylfolate',
+      'magnesium', 'zinc', 'zinc_picolinate', 'zinc_bisglycinate', 'selenium', 'selenomethionine',
+      'omega_3', 'omega3', 'epa', 'dha', 'fish_oil', 'coq10', 'coenzyme_q10', 'ubiquinone', 'ubiquinol',
+      'iodine', 'potassium_citrate', 'vitamin_b1', 'thiamine', 'vitamin_b2', 'riboflavin',
+      'vitamin_b6', 'pyridoxine', 'vitamin_b9', 'folate', 'folic_acid', 'vitamin_b12',
+      'iron_bisglycinate', 'iron_fumarate', 'calcium_citrate', 'calcium_carbonate',
+      'chromium_picolinate', 'manganese', 'copper_bisglycinate', 'molybdenum'];
+    if (corePatterns.some(cp => searchStr.includes(cp))) return 'core';
+
+    // Essential vitamins → CORE
+    if (type === 'vitamin') {
+      const baseVitamins = ['vitamin_e', 'tocopherol', 'vitamin_a', 'retinol', 'beta_carotene'];
+      if (baseVitamins.some(bv => searchStr.includes(bv))) return 'base';
+      return 'core';
+    }
+    // Essential minerals → CORE
+    if (type === 'mineral') {
+      const boostMinerals = ['boron', 'silicon', 'silica', 'vanadium', 'strontium', 'lithium'];
+      if (boostMinerals.some(bm => searchStr.includes(bm))) return 'boost';
+      return 'core';
+    }
+    // Electrolytes → BASE
+    if (cats.some(c => c === 'electrolyte' || c === 'electrolytes')) return 'base';
+
+    // BOOST: nootropics, advanced cognition, adaptogens, high-dosage liver support
+    if (cats.some(c => c === 'nootropic' || c === 'nootropics')) return 'boost';
+    if (mechs.some(m => m.includes('nootropic') || m.includes('cognitive'))) return 'boost';
+    if (cats.some(c => c === 'adaptogen' || c === 'adaptogens')) return 'boost';
+    if (mechs.some(m => m.includes('adaptogen'))) return 'boost';
+    if (searchStr.includes('tudca') || searchStr.includes('udca')) return 'boost';
+
+    // BASE: hepatoprotectors, antioxidants, probiotics, joint support, sports basics
+    if (mechs.some(m => m.includes('hepatoprotective') || m.includes('liver_protect'))) return 'base';
+    if (cats.some(c => c === 'hepatoprotective' || c === 'hepatoprotector' || c === 'detox')) return 'base';
+    if (cats.some(c => c === 'antioxidant' || c === 'antioxidants') && type !== 'vitamin' && type !== 'mineral') return 'base';
+
+    const basePatterns = ['nac', 'n_acetyl_cysteine', 'alpha_lipoic_acid', 'r_ala', 'r_lipoic',
+      'curcumin', 'turmeric', 'probiotic', 'lactobacillus', 'bifidobacterium', 'saccharomyces',
+      'collagen', 'gelatin', 'glucosamine', 'chondroitin', 'msm', 'methylsulfonylmethane',
+      'vitamin_e', 'tocopherol', 'creatine', 'beta_alanine', 'l_carnitine', 'acetyl_l_carnitine',
+      'hmb', 'beta_hydroxy', 'betaine', 'glutamine', 'milk_thistle', 'silymarin',
+      'berberine', 'quercetin', 'resveratrol', 'pterostilbene', 'astaxanthin',
+      'pycnogenol', 'grape_seed', 'green_tea', 'egcg', 'sulforaphane', 'dihydroquercetin',
+      'digestive_enzymes', 'pancreatin', 'bromelain', 'papain',
+      'tyrosine', 'n_acetyl_tyrosine', 'theanine', 'l_theanine',
+      'taurine', 'glycine', 'citrulline', 'arginine', 'ornithine'];
+    if (basePatterns.some(bp => searchStr.includes(bp))) return 'base';
+
+    // BOOST default for remaining specialized substances
+    if (mechs.some(m => m.includes('hormone') || m.includes('testosterone') || m.includes('estrogen'))) return 'boost';
+    if (cats.some(c => c === 'hormone' || c === 'hormones' || c === 'peptide_hormone')) return 'max';
+
+    // Default: assign by type
+    if (type === 'amino_acid' || type === 'amino_acids') return 'base';
+    if (type === 'enzyme' || type === 'enzymes') return 'base';
+    if (type === 'fatty_acid' || type === 'fatty_acids') return 'base';
+    return 'boost';
+  };
+
+  const SUPPORT_TIER_GROUPS = useMemo(() => {
+    const tiers: Record<string, { key: string; label: string; emoji: string; color: string; substances: string[] }> = {
+      core: { key: 'core', label: 'Ядро (CORE)', emoji: '🟢', color: '#22c55e', substances: [] },
+      base: { key: 'base', label: 'База (BASE)', emoji: '🟡', color: '#f59e0b', substances: [] },
+      boost: { key: 'boost', label: 'Усиление (BOOST)', emoji: '🟠', color: '#f97316', substances: [] },
+      max: { key: 'max', label: 'Максимум (MAX)', emoji: '🔴', color: '#ef4444', substances: [] },
+    };
+    for (const sub of ALL_SUBSTANCES) {
+      const tier = classifyTier(sub);
+      tiers[tier].substances.push(sub.id);
+    }
+    return [tiers.core, tiers.base, tiers.boost, tiers.max];
+  }, []);
 
   // Pre-build conflict lookup map for O(1) pair checking in stacks (avoid iterating ALL_INTERACTIONS in render)
   const conflictLookup = useMemo(() => {

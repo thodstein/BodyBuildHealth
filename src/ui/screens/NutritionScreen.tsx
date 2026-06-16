@@ -433,10 +433,19 @@ const MealPlanExtended: React.FC<{ tKcal: number; tProt: number; tFat: number; t
       return times;
     })();
 
-    const labels = indivMeals === 3 ? ['Завтрак', 'Обед', 'Ужин']
-      : indivMeals === 4 ? ['Завтрак', 'Перекус', 'Обед', 'Ужин']
-      : indivMeals === 5 ? ['Завтрак', 'Перекус 1', 'Обед', 'Предтрен', 'Ужин']
-      : ['Завтрак', 'Перекус 1', 'Обед', 'Предтрен', 'Пост-трен', 'Ужин'];
+    // Phase 5.12: Time-based meal name assignment
+    const getMealLabelByTime = (timeStr: string): string => {
+      const h = parseInt(timeStr.split(':')[0]);
+      if (h >= 6 && h <= 9) return 'Завтрак';
+      if (h >= 10 && h <= 11) return 'Второй завтрак';
+      if (h >= 12 && h <= 14) return 'Обед';
+      if (h >= 15 && h <= 16) return 'Полдник / Предтрен';
+      if (h >= 17 && h <= 18) return 'Пост-тренировочный';
+      if (h >= 19 && h <= 21) return 'Ужин';
+      if (h >= 21) return 'Поздний перекус (casein)';
+      return 'Приём пищи';
+    };
+    const labels = mealTimes.map(t => getMealLabelByTime(t));
 
     const meals: any[] = mealTimes.map((time, i) => {
       const h = parseInt(time.split(':')[0]);
@@ -1355,6 +1364,11 @@ const MealPlanExtended: React.FC<{ tKcal: number; tProt: number; tFat: number; t
               </div>
 
               {indivPlan.meals.map((meal: any, mi: number) => {
+                // Phase 5.12: Running total calculation
+                const runningKcal = indivPlan.meals.slice(0, mi + 1).reduce((s: number, m: any) => s + m.totals.kcal, 0);
+                const runningProt = indivPlan.meals.slice(0, mi + 1).reduce((s: number, m: any) => s + m.totals.protein, 0);
+                const runningFat = indivPlan.meals.slice(0, mi + 1).reduce((s: number, m: any) => s + m.totals.fat, 0);
+                const runningCarbs = indivPlan.meals.slice(0, mi + 1).reduce((s: number, m: any) => s + m.totals.carbs, 0);
                 const isExpanded = expandedMeals.has(mi);
                 const isBreakfast = meal.label?.toLowerCase().includes('завтрак');
                 const isLunch = meal.label?.toLowerCase().includes('обед');
@@ -1392,13 +1406,16 @@ const MealPlanExtended: React.FC<{ tKcal: number; tProt: number; tFat: number; t
                         transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)',
                       }}>›</span>
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ color: mealColor, fontSize: 11 }}>{meal.label}</div>
-                        <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>{meal.time} · ~{meal.prepTime || 15} мин подготовки</div>
+                        <div style={{ color: mealColor, fontSize: 11 }}>{meal.time} {meal.label}</div>
+                        <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>~{meal.prepTime || 15} мин подготовки</div>
                       </div>
                       <div style={{ textAlign: 'right', flexShrink: 0 }}>
                         <div style={{ fontSize: 9, fontWeight: 700, color: mealColor }}>{meal.totals.kcal} ккал</div>
                         <div style={{ fontSize: 8, color: 'var(--text-dim)' }}>
                           Б:{meal.totals.protein}г Ж:{meal.totals.fat}г У:{meal.totals.carbs}г
+                        </div>
+                        <div style={{ fontSize: 8, color: '#00e68a', fontWeight: 600, marginTop: 1 }}>
+                          Всего: {runningKcal} ккал · Б:{runningProt} Ж:{runningFat} У:{runningCarbs}
                         </div>
                       </div>
                     </button>
@@ -1455,11 +1472,20 @@ const MealPlanExtended: React.FC<{ tKcal: number; tProt: number; tFat: number; t
               marginBottom: 8,
             }}>
               <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--accent)', marginBottom: 8 }}>📊 Итого за день</div>
-              <div style={{ display: 'flex', justifyContent: 'center', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
-                <span style={{ padding: '3px 8px', borderRadius: 10, background: 'rgba(0,230,138,0.12)', color: '#00e68a', fontSize: 10, fontWeight: 700 }}>Ккал: {Math.round(indivPlan.dayTotals.kcal)}</span>
-                <span style={{ padding: '3px 8px', borderRadius: 10, background: 'rgba(59,130,246,0.12)', color: '#3b82f6', fontSize: 10, fontWeight: 700 }}>Б: {Math.round(indivPlan.dayTotals.protein)}г</span>
-                <span style={{ padding: '3px 8px', borderRadius: 10, background: 'rgba(245,158,11,0.12)', color: '#f59e0b', fontSize: 10, fontWeight: 700 }}>Ж: {Math.round(indivPlan.dayTotals.fat)}г</span>
-                <span style={{ padding: '3px 8px', borderRadius: 10, background: 'rgba(249,115,22,0.12)', color: '#f97316', fontSize: 10, fontWeight: 700 }}>У: {Math.round(indivPlan.dayTotals.carbs)}г</span>
+              <div style={{ display: 'flex', justifyContent: 'center', gap: 6, flexWrap: 'wrap', marginBottom: 6 }}>
+                {(() => {
+                  const kcalPct = indivKcal > 0 ? Math.round(indivPlan.dayTotals.kcal / indivKcal * 100) : 0;
+                  const protPct = indivProt > 0 ? Math.round(indivPlan.dayTotals.protein / indivProt * 100) : 0;
+                  const fatPct = indivFat > 0 ? Math.round(indivPlan.dayTotals.fat / indivFat * 100) : 0;
+                  const carbsPct = indivCarbs > 0 ? Math.round(indivPlan.dayTotals.carbs / indivCarbs * 100) : 0;
+                  const pctColor = (p: number) => p >= 90 && p <= 110 ? '#22c55e' : p > 110 ? '#ef4444' : '#f59e0b';
+                  return (
+                    <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-light)', textAlign: 'center', lineHeight: 1.6 }}>
+                      <div>Ккал: <span style={{color: pctColor(kcalPct)}}>{Math.round(indivPlan.dayTotals.kcal)} / {indivKcal}</span> <span style={{fontSize:9, color: pctColor(kcalPct)}}>({kcalPct}%)</span></div>
+                      <div>Б: <span style={{color: pctColor(protPct)}}>{Math.round(indivPlan.dayTotals.protein)}/{indivProt}г</span> · Ж: <span style={{color: pctColor(fatPct)}}>{Math.round(indivPlan.dayTotals.fat)}/{indivFat}г</span> · У: <span style={{color: pctColor(carbsPct)}}>{Math.round(indivPlan.dayTotals.carbs)}/{indivCarbs}г</span></div>
+                    </div>
+                  );
+                })()}
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 6, textAlign: 'center', fontSize: 9 }}>
                 {[
@@ -1481,6 +1507,40 @@ const MealPlanExtended: React.FC<{ tKcal: number; tProt: number; tFat: number; t
                 })}
               </div>
             </div>
+            {/* Phase 5.12: Water intake calculator */}
+            {(() => {
+              const weight = s?.weight || profile?.settings?.weight || 80;
+              const baseWater = Math.round(weight * 30 / 1000 * 10) / 10; // 30 ml/kg → liters
+              const trainingBonus = (s?.workoutsPerWeek || 0) > 0 ? 0.5 : 0; // +500ml per training day
+              const avgFiber = 30;
+              const fiberBonus = Math.round((avgFiber / 10) * 200 / 1000 * 10) / 10; // +200ml per 10g fiber
+              const coffeeCups: number = 0;
+              const coffeePenalty = coffeeCups * 0.2; // -200ml per coffee cup
+              const totalWater = Math.max(1.5, baseWater + trainingBonus + fiberBonus - coffeePenalty);
+              return (
+                <div style={{
+                  padding: 12, borderRadius: 10, marginTop: 8,
+                  background: 'rgba(6,182,212,0.06)', border: '1px solid rgba(6,182,212,0.15)',
+                }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#06b6d4', marginBottom: 6 }}>💧 Водный баланс</div>
+                  <div style={{ fontSize: 9, color: 'var(--text-dim)', lineHeight: 1.8 }}>
+                    <div>Вода: <b style={{color:'var(--text-light)'}}>30 мл × {weight} кг = {baseWater} л</b></div>
+                    {trainingBonus > 0 && <div>+ {trainingBonus * 1000} мл за тренировку</div>}
+                    {avgFiber > 0 && <div>+ {Math.round(avgFiber/10) * 200} мл на клетчатку (~{avgFiber}г)</div>}
+                    {coffeePenalty > 0 && <div style={{color:'#f59e0b'}}>- {coffeePenalty * 1000} мл: кофеин ({coffeeCups} чаш{coffeeCups === 1 ? 'ка' : coffeeCups < 5 ? 'ки' : 'ек'} кофе)</div>}
+                  </div>
+                  <div style={{
+                    fontSize: 14, fontWeight: 800, color: '#06b6d4',
+                    marginTop: 6, padding: '6px 10px',
+                    background: 'rgba(6,182,212,0.08)', borderRadius: 8,
+                    textAlign: 'center',
+                  }}>Итого: {Math.round(totalWater * 10) / 10} л/день</div>
+                  <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.4)', marginTop: 4, textAlign: 'center' }}>
+                    Калий: 4-5 г/день · Натрий: 3-5 г/день · Магний: 400-600 мг/день
+                  </div>
+                </div>
+              );
+            })()}
           </div>
         )}
       </div>
