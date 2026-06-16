@@ -2563,7 +2563,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
                       <div onClick={() => setExpandedCategories(prev => ({ ...prev, drug_combo_ref: !prev.drug_combo_ref }))} style={{ display:'flex', alignItems:'center', gap:6, padding:'7px 10px', cursor:'pointer', userSelect:'none', background:'var(--bg-secondary)', borderRadius:8 }}>
                         <span style={{ fontSize:13 }}>💊</span>
                         <div style={{ flex:1, fontSize:10, fontWeight:700, color:'var(--text-light)' }}>Фармакологические взаимодействия</div>
-                        <span style={{ fontSize:9, color:'var(--text-dim)', marginRight:2 }}>23</span>
+                         <span style={{ fontSize:9, color:'var(--text-dim)', marginRight:2 }}>33</span>
                         <span style={{ fontSize:9, color:'var(--text-dim)', transform: expandedCategories.drug_combo_ref !== false ? 'rotate(180deg)' : 'none', transition:'transform 0.2s' }}>▼</span>
                       </div>
                       {expandedCategories.drug_combo_ref !== false && (
@@ -2591,8 +2591,18 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
                             { a:'Метформин', b:'ГР', effect:'ГР повышает глюкозу, метформин компенсирует', risk:'Гипогликемия', control:'Глюкоза натощак', type:'caution' },
                             { a:'L-тироксин', b:'Кленбутерол', effect:'Оба повышают ЧСС и метаболизм', risk:'Тахикардия, тремор', control:'ЧСС, ТТГ', type:'warning' },
                             { a:'Тестостерон', b:'Дека-дураболин', effect:'Дека (нандролон) с тестостероном — классика', risk:'Пролактин, прогестероновая активность', control:'Пролактин каждые 4 нед.', type:'caution' },
-                            { a:'Тренболон', b:'ГР', effect:'Синергия. Тренболон повышает IGF-1, ГР добавляет IGF-1 из печени', risk:'Гипогликемия (ГР + инсулин)', control:'Глюкоза', type:'synergy' },
-                          ] as const).map((combo, ci) => {
+                             { a:'Тренболон', b:'ГР', effect:'Синергия. Тренболон повышает IGF-1, ГР добавляет IGF-1 из печени', risk:'Гипогликемия (ГР + инсулин)', control:'Глюкоза', type:'synergy' },
+                             { a:'Тестостерон', b:'Экземестан (Аромазин)', effect:'Экземестан снижает Е2 (суицидальный ингибитор ароматазы)', risk:'Избыточное подавление Е2', control:'Е2 через 2 недели', type:'synergy' },
+                             { a:'Тренболон', b:'Каберголин', effect:'Каберголин снижает пролактин от тренболона', risk:'Передозировка каберголина', control:'Пролактин, доза 0.25мг 2р/нед', type:'synergy' },
+                             { a:'Оксандролон', b:'Тамоксифен', effect:'Тамоксифен снижает ГСПГ — больше свободного оксандролона', risk:'Снижение ГСПГ', control:'Контроль ГСПГ', type:'synergy' },
+                             { a:'Кленбутерол', b:'Кетотифен', effect:'Кетотифен восстанавливает β2-рецепторы, продлевает действие кленбутерола', risk:'Седация от кетотифена', control:'Цикл 2 нед кленбутерол + 1 нед кетотифен', type:'synergy' },
+                             { a:'T3', b:'Кленбутерол', effect:'Синергия жиросжигания', risk:'Катаболизм, тахикардия', control:'ЧСС, ТТГ', type:'warning' },
+                             { a:'Гидрохлортиазид', b:'Калий', effect:'Гидрохлортиазид вымывает калий — обязательная компенсация', risk:'Гипокалиемия', control:'Калий сыворотки', type:'caution' },
+                             { a:'Фуросемид', b:'Калий', effect:'Мощный диуретик, резкая потеря калия', risk:'Аритмия', control:'Калий + ЭКГ', type:'critical' },
+                             { a:'Спиронолактон', b:'Калий', effect:'Калий-сберегающий диуретик', risk:'Гиперкалиемия. НЕ добавлять калий!', control:'Калий сыворотки', type:'critical' },
+                             { a:'Статины', b:'Убихинол (CoQ10)', effect:'Статины блокируют синтез CoQ10', risk:'Миопатия, слабость', control:'CoQ10 100-200 мг/день обязательно', type:'warning' },
+                             { a:'Финастерид', b:'Цинк', effect:'Оба снижают DHT — усиление эффекта против выпадения волос', risk:'Снижение либидо', control:'DHT, контроль симптомов', type:'synergy' },
+                           ] as const).map((combo, ci) => {
                             const typeColor = combo.type === 'critical' ? '#ff1744' : combo.type === 'warning' ? '#ff9100' : combo.type === 'synergy' ? '#22c55e' : '#f59e0b';
                             const typeLabel = combo.type === 'critical' ? '🚫 КРИТИЧНО' : combo.type === 'warning' ? '⚡ ОСТОРОЖНО' : combo.type === 'synergy' ? '⊕ СИНЕРГИЯ' : 'ℹ УМЕРЕННО';
                             return (

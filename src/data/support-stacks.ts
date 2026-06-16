@@ -1,9 +1,14 @@
 export interface SupportStack {
   id: string;
+  name?: string;
   effects: string[];
   substances: string[];
   synergyScore: number;
   description: string;
+  dosages?: Record<string, { morning?: number; evening?: number; unit: string }>;
+  synergy_notes?: string;
+  timing?: string;
+  goalTags?: string[];
 }
 
 export const EFFECT_LABELS_ru: Record<string, string> = {
@@ -422,6 +427,30 @@ function generateStacks(): SupportStack[] {
       }
     }
   }
+
+  // Phase 5.5: Hardcoded stacks
+  stacks.push({
+    id: 'iron_thyroid_stack',
+    name: 'Железо и щитовидная',
+    description: 'Поддержка кроветворения, транспорта железа и функции щитовидной железы',
+    effects: ['blood','thyroid_support','energy','hormone_balance','immune_support'],
+    substances: ['iron_bisglycinate','vitamin_c','selenium_methionine','iodine_potassium_iodide','zinc_picolinate','copper_gluconate','vitamin_b12_methylcobalamin','folate_methylfolate','vitamin_a_palmitate'],
+    synergyScore: 25.5,
+    dosages: {
+      iron_bisglycinate: { morning: 30, unit: 'мг' },
+      vitamin_c: { morning: 500, unit: 'мг' },
+      selenium_methionine: { morning: 200, unit: 'мкг' },
+      iodine_potassium_iodide: { morning: 150, unit: 'мкг' },
+      zinc_picolinate: { evening: 15, unit: 'мг' },
+      copper_gluconate: { evening: 2, unit: 'мг' },
+      vitamin_b12_methylcobalamin: { morning: 500, unit: 'мкг' },
+      folate_methylfolate: { morning: 400, unit: 'мкг' },
+      vitamin_a_palmitate: { morning: 5000, unit: 'IU' },
+    },
+    synergy_notes: 'Витамин С удваивает абсорбцию железа. Цинк и медь конкурируют — разнесены на утро/вечер.',
+    timing: 'Утро: железо + витамин С + селен + йод + B12 + фолат + витамин A. Вечер: цинк + медь.',
+    goalTags: ['blood','thyroid','energy'],
+  });
 
   // Deduplicate by substance+effect signature
   const seen = new Set<string>();

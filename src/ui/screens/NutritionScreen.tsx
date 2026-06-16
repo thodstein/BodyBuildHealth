@@ -255,10 +255,10 @@ const MealPlan: React.FC<{ profile: UserProfile | null }> = ({ profile }) => {
     }));
   }, [targets]);
 
-  const totalKcal = meals.reduce((s, m) => s + m.totalKcal, 0);
-  const totalP = meals.reduce((s, m) => s + m.totalP, 0);
-  const totalF = meals.reduce((s, m) => s + m.totalF, 0);
-  const totalC = meals.reduce((s, m) => s + m.totalC, 0);
+  const totalKcal = Math.round(meals.reduce((s, m) => s + m.totalKcal, 0));
+  const totalP = Math.round(meals.reduce((s, m) => s + m.totalP, 0));
+  const totalF = Math.round(meals.reduce((s, m) => s + m.totalF, 0));
+  const totalC = Math.round(meals.reduce((s, m) => s + m.totalC, 0));
 
   return (
     <div>
@@ -273,12 +273,22 @@ const MealPlan: React.FC<{ profile: UserProfile | null }> = ({ profile }) => {
         <div key={mi} className="card" style={{ marginBottom: 8 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
             <h4 style={{ margin: 0, fontSize: 13 }}>{meal.name}</h4>
-            <span style={{ fontSize: 10, color: 'var(--accent)', fontWeight: 600 }}>{meal.totalKcal} ккал | Б{meal.totalP} Ж{meal.totalF} У{meal.totalC}</span>
+            <span style={{ fontSize: 9, display:'flex', gap:4, flexWrap:'wrap' }}>
+              <b style={{ color:'#00e68a' }}>{meal.totalKcal} ккал</b>
+              <span style={{ color:'#3b82f6' }}>Б:{meal.totalP}г</span>
+              <span style={{ color:'#f59e0b' }}>Ж:{meal.totalF}г</span>
+              <span style={{ color:'#f97316' }}>У:{meal.totalC}г</span>
+            </span>
           </div>
           {meal.items.map((food, fi) => food && (
             <div key={fi} style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0', fontSize: 11, borderBottom: fi < meal.items.length - 1 ? '1px solid var(--border)' : 'none' }}>
               <span>{food.name}</span>
-              <span style={{ color: 'var(--text-dim)', fontSize: 10 }}>{food.kcal}ккал | Б{food.protein} Ж{food.fat} У{food.carbs}</span>
+              <span style={{ color: 'var(--text-dim)', fontSize: 9, display:'flex', gap:4, flexWrap:'wrap' }}>
+                <b style={{ color:'#00e68a' }}>{food.kcal} ккал</b>
+                <span style={{ color:'#3b82f6' }}>Б:{food.protein}г</span>
+                <span style={{ color:'#f59e0b' }}>Ж:{food.fat}г</span>
+                <span style={{ color:'#f97316' }}>У:{food.carbs}г</span>
+              </span>
             </div>
           ))}
         </div>
@@ -286,23 +296,11 @@ const MealPlan: React.FC<{ profile: UserProfile | null }> = ({ profile }) => {
 
       <div className="card" style={{ textAlign: 'center' }}>
         <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 4 }}>Итого за день</div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 6 }}>
-          {[
-            { l: '', v: totalKcal, t: targets?.kcal || 2500, u: '' },
-            { l: '', v: totalP, t: targets?.protein || 160, u: '' },
-            { l: '', v: totalF, t: targets?.fats || 70, u: '' },
-            { l: '', v: totalC, t: targets?.carbs || 250, u: '' },
-          ].map(m => {
-            const pct = Math.round((m.v / m.t) * 100);
-            const color = pct >= 90 && pct <= 110 ? '#22c55e' : pct < 90 ? '#ff9100' : '#ef4444';
-            return (
-              <div key={m.l} style={{ background: 'rgba(0,230,138,0.05)', borderRadius: 6, padding: 6 }}>
-                <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>{m.l}</div>
-                <div style={{ fontWeight: 700, color }}>{m.v}<span style={{ fontSize: 9, color: 'var(--text-dim)' }}>/{m.t}{m.u}</span></div>
-                <div style={{ fontSize: 8, color }}>{pct}%</div>
-              </div>
-            );
-          })}
+        <div style={{ display: 'flex', justifyContent: 'center', gap: 6, flexWrap: 'wrap' }}>
+          <span style={{ padding: '3px 8px', borderRadius: 10, background: 'rgba(0,230,138,0.12)', color: '#00e68a', fontSize: 10, fontWeight: 700 }}>Ккал: {Math.round(totalKcal)}</span>
+          <span style={{ padding: '3px 8px', borderRadius: 10, background: 'rgba(59,130,246,0.12)', color: '#3b82f6', fontSize: 10, fontWeight: 700 }}>Б: {Math.round(totalP)}г</span>
+          <span style={{ padding: '3px 8px', borderRadius: 10, background: 'rgba(245,158,11,0.12)', color: '#f59e0b', fontSize: 10, fontWeight: 700 }}>Ж: {Math.round(totalF)}г</span>
+          <span style={{ padding: '3px 8px', borderRadius: 10, background: 'rgba(249,115,22,0.12)', color: '#f97316', fontSize: 10, fontWeight: 700 }}>У: {Math.round(totalC)}г</span>
         </div>
       </div>
     </div>
@@ -945,10 +943,15 @@ const MealPlanExtended: React.FC<{ tKcal: number; tProt: number; tFat: number; t
             { name: 'Протеин сывороточный', score: 9, desc: 'Быстрое усвоение, полный профиль. Минус: искусственные подсластители в некоторых' },
             { name: 'Соевый белок', score: 6, desc: 'Полный растительный профиль. Минус: фитоэстрогены, антинутриенты, ГМО в неорганическом' },
             { name: 'Баранина', score: 7, desc: 'Хороший белок, цинк, B12. Минус: высокий насыщенный жир, специфичный вкус' },
+            { name: 'Индейка', score: 9, desc: 'Нежное мясо, цинк, селен. Минус: суховата при переготовке' },
+            { name: 'Говяжья печень', score: 10, desc: 'Суперфуд: железо, B12, медь, витамин A. Минус: вкус на любителя, холестерин' },
+            { name: 'Креветки', score: 8, desc: 'Чистый белок, йод, селен. Минус: холестерин, цена' },
+            { name: 'Тунец консервированный', score: 7, desc: 'Удобный белок. Минус: ртуть, BPA в банках' },
+            { name: 'Кролик', score: 9, desc: 'Диетическое мясо, легко усваивается. Минус: цена, доступность' },
           ].map((p, j) => {
             const scoreColor = p.score >= 9 ? '#22c55e' : p.score >= 7 ? '#f59e0b' : p.score >= 5 ? '#f97316' : '#ef4444';
             return (
-              <div key={j} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0', borderBottom: j < 10 ? '1px solid rgba(255,255,255,0.04)' : 'none' }}>
+              <div key={j} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0', borderBottom: j < 15 ? '1px solid rgba(255,255,255,0.04)' : 'none' }}>
                 <div style={{ minWidth: 32, height: 22, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', background: scoreColor + '15', color: scoreColor, fontWeight: 800, fontSize: 11 }}>{p.score}/10</div>
                 <div style={{ flex: 1 }}>
                   <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--text)' }}>{p.name}</span>
@@ -971,10 +974,15 @@ const MealPlanExtended: React.FC<{ tKcal: number; tProt: number; tFat: number; t
             { name: 'Булгур', score: 8, desc: 'Клетчатка, магний. Минус: глютен' },
             { name: 'Киноа', score: 9, desc: 'Полный белок + углеводы. Минус: цена, сапонины' },
             { name: 'Кукурузные хлопья (без пшеницы)', score: 5, desc: 'Быстрая энергия. Минус: обработанные, часто с сахаром' },
+            { name: 'Рис басмати', score: 8, desc: 'Ароматный, низкий ГИ. Минус: цена выше обычного риса' },
+            { name: 'Перловка', score: 8, desc: 'Самый низкий ГИ среди круп, клетчатка. Минус: долго варить' },
+            { name: 'Кус-кус', score: 7, desc: 'Быстро готовится. Минус: средний ГИ, мало клетчатки' },
+            { name: 'Пшено', score: 7, desc: 'Магний, кремний. Минус: горчит при неправильной варке' },
+            { name: 'Нут', score: 9, desc: 'Белок + углеводы, клетчатка. Минус: долгое замачивание' },
           ].map((p, j) => {
             const scoreColor = p.score >= 9 ? '#22c55e' : p.score >= 7 ? '#f59e0b' : p.score >= 5 ? '#f97316' : '#ef4444';
             return (
-              <div key={j} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0', borderBottom: j < 9 ? '1px solid rgba(255,255,255,0.04)' : 'none' }}>
+              <div key={j} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0', borderBottom: j < 14 ? '1px solid rgba(255,255,255,0.04)' : 'none' }}>
                 <div style={{ minWidth: 32, height: 22, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', background: scoreColor + '15', color: scoreColor, fontWeight: 800, fontSize: 11 }}>{p.score}/10</div>
                 <div style={{ flex: 1 }}>
                   <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--text)' }}>{p.name}</span>
@@ -995,10 +1003,15 @@ const MealPlanExtended: React.FC<{ tKcal: number; tProt: number; tFat: number; t
             { name: 'Рыбий жир', score: 10, desc: 'Омега-3 EPA/DHA, антивоспалительное' },
             { name: 'Льняное масло', score: 8, desc: 'ALA омега-3. Минус: нестабильно, быстро окисляется' },
             { name: 'Яичный желток', score: 8, desc: 'Лецитин, холин, витамины. Минус: холестерин' },
+            { name: 'Грецкие орехи', score: 9, desc: 'Омега-3 ALA, магний. Минус: калорийность' },
+            { name: 'Миндаль', score: 9, desc: 'Витамин E, магний. Минус: оксалаты при больших дозах' },
+            { name: 'Кедровые орехи', score: 8, desc: 'Уникальный жирнокислотный состав. Минус: цена' },
+            { name: 'Урбеч кокосовый', score: 7, desc: 'MCT, быстрая энергия. Минус: насыщенные жиры' },
+            { name: 'Красная икра', score: 9, desc: 'Омега-3, витамин D, белок. Минус: соль, цена' },
           ].map((p, j) => {
             const scoreColor = p.score >= 9 ? '#22c55e' : p.score >= 7 ? '#f59e0b' : p.score >= 5 ? '#f97316' : '#ef4444';
             return (
-              <div key={j} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0', borderBottom: j < 7 ? '1px solid rgba(255,255,255,0.04)' : 'none' }}>
+              <div key={j} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0', borderBottom: j < 12 ? '1px solid rgba(255,255,255,0.04)' : 'none' }}>
                 <div style={{ minWidth: 32, height: 22, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', background: scoreColor + '15', color: scoreColor, fontWeight: 800, fontSize: 11 }}>{p.score}/10</div>
                 <div style={{ flex: 1 }}>
                   <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--text)' }}>{p.name}</span>
@@ -1248,22 +1261,25 @@ const MealPlanExtended: React.FC<{ tKcal: number; tProt: number; tFat: number; t
               marginBottom: 8,
             }}>
               <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--accent)', marginBottom: 8 }}>📊 Итого за день</div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 6, textAlign: 'center', fontSize: 10 }}>
+              <div style={{ display: 'flex', justifyContent: 'center', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
+                <span style={{ padding: '3px 8px', borderRadius: 10, background: 'rgba(0,230,138,0.12)', color: '#00e68a', fontSize: 10, fontWeight: 700 }}>Ккал: {Math.round(indivPlan.dayTotals.kcal)}</span>
+                <span style={{ padding: '3px 8px', borderRadius: 10, background: 'rgba(59,130,246,0.12)', color: '#3b82f6', fontSize: 10, fontWeight: 700 }}>Б: {Math.round(indivPlan.dayTotals.protein)}г</span>
+                <span style={{ padding: '3px 8px', borderRadius: 10, background: 'rgba(245,158,11,0.12)', color: '#f59e0b', fontSize: 10, fontWeight: 700 }}>Ж: {Math.round(indivPlan.dayTotals.fat)}г</span>
+                <span style={{ padding: '3px 8px', borderRadius: 10, background: 'rgba(249,115,22,0.12)', color: '#f97316', fontSize: 10, fontWeight: 700 }}>У: {Math.round(indivPlan.dayTotals.carbs)}г</span>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 6, textAlign: 'center', fontSize: 9 }}>
                 {[
-                  { l: 'Ккал', v: indivPlan.dayTotals.kcal, t: indivKcal, c: '#00e68a' },
-                  { l: 'Белок', v: indivPlan.dayTotals.protein, t: indivProt, c: '#3b82f6' },
-                  { l: 'Жиры', v: indivPlan.dayTotals.fat, t: indivFat, c: '#f59e0b' },
-                  { l: 'Углеводы', v: indivPlan.dayTotals.carbs, t: indivCarbs, c: '#f97316' },
+                  { l: 'Ккал', v: Math.round(indivPlan.dayTotals.kcal), t: indivKcal, c: '#00e68a' },
+                  { l: 'Белок', v: Math.round(indivPlan.dayTotals.protein), t: indivProt, c: '#3b82f6' },
+                  { l: 'Жиры', v: Math.round(indivPlan.dayTotals.fat), t: indivFat, c: '#f59e0b' },
+                  { l: 'Углеводы', v: Math.round(indivPlan.dayTotals.carbs), t: indivCarbs, c: '#f97316' },
                 ].map(m => {
                   const diff = m.v - m.t;
                   const diffPct = m.t > 0 ? Math.round((diff / m.t) * 100) : 0;
                   const deltaColor = Math.abs(diffPct) <= 10 ? '#22c55e' : diffPct > 0 ? '#ef4444' : '#f59e0b';
                   return (
-                    <div key={m.l} style={{ background: m.c + '10', borderRadius: 8, padding: 8 }}>
-                      <div style={{ fontSize: 8, color: 'var(--text-dim)' }}>{m.l}</div>
-                      <div style={{ fontWeight: 700, color: m.c, fontSize: 14 }}>{m.v}</div>
-                      <div style={{ fontSize: 8, color: 'var(--text-dim)' }}>цель: {m.t}</div>
-                      <div style={{ fontSize: 9, fontWeight: 600, color: deltaColor }}>
+                    <div key={m.l} style={{ background: m.c + '10', borderRadius: 8, padding: '4px 6px' }}>
+                      <div style={{ fontSize: 8, fontWeight: 600, color: deltaColor }}>
                         {diff >= 0 ? '+' : ''}{diff} ({diffPct >= 0 ? '+' : ''}{diffPct}%)
                       </div>
                     </div>
@@ -1306,47 +1322,42 @@ const GroceryTab: React.FC<{ tKcal: number; tProt: number }> = ({ tKcal, tProt }
   </div>);
 };
 
-const RESTAURANT_ITEMS: { name: string; kcal: number; p: number; f: number; c: number }[] = [
-  { name: 'Шаурма куриная', kcal: 550, p: 25, f: 22, c: 58 },
-  { name: 'Бургер классический', kcal: 480, p: 22, f: 24, c: 42 },
-  { name: 'Пицца Маргарита (кусок)', kcal: 240, p: 9, f: 8, c: 32 },
-  { name: 'Пицца Пепперони (кусок)', kcal: 298, p: 12, f: 12, c: 34 },
-  { name: 'Суши лосось (8 шт)', kcal: 310, p: 16, f: 6, c: 48 },
-  { name: 'Ролл Филадельфия', kcal: 290, p: 12, f: 10, c: 36 },
-  { name: 'Ролл Калифорния', kcal: 260, p: 10, f: 8, c: 38 },
-  { name: 'Паста Карбонара', kcal: 350, p: 14, f: 18, c: 32 },
-  { name: 'Паста Болоньезе', kcal: 280, p: 16, f: 10, c: 32 },
-  { name: 'Стейк рибай', kcal: 350, p: 30, f: 25, c: 0 },
-  { name: 'Курица гриль (половина)', kcal: 400, p: 45, f: 22, c: 0 },
-  { name: 'Шашлык свинина (200г)', kcal: 380, p: 32, f: 28, c: 2 },
-  { name: 'Шашлык курица (200г)', kcal: 280, p: 38, f: 12, c: 2 },
-  { name: 'Салат Цезарь с курицей', kcal: 320, p: 25, f: 18, c: 14 },
-  { name: 'Салат Греческий', kcal: 180, p: 6, f: 14, c: 8 },
-  { name: 'Борщ', kcal: 170, p: 7, f: 5, c: 25 },
-  { name: 'Окрошка', kcal: 200, p: 10, f: 8, c: 22 },
-  { name: 'Круассан', kcal: 230, p: 5, f: 14, c: 22 },
-  { name: 'Блинчики с творогом (2 шт)', kcal: 280, p: 14, f: 10, c: 32 },
-  { name: 'Хот-дог', kcal: 300, p: 10, f: 18, c: 24 },
-];
-
 const RestaurantTab: React.FC = () => {
   const guide = React.useMemo(() => getRestaurantGuide(), []);
   const top = React.useMemo(() => getTopAthleteChoices(), []);
   const travels = React.useMemo(() => getTravelWorkouts(), []);
   const sleepStacks = React.useMemo(() => getSleepStacks(), []);
-  const [selectedItem, setSelectedItem] = React.useState<number | null>(null);
-  const maxKcal = Math.max(...RESTAURANT_ITEMS.map(i => i.kcal), 1);
+  const [selectedItem, setSelectedItem] = React.useState<string | null>(null);
+  const [restSearch, setRestSearch] = React.useState('');
+
+  const fastFoodItems = React.useMemo(() => {
+    return FOOD_DB.filter(f => f.category === 'fast_food');
+  }, []);
+
+  const filteredItems = React.useMemo(() => {
+    if (!restSearch.trim()) return fastFoodItems;
+    const q = restSearch.toLowerCase();
+    return fastFoodItems.filter(f => f.name.toLowerCase().includes(q));
+  }, [fastFoodItems, restSearch]);
+
   return (<div>
     <div className="card" style={{ marginBottom: 8 }}>
-      <h4 style={{ margin: '0 0 6px', fontSize: 12 }}>🍽 Блюда и калорийность</h4>
+      <h4 style={{ margin: '0 0 8px', fontSize: 12 }}>🍽 Блюда и калорийность ({fastFoodItems.length})</h4>
+      <input
+        placeholder="🔍 Поиск блюда..."
+        value={restSearch}
+        onChange={e => setRestSearch(e.target.value)}
+        style={{ width:'100%', padding:'7px 10px', borderRadius:8, background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text)', fontSize:10, boxSizing:'border-box', marginBottom:8 }}
+      />
       <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-        {RESTAURANT_ITEMS.map((item, i) => {
-          const isExpanded = selectedItem === i;
-          const pWidth = Math.round((item.p / Math.max(item.p + item.f + item.c, 1)) * 100);
-          const fWidth = Math.round((item.f / Math.max(item.p + item.f + item.c, 1)) * 100);
-          const cWidth = Math.round((item.c / Math.max(item.p + item.f + item.c, 1)) * 100);
+        {filteredItems.map((item) => {
+          const isExpanded = selectedItem === item.id;
+          const total = item.protein + item.fat + item.carbs;
+          const pWidth = total > 0 ? Math.round((item.protein / total) * 100) : 33;
+          const fWidth = total > 0 ? Math.round((item.fat / total) * 100) : 33;
+          const cWidth = total > 0 ? Math.round((item.carbs / total) * 100) : 34;
           return (
-            <div key={i} onClick={() => setSelectedItem(isExpanded ? null : i)} style={{
+            <div key={item.id} onClick={() => setSelectedItem(isExpanded ? null : item.id)} style={{
               padding: '8px 10px', borderRadius: 10, cursor: 'pointer',
               background: isExpanded ? 'rgba(0,230,138,0.06)' : 'var(--bg-secondary)',
               border: isExpanded ? '1px solid rgba(0,230,138,0.2)' : '1px solid var(--border)',
@@ -1362,23 +1373,28 @@ const RestaurantTab: React.FC = () => {
                 <div style={{ flex: cWidth || 0.1, background: '#f97316', minWidth: cWidth > 0 ? 12 : 0 }} />
               </div>
               <div style={{ display: 'flex', gap: 8, fontSize: 8, color: 'var(--text-dim)' }}>
-                <span>Б: <b style={{ color: '#3b82f6' }}>{item.p}г</b></span>
-                <span>Ж: <b style={{ color: '#f59e0b' }}>{item.f}г</b></span>
-                <span>У: <b style={{ color: '#f97316' }}>{item.c}г</b></span>
+                <span>Б: <b style={{ color: '#3b82f6' }}>{item.protein}г</b></span>
+                <span>Ж: <b style={{ color: '#f59e0b' }}>{item.fat}г</b></span>
+                <span>У: <b style={{ color: '#f97316' }}>{item.carbs}г</b></span>
+                {item.servingSize && <span style={{ color:'rgba(255,255,255,0.5)' }}>{item.servingSize}</span>}
               </div>
               {isExpanded && (
                 <div style={{ marginTop: 6, padding: '6px 8px', background: 'rgba(255,255,255,0.03)', borderRadius: 6, fontSize: 9, color: 'var(--text-dim)', lineHeight: 1.5 }}>
                   <div>Полный состав на порцию: {item.kcal} ккал</div>
                   <div style={{ display: 'flex', gap: 12, marginTop: 2 }}>
-                    <span>🔵 Белки: {item.p}г ({item.p * 4} ккал)</span>
-                    <span>🟡 Жиры: {item.f}г ({item.f * 9} ккал)</span>
-                    <span>🟠 Углеводы: {item.c}г ({item.c * 4} ккал)</span>
+                    <span>🔵 Белки: {item.protein}г ({Math.round(item.protein * 4)} ккал)</span>
+                    <span>🟡 Жиры: {item.fat}г ({Math.round(item.fat * 9)} ккал)</span>
+                    <span>🟠 Углеводы: {item.carbs}г ({Math.round(item.carbs * 4)} ккал)</span>
                   </div>
+                  {item.fiber !== undefined && <div style={{ marginTop: 2 }}>Клетчатка: {item.fiber}г | ГИ: {item.gi || '—'}</div>}
                 </div>
               )}
             </div>
           );
         })}
+        {filteredItems.length === 0 && (
+          <div style={{ textAlign:'center', padding:12, color:'var(--text-dim)', fontSize:10 }}>Ничего не найдено</div>
+        )}
       </div>
     </div>
     <div className="card" style={{ marginBottom: 8 }}><h4 style={{ margin: '0 0 4px', fontSize: 12 }}>🍔 Рестораны ({guide.length})</h4><div style={{ maxHeight: 200, overflowY: 'auto' }}>{guide.slice(0,12).map((r:any,i:number)=><div key={i} style={{fontSize:9,padding:'2px 4px',display:'flex',justifyContent:'space-between'}}><span>{r.chain}: {r.item}</span><span style={{color:r.athleteRating==='excellent'?'#22c55e':'#f59e0b'}}>Б:{r.protein}г</span></div>)}</div></div>
