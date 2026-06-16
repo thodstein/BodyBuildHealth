@@ -490,7 +490,7 @@ export const ProfileScreen: React.FC = () => {
                   <div key={s.label} style={{ textAlign:'center', background:'rgba(255,255,255,0.03)', borderRadius:10, padding:'8px 4px' }}>
                     <div style={{ fontSize:10, color: apple.textDim, marginBottom:2 }}>{s.label}</div>
                     <div style={{ fontSize:14, fontWeight:700, color: s.color || apple.textPrimary }}>{s.val}</div>
-                    <div style={{ fontSize:9, color: s.color || apple.textDim, marginTop:1 }}>{s.sub}</div>
+                    <div style={{ fontSize:9, color: s.color || apple.textSecondary, marginTop:1 }}>{s.sub}</div>
                   </div>
                 ))}
               </div>
@@ -1226,7 +1226,7 @@ export const ProfileScreen: React.FC = () => {
                   return (
                     <div key={m.k} style={{ background:'rgba(255,255,255,0.03)', borderRadius:10, padding:'10px 8px', textAlign:'center', border: apple.glassBorder }}>
                       <div style={{ fontSize:9, color: apple.textDim, marginBottom:2 }}>{m.l}</div>
-                      <div style={{ fontSize:16, fontWeight:700, color: val ? apple.textPrimary : apple.textDim }}>{val ? `${val}` : '—'}<span style={{ fontSize:9, fontWeight:400, marginLeft:2, color: apple.textDim }}>{val ? m.unit : ''}</span></div>
+                      <div style={{ fontSize:16, fontWeight:700, color: val ? apple.textPrimary : apple.textSecondary }}>{val ? `${val}` : '—'}<span style={{ fontSize:9, fontWeight:400, marginLeft:2, color: apple.textDim }}>{val ? m.unit : ''}</span></div>
                     </div>
                   );
                 })}
@@ -1367,6 +1367,9 @@ export const ProfileScreen: React.FC = () => {
               `  Длительность: ${settings.avgWorkoutMinutes || '—'} мин/тренировка`,
               `  Недельный объём: ~${(settings.workoutsPerWeek || 0) * (settings.avgWorkoutMinutes || 0)} мин/нед`,
               `  Программа: ${programName}`,
+              `  Текущий сплит: ${workoutLogs.length > 0 ? (workoutLogs[0].split || 'не указан') : ((() => { try { const ap = JSON.parse(localStorage.getItem('activeProgram') || 'null'); return ap?.weeks?.[0]?.days?.[0]?.name || ap?.name || 'не задан'; } catch { return 'не задан'; } })())}`,
+              `  Последняя тренировка: ${workoutLogs.length > 0 ? workoutLogs[0].date : 'нет записей'}`,
+              `  Объём за неделю: ${(() => { const last7 = new Date(Date.now() - 7*86400000).toISOString().split('T')[0]; const wkLogs = workoutLogs.filter(w => w.date >= last7); const wkVol = wkLogs.reduce((s, w) => s + w.exercises.reduce((ss, e) => ss + e.totalVolume, 0), 0); return wkVol > 0 ? `${wkVol.toFixed(0)} кг` : 'нет данных'; })()}`,
               ``,
               `ПОСЛЕДНИЕ ТРЕНИРОВКИ (${last3Workouts.length})`,
               workoutSummary,
@@ -1403,6 +1406,7 @@ export const ProfileScreen: React.FC = () => {
               ``,
               `ЛАБОРАТОРНЫЕ АНАЛИЗЫ`,
               `  ${labsList}`,
+              `  Последние анализы: ${labs.length > 0 ? labs.sort((a,b) => b.date.localeCompare(a.date)).slice(0,5).map(l => `${l.code} ${l.value}${l.unit} (${l.date})`).join(', ') : 'нет данных'}`,
               ``,
               `РИСКИ ПО СИСТЕМАМ`,
               ...(riskData?.systemBreakdown
@@ -1507,7 +1511,7 @@ export const ProfileScreen: React.FC = () => {
                     <div style={{ fontSize:13, fontWeight:700, color: r.color }}>{r.title}</div>
                   </div>
                   <pre style={{
-                    fontSize:9, color: apple.textSecondary, whiteSpace:'pre-wrap',
+                    fontSize:9, color: apple.textPrimary, whiteSpace:'pre-wrap',
                     fontFamily:'SF Mono, Consolas, monospace',
                     margin:'0 0 10px', background:'rgba(0,0,0,0.2)', borderRadius:10,
                     padding:10, maxHeight:250, overflowY:'auto', lineHeight:1.5,

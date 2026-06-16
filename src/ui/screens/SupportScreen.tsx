@@ -1387,7 +1387,10 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
         const classBadges = Object.entries(classMap)
           .map(([clsKey, clsItems]) => ({ clsKey, label: CLASS_BASE_NAMES[clsKey]?.label || clsKey, emoji: CLASS_BASE_NAMES[clsKey]?.emoji || '📦', count: clsItems.length }))
           .sort((a, b) => b.count - a.count);
-        return { cat, items, count: items.length, classBadges };
+        const classItems = Object.fromEntries(
+          Object.entries(classMap).filter(([, clsItems]) => clsItems.length >= 3)
+        );
+        return { cat, items, count: items.length, classBadges, classItems };
       })
       .sort((a, b) => b.count - a.count);
   }, [searchQuery]);
@@ -1639,10 +1642,10 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
                     <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:2 }}>
                       <div style={{ display:'flex', alignItems:'center', gap:4, flexWrap:'wrap', flex:1, minWidth:0 }}>
                         <span style={{ fontWeight:600, fontSize:10, color:'var(--text-light)', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', maxWidth:'35%' }}>{aName}</span>
-                        <button onClick={(e) => { e.stopPropagation(); setStackBuilder(prev => prev.includes(interaction?.substanceA) ? prev : [...prev, interaction?.substanceA]); }} style={{ padding:'1px 4px', borderRadius:4, fontSize:7, cursor:'pointer', background:'rgba(0,230,138,0.08)', border:'1px solid rgba(0,230,138,0.2)', color:'#00e68a', fontWeight:700, lineHeight:'12px' }}>+</button>
+                        <button onClick={(e) => { e.stopPropagation(); setStackBuilder(prev => prev.includes(interaction?.substanceA) ? prev : [...prev, interaction?.substanceA]); }} style={{ padding:'3px 8px', borderRadius:4, fontSize:9, cursor:'pointer', background:'rgba(0,230,138,0.08)', border:'1px solid rgba(0,230,138,0.2)', color:'#00e68a', fontWeight:700, minWidth:22 }} title="Добавить в стек">+</button>
                         <span style={{ fontSize:10, color:'#22c55e', fontWeight:700 }}>+</span>
                         <span style={{ fontWeight:600, fontSize:10, color:'var(--text-light)', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', maxWidth:'35%' }}>{bName}</span>
-                        <button onClick={(e) => { e.stopPropagation(); setStackBuilder(prev => prev.includes(interaction?.substanceB) ? prev : [...prev, interaction?.substanceB]); }} style={{ padding:'1px 4px', borderRadius:4, fontSize:7, cursor:'pointer', background:'rgba(0,230,138,0.08)', border:'1px solid rgba(0,230,138,0.2)', color:'#00e68a', fontWeight:700, lineHeight:'12px' }}>+</button>
+                        <button onClick={(e) => { e.stopPropagation(); setStackBuilder(prev => prev.includes(interaction?.substanceB) ? prev : [...prev, interaction?.substanceB]); }} style={{ padding:'3px 8px', borderRadius:4, fontSize:9, cursor:'pointer', background:'rgba(0,230,138,0.08)', border:'1px solid rgba(0,230,138,0.2)', color:'#00e68a', fontWeight:700, minWidth:22 }} title="Добавить в стек">+</button>
                       </div>
                       <span style={{ fontSize:7, padding:'1px 4px', borderRadius:3, background:sevInfo.color+'22', color:sevInfo.color, flexShrink:0 }}>{sevInfo.label}</span>
                     </div>
@@ -1873,68 +1876,154 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
                         </div>
                         {isExpanded && (
                           <div style={{ borderTop:'1px solid var(--border)' }}>
-                            {(group.items||[]).map(sub => (
-                              <div key={sub?.id||'x'}>
-                                <div onClick={() => setSelectedSub(selectedSub === sub?.id ? null : (sub?.id||null))} style={{ display:'flex', alignItems:'flex-start', gap:4, padding:'6px 10px 6px 14px', cursor:'pointer', borderBottom:'1px solid var(--border)' }}>
-                                  <div style={{ flex:1 }}>
-                                    <div style={{ fontSize:10, fontWeight:600, color:'var(--text-light)', lineHeight:1.3 }}>{sub?.name||''}</div>
-                                    <div style={{ display:'flex', gap:2, flexWrap:'wrap', marginTop:1 }}>
-                                      {(sub?.categories||[]).slice(0,3).map(c => <span key={c} style={{ fontSize:8, padding:'1px 4px', borderRadius:3, background:'rgba(255,255,255,0.06)', color:'rgba(255,255,255,0.85)' }}>{c||''}</span>)}
-                                      {(sub?.mechanisms||[]).slice(0,4).map(m => <span key={m||''} style={{ fontSize:8, padding:'1px 4px', borderRadius:3, background:'rgba(0,230,138,0.08)', color:'#00e68a' }}>{m||''}</span>)}
-                                    </div>
+                            {/* Class sub-groups (3+ matching substances) */}
+                            {Object.entries(group.classItems || {}).map(([clsKey, clsSubs]) => {
+                              const clsInfo = CLASS_BASE_NAMES[clsKey];
+                              const clsExpKey = `cls_${group.cat}_${clsKey}`;
+                              const clsExpanded = expandedCategories[clsExpKey] ?? true;
+                              return (
+                                <div key={clsKey}>
+                                  <div onClick={() => setExpandedCategories(prev => ({ ...prev, [clsExpKey]: !clsExpanded }))} style={{ display:'flex', alignItems:'center', gap:4, padding:'6px 10px 6px 18px', cursor:'pointer', userSelect:'none', background:'rgba(0,230,138,0.03)', borderBottom:'1px solid rgba(0,230,138,0.1)' }}>
+                                    <span style={{ fontSize:11 }}>{clsInfo?.emoji || '📦'}</span>
+                                    <div style={{ flex:1, fontSize:9, fontWeight:700, color:'#00e68a' }}>{clsInfo?.label || clsKey} ({clsSubs.length} форм{clsSubs.length === 1 ? 'а' : clsSubs.length < 5 ? 'ы' : ''})</div>
+                                    <span style={{ fontSize:8, color:'var(--text-dim)', transform:clsExpanded ? 'rotate(180deg)' : 'none', transition:'transform 0.2s' }}>▼</span>
                                   </div>
-                                  <span style={{ fontSize:9, color:'var(--text-dim)', transform:selectedSub === sub?.id ? 'rotate(180deg)' : 'none' }}>▼</span>
-                                </div>
-                                {selectedSub === sub?.id && sub && (
-                                  <div style={{ padding:'6px 10px 8px 14px', background:'rgba(0,0,0,0.15)', borderBottom:'1px solid var(--border)' }}>
-                                    <div style={{ fontSize:10, color:'rgba(255,255,255,0.9)', lineHeight:1.4, marginBottom:4 }}>{sub.description||''}</div>
-                                    <div style={{ fontSize:7, color:'var(--accent-green, #00e68a)', marginBottom:3 }}>
-                                      {TYPE_LABELS_RU[sub.type] || (sub.type||'')}{(sub.categories||[]).length > 0 ? ' · ' + (sub.categories||[]).slice(0,3).join(', ') : ''}
+                                  {clsExpanded && clsSubs.map(sub => (
+                                    <div key={sub?.id||'x'}>
+                                      <div onClick={() => setSelectedSub(selectedSub === sub?.id ? null : (sub?.id||null))} style={{ display:'flex', alignItems:'flex-start', gap:4, padding:'6px 10px 6px 22px', cursor:'pointer', borderBottom:'1px solid var(--border)' }}>
+                                        <div style={{ flex:1 }}>
+                                          <div style={{ fontSize:10, fontWeight:600, color:'var(--text-light)', lineHeight:1.3 }}>{sub?.name||''}</div>
+                                          <div style={{ display:'flex', gap:2, flexWrap:'wrap', marginTop:1 }}>
+                                            {(sub?.categories||[]).slice(0,3).map(c => <span key={c} style={{ fontSize:8, padding:'1px 4px', borderRadius:3, background:'rgba(255,255,255,0.06)', color:'rgba(255,255,255,0.85)' }}>{c||''}</span>)}
+                                            {(sub?.mechanisms||[]).slice(0,4).map(m => <span key={m||''} style={{ fontSize:8, padding:'1px 4px', borderRadius:3, background:'rgba(0,230,138,0.08)', color:'#00e68a' }}>{m||''}</span>)}
+                                          </div>
+                                        </div>
+                                        <span style={{ fontSize:9, color:'var(--text-dim)', transform:selectedSub === sub?.id ? 'rotate(180deg)' : 'none' }}>▼</span>
+                                      </div>
+                                      {selectedSub === sub?.id && sub && (
+                                        <div style={{ padding:'6px 10px 8px 22px', background:'rgba(0,0,0,0.15)', borderBottom:'1px solid var(--border)' }}>
+                                          <div style={{ fontSize:10, color:'rgba(255,255,255,0.9)', lineHeight:1.4, marginBottom:4 }}>{sub.description||''}</div>
+                                          <div style={{ fontSize:7, color:'var(--accent-green, #00e68a)', marginBottom:3 }}>
+                                            {TYPE_LABELS_RU[sub.type] || (sub.type||'')}{(sub.categories||[]).length > 0 ? ' · ' + (sub.categories||[]).slice(0,3).join(', ') : ''}
+                                          </div>
+                                          {(sub.mechanisms||[]).length > 0 && (
+                                            <div style={{ marginBottom:3 }}>
+                                              <div style={{ fontSize:8, color:'rgba(255,255,255,0.85)', marginBottom:1 }}>Механизмы действия:</div>
+                                              <div style={{ display:'flex', gap:2, flexWrap:'wrap' }}>
+                                                {(sub.mechanisms||[]).map((m,i) => (
+                                                  <span key={i} style={{ fontSize:8, padding:'2px 6px', borderRadius:4, background:'rgba(0,230,138,0.08)', color:'#00e68a', border:'1px solid rgba(0,230,138,0.15)' }}>{(m||'')}</span>
+                                                ))}
+                                              </div>
+                                            </div>
+                                          )}
+                                          {(sub.organs||[]).length > 0 && (
+                                            <div style={{ marginBottom:3 }}>
+                                              <div style={{ fontSize:8, color:'rgba(255,255,255,0.85)', marginBottom:1 }}>Органы-мишени:</div>
+                                              <div style={{ display:'flex', gap:2, flexWrap:'wrap' }}>
+                                                {(sub.organs||[]).map(o => <span key={o||''} style={{ fontSize:8, padding:'2px 6px', borderRadius:4, background:'rgba(59,130,246,0.1)', color:'#60a5fa', border:'1px solid rgba(59,130,246,0.15)' }}>{o||''}</span>)}
+                                              </div>
+                                            </div>
+                                          )}
+                                          {sub.deficiency && sub.deficiency !== 'NONE' && (
+                                            <div style={{ fontSize:9, color:'#f59e0b', marginTop:2 }}>⚠ Дефицит: {sub.deficiency}</div>
+                                          )}
+                                          {SUPPLEMENT_DESCRIPTIONS[sub.id] && (
+                                            <div style={{ marginTop:4, padding:'4px 6px', background:'rgba(0,230,138,0.05)', borderRadius:4, border:'1px solid rgba(0,230,138,0.1)' }}>
+                                              <div style={{ fontSize:8, color:'#00e68a', fontWeight:600, marginBottom:1 }}>📋 Подробнее:</div>
+                                              <div style={{ fontSize:9, color:'rgba(255,255,255,0.9)', lineHeight:1.4 }}>{SUPPLEMENT_DESCRIPTIONS[sub.id]}</div>
+                                            </div>
+                                          )}
+                                          {(sub as any).forms && (sub as any).forms.length > 0 && (
+                                            <div style={{ marginTop:4, padding:'4px 6px', background:'rgba(59,130,246,0.05)', borderRadius:4, border:'1px solid rgba(59,130,246,0.1)' }}>
+                                              <div style={{ fontSize:8, color:'#60a5fa', fontWeight:600, marginBottom:2 }}>💊 Формы выпуска:</div>
+                                              {((sub as any).forms as any[]).map((f, fi) => (
+                                                <div key={fi} style={{ display:'flex', alignItems:'center', gap:4, marginBottom:2 }}>
+                                                  <span style={{ fontSize:9, fontWeight: f.best ? 700 : 400, color: f.best ? '#00e68a' : 'rgba(255,255,255,0.85)' }}>{f.best ? '★' : '○'} {f.name}</span>
+                                                  <span style={{ fontSize:8, color:'rgba(255,255,255,0.6)' }}>{f.dose}</span>
+                                                  {f.best && <span style={{ fontSize:7, padding:'0px 4px', borderRadius:3, background:'rgba(0,230,138,0.1)', color:'#00e68a', border:'1px solid rgba(0,230,138,0.2)' }}>Рекоменд.</span>}
+                                                </div>
+                                              ))}
+                                            </div>
+                                          )}
+                                          {catDetailInteractions(sub, mergedInteractions)}
+                                        </div>
+                                      )}
                                     </div>
-                                    {(sub.mechanisms||[]).length > 0 && (
-                                      <div style={{ marginBottom:3 }}>
-                                        <div style={{ fontSize:8, color:'rgba(255,255,255,0.85)', marginBottom:1 }}>Механизмы действия:</div>
-                                        <div style={{ display:'flex', gap:2, flexWrap:'wrap' }}>
-                                          {(sub.mechanisms||[]).map((m,i) => (
-                                            <span key={i} style={{ fontSize:8, padding:'2px 6px', borderRadius:4, background:'rgba(0,230,138,0.08)', color:'#00e68a', border:'1px solid rgba(0,230,138,0.15)' }}>{(m||'')}</span>
+                                  ))}
+                                </div>
+                              );
+                            })}
+                            {/* Remaining items (not in any class sub-group) */}
+                            {(() => {
+                              const classSubsSet = new Set<string>();
+                              for (const clsSubs of Object.values(group.classItems || {})) {
+                                for (const s of clsSubs as SupportSubstance[]) { if (s?.id) classSubsSet.add(s.id); }
+                              }
+                              const remaining = (group.items||[]).filter(sub => sub?.id && !classSubsSet.has(sub.id));
+                              if (remaining.length === 0) return null;
+                              return remaining.map(sub => (
+                                <div key={sub?.id||'x'}>
+                                  <div onClick={() => setSelectedSub(selectedSub === sub?.id ? null : (sub?.id||null))} style={{ display:'flex', alignItems:'flex-start', gap:4, padding:'6px 10px 6px 14px', cursor:'pointer', borderBottom:'1px solid var(--border)' }}>
+                                    <div style={{ flex:1 }}>
+                                      <div style={{ fontSize:10, fontWeight:600, color:'var(--text-light)', lineHeight:1.3 }}>{sub?.name||''}</div>
+                                      <div style={{ display:'flex', gap:2, flexWrap:'wrap', marginTop:1 }}>
+                                        {(sub?.categories||[]).slice(0,3).map(c => <span key={c} style={{ fontSize:8, padding:'1px 4px', borderRadius:3, background:'rgba(255,255,255,0.06)', color:'rgba(255,255,255,0.85)' }}>{c||''}</span>)}
+                                        {(sub?.mechanisms||[]).slice(0,4).map(m => <span key={m||''} style={{ fontSize:8, padding:'1px 4px', borderRadius:3, background:'rgba(0,230,138,0.08)', color:'#00e68a' }}>{m||''}</span>)}
+                                      </div>
+                                    </div>
+                                    <span style={{ fontSize:9, color:'var(--text-dim)', transform:selectedSub === sub?.id ? 'rotate(180deg)' : 'none' }}>▼</span>
+                                  </div>
+                                  {selectedSub === sub?.id && sub && (
+                                    <div style={{ padding:'6px 10px 8px 14px', background:'rgba(0,0,0,0.15)', borderBottom:'1px solid var(--border)' }}>
+                                      <div style={{ fontSize:10, color:'rgba(255,255,255,0.9)', lineHeight:1.4, marginBottom:4 }}>{sub.description||''}</div>
+                                      <div style={{ fontSize:7, color:'var(--accent-green, #00e68a)', marginBottom:3 }}>
+                                        {TYPE_LABELS_RU[sub.type] || (sub.type||'')}{(sub.categories||[]).length > 0 ? ' · ' + (sub.categories||[]).slice(0,3).join(', ') : ''}
+                                      </div>
+                                      {(sub.mechanisms||[]).length > 0 && (
+                                        <div style={{ marginBottom:3 }}>
+                                          <div style={{ fontSize:8, color:'rgba(255,255,255,0.85)', marginBottom:1 }}>Механизмы действия:</div>
+                                          <div style={{ display:'flex', gap:2, flexWrap:'wrap' }}>
+                                            {(sub.mechanisms||[]).map((m,i) => (
+                                              <span key={i} style={{ fontSize:8, padding:'2px 6px', borderRadius:4, background:'rgba(0,230,138,0.08)', color:'#00e68a', border:'1px solid rgba(0,230,138,0.15)' }}>{(m||'')}</span>
+                                            ))}
+                                          </div>
+                                        </div>
+                                      )}
+                                      {(sub.organs||[]).length > 0 && (
+                                        <div style={{ marginBottom:3 }}>
+                                          <div style={{ fontSize:8, color:'rgba(255,255,255,0.85)', marginBottom:1 }}>Органы-мишени:</div>
+                                          <div style={{ display:'flex', gap:2, flexWrap:'wrap' }}>
+                                            {(sub.organs||[]).map(o => <span key={o||''} style={{ fontSize:8, padding:'2px 6px', borderRadius:4, background:'rgba(59,130,246,0.1)', color:'#60a5fa', border:'1px solid rgba(59,130,246,0.15)' }}>{o||''}</span>)}
+                                          </div>
+                                        </div>
+                                      )}
+                                      {sub.deficiency && sub.deficiency !== 'NONE' && (
+                                        <div style={{ fontSize:9, color:'#f59e0b', marginTop:2 }}>⚠ Дефицит: {sub.deficiency}</div>
+                                      )}
+                                      {SUPPLEMENT_DESCRIPTIONS[sub.id] && (
+                                        <div style={{ marginTop:4, padding:'4px 6px', background:'rgba(0,230,138,0.05)', borderRadius:4, border:'1px solid rgba(0,230,138,0.1)' }}>
+                                          <div style={{ fontSize:8, color:'#00e68a', fontWeight:600, marginBottom:1 }}>📋 Подробнее:</div>
+                                          <div style={{ fontSize:9, color:'rgba(255,255,255,0.9)', lineHeight:1.4 }}>{SUPPLEMENT_DESCRIPTIONS[sub.id]}</div>
+                                        </div>
+                                      )}
+                                      {(sub as any).forms && (sub as any).forms.length > 0 && (
+                                        <div style={{ marginTop:4, padding:'4px 6px', background:'rgba(59,130,246,0.05)', borderRadius:4, border:'1px solid rgba(59,130,246,0.1)' }}>
+                                          <div style={{ fontSize:8, color:'#60a5fa', fontWeight:600, marginBottom:2 }}>💊 Формы выпуска:</div>
+                                          {((sub as any).forms as any[]).map((f, fi) => (
+                                            <div key={fi} style={{ display:'flex', alignItems:'center', gap:4, marginBottom:2 }}>
+                                              <span style={{ fontSize:9, fontWeight: f.best ? 700 : 400, color: f.best ? '#00e68a' : 'rgba(255,255,255,0.85)' }}>{f.best ? '★' : '○'} {f.name}</span>
+                                              <span style={{ fontSize:8, color:'rgba(255,255,255,0.6)' }}>{f.dose}</span>
+                                              {f.best && <span style={{ fontSize:7, padding:'0px 4px', borderRadius:3, background:'rgba(0,230,138,0.1)', color:'#00e68a', border:'1px solid rgba(0,230,138,0.2)' }}>Рекоменд.</span>}
+                                            </div>
                                           ))}
                                         </div>
-                                      </div>
-                                    )}
-                                    {(sub.organs||[]).length > 0 && (
-                                      <div style={{ marginBottom:3 }}>
-                                        <div style={{ fontSize:8, color:'rgba(255,255,255,0.85)', marginBottom:1 }}>Органы-мишени:</div>
-                                        <div style={{ display:'flex', gap:2, flexWrap:'wrap' }}>
-                                          {(sub.organs||[]).map(o => <span key={o||''} style={{ fontSize:8, padding:'2px 6px', borderRadius:4, background:'rgba(59,130,246,0.1)', color:'#60a5fa', border:'1px solid rgba(59,130,246,0.15)' }}>{o||''}</span>)}
-                                        </div>
-                                      </div>
-                                    )}
-                                    {sub.deficiency && sub.deficiency !== 'NONE' && (
-                                      <div style={{ fontSize:9, color:'#f59e0b', marginTop:2 }}>⚠ Дефицит: {sub.deficiency}</div>
-                                    )}
-                                    {SUPPLEMENT_DESCRIPTIONS[sub.id] && (
-                                      <div style={{ marginTop:4, padding:'4px 6px', background:'rgba(0,230,138,0.05)', borderRadius:4, border:'1px solid rgba(0,230,138,0.1)' }}>
-                                        <div style={{ fontSize:8, color:'#00e68a', fontWeight:600, marginBottom:1 }}>📋 Подробнее:</div>
-                                        <div style={{ fontSize:9, color:'rgba(255,255,255,0.9)', lineHeight:1.4 }}>{SUPPLEMENT_DESCRIPTIONS[sub.id]}</div>
-                                      </div>
-                                    )}
-                                    {(sub as any).forms && (sub as any).forms.length > 0 && (
-                                      <div style={{ marginTop:4, padding:'4px 6px', background:'rgba(59,130,246,0.05)', borderRadius:4, border:'1px solid rgba(59,130,246,0.1)' }}>
-                                        <div style={{ fontSize:8, color:'#60a5fa', fontWeight:600, marginBottom:2 }}>💊 Формы выпуска:</div>
-                                        {((sub as any).forms as any[]).map((f, fi) => (
-                                          <div key={fi} style={{ display:'flex', alignItems:'center', gap:4, marginBottom:2 }}>
-                                            <span style={{ fontSize:9, fontWeight: f.best ? 700 : 400, color: f.best ? '#00e68a' : 'rgba(255,255,255,0.85)' }}>{f.best ? '★' : '○'} {f.name}</span>
-                                            <span style={{ fontSize:8, color:'rgba(255,255,255,0.6)' }}>{f.dose}</span>
-                                            {f.best && <span style={{ fontSize:7, padding:'0px 4px', borderRadius:3, background:'rgba(0,230,138,0.1)', color:'#00e68a', border:'1px solid rgba(0,230,138,0.2)' }}>Рекоменд.</span>}
-                                          </div>
-                                        ))}
-                                      </div>
-                                    )}
-                                    {catDetailInteractions(sub, mergedInteractions)}
-                                  </div>
-                                )}
-                              </div>
-                            ))}
+                                      )}
+                                      {catDetailInteractions(sub, mergedInteractions)}
+                                    </div>
+                                  )}
+                                </div>
+                              ));
+                            })()}
                           </div>
                         )}
                       </div>
@@ -1986,7 +2075,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
                                   <span style={{ fontSize:11, fontWeight:800, color:synergyColor, marginLeft:4 }}>{(stack.synergyScore||0).toFixed(1)}</span>
                                 </div>
                                 <div style={{ display:'flex', flexWrap:'wrap', gap:2, marginBottom:expandedMed === stack.id ? 4 : 0 }}>
-                                  {stack.substances.map(sid => <span key={sid} style={{ fontSize:8, padding:'1px 6px', borderRadius:6, background:'rgba(139,92,246,0.08)', border:'1px solid rgba(139,92,246,0.12)', color:'#a78bfa', fontWeight:600 }}>{getStackSubLabel(sid)}<button onClick={(e) => { e.stopPropagation(); setStackBuilder(prev => prev.includes(sid) ? prev : [...prev, sid]); }} style={{ padding:'0px 3px', borderRadius:3, fontSize:7, cursor:'pointer', background:'rgba(0,230,138,0.1)', border:'none', color:'#00e68a', fontWeight:700, marginLeft:2, lineHeight:'14px' }}>+</button></span>)}
+                                  {stack.substances.map(sid => <span key={sid} style={{ fontSize:8, padding:'1px 6px', borderRadius:6, background:'rgba(139,92,246,0.08)', border:'1px solid rgba(139,92,246,0.12)', color:'#a78bfa', fontWeight:600 }}>{getStackSubLabel(sid)}<button onClick={(e) => { e.stopPropagation(); setStackBuilder(prev => prev.includes(sid) ? prev : [...prev, sid]); }} style={{ padding:'3px 8px', borderRadius:4, fontSize:9, cursor:'pointer', background:'rgba(0,230,138,0.1)', border:'none', color:'#00e68a', fontWeight:700, marginLeft:2, minWidth:22 }} title="Добавить в стек">+</button></span>)}
                                 </div>
                                 <div style={{ fontSize:7, color:'var(--text-dim)' }}>{stack.substances.length} веществ</div>
                                 {expandedMed === stack.id && safeRender('stack_'+stack.id, () =>
@@ -2209,7 +2298,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
                       <div onClick={() => setExpandedCategories(prev => ({ ...prev, drug_combo_ref: !prev.drug_combo_ref }))} style={{ display:'flex', alignItems:'center', gap:6, padding:'7px 10px', cursor:'pointer', userSelect:'none', background:'var(--bg-secondary)', borderRadius:8 }}>
                         <span style={{ fontSize:13 }}>💊</span>
                         <div style={{ flex:1, fontSize:10, fontWeight:700, color:'var(--text-light)' }}>Фармакологические взаимодействия</div>
-                        <span style={{ fontSize:9, color:'var(--text-dim)', marginRight:2 }}>13</span>
+                        <span style={{ fontSize:9, color:'var(--text-dim)', marginRight:2 }}>23</span>
                         <span style={{ fontSize:9, color:'var(--text-dim)', transform: expandedCategories.drug_combo_ref !== false ? 'rotate(180deg)' : 'none', transition:'transform 0.2s' }}>▼</span>
                       </div>
                       {expandedCategories.drug_combo_ref !== false && (
@@ -2228,6 +2317,16 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
                             { a:'Тамоксифен', b:'Кломифен', effect:'Оба СЕРМ. Синергия в ПКТ', risk:'Тамоксифен для Е2, кломифен для ЛГ/ФСГ', control:'Гормональная панель', type:'synergy' },
                             { a:'Анастрозол', b:'Тамоксифен', effect:'Анастрозол снижает Е2, тамоксифен блокирует рецепторы', risk:'Синергия при гинекомастии', control:'Контроль Е2', type:'synergy' },
                             { a:'Дексаметазон', b:'Тестостерон', effect:'Глюкокортикоид + андроген', risk:'Гипергликемия, катаболизм', control:'Глюкоза', type:'warning' },
+                            { a:'Тестостерон', b:'Примоболан', effect:'Синергия. Нет ароматизации', risk:'Липиды', control:'Липидограмма', type:'synergy' },
+                            { a:'Тренболон', b:'Мастерон', effect:'Синергия (сухая масса)', risk:'Липиды, агрессия', control:'Липидограмма, настроение', type:'synergy' },
+                            { a:'Болденон', b:'Нандролон', effect:'Оба повышают гематокрит', risk:'Тромбоз', control:'ОАК каждые 2 нед.', type:'critical' },
+                            { a:'Анавар', b:'Винстрол', effect:'Оба 17α-алкилированные', risk:'Гепатотоксичность x2', control:'НЕ комбинировать >4 нед. АЛТ/АСТ', type:'critical' },
+                            { a:'Кломид', b:'ХГЧ', effect:'Синергия в ПКТ. ХГЧ восстанавливает тестикулы, кломид стимулирует гипофиз', risk:'Эстрогеновый отскок', control:'Е2, ЛГ, ФСГ', type:'synergy' },
+                            { a:'Аримидекс', b:'Тамоксифен', effect:'Разные механизмы. Аримидекс снижает ароматизацию, тамоксифен блокирует рецепторы Е2', risk:'Избыточное подавление Е2', control:'Е2 каждые 4 нед.', type:'synergy' },
+                            { a:'Метформин', b:'ГР', effect:'ГР повышает глюкозу, метформин компенсирует', risk:'Гипогликемия', control:'Глюкоза натощак', type:'caution' },
+                            { a:'L-тироксин', b:'Кленбутерол', effect:'Оба повышают ЧСС и метаболизм', risk:'Тахикардия, тремор', control:'ЧСС, ТТГ', type:'warning' },
+                            { a:'Тестостерон', b:'Дека-дураболин', effect:'Дека (нандролон) с тестостероном — классика', risk:'Пролактин, прогестероновая активность', control:'Пролактин каждые 4 нед.', type:'caution' },
+                            { a:'Тренболон', b:'ГР', effect:'Синергия. Тренболон повышает IGF-1, ГР добавляет IGF-1 из печени', risk:'Гипогликемия (ГР + инсулин)', control:'Глюкоза', type:'synergy' },
                           ] as const).map((combo, ci) => {
                             const typeColor = combo.type === 'critical' ? '#ff1744' : combo.type === 'warning' ? '#ff9100' : combo.type === 'synergy' ? '#22c55e' : '#f59e0b';
                             const typeLabel = combo.type === 'critical' ? '🚫 КРИТИЧНО' : combo.type === 'warning' ? '⚡ ОСТОРОЖНО' : combo.type === 'synergy' ? '⊕ СИНЕРГИЯ' : 'ℹ УМЕРЕННО';
@@ -2246,8 +2345,11 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
                         </div>
                       )}
                     </div>
+                  </div>
+                </div>
+              )}
 
-             {/* ===== RESEARCH: Multi-Source ===== */}
+              {/* ===== RESEARCH: Multi-Source ===== */}
               {renderView(infoView, 'research', () => (
                 <div>
                   <div style={{fontSize:13,fontWeight:700,color:'var(--accent)',marginBottom:4}}>🔬 Поиск исследований</div>
@@ -2445,9 +2547,6 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
 
 
 
-           </div>
-         </div>
-       )}
           </div>
         </div>
       )}
@@ -3718,7 +3817,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
                           <div style={{ display:'flex', flexWrap:'wrap', gap:3, marginBottom:expandedMed === stack.id ? 6 : 0 }}>
                             {stack.substances.map(sid => (
                               <span key={sid} style={{ fontSize:9, padding:'2px 7px', borderRadius:8, background:'rgba(139,92,246,0.08)', border:'1px solid rgba(139,92,246,0.15)', color:'#a78bfa', fontWeight:600 }}>
-                                {getStackSubLabel(sid)}<button onClick={(e) => { e.stopPropagation(); setStackBuilder(prev => prev.includes(sid) ? prev : [...prev, sid]); }} style={{ padding:'0px 4px', borderRadius:4, fontSize:8, cursor:'pointer', background:'rgba(0,230,138,0.1)', border:'none', color:'#00e68a', fontWeight:700, marginLeft:2, lineHeight:'16px' }}>+</button>
+                                {getStackSubLabel(sid)}<button onClick={(e) => { e.stopPropagation(); setStackBuilder(prev => prev.includes(sid) ? prev : [...prev, sid]); }} style={{ padding:'3px 8px', borderRadius:4, fontSize:9, cursor:'pointer', background:'rgba(0,230,138,0.1)', border:'none', color:'#00e68a', fontWeight:700, marginLeft:2, minWidth:22 }} title="Добавить в стек">+</button>
                               </span>
                             ))}
                           </div>
@@ -4626,7 +4725,7 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
 
       {/* ===== STACK BUILDER FLOATING BADGE ===== */}
       {stackBuilder.length > 0 && (
-        <div style={{ position:'fixed', bottom:16, left:'50%', transform:'translateX(-50%)', zIndex:100, display:'flex', alignItems:'center', gap:8, padding:'8px 14px', borderRadius:16, background:'rgba(0,0,0,0.9)', backdropFilter:'blur(12px)', border:'1px solid rgba(0,230,138,0.3)', boxShadow:'0 4px 20px rgba(0,0,0,0.5)' }}>
+        <div style={{ position:'sticky', bottom:0, zIndex:100, display:'flex', alignItems:'center', justifyContent:'center', gap:8, padding:'8px 14px', borderRadius:16, background:'rgba(0,0,0,0.9)', backdropFilter:'blur(12px)', border:'1px solid rgba(0,230,138,0.3)', boxShadow:'0 4px 20px rgba(0,0,0,0.5)' }}>
           <span style={{ fontSize:10, fontWeight:700, color:'#00e68a' }}>🧮 Стек: {stackBuilder.length} веществ</span>
           <button onClick={() => setStackBuilder([])} style={{ padding:'4px 10px', borderRadius:8, fontSize:9, cursor:'pointer', background:'rgba(239,68,68,0.1)', border:'1px solid rgba(239,68,68,0.2)', color:'#f87171', fontWeight:600 }}>Очистить</button>
           <button onClick={saveBuilderStack} style={{ padding:'4px 10px', borderRadius:8, fontSize:9, cursor:'pointer', background:'linear-gradient(135deg,#00e68a,#00c853)', border:'none', color:'#000', fontWeight:700 }}>Сохранить</button>

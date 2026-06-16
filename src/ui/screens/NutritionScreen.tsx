@@ -15,9 +15,8 @@ import { generateNutritionAdvice } from '../../engines/nutrition-full.engine';
 import { NutritionOverview } from './NutritionScreen_parts/NutritionOverview';
 import { NutritionDiary } from './NutritionScreen_parts/NutritionDiary';
 import { NutritionCharts } from './NutritionScreen_parts/NutritionCharts';
-import { NutritionMealGen } from './NutritionScreen_parts/NutritionMealGen';
 import { NutritionCustomFood } from './NutritionScreen_parts/NutritionCustomFood';
-import { generateTierMealPlan, generateRegimeAdvice, generateLabsBasedAdvice, type MealTier, type MealPlanResult } from '../../engines/meal-tier-generator.engine';
+import { generateTierMealPlan, generateRegimeAdvice, type MealTier, type MealPlanResult } from '../../engines/meal-tier-generator.engine';
 
 interface DiaryEntry {
   name: string;
@@ -30,29 +29,30 @@ interface DiaryEntry {
 
 type NutritionPage = 'hero' | 'tabs';
 type NutritionSection = 'overview' | 'diary' | 'planning' | 'tools' | 'all';
+type ActiveTab = 'overview' | 'diary' | 'charts' | 'mealplan' | 'grocery' | 'restaurant' | 'cycling' | 'calc' | 'custom';
 
 const SECTION_TABS: Record<NutritionSection, string[]> = {
-  overview: ['overview', 'grocery', 'restaurant', 'regime', 'custom'],
+  overview: ['overview', 'grocery', 'restaurant', 'custom'],
   diary: ['diary', 'charts'],
   planning: ['mealplan', 'cycling'],
   tools: ['calc'],
-  all: ['overview', 'diary', 'charts', 'mealplan', 'grocery', 'restaurant', 'calc', 'cycling', 'regime', 'custom'],
+  all: ['overview', 'diary', 'charts', 'mealplan', 'grocery', 'restaurant', 'calc', 'cycling', 'custom'],
 };
 
 const TAB_LABELS: Record<string, string> = {
   overview: '📊 Обзор', diary: '📝 Дневник', charts: '📈 Графики',
   mealplan: '🥗 План', grocery: '🛒 Список', restaurant: '🍽 Ресторан',
   calc: '📐 Калькуляторы', cycling: '🔄 Циклирование',
-  regime: '⏰ Режим', custom: '🍎 Своё',
+  custom: '🍎 Своё',
 };
 
 const NutritionLabContext: React.FC<{ labAnalysis: LabCompositeResult }> = ({ labAnalysis }) => (
   <div style={{ background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', borderRadius: 10, padding: '8px 10px', marginTop: 8 }}>
     <div style={{ fontWeight: 600, fontSize: 11, marginBottom: 4 }}>🧪 Контекст питания из анализов</div>
     <div style={{ fontSize: 10, color: 'var(--text-dim)', lineHeight: 1.6 }}>
-      {labAnalysis.homaIR !== null && labAnalysis.homaIR > 2.5 && <div>⚠ HOMA-IR {labAnalysis.homaIR.toFixed(1)} — рекомендованы низко-ГИ продукты, ограничение простых углеводов</div>}
+      {labAnalysis.homaIR !== null && labAnalysis.homaIR > 2.5 && <div>⚠ HOMA-IR {Math.round(labAnalysis.homaIR)} — рекомендованы низко-ГИ продукты, ограничение простых углеводов</div>}
       {labAnalysis.liverStress > 40 && <div>⚠ Печёночная нагрузка {labAnalysis.liverStress}% — исключить алкоголь, добавить NAC/омега-3</div>}
-      {labAnalysis.inflammation > 4 && <div>⚠ Воспаление {labAnalysis.inflammation.toFixed(1)} — противовоспалительная диета: омега-3, куркума, ягоды</div>}
+      {labAnalysis.inflammation > 4 && <div>⚠ Воспаление {Math.round(labAnalysis.inflammation)} — противовоспалительная диета: омега-3, куркума, ягоды</div>}
       {labAnalysis.kidneyStress > 40 && <div>⚠ Почечная нагрузка {labAnalysis.kidneyStress}% — контроль белка и соли</div>}
       {labAnalysis.hormoneScore > 40 && <div>⚠ Гормональный дисбаланс {labAnalysis.hormoneScore}% — цинк, витамин D, крестоцветные</div>}
       {labAnalysis.homaIR !== null && labAnalysis.homaIR <= 2.5 && labAnalysis.liverStress <= 40 && labAnalysis.inflammation <= 4 && labAnalysis.kidneyStress <= 40 && labAnalysis.hormoneScore <= 40 && (
@@ -65,7 +65,7 @@ const NutritionLabContext: React.FC<{ labAnalysis: LabCompositeResult }> = ({ la
 export const NutritionScreen: React.FC = () => {
   const linked = useDataLink();
   const labAnalysis = linked.labAnalysis;
-  const [tab, setTab] = useState<'overview' | 'diary' | 'charts' | 'mealplan' | 'grocery' | 'restaurant' | 'cycling' | 'calc' | 'regime' | 'custom'>('overview');
+  const [tab, setTab] = useState<ActiveTab>('overview');
   const [page, setPage] = useState<NutritionPage>('hero');
   const [nutritionSection, setNutritionSection] = useState<NutritionSection>('all');
   const [foodEntries, setFoodEntries] = useState<DiaryEntry[]>([]);
@@ -141,7 +141,6 @@ export const NutritionScreen: React.FC = () => {
       case 'restaurant': return <RestaurantTab />;
       case 'calc': return <NutritionCalculators />;
       case 'cycling': return <CyclingTab tKcal={tKcal} tProt={tProt} />;
-      case 'regime': return <NutritionRegime />;
       case 'custom': return <NutritionCustomFood />;
       default: return <NutritionOverview profile={linked.profile} avgWeeklyKcal={avgWeeklyKcal} avgWeeklyProtein={avgWeeklyProtein} avgWeeklyFat={avgWeeklyFat} avgWeeklyCarbs={avgWeeklyCarbs} microsIntake={microsIntake} />;
     }
@@ -164,7 +163,7 @@ export const NutritionScreen: React.FC = () => {
               {[
                 { section: 'diary' as NutritionSection, tab: 'diary', icon: '📝', title: 'Дневник питания', desc: 'Запись продуктов, OCR, штрих-коды', color: '#22c55e' },
                 { section: 'planning' as NutritionSection, tab: 'mealplan', icon: '🥗', title: 'План питания', desc: 'Генератор рациона, уровни, циклирование', color: '#3b82f6' },
-                { section: 'overview' as NutritionSection, tab: 'overview', icon: '📊', title: 'Обзор и списки', desc: 'Сводка, список покупок, рестораны, режим', color: 'var(--accent)' },
+                { section: 'overview' as NutritionSection, tab: 'overview', icon: '📊', title: 'Обзор и списки', desc: 'Сводка, список покупок, рестораны', color: 'var(--accent)' },
                 { section: 'tools' as NutritionSection, tab: 'calc', icon: '📐', title: 'Калькуляторы', desc: 'КБЖУ, дефицит, HOMA-IR', color: '#a855f7' },
               ].map(card => (
                 <button key={card.section} onClick={() => { setPage('tabs'); setNutritionSection(card.section); setTab(card.tab as any); }} style={{
@@ -322,6 +321,7 @@ const MealPlanExtended: React.FC<{ tKcal: number; tProt: number; tFat: number; t
   const [planSaved, setPlanSaved] = React.useState(false);
   const recipes = React.useMemo(() => getRecipes(), []);
   const timings = React.useMemo(() => getSupplementTimings(), []);
+  const regimeAdviceLines = React.useMemo(() => generateRegimeAdvice(), []);
 
   const [expandedRules, setExpandedRules] = React.useState<Set<number>>(new Set());
   const toggleRule = (i: number) => setExpandedRules(prev => { const s = new Set(prev); s.has(i) ? s.delete(i) : s.add(i); return s; });
@@ -336,6 +336,11 @@ const MealPlanExtended: React.FC<{ tKcal: number; tProt: number; tFat: number; t
     { title: 'Естественный аппетит', body: 'Только при чувстве голода. Не давиться через силу.', color: '#a855f7' },
     { title: 'Баланс нутриентов', body: 'Каждый приём: белки+жиры+углеводы. Исключение: до/после тренировки (без жиров).', color: '#8b5cf6' },
     { title: 'Комфортное пищеварение', body: 'Без вздутия/диареи. При симптомах → пересмотреть рацион или ЖКТ.', color: '#06b6d4' },
+    { title: 'Гидратация', body: '30-40 мл воды на кг веса. +500 мл за час тренировки. Обезвоживание снижает силу на 10-15%.', color: '#06b6d4' },
+    { title: 'Сон и питание', body: 'Последний приём за 2-3 часа до сна. Казеин/творог на ночь для медленного белка.', color: '#8b5cf6' },
+    { title: 'Пост-тренировочное окно', body: 'Белок + углеводы в первые 60-90 минут после тренировки. Соотношение 1:3 для набора, 1:1 для сушки.', color: '#3b82f6' },
+    { title: 'Циклирование калорий', body: 'Тренировочные дни +10-15% ккал, дни отдыха -5-10%.', color: '#f59e0b' },
+    { title: 'Контроль натрия', body: '3-5 г соли/день. При высоком АД — снизить до 2-3 г. Задержка воды от избытка соли маскирует результат.', color: '#ef4444' },
   ];
 
   const RECOMMENDED_FOODS: Record<string, { items: string[]; color: string; bg: string }> = {
@@ -345,6 +350,8 @@ const MealPlanExtended: React.FC<{ tKcal: number; tProt: number; tFat: number; t
     'С ограничением': { items: ['Кукурузные хлопья (без пшеницы)', 'Цитрусовые', 'Зелёные яблоки', 'Финики', 'Ягоды', 'Мармелад (желатин+сахар)', 'Томатный сок', 'Амилопектин/декстрин/декстроза'], color: '#ef4444', bg: 'rgba(239,68,68,0.1)' },
     'Клетчатка': { items: ['Морковь', 'Свёкла', 'Огурцы', 'Помидоры', 'Лук', 'Квашеная капуста'], color: '#22c55e', bg: 'rgba(34,197,94,0.1)' },
     'Специи': { items: ['Томатная паста', 'Гималайская соль', 'Любые травы'], color: '#a855f7', bg: 'rgba(168,85,247,0.1)' },
+    'До тренировки (за 1.5-2 ч)': { items: ['Рис/макароны + курица/индейка', 'Овсянка + протеин', 'Банан + яйца'], color: '#8b5cf6', bg: 'rgba(139,92,246,0.1)' },
+    'После тренировки': { items: ['Протеиновый коктейль + банан', 'Рис + рыба/курица', 'Картофель + яйца'], color: '#f59e0b', bg: 'rgba(245,158,11,0.1)' },
   };
 
   const s = profile?.settings;
@@ -746,6 +753,42 @@ const MealPlanExtended: React.FC<{ tKcal: number; tProt: number; tFat: number; t
               )}
             </div>
           ))}
+          {/* Regime advice merged from former "Режим" tab */}
+          <div style={{ borderRadius: 10, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.06)', transition: 'all 0.25s ease', marginTop: 4 }}>
+            <button
+              onClick={() => toggleRule(NUTRITION_RULES.length)}
+              style={{
+                width: '100%', padding: '8px 12px', cursor: 'pointer',
+                display: 'flex', alignItems: 'center', gap: 8,
+                background: expandedRules.has(NUTRITION_RULES.length) ? 'rgba(0,230,138,0.06)' : 'var(--bg-secondary)',
+                border: 'none', color: 'var(--text)', textAlign: 'left',
+                fontSize: 11, fontWeight: 600,
+                transition: 'background 0.2s',
+              }}
+            >
+              <span style={{
+                width: 20, height: 20, borderRadius: 6,
+                background: 'rgba(0,230,138,0.12)', color: 'var(--accent)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                flexShrink: 0, fontSize: 13, fontWeight: 700,
+                transition: 'transform 0.2s',
+                transform: expandedRules.has(NUTRITION_RULES.length) ? 'rotate(90deg)' : 'rotate(0deg)',
+              }}>›</span>
+              <span>⏰ Режим питания (тайминг приёмов)</span>
+            </button>
+            {expandedRules.has(NUTRITION_RULES.length) && (
+              <div style={{
+                padding: '8px 12px 8px 40px',
+                fontSize: 10, color: 'rgba(255,255,255,0.7)',
+                lineHeight: 1.5, borderTop: '1px solid rgba(255,255,255,0.04)',
+                background: 'rgba(0,0,0,0.15)',
+              }}>
+                {regimeAdviceLines.map((a, j) => (
+                  <div key={j} style={{ padding: '4px 0', borderBottom: j < regimeAdviceLines.length - 1 ? '1px solid rgba(255,255,255,0.03)' : 'none' }}>{a}</div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -974,36 +1017,6 @@ const CyclingTab: React.FC<{ tKcal: number; tProt: number }> = ({ tKcal, tProt }
   </div>);
 };
 
-const NutritionRegime: React.FC = () => {
-  const [advice] = React.useState(() => generateRegimeAdvice());
-  const [labsAdvice] = React.useState(() => generateLabsBasedAdvice());
-  return (
-    <div style={{ padding: 12 }}>
-      <div className="card" style={{ padding: 14, marginBottom: 10 }}>
-        <h3 style={{ margin: '0 0 8px', fontSize: 14, color: 'var(--accent)' }}>⏰ Режим питания</h3>
-        <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', margin: '0 0 10px', lineHeight: 1.5 }}>
-          Основные принципы режима питания для максимальной эффективности тренировок и здоровья.
-        </p>
-        {advice.map((a, i) => (
-          <div key={i} style={{ fontSize: 11, color: 'rgba(255,255,255,0.85)', padding: '6px 0', borderBottom: i < advice.length - 1 ? '1px solid rgba(255,255,255,0.06)' : 'none', lineHeight: 1.5 }}>
-            {a}
-          </div>
-        ))}
-      </div>
-      {labsAdvice.length > 0 && (
-        <div className="card" style={{ padding: 14 }}>
-          <h3 style={{ margin: '0 0 8px', fontSize: 14, color: '#f59e0b' }}>🧪 Рекомендации по анализам</h3>
-          {labsAdvice.map((a, i) => (
-            <div key={i} style={{ fontSize: 11, color: 'rgba(255,255,255,0.85)', padding: '6px 0', borderBottom: i < labsAdvice.length - 1 ? '1px solid rgba(255,255,255,0.06)' : 'none', lineHeight: 1.5 }}>
-              {a}
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-};
-
 const QuickAdviceCard: React.FC = () => {
   const s = getProfile()?.settings;
   const targets = { kcal: s?.weight ? Math.round(s.weight * 30) : 2500, protein: s?.weight ? Math.round(s.weight * 2) : 160, fats: Math.round((s?.weight || 80) * 0.8), carbs: 300, water: 3, fiber: 30, steps: 8000, vitaminD: 2000, potassium: 3500, iron: 12, calcium: 800, sodium: 2300 };
@@ -1067,8 +1080,8 @@ const NutritionCalculators: React.FC = () => {
         <button onClick={calcDeficit} style={{ width: '100%', padding: 6, borderRadius: 6, border: 'none', cursor: 'pointer', background: 'var(--accent)', color: '#000', fontWeight: 600, fontSize: 11, marginBottom: 8 }}>Рассчитать</button>
         {dResult !== null && (
           <div style={{ background: 'rgba(0,230,138,0.08)', borderRadius: 8, padding: 10, textAlign: 'center' }}>
-            <div style={{ fontSize: 14, fontWeight: 700, color: dResult.deficit > 0 ? '#ef4444' : '#22c55e' }}>{dResult.deficit > 0 ? `Дефицит ${dResult.deficit} ккал/день` : 'Нет дефицита'}</div>
-            <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>Потеря веса: {dResult.rateKgWeek.toFixed(2)} кг/нед</div>
+            <div style={{ fontSize: 15, fontWeight: 700, color: '#ffffff' }}>{dResult.deficit > 0 ? `Дефицит ${dResult.deficit} ккал/день` : 'Нет дефицита'}</div>
+            <div style={{ fontSize: 13, color: 'var(--accent)', marginTop: 4 }}>Потеря веса: {Math.round(dResult.rateKgWeek)} кг/нед</div>
           </div>
         )}
       </div>
@@ -1121,13 +1134,13 @@ const NutritionCalculators: React.FC = () => {
         <button onClick={calcMacros} style={{ width: '100%', padding: 6, borderRadius: 6, border: 'none', cursor: 'pointer', background: 'var(--accent)', color: '#000', fontWeight: 600, fontSize: 11, marginBottom: 8 }}>Рассчитать</button>
         {mResult !== null && (
           <div style={{ background: 'rgba(0,230,138,0.08)', borderRadius: 8, padding: 10 }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, textAlign: 'center', fontSize: 10 }}>
-              <div><span style={{ color: 'var(--text-dim)' }}>Ккал</span><div style={{ fontSize: 16, fontWeight: 700, color: 'var(--accent)' }}>{mResult.kcal}</div></div>
-              <div><span style={{ color: 'var(--text-dim)' }}>Белки</span><div style={{ fontSize: 16, fontWeight: 700, color: '#3b82f6' }}>{mResult.protein}г</div></div>
-              <div><span style={{ color: 'var(--text-dim)' }}>Жиры</span><div style={{ fontSize: 16, fontWeight: 700, color: '#f59e0b' }}>{mResult.fats}г</div></div>
-              <div><span style={{ color: 'var(--text-dim)' }}>Углеводы</span><div style={{ fontSize: 16, fontWeight: 700, color: '#ef4444' }}>{mResult.carbs}г</div></div>
-              <div><span style={{ color: 'var(--text-dim)' }}>Вода</span><div style={{ fontSize: 16, fontWeight: 700, color: '#06b6d4' }}>{mResult.water}л</div></div>
-              <div><span style={{ color: 'var(--text-dim)' }}>Клетчатка</span><div style={{ fontSize: 16, fontWeight: 700, color: '#22c55e' }}>{mResult.fiber}г</div></div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, textAlign: 'center', fontSize: 11 }}>
+              <div><span style={{ color: 'var(--text-light)' }}>Ккал</span><div style={{ fontSize: 15, fontWeight: 700, color: '#ffffff' }}>{mResult.kcal}</div></div>
+              <div><span style={{ color: 'var(--text-light)' }}>Белки</span><div style={{ fontSize: 15, fontWeight: 700, color: '#3b82f6' }}>{mResult.protein}г</div></div>
+              <div><span style={{ color: 'var(--text-light)' }}>Жиры</span><div style={{ fontSize: 15, fontWeight: 700, color: '#f59e0b' }}>{mResult.fats}г</div></div>
+              <div><span style={{ color: 'var(--text-light)' }}>Углеводы</span><div style={{ fontSize: 15, fontWeight: 700, color: '#ef4444' }}>{mResult.carbs}г</div></div>
+              <div><span style={{ color: 'var(--text-light)' }}>Вода</span><div style={{ fontSize: 15, fontWeight: 700, color: '#06b6d4' }}>{mResult.water}л</div></div>
+              <div><span style={{ color: 'var(--text-light)' }}>Клетчатка</span><div style={{ fontSize: 15, fontWeight: 700, color: '#22c55e' }}>{mResult.fiber}г</div></div>
             </div>
           </div>
         )}
@@ -1148,8 +1161,8 @@ const NutritionCalculators: React.FC = () => {
         <button onClick={calcHOMA} style={{ width: '100%', padding: 6, borderRadius: 6, border: 'none', cursor: 'pointer', background: 'var(--accent)', color: '#000', fontWeight: 600, fontSize: 11, marginBottom: 8 }}>Рассчитать</button>
         {hResult !== null && (
           <div style={{ background: 'rgba(0,230,138,0.08)', borderRadius: 8, padding: 10, textAlign: 'center' }}>
-            <div style={{ fontSize: 22, fontWeight: 800, color: hResult.resistant ? '#ef4444' : 'var(--accent)' }}>{hResult.index.toFixed(2)}</div>
-            <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>{hResult.resistant ? 'Инсулинорезистентность (>2.5)' : 'Норма'}</div>
+            <div style={{ fontSize: 24, fontWeight: 800, color: '#ffffff' }}>{Math.round(hResult.index * 10) / 10}</div>
+            <div style={{ fontSize: 13, color: hResult.resistant ? '#ef4444' : 'var(--accent)', marginTop: 4 }}>{hResult.resistant ? 'Инсулинорезистентность (>2.5)' : 'Норма'}</div>
           </div>
         )}
       </div>

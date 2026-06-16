@@ -167,11 +167,12 @@ function pickFoodForCategory(cat: string, tier: MealTier, count: number): FoodIt
   const all = getFoodsForTier(cat, tier);
   if (all.length === 0) {
     const fallback = FOOD_DB.filter(f => f.category === cat);
-    return fallback.slice(0, count);
+    return [...fallback].sort(() => Math.random() - 0.5).slice(0, count);
   }
+  const shuffled = [...all].sort(() => Math.random() - 0.5);
   const result: FoodItem[] = [];
-  for (let i = 0; i < count; i++) {
-    result.push(all[i % all.length]);
+  for (let i = 0; i < count && i < shuffled.length; i++) {
+    result.push(shuffled[i]);
   }
   return result;
 }

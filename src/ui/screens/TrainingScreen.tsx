@@ -1852,15 +1852,20 @@ export const TrainingScreen: React.FC = () => {
             <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 8 }}>4 шага: параметры → сплит → упражнения → цикл</div>
 
             {/* Step indicators */}
-            <div style={{ display: 'flex', gap: 4, marginBottom: 10 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginBottom: 10 }}>
               {[1,2,3,4].map(s => (
-                <div key={s} onClick={() => setBuilderStep(s)} style={{
-                  flex: 1, padding: '4px 2px', borderRadius: 6, textAlign: 'center', cursor: 'pointer', fontSize: 9,
-                  background: builderStep === s ? 'rgba(0,230,138,0.15)' : 'var(--bg-secondary)',
-                  border: builderStep === s ? '1px solid var(--accent)' : '1px solid var(--border)',
-                  color: builderStep === s ? 'var(--accent)' : 'var(--text-dim)', fontWeight: builderStep === s ? 700 : 400,
-                }}>
-                  Шаг {s}
+                <div key={s} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <div onClick={() => setBuilderStep(s)} style={{
+                    width: 18, height: 18, borderRadius: '50%', cursor: 'pointer',
+                    background: builderStep === s ? 'var(--accent)' : 'var(--bg-secondary)',
+                    border: builderStep === s ? '2px solid var(--accent)' : '2px solid var(--border)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: 8, fontWeight: 700, color: builderStep === s ? '#000' : 'var(--text-dim)',
+                  }}>{s}</div>
+                  <span style={{ fontSize: 9, color: builderStep === s ? 'var(--text-light)' : 'var(--text-dim)', fontWeight: builderStep === s ? 600 : 400 }}>
+                    {s === 1 ? 'Параметры' : s === 2 ? 'Сплит' : s === 3 ? 'Упражнения' : 'Цикл'}
+                  </span>
+                  {s < 4 && <span style={{ color: 'var(--text-dim)', fontSize: 8, marginLeft: 2 }}>→</span>}
                 </div>
               ))}
             </div>
@@ -1932,7 +1937,7 @@ export const TrainingScreen: React.FC = () => {
                 <div style={{ background: 'rgba(0,230,138,0.06)', borderRadius: 8, padding: 10, marginBottom: 8, border: '1px solid rgba(0,230,138,0.12)' }}>
                   <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--accent)' }}>🏆 {builderSplit.name}</div>
                   <div style={{ fontSize: 9, color: 'var(--text-light)', marginTop: 3 }}>{builderSplit.desc}</div>
-                  <div style={{ fontSize: 9, color: 'var(--accent)', marginTop: 3 }}>Score: {builderSplit.score?.toFixed(0) || '—'}</div>
+                  <div style={{ fontSize: 9, color: 'var(--accent)', marginTop: 3 }}>Score: {((builderSplit.score || 0) * 100).toFixed(0)}%</div>
                   {builderSplit.rationale && <div style={{ fontSize: 8, color: 'var(--text-dim)', marginTop: 3 }}>{builderSplit.rationale.join(' · ')}</div>}
                 </div>
               ) : (
@@ -1941,21 +1946,39 @@ export const TrainingScreen: React.FC = () => {
               {(() => {
                 const inp = { goal, level, daysPerWeek, recovery, fatigue, nutrition: 7, weakPoints, sessionDuration: 60, exercises: [] } as TrainingInput;
                 const topSplits = getSplitOptions(inp);
+                const top10 = topSplits.slice(0, 10);
+                const rest = topSplits.slice(10);
                 return (
-                  <details style={{ marginBottom: 8 }}>
-                    <summary style={{ fontSize: 9, fontWeight: 600, color: 'var(--text-light)', cursor: 'pointer' }}>Все варианты сплитов ({topSplits.length})</summary>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 3, marginTop: 4, maxHeight: 160, overflowY: 'auto' }}>
-                      {topSplits.map((s, i) => (
+                  <div style={{ marginBottom: 8 }}>
+                    <div style={{ fontSize: 9, fontWeight: 600, color: 'var(--text-light)', marginBottom: 4 }}>Топ-10 сплитов</div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 3, maxHeight: 200, overflowY: 'auto', marginBottom: 4 }}>
+                      {top10.map((s, i) => (
                         <div key={i} onClick={() => { setBuilderSplit(s); setSplitType(s.id || 'auto'); }} style={{ padding: '4px 8px', borderRadius: 6, cursor: 'pointer', background: builderSplit?.name === s.name ? 'rgba(0,230,138,0.08)' : 'var(--bg-secondary)', border: builderSplit?.name === s.name ? '1px solid var(--accent)' : '1px solid var(--border)' }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                             <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-light)' }}>{s.name}</span>
-                            <span style={{ fontSize: 8, fontWeight: 700, color: 'var(--accent)' }}>{s.score?.toFixed(0)}</span>
+                            <span style={{ fontSize: 8, fontWeight: 700, color: 'var(--accent)' }}>{(s.score * 100).toFixed(0)}%</span>
                           </div>
-                          <div style={{ fontSize: 7, color: 'var(--text-dim)', marginTop: 1 }}>{s.desc}</div>
+                          <div style={{ fontSize: 7, color: 'var(--text-dim)', marginTop: 1 }}>{s.desc}{s.rationale ? ' · ' + s.rationale.slice(0, 3).join(' | ') : ''}</div>
                         </div>
                       ))}
                     </div>
-                  </details>
+                    {rest.length > 0 && (
+                      <details>
+                        <summary style={{ fontSize: 9, fontWeight: 600, color: 'var(--accent)', cursor: 'pointer' }}>Показать все сплиты ({topSplits.length})</summary>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 3, marginTop: 4, maxHeight: 160, overflowY: 'auto' }}>
+                          {rest.map((s, i) => (
+                            <div key={i} onClick={() => { setBuilderSplit(s); setSplitType(s.id || 'auto'); }} style={{ padding: '4px 8px', borderRadius: 6, cursor: 'pointer', background: builderSplit?.name === s.name ? 'rgba(0,230,138,0.08)' : 'var(--bg-secondary)', border: builderSplit?.name === s.name ? '1px solid var(--accent)' : '1px solid var(--border)' }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-light)' }}>{s.name}</span>
+                                <span style={{ fontSize: 8, fontWeight: 700, color: 'var(--accent)' }}>{(s.score * 100).toFixed(0)}%</span>
+                              </div>
+                              <div style={{ fontSize: 7, color: 'var(--text-dim)', marginTop: 1 }}>{s.desc}</div>
+                            </div>
+                          ))}
+                        </div>
+                      </details>
+                    )}
+                  </div>
                 );
               })()}
               <div style={{ display: 'flex', gap: 6 }}>
@@ -2844,6 +2867,16 @@ const GOAL_FILTER_OPTIONS: { value: string; label: string; goal?: string }[] = [
   { value: 'peaking', label: 'Сушка' },
 ];
 
+const PROGRAM_LEVEL_MAP: Record<string, string> = {
+  novice: 'Новичок', beginner: 'Начинающий', intermediate: 'Средний', advanced: 'Продвинутый', elite: 'Элитный', enhanced: 'Enhanced',
+};
+const PROGRAM_GOAL_MAP: Record<string, string> = {
+  strength: 'Сила', hypertrophy: 'Масса', peaking: 'Сушка', powerlifting: 'Пауэрлифтинг', bodybuilding: 'Бодибилдинг', general: 'Общее', mass: 'Масса', conditioning: 'Кондиция', weightloss: 'Похудение',
+};
+const PROGRAM_EQUIP_MAP: Record<string, string> = {
+  barbell: 'Штанга', dumbbell: 'Гантели', machine: 'Тренажёр', cable: 'Блок', bodyweight: 'Вес тела', bench: 'Скамья', rack: 'Стойка', kettlebell: 'Гиря', band: 'Резинка',
+};
+
 const ProgramsTab: React.FC = () => {
   const [selectedId, setSelectedId] = React.useState<string | null>(null);
   const [goalFilter, setGoalFilter] = React.useState('all');
@@ -2890,13 +2923,13 @@ const ProgramsTab: React.FC = () => {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
               <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--text)' }}>{p.name}</div>
               <span style={{ fontSize: 9, padding: '2px 8px', borderRadius: 10, background: 'rgba(0,230,138,0.1)', color: 'var(--accent)', fontWeight: 600 }}>
-                {p.goal === 'strength' ? 'Сила' : p.goal === 'hypertrophy' ? 'Масса' : p.goal === 'peaking' ? 'Сушка' : p.goal}
+                {PROGRAM_GOAL_MAP[p.goal] || p.goal}
               </span>
             </div>
             <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 6 }}>{p.description}</div>
             <div style={{ display: 'flex', gap: 10, fontSize: 9, color: 'var(--text-light)' }}>
               <span>Автор: <b>{p.author}</b></span>
-              <span>Уровень: <b style={{ color: 'var(--accent)' }}>{p.level}</b></span>
+              <span>Уровень: <b style={{ color: 'var(--accent)' }}>{PROGRAM_LEVEL_MAP[p.level] || p.level}</b></span>
               <span>{p.daysPerWeek} дн/нед</span>
               <span>{p.durationWeeks} нед</span>
             </div>
@@ -2922,11 +2955,11 @@ const ProgramsTab: React.FC = () => {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 4, fontSize: 10, marginBottom: 8 }}>
             <div style={{ background: 'rgba(0,230,138,0.05)', borderRadius: 8, padding: 8, textAlign: 'center' }}>
               <div style={{ color: 'var(--text-dim)', fontSize: 8 }}>Уровень</div>
-              <div style={{ fontWeight: 700, color: 'var(--accent)' }}>{selected.level}</div>
+              <div style={{ fontWeight: 700, color: 'var(--accent)' }}>{PROGRAM_LEVEL_MAP[selected.level] || selected.level}</div>
             </div>
             <div style={{ background: 'rgba(0,230,138,0.05)', borderRadius: 8, padding: 8, textAlign: 'center' }}>
               <div style={{ color: 'var(--text-dim)', fontSize: 8 }}>Цель</div>
-              <div style={{ fontWeight: 700, color: 'var(--accent)' }}>{selected.goal}</div>
+              <div style={{ fontWeight: 700, color: 'var(--accent)' }}>{PROGRAM_GOAL_MAP[selected.goal] || selected.goal}</div>
             </div>
             <div style={{ background: 'rgba(0,230,138,0.05)', borderRadius: 8, padding: 8, textAlign: 'center' }}>
               <div style={{ color: 'var(--text-dim)', fontSize: 8 }}>Дней/нед</div>
@@ -2935,7 +2968,7 @@ const ProgramsTab: React.FC = () => {
           </div>
 
           <div style={{ fontSize: 10, color: 'var(--text-light)', marginBottom: 4 }}>
-            <b>Снаряжение:</b> {selected.equipmentNeeded.join(', ')}
+            <b>Снаряжение:</b> {selected.equipmentNeeded.map(e => PROGRAM_EQUIP_MAP[e] || e).join(', ')}
           </div>
           <div style={{ fontSize: 10, color: 'var(--text-light)', marginBottom: 4 }}>
             <b>Прогрессия:</b> {selected.progressionModel}
@@ -2982,7 +3015,7 @@ const ProgramsTab: React.FC = () => {
             return (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                 <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 2 }}>
-                  Фаза: <b>{wk.phase}</b> | Объём: {wk.volumeMultiplier}× | Интенсивность: {wk.intensityMultiplier}×
+                  Фаза: <b>{PHASE_LABELS[wk.phase] || wk.phase}</b> | Объём: {wk.volumeMultiplier}× | Интенсивность: {wk.intensityMultiplier}×
                   {wk.deload ? ' | 🟢 Разгрузка' : ''}
                 </div>
                 {wk.days.map((day, di) => (
@@ -2995,6 +3028,13 @@ const ProgramsTab: React.FC = () => {
                     </div>
                     <div style={{ fontSize: 8, color: 'var(--text-dim)', marginBottom: 6 }}>
                       Разминка: {day.warmup} | Заминка: {day.cooldown}
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '2px 8px', borderRadius: 4, marginBottom: 2, fontSize: 8, color: 'var(--text-dim)', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                      <span style={{ flex: 1 }}>Упражнение</span>
+                      <span style={{ minWidth: 50, textAlign: 'center' }}>Подходы</span>
+                      <span style={{ minWidth: 35, textAlign: 'center' }}>RPE</span>
+                      <span style={{ minWidth: 30, textAlign: 'center' }}>RIR</span>
+                      <span style={{ minWidth: 35, textAlign: 'center' }}>Отдых</span>
                     </div>
                     {day.exercises.map((ex, ei) => (
                       <div key={ei} style={{
