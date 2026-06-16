@@ -1422,6 +1422,8 @@ export const ProfileScreen: React.FC = () => {
               `МЕДИКАМЕНТОЗНАЯ ТЕРАПИЯ`,
               `  Препараты на курсе: ${medsList}`,
               `  БАДы и поддержка: ${suppsList}`,
+              ...(riskData?.systemSupport ? RISK_SYSTEMS.filter(sys => riskData.systemSupport[sys] !== undefined).map(sys => `    ${(sysLabels[sys] || sys).padEnd(20)} покрытие ${Math.round(riskData.systemSupport[sys])}%`) : []),
+              `  Общее покрытие поддержки: ${riskData?.totalSupport ? Math.round(riskData.totalSupport) + '%' : '—'}`,
               ``,
               `ХРОНИЧЕСКИЕ ЗАБОЛЕВАНИЯ`,
               `  ${chronicList}`,
