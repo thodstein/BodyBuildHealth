@@ -5236,13 +5236,17 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
 
       {/* ===== SUPPORT CALCULATOR — FULL DATA-INTEGRATED OVERHAUL ===== */}
       {tab === 'main' && supportView === 'calc' && calcView === 'calculator' && (() => {
+        try {
+        if (!linked || !linked.profile) {
+          return <div style={{ padding:40, textAlign:'center', color:'var(--text-dim)' }}>Загрузка данных...</div>;
+        }
         const weightKg = linked.profile?.settings?.weight ?? 80;
         const age = linked.profile?.settings?.age ?? 30;
         const sex = linked.profile?.settings?.sex ?? 'male';
         const course = linked.course || [];
         const labs = linked.labs || [];
-        const riskData = linked.risk;
-        const labAnalysis = linked.labAnalysis;
+        const riskData = linked.risk || null;
+        const labAnalysis = linked.labAnalysis || null;
         const planSavedLocal = planSaved;
 
         const SYSTEM_LABELS_RU: Record<string, { name: string; emoji: string; rec: string }> = {
@@ -5849,6 +5853,7 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
           </div>
         </div>
         );
+        } catch(e) { return <div style={{ padding:40, textAlign:'center', color:'#ef4444', background:'var(--bg-secondary)', borderRadius:12, margin:20 }}>⚠️ Ошибка калькулятора: {String(e)}<br/><button onClick={() => setCalcView('main')} style={{ marginTop:12, padding:'6px 16px', borderRadius:8, cursor:'pointer', background:'var(--accent)', border:'none', color:'#000', fontWeight:600 }}>← Назад</button></div>; }
       })()}
 
       {/* ===== PEPTIDE CALCULATOR ===== */}
