@@ -955,6 +955,66 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   const [manualFilter, setManualFilter] = useState<string>('all');
   const [manualResult, setManualResult] = useState<OptimizerStackResult | null>(null);
 
+  // Neurotoxicity calculator state
+  const courseCompounds = useMemo(() => (linked.course || []).map(c => {
+    const ph = PHARMA_DB[c.substanceId];
+    return { substanceId: c.substanceId, name: ph?.name || c.substanceId, cls: ph?.class || 'other', doseWeekly: (c.doseValue * (typeof c.frequency === 'number' ? c.frequency : 1)), startWeek: c.startWeek, endWeek: c.endWeek };
+  }), [linked.course]);
+  const uniqueCompounds = useMemo(() => {
+    const map = new Map<string, { substanceId: string; name: string; cls: string; doseWeekly: number; startWeek: number; endWeek: number }>();
+    courseCompounds.forEach(c => {
+      const ex = map.get(c.cls);
+      map.set(c.cls, ex ? { ...ex, doseWeekly: ex.doseWeekly + c.doseWeekly } : c);
+    });
+    return Array.from(map.values());
+  }, [courseCompounds]);
+  const [neuroSelected, setNeuroSelected] = useState<string[]>(() => uniqueCompounds.map(c => c.cls));
+  const [neuroDoses, setNeuroDoses] = useState<Record<string, number>>(() => {
+    const d: Record<string, number> = {};
+    uniqueCompounds.forEach(c => { d[c.cls] = c.doseWeekly; });
+    return d;
+  });
+  const [neuroDuration, setNeuroDuration] = useState<number>(() => {
+    if (uniqueCompounds.length === 0) return 8;
+    const activeCourses = uniqueCompounds.filter(c => c.endWeek > 0);
+    return activeCourses.length > 0 ? Math.max(...activeCourses.map(c => c.endWeek - c.startWeek), 8) : 8;
+  });
+  const [neuroAge, setNeuroAge] = useState<number>(() => {
+    const dob = linked.profile?.settings?.dateOfBirth;
+    if (dob) { const age = Math.floor((Date.now() - new Date(dob).getTime()) / 31557600000); return age > 0 ? age : 30; }
+    return 30;
+  });
+
+  const CLASS_RISK: Record<string, number> = {
+    trenbolone: 0.9, nandrolone: 0.8, stanozolol: 0.7, boldenone: 0.5,
+    oxandrolone: 0.4, masteron: 0.3, primobolan: 0.2, testosterone: 0.3,
+  };
+  const neuroScore = useMemo(() => {
+    if (neuroSelected.length === 0) return 0;
+    let totalRisk = 0;
+    neuroSelected.forEach(cls => {
+      const riskFactor = CLASS_RISK[cls] ?? 0.2;
+      const dose = neuroDoses[cls] || 0;
+      let doseMultiplier = 1;
+      if (cls === 'testosterone' && dose > 500) doseMultiplier = 1.5;
+      else if (cls === 'testosterone' && dose <= 500) doseMultiplier = 0.3;
+      totalRisk += riskFactor * (dose / 500) * doseMultiplier * (neuroDuration / 8);
+    });
+    const ageFactor = Math.max(0.5, Math.min(2, 30 / Math.max(18, neuroAge)));
+    const rawScore = totalRisk * ageFactor * 100;
+    return Math.min(100, Math.round(rawScore));
+  }, [neuroSelected, neuroDoses, neuroDuration, neuroAge]);
+  const supportStack = useMemo(() => [
+    { name:'NAC (N-ацетилцистеин)', dose: neuroScore * 20, unit:'мг', timing:'Утро + вечер, после еды' },
+    { name:'Альфа-липоевая кислота (ALA)', dose: neuroScore * 10, unit:'мг', timing:'Утро, натощак за 30 мин' },
+    { name:'Омега-3 (EPA+DHA)', dose: neuroScore * 50, unit:'мг', timing:'Утро + вечер, с едой' },
+    { name:'Коэнзим Q10', dose: neuroScore * 5, unit:'мг', timing:'Утро, с жирной пищей' },
+    { name:'Магний L-треонат', dose: neuroScore * 15, unit:'мг', timing:'Вечер, за 1ч до сна' },
+    { name:'Lion\'s Mane (Ежовик)', dose: neuroScore * 20, unit:'мг', timing:'Утро, натощак' },
+    { name:'Прегненолон', dose: Math.round(neuroScore * 0.5 * 10) / 10, unit:'мг', timing:'Утро, сублингвально' },
+    { name:'DHEA', dose: Math.round(neuroScore * 0.8 * 10) / 10, unit:'мг', timing:'Утро' },
+  ], [neuroScore]);
+
   const SUPPORT_LEVELS: Record<string, { label: string; desc: string; subs: string[]; dosages: Record<string, { mg: number; timing: string }> }> = {
     basic: { label: '🟢 База', desc: 'Бюджетный минимум — 5 добавок для базового покрытия рисков', subs: ['nac', 'omega3', 'vitamin_d3', 'zinc', 'magnesium'], dosages: { nac: { mg: 600, timing: 'утро, натощак' }, omega3: { mg: 2000, timing: 'с едой, завтрак' }, vitamin_d3: { mg: 5000, timing: 'с едой, завтрак (МЕ)' }, zinc: { mg: 15, timing: 'на ночь' }, magnesium: { mg: 200, timing: 'на ночь' } } },
     mid: { label: '🟡 Средний', desc: 'Стандартная поддержка курса — 11 добавок', subs: ['nac', 'omega3', 'tudca', 'magnesium', 'vitamin_d3', 'coq10', 'zinc', 'vitamin_k2', 'vitamin_b12', 'glucosamine', 'collagen'], dosages: { nac: { mg: 1200, timing: 'утро, натощак' }, omega3: { mg: 3000, timing: 'с едой, завтрак' }, tudca: { mg: 500, timing: 'перед едой' }, magnesium: { mg: 400, timing: 'на ночь' }, vitamin_d3: { mg: 5000, timing: 'с едой, завтрак (МЕ)' }, coq10: { mg: 200, timing: 'с едой, завтрак' }, zinc: { mg: 30, timing: 'на ночь, натощак' }, vitamin_k2: { mg: 200, timing: 'с едой, обед (мкг)' }, vitamin_b12: { mg: 1000, timing: 'утро (мкг)' }, glucosamine: { mg: 1500, timing: 'с едой' }, collagen: { mg: 10000, timing: 'с едой, утро (мг)' } } },
@@ -1790,13 +1850,44 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
         <div style={{ position:'fixed', inset:0, zIndex:100, display:'flex', flexDirection:'column' }}>
           <img src="/calc-hero.jpg" alt="" style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'cover', objectPosition:'center top' }} />
           <div style={{ position:'absolute', inset:0, background:'linear-gradient(transparent 50%, rgba(0,0,0,0.85))' }} />
-          <div style={{ position:'relative', zIndex:2, flex:1, display:'flex', flexDirection:'column', justifyContent:'flex-end', padding:'16px 16px 80px' }}>
+          <div style={{ position:'relative', zIndex:2, flex:1, display:'flex', flexDirection:'column', padding:'16px 16px 80px', overflow:'hidden' }}>
             <button onClick={() => setSupportView('main')} style={{ alignSelf:'flex-start', padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', marginBottom:8, background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← Назад</button>
             <h2 style={{ fontSize:18, fontWeight:800, color:'#fff', margin:'8px 0 2px', textShadow:'0 2px 10px rgba(0,0,0,0.9)' }}>Расчет поддержки</h2>
             <p style={{ fontSize:10, color:'rgba(255,255,255,0.9)', margin:'0 0 16px', textShadow:'0 1px 6px rgba(0,0,0,0.8)' }}>
               Калькулятор поддержки, пептидный калькулятор и общая информация
             </p>
-            <div style={{ display:'flex', gap:6, marginTop:12, overflowX:'auto', scrollbarWidth:'none', flexWrap:'wrap' }}>
+            {/* PRIMARY: Apple-style large cards */}
+            <div style={{ flex:1, overflowY:'auto', scrollbarWidth:'none', msOverflowStyle:'none', paddingRight:4 }}>
+              <div style={{ display:'flex', flexDirection:'column', gap:8, paddingBottom:8 }}>
+                {[
+                  { icon:'🧮', title:'Калькулятор поддержки', desc:'Персонализированный расчёт поддержки по курсу, рискам и целям', color:'#00e68a', action:() => setCalcView('calculator') },
+                  { icon:'🧬', title:'Пептидный калькулятор', desc:'Расчёт дозировок, баков, разведения и протоколов пептидов', color:'#a78bfa', action:() => setCalcView('peptides') },
+                  { icon:'ℹ️', title:'Общая информация', desc:'Каталог веществ, синергии, готовые стеки и взаимодействия', color:'#60a5fa', action:() => { setCalcView('info'); setInfoView('catalog'); } },
+                  { icon:'🔬', title:'Исследования', desc:'Научная база исследований по всем веществам поддержки', color:'#f59e0b', action:() => { setCalcView('info'); setInfoView('research'); } },
+                  { icon:'🧮', title:'Генератор стеков', desc:'Автоматический подбор стека по органам, целям и биомаркерам', color:'#ec4899', action:() => setCalcView('stackcalc') },
+                  { icon:'📂', title:'Мои стеки', desc:'Сохранённые персональные стеки с оценкой синергий и конфликтов', color:'#22c55e', action:() => setCalcView('mystacks') },
+                  { icon:'⚡', title:'Тренировочные миксы', desc:'Пре-/интра-/пост-тренировочные стеки для пампа, силы и восстановления', color:'#f97316', action:() => setCalcView('mixcalc') },
+                  { icon:'📅', title:'План поддержки', desc:'Дневной, недельный и месячный план приёма по тайм-слотам', color:'#84cc16', action:() => setCalcView('plan') },
+                  { icon:'🧠', title:'Нейротоксичность', desc:'Калькулятор нейротоксичности ААС и протокол нейропротекции', color:'#ec4899', action:() => setCalcView('neuro') },
+                  { icon:'⚕️', title:'ГЗТ', desc:'Протоколы гормонозаместительной терапии и мониторинг', color:'#8b5cf6', action:() => setCalcView('hrt') },
+                ].map((card, i) => (
+                  <div key={i} onClick={card.action} style={{
+                    display:'flex', alignItems:'center', gap:12, padding:'12px 14px', borderRadius:14, cursor:'pointer',
+                    background:'rgba(20,22,30,0.35)', border:'1px solid var(--glass-border)', color:'var(--text)',
+                    transition:'all 0.2s', backdropFilter:'blur(10px)', WebkitBackdropFilter:'blur(10px)',
+                  }}>
+                    <div style={{ width:44, height:44, borderRadius:12, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, background:`${card.color}18`, fontSize:20 }}>{card.icon}</div>
+                    <div style={{ flex:1, minWidth:0 }}>
+                      <div style={{ fontSize:13, fontWeight:700, marginBottom:2, color:card.color }}>{card.title}</div>
+                      <div style={{ fontSize:10, color:'rgba(255,255,255,0.85)', lineHeight:1.3 }}>{card.desc}</div>
+                    </div>
+                    <span style={{ color:card.color, fontSize:16, opacity:0.6 }}>→</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+            {/* SECONDARY: compact pills */}
+            <div style={{ display:'flex', gap:6, marginTop:10, overflowX:'auto', scrollbarWidth:'none', flexWrap:'wrap', flexShrink:0 }}>
               <button onClick={() => { setCalcView('info'); setInfoView('research'); }} style={{ padding:'6px 12px', borderRadius:16, fontSize:9, fontWeight:700, whiteSpace:'nowrap', cursor:'pointer', flexShrink:0, background:'var(--bg-secondary)', color:'var(--text-dim)', border:'1px solid var(--border)' }}>🔬 Исследования</button>
               <button onClick={() => setCalcView('stackcalc')} style={{ padding:'6px 12px', borderRadius:16, fontSize:9, fontWeight:700, whiteSpace:'nowrap', cursor:'pointer', flexShrink:0, background:'var(--bg-secondary)', color:'var(--text-dim)', border:'1px solid var(--border)' }}>🧮 Генератор</button>
               <button onClick={() => setCalcView('mystacks')} style={{ padding:'6px 12px', borderRadius:16, fontSize:9, fontWeight:700, whiteSpace:'nowrap', cursor:'pointer', flexShrink:0, background:'var(--bg-secondary)', color:'var(--text-dim)', border:'1px solid var(--border)' }}>📂 Мои стеки</button>
@@ -1811,7 +1902,10 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
 
       {tab === 'main' && supportView === 'calc' && calcView === 'info' && (
         <div style={{ padding:'0 0 70px', height:'100vh', display:'flex', flexDirection:'column' }}>
-          <button onClick={() => setCalcView('main')} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', marginBottom:6, background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600, alignSelf:'flex-start' }}>← Назад</button>
+          <div style={{ display:'flex', gap:6, marginBottom:6 }}>
+            <button onClick={() => setCalcView('main')} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← Назад</button>
+            <button onClick={() => setSupportView('main')} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← На главную Поддержки</button>
+          </div>
           {/* Pills */}
           <div style={{ display:'flex', gap:4, marginBottom:8, overflowX:'auto', scrollbarWidth:'none', flexShrink:0 }}>
             {(['catalog','synergies','stacks','interactions','research'] as const).map(t => (
@@ -4154,7 +4248,10 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
       {/* ===== STACKCALC IN CALC VIEW ===== */}
       {tab === 'main' && supportView === 'calc' && calcView === 'stackcalc' && (
         <div style={{ padding:'0 0 70px' }}>
-          <button onClick={() => setCalcView('main')} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', marginBottom:6, background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← Назад</button>
+          <div style={{ display:'flex', gap:6, marginBottom:6 }}>
+            <button onClick={() => setCalcView('main')} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← Назад</button>
+            <button onClick={() => setSupportView('main')} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← На главную Поддержки</button>
+          </div>
           {safeRender('calc_stackcalc', () => {
             const organList = [
               {key:'cardio',label:'❤️ Сердце/Сосуды',organs:['heart','vessels','cardiovascular']},
@@ -4317,7 +4414,10 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
       {/* ===== MYSTACKS IN CALC VIEW ===== */}
       {tab === 'main' && supportView === 'calc' && calcView === 'mystacks' && (
         <div style={{ padding:'0 0 80px' }}>
-          <button onClick={() => setCalcView('main')} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', marginBottom:6, background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← Назад</button>
+          <div style={{ display:'flex', gap:6, marginBottom:6 }}>
+            <button onClick={() => setCalcView('main')} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← Назад</button>
+            <button onClick={() => setSupportView('main')} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← На главную Поддержки</button>
+          </div>
           <h2 style={{ margin:'0 0 6px', fontSize:16, fontWeight:800, color:'var(--accent)' }}>📂 Мои стеки</h2>
           <p style={{ fontSize:10, color:'var(--text-dim)', margin:'0 0 12px' }}>Сохранённые стеки поддержки из калькулятора. Выберите уровень, рассчитайте и сохраните.</p>
           <div className="card" style={{ marginBottom:10, padding:10 }}>
@@ -4370,7 +4470,10 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
       {/* ===== MIX CALCULATOR: Training Mix ===== */}
       {tab === 'main' && supportView === 'calc' && calcView === 'mixcalc' && (
         <div style={{ padding:'0 0 80px', height:'100vh', display:'flex', flexDirection:'column' }}>
-          <button onClick={() => setCalcView('main')} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', marginBottom:6, background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600, alignSelf:'flex-start' }}>← Назад</button>
+          <div style={{ display:'flex', gap:6, marginBottom:6 }}>
+            <button onClick={() => setCalcView('main')} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← Назад</button>
+            <button onClick={() => setSupportView('main')} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← На главную Поддержки</button>
+          </div>
           <div style={{ flex:1, overflowY:'auto', paddingRight:4 }}>
             <h2 style={{ margin:'0 0 2px', fontSize:16, fontWeight:800, color:'var(--accent)' }}>⚡ Миксы для тренировки</h2>
             <p style={{ fontSize:10, color:'var(--text-dim)', margin:'0 0 12px' }}>Калькулятор пре-/интра-/пост-тренировочных стеков</p>
@@ -4531,7 +4634,10 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
       {/* ===== SUPPORT PLAN VIEW ===== */}
       {tab === 'main' && supportView === 'calc' && calcView === 'plan' && (
         <div style={{ padding:'0 0 80px' }}>
-          <button onClick={() => setCalcView('main')} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', marginBottom:6, background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← Назад</button>
+          <div style={{ display:'flex', gap:6, marginBottom:6 }}>
+            <button onClick={() => setCalcView('main')} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← Назад</button>
+            <button onClick={() => setSupportView('main')} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← На главную Поддержки</button>
+          </div>
           <h2 style={{ margin:'0 0 2px', fontSize:16, fontWeight:800, color:'var(--accent)' }}>📅 План поддержки</h2>
           <p style={{ fontSize:10, color:'var(--text-dim)', margin:'0 0 12px' }}>Сгенерирован из уровня: {SUPPORT_LEVELS[supportLevel]?.label || supportLevel}</p>
           <div style={{ display:'flex', gap:6, marginBottom:10 }}>
@@ -4697,60 +4803,199 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
         </div>
       )}
 
+      {/* ===== SUPPORT CALCULATOR (redirect to info catalog) ===== */}
+      {tab === 'main' && supportView === 'calc' && calcView === 'calculator' && (
+        <div style={{ padding:'0 0 80px', height:'100vh', display:'flex', flexDirection:'column' }}>
+          <div style={{ display:'flex', gap:6, marginBottom:6 }}>
+            <button onClick={() => setCalcView('main')} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← Назад</button>
+            <button onClick={() => setSupportView('main')} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← На главную Поддержки</button>
+          </div>
+          <h2 style={{ margin:'0 0 4px', fontSize:16, fontWeight:800, color:'var(--accent)' }}>🧮 Калькулятор поддержки</h2>
+          <p style={{ fontSize:10, color:'var(--text-dim)', margin:'0 0 12px' }}>Персонализированный расчёт поддержки по курсу, рискам и целям.</p>
+          <div style={{ flex:1, overflowY:'auto', paddingRight:4 }}>
+            <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:14, marginBottom:10, border:'1px solid var(--border)' }}>
+              <h4 style={{ margin:'0 0 8px', fontSize:12, color:'var(--text)' }}>⚙️ Параметры расчёта</h4>
+              <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                <div>
+                  <div style={{ fontSize:9, color:'var(--text-dim)', marginBottom:4 }}>Уровень поддержки</div>
+                  <div style={{ display:'flex', gap:4, flexWrap:'wrap' }}>
+                    {(['basic','mid','max','boost'] as const).map(l => (
+                      <button key={l} onClick={() => setSupportLevel(l)} style={{
+                        padding:'6px 14px', borderRadius:16, fontSize:10, fontWeight:700, cursor:'pointer',
+                        background: supportLevel === l ? 'var(--accent)' : 'var(--bg-secondary)',
+                        color: supportLevel === l ? '#000' : 'var(--text-dim)',
+                        border: `1px solid ${supportLevel === l ? 'var(--accent)' : 'var(--border)'}`,
+                      }}>{l === 'basic' ? 'Базовый' : l === 'mid' ? 'Средний' : l === 'max' ? 'Максимум' : 'Boost'}</button>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <div style={{ fontSize:9, color:'var(--text-dim)', marginBottom:4 }}>Цель цикла</div>
+                  <select value={supportGoal} onChange={e => setSupportGoal(e.target.value)} style={{ width:'100%', padding:'8px 10px', borderRadius:8, border:'1px solid var(--border)', background:'rgba(0,0,0,0.2)', color:'var(--text)', fontSize:11 }}>
+                    <option value="muscle_gain">💪 Набор массы</option>
+                    <option value="fat_loss">🔥 Жиросжигание</option>
+                    <option value="recomp">🔄 Рекомпозиция</option>
+                    <option value="strength">🏋️ Сила</option>
+                    <option value="endurance">🏃 Выносливость</option>
+                    <option value="health">❤️ Здоровье</option>
+                  </select>
+                </div>
+                <button onClick={() => {
+                  try {
+                    const input: SupportInput = { substances: SUPPORT_LEVELS[supportLevel]?.subs || [], goals: [supportGoal], drugDoses: {}, labs: [] };
+                    const result = calculateSupport(input);
+                    setSupportResult(result);
+                  } catch { }
+                }} style={{ padding:'10px', borderRadius:8, border:'none', cursor:'pointer', background:'linear-gradient(135deg,#00e68a,#00c853)', color:'#000', fontWeight:800, fontSize:12 }}>📐 Рассчитать</button>
+              </div>
+            </div>
+            {supportResult && (
+              <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:14, border:'1px solid var(--border)' }}>
+                <h4 style={{ margin:'0 0 8px', fontSize:12, color:'var(--accent)' }}>📊 Результат</h4>
+                <div style={{ fontSize:10, color:'var(--text-dim)' }}>
+                  <div>Риск до: {supportResult.riskBeforeSupport}% → После: {supportResult.riskAfterSupport}%</div>
+                  <div style={{ marginTop:6 }}>
+                    <div style={{ fontWeight:600, color:'var(--text)', marginBottom:4 }}>Системное покрытие:</div>
+                    {Object.entries(supportResult.systemSupport || {}).map(([k,v]) => (
+                      <div key={k} style={{ display:'flex', justifyContent:'space-between', fontSize:9, marginBottom:2 }}>
+                        <span>{k}</span>
+                        <span style={{ color:v > 50 ? '#22c55e' : v > 30 ? '#f59e0b' : '#ef4444' }}>{v}%</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+            <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:14, marginTop:10, border:'1px solid var(--border)' }}>
+              <h4 style={{ margin:'0 0 6px', fontSize:12, color:'#60a5fa' }}>💡 Подсказки</h4>
+              <p style={{ fontSize:9, color:'var(--text-dim)', lineHeight:1.5, margin:0 }}>
+                Для детального просмотра каталога, синергий, стеков и плана используйте соответствующие разделы в меню.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ===== PEPTIDE CALCULATOR ===== */}
+      {tab === 'main' && supportView === 'calc' && calcView === 'peptides' && (
+        <div style={{ padding:'0 0 80px', height:'100vh', display:'flex', flexDirection:'column' }}>
+          <div style={{ display:'flex', gap:6, marginBottom:6 }}>
+            <button onClick={() => setCalcView('main')} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← Назад</button>
+            <button onClick={() => setSupportView('main')} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← На главную Поддержки</button>
+          </div>
+          <h2 style={{ margin:'0 0 4px', fontSize:16, fontWeight:800, color:'#a78bfa' }}>🧬 Пептидный калькулятор</h2>
+          <p style={{ fontSize:10, color:'var(--text-dim)', margin:'0 0 12px' }}>Расчёт дозировок, баков, разведения и протоколов пептидов.</p>
+          <div style={{ flex:1, overflowY:'auto', paddingRight:4 }}>
+            <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:14, marginBottom:10, border:'1px solid var(--border)' }}>
+              <h4 style={{ margin:'0 0 8px', fontSize:12, color:'var(--text)' }}>🧪 Выберите пептид</h4>
+              <div style={{ display:'flex', flexWrap:'wrap', gap:4, marginBottom:12 }}>
+                {PEPTIDE_LIST.slice(0, 12).map(p => (
+                  <span key={p.id} style={{
+                    padding:'6px 10px', borderRadius:16, fontSize:9, fontWeight:600, whiteSpace:'nowrap',
+                    background:'var(--bg-secondary)', color:'var(--text-dim)', border:'1px solid var(--border)',
+                  }}>{p.name}</span>
+                ))}
+              </div>
+            </div>
+            <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:14, border:'1px solid var(--border)' }}>
+              <h4 style={{ margin:'0 0 6px', fontSize:12, color:'#60a5fa' }}>💡 Информация</h4>
+              <p style={{ fontSize:9, color:'var(--text-dim)', lineHeight:1.5, margin:0 }}>
+                Для детального расчёта дозировок, баков, разведения и протоколов пептидов перейдите во вкладку "Пептиды" основного меню или нажмите кнопку "Фарма" в панели навигации. Там доступен полный пептидный калькулятор с PK/PD моделированием.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ===== NEUROTOXICITY CALCULATOR ===== */}
-      {tab === 'main' && supportView === 'calc' && calcView === 'neuro' && (
+      {tab === 'main' && supportView === 'calc' && calcView === 'neuro' && (() => {
+        const neuroColor = neuroScore < 30 ? '#22c55e' : neuroScore < 50 ? '#f59e0b' : neuroScore < 70 ? '#f97316' : '#ef4444';
+        const neuroLabel = neuroScore < 30 ? 'Низкий' : neuroScore < 50 ? 'Средний' : neuroScore < 70 ? 'Высокий' : 'Критический';
+
+        return (
         <div style={{ padding:'0 0 80px' }}>
           <button onClick={() => setCalcView('main')} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', marginBottom:6, background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← Назад</button>
-          <h2 style={{ margin:'0 0 4px', fontSize:16, fontWeight:800, color:'#ec4899' }}>🧠 Нейротоксичность ААС</h2>
-          <p style={{ fontSize:10, color:'var(--text-dim)', margin:'0 0 10px', lineHeight:1.4 }}>
-            Анаболические стероиды повреждают нейроны гипоталамуса, нарушают GnRH-нейроны, GABA-рецепторы и сигнализацию кисспептина, вызывая депрессию, агрессию и когнитивные нарушения.
+          <button onClick={() => setSupportView('main')} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', marginBottom:4, marginLeft:6, background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← На главную Поддержки</button>
+          <h2 style={{ margin:'0 0 4px', fontSize:16, fontWeight:800, color:'#ec4899' }}>🧠 Калькулятор нейротоксичности ААС</h2>
+          <p style={{ fontSize:10, color:'var(--text-dim)', margin:'0 0 12px', lineHeight:1.4 }}>
+            Интерактивный расчёт нейротоксичности на основе соединений курса, дозировок, длительности и возраста.
           </p>
 
+          {/* Compound Selection */}
           <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:14, marginBottom:10, border:'1px solid var(--border)' }}>
-            <h4 style={{ margin:'0 0 8px', fontSize:12, color:'#f59e0b' }}>⚠ Уровень риска по веществам</h4>
-            <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
-              {[
-                { name:'Тренболон', level:'Чрезвычайно высокий', color:'#ef4444', bg:'rgba(239,68,68,0.1)' },
-                { name:'Нандролон', level:'Очень высокий', color:'#f97316', bg:'rgba(249,115,22,0.1)' },
-                { name:'Станозолол', level:'Высокий', color:'#f59e0b', bg:'rgba(245,158,11,0.1)' },
-                { name:'Тестостерон (>500 мг/нед)', level:'Высокий (дозозависимый)', color:'#f59e0b', bg:'rgba(245,158,11,0.1)' },
-                { name:'Тестостерон (ТЗТ дозы)', level:'Низкий', color:'#22c55e', bg:'rgba(34,197,94,0.1)' },
-                { name:'Оксандролон', level:'Средний', color:'#eab308', bg:'rgba(234,179,8,0.1)' },
-                { name:'Примоболан', level:'Низкий', color:'#22c55e', bg:'rgba(34,197,94,0.1)' },
-                { name:'Мастерон', level:'Низкий', color:'#22c55e', bg:'rgba(34,197,94,0.1)' },
-              ].map((r, i) => (
-                <div key={i} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'8px 10px', borderRadius:8, background:r.bg, border:`1px solid ${r.color}22` }}>
-                  <span style={{ fontSize:11, fontWeight:600, color:'var(--text-light)' }}>{r.name}</span>
-                  <span style={{ fontSize:10, fontWeight:700, color:r.color }}>{r.level}</span>
-                </div>
-              ))}
+            <h4 style={{ margin:'0 0 8px', fontSize:12, color:'var(--text)' }}>💊 Соединения курса</h4>
+            {uniqueCompounds.length === 0 ? (
+              <p style={{ fontSize:10, color:'var(--text-dim)', textAlign:'center', padding:'16px 0' }}>Нет активного курса. Добавьте соединения на вкладке Фарма.</p>
+            ) : (
+              <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+                {uniqueCompounds.map((c, i) => {
+                  const isSelected = neuroSelected.includes(c.cls);
+                  const ph = PHARMA_DB[c.substanceId];
+                  const neuroToxPd = ph?.pd?.neuro_toxicity ?? 0;
+                  return (
+                  <div key={i} style={{ padding:'8px 10px', borderRadius:8, background:isSelected ? 'rgba(236,72,153,0.08)' : 'rgba(255,255,255,0.03)', border:`1px solid ${isSelected ? 'rgba(236,72,153,0.25)' : 'var(--border)'}` }}>
+                    <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                      <label style={{ display:'flex', alignItems:'center', gap:6, flex:1, cursor:'pointer', userSelect:'none' }}>
+                        <input type="checkbox" checked={isSelected} onChange={() => setNeuroSelected(prev => prev.includes(c.cls) ? prev.filter(x => x !== c.cls) : [...prev, c.cls])} style={{ accentColor:'#ec4899' }} />
+                        <span style={{ fontSize:11, fontWeight:600, color:'var(--text-light)' }}>{c.name}</span>
+                        <span style={{ fontSize:8, color:'var(--text-dim)', background:'rgba(255,255,255,0.06)', padding:'1px 5px', borderRadius:3 }}>PD:{neuroToxPd}</span>
+                      </label>
+                      {isSelected && (
+                        <div style={{ display:'flex', alignItems:'center', gap:4 }}>
+                          <input type="number" value={neuroDoses[c.cls] || ''} onChange={e => setNeuroDoses(prev => ({ ...prev, [c.cls]: Number(e.target.value) || 0 }))} style={{ width:60, padding:'4px 6px', borderRadius:4, border:'1px solid var(--border)', background:'rgba(0,0,0,0.2)', color:'var(--text)', fontSize:10, textAlign:'center' }} />
+                          <span style={{ fontSize:9, color:'var(--text-dim)' }}>мг/нед</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Duration & Age */}
+          <div style={{ display:'flex', gap:8, marginBottom:10 }}>
+            <div style={{ flex:1, background:'var(--bg-secondary)', borderRadius:12, padding:12, border:'1px solid var(--border)' }}>
+              <div style={{ fontSize:9, color:'var(--text-dim)', marginBottom:4 }}>⏱ Длительность курса (недель)</div>
+              <input type="number" value={neuroDuration} onChange={e => setNeuroDuration(Math.max(1, Math.min(52, Number(e.target.value) || 1)))} style={{ width:'100%', padding:'8px 10px', borderRadius:8, border:'1px solid var(--border)', background:'rgba(0,0,0,0.2)', color:'var(--text)', fontSize:14, fontWeight:700, textAlign:'center', boxSizing:'border-box' }} />
+            </div>
+            <div style={{ flex:1, background:'var(--bg-secondary)', borderRadius:12, padding:12, border:'1px solid var(--border)' }}>
+              <div style={{ fontSize:9, color:'var(--text-dim)', marginBottom:4 }}>🎂 Возраст</div>
+              <input type="number" value={neuroAge} onChange={e => setNeuroAge(Math.max(18, Math.min(80, Number(e.target.value) || 18)))} style={{ width:'100%', padding:'8px 10px', borderRadius:8, border:'1px solid var(--border)', background:'rgba(0,0,0,0.2)', color:'var(--text)', fontSize:14, fontWeight:700, textAlign:'center', boxSizing:'border-box' }} />
             </div>
           </div>
 
+          {/* Score */}
+          <div style={{ background:neuroColor+'18', borderRadius:12, padding:16, marginBottom:10, border:`2px solid ${neuroColor}44`, textAlign:'center' }}>
+            <div style={{ fontSize:10, color:'var(--text-dim)', marginBottom:4 }}>Общий индекс нейротоксичности</div>
+            <div style={{ fontSize:42, fontWeight:800, color:neuroColor, lineHeight:1 }}>{neuroScore}</div>
+            <div style={{ fontSize:14, fontWeight:700, color:neuroColor, marginTop:4 }}>{neuroLabel}</div>
+            <div style={{ marginTop:8, height:6, borderRadius:3, background:'rgba(255,255,255,0.1)', overflow:'hidden' }}>
+              <div style={{ width:`${neuroScore}%`, height:'100%', borderRadius:3, background:`linear-gradient(90deg, #22c55e, #f59e0b ${50}%, #f97316 ${70}%, #ef4444)`, transition:'width 0.5s' }} />
+            </div>
+          </div>
+
+          {/* Protection Protocol */}
           <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:14, marginBottom:10, border:'1px solid var(--border)' }}>
-            <h4 style={{ margin:'0 0 8px', fontSize:12, color:'#22c55e' }}>🛡 Нейропротекция — рекомендации</h4>
+            <h4 style={{ margin:'0 0 10px', fontSize:13, color:'#00e68a' }}>💊 Протокол нейропротекции</h4>
+            <p style={{ fontSize:9, color:'var(--text-dim)', margin:'0 0 10px' }}>
+              Дозировки рассчитаны пропорционально индексу нейротоксичности ({neuroScore}). При значении &lt;10 используйте минимальные профилактические дозы.
+            </p>
             <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
-              {[
-                { name:'NAC (N-ацетилцистеин)', dose:'1200-2400 мг/день', desc:'Предшественник глутатиона, защищает нейроны от оксидативного стресса' },
-                { name:'Альфа-липоевая кислота (ALA)', dose:'600 мг/день', desc:'Универсальный антиоксидант, проникает через ГЭБ, регенерирует глутатион' },
-                { name:'Омега-3 (EPA+DHA)', dose:'3-5 г/день', desc:'Структурный компонент нейромембран, противовоспалительный, нейропротектор' },
-                { name:'Коэнзим Q10', dose:'200-400 мг/день', desc:'Митохондриальная защита нейронов, АТФ-синтез, антиоксидант' },
-                { name:'Магний L-треонат', dose:'1000-2000 мг/день', desc:'Единственная форма магния, проникающая через ГЭБ, NMDA-антагонист' },
-                { name:'Ежовик гребенчатый (Lion\'s Mane)', dose:'1-3 г/день', desc:'Стимулирует NGF (фактор роста нервов), нейрогенез' },
-                { name:'Прегненолон', dose:'10-30 мг/день', desc:'Нейростероид-предшественник, восстанавливает нейростероидогенез после ААС' },
-                { name:'DHEA', dose:'25-50 мг/день', desc:'Нейростероид, модулятор GABA-A и NMDA, восстанавливает нейропластичность' },
-              ].map((r, i) => (
+              {supportStack.map((s, i) => (
                 <div key={i} style={{ padding:'8px 10px', borderRadius:8, background:'rgba(0,230,138,0.04)', border:'1px solid rgba(0,230,138,0.1)' }}>
                   <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-                    <span style={{ fontSize:11, fontWeight:600, color:'var(--text-light)' }}>{r.name}</span>
-                    <span style={{ fontSize:9, fontWeight:700, color:'#00e68a' }}>{r.dose}</span>
+                    <span style={{ fontSize:11, fontWeight:600, color:'var(--text-light)' }}>{s.name}</span>
+                    <span style={{ fontSize:10, fontWeight:700, color:'#00e68a' }}>{s.dose} {s.unit}/день</span>
                   </div>
-                  <div style={{ fontSize:9, color:'var(--text-dim)', marginTop:2, lineHeight:1.3 }}>{r.desc}</div>
+                  <div style={{ fontSize:8, color:'var(--text-dim)', marginTop:2 }}>⏰ {s.timing}</div>
                 </div>
               ))}
             </div>
           </div>
 
+          {/* Symptoms reference */}
           <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:14, marginBottom:10, border:'1px solid var(--border)' }}>
             <h4 style={{ margin:'0 0 8px', fontSize:12, color:'#ef4444' }}>🩺 Симптомы нейротоксичности</h4>
             <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
@@ -4760,6 +5005,7 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
             </div>
           </div>
 
+          {/* Monitoring */}
           <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:14, border:'1px solid var(--border)' }}>
             <h4 style={{ margin:'0 0 8px', fontSize:12, color:'#60a5fa' }}>📊 Мониторинг</h4>
             <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
@@ -4780,12 +5026,16 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
             </div>
           </div>
         </div>
-      )}
+        );
+      })()}
 
       {/* ===== HRT/TRT CALCULATOR ===== */}
       {tab === 'main' && supportView === 'calc' && calcView === 'hrt' && (
         <div style={{ padding:'0 0 80px' }}>
-          <button onClick={() => setCalcView('main')} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', marginBottom:6, background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← Назад</button>
+          <div style={{ display:'flex', gap:6, marginBottom:6 }}>
+            <button onClick={() => setCalcView('main')} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← Назад</button>
+            <button onClick={() => setSupportView('main')} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← На главную Поддержки</button>
+          </div>
           <h2 style={{ margin:'0 0 4px', fontSize:16, fontWeight:800, color:'#8b5cf6' }}>⚕️ Гормонозаместительная терапия</h2>
           <p style={{ fontSize:10, color:'var(--text-dim)', margin:'0 0 10px', lineHeight:1.4 }}>
             Научно обоснованные протоколы ТЗТ/ГЗТ, мониторинг и адъювантная терапия.

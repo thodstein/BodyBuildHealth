@@ -365,11 +365,16 @@ const MealPlanExtended: React.FC<{ tKcal: number; tProt: number; tFat: number; t
   const [indivDairyFree, setIndivDairyFree] = React.useState(s?.dietRestrictions?.includes('dairy') || false);
   const [indivGlutenFree, setIndivGlutenFree] = React.useState(s?.dietRestrictions?.includes('gluten') || false);
   const [indivFishFree, setIndivFishFree] = React.useState(false);
-  const [indivInsulinBinding, setIndivInsulinBinding] = React.useState(false);
-  const [indivGHBinding, setIndivGHBinding] = React.useState(false);
-  const [indivIGFBinding, setIndivIGFBinding] = React.useState(false);
-  const [indivInsulinTime, setIndivInsulinTime] = React.useState('12:00');
-  const [indivGHTime, setIndivGHTime] = React.useState('08:00');
+  const [indivInsulinShots, setIndivInsulinShots] = React.useState<{ time: string; dose: number; type: string }[]>([]);
+  const [indivGHShots, setIndivGHShots] = React.useState<{ time: string; dose: number }[]>([]);
+  const [indivIGFShots, setIndivIGFShots] = React.useState<{ time: string; dose: number }[]>([]);
+  const [newInsulinTime, setNewInsulinTime] = React.useState('12:00');
+  const [newInsulinDose, setNewInsulinDose] = React.useState(5);
+  const [newInsulinType, setNewInsulinType] = React.useState('короткий');
+  const [newGHTime, setNewGHTime] = React.useState('08:00');
+  const [newGHDose, setNewGHDose] = React.useState(4);
+  const [newIGFTime, setNewIGFTime] = React.useState('10:00');
+  const [newIGFDose, setNewIGFDose] = React.useState(50);
 
   const RECOMMENDED_IDS: Record<string, string[]> = {
     'protein': ['turkey_breast', 'chicken_breast', 'egg_whole', 'egg_white', 'beef_lean', 'salmon', 'shrimp', 'tuna_steak'],
@@ -390,8 +395,9 @@ const MealPlanExtended: React.FC<{ tKcal: number; tProt: number; tFat: number; t
     const vegFoods = FOOD_DB.filter(f => RECOMMENDED_IDS.veg.includes(f.id) && f.category === 'veg_fruit');
 
     const trainHour = parseInt(indivTrainTime.split(':')[0]);
-    const insulinHour = indivInsulinBinding ? parseInt(indivInsulinTime.split(':')[0]) : -1;
-    const ghHour = indivGHBinding ? parseInt(indivGHTime.split(':')[0]) : -1;
+    const insulinShots = indivInsulinShots.map(s => ({ ...s, hour: parseInt(s.time.split(':')[0]) }));
+    const ghShots = indivGHShots.map(s => ({ ...s, hour: parseInt(s.time.split(':')[0]) }));
+    const igfShots = indivIGFShots.map(s => ({ ...s, hour: parseInt(s.time.split(':')[0]) }));
 
     const mealTimes = (() => {
       const n = indivMeals;
@@ -415,19 +421,24 @@ const MealPlanExtended: React.FC<{ tKcal: number; tProt: number; tFat: number; t
       const isMorning = h < 11;
       const isEvening = h >= 18;
 
-      // GH/insulin/IGF binding flags
-      const isInsulinMeal = indivInsulinBinding && (h === insulinHour || h === insulinHour + 1);
-      const isGHNoCarb = indivGHBinding && Math.abs(h - ghHour) <= 1;
-      const isIGFProtein = indivIGFBinding && Math.abs(h - ghHour) <= 1;
+      // Insulin shots check — carbs at 0min and +60min for short, balanced every 3-4h for long
+      const matchingInsulin = insulinShots.filter(s => h === s.hour || h === s.hour + 1);
+      const isInsulinShortMeal = matchingInsulin.some(s => s.type === 'короткий' || s.type === 'сверхбыстрый');
+      const isInsulinLongMeal = matchingInsulin.some(s => s.type === 'длинный');
+      const isInsulinMeal = isInsulinShortMeal || isInsulinLongMeal;
+      // GH: avoid carbs 30min before/after each GH injection
+      const isGHWindow = ghShots.some(s => Math.abs(h - s.hour) <= 1);
+      // IGF: protein-rich meal within 1hr of each injection
+      const isIGFWindow = igfShots.some(s => Math.abs(h - s.hour) <= 1);
 
       const targetP = Math.round(indivProt / indivMeals);
-      const targetC = isGHNoCarb ? 0 : (isInsulinMeal ? Math.round(indivCarbs * 0.4) : isPreWorkout || isPostWorkout ? Math.round(indivCarbs * 0.25) : isEvening ? Math.round(indivCarbs * 0.1) : Math.round(indivCarbs * 0.15));
-      const targetF = isGHNoCarb || isPreWorkout || isPostWorkout ? 0 : isMorning ? Math.round(indivFat * 0.25) : Math.round(indivFat * 0.15);
+      const targetC = isGHWindow ? 0 : (isInsulinShortMeal ? Math.round(indivCarbs * 0.4) : isInsulinLongMeal ? Math.round(indivCarbs * 0.2) : isPreWorkout || isPostWorkout ? Math.round(indivCarbs * 0.25) : isEvening ? Math.round(indivCarbs * 0.1) : Math.round(indivCarbs * 0.15));
+      const targetF = isGHWindow || isPreWorkout || isPostWorkout ? 0 : isMorning ? Math.round(indivFat * 0.25) : Math.round(indivFat * 0.15);
 
       const bindingTags: string[] = [];
       if (isInsulinMeal) bindingTags.push('инсулин');
-      if (isGHNoCarb) bindingTags.push('ГР');
-      if (isIGFProtein) bindingTags.push('ИФР-1/MGF');
+      if (isGHWindow) bindingTags.push('ГР');
+      if (isIGFWindow) bindingTags.push('ИФР-1/MGF');
 
       const items: { foodName: string; amount: number; kcal: number; p: number; f: number; c: number }[] = [];
 
@@ -506,7 +517,7 @@ const MealPlanExtended: React.FC<{ tKcal: number; tProt: number; tFat: number; t
           carbs: items.reduce((s, it) => s + it.c, 0),
         },
         isPreWorkout, isPostWorkout,
-        isInsulinMeal, isGHNoCarb, isIGFProtein,
+        isInsulinMeal, isGHNoCarb: isGHWindow, isIGFProtein: isIGFWindow,
         bindingTags,
       };
     });
@@ -832,10 +843,11 @@ const MealPlanExtended: React.FC<{ tKcal: number; tProt: number; tFat: number; t
       </div>
 
       <div className="card" style={{ marginBottom: 8, padding: 14 }}>
-        <h4 style={{ margin: '0 0 10px', fontSize: 13, color: 'var(--accent)' }}>📊 Качество белка</h4>
+        <h4 style={{ margin: '0 0 10px', fontSize: 13, color: 'var(--accent)' }}>📊 Качество продуктов</h4>
         <p style={{ fontSize: 9, color: 'var(--text-dim)', margin: '0 0 8px' }}>
-          Оценка источников белка по шкале 1–10 (аминокислотный профиль, биодоступность, содержание жира, универсальность)
+          Оценка источников белка, углеводов и жиров по шкале 1–10
         </p>
+        <h5 style={{ margin: '8px 0 6px', fontSize: 11, color: '#3b82f6' }}>Белки (оценка 1–10)</h5>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
           {[
             { name: 'Куриная грудка', score: 9, desc: 'Чистый белок, минимум жира, нейтральный вкус, универсальна' },
@@ -853,6 +865,56 @@ const MealPlanExtended: React.FC<{ tKcal: number; tProt: number; tFat: number; t
             const scoreColor = p.score >= 9 ? '#22c55e' : p.score >= 7 ? '#f59e0b' : p.score >= 5 ? '#f97316' : '#ef4444';
             return (
               <div key={j} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0', borderBottom: j < 10 ? '1px solid rgba(255,255,255,0.04)' : 'none' }}>
+                <div style={{ minWidth: 32, height: 22, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', background: scoreColor + '15', color: scoreColor, fontWeight: 800, fontSize: 11 }}>{p.score}/10</div>
+                <div style={{ flex: 1 }}>
+                  <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--text)' }}>{p.name}</span>
+                  <span style={{ fontSize: 8, color: 'var(--text-dim)', marginLeft: 6 }}>— {p.desc}</span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        <h5 style={{ margin: '12px 0 6px', fontSize: 11, color: '#f97316' }}>Углеводы (оценка 1–10)</h5>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          {[
+            { name: 'Рис белый', score: 8, desc: 'Быстрые углеводы, легко усваивается. Минус: высокий ГИ, мало клетчатки' },
+            { name: 'Гречка', score: 9, desc: 'Медленные углеводы, магний, железо. Минус: специфичный вкус не всем' },
+            { name: 'Овсянка', score: 9, desc: 'Бета-глюкан, клетчатка, медленная энергия. Минус: фитиновая кислота' },
+            { name: 'Картофель', score: 7, desc: 'Калий, витамин C. Минус: высокий ГИ, соланин в зелёном' },
+            { name: 'Батат', score: 9, desc: 'Витамин A, клетчатка, низкий ГИ. Минус: цена' },
+            { name: 'Макароны твёрдых сортов', score: 8, desc: 'Медленные углеводы, сытость. Минус: глютен' },
+            { name: 'Хлеб цельнозерновой', score: 7, desc: 'Клетчатка, витамины B. Минус: глютен, фитаты' },
+            { name: 'Булгур', score: 8, desc: 'Клетчатка, магний. Минус: глютен' },
+            { name: 'Киноа', score: 9, desc: 'Полный белок + углеводы. Минус: цена, сапонины' },
+            { name: 'Кукурузные хлопья (без пшеницы)', score: 5, desc: 'Быстрая энергия. Минус: обработанные, часто с сахаром' },
+          ].map((p, j) => {
+            const scoreColor = p.score >= 9 ? '#22c55e' : p.score >= 7 ? '#f59e0b' : p.score >= 5 ? '#f97316' : '#ef4444';
+            return (
+              <div key={j} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0', borderBottom: j < 9 ? '1px solid rgba(255,255,255,0.04)' : 'none' }}>
+                <div style={{ minWidth: 32, height: 22, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', background: scoreColor + '15', color: scoreColor, fontWeight: 800, fontSize: 11 }}>{p.score}/10</div>
+                <div style={{ flex: 1 }}>
+                  <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--text)' }}>{p.name}</span>
+                  <span style={{ fontSize: 8, color: 'var(--text-dim)', marginLeft: 6 }}>— {p.desc}</span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        <h5 style={{ margin: '12px 0 6px', fontSize: 11, color: '#f59e0b' }}>Жиры (оценка 1–10)</h5>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          {[
+            { name: 'Оливковое масло extra virgin', score: 10, desc: 'Мононенасыщенные жиры, полифенолы, антивоспалительное' },
+            { name: 'Авокадо', score: 10, desc: 'Калий, клетчатка, мононенасыщенные жиры' },
+            { name: 'Кокосовое масло', score: 7, desc: 'MCT, быстрая энергия. Минус: насыщенные жиры' },
+            { name: 'Орехи (грецкие)', score: 8, desc: 'Омега-3, магний. Минус: калорийность, оксалаты' },
+            { name: 'Сливочное масло', score: 6, desc: 'Витамин A, вкус. Минус: насыщенные жиры, холестерин' },
+            { name: 'Рыбий жир', score: 10, desc: 'Омега-3 EPA/DHA, антивоспалительное' },
+            { name: 'Льняное масло', score: 8, desc: 'ALA омега-3. Минус: нестабильно, быстро окисляется' },
+            { name: 'Яичный желток', score: 8, desc: 'Лецитин, холин, витамины. Минус: холестерин' },
+          ].map((p, j) => {
+            const scoreColor = p.score >= 9 ? '#22c55e' : p.score >= 7 ? '#f59e0b' : p.score >= 5 ? '#f97316' : '#ef4444';
+            return (
+              <div key={j} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0', borderBottom: j < 7 ? '1px solid rgba(255,255,255,0.04)' : 'none' }}>
                 <div style={{ minWidth: 32, height: 22, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', background: scoreColor + '15', color: scoreColor, fontWeight: 800, fontSize: 11 }}>{p.score}/10</div>
                 <div style={{ flex: 1 }}>
                   <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--text)' }}>{p.name}</span>
@@ -931,27 +993,77 @@ const MealPlanExtended: React.FC<{ tKcal: number; tProt: number; tFat: number; t
             Без рыбы
           </label>
         </div>
-        <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-light)', margin: '8px 0 4px' }}>💉 Привязка к гормонам (GH/Инсулин)</div>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
-          <label style={{ fontSize: 10, display: 'flex', alignItems: 'center', gap: 4, color: 'var(--text-dim)' }}>
-            <input type="checkbox" checked={indivInsulinBinding} onChange={e => setIndivInsulinBinding(e.target.checked)} style={{ accentColor: 'var(--accent)' }} />
-            Привязка к инсулину
-          </label>
-          {indivInsulinBinding && (
-            <input type="time" value={indivInsulinTime} onChange={e => setIndivInsulinTime(e.target.value)} style={{ padding: '3px 6px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 10, boxSizing: 'border-box' }} />
-          )}
-          <label style={{ fontSize: 10, display: 'flex', alignItems: 'center', gap: 4, color: 'var(--text-dim)' }}>
-            <input type="checkbox" checked={indivGHBinding} onChange={e => setIndivGHBinding(e.target.checked)} style={{ accentColor: 'var(--accent)' }} />
-            Привязка к ГР (GH)
-          </label>
-          {indivGHBinding && (
-            <input type="time" value={indivGHTime} onChange={e => setIndivGHTime(e.target.value)} style={{ padding: '3px 6px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 10, boxSizing: 'border-box' }} />
-          )}
-          <label style={{ fontSize: 10, display: 'flex', alignItems: 'center', gap: 4, color: 'var(--text-dim)' }}>
-            <input type="checkbox" checked={indivIGFBinding} onChange={e => setIndivIGFBinding(e.target.checked)} style={{ accentColor: 'var(--accent)' }} />
-            Привязка к ИФР-1/MGF
-          </label>
+        <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-light)', margin: '8px 0 4px' }}>💉 Инъекции инсулина</div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 4, alignItems: 'flex-end' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <span style={{ fontSize: 8, color: 'var(--text-dim)' }}>Время</span>
+            <input type="time" value={newInsulinTime} onChange={e => setNewInsulinTime(e.target.value)} style={{ padding: '3px 6px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 10, boxSizing: 'border-box' }} />
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <span style={{ fontSize: 8, color: 'var(--text-dim)' }}>Доза (IU)</span>
+            <input type="number" value={newInsulinDose} onChange={e => setNewInsulinDose(parseFloat(e.target.value) || 0)} style={{ width: 55, padding: '3px 6px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 10, boxSizing: 'border-box' }} />
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <span style={{ fontSize: 8, color: 'var(--text-dim)' }}>Тип</span>
+            <select value={newInsulinType} onChange={e => setNewInsulinType(e.target.value)} style={{ padding: '3px 4px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 10, boxSizing: 'border-box' }}>
+              <option value="короткий">короткий</option>
+              <option value="длинный">длинный</option>
+              <option value="сверхбыстрый">сверхбыстрый</option>
+            </select>
+          </div>
+          <button onClick={() => setIndivInsulinShots([...indivInsulinShots, { time: newInsulinTime, dose: newInsulinDose, type: newInsulinType }])} style={{
+            padding: '3px 10px', borderRadius: 6, border: '1px solid #06b6d4', cursor: 'pointer',
+            background: 'rgba(6,182,212,0.1)', color: '#06b6d4', fontWeight: 600, fontSize: 10,
+          }}>+ Добавить укол</button>
         </div>
+        {indivInsulinShots.map((shot, i) => (
+          <div key={i} style={{ display: 'inline-flex', gap: 4, alignItems: 'center', padding: '2px 6px', borderRadius: 6, background: 'rgba(6,182,212,0.08)', border: '1px solid rgba(6,182,212,0.15)', fontSize: 9, marginRight: 4, marginBottom: 4, color: '#06b6d4' }}>
+            💉 {shot.time} {shot.dose}IU {shot.type}
+            <button onClick={() => setIndivInsulinShots(indivInsulinShots.filter((_, j) => j !== i))} style={{ background: 'none', border: 'none', color: '#ef4444', fontSize: 12, cursor: 'pointer', padding: 0 }}>×</button>
+          </div>
+        ))}
+        <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-light)', margin: '6px 0 4px' }}>💉 Инъекции ГР</div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 4, alignItems: 'flex-end' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <span style={{ fontSize: 8, color: 'var(--text-dim)' }}>Время</span>
+            <input type="time" value={newGHTime} onChange={e => setNewGHTime(e.target.value)} style={{ padding: '3px 6px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 10, boxSizing: 'border-box' }} />
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <span style={{ fontSize: 8, color: 'var(--text-dim)' }}>Доза (IU)</span>
+            <input type="number" value={newGHDose} onChange={e => setNewGHDose(parseFloat(e.target.value) || 0)} style={{ width: 55, padding: '3px 6px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 10, boxSizing: 'border-box' }} />
+          </div>
+          <button onClick={() => setIndivGHShots([...indivGHShots, { time: newGHTime, dose: newGHDose }])} style={{
+            padding: '3px 10px', borderRadius: 6, border: '1px solid #a855f7', cursor: 'pointer',
+            background: 'rgba(168,85,247,0.1)', color: '#a855f7', fontWeight: 600, fontSize: 10,
+          }}>+ Добавить укол</button>
+        </div>
+        {indivGHShots.map((shot, i) => (
+          <div key={i} style={{ display: 'inline-flex', gap: 4, alignItems: 'center', padding: '2px 6px', borderRadius: 6, background: 'rgba(168,85,247,0.08)', border: '1px solid rgba(168,85,247,0.15)', fontSize: 9, marginRight: 4, marginBottom: 4, color: '#a855f7' }}>
+            💉 {shot.time} {shot.dose}IU
+            <button onClick={() => setIndivGHShots(indivGHShots.filter((_, j) => j !== i))} style={{ background: 'none', border: 'none', color: '#ef4444', fontSize: 12, cursor: 'pointer', padding: 0 }}>×</button>
+          </div>
+        ))}
+        <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-light)', margin: '6px 0 4px' }}>💉 Инъекции ИФР-1/MGF</div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 4, alignItems: 'flex-end' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <span style={{ fontSize: 8, color: 'var(--text-dim)' }}>Время</span>
+            <input type="time" value={newIGFTime} onChange={e => setNewIGFTime(e.target.value)} style={{ padding: '3px 6px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 10, boxSizing: 'border-box' }} />
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <span style={{ fontSize: 8, color: 'var(--text-dim)' }}>Доза (mcg)</span>
+            <input type="number" value={newIGFDose} onChange={e => setNewIGFDose(parseFloat(e.target.value) || 0)} style={{ width: 55, padding: '3px 6px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 10, boxSizing: 'border-box' }} />
+          </div>
+          <button onClick={() => setIndivIGFShots([...indivIGFShots, { time: newIGFTime, dose: newIGFDose }])} style={{
+            padding: '3px 10px', borderRadius: 6, border: '1px solid #ec4899', cursor: 'pointer',
+            background: 'rgba(236,72,153,0.1)', color: '#ec4899', fontWeight: 600, fontSize: 10,
+          }}>+ Добавить укол</button>
+        </div>
+        {indivIGFShots.map((shot, i) => (
+          <div key={i} style={{ display: 'inline-flex', gap: 4, alignItems: 'center', padding: '2px 6px', borderRadius: 6, background: 'rgba(236,72,153,0.08)', border: '1px solid rgba(236,72,153,0.15)', fontSize: 9, marginRight: 4, marginBottom: 4, color: '#ec4899' }}>
+            💉 {shot.time} {shot.dose}mcg
+            <button onClick={() => setIndivIGFShots(indivIGFShots.filter((_, j) => j !== i))} style={{ background: 'none', border: 'none', color: '#ef4444', fontSize: 12, cursor: 'pointer', padding: 0 }}>×</button>
+          </div>
+        ))}
         <button onClick={generateIndividualPlan} style={{
           width: '100%', padding: 10, borderRadius: 10, border: 'none', cursor: 'pointer',
           background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)', color: '#fff',
@@ -1065,12 +1177,81 @@ const GroceryTab: React.FC<{ tKcal: number; tProt: number }> = ({ tKcal, tProt }
   </div>);
 };
 
+const RESTAURANT_ITEMS: { name: string; kcal: number; p: number; f: number; c: number }[] = [
+  { name: 'Шаурма куриная', kcal: 550, p: 25, f: 22, c: 58 },
+  { name: 'Бургер классический', kcal: 480, p: 22, f: 24, c: 42 },
+  { name: 'Пицца Маргарита (кусок)', kcal: 240, p: 9, f: 8, c: 32 },
+  { name: 'Пицца Пепперони (кусок)', kcal: 298, p: 12, f: 12, c: 34 },
+  { name: 'Суши лосось (8 шт)', kcal: 310, p: 16, f: 6, c: 48 },
+  { name: 'Ролл Филадельфия', kcal: 290, p: 12, f: 10, c: 36 },
+  { name: 'Ролл Калифорния', kcal: 260, p: 10, f: 8, c: 38 },
+  { name: 'Паста Карбонара', kcal: 350, p: 14, f: 18, c: 32 },
+  { name: 'Паста Болоньезе', kcal: 280, p: 16, f: 10, c: 32 },
+  { name: 'Стейк рибай', kcal: 350, p: 30, f: 25, c: 0 },
+  { name: 'Курица гриль (половина)', kcal: 400, p: 45, f: 22, c: 0 },
+  { name: 'Шашлык свинина (200г)', kcal: 380, p: 32, f: 28, c: 2 },
+  { name: 'Шашлык курица (200г)', kcal: 280, p: 38, f: 12, c: 2 },
+  { name: 'Салат Цезарь с курицей', kcal: 320, p: 25, f: 18, c: 14 },
+  { name: 'Салат Греческий', kcal: 180, p: 6, f: 14, c: 8 },
+  { name: 'Борщ', kcal: 170, p: 7, f: 5, c: 25 },
+  { name: 'Окрошка', kcal: 200, p: 10, f: 8, c: 22 },
+  { name: 'Круассан', kcal: 230, p: 5, f: 14, c: 22 },
+  { name: 'Блинчики с творогом (2 шт)', kcal: 280, p: 14, f: 10, c: 32 },
+  { name: 'Хот-дог', kcal: 300, p: 10, f: 18, c: 24 },
+];
+
 const RestaurantTab: React.FC = () => {
   const guide = React.useMemo(() => getRestaurantGuide(), []);
   const top = React.useMemo(() => getTopAthleteChoices(), []);
   const travels = React.useMemo(() => getTravelWorkouts(), []);
   const sleepStacks = React.useMemo(() => getSleepStacks(), []);
+  const [selectedItem, setSelectedItem] = React.useState<number | null>(null);
+  const maxKcal = Math.max(...RESTAURANT_ITEMS.map(i => i.kcal), 1);
   return (<div>
+    <div className="card" style={{ marginBottom: 8 }}>
+      <h4 style={{ margin: '0 0 6px', fontSize: 12 }}>🍽 Блюда и калорийность</h4>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+        {RESTAURANT_ITEMS.map((item, i) => {
+          const isExpanded = selectedItem === i;
+          const pWidth = Math.round((item.p / Math.max(item.p + item.f + item.c, 1)) * 100);
+          const fWidth = Math.round((item.f / Math.max(item.p + item.f + item.c, 1)) * 100);
+          const cWidth = Math.round((item.c / Math.max(item.p + item.f + item.c, 1)) * 100);
+          return (
+            <div key={i} onClick={() => setSelectedItem(isExpanded ? null : i)} style={{
+              padding: '8px 10px', borderRadius: 10, cursor: 'pointer',
+              background: isExpanded ? 'rgba(0,230,138,0.06)' : 'var(--bg-secondary)',
+              border: isExpanded ? '1px solid rgba(0,230,138,0.2)' : '1px solid var(--border)',
+              transition: 'all 0.15s',
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                <span style={{ fontWeight: 600, fontSize: 10, color: 'var(--text)' }}>{item.name}</span>
+                <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--accent)' }}>{item.kcal} ккал</span>
+              </div>
+              <div style={{ display: 'flex', gap: 2, height: 6, borderRadius: 3, overflow: 'hidden', marginBottom: 4 }}>
+                <div style={{ flex: pWidth || 0.1, background: '#3b82f6', minWidth: pWidth > 0 ? 12 : 0 }} />
+                <div style={{ flex: fWidth || 0.1, background: '#f59e0b', minWidth: fWidth > 0 ? 12 : 0 }} />
+                <div style={{ flex: cWidth || 0.1, background: '#f97316', minWidth: cWidth > 0 ? 12 : 0 }} />
+              </div>
+              <div style={{ display: 'flex', gap: 8, fontSize: 8, color: 'var(--text-dim)' }}>
+                <span>Б: <b style={{ color: '#3b82f6' }}>{item.p}г</b></span>
+                <span>Ж: <b style={{ color: '#f59e0b' }}>{item.f}г</b></span>
+                <span>У: <b style={{ color: '#f97316' }}>{item.c}г</b></span>
+              </div>
+              {isExpanded && (
+                <div style={{ marginTop: 6, padding: '6px 8px', background: 'rgba(255,255,255,0.03)', borderRadius: 6, fontSize: 9, color: 'var(--text-dim)', lineHeight: 1.5 }}>
+                  <div>Полный состав на порцию: {item.kcal} ккал</div>
+                  <div style={{ display: 'flex', gap: 12, marginTop: 2 }}>
+                    <span>🔵 Белки: {item.p}г ({item.p * 4} ккал)</span>
+                    <span>🟡 Жиры: {item.f}г ({item.f * 9} ккал)</span>
+                    <span>🟠 Углеводы: {item.c}г ({item.c * 4} ккал)</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
     <div className="card" style={{ marginBottom: 8 }}><h4 style={{ margin: '0 0 4px', fontSize: 12 }}>🍔 Рестораны ({guide.length})</h4><div style={{ maxHeight: 200, overflowY: 'auto' }}>{guide.slice(0,12).map((r:any,i:number)=><div key={i} style={{fontSize:9,padding:'2px 4px',display:'flex',justifyContent:'space-between'}}><span>{r.chain}: {r.item}</span><span style={{color:r.athleteRating==='excellent'?'#22c55e':'#f59e0b'}}>Б:{r.protein}г</span></div>)}</div></div>
     <div className="card" style={{ marginBottom: 8 }}><h4 style={{ margin: '0 0 4px', fontSize: 12 }}>✈️ Тренировки в поездках</h4>{travels.map((w:any,i:number)=><div key={i} style={{marginBottom:4}}><b style={{fontSize:10}}>{w.name}</b><span style={{fontSize:9,color:'var(--text-dim)'}}> ({w.duration}мин)</span></div>)}</div>
     <div className="card"><h4 style={{ margin: '0 0 4px', fontSize: 12 }}>😴 Стек для сна</h4>{sleepStacks.map((s:any,i:number)=><div key={i} style={{marginBottom:4}}><b style={{fontSize:10}}>{s.name}</b><span style={{fontSize:9,color:'var(--text-light)'}}>: {s.supplements.join(' + ')}</span></div>)}</div>
