@@ -917,6 +917,8 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   const [interactionPage, setInteractionPage] = useState<number>(1);
   const INTERACTION_PAGE_SIZE = 40;
   const [supportResult, setSupportResult] = useState<ReturnType<typeof calculateSupport> | null>(null);
+  const [calcResult, setCalcResult] = useState<any>(null);
+  const [calcDone, setCalcDone] = useState(false);
 
   const [dbInteractions, setDbInteractions] = useState<ReturnType<typeof checkSupportInteractions> | null>(null);
   const [dbSearchQuery, setDbSearchQuery] = useState('');
@@ -5309,7 +5311,7 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
           return cls === 'oral_17aa';
         };
 
-        const uniqCourse = useMemo(() => {
+        const uniqCourse = (() => {
           const seen = new Map<string, { substanceId: string; name: string; cls: string; totalDose: number; hep: number; arom: number; andro: number; is19: boolean; is17aa: boolean }>();
           course.forEach(c => {
             const id = c.substanceId;
@@ -5326,7 +5328,7 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
             }
           });
           return Array.from(seen.values());
-        }, [course]);
+        })();
 
         const count17aa = uniqCourse.filter(c => c.is17aa).length;
         const hasTren = uniqCourse.some(c => c.cls === 'trenbolone');
@@ -5448,11 +5450,7 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
           return slots.filter(s => s.items.length > 0);
         };
 
-        const [dailySchedule, setDailySchedule] = useState<any[]>(() => buildDailySchedule(supportLevel));
-        const [calcResult, setCalcResult] = useState<ReturnType<typeof calculateSupport> | null>(null);
-        const [calcDone, setCalcDone] = useState(false);
-
-        useEffect(() => { setDailySchedule(buildDailySchedule(supportLevel)); }, [supportLevel]);
+        const dailySchedule = buildDailySchedule(supportLevel);
 
         const SYSTEM_ORDER = ['cardio', 'hepatic', 'renal', 'neuro', 'endocrine', 'hematologic', 'reproductive', 'musculoskeletal'];
         const riskColorFn = (v: number) => v > 60 ? '#ef4444' : v > 30 ? '#f59e0b' : '#22c55e';
