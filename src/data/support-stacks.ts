@@ -5,7 +5,7 @@ export interface SupportStack {
   substances: string[];
   synergyScore: number;
   description: string;
-  dosages?: Record<string, { morning?: number; evening?: number; unit: string }>;
+  dosages?: Record<string, { morning?: number; afternoon?: number; evening?: number; night?: number; unit: string }>;
   synergy_notes?: string;
   timing?: string;
   goalTags?: string[];
@@ -450,6 +450,67 @@ function generateStacks(): SupportStack[] {
     synergy_notes: 'Витамин С удваивает абсорбцию железа. Цинк и медь конкурируют — разнесены на утро/вечер.',
     timing: 'Утро: железо + витамин С + селен + йод + B12 + фолат + витамин A. Вечер: цинк + медь.',
     goalTags: ['blood','thyroid','energy'],
+  });
+
+  stacks.push({
+    id: 'full_support_protocol',
+    name: 'Полный протокол поддержки (25.05-06.07.2026)',
+    description: 'Комплексная поддержка на курсе: нейропротекция, сердечно-сосудистая, печень, почки, суставы, реология крови, гормональный баланс',
+    effects: ['neuroprotection','cardiovascular','hepatic','renal','joint','blood_flow','hormone_balance','energy','sleep','immune'],
+    substances: [
+      'lactoferrin','colostrum','citicoline_complex','alpha_gpc','huperzine_a',
+      'serrapeptase','nattokinase','taurine','nac',
+      'tadalafil','nebivolol','diosmin_complex','pine_extract_opc',
+      'astragalus','vitamin_d3','vitamin_k2_mk7','vitamin_c_ascorbate',
+      'bromelain','bromantane','fasoracetam','agmatine',
+      'bergamot','tmg_trimethylglycine','methylfolate_5mthf',
+      'lecithin','same','artichoke','joint_health_complex',
+      'atp_optimizer','vitamin_e_mixed','telmisartan',
+      'udca_tabs','berberine_hcl_dhbbr',
+      'l_theanine','ashwagandha','magnesium_l_threonate'
+    ],
+    synergyScore: 60,
+    dosages: {
+      lactoferrin: { morning: 500, unit: 'мг' },
+      colostrum: { morning: 200, unit: 'мг' },
+      citicoline_complex: { morning: 700, unit: 'мг' },
+      alpha_gpc: { morning: 300, unit: 'мг' },
+      huperzine_a: { morning: 50, unit: 'мкг' },
+      serrapeptase: { morning: 240000, unit: 'SPU' },
+      nattokinase: { morning: 12000, unit: 'FU' },
+      taurine: { morning: 2000, unit: 'мг' },
+      nac: { morning: 1800, unit: 'мг' },
+      tadalafil: { morning: 5, unit: 'мг' },
+      nebivolol: { morning: 2.5, unit: 'мг' },
+      diosmin_complex: { morning: 300, unit: 'мг' },
+      pine_extract_opc: { morning: 95, unit: '%' },
+      astragalus: { morning: 1300, unit: 'мг' },
+      vitamin_d3: { morning: 5000, unit: 'МЕ' },
+      vitamin_k2_mk7: { morning: 100, unit: 'мкг' },
+      vitamin_c_ascorbate: { morning: 1000, unit: 'мг' },
+      bromelain: { morning: 1300, unit: 'GDU/G' },
+      bromantane: { morning: 50, unit: 'мг' },
+      fasoracetam: { morning: 100, unit: 'мг' },
+      agmatine: { morning: 1000, unit: 'мг' },
+      bergamot: { morning: 1, unit: 'таб' },
+      tmg_trimethylglycine: { morning: 1000, unit: 'мг' },
+      methylfolate_5mthf: { morning: 1000, unit: 'мкг' },
+      lecithin: { morning: 1, unit: 'капс' },
+      same: { morning: 1, unit: 'капс' },
+      artichoke: { morning: 1, unit: 'капс' },
+      joint_health_complex: { morning: 2, unit: 'капс' },
+      atp_optimizer: { afternoon: 2, unit: 'капс' },
+      vitamin_e_mixed: { afternoon: 400, unit: 'МЕ' },
+      telmisartan: { evening: 80, unit: 'мг' },
+      udca_tabs: { evening: 1500, unit: 'мг' },
+      berberine_hcl_dhbbr: { evening: 1000, unit: 'мг' },
+      l_theanine: { night: 400, unit: 'мг' },
+      ashwagandha: { night: 50, unit: 'мг' },
+      magnesium_l_threonate: { night: 1200, unit: 'мг' },
+    },
+    synergy_notes: 'Цитиколин+Alpha-GPC — синергия ацетилхолина. NAC+Таурин — глутатион+реология. D3+K2 — кальциевый обмен. Телмисартан+Небиволол — АД контроль. Берберин+TMG — метаболизм+гомоцистеин.',
+    timing: 'Пробуждение (натощак 40 мин): Лактоферрин+Молозиво, Цитиколин комплекс, Серрапептаза+Наттокиназа, Таурин, NAC. Завтрак: Тадафил, Небиволол, DioMax, экстракт сосны, Астрагал, D3+K2, C, Бромелайн, Бромантан, Фасорацетам, Бергамот, TMG, 5-MTHF, Лецитин, SAMe, Артишок, JointHealth. Обед: DioMax, Астрагал, ATP Optimizer, E, Бергамот, TMG, 5-MTHF. Вечер: Телмисартан, УДХК, Берберин. Перед сном: L-Теанин, Ашваганда, Магний L-треонат.',
+    goalTags: ['neuroprotection','cardiovascular','hepatic','renal','joint'],
   });
 
   // Deduplicate by substance+effect signature
