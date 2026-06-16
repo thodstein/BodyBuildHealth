@@ -3323,8 +3323,15 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
         </div>
       )}
 
-      {/* ===== CALCULATOR ===== */}
-      {tab === 'calculator' && (
+      {/* ===== CALCULATOR: REDIRECT TO FULL CALCULATOR ===== */}
+      {tab === 'calculator' && (() => {
+        // Redirect to the full-featured calculator view
+        requestAnimationFrame(() => { setSupportView('calc'); setCalcView('calculator'); });
+        return null;
+      })()}
+
+      {/* ===== ORIGINAL CALCULATOR (kept as hidden fallback) ===== */}
+      {false && tab === 'calculator' && (
         <div>
           <div className="card" style={{ marginBottom: 12 }}>
             <h3 style={{ margin: '0 0 4px 0', fontSize: 14, color: 'var(--accent)' }}>🧮 Калькулятор поддержки</h3>
