@@ -9,6 +9,7 @@ import { getRiskColor } from '../../core/utils/risk-colors';
 import { SUPPORT_BASE_COVERAGE } from '../../core/constants';
 import { INTERACTIONS_DB } from '../../data/interactions';
 import { ALL_SUBSTANCES, ALL_INTERACTIONS, type SupportSubstance, type SupportInteraction } from '../../data/support-database';
+import { getSubstanceTier, TIER_LABELS } from '../../data/substance-tiers';
 import { SUBSTANCE_ANALOGS, SUBSTANCE_ENHANCERS, PHASE_MODS, DEFAULT_DOSAGES, getPhaseLevel, type SupportPhase } from '../../data/support-levels';
 import { FertilityPCTScreen } from './FertilityPCTScreen';
 import { ALL_STACKS, EFFECT_LABELS_ru, findStacksByEffect, getSubstanceLabel as getStackSubLabel, type SupportStack } from '../../data/support-stacks';
@@ -902,6 +903,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   const [synergyFilter, setSynergyFilter] = useState<string>('all');
   const [systemFilter, setSystemFilter] = useState<string>('all');
   const [supportClassFilter, setSupportClassFilter] = useState<string>('all');
+  const [supportTierFilter, setSupportTierFilter] = useState<string>('all');
   const [supportLevel, setSupportLevel] = useState<'basic' | 'mid' | 'max' | 'boost'>('mid');
   const [manualLevelSelected, setManualLevelSelected] = useState(false);
   const [boostEnabled, setBoostEnabled] = useState(false);
@@ -3209,7 +3211,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
                         <div key={sub.id}>
                           <div onClick={() => setSelectedSub(selectedSub === sub.id ? null : sub.id)} style={{ display: 'flex', alignItems: 'flex-start', gap: 6, padding: '7px 12px 7px 16px', cursor: 'pointer', borderBottom: '1px solid var(--border)' }}>
                             <div style={{ flex: 1 }}>
-                              <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-light)', lineHeight: 1.3 }}>{sub.name||(sub.id||'').replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase())}</div>
+                              <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-light)', lineHeight: 1.3 }}>{sub.name||(sub.id||'').replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase())}{' '}<span style={{fontSize:8,padding:'0 3px',borderRadius:3,fontWeight:700,color:TIER_LABELS[getSubstanceTier(sub.id)]?.color||'var(--text-dim)',background:(TIER_LABELS[getSubstanceTier(sub.id)]?.color||'var(--text-dim)')+'18'}}>{TIER_LABELS[getSubstanceTier(sub.id)]?.label||'Стд'}</span></div>
                               <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap', marginTop: 2 }}>
                                 {(sub.categories||[]).slice(0, 3).map(c => (
                                   <span key={c} style={{ fontSize: 8, padding: '1px 4px', borderRadius: 3, background: 'rgba(255,255,255,0.04)', color: 'var(--text-dim)' }}>{c}</span>
