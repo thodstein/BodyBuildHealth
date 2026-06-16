@@ -33,6 +33,7 @@ import {
   type SupportInteraction,
   type SupportRisk,
 } from '../data/support-database';
+import { resolveCanonicalId } from '../data/canonical-map';
 
 export interface SupportInput {
   userId?: string;
@@ -486,10 +487,18 @@ function calculateSupportCoverage(
 
   // Build a lookup map: substance id -> SUPPORT_BASE_COVERAGE key
   const resolveSupKey = (id: string): string | undefined => {
-    if (SUPPORT_BASE_COVERAGE[id]) return id;
+    // 1. Resolve to canonical ID first (consolidates all 2083+ variants to ~279 canonical IDs)
+    const canonicalId = resolveCanonicalId(id);
+    if (SUPPORT_BASE_COVERAGE[canonicalId]) return canonicalId;
+    // 2. Check alias map
     if (COVERAGE_ID_ALIAS[id] && SUPPORT_BASE_COVERAGE[COVERAGE_ID_ALIAS[id]]) return COVERAGE_ID_ALIAS[id];
+    if (COVERAGE_ID_ALIAS[canonicalId] && SUPPORT_BASE_COVERAGE[COVERAGE_ID_ALIAS[canonicalId]]) return COVERAGE_ID_ALIAS[canonicalId];
+    // 3. Direct check
+    if (SUPPORT_BASE_COVERAGE[id]) return id;
+    // 4. Fuzzy matching (case-insensitive)
+    const lower = canonicalId.toLowerCase();
     for (const k of Object.keys(SUPPORT_BASE_COVERAGE)) {
-      if (id.toLowerCase().includes(k) || k.includes(id.toLowerCase())) return k;
+      if (lower.includes(k) || k.includes(lower)) return k;
     }
     return undefined;
   };

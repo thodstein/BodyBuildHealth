@@ -1,4 +1,5 @@
 ﻿// ===========================================================================
+import { CANONICAL_ID_MAP, resolveCanonicalId } from './canonical-map';
 // COMPREHENSIVE SUPPORT DATABASE ” Auto-generated from CSV data
 // Source: support-calculator/modules/support/data/
 // Generated: 2026-06-11T14:03:04.109Z
@@ -22328,18 +22329,21 @@ export const GHOST_ID_MAP: Record<string, string> = {
 /** Resolve ghost/alias substance IDs to real IDs in ALL_SUBSTANCES */
 export function resolveSubstanceId(id: string): string {
   if (!id) return id;
-  // Check ghost map first
+  // 1. Check canonical ID map (consolidates 2083+ variants to ~279 canonical IDs)
+  const canonical = resolveCanonicalId(id);
+  if (canonical !== id) return canonical;
+  // 2. Check ghost map (legacy aliases)
   const resolved = GHOST_ID_MAP[id.toUpperCase()] || GHOST_ID_MAP[id];
   if (resolved) return resolved;
-  // Check if ID exists directly
+  // 3. Check if ID exists directly in ALL_SUBSTANCES
   const direct = ALL_SUBSTANCES.find(s => s.id === id);
   if (direct) return id;
-  // Try case-insensitive match
+  // 4. Try case-insensitive match
   const upper = id.toUpperCase();
   for (const s of ALL_SUBSTANCES) {
     if (s.id.toUpperCase() === upper) return s.id;
   }
-  // Try ghost map with uppercase
+  // 5. Try ghost map with uppercase
   if (GHOST_ID_MAP[upper]) return GHOST_ID_MAP[upper];
   return id;
 }
@@ -22353,12 +22357,12 @@ export function resolveSubName(id: string): string {
   return id.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 }
 
-/** Get human-readable label for a substance ID */
+/** Get human-readable label for a substance ID, using canonical names */
 export function getSubstanceLabel(id: string): string {
   if (!id) return '—';
   const resolvedId = resolveSubstanceId(id);
   const s = SUPPORT_SUBSTANCE_MAP[resolvedId];
   if (s) return s.name;
-  return id.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+  return resolvedId.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 }
 
