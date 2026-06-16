@@ -5,7 +5,7 @@ import { RIR_MATRIX, MesocyclePhase, calculateWeeklyProgression, generateWeeklyP
 export { EXERCISE_CATALOG as EXERCISE_DB, getExercisesByGroup as selectExercises, canReplace, getSubstitutes, getExerciseById };
 
 // вЧ §5.1: Матрица MV-MRV по уровням (унифицировано с LEVEL_CONFIGS)
-const LEVEL_VOLUMES: Record<string, { mv: number; mev: number; mav: number; mrv: number }> = {
+export const LEVEL_VOLUMES: Record<string, { mv: number; mev: number; mav: number; mrv: number }> = {
   beginner:    { mv: 4,  mev: 8,  mav: 12, mrv: 16 },
   intermediate:{ mv: 6,  mev: 10, mav: 16, mrv: 20 },
   advanced:    { mv: 8,  mev: 12, mav: 18, mrv: 24 },

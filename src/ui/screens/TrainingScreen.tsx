@@ -1,6 +1,6 @@
 ﻿import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { EXERCISE_CATALOG, getExercisesByGroup } from '../../core/exercise-catalog';
-import { calcTraining, calcExercisePrescription, EXERCISE_DB, TRAINING_SPLITS } from '../../engines/training.engine';
+import { calcTraining, calcExercisePrescription, EXERCISE_DB, TRAINING_SPLITS, TRAINING_LEVEL_CONFIGS, LEVEL_VOLUMES } from '../../engines/training.engine';
 import { generateMacrocycle, getCurrentWeekPlan, type MacrocyclePlan, type Microcycle, type MacrocycleInput } from '../../engines/training-periodization.engine';
 import { selectSplit, getSplitOptions, type SplitCandidate } from '../../engines/split-selector.engine';
 import { selectProgressionRule } from '../../engines/progression.engine';
@@ -159,7 +159,7 @@ export const TrainingScreen: React.FC = () => {
   // Unified program builder state
   const [builderStep, setBuilderStep] = useState(1);
   const [builderSplit, setBuilderSplit] = useState<SplitCandidate | null>(null);
-  const [builderDayExercises, setBuilderDayExercises] = useState<Record<number, { name: string; sets: number; reps: string; rir: number; rest: number; group: string }[]>>({});
+  const [builderDayExercises, setBuilderDayExercises] = useState<Record<number, { name: string; sets: number; reps: string; rir: number; rest: number; group: string; type?: string; rpeHint?: string; dropSet?: boolean; backoffSet?: boolean; substitutes?: string[] }[]>>({});
   const [builderMacroResult, setBuilderMacroResult] = useState<any[] | null>(null);
   const [builderShowSubs, setBuilderShowSubs] = useState<string | null>(null);
   const [builderAddExDay, setBuilderAddExDay] = useState<number | null>(null);
@@ -2054,9 +2054,6 @@ export const TrainingScreen: React.FC = () => {
             {/* STEP 3: Упражнения */}
             {builderStep === 3 && (<>
               <button onClick={() => {
-                const newSeed = Date.now();
-                setGeneratorSeed(newSeed);
-                const shuffleSeed = (newSeed % 1000) / 1000;
                 const s = builderSplit;
                 if (s) {
                   const dayKeys = Object.keys(TRAINING_SPLITS);
@@ -2069,57 +2066,46 @@ export const TrainingScreen: React.FC = () => {
                       for (const g of sp.groupsPerDay) { cycle.push(g); if (cycle.length >= daysPerWeek) break; }
                     }
                     const isWeak = (group: string) => weakPoints.includes(group);
-                    const getReps = (ex: any, g: string, roleIdx: number): string => {
-                      const rng = Math.random() + shuffleSeed;
-                      if (goal === 'strength') {
-                        if (ex.type === 'compound') return (rng % 3) < 1 ? '3-5' : '4-6';
-                        return (rng % 3) < 1 ? '5-7' : '6-8';
-                      }
-                      if (goal === 'bulk') {
-                        if (ex.type === 'compound') return (rng % 3) < 1 ? '6-10' : '8-12';
-                        if (ex.type === 'isolation') return (rng % 3) < 1 ? '8-12' : '10-15';
-                        return '8-12';
-                      }
-                      if (goal === 'cut') return '10-15';
-                      if (ex.type === 'compound') return (rng % 3) < 1 ? '6-10' : '8-12';
-                      return (rng % 3) < 1 ? '8-12' : '10-15';
-                    };
-                    const getRIR = (g: string, isFirst: boolean, exIdx: number): number => {
-                      const jitter = Math.round((shuffleSeed * (exIdx + 1)) % 1);
-                      let base = isFirst ? 1 : 2;
-                      if (isWeak(g)) base = 1;
-                      if (goal === 'strength') base = isFirst ? 2 : 3;
-                      if (goal === 'cut') base = 2;
-                      return Math.max(0, base + jitter);
-                    };
-                    const getSets = (ex: any, g: string, roleIdx: number): number => {
-                      const jitter = Math.round((shuffleSeed * (roleIdx + 2)) % 2);
-                      if (ex.type === 'compound') {
-                        const baseC = level === 'beginner' ? 3 : level === 'enhanced' ? 5 : 4;
-                        return Math.max(3, Math.min(5, baseC + jitter * (isWeak(g) ? 1 : 0)));
-                      }
-                      const baseI = level === 'beginner' ? 2 : 3;
-                      return Math.max(2, Math.min(4, baseI + jitter * (isWeak(g) ? 1 : 0)));
-                    };
                     cycle.forEach((groups, di) => {
                       const dayExs: any[] = [];
                       groups.forEach(g => {
+                        const isWk = isWeak(g);
                         const catalogExs = [...getExercisesByGroup(g)];
-                        const shuffled = catalogExs.sort(() => (Math.random() + shuffleSeed) % 1 - 0.5);
-                        const compounds = shuffled.filter(e => e.type === 'compound');
-                        const isolations = shuffled.filter(e => e.type === 'isolation');
-                        const chosen: typeof shuffled = [];
+                        // Score exercises by relevance using calcExercisePrescription
+                        const scored = catalogExs.map(ex => {
+                          const presc = calcExercisePrescription(ex, goal, level, isWk, false, 1.0, 1, mesoLength || 12);
+                          let score = 0;
+                          if (ex.type === 'compound') score += 10;
+                          if (ex.type === 'isolation') score += 3;
+                          if (isWk) score += 2;
+                          // Prefer exercises bestFor match with goal
+                          if ((ex as any).bestFor && (ex as any).bestFor.includes(goal)) score += 3;
+                          return { ex, presc, score };
+                        });
+                        scored.sort((a, b) => b.score - a.score);
+                        const compounds = scored.filter(s => s.ex.type === 'compound');
+                        const isolations = scored.filter(s => s.ex.type !== 'compound');
+                        const chosen: typeof scored = [];
                         chosen.push(...compounds.slice(0, 2));
                         chosen.push(...isolations.slice(0, Math.max(0, 3 - chosen.length)));
-                        if (chosen.length === 0) chosen.push(...shuffled.slice(0, 2));
-                        chosen.forEach((ex, i) => {
-                          const roleIdx = i;
-                          const sets = getSets(ex, g, roleIdx);
+                        if (chosen.length === 0 && scored.length > 0) chosen.push(...scored.slice(0, 2));
+                        chosen.forEach(({ ex, presc }, i) => {
                           dayExs.push({
-                            name: ex.name, sets, reps: getReps(ex, g, roleIdx),
-                            rir: getRIR(g, i === 0, roleIdx),
-                            rest: ex.type === 'compound' ? (goal === 'strength' ? 180 : 120) : 60,
-                            group: g
+                            name: ex.name,
+                            sets: presc.sets,
+                            reps: presc.reps,
+                            rir: presc.rir,
+                            rest: presc.rest,
+                            group: g,
+                            type: ex.type,
+                            rpeHint: (() => {
+                              if (ex.type === 'compound') return goal === 'strength' ? '8-9.5' : '7-9';
+                              if (ex.type === 'isolation') return goal === 'strength' ? '8-9' : '8-10';
+                              return '7-9';
+                            })(),
+                            dropSet: presc.dropSet,
+                            backoffSet: presc.backoffSet,
+                            substitutes: getExercisesByGroup(g).filter(e => e.name !== ex.name).slice(0, 3).map(e => e.name),
                           });
                         });
                       });
@@ -2219,6 +2205,12 @@ export const TrainingScreen: React.FC = () => {
                         }} style={{ fontSize: 9, padding: '2px 2px', borderRadius: 4, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', maxWidth: 42 }}>
                           {rirOptions.map(r => <option key={r} value={r}>RIR{r}</option>)}
                         </select>
+                        {/* RPE hint */}
+                        <span style={{ fontSize: 8, color: 'var(--text-dim)', minWidth: 40, textAlign: 'center', padding: '1px 4px', borderRadius: 3, background: 'rgba(168,85,247,0.08)' }} title="Рекомендуемая интенсивность">
+                          RPE {ex.rpeHint || '7-9'}
+                        </span>
+                        {ex.dropSet && <span style={{ fontSize: 7, padding: '1px 3px', borderRadius: 3, background: 'rgba(34,197,94,0.1)', color: '#22c55e' }} title="Дроп-сет">▾</span>}
+                        {ex.backoffSet && <span style={{ fontSize: 7, padding: '1px 3px', borderRadius: 3, background: 'rgba(59,130,246,0.1)', color: '#3b82f6' }} title="Обратный сет">◂</span>}
                         {/* Substitute */}
                         <button onClick={() => {
                           setBuilderShowSubs(builderShowSubs === `${dayKey}_${ei}` ? null : `${dayKey}_${ei}`);
@@ -2244,9 +2236,7 @@ export const TrainingScreen: React.FC = () => {
                       {builderShowSubs === `${dayKey}_${ei}` && (<>
                         <div style={{ fontSize: 8, color: 'var(--text-dim)', marginLeft: 8, marginBottom: 2 }}>Альтернативы:</div>
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, marginLeft: 8, marginBottom: 4 }}>
-                          {getExercisesByGroup(ex.group || '').slice(0, 5).map((alt, ai: number) => {
-                            const altName = alt.name || alt.id;
-                            return (
+                          {(ex.substitutes && ex.substitutes.length > 0 ? ex.substitutes : getExercisesByGroup(ex.group || '').filter(e => e.name !== ex.name).slice(0, 5).map(e => e.name || e.id)).map((altName: string, ai: number) => (
                               <button key={ai} onClick={() => {
                                 const newExs = { ...builderDayExercises };
                                 newExs[parseInt(dayKey)] = newExs[parseInt(dayKey)].map((e, j) => j === ei ? { ...e, name: altName } : e);
@@ -2255,8 +2245,7 @@ export const TrainingScreen: React.FC = () => {
                               }} style={{ fontSize: 8, padding: '2px 6px', borderRadius: 4, border: '1px solid var(--border)', cursor: 'pointer', background: 'rgba(0,230,138,0.06)', color: 'var(--text-dim)' }}>
                                 {altName}
                               </button>
-                            );
-                          })}
+                            ))}
                         </div>
                       </>)}
                     </div>);
@@ -2280,6 +2269,39 @@ export const TrainingScreen: React.FC = () => {
                   </div>
                 ))}
               </div>
+              {/* ─── Volume tracking per muscle group ─── */}
+              {(() => {
+                const lv = LEVEL_VOLUMES[level] || LEVEL_VOLUMES.intermediate;
+                const volMap: Record<string, number> = {};
+                Object.values(builderDayExercises).forEach((exs: any[]) => {
+                  exs.forEach((ex: any) => {
+                    const g = ex.group || '';
+                    volMap[g] = (volMap[g] || 0) + (ex.sets || 0);
+                  });
+                });
+                if (Object.keys(volMap).length === 0) return null;
+                return (
+                  <div style={{ background: 'rgba(0,230,138,0.03)', borderRadius: 8, padding: '8px 10px', marginBottom: 8, border: '1px solid rgba(0,230,138,0.08)' }}>
+                    <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--accent)', marginBottom: 6 }}>📊 Объём за неделю:</div>
+                    {MUSCLE_GROUPS.filter(g => volMap[g]).map(g => {
+                      const sets = volMap[g];
+                      let status = '✅'; let statusColor = '#22c55e'; let note = '';
+                      if (sets < lv.mev) { status = '🔴'; statusColor = '#ef4444'; note = `ниже MEV (${lv.mev})`; }
+                      else if (sets >= lv.mrv) { status = '⚠️'; statusColor = '#f59e0b'; note = `близко к MRV (${lv.mrv})`; }
+                      else if (sets >= lv.mrv * 0.85) { status = '⚠️'; statusColor = '#f59e0b'; note = `близко к MRV`; }
+                      else { note = ''; }
+                      return (
+                        <div key={g} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '2px 0', fontSize: 10 }}>
+                          <span style={{ color: 'var(--text-light)', fontWeight: 600 }}>{GROUP_LABELS[g] || g}:</span>
+                          <span style={{ color: statusColor }}>
+                            {sets} подходов (MEV: {lv.mev}, MAV: {lv.mav}, MRV: {lv.mrv}) {status} {note}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
               <div style={{ display: 'flex', gap: 6 }}>
                 <button onClick={() => setBuilderStep(2)} style={{ flex: 1, padding: 8, borderRadius: 8, border: '1px solid var(--border)', cursor: 'pointer', background: 'var(--bg-secondary)', color: 'var(--text-dim)', fontSize: 12 }}>← Назад</button>
                 <button onClick={() => {
@@ -5221,6 +5243,7 @@ const PROGRAM_EQUIP_MAP: Record<string, string> = {
 const ProgramsTab: React.FC<{ selectedProgram: string | null; setSelectedProgram: (id: string | null) => void }> = ({ selectedProgram: selectedId, setSelectedProgram: setSelectedId }) => {
   const [goalFilter, setGoalFilter] = React.useState('all');
   const [detailWeek, setDetailWeek] = React.useState(1);
+  const [expandedDay, setExpandedDay] = React.useState<number | null>(null);
 
   const allPrograms = React.useMemo(() => [...FULL_PROGRAM_LIBRARY, ...WOMENS_PROGRAMS, ...CUSTOM_PROGRAMS], []);
   const programs = React.useMemo(() => {
@@ -5359,46 +5382,119 @@ const ProgramsTab: React.FC<{ selectedProgram: string | null; setSelectedProgram
 
           {selected.weeks[detailWeek - 1] && (() => {
             const wk = selected.weeks[detailWeek - 1];
+            const DAY_NAMES = ['ПН', 'ВТ', 'СР', 'ЧТ', 'ПТ', 'СБ', 'ВС'];
+            const dayMap: Record<number, typeof wk.days[0]> = {};
+            wk.days.forEach(d => { dayMap[d.day] = d; });
             return (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                 <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 2 }}>
                   Фаза: <b>{PHASE_LABELS[wk.phase] || wk.phase}</b> | Объём: {wk.volumeMultiplier}× | Интенсивность: {wk.intensityMultiplier}×
                   {wk.deload ? ' | 🟢 Разгрузка' : ''}
                 </div>
-                {wk.days.map((day, di) => (
-                  <div key={di} style={{
-                    padding: 10, borderRadius: 10, background: 'rgba(255,255,255,0.02)',
-                    border: '1px solid var(--border)',
-                  }}>
-                    <div style={{ fontWeight: 700, fontSize: 11, color: 'var(--accent)', marginBottom: 4 }}>
-                      День {day.day}: {day.name} — {day.focus}
-                    </div>
-                    <div style={{ fontSize: 8, color: 'var(--text-dim)', marginBottom: 6 }}>
-                      Разминка: {day.warmup} | Заминка: {day.cooldown}
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '2px 8px', borderRadius: 4, marginBottom: 2, fontSize: 8, color: 'var(--text-dim)', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                      <span style={{ flex: 1 }}>Упражнение</span>
-                      <span style={{ minWidth: 50, textAlign: 'center' }}>Подходы</span>
-                      <span style={{ minWidth: 35, textAlign: 'center' }}>RPE</span>
-                      <span style={{ minWidth: 30, textAlign: 'center' }}>RIR</span>
-                      <span style={{ minWidth: 35, textAlign: 'center' }}>Отдых</span>
-                    </div>
-                    {day.exercises.map((ex, ei) => (
-                      <div key={ei} style={{
-                        display: 'flex', alignItems: 'center', gap: 6, padding: '4px 8px',
-                        borderRadius: 6, marginBottom: 2, background: 'rgba(255,255,255,0.03)',
-                        fontSize: 9,
-                      }}>
-                        <span style={{ flex: 1, fontWeight: 600 }}>{ex.name}</span>
-                        <span style={{ color: 'var(--accent)' }}>{ex.sets}×{ex.reps}</span>
-                        <span style={{ color: 'var(--text-dim)' }}>RPE {ex.rpe}</span>
-                        <span style={{ color: 'var(--text-dim)' }}>RIR {ex.rir}</span>
-                        <span style={{ color: 'var(--text-dim)' }}>Отд {ex.restSec}с</span>
-                        {ex.notes ? <span style={{ fontSize: 8, color: 'var(--text-dim)' }}>{ex.notes}</span> : null}
+                {/* Visual weekly calendar */}
+                <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--accent)', margin: '4px 0 6px' }}>
+                  📅 Неделя {wk.week}
+                </div>
+                <div style={{
+                  display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 3,
+                  borderRadius: 10, overflow: 'hidden',
+                  border: '1px solid var(--glass-border)',
+                }}>
+                  {/* Day headers */}
+                  {DAY_NAMES.map((dn, i) => (
+                    <div key={`hdr-${i}`} style={{
+                      padding: '6px 2px', textAlign: 'center',
+                      background: 'rgba(0,230,138,0.08)',
+                      fontSize: 10, fontWeight: 700, color: 'var(--accent)',
+                      borderBottom: '1px solid var(--glass-border)',
+                    }}>{dn}</div>
+                  ))}
+                  {/* Day cells */}
+                  {DAY_NAMES.map((_, i) => {
+                    const dayNum = i + 1;
+                    const day = dayMap[dayNum];
+                    const isRest = !day;
+                    const isExpanded = expandedDay === dayNum;
+                    return (
+                      <div key={`day-${i}`} onClick={() => day && setExpandedDay(isExpanded ? null : dayNum)}
+                        style={{
+                          padding: isRest ? '10px 4px' : '8px 4px',
+                          textAlign: 'center',
+                          cursor: day ? 'pointer' : 'default',
+                          background: isExpanded ? 'rgba(0,230,138,0.1)' : isRest ? 'rgba(255,255,255,0.01)' : 'rgba(255,255,255,0.03)',
+                          border: isExpanded ? '1px solid var(--accent)' : '1px solid transparent',
+                          borderRadius: isExpanded ? 4 : 0,
+                          transition: 'background 0.2s',
+                          minHeight: 50,
+                          display: 'flex', flexDirection: 'column', justifyContent: 'center',
+                        }}
+                      >
+                        {isRest ? (
+                          <span style={{ fontSize: 9, color: 'var(--text-dim)', opacity: 0.5 }}>Отдых</span>
+                        ) : (
+                          <>
+                            <span style={{ fontSize: 9, fontWeight: 700, color: 'var(--text-light)' }}>
+                              {day.focus || day.name}
+                            </span>
+                            <span style={{ fontSize: 8, color: 'var(--accent)', marginTop: 1 }}>
+                              {day.exercises.length} упр
+                            </span>
+                            {day.day && (
+                              <span style={{ fontSize: 7, color: 'var(--text-dim)', marginTop: 1 }}>
+                                День {day.day}
+                              </span>
+                            )}
+                          </>
+                        )}
                       </div>
-                    ))}
-                  </div>
-                ))}
+                    );
+                  })}
+                </div>
+                {/* Expanded day detail */}
+                {expandedDay !== null && dayMap[expandedDay] && (() => {
+                  const day = dayMap[expandedDay];
+                  return (
+                    <div style={{
+                      padding: 10, marginTop: 4, borderRadius: 10,
+                      background: 'rgba(0,230,138,0.04)', border: '1px solid rgba(0,230,138,0.12)',
+                    }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                        <div style={{ fontWeight: 700, fontSize: 11, color: 'var(--accent)' }}>
+                          {DAY_NAMES[expandedDay - 1]} — День {day.day}: {day.name}
+                        </div>
+                        <button onClick={() => setExpandedDay(null)} style={{
+                          padding: '2px 8px', borderRadius: 4, fontSize: 9, cursor: 'pointer',
+                          background: 'transparent', border: '1px solid var(--border)',
+                          color: 'var(--text-dim)',
+                        }}>✕</button>
+                      </div>
+                      <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 6 }}>
+                        {day.focus} · Разминка: {day.warmup} · Заминка: {day.cooldown}
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '2px 8px', borderRadius: 4, marginBottom: 2, fontSize: 8, color: 'var(--text-dim)', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                        <span style={{ flex: 1 }}>Упражнение</span>
+                        <span style={{ minWidth: 50, textAlign: 'center' }}>Подходы</span>
+                        <span style={{ minWidth: 35, textAlign: 'center' }}>RPE</span>
+                        <span style={{ minWidth: 30, textAlign: 'center' }}>RIR</span>
+                        <span style={{ minWidth: 35, textAlign: 'center' }}>Отдых</span>
+                      </div>
+                      {day.exercises.map((ex, ei) => (
+                        <div key={ei} style={{
+                          display: 'flex', alignItems: 'center', gap: 6, padding: '4px 8px',
+                          borderRadius: 6, marginBottom: 2, background: 'rgba(255,255,255,0.03)',
+                          fontSize: 9,
+                        }}>
+                          <span style={{ flex: 1, fontWeight: 600 }}>{ex.name}</span>
+                          <span style={{ color: 'var(--accent)' }}>{ex.sets}×{ex.reps}</span>
+                          <span style={{ color: 'var(--text-dim)' }}>RPE {ex.rpe}</span>
+                          <span style={{ color: 'var(--text-dim)' }}>RIR {ex.rir}</span>
+                          <span style={{ color: 'var(--text-dim)' }}>Отд {ex.restSec}с</span>
+                          {ex.notes ? <span style={{ fontSize: 8, color: 'var(--text-dim)' }}>{ex.notes}</span> : null}
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })()}
               </div>
             );
           })()}

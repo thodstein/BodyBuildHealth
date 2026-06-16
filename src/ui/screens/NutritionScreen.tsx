@@ -440,6 +440,10 @@ const MealPlanExtended: React.FC<{ tKcal: number; tProt: number; tFat: number; t
   const [newGHDose, setNewGHDose] = React.useState(4);
   const [newIGFTime, setNewIGFTime] = React.useState('10:00');
   const [newIGFDose, setNewIGFDose] = React.useState(50);
+  const [macroCyclingEnabled, setMacroCyclingEnabled] = React.useState(false);
+  const [shoppingListVisible, setShoppingListVisible] = React.useState(false);
+  const [indivPlanRest, setIndivPlanRest] = React.useState<any>(null);
+  const [activeCyclingView, setActiveCyclingView] = React.useState<'train' | 'rest'>('train');
 
   const RECOMMENDED_IDS: Record<string, string[]> = {
     'protein': ['turkey_breast', 'chicken_breast', 'egg_whole', 'egg_white', 'beef_lean', 'salmon', 'shrimp', 'tuna_steak'],
@@ -614,6 +618,25 @@ const MealPlanExtended: React.FC<{ tKcal: number; tProt: number; tFat: number; t
           if (names.some(n => n.includes('яйц') || n.includes('творог') || n.includes('йогурт') || n.includes('сыр'))) return 10;
           if (names.some(n => n.includes('рис') || n.includes('макарон') || n.includes('картоф') || n.includes('гречк') || n.includes('плов'))) return 20;
           return 15;
+        })(),
+        cookingMethod: (() => {
+          const names = items.map(it => (it.foodName || '').toLowerCase());
+          if (names.some(n => n.includes('говядин') || n.includes('свинин') || n.includes('баранин') || n.includes('куриц') || n.includes('индейк'))) return '🍳 жарка';
+          if (names.some(n => n.includes('лосос') || n.includes('треск') || n.includes('палтус') || n.includes('рыб'))) return '🔥 запекание';
+          if (names.some(n => n.includes('рис') || n.includes('макарон') || n.includes('картоф') || n.includes('гречк') || n.includes('плов') || n.includes('овсянк'))) return '💧 варка';
+          if (names.some(n => n.includes('яйц'))) return '💧 варка';
+          if (names.some(n => n.includes('творог') || n.includes('йогурт') || n.includes('сыр') || n.includes('орех') || n.includes('авокадо') || n.includes('масло'))) return '🟢 без готовки';
+          if (names.some(n => n.includes('креветк') || n.includes('тунец'))) return '💧 варка';
+          return '🟢 без готовки';
+        })(),
+        storage: (() => {
+          const names = items.map(it => (it.foodName || '').toLowerCase());
+          if (names.some(n => n.includes('творог') || n.includes('йогурт') || n.includes('сыр') || n.includes('молок') || n.includes('кефир'))) return '🧊 холодильник 3 дня';
+          if (names.some(n => n.includes('говядин') || n.includes('куриц') || n.includes('индейк') || n.includes('свинин') || n.includes('рыб') || n.includes('лосос') || n.includes('яйц'))) return '❄️ морозилка 1 мес';
+          if (names.some(n => n.includes('рис') || n.includes('гречк') || n.includes('плов') || n.includes('макарон'))) return '🧊 холодильник 3 дня';
+          if (names.some(n => n.includes('овощ') || n.includes('фрукт') || n.includes('яблок') || n.includes('огур') || n.includes('помидор') || n.includes('салат') || n.includes('зелен'))) return '🧊 холодильник 5 дней';
+          if (names.some(n => n.includes('орех') || n.includes('масло') || n.includes('авокадо'))) return '📦 комн. темп 2 нед';
+          return '🧊 холодильник 3 дня';
         })(),
       };
     });
@@ -1395,7 +1418,30 @@ const MealPlanExtended: React.FC<{ tKcal: number; tProt: number; tFat: number; t
             <button onClick={() => setIndivIGFShots(indivIGFShots.filter((_, j) => j !== i))} style={{ background: 'none', border: 'none', color: '#ef4444', fontSize: 12, cursor: 'pointer', padding: 0 }}>×</button>
           </div>
         ))}
-        <button onClick={generateIndividualPlan} style={{
+        {/* Macro cycling toggle */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, padding: '8px 10px', borderRadius: 8, background: macroCyclingEnabled ? 'rgba(59,130,246,0.08)' : 'var(--bg-secondary)', border: macroCyclingEnabled ? '1px solid rgba(59,130,246,0.3)' : '1px solid var(--border)' }}>
+          <button onClick={() => setMacroCyclingEnabled(!macroCyclingEnabled)} style={{
+            width: 36, height: 20, borderRadius: 10, cursor: 'pointer', border: 'none',
+            background: macroCyclingEnabled ? '#3b82f6' : 'var(--border)',
+            position: 'relative' as const, transition: 'background 0.2s',
+          }}>
+            <div style={{ width: 16, height: 16, borderRadius: '50%', background: '#fff', position: 'absolute', top: 2, left: macroCyclingEnabled ? 18 : 2, transition: 'left 0.2s' }} />
+          </button>
+          <span style={{ fontSize: 11, fontWeight: 600, color: macroCyclingEnabled ? '#3b82f6' : 'var(--text-dim)' }}>
+            🔄 Циклирование макросов
+          </span>
+        </div>
+        {macroCyclingEnabled && (
+          <div style={{ padding: '6px 10px', marginBottom: 8, borderRadius: 8, background: 'rgba(59,130,246,0.04)', border: '1px solid rgba(59,130,246,0.1)', fontSize: 9, color: 'var(--text-dim)', lineHeight: 1.6 }}>
+            <div>🏋️ <b>Тренировочный день:</b> +200 ккал, +50 г углеводов</div>
+            <div>😴 <b>День отдыха:</b> −200 ккал, −50 г углеводов</div>
+            <div>🥩 <b>Белок:</b> постоянный ({indivProt} г) все дни</div>
+          </div>
+        )}
+        <button onClick={() => {
+          generateIndividualPlan();
+          setIndivPlanRest(null);
+        }} style={{
           width: '100%', padding: 10, borderRadius: 10, border: 'none', cursor: 'pointer',
           background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)', color: '#fff',
           fontWeight: 700, fontSize: 13, marginBottom: 10,
@@ -1494,7 +1540,9 @@ const MealPlanExtended: React.FC<{ tKcal: number; tProt: number; tFat: number; t
                       }}>›</span>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ color: mealColor, fontSize: 11 }}>{meal.time} {meal.label}</div>
-                        <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>~{meal.prepTime || 15} мин подготовки</div>
+                        <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>
+                          ⏱ {meal.prepTime || 15} мин · {meal.cookingMethod || 'готовка'} · {meal.storage || 'холодильник'}
+                        </div>
                       </div>
                       <div style={{ textAlign: 'right', flexShrink: 0 }}>
                         <div style={{ fontSize: 9, fontWeight: 700, color: mealColor }}>{meal.totals.kcal} ккал</div>
@@ -1594,6 +1642,90 @@ const MealPlanExtended: React.FC<{ tKcal: number; tProt: number; tFat: number; t
                 })}
               </div>
             </div>
+            {/* Macro cycling comparison */}
+            {macroCyclingEnabled && (
+              <div style={{ marginTop: 8, padding: '8px 10px', borderRadius: 8, background: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.12)' }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: '#3b82f6', marginBottom: 6 }}>🔄 Циклирование</div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, fontSize: 9 }}>
+                  <div style={{ padding: 6, borderRadius: 6, background: 'rgba(0,230,138,0.06)' }}>
+                    <div style={{ fontWeight: 700, color: '#22c55e', marginBottom: 2 }}>🏋️ Тренировочный день</div>
+                    <div style={{ color: 'var(--text-dim)' }}>
+                      {Math.round(indivPlan.dayTotals.kcal)} ккал<br/>
+                      Б: {Math.round(indivPlan.dayTotals.protein)}г · Ж: {Math.round(indivPlan.dayTotals.fat)}г · У: {Math.round(indivPlan.dayTotals.carbs)}г
+                    </div>
+                  </div>
+                  <div style={{ padding: 6, borderRadius: 6, background: 'rgba(139,92,246,0.06)' }}>
+                    <div style={{ fontWeight: 700, color: '#8b5cf6', marginBottom: 2 }}>😴 День отдыха</div>
+                    <div style={{ color: 'var(--text-dim)' }}>
+                      {Math.round(indivPlan.dayTotals.kcal) - 200} ккал<br/>
+                      Б: {Math.round(indivPlan.dayTotals.protein)}г · Ж: {Math.round(indivPlan.dayTotals.fat)}г · У: {Math.round(indivPlan.dayTotals.carbs) - 50}г
+                    </div>
+                  </div>
+                </div>
+                <div style={{ fontSize: 8, color: 'var(--text-dim)', marginTop: 4, textAlign: 'center' }}>
+                  Белок постоянный · Углеводы циклируются · Жиры стабильны
+                </div>
+              </div>
+            )}
+            {/* Shopping list button */}
+            <button onClick={() => setShoppingListVisible(!shoppingListVisible)} style={{
+              width: '100%', marginTop: 8, padding: 8, borderRadius: 8,
+              border: '1px solid rgba(249,115,22,0.3)', cursor: 'pointer',
+              background: shoppingListVisible ? 'rgba(249,115,22,0.08)' : 'var(--bg-secondary)',
+              color: '#f97316', fontWeight: 600, fontSize: 11,
+            }}>🛒 {shoppingListVisible ? 'Скрыть список покупок' : 'Список покупок на неделю'}</button>
+            {shoppingListVisible && (() => {
+              const allItems: { name: string; totalGrams: number; category: string }[] = [];
+              const itemMap: Record<string, { totalGrams: number; category: string }> = {};
+              indivPlan.meals.forEach((meal: any) => {
+                meal.items.forEach((it: any) => {
+                  const key = it.foodName;
+                  if (itemMap[key]) {
+                    itemMap[key].totalGrams += it.amount;
+                  } else {
+                    const food = FOOD_DB.find(f => f.name === key);
+                    itemMap[key] = { totalGrams: it.amount, category: food?.category || 'protein' };
+                  }
+                });
+              });
+              Object.entries(itemMap).forEach(([name, data]) => {
+                allItems.push({ name, totalGrams: Math.round(data.totalGrams * 7), category: data.category });
+              });
+              const catGroups: Record<string, { label: string; emoji: string; color: string; items: typeof allItems }> = {
+                protein: { label: 'Белки', emoji: '🥩', color: '#3b82f6', items: [] },
+                carb: { label: 'Углеводы', emoji: '🌾', color: '#f97316', items: [] },
+                grain: { label: 'Углеводы', emoji: '🌾', color: '#f97316', items: [] },
+                fat: { label: 'Жиры', emoji: '🥑', color: '#f59e0b', items: [] },
+                veg_fruit: { label: 'Овощи/Фрукты', emoji: '🥬', color: '#22c55e', items: [] },
+                dairy: { label: 'Молочное', emoji: '🥛', color: '#06b6d4', items: [] },
+                supplement: { label: 'Добавки', emoji: '💊', color: '#a855f7', items: [] },
+              };
+              allItems.forEach(it => {
+                const g = catGroups[it.category] || catGroups.protein;
+                g.items.push(it);
+              });
+              return (
+                <div style={{ marginTop: 8, padding: '8px 10px', borderRadius: 8, background: 'rgba(249,115,22,0.04)', border: '1px solid rgba(249,115,22,0.12)', fontSize: 9 }}>
+                  <div style={{ fontWeight: 700, color: '#f97316', marginBottom: 6 }}>🛒 Список покупок на неделю:</div>
+                  {Object.values(catGroups).filter(g => g.items.length > 0).map(g => (
+                    <div key={g.label} style={{ marginBottom: 4 }}>
+                      <span style={{ fontWeight: 600, color: g.color }}>{g.emoji} {g.label}: </span>
+                      <span style={{ color: 'var(--text-dim)' }}>
+                        {g.items.map(it => it.totalGrams >= 1000
+                          ? `${it.name} ${(it.totalGrams / 1000).toFixed(1)} кг`
+                          : `${it.name} ${it.totalGrams} г`
+                        ).join(', ')}
+                      </span>
+                    </div>
+                  ))}
+                  {macroCyclingEnabled && (
+                    <div style={{ fontSize: 8, color: 'var(--text-dim)', marginTop: 4, fontStyle: 'italic' }}>
+                      * Для дней отдыха берите на ~15% меньше углеводов
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
             {/* Phase 5.12: Water intake calculator */}
             {(() => {
               const weight = s?.weight || profile?.settings?.weight || 80;
