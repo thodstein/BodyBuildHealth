@@ -1111,13 +1111,14 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
     const phaseResult = getPhaseLevel(supportLevel, supportPhase, SUPPORT_LEVELS);
     const subs = [...phaseResult.subs];
     const dosages = { ...phaseResult.dosages };
-    // Replace substances with selected analogs
+    // Replace substances with selected analogs — use form/mg/timing from SUBSTANCE_ANALOGS if available
     for (const [originalId, analogId] of Object.entries(selectedAnalogs)) {
       const idx = subs.indexOf(originalId);
       if (idx >= 0 && analogId !== originalId) {
         subs[idx] = analogId;
-        // Replace dosage if analog has one, otherwise use default
-        const analogDosage = SUPPORT_LEVELS[supportLevel]?.dosages?.[analogId] || DEFAULT_DOSAGES[analogId] || { mg: 500, timing: 'с едой' };
+        // Find analog entry to get its dosage info
+        const analogEntry = (SUBSTANCE_ANALOGS[originalId] || []).find(a => a.id === analogId);
+        const analogDosage = (analogEntry?.mg ? { mg: analogEntry.mg, timing: analogEntry.timing || 'с едой' } : null) || SUPPORT_LEVELS[supportLevel]?.dosages?.[analogId] || DEFAULT_DOSAGES[analogId] || { mg: 500, timing: 'с едой' };
         delete dosages[originalId];
         dosages[analogId] = analogDosage;
       }
@@ -1539,15 +1540,17 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
       return cat;
     };
     const groups: Record<string, SupportSubstance[]> = {};
+    // Apply tier filter and search query
+    const tierFiltered = supportTierFilter === 'all' ? ALL_SUBSTANCES : ALL_SUBSTANCES.filter(s => getSubstanceTier(s.id) === supportTierFilter);
     const filtered = searchQuery
-      ? ALL_SUBSTANCES.filter(s =>
+      ? tierFiltered.filter(s =>
           (s.name||'').toLowerCase().includes(searchQuery.toLowerCase()) ||
           (s.id||'').toLowerCase().includes(searchQuery.toLowerCase()) ||
           (s.description||'').toLowerCase().includes(searchQuery.toLowerCase()) ||
           (s.categories||[]).some(c => (c||'').toLowerCase().includes(searchQuery.toLowerCase())) ||
           (s.mechanisms||[]).some(m => (m||'').toLowerCase().includes(searchQuery.toLowerCase()))
         )
-        : ALL_SUBSTANCES;
+        : tierFiltered;
     for (const sub of filtered) {
       const primaryCat = normCat((sub.categories||[])[0] || 'other');
       if (!groups[primaryCat]) groups[primaryCat] = [];
@@ -1580,7 +1583,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
         return { cat, items, count: items.length, classBadges, classItems };
       })
       .sort((a, b) => b.count - a.count);
-  }, [searchQuery]);
+  }, [searchQuery, supportTierFilter]);
 
   // Organ-based grouping for catalog sub-tab
   // Phase 5.12: Comprehensive 16-category organ mapping
@@ -2280,6 +2283,22 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
                 </div>
                 <div style={{ display:'flex', gap:6, marginBottom:8, alignItems:'center' }}>
                   <input value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Поиск по названию, категориям, механизмам" style={{ flex:1, padding:'8px 10px', borderRadius:8, border:'1px solid var(--border-color)', background:'var(--bg-secondary)', color:'var(--text-light)', fontSize:12 }} />
+                </div>
+                {/* Tier filter buttons */}
+                <div style={{ display:'flex', gap:4, marginBottom:8, flexWrap:'wrap' }}>
+                  {(['all','core','standard','advanced','specialty'] as const).map(tier => {
+                    const isSel = supportTierFilter === tier;
+                    const info = tier === 'all' ? { label:'Все', emoji:'🔍', color:'var(--text-dim)' } : TIER_LABELS[tier];
+                    const count = tier === 'all' ? ALL_SUBSTANCES.length : ALL_SUBSTANCES.filter(s => getSubstanceTier(s.id) === tier).length;
+                    return (
+                      <button key={tier} onClick={() => setSupportTierFilter(tier)} style={{
+                        padding:'4px 10px', borderRadius:12, fontSize:9, fontWeight:700, cursor:'pointer',
+                        background: isSel ? (info?.color || 'var(--accent)') : 'var(--bg-secondary)',
+                        color: isSel ? '#000' : 'var(--text-dim)',
+                        border: `1px solid ${isSel ? (info?.color || 'var(--accent)') : 'var(--border)'}`,
+                      }}>{info?.emoji || ''} {info?.label || tier} ({count})</button>
+                    );
+                  })}
                 </div>
                 <div style={{ fontSize:9, color:'var(--text-dim)', marginBottom:6 }}>
                   {searchQuery ? `Найдено: ${groupedSubstances.reduce((a, g) => a + g.count, 0)} из ${ALL_SUBSTANCES.length}` : `Всего: ${ALL_SUBSTANCES.length} веществ`}
@@ -5362,7 +5381,18 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
                       </div>
                       <div style={{ display:'flex', gap:3, marginTop:2, flexWrap:'wrap' }}>
                         {analogs.length > 1 && (
-                          <button onClick={() => { const ci = analogs.findIndex(a => a.id === (selectedAnalogs[id] || id)); setSelectedAnalogs(prev => ({ ...prev, [id]: analogs[(ci + 1) % analogs.length].id })); calcSupport(supportLevel); }} style={{ padding:'1px 5px', borderRadius:3, fontSize:7, cursor:'pointer', border:'1px solid rgba(96,165,250,0.3)', background:'rgba(96,165,250,0.08)', color:'#60a5fa', fontWeight:500 }}>🔄 Заменить</button>
+                          <div style={{ marginTop:2 }}>
+                            <div style={{ display:'flex', gap:2, flexWrap:'wrap' }}>
+                              {analogs.map((a: any, ai: number) => {
+                                const isSelectedAnalog = (selectedAnalogs[id] || id) === a.id;
+                                return (
+                                  <button key={a.id} onClick={() => { setSelectedAnalogs(prev => ({ ...prev, [id]: a.id })); calcSupport(supportLevel); }} style={{ padding:'1px 4px', borderRadius:3, fontSize:7, cursor:'pointer', border: isSelectedAnalog ? '1px solid rgba(96,165,250,0.5)' : '1px solid rgba(96,165,250,0.15)', background: isSelectedAnalog ? 'rgba(96,165,250,0.15)' : 'transparent', color: isSelectedAnalog ? '#60a5fa' : 'var(--text-dim)', fontWeight: isSelectedAnalog ? 700 : 400 }}>
+                                    {a.name}{a.form ? ' (' + a.form + ')' : ''}{a.mg ? ' ' + (a.mg >= 1000 ? (a.mg/1000).toFixed(1) + 'г' : a.mg + 'мг') : ''}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
                         )}
                         {enhancers.length > 0 && !isEnhanced && (
                           <button onClick={() => { setEnhancedSubs(prev => [...prev, enhancers[0].id]); calcSupport(supportLevel); }} style={{ padding:'1px 5px', borderRadius:3, fontSize:7, cursor:'pointer', border:'1px solid rgba(0,230,138,0.3)', background:'rgba(0,230,138,0.08)', color:'#00e68a', fontWeight:500 }}>⚡ Усилить</button>

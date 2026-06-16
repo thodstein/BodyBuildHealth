@@ -401,6 +401,7 @@ export interface RiskResult {
   systemBreakdown: Record<string, { raw: number; net: number }>;
   mechanismBreakdown?: Record<string, number>;
   mechanismDetail?: Record<string, MechanismCell>;
+  coverageMap?: Record<string, number>;
 }
 
 export interface RiskInput {

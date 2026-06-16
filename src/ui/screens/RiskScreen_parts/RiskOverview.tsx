@@ -197,6 +197,37 @@ export const RiskOverview: React.FC<{
         </Section>
       )}
 
+      {/* Support Coverage — How support reduces risk per system */}
+      <Section id="support_coverage" icon="🛡️" title="Покрытие поддержкой">
+        <div style={{ fontSize:10, color:'var(--text-dim)', marginBottom:6 }}>Насколько препараты поддержки снижают риски по системам</div>
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:4 }}>
+          {(() => {
+            const supportData = riskResult?.coverageMap || {};
+            const systems = ['cardio','hepatic','renal','neuro','endocrine','hematologic','reproductive','musculoskeletal'];
+            const sysLabels: Record<string, string> = { cardio:'❤️ Сердце', hepatic:'🫁 Печень', renal:'🫘 Почки', neuro:'🧠 Нервная', endocrine:'⚖️ Эндокринная', hematologic:'🩸 Кровь', reproductive:'🧬 Репрод.', musculoskeletal:'💪 Мышцы' };
+            const riskMap = riskResult?.systemBreakdown || {};
+            return systems.map(sys => {
+              const coverage = supportData[sys] || 0;
+              const riskVal = riskMap[sys]?.net || 0;
+              const netRisk = Math.max(0, riskVal * (1 - coverage));
+              const pct = Math.round(coverage * 100);
+              return (
+                <div key={sys} style={{ background:'var(--bg-secondary)', padding:'6px 8px', borderRadius:8 }}>
+                  <div style={{ fontSize:9, fontWeight:600, color:'var(--text-light)', marginBottom:2 }}>{sysLabels[sys] || sys}</div>
+                  <div style={{ display:'flex', alignItems:'center', gap:4 }}>
+                    <div style={{ flex:1, height:6, borderRadius:3, background:'rgba(255,255,255,0.1)', overflow:'hidden' }}>
+                      <div style={{ width: pct + '%', height:'100%', borderRadius:3, background: pct >= 70 ? '#22c55e' : pct >= 40 ? '#eab308' : '#ef4444', transition:'width 0.3s' }} />
+                    </div>
+                    <span style={{ fontSize:9, fontWeight:700, color: pct >= 70 ? '#22c55e' : pct >= 40 ? '#eab308' : '#ef4444' }}>{pct}%</span>
+                  </div>
+                  <div style={{ fontSize:7, color:'var(--text-dim)', marginTop:1 }}>Риск: {Math.round(riskVal)}% → {Math.round(netRisk)}%</div>
+                </div>
+              );
+            });
+          })()}
+        </div>
+      </Section>
+
       {/* Recommendations */}
       {/* Recommendations */}
       {!hideRecs && (

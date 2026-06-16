@@ -245,6 +245,82 @@ export const NutritionOverview: React.FC<{
               </div>
             ))}
           </div>
+
+      {/* Meal Templates per Goal */}
+      <div className="card" style={{ marginBottom: 12 }}>
+        <h3 style={{ margin: '0 0 8px 0' }}>&#x1F37D;&#xFE0F; Шаблоны приёмов пищи</h3>
+        <p style={{ fontSize: 11, color: 'var(--text-dim)', margin: '0 0 10px 0' }}>
+          Рекомендуемые шаблоны приёмов пищи на основе вашей цели ({goalInfo || 'не указана'})
+        </p>
+        {(() => {
+          const goal = s?.primaryGoal || s?.goal || 'health';
+          const mealTemplates: Record<string, { name: string; meals: { time: string; name: string; kcal: number; protein: number; desc: string }[] }> = {
+            bulk: { name: 'Набор массы', meals: [
+              { time: '07:00', name: 'Завтрак', kcal: 700, protein: 40, desc: 'Овсянка + яйца + банан + арахисовая паста' },
+              { time: '10:00', name: 'Перекус', kcal: 350, protein: 25, desc: 'Протеиновый коктейль + орехи' },
+              { time: '13:00', name: 'Обед', kcal: 800, protein: 50, desc: 'Рис/гречка + курица/говядина + овощи + масло' },
+              { time: '16:00', name: 'Перекус', kcal: 300, protein: 20, desc: 'Творог + фрукты' },
+              { time: '19:00', name: 'Ужин', kcal: 700, protein: 45, desc: 'Паста/картофель + рыба/мясо + салат' },
+              { time: '21:30', name: 'Перед сном', kcal: 250, protein: 30, desc: 'Казеин + орехи' },
+            ]},
+            cut: { name: 'Сушка', meals: [
+              { time: '07:30', name: 'Завтрак', kcal: 400, protein: 35, desc: 'Яйца + овощи + авокадо' },
+              { time: '11:00', name: 'Перекус', kcal: 200, protein: 25, desc: 'Протеин + ягоды' },
+              { time: '13:30', name: 'Обед', kcal: 500, protein: 45, desc: 'Куриная грудка + салат + мин. углеводы' },
+              { time: '17:00', name: 'Перекус', kcal: 150, protein: 20, desc: 'Творог 0%' },
+              { time: '19:30', name: 'Ужин', kcal: 450, protein: 40, desc: 'Рыба + овощи + оливковое масло' },
+            ]},
+            maintenance: { name: 'Поддержание', meals: [
+              { time: '08:00', name: 'Завтрак', kcal: 500, protein: 30, desc: 'Овсянка + яйца + фрукты' },
+              { time: '12:00', name: 'Обед', kcal: 650, protein: 45, desc: 'Курица/рыба + крупы + овощи' },
+              { time: '16:00', name: 'Перекус', kcal: 250, protein: 20, desc: 'Творог + орехи' },
+              { time: '19:30', name: 'Ужин', kcal: 600, protein: 35, desc: 'Мясо/рыба + салат + гарнир' },
+            ]},
+            strength: { name: 'Сила', meals: [
+              { time: '07:00', name: 'Завтрак', kcal: 600, protein: 35, desc: 'Овсянка + яйца + банан' },
+              { time: '10:30', name: 'Предтренировочный', kcal: 300, protein: 15, desc: 'Рис + кофеин' },
+              { time: '13:00', name: 'После тренировки', kcal: 500, protein: 40, desc: 'Протеин + быстрые углеводы' },
+              { time: '15:30', name: 'Обед', kcal: 700, protein: 50, desc: 'Говядина + рис + овощи' },
+              { time: '19:30', name: 'Ужин', kcal: 600, protein: 35, desc: 'Рыба + картофель + салат' },
+              { time: '22:00', name: 'Перед сном', kcal: 200, protein: 25, desc: 'Казеин + арахисовая паста' },
+            ]},
+            health: { name: 'Здоровье', meals: [
+              { time: '08:00', name: 'Завтрак', kcal: 400, protein: 25, desc: 'Овсянка + ягоды + орехи' },
+              { time: '12:30', name: 'Обед', kcal: 550, protein: 35, desc: 'Рыба/курица + овощи + крупы' },
+              { time: '16:00', name: 'Перекус', kcal: 200, protein: 15, desc: 'Фрукты + йогурт' },
+              { time: '19:00', name: 'Ужин', kcal: 450, protein: 30, desc: 'Салат + белок + оливковое масло' },
+            ]},
+          };
+          const template = mealTemplates[goal] || mealTemplates.health;
+          const totalKcal = template.meals.reduce((s: number, m: any) => s + m.kcal, 0);
+          const totalProt = template.meals.reduce((s: number, m: any) => s + m.protein, 0);
+          return (
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, padding: '6px 10px', background: 'rgba(0,230,138,0.06)', borderRadius: 8 }}>
+                <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--accent)' }}>{template.name}</span>
+                <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>{totalKcal} ккал | {totalProt}г белка | {template.meals.length} приёмов</span>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {template.meals.map((m: any, i: number) => (
+                  <div key={i} style={{ background: 'var(--bg-secondary)', padding: '8px 10px', borderRadius: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span style={{ fontSize: 9, color: 'var(--text-dim)', background: 'rgba(0,230,138,0.1)', padding: '2px 6px', borderRadius: 4, fontWeight: 600 }}>{m.time}</span>
+                        <span style={{ fontSize: 11, fontWeight: 600 }}>{m.name}</span>
+                      </div>
+                      <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 2 }}>{m.desc}</div>
+                    </div>
+                    <div style={{ textAlign: 'right', minWidth: 80 }}>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: '#22c55e' }}>{m.kcal} ккал</div>
+                      <div style={{ fontSize: 9, color: '#3b82f6' }}>{m.protein}г белка</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })()}
+      </div>
         </div>
       </div>
     </div>

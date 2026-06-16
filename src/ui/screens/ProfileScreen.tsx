@@ -1385,11 +1385,11 @@ export const ProfileScreen: React.FC = () => {
               `═`.repeat(40),
             ].join('\n');
 
-            const RISK_SYSTEMS = ['cardiovascular','hepatic','renal','hormonal','metabolic','hematologic','neurologic','musculoskeletal','gastrointestinal','psychological'];
+            const RISK_SYSTEMS = ['cardio','hepatic','renal','neuro','endocrine','hematologic','reproductive','musculoskeletal'];
+            const RISK_LABELS_MAP: Record<string, string> = { cardio:'ССС', hepatic:'Печень', renal:'Почки', neuro:'НС', endocrine:'Эндокринная', hematologic:'Кровь', reproductive:'Репрод.', musculoskeletal:'Опорно-дв.' };
             const sysLabels: Record<string, string> = {
-              cardiovascular:'ССС', hepatic:'Печень', renal:'Почки', hormonal:'Гормоны',
-              metabolic:'Метаболизм', hematologic:'Кровь', neurologic:'НС', musculoskeletal:'Опорно-дв.',
-              gastrointestinal:'ЖКТ', psychological:'Психика',
+              cardio:'ССС', hepatic:'Печень', renal:'Почки', neuro:'НС',
+              endocrine:'Эндокринная', hematologic:'Кровь', reproductive:'Репрод.', musculoskeletal:'Опорно-дв.',
             };
 
             const doctorReport = [
@@ -1415,14 +1415,14 @@ export const ProfileScreen: React.FC = () => {
                     const pct = v?.net !== undefined ? `${v.net}%` : '—';
                     const bar = v?.net !== undefined ? '█'.repeat(Math.round(v.net / 10)) : '';
                     const status = v?.net < 20 ? 'OK' : v?.net < 40 ? 'ВНИМАНИЕ' : v?.net < 60 ? 'РИСК' : 'ОПАСНОСТЬ';
-                    return `  ${(sysLabels[sys] || sys).padEnd(12)} ${pct.padEnd(6)} ${status.padEnd(10)} ${bar}`;
+                    return `  ${(RISK_LABELS_MAP[sys] || sysLabels[sys] || sys).padEnd(12)} ${pct.padEnd(6)} ${status.padEnd(10)} ${bar}`;
                   })
                 : ['  — нет данных']),
               ``,
               `МЕДИКАМЕНТОЗНАЯ ТЕРАПИЯ`,
               `  Препараты на курсе: ${medsList}`,
               `  БАДы и поддержка: ${suppsList}`,
-              ...(riskData?.systemSupport ? RISK_SYSTEMS.filter(sys => riskData.systemSupport[sys] !== undefined).map(sys => `    ${(sysLabels[sys] || sys).padEnd(20)} покрытие ${Math.round(riskData.systemSupport[sys])}%`) : []),
+              ...(riskData?.systemSupport ? RISK_SYSTEMS.filter(sys => riskData.systemSupport[sys] !== undefined).map(sys => `    ${(RISK_LABELS_MAP[sys] || sysLabels[sys] || sys).padEnd(20)} покрытие ${Math.round(riskData.systemSupport[sys])}%`) : []),
               `  Общее покрытие поддержки: ${riskData?.totalSupport ? Math.round(riskData.totalSupport) + '%' : '—'}`,
               ``,
               `ХРОНИЧЕСКИЕ ЗАБОЛЕВАНИЯ`,

@@ -2640,6 +2640,66 @@ export const TrainingScreen: React.FC = () => {
             </>
           )}
 
+          {/* ═══ Training Insights: Deload Alerts & Progression ═══ */}
+          {(() => {
+            const insights: { icon: string; text: string; color: string }[] = [];
+            const totalWeeks = diaryProgress.length;
+            if (totalWeeks >= 4) {
+              const avgVol = diaryProgress.reduce((a: number, b: any) => a + b.totalVolume, 0) / Math.max(1, totalWeeks);
+              const lastVol = diaryProgress[diaryProgress.length - 1].totalVolume;
+              const isDeload = lastVol < avgVol * 0.6;
+              if (!isDeload) {
+                insights.push({ icon: '🧊', text: totalWeeks + ' нед. без разгрузки — рекомендация: deload-неделя', color: '#ff9100' });
+              }
+            }
+            if (diaryProgress.length >= 2) {
+              const lastWeek = diaryProgress[diaryProgress.length - 1];
+              const prevWeek = diaryProgress[diaryProgress.length - 2];
+              if (prevWeek.totalVolume > 0 && lastWeek.totalVolume > prevWeek.totalVolume * 1.2) {
+                insights.push({ icon: '⚠️', text: 'Скачок объёма +20% — риск перетренированности', color: '#ef4444' });
+              }
+            }
+            if (diaryStats.length >= 3) {
+              const stagnant = diaryStats.filter((s: any) => {
+                const p = s.weeklyProgress || [];
+                return p.length >= 3 && Math.abs((p[p.length-1]?.estimated1RM||0) - (p[p.length-3]?.estimated1RM||0)) < 2.5;
+              });
+              if (stagnant.length > 0) {
+                insights.push({ icon: '📊', text: 'Плато в ' + stagnant.length + ' упр. Смените схему прогрессии.', color: '#eab308' });
+              }
+            }
+            const rpe = (linked.readiness?.recovery ?? 7);
+            if ((10 - rpe) > 5) {
+              insights.push({ icon: '😴', text: 'Высокая усталость: приоритет — восстановление. Объём -15-25%.', color: '#8b5cf6' });
+            }
+            const freq = linked.profile?.settings?.workoutsPerWeek ?? 3;
+            const recFreq = level === 'beginner' ? '3-4' : level === 'intermediate' ? '4-5' : '4-6';
+            if (freq < parseInt(recFreq.split('-')[0]) || freq > parseInt(recFreq.split('-')[1])) {
+              insights.push({ icon: '📅', text: 'Оптимальная частота: ' + recFreq + ' дн/нед (сейчас: ' + freq + ')', color: '#3b82f6' });
+            }
+            const lastVol = diaryProgress.length > 0 ? diaryProgress[diaryProgress.length - 1].totalVolume : 0;
+            const bw = linked.profile?.settings?.weight || 80;
+            const volPerKg = lastVol / bw;
+            if (volPerKg > 0 && volPerKg < 30) {
+              insights.push({ icon: '📉', text: 'Объём ' + Math.round(volPerKg) + ' кг/кг — ниже MEV', color: '#ef4444' });
+            } else if (volPerKg > 80) {
+              insights.push({ icon: '📈', text: 'Объём ' + Math.round(volPerKg) + ' кг/кг — выше MRV', color: '#ef4444' });
+            } else if (volPerKg >= 30) {
+              insights.push({ icon: '✅', text: 'Объём ' + Math.round(volPerKg) + ' кг/кг — в оптимальном диапазоне', color: '#22c55e' });
+            }
+            if (insights.length === 0) return null;
+            return (
+              <div className="card" style={{ padding: '10px 12px', marginBottom: 8, background: 'rgba(0,230,138,0.03)', border: '1px solid rgba(0,230,138,0.15)' }}>
+                <h4 style={{ margin: '0 0 8px', fontSize: 12, color: 'var(--accent)' }}>🧠 Анализ тренировок</h4>
+                {insights.map((t: any, i: number) => (
+                  <div key={i} style={{ fontSize: 10, color: t.color, padding: '3px 0', display: 'flex', gap: 4, alignItems: 'flex-start' }}>
+                    <span>{t.icon}</span>
+                    <span>{t.text}</span>
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
           {diaryStats.length > 0 && (
             <div className="card" style={{ padding: '10px 12px', marginBottom: 8 }}>
               <h4 style={{ margin: '0 0 8px', fontSize: 12 }}>🏆 1RM по базовым</h4>
