@@ -158,9 +158,18 @@ export const FertilityPCTScreen: React.FC = () => {
   return (
     <div className="screen fertility-pct">
       <h2>ПКТ и гормональное здоровье</h2>
-      <div style={{ display: 'flex', gap: 4, marginBottom: 12 }}>
-        {fertTabs.map(t => <button key={t.id} className={`tab-button ${tab === t.id ? 'active' : ''}`} onClick={() => setTab(t.id)}>{t.label}</button>)}
+      <div style={{ display: 'flex', gap: 4, marginBottom: 12, overflowX: 'auto', scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch', paddingBottom: 4 }}>
+        {fertTabs.map(t => (
+          <button
+            key={t.id}
+            className={`tab-button ${tab === t.id ? 'active' : ''}`}
+            onClick={() => setTab(t.id)}
+            style={{ flexShrink: 0, whiteSpace: 'nowrap', padding: '8px 12px', fontSize: 11 }}
+          >{t.label}</button>
+        ))}
       </div>
+
+      <div style={{ maxWidth: '100%', overflowX: 'hidden', wordBreak: 'break-word' }}>
 
       {tab === 'semen' && (
         <div style={s.card}>
@@ -751,6 +760,7 @@ export const FertilityPCTScreen: React.FC = () => {
           <h5>Нутритивная поддержка</h5>
           <ul><li>Цинк 30 мг/день</li><li>Селен 100 мкг/день</li><li>L-карнитин 1 г/день</li><li>CoQ10 200 мг/день</li><li>Витамин E 400 МЕ/день</li></ul>
         </div>
+      </div>
       </div>
     </div>
   );

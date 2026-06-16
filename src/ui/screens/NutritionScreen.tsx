@@ -341,8 +341,8 @@ const MealPlanExtended: React.FC<{ tKcal: number; tProt: number; tFat: number; t
     { title: 'Пост-тренировочное окно', body: 'Белок + углеводы в первые 60-90 минут после тренировки. Соотношение 1:3 для набора, 1:1 для сушки.', color: '#3b82f6' },
     { title: 'Циклирование калорий', body: 'Тренировочные дни +10-15% ккал, дни отдыха -5-10%.', color: '#f59e0b' },
     { title: 'Контроль натрия', body: '3-5 г соли/день. При высоком АД — снизить до 2-3 г. Задержка воды от избытка соли маскирует результат.', color: '#ef4444' },
-    { title: 'Читмил', body: 'Один приём пищи в неделю без ограничений. Правила:\n- Не на голодный желудок (съешьте белок за 30 мин до)\n- Лучше после тренировки (чувствительность к инсулину выше)\n- Не перед сном (нарушит сон и пищеварение)\n- Не более 1500 ккал за один читмил\n- Пейте воду до и после', color: '#f59e0b' },
-    { title: 'Углеводная загрузка', body: 'За 2-3 дня до соревнований/фотосессии:\n- День 1-2: истощение гликогена (низкоуглеводно + тренировка)\n- День 3: загрузка 8-10 г/кг углеводов, минимум жиров\n- Вода: много в дни истощения, ограничить в день загрузки\n- Натрий: увеличить в день загрузки для удержания воды в мышцах', color: '#f97316' },
+    { title: 'Читмил и тяжёлая тренировка', body: 'Лучшее время: сразу ПОСЛЕ тяжёлой тренировки (гликогеновые депо опустошены, чувствительность к инсулину максимальна)\n- Перед тренировкой: лёгкий белковый приём за 1.5-2 часа\n- После читмила: вернуться к обычному рациону без компенсации (не голодать!)\n- Частота: 1 раз в 7-10 дней\n- Не более 1500 ккал за читмил', color: '#f59e0b' },
+    { title: 'Углеводная загрузка (вокруг тяжёлой тренировки)', body: 'За 24-48 часов ДО тяжёлой тренировки: увеличить углеводы до 6-8 г/кг\n- В день тренировки: 1-1.5 г/кг углеводов за 2-3 часа до\n- Сразу после: 1 г/кг быстрых углеводов + 0.3 г/кг белка\n- Следующие 24 часа: поддерживать повышенные углеводы\n- Вода: увеличить потребление на 1-1.5 л в дни загрузки', color: '#f97316' },
     { title: 'Белково-углеводное чередование (БУЧ)', body: 'Высокоуглеводные дни: тренировочные дни, +30% к базовым углеводам\nНизкоуглеводные дни: дни отдыха, -50% к базовым углеводам\nБелок: постоянно высокий (2-2.5 г/кг) все дни\nЖиры: выше в низкоуглеводные дни, ниже в высокоуглеводные\nЦикл: 3 тренировочных (высоко) + 1 отдых (низко) или 2+1', color: '#3b82f6' },
   ];
 
@@ -424,18 +424,29 @@ const MealPlanExtended: React.FC<{ tKcal: number; tProt: number; tFat: number; t
       const isMorning = h < 11;
       const isEvening = h >= 18;
 
-      // Insulin shots check — carbs at 0min and +60min for short, balanced every 3-4h for long
-      const matchingInsulin = insulinShots.filter(s => h === s.hour || h === s.hour + 1);
-      const isInsulinShortMeal = matchingInsulin.some(s => s.type === 'короткий' || s.type === 'сверхбыстрый');
-      const isInsulinLongMeal = matchingInsulin.some(s => s.type === 'длинный');
-      const isInsulinMeal = isInsulinShortMeal || isInsulinLongMeal;
-      // GH: avoid carbs 30min before/after each GH injection
+        // Insulin shots check — carbs at 0min and +60min for short, balanced every 3-4h for long
+        const matchingInsulin = insulinShots.filter(s => h === s.hour || h === s.hour + 1);
+        const isInsulinShortMeal = matchingInsulin.some(s => s.type === 'короткий' || s.type === 'сверхбыстрый');
+        const isInsulinLongMeal = matchingInsulin.some(s => s.type === 'длинный');
+        const isInsulinMeal = isInsulinShortMeal || isInsulinLongMeal;
+
+        // Calculate forced carbs from insulin: 0.5g per IU short, 0.3g per IU at +60min
+        const totalShortInsulinDose = matchingInsulin
+          .filter(s => s.type === 'короткий' || s.type === 'сверхбыстрый')
+          .reduce((sum, s) => sum + (s.hour !== undefined ? s.dose : 0), 0);
+        const forcedCarbsFromInsulin = Math.round(totalShortInsulinDose * 0.5);
+        const forcedCarbs60Min = isInsulinShortMeal ? Math.round(totalShortInsulinDose * 0.3) : 0;
+
+        // GH: avoid carbs 30min before/after each GH injection
       const isGHWindow = ghShots.some(s => Math.abs(h - s.hour) <= 1);
       // IGF: protein-rich meal within 1hr of each injection
       const isIGFWindow = igfShots.some(s => Math.abs(h - s.hour) <= 1);
 
       const targetP = Math.round(indivProt / indivMeals);
-      const targetC = isGHWindow ? 0 : (isInsulinShortMeal ? Math.round(indivCarbs * 0.4) : isInsulinLongMeal ? Math.round(indivCarbs * 0.2) : isPreWorkout || isPostWorkout ? Math.round(indivCarbs * 0.25) : isEvening ? Math.round(indivCarbs * 0.1) : Math.round(indivCarbs * 0.15));
+      // Forced carbs from insulin take priority
+      const insulinBaseCarbs = isInsulinShortMeal ? forcedCarbsFromInsulin : 0;
+      const carbFromMacro = isGHWindow ? 0 : (isInsulinLongMeal ? Math.round(indivCarbs * 0.2) : isPreWorkout || isPostWorkout ? Math.round(indivCarbs * 0.25) : isEvening ? Math.round(indivCarbs * 0.1) : Math.round(indivCarbs * 0.15));
+      const targetC = Math.max(insulinBaseCarbs, carbFromMacro) + (isInsulinShortMeal ? forcedCarbs60Min : 0);
       const targetF = isGHWindow || isPreWorkout || isPostWorkout ? 0 : isMorning ? Math.round(indivFat * 0.25) : Math.round(indivFat * 0.15);
 
       const bindingTags: string[] = [];
@@ -536,6 +547,26 @@ const MealPlanExtended: React.FC<{ tKcal: number; tProt: number; tFat: number; t
     const insulinWarnings: string[] = [];
     const glucoseEstimates: { mealIdx: number; label: string; glucoseImpact: number; risk: 'low' | 'medium' | 'high'; note: string }[] = [];
 
+    // Calculate total daily short insulin dose and required carbs
+    const totalDailyShortDose = indivInsulinShots
+      .filter(s => s.type === 'короткий' || s.type === 'сверхбыстрый')
+      .reduce((sum, s) => sum + s.dose, 0);
+    const totalDailyLongDose = indivInsulinShots
+      .filter(s => s.type === 'длинный')
+      .reduce((sum, s) => sum + s.dose, 0);
+    const minDailyCarbs = Math.round(totalDailyShortDose * 0.5);
+    const totalDailyInsulinIU = totalDailyShortDose + totalDailyLongDose;
+
+    if (totalDailyShortDose > 0) {
+      insulinWarnings.push(`⚠️ Риск гипогликемии! Минимум ${minDailyCarbs}г углеводов в день для покрытия ${totalDailyShortDose} IU короткого инсулина. Обеспечьте минимум 15-20г быстрых углеводов через 30 мин после инсулина.`);
+    }
+    if (totalDailyLongDose > 0) {
+      insulinWarnings.push(`💉 Длинный инсулин (${totalDailyLongDose} IU/день): обеспечьте равномерное питание каждые 3-4 часа для стабильной гликемии.`);
+    }
+    if (totalDailyInsulinIU > 0) {
+      insulinWarnings.push(`📊 Общая суточная доза инсулина: ${totalDailyInsulinIU} IU. Расчётная суточная потребность в углеводах: минимум ${minDailyCarbs}г (0.5 г/кг веса на IU короткого).`);
+    }
+
     meals.forEach((meal: any, mi: number) => {
       const h = parseInt(meal.time.split(':')[0]);
       const mealCarbs = meal.totals.carbs;
@@ -554,9 +585,9 @@ const MealPlanExtended: React.FC<{ tKcal: number; tProt: number; tFat: number; t
       let note = 'Стабильный уровень глюкозы';
       if (hasShortInsulin && mealCarbs < 20) {
         risk = 'high';
-        note = '⚠ Риск гипогликемии: мало углеводов при коротком инсулине';
-        insulinWarnings.push(`Приём ${meal.label} (${meal.time}): мало углеводов (${mealCarbs}г) для короткого инсулина — риск гипогликемии!`);
-      } else if (hasShortInsulin && mealCarbs >= 40) {
+        note = `⚠ Риск гипогликемии! Минимум 15-20г быстрых углеводов через 30 мин после инсулина.`;
+        insulinWarnings.push(`Приём ${meal.label} (${meal.time}): мало углеводов (${mealCarbs}г) для короткого инсулина (${totalDailyShortDose} IU) — риск гипогликемии! Добавьте минимум 15-20г быстрых углеводов.`);
+      } else if (hasShortInsulin && mealCarbs >= Math.max(20, totalDailyShortDose * 0.5)) {
         risk = 'low';
         note = '✓ Адекватное покрытие углеводами';
       } else if (hasShortInsulin) {

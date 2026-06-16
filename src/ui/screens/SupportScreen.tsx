@@ -1134,6 +1134,20 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   const [mixTiming, setMixTiming] = useState<string>('pre');
   const [mixCompoundTimings, setMixCompoundTimings] = useState<Record<string, number>>({});
 
+  // Joints calculator state (lifted from IIFE to component level for hook stability)
+  const [jointPain, setJointPain] = useState(0);
+  const [injuryHistory, setInjuryHistory] = useState(0);
+  const [trainLoad, setTrainLoad] = useState(3);
+  const jointScore = Math.min(100, Math.round((jointPain * 10) + (injuryHistory * 5) + (trainLoad * 3)));
+  const jointColor = jointScore < 20 ? '#22c55e' : jointScore < 40 ? '#f59e0b' : jointScore < 60 ? '#f97316' : '#ef4444';
+  const jointLabel = jointScore < 20 ? 'Норма' : jointScore < 40 ? 'Умеренный риск' : jointScore < 60 ? 'Высокий риск' : 'Критический';
+
+  // Neurotoxicity tab state (lifted from IIFE to component level)
+  const [neuroTab, setNeuroTab] = useState<'calc' | 'mechanisms' | 'support'>('calc');
+
+  // Catalog sub-tab
+  const [catalogSubTab, setCatalogSubTab] = useState<'type' | 'organ' | 'tier'>('type');
+
   const handlePubMedSearch = async () => {
     if (!pubMedQuery.trim()) return;
     setPubMedLoading(true);
@@ -1448,6 +1462,53 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
       })
       .sort((a, b) => b.count - a.count);
   }, [searchQuery]);
+
+  // Organ-based grouping for catalog sub-tab
+  const ORGAN_EMOJI: Record<string, string> = { heart:'❤️', liver:'🫁', kidney:'🫘', brain:'🧠', bone:'🦴', joint:'🦵', skin:'✨', hair:'💇', eye:'👁', gut:'🫃', lung:'🫁', thyroid:'🦋', pancreas:'🍬', adrenal:'🌀', immune:'🛡', blood:'🩸', muscle:'💪', nerve:'🧠', prostate:'♂️', ovary:'♀️', liver_kidney:'🫁🫘' };
+  const ORGAN_LABELS: Record<string, string> = { heart:'Сердце', liver:'Печень', kidney:'Почки', brain:'Мозг', bone:'Кости', joint:'Суставы', skin:'Кожа', hair:'Волосы', eye:'Зрение', gut:'ЖКТ', lung:'Лёгкие', thyroid:'Щитовидная', pancreas:'Поджелудочная', adrenal:'Надпочечники', immune:'Иммунитет', blood:'Кровь', muscle:'Мышцы', nerve:'Нервы', prostate:'Простата', ovary:'Яичники', liver_kidney:'Печень/Почки' };
+  const OrganGroupedSubstances = useMemo(() => {
+    const groups: Record<string, { key: string; label: string; emoji: string; items: SupportSubstance[]; count: number }> = {};
+    const filtered = searchQuery
+      ? ALL_SUBSTANCES.filter(s =>
+          (s.name||'').toLowerCase().includes(searchQuery.toLowerCase()) ||
+          (s.id||'').toLowerCase().includes(searchQuery.toLowerCase())
+        )
+      : ALL_SUBSTANCES;
+    for (const sub of filtered) {
+      const organs = sub.organs || [];
+      if (organs.length === 0) {
+        const key = 'other';
+        if (!groups[key]) groups[key] = { key, label:'Прочее', emoji:'📦', items:[], count:0 };
+        groups[key].items.push(sub);
+        groups[key].count++;
+        continue;
+      }
+      for (const org of organs) {
+        const normOrg = (org||'').toLowerCase().trim();
+        const key = normOrg || 'other';
+        if (!groups[key]) groups[key] = { key, label:ORGAN_LABELS[key]||key, emoji:ORGAN_EMOJI[key]||'🫀', items:[], count:0 };
+        groups[key].items.push(sub);
+        groups[key].count++;
+      }
+    }
+    return Object.values(groups).sort((a, b) => b.count - a.count);
+  }, [searchQuery]);
+
+  // Tier-based grouping for catalog sub-tab
+  const SUPPORT_TIER_GROUPS = useMemo(() => [
+    { key:'core', label:'Ядро', emoji:'🟢', color:'#22c55e', substances:[
+      'vitamin_d3','vitamin_c','vitamin_b_complex','magnesium','zinc','omega3','coq10',
+    ]},
+    { key:'base', label:'База', emoji:'🟡', color:'#f59e0b', substances:[
+      'nac','alpha_lipoic','curcumin','probiotics','vitamin_e','selenium','milk_thistle','berberine',
+    ]},
+    { key:'boost', label:'Усиление', emoji:'🟠', color:'#f97316', substances:[
+      'lion_mane','ashwagandha','rhodiola','gingko','bacopa','collagen','creatine','l_carnitine','taurine','glycine',
+    ]},
+    { key:'max', label:'Максимум', emoji:'🔴', color:'#ef4444', substances:[
+      'noopept','tudca','glutathione','phosphatidylserine','citicoline','pqq','nmn','alpha_gpc','huperzine_a',
+    ]},
+  ], []);
 
   // Pre-build conflict lookup map for O(1) pair checking in stacks (avoid iterating ALL_INTERACTIONS in render)
   const conflictLookup = useMemo(() => {
@@ -1928,12 +1989,140 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
             </div>
             {renderView(infoView, 'catalog', () =>
               <div>
+                {/* Sub-tabs: По типам / По органам / По уровням */}
+                <div style={{ display:'flex', gap:4, marginBottom:8, overflowX:'auto', scrollbarWidth:'none' }}>
+                  {(['type','organ','tier'] as const).map(t => (
+                    <button key={t} onClick={() => setCatalogSubTab(t)} style={{
+                      padding:'6px 12px', borderRadius:16, fontSize:9, fontWeight:700, whiteSpace:'nowrap', cursor:'pointer',
+                      background: catalogSubTab === t ? 'var(--accent)' : 'var(--bg-secondary)',
+                      color: catalogSubTab === t ? '#000' : 'var(--text-dim)',
+                      border: `1px solid ${catalogSubTab === t ? 'var(--accent)' : 'var(--border)'}`,
+                    }}>{t === 'type' ? '📋 По типам' : t === 'organ' ? '🫀 По органам' : '⚡ По уровням'}</button>
+                  ))}
+                </div>
                 <div style={{ display:'flex', gap:6, marginBottom:8, alignItems:'center' }}>
                   <input value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Поиск по названию, категориям, механизмам" style={{ flex:1, padding:'8px 10px', borderRadius:8, border:'1px solid var(--border-color)', background:'var(--bg-secondary)', color:'var(--text-light)', fontSize:12 }} />
                 </div>
                 <div style={{ fontSize:9, color:'var(--text-dim)', marginBottom:6 }}>
                   {searchQuery ? `Найдено: ${groupedSubstances.reduce((a, g) => a + g.count, 0)} из ${ALL_SUBSTANCES.length}` : `Всего: ${ALL_SUBSTANCES.length} веществ`}
                 </div>
+                {catalogSubTab === 'organ' ? (
+                  /* По органам */
+                  <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
+                    {(OrganGroupedSubstances||[]).map(group => {
+                      const isExpanded = expandedCategories[group.key] ?? (group.count <= 5);
+                      return (
+                        <div key={group.key} style={{ background:'var(--bg-secondary)', borderRadius:10, overflow:'hidden', border:'1px solid var(--border)' }}>
+                          <div onClick={() => setExpandedCategories(prev => ({ ...prev, [group.key]: !isExpanded }))} style={{ display:'flex', alignItems:'center', gap:6, padding:'8px 10px', cursor:'pointer', userSelect:'none' }}>
+                            <span style={{ fontSize:14 }}>{group.emoji}</span>
+                            <div style={{ flex:1, fontSize:11, fontWeight:700, color:'var(--text-light)' }}>{group.label}</div>
+                            <span style={{ fontSize:9, color:'var(--text-dim)', fontWeight:600 }}>{group.count}</span>
+                            <span style={{ fontSize:9, color:'var(--text-dim)', transform:isExpanded ? 'rotate(180deg)' : 'none', transition:'transform 0.2s' }}>▼</span>
+                          </div>
+                          {isExpanded && (group.items||[]).map(sub => {
+                            const isSelected = selectedSub === sub?.id;
+                            return (
+                              <div key={sub?.id||'x'}>
+                                <div onClick={() => setSelectedSub(isSelected ? null : (sub?.id||null))} style={{ display:'flex', alignItems:'flex-start', gap:4, padding:'6px 10px 6px 18px', cursor:'pointer', borderBottom:'1px solid var(--border)' }}>
+                                  <div style={{ flex:1 }}>
+                                    <div style={{ fontSize:10, fontWeight:600, color:'var(--text-light)', lineHeight:1.3 }}>{sub?.name||''}</div>
+                                    <div style={{ display:'flex', gap:2, flexWrap:'wrap', marginTop:1 }}>
+                                      {(sub?.categories||[]).slice(0,3).map(c => <span key={c} style={{ fontSize:8, padding:'1px 4px', borderRadius:3, background:'rgba(255,255,255,0.06)', color:'rgba(255,255,255,0.85)' }}>{c||''}</span>)}
+                                      {(sub?.mechanisms||[]).slice(0,4).map(m => <span key={m||''} style={{ fontSize:8, padding:'1px 4px', borderRadius:3, background:'rgba(0,230,138,0.08)', color:'#00e68a' }}>{m||''}</span>)}
+                                    </div>
+                                  </div>
+                                  <span style={{ fontSize:9, color:'var(--text-dim)', transform:isSelected ? 'rotate(180deg)' : 'none' }}>▼</span>
+                                </div>
+                                {isSelected && sub && (
+                                  <div style={{ padding:'6px 10px 8px 18px', background:'rgba(0,0,0,0.15)', borderBottom:'1px solid var(--border)' }}>
+                                    <div style={{ fontSize:10, color:'rgba(255,255,255,0.9)', lineHeight:1.4, marginBottom:4 }}>{sub.description||''}</div>
+                                    <div style={{ fontSize:7, color:'var(--accent-green, #00e68a)', marginBottom:3 }}>
+                                      {TYPE_LABELS_RU[sub.type] || (sub.type||'')}{(sub.categories||[]).length > 0 ? ' · ' + (sub.categories||[]).slice(0,3).join(', ') : ''}
+                                    </div>
+                                    {(sub.mechanisms||[]).length > 0 && (
+                                      <div style={{ marginBottom:3 }}>
+                                        <div style={{ fontSize:8, color:'rgba(255,255,255,0.85)', marginBottom:1 }}>Механизмы действия:</div>
+                                        <div style={{ display:'flex', gap:2, flexWrap:'wrap' }}>
+                                          {(sub.mechanisms||[]).map((m,i) => <span key={i} style={{ fontSize:8, padding:'2px 6px', borderRadius:4, background:'rgba(0,230,138,0.08)', color:'#00e68a', border:'1px solid rgba(0,230,138,0.15)' }}>{m||''}</span>)}
+                                        </div>
+                                      </div>
+                                    )}
+                                    {(sub.organs||[]).length > 0 && (
+                                      <div style={{ marginBottom:3 }}>
+                                        <div style={{ fontSize:8, color:'rgba(255,255,255,0.85)', marginBottom:1 }}>Органы-мишени:</div>
+                                        <div style={{ display:'flex', gap:2, flexWrap:'wrap' }}>
+                                          {(sub.organs||[]).map(o => <span key={o||''} style={{ fontSize:8, padding:'2px 6px', borderRadius:4, background:'rgba(59,130,246,0.1)', color:'#60a5fa', border:'1px solid rgba(59,130,246,0.15)' }}>{o||''}</span>)}
+                                        </div>
+                                      </div>
+                                    )}
+                                    {SUPPLEMENT_DESCRIPTIONS[sub.id] && (
+                                      <div style={{ marginTop:4, padding:'4px 6px', background:'rgba(0,230,138,0.05)', borderRadius:4, border:'1px solid rgba(0,230,138,0.1)' }}>
+                                        <div style={{ fontSize:8, color:'#00e68a', fontWeight:600, marginBottom:1 }}>📋 Подробнее:</div>
+                                        <div style={{ fontSize:9, color:'rgba(255,255,255,0.9)', lineHeight:1.4 }}>{SUPPLEMENT_DESCRIPTIONS[sub.id]}</div>
+                                      </div>
+                                    )}
+                                    {catDetailInteractions(sub, ALL_INTERACTIONS)}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : catalogSubTab === 'tier' ? (
+                  /* По уровням */
+                  <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+                    {SUPPORT_TIER_GROUPS.map((tg, tgi) => {
+                      const isExpanded = expandedCategories[tg.key] ?? true;
+                      return (
+                        <div key={tg.key} style={{ background:'var(--bg-secondary)', borderRadius:10, overflow:'hidden', border:'1px solid var(--border)' }}>
+                          <div onClick={() => setExpandedCategories(prev => ({ ...prev, [tg.key]: !isExpanded }))} style={{ display:'flex', alignItems:'center', gap:6, padding:'8px 10px', cursor:'pointer', userSelect:'none' }}>
+                            <span style={{ fontSize:14 }}>{tg.emoji}</span>
+                            <div style={{ flex:1, fontSize:11, fontWeight:700, color:tg.color }}>{tg.label}</div>
+                            <span style={{ fontSize:9, color:'var(--text-dim)', fontWeight:600 }}>{tg.substances.length}</span>
+                            <span style={{ fontSize:9, color:'var(--text-dim)', transform:isExpanded ? 'rotate(180deg)' : 'none', transition:'transform 0.2s' }}>▼</span>
+                          </div>
+                          {isExpanded && (
+                            <div style={{ borderTop:'1px solid var(--border)' }}>
+                              {tg.substances.map(id => {
+                                const sub = ALL_SUBSTANCES.find(s => s.id === id);
+                                if (!sub) return null;
+                                const isSelected = selectedSub === id;
+                                return (
+                                  <div key={id}>
+                                    <div onClick={() => setSelectedSub(isSelected ? null : id)} style={{ display:'flex', alignItems:'center', gap:4, padding:'6px 10px 6px 18px', cursor:'pointer', borderBottom:'1px solid var(--border)' }}>
+                                      <div style={{ flex:1 }}>
+                                        <div style={{ fontSize:10, fontWeight:600, color:'var(--text-light)' }}>{sub.name}</div>
+                                        <div style={{ fontSize:8, color:'var(--text-dim)' }}>{(sub.categories||[]).slice(0,2).join(', ')}</div>
+                                      </div>
+                                      <span style={{ fontSize:9, color:'var(--text-dim)', transform:isSelected ? 'rotate(180deg)' : 'none' }}>▼</span>
+                                    </div>
+                                    {isSelected && (
+                                      <div style={{ padding:'6px 10px 8px 18px', background:'rgba(0,0,0,0.15)', borderBottom:'1px solid var(--border)' }}>
+                                        <div style={{ fontSize:10, color:'rgba(255,255,255,0.9)', lineHeight:1.4, marginBottom:4 }}>{sub.description}</div>
+                                        {(sub.mechanisms||[]).length > 0 && (
+                                          <div style={{ marginBottom:3 }}>
+                                            <div style={{ display:'flex', gap:2, flexWrap:'wrap' }}>
+                                              {(sub.mechanisms||[]).map((m,i) => <span key={i} style={{ fontSize:8, padding:'2px 6px', borderRadius:4, background:'rgba(0,230,138,0.08)', color:'#00e68a', border:'1px solid rgba(0,230,138,0.15)' }}>{m||''}</span>)}
+                                            </div>
+                                          </div>
+                                        )}
+                                        {catDetailInteractions(sub, ALL_INTERACTIONS)}
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                /* По типам (default) */
                 <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
                   {(groupedSubstances||[]).map(group => {
                     const catInfo = getCategoryInfo(group.cat);
@@ -2106,6 +2295,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
                   })}
                   {(groupedSubstances||[]).length === 0 && <div style={{ padding:20, textAlign:'center', color:'var(--text-dim)', fontSize:11 }}>Ничего не найдено</div>}
                 </div>
+                )}
               </div>
             )}
             {renderView(infoView, 'synergies', () =>
@@ -4868,6 +5058,25 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
                     ))}
                   </div>
                 </div>
+                {/* Dosage table */}
+                <div style={{ marginTop:10 }}>
+                  <h4 style={{ margin:'0 0 8px', fontSize:12, color:'#22c55e' }}>💊 Рекомендуемые дозировки ({SUPPORT_LEVELS[supportLevel]?.label})</h4>
+                  <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
+                    {SUPPORT_LEVELS[supportLevel]?.subs?.map(id => {
+                      const dosage = SUPPORT_LEVELS[supportLevel]?.dosages?.[id];
+                      const subInfo = ALL_SUBSTANCES.find(s => s.id === id);
+                      return (
+                        <div key={id} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'6px 8px', borderRadius:6, background:'rgba(0,230,138,0.04)', border:'1px solid rgba(0,230,138,0.1)' }}>
+                          <span style={{ fontSize:10, fontWeight:600, color:'var(--text-light)' }}>{subInfo?.name || id}</span>
+                          <div style={{ textAlign:'right' }}>
+                            <div style={{ fontSize:10, fontWeight:700, color:'#00e68a' }}>{dosage?.mg}{dosage?.mg > 50 && dosage?.mg < 5000 ? ' мг' : dosage?.mg >= 5000 ? ' МЕ' : ''}</div>
+                            <div style={{ fontSize:8, color:'var(--text-dim)' }}>{dosage?.timing}</div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
               </div>
             )}
             <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:14, marginTop:10, border:'1px solid var(--border)' }}>
@@ -4890,22 +5099,138 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
           <h2 style={{ margin:'0 0 4px', fontSize:16, fontWeight:800, color:'#a78bfa' }}>🧬 Пептидный калькулятор</h2>
           <p style={{ fontSize:10, color:'var(--text-dim)', margin:'0 0 12px' }}>Расчёт дозировок, баков, разведения и протоколов пептидов.</p>
           <div style={{ flex:1, overflowY:'auto', paddingRight:4 }}>
+            {/* Peptide Selection */}
             <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:14, marginBottom:10, border:'1px solid var(--border)' }}>
               <h4 style={{ margin:'0 0 8px', fontSize:12, color:'var(--text)' }}>🧪 Выберите пептид</h4>
               <div style={{ display:'flex', flexWrap:'wrap', gap:4, marginBottom:12 }}>
-                {PEPTIDE_LIST.slice(0, 12).map(p => (
-                  <span key={p.id} style={{
-                    padding:'6px 10px', borderRadius:16, fontSize:9, fontWeight:600, whiteSpace:'nowrap',
-                    background:'var(--bg-secondary)', color:'var(--text-dim)', border:'1px solid var(--border)',
-                  }}>{p.name}</span>
+                {PEPTIDE_LIST.slice(0, 16).map(p => (
+                  <button key={p.id} onClick={() => { setPeptideId(p.id); setPepAmount(2); setPepDose(100); }} style={{
+                    padding:'6px 10px', borderRadius:16, fontSize:9, fontWeight:600, whiteSpace:'nowrap', cursor:'pointer',
+                    background: peptideId === p.id ? 'var(--accent)' : 'var(--bg-secondary)',
+                    color: peptideId === p.id ? '#000' : 'var(--text-dim)',
+                    border: `1px solid ${peptideId === p.id ? 'var(--accent)' : 'var(--border)'}`,
+                  }}>{p.name}</button>
                 ))}
               </div>
+              {peptideId && (() => {
+                const sel = PEPTIDE_LIST.find(p => p.id === peptideId);
+                if (!sel) return null;
+                return (
+                  <div style={{ padding:'8px 10px', borderRadius:8, background:'rgba(167,139,250,0.06)', border:'1px solid rgba(167,139,250,0.15)' }}>
+                    <div style={{ fontSize:11, fontWeight:700, color:'#a78bfa', marginBottom:2 }}>{sel.name}</div>
+                    <div style={{ fontSize:9, color:'var(--text-dim)', lineHeight:1.4 }}>{(sel.effects || []).join(', ') || 'Нет описания'}</div>
+                    <div style={{ fontSize:8, color:'#a78bfa', marginTop:2 }}>T½: {sel.tHalfHours} ч</div>
+                  </div>
+                );
+              })()}
             </div>
-            <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:14, border:'1px solid var(--border)' }}>
-              <h4 style={{ margin:'0 0 6px', fontSize:12, color:'#60a5fa' }}>💡 Информация</h4>
-              <p style={{ fontSize:9, color:'var(--text-dim)', lineHeight:1.5, margin:0 }}>
-                Для детального расчёта дозировок, баков, разведения и протоколов пептидов перейдите во вкладку "Пептиды" основного меню или нажмите кнопку "Фарма" в панели навигации. Там доступен полный пептидный калькулятор с PK/PD моделированием.
-              </p>
+
+            {/* Dilution Calculator */}
+            <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:14, marginBottom:10, border:'1px solid var(--border)' }}>
+              <h4 style={{ margin:'0 0 8px', fontSize:12, color:'#60a5fa' }}>💧 Калькулятор разведения</h4>
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+                <div>
+                  <div style={{ fontSize:9, color:'var(--text-dim)', marginBottom:4 }}>Кол-во пептида (мг)</div>
+                  <input type="number" value={pepAmount} onChange={e => setPepAmount(Math.max(0.1, Number(e.target.value) || 1))} style={{ width:'100%', padding:'6px 8px', borderRadius:6, border:'1px solid var(--border)', background:'rgba(0,0,0,0.2)', color:'var(--text)', fontSize:11, boxSizing:'border-box' }} />
+                </div>
+                <div>
+                  <div style={{ fontSize:9, color:'var(--text-dim)', marginBottom:4 }}>Объём бака (мл)</div>
+                  <input type="number" value={pepDilution} onChange={e => setPepDilution(Math.max(0.1, Number(e.target.value) || 1))} style={{ width:'100%', padding:'6px 8px', borderRadius:6, border:'1px solid var(--border)', background:'rgba(0,0,0,0.2)', color:'var(--text)', fontSize:11, boxSizing:'border-box' }} />
+                </div>
+                <div>
+                  <div style={{ fontSize:9, color:'var(--text-dim)', marginBottom:4 }}>Дозировка (мкг)</div>
+                  <input type="number" value={pepDose} onChange={e => setPepDose(Math.max(1, Number(e.target.value) || 100))} style={{ width:'100%', padding:'6px 8px', borderRadius:6, border:'1px solid var(--border)', background:'rgba(0,0,0,0.2)', color:'var(--text)', fontSize:11, boxSizing:'border-box' }} />
+                </div>
+                <div>
+                  <div style={{ fontSize:9, color:'var(--text-dim)', marginBottom:4 }}>Шприц</div>
+                  <select value={pepSyringe} onChange={e => setPepSyringe(e.target.value)} style={{ width:'100%', padding:'6px 8px', borderRadius:6, border:'1px solid var(--border)', background:'rgba(0,0,0,0.2)', color:'var(--text)', fontSize:10, boxSizing:'border-box' }}>
+                    {Object.values(SYRINGE_TYPES).map((sy: any) => <option key={sy.label} value={sy.label}>{sy.label}</option>)}
+                  </select>
+                </div>
+              </div>
+              {(() => {
+                const conc = pepAmount / pepDilution; // mg/mL
+                const doseMg = pepDose / 1000; // mcg -> mg
+                const doseMl = doseMg / conc;
+                const syringeInfo = SYRINGE_TYPES[pepSyringe] as any;
+                const units = syringeInfo ? doseMl * syringeInfo.unitsPerMl : doseMl * 100;
+                return (
+                  <div style={{ marginTop:10, padding:'10px 12px', borderRadius:8, background:'rgba(96,165,250,0.06)', border:'1px solid rgba(96,165,250,0.15)' }}>
+                    <div style={{ fontSize:9, color:'var(--text-dim)', marginBottom:4 }}>📐 Результат разведения</div>
+                    <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:4, fontSize:9 }}>
+                      <div>Концентрация: <b style={{ color:'#60a5fa' }}>{conc.toFixed(2)} мг/мл</b></div>
+                      <div>Объем дозы: <b style={{ color:'#60a5fa' }}>{doseMl.toFixed(3)} мл</b></div>
+                      <div>Единиц (IU): <b style={{ color:'#60a5fa' }}>{units.toFixed(0)} IU</b></div>
+                      <div>Доз на флакон: <b style={{ color:'#60a5fa' }}>{pepDilution > 0 && doseMl > 0 ? Math.floor(pepDilution / doseMl) : 0}</b></div>
+                    </div>
+                    <div style={{ fontSize:8, color:'var(--text-dim)', marginTop:2 }}>Наберите {units.toFixed(0)} IU ({doseMl.toFixed(3)} мл) для дозы {pepDose} мкг</div>
+                  </div>
+                );
+              })()}
+            </div>
+
+            {/* PK Display */}
+            {peptideId && (() => {
+              const sel = PEPTIDE_LIST.find(p => p.id === peptideId);
+              if (!sel) return null;
+              const tHalf = sel.tHalfHours || 4;
+              const peakTime = tHalf * 0.33;
+              const steadyState = tHalf * 5;
+              const clearanceTime = tHalf * 6;
+              return (
+                <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:14, marginBottom:10, border:'1px solid var(--border)' }}>
+                  <h4 style={{ margin:'0 0 8px', fontSize:12, color:'#a78bfa' }}>📈 Фармакокинетика (PK)</h4>
+                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
+                    <div style={{ padding:'8px 10px', borderRadius:8, background:'rgba(167,139,250,0.06)', border:'1px solid rgba(167,139,250,0.1)' }}>
+                      <div style={{ fontSize:8, color:'var(--text-dim)' }}>Период полувыведения (T½)</div>
+                      <div style={{ fontSize:16, fontWeight:800, color:'#a78bfa' }}>{tHalf.toFixed(1)} ч</div>
+                    </div>
+                    <div style={{ padding:'8px 10px', borderRadius:8, background:'rgba(167,139,250,0.06)', border:'1px solid rgba(167,139,250,0.1)' }}>
+                      <div style={{ fontSize:8, color:'var(--text-dim)' }}>Пик концентрации (Cmax)</div>
+                      <div style={{ fontSize:16, fontWeight:800, color:'#a78bfa' }}>{peakTime.toFixed(1)} ч</div>
+                    </div>
+                    <div style={{ padding:'8px 10px', borderRadius:8, background:'rgba(167,139,250,0.06)', border:'1px solid rgba(167,139,250,0.1)' }}>
+                      <div style={{ fontSize:8, color:'var(--text-dim)' }}>Стабильное состояние (5×T½)</div>
+                      <div style={{ fontSize:16, fontWeight:800, color:'#a78bfa' }}>{steadyState.toFixed(1)} ч</div>
+                    </div>
+                    <div style={{ padding:'8px 10px', borderRadius:8, background:'rgba(167,139,250,0.06)', border:'1px solid rgba(167,139,250,0.1)' }}>
+                      <div style={{ fontSize:8, color:'var(--text-dim)' }}>Полный клиренс (6×T½)</div>
+                      <div style={{ fontSize:16, fontWeight:800, color:'#a78bfa' }}>{clearanceTime.toFixed(1)} ч</div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* Dosing Schedule */}
+            <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:14, marginBottom:10, border:'1px solid var(--border)' }}>
+              <h4 style={{ margin:'0 0 8px', fontSize:12, color:'#f59e0b' }}>📅 График дозирования</h4>
+              <div style={{ display:'flex', flexWrap:'wrap', gap:4, marginBottom:8 }}>
+                {['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map(day => {
+                  const active = pepSchedule.includes(day);
+                  return (
+                    <button key={day} onClick={() => setPepSchedule(active ? pepSchedule.filter(d => d !== day) : [...pepSchedule, day])} style={{
+                      padding:'6px 10px', borderRadius:8, fontSize:9, fontWeight:600, cursor:'pointer',
+                      background: active ? 'var(--accent)' : 'var(--bg-secondary)',
+                      color: active ? '#000' : 'var(--text-dim)',
+                      border: `1px solid ${active ? 'var(--accent)' : 'var(--border)'}`,
+                    }}>{day}</button>
+                  );
+                })}
+              </div>
+              <div>
+                <div style={{ fontSize:9, color:'var(--text-dim)', marginBottom:4 }}>Длительность (дней)</div>
+                <input type="number" value={pepTotalDays} onChange={e => setPepTotalDays(Math.max(1, Number(e.target.value) || 30))} style={{ width:'100%', padding:'6px 8px', borderRadius:6, border:'1px solid var(--border)', background:'rgba(0,0,0,0.2)', color:'var(--text)', fontSize:11, boxSizing:'border-box' }} />
+              </div>
+              <div style={{ marginTop:8, padding:'10px 12px', borderRadius:8, background:'rgba(245,158,11,0.06)', border:'1px solid rgba(245,158,11,0.15)' }}>
+                <div style={{ fontSize:9, color:'var(--text-dim)', marginBottom:4 }}>📊 Итого</div>
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:4, fontSize:9 }}>
+                  <div>Доз в неделю: <b style={{ color:'#f59e0b' }}>{pepSchedule.length}</b></div>
+                  <div>Всего доз: <b style={{ color:'#f59e0b' }}>{Math.round(pepTotalDays / 7 * pepSchedule.length)}</b></div>
+                  <div>Недельный расход: <b style={{ color:'#f59e0b' }}>{(pepSchedule.length * pepDose / 1000).toFixed(1)} мг</b></div>
+                  <div>Общий расход: <b style={{ color:'#f59e0b' }}>{(pepTotalDays / 7 * pepSchedule.length * pepDose / 1000).toFixed(1)} мг</b></div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -4913,11 +5238,11 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
 
       {/* ===== NEUROTOXICITY CALCULATOR ===== */}
       {tab === 'main' && supportView === 'calc' && calcView === 'neuro' && (() => {
+        const course = linked?.course || [];
         const neuroColor = neuroScore < 30 ? '#22c55e' : neuroScore < 50 ? '#f59e0b' : neuroScore < 70 ? '#f97316' : '#ef4444';
         const neuroLabel = neuroScore < 30 ? 'Низкий' : neuroScore < 50 ? 'Средний' : neuroScore < 70 ? 'Высокий' : 'Критический';
-        const [neuroTab, setNeuroTab] = useState<'calc' | 'mechanisms' | 'support'>('calc');
 
-        return (
+        return safeRender('neuro', () => (
         <div style={{ padding:'0 0 80px' }}>
           <button onClick={() => setCalcView('main')} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', marginBottom:6, background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← Назад</button>
           <button onClick={() => setSupportView('main')} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', marginBottom:4, marginLeft:6, background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← На главную Поддержки</button>
@@ -5105,19 +5430,12 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
             </div>
           )}
         </div>
-        );
+        ));
       })()}
 
       {/* ===== JOINTS/LIGAMENTS CALCULATOR ===== */}
       {tab === 'main' && supportView === 'calc' && calcView === 'joints' && (() => {
-        const [jointPain, setJointPain] = useState(0);
-        const [injuryHistory, setInjuryHistory] = useState(0);
-        const [trainLoad, setTrainLoad] = useState(3);
-        const jointScore = Math.min(100, Math.round((jointPain * 10) + (injuryHistory * 5) + (trainLoad * 3)));
-        const jointColor = jointScore < 20 ? '#22c55e' : jointScore < 40 ? '#f59e0b' : jointScore < 60 ? '#f97316' : '#ef4444';
-        const jointLabel = jointScore < 20 ? 'Норма' : jointScore < 40 ? 'Умеренный риск' : jointScore < 60 ? 'Высокий риск' : 'Критический';
-
-        return (
+        return safeRender('joints', () => (
         <div style={{ padding:'0 0 80px' }}>
           <button onClick={() => setCalcView('main')} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', marginBottom:6, background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← Назад</button>
           <button onClick={() => setSupportView('main')} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', marginBottom:4, marginLeft:6, background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← На главную Поддержки</button>
@@ -5240,7 +5558,7 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
             ))}
           </div>
         </div>
-        );
+        ));
       })()}
 
       {/* ===== FERTILITY/PCT TAB (with back button) ===== */}

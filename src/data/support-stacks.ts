@@ -333,7 +333,7 @@ function generateStacks(): SupportStack[] {
     { effects: ['prenatal','methylation','bone_support','immune_boost'], substances: ['vitamin_b12','folate','vitamin_d','calcium','iron','zinc','iodine','omega3','cholin'] },
     { effects: ['hair','skin','nails','collagen'], substances: ['biotin','zinc','silicon','collagen','msm','vitamin_d','vitamin_e','astaxanthin'] },
     { effects: ['vision','antioxidant','anti_inflammation','brain'], substances: ['lutein','zeaxanthin','astaxanthin','vitamin_c','zinc','gingko','quercetin','bilberry'] },
-    { effects: ['libido','hormone_balance','male_health','energy'], substances: ['maca','tribulus','tongkat_ali','fadogia','boron','zinc','ashwagandha','shilajit','vitamin_d'] },
+    { effects: ['thyroid_support','blood','hormone_balance','energy'], substances: ['iron','vitamin_c','selenium','iodine','zinc','copper','vitamin_b12','folate','vitamin_a'] },
   ];
 
   for (const ps of premiumSets) {
