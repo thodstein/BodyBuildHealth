@@ -5112,7 +5112,7 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
           <h2 style={{ margin:'0 0 2px', fontSize:16, fontWeight:800, color:'var(--accent)' }}>🧮 Калькулятор поддержки</h2>
           <p style={{ fontSize:10, color:'var(--text-dim)', margin:'0 0 10px' }}>Анализ курса + анализов + рисков → персонализированный план</p>
 
-          <div style={{ flex:1, overflowY:'auto', paddingRight:4, display:'flex', flexDirection:'column', gap:8 }}>
+            <div style={{ flex:1, overflowY:'auto', paddingRight:4, display:'flex', flexDirection:'column', gap:8 }}>
 
             {/* ==================== 2a: АНАЛИЗ КУРСА ==================== */}
             <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:12, border:'1px solid var(--border)' }}>
@@ -5181,45 +5181,59 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
                 <span style={{ flex:1, fontSize:12, fontWeight:700, color:'#f59e0b' }}>Риски по системам</span>
                 <span style={{ fontSize:9, color:'var(--text-dim)', transform: (expandedCategories.calc_risks ?? true) ? 'rotate(180deg)' : 'none', transition:'transform 0.2s' }}>▼</span>
               </div>
-              {(expandedCategories.calc_risks ?? true) && (riskData?.systemBreakdown && Object.keys(riskData.systemBreakdown).length > 0 ? (
-                <div style={{ display:'flex', flexDirection:'column', gap:5 }}>
-                  {SYSTEM_ORDER.filter(k => riskData.systemBreakdown[k]).map(sysKey => {
-                    const sysData = riskData.systemBreakdown[sysKey];
-                    const sysInfo = SYSTEM_LABELS_RU[sysKey] || { name: sysKey, emoji: '📌', rec: '' };
-                    const color = riskColorFn(sysData.net);
-                    const levelData = SUPPORT_LEVELS[supportLevel];
-                    const coveragePct = levelData ? Math.min(100, levelData.subs.length * 3) : 25;
-                    const afterRisk = Math.max(0, Math.round(sysData.net * (1 - coveragePct / 100)));
-                    return (
-                      <div key={sysKey}>
-                        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:2 }}>
-                          <span style={{ fontSize:9, fontWeight:600, color:'var(--text-light)' }}>{sysInfo.emoji} {sysInfo.name}</span>
-                          <span style={{ fontSize:9, fontWeight:700, color }}>{Math.round(sysData.net)}%</span>
-                        </div>
-                        <div style={{ height:6, borderRadius:3, background:'var(--bg-secondary)', overflow:'hidden', border:'1px solid var(--border)' }}>
-                          <div style={{ height:'100%', width:`${Math.min(100, sysData.net)}%`, borderRadius:3, background: color, transition:'width 0.4s' }} />
-                        </div>
-                        {sysData.net > 25 && (
-                          <div style={{ fontSize:7, color:'var(--text-dim)', marginTop:1, paddingLeft:18 }}>
-                            → требуется {sysInfo.rec}
-                          </div>
-                        )}
-                        {calcDone && calcResult && (
-                          <div style={{ fontSize:7, color:'#22c55e', marginTop:1, paddingLeft:18 }}>
-                            После поддержки: ~{afterRisk}% (-{Math.round(sysData.net - afterRisk)}%)
-                          </div>
-                        )}
+              {(expandedCategories.calc_risks ?? true) && (() => {
+                const riskAssessment = calcResult?.riskAssessment;
+                const sysBreakdown = riskAssessment?.systemBreakdown;
+                if (!calcDone || !calcResult || !sysBreakdown || Object.keys(sysBreakdown).length === 0) {
+                  return <p style={{ fontSize:9, color:'var(--text-dim)', margin:0 }}>Нет данных о рисках. Нажмите «Рассчитать» ниже.</p>;
+                }
+                return (
+                  <div>
+                    {calcDone && calcResult && (
+                      <div style={{ display:'flex', justifyContent:'space-between', fontSize:11, fontWeight:600, color:'var(--text-light)', marginBottom:8, padding:'6px 10px', borderRadius:8, background:'rgba(0,0,0,0.08)', border:'1px solid var(--border)' }}>
+                        <span>Базовый риск: <b style={{ color:'#ef4444' }}>{Math.round(calcResult.riskBeforeSupport)}%</b></span>
+                        <span style={{ color:'var(--accent)' }}>→</span>
+                        <span>После поддержки: <b style={{ color:'#22c55e' }}>{Math.round(calcResult.riskAfterSupport)}%</b></span>
+                        <span style={{ color:'#22c55e', fontSize:12 }}>(-{Math.round(calcResult.riskBeforeSupport - calcResult.riskAfterSupport)}%)</span>
                       </div>
-                    );
-                  })}
-                </div>
-              ) : (
-                <p style={{ fontSize:9, color:'var(--text-dim)', margin:0 }}>Нет данных о рисках. Нажмите «Рассчитать» ниже.</p>
-              ))}
+                    )}
+                    <div style={{ display:'flex', flexDirection:'column', gap:5 }}>
+                      {SYSTEM_ORDER.filter(k => sysBreakdown[k]).map(sysKey => {
+                        const sysData = sysBreakdown[sysKey];
+                        const sysInfo = SYSTEM_LABELS_RU[sysKey] || { name: sysKey, emoji: '📌', rec: '' };
+                        const rawRisk = sysData.raw ?? 0;
+                        const netRisk = sysData.net ?? 0;
+                        const color = riskColorFn(netRisk);
+                        return (
+                          <div key={sysKey}>
+                            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:2 }}>
+                              <span style={{ fontSize:9, fontWeight:600, color:'var(--text-light)' }}>{sysInfo.emoji} {sysInfo.name}</span>
+                              <span style={{ fontSize:9, fontWeight:700, color }}>{Math.round(netRisk)}%</span>
+                            </div>
+                            <div style={{ height:6, borderRadius:3, background:'var(--bg-secondary)', overflow:'hidden', border:'1px solid var(--border)' }}>
+                              <div style={{ height:'100%', width:`${Math.min(100, netRisk)}%`, borderRadius:3, background: color, transition:'width 0.4s' }} />
+                            </div>
+                            {netRisk > 25 && (
+                              <div style={{ fontSize:7, color:'var(--text-dim)', marginTop:1, paddingLeft:18 }}>
+                                → требуется {sysInfo.rec}
+                              </div>
+                            )}
+                            {calcDone && calcResult && rawRisk !== netRisk && (
+                              <div style={{ fontSize:7, color:'#22c55e', marginTop:1, paddingLeft:18 }}>
+                                После поддержки: ~{Math.round(netRisk)}% (-{Math.round(rawRisk - netRisk)}%)
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
 
             {/* ==================== ADD 1: REAL CALCULATESUPPORT INTEGRATION ==================== */}
-            <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:16, border:'2px solid rgba(0,230,138,0.25)', position:'relative', overflow:'hidden' }}>
+            <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:16, border:'2px solid rgba(0,230,138,0.25)', position:'relative' }}>
               <div style={{ position:'absolute', top:0, left:0, right:0, bottom:0, background:'linear-gradient(135deg, rgba(0,230,138,0.02), rgba(0,198,83,0.02))', pointerEvents:'none' }} />
               <div onClick={() => setExpandedCategories(p => ({ ...p, calc_intel: !(p.calc_intel ?? true) }))} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom: (expandedCategories.calc_intel ?? true) ? 8 : 0, cursor:'pointer' }}>
                 <div style={{ display:'flex', alignItems:'center', gap:6 }}>
@@ -5353,7 +5367,12 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
 
             {/* ==================== PHASE SELECTOR ==================== */}
             <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:12, border:'1px solid var(--border)' }}>
-              <h4 style={{ margin:'0 0 8px', fontSize:12, color:'var(--text)' }}>🔄 Фаза курса</h4>
+              <div onClick={() => setExpandedCategories(p => ({ ...p, calc_phase: !(p.calc_phase ?? true) }))} style={{ display:'flex', alignItems:'center', gap:6, cursor:'pointer', marginBottom: (expandedCategories.calc_phase ?? true) ? 8 : 0 }}>
+                <span style={{ fontSize:13 }}>🔄</span>
+                <span style={{ flex:1, fontSize:12, fontWeight:700, color:'var(--text)' }}>Фаза курса</span>
+                <span style={{ fontSize:9, color:'var(--text-dim)', transform: (expandedCategories.calc_phase ?? true) ? 'rotate(180deg)' : 'none', transition:'transform 0.2s' }}>▼</span>
+              </div>
+              {(expandedCategories.calc_phase ?? true) && (<>
               <p style={{ fontSize:9, color:'var(--text-dim)', margin:'0 0 8px' }}>{PHASE_MODS[supportPhase]?.desc}</p>
               <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr', gap:4 }}>
                 {([
@@ -5378,6 +5397,7 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
                   ⚡ +{PHASE_MODS[supportPhase]?.addSubs?.length || 0} / -{PHASE_MODS[supportPhase]?.removeSubs?.length || 0} веществ
                 </div>
               )}
+            </>)}
             </div>
             {/* ==================== ADD 5: INTEGRATION NOTICE ==================== */}
             <div style={{ padding:'10px 12px', borderRadius:10, background:'rgba(96,165,250,0.05)', border:'1px solid rgba(96,165,250,0.12)', display:'flex', alignItems:'flex-start', gap:8 }}>
@@ -5392,7 +5412,12 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
 
             {/* ==================== 3a: ВЫБОР УРОВНЯ ==================== */}
             <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:12, border:'1px solid var(--border)' }}>
-              <h4 style={{ margin:'0 0 8px', fontSize:12, color:'var(--text)' }}>🎯 Уровень поддержки</h4>
+              <div onClick={() => setExpandedCategories(p => ({ ...p, calc_level: !(p.calc_level ?? true) }))} style={{ display:'flex', alignItems:'center', gap:6, cursor:'pointer', marginBottom: (expandedCategories.calc_level ?? true) ? 8 : 0 }}>
+                <span style={{ fontSize:13 }}>🎯</span>
+                <span style={{ flex:1, fontSize:12, fontWeight:700, color:'var(--text)' }}>Уровень поддержки</span>
+                <span style={{ fontSize:9, color:'var(--text-dim)', transform: (expandedCategories.calc_level ?? true) ? 'rotate(180deg)' : 'none', transition:'transform 0.2s' }}>▼</span>
+              </div>
+              {(expandedCategories.calc_level ?? true) && (<>
               <div style={{ fontSize:9, color:'var(--text-dim)', marginBottom:8 }}>
                 Авто-выбран: <b style={{ color:'#8b5cf6' }}>{SUPPORT_LEVELS[autoLevel]?.label || autoLevel}</b>
                 {autoLevel !== supportLevel && (
@@ -5466,11 +5491,17 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
                   </div>
                 </div>
               )}
+            </>)}
             </div>
 
             {/* ==================== 3c: ДНЕВНОЕ РАСПИСАНИЕ ==================== */}
             <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:12, border:'1px solid var(--border)' }}>
-              <h4 style={{ margin:'0 0 8px', fontSize:12, color:'var(--accent)' }}>📅 Дневное расписание ({effectiveLevel?.label || SUPPORT_LEVELS[supportLevel]?.label})</h4>
+              <div onClick={() => setExpandedCategories(p => ({ ...p, calc_schedule: !(p.calc_schedule ?? true) }))} style={{ display:'flex', alignItems:'center', gap:6, cursor:'pointer', marginBottom: (expandedCategories.calc_schedule ?? true) ? 8 : 0 }}>
+                <span style={{ fontSize:13 }}>📅</span>
+                <span style={{ flex:1, fontSize:12, fontWeight:700, color:'var(--accent)' }}>Дневное расписание ({effectiveLevel?.label || SUPPORT_LEVELS[supportLevel]?.label})</span>
+                <span style={{ fontSize:9, color:'var(--text-dim)', transform: (expandedCategories.calc_schedule ?? true) ? 'rotate(180deg)' : 'none', transition:'transform 0.2s' }}>▼</span>
+              </div>
+              {(expandedCategories.calc_schedule ?? true) && (<>
               {dailySchedule.length === 0 ? (
                 <p style={{ fontSize:9, color:'var(--text-dim)', margin:0 }}>Выберите уровень поддержки.</p>
               ) : (
@@ -5494,12 +5525,18 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
                   ))}
                 </div>
               )}
+            </>)}
             </div>
 
             {/* ==================== 3d: ПРОГНОЗ СНИЖЕНИЯ РИСКОВ ==================== */}
-            {calcDone && calcResult && riskData?.systemBreakdown && (
+            {calcDone && calcResult && calcResult?.riskAssessment?.systemBreakdown && (
               <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:12, border:'1px solid var(--border)' }}>
-                <h4 style={{ margin:'0 0 8px', fontSize:12, color:'#22c55e' }}>📉 Прогноз снижения рисков</h4>
+                <div onClick={() => setExpandedCategories(p => ({ ...p, calc_forecast: !(p.calc_forecast ?? true) }))} style={{ display:'flex', alignItems:'center', gap:6, cursor:'pointer', marginBottom: (expandedCategories.calc_forecast ?? true) ? 8 : 0 }}>
+                  <span style={{ fontSize:13 }}>📉</span>
+                  <span style={{ flex:1, fontSize:12, fontWeight:700, color:'#22c55e' }}>Прогноз снижения рисков</span>
+                  <span style={{ fontSize:9, color:'var(--text-dim)', transform: (expandedCategories.calc_forecast ?? true) ? 'rotate(180deg)' : 'none', transition:'transform 0.2s' }}>▼</span>
+                </div>
+                {(expandedCategories.calc_forecast ?? true) && (<>
                 <div style={{ display:'flex', flexDirection:'column', gap:4, fontSize:9 }}>
                   <div style={{ padding:'6px 8px', borderRadius:6, background:'rgba(34,197,94,0.06)', border:'1px solid rgba(34,197,94,0.1)', display:'flex', justifyContent:'space-between', fontWeight:600 }}>
                     <span style={{ color:'var(--text-light)' }}>Общий риск</span>
@@ -5510,27 +5547,26 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
                       <span style={{ color:'#22c55e', marginLeft:4 }}>(-{Math.round(calcResult.riskBeforeSupport - calcResult.riskAfterSupport)}%)</span>
                     </span>
                   </div>
-                  {SYSTEM_ORDER.filter(k => riskData.systemBreakdown[k] && (calcResult.systemSupport || {})[k] !== undefined).map(sysKey => {
-                    const sysData = riskData.systemBreakdown[sysKey];
+                  {SYSTEM_ORDER.filter(k => calcResult.riskAssessment.systemBreakdown[k] && (calcResult.systemSupport || {})[k] !== undefined).map(sysKey => {
+                    const sysRaw = calcResult.riskAssessment.systemBreakdown[sysKey].raw ?? 0;
+                    const sysNet = calcResult.riskAssessment.systemBreakdown[sysKey].net ?? 0;
                     const sysInfo = SYSTEM_LABELS_RU[sysKey] || { name: sysKey, emoji: '' };
-                    const supportCov = (calcResult.systemSupport || {})[sysKey] || 0;
-                    const afterRisk = Math.round(Math.max(0, sysData.net * (1 - supportCov / 100)));
-                    const reduction = Math.round(sysData.net - afterRisk);
                     return (
                       <div key={sysKey} style={{ display:'flex', justifyContent:'space-between', padding:'3px 8px', borderRadius:4, background:'rgba(0,0,0,0.08)' }}>
                         <span style={{ color:'var(--text-light)' }}>{sysInfo.emoji} {sysInfo.name}</span>
                         <span>
-                          <span style={{ color: riskColorFn(sysData.net) }}>{Math.round(sysData.net)}%</span>
+                          <span style={{ color: riskColorFn(sysRaw) }}>{Math.round(sysRaw)}%</span>
                           <span style={{ color:'var(--text-dim)', margin:'0 3px' }}>→</span>
-                          <span style={{ color: riskColorFn(afterRisk) }}>{afterRisk}%</span>
-                          {reduction > 0 && (
-                            <span style={{ color:'#22c55e', marginLeft:3 }}>(-{reduction}%)</span>
+                          <span style={{ color: riskColorFn(sysNet) }}>{Math.round(sysNet)}%</span>
+                          {sysRaw !== sysNet && (
+                            <span style={{ color:'#22c55e', marginLeft:3 }}>(-{Math.round(sysRaw - sysNet)}%)</span>
                           )}
                         </span>
                       </div>
                     );
                   })}
                 </div>
+              </>)}
               </div>
             )}
 
