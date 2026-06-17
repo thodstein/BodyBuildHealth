@@ -793,12 +793,12 @@ function calculateBaseRisk(input: SupportInput): Record<string, number> {
           for (const system of affectedSystems) {
             if (systemRisks[system] !== undefined) {
               systemRisks[system] *= multiplier;
-            }
-          }
-        } else {
-          for (const system of ALL_RISK_SYSTEMS) {
-            systemRisks[system] *= multiplier;
-          }
+    }
+  }
+
+  for (const system of ALL_RISK_SYSTEMS) {
+    systemRisks[system] = Math.min(100, Math.max(0, systemRisks[system]));
+  }
         }
       }
     }

@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { SYNERGY_PAIRS, ORGAN_SYNERGIES, SUPPLEMENT_DESCRIPTIONS, SUPPLEMENT_TARGETS, SUPPORT_RESEARCH, calculateSupport, checkSupportInteractions, findSupportForGoal, searchSupport, getSubstanceInfo, getSupportDatabaseStats, type SupportInput, type SynergyPair, type SupplementTarget, type OrganSynergy } from '../../engines/support.engine';
 import { RISK_SYSTEMS, ALL_RISK_SYSTEMS } from '../../core/constants';
 import { PHARMA_DB, getPharmaDetail } from '../../core/pharma-database';
@@ -1544,6 +1544,19 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   const supportCautions = supportInteractions?.filter(i => i.type === 'caution') ?? [];
 
   // Group ALL_SUBSTANCES by primary category for catalog
+  const catalogSubstances = useMemo(() => {
+    return Object.values(SUPPORT_CATALOG_DATA).map(entry => ({
+      id: entry.id,
+      name: entry.nameRu || entry.name || entry.id,
+      categories: entry.category || [],
+      mechanisms: entry.mechanisms || [],
+      organs: entry.organs || [],
+      description: entry.description || '',
+      type: (entry.category||[])[0] || 'supplement',
+      deficiency: '',
+    })) as SupportSubstance[];
+  }, []);
+
   const groupedSubstances = useMemo(() => {
     const normCat = (cat: string): string => {
       const m: Record<string,string> = {
@@ -1568,20 +1581,23 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
       return cat;
     };
     const groups: Record<string, SupportSubstance[]> = {};
-    // Filter to 289 curated catalog entries only
-    const CATALOG_IDS = new Set(Object.keys(SUPPORT_CATALOG_DATA).map(k => k.toLowerCase()));
-    const catalogFiltered = ALL_SUBSTANCES.filter(s => CATALOG_IDS.has(s.id.toLowerCase()));
-    // Apply tier filter and search query
-    const tierFiltered = supportTierFilter === 'all' ? catalogFiltered : catalogFiltered.filter(s => getSubstanceTier(s.id) === supportTierFilter);
-    const filtered = searchQuery
-      ? tierFiltered.filter(s =>
-          (s.name||'').toLowerCase().includes(searchQuery.toLowerCase()) ||
-          (s.id||'').toLowerCase().includes(searchQuery.toLowerCase()) ||
-          (s.description||'').toLowerCase().includes(searchQuery.toLowerCase()) ||
-          (s.categories||[]).some(c => (c||'').toLowerCase().includes(searchQuery.toLowerCase())) ||
-          (s.mechanisms||[]).some(m => (m||'').toLowerCase().includes(searchQuery.toLowerCase()))
-        )
-        : tierFiltered;
+    // Use 289 curated catalog entries directly
+    let filtered = catalogSubstances;
+    // Apply tier filter
+    if (supportTierFilter !== 'all') {
+      filtered = filtered.filter(s => getSubstanceTier(s.id) === supportTierFilter);
+    }
+    // Apply search query
+    if (searchQuery) {
+      const sq = searchQuery.toLowerCase();
+      filtered = filtered.filter(s =>
+        (s.name||'').toLowerCase().includes(sq) ||
+        (s.id||'').toLowerCase().includes(sq) ||
+        (s.description||'').toLowerCase().includes(sq) ||
+        (s.categories||[]).some(c => (c||'').toLowerCase().includes(sq)) ||
+        (s.mechanisms||[]).some(m => (m||'').toLowerCase().includes(sq))
+      );
+    }
     for (const sub of filtered) {
       const primaryCat = normCat((sub.categories||[])[0] || 'other');
       if (!groups[primaryCat]) groups[primaryCat] = [];
@@ -1614,7 +1630,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
         return { cat, items, count: items.length, classBadges, classItems };
       })
       .sort((a, b) => b.count - a.count);
-  }, [searchQuery, supportTierFilter]);
+  }, [searchQuery, supportTierFilter, catalogSubstances]);
 
   // Organ-based grouping for catalog sub-tab
   // Phase 5.12: Comprehensive 16-category organ mapping
@@ -1693,11 +1709,11 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
     const groups: Record<string, { key: string; label: string; emoji: string; items: SupportSubstance[]; count: number }> = {};
     const usedKeys = new Set<string>();
     const filtered = searchQuery
-      ? ALL_SUBSTANCES.filter(s =>
+      ? catalogSubstances.filter(s =>
           (s.name||'').toLowerCase().includes(searchQuery.toLowerCase()) ||
           (s.id||'').toLowerCase().includes(searchQuery.toLowerCase())
         )
-      : ALL_SUBSTANCES;
+      : catalogSubstances;
     for (const sub of filtered) {
       const organs = sub.organs || [];
       usedKeys.clear();
@@ -1814,7 +1830,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
       boost: { key: 'boost', label: 'Усиление (BOOST)', emoji: '🟠', color: '#f97316', substances: [] },
       max: { key: 'max', label: 'Максимум (MAX)', emoji: '🔴', color: '#ef4444', substances: [] },
     };
-    for (const sub of ALL_SUBSTANCES) {
+    for (const sub of catalogSubstances) {
       const tier = classifyTier(sub);
       tiers[tier].substances.push(sub.id);
     }
@@ -1864,8 +1880,16 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   }, [conflictLookup]);
 
   // Merge ALL_INTERACTIONS + SYNERGY_PAIRS for synergies tab (with null filter + dedup + catalog filter)
+  const catalogOk = useCallback((id: string) => {
+    const lower = id.toLowerCase();
+    if (CATALOG_IDS.has(lower)) return true;
+    for (const cid of CATALOG_IDS) {
+      if (cid.startsWith(lower) || lower.startsWith(cid)) return true;
+    }
+    return false;
+  }, [CATALOG_IDS]);
+
   const mergedInteractions = useMemo(() => {
-    const catalogOk = (id: string) => CATALOG_IDS.has(id.toLowerCase());
     const seen = new Set<string>();
     const fromDB = ALL_INTERACTIONS
       .filter(i => i && i.interactionId && i.substanceA && i.substanceB && i.substanceA !== i.substanceB && catalogOk(i.substanceA) && catalogOk(i.substanceB))
@@ -1972,17 +1996,26 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
     return safeRender(target, contentFn);
   };
 
+  const matchesCatId = (interactionId: string, catId: string): boolean => {
+    const a = interactionId.toLowerCase();
+    const b = catId.toLowerCase();
+    if (a === b) return true;
+    if (a.startsWith(b) || b.startsWith(a)) return true;
+    return false;
+  };
+
   const catDetailInteractions = (sub: SupportSubstance, interactions: any[]): React.ReactNode => {
     try {
+      const subId = sub.id;
       const subsInteractions = (interactions||[]).filter(i =>
-        i&&(i.substanceA === sub.id || i.substanceB === sub.id)
+        i && i.substanceA && i.substanceB && (matchesCatId(i.substanceA, subId) || matchesCatId(i.substanceB, subId))
       ).slice(0, 5);
       return subsInteractions.length > 0 ? (
         <div style={{ marginTop:4 }}>
           <div style={{ fontSize:7, color:'var(--text-dim)', marginBottom:1 }}>Взаимодействия:</div>
           {subsInteractions.map(i => {
             if (!i) return null;
-            const isA = i.substanceA === sub.id;
+            const isA = matchesCatId(i.substanceA, subId);
             const partner = isA ? i.substanceB : i.substanceA;
             const pName = resolveSubName(partner);
             const tColor = i.type === 'synergy' ? '#22c55e' : i.type === 'conflict' ? '#ef4444' : '#f59e0b';
@@ -2496,7 +2529,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                   {(['all','core','standard','advanced','specialty'] as const).map(tier => {
                     const isSel = supportTierFilter === tier;
                     const info = tier === 'all' ? { label:'Все', emoji:'🔍', color:'var(--text-dim)' } : TIER_LABELS[tier];
-                    const count = tier === 'all' ? ALL_SUBSTANCES.length : ALL_SUBSTANCES.filter(s => getSubstanceTier(s.id) === tier).length;
+                    const count = tier === 'all' ? catalogSubstances.length : catalogSubstances.filter(s => getSubstanceTier(s.id) === tier).length;
                     return (
                       <button key={tier} onClick={() => setSupportTierFilter(tier)} style={{
                         padding:'4px 10px', borderRadius:12, fontSize:9, fontWeight:700, cursor:'pointer',
@@ -2593,7 +2626,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                           {isExpanded && (
                             <div style={{ borderTop:'1px solid var(--border)' }}>
                               {tg.substances.map(id => {
-                                const sub = ALL_SUBSTANCES.find(s => s.id === id);
+                                const sub = catalogSubstances.find(s => s.id === id);
                                 if (!sub) return null;
                                 const isSelected = selectedSub === id;
                                 return (
