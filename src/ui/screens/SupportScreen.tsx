@@ -1151,11 +1151,18 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
         }
       }
     }
-    // Joint mode: filter to only joint-related substances
+    // Normal mode: exclude joints (they have separate calculator)
+    // Joint mode: only include joints
     let finalSubs = subs;
     let finalDosages = dosages;
     if (jointMode) {
       finalSubs = subs.filter(s => JOINT_SUBS.includes(s));
+      finalDosages = {};
+      for (const s of finalSubs) {
+        finalDosages[s] = dosages[s] || DEFAULT_DOSAGES[s] || { mg: 500, timing: 'с едой' };
+      }
+    } else {
+      finalSubs = subs.filter(s => !JOINT_SUBS.includes(s));
       finalDosages = {};
       for (const s of finalSubs) {
         finalDosages[s] = dosages[s] || DEFAULT_DOSAGES[s] || { mg: 500, timing: 'с едой' };
@@ -5169,8 +5176,12 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
 
             {/* ==================== 2c: РИСКИ ПО СИСТЕМАМ ==================== */}
             <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:12, border:'1px solid var(--border)' }}>
-              <h4 style={{ margin:'0 0 8px', fontSize:12, color:'#f59e0b' }}>📈 Риски по системам</h4>
-              {riskData?.systemBreakdown && Object.keys(riskData.systemBreakdown).length > 0 ? (
+              <div onClick={() => setExpandedCategories(p => ({ ...p, calc_risks: !(p.calc_risks ?? true) }))} style={{ display:'flex', alignItems:'center', gap:6, cursor:'pointer', marginBottom: (expandedCategories.calc_risks ?? true) ? 8 : 0 }}>
+                <span style={{ fontSize:13 }}>📈</span>
+                <span style={{ flex:1, fontSize:12, fontWeight:700, color:'#f59e0b' }}>Риски по системам</span>
+                <span style={{ fontSize:9, color:'var(--text-dim)', transform: (expandedCategories.calc_risks ?? true) ? 'rotate(180deg)' : 'none', transition:'transform 0.2s' }}>▼</span>
+              </div>
+              {(expandedCategories.calc_risks ?? true) && (riskData?.systemBreakdown && Object.keys(riskData.systemBreakdown).length > 0 ? (
                 <div style={{ display:'flex', flexDirection:'column', gap:5 }}>
                   {SYSTEM_ORDER.filter(k => riskData.systemBreakdown[k]).map(sysKey => {
                     const sysData = riskData.systemBreakdown[sysKey];
@@ -5204,16 +5215,23 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
                 </div>
               ) : (
                 <p style={{ fontSize:9, color:'var(--text-dim)', margin:0 }}>Нет данных о рисках. Нажмите «Рассчитать» ниже.</p>
-              )}
+              ))}
             </div>
 
             {/* ==================== ADD 1: REAL CALCULATESUPPORT INTEGRATION ==================== */}
-            <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:12, border:'2px solid rgba(0,230,138,0.25)', position:'relative', overflow:'hidden' }}>
+            <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:16, border:'2px solid rgba(0,230,138,0.25)', position:'relative', overflow:'hidden' }}>
               <div style={{ position:'absolute', top:0, left:0, right:0, bottom:0, background:'linear-gradient(135deg, rgba(0,230,138,0.02), rgba(0,198,83,0.02))', pointerEvents:'none' }} />
-              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
-                <h4 style={{ margin:0, fontSize:13, color:'#00e68a' }}>🧮 Интеллектуальный расчёт поддержки</h4>
-                <span style={{ fontSize:9, fontWeight:400, color:'var(--text-dim)', background:'rgba(0,230,138,0.08)', padding:'2px 8px', borderRadius:10 }}>v2.0</span>
+              <div onClick={() => setExpandedCategories(p => ({ ...p, calc_intel: !(p.calc_intel ?? true) }))} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom: (expandedCategories.calc_intel ?? true) ? 8 : 0, cursor:'pointer' }}>
+                <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                  <span style={{ fontSize:16 }}>🧮</span>
+                  <h4 style={{ margin:0, fontSize:13, color:'#00e68a' }}>Интеллектуальный расчёт поддержки</h4>
+                </div>
+                <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                  <span style={{ fontSize:9, fontWeight:400, color:'var(--text-dim)', background:'rgba(0,230,138,0.08)', padding:'2px 8px', borderRadius:10 }}>v2.0</span>
+                  <span style={{ fontSize:9, color:'var(--text-dim)', transform: (expandedCategories.calc_intel ?? true) ? 'rotate(180deg)' : 'none', transition:'transform 0.2s' }}>▼</span>
+                </div>
               </div>
+              {(expandedCategories.calc_intel ?? true) && (<>
               <p style={{ fontSize:9, color:'var(--text-dim)', margin:'0 0 10px', lineHeight:1.5 }}>
                 Анализ: <b style={{ color:'var(--accent)' }}>{uniqCourse.length}</b> препаратов · <b style={{ color:'#60a5fa' }}>{labs.length}</b> анализов · <b style={{ color:'#f59e0b' }}>{Object.keys(riskData?.systemBreakdown || {}).length}</b> систем рисков · <b style={{ color:'#a78bfa' }}>{weightKg}</b>кг {age}лет {sex === 'male' ? '♂' : '♀'}
               </p>
@@ -5330,6 +5348,7 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
                   </div>
                 </div>
               )}
+              </>)}
             </div>
 
             {/* ==================== PHASE SELECTOR ==================== */}
