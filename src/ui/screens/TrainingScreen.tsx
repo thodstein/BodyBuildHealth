@@ -63,21 +63,21 @@ const PHASE_HINTS: Record<string, string> = {
   deload: 'Разгрузка: снижаем объём и интенсивность, восстанавливаем суставы и нервную систему.',
 };
 
-type TrainingTab = 'plan' | 'runtime' | 'exercises' | 'calculators' | 'diary' | 'cycles' | 'history' | 'analytics' | 'methods' | 'visual' | 'programs' | 'timers' | 'progress' | 'mytraining';
+type TrainingTab = 'plan' | 'runtime' | 'exercises' | 'calculators' | 'diary' | 'cycles' | 'history' | 'analytics' | 'methods' | 'visual' | 'programs' | 'timers' | 'progress' | 'mytraining' | 'programcalc';
 type TrainingPage = 'hero' | 'tabs';
 type TrainingGroup = 'training' | 'planning' | 'info' | null;
 
 const TAB_GROUPS: Record<string, { title: string; icon: string; tabs: TrainingTab[]; color: string }> = {
-  training: { title: '🏋️ Тренировки', icon: '🏋️', tabs: ['plan', 'runtime', 'exercises', 'diary', 'history'], color: 'var(--accent)' },
-  planning: { title: '📐 Планирование', icon: '📐', tabs: ['calculators', 'cycles', 'programs', 'mytraining'], color: '#3b82f6' },
-  info: { title: '📊 Инфо', icon: '📊', tabs: ['analytics', 'methods', 'visual', 'timers', 'progress'], color: '#8b5cf6' },
+  training: { title: '🏋️ Тренировки', icon: '🏋️', tabs: ['runtime', 'diary', 'history', 'timers'], color: 'var(--accent)' },
+  planning: { title: '📐 Планирование', icon: '📐', tabs: ['plan', 'cycles', 'programs', 'mytraining', 'methods', 'programcalc'], color: '#3b82f6' },
+  info: { title: '📊 Инфо', icon: '📊', tabs: ['analytics', 'visual', 'progress', 'calculators', 'exercises'], color: '#8b5cf6' },
 };
 
 const TAB_LABELS: Record<TrainingTab, string> = {
   plan: '📋 План', runtime: '▶ Тренировка', exercises: '🏋️ Упражнения', calculators: '📐 Калькуляторы',
   diary: '📝 Дневник', cycles: '🔄 Циклы', history: '📜 История', analytics: '📊 Аналитика',
   methods: '🧠 Методики', visual: '📈 Визуализация', programs: '📚 Программы', timers: '⏱ Таймеры',
-  progress: '📏 Прогресс', mytraining: '⭐ Мои',
+  progress: '📏 Прогресс', mytraining: '⭐ Мои', programcalc: '🛠️ Программа',
 };
 
 export const TrainingScreen: React.FC = () => {
@@ -385,6 +385,8 @@ export const TrainingScreen: React.FC = () => {
 
   const bmiCategory = (v: number) => v < 18.5 ? 'Недостаток веса' : v < 25 ? 'Норма' : v < 30 ? 'Избыток' : 'Ожирение';
 
+  const showNonBuilder = tab !== 'programcalc';
+
   return (
     <div className="screen training-screen" style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'auto', padding: 0 }}>
 
@@ -462,8 +464,8 @@ export const TrainingScreen: React.FC = () => {
         ))}
       </div>
 
-      {/* Readiness card — visible on all tabs */}
-      {readiness && (
+      {/* Readiness card — only on training tabs */}
+      {readiness && mainGroup === 'training' && (
         <div className="card" style={{ marginBottom: 8, padding: '10px 12px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
             <h4 style={{ margin: 0, fontSize: 12 }}>📊 Готовность к тренировке</h4>
@@ -1505,107 +1507,99 @@ export const TrainingScreen: React.FC = () => {
         </div>
       )}
 
-      {/* ═══════════ EXERCISES TAB ═══════════ */}
+      {/* ═══════════ EXERCISES TAB (Apple-style) ═══════════ */}
       {tab === 'exercises' && (
-        <div style={{ display: 'flex', gap: 8, flexDirection: selectedEx ? 'row' : 'column', flexWrap: 'wrap' }}>
-          <div style={{ flex: selectedEx ? '0 0 280px' : 1, maxHeight: 'calc(100vh - 200px)', display: 'flex', flexDirection: 'column' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {/* Search + filters */}
+          <div style={{ background:'var(--bg-secondary)', borderRadius:14, padding:'8px 10px', border:'1px solid var(--border)' }}>
             <input type="text" value={exSearch} onChange={e => setExSearch(e.target.value)}
-              placeholder=""
-              style={{ width: '100%', padding: '7px 10px', borderRadius: 8, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, marginBottom: 4, boxSizing: 'border-box', flexShrink: 0 }} />
-            <div style={{ display: 'flex', gap: 3, marginBottom: 4, flexShrink: 0 }}>
-              <select value={exGroup} onChange={e => setExGroup(e.target.value)} style={{ flex: 1, padding: '4px 4px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 10 }}>
-                <option value="all">Все группы</option>
-                {MUSCLE_GROUPS.map(g => <option key={g} value={g}>{GROUP_LABELS[g]}</option>)}
-              </select>
-              <select value={exType} onChange={e => setExType(e.target.value)} style={{ flex: 1, padding: '4px 4px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 10 }}>
-                <option value="all">Все типы</option>
-                <option value="compound">Базовые</option>
-                <option value="isolation">Изолирующие</option>
-              </select>
-              <select value={exEquipment} onChange={e => setExEquipment(e.target.value)} style={{ flex: 1, padding: '4px 4px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 10 }}>
-                <option value="all">Оборуд.</option>
-                <option value="barbell">Штанга</option>
-                <option value="dumbbell">Гантели</option>
-                <option value="machine">Тренажёр</option>
-                <option value="cable">Блок</option>
-                <option value="bodyweight">Вес тела</option>
-              </select>
-            </div>
-            <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 2 }}>
-              {filteredExercises.slice(0, 80).map(ex => (
-                <div key={ex.id} onClick={() => setSelectedEx(selectedEx?.id === ex.id ? null : ex)} style={{
-                  padding: '4px 8px', borderRadius: 6, cursor: 'pointer', fontSize: 11,
-                  background: selectedEx?.id === ex.id ? 'rgba(0,230,138,0.1)' : 'var(--bg-secondary)',
-                  border: selectedEx?.id === ex.id ? '1px solid var(--accent)' : '1px solid transparent',
-                }}>
-                  <div style={{ fontWeight: 600, fontSize: 11, display: 'flex', justifyContent: 'space-between' }}>
-                    <span>{ex.name}</span>
-                    <span style={{ fontSize: 9, color: 'var(--text-dim)' }}>{GROUP_LABELS[ex.group]}</span>
-                  </div>
-                </div>
+              placeholder="🔍 Поиск упражнений..." 
+              style={{ width:'100%', padding:'10px 12px', borderRadius:10, background:'rgba(0,0,0,0.2)', border:'1px solid var(--border)', color:'var(--text)', fontSize:13, boxSizing:'border-box', marginBottom:6 }} />
+            <div style={{ display:'flex', gap:4 }}>
+              {[{ key:'exGroup', val:exGroup, set:(v:string)=>setExGroup(v), opts:[['all','Группа'],...MUSCLE_GROUPS.map(g=>[g,GROUP_LABELS[g]] as [string,string])] },
+                { key:'exType', val:exType, set:(v:string)=>setExType(v), opts:[['all','Тип'],['compound','Базовые'],['isolation','Изо']] },
+                { key:'exEquipment', val:exEquipment, set:(v:string)=>setExEquipment(v), opts:[['all','Инвентарь'],['barbell','Штанга'],['dumbbell','Гантели'],['machine','Тренажёр'],['cable','Блок'],['bodyweight','Вес']] }
+              ].map(f => (
+                <select key={f.key} value={f.val} onChange={e => f.set(e.target.value)} style={{ flex:1, padding:'7px 4px', borderRadius:8, background:'rgba(0,0,0,0.2)', border:'1px solid var(--border)', color:'var(--text)', fontSize:10, fontWeight:600, textAlign:'center', minWidth:0 }}>
+                  {f.opts.map(([v,l]) => <option key={v} value={v}>{l}</option>)}
+                </select>
               ))}
             </div>
           </div>
-          {selectedEx && (
-            <div style={{ flex: 1, background: 'var(--bg-secondary)', borderRadius: 10, padding: '10px 12px', maxHeight: 'calc(100vh - 190px)', overflowY: 'auto', minWidth: 250 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                <h3 style={{ margin: 0, fontSize: 13, color: 'var(--accent)' }}>{selectedEx.name}</h3>
-                <button onClick={() => setSelectedEx(null)} style={{ background: 'none', border: 'none', color: 'var(--text-dim)', fontSize: 14, cursor: 'pointer', padding: 0 }}>✕</button>
-              </div>
-              <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap', marginBottom: 6 }}>
-                <span style={{ fontSize: 9, padding: '1px 5px', borderRadius: 3, background: 'rgba(0,230,138,0.1)', color: '#00e68a' }}>{GROUP_LABELS[selectedEx.group]}</span>
-                <span style={{ fontSize: 9, padding: '1px 5px', borderRadius: 3, background: 'rgba(59,130,246,0.1)', color: '#3b82f6' }}>{selectedEx.type === 'compound' ? 'Базовое' : 'Изолирующее'}</span>
-                <span style={{ fontSize: 9, padding: '1px 5px', borderRadius: 3, background: 'rgba(249,115,22,0.1)', color: '#f97316' }}>{EQUIP_LABELS[selectedEx.equipment] || selectedEx.equipment}</span>
-                <span style={{ fontSize: 9, padding: '1px 5px', borderRadius: 3, background: selectedEx.jointStress === 'high' ? 'rgba(239,68,68,0.1)' : 'rgba(34,197,94,0.1)', color: selectedEx.jointStress === 'high' ? '#ef4444' : '#22c55e' }}>Суставы: {JOINT_LABELS[selectedEx.jointStress] || selectedEx.jointStress}</span>
-                <span style={{ fontSize: 9, padding: '1px 5px', borderRadius: 3, background: 'rgba(139,92,246,0.1)', color: '#8b5cf6' }}>Усталость: {selectedEx.fatigueCost}/10</span>
-                {selectedEx.difficulty && (
-                  <span style={{ fontSize: 9, padding: '1px 5px', borderRadius: 3, background: selectedEx.difficulty === 'advanced' ? 'rgba(239,68,68,0.1)' : selectedEx.difficulty === 'intermediate' ? 'rgba(249,115,22,0.1)' : 'rgba(34,197,94,0.1)', color: selectedEx.difficulty === 'advanced' ? '#ef4444' : selectedEx.difficulty === 'intermediate' ? '#f97316' : '#22c55e' }}>
-                    {selectedEx.difficulty === 'advanced' ? 'Продвинутое' : selectedEx.difficulty === 'intermediate' ? 'Среднее' : 'Начальное'}
-                  </span>
-                )}
-                {selectedEx.targetMuscle && (
-                  <span style={{ fontSize: 9, padding: '1px 5px', borderRadius: 3, background: 'rgba(236,72,153,0.1)', color: '#ec4899' }}>
-                    🎯 {selectedEx.targetMuscle}
-                  </span>
-                )}
-              </div>
-              {selectedEx.technique && (
-                <div style={{ marginBottom: 6, background: 'rgba(0,230,138,0.05)', borderRadius: 6, padding: '5px 8px', fontSize: 10, color: 'var(--text)', lineHeight: 1.4 }}>
-                  <span style={{ fontWeight: 600, color: 'var(--accent)' }}>🎯 </span>{selectedEx.technique}
+
+          {/* Exercise list */}
+          <div style={{ display:'flex', flexDirection:'column', gap:4, maxHeight:'50vh', overflowY:'auto', paddingRight:2 }}>
+            {filteredExercises.slice(0, 80).map(ex => {
+              const isSelected = selectedEx?.id === ex.id;
+              const typeIcon = ex.type === 'compound' ? '🔩' : '🎯';
+              const equipIcon = { barbell:'🏋️', dumbbell:'💪', machine:'⚙️', cable:'🔗', bodyweight:'🧘' }[ex.equipment] || '📦';
+              return (
+                <div key={ex.id} onClick={() => setSelectedEx(isSelected ? null : ex)} style={{
+                  padding:'8px 10px', borderRadius:12, cursor:'pointer',
+                  background: isSelected ? 'linear-gradient(135deg, rgba(0,230,138,0.08), rgba(59,130,246,0.04))' : 'var(--bg-secondary)',
+                  border: isSelected ? '1px solid rgba(0,230,138,0.3)' : '1px solid var(--border)',
+                  transition:'all 0.15s',
+                }}>
+                  <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                    <div style={{ width:32, height:32, borderRadius:10, background:isSelected?'rgba(0,230,138,0.12)':'rgba(255,255,255,0.04)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:16, flexShrink:0 }}>
+                      {typeIcon}
+                    </div>
+                    <div style={{ flex:1, minWidth:0 }}>
+                      <div style={{ fontSize:12, fontWeight:600, color:isSelected?'var(--accent)':'var(--text-light)', lineHeight:1.2 }}>{ex.name}</div>
+                      <div style={{ display:'flex', gap:3, marginTop:2, flexWrap:'wrap' }}>
+                        <span style={{ fontSize:8, padding:'1px 4px', borderRadius:3, background:'rgba(255,255,255,0.04)', color:'var(--text-dim)' }}>{equipIcon} {EQUIP_LABELS[ex.equipment]||ex.equipment}</span>
+                        <span style={{ fontSize:8, padding:'1px 4px', borderRadius:3, background:'rgba(255,255,255,0.04)', color:'var(--text-dim)' }}>{GROUP_LABELS[ex.group]}</span>
+                        <span style={{ fontSize:8, padding:'1px 4px', borderRadius:3, background:ex.jointStress==='high'?'rgba(239,68,68,0.08)':'rgba(34,197,94,0.08)', color:ex.jointStress==='high'?'#ef4444':'#22c55e' }}>{JOINT_LABELS[ex.jointStress]||ex.jointStress}</span>
+                      </div>
+                    </div>
+                    <span style={{ fontSize:10, color:isSelected?'#00e68a':'var(--text-dim)', transition:'transform 0.15s', transform:isSelected?'rotate(180deg)':'none' }}>▼</span>
+                  </div>
+
+                  {/* Detail panel inline (Apple bottom-sheet style) */}
+                  {isSelected && (
+                    <div style={{ marginTop:8, paddingTop:8, borderTop:'1px solid var(--border)' }}>
+                      {/* Tags row */}
+                      <div style={{ display:'flex', gap:3, flexWrap:'wrap', marginBottom:6 }}>
+                        <span style={{ fontSize:8, padding:'2px 6px', borderRadius:4, background:'rgba(0,230,138,0.08)', color:'#00e68a' }}>{ex.type==='compound'?'Базовое':'Изолирующее'}</span>
+                        {ex.difficulty && <span style={{ fontSize:8, padding:'2px 6px', borderRadius:4, background:ex.difficulty==='advanced'?'rgba(239,68,68,0.08)':'rgba(249,115,22,0.08)', color:ex.difficulty==='advanced'?'#ef4444':ex.difficulty==='intermediate'?'#f97316':'#22c55e' }}>{ex.difficulty==='advanced'?'Продвинутое':ex.difficulty==='intermediate'?'Среднее':'Начальное'}</span>}
+                        <span style={{ fontSize:8, padding:'2px 6px', borderRadius:4, background:'rgba(139,92,246,0.08)', color:'#8b5cf6' }}>Усталость: {ex.fatigueCost}/10</span>
+                        {ex.targetMuscle && <span style={{ fontSize:8, padding:'2px 6px', borderRadius:4, background:'rgba(236,72,153,0.08)', color:'#ec4899' }}>🎯 {ex.targetMuscle}</span>}
+                      </div>
+                      {/* Technique */}
+                      {ex.technique && <div style={{ marginBottom:4, background:'rgba(0,230,138,0.04)', borderRadius:8, padding:'6px 8px', fontSize:10, color:'var(--text)', lineHeight:1.4 }}>🎯 {ex.technique}</div>}
+                      {/* Comments */}
+                      {ex.comments && <div style={{ marginBottom:4, background:'rgba(255,145,0,0.04)', borderRadius:8, padding:'6px 8px', fontSize:10, color:'var(--text-dim)', lineHeight:1.4 }}>💡 {ex.comments}</div>}
+                      {/* Biomechanics */}
+                      {(() => { const bio = getExerciseBio(ex.id); if (!bio) return null; const js = bio.jointStress; const strs = Object.entries(js||{}).map(([k,v])=>`${k} ${v}/10`); return <div style={{ marginBottom:4, background:'rgba(59,130,246,0.04)', borderRadius:8, padding:'5px 8px', fontSize:8, color:'var(--text-dim)' }}>
+                        🔬 Биомеханика: {strs.join(', ')} | Сложность: {bio.difficulty}/10 | ЦНС: {bio.cnsDemand||5}/10
+                      </div>; })()}
+                      {/* Replacements */}
+                      {ex.canReplace && ex.canReplace.length > 0 && <div style={{ display:'flex', flexWrap:'wrap', gap:3, alignItems:'center', marginBottom:4 }}>
+                        <span style={{ fontSize:8, color:'var(--text-dim)' }}>Замена:</span>
+                        {ex.canReplace.map(r => { const rep = EXERCISE_CATALOG.find(e => e.id === r); return rep ? <span key={r} style={{ fontSize:8, padding:'1px 5px', borderRadius:3, background:'rgba(0,230,138,0.06)', color:'#00e68a' }}>{rep.name}</span> : null; })}
+                      </div>}
+                      {/* Add to plan button */}
+                      <button onClick={() => {
+                        setCustomExercises([...customExercises, { name: ex.name, sets:3, reps:10, rir:2 }]);
+                        setSelectedEx(null);
+                      }} style={{
+                        width:'100%', marginTop:4, padding:'8px', borderRadius:8, border:'1px solid rgba(0,230,138,0.3)',
+                        background:'rgba(0,230,138,0.06)', color:'var(--accent)', fontWeight:700, fontSize:11, cursor:'pointer',
+                      }}>+ Добавить в план</button>
+                    </div>
+                  )}
                 </div>
-              )}
-              {selectedEx.comments && (
-                <div style={{ marginBottom: 6, background: 'rgba(255,145,0,0.05)', borderRadius: 6, padding: '5px 8px', fontSize: 10, color: 'var(--text-dim)', lineHeight: 1.4 }}>
-                  <span style={{ fontWeight: 600, color: '#ff9100' }}>💡 </span>{selectedEx.comments}
-                </div>
-              )}
-              {(() => { const bio = getExerciseBio(selectedEx.id); if (!bio) return null; const js = bio.jointStress; const strs = Object.entries(js||{}).map(([k,v])=>`${k} ${v}/10`); return <div key="exercise-bio" style={{ marginBottom: 6, background: 'rgba(59,130,246,0.05)', borderRadius: 6, padding: '5px 8px', fontSize: 9 }}>
-                <span style={{ fontWeight: 600, color: '#3b82f6' }}>🔬 Биомеханика:</span> Суставы: {strs.join(', ')} | Сложность: {bio.difficulty}/10 | ЦНС: {bio.cnsDemand || 5}/10
-              </div>; })()}
-              {selectedEx.canReplace && selectedEx.canReplace.length > 0 && (
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, alignItems: 'center' }}>
-                  <span style={{ fontSize: 9, color: 'var(--text-dim)' }}>Замена:</span>
-                  {selectedEx.canReplace.map(r => {
-                    const rep = EXERCISE_CATALOG.find(e => e.id === r);
-                    return rep ? <span key={r} style={{ fontSize: 9, padding: '1px 5px', borderRadius: 3, background: 'rgba(0,230,138,0.08)', color: '#00e68a' }}>{rep.name}</span> : null;
-                  })}
-                </div>
-              )}
-              <button onClick={() => {
-                setCustomExercises([...customExercises, { name: selectedEx.name, sets: 3, reps: 10, rir: 2 }]);
-                setSelectedEx(null);
-              }} style={{
-                width: '100%', marginTop: 6, padding: '6px 12px', borderRadius: 6, border: '1px dashed var(--accent)',
-                background: 'rgba(0,230,138,0.08)', color: 'var(--accent)', fontWeight: 600, fontSize: 11, cursor: 'pointer',
-              }}>+ Добавить в план</button>
-            </div>
-          )}
+              );
+            })}
+            {filteredExercises.length === 0 && <div style={{ textAlign:'center', padding:20, color:'var(--text-dim)', fontSize:11 }}>Упражнения не найдены</div>}
+          </div>
         </div>
       )}
 
-      {/* ═══════════ CALCULATORS TAB ═══════════ */}
-      {tab === 'calculators' && (
+      {/* ═══════════ CALCULATORS TAB (also serves programcalc) ═══════════ */}
+      {(tab === 'calculators' || tab === 'programcalc') && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {showNonBuilder && (<>
           <div className="card" style={{ padding: '12px 14px', background:'rgba(20,22,30,0.35)', border:'1px solid var(--glass-border)', borderRadius:14 }}>
             <h3 style={{ margin: '0 0 4px', fontSize: 13, color:'var(--accent)' }}>📐 Калькулятор 1RM</h3>
             <div style={{ fontSize:9, color:'var(--text-dim)', marginBottom:10 }}>Вес × Повторения → 1ПМ</div>
@@ -1902,7 +1896,7 @@ export const TrainingScreen: React.FC = () => {
               </div>
             )}
           </div>
-
+          </>)}
           {/* ═══════ UNIFIED PROGRAM BUILDER ═══════ */}
           <div className="card" style={{ padding: '10px 12px' }}>
             <h3 style={{ margin: '0 0 8px', fontSize: 13 }}>🧬 Конструктор программы</h3>
