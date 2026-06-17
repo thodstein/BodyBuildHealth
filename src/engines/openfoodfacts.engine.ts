@@ -15,16 +15,33 @@ export interface OFFProduct {
   servingSize: string;
   imageUrl?: string;
   cachedAt: number;
+  micros?: {
+    saturatedFat?: number;
+    sugars?: number;
+    sodium?: number;
+    calcium?: number;
+    iron?: number;
+    magnesium?: number;
+    potassium?: number;
+    vitaminC?: number;
+    vitaminD?: number;
+    vitaminB12?: number;
+  };
 }
 
 const OFF_API = 'https://ru.openfoodfacts.org/api/v0';
 const CACHE_STORE = 'food_cache';
 const CACHE_TTL = 7 * 24 * 60 * 60 * 1000;
 
+function round1(v: number | undefined): number | undefined {
+  return v !== undefined && v !== null ? Math.round(v * 10) / 10 : undefined;
+}
+
 function normalizeProduct(p: any): OFFProduct | null {
   const nutriments = p.nutriments || {};
   const name = p.product_name_ru || p.product_name || '';
   if (!name) return null;
+  const n = (field: string) => nutriments[field + '_100g'] ?? nutriments[field];
   return {
     id: p.code || p._id || '',
     barcode: p.code || '',
@@ -32,14 +49,26 @@ function normalizeProduct(p: any): OFFProduct | null {
     nameRu: p.product_name_ru || undefined,
     brand: p.brands || undefined,
     categories: p.categories || undefined,
-    kcal: Math.round(nutriments['energy-kcal_100g'] || nutriments['energy-kcal'] || 0),
-    protein: Math.round((nutriments.proteins_100g || 0) * 10) / 10,
-    fat: Math.round((nutriments.fat_100g || 0) * 10) / 10,
-    carbs: Math.round((nutriments.carbohydrates_100g || 0) * 10) / 10,
-    fiber: Math.round((nutriments.fiber_100g || 0) * 10) / 10,
+    kcal: Math.round(n('energy-kcal') || 0),
+    protein: round1(n('proteins')) || 0,
+    fat: round1(n('fat')) || 0,
+    carbs: round1(n('carbohydrates')) || 0,
+    fiber: round1(n('fiber')) || 0,
     servingSize: p.serving_quantity ? `${p.serving_quantity} г` : '100 г',
     imageUrl: p.image_small_url || p.image_front_small_url || undefined,
     cachedAt: Date.now(),
+    micros: {
+      saturatedFat: round1(n('saturated-fat')),
+      sugars: round1(n('sugars')),
+      sodium: round1(n('sodium')),
+      calcium: round1(n('calcium')),
+      iron: round1(n('iron')),
+      magnesium: round1(n('magnesium')),
+      potassium: round1(n('potassium')),
+      vitaminC: round1(n('vitamin-c')),
+      vitaminD: n('vitamin-d'),
+      vitaminB12: n('vitamin-b12'),
+    },
   };
 }
 
@@ -125,6 +154,16 @@ export function productToFoodItem(p: OFFProduct) {
     fat: p.fat,
     carbs: p.carbs,
     fiber: p.fiber,
+    saturatedFat: p.micros?.saturatedFat,
+    sugars: p.micros?.sugars,
+    sodium: p.micros?.sodium,
+    calcium: p.micros?.calcium,
+    iron: p.micros?.iron,
+    magnesium: p.micros?.magnesium,
+    potassium: p.micros?.potassium,
+    vitaminC: p.micros?.vitaminC,
+    vitaminD: p.micros?.vitaminD,
+    vitaminB12: p.micros?.vitaminB12,
     gi: 0,
     servingSize: p.servingSize,
     description: [p.brand, p.categories].filter(Boolean).join(' • '),

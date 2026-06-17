@@ -1,6 +1,6 @@
 ﻿import React, { useState, useRef, useMemo } from 'react';
 import { BarcodeScanner } from '../../components/BarcodeScanner';
-import { type OFFProduct } from '../../../engines/openfoodfacts.engine';
+import { type OFFProduct, productToFoodItem } from '../../../engines/openfoodfacts.engine';
 import { parseFatSecretText, parseNutritionScreenshot } from '../../../engines/nutrition-ocr-parser';
 import { processUploadedFile, saveParsedMeals } from '../../../core/ocr-engine';
 import { FOOD_DB } from '../../../core/nutrition-database';
@@ -51,12 +51,13 @@ export const NutritionDiary: React.FC<{
 
   const handleBarcodeProduct = (product: OFFProduct) => {
     setShowBarcode(false);
+    const item = productToFoodItem(product);
     setParsedItems(prev => [...prev, {
-      name: product.nameRu || product.name || product.brand || '',
-      kcal: product.kcal,
-      p: product.protein,
-      f: product.fat,
-      c: product.carbs,
+      name: item.name,
+      kcal: item.kcal,
+      p: item.protein,
+      f: item.fat,
+      c: item.carbs,
     }]);
   };  const handleOcrFileUpload = async (file: File) => {
     setOcrFileLoading(true);
