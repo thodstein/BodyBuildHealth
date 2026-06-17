@@ -95,8 +95,41 @@ const LAB_MECHANISM_MAP: Record<string, { mechanism: string; organ: string; syst
   THROMBOCYTES: { mechanism: 'CLOTTING_SHIFT', organ: 'bone_marrow', system: 'hematologic', risk: 'BLOOD_CLOTS' },
 };
 
+// Short-code to canonical-code alias map for lab marker lookup
+const LAB_CODE_ALIASES: Record<string, string[]> = {
+  TT: ['TESTOSTERONE', 'TESTOSTERONE_TOTAL'],
+  E2: ['ESTRADIOL'],
+  PRL: ['PROLACTIN'],
+  FT3: ['FREE_T3', 'T3_FREE'],
+  FT4: ['FREE_T4', 'T4_FREE'],
+  GLU: ['GLUCOSE'],
+  INS: ['INSULIN'],
+  HOMA: ['HOMA_IR'],
+  TG: ['TRIGLYCERIDES'],
+  HGB: ['HEMOGLOBIN'],
+  HCT: ['HEMATOCRIT'],
+  RBC: ['ERYTHROCYTES'],
+  WBC: ['LEUKOCYTES'],
+  PLT: ['THROMBOCYTES', 'PLATELETS'],
+  BIL: ['BILIRUBIN', 'BILIRUBIN_TOTAL'],
+  ALB: ['ALBUMIN'],
+  VITD: ['VITAMIN_D'],
+  B12: ['VITAMIN_B12'],
+  FOL: ['FOLATE'],
+  PROG: ['PROGESTERONE'],
+  INHB: ['INHIBIN_B'],
+};
+
 function findLab(labs: LabPoint[], code: string): number | null {
-  const lab = labs.find(l => l.code?.toUpperCase() === code || l.code?.toUpperCase().replace(/[^A-Z0-9]/g, '_') === code);
+  const upper = code.toUpperCase();
+  const lab = labs.find(l => {
+    const lc = l.code?.toUpperCase() || '';
+    if (lc === upper) return true;
+    if (lc.replace(/[^A-Z0-9]/g, '_') === upper) return true;
+    const aliases = LAB_CODE_ALIASES[lc];
+    if (aliases && aliases.includes(upper)) return true;
+    return false;
+  });
   return lab?.value ?? null;
 }
 

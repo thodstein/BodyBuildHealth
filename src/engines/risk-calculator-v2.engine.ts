@@ -49,14 +49,16 @@ export function calculateRiskFromAnalyses(arg1: RiskResult | LabPoint[], labs?: 
     'LP(a)': { 'cardio': 1.0 },
     'hsCRP': { 'cardio': 1.0, 'hematologic': 1.0 },
 
-    // Hepatic system
+    // Hepatic system (+ short-code aliases)
     'ALT': { 'hepatic': 1.0 },
     'AST': { 'hepatic': 1.0 },
     'GGT': { 'hepatic': 1.0 },
     'ALP': { 'hepatic': 1.0 },
     'BILIRUBIN_TOTAL': { 'hepatic': 1.0 },
+    'BIL': { 'hepatic': 1.0 },
     'BILIRUBIN_DIRECT': { 'hepatic': 1.0 },
-    'ALBUMIN': { 'hepatic': 1.0, inverse: true }, // low albumin = bad
+    'ALBUMIN': { 'hepatic': 1.0, inverse: true },
+    'ALB': { 'hepatic': 1.0, inverse: true },
     'PT': { 'hepatic': 1.0 },
     'INR': { 'hepatic': 1.0 },
 
@@ -64,24 +66,27 @@ export function calculateRiskFromAnalyses(arg1: RiskResult | LabPoint[], labs?: 
     'CREATININE': { 'renal': 1.0 },
     'CYSATIN_C': { 'renal': 1.0 },
     'BUN': { 'renal': 1.0 },
-    'GFR': { 'renal': 1.0, inverse: true }, // low GFR = bad
+    'GFR': { 'renal': 1.0, inverse: true },
     'UACR': { 'renal': 1.0 },
 
-    // Neurological system
+    // Neurological system (+ short-code aliases)
     'HOMOCYSTEINE': { 'cardio': 1.0, 'neuro': 1.0 },
-    'VITAMIN_B12': { 'neuro': 1.0, inverse: true }, // low B12 = bad
-    'VITAMIN_D': { 'neuro': 1.0, inverse: true }, // low D = bad
-    'FOLATE': { 'neuro': 1.0, inverse: true }, // low folate = bad
-    'BDNF': { 'neuro': 1.0, inverse: true }, // low BDNF = bad
+    'VITAMIN_B12': { 'neuro': 1.0, inverse: true },
+    'B12': { 'neuro': 1.0, inverse: true },
+    'VITAMIN_D': { 'neuro': 1.0, inverse: true },
+    'VITD': { 'neuro': 1.0, inverse: true },
+    'FOLATE': { 'neuro': 1.0, inverse: true },
+    'BDNF': { 'neuro': 1.0, inverse: true },
 
-    // Endocrine system
+    // Endocrine system (+ short-code aliases)
     'TSH': { 'endocrine': 1.0 },
-    'FREE_T3': { 'endocrine': 1.0, inverse: true }, // low FT3 = bad
-    'FREE_T4': { 'endocrine': 1.0, inverse: true }, // low FT4 = bad
-    'INSULIN': { 'endocrine': 1.0 },
-    'HOMA_IR': { 'endocrine': 1.0 },
+    'FREE_T3': { 'endocrine': 1.0, inverse: true },
+    'FT3': { 'endocrine': 1.0, inverse: true },
+    'FREE_T4': { 'endocrine': 1.0, inverse: true },
+    'FT4': { 'endocrine': 1.0, inverse: true },
     'CORTISOL': { 'endocrine': 1.0 },
     'PROLACTIN': { 'endocrine': 1.0 },
+    'PRL': { 'endocrine': 1.0 },
 
     // Hematological system
     'HGB': { 'hematologic': 1.0 },
@@ -94,22 +99,34 @@ export function calculateRiskFromAnalyses(arg1: RiskResult | LabPoint[], labs?: 
     'MCHC': { 'hematologic': 1.0 },
     'RDW': { 'hematologic': 1.0 },
 
-    // Reproductive system
+    // Reproductive system (+ short-code aliases)
     'PROGESTERONE': { 'reproductive': 1.0 },
-    'DHEA_S': { 'reproductive': 1.0, inverse: true }, // low DHEA = bad
-    'AMH': { 'reproductive': 1.0, inverse: true }, // low AMH = bad
-    'INHIBIN_B': { 'reproductive': 1.0, inverse: true }, // low inhibin B = bad
+    'PROG': { 'reproductive': 1.0 },
+    'DHEA_S': { 'reproductive': 1.0, inverse: true },
+    'AMH': { 'reproductive': 1.0, inverse: true },
+    'INHIBIN_B': { 'reproductive': 1.0, inverse: true },
+    'INHB': { 'reproductive': 1.0, inverse: true },
+    'PSA': { 'reproductive': 1.0 },
 
-    // Multi-system hormones
+    // Multi-system hormones (+ short-code aliases for manual entry)
     'TESTOSTERONE': { 'endocrine': 1.0, 'reproductive': 1.0 },
+    'TT': { 'endocrine': 1.0, 'reproductive': 1.0 },
     'ESTRADIOL': { 'endocrine': 1.0, 'reproductive': 1.0 },
+    'E2': { 'endocrine': 1.0, 'reproductive': 1.0 },
     'LH': { 'endocrine': 1.0, 'reproductive': 1.0 },
     'FSH': { 'endocrine': 1.0, 'reproductive': 1.0 },
+    'SHBG': { 'endocrine': 1.0, 'reproductive': 1.0 },
+    'IGF1': { 'endocrine': 1.0 },
 
     // Glucose / metabolic
     'GLUCOSE': { 'metabolic': 1.0, 'endocrine': 1.0 },
     'GLU': { 'metabolic': 1.0, 'endocrine': 1.0 },
     'HBA1C': { 'metabolic': 1.0, 'endocrine': 1.0 },
+    'HbA1c': { 'metabolic': 1.0, 'endocrine': 1.0 },
+    'INSULIN': { 'metabolic': 1.0, 'endocrine': 1.0 },
+    'INS': { 'metabolic': 1.0, 'endocrine': 1.0 },
+    'HOMA_IR': { 'metabolic': 1.0, 'endocrine': 1.0 },
+    'HOMA': { 'metabolic': 1.0, 'endocrine': 1.0 },
 
     // Inflammation
     'CRP': { 'cardio': 1.0, 'hematologic': 1.0 },
