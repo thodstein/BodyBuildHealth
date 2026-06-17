@@ -237,6 +237,14 @@ export const TrainingScreen: React.FC = () => {
     } catch {}
   };
 
+  // Regenerate plan when a training method is applied
+  useEffect(() => {
+    if (appliedMethod) {
+      const timer = setTimeout(() => generatePlan(), 150);
+      return () => clearTimeout(timer);
+    }
+  }, [appliedMethod]);
+
   const prevDays = useRef(daysPerWeek);
   useEffect(() => { loadDiaryStats(); }, []);
   useEffect(() => { if (prevDays.current !== daysPerWeek) { prevDays.current = daysPerWeek; generatePlan(); } }, [daysPerWeek]);
