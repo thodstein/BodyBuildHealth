@@ -293,7 +293,7 @@ export const CANONICAL_ID_MAP: Record<string, string> = {
   "AA_L_TYROSINE": "tyrosine",
   "AA_L_DOPA": "l_dopa",
   "AA_L_TRYPTOPHAN": "tryptophan",
-  "AA_5HTP": "5htp",
+  "AA_5HTP": "x5htp",
   "AA_L_CARNITINE_TARTRATE": "l_carnitine",
   "AA_L_CITRULLINE": "citrulline",
   "AA_L_ARGININE": "arginine",
