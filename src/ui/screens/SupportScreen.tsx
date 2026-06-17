@@ -11,6 +11,7 @@ import { INTERACTIONS_DB } from '../../data/interactions';
 import { ALL_SUBSTANCES, ALL_INTERACTIONS, type SupportSubstance, type SupportInteraction } from '../../data/support-database';
 import { getSubstanceTier, TIER_LABELS } from '../../data/substance-tiers';
 import { SUPPORT_CATALOG_DATA, ORGAN_LABELS as CATALOG_ORGAN_LABELS, SYSTEM_LABELS_CATALOG, CATEGORY_LABELS as CATALOG_CATEGORY_LABELS, TIER_LABELS_CATALOG, type SupportCatalogEntry } from '../../data/support-catalog';
+import { CANONICAL_ID_MAP } from '../../data/canonical-map';
 import { SUBSTANCE_ANALOGS, SUBSTANCE_ENHANCERS, PHASE_MODS, DEFAULT_DOSAGES, getPhaseLevel, type SupportPhase } from '../../data/support-levels';
 import { FertilityPCTScreen } from './FertilityPCTScreen';
 import { ALL_STACKS, EFFECT_LABELS_ru, findStacksByEffect, getSubstanceLabel as getStackSubLabel, type SupportStack } from '../../data/support-stacks';
@@ -1967,7 +1968,8 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   }
 // Helper to render SUPPORT_CATALOG_DATA for a substance
 const renderCatalogDetail = (subId: string): React.ReactNode => {
-  const entry = SUPPORT_CATALOG_DATA[subId];
+  const canonicalId = CANONICAL_ID_MAP[subId] || CANONICAL_ID_MAP[subId.toLowerCase()] || subId.toLowerCase();
+  const entry = SUPPORT_CATALOG_DATA[canonicalId] || SUPPORT_CATALOG_DATA[subId];
   if (!entry) return null;
   return (
     <div style={{ marginTop: 4 }}>
