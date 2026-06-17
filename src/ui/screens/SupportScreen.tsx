@@ -11,7 +11,7 @@ import { INTERACTIONS_DB } from '../../data/interactions';
 import { ALL_SUBSTANCES, ALL_INTERACTIONS, type SupportSubstance, type SupportInteraction } from '../../data/support-database';
 import { getSubstanceTier, TIER_LABELS } from '../../data/substance-tiers';
 import { SUPPORT_CATALOG_DATA, ORGAN_LABELS as CATALOG_ORGAN_LABELS, SYSTEM_LABELS_CATALOG, CATEGORY_LABELS as CATALOG_CATEGORY_LABELS, TIER_LABELS_CATALOG, type SupportCatalogEntry } from '../../data/support-catalog';
-import { CATALOG_SIZE, CANONICAL_SIZE } from '../../data/catalog-exports';
+
 import { CANONICAL_ID_MAP } from '../../data/catalog-exports';
 import { SUBSTANCE_ANALOGS, SUBSTANCE_ENHANCERS, PHASE_MODS, DEFAULT_DOSAGES, getPhaseLevel, type SupportPhase } from '../../data/support-levels';
 import { FertilityPCTScreen } from './FertilityPCTScreen';
@@ -41,12 +41,11 @@ import { checkDrugInteractions } from '../../engines/pharma-interactions.engine'
 import type { CourseEntry } from '../../core/types';
 import { searchPubMed, type PubMedArticle } from '../../engines/pubmed-search.engine';
 // Force Vite to include SUPPORT_CATALOG_DATA and CANONICAL_ID_MAP (prevents tree-shaking)
-  // Force catalog data inclusion (prevents Vite tree-shaking)
-  // @ts-ignore
-  window.__SUPPORT_CATALOG__ = SUPPORT_CATALOG_DATA;
-  // @ts-ignore
-  window.__CANONICAL_MAP__ = CANONICAL_ID_MAP;
-  const canonicalMapSize = useMemo(() => Object.keys(CANONICAL_ID_MAP).length > 0, []);
+// @ts-ignore
+(window as any).__SUPPORT_CATALOG__ = SUPPORT_CATALOG_DATA;
+// @ts-ignore
+(window as any).__CANONICAL_MAP__ = CANONICAL_ID_MAP;
+
 type SupportTab = 'main' | 'catalog' | 'synergies' | 'calculator' | 'interactions' | 'stacks' | 'peptides' | 'fertility-pct';
 type SupportView = 'main' | 'calc' | 'fertility';
 type CalcView = 'main' | 'calculator' | 'peptides' | 'info' | 'stackcalc' | 'mystacks' | 'mixcalc' | 'plan' | 'neuro' | 'joints' | 'acne';
