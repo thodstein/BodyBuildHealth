@@ -544,7 +544,100 @@ function generateStacks(): SupportStack[] {
   }).slice(0, 600);
 }
 
-export const ALL_STACKS: SupportStack[] = generateStacks();
+export const ALL_STACKS: SupportStack[] = (() => {
+  const gen = generateStacks();
+  const curated: SupportStack[] = [
+    // === 40-препаратный полный стек покрытия ===
+    {
+      id: 'full_coverage_40', name: 'Полный стек покрытия (40)',
+      effects: ['liver_support','cardio_support','kidney','lung','blood','anti_inflammation','antioxidant','immune_boost','detox','energy','recovery','hormone_balance'],
+      substances: ['nac','tudca','milk_thistle','artichoke','omega3','coq10','magnesium','vitamin_d3','vitamin_k2','zinc','selenium','berberine','curcumin','quercetin','vitamin_c','ashwagandha','rhodiola','taurine','glycine','probiotics','bpc157','astragalus','alpha_lipoic','glutathione','pqq','nmn','resveratrol','astaxanthin','collagen','hyaluronic','glucosamine','msm','grape_seed_extract','pygeum','saw_palmetto','l_carnitine','carnosine','beta_alanine','creatine','eaa'],
+      synergyScore: 38.5,
+      description: 'Максимальное покрытие всех систем: печень ➔ кардио ➔ почки ➔ лёгкие ➔ кровь ➔ иммунитет ➔ суставы ➔ кожа ➔ митохондрии. 40 препаратов для полной поддержки на курсе ААС.',
+      goalTags: ['full_coverage','aas_course','maximum'],
+    },
+    // === 5-6 развёрнутых стеков по 20+ препаратов ===
+    {
+      id: 'liver_detox_24', name: 'Детокс печени (24)',
+      effects: ['liver_support','detox','antioxidant','gi_healing'],
+      substances: ['nac','tudca','milk_thistle','artichoke','alpha_lipoic','glutathione','curcumin','selenium','vitamin_c','vitamin_e','vitamin_b6','vitamin_b12','folate','schisandra','astragalus','chanca_piedra','dandelion_root','barberry','betaine','methionine','inositol','choline','silymarin','lecithin'],
+      synergyScore: 28.4,
+      description: 'Комплексная детоксикация печени: фаза 1 и фаза 2 детокса, желчегонные, антиоксиданты и гепатопротекторы. Полное покрытие при токсическом поражении и холестазе.',
+      goalTags: ['liver','detox','hepatoprotection'],
+    },
+    {
+      id: 'cardio_protect_22', name: 'Кардиозащита (22)',
+      effects: ['cardio_support','kidney','blood','electrolyte'],
+      substances: ['omega3','coq10','magnesium','potassium','taurine','telmisartan','nebivolol','garlic','resveratrol','pterostilbene','hawthorn','arginine','citrulline','vitamin_k2','vitamin_d3','folate','vitamin_b12','nattokinase','serrapeptase','grape_seed_extract','pomegranate_extract','lycopene'],
+      synergyScore: 29.1,
+      description: 'Защита сердечно-сосудистой системы: снижение АД, липидный профиль, антиагреганты, электролиты и антиоксиданты. Полная кардиопротекция на курсе ААС.',
+      goalTags: ['cardio','heart','bp'],
+    },
+    {
+      id: 'neuro_protect_21', name: 'Нейрозащита + ноотропы (21)',
+      effects: ['nootropic','memory','anti_stress','dopamine','gaba','sleep'],
+      substances: ['alpha_gpc','citicoline','noopept','piracetam','pramiracetam','l_carnitine','ginkgo','bacopa','lions_mane','phosphatidylserine','magnesium_l_threonate','magnesium_glycinate','theanine','ashwagandha','rhodiola','tyrosine','selank','semax','cerebrolysin','p21','dihexa'],
+      synergyScore: 30.2,
+      description: 'Полная нейропротекция: нейропластичность, ацетилхолин, дофамин, GABA, антистресс и факторы роста нервов. Предотвращение нейротоксичности ААС и когнитивное улучшение.',
+      goalTags: ['neuro','nootropic','brain'],
+    },
+    {
+      id: 'immune_full_20', name: 'Иммунитет + антиоксиданты (20)',
+      effects: ['immune_boost','antioxidant','anti_inflammation','lung','allergy'],
+      substances: ['vitamin_c','vitamin_d3','zinc','quercetin','curcumin','omega3','sulforaphane','reishi','astragalus','echinacea','beta_glucan','colostrum','lactoferrin','probiotics','vitamin_a','selenium','copper','black_seed_oil','andrographis','elderberry'],
+      synergyScore: 27.8,
+      description: 'Максимальная иммунная поддержка: врождённый и адаптивный иммунитет, антиоксидантный каскад, лёгкие и противовоспалительная модуляция.',
+      goalTags: ['immune','antioxidant','lungs'],
+    },
+    {
+      id: 'joint_bone_20', name: 'Суставы + кости + связки (20)',
+      effects: ['joint','bone_support','collagen','anti_inflammation'],
+      substances: ['glucosamine','chondroitin','msm','collagen_i_iii','collagen_ii','hyaluronic','cissus','bpc157','tb500','vitamin_d3','vitamin_k2','calcium','magnesium','boron','silicon','curcumin','boswellia','ginger','eggshell_membrane','bamboo_silica'],
+      synergyScore: 26.5,
+      description: 'Комплексное восстановление суставов, костей и связок: матриксные белки, ингибиторы воспаления, минерализация и регенерация. Незаменим на курсах с тяжёлыми нагрузками.',
+      goalTags: ['joints','bones','ligaments'],
+    },
+    {
+      id: 'metabolic_mito_20', name: 'Метаболизм + митохондрии (20)',
+      effects: ['mitochondria','energy','fat_loss','insulin_sensitivity','thyroid_support'],
+      substances: ['pqq','coq10','nmn','nr','ss31','mots_c','ala','r_ala','l_carnitine','acetyl_l_carnitine','berberine','cinnamon','chromium','magnesium','vitamin_d3','iodine','selenium','zinc','shilajit','d_ribose'],
+      synergyScore: 28.9,
+      description: 'Митохондриальный биогенез, чувствительность к инсулину, термогенез и поддержка щитовидной железы. Полный контроль энергетического метаболизма.',
+      goalTags: ['mitochondria','metabolic','thyroid'],
+    },
+    // === 3 органо-специфичных стека ===
+    {
+      id: 'renal_protect_12', name: 'Почечный протектор (12)',
+      effects: ['kidney','electrolyte','detox'],
+      substances: ['astragalus','cranberry','dandelion_root','chanca_piedra','potassium','magnesium','vitamin_b6','omega3','probiotics','curcumin','nettle_extract','horsetail'],
+      synergyScore: 16.8,
+      description: 'Нефропротекция: снижение мочевой кислоты, антиоксидантная защита почечных канальцев, электролитный баланс. Профилактика мочекаменной болезни.',
+      goalTags: ['kidney','renal','uric_acid'],
+    },
+    {
+      id: 'pulmo_protect_12', name: 'Лёгочный протектор (12)',
+      effects: ['lung','immune_boost','antioxidant'],
+      substances: ['nac','vitamin_c','quercetin','vitamin_d3','zinc','omega3','magnesium','cordyceps','reishi','andrographis','ginger','selenium'],
+      synergyScore: 15.4,
+      description: 'Защита лёгких: муколитик, сурфактант, антиоксидантная защита альвеол и бронхов. Улучшение кислородного обмена и детоксикация лёгочной ткани.',
+      goalTags: ['lungs','pulmonary','oxygen'],
+    },
+    {
+      id: 'gi_heal_12', name: 'ЖКТ протектор (12)',
+      effects: ['gi_healing','probiotics','absorption'],
+      substances: ['bpc157','glutamine','curcumin','licorice','slippery_elm','marshmallow_root','aloe_vera','probiotics','prebiotics','digestive_enzymes','betaine_hcl','ginger'],
+      synergyScore: 17.2,
+      description: 'Восстановление желудочно-кишечного тракта: регенерация слизистой, микробиом, абсорбция и пищеварение. Лечение и профилактика гастрита и язв.',
+      goalTags: ['gi','gut','digestion'],
+    },
+  ];
+  // Merge curated stacks with generated ones, giving priority to curated
+  const existingIds = new Set(gen.map(s => s.id));
+  for (const s of curated) {
+    if (!existingIds.has(s.id)) gen.push(s);
+  }
+  return gen;
+})();
 
 export function findStacksByEffect(effect: string): SupportStack[] {
   return ALL_STACKS.filter(s => s.effects.includes(effect));

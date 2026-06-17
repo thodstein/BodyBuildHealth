@@ -1286,6 +1286,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   const jointScore = Math.min(100, Math.round((jointPain * 10) + (injuryHistory * 5) + (trainLoad * 3)));
   const jointColor = jointScore < 20 ? '#22c55e' : jointScore < 40 ? '#f59e0b' : jointScore < 60 ? '#f97316' : '#ef4444';
   const jointLabel = jointScore < 20 ? 'Норма' : jointScore < 40 ? 'Умеренный риск' : jointScore < 60 ? 'Высокий риск' : 'Критический';
+  const CATALOG_IDS = useMemo(() => new Set(Object.keys(SUPPORT_CATALOG_DATA).map(k => k.toLowerCase())), []);
 
   // Neurotoxicity tab state (lifted from IIFE to component level)
   const [neuroTab, setNeuroTab] = useState<'calc' | 'mechanisms' | 'support'>('calc');
@@ -1450,6 +1451,8 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
 
   // All support substances for interaction checker
   const allSupport = useMemo(() => supplementList, [supplementList]);
+  // Catalog-filtered substances for interaction selectors (289 curated entries)
+  const catalogSupport = useMemo(() => allSupport.filter(s => CATALOG_IDS.has(s.id.toLowerCase())), [allSupport, CATALOG_IDS]);
 
   // Support-only synergy pairs
   const supportSynergies = useMemo(() => {
@@ -1460,9 +1463,9 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
       // Include: both are support substances, or at least one is a supplement
       const aIsSupport = a ? supportClasses.includes(a.class) : SUPPLEMENT_DESCRIPTIONS[p.substanceA] !== undefined;
       const bIsSupport = b ? supportClasses.includes(b.class) : SUPPLEMENT_DESCRIPTIONS[p.substanceB] !== undefined;
-      return aIsSupport || bIsSupport;
+      return (aIsSupport || bIsSupport) && CATALOG_IDS.has(p.substanceA.toLowerCase()) && CATALOG_IDS.has(p.substanceB.toLowerCase());
     });
-  }, []);
+  }, [CATALOG_IDS]);
 
   const filteredSupplements = useMemo(() => {
     let list = supplementList;
@@ -1860,17 +1863,20 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
     return map;
   }, [conflictLookup]);
 
-  // Merge ALL_INTERACTIONS + SYNERGY_PAIRS for synergies tab (with null filter + dedup)
+  // Merge ALL_INTERACTIONS + SYNERGY_PAIRS for synergies tab (with null filter + dedup + catalog filter)
   const mergedInteractions = useMemo(() => {
+    const catalogOk = (id: string) => CATALOG_IDS.has(id.toLowerCase());
     const seen = new Set<string>();
     const fromDB = ALL_INTERACTIONS
-      .filter(i => i && i.interactionId && i.substanceA && i.substanceB && i.substanceA !== i.substanceB)
+      .filter(i => i && i.interactionId && i.substanceA && i.substanceB && i.substanceA !== i.substanceB && catalogOk(i.substanceA) && catalogOk(i.substanceB))
       .map(i => ({ ...i, source: 'db' as const }));
     for (const item of fromDB) {
       seen.add(item.interactionId);
       seen.add(`${item.substanceA}|${item.substanceB}`);
     }
-    const fromEngine = SYNERGY_PAIRS.map((p, idx) => ({
+    const fromEngine = SYNERGY_PAIRS
+      .filter(p => catalogOk(p.substanceA) && catalogOk(p.substanceB))
+      .map((p, idx) => ({
       interactionId: `synergy_pair_${idx}`,
       substanceA: p.substanceA,
       substanceB: p.substanceB,
@@ -1883,7 +1889,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
     }));
     const dedupedEngine = fromEngine.filter(e => !seen.has(`${e.substanceA}|${e.substanceB}`) && !seen.has(e.interactionId));
     return [...fromDB, ...dedupedEngine];
-  }, []);
+  }, [CATALOG_IDS]);
 
   const filteredInteractions = useMemo(() => {
     let list = mergedInteractions;
@@ -2332,7 +2338,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                 synergies: ()=>setTab('synergies'),
                 readystacks: ()=>setTab('stacks'),
                 interactions: ()=>setTab('interactions'),
-                research: ()=>{ setTab('main'); setSupportView('calc'); setCalcView('info'); setInfoView('research'); },
+                research: ()=>{ setTab('main'); setSupportView('calc'); setCalcView('info'); setInfoView('research'); setSection('home'); },
                 mixcalc: ()=>{ setTab('main'); setSupportView('calc'); setCalcView('mixcalc'); },
                 neuro: ()=>{ setTab('main'); setSupportView('calc'); setCalcView('neuro'); },
                 joints: ()=>{ setTab('main'); setSupportView('calc'); setCalcView('joints'); },
@@ -2450,7 +2456,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
       {section === 'home' && tab === 'main' && supportView === 'calc' && calcView === 'info' && (
         <div style={{ padding:'0 0 70px', height:'100vh', display:'flex', flexDirection:'column' }}>
           <div style={{ display:'flex', gap:6, marginBottom:6 }}>
-            <button onClick={() => setCalcView('main')} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← Назад</button>
+            <button onClick={goBack} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← Назад</button>
             <button onClick={() => setSupportView('main')} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← На главную Поддержки</button>
           </div>
           {/* Pills */}
@@ -2934,7 +2940,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                     <div>
                       <div style={{ display:'flex', flexDirection:'column', gap:6, marginBottom:8 }}>
                         {interactionIds.map((id, idx) => {
-                          const selectedName = id ? (allSupport.find(s => s.id === id)?.name || id) : '';
+                          const selectedName = id ? (catalogSupport.find(s => s.id === id)?.name || allSupport.find(s => s.id === id)?.name || id) : '';
                           return (
                             <div key={idx} style={{ background:'var(--bg-secondary)', borderRadius:10, padding:'8px 10px', border:'1px solid var(--border)' }}>
                               <div style={{ display:'flex', alignItems:'center', gap:4, marginBottom:4 }}>
@@ -2950,7 +2956,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                                     <input value={interactionSearchIdx===idx ? interactionSearch : ''} placeholder="🔍 Введите название..." onFocus={() => { setInteractionSearchIdx(idx); setInteractionSearch(''); }} onChange={e => { setInteractionSearchIdx(idx); setInteractionSearch(e.target.value); }} style={{ width:'100%', padding:'7px 8px', borderRadius:6, background:'rgba(0,0,0,0.2)', border:'1px solid var(--border)', color:'var(--text)', fontSize:10, boxSizing:'border-box' }} />
                                     {interactionSearch && interactionSearchIdx===idx && (
                                       <div style={{ position:'absolute', top:'100%', left:0, right:0, zIndex:10, background:'var(--bg)', border:'1px solid var(--border)', borderRadius:6, maxHeight:150, overflowY:'auto', marginTop:1 }}>
-                                        {allSupport.filter(s => (s.name||'').toLowerCase().includes(interactionSearch.toLowerCase())).slice(0,10).map(s => (
+                                        {catalogSupport.filter(s => (s.name||'').toLowerCase().includes(interactionSearch.toLowerCase())).slice(0,10).map(s => (
                                           <div key={s.id} onClick={() => { updateInteraction(idx, s.id); setInteractionSearch(''); setInteractionSearchIdx(-1); }} style={{ padding:'7px 10px', cursor:'pointer', fontSize:10, borderBottom:'1px solid var(--border)' }}>
                                             <span style={{ fontWeight:600, color:'var(--text)' }}>{s.name}</span>
                                             <span style={{ fontSize:8, color:'var(--text-dim)', marginLeft:4 }}>{s.id}</span>
@@ -3642,8 +3648,8 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
 
               {/* Drug selector cards */}
               <div style={{ display:'flex', flexDirection:'column', gap:8, marginBottom:12 }}>
-                {interactionIds.map((id, idx) => {
-                  const selectedName = id ? (allSupport.find(s => s.id === id)?.name || id) : '';
+                  {interactionIds.map((id, idx) => {
+                  const selectedName = id ? (catalogSupport.find(s => s.id === id)?.name || allSupport.find(s => s.id === id)?.name || id) : '';
                   return (
                     <div key={idx} style={{ background:'var(--bg-secondary)', borderRadius:12, padding:'10px 12px', border:'1px solid var(--border)' }}>
                       <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:6 }}>
@@ -3661,7 +3667,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                           />
                           {interactionSearch && interactionSearchIdx === idx && (
                             <div style={{ position:'absolute', top:'100%', left:0, right:0, zIndex:10, background:'var(--bg)', border:'1px solid var(--border)', borderRadius:8, maxHeight:160, overflowY:'auto', marginTop:2 }}>
-                              {allSupport.filter(s => (s.name||'').toLowerCase().includes(interactionSearch.toLowerCase()) || (s.id||'').toLowerCase().includes(interactionSearch.toLowerCase())).slice(0, 10).map(s => (
+                              {catalogSupport.filter(s => (s.name||'').toLowerCase().includes(interactionSearch.toLowerCase()) || (s.id||'').toLowerCase().includes(interactionSearch.toLowerCase())).slice(0, 10).map(s => (
                                 <div key={s.id} onClick={() => { updateInteraction(idx, s.id); setInteractionSearch(''); }}
                                   style={{ padding:'7px 10px', cursor:'pointer', fontSize:11, borderBottom:'1px solid var(--border)' }}>
                                   <span style={{ fontWeight: id === s.id ? 700 : 400, color: id === s.id ? 'var(--accent)' : 'var(--text)' }}>{s.name}</span>
@@ -4084,7 +4090,16 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
 
           {/* Calculate button */}
           <button onClick={() => {
-            const pep = PEPTIDE_DB[peptideId];
+            let pep: PeptideInfo | undefined;
+            if (growthId && PHARMA_DB[growthId]?.pk) {
+              const g = PHARMA_DB[growthId];
+              const r = (g as any).routes?.[0] || 'sc';
+              const routesArr = (g as any).routes || [r];
+              const halfLife = g.pk?.halfLifeHours || 24;
+              pep = { id: g.id, name: g.name || g.id, shortName: g.name || g.id, amountMg: pepAmount, routes: routesArr, tHalfHours: halfLife, bioavailability: { [r]: { min: 60, max: 100, avg: 80 } }, className: g.class || '', effects: [], mechanisms: [], riskLevel: 'medium', riskNotes: [] };
+            } else {
+              pep = PEPTIDE_DB[peptideId];
+            }
             if (!pep) return;
             const bio = pep.bioavailability[pepRoute] || { min: 80, max: 100, avg: 90 };
             const dilInput: DilutionInput = {
@@ -4172,28 +4187,16 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
               </div>
 
               {/* Risks */}
-              {PEPTIDE_DB[peptideId] && (
+              {(growthId ? PHARMA_DB[growthId] : PEPTIDE_DB[peptideId]) && (
                 <div className="card" style={{ marginBottom: 8 }}>
-                  <h4 style={{ margin: '0 0 6px 0', fontSize: 12 }}>⚠ Риски: {PEPTIDE_DB[peptideId].shortName}</h4>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-                    {computePeptideRisks(PEPTIDE_DB[peptideId]).map((r, i) => (
-                      <div key={i} style={{
-                        padding: '4px 8px', borderRadius: 6, fontSize: 10,
-                        background: r.riskPercent > 25 ? 'rgba(239,68,68,0.1)' : 'rgba(245,158,11,0.1)',
-                        border: `1px solid ${r.riskPercent > 25 ? 'rgba(239,68,68,0.3)' : 'rgba(245,158,11,0.3)'}`,
-                        color: r.riskPercent > 25 ? '#ef4444' : '#f59e0b',
-                      }}>
-                        {r.label}: {r.riskPercent}%
-                      </div>
-                    ))}
-                  </div>
+                  <h4 style={{ margin: '0 0 6px 0', fontSize: 12 }}>⚠ Риски: {growthId ? (PHARMA_DB[growthId]?.name || growthId) : (PEPTIDE_DB[peptideId]?.shortName || peptideId)}</h4>
                 </div>
               )}
 
               {/* Synergies & Conflicts */}
               <div className="card" style={{ marginBottom: 8 }}>
                 <h4 style={{ margin: '0 0 6px 0', fontSize: 12 }}>🔗 Синергии и конфликты</h4>
-                {getPeptideSynergiesFor(peptideId).length > 0 && (
+                {!growthId && getPeptideSynergiesFor(peptideId).length > 0 && (
                   <div style={{ marginBottom: 4 }}>
                     <span style={{ fontSize: 10, color: '#22c55e', fontWeight: 600 }}>Синергии:</span>
                     {getPeptideSynergiesFor(peptideId).map(s => (
@@ -4201,7 +4204,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                     ))}
                   </div>
                 )}
-                {getPeptideConflictsFor(peptideId).length > 0 && (
+                {!growthId && getPeptideConflictsFor(peptideId).length > 0 && (
                   <div>
                     <span style={{ fontSize: 10, color: '#ef4444', fontWeight: 600 }}>Конфликты:</span>
                     {getPeptideConflictsFor(peptideId).map(c => (
@@ -4209,9 +4212,11 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                     ))}
                   </div>
                 )}
-                {getPeptideSynergiesFor(peptideId).length === 0 && getPeptideConflictsFor(peptideId).length === 0 && (
+                {growthId ? (
+                  <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>Данные синергий для факторов роста из каталога фармы</span>
+                ) : getPeptideSynergiesFor(peptideId).length === 0 && getPeptideConflictsFor(peptideId).length === 0 ? (
                   <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>Нет данных</span>
-                )}
+                ) : null}
               </div>
             </>
           )}
@@ -4252,7 +4257,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
       {section === 'generator' && tab === 'main' && supportView === 'calc' && calcView === 'stackcalc' && (
         <div style={{ padding:'0 0 70px' }}>
           <div style={{ display:'flex', gap:6, marginBottom:6 }}>
-            <button onClick={() => setCalcView('main')} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← Назад</button>
+            <button onClick={goBack} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← Назад</button>
             <button onClick={() => setSupportView('main')} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← На главную Поддержки</button>
           </div>
           {safeRender('calc_stackcalc', () => {
@@ -4418,7 +4423,7 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
       {section === 'generator' && tab === 'main' && supportView === 'calc' && calcView === 'mystacks' && (
         <div style={{ padding:'0 0 80px' }}>
           <div style={{ display:'flex', gap:6, marginBottom:6 }}>
-            <button onClick={() => setCalcView('main')} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← Назад</button>
+            <button onClick={goBack} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← Назад</button>
             <button onClick={() => setSupportView('main')} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← На главную Поддержки</button>
           </div>
           <h2 style={{ margin:'0 0 6px', fontSize:16, fontWeight:800, color:'var(--accent)' }}>📂 Мои стеки</h2>
@@ -4474,7 +4479,7 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
       {section === 'info' && tab === 'main' && supportView === 'calc' && calcView === 'mixcalc' && (
         <div style={{ padding:'0 0 80px', height:'100vh', display:'flex', flexDirection:'column' }}>
           <div style={{ display:'flex', gap:6, marginBottom:6 }}>
-            <button onClick={() => setCalcView('main')} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← Назад</button>
+            <button onClick={goBack} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← Назад</button>
             <button onClick={() => setSupportView('main')} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← На главную Поддержки</button>
           </div>
           <div style={{ flex:1, overflowY:'auto', paddingRight:4 }}>
@@ -4638,7 +4643,7 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
       {section === 'generator' && tab === 'main' && supportView === 'calc' && calcView === 'plan' && (
         <div style={{ padding:'0 0 80px' }}>
           <div style={{ display:'flex', gap:6, marginBottom:6 }}>
-            <button onClick={() => setCalcView('main')} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← Назад</button>
+            <button onClick={goBack} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← Назад</button>
             <button onClick={() => setSupportView('main')} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← На главную Поддержки</button>
           </div>
           <h2 style={{ margin:'0 0 2px', fontSize:16, fontWeight:800, color:'var(--accent)' }}>📅 План поддержки</h2>
@@ -5115,7 +5120,7 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
         return (
         <div style={{ padding:'0 0 80px', height:'100vh', display:'flex', flexDirection:'column' }}>
           <div style={{ display:'flex', gap:6, marginBottom:6, flexWrap:'wrap' }}>
-            <button onClick={() => setCalcView('main')} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← Назад</button>
+            <button onClick={goBack} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← Назад</button>
             <button onClick={() => setSupportView('main')} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← На главную</button>
           </div>
           <h2 style={{ margin:'0 0 2px', fontSize:16, fontWeight:800, color:'var(--accent)' }}>🧮 Калькулятор поддержки</h2>
@@ -5683,14 +5688,14 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
           </div>
         </div>
         );
-        } catch(e) { return <div style={{ padding:40, textAlign:'center', color:'#ef4444', background:'var(--bg-secondary)', borderRadius:12, margin:20 }}>⚠️ Ошибка калькулятора: {String(e)}<br/><button onClick={() => setCalcView('main')} style={{ marginTop:12, padding:'6px 16px', borderRadius:8, cursor:'pointer', background:'var(--accent)', border:'none', color:'#000', fontWeight:600 }}>← Назад</button></div>; }
+        } catch(e) { return <div style={{ padding:40, textAlign:'center', color:'#ef4444', background:'var(--bg-secondary)', borderRadius:12, margin:20 }}>⚠️ Ошибка калькулятора: {String(e)}<br/><button onClick={goBack} style={{ marginTop:12, padding:'6px 16px', borderRadius:8, cursor:'pointer', background:'var(--accent)', border:'none', color:'#000', fontWeight:600 }}>← Назад</button></div>; }
       })()}
 
       {/* ===== PEPTIDE CALCULATOR ===== */}
       {section === 'info' && tab === 'main' && supportView === 'calc' && calcView === 'peptides' && (
         <div style={{ padding:'0 0 80px', height:'100vh', display:'flex', flexDirection:'column' }}>
           <div style={{ display:'flex', gap:6, marginBottom:6 }}>
-            <button onClick={() => setCalcView('main')} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← Назад</button>
+            <button onClick={goBack} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← Назад</button>
             <button onClick={() => setSupportView('main')} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← На главную Поддержки</button>
           </div>
           <h2 style={{ margin:'0 0 4px', fontSize:16, fontWeight:800, color:'#a78bfa' }}>🧬 Пептидный калькулятор</h2>
@@ -5867,7 +5872,7 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
 
         return safeRender('neuro', () => (
         <div style={{ padding:'0 0 80px' }}>
-          <button onClick={() => setCalcView('main')} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', marginBottom:6, background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← Назад</button>
+          <button onClick={goBack} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', marginBottom:6, background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← Назад</button>
           <button onClick={() => setSupportView('main')} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', marginBottom:4, marginLeft:6, background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← На главную Поддержки</button>
           <h2 style={{ margin:'0 0 4px', fontSize:16, fontWeight:800, color:'#ec4899' }}>🧠 Нейротоксичность ААС</h2>
           <p style={{ fontSize:10, color:'var(--text-dim)', margin:'0 0 12px', lineHeight:1.4 }}>
@@ -6123,7 +6128,7 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
       {section === 'info' && tab === 'main' && supportView === 'calc' && calcView === 'joints' && (() => {
         return safeRender('joints', () => (
         <div style={{ padding:'0 0 80px' }}>
-          <button onClick={() => setCalcView('main')} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', marginBottom:6, background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← Назад</button>
+          <button onClick={goBack} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', marginBottom:6, background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← Назад</button>
           <button onClick={() => setSupportView('main')} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', marginBottom:4, marginLeft:6, background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← На главную Поддержки</button>
           <h2 style={{ margin:'0 0 4px', fontSize:16, fontWeight:800, color:'#f59e0b' }}>🦴 Калькулятор суставов и связок</h2>
           <p style={{ fontSize:10, color:'var(--text-dim)', margin:'0 0 12px', lineHeight:1.4 }}>
@@ -6298,7 +6303,7 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
       {/* ===== ACNE TAB ===== */}
       {section === 'info' && tab === 'main' && supportView === 'calc' && calcView === 'acne' && (
         <div style={{ padding:'0 0 80px' }}>
-          <button onClick={() => setCalcView('main')} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', marginBottom:6, background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← Назад</button>
+          <button onClick={goBack} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', marginBottom:6, background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← Назад</button>
           <button onClick={() => setSupportView('main')} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', marginBottom:4, marginLeft:6, background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← На главную Поддержки</button>
           <h2 style={{ margin:'0 0 4px', fontSize:16, fontWeight:800, color:'#ef4444' }}>🔴 Анти-прыщ протокол</h2>
           <p style={{ fontSize:10, color:'var(--text-dim)', margin:'0 0 12px' }}>Протокол борьбы с акне на курсе ААС: системная и локальная терапия.</p>
