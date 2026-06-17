@@ -1277,6 +1277,14 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   const [fdaError, setFdaError] = useState('');
   const [mixGoal, setMixGoal] = useState<string>('pump');
   const [mixTiming, setMixTiming] = useState<string>('pre');
+  const [mixInsulin, setMixInsulin] = useState<number>(0);
+  const [mixInsulinTiming, setMixInsulinTiming] = useState<'pre'|'post'>('post');
+  const [mixMGF, setMixMGF] = useState<number>(0);
+  const [mixMGFTiming, setMixMGFTiming] = useState<'pre'|'post'>('pre');
+  const [mixIGF, setMixIGF] = useState<number>(0);
+  const [mixIGFTiming, setMixIGFTiming] = useState<'pre'|'post'>('pre');
+  const [mixGH, setMixGH] = useState<number>(0);
+  const [mixGHTiming, setMixGHTiming] = useState<'pre'|'post'>('pre');
   const [mixCompoundTimings, setMixCompoundTimings] = useState<Record<string, number>>({});
 
   // Joints calculator state (lifted from IIFE to component level for hook stability)
@@ -2315,7 +2323,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
   };
 
   return (
-    <div className="screen support-screen" style={{ paddingTop: section !== 'home' ? '50px' : '16px', paddingBottom: '60px' }}>
+    <div className="screen support-screen" style={{ paddingTop: section === 'info' ? '88px' : section !== 'home' ? '50px' : '10px', paddingBottom: '50px' }}>
 
       {/* ===== GENERATOR SUB-TAB PILLS ===== */}
       {section === 'generator' && (
@@ -2360,31 +2368,39 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
         </div>
       )}
 
-      {/* ===== INFO SUB-TAB PILLS ===== */}
+      {/* ===== INFO HEADER (back/home + pills) ===== */}
       {section === 'info' && (
-        <div style={{ position:'fixed', top:0, left:0, right:0, zIndex:150, display:'flex', gap:4, padding:'8px 12px', background:'var(--bg-primary)', borderBottom:'1px solid var(--border)', overflowX:'auto' }}>
-          {[['peptides','Пептиды'],['catalog','Каталог'],['synergies','Синергии'],['readystacks','Стеки'],['interactions','Взаимодействия'],['research','Исследования'],['mixcalc','Микс'],['neuro','Нейро'],['joints','Суставы'],['acne','Акне']].map(([id,label]) => (
-            <button key={id} onClick={() => { setInfoTab(id as any);
-              const a: Record<string,()=>void> = {
-                peptides: ()=>setTab('peptides'),
-                catalog: ()=>setTab('catalog'),
-                synergies: ()=>setTab('synergies'),
-                readystacks: ()=>setTab('stacks'),
-                interactions: ()=>setTab('interactions'),
-                research: ()=>{ setTab('main'); setSupportView('calc'); setCalcView('info'); setInfoView('research'); setSection('home'); },
-                mixcalc: ()=>{ setTab('main'); setSupportView('calc'); setCalcView('mixcalc'); },
-                neuro: ()=>{ setTab('main'); setSupportView('calc'); setCalcView('neuro'); },
-                joints: ()=>{ setTab('main'); setSupportView('calc'); setCalcView('joints'); },
-                acne: ()=>{ setTab('main'); setSupportView('calc'); setCalcView('acne'); },
-              };
-              a[id]?.();
-            }} style={{
-              padding:'6px 14px', borderRadius:22, fontSize:11, fontWeight:700, whiteSpace:'nowrap', cursor:'pointer', flexShrink:0,
-              background: infoTab === id ? 'var(--accent)' : 'var(--bg-secondary)',
-              color: infoTab === id ? '#000' : 'var(--text-dim)',
-              border: '1px solid ' + (infoTab === id ? 'var(--accent)' : 'var(--border)'),
-            }}>{label}</button>
-          ))}
+        <div style={{ position:'fixed', top:0, left:0, right:0, zIndex:150, background:'var(--bg-primary)', borderBottom:'1px solid var(--border)' }}>
+          <div style={{ display:'flex', gap:6, padding:'4px 12px', borderBottom:'1px solid var(--border)', alignItems:'center' }}>
+            <button onClick={goBack} style={{ padding:'3px 10px', borderRadius:6, fontSize:10, cursor:'pointer', background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600, whiteSpace:'nowrap' }}>← Назад</button>
+            <button onClick={() => { setSection('home'); setTab('main'); setSupportView('main'); setCalcView('main'); }} style={{ padding:'3px 10px', borderRadius:6, fontSize:10, cursor:'pointer', background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600, whiteSpace:'nowrap' }}>← На главную</button>
+            <div style={{ flex:1 }} />
+            <span style={{ fontSize:9, color:'var(--text-dim)', fontWeight:600 }}>Поддержка</span>
+          </div>
+          <div style={{ display:'flex', gap:4, padding:'6px 12px 8px', overflowX:'auto', scrollbarWidth:'none' }}>
+            {[['peptides','Пептиды'],['catalog','Каталог'],['synergies','Синергии'],['readystacks','Стеки'],['interactions','Взаимодействия'],['research','Исследования'],['mixcalc','Микс'],['neuro','Нейро'],['joints','Суставы'],['acne','Акне']].map(([id,label]) => (
+              <button key={id} onClick={() => { setInfoTab(id as any);
+                const a: Record<string,()=>void> = {
+                  peptides: ()=>setTab('peptides'),
+                  catalog: ()=>setTab('catalog'),
+                  synergies: ()=>setTab('synergies'),
+                  readystacks: ()=>setTab('stacks'),
+                  interactions: ()=>setTab('interactions'),
+                  research: ()=>{ setTab('main'); setSupportView('calc'); setCalcView('info'); setInfoView('research'); setSection('home'); },
+                  mixcalc: ()=>{ setTab('main'); setSupportView('calc'); setCalcView('mixcalc'); },
+                  neuro: ()=>{ setTab('main'); setSupportView('calc'); setCalcView('neuro'); },
+                  joints: ()=>{ setTab('main'); setSupportView('calc'); setCalcView('joints'); },
+                  acne: ()=>{ setTab('main'); setSupportView('calc'); setCalcView('acne'); },
+                };
+                a[id]?.();
+              }} style={{
+                padding:'5px 12px', borderRadius:16, fontSize:10, fontWeight:700, whiteSpace:'nowrap', cursor:'pointer', flexShrink:0,
+                background: infoTab === id || (id==='catalog' && tab==='main' && supportView==='main') ? 'var(--accent)' : 'var(--bg-secondary)',
+                color: infoTab === id ? '#000' : 'var(--text-dim)',
+                border: '1px solid ' + (infoTab === id ? 'var(--accent)' : 'var(--border)'),
+              }}>{label}</button>
+            ))}
+          </div>
         </div>
       )}
 
@@ -2442,10 +2458,10 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
 
       {/* ===== SUB-NAVIGATION (calc / fertility menus) ===== */}
       {section === 'home' && tab === 'main' && supportView === 'calc' && calcView === 'main' && (
-        <div style={{ position:'fixed', inset:0, zIndex:100, display:'flex', flexDirection:'column', paddingTop:'46px' }}>
+        <div style={{ position:'fixed', inset:0, zIndex:100, display:'flex', flexDirection:'column' }}>
           <img src="/calc-hero.jpg" alt="" style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'cover', objectPosition:'center top' }} />
           <div style={{ position:'absolute', inset:0, background:'linear-gradient(transparent 50%, rgba(0,0,0,0.85))' }} />
-          <div style={{ position:'relative', zIndex:2, flex:1, display:'flex', flexDirection:'column', padding:'16px 16px 80px', overflow:'hidden' }}>
+          <div style={{ position:'relative', zIndex:2, flex:1, display:'flex', flexDirection:'column', padding:'10px 12px 16px', overflow:'hidden' }}>
             <button onClick={() => setSupportView('main')} style={{ alignSelf:'flex-start', padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', marginBottom:8, background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← Назад</button>
             <h2 style={{ fontSize:18, fontWeight:800, color:'#fff', margin:'8px 0 2px', textShadow:'0 2px 10px rgba(0,0,0,0.9)' }}>Расчет поддержки</h2>
             <p style={{ fontSize:10, color:'rgba(255,255,255,0.9)', margin:'0 0 16px', textShadow:'0 1px 6px rgba(0,0,0,0.8)' }}>
@@ -3439,10 +3455,9 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
         </div>
       )}
 
-      {/* ===== NON-MAIN CONTENT (with back button) ===== */}
+      {/* ===== NON-MAIN CONTENT ===== */}
       {tab !== 'main' && tab !== 'fertility-pct' && (
-        <div style={{ paddingTop: section === 'info' ? 48 : 0, paddingBottom: 70, overflowY:'auto', maxHeight:'100vh' }}>
-          <button onClick={() => { setTab('main'); setSupportView('main'); setCalcView('main'); setSection('home'); }} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', marginBottom:8, background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← На главную</button>
+        <div style={{ paddingBottom: 16 }}>
 
       {/* ===== CATALOG (SUPPORT_CATALOG_DATA — 289 записей) ===== */}
       {section === 'info' && tab === 'catalog' && (
@@ -4648,6 +4663,34 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
                         <div key={gi} style={{ padding:'8px 10px', borderRadius:8, background:'var(--bg-secondary)', border:'1px solid var(--border)' }}>
                           <div style={{ fontSize:10, fontWeight:700, color:'var(--accent)', marginBottom:3 }}>{grp.label}-тренировочный</div>
                           <div style={{ fontSize:8, color:'var(--text-dim)', lineHeight:1.4 }}>{grp.items}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Peptide/GH/Insulin inputs */}
+                  <div className="card" style={{ padding:12, marginBottom:8, border:'1px solid rgba(236,72,153,0.2)' }}>
+                    <h4 style={{ margin:'0 0 8px', fontSize:11, color:'#ec4899' }}>💉 Пептиды/Гормоны к тренировке</h4>
+                    <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+                      {[
+                        { key:'insulin', label:'Инсулин', val:mixInsulin, set:setMixInsulin, timing:mixInsulinTiming, setTiming:setMixInsulinTiming, defaultUnit:'ЕД', note:'Только под глюкометром! +30г быстрых углеводов' },
+                        { key:'mgf', label:'MGF (PEG-MGF)', val:mixMGF, set:setMixMGF, timing:mixMGFTiming, setTiming:setMixMGFTiming, defaultUnit:'мкг', note:'Локально в целевую мышцу за 15 мин до тренировки' },
+                        { key:'igf', label:'IGF-1 (LR3/DES)', val:mixIGF, set:setMixIGF, timing:mixIGFTiming, setTiming:setMixIGFTiming, defaultUnit:'мкг', note:'Системно/локально. DES — немедленно, LR3 — за 20 мин' },
+                        { key:'gh', label:'ГР (HGH/rHGH)', val:mixGH, set:setMixGH, timing:mixGHTiming, setTiming:setMixGHTiming, defaultUnit:'МЕ', note:'За 30-60 мин до для жиросжигания. Пост — для восстановления' },
+                      ].map((p) => (
+                        <div key={p.key} style={{ padding:'8px 10px', borderRadius:8, background:'rgba(236,72,153,0.04)', border:'1px solid rgba(236,72,153,0.1)' }}>
+                          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:4 }}>
+                            <span style={{ fontSize:10, fontWeight:700, color:'var(--text-light)' }}>{p.label}</span>
+                            <div style={{ display:'flex', gap:4, alignItems:'center' }}>
+                              <span style={{ fontSize:8, color:'var(--text-dim)' }}>{p.defaultUnit}</span>
+                              <input type="number" min="0" max="100" step="0.5" value={p.val} onChange={e => p.set(Math.max(0, Number(e.target.value) || 0))} placeholder="0" style={{ width:60, padding:'4px 6px', borderRadius:4, border:'1px solid var(--border)', background:'var(--bg-primary)', color:'var(--text)', fontSize:10, textAlign:'center' }} />
+                            </div>
+                          </div>
+                          <div style={{ display:'flex', gap:4 }}>
+                            <button onClick={() => p.setTiming('pre')} style={{ padding:'2px 8px', borderRadius:4, fontSize:8, fontWeight:600, cursor:'pointer', border:'none', background:p.timing==='pre'?'#ec4899':'var(--bg-secondary)', color:p.timing==='pre'?'#000':'var(--text-dim)' }}>До тренировки</button>
+                            <button onClick={() => p.setTiming('post')} style={{ padding:'2px 8px', borderRadius:4, fontSize:8, fontWeight:600, cursor:'pointer', border:'none', background:p.timing==='post'?'#ec4899':'var(--bg-secondary)', color:p.timing==='post'?'#000':'var(--text-dim)' }}>После тренировки</button>
+                          </div>
+                          {p.val > 0 && <div style={{ fontSize:7, color:'#ec4899', marginTop:2, opacity:0.7 }}>{p.note}</div>}
                         </div>
                       ))}
                     </div>
@@ -6035,12 +6078,7 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
                 </div>
               </div>
 
-              {/* WARNING BANNER */}
-              <div style={{ background:'linear-gradient(135deg, rgba(239,68,68,0.12), rgba(236,72,153,0.12))', borderRadius:12, padding:12, border:'2px solid rgba(239,68,68,0.35)', textAlign:'center' }}>
-                <div style={{ fontSize:10, fontWeight:800, color:'#f87171', lineHeight:1.5 }}>⚠️ ЭТО НЕ ПРОСТО ИСТОРИЯ ПРО «СТАЛ БОЛЕЕ ЗЛОЙ НА КУРСЕ». ЭТО ПРО ТО, ЧТО ТЫ ХИМИЕЙ ЛЕЗЕШЬ В ТОНКО НАСТРОЕННУЮ НЕЙРОБИОЛОГИЮ.</div>
-              </div>
-
-              {/* EXISTING: Detailed mechanism cards */}
+              {/* Detailed mechanism cards */}
               <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:14, border:'1px solid var(--border)' }}>
                 <h4 style={{ margin:'0 0 10px', fontSize:13, color:'#ec4899' }}>🔬 Детальные механизмы нейротоксичности ААС</h4>
                 {[
@@ -6235,6 +6273,27 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
             </div>
           </div>
 
+          {/* Imaging Examinations */}
+          <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:14, marginBottom:10, border:'1px solid var(--border)' }}>
+            <h4 style={{ margin:'0 0 8px', fontSize:12, color:'#a855f7' }}>🔬 Инструментальные исследования</h4>
+            <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
+              {[
+                { name:'УЗИ суставов (B-режим)', purpose:'Оценка выпота, синовита, эрозий', when:'При боли/отёке ≥2 нед' },
+                { name:'МРТ сустава (T1/T2/PD-FS)', purpose:'Визуализация хряща, менисков, связок', when:'При подозрении на повреждение мениска/связок, хроническая боль >4 нед' },
+                { name:'Рентгенография (2 проекции)', purpose:'Оценка суставной щели, остеофитов, переломов', when:'При подозрении на перелом/остеоартрит' },
+                { name:'КТ сустава', purpose:'Точная оценка костной архитектуры, переломов', when:'При сложных переломах/планировании операции' },
+                { name:'УЗИ связок/сухожилий', purpose:'Оценка целостности, тендинопатии', when:'При локальной боли/хрусте в сухожилии' },
+                { name:'Тепловизионное исследование', purpose:'Зоны асимметричной температурной активности', when:'Скрининг воспалительной активности' },
+              ].map((e, i) => (
+                <div key={i} style={{ padding:'6px 8px', borderRadius:6, background:'rgba(168,85,247,0.04)', border:'1px solid rgba(168,85,247,0.08)' }}>
+                  <div style={{ fontSize:10, fontWeight:600, color:'#a855f7' }}>{e.name}</div>
+                  <div style={{ fontSize:8, color:'var(--text-dim)', marginTop:1 }}>{e.purpose}</div>
+                  <div style={{ fontSize:7, color:'#a855f7', marginTop:1, opacity:0.7 }}>Показание: {e.when}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+
           {/* Tiered Support */}
           <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:14, border:'1px solid var(--border)' }}>
             <h4 style={{ margin:'0 0 4px', fontSize:13, color:'#22c55e' }}>💊 Многоуровневая поддержка суставов</h4>
@@ -6350,6 +6409,45 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
             <p style={{ fontSize:10, color:'var(--text-light)', lineHeight:1.6, margin:'0 0 6px' }}><b style={{color:'#ef4444'}}>Клензит-С</b> содержит антибактериальный компонент + адапален для открытия комедонов.</p>
             <p style={{ fontSize:10, color:'var(--text-light)', lineHeight:1.6 }}><b style={{color:'#f59e0b'}}>Верошпирон:</b> калий-сберегающий диуретик+антиандроген. Блокирует AR в коже. <b style={{color:'#ef4444'}}>СЛЕДИ ЗА КАЛИЕМ!</b></p>
           </div>
+          {/* Analyses & Examinations */}
+          <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:14, marginBottom:10, border:'1px solid var(--border)' }}>
+            <h4 style={{ margin:'0 0 8px', fontSize:12, color:'#ec4899' }}>🧪 Необходимые анализы и исследования</h4>
+            <div style={{ display:'flex', flexDirection:'column', gap:4, marginBottom:10 }}>
+              <div style={{ fontSize:10, fontWeight:700, color:'#ec4899', marginBottom:2 }}>Анализы крови</div>
+              {[
+                { name:'Тестостерон общий/свободный', purpose:'Оценка гиперандрогении' },
+                { name:'Дигидротестостерон (DHT)', purpose:'Прямой маркер андрогенной стимуляции сальных желёз' },
+                { name:'Эстрадиол (E2)', purpose:'Гиперэстрогения усугубляет акне' },
+                { name:'ЛГ/ФСГ', purpose:'Оценка оси HPA, ПКТ/посткурсовая эстроген-андрогенная перестройка' },
+                { name:'Пролактин', purpose:'Повышение ПРЛ через трен/19-нор метаболиты усугубляет акне' },
+                { name:'DHEA-S', purpose:'Надпочечниковые андрогены как дополнительный фактор' },
+                { name:'Кортизол', purpose:'Хронический стресс ухудшает состояние кожи' },
+                { name:'SHBG', purpose:'Низкий SHBG = больше свободного тестостерона' },
+                { name:'Калий (K+)', purpose:'При Верошпироне — риск гиперкалиемии' },
+                { name:'Глюкоза/Инсулин/HOMA-IR', purpose:'Инсулинорезистентность усиливает андрогенное стимулирование сальных желёз' },
+              ].map((a, i) => (
+                <div key={i} style={{ padding:'5px 8px', borderRadius:6, background:'rgba(236,72,153,0.04)', border:'1px solid rgba(236,72,153,0.08)', fontSize:9 }}>
+                  <span style={{ fontWeight:600, color:'var(--text-light)' }}>{a.name}</span>
+                  <span style={{ color:'var(--text-dim)', marginLeft:4 }}>— {a.purpose}</span>
+                </div>
+              ))}
+            </div>
+            <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
+              <div style={{ fontSize:10, fontWeight:700, color:'#a855f7', marginBottom:2 }}>Инструментальные исследования</div>
+              {[
+                { name:'УЗИ кожи (20-50 МГц)', purpose:'Оценка толщины эпидермиса, сальных желёз, воспалительных инфильтратов' },
+                { name:'Себуметрия', purpose:'Измерение продукции себума на разных участках' },
+                { name:'Дерматоскопия', purpose:'Дифференциация типов акне, оценка эффективности терапии' },
+                { name:'Микробиологическое исследование', purpose:'Посев на Cutibacterium acnes + чувствительность к антибиотикам' },
+              ].map((e, i) => (
+                <div key={i} style={{ padding:'5px 8px', borderRadius:6, background:'rgba(168,85,247,0.04)', border:'1px solid rgba(168,85,247,0.08)', fontSize:9 }}>
+                  <span style={{ fontWeight:600, color:'var(--text-light)' }}>{e.name}</span>
+                  <span style={{ color:'var(--text-dim)', marginLeft:4 }}>— {e.purpose}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
           <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:14, border:'1px solid var(--border)' }}>
             <h4 style={{ margin:'0 0 6px', fontSize:11, color:'#f59e0b' }}>⚠️ Важно</h4>
             <div style={{ fontSize:9, color:'var(--text-dim)', lineHeight:1.5 }}>• При Верошпироне — исключить добавки калия<br/>• Солярий ≤ 2 раза/нед по 5 мин<br/>• Клендовит+Клензит-С только локально<br/>• При сильном акне — дерматолог, системные ретиноиды</div>
