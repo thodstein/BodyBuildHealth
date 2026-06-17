@@ -5771,8 +5771,8 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
                 </div>
                 <div>
                   <div style={{ fontSize:9, color:'var(--text-dim)', marginBottom:4 }}>Шприц</div>
-                  <select value={pepSyringe} onChange={e => setPepSyringe(e.target.value)} style={{ width:'100%', padding:'6px 8px', borderRadius:6, border:'1px solid var(--border)', background:'rgba(0,0,0,0.2)', color:'var(--text)', fontSize:10, boxSizing:'border-box' }}>
-                    {Object.values(SYRINGE_TYPES).map((sy: any) => <option key={sy.label} value={sy.label}>{sy.label}</option>)}
+                  <select value={pepSyringe} onChange={e => setPepSyringe(e.target.value as keyof typeof SYRINGE_TYPES)} style={{ width:'100%', padding:'6px 8px', borderRadius:6, border:'1px solid var(--border)', background:'rgba(0,0,0,0.2)', color:'var(--text)', fontSize:10, boxSizing:'border-box' }}>
+                    {Object.entries(SYRINGE_TYPES).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
                   </select>
                 </div>
               </div>
@@ -5780,7 +5780,7 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
                 const conc = pepAmount / pepDilution; // mg/mL
                 const doseMg = pepDose / 1000; // mcg -> mg
                 const doseMl = doseMg / conc;
-                const syringeInfo = SYRINGE_TYPES[pepSyringe] as any;
+                const syringeInfo = SYRINGE_TYPES[pepSyringe];
                 const units = syringeInfo ? doseMl * syringeInfo.unitsPerMl : doseMl * 100;
                 return (
                   <div style={{ marginTop:10, padding:'10px 12px', borderRadius:8, background:'rgba(96,165,250,0.06)', border:'1px solid rgba(96,165,250,0.15)' }}>
