@@ -2385,7 +2385,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
       )}
 
       {/* ===== SUB-NAVIGATION (calc / fertility menus) ===== */}
-      {tab === 'main' && supportView === 'calc' && calcView === 'main' && (
+      {section === 'home' && tab === 'main' && supportView === 'calc' && calcView === 'main' && (
         <div style={{ position:'fixed', inset:0, zIndex:100, display:'flex', flexDirection:'column', paddingTop:'46px' }}>
           <img src="/calc-hero.jpg" alt="" style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'cover', objectPosition:'center top' }} />
           <div style={{ position:'absolute', inset:0, background:'linear-gradient(transparent 50%, rgba(0,0,0,0.85))' }} />
@@ -2430,7 +2430,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
         </div>
       )}
 
-      {tab === 'main' && supportView === 'calc' && calcView === 'info' && (
+      {section === 'home' && tab === 'main' && supportView === 'calc' && calcView === 'info' && (
         <div style={{ padding:'0 0 70px', height:'100vh', display:'flex', flexDirection:'column' }}>
           <div style={{ display:'flex', gap:6, marginBottom:6 }}>
             <button onClick={() => setCalcView('main')} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← Назад</button>
