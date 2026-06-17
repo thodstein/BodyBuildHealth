@@ -1,0 +1,16 @@
+Port 5173 is in use, trying another one...
+
+  [32m[1mVITE[22m v6.4.3[39m  [2mready in [0m[1m483[22m[2m[0m ms[22m
+
+  [32m➜[39m  [1mLocal[22m:   [36mhttp://localhost:[1m5174[22m/[39m
+[2m  [32m➜[39m  [1mNetwork[22m[2m: use [22m[1m--host[22m[2m to expose[22m
+[BABEL] Note: The code generator has deoptimised the styling of D:\BodyBuildHealth\src\ui\screens\SupportScreen.tsx as it exceeds the max of 500KB.
+
+PWA v1.0.3
+mode      generateSW
+precache  2 entries (0.12 KiB)
+files generated
+  dev-dist/sw.js.map
+  dev-dist/sw.js
+  dev-dist/workbox-2427537b.js.map
+  dev-dist/workbox-2427537b.js
