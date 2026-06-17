@@ -371,7 +371,7 @@ export const FertilityPCTScreen: React.FC<{ initialTab?: FertTab }> = ({ initial
                 { code: 'FT', name: 'Тестостерон своб.' }, { code: 'E2', name: 'Эстрадиол' }, { code: 'PRL', name: 'Пролактин' },
                 { code: 'SHBG', name: 'SHBG' }, { code: 'TSH', name: 'TSH' }, { code: 'FT4', name: 'T4 своб.' },
                 { code: 'CORT', name: 'Кортизол' }, { code: 'PSA', name: 'ПСА' }, { code: 'VITD', name: 'Витамин D' },
-                { code: 'SPERM', name: 'Спермограмма' }, { code: 'CBC', name: 'ОАК' },
+                { code: 'SPERM', name: 'Спермограмма' }, { code: 'INHB', name: 'Ингибин B' }, { code: 'CBC', name: 'ОАК' },
               ].map(item => (
                 <label key={item.code} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 9, color: 'var(--text)', padding: '3px 0', cursor: 'pointer' }}>
                   <input
@@ -387,6 +387,48 @@ export const FertilityPCTScreen: React.FC<{ initialTab?: FertTab }> = ({ initial
           </div>
 
           {/* IF Score card */}
+          {/* Fertility analyses */}
+          <div style={{ ...s.card, borderLeft:'3px solid #ec4899' }}>
+            <h4 style={{ margin:'0 0 8px', fontSize:12, color:'#ec4899' }}>🧪 Анализы для оценки фертильности</h4>
+            <div style={{ display:'flex', flexDirection:'column', gap:3 }}>
+              {[
+                { code:'INHB', name:'Ингибин B', range:'>80 pg/mL', note:'Золотой маркер сперматогенеза. Секретируется клетками Сертоли.' },
+                { code:'AMH', name:'Антимюллеров гормон', range:'>3 ng/mL', note:'Оценка овариального резерва (у женщин) и функции клеток Сертоли (у мужчин)' },
+                { code:'FSH', name:'ФСГ', range:'1.5-12.4', note:'Высокий ФСГ + низкий ингибин B = нарушение сперматогенеза' },
+                { code:'LH', name:'ЛГ', range:'1.7-8.6', note:'Стимуляция клеток Лейдига для продукции тестостерона' },
+                { code:'TT', name:'Тестостерон общий', range:'300-1000', note:'Субстрат для интратестикулярного тестостерона (в 100× выше крови)' },
+                { code:'E2', name:'Эстрадиол', range:'11-44', note:'Ароматизация Т → E2, влияет на эректильную функцию' },
+                { code:'PRL', name:'Пролактин', range:'4-15.2', note:'Гиперпролактинемия → импотенция, гипогонадизм' },
+                { code:'SHBG', name:'ГСПГ (SHBG)', range:'18-54', note:'Связывает тестостерон, влияет на свободный Т' },
+                { code:'SPERM', name:'Спермограмма', range:'Объём≥1.5мл, PR≥32%', note:'Прямая оценка фертильности. Концентрация ≥15 млн/мл' },
+                { code:'DFI', name:'Фрагментация ДНК сперматозоидов (DFI)', range:'<15%', note:'Целостность генетического материала. Выше = хуже имплантация' },
+              ].map((a, i) => (
+                <div key={i} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'5px 8px', borderRadius:6, background:'rgba(236,72,153,0.04)', border:'1px solid rgba(236,72,153,0.08)', flexWrap:'wrap', gap:2 }}>
+                  <div style={{ fontSize:9, fontWeight:600, color:'var(--text-light)' }}>{a.code} — {a.name} <span style={{ color:'var(--text-dim)', fontWeight:400 }}>({a.range})</span></div>
+                  <span style={{ fontSize:7, color:'#ec4899', opacity:0.7 }}>{a.note}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+          {/* Instrumental for Fertility */}
+          <div style={{ ...s.card, borderLeft:'3px solid #a855f7' }}>
+            <h4 style={{ margin:'0 0 8px', fontSize:12, color:'#a855f7' }}>🔬 Инструментальные исследования</h4>
+            <div style={{ display:'flex', flexDirection:'column', gap:3 }}>
+              {[
+                { name:'УЗИ мошонки с допплером', purpose:'Кровоток яичек, варикоцеле, объём яичек' },
+                { name:'Спермограмма + MAR-тест', purpose:'Количество, подвижность, морфология, антиспермальные антитела' },
+                { name:'Фрагментация ДНК (SCD/Halosperm)', purpose:'Целостность хроматина, DFI < 15%' },
+                { name:'УЗИ простаты (трансректальное)', purpose:'Исключение инфекции/воспаления' },
+                { name:'Гормональный профиль (кровь)', purpose:'ЛГ, ФСГ, ТТ, Е2, Пролактин, Ингибин В, АМГ' },
+              ].map((e, i) => (
+                <div key={i} style={{ padding:'5px 8px', borderRadius:6, background:'rgba(168,85,247,0.04)', border:'1px solid rgba(168,85,247,0.08)' }}>
+                  <span style={{ fontSize:9, fontWeight:600, color:'var(--text-light)' }}>{e.name}</span>
+                  <span style={{ fontSize:8, color:'var(--text-dim)', marginLeft:4 }}>— {e.purpose}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
           <div style={{ ...s.card, borderColor: scoreColor, background: scoreBg, border: `1px solid ${scoreColor}` }}>
             <h3 style={{ color: scoreColor, margin: '0 0 8px', fontSize: 16 }}>Индекс фертильности: {result.ifScore}</h3>
             <p style={{ color: scoreColor, margin: '0 0 4px', fontSize: 11 }}>{result.interpretation}</p>
@@ -657,6 +699,48 @@ export const FertilityPCTScreen: React.FC<{ initialTab?: FertTab }> = ({ initial
               </div>
             </>
           )}
+          {/* PCT analyses */}
+          <div style={{ ...s.card, borderLeft:'3px solid #60a5fa', marginTop:10 }}>
+            <h4 style={{ margin:'0 0 8px', fontSize:12, color:'#60a5fa' }}>🧪 Анализы для ПКТ</h4>
+            <div style={{ display:'flex', flexDirection:'column', gap:3 }}>
+              {[
+                { code:'LH', name:'Лютеинизирующий гормон', range:'1.7-8.6', note:'Восстановление оси HPT' },
+                { code:'FSH', name:'Фолликулостимулирующий гормон', range:'1.5-12.4', note:'Восстановление сперматогенеза' },
+                { code:'TT', name:'Тестостерон общий', range:'300-1000', note:'Основной маркер восстановления' },
+                { code:'FT', name:'Тестостерон свободный', range:'5-21', note:'Активная фракция' },
+                { code:'E2', name:'Эстрадиол (чувствительный)', range:'11-44', note:'Контроль эстрогенового rebound' },
+                { code:'PRL', name:'Пролактин', range:'4-15.2', note:'Исключение гиперпролактинемии' },
+                { code:'SHBG', name:'ГСПГ (SHBG)', range:'18-54', note:'Влияние на свободный тестостерон' },
+                { code:'TSH', name:'Тиреотропный гормон', range:'0.4-4.0', note:'Тиреоидный статус влияет на гонады' },
+                { code:'CORT', name:'Кортизол', range:'6.2-19.4', note:'Катаболический статус' },
+                { code:'PSA', name:'ПСА общий', range:'<4.0', note:'Скрининг простаты' },
+                { code:'HCT', name:'Гематокрит (Hct)', range:'<50%', note:'Полицитемия после курса' },
+                { code:'GLU', name:'Глюкоза', range:'3.9-5.6', note:'Инсулинорезистентность после ААС' },
+              ].map((a, i) => (
+                <div key={i} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'5px 8px', borderRadius:6, background:'rgba(59,130,246,0.04)', border:'1px solid rgba(59,130,246,0.08)', flexWrap:'wrap', gap:2 }}>
+                  <div style={{ fontSize:9, fontWeight:600, color:'var(--text-light)' }}>{a.code} — {a.name} <span style={{ color:'var(--text-dim)', fontWeight:400 }}>({a.range})</span></div>
+                  <span style={{ fontSize:7, color:'#60a5fa', opacity:0.7 }}>{a.note}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+          {/* Instrumental for PCT */}
+          <div style={{ ...s.card, borderLeft:'3px solid #a855f7', marginTop:10 }}>
+            <h4 style={{ margin:'0 0 8px', fontSize:12, color:'#a855f7' }}>🔬 Инструментальные исследования</h4>
+            <div style={{ display:'flex', flexDirection:'column', gap:3 }}>
+              {[
+                { name:'УЗИ мошонки/яичек', purpose:'Оценка объёма яичек, исключение варикоцеле' },
+                { name:'УЗИ простаты (трансректальное)', purpose:'Исключение простатита/аденомы после курса ААС' },
+                { name:'ЭКГ', purpose:'Скрининг нарушений ритма, гипертрофии ЛЖ на фоне ААС' },
+                { name:'Спермограмма', purpose:'Контроль восстановления сперматогенеза после ПКТ' },
+              ].map((e, i) => (
+                <div key={i} style={{ padding:'5px 8px', borderRadius:6, background:'rgba(168,85,247,0.04)', border:'1px solid rgba(168,85,247,0.08)' }}>
+                  <span style={{ fontSize:9, fontWeight:600, color:'var(--text-light)' }}>{e.name}</span>
+                  <span style={{ fontSize:8, color:'var(--text-dim)', marginLeft:4 }}>— {e.purpose}</span>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       )}
 
@@ -706,6 +790,21 @@ export const FertilityPCTScreen: React.FC<{ initialTab?: FertTab }> = ({ initial
                     <div style={{ fontSize:8, color:'var(--text-dim)' }}>{m.freq}</div>
                   </div>
                   <span style={{ fontSize:9, fontWeight:700, color:'#60a5fa' }}>{m.target}</span>
+                </div>
+              ))}
+            </div>
+
+            <h5 style={{ margin:'0 0 6px', fontSize:11, color:'#a855f7' }}>🔬 Инструментальные исследования</h5>
+            <div style={{ display:'flex', flexDirection:'column', gap:4, marginBottom:10 }}>
+              {[
+                { name:'УЗИ простаты (трансректальное)', purpose:'Оценка объёма, исключение узлов/РПЖ' },
+                { name:'Денситометрия (DEXA)', purpose:'Оценка минеральной плотности костей при длительной ГЗТ' },
+                { name:'Эхокардиография', purpose:'Скрининг гипертрофии ЛЖ при длительной терапии' },
+                { name:'УЗИ мошонки', purpose:'Исключение варикоцеле, оценка яичек' },
+              ].map((e, i) => (
+                <div key={i} style={{ padding:'5px 8px', borderRadius:6, background:'rgba(168,85,247,0.04)', border:'1px solid rgba(168,85,247,0.08)' }}>
+                  <span style={{ fontSize:9, fontWeight:600, color:'var(--text-light)' }}>{e.name}</span>
+                  <span style={{ fontSize:8, color:'var(--text-dim)', marginLeft:4 }}>— {e.purpose}</span>
                 </div>
               ))}
             </div>
