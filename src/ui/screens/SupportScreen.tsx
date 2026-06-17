@@ -928,6 +928,12 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   const [autoLevel, setAutoLevel] = useState<'basic' | 'mid' | 'max' | 'boost'>('mid');
   const [expandedMed, setExpandedMed] = useState<string | null>(null);
   const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({});
+  const goBack = () => {
+    if (calcView !== 'main') { setCalcView('main'); return; }
+    if (supportView !== 'main') { setSupportView('main'); return; }
+    if (tab !== 'main') { setTab('main'); return; }
+    if (section !== 'home') { setSection('home'); return; }
+  };
   const [interactionTypeFilter, setInteractionTypeFilter] = useState<string>('all');
   const [interactionSeverityFilter, setInteractionSeverityFilter] = useState<string>('all');
   const [infoSynergySeverity, setInfoSynergySeverity] = useState<string>('all');
@@ -1559,8 +1565,11 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
       return cat;
     };
     const groups: Record<string, SupportSubstance[]> = {};
+    // Filter to 289 curated catalog entries only
+    const CATALOG_IDS = new Set(Object.keys(SUPPORT_CATALOG_DATA).map(k => k.toLowerCase()));
+    const catalogFiltered = ALL_SUBSTANCES.filter(s => CATALOG_IDS.has(s.id.toLowerCase()));
     // Apply tier filter and search query
-    const tierFiltered = supportTierFilter === 'all' ? ALL_SUBSTANCES : ALL_SUBSTANCES.filter(s => getSubstanceTier(s.id) === supportTierFilter);
+    const tierFiltered = supportTierFilter === 'all' ? catalogFiltered : catalogFiltered.filter(s => getSubstanceTier(s.id) === supportTierFilter);
     const filtered = searchQuery
       ? tierFiltered.filter(s =>
           (s.name||'').toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -2493,7 +2502,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                   })}
                 </div>
                 <div style={{ fontSize:9, color:'var(--text-dim)', marginBottom:6 }}>
-                  {searchQuery ? `Найдено: ${groupedSubstances.reduce((a, g) => a + g.count, 0)} из ${ALL_SUBSTANCES.length}` : `Всего: ${ALL_SUBSTANCES.length} веществ`}
+            {searchQuery ? `Найдено: ${groupedSubstances.reduce((a, g) => a + g.count, 0)} из 289` : `Всего: 289 препаратов`}
                 </div>
                 {catalogSubTab === 'organ' && (
                   /* По органам */
@@ -3394,16 +3403,16 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
       {/* ===== NON-MAIN CONTENT (with back button) ===== */}
       {tab !== 'main' && tab !== 'fertility-pct' && (
         <>
-          <button onClick={() => setTab('main')} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', marginBottom:8, background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← На главную</button>
+          <button onClick={() => { setTab('main'); setSupportView('main'); setCalcView('main'); setSection('home'); }} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', marginBottom:8, background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← На главную</button>
 
-      {/* ===== CATALOG (ALL_SUBSTANCES — 1881+ записей) ===== */}
+      {/* ===== CATALOG (SUPPORT_CATALOG_DATA — 289 записей) ===== */}
       {section === 'info' && tab === 'catalog' && (
         <div>
           <div style={{ display: 'flex', gap: 6, marginBottom: 10, alignItems: 'center' }}>
             <input value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Поиск по названию, категориям, механизмам" style={{ flex: 1, padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border-color)', background: 'var(--bg-secondary)', color: 'var(--text-light)', fontSize: 12 }} />
           </div>
           <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 6 }}>
-            {searchQuery ? `Найдено: ${groupedSubstances.reduce((a, g) => a + g.count, 0)} из ${ALL_SUBSTANCES.length}` : `Всего: ${ALL_SUBSTANCES.length} веществ`}
+            {searchQuery ? `Найдено: ${groupedSubstances.reduce((a, g) => a + g.count, 0)} из 289` : `Всего: 289 препаратов`}
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: '68vh', overflowY: 'auto', paddingRight: 2 }}>
             {groupedSubstances.map(group => {
@@ -4814,7 +4823,7 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
 
         const SYSTEM_LABELS_RU: Record<string, { name: string; emoji: string; rec: string }> = {
           cardio: { name: 'Сердце', emoji: '❤️', rec: 'Тельмисартан, Небиволол, CoQ10, Omega-3, L-карнитин' },
-          hepatic: { name: 'Печень', emoji: '🫁', rec: 'NAC, TUDCA, Силимарин, Альфа-липоевая, Фосфатидилхолин' },
+          hepatic: { name: 'Печень', emoji: '🧪', rec: 'NAC, TUDCA, Силимарин, Альфа-липоевая, Фосфатидилхолин' },
           renal: { name: 'Почки', emoji: '🫘', rec: 'Астрагал, Кордицепс, Omega-3, гидратация' },
           neuro: { name: 'Нейро', emoji: '🧠', rec: 'Mg L-треонат, Lion\'s Mane, Theanine, Omega-3, B-комплекс' },
           endocrine: { name: 'Эндокринная', emoji: '🔄', rec: 'DIM, Цинк, Ашваганда, Витекс, Бор' },
@@ -5116,7 +5125,12 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
 
             {/* ==================== 2a: АНАЛИЗ КУРСА ==================== */}
             <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:12, border:'1px solid var(--border)' }}>
-              <h4 style={{ margin:'0 0 8px', fontSize:12, color:'var(--accent)' }}>📊 Анализ курса</h4>
+              <div onClick={() => setExpandedCategories(p => ({ ...p, calc_course: !(p.calc_course ?? true) }))} style={{ display:'flex', alignItems:'center', gap:6, cursor:'pointer', marginBottom: (expandedCategories.calc_course ?? true) ? 8 : 0 }}>
+                <span style={{ fontSize:13 }}>📊</span>
+                <span style={{ flex:1, fontSize:12, fontWeight:700, color:'var(--accent)' }}>Анализ курса</span>
+                <span style={{ fontSize:9, color:'var(--text-dim)', transform: (expandedCategories.calc_course ?? true) ? 'rotate(180deg)' : 'none', transition:'transform 0.2s' }}>▼</span>
+              </div>
+              {(expandedCategories.calc_course ?? true) && (<>
               {uniqCourse.length === 0 ? (
                 <p style={{ fontSize:9, color:'var(--text-dim)', margin:0 }}>Нет активного курса. Добавьте препараты в Профиль → Курс.</p>
               ) : (
@@ -5143,11 +5157,17 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
                   </div>
                 </div>
               )}
+            </>)}
             </div>
 
             {/* ==================== 2b: АНАЛИЗ АНАЛИЗОВ ==================== */}
             <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:12, border:'1px solid var(--border)' }}>
-              <h4 style={{ margin:'0 0 8px', fontSize:12, color:'#60a5fa' }}>🧪 Анализы — требуется поддержка</h4>
+              <div onClick={() => setExpandedCategories(p => ({ ...p, calc_labs: !(p.calc_labs ?? true) }))} style={{ display:'flex', alignItems:'center', gap:6, cursor:'pointer', marginBottom: (expandedCategories.calc_labs ?? true) ? 8 : 0 }}>
+                <span style={{ fontSize:13 }}>🧪</span>
+                <span style={{ flex:1, fontSize:12, fontWeight:700, color:'#60a5fa' }}>Анализы — требуется поддержка</span>
+                <span style={{ fontSize:9, color:'var(--text-dim)', transform: (expandedCategories.calc_labs ?? true) ? 'rotate(180deg)' : 'none', transition:'transform 0.2s' }}>▼</span>
+              </div>
+              {(expandedCategories.calc_labs ?? true) && (<>
               {labs.length === 0 ? (
                 <p style={{ fontSize:9, color:'var(--text-dim)', margin:0 }}>Нет анализов. <span style={{ color:'#60a5fa', cursor:'pointer', textDecoration:'underline' }} onClick={() => setSupportView('main')}>Добавьте анализы</span> для персональных рекомендаций.</p>
               ) : (() => {
@@ -5172,6 +5192,7 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
                   </div>
                 );
               })()}
+            </>)}
             </div>
 
             {/* ==================== 2c: РИСКИ ПО СИСТЕМАМ ==================== */}
@@ -5191,10 +5212,10 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
                   <div>
                     {calcDone && calcResult && (
                       <div style={{ display:'flex', justifyContent:'space-between', fontSize:11, fontWeight:600, color:'var(--text-light)', marginBottom:8, padding:'6px 10px', borderRadius:8, background:'rgba(0,0,0,0.08)', border:'1px solid var(--border)' }}>
-                        <span>Базовый риск: <b style={{ color:'#ef4444' }}>{Math.round(calcResult.riskBeforeSupport)}%</b></span>
-                        <span style={{ color:'var(--accent)' }}>→</span>
-                        <span>После поддержки: <b style={{ color:'#22c55e' }}>{Math.round(calcResult.riskAfterSupport)}%</b></span>
-                        <span style={{ color:'#22c55e', fontSize:12 }}>(-{Math.round(calcResult.riskBeforeSupport - calcResult.riskAfterSupport)}%)</span>
+                        <span>Без поддержки: <b style={{ color:'#ef4444' }}>{Math.round(calcResult.riskBeforeSupport)}%</b></span>
+                        <span style={{ color:'var(--accent)' }}>/</span>
+                        <span>С поддержкой: <b style={{ color:'#22c55e' }}>{Math.round(calcResult.riskAfterSupport)}%</b></span>
+                        <span style={{ color:'#22c55e', fontSize:12 }}>({Math.round(calcResult.riskBeforeSupport)}/{Math.round(calcResult.riskAfterSupport)})</span>
                       </div>
                     )}
                     <div style={{ display:'flex', flexDirection:'column', gap:5 }}>
@@ -5283,18 +5304,18 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
                   </div>
                   <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8, padding:'8px 10px', borderRadius:8, background:'rgba(0,0,0,0.08)', border:'1px solid var(--border)' }}>
                     <div style={{ display:'flex', alignItems:'center', gap:4 }}>
-                      <span style={{ fontSize:9, color:'var(--text-dim)' }}>Риск до</span>
+                      <span style={{ fontSize:9, color:'var(--text-dim)' }}>Без</span>
                       <span style={{ fontSize:13, fontWeight:800, color:'#ef4444' }}>{Math.round(calcResult.riskBeforeSupport)}%</span>
                     </div>
                     <div style={{ display:'flex', alignItems:'center', gap:4 }}>
-                      <span style={{ fontSize:10, color:'var(--accent)', fontWeight:700 }}>→</span>
+                      <span style={{ fontSize:10, color:'var(--accent)', fontWeight:700 }}>/</span>
                     </div>
                     <div style={{ display:'flex', alignItems:'center', gap:4 }}>
-                      <span style={{ fontSize:9, color:'var(--text-dim)' }}>После</span>
+                      <span style={{ fontSize:9, color:'var(--text-dim)' }}>С</span>
                       <span style={{ fontSize:13, fontWeight:800, color:'#22c55e' }}>{Math.round(calcResult.riskAfterSupport)}%</span>
                     </div>
                     <div style={{ padding:'2px 8px', borderRadius:6, background:'rgba(34,197,94,0.1)' }}>
-                      <span style={{ fontSize:10, fontWeight:700, color:'#22c55e' }}>−{Math.round(calcResult.riskBeforeSupport - calcResult.riskAfterSupport)}%</span>
+                      <span style={{ fontSize:10, fontWeight:700, color:'#22c55e' }}>{Math.round(calcResult.riskBeforeSupport)}/{Math.round(calcResult.riskAfterSupport)}</span>
                     </div>
                   </div>
                   <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:8, padding:'6px 10px', borderRadius:6, background:'rgba(139,92,246,0.05)', border:'1px solid rgba(139,92,246,0.1)' }}>
@@ -5431,13 +5452,15 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
                   const colors: Record<string, string> = { basic: '#22c55e', mid: '#eab308', max: '#f97316', boost: '#ef4444' };
                   const levelNames: Record<string, string> = { basic: '🟢 База', mid: '🟡 Средний', max: '🟠 Максимум', boost: '🔴 Усиление' };
                   return (
-                    <button key={l} onClick={() => { setManualLevelSelected(true); setManualLevelSelected(true); setSupportLevel(l); calcSupport(l); }} style={{
+                    <button key={l} onClick={() => { setManualLevelSelected(true); setSupportLevel(l); calcSupport(l); }} style={{
                       padding:'10px 6px', borderRadius:10, border: `2px solid ${active ? colors[l] : 'var(--border)'}`,
-                      background: active ? `${colors[l]}12` : 'var(--bg-secondary)', cursor:'pointer', textAlign:'center', position:'relative',
+                      background: active ? `${colors[l]}20` : 'var(--bg-secondary)', cursor:'pointer', textAlign:'center', position:'relative',
+                      boxShadow: active ? `0 0 12px ${colors[l]}40` : 'none', transform: active ? 'scale(1.02)' : 'none',
+                      transition:'all 0.15s',
                     }}>
-                      <div style={{ fontSize:15, fontWeight:800, color: active ? colors[l] : 'var(--text-dim)', marginBottom:1 }}>{levelNames[l]}</div>
-                      <div style={{ fontSize:8, color: active ? 'var(--text-light)' : 'var(--text-dim)' }}>{SUPPORT_LEVELS[l]?.desc?.slice(0, 40)}...</div>
-                      <div style={{ fontSize:9, color:'var(--text-dim)', marginTop:3 }}>{SUPPORT_LEVELS[l]?.subs?.length} добавок</div>
+                      <div style={{ fontSize:15, fontWeight:800, color: active ? colors[l] : 'var(--text-dim)', marginBottom:1 }}>{levelNames[l]} {active ? '✓' : ''}</div>
+                      <div style={{ fontSize:8, color: active ? colors[l] : 'var(--text-dim)' }}>{SUPPORT_LEVELS[l]?.desc?.slice(0, 40)}...</div>
+                      <div style={{ fontSize:9, color: active ? 'var(--text-light)' : 'var(--text-dim)', marginTop:3 }}>{SUPPORT_LEVELS[l]?.subs?.length} добавок</div>
                       {autoActive && (
                         <div style={{ position:'absolute', top:-4, right:-4, fontSize:8, padding:'1px 4px', borderRadius:4, background:'#8b5cf6', color:'#fff', fontWeight:600 }}>Авто</div>
                       )}
@@ -5484,10 +5507,10 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
               {calcDone && calcResult && (
                 <div style={{ marginTop:8, padding:'10px 12px', borderRadius:8, background:'rgba(0,230,138,0.06)', border:'1px solid rgba(0,230,138,0.15)' }}>
                   <div style={{ display:'flex', justifyContent:'space-between', fontSize:11, fontWeight:600, color:'var(--text-light)', marginBottom:6 }}>
-                    <span>Риск до: <b style={{ color:'#ef4444' }}>{Math.round(calcResult.riskBeforeSupport)}%</b></span>
-                    <span style={{ color:'var(--accent)' }}>→</span>
-                    <span>После: <b style={{ color:'#22c55e' }}>{Math.round(calcResult.riskAfterSupport)}%</b></span>
-                    <span style={{ color:'#22c55e', fontSize:12 }}>(-{Math.round(calcResult.riskBeforeSupport - calcResult.riskAfterSupport)}%)</span>
+                    <span>Без поддержки: <b style={{ color:'#ef4444' }}>{Math.round(calcResult.riskBeforeSupport)}%</b></span>
+                    <span style={{ color:'var(--accent)' }}>/</span>
+                    <span>С поддержкой: <b style={{ color:'#22c55e' }}>{Math.round(calcResult.riskAfterSupport)}%</b></span>
+                    <span style={{ color:'#22c55e', fontSize:12 }}>({Math.round(calcResult.riskBeforeSupport)}/{Math.round(calcResult.riskAfterSupport)})</span>
                   </div>
                 </div>
               )}
@@ -5542,9 +5565,9 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
                     <span style={{ color:'var(--text-light)' }}>Общий риск</span>
                     <span>
                       <span style={{ color:'#ef4444' }}>{Math.round(calcResult.riskBeforeSupport)}%</span>
-                      <span style={{ color:'var(--text-dim)', margin:'0 4px' }}>→</span>
+                      <span style={{ color:'var(--text-dim)', margin:'0 4px' }}>/</span>
                       <span style={{ color:'#22c55e' }}>{Math.round(calcResult.riskAfterSupport)}%</span>
-                      <span style={{ color:'#22c55e', marginLeft:4 }}>(-{Math.round(calcResult.riskBeforeSupport - calcResult.riskAfterSupport)}%)</span>
+                      <span style={{ color:'#22c55e', marginLeft:4 }}>({Math.round(calcResult.riskBeforeSupport)}/{Math.round(calcResult.riskAfterSupport)})</span>
                     </span>
                   </div>
                   {SYSTEM_ORDER.filter(k => calcResult.riskAssessment.systemBreakdown[k] && (calcResult.systemSupport || {})[k] !== undefined).map(sysKey => {
@@ -5556,10 +5579,10 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
                         <span style={{ color:'var(--text-light)' }}>{sysInfo.emoji} {sysInfo.name}</span>
                         <span>
                           <span style={{ color: riskColorFn(sysRaw) }}>{Math.round(sysRaw)}%</span>
-                          <span style={{ color:'var(--text-dim)', margin:'0 3px' }}>→</span>
+                          <span style={{ color:'var(--text-dim)', margin:'0 3px' }}>/</span>
                           <span style={{ color: riskColorFn(sysNet) }}>{Math.round(sysNet)}%</span>
                           {sysRaw !== sysNet && (
-                            <span style={{ color:'#22c55e', marginLeft:3 }}>(-{Math.round(sysRaw - sysNet)}%)</span>
+                            <span style={{ color:'#22c55e', marginLeft:3 }}>({Math.round(sysRaw)}/{Math.round(sysNet)})</span>
                           )}
                         </span>
                       </div>
@@ -5598,7 +5621,12 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
 
             {/* ==================== ДОЗИРОВКИ С РАСЧЁТОМ ПО ВЕСУ ==================== */}
             <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:12, border:'1px solid var(--border)' }}>
-              <h4 style={{ margin:'0 0 8px', fontSize:12, color:'#22c55e' }}>💊 Дозировки ({effectiveLevel?.label || SUPPORT_LEVELS[supportLevel]?.label}) {supportPhase !== 'course' && <span style={{ fontSize:9, color:'#f59e0b', fontWeight:400 }}> · {PHASE_MODS[supportPhase]?.emoji} {PHASE_MODS[supportPhase]?.label}</span>}</h4>
+              <div onClick={() => setExpandedCategories(p => ({ ...p, calc_dose: !(p.calc_dose ?? true) }))} style={{ display:'flex', alignItems:'center', gap:6, cursor:'pointer', marginBottom: (expandedCategories.calc_dose ?? true) ? 8 : 0 }}>
+                <span style={{ fontSize:13 }}>💊</span>
+                <span style={{ flex:1, fontSize:12, fontWeight:700, color:'#22c55e' }}>Дозировки ({effectiveLevel?.label || SUPPORT_LEVELS[supportLevel]?.label}) {supportPhase !== 'course' && <span style={{ fontSize:9, color:'#f59e0b', fontWeight:400 }}> · {PHASE_MODS[supportPhase]?.emoji} {PHASE_MODS[supportPhase]?.label}</span>}</span>
+                <span style={{ fontSize:9, color:'var(--text-dim)', transform: (expandedCategories.calc_dose ?? true) ? 'rotate(180deg)' : 'none', transition:'transform 0.2s' }}>▼</span>
+              </div>
+              {(expandedCategories.calc_dose ?? true) && (<>
               <div style={{ fontSize:8, color:'var(--text-dim)', marginBottom:6 }}>
                 💡 Дозы рассчитаны на вес {weightKg} кг. В скобках — расчёт мг/кг. 🔄 Заменить · ⚡ Усилить
               </div>
@@ -5649,6 +5677,7 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
                   );
                 })}
               </div>
+            </>)}
             </div>
 
           </div>
