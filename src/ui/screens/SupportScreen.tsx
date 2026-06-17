@@ -912,7 +912,6 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   const [infoTab, setInfoTab] = useState<'peptides'|'catalog'|'synergies'|'readystacks'|'interactions'|'research'|'mixcalc'|'neuro'|'joints'|'acne'>('catalog');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedSub, setSelectedSub] = useState<string | null>(null);
-  const [synergyFilter, setSynergyFilter] = useState<string>('all');
   const [systemFilter, setSystemFilter] = useState<string>('all');
   const [supportClassFilter, setSupportClassFilter] = useState<string>('all');
   const [supportTierFilter, setSupportTierFilter] = useState<string>('all');
@@ -1496,17 +1495,6 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
     }
     return list;
   }, [supplementList, searchQuery, systemFilter, supportClassFilter]);
-
-  const filteredSynergies = useMemo(() => {
-    let pairs = supportSynergies;
-    if (synergyFilter !== 'all') {
-      pairs = pairs.filter(p => p.synergyType === synergyFilter);
-    }
-    if (systemFilter !== 'all') {
-      pairs = pairs.filter(p => p.affectedSystems?.includes(systemFilter));
-    }
-    return pairs;
-  }, [synergyFilter, systemFilter, supportSynergies]);
 
   const systemLabels: Record<string, string> = Object.fromEntries(ALL_RISK_SYSTEMS.map(k => [k, SYSTEM_INFO_ALL[k]?.label ?? k]));
 

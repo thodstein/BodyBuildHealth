@@ -6,7 +6,6 @@ import type { RiskResult, MechanismCell, LabPoint, CourseEntry } from '../../cor
 import { calculateRisks, calculateAggregatedRisks, type AggregatedRisk } from '../../engines/risk.engine';
 import { calculateRiskFromAnalyses } from '../../engines/risk-calculator-v2.engine';
 import { calculatePenaltyCoefficients } from '../../engines/labs-penalty.engine';
-import { computeLabIndexDetails } from '../../engines/labs-indices.engine';
 import { getRiskColor } from '../../core/utils/risk-colors';
 import { useDataLink, notifyDataChange } from '../../core/data-link';
 import { getGlobalNoLabs, getNoLabsSystems } from './LabsScreen';
