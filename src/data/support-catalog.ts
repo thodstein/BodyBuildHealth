@@ -1,4 +1,4 @@
-﻿// ===========================================================================
+// ===========================================================================
 // SUPPORT CATALOG — Complete substance database with forms, organs, systems,
 // mechanisms, synergies, conflicts, monitoring, contraindications, side effects.
 // Each substance has ALL forms grouped (no duplicates), tier classification,
@@ -262,7 +262,9 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
         severity: "MEDIUM"
       }
     ],
-    conflicts: [],
+    conflicts: [
+        {with: "charcoal", effect: "Снижение абсорбции", mechanism: "Уголь связывает желчные кислоты", severity: "LOW"},
+      ],
     monitoring: [
       {
         what: "АЛТ/АСТ",
@@ -368,25 +370,25 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
       {
         with: "vitamin_b6",
         effect: "Улучшение усвоения Mg",
-        mechanism: "B6 усиливает транспорт Mg в клетки",
+        mechanism: "B6 усиливает транспорт Магний в клетки",
         severity: "MEDIUM"
       },
       {
         with: "taurine",
         effect: "Синергия расслабления",
-        mechanism: "Таурин + Mg = кардиопротекция и расслабление мышц",
+        mechanism: "Таурин + Магний = кардиопротекция и расслабление мышц",
         severity: "MEDIUM"
       },
       {
         with: "vitamin_d3",
         effect: "Взаимное усвоение",
-        mechanism: "Mg необходим для активации витамина D",
+        mechanism: "Магний необходим для активации витамина D",
         severity: "MEDIUM"
       },
       {
         with: "zinc",
         effect: "Баланс минералов",
-        mechanism: "Сбалансированный приём Zn и Mg",
+        mechanism: "Сбалансированный приём Цинк и Mg",
         severity: "LOW"
       }
     ],
@@ -394,13 +396,13 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
       {
         with: "calcium_high",
         effect: "Конкуренция за всасывание",
-        mechanism: "Ca и Mg конкурируют за транспортёры",
+        mechanism: "Кальций и Магний конкурируют за транспортёры",
         severity: "LOW"
       },
       {
         with: "iron",
         effect: "Раздельный приём",
-        mechanism: "Mg снижает всасывание железа при одновременном приёме",
+        mechanism: "Магний снижает всасывание железа при одновременном приёме",
         severity: "LOW"
       }
     ],
@@ -532,7 +534,9 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
       { with: 'vitamin_e', effect: 'Антиоксидантная синергия', mechanism: 'Se (GPx) + вит. E = двойная защита мембран', severity: 'HIGH' },
       { with: 'nac', effect: 'Глутатионовая система', mechanism: 'Se = GPx, NAC = предшественник глутатиона', severity: 'HIGH' },
     ],
-    conflicts: [],
+    conflicts: [
+        {with: "vitamin_c", effect: "Снижение биодоступности Se", mechanism: "Высокие дозы C окисляют Se", severity: "LOW"},
+      ],
     monitoring: [
       { what: 'Селен сыворотки', when: 'Каждые 12 нед', targetRange: '70-150 нг/мл' },
     ],
@@ -556,7 +560,9 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
       { with: 'nac', effect: 'Комплексная гепатопротекция', mechanism: 'NAC = глутатион, силимарин = мембраны', severity: 'HIGH' },
       { with: 'tudca', effect: 'Максимальная гепатопротекция', mechanism: 'TUDCA + силимарин = полный охват', severity: 'HIGH' },
     ],
-    conflicts: [],
+    conflicts: [
+        {with: "statin_drugs", effect: "Изменение метаболизма статинов", mechanism: "Силимарин ингибирует CYP3A4", severity: "MEDIUM"},
+      ],
     monitoring: [
       { what: 'АЛТ/АСТ', when: 'Каждые 4 нед', targetRange: '<40 Ед/л' },
     ],
@@ -685,7 +691,9 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
       { with: 'coq10', effect: 'Регенерация CoQ10', mechanism: 'АЛЬК восстанавливает окисленный CoQ10', severity: 'MEDIUM' },
       { with: 'vitamin_c', effect: 'Регенерация витамина E', mechanism: 'АЛЬК → вит. C → вит. E', severity: 'MEDIUM' },
     ],
-    conflicts: [],
+    conflicts: [
+        {with: "thyroid_drugs", effect: "Снижение T3", mechanism: "АЛЬК может снижать T3", severity: "MEDIUM"},
+      ],
     monitoring: [],
     contraindications: ['Тяжёлая почечная недостаточность', 'Беременность'],
     sideEffects: ['Тошнота натощак', 'Редко: кожная сыпь', 'Редко: гипогликемия'],
@@ -758,7 +766,9 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
       { with: 'milk_thistle', effect: 'Кишечно-печёночная ось', mechanism: 'Пробиотики улучшают всасывание силимарина', severity: 'LOW' },
       { with: 'vitamin_d3', effect: 'Усиление иммунитета', mechanism: 'Пробиотики + D3 = синергичная иммунная модуляция', severity: 'MEDIUM' },
     ],
-    conflicts: [],
+    conflicts: [
+        {with: "antibiotic_drugs", effect: "Уничтожение пробиотиков", mechanism: "Антибиотики убивают штаммы", severity: "HIGH"},
+      ],
     monitoring: [],
     contraindications: ['Тяжёлый иммунодефицит', 'Центральный венозный катетер (риск бактериемии)'],
     sideEffects: ['Вздутие в начале приёма', 'Редко: диарея', 'Редко: аллергия на штамм'],
@@ -803,7 +813,9 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
       { with: 'msm', effect: 'Противовоспалительная синергия', mechanism: 'MSM снижает воспаление + глюкозамин восстанавливает хрящ', severity: 'MEDIUM' },
       { with: 'collagen', effect: 'Восстановление суставов', mechanism: 'Коллаген + глюкозамин = полный набор для хряща', severity: 'MEDIUM' },
     ],
-    conflicts: [],
+    conflicts: [
+        {with: "antidiabetic_drugs", effect: "Инсулинорезистентность", mechanism: "Глюкозамин может ухудшать", severity: "LOW"},
+      ],
     monitoring: [],
     contraindications: ['Аллергия на моллюсков (для хондроитина из моллюсков)', 'С осторожностью при диабете'],
     sideEffects: ['Редко: дискомфорт в ЖКТ', 'Редко: аллергия'],
@@ -1141,7 +1153,9 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
       { with: "vitamin_b3", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
       { with: "pterostilbene", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" }
     ],
-    conflicts: [],
+    conflicts: [
+        {with: "statin_drugs", effect: "Риск миопатии", mechanism: "Ниацин + статины — мышцы", severity: "HIGH"},
+      ],
     monitoring: [
       { what: 'Липидограмма', when: 'Каждые 8 нед', targetRange: 'ЛПНП<3.0 ЛПВП>1.0' }
     ],
@@ -1255,7 +1269,9 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
       { with: "omega3", effect: "Витамин Е защищает Омега-3 от перекисного окисления", mechanism: "Комбинированное действие", severity: "MEDIUM" },
       { with: "astaxanthin", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" }
     ],
-    conflicts: [],
+    conflicts: [
+        {with: "anticoagulant_drugs", effect: "Усиление антикоагуляции", mechanism: "E снижает агрегацию тромбоцитов", severity: "MEDIUM"},
+      ],
     monitoring: [
       { what: 'Витамин Е в крови', when: 'Каждые 12 нед', targetRange: '12-46 мкмоль/л' }
     ],
@@ -1304,7 +1320,11 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['neuro', 'endocrine', 'reproductive'],
     mechanisms: ['INSULIN_SIGNALING', 'SEROTONIN_MODULATION', 'LIPID_SIGNALING', 'OOCYTE_MATURATION'],
     description: 'Инозитол — второй мессенджер инсулина и серотонина. Улучшает чувствительность к инсулину. На курсе поддерживает инсулиновую чувствительность.',
-    synergies: [],
+    synergies: [
+        {with: "vitamin_b_complex", effect: "Сигнальные пути", mechanism: "Инозитол — вторичный мессенджер", severity: "MEDIUM"},
+        {with: "choline", effect: "Фосфолипидный обмен", mechanism: "Оба — фосфатидилинозитол", severity: "MEDIUM"},
+        {with: "folic_acid", effect: "Репродуктивное здоровье", mechanism: "Инозитол + фолат — СПКЯ", severity: "HIGH"},
+      ],
     conflicts: [],
     monitoring: [
       { what: 'Инсулин натощак', when: 'Каждые 8 нед', targetRange: '<12 мкЕд/мл' }
@@ -1382,7 +1402,10 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['hepatic', 'neuro', 'immune', 'metabolic'],
     mechanisms: ['MICRONUTRIENT_REPLETION', 'COFACTOR_SUPPORT', 'ANTIOXIDANT_NETWORK', 'METHYLATION'],
     description: 'Мультивитаминный комплекс — базовая добавка для покрытия дефицитов. На курсе ААС потребность в витаминах возрастает на 30-50%.',
-    synergies: [],
+    synergies: [
+        {with: "mineral_complex", effect: "Полное покрытие микронутриентов", mechanism: "Витамины + минералы — кофакторы", severity: "HIGH"},
+        {with: "omega3", effect: "Базовая поддержка", mechanism: "Жирорастворимые нужны омега-3", severity: "MEDIUM"},
+      ],
     conflicts: [],
     monitoring: [
       { what: 'ОАК', when: 'Каждые 8 нед' },
@@ -1437,7 +1460,9 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
       { with: "vitamin_b6", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
       { with: "saw_palmetto", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" }
     ],
-    conflicts: [],
+    conflicts: [
+        {with: "hormonal_therapy", effect: "Взаимодействие с гормонами", mechanism: "Может влиять на гормональный баланс", severity: "MEDIUM"},
+      ],
     monitoring: [
       { what: 'ПСА', when: 'Каждые 12 нед', targetRange: '<4 нг/мл' },
       { what: 'Свободный тестостерон', when: 'Каждые 8 нед' }
@@ -1464,7 +1489,9 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     synergies: [
       { with: "testosterone", effect: "ХГЧ + Тестостерон — восстановление оси ГРГ-ЛГ", mechanism: "Комбинированное действие", severity: "MEDIUM" }
     ],
-    conflicts: [],
+    conflicts: [
+        {with: "aromatase_inhibitor", effect: "Десенситизация", mechanism: "Высокие дозы ХГЧ", severity: "HIGH"},
+      ],
     monitoring: [
       { what: 'Тестостерон общий', when: 'Каждые 4 нед', targetRange: '12-33 нмоль/л' },
       { what: 'Эстрадиол', when: 'Каждые 4 нед', targetRange: '<200 пмоль/л' }
@@ -1583,7 +1610,11 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['immune', 'hepatic', 'metabolic'],
     mechanisms: ['INTESTINAL_CELL_FUEL', 'IMMUNE_CELL_PROLIFERATION', 'GLUTATHIONE_PRECURSOR', 'NITROGEN_TRANSPORT'],
     description: 'Глутамин — условно-незаменимая аминокислота, топливо для энтероцитов. Предшественник глутатиона. На курсе поддерживает кишечный барьер и иммунитет.',
-    synergies: [],
+    synergies: [
+        {with: "probiotics", effect: "Здоровье кишечника", mechanism: "Глутамин — топливо энтероцитов", severity: "HIGH"},
+        {with: "vitamin_c", effect: "Иммунитет кишечника", mechanism: "Оба поддерживают иммунитет слизистых", severity: "MEDIUM"},
+        {with: "zinc_carnosine", effect: "Заживление ЖКТ", mechanism: "Оба восстанавливают барьер", severity: "MEDIUM"},
+      ],
     conflicts: [],
     monitoring: [
       { what: 'Глутамин в плазме', when: 'Каждые 12 нед', targetRange: '500-900 мкмоль/л' }
@@ -1607,8 +1638,12 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['hepatic', 'renal', 'metabolic'],
     mechanisms: ['SULFITE_OXIDASE', 'XANTHINE_OXIDASE', 'DETOXIFICATION'],
     description: 'Молибден — кофактор сульфитоксидазы и ксантиноксидазы, критичен для детоксикации сульфитов.',
-    synergies: [],
-    conflicts: [],
+    synergies: [
+        {with: "sulfur_compounds", effect: "Метаболизм сульфитов", mechanism: "Молибден — кофактор сульфитоксидазы", severity: "MEDIUM"},
+      ],
+    conflicts: [
+        {with: "copper", effect: "Конкуренция", mechanism: "Высокие дозы Молибден снижают Cu", severity: "MEDIUM"},
+      ],
     monitoring: [
       { what: 'Мочевая кислота', when: 'Каждые 12 нед', targetRange: '<420 мкмоль/л' }
     ],
@@ -1724,7 +1759,10 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['renal', 'cardio', 'metabolic'],
     mechanisms: ['ELECTROLYTE_BALANCE', 'FLUID_REGULATION', 'BLOOD_PRESSURE', 'NERVE_SIGNALING'],
     description: 'Натрий — основной внеклеточный электролит. На курсе ААС важен для электролитного баланса.',
-    synergies: [],
+    synergies: [
+        {with: "potassium", effect: "Электролитный баланс", mechanism: "Натрий/Калий насос — основа клетки", severity: "HIGH"},
+        {with: "magnesium", effect: "Нервно-мышечная проводимость", mechanism: "Оба — критичные электролиты", severity: "MEDIUM"},
+      ],
     conflicts: [
       { with: "lithium", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "HIGH" },
       { with: "magnesium", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "LOW" }
@@ -1751,8 +1789,13 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['hepatic', 'musculoskeletal', 'metabolic'],
     mechanisms: ['SOD_MITOCHONDRIAL', 'BONE_FORMATION', 'GLUCONEOGENESIS', 'COLLAGEN_SYNTHESIS'],
     description: 'Марганец — кофактор митохондриальной СОД. На курсе ААС защищает суставы.',
-    synergies: [],
-    conflicts: [],
+    synergies: [
+        {with: "glucosamine", effect: "Синтез хряща", mechanism: "Марганец — кофактор гликозилтрансфераз", severity: "MEDIUM"},
+        {with: "chondroitin", effect: "Структура хряща", mechanism: "Марганец — кофактор синтеза ГАГ", severity: "MEDIUM"},
+      ],
+    conflicts: [
+        {with: "iron", effect: "Конкуренция за всасывание", mechanism: "Оба используют DMT1", severity: "MEDIUM"},
+      ],
     monitoring: [
       { what: 'Марганец в крови', when: 'Каждые 12 нед' }
     ],
@@ -1806,7 +1849,10 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['neuro'],
     mechanisms: ['MOOD_STABILIZATION', 'NEUROPROTECTION', 'GSK3_INHIBITION', 'BDNF_INCREASE'],
     description: 'Литий в микродозах — нейропротектор, стабилизирует настроение через ингибирование GSK-3b и повышение BDNF.',
-    synergies: [],
+    synergies: [
+        {with: "omega3", effect: "Нейропротекция", mechanism: "Оба поддерживают мозг", severity: "MEDIUM"},
+        {with: "vitamin_b_complex", effect: "Стабильность настроения", mechanism: "Литий + B — нейротрансмиттеры", severity: "MEDIUM"},
+      ],
     conflicts: [
       { with: "sodium", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "HIGH" },
       { with: "nsaid_drugs", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "HIGH" },
@@ -1835,7 +1881,9 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['hepatic', 'endocrine', 'metabolic'],
     mechanisms: ['INSULIN_MIMETIC', 'GLUCONEOGENESIS_INHIBITION', 'GLYCOGEN_SYNTHESIS', 'PTP_INHIBITION'],
     description: 'Ванадий — инсулиномиметик. На курсе ААС поддерживает углеводный обмен.',
-    synergies: [],
+    synergies: [
+        {with: "chromium", effect: "Метаболизм глюкозы", mechanism: "Оба имитируют инсулин", severity: "MEDIUM"},
+      ],
     conflicts: [],
     monitoring: [
       { what: 'Глюкоза натощак', when: 'Каждые 4 нед', targetRange: '<6.1 ммоль/л' }
@@ -1859,7 +1907,10 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['musculoskeletal', 'renal', 'metabolic'],
     mechanisms: ['BONE_MINERALIZATION', 'ATP_SYNTHESIS', 'PHOSPHOLIPID_SYNTHESIS', 'ENERGY_PRODUCTION'],
     description: 'Фосфор — ключевой компонент костей и АТФ. На курсе ААС поддерживает костную ткань.',
-    synergies: [],
+    synergies: [
+        {with: "calcium", effect: "Костная минерализация", mechanism: "Кальций:Фосфор = 2:1 для костей", severity: "HIGH"},
+        {with: "vitamin_d3", effect: "Всасывание фосфора", mechanism: "Витамин D3 регулирует фосфатный транспорт", severity: "MEDIUM"},
+      ],
     conflicts: [
       { with: "magnesium", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "LOW" }
     ],
@@ -1911,7 +1962,9 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['hepatic', 'immune', 'metabolic'],
     mechanisms: ['ENZYME_COFACTOR', 'IMMUNE_FUNCTION', 'ANTIOXIDANT_DEFENSE', 'HORMONE_SYNTHESIS'],
     description: 'Комплекс микроэлементов (Se, Mn, Mo, Cr, V, B, Si) — обеспечивает работу 300+ ферментов.',
-    synergies: [],
+    synergies: [
+        {with: "vitamin_complex", effect: "Полный спектр", mechanism: "Следовые элементы — кофакторы", severity: "MEDIUM"},
+      ],
     conflicts: [],
     monitoring: [
       { what: 'Микроэлементы в волосах', when: 'Каждые 12 нед' }
@@ -1935,7 +1988,10 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['endocrine', 'metabolic'],
     mechanisms: ['INSULIN_SENSITIVITY', 'GLUCOSE_METABOLISM', 'GLYCOGEN_SYNTHESIS', 'LIPID_METABOLISM'],
     description: 'Хром — усиливает действие инсулина через хромодулин. На курсе ААС поддерживает инсулиновую чувствительность.',
-    synergies: [],
+    synergies: [
+        {with: "vitamin_b3", effect: "Метаболизм глюкозы", mechanism: "Хром + ниацин — толерантность к глюкозе", severity: "MEDIUM"},
+        {with: "vanadium", effect: "Инсулиноподобная активность", mechanism: "Оба усиливают инсулин", severity: "MEDIUM"},
+      ],
     conflicts: [],
     monitoring: [
       { what: 'Глюкоза натощак', when: 'Каждые 8 нед', targetRange: '<6.1 ммоль/л' },
@@ -1960,7 +2016,9 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['hepatic', 'renal', 'musculoskeletal'],
     mechanisms: ['MINERAL_REPLETION', 'ENZYME_ACTIVATION', 'PH_BALANCE', 'ELECTROLYTE_SUPPORT'],
     description: 'Коллоидные минералы — жидкая форма 70+ микроэлементов с высокой биодоступностью.',
-    synergies: [],
+    synergies: [
+        {with: "vitamin_complex", effect: "Полный минеральный спектр", mechanism: "Коллоидные минералы — наноразмерные", severity: "MEDIUM"},
+      ],
     conflicts: [
       { with: "prebiotics", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "LOW" },
       { with: "ppi_drugs", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "HIGH" },
@@ -1988,8 +2046,13 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['musculoskeletal'],
     mechanisms: ['BONE_FORMATION', 'OSTEOCLAST_INHIBITION', 'CALCIUM_ABSORPTION', 'BONE_MINERAL_DENSITY'],
     description: 'Стронций (ренелат) — увеличивает костное формирование и подавляет резорбцию.',
-    synergies: [],
-    conflicts: [],
+    synergies: [
+        {with: "vitamin_d3", effect: "Костная плотность", mechanism: "Стронций замещает Ca, Витамин D3 — всасывание", severity: "MEDIUM"},
+        {with: "vitamin_k2", effect: "Правильная минерализация", mechanism: "Витамин K2 направляет минералы в кости", severity: "MEDIUM"},
+      ],
+    conflicts: [
+        {with: "calcium", effect: "Конкуренция за всасывание", mechanism: "Принимать в разное время", severity: "MEDIUM"},
+      ],
     monitoring: [
       { what: 'Денситометрия', when: 'Каждые 12 мес' },
       { what: 'Кальций', when: 'Каждые 12 нед', targetRange: '2.1-2.6 ммоль/л' }
@@ -2016,7 +2079,9 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     synergies: [
       { with: "omega6", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" }
     ],
-    conflicts: [],
+    conflicts: [
+        {with: "omega3_excess", effect: "Нарушение баланса ЖК", mechanism: "Избыток омега-6 = воспаление", severity: "MEDIUM"},
+      ],
     monitoring: [
       { what: 'Кожные покровы', when: 'Субъективно' }
     ],
@@ -2039,7 +2104,10 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['hepatic', 'metabolic'],
     mechanisms: ['MUCOSA_PROTECTION', 'LIPID_METABOLISM', 'SKIN_BARRIER', 'INSULIN_SENSITIVITY'],
     description: 'Омега-7 — из облепихи. Защищает слизистые и кожу. На курсе ААС — поддержка слизистых ЖКТ.',
-    synergies: [],
+    synergies: [
+        {with: "omega3", effect: "Комплексная ЖК поддержка", mechanism: "Омега-7 — слизистые, омега-3 — воспаление", severity: "MEDIUM"},
+        {with: "probiotics", effect: "Здоровье слизистых", mechanism: "Оба поддерживают кишечный барьер", severity: "MEDIUM"},
+      ],
     conflicts: [],
     monitoring: [
       { what: 'Кожа/слизистые', when: 'Субъективно' }
@@ -2093,7 +2161,10 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['metabolic', 'endocrine'],
     mechanisms: ['FAT_OXIDATION', 'LEAN_MASS_PRESERVATION', 'INSULIN_SENSITIVITY', 'ANTI_INFLAMMATORY'],
     description: 'КЛА — улучшает композицию тела через стимуляцию окисления жиров и сохранение сухой массы.',
-    synergies: [],
+    synergies: [
+        {with: "omega3", effect: "Состав тела", mechanism: "КЛК + омега-3 — жировой метаболизм", severity: "MEDIUM"},
+        {with: "l_carnitine", effect: "Окисление жиров", mechanism: "Оба способствуют липолизу", severity: "MEDIUM"},
+      ],
     conflicts: [],
     monitoring: [
       { what: 'Жировая масса', when: 'Каждые 4 нед' },
@@ -2118,7 +2189,10 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['hepatic', 'metabolic', 'neuro'],
     mechanisms: ['KETONE_PRODUCTION', 'QUICK_ENERGY', 'LIPID_METABOLISM', 'MCT_KETOSIS'],
     description: 'МСТ масло — среднецепочечные триглицериды, быстро конвертируются в кетоны. На курсе обеспечивает быструю энергию.',
-    synergies: [],
+    synergies: [
+        {with: "l_carnitine", effect: "Производство кетонов", mechanism: "МСТ → кетоны, L-карнитин — транспорт", severity: "MEDIUM"},
+        {with: "coq10", effect: "Энергетический метаболизм", mechanism: "МСТ — топливо, CoQ10 — АТФ", severity: "LOW"},
+      ],
     conflicts: [
       { with: "antidiabetic_drugs", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "LOW" },
       { with: "electrolyte_complex", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "LOW" }
@@ -2145,7 +2219,10 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['musculoskeletal'],
     mechanisms: ['SKIN_BARRIER', 'JOINT_LUBRICATION', 'CELL_SIGNALING', 'APOPTOSIS_REGULATION'],
     description: 'Церамиды — сфинголипиды, ключевые компоненты кожного барьера и суставной жидкости.',
-    synergies: [],
+    synergies: [
+        {with: "hyaluronic", effect: "Увлажнение кожи", mechanism: "Церамиды — барьер, гиалуронка — увлажнение", severity: "MEDIUM"},
+        {with: "collagen", effect: "Структурная поддержка кожи", mechanism: "Оба — компоненты матрикса", severity: "MEDIUM"},
+      ],
     conflicts: [],
     monitoring: [
       { what: 'Кожа/суставы', when: 'Субъективно' }
@@ -2169,7 +2246,11 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['hepatic', 'metabolic'],
     mechanisms: ['GUT_BARRIER_INTEGRITY', 'ANTI_INFLAMMATORY', 'HDAC_INHIBITION', 'COLONOCYTE_FUEL'],
     description: 'Бутират — короткоцепочечная жирная кислота, главный энергетический субстрат колоноцитов. Укрепляет кишечный барьер.',
-    synergies: [],
+    synergies: [
+        {with: "probiotics", effect: "Здоровье кишечника", mechanism: "Бутират — топливо колоноцитов", severity: "HIGH"},
+        {with: "fiber", effect: "Производство бутирата", mechanism: "Клетчатка → бутират", severity: "MEDIUM"},
+        {with: "glutamine", effect: "Заживление кишечника", mechanism: "Оба питают клетки", severity: "MEDIUM"},
+      ],
     conflicts: [],
     monitoring: [
       { what: 'Калпротектин', when: 'Каждые 8 нед' }
@@ -2280,7 +2361,11 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['neuro', 'metabolic'],
     mechanisms: ['SEROTONIN_PRECURSOR', 'MELATONIN_SYNTHESIS', 'SLEEP_IMPROVEMENT', 'MOOD_REGULATION'],
     description: 'Л-Триптофан — предшественник серотонина и мелатонина. Улучшает сон и настроение.',
-    synergies: [],
+    synergies: [
+        {with: "vitamin_b6", effect: "Синтез серотонина", mechanism: "B6 — кофактор декарбоксилазы", severity: "HIGH"},
+        {with: "magnesium", effect: "Улучшение сна", mechanism: "Триптофан → мелатонин + Mg", severity: "MEDIUM"},
+        {with: "vitamin_b3", effect: "Синтез ниацина", mechanism: "Триптофан → ниацин", severity: "MEDIUM"},
+      ],
     conflicts: [
       { with: "x5htp", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "LOW" },
       { with: "antidepressant_drugs", effect: "СИОЗС + Триптофан — риск серотонинового синдрома", mechanism: "Комбинированное действие", severity: "HIGH" }
@@ -2401,7 +2486,9 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     synergies: [
       { with: "creatine", effect: "β-аланин + Креатин — буфер + АТФ", mechanism: "Комбинированное действие", severity: "MEDIUM" }
     ],
-    conflicts: [],
+    conflicts: [
+        {with: "taurine", effect: "Конкуренция за транспорт", mechanism: "Бета-аланин конкурирует с таурином", severity: "MEDIUM"},
+      ],
     monitoring: [
       { what: 'Карнозин в мышцах', when: 'Каждые 12 нед' }
     ],
@@ -2453,7 +2540,9 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     synergies: [
       { with: "citrulline", effect: "Цитруллин рециклирует аргинин → больше NO", mechanism: "Комбинированное действие", severity: "MEDIUM" }
     ],
-    conflicts: [],
+    conflicts: [
+        {with: "antiviral_drugs", effect: "Взаимодействие", mechanism: "Аргинин может усиливать репликацию вирусов", severity: "LOW"},
+      ],
     monitoring: [
       { what: 'Артериальное давление', when: 'Каждые 8 нед' }
     ],
@@ -2475,7 +2564,9 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['neuro', 'metabolic'],
     mechanisms: ['NITRIC_OXIDE_MODULATION', 'NMDA_REGULATION', 'NORADRENALINE_RELEASE', 'INSULIN_SENSITIVITY'],
     description: 'Агматин — метаболит аргинина, нейромодулятор. Регулирует оксид азота и NMDA-рецепторы. Улучшает памп и настроение.',
-    synergies: [],
+    synergies: [
+        {with: "creatine", effect: "Производительность", mechanism: "Агматин модулирует NMDA", severity: "MEDIUM"},
+      ],
     conflicts: [],
     monitoring: [
       { what: 'Настроение/памп', when: 'Субъективно' }
@@ -2499,8 +2590,13 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['musculoskeletal', 'hepatic', 'metabolic'],
     mechanisms: ['MUSCLE_PROTEIN_SYNTHESIS', 'MUSCLE_BREAKDOWN_PREVENTION', 'ENERGY_PRODUCTION', 'MTOR_ACTIVATION'],
     description: 'BCAA (лейцин, изолейцин, валин) — стимулируют синтез белка через mTOR. Предотвращают катаболизм на курсе ААС.',
-    synergies: [],
-    conflicts: [],
+    synergies: [
+        {with: "creatine", effect: "Антикатаболическое действие", mechanism: "BCAA + креатин — мышцы", severity: "MEDIUM"},
+        {with: "vitamin_b6", effect: "Метаболизм BCAA", mechanism: "B6 — кофактор трансаминирования", severity: "MEDIUM"},
+      ],
+    conflicts: [
+        {with: "tryptophan", effect: "Конкуренция за транспорт", mechanism: "BCAA конкурируют с триптофаном за LAT1", severity: "MEDIUM"},
+      ],
     monitoring: [
       { what: 'Мышечная масса', when: 'Каждые 4 нед' }
     ],
@@ -2523,7 +2619,10 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['musculoskeletal', 'metabolic'],
     mechanisms: ['MUSCLE_BREAKDOWN_PREVENTION', 'MTOR_ACTIVATION', 'CORTISOL_ANTAGONISM', 'RECOVERY_ENHANCEMENT'],
     description: 'HMB — метаболит лейцина, мощный антикатаболик. Предотвращает распад мышц при калорийном дефиците и стрессе.',
-    synergies: [],
+    synergies: [
+        {with: "creatine", effect: "Максимальное антикатаболическое", mechanism: "HMB + креатин — мышцы", severity: "HIGH"},
+        {with: "vitamin_d3", effect: "Синтез белка", mechanism: "Витамин D3 усиливает mTOR", severity: "MEDIUM"},
+      ],
     conflicts: [],
     monitoring: [
       { what: 'Мышечная масса', when: 'Каждые 4 нед' }
@@ -2573,7 +2672,10 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['musculoskeletal', 'metabolic'],
     mechanisms: ['MUSCLE_PROTEIN_SYNTHESIS', 'MTOR_ACTIVATION', 'ESSENTIAL_AMINO_ACID_SUPPLY', 'RECOVERY_ENHANCEMENT'],
     description: 'EAA — полный набор незаменимых аминокислот для синтеза белка. Альтернатива протеину с быстрой абсорбцией.',
-    synergies: [],
+    synergies: [
+        {with: "creatine", effect: "Синтез белка", mechanism: "EAA + креатин — анаболизм", severity: "MEDIUM"},
+        {with: "vitamin_b6", effect: "Метаболизм аминокислот", mechanism: "B6 — кофактор трансаминаз", severity: "MEDIUM"},
+      ],
     conflicts: [],
     monitoring: [
       { what: 'Мышечная масса', when: 'Каждые 4 нед' }
@@ -2622,8 +2724,14 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['neuro'],
     mechanisms: ['GABA_B_AGONIST', 'ANXIOLYTIC', 'COGNITIVE_ENHANCEMENT', 'SLEEP_IMPROVEMENT'],
     description: 'Фенибут — производное ГАМК с фенильным кольцом, проникает через ГГБ. Снижает тревожность, улучшает сон. Риск зависимости.',
-    synergies: [],
-    conflicts: [],
+    synergies: [
+        {with: "magnesium", effect: "Расслабление", mechanism: "Оба усиливают GABA", severity: "MEDIUM"},
+        {with: "theanine", effect: "Фокус без седации", mechanism: "Разные GABA-механизмы", severity: "MEDIUM"},
+      ],
+    conflicts: [
+        {with: "sedative_drugs", effect: "Опасная седация", mechanism: "Фенибут + бензодиазепины", severity: "HIGH"},
+        {with: "alcohol", effect: "Депрессия ЦНС", mechanism: "Оба — депрессанты ЦНС", severity: "HIGH"},
+      ],
     monitoring: [
       { what: 'Тревожность/сон', when: 'Субъективно' }
     ],
@@ -2645,7 +2753,10 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['musculoskeletal', 'neuro', 'metabolic'],
     mechanisms: ['PH_BUFFER', 'ANTIOXIDANT', 'ANTI_GLYCATION', 'MUSCLE_ENDURANCE'],
     description: 'Карнозин — дипептид (бета-аланин + гистидин), внутриклеточный буфер и антиоксидант. Предотвращает гликирование.',
-    synergies: [],
+    synergies: [
+        {with: "beta_alanine", effect: "Увеличение запасов карнозина", mechanism: "Бета-аланин → карнозин", severity: "HIGH"},
+        {with: "creatine", effect: "Буферинг и энергетика", mechanism: "Карнозин — буфер, креатин — АТФ", severity: "MEDIUM"},
+      ],
     conflicts: [],
     monitoring: [
       { what: 'Мышечная выносливость', when: 'Субъективно' }
@@ -2668,7 +2779,9 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['hepatic', 'metabolic'],
     mechanisms: ['GLUCONEOGENESIS', 'AMINO_ACID_METABOLISM', 'LIVER_PROTECTION', 'GLUCOSE_REGULATION'],
     description: 'Аланин — заменимая аминокислота, ключевой субстрат глюконеогенеза в печени. Поддерживает уровень глюкозы.',
-    synergies: [],
+    synergies: [
+        {with: "glycine", effect: "Метаболическая поддержка", mechanism: "Оба — заменимые аминокислоты", severity: "LOW"},
+      ],
     conflicts: [],
     monitoring: [
       { what: 'Глюкоза натощак', when: 'Каждые 8 нед' }
@@ -2691,7 +2804,9 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['neuro'],
     mechanisms: ['DOPAMINE_PRECURSOR', 'NOREPINEPHRINE_PRECURSOR', 'MOTOR_FUNCTION', 'MOOD_REGULATION'],
     description: 'Л-ДОФА — прямой предшественник дофамина. Используется для кратковременного повышения дофамина. Ряд побочных эффектов.',
-    synergies: [],
+    synergies: [
+        {with: "vitamin_b6", effect: "Синтез дофамина", mechanism: "B6 — кофактор декарбоксилазы", severity: "HIGH"},
+      ],
     conflicts: [
       { with: "tyrosine", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "LOW" }
     ],
@@ -2743,7 +2858,10 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['hepatic', 'metabolic'],
     mechanisms: ['METHYL_DONATION', 'LIPOTROPIC_EFFECT', 'GLUTATHIONE_PRECURSOR', 'HOMOCYSTEINE_SOURCE'],
     description: 'Метионин — незаменимая аминокислота, донор метильных групп и липотропик. Предшественник SAMe и глутатиона.',
-    synergies: [],
+    synergies: [
+        {with: "betaine", effect: "Метилирование", mechanism: "Метионин → SAMe", severity: "HIGH"},
+        {with: "vitamin_b_complex", effect: "Гомоцистеин", mechanism: "B6, B12, фолат — реметилирование", severity: "MEDIUM"},
+      ],
     conflicts: [],
     monitoring: [
       { what: 'Гомоцистеин', when: 'Каждые 8 нед', targetRange: '<15 мкмоль/л' }
@@ -2767,8 +2885,14 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['hepatic', 'neuro'],
     mechanisms: ['METHYL_DONATION', 'ANTIDEPRESSANT', 'JOINT_PROTECTION', 'LIVER_DETOXIFICATION'],
     description: 'SAMe — главный донор метильных групп в организме. Антидепрессант, гепатопротектор, хондропротектор.',
-    synergies: [],
-    conflicts: [],
+    synergies: [
+        {with: "vitamin_b_complex", effect: "Метилирование и настроение", mechanism: "SAMe + B-кофакторы", severity: "HIGH"},
+        {with: "betaine", effect: "Цикл метилирования", mechanism: "Бетаин — альтернативный путь", severity: "MEDIUM"},
+        {with: "curcumin", effect: "Противовоспалительное + антидепрессивное", mechanism: "Оба модулируют воспаление", severity: "MEDIUM"},
+      ],
+    conflicts: [
+        {with: "antidepressant_drugs", effect: "Серотониновый синдром", mechanism: "SAMe + СИОЗС", severity: "HIGH"},
+      ],
     monitoring: [
       { what: 'Настроение', when: 'Субъективно' },
       { what: 'АЛТ/АСТ', when: 'Каждые 4 нед', targetRange: '<40 Ед/л' }
@@ -2987,7 +3111,11 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['neuro', 'musculoskeletal'],
     mechanisms: ['COLLAGEN_SYNTHESIS', 'NEUROPROTECTION', 'CIRCULATION_ENHANCEMENT', 'ANXIOLYTIC'],
     description: 'Готу Кола — ноотропный адаптоген, стимулирует синтез коллагена, улучшает кровообращение и память.',
-    synergies: [],
+    synergies: [
+        {with: "bacopa", effect: "Когнитивная функция", mechanism: "Оба — ноотропы", severity: "MEDIUM"},
+        {with: "ginkgo", effect: "Кровообращение мозга", mechanism: "Оба улучшают кровоток", severity: "MEDIUM"},
+        {with: "collagen", effect: "Заживление ран", mechanism: "Готу кола + синтез коллагена", severity: "MEDIUM"},
+      ],
     conflicts: [],
     monitoring: [
       { what: 'Когниция/кожа', when: 'Субъективно' }
@@ -3010,7 +3138,10 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['musculoskeletal', 'metabolic'],
     mechanisms: ['PROTEIN_SYNTHESIS', 'MTOR_ACTIVATION', 'LEAN_MASS_GAIN', 'INSULIN_SENSITIVITY'],
     description: 'Экдистерон — фитостероид из левзеи, стимулирует синтез белка через mTOR без андрогенных эффектов. Улучшает композицию тела.',
-    synergies: [],
+    synergies: [
+        {with: "vitamin_d3", effect: "Сигнальные пути роста", mechanism: "Экдистерон + D3", severity: "MEDIUM"},
+        {with: "creatine", effect: "Анаболическая синергия", mechanism: "Оба активируют синтез белка", severity: "MEDIUM"},
+      ],
     conflicts: [],
     monitoring: [
       { what: 'Мышечная масса', when: 'Каждые 4 нед' }
@@ -3034,7 +3165,11 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['neuro', 'renal', 'metabolic'],
     mechanisms: ['FULVIC_ACID_DELIVERY', 'MINERAL_REPLETION', 'MITOCHONDRIAL_ENHANCEMENT', 'TESTOSTERONE_SUPPORT'],
     description: 'Шиладжит — минеральная смола из Гималаев, содержит фульвокислоты и 80+ минералов. Повышает тестостерон и энергетику.',
-    synergies: [],
+    synergies: [
+        {with: "coq10", effect: "Усиление АТФ", mechanism: "Мумиё повышает биодоступность CoQ10", severity: "MEDIUM"},
+        {with: "ashwagandha", effect: "Адаптогенный эффект", mechanism: "Оба модулируют стресс", severity: "MEDIUM"},
+        {with: "iron", effect: "Предотвращение анемии", mechanism: "Мумиё содержит Fe", severity: "MEDIUM"},
+      ],
     conflicts: [],
     monitoring: [
       { what: 'Тестостерон общий', when: 'Каждые 8 нед' }
@@ -3210,7 +3345,9 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
       { with: "polyphenol_complex", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
       { with: "mushroom_complex", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" }
     ],
-    conflicts: [],
+    conflicts: [
+        {with: "iron", effect: "Снижение всасывания Fe", mechanism: "Дубильные вещества связывают Fe", severity: "MEDIUM"},
+      ],
     monitoring: [
       { what: 'АЛТ/АСТ', when: 'Каждые 4 нед', targetRange: '<40 Ед/л' }
     ],
@@ -3294,7 +3431,9 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
       { with: "ginseng", effect: "Женьшень + Гинкго — энергия + кровоток", mechanism: "Комбинированное действие", severity: "MEDIUM" },
       { with: "vinpocetine", effect: "Гинкго + Винпоцетин — двойной мозговой кровоток", mechanism: "Комбинированное действие", severity: "MEDIUM" }
     ],
-    conflicts: [],
+    conflicts: [
+        {with: "anticoagulant_drugs", effect: "Риск кровотечения", mechanism: "Гинкго снижает агрегацию тромбоцитов", severity: "HIGH"},
+      ],
     monitoring: [
       { what: 'Когниция/память', when: 'Субъективно' }
     ],
@@ -3317,8 +3456,13 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['reproductive', 'endocrine'],
     mechanisms: ['GH_RELEASING_IGH_INCREASE', 'LH_RELEASE', 'MUSCLE_GROWTH', 'FAT_LOSS'],
     description: 'CJC-1295 с модагриком — пептид GHRH-аналог, стимулирует выброс ГР и ИФР-1. Улучшает композицию тела и восстановление.',
-    synergies: [],
-    conflicts: [],
+    synergies: [
+        {with: "ipamorelin", effect: "Максимальная стимуляция GH", mechanism: "CJC-1295 + ипаморелин — GHRH+GHRP", severity: "HIGH"},
+        {with: "ghrp6", effect: "Усиление пульсации GH", mechanism: "GHRH+GHRP = синергия GH", severity: "HIGH"},
+      ],
+    conflicts: [
+        {with: "somatostatin_analogues", effect: "Подавление GH", mechanism: "Соматостатин блокирует GH", severity: "HIGH"},
+      ],
     monitoring: [
       { what: 'ИФР-1', when: 'Каждые 4 нед', targetRange: '150-450 нг/мл' }
     ],
@@ -3344,7 +3488,9 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     synergies: [
       { with: "insulin", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" }
     ],
-    conflicts: [],
+    conflicts: [
+        {with: "somatostatin_analogues", effect: "Блокировка GH", mechanism: "Соматостатин блокирует GH", severity: "HIGH"},
+      ],
     monitoring: [
       { what: 'ИФР-1', when: 'Каждые 4 нед' }
     ],
@@ -3366,8 +3512,13 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['reproductive', 'endocrine'],
     mechanisms: ['GH_RELEASE', 'CORTISOL_MODULATION', 'APPETITE_STIMULATION', 'MUSCLE_RECOVERY'],
     description: 'GHRP-2 — секретагог ГР, стимулирует аппетит и восстановление. Менее селективный чем ипаморелин.',
-    synergies: [],
-    conflicts: [],
+    synergies: [
+        {with: "cjc1295", effect: "Максимальная стимуляция GH", mechanism: "GHRH+GHRP = синергия GH", severity: "HIGH"},
+        {with: "ipamorelin", effect: "GHRP синергия", mechanism: "Оба — GHRP-агонисты", severity: "MEDIUM"},
+      ],
+    conflicts: [
+        {with: "somatostatin_analogues", effect: "Блокировка GH", mechanism: "Соматостатин ингибирует GHRP", severity: "HIGH"},
+      ],
     monitoring: [
       { what: 'ИФР-1', when: 'Каждые 4 нед' }
     ],
@@ -3389,8 +3540,13 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['reproductive', 'endocrine'],
     mechanisms: ['GH_RELEASE', 'APPETITE_STIMULATION', 'CORTISOL_INCREASE', 'MUSCLE_RECOVERY'],
     description: 'GHRP-6 — секретагог ГР с сильным стимулирующим аппетит действием. На курсе — набор массы.',
-    synergies: [],
-    conflicts: [],
+    synergies: [
+        {with: "cjc1295", effect: "Максимальная стимуляция GH", mechanism: "GHRH+GHRP = синергия GH", severity: "HIGH"},
+        {with: "ghrp2", effect: "Усиление аппетита и GH", mechanism: "GHRP-6 — самый сильный GHRP", severity: "MEDIUM"},
+      ],
+    conflicts: [
+        {with: "somatostatin_analogues", effect: "Блокировка GH", mechanism: "Соматостатин ингибирует GHRP", severity: "HIGH"},
+      ],
     monitoring: [
       { what: 'ИФР-1', when: 'Каждые 4 нед' }
     ],
@@ -3412,7 +3568,9 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['reproductive', 'endocrine'],
     mechanisms: ['MYOSTATIN_INHIBITION', 'MUSCLE_GROWTH', 'FOLLICLE_REGULATION'],
     description: 'Фоллистатин — белок-ингибитор миостатина, блокирует ограничитель роста мышц. Потенцирует гипертрофию на курсе.',
-    synergies: [],
+    synergies: [
+        {with: "cjc1295", effect: "Рост мышц: миостатин+GH", mechanism: "Фоллистатин + CJC-1295", severity: "HIGH"},
+      ],
     conflicts: [],
     monitoring: [
       { what: 'Миостатин', when: 'Каждые 8 нед' }
@@ -3436,7 +3594,10 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['neuro'],
     mechanisms: ['NGF_STIMULATION', 'BDNF_INCREASE', 'NEUROPROTECTION', 'COGNITION_ENHANCEMENT'],
     description: 'Семакс — нейропептид, стимулирует синтез NGF и BDNF, улучшает память, внимание и нейропротекцию. Обязателен на курсе ААС.',
-    synergies: [],
+    synergies: [
+        {with: "selank", effect: "Комплексная нейропротекция", mechanism: "Семакс — BDNF, Селанк — GABA", severity: "MEDIUM"},
+        {with: "citicoline", effect: "Когнитивная функция", mechanism: "Оба улучшают память", severity: "MEDIUM"},
+      ],
     conflicts: [],
     monitoring: [
       { what: 'Когнитивные тесты', when: 'Каждые 4 нед' }
@@ -3459,7 +3620,10 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['nero'],
     mechanisms: ['GABA_MODULATION', 'ANXIOLYTIC', 'NEUROPROTECTION', 'MOOD_REGULATION'],
     description: 'Селанк — анксиолитический пептид, модулирует ГАМК-систему, снижает тревожность и улучшает сон. На курсе — антистресс.',
-    synergies: [],
+    synergies: [
+        {with: "semax", effect: "Нейропротекция + антистресс", mechanism: "Семакс — BDNF/NGF, Селанк — GABA", severity: "MEDIUM"},
+        {with: "magnesium", effect: "Анксиолитический эффект", mechanism: "Оба снижают тревожность", severity: "MEDIUM"},
+      ],
     conflicts: [],
     monitoring: [
       { what: 'Когнитивные тесты', when: 'Субъективно' }
@@ -3483,7 +3647,10 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['nero'],
     mechanisms: ['SLEEP_REGULATION', 'ANALGESIC', 'CORTISOL_REDUCTION', 'STRESS_MODULATION'],
     description: 'DSIP — дельта-сон-индуцирующий пептид, нормализует структуру сна, снижает кортизол. На курсе — улучшение восстановления.',
-    synergies: [],
+    synergies: [
+        {with: "melatonin", effect: "Глубокий сон", mechanism: "DSIP — дельта-сон, мелатонин — циркадный", severity: "MEDIUM"},
+        {with: "magnesium", effect: "Расслабление", mechanism: "Оба — глубокий сон", severity: "MEDIUM"},
+      ],
     conflicts: [],
     monitoring: [
       { what: 'Сон (соно-графия)', when: 'Субъективно' }
@@ -3506,7 +3673,9 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['neuro'],
     mechanisms: ['NEUROGENESIS', 'MEMORY_ENHANCEMENT', 'BDNF_INCREASE', 'NEUROPROTECTION'],
     description: 'P21 — ноотропный пептид, стимулирует нейрогенез и BDNF. Улучшает память и обучение на курсе.',
-    synergies: [],
+    synergies: [
+        {with: "semax", effect: "Нейропластичность", mechanism: "Оба стимулируют нейрогенез", severity: "MEDIUM"},
+      ],
     conflicts: [],
     monitoring: [
       { what: 'Когнитивные тесты', when: 'Субъективно' }
@@ -3529,7 +3698,10 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['hepatic', 'metabolic'],
     mechanisms: ['AMPK_ACTIVATION', 'FAT_OXIDATION', 'INSULIN_SENSITIVITY', 'MUSCLE_REGULATION'],
     description: 'MOTS-c — митохондриальный пептид, активирует AMPK, улучшает инсулиновую чувствительность и жиросжигание.',
-    synergies: [],
+    synergies: [
+        {with: "nmn", effect: "Митохондриальная функция", mechanism: "MOTS-c + NMN — путь NAD+", severity: "MEDIUM"},
+        {with: "coq10", effect: "Энергетический метаболизм", mechanism: "Оба поддерживают митохондрии", severity: "MEDIUM"},
+      ],
     conflicts: [],
     monitoring: [
       { what: 'Глюкоза натощак', when: 'Каждые 4 нед' }
@@ -3552,7 +3724,10 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['neuro', 'cardio'],
     mechanisms: ['NEUROPROTECTION', 'APOPTOSIS_INHIBITION', 'MITOCHONDRIAL_PROTECTION', 'INSULIN_SENSITIVITY'],
     description: 'Хьюманин — митохондриальный пептид, подавляет апоптоз, нейропротекция и защита митохондрий. Анти-возрастной.',
-    synergies: [],
+    synergies: [
+        {with: "mots_c", effect: "Митохондриальная защита", mechanism: "Оба — митохондриальные пептиды", severity: "MEDIUM"},
+        {with: "coq10", effect: "Клеточная защита", mechanism: "Хьюманин защищает от апоптоза", severity: "LOW"},
+      ],
     conflicts: [],
     monitoring: [
       { what: 'Когнитивные тесты', when: 'Субъективно' }
@@ -3601,8 +3776,13 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['immune'],
     mechanisms: ['IMMUNE_REGULATION', 'T_CELL_ACTIVATION', 'ANTI_INFLAMMATORY', 'INFECTION_RESISTANCE'],
     description: 'Тимозин Альфа-1 — иммуномодулирующий пептид, активирует Т-клетки и NK-клетки. На курсе — защита от инфекций.',
-    synergies: [],
-    conflicts: [],
+    synergies: [
+        {with: "vitamin_d3", effect: "Иммунная модуляция", mechanism: "Оба усиливают Th1-иммунитет", severity: "MEDIUM"},
+        {with: "zinc", effect: "Т-клеточный иммунитет", mechanism: "Оба поддерживают Т-лимфоциты", severity: "MEDIUM"},
+      ],
+    conflicts: [
+        {with: "immunosuppressant_drugs", effect: "Антагонизм", mechanism: "Тимозин стимулирует иммунитет", severity: "MEDIUM"},
+      ],
     monitoring: [
       { what: 'Иммунограмма', when: 'Каждые 8 нед' }
     ],
@@ -3625,7 +3805,11 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['musculoskeletal'],
     mechanisms: ['WOUND_HEALING', 'COLLAGEN_SYNTHESIS', 'ANTI_INFLAMMATORY', 'COPPER_DELIVERY'],
     description: 'GHK-Cu — медный пептид, стимулирует синтез коллагена, заживление ран, антиоксидант. На курсе — кожа, связки, волосы.',
-    synergies: [],
+    synergies: [
+        {with: "vitamin_c", effect: "Синтез коллагена", mechanism: "GHK-Медь стимулирует синтез", severity: "HIGH"},
+        {with: "zinc", effect: "Заживление ран", mechanism: "Оба — кофакторы восстановления", severity: "MEDIUM"},
+        {with: "bpc157", effect: "Комплексное заживление", mechanism: "Оба стимулируют ангиогенез", severity: "HIGH"},
+      ],
     conflicts: [],
     monitoring: [
       { what: 'Медь сыворотки', when: 'Каждые 8 нед' }
@@ -3649,7 +3833,12 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['musculoskeletal', 'gastrointestinal'],
     mechanisms: ['WOUND_HEALING', 'ANGIOGENESIS', 'GUT_PROTECTION', 'ANTI_INFLAMMATORY'],
     description: 'BPC-157 — пептид защиты тела, ускоряет заживление связок, сухожилий, кишки. На курсе — защита суставов и ЖКТ.',
-    synergies: [],
+    synergies: [
+        {with: "tb500", effect: "Максимальное заживление", mechanism: "BPC-157 — ангиогенез, TB-500 — миграция", severity: "HIGH"},
+        {with: "vitamin_c", effect: "Синтез коллагена", mechanism: "Оба — синтез коллагена", severity: "MEDIUM"},
+        {with: "ghk_cu", effect: "Регенерация тканей", mechanism: "Оба — заживление через разные пути", severity: "HIGH"},
+        {with: "glucosamine", effect: "Восстановление суставов", mechanism: "BPC-157 + глюкозамин — хрящ", severity: "MEDIUM"},
+      ],
     conflicts: [],
     monitoring: [
       { what: 'Контроль суставов', when: 'Субъективно' }
@@ -3673,7 +3862,11 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['musculoskeletal'],
     mechanisms: ['ACTIN_REGULATION', 'WOUND_HEALING', 'MUSCLE_RECOVERY', 'ANTI_INFLAMMATORY'],
     description: 'TB-500 — пептид на основе тимозина бета-4, регулирует актин, ускоряет заживление мышц и связок. На курсе — восстановление.',
-    synergies: [],
+    synergies: [
+        {with: "bpc157", effect: "Максимальное заживление", mechanism: "TB-500 — актин, BPC-157 — ангиогенез", severity: "HIGH"},
+        {with: "vitamin_c", effect: "Заживление", mechanism: "Оба способствуют восстановлению", severity: "MEDIUM"},
+        {with: "ghk_cu", effect: "Регенерация", mechanism: "Оба стимулируют миграцию", severity: "MEDIUM"},
+      ],
     conflicts: [],
     monitoring: [
       { what: 'Контроль суставов', when: 'Субъективно' }
@@ -3696,7 +3889,9 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['reproductive'],
     mechanisms: ['MELANOGENESIS', 'SKIN_PROTECTION', 'UV_PROTECTION', 'APHRODISIAC_EFFECT'],
     description: 'Меланотан-1 — пептид, стимулирующий меланогенез, защиту кожи от УФ. Минимальные побочные эффекты.',
-    synergies: [],
+    synergies: [
+        {with: "vitamin_d3", effect: "Пигментация и синтез витамина D", mechanism: "Меланотан → меланин → D3", severity: "LOW"},
+      ],
     conflicts: [],
     monitoring: [
       { what: 'Пигментация кожи', when: 'Субъективно' }
@@ -3719,7 +3914,9 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['reproductive'],
     mechanisms: ['MELANOGENESIS', 'APHRODISIAC_EFFECT', 'APPETITE_SUPPRESSION', 'UV_PROTECTION'],
     description: 'Меланотан-2 — сильнее МТ1, стимулирует загар и либидо, но с больше побочными. На курсе — защита кожи.',
-    synergies: [],
+    synergies: [
+        {with: "vitamin_d3", effect: "Пигментация и синтез витамина D", mechanism: "Меланотан → меланин → D3", severity: "LOW"},
+      ],
     conflicts: [],
     monitoring: [
       { what: 'Пигментация кожи', when: 'Субъективно' }
@@ -3742,7 +3939,9 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['reproductive'],
     mechanisms: ['MELANOCORTIN_ACTIVATION', 'APHRODISIAC_EFFECT', 'LIBIDO_ENHANCEMENT', 'ERECTILE_FUNCTION'],
     description: 'PT-141 — пептид для лечения сексуальной дисфункции, активирует меланокортиновые рецепторы. На курсе — либидо.',
-    synergies: [],
+    synergies: [
+        {with: "melanotan2", effect: "Усиление эффекта", mechanism: "PT-141 — метаболит меланотана II", severity: "MEDIUM"},
+      ],
     conflicts: [
       { with: "stimulant_complex", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "LOW" }
     ],
@@ -3767,7 +3966,9 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['reproductive', 'endocrine'],
     mechanisms: ['GNRH_RELEASE', 'LH_FSH_REGULATION', 'TESTOSTERONE_RESTORE', 'PCT_SUPPORT'],
     description: 'Гонадорелин — стимулятор ГнРГ, восстанавливает ось ГРГ-ЛГ-ФСГ. Для ПКТ и восстановления после курса.',
-    synergies: [],
+    synergies: [
+        {with: "hcg", effect: "Стимуляция HPG-оси", mechanism: "Гонадорелин — GnRH, ХГЧ — LH-аналог", severity: "MEDIUM"},
+      ],
     conflicts: [],
     monitoring: [
       { what: 'ЛГ/ФСГ', when: 'Каждые 2 нед' }
@@ -3790,7 +3991,9 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['reproductive', 'endocrine'],
     mechanisms: ['GNRH_RELEASE', 'LH_FSH_STIMULATION', 'PUBERTY_REGULATION', 'REPRODUCTIVE_RECOVERY'],
     description: 'Киссептин — пептид, стимулирующий выброс ГнРГ, восстанавливает репродуктивную ось. Для ПКТ и восстановления.',
-    synergies: [],
+    synergies: [
+        {with: "gonadorelin", effect: "Стимуляция HPG-оси", mechanism: "Кисспептин → GnRH → LH/FSH", severity: "HIGH"},
+      ],
     conflicts: [],
     monitoring: [
       { what: 'ЛГ/ФСГ', when: 'Каждые 2 нед' }
@@ -3813,8 +4016,12 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['metabolic', 'gastrointestinal'],
     mechanisms: ['INSULIN_SECRETION', 'GLUCOSE_REGULATION', 'APPETITE_SUPPRESSION', 'WEIGHT_LOSS'],
     description: 'ГПП-1 — инкретиновый пептид, стимулирует инсулин, подавляет аппетит. На курсе — контроль глюкозы и веса.',
-    synergies: [],
-    conflicts: [],
+    synergies: [
+        {with: "berberine", effect: "Контроль глюкозы и аппетита", mechanism: "Оба снижают аппетит и глюкозу", severity: "MEDIUM"},
+      ],
+    conflicts: [
+        {with: "antidiabetic_drugs", effect: "Риск гипогликемии", mechanism: "Двойное снижение глюкозы", severity: "HIGH"},
+      ],
     monitoring: [
       { what: 'Глюкоза натощак', when: 'Каждые 4 нед' }
     ],
@@ -3836,7 +4043,9 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['metabolic'],
     mechanisms: ['INSULIN_SECRETION', 'BONE_FORMATION', 'FAT_METABOLISM', 'GLUCOSE_REGULATION'],
     description: 'ГИП — инкретиновый пептид, стимулирует инсулин и формирование кости. Дополнение к ГПП-1.',
-    synergies: [],
+    synergies: [
+        {with: "glp1", effect: "Двойной инкретиновый эффект", mechanism: "GLP-1 + GIP — двойной инкретин", severity: "MEDIUM"},
+      ],
     conflicts: [],
     monitoring: [
       { what: 'Глюкоза натощак', when: 'Каждые 4 нед' }
@@ -3860,7 +4069,10 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['neuro'],
     mechanisms: ['NEUROTROPHIC_STIMULATION', 'NEUROPROTECTION', 'SYNAPTIC_PLASTICITY', 'MEMORY_ENHANCEMENT'],
     description: 'Церебролизин — комплекс нейропептидов, нейротрофическая активность, улучшает память и когницию. На курсе — нейропротекция.',
-    synergies: [],
+    synergies: [
+        {with: "semax", effect: "Нейропротекция", mechanism: "Оба стимулируют нейротрофические факторы", severity: "HIGH"},
+        {with: "citicoline", effect: "Когнитивная функция", mechanism: "Оба улучшают память", severity: "MEDIUM"},
+      ],
     conflicts: [],
     monitoring: [
       { what: 'Когнитивные тесты', when: 'Каждые 4 нед' }
@@ -3883,7 +4095,10 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['neuro'],
     mechanisms: ['NEUROPROTECTION', 'COGNITION_ENHANCEMENT', 'BDNF_INCREASE', 'MEMORY_IMPROVEMENT'],
     description: 'Кортексин — комплекс корковых пептидов, нейропротектор и ноотроп. Улучшает память и внимание на курсе.',
-    synergies: [],
+    synergies: [
+        {with: "cerebrolysin", effect: "Нейропротекция", mechanism: "Оба содержат нейропептиды", severity: "MEDIUM"},
+        {with: "piracetam", effect: "Ноотропная синергия", mechanism: "Оба улучшают когницию", severity: "MEDIUM"},
+      ],
     conflicts: [],
     monitoring: [
       { what: 'Когнитивные тесты', when: 'Субъективно' }
@@ -3941,7 +4156,10 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['musculoskeletal'],
     mechanisms: ['ELASTICITY_RESTORATION', 'JOINT_FUNCTION', 'SKIN_ELASTICITY', 'ANTI_AGING'],
     description: 'Эластин — структурный белок соединительной ткани, обеспечивает упругость кожи и связок. На курсе — поддержка связок.',
-    synergies: [],
+    synergies: [
+        {with: "collagen", effect: "Структурная поддержка", mechanism: "Эластин + коллаген — каркас", severity: "MEDIUM"},
+        {with: "vitamin_c", effect: "Синтез эластина", mechanism: "C — кофактор синтеза", severity: "MEDIUM"},
+      ],
     conflicts: [],
     monitoring: [
       { what: 'Кожа/суставы', when: 'Субъективно' }
@@ -3964,7 +4182,10 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['musculoskeletal', 'hematologic'],
     mechanisms: ['HISTAMINE_SYNTHESIS', 'CARNOSINE_PRECURSOR', 'METAL_CHELATION', 'ANTI_INFLAMMATORY'],
     description: 'Гистидин — незаменимая аминокислота, предшественник гистамина и карнозина. Хелатирует тяжёлые металлы, поддерживает иммунитет.',
-    synergies: [],
+    synergies: [
+        {with: "zinc", effect: "Иммунная функция", mechanism: "Гистидин — предшественник гистамина", severity: "LOW"},
+        {with: "vitamin_c", effect: "Карнозиновая система", mechanism: "Гистидин + бета-аланин → карнозин", severity: "MEDIUM"},
+      ],
     conflicts: [],
     monitoring: [
       { what: 'Общий белок', when: 'Каждые 8 нед' }
@@ -3988,7 +4209,10 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['hepatic', 'renal'],
     mechanisms: ['GLUTATHIONE_SYNTHESIS', 'METAL_CHELATION', 'SKIN_HEALTH', 'DETOXIFICATION'],
     description: 'Цистеин — серосодержащая аминокислота, предшественник глутатиона. Защищает печень, хелатирует тяжёлые металлы.',
-    synergies: [],
+    synergies: [
+        {with: "nac", effect: "Синтез глутатиона", mechanism: "Цистеин — предшественник глутатиона", severity: "HIGH"},
+        {with: "vitamin_c", effect: "Антиоксидантная сеть", mechanism: "Оба поддерживают редокс-баланс", severity: "MEDIUM"},
+      ],
     conflicts: [],
     monitoring: [
       { what: 'АЛТ/АСТ', when: 'Каждые 4 нед' }
@@ -4011,7 +4235,9 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['neuro'],
     mechanisms: ['SERINE_SYNTHESIS', 'PHOSPHOLIPID_PRECURSOR', 'NEUROPROTECTION', 'MEMORY_SUPPORT'],
     description: 'Серин — заменимая аминокислота, предшественник фосфолипидов и сериновых протеаз. Поддержка мозга и нервной системы.',
-    synergies: [],
+    synergies: [
+        {with: "vitamin_b_complex", effect: "Фосфолипидный обмен", mechanism: "Серин — фосфатидилсерин", severity: "LOW"},
+      ],
     conflicts: [],
     monitoring: [
       { what: 'Когнитивные тесты', when: 'Субъективно' }
@@ -4086,7 +4312,10 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['hepatic'],
     mechanisms: ['UREA_CYCLE', 'AMMONIA_DETOX', 'GH_RELEASE', 'LIVER_PROTECTION'],
     description: 'Орнитин — заменимая аминокислота, участвует в цикле мочевины, снижает аммиак, стимулирует выброс ГР. На курсе — защита печени.',
-    synergies: [],
+    synergies: [
+        {with: "arginine", effect: "Цикл мочевины", mechanism: "Оба — компоненты цикла мочевины", severity: "MEDIUM"},
+        {with: "citrulline", effect: "NO-путь", mechanism: "Орнитин → цитруллин → NO", severity: "MEDIUM"},
+      ],
     conflicts: [],
     monitoring: [
       { what: 'Аммиак', when: 'Каждые 8 нед' }
@@ -4109,7 +4338,9 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['hepatic', 'immune'],
     mechanisms: ['MUCIN_SYNTHESIS', 'LIVER_LIPID_REGULATION', 'IMMUNE_FUNCTION', 'COLLAGEN_SYNTHESIS'],
     description: 'Треонин — незаменимая аминокислота, важна для синтеза муцина (защита ЖКТ) и иммунных белков. На курсе — защита ЖКТ.',
-    synergies: [],
+    synergies: [
+        {with: "vitamin_b6", effect: "Метаболизм треонина", mechanism: "B6 — кофактор", severity: "LOW"},
+      ],
     conflicts: [],
     monitoring: [
       { what: 'Общий белок', when: 'Каждые 8 нед' }
@@ -4159,8 +4390,13 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['neuro', 'endocrine'],
     mechanisms: ['DOPAMINE_PRECURSOR', 'NOREPINEPHRINE_SYNTHESIS', 'PAIN_MODULATION', 'MOOD_REGULATION'],
     description: 'Фенилаланин — незаменимая аминокислота, предшественник дофамина и норадреналина. Улучшает настроение и концентрацию.',
-    synergies: [],
-    conflicts: [],
+    synergies: [
+        {with: "vitamin_b6", effect: "Синтез дофамина", mechanism: "Фенилаланин → тирозин → дофамин", severity: "MEDIUM"},
+        {with: "vitamin_c", effect: "Синтез норадреналина", mechanism: "C — кофактор дофамин-бета-гидроксилазы", severity: "MEDIUM"},
+      ],
+    conflicts: [
+        {with: "maoi_drugs", effect: "Гипертонический криз", mechanism: "Фенилаланин + ИМАО = опасно", severity: "HIGH"},
+      ],
     monitoring: [
       { what: 'Когнитивные тесты', when: 'Субъективно' }
     ],
@@ -4213,8 +4449,12 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['neuro'],
     mechanisms: ['NEUROTRANSMISSION', 'AMMONIA_DETOX', 'GABA_PRECURSOR', 'ENERGY_PRODUCTION'],
     description: 'Глутамат — заменимая аминокислота, главный возбуждающий нейромедиатор. В избытке — эксайтотоксичность.',
-    synergies: [],
-    conflicts: [],
+    synergies: [
+        {with: "magnesium", effect: "Блокировка эксайтотоксичности", mechanism: "Магний блокирует NMDA при избытке глутамата", severity: "HIGH"},
+      ],
+    conflicts: [
+        {with: "msg_sensitivity", effect: "Головная боль", mechanism: "Избыток глутамата — эксайтотоксичность", severity: "MEDIUM"},
+      ],
     monitoring: [
       { what: 'Аммиак', when: 'Каждые 8 нед' }
     ],
@@ -4262,8 +4502,14 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['hepatic', 'immune', 'neuro'],
     mechanisms: ['IMMUNE_REGULATION', 'ANTI_INFLAMMATORY', 'LIVER_PROTECTION', 'STRESS_REDUCTION'],
     description: 'Рейши — король грибов, иммуномодулятор и адаптоген. Защищает печень, снижает воспаление и стресс на курсе.',
-    synergies: [],
-    conflicts: [],
+    synergies: [
+        {with: "ashwagandha", effect: "Адаптогенный и иммунный", mechanism: "Оба модулируют стресс и иммунитет", severity: "MEDIUM"},
+        {with: "vitamin_c", effect: "Иммуномодуляция", mechanism: "Оба поддерживают иммунитет", severity: "MEDIUM"},
+        {with: "turkey_tail", effect: "Максимальная иммуномодуляция", mechanism: "Разные бета-глюканы", severity: "MEDIUM"},
+      ],
+    conflicts: [
+        {with: "immunosuppressant_drugs", effect: "Антагонизм", mechanism: "Рейши стимулирует иммунитет", severity: "MEDIUM"},
+      ],
     monitoring: [
       { what: 'АЛТ/АСТ', when: 'Каждые 8 нед' }
     ],
@@ -4314,7 +4560,10 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['immune', 'metabolic'],
     mechanisms: ['IMMUNE_ACTIVATION', 'GLUCOSE_REGULATION', 'BETA_GLUCAN_DELIVERY', 'ANTI_INFLAMMATORY'],
     description: 'Майтаке — гриб с высоким содержанием бета-глюканов, активирует иммунитет и регулирует глюкозу. На курсе — метаболическая поддержка.',
-    synergies: [],
+    synergies: [
+        {with: "vitamin_d3", effect: "Иммунитет", mechanism: "Майтаке-D-фракция + D3", severity: "MEDIUM"},
+        {with: "turkey_tail", effect: "Иммуномодуляция", mechanism: "Оба — бета-глюканы", severity: "MEDIUM"},
+      ],
     conflicts: [],
     monitoring: [
       { what: 'Глюкоза натощак', when: 'Каждые 8 нед' }
@@ -4337,7 +4586,9 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['immune', 'cardio', 'hepatic'],
     mechanisms: ['IMMUNE_REGULATION', 'CHOLESTEROL_LOWERING', 'B_VITAMIN_SOURCE', 'LIVER_PROTECTION'],
     description: 'Шиитаке — гриб с лентинаном, снижает холестерин и поддерживает иммунитет. Источник витаминов группы В.',
-    synergies: [],
+    synergies: [
+        {with: "reishi", effect: "Комплексная грибная поддержка", mechanism: "Разные полисахариды", severity: "MEDIUM"},
+      ],
     conflicts: [],
     monitoring: [
       { what: 'Липидограмма', when: 'Каждые 8 нед' }
@@ -4390,7 +4641,9 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['immune', 'hepatic', 'gastrointestinal'],
     mechanisms: ['IMMUNE_ACTIVATION', 'BETA_GLUCAN_DELIVERY', 'LIVER_PROTECTION', 'ANTI_INFLAMMATORY'],
     description: 'Агарикус — бразильский гриб с мощными бета-глюканами, активирует NK-клетки и макрофаги. Поддержка иммунитета на курсе.',
-    synergies: [],
+    synergies: [
+        {with: "reishi", effect: "Иммуномодуляция", mechanism: "Оба — мощные иммуномодуляторы", severity: "MEDIUM"},
+      ],
     conflicts: [],
     monitoring: [
       { what: 'Общий анализ крови', when: 'Каждые 8 нед' }
@@ -4413,7 +4666,11 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['immune', 'gastrointestinal', 'hepatic'],
     mechanisms: ['IMMUNE_REGULATION', 'BETA_GLUCAN_DELIVERY', 'GUT_MICROBIOME_SUPPORT', 'ANTI_INFLAMMATORY'],
     description: 'Хвост индейки — мощный иммуномодулятор с PSP и PSK полисахаридами. Поддержка кишечника и иммунитета на курсе.',
-    synergies: [],
+    synergies: [
+        {with: "reishi", effect: "Комплексная иммуномодуляция", mechanism: "Оба — бета-глюканы разных типов", severity: "HIGH"},
+        {with: "probiotics", effect: "Микробиом + иммунитет", mechanism: "Оба поддерживают кишечный иммунитет", severity: "MEDIUM"},
+        {with: "vitamin_d3", effect: "Иммунная активация", mechanism: "Оба активируют макрофаги", severity: "MEDIUM"},
+      ],
     conflicts: [],
     monitoring: [
       { what: 'Общий анализ крови', when: 'Каждые 8 нед' }
@@ -4525,8 +4782,14 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['cardio'],
     mechanisms: ['ANTIOXIDANT', 'ENDOTHELIAL_PROTECTION', 'COLLAGEN_SYNTHESIS', 'MICROCIRCULATION'],
     description: 'Экстракт косточек винограда — богат проантоцианидинами, защищает эндотелий и коллаген. На курсе — сосуды и кожа.',
-    synergies: [],
-    conflicts: [],
+    synergies: [
+        {with: "vitamin_c", effect: "Антиоксидантная активность", mechanism: "Проантоцианидины + C", severity: "MEDIUM"},
+        {with: "vitamin_e", effect: "Защита сосудов", mechanism: "Оба укрепляют стенки сосудов", severity: "MEDIUM"},
+        {with: "curcumin", effect: "Противовоспалительное", mechanism: "Оба подавляют NF-kB", severity: "MEDIUM"},
+      ],
+    conflicts: [
+        {with: "anticoagulant_drugs", effect: "Усиление антикоагуляции", mechanism: "Снижает агрегацию тромбоцитов", severity: "MEDIUM"},
+      ],
     monitoring: [
       { what: 'Липидограмма', when: 'Каждые 8 нед' }
     ],
@@ -4548,8 +4811,13 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['cardio', 'neuro'],
     mechanisms: ['ANTIOXIDANT', 'ENDOTHELIAL_PROTECTION', 'COLLAGEN_PROTECTION', 'MICROCIRCULATION'],
     description: 'Пикногенол — экстракт коры приморской сосны, мощный антиоксидант. Защищает сосуды, кожу и эндотелий.',
-    synergies: [],
-    conflicts: [],
+    synergies: [
+        {with: "vitamin_c", effect: "Регенерация витамина C", mechanism: "Пикногенол + C", severity: "MEDIUM"},
+        {with: "vitamin_e", effect: "Защита сосудов и кожи", mechanism: "Оба — антиоксиданты", severity: "MEDIUM"},
+      ],
+    conflicts: [
+        {with: "anticoagulant_drugs", effect: "Антикоагуляция", mechanism: "Снижает агрегацию тромбоцитов", severity: "MEDIUM"},
+      ],
     monitoring: [
       { what: 'Липидограмма', when: 'Каждые 8 нед' }
     ],
@@ -4571,7 +4839,9 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['cardio', 'neuro'],
     mechanisms: ['ANTIOXIDANT', 'NITRIC_OXIDE_PRODUCTION', 'BLOOD_FLOW_IMPROVEMENT', 'COGNITION_ENHANCEMENT'],
     description: 'Какао-флаванолы — улучшают производство NO, кровоток мозга и сердца. На курсе — кардио- и нейропротекция.',
-    synergies: [],
+    synergies: [
+        {with: "omega3", effect: "Кардиопротекция", mechanism: "Оба улучшают эндотелий", severity: "MEDIUM"},
+      ],
     conflicts: [],
     monitoring: [
       { what: 'Липидограмма', when: 'Каждые 8 нед' }
@@ -4594,7 +4864,9 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['hepatic'],
     mechanisms: ['ANTIOXIDANT', 'MITOCHONDRIAL_PROTECTION', 'ANTI_INFLAMMATORY', 'ANTI_AGING'],
     description: 'C60 фуллерен — наночастица с мощнейшей антиоксидантной активностью, защищает митохондрии. Экспериментальный анти-возрастной.',
-    synergies: [],
+    synergies: [
+        {with: "olive_oil", effect: "Усиление антиоксидантного эффекта", mechanism: "C60 в масле — лучшая доставка", severity: "MEDIUM"},
+      ],
     conflicts: [],
     monitoring: [
       { what: 'Окислительный стресс', when: 'Субъективно' }
@@ -4644,7 +4916,10 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['hepatic', 'neuro'],
     mechanisms: ['NRF2_ACTIVATION', 'ANTIOXIDANT_ENZYME_INDUCTION', 'DETOXIFICATION', 'ANTI_INFLAMMATORY'],
     description: 'Nrf2-активатор (сульфорафан+куркумин) — индуцирует антиоксидантные ферменты через Nrf2-путь. Мощная гепатопротекция.',
-    synergies: [],
+    synergies: [
+        {with: "sulforaphane", effect: "Максимальная активация Nrf2", mechanism: "Оба активируют Nrf2", severity: "HIGH"},
+        {with: "curcumin", effect: "Антиоксидантный ответ", mechanism: "Куркумин тоже активирует Nrf2", severity: "MEDIUM"},
+      ],
     conflicts: [],
     monitoring: [
       { what: 'АЛТ/АСТ', when: 'Каждые 4 нед' }
@@ -4730,7 +5005,10 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['cardio'],
     mechanisms: ['ANTIOXIDANT', 'VITAMIN_C_POTENTIATION', 'MICROCIRCULATION', 'ANTI_INFLAMMATORY'],
     description: 'Цитрусовые биофлавоноиды — гесперидин, рутин, нарингенин. Усиливают витамин С, защищают сосуды.',
-    synergies: [],
+    synergies: [
+        {with: "vitamin_c", effect: "Синергия", mechanism: "Флавоноиды + C", severity: "HIGH"},
+        {with: "quercetin", effect: "Противовоспалительное", mechanism: "Оба — флавоноиды", severity: "MEDIUM"},
+      ],
     conflicts: [
       { with: "statin_drugs", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "HIGH" }
     ],
@@ -4782,7 +5060,10 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['hepatic', 'gastrointestinal'],
     mechanisms: ['ANTIOXIDANT', 'LIVER_DETOXIFICATION', 'ANTI_MUTAGENIC', 'ANTI_INFLAMMATORY'],
     description: 'Эллаговая кислота — полифенол из граната и малины, гепатопротектор и антимутаген. Защищает печень и ДНК.',
-    synergies: [],
+    synergies: [
+        {with: "vitamin_c", effect: "Антиоксидант", mechanism: "Оба — антиоксиданты", severity: "LOW"},
+        {with: "curcumin", effect: "Противораковая защита", mechanism: "Оба подавляют пролиферацию", severity: "LOW"},
+      ],
     conflicts: [],
     monitoring: [
       { what: 'АЛТ/АСТ', when: 'Каждые 8 нед' }
@@ -4805,7 +5086,10 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['musculoskeletal', 'hepatic'],
     mechanisms: ['ANTI_INFLAMMATORY', 'MUSCLE_GROWTH', 'LIPID_LOWERING', 'ANTI_CATABOLIC'],
     description: 'Урсоловая кислота — тритерпен из яблочных шкурок, антикатаболическое и антивоспалительное действие. Поддержка мышц.',
-    synergies: [],
+    synergies: [
+        {with: "creatine", effect: "Анаболическая поддержка", mechanism: "Урсоловая кислота + mTOR", severity: "MEDIUM"},
+        {with: "curcumin", effect: "Противовоспалительное", mechanism: "Оба подавляют NF-kB", severity: "MEDIUM"},
+      ],
     conflicts: [],
     monitoring: [
       { what: 'КФК', when: 'Каждые 8 нед' }
@@ -4828,8 +5112,13 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['neuro', 'hepatic'],
     mechanisms: ['ANXIOLYTIC', 'MUSCLE_RELAXATION', 'NEUROPROTECTION', 'LIVER_PROTECTION'],
     description: 'Магнолия (хонокиол) — анксиолитик и нейропротектор, расслабляет мышцы и улучшает сон. На курсе — антистресс.',
-    synergies: [],
-    conflicts: [],
+    synergies: [
+        {with: "theanine", effect: "Расслабление", mechanism: "Оба усиливают GABA", severity: "MEDIUM"},
+        {with: "magnesium", effect: "Улучшение сна", mechanism: "Оба — расслабление", severity: "MEDIUM"},
+      ],
+    conflicts: [
+        {with: "sedative_drugs", effect: "Усиление седации", mechanism: "Магнолол потенцирует седативные", severity: "MEDIUM"},
+      ],
     monitoring: [
       { what: 'Когнитивные тесты', when: 'Субъективно' }
     ],
@@ -4851,7 +5140,10 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['hepatic', 'gastrointestinal'],
     mechanisms: ['DIGESTION_STIMULATION', 'BILE_SECRETION', 'APPETITE_IMPROVEMENT', 'LIVER_PROTECTION'],
     description: 'Горечавка — горький тоник, стимулирует пищеварение и желчеотток. Улучшает аппетит и усвоение на курсе.',
-    synergies: [],
+    synergies: [
+        {with: "digestive_enzymes", effect: "Улучшение пищеварения", mechanism: "Горечи стимулируют секрецию", severity: "MEDIUM"},
+        {with: "artichoke", effect: "Желчеотток", mechanism: "Оба стимулируют желчеотделение", severity: "MEDIUM"},
+      ],
     conflicts: [],
     monitoring: [
       { what: 'Пищеварение', when: 'Субъективно' }
@@ -4901,7 +5193,10 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['cardio', 'immune'],
     mechanisms: ['CHOLESTEROL_LOWERING', 'ANTI_INFLAMMATORY', 'ANTIMICROBIAL', 'BLOOD_PRESSURE_REGULATION'],
     description: 'Чеснок (аллицин) — кардиопротектор, снижает холестерин и АД, антимикробное действие. На курсе — сосуды и иммунитет.',
-    synergies: [],
+    synergies: [
+        {with: "vitamin_c", effect: "Иммунитет", mechanism: "Аллицин + C", severity: "MEDIUM"},
+        {with: "omega3", effect: "Кардиопротекция", mechanism: "Оба снижают холестерин", severity: "MEDIUM"},
+      ],
     conflicts: [
       { with: "anticoagulant_drugs", effect: "Чеснок потенцирует антикоагулянты", mechanism: "Комбинированное действие", severity: "LOW" }
     ],
@@ -4926,7 +5221,9 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['immune', 'gastrointestinal'],
     mechanisms: ['ANTIOXIDANT', 'ANTI_INFLAMMATORY', 'SKIN_HEALTH', 'IMMUNE_REGULATION'],
     description: 'Мангостин — источник ксантонов, мощных антиоксидантов. Противовоспалительное и антиоксидантное действие.',
-    synergies: [],
+    synergies: [
+        {with: "curcumin", effect: "Противовоспалительное", mechanism: "Оба подавляют NF-kB и COX-2", severity: "MEDIUM"},
+      ],
     conflicts: [],
     monitoring: [
       { what: 'Окислительный стресс', when: 'Субъективно' }
@@ -4950,8 +5247,12 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['cardio'],
     mechanisms: ['FIBRINOLYSIS', 'BLOOD_THINNING', 'MICROCIRCULATION', 'THROMBUS_PREVENTION'],
     description: 'Наттокиназа — фермент из натто, растворяет фибрин и предотвращает тромбы. На курсе — защита сосудов.',
-    synergies: [],
-    conflicts: [],
+    synergies: [
+        {with: "omega3", effect: "Антитромботическое", mechanism: "Оба снижают риск тромбов", severity: "MEDIUM"},
+      ],
+    conflicts: [
+        {with: "anticoagulant_drugs", effect: "Риск кровотечения", mechanism: "Наттокиназа + антикоагулянты", severity: "HIGH"},
+      ],
     monitoring: [
       { what: 'Фибриноген', when: 'Каждые 8 нед' }
     ],
@@ -4973,8 +5274,12 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['gastrointestinal', 'immune'],
     mechanisms: ['ANTIMICROBIAL', 'ANTI_INFLAMMATORY', 'IMMUNE_REGULATION', 'GUT_FLORA_BALANCE'],
     description: 'Экстракт грейпфрутовых косточек — мощный антимикробный агент, поддерживает микрофлору кишечника и иммунитет.',
-    synergies: [],
-    conflicts: [],
+    synergies: [
+        {with: "probiotics", effect: "Антимикробное + пробиотическое", mechanism: "Экстракт грейпфрута — антимикробное", severity: "LOW"},
+      ],
+    conflicts: [
+        {with: "statin_drugs", effect: "Ингибирование CYP3A4", mechanism: "Бергамоттин ингибирует CYP3A4", severity: "HIGH"},
+      ],
     monitoring: [
       { what: 'Микрофлора', when: 'Субъективно' }
     ],
@@ -4996,7 +5301,9 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['hepatic', 'metabolic'],
     mechanisms: ['CIRCADIAN_RHYTHM_REGULATION', 'METABOLIC_IMPROVEMENT', 'ANTI_INFLAMMATORY', 'ANTIOXIDANT'],
     description: 'Нобилетин — флавоноид из цитрусовых, регулирует циркадные ритмы и метаболизм. Антивоспалительное действие.',
-    synergies: [],
+    synergies: [
+        {with: "curcumin", effect: "Противовоспалительное", mechanism: "Оба — флавоноиды", severity: "MEDIUM"},
+      ],
     conflicts: [],
     monitoring: [
       { what: 'Глюкоза натощак', when: 'Каждые 8 нед' }
@@ -5019,7 +5326,10 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['neuro', 'renal'],
     mechanisms: ['SENOLYTIC', 'ANTIOXIDANT', 'NEUROPROTECTION', 'ANTI_INFLAMMATORY'],
     description: 'Физетин — флавоноид с сенолитической активностью, избирательно удаляет стареющие клетки. Анти-возрастной.',
-    synergies: [],
+    synergies: [
+        {with: "quercetin", effect: "Сенолитическая активность", mechanism: "Оба удаляют стареющие клетки", severity: "HIGH"},
+        {with: "curcumin", effect: "Антиоксидантная защита", mechanism: "Оба подавляют воспаление", severity: "MEDIUM"},
+      ],
     conflicts: [],
     monitoring: [
       { what: 'Окислительный стресс', when: 'Субъективно' }
@@ -5042,7 +5352,9 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['hepatic', 'neuro'],
     mechanisms: ['ANTI_INFLAMMATORY', 'NEUROPROTECTION', 'LIVER_PROTECTION', 'ANXIOLYTIC'],
     description: 'Байкалин — флавоноид из шлемника байкальского, нейропротектор и гепатопротектор. Успокаивает и защищает.',
-    synergies: [],
+    synergies: [
+        {with: "curcumin", effect: "Противовоспалительное", mechanism: "Оба подавляют NF-kB и COX-2", severity: "MEDIUM"},
+      ],
     conflicts: [],
     monitoring: [
       { what: 'АЛТ/АСТ', when: 'Каждые 8 нед' }
@@ -5066,7 +5378,9 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['cardio', 'hepatic'],
     mechanisms: ['ANTIOXIDANT', 'ANTI_INFLAMMATORY', 'VASCULAR_PROTECTION', 'MITOCHONDRIAL_PROTECTION'],
     description: 'Таксифолин (дигидрокверцетин) — флавоноид из лиственницы, мощный антиоксидент. Защищает сосуды и митохондрии.',
-    synergies: [],
+    synergies: [
+        {with: "vitamin_c", effect: "Антиоксидантная сеть", mechanism: "Оба — флавоноиды", severity: "MEDIUM"},
+      ],
     conflicts: [],
     monitoring: [
       { what: 'Липидограмма', when: 'Каждые 8 нед' }
@@ -5092,7 +5406,9 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     synergies: [
       { with: "holy_basil", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" }
     ],
-    conflicts: [],
+    conflicts: [
+        {with: "tamoxifen", effect: "Антагонизм", mechanism: "Изофлавоны могут мешать антиэстрогенной терапии", severity: "MEDIUM"},
+      ],
     monitoring: [
       { what: 'Эстрадиол', when: 'Каждые 8 нед' }
     ],
@@ -5114,7 +5430,10 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['neuro', 'hepatic'],
     mechanisms: ['ANTIOXIDANT', 'NEUROPROTECTION', 'LIVER_PROTECTION', 'ANTI_INFLAMMATORY'],
     description: 'Розмарин (карнозиновая кислота) — мощный антиоксидант и нейропротектор. Улучшает память и защищает мозг.',
-    synergies: [],
+    synergies: [
+        {with: "curcumin", effect: "Нейропротекция", mechanism: "Карнозная кислота + куркумин", severity: "MEDIUM"},
+        {with: "omega3", effect: "Защита ЖК от окисления", mechanism: "Розмарин защищает ЖК", severity: "MEDIUM"},
+      ],
     conflicts: [],
     monitoring: [
       { what: 'Когнитивные тесты', when: 'Субъективно' }
@@ -5164,7 +5483,10 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['cardio', 'reproductive'],
     mechanisms: ['ANTIOXIDANT', 'NITRIC_OXIDE_PRODUCTION', 'PROSTATE_PROTECTION', 'ANTI_INFLAMMATORY'],
     description: 'Гранат — богат эллаготаннинами, улучшает NO-продукцию и защищает простату. Кардиопротекция на курсе.',
-    synergies: [],
+    synergies: [
+        {with: "vitamin_c", effect: "Антиоксидант", mechanism: "Эллаговая кислота + C", severity: "MEDIUM"},
+        {with: "curcumin", effect: "Противовоспалительное", mechanism: "Оба подавляют NF-kB", severity: "MEDIUM"},
+      ],
     conflicts: [],
     monitoring: [
       { what: 'ПСА', when: 'Каждые 12 нед' }
@@ -5192,7 +5514,9 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
       { with: "cranberry", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" },
       { with: "probiotics", effect: "Клюква + Пробиотики — МП защита", mechanism: "Комбинированное действие", severity: "MEDIUM" }
     ],
-    conflicts: [],
+    conflicts: [
+        {with: "anticoagulant_drugs", effect: "Усиление антикоагуляции", mechanism: "Клюква + варфарин", severity: "HIGH"},
+      ],
     monitoring: [
       { what: 'Общий анализ мочи', when: 'Каждые 8 нед' }
     ],
@@ -5214,7 +5538,10 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['musculoskeletal', 'neuro'],
     mechanisms: ['MITOPHAGY_ACTIVATION', 'MITOCHONDRIAL_BIOGENESIS', 'MUSCLE_FUNCTION', 'ANTI_AGING'],
     description: 'Уролитин А — метаболит эллаготаннинов, активирует митофагию (очистку митохондрий). Анти-возрастной и мышечная поддержка.',
-    synergies: [],
+    synergies: [
+        {with: "nmn", effect: "Митофагия + NAD+", mechanism: "Уролитин A — митофагия, NMN — NAD+", severity: "HIGH"},
+        {with: "coq10", effect: "Митохондриальная функция", mechanism: "Оба поддерживают митохондрии", severity: "MEDIUM"},
+      ],
     conflicts: [],
     monitoring: [
       { what: 'КФК', when: 'Каждые 8 нед' }
@@ -5238,7 +5565,9 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['hepatic', 'gastrointestinal'],
     mechanisms: ['BILE_FLOW_STIMULATION', 'CHOLESTEROL_SOLUBILIZATION', 'LIVER_PROTECTION', 'GALLSTONE_PREVENTION'],
     description: 'Жёлчные кислоты (УДХК) — стимулируют желчеотток, растворяют камни, защищают печень. На курсе — гепатопротекция.',
-    synergies: [],
+    synergies: [
+        {with: "tudca", effect: "Желчеотток", mechanism: "Оба — желчные кислоты", severity: "MEDIUM"},
+      ],
     conflicts: [],
     monitoring: [
       { what: 'АЛТ/АСТ', when: 'Каждые 4 нед' }
@@ -5287,7 +5616,10 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['neuro'],
     mechanisms: ['ACETYLCHOLINE_MODULATION', 'ANXIOLYTIC', 'MEMORY_ENHANCEMENT', 'CREATIVITY_BOOST'],
     description: 'Анирацетам — ноотроп с анксиолитическим действием, улучшает память и снижает тревожность. На курсе — антистресс.',
-    synergies: [],
+    synergies: [
+        {with: "citicoline", effect: "Холинэргическая синергия", mechanism: "Рацетам + холин", severity: "HIGH"},
+        {with: "alpha_gpc", effect: "Фокус и память", mechanism: "Анирацетам + холин", severity: "MEDIUM"},
+      ],
     conflicts: [],
     monitoring: [
       { what: 'Когнитивные тесты', when: 'Субъективно' }
@@ -5310,7 +5642,9 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['neuro'],
     mechanisms: ['MEMORY_ENHANCEMENT', 'NEUROPROTECTION', 'FOCUS_IMPROVEMENT', 'ENERGY_BOOST'],
     description: 'Оксирацетам — стимулирующий ноотроп, улучшает память и фокус. На курсе — концентрация при тренировках.',
-    synergies: [],
+    synergies: [
+        {with: "citicoline", effect: "Когнитивная функция", mechanism: "Рацетам + холин", severity: "MEDIUM"},
+      ],
     conflicts: [],
     monitoring: [
       { what: 'Когнитивные тесты', when: 'Субъективно' }
@@ -5333,7 +5667,9 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['neuro'],
     mechanisms: ['MEMORY_ENHANCEMENT', 'FOCUS_IMPROVEMENT', 'ACETYLCHOLINE_MODULATION', 'LEARNING_BOOST'],
     description: 'Прамирацетам — мощный ноотроп, в 10-30 раз сильнее пирацетама. Улучшает память и обучение на курсе.',
-    synergies: [],
+    synergies: [
+        {with: "citicoline", effect: "Память и фокус", mechanism: "Самый мощный рацетам + холин", severity: "HIGH"},
+      ],
     conflicts: [],
     monitoring: [
       { what: 'Когнитивные тесты', when: 'Субъективно' }
@@ -5356,7 +5692,9 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['neuro', 'endocrine'],
     mechanisms: ['GLUTAMATE_MODULATION', 'ANXIOLYTIC', 'MEMORY_ENHANCEMENT', 'ADRENAL_RECOVERY'],
     description: 'Фасорацетам — ноотроп нового поколения, модулирует глутаматные рецепторы и восстанавливает надпочечники.',
-    synergies: [],
+    synergies: [
+        {with: "magnesium", effect: "GABA-B модуляция", mechanism: "Фасорацетам + GABA-B", severity: "MEDIUM"},
+      ],
     conflicts: [],
     monitoring: [
       { what: 'Когнитивные тесты', when: 'Субъективно' }
@@ -5379,7 +5717,9 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['neuro'],
     mechanisms: ['CHOLINE_UPTAKE_ENHANCEMENT', 'MEMORY_ENHANCEMENT', 'VISION_IMPROVEMENT', 'NEUROPROTECTION'],
     description: 'Колурацетам — усиливает захват холина, улучшает память и зрение. На курсе — нейропротекция и фокус.',
-    synergies: [],
+    synergies: [
+        {with: "citicoline", effect: "Холинэргическая синергия", mechanism: "Колурацетам + захват холина", severity: "MEDIUM"},
+      ],
     conflicts: [],
     monitoring: [
       { what: 'Когнитивные тесты', when: 'Субъективно' }
@@ -5483,7 +5823,9 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     synergies: [
       { with: "ginkgo", effect: "Винпоцетин + Гинкго — мозговой кровоток", mechanism: "Комбинированное действие", severity: "MEDIUM" }
     ],
-    conflicts: [],
+    conflicts: [
+        {with: "anticoagulant_drugs", effect: "Риск кровотечения", mechanism: "Винпоцетин + антикоагулянты", severity: "MEDIUM"},
+      ],
     monitoring: [
       { what: 'Когнитивные тесты', when: 'Субъективно' }
     ],
@@ -5506,8 +5848,12 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['neuro'],
     mechanisms: ['WAKEFULNESS', 'PROMOTING', 'FOCUS_ENHANCEMENT', 'DOPAMINE_MODULATION', 'FATIGUE_REDUCTION'],
     description: 'Модафинил — стимулятор бодрствования, улучшает фокус и снижает усталость. На курсе — при тренировках в 5 утра.',
-    synergies: [],
-    conflicts: [],
+    synergies: [
+        {with: "l_tyrosine", effect: "Бодрость и фокус", mechanism: "Модафинил + тирозин — дофамин", severity: "MEDIUM"},
+      ],
+    conflicts: [
+        {with: "antihypertensive_drugs", effect: "Повышение давления", mechanism: "Модафинил может повышать АД", severity: "MEDIUM"},
+      ],
     monitoring: [
       { what: 'Когнитивные тесты', when: 'Субъективно' }
     ],
@@ -5529,8 +5875,13 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['neuro'],
     mechanisms: ['MAO_B_INHIBITION', 'DOPAMINE_PROTECTION', 'NEUROPROTECTION', 'ANTI_AGING'],
     description: 'Селегилин — ингибитор МАО-Б, защищает дофамин и обладает нейропротекторным действием. Анти-возрастной.',
-    synergies: [],
-    conflicts: [],
+    synergies: [
+        {with: "l_tyrosine", effect: "Дофаминергическая синергия", mechanism: "Селегилин ингибирует MAO-B", severity: "HIGH"},
+      ],
+    conflicts: [
+        {with: "maoi_drugs", effect: "Серотониновый синдром", mechanism: "Двойное ингибирование MAO", severity: "HIGH"},
+        {with: "antidepressant_drugs", effect: "Серотониновый синдром", mechanism: "Селегилин + СИОЗС", severity: "HIGH"},
+      ],
     monitoring: [
       { what: 'Дофамин', when: 'Каждые 8 нед' }
     ],
@@ -5553,7 +5904,10 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['neuro'],
     mechanisms: ['NMDA_ANTAGONISM', 'NEUROPROTECTION', 'MEMORY_PRESERVATION', 'NEUROPLASTICITY'],
     description: 'Мемантин — антагонист NMDA-рецепторов, нейропротектор. Предотвращает эксайтотоксичность на курсе.',
-    synergies: [],
+    synergies: [
+        {with: "magnesium", effect: "Нейропротекция", mechanism: "Оба блокируют NMDA", severity: "MEDIUM"},
+        {with: "citicoline", effect: "Когнитивная функция", mechanism: "Мемантин + холин", severity: "MEDIUM"},
+      ],
     conflicts: [],
     monitoring: [
       { what: 'Когнитивные тесты', when: 'Субъективно' }
@@ -5576,7 +5930,10 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['neuro', 'endocrine'],
     mechanisms: ['DOPAMINE_SYNTHESIS_UPREGULATION', 'ANXIOLYTIC', 'ANTI_FATIGUE', 'STRESS_ADAPTATION'],
     description: 'Бромантан — ноотроп и адаптоген, стимулирует синтез дофамина и снижает тревожность. На курсе — антистресс и фокус.',
-    synergies: [],
+    synergies: [
+        {with: "l_tyrosine", effect: "Синтез дофамина", mechanism: "Бромантан усиливает дофамин", severity: "MEDIUM"},
+        {with: "rhodiola", effect: "Адаптогенный эффект", mechanism: "Оба — актопротекторы", severity: "MEDIUM"},
+      ],
     conflicts: [],
     monitoring: [
       { what: 'Когнитивные тесты', when: 'Субъективно' }
@@ -5599,8 +5956,13 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['neuro'],
     mechanisms: ['SEROTONIN_REUPTAKE_ENHANCEMENT', 'NEUROPROTECTION', 'BDNF_INCREASE', 'ANXIOLYTIC'],
     description: 'Тианептин — антидепрессант с нейропротекторным действием, увеличивает BDNF. На курсе — настроение и мозг.',
-    synergies: [],
-    conflicts: [],
+    synergies: [
+        {with: "omega3", effect: "Нейропротекция", mechanism: "Оба поддерживают нейропластичность", severity: "LOW"},
+      ],
+    conflicts: [
+        {with: "maoi_drugs", effect: "Серотониновый синдром", mechanism: "Тианептин + ИМАО = опасно", severity: "HIGH"},
+        {with: "antidepressant_drugs", effect: "Серотониновый синдром", mechanism: "Тианептин + СИОЗС", severity: "HIGH"},
+      ],
     monitoring: [
       { what: 'Настроение', when: 'Субъективно' }
     ],
@@ -5649,7 +6011,10 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['neuro'],
     mechanisms: ['GABA_MODULATION', 'ANXIOLYTIC', 'ANTIOXIDANT', 'ANTI_INFLAMMATORY'],
     description: 'Апигенин — флавоноид из ромашки, модулирует ГАМК-рецепторы, снижает тревожность и улучшает сон.',
-    synergies: [],
+    synergies: [
+        {with: "magnesium", effect: "Улучшение сна", mechanism: "Оба модулируют GABA", severity: "MEDIUM"},
+        {with: "theanine", effect: "Расслабление", mechanism: "Оба — природные анксиолитики", severity: "MEDIUM"},
+      ],
     conflicts: [],
     monitoring: [
       { what: 'Когнитивные тесты', when: 'Субъективно' }
@@ -5672,8 +6037,12 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['neuro', 'gastrointestinal'],
     mechanisms: ['GABA_MODULATION', 'ANXIOLYTIC', 'DIGESTION_IMPROVEMENT', 'SLEEP_REGULATION'],
     description: 'Мелисса — анксиолитик с ГАМК-модулирующим действием, улучшает сон и пищеварение. На курсе — антистресс.',
-    synergies: [],
-    conflicts: [],
+    synergies: [
+        {with: "magnesium", effect: "Анксиолитический эффект", mechanism: "Оба усиливают GABA", severity: "MEDIUM"},
+      ],
+    conflicts: [
+        {with: "sedative_drugs", effect: "Усиление седации", mechanism: "Мелисса потенцирует седативные", severity: "MEDIUM"},
+      ],
     monitoring: [
       { what: 'Когнитивные тесты', when: 'Субъективно' }
     ],
@@ -5695,8 +6064,13 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['neuro'],
     mechanisms: ['SEROTONIN_MODULATION', 'ANTIDEPRESSANT', 'VISION_PROTECTION', 'ANTI_INFLAMMATORY'],
     description: 'Шафран — антидепрессант и ноотроп, модулирует серотонин и защищает зрение. На курсе — настроение.',
-    synergies: [],
-    conflicts: [],
+    synergies: [
+        {with: "omega3", effect: "Антидепрессивный эффект", mechanism: "Оба улучшают настроение", severity: "MEDIUM"},
+        {with: "curcumin", effect: "Противовоспалительное + антидепрессивное", mechanism: "Оба модулируют серотонин", severity: "MEDIUM"},
+      ],
+    conflicts: [
+        {with: "antidepressant_drugs", effect: "Серотониновый синдром", mechanism: "Шафран + СИОЗС", severity: "HIGH"},
+      ],
     monitoring: [
       { what: 'Настроение', when: 'Субъективно' }
     ],
@@ -5748,8 +6122,12 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['metabolic'],
     mechanisms: ['GLP1_RECEPTOR_AGONISM', 'APPETITE_SUPPRESSION', 'GLUCOSE_REGULATION', 'WEIGHT_LOSS'],
     description: 'Семаглутид — агонист ГПП-1 рецепторов, мощное снижение аппетита и веса. На курсе — контроль метаболизма.',
-    synergies: [],
-    conflicts: [],
+    synergies: [
+        {with: "berberine", effect: "Контроль глюкозы и веса", mechanism: "Оба снижают аппетит", severity: "MEDIUM"},
+      ],
+    conflicts: [
+        {with: "antidiabetic_drugs", effect: "Риск гипогликемии", mechanism: "Двойное снижение глюкозы", severity: "HIGH"},
+      ],
     monitoring: [
       { what: 'Глюкоза натощак', when: 'Каждые 4 нед', targetRange: '3.5-5.5 ммоль/л' }
     ],
@@ -5799,7 +6177,9 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['reproductive', 'endocrine'],
     mechanisms: ['PROLACTIN_INHIBITION', 'DOPAMINE_D2_AGONISM', 'LH_PULSE_RESTORE', 'LIBIDO_RECOVERY'],
     description: 'Каберголин — агонист D2-рецепторов, подавляет пролактин. Восстанавливает ЛГ и либидо на курсе.',
-    synergies: [],
+    synergies: [
+        {with: "vitamin_b6", effect: "Снижение пролактина", mechanism: "Оба снижают пролактин", severity: "MEDIUM"},
+      ],
     conflicts: [
       { with: "testosterone", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "LOW" }
     ],
@@ -5888,8 +6268,13 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['musculoskeletal', 'renal'],
     mechanisms: ['COX_INHIBITION', 'ANTI_INFLAMMATORY', 'ANALGESIC', 'ANTIPYRETIC'],
     description: 'Диклофенак — НПВС, ингибитор ЦОГ-1/2, мощное противовоспалительное и обезболивающее. На курсе — суставы (краткосрочно).',
-    synergies: [],
-    conflicts: [],
+    synergies: [
+        {with: "omeprazole", effect: "Защита желудка при НПВС", mechanism: "ИПП предотвращает НПВС-гастропатию", severity: "HIGH"},
+      ],
+    conflicts: [
+        {with: "anticoagulant_drugs", effect: "Риск кровотечения", mechanism: "НПВС + антикоагулянты", severity: "HIGH"},
+        {with: "lithium", effect: "Токсичность лития", mechanism: "НПВС снижают выведение Li", severity: "HIGH"},
+      ],
     monitoring: [
       { what: 'Креатинин', when: 'Каждые 2 нед' }
     ],
@@ -5912,8 +6297,12 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['musculoskeletal', 'renal'],
     mechanisms: ['COX2_SELECTIVE_INHIBITION', 'ANTI_INFLAMMATORY', 'ANALGESIC', 'JOINT_PROTECTION'],
     description: 'Мелоксикам — селективный ингибитор ЦОГ-2, меньше гастротоксичности чем диклофенак. На курсе — суставы.',
-    synergies: [],
-    conflicts: [],
+    synergies: [
+        {with: "omeprazole", effect: "Защита ЖКТ", mechanism: "ИПП при НПВС", severity: "MEDIUM"},
+      ],
+    conflicts: [
+        {with: "anticoagulant_drugs", effect: "Риск кровотечения", mechanism: "НПВС + антикоагулянты", severity: "HIGH"},
+      ],
     monitoring: [
       { what: 'Креатинин', when: 'Каждые 2 нед' }
     ],
@@ -5967,8 +6356,12 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['renal', 'cardio'],
     mechanisms: ['ALDOSTERONE_ANTAGONISM', 'POTASSIUM_SPARING', 'ANTI_ANDROGEN', 'EDEMA_REDUCTION'],
     description: 'Спиронолактон — антагонист альдостерона, калийсберегающий диуретик с антиандрогенным действием. На курсе — отёки и калий.',
-    synergies: [],
-    conflicts: [],
+    synergies: [
+        {with: "saw_palmetto", effect: "Антиандрогенный эффект", mechanism: "Оба подавляют андрогены", severity: "MEDIUM"},
+      ],
+    conflicts: [
+        {with: "ace_inhibitor_drugs", effect: "Риск гиперкалиемии", mechanism: "Спиронолактон + ИАПФ = калий", severity: "HIGH"},
+      ],
     monitoring: [
       { what: 'Калий', when: 'Каждые 2 нед', targetRange: '4.0-5.0 ммоль/л' }
     ],
@@ -6127,7 +6520,9 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     mechanisms: ['NMDA_ANTAGONISM', 'RAPID_ANTIDEPRESSANT', 'ANALGESIC', 'NEUROPLASTICITY'],
     description: 'Кетамин — NMDA-антагонист с быстрым антидепрессивным действием. Только в клинике под наблюдением.',
     synergies: [],
-    conflicts: [],
+    conflicts: [
+        {with: "antidepressant_drugs", effect: "Риск серотонинового синдрома", mechanism: "Кетамин + СИОЗС", severity: "MEDIUM"},
+      ],
     monitoring: [
       { what: 'Настроение', when: 'Субъективно' }
     ],
@@ -6207,7 +6602,11 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     synergies: [
       { with: "curcumin", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "MEDIUM" }
     ],
-    conflicts: [],
+    conflicts: [
+        {with: "calcium", effect: "Остеопороз", mechanism: "Кортикостероиды вымывают Ca", severity: "HIGH"},
+        {with: "vitamin_d3", effect: "Дефицит D3", mechanism: "Кортикостероиды снижают D3", severity: "MEDIUM"},
+        {with: "nsaid_drugs", effect: "Риск язвы", mechanism: "КС + НПВС = язва желудка", severity: "HIGH"},
+      ],
     monitoring: [
       { what: 'Кортизол', when: 'Каждые 4 нед' }
     ],
@@ -6261,7 +6660,11 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     mechanisms: ['PLATELET_INHIBITION', 'THROMBUS_PREVENTION', 'MICROCIRCULATION', 'STROKE_PREVENTION'],
     description: 'Антиагреганты — аспирин/клопидогрел для предотвращения тромбов. На курсе — защита сосудов при эритроцитозе.',
     synergies: [],
-    conflicts: [],
+    conflicts: [
+        {with: "nsaid_drugs", effect: "Риск кровотечения", mechanism: "Двойное подавление тромбоцитов", severity: "HIGH"},
+        {with: "omega3", effect: "Усиление антиагрегантного эффекта", mechanism: "Омега-3 снижает агрегацию", severity: "MEDIUM"},
+        {with: "ginger", effect: "Усиление эффекта", mechanism: "Имбирь ингибирует тромбоциты", severity: "MEDIUM"},
+      ],
     monitoring: [
       { what: 'Гемоглобин/Гематокрит', when: 'Каждые 8 нед', targetRange: 'Ht<54%' }
     ],
@@ -6347,7 +6750,9 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     synergies: [
       { with: "ginger", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "MEDIUM" }
     ],
-    conflicts: [],
+    conflicts: [
+        {with: "potassium_supplements", effect: "Риск гиперкалиемии", mechanism: "АРБ снижают выведение K", severity: "HIGH"},
+      ],
     monitoring: [
       { what: 'АД', when: 'Каждые 2 нед', targetRange: '<130/85 мм рт.ст.' }
     ],
@@ -6394,7 +6799,9 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['cardio'],
     mechanisms: ['BETA_RECEPTOR_BLOCKADE', 'HEART_RATE_REDUCTION', 'BLOOD_PRESSURE_LOWERING', 'ARRHYTHMIA_PREVENTION'],
     description: 'Бета-блокаторы — бисопролол/метопролол, снижают ЧСС и АД. На курсе — контроль пульса и АД.',
-    synergies: [],
+    synergies: [
+        {with: "coq10", effect: "Защита сердца", mechanism: "Бета-блокаторы + CoQ10", severity: "MEDIUM"},
+      ],
     conflicts: [
       { with: "stimulant_complex", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "HIGH" },
       { with: "potassium", effect: "Взаимодействие с фарма-препаратом — консультация врача", mechanism: "Комбинированное действие", severity: "HIGH" }
@@ -6567,8 +6974,15 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['endocrine', 'cardio', 'neuro'],
     mechanisms: ['T4_REPLACEMENT', 'THYROID_HORMONE_NORMALIZATION', 'METABOLIC_RATE', 'BMR_REGULATION'],
     description: 'Левотироксин — замещающая терапия при гипотиреозе. Нормализует ТТГ и метаболизм. Только по назначению.',
-    synergies: [],
-    conflicts: [],
+    synergies: [
+        {with: "selenium", effect: "Конверсия T4→T3", mechanism: "Селен — кофактор дейодиназ", severity: "HIGH"},
+        {with: "iron", effect: "Синтез гормонов", mechanism: "Железо необходим для щитовидной", severity: "MEDIUM"},
+      ],
+    conflicts: [
+        {with: "calcium", effect: "Снижение всасывания", mechanism: "Кальций снижает всасывание левотироксина", severity: "HIGH"},
+        {with: "iron", effect: "Снижение всасывания", mechanism: "Железо снижает всасывание левотироксина", severity: "HIGH"},
+        {with: "fiber", effect: "Снижение всасывания", mechanism: "Клетчатка может связывать", severity: "LOW"},
+      ],
     monitoring: [
       { what: 'ТТГ', when: 'Каждые 8 нед', targetRange: '0.5-3.0 мкМЕ/мл' }
     ],
@@ -6615,7 +7029,9 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['gastrointestinal', 'immune'],
     mechanisms: ['GUT_BARRIER_STRENGTHENING', 'ANTI_INFLAMMATORY', 'IMMUNE_REGULATION', 'MICROBIOME_SUPPORT'],
     description: 'Постбиотики — метаболиты пробиотиков (бутират, лактат, короткоцепочечные кислоты). Укрепляют кишечный барьер.',
-    synergies: [],
+    synergies: [
+        {with: "probiotics", effect: "Комплексная поддержка микробиома", mechanism: "Постбиотики + пробиотики", severity: "MEDIUM"},
+      ],
     conflicts: [],
     monitoring: [
       { what: 'Микрофлора', when: 'Субъективно' }
@@ -6638,7 +7054,9 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['gastrointestinal', 'immune'],
     mechanisms: ['IMMUNE_REGULATION', 'ANTI_INFLAMMATORY', 'GUT_BARRIER_INTEGRITY', 'MICROBIOME_BALANCE'],
     description: 'Парабиотики — инактивированные пробиотические штаммы, обладают иммуномодулирующим действием без риска для иммунокомпрометированных.',
-    synergies: [],
+    synergies: [
+        {with: "probiotics", effect: "Иммуномодуляция", mechanism: "Парабиотики + живые пробиотики", severity: "MEDIUM"},
+      ],
     conflicts: [],
     monitoring: [
       { what: 'Микрофлора', when: 'Субъективно' }
@@ -6662,7 +7080,10 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['gastrointestinal', 'metabolic'],
     mechanisms: ['BUTYRATE_PRODUCTION', 'INSULIN_SENSITIVITY', 'GUT_FLORA_SUPPORT', 'FAT_OXIDATION'],
     description: 'Резистентный крахмал — пребиотик, ферментируется кишечной микрофлорой с образованием бутирата. Улучшает инсулиновую чувствительность.',
-    synergies: [],
+    synergies: [
+        {with: "probiotics", effect: "Пребиотический эффект", mechanism: "Резистентный крахмал — пища для пробиотиков", severity: "HIGH"},
+        {with: "butyrate", effect: "Здоровье кишечника", mechanism: "Крахмал → бутират", severity: "MEDIUM"},
+      ],
     conflicts: [],
     monitoring: [
       { what: 'Глюкоза натощак', when: 'Каждые 8 нед' }
@@ -6685,8 +7106,13 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['gastrointestinal', 'immune', 'cardio'],
     mechanisms: ['IMMUNE_ACTIVATION', 'CHOLESTEROL_LOWERING', 'GUT_FLORA_SUPPORT', 'ANTI_INFLAMMATORY'],
     description: 'Бета-глюкан — полисахарид из овса/грибов, активирует иммунитет и снижает холестерин. На курсе — иммунитет и сосуды.',
-    synergies: [],
-    conflicts: [],
+    synergies: [
+        {with: "vitamin_d3", effect: "Иммунная активация", mechanism: "Бета-глюканы + D3", severity: "MEDIUM"},
+        {with: "zinc", effect: "Иммунитет", mechanism: "Оба — врождённый иммунитет", severity: "MEDIUM"},
+      ],
+    conflicts: [
+        {with: "immunosuppressant_drugs", effect: "Антагонизм", mechanism: "Стимулирует иммунитет", severity: "MEDIUM"},
+      ],
     monitoring: [
       { what: 'Общий анализ крови', when: 'Каждые 8 нед' }
     ],
@@ -6709,8 +7135,13 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['gastrointestinal', 'metabolic', 'cardio'],
     mechanisms: ['GUT_MOTILITY', 'CHOLESTEROL_LOWERING', 'INSULIN_SENSITIVITY', 'SATIETY'],
     description: 'Клетчатка — пищевые волокна для нормализации моторики кишечника, снижения холестерина и контроля глюкозы.',
-    synergies: [],
-    conflicts: [],
+    synergies: [
+        {with: "probiotics", effect: "Синбиотический эффект", mechanism: "Клетчатка — пребиотик", severity: "HIGH"},
+        {with: "butyrate", effect: "Здоровье кишечника", mechanism: "Клетчатка → бутират", severity: "MEDIUM"},
+      ],
+    conflicts: [
+        {with: "iron", effect: "Снижение всасывания", mechanism: "Фитаты связывают железо", severity: "LOW"},
+      ],
     monitoring: [
       { what: 'Стул', when: 'Субъективно' }
     ],
@@ -6733,7 +7164,9 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['gastrointestinal', 'immune', 'neuro'],
     mechanisms: ['BIFIDOBACTERIA_GROWTH', 'GUT_BARRIER_STRENGTHENING', 'IMMUNE_REGULATION', 'BRAIN_GUT_AXIS'],
     description: 'Олигосахариды грудного молока (HMO) — пребиотики, стимулирующие рост бифидобактерий. Поддержка микробиома и иммунитета.',
-    synergies: [],
+    synergies: [
+        {with: "probiotics", effect: "Рост бифидобактерий", mechanism: "HMO — специфический пребиотик", severity: "HIGH"},
+      ],
     conflicts: [],
     monitoring: [
       { what: 'Микрофлора', when: 'Субъективно' }
@@ -6756,7 +7189,9 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['musculoskeletal', 'gastrointestinal'],
     mechanisms: ['ENERGY_PRODUCTION', 'GUT_FLORA_SUPPORT', 'MITOCHONDRIAL_FUNCTION', 'MUSCLE_RECOVERY'],
     description: 'Лактат — молочная кислота, используется как энергетический субстрат. Улучшает восстановление и митохондриальную функцию.',
-    synergies: [],
+    synergies: [
+        {with: "probiotics", effect: "Среда для пробиотиков", mechanism: "Лактат — метаболит лактобактерий", severity: "LOW"},
+      ],
     conflicts: [],
     monitoring: [
       { what: 'КФК', when: 'Каждые 8 нед' }
@@ -6780,7 +7215,10 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['gastrointestinal'],
     mechanisms: ['DIGESTION_IMPROVEMENT', 'PROTEIN_ABSORPTION', 'NUTRIENT_BIOAVAILABILITY', 'GUT_PROTECTION'],
     description: 'Пищеварительные ферменты — амилаза, протеаза, липаза для улучшения усвоения белка и нутриентов. На курсе — ЖКТ.',
-    synergies: [],
+    synergies: [
+        {with: "probiotics", effect: "Улучшение пищеварения", mechanism: "Ферменты расщепляют, пробиотики усваивают", severity: "MEDIUM"},
+        {with: "betaine", effect: "Переваривание белков", mechanism: "Бетаин HCl + ферменты", severity: "MEDIUM"},
+      ],
     conflicts: [],
     monitoring: [
       { what: 'Пищеварение', when: 'Субъективно' }
@@ -6804,7 +7242,10 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['gastrointestinal', 'immune'],
     mechanisms: ['GUT_BARRIER_STRENGTHENING', 'ANTI_INFLAMMATORY', 'WOUND_HEALING', 'IMMUNE_SUPPORT'],
     description: 'Цинк-карнозин — комплекс цинка и карнозина, заживляет слизистую желудка и кишечника. На курсе — защита ЖКТ.',
-    synergies: [],
+    synergies: [
+        {with: "probiotics", effect: "Заживление слизистой ЖКТ", mechanism: "Цинк-карнозин + пробиотики", severity: "HIGH"},
+        {with: "glutamine", effect: "Целостность кишечного барьера", mechanism: "Оба восстанавливают слизистую", severity: "MEDIUM"},
+      ],
     conflicts: [],
     monitoring: [
       { what: 'Гастроскопия', when: 'Каждые 8 нед' }
@@ -6828,7 +7269,10 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['gastrointestinal', 'immune'],
     mechanisms: ['IMMUNE_REGULATION', 'GUT_BARRIER_STRENGTHENING', 'GROWTH_FACTORS', 'ANTI_INFLAMMATORY'],
     description: 'Молозиво — первый секрет молочных желёз, богат иммуноглобулинами и факторами роста. Поддержка иммунитета и ЖКТ.',
-    synergies: [],
+    synergies: [
+        {with: "probiotics", effect: "Иммунитет кишечника", mechanism: "Молозиво + пробиотики", severity: "MEDIUM"},
+        {with: "zinc_carnosine", effect: "Заживление ЖКТ", mechanism: "Оба содержат факторы роста", severity: "MEDIUM"},
+      ],
     conflicts: [],
     monitoring: [
       { what: 'Общий анализ крови', when: 'Каждые 8 нед' }
@@ -6852,8 +7296,13 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['immune', 'hepatic'],
     mechanisms: ['IMMUNE_ACTIVATION', 'NK_CELL_INCREASE', 'LIVER_PROTECTION', 'ANTI_INFLAMMATORY'],
     description: 'AHCC — экстракт грибов шиитаке, активирует NK-клетки и макрофаги. Поддержка иммунитета и печени на курсе.',
-    synergies: [],
-    conflicts: [],
+    synergies: [
+        {with: "vitamin_d3", effect: "Иммунитет", mechanism: "Оба активируют NK-клетки", severity: "MEDIUM"},
+        {with: "reishi", effect: "Грибная иммуномодуляция", mechanism: "Оба — иммуномодуляторы", severity: "MEDIUM"},
+      ],
+    conflicts: [
+        {with: "immunosuppressant_drugs", effect: "Антагонизм", mechanism: "AHCC стимулирует иммунитет", severity: "MEDIUM"},
+      ],
     monitoring: [
       { what: 'NK-клетки', when: 'Каждые 8 нед' }
     ],
@@ -6899,7 +7348,9 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     mechanisms: ['FIGHT_OR_FLIGHT', 'HEART_RATE_INCREASE', 'BRONCHODILATION', 'GLUCOSE_ELEVATION'],
     description: 'Адреналин — маркер симпатической активации. Не добавка, а показатель стресс-реакции для контроля на курсе.',
     synergies: [],
-    conflicts: [],
+    conflicts: [
+        {with: "beta_blocker_drugs", effect: "Антагонизм", mechanism: "Бета-блокаторы блокируют адреналин", severity: "HIGH"},
+      ],
     monitoring: [
       { what: 'Адреналин', when: 'Каждые 8 нед' }
     ],
@@ -6944,7 +7395,9 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['neuro', 'endocrine'],
     mechanisms: ['GABA_MODULATION', 'NEUROPROTECTION', 'STRESS_RESPONSE', 'MOOD_REGULATION'],
     description: 'Нейростероид — маркер нейроэндокринного баланса (ДГЭА, прегненолон, аллопрегнанолон). Для контроля на курсе.',
-    synergies: [],
+    synergies: [
+        {with: "pregnenolone", effect: "Нейростероидный путь", mechanism: "Прегненолон — предшественник", severity: "MEDIUM"},
+      ],
     conflicts: [],
     monitoring: [
       { what: 'ДГЭА-S', when: 'Каждые 8 нед' }
@@ -6967,8 +7420,12 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['metabolic', 'hepatic'],
     mechanisms: ['GLUCOSE_ELEVATION', 'Glycogenolysis', 'KETOGENESIS_REGULATION', 'INSULIN_COUNTER_REGULATION'],
     description: 'Глюкагон — маркер метаболизма, контр-инсулиновый гормон. Не добавка, а показатель для контроля на курсе.',
-    synergies: [],
-    conflicts: [],
+    synergies: [
+        {with: "insulin", effect: "Баланс глюкозы", mechanism: "Антагонистическая регуляция", severity: "MEDIUM"},
+      ],
+    conflicts: [
+        {with: "insulin", effect: "Антагонизм", mechanism: "Глюкагон повышает глюкозу, инсулин снижает", severity: "MEDIUM"},
+      ],
     monitoring: [
       { what: 'Глюкагон', when: 'Каждые 8 нед' }
     ],
@@ -6991,7 +7448,9 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['renal', 'cardio', 'musculoskeletal'],
     mechanisms: ['HYDRATION', 'TEMPERATURE_REGULATION', 'NUTRIENT_TRANSPORT', 'WASTE_REMOVAL'],
     description: 'Вода — основа гидратации и метаболизма. 30-40 мл/кг/день — обязательна на курсе для всех процессов.',
-    synergies: [],
+    synergies: [
+        {with: "sodium", effect: "Гидратация", mechanism: "Натрий + вода — осмотический баланс", severity: "MEDIUM"},
+      ],
     conflicts: [],
     monitoring: [
       { what: 'Электролиты', when: 'Каждые 4 нед' }
@@ -7112,8 +7571,13 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['immune', 'cardio', 'renal'],
     mechanisms: ['IMMUNE_ACTIVATION', 'ANTI_AGING', 'TELOMERE_SUPPORT', 'KIDNEY_PROTECTION'],
     description: 'Астрагал — адаптоген и иммуномодулятор, поддерживает теломеры и защищает почки. На курсе — иммунитет и анти-возраст.',
-    synergies: [],
-    conflicts: [],
+    synergies: [
+        {with: "vitamin_c", effect: "Иммунитет", mechanism: "Оба поддерживают иммунитет", severity: "MEDIUM"},
+        {with: "reishi", effect: "Адаптогенный и иммунный", mechanism: "Оба — иммуномодуляторы", severity: "MEDIUM"},
+      ],
+    conflicts: [
+        {with: "immunosuppressant_drugs", effect: "Антагонизм", mechanism: "Астрагал стимулирует иммунитет", severity: "MEDIUM"},
+      ],
     monitoring: [
       { what: 'Общий анализ крови', when: 'Каждые 8 нед' }
     ],
@@ -7135,7 +7599,9 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['neuro', 'reproductive'],
     mechanisms: ['BONDING_ENHANCEMENT', 'ANXIOLYTIC', 'MUSCLE_REGENERATION', 'WOUND_HEALING'],
     description: 'Окситоцин — гормон привязанности, снижает тревожность и улучшает восстановление мышц. На курсе — антистресс.',
-    synergies: [],
+    synergies: [
+        {with: "magnesium", effect: "Расслабление", mechanism: "Оба способствуют расслаблению", severity: "LOW"},
+      ],
     conflicts: [],
     monitoring: [
       { what: 'Настроение', when: 'Субъективно' }
@@ -7159,8 +7625,13 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['endocrine', 'neuro', 'musculoskeletal'],
     mechanisms: ['DHEA_PRODUCTION', 'ANDROGEN_PRECURSOR', 'CORTISOL_BALANCE', 'ANTI_AGING'],
     description: 'ДГЭА — предшественник половых гормонов, снижается с возрастом. На курсе — гормональный баланс и анти-возраст.',
-    synergies: [],
-    conflicts: [],
+    synergies: [
+        {with: "vitamin_d3", effect: "Гормональная поддержка", mechanism: "Оба поддерживают гормональный баланс", severity: "MEDIUM"},
+        {with: "zinc", effect: "Синтез гормонов", mechanism: "Цинк необходим для стероидогенеза", severity: "MEDIUM"},
+      ],
+    conflicts: [
+        {with: "hormone_sensitive_conditions", effect: "Риск при гормонозависимых опухолях", mechanism: "DHEA конвертируется в гормоны", severity: "HIGH"},
+      ],
     monitoring: [
       { what: 'ДГЭА-S', when: 'Каждые 8 нед', targetRange: '150-420 мкг/дл' }
     ],
@@ -7182,8 +7653,12 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['reproductive', 'cardio'],
     mechanisms: ['BONE_DENSITY_REGULATION', 'CARDIOVASCULAR_PROTECTION', 'REPRODUCTIVE_FUNCTION', 'MOOD_REGULATION'],
     description: 'Эстрадиол — основной эстроген, маркер феминизации на курсе. Контроль для корректировки ПКТ и антиэстрогенов.',
-    synergies: [],
-    conflicts: [],
+    synergies: [
+        {with: "progesterone", effect: "Гормональный баланс", mechanism: "Эстрадиол + прогестерон — цикл", severity: "MEDIUM"},
+      ],
+    conflicts: [
+        {with: "aromatase_inhibitor", effect: "Антагонизм", mechanism: "ИА подавляют эстрадиол", severity: "HIGH"},
+      ],
     monitoring: [
       { what: 'Эстрадиол', when: 'Каждые 4 нед', targetRange: '10-40 пг/мл (муж.)' }
     ],
@@ -7205,7 +7680,10 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['reproductive', 'neuro'],
     mechanisms: ['PROGESTERONE_BALANCE', 'NEUROPROTECTION', 'ANTI_INFLAMMATORY', 'SLEEP_REGULATION'],
     description: 'Прогестерон — маркер для контроля на курсе. У мужчин — маркер подавления оси ГРГ-ЛГ-ФСГ.',
-    synergies: [],
+    synergies: [
+        {with: "estradiol", effect: "Баланс эстроген/прогестерон", mechanism: "Необходим для женского баланса", severity: "MEDIUM"},
+        {with: "vitamin_b6", effect: "Снижение ПМС", mechanism: "B6 поддерживает прогестерон", severity: "MEDIUM"},
+      ],
     conflicts: [
       { with: "holy_basil", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "HIGH" }
     ],
@@ -7233,7 +7711,9 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     synergies: [
       { with: "ipamorelin", effect: "Синергия: усиление взаимного эффекта", mechanism: "Комбинированное действие", severity: "MEDIUM" }
     ],
-    conflicts: [],
+    conflicts: [
+        {with: "antidiabetic_drugs", effect: "Риск гипогликемии", mechanism: "Двойное снижение глюкозы", severity: "HIGH"},
+      ],
     monitoring: [
       { what: 'Глюкоза', when: 'Каждые 4 нед', targetRange: '3.5-5.5 ммоль/л' }
     ],
@@ -7255,7 +7735,9 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['renal', 'neuro'],
     mechanisms: ['WATER_RETENTION', 'BLOOD_PRESSURE_REGULATION', 'MEMORY_ENHANCEMENT', 'SOCIAL_BONDING'],
     description: 'Вазопрессин — антидиуретический гормон, регулирует водный баланс и память. На курсе — контроль гидратации.',
-    synergies: [],
+    synergies: [
+        {with: "sodium", effect: "Водный баланс", mechanism: "Вазопрессин регулирует воду", severity: "MEDIUM"},
+      ],
     conflicts: [],
     monitoring: [
       { what: 'Натрий/Осмолярность', when: 'Каждые 4 нед' }
@@ -7278,7 +7760,9 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['neuro', 'immune', 'gastrointestinal'],
     mechanisms: ['PAIN_MODULATION', 'APPETITE_REGULATION', 'MOOD_REGULATION', 'ANTI_INFLAMMATORY'],
     description: 'Эндоканнабиноидная система — регулятор боли, аппетита и настроения. Модулируется фитоканнабиноидами и ПНЖК.',
-    synergies: [],
+    synergies: [
+        {with: "omega3", effect: "Эндоканнабиноидная система", mechanism: "Омега-3 — предшественник", severity: "MEDIUM"},
+      ],
     conflicts: [],
     monitoring: [
       { what: 'Настроение', when: 'Субъективно' }
@@ -7302,8 +7786,12 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['gastrointestinal', 'hepatic'],
     mechanisms: ['GUT_DETOXIFICATION', 'CHOLESTEROL_LOWERING', 'BILE_ACID_BINDING', 'GUT_FLORA_SUPPORT'],
     description: 'Пектин — растворимое пищевое волокно, связывает токсины и желчные кислоты в кишечнике. На курсе — детокс.',
-    synergies: [],
-    conflicts: [],
+    synergies: [
+        {with: "probiotics", effect: "Пребиотический эффект", mechanism: "Пектин — растворимая клетчатка", severity: "MEDIUM"},
+      ],
+    conflicts: [
+        {with: "statin_drugs", effect: "Снижение всасывания", mechanism: "Пектин может связывать лекарства", severity: "LOW"},
+      ],
     monitoring: [
       { what: 'Холестерин', when: 'Каждые 8 нед' }
     ],
@@ -7325,7 +7813,10 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['reproductive', 'musculoskeletal'],
     mechanisms: ['TESTOSTERONE_PRODUCTION', 'LH_STIMULATION', 'LIBIDO_ENHANCEMENT', 'MUSCLE_RECOVERY'],
     description: 'Фадогия агрестис — африканское растение, стимулирует ЛГ и тестостерон. На курсе — либидо и восстановление.',
-    synergies: [],
+    synergies: [
+        {with: "zinc", effect: "Поддержка тестостерона", mechanism: "Оба способствуют тестостерону", severity: "MEDIUM"},
+        {with: "ashwagandha", effect: "Либидо и тестостерон", mechanism: "Разные механизмы", severity: "MEDIUM"},
+      ],
     conflicts: [],
     monitoring: [
       { what: 'Тестостерон', when: 'Каждые 4 нед' }
@@ -7349,7 +7840,10 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['endocrine', 'neuro'],
     mechanisms: ['NEUROSTEROID_PRECURSOR', 'MEMORY_ENHANCEMENT', 'CORTISOL_BALANCE', 'ANTI_AGING'],
     description: 'Прегненолон — прегормон, предшественник всех стероидных гормонов. Улучшает память и снижает кортизол на курсе.',
-    synergies: [],
+    synergies: [
+        {with: "dhea", effect: "Нейростероидный каскад", mechanism: "Прегненолон → DHEA → гормоны", severity: "HIGH"},
+        {with: "vitamin_c", effect: "Стероидогенез", mechanism: "C — кофактор стероидогенеза", severity: "MEDIUM"},
+      ],
     conflicts: [],
     monitoring: [
       { what: 'Прегненолон/Кортизол', when: 'Каждые 8 нед' }
@@ -7373,7 +7867,10 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['immune', 'hepatic', 'hematologic'],
     mechanisms: ['IMMUNE_REGULATION', 'ANTI_INFLAMMATORY', 'WHITE_BLOOD_CELL_SUPPORT', 'INFECTION_RESISTANCE'],
     description: 'Иммунная поддержка — комплекс витаминов С, D, цинка, селена и пробиотиков для защиты иммунитета на курсе.',
-    synergies: [],
+    synergies: [
+        {with: "vitamin_c", effect: "Иммунитет", mechanism: "Оба поддерживают иммунитет", severity: "MEDIUM"},
+        {with: "zinc", effect: "Иммунитет", mechanism: "Оба — иммуномодуляторы", severity: "MEDIUM"},
+      ],
     conflicts: [],
     monitoring: [
       { what: 'Общий анализ крови', when: 'Каждые 8 нед' }
@@ -7396,8 +7893,13 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['hepatic', 'immune'],
     mechanisms: ['IMMUNE_ACTIVATION', 'ANTI_INFLAMMATORY', 'LIVER_PROTECTION', 'FEVER_REDUCTION'],
     description: 'Андографис — иммуномодулятор и гепатопротектор, активирует NK-клетки и защищает печень. На курсе — иммунитет.',
-    synergies: [],
-    conflicts: [],
+    synergies: [
+        {with: "vitamin_c", effect: "Иммунитет при простуде", mechanism: "Оба — иммуномодуляторы", severity: "MEDIUM"},
+        {with: "zinc", effect: "Противовирусная активность", mechanism: "Оба подавляют вирусы", severity: "MEDIUM"},
+      ],
+    conflicts: [
+        {with: "immunosuppressant_drugs", effect: "Антагонизм", mechanism: "Андрографис стимулирует иммунитет", severity: "MEDIUM"},
+      ],
     monitoring: [
       { what: 'АЛТ/АСТ', when: 'Каждые 8 нед' }
     ],
@@ -7420,7 +7922,11 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['musculoskeletal', 'respiratory', 'neuro'],
     mechanisms: ['ANTI_INFLAMMATORY', 'JOINT_PROTECTION', '5_LOX_INHIBITION', 'PAIN_RELIEF'],
     description: 'Босвеллия — мощный ингибитор 5-ЛОГ, противовоспалительное для суставов и лёгких. На курсе — суставы.',
-    synergies: [],
+    synergies: [
+        {with: "curcumin", effect: "Двойное подавление воспаления", mechanism: "Босвеллия — 5-LOX, куркумин — COX-2", severity: "HIGH"},
+        {with: "glucosamine", effect: "Здоровье суставов", mechanism: "Противовоспалительное + структурное", severity: "MEDIUM"},
+        {with: "msm", effect: "Противовоспалительное для суставов", mechanism: "Оба снижают воспаление", severity: "MEDIUM"},
+      ],
     conflicts: [],
     monitoring: [
       { what: 'Суставы', when: 'Субъективно' }
@@ -7443,7 +7949,11 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['musculoskeletal'],
     mechanisms: ['BONE_HEALING', 'JOINT_PROTECTION', 'ANTI_INFLAMMATORY', 'COLLAGEN_SYNTHESIS'],
     description: 'Циссус — растение для заживления костей и суставов, стимулирует синтез коллагена. На курсе — связки и кости.',
-    synergies: [],
+    synergies: [
+        {with: "vitamin_c", effect: "Заживление костей и связок", mechanism: "Оба поддерживают коллаген", severity: "MEDIUM"},
+        {with: "calcium", effect: "Минерализация костей", mechanism: "Циссус + Кальций — костная поддержка", severity: "MEDIUM"},
+        {with: "bpc157", effect: "Заживление связок", mechanism: "Оба стимулируют регенерацию", severity: "MEDIUM"},
+      ],
     conflicts: [],
     monitoring: [
       { what: 'Кальций/Кости', when: 'Каждые 12 нед' }
@@ -7466,8 +7976,13 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['hepatic', 'endocrine', 'gastrointestinal'],
     mechanisms: ['ANTI_INFLAMMATORY', 'LIVER_PROTECTION', 'ADRENAL_SUPPORT', 'MUCUS_PROTECTION'],
     description: 'Солодка — гепатопротектор и адаптоген, поддерживает надпочечники и защищает слизистую ЖКТ.',
-    synergies: [],
-    conflicts: [],
+    synergies: [
+        {with: "milk_thistle", effect: "Гепатопротекция", mechanism: "Оба защищают печень", severity: "MEDIUM"},
+        {with: "probiotics", effect: "Защита слизистой желудка", mechanism: "Солодка — гастропротектор", severity: "MEDIUM"},
+      ],
+    conflicts: [
+        {with: "antihypertensive_drugs", effect: "Повышение давления", mechanism: "Солодка задерживает натрий и воду", severity: "HIGH"},
+      ],
     monitoring: [
       { what: 'Калий/АД', when: 'Каждые 4 нед' }
     ],
@@ -7530,7 +8045,9 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['cardio', 'neuro'],
     mechanisms: ['OMEGA3_6_9_BALANCE', 'CHOLESTEROL_LOWERING', 'ANTI_INFLAMMATORY', 'BRAIN_PROTECTION'],
     description: 'Липидный комплекс — Омега-3+6+9+CLA+МСТ для баланса жирных кислот и кардиопротекции на курсе.',
-    synergies: [],
+    synergies: [
+        {with: "omega3", effect: "Комплексная поддержка липидов", mechanism: "Оба — источники ЖК", severity: "MEDIUM"},
+      ],
     conflicts: [],
     monitoring: [
       { what: 'Липидограмма', when: 'Каждые 8 нед' }
@@ -7580,8 +8097,13 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['gastrointestinal'],
     mechanisms: ['ACID_NEUTRALIZATION', 'GASTRIC_PROTECTION', 'HEARTBURN_RELIEF', 'ESOPHAGUS_PROTECTION'],
     description: 'Антацид — нейтрализует желудочную кислоту, снимает изжогу и защищает пищевод. На курсе — ЖКТ защита при НПВС.',
-    synergies: [],
-    conflicts: [],
+    synergies: [
+        {with: "zinc_carnosine", effect: "Защита желудка", mechanism: "Антацид + цинк-карнозин", severity: "MEDIUM"},
+      ],
+    conflicts: [
+        {with: "iron", effect: "Снижение всасывания Fe", mechanism: "Антациды блокируют Fe", severity: "MEDIUM"},
+        {with: "vitamin_b12", effect: "Снижение всасывания B12", mechanism: "Антациды нарушают B12", severity: "MEDIUM"},
+      ],
     monitoring: [
       { what: 'Гастроскопия', when: 'Субъективно' }
     ],
@@ -7603,7 +8125,9 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['musculoskeletal', 'endocrine', 'neuro'],
     mechanisms: ['MUSCLE_GROWTH', 'BONE_DENSITY', 'NERVE_REGENERATION', 'ANABOLIC_EFFECT'],
     description: 'ИФР-1 — инсулиноподобный фактор роста, анаболический гормон для мышц и костей. Маркер ГР на курсе.',
-    synergies: [],
+    synergies: [
+        {with: "cjc1295", effect: "GH-IGF-1 каскад", mechanism: "CJC-1295 стимулирует GH → IGF-1", severity: "MEDIUM"},
+      ],
     conflicts: [],
     monitoring: [
       { what: 'ИФР-1', when: 'Каждые 4 нед', targetRange: '150-450 нг/мл' }
@@ -7626,7 +8150,9 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['musculoskeletal'],
     mechanisms: ['MUSCLE_REGENERATION', 'SATELLITE_CELL_ACTIVATION', 'HYPERTROPHY', 'RECOVERY'],
     description: 'MGF — механо-фактор роста, вариант ИФР-1, стимулирует сателлитные клетки и гипертрофию мышц. На курсе — восстановление.',
-    synergies: [],
+    synergies: [
+        {with: "igf1", effect: "Рост и восстановление мышц", mechanism: "MGF — изоформа IGF-1", severity: "MEDIUM"},
+      ],
     conflicts: [],
     monitoring: [
       { what: 'ИФР-1', when: 'Каждые 4 нед' }
@@ -7649,7 +8175,10 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     systems: ['gastrointestinal', 'immune'],
     mechanisms: ['ANTI_INFLAMMATORY', 'GUT_BARRIER_STRENGTHENING', 'IMMUNE_REGULATION', 'WOUND_HEALING'],
     description: 'KPV — противовоспалительный пептид, заживляет слизистую кишечника и кожу. На курсе — защита ЖКТ.',
-    synergies: [],
+    synergies: [
+        {with: "bpc157", effect: "Заживление кишечника", mechanism: "Оба — пептиды для ЖКТ", severity: "MEDIUM"},
+        {with: "probiotics", effect: "Восстановление слизистой", mechanism: "KPV + пробиотики — барьер", severity: "MEDIUM"},
+      ],
     conflicts: [],
     monitoring: [
       { what: 'Воспалительные маркеры', when: 'Субъективно' }

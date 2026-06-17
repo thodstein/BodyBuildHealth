@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+﻿import React, { useState, useMemo, useEffect } from 'react';
 import { SYNERGY_PAIRS, ORGAN_SYNERGIES, SUPPLEMENT_DESCRIPTIONS, SUPPLEMENT_TARGETS, SUPPORT_RESEARCH, calculateSupport, checkSupportInteractions, findSupportForGoal, searchSupport, getSubstanceInfo, getSupportDatabaseStats, type SupportInput, type SynergyPair, type SupplementTarget, type OrganSynergy } from '../../engines/support.engine';
 import { RISK_SYSTEMS, ALL_RISK_SYSTEMS } from '../../core/constants';
 import { PHARMA_DB, getPharmaDetail } from '../../core/pharma-database';
@@ -11,6 +11,7 @@ import { INTERACTIONS_DB } from '../../data/interactions';
 import { ALL_SUBSTANCES, ALL_INTERACTIONS, type SupportSubstance, type SupportInteraction } from '../../data/support-database';
 import { getSubstanceTier, TIER_LABELS } from '../../data/substance-tiers';
 import { SUPPORT_CATALOG_DATA, ORGAN_LABELS as CATALOG_ORGAN_LABELS, SYSTEM_LABELS_CATALOG, CATEGORY_LABELS as CATALOG_CATEGORY_LABELS, TIER_LABELS_CATALOG, type SupportCatalogEntry } from '../../data/support-catalog';
+import { MECHANISM_LABELS } from '../../data/mechanism-labels';
 
 import { CANONICAL_ID_MAP } from '../../data/catalog-exports';
 import { SUBSTANCE_ANALOGS, SUBSTANCE_ENHANCERS, PHASE_MODS, DEFAULT_DOSAGES, getPhaseLevel, type SupportPhase } from '../../data/support-levels';
@@ -1435,6 +1436,18 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   // All support substances for interaction checker
   const allSupport = useMemo(() => supplementList, [supplementList]);
 
+  // Catalog-based substance list for interactions/stacks (284 items, no duplicates)
+  const catalogSupportList = useMemo(() => {
+    return Object.values(SUPPORT_CATALOG_DATA).map(e => ({
+      id: e.id,
+      name: e.nameRu || e.name,
+      type: e.tier,
+      categories: e.category,
+      mechanisms: e.mechanisms,
+      organs: e.organs,
+    }));
+  }, []);
+
   // Support-only synergy pairs
   const supportSynergies = useMemo(() => {
     return SYNERGY_PAIRS.filter(p => {
@@ -1499,25 +1512,75 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
     if (validInteractionIds.length < 2) return null;
     const subs: Record<string, string> = {};
     validInteractionIds.forEach(id => {
-      const s = allSupport.find(x => x.id === id);
+      const s = catalogSupportList.find(x => x.id === id) || allSupport.find(x => x.id === id);
       if (s) subs[id] = s.name;
     });
+    const results: any[] = [];
     try {
       const norm = (s: string) => s.replace(/_/g,'').toLowerCase();
-      return INTERACTIONS_DB.filter(i => {
-        if (!i || !i.substanceA || !i.substanceB) return false;
+      // From INTERACTIONS_DB
+      for (const i of INTERACTIONS_DB) {
+        if (!i || !i.substanceA || !i.substanceB) continue;
         const a = norm(i.substanceA);
         const b = norm(i.substanceB);
-        return validInteractionIds.some(id => {
-          const up = norm(id);
-          return a === up || a.includes(up) || up.includes(a);
-        }) && validInteractionIds.some(id => {
-          const up = norm(id);
-          return b === up || b.includes(up) || up.includes(b);
-        });
-      });
+        const matchA = validInteractionIds.some(id => { const up = norm(id); return a === up || a.includes(up) || up.includes(a); });
+        const matchB = validInteractionIds.some(id => { const up = norm(id); return b === up || b.includes(up) || up.includes(b); });
+        if (matchA && matchB) results.push(i);
+      }
+      // From SUPPORT_CATALOG_DATA synergies/conflicts
+      for (let ai = 0; ai < validInteractionIds.length; ai++) {
+        for (let bi = ai + 1; bi < validInteractionIds.length; bi++) {
+          const idA = validInteractionIds[ai];
+          const idB = validInteractionIds[bi];
+          const canA = CANONICAL_ID_MAP[idA] || CANONICAL_ID_MAP[idA.toLowerCase()] || idA;
+          const canB = CANONICAL_ID_MAP[idB] || CANONICAL_ID_MAP[idB.toLowerCase()] || idB;
+          const entryA = SUPPORT_CATALOG_DATA[canA] || SUPPORT_CATALOG_DATA[idA];
+          const entryB = SUPPORT_CATALOG_DATA[canB] || SUPPORT_CATALOG_DATA[idB];
+          if (entryA?.synergies) {
+            for (const syn of entryA.synergies) {
+              if (syn.with === idB || syn.with === canB) {
+                const dupKey = `cat_syn_${canA}_${canB}`;
+                if (!results.some(r => r.interactionId === dupKey || r.id === dupKey)) {
+                  results.push({ interactionId: dupKey, substanceA: idA, substanceB: idB, type: 'synergy', effect: syn.effect, mechanisms: [syn.mechanism], severity: syn.severity || 'MEDIUM', notes: '' });
+                }
+              }
+            }
+          }
+          if (entryA?.conflicts) {
+            for (const conf of entryA.conflicts) {
+              if (conf.with === idB || conf.with === canB) {
+                const dupKey = `cat_conf_${canA}_${canB}`;
+                if (!results.some(r => r.interactionId === dupKey || r.id === dupKey)) {
+                  results.push({ interactionId: dupKey, substanceA: idA, substanceB: idB, type: 'conflict', effect: conf.effect, mechanisms: [conf.mechanism], severity: conf.severity || 'MEDIUM', notes: '' });
+                }
+              }
+            }
+          }
+          if (entryB?.synergies) {
+            for (const syn of entryB.synergies) {
+              if (syn.with === idA || syn.with === canA) {
+                const dupKey = `cat_syn_${canB}_${canA}`;
+                if (!results.some(r => r.interactionId === dupKey || r.id === dupKey)) {
+                  results.push({ interactionId: dupKey, substanceA: idB, substanceB: idA, type: 'synergy', effect: syn.effect, mechanisms: [syn.mechanism], severity: syn.severity || 'MEDIUM', notes: '' });
+                }
+              }
+            }
+          }
+          if (entryB?.conflicts) {
+            for (const conf of entryB.conflicts) {
+              if (conf.with === idA || conf.with === canA) {
+                const dupKey = `cat_conf_${canB}_${canA}`;
+                if (!results.some(r => r.interactionId === dupKey || r.id === dupKey)) {
+                  results.push({ interactionId: dupKey, substanceA: idB, substanceB: idA, type: 'conflict', effect: conf.effect, mechanisms: [conf.mechanism], severity: conf.severity || 'MEDIUM', notes: '' });
+                }
+              }
+            }
+          }
+        }
+      }
     } catch { return []; }
-  }, [interactionIds, allSupport]);
+    return results;
+  }, [interactionIds, allSupport, catalogSupportList]);
 
   const hasSupportInteractions = supportInteractions && supportInteractions.length > 0;
   const supportSynergiesList = supportInteractions?.filter(i => i.type === 'synergy') ?? [];
@@ -2222,9 +2285,9 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                       return (
                         <div style={{ marginTop:3, padding:'4px 6px', background:'rgba(34,197,94,0.04)', borderRadius:4, border:'1px solid rgba(34,197,94,0.08)' }}>
                           {aDesc && <div style={{fontSize:7,color:'var(--text-dim)',lineHeight:1.3,marginBottom:1}}><b style={{color:'#4ade80'}}>{aName}</b>: {aDesc.slice(0,100)}{aDesc.length>100?'...':''}</div>}
-                          {aMechs.length > 0 && <div style={{display:'flex',flexWrap:'wrap',gap:1,marginBottom:2}}>{aMechs.map((m,mi)=><span key={mi} style={{fontSize:5,padding:'0px 2px',borderRadius:2,background:'rgba(74,222,128,0.1)',color:'#4ade80'}}>{m}</span>)}</div>}
+                          {aMechs.length > 0 && <div style={{display:'flex',flexWrap:'wrap',gap:1,marginBottom:2}}>{aMechs.map((m,mi)=><span key={mi} style={{fontSize:5,padding:'0px 2px',borderRadius:2,background:'rgba(74,222,128,0.1)',color:'#4ade80'}}>{MECHANISM_LABELS[m] || m}</span>)}</div>}
                           {bDesc && <div style={{fontSize:7,color:'var(--text-dim)',lineHeight:1.3,marginBottom:1}}><b style={{color:'#4ade80'}}>{bName}</b>: {bDesc.slice(0,100)}{bDesc.length>100?'...':''}</div>}
-                          {bMechs.length > 0 && <div style={{display:'flex',flexWrap:'wrap',gap:1}}>{bMechs.map((m,mi)=><span key={mi} style={{fontSize:5,padding:'0px 2px',borderRadius:2,background:'rgba(74,222,128,0.1)',color:'#4ade80'}}>{m}</span>)}</div>}
+                          {bMechs.length > 0 && <div style={{display:'flex',flexWrap:'wrap',gap:1}}>{bMechs.map((m,mi)=><span key={mi} style={{fontSize:5,padding:'0px 2px',borderRadius:2,background:'rgba(74,222,128,0.1)',color:'#4ade80'}}>{MECHANISM_LABELS[m] || m}</span>)}</div>}
                         </div>
                       );
                     })()}
@@ -2282,9 +2345,9 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                       return (
                         <div style={{ marginTop:3, padding:'4px 6px', background:'rgba(239,68,68,0.04)', borderRadius:4, border:'1px solid rgba(239,68,68,0.08)' }}>
                           {aDesc && <div style={{fontSize:7,color:'var(--text-dim)',lineHeight:1.3,marginBottom:1}}><b style={{color:'#f87171'}}>{aName}</b>: {aDesc.slice(0,100)}{aDesc.length>100?'...':''}</div>}
-                          {aMechs.length > 0 && <div style={{display:'flex',flexWrap:'wrap',gap:1,marginBottom:2}}>{aMechs.map((m,mi)=><span key={mi} style={{fontSize:5,padding:'0px 2px',borderRadius:2,background:'rgba(248,113,113,0.1)',color:'#f87171'}}>{m}</span>)}</div>}
+                          {aMechs.length > 0 && <div style={{display:'flex',flexWrap:'wrap',gap:1,marginBottom:2}}>{aMechs.map((m,mi)=><span key={mi} style={{fontSize:5,padding:'0px 2px',borderRadius:2,background:'rgba(248,113,113,0.1)',color:'#f87171'}}>{MECHANISM_LABELS[m] || m}</span>)}</div>}
                           {bDesc && <div style={{fontSize:7,color:'var(--text-dim)',lineHeight:1.3,marginBottom:1}}><b style={{color:'#f87171'}}>{bName}</b>: {bDesc.slice(0,100)}{bDesc.length>100?'...':''}</div>}
-                          {bMechs.length > 0 && <div style={{display:'flex',flexWrap:'wrap',gap:1}}>{bMechs.map((m,mi)=><span key={mi} style={{fontSize:5,padding:'0px 2px',borderRadius:2,background:'rgba(248,113,113,0.1)',color:'#f87171'}}>{m}</span>)}</div>}
+                          {bMechs.length > 0 && <div style={{display:'flex',flexWrap:'wrap',gap:1}}>{bMechs.map((m,mi)=><span key={mi} style={{fontSize:5,padding:'0px 2px',borderRadius:2,background:'rgba(248,113,113,0.1)',color:'#f87171'}}>{MECHANISM_LABELS[m] || m}</span>)}</div>}
                         </div>
                       );
                     })()}
@@ -2470,7 +2533,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                                         {entry.dosage && <div style={{ fontSize:9, color:'rgba(255,255,255,0.7)', marginBottom:2 }}>💊 {entry.dosage.mg >= 1000 ? (entry.dosage.mg/1000)+' г' : entry.dosage.mg < 1 ? (entry.dosage.mg*1000)+' мкг' : entry.dosage.mg+' мг'} · {entry.dosage.timing}</div>}
                                         {entry.mechanisms && entry.mechanisms.length > 0 && (
                                           <div style={{ display:'flex', gap:2, flexWrap:'wrap', marginBottom:3 }}>
-                                            {entry.mechanisms.map((m,i) => <span key={i} style={{ fontSize:8, padding:'2px 6px', borderRadius:4, background:'rgba(0,230,138,0.08)', color:'#00e68a', border:'1px solid rgba(0,230,138,0.15)' }}>{m}</span>)}
+                                            {entry.mechanisms.map((m,i) => <span key={i} style={{ fontSize:8, padding:'2px 6px', borderRadius:4, background:'rgba(0,230,138,0.08)', color:'#00e68a', border:'1px solid rgba(0,230,138,0.15)' }}>{MECHANISM_LABELS[m] || m}</span>)}
                                           </div>
                                         )}
                                         {entry.organs && entry.organs.length > 0 && (
@@ -2557,7 +2620,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                                         )}
                                         {entry.mechanisms && entry.mechanisms.length > 0 && (
                                           <div style={{ display:'flex', gap:2, flexWrap:'wrap', marginBottom:3 }}>
-                                            {entry.mechanisms.map((m,i) => <span key={i} style={{ fontSize:8, padding:'2px 6px', borderRadius:4, background:'rgba(0,230,138,0.08)', color:'#00e68a', border:'1px solid rgba(0,230,138,0.15)' }}>{m}</span>)}
+                                            {entry.mechanisms.map((m,i) => <span key={i} style={{ fontSize:8, padding:'2px 6px', borderRadius:4, background:'rgba(0,230,138,0.08)', color:'#00e68a', border:'1px solid rgba(0,230,138,0.15)' }}>{MECHANISM_LABELS[m] || m}</span>)}
                                           </div>
                                         )}
                                         {entry.organs && entry.organs.length > 0 && (
@@ -2739,7 +2802,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                     <div>
                       <div style={{ display:'flex', flexDirection:'column', gap:6, marginBottom:8 }}>
                         {interactionIds.map((id, idx) => {
-                          const selectedName = id ? (allSupport.find(s => s.id === id)?.name || id) : '';
+                          const selectedName = id ? (catalogSupportList.find(s => s.id === id)?.name || allSupport.find(s => s.id === id)?.name || id) : '';
                           return (
                             <div key={idx} style={{ background:'var(--bg-secondary)', borderRadius:10, padding:'8px 10px', border:'1px solid var(--border)' }}>
                               <div style={{ display:'flex', alignItems:'center', gap:4, marginBottom:4 }}>
@@ -2755,7 +2818,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                                     <input value={interactionSearchIdx===idx ? interactionSearch : ''} placeholder="🔍 Введите название..." onFocus={() => { setInteractionSearchIdx(idx); setInteractionSearch(''); }} onChange={e => { setInteractionSearchIdx(idx); setInteractionSearch(e.target.value); }} style={{ width:'100%', padding:'7px 8px', borderRadius:6, background:'rgba(0,0,0,0.2)', border:'1px solid var(--border)', color:'var(--text)', fontSize:10, boxSizing:'border-box' }} />
                                     {interactionSearch && interactionSearchIdx===idx && (
                                       <div style={{ position:'absolute', top:'100%', left:0, right:0, zIndex:10, background:'var(--bg)', border:'1px solid var(--border)', borderRadius:6, maxHeight:150, overflowY:'auto', marginTop:1 }}>
-                                        {allSupport.filter(s => (s.name||'').toLowerCase().includes(interactionSearch.toLowerCase())).slice(0,10).map(s => (
+                                        {catalogSupportList.filter(s => (s.name||'').toLowerCase().includes(interactionSearch.toLowerCase())).slice(0,10).map(s => (
                                           <div key={s.id} onClick={() => { updateInteraction(idx, s.id); setInteractionSearch(''); setInteractionSearchIdx(-1); }} style={{ padding:'7px 10px', cursor:'pointer', fontSize:10, borderBottom:'1px solid var(--border)' }}>
                                             <span style={{ fontWeight:600, color:'var(--text)' }}>{s.name}</span>
                                             <span style={{ fontSize:8, color:'var(--text-dim)', marginLeft:4 }}>{s.id}</span>
@@ -2800,7 +2863,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                                     {i.mechanisms && i.mechanisms.length > 0 && (
                                       <div style={{ display:'flex', flexWrap:'wrap', gap:2, marginTop:2 }}>
                                         {i.mechanisms.map((m: string, mi: number) => (
-                                          <span key={mi} style={{ fontSize:6, padding:'1px 5px', borderRadius:3, background:'rgba(139,92,246,0.12)', color:'#a78bfa', border:'1px solid rgba(139,92,246,0.15)' }}>{m}</span>
+                                          <span key={mi} style={{ fontSize:6, padding:'1px 5px', borderRadius:3, background:'rgba(139,92,246,0.12)', color:'#a78bfa', border:'1px solid rgba(139,92,246,0.15)' }}>{MECHANISM_LABELS[m] || m}</span>
                                         ))}
                                       </div>
                                     )}
@@ -3289,7 +3352,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                                 )}
                                 {entry.mechanisms && entry.mechanisms.length > 0 && (
                                   <div style={{ display:'flex', gap:2, flexWrap:'wrap', marginBottom:4 }}>
-                                    {entry.mechanisms.map((m,i) => <span key={i} style={{ fontSize:8, padding:'2px 6px', borderRadius:4, background:'rgba(0,230,138,0.08)', color:'#00e68a', border:'1px solid rgba(0,230,138,0.15)' }}>{m}</span>)}
+                                    {entry.mechanisms.map((m,i) => <span key={i} style={{ fontSize:8, padding:'2px 6px', borderRadius:4, background:'rgba(0,230,138,0.08)', color:'#00e68a', border:'1px solid rgba(0,230,138,0.15)' }}>{MECHANISM_LABELS[m] || m}</span>)}
                                   </div>
                                 )}
                                 {entry.organs && entry.organs.length > 0 && (
@@ -3419,7 +3482,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                           const mColor = ms.toLowerCase().includes('toxic') || ms.toLowerCase().includes('hepatic') ? '#ef4444' :
                             ms.toLowerCase().includes('kidney') || ms.toLowerCase().includes('renal') ? '#f59e0b' :
                             ms.toLowerCase().includes('synerg') || ms.toLowerCase().includes('enhanc') || ms.toLowerCase().includes('potent') ? '#22c55e' : '#a78bfa';
-                          return <span key={m} style={{ fontSize: 8, padding: '1px 5px', borderRadius: 3, background: mColor + '18', color: mColor, border: `1px solid ${mColor}22`, fontWeight: 500 }}>{m}</span>;
+                          return <span key={m} style={{ fontSize: 8, padding: '1px 5px', borderRadius: 3, background: mColor + '18', color: mColor, border: `1px solid ${mColor}22`, fontWeight: 500 }}>{MECHANISM_LABELS[m] || m}</span>;
                         })}
                       </div>
                     )}
@@ -3469,7 +3532,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
               {/* Drug selector cards */}
               <div style={{ display:'flex', flexDirection:'column', gap:8, marginBottom:12 }}>
                 {interactionIds.map((id, idx) => {
-                  const selectedName = id ? (allSupport.find(s => s.id === id)?.name || id) : '';
+                  const selectedName = id ? (catalogSupportList.find(s => s.id === id)?.name || allSupport.find(s => s.id === id)?.name || id) : '';
                   return (
                     <div key={idx} style={{ background:'var(--bg-secondary)', borderRadius:12, padding:'10px 12px', border:'1px solid var(--border)' }}>
                       <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:6 }}>
@@ -3553,7 +3616,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                             {i.mechanisms && i.mechanisms.length > 0 && (
                               <div style={{ display:'flex', flexWrap:'wrap', gap:2, marginTop:2 }}>
                                 {i.mechanisms.map((m: string, mi: number) => (
-                                  <span key={mi} style={{ fontSize:7, padding:'1px 5px', borderRadius:3, background:'rgba(139,92,246,0.12)', color:'#a78bfa', border:'1px solid rgba(139,92,246,0.15)' }}>{m}</span>
+                                  <span key={mi} style={{ fontSize:7, padding:'1px 5px', borderRadius:3, background:'rgba(139,92,246,0.12)', color:'#a78bfa', border:'1px solid rgba(139,92,246,0.15)' }}>{MECHANISM_LABELS[m] || m}</span>
                                 ))}
                               </div>
                             )}

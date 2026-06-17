@@ -1,4 +1,5 @@
 import { SUPPORT_BASE_COVERAGE, RISK_SYSTEMS, ALL_RISK_SYSTEMS, COVERAGE_ID_ALIAS } from '../core/constants';
+import { SUPPORT_CATALOG_DATA } from '../data/support-catalog';
 import {
   ALL_SUBSTANCES,
   ALL_INTERACTIONS,
@@ -128,12 +129,34 @@ export function getSimpleId(id: string): string {
 
 /* ---------- Main: derive system coverage for ANY substance ---------- */
 export function deriveSystemCoverage(substanceId: string): Record<string, number> {
-  const sub = ALL_SUBSTANCES.find(s => s.id === substanceId);
-  if (!sub) {
-    const empty: Record<string, number> = {};
-    for (const s of RISK_SYSTEMS_8) empty[s] = 0;
-    return empty;
+  const empty: Record<string, number> = {};
+  for (const s of RISK_SYSTEMS_8) empty[s] = 0;
+
+  // Check catalog data first (284 entries)
+  const catEntry = SUPPORT_CATALOG_DATA[substanceId];
+  if (catEntry) {
+    const catCov: Record<string, number> = {};
+    for (const sys of catEntry.systems) {
+      // Map catalog system keys to risk systems
+      if (sys === 'hepatic') catCov.hepatic = 0.4;
+      else if (sys === 'cardio') catCov.cardio = 0.35;
+      else if (sys === 'renal') catCov.renal = 0.3;
+      else if (sys === 'neuro') catCov.neuro = 0.3;
+      else if (sys === 'endocrine') catCov.endocrine = 0.3;
+      else if (sys === 'hematologic') catCov.hematologic = 0.25;
+      else if (sys === 'reproductive') catCov.reproductive = 0.25;
+      else if (sys === 'musculoskeletal') catCov.musculoskeletal = 0.3;
+      else if (sys === 'immune') { catCov.hematologic = Math.max(catCov.hematologic ?? 0, 0.2); catCov.hepatic = Math.max(catCov.hepatic ?? 0, 0.15); }
+      else if (sys === 'metabolic') { catCov.endocrine = Math.max(catCov.endocrine ?? 0, 0.25); catCov.hepatic = Math.max(catCov.hepatic ?? 0, 0.15); }
+      else if (sys === 'gastrointestinal') { catCov.hepatic = Math.max(catCov.hepatic ?? 0, 0.2); catCov.hematologic = Math.max(catCov.hematologic ?? 0, 0.1); }
+    }
+    // Fill missing systems with 0
+    for (const s of RISK_SYSTEMS_8) { catCov[s] = catCov[s] ?? 0; }
+    return catCov;
   }
+
+  const sub = ALL_SUBSTANCES.find(s => s.id === substanceId);
+  if (!sub) return empty;
 
   const subLower = substanceId.toLowerCase();
   const aliasKey = COVERAGE_ID_ALIAS[substanceId];
@@ -159,16 +182,27 @@ export function deriveSystemCoverage(substanceId: string): Record<string, number
 
 /* ---------- Lookup substance name ---------- */
 export function getSubstanceName(id: string): string {
+  // Check catalog data first (284 entries with Russian names)
+  const catEntry = SUPPORT_CATALOG_DATA[id];
+  if (catEntry) return catEntry.nameRu || catEntry.name;
   const sub = ALL_SUBSTANCES.find(s => s.id === id);
   if (sub) return sub.name;
   const lower = id.toLowerCase();
   const found = ALL_SUBSTANCES.find(s => s.id.toLowerCase().includes(lower));
   if (found) return found.name;
+  // Try catalog fuzzy match
+  for (const [catId, entry] of Object.entries(SUPPORT_CATALOG_DATA)) {
+    if (catId.toLowerCase().includes(lower) || lower.includes(catId.toLowerCase())) {
+      return entry.nameRu || entry.name;
+    }
+  }
   return id;
 }
 
 /* ---------- Lookup categories ---------- */
 export function getSubstanceCategories(id: string): string[] {
+  const catEntry = SUPPORT_CATALOG_DATA[id];
+  if (catEntry) return catEntry.category;
   const sub = ALL_SUBSTANCES.find(s => s.id === id);
   return sub?.categories ?? [];
 }
