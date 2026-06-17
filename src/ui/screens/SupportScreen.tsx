@@ -2383,7 +2383,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                 a[id]?.();
               }} style={{
                 padding:'5px 12px', borderRadius:16, fontSize:10, fontWeight:700, whiteSpace:'nowrap', cursor:'pointer', flexShrink:0,
-                background: infoTab === id || (id==='catalog' && tab==='main' && supportView==='main') ? 'var(--accent)' : 'var(--bg-secondary)',
+                background: infoTab === id ? 'var(--accent)' : 'var(--bg-secondary)',
                 color: infoTab === id ? '#000' : 'var(--text-dim)',
                 border: '1px solid ' + (infoTab === id ? 'var(--accent)' : 'var(--border)'),
               }}>{label}</button>

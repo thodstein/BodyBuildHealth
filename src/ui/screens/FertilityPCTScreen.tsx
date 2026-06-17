@@ -27,7 +27,7 @@ const VARICOCELE = [
 
 export const FertilityPCTScreen: React.FC<{ initialTab?: FertTab }> = ({ initialTab }) => {
   const [tab, setTab] = useState<FertTab>(initialTab || 'overview');
-  useEffect(() => { if (initialTab) setTab(initialTab); }, [initialTab]);
+  useEffect(() => { setTab(initialTab || 'overview'); }, [initialTab]);
 
   const [volume, setVolume] = useState('');
   const [concentration, setConcentration] = useState('');
