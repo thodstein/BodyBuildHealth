@@ -112,6 +112,7 @@ export const TrainingScreen: React.FC = () => {
   const [currentMicrocycle, setCurrentMicrocycle] = useState<Microcycle | null>(null);
   const [selectedProgram, setSelectedProgram] = useState<string | null>(null);
   const [expandedMeso, setExpandedMeso] = useState<number | null>(null);
+  const [appliedMethod, setAppliedMethod] = useState<string | null>(null);
 
   // Exercise DB state
   const [exSearch, setExSearch] = useState('');
@@ -3026,7 +3027,7 @@ export const TrainingScreen: React.FC = () => {
       )}
       {/* ═══════════ ANALYTICS TAB ═══════════ */}
       {tab === 'analytics' && <><AnalyticsTab sessions={historyWorkouts} /><StructuredAnalyticsCard sessions={historyWorkouts} /></>}
-      {tab === 'methods' && <MethodsTab linked={linked} trainingOutput={trainingOutput} diaryStats={diaryStats} historyWorkouts={historyWorkouts} goal={goal} level={level} daysPerWeek={daysPerWeek} recovery={recovery} fatigue={fatigue} />}
+      {tab === 'methods' && <MethodsTab linked={linked} trainingOutput={trainingOutput} diaryStats={diaryStats} historyWorkouts={historyWorkouts} goal={goal} level={level} daysPerWeek={daysPerWeek} recovery={recovery} fatigue={fatigue} appliedMethod={appliedMethod} onApplyMethod={(name, category) => { setAppliedMethod(name); if (category === 'periodization') setPeriodizationType(name.includes('linear') ? 'linear' : name.includes('undulating') || name.includes('DUP') ? 'undulating' : name.includes('block') ? 'block' : 'auto'); }} />}
       {tab === 'visual' && <VisualTab sessions={historyWorkouts} />}
       {tab === 'programs' && <ProgramsTab selectedProgram={selectedProgram} setSelectedProgram={setSelectedProgram} />}
       {tab === 'timers' && <TimersTab />}
@@ -3198,7 +3199,7 @@ const MyTrainingTab: React.FC<{ customExercises: { name: string; sets: number; r
   );
 };
 
-const MethodsTab: React.FC<{ linked: ReturnType<typeof useDataLink>; trainingOutput: TrainingOutput | null; diaryStats: StrengthStats[]; historyWorkouts: WorkoutLog[]; goal: string; level: string; daysPerWeek: number; recovery: number; fatigue: number }> = ({ linked, trainingOutput, diaryStats, historyWorkouts, goal, level, daysPerWeek, recovery, fatigue }) => {
+const MethodsTab: React.FC<{ linked: ReturnType<typeof useDataLink>; trainingOutput: TrainingOutput | null; diaryStats: StrengthStats[]; historyWorkouts: WorkoutLog[]; goal: string; level: string; daysPerWeek: number; recovery: number; fatigue: number; appliedMethod: string | null; onApplyMethod: (name: string, category: string) => void }> = ({ linked, trainingOutput, diaryStats, historyWorkouts, goal, level, daysPerWeek, recovery, fatigue, appliedMethod, onApplyMethod }) => {
   const methods = React.useMemo(() => getTrainingMethods(), []);
   const volumes = React.useMemo(() => getVolumeReferences(), []);
   const visuals = React.useMemo(() => getSplitVisuals(), []);
@@ -3510,13 +3511,20 @@ const MethodsTab: React.FC<{ linked: ReturnType<typeof useDataLink>; trainingOut
             <h4 style={{ margin: '0 0 6px', fontSize: 12, color: '#8b5cf6' }}>💡 Рекомендованные методики</h4>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               {recommendations.map((r, i) => r.method && (
-                <div key={i} style={{ padding: 8, borderRadius: 8, background: 'rgba(139,92,246,0.06)', border: '1px solid rgba(139,92,246,0.1)' }}>
-                  <div style={{ fontWeight: 600, fontSize: 11, color: '#8b5cf6' }}>{r.method.name}</div>
+                <div key={i} style={{ padding: 8, borderRadius: 8, background: appliedMethod === r.method.name ? 'rgba(0,230,138,0.1)' : 'rgba(139,92,246,0.06)', border: `1px solid ${appliedMethod === r.method.name ? 'rgba(0,230,138,0.3)' : 'rgba(139,92,246,0.1)'}` }}>
+                  <div style={{ fontWeight: 600, fontSize: 11, color: appliedMethod === r.method.name ? '#00e68a' : '#8b5cf6' }}>
+                    {appliedMethod === r.method.name ? '✓ ' : ''}{r.method.name}
+                  </div>
                   <div style={{ fontSize: 9, color: 'var(--text-dim)', marginTop: 2 }}>{r.reason}</div>
                   <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>{r.method.description}</div>
                   <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.35)', marginTop: 1 }}>
                     Протокол: {r.method.example} | Уровень доказательности: {r.method.evidenceLevel}
                   </div>
+                  {appliedMethod === r.method.name ? (
+                    <div style={{ marginTop: 4, fontSize: 8, color: '#00e68a', fontWeight: 600 }}>✅ Применена к плану</div>
+                  ) : (
+                    <button onClick={() => onApplyMethod(r.method!.name, r.method!.category)} style={{ marginTop: 4, padding: '3px 8px', borderRadius: 4, fontSize: 8, background: 'var(--accent)', color: '#000', border: 'none', cursor: 'pointer', fontWeight: 600 }}>Применить к плану</button>
+                  )}
                 </div>
               ))}
             </div>
@@ -3531,12 +3539,17 @@ const MethodsTab: React.FC<{ linked: ReturnType<typeof useDataLink>; trainingOut
       <button onClick={()=>setMethodCat('all')} style={{ padding:'4px 10px', borderRadius:6, fontSize:10, background: methodCat==='all'?'var(--accent)':'var(--bg-secondary)', color: methodCat==='all'?'#000':'var(--text-dim)', border:'none', cursor:'pointer' }}>Все</button>
       {cats.map(c => <button key={c} onClick={()=>setMethodCat(c)} style={{ padding:'4px 10px', borderRadius:6, fontSize:10, background: methodCat===c?'rgba(139,92,246,0.2)':'var(--bg-secondary)', border: methodCat===c?'1px solid #8b5cf6':'1px solid var(--border)', color: methodCat===c?'#8b5cf6':'var(--text-dim)', cursor:'pointer' }}>{c}</button>)}
     </div>
-    {filtered.map((m,i) => <div key={i} className="card" style={{ marginBottom:6, padding:10 }}>
-      <div style={{ fontWeight:600, fontSize:12 }}>{m.name} <span style={{ fontSize:9, color:'var(--text-dim)' }}>[{m.category}]</span></div>
+    {filtered.map((m,i) => <div key={i} className="card" style={{ marginBottom:6, padding:10, border: appliedMethod === m.name ? '1px solid rgba(0,230,138,0.3)' : '1px solid var(--border)' }}>
+      <div style={{ fontWeight:600, fontSize:12 }}>{appliedMethod === m.name ? '✓ ' : ''}{m.name} <span style={{ fontSize:9, color:'var(--text-dim)' }}>[{m.category}]</span></div>
       <div style={{ fontSize:9, color:'var(--text-light)', marginTop:2 }}>{m.description}</div>
       <div style={{ fontSize:8, color:'var(--text-dim)' }}>Лучше всего для: {m.bestFor}</div>
       <div style={{ fontSize:8, color:'rgba(255,255,255,0.4)' }}>Протокол: {m.example}</div>
       <div style={{ fontSize:7, color:'rgba(255,255,255,0.3)', marginTop:1 }}>Док-во: {m.evidenceLevel} | Авторы: {m.popularizedBy}</div>
+      {appliedMethod === m.name ? (
+        <div style={{ marginTop:4, fontSize:8, color:'#00e68a', fontWeight:600 }}>✅ Применена к плану</div>
+      ) : (
+        <button onClick={() => onApplyMethod(m.name, m.category)} style={{ marginTop:4, padding:'3px 8px', borderRadius:4, fontSize:8, background:'var(--accent)', color:'#000', border:'none', cursor:'pointer', fontWeight:600 }}>Применить к плану</button>
+      )}
     </div>)}
 
     <h4 style={{ margin:'12px 0 8px', fontSize:12 }}>📊 Volume Landmarks (MEV/MAV/MRV)</h4>

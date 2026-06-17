@@ -1227,9 +1227,11 @@ const ClinicalRiskDisplay: React.FC = () => {
   const s = linked.profile?.settings;
   const [result, setResult] = useState<any>(null);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleAnalyze = async () => {
     setLoading(true);
+    setError(null);
     try {
       const [{ analyzeClinicalRisks }, { mapStackToPathologies }, { SYSTEM_GROUPS, CLINICAL_PATHOLOGIES }] = await Promise.all([
         import('../../engines/clinical-analyzer.engine'),
@@ -1305,11 +1307,11 @@ const ClinicalRiskDisplay: React.FC = () => {
         overallMaxRisk: newResults.length > 0 ? newResults[0].riskPercent : 0,
         mapperPathologies: mapper.activePathologies.length,
       } as any);
-    } catch (e) { console.error(e); }
+    } catch (e) { setError('Ошибка загрузки модулей. Попробуйте перезагрузить.'); console.error(e); }
     setLoading(false);
   };
 
-  useEffect(() => { handleAnalyze(); }, []);
+  useEffect(() => { if (!result && !error) handleAnalyze(); }, []);
 
   const zoneColors: Record<number, string> = { 0: '#22c55e', 1: '#eab308', 2: '#f97316', 3: '#ef4444' };
 
@@ -1324,9 +1326,10 @@ const ClinicalRiskDisplay: React.FC = () => {
 
       {!result && (
         <button onClick={handleAnalyze} disabled={loading} style={{ width: '100%', padding: 10, borderRadius: 8, border: 'none', cursor: loading ? 'wait' : 'pointer', background: loading ? 'var(--border)' : 'linear-gradient(135deg, #ec4899, #8b5cf6)', color: '#fff', fontWeight: 700, fontSize: 14, marginBottom: 8 }}>
-          {loading ? '⏳ Анализ...' : '▶ Запустить клинический анализ'}
+          {loading ? '⏳ Анализ...' : course.length === 0 && labs.length === 0 ? '▶ Запустить (нет данных курса)' : '▶ Запустить клинический анализ'}
         </button>
       )}
+      {error && <div style={{ padding: 10, borderRadius: 8, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', color: '#ef4444', fontSize: 11, marginBottom: 8, textAlign: 'center' }}>{error}</div>}
 
       {result && (
         <>
