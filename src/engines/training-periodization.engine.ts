@@ -78,7 +78,55 @@ export interface MacrocycleInput {
   currentWeek?: number;
   periodizationType?: 'auto' | 'linear' | 'undulating' | 'block';
   cycleType?: string;
+  blockSequence?: import('../core/types').BlockDefinition[];
 }
+
+// Block definitions (Issurin system)
+export const BLOCK_TYPES: Record<string, import('../core/types').BlockDefinition> = {
+  accumulation: {
+    id: 'accumulation', name: 'Аккумуляция', durationWeeks: 3, primaryQuality: 'volume',
+    volumeMultiplier: 1.2, intensityMultiplier: 0.7, rirTarget: '2-3', frequencyMod: 1,
+    exerciseRotation: true, deconditioningRisk: 'low',
+  },
+  transmutation: {
+    id: 'transmutation', name: 'Трансмутация', durationWeeks: 3, primaryQuality: 'intensity',
+    volumeMultiplier: 0.85, intensityMultiplier: 0.9, rirTarget: '1-2', frequencyMod: 0,
+    exerciseRotation: false, deconditioningRisk: 'medium',
+  },
+  realization: {
+    id: 'realization', name: 'Реализация', durationWeeks: 1, primaryQuality: 'peak',
+    volumeMultiplier: 0.5, intensityMultiplier: 1.05, rirTarget: '0-1', frequencyMod: -1,
+    exerciseRotation: false, deconditioningRisk: 'high',
+  },
+  active_rest: {
+    id: 'active_rest', name: 'Активный отдых', durationWeeks: 1, primaryQuality: 'volume',
+    volumeMultiplier: 0.3, intensityMultiplier: 0.3, rirTarget: '3-4', frequencyMod: -2,
+    exerciseRotation: true, deconditioningRisk: 'low',
+  },
+};
+
+export const BLOCK_SEQUENCES: Record<string, { id: string; weeks: number }[]> = {
+  beginner: [
+    { id: 'accumulation', weeks: 3 },
+    { id: 'transmutation', weeks: 3 },
+  ],
+  intermediate: [
+    { id: 'accumulation', weeks: 3 },
+    { id: 'transmutation', weeks: 2 },
+    { id: 'realization', weeks: 1 },
+  ],
+  advanced: [
+    { id: 'accumulation', weeks: 4 },
+    { id: 'transmutation', weeks: 3 },
+    { id: 'realization', weeks: 1 },
+  ],
+  enhanced: [
+    { id: 'accumulation', weeks: 4 },
+    { id: 'transmutation', weeks: 3 },
+    { id: 'realization', weeks: 1 },
+    { id: 'active_rest', weeks: 1 },
+  ],
+};
 
 const LEVEL_CONFIGS: Record<string, { volumeBase: number; rirBase: number; deloadFreq: number; progressionPct: number }> = {
   beginner: { volumeBase: 12, rirBase: 3, deloadFreq: 8, progressionPct: 5 },
@@ -301,6 +349,75 @@ function generateWeekDays(
       intensity,
     };
   });
+}
+
+export function generateBlockPlan(input: MacrocycleInput): MacrocyclePlan {
+  const level = input.level || 'intermediate';
+  const rawSeq: { id: string; weeks: number }[] = (input.blockSequence || BLOCK_SEQUENCES[level] || BLOCK_SEQUENCES.intermediate) as any;
+  const seq = rawSeq.map(b => {
+    const tpl = BLOCK_TYPES[b.id] || BLOCK_TYPES.accumulation;
+    return { ...tpl, durationWeeks: b.weeks };
+  });
+
+  const totalWeeks = seq.reduce((s, b) => s + b.durationWeeks, 0);
+  const splitKey = selectSplit(input.daysPerWeek, level, input.goal);
+  const splitData = EXTENDED_SPLITS[splitKey] || EXTENDED_SPLITS.push_pull_legs_6;
+  const usePPL = splitKey.includes('push_pull');
+  const isUpperLower = splitKey.includes('upper_lower');
+
+  let weekCounter = 0;
+  const mesocycles: MesocyclePlan[] = [];
+
+  for (const block of seq) {
+    const blockType: MesocycleType = block.id === 'accumulation' ? 'accumulation' : block.id === 'transmutation' ? 'intensification' : block.id === 'realization' ? 'peaking' : 'deload';
+    const daysThisBlock = Math.max(2, input.daysPerWeek + block.frequencyMod);
+    const microcycles: Microcycle[] = [];
+
+    for (let w = 0; w < block.durationWeeks; w++) {
+      weekCounter++;
+      const isDeloadWk = w === block.durationWeeks - 1 && block.id !== 'active_rest' && block.durationWeeks > 1;
+      const progression = block.durationWeeks > 1 ? w / (block.durationWeeks - 1) : 0;
+      const volMultiplier = block.id === 'active_rest' ? 0.3 : Math.max(0.4, block.volumeMultiplier - progression * 0.15);
+      const rirVal = block.id === 'active_rest' ? 4 : Math.max(0, Math.round(Number(block.rirTarget.split('-')[0]) - progression));
+      const rpeVal = block.id === 'active_rest' ? 4 : Math.min(10, 10 - rirVal);
+
+      const days: TrainingDayPlan[] = [];
+      for (let d = 0; d < Math.min(daysThisBlock, 7); d++) {
+        if (!getTrainingDayPattern(daysThisBlock)[d]) continue;
+        let targets: string[];
+        if (usePPL) targets = [['push','pull','legs'][d % 3]];
+        else if (isUpperLower) targets = d % 2 === 0 ? ['chest','shoulders','triceps'] : ['back','legs','biceps'];
+        else targets = splitData.groupsPerDay[d % splitData.groupsPerDay.length];
+
+        const exercises: PlannedExercise[] = targets.flatMap((group: string) => {
+          const exList = (EXERCISE_CATALOG as any[]).filter((e: any) => e.group === group || e.targetMuscle === group);
+          const picked = exList.filter((_: any, i: number) => i % Math.max(1, Math.round(exList.length / 3)) === 0).slice(0, 2);
+          return picked.map((ex: any) => ({
+            exerciseId: ex.id, name: ex.name, group, sets: Math.max(1, Math.round(volMultiplier * 4)),
+            reps: block.id === 'accumulation' ? '8-12' : block.id === 'transmutation' ? '4-8' : '1-3',
+            rir: rirVal, rpe: rpeVal, restSeconds: block.id === 'realization' ? 180 : 90, isCompound: ex.type === 'compound',
+            canReplace: ex.canReplace, cannotReplace: ex.cannotReplace, comments: ex.comments || '',
+          }));
+        });
+
+        const intensity: 'low' | 'medium' | 'high' | 'very_high' = block.id === 'active_rest' ? 'low' : block.id === 'realization' ? 'very_high' : rpeVal >= 8 ? 'high' : 'medium';
+        days.push({ day: ['Пн','Вт','Ср','Чт','Пт','Сб','Вс'][d], isTraining: true, split: `${block.name} — ${targets.join('+')}`, exercises, duration: Math.round(exercises.length * 5), intensity });
+      }
+
+      microcycles.push({
+        weekNumber: weekCounter, mesocycleType: isDeloadWk ? 'deload' : blockType, isDeload: isDeloadWk,
+        days, volumeMultiplier: volMultiplier, rirRange: [rirVal, Math.min(4, rirVal + 1)] as [number, number], rpeTarget: rpeVal,
+        notes: `${block.name}: ${block.primaryQuality}, RIR ${block.rirTarget}`,
+      });
+    }
+
+    mesocycles.push({ type: blockType, weeks: block.durationWeeks, weekStart: weekCounter - block.durationWeeks + 1, microcycles });
+  }
+
+  return {
+    id: `block_${Date.now()}`, goal: input.goal, level, totalWeeks,
+    mesocycles, currentWeek: 1,
+  };
 }
 
 function getTrainingDayPattern(daysPerWeek: number): boolean[] {

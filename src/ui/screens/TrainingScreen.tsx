@@ -1,7 +1,7 @@
 ﻿import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { EXERCISE_CATALOG, getExercisesByGroup } from '../../core/exercise-catalog';
 import { calcTraining, calcExercisePrescription, EXERCISE_DB, TRAINING_SPLITS, TRAINING_LEVEL_CONFIGS, LEVEL_VOLUMES } from '../../engines/training.engine';
-import { generateMacrocycle, getCurrentWeekPlan, type MacrocyclePlan, type Microcycle, type MacrocycleInput } from '../../engines/training-periodization.engine';
+import { generateMacrocycle, generateBlockPlan, getCurrentWeekPlan, BLOCK_SEQUENCES, type MacrocyclePlan, type Microcycle, type MacrocycleInput } from '../../engines/training-periodization.engine';
 import { selectSplit, getSplitOptions, type SplitCandidate } from '../../engines/split-selector.engine';
 import { selectProgressionRule } from '../../engines/progression.engine';
 import { RIR_MATRIX, generateWeeklyPlan } from '../../engines/rir-matrix.engine';
@@ -217,7 +217,7 @@ export const TrainingScreen: React.FC = () => {
       periodizationType,
       cycleType,
     };
-    const macro = generateMacrocycle(macroInput);
+    const macro = periodizationType === 'block' ? generateBlockPlan(macroInput) : generateMacrocycle(macroInput);
     setMacrocycle(macro);
     setSelectedWeek(1);
     setCurrentMicrocycle(getCurrentWeekPlan(macro, 1));
@@ -575,6 +575,14 @@ export const TrainingScreen: React.FC = () => {
                 {periodizationType === 'undulating' && 'Объём/интенсивность меняются каждый день/неделю. RIR средний.'}
                 {periodizationType === 'block' && 'Блоки по 3-6 нед с одной целью. RIR снижен, объём повышен.'}
               </div>
+              {periodizationType === 'block' && (() => {
+                const seq = BLOCK_SEQUENCES[level] || BLOCK_SEQUENCES.intermediate;
+                const colors: Record<string,string> = { accumulation:'#22c55e', transmutation:'#3b82f6', realization:'#f97316', active_rest:'#eab308' };
+                const labels: Record<string,string> = { accumulation:'Акк', transmutation:'Транс', realization:'Реал', active_rest:'Отдых' };
+                return <div style={{ marginTop:4, display:'flex', gap:4, flexWrap:'wrap' }}>
+                  {seq.map((b, i) => <span key={b.id} style={{ fontSize:8, padding:'2px 6px', borderRadius:4, background:(colors[b.id]||'#888')+'22', color:colors[b.id]||'#888', fontWeight:600, whiteSpace:'nowrap' }}>{labels[b.id]||b.id} {b.weeks}н{i < seq.length-1 ? ' →' : ''}</span>)}
+                </div>;
+              })()}
             </div>
             <div style={{ marginBottom: 8 }}>
               <label style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 2, display: 'block' }}>Тип цикла</label>

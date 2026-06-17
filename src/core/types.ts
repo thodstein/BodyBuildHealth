@@ -733,6 +733,19 @@ export interface ReadinessScores {
   timestamp?: string;
 }
 
+export interface BlockDefinition {
+  id: string;
+  name: string;
+  durationWeeks: number;
+  primaryQuality: 'volume' | 'intensity' | 'peak';
+  volumeMultiplier: number;
+  intensityMultiplier: number;
+  rirTarget: string;
+  frequencyMod: number;
+  exerciseRotation: boolean;
+  deconditioningRisk: string;
+}
+
 export interface TrainingInput {
   goal: string;
   level: string;
@@ -749,6 +762,7 @@ export interface TrainingInput {
   splitType?: string;
   periodizationType?: 'auto' | 'linear' | 'undulating' | 'block';
   cycleType?: string;
+  blockSequence?: BlockDefinition[];
 }
 
 export interface TrainingOutput {
