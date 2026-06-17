@@ -1151,11 +1151,18 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
         }
       }
     }
-    // Joint mode: filter to only joint-related substances
+    // Normal mode: exclude joint-related substances (they have a separate calculator)
+    // Joint mode: ONLY include joint-related substances
     let finalSubs = subs;
     let finalDosages = dosages;
     if (jointMode) {
       finalSubs = subs.filter(s => JOINT_SUBS.includes(s));
+      finalDosages = {};
+      for (const s of finalSubs) {
+        finalDosages[s] = dosages[s] || DEFAULT_DOSAGES[s] || { mg: 500, timing: 'с едой' };
+      }
+    } else {
+      finalSubs = subs.filter(s => !JOINT_SUBS.includes(s));
       finalDosages = {};
       for (const s of finalSubs) {
         finalDosages[s] = dosages[s] || DEFAULT_DOSAGES[s] || { mg: 500, timing: 'с едой' };
@@ -2051,14 +2058,15 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
         {[
           { id:'home', label:'Главная', icon:'🏠' },
           { id:'generator', label:'Генератор', icon:'🧩' },
-          { id:'hormonal', label:'Гормоны', icon:'⚕️' },
           { id:'info', label:'Инфо', icon:'📚' },
+          { id:'hormonal', label:'Гормоны', icon:'⚕️' },
         ].map(item => (
           <button key={item.id} onClick={() => {
             setSection(item.id as any);
-            if (item.id === 'generator') { setTab('calculator'); }
-            if (item.id === 'hormonal') { setSupportView('fertility'); }
-            if (item.id === 'info') { setTab('catalog'); }
+            if (item.id === 'home') { setTab('main'); setSupportView('main'); }
+            if (item.id === 'generator') { setTab('calculator'); setSupportView('calc'); }
+            if (item.id === 'info') { setTab('catalog'); setSupportView('calc'); }
+            if (item.id === 'hormonal') { setTab('fertility-pct'); setSupportView('calc'); }
           }} style={{
             flex:1, display:'flex', flexDirection:'column', alignItems:'center', gap:2,
             padding:'4px 0', background:'transparent', border:'none', cursor:'pointer',
@@ -2355,7 +2363,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                 </div>
                 <span style={{ color:'var(--accent)', fontSize:18, opacity:0.6 }}>→</span>
               </div>
-              <div onClick={() => { setSection('hormonal'); setSupportView('fertility'); }} style={{
+              <div onClick={() => { setSection('hormonal'); setTab('main'); setSupportView('fertility'); }} style={{
                 display:'flex', alignItems:'center', gap:12, padding:'14px 16px', borderRadius:16, cursor:'pointer', textAlign:'left', width:'100%',
                 background:'rgba(20,22,30,0.4)', border:'1px solid var(--glass-border)', color:'var(--text)', transition:'all 0.2s',
                 backdropFilter:'blur(12px)', WebkitBackdropFilter:'blur(12px)',
@@ -5168,7 +5176,12 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
 
             {/* ==================== 2c: РИСКИ ПО СИСТЕМАМ ==================== */}
             <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:12, border:'1px solid var(--border)' }}>
-              <h4 style={{ margin:'0 0 8px', fontSize:12, color:'#f59e0b' }}>📈 Риски по системам</h4>
+              <div onClick={() => setExpandedCategories(prev => ({ ...prev, calc_risks: !(prev?.calc_risks ?? true) }))} style={{ display:'flex', alignItems:'center', gap:6, cursor:'pointer', userSelect:'none', marginBottom: expandedCategories?.calc_risks !== false ? 8 : 0 }}>
+                <span style={{ fontSize:13 }}>📈</span>
+                <h4 style={{ margin:0, fontSize:12, color:'#f59e0b', flex:1 }}>Риски по системам</h4>
+                <span style={{ fontSize:9, color:'var(--text-dim)', transform: expandedCategories?.calc_risks !== false ? 'rotate(180deg)' : 'none', transition:'transform 0.2s' }}>▼</span>
+              </div>
+              {expandedCategories?.calc_risks !== false && (<>
               {riskData?.systemBreakdown && Object.keys(riskData.systemBreakdown).length > 0 ? (
                 <div style={{ display:'flex', flexDirection:'column', gap:5 }}>
                   {SYSTEM_ORDER.filter(k => riskData.systemBreakdown[k]).map(sysKey => {
@@ -5204,15 +5217,23 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
               ) : (
                 <p style={{ fontSize:9, color:'var(--text-dim)', margin:0 }}>Нет данных о рисках. Нажмите «Рассчитать» ниже.</p>
               )}
+              </>)}
             </div>
 
             {/* ==================== ADD 1: REAL CALCULATESUPPORT INTEGRATION ==================== */}
-            <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:12, border:'2px solid rgba(0,230,138,0.25)', position:'relative', overflow:'hidden' }}>
+            <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:16, border:'2px solid rgba(0,230,138,0.25)', position:'relative', overflow:'hidden' }}>
               <div style={{ position:'absolute', top:0, left:0, right:0, bottom:0, background:'linear-gradient(135deg, rgba(0,230,138,0.02), rgba(0,198,83,0.02))', pointerEvents:'none' }} />
-              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
-                <h4 style={{ margin:0, fontSize:13, color:'#00e68a' }}>🧮 Интеллектуальный расчёт поддержки</h4>
-                <span style={{ fontSize:9, fontWeight:400, color:'var(--text-dim)', background:'rgba(0,230,138,0.08)', padding:'2px 8px', borderRadius:10 }}>v2.0</span>
+              <div onClick={() => setExpandedCategories(prev => ({ ...prev, calc_intel: !(prev?.calc_intel ?? true) }))} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom: expandedCategories?.calc_intel !== false ? 8 : 0, cursor:'pointer', userSelect:'none' }}>
+                <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                  <span style={{ fontSize:16 }}>🧮</span>
+                  <h4 style={{ margin:0, fontSize:13, color:'#00e68a' }}>Интеллектуальный расчёт поддержки</h4>
+                </div>
+                <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                  <span style={{ fontSize:9, fontWeight:400, color:'var(--text-dim)', background:'rgba(0,230,138,0.08)', padding:'2px 8px', borderRadius:10 }}>v2.0</span>
+                  <span style={{ fontSize:9, color:'var(--text-dim)', transform: expandedCategories?.calc_intel !== false ? 'rotate(180deg)' : 'none', transition:'transform 0.2s' }}>▼</span>
+                </div>
               </div>
+              {expandedCategories?.calc_intel !== false && (<>
               <p style={{ fontSize:9, color:'var(--text-dim)', margin:'0 0 10px', lineHeight:1.5 }}>
                 Анализ: <b style={{ color:'var(--accent)' }}>{uniqCourse.length}</b> препаратов · <b style={{ color:'#60a5fa' }}>{labs.length}</b> анализов · <b style={{ color:'#f59e0b' }}>{Object.keys(riskData?.systemBreakdown || {}).length}</b> систем рисков · <b style={{ color:'#a78bfa' }}>{weightKg}</b>кг {age}лет {sex === 'male' ? '♂' : '♀'}
               </p>
@@ -5329,6 +5350,7 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
                   </div>
                 </div>
               )}
+              </>)}
             </div>
 
             {/* ==================== PHASE SELECTOR ==================== */}
