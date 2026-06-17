@@ -3402,7 +3402,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
 
       {/* ===== NON-MAIN CONTENT (with back button) ===== */}
       {tab !== 'main' && tab !== 'fertility-pct' && (
-        <>
+        <div style={{ paddingTop: section === 'info' ? 48 : 0, paddingBottom: 70, overflowY:'auto', maxHeight:'100vh' }}>
           <button onClick={() => { setTab('main'); setSupportView('main'); setCalcView('main'); setSection('home'); }} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', marginBottom:8, background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← На главную</button>
 
       {/* ===== CATALOG (SUPPORT_CATALOG_DATA — 289 записей) ===== */}
@@ -4245,7 +4245,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
           </div>
         </div>
       )}
-      </>
+      </div>
       )}
 
       {/* ===== STACKCALC IN CALC VIEW ===== */}
