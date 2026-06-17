@@ -68,9 +68,9 @@ type TrainingPage = 'hero' | 'tabs';
 type TrainingGroup = 'training' | 'planning' | 'info' | null;
 
 const TAB_GROUPS: Record<string, { title: string; icon: string; tabs: TrainingTab[]; color: string }> = {
-  training: { title: '🏋️ Тренировки', icon: '🏋️', tabs: ['runtime', 'diary', 'history', 'timers'], color: 'var(--accent)' },
+  training: { title: '🏋️ Тренировки', icon: '🏋️', tabs: ['runtime', 'timers'], color: 'var(--accent)' },
   planning: { title: '📐 Планирование', icon: '📐', tabs: ['plan', 'cycles', 'programs', 'mytraining', 'methods', 'programcalc'], color: '#3b82f6' },
-  info: { title: '📊 Инфо', icon: '📊', tabs: ['analytics', 'visual', 'progress', 'calculators', 'exercises'], color: '#8b5cf6' },
+  info: { title: '📊 Инфо', icon: '📊', tabs: ['analytics', 'visual', 'progress', 'calculators', 'exercises', 'diary', 'history'], color: '#8b5cf6' },
 };
 
 const TAB_LABELS: Record<TrainingTab, string> = {

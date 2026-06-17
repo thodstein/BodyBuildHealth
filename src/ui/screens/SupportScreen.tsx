@@ -930,7 +930,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   const goBack = () => {
     if (calcView !== 'main') { setCalcView('main'); return; }
     if (supportView !== 'main') { setSupportView('main'); return; }
-    if (tab !== 'main') { setTab('main'); return; }
+    if (tab !== 'main') { setTab('main'); if (section === 'info') { setSection('home'); setSupportView('main'); setCalcView('main'); } return; }
     if (section !== 'home') { setSection('home'); return; }
   };
   const [interactionTypeFilter, setInteractionTypeFilter] = useState<string>('all');
@@ -3443,11 +3443,21 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
         </div>
       )}
 
+      {/* ===== INFO WELCOME (tab === 'main') ===== */}
+      {section === 'info' && tab === 'main' && (
+        <div style={{ padding:'16px 12px', textAlign:'center' }}>
+          <div style={{ fontSize:36, marginBottom:8 }}>📚</div>
+          <div style={{ fontSize:14, fontWeight:700, color:'var(--text-light)', marginBottom:4 }}>База знаний поддержки</div>
+          <div style={{ fontSize:11, color:'var(--text-dim)', marginBottom:12 }}>Выберите раздел сверху: каталог препаратов, синергии, готовые стеки, взаимодействия, исследования, миксы для тренировки, нейротоксичность, суставы, акне.</div>
+          <div style={{ fontSize:9, color:'var(--text-dim)', opacity:0.6 }}>289 препаратов · 206 взаимодействий · 40+ стеков</div>
+        </div>
+      )}
+
       {/* ===== NON-MAIN CONTENT ===== */}
       {tab !== 'main' && tab !== 'fertility-pct' && (
         <div style={{ paddingBottom: 16 }}>
 
-      {/* ===== CATALOG (SUPPORT_CATALOG_DATA — 289 записей) ===== */}
+      {/* ===== CATALOG ===== */}
       {section === 'info' && tab === 'catalog' && (
         <div>
           <div style={{ display: 'flex', gap: 6, marginBottom: 10, alignItems: 'center' }}>

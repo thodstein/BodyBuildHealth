@@ -28,22 +28,20 @@ interface DiaryEntry {
 }
 
 type NutritionPage = 'hero' | 'tabs';
-type NutritionSection = 'overview' | 'diary' | 'planning' | 'tools' | 'all';
-type ActiveTab = 'overview' | 'diary' | 'charts' | 'mealplan' | 'grocery' | 'restaurant' | 'cycling' | 'calc' | 'custom';
+type NutritionSection = 'diary' | 'planning' | 'overview' | 'all';
+type ActiveTab = 'overview' | 'diary' | 'charts' | 'mealplan' | 'grocery' | 'restaurant' | 'cycling' | 'calc' | 'custom' | 'planoverview' | 'rules' | 'products' | 'infocalc';
 
 const SECTION_TABS: Record<NutritionSection, string[]> = {
-  overview: ['overview', 'grocery', 'restaurant', 'custom'],
   diary: ['diary', 'charts'],
   planning: ['mealplan', 'cycling'],
-  tools: ['calc'],
-  all: ['overview', 'diary', 'charts', 'mealplan', 'grocery', 'restaurant', 'calc', 'cycling', 'custom'],
+  overview: ['overview', 'infocalc'],
+  all: ['diary', 'charts', 'mealplan', 'cycling', 'overview', 'infocalc'],
 };
 
 const TAB_LABELS: Record<string, string> = {
-  overview: '📊 Обзор', diary: '📝 Дневник', charts: '📈 Графики',
-  mealplan: '🥗 План', grocery: '🛒 Список', restaurant: '🍽 Ресторан',
-  calc: '📐 Калькуляторы', cycling: '🔄 Циклирование',
-  custom: '🍎 Своё',
+  diary: '📝 Дневник', charts: '📈 Графики',
+  mealplan: '🥗 План', cycling: '🔄 Циклирование',
+  overview: '📊 Общая информация', infocalc: '📐 Калькуляторы',
 };
 
 const NutritionLabContext: React.FC<{ labAnalysis: LabCompositeResult }> = ({ labAnalysis }) => (
@@ -68,6 +66,7 @@ export const NutritionScreen: React.FC = () => {
   const [tab, setTab] = useState<ActiveTab>('overview');
   const [page, setPage] = useState<NutritionPage>('hero');
   const [nutritionSection, setNutritionSection] = useState<NutritionSection>('all');
+  const [mealSubTab, setMealSubTab] = useState<string>('planoverview');
   const [foodEntries, setFoodEntries] = useState<DiaryEntry[]>([]);
   const [dailyLogs, setDailyLogs] = useState<Record<string, DiaryEntry[]>>({});
 
@@ -133,13 +132,13 @@ export const NutritionScreen: React.FC = () => {
     const tFat = linked.avgWeeklyFat || Math.round(tKcal * 0.25 / 9);
     const tCarbs = linked.avgWeeklyCarbs || Math.round((tKcal - tProt * 4 - tFat * 9) / 4);
     switch (tab) {
-      case 'overview': return <><NutritionOverview profile={linked.profile} avgWeeklyKcal={avgWeeklyKcal} avgWeeklyProtein={avgWeeklyProtein} avgWeeklyFat={avgWeeklyFat} avgWeeklyCarbs={avgWeeklyCarbs} microsIntake={microsIntake} />{labAnalysis && <NutritionLabContext labAnalysis={labAnalysis} />}<QuickAdviceCard /><FoodDbSyncCard /></>;
+      case 'overview': return <><NutritionOverview profile={linked.profile} avgWeeklyKcal={avgWeeklyKcal} avgWeeklyProtein={avgWeeklyProtein} avgWeeklyFat={avgWeeklyFat} avgWeeklyCarbs={avgWeeklyCarbs} microsIntake={microsIntake} />{labAnalysis && <NutritionLabContext labAnalysis={labAnalysis} />}</>;
+      case 'infocalc': return <NutritionCalculators />;
       case 'diary': return <NutritionDiary foodEntries={foodEntries} />;
       case 'charts': return <NutritionCharts kcalData={[avgWeeklyKcal]} proteinData={[avgWeeklyProtein]} labels={['']} dailyLogs={dailyLogs} />;
-      case 'mealplan': return <MealPlanExtended tKcal={tKcal} tProt={tProt} tFat={tFat} tCarbs={tCarbs} profile={linked.profile} />;
+      case 'mealplan': return <MealPlanExtended tKcal={tKcal} tProt={tProt} tFat={tFat} tCarbs={tCarbs} profile={linked.profile} mealSubTab={mealSubTab} setMealSubTab={setMealSubTab} />;
       case 'grocery': return <GroceryTab tKcal={tKcal} tProt={tProt} />;
       case 'restaurant': return <RestaurantTab />;
-      case 'calc': return <NutritionCalculators />;
       case 'cycling': return <CyclingTab tKcal={tKcal} tProt={tProt} />;
       case 'custom': return <NutritionCustomFood />;
       default: return <NutritionOverview profile={linked.profile} avgWeeklyKcal={avgWeeklyKcal} avgWeeklyProtein={avgWeeklyProtein} avgWeeklyFat={avgWeeklyFat} avgWeeklyCarbs={avgWeeklyCarbs} microsIntake={microsIntake} />;
@@ -163,8 +162,7 @@ export const NutritionScreen: React.FC = () => {
               {[
                 { section: 'diary' as NutritionSection, tab: 'diary', icon: '📝', title: 'Дневник питания', desc: 'Запись продуктов, OCR, штрих-коды', color: '#22c55e' },
                 { section: 'planning' as NutritionSection, tab: 'mealplan', icon: '🥗', title: 'План питания', desc: 'Генератор рациона, уровни, циклирование', color: '#3b82f6' },
-                { section: 'overview' as NutritionSection, tab: 'overview', icon: '📊', title: 'Обзор и списки', desc: 'Сводка, список покупок, рестораны', color: 'var(--accent)' },
-                { section: 'tools' as NutritionSection, tab: 'calc', icon: '📐', title: 'Калькуляторы', desc: 'КБЖУ, дефицит, HOMA-IR', color: '#a855f7' },
+                { section: 'overview' as NutritionSection, tab: 'overview', icon: '📊', title: 'Общая информация', desc: 'Сводка, калькуляторы', color: 'var(--accent)' },
               ].map(card => (
                 <button key={card.section} onClick={() => { setPage('tabs'); setNutritionSection(card.section); setTab(card.tab as any); }} style={{
                   display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', borderRadius: 14, cursor: 'pointer', textAlign: 'left', width: '100%',
@@ -199,7 +197,7 @@ export const NutritionScreen: React.FC = () => {
             fontWeight: 600,
           }}>← На главную</button>
           <span style={{ fontSize: 9, color: 'var(--text-dim)', marginLeft: 'auto' }}>
-            {nutritionSection === 'diary' ? 'Дневник' : nutritionSection === 'planning' ? 'Планирование' : nutritionSection === 'overview' ? 'Обзор' : nutritionSection === 'tools' ? 'Инструменты' : 'Всё'}
+            {nutritionSection === 'diary' ? 'Дневник' : nutritionSection === 'planning' ? 'Планирование' : nutritionSection === 'overview' ? 'Общая информация' : 'Всё'}
           </span>
         </div>
       )}
@@ -307,7 +305,7 @@ const MealPlan: React.FC<{ profile: UserProfile | null }> = ({ profile }) => {
   );
 };
 
-const MealPlanExtended: React.FC<{ tKcal: number; tProt: number; tFat: number; tCarbs: number; profile: UserProfile | null }> = ({ tKcal, tProt, tFat, tCarbs, profile }) => {
+const MealPlanExtended: React.FC<{ tKcal: number; tProt: number; tFat: number; tCarbs: number; profile: UserProfile | null; mealSubTab?: string; setMealSubTab?: (v: string) => void }> = ({ tKcal, tProt, tFat, tCarbs, profile, mealSubTab, setMealSubTab }) => {
   const [planDays, setPlanDays] = React.useState(3);
   const [mealPlan, setMealPlan] = React.useState<DailyMealPlan[] | null>(null);
   const [weeklyPlan, setWeeklyPlan] = React.useState<any[] | null>(null);
@@ -777,8 +775,28 @@ const MealPlanExtended: React.FC<{ tKcal: number; tProt: number; tFat: number; t
     } catch {}
   };
 
+  const msTab = mealSubTab || 'planoverview';
+  const setMs = setMealSubTab || ((v: string) => {});
+
   return (
     <div>
+      {/* Sub-tab pills */}
+      <div style={{ display:'flex', gap:4, marginBottom:8, overflowX:'auto', scrollbarWidth:'none' }}>
+        {[
+          { id:'planoverview', label:'📋 Обзор' },
+          { id:'rules', label:'📋 Правила питания' },
+          { id:'products', label:'📋 Обзор продуктов' },
+        ].map(st => (
+          <button key={st.id} onClick={() => setMs(st.id)} style={{
+            padding:'6px 12px', borderRadius:16, fontSize:10, fontWeight:700, whiteSpace:'nowrap', cursor:'pointer', flexShrink:0,
+            background: msTab === st.id ? 'var(--accent)' : 'var(--bg-secondary)',
+            color: msTab === st.id ? '#000' : 'var(--text-dim)',
+            border: `1px solid ${msTab === st.id ? 'var(--accent)' : 'var(--border)'}`,
+          }}>{st.label}</button>
+        ))}
+      </div>
+
+      {msTab === 'planoverview' && (<>
       <div className="card" style={{ marginBottom: 8, padding: 14 }}>
         <h4 style={{ margin: '0 0 8px', fontSize: 12 }}>🏷️ Выберите уровень питания</h4>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
@@ -929,7 +947,9 @@ const MealPlanExtended: React.FC<{ tKcal: number; tProt: number; tFat: number; t
           </div>
         )}
       </div>
+      </>)}
 
+      {msTab === 'rules' && (<>
       <div className="card" style={{ marginBottom: 8, padding: 14 }}>
         <h4 style={{ margin: '0 0 8px', fontSize: 13, color: 'var(--accent)' }}>📋 Правила питания</h4>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
@@ -1010,7 +1030,9 @@ const MealPlanExtended: React.FC<{ tKcal: number; tProt: number; tFat: number; t
           </div>
         </div>
       </div>
+      </>)}
 
+      {msTab === 'products' && (<>
       <div className="card" style={{ marginBottom: 8, padding: 14 }}>
         <h4 style={{ margin: '0 0 10px', fontSize: 13, color: 'var(--accent)' }}>🍽 Рекомендуемые продукты</h4>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -1261,7 +1283,9 @@ const MealPlanExtended: React.FC<{ tKcal: number; tProt: number; tFat: number; t
           ))}
         </div>
       </div>
+      </>)}
 
+      {msTab !== 'products' && msTab !== 'rules' && (<>
       <div className="card" style={{ marginBottom: 8, padding: 14 }}>
         <h4 style={{ margin: '0 0 8px', fontSize: 13, color: 'var(--accent)' }}>🎯 Индивидуальный план</h4>
         <p style={{ fontSize: 10, color: 'var(--text-dim)', margin: '0 0 8px' }}>
@@ -1779,6 +1803,7 @@ const MealPlanExtended: React.FC<{ tKcal: number; tProt: number; tFat: number; t
       </div>
       <div className="card" style={{ marginBottom: 8 }}><h4 style={{ margin: '0 0 4px', fontSize: 12 }}>⏰ Тайминг добавок</h4>{timings.slice(0,6).map((t:any,i:number)=><div key={i} style={{fontSize:9,padding:'2px 0'}}><b>{t.name}</b>: {t.morning||''}{t.preWorkout||''}{t.evening||''}{t.beforeBed||''} — {t.dosage}</div>)}</div>
       <div className="card"><h4 style={{ margin: '0 0 4px', fontSize: 12 }}>🍳 Рецепты ({recipes.length})</h4>{recipes.slice(0,5).map((r:any,i:number)=><div key={i} style={{marginBottom:4}}><b style={{fontSize:10}}>{r.name}</b><span style={{fontSize:9,color:'var(--text-dim)'}}> — {r.kcal}ккал Б:{r.protein} Ж:{r.fat} У:{r.carbs}</span></div>)}</div>
+      </>)}
     </div>
   );
 };
