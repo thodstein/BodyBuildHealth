@@ -907,6 +907,10 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   const [supportView, setSupportView] = useState<SupportView>('main');
   const [calcView, setCalcView] = useState<CalcView>('main');
   const [infoView, setInfoView] = useState<InfoView>('main');
+  const [section, setSection] = useState<'home' | 'generator' | 'hormonal' | 'info'>('home');
+  const [genTab, setGenTab] = useState<'calculator' | 'stackgen' | 'mystacks' | 'plan'>('calculator');
+  const [hormonalTab, setHormonalTab] = useState<'pct' | 'fertility' | 'hrt'>('pct');
+  const [infoTab, setInfoTab] = useState<'peptides' | 'catalog' | 'synergies' | 'readystacks' | 'interactions' | 'research' | 'mixcalc' | 'neuro' | 'joints' | 'acne'>('catalog');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedSub, setSelectedSub] = useState<string | null>(null);
   const [synergyFilter, setSynergyFilter] = useState<string>('all');
@@ -2376,57 +2380,130 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
   };
 
   return (
-    <div className="screen support-screen">
-      {/* ===== MAIN HERO ===== */}
-      {tab === 'main' && supportView === 'main' && (
-        <div style={{ position:'fixed', inset:0, zIndex:100, display:'flex', flexDirection:'column' }}>
-          <img src="/support-hero.jpg" alt="" style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'cover', objectPosition:'center top' }} />
-          <div style={{ position:'absolute', inset:0, background:'linear-gradient(transparent 50%, rgba(0,0,0,0.85))' }} />
-          <div style={{ position:'relative', zIndex:2, flex:1, display:'flex', flexDirection:'column', justifyContent:'flex-end', padding:'16px 16px 80px' }}>
-            <h1 style={{ fontSize:22, fontWeight:800, color:'#fff', margin:'0 0 2px', textShadow:'0 2px 14px rgba(0,0,0,0.9)' }}>Поддержка</h1>
-            <p style={{ fontSize:11, color:'rgba(255,255,255,0.9)', margin:'0 0 16px', lineHeight:1.3, textShadow:'0 1px 8px rgba(0,0,0,0.8)' }}>
-              Фармакологическая поддержка, пептиды и предлагаемые препараты поддержки для уменьшения рисков
-            </p>
-            <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-              <div onClick={() => { setSupportView('calc'); setCalcView('calculator'); }} style={{
-                display:'flex', alignItems:'center', gap:12, padding:'14px 16px', borderRadius:16, cursor:'pointer', textAlign:'left', width:'100%',
-                background:'rgba(20,22,30,0.4)', border:'1px solid var(--glass-border)', color:'var(--text)', transition:'all 0.2s',
-                backdropFilter:'blur(12px)', WebkitBackdropFilter:'blur(12px)',
-              }}>
-                <div style={{ width:48, height:48, borderRadius:14, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, background:'rgba(0,230,138,0.15)', fontSize:24 }}>🧮</div>
+    <div className="screen support-screen" style={{ paddingTop: section !== 'home' ? '50px' : '16px' }}>
+      {/* ===== SECTION: HOME ===== */}
+      {section === 'home' && (
+        <div style={{ position:'fixed', inset:0, zIndex:100, display:'flex', flexDirection:'column', padding:'40px 16px', overflow:'auto' }}>
+          <h1 style={{ fontSize:24, fontWeight:800, color:'#fff', margin:'0 0 16px' }}>Поддержка</h1>
+          <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
+            {/* Card 1: Генератор поддержки */}
+            <div onClick={() => { setSection('generator'); setTab('calculator'); }} style={{
+              background:'var(--bg-primary)', borderRadius:22, padding:'20px 18px 18px', border:'1px solid var(--border)', cursor:'pointer',
+            }}>
+              <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:8 }}>
+                <div style={{ width:48, height:48, borderRadius:14, background:'var(--accent)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:22 }}>🧩</div>
                 <div style={{ flex:1 }}>
-                  <div style={{ fontSize:15, fontWeight:800, marginBottom:4, color:'var(--accent)' }}>Калькулятор поддержки</div>
-                  <div style={{ fontSize:10, color:'rgba(255,255,255,0.85)', lineHeight:1.3 }}>Пептиды, нейротоксичность, суставы, тренировочные миксы, генератор стеков, план приёма</div>
+                  <div style={{ fontSize:17, fontWeight:700, color:'#fff' }}>Генератор поддержки</div>
+                  <div style={{ fontSize:12, color:'var(--text-dim)', marginTop:2 }}>Расчёт стека, подбор доз, план приёма</div>
                 </div>
-                <span style={{ color:'var(--accent)', fontSize:18, opacity:0.6 }}>→</span>
-              </div>
-              <div onClick={() => setSupportView('fertility')} style={{
-                display:'flex', alignItems:'center', gap:12, padding:'14px 16px', borderRadius:16, cursor:'pointer', textAlign:'left', width:'100%',
-                background:'rgba(20,22,30,0.4)', border:'1px solid var(--glass-border)', color:'var(--text)', transition:'all 0.2s',
-                backdropFilter:'blur(12px)', WebkitBackdropFilter:'blur(12px)',
-              }}>
-                <div style={{ width:48, height:48, borderRadius:14, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, background:'rgba(139,92,246,0.15)', fontSize:24 }}>🧬</div>
-                <div style={{ flex:1 }}>
-                  <div style={{ fontSize:15, fontWeight:800, marginBottom:4, color:'#8b5cf6' }}>ПКТ и гормональное здоровье</div>
-                  <div style={{ fontSize:10, color:'rgba(255,255,255,0.85)', lineHeight:1.3 }}>Фертильность, ПКТ, ГЗТ/ТЗТ, анализы, гайд восстановления</div>
-                </div>
-                <span style={{ color:'#8b5cf6', fontSize:18, opacity:0.6 }}>→</span>
-              </div>
-              <div onClick={() => { setSupportView('calc'); setCalcView('info'); setInfoView('catalog'); }} style={{
-                display:'flex', alignItems:'center', gap:12, padding:'14px 16px', borderRadius:16, cursor:'pointer', textAlign:'left', width:'100%',
-                background:'rgba(20,22,30,0.4)', border:'1px solid var(--glass-border)', color:'var(--text)', transition:'all 0.2s',
-                backdropFilter:'blur(12px)', WebkitBackdropFilter:'blur(12px)',
-              }}>
-                <div style={{ width:48, height:48, borderRadius:14, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, background:'rgba(96,165,250,0.15)', fontSize:24 }}>📚</div>
-                <div style={{ flex:1 }}>
-                  <div style={{ fontSize:15, fontWeight:800, marginBottom:4, color:'#60a5fa' }}>Каталог и информация</div>
-                  <div style={{ fontSize:10, color:'rgba(255,255,255,0.85)', lineHeight:1.3 }}>Каталог веществ, синергии, готовые стеки, взаимодействия, исследования</div>
-                </div>
-                <span style={{ color:'#60a5fa', fontSize:18, opacity:0.6 }}>→</span>
+                <div style={{ color:'var(--text-dim)', fontSize:18 }}>›</div>
               </div>
             </div>
+            {/* Card 2: Гормональное здоровье */}
+            <div onClick={() => { setSection('hormonal'); setSupportView('fertility'); }} style={{
+              background:'var(--bg-primary)', borderRadius:22, padding:'20px 18px 18px', border:'1px solid var(--border)', cursor:'pointer',
+            }}>
+              <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:8 }}>
+                <div style={{ width:48, height:48, borderRadius:14, background:'#ff6b6b', display:'flex', alignItems:'center', justifyContent:'center', fontSize:22 }}>⚕️</div>
+                <div style={{ flex:1 }}>
+                  <div style={{ fontSize:17, fontWeight:700, color:'#fff' }}>Гормональное здоровье</div>
+                  <div style={{ fontSize:12, color:'var(--text-dim)', marginTop:2 }}>ПКТ, фертильность, ГЗТ</div>
+                </div>
+                <div style={{ color:'var(--text-dim)', fontSize:18 }}>›</div>
+              </div>
+            </div>
+            {/* Card 3: Общая информация */}
+            <div onClick={() => { setSection('info'); setTab('catalog'); }} style={{
+              background:'var(--bg-primary)', borderRadius:22, padding:'20px 18px 18px', border:'1px solid var(--border)', cursor:'pointer',
+            }}>
+              <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:8 }}>
+                <div style={{ width:48, height:48, borderRadius:14, background:'#5b8def', display:'flex', alignItems:'center', justifyContent:'center', fontSize:22 }}>📚</div>
+                <div style={{ flex:1 }}>
+                  <div style={{ fontSize:17, fontWeight:700, color:'#fff' }}>Общая информация</div>
+                  <div style={{ fontSize:12, color:'var(--text-dim)', marginTop:2 }}>Каталог, синергии, исследования, калькуляторы</div>
+                </div>
+                <div style={{ color:'var(--text-dim)', fontSize:18 }}>›</div>
+              </div>
+            </div>
+          </div>
         </div>
-      </div>
+      )}
+
+      {/* ===== GENERATOR SECTION NAV ===== */}
+      {section === 'generator' && (
+        <div style={{ position:'fixed', top:0, left:0, right:0, zIndex:200, padding:'8px 12px', background:'var(--bg-primary)', borderBottom:'1px solid var(--border)', display:'flex', alignItems:'center', gap:6 }}>
+          <button onClick={() => setSection('home')} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600, whiteSpace:'nowrap' }}>←</button>
+          {['calculator','stackgen','mystacks','plan'].map(t => (
+            <button key={t} onClick={() => { setGenTab(t as any); 
+              const actions: Record<string,()=>void> = {
+                calculator: () => setTab('calculator'),
+                stackgen: () => { setTab('main'); setSupportView('calc'); setCalcView('stackcalc'); },
+                mystacks: () => { setTab('main'); setSupportView('calc'); setCalcView('mystacks'); },
+                plan: () => { setTab('main'); setSupportView('calc'); setCalcView('plan'); },
+              };
+              actions[t]?.();
+            }} style={{
+              padding:'6px 14px', borderRadius:22, fontSize:11, fontWeight:700, whiteSpace:'nowrap', cursor:'pointer', flexShrink:0,
+              background: genTab === t ? 'var(--accent)' : 'var(--bg-secondary)',
+              color: genTab === t ? '#000' : 'var(--text-dim)',
+              border: `1px solid ${genTab === t ? 'var(--accent)' : 'var(--border)'}`,
+              transition:'all 0.15s',
+            }}>{t === 'calculator' ? 'Калькулятор' : t === 'stackgen' ? 'Генератор стеков' : t === 'mystacks' ? 'Мои стеки' : 'План'}</button>
+          ))}
+        </div>
+      )}
+
+      {/* ===== HORMONAL SECTION NAV ===== */}
+      {section === 'hormonal' && (
+        <div style={{ position:'fixed', top:0, left:0, right:0, zIndex:200, padding:'8px 12px', background:'var(--bg-primary)', borderBottom:'1px solid var(--border)', display:'flex', alignItems:'center', gap:6 }}>
+          <button onClick={() => setSection('home')} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600, whiteSpace:'nowrap' }}>←</button>
+          {['pct','fertility','hrt'].map(t => (
+            <button key={t} onClick={() => { setHormonalTab(t as any);
+              const actions: Record<string,()=>void> = {
+                pct: () => setSupportView('fertility'),
+                fertility: () => setTab('fertility-pct'),
+                hrt: () => {},
+              };
+              actions[t]?.();
+            }} style={{
+              padding:'6px 14px', borderRadius:22, fontSize:11, fontWeight:700, whiteSpace:'nowrap', cursor:'pointer', flexShrink:0,
+              background: hormonalTab === t ? 'var(--accent)' : 'var(--bg-secondary)',
+              color: hormonalTab === t ? '#000' : 'var(--text-dim)',
+              border: `1px solid ${hormonalTab === t ? 'var(--accent)' : 'var(--border)'}`,
+              transition:'all 0.15s',
+            }}>{t === 'pct' ? 'ПКТ' : t === 'fertility' ? 'Фертильность' : 'ГЗТ'}</button>
+          ))}
+        </div>
+      )}
+
+      {/* ===== INFO SECTION NAV ===== */}
+      {section === 'info' && (
+        <div style={{ position:'fixed', top:0, left:0, right:0, zIndex:200, padding:'8px 12px', background:'var(--bg-primary)', borderBottom:'1px solid var(--border)', overflowX:'auto', scrollbarWidth:'none', msOverflowStyle:'none', display:'flex', alignItems:'center', gap:6 }}>
+          <button onClick={() => setSection('home')} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600, whiteSpace:'nowrap' }}>←</button>
+          {['peptides','catalog','synergies','readystacks','interactions','research','mixcalc','neuro','joints','acne'].map(t => (
+            <button key={t} onClick={() => { setInfoTab(t as any);
+              const actions: Record<string,()=>void> = {
+                peptides: () => setTab('peptides'),
+                catalog: () => setTab('catalog'),
+                synergies: () => { setTab('main'); setSupportView('calc'); setCalcView('info'); setInfoView('synergies'); },
+                readystacks: () => { setTab('main'); setSupportView('calc'); setCalcView('info'); setInfoView('stacks'); },
+                interactions: () => { setTab('main'); setSupportView('calc'); setCalcView('info'); setInfoView('interactions'); },
+                research: () => { setTab('main'); setSupportView('calc'); setCalcView('info'); setInfoView('research'); },
+                mixcalc: () => { setTab('main'); setSupportView('calc'); setCalcView('mixcalc'); },
+                neuro: () => { setTab('main'); setSupportView('calc'); setCalcView('neuro'); },
+                joints: () => { setTab('main'); setSupportView('calc'); setCalcView('joints'); },
+                acne: () => { setTab('main'); setSupportView('calc'); setCalcView('acne'); },
+              };
+              actions[t]?.();
+            }} style={{
+              padding:'6px 14px', borderRadius:22, fontSize:11, fontWeight:700, whiteSpace:'nowrap', cursor:'pointer', flexShrink:0,
+              background: infoTab === t ? 'var(--accent)' : 'var(--bg-secondary)',
+              color: infoTab === t ? '#000' : 'var(--text-dim)',
+              border: `1px solid ${infoTab === t ? 'var(--accent)' : 'var(--border)'}`,
+              transition:'all 0.15s',
+            }}>{t === 'peptides' ? 'Пептиды' : t === 'catalog' ? 'Каталог' : t === 'synergies' ? 'Синергии' : t === 'readystacks' ? 'Стеки' : t === 'interactions' ? 'Взаимодействия' : t === 'research' ? 'Исследования' : t === 'mixcalc' ? 'Микс' : t === 'neuro' ? 'Нейро' : t === 'joints' ? 'Суставы' : 'Акне'}</button>
+          ))}
+        </div>
       )}
 
       {/* ===== SUB-NAVIGATION (calc / fertility menus) ===== */}
@@ -2475,23 +2552,8 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
         </div>
       )}
 
-      {tab === 'main' && supportView === 'calc' && calcView === 'info' && (
-        <div style={{ padding:'0 0 70px', height:'100vh', display:'flex', flexDirection:'column' }}>
-          <div style={{ display:'flex', gap:6, marginBottom:6 }}>
-            <button onClick={() => setCalcView('main')} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← Назад</button>
-            <button onClick={() => setSupportView('main')} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← На главную Поддержки</button>
-          </div>
-          {/* Pills */}
-          <div style={{ display:'flex', gap:4, marginBottom:8, overflowX:'auto', scrollbarWidth:'none', flexShrink:0 }}>
-            {(['catalog','synergies','stacks','interactions','research'] as const).map(t => (
-              <button key={t} onClick={() => { setInfoView(t); setSynergyPage(1); }} style={{
-                padding:'7px 14px', borderRadius:20, fontSize:10, fontWeight:700, whiteSpace:'nowrap', cursor:'pointer', flexShrink:0,
-                background: infoView === t ? 'var(--accent)' : 'var(--bg-secondary)',
-                color: infoView === t ? '#000' : 'var(--text-dim)',
-                border: `1px solid ${infoView === t ? 'var(--accent)' : 'var(--border)'}`,
-              }}>{t === 'catalog' ? '📖 Каталог' : t === 'synergies' ? '🔗 Синергии' : t === 'stacks' ? '📦 Готовые' : t === 'research' ? '🔬 Исследования' : '⚡ Взаимодействия'}</button>
-            ))}
-          </div>
+      {(tab === 'main' && supportView === 'calc' && calcView === 'info') || (section === 'info' && ['synergies','readystacks','interactions','research'].includes(infoTab)) && (
+        <div style={{ padding:'46px 0 70px', height:'100vh', display:'flex', flexDirection:'column' }}>
           {/* Content */}
           <div style={{ flex:1, overflowY:'auto', paddingRight:4 }}>
             <div style={{fontSize:7,color:'rgba(255,255,255,0.2)',textAlign:'center',marginBottom:4}}>
@@ -3236,7 +3298,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
       )}
 
       {tab === 'main' && supportView === 'fertility' && (
-        <div style={{ position:'fixed', inset:0, zIndex:100, display:'flex', flexDirection:'column' }}>
+        <div style={{ position:'fixed', inset:0, zIndex:100, display:'flex', flexDirection:'column', paddingTop:'48px' }}>
           <img src="/fertility-hero.jpg" alt="" style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'cover', objectPosition:'center top' }} />
           <div style={{ position:'absolute', inset:0, background:'linear-gradient(transparent 50%, rgba(0,0,0,0.85))' }} />
           <div style={{ position:'relative', zIndex:2, flex:1, display:'flex', flexDirection:'column', justifyContent:'flex-end', padding:'16px 16px 80px' }}>

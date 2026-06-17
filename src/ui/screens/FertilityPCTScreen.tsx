@@ -25,8 +25,9 @@ const VARICOCELE = [
   { id: 'grade2', label: '2 степень' }, { id: 'grade3', label: '3 степень' }
 ] as const;
 
-export const FertilityPCTScreen: React.FC = () => {
-  const [tab, setTab] = useState<FertTab>('overview');
+export const FertilityPCTScreen: React.FC<{ initialTab?: FertTab }> = ({ initialTab }) => {
+  const [tab, setTab] = useState<FertTab>(initialTab || 'overview');
+  useEffect(() => { if (initialTab) setTab(initialTab); }, [initialTab]);
 
   const [volume, setVolume] = useState('');
   const [concentration, setConcentration] = useState('');
