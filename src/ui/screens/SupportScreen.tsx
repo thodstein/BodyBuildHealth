@@ -2292,7 +2292,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
       )}
 
       {/* ===== HORMONAL SUB-TAB PILLS ===== */}
-      {section === 'hormonal' && (
+      {section === 'hormonal' && tab !== 'fertility-pct' && (
         <div style={{ position:'fixed', top:0, left:0, right:0, zIndex:150, display:'flex', gap:4, padding:'8px 12px', background:'var(--bg-primary)', borderBottom:'1px solid var(--border)', overflowX:'auto' }}>
           {[['pct','ПКТ'],['fertility','Фертильность'],['hrt','ГЗТ']].map(([id,label]) => (
             <button key={id} onClick={() => { setHormonalTab(id as any);
@@ -6257,7 +6257,17 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
       {/* ===== FERTILITY/PCT TAB ===== */}
       {section === 'hormonal' && tab === 'fertility-pct' && (
         <div>
-          <button onClick={() => setTab('main')} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', marginBottom:8, background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← На главную</button>
+          <button onClick={() => { setSection('home'); setTab('main'); setSupportView('main'); }} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', marginBottom:8, background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← На главную</button>
+          <div style={{ display:'flex', gap:4, marginBottom:8, overflowX:'auto' }}>
+            {[['pct','ПКТ'],['fertility','Фертильность'],['hrt','ГЗТ']].map(([id,label]) => (
+              <button key={id} onClick={() => { setHormonalTab(id as any); }} style={{
+                padding:'6px 14px', borderRadius:22, fontSize:11, fontWeight:700, whiteSpace:'nowrap', cursor:'pointer', flexShrink:0,
+                background: hormonalTab === id ? 'var(--accent)' : 'var(--bg-secondary)',
+                color: hormonalTab === id ? '#000' : 'var(--text-dim)',
+                border: '1px solid ' + (hormonalTab === id ? 'var(--accent)' : 'var(--border)'),
+              }}>{label}</button>
+            ))}
+          </div>
           <FertilityPCTScreen initialTab={hormonalTab === 'pct' ? 'pct-plan' : hormonalTab === 'hrt' ? 'hrt' : undefined} />
         </div>
       )}
