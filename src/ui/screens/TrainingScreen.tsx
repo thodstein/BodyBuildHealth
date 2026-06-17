@@ -97,6 +97,7 @@ export const TrainingScreen: React.FC = () => {
   const [splitCandidates, setSplitCandidates] = useState<SplitCandidate[]>([]);
   const [showSplitPicker, setShowSplitPicker] = useState(false);
   const [cycleType, setCycleType] = useState('auto');
+  const [periodizationType, setPeriodizationType] = useState<'auto' | 'linear' | 'undulating' | 'block'>('auto');
   const [mesoLength, setMesoLength] = useState(12);
   const [recovery, setRecovery] = useState(Math.round((readiness?.recovery ?? 70) / 10));
   const [fatigue, setFatigue] = useState(Math.round((readiness?.fatigue ?? 30) / 10));
@@ -196,6 +197,8 @@ export const TrainingScreen: React.FC = () => {
       goal, level, daysPerWeek, recovery: jitter(recovery, 6), fatigue: jitter(fatigue, 6), nutrition: jitter(7, 1),
       weakPoints, sessionDuration: 60, exercises: [],
       splitType: overrideSplitType || splitType,
+      periodizationType,
+      cycleType,
     };
     const output = calcTraining(input);
     setTrainingOutput(output);
@@ -210,12 +213,14 @@ export const TrainingScreen: React.FC = () => {
       injuries: [],
       experience: level as MacrocycleInput['experience'],
       currentWeek: 1,
+      periodizationType,
+      cycleType,
     };
     const macro = generateMacrocycle(macroInput);
     setMacrocycle(macro);
     setSelectedWeek(1);
     setCurrentMicrocycle(getCurrentWeekPlan(macro, 1));
-  }, [goal, level, daysPerWeek, recovery, fatigue, weakPoints, splitType]);
+  }, [goal, level, daysPerWeek, recovery, fatigue, weakPoints, splitType, periodizationType, cycleType]);
 
   // Auto-regenerate when days/sparse
   const loadDiaryStats = async () => {
@@ -537,18 +542,42 @@ export const TrainingScreen: React.FC = () => {
               )}
             </div>
             <div style={{ marginBottom: 8 }}>
+              <label style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 2, display: 'block' }}>Тип периодизации</label>
+              <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
+                {[
+                  { v: 'auto', l: 'Авто', desc: 'Автоматический выбор по уровню' },
+                  { v: 'linear', l: 'Линейная', desc: 'Объём ↓, интенсивность ↑. Классическая.' },
+                  { v: 'undulating', l: 'Волновая DUP', desc: 'Смена нагрузки внутри недели. Гибкая.' },
+                  { v: 'block', l: 'Блочная', desc: 'Блоки по 3-6 нед с одной целью. Продвинутая.' },
+                ].map(p => (
+                  <button key={p.v} onClick={() => { setPeriodizationType(p.v as any); setTimeout(generatePlan, 50); }} style={{
+                    padding: '3px 7px', borderRadius: 6, fontSize: 9, fontWeight: periodizationType === p.v ? 700 : 400, cursor: 'pointer',
+                    border: periodizationType === p.v ? '1px solid var(--accent)' : '1px solid var(--border)',
+                    background: periodizationType === p.v ? 'rgba(0,230,138,0.15)' : 'var(--bg-secondary)', color: 'var(--text)',
+                    position:'relative',
+                  }} title={p.desc}>{p.l}</button>
+                ))}
+              </div>
+              <div style={{ fontSize: 8, color: 'var(--text-dim)', marginTop: 2 }}>
+                {periodizationType === 'auto' && 'Автоматический подбор по цели и уровню'}
+                {periodizationType === 'linear' && 'Объём снижается, интенсивность растёт от блока к блоку. RIR повышен.'}
+                {periodizationType === 'undulating' && 'Объём/интенсивность меняются каждый день/неделю. RIR средний.'}
+                {periodizationType === 'block' && 'Блоки по 3-6 нед с одной целью. RIR снижен, объём повышен.'}
+              </div>
+            </div>
+            <div style={{ marginBottom: 8 }}>
               <label style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 2, display: 'block' }}>Тип цикла</label>
               <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
                 {[
-                  { v: 'auto', l: 'Авто' }, { v: 'pl_strength', l: 'PL Сила' }, { v: 'pl_peaking', l: 'PL Пик' },
-                  { v: 'bb_mass', l: 'BB Масса' }, { v: 'bb_specialization', l: 'BB Спец' },
-                  { v: 'rehab', l: 'Реабилитация' }, { v: 'wl_tech', l: 'WL Техника' },
+                  { v: 'auto', l: 'Авто', desc: 'Авто' }, { v: 'pl_strength', l: 'PL Сила', desc: 'Пауэрлифтинг сила' }, { v: 'pl_peaking', l: 'PL Пик', desc: 'Пауэрлифтинг пик' },
+                  { v: 'bb_mass', l: 'BB Масса', desc: 'Бодибилдинг масса' }, { v: 'bb_specialization', l: 'BB Спец', desc: 'Бодибилдинг спец' },
+                  { v: 'rehab', l: 'Реабилитация', desc: 'Реабилитация' }, { v: 'wl_tech', l: 'WL Техника', desc: 'Тяжелая атлетика техника' },
                 ].map(c => (
                   <button key={c.v} onClick={() => { setCycleType(c.v); setTimeout(generatePlan, 50); }} style={{
                     padding: '3px 7px', borderRadius: 6, fontSize: 9, fontWeight: cycleType === c.v ? 700 : 400, cursor: 'pointer',
                     border: cycleType === c.v ? '1px solid var(--accent)' : '1px solid var(--border)',
                     background: cycleType === c.v ? 'rgba(0,230,138,0.15)' : 'var(--bg-secondary)', color: 'var(--text)',
-                  }}>{c.l}</button>
+                  }} title={c.desc}>{c.l}</button>
                 ))}
               </div>
             </div>
@@ -1105,9 +1134,12 @@ export const TrainingScreen: React.FC = () => {
                   ))}
                   {trainingOutput.estimatedProgress !== undefined && (
                     <div style={{ marginTop: 6, padding: '6px 8px', background: 'rgba(0,230,138,0.05)', borderRadius: 6, fontSize: 10 }}>
-                      <span style={{ color: 'var(--accent)', fontWeight: 600 }}>📈 Ожидаемый прогресс: +{trainingOutput.estimatedProgress}%/нед</span>
+                      <span style={{ color: 'var(--accent)', fontWeight: 600 }}>📈 Прогресс: +{trainingOutput.estimatedProgress}%/нед</span>
                       <span style={{ color: 'var(--text-dim)', marginLeft: 8 }}>
-                        Модель: {goal} × {level}
+                        {trainingOutput.progressionModel || '—'} · {cycleType === 'auto' ? 'Автоцикл' : cycleType}
+                      </span>
+                      <span style={{ color: 'var(--text-dim)', marginLeft: 6, fontSize: 9 }}>
+                        {goal} · {periodizationType !== 'auto' ? periodizationType : ''}
                       </span>
                     </div>
                   )}
@@ -2737,6 +2769,31 @@ export const TrainingScreen: React.FC = () => {
                   cursor: 'pointer', border: goal === g.value ? '1px solid var(--accent)' : '1px solid var(--border)',
                   background: goal === g.value ? 'rgba(0,230,138,0.15)' : 'var(--bg-secondary)', color: 'var(--text)', textAlign: 'left',
                 }}>{g.icon} {g.label}</button>
+              ))}
+            </div>
+            <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 6, display:'flex', gap:4, flexWrap:'wrap' }}>
+              <span>Периодизация:</span>
+              {[
+                { v: 'auto', l: 'Авто' },
+                { v: 'linear', l: 'Линейная' },
+                { v: 'undulating', l: 'DUP' },
+                { v: 'block', l: 'Блочная' },
+              ].map(p => (
+                <button key={p.v} onClick={() => { setPeriodizationType(p.v as any); setTimeout(generatePlan, 50); }} style={{
+                  padding: '2px 6px', borderRadius: 4, fontSize: 9, fontWeight: periodizationType === p.v ? 700 : 400, cursor:'pointer',
+                  border: periodizationType === p.v ? '1px solid var(--accent)' : '1px solid var(--border)',
+                  background: periodizationType === p.v ? 'rgba(0,230,138,0.15)' : 'var(--bg-secondary)', color: 'var(--text)',
+                }}>{p.l}</button>
+              ))}
+              <span style={{ marginLeft: 4 }}>Цикл:</span>
+              {[
+                { v: 'auto', l: 'Авто' }, { v: 'bb_mass', l: 'Масса' }, { v: 'pl_peaking', l: 'Пик' },
+              ].map(c => (
+                <button key={c.v} onClick={() => { setCycleType(c.v); setTimeout(generatePlan, 50); }} style={{
+                  padding: '2px 6px', borderRadius: 4, fontSize: 9, fontWeight: cycleType === c.v ? 700 : 400, cursor:'pointer',
+                  border: cycleType === c.v ? '1px solid var(--accent)' : '1px solid var(--border)',
+                  background: cycleType === c.v ? 'rgba(0,230,138,0.15)' : 'var(--bg-secondary)', color: 'var(--text)',
+                }}>{c.l}</button>
               ))}
             </div>
             <button onClick={() => generatePlan()} style={{

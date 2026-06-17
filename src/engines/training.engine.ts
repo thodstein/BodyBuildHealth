@@ -141,18 +141,23 @@ export function assignIntensityTechnique(
 }
 
 export function calcTraining(i: TrainingInput): TrainingOutput {
-  // Unified volume calculation using TRAINING_LEVEL_CONFIGS
   const levelConfig = TRAINING_LEVEL_CONFIGS[i.level] || TRAINING_LEVEL_CONFIGS.intermediate;
   let volume = levelConfig.volumeBase;
 
-  // Volume modifiers based on status
   if (i.recovery < 50) volume *= 0.8;
   if (i.fatigue > 60) volume *= 0.9;
   if (i.nutrition < 60) volume *= 0.85;
 
-  // Goal-based volume modification
   const goalConfig = TRAINING_GOAL_CONFIGS[i.goal] || TRAINING_GOAL_CONFIGS.maintenance;
   volume *= goalConfig.volumeMod;
+
+  // Periodization type volume mod
+  if (i.periodizationType === 'block') volume *= 1.1;
+  else if (i.periodizationType === 'undulating') volume *= 0.95;
+
+  // Cycle type volume mod
+  if (i.cycleType === 'bb_mass' || i.cycleType === 'bb_specialization') volume *= 1.15;
+  else if (i.cycleType === 'wl_tech') volume *= 0.85;
 
   const groups = ['chest', 'back', 'legs', 'shoulders', 'arms', 'core'];
   const volMap: Record<string, number> = {};
@@ -165,7 +170,6 @@ export function calcTraining(i: TrainingInput): TrainingOutput {
     volMap[g] = volume * (i.weakPoints.includes(g) ? wpFactor : nonWpFactor) / normFactor; 
   });
 
-  // Use unified TRAINING_SPLITS with groupsPerDay format
   const availableSplits = Object.entries(TRAINING_SPLITS).filter(([, s]) => 
     s.minDays <= i.daysPerWeek && s.maxDays >= i.daysPerWeek && s.level.includes(i.level)
   );
@@ -185,7 +189,6 @@ export function calcTraining(i: TrainingInput): TrainingOutput {
   let splitName = selected.name;
   let splitDesc = selected.desc;
 
-  // Определение фазы
   let phase: MesocyclePhase = 'base';
   let isDeload = false;
   let deloadReason = '';
@@ -194,25 +197,29 @@ export function calcTraining(i: TrainingInput): TrainingOutput {
   else if (i.fatigue > 70) { isDeload = true; deloadReason = 'Усталость > 70'; phase = 'deload'; Object.keys(volMap).forEach(k => { volMap[k] *= 0.6; }); }
   else if (i.nutrition < 55) { isDeload = true; deloadReason = 'Питание < 55'; phase = 'deload'; Object.keys(volMap).forEach(k => { volMap[k] *= 0.7; }); }
 
-  // RIR из матрицы
-  const levelConfigRir = levelConfig.rirBase;
-  const goalConfigRir = goalConfig.intensityMod > 1.1 ? 2 : goalConfig.intensityMod < 0.9 ? 3 : 2;
   let rir = isDeload ? 4 : RIR_MATRIX[i.goal]?.[i.level]?.[phase] ?? 2;
   if (i.recovery < 50) rir = Math.max(0, rir + 1);
   if (i.fatigue > 70) rir = Math.max(0, rir + 1);
+  // Periodization-based RIR adjustment
+  if (i.periodizationType === 'linear' && !isDeload) rir = Math.max(1, rir + 1);
+  else if (i.periodizationType === 'block' && !isDeload) rir = Math.max(1, rir - 1);
 
   const roundedVol: Record<string, number> = {};
   Object.entries(volMap).forEach(([k, v]) => { roundedVol[k] = Math.round(v); });
 
-  // Генерация недельного плана
   const weeklyProgression = generateWeeklyPlan(i, 6);
   
-  // Формирование плана на неделю
   const weekNum = 1;
   const PHASE_NAMES_RU: Record<string, string> = { base: 'База', build: 'Накопление', peak: 'Пик', deload: 'Разгрузка' };
   const PROGRESSION_NAMES_RU: Record<string, string> = { linear: 'Линейная', double: 'Двойная', undulating: 'Волнообразная', conjugate: 'Конъюгейт' };
   const phaseName = PHASE_NAMES_RU[phase] || phase;
   const progName = PROGRESSION_NAMES_RU[weeklyProgression[0].progressionType] || weeklyProgression[0].progressionType;
+  
+  // Progress estimates differ by goal AND periodization type
+  const goalProgressRate = goalConfig.volumeMod > 1 ? 3.5 : goalConfig.volumeMod < 0.9 ? 2.0 : 2.5;
+  const periodizationProgressMod = i.periodizationType === 'block' ? 1.15 : i.periodizationType === 'linear' ? 0.9 : 1.0;
+  const cycleProgressMod = i.cycleType === 'pl_peaking' ? 1.2 : i.cycleType === 'bb_specialization' ? 0.85 : 1.0;
+
   const weekPlan = isDeload
     ? `Неделя ${weekNum} (Разгрузка): 50% объёма, RIR 4, без отказов, акцент на технику и мобильность`
     : `Неделя ${weekNum} (${phaseName}): ${Math.round(weeklyProgression[0].volumeTotal)} общих подходов, RIR ${rir}, прогрессия ${progName}`;
@@ -229,9 +236,11 @@ export function calcTraining(i: TrainingInput): TrainingOutput {
     isDeload,
     deloadReason,
     weekPlan,
-    plan: [], // Will be populated by PlanScreen with exercise-level details
+    plan: [],
     weeklyVolume: roundedVol['chest'] + roundedVol['back'] + roundedVol['legs'] + roundedVol['shoulders'] + roundedVol['arms'] + roundedVol['core'],
-    estimatedProgress: isDeload ? 0 : 2.5
+    estimatedProgress: isDeload ? 0 : Math.round(goalProgressRate * periodizationProgressMod * cycleProgressMod * 10) / 10,
+    periodizationType: i.periodizationType,
+    progressionModel: progName,
   };
 }
 

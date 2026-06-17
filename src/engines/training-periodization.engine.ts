@@ -76,6 +76,8 @@ export interface MacrocycleInput {
   injuries: string[];
   experience: 'beginner' | 'intermediate' | 'advanced' | 'enhanced';
   currentWeek?: number;
+  periodizationType?: 'auto' | 'linear' | 'undulating' | 'block';
+  cycleType?: string;
 }
 
 const LEVEL_CONFIGS: Record<string, { volumeBase: number; rirBase: number; deloadFreq: number; progressionPct: number }> = {
@@ -139,14 +141,25 @@ export const MESOCYCLE_PARAMS: Record<MesocycleType, { volumeMultiplier: number;
 };
 
 export function generateMacrocycle(input: MacrocycleInput): MacrocyclePlan {
-  const { goal, level, daysPerWeek, readinessScore, isOnCourse, weakPoints, injuries } = input;
+  const { goal, level, daysPerWeek, readinessScore, isOnCourse, weakPoints, injuries, periodizationType, cycleType } = input;
   const levelConfig = LEVEL_CONFIGS[level] || LEVEL_CONFIGS.intermediate;
   const goalConfig = GOAL_CONFIGS[goal] || GOAL_CONFIGS.maintenance;
 
-  const totalWeeks = level === 'beginner' ? 12 : level === 'intermediate' ? 16 : level === 'advanced' ? 16 : 20;
+  // Periodization-based total weeks
+  let totalWeeks = level === 'beginner' ? 12 : level === 'intermediate' ? 16 : level === 'advanced' ? 16 : 20;
+  if (periodizationType === 'linear') totalWeeks = Math.max(totalWeeks, 12);
+  else if (periodizationType === 'block') totalWeeks = Math.min(totalWeeks + 4, 24);
+
+  // Cycle type overrides total weeks
+  if (cycleType === 'bb_specialization') totalWeeks = Math.max(totalWeeks, 16);
+  if (cycleType === 'pl_peaking') totalWeeks = Math.max(totalWeeks, 12);
+  if (cycleType === 'wl_tech') totalWeeks = Math.min(totalWeeks, 12);
 
   const sequences = MESOCYCLE_SEQUENCES[level] || MESOCYCLE_SEQUENCES.intermediate;
-  const sequenceIdx = isOnCourse ? 0 : (goal === 'strength' ? 1 : 0);
+  let sequenceIdx = isOnCourse ? 0 : (goal === 'strength' ? 1 : 0);
+  // Periodization type modifies sequence index
+  if (periodizationType === 'undulating') sequenceIdx = 1;
+  if (periodizationType === 'block') sequenceIdx = isOnCourse ? 1 : 0;
   const sequence = sequences[Math.min(sequenceIdx, sequences.length - 1)];
 
   let adjustedReadiness = readinessScore;

@@ -747,6 +747,8 @@ export interface TrainingInput {
   rir?: number;
   exercises?: Exercise[];
   splitType?: string;
+  periodizationType?: 'auto' | 'linear' | 'undulating' | 'block';
+  cycleType?: string;
 }
 
 export interface TrainingOutput {
@@ -760,6 +762,8 @@ export interface TrainingOutput {
   plan?: TrainingDay[];
   weeklyVolume?: number;
   estimatedProgress?: number;
+  periodizationType?: string;
+  progressionModel?: string;
 }
 
 export type IntensityTechnique =
