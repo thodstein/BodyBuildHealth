@@ -1,0 +1,595 @@
+  omega3: {
+  "id": "omega3",
+  "name": "Omega-3 (EPA/DHA)",
+  "nameRu": "�����-3 (EPA/DHA)",
+  "tier": "core",
+  "category": [
+    "fatty_acid",
+    "cardioprotector",
+    "antiinflammatory"
+  ],
+  "forms": [
+    {
+      "id": "omega3_triglyceride",
+      "name": "Triglyceride Form",
+      "nameRu": "�������������� �����",
+      "dose": "2000-4000 �� � ����",
+      "best": true,
+      "notes": "����������� �����, ������ �����������"
+    },
+    {
+      "id": "omega3_ee",
+      "name": "Ethyl Ester",
+      "nameRu": "�������� ����",
+      "dose": "2000-4000 �� � ����",
+      "best": false,
+      "notes": "�������, �� ���� ��������"
+    },
+    {
+      "id": "omega3_krill",
+      "name": "Krill Oil",
+      "nameRu": "�������� �����",
+      "dose": "1000-2000 �� � ����",
+      "best": false,
+      "notes": "�������� �����������, ����� ��������"
+    },
+    {
+      "id": "omega3_algae",
+      "name": "Algae Oil",
+      "nameRu": "����� ����������",
+      "dose": "2000-4000 �� � ����",
+      "best": false,
+      "notes": "��������� �������� DHA"
+    }
+  ],
+  "organs": [
+    "HEART",
+    "BRAIN",
+    "VESSELS",
+    "EYES",
+    "SKIN"
+  ],
+  "systems": [
+    "cardio",
+    "neuro",
+    "endocrine",
+    "musculoskeletal"
+  ],
+  "mechanisms": [
+    "EPA_ANTIINFLAMMATORY",
+    "DHA_NEUROPROTECTIVE",
+    "OMEGA3_MEMBRANE_FLUIDITY",
+    "TRIGLYCERIDE_REDUCTION",
+    "ANTIPLATELET",
+    "Vasodilation_UP"
+  ],
+  "description": "�����-3 � ����������� ������ ������� EPA � DHA, ���������� ������ ��� ��������-���������� �������, ����� � ���������� ����������. ������� ������������, �������� ��������� �������, ��������� ����������������� �����������.",
+  "synergies": [
+    {
+      "with": "vitamin_d3",
+      "effect": "�������� ���������� �������� D",
+      "mechanism": "��������������� ����� �������� ���������",
+      "severity": "MEDIUM"
+    },
+    {
+      "with": "coq10",
+      "effect": "�������� ������������",
+      "mechanism": "����������� ������ ����������� ������",
+      "severity": "HIGH"
+    },
+    {
+      "with": "curcumin",
+      "effect": "�������� ���������������������� �������",
+      "mechanism": "������ ���� ���������� NF-?B",
+      "severity": "MEDIUM"
+    },
+    {
+      "with": "vitamin_e",
+      "effect": "�������������� ��������� �����-3",
+      "mechanism": "������� E �������� �� ����������� ���������",
+      "severity": "LOW"
+    }
+  ],
+  "conflicts": [
+    {
+      "with": "blood_thinners",
+      "effect": "��������� ����� ������������",
+      "mechanism": "���������� ��������������� ������",
+      "severity": "HIGH"
+    }
+  ],
+  "monitoring": [
+    {
+      "what": "������������",
+      "when": "����� 4-6 ������",
+      "targetRange": "< 1.7 �����/�"
+    },
+    {
+      "what": "�����-3 ������",
+      "when": "����� 3 ������",
+      "targetRange": "> 8%"
+    },
+    {
+      "what": "����",
+      "when": "��� ����� ���������������",
+      "targetRange": "� �������� �����"
+    }
+  ],
+  "contraindications": [
+    "��������������� �������",
+    "���� ��������������� (��� �������� ���)",
+    "������ ����������",
+    "�������������� ���������������"
+  ],
+  "sideEffects": [
+    "������ �������",
+    "���������� ����� ��� ������� �����",
+    "������ ��� ����� > 5 �",
+    "���� ���� �� ���"
+  ],
+  "dosage": {
+    "mg": 3000,
+    "timing": "� ����, 2-3 �������"
+  },
+  "bestForCourse": true
+},
+  iron: {
+  "id": "iron",
+  "name": "Iron",
+  "nameRu": "������",
+  "tier": "core",
+  "category": [
+    "mineral",
+    "hematologic",
+    "energy"
+  ],
+  "forms": [
+    {
+      "id": "iron_bisglycinate",
+      "name": "Iron Bisglycinate",
+      "nameRu": "������ �����������",
+      "dose": "18-27 �� �������",
+      "best": true,
+      "notes": "������ ��������, ������� �������"
+    },
+    {
+      "id": "iron_heme",
+      "name": "Heme Iron",
+      "nameRu": "������� ������",
+      "dose": "10-20 �� � ����",
+      "best": false,
+      "notes": "�� ��������� ���������, ������ �����������"
+    },
+    {
+      "id": "iron_liposomal",
+      "name": "Liposomal Iron",
+      "nameRu": "������������� ������",
+      "dose": "14-25 ��",
+      "best": false,
+      "notes": "������ ��� �������"
+    }
+  ],
+  "organs": [
+    "BLOOD",
+    "BRAIN",
+    "MUSCLES"
+  ],
+  "systems": [
+    "hematologic",
+    "neuro",
+    "musculoskeletal"
+  ],
+  "mechanisms": [
+    "HEMOGLOBIN_SYNTHESIS",
+    "OXYGEN_TRANSPORT",
+    "MYOGLOBIN_PRODUCTION",
+    "ENERGY_METABOLISM",
+    "DOPAMINE_SYNTHESIS"
+  ],
+  "description": "������ � �������� ������������ ��� ���������� ��������� (����������) � ��������������� ������. ������� �������� ������, ����������� ��������� � ����������� ���������. �� ����� ��� ���� ����������� � ���� ������ ��� ������������� ��������.",
+  "synergies": [
+    {
+      "with": "vitamin_c",
+      "effect": "�������� ���������� ������ � 3-6 ���",
+      "mechanism": "�������� ��������������� Fe3+ > Fe2+",
+      "severity": "HIGH"
+    },
+    {
+      "with": "folate",
+      "effect": "���������� ������ �����������",
+      "mechanism": "��� ���������� ��� �����������",
+      "severity": "MEDIUM"
+    },
+    {
+      "with": "vitamin_b12",
+      "effect": "����������� ��������� �������������",
+      "mechanism": "B12 + ������ + ����� = ����������",
+      "severity": "MEDIUM"
+    }
+  ],
+  "conflicts": [
+    {
+      "with": "calcium",
+      "effect": "�������� ���������� ������ �� 50%",
+      "mechanism": "����������� �� DMT1 ����������������",
+      "severity": "HIGH"
+    },
+    {
+      "with": "zinc",
+      "effect": "�������� �������� ����������",
+      "mechanism": "����������� �� �����������������",
+      "severity": "MEDIUM"
+    },
+    {
+      "with": "tea_coffee",
+      "effect": "�������� ���������� �� 60%",
+      "mechanism": "������� ��������� ������",
+      "severity": "MEDIUM"
+    }
+  ],
+  "monitoring": [
+    {
+      "what": "��������",
+      "when": "�� ������ � ����� 4 ������",
+      "targetRange": "> 50 ���/� (�), > 30 ���/� (�)"
+    },
+    {
+      "what": "����������",
+      "when": "����� 4 ������",
+      "targetRange": "> 130 �/� (�), > 120 �/� (�)"
+    },
+    {
+      "what": "������������ ������",
+      "when": "��� ���������� ����������",
+      "targetRange": "10-30 ������/�"
+    }
+  ],
+  "contraindications": [
+    "������������",
+    "�����������",
+    "���� ������������� ��� ��������",
+    "�������� ��������"
+  ],
+  "sideEffects": [
+    "������",
+    "Ҹ���� ����",
+    "������� �������",
+    "��� ���������� � ��������� ������"
+  ],
+  "dosage": {
+    "mg": 18,
+    "timing": "�������, � ��������� C"
+  },
+  "bestForCourse": false
+},
+  copper: {
+  "id": "copper",
+  "name": "Copper",
+  "nameRu": "����",
+  "tier": "core",
+  "category": [
+    "mineral",
+    "hematologic",
+    "antioxidant"
+  ],
+  "forms": [
+    {
+      "id": "copper_bisglycinate",
+      "name": "Copper Bisglycinate",
+      "nameRu": "���� �����������",
+      "dose": "2 �� � ����",
+      "best": true,
+      "notes": "������� ��������"
+    },
+    {
+      "id": "copper_gluconate",
+      "name": "Copper Gluconate",
+      "nameRu": "���� ��������",
+      "dose": "2 �� � ����",
+      "best": false
+    }
+  ],
+  "organs": [
+    "BLOOD",
+    "BRAIN",
+    "VESSELS"
+  ],
+  "systems": [
+    "hematologic",
+    "neuro",
+    "cardio"
+  ],
+  "mechanisms": [
+    "CERULOPLASMIN_SYNTHESIS",
+    "SUPEROXIDE_DISMUTASE",
+    "COLLAGEN_CROSSLINK",
+    "IRON_MOBILIZATION",
+    "MELANIN_SYNTHESIS"
+  ],
+  "description": "���� ���������� ��� ����������� �����������, ������� ���������, ��������������� ������ (Cu/Zn-SOD) � ����������� ������. ������ ����/���� �������� � ������� ����� �������� ����.",
+  "synergies": [
+    {
+      "with": "iron",
+      "effect": "���� ���������� ��� ����������� ������",
+      "mechanism": "������������� �������� Fe2+ > Fe3+",
+      "severity": "HIGH"
+    },
+    {
+      "with": "vitamin_c",
+      "effect": "���� ��������� ��������������� ������ �������� �",
+      "mechanism": "Cu-��������� ��������",
+      "severity": "LOW"
+    }
+  ],
+  "conflicts": [
+    {
+      "with": "zinc",
+      "effect": "������� ����� �������� ����",
+      "mechanism": "�������� ��������������� ��������� ����",
+      "severity": "HIGH"
+    }
+  ],
+  "monitoring": [
+    {
+      "what": "������������ ����",
+      "when": "��� ����� ����� > 30 ��/����",
+      "targetRange": "12-20 ������/�"
+    },
+    {
+      "what": "�������������",
+      "when": "��� ���������� ��������",
+      "targetRange": "0.2-0.6 �/�"
+    }
+  ],
+  "contraindications": [
+    "������� ��������",
+    "������� ����",
+    "���� ����� > 50 �� ��� ����"
+  ],
+  "sideEffects": [
+    "������� ��� �������",
+    "������� �������",
+    "��� ������� � ����������� ������"
+  ],
+  "dosage": {
+    "mg": 2,
+    "timing": "�������� �� �����, � ����"
+  },
+  "bestForCourse": false
+},
+  vitamin_b12: {
+  "id": "vitamin_b12",
+  "name": "Vitamin B12",
+  "nameRu": "������� B12 (���������)",
+  "tier": "core",
+  "category": [
+    "vitamin",
+    "hematologic",
+    "neuro"
+  ],
+  "forms": [
+    {
+      "id": "vitamin_b12_methyl",
+      "name": "Methylcobalamin",
+      "nameRu": "��������������",
+      "dose": "1000-5000 ��� ����",
+      "best": true,
+      "notes": "�������� �����, ����� ����� �����������"
+    },
+    {
+      "id": "vitamin_b12_cyano",
+      "name": "Cyanocobalamin",
+      "nameRu": "��������������",
+      "dose": "1000-5000 ��� ����",
+      "best": false,
+      "notes": "����� ������� �����"
+    },
+    {
+      "id": "vitamin_b12_adeno",
+      "name": "Adenosylcobalamin",
+      "nameRu": "�����������������",
+      "dose": "1000-3000 ��� ����",
+      "best": false,
+      "notes": "�������� ����� ��� �����������"
+    }
+  ],
+  "organs": [
+    "BRAIN",
+    "BLOOD",
+    "NERVES"
+  ],
+  "systems": [
+    "hematologic",
+    "neuro",
+    "hepatic"
+  ],
+  "mechanisms": [
+    "METHYLATION_SUPPORT",
+    "MYELIN_SYNTHESIS",
+    "ERYTHROPOIESIS",
+    "HOMOCYSTEINE_REDUCTION",
+    "MITOCHONDRIAL_ENERGY",
+    "DNA_SYNTHESIS"
+  ],
+  "description": "������� B12 ���������� ����� ��� �������������, ������ ������� ������� � �������� ������������. �� ����� ��� ����������� ��������� ��-�� ����������� �����������. ������� �������� � �������������� ������ � ������������ ��������� ������.",
+  "synergies": [
+    {
+      "with": "folate",
+      "effect": "���������� ������ � �������������",
+      "mechanism": "B12 > ���������� > ��������",
+      "severity": "HIGH"
+    },
+    {
+      "with": "vitamin_b6",
+      "effect": "����������� �������� ������������",
+      "mechanism": "B6 + B9 + B12 = �������������",
+      "severity": "HIGH"
+    },
+    {
+      "with": "iron",
+      "effect": "�������� �������������",
+      "mechanism": "B12 + ������ + ����� = ����������",
+      "severity": "MEDIUM"
+    }
+  ],
+  "conflicts": [
+    {
+      "with": "metformin",
+      "effect": "�������� ���������� B12 �� 30%",
+      "mechanism": "������� �������-���������� ���������� � ����������� �����",
+      "severity": "MEDIUM"
+    },
+    {
+      "with": "ppi_drugs",
+      "effect": "�������� ���������� �� ����",
+      "mechanism": "�������� ����������� ������� �������� ��������� B12 �� ������",
+      "severity": "MEDIUM"
+    }
+  ],
+  "monitoring": [
+    {
+      "what": "������� B12",
+      "when": "�� ������ � ����� 4 ������",
+      "targetRange": "> 400 ��/�� (���������� > 500)"
+    },
+    {
+      "what": "�����������",
+      "when": "����� 6 ������",
+      "targetRange": "< 10 ������/�"
+    },
+    {
+      "what": "����������",
+      "when": "����� 4 ������",
+      "targetRange": "> 130 �/�"
+    }
+  ],
+  "contraindications": [
+    "������� ������ (�������������� ������� ����������� �����)",
+    "�������� �� �������"
+  ],
+  "sideEffects": [
+    "����� � ������������ ����",
+    "��� ������� ����� � ��������������",
+    "����������� ���� � �������"
+  ],
+  "dosage": {
+    "mg": 1000,
+    "timing": "���� (���, ��������������)"
+  },
+  "bestForCourse": true
+},
+  folate: {
+  "id": "folate",
+  "name": "Folate (B9)",
+  "nameRu": "����� (������� B9)",
+  "tier": "core",
+  "category": [
+    "vitamin",
+    "hematologic",
+    "methylation"
+  ],
+  "forms": [
+    {
+      "id": "folate_5mthf",
+      "name": "5-MTHF (���������)",
+      "nameRu": "5-��������������������",
+      "dose": "800-1000 ��� � ����",
+      "best": true,
+      "notes": "�������� �����, �������� ��� ������� MTHFR"
+    },
+    {
+      "id": "folate_folinic",
+      "name": "Folinic Acid",
+      "nameRu": "��������� �������",
+      "dose": "400-800 ��� � ����",
+      "best": false,
+      "notes": "�������� �����, �� ������� MTHFR"
+    },
+    {
+      "id": "folate_folic",
+      "name": "Folic Acid",
+      "nameRu": "�������� �������",
+      "dose": "400-800 ��� � ����",
+      "best": false,
+      "notes": "������������� �����, �� �������� ��� MTHFR"
+    }
+  ],
+  "organs": [
+    "BLOOD",
+    "BRAIN",
+    "LIVER"
+  ],
+  "systems": [
+    "hematologic",
+    "neuro",
+    "hepatic"
+  ],
+  "mechanisms": [
+    "METHYLATION_SUPPORT",
+    "DNA_SYNTHESIS",
+    "HOMOCYSTEINE_REDUCTION",
+    "ERYTHROPOIESIS",
+    "NTD_PREVENTION",
+    "SEROTONIN_SYNTHESIS"
+  ],
+  "description": "����� (B9) � �������� �������� �������������, ������� ��� � �������� ������������. ���������� ����� ��� ������� MTHFR (40% ���������). � ����� 5-MTHF �������� � ����, � ��� ����� ��� MTHFR C677T.",
+  "synergies": [
+    {
+      "with": "vitamin_b12",
+      "effect": "���������� �������������",
+      "mechanism": "B12 > ���������� > ��������",
+      "severity": "HIGH"
+    },
+    {
+      "with": "vitamin_b6",
+      "effect": "����������� �������� ������������",
+      "mechanism": "B6 + B9 + B12 = �������������",
+      "severity": "HIGH"
+    },
+    {
+      "with": "betaine",
+      "effect": "�������������� ���� �������������",
+      "mechanism": "������-�����������-����������������",
+      "severity": "MEDIUM"
+    }
+  ],
+  "conflicts": [
+    {
+      "with": "methotrexate",
+      "effect": "������� ��������� �����������",
+      "mechanism": "������������� ���������������������",
+      "severity": "HIGH"
+    },
+    {
+      "with": "antiepileptic_drugs",
+      "effect": "�������� ������ ������",
+      "mechanism": "�������� ���������, ���������������� �����",
+      "severity": "MEDIUM"
+    }
+  ],
+  "monitoring": [
+    {
+      "what": "����� ���������",
+      "when": "�� ������",
+      "targetRange": "> 10 ��/��"
+    },
+    {
+      "what": "�����������",
+      "when": "����� 6 ������",
+      "targetRange": "< 10 ������/�"
+    }
+  ],
+  "contraindications": [
+    "���� ������������ ��� ����������",
+    "�� ���������� B12-���������� ������"
+  ],
+  "sideEffects": [
+    "����� � ������������� �������",
+    "��� ������� ����� � ���������� B12-��������"
+  ],
+  "dosage": {
+    "mg": 800,
+    "timing": "� ���� (���, 5-MTHF)"
+  },
+  "bestForCourse": true
+},

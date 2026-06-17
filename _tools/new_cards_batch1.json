@@ -1,0 +1,558 @@
+{
+  "vitamin_a": {
+    "id": "vitamin_a",
+    "name": "Vitamin A",
+    "nameRu": "Витамин A (Ретинол/Бета-каротин)",
+    "tier": "standard",
+    "category": [
+      "vitamin",
+      "antioxidant",
+      "vision"
+    ],
+    "forms": [
+      {
+        "id": "vit_a_beta",
+        "name": "Beta-Carotene",
+        "nameRu": "Бета-каротин",
+        "dose": "25000 МЕ с едой",
+        "best": true,
+        "notes": "Безопасная форма, конвертируется по мере необходимости"
+      },
+      {
+        "id": "vit_a_palmitate",
+        "name": "Retinyl Palmitate",
+        "nameRu": "Ретинил пальмитат",
+        "dose": "5000-10000 МЕ с едой",
+        "best": false,
+        "notes": "Прямая форма витамина A"
+      }
+    ],
+    "organs": [
+      "EYES",
+      "SKIN",
+      "IMMUNE_SYSTEM"
+    ],
+    "systems": [
+      "neuro",
+      "endocrine",
+      "musculoskeletal"
+    ],
+    "mechanisms": [
+      "RETINOID_SIGNALING",
+      "ANTIOXIDANT",
+      "IMMUNE_SUPPORT",
+      "COLLAGEN_SUPPORT"
+    ],
+    "description": "Витамин A — жирорастворимый витамин, критический для зрения (родопсин), иммунитета и кожи. Бета-каротин — безопасная форма, конвертируется в ретинол по мере необходимости. На курсе приём с осторожностью из-за гепатотоксичности.",
+    "synergies": [
+      {
+        "with": "vitamin_e",
+        "effect": "Взаимная защита от окисления",
+        "mechanism": "Витамин E защищает витамин A от деградации",
+        "severity": "MEDIUM"
+      },
+      {
+        "with": "vitamin_d3",
+        "effect": "Взаимная поддержка иммунитета",
+        "mechanism": "Разные пути иммуномодуляции",
+        "severity": "LOW"
+      }
+    ],
+    "conflicts": [
+      {
+        "with": "blood_thinners",
+        "effect": "Повышение риска кровотечения при высоких дозах",
+        "mechanism": "Аддитивный эффект",
+        "severity": "MEDIUM"
+      },
+      {
+        "with": "zinc",
+        "effect": "Конкуренция за абсорбцию при очень высоких дозах",
+        "mechanism": "Zn и A конкурируют за транспортировщики",
+        "severity": "LOW"
+      }
+    ],
+    "monitoring": [
+      {
+        "what": "Витамин A сывороточный",
+        "when": "Через 4 недели",
+        "targetRange": "1-3 мкмоль/л"
+      },
+      {
+        "what": "Ретинол",
+        "when": "При дозах >25000 МЕ",
+        "targetRange": "0.7-2.8 мкмоль/л"
+      }
+    ],
+    "contraindications": [
+      "Беременность (тератогенность!)",
+      "Гипервитаминоз A",
+      "Заболевания печени"
+    ],
+    "sideEffects": [
+      "Головная боль при высоких дозах",
+      "Сухость кожи",
+      "Тератогенность при беременности"
+    ],
+    "dosage": {
+      "mg": 5000,
+      "timing": "с едой (МЕ, бета-каротин)"
+    },
+    "bestForCourse": false
+  },
+  "vitamin_b1": {
+    "id": "vitamin_b1",
+    "name": "Vitamin B1",
+    "nameRu": "Витамин B1 (Тиамин)",
+    "tier": "standard",
+    "category": [
+      "vitamin",
+      "energy",
+      "neuro"
+    ],
+    "forms": [
+      {
+        "id": "vit_b1",
+        "name": "Thiamine HCl",
+        "nameRu": "Тиамина гидрохлорид",
+        "dose": "50-100 мг с едой",
+        "best": true
+      },
+      {
+        "id": "vit_b1_benf",
+        "name": "Benfotiamine",
+        "nameRu": "Бенфотиамин",
+        "dose": "300-600 мг с едой",
+        "best": false,
+        "notes": "Жирорастворимая форма, лучше проникает"
+      },
+      {
+        "id": "vit_b1_ttfD",
+        "name": "TTFD",
+        "nameRu": "Тиаминтетрагидрофурфурилдисульфид",
+        "dose": "100-200 мг с едой",
+        "best": false,
+        "notes": "Лучшая биодоступность"
+      }
+    ],
+    "organs": [
+      "BRAIN",
+      "NERVES",
+      "HEART"
+    ],
+    "systems": [
+      "neuro",
+      "cardio",
+      "endocrine"
+    ],
+    "mechanisms": [
+      "THIAMINE_PYROPHOSPHATE",
+      "GLUCOSE_METABOLISM",
+      "NERVE_CONDUCTION",
+      "ACETYLCHOLINE_SYNTHESIS"
+    ],
+    "description": "Витамин B1 (тиамин) — ключевой кофактор энергетического обмена. Превращает глюкозу в энергию, поддерживает нервную проводимость и работу сердца. На курсе ААС расход ускорен.",
+    "synergies": [
+      {
+        "with": "magnesium",
+        "effect": "Магний необходим для активации B1",
+        "mechanism": "Mg — кофактор тиаминпирофосфатазы",
+        "severity": "MEDIUM"
+      },
+      {
+        "with": "vitamin_b6",
+        "effect": "Совместная поддержка метаболизма",
+        "mechanism": "B1 + B6 + B12 = энергетический комплекс",
+        "severity": "LOW"
+      }
+    ],
+    "conflicts": [
+      {
+        "with": "alcohol",
+        "effect": "Разрушение тиамина",
+        "mechanism": "Алкоголь ускоряет деградацию B1",
+        "severity": "HIGH"
+      }
+    ],
+    "monitoring": [
+      {
+        "what": "Тиамин плазмы",
+        "when": "При подозрении дефицита",
+        "targetRange": "70-180 нмоль/л"
+      }
+    ],
+    "contraindications": [
+      "Аллергия на тиамин"
+    ],
+    "sideEffects": [
+      "Редко — аллергические реакции при в/в введении",
+      "При высоких дозах — тахикардия"
+    ],
+    "dosage": {
+      "mg": 100,
+      "timing": "с едой (тиамина HCl)"
+    },
+    "bestForCourse": false
+  },
+  "vitamin_b2": {
+    "id": "vitamin_b2",
+    "name": "Vitamin B2",
+    "nameRu": "Витамин B2 (Рибофлавин)",
+    "tier": "standard",
+    "category": [
+      "vitamin",
+      "energy",
+      "antioxidant"
+    ],
+    "forms": [
+      {
+        "id": "vit_b2",
+        "name": "Riboflavin",
+        "nameRu": "Рибофлавин",
+        "dose": "10-20 мг с едой",
+        "best": true
+      },
+      {
+        "id": "vit_b2_r5p",
+        "name": "Riboflavin-5-Phosphate",
+        "nameRu": "Рибофлавин-5-фосфат",
+        "dose": "10-20 мг с едой",
+        "best": false,
+        "notes": "Активная форма"
+      }
+    ],
+    "organs": [
+      "BRAIN",
+      "SKIN",
+      "EYES"
+    ],
+    "systems": [
+      "neuro",
+      "hepatic",
+      "endocrine"
+    ],
+    "mechanisms": [
+      "FAD_SYNTHESIS",
+      "FMN_ENZYME",
+      "ENERGY_METABOLISM",
+      "ANTIOXIDANT_RECYCLING",
+      "METHYLENETETRAHYDROFOLATE_REDUCTION"
+    ],
+    "description": "Витамин B2 (рибофлавин) — кофактор FAD и FMN, ключевых для энергетического обмена. Участвует в метаболизме железа, рециклирует глутатион и витамин C. Дефицит → трещины в уголках рта, светобоязнь.",
+    "synergies": [
+      {
+        "with": "iron",
+        "effect": "B2 улучшает усвоение и транспорт железа",
+        "mechanism": "FAD-зависимые ферменты метаболизма железа",
+        "severity": "MEDIUM"
+      },
+      {
+        "with": "vitamin_b6",
+        "effect": "Совместная работа в метаболизме",
+        "mechanism": "B2 нужен для конверсии B6 в активную форму",
+        "severity": "MEDIUM"
+      }
+    ],
+    "conflicts": [],
+    "monitoring": [
+      {
+        "what": "Витамин B2",
+        "when": "При подозрении дефицита",
+        "targetRange": "1.1-1.3 мг/л"
+      }
+    ],
+    "contraindications": [],
+    "sideEffects": [
+      "Ярко-жёлтая моча (безопасно)",
+      "Редко — фоточувствительность"
+    ],
+    "dosage": {
+      "mg": 20,
+      "timing": "с едой"
+    },
+    "bestForCourse": false
+  },
+  "vitamin_b3": {
+    "id": "vitamin_b3",
+    "name": "Vitamin B3",
+    "nameRu": "Витамин B3 (Ниацин)",
+    "tier": "standard",
+    "category": [
+      "vitamin",
+      "energy",
+      "cardiovascular",
+      "lipids"
+    ],
+    "forms": [
+      {
+        "id": "vit_b3_niacin",
+        "name": "Niacin",
+        "nameRu": "Ниацин (никотиновая кислота)",
+        "dose": "100-500 мг с едой",
+        "best": true,
+        "notes": "Для липидов"
+      },
+      {
+        "id": "vit_b3_niacinamide",
+        "name": "Niacinamide",
+        "nameRu": "Ниацинамид",
+        "dose": "500-1000 мг с едой",
+        "best": false,
+        "notes": "Без флеша, для кожи"
+      }
+    ],
+    "organs": [
+      "LIVER",
+      "SKIN",
+      "BRAIN",
+      "VESSELS"
+    ],
+    "systems": [
+      "hepatic",
+      "cardio",
+      "neuro",
+      "endocrine"
+    ],
+    "mechanisms": [
+      "NAD_SYNTHESIS",
+      "LDL_REDUCTION",
+      "HDL_INCREASE",
+      "ENERGY_METABOLISM",
+      "SKIN_BARRIER"
+    ],
+    "description": "Витамин B3 (ниацин) — предшественник NAD+/NADH, ключевой для энергетического обмена. Ниацин снижает LDL и повышает HDL. Ниацинамид не вызывает прилива, лучше для кожи и мозга.",
+    "synergies": [
+      {
+        "with": "chromium",
+        "effect": "Ниацин + хром усиливают снижение сахара",
+        "mechanism": "GTF содержит ниацин",
+        "severity": "LOW"
+      }
+    ],
+    "conflicts": [
+      {
+        "with": "statin_drugs",
+        "effect": "Риск рабдомиолиза при комбинации с ниацином",
+        "mechanism": "Аддитивное поражение мышц",
+        "severity": "HIGH"
+      },
+      {
+        "with": "blood_thinners",
+        "effect": "Усиление антиагрегантного эффекта",
+        "mechanism": "Ниацин ингибирует агрегацию",
+        "severity": "MEDIUM"
+      }
+    ],
+    "monitoring": [
+      {
+        "what": "ЛПНП/ЛПВП",
+        "when": "Через 4-6 недель",
+        "targetRange": "ЛПНП < 2.6, ЛПВП > 1.0"
+      },
+      {
+        "what": "АЛТ/АСТ",
+        "when": "При высоких дозах ниацина",
+        "targetRange": "< 40 Ед/л"
+      }
+    ],
+    "contraindications": [
+      "Подагра (ниацин повышает мочевую кислоту)",
+      "Язва желудка",
+      "Аритмии"
+    ],
+    "sideEffects": [
+      "Прилив (флаш) при ниацине",
+      "Зуд",
+      "Повышение сахара",
+      "Повышение мочевой кислоты"
+    ],
+    "dosage": {
+      "mg": 500,
+      "timing": "с едой (ниацинамид)"
+    },
+    "bestForCourse": false
+  },
+  "vitamin_b5": {
+    "id": "vitamin_b5",
+    "name": "Vitamin B5",
+    "nameRu": "Витамин B5 (Пантотеновая кислота)",
+    "tier": "standard",
+    "category": [
+      "vitamin",
+      "energy",
+      "adrenal"
+    ],
+    "forms": [
+      {
+        "id": "vit_b5",
+        "name": "Pantothenic Acid",
+        "nameRu": "Пантотеновая кислота",
+        "dose": "10-50 мг с едой",
+        "best": true
+      },
+      {
+        "id": "vit_b5_pantethine",
+        "name": "Pantethine",
+        "nameRu": "Пантетин",
+        "dose": "300-900 мг с едой",
+        "best": false,
+        "notes": "Активная форма, для липидов"
+      }
+    ],
+    "organs": [
+      "ADRENAL_GLAND",
+      "SKIN",
+      "BRAIN"
+    ],
+    "systems": [
+      "endocrine",
+      "neuro",
+      "hepatic"
+    ],
+    "mechanisms": [
+      "COA_SYNTHESIS",
+      "CORTISOL_PRODUCTION",
+      "FATTY_ACID_SYNTHESIS",
+      "ACETYLCHOLINE_SYNTHESIS"
+    ],
+    "description": "Витамин B5 (пантотеновая кислота) — предшественник коэнзима A, ключевого для синтеза кортизола, жирных кислот и ацетилхолина. Поддерживает надпочечники при стрессе. Пантетин — активная форма для липидов.",
+    "synergies": [
+      {
+        "with": "vitamin_c",
+        "effect": "Совместная поддержка надпочечников",
+        "mechanism": "Оба участвуют в синтезе кортизола",
+        "severity": "MEDIUM"
+      },
+      {
+        "with": "vitamin_b6",
+        "effect": "Комплексная поддержка энергии",
+        "mechanism": "B5 + B6 = коферменты энергетического обмена",
+        "severity": "LOW"
+      }
+    ],
+    "conflicts": [],
+    "monitoring": [
+      {
+        "what": "Общий анализ крови",
+        "when": "При длительном приёме",
+        "targetRange": "В пределах нормы"
+      }
+    ],
+    "contraindications": [],
+    "sideEffects": [
+      "Редко — диарея при очень высоких дозах"
+    ],
+    "dosage": {
+      "mg": 50,
+      "timing": "с едой"
+    },
+    "bestForCourse": false
+  },
+  "vitamin_b6": {
+    "id": "vitamin_b6",
+    "name": "Vitamin B6",
+    "nameRu": "Витамин B6 (Пиридоксин)",
+    "tier": "core",
+    "category": [
+      "vitamin",
+      "neuro",
+      "hematologic"
+    ],
+    "forms": [
+      {
+        "id": "vit_b6_p5p",
+        "name": "Pyridoxal-5-Phosphate",
+        "nameRu": "Пиридоксаль-5-фосфат (P5P)",
+        "dose": "25-50 мг с едой",
+        "best": true,
+        "notes": "Активная форма"
+      },
+      {
+        "id": "vit_b6",
+        "name": "Pyridoxine HCl",
+        "nameRu": "Пиридоксина гидрохлорид",
+        "dose": "10-50 мг с едой",
+        "best": false,
+        "notes": "Неактивная форма, нужна конверсия"
+      }
+    ],
+    "organs": [
+      "BRAIN",
+      "NERVES",
+      "BLOOD"
+    ],
+    "systems": [
+      "neuro",
+      "hematologic",
+      "endocrine"
+    ],
+    "mechanisms": [
+      "GABA_SYNTHESIS",
+      "SEROTONIN_SYNTHESIS",
+      "DOPAMINE_SYNTHESIS",
+      "HOMOCYSTEINE_REDUCTION",
+      "PROTEIN_METABOLISM"
+    ],
+    "description": "Витамин B6 (пиридоксин) — ключевой для синтеза нейромедиаторов (серотонин, дофамин, GABA), снижения гомоцистеина и метаболизма белков. P5P — активная форма, работает при генетических вариантах.",
+    "synergies": [
+      {
+        "with": "magnesium",
+        "effect": "Магний необходим для активации B6",
+        "mechanism": "Mg — кофактор B6-зависимых ферментов",
+        "severity": "HIGH"
+      },
+      {
+        "with": "folate",
+        "effect": "Комплексное снижение гомоцистеина",
+        "mechanism": "B6 + B9 + B12",
+        "severity": "HIGH"
+      },
+      {
+        "with": "vitamin_b12",
+        "effect": "Комплекс B6+B9+B12 = метилирование",
+        "mechanism": "Метилирование гомоцистеина",
+        "severity": "HIGH"
+      }
+    ],
+    "conflicts": [
+      {
+        "with": "levodopa",
+        "effect": "B6 ускоряет декарбоксилирование L-DOPA",
+        "mechanism": "Снижение эффективности L-DOPA",
+        "severity": "HIGH"
+      },
+      {
+        "with": "phenobarbital",
+        "effect": "Ускорение метаболизма B6",
+        "mechanism": "Индукция ферментов печени",
+        "severity": "MEDIUM"
+      }
+    ],
+    "monitoring": [
+      {
+        "what": "Витамин B6 плазмы",
+        "when": "При подозрении дефицита",
+        "targetRange": "5-30 нг/мл"
+      },
+      {
+        "what": "Гомоцистеин",
+        "when": "Через 6 недель",
+        "targetRange": "< 10 мкмоль/л"
+      }
+    ],
+    "contraindications": [
+      "Приём L-DOPA (без ингибитора декарбоксилазы)",
+      "Болезнь Паркинсона (при L-DOPA без карбидопы)"
+    ],
+    "sideEffects": [
+      "Периферическая нейропатия при дозах >100 мг/д",
+      "Светочувствительность кожи",
+      "Онемение конечностей"
+    ],
+    "dosage": {
+      "mg": 50,
+      "timing": "с едой (P5P)"
+    },
+    "bestForCourse": true
+  }
+}
