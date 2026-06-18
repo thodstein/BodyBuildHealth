@@ -5337,13 +5337,48 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
               })()}
             </div>
 
+            {/* ==================== PHASE SELECTOR ==================== */}
+            <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:12, border:'1px solid var(--border)' }}>
+              <div onClick={() => setExpandedCategories(p => ({ ...p, calc_phase: !(p.calc_phase ?? true) }))} style={{ display:'flex', alignItems:'center', gap:6, cursor:'pointer', marginBottom: (expandedCategories.calc_phase ?? true) ? 8 : 0 }}>
+                <span style={{ fontSize:13 }}>🔄</span>
+                <span style={{ flex:1, fontSize:12, fontWeight:700, color:'var(--text)' }}>Фаза курса</span>
+                <span style={{ fontSize:9, color:'var(--text-dim)', transform: (expandedCategories.calc_phase ?? true) ? 'rotate(180deg)' : 'none', transition:'transform 0.2s' }}>▼</span>
+              </div>
+              {(expandedCategories.calc_phase ?? true) && (<>
+              <p style={{ fontSize:9, color:'var(--text-dim)', margin:'0 0 8px' }}>{PHASE_MODS[supportPhase]?.desc}</p>
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr', gap:4 }}>
+                {([
+                  { v: 'course' as SupportPhase, l: '💉 Курс', d: 'На курсе' },
+                  { v: 'bridge' as SupportPhase, l: '🌉 Мост', d: 'Мост' },
+                  { v: 'pct' as SupportPhase, l: '🔄 ПКТ', d: 'Восстановление' },
+                  { v: 'fertility' as SupportPhase, l: '⚧ Фертильность', d: 'Сперматогенез' },
+                ]).map(p => (
+                  <button key={p.v} onClick={() => setSupportPhase(p.v)} style={{
+                    padding:'6px 2px', borderRadius:8, fontSize:9, cursor:'pointer', textAlign:'center',
+                    background: supportPhase === p.v ? 'rgba(0,230,138,0.15)' : 'var(--bg-secondary)',
+                    border: supportPhase === p.v ? '1px solid var(--accent)' : '1px solid var(--border)',
+                    color: supportPhase === p.v ? '#00e68a' : 'var(--text-dim)', fontWeight: supportPhase === p.v ? 700 : 400,
+                  }}>
+                    <div style={{ fontSize:13 }}>{p.l}</div>
+                    <div style={{ fontSize:7 }}>{p.d}</div>
+                  </button>
+                ))}
+              </div>
+              {supportPhase !== 'course' && (
+                <div style={{ marginTop:4, fontSize:8, color:'#f59e0b' }}>
+                  ⚡ +{PHASE_MODS[supportPhase]?.addSubs?.length || 0} / -{PHASE_MODS[supportPhase]?.removeSubs?.length || 0} веществ
+                </div>
+              )}
+            </>)}
+            </div>
+
             {/* ==================== ADD 1: REAL CALCULATESUPPORT INTEGRATION ==================== */}
             <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:16, border:'2px solid rgba(0,230,138,0.25)', position:'relative' }}>
               <div style={{ position:'absolute', top:0, left:0, right:0, bottom:0, background:'linear-gradient(135deg, rgba(0,230,138,0.02), rgba(0,198,83,0.02))', pointerEvents:'none' }} />
               <div onClick={() => setExpandedCategories(p => ({ ...p, calc_intel: !(p.calc_intel ?? true) }))} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom: (expandedCategories.calc_intel ?? true) ? 8 : 0, cursor:'pointer' }}>
                 <div style={{ display:'flex', alignItems:'center', gap:6 }}>
                   <span style={{ fontSize:16 }}>🧮</span>
-                  <h4 style={{ margin:0, fontSize:13, color:'#00e68a' }}>Интеллектуальный расчёт поддержки</h4>
+                  <h4 style={{ margin:0, fontSize:13, color:'#00e68a' }}>Расчёт поддержки</h4>
                 </div>
                 <div style={{ display:'flex', alignItems:'center', gap:6 }}>
                   <span style={{ fontSize:9, fontWeight:400, color:'var(--text-dim)', background:'rgba(0,230,138,0.08)', padding:'2px 8px', borderRadius:10 }}>v2.0</span>
@@ -5470,40 +5505,6 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
               </>)}
             </div>
 
-            {/* ==================== PHASE SELECTOR ==================== */}
-            <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:12, border:'1px solid var(--border)' }}>
-              <div onClick={() => setExpandedCategories(p => ({ ...p, calc_phase: !(p.calc_phase ?? true) }))} style={{ display:'flex', alignItems:'center', gap:6, cursor:'pointer', marginBottom: (expandedCategories.calc_phase ?? true) ? 8 : 0 }}>
-                <span style={{ fontSize:13 }}>🔄</span>
-                <span style={{ flex:1, fontSize:12, fontWeight:700, color:'var(--text)' }}>Фаза курса</span>
-                <span style={{ fontSize:9, color:'var(--text-dim)', transform: (expandedCategories.calc_phase ?? true) ? 'rotate(180deg)' : 'none', transition:'transform 0.2s' }}>▼</span>
-              </div>
-              {(expandedCategories.calc_phase ?? true) && (<>
-              <p style={{ fontSize:9, color:'var(--text-dim)', margin:'0 0 8px' }}>{PHASE_MODS[supportPhase]?.desc}</p>
-              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr', gap:4 }}>
-                {([
-                  { v: 'course' as SupportPhase, l: '💉 Курс', d: 'На курсе' },
-                  { v: 'bridge' as SupportPhase, l: '🌉 Мост', d: 'Мост' },
-                  { v: 'pct' as SupportPhase, l: '🔄 ПКТ', d: 'Восстановление' },
-                  { v: 'fertility' as SupportPhase, l: '⚧ Фертильность', d: 'Сперматогенез' },
-                ]).map(p => (
-                  <button key={p.v} onClick={() => setSupportPhase(p.v)} style={{
-                    padding:'6px 2px', borderRadius:8, fontSize:9, cursor:'pointer', textAlign:'center',
-                    background: supportPhase === p.v ? 'rgba(0,230,138,0.15)' : 'var(--bg-secondary)',
-                    border: supportPhase === p.v ? '1px solid var(--accent)' : '1px solid var(--border)',
-                    color: supportPhase === p.v ? '#00e68a' : 'var(--text-dim)', fontWeight: supportPhase === p.v ? 700 : 400,
-                  }}>
-                    <div style={{ fontSize:13 }}>{p.l}</div>
-                    <div style={{ fontSize:7 }}>{p.d}</div>
-                  </button>
-                ))}
-              </div>
-              {supportPhase !== 'course' && (
-                <div style={{ marginTop:4, fontSize:8, color:'#f59e0b' }}>
-                  ⚡ +{PHASE_MODS[supportPhase]?.addSubs?.length || 0} / -{PHASE_MODS[supportPhase]?.removeSubs?.length || 0} веществ
-                </div>
-              )}
-            </>)}
-            </div>
             {/* ==================== ADD 5: INTEGRATION NOTICE ==================== */}
             <div style={{ padding:'10px 12px', borderRadius:10, background:'rgba(96,165,250,0.05)', border:'1px solid rgba(96,165,250,0.12)', display:'flex', alignItems:'flex-start', gap:8 }}>
               <span style={{ fontSize:14, flexShrink:0 }}>🔄</span>
