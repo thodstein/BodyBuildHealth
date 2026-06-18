@@ -5290,11 +5290,16 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
                 return (
                   <div>
                     {calcDone && calcResult && (
-                      <div style={{ display:'flex', justifyContent:'space-between', fontSize:11, fontWeight:600, color:'var(--text-light)', marginBottom:8, padding:'6px 10px', borderRadius:8, background:'rgba(0,0,0,0.08)', border:'1px solid var(--border)' }}>
-                        <span>Без поддержки: <b style={{ color:'#ef4444' }}>{Math.round(calcResult.riskBeforeSupport)}%</b></span>
-                        <span style={{ color:'var(--accent)' }}>/</span>
-                        <span>С поддержкой: <b style={{ color:'#22c55e' }}>{Math.round(calcResult.riskAfterSupport)}%</b></span>
-                        <span style={{ color:'#22c55e', fontSize:12 }}>({Math.round(calcResult.riskBeforeSupport)}/{Math.round(calcResult.riskAfterSupport)})</span>
+                      <div style={{ display:'flex', justifyContent:'space-around', fontSize:13, fontWeight:800, color:'var(--text-light)', marginBottom:8, padding:'10px 12px', borderRadius:8, background:'rgba(0,0,0,0.08)', border:'1px solid var(--border)' }}>
+                        <div style={{ textAlign:'center' }}>
+                          <div style={{ fontSize:9, fontWeight:600, color:'var(--text-dim)', marginBottom:2 }}>Без поддержки</div>
+                          <span style={{ fontSize:28, fontWeight:800, color:'#ef4444' }}>{Math.round(linked?.risk?.overallRaw ?? calcResult.riskBeforeSupport)}</span><span style={{ fontSize:14, color:'#ef4444' }}>%</span>
+                        </div>
+                        <div style={{ display:'flex', alignItems:'center', color:'var(--text-dim)', fontSize:16 }}>/</div>
+                        <div style={{ textAlign:'center' }}>
+                          <div style={{ fontSize:9, fontWeight:600, color:'var(--text-dim)', marginBottom:2 }}>С поддержкой</div>
+                          <span style={{ fontSize:28, fontWeight:800, color:'#22c55e' }}>{Math.round(calcResult.riskAfterSupport)}</span><span style={{ fontSize:14, color:'#22c55e' }}>%</span>
+                        </div>
                       </div>
                     )}
                     <div style={{ display:'flex', flexDirection:'column', gap:5 }}>
