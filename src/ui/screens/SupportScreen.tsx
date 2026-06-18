@@ -1602,17 +1602,21 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
     });
     try {
       const norm = (s: string) => s.replace(/_/g,'').toLowerCase();
+      const matchId = (interactKey: string, subId: string, subName: string): boolean => {
+        const a = norm(interactKey);
+        const b = norm(subId);
+        const c = norm(subName);
+        return a === b || a.includes(b) || b.includes(a) || a === c || a.includes(c) || c.includes(a);
+      };
       return INTERACTIONS_DB.filter(i => {
         if (!i || !i.substanceA || !i.substanceB) return false;
-        const a = norm(i.substanceA);
-        const b = norm(i.substanceB);
-        return validInteractionIds.some(id => {
-          const up = norm(id);
-          return a === up || a.includes(up) || up.includes(a);
-        }) && validInteractionIds.some(id => {
-          const up = norm(id);
-          return b === up || b.includes(up) || up.includes(b);
+        const matched: string[] = [];
+        validInteractionIds.forEach(id => {
+          const s = allSupport.find(x => x.id === id);
+          if (matchId(i.substanceA, id, s?.name || '')) matched.push('a');
+          if (matchId(i.substanceB, id, s?.name || '')) matched.push('b');
         });
+        return matched.includes('a') && matched.includes('b');
       });
     } catch { return []; }
   }, [interactionIds, allSupport]);
@@ -3207,9 +3211,9 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                         })()}
                       </div>
                     </div>
-            )}
+              )}
                     {/* Hardcoded drug interaction cards */}
-                    <div style={{ marginTop:8 }}>
+                    <div style={{ marginTop:8, display: interactTab === 'pharma' ? 'block' : 'none' }}>
                       <div onClick={() => setExpandedCategories(prev => ({ ...prev, drug_combo_ref: !prev.drug_combo_ref }))} style={{ display:'flex', alignItems:'center', gap:6, padding:'7px 10px', cursor:'pointer', userSelect:'none', background:'var(--bg-secondary)', borderRadius:8 }}>
                         <span style={{ fontSize:13 }}>💊</span>
                         <div style={{ flex:1, fontSize:10, fontWeight:700, color:'var(--text-light)' }}>Фармакологические взаимодействия</div>
@@ -4200,10 +4204,6 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
       {/* ===== SUPPORT PLAN VIEW (Active + Archive) ===== */}
       {section === 'generator' && tab === 'main' && supportView === 'calc' && calcView === 'plan' && (
         <div style={{ padding:'0 0 80px' }}>
-          <div style={{ display:'flex', gap:6, marginBottom:8 }}>
-            <button onClick={goBack} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← Назад</button>
-            <button onClick={goHome} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← На главную</button>
-          </div>
           <div style={{ display:'flex', gap:6, marginBottom:8 }}>
             <button onClick={() => setPlanSubTab('active')} style={{ padding:'6px 16px', borderRadius:20, fontSize:11, fontWeight:700, cursor:'pointer', background: planSubTab === 'active' ? 'var(--accent)' : 'var(--bg-secondary)', color: planSubTab === 'active' ? '#000' : 'var(--text-dim)', border: `1px solid ${planSubTab === 'active' ? 'var(--accent)' : 'var(--border)'}` }}>✅ Действующий план</button>
             <button onClick={() => setPlanSubTab('archive')} style={{ padding:'6px 16px', borderRadius:20, fontSize:11, fontWeight:700, cursor:'pointer', background: planSubTab === 'archive' ? 'var(--accent)' : 'var(--bg-secondary)', color: planSubTab === 'archive' ? '#000' : 'var(--text-dim)', border: `1px solid ${planSubTab === 'archive' ? 'var(--accent)' : 'var(--border)'}` }}>📦 Архив ({archivedPlans.length})</button>

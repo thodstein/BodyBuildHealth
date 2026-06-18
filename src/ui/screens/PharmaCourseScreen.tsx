@@ -70,7 +70,12 @@ export const PharmaCourseScreen: React.FC = () => {
       try {
         await db.init();
         const entries = await db.getAll<CourseEntry>('course_log');
-        setCourse(entries);
+        // Filter out support-class substances (not pharma)
+        const pharmaEntries = entries.filter(e => {
+          const sub = Object.values(PHARMA_DB).flat().find(s => s.id === e.substanceId);
+          return sub && sub.class !== 'support';
+        });
+        setCourse(pharmaEntries);
       } catch (e) { console.error(e); }
       setLoading(false);
     };
