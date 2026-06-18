@@ -1919,7 +1919,27 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
       source: 'engine' as const,
     }));
     const dedupedEngine = fromEngine.filter(e => !seen.has(`${e.substanceA}|${e.substanceB}`) && !seen.has(e.interactionId));
-    return [...fromDB, ...dedupedEngine];
+    // Pharma synergy pairs (AAS + peptides + insulin)
+    const PHARMA_CLASSES = new Set(['testosterone','trenbolone','nandrolone','boldenone','primobolan','oral_17aa','sarm','drostanolone','dht_derivative','igf1','mgf','insulin','pct_serm','pct_aromatase','pct_dopamine','pct_gonadotropin']);
+    const pharmaFromEngine = SYNERGY_PAIRS
+      .filter(p => {
+        const a = PHARMA_DB[p.substanceA];
+        const b = PHARMA_DB[p.substanceB];
+        return a && b && PHARMA_CLASSES.has(a.class) && PHARMA_CLASSES.has(b.class) && !catalogOk(p.substanceA) && !catalogOk(p.substanceB);
+      })
+      .filter(p => !seen.has(`${p.substanceA}|${p.substanceB}`))
+      .map((p, idx) => ({
+      interactionId: `pharma_synergy_${idx}`,
+      substanceA: p.substanceA,
+      substanceB: p.substanceB,
+      type: 'synergy' as const,
+      effect: p.mechanism || `Синергия: ${p.synergyType}`,
+      mechanisms: p.affectedSystems || [],
+      severity: (p.strength > 0.7 ? 'HIGH' : p.strength > 0.4 ? 'MEDIUM' : 'LOW') as 'LOW' | 'MEDIUM' | 'HIGH',
+      notes: p.clinicalNote || '',
+      source: 'pharma' as const,
+    }));
+    return [...fromDB, ...dedupedEngine, ...pharmaFromEngine];
   }, [CATALOG_IDS]);
 
   const filteredInteractions = useMemo(() => {
