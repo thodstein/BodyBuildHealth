@@ -664,7 +664,7 @@ alpha_lipoic: {
   },
 astragalus: {
     description: 'Астрагал (Astragalus membranaceus) — нефропротектор, иммуномодулятор. Защищает подоциты почек, снижает TGF-β1, модулирует NF-κB. Используется в китайской медицине тысячелетиями.',
-    mechanism: 'Защита подоцитов через астрагалозиды. ↓ TGF-β1 → ↓ фиброз почек. Ингибирование NF-κB → противовоспалительное действие. ↑ иммунитет через激活 макрофагов и NK-клеток.',
+    mechanism: 'Защита подоцитов через астрагалозиды. ↓ TGF-β1 → ↓ фиброз почек. Ингибирование NF-κB → противовоспалительное действие. ↑ иммунитет через активацию макрофагов и NK-клеток.',
     mechanismKeys: ['PODOCYTE_PROTECT', 'NFkB_DOWN', 'TGF_B1_DOWN', 'IMMUNE_UP'],
     systems: [
       { key: 'renal', label: 'Почечная', mechanisms: ['Защита подоцитов', 'Снижение фиброза', 'Противовоспалительное'] },
@@ -930,13 +930,16 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({});
   const goHome = () => { setSection('home'); setTab('main'); setSupportView('main'); setCalcView('main'); setInfoView('catalog'); };
   const goBack = () => {
-    if (calcView !== 'main' || supportView === 'calc') {
-      if (calcView !== 'main') setCalcView('main');
-      else { setSupportView('main'); setTab('main'); }
-      return;
+    // Deep sub-views (calculator, info, stackcalc, plan, mixcalc, etc.)
+    if (calcView !== 'main') {
+      if (section === 'info') { setSection('info'); setTab('main'); setSupportView('calc'); setCalcView('main'); return; }
+      setCalcView('main'); setSupportView('calc'); setTab('main'); return;
     }
-    if (supportView !== 'main') { setSupportView('main'); setTab('main'); return; }
+    // Calc menu / non-main support view
+    if (supportView === 'calc' || supportView !== 'main') { setSupportView('main'); setTab('main'); return; }
+    // Non-main tab (peptides, calculator via old route)
     if (tab !== 'main') { setTab('main'); return; }
+    // Non-home section
     if (section !== 'home') { setSection('home'); setTab('main'); setSupportView('main'); setCalcView('main'); return; }
   };
   const [interactionTypeFilter, setInteractionTypeFilter] = useState<string>('all');
@@ -2156,9 +2159,10 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
         ].map(item => (
           <button key={item.id} onClick={() => {
             setSection(item.id as any);
+            setCalcView('main');
             if (item.id === 'home') { setTab('main'); setSupportView('main'); }
             if (item.id === 'generator') { setTab('calculator'); setSupportView('calc'); }
-            if (item.id === 'info') { setTab('catalog'); setSupportView('calc'); }
+            if (item.id === 'info') { setTab('main'); setSupportView('calc'); setCalcView('info'); setInfoView('catalog'); }
             if (item.id === 'hormonal') { setTab('fertility-pct'); setSupportView('calc'); }
           }} style={{
             flex:1, display:'flex', flexDirection:'column', alignItems:'center', gap:2,
@@ -2424,10 +2428,10 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                   readystacks: ()=>{ setTab('main'); setSupportView('calc'); setCalcView('info'); setInfoView('stacks'); setSection('home'); },
                   interactions: ()=>{ setTab('main'); setSupportView('calc'); setCalcView('info'); setInfoView('interactions'); setSection('home'); },
                   research: ()=>{ setTab('main'); setSupportView('calc'); setCalcView('info'); setInfoView('research'); setSection('home'); },
-                  mixcalc: ()=>{ setTab('main'); setSupportView('calc'); setCalcView('mixcalc'); },
-                  neuro: ()=>{ setTab('main'); setSupportView('calc'); setCalcView('neuro'); },
-                  joints: ()=>{ setTab('main'); setSupportView('calc'); setCalcView('joints'); },
-                  acne: ()=>{ setTab('main'); setSupportView('calc'); setCalcView('acne'); },
+                  mixcalc: ()=>{ setSection('info'); setTab('main'); setSupportView('calc'); setCalcView('mixcalc'); },
+                  neuro: ()=>{ setSection('info'); setTab('main'); setSupportView('calc'); setCalcView('neuro'); },
+                  joints: ()=>{ setSection('info'); setTab('main'); setSupportView('calc'); setCalcView('joints'); },
+                  acne: ()=>{ setSection('info'); setTab('main'); setSupportView('calc'); setCalcView('acne'); },
                 };
                 a[id]?.();
               }} style={{
@@ -2452,7 +2456,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
               Фармакологическая поддержка, пептиды и предлагаемые препараты поддержки для уменьшения рисков
             </p>
             <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-              <div onClick={() => { setSection('generator'); setTab('calculator'); setSupportView('calc'); }} style={{
+              <div onClick={() => { setSection('generator'); setTab('calculator'); setSupportView('calc'); setCalcView('main'); }} style={{
                 display:'flex', alignItems:'center', gap:12, padding:'14px 16px', borderRadius:16, cursor:'pointer', textAlign:'left', width:'100%',
                 background:'rgba(20,22,30,0.4)', border:'1px solid var(--glass-border)', color:'var(--text)', transition:'all 0.2s',
                 backdropFilter:'blur(12px)', WebkitBackdropFilter:'blur(12px)',
@@ -2464,7 +2468,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                 </div>
                 <span style={{ color:'var(--accent)', fontSize:18, opacity:0.6 }}>→</span>
               </div>
-              <div onClick={() => { setSection('hormonal'); setTab('main'); setSupportView('fertility'); }} style={{
+              <div onClick={() => { setSection('hormonal'); setTab('main'); setSupportView('fertility'); setCalcView('main'); }} style={{
                 display:'flex', alignItems:'center', gap:12, padding:'14px 16px', borderRadius:16, cursor:'pointer', textAlign:'left', width:'100%',
                 background:'rgba(20,22,30,0.4)', border:'1px solid var(--glass-border)', color:'var(--text)', transition:'all 0.2s',
                 backdropFilter:'blur(12px)', WebkitBackdropFilter:'blur(12px)',
@@ -2476,7 +2480,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                 </div>
                 <span style={{ color:'#8b5cf6', fontSize:18, opacity:0.6 }}>→</span>
               </div>
-              <div onClick={() => { setSection('info'); setTab('catalog'); }} style={{
+              <div onClick={() => { setSection('home'); setTab('main'); setSupportView('calc'); setCalcView('info'); setInfoView('catalog'); }} style={{
                 display:'flex', alignItems:'center', gap:12, padding:'14px 16px', borderRadius:16, cursor:'pointer', textAlign:'left', width:'100%',
                 background:'rgba(20,22,30,0.4)', border:'1px solid var(--glass-border)', color:'var(--text)', transition:'all 0.2s',
                 backdropFilter:'blur(12px)', WebkitBackdropFilter:'blur(12px)',

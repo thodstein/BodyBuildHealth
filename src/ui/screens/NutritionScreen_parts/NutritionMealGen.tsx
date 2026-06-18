@@ -247,70 +247,70 @@ export const NutritionMealGen: React.FC<{ profile: UserProfile | null; labAnalys
     
       {/* Food Categories Reference */}
       <div className="card" style={{ padding: 14, marginBottom: 12 }}>
-        <h3 style={{ margin: '0 0 12px', fontSize: 15 }}>{'📋'} ���������� ���������</h3>
+        <h3 style={{ margin: '0 0 12px', fontSize: 15 }}>{'📋'} Категории продуктов</h3>
         
         {/* Proteins */}
         <div style={{ background: 'var(--bg-secondary)', padding: 10, borderRadius: 10, marginBottom: 8 }}>
-          <div style={{ fontSize: 13, fontWeight: 700, color: '#3b82f6', marginBottom: 6 }}>{'🥩'} �����</div>
+          <div style={{ fontSize: 13, fontWeight: 700, color: '#3b82f6', marginBottom: 6 }}>{'🥩'} Белки</div>
           <div style={{ fontSize: 11, color: 'var(--text-dim)', lineHeight: 1.6 }}>
-            {'•'} ���� �������, ���� ������, ����<br/>
-            {'•'} ������� ���� {'≤'}10% ��������, ���� �������<br/>
-            {'•'} ������� ���� (�� ���� 2�/���), �������� (�� ���� 1�/���)<br/>
-            {'•'} ����� ����: ������, ������, ������
+            {'•'} Курица грудка, яйца целые, рыба<br/>
+            {'•'} Говядина постная {'≤'}10% жирности, творог обезжир.<br/>
+            {'•'} Протеин сыв. (до 2х/день), казеин (до 1х/день)<br/>
+            {'•'} Море белки: креветки, мидии, кальмары
           </div>
         </div>
         
         {/* Fats */}
         <div style={{ background: 'var(--bg-secondary)', padding: 10, borderRadius: 10, marginBottom: 8 }}>
-          <div style={{ fontSize: 13, fontWeight: 700, color: '#f59e0b', marginBottom: 6 }}>{'🧁'} ����</div>
+          <div style={{ fontSize: 13, fontWeight: 700, color: '#f59e0b', marginBottom: 6 }}>{'🧁'} Жиры</div>
           <div style={{ fontSize: 11, color: 'var(--text-dim)', lineHeight: 1.6 }}>
-            {'•'} ������� � ���������, ����<br/>
-            {'•'} ��������� �����, ��������� �����<br/>
-            {'•'} ������� ����<br/>
-            {'•'} ����� ��������� ������-������
+            {'•'} Оливковое и кокосовое масло, авокадо<br/>
+            {'•'} Орехи грецкие, миндаль, фундук<br/>
+            {'•'} Рыбий жир, красная рыба<br/>
+            {'•'} Жир яичный (желток не более 2-3/день)
           </div>
         </div>
         
         {/* Carbs */}
         <div style={{ background: 'var(--bg-secondary)', padding: 10, borderRadius: 10, marginBottom: 8 }}>
-          <div style={{ fontSize: 13, fontWeight: 700, color: '#a855f7', marginBottom: 6 }}>{'🍚'} ��������</div>
+          <div style={{ fontSize: 13, fontWeight: 700, color: '#a855f7', marginBottom: 6 }}>{'🍚'} Углеводы</div>
           <div style={{ fontSize: 11, color: 'var(--text-dim)', lineHeight: 1.6 }}>
-            {'•'} ��� (����� ������), �������� �� ��. ������<br/>
-            {'•'} ������� ��������, Cream of Rice<br/>
-            {'•'} ���������, �����<br/>
-            {'•'} ���� ��������������
+            {'•'} Рис (лучше бурый), гречка, овсянка нат. хлопья<br/>
+            {'•'} Макароны тв.сорта, Cream of Rice, киноа<br/>
+            {'•'} Картофель запеч., батат, фасоль<br/>
+            {'•'} Хлеб цельнозерновой, лаваш
           </div>
         </div>
         
         {/* Limited */}
         <div style={{ background: 'rgba(245,158,11,0.08)', padding: 10, borderRadius: 10, marginBottom: 8, border: '1px solid rgba(245,158,11,0.2)' }}>
-          <div style={{ fontSize: 13, fontWeight: 700, color: '#f59e0b', marginBottom: 6 }}>{'⚠️'} ������������ �������������</div>
+          <div style={{ fontSize: 13, fontWeight: 700, color: '#f59e0b', marginBottom: 6 }}>{'⚠️'} Ограниченное потребление</div>
           <div style={{ fontSize: 11, color: 'var(--text-dim)', lineHeight: 1.6 }}>
-            {'•'} ���������� ������ (��� �������)<br/>
-            {'•'} ����������, ������ ������, ������<br/>
-            {'•'} �����, �������� (������� + �����)<br/>
-            {'•'} �������� ���<br/>
-            {'•'} �����������, ��������, ���������
+            {'•'} Сахар рафинированный (не более 10-15г)<br/>
+            {'•'} Выпечка сдобная, соусы жирн., колбасы, бекон<br/>
+            {'•'} Соль, бобовые (клетчатка + пурины)<br/>
+            {'•'} Соевые продукты (тофу, соевый изолят)<br/>
+            {'•'} Энергетики, кофеин до 300-400мг/день
           </div>
         </div>
         
         {/* Fiber */}
         <div style={{ background: 'var(--bg-secondary)', padding: 10, borderRadius: 10, marginBottom: 8 }}>
-          <div style={{ fontSize: 13, fontWeight: 700, color: '#22c55e', marginBottom: 6 }}>{'🥦'} ���������</div>
+          <div style={{ fontSize: 13, fontWeight: 700, color: '#22c55e', marginBottom: 6 }}>{'🥦'} Клетчатка</div>
           <div style={{ fontSize: 11, color: 'var(--text-dim)', lineHeight: 1.6 }}>
-            {'•'} �������, �����, ������, ��������<br/>
-            {'•'} ���, �������� �������<br/>
-            <div style={{ color: '#f59e0b', marginTop: 4 }}>{'⚠️'} ������� � �� ���������! ������ (��������) + ������ � �� ������ ����</div>
+            {'•'} Брокколи, шпинат, огурцы, кабачки<br/>
+            {'•'} Зелень, салат листовой, руккола, сельдерей<br/>
+            <div style={{ color: '#f59e0b', marginTop: 4 }}>{'⚠️'} Важно не переусердствовать! Много (свыше 40г) + мало воды = проблемы с ЖКТ</div>
           </div>
         </div>
         
         {/* Spices */}
         <div style={{ background: 'var(--bg-secondary)', padding: 10, borderRadius: 10 }}>
-          <div style={{ fontSize: 13, fontWeight: 700, color: '#ef4444', marginBottom: 6 }}>{'🧭'} ������</div>
+          <div style={{ fontSize: 13, fontWeight: 700, color: '#ef4444', marginBottom: 6 }}>{'🧭'} Специи</div>
           <div style={{ fontSize: 11, color: 'var(--text-dim)', lineHeight: 1.6 }}>
-            {'•'} �������� �����<br/>
-            {'•'} ����������� ����<br/>
-            {'•'} ����� �����
+            {'•'} Перец черный, куркума, имбирь<br/>
+            {'•'} Качественная морская соль, розмарин, тимьян<br/>
+            {'•'} Чеснок, хрен, горчица, лимонный сок
           </div>
         </div>
       </div>
