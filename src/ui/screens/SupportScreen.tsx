@@ -957,13 +957,84 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   const [autoLevel, setAutoLevel] = useState<'basic' | 'mid' | 'max' | 'boost'>('mid');
   const [expandedMed, setExpandedMed] = useState<string | null>(null);
   const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({});
+  // Protocol substance name -> ID lookup for +Стек buttons
+  const PROTOCOL_IDS: Record<string, string> = {
+    'nac':'AA_NAC','n-ацетилцистеин':'AA_NAC','n-acetyl-cysteine':'AA_NAC',
+    'омега-3':'FA_OMEGA3_BALANCED','omega-3':'FA_OMEGA3_BALANCED','epa/dha':'FA_OMEGA3_BALANCED',
+    'magnesium l-threonate':'MIN_MG_THREONATE','магний l-треонат':'MIN_MG_THREONATE','магний':'MIN_MG_CITRATE',
+    'таурин':'AA_TAURINE','taurine':'AA_TAURINE',
+    'глицин':'AA_GLYCINE','glycine':'AA_GLYCINE',
+    'alpha-lipoic acid':'AO_ALA','альфа-липоевая кислота':'AO_ALA','ala':'AO_ALA',
+    'coq10':'AO_COQ10_UBIQUINOL','коэнзим q10':'AO_COQ10_UBIQUINOL','убихинол':'AO_COQ10_UBIQUINOL',
+    'pregnenolone':'HORMONE_PREGNENOLONE','прегненолон':'HORMONE_PREGNENOLONE',
+    'агмантин':'AA_AGMATINE','agmatine':'AA_AGMATINE',
+    'альфа-gpc':'AA_ALPHA_GPC','alpha-gpc':'AA_ALPHA_GPC',
+    'lion\'s mane':'MUSHROOM_LIONS_MANE','ежовик':'MUSHROOM_LIONS_MANE',
+    'dhea':'HORMONE_DHEA',
+    'phosphatidylserine':'PHOSPHATIDYLSERINE','фосфатидилсерин':'PHOSPHATIDYLSERINE',
+    'ginkgo biloba':'HERB_GINKGO','гинкго':'HERB_GINKGO',
+    'бромантан':'PHARMA_BROMANTAN','bromantan':'PHARMA_BROMANTAN',
+    'фасорацетам':'PHARMA_FASORACETAM','fasoracetam':'PHARMA_FASORACETAM',
+    'гуперзин а':'HERB_HUPERZINE','huperzine':'HERB_HUPERZINE',
+    'bacopa monnieri':'HERB_BACOPA','бакопа':'HERB_BACOPA',
+    'l-theanine':'AA_THEANINE','теанин':'AA_THEANINE','l-теанин':'AA_THEANINE',
+    'citicoline':'AA_CITICOLINE','цитиколин':'AA_CITICOLINE',
+    'noopept':'PHARMA_NOOPEPT','ноопепт':'PHARMA_NOOPEPT',
+    'семакс':'PEPTIDE_SEMAX','semax':'PEPTIDE_SEMAX',
+    'кортексин':'PEPTIDE_CORTEXIN','cortexin':'PEPTIDE_CORTEXIN',
+    'церебролизин':'PEPTIDE_CEREBROLYSIN','cerebrolysin':'PEPTIDE_CEREBROLYSIN',
+    'коллаген ii типа':'PEPTIDE_COLLAGEN_2','collagen type ii':'PEPTIDE_COLLAGEN_2','коллаген':'PEPTIDE_COLLAGEN_2',
+    'витамин c':'VITAMIN_C','vitamin c':'VITAMIN_C',
+    'витамин d3':'VITAMIN_D3','vitamin d3':'VITAMIN_D3',
+    'k2':'VITAMIN_K2','витамин k2':'VITAMIN_K2',
+    'глюкозамин':'GLUCOSAMINE','glucosamine':'GLUCOSAMINE',
+    'хондроитин':'CHONDROITIN','chondroitin':'CHONDROITIN',
+    'msm':'MSM','метилсульфонилметан':'MSM',
+    'гиалуроновая кислота':'HYALURONIC_ACID','hyaluronic acid':'HYALURONIC_ACID',
+    'куркумин':'CURCUMIN','curcumin':'CURCUMIN',
+    'босвеллия':'BOSWELLIA','boswellia':'BOSWELLIA','akba':'BOSWELLIA',
+    'bpc-157':'PEPTIDE_BPC157',
+    'tb-500':'PEPTIDE_TB500','тимозин':'PEPTIDE_TB500','thymosin':'PEPTIDE_TB500',
+    'секретагоги гр':'PEPTIDE_GHRP_GHRELIN','ипаморелин':'PEPTIDE_IPAMORELIN','cjc-1295':'PEPTIDE_CJC1295',
+    'кофеин':'STIM_CAFFEINE','caffeine':'STIM_CAFFEINE',
+    'l-цитруллин':'AA_CITRULLINE','цитруллин':'AA_CITRULLINE','l-цитруллин малат':'AA_CITRULLINE',
+    'бета-аланин':'AA_BETA_ALANINE','beta-alanine':'AA_BETA_ALANINE',
+    'l-аргинин':'AA_ARGININE','аргинин':'AA_ARGININE',
+    'l-тирозин':'AA_TYROSINE','тирозин':'AA_TYROSINE','l-tyrosine':'AA_TYROSINE',
+    'creatine':'CREATINE','креатин':'CREATINE','креатин моногидрат':'CREATINE',
+    'hmb':'HMB','β-гидрокси-β-метилбутират':'HMB',
+    'l-глютамин':'AA_GLUTAMINE','глютамин':'AA_GLUTAMINE',
+    'zma':'ZMA','цинк+магний':'ZMA',
+    'сывороточный протеин':'PROTEIN_WHEY','протеин':'PROTEIN_WHEY',
+    'натрий':'ELECTROLYTE_NACL','калий':'ELECTROLYTE_KCL',
+    'циклический декстрин':'HBCD','hbcd':'HBCD',
+    'eaa':'EAA_COMPLEX','bcaa':'BCAA_COMPLEX',
+    'ниацинамид':'VITAMIN_B3','витамин b3':'VITAMIN_B3',
+    'медь':'MIN_COPPER','copper':'MIN_COPPER',
+    'верошпирон':'PHARMA_SPIRONOLACTONE','спиронолактон':'PHARMA_SPIRONOLACTONE',
+    'клендовит гель':'','клензит-с':'','солярий':'',
+  };
+  const resolveProtoId = (name: string): string => {
+    const key = name.toLowerCase().trim();
+    if (PROTOCOL_IDS[key]) return PROTOCOL_IDS[key];
+    // Try partial match by first word
+    const firstWord = key.split(/[\s-(]+/)[0];
+    if (firstWord && PROTOCOL_IDS[firstWord]) return PROTOCOL_IDS[firstWord];
+    // Fallback to ALL_SUBSTANCES search
+    const terms = [key, ...key.split(/[\s-]+/).filter((t:string)=>t.length>2)];
+    const found = ALL_SUBSTANCES.find((s:any) => {
+      const sn = (s.name||s.id).toLowerCase(); const sid = s.id.toLowerCase();
+      return terms.some(t => sid.includes(t) || sid.replace(/_/g,'').includes(t) || sn.includes(t));
+    });
+    return found?.id || '';
+  };
   const goHome = () => { setSection('home'); setTab('main'); setSupportView('main'); setCalcView('main'); setInfoView('catalog'); };
   const goBack = () => {
     if (calcView !== 'main') {
       if (section === 'generator') {
         setSection('home'); setTab('main'); setSupportView('main'); setCalcView('main');
       } else if (['mixcalc','neuro','joints','acne'].includes(calcView)) {
-        setCalcView('info'); setInfoView('catalog');
+        setCalcView('info'); setInfoView('catalog'); setInfoTab('catalog');
       } else {
         setCalcView('main');
       }
@@ -2421,7 +2492,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
   };
 
   return (
-    <div className="screen support-screen" style={{ paddingTop: section === 'info' || calcView === 'info' || ['mixcalc','neuro','joints','acne'].includes(calcView) || section === 'generator' || section === 'hormonal' ? '88px' : section !== 'home' ? '50px' : '10px', paddingBottom: '0px' }}>
+    <div className="screen support-screen" style={{ paddingTop: section === 'info' || calcView === 'info' || ['mixcalc','neuro','joints','acne'].includes(calcView) || section === 'generator' || section === 'hormonal' ? '88px' : section !== 'home' ? '50px' : '10px', paddingBottom: '0px', overflowY: 'auto' }}>
 
       {/* ===== GENERATOR SUB-TAB PILLS (with back/home) ===== */}
       {section === 'generator' && (
@@ -2611,7 +2682,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
       )}
 
       {section === 'home' && tab === 'main' && supportView === 'calc' && calcView === 'info' && (
-        <div style={{ padding:'0 0 70px', height:'100vh', display:'flex', flexDirection:'column' }}>
+        <div style={{ padding:'0 0 70px', display:'flex', flexDirection:'column' }}>
           {/* Content */}
           <div style={{ flex:1, overflowY:'auto', paddingRight:4 }}>
             <div style={{fontSize:7,color:'rgba(255,255,255,0.2)',textAlign:'center',marginBottom:4}}>
@@ -4013,7 +4084,7 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
 
       {/* ===== MIX CALCULATOR: Training Mix ===== */}
       {section === 'home' && tab === 'main' && supportView === 'calc' && calcView === 'mixcalc' && (
-        <div style={{ padding:'0 0 80px', height:'100vh', display:'flex', flexDirection:'column' }}>
+        <div style={{ padding:'0 0 80px', display:'flex', flexDirection:'column' }}>
           <div style={{ display:'flex', gap:6, marginBottom:6 }}>
             <button onClick={goBack} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← Назад</button>
             <button onClick={goHome} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← На главную Поддержки</button>
@@ -4122,6 +4193,7 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
                             <span style={{ color:'var(--text-dim)', fontSize:8, marginLeft:4 }}>— {item.note}</span>
                           </div>
                           <span style={{ fontSize:10, fontWeight:600, color:'#00e68a', whiteSpace:'nowrap' }}>{item.dose}</span>
+                          <button onClick={() => { const id = resolveProtoId(item.name); if (id && !enhancedSubs.includes(id)) setEnhancedSubs(prev => [...prev, id]); }} style={{ padding:'2px 8px', borderRadius:6, fontSize:8, fontWeight:700, cursor:'pointer', whiteSpace:'nowrap', background:'rgba(0,230,138,0.08)', border:'1px solid rgba(0,230,138,0.2)', color:'rgba(0,230,138,0.7)' }}>+ Стек</button>
                         </div>
                       ))}
                     </div>
@@ -5739,7 +5811,15 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
                       <div key={ii} style={{ padding:'6px 8px', borderRadius:6, marginBottom:4, background:'rgba(255,255,255,0.03)', border:'1px solid var(--border)' }}>
                         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
                           <span style={{ fontSize:10, fontWeight:600, color:'var(--text-light)' }}>{item.name}</span>
-                          <span style={{ fontSize:9, fontWeight:700, color:tier.color }}>{item.dose}</span>
+                          <div style={{ display:'flex', gap:4, alignItems:'center' }}>
+                            <span style={{ fontSize:9, fontWeight:700, color:tier.color }}>{item.dose}</span>
+                              <button onClick={() => { const id = resolveProtoId(item.name); if (id && !enhancedSubs.includes(id)) setEnhancedSubs(prev => [...prev, id]); }} style={{
+                                padding:'2px 8px', borderRadius:6, fontSize:8, fontWeight:700, cursor:'pointer', whiteSpace:'nowrap',
+                                background: (() => { const id = resolveProtoId(item.name); return id && enhancedSubs.includes(id) ? 'rgba(0,230,138,0.15)' : 'rgba(0,230,138,0.08)'; })(),
+                                border: (() => { const id = resolveProtoId(item.name); return `1px solid ${id && enhancedSubs.includes(id) ? 'rgba(0,230,138,0.4)' : 'rgba(0,230,138,0.2)'}`; })(),
+                                color: (() => { const id = resolveProtoId(item.name); return id && enhancedSubs.includes(id) ? '#00e68a' : 'rgba(0,230,138,0.7)'; })(),
+                              }}>{((): string => { const id = resolveProtoId(item.name); return id && enhancedSubs.includes(id) ? '✓' : '+ Стек'; })()}</button>
+                          </div>
                         </div>
                         <div style={{ fontSize:8, color:'var(--text-dim)', marginTop:2, lineHeight:1.3 }}>{item.note}</div>
                       </div>
@@ -5890,7 +5970,13 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
                   <div key={ii} style={{ padding:'6px 8px', borderRadius:6, marginBottom:4, background:'rgba(255,255,255,0.03)', border:'1px solid var(--border)' }}>
                     <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
                       <span style={{ fontSize:10, fontWeight:600, color:'var(--text-light)' }}>{item.name}</span>
-                      <span style={{ fontSize:9, fontWeight:700, color:tier.color }}>{item.dose}</span>
+                      <div style={{ display:'flex', gap:4, alignItems:'center' }}>
+                        <span style={{ fontSize:9, fontWeight:700, color:tier.color }}>{item.dose}</span>
+                        <button onClick={() => { const id = resolveProtoId(item.name); if (id && !enhancedSubs.includes(id)) setEnhancedSubs(prev => [...prev, id]); }} style={{
+                          padding:'2px 8px', borderRadius:6, fontSize:8, fontWeight:700, cursor:'pointer', whiteSpace:'nowrap',
+                          background:'rgba(0,230,138,0.08)', border:'1px solid rgba(0,230,138,0.2)', color:'rgba(0,230,138,0.7)',
+                        }}>+ Стек</button>
+                      </div>
                     </div>
                     <div style={{ fontSize:8, color:'var(--text-dim)', marginTop:2, lineHeight:1.3 }}>{item.note}</div>
                   </div>
@@ -5959,7 +6045,7 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
           <p style={{ fontSize:10, color:'var(--text-dim)', margin:'0 0 12px' }}>Протокол борьбы с акне на курсе ААС: системная и локальная терапия.</p>
           <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:14, marginBottom:10, border:'1px solid var(--border)' }}>
             <h4 style={{ margin:'0 0 10px', fontSize:12 }}>⚙️ Ежедневный протокол</h4>
-            {[{n:'Ниацинамид',d:'500-1000 мг',t:'На ночь',note:'Витамин B3. Регулирует себум, антивоспалительное.'},{n:'Медь',d:'1 мг',t:'На ночь',note:'Кофактор лизил-оксидазы. Сшивка коллагена.'},{n:'Солярий',d:'2 раза/нед × 5 мин',t:'День',note:'UV-B подсушивает акне. Не более 5 минут.'},{n:'Клендовит гель',d:'Тонкий слой',t:'Утро локально',note:'Клиндамицин+адапален. Только на зону акне.'},{n:'Клензит-С',d:'Тонкий слой',t:'На ночь локально',note:'Антибактериальный+комедонолитический.'},{n:'Верошпирон',d:'50 мг',t:'Утро',note:'Спиронолактон. Антиандроген. Контроль калия!'}].map((r,i)=>(<div key={i} style={{padding:'8px 10px',borderRadius:8,background:'rgba(239,68,68,0.04)',border:'1px solid rgba(239,68,68,0.12)',fontSize:10,marginBottom:6}}><div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:2}}><span style={{fontWeight:700,color:'var(--text-light)'}}>{r.n}</span><div style={{display:'flex',gap:8}}><span style={{fontSize:9,fontWeight:700,color:'#ef4444'}}>{r.d}</span><span style={{fontSize:8,color:'var(--text-dim)',padding:'1px 6px',borderRadius:4,background:'rgba(255,255,255,0.04)'}}>{r.t}</span></div></div><div style={{fontSize:8,color:'var(--text-dim)',lineHeight:1.3}}>{r.note}</div></div>))}
+            {[{n:'Ниацинамид',d:'500-1000 мг',t:'На ночь',note:'Витамин B3. Регулирует себум, антивоспалительное.'},{n:'Медь',d:'1 мг',t:'На ночь',note:'Кофактор лизил-оксидазы. Сшивка коллагена.'},{n:'Солярий',d:'2 раза/нед × 5 мин',t:'День',note:'UV-B подсушивает акне. Не более 5 минут.'},{n:'Клендовит гель',d:'Тонкий слой',t:'Утро локально',note:'Клиндамицин+адапален. Только на зону акне.'},{n:'Клензит-С',d:'Тонкий слой',t:'На ночь локально',note:'Антибактериальный+комедонолитический.'},{n:'Верошпирон',d:'50 мг',t:'Утро',note:'Спиронолактон. Антиандроген. Контроль калия!'}].map((r,i)=>(<div key={i} style={{padding:'8px 10px',borderRadius:8,background:'rgba(239,68,68,0.04)',border:'1px solid rgba(239,68,68,0.12)',fontSize:10,marginBottom:6}}><div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:2}}><span style={{fontWeight:700,color:'var(--text-light)'}}>{r.n}</span><div style={{display:'flex',gap:8,alignItems:'center'}}><span style={{fontSize:9,fontWeight:700,color:'#ef4444'}}>{r.d}</span><span style={{fontSize:8,color:'var(--text-dim)',padding:'1px 6px',borderRadius:4,background:'rgba(255,255,255,0.04)'}}>{r.t}</span>{r.n !== 'Солярий' && r.n !== 'Клендовит гель' && r.n !== 'Клензит-С' && <button onClick={()=>{const id=resolveProtoId(r.n);if(id&&!enhancedSubs.includes(id))setEnhancedSubs(prev=>[...prev,id]);}} style={{padding:'2px 6px',borderRadius:5,fontSize:7,fontWeight:700,cursor:'pointer',whiteSpace:'nowrap',background:'rgba(0,230,138,0.08)',border:'1px solid rgba(0,230,138,0.2)',color:'rgba(0,230,138,0.7)'}}>+Стек</button>}</div></div><div style={{fontSize:8,color:'var(--text-dim)',lineHeight:1.3}}>{r.note}</div></div>))}
           </div>
           <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:14, marginBottom:10, border:'1px solid var(--border)' }}>
             <h4 style={{ margin:'0 0 6px', fontSize:11 }}>🧼 Гигиена и уход</h4>
