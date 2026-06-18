@@ -5518,6 +5518,34 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
               </>)}
             </div>
 
+            {/* ===== PLAN REVIEW CARD ===== */}
+            {calcDone && effectiveLevel?.subs && effectiveLevel.subs.length > 0 && (
+              <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:12, border:'1px solid var(--border)' }}>
+                <div onClick={() => setExpandedCategories(p => ({ ...p, calc_plan: !(p.calc_plan ?? true) }))} style={{ display:'flex', alignItems:'center', gap:6, cursor:'pointer', marginBottom: (expandedCategories.calc_plan ?? true) ? 8 : 0 }}>
+                  <span style={{ fontSize:12, fontWeight:700, color:'var(--text-light)', flex:1 }}>📋 План поддержки ({effectiveLevel.subs.length} препаратов)</span>
+                  <span style={{ fontSize:9, color:'var(--text-dim)', transform: (expandedCategories.calc_plan ?? true) ? 'rotate(180deg)' : 'none', transition:'transform 0.2s' }}>▼</span>
+                </div>
+                {(expandedCategories.calc_plan ?? true) && (<>
+                  <div style={{ display:'flex', flexDirection:'column', gap:3, maxHeight:'40vh', overflowY:'auto', marginBottom:8 }}>
+                    {effectiveLevel.subs.map((id: string) => {
+                      const sub = allSupport.find((s: any) => s.id === id);
+                      const d = effectiveLevel.dosages?.[id];
+                      return sub ? (
+                        <div key={id} style={{ padding:'5px 8px', borderRadius:6, background:'rgba(255,255,255,0.02)', border:'1px solid var(--border)', fontSize:9, display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                          <span style={{ fontWeight:600, color:'var(--text-light)' }}>{sub.name}</span>
+                          {d && <span style={{ color:'#00e68a', fontSize:8 }}>{d.mg}мг — {d.timing}</span>}
+                        </div>
+                      ) : null;
+                    })}
+                  </div>
+                  <div style={{ display:'flex', gap:6 }}>
+                    <button style={{ flex:1, padding:'8px', borderRadius:8, border:'none', cursor:'pointer', background:'var(--accent)', color:'#000', fontWeight:700, fontSize:10 }} onClick={() => setPlanSaved(true)}>✅ Утвердить план</button>
+                    <button style={{ flex:1, padding:'8px', borderRadius:8, border:'1px solid var(--border)', cursor:'pointer', background:'transparent', color:'var(--text-dim)', fontWeight:600, fontSize:10 }}>✏️ Внести изменения</button>
+                  </div>
+                </>)}
+              </div>
+            )}
+
             {/* ==================== ADD 5: INTEGRATION NOTICE ==================== */}
             <div style={{ padding:'10px 12px', borderRadius:10, background:'rgba(96,165,250,0.05)', border:'1px solid rgba(96,165,250,0.12)', display:'flex', alignItems:'flex-start', gap:8 }}>
               <span style={{ fontSize:14, flexShrink:0 }}>🔄</span>
