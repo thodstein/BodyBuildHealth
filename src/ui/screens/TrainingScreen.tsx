@@ -453,7 +453,7 @@ export const TrainingScreen: React.FC = () => {
         <h2 style={{ margin: '0 0 8px', fontSize: 16, color: TAB_GROUPS[mainGroup].color }}>{TAB_GROUPS[mainGroup].title}</h2>
       )}
 
-      <div style={{ display: 'flex', gap: 3, marginBottom: 10, overflowX: 'auto', scrollbarWidth: 'none' }}>
+      <div style={{ display: 'flex', gap: 3, marginBottom: 10, flexWrap: 'wrap' }}>
         {(mainGroup ? TAB_GROUPS[mainGroup].tabs : Object.keys(TAB_LABELS) as TrainingTab[]).map(k => (
           <button key={k} onClick={() => setTab(k)} style={{
             padding: '7px 12px', borderRadius: 20, fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap',

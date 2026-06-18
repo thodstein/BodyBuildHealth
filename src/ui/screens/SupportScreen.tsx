@@ -2364,7 +2364,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
   };
 
   return (
-    <div className="screen support-screen" style={{ paddingTop: section === 'info' || calcView === 'info' ? '88px' : section !== 'home' ? '50px' : '10px', paddingBottom: '50px' }}>
+    <div className="screen support-screen" style={{ paddingTop: section === 'info' || calcView === 'info' || ['mixcalc','neuro','joints','acne'].includes(calcView) ? '88px' : section !== 'home' ? '50px' : '10px', paddingBottom: '50px' }}>
 
       {/* ===== GENERATOR SUB-TAB PILLS ===== */}
       {section === 'generator' && (
@@ -3481,22 +3481,12 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
         </div>
       )}
 
-      {/* ===== INFO WELCOME (tab === 'main') ===== */}
-      {section === 'info' && tab === 'main' && (
-        <div style={{ padding:'16px 12px', textAlign:'center' }}>
-          <div style={{ fontSize:36, marginBottom:8 }}>📚</div>
-          <div style={{ fontSize:14, fontWeight:700, color:'var(--text-light)', marginBottom:4 }}>База знаний поддержки</div>
-          <div style={{ fontSize:11, color:'var(--text-dim)', marginBottom:12 }}>Выберите раздел сверху: каталог препаратов, синергии, готовые стеки, взаимодействия, исследования, миксы для тренировки, нейротоксичность, суставы, акне.</div>
-          <div style={{ fontSize:9, color:'var(--text-dim)', opacity:0.6 }}>289 препаратов · 206 взаимодействий · 40+ стеков</div>
-        </div>
-      )}
-
       {/* ===== NON-MAIN CONTENT ===== */}
       {tab !== 'main' && tab !== 'fertility-pct' && (
         <div style={{ paddingBottom: 16 }}>
 
       {/* ===== CATALOG ===== */}
-      {section === 'info' && tab === 'catalog' && (
+      {(section === 'home' || section === 'info') && tab === 'catalog' && (
         <div>
           <div style={{ display: 'flex', gap: 6, marginBottom: 10, alignItems: 'center' }}>
             <input value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Поиск по названию, категориям, механизмам" style={{ flex: 1, padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border-color)', background: 'var(--bg-secondary)', color: 'var(--text-light)', fontSize: 12 }} />
@@ -4582,7 +4572,7 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
       )}
 
       {/* ===== MIX CALCULATOR: Training Mix ===== */}
-      {section === 'info' && tab === 'main' && supportView === 'calc' && calcView === 'mixcalc' && (
+      {section === 'home' && tab === 'main' && supportView === 'calc' && calcView === 'mixcalc' && (
         <div style={{ padding:'0 0 80px', height:'100vh', display:'flex', flexDirection:'column' }}>
           <div style={{ display:'flex', gap:6, marginBottom:6 }}>
             <button onClick={goBack} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← Назад</button>
@@ -5251,6 +5241,29 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
           navigator.clipboard.writeText(text).catch(() => {});
         };
 
+        const buildShareText = () => {
+          const schedule = dailySchedule || [];
+          let text = '🧮 ПЛАН ПОДДЕРЖКИ — BodyBuildHealth\n';
+          text += '═══════════════════════════════\n\n';
+          text += `📅 Дата: ${new Date().toLocaleDateString('ru-RU')}\n`;
+          text += `🎯 Уровень: ${SUPPORT_LEVELS[supportLevel]?.label || supportLevel}\n`;
+          text += `📊 Токсичность курса: ${toxicityLabel}\n\n`;
+          if (calcDone && calcResult) {
+            text += `📉 Риски: ${Math.round(calcResult.riskBeforeSupport)}% → ${Math.round(calcResult.riskAfterSupport)}% (снижение ${Math.round(calcResult.riskBeforeSupport - calcResult.riskAfterSupport)}%)\n`;
+          }
+          text += `\n💊 Поддержка (${schedule.length} приёмов):\n`;
+          schedule.forEach(s => {
+            s.items.forEach((i: any) => {
+              text += `  • ${i.name} — ${i.dose} | ${i.with}\n`;
+            });
+          });
+          const synCount = calcResult?.synergies?.length ?? 0;
+          if (synCount > 0) text += `\n✅ Синергий: ${synCount}\n`;
+          text += `\n═══════════════════════════════\n`;
+          text += `body-build-health.vercel.app\n`;
+          return text;
+        };
+
         return (
         <div style={{ padding:'0 0 80px', height:'100vh', display:'flex', flexDirection:'column' }}>
           <div style={{ display:'flex', gap:6, marginBottom:6, flexWrap:'wrap' }}>
@@ -5659,6 +5672,56 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
                           )) : null;
                         })}
                       </div>
+                      {/* Second table: mechanisms, synergies, interactions per substance */}
+                      <div style={{ marginTop:10, fontSize:8, color:'var(--text-dim)' }}>
+                        <div style={{ fontWeight:700, color:'#8b5cf6', marginBottom:4, fontSize:9 }}>🧬 Механизмы, препараты и синергии</div>
+                        <table style={{ width:'100%', fontSize:7.5, borderCollapse:'collapse' }}>
+                          <thead><tr style={{ background:'rgba(139,92,246,0.08)' }}>
+                            <th style={{ padding:'3px 4px', textAlign:'left', color:'#8b5cf6', fontWeight:600 }}>Препарат</th>
+                            <th style={{ padding:'3px 4px', textAlign:'left', color:'#8b5cf6', fontWeight:600 }}>Механизм</th>
+                            <th style={{ padding:'3px 4px', textAlign:'left', color:'#8b5cf6', fontWeight:600 }}>Синергии</th>
+                          </tr></thead>
+                          <tbody>
+                            {effectiveLevel.subs.map((id: string) => {
+                              const sub = allSupport.find((s: any) => s.id === id);
+                              const subDb = ALL_SUBSTANCES.find((s: any) => s.id === id);
+                              if (!sub) return null;
+                              const mechanisms = (subDb?.mechanisms || []).slice(0, 3);
+                              const syns = ALL_INTERACTIONS.filter((int: any) => 
+                                (int.substanceA === id || int.substanceB === id) && int.type === 'synergy'
+                              ).slice(0, 2);
+                              const conflicts = ALL_INTERACTIONS.filter((int: any) => 
+                                (int.substanceA === id || int.substanceB === id) && int.type === 'conflict'
+                              ).slice(0, 1);
+                              return (
+                                <tr key={id} style={{ borderBottom:'1px solid var(--border)' }}>
+                                  <td style={{ padding:'3px 4px', fontWeight:600, color:'var(--text-light)' }}>{sub.name}</td>
+                                  <td style={{ padding:'3px 4px', color:'var(--text-dim)' }}>
+                                    {mechanisms.length > 0 ? mechanisms.map((m: string) => (
+                                      <div key={m} style={{ lineHeight:1.3, marginBottom:1 }}>• {m.length > 50 ? m.slice(0,50)+'…' : m}</div>
+                                    )) : <span style={{ color:'rgba(255,255,255,0.3)' }}>—</span>}
+                                  </td>
+                                  <td style={{ padding:'3px 4px' }}>
+                                    {syns.map((s: any, j: number) => {
+                                      const partner = allSupport.find((x: any) => x.id === (s.substanceA === id ? s.substanceB : s.substanceA));
+                                      return (
+                                        <div key={j} style={{ color:'#22c55e', lineHeight:1.3 }}>⊕ {partner?.name || '?'} — {s.effect?.slice(0,35)}</div>
+                                      );
+                                    })}
+                                    {conflicts.length > 0 && conflicts.map((c: any, j: number) => {
+                                      const partner = allSupport.find((x: any) => x.id === (c.substanceA === id ? c.substanceB : c.substanceA));
+                                      return (
+                                        <div key={`c${j}`} style={{ color:'#ef4444', lineHeight:1.3 }}>⊖ {partner?.name || '?'} — {c.effect?.slice(0,35)}</div>
+                                      );
+                                    })}
+                                    {syns.length === 0 && conflicts.length === 0 && <span style={{ color:'rgba(255,255,255,0.3)' }}>—</span>}
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
                     </div>
                   )}
                 </>)}
@@ -5674,86 +5737,6 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
                   Данные обновляются автоматически из вашего профиля, курса и анализов. Измените параметры в Профиле или Анализах для пересчёта.
                 </div>
               </div>
-            </div>
-
-            {/* ==================== 3a: ВЫБОР УРОВНЯ ==================== */}
-            <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:12, border:'1px solid var(--border)' }}>
-              <div onClick={() => setExpandedCategories(p => ({ ...p, calc_level: !(p.calc_level ?? true) }))} style={{ display:'flex', alignItems:'center', gap:6, cursor:'pointer', marginBottom: (expandedCategories.calc_level ?? true) ? 8 : 0 }}>
-                <span style={{ fontSize:13 }}>🎯</span>
-                <span style={{ flex:1, fontSize:12, fontWeight:700, color:'var(--text)' }}>Уровень поддержки</span>
-                <span style={{ fontSize:9, color:'var(--text-dim)', transform: (expandedCategories.calc_level ?? true) ? 'rotate(180deg)' : 'none', transition:'transform 0.2s' }}>▼</span>
-              </div>
-              {(expandedCategories.calc_level ?? true) && (<>
-              <div style={{ fontSize:9, color:'var(--text-dim)', marginBottom:8 }}>
-                Авто-выбран: <b style={{ color:'#8b5cf6' }}>{SUPPORT_LEVELS[autoLevel]?.label || autoLevel}</b>
-                {autoLevel !== supportLevel && (
-                  <span style={{ color:'#f59e0b', marginLeft:4 }}>(изменён вручную)</span>
-                )}
-              </div>
-              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
-                {(['basic','mid','max','boost'] as const).map(l => {
-                  const active = supportLevel === l;
-                  const autoActive = autoLevel === l;
-                  const colors: Record<string, string> = { basic: '#22c55e', mid: '#eab308', max: '#f97316', boost: '#ef4444' };
-                  const levelNames: Record<string, string> = { basic: '🟢 База', mid: '🟡 Средний', max: '🟠 Максимум', boost: '🔴 Усиление' };
-                  return (
-                    <button key={l} onClick={() => { setManualLevelSelected(true); setSupportLevel(l); calcSupport(l); }} style={{
-                      padding:'10px 6px', borderRadius:10, border: `2px solid ${active ? colors[l] : 'var(--border)'}`,
-                      background: active ? `${colors[l]}20` : 'var(--bg-secondary)', cursor:'pointer', textAlign:'center', position:'relative',
-                      boxShadow: active ? `0 0 12px ${colors[l]}40` : 'none', transform: active ? 'scale(1.02)' : 'none',
-                      transition:'all 0.15s',
-                    }}>
-                      <div style={{ fontSize:15, fontWeight:800, color: active ? colors[l] : 'var(--text-dim)', marginBottom:1 }}>{levelNames[l]} {active ? '✓' : ''}</div>
-                      <div style={{ fontSize:8, color: active ? colors[l] : 'var(--text-dim)' }}>{SUPPORT_LEVELS[l]?.desc?.slice(0, 40)}...</div>
-                      <div style={{ fontSize:9, color: active ? 'var(--text-light)' : 'var(--text-dim)', marginTop:3 }}>{SUPPORT_LEVELS[l]?.subs?.length} добавок</div>
-                      {autoActive && (
-                        <div style={{ position:'absolute', top:-4, right:-4, fontSize:8, padding:'1px 4px', borderRadius:4, background:'#8b5cf6', color:'#fff', fontWeight:600 }}>Авто</div>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-
-              {calcDone && calcResult && (
-                <div style={{ marginTop:8, textAlign:'center' }}>
-                  <span style={{ fontSize:9, color:'var(--text-dim)' }}>Без поддержки: <b style={{ color:'#ef4444' }}>{Math.round(calcResult.riskBeforeSupport)}%</b></span>
-                  <span style={{ color:'var(--text-dim)', margin:'0 4px' }}>/</span>
-                  <span style={{ fontSize:9, color:'var(--text-dim)' }}>С поддержкой: <b style={{ color:'#22c55e' }}>{Math.round(calcResult.riskAfterSupport)}%</b></span>
-                </div>
-              )}
-
-              <button onClick={execCalculate} style={{
-                width:'100%', padding:'12px', borderRadius:8, border:'none', cursor:'pointer', marginTop:8,
-                background:'linear-gradient(135deg,#00e68a,#00c853)', color:'#000', fontWeight:800, fontSize:13,
-                boxShadow:'0 2px 8px rgba(0,230,138,0.3)',
-              }}>
-                🧮 Рассчитать ({(effectiveLevel?.subs || SUPPORT_LEVELS[supportLevel]?.subs || []).length} добавок)
-              </button>              <button onClick={() => { setJointMode(!jointMode); if (!jointMode) setBoostEnabled(false); calcSupport(); }}
-                style={{width:'100%',padding:10,borderRadius:8,marginTop:6,
-                border:`1px solid ${jointMode?'#8b5cf6':'var(--border)'}`,
-                background:jointMode?'rgba(139,92,246,0.1)':'var(--bg-secondary)',
-                color:jointMode?'#8b5cf6':'var(--text-dim)',fontWeight:700,cursor:'pointer'}}>
-                🦴 {jointMode ? '✅ Режим суставов включён' : 'Рассчитать суставы и связки'}
-              </button>
-              <button onClick={() => { setBoostEnabled(!boostEnabled); if (!boostEnabled) setJointMode(false); calcSupport(); }}
-                style={{width:'100%',padding:10,borderRadius:8,marginTop:4,
-                border:`1px solid ${boostEnabled?'#ef4444':'var(--border)'}`,
-                background:boostEnabled?'rgba(239,68,68,0.1)':'var(--bg-secondary)',
-                color:boostEnabled?'#ef4444':'var(--text-dim)',fontWeight:700,cursor:'pointer'}}>
-                🔴 {boostEnabled ? '✅ Усиление стека включено' : 'Усилить стек (+20 препаратов)'}
-              </button>
-
-              {calcDone && calcResult && (
-                <div style={{ marginTop:8, padding:'10px 12px', borderRadius:8, background:'rgba(0,230,138,0.06)', border:'1px solid rgba(0,230,138,0.15)' }}>
-                  <div style={{ display:'flex', justifyContent:'space-between', fontSize:11, fontWeight:600, color:'var(--text-light)', marginBottom:6 }}>
-                    <span>Без поддержки: <b style={{ color:'#ef4444' }}>{Math.round(calcResult.riskBeforeSupport)}%</b></span>
-                    <span style={{ color:'var(--accent)' }}>/</span>
-                    <span>С поддержкой: <b style={{ color:'#22c55e' }}>{Math.round(calcResult.riskAfterSupport)}%</b></span>
-                    <span style={{ color:'#22c55e', fontSize:12 }}>({Math.round(calcResult.riskBeforeSupport)}/{Math.round(calcResult.riskAfterSupport)})</span>
-                  </div>
-                </div>
-              )}
-            </>)}
             </div>
 
             {/* ==================== 3c: ДНЕВНОЕ РАСПИСАНИЕ ==================== */}
@@ -5835,7 +5818,7 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
             {/* ==================== PHASE 4: SAVE & SHARE ==================== */}
             <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:12, border:'1px solid var(--border)' }}>
               <h4 style={{ margin:'0 0 8px', fontSize:12, color:'var(--text)' }}>💾 Сохранить и поделиться</h4>
-              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:6 }}>
                 <button onClick={savePlan} style={{
                   padding:'10px', borderRadius:8, border:'1px solid var(--accent)', background:'rgba(0,230,138,0.08)',
                   cursor:'pointer', fontSize:10, fontWeight:700, color:'var(--accent)',
@@ -5844,6 +5827,18 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
                   padding:'10px', borderRadius:8, border:'1px solid #60a5fa', background:'rgba(96,165,250,0.08)',
                   cursor:'pointer', fontSize:10, fontWeight:700, color:'#60a5fa',
                 }}>📋 Копировать</button>
+                <button onClick={async () => {
+                  const text = buildShareText();
+                  if (navigator.share) {
+                    await navigator.share({ title: 'План поддержки', text });
+                  } else {
+                    await navigator.clipboard.writeText(text);
+                    alert('Скопировано в буфер обмена');
+                  }
+                }} style={{
+                  padding:'10px', borderRadius:8, border:'1px solid #34d399', background:'rgba(52,211,153,0.08)',
+                  cursor:'pointer', fontSize:10, fontWeight:700, color:'#34d399',
+                }}>📤 Поделиться</button>
                 <button onClick={() => alert('Напоминания через Telegram Mini App будут доступны в следующем обновлении.')} style={{
                   padding:'10px', borderRadius:8, border:'1px solid #a78bfa', background:'rgba(167,139,250,0.08)',
                   cursor:'pointer', fontSize:10, fontWeight:700, color:'#a78bfa',
@@ -6099,7 +6094,7 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
       )}
 
       {/* ===== NEUROTOXICITY CALCULATOR ===== */}
-      {section === 'info' && tab === 'main' && supportView === 'calc' && calcView === 'neuro' && (() => {
+      {section === 'home' && tab === 'main' && supportView === 'calc' && calcView === 'neuro' && (() => {
         const course = linked?.course || [];
         const neuroColor = neuroScore < 30 ? '#22c55e' : neuroScore < 50 ? '#f59e0b' : neuroScore < 70 ? '#f97316' : '#ef4444';
         const neuroLabel = neuroScore < 30 ? 'Низкий' : neuroScore < 50 ? 'Средний' : neuroScore < 70 ? 'Высокий' : 'Критический';
@@ -6354,7 +6349,7 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
       })()}
 
       {/* ===== JOINTS/LIGAMENTS CALCULATOR ===== */}
-      {section === 'info' && tab === 'main' && supportView === 'calc' && calcView === 'joints' && (() => {
+      {section === 'home' && tab === 'main' && supportView === 'calc' && calcView === 'joints' && (() => {
         return safeRender('joints', () => (
         <div style={{ padding:'0 0 80px' }}>
           <button onClick={goBack} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', marginBottom:6, background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← Назад</button>
@@ -6551,7 +6546,7 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
       })()}
 
       {/* ===== ACNE TAB ===== */}
-      {section === 'info' && tab === 'main' && supportView === 'calc' && calcView === 'acne' && (
+      {section === 'home' && tab === 'main' && supportView === 'calc' && calcView === 'acne' && (
         <div style={{ padding:'0 0 80px' }}>
           <button onClick={goBack} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', marginBottom:6, background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← Назад</button>
           <button onClick={goHome} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', marginBottom:4, marginLeft:6, background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← На главную Поддержки</button>
@@ -6750,7 +6745,16 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
               </div>
               <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginBottom:8 }}>
                 <button style={{ flex:1, padding:'6px', borderRadius:6, border:'1px dashed var(--accent)', cursor:'pointer', background:'transparent', color:'var(--accent)', fontSize:9, fontWeight:600, minWidth:0 }} onClick={() => setShowModal('manual')}>🔄 Заменить на аналог</button>
-                <button style={{ flex:1, padding:'6px', borderRadius:6, border:'1px dashed var(--accent)', cursor:'pointer', background:'transparent', color:'var(--accent)', fontSize:9, fontWeight:600, minWidth:0 }}>💾 Из сохранённых</button>
+                <button style={{ flex:1, padding:'6px', borderRadius:6, border:'1px dashed var(--accent)', cursor:'pointer', background:'transparent', color:'var(--accent)', fontSize:9, fontWeight:600, minWidth:0 }} onClick={() => {
+                  try {
+                    const saved = JSON.parse(localStorage.getItem('savedStacks') || '[]');
+                    if (saved.length > 0) {
+                      const ids = saved[0].subs || [];
+                      setEnhancedSubs(ids);
+                      setShowModal(null);
+                    }
+                  } catch (e) { console.error(e); }
+                }}>💾 Из сохранённых</button>
                 <button style={{ flex:1, padding:'6px', borderRadius:6, border:'1px dashed var(--accent)', cursor:'pointer', background:'transparent', color:'var(--accent)', fontSize:9, fontWeight:600, minWidth:0 }} onClick={() => setShowModal('manual')}>📋 Из каталога</button>
               </div>
               <div style={{ display:'flex', gap:6 }}>
