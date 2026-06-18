@@ -2415,7 +2415,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
   };
 
   return (
-    <div className="screen support-screen" style={{ paddingTop: section === 'info' || calcView === 'info' || ['mixcalc','neuro','joints','acne'].includes(calcView) || section === 'generator' || section === 'hormonal' ? '88px' : section !== 'home' ? '50px' : '10px', paddingBottom: '50px' }}>
+    <div className="screen support-screen" style={{ paddingTop: section === 'info' || calcView === 'info' || ['mixcalc','neuro','joints','acne'].includes(calcView) || section === 'generator' || section === 'hormonal' ? '88px' : section !== 'home' ? '50px' : '10px', paddingBottom: '0px' }}>
 
       {/* ===== GENERATOR SUB-TAB PILLS (with back/home) ===== */}
       {section === 'generator' && (

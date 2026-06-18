@@ -33,8 +33,8 @@ type ActiveTab = 'overview' | 'diary' | 'charts' | 'mealplan' | 'grocery' | 'res
 
 const SECTION_TABS: Record<NutritionSection, string[]> = {
   diary: ['diary', 'charts'],
-  planning: ['overview', 'mealplan', 'cycling'],
-  overview: ['infocalc', 'grocery', 'restaurant', 'custom', 'recipes'],
+  planning: ['overview', 'custom', 'mealplan', 'cycling'],
+  overview: ['infocalc', 'grocery', 'restaurant', 'recipes'],
   all: ['overview', 'diary', 'charts', 'mealplan', 'cycling', 'infocalc', 'grocery', 'restaurant', 'custom', 'recipes'],
 };
 
