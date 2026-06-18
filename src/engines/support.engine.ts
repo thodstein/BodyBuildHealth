@@ -977,7 +977,8 @@ function generateCoverageFromCatalog(entry: typeof SUPPORT_CATALOG_DATA[string])
 function calculateSupportCoverage(
   substances: SubstanceEntry[],
   substanceIds: string[],
-  supportDoses?: Record<string, number>
+  supportDoses?: Record<string, number>,
+  goals?: string[]
 ): { totalSupport: number; systemSupport: Record<string, number>; organSupport: Record<string, number> } {
   const systemSupport: Record<string, number> = {};
   const organSupport: Record<string, number> = {};
@@ -994,6 +995,28 @@ function calculateSupportCoverage(
     reproductive: 10,
     musculoskeletal: 10
   };
+
+  // Goal-based weight multipliers
+  if (goals && goals.length > 0) {
+    const goal = goals[0];
+    if (goal === 'muscle_gain' || goal === 'strength') {
+      SYSTEM_WEIGHT.musculoskeletal = 20;
+      SYSTEM_WEIGHT.endocrine = 18;
+      SYSTEM_WEIGHT.hepatic = 12;
+    } else if (goal === 'fat_loss') {
+      SYSTEM_WEIGHT.endocrine = 18;
+      SYSTEM_WEIGHT.hepatic = 15;
+      SYSTEM_WEIGHT.cardio = 15;
+    } else if (goal === 'endurance') {
+      SYSTEM_WEIGHT.cardio = 20;
+      SYSTEM_WEIGHT.hematologic = 15;
+      SYSTEM_WEIGHT.musculoskeletal = 15;
+    } else if (goal === 'recomp') {
+      SYSTEM_WEIGHT.endocrine = 16;
+      SYSTEM_WEIGHT.musculoskeletal = 15;
+      SYSTEM_WEIGHT.hepatic = 14;
+    }
+  }
 
   for (const system of ALL_RISK_SYSTEMS) {
     systemSupport[system] = 0;
@@ -1108,7 +1131,7 @@ function calculateSupportScore(
   substances: SubstanceEntry[],
   substanceIds: string[]
 ): { score: number; systemSupport: Record<string, number>; organSupport: Record<string, number> } {
-  const coverage = calculateSupportCoverage(substances, substanceIds, input.supportDoses);
+  const coverage = calculateSupportCoverage(substances, substanceIds, input.supportDoses, input.goals);
   // Lifestyle factors (nutrition, training) are already priced into base risk.
   // Only actual supplement coverage reduces risk. lifestyleSupport removed to avoid
   // auto-reducing risk by ~27% when user has selected NO support items.

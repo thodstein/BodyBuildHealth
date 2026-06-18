@@ -389,7 +389,7 @@ export const RiskScreen: React.FC = () => {
     // ── Main page: cards ──
     if (basicPage === 'main') {
       const cardDefs = [
-        { key:'dynamics', icon:'📈', title:'Динамика рисков', desc:'График изменения Raw и Net рисков по неделям', color:'#3b82f6' },
+        { key:'dynamics', icon:'📈', title:'Динамика рисков', desc:'График изменения рисков по неделям', color:'#3b82f6' },
         { key:'mechanisms', icon:'⚙️', title:'Системы и механизмы', desc:'Риски по всем системам организма с описанием механизмов', color:'#a855f7' },
         { key:'key_risks', icon:'🔑', title:'Ключевые риски', desc:'Основные факторы риска по каждой системе', color:'#ef4444' },
         { key:'history', icon:'📜', title:'История и пороги препаратов', desc:'Динамика рисков и пороговые дозы всей фармакологии', color:'#f97316' },
@@ -543,8 +543,8 @@ export const RiskScreen: React.FC = () => {
                 {riskHistory.map((h: any, i: number) => (
                   <div key={i} style={{ display:'flex', justifyContent:'space-between', padding:'4px 8px', borderRadius:4, background:'var(--bg-secondary)', fontSize:10 }}>
                     <span style={{ color:'var(--text-dim)' }}>{h.date}</span>
-                    <span style={{ color:getRiskColor(h.overallNet), fontWeight:600 }}>Net: {Math.round(h.overallNet)}%</span>
-                    <span style={{ color:getRiskColor(h.overallRaw), fontWeight:600 }}>Raw: {Math.round(h.overallRaw)}%</span>
+                    <span style={{ color:getRiskColor(h.overallNet), fontWeight:600 }}>С поддержкой: {Math.round(h.overallNet)}%</span>
+                    <span style={{ color:getRiskColor(h.overallRaw), fontWeight:600 }}>Без поддержки: {Math.round(h.overallRaw)}%</span>
                   </div>
                 ))}
               </div>
@@ -599,11 +599,11 @@ export const RiskScreen: React.FC = () => {
             <div style={{ fontSize:14, fontWeight:700, color:'#8b5cf6', marginBottom:8 }}>🎲 Монте Карло (V7)</div>
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom:8 }}>
               <div style={{ padding:'8px 0', borderRadius:8, background:'var(--bg-secondary)' }}>
-                <div style={{ fontSize:9, color:'var(--text-dim)' }}>Raw</div>
+                <div style={{ fontSize:9, color:'var(--text-dim)' }}>Без поддержки</div>
                 <div style={{ fontSize:24, fontWeight:800, color:getRiskColor(v7Result.globalRiskRaw) }}>{Math.round(v7Result.globalRiskRaw)}%</div>
               </div>
               <div style={{ padding:'8px 0', borderRadius:8, background:'var(--bg-secondary)' }}>
-                <div style={{ fontSize:9, color:'var(--text-dim)' }}>Net</div>
+                <div style={{ fontSize:9, color:'var(--text-dim)' }}>С поддержкой</div>
                 <div style={{ fontSize:24, fontWeight:800, color:getRiskColor(v7Result.globalRiskNet) }}>{Math.round(v7Result.globalRiskNet)}%</div>
               </div>
             </div>
@@ -721,15 +721,12 @@ export const RiskScreen: React.FC = () => {
                       background: item.color + '0d', border: `1px solid ${item.color}22`,
                     }}>
                       <div style={{ fontSize: 10, color: item.color, fontWeight: 600 }}>{item.icon} {item.label}</div>
-                      <div style={{ display: 'flex', justifyContent: 'center', gap: 6, marginTop: 2 }}>
-                        <span style={{ fontSize: 'clamp(16px, 5vw, 22px)', fontWeight: 800, color: item.net != null ? getRiskColor(item.net) : 'var(--text-dim)' }}>
-                          {item.net != null ? `${item.net}%` : '—'}
-                        </span>
-                        <span style={{ fontSize: 'clamp(16px, 5vw, 22px)', fontWeight: 800, color: item.raw != null ? getRiskColor(item.raw) : 'var(--text-dim)' }}>
-                          {item.raw != null ? `${item.raw}%` : '—'}
-                        </span>
+                      <div style={{ fontSize: 'clamp(18px, 6vw, 26px)', fontWeight: 800, color: item.net != null ? getRiskColor(item.net) : 'var(--text-dim)', display:'flex', alignItems:'center', gap:2 }}>
+                        <span>{item.net != null ? `${item.net}` : '—'}</span>
+                        <span style={{ fontSize:'clamp(12px,3vw,16px)', color:'var(--text-dim)', fontWeight:400 }}>/</span>
+                        <span style={{ color: item.raw != null ? getRiskColor(item.raw) : 'var(--text-dim)' }}>{item.raw != null ? `${item.raw}` : '—'}</span>
                       </div>
-                      <div style={{ fontSize: 'clamp(7px, 2vw, 8px)', color: 'var(--text-dim)', marginTop: 1 }}>net · raw</div>
+                      <div style={{ fontSize: 'clamp(7px, 2vw, 8px)', color: 'var(--text-dim)', marginTop: 1 }}>с поддержкой / без поддержки</div>
                     </div>
                   ))}
                 </div>

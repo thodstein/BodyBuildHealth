@@ -25,9 +25,28 @@ const VARICOCELE = [
   { id: 'grade2', label: '2 степень' }, { id: 'grade3', label: '3 степень' }
 ] as const;
 
-export const FertilityPCTScreen: React.FC<{ initialTab?: FertTab }> = ({ initialTab }) => {
+export const FertilityPCTScreen: React.FC<{ initialTab?: FertTab; restrictToMode?: 'pct' | 'hrt' | 'fertility' }> = ({ initialTab, restrictToMode }) => {
   const [tab, setTab] = useState<FertTab>(initialTab || 'overview');
   useEffect(() => { setTab(initialTab || 'overview'); }, [initialTab]);
+
+  // Filter tabs based on mode
+  const fertTabsAll: { id: FertTab; label: string }[] = [
+    { id: 'overview', label: '📋 Обзор' },
+    { id: 'semen', label: 'Спермограмма' },
+    { id: 'hormones', label: 'Гормоны' },
+    { id: 'structure', label: 'DFI/Структура' },
+    { id: 'pct-plan', label: 'ПКТ план' },
+    { id: 'hrt', label: '⚕️ ГЗТ' },
+    { id: 'analyses', label: '🧪 Анализы' },
+    { id: 'brain', label: '🧠 Гайд' }
+  ];
+  const fertTabs = fertTabsAll.filter(t => {
+    if (!restrictToMode) return true;
+    if (restrictToMode === 'pct') return ['pct-plan', 'analyses', 'brain'].includes(t.id);
+    if (restrictToMode === 'hrt') return ['hrt', 'analyses', 'brain'].includes(t.id);
+    if (restrictToMode === 'fertility') return ['overview', 'semen', 'hormones', 'structure', 'analyses', 'brain'].includes(t.id);
+    return true;
+  });
 
   const [volume, setVolume] = useState('');
   const [concentration, setConcentration] = useState('');
@@ -149,12 +168,6 @@ export const FertilityPCTScreen: React.FC<{ initialTab?: FertTab }> = ({ initial
       <input type="number" step={step} value={val || ''} onChange={e => set(e.target.value)} placeholder={placeholder} />
     </div>
   );
-
-  const fertTabs: { id: FertTab; label: string }[] = [
-    { id: 'overview', label: '📋 Обзор' },
-    { id: 'semen', label: 'Спермограмма' }, { id: 'hormones', label: 'Гормоны' }, { id: 'structure', label: 'DFI/Структура' },
-    { id: 'pct-plan', label: 'ПКТ план' }, { id: 'hrt', label: '⚕️ ГЗТ' }, { id: 'analyses', label: '🧪 Анализы' }, { id: 'brain', label: '🧠 Гайд' }
-  ];
 
   const lastLabDate = labEntries.length > 0
     ? labEntries.filter(e => e.date).sort((a, b) => (b.date || '').localeCompare(a.date || ''))[0]?.date?.split('T')[0]

@@ -928,11 +928,15 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   const [autoLevel, setAutoLevel] = useState<'basic' | 'mid' | 'max' | 'boost'>('mid');
   const [expandedMed, setExpandedMed] = useState<string | null>(null);
   const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({});
-  const goHome = () => { setSection('home'); setTab('main'); setSupportView('main'); setCalcView('main'); };
+  const goHome = () => { setSection('home'); setTab('main'); setSupportView('main'); setCalcView('main'); setInfoView('catalog'); };
   const goBack = () => {
-    if (calcView !== 'main') { setCalcView('main'); setSupportView('main'); setTab('main'); setSection('home'); return; }
-    if (supportView !== 'main') { setSupportView('main'); setTab('main'); setSection('home'); return; }
-    if (tab !== 'main') { setTab('main'); setSection('home'); setSupportView('main'); setCalcView('main'); return; }
+    if (calcView !== 'main' || supportView === 'calc') {
+      if (calcView !== 'main') setCalcView('main');
+      else { setSupportView('main'); setTab('main'); }
+      return;
+    }
+    if (supportView !== 'main') { setSupportView('main'); setTab('main'); return; }
+    if (tab !== 'main') { setTab('main'); return; }
     if (section !== 'home') { setSection('home'); setTab('main'); setSupportView('main'); setCalcView('main'); return; }
   };
   const [interactionTypeFilter, setInteractionTypeFilter] = useState<string>('all');
@@ -2356,7 +2360,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
   };
 
   return (
-    <div className="screen support-screen" style={{ paddingTop: section === 'info' ? '88px' : section !== 'home' ? '50px' : '10px', paddingBottom: '50px' }}>
+    <div className="screen support-screen" style={{ paddingTop: section === 'info' || calcView === 'info' ? '88px' : section !== 'home' ? '50px' : '10px', paddingBottom: '50px' }}>
 
       {/* ===== GENERATOR SUB-TAB PILLS ===== */}
       {section === 'generator' && (
@@ -2364,7 +2368,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
           {[['calculator','Калькулятор'],['stackgen','Генератор стеков'],['mystacks','Мои стеки'],['plan','План']].map(([id,label]) => (
             <button key={id} onClick={() => { setGenTab(id as any); 
               const a: Record<string,()=>void> = {
-                calculator: ()=>setTab('calculator'),
+                calculator: ()=>{ setTab('calculator'); setSupportView('calc'); },
                 stackgen: ()=>{ setTab('main'); setSupportView('calc'); setCalcView('stackcalc'); },
                 mystacks: ()=>{ setTab('main'); setSupportView('calc'); setCalcView('mystacks'); },
                 plan: ()=>{ setTab('main'); setSupportView('calc'); setCalcView('plan'); },
@@ -2402,7 +2406,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
       )}
 
       {/* ===== INFO HEADER (back/home + pills) ===== */}
-      {section === 'info' && (
+      {(section === 'info' || calcView === 'info') && (
         <div style={{ position:'fixed', top:0, left:0, right:0, zIndex:150, background:'var(--bg-primary)', borderBottom:'1px solid var(--border)' }}>
           <div style={{ display:'flex', gap:6, padding:'4px 12px', borderBottom:'1px solid var(--border)', alignItems:'center' }}>
             <button onClick={goBack} style={{ padding:'3px 10px', borderRadius:6, fontSize:10, cursor:'pointer', background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600, whiteSpace:'nowrap' }}>← Назад</button>
@@ -2415,10 +2419,10 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
               <button key={id} onClick={() => { setInfoTab(id as any);
                 const a: Record<string,()=>void> = {
                   peptides: ()=>setTab('peptides'),
-                  catalog: ()=>setTab('catalog'),
-                  synergies: ()=>setTab('synergies'),
-                  readystacks: ()=>setTab('stacks'),
-                  interactions: ()=>setTab('interactions'),
+                  catalog: ()=>{ setTab('main'); setSupportView('calc'); setCalcView('info'); setInfoView('catalog'); setSection('home'); },
+                  synergies: ()=>{ setTab('main'); setSupportView('calc'); setCalcView('info'); setInfoView('synergies'); setSection('home'); },
+                  readystacks: ()=>{ setTab('main'); setSupportView('calc'); setCalcView('info'); setInfoView('stacks'); setSection('home'); },
+                  interactions: ()=>{ setTab('main'); setSupportView('calc'); setCalcView('info'); setInfoView('interactions'); setSection('home'); },
                   research: ()=>{ setTab('main'); setSupportView('calc'); setCalcView('info'); setInfoView('research'); setSection('home'); },
                   mixcalc: ()=>{ setTab('main'); setSupportView('calc'); setCalcView('mixcalc'); },
                   neuro: ()=>{ setTab('main'); setSupportView('calc'); setCalcView('neuro'); },
@@ -2448,7 +2452,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
               Фармакологическая поддержка, пептиды и предлагаемые препараты поддержки для уменьшения рисков
             </p>
             <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-              <div onClick={() => { setSection('generator'); setTab('calculator'); }} style={{
+              <div onClick={() => { setSection('generator'); setTab('calculator'); setSupportView('calc'); }} style={{
                 display:'flex', alignItems:'center', gap:12, padding:'14px 16px', borderRadius:16, cursor:'pointer', textAlign:'left', width:'100%',
                 background:'rgba(20,22,30,0.4)', border:'1px solid var(--glass-border)', color:'var(--text)', transition:'all 0.2s',
                 backdropFilter:'blur(12px)', WebkitBackdropFilter:'blur(12px)',
@@ -2537,21 +2541,6 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
 
       {section === 'home' && tab === 'main' && supportView === 'calc' && calcView === 'info' && (
         <div style={{ padding:'0 0 70px', height:'100vh', display:'flex', flexDirection:'column' }}>
-          <div style={{ display:'flex', gap:6, marginBottom:6 }}>
-            <button onClick={goBack} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← Назад</button>
-            <button onClick={goHome} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← На главную Поддержки</button>
-          </div>
-          {/* Pills */}
-          <div style={{ display:'flex', gap:4, marginBottom:8, overflowX:'auto', scrollbarWidth:'none', flexShrink:0 }}>
-            {(['catalog','synergies','stacks','interactions','research'] as const).map(t => (
-              <button key={t} onClick={() => { setInfoView(t); setSynergyPage(1); }} style={{
-                padding:'7px 14px', borderRadius:20, fontSize:10, fontWeight:700, whiteSpace:'nowrap', cursor:'pointer', flexShrink:0,
-                background: infoView === t ? 'var(--accent)' : 'var(--bg-secondary)',
-                color: infoView === t ? '#000' : 'var(--text-dim)',
-                border: `1px solid ${infoView === t ? 'var(--accent)' : 'var(--border)'}`,
-              }}>{t === 'catalog' ? '📖 Каталог' : t === 'synergies' ? '🔗 Синергии' : t === 'stacks' ? '📦 Готовые' : t === 'research' ? '🔬 Исследования' : '⚡ Взаимодействия'}</button>
-            ))}
-          </div>
           {/* Content */}
           <div style={{ flex:1, overflowY:'auto', paddingRight:4 }}>
             <div style={{fontSize:7,color:'rgba(255,255,255,0.2)',textAlign:'center',marginBottom:4}}>
@@ -4399,11 +4388,12 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
             const selectedOrgans = organList.filter(o=>stackCalcOrgans.includes(o.key)).flatMap(o=>o.organs);
             const toggleMech = (m:string) => setStackCalcMech(prev=>prev.includes(m)?prev.filter(x=>x!==m):[...prev,m]);
 const [lo,hi]=stackCalcSize.split('-').map(Number);
-             const generate = () => {
-               const candidates:Array<{sub:typeof ALL_SUBSTANCES[0];score:number;organHits:number;mechHits:number}> = [];
-               for (const sub of ALL_SUBSTANCES) {
-                 if (!sub.name||!sub.mechanisms) continue;
-                 let score = 0; let organHits = 0; let mechHits = 0;
+              const generate = () => {
+                const candidates:Array<{sub:typeof ALL_SUBSTANCES[0];score:number;organHits:number;mechHits:number}> = [];
+                for (const sub of ALL_SUBSTANCES) {
+                  if (!sub.name||!sub.mechanisms||!sub.mechanisms.length) continue;
+                  if (sub.mechanisms.length === 1 && (sub.mechanisms[0] === 'general' || sub.mechanisms[0] === 'antioxidant')) continue;
+                  let score = 0; let organHits = 0; let mechHits = 0;
                  const subOrgans = ((sub.organs||[]) as string[]).map((o:any)=>(o||'').toLowerCase());
                  if (selectedOrgans.length>0) {
                    for (const o of selectedOrgans) {
@@ -6633,7 +6623,7 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
               }}>{label}</button>
             ))}
           </div>
-          <FertilityPCTScreen initialTab={hormonalTab === 'pct' ? 'pct-plan' : hormonalTab === 'hrt' ? 'hrt' : undefined} />
+          <FertilityPCTScreen initialTab={hormonalTab === 'pct' ? 'pct-plan' : hormonalTab === 'hrt' ? 'hrt' : undefined} restrictToMode={hormonalTab} />
         </div>
       )}
 
@@ -6712,7 +6702,7 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
               <div style={{ display:'flex', flexDirection:'column', gap:3, maxHeight:'45vh', overflowY:'auto', marginBottom:8 }}>
                 {catalogSupport.filter(s => !modalSearch || (s.name||'').toLowerCase().includes(modalSearch.toLowerCase()) || (s.id||'').toLowerCase().includes(modalSearch.toLowerCase())).map(s => {
                   const sel = modalSelected.includes(s.id);
-                  const descOk = s.description && /^[а-яА-Яa-zA-Z0-9\s\-–—,.!?;:()]+$/u.test(s.description.slice(0,10));
+                  const descOk = s.description && isReadableText(s.description);
                   return (
                     <div key={s.id} onClick={() => setModalSelected(prev => sel ? prev.filter(x => x !== s.id) : [...prev, s.id])} style={{
                       padding:'6px 8px', borderRadius:6, cursor:'pointer', display:'flex', alignItems:'center', gap:6,
@@ -6720,7 +6710,7 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
                     }}>
                       <span style={{ fontSize:8, minWidth:12 }}>{sel ? '✓' : ''}</span>
                       <div style={{ flex:1, fontSize:10, fontWeight:600, color:'var(--text-light)' }}>{s.name}</div>
-                      {s.description && <div style={{ fontSize:7, color:'var(--text-dim)', maxWidth:120, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{descOk ? s.description.slice(0,40) : s.id.replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase()).slice(0,40)}</div>}
+                      {s.description && <div style={{ fontSize:7, color:'var(--text-dim)', maxWidth:120, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{decodeGarbled(s.description).slice(0,40)}</div>}
                     </div>
                   );
                 })}

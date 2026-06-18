@@ -34,8 +34,8 @@ type ActiveTab = 'overview' | 'diary' | 'charts' | 'mealplan' | 'grocery' | 'res
 const SECTION_TABS: Record<NutritionSection, string[]> = {
   diary: ['diary', 'charts'],
   planning: ['mealplan', 'cycling'],
-  overview: ['recipes', 'infocalc', 'grocery', 'restaurant', 'custom'],
-  all: ['diary', 'charts', 'mealplan', 'cycling', 'recipes', 'infocalc', 'grocery', 'restaurant', 'custom'],
+  overview: ['infocalc', 'grocery', 'restaurant', 'custom'],
+  all: ['diary', 'charts', 'mealplan', 'cycling', 'infocalc', 'grocery', 'restaurant', 'custom'],
 };
 
 const TAB_LABELS: Record<string, string> = {
@@ -788,6 +788,7 @@ const MealPlanExtended: React.FC<{ tKcal: number; tProt: number; tFat: number; t
           { id:'planoverview', label:'📋 Обзор' },
           { id:'rules', label:'📋 Правила питания' },
           { id:'products', label:'📋 Обзор продуктов' },
+          { id:'recipes', label:'🍳 Рецепты' },
         ].map(st => (
           <button key={st.id} onClick={() => setMs(st.id)} style={{
             padding:'6px 12px', borderRadius:16, fontSize:10, fontWeight:700, whiteSpace:'nowrap', cursor:'pointer', flexShrink:0,
@@ -1287,8 +1288,8 @@ const MealPlanExtended: React.FC<{ tKcal: number; tProt: number; tFat: number; t
         </div>
       </div>
       </>)}
-
-      {msTab !== 'products' && msTab !== 'rules' && (<>
+      {msTab === 'recipes' && (<RecipesTab />)}
+      {msTab !== 'products' && msTab !== 'rules' && msTab !== 'recipes' && (<>
       <div className="card" style={{ marginBottom: 8, padding: 14 }}>
         <h4 style={{ margin: '0 0 8px', fontSize: 13, color: 'var(--accent)' }}>🎯 Индивидуальный план</h4>
         <p style={{ fontSize: 10, color: 'var(--text-dim)', margin: '0 0 8px' }}>
