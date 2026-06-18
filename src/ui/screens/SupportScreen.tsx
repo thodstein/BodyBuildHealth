@@ -5421,7 +5421,7 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
                 color:jointMode?'#8b5cf6':'var(--text-dim)',fontWeight:700,cursor:'pointer'}}>
                 🦴 {jointMode ? '✅ Режим суставов включён' : 'Рассчитать суставы и связки'}
               </button>
-              <button onClick={() => { setBoostEnabled(!boostEnabled); if (!boostEnabled) setJointMode(false); calcSupport(); }}
+              <button onClick={() => setShowModal('boost')}
                 style={{width:'100%',padding:10,borderRadius:8,marginTop:4,
                 border: (boostEnabled ? '1px solid #ef4444' : '1px solid var(--border)'),
                 background:boostEnabled?'rgba(239,68,68,0.1)':'var(--bg-secondary)',
@@ -6566,6 +6566,34 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
               <div style={{ display:'flex', gap:6 }}>
                 <button onClick={() => { setShowModal(null); setModalSelected([]); }} style={{ flex:1, padding:'8px', borderRadius:8, border:'1px solid var(--border)', background:'transparent', color:'var(--text-dim)', cursor:'pointer', fontSize:10 }}>Отмена</button>
                 <button onClick={() => { setShowModal(null); setModalSelected([]); }} style={{ flex:1, padding:'8px', borderRadius:8, border:'none', cursor:'pointer', background:'var(--accent)', color:'#000', fontWeight:700, fontSize:10 }}>Добавить ({modalSelected.length})</button>
+              </div>
+              </>
+            )}
+            {/* Boost modal */}
+            {showModal === 'boost' && (
+              <>
+              <h3 style={{ margin:'0 0 10px', fontSize:14, fontWeight:800, color:'#ef4444' }}>🔴 Усиление стека</h3>
+              <p style={{ fontSize:9, color:'var(--text-dim)', marginBottom:8 }}>Бустер-препараты для максимального покрытия рисков. +20 веществ к текущему стеку.</p>
+              <div style={{ display:'flex', flexDirection:'column', gap:4, maxHeight:'40vh', overflowY:'auto', marginBottom:8 }}>
+                {(BOOST_SUBS || []).map((id: string) => {
+                  const sub = allSupport.find(s => s.id === id);
+                  if (!sub) return null;
+                  return (
+                    <div key={id} style={{ padding:'6px 8px', borderRadius:6, background:'rgba(239,68,68,0.04)', border:'1px solid rgba(239,68,68,0.1)', fontSize:10 }}>
+                      <div style={{ fontWeight:600, color:'var(--text-light)' }}>{sub.name}</div>
+                      {sub.description && <div style={{ fontSize:8, color:'var(--text-dim)' }}>{sub.description?.slice(0,80)}</div>}
+                    </div>
+                  );
+                })}
+              </div>
+              <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginBottom:8 }}>
+                <button style={{ flex:1, padding:'6px', borderRadius:6, border:'1px dashed var(--accent)', cursor:'pointer', background:'transparent', color:'var(--accent)', fontSize:9, fontWeight:600, minWidth:0 }} onClick={() => setShowModal('manual')}>🔄 Заменить на аналог</button>
+                <button style={{ flex:1, padding:'6px', borderRadius:6, border:'1px dashed var(--accent)', cursor:'pointer', background:'transparent', color:'var(--accent)', fontSize:9, fontWeight:600, minWidth:0 }}>💾 Из сохранённых</button>
+                <button style={{ flex:1, padding:'6px', borderRadius:6, border:'1px dashed var(--accent)', cursor:'pointer', background:'transparent', color:'var(--accent)', fontSize:9, fontWeight:600, minWidth:0 }} onClick={() => setShowModal('manual')}>📋 Из каталога</button>
+              </div>
+              <div style={{ display:'flex', gap:6 }}>
+                <button onClick={() => { setShowModal(null); }} style={{ flex:1, padding:'8px', borderRadius:8, border:'1px solid var(--border)', background:'transparent', color:'var(--text-dim)', cursor:'pointer', fontSize:10 }}>Отмена</button>
+                <button onClick={() => { setBoostEnabled(true); calcSupport(); setShowModal(null); }} style={{ flex:1, padding:'8px', borderRadius:8, border:'none', cursor:'pointer', background:'linear-gradient(135deg,#ef4444,#dc2626)', color:'#000', fontWeight:700, fontSize:10 }}>✅ Усилить стек</button>
               </div>
               </>
             )}
