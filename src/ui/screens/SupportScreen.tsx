@@ -2308,7 +2308,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                     {(interaction?.mechanisms||[]).length > 0 && (
                       <div style={{ display:'flex', flexWrap:'wrap', gap:2, marginTop:2 }}>
                         {(interaction.mechanisms||[]).map((m: any, mi: number) => (
-                          <span key={mi} style={{ fontSize:6, padding:'1px 4px', borderRadius:3, background:'rgba(34,197,94,0.1)', color:'#22c55e', border:'1px solid rgba(34,197,94,0.15)', fontWeight:500 }}>{(m||'')}</span>
+                          <span key={mi} style={{ fontSize:6, padding:'1px 4px', borderRadius:3, background:'rgba(34,197,94,0.1)', color:'#22c55e', border:'1px solid rgba(34,197,94,0.15)', fontWeight:500 }}>{MECH_LABELS[m] || MECH_TRANSLATIONS_RU[m] || (m||'')}</span>
                         ))}
                       </div>
                     )}
@@ -2372,7 +2372,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                           const mColor = ms.toLowerCase().includes('toxic') || ms.toLowerCase().includes('hepatic') ? '#ef4444' :
                             ms.toLowerCase().includes('kidney') || ms.toLowerCase().includes('renal') ? '#f59e0b' :
                             ms.toLowerCase().includes('synerg') || ms.toLowerCase().includes('enhanc') || ms.toLowerCase().includes('potent') ? '#22c55e' : '#8b5cf6';
-                          return <span key={mi} style={{ fontSize:6, padding:'1px 4px', borderRadius:3, background:mColor+'18', color:mColor, border:`1px solid ${mColor}22`, fontWeight:500 }}>{(m||'')}</span>;
+                          return <span key={mi} style={{ fontSize:6, padding:'1px 4px', borderRadius:3, background:mColor+'18', color:mColor, border:`1px solid ${mColor}22`, fontWeight:500 }}>{MECH_LABELS[m] || MECH_TRANSLATIONS_RU[m] || (m||'')}</span>;
                         })}
                       </div>
                     )}
@@ -2451,10 +2451,10 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                   readystacks: ()=>{ setTab('main'); setSupportView('calc'); setCalcView('info'); setInfoView('stacks'); setSection('home'); },
                   interactions: ()=>{ setTab('main'); setSupportView('calc'); setCalcView('info'); setInfoView('interactions'); setSection('home'); },
                   research: ()=>{ setTab('main'); setSupportView('calc'); setCalcView('info'); setInfoView('research'); setSection('home'); },
-                  mixcalc: ()=>{ setSection('info'); setTab('main'); setSupportView('calc'); setCalcView('mixcalc'); },
-                  neuro: ()=>{ setSection('info'); setTab('main'); setSupportView('calc'); setCalcView('neuro'); },
-                  joints: ()=>{ setSection('info'); setTab('main'); setSupportView('calc'); setCalcView('joints'); },
-                  acne: ()=>{ setSection('info'); setTab('main'); setSupportView('calc'); setCalcView('acne'); },
+                  mixcalc: ()=>{ setSection('home'); setTab('main'); setSupportView('calc'); setCalcView('mixcalc'); },
+                  neuro: ()=>{ setSection('home'); setTab('main'); setSupportView('calc'); setCalcView('neuro'); },
+                  joints: ()=>{ setSection('home'); setTab('main'); setSupportView('calc'); setCalcView('joints'); },
+                  acne: ()=>{ setSection('home'); setTab('main'); setSupportView('calc'); setCalcView('acne'); },
                 };
                 a[id]?.();
               }} style={{
@@ -2535,14 +2535,14 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
             <div style={{ flex:1, overflowY:'auto', scrollbarWidth:'none', msOverflowStyle:'none', paddingRight:4 }}>
               <div style={{ display:'flex', flexDirection:'column', gap:8, paddingBottom:8 }}>
                 {[
-                  { icon:'🧮', title:'Калькулятор поддержки', desc:'Персонализированный расчёт поддержки по курсу, рискам и целям', color:'#00e68a', action:() => setCalcView('calculator') },
-                  { icon:'🧬', title:'Пептидный калькулятор', desc:'Расчёт дозировок, баков, разведения и протоколов пептидов', color:'#a78bfa', action:() => setCalcView('peptides') },
+                  { icon:'🧮', title:'Калькулятор поддержки', desc:'Персонализированный расчёт поддержки по курсу, рискам и целям', color:'#00e68a', action:() => { setSection('generator'); setTab('calculator'); setSupportView('calc'); setCalcView('main'); } },
+                  { icon:'🧬', title:'Пептидный калькулятор', desc:'Расчёт дозировок, баков, разведения и протоколов пептидов', color:'#a78bfa', action:() => { setSection('info'); setTab('main'); setSupportView('calc'); setCalcView('peptides'); } },
                   { icon:'ℹ️', title:'Общая информация', desc:'Каталог веществ, синергии, готовые стеки и взаимодействия', color:'#60a5fa', action:() => { setCalcView('info'); setInfoView('catalog'); } },
                   { icon:'🔬', title:'Исследования', desc:'Научная база исследований по всем веществам поддержки', color:'#f59e0b', action:() => { setCalcView('info'); setInfoView('research'); } },
-                  { icon:'🧮', title:'Генератор стеков', desc:'Автоматический подбор стека по органам, целям и биомаркерам', color:'#ec4899', action:() => setCalcView('stackcalc') },
-                  { icon:'📂', title:'Мои стеки', desc:'Сохранённые персональные стеки с оценкой синергий и конфликтов', color:'#22c55e', action:() => setCalcView('mystacks') },
+                  { icon:'🧮', title:'Генератор стеков', desc:'Автоматический подбор стека по органам, целям и биомаркерам', color:'#ec4899', action:() => { setSection('generator'); setTab('main'); setSupportView('calc'); setCalcView('stackcalc'); } },
+                  { icon:'📂', title:'Мои стеки', desc:'Сохранённые персональные стеки с оценкой синергий и конфликтов', color:'#22c55e', action:() => { setSection('generator'); setTab('main'); setSupportView('calc'); setCalcView('mystacks'); } },
                   { icon:'⚡', title:'Тренировочные миксы', desc:'Пре-/интра-/пост-тренировочные стеки для пампа, силы и восстановления', color:'#f97316', action:() => setCalcView('mixcalc') },
-                  { icon:'📅', title:'План поддержки', desc:'Дневной, недельный и месячный план приёма по тайм-слотам', color:'#84cc16', action:() => setCalcView('plan') },
+                  { icon:'📅', title:'План поддержки', desc:'Дневной, недельный и месячный план приёма по тайм-слотам', color:'#84cc16', action:() => { setSection('generator'); setTab('main'); setSupportView('calc'); setCalcView('plan'); } },
                   { icon:'🧠', title:'Нейротоксичность', desc:'Детальные механизмы нейротоксичности ААС и протокол нейропротекции', color:'#ec4899', action:() => setCalcView('neuro') },
                   { icon:'🦴', title:'Суставы и связки', desc:'Калькулятор поддержки суставов, анализы и протоколы', color:'#f59e0b', action:() => setCalcView('joints') },
                   { icon:'🔴', title:'Акне', desc:'Анти-прыщ протокол: ниацинамид, ретиноиды, солярий, гигиена', color:'#ef4444', action:() => setCalcView('acne') },
@@ -2630,7 +2630,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                                     <div style={{ fontSize:10, fontWeight:600, color:'var(--text-light)', lineHeight:1.3 }}>{sub?.name||(sub?.id||'').replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase())}</div>
                                     <div style={{ display:'flex', gap:2, flexWrap:'wrap', marginTop:1 }}>
                                       {(sub?.categories||[]).slice(0,3).map(c => <span key={c} style={{ fontSize:8, padding:'1px 4px', borderRadius:3, background:'rgba(255,255,255,0.06)', color:'rgba(255,255,255,0.85)' }}>{c||''}</span>)}
-                                      {(sub?.mechanisms||[]).slice(0,4).map(m => <span key={m||''} style={{ fontSize:8, padding:'1px 4px', borderRadius:3, background:'rgba(0,230,138,0.08)', color:'#00e68a' }}>{m||''}</span>)}
+                                          {(sub?.mechanisms||[]).slice(0,4).map(m => <span key={m||''} style={{ fontSize:8, padding:'1px 4px', borderRadius:3, background:'rgba(0,230,138,0.08)', color:'#00e68a' }}>{MECH_LABELS[m] || MECH_TRANSLATIONS_RU[m] || m||''}</span>)}
                                     </div>
                                   </div>
                                   <span style={{ fontSize:9, color:'var(--text-dim)', transform:isSelected ? 'rotate(180deg)' : 'none' }}>▼</span>
@@ -2645,7 +2645,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                                       <div style={{ marginBottom:3 }}>
                                         <div style={{ fontSize:8, color:'rgba(255,255,255,0.85)', marginBottom:1 }}>Механизмы действия:</div>
                                         <div style={{ display:'flex', gap:2, flexWrap:'wrap' }}>
-                                          {(sub.mechanisms||[]).map((m,i) => <span key={i} style={{ fontSize:8, padding:'2px 6px', borderRadius:4, background:'rgba(0,230,138,0.08)', color:'#00e68a', border:'1px solid rgba(0,230,138,0.15)' }}>{m||''}</span>)}
+                                          {(sub.mechanisms||[]).map((m,i) => <span key={i} style={{ fontSize:8, padding:'2px 6px', borderRadius:4, background:'rgba(0,230,138,0.08)', color:'#00e68a', border:'1px solid rgba(0,230,138,0.15)' }}>{MECH_LABELS[m] || MECH_TRANSLATIONS_RU[m] || m||''}</span>)}
                                         </div>
                                       </div>
                                     )}
@@ -2709,7 +2709,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                                         {(sub.mechanisms||[]).length > 0 && (
                                           <div style={{ marginBottom:3 }}>
                                             <div style={{ display:'flex', gap:2, flexWrap:'wrap' }}>
-                                              {(sub.mechanisms||[]).map((m,i) => <span key={i} style={{ fontSize:8, padding:'2px 6px', borderRadius:4, background:'rgba(0,230,138,0.08)', color:'#00e68a', border:'1px solid rgba(0,230,138,0.15)' }}>{m||''}</span>)}
+                                              {(sub.mechanisms||[]).map((m,i) => <span key={i} style={{ fontSize:8, padding:'2px 6px', borderRadius:4, background:'rgba(0,230,138,0.08)', color:'#00e68a', border:'1px solid rgba(0,230,138,0.15)' }}>{MECH_LABELS[m] || MECH_TRANSLATIONS_RU[m] || m||''}</span>)}
                                             </div>
                                           </div>
                                         )}
@@ -2765,7 +2765,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                                           <div style={{ fontSize:10, fontWeight:600, color:'var(--text-light)', lineHeight:1.3 }}>{sub?.name||(sub?.id||'').replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase())}</div>
                                           <div style={{ display:'flex', gap:2, flexWrap:'wrap', marginTop:1 }}>
                                             {(sub?.categories||[]).slice(0,3).map(c => <span key={c} style={{ fontSize:8, padding:'1px 4px', borderRadius:3, background:'rgba(255,255,255,0.06)', color:'rgba(255,255,255,0.85)' }}>{c||''}</span>)}
-                                            {(sub?.mechanisms||[]).slice(0,4).map(m => <span key={m||''} style={{ fontSize:8, padding:'1px 4px', borderRadius:3, background:'rgba(0,230,138,0.08)', color:'#00e68a' }}>{m||''}</span>)}
+                                      {(sub?.mechanisms||[]).slice(0,4).map(m => <span key={m||''} style={{ fontSize:8, padding:'1px 4px', borderRadius:3, background:'rgba(0,230,138,0.08)', color:'#00e68a' }}>{MECH_LABELS[m] || MECH_TRANSLATIONS_RU[m] || m||''}</span>)}
                                           </div>
                                         </div>
                                         <span style={{ fontSize:9, color:'var(--text-dim)', transform:selectedSub === sub?.id ? 'rotate(180deg)' : 'none' }}>▼</span>
@@ -2781,7 +2781,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                                               <div style={{ fontSize:8, color:'rgba(255,255,255,0.85)', marginBottom:1 }}>Механизмы действия:</div>
                                               <div style={{ display:'flex', gap:2, flexWrap:'wrap' }}>
                                                 {(sub.mechanisms||[]).map((m,i) => (
-                                                  <span key={i} style={{ fontSize:8, padding:'2px 6px', borderRadius:4, background:'rgba(0,230,138,0.08)', color:'#00e68a', border:'1px solid rgba(0,230,138,0.15)' }}>{(m||'')}</span>
+                                                  <span key={i} style={{ fontSize:8, padding:'2px 6px', borderRadius:4, background:'rgba(0,230,138,0.08)', color:'#00e68a', border:'1px solid rgba(0,230,138,0.15)' }}>{MECH_LABELS[m] || MECH_TRANSLATIONS_RU[m] || (m||'')}</span>
                                                 ))}
                                               </div>
                                             </div>
@@ -2839,7 +2839,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                                       <div style={{ fontSize:10, fontWeight:600, color:'var(--text-light)', lineHeight:1.3 }}>{sub?.name||(sub?.id||'').replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase())}</div>
                                       <div style={{ display:'flex', gap:2, flexWrap:'wrap', marginTop:1 }}>
                                         {(sub?.categories||[]).slice(0,3).map(c => <span key={c} style={{ fontSize:8, padding:'1px 4px', borderRadius:3, background:'rgba(255,255,255,0.06)', color:'rgba(255,255,255,0.85)' }}>{c||''}</span>)}
-                                        {(sub?.mechanisms||[]).slice(0,4).map(m => <span key={m||''} style={{ fontSize:8, padding:'1px 4px', borderRadius:3, background:'rgba(0,230,138,0.08)', color:'#00e68a' }}>{m||''}</span>)}
+                                            {(sub?.mechanisms||[]).slice(0,4).map(m => <span key={m||''} style={{ fontSize:8, padding:'1px 4px', borderRadius:3, background:'rgba(0,230,138,0.08)', color:'#00e68a' }}>{MECH_LABELS[m] || MECH_TRANSLATIONS_RU[m] || m||''}</span>)}
                                       </div>
                                     </div>
                                     <span style={{ fontSize:9, color:'var(--text-dim)', transform:selectedSub === sub?.id ? 'rotate(180deg)' : 'none' }}>▼</span>
@@ -3099,7 +3099,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                                     {i.mechanisms && i.mechanisms.length > 0 && (
                                       <div style={{ display:'flex', flexWrap:'wrap', gap:2, marginTop:2 }}>
                                         {i.mechanisms.map((m: string, mi: number) => (
-                                          <span key={mi} style={{ fontSize:6, padding:'1px 5px', borderRadius:3, background:'rgba(139,92,246,0.12)', color:'#a78bfa', border:'1px solid rgba(139,92,246,0.15)' }}>{m}</span>
+                                          <span key={mi} style={{ fontSize:6, padding:'1px 5px', borderRadius:3, background:'rgba(139,92,246,0.12)', color:'#a78bfa', border:'1px solid rgba(139,92,246,0.15)' }}>{MECH_LABELS[m] || MECH_TRANSLATIONS_RU[m] || m}</span>
                                         ))}
                                       </div>
                                     )}
@@ -3544,7 +3544,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                                   <span key={c} style={{ fontSize: 8, padding: '1px 4px', borderRadius: 3, background: 'rgba(255,255,255,0.04)', color: 'var(--text-dim)' }}>{c}</span>
                                 ))}
                                 {(sub.mechanisms||[]).slice(0, 2).map(m => (
-                                  <span key={m} style={{ fontSize: 8, padding: '1px 4px', borderRadius: 3, background: 'rgba(0,230,138,0.06)', color: 'var(--accent-green, #00e68a)' }}>{m.slice(0, 30)}</span>
+                                  <span key={m} style={{ fontSize: 8, padding: '1px 4px', borderRadius: 3, background: 'rgba(0,230,138,0.06)', color: 'var(--accent-green, #00e68a)' }}>{MECH_LABELS[m] || MECH_TRANSLATIONS_RU[m] || m.slice(0, 30)}</span>
                                 ))}
                               </div>
                             </div>
@@ -3563,7 +3563,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                                   <div style={{ fontSize: 8, color: 'var(--text-dim)', marginBottom: 2 }}>Механизмы действия:</div>
                                   <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
                                     {sub.mechanisms.map((m, i) => (
-                                      <span key={i} style={{ fontSize: 8, padding: '2px 6px', borderRadius: 4, background: 'rgba(0,230,138,0.06)', color: '#00e68a' }}>{m}</span>
+                                      <span key={i} style={{ fontSize: 8, padding: '2px 6px', borderRadius: 4, background: 'rgba(0,230,138,0.06)', color: '#00e68a' }}>{MECH_LABELS[m] || MECH_TRANSLATIONS_RU[m] || m}</span>
                                     ))}
                                   </div>
                                 </div>
@@ -3628,748 +3628,9 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
           </div>
         </div>
       )}
-
-      {/* ===== SYNERGIES (ALL_INTERACTIONS — 138+ пар) ===== */}
-      {section === 'info' && tab === 'synergies' && (
-        <div>
-          <div style={{ display: 'flex', gap: 6, marginBottom: 10, overflowX: 'auto', scrollbarWidth: 'none', flexWrap: 'wrap' }}>
-            {(['all', 'synergy', 'conflict', 'caution'] as const).map(t => (
-              <button key={t} onClick={() => { setInteractionTypeFilter(t); setInteractionPage(1); setSynergyPage(1); }} style={{
-                padding: '5px 12px', borderRadius: 16, fontSize: 10, fontWeight: 700, whiteSpace: 'nowrap', cursor: 'pointer', flexShrink: 0,
-                background: interactionTypeFilter === t ? (INTERACTION_TYPE_LABELS[t]?.color || 'var(--accent)') : 'var(--bg-secondary)',
-                color: interactionTypeFilter === t ? '#000' : 'var(--text-dim)',
-                border: `1px solid ${interactionTypeFilter === t ? (INTERACTION_TYPE_LABELS[t]?.color || 'var(--accent)') : 'var(--border)'}`,
-              }}>
-                {t === 'all' ? '🧲 Все' : `${INTERACTION_TYPE_LABELS[t]?.emoji || ''} ${INTERACTION_TYPE_LABELS[t]?.label || t}`}
-              </button>
-            ))}
-            <span style={{ width: 1, height: 20, background: 'var(--border)', margin: '0 2px' }} />
-            {(['all', 'LOW', 'MEDIUM', 'HIGH'] as const).map(s => (
-              <button key={s} onClick={() => { setInteractionSeverityFilter(s); setSynergyPage(1); setInteractionPage(1); }} style={{
-                padding: '5px 10px', borderRadius: 12, fontSize: 9, fontWeight: 600, whiteSpace: 'nowrap', cursor: 'pointer', flexShrink: 0,
-                background: interactionSeverityFilter === s ? (INTERACTION_SEVERITY_LABELS[s]?.color || 'var(--accent)') : 'transparent',
-                color: interactionSeverityFilter === s ? '#000' : 'var(--text-dim)',
-                border: `1px solid ${interactionSeverityFilter === s ? (INTERACTION_SEVERITY_LABELS[s]?.color || 'var(--accent)') : 'var(--border)'}`,
-              }}>
-                {s === 'all' ? 'Любая' : `${INTERACTION_SEVERITY_LABELS[s]?.label || s}`}
-              </button>
-            ))}
-            <div style={{ fontSize: 10, color: 'var(--text-dim)', display: 'flex', alignItems: 'center', marginLeft: 4, whiteSpace: 'nowrap' }}>
-              {filteredInteractions.length} из {mergedInteractions.length}
-            </div>
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 5, maxHeight: '65vh', overflowY: 'auto', paddingRight: 2 }}>
-            {filteredInteractions.slice(0, interactionPage * INTERACTION_PAGE_SIZE).map((interaction, i) => {
-              const typeInfo = INTERACTION_TYPE_LABELS[interaction.type] || { label: interaction.type, emoji: '🔗', color: '#888' };
-              const sevInfo = INTERACTION_SEVERITY_LABELS[interaction.severity] || { label: interaction.severity, color: '#888' };
-              const aName = resolveSubName(interaction.substanceA);
-              const bName = resolveSubName(interaction.substanceB);
-              return (
-                  <div key={interaction.interactionId} style={{
-                    background: 'var(--bg-secondary)', borderRadius: 10, padding: '9px 10px',
-                    borderLeft: `3px solid ${typeInfo.color}`,
-                  }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'wrap', flex: 1, minWidth: 0 }}>
-                        <span style={{ fontWeight: 600, fontSize: 11, color: 'var(--text-light)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '35%' }}>{aName}</span>
-                        <span style={{ fontSize: 12, color: typeInfo.color, fontWeight: 700 }}>
-                          {interaction.type === 'synergy' ? '+' : interaction.type === 'conflict' ? '×' : '?'}
-                        </span>
-                        <span style={{ fontWeight: 600, fontSize: 11, color: 'var(--text-light)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '35%' }}>{bName}</span>
-                      </div>
-                      <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
-                        <span style={{ fontSize: 8, padding: '1px 5px', borderRadius: 4, background: typeInfo.color + '22', color: typeInfo.color, fontWeight: 600 }}>{typeInfo.label}</span>
-                        <span style={{ fontSize: 8, padding: '1px 5px', borderRadius: 4, background: sevInfo.color + '22', color: sevInfo.color }}>{sevInfo.label}</span>
-                      </div>
-                    </div>
-                    <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', lineHeight: 1.3, marginBottom: 4 }}>
-                      {(() => {
-                        const eff = interaction.effect;
-                        const displayEff = (/^[A-Z0-9_]+$/.test(eff) && interaction.notes) ? interaction.notes : eff;
-                        return <>{interaction.type === 'synergy' ? '⊕ ' : interaction.type === 'conflict' ? '⊖ ' : ''}{displayEff}</>;
-                      })()}
-                    </div>
-                    {interaction.mechanisms && interaction.mechanisms.length > 0 && (
-                      <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap', marginBottom: 2 }}>
-                        {interaction.mechanisms.map(m => {
-                          const ms = (m||'');
-                          const mColor = ms.toLowerCase().includes('toxic') || ms.toLowerCase().includes('hepatic') ? '#ef4444' :
-                            ms.toLowerCase().includes('kidney') || ms.toLowerCase().includes('renal') ? '#f59e0b' :
-                            ms.toLowerCase().includes('synerg') || ms.toLowerCase().includes('enhanc') || ms.toLowerCase().includes('potent') ? '#22c55e' : '#a78bfa';
-                          return <span key={m} style={{ fontSize: 8, padding: '1px 5px', borderRadius: 3, background: mColor + '18', color: mColor, border: `1px solid ${mColor}22`, fontWeight: 500 }}>{m}</span>;
-                        })}
-                      </div>
-                    )}
-                    {interaction.notes && (
-                      <div style={{ fontSize: 9, color: 'var(--text-dim)', fontStyle: 'italic', lineHeight: 1.3 }}>{interaction.notes}</div>
-                    )}
-                  </div>
-              );
-            })}
-            {filteredInteractions.length > interactionPage * INTERACTION_PAGE_SIZE && <button onClick={() => setInteractionPage(p => p + 1)} style={{ width:'100%', padding:'8px', marginTop:4, borderRadius:8, border:'1px solid var(--border)', background:'var(--bg-secondary)', color:'var(--text-dim)', fontSize:10, cursor:'pointer' }}>Показать ещё ({filteredInteractions.length - interactionPage * INTERACTION_PAGE_SIZE} из {filteredInteractions.length})</button>}
-            {filteredInteractions.length === 0 && (
-              <div style={{ padding: 30, textAlign: 'center', color: 'var(--text-dim)', fontSize: 12 }}>
-                Нет взаимодействий по выбранным фильтрам
-              </div>
-            )}
-          </div>
         </div>
       )}
 
-      {/* ===== CALCULATOR: now rendered by IIFE ===== */}
-
-
-      {/* ===== INTERACTIONS (Apple-style redesign) ===== */}
-      {section === 'info' && tab === 'interactions' && (
-        <div style={{ padding: '0 0 16px' }}>
-          {/* Segmented control */}
-          <div style={{ display:'flex', marginBottom:14, background:'var(--bg-secondary)', borderRadius:10, padding:2 }}>
-            {(['support','pharma'] as const).map(t => (
-              <button key={t} onClick={() => setInteractTab(t)} style={{
-                flex:1, padding:'8px 0', borderRadius:8, fontSize:12, fontWeight:700,
-                cursor:'pointer', transition:'all 0.15s',
-                background: interactTab === t ? 'var(--accent)' : 'transparent',
-                color: interactTab === t ? '#000' : 'var(--text-dim)',
-                border: 'none',
-              }}>{t === 'support' ? '💊 Поддержка' : '💉 Фарма'}</button>
-            ))}
-          </div>
-
-          {interactTab === 'support' ? (
-            <div>
-              {/* Header */}
-              <div style={{ marginBottom:12 }}>
-                <div style={{ fontSize:14, fontWeight:700, color:'var(--text-light)', marginBottom:2 }}>⚡ Взаимодействия поддержки</div>
-                <div style={{ fontSize:10, color:'var(--text-dim)' }}>Проверка синергий и конфликтов между препаратами поддержки и БАДами</div>
-              </div>
-
-              {/* Drug selector cards */}
-              <div style={{ display:'flex', flexDirection:'column', gap:8, marginBottom:12 }}>
-                  {interactionIds.map((id, idx) => {
-                  const selectedName = id ? (allSupport.find(s => s.id === id)?.name || id) : '';
-                  return (
-                    <div key={idx} style={{ background:'var(--bg-secondary)', borderRadius:12, padding:'10px 12px', border:'1px solid var(--border)' }}>
-                      <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:6 }}>
-                        <span style={{ fontSize:9, color:'var(--text-dim)', fontWeight:600, background:'rgba(255,255,255,0.04)', padding:'2px 6px', borderRadius:4 }}>#{idx + 1}</span>
-                        <span style={{ fontSize:10, color:'var(--text-dim)' }}>Выберите препарат</span>
-                      </div>
-                      <div style={{ display:'flex', gap:6, alignItems:'center' }}>
-                        <div style={{ position:'relative', flex:1 }}>
-                          <input
-                            value={interactionSearchIdx === idx ? interactionSearch : selectedName}
-                            placeholder="🔍 Поиск..."
-                            onFocus={() => { setInteractionSearchIdx(idx); setInteractionSearch(''); }}
-                            onChange={e => { setInteractionSearchIdx(idx); setInteractionSearch(e.target.value); if (!e.target.value) updateInteraction(idx, ''); }}
-                            style={{ width:'100%', padding:'9px 10px', borderRadius:8, background:'rgba(0,0,0,0.2)', border:'1px solid var(--border)', color:'var(--text)', fontSize:12, boxSizing:'border-box' }}
-                          />
-                          {interactionSearch && interactionSearchIdx === idx && (
-                            <div style={{ position:'absolute', top:'100%', left:0, right:0, zIndex:10, background:'var(--bg)', border:'1px solid var(--border)', borderRadius:8, maxHeight:160, overflowY:'auto', marginTop:2 }}>
-                              {allSupport.filter(s => (s.name||'').toLowerCase().includes(interactionSearch.toLowerCase()) || (s.id||'').toLowerCase().includes(interactionSearch.toLowerCase())).slice(0, 10).map(s => (
-                                <div key={s.id} onClick={() => { updateInteraction(idx, s.id); setInteractionSearch(''); }}
-                                  style={{ padding:'7px 10px', cursor:'pointer', fontSize:11, borderBottom:'1px solid var(--border)' }}>
-                                  <span style={{ fontWeight: id === s.id ? 700 : 400, color: id === s.id ? 'var(--accent)' : 'var(--text)' }}>{s.name}</span>
-                                  <span style={{ fontSize:9, color:'var(--text-dim)', marginLeft:6 }}>{s.id}</span>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                        {interactionIds.length > 2 && (
-                          <button onClick={() => removeInteraction(idx)} style={{ padding:'6px 10px', borderRadius:6, fontSize:10, cursor:'pointer', background:'rgba(239,68,68,0.1)', border:'1px solid rgba(239,68,68,0.25)', color:'#ef4444', flexShrink:0 }}>✕</button>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-                <button onClick={addInteraction} style={{
-                  padding:'10px', borderRadius:10, fontSize:11, fontWeight:600, cursor:'pointer',
-                  background:'rgba(0,230,138,0.06)', border:'1px dashed rgba(0,230,138,0.3)', color:'#00e68a',
-                }}>+ Добавить препарат</button>
-              </div>
-
-              {/* Empty state */}
-              {validInteractionIds.length < 2 && (
-                <div style={{ textAlign:'center', padding:'32px 16px', background:'var(--bg-secondary)', borderRadius:12, border:'1px solid var(--border)' }}>
-                  <div style={{ fontSize:24, marginBottom:6 }}>⚡</div>
-                  <div style={{ fontSize:11, color:'var(--text-dim)' }}>Выберите минимум 2 препарата для проверки</div>
-                </div>
-              )}
-
-              {/* No conflicts */}
-              {validInteractionIds.length >= 2 && !hasSupportInteractions && (
-                <div style={{ textAlign:'center', padding:'14px', borderRadius:10, background:'rgba(0,230,138,0.06)', border:'1px solid rgba(0,230,138,0.2)' }}>
-                  <span style={{ fontSize:11, color:'#4caf50', fontWeight:600 }}>✓ Критических взаимодействий не обнаружено</span>
-                </div>
-              )}
-
-              {/* Results */}
-              {hasSupportInteractions && (
-                <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
-                  {[
-                    { list: supportSynergiesList, label: '⊕ Синергия — положительное взаимодействие', color: '#22c55e' },
-                    { list: supportConflicts, label: '⊖ Конфликт — отрицательное взаимодействие', color: '#ef4444' },
-                    { list: supportCautions, label: '⚡ Осторожность — потенциальный риск', color: '#f59e0b' },
-                  ].filter(s => s.list.length > 0).map(section => (
-                    <div key={section.label} style={{ background:'var(--bg-secondary)', borderRadius:12, padding:'10px 12px', border:'1px solid var(--border)' }}>
-                      <div style={{ fontSize:11, fontWeight:700, color:section.color, marginBottom:6 }}>{section.label} ({section.list.length})</div>
-                      {section.list.map(i => {
-                        const sevColor = i.severity === 'HIGH' ? '#ef4444' : i.severity === 'MEDIUM' ? '#f59e0b' : '#22c55e';
-                        const aName = resolveSubName(i.substanceA) || i.substanceA;
-                        const bName = resolveSubName(i.substanceB) || i.substanceB;
-                        const effDesc = showEffect(i);
-                        return (
-                          <div key={i.id} style={{ padding:'5px 0', borderBottom:'1px solid var(--border)' }}>
-                            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-                              <span style={{ color:section.color, fontWeight:700, fontSize:10 }}>{aName} + {bName}</span>
-                              <div style={{ display:'flex', gap:3 }}>
-                                <span style={{ fontSize:8, padding:'1px 5px', borderRadius:3, background:section.color+'22', color:section.color, fontWeight:600 }}>{i.type === 'synergy' ? '⊕' : i.type === 'conflict' ? '⊖' : '⚡'}</span>
-                                {i.severity && <span style={{ fontSize:8, padding:'1px 5px', borderRadius:3, background:sevColor+'22', color:sevColor, fontWeight:600 }}>{i.severity==='HIGH'?'Высокий':i.severity==='MEDIUM'?'Средний':'Низкий'}</span>}
-                              </div>
-                            </div>
-                            {effDesc && <div style={{ fontSize:10, color:'rgba(255,255,255,0.85)', lineHeight:1.3, marginTop:2 }}>{effDesc}</div>}
-                            {i.mechanisms && i.mechanisms.length > 0 && (
-                              <div style={{ display:'flex', flexWrap:'wrap', gap:2, marginTop:2 }}>
-                                {i.mechanisms.map((m: string, mi: number) => (
-                                  <span key={mi} style={{ fontSize:7, padding:'1px 5px', borderRadius:3, background:'rgba(139,92,246,0.12)', color:'#a78bfa', border:'1px solid rgba(139,92,246,0.15)' }}>{m}</span>
-                                ))}
-                              </div>
-                            )}
-                            {i.notes && <div style={{ fontSize:8, color:'var(--text-dim)', fontStyle:'italic', lineHeight:1.2, marginTop:1 }}>{i.notes}</div>}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          ) : (
-            /* ─── PHARMA INTERACTIONS ─── */
-            <div>
-              <div style={{ marginBottom:12 }}>
-                <div style={{ fontSize:14, fontWeight:700, color:'var(--text-light)', marginBottom:2 }}>💉 Взаимодействия фармы</div>
-                <div style={{ fontSize:10, color:'var(--text-dim)' }}>Проверка синергий и конфликтов между фармакологическими препаратами</div>
-              </div>
-
-              <div style={{ display:'flex', flexDirection:'column', gap:8, marginBottom:12 }}>
-                {(() => {
-                  const PHARMA_CORE_FILTER = new Set(['testosterone','trenbolone','nandrolone','boldenone','primobolan','oral_17aa','sarm','drostanolone','dht_derivative','igf1','mgf','insulin','pct_serm','pct_aromatase','pct_dopamine','pct_gonadotropin']);
-                  const pharmaAll = Object.values(PHARMA_DB).filter((s): s is (typeof PHARMA_DB)[string] => !!s?.name && PHARMA_CORE_FILTER.has(s.class));
-                  const pharmaFiltered = pharmaInteractSearch ? pharmaAll.filter(s => (s.name||'').toLowerCase().includes(pharmaInteractSearch.toLowerCase())) : pharmaAll;
-                  const pharmaValid = pharmaInteractIds.filter(Boolean);
-                  return (
-                    <>
-                      {pharmaInteractIds.map((id, idx) => {
-                        const selectedName = id ? (PHARMA_DB[id]?.name || '') : '';
-                        return (
-                          <div key={idx} style={{ background:'var(--bg-secondary)', borderRadius:12, padding:'10px 12px', border:'1px solid var(--border)' }}>
-                            <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:6 }}>
-                              <span style={{ fontSize:9, color:'var(--text-dim)', fontWeight:600, background:'rgba(255,255,255,0.04)', padding:'2px 6px', borderRadius:4 }}>#{idx + 1}</span>
-                              <span style={{ fontSize:10, color:'var(--text-dim)' }}>Выберите препарат</span>
-                            </div>
-                            <div style={{ display:'flex', gap:6, alignItems:'center' }}>
-                              <div style={{ flex:1, position:'relative' }}>
-                                <input
-                                  value={id ? selectedName : pharmaInteractSearch}
-                                  onChange={e => { setPharmaInteractSearch(e.target.value); if (!e.target.value) { const next = [...pharmaInteractIds]; next[idx] = ''; setPharmaInteractIds(next); }}}
-                                  placeholder="🔍 Поиск..." style={{ width:'100%', padding:'9px 10px', borderRadius:8, background:'rgba(0,0,0,0.2)', border:'1px solid var(--border)', color:'var(--text)', fontSize:12, boxSizing:'border-box' }} />
-                                {!id && pharmaInteractSearch && (
-                                  <div style={{ position:'absolute', zIndex:10, background:'var(--bg)', border:'1px solid var(--border)', borderRadius:8, maxHeight:140, overflowY:'auto', marginTop:2, width:'calc(100% - 2px)' }}>
-                                    {pharmaFiltered.slice(0, 10).map(s => (
-                                      <div key={s.id} onClick={() => { const next = [...pharmaInteractIds]; next[idx] = s.id; setPharmaInteractIds(next); setPharmaInteractSearch(''); }} style={{ padding:'7px 10px', cursor:'pointer', fontSize:11, borderBottom:'1px solid var(--border)' }}>
-                                        <span style={{ fontWeight:600 }}>{s.name}</span>
-                                        <span style={{ marginLeft:6, color:'var(--text-dim)', fontSize:9 }}>{s.class}</span>
-                                      </div>
-                                    ))}
-                                  </div>
-                                )}
-                              </div>
-                              {pharmaInteractIds.length > 2 && (
-                                <button onClick={() => setPharmaInteractIds(pharmaInteractIds.filter((_, ix) => ix !== idx))} style={{ padding:'6px 10px', borderRadius:6, fontSize:10, cursor:'pointer', background:'rgba(239,68,68,0.1)', border:'1px solid rgba(239,68,68,0.25)', color:'#ef4444', flexShrink:0 }}>✕</button>
-                              )}
-                            </div>
-                          </div>
-                        );
-                      })}
-                      <button onClick={() => setPharmaInteractIds([...pharmaInteractIds, ''])} style={{
-                        padding:'10px', borderRadius:10, fontSize:11, fontWeight:600, cursor:'pointer',
-                        background:'rgba(0,230,138,0.06)', border:'1px dashed rgba(0,230,138,0.3)', color:'#00e68a',
-                      }}>+ Добавить препарат</button>
-                      {pharmaValid.length >= 2 && checkDrugInteractions(pharmaValid.map((id, i) => ({ id: `${id}-${i}`, substanceId: id, doseValue: 300, doseUnit: 'mg/wk', frequency: '2x/week', startWeek: 0, endWeek: 12 }))).length === 0 && (
-                        <div style={{ padding:'14px', borderRadius:10, background:'rgba(0,230,138,0.06)', border:'1px solid rgba(0,230,138,0.2)', textAlign:'center' }}>
-                          <span style={{ fontSize:11, color:'#4caf50', fontWeight:600 }}>✓ Критических взаимодействий не обнаружено</span>
-                        </div>
-                      )}
-                      {pharmaValid.length >= 2 && (
-                        <div>
-                          {checkDrugInteractions(pharmaValid.map((id, i) => ({ id: `${id}-${i}`, substanceId: id, doseValue: 300, doseUnit: 'mg/wk', frequency: '2x/week', startWeek: 0, endWeek: 12 }))).map((alert, i) => {
-                            const c = alert.type === 'critical' ? '#ff1744' : alert.type === 'warning' ? '#ff9100' : '#2979ff';
-                            const icon = alert.type === 'critical' ? '🚫' : alert.type === 'warning' ? '⚠️' : 'ℹ️';
-                            return (
-                              <div key={i} style={{ background:'var(--bg-secondary)', borderRadius:12, padding:'12px', marginBottom:6, borderLeft:`3px solid ${c}`, border:'1px solid var(--border)' }}>
-                                <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:4 }}>
-                                  <span style={{ fontSize:14 }}>{icon}</span>
-                                  <span style={{ fontWeight:700, fontSize:10, color:c }}>
-                                    {alert.type === 'critical' ? 'КРИТИЧЕСКОЕ' : alert.type === 'warning' ? 'ПРЕДУПРЕЖДЕНИЕ' : 'ИНФО'}
-                                  </span>
-                                </div>
-                                <div style={{ fontSize:11, fontWeight:600, color:'var(--text-light)', marginBottom:4 }}>{alert.drugs.join(' + ')}</div>
-                                <div style={{ fontSize:10, color:'var(--text-dim)', lineHeight:1.4, marginBottom:2 }}>
-                                  <b>Механизм:</b> {alert.mechanism}
-                                </div>
-                                <div style={{ fontSize:10, color:'var(--text-dim)', lineHeight:1.4 }}>
-                                  <b>Рекомендация:</b> {alert.recommendation}
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </>
-                  );
-                })()}
-                {/* Pharma synergies */}
-                {pharmaInteractIds.filter(Boolean).length >= 2 && (() => {
-                  const ids = pharmaInteractIds.filter(Boolean);
-                  const pharmaSynPairs = SYNERGY_PAIRS.filter(p => ids.includes(p.substanceA) && ids.includes(p.substanceB));
-                  if (pharmaSynPairs.length === 0) return null;
-                  return (
-                    <div style={{ marginTop:10, padding:'12px', borderRadius:10, background:'rgba(0,230,138,0.04)', border:'1px solid rgba(0,230,138,0.12)' }}>
-                      <div style={{ fontSize:10, fontWeight:700, color:'#00e68a', marginBottom:6 }}>⊕ Синергии между выбранными препаратами</div>
-                      <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
-                        {pharmaSynPairs.map((p, i) => (
-                          <div key={i} style={{ padding:'6px 8px', borderRadius:6, background:'rgba(0,230,138,0.04)', border:'1px solid rgba(0,230,138,0.1)', fontSize:9 }}>
-                            <div style={{ fontWeight:600, color:'var(--text-light)' }}>
-                              {PHARMA_DB[p.substanceA]?.name || p.substanceA} + {PHARMA_DB[p.substanceB]?.name || p.substanceB}
-                            </div>
-                            <div style={{ color:'var(--text-dim)', marginTop:1 }}>{p.mechanism?.slice(0,120) || p.synergyType} {p.strength ? `(сила: ${(p.strength*100).toFixed(0)}%)` : ''}</div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  );
-                })()}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* ===== STACKS (ALL_STACKS — 30+ готовых стеков) ===== */}
-      {section === 'info' && tab === 'stacks' && (
-        <div style={{ padding: '0 0 16px' }}>
-          <div style={{ marginBottom:10 }}>
-            <div style={{ fontSize:15, fontWeight:800, color:'var(--accent)', marginBottom:2 }}>📦 Готовые стеки</div>
-            <div style={{ fontSize:10, color:'var(--text-dim)' }}>
-              {ALL_STACKS.length} оптимизированных комбинаций добавок с рассчитанной синергией
-            </div>
-          </div>
-          <input value={stackSearch} onChange={e => setStackSearch(e.target.value)} placeholder="🔍 Поиск по эффекту или веществу..." style={{ width:'100%', padding:'9px 10px', borderRadius:10, border:'1px solid var(--border)', background:'var(--bg-secondary)', color:'var(--text)', fontSize:12, boxSizing:'border-box', marginBottom:10 }} />
-          <div style={{ display:'flex', flexDirection:'column', gap:6, maxHeight:'62vh', overflowY:'auto', paddingRight:2 }}>
-            {(stackSearch ? [{ key:'search', label:`Результаты поиска (${filteredStacks.length})`, stacks:filteredStacks }] : groupedStacks).map(group => (
-              <div key={group.key} style={{ background:'var(--bg-secondary)', borderRadius:12, overflow:'hidden', border:'1px solid var(--border)' }}>
-                <div onClick={() => setExpandedCategories(prev => ({ ...prev, ['stack_'+group.key]: !(prev['stack_'+group.key] ?? true) }))} style={{ display:'flex', alignItems:'center', gap:6, padding:'9px 12px', cursor:'pointer', userSelect:'none' }}>
-                  <span style={{ fontSize:14 }}>📋</span>
-                  <div style={{ flex:1, fontSize:11, fontWeight:700, color:'var(--text-light)' }}>{group.label}</div>
-                  <span style={{ fontSize:10, color:'var(--text-dim)', fontWeight:600, marginRight:4 }}>{group.stacks.length}</span>
-                  <span style={{ fontSize:10, color:'var(--text-dim)', transform: expandedCategories['stack_'+group.key] !== false ? 'rotate(180deg)' : 'none', transition:'transform 0.2s' }}>▼</span>
-                </div>
-                {expandedCategories['stack_'+group.key] !== false && (
-                  <div style={{ borderTop:'1px solid var(--border)' }}>
-                    {group.stacks.map(stack => {
-                      const synergyColor = stack.synergyScore > 20 ? '#22c55e' : stack.synergyScore > 12 ? '#eab308' : '#f59e0b';
-                      return (
-                        <div key={stack.id} style={{ padding:'8px 12px 10px', borderBottom:'1px solid var(--border)', cursor:'pointer' }}
-                          onClick={() => setExpandedMed(expandedMed === stack.id ? null : stack.id)}>
-                          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:4 }}>
-                            <div style={{ display:'flex', flexWrap:'wrap', gap:3, flex:1 }}>
-                              {stack.effects.map(e => (
-                                <span key={e} style={{ fontSize:8, padding:'2px 6px', borderRadius:4, background:'rgba(0,230,138,0.08)', color:'#00e68a', fontWeight:500 }}>
-                                  {EFFECT_LABELS_ru[e] || e}
-                                </span>
-                              ))}
-                            </div>
-                            <div style={{ display:'flex', alignItems:'center', gap:4 }}>
-                              <span style={{ fontSize:13, fontWeight:800, color:synergyColor }}>{stack.synergyScore.toFixed(1)}</span>
-                              <span style={{ fontSize:8, color:'var(--text-dim)' }}>syn</span>
-                            </div>
-                          </div>
-                          <div style={{ display:'flex', flexWrap:'wrap', gap:3, marginBottom:expandedMed === stack.id ? 6 : 0 }}>
-                            {stack.substances.map(sid => (
-                              <span key={sid} style={{ fontSize:9, padding:'2px 7px', borderRadius:8, background:'rgba(139,92,246,0.08)', border:'1px solid rgba(139,92,246,0.15)', color:'#a78bfa', fontWeight:600 }}>
-                                {getStackSubLabel(sid)}<button onClick={(e) => { e.stopPropagation(); setStackBuilder(prev => prev.includes(sid) ? prev : [...prev, sid]); }} style={{ padding:'3px 8px', borderRadius:4, fontSize:9, cursor:'pointer', background:'rgba(0,230,138,0.1)', border:'none', color:'#00e68a', fontWeight:700, marginLeft:2, minWidth:22 }} title="Добавить в стек">+</button>
-                              </span>
-                            ))}
-                          </div>
-                          <div style={{ fontSize:8, color:'var(--text-dim)' }}>
-                            {stack.substances.length} веществ
-                          </div>
-                          {expandedMed === stack.id && safeRender('stack2_'+stack.id, () =>
-                            <div style={{ marginTop:6, padding:'6px 8px', background:'rgba(0,0,0,0.15)', borderRadius:8 }}>
-                              {/* Positive effects */}
-                              <div style={{ marginBottom:4 }}>
-                                <div style={{ fontSize:9, fontWeight:700, color:'#22c55e', marginBottom:3 }}>⊕ Положительные эффекты</div>
-                                <div style={{ display:'flex', flexWrap:'wrap', gap:2 }}>
-                                  {stack.effects.map(e => (
-                                    <span key={e} style={{ fontSize:8, padding:'2px 6px', borderRadius:4, background:'rgba(34,197,94,0.1)', color:'#4ade80', fontWeight:600 }}>
-                                      {EFFECT_LABELS_ru[e] || e}
-                                    </span>
-                                  ))}
-                                </div>
-                              </div>
-                              {/* Substance breakdown */}
-                              <div style={{ marginBottom:4 }}>
-                                <div style={{ fontSize:9, fontWeight:700, color:'var(--text-light)', marginBottom:2 }}>🧬 Компоненты</div>
-                                {stack.substances.map(sid => {
-                                  const subInfo = ALL_SUBSTANCES.find(s => s.id === sid);
-                                  const cat = subInfo?.categories?.[0];
-                                  return (
-                                    <div key={sid} style={{ fontSize:8, color:'var(--text-dim)', padding:'2px 0', borderBottom:'1px solid rgba(255,255,255,0.04)', lineHeight:1.4 }}>
-                                      <b style={{ color:'#a78bfa' }}>{getStackSubLabel(sid)}</b>
-                                      {cat && <span style={{ marginLeft:4, opacity:0.6 }}>· {getCategoryInfo(cat).label}</span>}
-                                      {subInfo?.description && <div style={{ opacity:0.7 }}>{subInfo.description.slice(0, 100)}</div>}
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                              {/* Potential conflicts warning */}
-                              {(() => {
-                                const pairs: string[] = [];
-                                for (let a = 0; a < (stack.substances||[]).length; a++) {
-                                  for (let b = a + 1; b < (stack.substances||[]).length; b++) {
-                                    const key = `${stack.substances[a]||''}||${stack.substances[b]||''}`;
-                                    const found = conflictLookup.get(key);
-                                    if (found && found.type !== 'synergy') pairs.push(`${getStackSubLabel(stack.substances[a])} + ${getStackSubLabel(stack.substances[b])}: ${found.effect} (${found.severity})`);
-                                  }
-                                }
-                                return pairs.length > 0 ? (
-                                  <div>
-                                    <div style={{ fontSize:9, fontWeight:700, color:'#ef4444', marginBottom:2 }}>⚠ Возможные конфликты</div>
-                                    {pairs.map((p, i) => <div key={i} style={{ fontSize:8, color:'#f87171', padding:'1px 0', lineHeight:1.3 }}>{p}</div>)}
-                                  </div>
-                                ) : (
-                                  <div style={{ fontSize:8, color:'#4ade80', opacity:0.6 }}>✓ Конфликтов между компонентами не обнаружено</div>
-                                );
-                              })()}
-                              {/* Stack mechanisms & synergies */}
-                              {(()=>{
-                                const d=stackDetailMap.get(stack.id);
-                                if(!d)return null;
-                                return <>
-                                  {d.mechs.length>0&&<div style={{marginTop:4}}><div style={{fontSize:8,fontWeight:600,color:'var(--text-dim)',marginBottom:1}}>⚙️ Механизмы действия:</div><div style={{display:'flex',flexWrap:'wrap',gap:2}}>{d.mechs.map((m,i)=><span key={i} style={{fontSize:7,padding:'1px 5px',borderRadius:3,background:'rgba(139,92,246,0.08)',color:'#a78bfa',border:'1px solid rgba(139,92,246,0.12)'}}>{MECH_TRANSLATIONS_RU[m as string] || m}</span>)}</div></div>}
-                                  {d.synergies.length>0&&<div style={{marginTop:4}}><div style={{fontSize:8,fontWeight:600,color:'#22c55e',marginBottom:1}}>⊕ Синергии в стеке ({d.synergies.length}):</div>{d.synergies.map((s,i)=><div key={i} style={{fontSize:8,color:'var(--text-dim)',padding:'1px 0',lineHeight:1.3}}><b style={{color:'#4ade80'}}>{s.aName}+{s.bName}</b>: {s.effect}{s.notes?`: ${s.notes.slice(0,80)}`:''}{s.mechs.length>0&&<span style={{marginLeft:2,opacity:.5}}>[{s.mechs.map((mx: string) => MECH_TRANSLATIONS_RU[mx] || mx).join(', ')}]</span>}</div>)}</div>}
-                                </>;
-                              })()}
-                              <div style={{ fontSize:8, color:'var(--text-dim)', marginTop:3 }}>Оценка синергии: <b style={{ color: synergyColor }}>{(stack.synergyScore||0).toFixed(1)}</b> · {(stack.substances||[]).length} веществ</div>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            ))}
-            {stackSearch && filteredStacks.length === 0 && (
-              <div style={{ padding:30, textAlign:'center', color:'var(--text-dim)', fontSize:11 }}>
-                Ничего не найдено по запросу "{stackSearch}"
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* ===== PEPTIDES ===== */}
-      {section === 'info' && tab === 'peptides' && (
-        <div>
-          <div className="card" style={{ marginBottom: 12 }}>
-            <h3 style={{ margin: '0 0 4px 0', fontSize: 14, color: 'var(--accent)' }}>🧬 Пептидный калькулятор</h3>
-            <p style={{ fontSize: 11, color: 'var(--text-dim)', margin: 0 }}>Расчёт разведения, дозировки, PK‑модели и рисков для пептидов и факторов роста</p>
-          </div>
-
-          {/* Unified peptide + growth factor selector */}
-          <div className="card" style={{ marginBottom: 8 }}>
-            <div style={{ display:'flex', flexWrap:'wrap', gap:4, maxHeight:160, overflowY:'auto' }}>
-              {PEPTIDE_LIST.map(p => {
-                const sel = peptideId === p.id;
-                return <div key={p.id} onClick={() => { setPeptideId(p.id); const pd = PEPTIDE_DB[p.id]; if (pd) { setPepAmount(pd.amountMg); setPepRoute(pd.routes[0]); setPepResult(null); setGrowthId(null); }}} style={{
-                  padding:'6px 10px', borderRadius:8, cursor:'pointer', fontSize:10,
-                  background: sel ? 'rgba(0,230,138,0.15)' : 'var(--bg-secondary)',
-                  border: sel ? '1.5px solid #00e68a' : '1px solid var(--border)',
-                  color: sel ? '#00e68a' : 'var(--text)', fontWeight: sel ? 700 : 400,
-                }}>{p.shortName}</div>;
-              })}
-              {(() => {
-                const GROWTH_CLASSES = new Set(['peptide_ghrh','peptide_ghrp','igf1','mgf','insulin','peptide_gnrh','peptide_fat_loss','peptide_other','peptide_regenerative','peptide_immune','peptide_nootropic','pct_gonadotropin']);
-                const inPeptideDb = new Set(PEPTIDE_LIST.map(p => PEPTIDE_DB[p.id]?.name.toLowerCase()));
-                return Object.values(PHARMA_DB).filter(s => !!s?.name && GROWTH_CLASSES.has(s.class) && s.id !== 'mk677' && !inPeptideDb.has(s.name.toLowerCase())).map(s => {
-                  const sel = growthId === s.id;
-                  return <div key={s.id} onClick={() => { setGrowthId(s.id); setPepResult(null); }} style={{
-                    padding:'6px 10px', borderRadius:8, cursor:'pointer', fontSize:10,
-                    background: sel ? 'rgba(139,92,246,0.15)' : 'var(--bg-secondary)',
-                    border: sel ? '1.5px solid #8b5cf6' : '1px solid var(--border)',
-                    color: sel ? '#8b5cf6' : 'var(--text)', fontWeight: sel ? 700 : 400,
-                  }}>{s.name}</div>;
-                });
-              })()}
-            </div>
-            {PEPTIDE_DB[peptideId] && (
-              <div style={{ marginTop:6, padding:'8px 10px', borderRadius:8, background:'rgba(0,230,138,0.04)', border:'1px solid rgba(0,230,138,0.1)', fontSize:9, lineHeight:1.4 }}>
-                <div style={{ fontWeight:700, color:'#00e68a', marginBottom:3 }}>{PEPTIDE_DB[peptideId].name || PEPTIDE_DB[peptideId].shortName || peptideId}</div>
-                {(PEPTIDE_DB[peptideId].effects||[]).length > 0 && (
-                  <div style={{ marginBottom:2 }}><b>Эффекты:</b> {(PEPTIDE_DB[peptideId].effects||[]).join(', ')}</div>
-                )}
-                <div style={{ color:'var(--text-dim)' }}>
-                  <b>T½:</b> {PEPTIDE_DB[peptideId].tHalfHours || '—'} ч · <b>Класс:</b> {PEPTIDE_DB[peptideId].className || '—'} · <b>Пути:</b> {(PEPTIDE_DB[peptideId].routes||[]).map(r => ROUTE_LABELS[r]||r).join(', ') || '—'}
-                </div>
-                {(PEPTIDE_DB[peptideId].mechanisms||[]).length > 0 && (
-                  <div style={{ marginTop:1, color:'rgba(255,255,255,0.7)' }}><b>Механизмы:</b> {(PEPTIDE_DB[peptideId].mechanisms||[]).join(', ') || '—'}</div>
-                )}
-                <div style={{ marginTop:1, display:'flex', gap:8, flexWrap:'wrap' }}>
-                  <span style={{ color:'var(--text-dim)' }}><b>Флакон:</b> {PEPTIDE_DB[peptideId].amountMg || '—'} мг</span>
-                  {PEPTIDE_DB[peptideId].riskLevel && (
-                    <span style={{ color: PEPTIDE_DB[peptideId].riskLevel === 'high' ? '#ef4444' : PEPTIDE_DB[peptideId].riskLevel === 'medium' ? '#f59e0b' : '#22c55e', fontWeight:600 }}>
-                      <b>Риск:</b> {PEPTIDE_DB[peptideId].riskLevel === 'high' ? 'Высокий' : PEPTIDE_DB[peptideId].riskLevel === 'medium' ? 'Средний' : 'Низкий'}
-                    </span>
-                  )}
-                </div>
-                {(PEPTIDE_DB[peptideId].riskNotes||[]).length > 0 && (
-                  <div style={{ fontSize:7, color:'#f59e0b', marginTop:1 }}>⚠ {(PEPTIDE_DB[peptideId].riskNotes||[]).slice(0,3).join('; ') || '—'}</div>
-                )}
-              </div>
-            )}
-            {growthId && PHARMA_DB[growthId] && (
-              <div style={{ marginTop:6, padding:'8px 10px', background:'rgba(139,92,246,0.06)', borderRadius:8, fontSize:10, color:'var(--text-dim)', lineHeight:1.6 }}>
-                <b>{PHARMA_DB[growthId].name}</b> — T½ {(PHARMA_DB[growthId].pk?.halfLifeHours ?? 0).toFixed(0)}ч, био {(PHARMA_DB[growthId].pk?.bioavailability ?? 0) * 100}%
-              </div>
-            )}
-          </div>
-
-          {/* Dilution calculator */}
-          <div className="card" style={{ marginBottom: 8 }}>
-            <h4 style={{ margin: '0 0 8px 0', fontSize: 12 }}>💧 Разведение</h4>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
-              <div>
-                <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Во флаконе</label>
-                <div style={{ display: 'flex', gap: 4 }}>
-                  <input type="number" value={pepAmount} onChange={e => setPepAmount(parseFloat(e.target.value) || 0)} style={{ width: '60%', padding: '6px 8px', borderRadius: 6, border: '1px solid var(--border-color)', background: 'var(--bg-secondary)', color: 'var(--text-light)', fontSize: 12 }} />
-                  <select value={pepAmountUnit || ''} onChange={e => setPepAmountUnit(e.target.value as 'mg' | 'mcg')} style={{ flex: 1, padding: '6px', borderRadius: 6, border: '1px solid var(--border-color)', background: 'var(--bg-secondary)', color: 'var(--text-light)', fontSize: 11 }}>
-                    <option value="mg">мг</option><option value="mcg">мкг</option>
-                  </select>
-                </div>
-              </div>
-              <div>
-                <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Растворитель (мл)</label>
-                <input type="number" step="0.1" value={pepDilution} onChange={e => setPepDilution(parseFloat(e.target.value) || 0)} style={{ width: '100%', padding: '6px 8px', borderRadius: 6, border: '1px solid var(--border-color)', background: 'var(--bg-secondary)', color: 'var(--text-light)', fontSize: 12, boxSizing: 'border-box' }} />
-              </div>
-              <div>
-                <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Доза</label>
-                <div style={{ display: 'flex', gap: 4 }}>
-                  <input type="number" value={pepDose} onChange={e => setPepDose(parseFloat(e.target.value) || 0)} style={{ width: '60%', padding: '6px 8px', borderRadius: 6, border: '1px solid var(--border-color)', background: 'var(--bg-secondary)', color: 'var(--text-light)', fontSize: 12 }} />
-                  <select value={pepDoseUnit || ''} onChange={e => setPepDoseUnit(e.target.value as 'mg' | 'mcg')} style={{ flex: 1, padding: '6px', borderRadius: 6, border: '1px solid var(--border-color)', background: 'var(--bg-secondary)', color: 'var(--text-light)', fontSize: 11 }}>
-                    <option value="mcg">мкг</option><option value="mg">мг</option>
-                  </select>
-                </div>
-              </div>
-              <div>
-                <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Шприц</label>
-                <select value={pepSyringe} onChange={e => setPepSyringe(e.target.value as keyof typeof SYRINGE_TYPES)} style={{ width: '100%', padding: '6px', borderRadius: 6, border: '1px solid var(--border-color)', background: 'var(--bg-secondary)', color: 'var(--text-light)', fontSize: 11 }}>
-                  {Object.entries(SYRINGE_TYPES).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
-                </select>
-              </div>
-              <div>
-                <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Способ введения</label>
-                <select value={pepRoute} onChange={e => setPepRoute(e.target.value)} style={{ width: '100%', padding: '6px', borderRadius: 6, border: '1px solid var(--border-color)', background: 'var(--bg-secondary)', color: 'var(--text-light)', fontSize: 11 }}>
-                  {Object.entries(ROUTE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-                </select>
-              </div>
-            </div>
-          </div>
-
-          {/* Course parameters */}
-          <div className="card" style={{ marginBottom: 8 }}>
-            <h4 style={{ margin: '0 0 8px 0', fontSize: 12 }}>📅 Параметры курса</h4>
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 6 }}>
-              {WEEK.map(d => (
-                <button key={d} onClick={() => setPepSchedule(pepSchedule.includes(d) ? pepSchedule.filter(x => x !== d) : [...pepSchedule, d].sort((a, b) => WEEK.indexOf(a) - WEEK.indexOf(b)))} style={{
-                  padding: '5px 10px', borderRadius: 16, fontSize: 10, cursor: 'pointer',
-                  background: pepSchedule.includes(d) ? 'rgba(0,230,138,0.2)' : 'var(--bg-secondary)',
-                  border: pepSchedule.includes(d) ? '1px solid var(--accent)' : '1px solid var(--border)',
-                  color: pepSchedule.includes(d) ? '#00e68a' : 'var(--text-dim)', fontWeight: pepSchedule.includes(d) ? 700 : 400,
-                }}>{d === 'Mon' ? 'Пн' : d === 'Tue' ? 'Вт' : d === 'Wed' ? 'Ср' : d === 'Thu' ? 'Чт' : d === 'Fri' ? 'Пт' : d === 'Sat' ? 'Сб' : 'Вс'}</button>
-              ))}
-            </div>
-            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-              <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Длительность (дни):</label>
-              <input type="number" value={pepTotalDays} onChange={e => setPepTotalDays(parseFloat(e.target.value) || 0)} style={{ width: 60, padding: '4px 8px', borderRadius: 6, border: '1px solid var(--border-color)', background: 'var(--bg-secondary)', color: 'var(--text-light)', fontSize: 12 }} />
-              <span style={{ fontSize: 9, color: 'var(--text-dim)' }}>Инъекций: {pepSchedule.length}/нед</span>
-            </div>
-          </div>
-
-          {/* Calculate button */}
-          <button onClick={() => {
-            let pep: PeptideInfo | undefined;
-            if (growthId && PHARMA_DB[growthId]?.pk) {
-              const g = PHARMA_DB[growthId];
-              const r = (g as any).routes?.[0] || 'sc';
-              const routesArr = (g as any).routes || [r];
-              const halfLife = g.pk?.halfLifeHours || 24;
-              pep = { id: g.id, name: g.name || g.id, shortName: g.name || g.id, amountMg: pepAmount, routes: routesArr, tHalfHours: halfLife, bioavailability: { [r]: { min: 60, max: 100, avg: 80 } }, className: g.class || '', effects: [], mechanisms: [], riskLevel: 'medium', riskNotes: [] };
-            } else {
-              pep = PEPTIDE_DB[peptideId];
-            }
-            if (!pep) return;
-            const bio = pep.bioavailability[pepRoute] || { min: 80, max: 100, avg: 90 };
-            const dilInput: DilutionInput = {
-              amountValue: pepAmount, amountUnit: pepAmountUnit,
-              dilutionVolumeMl: pepDilution, doseValue: pepDose, doseUnit: pepDoseUnit,
-              syringeType: pepSyringe as DilutionInput['syringeType'],
-            };
-            const dilution = computeDilution(dilInput);
-            const effective = computeEffectiveDose(dilution.doseMcg, bio);
-            const pk = computePK({
-              doseMcg: dilution.doseMcg, bioAvg: bio.avg,
-              tHalfHours: pep.tHalfHours, scheduleDays: pepSchedule, totalDays: pepTotalDays,
-            });
-            setPepResult({ dilution, effective, pk });
-          }} style={{
-            width: '100%', padding: '14px', borderRadius: 8, border: 'none', cursor: 'pointer', marginBottom: 12,
-            background: 'linear-gradient(135deg, #8b5cf6, #6366f1)', color: '#fff', fontWeight: 700, fontSize: 15,
-            boxShadow: '0 2px 8px rgba(139,92,246,0.3)',
-          }}>
-            🧬 Рассчитать
-          </button>
-
-          {/* Results */}
-          {pepResult && (
-            <>
-              {/* Dilution results */}
-              <div className="card" style={{ marginBottom: 8 }}>
-                <h4 style={{ margin: '0 0 8px 0', fontSize: 12 }}>📊 Результаты разведения</h4>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 11 }}>
-                  <span style={{ color: 'var(--text-dim)' }}>Концентрация:</span><span style={{ fontWeight: 600 }}>{pepResult.dilution.concentrationMcgPerMl.toFixed(1)} мкг/мл</span>
-                  <span style={{ color: 'var(--text-dim)' }}>Объём дозы:</span><span style={{ fontWeight: 600 }}>{pepResult.dilution.doseVolumeMl.toFixed(3)} мл</span>
-                  <span style={{ color: 'var(--text-dim)' }}>Деления шприца:</span><span style={{ fontWeight: 600, color: pepResult.dilution.syringeUnits > SYRINGE_TYPES[pepSyringe].maxUnits ? '#ef4444' : 'var(--text-light)' }}>{pepResult.dilution.syringeUnitsDisplay}</span>
-                  <span style={{ color: 'var(--text-dim)' }}>Доз во флаконе:</span><span style={{ fontWeight: 600 }}>{pepResult.dilution.dosesPerVial.toFixed(1)}</span>
-                </div>
-              </div>
-
-              {/* Bioavailability */}
-              <div className="card" style={{ marginBottom: 8 }}>
-                <h4 style={{ margin: '0 0 6px 0', fontSize: 12 }}>💉 Биодоступность ({ROUTE_LABELS[pepRoute]})</h4>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 4, fontSize: 11 }}>
-                  <div style={{ textAlign: 'center', background: 'var(--bg-secondary)', borderRadius: 6, padding: 6 }}>
-                    <div style={{ color: 'var(--text-dim)', fontSize: 9 }}>Мин</div>
-                    <div style={{ fontWeight: 600 }}>{pepResult.effective.effectiveMinMcg.toFixed(0)} мкг</div>
-                  </div>
-                  <div style={{ textAlign: 'center', background: 'rgba(0,230,138,0.1)', borderRadius: 6, padding: 6 }}>
-                    <div style={{ color: 'var(--text-dim)', fontSize: 9 }}>Средняя</div>
-                    <div style={{ fontWeight: 700, color: '#00e68a' }}>{pepResult.effective.effectiveAvgMcg.toFixed(0)} мкг</div>
-                  </div>
-                  <div style={{ textAlign: 'center', background: 'var(--bg-secondary)', borderRadius: 6, padding: 6 }}>
-                    <div style={{ color: 'var(--text-dim)', fontSize: 9 }}>Макс</div>
-                    <div style={{ fontWeight: 600 }}>{pepResult.effective.effectiveMaxMcg.toFixed(0)} мкг</div>
-                  </div>
-                </div>
-              </div>
-
-              {/* PK Results */}
-              <div className="card" style={{ marginBottom: 8 }}>
-                <h4 style={{ margin: '0 0 6px 0', fontSize: 12 }}>📈 PK‑модель</h4>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2px 12px', fontSize: 10, marginBottom: 8 }}>
-                  <span style={{ color: 'var(--text-dim)' }}>Макс. концентрация:</span><span style={{ fontWeight: 600 }}>{pepResult.pk.maxConcentration.toFixed(1)}</span>
-                  <span style={{ color: 'var(--text-dim)' }}>Средняя концентрация:</span><span style={{ fontWeight: 600 }}>{pepResult.pk.avgConcentration.toFixed(1)}</span>
-                  <span style={{ color: 'var(--text-dim)' }}>Steady-state (день):</span><span style={{ fontWeight: 600 }}>~{pepResult.pk.steadyStateDay}</span>
-                  <span style={{ color: 'var(--text-dim)' }}>t<sub>1/2</sub> (дни):</span><span style={{ fontWeight: 600 }}>{pepResult.pk.halfLifeDays.toFixed(2)}</span>
-                </div>
-                <div style={{ maxHeight: 160, overflowY: 'auto', border: '1px solid var(--border-color)', borderRadius: 6 }}>
-                  <table style={{ width: '100%', fontSize: 9, borderCollapse: 'collapse' }}>
-                    <thead>
-                      <tr style={{ background: 'var(--bg-secondary)', position: 'sticky', top: 0 }}>
-                        <th style={{ padding: '2px 4px', textAlign: 'left' }}>День</th>
-                        <th style={{ padding: '2px 4px' }}>Инъекция</th>
-                        <th style={{ padding: '2px 4px', textAlign: 'right' }}>Конц.</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {pepResult.pk.days.map(d => (
-                        <tr key={d.day} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', background: d.inject ? 'rgba(139,92,246,0.05)' : 'transparent' }}>
-                          <td style={{ padding: '2px 4px' }}>{d.day} ({d.weekday === 'Mon' ? 'Пн' : d.weekday === 'Tue' ? 'Вт' : d.weekday === 'Wed' ? 'Ср' : d.weekday === 'Thu' ? 'Чт' : d.weekday === 'Fri' ? 'Пт' : d.weekday === 'Sat' ? 'Сб' : 'Вс'})</td>
-                          <td style={{ padding: '2px 4px', textAlign: 'center' }}>{d.inject ? '💉' : ''}</td>
-                          <td style={{ padding: '2px 4px', textAlign: 'right', fontFamily: 'monospace', color: d.concentration > pepResult.pk.avgConcentration * 1.5 ? '#22c55e' : 'var(--text-light)' }}>{d.concentration.toFixed(0)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-              {/* Risks */}
-              {(growthId ? PHARMA_DB[growthId] : PEPTIDE_DB[peptideId]) && (
-                <div className="card" style={{ marginBottom: 8 }}>
-                  <h4 style={{ margin: '0 0 6px 0', fontSize: 12 }}>⚠ Риски: {growthId ? (PHARMA_DB[growthId]?.name || growthId) : (PEPTIDE_DB[peptideId]?.shortName || peptideId)}</h4>
-                </div>
-              )}
-
-              {/* Synergies & Conflicts */}
-              <div className="card" style={{ marginBottom: 8 }}>
-                <h4 style={{ margin: '0 0 6px 0', fontSize: 12 }}>🔗 Синергии и конфликты</h4>
-                {!growthId && getPeptideSynergiesFor(peptideId).length > 0 && (
-                  <div style={{ marginBottom: 4 }}>
-                    <span style={{ fontSize: 10, color: '#22c55e', fontWeight: 600 }}>Синергии:</span>
-                    {getPeptideSynergiesFor(peptideId).map(s => (
-                      <span key={s.partner} style={{ fontSize: 9, marginLeft: 6, color: '#22c55e' }}>{s.partnerName} (+{s.strength})</span>
-                    ))}
-                  </div>
-                )}
-                {!growthId && getPeptideConflictsFor(peptideId).length > 0 && (
-                  <div>
-                    <span style={{ fontSize: 10, color: '#ef4444', fontWeight: 600 }}>Конфликты:</span>
-                    {getPeptideConflictsFor(peptideId).map(c => (
-                      <span key={c.partner} style={{ fontSize: 9, marginLeft: 6, color: '#ef4444' }}>{c.partnerName} (severity: {c.severity})</span>
-                    ))}
-                  </div>
-                )}
-                {growthId ? (
-                  <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>Данные синергий для факторов роста из каталога фармы</span>
-                ) : getPeptideSynergiesFor(peptideId).length === 0 && getPeptideConflictsFor(peptideId).length === 0 ? (
-                  <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>Нет данных</span>
-                ) : null}
-              </div>
-            </>
-          )}
-
-          {/* Protocol generator */}
-          <div className="card">
-            <h4 style={{ margin: '0 0 6px 0', fontSize: 12 }}>🎯 Генератор протокола по цели</h4>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 8 }}>
-              {Object.keys(PEPTIDE_GOAL_PROFILES).map(goal => (
-                <button key={goal} onClick={() => setPepProtocol(generatePeptideProtocol(goal))} style={{
-                  padding: '5px 10px', borderRadius: 6, fontSize: 10, cursor: 'pointer',
-                  background: 'rgba(139,92,246,0.1)', border: '1px solid rgba(139,92,246,0.2)',
-                  color: '#8b5cf6', fontWeight: 500,
-                }}>
-                  {goal === 'muscle_growth' ? '💪 Рост мышц' : goal === 'fat_loss' ? '🔥 Жиросжигание' : goal === 'recovery' ? '🔄 Восстановление' : goal === 'gi_healing' ? '🫃 ЖКТ' : goal === 'mitochondria' ? '🧬 Митохондрии' : goal === 'focus' ? '🎯 Фокус' : '😴 Сон'}
-                </button>
-              ))}
-            </div>
-            {pepProtocol && (
-              <div style={{ background: 'var(--bg-secondary)', borderRadius: 8, padding: 10 }}>
-                <div style={{ fontSize: 11, fontWeight: 600, marginBottom: 4 }}>{pepProtocol.goal === 'muscle_growth' ? 'Рост мышц' : pepProtocol.goal === 'fat_loss' ? 'Жиросжигание' : pepProtocol.goal === 'recovery' ? 'Восстановление' : pepProtocol.goal}: оценка синергии <span style={{ color: '#8b5cf6' }}>{pepProtocol.synergyScore.toFixed(1)}</span></div>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-                  {pepProtocol.peptides.map(p => (
-                    <span key={p.id} style={{ fontSize: 10, padding: '3px 8px', borderRadius: 12, background: 'rgba(139,92,246,0.15)', border: '1px solid rgba(139,92,246,0.3)', color: '#8b5cf6', fontWeight: 600 }}>
-                      {p.shortName}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-      </div>
-      )}
 
       {/* ===== STACKCALC IN CALC VIEW ===== */}
       {section === 'generator' && tab === 'main' && supportView === 'calc' && calcView === 'stackcalc' && (
