@@ -7,7 +7,7 @@ import { computeLabIndices, interpretLabIndices } from '../../engines/labs-indic
 import { calculateIndices } from '../../engines/clinical-indices.engine';
 import { NAVY_BF_FORMULAS, MUSCLE_GROUPS_FULL, INJURY_LOCATIONS } from '../../core/constants';
 
-type ProfileTab = 'overview' | 'anthropometry' | 'sleep' | 'lifestyle' | 'diet' | 'nutrition_v7' | 'genetics' | 'injuries' | 'progress' | 'reports' | 'contacts';
+type ProfileTab = 'overview' | 'anthropometry' | 'sleep' | 'lifestyle' | 'diet' | 'nutrition_v7' | 'genetics' | 'injuries' | 'progress' | 'reports' | 'contacts' | 'bp_diary';
 type ProfilePage = 'hero' | 'tabs';
 
 const SPORT_TYPES = [
@@ -49,6 +49,15 @@ const MEASUREMENTS_LOG_KEY = 'he_measurements_log';
 interface MeasurementEntry { date: string; waistCm: number; chestCm: number; hipCm: number; bicepCm: number; thighCm: number; neckCm: number; forearmCm: number; bodyFat: number; }
 function getMeasurementsLog(): MeasurementEntry[] {
   try { return JSON.parse(localStorage.getItem(MEASUREMENTS_LOG_KEY) || '[]'); } catch { return []; }
+}
+
+const BP_DIARY_KEY = 'he_bp_diary';
+interface BPEntry { date: string; systolic: number; diastolic: number; hr: number; }
+function getBPDiary(): BPEntry[] {
+  try { return JSON.parse(localStorage.getItem(BP_DIARY_KEY) || '[]'); } catch { return []; }
+}
+function saveBPDiary(log: BPEntry[]) {
+  localStorage.setItem(BP_DIARY_KEY, JSON.stringify(log));
 }
 
 const DIET_TYPES = [
@@ -193,6 +202,12 @@ export const ProfileScreen: React.FC = () => {
   const [editInjury, setEditInjury] = useState<InjuryRecord | null>(null);
   const [weightLog, setWeightLog] = useState<WeightEntry[]>(getWeightLog);
   const [workoutLogs, setWorkoutLogs] = useState<WorkoutLog[]>([]);
+  const [bpEntries, setBpEntries] = useState<BPEntry[]>(getBPDiary);
+  const [bpPeriod, setBpPeriod] = useState<'day' | 'week' | 'month'>('week');
+  const [showBpForm, setShowBpForm] = useState(false);
+  const [bpSystolic, setBpSystolic] = useState('');
+  const [bpDiastolic, setBpDiastolic] = useState('');
+  const [bpHr, setBpHr] = useState('');
 
   // Food diary data for reports
   const [foodDiaryAvg, setFoodDiaryAvg] = useState<{avgKcal:number;avgProtein:number;avgFat:number;avgCarbs:number} | null>(null);
@@ -369,7 +384,8 @@ export const ProfileScreen: React.FC = () => {
     { id: 'overview', label: 'Обзор' }, { id: 'anthropometry', label: 'Тело' },
     { id: 'sleep', label: 'Сон' }, { id: 'lifestyle', label: 'Образ жизни' },
     { id: 'diet', label: 'Питание' }, { id: 'injuries', label: 'Травмы' },
-    { id: 'progress', label: 'Прогресс' }, { id: 'reports', label: 'Отчёты' }, { id: 'contacts', label: 'Контакты' }
+    { id: 'progress', label: 'Прогресс' }, { id: 'reports', label: 'Отчёты' },
+    { id: 'bp_diary', label: 'Давление' }, { id: 'contacts', label: 'Контакты' }
   ];
 
   const initials = (profile.name || 'П').charAt(0).toUpperCase();
@@ -1536,6 +1552,158 @@ export const ProfileScreen: React.FC = () => {
               ))}
             </div>);
           })()}
+
+          {/* ═══ BP/HR DIARY ═══ */}
+          {tab === 'bp_diary' && (
+            <div>
+              {/* Header + Add button */}
+              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:10 }}>
+                <h3 style={{ margin:0, fontSize:15, fontWeight:700, color: apple.textPrimary }}>🫀 Давление и пульс</h3>
+                <button onClick={() => setShowBpForm(!showBpForm)} style={{
+                  padding:'6px 14px', borderRadius:20, fontSize:11, fontWeight:700, cursor:'pointer',
+                  background: apple.accentDim, border: apple.accentBorder, color: apple.accent,
+                }}>{showBpForm ? '✕ Отмена' : '+ Добавить'}</button>
+              </div>
+
+              {/* Entry form */}
+              {showBpForm && (
+                <div style={{ ...glassCard, marginBottom:10 }}>
+                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8, marginBottom:10 }}>
+                    <div>
+                      <div style={{ fontSize:9, color: apple.textDim, marginBottom:3 }}>Систолическое</div>
+                      <input type="number" value={bpSystolic} onChange={e => setBpSystolic(e.target.value)} placeholder="120" style={appleInput} />
+                    </div>
+                    <div>
+                      <div style={{ fontSize:9, color: apple.textDim, marginBottom:3 }}>Диастолическое</div>
+                      <input type="number" value={bpDiastolic} onChange={e => setBpDiastolic(e.target.value)} placeholder="80" style={appleInput} />
+                    </div>
+                    <div>
+                      <div style={{ fontSize:9, color: apple.textDim, marginBottom:3 }}>Пульс</div>
+                      <input type="number" value={bpHr} onChange={e => setBpHr(e.target.value)} placeholder="70" style={appleInput} />
+                    </div>
+                  </div>
+                  <button onClick={() => {
+                    const s = parseInt(bpSystolic); const d = parseInt(bpDiastolic); const h = parseInt(bpHr);
+                    if (!s || !d || !h) return;
+                    const entry: BPEntry = { date: new Date().toISOString().slice(0,10), systolic: s, diastolic: d, hr: h };
+                    const updated = [...bpEntries, entry];
+                    setBpEntries(updated); saveBPDiary(updated);
+                    setBpSystolic(''); setBpDiastolic(''); setBpHr(''); setShowBpForm(false);
+                  }} style={{
+                    width:'100%', padding:'10px', borderRadius:10, border:'none', cursor:'pointer',
+                    background: apple.gradientGreen, color:'#000', fontWeight:700, fontSize:12,
+                  }}>Сохранить</button>
+                </div>
+              )}
+
+              {/* Period toggle */}
+              <div style={{ display:'flex', gap:4, marginBottom:10 }}>
+                {(['day','week','month'] as const).map(p => (
+                  <button key={p} onClick={() => setBpPeriod(p)} style={{
+                    flex:1, padding:'8px', borderRadius:10, fontSize:11, fontWeight:700, cursor:'pointer',
+                    background: bpPeriod === p ? apple.accentDim : apple.glassBg,
+                    border: bpPeriod === p ? apple.accentBorder : apple.glassBorder,
+                    color: bpPeriod === p ? apple.accent : apple.textSecondary,
+                  }}>{p === 'day' ? 'День' : p === 'week' ? 'Неделя' : 'Месяц'}</button>
+                ))}
+              </div>
+
+              {/* Filtered entries */}
+              {(() => {
+                const now = new Date();
+                const cutoff = new Date(now);
+                if (bpPeriod === 'day') cutoff.setDate(cutoff.getDate() - 1);
+                else if (bpPeriod === 'week') cutoff.setDate(cutoff.getDate() - 7);
+                else cutoff.setMonth(cutoff.getMonth() - 1);
+                const filtered = bpEntries.filter(e => new Date(e.date) >= cutoff).sort((a, b) => b.date.localeCompare(a.date));
+                const avgSystolic = filtered.length ? Math.round(filtered.reduce((s, e) => s + e.systolic, 0) / filtered.length) : 0;
+                const avgDiastolic = filtered.length ? Math.round(filtered.reduce((s, e) => s + e.diastolic, 0) / filtered.length) : 0;
+                const avgHr = filtered.length ? Math.round(filtered.reduce((s, e) => s + e.hr, 0) / filtered.length) : 0;
+
+                return (
+                  <>
+                    {/* Average cards */}
+                    <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8, marginBottom:10 }}>
+                      <div style={{ ...glassCard, textAlign:'center', padding:12 }}>
+                        <div style={{ fontSize:9, color: apple.textDim, marginBottom:4 }}>Среднее сист.</div>
+                        <div style={{ fontSize:24, fontWeight:800, color: avgSystolic > 140 ? '#ef4444' : avgSystolic > 130 ? '#f59e0b' : apple.accent }}>{avgSystolic || '—'}</div>
+                        <div style={{ fontSize:8, color: apple.textDim }}>мм рт. ст.</div>
+                      </div>
+                      <div style={{ ...glassCard, textAlign:'center', padding:12 }}>
+                        <div style={{ fontSize:9, color: apple.textDim, marginBottom:4 }}>Среднее диаст.</div>
+                        <div style={{ fontSize:24, fontWeight:800, color: avgDiastolic > 90 ? '#ef4444' : avgDiastolic > 80 ? '#f59e0b' : apple.accent }}>{avgDiastolic || '—'}</div>
+                        <div style={{ fontSize:8, color: apple.textDim }}>мм рт. ст.</div>
+                      </div>
+                      <div style={{ ...glassCard, textAlign:'center', padding:12 }}>
+                        <div style={{ fontSize:9, color: apple.textDim, marginBottom:4 }}>Средний пульс</div>
+                        <div style={{ fontSize:24, fontWeight:800, color: avgHr > 100 ? '#ef4444' : avgHr > 85 ? '#f59e0b' : apple.accent }}>{avgHr || '—'}</div>
+                        <div style={{ fontSize:8, color: apple.textDim }}>уд/мин</div>
+                      </div>
+                    </div>
+
+                    {/* Simple chart */}
+                    {filtered.length >= 2 && (
+                      <div style={{ ...glassCard, marginBottom:10, padding:'12px 10px', overflow:'hidden' }}>
+                        <div style={{ fontSize:10, color: apple.textDim, fontWeight:600, marginBottom:6 }}>📈 Динамика</div>
+                        <div style={{ display:'flex', alignItems:'flex-end', gap:2, height:80 }}>
+                          {filtered.slice().reverse().map((e, i) => {
+                            const maxVal = 200;
+                            const hS = Math.min(100, (e.systolic / maxVal) * 100);
+                            const hD = Math.min(100, (e.diastolic / maxVal) * 100);
+                            return (
+                              <div key={i} style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', gap:1, position:'relative' }}>
+                                <div style={{ width:'70%', height:`${hS}%`, borderRadius:'4px 4px 0 0', background:'linear-gradient(180deg, #ef4444, #dc2626)', opacity:0.8 }} />
+                                <div style={{ width:'70%', height:`${hD}%`, borderRadius:'4px 4px 0 0', background:'linear-gradient(180deg, #f59e0b, #d97706)', opacity:0.8 }} />
+                                {filtered.length <= 14 && (
+                                  <span style={{ fontSize:6, color: apple.textDim, marginTop:2, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', maxWidth:'100%', textAlign:'center' }}>
+                                    {e.date.slice(5)}
+                                  </span>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                        <div style={{ display:'flex', gap:10, fontSize:8, color: apple.textDim, marginTop:6 }}>
+                          <span><span style={{ display:'inline-block', width:8, height:8, borderRadius:2, background:'#ef4444', marginRight:3 }} /> Систолическое</span>
+                          <span><span style={{ display:'inline-block', width:8, height:8, borderRadius:2, background:'#f59e0b', marginRight:3 }} /> Диастолическое</span>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Entry list */}
+                    <div style={{ fontSize:10, color: apple.textDim, fontWeight:600, marginBottom:6 }}>Записи ({filtered.length})</div>
+                    {filtered.length === 0 ? (
+                      <div style={{ ...glassCard, textAlign:'center', padding:20 }}>
+                        <div style={{ fontSize:24, marginBottom:4 }}>🫀</div>
+                        <div style={{ fontSize:10, color: apple.textDim }}>Нет записей за выбранный период</div>
+                      </div>
+                    ) : (
+                      filtered.map((e, i) => {
+                        const bpColor = e.systolic > 140 || e.diastolic > 90 ? '#ef4444' : e.systolic > 130 || e.diastolic > 80 ? '#f59e0b' : apple.accent;
+                        return (
+                          <div key={i} style={{ ...glassCard, display:'flex', alignItems:'center', gap:10, padding:'10px 12px' }}>
+                            <div style={{ width:36, height:36, borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(239,68,68,0.1)', fontSize:16 }}>🫀</div>
+                            <div style={{ flex:1 }}>
+                              <div style={{ fontSize:13, fontWeight:700, color: apple.textPrimary }}>{e.systolic}/{e.diastolic}</div>
+                              <div style={{ fontSize:9, color: apple.textDim }}>Пульс: {e.hr} уд/мин</div>
+                            </div>
+                            <div style={{ textAlign:'right' }}>
+                              <div style={{ fontSize:11, color: bpColor, fontWeight:600 }}>{e.systolic > 140 || e.diastolic > 90 ? '⚠ Повышено' : e.systolic > 130 || e.diastolic > 80 ? '⚡ Граница' : '✅ Норма'}</div>
+                              <div style={{ fontSize:8, color: apple.textDim }}>{e.date}</div>
+                            </div>
+                            <button onClick={() => {
+                              const updated = bpEntries.filter((_, idx) => idx !== bpEntries.indexOf(e));
+                              setBpEntries(updated); saveBPDiary(updated);
+                            }} style={{ padding:'4px 8px', borderRadius:6, border:'1px solid rgba(239,68,68,0.3)', background:'rgba(239,68,68,0.08)', color:'#ef4444', cursor:'pointer', fontSize:9 }}>✕</button>
+                          </div>
+                        );
+                      })
+                    )}
+                  </>
+                );
+              })()}
+            </div>
+          )}
 
           {/* ═══ CONTACTS TAB ═══ */}
           {tab === 'contacts' && (

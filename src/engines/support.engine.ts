@@ -1195,7 +1195,7 @@ export function calculateSupport(input: SupportInput): SupportOutput {
     totalRaw += systemBreakdownRaw[system];
   }
 
-  const riskBeforeSupport = Math.min(100, totalRaw / ALL_RISK_SYSTEMS.length);
+  const riskBeforeSupport = Math.min(100, Math.max(...Object.values(systemBreakdownRaw)));
 
   const { score: supportScore, systemSupport, organSupport } = calculateSupportScore(input, substances, input.substances);
 
@@ -1215,7 +1215,7 @@ export function calculateSupport(input: SupportInput): SupportOutput {
   for (const system of ALL_RISK_SYSTEMS) {
     totalNet += systemBreakdownNet[system];
   }
-  const riskAfterSupport = Math.min(100, totalNet / ALL_RISK_SYSTEMS.length);
+  const riskAfterSupport = Math.min(100, Math.max(...Object.values(systemBreakdownNet)));
 
   const riskResult: RiskResult = {
     overallRaw: riskBeforeSupport,
