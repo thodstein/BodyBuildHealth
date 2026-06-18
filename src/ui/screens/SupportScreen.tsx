@@ -1255,6 +1255,13 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   const [interactionSearchIdx, setInteractionSearchIdx] = useState<number>(0);
   const [pharmaInteractIds, setPharmaInteractIds] = useState<string[]>(['', '']);
   const [pharmaInteractSearch, setPharmaInteractSearch] = useState('');
+  // Auto-seed pharma interaction selectors from course
+  useEffect(() => {
+    const courseIds = (linked.course || []).map(c => c.substanceId).filter(Boolean);
+    if (courseIds.length > 0 && pharmaInteractIds.every(id => !id)) {
+      setPharmaInteractIds(courseIds.slice(0, Math.min(4, courseIds.length)));
+    }
+  }, [(linked.course || []).length]);
   const [stackCalcSize, setStackCalcSize] = useState<string>('5-7');
   const [stackCalcOrgans, setStackCalcOrgans] = useState<string[]>([]);
   const [stackCalcMech, setStackCalcMech] = useState<string[]>([]);

@@ -1821,6 +1821,7 @@ const PeptideCalcTab: React.FC = () => {
 };
 
 const InteractionCheckerTab: React.FC = () => {
+  const linked = useDataLink();
   const [interactSub, setInteractSub] = useState<'interactions' | 'synergies'>('interactions');
   // Filter to show only pharma core substances (exclude peptides, PCT, support)
   const PHARMA_INTERACT_FILTER = new Set(['testosterone','trenbolone','nandrolone','boldenone','primobolan','oral_17aa','sarm','drostanolone','dht_derivative','igf1','mgf','insulin']);
@@ -1842,6 +1843,12 @@ const InteractionCheckerTab: React.FC = () => {
   const [selectedIds, setSelectedIds] = useState<string[]>(['', '']);
   const [doseMgWk, setDoseMgWk] = useState(300);
   const [interactSearch, setInteractSearch] = useState('');
+  useEffect(() => {
+    const courseIds = (linked.course || []).map(c => c.substanceId).filter(Boolean);
+    if (courseIds.length > 0 && selectedIds.every(id => !id)) {
+      setSelectedIds(courseIds.slice(0, Math.min(4, courseIds.length)));
+    }
+  }, [(linked.course || []).length]);
 
   const addDrug = () => setSelectedIds([...selectedIds, '']);
   const removeDrug = (idx: number) => setSelectedIds(selectedIds.filter((_, i) => i !== idx));
