@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { SYNERGY_PAIRS, ORGAN_SYNERGIES, SUPPLEMENT_DESCRIPTIONS, SUPPLEMENT_TARGETS, SUPPORT_RESEARCH, calculateSupport, checkSupportInteractions, findSupportForGoal, searchSupport, getSubstanceInfo, getSupportDatabaseStats, type SupportInput, type SynergyPair, type SupplementTarget, type OrganSynergy } from '../../engines/support.engine';
+import { decodeGarbled, cleanDesc, cleanSynergy, isReadableText } from '../../utils/text-sanitizer';
 import { RISK_SYSTEMS, ALL_RISK_SYSTEMS } from '../../core/constants';
 import { PHARMA_DB, getPharmaDetail } from '../../core/pharma-database';
 import { useDataLink, notifyDataChange } from '../../core/data-link';
@@ -927,11 +928,12 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   const [autoLevel, setAutoLevel] = useState<'basic' | 'mid' | 'max' | 'boost'>('mid');
   const [expandedMed, setExpandedMed] = useState<string | null>(null);
   const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({});
+  const goHome = () => { setSection('home'); setTab('main'); setSupportView('main'); setCalcView('main'); };
   const goBack = () => {
-    if (calcView !== 'main') { setCalcView('main'); return; }
-    if (supportView !== 'main') { setSupportView('main'); return; }
-    if (tab !== 'main') { setTab('main'); if (section === 'info') { setSection('home'); setSupportView('main'); setCalcView('main'); } return; }
-    if (section !== 'home') { setSection('home'); return; }
+    if (calcView !== 'main') { setCalcView('main'); setSupportView('main'); setTab('main'); setSection('home'); return; }
+    if (supportView !== 'main') { setSupportView('main'); setTab('main'); setSection('home'); return; }
+    if (tab !== 'main') { setTab('main'); setSection('home'); setSupportView('main'); setCalcView('main'); return; }
+    if (section !== 'home') { setSection('home'); setTab('main'); setSupportView('main'); setCalcView('main'); return; }
   };
   const [interactionTypeFilter, setInteractionTypeFilter] = useState<string>('all');
   const [interactionSeverityFilter, setInteractionSeverityFilter] = useState<string>('all');
@@ -2404,7 +2406,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
         <div style={{ position:'fixed', top:0, left:0, right:0, zIndex:150, background:'var(--bg-primary)', borderBottom:'1px solid var(--border)' }}>
           <div style={{ display:'flex', gap:6, padding:'4px 12px', borderBottom:'1px solid var(--border)', alignItems:'center' }}>
             <button onClick={goBack} style={{ padding:'3px 10px', borderRadius:6, fontSize:10, cursor:'pointer', background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600, whiteSpace:'nowrap' }}>← Назад</button>
-            <button onClick={() => { setSection('home'); setTab('main'); setSupportView('main'); setCalcView('main'); }} style={{ padding:'3px 10px', borderRadius:6, fontSize:10, cursor:'pointer', background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600, whiteSpace:'nowrap' }}>← На главную</button>
+            <button onClick={goHome} style={{ padding:'3px 10px', borderRadius:6, fontSize:10, cursor:'pointer', background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600, whiteSpace:'nowrap' }}>← На главную</button>
             <div style={{ flex:1 }} />
             <span style={{ fontSize:9, color:'var(--text-dim)', fontWeight:600 }}>Поддержка</span>
           </div>
@@ -2493,7 +2495,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
           <img src="/calc-hero.jpg" alt="" style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'cover', objectPosition:'center top' }} />
           <div style={{ position:'absolute', inset:0, background:'linear-gradient(transparent 50%, rgba(0,0,0,0.85))' }} />
           <div style={{ position:'relative', zIndex:2, flex:1, display:'flex', flexDirection:'column', padding:'10px 12px 16px', overflow:'hidden' }}>
-            <button onClick={() => setSupportView('main')} style={{ alignSelf:'flex-start', padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', marginBottom:8, background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← Назад</button>
+            <button onClick={goHome} style={{ alignSelf:'flex-start', padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', marginBottom:8, background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← Назад</button>
             <h2 style={{ fontSize:18, fontWeight:800, color:'#fff', margin:'8px 0 2px', textShadow:'0 2px 10px rgba(0,0,0,0.9)' }}>Расчет поддержки</h2>
             <p style={{ fontSize:10, color:'rgba(255,255,255,0.9)', margin:'0 0 16px', textShadow:'0 1px 6px rgba(0,0,0,0.8)' }}>
               Калькулятор поддержки, пептидный калькулятор и общая информация
@@ -2537,7 +2539,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
         <div style={{ padding:'0 0 70px', height:'100vh', display:'flex', flexDirection:'column' }}>
           <div style={{ display:'flex', gap:6, marginBottom:6 }}>
             <button onClick={goBack} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← Назад</button>
-            <button onClick={() => setSupportView('main')} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← На главную Поддержки</button>
+            <button onClick={goHome} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← На главную Поддержки</button>
           </div>
           {/* Pills */}
           <div style={{ display:'flex', gap:4, marginBottom:8, overflowX:'auto', scrollbarWidth:'none', flexShrink:0 }}>
@@ -3458,7 +3460,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
           <img src="/fertility-hero.jpg" alt="" style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'cover', objectPosition:'center top' }} />
           <div style={{ position:'absolute', inset:0, background:'linear-gradient(transparent 50%, rgba(0,0,0,0.85))' }} />
           <div style={{ position:'relative', zIndex:2, flex:1, display:'flex', flexDirection:'column', justifyContent:'flex-end', padding:'16px 16px 80px' }}>
-            <button onClick={() => setSupportView('main')} style={{ alignSelf:'flex-start', padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', marginBottom:8, background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← Назад</button>
+            <button onClick={goHome} style={{ alignSelf:'flex-start', padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', marginBottom:8, background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← Назад</button>
             <h2 style={{ fontSize:18, fontWeight:800, color:'#fff', margin:'8px 0 2px', textShadow:'0 2px 10px rgba(0,0,0,0.9)' }}>ПКТ и Фертильность</h2>
             <p style={{ fontSize:10, color:'rgba(255,255,255,0.9)', margin:'0 0 16px', textShadow:'0 1px 6px rgba(0,0,0,0.8)' }}>
               Анализы, план ПКТ и восстановление фертильности
@@ -4368,7 +4370,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
         <div style={{ padding:'0 0 70px' }}>
           <div style={{ display:'flex', gap:6, marginBottom:6 }}>
             <button onClick={goBack} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← Назад</button>
-            <button onClick={() => setSupportView('main')} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← На главную Поддержки</button>
+            <button onClick={goHome} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← На главную Поддержки</button>
           </div>
           {safeRender('calc_stackcalc', () => {
             const organList = [
@@ -4534,7 +4536,7 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
         <div style={{ padding:'0 0 80px' }}>
           <div style={{ display:'flex', gap:6, marginBottom:6 }}>
             <button onClick={goBack} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← Назад</button>
-            <button onClick={() => setSupportView('main')} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← На главную Поддержки</button>
+            <button onClick={goHome} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← На главную Поддержки</button>
           </div>
           <h2 style={{ margin:'0 0 6px', fontSize:16, fontWeight:800, color:'var(--accent)' }}>📂 Мои стеки</h2>
           <p style={{ fontSize:10, color:'var(--text-dim)', margin:'0 0 12px' }}>Сохранённые стеки поддержки из калькулятора. Выберите уровень, рассчитайте и сохраните.</p>
@@ -4590,7 +4592,7 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
         <div style={{ padding:'0 0 80px', height:'100vh', display:'flex', flexDirection:'column' }}>
           <div style={{ display:'flex', gap:6, marginBottom:6 }}>
             <button onClick={goBack} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← Назад</button>
-            <button onClick={() => setSupportView('main')} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← На главную Поддержки</button>
+            <button onClick={goHome} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← На главную Поддержки</button>
           </div>
           <div style={{ flex:1, overflowY:'auto', paddingRight:4 }}>
             <h2 style={{ margin:'0 0 2px', fontSize:16, fontWeight:800, color:'var(--accent)' }}>⚡ Миксы для тренировки</h2>
@@ -4782,7 +4784,7 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
         <div style={{ padding:'0 0 80px' }}>
           <div style={{ display:'flex', gap:6, marginBottom:6 }}>
             <button onClick={goBack} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← Назад</button>
-            <button onClick={() => setSupportView('main')} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← На главную Поддержки</button>
+            <button onClick={goHome} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← На главную Поддержки</button>
           </div>
           <h2 style={{ margin:'0 0 2px', fontSize:16, fontWeight:800, color:'var(--accent)' }}>📅 План поддержки</h2>
           <p style={{ fontSize:10, color:'var(--text-dim)', margin:'0 0 12px' }}>Сгенерирован из уровня: {SUPPORT_LEVELS[supportLevel]?.label || supportLevel}</p>
@@ -5259,7 +5261,7 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
         <div style={{ padding:'0 0 80px', height:'100vh', display:'flex', flexDirection:'column' }}>
           <div style={{ display:'flex', gap:6, marginBottom:6, flexWrap:'wrap' }}>
             <button onClick={goBack} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← Назад</button>
-            <button onClick={() => setSupportView('main')} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← На главную</button>
+            <button onClick={goHome} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← На главную</button>
           </div>
           <h2 style={{ margin:'0 0 2px', fontSize:16, fontWeight:800, color:'var(--accent)' }}>🧮 Калькулятор поддержки</h2>
           <p style={{ fontSize:10, color:'var(--text-dim)', margin:'0 0 10px' }}>Анализ курса + анализов + рисков → персонализированный план</p>
@@ -5312,7 +5314,7 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
               </div>
               {(expandedCategories.calc_labs ?? true) && (<>
               {labs.length === 0 ? (
-                <p style={{ fontSize:9, color:'var(--text-dim)', margin:0 }}>Нет анализов. <span style={{ color:'#60a5fa', cursor:'pointer', textDecoration:'underline' }} onClick={() => setSupportView('main')}>Добавьте анализы</span> для персональных рекомендаций.</p>
+                <p style={{ fontSize:9, color:'var(--text-dim)', margin:0 }}>Нет анализов. <span style={{ color:'#60a5fa', cursor:'pointer', textDecoration:'underline' }} onClick={goHome}>Добавьте анализы</span> для персональных рекомендаций.</p>
               ) : (() => {
                 const allLabResults = Object.keys(LAB_REC_MAP).map(code => getLabStatus(code)).filter(Boolean).filter(s => s!.status !== 'normal');
                 if (allLabResults.length === 0) return <p style={{ fontSize:9, color:'#22c55e', margin:0 }}>Все показатели в норме ✅</p>;
@@ -5434,6 +5436,24 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
                 </div>
               )}
             </>)}
+            </div>
+
+            {/* ==================== GOAL SELECTOR (under phase card) ==================== */}
+            <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:12, border:'1px solid var(--border)' }}>
+              <div style={{ fontSize:9, color:'var(--text-dim)', marginBottom:6 }}>🎯 Цель</div>
+              <div style={{ display:'flex', flexWrap:'wrap', gap:4 }}>
+                {[{ v:'muscle_gain', l:'💪 Масса' },{ v:'fat_loss', l:'🔥 Сушка' },{ v:'strength', l:'🏋️ Сила' },
+                  { v:'endurance', l:'🏃 Выносливость' },{ v:'recomp', l:'⚖️ Рекомп' },{ v:'maintenance', l:'🔄 Поддержание' }
+                ].map(g => (
+                  <button key={g.v} onClick={() => setSupportGoal(g.v)} style={{
+                    padding:'5px 8px', borderRadius:6, fontSize:10, cursor:'pointer',
+                    background: supportGoal === g.v ? 'rgba(0,230,138,0.15)' : 'var(--bg-secondary)',
+                    border: supportGoal === g.v ? '1px solid var(--accent)' : '1px solid var(--border)',
+                    color: supportGoal === g.v ? '#00e68a' : 'var(--text-dim)',
+                    fontWeight: supportGoal === g.v ? 700 : 400,
+                  }}>{g.l}</button>
+                ))}
+              </div>
             </div>
 
             {/* ==================== ADD 1: REAL CALCULATESUPPORT INTEGRATION ==================== */}
@@ -5700,19 +5720,13 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
                 })}
               </div>
 
-              <div style={{ marginTop:8 }}>
-                <div style={{ fontSize:9, color:'var(--text-dim)', marginBottom:4 }}>Цель</div>
-                <div style={{ display:'flex', flexWrap:'wrap', gap:4 }}>
-                  {[{ v:'muscle_gain', l:'💪 Масса' },{ v:'fat_loss', l:'🔥 Сушка' },{ v:'strength', l:'🏋️ Сила' },{ v:'endurance', l:'🏃 Выносливость' },{ v:'recomp', l:'⚖️ Рекомп' },{ v:'maintenance', l:'🔄 Поддержание' }].map(g => (
-                    <button key={g.v} onClick={() => setSupportGoal(g.v)} style={{
-                      padding:'5px 8px', borderRadius:6, fontSize:10, cursor:'pointer',
-                      background: supportGoal === g.v ? 'rgba(0,230,138,0.15)' : 'var(--bg-secondary)',
-                      border: supportGoal === g.v ? '1px solid var(--accent)' : '1px solid var(--border)',
-                      color: supportGoal === g.v ? '#00e68a' : 'var(--text-dim)', fontWeight: supportGoal === g.v ? 700 : 400,
-                    }}>{g.l}</button>
-                  ))}
+              {calcDone && calcResult && (
+                <div style={{ marginTop:8, textAlign:'center' }}>
+                  <span style={{ fontSize:9, color:'var(--text-dim)' }}>Без поддержки: <b style={{ color:'#ef4444' }}>{Math.round(calcResult.riskBeforeSupport)}%</b></span>
+                  <span style={{ color:'var(--text-dim)', margin:'0 4px' }}>/</span>
+                  <span style={{ fontSize:9, color:'var(--text-dim)' }}>С поддержкой: <b style={{ color:'#22c55e' }}>{Math.round(calcResult.riskAfterSupport)}%</b></span>
                 </div>
-              </div>
+              )}
 
               <button onClick={execCalculate} style={{
                 width:'100%', padding:'12px', borderRadius:8, border:'none', cursor:'pointer', marginTop:8,
@@ -5922,7 +5936,7 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
         <div style={{ padding:'0 0 80px', height:'100vh', display:'flex', flexDirection:'column' }}>
           <div style={{ display:'flex', gap:6, marginBottom:6 }}>
             <button onClick={goBack} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← Назад</button>
-            <button onClick={() => setSupportView('main')} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← На главную Поддержки</button>
+            <button onClick={goHome} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← На главную Поддержки</button>
           </div>
           <h2 style={{ margin:'0 0 4px', fontSize:16, fontWeight:800, color:'#a78bfa' }}>🧬 Пептидный калькулятор</h2>
           <p style={{ fontSize:10, color:'var(--text-dim)', margin:'0 0 12px' }}>Расчёт дозировок, баков, разведения и протоколов пептидов.</p>
@@ -6099,7 +6113,7 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
         return safeRender('neuro', () => (
         <div style={{ padding:'0 0 80px' }}>
           <button onClick={goBack} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', marginBottom:6, background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← Назад</button>
-          <button onClick={() => setSupportView('main')} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', marginBottom:4, marginLeft:6, background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← На главную Поддержки</button>
+          <button onClick={goHome} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', marginBottom:4, marginLeft:6, background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← На главную Поддержки</button>
           <h2 style={{ margin:'0 0 4px', fontSize:16, fontWeight:800, color:'#ec4899' }}>🧠 Нейротоксичность ААС</h2>
           <p style={{ fontSize:10, color:'var(--text-dim)', margin:'0 0 12px', lineHeight:1.4 }}>
             Механизмы нейротоксичности, калькулятор риска и многоуровневый протокол нейропротекции.
@@ -6350,7 +6364,7 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
         return safeRender('joints', () => (
         <div style={{ padding:'0 0 80px' }}>
           <button onClick={goBack} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', marginBottom:6, background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← Назад</button>
-          <button onClick={() => setSupportView('main')} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', marginBottom:4, marginLeft:6, background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← На главную Поддержки</button>
+          <button onClick={goHome} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', marginBottom:4, marginLeft:6, background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← На главную Поддержки</button>
           <h2 style={{ margin:'0 0 4px', fontSize:16, fontWeight:800, color:'#f59e0b' }}>🦴 Калькулятор суставов и связок</h2>
           <p style={{ fontSize:10, color:'var(--text-dim)', margin:'0 0 12px', lineHeight:1.4 }}>
             Оценка риска суставной патологии и многоуровневая поддержка хрящевой и соединительной ткани.
@@ -6546,7 +6560,7 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
       {section === 'info' && tab === 'main' && supportView === 'calc' && calcView === 'acne' && (
         <div style={{ padding:'0 0 80px' }}>
           <button onClick={goBack} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', marginBottom:6, background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← Назад</button>
-          <button onClick={() => setSupportView('main')} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', marginBottom:4, marginLeft:6, background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← На главную Поддержки</button>
+          <button onClick={goHome} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', marginBottom:4, marginLeft:6, background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← На главную Поддержки</button>
           <h2 style={{ margin:'0 0 4px', fontSize:16, fontWeight:800, color:'#ef4444' }}>🔴 Анти-прыщ протокол</h2>
           <p style={{ fontSize:10, color:'var(--text-dim)', margin:'0 0 12px' }}>Протокол борьбы с акне на курсе ААС: системная и локальная терапия.</p>
           <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:14, marginBottom:10, border:'1px solid var(--border)' }}>
@@ -6660,11 +6674,10 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
                 {(SUPPORT_LEVELS[modalLevel]?.subs || []).map((id: string) => {
                   const sub = allSupport.find(s => s.id === id);
                   if (!sub) return null;
-                  const descOk = sub.description && /^[а-яА-Яa-zA-Z0-9\s\-–—,.!?;:()]+$/u.test(sub.description.slice(0,10));
                   return (
                     <div key={id} style={{ padding:'6px 8px', borderRadius:6, background:'rgba(255,255,255,0.03)', border:'1px solid var(--border)', fontSize:10 }}>
                       <div style={{ fontWeight:600, color:'var(--text-light)' }}>{sub.name}</div>
-                      {sub.description && <div style={{ fontSize:8, color:'var(--text-dim)' }}>{descOk ? sub.description?.slice(0,80) : sub.id.replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase())}</div>}
+                      {sub.description && <div style={{ fontSize:8, color:'var(--text-dim)' }}>{cleanDesc(sub).slice(0,80)}</div>}
                     </div>
                   );
                 })}
@@ -6686,7 +6699,7 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
                 }} />
                 <button onClick={() => {
                   try {
-                    const saved = JSON.parse(localStorage.getItem('savedSupportStacks') || '[]');
+                    const saved = JSON.parse(localStorage.getItem('savedStacks') || '[]');
                     if (saved.length > 0) {
                       const ids = saved[0].subs || [];
                       setEnhancedSubs(ids);

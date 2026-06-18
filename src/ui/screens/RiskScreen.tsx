@@ -403,11 +403,11 @@ export const RiskScreen: React.FC = () => {
             <div style={{ fontSize:11, color:'var(--text-dim)', marginBottom:6 }}>📊 Общий риск</div>
             <div style={{ display:'flex', justifyContent:'center', gap:10, marginBottom:4, flexWrap:'wrap' }}>
               <div>
-                <div style={{ fontSize:9, color:'var(--text-dim)' }}>Net</div>
+                <div style={{ fontSize:9, color:'var(--text-dim)' }}>С поддержкой</div>
                 <div style={{ fontSize:28, fontWeight:800, color:getRiskColor(riskResult.overallNet) }}>{Math.round(riskResult.overallNet)}%</div>
               </div>
               <div>
-                <div style={{ fontSize:9, color:'var(--text-dim)' }}>Raw</div>
+                <div style={{ fontSize:9, color:'var(--text-dim)' }}>Без поддержки</div>
                 <div style={{ fontSize:28, fontWeight:800, color:getRiskColor(riskResult.overallRaw) }}>{Math.round(riskResult.overallRaw)}%</div>
               </div>
             </div>
@@ -505,7 +505,7 @@ export const RiskScreen: React.FC = () => {
                   <div style={{ width:`${s.net}%`, height:'100%', background:getRiskColor(s.net), borderRadius:2 }} />
                 </div>
                 <div style={{ display:'flex', gap:8, marginTop:2, fontSize:9, color:'var(--text-dim)' }}>
-                  <span>Raw: {Math.round(s.raw)}%</span>
+                  <span>Без поддержки: {Math.round(s.raw)}%</span>
                 </div>
               </div>
             ))}
