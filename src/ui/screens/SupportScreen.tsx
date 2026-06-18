@@ -959,8 +959,22 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({});
   const goHome = () => { setSection('home'); setTab('main'); setSupportView('main'); setCalcView('main'); setInfoView('catalog'); };
   const goBack = () => {
-    if (calcView !== 'main') { setCalcView('main'); setSupportView('calc'); setTab('main'); return; }
-    if (supportView === 'calc' || supportView !== 'main') { setSupportView('main'); setTab('main'); return; }
+    if (calcView !== 'main') {
+      if (section === 'generator') {
+        setSection('home'); setTab('main'); setSupportView('main'); setCalcView('main');
+      } else {
+        setCalcView('main');
+      }
+      return;
+    }
+    if (supportView === 'calc' || supportView !== 'main') {
+      if (section === 'generator') {
+        setSection('home'); setTab('main'); setSupportView('main'); setCalcView('main');
+      } else {
+        setSupportView('main');
+      }
+      setTab('main'); return;
+    }
     if (tab !== 'main') { setTab('main'); return; }
     if (section !== 'home') { setSection('home'); setTab('main'); setSupportView('main'); setCalcView('main'); return; }
   };
@@ -1289,7 +1303,8 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
     } catch (e2) { /* ignore profile save errors */ }
   };
 
-  useEffect(() => { calcSupport(); }, [supportDrugs, supportGoal, supportLevel, enhancedSubs]);
+  // Removed auto-calc useEffect. User clicks "Рассчитать поддержку" manually.
+  const [calcRequested, setCalcRequested] = useState(false);
 
   // Interaction checker state
   const [interactTab, setInteractTab] = useState<'support' | 'pharma'>('support');
@@ -1315,6 +1330,14 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   const [pubMedLoading, setPubMedLoading] = useState(false);
   const [planView, setPlanView] = useState<'daily' | 'weekly' | 'monthly'>('daily');
   const [planSaved, setPlanSaved] = useState(false);
+  const [planSubTab, setPlanSubTab] = useState<'active' | 'archive'>('active');
+  const [archivedPlans, setArchivedPlans] = useState<any[]>(() => {
+    try { return JSON.parse(localStorage.getItem('supportPlanArchive') || '[]'); } catch { return []; }
+  });
+  const [expandedArchiveId, setExpandedArchiveId] = useState<string | null>(null);
+  const [cartItems, setCartItems] = useState<any[]>(() => {
+    try { return JSON.parse(localStorage.getItem('supportCart') || '[]'); } catch { return []; }
+  });
   const [pubMedError, setPubMedError] = useState('');
   const [pharmaSearchQ, setPharmaSearchQ] = useState('');
   const [pharmaSearchResults, setPharmaSearchResults] = useState<{ name: string; id: string; cls: string; desc: string }[]>([]);
@@ -1324,6 +1347,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   const [stackNotes, setStackNotes] = useState('');
   const [editingStackNotes, setEditingStackNotes] = useState<string | null>(null);
   const [editNotesText, setEditNotesText] = useState('');
+  const [expandedStack, setExpandedStack] = useState<string | null>(null);
   const [researchSource, setResearchSource] = useState<'pubmed' | 'pubchem' | 'scholar' | 'fda' | 'pharma'>('pubmed');
   const [pubchemResults, setPubchemResults] = useState<any[]>([]);
   const [pubchemLoading, setPubchemLoading] = useState(false);
@@ -2390,13 +2414,18 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
   };
 
   return (
-    <div className="screen support-screen" style={{ paddingTop: section === 'info' || calcView === 'info' || ['mixcalc','neuro','joints','acne'].includes(calcView) ? '88px' : section !== 'home' ? '50px' : '10px', paddingBottom: '50px' }}>
+    <div className="screen support-screen" style={{ paddingTop: section === 'info' || calcView === 'info' || ['mixcalc','neuro','joints','acne'].includes(calcView) || section === 'generator' || section === 'hormonal' ? '88px' : section !== 'home' ? '50px' : '10px', paddingBottom: '50px' }}>
 
-      {/* ===== GENERATOR SUB-TAB PILLS ===== */}
+      {/* ===== GENERATOR SUB-TAB PILLS (with back/home) ===== */}
       {section === 'generator' && (
-        <div style={{ position:'fixed', top:0, left:0, right:0, zIndex:150, display:'flex', gap:4, padding:'8px 12px', background:'var(--bg-primary)', borderBottom:'1px solid var(--border)', overflowX:'auto' }}>
-          {[['calculator','Калькулятор'],['stackgen','Генератор стеков'],['mystacks','Мои стеки'],['plan','План']].map(([id,label]) => (
-            <button key={id} onClick={() => { setGenTab(id as any); 
+        <div style={{ position:'fixed', top:0, left:0, right:0, zIndex:150, background:'var(--bg-primary)', borderBottom:'1px solid var(--border)' }}>
+          <div style={{ display:'flex', gap:6, padding:'4px 12px', borderBottom:'1px solid var(--border)', alignItems:'center', overflowX:'auto' }}>
+            <button onClick={goBack} style={{ padding:'3px 10px', borderRadius:6, fontSize:10, cursor:'pointer', background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600, whiteSpace:'nowrap' }}>← Назад</button>
+            <button onClick={goHome} style={{ padding:'3px 10px', borderRadius:6, fontSize:10, cursor:'pointer', background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600, whiteSpace:'nowrap' }}>← На главную</button>
+          </div>
+          <div style={{ display:'flex', gap:4, padding:'6px 12px 8px', overflowX:'auto', scrollbarWidth:'none' }}>
+            {[['calculator','Калькулятор'],['stackgen','Генератор стеков'],['mystacks','Мои стеки'],['plan','План']].map(([id,label]) => (
+              <button key={id} onClick={() => { setGenTab(id as any); 
               const a: Record<string,()=>void> = {
                 calculator: ()=>{ setTab('calculator'); setSupportView('calc'); },
                 stackgen: ()=>{ setTab('main'); setSupportView('calc'); setCalcView('stackcalc'); },
@@ -2411,13 +2440,19 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
               border: '1px solid ' + (genTab === id ? 'var(--accent)' : 'var(--border)'),
             }}>{label}</button>
           ))}
+          </div>
         </div>
       )}
 
-      {/* ===== HORMONAL SUB-TAB PILLS ===== */}
+      {/* ===== HORMONAL SUB-TAB PILLS (with back/home) ===== */}
       {section === 'hormonal' && tab !== 'fertility-pct' && (
-        <div style={{ position:'fixed', top:0, left:0, right:0, zIndex:150, display:'flex', gap:4, padding:'8px 12px', background:'var(--bg-primary)', borderBottom:'1px solid var(--border)', overflowX:'auto' }}>
-          {[['pct','ПКТ'],['fertility','Фертильность'],['hrt','ГЗТ']].map(([id,label]) => (
+        <div style={{ position:'fixed', top:0, left:0, right:0, zIndex:150, background:'var(--bg-primary)', borderBottom:'1px solid var(--border)' }}>
+          <div style={{ display:'flex', gap:6, padding:'4px 12px', borderBottom:'1px solid var(--border)', alignItems:'center', overflowX:'auto' }}>
+            <button onClick={goBack} style={{ padding:'3px 10px', borderRadius:6, fontSize:10, cursor:'pointer', background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600, whiteSpace:'nowrap' }}>← Назад</button>
+            <button onClick={goHome} style={{ padding:'3px 10px', borderRadius:6, fontSize:10, cursor:'pointer', background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600, whiteSpace:'nowrap' }}>← На главную</button>
+          </div>
+          <div style={{ display:'flex', gap:4, padding:'6px 12px 8px', overflowX:'auto', scrollbarWidth:'none' }}>
+            {[['pct','ПКТ'],['fertility','Фертильность'],['hrt','ГЗТ']].map(([id,label]) => (
             <button key={id} onClick={() => { setHormonalTab(id as any);
               const a: Record<string,()=>void> = {
                 pct: ()=>setTab('fertility-pct'),
@@ -2432,6 +2467,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
               border: '1px solid ' + (hormonalTab === id ? 'var(--accent)' : 'var(--border)'),
             }}>{label}</button>
           ))}
+          </div>
         </div>
       )}
 
@@ -3640,6 +3676,57 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
             <button onClick={goHome} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← На главную Поддержки</button>
           </div>
           {safeRender('calc_stackcalc', () => {
+            const MECH_ROLE_LABELS: Record<string, string> = {
+              antioxidant: 'Антиоксидант', anti_inflammatory: 'Противовоспал.', liver_protection: 'Гепатопротектор',
+              hepatoprotective: 'Гепатопротектор', kidney_protection: 'Нефропротектор', nephroprotective: 'Нефропротектор',
+              neuroprotective: 'Нейропротектор', brain_support: 'Поддержка мозга', cognitive: 'Когнитивный',
+              cardio_protection: 'Кардиопротектор', cardioprotective: 'Кардиопротектор', hypotensive: 'Снижает АД',
+              lipid_lowering: 'Снижает липиды', endocrine_support: 'Поддержка гормонов', hormonal: 'Гормональный',
+              immune_support: 'Иммуномодулятор', immunomodulator: 'Иммуномодулятор', anti_catabolic: 'Антикатаболик',
+              anabolic: 'Анаболик', energy: 'Энергия', mitochondrial: 'Митохондрии', adaptogen: 'Адаптоген',
+              stress_reduction: 'Стресс-протектор', nootropic: 'Ноотроп', detoxification: 'Детокс',
+              anti_estrogenic: 'Антиэстроген', anti_aging: 'Антивозрастной', gastrointestinal: 'Поддержка ЖКТ',
+              digestive: 'Пищеварение', probiotic: 'Пробиотик', bone_health: 'Кости', joint_health: 'Суставы',
+              skin_health: 'Кожа', hair_health: 'Волосы', blood_sugar: 'Сахар крови', insulin_sensitizer: 'Инсулин.сенс.',
+              thyroid_support: 'Щитовидка', eye_health: 'Зрение', respiratory: 'Дыхание', anti_coagulant: 'Антикоагулянт',
+              circulation: 'Циркуляция', libido: 'Либидо', testosterone: 'Тестостерон', fertility: 'Фертильность',
+              general: 'Общая поддержка', metabolic: 'Метаболизм', sleep: 'Сон', mood: 'Настроение',
+              anti_estrogen: 'Антиэстроген', aromatase_inhibitor: 'Ингиб. ароматазы', dopamine: 'Дофамин',
+              gaba: 'ГАМК', serotonin: 'Серотонин', glucocorticoid: 'Глюкокортикоид', anticoagulant: 'Антикоагулянт',
+              antiplatelet: 'Антиагрегант', vasodilator: 'Вазодилататор', nitric_oxide: 'Оксид азота',
+              hpta_support: 'HPTA', liver_detox: 'Детокс печени', bile: 'Желчегонное', pancreatic: 'Поджелудочная',
+              gut_health: 'Кишечник', microbiome: 'Микробиом', prebiotic: 'Пребиотик', antimicrobial: 'Антимикробн.',
+              antifungal: 'Противогрибк.', antiviral: 'Противовирусн.', anticancer: 'Противораков.',
+              chemoprotective: 'Химопротектор', radioprotective: 'Радиопротектор', anti_allergic: 'Антиаллерген',
+              antihistamine: 'Антигистамин', expectorant: 'Отхаркивающее', mucolytic: 'Муколитик',
+              bronchodilator: 'Бронходилататор', anti_asthmatic: 'Против астмы', anti_arthritic: 'Против артрита',
+              analgesic: 'Анальгетик', anti_spasmodic: 'Спазмолитик', muscle_relaxant: 'Миорелаксант',
+              wound_healing: 'Заживление', anti_scar: 'Против рубцов', collagen: 'Коллаген',
+              anti_cellulite: 'Против целлюлита', lymphatic: 'Лимфа', diuretic: 'Диуретик',
+              anti_edema: 'Против отёков', vein_tonic: 'Венотоник', anti_varicose: 'Против варикоза',
+              anti_hemorrhoidal: 'Против геморроя', anti_ulcer: 'Против язвы', anti_reflux: 'Против рефлюкса',
+              anti_emetic: 'Противорвотн.', anti_nausea: 'Против тошноты', appetite: 'Аппетит',
+              anti_obesity: 'Против ожирения', thermogenic: 'Термогеник', fat_burner: 'Жиросжигатель',
+              lipolytic: 'Липолитик', anti_lipid: 'Антилипидный', hypoglycemic: 'Гипогликемический',
+              anti_diabetic: 'Противодиабетический', anti_glycation: 'Антигликация', anti_cataract: 'Против катаракты',
+              anti_glaucoma: 'Против глаукомы', retinal: 'Сетчатка', macular: 'Макула',
+              hearing: 'Слух', anti_tinnitus: 'Против шума', anti_vertigo: 'Против головокружения',
+              anti_migraine: 'Против мигрени', anti_convulsant: 'Противосудорожн.',
+              anti_parkinson: 'Против Паркинсона', anti_alzheimer: 'Против Альцгеймера',
+              anti_depressant: 'Антидепрессант', anti_anxiety: 'Против тревоги', anti_psychotic: 'Антипсихотик',
+              sedative: 'Седативное', hypnotic: 'Снотворное', stimulant: 'Стимулятор',
+              anti_fatigue: 'Против усталости', performance: 'Производительность', endurance: 'Выносливость',
+              recovery: 'Восстановление', muscle_building: 'Мышечный рост', strength: 'Сила',
+              anti_osteoporotic: 'Против остеопороза', chondroprotective: 'Хондропротектор',
+              anti_gout: 'Против подагры', uricosuric: 'Урикозурик', anti_rheumatic: 'Против ревматизма',
+              detox: 'Детокс', heavy_metal: 'Тяжёлые металлы', chelation: 'Хелатор',
+              anti_radiation: 'Против радиации', anti_mutation: 'Против мутаций', dna_repair: 'ДНК-репарация',
+              telomere: 'Теломеры', stem_cell: 'Стволовые клетки', growth_factor: 'Фактор роста',
+              anti_apoptotic: 'Антиапоптоз', autophagy: 'Аутофагия', sirtuin: 'Сиртуин', nad: 'NAD+',
+              ampk: 'AMPK', mtor: 'mTOR', longevity: 'Долголетие', rejuvenation: 'Омоложение',
+              anti_cancer: 'Противораковый', anti_tumor: 'Противоопухолевый', anti_angiogenic: 'Антиангиогенез',
+              pro_apoptotic: 'Проапоптоз', anti_metastatic: 'Антиметастатический', anti_mutagenic: 'Антимутагенный',
+            };
             const organList = [
               {key:'cardio',label:'❤️ Сердце/Сосуды',organs:['heart','vessels','cardiovascular']},
               {key:'liver',label:'🫁 Печень',organs:['liver','hepatobiliary']},
@@ -3780,10 +3867,15 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
                     <summary style={{fontSize:8,fontWeight:600,color:'var(--text-light)',cursor:'pointer',marginBottom:3}}>📋 Детали веществ ({generatedStack.subDetails.length})</summary>
                     <div style={{display:'flex',flexDirection:'column',gap:3}}>
                       {generatedStack.subDetails.map((sd:any,si:number)=>(
-                        <div key={si} style={{padding:'3px 6px',borderRadius:6,background:'var(--bg-secondary)',border:'1px solid var(--border)'}}>
-                          <div style={{fontSize:8,fontWeight:600,color:'var(--text-light)'}}>{sd.name} <span style={{fontSize:7,color:'var(--text-dim)',fontWeight:400}}>{sd.id}</span></div>
+                        <div key={si} style={{padding:'4px 8px',borderRadius:6,background:'var(--bg-secondary)',border:'1px solid var(--border)'}}>
+                          <div style={{fontSize:9,fontWeight:600,color:'var(--text-light)',marginBottom:2}}>{sd.name}</div>
+                          <div style={{display:'flex',flexWrap:'wrap',gap:2,marginBottom:2}}>
+                            {sd.mechanisms && sd.mechanisms.length > 0 && sd.mechanisms.slice(0,3).map((m:string,mi:number)=>{
+                              const role = MECH_ROLE_LABELS[m.toLowerCase().replace(/\s+/g,'_')] || MECH_ROLE_LABELS[m] || '';
+                              return <span key={mi} style={{fontSize:7,padding:'1px 5px',borderRadius:4,background:role?'rgba(0,230,138,0.1)':'rgba(139,92,246,0.08)',color:role?'#00e68a':'#a78bfa',fontWeight:role?600:400}}>{role || MECH_TRANSLATIONS_RU[m] || m}</span>;
+                            })}
+                          </div>
                           {sd.description && <div style={{fontSize:7,color:'var(--text-dim)',lineHeight:1.3}}>{sd.description}</div>}
-                          {sd.mechanisms && sd.mechanisms.length > 0 && <div style={{display:'flex',flexWrap:'wrap',gap:2,marginTop:2}}>{sd.mechanisms.slice(0,5).map((m:string,mi:number)=><span key={mi} style={{fontSize:6,padding:'1px 3px',borderRadius:3,background:'rgba(139,92,246,0.08)',color:'#a78bfa'}}>{MECH_TRANSLATIONS_RU[m] || m}</span>)}</div>}
                         </div>
                       ))}
                     </div>
@@ -3825,50 +3917,84 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
               <div style={{ fontSize:9, color:'var(--text-dim)', marginTop:4 }}>Рассчитайте стек в калькуляторе и нажмите «Сохранить»</div>
             </div>
           ) : (
-            savedStacks.map(stack => (
-              <div key={stack.id} className="card" style={{ marginBottom:6, padding:10 }}>
-                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:4 }}>
-                  <div style={{ flex:1 }}>
-                    <div style={{ fontSize:12, fontWeight:700, color:'var(--accent)' }}>{stack.name}</div>
-                    <div style={{ fontSize:8, color:'var(--text-dim)' }}>{new Date(stack.date).toLocaleDateString('ru')} · {stack.subs.length} добавок</div>
+            savedStacks.map(stack => {
+              const isExpanded = expandedStack === stack.id;
+              return (
+                <div key={stack.id} style={{ marginBottom:8, background:'var(--bg-secondary)', borderRadius:10, border:'1px solid var(--border)', overflow:'hidden' }}>
+                  <div onClick={() => setExpandedStack(isExpanded ? null : stack.id)} style={{ padding:'10px 12px', cursor:'pointer', display:'flex', justifyContent:'space-between', alignItems:'flex-start', borderBottom: isExpanded ? '1px solid var(--border)' : 'none' }}>
+                    <div style={{ flex:1 }}>
+                      <div style={{ fontSize:12, fontWeight:700, color:'var(--accent)' }}>{stack.name}</div>
+                      <div style={{ fontSize:8, color:'var(--text-dim)', marginTop:1 }}>{new Date(stack.date).toLocaleDateString('ru')} · {stack.subs.length} добавок</div>
+                      {(stack as any).description && <div style={{ fontSize:8, color:'var(--text-dim)', marginTop:2, lineHeight:1.3 }}>{(stack as any).description}</div>}
+                    </div>
+                    <span style={{ fontSize:12, color:'var(--text-dim)', flexShrink:0 }}>{isExpanded ? '▲' : '▼'}</span>
                   </div>
-                  <div style={{ display:'flex', gap:3, flexShrink:0 }}>
-                    <button onClick={() => { setEditingStackNotes(editingStackNotes === stack.id ? null : stack.id); setEditNotesText(stack.notes || ''); }} style={{ padding:'3px 5px', borderRadius:6, border:'1px solid rgba(139,92,246,0.3)', background:'rgba(139,92,246,0.08)', color:'#a78bfa', fontSize:8, cursor:'pointer' }}>📝</button>
-                    <button onClick={() => deleteStack(stack.id)} style={{ padding:'3px 5px', borderRadius:6, border:'1px solid rgba(239,68,68,0.3)', background:'rgba(239,68,68,0.08)', color:'#f87171', fontSize:8, cursor:'pointer' }}>✕</button>
-                  </div>
-                </div>
-                {editingStackNotes === stack.id && (
-                  <div style={{ marginBottom:4, display:'flex', gap:3 }}>
-                    <input value={editNotesText} onChange={e => setEditNotesText(e.target.value)} placeholder="Заметка к стеку..."
-                      style={{ flex:1, padding:'3px 6px', borderRadius:4, border:'1px solid var(--border)', background:'var(--bg-secondary)', color:'var(--text)', fontSize:8 }} />
-                    <button onClick={() => {
-                      const updated = savedStacks.map(s => s.id === stack.id ? { ...s, notes: editNotesText } : s);
-                      setSavedStacks(updated);
-                      localStorage.setItem('savedStacks', JSON.stringify(updated));
-                      setEditingStackNotes(null);
-                    }} style={{ padding:'3px 6px', borderRadius:4, border:'none', cursor:'pointer', background:'var(--accent)', color:'#000', fontWeight:700, fontSize:8 }}>OK</button>
-                  </div>
-                )}
-                {stack.notes && editingStackNotes !== stack.id && (
-                  <div style={{ fontSize:8, color:'var(--text-dim)', marginBottom:4, padding:'3px 6px', borderRadius:4, background:'rgba(255,255,255,0.03)', border:'1px solid var(--border)' }}>📝 {stack.notes}</div>
-                )}
-                <div style={{ display:'flex', flexWrap:'wrap', gap:2 }}>
-                  {stack.subs.slice(0, 20).map(id => {
-                    const sub = ALL_SUBSTANCES.find(s => s.id === id);
-                    const pharma = PHARMA_DB[id];
-                    const name = sub?.name || pharma?.name || id.replace(/_/g, ' ');
-                    const dosage = stack.dosages?.[id];
-                    return (
-                      <div key={id} style={{ padding:'2px 6px', borderRadius:5, background:'rgba(139,92,246,0.08)', border:'1px solid rgba(139,92,246,0.15)', fontSize:8 }}>
-                        <span style={{ fontWeight:500 }}>{name}</span>
-                        {dosage && <span style={{ color:'var(--text-dim)', marginLeft:3 }}>{dosage.mg >= 1000 && id !== 'omega3' ? `${(dosage.mg/1000).toFixed(dosage.mg%1000===0?0:1)}г` : `${dosage.mg}мг`}</span>}
+                  {isExpanded && (
+                    <div style={{ padding:'0 12px 10px' }}>
+                      {/* Notes editing */}
+                      {editingStackNotes === stack.id ? (
+                        <div style={{ marginBottom:6, display:'flex', gap:3 }}>
+                          <input value={editNotesText} onChange={e => setEditNotesText(e.target.value)} placeholder="Заметка к стеку..."
+                            style={{ flex:1, padding:'3px 6px', borderRadius:4, border:'1px solid var(--border)', background:'var(--bg-primary)', color:'var(--text)', fontSize:8 }} />
+                          <button onClick={() => {
+                            const updated = savedStacks.map(s => s.id === stack.id ? { ...s, notes: editNotesText } : s);
+                            setSavedStacks(updated);
+                            localStorage.setItem('savedStacks', JSON.stringify(updated));
+                            setEditingStackNotes(null);
+                          }} style={{ padding:'3px 6px', borderRadius:4, border:'none', cursor:'pointer', background:'var(--accent)', color:'#000', fontWeight:700, fontSize:8 }}>OK</button>
+                        </div>
+                      ) : (
+                        stack.notes && <div style={{ fontSize:8, color:'var(--text-dim)', marginBottom:6, padding:'3px 6px', borderRadius:4, background:'rgba(255,255,255,0.03)', border:'1px solid var(--border)' }}>📝 {stack.notes}</div>
+                      )}
+
+                      {/* Full substance list with descriptions */}
+                      <div style={{ display:'flex', flexDirection:'column', gap:3 }}>
+                        {stack.subs.map(id => {
+                          const sub = ALL_SUBSTANCES.find(s => s.id === id);
+                          const pharma = PHARMA_DB[id];
+                          const name = sub?.name || pharma?.name || id.replace(/_/g, ' ');
+                          const dosage = stack.dosages?.[id];
+                          const description = sub?.description || pharma?.description || '';
+                          return (
+                            <div key={id} style={{ padding:'5px 8px', borderRadius:6, background:'rgba(139,92,246,0.05)', border:'1px solid rgba(139,92,246,0.1)' }}>
+                              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                                <span style={{ fontSize:10, fontWeight:600, color:'var(--text-light)' }}>{name}</span>
+                                {dosage && <span style={{ fontSize:9, color:'#00e68a' }}>{dosage.mg >= 1000 && id !== 'omega3' ? `${(dosage.mg/1000).toFixed(dosage.mg%1000===0?0:1)}г` : `${dosage.mg}мг`}</span>}
+                              </div>
+                              {description && <div style={{ fontSize:8, color:'var(--text-dim)', marginTop:2, lineHeight:1.3 }}>{description}</div>}
+                              {sub?.mechanisms && sub.mechanisms.length > 0 && (
+                                <div style={{ display:'flex', flexWrap:'wrap', gap:2, marginTop:2 }}>
+                                  {sub.mechanisms.slice(0,3).map((m: string) => (
+                                    <span key={m} style={{ fontSize:7, padding:'1px 4px', borderRadius:3, background:'rgba(139,92,246,0.1)', color:'#8b5cf6' }}>{m}</span>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
                       </div>
-                    );
-                  })}
-                  {stack.subs.length > 20 && <span style={{ fontSize:8, color:'var(--text-dim)' }}>+{stack.subs.length - 20} ещё</span>}
+
+                      {/* Action buttons */}
+                      <div style={{ display:'flex', gap:4, marginTop:8 }}>
+                        <button onClick={() => { setEditingStackNotes(editingStackNotes === stack.id ? null : stack.id); setEditNotesText(stack.notes || ''); }} style={{ padding:'4px 8px', borderRadius:6, fontSize:8, cursor:'pointer', background:'rgba(139,92,246,0.1)', border:'1px solid rgba(139,92,246,0.3)', color:'#a78bfa', fontWeight:600 }}>✏️ Редактировать</button>
+                        <button onClick={() => {
+                          const items = stack.subs.map((id: string) => {
+                            const sub = ALL_SUBSTANCES.find(s => s.id === id);
+                            const d = stack.dosages?.[id];
+                            return { id, name: sub?.name || id, dose: d?.mg || 0, timing: d?.timing || '' };
+                          });
+                          const existing = JSON.parse(localStorage.getItem('supportCart') || '[]');
+                          localStorage.setItem('supportCart', JSON.stringify([...existing, ...items]));
+                          setCartItems([...cartItems, ...items]);
+                          alert('✅ Добавлено в корзину');
+                        }} style={{ padding:'4px 8px', borderRadius:6, fontSize:8, cursor:'pointer', background:'rgba(255,152,0,0.1)', border:'1px solid rgba(255,152,0,0.3)', color:'#ff9800', fontWeight:600 }}>🛒 В корзину</button>
+                        <button onClick={() => deleteStack(stack.id)} style={{ padding:'4px 8px', borderRadius:6, fontSize:8, cursor:'pointer', background:'rgba(239,68,68,0.05)', border:'1px solid rgba(239,68,68,0.2)', color:'#ef4444', fontWeight:600, marginLeft:'auto' }}>✕ Удалить</button>
+                      </div>
+                    </div>
+                  )}
                 </div>
-              </div>
-            ))
+              );
+            })
           )}
         </div>
       )}
@@ -4065,251 +4191,258 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
         </div>
       )}
 
-      {/* ===== SUPPORT PLAN VIEW ===== */}
+      {/* ===== SUPPORT PLAN VIEW (Active + Archive) ===== */}
       {section === 'generator' && tab === 'main' && supportView === 'calc' && calcView === 'plan' && (
         <div style={{ padding:'0 0 80px' }}>
-          <div style={{ display:'flex', gap:6, marginBottom:6 }}>
+          <div style={{ display:'flex', gap:6, marginBottom:8 }}>
             <button onClick={goBack} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← Назад</button>
-            <button onClick={goHome} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← На главную Поддержки</button>
+            <button onClick={goHome} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← На главную</button>
           </div>
-          <h2 style={{ margin:'0 0 2px', fontSize:16, fontWeight:800, color:'var(--accent)' }}>📅 План поддержки</h2>
-          <p style={{ fontSize:10, color:'var(--text-dim)', margin:'0 0 12px' }}>Сгенерирован из уровня: {SUPPORT_LEVELS[supportLevel]?.label || supportLevel}</p>
-          <div style={{ display:'flex', gap:6, marginBottom:10 }}>
-            {(['daily','weekly','monthly'] as const).map(p => (
-              <button key={p} onClick={() => { setPlanView(p); setPlanSaved(false); }} style={{
-                padding:'8px 18px', borderRadius:20, fontSize:11, fontWeight:700, cursor:'pointer',
-                background: planView === p ? 'var(--accent)' : 'var(--bg-secondary)',
-                color: planView === p ? '#000' : 'var(--text-dim)',
-                border: `1px solid ${planView === p ? 'var(--accent)' : 'var(--border)'}`,
-              }}>{p === 'daily' ? '☀️ Дневной' : p === 'weekly' ? '📆 Недельный' : '🗓 Месячный'}</button>
-            ))}
+          <div style={{ display:'flex', gap:6, marginBottom:8 }}>
+            <button onClick={() => setPlanSubTab('active')} style={{ padding:'6px 16px', borderRadius:20, fontSize:11, fontWeight:700, cursor:'pointer', background: planSubTab === 'active' ? 'var(--accent)' : 'var(--bg-secondary)', color: planSubTab === 'active' ? '#000' : 'var(--text-dim)', border: `1px solid ${planSubTab === 'active' ? 'var(--accent)' : 'var(--border)'}` }}>✅ Действующий план</button>
+            <button onClick={() => setPlanSubTab('archive')} style={{ padding:'6px 16px', borderRadius:20, fontSize:11, fontWeight:700, cursor:'pointer', background: planSubTab === 'archive' ? 'var(--accent)' : 'var(--bg-secondary)', color: planSubTab === 'archive' ? '#000' : 'var(--text-dim)', border: `1px solid ${planSubTab === 'archive' ? 'var(--accent)' : 'var(--border)'}` }}>📦 Архив ({archivedPlans.length})</button>
           </div>
-          {(() => {
+
+          {planSubTab === 'active' && (() => {
             const level = SUPPORT_LEVELS[supportLevel];
             const subs = level?.subs || [];
             const dosages = level?.dosages || {};
-            const TIME_SLOTS = [
-              { key:'morning', label:'🌅 Утро', timeHint:'натощак или с завтраком' },
-              { key:'afternoon', label:'☀️ День', timeHint:'с обедом' },
-              { key:'evening', label:'🌙 Вечер', timeHint:'на ночь, перед сном' },
-            ];
             const getInfo = (id: string) => {
               const sub = ALL_SUBSTANCES.find(s => s.id === id);
               const d = dosages[id];
-              const name = sub?.name || id.replace(/_/g, ' ');
-              return { id, name, mg: d?.mg ?? 0, timing: d?.timing || '' };
+              return { id, name: sub?.name || id.replace(/_/g, ' '), mg: d?.mg ?? 0, timing: d?.timing || '', desc: sub?.description || '' };
             };
-            const distributeDaily = () => {
-              const slots: Record<string, Array<{id:string,name:string,mg:number,timing:string}>> = { morning:[], afternoon:[], evening:[] };
-              for (const id of subs) {
-                const info = getInfo(id);
-                const t = info.timing.toLowerCase();
-                if (t.includes('вечер') || t.includes('ночь')) slots.evening.push(info);
-                else if (t.includes('день') || t.includes('обед')) slots.afternoon.push(info);
-                else slots.morning.push(info);
-              }
-              return slots;
-            };
-            const genDailyPlan = distributeDaily();
-            if (planView === 'daily') return (
-              <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
-                {TIME_SLOTS.map(slot => (
-                  <div key={slot.key} style={{ background:'var(--bg-secondary)', borderRadius:12, padding:'10px 12px', border:'1px solid var(--border)' }}>
-                    <div style={{ fontSize:12, fontWeight:700, color:'var(--accent)', marginBottom:6 }}>{slot.label} <span style={{ fontSize:9, fontWeight:400, color:'var(--text-dim)' }}>— {slot.timeHint}</span></div>
-                    {genDailyPlan[slot.key].length > 0 ? (
-                      genDailyPlan[slot.key].map((item, idx) => (
-                        <div key={idx} style={{ display:'flex', alignItems:'center', gap:8, padding:'6px 0', borderBottom: idx < genDailyPlan[slot.key].length - 1 ? '1px solid var(--border)' : 'none' }}>
-                          <div style={{ width:6, height:6, borderRadius:'50%', background:'var(--accent)', flexShrink:0 }} />
-                          <div style={{ flex:1 }}>
-                            <div style={{ fontSize:11, fontWeight:600, color:'var(--text-light)' }}>{item.name}</div>
-                            <div style={{ fontSize:9, color:'var(--text-dim)' }}>{item.mg >= 1000 && item.id !== 'omega3' ? `${(item.mg/1000).toFixed(item.mg%1000===0?0:1)}г` : `${item.mg}мг`} · {item.timing}</div>
+            return (
+              <>
+                <h2 style={{ margin:'0 0 2px', fontSize:16, fontWeight:800, color:'var(--accent)' }}>📅 Действующий план поддержки</h2>
+                <p style={{ fontSize:10, color:'var(--text-dim)', margin:'0 0 10px' }}>Уровень: {level?.label || supportLevel}</p>
+
+                {/* Action buttons */}
+                <div style={{ display:'flex', gap:4, marginBottom:10, flexWrap:'wrap' }}>
+                  <button onClick={() => {
+                    const name = prompt('Название препарата:');
+                    if (!name) return;
+                    const dose = prompt('Дозировка (мг):', '500');
+                    if (!dose) return;
+                    const timing = prompt('Время приёма (утро/день/вечер):', 'с едой');
+                    const id = 'manual_' + Date.now();
+                    const newSub = { id, type: 'vitamin' as const, name, description: 'Добавлен вручную', mechanisms: [], categories: [] as string[] };
+                    (ALL_SUBSTANCES as any).push(newSub);
+                    const newDosages = { ...dosages, [id]: { mg: parseInt(dose), timing: timing || 'с едой' } };
+                    const newLevel = { ...level, subs: [...subs, id], dosages: newDosages };
+                    SUPPORT_LEVELS[supportLevel] = newLevel;
+                    window.location.reload();
+                  }} style={{ padding:'6px 12px', borderRadius:8, fontSize:10, cursor:'pointer', background:'rgba(96,165,250,0.15)', border:'1px solid rgba(96,165,250,0.3)', color:'#60a5fa', fontWeight:600 }}>➕ Добавить препарат</button>
+                  <button onClick={() => {
+                    const saved = localStorage.getItem('savedStacks');
+                    if (!saved || JSON.parse(saved).length === 0) { alert('Нет сохранённых стеков'); return; }
+                    const stacks = JSON.parse(saved);
+                    const names = stacks.map((s: any,i: number) => `${i+1}. ${s.name || 'Стек '+(i+1)}`).join('\n');
+                    const idx = parseInt(prompt(`Выберите стек:\n${names}`) || '-1') - 1;
+                    if (idx < 0 || idx >= stacks.length) return;
+                    const stack = stacks[idx];
+                    const stackSubs = (stack.substanceIds || stack.subs || []).filter((id: string) => !subs.includes(id));
+                    if (stackSubs.length === 0) { alert('Все препараты уже в плане'); return; }
+                    const newDosages = { ...dosages };
+                    stackSubs.forEach((id: string) => {
+                      const d = stack.dosages?.[id] || stack.doses?.[id];
+                      if (d) newDosages[id] = typeof d === 'number' ? { mg: d, timing: 'с едой' } : d;
+                    });
+                    const newLevel = { ...level, subs: [...subs, ...stackSubs], dosages: newDosages };
+                    SUPPORT_LEVELS[supportLevel] = newLevel;
+                    window.location.reload();
+                  }} style={{ padding:'6px 12px', borderRadius:8, fontSize:10, cursor:'pointer', background:'rgba(139,92,246,0.15)', border:'1px solid rgba(139,92,246,0.3)', color:'#8b5cf6', fontWeight:600 }}>📦 Из моих стеков</button>
+                  <button onClick={() => {
+                    const items = subs.map((id: string) => {
+                      const info = getInfo(id);
+                      return { id, name: info.name, dose: info.mg, timing: info.timing };
+                    });
+                    const existing = JSON.parse(localStorage.getItem('supportCart') || '[]');
+                    localStorage.setItem('supportCart', JSON.stringify([...existing, ...items]));
+                    setCartItems([...cartItems, ...items]);
+                    alert('✅ Добавлено в корзину');
+                  }} style={{ padding:'6px 12px', borderRadius:8, fontSize:10, cursor:'pointer', background:'rgba(255,152,0,0.15)', border:'1px solid rgba(255,152,0,0.3)', color:'#ff9800', fontWeight:600 }}>🛒 В корзину</button>
+                </div>
+
+                {/* Timing table */}
+                {subs.length > 0 && (
+                  <>
+                    <div style={{ marginBottom:8, padding:'8px 10px', borderRadius:8, background:'rgba(0,230,138,0.04)', border:'1px solid rgba(0,230,138,0.12)' }}>
+                      <div style={{ fontSize:10, fontWeight:700, color:'#00e68a', marginBottom:6 }}>📋 Таблица приёма</div>
+                      <table style={{ width:'100%', fontSize:8, borderCollapse:'collapse' }}>
+                        <thead><tr style={{ background:'rgba(0,0,0,0.1)' }}>
+                          <th style={{ padding:'3px 5px', textAlign:'left' }}>Время</th>
+                          <th style={{ padding:'3px 5px', textAlign:'left' }}>Препарат</th>
+                          <th style={{ padding:'3px 5px', textAlign:'left' }}>Доза</th>
+                          <th style={{ padding:'3px 5px', textAlign:'left' }}>Описание</th>
+                        </tr></thead>
+                        <tbody>
+                          {subs.map((id: string) => {
+                            const sub = ALL_SUBSTANCES.find(s => s.id === id);
+                            const d = dosages[id];
+                            if (!sub || !d) return null;
+                            return (
+                              <tr key={id} style={{ borderBottom:'1px solid var(--border)' }}>
+                                <td style={{ padding:'3px 5px', color:'var(--text-dim)' }}>{d.timing}</td>
+                                <td style={{ padding:'3px 5px', fontWeight:600, color:'var(--text-light)' }}>{sub.name || id.replace(/_/g, ' ')}</td>
+                                <td style={{ padding:'3px 5px', color:'#00e68a' }}>{d.mg >= 1000 && id !== 'omega3' ? `${(d.mg/1000).toFixed(d.mg%1000===0?0:1)}г` : `${d.mg}мг`}</td>
+                                <td style={{ padding:'3px 5px', color:'var(--text-dim)', fontSize:7.5 }}>{sub.description?.slice(0,50) || ''}</td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {/* Mechanisms table */}
+                    <div style={{ marginBottom:10, fontSize:8, color:'var(--text-dim)' }}>
+                      <div style={{ fontWeight:700, color:'#8b5cf6', marginBottom:4, fontSize:9 }}>🧬 Механизмы, препараты и синергии</div>
+                      <table style={{ width:'100%', fontSize:7.5, borderCollapse:'collapse' }}>
+                        <thead><tr style={{ background:'rgba(139,92,246,0.08)' }}>
+                          <th style={{ padding:'3px 4px', textAlign:'left', color:'#8b5cf6', fontWeight:600 }}>Препарат</th>
+                          <th style={{ padding:'3px 4px', textAlign:'left', color:'#8b5cf6', fontWeight:600 }}>Механизм</th>
+                          <th style={{ padding:'3px 4px', textAlign:'left', color:'#8b5cf6', fontWeight:600 }}>Синергии</th>
+                        </tr></thead>
+                        <tbody>
+                          {subs.map((id: string) => {
+                            const sub = ALL_SUBSTANCES.find((s: any) => s.id === id);
+                            if (!sub) return null;
+                            const mechanisms = (sub.mechanisms || []).slice(0, 3);
+                            const syns = ALL_INTERACTIONS.filter((int: any) => 
+                              (int.substanceA === id || int.substanceB === id) && int.type === 'synergy'
+                            ).slice(0, 2);
+                            const conflicts = ALL_INTERACTIONS.filter((int: any) => 
+                              (int.substanceA === id || int.substanceB === id) && int.type === 'conflict'
+                            ).slice(0, 1);
+                            return (
+                              <tr key={id} style={{ borderBottom:'1px solid var(--border)' }}>
+                                <td style={{ padding:'3px 4px', fontWeight:600, color:'var(--text-light)' }}>{sub.name || id.replace(/_/g, ' ')}</td>
+                                <td style={{ padding:'3px 4px', color:'var(--text-dim)' }}>
+                                  {mechanisms.length > 0 ? mechanisms.map((m: string) => (
+                                    <div key={m} style={{ lineHeight:1.3, marginBottom:1 }}>• {m.length > 50 ? m.slice(0,50)+'…' : m}</div>
+                                  )) : <span style={{ color:'rgba(255,255,255,0.3)' }}>—</span>}
+                                </td>
+                                <td style={{ padding:'3px 4px' }}>
+                                  {syns.map((s: any, j: number) => {
+                                    const partner = ALL_SUBSTANCES.find((x: any) => x.id === (s.substanceA === id ? s.substanceB : s.substanceA));
+                                    return (
+                                      <div key={j} style={{ color:'#22c55e', lineHeight:1.3 }}>⊕ {partner?.name || '?'} — {s.effect?.slice(0,35)}</div>
+                                    );
+                                  })}
+                                  {conflicts.length > 0 && conflicts.map((c: any, j: number) => {
+                                    const partner = ALL_SUBSTANCES.find((x: any) => x.id === (c.substanceA === id ? c.substanceB : c.substanceA));
+                                    return (
+                                      <div key={`c${j}`} style={{ color:'#ef4444', lineHeight:1.3 }}>⊖ {partner?.name || '?'} — {c.effect?.slice(0,35)}</div>
+                                    );
+                                  })}
+                                  {syns.length === 0 && conflicts.length === 0 && <span style={{ color:'rgba(255,255,255,0.3)' }}>—</span>}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </>
+                )}
+                {subs.length === 0 && <p style={{ fontSize:10, color:'var(--text-dim)' }}>Нет препаратов в плане. Сначала выполните расчёт в калькуляторе поддержки.</p>}
+
+                {/* Save plan button — moves old plan to archive */}
+                <button onClick={() => {
+                  const existing = localStorage.getItem('supportPlans');
+                  if (existing) {
+                    const oldPlan = JSON.parse(existing);
+                    const archive = JSON.parse(localStorage.getItem('supportPlanArchive') || '[]');
+                    archive.push({ ...oldPlan, archivedAt: new Date().toISOString(), label: level?.label || supportLevel });
+                    localStorage.setItem('supportPlanArchive', JSON.stringify(archive));
+                    setArchivedPlans([...archivedPlans, { ...oldPlan, archivedAt: new Date().toISOString(), label: level?.label || supportLevel }]);
+                  }
+                  const plan = { period:'daily', date:new Date().toISOString(), level:supportLevel, subs, dosages, levelLabel:level?.label };
+                  localStorage.setItem('supportPlans', JSON.stringify(plan));
+                  setPlanSaved(true);
+                }} style={{ width:'100%', padding:'12px', borderRadius:10, border:'none', cursor:'pointer', background:'linear-gradient(135deg,#00e68a,#00c853)', color:'#000', fontWeight:800, fontSize:13 }}>💾 Сохранить план (старый → архив)</button>
+                {planSaved && <div style={{ textAlign:'center', fontSize:10, color:'#22c55e', marginTop:4 }}>✅ План сохранён</div>}
+              </>
+            );
+          })()}
+
+          {/* ===== ARCHIVE VIEW ===== */}
+          {planSubTab === 'archive' && (
+            <div>
+              <h3 style={{ margin:'0 0 8px', fontSize:14, fontWeight:700, color:'var(--accent)' }}>📦 Архив планов</h3>
+              {archivedPlans.length === 0 ? (
+                <p style={{ fontSize:10, color:'var(--text-dim)' }}>Архив пуст. При сохранении нового плана старый автоматически перемещается в архив.</p>
+              ) : (
+                [...archivedPlans].reverse().map((plan, idx) => {
+                  const planId = `arch_${idx}_${plan.archivedAt || plan.date}`;
+                  const isExpanded = expandedArchiveId === planId;
+                  const planSubs = plan.subs || [];
+                  const planDosages = plan.dosages || {};
+                  return (
+                    <div key={planId} style={{ marginBottom:8, background:'var(--bg-secondary)', borderRadius:10, border:'1px solid var(--border)', overflow:'hidden' }}>
+                      <div onClick={() => setExpandedArchiveId(isExpanded ? null : planId)} style={{ padding:'10px 12px', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'space-between', borderBottom: isExpanded ? '1px solid var(--border)' : 'none' }}>
+                        <div>
+                          <div style={{ fontSize:11, fontWeight:600, color:'var(--text-light)' }}>{plan.label || plan.level || 'План'} {plan.levelLabel ? `(${plan.levelLabel})` : ''}</div>
+                          <div style={{ fontSize:9, color:'var(--text-dim)', marginTop:2 }}>{new Date(plan.archivedAt || plan.date).toLocaleDateString('ru-RU')} · {planSubs.length} препаратов</div>
+                        </div>
+                        <span style={{ fontSize:12, color:'var(--text-dim)' }}>{isExpanded ? '▲' : '▼'}</span>
+                      </div>
+                      {isExpanded && (
+                        <div style={{ padding:'8px 12px' }}>
+                          {planSubs.length > 0 && (
+                            <table style={{ width:'100%', fontSize:8, borderCollapse:'collapse' }}>
+                              <thead><tr style={{ background:'rgba(0,0,0,0.1)' }}>
+                                <th style={{ padding:'3px 5px', textAlign:'left' }}>Препарат</th>
+                                <th style={{ padding:'3px 5px', textAlign:'left' }}>Доза</th>
+                                <th style={{ padding:'3px 5px', textAlign:'left' }}>Время</th>
+                              </tr></thead>
+                              <tbody>
+                                {planSubs.map((id: string) => {
+                                  const sub = ALL_SUBSTANCES.find((s: any) => s.id === id);
+                                  const d = planDosages[id];
+                                  return (
+                                    <tr key={id} style={{ borderBottom:'1px solid var(--border)' }}>
+                                      <td style={{ padding:'3px 5px', fontWeight:600, color:'var(--text-light)' }}>{sub?.name || id.replace(/_/g, ' ')}</td>
+                                      <td style={{ padding:'3px 5px', color:'#00e68a' }}>{d?.mg ? `${d.mg}мг` : '—'}</td>
+                                      <td style={{ padding:'3px 5px', color:'var(--text-dim)' }}>{d?.timing || '—'}</td>
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+                          )}
+                          {planSubs.length === 0 && <div style={{ fontSize:9, color:'var(--text-dim)' }}>Нет данных о препаратах</div>}
+                          <div style={{ display:'flex', gap:4, marginTop:8 }}>
+                            <button onClick={() => {
+                              const archive = JSON.parse(localStorage.getItem('supportPlanArchive') || '[]');
+                              const key = [...archivedPlans].reverse()[idx];
+                              const realIdx = archivedPlans.indexOf(key);
+                              if (realIdx >= 0) {
+                                archive.splice(realIdx, 1);
+                                localStorage.setItem('supportPlanArchive', JSON.stringify(archive));
+                                setArchivedPlans(archive);
+                              }
+                            }} style={{ padding:'4px 10px', borderRadius:6, fontSize:9, cursor:'pointer', background:'rgba(239,68,68,0.1)', border:'1px solid rgba(239,68,68,0.3)', color:'#ef4444' }}>🗑 Удалить</button>
+                            <button onClick={() => {
+                              const items = planSubs.map((id: string) => {
+                                const sub = ALL_SUBSTANCES.find((s: any) => s.id === id);
+                                const d = planDosages[id];
+                                return { id, name: sub?.name || id, dose: d?.mg || 0, timing: d?.timing || '' };
+                              });
+                              const existing = JSON.parse(localStorage.getItem('supportCart') || '[]');
+                              localStorage.setItem('supportCart', JSON.stringify([...existing, ...items]));
+                              setCartItems([...cartItems, ...items]);
+                              alert('✅ Добавлено в корзину');
+                            }} style={{ padding:'4px 10px', borderRadius:6, fontSize:9, cursor:'pointer', background:'rgba(255,152,0,0.1)', border:'1px solid rgba(255,152,0,0.3)', color:'#ff9800' }}>🛒 В корзину</button>
                           </div>
                         </div>
-                      ))
-                    ) : (
-                      <div style={{ fontSize:9, color:'var(--text-dim)', padding:'4px 0' }}>Нет добавок</div>
-                    )}
-                  </div>
-                ))}
-                {/* Timing table */}
-                <div style={{ marginTop:8, padding:'8px 10px', borderRadius:8, background:'rgba(0,230,138,0.04)', border:'1px solid rgba(0,230,138,0.12)' }}>
-                  <div style={{ fontSize:10, fontWeight:700, color:'#00e68a', marginBottom:6 }}>📋 Таблица приёма</div>
-                  <table style={{ width:'100%', fontSize:8, borderCollapse:'collapse' }}>
-                    <thead><tr style={{ background:'rgba(0,0,0,0.1)' }}>
-                      <th style={{ padding:'3px 5px', textAlign:'left' }}>Время</th>
-                      <th style={{ padding:'3px 5px', textAlign:'left' }}>Препарат</th>
-                      <th style={{ padding:'3px 5px', textAlign:'left' }}>Доза</th>
-                      <th style={{ padding:'3px 5px', textAlign:'left' }}>Примечание</th>
-                    </tr></thead>
-                    <tbody>
-                      {subs.map((id: string) => {
-                        const sub = ALL_SUBSTANCES.find(s => s.id === id);
-                        const d = dosages[id];
-                        if (!sub || !d) return null;
-                        return (
-                          <tr key={id} style={{ borderBottom:'1px solid var(--border)' }}>
-                            <td style={{ padding:'3px 5px', color:'var(--text-dim)' }}>{d.timing}</td>
-                            <td style={{ padding:'3px 5px', fontWeight:600, color:'var(--text-light)' }}>{sub.name || id.replace(/_/g, ' ')}</td>
-                            <td style={{ padding:'3px 5px', color:'#00e68a' }}>{d.mg} мг</td>
-                            <td style={{ padding:'3px 5px', color:'var(--text-dim)' }}>{sub.description?.slice(0,30) || ''}</td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-                {/* Mechanisms table */}
-                <div style={{ marginTop:10, fontSize:8, color:'var(--text-dim)' }}>
-                  <div style={{ fontWeight:700, color:'#8b5cf6', marginBottom:4, fontSize:9 }}>🧬 Механизмы, препараты и синергии</div>
-                  <table style={{ width:'100%', fontSize:7.5, borderCollapse:'collapse' }}>
-                    <thead><tr style={{ background:'rgba(139,92,246,0.08)' }}>
-                      <th style={{ padding:'3px 4px', textAlign:'left', color:'#8b5cf6', fontWeight:600 }}>Препарат</th>
-                      <th style={{ padding:'3px 4px', textAlign:'left', color:'#8b5cf6', fontWeight:600 }}>Механизм</th>
-                      <th style={{ padding:'3px 4px', textAlign:'left', color:'#8b5cf6', fontWeight:600 }}>Синергии</th>
-                    </tr></thead>
-                    <tbody>
-                      {subs.map((id: string) => {
-                        const sub = ALL_SUBSTANCES.find((s: any) => s.id === id);
-                        if (!sub) return null;
-                        const mechanisms = (sub.mechanisms || []).slice(0, 3);
-                        const syns = ALL_INTERACTIONS.filter((int: any) => 
-                          (int.substanceA === id || int.substanceB === id) && int.type === 'synergy'
-                        ).slice(0, 2);
-                        const conflicts = ALL_INTERACTIONS.filter((int: any) => 
-                          (int.substanceA === id || int.substanceB === id) && int.type === 'conflict'
-                        ).slice(0, 1);
-                        return (
-                          <tr key={id} style={{ borderBottom:'1px solid var(--border)' }}>
-                            <td style={{ padding:'3px 4px', fontWeight:600, color:'var(--text-light)' }}>{sub.name || id.replace(/_/g, ' ')}</td>
-                            <td style={{ padding:'3px 4px', color:'var(--text-dim)' }}>
-                              {mechanisms.length > 0 ? mechanisms.map((m: string) => (
-                                <div key={m} style={{ lineHeight:1.3, marginBottom:1 }}>• {m.length > 50 ? m.slice(0,50)+'…' : m}</div>
-                              )) : <span style={{ color:'rgba(255,255,255,0.3)' }}>—</span>}
-                            </td>
-                            <td style={{ padding:'3px 4px' }}>
-                              {syns.map((s: any, j: number) => {
-                                const partner = ALL_SUBSTANCES.find((x: any) => x.id === (s.substanceA === id ? s.substanceB : s.substanceA));
-                                return (
-                                  <div key={j} style={{ color:'#22c55e', lineHeight:1.3 }}>⊕ {partner?.name || '?'} — {s.effect?.slice(0,35)}</div>
-                                );
-                              })}
-                              {conflicts.length > 0 && conflicts.map((c: any, j: number) => {
-                                const partner = ALL_SUBSTANCES.find((x: any) => x.id === (c.substanceA === id ? c.substanceB : c.substanceA));
-                                return (
-                                  <div key={`c${j}`} style={{ color:'#ef4444', lineHeight:1.3 }}>⊖ {partner?.name || '?'} — {c.effect?.slice(0,35)}</div>
-                                );
-                              })}
-                              {syns.length === 0 && conflicts.length === 0 && <span style={{ color:'rgba(255,255,255,0.3)' }}>—</span>}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-                <button onClick={() => {
-                  const plan = { period:'daily', date:new Date().toISOString(), level:supportLevel, plan:genDailyPlan, levelLabel:level?.label };
-                  localStorage.setItem('supportPlans', JSON.stringify([...(JSON.parse(localStorage.getItem('supportPlans') || '[]')), plan]));
-                  setPlanSaved(true);
-                }} style={{ width:'100%', padding:'12px', borderRadius:10, border:'none', cursor:'pointer', marginTop:4, background:'linear-gradient(135deg,#00e68a,#00c853)', color:'#000', fontWeight:800, fontSize:13 }}>💾 Сохранить план</button>
-                {planSaved && <div style={{ textAlign:'center', fontSize:10, color:'#22c55e', marginTop:4 }}>✅ План сохранён</div>}
-              </div>
-            );
-            if (planView === 'weekly') return (
-              <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
-                {[0,1,2,3,4,5,6].map(dayIdx => {
-                  const dayNames = ['Пн','Вт','Ср','Чт','Пт','Сб','Вс'];
-                  const isRestDay = dayIdx === 6;
-                  const daySlots = distributeDaily();
-                  return (
-                    <div key={dayIdx} style={{ background:'var(--bg-secondary)', borderRadius:12, padding:'8px 12px', border: isRestDay ? '1px solid rgba(139,92,246,0.3)' : '1px solid var(--border)' }}>
-                      <div style={{ fontSize:12, fontWeight:700, marginBottom:4, color: isRestDay ? '#8b5cf6' : 'var(--accent)' }}>
-                        {dayNames[dayIdx]} {isRestDay ? '🔄 Восстановление' : '🏋️ Тренировка'}
-                      </div>
-                      {TIME_SLOTS.map(slot => {
-                        const items = daySlots[slot.key];
-                        if (items.length === 0) return null;
-                        return (
-                          <div key={slot.key} style={{ marginBottom:3, paddingLeft:8 }}>
-                            <div style={{ fontSize:9, color:'var(--text-dim)', marginBottom:1 }}>{slot.label}</div>
-                            {items.map((item, idx) => (
-                              <div key={idx} style={{ display:'flex', alignItems:'center', gap:6, padding:'2px 0' }}>
-                                <div style={{ width:4, height:4, borderRadius:'50%', background:'var(--accent)', flexShrink:0 }} />
-                                <span style={{ fontSize:9, color:'var(--text-light)' }}>{item.name}</span>
-                                <span style={{ fontSize:8, color:'var(--text-dim)' }}>{item.mg >= 1000 && item.id !== 'omega3' ? `${(item.mg/1000).toFixed(item.mg%1000===0?0:1)}г` : `${item.mg}мг`}</span>
-                              </div>
-                            ))}
-                          </div>
-                        );
-                      })}
-                      {subs.length === 0 && <div style={{ fontSize:9, color:'var(--text-dim)' }}>Нет добавок</div>}
+                      )}
                     </div>
                   );
-                })}
-                <button onClick={() => {
-                  const plan = { period:'weekly', date:new Date().toISOString(), level:supportLevel, plan: distributeDaily(), levelLabel:level?.label };
-                  localStorage.setItem('supportPlans', JSON.stringify([...(JSON.parse(localStorage.getItem('supportPlans') || '[]')), plan]));
-                  setPlanSaved(true);
-                }} style={{ width:'100%', padding:'12px', borderRadius:10, border:'none', cursor:'pointer', marginTop:4, background:'linear-gradient(135deg,#00e68a,#00c853)', color:'#000', fontWeight:800, fontSize:13 }}>💾 Сохранить план</button>
-                {planSaved && <div style={{ textAlign:'center', fontSize:10, color:'#22c55e', marginTop:4 }}>✅ План сохранён</div>}
-              </div>
-            );
-            if (planView === 'monthly') {
-              const isMaxLevel = supportLevel === 'boost';
-              return (
-                <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
-                  {[1,2,3,4].map(weekIdx => {
-                    const isDeload = isMaxLevel && weekIdx === 4;
-                    return (
-                      <div key={weekIdx} style={{ background: isDeload ? 'rgba(139,92,246,0.08)' : 'var(--bg-secondary)', borderRadius:12, padding:'10px 12px', border: isDeload ? '1px solid rgba(139,92,246,0.3)' : '1px solid var(--border)' }}>
-                        <div style={{ fontSize:13, fontWeight:700, marginBottom:6, color: isDeload ? '#8b5cf6' : 'var(--accent)' }}>
-                          Неделя {weekIdx}{isDeload ? ' 🔄 Делоад' : ''}
-                        </div>
-                        {isDeload ? (
-                          <div style={{ fontSize:10, color:'var(--text-dim)', lineHeight:1.5 }}>
-                            <div>📉 Снижение дозировок до 50% базовых</div>
-                            <div>🛌 Акцент на восстановление</div>
-                            <div>🧘 Минимальная поддержка: только базовые антиоксиданты</div>
-                            {['nac','omega3','magnesium','vitamin_d3'].map(id => {
-                              const info = getInfo(id);
-                              const halfMg = Math.round(info.mg / 2);
-                              return (
-                                <div key={id} style={{ display:'flex', gap:6, padding:'2px 0', marginLeft:8 }}>
-                                  <span style={{ color:'var(--text-light)', fontSize:10 }}>{info.name}</span>
-                                  <span style={{ fontSize:9, color:'var(--text-dim)' }}>{halfMg >= 1000 ? `${(halfMg/1000).toFixed(0)}г` : `${halfMg}мг`}</span>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        ) : (
-                          <div style={{ display:'flex', flexDirection:'column', gap:3 }}>
-                            {subs.map(id => {
-                              const info = getInfo(id);
-                              return (
-                                <div key={id} style={{ display:'flex', alignItems:'center', gap:6, padding:'2px 0' }}>
-                                  <div style={{ width:5, height:5, borderRadius:'50%', background:'var(--accent)', flexShrink:0 }} />
-                                  <span style={{ fontSize:10, fontWeight:500, color:'var(--text-light)', flex:1 }}>{info.name}</span>
-                                  <span style={{ fontSize:9, color:'var(--text-dim)' }}>{info.mg >= 1000 && id !== 'omega3' ? `${(info.mg/1000).toFixed(info.mg%1000===0?0:1)}г` : `${info.mg}мг`}</span>
-                                </div>
-                              );
-                            })}
-                            {subs.length === 0 && <div style={{ fontSize:9, color:'var(--text-dim)' }}>Нет добавок</div>}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                  <button onClick={() => {
-                    const plan = { period:'monthly', date:new Date().toISOString(), level:supportLevel, subs, dosages, levelLabel:level?.label };
-                    localStorage.setItem('supportPlans', JSON.stringify([...(JSON.parse(localStorage.getItem('supportPlans') || '[]')), plan]));
-                    setPlanSaved(true);
-                  }} style={{ width:'100%', padding:'12px', borderRadius:10, border:'none', cursor:'pointer', marginTop:4, background:'linear-gradient(135deg,#00e68a,#00c853)', color:'#000', fontWeight:800, fontSize:13 }}>💾 Сохранить план</button>
-                  {planSaved && <div style={{ textAlign:'center', fontSize:10, color:'#22c55e', marginTop:4 }}>✅ План сохранён</div>}
-                </div>
-              );
-            }
-            return null;
-          })()}
+                })
+              )}
+            </div>
+          )}
         </div>
       )}
 
@@ -4873,8 +5006,8 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
                 </button>
               </div>
               <button onClick={() => calcSupport()} style={{
-                width:'100%', padding:'12px', borderRadius:10, border:'1px solid var(--border)', cursor:'pointer',
-                background:'var(--bg-secondary)', color:'var(--text-dim)', fontWeight:600, fontSize:11, marginBottom:6,
+                width:'100%', padding:'14px', borderRadius:12, border:'2px solid var(--accent)', cursor:'pointer',
+                background:'linear-gradient(135deg, rgba(0,230,138,0.12), rgba(0,198,83,0.05))', color:'#00e68a', fontWeight:800, fontSize:13, marginBottom:6, letterSpacing:0.5,
               }}>
                 🧮 Рассчитать поддержку
               </button>
@@ -4978,6 +5111,17 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
                     <b style={{ color:'#8b5cf6' }}>{SUPPORT_LEVELS[autoLevel as string]?.label || autoLevel}</b>
                     <span style={{ color:'var(--text-dim)', fontSize:9 }}> — {SUPPORT_LEVELS[autoLevel as string]?.desc?.slice(0, 60) || 'Автоматически определённый уровень поддержки'}</span>
                   </div>
+                  {/* Explanation of risk calculation */}
+                  <details style={{ marginTop:6 }}>
+                    <summary style={{ fontSize:8, fontWeight:600, color:'var(--text-dim)', cursor:'pointer' }}>📖 Как считаются риски и оценка поддержки</summary>
+                    <div style={{ fontSize:7, color:'var(--text-dim)', lineHeight:1.5, marginTop:4, padding:'6px 8px', borderRadius:6, background:'rgba(0,0,0,0.06)' }}>
+                      <b>Риск без поддержки:</b> {Math.round(calcResult.riskBeforeSupport)}% = среднее по {Object.keys(calcResult.riskAssessment?.systemBreakdown || {}).length} системам.<br/>
+                      <b>Снижение риска:</b> каждый препарат покрывает системы с {calcResult.supportScore.toFixed(0)}% эффективностью. Защита = покрытие / 100 от базового риска.<br/>
+                      <b>Риск с поддержкой:</b> {Math.round(calcResult.riskAfterSupport)}% = базовый риск × (1 - защита).<br/>
+                      <b>Оценка поддержки:</b> {Math.round(calcResult.supportScore)}/100 — взвешенное среднее покрытия всех систем (вес систем: сердечно-сосуд. 15, печень 15, почки 10, нейро 10, эндокринная 12, кровь 8, репродуктивная 10, опорно-двиг. 10).<br/>
+                      <b>Факторы:</b> питание ×{((linked.profile?.settings?.nutritionFactor ?? 0.8) * 100).toFixed(0)}%, тренировки ×{((linked.profile?.settings?.trainingFactor ?? 0.7) * 100).toFixed(0)}% дополнительно снижают риск.
+                    </div>
+                  </details>
                 </div>
               )}
               </>)}

@@ -1201,7 +1201,11 @@ export function calculateSupport(input: SupportInput): SupportOutput {
 
   for (const system of ALL_RISK_SYSTEMS) {
     const raw = systemBreakdownRaw[system];
-    const protectionFraction = Math.min(1, (systemSupport[system] ?? 0) / 100);
+    const weightedSupport = systemSupport[system] ?? 0;
+    const sysWeight: Record<string, number> = { hepatic:15, cardio:15, renal:10, neuro:10, endocrine:12, hematologic:8, reproductive:10, musculoskeletal:10 };
+    const weight = sysWeight[system] ?? 10;
+    const rawCoverage = weight > 0 ? weightedSupport / weight : 0;
+    const protectionFraction = Math.min(1, Math.max(0, rawCoverage));
     const lifestyleReduction = ((input.nutritionFactor ?? 0) * (NUTRITION_SYSTEM_REDUCTION[system] ?? 0.3) + (input.trainingFactor ?? 0) * (TRAINING_SYSTEM_REDUCTION[system] ?? 0.2));
     const netRisk = raw * (1 - protectionFraction) * (1 - Math.min(0.5, lifestyleReduction));
     systemBreakdownNet[system] = Math.min(100, Math.max(0, netRisk));
