@@ -1583,8 +1583,8 @@ export const ProfileScreen: React.FC = () => {
                     </div>
                   </div>
                   <button onClick={() => {
-                    const s = parseInt(bpSystolic); const d = parseInt(bpDiastolic); const h = parseInt(bpHr);
-                    if (!s || !d || !h) return;
+                    const s = Math.round(Number(bpSystolic)); const d = Math.round(Number(bpDiastolic)); const h = Math.round(Number(bpHr));
+                    if (!s || !d || !h || isNaN(s) || isNaN(d) || isNaN(h) || s < 50 || s > 250 || d < 30 || d > 160 || h < 30 || h > 250) return;
                     const entry: BPEntry = { date: new Date().toISOString().slice(0,10), systolic: s, diastolic: d, hr: h };
                     const updated = [...bpEntries, entry];
                     setBpEntries(updated); saveBPDiary(updated);

@@ -962,6 +962,8 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
     if (calcView !== 'main') {
       if (section === 'generator') {
         setSection('home'); setTab('main'); setSupportView('main'); setCalcView('main');
+      } else if (['mixcalc','neuro','joints','acne'].includes(calcView)) {
+        setCalcView('info'); setInfoView('catalog');
       } else {
         setCalcView('main');
       }
