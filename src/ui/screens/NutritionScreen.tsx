@@ -29,19 +29,19 @@ interface DiaryEntry {
 
 type NutritionPage = 'hero' | 'tabs';
 type NutritionSection = 'diary' | 'planning' | 'overview' | 'all';
-type ActiveTab = 'overview' | 'diary' | 'charts' | 'mealplan' | 'grocery' | 'restaurant' | 'cycling' | 'calc' | 'custom' | 'planoverview' | 'rules' | 'products' | 'infocalc';
+type ActiveTab = 'overview' | 'diary' | 'charts' | 'mealplan' | 'grocery' | 'restaurant' | 'cycling' | 'calc' | 'custom' | 'planoverview' | 'rules' | 'products' | 'infocalc' | 'recipes';
 
 const SECTION_TABS: Record<NutritionSection, string[]> = {
   diary: ['diary', 'charts'],
   planning: ['mealplan', 'cycling'],
-  overview: ['overview', 'infocalc'],
-  all: ['diary', 'charts', 'mealplan', 'cycling', 'overview', 'infocalc'],
+  overview: ['overview', 'recipes', 'infocalc'],
+  all: ['diary', 'charts', 'mealplan', 'cycling', 'overview', 'recipes', 'infocalc'],
 };
 
 const TAB_LABELS: Record<string, string> = {
   diary: '📝 Дневник', charts: '📈 Графики',
   mealplan: '🥗 План', cycling: '🔄 Циклирование',
-  overview: '📊 Общая информация', infocalc: '📐 Калькуляторы',
+  overview: '📊 Общая информация', recipes: '🍳 Рецепты', infocalc: '📐 Калькуляторы',
 };
 
 const NutritionLabContext: React.FC<{ labAnalysis: LabCompositeResult }> = ({ labAnalysis }) => (
@@ -134,6 +134,7 @@ export const NutritionScreen: React.FC = () => {
     switch (tab) {
       case 'overview': return <><NutritionOverview profile={linked.profile} avgWeeklyKcal={avgWeeklyKcal} avgWeeklyProtein={avgWeeklyProtein} avgWeeklyFat={avgWeeklyFat} avgWeeklyCarbs={avgWeeklyCarbs} microsIntake={microsIntake} />{labAnalysis && <NutritionLabContext labAnalysis={labAnalysis} />}</>;
       case 'infocalc': return <NutritionCalculators />;
+      case 'recipes': return <RecipesTab />;
       case 'diary': return <NutritionDiary foodEntries={foodEntries} />;
       case 'charts': return <NutritionCharts kcalData={[avgWeeklyKcal]} proteinData={[avgWeeklyProtein]} labels={['']} dailyLogs={dailyLogs} />;
       case 'mealplan': return <MealPlanExtended tKcal={tKcal} tProt={tProt} tFat={tFat} tCarbs={tCarbs} profile={linked.profile} mealSubTab={mealSubTab} setMealSubTab={setMealSubTab} />;
@@ -1990,6 +1991,51 @@ const FoodDbSyncCard: React.FC = () => {
           <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.35)', marginTop: 6 }}>Всего в базе: 150+ продуктов с микронутриентами</div>
         </div>
       )}
+    </div>
+  );
+};
+
+const RecipesTab: React.FC = () => {
+  const recipes = React.useMemo(() => getRecipes(), []);
+  const [recSearch, setRecSearch] = React.useState('');
+  const [recMeal, setRecMeal] = React.useState('all');
+  const filtered = React.useMemo(() => {
+    let list = recipes;
+    if (recMeal !== 'all') list = list.filter(r => r.meal === recMeal);
+    if (recSearch) { const q = recSearch.toLowerCase(); list = list.filter(r => r.name.toLowerCase().includes(q) || r.ingredients.some(i => i.toLowerCase().includes(q))); }
+    return list.slice(0, 20);
+  }, [recipes, recMeal, recSearch]);
+  return (
+    <div>
+      <div style={{ display:'flex', gap:4, marginBottom:8, flexWrap:'wrap' }}>
+        <input value={recSearch} onChange={e => setRecSearch(e.target.value)} placeholder="🔍 Поиск по названию или ингредиенту..." style={{ flex:1, minWidth:120, padding:'8px 10px', borderRadius:8, border:'1px solid var(--border)', background:'var(--bg-secondary)', color:'var(--text)', fontSize:11 }} />
+        <select value={recMeal} onChange={e => setRecMeal(e.target.value)} style={{ padding:'6px 8px', borderRadius:8, border:'1px solid var(--border)', background:'var(--bg-secondary)', color:'var(--text)', fontSize:10 }}>
+          <option value="all">Все приёмы</option>
+          <option value="breakfast">Завтрак</option>
+          <option value="lunch">Обед</option>
+          <option value="dinner">Ужин</option>
+          <option value="snack">Перекус</option>
+        </select>
+      </div>
+      <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
+        {filtered.map((r, i) => (
+          <div key={i} className="card" style={{ padding:10, marginBottom:4 }}>
+            <div style={{ fontWeight:600, fontSize:12, color:'var(--text-light)' }}>{r.name}</div>
+            <div style={{ display:'flex', gap:6, fontSize:9, color:'var(--text-dim)', marginTop:2, flexWrap:'wrap' }}>
+              <span>🔥 {r.kcal} ккал</span>
+              <span style={{ color:'#22c55e' }}>Б {r.protein}г</span>
+              <span style={{ color:'#f59e0b' }}>Ж {r.fat}г</span>
+              <span style={{ color:'#3b82f6' }}>У {r.carbs}г</span>
+              <span>⏱ {r.prepTimeMin} мин</span>
+            </div>
+            <div style={{ display:'flex', gap:3, flexWrap:'wrap', marginTop:4 }}>
+              {r.ingredients.map((ing, j) => <span key={j} style={{ fontSize:8, padding:'1px 5px', borderRadius:3, background:'rgba(255,255,255,0.04)', color:'var(--text-dim)' }}>{ing}</span>)}
+            </div>
+            {r.instructions && <div style={{ fontSize:8, color:'var(--text-dim)', marginTop:4, lineHeight:1.4 }}>👨‍🍳 {r.instructions[0]}{r.instructions.length > 1 ? ' → ' + r.instructions.slice(1).join(' → ') : ''}</div>}
+          </div>
+        ))}
+        {filtered.length === 0 && <div style={{ textAlign:'center', padding:20, color:'var(--text-dim)', fontSize:11 }}>Рецепты не найдены</div>}
+      </div>
     </div>
   );
 };
