@@ -1840,19 +1840,24 @@ const InteractionCheckerTab: React.FC = () => {
       nandrolone_phenylprop: 'npp', boldenone_undecylenate: 'bold_undec', methenolone_enanthate: 'prim_enan',
       methandienone: 'methand', oxandrolone: 'oxan', oxymetholone: 'anadrol', stanozolol: 'stan',
       drostanolone_propionate: 'masteron', drostanolone_enanthate: 'masteron_enan',
-      cabergoline: 'cabergoline', anastrozole: 'anastrozole', hcg: 'hcg', tamoxifen: 'tamoxifen',
-      clomiphene: 'clomiphene', letrozole: 'letrozole', raloxifene: 'raloxifene',
+      cabergoline: 'caberg', anastrozole: 'anastro', hcg: 'hcg', tamoxifen: 'tamox',
+      clomiphene: 'clomi', letrozole: 'letrozole', raloxifene: 'raloxifene',
     };
     return map[id] || id;
   };
 
   const pharmaSynergies = useMemo(() => {
+    // Include drugs from SYNERGY_PAIRS that match pharma classes (AAS, peptides, PCT)
+    const ALLOWED_CLASSES = new Set(['testosterone','trenbolone','nandrolone','boldenone','primobolan','oral_17aa','sarm','drostanolone','dht_derivative','igf1','mgf','insulin','pct_serm','pct_aromatase','pct_dopamine','pct_gonadotropin','peptide_ghrh','peptide_regenerative']);
     return SYNERGY_PAIRS.filter(p => {
       const aKey = synergyToPharmaId(p.substanceA);
       const bKey = synergyToPharmaId(p.substanceB);
       const a = PHARMA_DB[aKey];
       const b = PHARMA_DB[bKey];
-      return a && b && PHARMA_INTERACT_FILTER_SYNERGY.has(a.class) && PHARMA_INTERACT_FILTER_SYNERGY.has(b.class);
+      // Both must be pharma drugs (not support supplements)
+      if (!a || !b) return false;
+      // At least one must be AAS/PCT/peptide class
+      return ALLOWED_CLASSES.has(a.class) && ALLOWED_CLASSES.has(b.class);
     });
   }, []);
 
