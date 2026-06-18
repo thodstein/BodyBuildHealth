@@ -1991,12 +1991,12 @@ const InteractionCheckerTab: React.FC = () => {
                   <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6, color: 'var(--text)' }}>
                     {aName} + {bName}
                   </div>
-                  <div style={{ fontSize: 11, lineHeight: 1.5, color: 'var(--text-light)' }}>
-                    {pair.mechanism}
+                  <div style={{ fontSize: 10, lineHeight: 1.4, color: 'var(--text-light)' }}>
+                    {pair.mechanism?.length > 100 ? pair.mechanism?.slice(0, 100) + '...' : pair.mechanism}
                   </div>
                   {pair.clinicalNote && (
-                    <div style={{ marginTop: 6, fontSize: 10, color: '#22c55e', fontStyle: 'italic' }}>
-                      💡 {pair.clinicalNote}
+                    <div style={{ marginTop: 4, fontSize: 9, color: '#22c55e' }}>
+                      💡 {pair.clinicalNote?.slice(0, 100)}
                     </div>
                   )}
                   {pair.affectedSystems && pair.affectedSystems.length > 0 && (

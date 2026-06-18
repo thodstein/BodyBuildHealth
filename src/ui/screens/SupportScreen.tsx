@@ -1144,11 +1144,23 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
         dosages[analogId] = analogDosage;
       }
     }
-    // Add enhancers
-    for (const enhId of enhancedSubs) {
-      if (!subs.includes(enhId)) {
-        subs.push(enhId);
-        dosages[enhId] = DEFAULT_DOSAGES[enhId] || { mg: 500, timing: 'с едой' };
+    // Manual mode: replace default subs entirely with enhancedSubs
+    if (enhancedSubs.length > 0 && enhancedSubs.some(id => !subs.includes(id))) {
+      // If enhancedSubs has items not in default subs → manual mode, replace everything
+      subs.length = 0;
+      for (const enhId of enhancedSubs) {
+        if (!subs.includes(enhId)) {
+          subs.push(enhId);
+          dosages[enhId] = DEFAULT_DOSAGES[enhId] || { mg: 500, timing: 'с едой' };
+        }
+      }
+    } else {
+      // Add enhancers on top of default
+      for (const enhId of enhancedSubs) {
+        if (!subs.includes(enhId)) {
+          subs.push(enhId);
+          dosages[enhId] = DEFAULT_DOSAGES[enhId] || { mg: 500, timing: 'с едой' };
+        }
       }
     }
     // Boost mode: add boost substances to the current stack
@@ -6677,7 +6689,7 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
                     if (saved.length > 0) {
                       const ids = saved[0].subs || [];
                       setEnhancedSubs(ids);
-                      calcSupport();
+                      setTimeout(() => { calcSupport(); }, 50);
                       setShowModal(null);
                     }
                   } catch {}
