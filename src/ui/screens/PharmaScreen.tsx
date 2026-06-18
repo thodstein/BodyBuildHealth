@@ -1832,10 +1832,26 @@ const InteractionCheckerTab: React.FC = () => {
   }, []);
   // Pharma-only synergy pairs (AAS/insulin only, exclude peptides/PCT/support)
   const PHARMA_INTERACT_FILTER_SYNERGY = new Set(['testosterone','trenbolone','nandrolone','boldenone','primobolan','oral_17aa','sarm','drostanolone','dht_derivative','igf1','mgf','insulin']);
+  // Map SYNERGY_PAIRS substance IDs to PHARMA_DB keys
+  const synergyToPharmaId = (id: string): string => {
+    const map: Record<string, string> = {
+      testosterone_enanthate: 'test_enan', testosterone_cypionate: 'test_cyp', testosterone_propionate: 'test_prop',
+      trenbolone_acetate: 'tren_acet', trenbolone_enanthate: 'tren_enan', nandrolone_decanoate: 'deca',
+      nandrolone_phenylprop: 'npp', boldenone_undecylenate: 'bold_undec', methenolone_enanthate: 'prim_enan',
+      methandienone: 'methand', oxandrolone: 'oxan', oxymetholone: 'anadrol', stanozolol: 'stan',
+      drostanolone_propionate: 'masteron', drostanolone_enanthate: 'masteron_enan',
+      cabergoline: 'cabergoline', anastrozole: 'anastrozole', hcg: 'hcg', tamoxifen: 'tamoxifen',
+      clomiphene: 'clomiphene', letrozole: 'letrozole', raloxifene: 'raloxifene',
+    };
+    return map[id] || id;
+  };
+
   const pharmaSynergies = useMemo(() => {
     return SYNERGY_PAIRS.filter(p => {
-      const a = PHARMA_DB[p.substanceA];
-      const b = PHARMA_DB[p.substanceB];
+      const aKey = synergyToPharmaId(p.substanceA);
+      const bKey = synergyToPharmaId(p.substanceB);
+      const a = PHARMA_DB[aKey];
+      const b = PHARMA_DB[bKey];
       return a && b && PHARMA_INTERACT_FILTER_SYNERGY.has(a.class) && PHARMA_INTERACT_FILTER_SYNERGY.has(b.class);
     });
   }, []);
@@ -1946,8 +1962,10 @@ const InteractionCheckerTab: React.FC = () => {
                 potentiative: '#f97316',
                 complementary: '#a855f7',
               };
-              const aName = PHARMA_DB[pair.substanceA]?.name || pair.substanceA;
-              const bName = PHARMA_DB[pair.substanceB]?.name || pair.substanceB;
+              const aKey = synergyToPharmaId(pair.substanceA);
+              const bKey = synergyToPharmaId(pair.substanceB);
+              const aName = (PHARMA_DB[aKey]?.name || pair.substanceA).replace(/\(.*\)/, '').trim();
+              const bName = (PHARMA_DB[bKey]?.name || pair.substanceB).replace(/\(.*\)/, '').trim();
               return (
                 <div key={i} style={{
                   background: synergyColors[pair.synergyType] || 'rgba(255,255,255,0.03)',
