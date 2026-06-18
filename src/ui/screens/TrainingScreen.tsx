@@ -416,7 +416,7 @@ export const TrainingScreen: React.FC = () => {
                   <div style={{ flex: 1 }}>
                     <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 2, color: group.color }}>{group.title}</div>
                     <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', lineHeight: 1.3 }}>
-                      {group.tabs.map(t => TAB_LABELS[t].replace(/^.\s?/, '')).join(' • ')}
+                      {key === 'training' ? 'Проведение тренировки, таймеры отдыха, учёт подходов' : key === 'planning' ? 'План на неделю, циклы, программы, методики, конструктор' : 'Аналитика, графики, прогресс, дневник, калькуляторы, история'}
                     </div>
                   </div>
                   <span style={{ color: group.color, fontSize: 16, opacity: 0.6 }}>→</span>

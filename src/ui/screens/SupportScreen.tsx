@@ -1061,6 +1061,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   const SYNERGY_PAGE_SIZE = 30;
   const [interactionPage, setInteractionPage] = useState<number>(1);
   const [showModal, setShowModal] = useState<string | null>(null);
+  const [modalAddMode, setModalAddMode] = useState(false);
   const [modalLevel, setModalLevel] = useState<string | null>(null);
   const [modalSearch, setModalSearch] = useState('');
   const [modalSelected, setModalSelected] = useState<string[]>([]);
@@ -2602,7 +2603,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                 <div style={{ width:48, height:48, borderRadius:14, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, background:'rgba(0,230,138,0.15)', fontSize:24 }}>🧮</div>
                 <div style={{ flex:1 }}>
                   <div style={{ fontSize:15, fontWeight:800, marginBottom:4, color:'var(--accent)' }}>Калькулятор поддержки</div>
-                  <div style={{ fontSize:10, color:'rgba(255,255,255,0.85)', lineHeight:1.3 }}>Пептиды, нейротоксичность, суставы, тренировочные миксы, генератор стеков, план приёма</div>
+                  <div style={{ fontSize:10, color:'rgba(255,255,255,0.85)', lineHeight:1.3 }}>Расчёт рисков, генератор стеков, протоколы нейропротекции, миксы, план приёма</div>
                 </div>
                 <span style={{ color:'var(--accent)', fontSize:18, opacity:0.6 }}>→</span>
               </div>
@@ -5268,7 +5269,7 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
                   </div>
                   <div style={{ display:'flex', gap:6 }}>
                     <button style={{ flex:1, padding:'8px', borderRadius:8, border:'none', cursor:'pointer', background:'var(--accent)', color:'#000', fontWeight:700, fontSize:10 }} onClick={() => setPlanSaved(true)}>✅ Утвердить план</button>
-                    <button onClick={() => { setShowModal('manual'); setPlanSaved(false); }} style={{ flex:1, padding:'8px', borderRadius:8, border:'1px solid var(--border)', cursor:'pointer', background:'transparent', color:'var(--text-dim)', fontWeight:600, fontSize:10 }}>✏️ Внести изменения</button>
+                    <button onClick={() => { setShowModal('manual'); setModalAddMode(true); setPlanSaved(false); }} style={{ flex:1, padding:'8px', borderRadius:8, border:'1px solid var(--border)', cursor:'pointer', background:'transparent', color:'var(--text-dim)', fontWeight:600, fontSize:10 }}>✏️ Внести изменения</button>
                   </div>
                   {/* Timing table when approved */}
                   {planSaved && (
@@ -6240,11 +6241,16 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
                 <button onClick={() => { setShowModal(null); setModalSelected([]); }} style={{ flex:1, padding:'8px', borderRadius:8, border:'1px solid var(--border)', background:'transparent', color:'var(--text-dim)', cursor:'pointer', fontSize:10 }}>Отмена</button>
                 <button onClick={() => {
                   if (modalSelected.length > 0) {
-                    setEnhancedSubs(modalSelected);
+                    if (modalAddMode) {
+                      setEnhancedSubs(prev => [...new Set([...prev, ...modalSelected])]);
+                    } else {
+                      setEnhancedSubs(modalSelected);
+                    }
                     setModalSelected([]);
                     setShowModal(null);
+                    setModalAddMode(false);
                   }
-                }} style={{ flex:1, padding:'8px', borderRadius:8, border:'none', cursor:'pointer', background:'var(--accent)', color:'#000', fontWeight:700, fontSize:10 }}>Добавить ({modalSelected.length})</button>
+                }} style={{ flex:1, padding:'8px', borderRadius:8, border:'none', cursor:'pointer', background:'var(--accent)', color:'#000', fontWeight:700, fontSize:10 }}>{modalAddMode ? '➕ Добавить к плану' : '✅ Применить'} ({modalSelected.length})</button>
               </div>
               </>
             )}
@@ -6309,9 +6315,9 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
                 })}
               </div>
               <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginBottom:8 }}>
-                <button style={{ flex:1, padding:'6px', borderRadius:6, border:'1px dashed var(--accent)', cursor:'pointer', background:'transparent', color:'var(--accent)', fontSize:9, fontWeight:600, minWidth:0 }} onClick={() => setShowModal('manual')}>🔄 Заменить на аналог</button>
+                <button style={{ flex:1, padding:'6px', borderRadius:6, border:'1px dashed var(--accent)', cursor:'pointer', background:'transparent', color:'var(--accent)', fontSize:9, fontWeight:600, minWidth:0 }} onClick={() => { setShowModal('manual'); setModalAddMode(false); }}>🔄 Заменить на аналог</button>
                 <button style={{ flex:1, padding:'6px', borderRadius:6, border:'1px dashed var(--accent)', cursor:'pointer', background:'transparent', color:'var(--accent)', fontSize:9, fontWeight:600, minWidth:0 }} onClick={() => setShowSavedPicker(true)}>💾 Из сохранённых</button>
-                <button style={{ flex:1, padding:'6px', borderRadius:6, border:'1px dashed var(--accent)', cursor:'pointer', background:'transparent', color:'var(--accent)', fontSize:9, fontWeight:600, minWidth:0 }} onClick={() => setShowModal('manual')}>📋 Из каталога</button>
+                <button style={{ flex:1, padding:'6px', borderRadius:6, border:'1px dashed var(--accent)', cursor:'pointer', background:'transparent', color:'var(--accent)', fontSize:9, fontWeight:600, minWidth:0 }} onClick={() => { setShowModal('manual'); setModalAddMode(false); }}>📋 Из каталога</button>
               </div>
               <div style={{ display:'flex', gap:6 }}>
                 <button onClick={() => { setShowModal(null); }} style={{ flex:1, padding:'8px', borderRadius:8, border:'1px solid var(--border)', background:'transparent', color:'var(--text-dim)', cursor:'pointer', fontSize:10 }}>Отмена</button>

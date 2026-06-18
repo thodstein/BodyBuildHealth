@@ -159,7 +159,7 @@ export const SUBSYSTEM_PARENT: Record<string, string> = {
 
 // For backward compat and iteration - only the 8 core systems
 export const ALL_RISK_SYSTEMS = ['cardio', 'hepatic', 'renal', 'neuro', 'endocrine', 'hematologic', 'reproductive', 'musculoskeletal', 'metabolic', 'ghigf', 'ins_axis', 'neuro_toxicity', 'blood', 'vessels', 'immunity', 'thyroid', 'prostate', 'skin'] as const;
-export const BASE_RISK = 0.12;
+export const BASE_RISK = 0.30;
 
 export const REQUIRED_LABS_PER_PHASE: Record<string, string[]> = {
   baseline:              ['ALT','AST','GGT','ALP','BIL','DBIL','HCT','HGB','PLT','WBC','TT','FT3','FT4','TSH','E2','PRL','LH','FSH','SHBG','CRP','HbA1c','FERRITIN','VITD','LDL','HDL','TG','GLU','INS','HOMA','CREATININE','UA','B12','FOLATE','ALB','TP','K','NA','CA','P','MG','CORTISOL','DHT','PSA','INHB','AMH'],

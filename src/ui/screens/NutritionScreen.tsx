@@ -33,8 +33,8 @@ type ActiveTab = 'overview' | 'diary' | 'charts' | 'mealplan' | 'grocery' | 'res
 
 const SECTION_TABS: Record<NutritionSection, string[]> = {
   diary: ['diary', 'charts'],
-  planning: ['overview', 'custom', 'mealplan', 'cycling'],
-  overview: ['infocalc', 'grocery', 'restaurant', 'recipes'],
+  planning: ['overview', 'infocalc', 'grocery', 'restaurant', 'recipes', 'custom', 'mealplan', 'cycling'],
+  overview: [],
   all: ['overview', 'diary', 'charts', 'mealplan', 'cycling', 'infocalc', 'grocery', 'restaurant', 'custom', 'recipes'],
 };
 
@@ -162,8 +162,7 @@ export const NutritionScreen: React.FC = () => {
             <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
               {[
                 { section: 'diary' as NutritionSection, tab: 'diary', icon: '📝', title: 'Дневник питания', desc: 'Запись продуктов, OCR, штрих-коды', color: '#22c55e' },
-                { section: 'planning' as NutritionSection, tab: 'overview', icon: '🥗', title: 'План питания', desc: 'Обзор, генератор рациона, уровни, циклирование', color: '#3b82f6' },
-                { section: 'overview' as NutritionSection, tab: 'infocalc', icon: '📊', title: 'Общая информация', desc: 'Сводка, калькуляторы, рецепты', color: 'var(--accent)' },
+                { section: 'planning' as NutritionSection, tab: 'overview', icon: '🥗', title: 'План питания', desc: 'Обзор, генератор рациона, уровни, циклирование, рецепты', color: '#3b82f6' },
               ].map(card => (
                 <button key={card.section} onClick={() => { setPage('tabs'); setNutritionSection(card.section); setTab(card.tab as any); }} style={{
                   display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', borderRadius: 14, cursor: 'pointer', textAlign: 'left', width: '100%',
@@ -1916,9 +1915,6 @@ const RestaurantTab: React.FC = () => {
         )}
       </div>
     </div>
-    <div className="card" style={{ marginBottom: 8 }}><h4 style={{ margin: '0 0 4px', fontSize: 12 }}>🍔 Рестораны ({guide.length})</h4><div style={{ maxHeight: 200, overflowY: 'auto' }}>{guide.slice(0,12).map((r:any,i:number)=><div key={i} style={{fontSize:9,padding:'2px 4px',display:'flex',justifyContent:'space-between'}}><span>{r.chain}: {r.item}</span><span style={{color:r.athleteRating==='excellent'?'#22c55e':'#f59e0b'}}>Б:{r.protein}г</span></div>)}</div></div>
-    <div className="card" style={{ marginBottom: 8 }}><h4 style={{ margin: '0 0 4px', fontSize: 12 }}>✈️ Тренировки в поездках</h4>{travels.map((w:any,i:number)=><div key={i} style={{marginBottom:4}}><b style={{fontSize:10}}>{w.name}</b><span style={{fontSize:9,color:'var(--text-dim)'}}> ({w.duration}мин)</span></div>)}</div>
-    <div className="card"><h4 style={{ margin: '0 0 4px', fontSize: 12 }}>😴 Стек для сна</h4>{sleepStacks.map((s:any,i:number)=><div key={i} style={{marginBottom:4}}><b style={{fontSize:10}}>{s.name}</b><span style={{fontSize:9,color:'var(--text-light)'}}>: {s.supplements.join(' + ')}</span></div>)}</div>
   </div>);
 };
 
