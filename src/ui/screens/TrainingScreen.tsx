@@ -106,6 +106,7 @@ export const TrainingScreen: React.FC = () => {
   const [sleepHours, setSleepHours] = useState(linked.profile?.settings?.baselineSleepHours ?? 7);
   const [stressLevel, setStressLevel] = useState(linked.profile?.settings?.baselineStressLevel ?? 5);
   const [customExercises, setCustomExercises] = useState<{ name: string; sets: number; reps: number; rir: number }[]>(() => { try { return JSON.parse(localStorage.getItem('myTrainingExercises') || '[]'); } catch { return []; } });
+  const [lastAddedEx, setLastAddedEx] = useState<string | null>(null);
   const [trainingOutput, setTrainingOutput] = useState<TrainingOutput | null>(null);
   const [macrocycle, setMacrocycle] = useState<MacrocyclePlan | null>(null);
   const [selectedWeek, setSelectedWeek] = useState(1);
@@ -1589,11 +1590,16 @@ export const TrainingScreen: React.FC = () => {
                       {/* Add to plan button */}
                       <button onClick={() => {
                         setCustomExercises([...customExercises, { name: ex.name, sets:3, reps:10, rir:2 }]);
+                        setLastAddedEx(ex.id);
+                        setTimeout(() => setLastAddedEx(null), 1500);
                         setSelectedEx(null);
                       }} style={{
-                        width:'100%', marginTop:4, padding:'8px', borderRadius:8, border:'1px solid rgba(0,230,138,0.3)',
-                        background:'rgba(0,230,138,0.06)', color:'var(--accent)', fontWeight:700, fontSize:11, cursor:'pointer',
-                      }}>+ Добавить в план</button>
+                        width:'100%', marginTop:4, padding:'8px', borderRadius:8,
+                        border: lastAddedEx === ex.id ? '1px solid rgba(0,230,138,0.5)' : '1px solid rgba(0,230,138,0.3)',
+                        background: lastAddedEx === ex.id ? 'rgba(0,230,138,0.15)' : 'rgba(0,230,138,0.06)',
+                        color: lastAddedEx === ex.id ? '#00e68a' : 'var(--accent)', fontWeight:700, fontSize:11, cursor:'pointer',
+                        transition:'all 0.3s',
+                      }}>{lastAddedEx === ex.id ? '✓ Добавлено!' : '+ Добавить в план'}</button>
                     </div>
                   )}
                 </div>
@@ -3641,6 +3647,7 @@ const VisualTab: React.FC<{ sessions: any[] }> = ({ sessions }) => {
 // ── Analytics Tab Component ──
 const AnalyticsTab: React.FC<{ sessions: WorkoutLog[] }> = ({ sessions }) => {
   const analytics = useMemo(() => {
+    try {
     const mapped = sessions.map(w => ({
       sessionId: w.id,
       date: w.date,
@@ -3660,6 +3667,7 @@ const AnalyticsTab: React.FC<{ sessions: WorkoutLog[] }> = ({ sessions }) => {
       ),
     }));
     return computeAnalytics({ sessions: mapped, weeks: 4 });
+    } catch { return null; }
   }, [sessions]);
 
   if (!analytics || sessions.length === 0) {
