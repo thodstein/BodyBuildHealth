@@ -6621,10 +6621,10 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
               <h3 style={{ margin:'0 0 10px', fontSize:14, fontWeight:800 }}>🧠 Выберите уровень поддержки</h3>
               <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
                 {[
-                  { v:'basic', l:'База', c:'#22c55e', d:'12 препаратов, обязательный минимум' },
-                  { v:'mid', l:'Средний', c:'#eab308', d:'23 препарата, расширенная защита' },
-                  { v:'max', l:'Максимум', c:'#f97316', d:'31 препарат, полное покрытие' },
-                  { v:'boost', l:'Усиление', c:'#ef4444', d:'51 препарат, максимальная поддержка' },
+                  { v:'basic', l:'База', c:'#22c55e', d:() => `${SUPPORT_LEVELS.basic?.subs?.length || 0} препаратов, обязательный минимум` },
+                  { v:'mid', l:'Средний', c:'#eab308', d:() => `${SUPPORT_LEVELS.mid?.subs?.length || 0} препарата, расширенная защита` },
+                  { v:'max', l:'Максимум', c:'#f97316', d:() => `${SUPPORT_LEVELS.max?.subs?.length || 0} препаратов, полное покрытие` },
+                  { v:'boost', l:'Усиление', c:'#ef4444', d:() => `${SUPPORT_LEVELS.boost?.subs?.length || 0} препаратов, максимальная поддержка` },
                 ].map(btn => (
                   <button key={btn.v} onClick={() => { setModalLevel(btn.v); }} style={{
                     padding:'12px 14px', borderRadius:10, cursor:'pointer', textAlign:'left',
@@ -6632,7 +6632,7 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
                     color:'var(--text-light)', fontWeight:700, fontSize:12,
                   }}>
                     <span style={{ color:btn.c, fontWeight:800 }}>{btn.l}</span>
-                    <span style={{ color:'var(--text-dim)', fontWeight:400, marginLeft:6 }}>— {btn.d}</span>
+                    <span style={{ color:'var(--text-dim)', fontWeight:400, marginLeft:6 }}>— {btn.d()}</span>
                   </button>
                 ))}
               </div>
@@ -6643,7 +6643,7 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
             {showModal === 'intel' && modalLevel && (
               <>
               <h3 style={{ margin:'0 0 10px', fontSize:14, fontWeight:800 }}>🧠 Рекомендуемые препараты</h3>
-              <p style={{ fontSize:9, color:'var(--text-dim)', marginBottom:8 }}>Уровень: <b style={{ color:'#00e68a' }}>{modalLevel}</b></p>
+              <p style={{ fontSize:9, color:'var(--text-dim)', marginBottom:8 }}>Уровень: <b style={{ color:'#00e68a' }}>{modalLevel}</b> — <b style={{ color:'var(--text-light)' }}>{(SUPPORT_LEVELS[modalLevel]?.subs || []).length}</b> препаратов</p>
               <div style={{ display:'flex', flexDirection:'column', gap:4, maxHeight:'50vh', overflowY:'auto', marginBottom:8 }}>
                 {(SUPPORT_LEVELS[modalLevel]?.subs || []).map((id: string) => {
                   const sub = allSupport.find(s => s.id === id);
@@ -6667,9 +6667,22 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
             {showModal === 'manual' && (
               <>
               <h3 style={{ margin:'0 0 10px', fontSize:14, fontWeight:800 }}>📋 Выбор препаратов</h3>
-              <input value={modalSearch} onChange={e => setModalSearch(e.target.value)} placeholder="🔍 Поиск по названию..." style={{
-                width:'100%', padding:'8px 10px', borderRadius:8, border:'1px solid var(--border)', background:'var(--bg-secondary)', color:'var(--text)', fontSize:11, boxSizing:'border-box', marginBottom:8,
-              }} />
+              <div style={{ display:'flex', gap:6, marginBottom:8 }}>
+                <input value={modalSearch} onChange={e => setModalSearch(e.target.value)} placeholder="🔍 Поиск..." style={{
+                  flex:1, padding:'8px 10px', borderRadius:8, border:'1px solid var(--border)', background:'var(--bg-secondary)', color:'var(--text)', fontSize:11, boxSizing:'border-box',
+                }} />
+                <button onClick={() => {
+                  try {
+                    const saved = JSON.parse(localStorage.getItem('savedSupportStacks') || '[]');
+                    if (saved.length > 0) {
+                      const ids = saved[0].subs || [];
+                      setEnhancedSubs(ids);
+                      calcSupport();
+                      setShowModal(null);
+                    }
+                  } catch {}
+                }} style={{ padding:'8px 10px', borderRadius:8, border:'1px dashed var(--accent)', background:'transparent', color:'var(--accent)', fontSize:10, fontWeight:600, cursor:'pointer', whiteSpace:'nowrap' }}>💾 Из сохранённых</button>
+              </div>
               <div style={{ display:'flex', flexDirection:'column', gap:3, maxHeight:'45vh', overflowY:'auto', marginBottom:8 }}>
                 {catalogSupport.filter(s => !modalSearch || (s.name||'').toLowerCase().includes(modalSearch.toLowerCase()) || (s.id||'').toLowerCase().includes(modalSearch.toLowerCase())).slice(0,60).map(s => {
                   const sel = modalSelected.includes(s.id);
@@ -6686,7 +6699,14 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
               </div>
               <div style={{ display:'flex', gap:6 }}>
                 <button onClick={() => { setShowModal(null); setModalSelected([]); }} style={{ flex:1, padding:'8px', borderRadius:8, border:'1px solid var(--border)', background:'transparent', color:'var(--text-dim)', cursor:'pointer', fontSize:10 }}>Отмена</button>
-                <button onClick={() => { setShowModal(null); setModalSelected([]); }} style={{ flex:1, padding:'8px', borderRadius:8, border:'none', cursor:'pointer', background:'var(--accent)', color:'#000', fontWeight:700, fontSize:10 }}>Добавить ({modalSelected.length})</button>
+                <button onClick={() => {
+                  if (modalSelected.length > 0) {
+                    setEnhancedSubs(prev => [...new Set([...prev, ...modalSelected])]);
+                    setTimeout(() => calcSupport(), 50);
+                  }
+                  setShowModal(null);
+                  setModalSelected([]);
+                }} style={{ flex:1, padding:'8px', borderRadius:8, border:'none', cursor:'pointer', background:'var(--accent)', color:'#000', fontWeight:700, fontSize:10 }}>Добавить ({modalSelected.length})</button>
               </div>
               </>
             )}
