@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { registry } from './core/data/registry';
 import { DashboardScreen } from './ui/screens/DashboardScreen';
+import { MarketplaceScreen } from './ui/screens/MarketplaceScreen';
 import { PharmaScreen } from './ui/screens/PharmaScreen';
 import { SupportScreen } from './ui/screens/SupportScreen';
 import { TrainingScreen } from './ui/screens/TrainingScreen';
@@ -12,7 +13,7 @@ import { ArticlesScreen } from './ui/screens/ArticlesScreen';
 
 import { ToastContainer } from './ui/ToastContainer';
 
-type Tab = 'home' | 'pharma' | 'training' | 'labs' | 'risks' | 'support' | 'nutrition' | 'profile' | 'articles';
+type Tab = 'home' | 'pharma' | 'training' | 'labs' | 'risks' | 'support' | 'nutrition' | 'profile' | 'articles' | 'marketplace';
 
 // Bottom nav: 5 primary tabs
 const PRIMARY_NAV: { id: Tab; label: string; icon: React.ReactNode }[] = [
