@@ -2217,7 +2217,7 @@ export const ALL_SUBSTANCES: SupportSubstance[] = [
   },
   {
     id: 'AA_BETA_ALANINE',
-    name: 'Beta-Alanine',
+    name: 'Бета-аланин',
     categories: ['amino', 'performance'],
     mechanisms: ['CARNOSINE_SYNTHESIS', 'LACTATE_BUFFER'],
     organs: ['MUSCLES'],

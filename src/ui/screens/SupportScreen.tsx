@@ -2475,8 +2475,9 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
       {/* ===== INFO HEADER (back/home + pills) ===== */}
       {(section === 'info' || calcView === 'info' || ['mixcalc','neuro','joints','acne','peptides'].includes(calcView)) && (
         <div style={{ position:'fixed', top:0, left:0, right:0, zIndex:150, background:'var(--bg-primary)', borderBottom:'1px solid var(--border)' }}>
-          <div style={{ display:'flex', gap:6, padding:'4px 12px', borderBottom:'1px solid var(--border)', alignItems:'center' }}>
-            <button onClick={goHome} style={{ padding:'3px 10px', borderRadius:6, fontSize:10, cursor:'pointer', background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600, whiteSpace:'nowrap' }}>← Назад</button>
+          <div style={{ display:'flex', gap:6, padding:'4px 12px', borderBottom:'1px solid var(--border)', alignItems:'center', overflowX:'auto' }}>
+            <button onClick={goBack} style={{ padding:'3px 10px', borderRadius:6, fontSize:10, cursor:'pointer', background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600, whiteSpace:'nowrap' }}>← Назад</button>
+            <button onClick={goHome} style={{ padding:'3px 10px', borderRadius:6, fontSize:10, cursor:'pointer', background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600, whiteSpace:'nowrap' }}>← На главную</button>
           </div>
           <div style={{ display:'flex', gap:4, padding:'6px 12px 8px', overflowX:'auto', scrollbarWidth:'none' }}>
             {[['peptides','Пептиды'],['catalog','Каталог'],['synergies','Синергии'],['readystacks','Стеки'],['interactions','Взаимодействия'],['research','Исследования'],['mixcalc','Микс'],['neuro','Нейро'],['joints','Суставы'],['acne','Акне']].map(([id,label]) => (
@@ -2670,6 +2671,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                                           {(sub?.mechanisms||[]).slice(0,4).map(m => <span key={m||''} style={{ fontSize:8, padding:'1px 4px', borderRadius:3, background:'rgba(0,230,138,0.08)', color:'#00e68a' }}>{MECH_LABELS[m] || MECH_TRANSLATIONS_RU[m] || m||''}</span>)}
                                     </div>
                                   </div>
+                                  <button onClick={e => { e.stopPropagation(); if (sub?.id && !enhancedSubs.includes(sub.id)) setEnhancedSubs(prev => [...prev, sub.id]); }} style={{ padding:'2px 8px', borderRadius:6, fontSize:9, fontWeight:700, cursor:'pointer', background:'rgba(0,230,138,0.1)', border:'1px solid rgba(0,230,138,0.3)', color:'#00e68a', whiteSpace:'nowrap', flexShrink:0 }}>{enhancedSubs.includes(sub?.id||'') ? '✓' : '+ Мой стек'}</button>
                                   <span style={{ fontSize:9, color:'var(--text-dim)', transform:isSelected ? 'rotate(180deg)' : 'none' }}>▼</span>
                                 </div>
                                 {isSelected && sub && (
@@ -2738,6 +2740,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                                         <div style={{ fontSize:10, fontWeight:600, color:'var(--text-light)' }}>{sub.name||(sub.id||'').replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase())}</div>
                                         <div style={{ fontSize:8, color:'var(--text-dim)' }}>{(sub.categories||[]).slice(0,2).join(', ')}</div>
                                       </div>
+                                      <button onClick={e => { e.stopPropagation(); if (!enhancedSubs.includes(id)) setEnhancedSubs(prev => [...prev, id]); }} style={{ padding:'2px 8px', borderRadius:6, fontSize:9, fontWeight:700, cursor:'pointer', background:'rgba(0,230,138,0.1)', border:'1px solid rgba(0,230,138,0.3)', color:'#00e68a', whiteSpace:'nowrap', flexShrink:0 }}>{enhancedSubs.includes(id) ? '✓' : '+ Мой стек'}</button>
                                       <span style={{ fontSize:9, color:'var(--text-dim)', transform:isSelected ? 'rotate(180deg)' : 'none' }}>▼</span>
                                     </div>
                                     {isSelected && (
@@ -2805,6 +2808,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                                       {(sub?.mechanisms||[]).slice(0,4).map(m => <span key={m||''} style={{ fontSize:8, padding:'1px 4px', borderRadius:3, background:'rgba(0,230,138,0.08)', color:'#00e68a' }}>{MECH_LABELS[m] || MECH_TRANSLATIONS_RU[m] || m||''}</span>)}
                                           </div>
                                         </div>
+                                        <button onClick={e => { e.stopPropagation(); if (sub?.id && !enhancedSubs.includes(sub.id)) setEnhancedSubs(prev => [...prev, sub.id]); }} style={{ padding:'2px 8px', borderRadius:6, fontSize:9, fontWeight:700, cursor:'pointer', background:'rgba(0,230,138,0.1)', border:'1px solid rgba(0,230,138,0.3)', color:'#00e68a', whiteSpace:'nowrap', flexShrink:0 }}>{enhancedSubs.includes(sub?.id||'') ? '✓' : '+ Мой стек'}</button>
                                         <span style={{ fontSize:9, color:'var(--text-dim)', transform:selectedSub === sub?.id ? 'rotate(180deg)' : 'none' }}>▼</span>
                                       </div>
                                       {selectedSub === sub?.id && sub && (
@@ -2879,6 +2883,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                                             {(sub?.mechanisms||[]).slice(0,4).map(m => <span key={m||''} style={{ fontSize:8, padding:'1px 4px', borderRadius:3, background:'rgba(0,230,138,0.08)', color:'#00e68a' }}>{MECH_LABELS[m] || MECH_TRANSLATIONS_RU[m] || m||''}</span>)}
                                       </div>
                                     </div>
+                                    <button onClick={e => { e.stopPropagation(); if (sub?.id && !enhancedSubs.includes(sub.id)) setEnhancedSubs(prev => [...prev, sub.id]); }} style={{ padding:'2px 8px', borderRadius:6, fontSize:9, fontWeight:700, cursor:'pointer', background:'rgba(0,230,138,0.1)', border:'1px solid rgba(0,230,138,0.3)', color:'#00e68a', whiteSpace:'nowrap', flexShrink:0 }}>{enhancedSubs.includes(sub?.id||'') ? '✓' : '+ Мой стек'}</button>
                                     <span style={{ fontSize:9, color:'var(--text-dim)', transform:selectedSub === sub?.id ? 'rotate(180deg)' : 'none' }}>▼</span>
                                   </div>
                                   {selectedSub === sub?.id && sub && (
@@ -6129,23 +6134,25 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
                       {savedStacks.map(stack => {
                         const totalItems = stack.subs?.length || 0;
                         return (
-                          <div key={stack.id} style={{ padding:'10px 12px', borderRadius:10, background:'rgba(255,255,255,0.02)', border:'1px solid var(--border)', cursor:'pointer' }}
-                            onClick={() => {
-                              const ids = stack.subs || [];
-                              setEnhancedSubs(ids);
-                              setModalSelected([]);
-                              setShowModal(null);
-                              setShowSavedPicker(false);
-                            }}
-                          >
-                            <div style={{ fontSize:12, fontWeight:700, color:'var(--text-light)' }}>{stack.name}</div>
-                            <div style={{ fontSize:9, color:'var(--text-dim)', marginTop:2 }}>{new Date(stack.date).toLocaleDateString('ru-RU')} · {totalItems} препаратов</div>
-                            <div style={{ display:'flex', flexWrap:'wrap', gap:2, marginTop:4 }}>
-                              {(stack.subs || []).slice(0,8).map((id: string) => {
-                                const sub = ALL_SUBSTANCES.find(s => s.id === id);
-                                return <span key={id} style={{ fontSize:8, padding:'1px 5px', borderRadius:4, background:'rgba(139,92,246,0.08)', color:'#a78bfa' }}>{sub?.name || id}</span>;
-                              })}
-                              {totalItems > 8 && <span style={{ fontSize:8, color:'var(--text-dim)' }}>+{totalItems-8}</span>}
+                          <div key={stack.id} style={{ padding:'10px 12px', borderRadius:10, background:'rgba(255,255,255,0.02)', border:'1px solid var(--border)' }}>
+                            <div style={{ cursor:'pointer' }}
+                              onClick={() => {
+                                const ids = stack.subs || [];
+                                setEnhancedSubs(ids);
+                                setModalSelected([]);
+                                setShowModal(null);
+                                setShowSavedPicker(false);
+                              }}
+                            >
+                              <div style={{ fontSize:12, fontWeight:700, color:'var(--text-light)' }}>{stack.name}</div>
+                              <div style={{ fontSize:9, color:'var(--text-dim)', marginTop:2 }}>{new Date(stack.date).toLocaleDateString('ru-RU')} · {totalItems} препаратов</div>
+                              <div style={{ display:'flex', flexWrap:'wrap', gap:2, marginTop:4 }}>
+                                {(stack.subs || []).slice(0,8).map((id: string) => {
+                                  const sub = ALL_SUBSTANCES.find(s => s.id === id);
+                                  return <span key={id} style={{ fontSize:8, padding:'1px 5px', borderRadius:4, background:'rgba(139,92,246,0.08)', color:'#a78bfa' }}>{sub?.name || id}</span>;
+                                })}
+                                {totalItems > 8 && <span style={{ fontSize:8, color:'var(--text-dim)' }}>+{totalItems-8}</span>}
+                              </div>
                             </div>
                           </div>
                         );

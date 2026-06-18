@@ -231,7 +231,30 @@ export const FertilityPCTScreen: React.FC<{ initialTab?: FertTab; restrictToMode
   return (
     <div className="screen fertility-pct" style={{ paddingBottom: 70 }}>
       <h2 style={{ fontSize: 18, fontWeight: 800, margin: '0 0 6px' }}>🧬 ПКТ и Фертильность</h2>
-      <p style={{ fontSize: 10, color: 'var(--text-dim)', margin: '0 0 12px', lineHeight: 1.4 }}>Восстановление гормонального фона после курса ААС. Оценка фертильности, ПКТ, ГЗТ и протоколы восстановления.</p>
+      <div style={{
+        display: 'flex', gap: 5, marginBottom: 10, overflowX: 'auto', scrollbarWidth: 'none' as const,
+        WebkitOverflowScrolling: 'touch', paddingBottom: 4, msOverflowStyle: 'none' as const,
+      }}>
+        {fertTabs.map(t => {
+          const isActive = tab === t.id;
+          return (
+            <button
+              key={t.id}
+              onClick={() => setTab(t.id)}
+              style={{
+                flexShrink: 0, whiteSpace: 'nowrap',
+                padding: '8px 16px', borderRadius: 24, fontSize: 11,
+                fontWeight: isActive ? 700 : 500,
+                background: isActive ? 'var(--accent)' : 'var(--glass-bg)',
+                color: isActive ? '#000' : 'var(--text-dim)',
+                border: isActive ? 'none' : '1px solid var(--glass-border)',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease',
+              }}
+            >{t.label}</button>
+          );
+        })}
+      </div>
 
       <div style={{ maxWidth: '100%', overflowX: 'hidden', overflowY: 'auto', wordBreak: 'break-word' }}>
 
@@ -1070,31 +1093,6 @@ export const FertilityPCTScreen: React.FC<{ initialTab?: FertTab; restrictToMode
           </div>
         </div>
       )}
-
-      <div style={{
-        display: 'flex', gap: 5, marginBottom: 0, marginTop: 12, overflowX: 'auto', scrollbarWidth: 'none' as const,
-        WebkitOverflowScrolling: 'touch', paddingBottom: 4, msOverflowStyle: 'none' as const,
-      }}>
-        {fertTabs.map(t => {
-          const isActive = tab === t.id;
-          return (
-            <button
-              key={t.id}
-              onClick={() => setTab(t.id)}
-              style={{
-                flexShrink: 0, whiteSpace: 'nowrap',
-                padding: '8px 16px', borderRadius: 24, fontSize: 11,
-                fontWeight: isActive ? 700 : 500,
-                background: isActive ? 'var(--accent)' : 'var(--glass-bg)',
-                color: isActive ? '#000' : 'var(--text-dim)',
-                border: isActive ? 'none' : '1px solid var(--glass-border)',
-                cursor: 'pointer',
-                transition: 'all 0.2s ease',
-              }}
-            >{t.label}</button>
-          );
-        })}
-      </div>
 
       </div>
     </div>

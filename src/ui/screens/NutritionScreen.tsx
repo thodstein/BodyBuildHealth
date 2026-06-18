@@ -33,9 +33,9 @@ type ActiveTab = 'overview' | 'diary' | 'charts' | 'mealplan' | 'grocery' | 'res
 
 const SECTION_TABS: Record<NutritionSection, string[]> = {
   diary: ['diary', 'charts'],
-  planning: ['mealplan', 'cycling'],
-  overview: ['overview', 'infocalc', 'grocery', 'restaurant', 'custom'],
-  all: ['overview', 'diary', 'charts', 'mealplan', 'cycling', 'infocalc', 'grocery', 'restaurant', 'custom'],
+  planning: ['overview', 'mealplan', 'cycling'],
+  overview: ['infocalc', 'grocery', 'restaurant', 'custom', 'recipes'],
+  all: ['overview', 'diary', 'charts', 'mealplan', 'cycling', 'infocalc', 'grocery', 'restaurant', 'custom', 'recipes'],
 };
 
 const TAB_LABELS: Record<string, string> = {
@@ -142,7 +142,7 @@ export const NutritionScreen: React.FC = () => {
       case 'restaurant': return <RestaurantTab />;
       case 'cycling': return <CyclingTab tKcal={tKcal} tProt={tProt} />;
       case 'custom': return <NutritionCustomFood />;
-      default: return <><NutritionOverview profile={linked.profile} avgWeeklyKcal={avgWeeklyKcal} avgWeeklyProtein={avgWeeklyProtein} avgWeeklyFat={avgWeeklyFat} avgWeeklyCarbs={avgWeeklyCarbs} microsIntake={microsIntake} /><RecipesTab /></>;
+      default: return <NutritionOverview profile={linked.profile} avgWeeklyKcal={avgWeeklyKcal} avgWeeklyProtein={avgWeeklyProtein} avgWeeklyFat={avgWeeklyFat} avgWeeklyCarbs={avgWeeklyCarbs} microsIntake={microsIntake} />;
     }
   };
 
@@ -162,8 +162,8 @@ export const NutritionScreen: React.FC = () => {
             <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
               {[
                 { section: 'diary' as NutritionSection, tab: 'diary', icon: '📝', title: 'Дневник питания', desc: 'Запись продуктов, OCR, штрих-коды', color: '#22c55e' },
-                { section: 'planning' as NutritionSection, tab: 'mealplan', icon: '🥗', title: 'План питания', desc: 'Генератор рациона, уровни, циклирование', color: '#3b82f6' },
-                { section: 'overview' as NutritionSection, tab: 'overview', icon: '📊', title: 'Общая информация', desc: 'Сводка, калькуляторы', color: 'var(--accent)' },
+                { section: 'planning' as NutritionSection, tab: 'overview', icon: '🥗', title: 'План питания', desc: 'Обзор, генератор рациона, уровни, циклирование', color: '#3b82f6' },
+                { section: 'overview' as NutritionSection, tab: 'infocalc', icon: '📊', title: 'Общая информация', desc: 'Сводка, калькуляторы, рецепты', color: 'var(--accent)' },
               ].map(card => (
                 <button key={card.section} onClick={() => { setPage('tabs'); setNutritionSection(card.section); setTab(card.tab as any); }} style={{
                   display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', borderRadius: 14, cursor: 'pointer', textAlign: 'left', width: '100%',
@@ -792,7 +792,6 @@ const MealPlanExtended: React.FC<{ tKcal: number; tProt: number; tFat: number; t
           { id:'planoverview', label:'📋 Обзор' },
           { id:'rules', label:'📋 Правила питания' },
           { id:'products', label:'📋 Обзор продуктов' },
-          { id:'recipes', label:'🍳 Рецепты' },
         ].map(st => (
           <button key={st.id} onClick={() => setMs(st.id)} style={{
             padding:'6px 12px', borderRadius:16, fontSize:10, fontWeight:700, whiteSpace:'nowrap', cursor:'pointer', flexShrink:0,
@@ -1292,8 +1291,7 @@ const MealPlanExtended: React.FC<{ tKcal: number; tProt: number; tFat: number; t
         </div>
       </div>
       </>)}
-      {msTab === 'recipes' && (<RecipesTab />)}
-      {msTab !== 'products' && msTab !== 'rules' && msTab !== 'recipes' && (<>
+      {msTab !== 'products' && msTab !== 'rules' && (<>
       <div className="card" style={{ marginBottom: 8, padding: 14 }}>
         <h4 style={{ margin: '0 0 8px', fontSize: 13, color: 'var(--accent)' }}>🎯 Индивидуальный план</h4>
         <p style={{ fontSize: 10, color: 'var(--text-dim)', margin: '0 0 8px' }}>
