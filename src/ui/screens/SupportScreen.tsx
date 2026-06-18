@@ -1192,7 +1192,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
     return { ...phaseResult, subs: finalSubs, dosages: finalDosages };
   }, [supportLevel, supportPhase, selectedAnalogs, enhancedSubs, boostEnabled, jointMode]);
 
-  const calcSupport = (overrideLevel?: 'basic' | 'mid' | 'max' | 'boost') => {
+  const calcSupport = (overrideLevel?: 'basic' | 'mid' | 'max' | 'boost', overrideSubs?: string[]) => {
     const s = linked.profile?.settings;
     const level = overrideLevel || supportLevel;
     const input: SupportInput = {
@@ -1258,7 +1258,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
     } catch (e2) { /* ignore profile save errors */ }
   };
 
-  useEffect(() => { calcSupport(); }, [supportDrugs, supportGoal, supportLevel]);
+  useEffect(() => { calcSupport(); }, [supportDrugs, supportGoal, supportLevel, enhancedSubs]);
 
   // Interaction checker state
   const [interactTab, setInteractTab] = useState<'support' | 'pharma'>('support');
@@ -6660,10 +6660,11 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
                 {(SUPPORT_LEVELS[modalLevel]?.subs || []).map((id: string) => {
                   const sub = allSupport.find(s => s.id === id);
                   if (!sub) return null;
+                  const descOk = sub.description && /^[а-яА-Яa-zA-Z0-9\s\-–—,.!?;:()]+$/u.test(sub.description.slice(0,10));
                   return (
                     <div key={id} style={{ padding:'6px 8px', borderRadius:6, background:'rgba(255,255,255,0.03)', border:'1px solid var(--border)', fontSize:10 }}>
                       <div style={{ fontWeight:600, color:'var(--text-light)' }}>{sub.name}</div>
-                      {sub.description && <div style={{ fontSize:8, color:'var(--text-dim)' }}>{sub.description?.slice(0,80)}</div>}
+                      {sub.description && <div style={{ fontSize:8, color:'var(--text-dim)' }}>{descOk ? sub.description?.slice(0,80) : sub.id.replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase())}</div>}
                     </div>
                   );
                 })}
@@ -6689,22 +6690,24 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
                     if (saved.length > 0) {
                       const ids = saved[0].subs || [];
                       setEnhancedSubs(ids);
-                      setTimeout(() => { calcSupport(); }, 50);
+                      setModalSelected([]);
                       setShowModal(null);
                     }
-                  } catch {}
+                  } catch (e) { console.error(e); }
                 }} style={{ padding:'8px 10px', borderRadius:8, border:'1px dashed var(--accent)', background:'transparent', color:'var(--accent)', fontSize:10, fontWeight:600, cursor:'pointer', whiteSpace:'nowrap' }}>💾 Из сохранённых</button>
               </div>
               <div style={{ display:'flex', flexDirection:'column', gap:3, maxHeight:'45vh', overflowY:'auto', marginBottom:8 }}>
-                {catalogSupport.filter(s => !modalSearch || (s.name||'').toLowerCase().includes(modalSearch.toLowerCase()) || (s.id||'').toLowerCase().includes(modalSearch.toLowerCase())).slice(0,60).map(s => {
+                {catalogSupport.filter(s => !modalSearch || (s.name||'').toLowerCase().includes(modalSearch.toLowerCase()) || (s.id||'').toLowerCase().includes(modalSearch.toLowerCase())).map(s => {
                   const sel = modalSelected.includes(s.id);
+                  const descOk = s.description && /^[а-яА-Яa-zA-Z0-9\s\-–—,.!?;:()]+$/u.test(s.description.slice(0,10));
                   return (
                     <div key={s.id} onClick={() => setModalSelected(prev => sel ? prev.filter(x => x !== s.id) : [...prev, s.id])} style={{
                       padding:'6px 8px', borderRadius:6, cursor:'pointer', display:'flex', alignItems:'center', gap:6,
                       background: sel ? 'rgba(0,230,138,0.08)' : 'rgba(255,255,255,0.02)', border: sel ? '1px solid rgba(0,230,138,0.3)' : '1px solid transparent',
                     }}>
-                      <span style={{ fontSize:8 }}>{sel ? '✓' : ''}</span>
+                      <span style={{ fontSize:8, minWidth:12 }}>{sel ? '✓' : ''}</span>
                       <div style={{ flex:1, fontSize:10, fontWeight:600, color:'var(--text-light)' }}>{s.name}</div>
+                      {s.description && <div style={{ fontSize:7, color:'var(--text-dim)', maxWidth:120, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{descOk ? s.description.slice(0,40) : s.id.replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase()).slice(0,40)}</div>}
                     </div>
                   );
                 })}
@@ -6713,11 +6716,10 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
                 <button onClick={() => { setShowModal(null); setModalSelected([]); }} style={{ flex:1, padding:'8px', borderRadius:8, border:'1px solid var(--border)', background:'transparent', color:'var(--text-dim)', cursor:'pointer', fontSize:10 }}>Отмена</button>
                 <button onClick={() => {
                   if (modalSelected.length > 0) {
-                    setEnhancedSubs(prev => [...new Set([...prev, ...modalSelected])]);
-                    setTimeout(() => calcSupport(), 50);
+                    setEnhancedSubs(modalSelected);
+                    setModalSelected([]);
+                    setShowModal(null);
                   }
-                  setShowModal(null);
-                  setModalSelected([]);
                 }} style={{ flex:1, padding:'8px', borderRadius:8, border:'none', cursor:'pointer', background:'var(--accent)', color:'#000', fontWeight:700, fontSize:10 }}>Добавить ({modalSelected.length})</button>
               </div>
               </>

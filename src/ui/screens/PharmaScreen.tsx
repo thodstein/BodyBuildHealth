@@ -1991,14 +1991,20 @@ const InteractionCheckerTab: React.FC = () => {
                   <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6, color: 'var(--text)' }}>
                     {aName} + {bName}
                   </div>
-                  <div style={{ fontSize: 10, lineHeight: 1.4, color: 'var(--text-light)' }}>
-                    {pair.mechanism?.length > 100 ? pair.mechanism?.slice(0, 100) + '...' : pair.mechanism}
+                  <div style={{ fontSize: 10, lineHeight: 1.4, color: 'var(--text-dim)' }}>
+                    {pair.mechanism && /^[а-яА-Яa-zA-Z0-9\s\-–—,.!?;:()]+$/u.test(pair.mechanism.slice(0,10)) ? 
+                      pair.mechanism.slice(0,120) + (pair.mechanism.length>120?'...':'') : 
+                      pair.synergyType === 'synergistic' ? 'Синергетический эффект при совместном применении' :
+                      pair.synergyType === 'additive' ? 'Аддитивный эффект: препараты дополняют друг друга' :
+                      pair.synergyType === 'potentiative' ? 'Потенцирующий эффект: один препарат усиливает действие другого' :
+                      pair.synergyType === 'complementary' ? 'Комплементарное действие: препараты компенсируют побочные эффекты друг друга' :
+                      'Взаимодействие препаратов'}
                   </div>
-                  {pair.clinicalNote && (
+                  {pair.clinicalNote && (/^[а-яА-Яa-zA-Z0-9\s\-–—,.!?;:()]+$/u.test(pair.clinicalNote.slice(0,5)) ? (
                     <div style={{ marginTop: 4, fontSize: 9, color: '#22c55e' }}>
                       💡 {pair.clinicalNote?.slice(0, 100)}
                     </div>
-                  )}
+                  ) : null)}
                   {pair.affectedSystems && pair.affectedSystems.length > 0 && (
                     <div style={{ marginTop: 8, display: 'flex', flexWrap: 'wrap', gap: 3 }}>
                       {pair.affectedSystems.map(sys => (
