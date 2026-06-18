@@ -942,6 +942,10 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   const [synergyPage, setSynergyPage] = useState<number>(1);
   const SYNERGY_PAGE_SIZE = 30;
   const [interactionPage, setInteractionPage] = useState<number>(1);
+  const [showModal, setShowModal] = useState<string | null>(null);
+  const [modalLevel, setModalLevel] = useState<string | null>(null);
+  const [modalSearch, setModalSearch] = useState('');
+  const [modalSelected, setModalSelected] = useState<string[]>([]);
   const INTERACTION_PAGE_SIZE = 40;
   const [supportResult, setSupportResult] = useState<ReturnType<typeof calculateSupport> | null>(null);
   const [calcResult, setCalcResult] = useState<any>(null);
@@ -5386,17 +5390,26 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
                 </div>
               </div>
               {(expandedCategories.calc_intel ?? true) && (<>
-              <p style={{ fontSize:9, color:'var(--text-dim)', margin:'0 0 10px', lineHeight:1.5 }}>
+               <p style={{ fontSize:9, color:'var(--text-dim)', margin:'0 0 10px', lineHeight:1.5 }}>
                 Анализ: <b style={{ color:'var(--accent)' }}>{uniqCourse.length}</b> препаратов · <b style={{ color:'#60a5fa' }}>{labs.length}</b> анализов · <b style={{ color:'#f59e0b' }}>{Object.keys(riskData?.systemBreakdown || {}).length}</b> систем рисков · <b style={{ color:'#a78bfa' }}>{weightKg}</b>кг {age}лет {sex === 'male' ? '♂' : '♀'}
               </p>
-              <button onClick={() => {
-                try {
-                  calcSupport();
-                } catch { }
-              }} style={{
-                width:'100%', padding:'14px', borderRadius:10, border:'none', cursor:'pointer',
-                background:'linear-gradient(135deg,#00e68a,#00c853)', color:'#000', fontWeight:800, fontSize:14,
-                boxShadow:'0 4px 20px rgba(0,230,138,0.35)', letterSpacing:'0.3px',
+              <div style={{ display:'flex', gap:6, marginBottom:6 }}>
+                <button onClick={() => setShowModal('intel')} style={{
+                  flex:1, padding:'12px', borderRadius:10, border:'none', cursor:'pointer',
+                  background:'linear-gradient(135deg,#00e68a,#00c853)', color:'#000', fontWeight:700, fontSize:12,
+                }}>
+                  🧠 Интеллектуальный расчет
+                </button>
+                <button onClick={() => setShowModal('manual')} style={{
+                  flex:1, padding:'12px', borderRadius:10, border:'1px solid var(--accent)', cursor:'pointer',
+                  background:'transparent', color:'var(--accent)', fontWeight:700, fontSize:12,
+                }}>
+                  📋 Ручной выбор
+                </button>
+              </div>
+              <button onClick={() => calcSupport()} style={{
+                width:'100%', padding:'12px', borderRadius:10, border:'1px solid var(--border)', cursor:'pointer',
+                background:'var(--bg-secondary)', color:'var(--text-dim)', fontWeight:600, fontSize:11, marginBottom:6,
               }}>
                 🧮 Рассчитать поддержку
               </button>
@@ -6474,6 +6487,89 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
             ))}
           </div>
           <FertilityPCTScreen initialTab={hormonalTab === 'pct' ? 'pct-plan' : hormonalTab === 'hrt' ? 'hrt' : undefined} />
+        </div>
+      )}
+
+      {/* ===== MODAL OVERLAY ===== */}
+      {showModal && (
+        <div style={{ position:'fixed', inset:0, zIndex:300, background:'rgba(0,0,0,0.7)', display:'flex', alignItems:'center', justifyContent:'center', padding:12 }}>
+          <div style={{ background:'var(--bg-primary)', borderRadius:16, maxWidth:400, width:'100%', maxHeight:'85vh', overflowY:'auto', padding:16 }}>
+            {/* Intel modal: level selection */}
+            {showModal === 'intel' && !modalLevel && (
+              <>
+              <h3 style={{ margin:'0 0 10px', fontSize:14, fontWeight:800 }}>🧠 Выберите уровень поддержки</h3>
+              <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+                {[
+                  { v:'basic', l:'База', c:'#22c55e', d:'12 препаратов, обязательный минимум' },
+                  { v:'mid', l:'Средний', c:'#eab308', d:'23 препарата, расширенная защита' },
+                  { v:'max', l:'Максимум', c:'#f97316', d:'31 препарат, полное покрытие' },
+                  { v:'boost', l:'Усиление', c:'#ef4444', d:'51 препарат, максимальная поддержка' },
+                ].map(btn => (
+                  <button key={btn.v} onClick={() => { setModalLevel(btn.v); }} style={{
+                    padding:'12px 14px', borderRadius:10, cursor:'pointer', textAlign:'left',
+                    background: btn.c + '12', border: '1px solid ' + btn.c + '33',
+                    color:'var(--text-light)', fontWeight:700, fontSize:12,
+                  }}>
+                    <span style={{ color:btn.c, fontWeight:800 }}>{btn.l}</span>
+                    <span style={{ color:'var(--text-dim)', fontWeight:400, marginLeft:6 }}>— {btn.d}</span>
+                  </button>
+                ))}
+              </div>
+              <button onClick={() => { setShowModal(null); setModalLevel(null); }} style={{ width:'100%', marginTop:10, padding:'8px', borderRadius:8, border:'1px solid var(--border)', background:'transparent', color:'var(--text-dim)', cursor:'pointer', fontSize:10 }}>Отмена</button>
+              </>
+            )}
+            {/* Intel modal: level selected, show substances */}
+            {showModal === 'intel' && modalLevel && (
+              <>
+              <h3 style={{ margin:'0 0 10px', fontSize:14, fontWeight:800 }}>🧠 Рекомендуемые препараты</h3>
+              <p style={{ fontSize:9, color:'var(--text-dim)', marginBottom:8 }}>Уровень: <b style={{ color:'#00e68a' }}>{modalLevel}</b></p>
+              <div style={{ display:'flex', flexDirection:'column', gap:4, maxHeight:'50vh', overflowY:'auto', marginBottom:8 }}>
+                {(SUPPORT_LEVELS[modalLevel]?.subs || []).map((id: string) => {
+                  const sub = allSupport.find(s => s.id === id);
+                  if (!sub) return null;
+                  return (
+                    <div key={id} style={{ padding:'6px 8px', borderRadius:6, background:'rgba(255,255,255,0.03)', border:'1px solid var(--border)', fontSize:10 }}>
+                      <div style={{ fontWeight:600, color:'var(--text-light)' }}>{sub.name}</div>
+                      {sub.description && <div style={{ fontSize:8, color:'var(--text-dim)' }}>{sub.description?.slice(0,80)}</div>}
+                    </div>
+                  );
+                })}
+              </div>
+              <button onClick={() => { setSupportLevel(modalLevel as any); calcSupport(modalLevel as any); setShowModal(null); setModalLevel(null); }} style={{
+                width:'100%', padding:'10px', borderRadius:8, border:'none', cursor:'pointer',
+                background:'linear-gradient(135deg,#00e68a,#00c853)', color:'#000', fontWeight:700, fontSize:12, marginBottom:6,
+              }}>✅ Применить уровень</button>
+              <button onClick={() => setModalLevel(null)} style={{ width:'100%', padding:'8px', borderRadius:8, border:'1px solid var(--border)', background:'transparent', color:'var(--text-dim)', cursor:'pointer', fontSize:10 }}>← Назад</button>
+              </>
+            )}
+            {/* Manual modal: catalog with search */}
+            {showModal === 'manual' && (
+              <>
+              <h3 style={{ margin:'0 0 10px', fontSize:14, fontWeight:800 }}>📋 Выбор препаратов</h3>
+              <input value={modalSearch} onChange={e => setModalSearch(e.target.value)} placeholder="🔍 Поиск по названию..." style={{
+                width:'100%', padding:'8px 10px', borderRadius:8, border:'1px solid var(--border)', background:'var(--bg-secondary)', color:'var(--text)', fontSize:11, boxSizing:'border-box', marginBottom:8,
+              }} />
+              <div style={{ display:'flex', flexDirection:'column', gap:3, maxHeight:'45vh', overflowY:'auto', marginBottom:8 }}>
+                {catalogSupport.filter(s => !modalSearch || (s.name||'').toLowerCase().includes(modalSearch.toLowerCase()) || (s.id||'').toLowerCase().includes(modalSearch.toLowerCase())).slice(0,60).map(s => {
+                  const sel = modalSelected.includes(s.id);
+                  return (
+                    <div key={s.id} onClick={() => setModalSelected(prev => sel ? prev.filter(x => x !== s.id) : [...prev, s.id])} style={{
+                      padding:'6px 8px', borderRadius:6, cursor:'pointer', display:'flex', alignItems:'center', gap:6,
+                      background: sel ? 'rgba(0,230,138,0.08)' : 'rgba(255,255,255,0.02)', border: sel ? '1px solid rgba(0,230,138,0.3)' : '1px solid transparent',
+                    }}>
+                      <span style={{ fontSize:8 }}>{sel ? '✓' : ''}</span>
+                      <div style={{ flex:1, fontSize:10, fontWeight:600, color:'var(--text-light)' }}>{s.name}</div>
+                    </div>
+                  );
+                })}
+              </div>
+              <div style={{ display:'flex', gap:6 }}>
+                <button onClick={() => { setShowModal(null); setModalSelected([]); }} style={{ flex:1, padding:'8px', borderRadius:8, border:'1px solid var(--border)', background:'transparent', color:'var(--text-dim)', cursor:'pointer', fontSize:10 }}>Отмена</button>
+                <button onClick={() => { setShowModal(null); setModalSelected([]); }} style={{ flex:1, padding:'8px', borderRadius:8, border:'none', cursor:'pointer', background:'var(--accent)', color:'#000', fontWeight:700, fontSize:10 }}>Добавить ({modalSelected.length})</button>
+              </div>
+              </>
+            )}
+          </div>
         </div>
       )}
 
