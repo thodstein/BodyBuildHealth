@@ -34,8 +34,8 @@ type ActiveTab = 'overview' | 'diary' | 'charts' | 'mealplan' | 'grocery' | 'res
 const SECTION_TABS: Record<NutritionSection, string[]> = {
   diary: ['diary', 'charts'],
   planning: ['mealplan', 'cycling'],
-  overview: ['overview', 'recipes', 'infocalc', 'grocery', 'restaurant', 'custom'],
-  all: ['diary', 'charts', 'mealplan', 'cycling', 'overview', 'recipes', 'infocalc', 'grocery', 'restaurant', 'custom'],
+  overview: ['recipes', 'infocalc', 'grocery', 'restaurant', 'custom'],
+  all: ['diary', 'charts', 'mealplan', 'cycling', 'recipes', 'infocalc', 'grocery', 'restaurant', 'custom'],
 };
 
 const TAB_LABELS: Record<string, string> = {
@@ -133,12 +133,11 @@ export const NutritionScreen: React.FC = () => {
     const tFat = linked.avgWeeklyFat || Math.round(tKcal * 0.25 / 9);
     const tCarbs = linked.avgWeeklyCarbs || Math.round((tKcal - tProt * 4 - tFat * 9) / 4);
     switch (tab) {
-      case 'overview': return <><NutritionOverview profile={linked.profile} avgWeeklyKcal={avgWeeklyKcal} avgWeeklyProtein={avgWeeklyProtein} avgWeeklyFat={avgWeeklyFat} avgWeeklyCarbs={avgWeeklyCarbs} microsIntake={microsIntake} />{labAnalysis && <NutritionLabContext labAnalysis={labAnalysis} />}</>;
       case 'infocalc': return <NutritionCalculators />;
       case 'recipes': return <RecipesTab />;
       case 'diary': return <NutritionDiary foodEntries={foodEntries} />;
       case 'charts': return <NutritionCharts kcalData={[avgWeeklyKcal]} proteinData={[avgWeeklyProtein]} labels={['']} dailyLogs={dailyLogs} />;
-      case 'mealplan': return <MealPlanExtended tKcal={tKcal} tProt={tProt} tFat={tFat} tCarbs={tCarbs} profile={linked.profile} mealSubTab={mealSubTab} setMealSubTab={setMealSubTab} />;
+      case 'mealplan': return <MealPlanExtended tKcal={tKcal} tProt={tProt} tFat={tFat} tCarbs={tCarbs} profile={linked.profile} mealSubTab={mealSubTab} setMealSubTab={setMealSubTab} avgWeeklyKcal={avgWeeklyKcal} avgWeeklyProtein={avgWeeklyProtein} avgWeeklyFat={avgWeeklyFat} avgWeeklyCarbs={avgWeeklyCarbs} microsIntake={microsIntake} labAnalysis={labAnalysis} />;
       case 'grocery': return <GroceryTab tKcal={tKcal} tProt={tProt} />;
       case 'restaurant': return <RestaurantTab />;
       case 'cycling': return <CyclingTab tKcal={tKcal} tProt={tProt} />;
@@ -307,7 +306,7 @@ const MealPlan: React.FC<{ profile: UserProfile | null }> = ({ profile }) => {
   );
 };
 
-const MealPlanExtended: React.FC<{ tKcal: number; tProt: number; tFat: number; tCarbs: number; profile: UserProfile | null; mealSubTab?: string; setMealSubTab?: (v: string) => void }> = ({ tKcal, tProt, tFat, tCarbs, profile, mealSubTab, setMealSubTab }) => {
+const MealPlanExtended: React.FC<{ tKcal: number; tProt: number; tFat: number; tCarbs: number; profile: UserProfile | null; mealSubTab?: string; setMealSubTab?: (v: string) => void; avgWeeklyKcal?: number; avgWeeklyProtein?: number; avgWeeklyFat?: number; avgWeeklyCarbs?: number; microsIntake?: Record<string,number>; labAnalysis?: LabCompositeResult | null }> = ({ tKcal, tProt, tFat, tCarbs, profile, mealSubTab, setMealSubTab, avgWeeklyKcal: owKcal, avgWeeklyProtein: owProt, avgWeeklyFat: owFat, avgWeeklyCarbs: owCarbs, microsIntake, labAnalysis }) => {
   const [planDays, setPlanDays] = React.useState(3);
   const [mealPlan, setMealPlan] = React.useState<DailyMealPlan[] | null>(null);
   const [weeklyPlan, setWeeklyPlan] = React.useState<any[] | null>(null);
@@ -785,6 +784,7 @@ const MealPlanExtended: React.FC<{ tKcal: number; tProt: number; tFat: number; t
       {/* Sub-tab pills */}
       <div style={{ display:'flex', gap:4, marginBottom:8, overflowX:'auto', scrollbarWidth:'none' }}>
         {[
+          { id:'overview', label:'📊 Общая информация' },
           { id:'planoverview', label:'📋 Обзор' },
           { id:'rules', label:'📋 Правила питания' },
           { id:'products', label:'📋 Обзор продуктов' },
@@ -798,6 +798,7 @@ const MealPlanExtended: React.FC<{ tKcal: number; tProt: number; tFat: number; t
         ))}
       </div>
 
+      {msTab === 'overview' && (<><NutritionOverview profile={profile} avgWeeklyKcal={owKcal ?? tKcal} avgWeeklyProtein={owProt ?? tProt} avgWeeklyFat={owFat ?? tFat} avgWeeklyCarbs={owCarbs ?? tCarbs} microsIntake={microsIntake} />{labAnalysis && <NutritionLabContext labAnalysis={labAnalysis} />}</>)}
       {msTab === 'planoverview' && (<>
       <div className="card" style={{ marginBottom: 8, padding: 14 }}>
         <h4 style={{ margin: '0 0 8px', fontSize: 12 }}>🏷️ Выберите уровень питания</h4>
@@ -1803,7 +1804,6 @@ const MealPlanExtended: React.FC<{ tKcal: number; tProt: number; tFat: number; t
         </div>}
         {weeklyPlan && <div>{weeklyPlan.slice(0,3).map((d: any, di: number) => <div key={di} className="card" style={{ padding: 6, marginBottom: 4 }}><span style={{ fontWeight: 600, fontSize: 10 }}>{d.dayName} {d.isTrainingDay ? '' : ''}</span> — {d.dailyKcal} ккал</div>)}</div>}
       </div>
-      <div className="card" style={{ marginBottom: 8 }}><h4 style={{ margin: '0 0 4px', fontSize: 12 }}>⏰ Тайминг добавок</h4>{timings.slice(0,6).map((t:any,i:number)=><div key={i} style={{fontSize:9,padding:'2px 0'}}><b>{t.name}</b>: {t.morning||''}{t.preWorkout||''}{t.evening||''}{t.beforeBed||''} — {t.dosage}</div>)}</div>
       <div className="card"><h4 style={{ margin: '0 0 4px', fontSize: 12 }}>🍳 Рецепты ({recipes.length})</h4>{recipes.slice(0,8).map((r:any,i:number)=><div key={i} style={{marginBottom:4}}><b style={{fontSize:10}}>{r.name}</b><span style={{fontSize:9,color:'var(--text-dim)'}}> — {r.kcal}ккал Б:{r.protein} Ж:{r.fat} У:{r.carbs}</span></div>)}</div>
       </>)}
     </div>

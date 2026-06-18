@@ -3037,7 +3037,7 @@ export const TrainingScreen: React.FC = () => {
       )}
       {/* ═══════════ ANALYTICS TAB ═══════════ */}
       {tab === 'analytics' && <><AnalyticsTab sessions={historyWorkouts} /><StructuredAnalyticsCard sessions={historyWorkouts} /></>}
-      {tab === 'methods' && <MethodsTab linked={linked} trainingOutput={trainingOutput} diaryStats={diaryStats} historyWorkouts={historyWorkouts} goal={goal} level={level} daysPerWeek={daysPerWeek} recovery={recovery} fatigue={fatigue} appliedMethod={appliedMethod} onApplyMethod={(name, category) => { setAppliedMethod(name); if (category === 'periodization') setPeriodizationType(name.includes('linear') ? 'linear' : name.includes('undulating') || name.includes('DUP') ? 'undulating' : name.includes('block') ? 'block' : 'auto'); }} />}
+      {tab === 'methods' && <MethodsTab linked={linked} trainingOutput={trainingOutput} diaryStats={diaryStats} historyWorkouts={historyWorkouts} goal={goal} level={level} daysPerWeek={daysPerWeek} recovery={recovery} fatigue={fatigue} appliedMethod={appliedMethod} onApplyMethod={(name, category) => { setAppliedMethod(name); const mapped: Record<string,string> = { periodization: name.includes('linear') ? 'linear' : name.includes('undulating')||name.includes('DUP') ? 'undulating' : name.includes('block') ? 'block' : name.includes('conjugate')||name.includes('westside') ? 'conjugate' : 'auto', progression: name.includes('double') ? 'double' : name.includes('step') ? 'step' : name.includes('rest')||name.includes('pause') ? 'rest_pause' : 'auto', technique: name.includes('cluster') ? 'cluster' : name.includes('tempo') ? 'tempo' : name.includes('eccentric') ? 'eccentric' : 'auto', intensity: name.includes('rm')||name.includes('rpe') ? 'rpe_based' : name.includes('helms') ? 'helms' : 'auto', volume: name.includes('gvt')||name.includes('german') ? 'gvt' : name.includes('mev') ? 'mev' : 'auto', frequency: name.includes('high')||name.includes('daily') ? 'high_freq' : 'auto', specialization: name.includes('bro')||name.includes('splits') ? 'bro_split' : 'auto',                     recovery: name.includes('deload') ? 'deload' : 'auto', }; const pt = (mapped[category] || 'auto') as 'linear'|'auto'|'undulating'|'block'; if (pt !== 'auto') setPeriodizationType(pt); setTab('plan'); }} />}
       {tab === 'visual' && <VisualTab sessions={historyWorkouts} />}
       {tab === 'programs' && <ProgramsTab selectedProgram={selectedProgram} setSelectedProgram={setSelectedProgram} />}
       {tab === 'timers' && <TimersTab />}
@@ -3547,10 +3547,10 @@ const MethodsTab: React.FC<{ linked: ReturnType<typeof useDataLink>; trainingOut
     <h4 style={{ margin: '12px 0 8px', fontSize: 12, color: 'var(--accent)' }}>📚 Библиотека методик</h4>
     <div style={{ display:'flex', gap:4, marginBottom:8, flexWrap:'wrap' }}>
       <button onClick={()=>setMethodCat('all')} style={{ padding:'4px 10px', borderRadius:6, fontSize:10, background: methodCat==='all'?'var(--accent)':'var(--bg-secondary)', color: methodCat==='all'?'#000':'var(--text-dim)', border:'none', cursor:'pointer' }}>Все</button>
-      {cats.map(c => <button key={c} onClick={()=>setMethodCat(c)} style={{ padding:'4px 10px', borderRadius:6, fontSize:10, background: methodCat===c?'rgba(139,92,246,0.2)':'var(--bg-secondary)', border: methodCat===c?'1px solid #8b5cf6':'1px solid var(--border)', color: methodCat===c?'#8b5cf6':'var(--text-dim)', cursor:'pointer' }}>{c}</button>)}
+      {cats.map(c => <button key={c} onClick={()=>setMethodCat(c)} style={{ padding:'4px 10px', borderRadius:6, fontSize:10, background: methodCat===c?'rgba(139,92,246,0.2)':'var(--bg-secondary)', border: methodCat===c?'1px solid #8b5cf6':'1px solid var(--border)', color: methodCat===c?'#8b5cf6':'var(--text-dim)', cursor:'pointer' }}>{({ periodization:'Периодизация', progression:'Прогрессия', technique:'Техника', intensity:'Интенсивность', volume:'Объём', frequency:'Частота', specialization:'Специализация', recovery:'Восстановление' } as Record<string,string>)[c] || c}</button>)}
     </div>
     {filtered.map((m,i) => <div key={i} className="card" style={{ marginBottom:6, padding:10, border: appliedMethod === m.name ? '1px solid rgba(0,230,138,0.3)' : '1px solid var(--border)' }}>
-      <div style={{ fontWeight:600, fontSize:12 }}>{appliedMethod === m.name ? '✓ ' : ''}{m.name} <span style={{ fontSize:9, color:'var(--text-dim)' }}>[{m.category}]</span></div>
+      <div style={{ fontWeight:600, fontSize:12 }}>{appliedMethod === m.name ? '✓ ' : ''}{m.name} <span style={{ fontSize:9, color:'var(--text-dim)' }}>[{({ periodization:'Периодизация', progression:'Прогрессия', technique:'Техника', intensity:'Интенсивность', volume:'Объём', frequency:'Частота', specialization:'Специализация', recovery:'Восстановление' } as Record<string,string>)[m.category] || m.category}]</span></div>
       <div style={{ fontSize:9, color:'var(--text-light)', marginTop:2 }}>{m.description}</div>
       <div style={{ fontSize:8, color:'var(--text-dim)' }}>Лучше всего для: {m.bestFor}</div>
       <div style={{ fontSize:8, color:'rgba(255,255,255,0.4)' }}>Протокол: {m.example}</div>
@@ -5394,6 +5394,7 @@ const ProgramsTab: React.FC<{ selectedProgram: string | null; setSelectedProgram
   }, [goalFilter, allPrograms]);
   const selected = selectedId ? allPrograms.find(p => p.id === selectedId) || null : null;
 
+  const [loadedMsg, setLoadedMsg] = useState('');
   const handleLoadProgram = () => {
     if (!selected) return;
     try {
@@ -5404,7 +5405,8 @@ const ProgramsTab: React.FC<{ selectedProgram: string | null; setSelectedProgram
         loadedAt: new Date().toISOString(),
       };
       localStorage.setItem('activeProgram', JSON.stringify(prog));
-      alert('✅ Программа загружена! Перейдите на вкладку "План" для генерации.');
+      setLoadedMsg('✅ Программа загружена!');
+      setTimeout(() => setLoadedMsg(''), 3000);
     } catch {}
   };
 
@@ -5502,6 +5504,7 @@ const ProgramsTab: React.FC<{ selectedProgram: string | null; setSelectedProgram
             }}>
             📋 Загрузить программу
           </button>
+          {loadedMsg && <div style={{ padding:'6px 10px', borderRadius:6, background:'rgba(0,230,138,0.1)', border:'1px solid rgba(0,230,138,0.3)', color:'#00e68a', fontSize:10, marginBottom:6, textAlign:'center' }}>{loadedMsg}</div>}
 
           {/* Week-by-week detail */}
           <h4 style={{ margin: '0 0 6px', fontSize: 12, color: 'var(--text)' }}>Программа по неделям</h4>

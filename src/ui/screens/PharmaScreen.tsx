@@ -9,6 +9,7 @@ import type { PharmaSubstance, CourseEntry, PD } from '../../core/types';
 import { SYRINGE_SPECS, DRUG_THRESHOLDS } from '../../core/constants';
 import { SYNERGY_PAIRS, type SynergyPair } from '../../engines/support.engine';
 import { ALL_INTERACTIONS, findInteractionsForSubstance, type SupportInteraction } from '../../data/support-database';
+import { decodeGarbled } from '../../utils/text-sanitizer';
 import {
   PEPTIDE_DB, PEPTIDE_LIST, PEPTIDE_SYNERGY, PEPTIDE_CONFLICTS, PEPTIDE_GOAL_PROFILES,
   computeDilution, computeEffectiveDose, computePK, computePeptideRisks,
@@ -582,14 +583,14 @@ const DrugDetailCard: React.FC<{ sub: PharmaSubstance; detail?: PharmaDetail }> 
       {(sub.description || (detail?.description)) && (
         <div style={{ borderTop: '1px solid var(--border)', paddingTop: 8, marginBottom: 8 }}>
           <div style={{ fontWeight: 600, marginBottom: 4 }}>Описание</div>
-          <div style={{ color: 'var(--text-dim)', lineHeight: 1.5 }}>{detail?.description || sub.description}</div>
+          <div style={{ color: 'var(--text-dim)', lineHeight: 1.5 }}>{decodeGarbled((detail?.description || sub.description) || '')}</div>
         </div>
       )}
       {(detail?.mechanism || sub.mechanisms?.length) && (
         <div style={{ borderTop: '1px solid var(--border)', paddingTop: 8, marginBottom: 8 }}>
           <div style={{ fontWeight: 600, marginBottom: 4 }}>Механизм действия</div>
           {detail?.mechanism ? (
-            <div style={{ color: 'var(--text-dim)', lineHeight: 1.5 }}>{detail.mechanism}</div>
+            <div style={{ color: 'var(--text-dim)', lineHeight: 1.5 }}>{decodeGarbled(detail.mechanism)}</div>
           ) : sub.mechanisms?.length ? (
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
               {sub.mechanisms.map((m, i) => (
@@ -1992,19 +1993,13 @@ const InteractionCheckerTab: React.FC = () => {
                     {aName} + {bName}
                   </div>
                   <div style={{ fontSize: 10, lineHeight: 1.4, color: 'var(--text-dim)' }}>
-                    {pair.mechanism && /^[а-яА-Яa-zA-Z0-9\s\-–—,.!?;:()]+$/u.test(pair.mechanism.slice(0,10)) ? 
-                      pair.mechanism.slice(0,120) + (pair.mechanism.length>120?'...':'') : 
-                      pair.synergyType === 'synergistic' ? 'Синергетический эффект при совместном применении' :
-                      pair.synergyType === 'additive' ? 'Аддитивный эффект: препараты дополняют друг друга' :
-                      pair.synergyType === 'potentiative' ? 'Потенцирующий эффект: один препарат усиливает действие другого' :
-                      pair.synergyType === 'complementary' ? 'Комплементарное действие: препараты компенсируют побочные эффекты друг друга' :
-                      'Взаимодействие препаратов'}
+                    {decodeGarbled(pair.mechanism).slice(0,120)}{pair.mechanism && decodeGarbled(pair.mechanism).length > 120 ? '...' : ''}
                   </div>
-                  {pair.clinicalNote && (/^[а-яА-Яa-zA-Z0-9\s\-–—,.!?;:()]+$/u.test(pair.clinicalNote.slice(0,5)) ? (
+                  {pair.clinicalNote && (() => { const d = decodeGarbled(pair.clinicalNote!); return d.length > 0 ? (
                     <div style={{ marginTop: 4, fontSize: 9, color: '#22c55e' }}>
-                      💡 {pair.clinicalNote?.slice(0, 100)}
+                      💡 {d.slice(0, 100)}
                     </div>
-                  ) : null)}
+                  ) : null; })()}
                   {pair.affectedSystems && pair.affectedSystems.length > 0 && (
                     <div style={{ marginTop: 8, display: 'flex', flexWrap: 'wrap', gap: 3 }}>
                       {pair.affectedSystems.map(sys => (
