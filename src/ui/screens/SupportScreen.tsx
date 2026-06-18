@@ -5542,6 +5542,51 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
                     <button style={{ flex:1, padding:'8px', borderRadius:8, border:'none', cursor:'pointer', background:'var(--accent)', color:'#000', fontWeight:700, fontSize:10 }} onClick={() => setPlanSaved(true)}>✅ Утвердить план</button>
                     <button style={{ flex:1, padding:'8px', borderRadius:8, border:'1px solid var(--border)', cursor:'pointer', background:'transparent', color:'var(--text-dim)', fontWeight:600, fontSize:10 }}>✏️ Внести изменения</button>
                   </div>
+                  {/* Timing table when approved */}
+                  {planSaved && (
+                    <div style={{ marginTop:8, padding:'8px 10px', borderRadius:8, background:'rgba(0,230,138,0.04)', border:'1px solid rgba(0,230,138,0.12)' }}>
+                      <div style={{ fontSize:10, fontWeight:700, color:'#00e68a', marginBottom:6 }}>✅ План утверждён</div>
+                      <table style={{ width:'100%', fontSize:8, borderCollapse:'collapse' }}>
+                        <thead><tr style={{ background:'rgba(0,0,0,0.1)' }}>
+                          <th style={{ padding:'3px 5px', textAlign:'left' }}>Время</th>
+                          <th style={{ padding:'3px 5px', textAlign:'left' }}>Препарат</th>
+                          <th style={{ padding:'3px 5px', textAlign:'left' }}>Доза</th>
+                          <th style={{ padding:'3px 5px', textAlign:'left' }}>Примечание</th>
+                        </tr></thead>
+                        <tbody>
+                          {effectiveLevel.subs.map((id: string) => {
+                            const sub = allSupport.find((s: any) => s.id === id);
+                            const d = effectiveLevel.dosages?.[id];
+                            if (!sub || !d) return null;
+                            return (
+                              <tr key={id} style={{ borderBottom:'1px solid var(--border)' }}>
+                                <td style={{ padding:'3px 5px', color:'var(--text-dim)' }}>{d.timing}</td>
+                                <td style={{ padding:'3px 5px', fontWeight:600, color:'var(--text-light)' }}>{sub.name}</td>
+                                <td style={{ padding:'3px 5px', color:'#00e68a' }}>{d.mg} мг</td>
+                                <td style={{ padding:'3px 5px', color:'var(--text-dim)' }}>{sub.description?.slice(0,30) || ''}</td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                      {/* Synergies info */}
+                      <div style={{ marginTop:8, fontSize:8, color:'var(--text-dim)' }}>
+                        <div style={{ fontWeight:600, color:'var(--text-light)', marginBottom:3 }}>⚡ Синергии в стеке:</div>
+                        {effectiveLevel.subs.slice(0, 6).map((id: string, i: number) => {
+                          const sub = allSupport.find((s: any) => s.id === id);
+                          if (!sub) return null;
+                          const syn = ALL_INTERACTIONS.filter((int: any) => 
+                            (int.substanceA === id || int.substanceB === id) && int.type === 'synergy'
+                          ).slice(0, 2);
+                          return syn.length > 0 ? syn.map((s: any, j: number) => (
+                            <div key={`${i}-${j}`} style={{ padding:'2px 0' }}>
+                              ⊕ {sub.name} + {allSupport.find((x: any) => x.id === (s.substanceA === id ? s.substanceB : s.substanceA))?.name || ''}: {s.effect}
+                            </div>
+                          )) : null;
+                        })}
+                      </div>
+                    </div>
+                  )}
                 </>)}
               </div>
             )}
