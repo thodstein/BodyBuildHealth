@@ -70,10 +70,18 @@ export const PharmaCourseScreen: React.FC = () => {
       try {
         await db.init();
         const entries = await db.getAll<CourseEntry>('course_log');
-        // Filter out support-class substances (not pharma)
+        // Filter out support-class substances (keep only pharma AAS/PCT/peptides)
         const pharmaEntries = entries.filter(e => {
-          const sub = Object.values(PHARMA_DB).flat().find(s => s.id === e.substanceId);
-          return sub && sub.class !== 'support';
+          // Try direct PHARMA_DB lookup by id
+          const subById = PHARMA_DB[e.substanceId];
+          if (subById) return subById.class !== 'support';
+          // Try by name match across all PHARMA_DB entries
+          const subByName = Object.values(PHARMA_DB).find(s => 
+            s.id === e.substanceId || s.name === e.substanceId || e.substanceId?.toLowerCase().includes(s.id.toLowerCase())
+          );
+          if (subByName) return subByName.class !== 'support';
+          // If not found in PHARMA_DB at all, keep it (custom drug)
+          return true;
         });
         setCourse(pharmaEntries);
       } catch (e) { console.error(e); }

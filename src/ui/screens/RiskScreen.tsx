@@ -1316,9 +1316,15 @@ const ClinicalRiskDisplay: React.FC = () => {
       <div className="card" style={{ marginBottom: 12 }}>
         <h3 style={{ margin: '0 0 4px 0' }}>🏥 Клинические патологии</h3>
         <p style={{ fontSize: 11, color: 'var(--text-dim)', margin: 0 }}>
-          28 патологий в 8 системах. Hill → MC (10K) → Sigmoid. Связь препарат→патология из клинической базы.
+          28 патологий в 8 системах. Hill → MC (10K) → Sigmoid.
         </p>
       </div>
+
+      {labs.length === 0 && course.length === 0 && !result && (
+        <div style={{ padding: '10px 12px', borderRadius: 8, background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)', marginBottom: 10, fontSize: 10, color: '#f59e0b', textAlign: 'center', lineHeight: 1.4 }}>
+          ⚠️ Для расчёта клинических рисков необходимы данные анализов и/или активный курс. Перейдите на вкладку <b>«Анализы»</b>, чтобы добавить лабораторные данные.
+        </div>
+      )}
 
       {!result && (
         <button onClick={handleAnalyze} disabled={loading} style={{ width: '100%', padding: 10, borderRadius: 8, border: 'none', cursor: loading ? 'wait' : 'pointer', background: loading ? 'var(--border)' : 'linear-gradient(135deg, #ec4899, #8b5cf6)', color: '#fff', fontWeight: 700, fontSize: 14, marginBottom: 8 }}>
@@ -1458,6 +1464,11 @@ const LabsRisksTab: React.FC = () => {
 
   return (
     <div>
+      {!hasLabs && (
+        <div style={{ padding: '10px 12px', borderRadius: 8, background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)', marginBottom: 10, fontSize: 10, color: '#f59e0b', textAlign: 'center', lineHeight: 1.4 }}>
+          ⚠️ Для расчёта рисков по анализам необходимо добавить лабораторные данные. Перейдите в раздел <b>«Анализы»</b> в главной навигации, чтобы внести результаты.
+        </div>
+      )}
       {[
         {key:'pharma',icon:'🧬',title:'Лабораторно-фармацевтические риски',
          body: labPharmaAlerts.length>0 ? <div style={{display:'grid',gap:3}}>{labPharmaAlerts.map((a,i)=>

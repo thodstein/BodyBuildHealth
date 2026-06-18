@@ -3230,6 +3230,45 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                           ))}
                         </div>
                       )}
+                      {/* Support interaction reference */}
+                      <div style={{ marginTop:8 }}>
+                        <div onClick={() => setExpandedCategories(prev => ({ ...prev, support_combo_ref: !prev.support_combo_ref }))} style={{ display:'flex', alignItems:'center', gap:6, padding:'7px 10px', cursor:'pointer', userSelect:'none', background:'var(--bg-secondary)', borderRadius:8 }}>
+                          <span style={{ fontSize:13 }}>💊</span>
+                          <div style={{ flex:1, fontSize:10, fontWeight:700, color:'var(--text-light)' }}>Взаимодействия препаратов поддержки</div>
+                          <span style={{ fontSize:9, color:'var(--text-dim)', transform: expandedCategories.support_combo_ref !== false ? 'rotate(180deg)' : 'none', transition:'transform 0.2s' }}>▼</span>
+                        </div>
+                        {expandedCategories.support_combo_ref !== false && (
+                          <div style={{ display:'flex', flexDirection:'column', gap:3, marginTop:4 }}>
+                            {supportInteractions && supportInteractions.length > 0 ? (
+                              supportInteractions.map(i => {
+                                const sevColor = i.severity === 'HIGH' ? '#ef4444' : i.severity === 'MEDIUM' ? '#f59e0b' : '#22c55e';
+                                const aName = resolveSubName(i.substanceA) || i.substanceA;
+                                const bName = resolveSubName(i.substanceB) || i.substanceB;
+                                const effDesc = showEffect(i);
+                                return (
+                                  <div key={i.id} style={{ padding:'6px 8px', borderRadius:8, background: i.type === 'synergy' ? 'rgba(34,197,94,0.06)' : i.type === 'conflict' ? 'rgba(239,68,68,0.06)' : 'rgba(234,179,8,0.06)', borderLeft:`3px solid ${sevColor}`, border:'1px solid var(--border)' }}>
+                                    <div style={{ display:'flex', justifyContent:'space-between', fontSize:9 }}>
+                                      <span style={{ fontWeight:600, color:'var(--text-light)' }}>{aName} + {bName}</span>
+                                      <span style={{ padding:'1px 5px', borderRadius:3, background:sevColor+'22', color:sevColor, fontSize:8, fontWeight:600 }}>{i.type === 'synergy' ? '⊕ Синергия' : i.type === 'conflict' ? '⊖ Конфликт' : '⚡ Осторожно'} · {i.severity}</span>
+                                    </div>
+                                    {effDesc && <div style={{ fontSize:9, color:'rgba(255,255,255,0.85)', marginTop:2 }}>{effDesc}</div>}
+                                    {i.mechanisms && i.mechanisms.length > 0 && (
+                                      <div style={{ display:'flex', flexWrap:'wrap', gap:2, marginTop:2 }}>
+                                        {i.mechanisms.map((m: string, mi: number) => (
+                                          <span key={mi} style={{ fontSize:7, padding:'1px 5px', borderRadius:3, background:'rgba(139,92,246,0.12)', color:'#a78bfa' }}>{MECH_LABELS[m] || MECH_TRANSLATIONS_RU[m] || m}</span>
+                                        ))}
+                                      </div>
+                                    )}
+                                    {i.notes && <div style={{ fontSize:8, color:'var(--text-dim)', fontStyle:'italic', marginTop:1 }}>{i.notes}</div>}
+                                  </div>
+                                );
+                              })
+                            ) : (
+                              <div style={{ textAlign:'center', padding:'12px', color:'var(--text-dim)', fontSize:10 }}>Добавьте препараты поддержки выше для проверки их взаимодействий</div>
+                            )}
+                          </div>
+                        )}
+                      </div>
                     </div>
                   ) : (
                     <div>
