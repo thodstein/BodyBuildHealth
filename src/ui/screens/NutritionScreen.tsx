@@ -34,14 +34,15 @@ type ActiveTab = 'overview' | 'diary' | 'charts' | 'mealplan' | 'grocery' | 'res
 const SECTION_TABS: Record<NutritionSection, string[]> = {
   diary: ['diary', 'charts'],
   planning: ['mealplan', 'cycling'],
-  overview: ['overview', 'recipes', 'infocalc'],
-  all: ['diary', 'charts', 'mealplan', 'cycling', 'overview', 'recipes', 'infocalc'],
+  overview: ['overview', 'recipes', 'infocalc', 'grocery', 'restaurant', 'custom'],
+  all: ['diary', 'charts', 'mealplan', 'cycling', 'overview', 'recipes', 'infocalc', 'grocery', 'restaurant', 'custom'],
 };
 
 const TAB_LABELS: Record<string, string> = {
   diary: '📝 Дневник', charts: '📈 Графики',
   mealplan: '🥗 План', cycling: '🔄 Циклирование',
   overview: '📊 Общая информация', recipes: '🍳 Рецепты', infocalc: '📐 Калькуляторы',
+  grocery: '🛒 Список', restaurant: '🍽 Ресторан', custom: '🍎 Своё',
 };
 
 const NutritionLabContext: React.FC<{ labAnalysis: LabCompositeResult }> = ({ labAnalysis }) => (

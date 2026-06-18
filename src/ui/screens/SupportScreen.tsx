@@ -3888,6 +3888,27 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                     </>
                   );
                 })()}
+                {/* Pharma synergies */}
+                {pharmaInteractIds.filter(Boolean).length >= 2 && (() => {
+                  const ids = pharmaInteractIds.filter(Boolean);
+                  const pharmaSynPairs = SYNERGY_PAIRS.filter(p => ids.includes(p.substanceA) && ids.includes(p.substanceB));
+                  if (pharmaSynPairs.length === 0) return null;
+                  return (
+                    <div style={{ marginTop:10, padding:'12px', borderRadius:10, background:'rgba(0,230,138,0.04)', border:'1px solid rgba(0,230,138,0.12)' }}>
+                      <div style={{ fontSize:10, fontWeight:700, color:'#00e68a', marginBottom:6 }}>⊕ Синергии между выбранными препаратами</div>
+                      <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
+                        {pharmaSynPairs.map((p, i) => (
+                          <div key={i} style={{ padding:'6px 8px', borderRadius:6, background:'rgba(0,230,138,0.04)', border:'1px solid rgba(0,230,138,0.1)', fontSize:9 }}>
+                            <div style={{ fontWeight:600, color:'var(--text-light)' }}>
+                              {PHARMA_DB[p.substanceA]?.name || p.substanceA} + {PHARMA_DB[p.substanceB]?.name || p.substanceB}
+                            </div>
+                            <div style={{ color:'var(--text-dim)', marginTop:1 }}>{p.mechanism?.slice(0,120) || p.synergyType} {p.strength ? `(сила: ${(p.strength*100).toFixed(0)}%)` : ''}</div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
             </div>
           )}
