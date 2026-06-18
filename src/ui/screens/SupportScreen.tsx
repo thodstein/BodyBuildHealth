@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
+﻿import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { SYNERGY_PAIRS, ORGAN_SYNERGIES, SUPPLEMENT_DESCRIPTIONS, SUPPLEMENT_TARGETS, SUPPORT_RESEARCH, calculateSupport, checkSupportInteractions, findSupportForGoal, searchSupport, getSubstanceInfo, getSupportDatabaseStats, type SupportInput, type SynergyPair, type SupplementTarget, type OrganSynergy } from '../../engines/support.engine';
 import { decodeGarbled, cleanDesc, cleanSynergy, isReadableText } from '../../utils/text-sanitizer';
 import { RISK_SYSTEMS, ALL_RISK_SYSTEMS } from '../../core/constants';
@@ -386,6 +386,35 @@ const SUPPORT_CLASS_LABELS: Record<string, string> = {
   bady: '🌿 БАДы',
 };
 
+const MECH_LABELS: Record<string,string> = {
+  'NAD_PATHWAY': 'NAD+ метаболизм', 'MITO_REPAIR': 'Митохондриальная защита',
+  'OXIDATIVE_STRESS_REDUCTION': 'Антиоксидант', 'COLLAGEN_SUPPORT': 'Синтез коллагена',
+  'CALCIUM_HOMEOSTASIS': 'Кальциевый гомеостаз', 'CALCIUM_DISTRIBUTION': 'Распределение Ca²⁺',
+  'BONE_MINERALIZATION': 'Минерализация костей', 'MEMBRANE_PROTECTION': 'Защита мембран',
+  'SIRT1_ACTIVATION': 'Активация SIRT1', 'IMMUNE_SUPPORT': 'Иммунная поддержка',
+  'IMMUNE_MODULATION': 'Иммуномодуляция', 'NEUROTRANSMITTER_SUPPORT': 'Нейротрансмиттеры',
+  'HOMOCYSTEINE_REDUCTION': 'Снижение гомоцистеина', 'CARBOXYLASE_SUPPORT': 'Кофактор карбоксилаз',
+  'METHYLATION': 'Метилирование', 'CELL_DIVISION': 'Деление клеток',
+  'MYELIN_REPAIR': 'Репарация миелина', 'CELL_REPAIR': 'Репарация клеток',
+  'ENERGY': 'Энергетический обмен', 'NITRIC_OXIDE_BINDING': 'Связывание NO',
+  'LIPOSOMAL_DELIVERY': 'Липосомальная доставка', 'ELECTRON_TRANSPORT_CHAIN': 'Электрон-транспортная цепь',
+  'ANTIOXIDANT': 'Антиоксидант', 'GLUTATHIONE_RECYCLING': 'Рециклинг глутатиона',
+  'GLUCOSE_REGULATION': 'Регуляция глюкозы', 'INSULIN_SENSITIVITY': 'Чувствительность к инсулину',
+  'INSULIN_SIGNALING': 'Инсулиновый сигналинг', 'SEROTONIN_SUPPORT': 'Серотонин',
+  'SKIN_REPAIR': 'Репарация кожи', 'ANTI_INFLAMMATION': 'Противовоспалительное',
+  'OXYGEN_UTILIZATION': 'Утилизация кислорода', 'METHYL_DONOR': 'Донор метильных групп',
+  'FATTY_ACID_TRANSPORT': 'Транспорт жирных кислот', 'ATP_PRODUCTION': 'Продукция АТФ',
+  'COA_PATHWAY': 'Кофермент А', 'HORMONE_SYNTHESIS': 'Синтез гормонов',
+  'LIPID_METABOLISM': 'Метаболизм липидов', 'FLAVIN_PATHWAY': 'Флавиновый обмен',
+  'TPP_PATHWAY': 'Тиаминпирофосфат', 'NERVE_REPAIR': 'Репарация нервов',
+  'NERVE_PROTECTION': 'Защита нервов', 'ANTI_GLYCATION': 'Анти-гликирование',
+  'RETINOID_SIGNALING': 'Ретиноидный сигналинг', 'CAROTENOID_PATHWAY': 'Каротиноидный обмен',
+  'LIPID_BALANCE': 'Баланс липидов', 'NAD_SYNTHESIS': 'Синтез NAD+',
+  'MITO_BIOGENESIS': 'Биогенез митохондрий', 'VASCULAR_RELAXATION': 'Вазодилатация',
+  'GABA_SUPPORT': 'ГАМК-поддержка', 'CALCIUM_REGULATION': 'Регуляция Ca²⁺',
+  'SULFITE_OXIDASE': 'Сульфитоксидаза', 'DETOX': 'Детоксикация',
+  'BONE_METABOLISM': 'Костный метаболизм', 'TESTOSTERONE_SUPPORT': 'Поддержка тестостерона',
+};
 const WEEK = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
 const SUPPORT_MED_DETAIL: Record<string, {
@@ -930,16 +959,9 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({});
   const goHome = () => { setSection('home'); setTab('main'); setSupportView('main'); setCalcView('main'); setInfoView('catalog'); };
   const goBack = () => {
-    // Deep sub-views (calculator, info, stackcalc, plan, mixcalc, etc.)
-    if (calcView !== 'main') {
-      if (section === 'info') { setSection('info'); setTab('main'); setSupportView('calc'); setCalcView('main'); return; }
-      setCalcView('main'); setSupportView('calc'); setTab('main'); return;
-    }
-    // Calc menu / non-main support view
+    if (calcView !== 'main') { setCalcView('main'); setSupportView('calc'); setTab('main'); return; }
     if (supportView === 'calc' || supportView !== 'main') { setSupportView('main'); setTab('main'); return; }
-    // Non-main tab (peptides, calculator via old route)
     if (tab !== 'main') { setTab('main'); return; }
-    // Non-home section
     if (section !== 'home') { setSection('home'); setTab('main'); setSupportView('main'); setCalcView('main'); return; }
   };
   const [interactionTypeFilter, setInteractionTypeFilter] = useState<string>('all');
@@ -1297,8 +1319,11 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   const [pharmaSearchQ, setPharmaSearchQ] = useState('');
   const [pharmaSearchResults, setPharmaSearchResults] = useState<{ name: string; id: string; cls: string; desc: string }[]>([]);
   const [stackBuilder, setStackBuilder] = useState<string[]>([]);
-  const [savedStacks, setSavedStacks] = useState<{ id: string; name: string; date: string; subs: string[]; dosages: Record<string, { mg: number; timing: string }> }[]>(() => { try { return JSON.parse(localStorage.getItem('savedStacks') || '[]'); } catch { return []; } });
+  const [savedStacks, setSavedStacks] = useState<{ id: string; name: string; date: string; subs: string[]; dosages: Record<string, { mg: number; timing: string }>; notes?: string }[]>(() => { try { return JSON.parse(localStorage.getItem('savedStacks') || '[]'); } catch { return []; } });
   const [stackName, setStackName] = useState('');
+  const [stackNotes, setStackNotes] = useState('');
+  const [editingStackNotes, setEditingStackNotes] = useState<string | null>(null);
+  const [editNotesText, setEditNotesText] = useState('');
   const [researchSource, setResearchSource] = useState<'pubmed' | 'pubchem' | 'scholar' | 'fda' | 'pharma'>('pubmed');
   const [pubchemResults, setPubchemResults] = useState<any[]>([]);
   const [pubchemLoading, setPubchemLoading] = useState(false);
@@ -1423,11 +1448,12 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
     const level = SUPPORT_LEVELS[supportLevel];
     if (!level) return;
     const id = 'stack_' + Date.now();
-    const newStack = { id, name: stackName || level.label + ' ' + new Date().toLocaleDateString('ru'), date: new Date().toISOString(), subs: level.subs, dosages: level.dosages || {} };
+    const newStack = { id, name: stackName || level.label + ' ' + new Date().toLocaleDateString('ru'), date: new Date().toISOString(), subs: level.subs, dosages: level.dosages || {}, notes: stackNotes || '' };
     const updated = [...savedStacks, newStack];
     setSavedStacks(updated);
     localStorage.setItem('savedStacks', JSON.stringify(updated));
     setStackName('');
+    setStackNotes('');
   };
 
   const saveBuilderStack = () => {
@@ -2410,13 +2436,10 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
       )}
 
       {/* ===== INFO HEADER (back/home + pills) ===== */}
-      {(section === 'info' || calcView === 'info') && (
+      {(section === 'info' || calcView === 'info' || ['mixcalc','neuro','joints','acne','peptides'].includes(calcView)) && (
         <div style={{ position:'fixed', top:0, left:0, right:0, zIndex:150, background:'var(--bg-primary)', borderBottom:'1px solid var(--border)' }}>
           <div style={{ display:'flex', gap:6, padding:'4px 12px', borderBottom:'1px solid var(--border)', alignItems:'center' }}>
-            <button onClick={goBack} style={{ padding:'3px 10px', borderRadius:6, fontSize:10, cursor:'pointer', background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600, whiteSpace:'nowrap' }}>← Назад</button>
-            <button onClick={goHome} style={{ padding:'3px 10px', borderRadius:6, fontSize:10, cursor:'pointer', background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600, whiteSpace:'nowrap' }}>← На главную</button>
-            <div style={{ flex:1 }} />
-            <span style={{ fontSize:9, color:'var(--text-dim)', fontWeight:600 }}>Поддержка</span>
+            <button onClick={goHome} style={{ padding:'3px 10px', borderRadius:6, fontSize:10, cursor:'pointer', background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600, whiteSpace:'nowrap' }}>← Назад</button>
           </div>
           <div style={{ display:'flex', gap:4, padding:'6px 12px 8px', overflowX:'auto', scrollbarWidth:'none' }}>
             {[['peptides','Пептиды'],['catalog','Каталог'],['synergies','Синергии'],['readystacks','Стеки'],['interactions','Взаимодействия'],['research','Исследования'],['mixcalc','Микс'],['neuro','Нейро'],['joints','Суставы'],['acne','Акне']].map(([id,label]) => (
@@ -2503,7 +2526,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
           <img src="/calc-hero.jpg" alt="" style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'cover', objectPosition:'center top' }} />
           <div style={{ position:'absolute', inset:0, background:'linear-gradient(transparent 50%, rgba(0,0,0,0.85))' }} />
           <div style={{ position:'relative', zIndex:2, flex:1, display:'flex', flexDirection:'column', padding:'10px 12px 16px', overflow:'hidden' }}>
-            <button onClick={goHome} style={{ alignSelf:'flex-start', padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', marginBottom:8, background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← Назад</button>
+            <button onClick={goBack} style={{ alignSelf:'flex-start', padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', marginBottom:8, background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← Назад</button>
             <h2 style={{ fontSize:18, fontWeight:800, color:'#fff', margin:'8px 0 2px', textShadow:'0 2px 10px rgba(0,0,0,0.9)' }}>Расчет поддержки</h2>
             <p style={{ fontSize:10, color:'rgba(255,255,255,0.9)', margin:'0 0 16px', textShadow:'0 1px 6px rgba(0,0,0,0.8)' }}>
               Калькулятор поддержки, пептидный калькулятор и общая информация
@@ -2583,7 +2606,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                   })}
                 </div>
                 <div style={{ fontSize:9, color:'var(--text-dim)', marginBottom:6 }}>
-            {searchQuery ? `Найдено: ${groupedSubstances.reduce((a, g) => a + g.count, 0)} из 289` : `Всего: 289 препаратов`}
+            {searchQuery ? `Найдено: ${groupedSubstances.reduce((a, g) => a + g.count, 0)} из ${catalogSubstances.length}` : `Всего: ${catalogSubstances.length} препаратов`}
                 </div>
                 {catalogSubTab === 'organ' && (
                   /* По органам */
@@ -3015,7 +3038,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                     <div>
                       <div style={{ display:'flex', flexDirection:'column', gap:6, marginBottom:8 }}>
                         {interactionIds.map((id, idx) => {
-                          const selectedName = id ? (catalogSupport.find(s => s.id === id)?.name || allSupport.find(s => s.id === id)?.name || id) : '';
+                          const selectedName = id ? (allSupport.find(s => s.id === id)?.name || id) : '';
                           return (
                             <div key={idx} style={{ background:'var(--bg-secondary)', borderRadius:10, padding:'8px 10px', border:'1px solid var(--border)' }}>
                               <div style={{ display:'flex', alignItems:'center', gap:4, marginBottom:4 }}>
@@ -3031,7 +3054,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                                     <input value={interactionSearchIdx===idx ? interactionSearch : ''} placeholder="🔍 Введите название..." onFocus={() => { setInteractionSearchIdx(idx); setInteractionSearch(''); }} onChange={e => { setInteractionSearchIdx(idx); setInteractionSearch(e.target.value); }} style={{ width:'100%', padding:'7px 8px', borderRadius:6, background:'rgba(0,0,0,0.2)', border:'1px solid var(--border)', color:'var(--text)', fontSize:10, boxSizing:'border-box' }} />
                                     {interactionSearch && interactionSearchIdx===idx && (
                                       <div style={{ position:'absolute', top:'100%', left:0, right:0, zIndex:10, background:'var(--bg)', border:'1px solid var(--border)', borderRadius:6, maxHeight:150, overflowY:'auto', marginTop:1 }}>
-                                        {catalogSupport.filter(s => (s.name||'').toLowerCase().includes(interactionSearch.toLowerCase())).slice(0,10).map(s => (
+                                        {allSupport.filter(s => (s.name||'').toLowerCase().includes(interactionSearch.toLowerCase())).slice(0,10).map(s => (
                                           <div key={s.id} onClick={() => { updateInteraction(idx, s.id); setInteractionSearch(''); setInteractionSearchIdx(-1); }} style={{ padding:'7px 10px', cursor:'pointer', fontSize:10, borderBottom:'1px solid var(--border)' }}>
                                             <span style={{ fontWeight:600, color:'var(--text)' }}>{s.name}</span>
                                             <span style={{ fontSize:8, color:'var(--text-dim)', marginLeft:4 }}>{s.id}</span>
@@ -3460,9 +3483,9 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
             </p>
             <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
               {[
-                { icon:'🩸', title:'Анализы', desc:'Ингибин B, ФСГ, ЛГ, эстрадиол, тестостерон, прогестерон', action:() => setTab('fertility-pct'), color:'#ef4444' },
-                { icon:'📋', title:'План ПКТ', desc:'Протокол послекурсовой терапии и таймер', action:() => setTab('fertility-pct'), color:'var(--accent)' },
-                { icon:'🌱', title:'План восстановления Фертильности', desc:'Восстановление сперматогенеза и гормонального фона', action:() => setTab('fertility-pct'), color:'#8b5cf6' },
+                { icon:'🩸', title:'Анализы', desc:'Ингибин B, ФСГ, ЛГ, эстрадиол, тестостерон, прогестерон', action:() => { setHormonalTab('pct'); setTab('fertility-pct'); }, color:'#ef4444' },
+                { icon:'📋', title:'План ПКТ', desc:'Протокол послекурсовой терапии и таймер', action:() => { setHormonalTab('pct'); setTab('fertility-pct'); }, color:'var(--accent)' },
+                { icon:'🌱', title:'План восстановления Фертильности', desc:'Восстановление сперматогенеза и гормонального фона', action:() => { setHormonalTab('fertility'); setTab('fertility-pct'); }, color:'#8b5cf6' },
               ].map((card, i) => (
                 <div key={i} onClick={card.action} style={{
                   display:'flex', alignItems:'center', gap:12, padding:'12px 14px', borderRadius:14, cursor:'pointer', textAlign:'left', width:'100%',
@@ -3492,7 +3515,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
             <input value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Поиск по названию, категориям, механизмам" style={{ flex: 1, padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border-color)', background: 'var(--bg-secondary)', color: 'var(--text-light)', fontSize: 12 }} />
           </div>
           <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 6 }}>
-            {searchQuery ? `Найдено: ${groupedSubstances.reduce((a, g) => a + g.count, 0)} из 289` : `Всего: 289 препаратов`}
+            {searchQuery ? `Найдено: ${groupedSubstances.reduce((a, g) => a + g.count, 0)} из ${catalogSubstances.length}` : `Всего: ${catalogSubstances.length} препаратов`}
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: '68vh', overflowY: 'auto', paddingRight: 2 }}>
             {groupedSubstances.map(group => {
@@ -3723,7 +3746,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
               {/* Drug selector cards */}
               <div style={{ display:'flex', flexDirection:'column', gap:8, marginBottom:12 }}>
                   {interactionIds.map((id, idx) => {
-                  const selectedName = id ? (catalogSupport.find(s => s.id === id)?.name || allSupport.find(s => s.id === id)?.name || id) : '';
+                  const selectedName = id ? (allSupport.find(s => s.id === id)?.name || id) : '';
                   return (
                     <div key={idx} style={{ background:'var(--bg-secondary)', borderRadius:12, padding:'10px 12px', border:'1px solid var(--border)' }}>
                       <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:6 }}>
@@ -3741,7 +3764,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                           />
                           {interactionSearch && interactionSearchIdx === idx && (
                             <div style={{ position:'absolute', top:'100%', left:0, right:0, zIndex:10, background:'var(--bg)', border:'1px solid var(--border)', borderRadius:8, maxHeight:160, overflowY:'auto', marginTop:2 }}>
-                              {catalogSupport.filter(s => (s.name||'').toLowerCase().includes(interactionSearch.toLowerCase()) || (s.id||'').toLowerCase().includes(interactionSearch.toLowerCase())).slice(0, 10).map(s => (
+                              {allSupport.filter(s => (s.name||'').toLowerCase().includes(interactionSearch.toLowerCase()) || (s.id||'').toLowerCase().includes(interactionSearch.toLowerCase())).slice(0, 10).map(s => (
                                 <div key={s.id} onClick={() => { updateInteraction(idx, s.id); setInteractionSearch(''); }}
                                   style={{ padding:'7px 10px', cursor:'pointer', fontSize:11, borderBottom:'1px solid var(--border)' }}>
                                   <span style={{ fontWeight: id === s.id ? 700 : 400, color: id === s.id ? 'var(--accent)' : 'var(--text)' }}>{s.name}</span>
@@ -4543,13 +4566,31 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
           ) : (
             savedStacks.map(stack => (
               <div key={stack.id} className="card" style={{ marginBottom:6, padding:10 }}>
-                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:4 }}>
-                  <div>
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:4 }}>
+                  <div style={{ flex:1 }}>
                     <div style={{ fontSize:12, fontWeight:700, color:'var(--accent)' }}>{stack.name}</div>
                     <div style={{ fontSize:8, color:'var(--text-dim)' }}>{new Date(stack.date).toLocaleDateString('ru')} · {stack.subs.length} добавок</div>
                   </div>
-                  <button onClick={() => deleteStack(stack.id)} style={{ padding:'3px 6px', borderRadius:6, border:'1px solid rgba(239,68,68,0.3)', background:'rgba(239,68,68,0.08)', color:'#f87171', fontSize:8, cursor:'pointer' }}>Удалить</button>
+                  <div style={{ display:'flex', gap:3, flexShrink:0 }}>
+                    <button onClick={() => { setEditingStackNotes(editingStackNotes === stack.id ? null : stack.id); setEditNotesText(stack.notes || ''); }} style={{ padding:'3px 5px', borderRadius:6, border:'1px solid rgba(139,92,246,0.3)', background:'rgba(139,92,246,0.08)', color:'#a78bfa', fontSize:8, cursor:'pointer' }}>📝</button>
+                    <button onClick={() => deleteStack(stack.id)} style={{ padding:'3px 5px', borderRadius:6, border:'1px solid rgba(239,68,68,0.3)', background:'rgba(239,68,68,0.08)', color:'#f87171', fontSize:8, cursor:'pointer' }}>✕</button>
+                  </div>
                 </div>
+                {editingStackNotes === stack.id && (
+                  <div style={{ marginBottom:4, display:'flex', gap:3 }}>
+                    <input value={editNotesText} onChange={e => setEditNotesText(e.target.value)} placeholder="Заметка к стеку..."
+                      style={{ flex:1, padding:'3px 6px', borderRadius:4, border:'1px solid var(--border)', background:'var(--bg-secondary)', color:'var(--text)', fontSize:8 }} />
+                    <button onClick={() => {
+                      const updated = savedStacks.map(s => s.id === stack.id ? { ...s, notes: editNotesText } : s);
+                      setSavedStacks(updated);
+                      localStorage.setItem('savedStacks', JSON.stringify(updated));
+                      setEditingStackNotes(null);
+                    }} style={{ padding:'3px 6px', borderRadius:4, border:'none', cursor:'pointer', background:'var(--accent)', color:'#000', fontWeight:700, fontSize:8 }}>OK</button>
+                  </div>
+                )}
+                {stack.notes && editingStackNotes !== stack.id && (
+                  <div style={{ fontSize:8, color:'var(--text-dim)', marginBottom:4, padding:'3px 6px', borderRadius:4, background:'rgba(255,255,255,0.03)', border:'1px solid var(--border)' }}>📝 {stack.notes}</div>
+                )}
                 <div style={{ display:'flex', flexWrap:'wrap', gap:2 }}>
                   {stack.subs.slice(0, 20).map(id => {
                     const sub = ALL_SUBSTANCES.find(s => s.id === id);
@@ -4829,6 +4870,82 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
                     )}
                   </div>
                 ))}
+                {/* Timing table */}
+                <div style={{ marginTop:8, padding:'8px 10px', borderRadius:8, background:'rgba(0,230,138,0.04)', border:'1px solid rgba(0,230,138,0.12)' }}>
+                  <div style={{ fontSize:10, fontWeight:700, color:'#00e68a', marginBottom:6 }}>📋 Таблица приёма</div>
+                  <table style={{ width:'100%', fontSize:8, borderCollapse:'collapse' }}>
+                    <thead><tr style={{ background:'rgba(0,0,0,0.1)' }}>
+                      <th style={{ padding:'3px 5px', textAlign:'left' }}>Время</th>
+                      <th style={{ padding:'3px 5px', textAlign:'left' }}>Препарат</th>
+                      <th style={{ padding:'3px 5px', textAlign:'left' }}>Доза</th>
+                      <th style={{ padding:'3px 5px', textAlign:'left' }}>Примечание</th>
+                    </tr></thead>
+                    <tbody>
+                      {subs.map((id: string) => {
+                        const sub = ALL_SUBSTANCES.find(s => s.id === id);
+                        const d = dosages[id];
+                        if (!sub || !d) return null;
+                        return (
+                          <tr key={id} style={{ borderBottom:'1px solid var(--border)' }}>
+                            <td style={{ padding:'3px 5px', color:'var(--text-dim)' }}>{d.timing}</td>
+                            <td style={{ padding:'3px 5px', fontWeight:600, color:'var(--text-light)' }}>{sub.name || id.replace(/_/g, ' ')}</td>
+                            <td style={{ padding:'3px 5px', color:'#00e68a' }}>{d.mg} мг</td>
+                            <td style={{ padding:'3px 5px', color:'var(--text-dim)' }}>{sub.description?.slice(0,30) || ''}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+                {/* Mechanisms table */}
+                <div style={{ marginTop:10, fontSize:8, color:'var(--text-dim)' }}>
+                  <div style={{ fontWeight:700, color:'#8b5cf6', marginBottom:4, fontSize:9 }}>🧬 Механизмы, препараты и синергии</div>
+                  <table style={{ width:'100%', fontSize:7.5, borderCollapse:'collapse' }}>
+                    <thead><tr style={{ background:'rgba(139,92,246,0.08)' }}>
+                      <th style={{ padding:'3px 4px', textAlign:'left', color:'#8b5cf6', fontWeight:600 }}>Препарат</th>
+                      <th style={{ padding:'3px 4px', textAlign:'left', color:'#8b5cf6', fontWeight:600 }}>Механизм</th>
+                      <th style={{ padding:'3px 4px', textAlign:'left', color:'#8b5cf6', fontWeight:600 }}>Синергии</th>
+                    </tr></thead>
+                    <tbody>
+                      {subs.map((id: string) => {
+                        const sub = ALL_SUBSTANCES.find((s: any) => s.id === id);
+                        if (!sub) return null;
+                        const mechanisms = (sub.mechanisms || []).slice(0, 3);
+                        const syns = ALL_INTERACTIONS.filter((int: any) => 
+                          (int.substanceA === id || int.substanceB === id) && int.type === 'synergy'
+                        ).slice(0, 2);
+                        const conflicts = ALL_INTERACTIONS.filter((int: any) => 
+                          (int.substanceA === id || int.substanceB === id) && int.type === 'conflict'
+                        ).slice(0, 1);
+                        return (
+                          <tr key={id} style={{ borderBottom:'1px solid var(--border)' }}>
+                            <td style={{ padding:'3px 4px', fontWeight:600, color:'var(--text-light)' }}>{sub.name || id.replace(/_/g, ' ')}</td>
+                            <td style={{ padding:'3px 4px', color:'var(--text-dim)' }}>
+                              {mechanisms.length > 0 ? mechanisms.map((m: string) => (
+                                <div key={m} style={{ lineHeight:1.3, marginBottom:1 }}>• {m.length > 50 ? m.slice(0,50)+'…' : m}</div>
+                              )) : <span style={{ color:'rgba(255,255,255,0.3)' }}>—</span>}
+                            </td>
+                            <td style={{ padding:'3px 4px' }}>
+                              {syns.map((s: any, j: number) => {
+                                const partner = ALL_SUBSTANCES.find((x: any) => x.id === (s.substanceA === id ? s.substanceB : s.substanceA));
+                                return (
+                                  <div key={j} style={{ color:'#22c55e', lineHeight:1.3 }}>⊕ {partner?.name || '?'} — {s.effect?.slice(0,35)}</div>
+                                );
+                              })}
+                              {conflicts.length > 0 && conflicts.map((c: any, j: number) => {
+                                const partner = ALL_SUBSTANCES.find((x: any) => x.id === (c.substanceA === id ? c.substanceB : c.substanceA));
+                                return (
+                                  <div key={`c${j}`} style={{ color:'#ef4444', lineHeight:1.3 }}>⊖ {partner?.name || '?'} — {c.effect?.slice(0,35)}</div>
+                                );
+                              })}
+                              {syns.length === 0 && conflicts.length === 0 && <span style={{ color:'rgba(255,255,255,0.3)' }}>—</span>}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
                 <button onClick={() => {
                   const plan = { period:'daily', date:new Date().toISOString(), level:supportLevel, plan:genDailyPlan, levelLabel:level?.label };
                   localStorage.setItem('supportPlans', JSON.stringify([...(JSON.parse(localStorage.getItem('supportPlans') || '[]')), plan]));
@@ -5697,37 +5814,37 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
                                 <tr key={id} style={{ borderBottom:'1px solid var(--border)' }}>
                                   <td style={{ padding:'3px 4px', fontWeight:600, color:'var(--text-light)' }}>{sub.name}</td>
                                   <td style={{ padding:'3px 4px', color:'var(--text-dim)' }}>
-                                    {mechanisms.length > 0 ? mechanisms.map((m: string) => (
-                                      <div key={m} style={{ lineHeight:1.3, marginBottom:1 }}>• {m.length > 50 ? m.slice(0,50)+'…' : m}</div>
-                                    )) : <span style={{ color:'rgba(255,255,255,0.3)' }}>—</span>}
-                                  </td>
-                                  <td style={{ padding:'3px 4px' }}>
-                                    {syns.map((s: any, j: number) => {
-                                      const partner = allSupport.find((x: any) => x.id === (s.substanceA === id ? s.substanceB : s.substanceA));
-                                      return (
-                                        <div key={j} style={{ color:'#22c55e', lineHeight:1.3 }}>⊕ {partner?.name || '?'} — {s.effect?.slice(0,35)}</div>
-                                      );
-                                    })}
-                                    {conflicts.length > 0 && conflicts.map((c: any, j: number) => {
-                                      const partner = allSupport.find((x: any) => x.id === (c.substanceA === id ? c.substanceB : c.substanceA));
-                                      return (
-                                        <div key={`c${j}`} style={{ color:'#ef4444', lineHeight:1.3 }}>⊖ {partner?.name || '?'} — {c.effect?.slice(0,35)}</div>
-                                      );
-                                    })}
-                                    {syns.length === 0 && conflicts.length === 0 && <span style={{ color:'rgba(255,255,255,0.3)' }}>—</span>}
-                                  </td>
-                                </tr>
-                              );
-                            })}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-                  )}
-                </>)}
+                              {mechanisms.length > 0 ? mechanisms.map((m: string) => (
+                                <div key={m} style={{ lineHeight:1.3, marginBottom:1 }}>• {MECH_LABELS[m] || m.replace(/_/g, ' ')}</div>
+                              )) : <span style={{ color:'rgba(255,255,255,0.3)' }}>—</span>}
+                            </td>
+                            <td style={{ padding:'3px 4px' }}>
+                              {syns.map((s: any, j: number) => {
+                                const partner = ALL_SUBSTANCES.find((x: any) => x.id === (s.substanceA === id ? s.substanceB : s.substanceA));
+                                return (
+                                  <div key={j} style={{ color:'#22c55e', lineHeight:1.3 }}>⊕ {partner?.name || '?'} — {s.effect?.slice(0,35)}</div>
+                                );
+                              })}
+                              {conflicts.length > 0 && conflicts.map((c: any, j: number) => {
+                                const partner = ALL_SUBSTANCES.find((x: any) => x.id === (c.substanceA === id ? c.substanceB : c.substanceA));
+                                return (
+                                  <div key={`c${j}`} style={{ color:'#ef4444', lineHeight:1.3 }}>⊖ {partner?.name || '?'} — {c.effect?.slice(0,35)}</div>
+                                );
+                              })}
+                              {syns.length === 0 && conflicts.length === 0 && <span style={{ color:'rgba(255,255,255,0.3)' }}>—</span>}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             )}
-
+            </>)}
+          </div>
+      )}
+      
             {/* ==================== ADD 5: INTEGRATION NOTICE ==================== */}
             <div style={{ padding:'10px 12px', borderRadius:10, background:'rgba(96,165,250,0.05)', border:'1px solid rgba(96,165,250,0.12)', display:'flex', alignItems:'flex-start', gap:8 }}>
               <span style={{ fontSize:14, flexShrink:0 }}>🔄</span>
@@ -5739,81 +5856,9 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
               </div>
             </div>
 
-            {/* ==================== 3c: ДНЕВНОЕ РАСПИСАНИЕ ==================== */}
-            <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:12, border:'1px solid var(--border)' }}>
-              <div onClick={() => setExpandedCategories(p => ({ ...p, calc_schedule: !(p.calc_schedule ?? true) }))} style={{ display:'flex', alignItems:'center', gap:6, cursor:'pointer', marginBottom: (expandedCategories.calc_schedule ?? true) ? 8 : 0 }}>
-                <span style={{ fontSize:13 }}>📅</span>
-                <span style={{ flex:1, fontSize:12, fontWeight:700, color:'var(--accent)' }}>Дневное расписание ({effectiveLevel?.label || SUPPORT_LEVELS[supportLevel]?.label})</span>
-                <span style={{ fontSize:9, color:'var(--text-dim)', transform: (expandedCategories.calc_schedule ?? true) ? 'rotate(180deg)' : 'none', transition:'transform 0.2s' }}>▼</span>
-              </div>
-              {(expandedCategories.calc_schedule ?? true) && (<>
-              {dailySchedule.length === 0 ? (
-                <p style={{ fontSize:9, color:'var(--text-dim)', margin:0 }}>Выберите уровень поддержки.</p>
-              ) : (
-                <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
-                  {dailySchedule.map(slot => (
-                    <div key={slot.time} style={{ padding:'8px 10px', borderRadius:8, background:'rgba(0,0,0,0.15)', border:'1px solid var(--border)' }}>
-                      <div style={{ fontSize:10, fontWeight:700, color:'var(--accent)', marginBottom:4 }}>
-                        {slot.time} — {slot.label}
-                      </div>
-                      {slot.items.map((item: any) => (
-                        <div key={item.id} style={{ display:'flex', alignItems:'flex-start', gap:6, padding:'3px 0', fontSize:9, color:'var(--text-light)' }}>
-                          <div style={{ width:4, height:4, borderRadius:'50%', background:'var(--accent)', marginTop:4, flexShrink:0 }} />
-                          <div style={{ flex:1 }}>
-                            <span style={{ fontWeight:600 }}>{item.name}</span>
-                            <span style={{ color:'#00e68a', marginLeft:4 }}>{item.dose}</span>
-                            <div style={{ fontSize:7, color:'var(--text-dim)' }}>{item.with} · {item.note}</div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </>)}
-            </div>
 
-            {/* ==================== 3d: ПРОГНОЗ СНИЖЕНИЯ РИСКОВ ==================== */}
-            {calcDone && calcResult && calcResult?.riskAssessment?.systemBreakdown && (
-              <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:12, border:'1px solid var(--border)' }}>
-                <div onClick={() => setExpandedCategories(p => ({ ...p, calc_forecast: !(p.calc_forecast ?? true) }))} style={{ display:'flex', alignItems:'center', gap:6, cursor:'pointer', marginBottom: (expandedCategories.calc_forecast ?? true) ? 8 : 0 }}>
-                  <span style={{ fontSize:13 }}>📉</span>
-                  <span style={{ flex:1, fontSize:12, fontWeight:700, color:'#22c55e' }}>Прогноз снижения рисков</span>
-                  <span style={{ fontSize:9, color:'var(--text-dim)', transform: (expandedCategories.calc_forecast ?? true) ? 'rotate(180deg)' : 'none', transition:'transform 0.2s' }}>▼</span>
-                </div>
-                {(expandedCategories.calc_forecast ?? true) && (<>
-                <div style={{ display:'flex', flexDirection:'column', gap:4, fontSize:9 }}>
-                  <div style={{ padding:'6px 8px', borderRadius:6, background:'rgba(34,197,94,0.06)', border:'1px solid rgba(34,197,94,0.1)', display:'flex', justifyContent:'space-between', fontWeight:600 }}>
-                    <span style={{ color:'var(--text-light)' }}>Общий риск</span>
-                    <span>
-                      <span style={{ color:'#ef4444' }}>{Math.round(calcResult.riskBeforeSupport)}%</span>
-                      <span style={{ color:'var(--text-dim)', margin:'0 4px' }}>/</span>
-                      <span style={{ color:'#22c55e' }}>{Math.round(calcResult.riskAfterSupport)}%</span>
-                      <span style={{ color:'#22c55e', marginLeft:4 }}>({Math.round(calcResult.riskBeforeSupport)}/{Math.round(calcResult.riskAfterSupport)})</span>
-                    </span>
-                  </div>
-                  {SYSTEM_ORDER.filter(k => calcResult.riskAssessment.systemBreakdown[k] && (calcResult.systemSupport || {})[k] !== undefined).map(sysKey => {
-                    const sysRaw = calcResult.riskAssessment.systemBreakdown[sysKey].raw ?? 0;
-                    const sysNet = calcResult.riskAssessment.systemBreakdown[sysKey].net ?? 0;
-                    const sysInfo = SYSTEM_LABELS_RU[sysKey] || { name: sysKey, emoji: '' };
-                    return (
-                      <div key={sysKey} style={{ display:'flex', justifyContent:'space-between', padding:'3px 8px', borderRadius:4, background:'rgba(0,0,0,0.08)' }}>
-                        <span style={{ color:'var(--text-light)' }}>{sysInfo.emoji} {sysInfo.name}</span>
-                        <span>
-                          <span style={{ color: riskColorFn(sysRaw) }}>{Math.round(sysRaw)}%</span>
-                          <span style={{ color:'var(--text-dim)', margin:'0 3px' }}>/</span>
-                          <span style={{ color: riskColorFn(sysNet) }}>{Math.round(sysNet)}%</span>
-                          {sysRaw !== sysNet && (
-                            <span style={{ color:'#22c55e', marginLeft:3 }}>({Math.round(sysRaw)}/{Math.round(sysNet)})</span>
-                          )}
-                        </span>
-                      </div>
-                    );
-                  })}
-                </div>
-              </>)}
-              </div>
-            )}
+
+
 
             {/* ==================== PHASE 4: SAVE & SHARE ==================== */}
             <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:12, border:'1px solid var(--border)' }}>
@@ -5829,11 +5874,17 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
                 }}>📋 Копировать</button>
                 <button onClick={async () => {
                   const text = buildShareText();
-                  if (navigator.share) {
-                    await navigator.share({ title: 'План поддержки', text });
-                  } else {
+                  try {
                     await navigator.clipboard.writeText(text);
-                    alert('Скопировано в буфер обмена');
+                    alert('✅ Текст плана скопирован в буфер обмена');
+                  } catch {
+                    try {
+                      if (navigator.share) {
+                        await navigator.share({ title: 'План поддержки', text });
+                      } else {
+                        prompt('📋 Скопируйте текст вручную:', text);
+                      }
+                    } catch { prompt('📋 Скопируйте текст вручную:', text); }
                   }
                 }} style={{
                   padding:'10px', borderRadius:8, border:'1px solid #34d399', background:'rgba(52,211,153,0.08)',
@@ -5853,66 +5904,7 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
               )}
             </div>
 
-            {/* ==================== ДОЗИРОВКИ С РАСЧЁТОМ ПО ВЕСУ ==================== */}
-            <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:12, border:'1px solid var(--border)' }}>
-              <div onClick={() => setExpandedCategories(p => ({ ...p, calc_dose: !(p.calc_dose ?? true) }))} style={{ display:'flex', alignItems:'center', gap:6, cursor:'pointer', marginBottom: (expandedCategories.calc_dose ?? true) ? 8 : 0 }}>
-                <span style={{ fontSize:13 }}>💊</span>
-                <span style={{ flex:1, fontSize:12, fontWeight:700, color:'#22c55e' }}>Дозировки ({effectiveLevel?.label || SUPPORT_LEVELS[supportLevel]?.label}) {supportPhase !== 'course' && <span style={{ fontSize:9, color:'#f59e0b', fontWeight:400 }}> · {PHASE_MODS[supportPhase]?.emoji} {PHASE_MODS[supportPhase]?.label}</span>}</span>
-                <span style={{ fontSize:9, color:'var(--text-dim)', transform: (expandedCategories.calc_dose ?? true) ? 'rotate(180deg)' : 'none', transition:'transform 0.2s' }}>▼</span>
-              </div>
-              {(expandedCategories.calc_dose ?? true) && (<>
-              <div style={{ fontSize:8, color:'var(--text-dim)', marginBottom:6 }}>
-                💡 Дозы рассчитаны на вес {weightKg} кг. В скобках — расчёт мг/кг. 🔄 Заменить · ⚡ Усилить
-              </div>
-              <div style={{ display:'flex', flexDirection:'column', gap:3 }}>
-                {(effectiveLevel?.subs || SUPPORT_LEVELS[supportLevel]?.subs || []).map(id => {
-                  const dosage = (effectiveLevel?.dosages || SUPPORT_LEVELS[supportLevel]?.dosages || {})[id] || DEFAULT_DOSAGES[id] || { mg: 500, timing: 'с едой' };
-                  const subInfo = ALL_SUBSTANCES.find(s => s.id === id);
-                  const isEnhanced = enhancedSubs.includes(id);
-                  const isReplaced = selectedAnalogs[id] && selectedAnalogs[id] !== id;
-                  const analogs = SUBSTANCE_ANALOGS[id] || [];
-                  const enhancers = SUBSTANCE_ENHANCERS[id] || [];
-                  const wbStr = getWeightDosing(id, dosage?.mg || 0);
-                  return (
-                    <div key={id} style={{ padding:'5px 8px', borderRadius:6, background: isEnhanced ? 'rgba(0,230,138,0.08)' : isReplaced ? 'rgba(96,165,250,0.06)' : 'rgba(0,230,138,0.04)', border: isEnhanced ? '1px solid rgba(0,230,138,0.2)' : isReplaced ? '1px solid rgba(96,165,250,0.2)' : '1px solid rgba(0,230,138,0.1)' }}>
-                      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-                        <span style={{ fontSize:9, fontWeight:600, color:'var(--text-light)' }}>{subInfo?.name || id}{isReplaced ? ' ↩️' : ''}{isEnhanced ? ' ⚡' : ''}</span>
-                        <div style={{ textAlign:'right' }}>
-                          <div style={{ fontSize:9, fontWeight:700, color:'#00e68a' }}>
-                            {dosage?.mg >= 5000 ? `${dosage?.mg/1000}г` : dosage?.mg >= 1000 ? `${(dosage?.mg/1000).toFixed(1)}г` : `${dosage?.mg} мг`}
-                          </div>
-                          {wbStr && <div style={{ fontSize:7, color:'var(--text-dim)' }}>{wbStr}</div>}
-                          <div style={{ fontSize:7, color:'var(--text-dim)' }}>{dosage?.timing}</div>
-                        </div>
-                      </div>
-                      <div style={{ display:'flex', gap:3, marginTop:2, flexWrap:'wrap' }}>
-                        {analogs.length > 1 && (
-                          <div style={{ marginTop:2 }}>
-                            <div style={{ display:'flex', gap:2, flexWrap:'wrap' }}>
-                              {analogs.map((a: any, ai: number) => {
-                                const isSelectedAnalog = (selectedAnalogs[id] || id) === a.id;
-                                return (
-                                  <button key={a.id} onClick={() => { setSelectedAnalogs(prev => ({ ...prev, [id]: a.id })); calcSupport(supportLevel); }} style={{ padding:'1px 4px', borderRadius:3, fontSize:7, cursor:'pointer', border: isSelectedAnalog ? '1px solid rgba(96,165,250,0.5)' : '1px solid rgba(96,165,250,0.15)', background: isSelectedAnalog ? 'rgba(96,165,250,0.15)' : 'transparent', color: isSelectedAnalog ? '#60a5fa' : 'var(--text-dim)', fontWeight: isSelectedAnalog ? 700 : 400 }}>
-                                    {a.name}{a.form ? ' (' + a.form + ')' : ''}{a.mg ? ' ' + (a.mg >= 1000 ? (a.mg/1000).toFixed(1) + 'г' : a.mg + 'мг') : ''}
-                                  </button>
-                                );
-                              })}
-                            </div>
-                          </div>
-                        )}
-                        {enhancers.length > 0 && !isEnhanced && (
-                          <button onClick={() => { setEnhancedSubs(prev => [...prev, enhancers[0].id]); calcSupport(supportLevel); }} style={{ padding:'1px 5px', borderRadius:3, fontSize:7, cursor:'pointer', border:'1px solid rgba(0,230,138,0.3)', background:'rgba(0,230,138,0.08)', color:'#00e68a', fontWeight:500 }}>⚡ Усилить</button>
-                        )}
-                        {isEnhanced && (
-                          <button onClick={() => { setEnhancedSubs(prev => prev.filter(s => s !== id)); calcSupport(supportLevel); }} style={{ padding:'1px 5px', borderRadius:3, fontSize:7, cursor:'pointer', border:'1px solid rgba(239,68,68,0.3)', background:'rgba(239,68,68,0.08)', color:'#ef4444', fontWeight:500 }}>✕ Убрать</button>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </>)}
-            </div>
+
 
           </div>
         </div>
@@ -6704,12 +6696,14 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
                   const descOk = s.description && isReadableText(s.description);
                   return (
                     <div key={s.id} onClick={() => setModalSelected(prev => sel ? prev.filter(x => x !== s.id) : [...prev, s.id])} style={{
-                      padding:'6px 8px', borderRadius:6, cursor:'pointer', display:'flex', alignItems:'center', gap:6,
+                      padding:'8px 10px', borderRadius:8, cursor:'pointer', display:'flex', flexDirection:'column', gap:3,
                       background: sel ? 'rgba(0,230,138,0.08)' : 'rgba(255,255,255,0.02)', border: sel ? '1px solid rgba(0,230,138,0.3)' : '1px solid transparent',
                     }}>
-                      <span style={{ fontSize:8, minWidth:12 }}>{sel ? '✓' : ''}</span>
-                      <div style={{ flex:1, fontSize:10, fontWeight:600, color:'var(--text-light)' }}>{s.name}</div>
-                      {s.description && <div style={{ fontSize:7, color:'var(--text-dim)', maxWidth:120, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{decodeGarbled(s.description).slice(0,40)}</div>}
+                      <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                        <span style={{ fontSize:10, minWidth:14 }}>{sel ? '✓' : ''}</span>
+                        <div style={{ fontSize:11, fontWeight:600, color:'var(--text-light)' }}>{s.name}</div>
+                      </div>
+                      {s.description && <div style={{ fontSize:9, color:'var(--text-dim)', lineHeight:1.3, marginLeft:20 }}>{decodeGarbled(s.description)}</div>}
                     </div>
                   );
                 })}

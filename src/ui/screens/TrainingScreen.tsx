@@ -437,7 +437,7 @@ export const TrainingScreen: React.FC = () => {
             fontWeight: 600, transition: 'all 0.2s',
           }}>← На главную</button>
           {mainGroup && (
-            <button onClick={() => { setMainGroup(null); setTab('plan'); }} style={{
+            <button onClick={() => { setPage('hero'); setMainGroup(null); }} style={{
               padding: '6px 8px', cursor: 'pointer', fontSize: 12,
               color: 'var(--accent)', border: 'none', background: 'transparent',
               display: 'flex', alignItems: 'center', gap: 4,

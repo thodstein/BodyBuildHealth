@@ -34,8 +34,8 @@ type ActiveTab = 'overview' | 'diary' | 'charts' | 'mealplan' | 'grocery' | 'res
 const SECTION_TABS: Record<NutritionSection, string[]> = {
   diary: ['diary', 'charts'],
   planning: ['mealplan', 'cycling'],
-  overview: ['infocalc', 'grocery', 'restaurant', 'custom'],
-  all: ['diary', 'charts', 'mealplan', 'cycling', 'infocalc', 'grocery', 'restaurant', 'custom'],
+  overview: ['overview', 'infocalc', 'grocery', 'restaurant', 'custom'],
+  all: ['overview', 'diary', 'charts', 'mealplan', 'cycling', 'infocalc', 'grocery', 'restaurant', 'custom'],
 };
 
 const TAB_LABELS: Record<string, string> = {
@@ -142,7 +142,7 @@ export const NutritionScreen: React.FC = () => {
       case 'restaurant': return <RestaurantTab />;
       case 'cycling': return <CyclingTab tKcal={tKcal} tProt={tProt} />;
       case 'custom': return <NutritionCustomFood />;
-      default: return <NutritionOverview profile={linked.profile} avgWeeklyKcal={avgWeeklyKcal} avgWeeklyProtein={avgWeeklyProtein} avgWeeklyFat={avgWeeklyFat} avgWeeklyCarbs={avgWeeklyCarbs} microsIntake={microsIntake} />;
+      default: return <><NutritionOverview profile={linked.profile} avgWeeklyKcal={avgWeeklyKcal} avgWeeklyProtein={avgWeeklyProtein} avgWeeklyFat={avgWeeklyFat} avgWeeklyCarbs={avgWeeklyCarbs} microsIntake={microsIntake} /><RecipesTab /></>;
     }
   };
 
@@ -425,6 +425,10 @@ const MealPlanExtended: React.FC<{ tKcal: number; tProt: number; tFat: number; t
   const [indivFishFree, setIndivFishFree] = React.useState(false);
   const [indivNutFree, setIndivNutFree] = React.useState(false);
   const [indivEggFree, setIndivEggFree] = React.useState(false);
+  const [indivGoal, setIndivGoal] = React.useState(s?.primaryGoal || s?.goal || 'maintenance');
+  React.useEffect(() => {
+    setIndivKcal(tKcal); setIndivProt(tProt); setIndivFat(tFat); setIndivCarbs(tCarbs);
+  }, [tKcal, tProt, tFat, tCarbs]);
   const [indivInsulinShots, setIndivInsulinShots] = React.useState<{ time: string; dose: number; type: string }[]>([]);
   const [indivGHShots, setIndivGHShots] = React.useState<{ time: string; dose: number }[]>([]);
   const [indivIGFShots, setIndivIGFShots] = React.useState<{ time: string; dose: number }[]>([]);
@@ -1373,6 +1377,22 @@ const MealPlanExtended: React.FC<{ tKcal: number; tProt: number; tFat: number; t
           <label style={{ fontSize: 10, display: 'flex', alignItems: 'center', gap: 4, color: 'var(--text-dim)' }}>
             <input type="checkbox" checked={indivEggFree} onChange={e => setIndivEggFree(e.target.checked)} style={{ accentColor: 'var(--accent)' }} />
             Без яиц
+          </label>
+        </div>
+        <div style={{ display:'flex', gap:6, marginBottom:10, alignItems:'center' }}>
+          <label style={{ fontSize:10, color:'var(--text-dim)', display:'flex', alignItems:'center', gap:4 }}>
+            Цель:
+            <select value={indivGoal} onChange={e => setIndivGoal(e.target.value)} style={{ padding:'4px 8px', borderRadius:6, background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text)', fontSize:11, boxSizing:'border-box' }}>
+              <option value="bulk">Масса</option>
+              <option value="cut">Сушка</option>
+              <option value="maintenance">Поддержание</option>
+              <option value="strength">Сила</option>
+              <option value="hypertrophy">Гипертрофия</option>
+              <option value="recomposition">Рекомпозиция</option>
+              <option value="health">Здоровье</option>
+              <option value="fitness">Фитнес</option>
+              <option value="endurance">Выносливость</option>
+            </select>
           </label>
         </div>
         <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-light)', margin: '8px 0 4px' }}>💉 Инъекции инсулина</div>

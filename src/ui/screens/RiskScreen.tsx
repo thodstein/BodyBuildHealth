@@ -1466,7 +1466,7 @@ const LabsRisksTab: React.FC = () => {
               <span style={{fontSize:9,fontWeight:600,color:a.severity==='critical'?'#ef4444':a.severity==='high'?'#f97316':'#eab308'}}>{a.marker} × {a.drugCause?.join(', ')}</span>
               <span style={{fontSize:7,fontWeight:700,padding:'1px 5px',borderRadius:3,background:a.severity==='critical'?'#ef4444':a.severity==='high'?'#f97316':'#eab308',color:'#fff'}}>{a.severity==='critical'?'КРИТ':a.severity==='high'?'ВЫСОК':'МОНИТ'}</span>
             </div><div style={{color:'var(--text-dim)',fontSize:8}}>{a.recommendation}</div></div>)}</div> :
-          <div style={{fontSize:10,color:'var(--text-dim)',textAlign:'center',padding:'12px 0'}}>{hasLabs?'Не обнаружены':'Введите анализы'}</div>},
+          <div style={{fontSize:10,color:'var(--text-dim)',textAlign:'center',padding:'12px 0'}}>{hasLabs?'Не обнаружены':'Нет данных анализов — показаны базовые риски'}</div>},
         {key:'indices',icon:'📊',title:'Композитные индексы здоровья',
          body:<div style={{display:'grid',gap:6}}>{[{label:'ASI (Анаболический синтез)',desc:'Способность к анаболизму',val:ASI,inv:true},{label:'HMI (Гепатический метаболизм)',desc:'Стресс печени',val:HMI,inv:false},{label:'CR (Кардиориск)',desc:'Липиды + воспаление',val:CR,inv:false}].map(item=>
           <div key={item.label} style={{padding:8,borderRadius:8,background:item.val!==null?`rgba(${item.inv?(item.val>=70?'34,197,94':item.val>=40?'234,179,8':'239,68,68'):(item.val<=30?'34,197,94':item.val<=60?'234,179,8':'239,68,68')},0.06)`:'var(--bg-secondary)',border:item.val!==null?`1px solid rgba(${item.inv?(item.val>=70?'34,197,94':item.val>=40?'234,179,8':'239,68,68'):(item.val<=30?'34,197,94':item.val<=60?'234,179,8':'239,68,68')},0.2)`:'1px solid var(--border)'}}>
@@ -1482,7 +1482,7 @@ const LabsRisksTab: React.FC = () => {
             <span style={{fontSize:9,fontWeight:600,minWidth:60,color:lc.text}}>{sysLabels[sys]||sys}</span>
             <div style={{flex:1,height:6,background:'rgba(255,255,255,0.06)',borderRadius:3,overflow:'hidden'}}><div style={{width:`${Math.min(100,val.net)}%`,height:'100%',background:lc.bar,borderRadius:3,transition:'width 0.4s ease'}}/></div>
             <span style={{fontSize:11,fontWeight:700,color:lc.text,minWidth:28,textAlign:'right'}}>{Math.round(val.net)}%</span></div>})}</div> :
-          <div style={{fontSize:10,color:'var(--text-dim)',textAlign:'center',padding:'12px 0'}}>{hasLabs?'Все системы в норме':'Введите анализы'}</div>},
+          <div style={{fontSize:10,color:'var(--text-dim)',textAlign:'center',padding:'12px 0'}}>{hasLabs?'Все системы в норме':'Нет данных анализов — отображаются базовые значения'}</div>},
         {key:'markers',icon:'🔬',title:'Маркеры с отклонениями',
          body: labRisks && labRisks.deviationCount>0 ? <div style={{display:'grid',gap:3}}>{labRisks.markerDeviations.map(m=>{
           const isHigh=m.deviation>0; const absDev=Math.abs(m.deviation);
@@ -1493,7 +1493,7 @@ const LabsRisksTab: React.FC = () => {
             <span style={{fontSize:10,fontWeight:600,flex:1,color:'var(--text)'}}>{m.name}</span>
             <span style={{fontSize:8,color:'var(--text-dim)'}}>{m.lln}–{m.uln}</span>
             <span style={{fontSize:10,fontWeight:700,color:dc.text}}>{m.value} <span style={{fontSize:8,padding:'1px 4px',borderRadius:3,fontWeight:600,background:dc.text+'22',color:dc.text}}>{isHigh?'↑':'↓'}{absDev}%</span></span></div>})}</div> :
-          <div style={{fontSize:10,color:'var(--text-dim)',textAlign:'center',padding:'12px 0'}}>{hasLabs?'Все маркеры в норме':'Введите анализы'}</div>},
+          <div style={{fontSize:10,color:'var(--text-dim)',textAlign:'center',padding:'12px 0'}}>{hasLabs?'Все маркеры в норме':'Нет данных анализов — добавьте анализы для просмотра отклонений'}</div>},
       ].map(b => (
         <div key={b.key} className="card" style={{ padding: 0, overflow: 'hidden', marginBottom: 8 }}>
           <button onClick={() => setRiskSections(s => ({...s, [b.key]: !s[b.key]}))} style={{
@@ -1506,9 +1506,10 @@ const LabsRisksTab: React.FC = () => {
           {riskSections[b.key] && <div style={{ padding: '0 12px 12px' }}>{b.body}</div>}
         </div>
       ))}
-      {!hasLabs && <div className="card" style={{ textAlign: 'center', padding: 24 }}>
-        <div style={{ fontSize: 36, marginBottom: 10 }}>🧪</div>
-        <div style={{ fontSize: 13, color: 'var(--text-dim)' }}>Нет данных анализов</div></div>}
+      {!hasLabs && <div className="card" style={{ textAlign: 'center', padding: 18 }}>
+        <div style={{ fontSize: 28, marginBottom: 6 }}>🧪</div>
+        <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 4 }}>Нет данных анализов</div>
+        <div style={{ fontSize: 10, color: '#f59e0b' }}>Отображаются базовые риски без точных лабов. Для расчёта штрафа используйте кнопку "Без анализов" в общем обзоре.</div></div>}
     </div>
   );
 };
