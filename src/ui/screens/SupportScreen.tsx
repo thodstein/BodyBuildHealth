@@ -1348,6 +1348,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   const [editingStackNotes, setEditingStackNotes] = useState<string | null>(null);
   const [editNotesText, setEditNotesText] = useState('');
   const [expandedStack, setExpandedStack] = useState<string | null>(null);
+  const [showSavedPicker, setShowSavedPicker] = useState(false);
   const [researchSource, setResearchSource] = useState<'pubmed' | 'pubchem' | 'scholar' | 'fda' | 'pharma'>('pubmed');
   const [pubchemResults, setPubchemResults] = useState<any[]>([]);
   const [pubchemLoading, setPubchemLoading] = useState(false);
@@ -2445,7 +2446,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
       )}
 
       {/* ===== HORMONAL SUB-TAB PILLS (with back/home) ===== */}
-      {section === 'hormonal' && tab !== 'fertility-pct' && (
+      {section === 'hormonal' && (
         <div style={{ position:'fixed', top:0, left:0, right:0, zIndex:150, background:'var(--bg-primary)', borderBottom:'1px solid var(--border)' }}>
           <div style={{ display:'flex', gap:6, padding:'4px 12px', borderBottom:'1px solid var(--border)', alignItems:'center', overflowX:'auto' }}>
             <button onClick={goBack} style={{ padding:'3px 10px', borderRadius:6, fontSize:10, cursor:'pointer', background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600, whiteSpace:'nowrap' }}>← Назад</button>
@@ -2527,7 +2528,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                 </div>
                 <span style={{ color:'var(--accent)', fontSize:18, opacity:0.6 }}>→</span>
               </div>
-              <div onClick={() => { setSection('hormonal'); setTab('main'); setSupportView('fertility'); setCalcView('main'); }} style={{
+              <div onClick={() => { setSection('hormonal'); setTab('fertility-pct'); setHormonalTab('pct'); setSupportView('fertility'); setCalcView('main'); }} style={{
                 display:'flex', alignItems:'center', gap:12, padding:'14px 16px', borderRadius:16, cursor:'pointer', textAlign:'left', width:'100%',
                 background:'rgba(20,22,30,0.4)', border:'1px solid var(--glass-border)', color:'var(--text)', transition:'all 0.2s',
                 backdropFilter:'blur(12px)', WebkitBackdropFilter:'blur(12px)',
@@ -6007,20 +6008,7 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
 
       {/* ===== FERTILITY/PCT TAB ===== */}
       {section === 'hormonal' && tab === 'fertility-pct' && (
-        <div>
-          <button onClick={() => { setSection('home'); setTab('main'); setSupportView('main'); }} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', marginBottom:8, background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← На главную</button>
-          <div style={{ display:'flex', gap:4, marginBottom:8, overflowX:'auto' }}>
-            {[['pct','ПКТ'],['fertility','Фертильность'],['hrt','ГЗТ']].map(([id,label]) => (
-              <button key={id} onClick={() => { setHormonalTab(id as any); }} style={{
-                padding:'6px 14px', borderRadius:22, fontSize:11, fontWeight:700, whiteSpace:'nowrap', cursor:'pointer', flexShrink:0,
-                background: hormonalTab === id ? 'var(--accent)' : 'var(--bg-secondary)',
-                color: hormonalTab === id ? '#000' : 'var(--text-dim)',
-                border: '1px solid ' + (hormonalTab === id ? 'var(--accent)' : 'var(--border)'),
-              }}>{label}</button>
-            ))}
-          </div>
-          <FertilityPCTScreen initialTab={hormonalTab === 'pct' ? 'pct-plan' : hormonalTab === 'hrt' ? 'hrt' : undefined} restrictToMode={hormonalTab} />
-        </div>
+        <FertilityPCTScreen initialTab={hormonalTab === 'pct' ? 'pct-plan' : hormonalTab === 'hrt' ? 'hrt' : undefined} restrictToMode={hormonalTab} />
       )}
 
       {/* ===== MODAL OVERLAY ===== */}
@@ -6063,7 +6051,14 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
                   return (
                     <div key={id} style={{ padding:'6px 8px', borderRadius:6, background:'rgba(255,255,255,0.03)', border:'1px solid var(--border)', fontSize:10 }}>
                       <div style={{ fontWeight:600, color:'var(--text-light)' }}>{sub.name}</div>
-                      {sub.description && <div style={{ fontSize:8, color:'var(--text-dim)' }}>{cleanDesc(sub).slice(0,80)}</div>}
+                      {sub.description && <div style={{ fontSize:8, color:'var(--text-dim)', marginTop:1 }}>{cleanDesc(sub)}</div>}
+                      {(sub as any).mechanisms && (sub as any).mechanisms.length > 0 && (
+                        <div style={{ display:'flex', flexWrap:'wrap', gap:2, marginTop:2 }}>
+                          {(sub as any).mechanisms.slice(0,3).map((m: string, mi: number) => (
+                            <span key={mi} style={{ fontSize:7, padding:'1px 4px', borderRadius:3, background:'rgba(139,92,246,0.08)', color:'#a78bfa' }}>{(MECH_TRANSLATIONS_RU as Record<string,string>)[m] || m.replace(/_/g, ' ')}</span>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   );
                 })}
@@ -6083,32 +6078,28 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
                 <input value={modalSearch} onChange={e => setModalSearch(e.target.value)} placeholder="🔍 Поиск..." style={{
                   flex:1, padding:'8px 10px', borderRadius:8, border:'1px solid var(--border)', background:'var(--bg-secondary)', color:'var(--text)', fontSize:11, boxSizing:'border-box',
                 }} />
-                <button onClick={() => {
-                  try {
-                    const saved = JSON.parse(localStorage.getItem('savedStacks') || '[]');
-                    if (saved.length > 0) {
-                      const ids = saved[0].subs || [];
-                      setEnhancedSubs(ids);
-                      setModalSelected([]);
-                      setShowModal(null);
-                    }
-                  } catch (e) { console.error(e); }
-                }} style={{ padding:'8px 10px', borderRadius:8, border:'1px dashed var(--accent)', background:'transparent', color:'var(--accent)', fontSize:10, fontWeight:600, cursor:'pointer', whiteSpace:'nowrap' }}>💾 Из сохранённых</button>
+                <button onClick={() => setShowSavedPicker(true)} style={{ padding:'8px 10px', borderRadius:8, border:'1px dashed var(--accent)', background:'transparent', color:'var(--accent)', fontSize:10, fontWeight:600, cursor:'pointer', whiteSpace:'nowrap' }}>💾 Из сохранённых ({savedStacks.length})</button>
               </div>
               <div style={{ display:'flex', flexDirection:'column', gap:3, maxHeight:'45vh', overflowY:'auto', marginBottom:8 }}>
                 {catalogSupport.filter(s => !modalSearch || (s.name||'').toLowerCase().includes(modalSearch.toLowerCase()) || (s.id||'').toLowerCase().includes(modalSearch.toLowerCase())).map(s => {
                   const sel = modalSelected.includes(s.id);
-                  const descOk = s.description && isReadableText(s.description);
                   return (
                     <div key={s.id} onClick={() => setModalSelected(prev => sel ? prev.filter(x => x !== s.id) : [...prev, s.id])} style={{
-                      padding:'8px 10px', borderRadius:8, cursor:'pointer', display:'flex', flexDirection:'column', gap:3,
+                      padding:'8px 10px', borderRadius:8, cursor:'pointer',
                       background: sel ? 'rgba(0,230,138,0.08)' : 'rgba(255,255,255,0.02)', border: sel ? '1px solid rgba(0,230,138,0.3)' : '1px solid transparent',
                     }}>
                       <div style={{ display:'flex', alignItems:'center', gap:6 }}>
-                        <span style={{ fontSize:10, minWidth:14 }}>{sel ? '✓' : ''}</span>
+                        <span style={{ fontSize:10, minWidth:14, color: sel ? '#00e68a' : 'var(--text-dim)' }}>{sel ? '✓' : '○'}</span>
                         <div style={{ fontSize:11, fontWeight:600, color:'var(--text-light)' }}>{s.name}</div>
                       </div>
-                      {s.description && <div style={{ fontSize:9, color:'var(--text-dim)', lineHeight:1.3, marginLeft:20 }}>{decodeGarbled(s.description)}</div>}
+                      {s.description && <div style={{ fontSize:8, color:'var(--text-dim)', lineHeight:1.4, marginLeft:20, marginTop:2 }}>{decodeGarbled(s.description)}</div>}
+                      {(s as any).mechanisms && (s as any).mechanisms.length > 0 && (
+                        <div style={{ display:'flex', flexWrap:'wrap', gap:2, marginLeft:20, marginTop:2 }}>
+                          {(s as any).mechanisms.slice(0,3).map((m: string) => (
+                            <span key={m} style={{ fontSize:7, padding:'1px 4px', borderRadius:3, background:'rgba(139,92,246,0.08)', color:'#a78bfa' }}>{(MECH_TRANSLATIONS_RU as Record<string,string>)[m] || m.replace(/_/g, ' ')}</span>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   );
                 })}
@@ -6122,6 +6113,47 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
                     setShowModal(null);
                   }
                 }} style={{ flex:1, padding:'8px', borderRadius:8, border:'none', cursor:'pointer', background:'var(--accent)', color:'#000', fontWeight:700, fontSize:10 }}>Добавить ({modalSelected.length})</button>
+              </div>
+              </>
+            )}
+            {/* Saved stack picker */}
+            {showSavedPicker && (
+              <>
+              <div style={{ position:'fixed', inset:0, zIndex:350, background:'rgba(0,0,0,0.8)', display:'flex', alignItems:'center', justifyContent:'center', padding:12 }}>
+                <div style={{ background:'var(--bg-primary)', borderRadius:16, maxWidth:400, width:'100%', maxHeight:'80vh', overflowY:'auto', padding:16 }}>
+                  <h3 style={{ margin:'0 0 10px', fontSize:14, fontWeight:800, color:'var(--accent)' }}>💾 Выберите сохранённый стек</h3>
+                  {savedStacks.length === 0 ? (
+                    <p style={{ fontSize:10, color:'var(--text-dim)', textAlign:'center', padding:20 }}>Нет сохранённых стеков. Сначала сохраните стек в Мои стеки.</p>
+                  ) : (
+                    <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+                      {savedStacks.map(stack => {
+                        const totalItems = stack.subs?.length || 0;
+                        return (
+                          <div key={stack.id} style={{ padding:'10px 12px', borderRadius:10, background:'rgba(255,255,255,0.02)', border:'1px solid var(--border)', cursor:'pointer' }}
+                            onClick={() => {
+                              const ids = stack.subs || [];
+                              setEnhancedSubs(ids);
+                              setModalSelected([]);
+                              setShowModal(null);
+                              setShowSavedPicker(false);
+                            }}
+                          >
+                            <div style={{ fontSize:12, fontWeight:700, color:'var(--text-light)' }}>{stack.name}</div>
+                            <div style={{ fontSize:9, color:'var(--text-dim)', marginTop:2 }}>{new Date(stack.date).toLocaleDateString('ru-RU')} · {totalItems} препаратов</div>
+                            <div style={{ display:'flex', flexWrap:'wrap', gap:2, marginTop:4 }}>
+                              {(stack.subs || []).slice(0,8).map((id: string) => {
+                                const sub = ALL_SUBSTANCES.find(s => s.id === id);
+                                return <span key={id} style={{ fontSize:8, padding:'1px 5px', borderRadius:4, background:'rgba(139,92,246,0.08)', color:'#a78bfa' }}>{sub?.name || id}</span>;
+                              })}
+                              {totalItems > 8 && <span style={{ fontSize:8, color:'var(--text-dim)' }}>+{totalItems-8}</span>}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                  <button onClick={() => setShowSavedPicker(false)} style={{ width:'100%', marginTop:10, padding:'8px', borderRadius:8, border:'1px solid var(--border)', background:'transparent', color:'var(--text-dim)', cursor:'pointer', fontSize:10 }}>← Назад</button>
+                </div>
               </div>
               </>
             )}
@@ -6144,16 +6176,7 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
               </div>
               <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginBottom:8 }}>
                 <button style={{ flex:1, padding:'6px', borderRadius:6, border:'1px dashed var(--accent)', cursor:'pointer', background:'transparent', color:'var(--accent)', fontSize:9, fontWeight:600, minWidth:0 }} onClick={() => setShowModal('manual')}>🔄 Заменить на аналог</button>
-                <button style={{ flex:1, padding:'6px', borderRadius:6, border:'1px dashed var(--accent)', cursor:'pointer', background:'transparent', color:'var(--accent)', fontSize:9, fontWeight:600, minWidth:0 }} onClick={() => {
-                  try {
-                    const saved = JSON.parse(localStorage.getItem('savedStacks') || '[]');
-                    if (saved.length > 0) {
-                      const ids = saved[0].subs || [];
-                      setEnhancedSubs(ids);
-                      setShowModal(null);
-                    }
-                  } catch (e) { console.error(e); }
-                }}>💾 Из сохранённых</button>
+                <button style={{ flex:1, padding:'6px', borderRadius:6, border:'1px dashed var(--accent)', cursor:'pointer', background:'transparent', color:'var(--accent)', fontSize:9, fontWeight:600, minWidth:0 }} onClick={() => setShowSavedPicker(true)}>💾 Из сохранённых</button>
                 <button style={{ flex:1, padding:'6px', borderRadius:6, border:'1px dashed var(--accent)', cursor:'pointer', background:'transparent', color:'var(--accent)', fontSize:9, fontWeight:600, minWidth:0 }} onClick={() => setShowModal('manual')}>📋 Из каталога</button>
               </div>
               <div style={{ display:'flex', gap:6 }}>
