@@ -19,16 +19,14 @@ const NAV_CARDS: { id: ScreenId; icon: string; label: string }[] = [
 ];
 
 export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
-  const [shopMsg, setShopMsg] = React.useState(false);
   return (
     <div style={{ position:'fixed', inset:0, zIndex:100, display:'flex', flexDirection:'column' }}>
       <img src="/hero-main.png" alt="" style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'fill' }} />
       <div style={{ position:'absolute', inset:0, background:'linear-gradient(transparent 50%, rgba(0,0,0,0.85))' }} />
       <div style={{ position:'relative', zIndex:2, flex:1, display:'flex', flexDirection:'column', justifyContent:'flex-end', padding:'0 12px 100px' }}>
-        {shopMsg && <div style={{ textAlign:'center', padding:'12px 16px', marginBottom:12, borderRadius:12, background:'rgba(0,230,138,0.1)', border:'1px solid rgba(0,230,138,0.2)', fontSize:13, color:'#00e68a', fontWeight:700 }}>🛍️ Магазин — в разработке</div>}
         <div style={{ display:'grid', gridTemplateColumns:'repeat(4, 1fr)', gap:10 }}>
           {NAV_CARDS.map(card => (
-            <button key={card.id} onClick={() => { if (card.id === 'marketplace') setShopMsg(true); else onNavigate?.(card.id); }} style={{
+            <button key={card.id} onClick={() => onNavigate?.(card.id)} style={{
               aspectRatio:'1',
               borderRadius:16,
               background:'rgba(0,0,0,0.55)',

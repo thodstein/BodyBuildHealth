@@ -109,7 +109,7 @@ export default function App() {
       'substances': 'pharma',
       'peptides': 'pharma',
       'predictive': 'home',
-      'marketplace': 'home',
+      'marketplace': 'marketplace',
       'articles': 'articles',
       'assistant': 'home',
       'gamification': 'home',
@@ -149,6 +149,7 @@ export default function App() {
       case 'labs': return <LabsScreen key={key} />;
       case 'risks': return <RiskScreen key={key} />;
       case 'nutrition': return <NutritionScreen key={key} />;
+      case 'marketplace': return <MarketplaceScreen key={key} />;
       case 'profile': return <ProfileScreen key={key} />;
       case 'articles': return <ArticlesScreen key={key} />;
       default: return <DashboardScreen key={key} onNavigate={handleNavigate} />;

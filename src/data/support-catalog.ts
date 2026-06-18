@@ -77,6 +77,16 @@ export const CATEGORY_LABELS: Record<string, string> = {
   renoprotector: '🫘 Нефропротектор', joint: '🦴 Суставное', hormonal: '⚖️ Гормональное',
   peptide: '🧬 Пептид', pharma: '💊 Фармакология', herb: '🌿 Трава', nootropic: '🧠 Ноотроп',
   immunomodulator: '🛡️ Иммуномодулятор', anabolic: '💪 Анаболическое', metabolic: '⚡ Метаболическое',
+  gut: '🫁 ЖКТ', gastrointestinal: '🫁 Желудочно-кишечный', stimulant: '⚡ Стимулятор',
+  anti_aging: '🕰 Антивозрастное', mitochondrial: '🔋 Митохондриальное', thyroid: '🦋 Щитовидная железа',
+  anticoagulant: '🩸 Антикоагулянт', antimicrobial: '🦠 Антимикробное', anxiolytic: '😌 Анксиолитик',
+  antidepressant: '😊 Антидепрессант', bone: '🦴 Костное',
+  skin: '🧴 Кожное', beauty: '💅 Красота', eye_protector: '👁 Защита глаз',
+  hydration: '💧 Гидратация', electrolyte: '⚡ Электролит', lipid: '🫧 Липидное',
+  multivitamin: '💊 Мультивитамин', mushroom: '🍄 Грибы', recovery: '🔄 Восстановление',
+  nsaid: '💊 НПВС', marker: '📊 Маркер', hematologic: '🩸 Гематологическое',
+  immune: '🛡️ Иммунное', urinary_protector: '🚽 Урологическое', polyphenol: '🫐 Полифенол',
+  anti_inflammatory: '🔥 Противовоспалительное',
 };
 
 export const TIER_LABELS_CATALOG: Record<string, { label: string; emoji: string; color: string; desc: string }> = {
