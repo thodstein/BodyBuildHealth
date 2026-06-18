@@ -72,14 +72,58 @@ const PD_LABELS: Record<keyof PD, string> = {
 };
 
 const PD_MECHANISMS: Record<keyof PD, string> = {
-  AR_affinity: '',
-  aromatization: '',
-  five_alpha_reduction: '',
-  progestogenic: '',
-  hepatotoxicity: '',
-  lipid_impact: '',
-  hct_impact: '',
-  neuro_toxicity: '',
+  AR_affinity: 'Сродство к андрогенному рецептору — определяет анаболическую/андрогенную силу',
+  aromatization: 'Скорость ароматизации в эстрадиол — риск эстрогенных побочных эффектов',
+  five_alpha_reduction: 'Восстановление до DHT — влияет на андрогенные эффекты (кожа, простата)',
+  progestogenic: 'Прогестагенная активность — может подавлять ГнРГ/ЛГ, влиять на либидо',
+  hepatotoxicity: 'Гепатотоксичность — нагрузка на печень, риск повреждения гепатоцитов',
+  lipid_impact: 'Влияние на липидный профиль — снижение ЛПВП, повышение ЛПНП',
+  hct_impact: 'Влияние на гематокрит — риск полицитемии при длительном приёме',
+  neuro_toxicity: 'Нейротоксичность — риск когнитивных/неврологических побочных эффектов',
+};
+
+const PHARMA_MECH_LABELS: Record<string, string> = {
+  'AR_AGONISM': 'Агонист AR', 'AR_SELECTIVE_AGONISM': 'Селективный агонист AR',
+  'mTOR_UP': 'Активация mTOR', 'PROTEIN_SYNTHESIS': 'Синтез белка',
+  'NITROGEN_RETENTION': 'Задержка азота', 'ERYTHROPOIESIS': 'Эритропоэз',
+  'IGF1_UPREGULATION': '↑ IGF-1', 'IGF1_UP': '↑ IGF-1',
+  '5AR_REDUCTION': '5α-редукция', 'AROMATIZATION': 'Ароматизация',
+  'AROMATASE_INHIBITION': 'Ингибитор ароматазы', 'E2_SUPPRESSION': '↓ E2',
+  'PR_AGONISM': 'Агонист PR', 'GR_ANTAGONISM': 'Антагонист GR',
+  'CORTISOL_SUPPRESSION': '↓ Кортизол', 'DOPAMINE_MODULATION': 'Модуляция дофамина',
+  'GABA_MODULATION': 'Модуляция ГАМК', 'CYP3A4_METABOLISM': 'Через CYP3A4',
+  'COLLAGEN_SYNTHESIS': 'Синтез коллагена', 'BONE_MINERALIZATION': 'Минерализация костей',
+  'PROGESTIN_ACTIVITY': 'Прогестиновая активность',
+  'ANTI_CATABOLIC': 'Антикатаболическое', 'GLYCOGEN_SYNTHESIS': 'Синтез гликогена',
+  'ANTI_ESTROGENIC': 'Антиэстрогенное', 'SHBG_BINDING': 'Связывание SHBG',
+  'GHSR_AGONISM': 'Агонист GHS-R', 'GH_RELEASE': 'Выброс ГР',
+  'NEUROPEPTIDE_MOD': 'Модуляция нейропептидов',
+  'LIPOLYSIS_ACTIVATION': 'Липолиз', 'HSL_STIMULATION': 'Стимуляция HSL',
+  'PEPTIDE_MOD': 'Пептидная модуляция', 'TISSUE_REPAIR': 'Репарация тканей',
+  'ER_ANTAGONISM': 'Антагонист ER', 'GNRH_UP': '↑ ГнРГ',
+  'GNRH_AGONISM': 'Агонист GnRH', 'LH_UP': '↑ ЛГ',
+  'FSH_UP': '↑ ФСГ', 'LH_MIMETIC': 'Миметик ЛГ',
+  'TESTOSTERONE_PRODUCTION': 'Продукция тестостерона',
+  'TESTOSTERONE_UP': '↑ Тестостерон', 'D2_AGONISM': 'Агонист D2',
+  'PROLACTIN_SUPPRESSION': '↓ Пролактин', 'IGF1R_AGONISM': 'Агонист IGF-1R',
+  'CELL_PROLIFERATION': 'Пролиферация клеток',
+  'SATELLITE_CELL_ACTIVATION': 'Активация сателлитов',
+  'GLUCOSE_TRANSPORT': 'Транспорт глюкозы', 'AMINO_ACID_UPTAKE': 'Захват аминокислот',
+  'NUTRITIONAL_SUPPORT': 'Нутрицевтическая поддержка',
+  'ANTI_INFLAMMATORY': 'Противовоспалительное', 'IMMUNE_SUPPORT': 'Иммунная поддержка',
+  'ANABOLIC': 'Анаболическое', 'STRESS_RESPONSE': 'Адаптоген',
+  'DETOX_UP': '↑ Детоксикация', 'GSH_UP': 'Синтез глутатиона',
+  'ROS_DOWN': '↓ ROS', 'NFkB_DOWN': '↓ NF-κB',
+  'MITO_STABILIZE': 'Стабилизация митохондрий',
+  'APOPTOSIS_DOWN': '↓ Апоптоз', 'BILE_FLOW_UP': '↑ Желчеотток',
+  'SPM_UP': 'Специализированные про-резольвные медиаторы',
+  'TG_DOWN': '↓ Триглицериды', 'NEURO_MEMBRANE': 'Структура нейромембран',
+  'AT1_BLOCK': 'Блокада AT1', 'ALDOSTERONE_DOWN': '↓ Альдостерон',
+  'BP_DOWN': '↓ АД', 'BETA1_BLOCK': 'Блокада β1',
+  'NO_UP': '↑ NO', 'HR_DOWN': '↓ ЧСС',
+  'HPTA_SUPPORT': 'Поддержка HPTA',
+  'AR_AGONISM (3-5x stronger)': 'Агонист AR (×3-5)',
+  'AROMATIZATION (20%)': 'Ароматизация (20%)',
 };
 
 const SEVERITY_COLORS: Record<string, string> = {
@@ -594,7 +638,7 @@ const DrugDetailCard: React.FC<{ sub: PharmaSubstance; detail?: PharmaDetail }> 
           ) : sub.mechanisms?.length ? (
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
               {sub.mechanisms.map((m, i) => (
-                <span key={i} style={{ fontSize: 9, padding: '2px 6px', borderRadius: 4, background: 'rgba(139,92,246,0.1)', color: '#8b5cf6', fontWeight: 500 }}>{m}</span>
+                <span key={i} style={{ fontSize: 9, padding: '2px 6px', borderRadius: 4, background: 'rgba(139,92,246,0.1)', color: '#8b5cf6', fontWeight: 500 }}>{PHARMA_MECH_LABELS[m] || m.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, c => c.toUpperCase())}</span>
               ))}
             </div>
           ) : null}
