@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { addToCart } from '../../../core/nutrition-utils';
 import { FOOD_DB, FOOD_ALLERGEN_DIET } from '../../../core/nutrition-database';
+import { PHARMA_DB } from '../../../core/pharma-database';
 import { calcNutrition } from '../../../engines/nutrition.engine';
 import { getProfile, updateProfile } from '../../../core/profile-manager';
 import type { UserProfile } from '../../../core/types';
@@ -14,7 +15,7 @@ type NutritionLevel = 'base' | 'medium' | 'enhanced' | 'max';
 type PlanType = 'classic' | 'keto' | 'highcarb' | 'mediterranean' | 'vegetarian';
 type CycleType = 'none' | 'macro' | 'butch' | 'cheatmeal' | 'carbload';
 
-interface DrugInjection { id: string; name: string; time: string; dose: number; unit: string; type: string; }
+interface DrugInjection { id: string; name: string; time: string; dose: number; unit: string; type: string; esterType: 'rapid' | 'short' | 'long' | 'none'; halfLifeHours: number; trainLinked: boolean; trainTiming: 'before' | 'after' | 'both' | 'none'; }
 interface MealPrepStep { step: number; action: string; duration: number; items: string[]; }
 interface SavedPlan { id: number; date: string; dayPlan: any; threeDayPlan: any; weekPlan: any; shoppingList: any; waterCalc: any; }
 
@@ -161,16 +162,51 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
   // 3. Phase + course drugs
   const [phase, setPhase] = useState<PhaseId>('course');
   const [injections, setInjections] = useState<DrugInjection[]>(() => {
-    // Auto-pull from pharma course
+    // Auto-pull from pharma course with proper type detection
     if (courseEntries.length > 0) {
-      return courseEntries.map(ce => ({
-        id: `course_${ce.substanceId}_${Date.now()}`,
-        name: ce.substanceId || ce.name || 'Препарат',
-        time: '08:00',
-        dose: ce.doseValue || 10,
-        unit: ce.doseUnit || 'mg',
-        type: ce.substanceId?.toLowerCase().includes('ins') || ce.name?.toLowerCase().includes('инсулин') ? 'инсулин' : 'другое',
-      }));
+      return courseEntries.map(ce => {
+        const substance = PHARMA_DB[ce.substanceId];
+        const name = substance?.name || ce.substanceId || ce.name || 'Препарат';
+        const halfLife = substance?.pk?.halfLifeHours || 24;
+        // Detect type from PHARMA_DB class
+        let type = 'другое';
+        let esterType: 'rapid' | 'short' | 'long' | 'none' = 'none';
+        if (substance?.class === 'insulin') {
+          type = 'инсулин';
+          // Ester-based timing: rapid = <2h, short = 2-8h, long = >8h
+          if (halfLife < 2) esterType = 'rapid';
+          else if (halfLife <= 8) esterType = 'short';
+          else esterType = 'long';
+        } else if (substance?.id?.includes('ghrp') || substance?.id?.includes('cjc') || substance?.id?.includes('sermorelin') || substance?.class === 'peptide_ghrh' || substance?.class === 'peptide_ghrp') {
+          type = 'ГР';
+          esterType = 'short';
+        } else if (substance?.id?.includes('igf1') || substance?.id?.includes('mgf')) {
+          type = 'ИФР-1';
+          esterType = 'short';
+        } else if (substance?.id?.includes('bpc') || substance?.id?.includes('tb500')) {
+          type = 'пептид';
+          esterType = 'none';
+        } else if (substance?.class && ['testosterone','trenbolone','nandrolone','boldenone','primobolan','drostanolone'].includes(substance.class)) {
+          type = 'ААС';
+          // Check esters for timing
+          const esters = substance.esters || [];
+          if (esters.some((e: string) => ['propionate','acetate','phenylpropionate'].includes(e))) esterType = 'short';
+          else if (esters.some((e: string) => ['enanthate','cypionate'].includes(e))) esterType = 'long';
+          else esterType = 'long';
+        }
+        return {
+          id: `course_${ce.substanceId}_${Date.now()}`,
+          name,
+          time: type === 'инсулин' ? (esterType === 'long' ? '22:00' : (linkToTraining ? '00:00' : '08:00')) : '08:00',
+          dose: ce.doseValue || 10,
+          unit: ce.doseUnit || 'mg',
+          type,
+          esterType,
+          halfLifeHours: halfLife,
+          trainLinked: linkToTraining && (type === 'инсулин' || type === 'ИФР-1'),
+          trainTiming: 'before' as 'before' | 'after' | 'both' | 'none',
+        };
+      });
     }
     return [];
   });
@@ -188,9 +224,27 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
 
   // 5. Editable KBJU
   const calcTargets = useMemo(() => {
-    const pal = 1.2 + ((s?.workoutsPerWeek || 3) * 0.075) + ((s?.avgWorkoutMinutes || 60) > 60 ? 0.1 : 0);
-    return calcNutrition({ weightKg: weight, heightCm: height, age, sex, pal: Math.min(1.9, Math.max(1.2, pal)), goal });
-  }, [weight, height, age, sex, goal, s?.workoutsPerWeek, s?.avgWorkoutMinutes]);
+    const wpw = s?.workoutsPerWeek || 3;
+    const awm = s?.avgWorkoutMinutes || 60;
+    let pal = 1.2 + wpw * 0.075;
+    if (awm > 60) pal += 0.1;
+    if (awm > 90) pal += 0.05;
+    if (wpw >= 6) pal += 0.05;
+    pal = Math.min(1.9, Math.max(1.2, Math.round(pal * 1000) / 1000));
+    const targets = calcNutrition({ weightKg: weight, heightCm: height, age, sex, pal: Math.min(1.9, Math.max(1.2, pal)), goal });
+    // Pharma-aware adjustments
+    const hasAAS = injections.some(i => i.type === 'ААС');
+    const hasShortInsulin = injections.some(i => i.type === 'инсулин' && i.esterType !== 'long');
+    if (hasAAS) targets.protein = Math.round(targets.protein + weight * 0.3); // +0.3g/kg on AAS
+    if (hasShortInsulin) {
+      const totalInsulinDose = injections.filter(i => i.type === 'инсулин' && i.esterType !== 'long').reduce((s, i) => s + i.dose, 0);
+      const minInsulinCarbs = totalInsulinDose * 10;
+      if (targets.carbs < minInsulinCarbs) targets.carbs = Math.round(minInsulinCarbs * 1.2); // 20% buffer
+      // Recalc kcal from new P/F/C
+      targets.kcal = targets.protein * 4 + targets.fats * 9 + targets.carbs * 4;
+    }
+    return targets;
+  }, [weight, height, age, sex, goal, s?.workoutsPerWeek, s?.avgWorkoutMinutes, injections]);
 
   const [manualKcal, setManualKcal] = useState<number | null>(null);
   const [manualP, setManualP] = useState<number | null>(null);
@@ -411,8 +465,13 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
       if (cyclingMode === 'cheatmeal' && isTrainingDay) { tKcalAdj = Math.round(tKcal * 0.85); /* cheat meal will be separate */ }
       if (cyclingMode === 'carbload' && isTrainingDay) { tCAdj = Math.round(tC * 1.5); }
 
-      // Pharma-aware carb timing: find insulin injection closest to meals
-      const insulinInj = injections.find(i => i.type === 'инсулин' || i.name.toLowerCase().includes('инсулин'));
+      // Find training-linked injections for pre/post workout meals
+      const trainLinkedInjs = injections.filter(i => i.trainLinked && i.type === 'инсулин' || i.trainLinked && i.type === 'ИФР-1');
+      const hasPreWorkoutInj = trainLinkedInjs.some(i => i.trainTiming === 'before' || i.trainTiming === 'both');
+      const hasPostWorkoutInj = trainLinkedInjs.some(i => i.trainTiming === 'after' || i.trainTiming === 'both');
+
+      // Pharma-aware carb timing: insulin = 10g carbs per 1 unit
+      const insulinsWithTiming = injections.filter(i => i.type === 'инсулин' && (i.esterType === 'rapid' || i.esterType === 'short'));
 
       const meals = mealTimes.map((mt, idx) => {
         const p = Math.round(tP / mealTimes.length);
@@ -427,7 +486,54 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
         let remainingC = c;
         const foodSeed = dayOffset * 10007 + idx * 997 + (isTrainingDay ? 3000 : 0) + (cyclingMode === 'butch' ? 5000 : 0);
 
-        // Protein source
+        const isPreWorkout = mt.label === 'Предтрен';
+        const isPostWorkout = mt.label === 'Пост-трен';
+        const isPeriWorkout = isPreWorkout || isPostWorkout;
+
+        // Pre/Post workout with training-linked insulin/IGF-1 → specific foods
+        if (isPeriWorkout && trainLinkedInjs.length > 0 && isTrainingDay) {
+          const needCarbs = isPreWorkout ? hasPreWorkoutInj : hasPostWorkoutInj;
+          // Total insulin dose for this timing
+          const timingInjs = trainLinkedInjs.filter(i =>
+            (isPreWorkout && (i.trainTiming === 'before' || i.trainTiming === 'both')) ||
+            (isPostWorkout && (i.trainTiming === 'after' || i.trainTiming === 'both'))
+          );
+          const totalInsulinDose = timingInjs.filter(i => i.type === 'инсулин').reduce((s, i) => s + i.dose, 0);
+          const requiredCarbs = Math.round(totalInsulinDose * 10); // 10g per 1 unit
+
+          // Protein: whey isolate (fast absorption)
+          const iso = FOOD_DB.find(f => f.id === 'whey_isolate');
+          const eggW = FOOD_DB.find(f => f.id === 'egg_white');
+          if (iso && !excludedIds.has(iso.id) && !allergenIds.has(iso.id)) {
+            const isoPortions = Math.min(1, remainingP / Math.max(1, iso.protein));
+            items.push({ name: iso.name, id: iso.id, amount: Math.round(isoPortions * 30), kcal: Math.round(iso.kcal * isoPortions), p: Math.round(iso.protein * isoPortions), f: Math.round(iso.fat * isoPortions), c: Math.round(iso.carbs * isoPortions) });
+            remainingP -= Math.round(iso.protein * isoPortions);
+          }
+          if (eggW && !excludedIds.has(eggW.id) && !allergenIds.has(eggW.id)) {
+            const eggPortions = Math.min(1.5, remainingP / Math.max(1, eggW.protein));
+            items.push({ name: eggW.name, id: eggW.id, amount: Math.round(eggPortions * 100), kcal: Math.round(eggW.kcal * eggPortions), p: Math.round(eggW.protein * eggPortions), f: Math.round(eggW.fat * eggPortions), c: Math.round(eggW.carbs * eggPortions) });
+          }
+
+          // Carbs: dextrose (post) or amylopectin (pre) for insulin coverage
+          if (needCarbs && requiredCarbs > 0) {
+            const carbItem = FOOD_DB.find(f => isPreWorkout ? f.id === 'amylopectin' : f.id === 'dextrose');
+            if (carbItem && !excludedIds.has(carbItem.id) && !allergenIds.has(carbItem.id)) {
+              const carbPortions = Math.min(2, requiredCarbs / Math.max(1, carbItem.carbs));
+              items.push({ name: carbItem.name, id: carbItem.id, amount: Math.round(carbPortions * 30), kcal: Math.round(carbItem.kcal * carbPortions), p: Math.round(carbItem.protein * carbPortions), f: Math.round(carbItem.fat * carbPortions), c: Math.round(carbItem.carbs * carbPortions) });
+              remainingC -= Math.round(carbItem.carbs * carbPortions);
+            }
+          }
+          // Also add regular carbs if there's remaining need
+          if (remainingC > 10 && isPostWorkout) {
+            const dex = FOOD_DB.find(f => f.id === 'dextrose');
+            if (dex && !excludedIds.has(dex.id) && !allergenIds.has(dex.id)) {
+              const dexPortions = Math.min(2, remainingC / Math.max(1, dex.carbs));
+              items.push({ name: dex.name, id: dex.id, amount: Math.round(dexPortions * 20), kcal: Math.round(dex.kcal * dexPortions), p: Math.round(dex.protein * dexPortions), f: Math.round(dex.fat * dexPortions), c: Math.round(dex.carbs * dexPortions) });
+            }
+          }
+          // No fat for pre/post workout
+          remainingF = 0;
+        } else {
         let protPool = foods.filter(f => f.id !== 'egg_white' && (f.category === 'protein' || f.category === 'dairy'));
         if (planType === 'vegetarian') protPool = protPool.filter(f => f.isVegetarian !== false);
         if (planType === 'mediterranean') protPool = protPool.filter(f => !f.name.toLowerCase().includes('говядин') && !f.name.toLowerCase().includes('свинин') && !f.name.toLowerCase().includes('баранин'));
@@ -450,13 +556,16 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
           carbPool = carbPool.filter(f => !excludedIds.has(f.id) && !allergenIds.has(f.id));
           if (carbPool.length > 0) {
             let carbAmount = remainingC;
-            // Insulin boost: if meal is within 45 min of insulin injection, boost carbs
-            if (insulinInj) {
-              const mealMin = parseInt(mt.time.split(':')[0]) * 60 + parseInt(mt.time.split(':')[1]);
-              const injMin = parseInt(insulinInj.time.split(':')[0]) * 60 + parseInt(insulinInj.time.split(':')[1]);
+            // Insulin: 10g carbs per 1 unit for meals near short/rapid insulin
+            const mealMin = parseInt(mt.time.split(':')[0]) * 60 + parseInt(mt.time.split(':')[1]);
+            insulinsWithTiming.forEach(ins => {
+              const injMin = parseInt(ins.time.split(':')[0]) * 60 + parseInt(ins.time.split(':')[1]);
               const diff = Math.abs(mealMin - injMin);
-              if (diff <= 45) carbAmount = Math.round(carbAmount * 2.0);
-            }
+              if (diff <= 45) {
+                const requiredCarbs = Math.round(ins.dose * 10); // 10g per 1 unit
+                carbAmount = Math.max(carbAmount, requiredCarbs);
+              }
+            });
             const carbIdx = Math.floor(seedRand(foodSeed + 2) * carbPool.length);
             const carb = carbPool[carbIdx % carbPool.length];
             const portions = Math.min(1.2, carbAmount / Math.max(1, carb.carbs));
@@ -483,6 +592,7 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
           const v = vegPool[vegIdx % vegPool.length];
           items.push({ name: v.name, id: v.id, amount: 80, kcal: Math.round(v.kcal * 0.8), p: Math.round(v.protein * 0.8), f: Math.round(v.fat * 0.8), c: Math.round(v.carbs * 0.8) });
         }
+        } // end else (regular meal)
 
         const tot = { kcal: items.reduce((s,i) => s + i.kcal, 0), p: items.reduce((s,i) => s + i.p, 0), f: items.reduce((s,i) => s + i.f, 0), c: items.reduce((s,i) => s + i.c, 0) };
 
@@ -560,9 +670,17 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
     const hasPharma = injections.length > 0 || (courseEntries?.length || 0) > 0;
     const baseWaterMl = weight * (hasPharma ? 40 : 30); // AAS ↑ protein metabolism → ↑ water
     const baseWater = baseWaterMl / 1000;
-    const trainBonus = (s?.workoutsPerWeek || 0) > 0 ? 0.5 : 0;
-    const fiberFactor = 0.2;
-    const pharmaBonus = hasPharma ? 0.5 + injections.length * 0.1 : 0; // Each injectable = +0.1L
+    // Training bonus proportional to weekly minutes (0.3L per hour of training)
+    const weeklyTrainMin = (s?.workoutsPerWeek || 0) * (s?.avgWorkoutMinutes || 60);
+    const trainBonus = Math.round((weeklyTrainMin / 60) * 0.3 * 10) / 10;
+    // Fiber factor proportional to fiber target (0.1L per 10g fiber)
+    const fiberTarget = Math.round(effectiveC * 0.025); // ~2.5% of carbs as fiber
+    const fiberFactor = Math.round((fiberTarget / 10) * 0.1 * 10) / 10;
+    // Pharma bonus: AAS/injectables = +0.1L per injectable, insulin = +0.3L
+    const aasCount = injections.filter(i => i.type === 'ААС').length;
+    const insulinCount = injections.filter(i => i.type === 'инсулин').length;
+    const ghCount = injections.filter(i => i.type === 'ГР').length;
+    const pharmaBonus = hasPharma ? Math.round((0.5 + aasCount * 0.15 + insulinCount * 0.3 + ghCount * 0.1) * 10) / 10 : 0;
     const waterTotal = Math.max(1.5, Math.round((baseWater + trainBonus + fiberFactor + pharmaBonus) * 10) / 10);
     setWaterCalc({ baseWater: Math.round(baseWater * 10) / 10, trainBonus, fiberFactor, pharmaBonus, total: waterTotal, hasPharma });
 
@@ -708,12 +826,21 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
     // Drugs specific
     if (injections.length > 0) {
       const hasInsulin = injections.some(i => i.type === 'инсулин');
+      const hasShortInsulin = injections.some(i => i.type === 'инсулин' && i.esterType !== 'long');
       const hasGH = injections.some(i => i.type === 'ГР' || i.type === 'GHRP' || i.type === 'CJC');
+      const hasIGF = injections.some(i => i.type === 'ИФР-1');
       const hasGLP = injections.some(i => i.type === 'семаглутид' || i.type === 'тирзепатид');
-      if (hasInsulin) recs.push('💉 Инсулин: обязательный контроль углеводов — минимум 150г/день. Быстрые углеводы (декстроза, сок) под рукой. Не тренироваться на пустой желудок.');
-      if (hasGH) recs.push('🧬 Гормон роста: избегать углеводов в окне 30мин до/после укола ГР. Увеличить воду на 0.5-1л.');
-      if (hasGLP) recs.push('💊 GLP-1: дробное питание 5-6 раз маленькими порциями. Избегать жирного. Контроль тошноты.');
-      recs.push('💉 Фарма поддержка: добавки для печени (расторопша, артишок, NAC), контроль давления, электролиты.');
+      const hasAAS = injections.some(i => i.type === 'ААС');
+      const trainLinkedInj = injections.some(i => i.trainLinked);
+      const totalInsulinDose = injections.filter(i => i.type === 'инсулин' && i.esterType !== 'long').reduce((s, i) => s + i.dose, 0);
+      if (hasAAS) recs.push('💉 На курсе ААС: белок +0.3г/кг (до 2.5-3г/кг). Вода 40мл/кг. Контроль АД и липидов. Добавки: расторопша, артишок, NAC, омега-3, CoQ10.');
+      if (hasShortInsulin) recs.push(`💉 Инсулин: ${totalInsulinDose}ЕД × 10г = ${totalInsulinDose * 10}г углеводов за инъекцию. Минимум 150г углеводов/день. Быстрые углеводы (декстроза, сок) под рукой.`);
+      if (trainLinkedInj) recs.push('🏋️ Инсулин/ИФР-1 привязаны к тренировке: до тренировки — изолят + амилопектин, после — изолят + декстроза. На тренировке ОБЯЗАТЕЛЬНО углеводы (изотоник/бананы/гейнер).');
+      if (hasInsulin) recs.push('🚨 Гипогликемия: симптомы — потливость, дрожь, голод, спутанность. Не принимай короткий инсулин перед сном! Контролируй глюкозу каждые 30 мин первые 2ч.');
+      if (hasGH) recs.push('🧬 Гормон роста: избегать углеводов в окне 30мин до/после укола. Увеличить воду на 0.5-1л. Контроль глюкозы — ГР снижает чувствительность к инсулину.');
+      if (hasIGF) recs.push('🧬 ИФР-1: натощак за 30 мин до еды (или согласно протоколу). Синергия с инсулином — усиление анаболизма.');
+      if (hasGLP) recs.push('💊 GLP-1 (семаглутид/тирзепатид): дробное питание 5-6 раз маленькими порциями. Избегать жирного. Контроль тошноты.');
+      recs.push('💉 Фарма поддержка: расторопша/артишок/NAC для печени, омега-3 + CoQ10 для сердца, электролиты (калий 4000+мг, магний 500+мг).');
     }
     // Water
     const hasPharmaRec = injections.length > 0 || (courseEntries?.length || 0) > 0;
@@ -1307,14 +1434,49 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
               <option value="IU">IU</option><option value="ml">ml</option>
             </select>
           </div>
-          <button onClick={() => { if (injName.trim()) { setInjections([...injections, { id: Date.now().toString(), name: injName.trim(), time: injTime, dose: injDose, unit: injUnit, type: injType }]); setInjName(''); } }} style={{ padding: '4px 8px', borderRadius: 6, border: '1px solid rgba(0,230,138,0.3)', background: 'rgba(0,230,138,0.08)', color: '#00e68a', fontSize: 9, cursor: 'pointer' }}>+</button>
+          <button onClick={() => { if (injName.trim()) { const substance = PHARMA_DB[injName.trim()]; const hl = substance?.pk?.halfLifeHours || 24; setInjections([...injections, { id: Date.now().toString(), name: injName.trim(), time: injTime, dose: injDose, unit: injUnit, type: injType, esterType: 'none', halfLifeHours: hl, trainLinked: false, trainTiming: 'none' }]); setInjName(''); } }} style={{ padding: '4px 8px', borderRadius: 6, border: '1px solid rgba(0,230,138,0.3)', background: 'rgba(0,230,138,0.08)', color: '#00e68a', fontSize: 9, cursor: 'pointer' }}>+</button>
         </div>
-        {injections.map((inj, i) => (
-          <div key={inj.id} style={{ display: 'inline-flex', gap: 4, alignItems: 'center', padding: '2px 6px', borderRadius: 6, background: 'rgba(6,182,212,0.08)', border: '1px solid rgba(6,182,212,0.15)', fontSize: 8, marginRight: 3, marginBottom: 3, color: '#06b6d4' }}>
-            💉 {inj.time} {inj.name} {inj.dose}{inj.unit}
-            <button onClick={() => setInjections(injections.filter((_, j) => j !== i))} style={{ background: 'none', border: 'none', color: '#ef4444', fontSize: 10, cursor: 'pointer', padding: 0 }}>×</button>
+        {injections.map((inj, i) => {
+          const canLink = inj.type === 'инсулин' || inj.type === 'ИФР-1';
+          return (
+          <div key={inj.id} style={{ padding: '6px 8px', borderRadius: 10, background: 'rgba(6,182,212,0.06)', border: '1px solid rgba(6,182,212,0.12)', marginBottom: 4 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 8, color: '#06b6d4' }}>
+              💉 <strong>{inj.time}</strong> {inj.name} {inj.dose}{inj.unit} {inj.esterType !== 'none' && <span style={{color:'rgba(255,255,255,0.3)',fontSize:7}}>({inj.esterType})</span>}
+              <button onClick={() => setInjections(injections.filter((_, j) => j !== i))} style={{ marginLeft: 'auto', background: 'none', border: 'none', color: '#ef4444', fontSize: 9, cursor: 'pointer', padding: 0 }}>✕</button>
+            </div>
+            {canLink && linkToTraining && (
+              <div style={{ display: 'flex', gap: 4, marginTop: 4, alignItems: 'center' }}>
+                <button onClick={() => {
+                  setInjections(injections.map((inj2, j) => j === i ? { ...inj2, trainLinked: !inj2.trainLinked, trainTiming: !inj2.trainLinked ? 'before' : 'none' } : inj2));
+                }} style={{
+                  fontSize: 7, padding: '2px 6px', borderRadius: 4, cursor: 'pointer',
+                  background: inj.trainLinked ? 'rgba(0,230,138,0.15)' : '#202023',
+                  border: inj.trainLinked ? '1px solid rgba(0,230,138,0.3)' : '1px solid #27272a',
+                  color: inj.trainLinked ? '#00e68a' : 'rgba(255,255,255,0.4)',
+                  fontWeight: 600,
+                }}>
+                  🏋️ {inj.trainLinked ? 'Привязан к тренировке' : 'Привязать к тренировке'}
+                </button>
+                {inj.trainLinked && (
+                  <>
+                    {(['before', 'after', 'both'] as const).map(t => (
+                      <button key={t} onClick={() => setInjections(injections.map((inj2, j) => j === i ? { ...inj2, trainTiming: t } : inj2))} style={{
+                        fontSize: 7, padding: '2px 5px', borderRadius: 4, cursor: 'pointer',
+                        background: inj.trainTiming === t ? 'rgba(59,130,246,0.15)' : '#202023',
+                        border: inj.trainTiming === t ? '1px solid rgba(59,130,246,0.3)' : '1px solid #27272a',
+                        color: inj.trainTiming === t ? '#60a5fa' : 'rgba(255,255,255,0.4)',
+                        fontWeight: 600,
+                      }}>
+                        {t === 'before' ? 'До' : t === 'after' ? 'После' : 'До+После'}
+                      </button>
+                    ))}
+                  </>
+                )}
+              </div>
+            )}
           </div>
-        ))}
+          );
+        })}
       </GlassCard>
 
       {/* 4. Training link */}
@@ -1814,40 +1976,95 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
 
       {/* 17b. Pharma meal timing */}
       {generated && injections.length > 0 && (
-        <GlassCard title="Совместимость с препаратами" icon="💊" color="#8b5cf6" style={{ border: '1px solid rgba(139,92,246,0.15)' }}>
+        <GlassCard title="Тайминг препаратов и приёмов пищи" icon="💊" color="#8b5cf6" style={{ border: '1px solid rgba(139,92,246,0.15)' }}>
           {injections.map((inj: DrugInjection) => {
-            const injH = parseInt(inj.time.split(':')[0]);
-            const injMin = parseInt(inj.time.split(':')[1]);
-            const isInsulin = inj.type === 'инсулин' || inj.name.toLowerCase().includes('инсулин');
-            const isGHorPeptide = inj.type === 'ГР' || inj.type === 'GHRP' || inj.type === 'CJC' || inj.name.toLowerCase().includes('гр') || inj.name.toLowerCase().includes('gh');
-            const isOral = !isInsulin && !isGHorPeptide;
+            const isInsulin = inj.type === 'инсулин';
+            const isIGF = inj.type === 'ИФР-1';
+            const isGH = inj.type === 'ГР';
+            const isPeptide = inj.type === 'пептид';
+            const isAAS = inj.type === 'ААС';
             return (
               <div key={inj.id} style={{ marginBottom: 6, padding: '8px 10px', borderRadius: 10, background: 'rgba(139,92,246,0.06)', border: '1px solid rgba(139,92,246,0.12)' }}>
                 <div style={{ fontWeight: 700, fontSize: 10, color: '#a78bfa', marginBottom: 3 }}>
-                  💉 {inj.name} ({inj.dose}{inj.unit}) в {inj.time}
+                  💉 {inj.name} ({inj.dose}{inj.unit}) — {inj.time}
+                  <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.3)', marginLeft: 4 }}>
+                    T½ {inj.halfLifeHours}ч
+                    {inj.trainLinked && <span style={{ color: '#00e68a', marginLeft: 4 }}>🏋️ {inj.trainTiming === 'before' ? 'До тренировки' : inj.trainTiming === 'after' ? 'После тренировки' : 'До+После'}</span>}
+                  </span>
                 </div>
-                {isInsulin && (
-                  <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)', lineHeight: 1.5 }}>
-                    ⏰ Приём пищи <strong style={{ color: '#f97316' }}>через 15-30 мин</strong> после инъекции (30-50г углеводов).
+                {isInsulin && inj.esterType === 'rapid' && (
+                  <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)', lineHeight: 1.6 }}>
+                    ⚡ <strong>Быстрый инсулин (аналог)</strong> — пик 30-90 мин, длительность 3-4ч.<br />
+                    🍚 На <strong>{Math.round(inj.dose * 10)}г углеводов</strong> (10г/ед). Принять сразу перед едой или после.<br />
+                    {inj.trainLinked ? `🏋️ Привязан к тренировке (${inj.trainTiming === 'before' ? 'до' : inj.trainTiming === 'after' ? 'после' : 'до и после'}). В приёме: изолят сывороточного белка + ${inj.trainTiming === 'before' ? 'амилопектин' : 'декстроза'}.` : ''}
+                    {inj.trainLinked && inj.trainTiming !== 'after' ? ' 🚨 На тренировке ОБЯЗАТЕЛЬНО углеводы (изотоник/гейнер/бананы)!' : ''}
+                    {!inj.trainLinked ? ' ⏰ Не ешь без углеводов — риск гипогликемии!' : ''}
                   </div>
                 )}
-                {isGHorPeptide && (
-                  <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)', lineHeight: 1.5 }}>
-                    ⏰ Принимать <strong style={{ color: '#06b6d4' }}>натощак</strong>, за 30-60 мин до еды.
-                    Избегать углеводов в течение 30 мин после инъекции.
+                {isInsulin && inj.esterType === 'short' && (
+                  <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)', lineHeight: 1.6 }}>
+                    🕐 <strong>Короткий инсулин (человеческий)</strong> — пик 2-4ч, длительность 5-8ч.<br />
+                    🍚 На <strong>{Math.round(inj.dose * 10)}г углеводов</strong> (10г/ед). Ввести за 20-30 мин до еды.<br />
+                    {inj.trainLinked ? `🏋️ Привязан к тренировке (${inj.trainTiming === 'before' ? 'до' : inj.trainTiming === 'after' ? 'после' : 'до и после'}). В приёме: изолят + ${inj.trainTiming === 'before' ? 'амилопектин' : 'декстроза'}.` : ''}
+                    {inj.trainLinked && inj.trainTiming !== 'after' ? ' 🚨 На тренировке ОБЯЗАТЕЛЬНО углеводы!' : ''}
                   </div>
                 )}
-                {isOral && (
-                  <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)', lineHeight: 1.5 }}>
-                    ⏰ Принимать <strong style={{ color: '#3b82f6' }}>во время еды</strong> (жирорастворимые) или натощак (водорастворимые).
-                    Сверьтесь с инструкцией.
+                {isInsulin && inj.esterType === 'long' && (
+                  <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)', lineHeight: 1.6 }}>
+                    🌙 <strong>Длинный инсулин (базальный)</strong> — покрывает суточную потребность.<br />
+                    🍚 Привязка к еде <strong>не требуется</strong>. Принимай в одно и то же время ежедневно.<br />
+                    📊 Короткий инсулин считай отдельно от длинного (суточная норма + еда).
+                  </div>
+                )}
+                {isIGF && (
+                  <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)', lineHeight: 1.6 }}>
+                    🧬 <strong>ИФР-1/MGF</strong> — анаболический пептид, работает синергично с инсулином.<br />
+                    {inj.trainLinked ? `🏋️ Привязан к тренировке (${inj.trainTiming === 'before' ? 'до' : inj.trainTiming === 'after' ? 'после' : 'до и после'}). Принимать НАТОЩАК. Еда через 30 мин. В приёме: изолят + декстроза.` : '⏰ Принимать натощак, за 30 мин до еды или согласно протоколу.'}
+                  </div>
+                )}
+                {isGH && (
+                  <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)', lineHeight: 1.6 }}>
+                    🧬 <strong>ГР/Пептиды</strong> — влияние на инсулин и глюкозу.<br />
+                    ⏰ Натощак, за 30-60 мин до еды. Не есть углеводы 30 мин после.<br />
+                    📊 Контролируй глюкозу — ГР снижает чувствительность к инсулину.
+                  </div>
+                )}
+                {isAAS && inj.esterType === 'short' && (
+                  <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)', lineHeight: 1.6 }}>
+                    💉 <strong>Короткий эфир</strong> — частая инъекция (EOD/ежедневно).<br />
+                    ⏰ Привязка к еде минимальна. Следи за уровнем воды: +0.5л к норме.
+                  </div>
+                )}
+                {isAAS && inj.esterType === 'long' && (
+                  <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)', lineHeight: 1.6 }}>
+                    💉 <strong>Длинный эфир</strong> — редкая инъекция (1-2р/нед).<br />
+                    ⏰ Пей 40мл/кг воды. Контролируй АД и липиды.
+                  </div>
+                )}
+                {inj.type === 'другое' && (
+                  <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)', lineHeight: 1.6 }}>
+                    ℹ️ Следуй инструкции по препарату. При необходимости уточни тип.
                   </div>
                 )}
               </div>
             );
           })}
-          <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.3)', marginTop: 2 }}>
-            💡 Учитывайте время приёма препаратов при планировании приёмов пищи для максимальной эффективности.
+          {/* Hypoglycemia checklist */}
+          {injections.some(i => i.type === 'инсулин' && i.esterType !== 'long') && (
+            <div style={{ marginTop: 6, padding: '8px 10px', borderRadius: 10, background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.15)' }}>
+              <div style={{ fontSize: 9, fontWeight: 700, color: '#ef4444', marginBottom: 4 }}>🚨 Чеклист гипогликемии</div>
+              <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.5)', lineHeight: 1.6 }}>
+                ✅ Всегда носи быстрые углеводы (сок, глюкоза в таблетках, сахар)<br />
+                ✅ Не принимай короткий/быстрый инсулин перед сном<br />
+                ✅ Контролируй глюкозу каждые 30 мин в первые 2ч после инъекции<br />
+                ✅ На тренировке — ОБЯЗАТЕЛЬНО изотоник или гейнер с углеводами<br />
+                ✅ Симптомы гипо: потливость, дрожь, голод, спутанность сознания
+              </div>
+            </div>
+          )}
+          <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.3)', marginTop: 2, lineHeight: 1.5 }}>
+            💡 <strong>Правило инсулина:</strong> 1 ЕД короткого/быстрого инсулина покрывает ~10г углеводов.
+            Учитывай чувствительность: после курса ГР/ААС может требоваться на 20-30% больше.
           </div>
         </GlassCard>
       )}
