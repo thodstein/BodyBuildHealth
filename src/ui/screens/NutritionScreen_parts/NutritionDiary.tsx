@@ -39,6 +39,7 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
   const [editQty, setEditQty] = useState(100);
   const [copySource, setCopySource] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const [mealPresets, setMealPresets] = useState<any[]>(() => { try { return JSON.parse(localStorage.getItem('he_meal_presets') || '[]'); } catch { return []; } });
   const ocrFileRef = useRef<HTMLInputElement>(null);
   const ocrCameraRef = useRef<HTMLInputElement>(null);
 
@@ -49,6 +50,9 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
   const addCustomMeal = () => { const name = customMealInput.trim(); if (!name || customMeals.includes(name)) return; const updated = [...customMeals, name]; setCustomMeals(updated); localStorage.setItem('he_custom_meals', JSON.stringify(updated)); setCustomMealInput(''); setShowCustomMeal(false); showToast('✅ Приём добавлен'); };
 
   const allMealTypes = [...MEAL_PRESETS, ...customMeals];
+
+  // Auto-select first meal type if none selected
+  useEffect(() => { if (!mealType && allMealTypes.length > 0) setMealType(allMealTypes[0]); }, [tab]);
 
   const foodSearchResults = useMemo(() => {
     if (!foodSearch.trim()) return [];
@@ -249,6 +253,18 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
                 <button onClick={addCustomFood} style={{ width:'100%', marginTop:4, padding:'5px', borderRadius:6, border:'none', cursor:'pointer', background:'linear-gradient(135deg,#00e68a,#00c8a0)', color:'#000', fontWeight:600, fontSize:9 }}>+ Добавить</button>
               </div>
             )}
+            {mealPresets.length > 0 && (
+              <div style={{ marginTop:6, padding:'8px 10px', borderRadius:10, background:'rgba(0,230,138,0.04)', border:'1px solid rgba(0,230,138,0.1)' }}>
+                <div style={{ fontSize:8, color:'rgba(255,255,255,0.5)', marginBottom:4 }}>📦 Пресеты приёмов</div>
+                <div style={{ display:'flex', flexWrap:'wrap', gap:3 }}>
+                  {mealPresets.map((p, i) => (
+                    <button key={i} onClick={() => setParsedItems(prev => [...prev, ...p.items])} style={{ padding:'3px 8px', borderRadius:6, fontSize:7, cursor:'pointer', background:'rgba(0,230,138,0.1)', border:'1px solid rgba(0,230,138,0.15)', color:'#00e68a', fontWeight:600 }}>
+                      {p.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           {favoriteFoods.length > 0 && (
@@ -276,7 +292,10 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
 
           {showOCR && (
             <div style={{ padding:14, borderRadius:16, background:'#18181b', border:'1px solid rgba(255,255,255,0.06)' }}>
-              <div style={{ fontSize:9, color:'rgba(255,255,255,0.6)', marginBottom:4 }}>Вставьте текст из FatSecret / MyFitnessPal:</div>
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:4 }}>
+                <div style={{ fontSize:9, color:'rgba(255,255,255,0.6)' }}>Вставьте текст из FatSecret / MyFitnessPal:</div>
+                <button onClick={() => { setShowOCR(false); setOcrText(''); }} style={{ padding:'2px 6px', borderRadius:4, cursor:'pointer', border:'none', background:'rgba(239,68,68,0.1)', color:'#ef4444', fontSize:8 }}>✕</button>
+              </div>
               <textarea value={ocrText} onChange={e => setOcrText(e.target.value)} placeholder="Название 100г 250 ккал Б:15 Ж:10 У:20 ..."
                 style={{ width:'100%', minHeight:70, padding:8, borderRadius:8, border:'1px solid rgba(255,255,255,0.06)', background:'#202023', color:'#fff', fontSize:11, resize:'vertical', boxSizing:'border-box', marginBottom:6 }} />
               <button onClick={handleOCR} style={{ padding:'7px 14px', borderRadius:8, border:'none', background:'linear-gradient(135deg,#00e68a,#00c8a0)', color:'#000', fontWeight:600, fontSize:10, cursor:'pointer' }}>Распознать</button>
@@ -313,15 +332,35 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
       {tab === 'day' && (
         <>
           <div style={{ padding:14, borderRadius:16, background:'#18181b', border:'1px solid rgba(255,255,255,0.06)' }}>
-            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
-              <div style={{ fontSize:12, fontWeight:600, color:'#fff' }}>📋 {selectedDate}</div>
-              <div style={{ display:'flex', alignItems:'center', gap:6 }}>
-                {Object.keys(dayMeals).length > 0 && (
-                  <button onClick={clearDay} style={{ padding:'4px 10px', borderRadius:6, border:'none', cursor:'pointer', background:'rgba(239,68,68,0.15)', color:'#ef4444', fontSize:8, fontWeight:600 }}>✕ Очистить</button>
-                )}
-                <span style={{ fontSize:9, color:'rgba(255,255,255,0.6)' }}>{Object.keys(dayMeals).length} приёмов</span>
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
+                <div style={{ fontSize:12, fontWeight:600, color:'#fff' }}>📋 {selectedDate}</div>
+                <div style={{ display:'flex', alignItems:'center', gap:4 }}>
+                  {Object.keys(dayMeals).length > 0 && (
+                    <button onClick={clearDay} style={{ padding:'4px 10px', borderRadius:6, border:'none', cursor:'pointer', background:'rgba(239,68,68,0.15)', color:'#ef4444', fontSize:8, fontWeight:600 }}>✕ Очистить</button>
+                  )}
+                  <button onClick={() => {
+                    try {
+                      const plans = JSON.parse(localStorage.getItem('he_saved_nutrition_plans') || '[]');
+                      if (plans.length === 0) return;
+                      const latest = plans[0];
+                      const meals = latest.dayPlan?.meals || [];
+                      if (meals.length === 0) return;
+                      const data = { ...diaryData };
+                      if (!data[selectedDate]) data[selectedDate] = { meals: {} };
+                      meals.forEach((m: any) => {
+                        const label = m.label || 'Приём пищи';
+                        if (!data[selectedDate].meals[label]) data[selectedDate].meals[label] = [];
+                        m.items.forEach((it: any) => {
+                          data[selectedDate].meals[label].push({ name: it.name, qty: `${it.amount || 100} г`, kcal: it.kcal || 0, p: it.p || 0, f: it.f || 0, c: it.c || 0, category: it.category });
+                        });
+                      });
+                      saveDiary(data);
+                      showToast('✅ Импортировано из плана');
+                    } catch { showToast('❌ Нет сохранённых планов'); }
+                  }} style={{ padding:'4px 10px', borderRadius:6, cursor:'pointer', border:'1px solid rgba(0,230,138,0.2)', background:'rgba(0,230,138,0.08)', color:'#00e68a', fontSize:8, fontWeight:600 }}>📥 Из плана</button>
+                  <span style={{ fontSize:9, color:'rgba(255,255,255,0.6)' }}>{Object.keys(dayMeals).length} приёмов</span>
+                </div>
               </div>
-            </div>
 
             {Object.keys(dayMeals).length > 0 && (
               <div style={{ marginBottom:8, padding:'8px 10px', borderRadius:10, background:'rgba(0,230,138,0.06)', border:'1px solid rgba(0,230,138,0.15)' }}>
@@ -360,7 +399,8 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
                   <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'5px 8px', borderRadius:8, background:'rgba(0,230,138,0.08)', border:'1px solid rgba(0,230,138,0.15)', marginBottom:3 }}>
                     <div style={{ display:'flex', alignItems:'center', gap:4 }}>
                       <span style={{ fontWeight:600, fontSize:10, color:'#00e68a' }}>{meal}</span>
-                      <button onClick={() => copyMeal(meal)} style={{ padding:'2px 6px', borderRadius:4, border:'none', cursor:'pointer', background:'rgba(139,92,246,0.15)', color:'#8b5cf6', fontSize:7 }} title="Копировать приём">📋</button>
+                      <button onClick={() => copyMeal(meal)} style={{ padding:'2px 6px', borderRadius:4, border:'none', cursor:'pointer', background:'rgba(139,92,246,0.15)', color:'#8b5cf6', fontSize:7 }} title="Копировать">📋</button>
+                      <button onClick={() => { const name = prompt('Название пресета:', meal); if (name) { const preset = { name, items: items.map((i: any) => ({ name: i.name, kcal: i.kcal, p: i.p, f: i.f, c: i.c })) }; const upd = [...mealPresets, preset]; setMealPresets(upd); localStorage.setItem('he_meal_presets', JSON.stringify(upd)); } }} style={{ padding:'2px 6px', borderRadius:4, border:'none', cursor:'pointer', background:'rgba(0,230,138,0.15)', color:'#00e68a', fontSize:7 }} title="Сохранить как пресет">💾</button>
                     </div>
                     <div style={{ display:'flex', alignItems:'center', gap:4, fontSize:8 }}>
                       <span style={{ color:'rgba(255,255,255,0.6)' }}>Б{Math.round(mealP)} Ж{Math.round(mealF)} У{Math.round(mealC)}</span>

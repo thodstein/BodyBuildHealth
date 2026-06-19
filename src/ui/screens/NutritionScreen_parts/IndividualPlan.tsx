@@ -1998,17 +1998,23 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
         {kbjuMode !== 'manual' ? (
           <div>
             {/* Big macro tiles */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 5, marginBottom: 8 }}>
-              {[
-                { l:'Калории', v: effectiveKcal, c:'#00e68a', unit:'ккал', perKg: Math.round(effectiveKcal / weight) },
-                { l:'Белки', v: effectiveP, c:'#3b82f6', unit:'г', perKg: Math.round(effectiveP / weight) },
-                { l:'Жиры', v: effectiveF, c:'#f59e0b', unit:'г', perKg: Math.round(effectiveF / weight) },
-                { l:'Углеводы', v: effectiveC, c:'#f97316', unit:'г', perKg: Math.round(effectiveC / weight) },
-              ].map(m => {
-                const pct = effectiveKcal > 0 && m.l !== 'Калории'
-                  ? Math.round(({ 'Белки': effectiveP * 4, 'Жиры': effectiveF * 9, 'Углеводы': effectiveC * 4 }[m.l] || 0) / effectiveKcal * 100)
-                  : null;
-                return (
+            {(() => {
+              const nm = NUTRITION_LEVELS.find(n => n.id === nutrLevel)?.mult || 1.0;
+              const dispKcal = Math.round(effectiveKcal * nm);
+              const dispP = Math.round(effectiveP * nm);
+              const dispF = Math.round(effectiveF * nm);
+              const dispC = Math.round(effectiveC * nm);
+              return <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 5, marginBottom: 8 }}>
+                {[
+                  { l:'Калории', v: dispKcal, c:'#00e68a', unit:'ккал', perKg: Math.round(dispKcal / weight) },
+                  { l:'Белки', v: dispP, c:'#3b82f6', unit:'г', perKg: Math.round(dispP / weight) },
+                  { l:'Жиры', v: dispF, c:'#f59e0b', unit:'г', perKg: Math.round(dispF / weight) },
+                  { l:'Углеводы', v: dispC, c:'#f97316', unit:'г', perKg: Math.round(dispC / weight) },
+                ].map(m => {
+                  const pct = dispKcal > 0 && m.l !== 'Калории'
+                    ? Math.round(({ 'Калории': dispKcal, 'Белки': dispP * 4, 'Жиры': dispF * 9, 'Углеводы': dispC * 4 }[m.l] || 0) / dispKcal * 100)
+                    : null;
+                  return (
                   <div key={m.l} style={{
                     textAlign:'center', borderRadius:10, padding:'8px 4px',
                     background: `linear-gradient(135deg, ${m.c}12, transparent)`,
@@ -2025,12 +2031,14 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
                   </div>
                 );
               })}
-            </div>
+            </div>;
+            })()}
             {/* Macro distribution bar */}
             {(() => {
-              const pKcal = effectiveP * 4;
-              const fKcal = effectiveF * 9;
-              const cKcal = effectiveC * 4;
+              const nm = NUTRITION_LEVELS.find(n => n.id === nutrLevel)?.mult || 1.0;
+              const pKcal = Math.round(effectiveP * nm) * 4;
+              const fKcal = Math.round(effectiveF * nm) * 9;
+              const cKcal = Math.round(effectiveC * nm) * 4;
               const total = pKcal + fKcal + cKcal || 1;
               const pPct = pKcal / total * 100;
               const fPct = fKcal / total * 100;
