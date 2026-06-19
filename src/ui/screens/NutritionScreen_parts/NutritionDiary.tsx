@@ -23,6 +23,12 @@ export const NutritionDiary: React.FC<{
   const [customMealInput, setCustomMealInput] = useState('');
   const [showCustomMeal, setShowCustomMeal] = useState(false);
   const [customMeals, setCustomMeals] = useState<string[]>(() => { try { return JSON.parse(localStorage.getItem('he_custom_meals') || '[]'); } catch { return []; } });
+  const [showCustomFood, setShowCustomFood] = useState(false);
+  const [customFoodName, setCustomFoodName] = useState('');
+  const [customFoodKcal, setCustomFoodKcal] = useState('100');
+  const [customFoodP, setCustomFoodP] = useState('10');
+  const [customFoodF, setCustomFoodF] = useState('5');
+  const [customFoodC, setCustomFoodC] = useState('10');
   const [diaryData, setDiaryData] = useState<any>(() => { try { return JSON.parse(localStorage.getItem('nutrition_diary') || '{}'); } catch { return {}; } });
   const [refreshKey, setRefreshKey] = useState(0);
   const ocrFileRef = useRef<HTMLInputElement>(null);
@@ -145,6 +151,36 @@ export const NutritionDiary: React.FC<{
     });
   }, [weekStart]);
 
+  // Delete an entry
+  const deleteItem = (mealName: string, idx: number) => {
+    const data = { ...diaryData };
+    if (!data[selectedDate]?.meals?.[mealName]) return;
+    data[selectedDate].meals[mealName] = data[selectedDate].meals[mealName].filter((_: any, i: number) => i !== idx);
+    if (data[selectedDate].meals[mealName].length === 0) delete data[selectedDate].meals[mealName];
+    if (Object.keys(data[selectedDate].meals).length === 0) delete data[selectedDate];
+    saveDiary(data);
+  };
+
+  // Clear all entries for selected date
+  const clearDay = () => {
+    if (!diaryData[selectedDate]) return;
+    const data = { ...diaryData };
+    delete data[selectedDate];
+    saveDiary(data);
+  };
+
+  // Add custom food
+  const addCustomFood = () => {
+    const name = customFoodName.trim();
+    if (!name) return;
+    setParsedItems(prev => [...prev, {
+      name, kcal: Math.round(+customFoodKcal || 0), p: Math.round((+customFoodP || 0) * 10) / 10,
+      f: Math.round((+customFoodF || 0) * 10) / 10, c: Math.round((+customFoodC || 0) * 10) / 10,
+    }]);
+    setCustomFoodName(''); setCustomFoodKcal('100'); setCustomFoodP('10'); setCustomFoodF('5'); setCustomFoodC('10');
+    setShowCustomFood(false);
+  };
+
   // Day's meals from diaryData
   const dayMeals = diaryData[selectedDate]?.meals || {};
 
@@ -205,6 +241,32 @@ export const NutritionDiary: React.FC<{
             ))}
           </div>
         )}
+
+        {/* Custom food button */}
+        <button onClick={() => setShowCustomFood(!showCustomFood)} style={{ width:'100%', padding:'5px 8px', borderRadius:6, fontSize:9, cursor:'pointer', background: showCustomFood ? 'rgba(139,92,246,0.12)' : 'rgba(139,92,246,0.06)', border:'1px solid rgba(139,92,246,0.2)', color:'#8b5cf6', marginTop:4 }}>
+          {showCustomFood ? '✕ Скрыть' : '🍎 Своя еда (ввести вручную)'}
+        </button>
+        {showCustomFood && (
+          <div style={{ marginTop:4, padding:'6px 8px', background:'rgba(139,92,246,0.04)', borderRadius:8, border:'1px solid rgba(139,92,246,0.1)' }}>
+            <div style={{ fontSize:8, color:'rgba(255,255,255,0.3)', marginBottom:4 }}>Добавить свой продукт (на 100г):</div>
+            <input value={customFoodName} onChange={e => setCustomFoodName(e.target.value)} placeholder="Название" style={{ width:'100%', padding:'4px 6px', borderRadius:4, background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text)', fontSize:9, marginBottom:3, boxSizing:'border-box' }} />
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr', gap:3 }}>
+              {['Ккал', 'Белки', 'Жиры', 'Угл.'].map((l, i) => (
+                <div key={i}>
+                  <label style={{ fontSize:7, color:'rgba(255,255,255,0.3)' }}>{l}</label>
+                  <input type="number" value={[customFoodKcal, customFoodP, customFoodF, customFoodC][i]}
+                    onChange={e => {
+                      const v = e.target.value;
+                      if (i===0) setCustomFoodKcal(v); if (i===1) setCustomFoodP(v);
+                      if (i===2) setCustomFoodF(v); if (i===3) setCustomFoodC(v);
+                    }}
+                    style={{ width:'100%', padding:'3px 4px', borderRadius:4, background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text)', fontSize:8, boxSizing:'border-box' }} />
+                </div>
+              ))}
+            </div>
+            <button onClick={addCustomFood} style={{ width:'100%', marginTop:4, padding:'4px', borderRadius:6, border:'none', cursor:'pointer', background:'var(--accent)', color:'#000', fontWeight:600, fontSize:9 }}>+ Добавить</button>
+          </div>
+        )}
       </div>
 
       {/* Favorites quick-add */}
@@ -262,26 +324,70 @@ export const NutritionDiary: React.FC<{
       <div style={{ padding:12, borderRadius:14, background:'linear-gradient(135deg,rgba(255,255,255,0.06),rgba(255,255,255,0.02))', backdropFilter:'blur(20px)', border:'1px solid rgba(255,255,255,0.06)' }}>
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:6 }}>
           <span style={{ fontSize:10, color:'rgba(255,255,255,0.35)', fontWeight:500 }}>📋 {selectedDate}</span>
-          <span style={{ fontSize:9, color:'rgba(255,255,255,0.3)' }}>{Object.keys(dayMeals).length} приёмов</span>
+          <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+            {Object.keys(dayMeals).length > 0 && (
+              <button onClick={clearDay} style={{ padding:'2px 6px', borderRadius:4, border:'none', cursor:'pointer', background:'rgba(239,68,68,0.12)', color:'#ef4444', fontSize:8, fontWeight:600 }}>✕ Очистить день</button>
+            )}
+            <span style={{ fontSize:9, color:'rgba(255,255,255,0.3)' }}>{Object.keys(dayMeals).length} приёмов</span>
+          </div>
         </div>
         {Object.keys(dayMeals).length === 0 ? (
           <div style={{ textAlign:'center', padding:12, color:'rgba(255,255,255,0.25)', fontSize:10 }}>Нет записей. Добавьте продукты через поиск, OCR или избранное.</div>
         ) : (
-          Object.entries(dayMeals).map(([meal, items]: [string, any]) => {
-            const kcal = items.reduce((s:number,i:any)=>s+(i.kcal||0),0);
-            return <div key={meal} style={{ marginBottom:4 }}>
-              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'4px 6px', borderRadius:6, background:'rgba(0,230,138,0.04)', marginBottom:2 }}>
-                <span style={{ fontWeight:600, fontSize:10 }}>{meal}</span>
-                <span style={{ fontSize:9, color:'#00e68a' }}>{Math.round(kcal)} ккал</span>
-              </div>
-              {items.map((item:any, idx:number) => (
-                <div key={idx} style={{ display:'flex', justifyContent:'space-between', padding:'2px 6px', fontSize:9, color:'rgba(255,255,255,0.4)' }}>
-                  <span>{item.name}</span>
-                  <span>{Math.round(item.kcal||0)}ккал Б{item.p||0} Ж{item.f||0} У{item.c||0}</span>
+          <>
+            {Object.entries(dayMeals).map(([meal, items]: [string, any]) => {
+              const mealKcal = items.reduce((s:number,i:any)=>s+(i.kcal||0),0);
+              const mealP = items.reduce((s:number,i:any)=>s+(i.p||0),0);
+              const mealF = items.reduce((s:number,i:any)=>s+(i.f||0),0);
+              const mealC = items.reduce((s:number,i:any)=>s+(i.c||0),0);
+              return <div key={meal} style={{ marginBottom:4 }}>
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'4px 6px', borderRadius:6, background:'rgba(0,230,138,0.04)', marginBottom:2 }}>
+                  <span style={{ fontWeight:600, fontSize:10 }}>{meal}</span>
+                  <div style={{ display:'flex', alignItems:'center', gap:4 }}>
+                    <span style={{ fontSize:8, color:'rgba(255,255,255,0.25)' }}>Б{Math.round(mealP)} Ж{Math.round(mealF)} У{Math.round(mealC)}</span>
+                    <span style={{ fontSize:9, color:'#00e68a', fontWeight:700 }}>{Math.round(mealKcal)} ккал</span>
+                  </div>
                 </div>
-              ))}
-            </div>;
-          })
+                {items.map((item:any, idx:number) => (
+                  <div key={idx} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'2px 6px', fontSize:9, color:'rgba(255,255,255,0.4)', borderRadius:4, transition:'background 0.15s' }}>
+                    <div style={{ display:'flex', alignItems:'center', gap:4, flex:1 }}>
+                      <span>{item.name}</span>
+                      <span style={{ fontSize:7, color:'rgba(255,255,255,0.15)' }}>{item.qty || '100 г'}</span>
+                    </div>
+                    <div style={{ display:'flex', alignItems:'center', gap:4 }}>
+                      <span>{Math.round(item.kcal||0)}ккал Б{item.p||0} Ж{item.f||0} У{item.c||0}</span>
+                      <button onClick={() => deleteItem(meal, idx)} style={{
+                        padding:'1px 5px', borderRadius:4, border:'none', cursor:'pointer',
+                        background:'rgba(239,68,68,0.08)', color:'#ef4444', fontSize:9, lineHeight:1, opacity:0.5,
+                        transition:'opacity 0.15s',
+                      }}
+                        onMouseEnter={e => (e.target as HTMLElement).style.opacity='1'}
+                        onMouseLeave={e => (e.target as HTMLElement).style.opacity='0.5'}
+                      >✕</button>
+                    </div>
+                  </div>
+                ))}
+              </div>;
+            })}
+            {/* Day totals */}
+            {(() => {
+              const dK = Object.values(dayMeals).flat().reduce((s:number,i:any)=>s+(i.kcal||0),0);
+              const dP = Object.values(dayMeals).flat().reduce((s:number,i:any)=>s+(i.p||0),0);
+              const dF = Object.values(dayMeals).flat().reduce((s:number,i:any)=>s+(i.f||0),0);
+              const dC = Object.values(dayMeals).flat().reduce((s:number,i:any)=>s+(i.c||0),0);
+              return (
+                <div style={{ marginTop:6, padding:'6px 8px', borderRadius:8, background:'rgba(0,230,138,0.04)', border:'1px solid rgba(0,230,138,0.1)', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                  <span style={{ fontSize:8, fontWeight:700, color:'rgba(255,255,255,0.3)' }}>📊 ИТОГО ЗА ДЕНЬ</span>
+                  <div style={{ display:'flex', gap:6, alignItems:'center' }}>
+                    <span style={{ color:'#00e68a', fontWeight:800, fontSize:11 }}>{Math.round(dK)} ккал</span>
+                    <span style={{ fontSize:8, color:'#3b82f6' }}>Б{Math.round(dP)}</span>
+                    <span style={{ fontSize:8, color:'#f59e0b' }}>Ж{Math.round(dF)}</span>
+                    <span style={{ fontSize:8, color:'#f97316' }}>У{Math.round(dC)}</span>
+                  </div>
+                </div>
+              );
+            })()}
+          </>
         )}
       </div>
 

@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { FOOD_DB } from '../../../core/nutrition-database';
 import { calcNutrition } from '../../../engines/nutrition.engine';
 import { getProfile, updateProfile } from '../../../core/profile-manager';
@@ -197,6 +197,7 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
     }
   }, [manualP, manualF, manualC]);
 
+  const resultsRef = useRef<HTMLDivElement>(null);
   const [editMode, setEditMode] = useState(false);
 
   // 6. Budget level
@@ -470,6 +471,8 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
     setWaterCalc({ baseWater: Math.round(baseWater * 10) / 10, trainBonus, fiberFactor, total: waterTotal });
 
     setGenerated(true);
+    // Scroll to results
+    setTimeout(() => resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
   };
 
   // Generate cheat meal plan
@@ -824,39 +827,115 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
   };
 
   // ─── Render ───
-  const renderMealList = (dayData: any) => {
+  const renderMealList = (dayData: any, editable = false) => {
     if (!dayData) return null;
     const d = dayData;
+    const macroPct = (val: number, total: number) => total > 0 ? Math.min(100, Math.round(val / total * 100)) : 0;
+    const totalKcal = Math.round(d.totals?.kcal || 0);
+    const totalP = Math.round(d.totals?.p || 0);
+    const totalF = Math.round(d.totals?.f || 0);
+    const totalC = Math.round(d.totals?.c || 0);
     return (
       <div>
-        <div style={{ fontSize: 9, fontWeight: 700, color: d.isTrainingDay ? '#00e68a' : 'rgba(255,255,255,0.4)', marginBottom: 6 }}>
-          {d.isTrainingDay ? '🏋️ Тренировочный день' : '😴 День отдыха'}
+        {/* Day header */}
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8,
+          padding: '6px 10px', borderRadius: 10,
+          background: d.isTrainingDay ? 'linear-gradient(135deg,rgba(0,230,138,0.08),rgba(0,200,160,0.04))' : 'rgba(255,255,255,0.02)',
+          border: d.isTrainingDay ? '1px solid rgba(0,230,138,0.15)' : '1px solid rgba(255,255,255,0.04)',
+        }}>
+          <span style={{ fontSize: 14 }}>{d.isTrainingDay ? '🏋️' : '😴'}</span>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 10, fontWeight: 700, color: d.isTrainingDay ? '#00e68a' : 'rgba(255,255,255,0.4)' }}>
+              {d.isTrainingDay ? 'Тренировочный день' : 'День отдыха'}
+            </div>
+            <div style={{ display: 'flex', gap: 6, fontSize: 8, color: 'rgba(255,255,255,0.3)', marginTop: 1 }}>
+              <span>🔥 {totalKcal} ккал</span>
+              <span style={{ color: '#3b82f6' }}>💪 {totalP}г Б</span>
+              <span style={{ color: '#f59e0b' }}>🧈 {totalF}г Ж</span>
+              <span style={{ color: '#f97316' }}>🌾 {totalC}г У</span>
+            </div>
+          </div>
+          {/* Macro bar */}
+          <div style={{ width: 60, height: 6, borderRadius: 3, background: 'rgba(255,255,255,0.06)', overflow: 'hidden', display: 'flex' }}>
+            <div style={{ height: '100%', width: `${(totalP * 4 / Math.max(1, totalKcal)) * 100}%`, background: '#3b82f6', minWidth: 2 }} />
+            <div style={{ height: '100%', width: `${(totalF * 9 / Math.max(1, totalKcal)) * 100}%`, background: '#f59e0b', minWidth: 2 }} />
+            <div style={{ height: '100%', width: `${(totalC * 4 / Math.max(1, totalKcal)) * 100}%`, background: '#f97316', minWidth: 2 }} />
+          </div>
         </div>
+
+        {/* Allergens */}
         {d.allergenWarnings?.length > 0 && (
-          <div style={{ padding: '4px 8px', borderRadius: 6, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', fontSize: 8, color: '#ef4444', marginBottom: 6 }}>
-            ⚠ {d.allergenWarnings.join('; ')}
+          <div style={{ padding: '4px 8px', borderRadius: 6, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', fontSize: 8, color: '#ef4444', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 4 }}>
+            <span>⚠️</span>
+            <span>{d.allergenWarnings.join('; ')}</span>
           </div>
         )}
-        {d.meals.map((m: any, mi: number) => (
-          <div key={mi} style={{ marginBottom: 4, padding: '6px 8px', borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9 }}>
-              <span style={{ fontWeight: 600, color: '#00e68a' }}>{m.time} {m.label}</span>
-              <span style={{ color: 'rgba(255,255,255,0.4)' }}>{m.totals.kcal} ккал</span>
+
+        {/* Meals */}
+        {d.meals.map((m: any, mi: number) => {
+          const mealKcal = Math.round(m.totals?.kcal || 0);
+          const isPreWorkout = m.label?.toLowerCase().includes('предтрен');
+          const isPostWorkout = m.label?.toLowerCase().includes('пост-трен');
+          const mealBorderColor = isPreWorkout ? '#8b5cf6' : isPostWorkout ? '#f59e0b' : 'rgba(255,255,255,0.06)';
+          return (
+            <div key={mi} style={{
+              marginBottom: 4, padding: '6px 8px', borderRadius: 8,
+              background: isPreWorkout ? 'rgba(139,92,246,0.04)' : isPostWorkout ? 'rgba(245,158,11,0.04)' : 'rgba(255,255,255,0.02)',
+              border: '1px solid ' + mealBorderColor, position: 'relative', transition: 'all 0.2s',
+            }}>
+              {/* Meal header */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 3 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.3)' }}>{m.time}</span>
+                  <span style={{ fontSize: 10, fontWeight: 600, color: isPreWorkout ? '#a855f7' : isPostWorkout ? '#f59e0b' : '#00e68a' }}>{m.label}</span>
+                  {isPreWorkout && <span style={{ fontSize: 7, padding: '1px 4px', borderRadius: 4, background: 'rgba(139,92,246,0.15)', color: '#a855f7' }}>До трен</span>}
+                  {isPostWorkout && <span style={{ fontSize: 7, padding: '1px 4px', borderRadius: 4, background: 'rgba(245,158,11,0.15)', color: '#f59e0b' }}>После трен</span>}
+                </div>
+                <span style={{ fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.6)' }}>{mealKcal} ккал</span>
+              </div>
+
+              {/* Items */}
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
+                {m.items.map((it: any, ii: number) => (
+                  <span key={ii} style={{
+                    padding: '2px 6px', borderRadius: 4, fontSize: 8,
+                    background: 'rgba(255,255,255,0.04)',
+                    border: '1px solid rgba(255,255,255,0.06)',
+                    color: 'rgba(255,255,255,0.7)',
+                    display: 'inline-flex', alignItems: 'center', gap: 3,
+                  }}>
+                    {it.name}
+                    <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: 7 }}>{it.amount}г</span>
+                  </span>
+                ))}
+              </div>
+
+              {/* Meal micro-macros */}
+              {m.totals && (
+                <div style={{ display: 'flex', gap: 4, marginTop: 3, fontSize: 7, color: 'rgba(255,255,255,0.3)' }}>
+                  <span style={{ color: '#3b82f6' }}>Б: {Math.round(m.totals.p || 0)}г</span>
+                  <span style={{ color: '#f59e0b' }}>Ж: {Math.round(m.totals.f || 0)}г</span>
+                  <span style={{ color: '#f97316' }}>У: {Math.round(m.totals.c || 0)}г</span>
+                </div>
+              )}
             </div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 2, marginTop: 3 }}>
-              {m.items.map((it: any, ii: number) => (
-                <span key={ii} style={{ padding: '1px 5px', borderRadius: 4, fontSize: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)' }}>
-                  {it.name} {it.amount}г
-                </span>
-              ))}
-            </div>
+          );
+        })}
+
+        {/* Day totals */}
+        <div style={{
+          display: 'flex', gap: 4, justifyContent: 'space-between', alignItems: 'center',
+          marginTop: 6, padding: '6px 10px', borderRadius: 8, background: 'rgba(0,230,138,0.04)',
+          border: '1px solid rgba(0,230,138,0.1)',
+        }}>
+          <span style={{ fontSize: 8, fontWeight: 700, color: 'rgba(255,255,255,0.3)' }}>ИТОГО ЗА ДЕНЬ</span>
+          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+            <span style={{ color: '#00e68a', fontWeight: 800, fontSize: 11 }}>{totalKcal} ккал</span>
+            <span style={{ fontSize: 8, color: '#3b82f6' }}>Б {totalP}г</span>
+            <span style={{ fontSize: 8, color: '#f59e0b' }}>Ж {totalF}г</span>
+            <span style={{ fontSize: 8, color: '#f97316' }}>У {totalC}г</span>
           </div>
-        ))}
-        <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end', fontSize: 9, marginTop: 4 }}>
-          <span style={{ color: '#00e68a', fontWeight: 700 }}>Ккал: {Math.round(d.totals.kcal)}</span>
-          <span style={{ color: '#3b82f6' }}>Б: {Math.round(d.totals.p)}</span>
-          <span style={{ color: '#f59e0b' }}>Ж: {Math.round(d.totals.f)}</span>
-          <span style={{ color: '#f97316' }}>У: {Math.round(d.totals.c)}</span>
         </div>
       </div>
     );
@@ -1131,9 +1210,12 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
       )}
 
       {/* 15. Generate button */}
-      <button onClick={() => setPlanDays(1)} style={{ ...greenBtn, fontSize: 13, padding: 12 }}>✨ Сгенерировать план питания</button>
+      <button onClick={() => generatePlan(1)} style={{ ...greenBtn, fontSize: 13, padding: 12 }}>
+        ✨ Сгенерировать план питания
+      </button>
 
       {/* Day/3day/Week selector */}
+      <div ref={resultsRef} />
       {generated && (
         <GlassCard title="Варианты отображения" icon="📐">
           <div style={{ display: 'flex', gap: 4 }}>
@@ -1142,7 +1224,7 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
               { id: 3 as const, label: 'На 3 дня' },
               { id: 7 as const, label: 'Недельный' },
             ].map(v => (
-              <button key={v.id} onClick={() => { setPlanDays(v.id); if (!dayPlan) generatePlan(1); if (v.id >= 3 && !threeDayPlan) generatePlan(3); if (v.id >= 7 && !weekPlan) generatePlan(7); }} style={{
+              <button key={v.id} onClick={() => { setPlanDays(v.id); if (v.id === 7 && !weekPlan) generatePlan(7); }} style={{
                 flex: 1, padding: 8, borderRadius: 8, cursor: 'pointer', textAlign: 'center',
                 background: planDays === v.id ? 'linear-gradient(135deg,#00e68a,#00c8a0)' : 'rgba(255,255,255,0.03)',
                 border: planDays === v.id ? 'none' : '1px solid rgba(255,255,255,0.06)',
