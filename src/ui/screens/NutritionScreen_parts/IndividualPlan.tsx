@@ -49,11 +49,11 @@ const BUDGET_LEVELS: { id: BudgetLevel; label: string; icon: string; desc: strin
   { id: 'enhanced', label: 'Усиленный', icon: '🔴', desc: 'Элитные продукты, спецсорта', color: '#ef4444' },
 ];
 
-const NUTRITION_LEVELS: { id: NutritionLevel; label: string; icon: string; mult: number }[] = [
-  { id: 'base', label: 'База', icon: '🟢', mult: 1.0 },
-  { id: 'medium', label: 'Средний', icon: '🟡', mult: 1.15 },
-  { id: 'enhanced', label: 'Усиление', icon: '🟠', mult: 1.3 },
-  { id: 'max', label: 'Максимум', icon: '🔴', mult: 1.5 },
+const NUTRITION_LEVELS: { id: NutritionLevel; label: string; icon: string; mult: number; desc: string }[] = [
+  { id: 'base', label: 'База', icon: '🟢', mult: 1.0, desc: '0%' },
+  { id: 'medium', label: '+15%', icon: '🟡', mult: 1.15, desc: 'Средний' },
+  { id: 'enhanced', label: '+30%', icon: '🟠', mult: 1.3, desc: 'Усиленный' },
+  { id: 'max', label: '+50%', icon: '🔴', mult: 1.5, desc: 'Максимум' },
 ];
 
 const PLAN_TYPES: { id: PlanType; label: string; icon: string; desc: string; pMult?: number; fMult?: number; cMult?: number }[] = [
@@ -92,15 +92,16 @@ const getDefaultKcal = (profile: UserProfile | null) => {
 
 const GlassCard: React.FC<{ title?: string; icon?: string; color?: string; style?: React.CSSProperties; children: React.ReactNode }> = ({ title, icon, color, style, children }) => (
   <div style={{
-    padding: 18, borderRadius: 16,
+    padding: 20, borderRadius: 18,
     background: '#18181b',
-    border: '1px solid #27272a',
+    border: '1px solid rgba(255,255,255,0.06)',
+    boxShadow: '0 2px 16px rgba(0,0,0,0.25)',
     position: 'relative', overflow: 'hidden',
     ...style,
   }}>
-    {color && <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: `linear-gradient(90deg, ${color}, ${color}66)` }} />}
-    {title && <div style={{ fontSize: 13, color: color || 'rgba(255,255,255,0.7)', fontWeight: 700, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6, letterSpacing: '0.2px' }}>
-      {icon && <span style={{ fontSize: 16 }}>{icon}</span>}{title}
+    {color && <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: `linear-gradient(90deg, ${color}, ${color}44)` }} />}
+    {title && <div style={{ fontSize: 14, color: color || 'rgba(255,255,255,0.75)', fontWeight: 700, marginBottom: 14, display: 'flex', alignItems: 'center', gap: 7, letterSpacing: '-0.2px' }}>
+      {icon && <span style={{ fontSize: 15 }}>{icon}</span>}{title}
     </div>}
     {children}
   </div>
@@ -108,19 +109,19 @@ const GlassCard: React.FC<{ title?: string; icon?: string; color?: string; style
 
 const PillBtn: React.FC<{ active?: boolean; onClick: () => void; color?: string; children: React.ReactNode; style?: React.CSSProperties }> = ({ active, onClick, color, children, style }) => (
   <button onClick={onClick} style={{
-    padding: '6px 12px', borderRadius: 18, fontSize: 10, cursor: 'pointer', fontWeight: 600, whiteSpace: 'nowrap',
-    background: active ? (color ? `${color}25` : 'rgba(0,230,138,0.18)') : '#202023',
-    border: active ? `1px solid ${color || '#00e68a'}` : '1px solid #27272a',
-    color: active ? (color || '#00e68a') : 'rgba(255,255,255,0.5)',
+    padding: '7px 14px', borderRadius: 20, fontSize: 10, cursor: 'pointer', fontWeight: 600, whiteSpace: 'nowrap', letterSpacing: '-0.1px',
+    background: active ? (color ? `${color}20` : 'rgba(0,230,138,0.15)') : '#202023',
+    border: active ? `1px solid ${color || '#00e68a'}` : '1px solid rgba(255,255,255,0.06)',
+    color: active ? (color || '#00e68a') : 'rgba(255,255,255,0.45)',
     transition: 'all 0.2s',
     ...style,
   }}>{children}</button>
 );
 
 const inputStyle: React.CSSProperties = {
-  width: '100%', padding: '8px 12px', borderRadius: 10,
-  background: '#202023', border: '1px solid #27272a',
-  color: '#fff', fontSize: 12, boxSizing: 'border-box' as const,
+  width: '100%', padding: '10px 14px', borderRadius: 12,
+  background: '#202023', border: '1px solid rgba(255,255,255,0.06)',
+  color: '#fff', fontSize: 13, boxSizing: 'border-box' as const, outline: 'none',
 };
 
 const selectStyle: React.CSSProperties = {
@@ -128,17 +129,18 @@ const selectStyle: React.CSSProperties = {
 };
 
 const greenBtn: React.CSSProperties = {
-  width: '100%', padding: 10, borderRadius: 10, border: 'none', cursor: 'pointer',
+  width: '100%', padding: 12, borderRadius: 14, border: 'none', cursor: 'pointer',
   background: 'linear-gradient(135deg,#00e68a,#00c8a0)', color: '#000',
-  fontWeight: 700, fontSize: 12, letterSpacing: '0.2px',
-  transition: 'box-shadow 0.2s, transform 0.15s',
+  fontWeight: 700, fontSize: 13, letterSpacing: '-0.2px',
+  boxShadow: '0 4px 20px rgba(0,230,138,0.2)',
+  transition: 'all 0.2s',
 };
 
 const reportPillStyle = (color: string, active: boolean): React.CSSProperties => ({
-  padding: '4px 8px', borderRadius: 6, fontSize: 8, cursor: 'pointer', fontWeight: 600,
-  background: active ? `${color}25` : '#202023',
-  border: active ? `1px solid ${color}` : '1px solid #27272a',
-  color: active ? color : 'rgba(255,255,255,0.5)',
+  padding: '5px 10px', borderRadius: 8, fontSize: 8, cursor: 'pointer', fontWeight: 600,
+  background: active ? `${color}18` : '#202023',
+  border: active ? `1px solid ${color}` : '1px solid rgba(255,255,255,0.06)',
+  color: active ? color : 'rgba(255,255,255,0.45)',
   transition: 'all 0.15s',
 });
 
@@ -401,6 +403,74 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
   const [savedPlans, setSavedPlans] = useState<SavedPlan[]>(() => { try { return JSON.parse(localStorage.getItem('he_saved_nutrition_plans') || '[]'); } catch { return []; } });
   const [expandedSavedId, setExpandedSavedId] = useState<number | null>(null);
 
+  // Plan editing state
+  const [editItem, setEditItem] = useState<{ dayIdx: number; mealIdx: number; itemIdx: number } | null>(null);
+  const [editAmount, setEditAmount] = useState<number>(0);
+  const [replacingItem, setReplacingItem] = useState<{ dayIdx: number; mealIdx: number; itemIdx: number } | null>(null);
+
+  // Find similar foods by category
+  const findSimilarFoods = (item: any, count = 5) => {
+    const food = FOOD_DB.find(f => f.id === item.id || f.name === item.name);
+    if (!food) return [];
+    const sameCat = FOOD_DB.filter(f => f.category === food.category && f.id !== food.id);
+    const scored = sameCat.map(f => {
+      const score = Math.abs(f.protein - food.protein) + Math.abs(f.fat - food.fat) * 0.5 + Math.abs(f.carbs - food.carbs) * 0.3;
+      return { ...f, score };
+    }).sort((a, b) => a.score - b.score).slice(0, count);
+    return scored;
+  };
+
+  // Replace food item with another
+  const replaceFoodItem = (dayIdx: number, mealIdx: number, itemIdx: number, newFood: any) => {
+    const dayData = dayIdx === 0 ? dayPlan : threeDayPlan?.days?.[dayIdx] || weekPlan?.days?.[dayIdx];
+    if (!dayData?.meals?.[mealIdx]?.items?.[itemIdx]) return;
+    const old = dayData.meals[mealIdx].items[itemIdx];
+    const portion = (old.amount || 100) / 100;
+    const replacement = { ...old, name: newFood.name, id: newFood.id, kcal: Math.round(newFood.kcal * portion), p: Math.round(newFood.protein * portion), f: Math.round(newFood.fat * portion), c: Math.round(newFood.carbs * portion), amount: Math.round(portion * (parseInt(newFood.servingSize) || 100)) };
+    const updatePlan = (prev: any) => {
+      if (!prev) return prev;
+      const meals = [...prev.meals];
+      const items = [...meals[mealIdx].items];
+      items[itemIdx] = replacement;
+      meals[mealIdx] = { ...meals[mealIdx], items, totals: { kcal: items.reduce((s: number, i: any) => s + i.kcal, 0), p: items.reduce((s: number, i: any) => s + i.p, 0), f: items.reduce((s: number, i: any) => s + i.f, 0), c: items.reduce((s: number, i: any) => s + i.c, 0) } };
+      const totals = { kcal: meals.reduce((s: number, m: any) => s + (m.totals?.kcal || 0), 0), p: meals.reduce((s: number, m: any) => s + (m.totals?.p || 0), 0), f: meals.reduce((s: number, m: any) => s + (m.totals?.f || 0), 0), c: meals.reduce((s: number, m: any) => s + (m.totals?.c || 0), 0) };
+      return { ...prev, meals, totals };
+    };
+    if (dayIdx === 0) setDayPlan(updatePlan);
+    setReplacingItem(null);
+  };
+
+  // Update item amount
+  const updateItemAmount = (dayIdx: number, mealIdx: number, itemIdx: number, newAmount: number) => {
+    const updatePlan = (prev: any) => {
+      if (!prev) return prev;
+      const meals = [...prev.meals];
+      const items = [...meals[mealIdx].items];
+      const it = { ...items[itemIdx], amount: Math.max(1, newAmount), kcal: Math.round(items[itemIdx].kcal / Math.max(1, items[itemIdx].amount) * Math.max(1, newAmount)) };
+      items[itemIdx] = it;
+      meals[mealIdx] = { ...meals[mealIdx], items, totals: { kcal: items.reduce((s: number, i: any) => s + i.kcal, 0), p: items.reduce((s: number, i: any) => s + i.p, 0), f: items.reduce((s: number, i: any) => s + i.f, 0), c: items.reduce((s: number, i: any) => s + i.c, 0) } };
+      const totals = { kcal: meals.reduce((s: number, m: any) => s + (m.totals?.kcal || 0), 0), p: meals.reduce((s: number, m: any) => s + (m.totals?.p || 0), 0), f: meals.reduce((s: number, m: any) => s + (m.totals?.f || 0), 0), c: meals.reduce((s: number, m: any) => s + (m.totals?.c || 0), 0) };
+      return { ...prev, meals, totals };
+    };
+    if (dayIdx === 0) setDayPlan(updatePlan);
+    setEditItem(null);
+  };
+
+  // Remove food item
+  const removeFoodItem = (dayIdx: number, mealIdx: number, itemIdx: number) => {
+    const updatePlan = (prev: any) => {
+      if (!prev) return prev;
+      const meals = [...prev.meals];
+      const items = meals[mealIdx].items.filter((_: any, i: number) => i !== itemIdx);
+      meals[mealIdx] = { ...meals[mealIdx], items, totals: { kcal: items.reduce((s: number, i: any) => s + i.kcal, 0), p: items.reduce((s: number, i: any) => s + i.p, 0), f: items.reduce((s: number, i: any) => s + i.f, 0), c: items.reduce((s: number, i: any) => s + i.c, 0) } };
+      const totals = { kcal: meals.reduce((s: number, m: any) => s + (m.totals?.kcal || 0), 0), p: meals.reduce((s: number, m: any) => s + (m.totals?.p || 0), 0), f: meals.reduce((s: number, m: any) => s + (m.totals?.f || 0), 0), c: meals.reduce((s: number, m: any) => s + (m.totals?.c || 0), 0) };
+      return { ...prev, meals, totals };
+    };
+    if (dayIdx === 0) setDayPlan(updatePlan);
+  };
+
+  const mealtimeToMin = (t: string) => { const [h, m] = t.split(':').map(Number); return h * 60 + m; };
+
   const loadSavedPlan = (plan: SavedPlan) => {
     if (plan.dayPlan) { setDayPlan(plan.dayPlan); setGenerated(true); setPlanDays(1); }
     if (plan.threeDayPlan) setThreeDayPlan(plan.threeDayPlan);
@@ -430,27 +500,17 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
     setPlanDays(days);
     const nutrMult = NUTRITION_LEVELS.find(l => l.id === nutrLevel)?.mult || 1.0;
     const budgetFilter = (id: BudgetLevel): number[] => {
-      const map: Record<string, number[]> = { low: [0,5], medium: [5,8], max: [8,10], enhanced: [10,15] };
+      const map: Record<string, number[]> = { low: [0,5], medium: [5,8], max: [8,10], enhanced: [9,15] };
       return map[id] || [5,10];
     };
     const [bMin, bMax] = budgetFilter(budget);
 
     const tierScores: Record<string, number> = { basic: 5, mid: 7, max: 9, boost: 11 };
-    const foods = FOOD_DB.filter(f => {
-      if (f.kcal <= 0) return false;
-      const score = tierScores[f.tier || 'basic'] || 5;
-      return score >= bMin && score <= bMax;
-    });
 
     const planTypeMod = PLAN_TYPES.find(p => p.id === planType);
     const pMod = planTypeMod?.pMult || 1.0;
     const fMod = planTypeMod?.fMult || 1.0;
     const cMod = planTypeMod?.cMult || 1.0;
-
-    const tKcal = Math.round(effectiveKcal * nutrMult);
-    const tP = Math.round(effectiveP * pMod * nutrMult);
-    const tF = Math.round(effectiveF * fMod * nutrMult);
-    const tC = Math.round(effectiveC * cMod * nutrMult);
 
     const excludedIds = new Set(excludedFoods);
     // Build food allergen map from authoritative sources
@@ -527,7 +587,6 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
       const foodVals = userAllergenToValues[a];
       FOOD_DB.forEach(f => {
         const fAllergens = [...getFoodAllergens(f.id), ...getDirectAllergens(f.id)];
-        // Remove duplicates
         const uniqueAllergens = [...new Set(fAllergens)];
         if (foodVals && uniqueAllergens.some(fa => foodVals.includes(fa))) {
           if (!allergenIds.has(f.id)) { allergenIds.add(f.id); allergenMatchCount++; }
@@ -538,6 +597,20 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
       });
     });
     setAllergenExcludedCount(allergenMatchCount);
+
+    // Build main food pool — exclude disliked + allergen items at source
+    const foods = FOOD_DB.filter(f => {
+      if (f.kcal <= 0) return false;
+      if (excludedIds.has(f.id)) return false;
+      if (allergenIds.has(f.id)) return false;
+      const score = tierScores[f.tier || 'basic'] || 5;
+      return score >= bMin && score <= bMax;
+    });
+
+    const tKcal = Math.round(effectiveKcal * nutrMult);
+    const tP = Math.round(effectiveP * pMod * nutrMult);
+    const tF = Math.round(effectiveF * fMod * nutrMult);
+    const tC = Math.round(effectiveC * cMod * nutrMult);
 
     // Seeded random for food variety
     const seedRand = (seed: number) => {
@@ -700,16 +773,28 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
           // No fat for pre/post workout
           remainingF = 0;
         } else {
+        // Helper: apply preferred foods + plan-type filters to any pool
+        const applyFoodPrefs = (pool: any[], category: string) => {
+          if (planType === 'keto' && category === 'carb') pool = pool.filter((f: any) => f.carbs < 15);
+          if (planType === 'keto' && category === 'veg') pool = pool.filter((f: any) => f.carbs < 10);
+          if (planType === 'vegetarian' && category === 'fat') pool = pool.filter((f: any) => f.isVegetarian !== false);
+          if (planType === 'mediterranean' && category === 'fat') pool = pool.filter((f: any) => f.name.toLowerCase().includes('оливк') || f.name.toLowerCase().includes('орех') || f.name.toLowerCase().includes('авокад'));
+          if (planType === 'mediterranean' && category === 'carb') pool = pool.filter((f: any) => f.name.toLowerCase().includes('киноа') || f.name.toLowerCase().includes('гречк') || f.name.toLowerCase().includes('рис') || f.name.toLowerCase().includes('овс') || f.name.toLowerCase().includes('чечевиц') || f.name.toLowerCase().includes('нут') || f.name.toLowerCase().includes('фасол') || f.name.toLowerCase().includes('макарон'));
+          if (planType === 'highcarb' && category === 'carb') pool = pool.filter((f: any) => f.carbs > 50 || f.name.toLowerCase().includes('рис') || f.name.toLowerCase().includes('макарон') || f.name.toLowerCase().includes('хлеб') || f.name.toLowerCase().includes('картоф') || f.name.toLowerCase().includes('овс'));
+          pool = pool.filter((f: any) => !excludedIds.has(f.id) && !allergenIds.has(f.id));
+          const preferredPool = pool.filter((f: any) => preferredFoods.some((pf: string) => pf === f.id));
+          return preferredPool.length >= 2 ? preferredPool : pool;
+        };
+
         let protPool = foods.filter(f => f.id !== 'egg_white' && (f.category === 'protein' || f.category === 'dairy'));
         if (planType === 'vegetarian') protPool = protPool.filter(f => f.isVegetarian !== false);
         if (planType === 'mediterranean') protPool = protPool.filter(f => !f.name.toLowerCase().includes('говядин') && !f.name.toLowerCase().includes('свинин') && !f.name.toLowerCase().includes('баранин'));
         protPool = protPool.filter(f => !excludedIds.has(f.id) && !allergenIds.has(f.id));
-        // Prefer user's preferred foods but mix in variety
-        const preferredPool = protPool.filter(f => preferredFoods.some(pf => pf === f.id));
-        const mixPool = preferredPool.length >= 2 ? preferredPool : protPool;
-        if (mixPool.length > 0) {
-          const protIdx = Math.floor(seedRand(foodSeed + 1) * mixPool.length);
-          const prot = mixPool[protIdx % mixPool.length];
+        const prefProtPool = protPool.filter(f => preferredFoods.some(pf => pf === f.id));
+        const mixProtPool = prefProtPool.length >= 2 ? prefProtPool : protPool;
+        if (mixProtPool.length > 0) {
+          const protIdx = Math.floor(seedRand(foodSeed + 1) * mixProtPool.length);
+          const prot = mixProtPool[protIdx % mixProtPool.length];
           const portions = Math.min(1.5, remainingP / Math.max(1, prot.protein));
           items.push({ name: prot.name, id: prot.id, amount: Math.round(portions * 100), kcal: Math.round(prot.kcal * portions), p: Math.round(prot.protein * portions), f: Math.round(prot.fat * portions), c: Math.round(prot.carbs * portions) });
           remainingP -= Math.round(prot.protein * portions);
@@ -718,17 +803,15 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
         // Carb source
         if (remainingC > 5) {
           let carbPool = foods.filter(f => f.category === 'carb' || f.category === 'grain');
-          if (planType === 'keto') carbPool = carbPool.filter(f => f.carbs < 15);
-          carbPool = carbPool.filter(f => !excludedIds.has(f.id) && !allergenIds.has(f.id));
+          carbPool = applyFoodPrefs(carbPool, 'carb');
           if (carbPool.length > 0) {
             let carbAmount = remainingC;
-            // Insulin: 10g carbs per 1 unit for meals near short/rapid insulin
             const mealMin = parseInt(mt.time.split(':')[0]) * 60 + parseInt(mt.time.split(':')[1]);
             insulinsWithTiming.forEach(ins => {
               const injMin = parseInt(ins.time.split(':')[0]) * 60 + parseInt(ins.time.split(':')[1]);
               const diff = Math.abs(mealMin - injMin);
               if (diff <= 45) {
-                const requiredCarbs = Math.round(ins.dose * 10); // 10g per 1 unit
+                const requiredCarbs = Math.round(ins.dose * 10);
                 carbAmount = Math.max(carbAmount, requiredCarbs);
               }
             });
@@ -739,7 +822,7 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
           }
         }
 
-        // Fat source (not duplicated with pre-workout) — SKIP IN INSULIN WINDOW (90 min)
+        // Fat source
         const isInsulinWindow = insulinsWithTiming.some(ins => {
           const mealMin = parseInt(mt.time.split(':')[0]) * 60 + parseInt(mt.time.split(':')[1]);
           const injMin = parseInt(ins.time.split(':')[0]) * 60 + parseInt(ins.time.split(':')[1]);
@@ -747,7 +830,7 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
         });
         if (remainingF > 3 && !mt.label.includes('Предтрен') && !mt.label.includes('Пост-трен') && !isInsulinWindow) {
           let fatPool = foods.filter(f => f.category === 'fat');
-          fatPool = fatPool.filter(f => !excludedIds.has(f.id) && !allergenIds.has(f.id));
+          fatPool = applyFoodPrefs(fatPool, 'fat');
           if (fatPool.length > 0) {
             const fatIdx = Math.floor(seedRand(foodSeed + 3) * fatPool.length);
             const fat = fatPool[fatIdx % fatPool.length];
@@ -757,7 +840,7 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
         }
 
         // Vegetables
-        const vegPool = FOOD_DB.filter(f => f.category === 'veg_fruit' && !excludedIds.has(f.id));
+        const vegPool = applyFoodPrefs(FOOD_DB.filter(f => f.category === 'veg_fruit'), 'veg');
         if (vegPool.length > 0) {
           const vegIdx = Math.floor(seedRand(foodSeed + 4) * vegPool.length);
           const v = vegPool[vegIdx % vegPool.length];
@@ -839,7 +922,12 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
 
     // Water balance (with pharma adjustments)
     const hasPharma = injections.length > 0 || (courseEntries?.length || 0) > 0;
-    const baseWaterMl = weight * (hasPharma ? 40 : 30); // AAS ↑ protein metabolism → ↑ water
+    const aasCount = injections.filter(i => i.type === 'ААС').length;
+    const insulinCount = injections.filter(i => i.type === 'инсулин').length;
+    const ghCount = injections.filter(i => i.type === 'ГР').length;
+    const pharmaHeavy = aasCount + insulinCount + ghCount;
+    const pharmaBaseMl = hasPharma ? Math.min(45, 40 + pharmaHeavy * 1.5) : 30; // 40-45 ml/kg by pharma load
+    const baseWaterMl = weight * pharmaBaseMl;
     const baseWater = baseWaterMl / 1000;
     // Training bonus proportional to weekly minutes (0.3L per hour of training)
     const weeklyTrainMin = (s?.workoutsPerWeek || 0) * (s?.avgWorkoutMinutes || 60);
@@ -848,12 +936,9 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
     const fiberTarget = Math.round(effectiveC * 0.025); // ~2.5% of carbs as fiber
     const fiberFactor = Math.round((fiberTarget / 10) * 0.1 * 10) / 10;
     // Pharma bonus: AAS/injectables = +0.1L per injectable, insulin = +0.3L
-    const aasCount = injections.filter(i => i.type === 'ААС').length;
-    const insulinCount = injections.filter(i => i.type === 'инсулин').length;
-    const ghCount = injections.filter(i => i.type === 'ГР').length;
     const pharmaBonus = hasPharma ? Math.round((0.5 + aasCount * 0.15 + insulinCount * 0.3 + ghCount * 0.1) * 10) / 10 : 0;
     const waterTotal = Math.max(1.5, Math.round((baseWater + trainBonus + fiberFactor + pharmaBonus) * 10) / 10);
-    setWaterCalc({ baseWater: Math.round(baseWater * 10) / 10, trainBonus, fiberFactor, pharmaBonus, total: waterTotal, hasPharma });
+    setWaterCalc({ baseWater: Math.round(baseWater * 10) / 10, pharmaBaseMl: Math.round(pharmaBaseMl), trainBonus, fiberFactor, pharmaBonus, total: waterTotal, hasPharma });
 
     setGenerated(true);
     // Scroll to results
@@ -1476,19 +1561,44 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
               {/* Meal items */}
               <div style={{ padding: '6px 10px 8px', background: '#18181b' }}>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
-                  {m.items.map((it: any, ii: number) => (
-                    <span key={ii} style={{
-                      padding: '3px 8px', borderRadius: 6, fontSize: 8,
-                      background: '#202023',
-                      border: '1px solid rgba(255,255,255,0.06)',
+                  {m.items.map((it: any, ii: number) => {
+                    const isEditing = editItem?.mealIdx === mi && editItem?.itemIdx === ii;
+                    const isReplacing = replacingItem?.mealIdx === mi && replacingItem?.itemIdx === ii;
+                    const similar = isReplacing ? findSimilarFoods(it) : [];
+                    return <span key={ii} style={{
+                      padding: '3px 6px', borderRadius: 6, fontSize: 8,
+                      background: isEditing ? 'rgba(59,130,246,0.08)' : isReplacing ? 'rgba(245,158,11,0.08)' : '#202023',
+                      border: `1px solid ${isEditing ? 'rgba(59,130,246,0.2)' : isReplacing ? 'rgba(245,158,11,0.2)' : 'rgba(255,255,255,0.06)'}`,
                       color: 'rgba(255,255,255,0.7)',
-                      display: 'inline-flex', alignItems: 'center', gap: 4,
+                      display: 'inline-flex', alignItems: 'center', gap: 3, flexWrap: 'wrap',
                     }}>
-                      <span style={{ fontWeight: 600 }}>{it.name}</span>
-                      <span style={{ color: 'rgba(255,255,255,0.25)', fontSize: 7 }}>{it.amount}г</span>
-                      <span onClick={() => addToCart({ name: it.name, kcal: it.kcal * (it.amount / 100), amount: it.amount, category: it.category })} style={{ cursor:'pointer', fontSize:7, color:'#00e68a', opacity:0.35, padding:'0 2px', transition:'opacity 0.15s' }} title="В корзину">🛒</span>
-                    </span>
-                  ))}
+                      {isEditing ? (
+                        <>
+                          <input type="number" defaultValue={it.amount} onChange={e => setEditAmount(+e.target.value || 0)} style={{ width: 40, padding: '1px 4px', borderRadius: 3, border: '1px solid #27272a', background: '#18181b', color: '#fff', fontSize: 8 }} />
+                          <span style={{ fontSize: 7, color: 'rgba(255,255,255,0.3)' }}>г</span>
+                          <button onClick={() => updateItemAmount(0, mi, ii, editAmount || it.amount)} style={{ padding: '1px 4px', borderRadius: 3, border: 'none', background: 'rgba(0,230,138,0.15)', color: '#00e68a', cursor: 'pointer', fontSize: 7 }}>✓</button>
+                          <button onClick={() => setEditItem(null)} style={{ padding: '1px 4px', borderRadius: 3, border: 'none', background: 'rgba(239,68,68,0.1)', color: '#ef4444', cursor: 'pointer', fontSize: 7 }}>✕</button>
+                        </>
+                      ) : isReplacing ? (
+                        <>
+                          <span style={{ fontWeight: 600 }}>{it.name}</span>
+                          <select onChange={e => { if (e.target.value) { const f = FOOD_DB.find(x => x.id === e.target.value); if (f) replaceFoodItem(0, mi, ii, f); } }} value="" style={{ fontSize: 7, padding: '1px 2px', borderRadius: 3, border: '1px solid #27272a', background: '#18181b', color: '#fff', maxWidth: 120 }}>
+                            <option value="">🔀 Заменить...</option>
+                            {similar.map(s => <option key={s.id} value={s.id}>{s.name} (Б{s.protein}/Ж{s.fat}/У{s.carbs})</option>)}
+                          </select>
+                        </>
+                      ) : (
+                        <>
+                          <span style={{ fontWeight: 600 }}>{it.name}</span>
+                          <span style={{ color: 'rgba(255,255,255,0.25)', fontSize: 7 }}>{it.amount}г</span>
+                          <span onClick={() => addToCart({ name: it.name, kcal: it.kcal * (it.amount / 100), amount: it.amount, category: it.category })} style={{ cursor:'pointer', fontSize:7, color:'#00e68a', opacity:0.35, padding:'0 2px', transition:'opacity 0.15s' }} title="В корзину">🛒</span>
+                          <span onClick={() => { setEditItem({ dayIdx: 0, mealIdx: mi, itemIdx: ii }); setEditAmount(it.amount); }} style={{ cursor:'pointer', fontSize:7, color:'rgba(255,255,255,0.2)', padding:'0 2px' }} title="Изменить вес">✏️</span>
+                          <span onClick={() => setReplacingItem({ dayIdx: 0, mealIdx: mi, itemIdx: ii })} style={{ cursor:'pointer', fontSize:7, color:'rgba(245,158,11,0.4)', padding:'0 2px' }} title="Аналог">🔄</span>
+                          <span onClick={() => removeFoodItem(0, mi, ii)} style={{ cursor:'pointer', fontSize:7, color:'rgba(239,68,68,0.3)', padding:'0 2px' }} title="Удалить">✕</span>
+                        </>
+                      )}
+                    </span>;
+                  })}
                 </div>
                 {/* Meal micro-macros row */}
                 {m.totals && (
@@ -1832,6 +1942,18 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
                 </div>
               );
             })()}
+            {nutrLevel !== 'base' && (() => {
+              const nm = NUTRITION_LEVELS.find(n => n.id === nutrLevel);
+              return <div style={{ fontSize: 8, color: 'rgba(0,230,138,0.5)', marginTop: 4, padding: '4px 8px', borderRadius: 6, background: 'rgba(0,230,138,0.04)', border: '1px solid rgba(0,230,138,0.08)' }}>📈 Уровень «{nm?.label}» (×{nm?.mult}) — план будет на {Math.round(((nm?.mult||1)-1)*100)}% больше: ~{Math.round(effectiveKcal * (nm?.mult||1))} ккал, Б {Math.round(effectiveP * (nm?.mult||1))} / Ж {Math.round(effectiveF * (nm?.mult||1))} / У {Math.round(effectiveC * (nm?.mult||1))}</div>;
+            })()}
+            {cyclingMode !== 'none' && (() => {
+              const trainDayC = Math.round(effectiveC * (cyclingMode === 'butch' ? 1.3 : cyclingMode === 'carbload' ? 1.5 : 1.0));
+              const restDayC = Math.round(effectiveC * (cyclingMode === 'macro' ? 0.7 : cyclingMode === 'butch' ? 0.5 : 1.0));
+              const trainDayK = Math.round(effectiveKcal * (cyclingMode === 'macro' ? 1.0 : cyclingMode === 'butch' ? 1.0 : cyclingMode === 'cheatmeal' ? 0.85 : 1.0));
+              const restDayK = Math.round(effectiveKcal * (cyclingMode === 'macro' ? 0.85 : 1.0));
+              const cycleLabel = ({ macro: '🔄 Макросы', butch: '⤴️⤵️ БУЧ', cheatmeal: '🍔 Читмил', carbload: '🍚 Угл.загр.' })[cyclingMode] || '';
+              return <div style={{ fontSize: 8, color: 'rgba(59,130,246,0.5)', marginTop: 2, padding: '4px 8px', borderRadius: 6, background: 'rgba(59,130,246,0.04)', border: '1px solid rgba(59,130,246,0.08)' }}>{cycleLabel}: в тренировочный день ~{trainDayK} ккал / {trainDayC}г угл. · в день отдыха ~{restDayK} ккал / {restDayC}г угл.</div>;
+            })()}
           </div>
         ) : (
           <div>
@@ -1871,6 +1993,7 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
         <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.35)', marginBottom: 8, lineHeight: 1.5 }}>
           База ×1.0, Средний ×1.15, Усиление ×1.3, Максимум ×1.5. Используется для коррекции калоража без смены цели.
         </div>
+        <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.2)', marginBottom: 4 }}>Множитель калорийности: {NUTRITION_LEVELS.find(n => n.id === nutrLevel)?.mult || 1.0}× — итоговый план будет на {Math.round(( (NUTRITION_LEVELS.find(n => n.id === nutrLevel)?.mult || 1) - 1) * 100)}% больше базы</div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 5 }}>
           {NUTRITION_LEVELS.map(n => (
             <button key={n.id} onClick={() => setNutrLevel(n.id)} style={{
@@ -1882,8 +2005,9 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
               transition: 'all 0.2s',
             }}>
               <div style={{ fontSize: 14, marginBottom: 2 }}>{n.icon}</div>
-              <div>{n.label}</div>
-              <div style={{ fontSize: 8, color: nutrLevel === n.id ? '#00e68a' : 'rgba(255,255,255,0.2)', marginTop: 2 }}>×{n.mult}</div>
+              <div style={{ fontWeight: 700 }}>{n.label}</div>
+              <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.3)', marginTop: 1 }}>{n.desc}</div>
+              <div style={{ fontSize: 8, color: nutrLevel === n.id ? '#00e68a' : 'rgba(255,255,255,0.2)', marginTop: 1 }}>×{n.mult}</div>
             </button>
           ))}
         </div>
@@ -2102,7 +2226,8 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
 
       {/* Results */}
       {generated && planDays === 1 && dayPlan && (
-        <GlassCard title="План на день" icon="📋" color="#00e68a" style={{ border: '1px solid rgba(0,230,138,0.15)' }}>
+        <GlassCard title={`План на день${cyclingMode !== 'none' ? (dayPlan.isTrainingDay ? ' 🏋️ Тренировочный' : ' 🛌 Отдых') : ''}`} icon="📋" color={dayPlan.isTrainingDay ? '#00e68a' : '#8b5cf6'} style={{ border: '1px solid rgba(0,230,138,0.15)' }}>
+          {dayPlan.isTrainingDay !== undefined && <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.3)', marginBottom: 4 }}>{dayPlan.isTrainingDay ? 'Тренировочный день' : 'День отдыха'}{cyclingMode !== 'none' && ` · циклирование: ${({macro:'макросы',butch:'БУЧ',cheatmeal:'читмил',carbload:'угл.загрузка'})[cyclingMode] || ''}`}</div>}
           {renderMealList(dayPlan)}
         </GlassCard>
       )}
@@ -2382,7 +2507,7 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
         <GlassCard title="Водный баланс" icon="💧" color="#06b6d4" style={{ border: '1px solid rgba(6,182,212,0.15)' }}>
           <div style={{ padding: '6px 10px', borderRadius: 8, background: 'rgba(6,182,212,0.04)', border: '1px solid rgba(6,182,212,0.08)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: 'rgba(255,255,255,0.6)', marginBottom: 2 }}>
-              <span>База: {waterCalc.hasPharma ? '40' : '30'} мл × {weight} кг</span>
+              <span>База: {waterCalc.hasPharma ? (waterCalc.pharmaBaseMl || 40) : '30'} мл × {weight} кг</span>
               <span>{waterCalc.baseWater} л</span>
             </div>
             {waterCalc.hasPharma && (

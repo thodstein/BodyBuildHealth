@@ -31,11 +31,11 @@ const TAB_LABELS: Record<string, string> = {
 
 const CAT_MAP = CAT_MAP_LABEL;
 
-const cardBg = { background: '#18181b', borderRadius: 16, border: '1px solid #27272a' };
-const pillActive = { background: 'linear-gradient(135deg,#00e68a,#00c8a0)', color: '#000', fontWeight: 700 as const, border: 'none' };
-const pillInactive = { background: '#18181b', color: 'rgba(255,255,255,0.5)', border: '1px solid #27272a' };
-const inputStyle: React.CSSProperties = { width:'100%', padding:'9px 12px', borderRadius:10, background:'#18181b', border:'1px solid #27272a', color:'#fff', fontSize:11, boxSizing:'border-box', outline:'none' };
-const labelSec: React.CSSProperties = { fontSize:13, fontWeight:600, color:'#fff', marginBottom:8, letterSpacing:-0.2 };
+const cardBg = { background: '#18181b', borderRadius: 18, border: '1px solid rgba(255,255,255,0.06)', boxShadow: '0 2px 16px rgba(0,0,0,0.2)' };
+const pillActive = { background: 'linear-gradient(135deg,#00e68a,#00c8a0)', color: '#000', fontWeight: 700 as const, border: 'none', boxShadow: '0 2px 12px rgba(0,230,138,0.25)' };
+const pillInactive = { background: '#202023', color: 'rgba(255,255,255,0.45)', border: '1px solid rgba(255,255,255,0.06)' };
+const inputStyle: React.CSSProperties = { width:'100%', padding:'10px 14px', borderRadius:12, background:'#202023', border:'1px solid rgba(255,255,255,0.06)', color:'#fff', fontSize:13, boxSizing:'border-box', outline:'none' };
+const labelSec: React.CSSProperties = { fontSize:14, fontWeight:600, color:'#fff', marginBottom:10, letterSpacing:-0.3 };
 
 const CartTab: React.FC = () => {
   const [, forceUpdate] = useState(0);

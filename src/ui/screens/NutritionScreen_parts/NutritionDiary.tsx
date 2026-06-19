@@ -150,7 +150,7 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
 
   return (
     <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-      {toast && <div style={{ position:'fixed', bottom:10, left:'50%', transform:'translateX(-50%)', zIndex:999, padding:'8px 20px', borderRadius:12, background:'#18181b', border:'1px solid #27272a', color:'#fff', fontSize:11, fontWeight:600 }}>{toast}</div>}
+      {toast && <div style={{ position:'fixed', bottom:20, left:'50%', transform:'translateX(-50%)', zIndex:999, padding:'10px 24px', borderRadius:14, background:'#202023', border:'1px solid rgba(255,255,255,0.06)', boxShadow:'0 4px 20px rgba(0,0,0,0.3)', color:'#fff', fontSize:11, fontWeight:600, letterSpacing:'-0.1px' }}>{toast}</div>}
 
       <div style={{ padding:12, borderRadius:16, background:'#18181b', border:'1px solid #27272a' }}>
         <div style={{ display:'flex', gap:2, marginBottom:6 }}>
@@ -386,26 +386,27 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
           </div>
 
           {editItem && (
-            <div style={{ position:'fixed', inset:0, zIndex:100, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(0,0,0,0.6)', padding:20 }}
+            <div style={{ position:'fixed', inset:0, zIndex:100, display:'flex', alignItems:'flex-end', justifyContent:'center', background:'rgba(0,0,0,0.7)', backdropFilter:'blur(4px)', WebkitBackdropFilter:'blur(4px)' }}
               onClick={() => setEditItem(null)}>
-              <div onClick={e => e.stopPropagation()} style={{ width:'100%', maxWidth:320, padding:20, borderRadius:20, background:'#18181b', border:'1px solid #27272a' }}>
-                <div style={{ fontSize:13, fontWeight:700, color:'#fff', marginBottom:4 }}>✎ {editItem.item.name}</div>
-                <div style={{ fontSize:9, color:'rgba(255,255,255,0.4)', marginBottom:8 }}>Изменить количество</div>
-                <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:8 }}>
-                  <button onClick={() => setEditQty(Math.max(10, editQty - 10))} style={{ width:36, height:36, borderRadius:10, border:'1px solid #27272a', background:'#202023', color:'#fff', cursor:'pointer', fontSize:16, fontWeight:700, display:'flex', alignItems:'center', justifyContent:'center' }}>−</button>
+              <div onClick={e => e.stopPropagation()} style={{ width:'100%', maxWidth:400, padding:'14px 20px 28px', borderRadius:'20px 20px 0 0', background:'#18181b', boxShadow:'0 -4px 30px rgba(0,0,0,0.4)', border:'1px solid rgba(255,255,255,0.06)', borderBottom:'none' }}>
+                <div style={{ width:36, height:4, borderRadius:2, background:'rgba(255,255,255,0.15)', margin:'0 auto 16px' }} />
+                <div style={{ fontSize:15, fontWeight:700, color:'#fff', marginBottom:2, letterSpacing:-0.3 }}>✎ {editItem.item.name}</div>
+                <div style={{ fontSize:10, color:'rgba(255,255,255,0.35)', marginBottom:12 }}>Изменить количество</div>
+                <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:10 }}>
+                  <button onClick={() => setEditQty(Math.max(10, editQty - 10))} style={{ width:40, height:40, borderRadius:12, border:'1px solid rgba(255,255,255,0.06)', background:'#202023', color:'#fff', cursor:'pointer', fontSize:18, fontWeight:600, display:'flex', alignItems:'center', justifyContent:'center', transition:'all 0.15s' }}>−</button>
                   <div style={{ flex:1, textAlign:'center' }}>
-                    <input type="number" value={editQty} onChange={e => setEditQty(+e.target.value || 0)} style={{ width:70, padding:'6px', borderRadius:8, background:'#202023', border:'1px solid #27272a', color:'#fff', fontSize:16, fontWeight:700, textAlign:'center', outline:'none' }} />
-                    <div style={{ fontSize:8, color:'rgba(255,255,255,0.4)', marginTop:2 }}>грамм</div>
+                    <input type="number" value={editQty} onChange={e => setEditQty(+e.target.value || 0)} style={{ width:80, padding:'8px', borderRadius:10, background:'#202023', border:'1px solid rgba(255,255,255,0.06)', color:'#fff', fontSize:20, fontWeight:700, textAlign:'center', outline:'none' }} />
+                    <div style={{ fontSize:9, color:'rgba(255,255,255,0.35)', marginTop:4, letterSpacing:0.5 }}>грамм</div>
                   </div>
-                  <button onClick={() => setEditQty(Math.min(1000, editQty + 10))} style={{ width:36, height:36, borderRadius:10, border:'1px solid #27272a', background:'#202023', color:'#fff', cursor:'pointer', fontSize:16, fontWeight:700, display:'flex', alignItems:'center', justifyContent:'center' }}>+</button>
+                  <button onClick={() => setEditQty(Math.min(1000, editQty + 10))} style={{ width:40, height:40, borderRadius:12, border:'1px solid rgba(255,255,255,0.06)', background:'#202023', color:'#fff', cursor:'pointer', fontSize:18, fontWeight:600, display:'flex', alignItems:'center', justifyContent:'center', transition:'all 0.15s' }}>+</button>
                 </div>
-                <div style={{ display:'flex', gap:4, justifyContent:'center', marginBottom:8 }}>
-                  {[50,100,150,200,300].map(v => <button key={v} onClick={() => setEditQty(v)} style={{ padding:'3px 8px', borderRadius:6, border:'1px solid #27272a', background: editQty===v ? 'rgba(0,230,138,0.2)' : '#202023', color: editQty===v ? '#00e68a' : 'rgba(255,255,255,0.5)', cursor:'pointer', fontSize:8 }}>{v}г</button>)}
+                <div style={{ display:'flex', gap:5, justifyContent:'center', marginBottom:10 }}>
+                  {[50,100,150,200,300].map(v => <button key={v} onClick={() => setEditQty(v)} style={{ padding:'4px 10px', borderRadius:8, border:'1px solid rgba(255,255,255,0.06)', background: editQty===v ? 'rgba(0,230,138,0.15)' : '#202023', color: editQty===v ? '#00e68a' : 'rgba(255,255,255,0.5)', cursor:'pointer', fontSize:9, fontWeight: editQty===v ? 600 : 400, transition:'all 0.15s' }}>{v}г</button>)}
                 </div>
-                <div style={{ fontSize:9, color:'rgba(255,255,255,0.4)', marginBottom:8, textAlign:'center' }}>
-                  → {Math.round(editQty * (editItem.item.kcal || 0) / 100)} ккал · {Math.round(((editItem.item.p||0) * editQty / 100) * 10)/10}г Б
+                <div style={{ fontSize:10, color:'rgba(255,255,255,0.35)', marginBottom:12, textAlign:'center', letterSpacing:'-0.1px' }}>
+                  → <span style={{ color:'#00e68a', fontWeight:700 }}>{Math.round(editQty * (editItem.item.kcal || 0) / 100)} ккал</span> · <span style={{ color:'#60a5fa' }}>{Math.round(((editItem.item.p||0) * editQty / 100) * 10)/10}г Б</span> · <span style={{ color:'#fbbf24' }}>{Math.round(((editItem.item.f||0) * editQty / 100) * 10)/10}г Ж</span> · <span style={{ color:'#fb923c' }}>{Math.round(((editItem.item.c||0) * editQty / 100) * 10)/10}г У</span>
                 </div>
-                <button onClick={saveEdit} style={{ width:'100%', padding:'8px', borderRadius:10, border:'none', cursor:'pointer', background:'linear-gradient(135deg,#00e68a,#00c8a0)', color:'#000', fontWeight:700, fontSize:11 }}>💾 Сохранить</button>
+                <button onClick={saveEdit} style={{ width:'100%', padding:'10px', borderRadius:12, border:'none', cursor:'pointer', background:'linear-gradient(135deg,#00e68a,#00c8a0)', color:'#000', fontWeight:700, fontSize:12, boxShadow:'0 4px 20px rgba(0,230,138,0.2)', letterSpacing:'-0.1px' }}>✓ Сохранить</button>
               </div>
             </div>
           )}
