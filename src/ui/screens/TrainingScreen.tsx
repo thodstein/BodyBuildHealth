@@ -102,6 +102,7 @@ export const TrainingScreen: React.FC = () => {
   const [recovery, setRecovery] = useState(Math.round((readiness?.recovery ?? 70) / 10));
   const [fatigue, setFatigue] = useState(Math.round((readiness?.fatigue ?? 30) / 10));
   const [weakPoints, setWeakPoints] = useState<string[]>([]);
+  const [myCycleMsg, setMyCycleMsg] = useState('');
   const [bodyWeight, setBodyWeight] = useState(80);
   const [sleepHours, setSleepHours] = useState(linked.profile?.settings?.baselineSleepHours ?? 7);
   const [stressLevel, setStressLevel] = useState(linked.profile?.settings?.baselineStressLevel ?? 5);
@@ -2967,6 +2968,23 @@ export const TrainingScreen: React.FC = () => {
                   <div style={{ fontSize: 9, color: 'var(--text-dim)', textAlign: 'center', padding: 8 }}>Сгенерируйте макроцикл для отображения параметров</div>
                 )}
               </div>
+
+              <div style={{marginBottom:8}}>
+                <button onClick={() => {
+                  try {
+                    const existing = JSON.parse(localStorage.getItem('myTrainingCycles') || '[]');
+                    existing.push({ id: 'cycle_' + Date.now(), name: ((macrocycle?.totalWeeks || 12) + '-нед макроцикл'), date: new Date().toISOString(), weeks: macrocycle?.totalWeeks || 12, goal, level, days: daysPerWeek });
+                    localStorage.setItem('myTrainingCycles', JSON.stringify(existing));
+                    setMyCycleMsg('✅ Цикл добавлен в «Мои циклы»!');
+                    setTimeout(() => setMyCycleMsg(''), 3000);
+                  } catch {}
+                }} style={{
+                  width:'100%', padding:8, borderRadius:8, border:'1px solid var(--accent)', cursor:'pointer',
+                  background:'rgba(0,230,138,0.08)', color:'var(--accent)', fontWeight:600, fontSize:11,
+                }}>📋 В мои циклы</button>
+                {myCycleMsg && <div style={{ padding:'6px 10px', borderRadius:6, background:'rgba(139,92,246,0.1)', border:'1px solid rgba(139,92,246,0.3)', color:'#8b5cf6', fontSize:10, marginTop:4, textAlign:'center' }}>{myCycleMsg}</div>}
+              </div>
+
             </>
           )}
           </div>
@@ -5410,6 +5428,7 @@ const ProgramsTab: React.FC<{ selectedProgram: string | null; setSelectedProgram
   const selected = selectedId ? allPrograms.find(p => p.id === selectedId) || null : null;
 
   const [loadedMsg, setLoadedMsg] = useState('');
+  const [myProgMsg, setMyProgMsg] = useState('');
   const handleLoadProgram = () => {
     if (!selected) return;
     try {
@@ -5422,6 +5441,20 @@ const ProgramsTab: React.FC<{ selectedProgram: string | null; setSelectedProgram
       localStorage.setItem('activeProgram', JSON.stringify(prog));
       setLoadedMsg('✅ Программа загружена!');
       setTimeout(() => setLoadedMsg(''), 3000);
+    } catch {}
+  };
+
+  const handleSaveToMyPrograms = () => {
+    if (!selected) return;
+    try {
+      const exercises = selected.weeks.flatMap(w => w.days.flatMap(d => d.exercises.map(e => ({
+        name: e.name, sets: e.sets, reps: parseInt(e.reps) || 10, rir: e.rir ?? 2,
+      }))));
+      const existing = JSON.parse(localStorage.getItem('myTrainingPlans') || '[]');
+      existing.push({ id: 'prog_' + Date.now(), name: selected.name, date: new Date().toISOString(), exercises });
+      localStorage.setItem('myTrainingPlans', JSON.stringify(existing));
+      setMyProgMsg('✅ Добавлено в «Мои программы»!');
+      setTimeout(() => setMyProgMsg(''), 3000);
     } catch {}
   };
 
@@ -5519,7 +5552,15 @@ const ProgramsTab: React.FC<{ selectedProgram: string | null; setSelectedProgram
             }}>
             📋 Загрузить программу
           </button>
+          <button onClick={handleSaveToMyPrograms}
+            style={{
+              width: '100%', padding: 10, borderRadius: 10, border: '1px solid var(--accent)', cursor: 'pointer',
+              background: 'rgba(0,230,138,0.08)', color: 'var(--accent)', fontWeight: 700, fontSize: 12, marginBottom: 6,
+            }}>
+            📋 В мои программы
+          </button>
           {loadedMsg && <div style={{ padding:'6px 10px', borderRadius:6, background:'rgba(0,230,138,0.1)', border:'1px solid rgba(0,230,138,0.3)', color:'#00e68a', fontSize:10, marginBottom:6, textAlign:'center' }}>{loadedMsg}</div>}
+          {myProgMsg && <div style={{ padding:'6px 10px', borderRadius:6, background:'rgba(139,92,246,0.1)', border:'1px solid rgba(139,92,246,0.3)', color:'#8b5cf6', fontSize:10, marginBottom:6, textAlign:'center' }}>{myProgMsg}</div>}
 
           {/* Week-by-week detail */}
           <h4 style={{ margin: '0 0 6px', fontSize: 12, color: 'var(--text)' }}>Программа по неделям</h4>
@@ -5867,7 +5908,11 @@ const StrengthLevelCard: React.FC = () => {
 };
 
 const StructuredAnalyticsCard: React.FC<{ sessions: any[] }> = ({ sessions }) => {
-  const result = React.useMemo(() => sessions.length > 0 ? computeStructuredAnalytics(sessions) : null, [sessions]);
+  const result = React.useMemo(() => {
+    try {
+      return sessions.length > 0 ? computeStructuredAnalytics(sessions) : null;
+    } catch { return null; }
+  }, [sessions]);
   if (!result) return null;
   return (<div className="card" style={{ marginTop:8, padding:10 }}>
     <h4 style={{ margin:'0 0 4px',fontSize:12 }}>📊 Структурная</h4>
