@@ -2234,7 +2234,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
         </div>
       )}
       {entry.dosage && (
-        <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.7)', marginBottom: 3 }}>
+        <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.9)', marginBottom: 3 }}>
           💊 Дозировка: <span style={{ fontWeight: 600 }}>{entry.dosage.mg}{entry.dosage.mg >= 1000 ? ' г' : entry.dosage.mg < 1 ? ' мкг' : ' мг'}</span> · {entry.dosage.timing}{entry.dosage.form ? ' · ' + entry.dosage.form : ''}
         </div>
       )}
@@ -5463,7 +5463,7 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
                       <b>T½:</b> {sel.tHalfHours || '—'} ч · <b>Класс:</b> {sel.className || '—'} · <b>Пути:</b> {routesStr}
                     </div>
                     {(sel.mechanisms||[]).length > 0 && (
-                      <div style={{ fontSize:8, color:'rgba(255,255,255,0.7)', marginBottom:2, lineHeight:1.3 }}>
+                      <div style={{ fontSize:8, color:'rgba(255,255,255,0.9)', marginBottom:2, lineHeight:1.3 }}>
                         <b>Механизмы:</b> {(sel.mechanisms||[]).join(', ') || '—'}
                       </div>
                     )}

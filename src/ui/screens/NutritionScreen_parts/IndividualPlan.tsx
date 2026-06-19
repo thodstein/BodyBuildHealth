@@ -113,7 +113,7 @@ const PillBtn: React.FC<{ active?: boolean; onClick: () => void; color?: string;
     padding: '7px 14px', borderRadius: 20, fontSize: 10, cursor: 'pointer', fontWeight: 600, whiteSpace: 'nowrap', letterSpacing: '-0.1px',
     background: active ? (color ? `${color}20` : 'rgba(0,230,138,0.15)') : '#202023',
     border: active ? `1px solid ${color || '#00e68a'}` : '1px solid rgba(255,255,255,0.06)',
-    color: active ? (color || '#00e68a') : 'rgba(255,255,255,0.7)',
+    color: active ? (color || '#00e68a') : '#fff',
     transition: 'all 0.2s',
     ...style,
   }}>{children}</button>
@@ -141,7 +141,7 @@ const reportPillStyle = (color: string, active: boolean): React.CSSProperties =>
   padding: '5px 10px', borderRadius: 8, fontSize: 8, cursor: 'pointer', fontWeight: 600,
   background: active ? `${color}18` : '#202023',
   border: active ? `1px solid ${color}` : '1px solid rgba(255,255,255,0.06)',
-  color: active ? color : 'rgba(255,255,255,0.7)',
+  color: active ? color : '#fff',
   transition: 'all 0.15s',
 });
 
@@ -417,6 +417,7 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
   const [undoStack, setUndoStack] = useState<any[]>([]);
   const [userRecipes, setUserRecipes] = useState<any[]>(() => { try { return JSON.parse(localStorage.getItem('he_user_recipes') || '[]'); } catch { return []; } });
   const [showRecipeCreator, setShowRecipeCreator] = useState(false);
+  const [showAddDrug, setShowAddDrug] = useState(false);
   const [newRecipe, setNewRecipe] = useState({ name: '', meal: 'lunch' as string, prepTime: 10, kcal: 400, protein: 30, fat: 10, carbs: 40, ingredients: '', instructions: '', tags: '' });
 
   // Save undo state before modifications
@@ -1179,6 +1180,11 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
     setRecommendations(recs);
   };
 
+  // Auto-regenerate recommendations when injections change
+  useEffect(() => {
+    if (generated && dayPlan) generateRecommendations();
+  }, [injections.length]);
+
   // Save plan
   const saveCurrentPlan = () => {
     const name = prompt('Название плана:', `${new Date().toLocaleDateString('ru-RU')} · ${Math.round(dayPlan?.totals?.kcal || 0)} ккал`);
@@ -1666,7 +1672,7 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
                       background: isEditing ? 'rgba(59,130,246,0.08)' : isReplacing ? 'rgba(245,158,11,0.08)' : '#202023',
                       border: `1px solid ${isEditing ? 'rgba(59,130,246,0.2)' : isReplacing ? 'rgba(245,158,11,0.2)' : 'rgba(255,255,255,0.1)'}`,
                       cursor: 'grab',
-                      color: 'rgba(255,255,255,0.7)',
+                      color: '#fff',
                       display: 'inline-flex', alignItems: 'center', gap: 3, flexWrap: 'wrap',
                     }}>
                       {isEditing ? (
@@ -1829,80 +1835,93 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
             📋 Загружено {courseEntries.length} препаратов из курса
           </div>
         )}
-        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.6)', marginBottom: 6 }}>Добавить инъекцию:</div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-          <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-            <input type="text" value={injName} onChange={e => {
-              setInjName(e.target.value);
-              const sub = PHARMA_DB[e.target.value.trim()];
-              if (sub?.class === 'insulin') setInjType('инсулин');
-              else if (sub?.class === 'glp1') setInjType('семаглутид');
-              else if (['testosterone','trenbolone','nandrolone','boldenone','primobolan','drostanolone'].includes(sub?.class || '')) setInjType('ААС');
-            }} placeholder="Название" style={{ ...inputStyle, flex: 1, fontSize: 11 }} list="drug-list" />
-            <datalist id="drug-list">{injectDrugTypes.map(d => <option key={d} value={d} />)}</datalist>
-            <input type="number" value={injDose} onChange={e => setInjDose(+e.target.value || 0)} style={{ ...inputStyle, width: 50, fontSize: 11 }} placeholder="Доза" />
-            <select value={injUnit} onChange={e => setInjUnit(e.target.value)} style={{ ...selectStyle, width: 42, fontSize: 10 }}>
-              <option value="mg">mg</option><option value="mcg">mcg</option><option value="IU">IU</option><option value="ml">ml</option>
-            </select>
-            <button onClick={() => {
-              if (!injName.trim()) return;
-              const sub = PHARMA_DB[injName.trim()];
-              const hl = sub?.pk?.halfLifeHours || 24;
-              setInjections([...injections, {
-                id: Date.now().toString(), name: injName.trim(), time: injTime, dose: injDose, unit: injUnit,
-                type: injType, esterType: injEster,
-                halfLifeHours: hl, trainLinked: false, trainTiming: 'none',
-              }]);
-              setInjName('');
-            }} style={{ padding: '8px 12px', borderRadius: 10, border: 'none', background: 'linear-gradient(135deg,#00e68a,#00c8a0)', color: '#000', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>+</button>
-          </div>
-          <div style={{ display: 'flex', gap: 4 }}>
-            <div style={{ flex: 1 }}><select value={injType} onChange={e => setInjType(e.target.value)} style={{ ...selectStyle, width: '100%', fontSize: 9 }}>
-              {injectDrugTypes.map(d => <option key={d} value={d}>{d}</option>)}
-            </select></div>
-            <div style={{ width: 100 }}><select value={injEster} onChange={e => setInjEster(e.target.value as any)} style={{ ...selectStyle, width: '100%', fontSize: 9 }}>
-              <option value="none">Авто</option>
-              <option value="rapid">⚡ Быстрый</option>
-              <option value="short">🕐 Короткий</option>
-              <option value="long">🌙 Длинный</option>
-            </select></div>
-            <input type="time" value={injTime} onChange={e => setInjTime(e.target.value)} style={{ ...inputStyle, width: 70, fontSize: 10 }} />
-          </div>
-        </div>
-        <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 4 }}>
+        <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: 10, marginBottom: 6 }}>Добавленные инъекции:</div>
+        <div style={{ marginBottom: 6, display: 'flex', flexDirection: 'column', gap: 4 }}>
           {injections.map((inj, i) => {
             const canLink = inj.type === 'инсулин' || inj.type === 'ИФР-1';
             return (
             <div key={inj.id} style={{ padding: '8px 10px', borderRadius: 10, background: 'rgba(6,182,212,0.04)', border: '1px solid rgba(6,182,212,0.1)' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 9, color: '#fff' }}>
-                <span style={{ fontSize: 12 }}>💉</span>
-                <strong style={{ color: '#06b6d4', fontSize: 10 }}>{inj.time}</strong>
-                <span style={{ color: '#fff', fontWeight: 600 }}>{inj.name}</span>
-                <span style={{ color: 'rgba(255,255,255,0.6)' }}>{inj.dose}{inj.unit}</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10, color: '#fff' }}>
+                <span>💉</span>
+                <strong style={{ color: '#06b6d4' }}>{inj.time}</strong>
+                <span style={{ fontWeight: 600 }}>{inj.name}</span>
+                <span style={{ color: 'rgba(255,255,255,0.5)' }}>{inj.dose}{inj.unit}</span>
                 {inj.esterType !== 'none' && <span style={{color:'rgba(255,255,255,0.4)',fontSize:8}}>({inj.esterType})</span>}
+                {canLink && (
+                  <button onClick={() => {
+                    if (!linkToTraining) setLinkToTraining(true);
+                    setInjections(injections.map((j2, j) => j === i ? { ...j2, trainLinked: !j2.trainLinked, trainTiming: !j2.trainLinked ? 'before' : 'none' } : j2));
+                  }} style={{
+                    fontSize: 7, padding: '2px 5px', borderRadius: 4, cursor: 'pointer', fontWeight: 600,
+                    background: inj.trainLinked ? 'rgba(0,230,138,0.15)' : 'rgba(255,255,255,0.05)',
+                    border: inj.trainLinked ? '1px solid rgba(0,230,138,0.3)' : '1px solid rgba(255,255,255,0.06)',
+                    color: inj.trainLinked ? '#00e68a' : '#fff',
+                  }}>🏋️</button>
+                )}
+                {canLink && inj.trainLinked && (['before', 'after', 'both'] as const).map(t => (
+                  <button key={t} onClick={() => setInjections(injections.map((j2, j) => j === i ? { ...j2, trainTiming: t } : j2))} style={{
+                    fontSize: 6, padding: '1px 4px', borderRadius: 3, cursor: 'pointer', fontWeight: 600,
+                    background: inj.trainTiming === t ? 'rgba(59,130,246,0.15)' : 'rgba(255,255,255,0.03)',
+                    border: inj.trainTiming === t ? '1px solid rgba(59,130,246,0.3)' : '1px solid rgba(255,255,255,0.06)',
+                    color: inj.trainTiming === t ? '#60a5fa' : '#fff',
+                  }}>{t === 'before' ? 'До' : t === 'after' ? 'После' : 'До+После'}</button>
+                ))}
                 <button onClick={() => setInjections(injections.filter((_, j) => j !== i))} style={{ marginLeft: 'auto', background: 'rgba(239,68,68,0.1)', border: 'none', color: '#ef4444', fontSize: 10, cursor: 'pointer', borderRadius: 4, padding: '2px 6px' }}>✕</button>
               </div>
-              {canLink && linkToTraining && (
-                <div style={{ display: 'flex', gap: 4, marginTop: 4, flexWrap: 'wrap' }}>
-                  <button onClick={() => setInjections(injections.map((inj2, j) => j === i ? { ...inj2, trainLinked: !inj2.trainLinked, trainTiming: !inj2.trainLinked ? 'before' : 'none' } : inj2))} style={{
-                    fontSize: 7, padding: '3px 8px', borderRadius: 4, cursor: 'pointer', fontWeight: 600,
-                    background: inj.trainLinked ? 'rgba(0,230,138,0.15)' : '#202023',
-                    border: inj.trainLinked ? '1px solid rgba(0,230,138,0.3)' : '1px solid rgba(255,255,255,0.06)',
-                    color: inj.trainLinked ? '#00e68a' : 'rgba(255,255,255,0.6)',
-                  }}>🏋️ {inj.trainLinked ? 'Привязан' : 'Привязать к тренировке'}</button>
-                  {inj.trainLinked && (['before', 'after', 'both'] as const).map(t => (
-                    <button key={t} onClick={() => setInjections(injections.map((inj2, j) => j === i ? { ...inj2, trainTiming: t } : inj2))} style={{
-                      fontSize: 7, padding: '2px 6px', borderRadius: 4, cursor: 'pointer', fontWeight: 600,
-                      background: inj.trainTiming === t ? 'rgba(59,130,246,0.15)' : '#202023',
-                      border: inj.trainTiming === t ? '1px solid rgba(59,130,246,0.3)' : '1px solid rgba(255,255,255,0.06)',
-                      color: inj.trainTiming === t ? '#60a5fa' : 'rgba(255,255,255,0.6)',
-                    }}>{t === 'before' ? 'До' : t === 'after' ? 'После' : 'До+После'}</button>
-                  ))}
-                </div>
-              )}
             </div>);
           })}
         </div>
+        <button onClick={() => setShowAddDrug(true)} style={{ width:'100%', padding:'8px', borderRadius:10, cursor:'pointer', border:'1px solid rgba(6,182,212,0.2)', background:'rgba(6,182,212,0.06)', color:'#06b6d4', fontSize:9, fontWeight:600 }}>
+          + Добавить инъекцию
+        </button>
+        {showAddDrug && (
+          <div style={{ position:'fixed', inset:0, zIndex:100, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(0,0,0,0.7)', padding:16 }}
+            onClick={() => setShowAddDrug(false)}>
+            <div onClick={e => e.stopPropagation()} style={{ width:'100%', maxWidth:340, padding:20, borderRadius:16, background:'#18181b', border:'1px solid rgba(255,255,255,0.1)', boxShadow:'0 8px 40px rgba(0,0,0,0.4)' }}>
+              <div style={{ fontSize:13, fontWeight:700, color:'#fff', marginBottom:12 }}>💉 Добавить препарат</div>
+              <input value={injName} onChange={e => setInjName(e.target.value)} placeholder="Название" style={{ ...inputStyle, marginBottom:6 }} list="drug-list" />
+              <datalist id="drug-list">{injectDrugTypes.map(d => <option key={d} value={d} />)}</datalist>
+              <div style={{ display:'flex', gap:4, marginBottom:6 }}>
+                <div style={{ flex:1 }}><select value={injType} onChange={e => setInjType(e.target.value)} style={{ ...selectStyle, width:'100%', fontSize:9 }}>
+                  {injectDrugTypes.map(d => <option key={d} value={d}>{d}</option>)}
+                </select></div>
+                <div style={{ width:100 }}><select value={injEster} onChange={e => setInjEster(e.target.value as any)} style={{ ...selectStyle, width:'100%', fontSize:9 }}>
+                  <option value="none">Авто</option><option value="rapid">Быстрый</option><option value="short">Короткий</option><option value="long">Длинный</option>
+                </select></div>
+              </div>
+              <div style={{ display:'flex', gap:4, marginBottom:6 }}>
+                <input type="number" value={injDose} onChange={e => setInjDose(+e.target.value || 0)} style={{ ...inputStyle, flex:1, fontSize:11 }} placeholder="Доза" />
+                <select value={injUnit} onChange={e => setInjUnit(e.target.value)} style={{ ...selectStyle, width:50, fontSize:9 }}>
+                  <option value="mg">mg</option><option value="mcg">mcg</option><option value="IU">IU</option><option value="ml">ml</option>
+                </select>
+                <input type="time" value={injTime} onChange={e => setInjTime(e.target.value)} style={{ ...inputStyle, width:68, fontSize:10 }} />
+              </div>
+              <div style={{ display:'flex', gap:4 }}>
+                <button onClick={() => setShowAddDrug(false)} style={{ flex:1, padding:'8px', borderRadius:10, cursor:'pointer', border:'1px solid rgba(255,255,255,0.06)', background:'#202023', color:'rgba(255,255,255,0.6)', fontSize:9, fontWeight:600 }}>Отмена</button>
+                <button onClick={() => {
+                  if (!injName.trim()) return;
+                  const sub = PHARMA_DB[injName.trim()];
+                  const hl = sub?.pk?.halfLifeHours || 24;
+                  let dt = injType, de = injEster;
+                  if (sub?.class === 'insulin') { dt = 'инсулин'; de = hl < 2 ? 'rapid' : hl <= 8 ? 'short' : 'long'; }
+                  else if (sub?.class === 'glp1') { dt = 'семаглутид'; de = 'long'; }
+                  else if (['testosterone','trenbolone','nandrolone','boldenone','primobolan','drostanolone'].includes(sub?.class || '')) { dt = 'ААС'; de = 'long'; }
+                  if (injEster !== 'none') de = injEster;
+                  // Auto-set time based on ester/type
+                  let autoTime = injTime;
+                  if (dt === 'инсулин' && de === 'long') autoTime = '22:00';
+                  else if (dt === 'инсулин' && de !== 'long') autoTime = '08:00';
+                  else if (dt === 'ГР' || dt === 'GHRP' || dt === 'CJC') autoTime = '22:00';
+                  else if (dt === 'семаглутид' || dt === 'тирзепатид') autoTime = '09:00';
+                  else if (dt === 'ААС' && de === 'long') autoTime = '08:00';
+                  else autoTime = '08:00';
+                  setInjections([...injections, { id: Date.now().toString(), name: injName.trim(), time: autoTime, dose: injDose, unit: injUnit, type: dt, esterType: de, halfLifeHours: hl, trainLinked: false, trainTiming: 'none' }]);
+                  setInjName(''); setShowAddDrug(false);
+                }} style={{ flex:1, padding:'8px', borderRadius:10, cursor:'pointer', border:'none', background:'linear-gradient(135deg,#00e68a,#00c8a0)', color:'#000', fontSize:9, fontWeight:700 }}>✓ Добавить</button>
+              </div>
+            </div>
+          </div>
+        )}
       </GlassCard>
 
       {/* 4. Training link */}
@@ -2540,7 +2559,7 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
               {getRecipesByMeal(recipePickerMeal.label === 'Завтрак' ? 'breakfast' : recipePickerMeal.label === 'Обед' || recipePickerMeal.label === 'Второй завтрак' ? 'lunch' : recipePickerMeal.label === 'Ужин' ? 'dinner' : 'snack').length === 0 ? (
                 <div style={{ fontSize:9, color:'rgba(255,255,255,0.6)', textAlign:'center', padding:10 }}>Нет рецептов для этого приёма.</div>
               ) : getRecipesByMeal(recipePickerMeal.label === 'Завтрак' ? 'breakfast' : recipePickerMeal.label === 'Обед' || recipePickerMeal.label === 'Второй завтрак' ? 'lunch' : recipePickerMeal.label === 'Ужин' ? 'dinner' : 'snack').map((r, i) => (
-                <button key={i} onClick={() => replaceMealWithRecipe(r, recipePickerMeal.mealIdx)} style={{ width:'100%', padding:'10px 12px', borderRadius:12, cursor:'pointer', textAlign:'left', background:'#202023', border:'1px solid rgba(255,255,255,0.06)', color:'rgba(255,255,255,0.7)', fontSize:9, transition:'all 0.15s' }}
+                <button key={i} onClick={() => replaceMealWithRecipe(r, recipePickerMeal.mealIdx)} style={{ width:'100%', padding:'10px 12px', borderRadius:12, cursor:'pointer', textAlign:'left', background:'#202023', border:'1px solid rgba(255,255,255,0.06)', color:'#fff', fontSize:9, transition:'all 0.15s' }}
                   onMouseEnter={e => (e.target as HTMLElement).style.borderColor = 'rgba(139,92,246,0.3)'}
                   onMouseLeave={e => (e.target as HTMLElement).style.borderColor = 'rgba(255,255,255,0.1)'}>
                   <div style={{ fontWeight:700, color:'#a78bfa', fontSize:10, marginBottom:2 }}>{r.name}</div>
@@ -2549,6 +2568,7 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
                 </button>
               ))}
             </div>
+            <button onClick={() => setRecipePickerMeal(null)} style={{ width:'100%', marginTop:8, padding:'6px', borderRadius:8, cursor:'pointer', border:'1px solid rgba(255,255,255,0.06)', background:'#202023', color:'rgba(255,255,255,0.6)', fontSize:8, fontWeight:600 }}>✕ Отмена</button>
           </div>
         </div>
       )}
@@ -2840,6 +2860,32 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
         </GlassCard>
       )}
 
+      {/* Insulin справочник */}
+      {injections.some(i => i.type === 'инсулин') && (
+        <GlassCard title="📖 Справочник: Инсулин" icon="📖" color="#ef4444" style={{ border: '1px solid rgba(239,68,68,0.15)' }}>
+          <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
+            <div style={{ fontSize:9, color:'#fff', lineHeight:1.5, padding:'6px 8px', borderRadius:8, background:'rgba(239,68,68,0.04)', border:'1px solid rgba(239,68,68,0.08)' }}>
+              <strong style={{ color:'#ef4444' }}>🧮 Правило 10г/1ЕД:</strong> 1 единица короткого/быстрого инсулина покрывает ~10г углеводов. Доза × 10 = необходимые углеводы.
+            </div>
+            <div style={{ fontSize:9, color:'#fff', lineHeight:1.5, padding:'6px 8px', borderRadius:8, background:'rgba(239,68,68,0.04)', border:'1px solid rgba(239,68,68,0.08)' }}>
+              <strong style={{ color:'#ef4444' }}>🥑 Жиры МИНИМУМ:</strong> в окне 90 минут после инъекции — не более 5г жиров. Жиры замедляют опорожнение желудка, вызывая гипогликемию при уже принятых углеводах.
+            </div>
+            <div style={{ fontSize:9, color:'#fff', lineHeight:1.5, padding:'6px 8px', borderRadius:8, background:'rgba(239,68,68,0.04)', border:'1px solid rgba(239,68,68,0.08)' }}>
+              <strong style={{ color:'#ef4444' }}>🚫 ПРОПУСК ЕДЫ КРИТИЧЕН:</strong> гипогликемия развивается за 15-30 минут. Каждый час после укола — минимум 10-15г углеводов.
+            </div>
+            <div style={{ fontSize:9, color:'#fff', lineHeight:1.5, padding:'6px 8px', borderRadius:8, background:'rgba(239,68,68,0.04)', border:'1px solid rgba(239,68,68,0.08)' }}>
+              <strong style={{ color:'#ef4444' }}>🩸 Глюкометр:</strong> замеры через 15, 30, 60, 90, 120 мин. Цель — не ниже 4.0 ммоль/л. При &lt;3.5 — 15-20г быстрых углеводов.
+            </div>
+            <div style={{ fontSize:9, color:'#fff', lineHeight:1.5, padding:'6px 8px', borderRadius:8, background:'rgba(239,68,68,0.04)', border:'1px solid rgba(239,68,68,0.08)' }}>
+              <strong style={{ color:'#ef4444' }}>🏋️ Тренировка + инсулин:</strong> предтрен — изолят (40-50г) + амилопектин (80-100г). Пост-трен — изолят + декстроза (10г/1ЕД). На тренировке изотоник каждые 20 мин.
+            </div>
+            <div style={{ fontSize:9, color:'#fff', lineHeight:1.5, padding:'6px 8px', borderRadius:8, background:'rgba(239,68,68,0.04)', border:'1px solid rgba(239,68,68,0.08)' }}>
+              <strong style={{ color:'#ef4444' }}>🛑 Не на ночь:</strong> короткий инсулин после 18:00 — риск ночной гипогликемии. Длинный (Лантус/Левемир) — базальный, можно.
+            </div>
+          </div>
+        </GlassCard>
+      )}
+
       {/* 18. Water balance */}
       {generated && waterCalc && (
         <GlassCard title="Водный баланс" icon="💧" color="#06b6d4" style={{ border: '1px solid rgba(6,182,212,0.15)' }}>
@@ -3021,7 +3067,7 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
           <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.6)', marginBottom: 6, textAlign: 'center' }}>{cheatMealPlan.bjuBreakdown}</div>
           {cheatMealPlan.items.map((it: any, i: number) => (
             <div key={i} style={{ display:'flex', justifyContent:'space-between', fontSize: 9, padding: '4px 0', alignItems:'center', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
-              <span style={{ color: 'rgba(255,255,255,0.7)' }}>• {it.name || it}</span>
+              <span style={{ color: '#fff' }}>• {it.name || it}</span>
               <span onClick={() => addToCart({ name: it.name || it, kcal: it.kcal || (cheatMealPlan.cals / cheatMealPlan.items.length), amount: 100 })} style={{ cursor:'pointer', fontSize:8, color:'#00e68a', opacity:0.5, padding:'2px 4px' }} title="В корзину">🛒</span>
             </div>
           ))}
@@ -3054,7 +3100,7 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
           <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.6)', marginBottom: 6, textAlign: 'center' }}>~{carbloadPlan.bju.kcal} ккал всего</div>
           {carbloadPlan.foods.map((f: any, i: number) => (
             <div key={i} style={{ display:'flex', justifyContent:'space-between', fontSize: 9, padding: '4px 0', alignItems:'center', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
-              <span style={{ color: 'rgba(255,255,255,0.7)' }}>• {f.name || f}</span>
+              <span style={{ color: '#fff' }}>• {f.name || f}</span>
               <span onClick={() => addToCart({ name: f.name || f, kcal: f.kcal || 100, amount: 100 })} style={{ cursor:'pointer', fontSize:8, color:'#00e68a', opacity:0.5, padding:'2px 4px' }} title="В корзину">🛒</span>
             </div>
           ))}
@@ -3105,7 +3151,7 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
       {recommendations.length > 0 && (
         <GlassCard title="Рекомендации" icon="💡" color="#a855f7" style={{ border: '1px solid rgba(168,85,247,0.15)' }}>
           {recommendations.map((r, i) => (
-            <div key={i} style={{ fontSize: 9, color: 'rgba(255,255,255,0.7)', padding: '4px 0', borderBottom: i < recommendations.length - 1 ? '1px solid rgba(255,255,255,0.03)' : 'none', lineHeight: 1.4 }}>
+            <div key={i} style={{ fontSize: 9, color: '#fff', padding: '4px 0', borderBottom: i < recommendations.length - 1 ? '1px solid rgba(255,255,255,0.03)' : 'none', lineHeight: 1.4 }}>
               • {r}
             </div>
           ))}
@@ -3162,7 +3208,7 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
               <div key={p.id} style={{ marginBottom: 6, borderRadius: 10, overflow: 'hidden', border: isExpanded ? '1px solid rgba(139,92,246,0.2)' : '1px solid rgba(255,255,255,0.06)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 10px', cursor: 'pointer', background: isExpanded ? 'rgba(139,92,246,0.04)' : '#202023' }}
                   onClick={() => setExpandedSavedId(isExpanded ? null : p.id)}>
-                  <span style={{ fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.7)' }}>{p.name || p.date}</span>
+                  <span style={{ fontSize: 9, fontWeight: 700, color: '#fff' }}>{p.name || p.date}</span>
                   <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
                     <span style={{ fontSize: 8, color: '#00e68a', fontWeight: 600 }}>{p.dayPlan ? `${Math.round(p.dayPlan.totals.kcal)} ккал` : ''}</span>
                     <button onClick={(e) => { e.stopPropagation(); loadSavedPlan(p); }} style={{ padding: '3px 6px', borderRadius: 6, fontSize: 7, cursor: 'pointer', background: 'rgba(0,230,138,0.1)', border: '1px solid rgba(0,230,138,0.2)', color: '#00e68a', fontWeight: 600 }}>📋</button>

@@ -296,7 +296,7 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
                     <span style={{ fontSize:10, fontWeight:500, color:'#fff' }}>{item.name}</span>
                     <input type="number" value={item.qty || 100} onChange={e => { const v = +e.target.value || 0; setParsedItems(prev => prev.map((x,j) => j===i ? {...x, qty: v} : x)); }}
                       style={{ width:45, padding:'2px 4px', borderRadius:4, background:'#18181b', border:'1px solid rgba(255,255,255,0.06)', color:'#fff', fontSize:8, textAlign:'center' }} />
-                    <span style={{ fontSize:7, color:'rgba(255,255,255,0.3)' }}>г</span>
+                    <span style={{ fontSize:7, color:'rgba(255,255,255,0.5)' }}>г</span>
                   </div>
                   <div style={{ display:'flex', gap:3, fontSize:8, color:'rgba(255,255,255,0.6)' }}>
                     <span style={{ color:'#00e68a' }}>{Math.round(item.kcal * (item.qty||100) / 100)}</span>
@@ -347,7 +347,7 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
             )}
 
             {Object.keys(dayMeals).length === 0 ? (
-              <div style={{ textAlign:'center', padding:20, color:'rgba(255,255,255,0.3)', fontSize:10 }}>
+              <div style={{ textAlign:'center', padding:20, color:'rgba(255,255,255,0.5)', fontSize:10 }}>
                 Нет записей. Переключитесь на «➕ Добавить», чтобы внести продукты.
               </div>
             ) : (
