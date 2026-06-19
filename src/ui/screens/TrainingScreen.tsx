@@ -2809,73 +2809,92 @@ export const TrainingScreen: React.FC = () => {
       {/* ═══════════ CYCLES TAB ═══════════ */}
       {tab === 'cycles' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <div className="card" style={{ padding: '10px 12px' }}>
-            <h3 style={{ margin: '0 0 8px', fontSize: 13 }}>🔄 Структура цикла</h3>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 8 }}>
+          {/* Controls - glass card */}
+          <div style={{ padding:12, borderRadius:14, background:'linear-gradient(135deg,rgba(255,255,255,0.06),rgba(255,255,255,0.02))', backdropFilter:'blur(20px)', border:'1px solid rgba(255,255,255,0.06)' }}>
+            <div style={{ fontSize:10, color:'rgba(255,255,255,0.35)', fontWeight:500, letterSpacing:'0.3px', textTransform:'uppercase', marginBottom:8 }}>🔄 Параметры цикла</div>
+            {/* Goal */}
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:4, marginBottom:8 }}>
               {GOALS.map(g => (
-                <button key={g.value} onClick={() => setGoal(g.value)} style={{
-                  padding: '6px 8px', borderRadius: 6, fontSize: 11, fontWeight: goal === g.value ? 700 : 400,
-                  cursor: 'pointer', border: goal === g.value ? '1px solid var(--accent)' : '1px solid var(--border)',
-                  background: goal === g.value ? 'rgba(0,230,138,0.15)' : 'var(--bg-secondary)', color: 'var(--text)', textAlign: 'left',
+                <button key={g.value} onClick={() => { setGoal(g.value); setTimeout(generatePlan, 50); }} style={{
+                  padding:'5px 8px', borderRadius:8, fontSize:10, fontWeight: goal === g.value ? 700 : 400,
+                  cursor:'pointer', border: goal === g.value ? '1px solid #00e68a' : '1px solid rgba(255,255,255,0.08)',
+                  background: goal === g.value ? 'rgba(0,230,138,0.12)' : 'rgba(255,255,255,0.03)', color: 'var(--text)', textAlign:'left',
                 }}>{g.icon} {g.label}</button>
               ))}
             </div>
-            <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 6, display:'flex', gap:4, flexWrap:'wrap' }}>
-              <span>Периодизация:</span>
+            {/* Periodization pills */}
+            <div style={{ display:'flex', gap:4, flexWrap:'wrap', marginBottom:8, alignItems:'center' }}>
+              <span style={{ fontSize:9, color:'rgba(255,255,255,0.35)' }}>Периодизация:</span>
               {[
-                { v: 'auto', l: 'Авто' },
-                { v: 'linear', l: 'Линейная' },
-                { v: 'undulating', l: 'DUP' },
-                { v: 'block', l: 'Блочная' },
+                { v:'auto', l:'Авто' }, { v:'linear', l:'Линейная' },
+                { v:'undulating', l:'DUP' }, { v:'block', l:'Блочная' },
               ].map(p => (
                 <button key={p.v} onClick={() => { setPeriodizationType(p.v as any); setTimeout(generatePlan, 50); }} style={{
-                  padding: '2px 6px', borderRadius: 4, fontSize: 9, fontWeight: periodizationType === p.v ? 700 : 400, cursor:'pointer',
-                  border: periodizationType === p.v ? '1px solid var(--accent)' : '1px solid var(--border)',
-                  background: periodizationType === p.v ? 'rgba(0,230,138,0.15)' : 'var(--bg-secondary)', color: 'var(--text)',
+                  padding:'3px 8px', borderRadius:6, fontSize:9, fontWeight: periodizationType === p.v ? 700 : 400, cursor:'pointer',
+                  border: periodizationType === p.v ? '1px solid #00e68a' : '1px solid rgba(255,255,255,0.08)',
+                  background: periodizationType === p.v ? 'rgba(0,230,138,0.12)' : 'rgba(255,255,255,0.03)', color: 'var(--text)',
                 }}>{p.l}</button>
               ))}
-              <span style={{ marginLeft: 4 }}>Цикл:</span>
+            </div>
+            {/* Cycle type - expanded with descriptions */}
+            <div style={{ fontSize:9, color:'rgba(255,255,255,0.35)', marginBottom:4 }}>Тип цикла:</div>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:3, marginBottom:8 }}>
               {[
-                { v: 'auto', l: 'Авто' }, { v: 'bb_mass', l: 'Масса' }, { v: 'pl_peaking', l: 'Пик' },
+                { v:'auto', l:'Авто', d:'Автоматический подбор по цели и уровню' },
+                { v:'bb_mass', l:'Масса', d:'Высокий объём, изоляция, wave-кривая' },
+                { v:'bb_specialization', l:'Специализация', d:'Акцент на отстающие группы' },
+                { v:'pl_peaking', l:'Пауэрлифтинг', d:'Силовой пик, 1ПМ, линейная кривая' },
+                { v:'wl_tech', l:'Тяжелоатлет', d:'Технические движения, рывок/толчок' },
+                { v:'cf_cond', l:'Кроссфит', d:'Кондиционирование, метконы, круговые' },
+                { v:'rehab', l:'Реабилитация', d:'Восстановление, низкий объём' },
               ].map(c => (
-                <button key={c.v} onClick={() => { setCycleType(c.v); setTimeout(generatePlan, 50); }} style={{
-                  padding: '2px 6px', borderRadius: 4, fontSize: 9, fontWeight: cycleType === c.v ? 700 : 400, cursor:'pointer',
-                  border: cycleType === c.v ? '1px solid var(--accent)' : '1px solid var(--border)',
-                  background: cycleType === c.v ? 'rgba(0,230,138,0.15)' : 'var(--bg-secondary)', color: 'var(--text)',
-                }}>{c.l}</button>
+                <button key={c.v} onClick={() => { setCycleType(c.v); setTimeout(generatePlan, 50); }} title={c.d} style={{
+                  padding:'4px 6px', borderRadius:6, fontSize:8, fontWeight: cycleType === c.v ? 700 : 400, cursor:'pointer',
+                  border: cycleType === c.v ? '1px solid #8b5cf6' : '1px solid rgba(255,255,255,0.06)',
+                  background: cycleType === c.v ? 'rgba(139,92,246,0.12)' : 'rgba(255,255,255,0.02)', color: 'var(--text)',
+                  textAlign:'center', lineHeight:1.2,
+                }}><div style={{fontWeight: cycleType === c.v ? 700 : 500}}>{c.l}</div><div style={{fontSize:6, color:'rgba(255,255,255,0.3)', marginTop:1}}>{c.d}</div></button>
               ))}
             </div>
-            <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 6, display:'flex', gap:4, flexWrap:'wrap', alignItems:'center' }}>
-              <span>Уровень:</span>
+            {/* Level pills + generate */}
+            <div style={{ display:'flex', gap:4, flexWrap:'wrap', alignItems:'center', marginBottom:8 }}>
+              <span style={{ fontSize:9, color:'rgba(255,255,255,0.35)' }}>Уровень:</span>
               {LEVELS.map(l => (
                 <button key={l.value} onClick={() => setLevel(l.value)} style={{
-                  padding: '2px 8px', borderRadius: 4, fontSize: 9, fontWeight: level === l.value ? 700 : 400, cursor:'pointer',
-                  border: level === l.value ? '1px solid var(--accent)' : '1px solid var(--border)',
-                  background: level === l.value ? 'rgba(0,230,138,0.15)' : 'var(--bg-secondary)', color: 'var(--text)',
+                  padding:'3px 8px', borderRadius:6, fontSize:9, fontWeight: level === l.value ? 700 : 400, cursor:'pointer',
+                  border: level === l.value ? '1px solid #00e68a' : '1px solid rgba(255,255,255,0.08)',
+                  background: level === l.value ? 'rgba(0,230,138,0.12)' : 'rgba(255,255,255,0.03)', color: 'var(--text)',
                 }}>{l.icon} {l.label}</button>
               ))}
             </div>
             <button onClick={() => generatePlan()} style={{
-              width: '100%', padding: 8, borderRadius: 8, border: 'none', cursor: 'pointer',
-              background: 'var(--accent)', color: '#000', fontWeight: 600, fontSize: 12,
+              width:'100%', padding:'9px', borderRadius:10, border:'none', cursor:'pointer',
+              background:'linear-gradient(135deg,#00e68a,#00cc7a)', color:'#000', fontWeight:700, fontSize:12,
             }}>▶ Сгенерировать макроцикл</button>
             {cyclesError && <div style={{ padding:'6px 10px', borderRadius:6, background:'rgba(239,68,68,0.1)', border:'1px solid rgba(239,68,68,0.3)', color:'#ef4444', fontSize:10, marginTop:6, textAlign:'center' }}>{cyclesError}</div>}
           </div>
 
+          {/* Empty state */}
           {!macrocycle && !cyclesError && (
-            <div className="card" style={{ textAlign:'center', padding:30 }}>
+            <div style={{ padding:24, borderRadius:14, background:'linear-gradient(135deg,rgba(255,255,255,0.04),rgba(255,255,255,0.01))', backdropFilter:'blur(20px)', border:'1px solid rgba(255,255,255,0.06)', textAlign:'center' }}>
               <div style={{ fontSize:28, marginBottom:6 }}>🔄</div>
-              <div style={{ fontSize:13, color:'var(--text-dim)', marginBottom:4 }}>Макроцикл ещё не сгенерирован</div>
-              <div style={{ fontSize:10, color:'var(--text-dim)' }}>Выберите параметры выше и нажмите «Сгенерировать макроцикл»</div>
+              <div style={{ fontSize:12, color:'rgba(255,255,255,0.4)', marginBottom:4 }}>Макроцикл ещё не сгенерирован</div>
+              <div style={{ fontSize:10, color:'rgba(255,255,255,0.3)' }}>Выберите параметры выше и нажмите «Сгенерировать макроцикл»</div>
             </div>
           )}
 
-          {macrocycle && (
-            <>
-              {/* Weekly volume/intensity chart */}
-              <div className="card" style={{ padding: '10px 12px' }}>
-                <h4 style={{ margin: '0 0 8px', fontSize: 12 }}>📊 Объём и интенсивность по неделям</h4>
-                <div style={{ display: 'flex', gap: 1, height: 80, alignItems: 'flex-end' }}>
+          {macrocycle && (() => {
+            const gCard: React.CSSProperties = { padding:12, borderRadius:14, background:'linear-gradient(135deg,rgba(255,255,255,0.06),rgba(255,255,255,0.02))', backdropFilter:'blur(20px)', border:'1px solid rgba(255,255,255,0.06)', marginBottom:8 };
+            const gLabel: React.CSSProperties = { fontSize:10, color:'rgba(255,255,255,0.35)', fontWeight:500, letterSpacing:'0.3px', textTransform:'uppercase', marginBottom:8 };
+            // Determine cycle type name
+            const ctName = cycleType === 'auto' ? 'Авто' : ({ bb_mass:'Масса', bb_specialization:'Специализация', pl_peaking:'Пауэрлифтинг', wl_tech:'Тяжелоатлет', cf_cond:'Кроссфит', rehab:'Реабилитация' } as Record<string,string>)[cycleType] || 'Авто';
+            const goalName = GOALS.find(g => g.value === macrocycle.goal)?.label || macrocycle.goal;
+            const levelName = LEVELS.find(l => l.value === macrocycle.level)?.label || macrocycle.level;
+            return (<>
+              {/* Volume/intensity chart */}
+              <div style={gCard}>
+                <div style={gLabel}>📊 Объём и интенсивность по неделям</div>
+                <div style={{ display:'flex', gap:1, height:80, alignItems:'flex-end' }}>
                   {macrocycle.mesocycles.flatMap(mc => mc.microcycles || []).map((mc, wi) => {
                     const isCurrent = wi + 1 === selectedWeek;
                     const volH = Math.max(4, (mc?.volumeMultiplier || 1) * 35);
@@ -2884,89 +2903,87 @@ export const TrainingScreen: React.FC = () => {
                                  mc?.mesocycleType === 'intensification' ? '#eab308' :
                                  mc?.mesocycleType === 'peaking' ? '#ef4444' : '#6b7280';
                     return (
-                      <div key={wi} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }} title={``}
+                      <div key={wi} style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', gap:1, cursor:'pointer' }}
                         onClick={() => { setSelectedWeek(wi + 1); setTab('plan'); }}>
-                        <div style={{ width: '70%', height: volH, background: color, borderRadius: '2px 2px 0 0', opacity: isCurrent ? 1 : 0.4 }} />
-                        <div style={{ width: '40%', height: intH, background: color, borderRadius: '2px 2px 0 0', opacity: isCurrent ? 0.8 : 0.3 }} />
-                        <span style={{ fontSize: 7, color: isCurrent ? 'var(--accent)' : 'var(--text-dim)', fontWeight: isCurrent ? 700 : 400 }}>{wi + 1}</span>
+                        <div style={{ width:'70%', height:volH, background:color, borderRadius:'2px 2px 0 0', opacity: isCurrent ? 1 : 0.4, transition:'height 0.2s' }} />
+                        <div style={{ width:'40%', height:intH, background:color, borderRadius:'2px 2px 0 0', opacity: isCurrent ? 0.8 : 0.3 }} />
+                        <span style={{ fontSize:7, color: isCurrent ? '#00e68a' : 'rgba(255,255,255,0.3)', fontWeight: isCurrent ? 700 : 400 }}>{wi + 1}</span>
                       </div>
                     );
                   })}
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'center', gap: 12, fontSize: 9, color: 'var(--text-dim)', marginTop: 4 }}>
-                  <span><span style={{ color: '#22c55e' }}>■</span> Накопление</span>
-                  <span><span style={{ color: '#eab308' }}>■</span> Интенсификация</span>
-                  <span><span style={{ color: '#ef4444' }}>■</span> Пик</span>
-                  <span><span style={{ color: '#6b7280' }}>■</span> Разгрузка</span>
+                <div style={{ display:'flex', justifyContent:'center', gap:12, fontSize:8, color:'rgba(255,255,255,0.3)', marginTop:4 }}>
+                  <span><span style={{ color:'#22c55e' }}>■</span> Накопление</span>
+                  <span><span style={{ color:'#eab308' }}>■</span> Интенсификация</span>
+                  <span><span style={{ color:'#ef4444' }}>■</span> Пик</span>
+                  <span><span style={{ color:'#6b7280' }}>■</span> Разгрузка</span>
                 </div>
               </div>
 
-              <div className="card" style={{ padding: '10px 12px' }}>
-                <h3 style={{ margin: '0 0 6px', fontSize: 13 }}>📅 {macrocycle.totalWeeks}-недельный макроцикл</h3>
-                <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 6 }}>
-                  {GOALS.find(g => g.value === macrocycle.goal)?.label} • {LEVELS.find(l => l.value === macrocycle.level)?.label}
+              {/* Macrocycle header + mesocycles */}
+              <div style={gCard}>
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:4 }}>
+                  <span style={gLabel}>📅 {macrocycle.totalWeeks}-недельный макроцикл</span>
+                  <span style={{ fontSize:8, padding:'2px 6px', borderRadius:4, background:'rgba(139,92,246,0.1)', color:'#8b5cf6' }}>{ctName}</span>
+                </div>
+                <div style={{ fontSize:10, color:'rgba(255,255,255,0.3)', marginBottom:6 }}>
+                  {goalName} • {levelName} • Phase curve: {cycleType === 'bb_mass' || goal === 'bulk' ? '🌊 Wave' : goal === 'strength' || cycleType === 'pl_peaking' ? '📈 Linear' : goal === 'rehab' ? '📉 Inverted' : '⚖️ Balanced'}
+                  {cycleType !== 'auto' && <span style={{ marginLeft:6, color:'rgba(255,255,255,0.2)' }}>| {({ bb_mass:'Высокий объём, изоляция', bb_specialization:'Акцент на слабые группы', pl_peaking:'Силовой пик, низкий объём', wl_tech:'Технические движения', cf_cond:'Метконы, круговые', rehab:'Восстановление' } as Record<string,string>)[cycleType]}</span>}
                 </div>
                 {macrocycle.mesocycles.map((mc, mi) => (
-                  <div key={mi} style={{ marginBottom: 6, background: 'var(--bg-secondary)', borderRadius: 6, padding: '8px', cursor: 'pointer' }}
+                  <div key={mi} style={{ marginBottom:6, borderRadius:10, overflow:'hidden', background:'rgba(255,255,255,0.02)', border: expandedMeso === mi ? '1px solid rgba(0,230,138,0.15)' : '1px solid rgba(255,255,255,0.03)' }}
                     onClick={() => setExpandedMeso(expandedMeso === mi ? null : mi)}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                      <span style={{ fontWeight: 600, fontSize: 12 }}>
-                        {PHASE_LABELS[mc.type] || 'Рабочая фаза'} — Мезоцикл {mi + 1}
-                        <span style={{ fontSize: 9, color: 'var(--text-dim)', marginLeft: 6 }}>{expandedMeso === mi ? '▴' : '▾'}</span>
+                    <div style={{ display:'flex', justifyContent:'space-between', padding:'6px 8px', cursor:'pointer' }}>
+                      <span style={{ fontWeight:600, fontSize:11, color:'rgba(255,255,255,0.7)' }}>
+                        {PHASE_LABELS[mc.type] || 'Рабочая фаза'} <span style={{ fontSize:8, color:'rgba(255,255,255,0.2)' }}>Мезо {mi + 1}</span>
                       </span>
-                      <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>{mc.weeks} нед (нед {mc.weekStart + 1}–{mc.weekStart + mc.weeks})</span>
+                      <span style={{ fontSize:9, color:'rgba(255,255,255,0.3)' }}>{mc.weeks} нед ({mc.weekStart + 1}–{mc.weekStart + mc.weeks}) {expandedMeso === mi ? '▴' : '▾'}</span>
                     </div>
-                    <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 4 }}>
+                    <div style={{ fontSize:8, color:'rgba(255,255,255,0.25)', padding:'0 8px 4px' }}>
                       {PHASE_HINTS[mc.type] || 'Стабильная рабочая фаза с контролем объёма, интенсивности и восстановления.'}
                     </div>
-                    <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-                      {Array.from({ length: mc.weeks }, (_, wi) => (
-                        <div key={wi} style={{
-                          width: 24, height: 24, borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          background: selectedWeek === mc.weekStart + wi + 1 ? 'var(--accent)' : 'rgba(255,255,255,0.05)',
-                          border: selectedWeek === mc.weekStart + wi + 1 ? '1px solid var(--accent)' : '1px solid var(--border)',
-                          fontSize: 9, color: selectedWeek === mc.weekStart + wi + 1 ? '#000' : 'var(--text-dim)',
-                          cursor: 'pointer',
-                        }} onClick={(e) => { e.stopPropagation(); setSelectedWeek(mc.weekStart + wi + 1); setTab('plan'); }}>
-                          {mc.weekStart + wi + 1}
-                        </div>
-                      ))}
+                    {/* Week squares */}
+                    <div style={{ display:'flex', gap:3, flexWrap:'wrap', padding:'0 8px 6px' }}>
+                      {Array.from({ length: mc.weeks }, (_, wi) => {
+                        const weekNum = mc.weekStart + wi + 1;
+                        const micro = mc.microcycles?.[wi];
+                        const isDeload = micro?.isDeload;
+                        return <div key={wi} style={{
+                          width:22, height:22, borderRadius:4, display:'flex', alignItems:'center', justifyContent:'center',
+                          background: selectedWeek === weekNum ? 'rgba(0,230,138,0.3)' : isDeload ? 'rgba(107,114,128,0.2)' : 'rgba(255,255,255,0.04)',
+                          border: selectedWeek === weekNum ? '1px solid #00e68a' : '1px solid rgba(255,255,255,0.06)',
+                          fontSize:8, color: selectedWeek === weekNum ? '#00e68a' : 'rgba(255,255,255,0.4)',
+                          cursor:'pointer', transition:'all 0.15s',
+                        }} onClick={(e) => { e.stopPropagation(); setSelectedWeek(weekNum); setTab('plan'); }}>
+                          {weekNum}
+                        </div>;
+                      })}
                     </div>
+                    {/* Expanded detail */}
                     {expandedMeso === mi && (
-                      <div style={{ marginTop: 6, borderTop: '1px solid var(--border)', paddingTop: 6 }}>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 4, marginBottom: 6, fontSize: 9 }}>
-                          <div style={{ background: 'rgba(0,230,138,0.05)', borderRadius: 4, padding: 4, textAlign: 'center' }}>
-                            <div style={{ color: 'var(--text-dim)' }}>Тип мезоцикла</div>
-                            <div style={{ fontWeight: 600, color: 'var(--accent)' }}>{mc.type || 'Рабочий'}</div>
-                          </div>
-                          <div style={{ background: 'rgba(0,230,138,0.05)', borderRadius: 4, padding: 4, textAlign: 'center' }}>
-                            <div style={{ color: 'var(--text-dim)' }}>Объём</div>
-                            <div style={{ fontWeight: 600, color: 'var(--accent)' }}>{(mc.microcycles?.[0]?.volumeMultiplier ?? 1).toFixed(1)}×</div>
-                          </div>
-                          <div style={{ background: 'rgba(0,230,138,0.05)', borderRadius: 4, padding: 4, textAlign: 'center' }}>
-                            <div style={{ color: 'var(--text-dim)' }}>RIR</div>
-                            <div style={{ fontWeight: 600, color: 'var(--accent)' }}>{mc.microcycles?.[0]?.rirRange?.[0] ?? 1}-{mc.microcycles?.[0]?.rirRange?.[1] ?? 3}</div>
-                          </div>
+                      <div style={{ borderTop:'1px solid rgba(255,255,255,0.04)', padding:'6px 8px' }}>
+                        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:4, marginBottom:4 }}>
+                          {[
+                            { label:'Тип', value: mc.type || 'Рабочий', color:'#00e68a' },
+                            { label:'Объём', value: `${(mc.microcycles?.[0]?.volumeMultiplier ?? 1).toFixed(1)}×`, color:'#60a5fa' },
+                            { label:'RIR', value: `${mc.microcycles?.[0]?.rirRange?.[0] ?? 1}-${mc.microcycles?.[0]?.rirRange?.[1] ?? 3}`, color:'#f59e0b' },
+                          ].map((s,i) => <div key={i} style={{ background:'rgba(255,255,255,0.02)', borderRadius:6, padding:'3px 6px', textAlign:'center' }}>
+                            <div style={{ fontSize:7, color:'rgba(255,255,255,0.3)' }}>{s.label}</div>
+                            <div style={{ fontSize:10, fontWeight:700, color:s.color }}>{s.value}</div>
+                          </div>)}
                         </div>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 4, fontSize: 9, marginBottom: 6 }}>
-                          <div style={{ background: 'rgba(0,230,138,0.05)', borderRadius: 4, padding: 4, textAlign: 'center' }}>
-                            <div style={{ color: 'var(--text-dim)' }}>RPE</div>
-                            <div style={{ fontWeight: 600, color: 'var(--accent)' }}>{mc.microcycles?.[0]?.rpeTarget ?? 7}</div>
-                          </div>
-                          <div style={{ background: 'rgba(0,230,138,0.05)', borderRadius: 4, padding: 4, textAlign: 'center' }}>
-                            <div style={{ color: 'var(--text-dim)' }}>Сплит</div>
-                            <div style={{ fontWeight: 600, color: 'var(--accent)' }}>{goal === 'bulk' ? 'Гипертрофия' : goal === 'strength' ? 'Сила' : goal === 'cut' ? 'Сушка' : 'Баланс'}</div>
-                          </div>
-                          <div style={{ background: 'rgba(0,230,138,0.05)', borderRadius: 4, padding: 4, textAlign: 'center' }}>
-                            <div style={{ color: 'var(--text-dim)' }}>Дней/нед</div>
-                            <div style={{ fontWeight: 600, color: 'var(--accent)' }}>{daysPerWeek}</div>
-                          </div>
+                        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:4, fontSize:8 }}>
+                          {[
+                            { label:'RPE', value: `${mc.microcycles?.[0]?.rpeTarget ?? 7}`, color:'#00e68a' },
+                            { label:'Сплит', value: goal === 'bulk' ? 'Гипертрофия' : goal === 'strength' ? 'Сила' : goal === 'cut' ? 'Сушка' : 'Баланс', color:'#a78bfa' },
+                            { label:'Дней', value: `${daysPerWeek}`, color:'#f59e0b' },
+                          ].map((s,i) => <div key={i} style={{ background:'rgba(255,255,255,0.02)', borderRadius:6, padding:'3px', textAlign:'center' }}>
+                            <span style={{ color:'rgba(255,255,255,0.3)' }}>{s.label}: <b style={{ color:s.color }}>{s.value}</b></span>
+                          </div>)}
                         </div>
                         {mc.microcycles && mc.microcycles.length > 0 && (
-                          <div style={{ fontSize: 9, color: 'var(--text-dim)', marginTop: 4 }}>
-                            Микроциклов: <b>{mc.microcycles.length}</b> |
-                            Дней/нед: <b>{daysPerWeek}</b> |
-                            Прогрессия: <b style={{ color: 'var(--accent)' }}>{mc.type === 'accumulation' ? '+объём' : mc.type === 'intensification' ? '+интенсивность' : mc.type === 'peaking' ? 'пик' : 'разгрузка'}</b>
+                          <div style={{ fontSize:8, color:'rgba(255,255,255,0.25)', marginTop:4 }}>
+                            Микроциклов: {mc.microcycles.length} | Прогрессия: <b style={{ color:'#00e68a' }}>{mc.type === 'accumulation' ? '+объём' : mc.type === 'intensification' ? '+интенсивность' : mc.type === 'peaking' ? 'пик' : 'разгрузка'}</b>
                           </div>
                         )}
                       </div>
@@ -2977,66 +2994,52 @@ export const TrainingScreen: React.FC = () => {
 
               {/* Projected max-out */}
               {diaryStats.length > 0 && (
-                <div className="card" style={{ padding: '10px 12px', border: '1px solid rgba(0,230,138,0.2)', marginBottom: 8 }}>
-                  <h4 style={{ margin: '0 0 6px', fontSize: 12, color: 'var(--accent)' }}>🎯 Прогноз к концу макроцикла</h4>
-                  <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 4 }}>
+                <div style={{ ...gCard, border:'1px solid rgba(0,230,138,0.15)' }}>
+                  <div style={gLabel}>🎯 Прогноз к концу макроцикла</div>
+                  <div style={{ fontSize:9, color:'rgba(255,255,255,0.3)', marginBottom:4 }}>
                     {macrocycle?.totalWeeks || 12} нед × {(trainingOutput?.estimatedProgress || 2)}%/нед прогресс
                   </div>
-                  {diaryStats.slice(0, 3).map(s => {
+                  {diaryStats.slice(0,3).map(s => {
                     const projected = Math.round(s.max1RM * (1 + (trainingOutput?.estimatedProgress || 2) / 100 * (macrocycle?.totalWeeks || 12)));
                     const gain = projected - Math.round(s.max1RM);
-                    return (
-                      <div key={s.exerciseId} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, padding: '2px 0' }}>
-                        <span>{s.exerciseName}</span>
-                        <span style={{ color: 'var(--text-dim)' }}>{Math.round(s.max1RM)} → <b style={{ color: '#22c55e' }}>{projected}</b> кг (+{gain})</span>
-                      </div>
-                    );
+                    return <div key={s.exerciseId} style={{ display:'flex', justifyContent:'space-between', fontSize:9, padding:'2px 0' }}>
+                      <span style={{ color:'rgba(255,255,255,0.5)' }}>{s.exerciseName}</span>
+                      <span style={{ color:'rgba(255,255,255,0.3)' }}>{Math.round(s.max1RM)} → <b style={{ color:'#34d399' }}>{projected}</b> кг <span style={{ color:'#34d399' }}>(+{gain})</span></span>
+                    </div>;
                   })}
                 </div>
               )}
 
-              <div className="card" style={{ padding: '10px 12px' }}>
-                <h4 style={{ margin: '0 0 6px', fontSize: 12 }}>📊 Параметры фаз</h4>
+              {/* Phase params */}
+              <div style={gCard}>
+                <div style={gLabel}>📊 Параметры фаз</div>
                 {macrocycle?.mesocycles?.map((mc, mi) => {
                   const firstMicro = mc.microcycles?.[0];
                   const vol = firstMicro?.volumeMultiplier || 1;
                   const rirLo = firstMicro?.rirRange?.[0] ?? 1;
                   const rirHi = firstMicro?.rirRange?.[1] ?? 3;
                   const rpe = firstMicro?.rpeTarget || 7;
-                  return (
-                    <div key={mi} style={{ marginBottom: 4, padding: '4px 6px', background: 'var(--bg-secondary)', borderRadius: 4, fontSize: 10 }}>
-                      <span style={{ fontWeight: 600 }}>
-                        {PHASE_LABELS[mc.type] || mc.type || 'Фаза'} — Мезо {mi + 1}
-                      </span>
-                      <span style={{ color: 'var(--text-dim)', marginLeft: 6 }}>
-                        Объём: {vol}× | RIR: {rirLo}-{rirHi} | RPE: {rpe} | {mc.weeks} нед
-                      </span>
-                    </div>
-                  );
+                  return <div key={mi} style={{ marginBottom:3, padding:'4px 6px', borderRadius:6, background:'rgba(255,255,255,0.02)', fontSize:9 }}>
+                    <span style={{ fontWeight:600, color:'rgba(255,255,255,0.6)' }}>{PHASE_LABELS[mc.type] || mc.type || 'Фаза'}</span>
+                    <span style={{ color:'rgba(255,255,255,0.25)', marginLeft:4 }}>Объём: {vol}× | RIR: {rirLo}-{rirHi} | RPE: {rpe} | {mc.weeks} нед</span>
+                  </div>;
                 })}
-                {!macrocycle && (
-                  <div style={{ fontSize: 9, color: 'var(--text-dim)', textAlign: 'center', padding: 8 }}>Сгенерируйте макроцикл для отображения параметров</div>
-                )}
               </div>
 
-              <div style={{marginBottom:8}}>
-                <button onClick={() => {
-                  try {
-                    const existing = JSON.parse(localStorage.getItem('myTrainingCycles') || '[]');
-                    existing.push({ id: 'cycle_' + Date.now(), name: ((macrocycle?.totalWeeks || 12) + '-нед макроцикл'), date: new Date().toISOString(), weeks: macrocycle?.totalWeeks || 12, goal, level, days: daysPerWeek });
-                    localStorage.setItem('myTrainingCycles', JSON.stringify(existing));
-                    setMyCycleMsg('✅ Цикл добавлен в «Мои циклы»!');
-                    setTimeout(() => setMyCycleMsg(''), 3000);
-                  } catch {}
-                }} style={{
-                  width:'100%', padding:8, borderRadius:8, border:'1px solid var(--accent)', cursor:'pointer',
-                  background:'rgba(0,230,138,0.08)', color:'var(--accent)', fontWeight:600, fontSize:11,
-                }}>📋 В мои циклы</button>
-                {myCycleMsg && <div style={{ padding:'6px 10px', borderRadius:6, background:'rgba(139,92,246,0.1)', border:'1px solid rgba(139,92,246,0.3)', color:'#8b5cf6', fontSize:10, marginTop:4, textAlign:'center' }}>{myCycleMsg}</div>}
-              </div>
-
-            </>
-          )}
+              {/* Save to my cycles */}
+              <button onClick={() => { try {
+                const existing = JSON.parse(localStorage.getItem('myTrainingCycles') || '[]');
+                existing.push({ id:'cycle_' + Date.now(), name: (macrocycle?.totalWeeks || 12) + '-нед ' + goalName, date: new Date().toISOString(), weeks: macrocycle?.totalWeeks || 12, goal, level, days: daysPerWeek });
+                localStorage.setItem('myTrainingCycles', JSON.stringify(existing));
+                setMyCycleMsg('✅ Цикл добавлен в «Мои циклы»!');
+                setTimeout(() => setMyCycleMsg(''), 3000);
+              } catch {} }} style={{
+                width:'100%', padding:9, borderRadius:10, border:'1px solid rgba(0,230,138,0.3)', cursor:'pointer',
+                background:'rgba(0,230,138,0.06)', color:'#00e68a', fontWeight:600, fontSize:11,
+              }}>📋 В мои циклы</button>
+              {myCycleMsg && <div style={{ padding:'6px 10px', borderRadius:6, background:'rgba(139,92,246,0.08)', border:'1px solid rgba(139,92,246,0.2)', color:'#8b5cf6', fontSize:10, marginTop:4, textAlign:'center' }}>{myCycleMsg}</div>}
+            </>);
+          })()}
           </div>
         )}
       {/* ═══════════ HISTORY TAB ═══════════ */}

@@ -161,23 +161,150 @@ const EXTENDED_SPLITS: Record<string, { name: string; desc: string; groupsPerDay
 
 const REST_DAY_NAME = { 0: 'Пн', 1: 'Вт', 2: 'Ср', 3: 'Чт', 4: 'Пт', 5: 'Сб', 6: 'Вс' };
 
-const MESOCYCLE_SEQUENCES: Record<string, MesocycleType[][]> = {
-  beginner: [
-    ['accumulation', 'accumulation', 'accumulation', 'deload'],
-    ['accumulation', 'accumulation', 'intensification', 'deload'],
-  ],
-  intermediate: [
-    ['accumulation', 'intensification', 'intensification', 'deload'],
-    ['accumulation', 'intensification', 'peaking', 'deload'],
-  ],
-  advanced: [
-    ['accumulation', 'accumulation', 'intensification', 'intensification', 'peaking', 'deload'],
-    ['accumulation', 'intensification', 'peaking', 'deload'],
-  ],
-  enhanced: [
-    ['accumulation', 'accumulation', 'intensification', 'intensification', 'peaking', 'peaking', 'deload'],
-    ['accumulation', 'intensification', 'intensification', 'peaking', 'deload'],
-  ],
+// ════════════════════════════════════════════════
+// GOAL-SPECIFIC CYCLE SEQUENCES
+// Each goal has different phase structure:
+//   bulk:     more accumulation for volume/mass
+//   cut:      shorter intensity + deload (avoid catabolism)
+//   strength: emphasis on peaking, less accumulation
+//   rehab:    recovery-heavy
+//   recomp:   balanced
+// ════════════════════════════════════════════════
+const GOAL_CYCLE_SEQUENCES: Record<string, Record<string, MesocycleType[][]>> = {
+  bulk: {
+    beginner: [
+      ['accumulation','accumulation','accumulation','intensification','deload'],
+      ['accumulation','accumulation','intensification','deload'],
+    ],
+    intermediate: [
+      ['accumulation','accumulation','intensification','intensification','deload'],
+      ['accumulation','intensification','intensification','peaking','deload'],
+    ],
+    advanced: [
+      ['accumulation','accumulation','accumulation','intensification','intensification','peaking','deload'],
+      ['accumulation','accumulation','intensification','peaking','deload'],
+    ],
+    enhanced: [
+      ['accumulation','accumulation','accumulation','intensification','intensification','peaking','peaking','deload'],
+      ['accumulation','accumulation','intensification','intensification','peaking','deload'],
+    ],
+  },
+  cut: {
+    beginner: [
+      ['accumulation','intensification','deload'],
+      ['accumulation','intensification','peaking','deload'],
+    ],
+    intermediate: [
+      ['accumulation','intensification','deload'],
+      ['accumulation','intensification','peaking','deload'],
+    ],
+    advanced: [
+      ['accumulation','intensification','intensification','peaking','deload'],
+      ['accumulation','intensification','peaking','deload'],
+    ],
+    enhanced: [
+      ['accumulation','intensification','intensification','peaking','deload'],
+      ['accumulation','intensification','peaking','peaking','deload'],
+    ],
+  },
+  strength: {
+    beginner: [
+      ['accumulation','intensification','peaking','deload'],
+      ['intensification','intensification','peaking','deload'],
+    ],
+    intermediate: [
+      ['accumulation','intensification','intensification','peaking','deload'],
+      ['accumulation','intensification','peaking','deload'],
+    ],
+    advanced: [
+      ['accumulation','intensification','intensification','peaking','deload'],
+      ['intensification','intensification','peaking','peaking','deload'],
+    ],
+    enhanced: [
+      ['intensification','intensification','peaking','peaking','deload'],
+      ['accumulation','intensification','intensification','peaking','peaking','deload'],
+    ],
+  },
+  maintenance: {
+    beginner: [
+      ['accumulation','accumulation','deload'],
+      ['accumulation','intensification','deload'],
+    ],
+    intermediate: [
+      ['accumulation','intensification','deload'],
+      ['accumulation','accumulation','intensification','deload'],
+    ],
+    advanced: [
+      ['accumulation','intensification','peaking','deload'],
+      ['accumulation','accumulation','peaking','deload'],
+    ],
+    enhanced: [
+      ['accumulation','intensification','peaking','deload'],
+      ['accumulation','intensification','intensification','deload'],
+    ],
+  },
+  recomp: {
+    beginner: [
+      ['accumulation','accumulation','intensification','deload'],
+      ['accumulation','intensification','intensification','deload'],
+    ],
+    intermediate: [
+      ['accumulation','intensification','intensification','peaking','deload'],
+      ['accumulation','accumulation','intensification','peaking','deload'],
+    ],
+    advanced: [
+      ['accumulation','intensification','intensification','peaking','deload'],
+      ['accumulation','accumulation','intensification','peaking','deload'],
+    ],
+    enhanced: [
+      ['accumulation','accumulation','intensification','intensification','peaking','deload'],
+      ['accumulation','intensification','intensification','peaking','peaking','deload'],
+    ],
+  },
+  rehab: {
+    beginner: [
+      ['accumulation','recovery','deload'],
+      ['recovery','accumulation','deload'],
+    ],
+    intermediate: [
+      ['accumulation','recovery','recovery','deload'],
+      ['recovery','accumulation','recovery','deload'],
+    ],
+    advanced: [
+      ['accumulation','recovery','recovery','accumulation','deload'],
+      ['recovery','accumulation','accumulation','deload'],
+    ],
+    enhanced: [
+      ['accumulation','recovery','accumulation','recovery','deload'],
+      ['recovery','accumulation','recovery','accumulation','deload'],
+    ],
+  },
+};
+
+// Cycle type config: specific phase curves
+const CYCLE_TYPE_CONFIG: Record<string, {
+  label: string;
+  desc: string;
+  weekMod: number;
+  seqPreference: number; // 0 = first, 1 = second
+  volumeCurve: 'linear' | 'wave' | 'inverted';
+  compoundPriority: number; // 0-1, higher = more compounds
+}> = {
+  bb_mass: { label: 'Масса', desc: 'Акцент на гипертрофию: высокий объём, умеренные веса, много изоляции', weekMod: 4, seqPreference: 0, volumeCurve: 'wave', compoundPriority: 0.3 },
+  bb_specialization: { label: 'Специализация', desc: 'Акцент на отстающие группы: PPL с увеличенным объёмом на слабые мышцы', weekMod: 4, seqPreference: 0, volumeCurve: 'wave', compoundPriority: 0.4 },
+  pl_peaking: { label: 'Пауэрлифтинг', desc: 'Максимум силы: низкий объём, высокие веса, пик на 1ПМ', weekMod: 0, seqPreference: 1, volumeCurve: 'linear', compoundPriority: 0.9 },
+  wl_tech: { label: 'Тяжелоатлет', desc: 'Технические движения: рывок/толчок, подсобка, гибкость', weekMod: -2, seqPreference: 1, volumeCurve: 'linear', compoundPriority: 0.8 },
+  cf_cond: { label: 'Кроссфит', desc: 'Кондиционирование: метконы, круговые, высокая частота', weekMod: -2, seqPreference: 0, volumeCurve: 'wave', compoundPriority: 0.6 },
+  rehab: { label: 'Реабилитация', desc: 'Восстановление после травм: низкий объём, контролируемые движения', weekMod: -4, seqPreference: 1, volumeCurve: 'inverted', compoundPriority: 0.3 },
+};
+
+const GOAL_WEEK_RANGES: Record<string, { min: number; max: number }> = {
+  bulk: { min: 12, max: 20 },
+  cut: { min: 8, max: 14 },
+  strength: { min: 8, max: 16 },
+  maintenance: { min: 8, max: 12 },
+  recomp: { min: 10, max: 16 },
+  rehab: { min: 6, max: 12 },
 };
 
 export const MESOCYCLE_PARAMS: Record<MesocycleType, { volumeMultiplier: number; rirRange: [number, number]; rpeTarget: number; description: string }> = {
@@ -188,27 +315,55 @@ export const MESOCYCLE_PARAMS: Record<MesocycleType, { volumeMultiplier: number;
   recovery: { volumeMultiplier: 0.4, rirRange: [4, 6], rpeTarget: 5, description: 'Восстановительный блок. Лёгкая активность, полный диапазон. Для реабилитации и делодов.' },
 };
 
+// Volume curve shaping per week within a mesocycle
+function applyVolumeCurve(base: number, w: number, totalMesoWeeks: number, curve: 'linear' | 'wave' | 'inverted'): number {
+  const t = totalMesoWeeks > 1 ? w / (totalMesoWeeks - 1) : 0;
+  switch (curve) {
+    case 'linear':  return base * (0.8 + 0.4 * t);             // Ramp up
+    case 'wave':    return base * (1.0 + 0.15 * Math.sin(t * Math.PI * 2)); // Oscillate
+    case 'inverted': return base * (1.2 - 0.4 * t);            // Ramp down
+    default: return base;
+  }
+}
+
 export function generateMacrocycle(input: MacrocycleInput): MacrocyclePlan {
   const { goal, level, daysPerWeek, readinessScore, isOnCourse, weakPoints, injuries, periodizationType, cycleType } = input;
   const levelConfig = LEVEL_CONFIGS[level] || LEVEL_CONFIGS.intermediate;
   const goalConfig = GOAL_CONFIGS[goal] || GOAL_CONFIGS.maintenance;
+  const goalSeq = GOAL_CYCLE_SEQUENCES[goal] || GOAL_CYCLE_SEQUENCES.maintenance;
+  const levelSeqs = goalSeq[level] || goalSeq.intermediate;
 
-  // Periodization-based total weeks
-  let totalWeeks = level === 'beginner' ? 12 : level === 'intermediate' ? 16 : level === 'advanced' ? 16 : 20;
-  if (periodizationType === 'linear') totalWeeks = Math.max(totalWeeks, 12);
-  else if (periodizationType === 'block') totalWeeks = Math.min(totalWeeks + 4, 24);
+  // Pick cycle type config
+  const ctCfg = cycleType ? CYCLE_TYPE_CONFIG[cycleType] : undefined;
 
-  // Cycle type overrides total weeks
-  if (cycleType === 'bb_specialization') totalWeeks = Math.max(totalWeeks, 16);
-  if (cycleType === 'pl_peaking') totalWeeks = Math.max(totalWeeks, 12);
-  if (cycleType === 'wl_tech') totalWeeks = Math.min(totalWeeks, 12);
+  // Total weeks: base from goal range, then modified by level and periodization type
+  const weekRange = GOAL_WEEK_RANGES[goal] || { min: 8, max: 16 };
+  const levelMulti = level === 'beginner' ? 0.8 : level === 'intermediate' ? 1.0 : level === 'advanced' ? 1.1 : 1.2;
+  let totalWeeks = Math.round((weekRange.min + (weekRange.max - weekRange.min) * (isOnCourse ? 0.7 : 0.5)) * levelMulti);
 
-  const sequences = MESOCYCLE_SEQUENCES[level] || MESOCYCLE_SEQUENCES.intermediate;
-  let sequenceIdx = isOnCourse ? 0 : (goal === 'strength' ? 1 : 0);
-  // Periodization type modifies sequence index
+  if (periodizationType === 'linear') totalWeeks = Math.max(totalWeeks, 10);
+  else if (periodizationType === 'block') totalWeeks = Math.min(totalWeeks + 4, 20);
+  if (periodizationType === 'undulating') totalWeeks = Math.round(totalWeeks * 1.1);
+
+  // Cycle type week mod
+  if (ctCfg) totalWeeks += ctCfg.weekMod;
+  totalWeeks = Math.max(4, Math.min(24, totalWeeks));
+
+  // Pick sequence: use cycle type pref or derive from goal+level
+  let sequenceIdx: number;
+  if (ctCfg) {
+    sequenceIdx = ctCfg.seqPreference;
+  } else {
+    sequenceIdx = goal === 'strength' ? 1 : goal === 'cut' ? 0 : goal === 'bulk' ? 0 : isOnCourse ? 0 : 1;
+  }
   if (periodizationType === 'undulating') sequenceIdx = 1;
   if (periodizationType === 'block') sequenceIdx = isOnCourse ? 1 : 0;
-  const sequence = sequences[Math.min(sequenceIdx, sequences.length - 1)];
+  const sequence = levelSeqs[Math.min(sequenceIdx, levelSeqs.length - 1)];
+
+  // Volume curve shape per goal/cycle
+  const curve: 'linear' | 'wave' | 'inverted' = ctCfg?.volumeCurve || (goal === 'strength' ? 'linear' : goal === 'cut' ? 'linear' : goal === 'bulk' ? 'wave' : goal === 'rehab' ? 'inverted' : 'wave');
+
+  const compoundPriority = ctCfg?.compoundPriority ?? (goal === 'strength' ? 0.85 : goal === 'cut' ? 0.5 : goal === 'bulk' ? 0.35 : 0.5);
 
   let adjustedReadiness = readinessScore;
   if (isOnCourse) adjustedReadiness = Math.min(100, readinessScore + 15);
@@ -226,12 +381,17 @@ export function generateMacrocycle(input: MacrocycleInput): MacrocyclePlan {
       const readinessMod = adjustedReadiness < 40 ? 0.6 : adjustedReadiness < 60 ? 0.8 : adjustedReadiness < 75 ? 0.9 : 1.0;
       const courseMod = isOnCourse ? 1.15 : 1.0;
       const weekRir = params.rirRange[0] + Math.round((params.rirRange[1] - params.rirRange[0]) * (w / Math.max(1, mesoWeeks - 1)));
-      const adjustedVolume = params.volumeMultiplier * goalConfig.volumeMod * readinessMod * courseMod;
+
+      // Apply volume curve per week within the mesocycle
+      const curveBase = params.volumeMultiplier * goalConfig.volumeMod * readinessMod * courseMod;
+      const adjustedVolume = applyVolumeCurve(curveBase, w, mesoWeeks, curve);
+
+      const goalRepsRange: [number, number] = goal === 'strength' ? [3, 6] : goal === 'cut' ? [10, 15] : goal === 'bulk' ? [8, 12] : goalConfig.repsRange;
 
       const days = generateWeekDays(
         daysPerWeek, goal, level, adjustedVolume, weekRir, params.rpeTarget,
-        goalConfig.repsRange, goalConfig.restSeconds,
-        isDeload, weakPoints, injuries
+        goalRepsRange, goalConfig.restSeconds,
+        isDeload, weakPoints, injuries, compoundPriority
       );
 
       micros.push({
@@ -277,7 +437,8 @@ function generateWeekDays(
   restSeconds: number,
   isDeload: boolean,
   weakPoints: string[],
-  injuries: string[]
+  injuries: string[],
+  compoundPriority: number = 0.5
 ): TrainingDayPlan[] {
   const dayNames = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
   const trainingDays = getTrainingDayPattern(daysPerWeek);
@@ -300,14 +461,19 @@ function generateWeekDays(
 
         const isWeak = weakPoints.includes(group);
         const shuffleArr = <T,>(arr: T[]): T[] => [...arr].sort(() => Math.random() - 0.5);
+
+        // Adjust compound/isolation ratio based on compoundPriority
+        const compoundCount = isDeload ? 1 : Math.max(1, Math.round(compoundPriority * 2.5));
+        const isolationCount = isDeload ? 0 : isWeak && !isDeload ? Math.max(1, Math.round((1 - compoundPriority) * 2.5) + 1) : Math.max(0, Math.round((1 - compoundPriority) * 2));
+
         const compounds = shuffleArr(groupExercises
           .filter(e => e.type === 'compound' && (!avoidHighJoint || e.jointStress !== 'high') && (!isDeload || e.fatigueCost <= 6) && (level === 'beginner' ? e.difficulty !== 'advanced' : true))
           .sort((a, b) => (a.order ?? 2) - (b.order ?? 2)))
-          .slice(0, isDeload ? 1 : 2);
+          .slice(0, compoundCount);
         const isolations = shuffleArr(groupExercises
           .filter(e => e.type === 'isolation' && (!avoidHighJoint || e.jointStress !== 'high') && (!isDeload || e.fatigueCost <= 4))
           .sort((a, b) => (a.order ?? 3) - (b.order ?? 3)))
-          .slice(0, isWeak && !isDeload ? 2 : 1);
+          .slice(0, isolationCount);
 
         for (const ex of [...compounds, ...isolations]) {
           const prescription = calcExercisePrescription(ex, goal, level, isWeak, isDeload, volumeMultiplier);
