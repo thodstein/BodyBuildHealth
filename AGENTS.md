@@ -228,6 +228,21 @@ if (shouldApplyPenalty && finalResult.systemBreakdown) {
 - **`NutritionDiary`**: full rewrite — no glass, white text, clear active states, solid dark modals
 - **`IndividualPlan`**: `GlassCard`/`PillBtn`/`inputStyle`/`reportPillStyle` — no glass, solid backgrounds
 - **`PharmaCourseScreen`**: drug picker modal — no glass/blur overlay, visible inactive pills (`#202023` + `#3f3f46`), substance cards solid, class selector maxHeight 300 (not 100), visible day buttons
+- **`IndividualPlan.tsx` redesign** — full card modernization:
+  - **Training day picker**: Пн-Вс toggles in cycling card for macro/butch modes (green=training, dark=rest)
+  - **KBJU карточка**: big macro tiles with per-kg, gradient backgrounds, colored top border, macro distribution bar (Б/Ж/У %), edit button
+  - **Meal plan cards**: gradient day headers with large kcal badge, macro progress bars per target (Б/Ж/У vs targets), colored meal blocks with vertical accent bar, item chips with dark bg, meal macro % distribution
+  - **GlassCard upgrade**: 3px colored top gradient bar per card, 14px padding, 700-weight title, 10px → 12px font
+  - **All cards** got `color` accent props: 👤#a78bfa, 🎯#00e68a, 💉#06b6d4, 🏋️#22c55e, 📊#00e68a, 💰#f59e0b, 📈#22c55e, ⏰#06b6d4, ⚠️#ef4444, 📋#a855f7, 🍎#f59e0b, 🔄#3b82f6, 📐#00e68a, 📋#00e68a, 🛒#f97316, 💧#06b6d4, 📊#3b82f6, 💡#a855f7, 👨‍🍳#06b6d4, 📂#8b5cf6, 📖#8b5cf6
+  - **Separate calculators** (чимил/углезагрузка/БУЧ): solid dark buttons with accent text
+  - **БУЧ display**: 2-column card (ВУ green / НУ red) with big numbers
+  - **Green button**: `boxShadow` for depth
+  - **Week plan**: per-day cards with training/rest icon, kcal badge, inline food list
+  - **Saved plans**: `#202023` collapsed state, expanded with full detail
+  - **Meal prep steps**: solid dark step cards, cyan items chips
+  - **Water balance**: breakdown with calculation details + big total
+  - All inactive backgrounds changed from `rgba(255,255,255,0.02)` → `#202023`; borders from `rgba(255,255,255,0.06)` → `#27272a`
+  - All inputs/selects consistently use `#202023`/`#27272a`
 - `tsc --noEmit` ✓, `vite build` ✓
 
 ## Build Commands

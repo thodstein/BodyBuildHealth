@@ -73,13 +73,15 @@ const getDefaultKcal = (profile: UserProfile | null) => {
 
 const GlassCard: React.FC<{ title?: string; icon?: string; color?: string; style?: React.CSSProperties; children: React.ReactNode }> = ({ title, icon, color, style, children }) => (
   <div style={{
-    padding: 12, borderRadius: 14,
+    padding: 14, borderRadius: 14,
     background: '#18181b',
     border: '1px solid #27272a',
+    position: 'relative', overflow: 'hidden',
     ...style,
   }}>
-    {title && <div style={{ fontSize: 10, color: color || 'rgba(255,255,255,0.5)', fontWeight: 600, marginBottom: 8, display: 'flex', alignItems: 'center', gap: 4 }}>
-      {icon && <span>{icon}</span>}{title}
+    {color && <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: `linear-gradient(90deg, ${color}, ${color}66)` }} />}
+    {title && <div style={{ fontSize: 11, color: color || 'rgba(255,255,255,0.5)', fontWeight: 700, marginBottom: 10, display: 'flex', alignItems: 'center', gap: 5, letterSpacing: '0.3px' }}>
+      {icon && <span style={{ fontSize: 14 }}>{icon}</span>}{title}
     </div>}
     {children}
   </div>
@@ -110,6 +112,7 @@ const greenBtn: React.CSSProperties = {
   width: '100%', padding: 8, borderRadius: 8, border: 'none', cursor: 'pointer',
   background: 'linear-gradient(135deg,#00e68a,#00c8a0)', color: '#000',
   fontWeight: 700, fontSize: 11,
+  transition: 'box-shadow 0.2s, transform 0.15s',
 };
 
 const reportPillStyle = (color: string, active: boolean): React.CSSProperties => ({
@@ -229,6 +232,8 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
   // 13-14: Cycling toggles
   const [cyclingMode, setCyclingMode] = useState<CycleType>('none');
   const [heavyTrainDay, setHeavyTrainDay] = useState('');
+  const [trainingDays, setTrainingDays] = useState<boolean[]>([true, false, true, false, true, true, false]);
+  const DAY_LABELS = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
 
   // 15. Plan generation
   const [generated, setGenerated] = useState(false);
@@ -426,9 +431,9 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
     };
 
     // Build plans
-    const d1 = buildDay(0, true);
-    const d2 = buildDay(1, false);
-    const d3 = buildDay(2, true);
+    const d1 = buildDay(0, trainingDays[0]);
+    const d2 = buildDay(1, trainingDays[1]);
+    const d3 = buildDay(2, trainingDays[2]);
     setDayPlan(d1);
 
     if (days >= 3) {
@@ -441,7 +446,7 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
     }
 
     if (days >= 7) {
-      const week = Array.from({ length: 7 }, (_, i) => buildDay(i, i % 3 === 0 || i % 3 === 2));
+      const week = Array.from({ length: 7 }, (_, i) => buildDay(i, trainingDays[i]));
       setWeekPlan({ days: week, totals: {
         kcal: week.reduce((s,d) => s + d.totals.kcal, 0),
         p: week.reduce((s,d) => s + d.totals.p, 0),
@@ -451,7 +456,7 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
     }
 
     // Shopping list
-    const allMeals = [d1, d2, d3, ...(days >= 7 ? Array.from({ length: 7 }, (_, i) => buildDay(i, i % 3 === 0)) : [])];
+    const allMeals = [d1, d2, d3, ...(days >= 7 ? Array.from({ length: 7 }, (_, i) => buildDay(i, trainingDays[i])) : [])];
     const itemMap: Record<string, { name: string; amount: number; category: string }> = {};
     allMeals.forEach(day => day.meals.forEach(m => m.items.forEach((it: any) => {
       if (itemMap[it.name]) itemMap[it.name].amount += it.amount;
@@ -829,44 +834,70 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
   const renderMealList = (dayData: any, editable = false) => {
     if (!dayData) return null;
     const d = dayData;
-    const macroPct = (val: number, total: number) => total > 0 ? Math.min(100, Math.round(val / total * 100)) : 0;
     const totalKcal = Math.round(d.totals?.kcal || 0);
     const totalP = Math.round(d.totals?.p || 0);
     const totalF = Math.round(d.totals?.f || 0);
     const totalC = Math.round(d.totals?.c || 0);
+    const pKcalPct = totalKcal > 0 ? (totalP * 4 / totalKcal) * 100 : 0;
+    const fKcalPct = totalKcal > 0 ? (totalF * 9 / totalKcal) * 100 : 0;
+    const cKcalPct = totalKcal > 0 ? (totalC * 4 / totalKcal) * 100 : 0;
     return (
       <div>
-        {/* Day header */}
+        {/* Day header — card with gradient badge */}
         <div style={{
-          display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8,
-          padding: '6px 10px', borderRadius: 10,
-          background: d.isTrainingDay ? 'linear-gradient(135deg,rgba(0,230,138,0.08),rgba(0,200,160,0.04))' : 'rgba(255,255,255,0.02)',
-          border: d.isTrainingDay ? '1px solid rgba(0,230,138,0.15)' : '1px solid rgba(255,255,255,0.04)',
+          marginBottom: 10, borderRadius: 12, overflow: 'hidden',
+          border: d.isTrainingDay ? '1px solid rgba(0,230,138,0.2)' : '1px solid #27272a',
         }}>
-          <span style={{ fontSize: 14 }}>{d.isTrainingDay ? '🏋️' : '😴'}</span>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 10, fontWeight: 700, color: d.isTrainingDay ? '#00e68a' : 'rgba(255,255,255,0.4)' }}>
-              {d.isTrainingDay ? 'Тренировочный день' : 'День отдыха'}
+          <div style={{
+            padding: '10px 12px',
+            background: d.isTrainingDay ? 'linear-gradient(135deg, rgba(0,230,138,0.1), rgba(0,200,160,0.03))' : '#202023',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+              <span style={{
+                fontSize: 20,
+                filter: d.isTrainingDay ? 'none' : 'grayscale(0.5)',
+              }}>{d.isTrainingDay ? '🏋️' : '😴'}</span>
+              <div style={{ flex: 1 }}>
+                <div style={{
+                  fontSize: 12, fontWeight: 800,
+                  color: d.isTrainingDay ? '#00e68a' : 'rgba(255,255,255,0.4)',
+                  letterSpacing: '0.3px',
+                }}>
+                  {d.isTrainingDay ? '🏆 ТРЕНИРОВОЧНЫЙ ДЕНЬ' : '🛌 ДЕНЬ ОТДЫХА'}
+                </div>
+              </div>
+              {/* Day total big number */}
+              <div style={{
+                padding: '4px 10px', borderRadius: 8,
+                background: d.isTrainingDay ? 'rgba(0,230,138,0.1)' : 'rgba(255,255,255,0.03)',
+                border: d.isTrainingDay ? '1px solid rgba(0,230,138,0.2)' : '1px solid rgba(255,255,255,0.06)',
+              }}>
+                <div style={{ fontSize: 16, fontWeight: 900, color: '#00e68a', lineHeight: 1 }}>{totalKcal}</div>
+                <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.3)', textAlign: 'center' }}>ккал</div>
+              </div>
             </div>
-            <div style={{ display: 'flex', gap: 6, fontSize: 8, color: 'rgba(255,255,255,0.3)', marginTop: 1 }}>
-              <span>🔥 {totalKcal} ккал</span>
-              <span style={{ color: '#3b82f6' }}>💪 {totalP}г Б</span>
-              <span style={{ color: '#f59e0b' }}>🧈 {totalF}г Ж</span>
-              <span style={{ color: '#f97316' }}>🌾 {totalC}г У</span>
+            {/* Day macro summary row */}
+            <div style={{ display: 'flex', gap: 8, fontSize: 9 }}>
+              <span style={{ color: '#3b82f6', fontWeight: 600 }}>💪 {totalP}г Б</span>
+              <span style={{ color: '#f59e0b', fontWeight: 600 }}>🧈 {totalF}г Ж</span>
+              <span style={{ color: '#f97316', fontWeight: 600 }}>🌾 {totalC}г У</span>
+              <span style={{ marginLeft: 'auto', color: 'rgba(255,255,255,0.3)' }}>
+                {weight > 0 ? `${Math.round(totalP / weight)}г/кг` : ''}
+              </span>
             </div>
           </div>
-          {/* Macro bar */}
-          <div style={{ width: 60, height: 6, borderRadius: 3, background: 'rgba(255,255,255,0.06)', overflow: 'hidden', display: 'flex' }}>
-            <div style={{ height: '100%', width: `${(totalP * 4 / Math.max(1, totalKcal)) * 100}%`, background: '#3b82f6', minWidth: 2 }} />
-            <div style={{ height: '100%', width: `${(totalF * 9 / Math.max(1, totalKcal)) * 100}%`, background: '#f59e0b', minWidth: 2 }} />
-            <div style={{ height: '100%', width: `${(totalC * 4 / Math.max(1, totalKcal)) * 100}%`, background: '#f97316', minWidth: 2 }} />
+          {/* Macro distribution thin bar */}
+          <div style={{ height: 4, display: 'flex' }}>
+            <div style={{ height: '100%', width: `${Math.max(2, pKcalPct)}%`, background: '#3b82f6', minWidth: 2 }} />
+            <div style={{ height: '100%', width: `${Math.max(2, fKcalPct)}%`, background: '#f59e0b', minWidth: 2 }} />
+            <div style={{ height: '100%', width: `${Math.max(2, cKcalPct)}%`, background: '#f97316', minWidth: 2, flex: 1 }} />
           </div>
         </div>
 
         {/* Allergens */}
         {d.allergenWarnings?.length > 0 && (
-          <div style={{ padding: '4px 8px', borderRadius: 6, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', fontSize: 8, color: '#ef4444', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 4 }}>
-            <span>⚠️</span>
+          <div style={{ padding: '6px 10px', borderRadius: 8, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', fontSize: 8, color: '#ef4444', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 4 }}>
+            <span style={{ fontSize: 10 }}>⚠️</span>
             <span>{d.allergenWarnings.join('; ')}</span>
           </div>
         )}
@@ -874,67 +905,121 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
         {/* Meals */}
         {d.meals.map((m: any, mi: number) => {
           const mealKcal = Math.round(m.totals?.kcal || 0);
+          const mealP = Math.round(m.totals?.p || 0);
+          const mealF = Math.round(m.totals?.f || 0);
+          const mealC = Math.round(m.totals?.c || 0);
           const isPreWorkout = m.label?.toLowerCase().includes('предтрен');
           const isPostWorkout = m.label?.toLowerCase().includes('пост-трен');
-          const mealBorderColor = isPreWorkout ? '#8b5cf6' : isPostWorkout ? '#f59e0b' : 'rgba(255,255,255,0.06)';
+          const accentColor = isPreWorkout ? '#8b5cf6' : isPostWorkout ? '#f59e0b' : '#00e68a';
           return (
             <div key={mi} style={{
-              marginBottom: 4, padding: '6px 8px', borderRadius: 8,
-              background: isPreWorkout ? 'rgba(139,92,246,0.04)' : isPostWorkout ? 'rgba(245,158,11,0.04)' : 'rgba(255,255,255,0.02)',
-              border: '1px solid ' + mealBorderColor, position: 'relative', transition: 'all 0.2s',
+              marginBottom: 6, borderRadius: 10, overflow: 'hidden',
+              border: `1px solid ${isPreWorkout ? 'rgba(139,92,246,0.2)' : isPostWorkout ? 'rgba(245,158,11,0.2)' : 'rgba(255,255,255,0.06)'}`,
+              transition: 'all 0.2s',
             }}>
               {/* Meal header */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 3 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                  <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.3)' }}>{m.time}</span>
-                  <span style={{ fontSize: 10, fontWeight: 600, color: isPreWorkout ? '#a855f7' : isPostWorkout ? '#f59e0b' : '#00e68a' }}>{m.label}</span>
-                  {isPreWorkout && <span style={{ fontSize: 7, padding: '1px 4px', borderRadius: 4, background: 'rgba(139,92,246,0.15)', color: '#a855f7' }}>До трен</span>}
-                  {isPostWorkout && <span style={{ fontSize: 7, padding: '1px 4px', borderRadius: 4, background: 'rgba(245,158,11,0.15)', color: '#f59e0b' }}>После трен</span>}
+              <div style={{
+                padding: '7px 10px 5px',
+                background: isPreWorkout ? 'rgba(139,92,246,0.06)' : isPostWorkout ? 'rgba(245,158,11,0.06)' : '#202023',
+                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                borderBottom: '1px solid rgba(255,255,255,0.04)',
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                  <span style={{
+                    fontSize: 8, fontWeight: 600, color: 'rgba(255,255,255,0.3)',
+                    fontVariantNumeric: 'tabular-nums',
+                  }}>{m.time}</span>
+                  <span style={{
+                    width: 3, height: 12, borderRadius: 2,
+                    background: accentColor,
+                  }} />
+                  <span style={{ fontSize: 10, fontWeight: 700, color: accentColor }}>{m.label}</span>
+                  {isPreWorkout && <span style={{ fontSize: 7, padding: '1px 5px', borderRadius: 4, background: 'rgba(139,92,246,0.15)', color: '#a855f7', fontWeight: 600 }}>ДО</span>}
+                  {isPostWorkout && <span style={{ fontSize: 7, padding: '1px 5px', borderRadius: 4, background: 'rgba(245,158,11,0.15)', color: '#f59e0b', fontWeight: 600 }}>ПОСЛЕ</span>}
                 </div>
-                <span style={{ fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.6)' }}>{mealKcal} ккал</span>
+                <span style={{ fontSize: 10, fontWeight: 800, color: 'rgba(255,255,255,0.6)' }}>{mealKcal} ккал</span>
               </div>
-
-              {/* Items */}
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
-                {m.items.map((it: any, ii: number) => (
-                  <span key={ii} style={{
-                    padding: '2px 6px', borderRadius: 4, fontSize: 8,
-                    background: 'rgba(255,255,255,0.04)',
-                    border: '1px solid rgba(255,255,255,0.06)',
-                    color: 'rgba(255,255,255,0.7)',
-                    display: 'inline-flex', alignItems: 'center', gap: 3,
-                  }}>
-                    <span style={{ flex:1 }}>{it.name}</span>
-                    <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: 7 }}>{it.amount}г</span>
-                    <span onClick={() => addToCart({ name: it.name, kcal: it.kcal * (it.amount / 100), amount: it.amount, category: it.category })} style={{ cursor:'pointer', fontSize:7, color:'#00e68a', opacity:0.4, padding:'0 2px' }} title="В корзину">🛒</span>
-                  </span>
-                ))}
-              </div>
-
-              {/* Meal micro-macros */}
-              {m.totals && (
-                <div style={{ display: 'flex', gap: 4, marginTop: 3, fontSize: 7, color: 'rgba(255,255,255,0.3)' }}>
-                  <span style={{ color: '#3b82f6' }}>Б: {Math.round(m.totals.p || 0)}г</span>
-                  <span style={{ color: '#f59e0b' }}>Ж: {Math.round(m.totals.f || 0)}г</span>
-                  <span style={{ color: '#f97316' }}>У: {Math.round(m.totals.c || 0)}г</span>
+              {/* Meal items */}
+              <div style={{ padding: '6px 10px 8px', background: '#18181b' }}>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
+                  {m.items.map((it: any, ii: number) => (
+                    <span key={ii} style={{
+                      padding: '3px 8px', borderRadius: 6, fontSize: 8,
+                      background: '#202023',
+                      border: '1px solid rgba(255,255,255,0.06)',
+                      color: 'rgba(255,255,255,0.7)',
+                      display: 'inline-flex', alignItems: 'center', gap: 4,
+                    }}>
+                      <span style={{ fontWeight: 600 }}>{it.name}</span>
+                      <span style={{ color: 'rgba(255,255,255,0.25)', fontSize: 7 }}>{it.amount}г</span>
+                      <span onClick={() => addToCart({ name: it.name, kcal: it.kcal * (it.amount / 100), amount: it.amount, category: it.category })} style={{ cursor:'pointer', fontSize:7, color:'#00e68a', opacity:0.35, padding:'0 2px', transition:'opacity 0.15s' }} title="В корзину">🛒</span>
+                    </span>
+                  ))}
                 </div>
-              )}
+                {/* Meal micro-macros row */}
+                {m.totals && (
+                  <div style={{ display: 'flex', gap: 6, marginTop: 4, fontSize: 7 }}>
+                    <span style={{ color: '#3b82f6', fontWeight: 600 }}>Б {mealP}г</span>
+                    <span style={{ color: '#f59e0b', fontWeight: 600 }}>Ж {mealF}г</span>
+                    <span style={{ color: '#f97316', fontWeight: 600 }}>У {mealC}г</span>
+                    <span style={{ color: 'rgba(255,255,255,0.2)', marginLeft: 'auto' }}>
+                      {(() => {
+                        const mp = mealKcal > 0 ? (mealP * 4 / mealKcal * 100) : 0;
+                        const mf = mealKcal > 0 ? (mealF * 9 / mealKcal * 100) : 0;
+                        const mc = mealKcal > 0 ? (mealC * 4 / mealKcal * 100) : 0;
+                        return `${Math.round(mp)}/${Math.round(mf)}/${Math.round(mc)}%`;
+                      })()}
+                    </span>
+                  </div>
+                )}
+              </div>
             </div>
           );
         })}
 
-        {/* Day totals */}
+        {/* Day totals — modern summary card */}
         <div style={{
-          display: 'flex', gap: 4, justifyContent: 'space-between', alignItems: 'center',
-          marginTop: 6, padding: '6px 10px', borderRadius: 8, background: 'rgba(0,230,138,0.04)',
-          border: '1px solid rgba(0,230,138,0.1)',
+          marginTop: 8, borderRadius: 10, overflow: 'hidden',
+          border: '1px solid rgba(0,230,138,0.15)',
         }}>
-          <span style={{ fontSize: 8, fontWeight: 700, color: 'rgba(255,255,255,0.3)' }}>ИТОГО ЗА ДЕНЬ</span>
-          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-            <span style={{ color: '#00e68a', fontWeight: 800, fontSize: 11 }}>{totalKcal} ккал</span>
-            <span style={{ fontSize: 8, color: '#3b82f6' }}>Б {totalP}г</span>
-            <span style={{ fontSize: 8, color: '#f59e0b' }}>Ж {totalF}г</span>
-            <span style={{ fontSize: 8, color: '#f97316' }}>У {totalC}г</span>
+          <div style={{
+            padding: '10px 12px',
+            background: 'linear-gradient(135deg, rgba(0,230,138,0.06), transparent)',
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+              <span style={{ fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.3)', letterSpacing: '1px' }}>ИТОГО ЗА ДЕНЬ</span>
+              <span style={{ color: '#00e68a', fontWeight: 900, fontSize: 16 }}>{totalKcal} ккал</span>
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              {[
+                { label: 'Белки', val: totalP, unit: 'г', color: '#3b82f6', target: effectiveP },
+                { label: 'Жиры', val: totalF, unit: 'г', color: '#f59e0b', target: effectiveF },
+                { label: 'Углеводы', val: totalC, unit: 'г', color: '#f97316', target: effectiveC },
+              ].map(m => {
+                const pct = Math.min(100, Math.round(m.val / Math.max(1, m.target) * 100));
+                const isOver = pct > 100;
+                return (
+                  <div key={m.label} style={{ flex: 1 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 8, marginBottom: 2 }}>
+                      <span style={{ color: m.color, fontWeight: 600 }}>{m.label}</span>
+                      <span style={{ color: isOver ? '#ef4444' : 'rgba(255,255,255,0.4)', fontWeight: 700 }}>
+                        {m.val}/{m.target}{m.unit}
+                      </span>
+                    </div>
+                    <div style={{ height: 5, borderRadius: 3, background: '#202023', overflow: 'hidden' }}>
+                      <div style={{
+                        height: '100%', width: `${Math.min(100, pct)}%`, borderRadius: 3,
+                        background: isOver ? '#ef4444' : `linear-gradient(90deg, ${m.color}, ${m.color}88)`,
+                        transition: 'width 0.3s',
+                      }} />
+                    </div>
+                    <div style={{ fontSize: 7, color: isOver ? '#ef4444' : 'rgba(255,255,255,0.3)', textAlign: 'right', marginTop: 1 }}>
+                      {isOver ? `+${pct - 100}%` : `${pct}%`}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </div>
       </div>
@@ -945,7 +1030,7 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingBottom: 80 }}>
 
       {/* 1. User info card */}
-      <GlassCard title="Пользователь" icon="👤">
+      <GlassCard title="Пользователь" icon="👤" color="#a78bfa">
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 4, marginBottom: 6 }}>
           <div><label style={{ fontSize: 8, color: 'rgba(255,255,255,0.3)' }}>Вес (кг)</label><input type="number" value={weight} onChange={e => setWeight(+e.target.value || 0)} style={inputStyle} /></div>
           <div><label style={{ fontSize: 8, color: 'rgba(255,255,255,0.3)' }}>Рост (см)</label><input type="number" value={height} onChange={e => setHeight(+e.target.value || 0)} style={inputStyle} /></div>
@@ -970,7 +1055,7 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
       </GlassCard>
 
       {/* 2. Goal card */}
-      <GlassCard title="Цель" icon="🎯">
+      <GlassCard title="Цель" icon="🎯" color="#00e68a">
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
           {GOALS.map(g => (
             <PillBtn key={g.id} active={goal === g.id} onClick={() => setGoal(g.id)} color={goal === g.id ? '#00e68a' : undefined}>
@@ -981,7 +1066,7 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
       </GlassCard>
 
       {/* 3. Phase + drugs card */}
-      <GlassCard title="Фаза и препараты" icon="💉">
+      <GlassCard title="Фаза и препараты" icon="💉" color="#06b6d4">
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, marginBottom: 6 }}>
           {PHASES.map(p => (
             <PillBtn key={p.id} active={phase === p.id} onClick={() => setPhase(p.id)}>{p.icon} {p.label}</PillBtn>
@@ -1021,7 +1106,7 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
       </GlassCard>
 
       {/* 4. Training link */}
-      <GlassCard title="Привязка к тренировке" icon="🏋️">
+      <GlassCard title="Привязка к тренировке" icon="🏋️" color="#22c55e">
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
           <button onClick={() => setLinkToTraining(!linkToTraining)} style={{
             width: 36, height: 20, borderRadius: 10, cursor: 'pointer', border: 'none',
@@ -1041,18 +1126,71 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
       </GlassCard>
 
       {/* 5. Editable KBJU card */}
-      <GlassCard title="КБЖУ" icon="📊">
+      <GlassCard title="КБЖУ" icon="📊" color="#00e68a">
         {!editMode ? (
           <div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 4, marginBottom: 6 }}>
-              {[{ l:'Ккал', v: effectiveKcal, c:'#00e68a' }, { l:'Белки', v: effectiveP, c:'#3b82f6' }, { l:'Жиры', v: effectiveF, c:'#f59e0b' }, { l:'Углеводы', v: effectiveC, c:'#f97316' }].map(m => (
-                <div key={m.l} style={{ textAlign:'center', background:'rgba(255,255,255,0.02)', borderRadius:6, padding:'4px' }}>
-                  <div style={{ fontSize:8, color:'rgba(255,255,255,0.3)' }}>{m.l}</div>
-                  <div style={{ fontWeight:700, color:m.c, fontSize:14 }}>{m.v}</div>
-                </div>
-              ))}
+            {/* Big macro tiles */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 5, marginBottom: 8 }}>
+              {[
+                { l:'Калории', v: effectiveKcal, c:'#00e68a', unit:'ккал', perKg: Math.round(effectiveKcal / weight) },
+                { l:'Белки', v: effectiveP, c:'#3b82f6', unit:'г', perKg: Math.round(effectiveP / weight) },
+                { l:'Жиры', v: effectiveF, c:'#f59e0b', unit:'г', perKg: Math.round(effectiveF / weight) },
+                { l:'Углеводы', v: effectiveC, c:'#f97316', unit:'г', perKg: Math.round(effectiveC / weight) },
+              ].map(m => {
+                const pct = effectiveKcal > 0 && m.l !== 'Калории'
+                  ? Math.round(({ 'Белки': effectiveP * 4, 'Жиры': effectiveF * 9, 'Углеводы': effectiveC * 4 }[m.l] || 0) / effectiveKcal * 100)
+                  : null;
+                return (
+                  <div key={m.l} style={{
+                    textAlign:'center', borderRadius:10, padding:'8px 4px',
+                    background: `linear-gradient(135deg, ${m.c}12, transparent)`,
+                    border: `1px solid ${m.c}25`,
+                    position:'relative', overflow:'hidden',
+                  }}>
+                    <div style={{ position:'absolute', top:0, left:0, right:0, height:2, background: m.c }} />
+                    <div style={{ fontSize:18, fontWeight:800, color:m.c, lineHeight:1.2 }}>{m.v}</div>
+                    <div style={{ fontSize:8, color:'rgba(255,255,255,0.4)', marginTop:1 }}>{m.unit}</div>
+                    <div style={{ fontSize:7, color:'rgba(255,255,255,0.25)', marginTop:1 }}>
+                      {m.perKg} / кг
+                      {pct !== null && ` · ${pct}%`}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
-            <button onClick={() => setEditMode(true)} style={{ width:'100%', padding:6, borderRadius:8, border:'1px solid rgba(255,255,255,0.08)', background:'rgba(255,255,255,0.02)', color:'rgba(255,255,255,0.5)', fontSize:9, cursor:'pointer' }}>✏️ Редактировать КБЖУ</button>
+            {/* Macro distribution bar */}
+            {(() => {
+              const pKcal = effectiveP * 4;
+              const fKcal = effectiveF * 9;
+              const cKcal = effectiveC * 4;
+              const total = pKcal + fKcal + cKcal || 1;
+              const pPct = pKcal / total * 100;
+              const fPct = fKcal / total * 100;
+              const cPct = cKcal / total * 100;
+              return (
+                <div style={{ marginBottom: 6 }}>
+                  <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.3)', marginBottom: 3 }}>Распределение макронутриентов</div>
+                  <div style={{ height: 8, borderRadius: 4, background: '#202023', overflow: 'hidden', display: 'flex' }}>
+                    <div style={{ height: '100%', width: `${pPct}%`, background: '#3b82f6', transition: 'width 0.3s', minWidth: 2 }} title={`Белки ${Math.round(pPct)}%`} />
+                    <div style={{ height: '100%', width: `${fPct}%`, background: '#f59e0b', transition: 'width 0.3s', minWidth: 2 }} title={`Жиры ${Math.round(fPct)}%`} />
+                    <div style={{ height: '100%', width: `${cPct}%`, background: '#f97316', transition: 'width 0.3s', minWidth: 2 }} title={`Углеводы ${Math.round(cPct)}%`} />
+                  </div>
+                  <div style={{ display: 'flex', gap: 8, fontSize: 7, color: 'rgba(255,255,255,0.3)', marginTop: 2 }}>
+                    <span style={{ color: '#3b82f6' }}>● Б {Math.round(pPct)}%</span>
+                    <span style={{ color: '#f59e0b' }}>● Ж {Math.round(fPct)}%</span>
+                    <span style={{ color: '#f97316' }}>● У {Math.round(cPct)}%</span>
+                  </div>
+                </div>
+              );
+            })()}
+            <button onClick={() => setEditMode(true)} style={{
+              width:'100%', padding:7, borderRadius:8,
+              border:'1px solid rgba(0,230,138,0.2)', background:'rgba(0,230,138,0.06)',
+              color:'#00e68a', fontSize:9, cursor:'pointer', fontWeight:600,
+              transition:'all 0.15s',
+            }}>
+              ✏️ Редактировать
+            </button>
           </div>
         ) : (
           <div>
@@ -1069,42 +1207,44 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
       </GlassCard>
 
       {/* 6. Budget level */}
-      <GlassCard title="Уровень бюджета" icon="💰">
+      <GlassCard title="Уровень бюджета" icon="💰" color="#f59e0b">
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4 }}>
           {BUDGET_LEVELS.map(b => (
             <button key={b.id} onClick={() => setBudget(b.id)} style={{
-              padding: '6px 8px', borderRadius: 8, cursor: 'pointer', textAlign: 'left',
-              background: budget === b.id ? `${b.color}15` : 'rgba(255,255,255,0.02)',
-              border: budget === b.id ? `1px solid ${b.color}` : '1px solid rgba(255,255,255,0.06)',
+              padding: '8px 10px', borderRadius: 10, cursor: 'pointer', textAlign: 'left',
+              background: budget === b.id ? `${b.color}15` : '#202023',
+              border: budget === b.id ? `1px solid ${b.color}` : '1px solid #27272a',
               color: budget === b.id ? b.color : 'rgba(255,255,255,0.5)',
               transition: 'all 0.15s',
             }}>
-              <div style={{ fontSize: 11 }}>{b.icon} {b.label}</div>
-              <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.3)', marginTop: 1 }}>{b.desc}</div>
+              <div style={{ fontSize: 11, fontWeight: budget === b.id ? 700 : 500 }}>{b.icon} {b.label}</div>
+              <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.3)', marginTop: 2 }}>{b.desc}</div>
             </button>
           ))}
         </div>
       </GlassCard>
 
       {/* 7. Nutrition level */}
-      <GlassCard title="Уровень питания" icon="📈">
+      <GlassCard title="Уровень питания" icon="📈" color="#22c55e">
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 4 }}>
           {NUTRITION_LEVELS.map(n => (
             <button key={n.id} onClick={() => setNutrLevel(n.id)} style={{
-              padding: '6px', borderRadius: 8, cursor: 'pointer', textAlign: 'center',
-              background: nutrLevel === n.id ? 'rgba(0,230,138,0.12)' : 'rgba(255,255,255,0.02)',
-              border: nutrLevel === n.id ? '1px solid #00e68a' : '1px solid rgba(255,255,255,0.06)',
+              padding: '8px', borderRadius: 10, cursor: 'pointer', textAlign: 'center',
+              background: nutrLevel === n.id ? 'rgba(0,230,138,0.12)' : '#202023',
+              border: nutrLevel === n.id ? '1px solid #00e68a' : '1px solid #27272a',
               color: nutrLevel === n.id ? '#00e68a' : 'rgba(255,255,255,0.5)',
-              fontWeight: nutrLevel === n.id ? 700 : 400, fontSize: 10,
+              fontWeight: nutrLevel === n.id ? 700 : 500, fontSize: 10,
+              transition: 'all 0.15s',
             }}>
-              {n.icon} {n.label}
+              <div style={{ fontSize: 12, marginBottom: 1 }}>{n.icon}</div>
+              <div>{n.label}</div>
             </button>
           ))}
         </div>
       </GlassCard>
 
       {/* 8. Schedule card */}
-      <GlassCard title="Расписание" icon="⏰">
+      <GlassCard title="Расписание" icon="⏰" color="#06b6d4">
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 4, marginBottom: 6 }}>
           <div><label style={{fontSize:8,color:'rgba(255,255,255,0.3)'}}>Пробуждение</label><input type="time" value={wakeTime} onChange={e => setWakeTime(e.target.value)} style={inputStyle} /></div>
           <div><label style={{fontSize:8,color:'rgba(255,255,255,0.3)'}}>Обед</label><input type="time" value={lunchTime} onChange={e => setLunchTime(e.target.value)} style={inputStyle} /></div>
@@ -1122,14 +1262,14 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
           <label style={{fontSize:8,color:'rgba(255,255,255,0.3)'}}>Количество приёмов пищи</label>
           <div style={{ display: 'flex', gap: 3 }}>
             {[3,4,5,6].map(n => (
-              <PillBtn key={n} active={mealsCount === n} onClick={() => setMealsCount(n)}>{n}</PillBtn>
+              <PillBtn key={n} active={mealsCount === n} onClick={() => setMealsCount(n)} color={mealsCount === n ? '#06b6d4' : undefined}>{n}</PillBtn>
             ))}
           </div>
         </div>
       </GlassCard>
 
       {/* 9. Allergens */}
-      <GlassCard title="Аллергены и ограничения" icon="⚠️">
+      <GlassCard title="Аллергены и ограничения" icon="⚠️" color="#ef4444">
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
           {ALLERGEN_LIST.map(a => (
             <PillBtn key={a} active={allergens.includes(a)} onClick={() => toggleAllergen(a)} color={allergens.includes(a) ? '#ef4444' : undefined}>
@@ -1140,7 +1280,7 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
       </GlassCard>
 
       {/* 10. Plan type */}
-      <GlassCard title="Тип плана питания" icon="📋">
+      <GlassCard title="Тип плана питания" icon="📋" color="#a855f7">
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
           {PLAN_TYPES.map(pt => (
             <PillBtn key={pt.id} active={planType === pt.id} onClick={() => setPlanType(pt.id)}>
@@ -1151,7 +1291,7 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
       </GlassCard>
 
       {/* 11-12. Food preferences + excluded */}
-      <GlassCard title="Предпочтения и исключения" icon="🍎">
+      <GlassCard title="Предпочтения и исключения" icon="🍎" color="#f59e0b">
         <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', marginBottom: 4 }}>Любимые продукты:</div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 2, marginBottom: 6 }}>
           {preferredFoods.slice(0, 8).map((pf, i) => {
@@ -1177,7 +1317,7 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
       </GlassCard>
 
       {/* 13. Cycling mode */}
-      <GlassCard title="Циклирование" icon="🔄">
+      <GlassCard title="Циклирование" icon="🔄" color="#3b82f6">
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, marginBottom: 6 }}>
           {[
             { id: 'none' as CycleType, label: 'Выкл', icon: '⏹️' },
@@ -1199,6 +1339,38 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
             {cyclingMode === 'carbload' && '6-8г/кг углеводов за 24-48ч до тяжёлой тренировки. +1-1.5л воды.'}
           </div>
         )}
+        {/* Training day picker for macro/butch */}
+        {(cyclingMode === 'macro' || cyclingMode === 'butch') && (
+          <div style={{ marginTop: 8, padding: '8px 10px', borderRadius: 10, background: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.12)' }}>
+            <div style={{ fontSize: 9, fontWeight: 600, color: '#60a5fa', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 4 }}>
+              📅 Выберите тренировочные дни:
+            </div>
+            <div style={{ display: 'flex', gap: 4, justifyContent: 'center' }}>
+              {DAY_LABELS.map((label, idx) => {
+                const isTrain = trainingDays[idx];
+                return (
+                  <button key={idx} onClick={() => {
+                    setTrainingDays(prev => prev.map((d, i) => i === idx ? !d : d));
+                  }} style={{
+                    width: 36, height: 36, borderRadius: '50%', cursor: 'pointer',
+                    border: isTrain ? '2px solid #22c55e' : '2px solid #3f3f46',
+                    background: isTrain ? 'rgba(34,197,94,0.2)' : '#202023',
+                    color: isTrain ? '#22c55e' : 'rgba(255,255,255,0.4)',
+                    fontSize: 10, fontWeight: isTrain ? 800 : 500,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    transition: 'all 0.15s',
+                  }}>
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4, fontSize: 8, color: 'rgba(255,255,255,0.3)' }}>
+              <span>🏋️ {trainingDays.filter(Boolean).length} тренировочных</span>
+              <span>😴 {trainingDays.filter(d => !d).length} выходных</span>
+            </div>
+          </div>
+        )}
       </GlassCard>
 
       {/* 14. Heavy training day for cycling */}
@@ -1210,14 +1382,17 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
       )}
 
       {/* 15. Generate button */}
-      <button onClick={() => generatePlan(1)} style={{ ...greenBtn, fontSize: 13, padding: 12 }}>
+      <button onClick={() => generatePlan(1)} style={{
+        ...greenBtn, fontSize: 14, padding: 14,
+        boxShadow: '0 4px 20px rgba(0,230,138,0.2)',
+      }}>
         ✨ Сгенерировать план питания
       </button>
 
       {/* Day/3day/Week selector */}
       <div ref={resultsRef} />
       {generated && (
-        <GlassCard title="Варианты отображения" icon="📐">
+        <GlassCard title="Варианты отображения" icon="📐" color="#00e68a">
           <div style={{ display: 'flex', gap: 4 }}>
             {[
               { id: 1 as const, label: 'На день' },
@@ -1225,16 +1400,17 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
               { id: 7 as const, label: 'Недельный' },
             ].map(v => (
               <button key={v.id} onClick={() => { setPlanDays(v.id); if (v.id === 7 && !weekPlan) generatePlan(7); }} style={{
-                flex: 1, padding: 8, borderRadius: 8, cursor: 'pointer', textAlign: 'center',
-                background: planDays === v.id ? 'linear-gradient(135deg,#00e68a,#00c8a0)' : 'rgba(255,255,255,0.03)',
-                border: planDays === v.id ? 'none' : '1px solid rgba(255,255,255,0.06)',
+                flex: 1, padding: 10, borderRadius: 10, cursor: 'pointer', textAlign: 'center',
+                background: planDays === v.id ? 'linear-gradient(135deg,#00e68a,#00c8a0)' : '#202023',
+                border: planDays === v.id ? 'none' : '1px solid #27272a',
                 color: planDays === v.id ? '#000' : 'rgba(255,255,255,0.5)',
                 fontWeight: 700, fontSize: 11,
+                transition: 'all 0.15s',
               }}>{v.label}</button>
             ))}
           </div>
           {planDays !== 1 && (
-            <button onClick={() => generatePlan(planDays)} style={{ marginTop: 6, padding: '6px 12px', borderRadius: 6, border: '1px solid rgba(0,230,138,0.3)', background: 'rgba(0,230,138,0.08)', color: '#00e68a', cursor: 'pointer', fontSize: 9, width: '100%' }}>
+            <button onClick={() => generatePlan(planDays)} style={{ marginTop: 6, padding: '8px', borderRadius: 8, border: '1px solid rgba(0,230,138,0.25)', background: 'rgba(0,230,138,0.06)', color: '#00e68a', cursor: 'pointer', fontSize: 9, fontWeight: 600, width: '100%' }}>
               🔄 Перегенерировать {planDays === 3 ? '3 дня' : 'неделю'}
             </button>
           )}
@@ -1243,88 +1419,121 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
 
       {/* Results */}
       {generated && planDays === 1 && dayPlan && (
-        <GlassCard title="📋 План на день" icon="📋" style={{ border: '1px solid rgba(0,230,138,0.15)' }}>
+        <GlassCard title="План на день" icon="📋" color="#00e68a" style={{ border: '1px solid rgba(0,230,138,0.15)' }}>
           {renderMealList(dayPlan)}
         </GlassCard>
       )}
 
       {generated && planDays === 3 && threeDayPlan && (
-        <>
-          <GlassCard title="📋 План на 3 дня" icon="📋" style={{ border: '1px solid rgba(0,230,138,0.15)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, marginBottom: 6 }}>
-              <span style={{ color: '#00e68a', fontWeight: 700 }}>Всего за 3 дня: {Math.round(threeDayPlan.totals.kcal)} ккал</span>
-              <span style={{ color: 'rgba(255,255,255,0.4)' }}>В ср/день: {Math.round(threeDayPlan.totals.kcal / 3)} ккал</span>
-            </div>
-            {threeDayPlan.days.map((d: any, di: number) => (
-              <div key={di} style={{ marginBottom: 8 }}>
-                <div style={{ fontSize: 9, fontWeight: 700, color: '#00e68a', marginBottom: 4 }}>День {di + 1}</div>
-                {renderMealList(d)}
+        <GlassCard title="План на 3 дня" icon="📋" color="#00e68a" style={{ border: '1px solid rgba(0,230,138,0.15)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 10, marginBottom: 8, padding: '6px 10px', borderRadius: 8, background: 'rgba(0,230,138,0.04)', border: '1px solid rgba(0,230,138,0.1)' }}>
+            <span style={{ color: '#00e68a', fontWeight: 700 }}>📊 Всего: {Math.round(threeDayPlan.totals.kcal)} ккал</span>
+            <span style={{ color: 'rgba(255,255,255,0.4)' }}>Среднее: {Math.round(threeDayPlan.totals.kcal / 3)} ккал/день</span>
+          </div>
+          {threeDayPlan.days.map((d: any, di: number) => (
+            <div key={di} style={{ marginBottom: 10 }}>
+              <div style={{
+                fontSize: 9, fontWeight: 700, color: '#00e68a', marginBottom: 6,
+                padding: '3px 8px', borderRadius: 6,
+                background: 'rgba(0,230,138,0.04)', display: 'inline-block',
+              }}>
+                День {di + 1}
               </div>
-            ))}
-          </GlassCard>
-        </>
+              {renderMealList(d)}
+            </div>
+          ))}
+        </GlassCard>
       )}
 
       {generated && planDays === 7 && weekPlan && (
-        <GlassCard title="📋 Недельный план" icon="📋" style={{ border: '1px solid rgba(0,230,138,0.15)' }}>
-          <div style={{ fontSize: 9, color: '#00e68a', fontWeight: 700, marginBottom: 6 }}>
-            Всего за неделю: {Math.round(weekPlan.totals.kcal)} ккал | В ср/день: {Math.round(weekPlan.totals.kcal / 7)} ккал
+        <GlassCard title="Недельный план" icon="📋" color="#00e68a" style={{ border: '1px solid rgba(0,230,138,0.15)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, marginBottom: 8, padding: '6px 10px', borderRadius: 8, background: 'rgba(0,230,138,0.04)', border: '1px solid rgba(0,230,138,0.1)' }}>
+            <span style={{ color: '#00e68a', fontWeight: 700 }}>📊 За неделю: {Math.round(weekPlan.totals.kcal)} ккал</span>
+            <span style={{ color: 'rgba(255,255,255,0.4)' }}>Среднее: {Math.round(weekPlan.totals.kcal / 7)} ккал/день</span>
           </div>
-          <div style={{ maxHeight: 400, overflowY: 'auto' }}>
-            {weekPlan.days.map((d: any, di: number) => (
-              <div key={di} style={{ marginBottom: 6, padding: 6, borderRadius: 8, background: 'rgba(255,255,255,0.02)' }}>
-                <div style={{ fontSize: 9, fontWeight: 700, color: d.isTrainingDay ? '#00e68a' : 'rgba(255,255,255,0.4)', marginBottom: 4 }}>
-                  День {di + 1} {d.isTrainingDay ? '🏋️' : '😴'} — {Math.round(d.totals.kcal)} ккал
-                </div>
-                {d.meals.map((m: any, mi: number) => (
-                  <div key={mi} style={{ fontSize: 8, color: 'rgba(255,255,255,0.4)', padding: '1px 0' }}>
-                    {m.time} {m.label}: {m.items.map((it: any) => it.name).join(', ')}
+          <div style={{ maxHeight: 400, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {weekPlan.days.map((d: any, di: number) => {
+              const wTotalKcal = Math.round(d.totals.kcal);
+              const wIsTraining = d.isTrainingDay;
+              return (
+                <div key={di} style={{
+                  padding: 8, borderRadius: 10,
+                  background: wIsTraining ? 'rgba(0,230,138,0.03)' : '#202023',
+                  border: wIsTraining ? '1px solid rgba(0,230,138,0.15)' : '1px solid #27272a',
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span style={{ fontSize: 12 }}>{wIsTraining ? '🏋️' : '😴'}</span>
+                      <span style={{ fontSize: 10, fontWeight: 700, color: wIsTraining ? '#00e68a' : 'rgba(255,255,255,0.4)' }}>
+                        День {di + 1}
+                      </span>
+                    </div>
+                    <span style={{ fontSize: 11, fontWeight: 800, color: '#00e68a' }}>{wTotalKcal} ккал</span>
                   </div>
-                ))}
-              </div>
-            ))}
+                  <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.4)', lineHeight: 1.5 }}>
+                    {DAY_LABELS[di]}: {d.meals.map((m: any) => m.items.map((it: any) => it.name)).flat().join(', ')}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </GlassCard>
       )}
 
       {/* Save plan button */}
       {generated && (
-        <button onClick={saveCurrentPlan} style={{ ...greenBtn, background: 'linear-gradient(135deg,#8b5cf6,#a78bfa)' }}>
+        <button onClick={saveCurrentPlan} style={{
+          ...greenBtn, background: 'linear-gradient(135deg,#8b5cf6,#a78bfa)',
+          fontSize: 13, padding: 12,
+          boxShadow: '0 4px 16px rgba(139,92,246,0.2)',
+        }}>
           💾 Сохранить в мои планы
         </button>
       )}
 
       {/* 17. Shopping list */}
       {generated && shoppingList && (
-        <GlassCard title="🛒 Список покупок" icon="🛒" style={{ border: '1px solid rgba(249,115,22,0.15)' }}>
+        <GlassCard title="Список покупок" icon="🛒" color="#f97316" style={{ border: '1px solid rgba(249,115,22,0.15)' }}>
           {Object.entries(shoppingList).map(([name, data]: [string, any]) => (
-            <div key={name} style={{ fontSize: 9, padding: '2px 0', display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
-              <span>{name}</span>
-              <span style={{ color: 'rgba(255,255,255,0.4)' }}>
+            <div key={name} style={{ fontSize: 9, padding: '3px 0', display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
+              <span style={{ color: 'rgba(255,255,255,0.7)' }}>{name}</span>
+              <span style={{ color: 'rgba(255,255,255,0.4)', fontWeight: 600 }}>
                 {data.amount >= 1000 ? `${(data.amount / 1000).toFixed(1)} кг` : `${Math.round(data.amount)} г`}
               </span>
             </div>
           ))}
-          <button onClick={saveCurrentPlan} style={{ marginTop: 6, padding: '6px', borderRadius: 6, border: '1px solid rgba(249,115,22,0.3)', background: 'rgba(249,115,22,0.08)', color: '#f97316', cursor: 'pointer', fontSize: 9, width: '100%' }}>💾 Сохранить в мои планы</button>
+          <button onClick={saveCurrentPlan} style={{ marginTop: 6, padding: '8px', borderRadius: 8, border: '1px solid rgba(249,115,22,0.25)', background: 'rgba(249,115,22,0.06)', color: '#f97316', cursor: 'pointer', fontSize: 9, fontWeight: 600, width: '100%' }}>💾 Сохранить план</button>
         </GlassCard>
       )}
 
       {/* 18. Water balance */}
       {generated && waterCalc && (
-        <GlassCard title="💧 Водный баланс" icon="💧" style={{ border: '1px solid rgba(6,182,212,0.15)' }}>
-          <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.6)', lineHeight: 1.6 }}>
-            <div>База: 30 мл × {weight} кг = {waterCalc.baseWater} л</div>
-            {waterCalc.trainBonus > 0 && <div>+ тренировка: {waterCalc.trainBonus} л</div>}
-            <div style={{ fontSize: 14, fontWeight: 800, color: '#06b6d4', marginTop: 4, textAlign: 'center' }}>
-              Итого: {waterCalc.total} л/день
+        <GlassCard title="Водный баланс" icon="💧" color="#06b6d4" style={{ border: '1px solid rgba(6,182,212,0.15)' }}>
+          <div style={{ padding: '6px 10px', borderRadius: 8, background: 'rgba(6,182,212,0.04)', border: '1px solid rgba(6,182,212,0.08)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: 'rgba(255,255,255,0.6)', marginBottom: 2 }}>
+              <span>База: 30 мл × {weight} кг</span>
+              <span>{waterCalc.baseWater} л</span>
             </div>
+            {waterCalc.trainBonus > 0 && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: 'rgba(255,255,255,0.6)', marginBottom: 2 }}>
+                <span>+ Тренировка</span>
+                <span>+{waterCalc.trainBonus} л</span>
+              </div>
+            )}
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: 'rgba(255,255,255,0.4)' }}>
+              <span>+ Клетчатка</span>
+              <span>+{waterCalc.fiberFactor} л</span>
+            </div>
+          </div>
+          <div style={{ fontSize: 20, fontWeight: 900, color: '#06b6d4', textAlign: 'center', marginTop: 6 }}>
+            {waterCalc.total} л/день
           </div>
         </GlassCard>
       )}
 
       {/* 19. Reports section */}
       {generated && (
-        <GlassCard title="📊 Отчёты по рациону" style={{ border: '1px solid rgba(59,130,246,0.15)' }}>
+        <GlassCard title="Отчёты по рациону" icon="📊" color="#3b82f6" style={{ border: '1px solid rgba(59,130,246,0.15)' }}>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, marginBottom: 6 }}>
             <button onClick={generateAllergenReport} style={reportPillStyle('#ef4444', activeReports.includes('allergen') && !!allergenReport)}>⚠️ Аллергены</button>
             <button onClick={generateNutrientReport} style={reportPillStyle('#22c55e', activeReports.includes('nutrient') && !!nutrientReport)}>🧬 Нутриенты</button>
@@ -1419,53 +1628,76 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
 
       {/* 20-22: Separate calculators */}
       <div style={{ display: 'flex', gap: 4 }}>
-        <button onClick={() => { generateCheatMeal(); }} style={{ flex: 1, padding: 7, borderRadius: 8, border: '1px solid rgba(245,158,11,0.3)', background: 'rgba(245,158,11,0.08)', color: '#f59e0b', cursor: 'pointer', fontSize: 9, fontWeight: 600 }}>
+        <button onClick={() => generateCheatMeal()} style={{
+          flex: 1, padding: 10, borderRadius: 10, cursor: 'pointer', textAlign: 'center',
+          background: '#202023', border: '1px solid #27272a',
+          color: '#f59e0b', fontWeight: 700, fontSize: 10,
+          transition: 'all 0.15s',
+        }}>
           🍔 Читмил
         </button>
-        <button onClick={() => { generateCarbload(); }} style={{ flex: 1, padding: 7, borderRadius: 8, border: '1px solid rgba(249,115,22,0.3)', background: 'rgba(249,115,22,0.08)', color: '#f97316', cursor: 'pointer', fontSize: 9, fontWeight: 600 }}>
+        <button onClick={() => generateCarbload()} style={{
+          flex: 1, padding: 10, borderRadius: 10, cursor: 'pointer', textAlign: 'center',
+          background: '#202023', border: '1px solid #27272a',
+          color: '#f97316', fontWeight: 700, fontSize: 10,
+          transition: 'all 0.15s',
+        }}>
           🍚 Углев. загрузка
         </button>
-        <button onClick={() => { generateBUTCH(); }} style={{ flex: 1, padding: 7, borderRadius: 8, border: '1px solid rgba(59,130,246,0.3)', background: 'rgba(59,130,246,0.08)', color: '#3b82f6', cursor: 'pointer', fontSize: 9, fontWeight: 600 }}>
+        <button onClick={() => generateBUTCH()} style={{
+          flex: 1, padding: 10, borderRadius: 10, cursor: 'pointer', textAlign: 'center',
+          background: '#202023', border: '1px solid #27272a',
+          color: '#3b82f6', fontWeight: 700, fontSize: 10,
+          transition: 'all 0.15s',
+        }}>
           ⤴️⤵️ БУЧ
         </button>
       </div>
 
       {cheatMealPlan && (
-        <GlassCard title="🍔 Читмил" style={{ border: '1px solid rgba(245,158,11,0.15)' }}>
-          <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.6)', marginBottom: 4 }}>~{cheatMealPlan.cals} ккал (35% от дневной нормы)</div>
+        <GlassCard title="Читмил" icon="🍔" color="#f59e0b" style={{ border: '1px solid rgba(245,158,11,0.15)' }}>
+          <div style={{ fontSize: 10, fontWeight: 700, color: '#f59e0b', marginBottom: 6 }}>~{cheatMealPlan.cals} ккал (35% от нормы)</div>
           {cheatMealPlan.items.map((it: any, i: number) => (
-            <div key={i} style={{ display:'flex', justifyContent:'space-between', fontSize: 9, padding: '2px 0', alignItems:'center' }}>
-              <span>• {it.name || it}</span>
-              <span onClick={() => addToCart({ name: it.name || it, kcal: it.kcal || (cheatMealPlan.cals / cheatMealPlan.items.length), amount: 100 })} style={{ cursor:'pointer', fontSize:7, color:'#00e68a', opacity:0.4 }} title="В корзину">🛒</span>
+            <div key={i} style={{ display:'flex', justifyContent:'space-between', fontSize: 9, padding: '4px 0', alignItems:'center', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
+              <span style={{ color: 'rgba(255,255,255,0.7)' }}>• {it.name || it}</span>
+              <span onClick={() => addToCart({ name: it.name || it, kcal: it.kcal || (cheatMealPlan.cals / cheatMealPlan.items.length), amount: 100 })} style={{ cursor:'pointer', fontSize:8, color:'#00e68a', opacity:0.5, padding:'2px 4px' }} title="В корзину">🛒</span>
             </div>
           ))}
-          <div style={{ fontSize: 8, color: '#f59e0b', marginTop: 4 }}>{cheatMealPlan.note}</div>
+          <div style={{ fontSize: 8, color: '#f59e0b', marginTop: 6, padding: '4px 8px', borderRadius: 6, background: 'rgba(245,158,11,0.06)' }}>{cheatMealPlan.note}</div>
         </GlassCard>
       )}
 
       {carbloadPlan && (
-        <GlassCard title="🍚 Углеводная загрузка" style={{ border: '1px solid rgba(249,115,22,0.15)' }}>
-          <div style={{ fontSize: 9, color: '#f97316', fontWeight: 700, marginBottom: 4 }}>Всего углеводов: {carbloadPlan.totalCarbs} г ({Math.round(carbloadPlan.totalCarbs / weight)} г/кг)</div>
+        <GlassCard title="Углеводная загрузка" icon="🍚" color="#f97316" style={{ border: '1px solid rgba(249,115,22,0.15)' }}>
+          <div style={{ fontSize: 10, fontWeight: 700, color: '#f97316', marginBottom: 6 }}>Всего: {carbloadPlan.totalCarbs} г ({Math.round(carbloadPlan.totalCarbs / weight)} г/кг)</div>
           {carbloadPlan.foods.map((f: any, i: number) => (
-            <div key={i} style={{ display:'flex', justifyContent:'space-between', fontSize: 9, padding: '2px 0', alignItems:'center' }}>
-              <span>• {f.name || f}</span>
-              <span onClick={() => addToCart({ name: f.name || f, kcal: f.kcal || 100, amount: 100 })} style={{ cursor:'pointer', fontSize:7, color:'#00e68a', opacity:0.4 }} title="В корзину">🛒</span>
+            <div key={i} style={{ display:'flex', justifyContent:'space-between', fontSize: 9, padding: '4px 0', alignItems:'center', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
+              <span style={{ color: 'rgba(255,255,255,0.7)' }}>• {f.name || f}</span>
+              <span onClick={() => addToCart({ name: f.name || f, kcal: f.kcal || 100, amount: 100 })} style={{ cursor:'pointer', fontSize:8, color:'#00e68a', opacity:0.5, padding:'2px 4px' }} title="В корзину">🛒</span>
             </div>
           ))}
-          <div style={{ fontSize: 8, color: '#f97316', marginTop: 4 }}>{carbloadPlan.note}</div>
+          <div style={{ fontSize: 8, color: '#f97316', marginTop: 6, padding: '4px 8px', borderRadius: 6, background: 'rgba(249,115,22,0.06)' }}>{carbloadPlan.note}</div>
         </GlassCard>
       )}
 
       {butchPlan && (
-        <GlassCard title="⤴️⤵️ БУЧ" style={{ border: '1px solid rgba(59,130,246,0.15)' }}>
-          <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.6)', lineHeight: 1.6 }}>
-            <div>📋 Схема: {butchPlan.pattern}</div>
-            <div style={{ marginTop: 4 }}>
-              <span style={{ color: '#22c55e' }}>ВУ дни: {butchPlan.highCarb}г угл</span> | 
-              <span style={{ color: '#ef4444' }}> НУ дни: {butchPlan.lowCarb}г угл</span>
+        <GlassCard title="БУЧ (белково-углеводное чередование)" icon="⤴️⤵️" color="#3b82f6" style={{ border: '1px solid rgba(59,130,246,0.15)' }}>
+          <div style={{ padding: '10px', borderRadius: 10, background: '#202023', border: '1px solid #27272a' }}>
+            <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)', marginBottom: 6 }}>📋 {butchPlan.pattern}</div>
+            <div style={{ display: 'flex', gap: 8, marginBottom: 4 }}>
+              <div style={{ flex: 1, padding: '6px 8px', borderRadius: 8, background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.2)', textAlign: 'center' }}>
+                <div style={{ fontSize: 7, color: '#22c55e', fontWeight: 600 }}>ВУ (тренировка)</div>
+                <div style={{ fontSize: 13, fontWeight: 800, color: '#22c55e' }}>{butchPlan.highCarb}</div>
+                <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.3)' }}>г углеводов</div>
+              </div>
+              <div style={{ flex: 1, padding: '6px 8px', borderRadius: 8, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', textAlign: 'center' }}>
+                <div style={{ fontSize: 7, color: '#ef4444', fontWeight: 600 }}>НУ (отдых)</div>
+                <div style={{ fontSize: 13, fontWeight: 800, color: '#ef4444' }}>{butchPlan.lowCarb}</div>
+                <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.3)' }}>г углеводов</div>
+              </div>
             </div>
-            <div>Белок: {butchPlan.protein}г (постоянный)</div>
-            <div style={{ fontSize: 8, color: '#3b82f6', marginTop: 4 }}>{butchPlan.note}</div>
+            <div style={{ fontSize: 8, color: '#3b82f6', textAlign: 'center', padding: '2px 0' }}>Белок: {butchPlan.protein}г (постоянный)</div>
+            <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.4)', marginTop: 6, padding: '4px 8px', borderRadius: 6, background: 'rgba(59,130,246,0.06)' }}>{butchPlan.note}</div>
           </div>
         </GlassCard>
       )}
@@ -1475,9 +1707,9 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
         💡 Выдать рекомендации
       </button>
       {recommendations.length > 0 && (
-        <GlassCard title="💡 Рекомендации" style={{ border: '1px solid rgba(168,85,247,0.15)' }}>
+        <GlassCard title="Рекомендации" icon="💡" color="#a855f7" style={{ border: '1px solid rgba(168,85,247,0.15)' }}>
           {recommendations.map((r, i) => (
-            <div key={i} style={{ fontSize: 9, color: 'rgba(255,255,255,0.7)', padding: '3px 0', borderBottom: i < recommendations.length - 1 ? '1px solid rgba(255,255,255,0.03)' : 'none' }}>
+            <div key={i} style={{ fontSize: 9, color: 'rgba(255,255,255,0.7)', padding: '4px 0', borderBottom: i < recommendations.length - 1 ? '1px solid rgba(255,255,255,0.03)' : 'none', lineHeight: 1.4 }}>
               • {r}
             </div>
           ))}
@@ -1491,57 +1723,62 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
         </button>
       )}
       {mealPrepPlan && (
-        <GlassCard title="👨‍🍳 План готовки" style={{ border: '1px solid rgba(6,182,212,0.15)' }}>
-          <div style={{ fontSize: 9, color: '#06b6d4', fontWeight: 700, marginBottom: 6 }}>
-            ⏱ Общее время: {mealPrepPlan.totalTime} мин · Контейнеров: {mealPrepPlan.containers}
+        <GlassCard title="План готовки" icon="👨‍🍳" color="#06b6d4" style={{ border: '1px solid rgba(6,182,212,0.15)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, fontWeight: 700, color: '#06b6d4', marginBottom: 6 }}>
+            <span>⏱ {mealPrepPlan.totalTime} мин</span>
+            <span>📦 {mealPrepPlan.containers} контейнеров</span>
           </div>
           {mealPrepPlan.steps.map((st, i) => (
-            <div key={i} style={{ marginBottom: 4, padding: '6px 8px', borderRadius: 8, background: 'rgba(6,182,212,0.04)', border: '1px solid rgba(6,182,212,0.08)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 }}>
-                <span style={{ fontSize: 9, fontWeight: 700, color: '#06b6d4' }}>Шаг {st.step}: {st.action}</span>
+            <div key={i} style={{ marginBottom: 6, padding: '8px 10px', borderRadius: 10, background: '#202023', border: '1px solid #27272a' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                <span style={{ fontSize: 10, fontWeight: 700, color: '#06b6d4' }}>Шаг {st.step}: {st.action}</span>
                 <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.3)' }}>{st.duration} мин</span>
               </div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 2, fontSize: 8, color: 'rgba(255,255,255,0.5)' }}>
-                {st.items.map((item, j) => <span key={j} style={{ padding: '1px 4px', borderRadius: 3, background: 'rgba(255,255,255,0.03)' }}>{item}</span>)}
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
+                {st.items.map((item, j) => <span key={j} style={{ padding: '2px 6px', borderRadius: 4, fontSize: 8, background: 'rgba(6,182,212,0.06)', border: '1px solid rgba(6,182,212,0.1)', color: 'rgba(255,255,255,0.6)' }}>{item}</span>)}
               </div>
             </div>
           ))}
-          <button onClick={saveCurrentPlan} style={{ marginTop: 6, padding: '6px', borderRadius: 6, border: '1px solid rgba(6,182,212,0.3)', background: 'rgba(6,182,212,0.08)', color: '#06b6d4', cursor: 'pointer', fontSize: 9, width: '100%' }}>💾 Сохранить</button>
+          <button onClick={saveCurrentPlan} style={{ marginTop: 6, padding: '8px', borderRadius: 8, border: '1px solid rgba(6,182,212,0.25)', background: 'rgba(6,182,212,0.06)', color: '#06b6d4', cursor: 'pointer', fontSize: 9, fontWeight: 600, width: '100%' }}>💾 Сохранить план</button>
         </GlassCard>
       )}
 
       {/* Saved plans with load/delete */}
       {savedPlans.length > 0 && (
-        <GlassCard title="📂 Сохранённые планы" icon="📂">
+        <GlassCard title="Сохранённые планы" icon="📂" color="#8b5cf6">
           {savedPlans.slice(0, 10).map((p, pi) => {
             const isExpanded = p.id === (expandedSavedId as any);
             return (
-              <div key={p.id} style={{ marginBottom: 4, borderRadius: 8, overflow: 'hidden', border: isExpanded ? '1px solid rgba(139,92,246,0.2)' : '1px solid rgba(255,255,255,0.04)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 8px', cursor: 'pointer', background: isExpanded ? 'rgba(139,92,246,0.04)' : 'transparent' }}
+              <div key={p.id} style={{ marginBottom: 6, borderRadius: 10, overflow: 'hidden', border: isExpanded ? '1px solid rgba(139,92,246,0.2)' : '1px solid #27272a' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 10px', cursor: 'pointer', background: isExpanded ? 'rgba(139,92,246,0.04)' : '#202023' }}
                   onClick={() => setExpandedSavedId(isExpanded ? null : p.id)}>
-                  <span style={{ fontSize: 9, fontWeight: 600 }}>📅 {p.date}</span>
+                  <span style={{ fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.7)' }}>📅 {p.date}</span>
                   <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-                    <span style={{ fontSize: 8, color: '#00e68a' }}>{p.dayPlan ? `${Math.round(p.dayPlan.totals.kcal)} ккал` : ''}</span>
-                    <button onClick={(e) => { e.stopPropagation(); loadSavedPlan(p); }} style={{ padding: '2px 6px', borderRadius: 4, fontSize: 8, cursor: 'pointer', background: 'rgba(0,230,138,0.1)', border: '1px solid rgba(0,230,138,0.2)', color: '#00e68a' }}>📋</button>
-                    <button onClick={(e) => { e.stopPropagation(); const updated = savedPlans.filter((_, j) => j !== pi); setSavedPlans(updated); localStorage.setItem('he_saved_nutrition_plans', JSON.stringify(updated)); }} style={{ padding: '2px 6px', borderRadius: 4, fontSize: 8, cursor: 'pointer', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', color: '#ef4444' }}>✕</button>
+                    <span style={{ fontSize: 8, color: '#00e68a', fontWeight: 600 }}>{p.dayPlan ? `${Math.round(p.dayPlan.totals.kcal)} ккал` : ''}</span>
+                    <button onClick={(e) => { e.stopPropagation(); loadSavedPlan(p); }} style={{ padding: '3px 8px', borderRadius: 6, fontSize: 8, cursor: 'pointer', background: 'rgba(0,230,138,0.1)', border: '1px solid rgba(0,230,138,0.2)', color: '#00e68a', fontWeight: 600 }}>📋</button>
+                    <button onClick={(e) => { e.stopPropagation(); const updated = savedPlans.filter((_, j) => j !== pi); setSavedPlans(updated); localStorage.setItem('he_saved_nutrition_plans', JSON.stringify(updated)); }} style={{ padding: '3px 8px', borderRadius: 6, fontSize: 8, cursor: 'pointer', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', color: '#ef4444', fontWeight: 600 }}>✕</button>
                   </div>
                 </div>
                 {isExpanded && (
-                  <div style={{ padding: '4px 8px 6px', borderTop: '1px solid rgba(255,255,255,0.04)', fontSize: 8, color: 'rgba(255,255,255,0.5)' }}>
+                  <div style={{ padding: '6px 10px 8px', borderTop: '1px solid rgba(255,255,255,0.04)', fontSize: 8, color: 'rgba(255,255,255,0.5)' }}>
                     {p.dayPlan && (
                       <div>
-                        <div style={{ fontWeight: 600, color: '#00e68a', marginBottom: 2 }}>День: {Math.round(p.dayPlan.totals.kcal)} ккал</div>
+                        <div style={{ fontWeight: 700, color: '#00e68a', marginBottom: 4, fontSize: 9 }}>🍽 План на день: {Math.round(p.dayPlan.totals.kcal)} ккал</div>
                         {p.dayPlan.meals?.map((m: any, mi: number) => (
-                          <div key={mi} style={{ padding: '1px 0' }}>{m.time} {m.label}: {m.items?.map((it: any) => it.name).join(', ')}</div>
+                          <div key={mi} style={{ padding: '2px 0', display: 'flex', gap: 4 }}>
+                            <span style={{ color: 'rgba(255,255,255,0.3)' }}>{m.time}</span>
+                            <span style={{ fontWeight: 600, color: '#00e68a' }}>{m.label}:</span>
+                            <span>{m.items?.map((it: any) => it.name).join(', ')}</span>
+                          </div>
                         ))}
                       </div>
                     )}
                     {p.shoppingList && Object.keys(p.shoppingList).length > 0 && (
-                      <div style={{ marginTop: 4 }}>
+                      <div style={{ marginTop: 4, display: 'flex', gap: 6 }}>
                         <span style={{ color: '#f97316', fontWeight: 600 }}>🛒 {Object.keys(p.shoppingList).length} продуктов</span>
                       </div>
                     )}
-                    {p.waterCalc && <div style={{ marginTop: 2, color: '#06b6d4' }}>💧 {p.waterCalc.total} л/день</div>}
+                    {p.waterCalc && <div style={{ marginTop: 2, color: '#06b6d4', fontWeight: 600 }}>💧 {p.waterCalc.total} л/день</div>}
                   </div>
                 )}
               </div>
@@ -1551,7 +1788,7 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
       )}
 
       {/* ─── Справочник (правила, качество, сочетаемость) ─── */}
-      <GlassCard title="📖 Справочник питания">
+      <GlassCard title="Справочник питания" icon="📖" color="#8b5cf6">
         <NutritionReference />
       </GlassCard>
 
