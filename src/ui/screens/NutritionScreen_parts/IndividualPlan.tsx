@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { addToCart } from '../../../core/nutrition-utils';
-import { FOOD_DB } from '../../../core/nutrition-database';
+import { FOOD_DB, FOOD_ALLERGEN_DIET } from '../../../core/nutrition-database';
 import { calcNutrition } from '../../../engines/nutrition.engine';
 import { getProfile, updateProfile } from '../../../core/profile-manager';
 import type { UserProfile } from '../../../core/types';
@@ -318,23 +318,55 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
     const tF = Math.round(effectiveF * fMod * nutrMult);
     const tC = Math.round(effectiveC * cMod * nutrMult);
 
-    // Get excluded food IDs
     const excludedIds = new Set(excludedFoods);
-    const allergenIds = new Set(
-      allergens.flatMap(a => {
-        if (a === 'лактоза' || a === 'молочные') return ['cottage_cheese_5','kefir','yogurt_greek','milk','cheese_hard','kefir_2','yogurt_natural','ryazhenka','sour_cream_15','greek_yogurt','milk_3_2','cheese_mozzarella','cheese_ricotta','whey_protein'];
-        if (a === 'глютен') return ['pasta_durum','bread_rye','tortilla_wheat','oats','bulgur','couscous','bread_white','flour_wheat'];
-        if (a === 'орехи') return FOOD_DB.filter(f => f.allergens?.includes('nuts') || f.name.toLowerCase().includes('миндаль') || f.name.toLowerCase().includes('грецк') || f.name.toLowerCase().includes('кешью') || f.name.toLowerCase().includes('фундук') || f.name.toLowerCase().includes('пекан')).map(f => f.id);
-        if (a === 'арахис') return FOOD_DB.filter(f => f.name.toLowerCase().includes('арахис')).map(f => f.id);
-        if (a === 'яйца') return ['egg_whole','egg_white'];
-        if (a === 'соя') return FOOD_DB.filter(f => f.name.toLowerCase().includes('соя') || f.name.toLowerCase().includes('тофу') || f.name.toLowerCase().includes('эдамам') || f.name.toLowerCase().includes('темпе')).map(f => f.id);
-        if (a === 'рыба') return FOOD_DB.filter(f => f.category === 'protein' && (f.name.toLowerCase().includes('рыб') || f.name.toLowerCase().includes('лосос') || f.name.toLowerCase().includes('тунец') || f.name.toLowerCase().includes('треск') || f.name.toLowerCase().includes('палтус') || f.name.toLowerCase().includes('скумбр') || f.name.toLowerCase().includes('форель') || f.name.toLowerCase().includes('сардин') || f.name.toLowerCase().includes('сельдь'))).map(f => f.id);
-        if (a === 'морепродукты') return FOOD_DB.filter(f => f.name.toLowerCase().includes('креветк') || f.name.toLowerCase().includes('краб') || f.name.toLowerCase().includes('лобстер') || f.name.toLowerCase().includes('омар') || f.name.toLowerCase().includes('мидии') || f.name.toLowerCase().includes('кальмар') || f.name.toLowerCase().includes('осьминог')).map(f => f.id);
-        if (a === 'кунжут') return FOOD_DB.filter(f => f.name.toLowerCase().includes('кунжут') || f.name.toLowerCase().includes('тахини') || f.name.toLowerCase().includes('сезам')).map(f => f.id);
-        if (a === 'горчица') return FOOD_DB.filter(f => f.name.toLowerCase().includes('горчиц')).map(f => f.id);
-        return [];
-      })
-    );
+    // Build food allergen map from authoritative sources
+    const getFoodAllergens = (foodId: string): string[] => {
+      const fromDiet = FOOD_ALLERGEN_DIET[foodId];
+      if (fromDiet) return fromDiet.allergens;
+      const food = FOOD_DB.find(f => f.id === foodId);
+      return food?.allergens || [];
+    };
+
+    // Map user-selected allergens to food allergen values + text fallbacks
+    const userAllergenToValues: Record<string, string[]> = {
+      'лактоза': ['dairy'],
+      'молочные': ['dairy'],
+      'глютен': ['gluten'],
+      'орехи': ['nuts', 'tree_nuts'],
+      'арахис': ['peanuts'],
+      'яйца': ['eggs'],
+      'соя': ['soy'],
+      'рыба': ['fish'],
+      'морепродукты': ['shellfish'],
+      'кунжут': ['sesame'],
+      'горчица': ['mustard'],
+    };
+
+    // Text-based name searches for items missing allergen tags
+    const allergenTextMatches = (a: string, foodName: string, foodId: string): boolean => {
+      const name = foodName.toLowerCase();
+      if (a === 'арахис' && name.includes('арахис')) return true;
+      if (a === 'горчица' && name.includes('горчиц')) return true;
+      if (a === 'кунжут' && (name.includes('кунжут') || name.includes('тахини') || name.includes('сезам'))) return true;
+      if (a === 'орехи' && (name.includes('миндаль') || name.includes('грецк') || name.includes('кешью') || name.includes('фундук') || name.includes('пекан'))) return true;
+      if (a === 'рыба' && (name.includes('рыб') || name.includes('лосос') || name.includes('тунец') || name.includes('треск') || name.includes('палтус') || name.includes('скумбр') || name.includes('форель') || name.includes('сардин') || name.includes('сельдь'))) return true;
+      if (a === 'морепродукты' && (name.includes('креветк') || name.includes('краб') || name.includes('лобстер') || name.includes('омар') || name.includes('мидии') || name.includes('кальмар') || name.includes('осьминог'))) return true;
+      return false;
+    };
+
+    const allergenIds = new Set<string>();
+    allergens.forEach(a => {
+      const foodVals = userAllergenToValues[a];
+      FOOD_DB.forEach(f => {
+        const fAllergens = getFoodAllergens(f.id);
+        if (foodVals && fAllergens.some(fa => foodVals.includes(fa))) {
+          allergenIds.add(f.id);
+        }
+        if (allergenTextMatches(a, f.name, f.id)) {
+          allergenIds.add(f.id);
+        }
+      });
+    });
 
     // Seeded random for food variety
     const seedRand = (seed: number) => {
@@ -379,6 +411,9 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
       if (cyclingMode === 'cheatmeal' && isTrainingDay) { tKcalAdj = Math.round(tKcal * 0.85); /* cheat meal will be separate */ }
       if (cyclingMode === 'carbload' && isTrainingDay) { tCAdj = Math.round(tC * 1.5); }
 
+      // Pharma-aware carb timing: find insulin injection closest to meals
+      const insulinInj = injections.find(i => i.type === 'инсулин' || i.name.toLowerCase().includes('инсулин'));
+
       const meals = mealTimes.map((mt, idx) => {
         const p = Math.round(tP / mealTimes.length);
         const f = Math.round(tF / mealTimes.length);
@@ -390,7 +425,7 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
         let remainingP = p;
         let remainingF = f;
         let remainingC = c;
-        const foodSeed = dayOffset * 1000 + idx * 73;
+        const foodSeed = dayOffset * 10007 + idx * 997 + (isTrainingDay ? 3000 : 0) + (cyclingMode === 'butch' ? 5000 : 0);
 
         // Protein source
         let protPool = foods.filter(f => f.id !== 'egg_white' && (f.category === 'protein' || f.category === 'dairy'));
@@ -414,9 +449,17 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
           if (planType === 'keto') carbPool = carbPool.filter(f => f.carbs < 15);
           carbPool = carbPool.filter(f => !excludedIds.has(f.id) && !allergenIds.has(f.id));
           if (carbPool.length > 0) {
+            let carbAmount = remainingC;
+            // Insulin boost: if meal is within 45 min of insulin injection, boost carbs
+            if (insulinInj) {
+              const mealMin = parseInt(mt.time.split(':')[0]) * 60 + parseInt(mt.time.split(':')[1]);
+              const injMin = parseInt(insulinInj.time.split(':')[0]) * 60 + parseInt(insulinInj.time.split(':')[1]);
+              const diff = Math.abs(mealMin - injMin);
+              if (diff <= 45) carbAmount = Math.round(carbAmount * 2.0);
+            }
             const carbIdx = Math.floor(seedRand(foodSeed + 2) * carbPool.length);
             const carb = carbPool[carbIdx % carbPool.length];
-            const portions = Math.min(1.2, remainingC / Math.max(1, carb.carbs));
+            const portions = Math.min(1.2, carbAmount / Math.max(1, carb.carbs));
             items.push({ name: carb.name, id: carb.id, amount: Math.round(portions * 100), kcal: Math.round(carb.kcal * portions), p: Math.round(carb.protein * portions), f: Math.round(carb.fat * portions), c: Math.round(carb.carbs * portions) });
           }
         }
@@ -1766,6 +1809,46 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
             );
           })()}
           <button onClick={saveCurrentPlan} style={{ marginTop: 6, padding: '8px', borderRadius: 8, border: '1px solid rgba(249,115,22,0.25)', background: 'rgba(249,115,22,0.06)', color: '#f97316', cursor: 'pointer', fontSize: 9, fontWeight: 600, width: '100%' }}>💾 Сохранить план</button>
+        </GlassCard>
+      )}
+
+      {/* 17b. Pharma meal timing */}
+      {generated && injections.length > 0 && (
+        <GlassCard title="Совместимость с препаратами" icon="💊" color="#8b5cf6" style={{ border: '1px solid rgba(139,92,246,0.15)' }}>
+          {injections.map((inj: DrugInjection) => {
+            const injH = parseInt(inj.time.split(':')[0]);
+            const injMin = parseInt(inj.time.split(':')[1]);
+            const isInsulin = inj.type === 'инсулин' || inj.name.toLowerCase().includes('инсулин');
+            const isGHorPeptide = inj.type === 'ГР' || inj.type === 'GHRP' || inj.type === 'CJC' || inj.name.toLowerCase().includes('гр') || inj.name.toLowerCase().includes('gh');
+            const isOral = !isInsulin && !isGHorPeptide;
+            return (
+              <div key={inj.id} style={{ marginBottom: 6, padding: '8px 10px', borderRadius: 10, background: 'rgba(139,92,246,0.06)', border: '1px solid rgba(139,92,246,0.12)' }}>
+                <div style={{ fontWeight: 700, fontSize: 10, color: '#a78bfa', marginBottom: 3 }}>
+                  💉 {inj.name} ({inj.dose}{inj.unit}) в {inj.time}
+                </div>
+                {isInsulin && (
+                  <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)', lineHeight: 1.5 }}>
+                    ⏰ Приём пищи <strong style={{ color: '#f97316' }}>через 15-30 мин</strong> после инъекции (30-50г углеводов).
+                  </div>
+                )}
+                {isGHorPeptide && (
+                  <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)', lineHeight: 1.5 }}>
+                    ⏰ Принимать <strong style={{ color: '#06b6d4' }}>натощак</strong>, за 30-60 мин до еды.
+                    Избегать углеводов в течение 30 мин после инъекции.
+                  </div>
+                )}
+                {isOral && (
+                  <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)', lineHeight: 1.5 }}>
+                    ⏰ Принимать <strong style={{ color: '#3b82f6' }}>во время еды</strong> (жирорастворимые) или натощак (водорастворимые).
+                    Сверьтесь с инструкцией.
+                  </div>
+                )}
+              </div>
+            );
+          })}
+          <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.3)', marginTop: 2 }}>
+            💡 Учитывайте время приёма препаратов при планировании приёмов пищи для максимальной эффективности.
+          </div>
         </GlassCard>
       )}
 
