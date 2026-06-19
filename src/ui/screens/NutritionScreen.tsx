@@ -138,7 +138,7 @@ export const NutritionScreen: React.FC = () => {
       case 'recipes': return <RecipesTab />;
       case 'diary': return <NutritionDiary foodEntries={foodEntries} />;
       case 'charts': return <NutritionCharts kcalData={[avgWeeklyKcal]} proteinData={[avgWeeklyProtein]} labels={['']} dailyLogs={dailyLogs} />;
-      case 'mealplan': return <IndividualPlan profile={linked.profile} />;
+      case 'mealplan': return <IndividualPlan profile={linked.profile} course={linked.course} />;
       case 'grocery': return <GroceryTab tKcal={tKcal} tProt={tProt} />;
       case 'restaurant': return <RestaurantTab />;
       case 'custom': return <NutritionCustomFood />;

@@ -121,9 +121,10 @@ const reportPillStyle = (color: string, active: boolean): React.CSSProperties =>
 });
 
 // ─── Main Component ───
-export const IndividualPlan: React.FC<{ profile: UserProfile | null }> = ({ profile: _profile }) => {
+export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: any[] }> = ({ profile: _profile, course: _course }) => {
   const profile = _profile || getProfileSafe();
   const s = profile?.settings;
+  const courseEntries = _course || [];
 
   // 1. User info state (synced from profile)
   const [weight, setWeight] = useState(s?.weight || 80);
@@ -138,7 +139,20 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null }> = ({ prof
 
   // 3. Phase + course drugs
   const [phase, setPhase] = useState<PhaseId>('course');
-  const [injections, setInjections] = useState<DrugInjection[]>([]);
+  const [injections, setInjections] = useState<DrugInjection[]>(() => {
+    // Auto-pull from pharma course
+    if (courseEntries.length > 0) {
+      return courseEntries.map(ce => ({
+        id: `course_${ce.substanceId}_${Date.now()}`,
+        name: ce.substanceId || ce.name || 'Препарат',
+        time: '08:00',
+        dose: ce.doseValue || 10,
+        unit: ce.doseUnit || 'mg',
+        type: ce.substanceId?.toLowerCase().includes('ins') || ce.name?.toLowerCase().includes('инсулин') ? 'инсулин' : 'другое',
+      }));
+    }
+    return [];
+  });
   const [injName, setInjName] = useState('');
   const [injTime, setInjTime] = useState('08:00');
   const [injDose, setInjDose] = useState(10);
@@ -883,7 +897,12 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null }> = ({ prof
             <PillBtn key={p.id} active={phase === p.id} onClick={() => setPhase(p.id)}>{p.icon} {p.label}</PillBtn>
           ))}
         </div>
-        <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', marginBottom: 4 }}>Инъекции (добавьте препараты курса):</div>
+        {courseEntries.length > 0 && (
+          <div style={{ fontSize: 8, color: '#8b5cf6', marginBottom: 4, padding: '2px 6px', borderRadius: 4, background: 'rgba(139,92,246,0.08)', display: 'inline-block' }}>
+            📋 Препараты автоматически загружены из фармы ({courseEntries.length})
+          </div>
+        )}
+        <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', marginBottom: 4 }}>Инъекции {courseEntries.length > 0 ? '(можно добавить ещё)' : '(добавьте препараты курса)'}:</div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, alignItems: 'flex-end', marginBottom: 4 }}>
           <div style={{ flex: 1, minWidth: 60 }}>
             <input type="text" value={injName} onChange={e => setInjName(e.target.value)} placeholder="Название" style={inputStyle} list="drug-list" />
