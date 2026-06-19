@@ -4,6 +4,7 @@ import { FOOD_DB, FOOD_ALLERGEN_DIET } from '../../../core/nutrition-database';
 import { PHARMA_DB } from '../../../core/pharma-database';
 import { calcNutrition } from '../../../engines/nutrition.engine';
 import { getProfile, updateProfile } from '../../../core/profile-manager';
+import { getRecipesByMeal, getRecipes, type Recipe } from '../../../engines/nutrition-periodization.engine';
 import type { UserProfile } from '../../../core/types';
 
 
@@ -408,6 +409,8 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
   const [editItem, setEditItem] = useState<{ dayIdx: number; mealIdx: number; itemIdx: number } | null>(null);
   const [editAmount, setEditAmount] = useState<number>(0);
   const [replacingItem, setReplacingItem] = useState<{ dayIdx: number; mealIdx: number; itemIdx: number } | null>(null);
+  const [recipePickerMeal, setRecipePickerMeal] = useState<{ dayIdx: number; mealIdx: number; label: string } | null>(null);
+  const [mealPrep, setMealPrep] = useState<any[] | null>(null);
 
   // Find similar foods by category
   const findSimilarFoods = (item: any, count = 5) => {
@@ -468,6 +471,26 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
       return { ...prev, meals, totals };
     };
     if (dayIdx === 0) setDayPlan(updatePlan);
+  };
+
+  // Replace meal with a recipe
+  const replaceMealWithRecipe = (recipe: Recipe, mealIdx: number) => {
+    const updatePlan = (prev: any) => {
+      if (!prev) return prev;
+      const meals = [...prev.meals];
+      const matchedItems = recipe.ingredients.map((ing, ii) => {
+        const lower = ing.toLowerCase();
+        const food = FOOD_DB.find(f => lower.includes(f.name.toLowerCase()) || lower.includes(f.id));
+        const item: any = food || { name: ing, id: ing, kcal: Math.round(recipe.kcal / recipe.ingredients.length), protein: Math.round(recipe.protein / recipe.ingredients.length), fat: Math.round(recipe.fat / recipe.ingredients.length), carbs: Math.round(recipe.carbs / recipe.ingredients.length) };
+        return { name: item.name || ing, id: item.id || ing, amount: 100, kcal: Math.round((item.kcal || 0) * (recipe.kcal / recipe.ingredients.length) / Math.max(1, item.kcal || 1)), p: Math.round(item.protein || recipe.protein / recipe.ingredients.length), f: Math.round(item.fat || recipe.fat / recipe.ingredients.length), c: Math.round(item.carbs || recipe.carbs / recipe.ingredients.length) };
+      });
+      const totals = { kcal: matchedItems.reduce((s, i) => s + i.kcal, 0), p: matchedItems.reduce((s, i) => s + i.p, 0), f: matchedItems.reduce((s, i) => s + i.f, 0), c: matchedItems.reduce((s, i) => s + i.c, 0) };
+      meals[mealIdx] = { ...meals[mealIdx], items: matchedItems, totals };
+      const dayTotals = { kcal: meals.reduce((s, m) => s + (m.totals?.kcal || 0), 0), p: meals.reduce((s, m) => s + (m.totals?.p || 0), 0), f: meals.reduce((s, m) => s + (m.totals?.f || 0), 0), c: meals.reduce((s, m) => s + (m.totals?.c || 0), 0) };
+      return { ...prev, meals, totals: dayTotals };
+    };
+    setDayPlan(updatePlan);
+    setRecipePickerMeal(null);
   };
 
   const mealtimeToMin = (t: string) => { const [h, m] = t.split(':').map(Number); return h * 60 + m; };
@@ -1557,7 +1580,10 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
                   {isPreWorkout && <span style={{ fontSize: 7, padding: '1px 5px', borderRadius: 4, background: 'rgba(139,92,246,0.15)', color: '#a855f7', fontWeight: 600 }}>ДО</span>}
                   {isPostWorkout && <span style={{ fontSize: 7, padding: '1px 5px', borderRadius: 4, background: 'rgba(245,158,11,0.15)', color: '#f59e0b', fontWeight: 600 }}>ПОСЛЕ</span>}
                 </div>
-                <span style={{ fontSize: 10, fontWeight: 800, color: 'rgba(255,255,255,0.6)' }}>{mealKcal} ккал</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <span style={{ fontSize: 10, fontWeight: 800, color: 'rgba(255,255,255,0.6)' }}>{mealKcal} ккал</span>
+                  <span onClick={() => setRecipePickerMeal({ dayIdx: 0, mealIdx: mi, label: m.label })} style={{ fontSize: 7, padding: '2px 5px', borderRadius: 4, background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.15)', color: '#a78bfa', cursor: 'pointer', fontWeight: 600 }}>🍳</span>
+                </div>
               </div>
               {/* Meal items */}
               <div style={{ padding: '6px 10px 8px', background: '#18181b' }}>
@@ -2419,6 +2445,31 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
             })}
           </div>
         </GlassCard>
+      )}
+
+      {/* Recipe picker modal */}
+      {recipePickerMeal && generated && dayPlan && (
+        <div style={{ position:'fixed', inset:0, zIndex:100, display:'flex', alignItems:'flex-end', justifyContent:'center', background:'rgba(0,0,0,0.7)', backdropFilter:'blur(4px)' }}
+          onClick={() => setRecipePickerMeal(null)}>
+          <div onClick={e => e.stopPropagation()} style={{ width:'100%', maxWidth:400, padding:'14px 20px 28px', borderRadius:'20px 20px 0 0', background:'#18181b', boxShadow:'0 -4px 30px rgba(0,0,0,0.4)', border:'1px solid rgba(255,255,255,0.06)', borderBottom:'none' }}>
+            <div style={{ width:36, height:4, borderRadius:2, background:'rgba(255,255,255,0.15)', margin:'0 auto 16px' }} />
+            <div style={{ fontSize:14, fontWeight:700, color:'#fff', marginBottom:4, letterSpacing:'-0.3px' }}>🍳 Заменить «{recipePickerMeal.label}» рецептом</div>
+            <div style={{ fontSize:9, color:'rgba(255,255,255,0.35)', marginBottom:12 }}>Подходящие рецепты</div>
+            <div style={{ maxHeight:300, overflowY:'auto', display:'flex', flexDirection:'column', gap:6 }}>
+              {getRecipesByMeal(recipePickerMeal.label === 'Завтрак' ? 'breakfast' : recipePickerMeal.label === 'Обед' || recipePickerMeal.label === 'Второй завтрак' ? 'lunch' : recipePickerMeal.label === 'Ужин' ? 'dinner' : 'snack').length === 0 ? (
+                <div style={{ fontSize:9, color:'rgba(255,255,255,0.3)', textAlign:'center', padding:10 }}>Нет рецептов для этого приёма.</div>
+              ) : getRecipesByMeal(recipePickerMeal.label === 'Завтрак' ? 'breakfast' : recipePickerMeal.label === 'Обед' || recipePickerMeal.label === 'Второй завтрак' ? 'lunch' : recipePickerMeal.label === 'Ужин' ? 'dinner' : 'snack').map((r, i) => (
+                <button key={i} onClick={() => replaceMealWithRecipe(r, recipePickerMeal.mealIdx)} style={{ width:'100%', padding:'10px 12px', borderRadius:12, cursor:'pointer', textAlign:'left', background:'#202023', border:'1px solid rgba(255,255,255,0.06)', color:'rgba(255,255,255,0.7)', fontSize:9, transition:'all 0.15s' }}
+                  onMouseEnter={e => (e.target as HTMLElement).style.borderColor = 'rgba(139,92,246,0.3)'}
+                  onMouseLeave={e => (e.target as HTMLElement).style.borderColor = 'rgba(255,255,255,0.06)'}>
+                  <div style={{ fontWeight:700, color:'#a78bfa', fontSize:10, marginBottom:2 }}>{r.name}</div>
+                  <div style={{ color:'rgba(255,255,255,0.3)', marginBottom:4 }}>⏱{r.prepTimeMin}мин · {r.kcal}ккал · Б{r.protein}/Ж{r.fat}/У{r.carbs}</div>
+                  <div style={{ fontSize:7, color:'rgba(255,255,255,0.2)', display:'flex', gap:2, flexWrap:'wrap' }}>{r.tags.map(t => <span key={t} style={{ padding:'1px 4px', borderRadius:3, background:'rgba(139,92,246,0.08)', color:'rgba(167,139,250,0.5)' }}>{t}</span>)}</div>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Save plan button */}
