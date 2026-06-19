@@ -168,48 +168,99 @@ const RecipesTab: React.FC = () => {
   </div>);
 };
 
+const RESTAURANT_CUISINE: Record<string, string[]> = {
+  russian: ['харчо','лагман','долма','хачапури','чебуреки','пян-се','шницель','котлета по-киевски','бефстроганов','щавелевый суп'],
+  asian: ['рамен','жареный рис','курица терияки','вок','поке','том ям','мисо суп','оладьи','курица карри','греческий','оладьи'],
+  italian: ['пицца'],
+  fastfood: ['шаурма','бургер','kfc','mcdonald','burger king','макнаггетс','big mac','whopper','maple','maple grilled','фалафель','гирос','сэндвич с тунцом','картофель фри'],
+};
+function detectCuisine(name: string): string {
+  const low = name.toLowerCase();
+  for (const [cuisine, keywords] of Object.entries(RESTAURANT_CUISINE)) {
+    for (const kw of keywords) { if (low.includes(kw)) return cuisine; }
+  }
+  return 'fastfood';
+}
+
 const RestaurantTab: React.FC = () => {
-  const [tabRT, setTabRT] = React.useState<'guide'|'travel'|'sleep'>('guide');
-  const rtBtn = (isActive: boolean, onClick: () => void, children: React.ReactNode) => (
-    <button onClick={onClick} style={{ padding:'5px 12px', borderRadius:8, fontSize:9, cursor:'pointer', border: isActive ? '1px solid #00e68a' : '1px solid #27272a', background: isActive ? 'linear-gradient(135deg,rgba(0,230,138,0.2),rgba(0,200,160,0.12))' : '#202023', color: isActive ? '#00e68a' : 'rgba(255,255,255,0.5)', fontWeight: isActive ? 700 : 400 }}>{children}</button>
+  const [g, setG] = React.useState<'all'|'russian'|'asian'|'italian'|'fastfood'>('all');
+  const [search, setSearch] = React.useState('');
+  const [portions, setPortions] = React.useState<Record<string, number>>({});
+  const restaurantDishes = useMemo(() => FOOD_DB.filter(f => f.category === 'fast_food'), []);
+  const filtered = useMemo(() => {
+    let list = g === 'all' ? restaurantDishes : restaurantDishes.filter(f => detectCuisine(f.name) === g);
+    if (search.trim()) { const q = search.toLowerCase(); list = list.filter(f => f.name.toLowerCase().includes(q)); }
+    return list;
+  }, [g, search, restaurantDishes]);
+  const totals = useMemo(() => ({
+    kcal: filtered.reduce((s,f) => s + f.kcal * (portions[f.id] || 1), 0),
+    p: filtered.reduce((s,f) => s + f.protein * (portions[f.id] || 1), 0),
+    f: filtered.reduce((s,f) => s + f.fat * (portions[f.id] || 1), 0),
+    c: filtered.reduce((s,f) => s + f.carbs * (portions[f.id] || 1), 0),
+  }), [filtered, portions]);
+  const cuisineBtn = (v: typeof g, label: string) => (
+    <button onClick={() => setG(v)} style={{ padding:'3px 8px', borderRadius:6, fontSize:8, cursor:'pointer', border: g === v ? '1px solid #00e68a' : '1px solid #27272a', background: g === v ? 'rgba(0,230,138,0.15)' : '#202023', color: g === v ? '#00e68a' : 'rgba(255,255,255,0.5)', fontWeight: g === v ? 600 : 400 }}>{label}</button>
   );
   return (<div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-    <div style={{ display:'flex', gap:3, padding:'4px 0' }}>
-      {rtBtn(tabRT === 'guide', () => setTabRT('guide'), '🍽 Ресторан')}
-      {rtBtn(tabRT === 'travel', () => setTabRT('travel'), '✈ В дороге')}
-      {rtBtn(tabRT === 'sleep', () => setTabRT('sleep'), '💤 Сон')}
-    </div>
+    {/* КБЖУ сводка */}
+    {filtered.length > 0 && (
+      <div style={{ padding:14, ...cardBg }}>
+        <div style={{ fontSize:12, fontWeight:700, color:'#fff', marginBottom:6 }}>📊 КБЖУ выбранных блюд</div>
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr', gap:6 }}>
+          {[{l:'Калории',v:Math.round(totals.kcal),c:'#00e68a',u:'ккал'},{l:'Белки',v:Math.round(totals.p),c:'#3b82f6',u:'г'},{l:'Жиры',v:Math.round(totals.f),c:'#f59e0b',u:'г'},{l:'Углеводы',v:Math.round(totals.c),c:'#f97316',u:'г'}].map((s,i) => (
+            <div key={i} style={{ background:'#202023', borderRadius:8, padding:'5px 8px', textAlign:'center' }}>
+              <div style={{ fontSize:7, color:'rgba(255,255,255,0.4)' }}>{s.l}</div>
+              <div style={{ fontSize:16, fontWeight:800, color:s.c }}>{s.v}<span style={{ fontSize:9, fontWeight:400, color:'rgba(255,255,255,0.3)' }}> {s.u}</span></div>
+            </div>
+          ))}
+        </div>
+      </div>
+    )}
+    {/* Фильтры */}
     <div style={{ padding:14, ...cardBg }}>
-      {tabRT === 'guide' && <RestaurantGuide />}
-      {tabRT === 'travel' && <TravelGuide />}
-      {tabRT === 'sleep' && <SleepGuide />}
+      <div style={{ display:'flex', gap:3, flexWrap:'wrap', marginBottom:6 }}>
+        {cuisineBtn('all', 'Все')}
+        {cuisineBtn('russian', '🇷🇺 Русская')}
+        {cuisineBtn('asian', '🥟 Азиатская')}
+        {cuisineBtn('italian', '🍝 Итальянская')}
+        {cuisineBtn('fastfood', '🍔 Фаст-фуд')}
+      </div>
+      <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder="🔍 Поиск блюд..." style={{ width:'100%', boxSizing:'border-box', padding:'6px 10px', borderRadius:8, fontSize:9, border:'1px solid #27272a', background:'#202023', color:'#fff', outline:'none' }} />
+    </div>
+    {/* Список блюд с КБЖУ */}
+    <div style={{ padding:14, ...cardBg }}>
+      <div style={{ fontSize:12, fontWeight:700, color:'#fff', marginBottom:6 }}>🍽 Блюда ресторанов ({filtered.length})</div>
+      {filtered.length === 0 ? (
+        <div style={{ fontSize:10, color:'rgba(255,255,255,0.3)', textAlign:'center', padding:20 }}>Нет блюд по выбранному фильтру.</div>
+      ) : (
+        <div style={{ maxHeight:400, overflowY:'auto', display:'flex', flexDirection:'column', gap:4 }}>
+          {filtered.map(food => {
+            const portion = portions[food.id] || 1;
+            return (<div key={food.id} style={{ padding:'6px 8px', borderRadius:8, background:'#202023', border:'1px solid #27272a' }}>
+              <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                <div style={{ flex:1 }}>
+                  <div style={{ fontSize:9, fontWeight:600, color:'#fff' }}>{food.name}</div>
+                  <div style={{ fontSize:7, color:'rgba(255,255,255,0.3)' }}>{food.servingSize || ''} · {detectCuisine(food.name)}</div>
+                </div>
+                <div style={{ display:'flex', gap:2 }}>
+                  {[-1,1].map(d => <button key={d} onClick={() => setPortions(p => ({...p, [food.id]: Math.max(0.25, (p[food.id]||1) + d * 0.25)}))} style={{ width:18, height:18, borderRadius:4, border:'1px solid #27272a', background:'#18181b', color:'rgba(255,255,255,0.5)', cursor:'pointer', fontSize:10, display:'flex', alignItems:'center', justifyContent:'center' }}>{d>0?'+':'-'}</button>)}
+                </div>
+                <button onClick={() => addToCart({ name: food.name, amount: Math.round(portion * (parseInt(food.servingSize) || 100)), kcal: Math.round(food.kcal * portion), category: 'fast_food' })} style={{ padding:'3px 6px', borderRadius:4, border:'1px solid rgba(0,230,138,0.3)', background:'rgba(0,230,138,0.08)', color:'#00e68a', cursor:'pointer', fontSize:7, fontWeight:600 }}>🛒</button>
+              </div>
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr', gap:3, marginTop:4 }}>
+                <div style={{ background:'#18181b', borderRadius:4, padding:'2px 4px', textAlign:'center', fontSize:7, color:'rgba(255,255,255,0.4)' }}>🔥 {Math.round(food.kcal * portion)}</div>
+                <div style={{ background:'rgba(59,130,246,0.08)', borderRadius:4, padding:'2px 4px', textAlign:'center', fontSize:7, color:'#60a5fa' }}>Б {Math.round(food.protein * portion)}</div>
+                <div style={{ background:'rgba(245,158,11,0.08)', borderRadius:4, padding:'2px 4px', textAlign:'center', fontSize:7, color:'#fbbf24' }}>Ж {Math.round(food.fat * portion)}</div>
+                <div style={{ background:'rgba(249,115,22,0.08)', borderRadius:4, padding:'2px 4px', textAlign:'center', fontSize:7, color:'#fb923c' }}>У {Math.round(food.carbs * portion)}</div>
+              </div>
+              {portion !== 1 && <div style={{ fontSize:7, color:'rgba(255,255,255,0.3)', marginTop:2 }}>× {portion.toFixed(2)} порции</div>}
+            </div>);
+          })}
+        </div>
+      )}
     </div>
   </div>);
 };
-
-const RestaurantGuide: React.FC = () => {
-  const [g, setG] = React.useState<'all'|'russian'|'asian'|'italian'|'fastfood'>('all');
-  const guide: any[] = useMemo(() => {
-    try { return JSON.parse(localStorage.getItem('restaurant_guide') || '[]'); } catch { return []; }
-  }, []);
-  if (guide.length === 0) return <div style={{ fontSize:10, color:'rgba(255,255,255,0.3)', textAlign:'center', padding:20 }}>Нет данных.</div>;
-  const filtered = g === 'all' ? guide : guide.filter((x: any) => x.cuisine === g);
-  return (<>
-    <div style={{ fontSize:12, fontWeight:600, color:'#fff', marginBottom:6 }}>🍽 Гайд по ресторанам</div>
-    <div style={{ display:'flex', gap:3, flexWrap:'wrap', marginBottom:6 }}>
-      <RestaurantGuideBtn isActive={g === 'all'} onClick={() => setG('all')} label="Все" />
-      <RestaurantGuideBtn isActive={g === 'russian'} onClick={() => setG('russian')} label="Русская" />
-      <RestaurantGuideBtn isActive={g === 'asian'} onClick={() => setG('asian')} label="Азиатская" />
-      <RestaurantGuideBtn isActive={g === 'italian'} onClick={() => setG('italian')} label="Итальянская" />
-      <RestaurantGuideBtn isActive={g === 'fastfood'} onClick={() => setG('fastfood')} label="Фаст-фуд" />
-    </div>
-    {filtered.map((item: any, i: number) => <div key={i} style={{ padding:'5px 8px', borderRadius:8, background:'#202023', border:'1px solid #27272a', marginBottom:3, fontSize:9, color:'#fff' }}>{item.name} — <span style={{ color:'rgba(255,255,255,0.4)' }}>{item.kcal} ккал</span></div>)}
-  </>);
-};
-
-const RestaurantGuideBtn: React.FC<{ isActive: boolean; onClick: () => void; label: string }> = ({ isActive, onClick, label }) => (
-  <button onClick={onClick} style={{ padding:'3px 8px', borderRadius:6, fontSize:8, cursor:'pointer', border: isActive ? '1px solid #00e68a' : '1px solid #27272a', background: isActive ? 'rgba(0,230,138,0.15)' : '#202023', color: isActive ? '#00e68a' : 'rgba(255,255,255,0.5)', fontWeight: isActive ? 600 : 400 }}>{label}</button>
-);
 
 const TravelGuide: React.FC = () => {
   const [travelAdvice] = React.useState<any[]>(() => { try { return JSON.parse(localStorage.getItem('travel_workouts') || '[]'); } catch { return []; } });
