@@ -21,12 +21,8 @@ const NAV_CARDS: { id: ScreenId; icon: string; label: string }[] = [
 export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
   return (
     <div style={{ height:'100%', display:'flex', flexDirection:'column', overflow:'hidden' }}>
-      <div style={{ flex:1, position:'relative', overflow:'hidden' }}>
-        <img src="/hero-main.png" alt="" style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'fill' }} />
-        <div style={{ position:'absolute', inset:0, background:'linear-gradient(transparent 50%, rgba(0,0,0,0.85))' }} />
-        <div style={{ position:'relative', zIndex:2, display:'flex', flexDirection:'column', justifyContent:'flex-end', height:'100%', padding:'0 16px 20px' }}>
-          <div style={{ fontSize:28, fontWeight:800, color:'#fff', textShadow:'0 2px 12px rgba(0,0,0,0.8)', letterSpacing:'-0.5px' }}>BodyBuild Health</div>
-        </div>
+      <div style={{ flex:1, position:'relative', overflow:'hidden', background:'#0a0a0f' }}>
+        <img src="/hero-main.png" alt="" style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'fill', opacity:0.3 }} />
       </div>
       <div style={{ padding:'8px 12px 12px', background:'#18181b', borderTop:'1px solid rgba(255,255,255,0.06)' }}>
         <div style={{ display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:8 }}>

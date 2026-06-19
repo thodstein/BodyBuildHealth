@@ -39,13 +39,13 @@ const labelSec: React.CSSProperties = { fontSize:14, fontWeight:600, color:'#fff
 
 const CartTab: React.FC = () => {
   const [, forceUpdate] = useState(0);
+  const [storeName, setStoreName] = useState(() => localStorage.getItem('he_cart_store') || '');
   const cart: any[] = useMemo(() => { try { return JSON.parse(localStorage.getItem('he_nutrition_cart') || '[]'); } catch { return []; } }, [forceUpdate]);
   const saveCart = (c: any[]) => { localStorage.setItem('he_nutrition_cart', JSON.stringify(c)); forceUpdate(n => n + 1); };
   const clearCart = () => saveCart([]);
   const removeItem = (idx: number) => saveCart(cart.filter((_, i) => i !== idx));
   const updateQty = (idx: number, delta: number) => saveCart(cart.map((item, i) => i === idx ? { ...item, amount: Math.max(10, (item.amount || 100) + delta), kcal: Math.round((item.kcal || 0) * Math.max(10, (item.amount || 100) + delta) / Math.max(1, item.amount || 100)) } : item));
   const totalKcal = cart.reduce((s: number, i: any) => s + (i.kcal || 0), 0);
-  // Group by category
   const groups: Record<string, any[]> = {};
   cart.forEach((item, idx) => { const cat = item.category || 'other'; if (!groups[cat]) groups[cat] = []; groups[cat].push({ ...item, idx }); });
   const catLabels: Record<string, string> = {
@@ -56,7 +56,7 @@ const CartTab: React.FC = () => {
   return (
     <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
       <div style={{ padding:14, ...cardBg }}>
-        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:10 }}>
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:6 }}>
           <div>
             <div style={{ fontSize:15, fontWeight:700, color:'#fff', letterSpacing:-0.3 }}>🛒 Корзина</div>
             <div style={{ fontSize:10, color:'rgba(255,255,255,0.6)', marginTop:2 }}>{cart.length} позиций • {Math.round(totalKcal)} ккал</div>
@@ -65,6 +65,7 @@ const CartTab: React.FC = () => {
             <button onClick={clearCart} style={{ padding:'6px 12px', borderRadius:10, border:'none', cursor:'pointer', background:'rgba(239,68,68,0.15)', color:'#ef4444', fontSize:9, fontWeight:600 }}>✕ Очистить</button>
           )}
         </div>
+        <input value={storeName} onChange={e => { setStoreName(e.target.value); localStorage.setItem('he_cart_store', e.target.value); }} placeholder="🏪 Магазин (например: Пятёрочка, Ашан)" style={{ ...inputStyle, marginBottom:6, fontSize:10 }} />
         {cart.length === 0 ? (
           <div style={{ textAlign:'center', padding:24, color:'rgba(255,255,255,0.5)', fontSize:11 }}>
             Корзина пуста. Добавляйте продукты из плана питания кнопкой «🛒 В корзину».
@@ -517,7 +518,7 @@ export const NutritionScreen: React.FC = () => {
           border:'none', background:'transparent', display:'flex', alignItems:'center',
         }}>←</button>
         <div style={{ flex:1, fontSize:15, fontWeight:700, color:'#fff', letterSpacing:-0.3 }}>Питание</div>
-        <span style={{ fontSize:9, color:'rgba(255,255,255,0.35)' }}>
+        <span style={{ fontSize:9, color:'rgba(255,255,255,0.6)' }}>
           {nutritionSection === 'diary' ? 'Дневник' : 'Всё'}
         </span>
       </div>
