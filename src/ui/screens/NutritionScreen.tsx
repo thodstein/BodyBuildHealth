@@ -15,6 +15,7 @@ import { NutritionOverview } from './NutritionScreen_parts/NutritionOverview';
 import { NutritionDiary } from './NutritionScreen_parts/NutritionDiary';
 import { NutritionCharts } from './NutritionScreen_parts/NutritionCharts';
 import { NutritionCustomFood } from './NutritionScreen_parts/NutritionCustomFood';
+import { IndividualPlan } from './NutritionScreen_parts/IndividualPlan';
 import { generateTierMealPlan, generateRegimeAdvice, type MealTier, type MealPlanResult } from '../../engines/meal-tier-generator.engine';
 
 interface DiaryEntry {
@@ -137,7 +138,7 @@ export const NutritionScreen: React.FC = () => {
       case 'recipes': return <RecipesTab />;
       case 'diary': return <NutritionDiary foodEntries={foodEntries} />;
       case 'charts': return <NutritionCharts kcalData={[avgWeeklyKcal]} proteinData={[avgWeeklyProtein]} labels={['']} dailyLogs={dailyLogs} />;
-      case 'mealplan': return <MealPlanExtended tKcal={tKcal} tProt={tProt} tFat={tFat} tCarbs={tCarbs} profile={linked.profile} mealSubTab={mealSubTab} setMealSubTab={setMealSubTab} avgWeeklyKcal={avgWeeklyKcal} avgWeeklyProtein={avgWeeklyProtein} avgWeeklyFat={avgWeeklyFat} avgWeeklyCarbs={avgWeeklyCarbs} microsIntake={microsIntake} labAnalysis={labAnalysis} />;
+      case 'mealplan': return <IndividualPlan profile={linked.profile} />;
       case 'grocery': return <GroceryTab tKcal={tKcal} tProt={tProt} />;
       case 'restaurant': return <RestaurantTab />;
       case 'custom': return <NutritionCustomFood />;
