@@ -60,6 +60,18 @@ export default defineConfig({
     open: true
   },
   build: {
-    sourcemap: true
+    sourcemap: true,
+    rollupOptions: {
+      output: {
+        manualChunks(id: string) {
+          if (id.includes('chart.js') || id.includes('react-chartjs-2')) return 'chart-js';
+          if (id.includes('pharma-database')) return 'pharma-db';
+          if (id.includes('support-database')) return 'support-db';
+          if (id.includes('nutrition-database')) return 'nutrition-db';
+          if (id.includes('pdf-lib')) return 'pdf-lib';
+          if (id.includes('Risk3DModel')) return 'risk-3d';
+        },
+      },
+    },
   }
 });
