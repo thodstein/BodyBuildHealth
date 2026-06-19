@@ -700,6 +700,8 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
         'Обед': lunchMin,
         'Ужин': dinnerMin,
       };
+      // When training is linked, push snack/dinner to avoid training window
+      const trainMin = linkToTraining && isTrainingDay ? parseInt(trainStart.split(':')[0]) * 60 + parseInt(trainStart.split(':')[1]) : 0;
       // Build meal order for this mealsCount
       const mealDefs: { label: string; anchor?: number }[] = [];
       mealDefs.push({ label: 'Завтрак', anchor: labelAnchor['Завтрак'] });
@@ -712,7 +714,6 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
       // Distribute times — anchored ones are fixed, others interpolate between anchors
       const anchored = mealDefs.map((m, i) => {
         if (m.anchor) return { ...m, time: m.anchor, fixed: true };
-        // Find nearest fixed anchors
         let leftAnchorIdx = i;
         let leftTime = wakeMin;
         while (leftAnchorIdx >= 0 && !mealDefs[leftAnchorIdx].anchor) leftAnchorIdx--;
@@ -723,11 +724,15 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
         while (rightAnchorIdx < mealDefs.length && !mealDefs[rightAnchorIdx].anchor) rightAnchorIdx++;
         if (rightAnchorIdx < mealDefs.length) rightTime = mealDefs[rightAnchorIdx].anchor!;
 
-        // Count unanchored positions between left and right
         const totalSlots = rightAnchorIdx - leftAnchorIdx;
         const thisSlot = i - leftAnchorIdx;
-        const interp = totalSlots > 0 ? thisSlot / totalSlots : 0.5;
-        return { ...m, time: Math.round(leftTime + (rightTime - leftTime) * interp), fixed: false };
+        let interp = totalSlots > 0 ? thisSlot / totalSlots : 0.5;
+        let t = Math.round(leftTime + (rightTime - leftTime) * interp);
+        // If this meal falls in training window, push it before
+        if (trainMin > 0 && t >= trainMin && t <= trainMin + 90) {
+          t = Math.max(leftTime + 15, trainMin - 45);
+        }
+        return { ...m, time: t, fixed: false };
       });
 
       anchored.forEach((m, i) => {
