@@ -440,33 +440,32 @@ export const NutritionScreen: React.FC = () => {
   if (page === 'hero') {
     return (
       <div className="screen nutrition" style={{ flex:1, minHeight:0, display:'flex', flexDirection:'column', overflow:'auto', padding:0 }}>
-        <div style={{ position:'relative', flex:1, minHeight:'100%', display:'flex', flexDirection:'column', overflow:'hidden' }}>
+        <div style={{ flex:1, position:'relative', overflow:'hidden' }}>
           <img src="/nutrition-hero.jpg" alt="" style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'cover', objectPosition:'center top' }} />
           <div style={{ position:'absolute', inset:0, background:'linear-gradient(transparent 50%, rgba(0,0,0,0.85))' }} />
-          <div style={{ position:'relative', zIndex:2, flex:1, display:'flex', flexDirection:'column', justifyContent:'flex-end', padding:'16px 16px 80px' }}>
-            <h1 style={{ fontSize:26, fontWeight:800, color:'#fff', margin:'0 0 2px', textShadow:'0 2px 14px rgba(0,0,0,0.9)', letterSpacing:-0.5 }}>Питание</h1>
-            <p style={{ fontSize:12, color:'rgba(255,255,255,0.9)', margin:'0 0 20px', lineHeight:1.3, textShadow:'0 1px 8px rgba(0,0,0,0.8)' }}>
-              План питания, дневник, графики, каталог продуктов
-            </p>
-            <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
-              {[
-                { section: 'diary' as NutritionSection, tab: 'mealplan' as ActiveTab, icon: '🥗', title: 'Планирование питания', desc: 'Индивидуальный план, дневник, справочник, корзина', color: '#3b82f6' },
-                { section: 'diary' as NutritionSection, tab: 'charts' as ActiveTab, icon: '📊', title: 'Аналитика питания', desc: 'Графики КБЖУ, отчёты, рецепты, рестораны', color: '#8b5cf6' },
-              ].map(card => (
-                <button key={card.tab} onClick={() => { setPage('tabs'); setNutritionSection(card.section); setTab(card.tab); }} style={{
-                  display:'flex', alignItems:'center', gap:12, padding:'14px 16px', borderRadius:16, cursor:'pointer', textAlign:'left', width:'100%',
-                  background:'#18181b', border:'1px solid rgba(255,255,255,0.06)', color:'#fff',
-                  transition:'all 0.2s',
-                }}>
-                  <div style={{ width:44, height:44, borderRadius:14, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, background: card.color + '25', fontSize:22 }}>{card.icon}</div>
-                  <div style={{ flex:1 }}>
-                    <div style={{ fontSize:14, fontWeight:700, marginBottom:2, color: card.color, letterSpacing:-0.2 }}>{card.title}</div>
-                    <div style={{ fontSize:10, color:'rgba(255,255,255,0.6)', lineHeight:1.3 }}>{card.desc}</div>
-                  </div>
-                  <span style={{ color: card.color, fontSize:18, opacity:0.6 }}>→</span>
-                </button>
-              ))}
-            </div>
+          <div style={{ position:'relative', zIndex:2, display:'flex', flexDirection:'column', justifyContent:'flex-end', height:'100%', padding:'0 16px 24px' }}>
+            <h1 style={{ fontSize:28, fontWeight:800, color:'#fff', margin:0, textShadow:'0 2px 14px rgba(0,0,0,0.9)', letterSpacing:-0.5 }}>Питание</h1>
+          </div>
+        </div>
+        <div style={{ padding:'8px 12px 12px', background:'#18181b', borderTop:'1px solid rgba(255,255,255,0.06)' }}>
+          <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+            {[
+              { section: 'diary' as NutritionSection, tab: 'mealplan' as ActiveTab, icon: '🥗', title: 'Планирование питания', desc: 'Индивидуальный план, дневник, корзина', color: '#3b82f6' },
+              { section: 'diary' as NutritionSection, tab: 'charts' as ActiveTab, icon: '📊', title: 'Аналитика питания', desc: 'Графики КБЖУ, отчёты, рецепты', color: '#8b5cf6' },
+            ].map(card => (
+              <button key={card.tab} onClick={() => { setPage('tabs'); setNutritionSection(card.section); setTab(card.tab); }} style={{
+                display:'flex', alignItems:'center', gap:12, padding:'12px 14px', borderRadius:14, cursor:'pointer', textAlign:'left', width:'100%',
+                background:'#202023', border:'1px solid rgba(255,255,255,0.06)', color:'#fff',
+                transition:'all 0.2s',
+              }}>
+                <div style={{ width:40, height:40, borderRadius:12, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, background: card.color + '20', fontSize:20 }}>{card.icon}</div>
+                <div style={{ flex:1 }}>
+                  <div style={{ fontSize:13, fontWeight:700, marginBottom:1, color: card.color, letterSpacing:-0.2 }}>{card.title}</div>
+                  <div style={{ fontSize:9, color:'#fff', opacity:0.5 }}>{card.desc}</div>
+                </div>
+                <span style={{ color: card.color, fontSize:16, opacity:0.5 }}>→</span>
+              </button>
+            ))}
           </div>
         </div>
       </div>

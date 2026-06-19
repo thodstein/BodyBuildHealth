@@ -93,28 +93,31 @@ const getDefaultKcal = (profile: UserProfile | null) => {
 
 const GlassCard: React.FC<{ title?: string; icon?: string; color?: string; style?: React.CSSProperties; children: React.ReactNode }> = ({ title, icon, color, style, children }) => (
   <div style={{
-    padding: 20, borderRadius: 18,
+    borderRadius: 18, overflow: 'hidden',
     background: '#18181b',
     border: '1px solid rgba(255,255,255,0.06)',
-    boxShadow: '0 2px 16px rgba(0,0,0,0.25)',
-    position: 'relative', overflow: 'hidden',
+    boxShadow: '0 2px 20px rgba(0,0,0,0.3)',
+    position: 'relative',
     ...style,
   }}>
-    {color && <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: `linear-gradient(90deg, ${color}, ${color}44)` }} />}
-    {title && <div style={{ fontSize: 14, color: color || 'rgba(255,255,255,0.75)', fontWeight: 700, marginBottom: 14, display: 'flex', alignItems: 'center', gap: 7, letterSpacing: '-0.2px' }}>
-      {icon && <span style={{ fontSize: 15 }}>{icon}</span>}{title}
+    {color && <div style={{ height: 4, background: `linear-gradient(90deg, ${color}, ${color}66, transparent)` }} />}
+    {title && <div style={{ padding: '14px 18px 0', fontSize: 14, color: color || 'rgba(255,255,255,0.75)', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8, letterSpacing: '-0.3px' }}>
+      {icon && <span style={{ fontSize: 16 }}>{icon}</span>}{title}
     </div>}
-    {children}
+    <div style={{ padding: title ? '12px 18px 18px' : 18 }}>
+      {children}
+    </div>
   </div>
 );
 
 const PillBtn: React.FC<{ active?: boolean; onClick: () => void; color?: string; children: React.ReactNode; style?: React.CSSProperties }> = ({ active, onClick, color, children, style }) => (
   <button onClick={onClick} style={{
-    padding: '7px 14px', borderRadius: 20, fontSize: 10, cursor: 'pointer', fontWeight: 600, whiteSpace: 'nowrap', letterSpacing: '-0.1px',
-    background: active ? (color ? `${color}20` : 'rgba(0,230,138,0.15)') : '#202023',
+    padding: '6px 14px', borderRadius: 20, fontSize: 10, cursor: 'pointer', fontWeight: 600, whiteSpace: 'nowrap', letterSpacing: '-0.1px',
+    background: active ? (color ? `${color}18` : 'rgba(0,230,138,0.12)') : '#202023',
     border: active ? `1px solid ${color || '#00e68a'}` : '1px solid rgba(255,255,255,0.06)',
     color: active ? (color || '#00e68a') : '#fff',
     transition: 'all 0.2s',
+    boxShadow: active ? `0 0 12px ${(color || '#00e68a')}22` : 'none',
     ...style,
   }}>{children}</button>
 );
@@ -339,6 +342,12 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
       setManualP(effectiveP);
       setManualF(effectiveF);
       setManualC(effectiveC);
+    }
+    if (mode !== 'manual') {
+      setManualKcal(null);
+      setManualP(null);
+      setManualF(null);
+      setManualC(null);
     }
     setKbjuMode(mode);
   };

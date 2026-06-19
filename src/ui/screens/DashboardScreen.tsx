@@ -25,8 +25,7 @@ export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
         <img src="/hero-main.png" alt="" style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'fill' }} />
         <div style={{ position:'absolute', inset:0, background:'linear-gradient(transparent 50%, rgba(0,0,0,0.85))' }} />
         <div style={{ position:'relative', zIndex:2, display:'flex', flexDirection:'column', justifyContent:'flex-end', height:'100%', padding:'0 16px 20px' }}>
-          <div style={{ fontSize:28, fontWeight:800, color:'#fff', textShadow:'0 2px 12px rgba(0,0,0,0.8)', letterSpacing:'-0.5px', marginBottom:4 }}>BodyBuild Health</div>
-          <div style={{ fontSize:12, color:'rgba(255,255,255,0.6)', marginBottom:20 }}>Персональный ассистент здоровья</div>
+          <div style={{ fontSize:28, fontWeight:800, color:'#fff', textShadow:'0 2px 12px rgba(0,0,0,0.8)', letterSpacing:'-0.5px' }}>BodyBuild Health</div>
         </div>
       </div>
       <div style={{ padding:'8px 12px 12px', background:'#18181b', borderTop:'1px solid rgba(255,255,255,0.06)' }}>
