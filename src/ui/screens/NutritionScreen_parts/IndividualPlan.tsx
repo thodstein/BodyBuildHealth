@@ -91,15 +91,15 @@ const getDefaultKcal = (profile: UserProfile | null) => {
 
 const GlassCard: React.FC<{ title?: string; icon?: string; color?: string; style?: React.CSSProperties; children: React.ReactNode }> = ({ title, icon, color, style, children }) => (
   <div style={{
-    padding: 14, borderRadius: 14,
+    padding: 18, borderRadius: 16,
     background: '#18181b',
     border: '1px solid #27272a',
     position: 'relative', overflow: 'hidden',
     ...style,
   }}>
     {color && <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: `linear-gradient(90deg, ${color}, ${color}66)` }} />}
-    {title && <div style={{ fontSize: 11, color: color || 'rgba(255,255,255,0.5)', fontWeight: 700, marginBottom: 10, display: 'flex', alignItems: 'center', gap: 5, letterSpacing: '0.3px' }}>
-      {icon && <span style={{ fontSize: 14 }}>{icon}</span>}{title}
+    {title && <div style={{ fontSize: 13, color: color || 'rgba(255,255,255,0.7)', fontWeight: 700, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6, letterSpacing: '0.2px' }}>
+      {icon && <span style={{ fontSize: 16 }}>{icon}</span>}{title}
     </div>}
     {children}
   </div>
@@ -107,19 +107,19 @@ const GlassCard: React.FC<{ title?: string; icon?: string; color?: string; style
 
 const PillBtn: React.FC<{ active?: boolean; onClick: () => void; color?: string; children: React.ReactNode; style?: React.CSSProperties }> = ({ active, onClick, color, children, style }) => (
   <button onClick={onClick} style={{
-    padding: '5px 10px', borderRadius: 16, fontSize: 9, cursor: 'pointer', fontWeight: 600, whiteSpace: 'nowrap',
-    background: active ? (color ? `${color}25` : 'rgba(0,230,138,0.2)') : '#202023',
+    padding: '6px 12px', borderRadius: 18, fontSize: 10, cursor: 'pointer', fontWeight: 600, whiteSpace: 'nowrap',
+    background: active ? (color ? `${color}25` : 'rgba(0,230,138,0.18)') : '#202023',
     border: active ? `1px solid ${color || '#00e68a'}` : '1px solid #27272a',
     color: active ? (color || '#00e68a') : 'rgba(255,255,255,0.5)',
-    transition: 'all 0.15s',
+    transition: 'all 0.2s',
     ...style,
   }}>{children}</button>
 );
 
 const inputStyle: React.CSSProperties = {
-  width: '100%', padding: '7px 10px', borderRadius: 8,
+  width: '100%', padding: '8px 12px', borderRadius: 10,
   background: '#202023', border: '1px solid #27272a',
-  color: '#fff', fontSize: 11, boxSizing: 'border-box' as const,
+  color: '#fff', fontSize: 12, boxSizing: 'border-box' as const,
 };
 
 const selectStyle: React.CSSProperties = {
@@ -127,9 +127,9 @@ const selectStyle: React.CSSProperties = {
 };
 
 const greenBtn: React.CSSProperties = {
-  width: '100%', padding: 8, borderRadius: 8, border: 'none', cursor: 'pointer',
+  width: '100%', padding: 10, borderRadius: 10, border: 'none', cursor: 'pointer',
   background: 'linear-gradient(135deg,#00e68a,#00c8a0)', color: '#000',
-  fontWeight: 700, fontSize: 11,
+  fontWeight: 700, fontSize: 12, letterSpacing: '0.2px',
   transition: 'box-shadow 0.2s, transform 0.15s',
 };
 
@@ -1196,29 +1196,29 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingBottom: 80 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12, paddingBottom: 80, maxWidth: 540, margin: '0 auto' }}>
 
       {/* 1. User info card */}
       <GlassCard title="Пользователь" icon="👤" color="#a78bfa">
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 4, marginBottom: 6 }}>
-          <div><label style={{ fontSize: 8, color: 'rgba(255,255,255,0.3)' }}>Вес (кг)</label><input type="number" value={weight} onChange={e => setWeight(+e.target.value || 0)} style={inputStyle} /></div>
-          <div><label style={{ fontSize: 8, color: 'rgba(255,255,255,0.3)' }}>Рост (см)</label><input type="number" value={height} onChange={e => setHeight(+e.target.value || 0)} style={inputStyle} /></div>
-          <div><label style={{ fontSize: 8, color: 'rgba(255,255,255,0.3)' }}>Возраст</label><input type="number" value={age} onChange={e => setAge(+e.target.value || 0)} style={inputStyle} /></div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginBottom: 8 }}>
+          <div><label style={{ fontSize: 9, color: 'rgba(255,255,255,0.35)', marginBottom: 3, display: 'block' }}>Вес (кг)</label><input type="number" value={weight} onChange={e => setWeight(+e.target.value || 0)} style={inputStyle} /></div>
+          <div><label style={{ fontSize: 9, color: 'rgba(255,255,255,0.35)', marginBottom: 3, display: 'block' }}>Рост (см)</label><input type="number" value={height} onChange={e => setHeight(+e.target.value || 0)} style={inputStyle} /></div>
+          <div><label style={{ fontSize: 9, color: 'rgba(255,255,255,0.35)', marginBottom: 3, display: 'block' }}>Возраст</label><input type="number" value={age} onChange={e => setAge(+e.target.value || 0)} style={inputStyle} /></div>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, marginBottom: 4 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 6 }}>
           <div>
-            <label style={{ fontSize: 8, color: 'rgba(255,255,255,0.3)' }}>Пол</label>
+            <label style={{ fontSize: 9, color: 'rgba(255,255,255,0.35)', marginBottom: 3, display: 'block' }}>Пол</label>
             <select value={sex} onChange={e => setSex(e.target.value as any)} style={selectStyle}>
               <option value="male">Мужской</option><option value="female">Женский</option>
             </select>
           </div>
           <div>
-            <label style={{ fontSize: 8, color: 'rgba(255,255,255,0.3)' }}>Шагов/день</label>
+            <label style={{ fontSize: 9, color: 'rgba(255,255,255,0.35)', marginBottom: 3, display: 'block' }}>Шагов/день</label>
             <input type="number" value={dailySteps} onChange={e => setDailySteps(+e.target.value || 0)} style={inputStyle} />
           </div>
         </div>
         <div>
-          <label style={{ fontSize: 8, color: 'rgba(255,255,255,0.3)' }}>Время на готовку (мин/день)</label>
+          <label style={{ fontSize: 9, color: 'rgba(255,255,255,0.35)', marginBottom: 3, display: 'block' }}>Время на готовку (мин/день)</label>
           <input type="number" value={cookTimeMin} onChange={e => setCookTimeMin(+e.target.value || 0)} style={inputStyle} />
         </div>
       </GlassCard>
@@ -1400,17 +1400,18 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
 
       {/* 6. Budget level */}
       <GlassCard title="Уровень бюджета" icon="💰" color="#f59e0b">
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
           {BUDGET_LEVELS.map(b => (
             <button key={b.id} onClick={() => setBudget(b.id)} style={{
-              padding: '8px 10px', borderRadius: 10, cursor: 'pointer', textAlign: 'left',
-              background: budget === b.id ? `${b.color}15` : '#202023',
-              border: budget === b.id ? `1px solid ${b.color}` : '1px solid #27272a',
+              padding: '10px 12px', borderRadius: 12, cursor: 'pointer', textAlign: 'left',
+              background: budget === b.id ? `${b.color}18` : '#202023',
+              border: budget === b.id ? `2px solid ${b.color}` : '1px solid #27272a',
               color: budget === b.id ? b.color : 'rgba(255,255,255,0.5)',
-              transition: 'all 0.15s',
+              fontWeight: budget === b.id ? 700 : 500,
+              transition: 'all 0.2s',
             }}>
-              <div style={{ fontSize: 11, fontWeight: budget === b.id ? 700 : 500 }}>{b.icon} {b.label}</div>
-              <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.3)', marginTop: 2 }}>{b.desc}</div>
+              <div style={{ fontSize: 12 }}>{b.icon} {b.label}</div>
+              <div style={{ fontSize: 9, color: budget === b.id ? `${b.color}aa` : 'rgba(255,255,255,0.3)', marginTop: 3 }}>{b.desc}</div>
             </button>
           ))}
         </div>
@@ -1418,23 +1419,22 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
 
       {/* 7. Nutrition level */}
       <GlassCard title="Уровень питания" icon="📈" color="#22c55e">
-        <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.3)', marginBottom: 6, lineHeight: 1.4 }}>
-          Множитель калорийности: База ×1.0, Средний ×1.15, Усиление ×1.3, Максимум ×1.5.
-          Используется, когда нужен более высокий/низкий калораж без изменения целей.
+        <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.35)', marginBottom: 8, lineHeight: 1.5 }}>
+          База ×1.0, Средний ×1.15, Усиление ×1.3, Максимум ×1.5. Используется для коррекции калоража без смены цели.
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 4 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 5 }}>
           {NUTRITION_LEVELS.map(n => (
             <button key={n.id} onClick={() => setNutrLevel(n.id)} style={{
-              padding: '8px', borderRadius: 10, cursor: 'pointer', textAlign: 'center',
-              background: nutrLevel === n.id ? 'rgba(0,230,138,0.12)' : '#202023',
-              border: nutrLevel === n.id ? '1px solid #00e68a' : '1px solid #27272a',
+              padding: '10px 6px', borderRadius: 12, cursor: 'pointer', textAlign: 'center',
+              background: nutrLevel === n.id ? 'rgba(0,230,138,0.15)' : '#202023',
+              border: nutrLevel === n.id ? '2px solid #00e68a' : '1px solid #27272a',
               color: nutrLevel === n.id ? '#00e68a' : 'rgba(255,255,255,0.5)',
               fontWeight: nutrLevel === n.id ? 700 : 500, fontSize: 10,
-              transition: 'all 0.15s',
+              transition: 'all 0.2s',
             }}>
-              <div style={{ fontSize: 12, marginBottom: 1 }}>{n.icon}</div>
+              <div style={{ fontSize: 14, marginBottom: 2 }}>{n.icon}</div>
               <div>{n.label}</div>
-              <div style={{ fontSize: 7, color: nutrLevel === n.id ? '#00e68a' : 'rgba(255,255,255,0.2)', marginTop: 1 }}>×{n.mult}</div>
+              <div style={{ fontSize: 8, color: nutrLevel === n.id ? '#00e68a' : 'rgba(255,255,255,0.2)', marginTop: 2 }}>×{n.mult}</div>
             </button>
           ))}
         </div>
@@ -1442,13 +1442,13 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
 
       {/* 8. Schedule card */}
       <GlassCard title="Расписание" icon="⏰" color="#06b6d4">
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 4, marginBottom: 6 }}>
-          <div><label style={{fontSize:8,color:'rgba(255,255,255,0.3)'}}>Пробуждение</label><input type="time" value={wakeTime} onChange={e => setWakeTime(e.target.value)} style={inputStyle} /></div>
-          <div><label style={{fontSize:8,color:'rgba(255,255,255,0.3)'}}>Обед</label><input type="time" value={lunchTime} onChange={e => setLunchTime(e.target.value)} style={inputStyle} /></div>
-          <div><label style={{fontSize:8,color:'rgba(255,255,255,0.3)'}}>Ужин</label><input type="time" value={dinnerTime} onChange={e => setDinnerTime(e.target.value)} style={inputStyle} /></div>
-          <div><label style={{fontSize:8,color:'rgba(255,255,255,0.3)'}}>Отход ко сну</label><input type="time" value={bedTime} onChange={e => setBedTime(e.target.value)} style={inputStyle} /></div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginBottom: 8 }}>
+          <div><label style={{fontSize:9,color:'rgba(255,255,255,0.35)',marginBottom:3,display:'block'}}>Пробуждение</label><input type="time" value={wakeTime} onChange={e => setWakeTime(e.target.value)} style={inputStyle} /></div>
+          <div><label style={{fontSize:9,color:'rgba(255,255,255,0.35)',marginBottom:3,display:'block'}}>Обед</label><input type="time" value={lunchTime} onChange={e => setLunchTime(e.target.value)} style={inputStyle} /></div>
+          <div><label style={{fontSize:9,color:'rgba(255,255,255,0.35)',marginBottom:3,display:'block'}}>Ужин</label><input type="time" value={dinnerTime} onChange={e => setDinnerTime(e.target.value)} style={inputStyle} /></div>
+          <div><label style={{fontSize:9,color:'rgba(255,255,255,0.35)',marginBottom:3,display:'block'}}>Отход ко сну</label><input type="time" value={bedTime} onChange={e => setBedTime(e.target.value)} style={inputStyle} /></div>
           <div style={{ gridColumn: 'span 2' }}>
-            <label style={{fontSize:8,color:'rgba(255,255,255,0.3)'}}>Еда на работе</label>
+            <label style={{fontSize:9,color:'rgba(255,255,255,0.35)',marginBottom:3,display:'block'}}>Еда на работе</label>
             <select value={workFood} onChange={e => setWorkFood(e.target.value as any)} style={selectStyle}>
               <option value="any">Любая (можно разогреть)</option>
               <option value="portable">Только порошок/хлопья/протеин</option>
@@ -1456,8 +1456,8 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
           </div>
         </div>
         <div>
-          <label style={{fontSize:8,color:'rgba(255,255,255,0.3)'}}>Количество приёмов пищи</label>
-          <div style={{ display: 'flex', gap: 3 }}>
+          <label style={{fontSize:9,color:'rgba(255,255,255,0.35)',marginBottom:4,display:'block'}}>Количество приёмов пищи</label>
+          <div style={{ display: 'flex', gap: 4 }}>
             {[3,4,5,6].map(n => (
               <PillBtn key={n} active={mealsCount === n} onClick={() => setMealsCount(n)} color={mealsCount === n ? '#06b6d4' : undefined}>{n}</PillBtn>
             ))}
