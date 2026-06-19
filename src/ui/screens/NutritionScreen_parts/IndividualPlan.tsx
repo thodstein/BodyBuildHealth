@@ -112,6 +112,14 @@ const greenBtn: React.CSSProperties = {
   fontWeight: 700, fontSize: 11,
 };
 
+const reportPillStyle = (color: string, active: boolean): React.CSSProperties => ({
+  padding: '4px 8px', borderRadius: 6, fontSize: 8, cursor: 'pointer', fontWeight: 600,
+  background: active ? `${color}18` : 'rgba(255,255,255,0.03)',
+  border: active ? `1px solid ${color}` : '1px solid rgba(255,255,255,0.06)',
+  color: active ? color : 'rgba(255,255,255,0.5)',
+  transition: 'all 0.15s',
+});
+
 // ─── Main Component ───
 export const IndividualPlan: React.FC<{ profile: UserProfile | null }> = ({ profile: _profile }) => {
   const profile = _profile || getProfileSafe();
@@ -590,6 +598,206 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null }> = ({ prof
     setMealPrepPlan({ steps, totalTime, containers: mealCount * 7 });
   };
 
+  // ─── Report Generators ───
+  const [activeReports, setActiveReports] = useState<string[]>([]);
+  const [allergenReport, setAllergenReport] = useState<{ conflicts: { food: string; allergens: string[] }[]; riskLevel: 'low' | 'medium' | 'high'; summary: string } | null>(null);
+  const [nutrientReport, setNutrientReport] = useState<{ micros: Record<string, { actual: number; target: number; pct: number; status: string }>; gaps: string[] } | null>(null);
+  const [qualityReport, setQualityReport] = useState<{ avgScore: number; bestItems: string[]; weakItems: string[]; recommendations: string[] } | null>(null);
+  const [riskReport, setRiskReport] = useState<{ systems: Record<string, { score: number; impact: string; recommendation: string }>; totalRisk: string; summary: string } | null>(null);
+  const [drugCompatReport, setDrugCompatReport] = useState<{ interactions: { drug: string; food: string; effect: string; severity: 'low' | 'medium' | 'high' }[]; warnings: string[] } | null>(null);
+
+  const generateAllergenReport = () => {
+    if (!dayPlan) return;
+    const conflicts: { food: string; allergens: string[] }[] = [];
+    const allItems = dayPlan.meals.flatMap((m: any) => m.items);
+    allItems.forEach((it: any) => {
+      const food = FOOD_DB.find(f => f.id === it.id || f.name === it.name);
+      if (food?.allergens) {
+        const matched = food.allergens.filter(a => allergens.includes(a));
+        if (matched.length > 0) conflicts.push({ food: it.name, allergens: matched });
+      }
+    });
+    const riskLevel: 'low' | 'medium' | 'high' = conflicts.length === 0 ? 'low' : conflicts.length <= 3 ? 'medium' : 'high';
+    const summary = conflicts.length === 0
+      ? '✅ Рацион не содержит выбранных аллергенов'
+      : `⚠ Обнаружено ${conflicts.length} совпадений с аллергенами. ${riskLevel === 'high' ? 'Требуется замена продуктов!' : 'Рекомендуется замена.'}`;
+    setAllergenReport({ conflicts, riskLevel, summary });
+    setActiveReports(prev => prev.includes('allergen') ? prev : [...prev, 'allergen']);
+  };
+
+  const generateNutrientReport = () => {
+    if (!dayPlan) return;
+    const totals: Record<string, number> = { kcal: 0, protein: 0, fat: 0, carbs: 0, fiber: 0 };
+    const micros: Record<string, number> = {};
+    const allItems = dayPlan.meals.flatMap((m: any) => m.items);
+    allItems.forEach((it: any) => {
+      const food = FOOD_DB.find(f => f.id === it.id || f.name === it.name);
+      if (!food) return;
+      totals.kcal += it.kcal || 0;
+      totals.protein += it.p || 0;
+      totals.fat += it.f || 0;
+      totals.carbs += it.c || 0;
+      totals.fiber += (food.fiber || 0) * (it.amount / 100);
+      if (food.micros) {
+        Object.entries(food.micros).forEach(([k, v]) => {
+          if (v) micros[k] = (micros[k] || 0) + (v as number) * (it.amount / 100);
+        });
+      }
+    });
+    const microTargets: Record<string, number> = { Ca: 1000, Fe: 18, Mg: 400, Zn: 15, K: 3500, Se: 55, VitC: 100, VitD: 15, VitB12: 2.4, Omega3: 1.6 };
+    const microResults: Record<string, { actual: number; target: number; pct: number; status: string }> = {};
+    const gaps: string[] = [];
+    Object.entries(microTargets).forEach(([k, target]) => {
+      const actual = Math.round((micros[k] || 0) * 10) / 10;
+      const pct = Math.round(actual / target * 100);
+      const status = pct >= 80 ? 'ok' : pct >= 50 ? 'low' : 'critical';
+      microResults[k] = { actual, target, pct, status };
+      if (status !== 'ok') gaps.push(`${k}: ${actual} из ${target} (${pct}%)`);
+    });
+    const gapsText = gaps.length === 0 ? ['✅ Все микрнутриенты в норме'] : gaps;
+    setNutrientReport({ micros: microResults, gaps: gapsText });
+    setActiveReports(prev => prev.includes('nutrient') ? prev : [...prev, 'nutrient']);
+  };
+
+  const generateQualityReport = () => {
+    if (!dayPlan) return;
+    const allItems = dayPlan.meals.flatMap((m: any) => m.items);
+    const scores: { name: string; score: number; category: string }[] = [];
+    allItems.forEach((it: any) => {
+      const food = FOOD_DB.find(f => f.id === it.id || f.name === it.name);
+      if (!food) return;
+      let score = 5;
+      const proteinDensity = (food.protein * 4) / Math.max(food.kcal, 1);
+      if (proteinDensity > 0.6) score += 2;
+      else if (proteinDensity > 0.3) score += 1;
+      if ((food.fiber || 0) >= 3) score += 1;
+      if (food.tier === 'max') score = 10;
+      else if (food.tier === 'mid') score = Math.max(score, 8);
+      else if (food.tier === 'basic') score = Math.max(score, 6);
+      scores.push({ name: it.name, score: Math.min(10, score), category: food.category });
+    });
+    const avgScore = Math.round(scores.reduce((s, x) => s + x.score, 0) / Math.max(1, scores.length) * 10) / 10;
+    const sorted = [...scores].sort((a, b) => b.score - a.score);
+    const bestItems = sorted.filter(s => s.score >= 8).map(s => s.name).slice(0, 5);
+    const weakItems = sorted.filter(s => s.score <= 5).map(s => s.name).slice(0, 5);
+    const recommendations: string[] = [];
+    if (avgScore < 6) recommendations.push('Повысьте качество: добавьте постное мясо, рыбу, свежие овощи');
+    if (scores.filter(s => s.score <= 5).length > 2) recommendations.push('Замените обработанные продукты на цельные');
+    if (avgScore >= 8) recommendations.push('Отличный выбор продуктов!');
+    setQualityReport({ avgScore, bestItems, weakItems, recommendations });
+    setActiveReports(prev => prev.includes('quality') ? prev : [...prev, 'quality']);
+  };
+
+  const generateRiskReport = () => {
+    if (!dayPlan) return;
+    const systems: Record<string, { score: number; impact: string; recommendation: string }> = {};
+    const allItems = dayPlan.meals.flatMap((m: any) => m.items);
+    const totalFat = allItems.reduce((s: number, it: any) => s + (it.f || 0), 0);
+    const totalSodium = allItems.reduce((s: number, it: any) => {
+      const food = FOOD_DB.find(f => f.id === it.id || f.name === it.name);
+      return s + ((food?.micros?.Na || 0) * (it.amount / 100));
+    }, 0);
+    const totalFiber = allItems.reduce((s: number, it: any) => {
+      const food = FOOD_DB.find(f => f.id === it.id || f.name === it.name);
+      return s + ((food?.fiber || 0) * (it.amount / 100));
+    }, 0);
+    const totalProtein = allItems.reduce((s: number, it: any) => s + (it.p || 0), 0);
+    const totalKcal = allItems.reduce((s: number, it: any) => s + (it.kcal || 0), 0);
+
+    // Hepatic risk (high fat → liver stress)
+    const fatPct = totalKcal > 0 ? totalFat * 9 / totalKcal * 100 : 0;
+    const hepaticScore = fatPct > 40 ? 7 : fatPct > 30 ? 5 : fatPct > 20 ? 3 : 1;
+    systems.hepatic = { score: hepaticScore, impact: fatPct > 35 ? 'Высокожировая диета' : 'Умеренные жиры', recommendation: fatPct > 35 ? 'Снизить долю жиров до 25-30%' : 'В норме' };
+
+    // Renal risk (high protein → kidney stress)
+    const proteinGPerKg = Math.round((totalProtein / weight) * 10) / 10;
+    const renalScore = proteinGPerKg > 3 ? 7 : proteinGPerKg > 2.5 ? 5 : proteinGPerKg > 2 ? 3 : 1;
+    systems.renal = { score: renalScore, impact: `${proteinGPerKg.toFixed(1)} г/кг белка`, recommendation: proteinGPerKg > 2.5 ? 'Контроль белка, поддержание гидратации' : 'Белок в норме' };
+
+    // Inflammatory risk (omega 6/3 balance, processed foods)
+    const processedCount = allItems.filter((it: any) => {
+      const food = FOOD_DB.find(f => f.id === it.id || f.name === it.name);
+      return food?.category === 'fast_food' || food?.gi && food.gi >= 80;
+    }).length;
+    const inflamScore = processedCount > 5 ? 7 : processedCount > 3 ? 5 : processedCount > 1 ? 3 : 1;
+    systems.inflammatory = { score: inflamScore, impact: `${processedCount} продукт(ов) с высоким ГИ/обработанных`, recommendation: inflamScore > 3 ? 'Добавить омега-3 (рыба, льняное масло), снизить ГИ' : 'Противовоспалительный профиль хороший' };
+
+    // Insulin risk (high carbs + simple sugars)
+    const carbGPerMeal = effectiveC / Math.max(1, dayPlan.meals.length);
+    const insulinScore = carbGPerMeal > 80 ? 7 : carbGPerMeal > 60 ? 5 : carbGPerMeal > 40 ? 3 : 1;
+    systems.insulin = { score: insulinScore, impact: `~${Math.round(carbGPerMeal)} г углеводов/приём`, recommendation: insulinScore > 3 ? 'Распределить углеводы равномерно, добавить клетчатку' : 'Гликемическая нагрузка в норме' };
+
+    // Electrolyte risk
+    const sodiumPerKcal = totalKcal > 0 ? totalSodium / totalKcal * 1000 : 0;
+    const electrolyteScore = sodiumPerKcal > 2 ? 5 : sodiumPerKcal > 1 ? 3 : 1;
+    systems.electrolyte = { score: electrolyteScore, impact: `Na: ${Math.round(totalSodium)} мг/день`, recommendation: electrolyteScore > 3 ? 'Контроль соли, увел. калия (овощи, картофель)' : 'Электролиты в балансе' };
+
+    const totalScore = Object.values(systems).reduce((s, sys) => s + sys.score, 0);
+    const totalRisk = totalScore <= 8 ? 'Низкий' : totalScore <= 14 ? 'Средний' : 'Высокий';
+    const summary = totalRisk === 'Низкий'
+      ? '✅ Рацион сбалансирован, риски минимальны'
+      : totalRisk === 'Средний'
+        ? '⚠ Есть зоны для улучшения. Обратите внимание на рекомендации.'
+        : '🔴 Требуется коррекция рациона. Высокая нагрузка на организм.';
+
+    setRiskReport({ systems, totalRisk, summary });
+    setActiveReports(prev => prev.includes('risk') ? prev : [...prev, 'risk']);
+  };
+
+  const generateDrugCompatReport = () => {
+    if (!dayPlan || injections.length === 0) return;
+    const interactions: { drug: string; food: string; effect: string; severity: 'low' | 'medium' | 'high' }[] = [];
+    const warnings: string[] = [];
+    const allItems = dayPlan.meals.flatMap((m: any) => m.items);
+
+    injections.forEach(inj => {
+      const t = inj.type.toLowerCase();
+      if (t.includes('инсулин')) {
+        const totalCarbs = dayPlan.totals.c || 0;
+        if (totalCarbs < 150) warnings.push(`💉 Инсулин (${inj.name}): всего ${Math.round(totalCarbs)}г углеводов/день — риск гипогликемии. Минимум 150г/день.`);
+        const fastCarbs = allItems.filter((it: any) => {
+          const food = FOOD_DB.find(f => f.id === it.id || f.name === it.name);
+          return food?.gi && food.gi >= 80;
+        });
+        if (fastCarbs.length === 0) warnings.push('Нет быстрых углеводов для покрытия инсулина. Добавьте рис/банан/декстрозу после укола.');
+        allItems.forEach((it: any) => {
+          const food = FOOD_DB.find(f => f.id === it.id || f.name === it.name);
+          if (food?.gi && food.gi >= 85) interactions.push({ drug: inj.name, food: it.name, effect: 'Резкий скачок глюкозы', severity: 'high' });
+        });
+      }
+      if (t.includes('гр') || t.includes('gh')) {
+        const mealAtInjTime = dayPlan.meals.find((m: any) => {
+          const h = parseInt(m.time.split(':')[0]);
+          const ih = parseInt(inj.time.split(':')[0]);
+          return Math.abs(h - ih) <= 1;
+        });
+        if (mealAtInjTime && mealAtInjTime.totals.c > 10) {
+          interactions.push({ drug: inj.name, food: 'Углеводы в окне ГР', effect: 'Снижение эффекта ГР', severity: 'medium' });
+          warnings.push('В окне ГР (30мин до/после) избегайте углеводов.');
+        }
+      }
+      if (t.includes('ифр') || t.includes('igf') || t.includes('mgf')) {
+        const mealAtInjTime = dayPlan.meals.find((m: any) => {
+          const h = parseInt(m.time.split(':')[0]);
+          const ih = parseInt(inj.time.split(':')[0]);
+          return Math.abs(h - ih) <= 1;
+        });
+        if (mealAtInjTime && mealAtInjTime.totals.p < 30) {
+          warnings.push(`🧬 ${inj.name}: в окне ИФР-1 нужно ≥30г белка. Приём ${mealAtInjTime.time} содержит ${Math.round(mealAtInjTime.totals.p)}г.`);
+        }
+      }
+      if (t.includes('семаглутид') || t.includes('тирзепатид')) {
+        warnings.push('💊 Агонисты GLP-1: еда маленькими порциями, избегать жирного. Контроль тошноты.');
+        const fattyMeals = dayPlan.meals.filter((m: any) => (m.totals.f || 0) > 20);
+        if (fattyMeals.length > 0) interactions.push({ drug: inj.name, food: `${fattyMeals.length} приёмов с >20г жиров`, effect: 'Замедление опорожнения желудка, тошнота', severity: 'medium' });
+      }
+    });
+
+    if (warnings.length === 0) warnings.push('✅ Все препараты совместимы с рационом');
+    setDrugCompatReport({ interactions, warnings });
+    setActiveReports(prev => prev.includes('drug') ? prev : [...prev, 'drug']);
+  };
+
   // ─── Render ───
   const renderMealList = (dayData: any) => {
     if (!dayData) return null;
@@ -1002,14 +1210,99 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null }> = ({ prof
         </GlassCard>
       )}
 
-      {/* 19. Generate reports */}
+      {/* 19. Reports section */}
       {generated && (
-        <button onClick={() => {
-          generatePlan(planDays);
-          setPlanDays(7);
-        }} style={{ ...greenBtn, background: 'linear-gradient(135deg,#3b82f6,#8b5cf6)' }}>
-          📊 Сгенерировать общий отчёт
-        </button>
+        <GlassCard title="📊 Отчёты по рациону" style={{ border: '1px solid rgba(59,130,246,0.15)' }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, marginBottom: 6 }}>
+            <button onClick={generateAllergenReport} style={reportPillStyle('#ef4444', activeReports.includes('allergen') && !!allergenReport)}>⚠️ Аллергены</button>
+            <button onClick={generateNutrientReport} style={reportPillStyle('#22c55e', activeReports.includes('nutrient') && !!nutrientReport)}>🧬 Нутриенты</button>
+            <button onClick={generateQualityReport} style={reportPillStyle('#f59e0b', activeReports.includes('quality') && !!qualityReport)}>⭐ Качество</button>
+            <button onClick={generateRiskReport} style={reportPillStyle('#ef4444', activeReports.includes('risk') && !!riskReport)}>🩺 Риски здоровья</button>
+            {injections.length > 0 && <button onClick={generateDrugCompatReport} style={reportPillStyle('#8b5cf6', activeReports.includes('drug') && !!drugCompatReport)}>💉 Совместимость</button>}
+            <button onClick={() => { generatePlan(planDays); setPlanDays(7); }} style={reportPillStyle('#3b82f6', false)}>📋 Общий отчёт</button>
+          </div>
+
+          {/* Allergen report */}
+          {allergenReport && activeReports.includes('allergen') && (
+            <div style={{ padding: '6px 8px', borderRadius: 8, marginBottom: 4, background: allergenReport.riskLevel === 'high' ? 'rgba(239,68,68,0.06)' : allergenReport.riskLevel === 'medium' ? 'rgba(245,158,11,0.06)' : 'rgba(34,197,94,0.06)', border: `1px solid ${allergenReport.riskLevel === 'high' ? '#ef4444' : allergenReport.riskLevel === 'medium' ? '#f59e0b' : '#22c55e'}20` }}>
+              <div style={{ fontSize: 9, fontWeight: 700, marginBottom: 3, color: allergenReport.riskLevel === 'high' ? '#ef4444' : allergenReport.riskLevel === 'medium' ? '#f59e0b' : '#22c55e' }}>
+                {allergenReport.summary}
+              </div>
+              {allergenReport.conflicts.map((c, i) => (
+                <div key={i} style={{ fontSize: 8, color: 'rgba(255,255,255,0.6)', padding: '1px 0' }}>
+                  • {c.food}: {c.allergens.join(', ')}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Nutrient report */}
+          {nutrientReport && activeReports.includes('nutrient') && (
+            <div style={{ padding: '6px 8px', borderRadius: 8, marginBottom: 4, background: 'rgba(34,197,94,0.04)', border: '1px solid rgba(34,197,94,0.12)' }}>
+              <div style={{ fontSize: 9, fontWeight: 700, color: '#22c55e', marginBottom: 4 }}>🧬 Микронутриенты</div>
+              {Object.entries(nutrientReport.micros).slice(0, 10).map(([k, v]) => (
+                <div key={k} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 8, padding: '1px 0', color: 'rgba(255,255,255,0.6)' }}>
+                  <span>{k}</span>
+                  <span style={{ color: v.status === 'ok' ? '#22c55e' : v.status === 'low' ? '#f59e0b' : '#ef4444' }}>
+                    {v.actual} / {v.target} ({v.pct}%)
+                  </span>
+                </div>
+              ))}
+              <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.4)', marginTop: 4 }}>
+                {nutrientReport.gaps.join('; ')}
+              </div>
+            </div>
+          )}
+
+          {/* Quality report */}
+          {qualityReport && activeReports.includes('quality') && (
+            <div style={{ padding: '6px 8px', borderRadius: 8, marginBottom: 4, background: 'rgba(245,158,11,0.04)', border: '1px solid rgba(245,158,11,0.12)' }}>
+              <div style={{ fontSize: 9, fontWeight: 700, color: qualityReport.avgScore >= 8 ? '#22c55e' : '#f59e0b', marginBottom: 3 }}>
+                ⭐ Среднее качество: {qualityReport.avgScore}/10
+              </div>
+              {qualityReport.bestItems.length > 0 && <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.6)' }}>Лучшие: {qualityReport.bestItems.join(', ')}</div>}
+              {qualityReport.weakItems.length > 0 && <div style={{ fontSize: 8, color: '#ef4444' }}>Слабые: {qualityReport.weakItems.join(', ')}</div>}
+              {qualityReport.recommendations.map((r, i) => <div key={i} style={{ fontSize: 8, color: 'rgba(255,255,255,0.5)', padding: '1px 0' }}>• {r}</div>)}
+            </div>
+          )}
+
+          {/* Risk report */}
+          {riskReport && activeReports.includes('risk') && (
+            <div style={{ padding: '6px 8px', borderRadius: 8, marginBottom: 4, background: 'rgba(239,68,68,0.04)', border: '1px solid rgba(239,68,68,0.12)' }}>
+              <div style={{ fontSize: 9, fontWeight: 700, marginBottom: 3, color: riskReport.totalRisk === 'Низкий' ? '#22c55e' : riskReport.totalRisk === 'Средний' ? '#f59e0b' : '#ef4444' }}>
+                🩺 Общий риск: {riskReport.totalRisk}
+              </div>
+              <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.5)', marginBottom: 4 }}>{riskReport.summary}</div>
+              {Object.entries(riskReport.systems).map(([sys, data]) => (
+                <div key={sys} style={{ fontSize: 8, padding: '2px 0', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ fontWeight: 600, color: data.score >= 5 ? '#ef4444' : data.score >= 3 ? '#f59e0b' : '#22c55e' }}>
+                      {sys === 'hepatic' ? 'Печень' : sys === 'renal' ? 'Почки' : sys === 'inflammatory' ? 'Воспаление' : sys === 'insulin' ? 'Инсулин' : 'Электролиты'}
+                    </span>
+                    <span style={{ color: 'rgba(255,255,255,0.4)' }}>⚠ {data.score}/7</span>
+                  </div>
+                  <div style={{ color: 'rgba(255,255,255,0.4)' }}>{data.impact}</div>
+                  {data.score >= 3 && <div style={{ color: '#f59e0b' }}>→ {data.recommendation}</div>}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Drug compatibility report */}
+          {drugCompatReport && activeReports.includes('drug') && (
+            <div style={{ padding: '6px 8px', borderRadius: 8, marginBottom: 4, background: 'rgba(139,92,246,0.04)', border: '1px solid rgba(139,92,246,0.12)' }}>
+              <div style={{ fontSize: 9, fontWeight: 700, color: '#8b5cf6', marginBottom: 4 }}>💉 Совместимость с препаратами</div>
+              {drugCompatReport.interactions.map((int, i) => (
+                <div key={i} style={{ fontSize: 8, padding: '2px 0', color: int.severity === 'high' ? '#ef4444' : '#f59e0b' }}>
+                  • {int.drug} + {int.food}: {int.effect}
+                </div>
+              ))}
+              <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.5)', marginTop: 3 }}>
+                {drugCompatReport.warnings.join('; ')}
+              </div>
+            </div>
+          )}
+        </GlassCard>
       )}
 
       {/* 20-22: Separate calculators */}
