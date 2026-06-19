@@ -411,9 +411,13 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
   const [replacingItem, setReplacingItem] = useState<{ dayIdx: number; mealIdx: number; itemIdx: number } | null>(null);
   const [recipePickerMeal, setRecipePickerMeal] = useState<{ dayIdx: number; mealIdx: number; label: string } | null>(null);
   const [mealPrep, setMealPrep] = useState<any[] | null>(null);
+  const [dayPlanNotes, setDayPlanNotes] = useState(() => { try { return localStorage.getItem('he_day_notes') || ''; } catch { return ''; } });
   const [draggedItem, setDraggedItem] = useState<any>(null);
   const [dropTarget, setDropTarget] = useState<number | null>(null);
   const [undoStack, setUndoStack] = useState<any[]>([]);
+  const [userRecipes, setUserRecipes] = useState<any[]>(() => { try { return JSON.parse(localStorage.getItem('he_user_recipes') || '[]'); } catch { return []; } });
+  const [showRecipeCreator, setShowRecipeCreator] = useState(false);
+  const [newRecipe, setNewRecipe] = useState({ name: '', meal: 'lunch' as string, prepTime: 10, kcal: 400, protein: 30, fat: 10, carbs: 40, ingredients: '', instructions: '', tags: '' });
 
   // Save undo state before modifications
   const saveUndo = () => {
@@ -1815,106 +1819,90 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
 
       {/* 3. Phase + drugs card */}
       <GlassCard title="Фаза и препараты" icon="💉" color="#06b6d4">
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, marginBottom: 6 }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, marginBottom: 8 }}>
           {PHASES.map(p => (
             <PillBtn key={p.id} active={phase === p.id} onClick={() => setPhase(p.id)}>{p.icon} {p.label}</PillBtn>
           ))}
         </div>
         {courseEntries.length > 0 && (
-          <div style={{ fontSize: 8, color: '#8b5cf6', marginBottom: 4, padding: '2px 6px', borderRadius: 4, background: 'rgba(139,92,246,0.08)', display: 'inline-block' }}>
-            📋 Препараты автоматически загружены из фармы ({courseEntries.length})
+          <div style={{ fontSize: 9, color: '#a78bfa', marginBottom: 6, padding: '4px 8px', borderRadius: 6, background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.15)' }}>
+            📋 Загружено {courseEntries.length} препаратов из курса
           </div>
         )}
-        <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.6)', marginBottom: 4 }}>Инъекции {courseEntries.length > 0 ? '(можно добавить ещё)' : '(добавьте препараты курса)'}:</div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 3, marginBottom: 4 }}>
-          <div style={{ display: 'flex', gap: 3 }}>
-            <div style={{ flex: 1, position: 'relative' }}>
-              <input type="text" value={injName} onChange={e => {
-                setInjName(e.target.value);
-                // Auto-detect type from PHARMA_DB
-                const sub = PHARMA_DB[e.target.value.trim()];
-                if (sub) {
-                  if (sub.class === 'insulin') { setInjType('инсулин'); setInjEster('none'); }
-                  else if (sub.id?.includes('ghrp') || sub.id?.includes('cjc') || sub.class === 'peptide_ghrh' || sub.class === 'peptide_ghrp') { setInjType('ГР'); setInjEster('short'); }
-                  else if (sub.id?.includes('igf1') || sub.id?.includes('mgf')) { setInjType('ИФР-1'); setInjEster('short'); }
-                  else if (sub.class === 'glp1') { setInjType('семаглутид'); setInjEster('long'); }
-                  else if (['testosterone','trenbolone','nandrolone','boldenone','primobolan','drostanolone'].includes(sub.class)) { setInjType('ААС'); setInjEster('long'); }
-                  else { setInjType('другое'); setInjEster('none'); }
-                }
-              }} placeholder="Название" style={inputStyle} list="drug-list" />
-              <datalist id="drug-list">{injectDrugTypes.map(d => <option key={d} value={d} />)}</datalist>
-            </div>
-            <div style={{ width: 50 }}><input type="time" value={injTime} onChange={e => setInjTime(e.target.value)} style={inputStyle} /></div>
-            <div style={{ width: 45 }}><input type="number" value={injDose} onChange={e => setInjDose(+e.target.value || 0)} style={inputStyle} placeholder="Доза" /></div>
-            <div style={{ width: 40 }}><select value={injUnit} onChange={e => setInjUnit(e.target.value)} style={selectStyle}>
+        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.6)', marginBottom: 6 }}>Добавить инъекцию:</div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+            <input type="text" value={injName} onChange={e => {
+              setInjName(e.target.value);
+              const sub = PHARMA_DB[e.target.value.trim()];
+              if (sub?.class === 'insulin') setInjType('инсулин');
+              else if (sub?.class === 'glp1') setInjType('семаглутид');
+              else if (['testosterone','trenbolone','nandrolone','boldenone','primobolan','drostanolone'].includes(sub?.class || '')) setInjType('ААС');
+            }} placeholder="Название" style={{ ...inputStyle, flex: 1, fontSize: 11 }} list="drug-list" />
+            <datalist id="drug-list">{injectDrugTypes.map(d => <option key={d} value={d} />)}</datalist>
+            <input type="number" value={injDose} onChange={e => setInjDose(+e.target.value || 0)} style={{ ...inputStyle, width: 50, fontSize: 11 }} placeholder="Доза" />
+            <select value={injUnit} onChange={e => setInjUnit(e.target.value)} style={{ ...selectStyle, width: 42, fontSize: 10 }}>
               <option value="mg">mg</option><option value="mcg">mcg</option><option value="IU">IU</option><option value="ml">ml</option>
-            </select></div>
-            <button onClick={() => {
-              if (injName.trim()) {
-                const sub = PHARMA_DB[injName.trim()]; const hl = sub?.pk?.halfLifeHours || 24;
-                let dt = injType, de = injEster;
-                if (sub?.class === 'insulin') { dt = 'инсулин'; de = hl < 2 ? 'rapid' : hl <= 8 ? 'short' : 'long'; }
-                else if (sub?.class === 'glp1') { dt = 'семаглутид'; de = 'long'; }
-                else if (['testosterone','trenbolone','nandrolone','boldenone','primobolan','drostanolone'].includes(sub?.class || '')) { dt = 'ААС'; de = 'long'; }
-                if (injEster !== 'none') de = injEster;
-                setInjections([...injections, { id: Date.now().toString(), name: injName.trim(), time: injTime, dose: injDose, unit: injUnit, type: dt, esterType: de, halfLifeHours: hl, trainLinked: false, trainTiming: 'none' }]);
-                setInjName('');
-              }
-            }} style={{ padding: '5px 10px', borderRadius: 10, border: 'none', background: 'linear-gradient(135deg,#00e68a,#00c8a0)', color: '#000', fontSize: 9, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>+</button>
-          </div>
-          <div style={{ display: 'flex', gap: 3 }}>
-            <select value={injType} onChange={e => setInjType(e.target.value)} style={{ ...selectStyle, flex: 1, fontSize: 8 }}>
-              {injectDrugTypes.map(d => <option key={d} value={d}>{d}</option>)}
             </select>
-            <select value={injEster} onChange={e => setInjEster(e.target.value as any)} style={{ ...selectStyle, flex: 1, fontSize: 8 }}>
-              <option value="none">🔄 Авто</option>
+            <button onClick={() => {
+              if (!injName.trim()) return;
+              const sub = PHARMA_DB[injName.trim()];
+              const hl = sub?.pk?.halfLifeHours || 24;
+              setInjections([...injections, {
+                id: Date.now().toString(), name: injName.trim(), time: injTime, dose: injDose, unit: injUnit,
+                type: injType, esterType: injEster,
+                halfLifeHours: hl, trainLinked: false, trainTiming: 'none',
+              }]);
+              setInjName('');
+            }} style={{ padding: '8px 12px', borderRadius: 10, border: 'none', background: 'linear-gradient(135deg,#00e68a,#00c8a0)', color: '#000', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>+</button>
+          </div>
+          <div style={{ display: 'flex', gap: 4 }}>
+            <div style={{ flex: 1 }}><select value={injType} onChange={e => setInjType(e.target.value)} style={{ ...selectStyle, width: '100%', fontSize: 9 }}>
+              {injectDrugTypes.map(d => <option key={d} value={d}>{d}</option>)}
+            </select></div>
+            <div style={{ width: 100 }}><select value={injEster} onChange={e => setInjEster(e.target.value as any)} style={{ ...selectStyle, width: '100%', fontSize: 9 }}>
+              <option value="none">Авто</option>
               <option value="rapid">⚡ Быстрый</option>
               <option value="short">🕐 Короткий</option>
               <option value="long">🌙 Длинный</option>
-            </select>
+            </select></div>
+            <input type="time" value={injTime} onChange={e => setInjTime(e.target.value)} style={{ ...inputStyle, width: 70, fontSize: 10 }} />
           </div>
         </div>
-        {injections.map((inj, i) => {
-          const canLink = inj.type === 'инсулин' || inj.type === 'ИФР-1';
-          return (
-          <div key={inj.id} style={{ padding: '6px 8px', borderRadius: 10, background: 'rgba(6,182,212,0.06)', border: '1px solid rgba(6,182,212,0.12)', marginBottom: 4 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 8, color: '#06b6d4' }}>
-              💉 <strong>{inj.time}</strong> {inj.name} {inj.dose}{inj.unit} {inj.esterType !== 'none' && <span style={{color:'rgba(255,255,255,0.6)',fontSize:7}}>({inj.esterType})</span>}
-              <button onClick={() => setInjections(injections.filter((_, j) => j !== i))} style={{ marginLeft: 'auto', background: 'none', border: 'none', color: '#ef4444', fontSize: 9, cursor: 'pointer', padding: 0 }}>✕</button>
-            </div>
-            {canLink && linkToTraining && (
-              <div style={{ display: 'flex', gap: 4, marginTop: 4, alignItems: 'center' }}>
-                <button onClick={() => {
-                  setInjections(injections.map((inj2, j) => j === i ? { ...inj2, trainLinked: !inj2.trainLinked, trainTiming: !inj2.trainLinked ? 'before' : 'none' } : inj2));
-                }} style={{
-                  fontSize: 7, padding: '2px 6px', borderRadius: 4, cursor: 'pointer',
-                  background: inj.trainLinked ? 'rgba(0,230,138,0.15)' : '#202023',
-                  border: inj.trainLinked ? '1px solid rgba(0,230,138,0.3)' : '1px solid rgba(255,255,255,0.06)',
-                  color: inj.trainLinked ? '#00e68a' : 'rgba(255,255,255,0.6)',
-                  fontWeight: 600,
-                }}>
-                  🏋️ {inj.trainLinked ? 'Привязан к тренировке' : 'Привязать к тренировке'}
-                </button>
-                {inj.trainLinked && (
-                  <>
-                    {(['before', 'after', 'both'] as const).map(t => (
-                      <button key={t} onClick={() => setInjections(injections.map((inj2, j) => j === i ? { ...inj2, trainTiming: t } : inj2))} style={{
-                        fontSize: 7, padding: '2px 5px', borderRadius: 4, cursor: 'pointer',
-                        background: inj.trainTiming === t ? 'rgba(59,130,246,0.15)' : '#202023',
-                        border: inj.trainTiming === t ? '1px solid rgba(59,130,246,0.3)' : '1px solid rgba(255,255,255,0.06)',
-                        color: inj.trainTiming === t ? '#60a5fa' : 'rgba(255,255,255,0.6)',
-                        fontWeight: 600,
-                      }}>
-                        {t === 'before' ? 'До' : t === 'after' ? 'После' : 'До+После'}
-                      </button>
-                    ))}
-                  </>
-                )}
+        <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 4 }}>
+          {injections.map((inj, i) => {
+            const canLink = inj.type === 'инсулин' || inj.type === 'ИФР-1';
+            return (
+            <div key={inj.id} style={{ padding: '8px 10px', borderRadius: 10, background: 'rgba(6,182,212,0.04)', border: '1px solid rgba(6,182,212,0.1)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 9, color: '#fff' }}>
+                <span style={{ fontSize: 12 }}>💉</span>
+                <strong style={{ color: '#06b6d4', fontSize: 10 }}>{inj.time}</strong>
+                <span style={{ color: '#fff', fontWeight: 600 }}>{inj.name}</span>
+                <span style={{ color: 'rgba(255,255,255,0.6)' }}>{inj.dose}{inj.unit}</span>
+                {inj.esterType !== 'none' && <span style={{color:'rgba(255,255,255,0.4)',fontSize:8}}>({inj.esterType})</span>}
+                <button onClick={() => setInjections(injections.filter((_, j) => j !== i))} style={{ marginLeft: 'auto', background: 'rgba(239,68,68,0.1)', border: 'none', color: '#ef4444', fontSize: 10, cursor: 'pointer', borderRadius: 4, padding: '2px 6px' }}>✕</button>
               </div>
-            )}
-          </div>
-          );
-        })}
+              {canLink && linkToTraining && (
+                <div style={{ display: 'flex', gap: 4, marginTop: 4, flexWrap: 'wrap' }}>
+                  <button onClick={() => setInjections(injections.map((inj2, j) => j === i ? { ...inj2, trainLinked: !inj2.trainLinked, trainTiming: !inj2.trainLinked ? 'before' : 'none' } : inj2))} style={{
+                    fontSize: 7, padding: '3px 8px', borderRadius: 4, cursor: 'pointer', fontWeight: 600,
+                    background: inj.trainLinked ? 'rgba(0,230,138,0.15)' : '#202023',
+                    border: inj.trainLinked ? '1px solid rgba(0,230,138,0.3)' : '1px solid rgba(255,255,255,0.06)',
+                    color: inj.trainLinked ? '#00e68a' : 'rgba(255,255,255,0.6)',
+                  }}>🏋️ {inj.trainLinked ? 'Привязан' : 'Привязать к тренировке'}</button>
+                  {inj.trainLinked && (['before', 'after', 'both'] as const).map(t => (
+                    <button key={t} onClick={() => setInjections(injections.map((inj2, j) => j === i ? { ...inj2, trainTiming: t } : inj2))} style={{
+                      fontSize: 7, padding: '2px 6px', borderRadius: 4, cursor: 'pointer', fontWeight: 600,
+                      background: inj.trainTiming === t ? 'rgba(59,130,246,0.15)' : '#202023',
+                      border: inj.trainTiming === t ? '1px solid rgba(59,130,246,0.3)' : '1px solid rgba(255,255,255,0.06)',
+                      color: inj.trainTiming === t ? '#60a5fa' : 'rgba(255,255,255,0.6)',
+                    }}>{t === 'before' ? 'До' : t === 'after' ? 'После' : 'До+После'}</button>
+                  ))}
+                </div>
+              )}
+            </div>);
+          })}
+        </div>
       </GlassCard>
 
       {/* 4. Training link */}
@@ -2328,6 +2316,22 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
             🔄 Перегенерировать {planDays === 3 ? '3 дня' : 'неделю'}
           </button>
         )}
+        <div style={{ display: 'flex', gap: 4, marginTop: 4 }}>
+          <button onClick={() => {
+            const txt = dayPlan ? `🍽 План питания\n${dayPlan.meals.map((m: any) => `${m.time} ${m.label}: ${m.items.map((it: any) => `${it.name} ${it.amount}г`).join(', ')}  [${Math.round(m.totals?.kcal || 0)}ккал]`).join('\n')}\n\n📊 Итого: ${Math.round(dayPlan.totals.kcal)} ккал, Б${Math.round(dayPlan.totals.p)}/Ж${Math.round(dayPlan.totals.f)}/У${Math.round(dayPlan.totals.c)}` : '';
+            navigator.clipboard?.writeText(txt);
+          }} style={{ flex:1, padding:'5px', borderRadius:6, cursor:'pointer', border:'1px solid rgba(96,165,250,0.2)', background:'rgba(96,165,250,0.06)', color:'#60a5fa', fontSize:7, fontWeight:600 }}>📤 Скопировать план</button>
+          <button onClick={() => {
+            const input = prompt('Вставьте план из буфера:');
+            if (!input) return;
+            try {
+              const parsed = JSON.parse(input);
+              if (parsed.meals) { setDayPlan(parsed); setGenerated(true); }
+            } catch {
+              alert('Неверный формат. Скопируйте план через кнопку "Копировать план".');
+            }
+          }} style={{ flex:1, padding:'5px', borderRadius:6, cursor:'pointer', border:'1px solid rgba(249,115,22,0.2)', background:'rgba(249,115,22,0.06)', color:'#f97316', fontSize:7, fontWeight:600 }}>📥 Импорт</button>
+        </div>
       </GlassCard>
       )}
       {generated && allergens.length > 0 && (
@@ -2348,6 +2352,8 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
         <GlassCard title={`План на день${cyclingMode !== 'none' ? (dayPlan.isTrainingDay ? ' 🏋️ Тренировочный' : ' 🛌 Отдых') : ''}`} icon="📋" color={dayPlan.isTrainingDay ? '#00e68a' : '#8b5cf6'} style={{ border: '1px solid rgba(0,230,138,0.15)' }}>
           {dayPlan.isTrainingDay !== undefined && <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.6)', marginBottom: 4 }}>{dayPlan.isTrainingDay ? 'Тренировочный день' : 'День отдыха'}{cyclingMode !== 'none' && ` · циклирование: ${({macro:'макросы',butch:'БУЧ',cheatmeal:'читмил',carbload:'угл.загрузка'})[cyclingMode] || ''}`}</div>}
           {renderMealList(dayPlan)}
+          {/* Day notes */}
+          <textarea value={dayPlanNotes} onChange={e => { setDayPlanNotes(e.target.value); localStorage.setItem('he_day_notes', e.target.value); }} placeholder="Заметки на сегодня..." style={{ width:'100%', marginTop:6, padding:'6px 10px', borderRadius:8, fontSize:8, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.1)', color:'rgba(255,255,255,0.6)', resize:'vertical', minHeight:30, boxSizing:'border-box' }} rows={1} />
           {(() => {
             const dayTotal = dayPlan.totals;
             const devKcal = Math.round(dayTotal?.kcal - effectiveKcal);
@@ -2563,6 +2569,81 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
         }}>
           💾 Сохранить в мои планы
         </button>
+      )}
+
+      {/* Achievements + Seasonal */}
+      {generated && (
+        <GlassCard title="🏆 Достижения и сезон" icon="🏆" color="#f472b6">
+          {(() => {
+            const ach: { label: string; earned: boolean; icon: string }[] = [];
+            try {
+              const diaryRaw = localStorage.getItem('nutrition_diary');
+              const diary = diaryRaw ? JSON.parse(diaryRaw) : {};
+              const daysLogged = Object.keys(diary).length;
+              if (daysLogged >= 1) ach.push({ label: 'Первый день в дневнике', earned: true, icon: '📝' });
+              if (daysLogged >= 7) ach.push({ label: 'Неделя дневника', earned: true, icon: '📆' });
+              if (daysLogged >= 30) ach.push({ label: 'Месяц дневника', earned: true, icon: '📅' });
+              const plansRaw = localStorage.getItem('he_saved_nutrition_plans');
+              const plans = plansRaw ? JSON.parse(plansRaw) : [];
+              if (plans.length >= 1) ach.push({ label: 'Первый сохранённый план', earned: true, icon: '💾' });
+              if (plans.length >= 5) ach.push({ label: '5 планов', earned: true, icon: '📚' });
+              if (localStorage.getItem('he_off_cache')) ach.push({ label: 'Сканировал штрих-код', earned: true, icon: '📷' });
+            } catch {}
+            // Seasonal products
+            const month = new Date().getMonth();
+            const seasonal = [
+              { months: [5,6,7,8], label: '🥒 Огурцы, помидоры, ягоды, зелень' },
+              { months: [9,10], label: '🍂 Тыква, кабачки, яблоки, виноград' },
+              { months: [11,12,1,2], label: '🥬 Цитрусовые, хурма, гранаты, свёкла' },
+              { months: [3,4], label: '🌱 Спаржа, редис, шпинат, первая зелень' },
+            ].find(s => s.months.includes(month));
+            return <>
+              {ach.length > 0 && <div style={{ display:'flex', flexWrap:'wrap', gap:4, marginBottom:8 }}>
+                {ach.map(a => <span key={a.label} style={{ padding:'3px 8px', borderRadius:6, fontSize:8, background:'rgba(244,114,182,0.08)', border:'1px solid rgba(244,114,182,0.15)', color:'#f472b6' }}>{a.icon} {a.label}</span>)}
+              </div>}
+              {seasonal && <div style={{ fontSize:8, color:'rgba(255,255,255,0.6)', padding:'4px 8px', borderRadius:6, background:'rgba(34,197,94,0.06)', border:'1px solid rgba(34,197,94,0.1)' }}>🌿 Сезонные продукты: {seasonal.label}</div>}
+              {ach.length === 0 && <div style={{ fontSize:8, color:'rgba(255,255,255,0.4)' }}>Начните вести дневник питания, чтобы получать достижения.</div>}
+            </>;
+          })()}
+        </GlassCard>
+      )}
+
+      {/* Recipe creator */}
+      <button onClick={() => setShowRecipeCreator(true)} style={{ width:'100%', padding:'8px', borderRadius:10, cursor:'pointer', border:'1px solid rgba(249,115,22,0.2)', background:'rgba(249,115,22,0.06)', color:'#f97316', fontSize:9, fontWeight:600, marginTop:4 }}>
+        🍳 Создать свой рецепт
+      </button>
+      {showRecipeCreator && (
+        <div style={{ position:'fixed', inset:0, zIndex:100, display:'flex', alignItems:'flex-end', justifyContent:'center', background:'rgba(0,0,0,0.7)', backdropFilter:'blur(4px)' }}
+          onClick={() => setShowRecipeCreator(false)}>
+          <div onClick={e => e.stopPropagation()} style={{ width:'100%', maxWidth:400, padding:'14px 20px 28px', borderRadius:'20px 20px 0 0', background:'#18181b', boxShadow:'0 -4px 30px rgba(0,0,0,0.4)', border:'1px solid rgba(255,255,255,0.1)', borderBottom:'none' }}>
+            <div style={{ width:36, height:4, borderRadius:2, background:'rgba(255,255,255,0.15)', margin:'0 auto 16px' }} />
+            <div style={{ fontSize:14, fontWeight:700, color:'#fff', marginBottom:12 }}>🍳 Создать рецепт</div>
+            <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+              <input value={newRecipe.name} onChange={e => setNewRecipe(r => ({...r, name: e.target.value}))} placeholder="Название рецепта" style={inputStyle} />
+              <div style={{ display:'flex', gap:4 }}>
+                <select value={newRecipe.meal} onChange={e => setNewRecipe(r => ({...r, meal: e.target.value}))} style={selectStyle}>
+                  <option value="breakfast">Завтрак</option><option value="lunch">Обед</option>
+                  <option value="dinner">Ужин</option><option value="snack">Перекус</option>
+                </select>
+                <input type="number" value={newRecipe.prepTime} onChange={e => setNewRecipe(r => ({...r, prepTime: +e.target.value || 10}))} placeholder="Мин" style={inputStyle} />
+              </div>
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr', gap:4 }}>
+                {[{k:'kcal',l:'Ккал'},{k:'protein',l:'Белки'},{k:'fat',l:'Жиры'},{k:'carbs',l:'Угл'}].map(f => <div key={f.k}><input type="number" value={(newRecipe as any)[f.k]} onChange={e => setNewRecipe(r => ({...r, [f.k]: +e.target.value || 0}))} placeholder={f.l} style={inputStyle} /></div>)}
+              </div>
+              <textarea value={newRecipe.ingredients} onChange={e => setNewRecipe(r => ({...r, ingredients: e.target.value}))} placeholder="Ингредиенты (каждый с новой строки)" style={{...inputStyle, minHeight:60, resize:'vertical', fontSize:9}} rows={3} />
+              <textarea value={newRecipe.instructions} onChange={e => setNewRecipe(r => ({...r, instructions: e.target.value}))} placeholder="Инструкция (каждый шаг с новой строки)" style={{...inputStyle, minHeight:60, resize:'vertical', fontSize:9}} rows={3} />
+              <input value={newRecipe.tags} onChange={e => setNewRecipe(r => ({...r, tags: e.target.value}))} placeholder="Теги (через запятую)" style={inputStyle} />
+              <button onClick={() => {
+                const recipe = { ...newRecipe, ingredients: newRecipe.ingredients.split('\n').filter(Boolean), instructions: newRecipe.instructions.split('\n').filter(Boolean), tags: newRecipe.tags.split(',').map(t => t.trim()).filter(Boolean), userCreated: true };
+                const updated = [...userRecipes, recipe];
+                setUserRecipes(updated);
+                localStorage.setItem('he_user_recipes', JSON.stringify(updated));
+                setShowRecipeCreator(false);
+                setNewRecipe({ name: '', meal: 'lunch', prepTime: 10, kcal: 400, protein: 30, fat: 10, carbs: 40, ingredients: '', instructions: '', tags: '' });
+              }} style={greenBtn}>✓ Сохранить рецепт</button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* 17. Shopping list */}
