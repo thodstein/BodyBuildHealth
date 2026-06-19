@@ -8,7 +8,7 @@ import type { UserProfile } from '../../../core/types';
 
 // ─── Types ───
 type GoalId = 'mass' | 'strength' | 'fat_loss' | 'cutting' | 'post_cut' | 'maintenance' | 'recomposition' | 'rehab';
-type PhaseId = 'mass' | 'cutting' | 'maintenance' | 'recomp' | 'recovery' | 'prep';
+type PhaseId = 'course' | 'bridge' | 'pct' | 'recovery' | 'cutting' | 'maintenance' | 'recomp' | 'fat_loss' | 'post_cut';
 type BudgetLevel = 'low' | 'medium' | 'max' | 'enhanced';
 type NutritionLevel = 'base' | 'medium' | 'enhanced' | 'max';
 type PlanType = 'classic' | 'keto' | 'highcarb' | 'mediterranean' | 'vegetarian';
@@ -30,12 +30,15 @@ const GOALS: { id: GoalId; label: string; icon: string; desc: string }[] = [
 ];
 
 const PHASES: { id: PhaseId; label: string; icon: string; desc: string }[] = [
-  { id: 'mass', label: 'Массонабор', icon: '💪', desc: 'Профицит 300-500 ккал, белок 1.8-2.2г/кг' },
-  { id: 'cutting', label: 'Сушка', icon: '✂️', desc: 'Дефицит 300-500 ккал, белок 2.5г/кг' },
-  { id: 'maintenance', label: 'Поддержка', icon: '⚖️', desc: 'Баланс, калории на поддержание' },
+  { id: 'course', label: 'Курс', icon: '💉', desc: 'Активная фаза с фармакологической поддержкой' },
+  { id: 'bridge', label: 'Мост', icon: '🌉', desc: 'Переход между курсами, низкие дозировки' },
+  { id: 'pct', label: 'ПКТ', icon: '🔄', desc: 'Послекурсовая терапия, восстановление оси ГГЯ' },
+  { id: 'recovery', label: 'Восстановление', icon: '🩹', desc: 'Повышенный белок, витамины, отдых' },
+  { id: 'cutting', label: 'Сушка', icon: '✂️', desc: 'Дефицит 300-500 ккал, рельеф' },
+  { id: 'maintenance', label: 'Поддержка', icon: '⚖️', desc: 'Баланс, сохранение формы' },
   { id: 'recomp', label: 'Рекомпозиция', icon: '🔄', desc: 'Одновременный рост + жиросжигание' },
-  { id: 'recovery', label: 'Восстановление', icon: '🩹', desc: 'Повышенный белок, витамины' },
-  { id: 'prep', label: 'Подготовка', icon: '🎯', desc: 'Плавный выход на пиковую форму' },
+  { id: 'fat_loss', label: 'Похудение', icon: '🔥', desc: 'Дефицит калорий, жиросжигание' },
+  { id: 'post_cut', label: 'Выход из сушки', icon: '📈', desc: 'Плавный выход, обратная метаболическая' },
 ];
 
 const BUDGET_LEVELS: { id: BudgetLevel; label: string; icon: string; desc: string; color: string }[] = [
@@ -156,7 +159,7 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
   const [goal, setGoal] = useState<GoalId>((s?.primaryGoal as GoalId) || 'maintenance');
 
   // 3. Phase + course drugs
-  const [phase, setPhase] = useState<PhaseId>('maintenance');
+  const [phase, setPhase] = useState<PhaseId>('course');
   const [injections, setInjections] = useState<DrugInjection[]>(() => {
     // Auto-pull from pharma course
     if (courseEntries.length > 0) {
@@ -630,10 +633,13 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
       recs.push('🧊 Противовоспалительные: куркума, имбирь, зеленый чай. Ограничить сахар/трансжиры.');
     }
     // Phase-based
-    if (phase === 'mass') recs.push('📊 Фаза массонабора: 2-3 основных приёма + 2 перекуса. Обязательно замшный протеин после тренировки.');
-    if (phase === 'cutting') recs.push('✂️ Фаза сушки: Дробное питание 5-6 раз. Контроль натрия. Увеличить клетчатку для насыщения.');
-    if (phase === 'recovery') recs.push('🩹 Фаза восстановления: Повышенный белок 2.5г/кг, глютамин, антиоксиданты.');
-    if (phase === 'prep') recs.push('🎯 Фаза подготовки: плавный выход на пик, контроль жиров, баланс омега-3/6.');
+    if (phase === 'course') recs.push('💉 Курс: повышенный белок 2.5г/кг, контроль печени (расторопша, артишок), вода 40мл/кг.');
+    if (phase === 'bridge') recs.push('🌉 Мост: калории на поддержание, белок 2г/кг, контроль эстрадиола, добавки для суставов.');
+    if (phase === 'pct') recs.push('🔄 ПКТ: белок 2.2г/кг, цинк 50мг, витамин D 5000МЕ, магний, DAA для восстановления оси.');
+    if (phase === 'cutting') recs.push('✂️ Сушка: дробное питание 5-6 раз, контроль натрия, увеличить клетчатку для насыщения.');
+    if (phase === 'recovery') recs.push('🩹 Восстановление: повышенный белок 2.5г/кг, глютамин, антиоксиданты.');
+    if (phase === 'fat_loss') recs.push('🔥 Похудение: дефицит 300-500 ккал, белок 2.5г/кг, большая часть углеводов вокруг тренировки.');
+    if (phase === 'post_cut') recs.push('📈 Выход из сушки: плавное +200 ккал/нед, обратная метаболическая, контроль отёков.');
     // Plan type
     if (planType === 'keto') {
       recs.push('🥑 КЕТО: Контроль электролитов (натрий 5-7г, калий 3-5г, магний 400-600мг). Адаптация 2-4 недели.');
@@ -1660,27 +1666,52 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
             <span style={{ color: '#00e68a', fontWeight: 700 }}>📊 За неделю: {Math.round(weekPlan.totals.kcal)} ккал</span>
             <span style={{ color: 'rgba(255,255,255,0.4)' }}>Среднее: {Math.round(weekPlan.totals.kcal / 7)} ккал/день</span>
           </div>
-          <div style={{ maxHeight: 400, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.3)', marginBottom: 6, display: 'flex', gap: 6, justifyContent: 'center' }}>
+            <span style={{ color: '#3b82f6' }}>● Б: {Math.round(weekPlan.totals.p)}г</span>
+            <span style={{ color: '#f59e0b' }}>● Ж: {Math.round(weekPlan.totals.f)}г</span>
+            <span style={{ color: '#f97316' }}>● У: {Math.round(weekPlan.totals.c)}г</span>
+          </div>
+          <div style={{ maxHeight: 500, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 6 }}>
             {weekPlan.days.map((d: any, di: number) => {
-              const wTotalKcal = Math.round(d.totals.kcal);
+              const wKcal = Math.round(d.totals.kcal);
+              const wP = Math.round(d.totals.p);
+              const wF = Math.round(d.totals.f);
+              const wC = Math.round(d.totals.c);
               const wIsTraining = d.isTrainingDay;
               return (
                 <div key={di} style={{
-                  padding: 8, borderRadius: 10,
+                  padding: 10, borderRadius: 12,
                   background: wIsTraining ? 'rgba(0,230,138,0.03)' : '#202023',
                   border: wIsTraining ? '1px solid rgba(0,230,138,0.15)' : '1px solid #27272a',
                 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <span style={{ fontSize: 12 }}>{wIsTraining ? '🏋️' : '😴'}</span>
-                      <span style={{ fontSize: 10, fontWeight: 700, color: wIsTraining ? '#00e68a' : 'rgba(255,255,255,0.4)' }}>
-                        День {di + 1}
-                      </span>
+                      <span style={{ fontSize: 14 }}>{wIsTraining ? '🏋️' : '😴'}</span>
+                      <div>
+                        <span style={{ fontSize: 10, fontWeight: 700, color: wIsTraining ? '#00e68a' : 'rgba(255,255,255,0.4)' }}>
+                          {DAY_LABELS[di]} · День {di + 1}
+                        </span>
+                        <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.3)', display: 'flex', gap: 4 }}>
+                          <span style={{ color: '#3b82f6' }}>Б {wP}</span>
+                          <span style={{ color: '#f59e0b' }}>Ж {wF}</span>
+                          <span style={{ color: '#f97316' }}>У {wC}</span>
+                        </div>
+                      </div>
                     </div>
-                    <span style={{ fontSize: 11, fontWeight: 800, color: '#00e68a' }}>{wTotalKcal} ккал</span>
+                    <span style={{ fontSize: 14, fontWeight: 800, color: '#00e68a' }}>{wKcal} ккал</span>
                   </div>
-                  <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.4)', lineHeight: 1.5 }}>
-                    {DAY_LABELS[di]}: {d.meals.map((m: any) => m.items.map((it: any) => it.name)).flat().join(', ')}
+                  {/* Meal breakdown */}
+                  <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.4)' }}>
+                    {d.meals.map((m: any, mi: number) => (
+                      <div key={mi} style={{ padding: '2px 0', display: 'flex', gap: 4 }}>
+                        <span style={{ color: '#00e68a', fontWeight: 600, minWidth: 50 }}>{m.time}</span>
+                        <span style={{ color: '#00e68a', minWidth: 55 }}>{m.label}</span>
+                        <span style={{ flex: 1 }}>{m.items.map((it: any) => it.name).join(', ')}</span>
+                        <span style={{ color: 'rgba(255,255,255,0.3)', whiteSpace: 'nowrap' }}>
+                          {Math.round(m.totals?.kcal || 0)} ккал
+                        </span>
+                      </div>
+                    ))}
                   </div>
                 </div>
               );
@@ -1710,19 +1741,29 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
               if (!groups[cat]) groups[cat] = [];
               groups[cat].push(item);
             });
-            return Object.entries(groups).map(([cat, items]) => (
-              <div key={cat} style={{ marginBottom: 8 }}>
-                <div style={{ fontSize: 9, fontWeight: 700, color: '#f97316', marginBottom: 3, padding: '2px 0', borderBottom: '1px solid rgba(249,115,22,0.1)' }}>{cat}</div>
-                {items.map((data: any, i: number) => (
-                  <div key={data.name + i} style={{ fontSize: 9, padding: '2px 0 2px 8px', display: 'flex', justifyContent: 'space-between', color: 'rgba(255,255,255,0.6)' }}>
-                    <span>{data.name}</span>
-                    <span style={{ color: 'rgba(255,255,255,0.4)', fontWeight: 600, whiteSpace: 'nowrap' }}>
-                      {data.amount >= 1000 ? `${(data.amount / 1000).toFixed(1)} кг` : `${Math.round(data.amount)} г`}
-                    </span>
+            return (
+              <>
+                <button onClick={() => { shoppingList.forEach((i: any) => addToCart({ name: i.name, kcal: i.kcal || 0, amount: i.amount, category: i.catLabel || i.category })); }} style={{ marginBottom: 8, padding: '5px 10px', borderRadius: 6, border: '1px solid rgba(249,115,22,0.2)', background: 'rgba(249,115,22,0.06)', color: '#f97316', cursor: 'pointer', fontSize: 8, fontWeight: 600, width: '100%' }}>
+                  🛒 Добавить всё в корзину ({shoppingList.length} товаров)
+                </button>
+                {Object.entries(groups).map(([cat, items]) => (
+                  <div key={cat} style={{ marginBottom: 6 }}>
+                    <div style={{ fontSize: 9, fontWeight: 700, color: '#f97316', marginBottom: 2, padding: '2px 0', borderBottom: '1px solid rgba(249,115,22,0.1)' }}>{cat}</div>
+                    {items.map((data: any, i: number) => (
+                      <div key={data.name + i} style={{ fontSize: 9, padding: '3px 0 3px 8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: 'rgba(255,255,255,0.6)' }}>
+                        <span>{data.name}</span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                          <span style={{ color: 'rgba(255,255,255,0.4)', fontWeight: 600, whiteSpace: 'nowrap' }}>
+                            {data.amount >= 1000 ? `${(data.amount / 1000).toFixed(1)} кг` : `${Math.round(data.amount)} г`}
+                          </span>
+                          <button onClick={() => addToCart({ name: data.name, kcal: data.kcal || 0, amount: data.amount, category: data.catLabel || data.category })} style={{ padding: '2px 4px', borderRadius: 4, border: 'none', background: 'rgba(249,115,22,0.12)', color: '#f97316', cursor: 'pointer', fontSize: 7 }}>🛒</button>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 ))}
-              </div>
-            ));
+              </>
+            );
           })()}
           <button onClick={saveCurrentPlan} style={{ marginTop: 6, padding: '8px', borderRadius: 8, border: '1px solid rgba(249,115,22,0.25)', background: 'rgba(249,115,22,0.06)', color: '#f97316', cursor: 'pointer', fontSize: 9, fontWeight: 600, width: '100%' }}>💾 Сохранить план</button>
         </GlassCard>
