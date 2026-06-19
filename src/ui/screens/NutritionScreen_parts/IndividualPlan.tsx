@@ -71,16 +71,14 @@ const getDefaultKcal = (profile: UserProfile | null) => {
   return s.weight ? Math.round(s.weight * 30) : 2200;
 };
 
-// ─── Apple-style glass card wrapper ───
 const GlassCard: React.FC<{ title?: string; icon?: string; color?: string; style?: React.CSSProperties; children: React.ReactNode }> = ({ title, icon, color, style, children }) => (
   <div style={{
     padding: 12, borderRadius: 14,
-    background: 'linear-gradient(135deg,rgba(255,255,255,0.06),rgba(255,255,255,0.02))',
-    backdropFilter: 'blur(20px)',
-    border: '1px solid rgba(255,255,255,0.06)',
+    background: '#18181b',
+    border: '1px solid #27272a',
     ...style,
   }}>
-    {title && <div style={{ fontSize: 10, color: color || 'rgba(255,255,255,0.35)', fontWeight: 600, marginBottom: 8, display: 'flex', alignItems: 'center', gap: 4 }}>
+    {title && <div style={{ fontSize: 10, color: color || 'rgba(255,255,255,0.5)', fontWeight: 600, marginBottom: 8, display: 'flex', alignItems: 'center', gap: 4 }}>
       {icon && <span>{icon}</span>}{title}
     </div>}
     {children}
@@ -90,8 +88,8 @@ const GlassCard: React.FC<{ title?: string; icon?: string; color?: string; style
 const PillBtn: React.FC<{ active?: boolean; onClick: () => void; color?: string; children: React.ReactNode; style?: React.CSSProperties }> = ({ active, onClick, color, children, style }) => (
   <button onClick={onClick} style={{
     padding: '5px 10px', borderRadius: 16, fontSize: 9, cursor: 'pointer', fontWeight: 600, whiteSpace: 'nowrap',
-    background: active ? (color || 'rgba(0,230,138,0.15)') : 'rgba(255,255,255,0.03)',
-    border: active ? `1px solid ${color || '#00e68a'}` : '1px solid rgba(255,255,255,0.06)',
+    background: active ? (color ? `${color}25` : 'rgba(0,230,138,0.2)') : '#202023',
+    border: active ? `1px solid ${color || '#00e68a'}` : '1px solid #27272a',
     color: active ? (color || '#00e68a') : 'rgba(255,255,255,0.5)',
     transition: 'all 0.15s',
     ...style,
@@ -100,7 +98,7 @@ const PillBtn: React.FC<{ active?: boolean; onClick: () => void; color?: string;
 
 const inputStyle: React.CSSProperties = {
   width: '100%', padding: '7px 10px', borderRadius: 8,
-  background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
+  background: '#202023', border: '1px solid #27272a',
   color: '#fff', fontSize: 11, boxSizing: 'border-box' as const,
 };
 
@@ -116,8 +114,8 @@ const greenBtn: React.CSSProperties = {
 
 const reportPillStyle = (color: string, active: boolean): React.CSSProperties => ({
   padding: '4px 8px', borderRadius: 6, fontSize: 8, cursor: 'pointer', fontWeight: 600,
-  background: active ? `${color}18` : 'rgba(255,255,255,0.03)',
-  border: active ? `1px solid ${color}` : '1px solid rgba(255,255,255,0.06)',
+  background: active ? `${color}25` : '#202023',
+  border: active ? `1px solid ${color}` : '1px solid #27272a',
   color: active ? color : 'rgba(255,255,255,0.5)',
   transition: 'all 0.15s',
 });

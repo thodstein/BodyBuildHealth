@@ -50,7 +50,6 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
 
   const allMealTypes = [...MEAL_PRESETS, ...customMeals];
 
-  // FOOD_DB search with category icons
   const foodSearchResults = useMemo(() => {
     if (!foodSearch.trim()) return [];
     const q = foodSearch.toLowerCase();
@@ -71,7 +70,6 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
 
   const handleOCR = () => { if (!ocrText.trim()) return; setOcrError(''); try { let items = parseFatSecretText(ocrText); if (items.length === 0) items = parseNutritionScreenshot(ocrText); const converted = items.flatMap(m => m.items.map(item => ({ name: item.name || m.mealType || '', kcal: Math.round(item.kcal) || 0, p: Math.round((item.p || 0)*10)/10, f: Math.round((item.f || 0)*10)/10, c: Math.round((item.c || 0)*10)/10, qty: 100 }))); setParsedItems(converted); } catch (e) { setOcrError('' + (e instanceof Error ? e.message : String(e))); } };
 
-  // Save with quantity scaling
   const saveItemsToDiary = (items: DiaryItem[]) => {
     if (items.length === 0) return;
     const data = { ...diaryData };
@@ -94,7 +92,6 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
     showToast(`✅ ${items.length} позиций → ${mt}`);
   };
 
-  // Delete / Edit
   const deleteItem = (mealName: string, idx: number) => {
     const data = { ...diaryData };
     if (!data[selectedDate]?.meals?.[mealName]) return;
@@ -107,7 +104,6 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
 
   const clearDay = () => { if (!diaryData[selectedDate]) return; const data = { ...diaryData }; delete data[selectedDate]; saveDiary(data); showToast('🗑 День очищен'); };
 
-  // Edit item quantity
   const openEdit = (meal: string, idx: number, item: any) => { setEditItem({ meal, idx, item }); const match = item.qty?.match(/(\d+)/); setEditQty(match ? +match[1] : 100); };
   const saveEdit = () => {
     if (!editItem) return;
@@ -123,7 +119,6 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
     saveDiary(data); setEditItem(null); showToast('✅ Количество обновлено');
   };
 
-  // Copy meal
   const copyMeal = (meal: string) => { setCopySource(meal); showToast(`📋 «${meal}» скопирован. Выберите день для вставки.`); };
   const pasteMeal = (targetDate: string) => {
     if (!copySource || !diaryData[selectedDate]?.meals?.[copySource]) return;
@@ -133,7 +128,6 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
     saveDiary(data); setCopySource(null); showToast(`✅ Вставлено в ${targetDate}`);
   };
 
-  // Add custom food
   const addCustomFood = () => {
     const name = customFoodName.trim();
     if (!name) return;
@@ -141,12 +135,10 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
     setCustomFoodName(''); setCustomFoodKcal('100'); setCustomFoodP('10'); setCustomFoodF('5'); setCustomFoodC('10'); setShowCustomFood(false);
   };
 
-  // Week
   const weekStart = useMemo(() => { const d = new Date(selectedDate); const day = d.getDay(); d.setDate(d.getDate() - day + (day === 0 ? -6 : 1)); return d; }, [selectedDate]);
   const weekDays = useMemo(() => Array.from({length:7}, (_,i) => { const d = new Date(weekStart); d.setDate(d.getDate()+i); return d.toISOString().split('T')[0]; }), [weekStart]);
   const dayMeals = diaryData[selectedDate]?.meals || {};
 
-  // Day totals
   const dayTotals = useMemo(() => {
     const items = Object.values(dayMeals).flat();
     const kcal = items.reduce((s: number, i: any) => s + (i.kcal || 0), 0);
@@ -158,10 +150,9 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
 
   return (
     <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-      {toast && <div style={{ position:'fixed', bottom:10, left:'50%', transform:'translateX(-50%)', zIndex:999, padding:'8px 20px', borderRadius:12, background:'rgba(0,0,0,0.85)', backdropFilter:'blur(20px)', color:'#fff', fontSize:11, fontWeight:600 }}>{toast}</div>}
+      {toast && <div style={{ position:'fixed', bottom:10, left:'50%', transform:'translateX(-50%)', zIndex:999, padding:'8px 20px', borderRadius:12, background:'#18181b', border:'1px solid #27272a', color:'#fff', fontSize:11, fontWeight:600 }}>{toast}</div>}
 
-      {/* ─── Apple-style week selector ─── */}
-      <div style={{ padding:12, borderRadius:16, background:'linear-gradient(135deg,rgba(255,255,255,0.08),rgba(255,255,255,0.02))', backdropFilter:'blur(24px)', WebkitBackdropFilter:'blur(24px)', border:'1px solid rgba(255,255,255,0.06)' }}>
+      <div style={{ padding:12, borderRadius:16, background:'#18181b', border:'1px solid #27272a' }}>
         <div style={{ display:'flex', gap:2, marginBottom:6 }}>
           {weekDays.map((ds, i) => {
             const isToday = ds === new Date().toISOString().split('T')[0];
@@ -170,62 +161,56 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
             return (
               <div key={i} onClick={() => setSelectedDate(ds)} style={{
                 flex:1, display:'flex', flexDirection:'column', alignItems:'center', padding:'6px 0', borderRadius:12, cursor:'pointer',
-                background: isSelected ? 'linear-gradient(135deg,rgba(0,230,138,0.15),rgba(0,200,160,0.08))' : 'transparent',
-                border: isSelected ? '1px solid rgba(0,230,138,0.3)' : '1px solid transparent',
+                background: isSelected ? 'linear-gradient(135deg,rgba(0,230,138,0.2),rgba(0,200,160,0.12))' : 'transparent',
+                border: isSelected ? '1px solid #00e68a' : '1px solid transparent',
                 transition:'all 0.15s',
               }}>
-                <span style={{ fontSize:8, color: isSelected ? '#00e68a' : 'rgba(255,255,255,0.3)', fontWeight: isSelected ? 700 : 400 }}>{DAY_NAMES[i]}</span>
+                <span style={{ fontSize:8, color: isSelected ? '#00e68a' : 'rgba(255,255,255,0.4)', fontWeight: isSelected ? 700 : 400 }}>{DAY_NAMES[i]}</span>
                 <span style={{ fontSize:14, fontWeight:700, color: isToday ? '#00e68a' : isSelected ? '#fff' : 'rgba(255,255,255,0.5)', marginTop:1 }}>{new Date(ds).getDate()}</span>
                 {hasData && <div style={{ width:5, height:5, borderRadius:'50%', background:'#00e68a', marginTop:2 }} />}
               </div>
             );
           })}
         </div>
-        {/* Copy/paste bar */}
         {copySource && (
-          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'5px 8px', borderRadius:8, background:'rgba(139,92,246,0.08)', border:'1px solid rgba(139,92,246,0.15)', fontSize:9, color:'#8b5cf6' }}>
+          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'5px 8px', borderRadius:8, background:'rgba(139,92,246,0.15)', border:'1px solid rgba(139,92,246,0.3)', fontSize:9, color:'#8b5cf6' }}>
             <span>📋 Вставить «{copySource}» →</span>
             <div style={{ display:'flex', gap:4 }}>
-              <button onClick={() => pasteMeal(selectedDate)} style={{ padding:'3px 8px', borderRadius:6, border:'none', cursor:'pointer', background:'rgba(139,92,246,0.15)', color:'#8b5cf6', fontSize:8, fontWeight:600 }}>Сюда</button>
-              <button onClick={() => setCopySource(null)} style={{ padding:'3px 8px', borderRadius:6, border:'none', cursor:'pointer', background:'rgba(255,255,255,0.05)', color:'rgba(255,255,255,0.4)', fontSize:8 }}>✕</button>
+              <button onClick={() => pasteMeal(selectedDate)} style={{ padding:'3px 8px', borderRadius:6, border:'none', cursor:'pointer', background:'rgba(139,92,246,0.2)', color:'#8b5cf6', fontSize:8, fontWeight:600 }}>Сюда</button>
+              <button onClick={() => setCopySource(null)} style={{ padding:'3px 8px', borderRadius:6, border:'none', cursor:'pointer', background:'rgba(255,255,255,0.08)', color:'rgba(255,255,255,0.4)', fontSize:8 }}>✕</button>
             </div>
           </div>
         )}
       </div>
 
-      {/* ─── Tab: Add / Day ─── */}
       <div style={{ display:'flex', gap:3, padding:'2px 0' }}>
         {(['add','day'] as const).map(t => <button key={t} onClick={() => setTab(t)} style={{
           flex:1, padding:'7px', borderRadius:10, cursor:'pointer', fontSize:10, fontWeight: tab===t ? 700 : 400,
-          border: tab===t ? '1px solid #00e68a' : '1px solid rgba(255,255,255,0.06)',
-          background: tab===t ? 'linear-gradient(135deg,rgba(0,230,138,0.12),rgba(0,200,160,0.06))' : 'rgba(255,255,255,0.02)',
+          border: tab===t ? '1px solid #00e68a' : '1px solid #27272a',
+          background: tab===t ? 'linear-gradient(135deg,rgba(0,230,138,0.2),rgba(0,200,160,0.12))' : '#202023',
           color: tab===t ? '#00e68a' : 'rgba(255,255,255,0.5)',
         }}>{t === 'add' ? '➕ Добавить' : '📋 День'}</button>)}
       </div>
 
-      {/* ─── ADD TAB ─── */}
       {tab === 'add' && (
         <>
-          {/* Search */}
-          <div style={{ padding:14, borderRadius:16, background:'linear-gradient(135deg,rgba(255,255,255,0.08),rgba(255,255,255,0.02))', backdropFilter:'blur(24px)', WebkitBackdropFilter:'blur(24px)', border:'1px solid rgba(255,255,255,0.06)' }}>
+          <div style={{ padding:14, borderRadius:16, background:'#18181b', border:'1px solid #27272a' }}>
             <input type="text" value={foodSearch} onChange={e => setFoodSearch(e.target.value)}
               placeholder="🔍 Поиск продуктов (начните печатать...)"
               autoFocus
-              style={{ width:'100%', padding:'10px 12px', borderRadius:10, background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.08)', color:'var(--text)', fontSize:12, boxSizing:'border-box', marginBottom:8, outline:'none' }} />
-            {/* Results with category icons */}
+              style={{ width:'100%', padding:'10px 12px', borderRadius:10, background:'#202023', border:'1px solid #27272a', color:'#fff', fontSize:12, boxSizing:'border-box', marginBottom:8, outline:'none' }} />
             {foodSearchResults.length > 0 && (
               <div style={{ maxHeight:220, overflowY:'auto', marginBottom:6, borderRadius:8 }}>
                 {foodSearchResults.map(f => (
                   <div key={f.id} onClick={() => addFoodFromDB(f)} style={{
-                    padding:'6px 10px', cursor:'pointer', fontSize:10, borderBottom:'1px solid rgba(255,255,255,0.03)',
-                    display:'flex', justifyContent:'space-between', alignItems:'center', color:'var(--text)', borderRadius:6,
-                    transition:'background 0.1s',
+                    padding:'6px 10px', cursor:'pointer', fontSize:10, borderBottom:'1px solid #27272a',
+                    display:'flex', justifyContent:'space-between', alignItems:'center', color:'#fff', borderRadius:6,
                   }}>
                     <div style={{ display:'flex', alignItems:'center', gap:6 }}>
                       <span style={{ fontSize:12 }}>{CAT_MAP_EMOJI[f.category] || '📦'}</span>
                       <span style={{ fontWeight:500 }}>{f.name}</span>
                     </div>
-                    <div style={{ display:'flex', gap:3, fontSize:8, color:'rgba(255,255,255,0.3)' }}>
+                    <div style={{ display:'flex', gap:3, fontSize:8, color:'rgba(255,255,255,0.4)' }}>
                       <span style={{ color:'#00e68a', fontWeight:700 }}>{f.kcal}</span>
                       <span style={{ color:'#3b82f6' }}>{f.protein}</span>
                       <span style={{ color:'#f59e0b' }}>{f.fat}</span>
@@ -235,46 +220,43 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
                 ))}
               </div>
             )}
-            {/* Meal type pills */}
             <div style={{ display:'flex', gap:2, flexWrap:'wrap', marginBottom:4 }}>
               {allMealTypes.slice(0, 8).map(mt => (
                 <button key={mt} onClick={() => setMealType(mealType === mt ? '' : mt)} style={{
                   padding:'3px 8px', borderRadius:6, fontSize:8, cursor:'pointer',
-                  background: mealType === mt ? 'rgba(0,230,138,0.15)' : 'rgba(255,255,255,0.03)',
-                  border: mealType === mt ? '1px solid #00e68a' : '1px solid rgba(255,255,255,0.06)',
+                  background: mealType === mt ? 'rgba(0,230,138,0.2)' : '#202023',
+                  border: mealType === mt ? '1px solid #00e68a' : '1px solid #27272a',
                   color: mealType === mt ? '#00e68a' : 'rgba(255,255,255,0.5)', fontWeight: mealType === mt ? 600 : 400,
                 }}>{mt}</button>
               ))}
-              <button onClick={() => setShowCustomMeal(!showCustomMeal)} style={{ padding:'3px 8px', borderRadius:6, fontSize:8, cursor:'pointer', background:'rgba(139,92,246,0.08)', border:'1px solid rgba(139,92,246,0.2)', color:'#8b5cf6' }}>+</button>
+              <button onClick={() => setShowCustomMeal(!showCustomMeal)} style={{ padding:'3px 8px', borderRadius:6, fontSize:8, cursor:'pointer', background:'rgba(139,92,246,0.15)', border:'1px solid rgba(139,92,246,0.3)', color:'#8b5cf6' }}>+</button>
             </div>
             {showCustomMeal && <div style={{ display:'flex', gap:4, marginBottom:6 }}>
-              <input value={customMealInput} onChange={e => setCustomMealInput(e.target.value)} placeholder="Название приёма..." style={{ flex:1, padding:'6px', borderRadius:6, background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.08)', color:'var(--text)', fontSize:9 }} />
-              <button onClick={addCustomMeal} style={{ padding:'6px 12px', borderRadius:6, border:'none', cursor:'pointer', background:'var(--accent)', color:'#000', fontWeight:600, fontSize:9 }}>Добавить</button>
+              <input value={customMealInput} onChange={e => setCustomMealInput(e.target.value)} placeholder="Название приёма..." style={{ flex:1, padding:'6px', borderRadius:6, background:'#202023', border:'1px solid #27272a', color:'#fff', fontSize:9 }} />
+              <button onClick={addCustomMeal} style={{ padding:'6px 12px', borderRadius:6, border:'none', cursor:'pointer', background:'linear-gradient(135deg,#00e68a,#00c8a0)', color:'#000', fontWeight:600, fontSize:9 }}>Добавить</button>
             </div>}
-            {/* Custom food creator */}
-            <button onClick={() => setShowCustomFood(!showCustomFood)} style={{ width:'100%', padding:'6px 10px', borderRadius:8, fontSize:9, cursor:'pointer', background: showCustomFood ? 'rgba(139,92,246,0.12)' : 'rgba(139,92,246,0.06)', border:'1px solid rgba(139,92,246,0.2)', color:'#8b5cf6', marginTop:2 }}>
+            <button onClick={() => setShowCustomFood(!showCustomFood)} style={{ width:'100%', padding:'6px 10px', borderRadius:8, fontSize:9, cursor:'pointer', background: showCustomFood ? 'rgba(139,92,246,0.15)' : '#202023', border:'1px solid rgba(139,92,246,0.3)', color:'#8b5cf6', marginTop:2 }}>
               {showCustomFood ? '✕ Скрыть' : '🍎 Своя еда (ввести вручную)'}
             </button>
             {showCustomFood && (
-              <div style={{ marginTop:4, padding:'8px', background:'rgba(139,92,246,0.04)', borderRadius:8, border:'1px solid rgba(139,92,246,0.1)' }}>
-                <input value={customFoodName} onChange={e => setCustomFoodName(e.target.value)} placeholder="Название" style={{ width:'100%', padding:'5px 8px', borderRadius:6, background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.08)', color:'var(--text)', fontSize:9, marginBottom:4, boxSizing:'border-box' }} />
+              <div style={{ marginTop:4, padding:'8px', background:'#202023', borderRadius:8, border:'1px solid rgba(139,92,246,0.2)' }}>
+                <input value={customFoodName} onChange={e => setCustomFoodName(e.target.value)} placeholder="Название" style={{ width:'100%', padding:'5px 8px', borderRadius:6, background:'#18181b', border:'1px solid #27272a', color:'#fff', fontSize:9, marginBottom:4, boxSizing:'border-box' }} />
                 <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr', gap:3 }}>
                   {[{l:'Ккал',v:customFoodKcal,s:setCustomFoodKcal},{l:'Белки',v:customFoodP,s:setCustomFoodP},{l:'Жиры',v:customFoodF,s:setCustomFoodF},{l:'Угл.',v:customFoodC,s:setCustomFoodC}].map((x,i) => (
-                    <div key={i}><label style={{ fontSize:7, color:'rgba(255,255,255,0.3)' }}>{x.l}</label><input type="number" value={x.v} onChange={e => x.s(e.target.value)} style={{ width:'100%', padding:'4px', borderRadius:4, background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.08)', color:'var(--text)', fontSize:8, boxSizing:'border-box' }} /></div>
+                    <div key={i}><label style={{ fontSize:7, color:'rgba(255,255,255,0.4)' }}>{x.l}</label><input type="number" value={x.v} onChange={e => x.s(e.target.value)} style={{ width:'100%', padding:'4px', borderRadius:4, background:'#18181b', border:'1px solid #27272a', color:'#fff', fontSize:8, boxSizing:'border-box' }} /></div>
                   ))}
                 </div>
-                <button onClick={addCustomFood} style={{ width:'100%', marginTop:4, padding:'5px', borderRadius:6, border:'none', cursor:'pointer', background:'var(--accent)', color:'#000', fontWeight:600, fontSize:9 }}>+ Добавить</button>
+                <button onClick={addCustomFood} style={{ width:'100%', marginTop:4, padding:'5px', borderRadius:6, border:'none', cursor:'pointer', background:'linear-gradient(135deg,#00e68a,#00c8a0)', color:'#000', fontWeight:600, fontSize:9 }}>+ Добавить</button>
               </div>
             )}
           </div>
 
-          {/* Favorites */}
           {favoriteFoods.length > 0 && (
-            <div style={{ padding:'10px 14px', borderRadius:16, background:'linear-gradient(135deg,rgba(255,255,255,0.08),rgba(255,255,255,0.02))', backdropFilter:'blur(24px)', WebkitBackdropFilter:'blur(24px)', border:'1px solid rgba(255,255,255,0.06)' }}>
-              <div style={{ fontSize:9, color:'rgba(255,255,255,0.35)', marginBottom:4 }}>⭐ Избранное</div>
+            <div style={{ padding:'10px 14px', borderRadius:16, background:'#18181b', border:'1px solid #27272a' }}>
+              <div style={{ fontSize:9, color:'rgba(255,255,255,0.4)', marginBottom:4 }}>⭐ Избранное</div>
               <div style={{ display:'flex', flexWrap:'wrap', gap:2 }}>
                 {favoriteFoods.slice(0,8).map(f => (
-                  <button key={f.id} onClick={() => addFoodFromDB(f)} style={{ padding:'4px 10px', borderRadius:8, fontSize:8, cursor:'pointer', background:'rgba(139,92,246,0.08)', border:'1px solid rgba(139,92,246,0.2)', color:'#8b5cf6', whiteSpace:'nowrap' }}>
+                  <button key={f.id} onClick={() => addFoodFromDB(f)} style={{ padding:'4px 10px', borderRadius:8, fontSize:8, cursor:'pointer', background:'rgba(139,92,246,0.15)', border:'1px solid rgba(139,92,246,0.3)', color:'#8b5cf6', whiteSpace:'nowrap' }}>
                     {CAT_MAP_EMOJI[f.category] || ''} {f.name.slice(0,14)}
                   </button>
                 ))}
@@ -282,73 +264,68 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
             </div>
           )}
 
-          {/* Barcode + OCR */}
           <div style={{ display:'flex', gap:3, flexWrap:'wrap' }}>
-            <button onClick={() => setShowBarcode(!showBarcode)} style={{ flex:1, padding:'7px 10px', borderRadius:8, fontSize:9, cursor:'pointer', background: showBarcode ? 'rgba(0,230,138,0.12)' : 'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', color:'var(--text)', minWidth:80 }}>📱 Штрих-код</button>
-            <button onClick={() => ocrFileRef.current?.click()} disabled={ocrFileLoading} style={{ flex:1, padding:'7px 10px', borderRadius:8, fontSize:9, cursor:'pointer', background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', color:'var(--text)', opacity: ocrFileLoading ? 0.5 : 1, minWidth:80 }}>{ocrFileLoading ? '⏳' : '📁 Файл'}</button>
-            <button onClick={() => ocrCameraRef.current?.click()} style={{ flex:1, padding:'7px 10px', borderRadius:8, fontSize:9, cursor:'pointer', background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', color:'var(--text)', minWidth:80 }}>📸 Скан</button>
-            <button onClick={() => setShowOCR(!showOCR)} style={{ flex:1, padding:'7px 10px', borderRadius:8, fontSize:9, cursor:'pointer', background: showOCR ? 'rgba(0,230,138,0.12)' : 'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', color:'var(--text)', minWidth:80 }}>📋 OCR</button>
+            <button onClick={() => setShowBarcode(!showBarcode)} style={{ flex:1, padding:'7px 10px', borderRadius:8, fontSize:9, cursor:'pointer', background: showBarcode ? 'rgba(0,230,138,0.15)' : '#202023', border:'1px solid #27272a', color:'#fff', minWidth:80 }}>📱 Штрих-код</button>
+            <button onClick={() => ocrFileRef.current?.click()} disabled={ocrFileLoading} style={{ flex:1, padding:'7px 10px', borderRadius:8, fontSize:9, cursor:'pointer', background:'#202023', border:'1px solid #27272a', color:'#fff', opacity: ocrFileLoading ? 0.5 : 1, minWidth:80 }}>{ocrFileLoading ? '⏳' : '📁 Файл'}</button>
+            <button onClick={() => ocrCameraRef.current?.click()} style={{ flex:1, padding:'7px 10px', borderRadius:8, fontSize:9, cursor:'pointer', background:'#202023', border:'1px solid #27272a', color:'#fff', minWidth:80 }}>📸 Скан</button>
+            <button onClick={() => setShowOCR(!showOCR)} style={{ flex:1, padding:'7px 10px', borderRadius:8, fontSize:9, cursor:'pointer', background: showOCR ? 'rgba(0,230,138,0.15)' : '#202023', border:'1px solid #27272a', color:'#fff', minWidth:80 }}>📋 OCR</button>
           </div>
           <input ref={ocrFileRef} type="file" accept=".pdf,.png,.jpg,.jpeg,.webp,.txt" style={{ display:'none' }} onChange={e => { const f = e.target.files?.[0]; if (f) handleOcrFileUpload(f); }} />
           <input ref={ocrCameraRef} type="file" accept="image/*" capture="environment" style={{ display:'none' }} onChange={e => { const f = e.target.files?.[0]; if (f) handleOcrFileUpload(f); }} />
           {showBarcode && <BarcodeScanner onProductFound={handleBarcodeProduct} onClose={() => setShowBarcode(false)} />}
 
           {showOCR && (
-            <div style={{ padding:14, borderRadius:16, background:'linear-gradient(135deg,rgba(255,255,255,0.08),rgba(255,255,255,0.02))', backdropFilter:'blur(24px)', WebkitBackdropFilter:'blur(24px)', border:'1px solid rgba(255,255,255,0.06)' }}>
-              <div style={{ fontSize:9, color:'rgba(255,255,255,0.3)', marginBottom:4 }}>Вставьте текст из FatSecret / MyFitnessPal:</div>
+            <div style={{ padding:14, borderRadius:16, background:'#18181b', border:'1px solid #27272a' }}>
+              <div style={{ fontSize:9, color:'rgba(255,255,255,0.4)', marginBottom:4 }}>Вставьте текст из FatSecret / MyFitnessPal:</div>
               <textarea value={ocrText} onChange={e => setOcrText(e.target.value)} placeholder="Название 100г 250 ккал Б:15 Ж:10 У:20 ..."
-                style={{ width:'100%', minHeight:70, padding:8, borderRadius:8, border:'1px solid rgba(255,255,255,0.08)', background:'rgba(255,255,255,0.03)', color:'inherit', fontSize:11, resize:'vertical', boxSizing:'border-box', marginBottom:6 }} />
-              <button onClick={handleOCR} style={{ padding:'7px 14px', borderRadius:8, border:'none', background:'#00e68a', color:'#000', fontWeight:600, fontSize:10, cursor:'pointer' }}>Распознать</button>
+                style={{ width:'100%', minHeight:70, padding:8, borderRadius:8, border:'1px solid #27272a', background:'#202023', color:'#fff', fontSize:11, resize:'vertical', boxSizing:'border-box', marginBottom:6 }} />
+              <button onClick={handleOCR} style={{ padding:'7px 14px', borderRadius:8, border:'none', background:'linear-gradient(135deg,#00e68a,#00c8a0)', color:'#000', fontWeight:600, fontSize:10, cursor:'pointer' }}>Распознать</button>
               {ocrError && <div style={{ color:'#ef4444', fontSize:9, marginTop:4 }}>{ocrError}</div>}
             </div>
           )}
 
-          {/* Parsed items quick-save */}
           {parsedItems.length > 0 && (
-            <div style={{ padding:14, borderRadius:16, background:'linear-gradient(135deg,rgba(0,230,138,0.06),rgba(0,200,160,0.02))', backdropFilter:'blur(24px)', WebkitBackdropFilter:'blur(24px)', border:'1px solid rgba(0,230,138,0.08)' }}>
+            <div style={{ padding:14, borderRadius:16, background:'rgba(0,230,138,0.06)', border:'1px solid rgba(0,230,138,0.2)' }}>
               <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:6 }}>
                 <span style={{ fontSize:10, color:'#00e68a', fontWeight:600 }}>📋 На очереди ({parsedItems.length})</span>
-                <span style={{ fontSize:9, color:'rgba(255,255,255,0.3)' }}>{mealType || 'Приём пищи'}</span>
+                <span style={{ fontSize:9, color:'rgba(255,255,255,0.4)' }}>{mealType || 'Приём пищи'}</span>
               </div>
               {parsedItems.map((item,i) => (
-                <div key={i} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'4px 8px', borderRadius:8, background:'rgba(255,255,255,0.02)', marginBottom:2 }}>
+                <div key={i} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'4px 8px', borderRadius:8, background:'#202023', marginBottom:2 }}>
                   <div style={{ display:'flex', alignItems:'center', gap:6, flex:1 }}>
-                    <span style={{ fontSize:10, fontWeight:500 }}>{item.name}</span>
+                    <span style={{ fontSize:10, fontWeight:500, color:'#fff' }}>{item.name}</span>
                     <input type="number" value={item.qty || 100} onChange={e => { const v = +e.target.value || 0; setParsedItems(prev => prev.map((x,j) => j===i ? {...x, qty: v} : x)); }}
-                      style={{ width:45, padding:'2px 4px', borderRadius:4, background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.08)', color:'var(--text)', fontSize:8, textAlign:'center' }} />
-                    <span style={{ fontSize:7, color:'rgba(255,255,255,0.2)' }}>г</span>
+                      style={{ width:45, padding:'2px 4px', borderRadius:4, background:'#18181b', border:'1px solid #27272a', color:'#fff', fontSize:8, textAlign:'center' }} />
+                    <span style={{ fontSize:7, color:'rgba(255,255,255,0.3)' }}>г</span>
                   </div>
-                  <div style={{ display:'flex', gap:3, fontSize:8, color:'rgba(255,255,255,0.3)' }}>
+                  <div style={{ display:'flex', gap:3, fontSize:8, color:'rgba(255,255,255,0.4)' }}>
                     <span style={{ color:'#00e68a' }}>{Math.round(item.kcal * (item.qty||100) / 100)}</span>
-                    <button onClick={() => setParsedItems(prev => prev.filter((_,j) => j !== i))} style={{ padding:'1px 5px', borderRadius:4, border:'none', cursor:'pointer', background:'rgba(239,68,68,0.08)', color:'#ef4444', fontSize:8, lineHeight:1 }}>✕</button>
+                    <button onClick={() => setParsedItems(prev => prev.filter((_,j) => j !== i))} style={{ padding:'1px 5px', borderRadius:4, border:'none', cursor:'pointer', background:'rgba(239,68,68,0.15)', color:'#ef4444', fontSize:8, lineHeight:1 }}>✕</button>
                   </div>
                 </div>
               ))}
-              <button onClick={() => saveItemsToDiary(parsedItems)} style={{ width:'100%', marginTop:6, padding:8, borderRadius:8, border:'none', cursor:'pointer', background:'var(--accent)', color:'#000', fontWeight:600, fontSize:10 }}>💾 Сохранить {parsedItems.length} позиций</button>
+              <button onClick={() => saveItemsToDiary(parsedItems)} style={{ width:'100%', marginTop:6, padding:8, borderRadius:8, border:'none', cursor:'pointer', background:'linear-gradient(135deg,#00e68a,#00c8a0)', color:'#000', fontWeight:600, fontSize:10 }}>💾 Сохранить {parsedItems.length} позиций</button>
             </div>
           )}
         </>
       )}
 
-      {/* ─── DAY TAB ─── */}
       {tab === 'day' && (
         <>
-          {/* Day meals */}
-          <div style={{ padding:14, borderRadius:16, background:'linear-gradient(135deg,rgba(255,255,255,0.08),rgba(255,255,255,0.02))', backdropFilter:'blur(24px)', WebkitBackdropFilter:'blur(24px)', border:'1px solid rgba(255,255,255,0.06)' }}>
+          <div style={{ padding:14, borderRadius:16, background:'#18181b', border:'1px solid #27272a' }}>
             <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
-              <div style={{ fontSize:12, fontWeight:600, color:'rgba(255,255,255,0.7)' }}>📋 {selectedDate}</div>
+              <div style={{ fontSize:12, fontWeight:600, color:'#fff' }}>📋 {selectedDate}</div>
               <div style={{ display:'flex', alignItems:'center', gap:6 }}>
                 {Object.keys(dayMeals).length > 0 && (
-                  <button onClick={clearDay} style={{ padding:'4px 10px', borderRadius:6, border:'none', cursor:'pointer', background:'rgba(239,68,68,0.1)', color:'#ef4444', fontSize:8, fontWeight:600 }}>✕ Очистить</button>
+                  <button onClick={clearDay} style={{ padding:'4px 10px', borderRadius:6, border:'none', cursor:'pointer', background:'rgba(239,68,68,0.15)', color:'#ef4444', fontSize:8, fontWeight:600 }}>✕ Очистить</button>
                 )}
-                <span style={{ fontSize:9, color:'rgba(255,255,255,0.3)' }}>{Object.keys(dayMeals).length} приёмов</span>
+                <span style={{ fontSize:9, color:'rgba(255,255,255,0.4)' }}>{Object.keys(dayMeals).length} приёмов</span>
               </div>
             </div>
 
-            {/* Macro progress */}
             {Object.keys(dayMeals).length > 0 && (
-              <div style={{ marginBottom:8, padding:'8px 10px', borderRadius:10, background:'rgba(0,230,138,0.03)', border:'1px solid rgba(0,230,138,0.08)' }}>
-                <div style={{ fontSize:8, color:'rgba(255,255,255,0.3)', marginBottom:4 }}>🎯 Прогресс за день</div>
+              <div style={{ marginBottom:8, padding:'8px 10px', borderRadius:10, background:'rgba(0,230,138,0.06)', border:'1px solid rgba(0,230,138,0.15)' }}>
+                <div style={{ fontSize:8, color:'rgba(255,255,255,0.4)', marginBottom:4 }}>🎯 Прогресс за день</div>
                 {[
                   { l:'Ккал', v:dayTotals.kcal, t:targets?.kcal || 2500, c:'#00e68a' },
                   { l:'Белки', v:dayTotals.p, t:targets?.protein || 160, c:'#3b82f6' },
@@ -359,9 +336,9 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
                   return <div key={m.l} style={{ marginBottom:3 }}>
                     <div style={{ display:'flex', justifyContent:'space-between', fontSize:8, marginBottom:1 }}>
                       <span style={{ color:m.c }}>{m.l}</span>
-                      <span style={{ color:'rgba(255,255,255,0.4)' }}>{Math.round(m.v)} / {m.t} <span style={{ fontWeight:700, color:m.c }}>{pct}%</span></span>
+                      <span style={{ color:'rgba(255,255,255,0.5)' }}>{Math.round(m.v)} / {m.t} <span style={{ fontWeight:700, color:m.c }}>{pct}%</span></span>
                     </div>
-                    <div style={{ height:6, borderRadius:3, background:'rgba(255,255,255,0.04)', overflow:'hidden' }}>
+                    <div style={{ height:6, borderRadius:3, background:'#202023', overflow:'hidden' }}>
                       <div style={{ height:'100%', width:`${pct}%`, borderRadius:3, background:m.c, transition:'width 0.4s cubic-bezier(0.22,1,0.36,1)' }} />
                     </div>
                   </div>;
@@ -370,7 +347,7 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
             )}
 
             {Object.keys(dayMeals).length === 0 ? (
-              <div style={{ textAlign:'center', padding:20, color:'rgba(255,255,255,0.2)', fontSize:10 }}>
+              <div style={{ textAlign:'center', padding:20, color:'rgba(255,255,255,0.3)', fontSize:10 }}>
                 Нет записей. Переключитесь на «➕ Добавить», чтобы внести продукты.
               </div>
             ) : (
@@ -380,26 +357,26 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
                 const mealF = items.reduce((s:number,i:any)=>s+(i.f||0),0);
                 const mealC = items.reduce((s:number,i:any)=>s+(i.c||0),0);
                 return <div key={meal} style={{ marginBottom:6 }}>
-                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'5px 8px', borderRadius:8, background:'rgba(0,230,138,0.04)', border:'1px solid rgba(0,230,138,0.06)', marginBottom:3 }}>
+                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'5px 8px', borderRadius:8, background:'rgba(0,230,138,0.08)', border:'1px solid rgba(0,230,138,0.15)', marginBottom:3 }}>
                     <div style={{ display:'flex', alignItems:'center', gap:4 }}>
-                      <span style={{ fontWeight:600, fontSize:10 }}>{meal}</span>
-                      <button onClick={() => copyMeal(meal)} style={{ padding:'2px 6px', borderRadius:4, border:'none', cursor:'pointer', background:'rgba(139,92,246,0.08)', color:'#8b5cf6', fontSize:7 }} title="Копировать приём">📋</button>
+                      <span style={{ fontWeight:600, fontSize:10, color:'#00e68a' }}>{meal}</span>
+                      <button onClick={() => copyMeal(meal)} style={{ padding:'2px 6px', borderRadius:4, border:'none', cursor:'pointer', background:'rgba(139,92,246,0.15)', color:'#8b5cf6', fontSize:7 }} title="Копировать приём">📋</button>
                     </div>
                     <div style={{ display:'flex', alignItems:'center', gap:4, fontSize:8 }}>
-                      <span style={{ color:'rgba(255,255,255,0.2)' }}>Б{Math.round(mealP)} Ж{Math.round(mealF)} У{Math.round(mealC)}</span>
+                      <span style={{ color:'rgba(255,255,255,0.4)' }}>Б{Math.round(mealP)} Ж{Math.round(mealF)} У{Math.round(mealC)}</span>
                       <span style={{ color:'#00e68a', fontWeight:700, fontSize:10 }}>{Math.round(mealKcal)}</span>
                     </div>
                   </div>
                   {items.map((item:any, idx:number) => (
-                    <div key={idx} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'3px 8px', fontSize:9, color:'rgba(255,255,255,0.4)', borderRadius:6 }}>
+                    <div key={idx} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'3px 8px', fontSize:9, color:'rgba(255,255,255,0.5)', borderRadius:6 }}>
                       <div style={{ display:'flex', alignItems:'center', gap:4, flex:1 }}>
                         <span>{item.name}</span>
-                        <span style={{ fontSize:7, color:'rgba(255,255,255,0.15)' }}>{item.qty || '100 г'}</span>
+                        <span style={{ fontSize:7, color:'rgba(255,255,255,0.25)' }}>{item.qty || '100 г'}</span>
                       </div>
                       <div style={{ display:'flex', alignItems:'center', gap:3 }}>
-                        <span style={{ fontSize:8, color:'rgba(255,255,255,0.25)' }}>{Math.round(item.kcal||0)} Б{item.p||0} Ж{item.f||0} У{item.c||0}</span>
-                        <button onClick={() => openEdit(meal, idx, item)} style={{ padding:'2px 5px', borderRadius:4, border:'none', cursor:'pointer', background:'rgba(59,130,246,0.08)', color:'#3b82f6', fontSize:8, lineHeight:1 }} title="Изменить количество">✎</button>
-                        <button onClick={() => deleteItem(meal, idx)} style={{ padding:'2px 5px', borderRadius:4, border:'none', cursor:'pointer', background:'rgba(239,68,68,0.08)', color:'#ef4444', fontSize:8, lineHeight:1 }}>✕</button>
+                        <span style={{ fontSize:8, color:'rgba(255,255,255,0.35)' }}>{Math.round(item.kcal||0)} Б{item.p||0} Ж{item.f||0} У{item.c||0}</span>
+                        <button onClick={() => openEdit(meal, idx, item)} style={{ padding:'2px 5px', borderRadius:4, border:'none', cursor:'pointer', background:'rgba(59,130,246,0.15)', color:'#3b82f6', fontSize:8, lineHeight:1 }} title="Изменить количество">✎</button>
+                        <button onClick={() => deleteItem(meal, idx)} style={{ padding:'2px 5px', borderRadius:4, border:'none', cursor:'pointer', background:'rgba(239,68,68,0.15)', color:'#ef4444', fontSize:8, lineHeight:1 }}>✕</button>
                       </div>
                     </div>
                   ))}
@@ -408,28 +385,27 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
             )}
           </div>
 
-          {/* Edit modal */}
           {editItem && (
-            <div style={{ position:'fixed', inset:0, zIndex:100, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(0,0,0,0.6)', backdropFilter:'blur(8px)', padding:20 }}
+            <div style={{ position:'fixed', inset:0, zIndex:100, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(0,0,0,0.6)', padding:20 }}
               onClick={() => setEditItem(null)}>
-              <div onClick={e => e.stopPropagation()} style={{ width:'100%', maxWidth:320, padding:20, borderRadius:20, background:'linear-gradient(135deg,rgba(30,32,40,0.98),rgba(20,22,30,0.98))', backdropFilter:'blur(30px)', border:'1px solid rgba(255,255,255,0.08)' }}>
-                <div style={{ fontSize:13, fontWeight:700, marginBottom:4 }}>✎ {editItem.item.name}</div>
-                <div style={{ fontSize:9, color:'rgba(255,255,255,0.3)', marginBottom:8 }}>Изменить количество</div>
+              <div onClick={e => e.stopPropagation()} style={{ width:'100%', maxWidth:320, padding:20, borderRadius:20, background:'#18181b', border:'1px solid #27272a' }}>
+                <div style={{ fontSize:13, fontWeight:700, color:'#fff', marginBottom:4 }}>✎ {editItem.item.name}</div>
+                <div style={{ fontSize:9, color:'rgba(255,255,255,0.4)', marginBottom:8 }}>Изменить количество</div>
                 <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:8 }}>
-                  <button onClick={() => setEditQty(Math.max(10, editQty - 10))} style={{ width:36, height:36, borderRadius:10, border:'1px solid rgba(255,255,255,0.08)', background:'rgba(255,255,255,0.03)', color:'var(--text)', cursor:'pointer', fontSize:16, fontWeight:700, display:'flex', alignItems:'center', justifyContent:'center' }}>−</button>
+                  <button onClick={() => setEditQty(Math.max(10, editQty - 10))} style={{ width:36, height:36, borderRadius:10, border:'1px solid #27272a', background:'#202023', color:'#fff', cursor:'pointer', fontSize:16, fontWeight:700, display:'flex', alignItems:'center', justifyContent:'center' }}>−</button>
                   <div style={{ flex:1, textAlign:'center' }}>
-                    <input type="number" value={editQty} onChange={e => setEditQty(+e.target.value || 0)} style={{ width:70, padding:'6px', borderRadius:8, background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.08)', color:'var(--text)', fontSize:16, fontWeight:700, textAlign:'center', outline:'none' }} />
-                    <div style={{ fontSize:8, color:'rgba(255,255,255,0.3)', marginTop:2 }}>грамм</div>
+                    <input type="number" value={editQty} onChange={e => setEditQty(+e.target.value || 0)} style={{ width:70, padding:'6px', borderRadius:8, background:'#202023', border:'1px solid #27272a', color:'#fff', fontSize:16, fontWeight:700, textAlign:'center', outline:'none' }} />
+                    <div style={{ fontSize:8, color:'rgba(255,255,255,0.4)', marginTop:2 }}>грамм</div>
                   </div>
-                  <button onClick={() => setEditQty(Math.min(1000, editQty + 10))} style={{ width:36, height:36, borderRadius:10, border:'1px solid rgba(255,255,255,0.08)', background:'rgba(255,255,255,0.03)', color:'var(--text)', cursor:'pointer', fontSize:16, fontWeight:700, display:'flex', alignItems:'center', justifyContent:'center' }}>+</button>
+                  <button onClick={() => setEditQty(Math.min(1000, editQty + 10))} style={{ width:36, height:36, borderRadius:10, border:'1px solid #27272a', background:'#202023', color:'#fff', cursor:'pointer', fontSize:16, fontWeight:700, display:'flex', alignItems:'center', justifyContent:'center' }}>+</button>
                 </div>
                 <div style={{ display:'flex', gap:4, justifyContent:'center', marginBottom:8 }}>
-                  {[50,100,150,200,300].map(v => <button key={v} onClick={() => setEditQty(v)} style={{ padding:'3px 8px', borderRadius:6, border:'1px solid rgba(255,255,255,0.06)', background: editQty===v ? 'rgba(0,230,138,0.12)' : 'rgba(255,255,255,0.02)', color: editQty===v ? '#00e68a' : 'rgba(255,255,255,0.4)', cursor:'pointer', fontSize:8 }}>{v}г</button>)}
+                  {[50,100,150,200,300].map(v => <button key={v} onClick={() => setEditQty(v)} style={{ padding:'3px 8px', borderRadius:6, border:'1px solid #27272a', background: editQty===v ? 'rgba(0,230,138,0.2)' : '#202023', color: editQty===v ? '#00e68a' : 'rgba(255,255,255,0.5)', cursor:'pointer', fontSize:8 }}>{v}г</button>)}
                 </div>
-                <div style={{ fontSize:9, color:'rgba(255,255,255,0.3)', marginBottom:8, textAlign:'center' }}>
+                <div style={{ fontSize:9, color:'rgba(255,255,255,0.4)', marginBottom:8, textAlign:'center' }}>
                   → {Math.round(editQty * (editItem.item.kcal || 0) / 100)} ккал · {Math.round(((editItem.item.p||0) * editQty / 100) * 10)/10}г Б
                 </div>
-                <button onClick={saveEdit} style={{ width:'100%', padding:'8px', borderRadius:10, border:'none', cursor:'pointer', background:'var(--accent)', color:'#000', fontWeight:700, fontSize:11 }}>💾 Сохранить</button>
+                <button onClick={saveEdit} style={{ width:'100%', padding:'8px', borderRadius:10, border:'none', cursor:'pointer', background:'linear-gradient(135deg,#00e68a,#00c8a0)', color:'#000', fontWeight:700, fontSize:11 }}>💾 Сохранить</button>
               </div>
             </div>
           )}

@@ -173,13 +173,13 @@ export const PharmaCourseScreen: React.FC = () => {
     <div style={{ padding: '0 0 16px' }}>
       <style>{`
         @keyframes spin { to { transform: rotate(360deg); } }
-        .pc-card { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; backdrop-filter: blur(8px); transition: all 0.2s; }
-        .pc-card:hover { border-color: rgba(255,255,255,0.12); }
+        .pc-card { background: #18181b; border: 1px solid #27272a; border-radius: 12px; transition: all 0.2s; }
+        .pc-card:hover { border-color: #3f3f46; }
         .pc-btn { cursor: pointer; transition: all 0.15s; user-select: none; }
-        .pc-btn:active { transform: scale(0.97); }
+        .pc-btn:active { background: rgba(0,230,138,0.15) !important; transform: scale(0.97); }
         .pc-sub-btn { cursor: pointer; transition: all 0.15s; }
-        .pc-sub-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 16px rgba(0,0,0,0.3); }
-        .pc-sub-btn:active { transform: scale(0.96); }
+        .pc-sub-btn:hover { transform: translateY(-2px); border-color: rgba(0,230,138,0.3) !important; }
+        .pc-sub-btn:active { background: rgba(0,230,138,0.08) !important; transform: scale(0.96); }
         .pc-input { transition: border-color 0.15s; }
         .pc-input:focus { border-color: #00e68a !important; outline: none; }
       `}</style>
@@ -377,8 +377,7 @@ export const PharmaCourseScreen: React.FC = () => {
       {showPicker && (
         <div style={{
           position: 'fixed', inset: 0, zIndex: 200,
-          background: 'rgba(0,0,0,0.7)',
-          backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)',
+          background: 'rgba(0,0,0,0.8)',
           display: 'flex', flexDirection: 'column', justifyContent: 'center',
           alignItems: 'center',
         }} onClick={() => setShowPicker(false)}>
@@ -415,7 +414,7 @@ export const PharmaCourseScreen: React.FC = () => {
               padding: '8px 10px 6px',
               display: 'flex', gap: 5, flexWrap: 'wrap',
               borderBottom: '1px solid rgba(255,255,255,0.06)',
-              maxHeight: 100, overflowY: 'auto',
+              maxHeight: 300, overflowY: 'auto',
             }}>
               {Object.entries(CLASS_LABELS).map(([cls, label]) => {
                 const hasSubs = SUBSTANCES_BY_CLASS[cls]?.length > 0;
@@ -424,15 +423,15 @@ export const PharmaCourseScreen: React.FC = () => {
                 const color = CLASS_COLORS[cls] || '#00e68a';
                 return (
                   <button key={cls} onClick={() => setPickerClass(cls)} className="pc-btn" style={{
-                    background: isActive ? `${color}18` : 'rgba(255,255,255,0.04)',
-                    border: `1px solid ${isActive ? `${color}50` : 'rgba(255,255,255,0.08)'}`,
-                    color: isActive ? color : 'rgba(255,255,255,0.5)',
+                    background: isActive ? `${color}30` : '#202023',
+                    border: `1px solid ${isActive ? color : '#3f3f46'}`,
+                    color: isActive ? color : 'rgba(255,255,255,0.6)',
                     borderRadius: 20, padding: '6px 12px', fontSize: 11,
                     fontWeight: isActive ? 700 : 500,
                     whiteSpace: 'nowrap',
                   }}>
                     {label}
-                    <span style={{ marginLeft: 4, fontSize: 9, opacity: 0.5 }}>{SUBSTANCES_BY_CLASS[cls]?.length || 0}</span>
+                    <span style={{ marginLeft: 4, fontSize: 9, opacity: 0.6 }}>{SUBSTANCES_BY_CLASS[cls]?.length || 0}</span>
                   </button>
                 );
               })}
@@ -451,23 +450,22 @@ export const PharmaCourseScreen: React.FC = () => {
                       setDose(String(defDose));
                       addEntry(sub.id);
                     }} className="pc-sub-btn" style={{
-                      background: 'rgba(255,255,255,0.03)',
-                      border: `1px solid rgba(255,255,255,0.06)`,
+                      background: '#202023',
+                      border: `1px solid #3f3f46`,
                       borderRadius: 10, padding: '10px 8px',
                       cursor: 'pointer', textAlign: 'center',
                       position: 'relative', overflow: 'hidden',
                     }}>
-                      {/* Top color bar */}
-                      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: color }} />
+                      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: color }} />
                       <div style={{ fontWeight: 700, fontSize: 11, color, marginBottom: 3, lineHeight: 1.3 }}>{sub.name}</div>
-                      <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)', marginBottom: 2 }}>
+                      <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)', marginBottom: 2 }}>
                         {hl ? (hl >= 168 ? `T½ ${(hl / 168).toFixed(1)} нед` : `T½ ${(hl / 24).toFixed(1)} дн`) : ''}
                         {sub.dosageRange ? ` · ${sub.dosageRange.min}–${sub.dosageRange.max} ${sub.dosageRange.unit}` : ''}
                       </div>
                       <div style={{
                         display: 'inline-flex', alignItems: 'center', gap: 3,
-                        background: `${color}15`, color, borderRadius: 6,
-                        padding: '2px 8px', fontSize: 9, fontWeight: 600, marginTop: 2,
+                        background: `${color}25`, color, borderRadius: 6,
+                        padding: '3px 10px', fontSize: 10, fontWeight: 700, marginTop: 3,
                       }}>
                         + {defDose} {unit}
                       </div>
@@ -478,38 +476,38 @@ export const PharmaCourseScreen: React.FC = () => {
 
               {/* Custom dose settings */}
               <div style={{
-                background: 'rgba(255,255,255,0.03)', borderRadius: 10, padding: '10px 12px',
-                border: '1px solid rgba(255,255,255,0.06)',
+                background: '#18181b', borderRadius: 10, padding: '10px 12px',
+                border: '1px solid #27272a',
               }}>
-                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', marginBottom: 8, lineHeight: 1.3 }}>
+                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', marginBottom: 8, lineHeight: 1.3 }}>
                   Задайте свою дозировку, затем нажмите на препарат выше:
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
                   <div style={{ display: 'flex', gap: 4 }}>
                     <input type="number" value={dose || ''} onChange={e => setDose(e.target.value)} placeholder="200"
                       className="pc-input" style={{
-                        flex: 2, padding: '7px 8px', background: 'rgba(255,255,255,0.04)',
-                        border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8,
+                        flex: 2, padding: '7px 8px', background: '#202023',
+                        border: '1px solid #3f3f46', borderRadius: 8,
                         color: '#fff', fontSize: 12, boxSizing: 'border-box', minWidth: 0,
                       }} />
                     <select value={unit} onChange={e => setUnit(e.target.value)}
                       style={{
-                        flex: 1, padding: '7px 6px', background: 'rgba(255,255,255,0.04)',
-                        border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8,
+                        flex: 1, padding: '7px 6px', background: '#202023',
+                        border: '1px solid #3f3f46', borderRadius: 8,
                         color: '#fff', fontSize: 10, boxSizing: 'border-box', minWidth: 56,
                       }}>
                       {UNIT_OPTIONS.map(u => <option key={u} value={u}>{u}</option>)}
                     </select>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent:'center', gap:3, flexWrap:'wrap' }}>
-                    <span style={{ fontSize:9, color:'rgba(255,255,255,0.35)', whiteSpace:'nowrap', minWidth:40 }}>Дни:</span>
+                    <span style={{ fontSize:9, color:'rgba(255,255,255,0.5)', whiteSpace:'nowrap', minWidth:40 }}>Дни:</span>
                     {['Пн','Вт','Ср','Чт','Пт','Сб','Вс'].map((day, idx) => (
                       <button key={idx} onClick={() => {
                         setSelectedDays(prev => prev.includes(idx) ? prev.filter(d => d !== idx) : [...prev, idx].sort());
                       }} style={{
                         width:28, height:28, borderRadius:'50%', fontSize:9, fontWeight:600,
-                        cursor:'pointer', border:`1px solid ${selectedDays.includes(idx) ? '#00e68a' : 'rgba(255,255,255,0.15)'}`,
-                        background: selectedDays.includes(idx) ? 'rgba(0,230,138,0.2)' : 'rgba(255,255,255,0.04)',
+                        cursor:'pointer', border:`1px solid ${selectedDays.includes(idx) ? '#00e68a' : '#3f3f46'}`,
+                        background: selectedDays.includes(idx) ? 'rgba(0,230,138,0.25)' : '#202023',
                         color: selectedDays.includes(idx) ? '#00e68a' : 'rgba(255,255,255,0.5)',
                         display:'flex', alignItems:'center', justifyContent:'center',
                       }}>{day}</button>
@@ -518,20 +516,20 @@ export const PharmaCourseScreen: React.FC = () => {
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, marginTop: 6 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                    <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', whiteSpace: 'nowrap' }}>c нед</span>
+                    <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', whiteSpace: 'nowrap' }}>c нед</span>
                     <input type="number" value={startWeek} onChange={e => setStartWeek(parseFloat(e.target.value) || 0 || 0)} min={0} placeholder="0"
                       className="pc-input" style={{
-                        flex: 1, padding: '7px 8px', background: 'rgba(255,255,255,0.04)',
-                        border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8,
+                        flex: 1, padding: '7px 8px', background: '#202023',
+                        border: '1px solid #3f3f46', borderRadius: 8,
                         color: '#fff', fontSize: 12, boxSizing: 'border-box', minWidth: 0, width: '100%',
                       }} />
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                    <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', whiteSpace: 'nowrap' }}>по нед</span>
+                    <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', whiteSpace: 'nowrap' }}>по нед</span>
                     <input type="number" value={endWeek} onChange={e => setEndWeek(parseFloat(e.target.value) || 0 || 12)} min={1} placeholder="12"
                       className="pc-input" style={{
-                        flex: 1, padding: '7px 8px', background: 'rgba(255,255,255,0.04)',
-                        border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8,
+                        flex: 1, padding: '7px 8px', background: '#202023',
+                        border: '1px solid #3f3f46', borderRadius: 8,
                         color: '#fff', fontSize: 12, boxSizing: 'border-box', minWidth: 0, width: '100%',
                       }} />
                   </div>

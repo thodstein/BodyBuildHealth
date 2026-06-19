@@ -215,7 +215,20 @@ if (shouldApplyPenalty && finalResult.systemBreakdown) {
 - ✅ `npx vite build` ✓
 
 ## Phase 7 (Planned): Remaining Items
-- [ ] Barcode search improvements (Open Food Facts cache) — Phase 3 item 17
+- [x] Barcode search improvements (Open Food Facts cache) — Phase 3 item 17 (fallback APIs, localStorage cache, category detection, batch search)
+
+## Session Summary (Jun 19)
+### Done
+- **Shared utils** (`src/core/nutrition-utils.ts`): `addToCart(item)` object param, `CAT_MAP_LABEL/EMOJI` split
+- **Macro → profile linking**: `NutritionDiary` accepts `targets` prop, `NutritionScreen` computes via `calcNutrition()`
+- **Open Food Facts** (`openfoodfacts.engine.ts`): fallback API chain (ru→world→us), localStorage cache (200 entries, 7d TTL), auto-category detection
+- **SW auto-update**: `reg.update()`, update toast, `controllerchange` → auto-reload
+- **Design overhaul (all screens)**: removed all glass/blur, solid `#18181b`/`#202023`/`#27272a`, white text, green-gradient active vs solid-dark inactive buttons
+- **`NutritionScreen`**: second hero card "Аналитика питания", sticky top-bar, pill tabs redesign
+- **`NutritionDiary`**: full rewrite — no glass, white text, clear active states, solid dark modals
+- **`IndividualPlan`**: `GlassCard`/`PillBtn`/`inputStyle`/`reportPillStyle` — no glass, solid backgrounds
+- **`PharmaCourseScreen`**: drug picker modal — no glass/blur overlay, visible inactive pills (`#202023` + `#3f3f46`), substance cards solid, class selector maxHeight 300 (not 100), visible day buttons
+- `tsc --noEmit` ✓, `vite build` ✓
 
 ## Build Commands
 ```bash
