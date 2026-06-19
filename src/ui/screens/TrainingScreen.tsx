@@ -103,6 +103,7 @@ export const TrainingScreen: React.FC = () => {
   const [fatigue, setFatigue] = useState(Math.round((readiness?.fatigue ?? 30) / 10));
   const [weakPoints, setWeakPoints] = useState<string[]>([]);
   const [myCycleMsg, setMyCycleMsg] = useState('');
+  const [cyclesError, setCyclesError] = useState<string | null>(null);
   const [bodyWeight, setBodyWeight] = useState(80);
   const [sleepHours, setSleepHours] = useState(linked.profile?.settings?.baselineSleepHours ?? 7);
   const [stressLevel, setStressLevel] = useState(linked.profile?.settings?.baselineStressLevel ?? 5);
@@ -194,6 +195,7 @@ export const TrainingScreen: React.FC = () => {
   const [runtimeSetRI, setRuntimeSetRI] = useState(2);
 
   const generatePlan = useCallback((overrideSplitType?: string) => {
+    try {
     const seed = Date.now();
     const jitter = (v: number, range: number) => Math.max(0, Math.min(100, v + (Math.random() - 0.5) * range * 2));
     const input: TrainingInput = {
@@ -223,6 +225,8 @@ export const TrainingScreen: React.FC = () => {
     setMacrocycle(macro);
     setSelectedWeek(1);
     setCurrentMicrocycle(getCurrentWeekPlan(macro, 1));
+    setCyclesError(null);
+    } catch (e) { setCyclesError('Ошибка генерации: ' + String(e)); }
   }, [goal, level, daysPerWeek, recovery, fatigue, weakPoints, splitType, periodizationType, cycleType]);
 
   // Auto-regenerate when days/sparse
@@ -1912,6 +1916,10 @@ export const TrainingScreen: React.FC = () => {
             )}
           </div>
           </>)}
+
+          {/* ═══════ EXERCISE GENERATOR ═══════ */}
+          <ExerciseGenerator />
+
           {/* ═══════ UNIFIED PROGRAM BUILDER ═══════ */}
           <div className="card" style={{ padding: '10px 12px' }}>
             <h3 style={{ margin: '0 0 8px', fontSize: 13 }}>🧬 Конструктор программы</h3>
@@ -2814,11 +2822,30 @@ export const TrainingScreen: React.FC = () => {
                 }}>{c.l}</button>
               ))}
             </div>
+            <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 6, display:'flex', gap:4, flexWrap:'wrap', alignItems:'center' }}>
+              <span>Уровень:</span>
+              {LEVELS.map(l => (
+                <button key={l.value} onClick={() => setLevel(l.value)} style={{
+                  padding: '2px 8px', borderRadius: 4, fontSize: 9, fontWeight: level === l.value ? 700 : 400, cursor:'pointer',
+                  border: level === l.value ? '1px solid var(--accent)' : '1px solid var(--border)',
+                  background: level === l.value ? 'rgba(0,230,138,0.15)' : 'var(--bg-secondary)', color: 'var(--text)',
+                }}>{l.icon} {l.label}</button>
+              ))}
+            </div>
             <button onClick={() => generatePlan()} style={{
               width: '100%', padding: 8, borderRadius: 8, border: 'none', cursor: 'pointer',
               background: 'var(--accent)', color: '#000', fontWeight: 600, fontSize: 12,
             }}>▶ Сгенерировать макроцикл</button>
+            {cyclesError && <div style={{ padding:'6px 10px', borderRadius:6, background:'rgba(239,68,68,0.1)', border:'1px solid rgba(239,68,68,0.3)', color:'#ef4444', fontSize:10, marginTop:6, textAlign:'center' }}>{cyclesError}</div>}
           </div>
+
+          {!macrocycle && !cyclesError && (
+            <div className="card" style={{ textAlign:'center', padding:30 }}>
+              <div style={{ fontSize:28, marginBottom:6 }}>🔄</div>
+              <div style={{ fontSize:13, color:'var(--text-dim)', marginBottom:4 }}>Макроцикл ещё не сгенерирован</div>
+              <div style={{ fontSize:10, color:'var(--text-dim)' }}>Выберите параметры выше и нажмите «Сгенерировать макроцикл»</div>
+            </div>
+          )}
 
           {macrocycle && (
             <>
@@ -3061,9 +3088,9 @@ export const TrainingScreen: React.FC = () => {
       )}
       {/* ═══════════ ANALYTICS TAB ═══════════ */}
       {tab === 'analytics' && <><AnalyticsTab sessions={historyWorkouts} onRefresh={loadDiaryStats} /><StructuredAnalyticsCard sessions={historyWorkouts} /></>}
-      {tab === 'methods' && <MethodsTab linked={linked} trainingOutput={trainingOutput} diaryStats={diaryStats} historyWorkouts={historyWorkouts} goal={goal} level={level} daysPerWeek={daysPerWeek} recovery={recovery} fatigue={fatigue} appliedMethod={appliedMethod} onApplyMethod={(name, category) => { setAppliedMethod(name); const mapped: Record<string,string> = { periodization: name.includes('linear') ? 'linear' : name.includes('undulating')||name.includes('DUP') ? 'undulating' : name.includes('block') ? 'block' : name.includes('conjugate')||name.includes('westside') ? 'conjugate' : 'auto', progression: name.includes('double') ? 'double' : name.includes('step') ? 'step' : name.includes('rest')||name.includes('pause') ? 'rest_pause' : 'auto', technique: name.includes('cluster') ? 'cluster' : name.includes('tempo') ? 'tempo' : name.includes('eccentric') ? 'eccentric' : 'auto', intensity: name.includes('rm')||name.includes('rpe') ? 'rpe_based' : name.includes('helms') ? 'helms' : 'auto', volume: name.includes('gvt')||name.includes('german') ? 'gvt' : name.includes('mev') ? 'mev' : 'auto', frequency: name.includes('high')||name.includes('daily') ? 'high_freq' : 'auto', specialization: name.includes('bro')||name.includes('splits') ? 'bro_split' : 'auto',                     recovery: name.includes('deload') ? 'deload' : 'auto', }; const pt = (mapped[category] || 'auto') as 'linear'|'auto'|'undulating'|'block'; if (pt !== 'auto') setPeriodizationType(pt); setTab('plan'); }} />}
+      {tab === 'methods' && <MethodsTab linked={linked} trainingOutput={trainingOutput} diaryStats={diaryStats} historyWorkouts={historyWorkouts} goal={goal} level={level} daysPerWeek={daysPerWeek} recovery={recovery} fatigue={fatigue} appliedMethod={appliedMethod} onApplyMethod={(name, category) => { setAppliedMethod(name); const mapped: Record<string,string> = { periodization: name.includes('linear') ? 'linear' : name.includes('undulating')||name.includes('DUP') ? 'undulating' : name.includes('block') ? 'block' : name.includes('conjugate')||name.includes('westside') ? 'conjugate' : 'auto', progression: name.includes('double') ? 'double' : name.includes('step') ? 'step' : name.includes('rest')||name.includes('pause') ? 'rest_pause' : 'auto', technique: name.includes('cluster') ? 'cluster' : name.includes('tempo') ? 'tempo' : name.includes('eccentric') ? 'eccentric' : 'auto', intensity: name.includes('rm')||name.includes('rpe') ? 'rpe_based' : name.includes('helms') ? 'helms' : 'auto', volume: name.includes('gvt')||name.includes('german') ? 'gvt' : name.includes('mev') ? 'mev' : 'auto', frequency: name.includes('high')||name.includes('daily') ? 'high_freq' : 'auto', specialization: name.includes('bro')||name.includes('splits') ? 'bro_split' : 'auto',                     recovery: name.includes('deload') ? 'deload' : 'auto', }; const pt = (mapped[category] || 'auto') as 'linear'|'auto'|'undulating'|'block'; if (pt !== 'auto') { setPeriodizationType(pt); setTimeout(generatePlan, 100); } setTab('plan'); }} />}
       {tab === 'visual' && <VisualTab sessions={historyWorkouts} />}
-      {tab === 'programs' && <ProgramsTab selectedProgram={selectedProgram} setSelectedProgram={setSelectedProgram} />}
+      {tab === 'programs' && <ProgramsTab selectedProgram={selectedProgram} setSelectedProgram={setSelectedProgram} onAddToMyTraining={(exs) => setCustomExercises(prev => [...prev, ...exs])} />}
       {tab === 'timers' && <TimersTab />}
       {tab === 'progress' && <ProgressTab historyWorkouts={historyWorkouts} />}
 
@@ -3201,6 +3228,7 @@ const MyTrainingTab: React.FC<{ customExercises: { name: string; sets: number; r
                 </div>
                 <div style={{display:'flex',gap:4}}>
                   <button onClick={()=>loadPlan(plan)} style={{padding:'3px 8px',borderRadius:4,border:'1px solid rgba(0,230,138,0.2)',background:'rgba(0,230,138,0.08)',color:'var(--accent)',fontSize:8,cursor:'pointer'}}>Загрузить</button>
+                  <button onClick={()=>setCustomExercises(prev=>[...prev, ...plan.exercises])} style={{padding:'3px 8px',borderRadius:4,border:'1px solid rgba(139,92,246,0.2)',background:'rgba(139,92,246,0.08)',color:'#8b5cf6',fontSize:8,cursor:'pointer'}}>➕ В мою</button>
                   <button onClick={()=>deletePlan(plan.id)} style={{padding:'3px 8px',borderRadius:4,border:'1px solid rgba(239,68,68,0.2)',background:'rgba(239,68,68,0.08)',color:'#f87171',fontSize:8,cursor:'pointer'}}>Удалить</button>
                 </div>
               </div>
@@ -5425,22 +5453,26 @@ const PROGRAM_EQUIP_MAP: Record<string, string> = {
   barbell: 'Штанга', dumbbell: 'Гантели', machine: 'Тренажёр', cable: 'Блок', bodyweight: 'Вес тела', bench: 'Скамья', rack: 'Стойка', kettlebell: 'Гиря', band: 'Резинка',
 };
 
-const ProgramsTab: React.FC<{ selectedProgram: string | null; setSelectedProgram: (id: string | null) => void }> = ({ selectedProgram: selectedId, setSelectedProgram: setSelectedId }) => {
+const ProgramsTab: React.FC<{ selectedProgram: string | null; setSelectedProgram: (id: string | null) => void; onAddToMyTraining?: (exercises: { name: string; sets: number; reps: number; rir: number }[]) => void }> = ({ selectedProgram: selectedId, setSelectedProgram: setSelectedId, onAddToMyTraining }) => {
   const [goalFilter, setGoalFilter] = React.useState('all');
+  const [levelFilter, setLevelFilter] = React.useState('all');
   const [detailWeek, setDetailWeek] = React.useState(1);
   const [expandedDay, setExpandedDay] = React.useState<number | null>(null);
 
   const allPrograms = React.useMemo(() => [...FULL_PROGRAM_LIBRARY, ...WOMENS_PROGRAMS, ...CUSTOM_PROGRAMS], []);
   const programs = React.useMemo(() => {
-    if (goalFilter === 'all') return allPrograms;
-    if (goalFilter === 'women') return WOMENS_PROGRAMS;
-    if (goalFilter === 'custom') return CUSTOM_PROGRAMS;
-    return allPrograms.filter(p => p.goal === goalFilter);
-  }, [goalFilter, allPrograms]);
+    let filtered = allPrograms;
+    if (goalFilter === 'women') filtered = WOMENS_PROGRAMS;
+    else if (goalFilter === 'custom') filtered = CUSTOM_PROGRAMS;
+    else if (goalFilter !== 'all') filtered = allPrograms.filter(p => p.goal === goalFilter);
+    if (levelFilter !== 'all') filtered = filtered.filter(p => p.level === levelFilter);
+    return filtered;
+  }, [goalFilter, levelFilter, allPrograms]);
   const selected = selectedId ? allPrograms.find(p => p.id === selectedId) || null : null;
 
   const [loadedMsg, setLoadedMsg] = useState('');
   const [myProgMsg, setMyProgMsg] = useState('');
+  const [myTrainingMsg, setMyTrainingMsg] = useState('');
   const handleLoadProgram = () => {
     if (!selected) return;
     try {
@@ -5470,6 +5502,18 @@ const ProgramsTab: React.FC<{ selectedProgram: string | null; setSelectedProgram
     } catch {}
   };
 
+  const handleAddToMyTraining = () => {
+    if (!selected || !onAddToMyTraining) return;
+    try {
+      const exercises = selected.weeks.flatMap(w => w.days.flatMap(d => d.exercises.map(e => ({
+        name: e.name, sets: e.sets, reps: parseInt(e.reps) || 10, rir: e.rir ?? 2,
+      }))));
+      onAddToMyTraining(exercises);
+      setMyTrainingMsg('✅ Добавлено в «Моя тренировка»!');
+      setTimeout(() => setMyTrainingMsg(''), 3000);
+    } catch {}
+  };
+
   return (<div>
     <div style={{ display: 'flex', gap: 4, marginBottom: 10, flexWrap: 'wrap' }}>
       {GOAL_FILTER_OPTIONS.map(g => (
@@ -5480,6 +5524,18 @@ const ProgramsTab: React.FC<{ selectedProgram: string | null; setSelectedProgram
             color: goalFilter === g.value ? '#000' : 'var(--text-dim)', border: 'none',
             fontWeight: goalFilter === g.value ? 600 : 400,
           }}>{g.label}</button>
+      ))}
+    </div>
+    <div style={{ display: 'flex', gap: 4, marginBottom: 10, flexWrap: 'wrap' }}>
+      <span style={{ fontSize: 10, color: 'var(--text-dim)', alignSelf: 'center' }}>Уровень:</span>
+      {[{v:'all',l:'Все'},{v:'beginner',l:'Начинающий'},{v:'intermediate',l:'Средний'},{v:'advanced',l:'Продвинутый'},{v:'enhanced',l:'Enhanced'}].map(l => (
+        <button key={l.v} onClick={() => { setLevelFilter(l.v); setSelectedId(null); }}
+          style={{
+            padding: '4px 10px', borderRadius: 14, fontSize: 10, cursor: 'pointer',
+            background: levelFilter === l.v ? 'var(--accent)' : 'var(--bg-secondary)',
+            color: levelFilter === l.v ? '#000' : 'var(--text-dim)', border: 'none',
+            fontWeight: levelFilter === l.v ? 600 : 400,
+          }}>{l.l}</button>
       ))}
     </div>
 
@@ -5571,8 +5627,16 @@ const ProgramsTab: React.FC<{ selectedProgram: string | null; setSelectedProgram
             }}>
             📋 В мои программы
           </button>
+          <button onClick={handleAddToMyTraining}
+            style={{
+              width: '100%', padding: 10, borderRadius: 10, border: '1px solid #8b5cf6', cursor: 'pointer',
+              background: 'rgba(139,92,246,0.08)', color: '#8b5cf6', fontWeight: 700, fontSize: 12, marginBottom: 6,
+            }}>
+            ⭐ В мою тренировку
+          </button>
           {loadedMsg && <div style={{ padding:'6px 10px', borderRadius:6, background:'rgba(0,230,138,0.1)', border:'1px solid rgba(0,230,138,0.3)', color:'#00e68a', fontSize:10, marginBottom:6, textAlign:'center' }}>{loadedMsg}</div>}
           {myProgMsg && <div style={{ padding:'6px 10px', borderRadius:6, background:'rgba(139,92,246,0.1)', border:'1px solid rgba(139,92,246,0.3)', color:'#8b5cf6', fontSize:10, marginBottom:6, textAlign:'center' }}>{myProgMsg}</div>}
+          {myTrainingMsg && <div style={{ padding:'6px 10px', borderRadius:6, background:'rgba(255,215,0,0.1)', border:'1px solid rgba(255,215,0,0.3)', color:'#ffd700', fontSize:10, marginBottom:6, textAlign:'center' }}>{myTrainingMsg}</div>}
 
           {/* Week-by-week detail */}
           <h4 style={{ margin: '0 0 6px', fontSize: 12, color: 'var(--text)' }}>Программа по неделям</h4>
@@ -5931,4 +5995,108 @@ const StructuredAnalyticsCard: React.FC<{ sessions: any[] }> = ({ sessions }) =>
     <div style={{ fontSize:10 }}>Сессий: <b>{(result as any).sessionCount || sessions.length}</b> | Объём: <b>{(result as any).totalVolume || '—'}</b></div>
     {(result as any).insights?.slice(0,3).map((r:any,i:number)=><div key={i} style={{ fontSize:9,color:'var(--text-dim)',marginTop:2 }}>• {r}</div>)}
   </div>);
+};
+
+const EX_GEN_GROUP_LABELS: Record<string, string> = {
+  chest:'Грудь', back:'Спина', legs:'Ноги', shoulders:'Плечи', arms:'Руки', core:'Кор',
+};
+const EX_GEN_GOALS = ['bulk','strength','cut','maintenance','recomp'];
+const EX_GEN_GOAL_LABELS: Record<string, string> = {
+  bulk:'Масса', strength:'Сила', cut:'Сушка', maintenance:'Поддержание', recomp:'Рекомп',
+};
+const EX_GEN_LEVELS = ['beginner','intermediate','advanced','enhanced'];
+const EX_GEN_LEVEL_LABELS: Record<string, string> = {
+  beginner:'Новичок', intermediate:'Средний', advanced:'Опытный', enhanced:'Enhanced',
+};
+
+const ExerciseGenerator: React.FC = () => {
+  const [genGroup, setGenGroup] = React.useState('chest');
+  const [genGoal, setGenGoal] = React.useState('bulk');
+  const [genLevel, setGenLevel] = React.useState('intermediate');
+  const [genCount, setGenCount] = React.useState(5);
+  const [genResult, setGenResult] = React.useState<{ name: string; group: string; type: string; equipment: string; sets: number; reps: string; rir: number; rest: number }[] | null>(null);
+
+  const generate = () => {
+    const exs = EXERCISE_CATALOG.filter(e => e.group === genGroup).slice(0, genCount * 2);
+    const scored = exs.map((ex: any) => {
+      const p = calcExercisePrescription(ex, genGoal, genLevel, false, false, 1);
+      let score = 0;
+      if (ex.type === 'compound') score += 10;
+      if (ex.type === 'isolation') score += 3;
+      return { ex, p, score };
+    });
+    scored.sort((a: any, b: any) => b.score - a.score);
+    setGenResult(scored.slice(0, genCount).map((s: any) => ({
+      name: s.ex.name, group: s.ex.group, type: s.ex.type,
+      equipment: s.ex.equipment || '—', sets: s.p.sets, reps: s.p.reps,
+      rir: s.p.rir, rest: s.p.rest,
+    })));
+  };
+
+  React.useEffect(() => { generate(); }, [genGroup, genGoal, genLevel, genCount]);
+
+  return (
+    <div className="card" style={{ padding: '10px 12px' }}>
+      <h3 style={{ margin: '0 0 8px', fontSize: 13 }}>🏋️ Генератор упражнений</h3>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 6 }}>
+        <div>
+          <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 2 }}>Группа мышц</div>
+          <select value={genGroup} onChange={e => setGenGroup(e.target.value)}
+            style={{ width:'100%', padding:'5px', borderRadius:6, background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text)', fontSize:11 }}>
+            {['chest','back','legs','shoulders','arms','core'].map(g => (
+              <option key={g} value={g}>{EX_GEN_GROUP_LABELS[g]}</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 2 }}>Цель</div>
+          <select value={genGoal} onChange={e => setGenGoal(e.target.value)}
+            style={{ width:'100%', padding:'5px', borderRadius:6, background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text)', fontSize:11 }}>
+            {EX_GEN_GOALS.map(g => <option key={g} value={g}>{EX_GEN_GOAL_LABELS[g]}</option>)}
+          </select>
+        </div>
+        <div>
+          <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 2 }}>Уровень</div>
+          <select value={genLevel} onChange={e => setGenLevel(e.target.value)}
+            style={{ width:'100%', padding:'5px', borderRadius:6, background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text)', fontSize:11 }}>
+            {EX_GEN_LEVELS.map(l => <option key={l} value={l}>{EX_GEN_LEVEL_LABELS[l]}</option>)}
+          </select>
+        </div>
+        <div>
+          <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 2 }}>Кол-во</div>
+          <select value={genCount} onChange={e => setGenCount(parseInt(e.target.value))}
+            style={{ width:'100%', padding:'5px', borderRadius:6, background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text)', fontSize:11 }}>
+            {[3,5,8,10].map(n => <option key={n} value={n}>{n}</option>)}
+          </select>
+        </div>
+      </div>
+
+      {genResult && genResult.length > 0 ? (
+        <div>
+          <div style={{ display:'flex', alignItems:'center', gap:6, padding:'3px 6px', borderRadius:4, marginBottom:4, fontSize:8, color:'var(--text-dim)', borderBottom:'1px solid rgba(255,255,255,0.05)' }}>
+            <span style={{ flex:1 }}>Упражнение</span>
+            <span style={{ width:30, textAlign:'center' }}>Тип</span>
+            <span style={{ width:30, textAlign:'center' }}>Инв.</span>
+            <span style={{ width:45, textAlign:'center' }}>Сеты</span>
+            <span style={{ width:50, textAlign:'center' }}>Повторы</span>
+            <span style={{ width:28, textAlign:'center' }}>RIR</span>
+            <span style={{ width:35, textAlign:'center' }}>Отдых</span>
+          </div>
+          {genResult.map((r, i) => (
+            <div key={i} style={{ display:'flex', alignItems:'center', gap:6, padding:'4px 6px', borderRadius:4, marginBottom:2, background:'rgba(255,255,255,0.02)', fontSize:9 }}>
+              <span style={{ flex:1, fontWeight:600 }}>{r.name}</span>
+              <span style={{ width:30, textAlign:'center', fontSize:7, color:'var(--text-dim)' }}>{r.type === 'compound' ? 'Базовое' : 'Изол.'}</span>
+              <span style={{ width:30, textAlign:'center', fontSize:7, color:'var(--text-dim)' }}>{r.equipment}</span>
+              <span style={{ width:45, textAlign:'center', color:'var(--accent)', fontWeight:700 }}>{r.sets}</span>
+              <span style={{ width:50, textAlign:'center', color:'var(--accent)', fontWeight:600 }}>{r.reps}</span>
+              <span style={{ width:28, textAlign:'center', color:'var(--text-dim)' }}>{r.rir}</span>
+              <span style={{ width:35, textAlign:'center', color:'var(--text-dim)' }}>{r.rest}с</span>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div style={{ textAlign:'center', padding:10, color:'var(--text-dim)', fontSize:10 }}>Нет упражнений для выбранной группы</div>
+      )}
+    </div>
+  );
 };
