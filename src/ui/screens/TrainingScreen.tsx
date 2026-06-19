@@ -3060,7 +3060,7 @@ export const TrainingScreen: React.FC = () => {
         </div>
       )}
       {/* ═══════════ ANALYTICS TAB ═══════════ */}
-      {tab === 'analytics' && <><AnalyticsTab sessions={historyWorkouts} /><StructuredAnalyticsCard sessions={historyWorkouts} /></>}
+      {tab === 'analytics' && <><AnalyticsTab sessions={historyWorkouts} onRefresh={loadDiaryStats} /><StructuredAnalyticsCard sessions={historyWorkouts} /></>}
       {tab === 'methods' && <MethodsTab linked={linked} trainingOutput={trainingOutput} diaryStats={diaryStats} historyWorkouts={historyWorkouts} goal={goal} level={level} daysPerWeek={daysPerWeek} recovery={recovery} fatigue={fatigue} appliedMethod={appliedMethod} onApplyMethod={(name, category) => { setAppliedMethod(name); const mapped: Record<string,string> = { periodization: name.includes('linear') ? 'linear' : name.includes('undulating')||name.includes('DUP') ? 'undulating' : name.includes('block') ? 'block' : name.includes('conjugate')||name.includes('westside') ? 'conjugate' : 'auto', progression: name.includes('double') ? 'double' : name.includes('step') ? 'step' : name.includes('rest')||name.includes('pause') ? 'rest_pause' : 'auto', technique: name.includes('cluster') ? 'cluster' : name.includes('tempo') ? 'tempo' : name.includes('eccentric') ? 'eccentric' : 'auto', intensity: name.includes('rm')||name.includes('rpe') ? 'rpe_based' : name.includes('helms') ? 'helms' : 'auto', volume: name.includes('gvt')||name.includes('german') ? 'gvt' : name.includes('mev') ? 'mev' : 'auto', frequency: name.includes('high')||name.includes('daily') ? 'high_freq' : 'auto', specialization: name.includes('bro')||name.includes('splits') ? 'bro_split' : 'auto',                     recovery: name.includes('deload') ? 'deload' : 'auto', }; const pt = (mapped[category] || 'auto') as 'linear'|'auto'|'undulating'|'block'; if (pt !== 'auto') setPeriodizationType(pt); setTab('plan'); }} />}
       {tab === 'visual' && <VisualTab sessions={historyWorkouts} />}
       {tab === 'programs' && <ProgramsTab selectedProgram={selectedProgram} setSelectedProgram={setSelectedProgram} />}
@@ -3670,8 +3670,11 @@ const VisualTab: React.FC<{ sessions: any[] }> = ({ sessions }) => {
 };
 
 // ── Analytics Tab Component ──
-const AnalyticsTab: React.FC<{ sessions: WorkoutLog[] }> = ({ sessions }) => {
+const AnalyticsTab: React.FC<{ sessions: WorkoutLog[]; onRefresh?: () => void }> = ({ sessions, onRefresh }) => {
+  const [analyticsError, setAnalyticsError] = useState<string | null>(null);
   const analytics = useMemo(() => {
+    setAnalyticsError(null);
+    if (sessions.length === 0) return null;
     try {
     const mapped = sessions.map(w => ({
       sessionId: w.id,
@@ -3691,17 +3694,26 @@ const AnalyticsTab: React.FC<{ sessions: WorkoutLog[] }> = ({ sessions }) => {
         }))
       ),
     }));
+    if (mapped.length === 0 || !mapped.some(m => m.sets.length > 0)) return null;
     return computeAnalytics({ sessions: mapped, weeks: 4 });
-    } catch { return null; }
+    } catch (e) { setAnalyticsError(String(e)); return null; }
   }, [sessions]);
 
   if (!analytics || sessions.length === 0) {
     return (
       <div className="card" style={{ textAlign: 'center', padding: 30 }}>
         <div style={{ fontSize: 32, marginBottom: 8 }}>📊</div>
-        <div style={{ fontSize: 13, color: 'var(--text-dim)' }}>
-          Нет данных для аналитики. Запишите тренировки во вкладке «Дневник».
+        <div style={{ fontSize: 13, color: 'var(--text-dim)', marginBottom: 8 }}>
+          {sessions.length === 0
+            ? 'Нет данных для аналитики. Запишите тренировки во вкладке «Дневник».'
+            : 'Недостаточно данных для расчёта (нужны сеты с весом).'}
         </div>
+        {sessions.length > 0 && <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>Найдено тренировок: {sessions.length}</div>}
+        {analyticsError && <div style={{ fontSize: 9, color: '#ef4444', marginTop: 4 }}>Ошибка: {analyticsError}</div>}
+        <button onClick={() => onRefresh?.()} style={{
+          marginTop: 8, padding: '6px 14px', borderRadius: 8, border: '1px solid var(--accent)',
+          background: 'transparent', color: 'var(--accent)', fontSize: 10, cursor: 'pointer',
+        }}>🔄 Обновить данные</button>
       </div>
     );
   }
