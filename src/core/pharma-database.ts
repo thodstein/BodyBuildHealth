@@ -113,6 +113,10 @@ export const PHARMA_DB: Record<string, PharmaSubstance> = {
   mots_c:     { id:'mots_c', name:'MOTS-C', class:'peptide_nootropic', pk:{ka:0.45,k10:0.035,k12:0.015,k21:0.01,Vd:22,bioavailability:0.35,halfLifeHours:4}, pd:{AR_affinity:0,aromatization:0,five_alpha_reduction:0,progestogenic:0,hepatotoxicity:0,lipid_impact:-0.15,hct_impact:0,neuro_toxicity:0}, ec50:150,n_hill:1.5,maxEffect:0.9, description:'Митохондриально-производный пептид (16 аа). Регулирует метаболизм через AMPK-активацию, ↑ чувствительность к инсулину, ↑ glucagon-like эффект. Противовозрастной.' },
   ss31:       { id:'ss31', name:'SS-31 (Elamipretide)', class:'peptide_regenerative', pk:{ka:0.4,k10:0.03,k12:0.012,k21:0.008,Vd:20,bioavailability:0.25,halfLifeHours:3}, pd:{AR_affinity:0,aromatization:0,five_alpha_reduction:0,progestogenic:0,hepatotoxicity:0,lipid_impact:0,hct_impact:0,neuro_toxicity:0}, ec50:200,n_hill:1.5,maxEffect:0.95, description:'Тетрапептид, нацеленный на внутреннюю митохондриальную мембрану. Стабилизирует кардиолипин, ↓ ROS-продукцию, ↑ АТФ-синтез. Кардиопротектор, нейропротектор.' },
   foxo4_dri:  { id:'foxo4_dri', name:'FOXO4-DRI', class:'peptide_other', pk:{ka:0.35,k10:0.02,k12:0.01,k21:0.007,Vd:25,bioavailability:0.2,halfLifeHours:5}, pd:{AR_affinity:0,aromatization:0,five_alpha_reduction:0,progestogenic:0,hepatotoxicity:0,lipid_impact:0,hct_impact:0,neuro_toxicity:0}, ec50:300,n_hill:1.4,maxEffect:0.85, description:'Сенолитический пептид — ингибирует взаимодействие FOXO4-p53, вызывая апоптоз стареющих (SEN) клеток. Противовозрастной, улучшение функции тканей.' },
+
+  // === GLP-1 АГОНИСТЫ ===
+  semaglutide:{ id:'semaglutide', name:'Семаглутид (Оземпик)', class:'glp1', pk:{ka:0.3,k10:0.02,k12:0.01,k21:0.008,Vd:12,bioavailability:0.7,halfLifeHours:168}, pd:{AR_affinity:0,aromatization:0,five_alpha_reduction:0,progestogenic:0,hepatotoxicity:0,lipid_impact:-0.2,hct_impact:0,neuro_toxicity:0}, ec50:50,n_hill:2.0,maxEffect:1, description:'Агонист GLP-1 рецепторов (Оземпик, Wegovy). Замедляет опорожнение желудка, снижает аппетит, стимулирует инсулин глюкозозависимо. Подавляет глюкагон. Т½ ~7 дней — 1 инъекция/нед.' },
+  tirzepatide:{ id:'tirzepatide', name:'Тирзепатид (Мунджаро)', class:'glp1', pk:{ka:0.28,k10:0.018,k12:0.009,k21:0.007,Vd:14,bioavailability:0.72,halfLifeHours:168}, pd:{AR_affinity:0,aromatization:0,five_alpha_reduction:0,progestogenic:0,hepatotoxicity:0,lipid_impact:-0.3,hct_impact:0,neuro_toxicity:0}, ec50:40,n_hill:2.1,maxEffect:1.2, description:'Двойной агонист GLP-1/GIP рецепторов (Мунджаро, Zepbound). Эффективнее семаглутида: ~20% vs ~15% снижения веса. Стимулирует инсулин, подавляет глюкагон, замедляет моторику ЖКТ. Т½ ~5 дней — 1 инъекция/нед.' },
 };
 
 const CLASS_DEFAULTS: Record<string, Partial<PharmaSubstance>> = {
@@ -139,6 +143,7 @@ const CLASS_DEFAULTS: Record<string, Partial<PharmaSubstance>> = {
   igf1:{ description:'IGF-1 — анаболический гормон. Стимулирует пролиферацию клеток, гиперплазию мышц.', mechanisms:['IGF1R_AGONISM','CELL_PROLIFERATION'], sideEffects:[{effect:'Гипогликемия',frequency:'common'},{effect:'Гиперплазия органов',frequency:'rare'}], contraindications:['Активный рак','Беременность'] },
   mgf:{ description:'MGF — активирует сателлитные клетки. Вызывает гиперплазию мышц после нагрузки.', mechanisms:['SATELLITE_CELL_ACTIVATION'], sideEffects:[], contraindications:['Активный рак'] },
   insulin:{ description:'Инсулин — анаболический гормон. Мощный но опасный анаболик.', mechanisms:['GLUCOSE_TRANSPORT','AMINO_ACID_UPTAKE','GLYCOGEN_SYNTHESIS'], sideEffects:[{effect:'Гипогликемия — смертельно опасна',frequency:'common'},{effect:'Жиронакопление',frequency:'common'}], contraindications:['Без надзора — смертельно'] },
+  glp1:{ description:'Агонист GLP-1/GIP рецепторов. Мощный контроль аппетита и снижение веса.', mechanisms:['GLP1_AGONISM','GIP_AGONISM','INSULIN_STIMULATION','GLUCAGON_SUPPRESSION','GASTRIC_EMPTYING_DELAY'], sideEffects:[{effect:'Тошнота, рвота, диарея',frequency:'common'},{effect:'Замедление опорожнения желудка',frequency:'common'},{effect:'Гипогликемия (редко, при комбинации с инсулином)',frequency:'rare'}], contraindications:['Медуллярный рак щитовидной железы (в анамнезе)','Семейная MEN-2','Тяжёлые гастропарезы','Панкреатит (острый, в анамнезе)','Непроходимость кишечника'] },
   support:{ description:'Нутрицевтик для поддержки здоровья и восполнения дефицитов.', mechanisms:['NUTRITIONAL_SUPPORT'], sideEffects:[], contraindications:['Индивидуальная непереносимость'] },
 };
 
@@ -167,7 +172,7 @@ SUBSTANCE_LIST.forEach(s => {
 
 export const PHARMA_CLASSES = [
   'testosterone', 'trenbolone', 'nandrolone', 'boldenone', 'primobolan', 'oral_17aa',
-  'sarm', 'peptide_ghrh', 'peptide_ghrp', 'igf1', 'mgf', 'insulin', 'pct_serm',
+  'sarm', 'peptide_ghrh', 'peptide_ghrp', 'igf1', 'mgf', 'glp1', 'insulin', 'pct_serm',
   'pct_aromatase', 'pct_dopamine', 'pct_gonadotropin', 'drostanolone', 'peptide_gnrh',
   'peptide_fat_loss', 'peptide_other'
 ] as const;

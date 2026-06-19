@@ -183,6 +183,9 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
         } else if (substance?.id?.includes('igf1') || substance?.id?.includes('mgf')) {
           type = 'ИФР-1';
           esterType = 'short';
+        } else if (substance?.class === 'glp1') {
+          type = 'семаглутид'; // generic GLP-1, specific name saved manually
+          esterType = 'long';
         } else if (substance?.id?.includes('bpc') || substance?.id?.includes('tb500')) {
           type = 'пептид';
           esterType = 'none';
@@ -235,12 +238,29 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
     // Pharma-aware adjustments
     const hasAAS = injections.some(i => i.type === 'ААС');
     const hasShortInsulin = injections.some(i => i.type === 'инсулин' && i.esterType !== 'long');
+    const hasInsulin = injections.some(i => i.type === 'инсулин');
+    const hasGLP = injections.some(i => i.type === 'семаглутид' || i.type === 'тирзепатид');
     if (hasAAS) targets.protein = Math.round(targets.protein + weight * 0.3); // +0.3g/kg on AAS
     if (hasShortInsulin) {
       const totalInsulinDose = injections.filter(i => i.type === 'инсулин' && i.esterType !== 'long').reduce((s, i) => s + i.dose, 0);
       const minInsulinCarbs = totalInsulinDose * 10;
       if (targets.carbs < minInsulinCarbs) targets.carbs = Math.round(minInsulinCarbs * 1.2); // 20% buffer
+      // Minimize fat during insulin therapy — max 0.5g/kg/day
+      const maxFat = Math.round(weight * 0.5);
+      if (targets.fats > maxFat) targets.fats = maxFat;
       // Recalc kcal from new P/F/C
+      targets.kcal = targets.protein * 4 + targets.fats * 9 + targets.carbs * 4;
+    }
+    if (hasInsulin) {
+      // General insulin fat limit
+      const maxFat = Math.round(weight * 0.5);
+      if (targets.fats > maxFat) targets.fats = maxFat;
+      targets.kcal = targets.protein * 4 + targets.fats * 9 + targets.carbs * 4;
+    }
+    if (hasGLP) {
+      // GLP-1 reduces appetite — increase protein density, minimize fat
+      targets.fats = Math.min(targets.fats, Math.round(weight * 0.4)); // max 0.4g/kg
+      targets.protein = Math.round(targets.protein + weight * 0.2); // +0.2g/kg for satiety
       targets.kcal = targets.protein * 4 + targets.fats * 9 + targets.carbs * 4;
     }
     return targets;
@@ -573,8 +593,13 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
           }
         }
 
-        // Fat source (not duplicated with pre-workout)
-        if (remainingF > 3 && !mt.label.includes('Предтрен') && !mt.label.includes('Пост-трен')) {
+        // Fat source (not duplicated with pre-workout) — SKIP IN INSULIN WINDOW (90 min)
+        const isInsulinWindow = insulinsWithTiming.some(ins => {
+          const mealMin = parseInt(mt.time.split(':')[0]) * 60 + parseInt(mt.time.split(':')[1]);
+          const injMin = parseInt(ins.time.split(':')[0]) * 60 + parseInt(ins.time.split(':')[1]);
+          return Math.abs(mealMin - injMin) <= 90;
+        });
+        if (remainingF > 3 && !mt.label.includes('Предтрен') && !mt.label.includes('Пост-трен') && !isInsulinWindow) {
           let fatPool = foods.filter(f => f.category === 'fat');
           fatPool = fatPool.filter(f => !excludedIds.has(f.id) && !allergenIds.has(f.id));
           if (fatPool.length > 0) {
@@ -834,12 +859,26 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
       const trainLinkedInj = injections.some(i => i.trainLinked);
       const totalInsulinDose = injections.filter(i => i.type === 'инсулин' && i.esterType !== 'long').reduce((s, i) => s + i.dose, 0);
       if (hasAAS) recs.push('💉 На курсе ААС: белок +0.3г/кг (до 2.5-3г/кг). Вода 40мл/кг. Контроль АД и липидов. Добавки: расторопша, артишок, NAC, омега-3, CoQ10.');
-      if (hasShortInsulin) recs.push(`💉 Инсулин: ${totalInsulinDose}ЕД × 10г = ${totalInsulinDose * 10}г углеводов за инъекцию. Минимум 150г углеводов/день. Быстрые углеводы (декстроза, сок) под рукой.`);
-      if (trainLinkedInj) recs.push('🏋️ Инсулин/ИФР-1 привязаны к тренировке: до тренировки — изолят + амилопектин, после — изолят + декстроза. На тренировке ОБЯЗАТЕЛЬНО углеводы (изотоник/бананы/гейнер).');
-      if (hasInsulin) recs.push('🚨 Гипогликемия: симптомы — потливость, дрожь, голод, спутанность. Не принимай короткий инсулин перед сном! Контролируй глюкозу каждые 30 мин первые 2ч.');
-      if (hasGH) recs.push('🧬 Гормон роста: избегать углеводов в окне 30мин до/после укола. Увеличить воду на 0.5-1л. Контроль глюкозы — ГР снижает чувствительность к инсулину.');
-      if (hasIGF) recs.push('🧬 ИФР-1: натощак за 30 мин до еды (или согласно протоколу). Синергия с инсулином — усиление анаболизма.');
-      if (hasGLP) recs.push('💊 GLP-1 (семаглутид/тирзепатид): дробное питание 5-6 раз маленькими порциями. Избегать жирного. Контроль тошноты.');
+      if (hasShortInsulin || hasInsulin) {
+        const fatRestrictionMsg = `🍔 НА ИНСУЛИНЕ — МИНИМУМ ЖИРОВ в окне действия: жиры замедляют всасывание углеводов и усиливают инсулинорезистентность. В приёмах пищи в течение 2ч после инъекции короткого/быстрого инсулина — жиры не более 5г.`;
+        recs.push(`💉 Инсулин: ${totalInsulinDose}ЕД × 10г = ${totalInsulinDose * 10}г углеводов за инъекцию. Минимум 150г углеводов/день. Быстрые углеводы (декстроза, сок) под рукой. ПРОПУСК ЕДЫ КРИТИЧЕН — гипогликемия развивается за 15-30 минут!`);
+        recs.push(fatRestrictionMsg);
+        recs.push(`📊 ПОЛНЫЙ КОНТРОЛЬ ГЛЮКОЗЫ: измерять через 15, 30, 60, 90, 120 минут после инъекции. Цель — не ниже 3.9 ммоль/л. Глюкометр обязателен! При уровне <3.5 ммоль/л — немедленно 15-20г быстрых углеводов (сок/глюкоза/декстроза), повторный замер через 15 мин.`);
+        recs.push(`⏰ ПРАВИЛО 4 ЧАСОВ: короткий инсулин (NovoRapid/Хумулин) действует ~4 часа. Каждый час после укола — минимум 10-15г углеводов на подержание. Длинный инсулин (Лантус/Тресиба/Левемир) — равномерно распределяй углеводы по дню.`);
+        recs.push(`🛑 НЕ ПРИНИМАЙ КОРОТКИЙ ИНСУЛИН НА НОЧЬ! Риск ночной гипогликемии — потеря сознания во сне. Последняя инъекция — не позднее 18:00.`);
+        recs.push(`🍬 ЭКСТРЕННЫЙ НАБОР: всегда носи при себе — 200мл сладкого сока, 3-4 таблетки глюкозы (по 5г), конфеты/сахар-рафинад, банан. Для тренировки — изотоник 6-8% + банан. Информируй окружающих о диабетической аптечке.`);
+        recs.push(`🏥 СИМПТОМЫ ГИПОГЛИКЕМИИ: лёгкая (<3.5 ммоль/л) — потливость, голод, дрожь, сердцебиение. Умеренная (<3.0) — спутанность, агрессия, нарушение речи. Тяжёлая (<2.5) — потеря сознания, судороги — ВЫЗОВ СКОРОЙ (глюкагон 1 мг в/м).`);
+        recs.push(`🧬 ЖИРОНАКОПЛЕНИЕ НА ИНСУЛИНЕ: инсулин — мощный липогенный гормон. В окне его действия организм не использует жиры как энергию — наоборот, запасает. Поэтому жиры в рационе при инсулинотерапии не должны превышать 0.5г/кг.`);
+        recs.push(`🔄 ИНСУЛИН + НАБОР МАССЫ: инсулин потенцирует синтез гликогена и белка. В паре с ААС/ГР даёт синергию анаболизма. НО — после отмены инсулина уменьши потребление углеводов на 30% за 3-5 дней, иначе быстрый набор жира.`);
+        recs.push(`⚠️ ИНСУЛИН ПОСЛЕ КУРСА ГР/ААС: чувствительность к инсулину может быть снижена на 20-30% — корректируй дозу по глюкометру. Не повышай дозу выше 10-15 ЕД за раз без врача!`);
+      }
+      if (trainLinkedInj) recs.push('🏋️ Инсулин/ИФР-1/MGF привязаны к тренировке: до тренировки (за 90мин) — изолят сывороточного белка (40-50г) + амилопектин (80-100г). После тренировки (немедленно) — изолят сывороточного белка (40-50г) + декстроза (80-120г из расчёта 10г на 1ЕД). НА ТРЕНИРОВКЕ ОБЯЗАТЕЛЬНО: изотоник 500-1000мл + банан/гейнер — каждые 20 мин по 100мл.🚨 Не допускай пустого желудка на тренировке с инсулином! Пред-тренировочный приём — минимум за 90 мин или внутривенный изотоник во время.');
+      if (hasGH) recs.push('🧬 Гормон роста: избегать углеводов в окне 60мин до/после укола (пик ГР, подавляет утилизацию глюкозы). Увеличить воду на 0.5-1л. Контроль глюкозы — ГР снижает чувствительность к инсулину на 20-50%. При долгом курсе — HOMA-IR каждые 4 нед.');
+      if (hasIGF) {
+        recs.push('🧬 ИФР-1 (IGF-1 LR3/DES): натощак за 30-45 мин до еды — не есть и не пить сладкое. Синергия с инсулином 100% — усиление анаболизма в разы. НО: гипогликемия вдвойне опасна. Контроль глюкозы обязателен при комбинации. Жиры минимизировать — IGF-1 улучшает утилизацию глюкозы, жиры замедляют этот эффект. Максимальный анаболический ответ: ИФР-1 + инсулин + глюкоза + аминокислоты (BCAA/изолят). Пропуск еды после ИФР-1 — гипогликемия. Держи глюкометр под рукой.');
+        recs.push('🔬 MGF (Механо-фактор): активирует сателлитные клетки в зоне нагрузки. Действует локально, а не на весь организм. Питание: те же принципы что и для ИФР-1 — натощак, контроль глюкозы, жиры минимум. Синергия с ИФР-1 (каскад GHRP→ГР→ИФР-1→MGF).');
+      }
+      if (hasGLP) recs.push('💊 GLP-1 (семаглутид/тирзепатид): дробное питание 5-6 раз маленькими порциями (100-200г за приём). Избегать жирного — замедляет опорожнение желудка, усиливает тошноту и риск панкреатита. Контроль тошноты — первые 4-8 нед самые сложные. За 3 дня до инъекции и 3 дня после — диета с минимальным содержанием жиров (<30г/день). Употреблять много воды — снижает риск запора. НЕ ПЕРЕЕДАТЬ — растяжение желудка на GLP-1 вызывает сильнейшую тошноту. Отказ от алкоголя на время курса. Контроль поджелудочной: при болях в левом подреберье — прекратить приём, срочно к врачу. Витамин B12 и электролиты — дополнительно (GLP-1 снижает всасывание B12 и минералов).');
       recs.push('💉 Фарма поддержка: расторопша/артишок/NAC для печени, омега-3 + CoQ10 для сердца, электролиты (калий 4000+мг, магний 500+мг).');
     }
     // Water
@@ -1153,14 +1192,24 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
           const ih = parseInt(inj.time.split(':')[0]);
           return Math.abs(h - ih) <= 1;
         });
-        if (mealAtInjTime && mealAtInjTime.totals.p < 30) {
-          warnings.push(`🧬 ${inj.name}: в окне ИФР-1 нужно ≥30г белка. Приём ${mealAtInjTime.time} содержит ${Math.round(mealAtInjTime.totals.p)}г.`);
+        if (mealAtInjTime) {
+          if (mealAtInjTime.totals.p < 30) warnings.push(`🧬 ${inj.name}: в окне нужно ≥30г белка. Приём ${mealAtInjTime.time} содержит ${Math.round(mealAtInjTime.totals.p)}г.`);
+          if (mealAtInjTime.totals.f > 5) warnings.push(`🥑 ${inj.name}: в окне не более 5г жиров (замедляют всасывание и блокируют IGF-1R сигналинг). Приём ${mealAtInjTime.time} содержит ${Math.round(mealAtInjTime.totals.f)}г жиров.`);
+          const fastCarbs = mealAtInjTime.items.filter((it: any) => {
+            const food = FOOD_DB.find(f => f.id === it.id);
+            return food?.gi && food.gi >= 80;
+          });
+          if (fastCarbs.length === 0 && (t.includes('igf') || t.includes('ифр'))) warnings.push(`🍚 ${inj.name}: быстрые углеводы (декстроза/сок) нужны для потенцирования анаболизма IGF-1.`);
         }
       }
       if (t.includes('семаглутид') || t.includes('тирзепатид')) {
-        warnings.push('💊 Агонисты GLP-1: еда маленькими порциями, избегать жирного. Контроль тошноты.');
-        const fattyMeals = dayPlan.meals.filter((m: any) => (m.totals.f || 0) > 20);
-        if (fattyMeals.length > 0) interactions.push({ drug: inj.name, food: `${fattyMeals.length} приёмов с >20г жиров`, effect: 'Замедление опорожнения желудка, тошнота', severity: 'medium' });
+        warnings.push('💊 GLP-1: дробное питание 5-6р/д по 100-200г. Жиры <5г/приём. Не переедать — тошнота, риск панкреатита. Обильное питьё. Контроль B12 и электролитов. Алкоголь исключить.');
+        const fattyMeals = dayPlan.meals.filter((m: any) => (m.totals.f || 0) > 15);
+        if (fattyMeals.length > 0) interactions.push({ drug: inj.name, food: `${fattyMeals.length} приёмов с >15г жиров`, effect: 'Замедление опорожнения желудка, тошнота, риск острого панкреатита', severity: 'high' });
+        const largeMeals = dayPlan.meals.filter((m: any) => m.items && m.items.reduce((s: number, i: any) => s + i.amount, 0) > 400);
+        if (largeMeals.length > 0) interactions.push({ drug: inj.name, food: `${largeMeals.length} приёмов >400г еды за раз`, effect: 'Растяжение желудка, рвота, рефлюкс-эзофагит', severity: 'high' });
+        const alcoholItems = dayPlan.meals.flatMap((m: any) => m.items).filter((i: any) => i.name?.toLowerCase().includes('алкоголь') || i.name?.toLowerCase().includes('вино') || i.name?.toLowerCase().includes('пиво'));
+        if (alcoholItems.length > 0) interactions.push({ drug: inj.name, food: 'Алкоголь', effect: 'Усиление тошноты, риск острого панкреатита, дегидратация', severity: 'high' });
       }
     });
 
@@ -1995,31 +2044,40 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
                 {isInsulin && inj.esterType === 'rapid' && (
                   <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)', lineHeight: 1.6 }}>
                     ⚡ <strong>Быстрый инсулин (аналог)</strong> — пик 30-90 мин, длительность 3-4ч.<br />
-                    🍚 На <strong>{Math.round(inj.dose * 10)}г углеводов</strong> (10г/ед). Принять сразу перед едой или после.<br />
+                    🍚 На <strong>{Math.round(inj.dose * 10)}г углеводов</strong> (10г/ед). Принять сразу перед едой или после. <strong>ПРОПУСК ЕДЫ = ГИПОГЛИКЕМИЯ!</strong><br />
                     {inj.trainLinked ? `🏋️ Привязан к тренировке (${inj.trainTiming === 'before' ? 'до' : inj.trainTiming === 'after' ? 'после' : 'до и после'}). В приёме: изолят сывороточного белка + ${inj.trainTiming === 'before' ? 'амилопектин' : 'декстроза'}.` : ''}
-                    {inj.trainLinked && inj.trainTiming !== 'after' ? ' 🚨 На тренировке ОБЯЗАТЕЛЬНО углеводы (изотоник/гейнер/бананы)!' : ''}
-                    {!inj.trainLinked ? ' ⏰ Не ешь без углеводов — риск гипогликемии!' : ''}
+                    {inj.trainLinked && inj.trainTiming !== 'after' ? ' 🚨 На тренировке ОБЯЗАТЕЛЬНО углеводы (изотоник/гейнер/бананы) каждые 20 мин!' : ''}
+                    {!inj.trainLinked ? ' ⏰ Не ешь без углеводов — риск гипогликемии!' : ''}<br />
+                    🥑 <strong>Жиры МИНИМУМ</strong> в окне действия (первые 90 мин) — не более 3-5г. Жиры замедляют опорожнение желудка и блокируют поступление глюкозы.<br />
+                    🩸 <strong>Глюкоза:</strong> замеры через 15, 30, 60, 90, 120 мин. Цель не ниже 4.0 ммоль/л.<br />
+                    🍬 <strong>Экстренно:</strong> 200мл сока + 4 таблетки глюкозы при уровне &lt;3.5 ммоль/л. 
                   </div>
                 )}
                 {isInsulin && inj.esterType === 'short' && (
                   <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)', lineHeight: 1.6 }}>
                     🕐 <strong>Короткий инсулин (человеческий)</strong> — пик 2-4ч, длительность 5-8ч.<br />
-                    🍚 На <strong>{Math.round(inj.dose * 10)}г углеводов</strong> (10г/ед). Ввести за 20-30 мин до еды.<br />
-                    {inj.trainLinked ? `🏋️ Привязан к тренировке (${inj.trainTiming === 'before' ? 'до' : inj.trainTiming === 'after' ? 'после' : 'до и после'}). В приёме: изолят + ${inj.trainTiming === 'before' ? 'амилопектин' : 'декстроза'}.` : ''}
-                    {inj.trainLinked && inj.trainTiming !== 'after' ? ' 🚨 На тренировке ОБЯЗАТЕЛЬНО углеводы!' : ''}
+                    🍚 На <strong>{Math.round(inj.dose * 10)}г углеводов</strong> (10г/ед). Ввести за 20-30 мин до еды. <strong>ПРОПУСК ЕДЫ ОПАСЕН!</strong><br />
+                    {inj.trainLinked ? `🏋️ Привязан к тренировке (${inj.trainTiming === 'before' ? 'до' : inj.trainTiming === 'after' ? 'после' : 'до+после'}). В приёме: изолят + ${inj.trainTiming === 'before' ? 'амилопектин' : 'декстроза'}.` : ''}
+                    {inj.trainLinked && inj.trainTiming !== 'after' ? ' 🚨 На тренировке ОБЯЗАТЕЛЬНО углеводы каждые 20 мин!' : ''}<br />
+                    🥑 <strong>Жиры &lt;5г</strong> в окне 90 мин — иначе гипогликемия на фоне уже принятых углеводов.<br />
+                    🩸 <strong>Правило 4 часов:</strong> каждый час после укола — минимум 10-15г углеводов на подержание.
                   </div>
                 )}
                 {isInsulin && inj.esterType === 'long' && (
                   <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)', lineHeight: 1.6 }}>
                     🌙 <strong>Длинный инсулин (базальный)</strong> — покрывает суточную потребность.<br />
                     🍚 Привязка к еде <strong>не требуется</strong>. Принимай в одно и то же время ежедневно.<br />
-                    📊 Короткий инсулин считай отдельно от длинного (суточная норма + еда).
+                    📊 Короткий инсулин считай отдельно от длинного (суточная норма + еда).<br />
+                    📋 Контроль глюкозы натощак каждое утро — цель 4.0-6.0 ммоль/л.
                   </div>
                 )}
                 {isIGF && (
                   <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)', lineHeight: 1.6 }}>
                     🧬 <strong>ИФР-1/MGF</strong> — анаболический пептид, работает синергично с инсулином.<br />
-                    {inj.trainLinked ? `🏋️ Привязан к тренировке (${inj.trainTiming === 'before' ? 'до' : inj.trainTiming === 'after' ? 'после' : 'до и после'}). Принимать НАТОЩАК. Еда через 30 мин. В приёме: изолят + декстроза.` : '⏰ Принимать натощак, за 30 мин до еды или согласно протоколу.'}
+                    {inj.trainLinked ? `🏋️ Привязан к тренировке (${inj.trainTiming === 'before' ? 'до' : inj.trainTiming === 'after' ? 'после' : 'до и после'}). Принимать НАТОЩАК за 30-45 мин до еды. Еда после — изолят + декстроза (МGF — натощак, локально в месте нагрузки).` : '⏰ Принимать натощак, за 30-45 мин до еды или согласно протоколу.'}<br />
+                    🥑 <strong>Жиры МИНИМУМ</strong> — в комбинации с инсулином жиры критически замедляют анаболический ответ.<br />
+                    🩸 <strong>Гипогликемия:</strong> ИФР-1 + инсулин — риск гипо вдвойне. Глюкометр обязателен!<br />
+                    🔬 <strong>MGF:</strong> активирует сателлитные клетки локально (только нагружаемая мышца). В комбинации с ИФР-1 — каскад гиперплазии. Питание: глюкоза + аминокислоты (BCAA/изолят) в окне 30 мин после.
                   </div>
                 )}
                 {isGH && (
@@ -2041,6 +2099,18 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
                     ⏰ Пей 40мл/кг воды. Контролируй АД и липиды.
                   </div>
                 )}
+                {(inj.type === 'семаглутид' || inj.type === 'тирзепатид') && (
+                  <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)', lineHeight: 1.6 }}>
+                    💊 <strong>GLP-1 агонист</strong> — замедляет опорожнение желудка, подавляет аппетит.<br />
+                    📏 <strong>Питание дробное:</strong> 5-6 раз/день по 100-200г. Не переедать — тошнота, рвота.<br />
+                    🥑 <strong>Жиры &lt;5г/приём</strong> — жирная пища задерживается в желудке на 4-6ч, вызывая тошноту и риск панкреатита.<br />
+                    💧 <strong>Вода 30-40мл/кг</strong> — GLP-1 снижает моторику ЖКТ, риск запора. Клетчатка 25-30г/день.<br />
+                    ⏰ <strong>Дни пик тошноты:</strong> первые 24-72ч после еженедельной инъекции — самые лёгкие приёмы, жиры &lt;20г/день.<br />
+                    🩸 <strong>B12 и электролиты:</strong> добавки обязательны — GLP-1 снижает всасывание через IF-фактор.<br />
+                    🚫 <strong>Алкоголь</strong> — исключить полностью (панкреатит, гипогликемия).<br />
+                    🆘 <strong>Боли в животе/подреберье:</strong> немедленно к врачу — исключить панкреатит.
+                  </div>
+                )}
                 {inj.type === 'другое' && (
                   <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)', lineHeight: 1.6 }}>
                     ℹ️ Следуй инструкции по препарату. При необходимости уточни тип.
@@ -2052,20 +2122,44 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
           {/* Hypoglycemia checklist */}
           {injections.some(i => i.type === 'инсулин' && i.esterType !== 'long') && (
             <div style={{ marginTop: 6, padding: '8px 10px', borderRadius: 10, background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.15)' }}>
-              <div style={{ fontSize: 9, fontWeight: 700, color: '#ef4444', marginBottom: 4 }}>🚨 Чеклист гипогликемии</div>
+              <div style={{ fontSize: 9, fontWeight: 700, color: '#ef4444', marginBottom: 4 }}>🚨 Чеклист гипогликемии (ОПАСНОСТЬ)</div>
               <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.5)', lineHeight: 1.6 }}>
-                ✅ Всегда носи быстрые углеводы (сок, глюкоза в таблетках, сахар)<br />
-                ✅ Не принимай короткий/быстрый инсулин перед сном<br />
-                ✅ Контролируй глюкозу каждые 30 мин в первые 2ч после инъекции<br />
-                ✅ На тренировке — ОБЯЗАТЕЛЬНО изотоник или гейнер с углеводами<br />
-                ✅ Симптомы гипо: потливость, дрожь, голод, спутанность сознания
+                🩸 <strong>Глюкометр обязателен!</strong> Замеры: до, через 15, 30, 60, 90, 120 мин<br />
+                🧃 <strong>Экстренный набор:</strong> 200мл сока + 3-4 таблетки глюкозы (15-20г) ВСЕГДА С СОБОЙ<br />
+                🛌 <strong>Не принимать короткий инсулин после 18:00</strong> — риск ночной гипогликемии<br />
+                ⏰ <strong>Каждый час после инъекции</strong> — минимум 10-15г углеводов (4-часовое окно действия)<br />
+                🏋️ <strong>На тренировке:</strong> изотоник 6-8% (500-1000мл) + банан каждые 20 мин<br />
+                🔴 <strong>Если глюкоза &lt;3.5 ммоль/л:</strong> немедленно 15-20г быстрых углеводов, замер через 15 мин<br />
+                🚑 <strong>Если &lt;2.5 ммоль/л или потеря сознания:</strong> ВЫЗОВ 103! Глюкагон 1мг в/м или в/в глюкоза 40%<br />
+                📋 <strong>Симптомы:</strong> потливость, дрожь, голод → спутанность, агрессия → потеря сознания, судороги<br />
+                🥑 <strong>Жиры МИНИМУМ:</strong> в окне действия инсулина — не более 5г жиров за приём (жиры замедляют всасывание углеводов!)
               </div>
             </div>
           )}
           <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.3)', marginTop: 2, lineHeight: 1.5 }}>
-            💡 <strong>Правило инсулина:</strong> 1 ЕД короткого/быстрого инсулина покрывает ~10г углеводов.
-            Учитывай чувствительность: после курса ГР/ААС может требоваться на 20-30% больше.
+            💡 <strong>БАЗОВЫЕ ПРАВИЛА ИНСУЛИНА:</strong><br />
+            🧮 1 ЕД короткого/быстрого ≈ 10г углеводов (чувствительность индивидуальна — после курса ГР/ААС может требоваться на 20-30% больше).<br />
+            🥑 <strong>ЖИРЫ МИНИМАЛЬНЫ</strong> в окне действия инсулина (первые 2ч) — не более 5г. Жиры блокируют выход глюкозы из желудка в кровь, вызывая гипогликемию при уже принятых углеводах!<br />
+            🚫 <strong>НЕ ПРОПУСКАЙ ПРИЁМЫ ПИЩИ</strong> — гипогликемия развивается за 15-30 минут!<br />
+            🩸 <strong>Глюкометр — твой лучший друг.</strong> Цель: 4.0-6.0 ммоль/л через 2ч после инъекции. Не выше 7.8, не ниже 3.9.<br />
+            🧬 MGF активирует сателлитные клетки локально (место инъекции/тренировки). ИФР-1 — системно. Оба требуют глюкозу и аминокислоты. Без еды в окне — нулевой эффект. 
           </div>
+          {/* GLP-1 info */}
+          {injections.some(i => i.type === 'семаглутид' || i.type === 'тирзепатид') && (
+            <div style={{ marginTop: 6, padding: '8px 10px', borderRadius: 10, background: 'rgba(251,191,36,0.06)', border: '1px solid rgba(251,191,36,0.15)' }}>
+              <div style={{ fontSize: 9, fontWeight: 700, color: '#fbbf24', marginBottom: 4 }}>💊 GLP-1 — справочник питания</div>
+              <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.5)', lineHeight: 1.6 }}>
+                📏 <strong>Дробное питание:</strong> 5-6 раз/день по 100-200г за приём. Не переполнять желудок — риск рвоты.<br />
+                🥑 <strong>Жиры &lt;5г/приём:</strong> GLP-1 замедляет опорожнение желудка — жиры задерживаются и вызывают тошноту, изжогу, риск панкреатита.<br />
+                💧 <strong>Вода 30-40 мл/кг:</strong> GLP-1 снижает моторику ЖКТ — риск запоров. Клетчатка 25-30г/день дополнительно.<br />
+                ⏰ <strong>График инъекций:</strong> пик тошноты — первые 24-72ч после инъекции. Планируй самые лёгкие приёмы на эти дни. Жиры в эти дни &lt;20г/день.<br />
+                🩸 <strong>Контроль B12 и электролитов:</strong> GLP-1 снижает всасывание B12 (через IF-фактор) и калия/магния — добавки обязательны.<br />
+                🆘 <strong>Боли в левом подреберье/животе:</strong> прекратить приём, срочно к врачу — исключить острый панкреатит.<br />
+                🚫 <strong>Алкоголь:</strong> исключить полностью — усиливает тошноту, риск гипогликемии, панкреатит.<br />
+                🍬 <strong>Гипогликемия:</strong> в комбинации с инсулином — риск возрастает вдвое. Глюкометр обязателен!
+              </div>
+            </div>
+          )}
         </GlassCard>
       )}
 
