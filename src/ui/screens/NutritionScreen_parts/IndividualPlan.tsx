@@ -1,4 +1,12 @@
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
+
+const addToCart = (name: string, kcal: number, amount?: number, category?: string) => {
+  try {
+    const cart = JSON.parse(localStorage.getItem('he_nutrition_cart') || '[]');
+    cart.push({ name, kcal: Math.round(kcal), amount: amount || 100, category: category || 'other' });
+    localStorage.setItem('he_nutrition_cart', JSON.stringify(cart));
+  } catch {}
+};
 import { FOOD_DB } from '../../../core/nutrition-database';
 import { calcNutrition } from '../../../engines/nutrition.engine';
 import { getProfile, updateProfile } from '../../../core/profile-manager';
@@ -905,8 +913,9 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
                     color: 'rgba(255,255,255,0.7)',
                     display: 'inline-flex', alignItems: 'center', gap: 3,
                   }}>
-                    {it.name}
+                    <span style={{ flex:1 }}>{it.name}</span>
                     <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: 7 }}>{it.amount}г</span>
+                    <span onClick={() => addToCart(it.name, it.kcal * (it.amount / 100), it.amount, it.category)} style={{ cursor:'pointer', fontSize:7, color:'#00e68a', opacity:0.4, padding:'0 2px' }} title="В корзину">🛒</span>
                   </span>
                 ))}
               </div>
@@ -1434,7 +1443,10 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
         <GlassCard title="🍔 Читмил" style={{ border: '1px solid rgba(245,158,11,0.15)' }}>
           <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.6)', marginBottom: 4 }}>~{cheatMealPlan.cals} ккал (35% от дневной нормы)</div>
           {cheatMealPlan.items.map((it: any, i: number) => (
-            <div key={i} style={{ fontSize: 9, padding: '2px 0' }}>• {it.name} — {it.kcal} ккал</div>
+            <div key={i} style={{ display:'flex', justifyContent:'space-between', fontSize: 9, padding: '2px 0', alignItems:'center' }}>
+              <span>• {it.name || it}</span>
+              <span onClick={() => addToCart(it.name || it, it.kcal || (cheatMealPlan.cals / cheatMealPlan.items.length), 100)} style={{ cursor:'pointer', fontSize:7, color:'#00e68a', opacity:0.4 }} title="В корзину">🛒</span>
+            </div>
           ))}
           <div style={{ fontSize: 8, color: '#f59e0b', marginTop: 4 }}>{cheatMealPlan.note}</div>
         </GlassCard>
@@ -1444,7 +1456,10 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
         <GlassCard title="🍚 Углеводная загрузка" style={{ border: '1px solid rgba(249,115,22,0.15)' }}>
           <div style={{ fontSize: 9, color: '#f97316', fontWeight: 700, marginBottom: 4 }}>Всего углеводов: {carbloadPlan.totalCarbs} г ({Math.round(carbloadPlan.totalCarbs / weight)} г/кг)</div>
           {carbloadPlan.foods.map((f: any, i: number) => (
-            <div key={i} style={{ fontSize: 9, padding: '2px 0', color: 'rgba(255,255,255,0.6)' }}>• {f.name}: {f.amount}г ({f.carbs}г/100г)</div>
+            <div key={i} style={{ display:'flex', justifyContent:'space-between', fontSize: 9, padding: '2px 0', alignItems:'center' }}>
+              <span>• {f.name || f}</span>
+              <span onClick={() => addToCart(f.name || f, f.kcal || 100, 100)} style={{ cursor:'pointer', fontSize:7, color:'#00e68a', opacity:0.4 }} title="В корзину">🛒</span>
+            </div>
           ))}
           <div style={{ fontSize: 8, color: '#f97316', marginTop: 4 }}>{carbloadPlan.note}</div>
         </GlassCard>
