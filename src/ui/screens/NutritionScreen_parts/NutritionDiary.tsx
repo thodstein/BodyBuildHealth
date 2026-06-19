@@ -165,7 +165,7 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
                 border: isSelected ? '1px solid #00e68a' : '1px solid transparent',
                 transition:'all 0.15s',
               }}>
-                <span style={{ fontSize:8, color: isSelected ? '#00e68a' : 'rgba(255,255,255,0.4)', fontWeight: isSelected ? 700 : 400 }}>{DAY_NAMES[i]}</span>
+                <span style={{ fontSize:8, color: isSelected ? '#00e68a' : 'rgba(255,255,255,0.6)', fontWeight: isSelected ? 700 : 400 }}>{DAY_NAMES[i]}</span>
                 <span style={{ fontSize:14, fontWeight:700, color: isToday ? '#00e68a' : isSelected ? '#fff' : 'rgba(255,255,255,0.5)', marginTop:1 }}>{new Date(ds).getDate()}</span>
                 {hasData && <div style={{ width:5, height:5, borderRadius:'50%', background:'#00e68a', marginTop:2 }} />}
               </div>
@@ -177,7 +177,7 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
             <span>📋 Вставить «{copySource}» →</span>
             <div style={{ display:'flex', gap:4 }}>
               <button onClick={() => pasteMeal(selectedDate)} style={{ padding:'3px 8px', borderRadius:6, border:'none', cursor:'pointer', background:'rgba(139,92,246,0.2)', color:'#8b5cf6', fontSize:8, fontWeight:600 }}>Сюда</button>
-              <button onClick={() => setCopySource(null)} style={{ padding:'3px 8px', borderRadius:6, border:'none', cursor:'pointer', background:'rgba(255,255,255,0.08)', color:'rgba(255,255,255,0.4)', fontSize:8 }}>✕</button>
+              <button onClick={() => setCopySource(null)} style={{ padding:'3px 8px', borderRadius:6, border:'none', cursor:'pointer', background:'rgba(255,255,255,0.08)', color:'rgba(255,255,255,0.6)', fontSize:8 }}>✕</button>
             </div>
           </div>
         )}
@@ -210,7 +210,7 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
                       <span style={{ fontSize:12 }}>{CAT_MAP_EMOJI[f.category] || '📦'}</span>
                       <span style={{ fontWeight:500 }}>{f.name}</span>
                     </div>
-                    <div style={{ display:'flex', gap:3, fontSize:8, color:'rgba(255,255,255,0.4)' }}>
+                    <div style={{ display:'flex', gap:3, fontSize:8, color:'rgba(255,255,255,0.6)' }}>
                       <span style={{ color:'#00e68a', fontWeight:700 }}>{f.kcal}</span>
                       <span style={{ color:'#3b82f6' }}>{f.protein}</span>
                       <span style={{ color:'#f59e0b' }}>{f.fat}</span>
@@ -243,7 +243,7 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
                 <input value={customFoodName} onChange={e => setCustomFoodName(e.target.value)} placeholder="Название" style={{ width:'100%', padding:'5px 8px', borderRadius:6, background:'#18181b', border:'1px solid rgba(255,255,255,0.06)', color:'#fff', fontSize:9, marginBottom:4, boxSizing:'border-box' }} />
                 <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr', gap:3 }}>
                   {[{l:'Ккал',v:customFoodKcal,s:setCustomFoodKcal},{l:'Белки',v:customFoodP,s:setCustomFoodP},{l:'Жиры',v:customFoodF,s:setCustomFoodF},{l:'Угл.',v:customFoodC,s:setCustomFoodC}].map((x,i) => (
-                    <div key={i}><label style={{ fontSize:7, color:'rgba(255,255,255,0.4)' }}>{x.l}</label><input type="number" value={x.v} onChange={e => x.s(e.target.value)} style={{ width:'100%', padding:'4px', borderRadius:4, background:'#18181b', border:'1px solid rgba(255,255,255,0.06)', color:'#fff', fontSize:8, boxSizing:'border-box' }} /></div>
+                    <div key={i}><label style={{ fontSize:7, color:'rgba(255,255,255,0.6)' }}>{x.l}</label><input type="number" value={x.v} onChange={e => x.s(e.target.value)} style={{ width:'100%', padding:'4px', borderRadius:4, background:'#18181b', border:'1px solid rgba(255,255,255,0.06)', color:'#fff', fontSize:8, boxSizing:'border-box' }} /></div>
                   ))}
                 </div>
                 <button onClick={addCustomFood} style={{ width:'100%', marginTop:4, padding:'5px', borderRadius:6, border:'none', cursor:'pointer', background:'linear-gradient(135deg,#00e68a,#00c8a0)', color:'#000', fontWeight:600, fontSize:9 }}>+ Добавить</button>
@@ -253,7 +253,7 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
 
           {favoriteFoods.length > 0 && (
             <div style={{ padding:'10px 14px', borderRadius:16, background:'#18181b', border:'1px solid rgba(255,255,255,0.06)' }}>
-              <div style={{ fontSize:9, color:'rgba(255,255,255,0.4)', marginBottom:4 }}>⭐ Избранное</div>
+              <div style={{ fontSize:9, color:'rgba(255,255,255,0.6)', marginBottom:4 }}>⭐ Избранное</div>
               <div style={{ display:'flex', flexWrap:'wrap', gap:2 }}>
                 {favoriteFoods.slice(0,8).map(f => (
                   <button key={f.id} onClick={() => addFoodFromDB(f)} style={{ padding:'4px 10px', borderRadius:8, fontSize:8, cursor:'pointer', background:'rgba(139,92,246,0.15)', border:'1px solid rgba(139,92,246,0.3)', color:'#8b5cf6', whiteSpace:'nowrap' }}>
@@ -276,7 +276,7 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
 
           {showOCR && (
             <div style={{ padding:14, borderRadius:16, background:'#18181b', border:'1px solid rgba(255,255,255,0.06)' }}>
-              <div style={{ fontSize:9, color:'rgba(255,255,255,0.4)', marginBottom:4 }}>Вставьте текст из FatSecret / MyFitnessPal:</div>
+              <div style={{ fontSize:9, color:'rgba(255,255,255,0.6)', marginBottom:4 }}>Вставьте текст из FatSecret / MyFitnessPal:</div>
               <textarea value={ocrText} onChange={e => setOcrText(e.target.value)} placeholder="Название 100г 250 ккал Б:15 Ж:10 У:20 ..."
                 style={{ width:'100%', minHeight:70, padding:8, borderRadius:8, border:'1px solid rgba(255,255,255,0.06)', background:'#202023', color:'#fff', fontSize:11, resize:'vertical', boxSizing:'border-box', marginBottom:6 }} />
               <button onClick={handleOCR} style={{ padding:'7px 14px', borderRadius:8, border:'none', background:'linear-gradient(135deg,#00e68a,#00c8a0)', color:'#000', fontWeight:600, fontSize:10, cursor:'pointer' }}>Распознать</button>
@@ -288,7 +288,7 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
             <div style={{ padding:14, borderRadius:16, background:'rgba(0,230,138,0.06)', border:'1px solid rgba(0,230,138,0.2)' }}>
               <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:6 }}>
                 <span style={{ fontSize:10, color:'#00e68a', fontWeight:600 }}>📋 На очереди ({parsedItems.length})</span>
-                <span style={{ fontSize:9, color:'rgba(255,255,255,0.4)' }}>{mealType || 'Приём пищи'}</span>
+                <span style={{ fontSize:9, color:'rgba(255,255,255,0.6)' }}>{mealType || 'Приём пищи'}</span>
               </div>
               {parsedItems.map((item,i) => (
                 <div key={i} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'4px 8px', borderRadius:8, background:'#202023', marginBottom:2 }}>
@@ -298,7 +298,7 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
                       style={{ width:45, padding:'2px 4px', borderRadius:4, background:'#18181b', border:'1px solid rgba(255,255,255,0.06)', color:'#fff', fontSize:8, textAlign:'center' }} />
                     <span style={{ fontSize:7, color:'rgba(255,255,255,0.3)' }}>г</span>
                   </div>
-                  <div style={{ display:'flex', gap:3, fontSize:8, color:'rgba(255,255,255,0.4)' }}>
+                  <div style={{ display:'flex', gap:3, fontSize:8, color:'rgba(255,255,255,0.6)' }}>
                     <span style={{ color:'#00e68a' }}>{Math.round(item.kcal * (item.qty||100) / 100)}</span>
                     <button onClick={() => setParsedItems(prev => prev.filter((_,j) => j !== i))} style={{ padding:'1px 5px', borderRadius:4, border:'none', cursor:'pointer', background:'rgba(239,68,68,0.15)', color:'#ef4444', fontSize:8, lineHeight:1 }}>✕</button>
                   </div>
@@ -319,13 +319,13 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
                 {Object.keys(dayMeals).length > 0 && (
                   <button onClick={clearDay} style={{ padding:'4px 10px', borderRadius:6, border:'none', cursor:'pointer', background:'rgba(239,68,68,0.15)', color:'#ef4444', fontSize:8, fontWeight:600 }}>✕ Очистить</button>
                 )}
-                <span style={{ fontSize:9, color:'rgba(255,255,255,0.4)' }}>{Object.keys(dayMeals).length} приёмов</span>
+                <span style={{ fontSize:9, color:'rgba(255,255,255,0.6)' }}>{Object.keys(dayMeals).length} приёмов</span>
               </div>
             </div>
 
             {Object.keys(dayMeals).length > 0 && (
               <div style={{ marginBottom:8, padding:'8px 10px', borderRadius:10, background:'rgba(0,230,138,0.06)', border:'1px solid rgba(0,230,138,0.15)' }}>
-                <div style={{ fontSize:8, color:'rgba(255,255,255,0.4)', marginBottom:4 }}>🎯 Прогресс за день</div>
+                <div style={{ fontSize:8, color:'rgba(255,255,255,0.6)', marginBottom:4 }}>🎯 Прогресс за день</div>
                 {[
                   { l:'Ккал', v:dayTotals.kcal, t:targets?.kcal || 2500, c:'#00e68a' },
                   { l:'Белки', v:dayTotals.p, t:targets?.protein || 160, c:'#3b82f6' },
@@ -363,7 +363,7 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
                       <button onClick={() => copyMeal(meal)} style={{ padding:'2px 6px', borderRadius:4, border:'none', cursor:'pointer', background:'rgba(139,92,246,0.15)', color:'#8b5cf6', fontSize:7 }} title="Копировать приём">📋</button>
                     </div>
                     <div style={{ display:'flex', alignItems:'center', gap:4, fontSize:8 }}>
-                      <span style={{ color:'rgba(255,255,255,0.4)' }}>Б{Math.round(mealP)} Ж{Math.round(mealF)} У{Math.round(mealC)}</span>
+                      <span style={{ color:'rgba(255,255,255,0.6)' }}>Б{Math.round(mealP)} Ж{Math.round(mealF)} У{Math.round(mealC)}</span>
                       <span style={{ color:'#00e68a', fontWeight:700, fontSize:10 }}>{Math.round(mealKcal)}</span>
                     </div>
                   </div>
