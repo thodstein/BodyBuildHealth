@@ -2103,9 +2103,71 @@ export function findSupportForGoal(
       if ((sub.organs||[]).some(o => riskLower.includes((o||'').toLowerCase()))) score += 1;
       if ((sub.mechanisms||[]).some(m => riskLower.includes((m||'').toLowerCase()))) score += 1;
       if (sub.description && (sub.description||'').toLowerCase().includes(riskLower)) score += 1;
+      if ((sub.categories||[]).some(c => riskLower.includes((c||'').toLowerCase()))) score += 2;
     }
     if (score > 0) scored.push({ substance: sub, score });
   }
+  scored.sort((a, b) => b.score - a.score);
+  return scored.slice(0, maxResults).map(s => ({ substance: s.substance, relevanceScore: s.score }));
+}
+
+/** Goal-aware substance scoring: scores substances by how well they support a given fitness goal */
+export function findSupportByGoal(
+  goal: string,
+  maxResults: number = 20
+): { substance: SupportSubstance; relevanceScore: number }[] {
+  // Map goals to relevant systems, mechanisms, and organ targets
+  const goalMap: Record<string, { organs: string[]; mechs: string[]; cats: string[] }> = {
+    muscle_gain: {
+      organs: ['musculoskeletal', 'endocrine', 'hepatic'],
+      mechs: ['protein synthesis', 'testosterone', 'anabolic', 'anti-catabolic', 'growth hormone', 'mTOR', 'nitrogen', 'creatine'],
+      cats: ['amino acid', 'mineral', 'protein', 'testosterone booster', 'adaptogen'],
+    },
+    strength: {
+      organs: ['musculoskeletal', 'neuro', 'endocrine'],
+      mechs: ['testosterone', 'strength', 'power', 'neural', 'creatine', 'cns', 'atp', 'phosphocreatine'],
+      cats: ['amino acid', 'mineral', 'testosterone booster', 'nootropic'],
+    },
+    fat_loss: {
+      organs: ['endocrine', 'hepatic', 'cardio'],
+      mechs: ['metabolism', 'fat oxidation', 'thermogenesis', 'insulin', 'thyroid', 'lipolysis', 'beta-oxidation'],
+      cats: ['thermogenic', 'metabolism', 'fat burner', 'adaptogen', 'mineral'],
+    },
+    endurance: {
+      organs: ['cardio', 'hematologic', 'musculoskeletal'],
+      mechs: ['oxygen', 'mitochondrial', 'atp', 'endurance', 'vo2', 'nitric oxide', 'blood flow', 'red blood cell'],
+      cats: ['amino acid', 'mineral', 'vasodilator', 'adaptogen', 'cardio'],
+    },
+    recomp: {
+      organs: ['endocrine', 'musculoskeletal', 'hepatic'],
+      mechs: ['metabolism', 'testosterone', 'muscle', 'fat', 'hormone', 'thyroid', 'protein synthesis'],
+      cats: ['adaptogen', 'amino acid', 'mineral', 'testosterone booster', 'metabolism'],
+    },
+    maintenance: {
+      organs: ['cardio', 'hepatic', 'endocrine', 'neuro'],
+      mechs: ['antioxidant', 'health', 'immune', 'vitamin', 'mineral', 'inflammation'],
+      cats: ['vitamin', 'mineral', 'antioxidant', 'adaptogen', 'omega'],
+    },
+  };
+
+  const cfg = goalMap[goal] || goalMap.maintenance;
+  const scored: { substance: SupportSubstance; score: number }[] = [];
+
+  for (const sub of ALL_SUBSTANCES) {
+    let score = 0;
+    for (const organ of cfg.organs) {
+      if ((sub.organs||[]).some(o => (o||'').toLowerCase().includes(organ))) score += 4;
+    }
+    for (const mech of cfg.mechs) {
+      if ((sub.mechanisms||[]).some(m => (m||'').toLowerCase().includes(mech))) score += 3;
+    }
+    for (const cat of cfg.cats) {
+      if ((sub.categories||[]).some(c => (c||'').toLowerCase().includes(cat))) score += 2;
+    }
+    if (sub.description && cfg.mechs.some(m => sub.description.toLowerCase().includes(m))) score += 1;
+    if (score > 0) scored.push({ substance: sub, score });
+  }
+
   scored.sort((a, b) => b.score - a.score);
   return scored.slice(0, maxResults).map(s => ({ substance: s.substance, relevanceScore: s.score }));
 }

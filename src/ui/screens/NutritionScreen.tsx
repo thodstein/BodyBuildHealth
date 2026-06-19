@@ -10,7 +10,6 @@ import { generateMealPlan, type MealPlanInput, type DailyMealPlan } from '../../
 import { generateWeeklyMealPlan, generateGroceryList, getFoodSwaps, getPortionGuide } from '../../engines/meal-planning-system.engine';
 import { calculateMacroPlan, generateCarbCycle, getSupplementTimings, getRecipes } from '../../engines/nutrition-periodization.engine';
 import { getRestaurantGuide, getTopAthleteChoices, getTravelWorkouts, getSleepStacks } from '../../engines/restaurant-travel-sleep.engine';
-import { generateMacroCycle, calcCycleAdherence, type WeeklyCyclePlan } from '../../engines/nutrition-cycling.engine';
 import { generateNutritionAdvice } from '../../engines/nutrition-full.engine';
 import { NutritionOverview } from './NutritionScreen_parts/NutritionOverview';
 import { NutritionDiary } from './NutritionScreen_parts/NutritionDiary';
@@ -29,20 +28,21 @@ interface DiaryEntry {
 
 type NutritionPage = 'hero' | 'tabs';
 type NutritionSection = 'diary' | 'planning' | 'overview' | 'all';
-type ActiveTab = 'overview' | 'diary' | 'charts' | 'mealplan' | 'grocery' | 'restaurant' | 'cycling' | 'calc' | 'custom' | 'planoverview' | 'rules' | 'products' | 'infocalc' | 'recipes';
+type ActiveTab = 'diary' | 'charts' | 'mealplan' | 'grocery' | 'infocalc' | 'custom' | 'planoverview' | 'rules' | 'products' | 'favorites' | 'catalog' | 'restaurant' | 'recipes' | 'reports' | 'overview';
 
 const SECTION_TABS: Record<NutritionSection, string[]> = {
-  diary: ['diary', 'charts'],
-  planning: ['overview', 'infocalc', 'grocery', 'restaurant', 'recipes', 'custom', 'mealplan', 'cycling'],
+  diary: ['mealplan', 'diary', 'charts', 'favorites', 'catalog', 'recipes', 'restaurant', 'reports'],
+  planning: ['mealplan', 'infocalc', 'grocery'],
   overview: [],
-  all: ['overview', 'diary', 'charts', 'mealplan', 'cycling', 'infocalc', 'grocery', 'restaurant', 'custom', 'recipes'],
+  all: ['mealplan', 'diary', 'charts', 'favorites', 'catalog', 'recipes', 'restaurant', 'reports', 'infocalc', 'grocery', 'custom'],
 };
 
 const TAB_LABELS: Record<string, string> = {
   diary: '📝 Дневник', charts: '📈 Графики',
-  mealplan: '🥗 План', cycling: '🔄 Циклирование',
-  overview: '📊 Общая информация', recipes: '🍳 Рецепты', infocalc: '📐 Калькуляторы',
+  mealplan: '🥗 Планирование питания',
+  infocalc: '📐 Калькуляторы',
   grocery: '🛒 Список', restaurant: '🍽 Ресторан', custom: '🍎 Своё',
+  favorites: '⭐ Избранное', catalog: '📦 Каталог', recipes: '🍳 Рецепты', reports: '📊 Отчёты',
 };
 
 const NutritionLabContext: React.FC<{ labAnalysis: LabCompositeResult }> = ({ labAnalysis }) => (
@@ -64,7 +64,7 @@ const NutritionLabContext: React.FC<{ labAnalysis: LabCompositeResult }> = ({ la
 export const NutritionScreen: React.FC = () => {
   const linked = useDataLink();
   const labAnalysis = linked.labAnalysis;
-  const [tab, setTab] = useState<ActiveTab>('overview');
+  const [tab, setTab] = useState<ActiveTab>('mealplan');
   const [page, setPage] = useState<NutritionPage>('hero');
   const [nutritionSection, setNutritionSection] = useState<NutritionSection>('all');
   const [mealSubTab, setMealSubTab] = useState<string>('planoverview');
@@ -140,9 +140,11 @@ export const NutritionScreen: React.FC = () => {
       case 'mealplan': return <MealPlanExtended tKcal={tKcal} tProt={tProt} tFat={tFat} tCarbs={tCarbs} profile={linked.profile} mealSubTab={mealSubTab} setMealSubTab={setMealSubTab} avgWeeklyKcal={avgWeeklyKcal} avgWeeklyProtein={avgWeeklyProtein} avgWeeklyFat={avgWeeklyFat} avgWeeklyCarbs={avgWeeklyCarbs} microsIntake={microsIntake} labAnalysis={labAnalysis} />;
       case 'grocery': return <GroceryTab tKcal={tKcal} tProt={tProt} />;
       case 'restaurant': return <RestaurantTab />;
-      case 'cycling': return <CyclingTab tKcal={tKcal} tProt={tProt} />;
       case 'custom': return <NutritionCustomFood />;
-      default: return <NutritionOverview profile={linked.profile} avgWeeklyKcal={avgWeeklyKcal} avgWeeklyProtein={avgWeeklyProtein} avgWeeklyFat={avgWeeklyFat} avgWeeklyCarbs={avgWeeklyCarbs} microsIntake={microsIntake} />;
+      case 'favorites': return <FavoritesTab />;
+      case 'catalog': return <CatalogTab />;
+      case 'reports': return <ReportsTab foodEntries={foodEntries} />;
+      default: return <MealPlanExtended tKcal={tKcal} tProt={tProt} tFat={tFat} tCarbs={tCarbs} profile={linked.profile} mealSubTab={mealSubTab} setMealSubTab={setMealSubTab} avgWeeklyKcal={avgWeeklyKcal} avgWeeklyProtein={avgWeeklyProtein} avgWeeklyFat={avgWeeklyFat} avgWeeklyCarbs={avgWeeklyCarbs} microsIntake={microsIntake} labAnalysis={labAnalysis} />;
     }
   };
 
@@ -161,8 +163,8 @@ export const NutritionScreen: React.FC = () => {
             </p>
             <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
               {[
-                { section: 'diary' as NutritionSection, tab: 'diary', icon: '📝', title: 'Дневник питания', desc: 'Запись продуктов, OCR, штрих-коды', color: '#22c55e' },
-                { section: 'planning' as NutritionSection, tab: 'overview', icon: '🥗', title: 'План питания', desc: 'Обзор, генератор рациона, уровни, циклирование, рецепты', color: '#3b82f6' },
+                { section: 'diary' as NutritionSection, tab: 'mealplan', icon: '🥗', title: 'Планирование питания', desc: 'План, дневник, графики, избранное, каталог', color: '#3b82f6' },
+                { section: 'planning' as NutritionSection, tab: 'mealplan', icon: '🧮', title: 'Калькуляторы и список', desc: 'Расчёты КБЖУ, продуктовый список, свои продукты', color: '#22c55e' },
               ].map(card => (
                 <button key={card.section} onClick={() => { setPage('tabs'); setNutritionSection(card.section); setTab(card.tab as any); }} style={{
                   display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', borderRadius: 14, cursor: 'pointer', textAlign: 'left', width: '100%',
@@ -1918,23 +1920,6 @@ const RestaurantTab: React.FC = () => {
   </div>);
 };
 
-const CyclingTab: React.FC<{ tKcal: number; tProt: number }> = ({ tKcal, tProt }) => {
-  const WEEK = ['','','','','','',''];
-  const [cycle, setCycle] = React.useState<WeeklyCyclePlan | null>(null);
-  const gen = () => {
-    const targets: any = { kcal: Math.round(tKcal), protein: Math.round(tProt), fats: Math.round(tKcal * 0.25 / 9), carbs: Math.round((tKcal - tProt * 4 - tKcal * 0.25) / 4), water: 3, fiber: 30, steps: 8000 };
-    setCycle(generateMacroCycle(targets, [true,true,false,true,true,false,false], new Date().toISOString().split('T')[0]));
-  };
-  return (<div>
-    <button onClick={gen} style={{ width:'100%',padding:12,borderRadius:8,border:'none',cursor:'pointer',marginBottom:10,background:'linear-gradient(135deg,#3b82f6,#6366f1)',color:'#fff',fontWeight:700,fontSize:14 }}>🔄 Сгенерировать макро-цикл</button>
-    {cycle && <div>{cycle.days.map((d,i)=><div key={i} className="card" style={{ marginBottom:4, padding:8 }}>
-      <div style={{ fontWeight:600,fontSize:11 }}>{WEEK[i]} {d.isTrainingDay ? '' : ''} — {d.targets.kcal} ккал</div>
-      <div style={{ fontSize:9,color:'var(--text-light)' }}>Б:{d.targets.p}г Ж:{d.targets.f}г У:{d.targets.c}г</div>
-    </div>)}</div>}
-  </div>);
-};
-
-
 const FoodDbSyncCard: React.FC = () => {
   const FOOD_DB_VERSION = '2026.06.15';
   const CHANGELOG = [
@@ -2207,4 +2192,171 @@ const NutritionCalculators: React.FC = () => {
       </div>
     </div>
   );
+};
+
+// ── Favorites Tab (избранное + свои продукты) ──
+interface FavItem { id: string; name: string; kcal: number; p: number; f: number; c: number; _type: 'fav' | 'custom'; }
+
+const FavoritesTab: React.FC = () => {
+  const [foodSearch, setFoodSearch] = React.useState('');
+  const [favs, setFavs] = React.useState<FavItem[]>(() => {
+    const ids: string[] = JSON.parse(localStorage.getItem('he_food_favs') || '[]');
+    return ids.map(id => {
+      const f = FOOD_DB.find(db => db.id === id);
+      if (!f) return null;
+      return { id: f.id, name: f.name, kcal: f.kcal, p: f.protein, f: f.fat, c: f.carbs, _type: 'fav' as const };
+    }).filter(Boolean) as FavItem[];
+  });
+  const [customFoods, setCustomFoods] = React.useState<any[]>(() => { try { return JSON.parse(localStorage.getItem('he_custom_foods') || '[]'); } catch { return []; } });
+  const [newName, setNewName] = React.useState(''); const [newKcal, setNewKcal] = React.useState(0); const [newP, setNewP] = React.useState(0); const [newF, setNewF] = React.useState(0); const [newC, setNewC] = React.useState(0);
+  const saveCustom = () => { if (!newName.trim()) return; const food = { id:'custom_'+Date.now(), name:newName, kcal:newKcal, p:newP, f:newF, c:newC }; const updated = [...customFoods, food]; setCustomFoods(updated); localStorage.setItem('he_custom_foods', JSON.stringify(updated)); setNewName(''); setNewKcal(0); setNewP(0); setNewF(0); setNewC(0); };
+  const deleteCustom = (id: string) => { const updated = customFoods.filter((f:any) => f.id !== id); setCustomFoods(updated); localStorage.setItem('he_custom_foods', JSON.stringify(updated)); };
+  const removeFav = (id: string) => { const ids: string[] = JSON.parse(localStorage.getItem('he_food_favs') || '[]'); const updated = ids.filter(fid => fid !== id); localStorage.setItem('he_food_favs', JSON.stringify(updated)); setFavs(prev => prev.filter(f => f.id !== id)); };
+  const addToDiary = (food: FavItem) => {
+    const raw = localStorage.getItem('nutrition_diary');
+    const diary = raw ? JSON.parse(raw) : {};
+    const today = new Date().toISOString().split('T')[0];
+    if (!diary[today]) diary[today] = { meals: { 'Приём пищи': [] } };
+    diary[today].meals['Приём пищи'].push({ name:food.name, qty:'100 г', kcal:food.kcal || 0, p:food.p || 0, f:food.f || 0, c:food.c || 0 });
+    localStorage.setItem('nutrition_diary', JSON.stringify(diary));
+  };
+  const allItems: FavItem[] = [
+    ...favs,
+    ...customFoods.map((f:any) => ({ id:f.id, name:f.name, kcal:f.kcal, p:f.p || f.protein || 0, f:f.f || f.fat || 0, c:f.c || f.carbs || 0, _type:'custom' as const })),
+  ];
+  const filtered = allItems.filter(f => !foodSearch || f.name.toLowerCase().includes(foodSearch.toLowerCase()));
+  return (<div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+    <div style={{ padding:12, borderRadius:14, background:'linear-gradient(135deg,rgba(255,255,255,0.06),rgba(255,255,255,0.02))', backdropFilter:'blur(20px)', border:'1px solid rgba(255,255,255,0.06)' }}>
+      <div style={{ fontSize:10, color:'rgba(255,255,255,0.35)', fontWeight:500, marginBottom:6 }}>⭐ Избранное и свои продукты</div>
+      <input value={foodSearch} onChange={e => setFoodSearch(e.target.value)} placeholder="🔍 Поиск..." style={{ width:'100%', padding:'7px 10px', borderRadius:8, background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text)', fontSize:10, boxSizing:'border-box', marginBottom:8 }} />
+      <div style={{ maxHeight:200, overflowY:'auto', display:'flex', flexDirection:'column', gap:3 }}>
+        {filtered.map(f => <div key={f.id} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'4px 8px', borderRadius:6, background:'rgba(255,255,255,0.02)' }}>
+          <span style={{ fontSize:10, fontWeight:500 }}>{f.name}</span>
+          <div style={{ display:'flex', gap:4, alignItems:'center' }}>
+            <span style={{ fontSize:8, color:'rgba(255,255,255,0.3)' }}>{f.kcal}ккал Б{f.p} Ж{f.f} У{f.c}</span>
+            <button onClick={() => addToDiary(f)} style={{ padding:'2px 6px', borderRadius:4, fontSize:8, cursor:'pointer', background:'rgba(0,230,138,0.1)', border:'1px solid rgba(0,230,138,0.2)', color:'#00e68a' }}>+Дневник</button>
+            {f._type === 'fav' ? <button onClick={() => removeFav(f.id)} style={{ padding:'2px 6px', borderRadius:4, fontSize:8, cursor:'pointer', background:'rgba(239,68,68,0.1)', border:'1px solid rgba(239,68,68,0.2)', color:'#ef4444' }}>✕</button>
+            : <button onClick={() => deleteCustom(f.id)} style={{ padding:'2px 6px', borderRadius:4, fontSize:8, cursor:'pointer', background:'rgba(239,68,68,0.1)', border:'1px solid rgba(239,68,68,0.2)', color:'#ef4444' }}>✕</button>}
+          </div>
+        </div>)}
+      </div>
+    </div>
+    {/* Add custom food */}
+    <div style={{ padding:12, borderRadius:14, background:'linear-gradient(135deg,rgba(255,255,255,0.06),rgba(255,255,255,0.02))', backdropFilter:'blur(20px)', border:'1px solid rgba(255,255,255,0.06)' }}>
+      <div style={{ fontSize:10, color:'rgba(255,255,255,0.35)', fontWeight:500, marginBottom:6 }}>➕ Добавить свой продукт</div>
+      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr 1fr', gap:4, marginBottom:6 }}>
+        <input value={newName} onChange={e => setNewName(e.target.value)} placeholder="Название" style={{ padding:'5px', borderRadius:6, background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text)', fontSize:9 }} />
+        <input type="number" value={newKcal || ''} onChange={e => setNewKcal(+e.target.value)} placeholder="Ккал" style={{ padding:'5px', borderRadius:6, background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text)', fontSize:9 }} />
+        <input type="number" value={newP || ''} onChange={e => setNewP(+e.target.value)} placeholder="Белки" style={{ padding:'5px', borderRadius:6, background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text)', fontSize:9 }} />
+        <input type="number" value={newF || ''} onChange={e => setNewF(+e.target.value)} placeholder="Жиры" style={{ padding:'5px', borderRadius:6, background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text)', fontSize:9 }} />
+        <input type="number" value={newC || ''} onChange={e => setNewC(+e.target.value)} placeholder="Угл." style={{ padding:'5px', borderRadius:6, background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text)', fontSize:9 }} />
+      </div>
+      <button onClick={saveCustom} style={{ width:'100%', padding:7, borderRadius:8, border:'none', cursor:'pointer', background:'var(--accent)', color:'#000', fontWeight:600, fontSize:10 }}>💾 Сохранить</button>
+    </div>
+  </div>);
+};
+
+// ── Catalog Tab ──
+const CatalogTab: React.FC = () => {
+  const [catSearch, setCatSearch] = React.useState('');
+  const [catFilter, setCatFilter] = React.useState('all');
+  const categories = [...new Set(FOOD_DB.map(f => f.category || 'other'))];
+  const addFav = (food: { id: string; name: string; kcal: number; protein: number; fat: number; carbs: number }) => {
+    const ids: string[] = JSON.parse(localStorage.getItem('he_food_favs') || '[]');
+    const updated = [food.id, ...ids.filter(f => f !== food.id)].slice(0, 12);
+    localStorage.setItem('he_food_favs', JSON.stringify(updated));
+  };
+  const filtered = FOOD_DB.filter(f => {
+    if (catFilter !== 'all' && f.category !== catFilter) return false;
+    if (catSearch && !f.name.toLowerCase().includes(catSearch.toLowerCase())) return false;
+    return true;
+  });
+  return (<div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+    <div style={{ padding:12, borderRadius:14, background:'linear-gradient(135deg,rgba(255,255,255,0.06),rgba(255,255,255,0.02))', backdropFilter:'blur(20px)', border:'1px solid rgba(255,255,255,0.06)' }}>
+      <div style={{ fontSize:10, color:'rgba(255,255,255,0.35)', fontWeight:500, marginBottom:6 }}>📦 Каталог продуктов ({FOOD_DB.length})</div>
+      <input value={catSearch} onChange={e => setCatSearch(e.target.value)} placeholder="🔍 Поиск..." style={{ width:'100%', padding:'7px 10px', borderRadius:8, background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text)', fontSize:10, boxSizing:'border-box', marginBottom:6 }} />
+      <div style={{ display:'flex', gap:3, flexWrap:'wrap', marginBottom:6 }}>
+        <button onClick={() => setCatFilter('all')} style={{ padding:'3px 8px', borderRadius:6, fontSize:8, cursor:'pointer', border: catFilter==='all' ? '1px solid #00e68a' : '1px solid rgba(255,255,255,0.06)', background: catFilter==='all' ? 'rgba(0,230,138,0.12)' : 'rgba(255,255,255,0.02)', color:'var(--text)' }}>Все</button>
+        {categories.map(c => <button key={c} onClick={() => setCatFilter(c)} style={{ padding:'3px 8px', borderRadius:6, fontSize:8, cursor:'pointer', border: catFilter===c ? '1px solid #00e68a' : '1px solid rgba(255,255,255,0.06)', background: catFilter===c ? 'rgba(0,230,138,0.12)' : 'rgba(255,255,255,0.02)', color:'var(--text)' }}>{c}</button>)}
+      </div>
+      <div style={{ maxHeight:300, overflowY:'auto', display:'flex', flexDirection:'column', gap:2 }}>
+        {filtered.map(f => <div key={f.id} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'4px 8px', borderRadius:6, background:'rgba(255,255,255,0.02)' }}>
+          <div><span style={{ fontSize:10, fontWeight:500 }}>{f.name}</span><span style={{ fontSize:7, color:'rgba(255,255,255,0.2)', marginLeft:4 }}>{f.category}</span></div>
+          <div style={{ display:'flex', gap:4, alignItems:'center' }}>
+            <span style={{ fontSize:8, color:'rgba(255,255,255,0.3)' }}>{f.kcal}ккал</span>
+            <button onClick={() => addFav(f)} style={{ padding:'2px 6px', borderRadius:4, fontSize:8, cursor:'pointer', background:'rgba(139,92,246,0.1)', border:'1px solid rgba(139,92,246,0.2)', color:'#8b5cf6' }}>+В избранное</button>
+          </div>
+        </div>)}
+      </div>
+    </div>
+  </div>);
+};
+
+// ── Reports Tab ──
+const ReportsTab: React.FC<{ foodEntries: DiaryEntry[] }> = ({ foodEntries }) => {
+  const [reportMode, setReportMode] = React.useState<'day'|'week'|'month'>('day');
+  const [reportDate, setReportDate] = React.useState(new Date().toISOString().split('T')[0]);
+  const raw = React.useMemo(() => { try { return JSON.parse(localStorage.getItem('nutrition_diary') || '{}'); } catch { return {}; } }, [foodEntries]);
+  const dayData = raw[reportDate];
+  const weekStart = React.useMemo(() => { const d = new Date(reportDate); d.setDate(d.getDate() - d.getDay() + 1); return d.toISOString().split('T')[0]; }, [reportDate]);
+  const weekData = React.useMemo(() => {
+    const start = new Date(weekStart);
+    const entries: any[] = [];
+    for (let i = 0; i < 7; i++) { const d = new Date(start); d.setDate(d.getDate() + i); const ds = d.toISOString().split('T')[0]; if (raw[ds]) Object.values(raw[ds].meals || {}).forEach((m:any) => m.forEach((e:any) => entries.push({...e, date:ds}))); }
+    return entries;
+  }, [raw, weekStart]);
+  const monthKey = reportDate.slice(0, 7);
+  const monthData = React.useMemo(() => {
+    const entries: any[] = [];
+    Object.entries(raw).forEach(([date, d]: [string, any]) => { if (date.startsWith(monthKey)) Object.values(d.meals || {}).forEach((m:any) => m.forEach((e:any) => entries.push({...e, date}))); });
+    return entries;
+  }, [raw, monthKey]);
+  const data = reportMode === 'day' ? (dayData ? Object.entries(dayData.meals || {}).flatMap(([meal, items]: [string, any]) => (items||[]).map((i:any) => ({...i, meal}))) : [])
+    : reportMode === 'week' ? weekData : monthData;
+  const totals = { kcal: data.reduce((s,i:any)=>s+(i.kcal||0),0), p: data.reduce((s,i:any)=>s+(i.p||0),0), f: data.reduce((s,i:any)=>s+(i.f||0),0), c: data.reduce((s,i:any)=>s+(i.c||0),0), count: data.length };
+  const byMeal: Record<string, {kcal:number;p:number;f:number;c:number;count:number}> = {};
+  (reportMode === 'day' && dayData ? Object.entries(dayData.meals || {}) : []).forEach(([meal, items]: [string, any]) => {
+    const mealItems = (items||[]);
+    byMeal[meal] = { kcal: mealItems.reduce((s:number,i:any)=>s+(i.kcal||0),0), p: mealItems.reduce((s:number,i:any)=>s+(i.p||0),0), f: mealItems.reduce((s:number,i:any)=>s+(i.f||0),0), c: mealItems.reduce((s:number,i:any)=>s+(i.c||0),0), count: mealItems.length };
+  });
+  const dayNames = ['Пн','Вт','Ср','Чт','Пт','Сб','Вс'];
+  return (<div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+    <div style={{ padding:12, borderRadius:14, background:'linear-gradient(135deg,rgba(255,255,255,0.06),rgba(255,255,255,0.02))', backdropFilter:'blur(20px)', border:'1px solid rgba(255,255,255,0.06)' }}>
+      <div style={{ fontSize:10, color:'rgba(255,255,255,0.35)', fontWeight:500, marginBottom:6 }}>📊 Отчёты</div>
+      <div style={{ display:'flex', gap:4, marginBottom:6 }}>
+        {(['day','week','month'] as const).map(m => <button key={m} onClick={() => setReportMode(m)} style={{ padding:'4px 10px', borderRadius:6, fontSize:9, cursor:'pointer', border: reportMode===m ? '1px solid #00e68a' : '1px solid rgba(255,255,255,0.06)', background: reportMode===m ? 'rgba(0,230,138,0.12)' : 'rgba(255,255,255,0.02)', color:'var(--text)', fontWeight: reportMode===m ? 700 : 400 }}>{m === 'day' ? 'День' : m === 'week' ? 'Неделя' : 'Месяц'}</button>)}
+      </div>
+      {reportMode === 'day' && <input type="date" value={reportDate} onChange={e => setReportDate(e.target.value)} style={{ width:'100%', padding:'6px', borderRadius:6, background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text)', fontSize:10, boxSizing:'border-box', marginBottom:6 }} />}
+      {/* Week row */}
+      {reportMode === 'week' && <div style={{ display:'flex', gap:2, marginBottom:6 }}>
+        {Array.from({length:7}, (_,i) => { const d = new Date(new Date(weekStart)); d.setDate(d.getDate()+i); const ds = d.toISOString().split('T')[0]; const hasData = !!raw[ds]; return <div key={i} style={{ flex:1, textAlign:'center', padding:'4px 2px', borderRadius:6, background: hasData ? 'rgba(0,230,138,0.1)' : 'rgba(255,255,255,0.02)', fontSize:8, color: hasData ? '#00e68a' : 'rgba(255,255,255,0.3)' }}>
+          <div>{dayNames[i]}</div><div style={{ fontWeight:700 }}>{d.getDate()}</div>
+        </div>; })}
+      </div>}
+      {/* Totals */}
+      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr 1fr', gap:4, marginBottom:6 }}>
+        {[{l:'Ккал',v:Math.round(totals.kcal),c:'#00e68a'},{l:'Белки',v:Math.round(totals.p),c:'#3b82f6'},{l:'Жиры',v:Math.round(totals.f),c:'#f59e0b'},{l:'Угл.',v:Math.round(totals.c),c:'#f97316'},{l:'Продуктов',v:totals.count,c:'#a78bfa'}].map((s,i) => <div key={i} style={{ background:'rgba(255,255,255,0.02)', borderRadius:6, padding:'4px', textAlign:'center' }}>
+          <div style={{ fontSize:7, color:'rgba(255,255,255,0.3)' }}>{s.l}</div><div style={{ fontSize:14, fontWeight:800, color:s.c }}>{s.v}</div>
+        </div>)}
+      </div>
+      {/* By meal type */}
+      {reportMode === 'day' && Object.keys(byMeal).length > 0 && <div>
+        <div style={{ fontSize:9, color:'rgba(255,255,255,0.3)', marginBottom:4 }}>По приёмам пищи:</div>
+        {Object.entries(byMeal).map(([meal, vals]) => <div key={meal} style={{ display:'flex', justifyContent:'space-between', padding:'3px 0', borderBottom:'1px solid rgba(255,255,255,0.03)', fontSize:9 }}>
+          <span style={{ fontWeight:600 }}>{meal}</span>
+          <span style={{ color:'rgba(255,255,255,0.4)' }}>{Math.round(vals.kcal)} ккал | Б{Math.round(vals.p)} Ж{Math.round(vals.f)} У{Math.round(vals.c)}</span>
+        </div>)}
+      </div>}
+      {/* Product list */}
+      {data.length > 0 && <div style={{ marginTop:6 }}>
+        <div style={{ fontSize:9, color:'rgba(255,255,255,0.3)', marginBottom:4 }}>Продукты:</div>
+        <div style={{ maxHeight:150, overflowY:'auto' }}>
+          {data.map((i:any, idx:number) => <div key={idx} style={{ display:'flex', justifyContent:'space-between', padding:'2px 0', fontSize:8, color:'rgba(255,255,255,0.4)' }}>
+            <span>{i.name} {i.meal ? <span style={{ color:'rgba(255,255,255,0.2)' }}>({i.meal})</span> : ''}</span>
+            <span>{Math.round(i.kcal||0)}ккал</span>
+          </div>)}
+        </div>
+      </div>}
+    </div>
+  </div>);
 };

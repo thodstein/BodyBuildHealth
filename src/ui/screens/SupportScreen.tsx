@@ -1,5 +1,5 @@
 ﻿import React, { useState, useMemo, useEffect, useCallback } from 'react';
-import { SYNERGY_PAIRS, ORGAN_SYNERGIES, SUPPLEMENT_DESCRIPTIONS, SUPPLEMENT_TARGETS, SUPPORT_RESEARCH, calculateSupport, checkSupportInteractions, findSupportForGoal, searchSupport, getSubstanceInfo, getSupportDatabaseStats, type SupportInput, type SynergyPair, type SupplementTarget, type OrganSynergy } from '../../engines/support.engine';
+import { SYNERGY_PAIRS, ORGAN_SYNERGIES, SUPPLEMENT_DESCRIPTIONS, SUPPLEMENT_TARGETS, SUPPORT_RESEARCH, calculateSupport, checkSupportInteractions, findSupportForGoal, findSupportByGoal, searchSupport, getSubstanceInfo, getSupportDatabaseStats, type SupportInput, type SynergyPair, type SupplementTarget, type OrganSynergy } from '../../engines/support.engine';
 import { decodeGarbled, cleanDesc, cleanSynergy, isReadableText } from '../../utils/text-sanitizer';
 import { RISK_SYSTEMS, ALL_RISK_SYSTEMS } from '../../core/constants';
 import { PHARMA_DB, getPharmaDetail } from '../../core/pharma-database';
@@ -1030,11 +1030,15 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   };
   const goHome = () => { setSection('home'); setTab('main'); setSupportView('main'); setCalcView('main'); setInfoView('catalog'); };
   const goBack = () => {
+    // Fix: hormonal section → full reset to home
+    if (section === 'hormonal') { setSection('home'); setTab('main'); setSupportView('main'); setCalcView('main'); setInfoView('catalog'); return; }
     if (calcView !== 'main') {
       if (section === 'generator') {
         setSection('home'); setTab('main'); setSupportView('main'); setCalcView('main');
       } else if (['mixcalc','neuro','joints','acne'].includes(calcView)) {
         setCalcView('info'); setInfoView('catalog'); setInfoTab('catalog');
+      } else if (calcView === 'info') {
+        setSection('home'); setTab('main'); setSupportView('calc'); setCalcView('main');
       } else {
         setCalcView('main');
       }
@@ -1331,8 +1335,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
     setCalcDone(true);
     const allSubs = [...supportDrugs, ...(effectiveLevel?.subs || SUPPORT_LEVELS[level]?.subs || [])].filter(Boolean);
     setDbInteractions(checkSupportInteractions(allSubs));
-    const goalRisks = supportGoal === 'muscle_gain' ? ['muscle', 'protein', 'testosterone'] : supportGoal === 'fat_loss' ? ['fat', 'metabolism', 'insulin'] : supportGoal === 'strength' ? ['strength', 'power', 'testosterone'] : supportGoal === 'endurance' ? ['endurance', 'oxygen', 'atp'] : supportGoal === 'recomp' ? ['muscle', 'fat', 'metabolism'] : ['health', 'vitamin', 'mineral'];
-    setGoalRecommendations(findSupportForGoal(goalRisks, 20));
+    setGoalRecommendations(findSupportByGoal(supportGoal, 20));
 
     const labData = linked.labs || [];
     const labRes = interpretLabs(labData);
@@ -3794,10 +3797,6 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
       {/* ===== STACKCALC IN CALC VIEW ===== */}
       {section === 'generator' && tab === 'main' && supportView === 'calc' && calcView === 'stackcalc' && (
         <div style={{ padding:'0 0 70px' }}>
-          <div style={{ display:'flex', gap:6, marginBottom:6 }}>
-            <button onClick={goBack} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← Назад</button>
-            <button onClick={goHome} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← На главную Поддержки</button>
-          </div>
           {safeRender('calc_stackcalc', () => {
             const MECH_ROLE_LABELS: Record<string, string> = {
               antioxidant: 'Антиоксидант', anti_inflammatory: 'Противовоспал.', liver_protection: 'Гепатопротектор',
@@ -4017,10 +4016,6 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
       {/* ===== MYSTACKS IN CALC VIEW ===== */}
       {section === 'generator' && tab === 'main' && supportView === 'calc' && calcView === 'mystacks' && (
         <div style={{ padding:'0 0 80px' }}>
-          <div style={{ display:'flex', gap:6, marginBottom:6 }}>
-            <button onClick={goBack} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← Назад</button>
-            <button onClick={goHome} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← На главную Поддержки</button>
-          </div>
           <h2 style={{ margin:'0 0 6px', fontSize:16, fontWeight:800, color:'var(--accent)' }}>📂 Мои стеки</h2>
           <p style={{ fontSize:10, color:'var(--text-dim)', margin:'0 0 12px' }}>Сохранённые стеки поддержки из калькулятора. Выберите уровень, рассчитайте и сохраните.</p>
           <div className="card" style={{ marginBottom:10, padding:10 }}>
@@ -4125,10 +4120,6 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
       {/* ===== MIX CALCULATOR: Training Mix ===== */}
       {section === 'home' && tab === 'main' && supportView === 'calc' && calcView === 'mixcalc' && (
         <div style={{ padding:'0 0 80px', display:'flex', flexDirection:'column' }}>
-          <div style={{ display:'flex', gap:6, marginBottom:6 }}>
-            <button onClick={goBack} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← Назад</button>
-            <button onClick={goHome} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← На главную Поддержки</button>
-          </div>
           <div style={{ flex:1, overflowY:'auto', paddingRight:4 }}>
             <h2 style={{ margin:'0 0 2px', fontSize:16, fontWeight:800, color:'var(--accent)' }}>⚡ Миксы для тренировки</h2>
             <p style={{ fontSize:10, color:'var(--text-dim)', margin:'0 0 12px' }}>Калькулятор пре-/интра-/пост-тренировочных стеков</p>
@@ -4897,10 +4888,6 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
 
         return (
         <div style={{ padding:'0 0 80px', height:'100vh', display:'flex', flexDirection:'column' }}>
-          <div style={{ display:'flex', gap:6, marginBottom:6, flexWrap:'wrap' }}>
-            <button onClick={goBack} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← Назад</button>
-            <button onClick={goHome} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← На главную</button>
-          </div>
           <h2 style={{ margin:'0 0 2px', fontSize:16, fontWeight:800, color:'var(--accent)' }}>🧮 Калькулятор поддержки</h2>
           <p style={{ fontSize:10, color:'var(--text-dim)', margin:'0 0 10px' }}>Анализ курса + анализов + рисков → персонализированный план</p>
 
@@ -5618,8 +5605,6 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
 
         return safeRender('neuro', () => (
         <div style={{ padding:'0 0 80px' }}>
-          <button onClick={goBack} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', marginBottom:6, background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← Назад</button>
-          <button onClick={goHome} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', marginBottom:4, marginLeft:6, background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← На главную Поддержки</button>
           <h2 style={{ margin:'0 0 4px', fontSize:16, fontWeight:800, color:'#ec4899' }}>🧠 Нейротоксичность ААС</h2>
           <p style={{ fontSize:10, color:'var(--text-dim)', margin:'0 0 12px', lineHeight:1.4 }}>
             Механизмы нейротоксичности, калькулятор риска и многоуровневый протокол нейропротекции.
@@ -5877,8 +5862,6 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
       {section === 'home' && tab === 'main' && supportView === 'calc' && calcView === 'joints' && (() => {
         return safeRender('joints', () => (
         <div style={{ padding:'0 0 80px' }}>
-          <button onClick={goBack} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', marginBottom:6, background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← Назад</button>
-          <button onClick={goHome} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', marginBottom:4, marginLeft:6, background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← На главную Поддержки</button>
           <h2 style={{ margin:'0 0 4px', fontSize:16, fontWeight:800, color:'#f59e0b' }}>🦴 Калькулятор суставов и связок</h2>
           <p style={{ fontSize:10, color:'var(--text-dim)', margin:'0 0 12px', lineHeight:1.4 }}>
             Оценка риска суставной патологии и многоуровневая поддержка хрящевой и соединительной ткани.
@@ -6079,8 +6062,6 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
       {/* ===== ACNE TAB ===== */}
       {section === 'home' && tab === 'main' && supportView === 'calc' && calcView === 'acne' && (
         <div style={{ padding:'0 0 80px' }}>
-          <button onClick={goBack} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', marginBottom:6, background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← Назад</button>
-          <button onClick={goHome} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', marginBottom:4, marginLeft:6, background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← На главную Поддержки</button>
           <h2 style={{ margin:'0 0 4px', fontSize:16, fontWeight:800, color:'#ef4444' }}>🔴 Анти-прыщ протокол</h2>
           <p style={{ fontSize:10, color:'var(--text-dim)', margin:'0 0 12px' }}>Протокол борьбы с акне на курсе ААС: системная и локальная терапия.</p>
           <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:14, marginBottom:10, border:'1px solid var(--border)' }}>

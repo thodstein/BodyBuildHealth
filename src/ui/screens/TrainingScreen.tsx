@@ -1917,26 +1917,26 @@ export const TrainingScreen: React.FC = () => {
           </div>
           </>)}
 
-          {/* ═══════ EXERCISE GENERATOR (только в Калькуляторах) ═══════ */}
-          {showNonBuilder && <ExerciseGenerator />}
-
-          {/* ═══════ Периодизация (только в Калькуляторах) ═══════ */}
+          {/* ═══════ EXERCISE GENERATOR + Периодизация (объединено) ═══════ */}
           {showNonBuilder && (
             <div className="card" style={{ padding: '10px 12px' }}>
-              <h4 style={{ margin: '0 0 6px', fontSize: 12 }}>📐 Периодизация</h4>
-              <div style={{ display:'flex', gap:4, flexWrap:'wrap', fontSize:10, color:'var(--text-dim)' }}>
-                <span style={{ alignSelf:'center' }}>Тип:</span>
-                {[
-                  { v:'auto', l:'Авто' }, { v:'linear', l:'Линейная' },
-                  { v:'undulating', l:'DUP' }, { v:'block', l:'Блочная' },
-                ].map(p => (
-                  <button key={p.v} onClick={() => setPeriodizationType(p.v as any)}
-                    style={{
-                      padding:'4px 10px', borderRadius:6, fontSize:10, fontWeight: periodizationType === p.v ? 700 : 400, cursor:'pointer',
-                      border: periodizationType === p.v ? '1px solid var(--accent)' : '1px solid var(--border)',
-                      background: periodizationType === p.v ? 'rgba(0,230,138,0.15)' : 'var(--bg-secondary)', color: 'var(--text)',
-                    }}>{p.l}</button>
-                ))}
+              <h3 style={{ margin: '0 0 8px', fontSize: 13 }}>🏋️ Генератор упражнений</h3>
+              <ExerciseGeneratorContent />
+              <div style={{ borderTop:'1px solid var(--border)', marginTop:6, paddingTop:6 }}>
+                <h4 style={{ margin: '0 0 6px', fontSize: 11 }}>📐 Тип периодизации</h4>
+                <div style={{ display:'flex', gap:4, flexWrap:'wrap', fontSize:10, color:'var(--text-dim)' }}>
+                  {[
+                    { v:'auto', l:'Авто' }, { v:'linear', l:'Линейная' },
+                    { v:'undulating', l:'DUP' }, { v:'block', l:'Блочная' },
+                  ].map(p => (
+                    <button key={p.v} onClick={() => setPeriodizationType(p.v as any)}
+                      style={{
+                        padding:'4px 10px', borderRadius:6, fontSize:10, fontWeight: periodizationType === p.v ? 700 : 400, cursor:'pointer',
+                        border: periodizationType === p.v ? '1px solid var(--accent)' : '1px solid var(--border)',
+                        background: periodizationType === p.v ? 'rgba(0,230,138,0.15)' : 'var(--bg-secondary)', color: 'var(--text)',
+                      }}>{p.l}</button>
+                  ))}
+                </div>
               </div>
             </div>
           )}
@@ -6058,7 +6058,7 @@ const EX_GEN_LEVEL_LABELS: Record<string, string> = {
   beginner:'Новичок', intermediate:'Средний', advanced:'Опытный', enhanced:'Enhanced',
 };
 
-const ExerciseGenerator: React.FC = () => {
+const ExerciseGeneratorContent: React.FC = () => {
   const [genGroup, setGenGroup] = React.useState('chest');
   const [genGoal, setGenGoal] = React.useState('bulk');
   const [genLevel, setGenLevel] = React.useState('intermediate');
@@ -6084,68 +6084,74 @@ const ExerciseGenerator: React.FC = () => {
 
   React.useEffect(() => { generate(); }, [genGroup, genGoal, genLevel, genCount]);
 
+  return (<>
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 6 }}>
+      <div>
+        <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 2 }}>Группа мышц</div>
+        <select value={genGroup} onChange={e => setGenGroup(e.target.value)}
+          style={{ width:'100%', padding:'5px', borderRadius:6, background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text)', fontSize:11 }}>
+          {['chest','back','legs','shoulders','arms','core'].map(g => (
+            <option key={g} value={g}>{EX_GEN_GROUP_LABELS[g]}</option>
+          ))}
+        </select>
+      </div>
+      <div>
+        <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 2 }}>Цель</div>
+        <select value={genGoal} onChange={e => setGenGoal(e.target.value)}
+          style={{ width:'100%', padding:'5px', borderRadius:6, background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text)', fontSize:11 }}>
+          {EX_GEN_GOALS.map(g => <option key={g} value={g}>{EX_GEN_GOAL_LABELS[g]}</option>)}
+        </select>
+      </div>
+      <div>
+        <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 2 }}>Уровень</div>
+        <select value={genLevel} onChange={e => setGenLevel(e.target.value)}
+          style={{ width:'100%', padding:'5px', borderRadius:6, background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text)', fontSize:11 }}>
+          {EX_GEN_LEVELS.map(l => <option key={l} value={l}>{EX_GEN_LEVEL_LABELS[l]}</option>)}
+        </select>
+      </div>
+      <div>
+        <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 2 }}>Кол-во</div>
+        <select value={genCount} onChange={e => setGenCount(parseInt(e.target.value))}
+          style={{ width:'100%', padding:'5px', borderRadius:6, background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text)', fontSize:11 }}>
+          {[3,5,8,10].map(n => <option key={n} value={n}>{n}</option>)}
+        </select>
+      </div>
+    </div>
+
+    {genResult && genResult.length > 0 ? (
+      <div>
+        <div style={{ display:'flex', alignItems:'center', gap:6, padding:'3px 6px', borderRadius:4, marginBottom:4, fontSize:8, color:'var(--text-dim)', borderBottom:'1px solid rgba(255,255,255,0.05)' }}>
+          <span style={{ flex:1 }}>Упражнение</span>
+          <span style={{ width:30, textAlign:'center' }}>Тип</span>
+          <span style={{ width:30, textAlign:'center' }}>Инв.</span>
+          <span style={{ width:45, textAlign:'center' }}>Сеты</span>
+          <span style={{ width:50, textAlign:'center' }}>Повторы</span>
+          <span style={{ width:28, textAlign:'center' }}>RIR</span>
+          <span style={{ width:35, textAlign:'center' }}>Отдых</span>
+        </div>
+        {genResult.map((r, i) => (
+          <div key={i} style={{ display:'flex', alignItems:'center', gap:6, padding:'4px 6px', borderRadius:4, marginBottom:2, background:'rgba(255,255,255,0.02)', fontSize:9 }}>
+            <span style={{ flex:1, fontWeight:600 }}>{r.name}</span>
+            <span style={{ width:30, textAlign:'center', fontSize:7, color:'var(--text-dim)' }}>{r.type === 'compound' ? 'Базовое' : 'Изол.'}</span>
+            <span style={{ width:30, textAlign:'center', fontSize:7, color:'var(--text-dim)' }}>{r.equipment}</span>
+            <span style={{ width:45, textAlign:'center', color:'var(--accent)', fontWeight:700 }}>{r.sets}</span>
+            <span style={{ width:50, textAlign:'center', color:'var(--accent)', fontWeight:600 }}>{r.reps}</span>
+            <span style={{ width:28, textAlign:'center', color:'var(--text-dim)' }}>{r.rir}</span>
+            <span style={{ width:35, textAlign:'center', color:'var(--text-dim)' }}>{r.rest}с</span>
+          </div>
+        ))}
+      </div>
+    ) : (
+      <div style={{ textAlign:'center', padding:10, color:'var(--text-dim)', fontSize:10 }}>Нет упражнений для выбранной группы</div>
+    )}
+  </>);
+};
+
+const ExerciseGenerator: React.FC = () => {
   return (
     <div className="card" style={{ padding: '10px 12px' }}>
       <h3 style={{ margin: '0 0 8px', fontSize: 13 }}>🏋️ Генератор упражнений</h3>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 6 }}>
-        <div>
-          <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 2 }}>Группа мышц</div>
-          <select value={genGroup} onChange={e => setGenGroup(e.target.value)}
-            style={{ width:'100%', padding:'5px', borderRadius:6, background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text)', fontSize:11 }}>
-            {['chest','back','legs','shoulders','arms','core'].map(g => (
-              <option key={g} value={g}>{EX_GEN_GROUP_LABELS[g]}</option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 2 }}>Цель</div>
-          <select value={genGoal} onChange={e => setGenGoal(e.target.value)}
-            style={{ width:'100%', padding:'5px', borderRadius:6, background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text)', fontSize:11 }}>
-            {EX_GEN_GOALS.map(g => <option key={g} value={g}>{EX_GEN_GOAL_LABELS[g]}</option>)}
-          </select>
-        </div>
-        <div>
-          <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 2 }}>Уровень</div>
-          <select value={genLevel} onChange={e => setGenLevel(e.target.value)}
-            style={{ width:'100%', padding:'5px', borderRadius:6, background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text)', fontSize:11 }}>
-            {EX_GEN_LEVELS.map(l => <option key={l} value={l}>{EX_GEN_LEVEL_LABELS[l]}</option>)}
-          </select>
-        </div>
-        <div>
-          <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 2 }}>Кол-во</div>
-          <select value={genCount} onChange={e => setGenCount(parseInt(e.target.value))}
-            style={{ width:'100%', padding:'5px', borderRadius:6, background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text)', fontSize:11 }}>
-            {[3,5,8,10].map(n => <option key={n} value={n}>{n}</option>)}
-          </select>
-        </div>
-      </div>
-
-      {genResult && genResult.length > 0 ? (
-        <div>
-          <div style={{ display:'flex', alignItems:'center', gap:6, padding:'3px 6px', borderRadius:4, marginBottom:4, fontSize:8, color:'var(--text-dim)', borderBottom:'1px solid rgba(255,255,255,0.05)' }}>
-            <span style={{ flex:1 }}>Упражнение</span>
-            <span style={{ width:30, textAlign:'center' }}>Тип</span>
-            <span style={{ width:30, textAlign:'center' }}>Инв.</span>
-            <span style={{ width:45, textAlign:'center' }}>Сеты</span>
-            <span style={{ width:50, textAlign:'center' }}>Повторы</span>
-            <span style={{ width:28, textAlign:'center' }}>RIR</span>
-            <span style={{ width:35, textAlign:'center' }}>Отдых</span>
-          </div>
-          {genResult.map((r, i) => (
-            <div key={i} style={{ display:'flex', alignItems:'center', gap:6, padding:'4px 6px', borderRadius:4, marginBottom:2, background:'rgba(255,255,255,0.02)', fontSize:9 }}>
-              <span style={{ flex:1, fontWeight:600 }}>{r.name}</span>
-              <span style={{ width:30, textAlign:'center', fontSize:7, color:'var(--text-dim)' }}>{r.type === 'compound' ? 'Базовое' : 'Изол.'}</span>
-              <span style={{ width:30, textAlign:'center', fontSize:7, color:'var(--text-dim)' }}>{r.equipment}</span>
-              <span style={{ width:45, textAlign:'center', color:'var(--accent)', fontWeight:700 }}>{r.sets}</span>
-              <span style={{ width:50, textAlign:'center', color:'var(--accent)', fontWeight:600 }}>{r.reps}</span>
-              <span style={{ width:28, textAlign:'center', color:'var(--text-dim)' }}>{r.rir}</span>
-              <span style={{ width:35, textAlign:'center', color:'var(--text-dim)' }}>{r.rest}с</span>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <div style={{ textAlign:'center', padding:10, color:'var(--text-dim)', fontSize:10 }}>Нет упражнений для выбранной группы</div>
-      )}
+      <ExerciseGeneratorContent />
     </div>
   );
 };
