@@ -243,6 +243,34 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
     };
     const engineGoal = goalMap[goal] || 'maintenance';
     const targets = calcNutrition({ weightKg: weight, heightCm: height, age, sex, pal: Math.min(1.9, Math.max(1.2, pal)), goal: engineGoal });
+    // Phase-aware adjustments
+    const phaseMult: Record<string, { kcalMod: number; pAdd: number }> = {
+      course:      { kcalMod: 1.0,  pAdd: 0.3 },
+      bridge:      { kcalMod: 0.95, pAdd: 0.0 },
+      pct:         { kcalMod: 0.9,  pAdd: 0.0 },
+      recovery:    { kcalMod: 1.05, pAdd: 0.3 },
+      cutting:     { kcalMod: 0.8,  pAdd: 0.2 },
+      maintenance: { kcalMod: 1.0,  pAdd: 0.0 },
+      recomp:      { kcalMod: 0.9,  pAdd: 0.1 },
+      fat_loss:    { kcalMod: 0.75, pAdd: 0.2 },
+      post_cut:    { kcalMod: 1.05, pAdd: 0.1 },
+    };
+    const pm = phaseMult[phase] || { kcalMod: 1.0, pAdd: 0 };
+    targets.kcal = Math.round(targets.kcal * pm.kcalMod);
+    targets.protein = Math.round(targets.protein + weight * pm.pAdd);
+    // Recalc fat+carbs proportionally from new kcal/protein
+    if (pm.kcalMod !== 1.0 || pm.pAdd !== 0) {
+      const pKcal = targets.protein * 4;
+      const remaining = Math.max(0, targets.kcal - pKcal);
+      if (targets.fats > 0 || targets.carbs > 0) {
+        const fRatio = (targets.fats * 9) / Math.max(1, targets.fats * 9 + targets.carbs * 4);
+        targets.fats = Math.round((remaining * fRatio) / 9);
+        targets.carbs = Math.round((remaining * (1 - fRatio)) / 4);
+      } else {
+        targets.fats = Math.round((remaining * 0.25) / 9);
+        targets.carbs = Math.round((remaining * 0.75) / 4);
+      }
+    }
     // Pharma-aware adjustments
     const hasAAS = injections.some(i => i.type === 'ААС');
     const hasShortInsulin = injections.some(i => i.type === 'инсулин' && i.esterType !== 'long');
@@ -253,26 +281,22 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
       const totalInsulinDose = injections.filter(i => i.type === 'инсулин' && i.esterType !== 'long').reduce((s, i) => s + i.dose, 0);
       const minInsulinCarbs = totalInsulinDose * 10;
       if (targets.carbs < minInsulinCarbs) targets.carbs = Math.round(minInsulinCarbs * 1.2); // 20% buffer
-      // Minimize fat during insulin therapy — max 0.5g/kg/day
       const maxFat = Math.round(weight * 0.5);
       if (targets.fats > maxFat) targets.fats = maxFat;
-      // Recalc kcal from new P/F/C
       targets.kcal = targets.protein * 4 + targets.fats * 9 + targets.carbs * 4;
     }
     if (hasInsulin) {
-      // General insulin fat limit
       const maxFat = Math.round(weight * 0.5);
       if (targets.fats > maxFat) targets.fats = maxFat;
       targets.kcal = targets.protein * 4 + targets.fats * 9 + targets.carbs * 4;
     }
     if (hasGLP) {
-      // GLP-1 reduces appetite — increase protein density, minimize fat
-      targets.fats = Math.min(targets.fats, Math.round(weight * 0.4)); // max 0.4g/kg
-      targets.protein = Math.round(targets.protein + weight * 0.2); // +0.2g/kg for satiety
+      targets.fats = Math.min(targets.fats, Math.round(weight * 0.4));
+      targets.protein = Math.round(targets.protein + weight * 0.2);
       targets.kcal = targets.protein * 4 + targets.fats * 9 + targets.carbs * 4;
     }
     return targets;
-  }, [weight, height, age, sex, goal, s?.workoutsPerWeek, s?.avgWorkoutMinutes, injections]);
+  }, [weight, height, age, sex, goal, s?.workoutsPerWeek, s?.avgWorkoutMinutes, injections, phase]);
 
   const [manualKcal, setManualKcal] = useState<number | null>(null);
   const [manualP, setManualP] = useState<number | null>(null);
@@ -333,6 +357,16 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
   const [workFood, setWorkFood] = useState<'any' | 'portable'>('any');
   const [mealsCount, setMealsCount] = useState(4);
 
+  // Auto-adjust mealsCount from awake hours
+  useEffect(() => {
+    const wMin = parseInt(wakeTime.split(':')[0]) * 60 + parseInt(wakeTime.split(':')[1]);
+    const bMin = parseInt(bedTime.split(':')[0]) * 60 + parseInt(bedTime.split(':')[1]);
+    const awakeHours = (bMin - wMin) / 60;
+    if (awakeHours >= 16) setMealsCount(5);
+    else if (awakeHours >= 14) setMealsCount(4);
+    else setMealsCount(3);
+  }, [wakeTime, bedTime]);
+
   // 9. Allergens
   const [allergens, setAllergens] = useState<string[]>(() => { try { return JSON.parse(localStorage.getItem('he_food_allergens') || '[]'); } catch { return []; } });
 
@@ -346,6 +380,7 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
 
   // 12. Excluded foods
   const [excludedFoods, setExcludedFoods] = useState<string[]>(() => { try { return JSON.parse(localStorage.getItem('he_excluded_foods') || '[]'); } catch { return []; } });
+  const [allergenExcludedCount, setAllergenExcludedCount] = useState(0);
 
   // 13-14: Cycling toggles
   const [cyclingMode, setCyclingMode] = useState<CycleType>('none');
@@ -428,44 +463,81 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
 
     // Map user-selected allergens to food allergen values + text fallbacks
     const userAllergenToValues: Record<string, string[]> = {
-      'лактоза': ['dairy'],
-      'молочные': ['dairy'],
-      'глютен': ['gluten'],
-      'орехи': ['nuts', 'tree_nuts'],
-      'арахис': ['peanuts'],
-      'яйца': ['eggs'],
-      'соя': ['soy'],
-      'рыба': ['fish'],
-      'морепродукты': ['shellfish'],
-      'кунжут': ['sesame'],
-      'горчица': ['mustard'],
+      'лактоза': ['dairy'], 'молочные': ['dairy'],
+      'глютен': ['gluten'], 'орехи': ['nuts', 'tree_nuts'],
+      'арахис': ['peanuts'], 'яйца': ['eggs'], 'соя': ['soy'],
+      'рыба': ['fish'], 'морепродукты': ['shellfish'],
+      'кунжут': ['sesame'], 'горчица': ['mustard'],
+      'сельдерей': ['celery'], 'сульфиты': ['sulfites'], 'люпин': ['lupin'],
     };
 
-    // Text-based name searches for items missing allergen tags
-    const allergenTextMatches = (a: string, foodName: string, foodId: string): boolean => {
-      const name = foodName.toLowerCase();
-      if (a === 'арахис' && name.includes('арахис')) return true;
-      if (a === 'горчица' && name.includes('горчиц')) return true;
-      if (a === 'кунжут' && (name.includes('кунжут') || name.includes('тахини') || name.includes('сезам'))) return true;
-      if (a === 'орехи' && (name.includes('миндаль') || name.includes('грецк') || name.includes('кешью') || name.includes('фундук') || name.includes('пекан'))) return true;
-      if (a === 'рыба' && (name.includes('рыб') || name.includes('лосос') || name.includes('тунец') || name.includes('треск') || name.includes('палтус') || name.includes('скумбр') || name.includes('форель') || name.includes('сардин') || name.includes('сельдь'))) return true;
-      if (a === 'морепродукты' && (name.includes('креветк') || name.includes('краб') || name.includes('лобстер') || name.includes('омар') || name.includes('мидии') || name.includes('кальмар') || name.includes('осьминог'))) return true;
+    // Comprehensive text-based name searches — covers items missed by FOOD_ALLERGEN_DIET
+    const allergenTextMatches = (a: string, fName: string): boolean => {
+      const n = fName.toLowerCase();
+      if (a === 'лактоза' || a === 'молочные') {
+        if (n.includes('молок')||n.includes('сыр')||n.includes('творог')||n.includes('кефир')||n.includes('сливк')||n.includes('йогурт')||n.includes('сметан')||n.includes('масл')||n.includes('морожен')||n.includes('сывороточ')||n.includes('whey')||n.includes('cas')||n.includes('casein')||n.includes('лактоз')) return true;
+      }
+      if (a === 'глютен') {
+        if (n.includes('пшениц')||n.includes('мук')||n.includes('хлеб')||n.includes('макарон')||n.includes('пельмен')||n.includes('вареник')||n.includes('пицц')||n.includes('лаваш')||n.includes('булгур')||n.includes('кускус')||n.includes('манк')||n.includes('паниров')||n.includes('сухар')||n.includes('кляр')||n.includes('тест')||n.includes('блин')||n.includes('олад')||n.includes('круасс')||n.includes('багет')||n.includes('чиабат')||n.includes('лепёш')||n.includes('торт')||n.includes('пирож')||n.includes('пончик')||n.includes('печень')||n.includes('крекер')||n.includes('вафл')||n.includes('глютен')) return true;
+      }
+      if (a === 'орехи') {
+        if (n.includes('миндаль')||n.includes('грецк')||n.includes('кешью')||n.includes('фундук')||n.includes('пекан')||n.includes('макадам')||n.includes('фисташк')||n.includes('орех')||n.includes('nut')||n.includes('almond')||n.includes('walnut')||n.includes('cashew')||n.includes('hazeln')||n.includes('pecan')||n.includes('pistach')) return true;
+      }
+      if (a === 'арахис') {
+        if (n.includes('арахис')||n.includes('peanut')||n.includes('groundnut')||n.includes('ахид')||n.includes('землян')) return true;
+      }
+      if (a === 'яйца') {
+        if (n.includes('яйц')||n.includes('яич')||n.includes('яичн')||n.includes('белок')||n.includes('желтк')||n.includes('омлет')||n.includes('egg')||n.includes('egg_')||n.includes('майонез')) return true;
+      }
+      if (a === 'соя') {
+        if (n.includes('со')||n.includes('тофу')||n.includes('соев')||n.includes('edamame')||n.includes('soy')||n.includes('мисо')||n.includes('miso')||n.includes('темпе')||n.includes('tamari')) return true;
+      }
+      if (a === 'рыба') {
+        if (n.includes('рыб')||n.includes('лосос')||n.includes('тунец')||n.includes('треск')||n.includes('палтус')||n.includes('скумбр')||n.includes('форель')||n.includes('сардин')||n.includes('сельдь')||n.includes('anchov')||n.includes('fish')||n.includes('salmon')||n.includes('tuna')||n.includes('cod')||n.includes('halibut')) return true;
+      }
+      if (a === 'морепродукты') {
+        if (n.includes('креветк')||n.includes('краб')||n.includes('лобстер')||n.includes('омар')||n.includes('мидии')||n.includes('кальмар')||n.includes('осьминог')||n.includes('shrimp')||n.includes('crab')||n.includes('lobster')||n.includes('mussel')||n.includes('squid')||n.includes('scallop')||n.includes('устриц')||n.includes('моллюск')||n.includes('ракушк')||n.includes('langoust')) return true;
+      }
+      if (a === 'кунжут') {
+        if (n.includes('кунжут')||n.includes('тахини')||n.includes('сезам')||n.includes('sesame')||n.includes('tahini')) return true;
+      }
+      if (a === 'горчица') {
+        if (n.includes('горчиц')||n.includes('mustard')) return true;
+      }
+      if (a === 'сельдерей') {
+        if (n.includes('сельдерей')||n.includes('celery')||n.includes('seler')) return true;
+      }
+      if (a === 'сульфиты') {
+        if (n.includes('сульфит')||n.includes('sulfite')||n.includes('sulphite')||n.includes('e22')) return true;
+      }
+      if (a === 'люпин') {
+        if (n.includes('люпин')||n.includes('lupin')||n.includes('lupine')) return true;
+      }
       return false;
+    };
+    // Also check direct FOOD_DB allergen field as fallback
+    const getDirectAllergens = (foodId: string): string[] => {
+      const food = FOOD_DB.find(f => f.id === foodId);
+      return food?.allergens || [];
     };
 
     const allergenIds = new Set<string>();
+    let allergenMatchCount = 0;
     allergens.forEach(a => {
       const foodVals = userAllergenToValues[a];
       FOOD_DB.forEach(f => {
-        const fAllergens = getFoodAllergens(f.id);
-        if (foodVals && fAllergens.some(fa => foodVals.includes(fa))) {
-          allergenIds.add(f.id);
+        const fAllergens = [...getFoodAllergens(f.id), ...getDirectAllergens(f.id)];
+        // Remove duplicates
+        const uniqueAllergens = [...new Set(fAllergens)];
+        if (foodVals && uniqueAllergens.some(fa => foodVals.includes(fa))) {
+          if (!allergenIds.has(f.id)) { allergenIds.add(f.id); allergenMatchCount++; }
         }
-        if (allergenTextMatches(a, f.name, f.id)) {
-          allergenIds.add(f.id);
+        if (allergenTextMatches(a, f.name)) {
+          if (!allergenIds.has(f.id)) { allergenIds.add(f.id); allergenMatchCount++; }
         }
       });
     });
+    setAllergenExcludedCount(allergenMatchCount);
 
     // Seeded random for food variety
     const seedRand = (seed: number) => {
@@ -477,29 +549,78 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
     const buildDay = (dayOffset: number, isTrainingDay: boolean) => {
       const mealTimes: { time: string; label: string; pct: number }[] = [];
       const wakeMin = parseInt(wakeTime.split(':')[0]) * 60 + parseInt(wakeTime.split(':')[1]);
+      const lunchMin = parseInt(lunchTime.split(':')[0]) * 60 + parseInt(lunchTime.split(':')[1]);
+      const dinnerMin = parseInt(dinnerTime.split(':')[0]) * 60 + parseInt(dinnerTime.split(':')[1]);
       const bedMin = parseInt(bedTime.split(':')[0]) * 60 + parseInt(bedTime.split(':')[1]);
-      const awakeMin = bedMin - wakeMin;
-      const interval = awakeMin / mealsCount;
+      const awakeMin = Math.max(1, bedMin - wakeMin);
+      const pcts = [0.2, 0.2, 0.3, 0.15, 0.1, 0.05];
 
-      for (let i = 0; i < mealsCount; i++) {
-        const mMin = wakeMin + interval * i;
-        const h = Math.floor(mMin / 60);
-        const m = mMin % 60;
-        const time = `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
-        const pcts = [0.2, 0.2, 0.3, 0.15, 0.1, 0.05];
+      // Build anchor points: label → target time
+      const labelAnchor: Record<string, number> = {
+        'Завтрак': wakeMin + 30,
+        'Обед': lunchMin,
+        'Ужин': dinnerMin,
+      };
+      // Build meal order for this mealsCount
+      const mealDefs: { label: string; anchor?: number }[] = [];
+      mealDefs.push({ label: 'Завтрак', anchor: labelAnchor['Завтрак'] });
+      if (mealsCount >= 5) mealDefs.push({ label: 'Второй завтрак' });
+      if (mealsCount >= 3) mealDefs.push({ label: 'Обед', anchor: labelAnchor['Обед'] });
+      if (mealsCount >= 4) mealDefs.push({ label: 'Полдник' });
+      mealDefs.push({ label: 'Ужин', anchor: labelAnchor['Ужин'] });
+      if (mealsCount >= 6) mealDefs.push({ label: 'Перекус' });
+
+      // Distribute times — anchored ones are fixed, others interpolate between anchors
+      const anchored = mealDefs.map((m, i) => {
+        if (m.anchor) return { ...m, time: m.anchor, fixed: true };
+        // Find nearest fixed anchors
+        let leftAnchorIdx = i;
+        let leftTime = wakeMin;
+        while (leftAnchorIdx >= 0 && !mealDefs[leftAnchorIdx].anchor) leftAnchorIdx--;
+        if (leftAnchorIdx >= 0) leftTime = mealDefs[leftAnchorIdx].anchor!;
+
+        let rightAnchorIdx = i;
+        let rightTime = bedMin - 30;
+        while (rightAnchorIdx < mealDefs.length && !mealDefs[rightAnchorIdx].anchor) rightAnchorIdx++;
+        if (rightAnchorIdx < mealDefs.length) rightTime = mealDefs[rightAnchorIdx].anchor!;
+
+        // Count unanchored positions between left and right
+        const totalSlots = rightAnchorIdx - leftAnchorIdx;
+        const thisSlot = i - leftAnchorIdx;
+        const interp = totalSlots > 0 ? thisSlot / totalSlots : 0.5;
+        return { ...m, time: Math.round(leftTime + (rightTime - leftTime) * interp), fixed: false };
+      });
+
+      anchored.forEach((m, i) => {
+        const mMin = Math.max(wakeMin + 15, Math.min(bedMin - 15, m.time));
+        const hh = Math.floor(mMin / 60);
+        const mm = mMin % 60;
         mealTimes.push({
-          time,
-          label: i === 0 ? 'Завтрак' : i === 1 ? 'Второй завтрак' : i === 2 ? 'Обед' : i === 3 ? 'Полдник' : i === mealsCount-1 ? 'Ужин' : 'Перекус',
+          time: `${String(hh).padStart(2,'0')}:${String(mm).padStart(2,'0')}`,
+          label: m.label,
           pct: pcts[i] || 0.15,
         });
-      }
+      });
 
       // Adjust for training
       if (linkToTraining && isTrainingDay) {
         const trainH = parseInt(trainStart.split(':')[0]);
-        // Add pre and post workout meals
-        mealTimes.push({ time: `${String(trainH-2).padStart(2,'0')}:00`, label: 'Предтрен', pct: 0.1 });
-        mealTimes.push({ time: `${String(trainH+1).padStart(2,'0')}:30`, label: 'Пост-трен', pct: 0.15 });
+        const preTime = `${String(trainH-2).padStart(2,'0')}:00`;
+        const postTime = `${String(trainH+1).padStart(2,'0')}:30`;
+        // Check if existing meals already cover this window (within 45 min)
+        const hasNearby = (t: string) => mealTimes.some(mt => {
+          const mtMin = parseInt(mt.time.split(':')[0])*60 + parseInt(mt.time.split(':')[1]);
+          const tMin = parseInt(t.split(':')[0])*60 + parseInt(t.split(':')[1]);
+          return Math.abs(mtMin - tMin) <= 45;
+        });
+        if (!hasNearby(preTime)) { mealTimes.push({ time: preTime, label: 'Предтрен', pct: 0.1 }); }
+        if (!hasNearby(postTime)) { mealTimes.push({ time: postTime, label: 'Пост-трен', pct: 0.15 }); }
+        // Sort by time so display order is chronological
+        mealTimes.sort((a, b) => {
+          const aMin = parseInt(a.time.split(':')[0])*60 + parseInt(a.time.split(':')[1]);
+          const bMin = parseInt(b.time.split(':')[0])*60 + parseInt(b.time.split(':')[1]);
+          return aMin - bMin;
+        });
       }
 
       // Cycling adjustments
@@ -1790,6 +1911,13 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
               <PillBtn key={n} active={mealsCount === n} onClick={() => setMealsCount(n)} color={mealsCount === n ? '#06b6d4' : undefined}>{n}</PillBtn>
             ))}
           </div>
+          {(() => {
+            const wMin = parseInt(wakeTime.split(':')[0]) * 60 + parseInt(wakeTime.split(':')[1]);
+            const bMin = parseInt(bedTime.split(':')[0]) * 60 + parseInt(bedTime.split(':')[1]);
+            const awakeH = Math.round((bMin - wMin) / 60);
+            const recCount = awakeH >= 16 ? 5 : awakeH >= 14 ? 4 : 3;
+            return <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.3)', marginTop: 2, lineHeight: 1.5 }}>⏰ Бодрствование {awakeH} ч → рекомендуется {recCount} приёмов (каждые {Math.round(awakeH / recCount)} ч).<br />🍳 Завтрак около {wakeTime} · 🥗 Обед в {lunchTime} · 🍽 Ужин в {dinnerTime}</div>;
+          })()}
         </div>
       </GlassCard>
 
@@ -1957,6 +2085,18 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
               🔄 Перегенерировать {planDays === 3 ? '3 дня' : 'неделю'}
             </button>
           )}
+        </GlassCard>
+      )}
+      {generated && allergens.length > 0 && (
+        <GlassCard title="Аллергены" icon="⚠️" color="#f97316" style={{ border: '1px solid rgba(249,115,22,0.15)' }}>
+          <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)', lineHeight: 1.6 }}>
+            {allergenExcludedCount > 0 ? (
+              <>🚫 Исключено <strong style={{ color: '#f97316' }}>{allergenExcludedCount}</strong> продуктов из {FOOD_DB.length} по вашим аллергенам: <span style={{ color: '#fb923c' }}>{allergens.map(a => ALLERGEN_LIST.find(al => al.id === a)?.label || a).join(', ')}</span></>
+            ) : (
+              <>⚠️ Аллергены выбраны ({allergens.map(a => ALLERGEN_LIST.find(al => al.id === a)?.label || a).join(', ')}), но ни один продукт не был исключён — проверьте список продуктов в базе</>
+            )}
+          </div>
+          <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.3)', marginTop: 2 }}>Чтобы применить изменения аллергенов, нажмите «Перегенерировать»</div>
         </GlassCard>
       )}
 
