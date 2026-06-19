@@ -152,7 +152,7 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
     <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
       {toast && <div style={{ position:'fixed', bottom:20, left:'50%', transform:'translateX(-50%)', zIndex:999, padding:'10px 24px', borderRadius:14, background:'#202023', border:'1px solid rgba(255,255,255,0.06)', boxShadow:'0 4px 20px rgba(0,0,0,0.3)', color:'#fff', fontSize:11, fontWeight:600, letterSpacing:'-0.1px' }}>{toast}</div>}
 
-      <div style={{ padding:12, borderRadius:16, background:'#18181b', border:'1px solid #27272a' }}>
+      <div style={{ padding:12, borderRadius:16, background:'#18181b', border:'1px solid rgba(255,255,255,0.06)' }}>
         <div style={{ display:'flex', gap:2, marginBottom:6 }}>
           {weekDays.map((ds, i) => {
             const isToday = ds === new Date().toISOString().split('T')[0];
@@ -186,7 +186,7 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
       <div style={{ display:'flex', gap:3, padding:'2px 0' }}>
         {(['add','day'] as const).map(t => <button key={t} onClick={() => setTab(t)} style={{
           flex:1, padding:'7px', borderRadius:10, cursor:'pointer', fontSize:10, fontWeight: tab===t ? 700 : 400,
-          border: tab===t ? '1px solid #00e68a' : '1px solid #27272a',
+          border: tab===t ? '1px solid #00e68a' : '1px solid rgba(255,255,255,0.06)',
           background: tab===t ? 'linear-gradient(135deg,rgba(0,230,138,0.2),rgba(0,200,160,0.12))' : '#202023',
           color: tab===t ? '#00e68a' : 'rgba(255,255,255,0.5)',
         }}>{t === 'add' ? '➕ Добавить' : '📋 День'}</button>)}
@@ -194,16 +194,16 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
 
       {tab === 'add' && (
         <>
-          <div style={{ padding:14, borderRadius:16, background:'#18181b', border:'1px solid #27272a' }}>
+          <div style={{ padding:14, borderRadius:16, background:'#18181b', border:'1px solid rgba(255,255,255,0.06)' }}>
             <input type="text" value={foodSearch} onChange={e => setFoodSearch(e.target.value)}
               placeholder="🔍 Поиск продуктов (начните печатать...)"
               autoFocus
-              style={{ width:'100%', padding:'10px 12px', borderRadius:10, background:'#202023', border:'1px solid #27272a', color:'#fff', fontSize:12, boxSizing:'border-box', marginBottom:8, outline:'none' }} />
+              style={{ width:'100%', padding:'10px 12px', borderRadius:10, background:'#202023', border:'1px solid rgba(255,255,255,0.06)', color:'#fff', fontSize:12, boxSizing:'border-box', marginBottom:8, outline:'none' }} />
             {foodSearchResults.length > 0 && (
               <div style={{ maxHeight:220, overflowY:'auto', marginBottom:6, borderRadius:8 }}>
                 {foodSearchResults.map(f => (
                   <div key={f.id} onClick={() => addFoodFromDB(f)} style={{
-                    padding:'6px 10px', cursor:'pointer', fontSize:10, borderBottom:'1px solid #27272a',
+                    padding:'6px 10px', cursor:'pointer', fontSize:10, borderBottom:'1px solid rgba(255,255,255,0.06)',
                     display:'flex', justifyContent:'space-between', alignItems:'center', color:'#fff', borderRadius:6,
                   }}>
                     <div style={{ display:'flex', alignItems:'center', gap:6 }}>
@@ -225,14 +225,14 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
                 <button key={mt} onClick={() => setMealType(mealType === mt ? '' : mt)} style={{
                   padding:'3px 8px', borderRadius:6, fontSize:8, cursor:'pointer',
                   background: mealType === mt ? 'rgba(0,230,138,0.2)' : '#202023',
-                  border: mealType === mt ? '1px solid #00e68a' : '1px solid #27272a',
+                  border: mealType === mt ? '1px solid #00e68a' : '1px solid rgba(255,255,255,0.06)',
                   color: mealType === mt ? '#00e68a' : 'rgba(255,255,255,0.5)', fontWeight: mealType === mt ? 600 : 400,
                 }}>{mt}</button>
               ))}
               <button onClick={() => setShowCustomMeal(!showCustomMeal)} style={{ padding:'3px 8px', borderRadius:6, fontSize:8, cursor:'pointer', background:'rgba(139,92,246,0.15)', border:'1px solid rgba(139,92,246,0.3)', color:'#8b5cf6' }}>+</button>
             </div>
             {showCustomMeal && <div style={{ display:'flex', gap:4, marginBottom:6 }}>
-              <input value={customMealInput} onChange={e => setCustomMealInput(e.target.value)} placeholder="Название приёма..." style={{ flex:1, padding:'6px', borderRadius:6, background:'#202023', border:'1px solid #27272a', color:'#fff', fontSize:9 }} />
+              <input value={customMealInput} onChange={e => setCustomMealInput(e.target.value)} placeholder="Название приёма..." style={{ flex:1, padding:'6px', borderRadius:6, background:'#202023', border:'1px solid rgba(255,255,255,0.06)', color:'#fff', fontSize:9 }} />
               <button onClick={addCustomMeal} style={{ padding:'6px 12px', borderRadius:6, border:'none', cursor:'pointer', background:'linear-gradient(135deg,#00e68a,#00c8a0)', color:'#000', fontWeight:600, fontSize:9 }}>Добавить</button>
             </div>}
             <button onClick={() => setShowCustomFood(!showCustomFood)} style={{ width:'100%', padding:'6px 10px', borderRadius:8, fontSize:9, cursor:'pointer', background: showCustomFood ? 'rgba(139,92,246,0.15)' : '#202023', border:'1px solid rgba(139,92,246,0.3)', color:'#8b5cf6', marginTop:2 }}>
@@ -240,10 +240,10 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
             </button>
             {showCustomFood && (
               <div style={{ marginTop:4, padding:'8px', background:'#202023', borderRadius:8, border:'1px solid rgba(139,92,246,0.2)' }}>
-                <input value={customFoodName} onChange={e => setCustomFoodName(e.target.value)} placeholder="Название" style={{ width:'100%', padding:'5px 8px', borderRadius:6, background:'#18181b', border:'1px solid #27272a', color:'#fff', fontSize:9, marginBottom:4, boxSizing:'border-box' }} />
+                <input value={customFoodName} onChange={e => setCustomFoodName(e.target.value)} placeholder="Название" style={{ width:'100%', padding:'5px 8px', borderRadius:6, background:'#18181b', border:'1px solid rgba(255,255,255,0.06)', color:'#fff', fontSize:9, marginBottom:4, boxSizing:'border-box' }} />
                 <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr', gap:3 }}>
                   {[{l:'Ккал',v:customFoodKcal,s:setCustomFoodKcal},{l:'Белки',v:customFoodP,s:setCustomFoodP},{l:'Жиры',v:customFoodF,s:setCustomFoodF},{l:'Угл.',v:customFoodC,s:setCustomFoodC}].map((x,i) => (
-                    <div key={i}><label style={{ fontSize:7, color:'rgba(255,255,255,0.4)' }}>{x.l}</label><input type="number" value={x.v} onChange={e => x.s(e.target.value)} style={{ width:'100%', padding:'4px', borderRadius:4, background:'#18181b', border:'1px solid #27272a', color:'#fff', fontSize:8, boxSizing:'border-box' }} /></div>
+                    <div key={i}><label style={{ fontSize:7, color:'rgba(255,255,255,0.4)' }}>{x.l}</label><input type="number" value={x.v} onChange={e => x.s(e.target.value)} style={{ width:'100%', padding:'4px', borderRadius:4, background:'#18181b', border:'1px solid rgba(255,255,255,0.06)', color:'#fff', fontSize:8, boxSizing:'border-box' }} /></div>
                   ))}
                 </div>
                 <button onClick={addCustomFood} style={{ width:'100%', marginTop:4, padding:'5px', borderRadius:6, border:'none', cursor:'pointer', background:'linear-gradient(135deg,#00e68a,#00c8a0)', color:'#000', fontWeight:600, fontSize:9 }}>+ Добавить</button>
@@ -252,7 +252,7 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
           </div>
 
           {favoriteFoods.length > 0 && (
-            <div style={{ padding:'10px 14px', borderRadius:16, background:'#18181b', border:'1px solid #27272a' }}>
+            <div style={{ padding:'10px 14px', borderRadius:16, background:'#18181b', border:'1px solid rgba(255,255,255,0.06)' }}>
               <div style={{ fontSize:9, color:'rgba(255,255,255,0.4)', marginBottom:4 }}>⭐ Избранное</div>
               <div style={{ display:'flex', flexWrap:'wrap', gap:2 }}>
                 {favoriteFoods.slice(0,8).map(f => (
@@ -265,20 +265,20 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
           )}
 
           <div style={{ display:'flex', gap:3, flexWrap:'wrap' }}>
-            <button onClick={() => setShowBarcode(!showBarcode)} style={{ flex:1, padding:'7px 10px', borderRadius:8, fontSize:9, cursor:'pointer', background: showBarcode ? 'rgba(0,230,138,0.15)' : '#202023', border:'1px solid #27272a', color:'#fff', minWidth:80 }}>📱 Штрих-код</button>
-            <button onClick={() => ocrFileRef.current?.click()} disabled={ocrFileLoading} style={{ flex:1, padding:'7px 10px', borderRadius:8, fontSize:9, cursor:'pointer', background:'#202023', border:'1px solid #27272a', color:'#fff', opacity: ocrFileLoading ? 0.5 : 1, minWidth:80 }}>{ocrFileLoading ? '⏳' : '📁 Файл'}</button>
-            <button onClick={() => ocrCameraRef.current?.click()} style={{ flex:1, padding:'7px 10px', borderRadius:8, fontSize:9, cursor:'pointer', background:'#202023', border:'1px solid #27272a', color:'#fff', minWidth:80 }}>📸 Скан</button>
-            <button onClick={() => setShowOCR(!showOCR)} style={{ flex:1, padding:'7px 10px', borderRadius:8, fontSize:9, cursor:'pointer', background: showOCR ? 'rgba(0,230,138,0.15)' : '#202023', border:'1px solid #27272a', color:'#fff', minWidth:80 }}>📋 OCR</button>
+            <button onClick={() => setShowBarcode(!showBarcode)} style={{ flex:1, padding:'7px 10px', borderRadius:8, fontSize:9, cursor:'pointer', background: showBarcode ? 'rgba(0,230,138,0.15)' : '#202023', border:'1px solid rgba(255,255,255,0.06)', color:'#fff', minWidth:80 }}>📱 Штрих-код</button>
+            <button onClick={() => ocrFileRef.current?.click()} disabled={ocrFileLoading} style={{ flex:1, padding:'7px 10px', borderRadius:8, fontSize:9, cursor:'pointer', background:'#202023', border:'1px solid rgba(255,255,255,0.06)', color:'#fff', opacity: ocrFileLoading ? 0.5 : 1, minWidth:80 }}>{ocrFileLoading ? '⏳' : '📁 Файл'}</button>
+            <button onClick={() => ocrCameraRef.current?.click()} style={{ flex:1, padding:'7px 10px', borderRadius:8, fontSize:9, cursor:'pointer', background:'#202023', border:'1px solid rgba(255,255,255,0.06)', color:'#fff', minWidth:80 }}>📸 Скан</button>
+            <button onClick={() => setShowOCR(!showOCR)} style={{ flex:1, padding:'7px 10px', borderRadius:8, fontSize:9, cursor:'pointer', background: showOCR ? 'rgba(0,230,138,0.15)' : '#202023', border:'1px solid rgba(255,255,255,0.06)', color:'#fff', minWidth:80 }}>📋 OCR</button>
           </div>
           <input ref={ocrFileRef} type="file" accept=".pdf,.png,.jpg,.jpeg,.webp,.txt" style={{ display:'none' }} onChange={e => { const f = e.target.files?.[0]; if (f) handleOcrFileUpload(f); }} />
           <input ref={ocrCameraRef} type="file" accept="image/*" capture="environment" style={{ display:'none' }} onChange={e => { const f = e.target.files?.[0]; if (f) handleOcrFileUpload(f); }} />
           {showBarcode && <BarcodeScanner onProductFound={handleBarcodeProduct} onClose={() => setShowBarcode(false)} />}
 
           {showOCR && (
-            <div style={{ padding:14, borderRadius:16, background:'#18181b', border:'1px solid #27272a' }}>
+            <div style={{ padding:14, borderRadius:16, background:'#18181b', border:'1px solid rgba(255,255,255,0.06)' }}>
               <div style={{ fontSize:9, color:'rgba(255,255,255,0.4)', marginBottom:4 }}>Вставьте текст из FatSecret / MyFitnessPal:</div>
               <textarea value={ocrText} onChange={e => setOcrText(e.target.value)} placeholder="Название 100г 250 ккал Б:15 Ж:10 У:20 ..."
-                style={{ width:'100%', minHeight:70, padding:8, borderRadius:8, border:'1px solid #27272a', background:'#202023', color:'#fff', fontSize:11, resize:'vertical', boxSizing:'border-box', marginBottom:6 }} />
+                style={{ width:'100%', minHeight:70, padding:8, borderRadius:8, border:'1px solid rgba(255,255,255,0.06)', background:'#202023', color:'#fff', fontSize:11, resize:'vertical', boxSizing:'border-box', marginBottom:6 }} />
               <button onClick={handleOCR} style={{ padding:'7px 14px', borderRadius:8, border:'none', background:'linear-gradient(135deg,#00e68a,#00c8a0)', color:'#000', fontWeight:600, fontSize:10, cursor:'pointer' }}>Распознать</button>
               {ocrError && <div style={{ color:'#ef4444', fontSize:9, marginTop:4 }}>{ocrError}</div>}
             </div>
@@ -295,7 +295,7 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
                   <div style={{ display:'flex', alignItems:'center', gap:6, flex:1 }}>
                     <span style={{ fontSize:10, fontWeight:500, color:'#fff' }}>{item.name}</span>
                     <input type="number" value={item.qty || 100} onChange={e => { const v = +e.target.value || 0; setParsedItems(prev => prev.map((x,j) => j===i ? {...x, qty: v} : x)); }}
-                      style={{ width:45, padding:'2px 4px', borderRadius:4, background:'#18181b', border:'1px solid #27272a', color:'#fff', fontSize:8, textAlign:'center' }} />
+                      style={{ width:45, padding:'2px 4px', borderRadius:4, background:'#18181b', border:'1px solid rgba(255,255,255,0.06)', color:'#fff', fontSize:8, textAlign:'center' }} />
                     <span style={{ fontSize:7, color:'rgba(255,255,255,0.3)' }}>г</span>
                   </div>
                   <div style={{ display:'flex', gap:3, fontSize:8, color:'rgba(255,255,255,0.4)' }}>
@@ -312,7 +312,7 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
 
       {tab === 'day' && (
         <>
-          <div style={{ padding:14, borderRadius:16, background:'#18181b', border:'1px solid #27272a' }}>
+          <div style={{ padding:14, borderRadius:16, background:'#18181b', border:'1px solid rgba(255,255,255,0.06)' }}>
             <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
               <div style={{ fontSize:12, fontWeight:600, color:'#fff' }}>📋 {selectedDate}</div>
               <div style={{ display:'flex', alignItems:'center', gap:6 }}>

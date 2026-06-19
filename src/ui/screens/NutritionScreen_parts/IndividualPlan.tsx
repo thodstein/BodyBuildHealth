@@ -393,6 +393,7 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
   // 15. Plan generation
   const [generated, setGenerated] = useState(false);
   const [planDays, setPlanDays] = useState<1 | 3 | 7>(1);
+  const [planView, setPlanView] = useState<'list' | 'calendar'>('list');
   const [dayPlan, setDayPlan] = useState<any>(null);
   const [threeDayPlan, setThreeDayPlan] = useState<any>(null);
   const [weekPlan, setWeekPlan] = useState<any>(null);
@@ -1465,7 +1466,7 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
         {/* Day header — card with gradient badge */}
         <div style={{
           marginBottom: 10, borderRadius: 12, overflow: 'hidden',
-          border: d.isTrainingDay ? '1px solid rgba(0,230,138,0.2)' : '1px solid #27272a',
+          border: d.isTrainingDay ? '1px solid rgba(0,230,138,0.2)' : '1px solid rgba(255,255,255,0.06)',
         }}>
           <div style={{
             padding: '10px 12px',
@@ -1574,7 +1575,7 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
                     }}>
                       {isEditing ? (
                         <>
-                          <input type="number" defaultValue={it.amount} onChange={e => setEditAmount(+e.target.value || 0)} style={{ width: 40, padding: '1px 4px', borderRadius: 3, border: '1px solid #27272a', background: '#18181b', color: '#fff', fontSize: 8 }} />
+                          <input type="number" defaultValue={it.amount} onChange={e => setEditAmount(+e.target.value || 0)} style={{ width: 40, padding: '1px 4px', borderRadius: 3, border: '1px solid rgba(255,255,255,0.06)', background: '#18181b', color: '#fff', fontSize: 8 }} />
                           <span style={{ fontSize: 7, color: 'rgba(255,255,255,0.3)' }}>г</span>
                           <button onClick={() => updateItemAmount(0, mi, ii, editAmount || it.amount)} style={{ padding: '1px 4px', borderRadius: 3, border: 'none', background: 'rgba(0,230,138,0.15)', color: '#00e68a', cursor: 'pointer', fontSize: 7 }}>✓</button>
                           <button onClick={() => setEditItem(null)} style={{ padding: '1px 4px', borderRadius: 3, border: 'none', background: 'rgba(239,68,68,0.1)', color: '#ef4444', cursor: 'pointer', fontSize: 7 }}>✕</button>
@@ -1582,7 +1583,7 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
                       ) : isReplacing ? (
                         <>
                           <span style={{ fontWeight: 600 }}>{it.name}</span>
-                          <select onChange={e => { if (e.target.value) { const f = FOOD_DB.find(x => x.id === e.target.value); if (f) replaceFoodItem(0, mi, ii, f); } }} value="" style={{ fontSize: 7, padding: '1px 2px', borderRadius: 3, border: '1px solid #27272a', background: '#18181b', color: '#fff', maxWidth: 120 }}>
+                          <select onChange={e => { if (e.target.value) { const f = FOOD_DB.find(x => x.id === e.target.value); if (f) replaceFoodItem(0, mi, ii, f); } }} value="" style={{ fontSize: 7, padding: '1px 2px', borderRadius: 3, border: '1px solid rgba(255,255,255,0.06)', background: '#18181b', color: '#fff', maxWidth: 120 }}>
                             <option value="">🔀 Заменить...</option>
                             {similar.map(s => <option key={s.id} value={s.id}>{s.name} (Б{s.protein}/Ж{s.fat}/У{s.carbs})</option>)}
                           </select>
@@ -1798,7 +1799,7 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
                 }} style={{
                   fontSize: 7, padding: '2px 6px', borderRadius: 4, cursor: 'pointer',
                   background: inj.trainLinked ? 'rgba(0,230,138,0.15)' : '#202023',
-                  border: inj.trainLinked ? '1px solid rgba(0,230,138,0.3)' : '1px solid #27272a',
+                  border: inj.trainLinked ? '1px solid rgba(0,230,138,0.3)' : '1px solid rgba(255,255,255,0.06)',
                   color: inj.trainLinked ? '#00e68a' : 'rgba(255,255,255,0.4)',
                   fontWeight: 600,
                 }}>
@@ -1810,7 +1811,7 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
                       <button key={t} onClick={() => setInjections(injections.map((inj2, j) => j === i ? { ...inj2, trainTiming: t } : inj2))} style={{
                         fontSize: 7, padding: '2px 5px', borderRadius: 4, cursor: 'pointer',
                         background: inj.trainTiming === t ? 'rgba(59,130,246,0.15)' : '#202023',
-                        border: inj.trainTiming === t ? '1px solid rgba(59,130,246,0.3)' : '1px solid #27272a',
+                        border: inj.trainTiming === t ? '1px solid rgba(59,130,246,0.3)' : '1px solid rgba(255,255,255,0.06)',
                         color: inj.trainTiming === t ? '#60a5fa' : 'rgba(255,255,255,0.4)',
                         fontWeight: 600,
                       }}>
@@ -1880,7 +1881,7 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
               <button key={mode} onClick={() => switchKbjuMode(mode)} style={{
                 flex: 1, padding: '5px 4px', borderRadius: 8, cursor: 'pointer', fontSize: 8, fontWeight: 600,
                 background: kbjuMode === mode ? `${colors[mode]}20` : '#202023',
-                border: kbjuMode === mode ? `1px solid ${colors[mode]}` : '1px solid #27272a',
+                border: kbjuMode === mode ? `1px solid ${colors[mode]}` : '1px solid rgba(255,255,255,0.06)',
                 color: kbjuMode === mode ? colors[mode] : 'rgba(255,255,255,0.4)',
               }}>{labels[mode]}</button>
             );
@@ -1976,7 +1977,7 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
             <button key={b.id} onClick={() => setBudget(b.id)} style={{
               padding: '10px 12px', borderRadius: 12, cursor: 'pointer', textAlign: 'left',
               background: budget === b.id ? `${b.color}18` : '#202023',
-              border: budget === b.id ? `2px solid ${b.color}` : '1px solid #27272a',
+              border: budget === b.id ? `2px solid ${b.color}` : '1px solid rgba(255,255,255,0.06)',
               color: budget === b.id ? b.color : 'rgba(255,255,255,0.5)',
               fontWeight: budget === b.id ? 700 : 500,
               transition: 'all 0.2s',
@@ -1999,7 +2000,7 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
             <button key={n.id} onClick={() => setNutrLevel(n.id)} style={{
               padding: '10px 6px', borderRadius: 12, cursor: 'pointer', textAlign: 'center',
               background: nutrLevel === n.id ? 'rgba(0,230,138,0.15)' : '#202023',
-              border: nutrLevel === n.id ? '2px solid #00e68a' : '1px solid #27272a',
+              border: nutrLevel === n.id ? '2px solid #00e68a' : '1px solid rgba(255,255,255,0.06)',
               color: nutrLevel === n.id ? '#00e68a' : 'rgba(255,255,255,0.5)',
               fontWeight: nutrLevel === n.id ? 700 : 500, fontSize: 10,
               transition: 'all 0.2s',
@@ -2063,6 +2064,26 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
             <PillBtn key={pt.id} active={planType === pt.id} onClick={() => setPlanType(pt.id)}>
               {pt.icon} {pt.label}
             </PillBtn>
+          ))}
+        </div>
+      </GlassCard>
+
+      {/* Quick presets */}
+      <GlassCard title="⚡ Быстрые пресеты" icon="⚡" color="#f97316">
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+          {[
+            { id: 'meat', label: '🥩 Мясной', desc: 'Курица, говядина, индейка', fn: () => { setPlanType('classic'); setPreferredFoods(['chicken_breast','beef_lean','turkey_breast','rice_white','broccoli']); } },
+            { id: 'fish', label: '🐟 Рыбный', desc: 'Лосось, тунец, треска', fn: () => { setPlanType('mediterranean'); setPreferredFoods(['salmon','tuna_canned','cod','rice_brown','broccoli','olive_oil']); } },
+            { id: 'vegan', label: '🌱 Веган', desc: 'Бобовые, тофу, киноа', fn: () => { setPlanType('vegetarian'); setPreferredFoods(['tofu','tempeh','lentils','quinoa','broccoli','avocado']); } },
+            { id: 'budget', label: '💰 Бюджет', desc: 'Яйца, курица, гречка', fn: () => { setBudget('low'); setPreferredFoods(['egg_whole','chicken_thigh','buckwheat','cabbage','apple']); } },
+          ].map(p => (
+            <button key={p.id} onClick={() => { p.fn(); }} style={{ flex: 1, minWidth: 80, padding: '8px 6px', borderRadius: 10, cursor: 'pointer', textAlign: 'center', background: '#202023', border: '1px solid rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.6)', fontSize: 8, fontWeight: 600, transition: 'all 0.15s' }}
+              onMouseEnter={e => { (e.target as HTMLElement).style.background = 'rgba(249,115,22,0.1)'; (e.target as HTMLElement).style.borderColor = 'rgba(249,115,22,0.3)'; }}
+              onMouseLeave={e => { (e.target as HTMLElement).style.background = '#202023'; (e.target as HTMLElement).style.borderColor = 'rgba(255,255,255,0.06)'; }}>
+              <div style={{ fontSize: 16, marginBottom: 2 }}>{p.label.slice(0,2)}</div>
+              <div>{p.label.slice(2)}</div>
+              <div style={{ fontSize: 6, color: 'rgba(255,255,255,0.3)', marginTop: 2 }}>{p.desc}</div>
+            </button>
           ))}
         </div>
       </GlassCard>
@@ -2197,19 +2218,27 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
               <button key={v.id} onClick={() => { setPlanDays(v.id); if (v.id === 7 && !weekPlan) generatePlan(7); }} style={{
                 flex: 1, padding: 10, borderRadius: 10, cursor: 'pointer', textAlign: 'center',
                 background: planDays === v.id ? 'linear-gradient(135deg,#00e68a,#00c8a0)' : '#202023',
-                border: planDays === v.id ? 'none' : '1px solid #27272a',
+                border: planDays === v.id ? 'none' : '1px solid rgba(255,255,255,0.06)',
                 color: planDays === v.id ? '#000' : 'rgba(255,255,255,0.5)',
                 fontWeight: 700, fontSize: 11,
                 transition: 'all 0.15s',
               }}>{v.label}</button>
             ))}
           </div>
-          {planDays !== 1 && (
-            <button onClick={() => generatePlan(planDays)} style={{ marginTop: 6, padding: '8px', borderRadius: 8, border: '1px solid rgba(0,230,138,0.25)', background: 'rgba(0,230,138,0.06)', color: '#00e68a', cursor: 'pointer', fontSize: 9, fontWeight: 600, width: '100%' }}>
-              🔄 Перегенерировать {planDays === 3 ? '3 дня' : 'неделю'}
-            </button>
+          {planDays === 7 && (
+            <button onClick={() => setPlanView(prev => prev === 'list' ? 'calendar' : 'list')} style={{
+              marginTop: 6, padding: '6px', borderRadius: 8, cursor: 'pointer', fontSize: 8, fontWeight: 600, width: '100%',
+              background: planView === 'calendar' ? 'rgba(139,92,246,0.15)' : '#202023',
+              border: planView === 'calendar' ? '1px solid rgba(139,92,246,0.3)' : '1px solid rgba(255,255,255,0.06)',
+              color: planView === 'calendar' ? '#a78bfa' : 'rgba(255,255,255,0.5)',
+            }}>📅 {planView === 'calendar' ? 'Список' : 'Календарь'}</button>
           )}
-        </GlassCard>
+        {planDays !== 1 && (
+          <button onClick={() => generatePlan(planDays)} style={{ marginTop: 6, padding: '8px', borderRadius: 8, border: '1px solid rgba(0,230,138,0.25)', background: 'rgba(0,230,138,0.06)', color: '#00e68a', cursor: 'pointer', fontSize: 9, fontWeight: 600, width: '100%' }}>
+            🔄 Перегенерировать {planDays === 3 ? '3 дня' : 'неделю'}
+          </button>
+        )}
+      </GlassCard>
       )}
       {generated && allergens.length > 0 && (
         <GlassCard title="Аллергены" icon="⚠️" color="#f97316" style={{ border: '1px solid rgba(249,115,22,0.15)' }}>
@@ -2275,7 +2304,7 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
                 <div key={di} style={{
                   padding: 10, borderRadius: 12,
                   background: wIsTraining ? 'rgba(0,230,138,0.03)' : '#202023',
-                  border: wIsTraining ? '1px solid rgba(0,230,138,0.15)' : '1px solid #27272a',
+                  border: wIsTraining ? '1px solid rgba(0,230,138,0.15)' : '1px solid rgba(255,255,255,0.06)',
                 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -2313,6 +2342,85 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
         </GlassCard>
       )}
 
+      {/* Calendar view */}
+      {generated && planDays === 7 && weekPlan && planView === 'calendar' && (
+        <GlassCard title="📅 Календарь питания на неделю" icon="📅" color="#a78bfa">
+          {(() => {
+            const allMealLabels = Array.from(new Set(weekPlan.days.flatMap((d: any) => d.meals.map((m: any) => m.label))));
+            return <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 3, fontSize: 7 }}>
+                <thead>
+                  <tr>
+                    <th style={{ padding: '4px 6px', textAlign: 'center', background: '#202023', borderRadius: 6, fontSize: 7, color: 'rgba(255,255,255,0.4)', fontWeight: 600 }}>Приём</th>
+                    {weekPlan.days.map((d: any, di: number) => (
+                      <th key={di} style={{ padding: '4px 6px', textAlign: 'center', background: d.isTrainingDay ? 'rgba(0,230,138,0.12)' : '#202023', borderRadius: 6, fontSize: 7, color: d.isTrainingDay ? '#00e68a' : 'rgba(255,255,255,0.4)', fontWeight: 700 }}>
+                        {DAY_LABELS[di]}
+                        <div style={{ fontWeight: 400, color: 'rgba(255,255,255,0.3)' }}>{Math.round(d.totals.kcal)} ккал</div>
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {allMealLabels.map((label: any) => (
+                    <tr key={label}>
+                      <td style={{ padding: '4px 6px', background: '#202023', borderRadius: 6, fontSize: 7, color: 'rgba(255,255,255,0.4)', fontWeight: 600, whiteSpace: 'nowrap' }}>{label}</td>
+                      {weekPlan.days.map((d: any, di: number) => {
+                        const meal = d.meals.find((m: any) => m.label === label);
+                        if (!meal) return <td key={di} style={{ padding: '4px', textAlign: 'center', color: 'rgba(255,255,255,0.1)', fontSize: 6 }}>—</td>;
+                        const kcal = Math.round(meal.totals?.kcal || 0);
+                        return (
+                          <td key={di} style={{ padding: '4px 6px', background: 'rgba(255,255,255,0.03)', borderRadius: 6, fontSize: 6, verticalAlign: 'top' }}>
+                            <div style={{ color: '#00e68a', fontWeight: 700, fontSize: 7, marginBottom: 2 }}>{kcal} ккал</div>
+                            {meal.items.slice(0, 2).map((it: any, ii: number) => (
+                              <div key={ii} style={{ color: 'rgba(255,255,255,0.5)', lineHeight: 1.4, fontSize: 6 }}>{it.name} {it.amount}г</div>
+                            ))}
+                            {meal.items.length > 2 && <div style={{ color: 'rgba(255,255,255,0.2)', fontSize: 5 }}>+{meal.items.length - 2} ещё</div>}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>;
+          })()}
+        </GlassCard>
+      )}
+
+      {/* Time-line view for day/week */}
+      {generated && planDays === 1 && dayPlan && (
+        <GlassCard title="⏳ Таймлайн дня" icon="⏳" color="#06b6d4">
+          <div style={{ position: 'relative', paddingLeft: 20 }}>
+            {/* Vertical timeline line */}
+            <div style={{ position: 'absolute', left: 8, top: 0, bottom: 0, width: 2, background: 'rgba(6,182,212,0.2)', borderRadius: 1 }} />
+            {dayPlan.meals.map((m: any, mi: number) => {
+              const k = Math.round(m.totals?.kcal || 0);
+              const w = Math.max(10, Math.round(k / Math.max(1, dayPlan.totals?.kcal) * 100));
+              return (
+                <div key={mi} style={{ position: 'relative', marginBottom: 8, paddingLeft: 16 }}>
+                  <div style={{ position: 'absolute', left: -16, top: 4, width: 10, height: 10, borderRadius: '50%', background: '#06b6d4', border: '2px solid #18181b' }} />
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                    <span style={{ fontSize: 8, fontWeight: 600, color: '#06b6d4', minWidth: 40 }}>{m.time}</span>
+                    <span style={{ fontSize: 9, fontWeight: 700, color: '#fff' }}>{m.label}</span>
+                    <span style={{ fontSize: 8, color: '#00e68a', fontWeight: 700 }}>{k} ккал</span>
+                    <span style={{ fontSize: 7, color: 'rgba(255,255,255,0.3)' }}>Б {Math.round(m.totals?.p || 0)} Ж {Math.round(m.totals?.f || 0)} У {Math.round(m.totals?.c || 0)}</span>
+                  </div>
+                  {/* Energy bar */}
+                  <div style={{ height: 4, borderRadius: 2, background: '#202023', overflow: 'hidden' }}>
+                    <div style={{ height: '100%', width: `${w}%`, background: 'linear-gradient(90deg, #06b6d4, #00e68a)', borderRadius: 2 }} />
+                  </div>
+                  <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.4)', marginTop: 2, display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                    {m.items.map((it: any, ii: number) => (
+                      <span key={ii} style={{ background: '#202023', padding: '1px 5px', borderRadius: 4 }}>{it.name} {it.amount}г</span>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </GlassCard>
+      )}
+
       {/* Save plan button */}
       {generated && (
         <button onClick={saveCurrentPlan} style={{
@@ -2334,14 +2442,30 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
               if (!groups[cat]) groups[cat] = [];
               groups[cat].push(item);
             });
+            const totalItems = shoppingList.length;
+            const totalGrams = shoppingList.reduce((s: number, i: any) => s + (i.amount || 0), 0);
+            const pricePerKg: Record<string, number> = { low: 4, medium: 7, max: 12, enhanced: 18 };
+            const estCost = Math.round(totalGrams / 1000 * (pricePerKg[budget] || 7));
+            const exportText = shoppingList.map((i: any) => `${i.name} — ${i.amount >= 1000 ? `${(i.amount/1000).toFixed(1)} кг` : `${Math.round(i.amount)} г`}`).join('\n');
             return (
               <>
-                <button onClick={() => { shoppingList.forEach((i: any) => addToCart({ name: i.name, kcal: i.kcal || 0, amount: i.amount, category: i.catLabel || i.category })); }} style={{ marginBottom: 8, padding: '5px 10px', borderRadius: 6, border: '1px solid rgba(249,115,22,0.2)', background: 'rgba(249,115,22,0.06)', color: '#f97316', cursor: 'pointer', fontSize: 8, fontWeight: 600, width: '100%' }}>
-                  🛒 Добавить всё в корзину ({shoppingList.length} товаров)
-                </button>
+                <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
+                  <button onClick={() => { shoppingList.forEach((i: any) => addToCart({ name: i.name, kcal: i.kcal || 0, amount: i.amount, category: i.catLabel || i.category })); }} style={{ flex:1, padding: '5px 10px', borderRadius: 8, border: '1px solid rgba(249,115,22,0.2)', background: 'rgba(249,115,22,0.06)', color: '#f97316', cursor: 'pointer', fontSize: 8, fontWeight: 600 }}>
+                    🛒 В корзину ({totalItems})
+                  </button>
+                  <div style={{ padding: '5px 8px', borderRadius: 8, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.15)', color: '#00e68a', fontSize: 8, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}>
+                    💰 ~{estCost}€
+                  </div>
+                  <button onClick={() => { navigator.clipboard?.writeText(exportText); }} style={{ padding: '5px 8px', borderRadius: 8, border: '1px solid rgba(96,165,250,0.2)', background: 'rgba(96,165,250,0.06)', color: '#60a5fa', cursor: 'pointer', fontSize: 8, fontWeight: 600 }}>
+                    📋
+                  </button>
+                </div>
                 {Object.entries(groups).map(([cat, items]) => (
                   <div key={cat} style={{ marginBottom: 6 }}>
-                    <div style={{ fontSize: 9, fontWeight: 700, color: '#f97316', marginBottom: 2, padding: '2px 0', borderBottom: '1px solid rgba(249,115,22,0.1)' }}>{cat}</div>
+                    <div style={{ fontSize: 9, fontWeight: 700, color: '#f97316', marginBottom: 2, padding: '2px 0 2px 4px', borderLeft: '2px solid rgba(249,115,22,0.3)', display: 'flex', alignItems: 'center', gap: 4 }}>
+                      {cat}
+                      <span style={{ fontSize: 7, color: 'rgba(255,255,255,0.2)', marginLeft: 'auto' }}>{items.length} шт</span>
+                    </div>
                     {items.map((data: any, i: number) => (
                       <div key={data.name + i} style={{ fontSize: 9, padding: '3px 0 3px 8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: 'rgba(255,255,255,0.6)' }}>
                         <span>{data.name}</span>
@@ -2639,7 +2763,7 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
       <div style={{ display: 'flex', gap: 4 }}>
         <button onClick={() => generateCheatMeal()} style={{
           flex: 1, padding: 10, borderRadius: 10, cursor: 'pointer', textAlign: 'center',
-          background: '#202023', border: '1px solid #27272a',
+          background: '#202023', border: '1px solid rgba(255,255,255,0.06)',
           color: '#f59e0b', fontWeight: 700, fontSize: 10,
           transition: 'all 0.15s',
         }}>
@@ -2647,7 +2771,7 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
         </button>
         <button onClick={() => generateCarbload()} style={{
           flex: 1, padding: 10, borderRadius: 10, cursor: 'pointer', textAlign: 'center',
-          background: '#202023', border: '1px solid #27272a',
+          background: '#202023', border: '1px solid rgba(255,255,255,0.06)',
           color: '#f97316', fontWeight: 700, fontSize: 10,
           transition: 'all 0.15s',
         }}>
@@ -2655,7 +2779,7 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
         </button>
         <button onClick={() => generateBUTCH()} style={{
           flex: 1, padding: 10, borderRadius: 10, cursor: 'pointer', textAlign: 'center',
-          background: '#202023', border: '1px solid #27272a',
+          background: '#202023', border: '1px solid rgba(255,255,255,0.06)',
           color: '#3b82f6', fontWeight: 700, fontSize: 10,
           transition: 'all 0.15s',
         }}>
@@ -2730,7 +2854,7 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
 
       {butchPlan && (
         <GlassCard title="БУЧ (белково-углеводное чередование)" icon="⤴️⤵️" color="#3b82f6" style={{ border: '1px solid rgba(59,130,246,0.15)' }}>
-          <div style={{ padding: '10px', borderRadius: 10, background: '#202023', border: '1px solid #27272a' }}>
+          <div style={{ padding: '10px', borderRadius: 10, background: '#202023', border: '1px solid rgba(255,255,255,0.06)' }}>
             <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)', marginBottom: 6 }}>📋 {butchPlan.pattern}</div>
             <div style={{ display: 'flex', gap: 8, marginBottom: 6 }}>
               <div style={{ flex: 1, padding: '8px', borderRadius: 8, background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.2)', textAlign: 'center' }}>
@@ -2801,7 +2925,7 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
             <span>📦 {mealPrepPlan.containers} контейнеров</span>
           </div>
           {mealPrepPlan.steps.map((st, i) => (
-            <div key={i} style={{ marginBottom: 6, padding: '8px 10px', borderRadius: 10, background: '#202023', border: '1px solid #27272a' }}>
+            <div key={i} style={{ marginBottom: 6, padding: '8px 10px', borderRadius: 10, background: '#202023', border: '1px solid rgba(255,255,255,0.06)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
                 <span style={{ fontSize: 10, fontWeight: 700, color: '#06b6d4' }}>Шаг {st.step}: {st.action}</span>
                 <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.3)' }}>{st.duration} мин</span>
@@ -2821,7 +2945,7 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
           {savedPlans.slice(0, 10).map((p, pi) => {
             const isExpanded = p.id === (expandedSavedId as any);
             return (
-              <div key={p.id} style={{ marginBottom: 6, borderRadius: 10, overflow: 'hidden', border: isExpanded ? '1px solid rgba(139,92,246,0.2)' : '1px solid #27272a' }}>
+              <div key={p.id} style={{ marginBottom: 6, borderRadius: 10, overflow: 'hidden', border: isExpanded ? '1px solid rgba(139,92,246,0.2)' : '1px solid rgba(255,255,255,0.06)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 10px', cursor: 'pointer', background: isExpanded ? 'rgba(139,92,246,0.04)' : '#202023' }}
                   onClick={() => setExpandedSavedId(isExpanded ? null : p.id)}>
                   <span style={{ fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.7)' }}>📅 {p.date}</span>
