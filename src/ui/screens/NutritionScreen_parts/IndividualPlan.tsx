@@ -218,6 +218,7 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
   const [injDose, setInjDose] = useState(10);
   const [injUnit, setInjUnit] = useState('mg');
   const [injType, setInjType] = useState('инсулин');
+  const [injEster, setInjEster] = useState<'rapid' | 'short' | 'long' | 'none'>('none');
   const injectDrugTypes = ['инсулин', 'ГР', 'ИФР-1', 'MGF', 'IGF-1 DES', 'IGF-1 LR3', 'HMG', 'HCG', 'GHRP', 'CJC', 'BPC-157', 'TB-500', 'меланотан', 'семаглутид', 'тирзепатид', 'другое'];
 
   // 4. Training link
@@ -234,7 +235,14 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
     if (awm > 90) pal += 0.05;
     if (wpw >= 6) pal += 0.05;
     pal = Math.min(1.9, Math.max(1.2, Math.round(pal * 1000) / 1000));
-    const targets = calcNutrition({ weightKg: weight, heightCm: height, age, sex, pal: Math.min(1.9, Math.max(1.2, pal)), goal });
+    // Map app goal IDs to engine-compatible values
+    const goalMap: Record<string, string> = {
+      mass: 'bulk', strength: 'strength', fat_loss: 'cut',
+      cutting: 'cut', post_cut: 'maintenance', maintenance: 'maintenance',
+      recomposition: 'recomp', rehab: 'rehab',
+    };
+    const engineGoal = goalMap[goal] || 'maintenance';
+    const targets = calcNutrition({ weightKg: weight, heightCm: height, age, sex, pal: Math.min(1.9, Math.max(1.2, pal)), goal: engineGoal });
     // Pharma-aware adjustments
     const hasAAS = injections.some(i => i.type === 'ААС');
     const hasShortInsulin = injections.some(i => i.type === 'инсулин' && i.esterType !== 'long');
@@ -270,13 +278,26 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
   const [manualP, setManualP] = useState<number | null>(null);
   const [manualF, setManualF] = useState<number | null>(null);
   const [manualC, setManualC] = useState<number | null>(null);
+  const [kbjuMode, setKbjuMode] = useState<'auto' | 'manual' | 'profile'>('auto');
 
-  const effectiveKcal = manualKcal ?? calcTargets.kcal;
-  const effectiveP = manualP ?? calcTargets.protein;
-  const effectiveF = manualF ?? calcTargets.fats;
-  const effectiveC = (() => {
+  // Profile-based KBJU (raw calc from profile settings, no pharma override)
+  const profileTargets = useMemo(() => {
+    const wpw = s?.workoutsPerWeek || 3;
+    const awm = s?.avgWorkoutMinutes || 60;
+    let pal = 1.2 + wpw * 0.075;
+    if (awm > 60) pal += 0.1;
+    if (awm > 90) pal += 0.05;
+    if (wpw >= 6) pal += 0.05;
+    pal = Math.min(1.9, Math.max(1.2, Math.round(pal * 1000) / 1000));
+    const gm: Record<string, string> = { mass:'bulk',strength:'strength',fat_loss:'cut',cutting:'cut',post_cut:'maintenance',maintenance:'maintenance',recomposition:'recomp',rehab:'rehab' };
+    return calcNutrition({ weightKg: s?.weight || weight, heightCm: s?.height || height, age: s?.age || age, sex: s?.sex || sex, pal, goal: gm[goal] || 'maintenance' });
+  }, [s?.weight, s?.height, s?.age, s?.sex, s?.workoutsPerWeek, s?.avgWorkoutMinutes, goal]);
+
+  const effectiveKcal = kbjuMode === 'profile' ? profileTargets.kcal : (manualKcal ?? calcTargets.kcal);
+  const effectiveP = kbjuMode === 'profile' ? profileTargets.protein : (manualP ?? calcTargets.protein);
+  const effectiveF = kbjuMode === 'profile' ? profileTargets.fats : (manualF ?? calcTargets.fats);
+  const effectiveC = kbjuMode === 'profile' ? profileTargets.carbs : (() => {
     if (manualC !== null) return manualC;
-    // If kcal is manual but carbs not set, calc from remaining
     if (manualKcal !== null && manualP !== null && manualF !== null && manualC === null) {
       const fromPF = (manualP * 4) + (manualF * 9);
       return Math.max(0, Math.round((manualKcal - fromPF) / 4));
@@ -284,12 +305,16 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
     return calcTargets.carbs;
   })();
 
-  // Auto-calc kcal from P+F+C when all 3 are set
-  useEffect(() => {
-    if (manualP !== null && manualF !== null && manualC !== null && manualKcal === null) {
-      setManualKcal(manualP * 4 + manualF * 9 + manualC * 4);
+  // Sync manual values when switching to manual mode
+  const switchKbjuMode = (mode: typeof kbjuMode) => {
+    if (mode === 'manual' && kbjuMode !== 'manual') {
+      setManualKcal(effectiveKcal);
+      setManualP(effectiveP);
+      setManualF(effectiveF);
+      setManualC(effectiveC);
     }
-  }, [manualP, manualF, manualC]);
+    setKbjuMode(mode);
+  };
 
   const resultsRef = useRef<HTMLDivElement>(null);
   const [editMode, setEditMode] = useState(false);
@@ -1436,6 +1461,17 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
             <input type="number" value={dailySteps} onChange={e => setDailySteps(+e.target.value || 0)} style={inputStyle} />
           </div>
         </div>
+        <button onClick={() => {
+          setWeight(s?.weight || weight);
+          setHeight(s?.height || height);
+          setAge(s?.age || age);
+          setSex(s?.sex || sex);
+          setDailySteps(s?.dailySteps || dailySteps);
+        }} style={{
+          width:'100%', padding:'5px 8px', borderRadius:8, cursor:'pointer', fontSize:8, fontWeight:600,
+          background:'rgba(96,165,250,0.08)', border:'1px solid rgba(96,165,250,0.2)', color:'#60a5fa',
+          marginBottom:8,
+        }}>👤 Автозаполнение из профиля</button>
         <div>
           <label style={{ fontSize: 9, color: 'rgba(255,255,255,0.35)', marginBottom: 3, display: 'block' }}>Время на готовку (мин/день)</label>
           <input type="number" value={cookTimeMin} onChange={e => setCookTimeMin(+e.target.value || 0)} style={inputStyle} />
@@ -1466,24 +1502,55 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
           </div>
         )}
         <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', marginBottom: 4 }}>Инъекции {courseEntries.length > 0 ? '(можно добавить ещё)' : '(добавьте препараты курса)'}:</div>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, alignItems: 'flex-end', marginBottom: 4 }}>
-          <div style={{ flex: 1, minWidth: 60 }}>
-            <input type="text" value={injName} onChange={e => setInjName(e.target.value)} placeholder="Название" style={inputStyle} list="drug-list" />
-            <datalist id="drug-list">{injectDrugTypes.map(d => <option key={d} value={d} />)}</datalist>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 4 }}>
+          <div style={{ display: 'flex', gap: 4, alignItems: 'flex-end' }}>
+            <div style={{ flex: 1, minWidth: 60 }}>
+              <input type="text" value={injName} onChange={e => setInjName(e.target.value)} placeholder="Название препарата" style={inputStyle} list="drug-list" />
+              <datalist id="drug-list">{injectDrugTypes.map(d => <option key={d} value={d} />)}</datalist>
+            </div>
+            <div style={{ width: 55 }}>
+              <input type="time" value={injTime} onChange={e => setInjTime(e.target.value)} style={inputStyle} />
+            </div>
+            <div style={{ width: 45 }}>
+              <input type="number" value={injDose} onChange={e => setInjDose(+e.target.value || 0)} style={inputStyle} placeholder="Доза" />
+            </div>
+            <div style={{ width: 40 }}>
+              <select value={injUnit} onChange={e => setInjUnit(e.target.value)} style={selectStyle}>
+                <option value="mg">mg</option><option value="mcg">mcg</option>
+                <option value="IU">IU</option><option value="ml">ml</option>
+              </select>
+            </div>
+            <button onClick={() => {
+              if (injName.trim()) {
+                const substance = PHARMA_DB[injName.trim()];
+                const hl = substance?.pk?.halfLifeHours || 24;
+                // Auto-detect type from PHARMA_DB
+                let detectedType = injType;
+                let detectedEster: 'rapid' | 'short' | 'long' | 'none' = injEster;
+                if (substance?.class === 'insulin') { detectedType = 'инсулин'; detectedEster = hl < 2 ? 'rapid' : hl <= 8 ? 'short' : 'long'; }
+                else if (substance?.id?.includes('ghrp') || substance?.id?.includes('cjc') || substance?.class === 'peptide_ghrh' || substance?.class === 'peptide_ghrp') { detectedType = 'ГР'; detectedEster = 'short'; }
+                else if (substance?.id?.includes('igf1') || substance?.id?.includes('mgf')) { detectedType = 'ИФР-1'; detectedEster = 'short'; }
+                else if (substance?.class === 'glp1') { detectedType = 'семаглутид'; detectedEster = 'long'; }
+                else if (substance?.class === 'pct_gonadotropin') { detectedType = 'HCG'; detectedEster = 'none'; }
+                else if (substance?.class && ['testosterone','trenbolone','nandrolone','boldenone','primobolan','drostanolone'].includes(substance.class)) { detectedType = 'ААС'; detectedEster = 'long'; }
+                // If user manually set ester (not 'auto'), prefer that
+                if (injEster !== 'none') detectedEster = injEster;
+                setInjections([...injections, { id: Date.now().toString(), name: injName.trim(), time: injTime, dose: injDose, unit: injUnit, type: detectedType, esterType: detectedEster, halfLifeHours: hl, trainLinked: false, trainTiming: 'none' }]);
+                setInjName('');
+              }
+            }} style={{ padding: '4px 8px', borderRadius: 6, border: '1px solid rgba(0,230,138,0.3)', background: 'rgba(0,230,138,0.08)', color: '#00e68a', fontSize: 9, cursor: 'pointer', fontWeight: 600, whiteSpace: 'nowrap' }}>+ Добавить</button>
           </div>
-          <div style={{ width: 55 }}>
-            <input type="time" value={injTime} onChange={e => setInjTime(e.target.value)} style={inputStyle} />
-          </div>
-          <div style={{ width: 45 }}>
-            <input type="number" value={injDose} onChange={e => setInjDose(+e.target.value || 0)} style={inputStyle} placeholder="Доза" />
-          </div>
-          <div style={{ width: 40 }}>
-            <select value={injUnit} onChange={e => setInjUnit(e.target.value)} style={selectStyle}>
-              <option value="mg">mg</option><option value="mcg">mcg</option>
-              <option value="IU">IU</option><option value="ml">ml</option>
+          <div style={{ display: 'flex', gap: 4 }}>
+            <select value={injType} onChange={e => setInjType(e.target.value)} style={{ ...selectStyle, width: 'auto', flex: 1, fontSize: 8 }}>
+              {injectDrugTypes.map(d => <option key={d} value={d}>{d}</option>)}
+            </select>
+            <select value={injEster} onChange={e => setInjEster(e.target.value as any)} style={{ ...selectStyle, width: 'auto', flex: 1, fontSize: 8 }}>
+              <option value="none">🔄 Эфир: авто</option>
+              <option value="rapid">⚡ Быстрый (rapid)</option>
+              <option value="short">🕐 Короткий (short)</option>
+              <option value="long">🌙 Длинный (long)</option>
             </select>
           </div>
-          <button onClick={() => { if (injName.trim()) { const substance = PHARMA_DB[injName.trim()]; const hl = substance?.pk?.halfLifeHours || 24; setInjections([...injections, { id: Date.now().toString(), name: injName.trim(), time: injTime, dose: injDose, unit: injUnit, type: injType, esterType: 'none', halfLifeHours: hl, trainLinked: false, trainTiming: 'none' }]); setInjName(''); } }} style={{ padding: '4px 8px', borderRadius: 6, border: '1px solid rgba(0,230,138,0.3)', background: 'rgba(0,230,138,0.08)', color: '#00e68a', fontSize: 9, cursor: 'pointer' }}>+</button>
         </div>
         {injections.map((inj, i) => {
           const canLink = inj.type === 'инсулин' || inj.type === 'ИФР-1';
@@ -1573,7 +1640,22 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
 
       {/* 5. Editable KBJU card */}
       <GlassCard title="КБЖУ" icon="📊" color="#00e68a">
-        {!editMode ? (
+        {/* Mode selector */}
+        <div style={{ display: 'flex', gap: 4, marginBottom: 10 }}>
+          {(['auto', 'manual', 'profile'] as const).map(mode => {
+            const labels: Record<string, string> = { auto: '🤖 Авторасчёт', manual: '✏️ Ручной ввод', profile: '👤 Из профиля' };
+            const colors: Record<string, string> = { auto: '#00e68a', manual: '#f59e0b', profile: '#60a5fa' };
+            return (
+              <button key={mode} onClick={() => switchKbjuMode(mode)} style={{
+                flex: 1, padding: '5px 4px', borderRadius: 8, cursor: 'pointer', fontSize: 8, fontWeight: 600,
+                background: kbjuMode === mode ? `${colors[mode]}20` : '#202023',
+                border: kbjuMode === mode ? `1px solid ${colors[mode]}` : '1px solid #27272a',
+                color: kbjuMode === mode ? colors[mode] : 'rgba(255,255,255,0.4)',
+              }}>{labels[mode]}</button>
+            );
+          })}
+        </div>
+        {kbjuMode !== 'manual' ? (
           <div>
             {/* Big macro tiles */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 5, marginBottom: 8 }}>
@@ -1629,14 +1711,6 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
                 </div>
               );
             })()}
-            <button onClick={() => setEditMode(true)} style={{
-              width:'100%', padding:7, borderRadius:8,
-              border:'1px solid rgba(0,230,138,0.2)', background:'rgba(0,230,138,0.06)',
-              color:'#00e68a', fontSize:9, cursor:'pointer', fontWeight:600,
-              transition:'all 0.15s',
-            }}>
-              ✏️ Редактировать
-            </button>
           </div>
         ) : (
           <div>
@@ -1647,7 +1721,7 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
               <div><label style={{fontSize:8,color:'rgba(255,255,255,0.3)'}}>Углеводы (г)</label><input type="number" value={manualC ?? calcTargets.carbs} onChange={e => setManualC(+e.target.value || null)} style={inputStyle} /></div>
             </div>
             <div style={{fontSize:8,color:'rgba(255,255,255,0.3)',marginBottom:4}}>Введите любые значения — недостающие рассчитаются автоматически</div>
-            <button onClick={() => setEditMode(false)} style={greenBtn}>✓ Готово</button>
+            <button onClick={() => setKbjuMode('auto')} style={greenBtn}>✓ Применить</button>
           </div>
         )}
       </GlassCard>
