@@ -3,6 +3,7 @@ import { FOOD_DB } from '../../../core/nutrition-database';
 import { calcNutrition } from '../../../engines/nutrition.engine';
 import { getProfile, updateProfile } from '../../../core/profile-manager';
 import type { UserProfile } from '../../../core/types';
+import { NutritionReference } from './NutritionReference';
 
 // ─── Types ───
 type GoalId = 'mass' | 'strength' | 'fat_loss' | 'cutting' | 'post_cut' | 'maintenance' | 'recomposition' | 'rehab';
@@ -240,6 +241,16 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
 
   // Save plans
   const [savedPlans, setSavedPlans] = useState<SavedPlan[]>(() => { try { return JSON.parse(localStorage.getItem('he_saved_nutrition_plans') || '[]'); } catch { return []; } });
+  const [expandedSavedId, setExpandedSavedId] = useState<number | null>(null);
+
+  const loadSavedPlan = (plan: SavedPlan) => {
+    if (plan.dayPlan) { setDayPlan(plan.dayPlan); setGenerated(true); setPlanDays(1); }
+    if (plan.threeDayPlan) setThreeDayPlan(plan.threeDayPlan);
+    if (plan.weekPlan) setWeekPlan(plan.weekPlan);
+    if (plan.shoppingList) setShoppingList(plan.shoppingList);
+    if (plan.waterCalc) setWaterCalc(plan.waterCalc);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
 
   // Sync goal to profile
   useEffect(() => {
@@ -1411,19 +1422,50 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
         </GlassCard>
       )}
 
-      {/* Saved plans */}
+      {/* Saved plans with load/delete */}
       {savedPlans.length > 0 && (
         <GlassCard title="📂 Сохранённые планы" icon="📂">
-          {savedPlans.slice(0, 5).map(p => (
-            <div key={p.id} style={{ padding: '4px 0', borderBottom: '1px solid rgba(255,255,255,0.03)', fontSize: 9, display: 'flex', justifyContent: 'space-between' }}>
-              <span>📅 {p.date}</span>
-              <span style={{color:'rgba(255,255,255,0.4)'}}>
-                {p.dayPlan ? `${Math.round(p.dayPlan.totals.kcal)} ккал` : ''}
-              </span>
-            </div>
-          ))}
+          {savedPlans.slice(0, 10).map((p, pi) => {
+            const isExpanded = p.id === (expandedSavedId as any);
+            return (
+              <div key={p.id} style={{ marginBottom: 4, borderRadius: 8, overflow: 'hidden', border: isExpanded ? '1px solid rgba(139,92,246,0.2)' : '1px solid rgba(255,255,255,0.04)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 8px', cursor: 'pointer', background: isExpanded ? 'rgba(139,92,246,0.04)' : 'transparent' }}
+                  onClick={() => setExpandedSavedId(isExpanded ? null : p.id)}>
+                  <span style={{ fontSize: 9, fontWeight: 600 }}>📅 {p.date}</span>
+                  <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                    <span style={{ fontSize: 8, color: '#00e68a' }}>{p.dayPlan ? `${Math.round(p.dayPlan.totals.kcal)} ккал` : ''}</span>
+                    <button onClick={(e) => { e.stopPropagation(); loadSavedPlan(p); }} style={{ padding: '2px 6px', borderRadius: 4, fontSize: 8, cursor: 'pointer', background: 'rgba(0,230,138,0.1)', border: '1px solid rgba(0,230,138,0.2)', color: '#00e68a' }}>📋</button>
+                    <button onClick={(e) => { e.stopPropagation(); const updated = savedPlans.filter((_, j) => j !== pi); setSavedPlans(updated); localStorage.setItem('he_saved_nutrition_plans', JSON.stringify(updated)); }} style={{ padding: '2px 6px', borderRadius: 4, fontSize: 8, cursor: 'pointer', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', color: '#ef4444' }}>✕</button>
+                  </div>
+                </div>
+                {isExpanded && (
+                  <div style={{ padding: '4px 8px 6px', borderTop: '1px solid rgba(255,255,255,0.04)', fontSize: 8, color: 'rgba(255,255,255,0.5)' }}>
+                    {p.dayPlan && (
+                      <div>
+                        <div style={{ fontWeight: 600, color: '#00e68a', marginBottom: 2 }}>День: {Math.round(p.dayPlan.totals.kcal)} ккал</div>
+                        {p.dayPlan.meals?.map((m: any, mi: number) => (
+                          <div key={mi} style={{ padding: '1px 0' }}>{m.time} {m.label}: {m.items?.map((it: any) => it.name).join(', ')}</div>
+                        ))}
+                      </div>
+                    )}
+                    {p.shoppingList && Object.keys(p.shoppingList).length > 0 && (
+                      <div style={{ marginTop: 4 }}>
+                        <span style={{ color: '#f97316', fontWeight: 600 }}>🛒 {Object.keys(p.shoppingList).length} продуктов</span>
+                      </div>
+                    )}
+                    {p.waterCalc && <div style={{ marginTop: 2, color: '#06b6d4' }}>💧 {p.waterCalc.total} л/день</div>}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </GlassCard>
       )}
+
+      {/* ─── Справочник (правила, качество, сочетаемость) ─── */}
+      <GlassCard title="📖 Справочник питания">
+        <NutritionReference />
+      </GlassCard>
 
     </div>
   );
