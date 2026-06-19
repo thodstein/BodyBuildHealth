@@ -3130,14 +3130,21 @@ const MyTrainingTab: React.FC<{ customExercises: { name: string; sets: number; r
         <div>
           <div className="card" style={{padding:10,marginBottom:8}}>
             <h4 style={{margin:'0 0 6px',fontSize:12}}>➕ Добавить упражнение</h4>
+            <div style={{display:'grid',gridTemplateColumns:'2fr 1fr 1fr 1fr',gap:4,marginBottom:4}}>
+              <div style={{fontSize:7,color:'var(--text-dim)',paddingLeft:2}}>Упражнение</div>
+              <div style={{fontSize:7,color:'var(--text-dim)',paddingLeft:2}}>Сеты</div>
+              <div style={{fontSize:7,color:'var(--text-dim)',paddingLeft:2}}>Повторы</div>
+              <div style={{fontSize:7,color:'var(--text-dim)',paddingLeft:2}}>RIR</div>
+            </div>
             <div style={{display:'grid',gridTemplateColumns:'2fr 1fr 1fr 1fr',gap:4,marginBottom:6}}>
               <input value={newExName} onChange={e=>setNewExName(e.target.value)} onKeyDown={e=>e.key==='Enter'&&addExercise()} placeholder="Название упражнения" style={{padding:'6px 8px',borderRadius:6,border:'1px solid var(--border)',background:'var(--bg-secondary)',color:'var(--text)',fontSize:11,boxSizing:'border-box'}} />
-              <input type="number" value={newExSets} onChange={e=>setNewExSets(parseFloat(e.target.value) || 0)} placeholder="Подходы" style={{padding:'6px 8px',borderRadius:6,border:'1px solid var(--border)',background:'var(--bg-secondary)',color:'var(--text)',fontSize:11,boxSizing:'border-box'}} />
-              <input type="number" value={newExReps} onChange={e=>setNewExReps(parseFloat(e.target.value) || 0)} placeholder="Повторы" style={{padding:'6px 8px',borderRadius:6,border:'1px solid var(--border)',background:'var(--bg-secondary)',color:'var(--text)',fontSize:11,boxSizing:'border-box'}} />
-              <input type="number" value={newExRir} onChange={e=>setNewExRir(parseFloat(e.target.value) || 0)} placeholder="RIR" style={{padding:'6px 8px',borderRadius:6,border:'1px solid var(--border)',background:'var(--bg-secondary)',color:'var(--text)',fontSize:11,boxSizing:'border-box'}} />
+              <input type="number" min="1" max="10" value={newExSets} onChange={e=>setNewExSets(parseFloat(e.target.value) || 0)} placeholder="Напр. 3" style={{padding:'6px 8px',borderRadius:6,border:'1px solid var(--border)',background:'var(--bg-secondary)',color:'var(--text)',fontSize:11,boxSizing:'border-box',textAlign:'center'}} />
+              <input type="number" min="1" max="30" value={newExReps} onChange={e=>setNewExReps(parseFloat(e.target.value) || 0)} placeholder="Напр. 10" style={{padding:'6px 8px',borderRadius:6,border:'1px solid var(--border)',background:'var(--bg-secondary)',color:'var(--text)',fontSize:11,boxSizing:'border-box',textAlign:'center'}} />
+              <input type="number" min="0" max="4" value={newExRir} onChange={e=>setNewExRir(parseFloat(e.target.value) || 0)} placeholder="0-4" style={{padding:'6px 8px',borderRadius:6,border:'1px solid var(--border)',background:'var(--bg-secondary)',color:'var(--text)',fontSize:11,boxSizing:'border-box',textAlign:'center'}} />
             </div>
             <div style={{display:'flex',flexWrap:'wrap',gap:3,marginBottom:6}}>
-              {groupOptions.slice(0,12).map(g=><button key={g} onClick={()=>setNewExName(g+' → ')} style={{padding:'2px 6px',borderRadius:4,fontSize:7,cursor:'pointer',background:'var(--bg-secondary)',border:'1px solid var(--border)',color:'var(--text-dim)'}}>{g}</button>)}
+              <span style={{fontSize:7,color:'var(--text-dim)',padding:'2px 4px',alignSelf:'center'}}>Категория:</span>
+              {groupOptions.slice(0,12).map(g=><button key={g} onClick={()=>setNewExName(g+' → ')} style={{padding:'2px 6px',borderRadius:4,fontSize:7,cursor:'pointer',background:'var(--bg-secondary)',border:'1px solid var(--border)',color:'var(--text-dim)'}}>{GROUP_LABELS[g] || g}</button>)}
             </div>
             <button onClick={addExercise} style={{width:'100%',padding:6,borderRadius:6,border:'none',cursor:'pointer',background:'var(--accent)',color:'#000',fontWeight:600,fontSize:11}}>Добавить</button>
           </div>

@@ -298,6 +298,22 @@ main.has-sub-nav {
   color:#fff;
 }
 
+/* === GLOBAL BUTTON VISUAL FEEDBACK (Glow + Scale) === */
+button {
+  transition: all 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  position: relative;
+}
+button:hover {
+  filter: brightness(1.12);
+  box-shadow: 0 0 14px rgba(0, 230, 138, 0.12);
+}
+button:active {
+  transform: scale(0.96);
+}
+button:active:not(:disabled) {
+  transform: scale(0.96);
+}
+
 /* === INPUTS === */
 input, select, textarea {
   background:var(--bg-secondary);
