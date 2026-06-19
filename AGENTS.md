@@ -233,16 +233,27 @@ if (shouldApplyPenalty && finalResult.systemBreakdown) {
   - **KBJU карточка**: big macro tiles with per-kg, gradient backgrounds, colored top border, macro distribution bar (Б/Ж/У %), edit button
   - **Meal plan cards**: gradient day headers with large kcal badge, macro progress bars per target (Б/Ж/У vs targets), colored meal blocks with vertical accent bar, item chips with dark bg, meal macro % distribution
   - **GlassCard upgrade**: 3px colored top gradient bar per card, 14px padding, 700-weight title, 10px → 12px font
-  - **All cards** got `color` accent props: 👤#a78bfa, 🎯#00e68a, 💉#06b6d4, 🏋️#22c55e, 📊#00e68a, 💰#f59e0b, 📈#22c55e, ⏰#06b6d4, ⚠️#ef4444, 📋#a855f7, 🍎#f59e0b, 🔄#3b82f6, 📐#00e68a, 📋#00e68a, 🛒#f97316, 💧#06b6d4, 📊#3b82f6, 💡#a855f7, 👨‍🍳#06b6d4, 📂#8b5cf6, 📖#8b5cf6
+  - **All cards** got `color` accent props
   - **Separate calculators** (чимил/углезагрузка/БУЧ): solid dark buttons with accent text
-  - **БУЧ display**: 2-column card (ВУ green / НУ red) with big numbers
+  - **БУЧ display**: 2-column card (ВУ green / НУ red) with big BJU
   - **Green button**: `boxShadow` for depth
   - **Week plan**: per-day cards with training/rest icon, kcal badge, inline food list
   - **Saved plans**: `#202023` collapsed state, expanded with full detail
-  - **Meal prep steps**: solid dark step cards, cyan items chips
-  - **Water balance**: breakdown with calculation details + big total
-  - All inactive backgrounds changed from `rgba(255,255,255,0.02)` → `#202023`; borders from `rgba(255,255,255,0.06)` → `#27272a`
-  - All inputs/selects consistently use `#202023`/`#27272a`
+  - **Meal prep steps**: solid dark step cards, cyan items chips, 1/3/7 day selector
+  - **Water balance**: pharma-aware (40ml/kg on AAS, +0.5L base +0.1L/injectable)
+  - All inactive backgrounds changed from `rgba(..0.02)` → `#202023`; borders → `#27272a`
+- **Phases**: replaced steroid cycles (course/bridge/pct) with nutrition phases (mass/cutting/maintenance/recomp/recovery/prep)
+- **Allergens**: expanded 7→14 (лактоза, глютен, орехи, арахис, яйца, соя, рыба, морепродукты, молочные, кунжут, сельдерей, горчица, сульфиты, люпин) with icons + search
+- **Preferences**: add/remove favorite foods via dropdown, excluded foods picker, custom notes textarea (saved to localStorage)
+- **Food randomization**: seeded random per day+meal so same params give different foods
+- **Shopping list**: grouped by category (🥩 мясо, 🥛 молочка, 🍚 крупы, 🥦 овощи, 🧈 жиры, etc.)
+- **Читмил/Загрузка/БУЧ**: detailed BJU breakdown + 5-7 принципов + goal-specific рекомендации
+- **Recommendations**: 20+ detailed recs covering goal, phase, plan type, allergens, training link, cycling, budget, pharma drugs, steps
+- **Meal prep**: day selector (1/3/7), uses respective plan source
+- **Reports**: "Общий отчёт" now triggers ALL reports + recommendations at once
+- **Nutrition level**: description text + multiplier display
+- **Training link**: day-of-week picker (Пн-Вс) for training day selection
+- **Removed**: duplicate NutritionReference at bottom (already in tab)
 - `tsc --noEmit` ✓, `vite build` ✓
 
 ## Build Commands

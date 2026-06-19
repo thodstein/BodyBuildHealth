@@ -4,11 +4,11 @@ import { FOOD_DB } from '../../../core/nutrition-database';
 import { calcNutrition } from '../../../engines/nutrition.engine';
 import { getProfile, updateProfile } from '../../../core/profile-manager';
 import type { UserProfile } from '../../../core/types';
-import { NutritionReference } from './NutritionReference';
+
 
 // ─── Types ───
 type GoalId = 'mass' | 'strength' | 'fat_loss' | 'cutting' | 'post_cut' | 'maintenance' | 'recomposition' | 'rehab';
-type PhaseId = 'course' | 'bridge' | 'pct' | 'cruise' | 'blast' | 'off';
+type PhaseId = 'mass' | 'cutting' | 'maintenance' | 'recomp' | 'recovery' | 'prep';
 type BudgetLevel = 'low' | 'medium' | 'max' | 'enhanced';
 type NutritionLevel = 'base' | 'medium' | 'enhanced' | 'max';
 type PlanType = 'classic' | 'keto' | 'highcarb' | 'mediterranean' | 'vegetarian';
@@ -29,13 +29,13 @@ const GOALS: { id: GoalId; label: string; icon: string; desc: string }[] = [
   { id: 'rehab', label: 'Реабилитация', icon: '🩹', desc: 'Восстановление после травм/болезни' },
 ];
 
-const PHASES: { id: PhaseId; label: string; icon: string }[] = [
-  { id: 'course', label: 'Курс', icon: '💉' },
-  { id: 'bridge', label: 'Мост', icon: '🌉' },
-  { id: 'pct', label: 'PCT', icon: '🔄' },
-  { id: 'cruise', label: 'Круиз', icon: '⛵' },
-  { id: 'blast', label: 'Бласт', icon: '💥' },
-  { id: 'off', label: 'Офф', icon: '⏸️' },
+const PHASES: { id: PhaseId; label: string; icon: string; desc: string }[] = [
+  { id: 'mass', label: 'Массонабор', icon: '💪', desc: 'Профицит 300-500 ккал, белок 1.8-2.2г/кг' },
+  { id: 'cutting', label: 'Сушка', icon: '✂️', desc: 'Дефицит 300-500 ккал, белок 2.5г/кг' },
+  { id: 'maintenance', label: 'Поддержка', icon: '⚖️', desc: 'Баланс, калории на поддержание' },
+  { id: 'recomp', label: 'Рекомпозиция', icon: '🔄', desc: 'Одновременный рост + жиросжигание' },
+  { id: 'recovery', label: 'Восстановление', icon: '🩹', desc: 'Повышенный белок, витамины' },
+  { id: 'prep', label: 'Подготовка', icon: '🎯', desc: 'Плавный выход на пиковую форму' },
 ];
 
 const BUDGET_LEVELS: { id: BudgetLevel; label: string; icon: string; desc: string; color: string }[] = [
@@ -60,7 +60,22 @@ const PLAN_TYPES: { id: PlanType; label: string; icon: string; desc: string; pMu
   { id: 'vegetarian', label: 'Вегетарианский', icon: '🌱', desc: 'Растительный белок', pMult: 0.8, fMult: 1.2 },
 ];
 
-const ALLERGEN_LIST = ['лактоза', 'глютен', 'орехи', 'яйца', 'соя', 'рыба', 'ракообразные'];
+const ALLERGEN_LIST = [
+  { id: 'лактоза', label: 'Лактоза', icon: '🥛' },
+  { id: 'глютен', label: 'Глютен', icon: '🌾' },
+  { id: 'орехи', label: 'Орехи (грецкие/миндаль/кешью)', icon: '🥜' },
+  { id: 'арахис', label: 'Арахис', icon: '🥜' },
+  { id: 'яйца', label: 'Яйца', icon: '🥚' },
+  { id: 'соя', label: 'Соя/тофу', icon: '🫘' },
+  { id: 'рыба', label: 'Рыба', icon: '🐟' },
+  { id: 'морепродукты', label: 'Морепродукты (креветки/крабы)', icon: '🦐' },
+  { id: 'молочные', label: 'Молочные продукты (казеин/сыворотка)', icon: '🧀' },
+  { id: 'кунжут', label: 'Кунжут/тахини', icon: '🌰' },
+  { id: 'сельдерей', label: 'Сельдерей', icon: '🥬' },
+  { id: 'горчица', label: 'Горчица', icon: '🫙' },
+  { id: 'сульфиты', label: 'Сульфиты (вино/сухофрукты)', icon: '🍷' },
+  { id: 'люпин', label: 'Люпин (мука/белок)', icon: '🌱' },
+];
 
 // ─── Helpers ───
 const getProfileSafe = () => { try { return getProfile(); } catch { return null; } };
@@ -141,7 +156,7 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
   const [goal, setGoal] = useState<GoalId>((s?.primaryGoal as GoalId) || 'maintenance');
 
   // 3. Phase + course drugs
-  const [phase, setPhase] = useState<PhaseId>('course');
+  const [phase, setPhase] = useState<PhaseId>('maintenance');
   const [injections, setInjections] = useState<DrugInjection[]>(() => {
     // Auto-pull from pharma course
     if (courseEntries.length > 0) {
@@ -225,6 +240,7 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
   // 11. Preferences + user foods
   const [preferredFoods, setPreferredFoods] = useState<string[]>(() => { try { return JSON.parse(localStorage.getItem('he_preferred_foods') || '["chicken_breast","rice_white","broccoli","egg_whole","avocado"]'); } catch { return ['chicken_breast','rice_white','broccoli','egg_whole','avocado']; } });
   const [userFoods, setUserFoods] = useState<any[]>(() => { try { return JSON.parse(localStorage.getItem('he_custom_foods') || '[]'); } catch { return []; } });
+  const [customNotes, setCustomNotes] = useState(() => { try { return localStorage.getItem('he_nutrition_notes') || ''; } catch { return ''; } });
 
   // 12. Excluded foods
   const [excludedFoods, setExcludedFoods] = useState<string[]>(() => { try { return JSON.parse(localStorage.getItem('he_excluded_foods') || '[]'); } catch { return []; } });
@@ -264,9 +280,9 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
     }
   }, [goal]);
 
-  const toggleAllergen = (a: string) => {
+  const toggleAllergen = (id: string) => {
     setAllergens(prev => {
-      const updated = prev.includes(a) ? prev.filter(x => x !== a) : [...prev, a];
+      const updated = prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id];
       localStorage.setItem('he_food_allergens', JSON.stringify(updated));
       return updated;
     });
@@ -303,16 +319,25 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
     const excludedIds = new Set(excludedFoods);
     const allergenIds = new Set(
       allergens.flatMap(a => {
-        if (a === 'лактоза') return ['cottage_cheese_5','kefir','yogurt_greek','milk','cheese_hard','kefir_2','yogurt_natural','ryazhenka','sour_cream_15','greek_yogurt'];
-        if (a === 'глютен') return ['pasta_durum','bread_rye','tortilla_wheat','oats','bulgur','couscous'];
-        if (a === 'орехи') return FOOD_DB.filter(f => f.allergens?.includes('nuts')).map(f => f.id);
+        if (a === 'лактоза' || a === 'молочные') return ['cottage_cheese_5','kefir','yogurt_greek','milk','cheese_hard','kefir_2','yogurt_natural','ryazhenka','sour_cream_15','greek_yogurt','milk_3_2','cheese_mozzarella','cheese_ricotta','whey_protein'];
+        if (a === 'глютен') return ['pasta_durum','bread_rye','tortilla_wheat','oats','bulgur','couscous','bread_white','flour_wheat'];
+        if (a === 'орехи') return FOOD_DB.filter(f => f.allergens?.includes('nuts') || f.name.toLowerCase().includes('миндаль') || f.name.toLowerCase().includes('грецк') || f.name.toLowerCase().includes('кешью') || f.name.toLowerCase().includes('фундук') || f.name.toLowerCase().includes('пекан')).map(f => f.id);
+        if (a === 'арахис') return FOOD_DB.filter(f => f.name.toLowerCase().includes('арахис')).map(f => f.id);
         if (a === 'яйца') return ['egg_whole','egg_white'];
-        if (a === 'соя') return FOOD_DB.filter(f => f.name.toLowerCase().includes('соя') || f.name.toLowerCase().includes('тофу')).map(f => f.id);
-        if (a === 'рыба') return FOOD_DB.filter(f => f.category === 'protein' && (f.name.toLowerCase().includes('рыб') || f.name.toLowerCase().includes('лосос') || f.name.toLowerCase().includes('тунец') || f.name.toLowerCase().includes('треск') || f.name.toLowerCase().includes('палтус') || f.name.toLowerCase().includes('скумбр') || f.name.toLowerCase().includes('форель') || f.name.toLowerCase().includes('креветк') || f.name.toLowerCase().includes('мидии') || f.name.toLowerCase().includes('кальмар'))).map(f => f.id);
-        if (a === 'ракообразные') return FOOD_DB.filter(f => f.name.toLowerCase().includes('креветк') || f.name.toLowerCase().includes('краб') || f.name.toLowerCase().includes('лобстер') || f.name.toLowerCase().includes('омар')).map(f => f.id);
+        if (a === 'соя') return FOOD_DB.filter(f => f.name.toLowerCase().includes('соя') || f.name.toLowerCase().includes('тофу') || f.name.toLowerCase().includes('эдамам') || f.name.toLowerCase().includes('темпе')).map(f => f.id);
+        if (a === 'рыба') return FOOD_DB.filter(f => f.category === 'protein' && (f.name.toLowerCase().includes('рыб') || f.name.toLowerCase().includes('лосос') || f.name.toLowerCase().includes('тунец') || f.name.toLowerCase().includes('треск') || f.name.toLowerCase().includes('палтус') || f.name.toLowerCase().includes('скумбр') || f.name.toLowerCase().includes('форель') || f.name.toLowerCase().includes('сардин') || f.name.toLowerCase().includes('сельдь'))).map(f => f.id);
+        if (a === 'морепродукты') return FOOD_DB.filter(f => f.name.toLowerCase().includes('креветк') || f.name.toLowerCase().includes('краб') || f.name.toLowerCase().includes('лобстер') || f.name.toLowerCase().includes('омар') || f.name.toLowerCase().includes('мидии') || f.name.toLowerCase().includes('кальмар') || f.name.toLowerCase().includes('осьминог')).map(f => f.id);
+        if (a === 'кунжут') return FOOD_DB.filter(f => f.name.toLowerCase().includes('кунжут') || f.name.toLowerCase().includes('тахини') || f.name.toLowerCase().includes('сезам')).map(f => f.id);
+        if (a === 'горчица') return FOOD_DB.filter(f => f.name.toLowerCase().includes('горчиц')).map(f => f.id);
         return [];
       })
     );
+
+    // Seeded random for food variety
+    const seedRand = (seed: number) => {
+      const x = Math.sin(seed * 9301 + 49297) * 49297;
+      return x - Math.floor(x);
+    };
 
     // Build meal plan for 1 day then expand
     const buildDay = (dayOffset: number, isTrainingDay: boolean) => {
@@ -362,15 +387,19 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
         let remainingP = p;
         let remainingF = f;
         let remainingC = c;
+        const foodSeed = dayOffset * 1000 + idx * 73;
 
         // Protein source
         let protPool = foods.filter(f => f.id !== 'egg_white' && (f.category === 'protein' || f.category === 'dairy'));
         if (planType === 'vegetarian') protPool = protPool.filter(f => f.isVegetarian !== false);
         if (planType === 'mediterranean') protPool = protPool.filter(f => !f.name.toLowerCase().includes('говядин') && !f.name.toLowerCase().includes('свинин') && !f.name.toLowerCase().includes('баранин'));
-        protPool = protPool.filter(f => !excludedIds.has(f.id) && !allergenIds.has(f.id) && preferredFoods.some(pf => pf === f.id || f.id.includes(pf)));
-        if (protPool.length === 0) protPool = foods.filter(f => f.category === 'protein' || f.category === 'dairy').filter(f => !excludedIds.has(f.id) && !allergenIds.has(f.id));
-        if (protPool.length > 0) {
-          const prot = protPool[idx % protPool.length];
+        protPool = protPool.filter(f => !excludedIds.has(f.id) && !allergenIds.has(f.id));
+        // Prefer user's preferred foods but mix in variety
+        const preferredPool = protPool.filter(f => preferredFoods.some(pf => pf === f.id));
+        const mixPool = preferredPool.length >= 2 ? preferredPool : protPool;
+        if (mixPool.length > 0) {
+          const protIdx = Math.floor(seedRand(foodSeed + 1) * mixPool.length);
+          const prot = mixPool[protIdx % mixPool.length];
           const portions = Math.min(1.5, remainingP / Math.max(1, prot.protein));
           items.push({ name: prot.name, id: prot.id, amount: Math.round(portions * 100), kcal: Math.round(prot.kcal * portions), p: Math.round(prot.protein * portions), f: Math.round(prot.fat * portions), c: Math.round(prot.carbs * portions) });
           remainingP -= Math.round(prot.protein * portions);
@@ -382,7 +411,8 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
           if (planType === 'keto') carbPool = carbPool.filter(f => f.carbs < 15);
           carbPool = carbPool.filter(f => !excludedIds.has(f.id) && !allergenIds.has(f.id));
           if (carbPool.length > 0) {
-            const carb = carbPool[idx % carbPool.length];
+            const carbIdx = Math.floor(seedRand(foodSeed + 2) * carbPool.length);
+            const carb = carbPool[carbIdx % carbPool.length];
             const portions = Math.min(1.2, remainingC / Math.max(1, carb.carbs));
             items.push({ name: carb.name, id: carb.id, amount: Math.round(portions * 100), kcal: Math.round(carb.kcal * portions), p: Math.round(carb.protein * portions), f: Math.round(carb.fat * portions), c: Math.round(carb.carbs * portions) });
           }
@@ -393,16 +423,18 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
           let fatPool = foods.filter(f => f.category === 'fat');
           fatPool = fatPool.filter(f => !excludedIds.has(f.id) && !allergenIds.has(f.id));
           if (fatPool.length > 0) {
-            const fat = fatPool[idx % fatPool.length];
+            const fatIdx = Math.floor(seedRand(foodSeed + 3) * fatPool.length);
+            const fat = fatPool[fatIdx % fatPool.length];
             const portions = Math.min(0.3, remainingF / Math.max(1, fat.fat));
             items.push({ name: fat.name, id: fat.id, amount: Math.max(5, Math.round(portions * 100)), kcal: Math.round(fat.kcal * portions), p: Math.round(fat.protein * portions), f: Math.round(fat.fat * portions), c: Math.round(fat.carbs * portions) });
           }
         }
 
         // Vegetables
-        const veg = FOOD_DB.filter(f => f.category === 'veg_fruit' && !excludedIds.has(f.id));
-        if (veg.length > 0) {
-          const v = veg[idx % veg.length];
+        const vegPool = FOOD_DB.filter(f => f.category === 'veg_fruit' && !excludedIds.has(f.id));
+        if (vegPool.length > 0) {
+          const vegIdx = Math.floor(seedRand(foodSeed + 4) * vegPool.length);
+          const v = vegPool[vegIdx % vegPool.length];
           items.push({ name: v.name, id: v.id, amount: 80, kcal: Math.round(v.kcal * 0.8), p: Math.round(v.protein * 0.8), f: Math.round(v.fat * 0.8), c: Math.round(v.carbs * 0.8) });
         }
 
@@ -455,24 +487,38 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
       }});
     }
 
-    // Shopping list
+    // Shopping list — grouped by category
     const allMeals = [d1, d2, d3, ...(days >= 7 ? Array.from({ length: 7 }, (_, i) => buildDay(i, trainingDays[i])) : [])];
-    const itemMap: Record<string, { name: string; amount: number; category: string }> = {};
+    const itemMap: Record<string, { name: string; amount: number; category: string; catLabel: string }> = {};
+    const catLabels: Record<string, string> = {
+      protein: '🥩 Мясо/рыба', dairy: '🥛 Молочка', eggs: '🥚 Яйца',
+      carb: '🍚 Крупы/хлеб', grain: '🌾 Зерновые', fat: '🧈 Жиры/масла',
+      veg_fruit: '🥦 Овощи/фрукты', nuts: '🥜 Орехи/семена',
+      sauce: '🫙 Соусы/специи', drink: '🥤 Напитки',
+      other: '📦 Прочее', fast_food: '🍔 Фастфуд',
+    };
     allMeals.forEach(day => day.meals.forEach(m => m.items.forEach((it: any) => {
+      const food = FOOD_DB.find(f => f.id === it.id);
+      const cat = food?.category || 'other';
       if (itemMap[it.name]) itemMap[it.name].amount += it.amount;
-      else {
-        const food = FOOD_DB.find(f => f.id === it.id);
-        itemMap[it.name] = { name: it.name, amount: it.amount, category: food?.category || 'other' };
-      }
+      else itemMap[it.name] = { name: it.name, amount: it.amount, category: cat, catLabel: catLabels[cat] || cat };
     })));
-    setShoppingList(itemMap);
+    // Sort: grouped by category, then by name
+    const sorted = Object.values(itemMap).sort((a, b) => {
+      if (a.category !== b.category) return a.category.localeCompare(b.category);
+      return a.name.localeCompare(b.name);
+    });
+    setShoppingList(sorted);
 
-    // Water balance
-    const baseWater = weight * 30 / 1000;
+    // Water balance (with pharma adjustments)
+    const hasPharma = injections.length > 0 || (courseEntries?.length || 0) > 0;
+    const baseWaterMl = weight * (hasPharma ? 40 : 30); // AAS ↑ protein metabolism → ↑ water
+    const baseWater = baseWaterMl / 1000;
     const trainBonus = (s?.workoutsPerWeek || 0) > 0 ? 0.5 : 0;
     const fiberFactor = 0.2;
-    const waterTotal = Math.max(1.5, Math.round((baseWater + trainBonus + fiberFactor) * 10) / 10);
-    setWaterCalc({ baseWater: Math.round(baseWater * 10) / 10, trainBonus, fiberFactor, total: waterTotal });
+    const pharmaBonus = hasPharma ? 0.5 + injections.length * 0.1 : 0; // Each injectable = +0.1L
+    const waterTotal = Math.max(1.5, Math.round((baseWater + trainBonus + fiberFactor + pharmaBonus) * 10) / 10);
+    setWaterCalc({ baseWater: Math.round(baseWater * 10) / 10, trainBonus, fiberFactor, pharmaBonus, total: waterTotal, hasPharma });
 
     setGenerated(true);
     // Scroll to results
@@ -489,33 +535,145 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
     const cals = Math.round(effectiveKcal * 0.35);
     const items = FOOD_DB.filter(f => f.category === 'fast_food' || (f.kcal > 200 && f.name.toLowerCase().includes('бургер') || f.name.toLowerCase().includes('пицц') || f.name.toLowerCase().includes('картофель фри') || f.name.toLowerCase().includes('чипс') || f.name.toLowerCase().includes('шоколад') || f.name.toLowerCase().includes('морожен') || f.name.toLowerCase().includes('пончик'))).sort(() => Math.random() - 0.5).slice(0, 2);
     const tot = items.reduce((s,i) => s + i.kcal, 0);
-    setCheatMealPlan({ items, totalKcal: tot, cals, note: 'Читмил ПОСЛЕ тяжёлой тренировки. Не более 1500 ккал. Вернуться к обычному рациону без компенсации.' });
+    setCheatMealPlan({
+      items, totalKcal: tot, cals,
+      note: 'Читмил ПОСЛЕ тяжёлой тренировки. Не более 1500 ккал. Вернуться к обычному рациону без компенсации.',
+      principles: [
+        '🍔 Читмил = психологическая разгрузка + метаболический всплеск',
+        '⏰ Только ПОСЛЕ тяжёлой тренировки (не в день отдыха)',
+        '📏 Максимум 1 раз в неделю, не более 1500 ккал за приём',
+        '🔄 Не компенсировать на следующий день — вернуться к обычному рациону',
+        '💧 Запить водой, не газировкой — меньше натрия и сахара',
+      ],
+      bju: { kcal: cals, p: Math.round(cals * 0.08 / 4), f: Math.round(cals * 0.40 / 9), c: Math.round(cals * 0.52 / 4) },
+      bjuBreakdown: 'Типичное распределение: Ж 35-45% · У 45-55% · Б 5-10%',
+      recommendation: goal === 'mass' ? 'Читмил на массе можно чаще — 1-2 раза в неделю, до 20% недельного профицита'
+        : goal === 'fat_loss' || goal === 'cutting' ? 'На сушке читмил строго 1 раз в 7-10 дней, контроль жиров'
+        : '1 раз в неделю, лучше в самый интенсивный тренировочный день',
+    });
   };
 
   const generateCarbload = () => {
     const carbsPerKg = 8;
     const totalCarbs = Math.round(weight * carbsPerKg);
     const carbFoods = FOOD_DB.filter(f => (f.category === 'carb' || f.category === 'grain') && f.carbs > 20).sort(() => Math.random() - 0.5).slice(0, 5);
-    setCarbloadPlan({ totalCarbs, foods: carbFoods.map(f => ({ name: f.name, carbs: f.carbs, amount: Math.round(totalCarbs * 0.3 / f.carbs * 100) })), note: 'За 24-48ч до тяжёлой тренировки. Увеличить воду на 1-1.5л.' });
+    setCarbloadPlan({
+      totalCarbs, foods: carbFoods.map(f => ({ name: f.name, carbs: f.carbs, amount: Math.round(totalCarbs * 0.3 / f.carbs * 100) })),
+      note: 'За 24-48ч до тяжёлой тренировки. Увеличить воду на 1-1.5л.',
+      principles: [
+        '🍚 Углеводная загрузка = максимальное заполнение гликогена',
+        '⏰ За 24-48 часов до тяжёлой тренировки (присед/становая/жим лёжа)',
+        '📏 6-8 г/кг углеводов (низкое ГИ в первые 24ч, высокое ГИ в последние 12ч)',
+        '💧 Увеличить воду на 1-1.5 л (гликоген связывает 3-4г воды на 1г)',
+        '🧂 Добавить натрий (200-500 мг дополнительно) для удержания воды',
+        '⬇ Снизить жиры до 0.5 г/кг в дни загрузки для лучшего усвоения углеводов',
+      ],
+      bju: {
+        c: totalCarbs, p: Math.round(effectiveP),
+        f: Math.round(weight * 0.5),
+        kcal: totalCarbs * 4 + Math.round(effectiveP) * 4 + Math.round(weight * 0.5) * 9,
+      },
+    });
   };
 
   const generateBUTCH = () => {
     const highCarb = Math.round(effectiveC * 1.3);
     const lowCarb = Math.round(effectiveC * 0.5);
-    setButchPlan({ pattern: '3 тренировочных + 1 отдых', highCarb, lowCarb, protein: effectiveP, note: 'Цикл: 3 дня ВУ (тренировочные) + 1 день НУ (отдых). Белок всегда высокий.' });
+    setButchPlan({
+      pattern: trainingDays.filter(Boolean).length + ' тренировочных + ' + trainingDays.filter(d => !d).length + ' отдых',
+      highCarb, lowCarb, protein: effectiveP,
+      fatHigh: Math.round(effectiveF * 0.8), fatLow: Math.round(effectiveF * 1.2),
+      note: 'Цикл: ' + trainingDays.filter(Boolean).length + ' дня ВУ (тренировочные) + ' + trainingDays.filter(d => !d).length + ' дня НУ (отдых). Белок всегда высокий.',
+      principles: [
+        '⤴️⤵️ БУЧ = белково-углеводное чередование для жиросжигания + сохранения мышц',
+        '📊 ВУ дни: углеводы +30% → гликоген + энергия на тренировку',
+        '📊 НУ дни: углеводы -50% → переключение на жиры как источник энергии',
+        '💪 Белок ВСЕГДА высокий (2-2.5 г/кг) — защита мышц в НУ дни',
+        '🧈 Жиры: в ВУ дни 0.8× нормы, в НУ дни 1.2× нормы',
+        '🔄 Типичный цикл: 2-3 дня ВУ → 1-2 дня НУ (подбирается индивидуально)',
+        '⏳ Максимум 4 недели БУЧ, затем переход на сбалансированное питание',
+      ],
+      bjuHigh: { c: highCarb, p: effectiveP, f: Math.round(effectiveF * 0.8), kcal: effectiveP * 4 + Math.round(effectiveF * 0.8) * 9 + highCarb * 4 },
+      bjuLow: { c: lowCarb, p: effectiveP, f: Math.round(effectiveF * 1.2), kcal: effectiveP * 4 + Math.round(effectiveF * 1.2) * 9 + lowCarb * 4 },
+    });
   };
 
   const generateRecommendations = () => {
     const recs: string[] = [];
-    if (goal === 'mass') recs.push('Профицит 300-500 ккал. Белок 2г/кг. Основные приёмы до/после тренировки.');
-    if (goal === 'fat_loss' || goal === 'cutting') recs.push('Дефицит 300-500 ккал. Белок 2.5г/кг. Углеводы вокруг тренировки.');
-    if (goal === 'strength') recs.push('Профицит 200-300 ккал. Углеводы 5-6г/кг в тренировочные дни. Белок 2г/кг.');
-    if (allergens.length > 0) recs.push(`Исключены аллергены: ${allergens.join(', ')}. Проверяйте состав продуктов.`);
-    if (planType === 'keto') recs.push('Кето: контроль электролитов (натрий, калий, магний). Адаптация 2-4 недели.');
-    if (linkToTraining) recs.push(`Тренировка ${trainStart}-${trainEnd}. Предтрен за 1.5-2ч. Пост-трен в течение 60-90мин.`);
-    if (cyclingMode === 'butch') recs.push('БУЧ: следить за энергией в низкоуглеводные дни. Возможна вялость.');
-    if (budget === 'low') recs.push('Бюджет: яйца, курица, рис, картофель, сезонные овощи — основа рациона.');
-    if (budget === 'enhanced') recs.push('Премиум: лосось, говядина мраморная, авокадо, ягоды, органические продукты.');
+    // Goal-based
+    if (goal === 'mass') {
+      recs.push('💪 МАССОНАБОР: Профицит 300-500 ккал. Белок 1.8-2.2г/кг. Углеводы 4-5г/кг. Основные приёмы до/после тренировки.');
+      recs.push('📈 Рост: 0.5-1% веса в неделю. Если вес не растёт 2 недели — +200 ккал. Контролировать калорийность каждые 3 дня.');
+      recs.push('⏰ Тайминг: 40% углеводов до/после тренировки. Казеин (творог) перед сном для антикатаболического эффекта.');
+    }
+    if (goal === 'fat_loss' || goal === 'cutting') {
+      recs.push('🔥 ПОХУДЕНИЕ: Дефицит 300-500 ккал. Белок 2.5г/кг — критически важен для сохранения мышц.');
+      recs.push('🥦 Стратегия: 80% углеводов вокруг тренировки. Овощи с каждым приёмом (клетчатка + объём).');
+      recs.push('📉 Темп: -0.5-1% веса в неделю. Если плато 2+ недели — пересмотреть дефицит или добавить NEAT (шаги 10k+).');
+      recs.push('🔄 Разгрузка: 1 день поддержки каждые 7-10 дней для гормонов щитовидной железы.');
+    }
+    if (goal === 'strength') {
+      recs.push('🏋️ СИЛА: Профицит 200-300 ккал. Углеводы 5-6г/кг в тренировочные дни. Белок 2г/кг.');
+      recs.push('⚡ Предтрен: за 1.5-2ч до — 0.5г/кг углеводов + 0.2г/кг белка. Кофеин 3-6 мг/кг за 60 мин.');
+      recs.push('🔄 Циклирование: больше углеводов в день ног/спины, меньше в день рук/плеч.');
+    }
+    if (goal === 'maintenance') {
+      recs.push('⚖️ ПОДДЕРЖКА: Калории на уровне TDEE. Баланс макронутриентов 30/20/50 (Б/Ж/У).');
+      recs.push('📊 Контроль: взвешивание 1 раз в неделю. Если вес отклоняется >2% — коррекция на 150-200 ккал.');
+    }
+    if (goal === 'recomposition') {
+      recs.push('🔄 РЕКОМПОЗИЦИЯ: Калории на уровне TDEE или лёгкий дефицит (-100-200). Белок 2.5г/кг.');
+      recs.push('📈 Условия: новички/возвращающиеся после перерыва/фарма. Только с силовыми тренировками.');
+    }
+    if (goal === 'rehab') {
+      recs.push('🩹 РЕАБИЛИТАЦИЯ: Белок 2.5-3г/кг. ВСАА 15-20г/день. Глютамин 10-20г/день. Омега-3 3-5г/день.');
+      recs.push('🧊 Противовоспалительные: куркума, имбирь, зеленый чай. Ограничить сахар/трансжиры.');
+    }
+    // Phase-based
+    if (phase === 'mass') recs.push('📊 Фаза массонабора: 2-3 основных приёма + 2 перекуса. Обязательно замшный протеин после тренировки.');
+    if (phase === 'cutting') recs.push('✂️ Фаза сушки: Дробное питание 5-6 раз. Контроль натрия. Увеличить клетчатку для насыщения.');
+    if (phase === 'recovery') recs.push('🩹 Фаза восстановления: Повышенный белок 2.5г/кг, глютамин, антиоксиданты.');
+    if (phase === 'prep') recs.push('🎯 Фаза подготовки: плавный выход на пик, контроль жиров, баланс омега-3/6.');
+    // Plan type
+    if (planType === 'keto') {
+      recs.push('🥑 КЕТО: Контроль электролитов (натрий 5-7г, калий 3-5г, магний 400-600мг). Адаптация 2-4 недели.');
+      recs.push('💧 Вода: 3-4 литра (кетоз увеличивает диурез). Бульоны для электролитов.');
+      recs.push('📊 Цели: жиры 70-80%, белок 20-25%, углеводы <5% (до 30г/день).');
+    }
+    if (planType === 'highcarb') recs.push('🍚 ВЫСОКОУГЛЕВОДНАЯ: 60% углеводов. Подходит при интенсивных тренировках и высокой NEAT.');
+    if (planType === 'mediterranean') recs.push('⚖️ СРЕДИЗЕМНОМОРСКАЯ: Рыба 2-3 раза/нед, оливковое масло, овощи, бобовые. Снижение воспаления.');
+    if (planType === 'vegetarian') recs.push('🌱 ВЕГЕТАРИАНСКАЯ: Контроль B12, железа, цинка, омега-3 (льняное/чиа). Комбинация злаков+бобовых.');
+    // Allergens
+    if (allergens.length > 0) recs.push(`⚠ Аллергены: исключены: ${allergens.map(a => ALLERGEN_LIST.find(al => al.id === a)?.label || a).join(', ')}. Проверяйте скрытые источники в соусах/добавках.`);
+    // Training link
+    if (linkToTraining) recs.push(`🏋️ Привязка: Тренировка ${trainStart}-${trainEnd}. Предтрен за 1.5-2ч (0.5г/кг угл + 0.2г/кг). Пост-трен в течение 60-90мин (0.4г/кг угл + 0.3г/кг белка).`);
+    // Cycling
+    if (cyclingMode === 'macro') recs.push('🔄 Циклирование макросов: тренировочные дни +15% ккал/+30% угл. Дни отдыха -15% ккал/-30% угл. Белок постоянный.');
+    if (cyclingMode === 'butch') recs.push('⤴️⤵️ БУЧ: следить за энергией в низкоуглеводные дни. Возможна вялость. Пить больше воды в НУ дни.');
+    if (cyclingMode === 'carbload') recs.push('🍚 Углеводная загрузка: 8г/кг за 24-48ч до тяжёлой тренировки. +1-1.5л воды. Снизить жиры до 0.5г/кг.');
+    // Budget
+    if (budget === 'low') recs.push('💰 Бюджет: яйца, курица (окорочка/бедро), рис, картофель, макароны, капуста, морковь, яблоки, сезонные овощи — основа. Протеин сывороточный — минимально необходим.');
+    if (budget === 'medium') recs.push('💰 Средний: филе курицы/индейки, говядина фарш, рис басмати, гречка, творог 5%, греческий йогурт, оливковое масло.');
+    if (budget === 'max') recs.push('💰 Премиум: лосось, мраморная говядина, фермерские яйца, киноа, авокадо, ягоды, миндаль, кокосовое масло.');
+    if (budget === 'enhanced') recs.push('💰 Элитный: вагю, дикий лосось, органические продукты, трюфель, спаржа, голубика, макадамия, чёрный рис.');
+    // Drugs specific
+    if (injections.length > 0) {
+      const hasInsulin = injections.some(i => i.type === 'инсулин');
+      const hasGH = injections.some(i => i.type === 'ГР' || i.type === 'GHRP' || i.type === 'CJC');
+      const hasGLP = injections.some(i => i.type === 'семаглутид' || i.type === 'тирзепатид');
+      if (hasInsulin) recs.push('💉 Инсулин: обязательный контроль углеводов — минимум 150г/день. Быстрые углеводы (декстроза, сок) под рукой. Не тренироваться на пустой желудок.');
+      if (hasGH) recs.push('🧬 Гормон роста: избегать углеводов в окне 30мин до/после укола ГР. Увеличить воду на 0.5-1л.');
+      if (hasGLP) recs.push('💊 GLP-1: дробное питание 5-6 раз маленькими порциями. Избегать жирного. Контроль тошноты.');
+      recs.push('💉 Фарма поддержка: добавки для печени (расторопша, артишок, NAC), контроль давления, электролиты.');
+    }
+    // Water
+    const hasPharmaRec = injections.length > 0 || (courseEntries?.length || 0) > 0;
+    if (hasPharmaRec) recs.push('💧 Гидратация на фарме: 40 мл/кг + 0.5л на каждую инъекцию. Контроль отёков — калий 4000-5000 мг, магний 500-600 мг.');
+    // Steps
+    if (dailySteps < 5000) recs.push('🚶 NEAT: текущие шаги <5000 — низкая активность. Цель 8-10k шагов для ускорения метаболизма.');
+    if (dailySteps >= 10000) recs.push('🚶 Отлично! 10k+ шагов поддерживают высокий NEAT. Контролировать восстановление ног.');
+    // General tips
+    recs.push('✅ Общие правила: белковая пища с каждым приёмом. Овощи 300-500г/день. Вода 2.5-4л. Сон 7-9ч. Постепенные изменения без экстрима.');
     setRecommendations(recs);
   };
 
@@ -534,11 +692,16 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
   // ─── Meal Prep Plan Generator ───
   const [mealPrepPlan, setMealPrepPlan] = useState<{ steps: MealPrepStep[]; totalTime: number; containers: number } | null>(null);
 
+  const [mealPrepDays, setMealPrepDays] = useState<1 | 3 | 7>(1);
+
   const generateMealPrep = () => {
-    if (!dayPlan) { generatePlan(1); if (!dayPlan) return; }
+    const prepSource = mealPrepDays === 1 ? dayPlan : mealPrepDays === 3 ? threeDayPlan : weekPlan;
+    if (!prepSource) { generatePlan(mealPrepDays as 1|3|7); if (!prepSource) return; }
+    const days = mealPrepDays === 1 ? [dayPlan] : mealPrepDays === 3 ? threeDayPlan.days : weekPlan.days;
+    if (!days) return;
     const steps: MealPrepStep[] = [];
     let stepNum = 1;
-    const allItems = dayPlan.meals.flatMap((m: any) => m.items.map((it: any) => ({ ...it, mealLabel: m.label, mealTime: m.time })));
+    const allItems = days.flatMap((d: any) => d.meals.flatMap((m: any) => m.items.map((it: any) => ({ ...it, mealLabel: m.label, mealTime: m.time }))));
     const uniqueItems = [...new Map(allItems.map((it: any) => [it.name, it])).values()];
 
     // Step 1: Prepare grains/rice (longest cooking time first)
@@ -614,10 +777,10 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
     }
 
     // Step 7: Portion into containers
-    const mealCount = dayPlan.meals.length;
+    const mealCount = days[0]?.meals?.length || dayPlan?.meals?.length || 4;
     steps.push({
       step: stepNum++, action: `Разложить по ${mealCount} контейнерам (по приёмам)`,
-      duration: 12, items: [`${mealCount} контейнеров × 7 дней = ${mealCount * 7} порций`],
+      duration: 12, items: [`${mealCount} контейнеров × ${mealPrepDays} дня(ей) = ${mealCount * mealPrepDays} порций`],
     });
 
     // Step 8: Label and organize
@@ -627,7 +790,7 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
     });
 
     const totalTime = steps.reduce((s, st) => s + st.duration, 0);
-    setMealPrepPlan({ steps, totalTime, containers: mealCount * 7 });
+    setMealPrepPlan({ steps, totalTime, containers: mealCount * mealPrepDays });
   };
 
   // ─── Report Generators ───
@@ -1118,10 +1281,33 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
           <span style={{ fontSize: 10, color: linkToTraining ? '#00e68a' : 'rgba(255,255,255,0.4)' }}>Привязать рацион к тренировке</span>
         </div>
         {linkToTraining && (
-          <div style={{ display: 'flex', gap: 4, fontSize: 9 }}>
-            <div><label style={{ color: 'rgba(255,255,255,0.3)' }}>Начало</label><input type="time" value={trainStart} onChange={e => setTrainStart(e.target.value)} style={inputStyle} /></div>
-            <div><label style={{ color: 'rgba(255,255,255,0.3)' }}>Конец</label><input type="time" value={trainEnd} onChange={e => setTrainEnd(e.target.value)} style={inputStyle} /></div>
-          </div>
+          <>
+            <div style={{ display: 'flex', gap: 4, fontSize: 9, marginBottom: 6 }}>
+              <div><label style={{ color: 'rgba(255,255,255,0.3)' }}>Начало</label><input type="time" value={trainStart} onChange={e => setTrainStart(e.target.value)} style={inputStyle} /></div>
+              <div><label style={{ color: 'rgba(255,255,255,0.3)' }}>Конец</label><input type="time" value={trainEnd} onChange={e => setTrainEnd(e.target.value)} style={inputStyle} /></div>
+            </div>
+            <div style={{ padding: '6px 8px', borderRadius: 8, background: 'rgba(34,197,94,0.06)', border: '1px solid rgba(34,197,94,0.12)' }}>
+              <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.3)', marginBottom: 4 }}>Выберите тренировочные дни:</div>
+              <div style={{ display: 'flex', gap: 4, justifyContent: 'center' }}>
+                {DAY_LABELS.map((label, idx) => {
+                  const isTrain = trainingDays[idx];
+                  return (
+                    <button key={idx} onClick={() => {
+                      setTrainingDays(prev => prev.map((d, i) => i === idx ? !d : d));
+                    }} style={{
+                      width: 32, height: 32, borderRadius: '50%', cursor: 'pointer',
+                      border: isTrain ? '2px solid #22c55e' : '2px solid #3f3f46',
+                      background: isTrain ? 'rgba(34,197,94,0.2)' : '#202023',
+                      color: isTrain ? '#22c55e' : 'rgba(255,255,255,0.4)',
+                      fontSize: 9, fontWeight: isTrain ? 800 : 500,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      transition: 'all 0.15s',
+                    }}>{label}</button>
+                  );
+                })}
+              </div>
+            </div>
+          </>
         )}
       </GlassCard>
 
@@ -1226,6 +1412,10 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
 
       {/* 7. Nutrition level */}
       <GlassCard title="Уровень питания" icon="📈" color="#22c55e">
+        <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.3)', marginBottom: 6, lineHeight: 1.4 }}>
+          Множитель калорийности: База ×1.0, Средний ×1.15, Усиление ×1.3, Максимум ×1.5.
+          Используется, когда нужен более высокий/низкий калораж без изменения целей.
+        </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 4 }}>
           {NUTRITION_LEVELS.map(n => (
             <button key={n.id} onClick={() => setNutrLevel(n.id)} style={{
@@ -1238,6 +1428,7 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
             }}>
               <div style={{ fontSize: 12, marginBottom: 1 }}>{n.icon}</div>
               <div>{n.label}</div>
+              <div style={{ fontSize: 7, color: nutrLevel === n.id ? '#00e68a' : 'rgba(255,255,255,0.2)', marginTop: 1 }}>×{n.mult}</div>
             </button>
           ))}
         </div>
@@ -1272,8 +1463,8 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
       <GlassCard title="Аллергены и ограничения" icon="⚠️" color="#ef4444">
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
           {ALLERGEN_LIST.map(a => (
-            <PillBtn key={a} active={allergens.includes(a)} onClick={() => toggleAllergen(a)} color={allergens.includes(a) ? '#ef4444' : undefined}>
-              {allergens.includes(a) ? '✕ ' : '○ '}{a}
+            <PillBtn key={a.id} active={allergens.includes(a.id)} onClick={() => toggleAllergen(a.id)} color={allergens.includes(a.id) ? '#ef4444' : undefined}>
+              {allergens.includes(a.id) ? '✕ ' : '○ '}{a.icon} {a.label}
             </PillBtn>
           ))}
         </div>
@@ -1292,27 +1483,45 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
 
       {/* 11-12. Food preferences + excluded */}
       <GlassCard title="Предпочтения и исключения" icon="🍎" color="#f59e0b">
-        <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', marginBottom: 4 }}>Любимые продукты:</div>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 2, marginBottom: 6 }}>
-          {preferredFoods.slice(0, 8).map((pf, i) => {
-            const food = FOOD_DB.find(f => f.id === pf);
-            return food ? (
-              <span key={pf} style={{ padding: '1px 5px', borderRadius: 4, fontSize: 8, background: 'rgba(0,230,138,0.08)', border: '1px solid rgba(0,230,138,0.15)', color: '#00e68a' }}>
-                {food.name}
-              </span>
-            ) : null;
-          })}
+        <div style={{ marginBottom: 6 }}>
+          <label style={{ fontSize: 8, color: 'rgba(255,255,255,0.3)', marginBottom: 3, display: 'block' }}>🌟 Любимые продукты (план будет их чаще использовать):</label>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 2, marginBottom: 4 }}>
+            {preferredFoods.slice(0, 10).map((pf) => {
+              const food = FOOD_DB.find(f => f.id === pf);
+              return food ? (
+                <span key={pf} style={{ padding: '2px 6px', borderRadius: 4, fontSize: 8, background: 'rgba(0,230,138,0.08)', border: '1px solid rgba(0,230,138,0.15)', color: '#00e68a', display: 'flex', alignItems: 'center', gap: 3 }}>
+                  {food.name}
+                  <span onClick={() => setPreferredFoods(prev => prev.filter(p => p !== pf))} style={{ cursor: 'pointer', color: 'rgba(255,255,255,0.3)', fontSize: 7 }}>✕</span>
+                </span>
+              ) : null;
+            })}
+          </div>
+          <select value="" onChange={e => { const val = e.target.value; if (val && !preferredFoods.includes(val)) { setPreferredFoods([...preferredFoods, val]); localStorage.setItem('he_preferred_foods', JSON.stringify([...preferredFoods, val])); } }} style={{ ...inputStyle, fontSize: 9, padding: '4px 8px', width: '100%' }}>
+            <option value="">+ Добавить любимый продукт...</option>
+            {FOOD_DB.filter(f => !preferredFoods.includes(f.id)).slice(0, 30).map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
+          </select>
         </div>
-        <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', marginBottom: 4 }}>Исключённые продукты:</div>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 2, marginBottom: 6 }}>
-          {excludedFoods.map((ef, i) => {
-            const food = FOOD_DB.find(f => f.id === ef);
-            return food ? (
-              <span key={ef} style={{ padding: '1px 5px', borderRadius: 4, fontSize: 8, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.15)', color: '#ef4444' }}>
-                {food.name}
-              </span>
-            ) : null;
-          })}
+        <div style={{ marginBottom: 6 }}>
+          <label style={{ fontSize: 8, color: 'rgba(255,255,255,0.3)', marginBottom: 3, display: 'block' }}>🚫 Исключённые продукты:</label>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 2, marginBottom: 4 }}>
+            {excludedFoods.map((ef) => {
+              const food = FOOD_DB.find(f => f.id === ef);
+              return food ? (
+                <span key={ef} style={{ padding: '2px 6px', borderRadius: 4, fontSize: 8, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.15)', color: '#ef4444', display: 'flex', alignItems: 'center', gap: 3 }}>
+                  {food.name}
+                  <span onClick={() => setExcludedFoods(prev => { const upd = prev.filter(p => p !== ef); localStorage.setItem('he_excluded_foods', JSON.stringify(upd)); return upd; })} style={{ cursor: 'pointer', color: 'rgba(255,255,255,0.3)', fontSize: 7 }}>✕</span>
+                </span>
+              ) : null;
+            })}
+          </div>
+          <select value="" onChange={e => { const val = e.target.value; if (val && !excludedFoods.includes(val)) { const upd = [...excludedFoods, val]; setExcludedFoods(upd); localStorage.setItem('he_excluded_foods', JSON.stringify(upd)); } }} style={{ ...inputStyle, fontSize: 9, padding: '4px 8px', width: '100%' }}>
+            <option value="">+ Исключить продукт...</option>
+            {FOOD_DB.filter(f => !excludedFoods.includes(f.id)).slice(0, 30).map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
+          </select>
+        </div>
+        <div>
+          <label style={{ fontSize: 8, color: 'rgba(255,255,255,0.3)', marginBottom: 3, display: 'block' }}>📝 Дополнительные заметки по питанию:</label>
+          <textarea value={customNotes} onChange={e => { setCustomNotes(e.target.value); localStorage.setItem('he_nutrition_notes', e.target.value); }} placeholder="Например: не ем после 20:00, аллергия на пенициллин, проблемы с ЖКТ, не переношу лактозу..." style={{ ...inputStyle, resize: 'vertical', minHeight: 50, fontSize: 9 }} rows={2} />
         </div>
       </GlassCard>
 
@@ -1494,14 +1703,27 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
       {/* 17. Shopping list */}
       {generated && shoppingList && (
         <GlassCard title="Список покупок" icon="🛒" color="#f97316" style={{ border: '1px solid rgba(249,115,22,0.15)' }}>
-          {Object.entries(shoppingList).map(([name, data]: [string, any]) => (
-            <div key={name} style={{ fontSize: 9, padding: '3px 0', display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
-              <span style={{ color: 'rgba(255,255,255,0.7)' }}>{name}</span>
-              <span style={{ color: 'rgba(255,255,255,0.4)', fontWeight: 600 }}>
-                {data.amount >= 1000 ? `${(data.amount / 1000).toFixed(1)} кг` : `${Math.round(data.amount)} г`}
-              </span>
-            </div>
-          ))}
+          {(() => {
+            const groups: Record<string, any[]> = {};
+            shoppingList.forEach((item: any) => {
+              const cat = item.catLabel || item.category || '📦 Прочее';
+              if (!groups[cat]) groups[cat] = [];
+              groups[cat].push(item);
+            });
+            return Object.entries(groups).map(([cat, items]) => (
+              <div key={cat} style={{ marginBottom: 8 }}>
+                <div style={{ fontSize: 9, fontWeight: 700, color: '#f97316', marginBottom: 3, padding: '2px 0', borderBottom: '1px solid rgba(249,115,22,0.1)' }}>{cat}</div>
+                {items.map((data: any, i: number) => (
+                  <div key={data.name + i} style={{ fontSize: 9, padding: '2px 0 2px 8px', display: 'flex', justifyContent: 'space-between', color: 'rgba(255,255,255,0.6)' }}>
+                    <span>{data.name}</span>
+                    <span style={{ color: 'rgba(255,255,255,0.4)', fontWeight: 600, whiteSpace: 'nowrap' }}>
+                      {data.amount >= 1000 ? `${(data.amount / 1000).toFixed(1)} кг` : `${Math.round(data.amount)} г`}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            ));
+          })()}
           <button onClick={saveCurrentPlan} style={{ marginTop: 6, padding: '8px', borderRadius: 8, border: '1px solid rgba(249,115,22,0.25)', background: 'rgba(249,115,22,0.06)', color: '#f97316', cursor: 'pointer', fontSize: 9, fontWeight: 600, width: '100%' }}>💾 Сохранить план</button>
         </GlassCard>
       )}
@@ -1511,9 +1733,15 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
         <GlassCard title="Водный баланс" icon="💧" color="#06b6d4" style={{ border: '1px solid rgba(6,182,212,0.15)' }}>
           <div style={{ padding: '6px 10px', borderRadius: 8, background: 'rgba(6,182,212,0.04)', border: '1px solid rgba(6,182,212,0.08)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: 'rgba(255,255,255,0.6)', marginBottom: 2 }}>
-              <span>База: 30 мл × {weight} кг</span>
+              <span>База: {waterCalc.hasPharma ? '40' : '30'} мл × {weight} кг</span>
               <span>{waterCalc.baseWater} л</span>
             </div>
+            {waterCalc.hasPharma && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: 'rgba(255,255,255,0.6)', marginBottom: 2 }}>
+                <span>+ Фармакология (повышенный метаболизм)</span>
+                <span>+{waterCalc.pharmaBonus.toFixed(1)} л</span>
+              </div>
+            )}
             {waterCalc.trainBonus > 0 && (
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: 'rgba(255,255,255,0.6)', marginBottom: 2 }}>
                 <span>+ Тренировка</span>
@@ -1540,7 +1768,14 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
             <button onClick={generateQualityReport} style={reportPillStyle('#f59e0b', activeReports.includes('quality') && !!qualityReport)}>⭐ Качество</button>
             <button onClick={generateRiskReport} style={reportPillStyle('#ef4444', activeReports.includes('risk') && !!riskReport)}>🩺 Риски здоровья</button>
             {injections.length > 0 && <button onClick={generateDrugCompatReport} style={reportPillStyle('#8b5cf6', activeReports.includes('drug') && !!drugCompatReport)}>💉 Совместимость</button>}
-            <button onClick={() => { generatePlan(planDays); setPlanDays(7); }} style={reportPillStyle('#3b82f6', false)}>📋 Общий отчёт</button>
+            <button onClick={() => {
+              generateAllergenReport();
+              generateNutrientReport();
+              generateQualityReport();
+              generateRiskReport();
+              if (injections.length > 0) generateDrugCompatReport();
+              generateRecommendations();
+            }} style={reportPillStyle('#3b82f6', activeReports.length >= 3)}>📋 Общий отчёт</button>
           </div>
 
           {/* Allergen report */}
@@ -1657,26 +1892,65 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
       {cheatMealPlan && (
         <GlassCard title="Читмил" icon="🍔" color="#f59e0b" style={{ border: '1px solid rgba(245,158,11,0.15)' }}>
           <div style={{ fontSize: 10, fontWeight: 700, color: '#f59e0b', marginBottom: 6 }}>~{cheatMealPlan.cals} ккал (35% от нормы)</div>
+          <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
+            <div style={{ flex: 1, padding: '4px 6px', borderRadius: 6, background: 'rgba(245,158,11,0.06)', textAlign: 'center' }}>
+              <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.3)' }}>Белки</div>
+              <div style={{ fontSize: 10, fontWeight: 700, color: '#3b82f6' }}>{cheatMealPlan.bju.p}г</div>
+            </div>
+            <div style={{ flex: 1, padding: '4px 6px', borderRadius: 6, background: 'rgba(245,158,11,0.06)', textAlign: 'center' }}>
+              <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.3)' }}>Жиры</div>
+              <div style={{ fontSize: 10, fontWeight: 700, color: '#f59e0b' }}>{cheatMealPlan.bju.f}г</div>
+            </div>
+            <div style={{ flex: 1, padding: '4px 6px', borderRadius: 6, background: 'rgba(245,158,11,0.06)', textAlign: 'center' }}>
+              <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.3)' }}>Углеводы</div>
+              <div style={{ fontSize: 10, fontWeight: 700, color: '#f97316' }}>{cheatMealPlan.bju.c}г</div>
+            </div>
+          </div>
+          <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.3)', marginBottom: 6, textAlign: 'center' }}>{cheatMealPlan.bjuBreakdown}</div>
           {cheatMealPlan.items.map((it: any, i: number) => (
             <div key={i} style={{ display:'flex', justifyContent:'space-between', fontSize: 9, padding: '4px 0', alignItems:'center', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
               <span style={{ color: 'rgba(255,255,255,0.7)' }}>• {it.name || it}</span>
               <span onClick={() => addToCart({ name: it.name || it, kcal: it.kcal || (cheatMealPlan.cals / cheatMealPlan.items.length), amount: 100 })} style={{ cursor:'pointer', fontSize:8, color:'#00e68a', opacity:0.5, padding:'2px 4px' }} title="В корзину">🛒</span>
             </div>
           ))}
-          <div style={{ fontSize: 8, color: '#f59e0b', marginTop: 6, padding: '4px 8px', borderRadius: 6, background: 'rgba(245,158,11,0.06)' }}>{cheatMealPlan.note}</div>
+          <div style={{ fontSize: 9, fontWeight: 600, color: '#f59e0b', marginTop: 6, marginBottom: 4 }}>📋 Основные принципы:</div>
+          <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.6)', lineHeight: 1.5, marginBottom: 4 }}>
+            {cheatMealPlan.principles.map((p: string, i: number) => <div key={i}>{p}</div>)}
+          </div>
+          <div style={{ fontSize: 8, color: '#f59e0b', marginTop: 4, padding: '4px 8px', borderRadius: 6, background: 'rgba(245,158,11,0.06)' }}>{cheatMealPlan.recommendation}</div>
+          <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.4)', marginTop: 4, padding: '4px 8px', borderRadius: 6, background: 'rgba(245,158,11,0.06)' }}>{cheatMealPlan.note}</div>
         </GlassCard>
       )}
 
       {carbloadPlan && (
         <GlassCard title="Углеводная загрузка" icon="🍚" color="#f97316" style={{ border: '1px solid rgba(249,115,22,0.15)' }}>
-          <div style={{ fontSize: 10, fontWeight: 700, color: '#f97316', marginBottom: 6 }}>Всего: {carbloadPlan.totalCarbs} г ({Math.round(carbloadPlan.totalCarbs / weight)} г/кг)</div>
+          <div style={{ fontSize: 10, fontWeight: 700, color: '#f97316', marginBottom: 4 }}>Всего: {carbloadPlan.totalCarbs} г ({Math.round(carbloadPlan.totalCarbs / weight)} г/кг)</div>
+          <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
+            <div style={{ flex: 1, padding: '4px 6px', borderRadius: 6, background: 'rgba(249,115,22,0.06)', textAlign: 'center' }}>
+              <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.3)' }}>Белки</div>
+              <div style={{ fontSize: 10, fontWeight: 700, color: '#3b82f6' }}>{carbloadPlan.bju.p}г</div>
+            </div>
+            <div style={{ flex: 1, padding: '4px 6px', borderRadius: 6, background: 'rgba(249,115,22,0.06)', textAlign: 'center' }}>
+              <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.3)' }}>Жиры</div>
+              <div style={{ fontSize: 10, fontWeight: 700, color: '#f59e0b' }}>{carbloadPlan.bju.f}г</div>
+            </div>
+            <div style={{ flex: 1, padding: '4px 6px', borderRadius: 6, background: 'rgba(249,115,22,0.06)', textAlign: 'center' }}>
+              <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.3)' }}>Углеводы</div>
+              <div style={{ fontSize: 10, fontWeight: 700, color: '#f97316' }}>{carbloadPlan.bju.c}г</div>
+            </div>
+          </div>
+          <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.3)', marginBottom: 6, textAlign: 'center' }}>~{carbloadPlan.bju.kcal} ккал всего</div>
           {carbloadPlan.foods.map((f: any, i: number) => (
             <div key={i} style={{ display:'flex', justifyContent:'space-between', fontSize: 9, padding: '4px 0', alignItems:'center', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
               <span style={{ color: 'rgba(255,255,255,0.7)' }}>• {f.name || f}</span>
               <span onClick={() => addToCart({ name: f.name || f, kcal: f.kcal || 100, amount: 100 })} style={{ cursor:'pointer', fontSize:8, color:'#00e68a', opacity:0.5, padding:'2px 4px' }} title="В корзину">🛒</span>
             </div>
           ))}
-          <div style={{ fontSize: 8, color: '#f97316', marginTop: 6, padding: '4px 8px', borderRadius: 6, background: 'rgba(249,115,22,0.06)' }}>{carbloadPlan.note}</div>
+          <div style={{ fontSize: 9, fontWeight: 600, color: '#f97316', marginTop: 6, marginBottom: 4 }}>📋 Основные принципы:</div>
+          <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.6)', lineHeight: 1.5, marginBottom: 4 }}>
+            {carbloadPlan.principles.map((p: string, i: number) => <div key={i}>{p}</div>)}
+          </div>
+          <div style={{ fontSize: 8, color: '#f97316', marginTop: 4, padding: '4px 8px', borderRadius: 6, background: 'rgba(249,115,22,0.06)' }}>{carbloadPlan.note}</div>
         </GlassCard>
       )}
 
@@ -1684,20 +1958,30 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
         <GlassCard title="БУЧ (белково-углеводное чередование)" icon="⤴️⤵️" color="#3b82f6" style={{ border: '1px solid rgba(59,130,246,0.15)' }}>
           <div style={{ padding: '10px', borderRadius: 10, background: '#202023', border: '1px solid #27272a' }}>
             <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)', marginBottom: 6 }}>📋 {butchPlan.pattern}</div>
-            <div style={{ display: 'flex', gap: 8, marginBottom: 4 }}>
-              <div style={{ flex: 1, padding: '6px 8px', borderRadius: 8, background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.2)', textAlign: 'center' }}>
+            <div style={{ display: 'flex', gap: 8, marginBottom: 6 }}>
+              <div style={{ flex: 1, padding: '8px', borderRadius: 8, background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.2)', textAlign: 'center' }}>
                 <div style={{ fontSize: 7, color: '#22c55e', fontWeight: 600 }}>ВУ (тренировка)</div>
-                <div style={{ fontSize: 13, fontWeight: 800, color: '#22c55e' }}>{butchPlan.highCarb}</div>
+                <div style={{ fontSize: 14, fontWeight: 900, color: '#22c55e' }}>{butchPlan.highCarb}</div>
                 <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.3)' }}>г углеводов</div>
+                <div style={{ fontSize: 7, color: '#3b82f6', marginTop: 2 }}>↑ белок {butchPlan.protein}г</div>
+                <div style={{ fontSize: 7, color: '#f59e0b' }}>↓ жиры {butchPlan.fatHigh}г</div>
               </div>
-              <div style={{ flex: 1, padding: '6px 8px', borderRadius: 8, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', textAlign: 'center' }}>
+              <div style={{ flex: 1, padding: '8px', borderRadius: 8, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', textAlign: 'center' }}>
                 <div style={{ fontSize: 7, color: '#ef4444', fontWeight: 600 }}>НУ (отдых)</div>
-                <div style={{ fontSize: 13, fontWeight: 800, color: '#ef4444' }}>{butchPlan.lowCarb}</div>
+                <div style={{ fontSize: 14, fontWeight: 900, color: '#ef4444' }}>{butchPlan.lowCarb}</div>
                 <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.3)' }}>г углеводов</div>
+                <div style={{ fontSize: 7, color: '#3b82f6', marginTop: 2 }}>↑ белок {butchPlan.protein}г</div>
+                <div style={{ fontSize: 7, color: '#f59e0b' }}>↑ жиры {butchPlan.fatLow}г</div>
               </div>
             </div>
-            <div style={{ fontSize: 8, color: '#3b82f6', textAlign: 'center', padding: '2px 0' }}>Белок: {butchPlan.protein}г (постоянный)</div>
-            <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.4)', marginTop: 6, padding: '4px 8px', borderRadius: 6, background: 'rgba(59,130,246,0.06)' }}>{butchPlan.note}</div>
+            <div style={{ fontSize: 8, color: '#22c55e', textAlign: 'center', marginBottom: 4 }}>
+              ВУ: {butchPlan.bjuHigh.kcal} ккал · НУ: {butchPlan.bjuLow.kcal} ккал
+            </div>
+            <div style={{ fontSize: 9, fontWeight: 600, color: '#3b82f6', marginTop: 6, marginBottom: 4 }}>📋 Основные принципы:</div>
+            <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.6)', lineHeight: 1.5, marginBottom: 4 }}>
+              {butchPlan.principles.map((p: string, i: number) => <div key={i}>{p}</div>)}
+            </div>
+            <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.4)', marginTop: 4, padding: '4px 8px', borderRadius: 6, background: 'rgba(59,130,246,0.06)' }}>{butchPlan.note}</div>
           </div>
         </GlassCard>
       )}
@@ -1718,9 +2002,23 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
 
       {/* 23. Meal prep plan */}
       {generated && dayPlan && (
-        <button onClick={generateMealPrep} style={{ ...greenBtn, background: 'linear-gradient(135deg,#06b6d4,#0e7490)' }}>
-          👨‍🍳 Составить план готовки (Meal Prep)
-        </button>
+        <div style={{ marginBottom: 4 }}>
+          <div style={{ display: 'flex', gap: 4, marginBottom: 4 }}>
+            {([1, 3, 7] as const).map(n => (
+              <button key={n} onClick={() => setMealPrepDays(n)} style={{
+                flex: 1, padding: '6px', borderRadius: 8, cursor: 'pointer', textAlign: 'center',
+                background: mealPrepDays === n ? 'linear-gradient(135deg,#06b6d4,#0e7490)' : '#202023',
+                border: 'none', color: mealPrepDays === n ? '#000' : 'rgba(255,255,255,0.5)',
+                fontWeight: 700, fontSize: 9,
+              }}>
+                {n === 1 ? '1 день' : n === 3 ? '3 дня' : 'Неделя'}
+              </button>
+            ))}
+          </div>
+          <button onClick={generateMealPrep} style={{ ...greenBtn, background: 'linear-gradient(135deg,#06b6d4,#0e7490)' }}>
+            👨‍🍳 Составить план готовки (Meal Prep)
+          </button>
+        </div>
       )}
       {mealPrepPlan && (
         <GlassCard title="План готовки" icon="👨‍🍳" color="#06b6d4" style={{ border: '1px solid rgba(6,182,212,0.15)' }}>
@@ -1773,9 +2071,9 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
                         ))}
                       </div>
                     )}
-                    {p.shoppingList && Object.keys(p.shoppingList).length > 0 && (
+                    {p.shoppingList && p.shoppingList.length > 0 && (
                       <div style={{ marginTop: 4, display: 'flex', gap: 6 }}>
-                        <span style={{ color: '#f97316', fontWeight: 600 }}>🛒 {Object.keys(p.shoppingList).length} продуктов</span>
+                        <span style={{ color: '#f97316', fontWeight: 600 }}>🛒 {p.shoppingList.length} продуктов</span>
                       </div>
                     )}
                     {p.waterCalc && <div style={{ marginTop: 2, color: '#06b6d4', fontWeight: 600 }}>💧 {p.waterCalc.total} л/день</div>}
@@ -1786,11 +2084,6 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
           })}
         </GlassCard>
       )}
-
-      {/* ─── Справочник (правила, качество, сочетаемость) ─── */}
-      <GlassCard title="Справочник питания" icon="📖" color="#8b5cf6">
-        <NutritionReference />
-      </GlassCard>
 
     </div>
   );
