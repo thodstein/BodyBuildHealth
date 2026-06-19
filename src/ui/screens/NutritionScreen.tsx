@@ -67,7 +67,7 @@ const CartTab: React.FC = () => {
         </div>
         <input value={storeName} onChange={e => { setStoreName(e.target.value); localStorage.setItem('he_cart_store', e.target.value); }} placeholder="🏪 Магазин (например: Пятёрочка, Ашан)" style={{ ...inputStyle, marginBottom:6, fontSize:10 }} />
         {cart.length === 0 ? (
-          <div style={{ textAlign:'center', padding:24, color:'rgba(255,255,255,0.5)', fontSize:11 }}>
+          <div style={{ textAlign:'center', padding:24, color:'rgba(255,255,255,0.8)', fontSize:11 }}>
             Корзина пуста. Добавляйте продукты из плана питания кнопкой «🛒 В корзину».
           </div>
         ) : (
@@ -75,7 +75,7 @@ const CartTab: React.FC = () => {
             {Object.entries(groups).map(([cat, items]) => (
               <div key={cat}>
                 <div style={{ fontSize:10, fontWeight:700, color:'#f97316', marginBottom:3, padding:'2px 0', borderBottom:'1px solid rgba(249,115,22,0.1)', display:'flex', alignItems:'center', gap:4 }}>
-                  {catLabels[cat] || cat} <span style={{ fontSize:8, color:'rgba(255,255,255,0.5)', fontWeight:400 }}>({items.length})</span>
+                  {catLabels[cat] || cat} <span style={{ fontSize:8, color:'rgba(255,255,255,0.8)', fontWeight:400 }}>({items.length})</span>
                 </div>
                 {items.map((item: any) => (
                   <div key={item.idx} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'5px 8px', borderRadius:8, background:'#202023', border:'1px solid rgba(255,255,255,0.04)', marginBottom:2 }}>
@@ -136,7 +136,7 @@ const CatalogTab: React.FC = () => {
         {filtered.map(f => <div key={f.id} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'6px 10px', borderRadius:10, background:'#202023', border:'1px solid rgba(255,255,255,0.06)' }}>
           <div>
             <div style={{ fontSize:11, fontWeight:600, color:'#fff' }}>{f.name}</div>
-            <div style={{ fontSize:7, color:'rgba(255,255,255,0.5)', marginTop:1 }}>{CAT_MAP[f.category] || f.category} • {f.kcal}ккал • Б{f.protein} Ж{f.fat} У{f.carbs}</div>
+            <div style={{ fontSize:7, color:'rgba(255,255,255,0.8)', marginTop:1 }}>{CAT_MAP[f.category] || f.category} • {f.kcal}ккал • Б{f.protein} Ж{f.fat} У{f.carbs}</div>
           </div>
           <div style={{ display:'flex', gap:3, alignItems:'center' }}>
             <button onClick={() => addFav(f)} style={{ padding:'4px 8px', borderRadius:6, fontSize:9, cursor:'pointer', background:'rgba(139,92,246,0.15)', border:'1px solid rgba(139,92,246,0.3)', color:'#8b5cf6' }}>⭐</button>
@@ -231,7 +231,7 @@ const RestaurantTab: React.FC = () => {
           {[{l:'Калории',v:Math.round(totals.kcal),c:'#00e68a',u:'ккал'},{l:'Белки',v:Math.round(totals.p),c:'#3b82f6',u:'г'},{l:'Жиры',v:Math.round(totals.f),c:'#f59e0b',u:'г'},{l:'Углеводы',v:Math.round(totals.c),c:'#f97316',u:'г'}].map((s,i) => (
             <div key={i} style={{ background:'#202023', borderRadius:8, padding:'5px 8px', textAlign:'center' }}>
               <div style={{ fontSize:7, color:'rgba(255,255,255,0.6)' }}>{s.l}</div>
-              <div style={{ fontSize:16, fontWeight:800, color:s.c }}>{s.v}<span style={{ fontSize:9, fontWeight:400, color:'rgba(255,255,255,0.5)' }}> {s.u}</span></div>
+              <div style={{ fontSize:16, fontWeight:800, color:s.c }}>{s.v}<span style={{ fontSize:9, fontWeight:400, color:'rgba(255,255,255,0.8)' }}> {s.u}</span></div>
             </div>
           ))}
         </div>
@@ -252,7 +252,7 @@ const RestaurantTab: React.FC = () => {
     <div style={{ padding:14, ...cardBg }}>
       <div style={{ fontSize:12, fontWeight:700, color:'#fff', marginBottom:6 }}>🍽 Блюда ресторанов ({filtered.length})</div>
       {filtered.length === 0 ? (
-        <div style={{ fontSize:10, color:'rgba(255,255,255,0.5)', textAlign:'center', padding:20 }}>Нет блюд по выбранному фильтру.</div>
+        <div style={{ fontSize:10, color:'rgba(255,255,255,0.8)', textAlign:'center', padding:20 }}>Нет блюд по выбранному фильтру.</div>
       ) : (
         <div style={{ maxHeight:400, overflowY:'auto', display:'flex', flexDirection:'column', gap:4 }}>
           {filtered.map(food => {
@@ -261,7 +261,7 @@ const RestaurantTab: React.FC = () => {
               <div style={{ display:'flex', alignItems:'center', gap:6 }}>
                 <div style={{ flex:1 }}>
                   <div style={{ fontSize:9, fontWeight:600, color:'#fff' }}>{food.name}</div>
-                  <div style={{ fontSize:7, color:'rgba(255,255,255,0.5)' }}>{food.servingSize || ''} · {detectCuisine(food.name)}</div>
+                  <div style={{ fontSize:7, color:'rgba(255,255,255,0.8)' }}>{food.servingSize || ''} · {detectCuisine(food.name)}</div>
                 </div>
                 <div style={{ display:'flex', gap:2 }}>
                   {[-1,1].map(d => <button key={d} onClick={() => setPortions(p => ({...p, [food.id]: Math.max(0.25, (p[food.id]||1) + d * 0.25)}))} style={{ width:18, height:18, borderRadius:4, border:'1px solid rgba(255,255,255,0.06)', background:'#18181b', color:'rgba(255,255,255,0.6)', cursor:'pointer', fontSize:10, display:'flex', alignItems:'center', justifyContent:'center' }}>{d>0?'+':'-'}</button>)}
@@ -274,7 +274,7 @@ const RestaurantTab: React.FC = () => {
                 <div style={{ background:'rgba(245,158,11,0.08)', borderRadius:4, padding:'2px 4px', textAlign:'center', fontSize:7, color:'#fbbf24' }}>Ж {Math.round(food.fat * portion)}</div>
                 <div style={{ background:'rgba(249,115,22,0.08)', borderRadius:4, padding:'2px 4px', textAlign:'center', fontSize:7, color:'#fb923c' }}>У {Math.round(food.carbs * portion)}</div>
               </div>
-              {portion !== 1 && <div style={{ fontSize:7, color:'rgba(255,255,255,0.5)', marginTop:2 }}>× {portion.toFixed(2)} порции</div>}
+              {portion !== 1 && <div style={{ fontSize:7, color:'rgba(255,255,255,0.8)', marginTop:2 }}>× {portion.toFixed(2)} порции</div>}
             </div>);
           })}
         </div>
@@ -287,7 +287,7 @@ const TravelGuide: React.FC = () => {
   const [travelAdvice] = React.useState<any[]>(() => { try { return JSON.parse(localStorage.getItem('travel_workouts') || '[]'); } catch { return []; } });
   return (<>
     <div style={{ fontSize:12, fontWeight:600, color:'#fff', marginBottom:6 }}>✈ Питание в дороге</div>
-    {travelAdvice.length > 0 ? travelAdvice.map((a, i) => <div key={i} style={{ fontSize:9, color:'rgba(255,255,255,0.7)', marginBottom:4 }}>{a}</div>) : <div style={{ fontSize:10, color:'rgba(255,255,255,0.5)', padding:10 }}>Нет сохранённых советов.</div>}
+    {travelAdvice.length > 0 ? travelAdvice.map((a, i) => <div key={i} style={{ fontSize:9, color:'#fff', marginBottom:4 }}>{a}</div>) : <div style={{ fontSize:10, color:'rgba(255,255,255,0.8)', padding:10 }}>Нет сохранённых советов.</div>}
     <div style={{ fontSize:9, color:'rgba(255,255,255,0.6)', marginTop:6 }}>
       🥜 Берите с собой: орехи, протеиновые батончики, сухофрукты<br />
       🍗 В ресторане: выбирайте белковую основу, просите соус отдельно<br />
@@ -300,7 +300,7 @@ const SleepGuide: React.FC = () => {
   const sleepStacks = useMemo(() => { try { return JSON.parse(localStorage.getItem('sleep_stacks') || '[]'); } catch { return []; } }, []);
   return (<>
     <div style={{ fontSize:12, fontWeight:600, color:'#fff', marginBottom:6 }}>💤 Сон и восстановление</div>
-    {sleepStacks.length > 0 ? sleepStacks.map((s: any, i: number) => <div key={i} style={{ fontSize:9, color:'rgba(255,255,255,0.7)', marginBottom:4 }}>{s}</div>) : <div style={{ fontSize:10, color:'rgba(255,255,255,0.5)', padding:10 }}>Нет сохранённых стеков.</div>}
+    {sleepStacks.length > 0 ? sleepStacks.map((s: any, i: number) => <div key={i} style={{ fontSize:9, color:'#fff', marginBottom:4 }}>{s}</div>) : <div style={{ fontSize:10, color:'rgba(255,255,255,0.8)', padding:10 }}>Нет сохранённых стеков.</div>}
     <div style={{ fontSize:9, color:'rgba(255,255,255,0.6)', marginTop:6 }}>
       🌙 Последний приём за 2-3 ч до сна<br />
       🥛 Казеин/творог 30г на ночь ↓ катаболизм<br />
@@ -343,7 +343,7 @@ const ReportsTab: React.FC<{ foodEntries: DiaryEntry[] }> = ({ foodEntries }) =>
       </div>
       {reportMode === 'day' && <input type="date" value={reportDate} onChange={e => setReportDate(e.target.value)} style={{ ...inputStyle, marginBottom:8 }} />}
       {reportMode === 'week' && <div style={{ display:'flex', gap:2, marginBottom:8 }}>
-        {Array.from({length:7}, (_,i) => { const d = new Date(new Date(weekStart)); d.setDate(d.getDate()+i); const ds = d.toISOString().split('T')[0]; const hasData = !!raw[ds]; return <div key={i} style={{ flex:1, textAlign:'center', padding:'5px 2px', borderRadius:8, background: hasData ? 'rgba(0,230,138,0.12)' : '#202023', fontSize:8, color: hasData ? '#00e68a' : 'rgba(255,255,255,0.5)' }}>
+        {Array.from({length:7}, (_,i) => { const d = new Date(new Date(weekStart)); d.setDate(d.getDate()+i); const ds = d.toISOString().split('T')[0]; const hasData = !!raw[ds]; return <div key={i} style={{ flex:1, textAlign:'center', padding:'5px 2px', borderRadius:8, background: hasData ? 'rgba(0,230,138,0.12)' : '#202023', fontSize:8, color: hasData ? '#00e68a' : 'rgba(255,255,255,0.8)' }}>
           <div>{dayNames[i]}</div><div style={{ fontWeight:700, fontSize:11 }}>{d.getDate()}</div>
         </div>; })}
       </div>}
@@ -354,7 +354,7 @@ const ReportsTab: React.FC<{ foodEntries: DiaryEntry[] }> = ({ foodEntries }) =>
       </div>
       {reportMode === 'day' && Object.keys(byMeal).length > 0 && <div>
         <div style={{ fontSize:9, color:'rgba(255,255,255,0.6)', marginBottom:4 }}>По приёмам пищи:</div>
-        {Object.entries(byMeal).map(([meal, vals]) => <div key={meal} style={{ display:'flex', justifyContent:'space-between', padding:'3px 0', borderBottom:'1px solid rgba(255,255,255,0.06)', fontSize:9, color:'rgba(255,255,255,0.7)' }}>
+        {Object.entries(byMeal).map(([meal, vals]) => <div key={meal} style={{ display:'flex', justifyContent:'space-between', padding:'3px 0', borderBottom:'1px solid rgba(255,255,255,0.06)', fontSize:9, color:'#fff' }}>
           <span style={{ fontWeight:600 }}>{meal}</span>
           <span style={{ color:'rgba(255,255,255,0.6)' }}>{Math.round(vals.kcal)} ккал | Б{Math.round(vals.p)} Ж{Math.round(vals.f)} У{Math.round(vals.c)}</span>
         </div>)}
@@ -363,7 +363,7 @@ const ReportsTab: React.FC<{ foodEntries: DiaryEntry[] }> = ({ foodEntries }) =>
         <div style={{ fontSize:9, color:'rgba(255,255,255,0.6)', marginBottom:4 }}>Продукты:</div>
         <div style={{ maxHeight:150, overflowY:'auto' }}>
           {data.map((i:any, idx:number) => <div key={idx} style={{ display:'flex', justifyContent:'space-between', padding:'2px 0', fontSize:8, color:'rgba(255,255,255,0.6)' }}>
-            <span>{i.name} {i.meal ? <span style={{ color:'rgba(255,255,255,0.5)' }}>({i.meal})</span> : ''}</span>
+            <span>{i.name} {i.meal ? <span style={{ color:'rgba(255,255,255,0.8)' }}>({i.meal})</span> : ''}</span>
             <span>{Math.round(i.kcal||0)}ккал</span>
           </div>)}
         </div>
@@ -445,17 +445,17 @@ export const NutritionScreen: React.FC = () => {
     return (<div style={{ display:'flex', flexDirection:'column', gap:8 }}>
       <div style={{ padding:14, ...cardBg }}>
         <div style={labelSec}>⭐ Избранное ({favs.length}/100)</div>
-        {favs.length === 0 ? <div style={{ textAlign:'center', padding:16, color:'rgba(255,255,255,0.5)', fontSize:10 }}>Нет избранных. Добавляйте из каталога кнопкой ⭐.</div> : <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
+        {favs.length === 0 ? <div style={{ textAlign:'center', padding:16, color:'rgba(255,255,255,0.8)', fontSize:10 }}>Нет избранных. Добавляйте из каталога кнопкой ⭐.</div> : <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
           {Object.entries(groups).map(([cat, items]) => (
             <div key={cat}>
               <div style={{ fontSize:9, fontWeight:700, color:'#f97316', marginBottom:2, padding:'2px 0', borderBottom:'1px solid rgba(249,115,22,0.08)', display:'flex', alignItems:'center', gap:4 }}>
-                {cat} <span style={{ fontSize:7, color:'rgba(255,255,255,0.3)', fontWeight:400 }}>({items.length})</span>
+                {cat} <span style={{ fontSize:7, color:'rgba(255,255,255,0.6)', fontWeight:400 }}>({items.length})</span>
               </div>
               {items.map(f => (
                 <div key={f.id} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'4px 8px', borderRadius:8, background:'#202023', border:'1px solid rgba(255,255,255,0.04)', marginBottom:2 }}>
                   <div>
                     <div style={{ fontSize:10, fontWeight:600, color:'#fff' }}>{f.name}</div>
-                    <div style={{ fontSize:7, color:'rgba(255,255,255,0.5)' }}>{f.kcal}ккал • Б{f.protein} Ж{f.fat} У{f.carbs}</div>
+                    <div style={{ fontSize:7, color:'rgba(255,255,255,0.8)' }}>{f.kcal}ккал • Б{f.protein} Ж{f.fat} У{f.carbs}</div>
                   </div>
                   <div style={{ display:'flex', gap:2, alignItems:'center' }}>
                     <button onClick={() => addToCart({ name: f.name, kcal: f.kcal, amount: 100, category: f.category })} style={{ padding:'3px 6px', borderRadius:5, fontSize:8, cursor:'pointer', background:'rgba(0,230,138,0.12)', border:'1px solid rgba(0,230,138,0.2)', color:'#00e68a' }}>🛒</button>
