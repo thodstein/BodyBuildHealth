@@ -77,7 +77,7 @@ const TAB_LABELS: Record<TrainingTab, string> = {
   plan: '📋 План', runtime: '▶ Тренировка', exercises: '🏋️ Упражнения', calculators: '📐 Калькуляторы',
   diary: '📝 Дневник', cycles: '🔄 Циклы', history: '📜 История', analytics: '📊 Аналитика',
   methods: '🧠 Методики', visual: '📈 Визуализация', programs: '📚 Программы', timers: '⏱ Таймеры',
-  progress: '📏 Прогресс', mytraining: '⭐ Мои', programcalc: '🛠️ Программа',
+  progress: '📏 Прогресс', mytraining: '⭐ Мои', programcalc: '🛠️ Ручной конструктор',
 };
 
 export const TrainingScreen: React.FC = () => {
@@ -1917,10 +1917,32 @@ export const TrainingScreen: React.FC = () => {
           </div>
           </>)}
 
-          {/* ═══════ EXERCISE GENERATOR ═══════ */}
-          <ExerciseGenerator />
+          {/* ═══════ EXERCISE GENERATOR (только в Калькуляторах) ═══════ */}
+          {showNonBuilder && <ExerciseGenerator />}
 
-          {/* ═══════ UNIFIED PROGRAM BUILDER ═══════ */}
+          {/* ═══════ Периодизация (только в Калькуляторах) ═══════ */}
+          {showNonBuilder && (
+            <div className="card" style={{ padding: '10px 12px' }}>
+              <h4 style={{ margin: '0 0 6px', fontSize: 12 }}>📐 Периодизация</h4>
+              <div style={{ display:'flex', gap:4, flexWrap:'wrap', fontSize:10, color:'var(--text-dim)' }}>
+                <span style={{ alignSelf:'center' }}>Тип:</span>
+                {[
+                  { v:'auto', l:'Авто' }, { v:'linear', l:'Линейная' },
+                  { v:'undulating', l:'DUP' }, { v:'block', l:'Блочная' },
+                ].map(p => (
+                  <button key={p.v} onClick={() => setPeriodizationType(p.v as any)}
+                    style={{
+                      padding:'4px 10px', borderRadius:6, fontSize:10, fontWeight: periodizationType === p.v ? 700 : 400, cursor:'pointer',
+                      border: periodizationType === p.v ? '1px solid var(--accent)' : '1px solid var(--border)',
+                      background: periodizationType === p.v ? 'rgba(0,230,138,0.15)' : 'var(--bg-secondary)', color: 'var(--text)',
+                    }}>{p.l}</button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* ═══════ UNIFIED PROGRAM BUILDER (только в Ручном конструкторе) ═══════ */}
+          {tab === 'programcalc' && (<>
           <div className="card" style={{ padding: '10px 12px' }}>
             <h3 style={{ margin: '0 0 8px', fontSize: 13 }}>🧬 Конструктор программы</h3>
             <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 8 }}>4 шага: параметры → сплит → упражнения → цикл</div>
@@ -2604,6 +2626,7 @@ export const TrainingScreen: React.FC = () => {
               </div>
             </>)}
           </div>
+        </>)}
         </div>
       )}
 
@@ -3017,75 +3040,72 @@ export const TrainingScreen: React.FC = () => {
           </div>
         )}
       {/* ═══════════ HISTORY TAB ═══════════ */}
-      {tab === 'history' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <div className="card" style={{ padding: '10px 12px' }}>
-            <h3 style={{ margin: '0 0 8px', fontSize: 13 }}>📜 История тренировок</h3>
-            {diaryProgress.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: 20, color: 'var(--text-dim)' }}>
-                Нет записей. Начните вести дневник на вкладке 📓 Дневник.
+      {tab === 'history' && (() => {
+        try {
+        const gCard: React.CSSProperties = { padding:12, borderRadius:14, background:'linear-gradient(135deg,rgba(255,255,255,0.06),rgba(255,255,255,0.02))', backdropFilter:'blur(20px)', border:'1px solid rgba(255,255,255,0.06)', marginBottom:8 };
+        if (diaryProgress.length === 0) return (
+          <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+            <div style={gCard}>
+              <div style={{ textAlign:'center', padding:20 }}>
+                <div style={{ fontSize:28, marginBottom:6 }}>📜</div>
+                <div style={{ fontSize:11, color:'rgba(255,255,255,0.4)' }}>Нет записей. Начните вести дневник на вкладке «Дневник».</div>
               </div>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                {[...diaryProgress].sort((a, b) => b.week - a.week).map((w, wi) => (
-                  <div key={wi} style={{
-                    background: 'var(--bg-secondary)', borderRadius: 8, padding: '8px 10px',
-                    border: historyExpanded === `w${wi}` ? '1px solid var(--accent)' : '1px solid transparent',
-                  }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}
-                      onClick={() => setHistoryExpanded(historyExpanded === `w${wi}` ? null : `w${wi}`)}>
-                      <div>
-                        <span style={{ fontWeight: 600, fontSize: 13 }}>Неделя {w.week}</span>
-                        <span style={{ fontSize: 10, color: 'var(--text-dim)', marginLeft: 8 }}>{w.workoutCount} тренировок</span>
-                      </div>
-                      <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-                        {(() => {
-                          const sorted = [...diaryProgress].sort((a, b) => b.week - a.week);
-                          const prev = sorted[wi + 1];
-                          const delta = prev ? Math.round((w.totalVolume - prev.totalVolume) / Math.max(1, prev.totalVolume) * 100) : 0;
-                          const arrow = prev ? (delta > 5 ? '↑' : delta < -5 ? '↓' : '→') : '';
-                          const arrColor = delta > 5 ? '#22c55e' : delta < -5 ? '#ef4444' : '#6b7280';
-                          return arrow ? <span style={{ fontSize: 13, color: arrColor, fontWeight: 700, minWidth: 16 }}>{arrow}</span> : null;
-                        })()}
-                        <span style={{ fontSize: 11, color: 'var(--accent)', fontWeight: 600 }}>{Math.round(w.totalVolume).toLocaleString()} кг</span>
-                        <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>
-                          {w.compoundWorkouts > 0 ? `${w.compoundWorkouts} базовых` : 'без базовых'}
-                        </span>
-                        <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>{historyExpanded === `w${wi}` ? '▴' : '▾'}</span>
-                      </div>
-                    </div>
-                    {historyExpanded === `w${wi}` && (
-                      <div style={{ marginTop: 6, borderTop: '1px solid var(--border)', paddingTop: 6 }}>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 4, marginBottom: 6, fontSize: 9 }}>
-                          <div style={{ background: 'rgba(0,230,138,0.05)', borderRadius: 4, padding: 4, textAlign: 'center' }}>
-                            <div style={{ color: 'var(--text-dim)' }}>Объём</div>
-                            <div style={{ fontWeight: 600, color: 'var(--accent)' }}>{Math.round(w.totalVolume)} кг</div>
-                          </div>
-                          <div style={{ background: 'rgba(0,230,138,0.05)', borderRadius: 4, padding: 4, textAlign: 'center' }}>
-                            <div style={{ color: 'var(--text-dim)' }}>Тренировок</div>
-                            <div style={{ fontWeight: 600, color: 'var(--accent)' }}>{w.workoutCount}</div>
-                          </div>
-                          <div style={{ background: 'rgba(0,230,138,0.05)', borderRadius: 4, padding: 4, textAlign: 'center' }}>
-                            <div style={{ color: 'var(--text-dim)' }}>1RM ср.</div>
-                            <div style={{ fontWeight: 600, color: 'var(--accent)' }}>{Math.round(w.total1RM)} кг</div>
-                          </div>
-                        </div>
-                        {diaryStats.filter(s => s.workoutCount > 0 && s.lastWorkoutDate >= `2020-01-01`).slice(0, 5).map(s => (
-                          <div key={s.exerciseId} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, padding: '2px 0', borderBottom: '1px solid var(--border)' }}>
-                            <span>{s.exerciseName}</span>
-                            <span style={{ color: 'var(--accent)', fontWeight: 600 }}>{s.maxWeight}×{s.maxReps}</span>
-                            <span style={{ color: 'var(--text-dim)' }}>1RM {Math.round(s.max1RM)} кг</span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
+            </div>
           </div>
-        </div>
-      )}
+        );
+        return (<div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+          <div style={gCard}>
+            <div style={{ fontSize:10, color:'rgba(255,255,255,0.35)', fontWeight:500, letterSpacing:'0.3px', textTransform:'uppercase', marginBottom:8 }}>📜 История тренировок</div>
+            <div style={{ display:'flex', gap:6, marginBottom:8 }}>
+              {[
+                { label:'Недель', value:diaryProgress.length, color:'#34d399' },
+                { label:'Тренировок', value:diaryProgress.reduce((s,w)=>s+w.workoutCount,0), color:'#60a5fa' },
+                { label:'Объём', value:diaryProgress.length > 0 ? `${(diaryProgress[diaryProgress.length-1]?.totalVolume/1000).toFixed(1)}т` : '—', color:'#f59e0b' },
+              ].map((s,i) => <div key={i} style={{ flex:1, background:'rgba(255,255,255,0.03)', borderRadius:8, padding:'6px 4px', textAlign:'center' }}>
+                <div style={{ fontSize:8, color:'rgba(255,255,255,0.35)' }}>{s.label}</div>
+                <div style={{ fontSize:16, fontWeight:800, color:s.color }}>{s.value}</div>
+              </div>)}
+            </div>
+            {[...diaryProgress].sort((a,b)=>b.week-a.week).map((w,wi) => (
+              <div key={wi} style={{ borderRadius:10, marginBottom:4, overflow:'hidden', background:'rgba(255,255,255,0.02)', border: historyExpanded===`w${wi}` ? '1px solid rgba(0,230,138,0.2)' : '1px solid rgba(255,255,255,0.03)', transition:'border 0.2s' }}>
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'8px 10px', cursor:'pointer' }} onClick={()=>setHistoryExpanded(historyExpanded===`w${wi}`?null:`w${wi}`)}>
+                  <div>
+                    <span style={{ fontWeight:700, fontSize:12, color:'rgba(255,255,255,0.8)' }}>Неделя {w.week}</span>
+                    <span style={{ fontSize:9, color:'rgba(255,255,255,0.3)', marginLeft:6 }}>{w.workoutCount} тр.</span>
+                  </div>
+                  <div style={{ display:'flex', gap:8, alignItems:'center' }}>
+                    {(() => { try { const sorted = [...diaryProgress].sort((a,b)=>b.week-a.week); const prev = sorted[wi+1]; if (!prev) return null; const d = Math.round((w.totalVolume-prev.totalVolume)/Math.max(1,prev.totalVolume)*100); return <span style={{ fontSize:11, fontWeight:700, color:d>5?'#34d399':d<-5?'#f87171':'#6b7280' }}>{d>5?'↑':d<-5?'↓':'→'}</span>; } catch{ return null; } })()}
+                    <span style={{ fontSize:11, fontWeight:700, color:'#34d399' }}>{Math.round(w.totalVolume).toLocaleString()} кг</span>
+                    <span style={{ fontSize:9, color:'rgba(255,255,255,0.3)' }}>{historyExpanded===`w${wi}`?'▴':'▾'}</span>
+                  </div>
+                </div>
+                {historyExpanded===`w${wi}` && <div style={{ padding:'0 10px 8px', borderTop:'1px solid rgba(255,255,255,0.04)', paddingTop:6 }}>
+                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:4, marginBottom:6 }}>
+                    {[
+                      { label:'Объём', value:`${Math.round(w.totalVolume)} кг`, color:'#34d399' },
+                      { label:'Тренировок', value:w.workoutCount, color:'#60a5fa' },
+                      { label:'1RM ср.', value:`${Math.round(w.total1RM)} кг`, color:'#f59e0b' },
+                    ].map((s,i) => <div key={i} style={{ background:'rgba(255,255,255,0.02)', borderRadius:6, padding:'4px 6px', textAlign:'center' }}>
+                      <div style={{ fontSize:8, color:'rgba(255,255,255,0.3)' }}>{s.label}</div>
+                      <div style={{ fontSize:12, fontWeight:700, color:s.color }}>{s.value}</div>
+                    </div>)}
+                  </div>
+                  {(diaryStats.filter(s=>s.workoutCount>0).slice(0,5).length > 0) && <div style={{ fontSize:9, color:'rgba(255,255,255,0.4)' }}>
+                    {diaryStats.filter(s=>s.workoutCount>0).slice(0,5).map(s => (
+                      <div key={s.exerciseId} style={{ display:'flex', justifyContent:'space-between', padding:'2px 0', borderBottom:'1px solid rgba(255,255,255,0.03)' }}>
+                        <span style={{ color:'rgba(255,255,255,0.6)' }}>{s.exerciseName}</span>
+                        <span style={{ color:'#34d399', fontWeight:600 }}>{s.maxWeight}×{s.maxReps}</span>
+                        <span style={{ color:'rgba(255,255,255,0.3)' }}>1RM {Math.round(s.max1RM)} кг</span>
+                      </div>
+                    ))}
+                  </div>}
+                </div>}
+              </div>
+            ))}
+          </div>
+        </div>);
+        } catch { return <div style={{ padding:20, textAlign:'center', color:'rgba(255,255,255,0.3)', fontSize:11 }}>Ошибка загрузки истории</div>; }
+      })()}
       {/* ═══════════ ANALYTICS TAB ═══════════ */}
       {tab === 'analytics' && <><AnalyticsTab sessions={historyWorkouts} onRefresh={loadDiaryStats} /><StructuredAnalyticsCard sessions={historyWorkouts} /></>}
       {tab === 'methods' && <MethodsTab linked={linked} trainingOutput={trainingOutput} diaryStats={diaryStats} historyWorkouts={historyWorkouts} goal={goal} level={level} daysPerWeek={daysPerWeek} recovery={recovery} fatigue={fatigue} appliedMethod={appliedMethod} onApplyMethod={(name, category) => { setAppliedMethod(name); const mapped: Record<string,string> = { periodization: name.includes('linear') ? 'linear' : name.includes('undulating')||name.includes('DUP') ? 'undulating' : name.includes('block') ? 'block' : name.includes('conjugate')||name.includes('westside') ? 'conjugate' : 'auto', progression: name.includes('double') ? 'double' : name.includes('step') ? 'step' : name.includes('rest')||name.includes('pause') ? 'rest_pause' : 'auto', technique: name.includes('cluster') ? 'cluster' : name.includes('tempo') ? 'tempo' : name.includes('eccentric') ? 'eccentric' : 'auto', intensity: name.includes('rm')||name.includes('rpe') ? 'rpe_based' : name.includes('helms') ? 'helms' : 'auto', volume: name.includes('gvt')||name.includes('german') ? 'gvt' : name.includes('mev') ? 'mev' : 'auto', frequency: name.includes('high')||name.includes('daily') ? 'high_freq' : 'auto', specialization: name.includes('bro')||name.includes('splits') ? 'bro_split' : 'auto',                     recovery: name.includes('deload') ? 'deload' : 'auto', }; const pt = (mapped[category] || 'auto') as 'linear'|'auto'|'undulating'|'block'; if (pt !== 'auto') { setPeriodizationType(pt); setTimeout(generatePlan, 100); } setTab('plan'); }} />}
@@ -3648,52 +3668,78 @@ const VisualTab: React.FC<{ sessions: any[] }> = ({ sessions }) => {
       weight: Math.max(...(e.sets||[{weight:0}]).map((st:any)=>st.weight||0), 0), rpe: 7, volume: e.totalVolume || 0,
     }))
   })), [sessions]);
-  const dashboard = React.useMemo(() => sessions.length > 2 ? buildVisualDashboard(vizSessions) : null, [sessions, vizSessions]);
-  const weekly = React.useMemo(() => computeWeeklyChart(vizSessions), [vizSessions]);
-  const muscleVol = React.useMemo(() => computeMuscleVolume(vizSessions), [vizSessions]);
-  const prog = React.useMemo(() => computeProgression(vizSessions), [vizSessions]);
+  const dashboard = React.useMemo(() => { try { return sessions.length > 2 ? buildVisualDashboard(vizSessions) : null; } catch { return null; } }, [sessions, vizSessions]);
+  const weekly = React.useMemo(() => { try { return computeWeeklyChart(vizSessions); } catch { return []; } }, [vizSessions]);
+  const muscleVol = React.useMemo(() => { try { return computeMuscleVolume(vizSessions); } catch { return []; } }, [vizSessions]);
+  const prog = React.useMemo(() => { try { return computeProgression(vizSessions); } catch { return []; } }, [vizSessions]);
 
-  if (sessions.length < 2) return <div className="card" style={{ padding:20, textAlign:'center', color:'var(--text-dim)' }}>Нужно минимум 2 тренировки для визуализации</div>;
+  if (sessions.length < 2) return (
+    <div style={{ padding:24, textAlign:'center', background:'linear-gradient(135deg,rgba(255,255,255,0.04),rgba(255,255,255,0.01))', backdropFilter:'blur(20px)', borderRadius:16, border:'1px solid rgba(255,255,255,0.06)' }}>
+      <div style={{ fontSize:28, marginBottom:6 }}>📊</div>
+      <div style={{ fontSize:12, color:'rgba(255,255,255,0.4)' }}>Нужно минимум 2 тренировки для визуализации</div>
+    </div>
+  );
 
-  return (<div>
-    {dashboard && <div className="card" style={{ marginBottom:8, padding:10 }}>
-      <h4 style={{ margin:'0 0 6px', fontSize:12 }}>📈 Недельный график</h4>
-      <div style={{ display:'flex', alignItems:'flex-end', gap:2, height:100 }}>
+  const glassCard: React.CSSProperties = { padding:12, borderRadius:14, background:'linear-gradient(135deg,rgba(255,255,255,0.06),rgba(255,255,255,0.02))', backdropFilter:'blur(20px)', border:'1px solid rgba(255,255,255,0.06)', marginBottom:10 };
+  const gLabel: React.CSSProperties = { fontSize:10, color:'rgba(255,255,255,0.35)', fontWeight:500, letterSpacing:'0.3px', textTransform:'uppercase', marginBottom:8 };
+
+  return (<div style={{ display:'flex', flexDirection:'column', gap:4 }}>
+    {/* Weekly Volume - Apple Bar Chart */}
+    {dashboard && <div style={glassCard}>
+      <div style={gLabel}>📈 Недельный объём</div>
+      <div style={{ display:'flex', alignItems:'flex-end', gap:3, height:90, padding:'4px 2px' }}>
         {weekly.map((w,i) => { const maxV = Math.max(...weekly.map(x=>x.volume),1); return <div key={i} style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center' }}>
-          <div style={{ width:'100%', background:'rgba(0,230,138,0.3)', borderRadius:'2px 2px 0 0', height:`${Math.max(5, (w.volume/maxV)*100)}%` }} title={``} />
-          <span style={{ fontSize:7, color:'var(--text-dim)', marginTop:2 }}>{w.week}</span>
+          <div style={{ width:'80%', borderRadius:'6px 6px 2px 2px', height:`${Math.max(6, (w.volume/maxV)*100)}%`, background:'linear-gradient(180deg,#00e68a,rgba(0,230,138,0.3))', transition:'height 0.4s cubic-bezier(0.22,1,0.36,1)' }} />
+          <span style={{ fontSize:7, color:'rgba(255,255,255,0.35)', marginTop:4, fontWeight:500 }}>Н{w.week}</span>
         </div>})}
       </div>
-      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:4, fontSize:9, marginTop:4 }}>
-        <span>Пик объёма: <b>{(dashboard.summary as any).peakVolume || dashboard.summary.totalVolume}</b></span>
-        <span>Средняя интенс.: <b>{dashboard.summary.avgIntensity}%</b></span>
-        <span>Тренд: <b style={{color:(dashboard.summary as any).trend==='up'?'#22c55e':'#ef4444'}}>{(dashboard.summary as any).trend==='up'?'↑':'→'}</b></span>
+      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:4, fontSize:9, marginTop:6, padding:'6px 4px', background:'rgba(255,255,255,0.03)', borderRadius:8 }}>
+        <span style={{ color:'rgba(255,255,255,0.4)' }}>Пик <b style={{color:'#fff'}}>{(dashboard.summary as any).peakVolume || dashboard.summary.totalVolume}</b></span>
+        <span style={{ color:'rgba(255,255,255,0.4)' }}>Интенс. <b style={{color:'#fff'}}>{dashboard.summary.avgIntensity}%</b></span>
+        <span style={{ color:'rgba(255,255,255,0.4)' }}>Тренд <b style={{color:(dashboard.summary as any).trend==='up'?'#34d399':(dashboard.summary as any).trend==='down'?'#f87171':'#9ca3af'}}>{(dashboard.summary as any).trend==='up'?'↑ +':(dashboard.summary as any).trend==='down'?'↓ ':'→'}</b></span>
       </div>
     </div>}
 
-    <div className="card" style={{ marginBottom:8, padding:10 }}>
-      <h4 style={{ margin:'0 0 6px', fontSize:12 }}>💪 Объём по группам мышц</h4>
-      {muscleVol.map((mv,i) => <div key={i} style={{ display:'flex', alignItems:'center', gap:6, marginBottom:2 }}>
-        <span style={{ width:60, fontSize:9, color:'var(--text-dim)' }}>{mv.muscle}</span>
-        <div style={{ flex:1, background:'rgba(255,255,255,0.06)', borderRadius:3, height:8, overflow:'hidden' }}>
-          <div style={{ width:`${mv.percent}%`, height:'100%', background:'#3b82f6', borderRadius:3 }} />
+    {/* Muscle volume - pill bars */}
+    {muscleVol.length > 0 && <div style={glassCard}>
+      <div style={gLabel}>💪 Объём по группам</div>
+      {muscleVol.map((mv,i) => <div key={i} style={{ display:'flex', alignItems:'center', gap:8, marginBottom:3 }}>
+        <span style={{ width:55, fontSize:9, color:'rgba(255,255,255,0.5)', fontWeight:500, textAlign:'right' }}>{mv.muscle}</span>
+        <div style={{ flex:1, background:'rgba(255,255,255,0.04)', borderRadius:8, height:10, overflow:'hidden', position:'relative' }}>
+          <div style={{ width:`${mv.percent}%`, height:'100%', borderRadius:8, background:'linear-gradient(90deg,#3b82f6,#60a5fa)', transition:'width 0.5s cubic-bezier(0.22,1,0.36,1)' }} />
         </div>
-        <span style={{ fontSize:9, fontWeight:600 }}>{mv.percent}%</span>
+        <span style={{ fontSize:9, fontWeight:700, color:'rgba(255,255,255,0.7)', minWidth:32, textAlign:'right' }}>{mv.percent}%</span>
       </div>)}
-    </div>
+    </div>}
 
-    <div className="card" style={{ padding:10 }}>
-      <h4 style={{ margin:'0 0 6px', fontSize:12 }}>📈 Прогрессия 1RM</h4>
-      {prog.slice(0,5).map((p,i) => <div key={i} style={{ marginBottom:4 }}>
-        <div style={{ fontWeight:600, fontSize:10 }}>{p.exercise}</div>
-        <div style={{ display:'flex', gap:4, alignItems:'flex-end', height:30 }}>
-          {p.weeks.map((w,wi) => { const max = Math.max(...p.weeks.map(x=>x.estimated1RM),1); return <div key={wi} style={{ flex:1, textAlign:'center' }}>
-            <div style={{ width:'100%', background: w.estimated1RM > (p.weeks[wi-1]?.estimated1RM||0) ? '#22c55e' : '#ef4444', borderRadius:2, height:`${Math.max(3,(w.estimated1RM/max)*30)}%` }} />
-            <span style={{ fontSize:6, color:'var(--text-dim)' }}>Н{w.week}</span>
-          </div>})}
-        </div>
-      </div>)}
-    </div>
+    {/* 1RM Progression - sparkline mini cards */}
+    {prog.length > 0 && <div style={glassCard}>
+      <div style={gLabel}>📈 Прогрессия 1RM</div>
+      <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+        {prog.slice(0,5).map((p,i) => {
+          const maxRM = Math.max(...p.weeks.map(x=>x.estimated1RM),1);
+          const latest = p.weeks[p.weeks.length-1]?.estimated1RM || 0;
+          const first = p.weeks[0]?.estimated1RM || 0;
+          const change = first > 0 ? Math.round((latest - first) / first * 100) : 0;
+          return <div key={i} style={{ background:'rgba(255,255,255,0.03)', borderRadius:10, padding:'6px 8px' }}>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:4 }}>
+              <span style={{ fontSize:9, fontWeight:600, color:'rgba(255,255,255,0.7)' }}>{p.exercise}</span>
+              <span style={{ fontSize:9, fontWeight:700, color: change >= 0 ? '#34d399' : '#f87171' }}>{change >= 0 ? `+${change}` : change}%</span>
+            </div>
+            <div style={{ display:'flex', gap:2, alignItems:'flex-end', height:24 }}>
+              {p.weeks.map((w,wi) => (
+                <div key={wi} style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center' }}>
+                  <div style={{ width:'100%', borderRadius:'3px 3px 1px 1px', height:`${Math.max(3, (w.estimated1RM/maxRM)*24)}px`,
+                    background: w.estimated1RM > (p.weeks[wi-1]?.estimated1RM||0) ? 'linear-gradient(180deg,#34d399,#059669)' : 'linear-gradient(180deg,#f87171,#dc2626)',
+                    transition:'height 0.3s cubic-bezier(0.22,1,0.36,1)' }} />
+                  <span style={{ fontSize:6, color:'rgba(255,255,255,0.25)', marginTop:1 }}>Н{w.week}</span>
+                </div>
+              ))}
+            </div>
+          </div>;
+        })}
+      </div>
+    </div>}
   </div>);
 };
 
