@@ -7,6 +7,7 @@ export interface OFFProduct {
   nameRu?: string;
   brand?: string;
   categories?: string;
+  category?: string;
   kcal: number;
   protein: number;
   fat: number;
@@ -29,9 +30,40 @@ export interface OFFProduct {
   };
 }
 
-const OFF_API = 'https://ru.openfoodfacts.org/api/v0';
+const OFF_API_RU = 'https://ru.openfoodfacts.org/api/v0';
+const OFF_API_WORLD = 'https://world.openfoodfacts.org/api/v0';
+const OFF_API_US = 'https://us.openfoodfacts.org/api/v0';
 const CACHE_STORE = 'food_cache';
 const CACHE_TTL = 7 * 24 * 60 * 60 * 1000;
+const LS_CACHE_KEY = 'he_off_cache';
+
+const CAT_KEYWORDS: Record<string, string[]> = {
+  protein: ['meat', 'мясо', 'chicken', 'куриц', 'fish', 'рыб', 'beef', 'говяд', 'pork', 'свинин',
+    'turkey', 'индейк', 'egg', 'яйц', 'seafood', 'морепродукт', 'tuna', 'тунец', 'salmon', 'лосос',
+    'sausage', 'колбас', 'ham', 'ветчин'],
+  dairy: ['milk', 'молок', 'cheese', 'сыр', 'yogurt', 'йогурт', 'cream', 'сливк', 'butter', 'масл',
+    'kefir', 'кефир', 'curd', 'творог'],
+  carb: ['rice', 'рис', 'pasta', 'макарон', 'bread', 'хлеб', 'potato', 'картофел', 'noodle', 'лапш',
+    'cereal', 'хлопь', 'tortilla', 'лепёшк'],
+  grain: ['oat', 'овсян', 'buckwheat', 'гречк', 'quinoa', 'киноа', 'bulgur', 'булгур', 'barley', 'перлов',
+    'couscous', 'кускус', 'millet', 'пшен', 'lentil', 'чечевиц'],
+  fat: ['oil', 'масл', 'avocado', 'авокад', 'nut', 'орех', 'seed', 'семечк', 'olive', 'оливк',
+    'coconut', 'кокос'],
+  veg_fruit: ['vegetable', 'овощ', 'fruit', 'фрукт', 'salad', 'салат', 'tomato', 'помидор',
+    'cucumber', 'огурец', 'broccoli', 'брокколи', 'berry', 'ягод'],
+  fast_food: ['pizza', 'пицц', 'burger', 'бургер', 'fries', 'фри', 'snack', 'чипс', 'chocolate', 'шоколад',
+    'candy', 'конфет', 'cookie', 'печень', 'cake', 'торт', 'soda', 'газировк'],
+  supplement: ['protein', 'протеин', 'vitamin', 'витамин', 'supplement', 'добавк', 'whey', 'сывороточн',
+    'bcaa', 'аминокислот', 'creatine', 'креатин'],
+};
+
+function detectCategory(categories?: string, name?: string): string {
+  const text = ((categories || '') + ' ' + (name || '')).toLowerCase();
+  for (const [cat, keywords] of Object.entries(CAT_KEYWORDS)) {
+    if (keywords.some(kw => text.includes(kw))) return cat;
+  }
+  return 'other';
+}
 
 function round1(v: number | undefined): number | undefined {
   return v !== undefined && v !== null ? Math.round(v * 10) / 10 : undefined;
@@ -49,6 +81,7 @@ function normalizeProduct(p: any): OFFProduct | null {
     nameRu: p.product_name_ru || undefined,
     brand: p.brands || undefined,
     categories: p.categories || undefined,
+    category: detectCategory(p.categories, name),
     kcal: Math.round(n('energy-kcal') || 0),
     protein: round1(n('proteins')) || 0,
     fat: round1(n('fat')) || 0,
@@ -77,58 +110,87 @@ async function getCached(barcode: string): Promise<OFFProduct | null> {
     const cached = await db.get<OFFProduct>(CACHE_STORE, barcode);
     if (cached && Date.now() - cached.cachedAt < CACHE_TTL) return cached;
     if (cached) await db.delete(CACHE_STORE, barcode);
-    return null;
-  } catch {
-    return null;
-  }
+  } catch {}
+  try {
+    const ls = localStorage.getItem(LS_CACHE_KEY);
+    if (ls) {
+      const map: Record<string, OFFProduct> = JSON.parse(ls);
+      const hit = map[barcode];
+      if (hit && Date.now() - hit.cachedAt < CACHE_TTL) return hit;
+    }
+  } catch {}
+  return null;
 }
 
-async function cacheProduct(product: OFFProduct): Promise<void> {
+async function saveToCache(product: OFFProduct): Promise<void> {
   try {
     await db.put(CACHE_STORE, product);
   } catch {}
+  try {
+    const ls = localStorage.getItem(LS_CACHE_KEY);
+    const map: Record<string, OFFProduct> = ls ? JSON.parse(ls) : {};
+    map[product.barcode] = product;
+    const keys = Object.keys(map);
+    if (keys.length > 200) delete map[keys[0]];
+    localStorage.setItem(LS_CACHE_KEY, JSON.stringify(map));
+  } catch {}
+}
+
+async function fetchFromApi(apiUrl: string, barcode: string): Promise<OFFProduct | null> {
+  try {
+    const res = await fetch(`${apiUrl}/product/${barcode}.json`, { signal: AbortSignal.timeout(5000) });
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (data.status !== 1 || !data.product) return null;
+    return normalizeProduct(data.product);
+  } catch {
+    return null;
+  }
 }
 
 export async function searchByBarcode(barcode: string): Promise<OFFProduct | null> {
   const cached = await getCached(barcode);
   if (cached) return cached;
 
-  try {
-    const res = await fetch(`${OFF_API}/product/${barcode}.json`);
-    if (!res.ok) return null;
-    const data = await res.json();
-    if (data.status !== 1 || !data.product) return null;
-    const product = normalizeProduct(data.product);
-    if (!product) return null;
-    await cacheProduct(product);
-    return product;
-  } catch {
-    return null;
+  const apis = [OFF_API_RU, OFF_API_WORLD, OFF_API_US];
+  for (const api of apis) {
+    const product = await fetchFromApi(api, barcode);
+    if (product) {
+      await saveToCache(product);
+      return product;
+    }
   }
+  return null;
+}
+
+export async function searchByBarcodeBatch(barcodes: string[]): Promise<(OFFProduct | null)[]> {
+  return Promise.all(barcodes.map(b => searchByBarcode(b)));
 }
 
 export async function searchByName(query: string, pageSize = 20): Promise<OFFProduct[]> {
   const cached = await searchCacheByName(query);
   if (cached.length > 0) return cached;
 
-  try {
-    const encoded = encodeURIComponent(query);
-    const res = await fetch(`${OFF_API}/search?search_terms=${encoded}&page_size=${pageSize}&json=1`);
-    if (!res.ok) return [];
-    const data = await res.json();
-    if (!data.products) return [];
-    const products: OFFProduct[] = [];
-    for (const p of data.products) {
-      const norm = normalizeProduct(p);
-      if (norm) {
-        await cacheProduct(norm);
-        products.push(norm);
+  const apis = [OFF_API_RU, OFF_API_WORLD];
+  for (const api of apis) {
+    try {
+      const encoded = encodeURIComponent(query);
+      const res = await fetch(`${api}/search?search_terms=${encoded}&page_size=${pageSize}&json=1`, { signal: AbortSignal.timeout(5000) });
+      if (!res.ok) continue;
+      const data = await res.json();
+      if (!data.products) continue;
+      const products: OFFProduct[] = [];
+      for (const p of data.products) {
+        const norm = normalizeProduct(p);
+        if (norm) {
+          await saveToCache(norm);
+          products.push(norm);
+        }
       }
-    }
-    return products;
-  } catch {
-    return [];
+      if (products.length > 0) return products;
+    } catch {}
   }
+  return [];
 }
 
 async function searchCacheByName(query: string): Promise<OFFProduct[]> {
@@ -148,7 +210,7 @@ export function productToFoodItem(p: OFFProduct) {
   return {
     id: p.barcode || p.id,
     name: p.name,
-    category: 'other' as const,
+    category: p.category || 'other',
     kcal: p.kcal,
     protein: p.protein,
     fat: p.fat,

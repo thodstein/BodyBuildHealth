@@ -1,11 +1,13 @@
 ﻿import React, { useState, useEffect, useMemo } from 'react';
 import { FOOD_DB } from '../../core/nutrition-database';
-import { useDataLink } from '../../core/data-link';
+import { useDataLink, derivePAL } from '../../core/data-link';
 import { getRecipes } from '../../engines/nutrition-periodization.engine';
+import { calcNutrition } from '../../engines/nutrition.engine';
 import { NutritionDiary } from './NutritionScreen_parts/NutritionDiary';
 import { NutritionCharts } from './NutritionScreen_parts/NutritionCharts';
 import { IndividualPlan } from './NutritionScreen_parts/IndividualPlan';
 import { NutritionReference } from './NutritionScreen_parts/NutritionReference';
+import { CAT_MAP_LABEL, addToCart } from '../../core/nutrition-utils';
 
 interface DiaryEntry { name: string; kcal: number; p: number; f: number; c: number; date?: string; }
 type NutritionPage = 'hero' | 'tabs';
@@ -27,19 +29,7 @@ const TAB_LABELS: Record<string, string> = {
   reference: '📖 Справочник', recipes: '🍳 Рецепты', reports: '📊 Отчёты',
 };
 
-const CAT_MAP: Record<string, string> = {
-  protein: '🥩 Мясо/Рыба', carb: '🥔 Углеводы', fat: '🧈 Жиры', dairy: '🥛 Молочка',
-  veg_fruit: '🥦 Овощи/Фрукты', grain: '🌾 Крупы', supplement: '💊 Добавки',
-  fast_food: '🍔 Фаст-фуд', other: '📦 Прочее',
-};
-
-const addToCart = (item: { name: string; kcal: number; amount?: number; category?: string }) => {
-  try {
-    const cart = JSON.parse(localStorage.getItem('he_nutrition_cart') || '[]');
-    cart.push(item);
-    localStorage.setItem('he_nutrition_cart', JSON.stringify(cart));
-  } catch {}
-};
+const CAT_MAP = CAT_MAP_LABEL;
 
 // ─── Sub-tabs ───
 
@@ -327,9 +317,20 @@ export const NutritionScreen: React.FC = () => {
 
   const cartCount = useMemo(() => { try { return JSON.parse(localStorage.getItem('he_nutrition_cart') || '[]').length; } catch { return 0; } }, [tab]);
 
+  const macroTargets = useMemo(() => {
+    const s = linked.profile?.settings;
+    if (!s?.weight) return { kcal: 2500, protein: 160, fats: 70, carbs: 300 };
+    const pal = derivePAL(s.workoutsPerWeek, s.avgWorkoutMinutes);
+    const goal = (s.primaryGoal as string) || 'maintenance';
+    try {
+      const t = calcNutrition({ weightKg: s.weight, heightCm: s.height || 175, age: s.age || 30, sex: s.sex || 'male', pal, goal });
+      return { kcal: t.kcal, protein: t.protein, fats: t.fats, carbs: t.carbs };
+    } catch { return { kcal: 2500, protein: 160, fats: 70, carbs: 300 }; }
+  }, [linked.profile]);
+
   const renderContent = () => {
     switch (tab) {
-      case 'diary': return <NutritionDiary foodEntries={foodEntries} />;
+      case 'diary': return <NutritionDiary foodEntries={foodEntries} targets={macroTargets} />;
       case 'charts': return <NutritionCharts kcalData={[avgWeeklyKcal]} proteinData={[avgWeeklyProtein]} labels={['']} dailyLogs={dailyLogs} />;
       case 'mealplan': return <IndividualPlan profile={linked.profile} course={linked.course} />;
       case 'cart': return <CartTab />;

@@ -1,12 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
-
-const addToCart = (name: string, kcal: number, amount?: number, category?: string) => {
-  try {
-    const cart = JSON.parse(localStorage.getItem('he_nutrition_cart') || '[]');
-    cart.push({ name, kcal: Math.round(kcal), amount: amount || 100, category: category || 'other' });
-    localStorage.setItem('he_nutrition_cart', JSON.stringify(cart));
-  } catch {}
-};
+import { addToCart } from '../../../core/nutrition-utils';
 import { FOOD_DB } from '../../../core/nutrition-database';
 import { calcNutrition } from '../../../engines/nutrition.engine';
 import { getProfile, updateProfile } from '../../../core/profile-manager';
@@ -915,7 +908,7 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
                   }}>
                     <span style={{ flex:1 }}>{it.name}</span>
                     <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: 7 }}>{it.amount}г</span>
-                    <span onClick={() => addToCart(it.name, it.kcal * (it.amount / 100), it.amount, it.category)} style={{ cursor:'pointer', fontSize:7, color:'#00e68a', opacity:0.4, padding:'0 2px' }} title="В корзину">🛒</span>
+                    <span onClick={() => addToCart({ name: it.name, kcal: it.kcal * (it.amount / 100), amount: it.amount, category: it.category })} style={{ cursor:'pointer', fontSize:7, color:'#00e68a', opacity:0.4, padding:'0 2px' }} title="В корзину">🛒</span>
                   </span>
                 ))}
               </div>
@@ -1445,7 +1438,7 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
           {cheatMealPlan.items.map((it: any, i: number) => (
             <div key={i} style={{ display:'flex', justifyContent:'space-between', fontSize: 9, padding: '2px 0', alignItems:'center' }}>
               <span>• {it.name || it}</span>
-              <span onClick={() => addToCart(it.name || it, it.kcal || (cheatMealPlan.cals / cheatMealPlan.items.length), 100)} style={{ cursor:'pointer', fontSize:7, color:'#00e68a', opacity:0.4 }} title="В корзину">🛒</span>
+              <span onClick={() => addToCart({ name: it.name || it, kcal: it.kcal || (cheatMealPlan.cals / cheatMealPlan.items.length), amount: 100 })} style={{ cursor:'pointer', fontSize:7, color:'#00e68a', opacity:0.4 }} title="В корзину">🛒</span>
             </div>
           ))}
           <div style={{ fontSize: 8, color: '#f59e0b', marginTop: 4 }}>{cheatMealPlan.note}</div>
@@ -1458,7 +1451,7 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
           {carbloadPlan.foods.map((f: any, i: number) => (
             <div key={i} style={{ display:'flex', justifyContent:'space-between', fontSize: 9, padding: '2px 0', alignItems:'center' }}>
               <span>• {f.name || f}</span>
-              <span onClick={() => addToCart(f.name || f, f.kcal || 100, 100)} style={{ cursor:'pointer', fontSize:7, color:'#00e68a', opacity:0.4 }} title="В корзину">🛒</span>
+              <span onClick={() => addToCart({ name: f.name || f, kcal: f.kcal || 100, amount: 100 })} style={{ cursor:'pointer', fontSize:7, color:'#00e68a', opacity:0.4 }} title="В корзину">🛒</span>
             </div>
           ))}
           <div style={{ fontSize: 8, color: '#f97316', marginTop: 4 }}>{carbloadPlan.note}</div>
