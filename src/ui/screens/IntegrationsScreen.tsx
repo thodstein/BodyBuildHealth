@@ -118,7 +118,7 @@ const FatSecretTab: React.FC = () => {
     const q = searchQuery.trim().toLowerCase();
     setTimeout(() => {
       const results = MOCK_FOODS.filter(f =>
-        f.name.toLowerCase().includes(q) || q.split('').some(ch => f.name.toLowerCase().includes(ch))
+        f.name.toLowerCase().includes(q) || q.split('').some(ch => (f.name||'').toLowerCase().includes(ch))
       );
       if (results.length === 0) {
         setSearchResults(MOCK_FOODS.slice(0, 3));

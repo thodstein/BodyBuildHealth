@@ -147,9 +147,9 @@ export const SmartAssistantScreen: React.FC = () => {
   };
 
   const filteredGlossary = GLOSSARY.filter(g =>
-    g.term.toLowerCase().includes(glossarySearch.toLowerCase()) ||
-    g.abbr.toLowerCase().includes(glossarySearch.toLowerCase()) ||
-    g.definition.toLowerCase().includes(glossarySearch.toLowerCase())
+    (g.term||'').toLowerCase().includes(glossarySearch.toLowerCase()) ||
+    (g.abbr||'').toLowerCase().includes(glossarySearch.toLowerCase()) ||
+    (g.definition||'').toLowerCase().includes(glossarySearch.toLowerCase())
   );
 
   if (loading && messages.length === 1) {

@@ -77,7 +77,7 @@ export const PharmaCourseScreen: React.FC = () => {
           if (subById) return subById.class !== 'support';
           // Try by name match across all PHARMA_DB entries
           const subByName = Object.values(PHARMA_DB).find(s => 
-            s.id === e.substanceId || s.name === e.substanceId || e.substanceId?.toLowerCase().includes(s.id.toLowerCase())
+            s.id === e.substanceId || s.name === e.substanceId || (e.substanceId||'').toLowerCase().includes((s.id||'').toLowerCase())
           );
           if (subByName) return subByName.class !== 'support';
           // If not found in PHARMA_DB at all, keep it (custom drug)

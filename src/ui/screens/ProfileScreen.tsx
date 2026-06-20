@@ -1,7 +1,7 @@
 ﻿import React, { useEffect, useState, useRef } from 'react';
 import type { UserProfile, InjuryRecord, SupplementEntry, MedicationEntry, LabPoint, WorkoutLog, StrengthLogEntry } from '../../core/types';
 import { getProfile, updateProfile, useProfileRefresh } from '../../core/profile-manager';
-import { saveContraindications, CHRONIC_CONDITIONS_LIST } from '../../core/contraindications';
+import { saveContraindications, CHRONIC_CONDITIONS_LIST, ORGAN_WEAKNESSES, GENETIC_POLYMORPHISMS, getContraindications } from '../../core/contraindications';
 import { db } from '../../core/db';
 import { calcReadiness } from '../../engines/readiness.engine';
 import { computeLabIndices, interpretLabIndices } from '../../engines/labs-indices.engine';
@@ -1338,10 +1338,32 @@ export const ProfileScreen: React.FC = () => {
                           <div style={{ fontSize:9, color: apple.textDim }}>{hasData ? labIndexText[k] : 'Нет данных'}</div>
                         </div>
                       );
-                    })}
-                  </div>
+                  })}
                 </div>
-              )}
+              </div>
+            )}
+            </div>
+
+            <div style={{ ...glassCard, marginTop:10 }}>
+              <div style={sectionLabel}>Слабые органы</div>
+              <div style={{ display:'flex', flexWrap:'wrap', gap:4, marginTop:4 }}>
+                {ORGAN_WEAKNESSES.map(o => {
+                  const ci = getContraindications();
+                  const active = (ci.organWeaknesses ?? []).includes(o.id);
+                  return <button key={o.id} onClick={() => { const cur = ci.organWeaknesses ?? []; const upd = active ? cur.filter(x => x !== o.id) : [...cur, o.id]; saveContraindications({ organWeaknesses: upd }); }} style={pillBtn(active)}>{o.label}</button>;
+                })}
+              </div>
+            </div>
+
+            <div style={{ ...glassCard, marginTop:10 }}>
+              <div style={sectionLabel}>Генетические полиморфизмы</div>
+              <div style={{ display:'flex', flexWrap:'wrap', gap:4, marginTop:4 }}>
+                {GENETIC_POLYMORPHISMS.map(g => {
+                  const ci = getContraindications();
+                  const active = (ci.geneticPolymorphisms ?? []).includes(g.id);
+                  return <button key={g.id} onClick={() => { const cur = ci.geneticPolymorphisms ?? []; const upd = active ? cur.filter(x => x !== g.id) : [...cur, g.id]; saveContraindications({ geneticPolymorphisms: upd }); }} style={pillBtn(active)}>{g.label}</button>;
+                })}
+              </div>
             </div>
           </>
           )}

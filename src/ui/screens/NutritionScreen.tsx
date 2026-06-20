@@ -1,13 +1,14 @@
-﻿import React, { useState, useEffect, useMemo } from 'react';
+﻿import React, { useState, useEffect, useMemo, lazy, Suspense } from 'react';
 import { FOOD_DB } from '../../core/nutrition-database';
 import { useDataLink, derivePAL } from '../../core/data-link';
 import { getRecipes } from '../../engines/nutrition-periodization.engine';
 import { calcNutrition } from '../../engines/nutrition.engine';
 import { NutritionDiary } from './NutritionScreen_parts/NutritionDiary';
-import { NutritionCharts } from './NutritionScreen_parts/NutritionCharts';
 import { IndividualPlan } from './NutritionScreen_parts/IndividualPlan';
 import { NutritionReference } from './NutritionScreen_parts/NutritionReference';
 import { addToCart, getCarts, saveCarts, getActiveStoreId, setActiveStoreId, CART_CAT_LABELS, CartStore, CartItemEnhanced } from '../../core/nutrition-utils';
+
+const NutritionCharts = lazy(() => import('./NutritionScreen_parts/NutritionCharts').then(m => ({ default: m.NutritionCharts })));
 import { generateNutritionReport, NutritionReport } from '../../engines/nutrition-report.engine';
 
 interface DiaryEntry { name: string; kcal: number; p: number; f: number; c: number; date?: string; }
@@ -1022,7 +1023,7 @@ export const NutritionScreen: React.FC = () => {
   const renderContent = () => {
     switch (tab) {
       case 'diary': return <NutritionDiary foodEntries={foodEntries} targets={macroTargets} />;
-      case 'charts': return <NutritionCharts kcalData={[avgWeeklyKcal]} proteinData={[avgWeeklyProtein]} labels={['']} dailyLogs={dailyLogs} />;
+      case 'charts': return <Suspense fallback={<div style={{padding:20,textAlign:'center',color:'var(--text-dim)',fontSize:11}}>Загрузка графиков...</div>}><NutritionCharts kcalData={[avgWeeklyKcal]} proteinData={[avgWeeklyProtein]} labels={['']} dailyLogs={dailyLogs} /></Suspense>;
       case 'mealplan': return <IndividualPlan profile={linked.profile} course={linked.course} />;
       case 'cart': return <CartTab />;
       case 'restaurant': return <RestaurantTab />;

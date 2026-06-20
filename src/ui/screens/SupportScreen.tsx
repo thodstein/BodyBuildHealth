@@ -1638,7 +1638,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   // All support substances for interaction checker
   const allSupport = useMemo(() => supplementList, [supplementList]);
   // Catalog-filtered substances for interaction selectors (289 curated entries)
-  const catalogSupport = useMemo(() => allSupport.filter(s => CATALOG_IDS.has(s.id.toLowerCase())), [allSupport, CATALOG_IDS]);
+  const catalogSupport = useMemo(() => allSupport.filter(s => CATALOG_IDS.has((s.id||'').toLowerCase())), [allSupport, CATALOG_IDS]);
 
   // Support-only synergy pairs
   const supportSynergies = useMemo(() => {
