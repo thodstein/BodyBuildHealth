@@ -7,7 +7,7 @@ import { NutritionDiary } from './NutritionScreen_parts/NutritionDiary';
 import { NutritionCharts } from './NutritionScreen_parts/NutritionCharts';
 import { IndividualPlan } from './NutritionScreen_parts/IndividualPlan';
 import { NutritionReference } from './NutritionScreen_parts/NutritionReference';
-import { CAT_MAP_LABEL, addToCart } from '../../core/nutrition-utils';
+import { addToCart } from '../../core/nutrition-utils';
 
 interface DiaryEntry { name: string; kcal: number; p: number; f: number; c: number; date?: string; }
 type NutritionPage = 'hero' | 'tabs';
@@ -29,8 +29,6 @@ const TAB_LABELS: Record<string, string> = {
   favorites: '⭐ Избранное', catalog: '📦 Каталог',
   reference: '📖 Справочник', recipes: '🍳 Рецепты', reports: '📊 Отчёты',
 };
-
-const CAT_MAP = CAT_MAP_LABEL;
 
 const cardBg = { background: '#18181b', borderRadius: 18, border: '1px solid rgba(255,255,255,0.06)', boxShadow: '0 2px 16px rgba(0,0,0,0.2)' };
 const pillActive = { background: 'linear-gradient(135deg,#00e68a,#00c8a0)', color: '#000', fontWeight: 700 as const, border: 'none', boxShadow: '0 2px 12px rgba(0,230,138,0.25)' };
@@ -110,18 +108,38 @@ const ReferenceTab: React.FC = () => (
   </div>
 );
 
+const CATEGORY_ORDER: Record<string, string> = {
+  protein: '🥩 Мясо/Рыба',
+  poultry: '🍗 Птица',
+  fish: '🐟 Рыба',
+  dairy: '🥛 Молочка',
+  grain: '🌾 Крупы',
+  carb: '🥔 Углеводы',
+  veg_fruit: '🥦 Овощи/Фрукты',
+  fat: '🧈 Жиры/Масла',
+  fast_food: '🍔 Фаст-фуд',
+  supplement: '💊 Добавки',
+  other: '📦 Прочее',
+};
+const CATEGORY_KEYS = Object.keys(CATEGORY_ORDER);
+
 const CatalogTab: React.FC = () => {
   const [catSearch, setCatSearch] = React.useState('');
   const [catFilter, setCatFilter] = React.useState('all');
-  const categories = [...new Set(FOOD_DB.map(f => f.category || 'other'))];
   const addFav = (food: { id: string; name: string; kcal: number; protein: number; fat: number; carbs: number }) => {
     try { const ids: string[] = JSON.parse(localStorage.getItem('he_food_favs') || '[]'); const updated = [food.id, ...ids.filter(f => f !== food.id)].slice(0, 100); localStorage.setItem('he_food_favs', JSON.stringify(updated)); } catch {}
   };
-  const filtered = FOOD_DB.filter(f => {
-    if (catFilter !== 'all' && f.category !== catFilter) return false;
-    if (catSearch && !f.name.toLowerCase().includes(catSearch.toLowerCase())) return false;
-    return true;
-  });
+  const filtered = React.useMemo(() => {
+    return FOOD_DB.filter(f => {
+      if (catFilter !== 'all' && f.category !== catFilter) return false;
+      if (catSearch && !f.name.toLowerCase().includes(catSearch.toLowerCase())) return false;
+      return true;
+    });
+  }, [catFilter, catSearch]);
+  const activeCategories = React.useMemo(() => {
+    const set = new Set<string>(FOOD_DB.map(f => f.category || 'other'));
+    return CATEGORY_KEYS.filter(k => set.has(k));
+  }, []);
   const filterBtn = (isActive: boolean, onClick: () => void, children: React.ReactNode) => (
     <button onClick={onClick} style={{ padding:'5px 10px', borderRadius:8, fontSize:8, cursor:'pointer', fontWeight: isActive ? 700 : 400, letterSpacing:0.2, whiteSpace:'nowrap', border: isActive ? '1px solid #00e68a' : '1px solid rgba(255,255,255,0.06)', background: isActive ? 'linear-gradient(135deg,rgba(0,230,138,0.2),rgba(0,200,160,0.12))' : '#202023', color: isActive ? '#00e68a' : 'rgba(255,255,255,0.85)' }}>{children}</button>
   );
@@ -131,13 +149,13 @@ const CatalogTab: React.FC = () => {
       <input value={catSearch} onChange={e => setCatSearch(e.target.value)} placeholder="🔍 Поиск по названию..." style={inputStyle} />
       <div style={{ marginTop:8, display:'flex', gap:3, flexWrap:'wrap', marginBottom:8 }}>
         {filterBtn(catFilter === 'all', () => setCatFilter('all'), 'Все')}
-        {categories.map(c => filterBtn(catFilter === c, () => setCatFilter(c), CAT_MAP[c] || c))}
+        {activeCategories.map(c => filterBtn(catFilter === c, () => setCatFilter(c), CATEGORY_ORDER[c] || c))}
       </div>
       <div style={{ maxHeight:380, overflowY:'auto', display:'flex', flexDirection:'column', gap:3, borderRadius:8 }}>
         {filtered.map(f => <div key={f.id} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'6px 10px', borderRadius:10, background:'#202023', border:'1px solid rgba(255,255,255,0.06)' }}>
           <div>
             <div style={{ fontSize:11, fontWeight:600, color:'#fff' }}>{f.name}</div>
-            <div style={{ fontSize:7, color:'rgba(255,255,255,0.8)', marginTop:1 }}>{CAT_MAP[f.category] || f.category} • {f.kcal}ккал • Б{f.protein} Ж{f.fat} У{f.carbs}</div>
+            <div style={{ fontSize:7, color:'rgba(255,255,255,0.8)', marginTop:1 }}>{CATEGORY_ORDER[f.category] || f.category} • {f.kcal}ккал • Б{f.protein} Ж{f.fat} У{f.carbs}</div>
           </div>
           <div style={{ display:'flex', gap:3, alignItems:'center' }}>
             <button onClick={() => addFav(f)} style={{ padding:'4px 8px', borderRadius:6, fontSize:9, cursor:'pointer', background:'rgba(139,92,246,0.15)', border:'1px solid rgba(139,92,246,0.3)', color:'#8b5cf6' }}>⭐</button>
