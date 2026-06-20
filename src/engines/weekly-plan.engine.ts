@@ -35,19 +35,7 @@ const ORGAN_LABELS: Record<string, string> = {
   gut: 'ЖКТ', lungs: 'Лёгкие', skin: 'Кожа', eyes: 'Глаза',
 };
 
-const MECHANISM_LABELS_RU: Record<string, string> = {
-  GH_UP: '↑ Гормон роста', IGF1_UP: '↑ ИФР-1', TESTOSTERONE_UP: '↑ Тестостерон',
-  DHT_BLOCK: '↓ ДГТ', E2_BLOCK: '↓ Эстрадиол', DOPAMINE_UP: '↑ Дофамин',
-  SEROTONIN_UP: '↑ Серотонин', GABA_UP: '↑ ГАМК', CORTISOL_DOWN: '↓ Кортизол',
-  AMPK_UP: 'AMPK-активация', Nrf2_UP: 'Nrf2-антиоксидант', NFKB_INHIBIT: '↓ NF-κB',
-  COX2_INHIBIT: '↓ COX-2', NO_UP: '↑ Оксид азота', MITO_UP: '↑ Митохондрии',
-  ATP_UP: '↑ АТФ-продукция', GSH_UP: '↑ Глутатион', BILE_FLOW_UP: '↑ Желчеотток',
-  ANGIOGENESIS: 'Ангиогенез', TISSUE_REPAIR: 'Регенерация тканей', CELL_MIGRATION: 'Миграция клеток',
-  BDNF_UP: '↑ BDNF', NEUROPROTECTION: 'Нейропротекция', SLEEP_UP: '↑ Качество сна',
-  MELANIN_UP: '↑ Меланин', LIBIDO_UP: '↑ Либидо', FAT_OXIDATION: 'Окисление жиров',
-  INSULIN_SENS: '↑ Чувств. к инсулину', LIPID_BALANCE: 'Липидный баланс',
-  ANTIOX_UP: 'Антиоксидант', IMMUNE_UP: '↑ Иммунитет', COLLAGEN_SYNTHESIS: 'Синтез коллагена',
-};
+import { MECHANISM_LABELS } from '../data/mechanism-labels';
 
 export interface SupplementPlanEntry {
   substanceId: string;
@@ -284,7 +272,7 @@ export function generateWeeklyPlan(
       substanceId: id,
       name: info.name,
       mechanism: primaryMech,
-      mechanismRu: MECHANISM_LABELS_RU[primaryMech] || primaryMech.replace(/_/g, ' '),
+      mechanismRu: MECHANISM_LABELS[primaryMech] || primaryMech.replace(/_/g, ' '),
       organs,
       organLabels: organs.map(o => ORGAN_LABELS[o] || o),
       systems,
@@ -334,7 +322,7 @@ export function generateWeeklyPlan(
   const allMechs = [...new Set(entries.flatMap(e => e.mechanism ? [e.mechanism] : []))];
   const keyMechanisms = allMechs.slice(0, 12).map(m => ({
     name: m,
-    label: MECHANISM_LABELS_RU[m] || m.replace(/_/g, ' '),
+    label: MECHANISM_LABELS[m] || m.replace(/_/g, ' '),
     substances: entries.filter(e => e.mechanism === m).map(e => e.substanceId),
   }));
 

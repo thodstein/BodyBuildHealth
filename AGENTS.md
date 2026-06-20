@@ -217,43 +217,19 @@ if (shouldApplyPenalty && finalResult.systemBreakdown) {
 ## Phase 7 (Planned): Remaining Items
 - [x] Barcode search improvements (Open Food Facts cache) — Phase 3 item 17 (fallback APIs, localStorage cache, category detection, batch search)
 
-## Session Summary (Jun 19)
+## Session Summary (Jun 20)
 ### Done
-- **Shared utils** (`src/core/nutrition-utils.ts`): `addToCart(item)` object param, `CAT_MAP_LABEL/EMOJI` split
-- **Macro → profile linking**: `NutritionDiary` accepts `targets` prop, `NutritionScreen` computes via `calcNutrition()`
-- **Open Food Facts** (`openfoodfacts.engine.ts`): fallback API chain (ru→world→us), localStorage cache (200 entries, 7d TTL), auto-category detection
-- **SW auto-update**: `reg.update()`, update toast, `controllerchange` → auto-reload
-- **Design overhaul (all screens)**: removed all glass/blur, solid `#18181b`/`#202023`/`#27272a`, white text, green-gradient active vs solid-dark inactive buttons
-- **`NutritionScreen`**: second hero card "Аналитика питания", sticky top-bar, pill tabs redesign
-- **`NutritionDiary`**: full rewrite — no glass, white text, clear active states, solid dark modals
-- **`IndividualPlan`**: `GlassCard`/`PillBtn`/`inputStyle`/`reportPillStyle` — no glass, solid backgrounds
-- **`PharmaCourseScreen`**: drug picker modal — no glass/blur overlay, visible inactive pills (`#202023` + `#3f3f46`), substance cards solid, class selector maxHeight 300 (not 100), visible day buttons
-- **`IndividualPlan.tsx` redesign** — full card modernization:
-  - **Training day picker**: Пн-Вс toggles in cycling card for macro/butch modes (green=training, dark=rest)
-  - **KBJU карточка**: big macro tiles with per-kg, gradient backgrounds, colored top border, macro distribution bar (Б/Ж/У %), edit button
-  - **Meal plan cards**: gradient day headers with large kcal badge, macro progress bars per target (Б/Ж/У vs targets), colored meal blocks with vertical accent bar, item chips with dark bg, meal macro % distribution
-  - **GlassCard upgrade**: 3px colored top gradient bar per card, 14px padding, 700-weight title, 10px → 12px font
-  - **All cards** got `color` accent props
-  - **Separate calculators** (чимил/углезагрузка/БУЧ): solid dark buttons with accent text
-  - **БУЧ display**: 2-column card (ВУ green / НУ red) with big BJU
-  - **Green button**: `boxShadow` for depth
-  - **Week plan**: per-day cards with training/rest icon, kcal badge, inline food list
-  - **Saved plans**: `#202023` collapsed state, expanded with full detail
-  - **Meal prep steps**: solid dark step cards, cyan items chips, 1/3/7 day selector
-  - **Water balance**: pharma-aware (40ml/kg on AAS, +0.5L base +0.1L/injectable)
-  - All inactive backgrounds changed from `rgba(..0.02)` → `#202023`; borders → `#27272a`
-- **Phases**: replaced steroid cycles (course/bridge/pct) with nutrition phases (mass/cutting/maintenance/recomp/recovery/prep)
-- **Allergens**: expanded 7→14 (лактоза, глютен, орехи, арахис, яйца, соя, рыба, морепродукты, молочные, кунжут, сельдерей, горчица, сульфиты, люпин) with icons + search
-- **Preferences**: add/remove favorite foods via dropdown, excluded foods picker, custom notes textarea (saved to localStorage)
-- **Food randomization**: seeded random per day+meal so same params give different foods
-- **Shopping list**: grouped by category (🥩 мясо, 🥛 молочка, 🍚 крупы, 🥦 овощи, 🧈 жиры, etc.)
-- **Читмил/Загрузка/БУЧ**: detailed BJU breakdown + 5-7 принципов + goal-specific рекомендации
-- **Recommendations**: 20+ detailed recs covering goal, phase, plan type, allergens, training link, cycling, budget, pharma drugs, steps
-- **Meal prep**: day selector (1/3/7), uses respective plan source
-- **Reports**: "Общий отчёт" now triggers ALL reports + recommendations at once
-- **Nutrition level**: description text + multiplier display
-- **Training link**: day-of-week picker (Пн-Вс) for training day selection
-- **Removed**: duplicate NutritionReference at bottom (already in tab)
+- **PctScreen fix**: CLASS_LABELS filled with Russian (`СЕРМ`, `Ингибиторы ароматазы`, `Дофаминовые агонисты`, `Гонадотропины`); pct-planner.engine.ts updated to include `class` in PCTProtocolItem; removed `as any`
+- **SubstancesScreen CLASS_LABELS**: all 16 class labels populated with Russian names (was 10 empty + fallback to English keys)
+- **SmartAssistantScreen**: fixed 11 empty-string issues — glossary terms with definitions (11 entries), welcome message, error message, checkup results with recommendations, input placeholder, send button, quick questions (5 real questions), search placeholder, notifications button shows readiness data
+- **Backup/duplicate cleanup**: removed 9 backup files (.bak, .bak2, .bak3, .backup, .backup2, backup_ui/), 3 duplicate data files (support-database-test.ts, support-database.with-450-interactions.ts, core/data/interactions.ts — fixed master-db.ts import), 2 misplaced MD files in engines/
+- **Console.log cleanup**: main.tsx (-20 lines), service-worker.ts (-3), labs.engine.ts (-2), performance-optimizer.ts (-1), data-loader.ts (-1) — removed debug step-by-step logging, kept error/warn for diagnostics
+- **mechanism-labels.ts**: FULL RESTORE (553 entries) from corrupted encoding to proper Russian text + integrated into codebase (replaced inline MECHANISM_LABELS_RU in weekly-plan.engine.ts with import from centralized file + added missing weekly-plan keys)
+- **FertilityPCTScreen guides**: MAJOR EXPANSION (159KB, ~3000 lines) — all 3 guide tabs expanded from ~20% to ~80% coverage of user's HTML files:
+  - **PCT guide** (+7 new cards): lab monitoring table, detailed nutraceutical table with doses, organ protection (hepatic/cardiac/renal), 3 clinical cases, FAQ (5 Qs), psychology of PCT, 11 PubMed references
+  - **HRT guide** (+8 new cards): ADAM scale (10-question screening), lab minimum table (10 markers with targets), drug forms pharmacokinetics (6 forms), full interaction table (12 pairs), 5 additional clinical cases, monitoring schedule (4 periods), special situations (post-RP/CKD/>70yo), final checklist
+  - **Fertility guide** (+11 new cards): AAS neurotoxicity (6 mechanisms), universal supplements table (16 rows with doses), hMG full chapter (mechanics/vs hCG/protocols/efficacy 66.8%/side effects/availability), female factor & ART (IUI/IVF/ICSI/PICSI), enclomiphene detail (4 studies, BSSM/AUA position), hidden obstacles table (8 substances), nootropics compatibility table (6 classes), FAQ (8 Qs), psychological traps (4 + CBT), appendices (WHO 2021 norms + pre-cycle checklist), 16 key PubMed references
+- **DashboardScreen**: FULL REWRITE — from 3-button stub to aggregated overview with profile card (name, goal, PAL, TDEE), risk card (score bar + system count), training/course stats grid, today's KBJU with targets vs actual, 12-button navigation grid
 - `tsc --noEmit` ✓, `vite build` ✓
 
 ## Build Commands
