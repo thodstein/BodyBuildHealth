@@ -1473,7 +1473,8 @@ export const ProfileScreen: React.FC = () => {
               `  Приёмы: ${settings.mealsPerDay || '—'} в день`,
               ...(foodDiaryAvg ? [
                 `  Среднее (7 дней): ${foodDiaryAvg.avgKcal} ккал | Б:${foodDiaryAvg.avgProtein}г Ж:${foodDiaryAvg.avgFat}г У:${foodDiaryAvg.avgCarbs}г`,
-              ] : [`  Среднее: нет данных`]),
+              ] : ['  Среднее: нет данных']),
+              ...(function(){try{var r=JSON.parse(localStorage.getItem('he_nutrition_report_archive')||'[]')[0];if(!r)return [];var g=r.overallGrade||'-',kc=r.kbjuPct?.kcal||'-',kp=r.kbjuPct?.p||'-',kf=r.kbjuPct?.f||'-',kc2=r.kbjuPct?.c||'-',defs=(r.microDeficiencies||[]).slice(0,3).join(', ')||'нет';return ['  Оценка: '+g+' | КБЖУ '+kc+'%/'+kp+'%/'+kf+'%/'+kc2+'%','  Дефициты: '+defs]}catch{return[]}})(),
               ``,
               `ФАРМАКОЛОГИЯ И ПОДДЕРЖКА`,
               `  Фаза: ${COURSE_PHASES.find(p => p.id === settings.phase)?.label || 'База'}`,
@@ -1550,6 +1551,38 @@ export const ProfileScreen: React.FC = () => {
                   </div>
                 </div>
               ))}
+              {/* Nutrition report card */}
+              {(() => { try { const reports = JSON.parse(localStorage.getItem('he_nutrition_report_archive') || '[]'); if (reports.length === 0) return null; const r = reports[0]; return (
+                <div style={{ ...glassCard, borderLeft:'3px solid #3b82f6', background:'rgba(59,130,246,0.06)' }}>
+                  <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:6 }}>
+                    <span style={{ fontSize:16 }}>📋</span>
+                    <div style={{ fontSize:13, fontWeight:700, color:'#3b82f6' }}>Отчёт о питании</div>
+                    <span style={{ marginLeft:'auto', fontSize:16, fontWeight:800, color: r.overallGrade === 'A' ? '#22c55e' : r.overallGrade === 'B' ? '#8b5cf6' : r.overallGrade === 'C' ? '#f59e0b' : '#ef4444' }}>{r.overallGrade}</span>
+                  </div>
+                  <div style={{ fontSize:10, color:'rgba(255,255,255,0.85)', marginBottom:4 }}>{r.overallGradeLabel} · {r.generatedAt?.slice(0,10)}</div>
+                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr', gap:4, marginBottom:6 }}>
+                    {[{l:'Ккал',v:r.kbjuPct?.kcal},{l:'Белки',v:r.kbjuPct?.p},{l:'Жиры',v:r.kbjuPct?.f},{l:'Угл.',v:r.kbjuPct?.c}].map(s => (
+                      <div key={s.l} style={{ background:'rgba(0,0,0,0.2)', borderRadius:6, padding:'4px', textAlign:'center' }}>
+                        <div style={{ fontSize:8, color:'rgba(255,255,255,0.7)' }}>{s.l}</div>
+                        <div style={{ fontSize:13, fontWeight:700, color: s.v >= 85 && s.v <= 115 ? '#22c55e' : s.v >= 70 ? '#f59e0b' : '#ef4444' }}>{s.v}%</div>
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{ display:'flex', gap:6, marginBottom:4 }}>
+                    <div style={{ flex:1, background:'rgba(59,130,246,0.06)', borderRadius:6, padding:'4px 6px' }}>
+                      <div style={{ fontSize:8, color:'rgba(255,255,255,0.7)' }}>Вес/нед</div>
+                      <div style={{ fontSize:11, fontWeight:700, color: r.weightDynamicsBasic?.direction === 'loss' ? '#22c55e' : r.weightDynamicsBasic?.direction === 'gain' ? '#f59e0b' : '#fff' }}>
+                        {r.weightDynamicsBasic?.direction === 'loss' ? '−' : r.weightDynamicsBasic?.direction === 'gain' ? '+' : '∼'}{r.weightDynamicsBasic?.weeklyKg || '0'} кг
+                      </div>
+                    </div>
+                    <div style={{ flex:1, background:'rgba(139,92,246,0.06)', borderRadius:6, padding:'4px 6px' }}>
+                      <div style={{ fontSize:8, color:'rgba(255,255,255,0.7)' }}>Качество</div>
+                      <div style={{ fontSize:11, fontWeight:700, color: r.foodQualityScore >= 7 ? '#22c55e' : '#f59e0b' }}>{r.foodQualityScore || '—'}/10</div>
+                    </div>
+                  </div>
+                  {(r.microDeficiencies || []).length > 0 && <div style={{ fontSize:8, color:'#f59e0b' }}>⚠ {r.microDeficiencies.slice(0,3).join('; ')}</div>}
+                </div>
+              ); } catch { return null; }})()}
             </div>);
           })()}
 

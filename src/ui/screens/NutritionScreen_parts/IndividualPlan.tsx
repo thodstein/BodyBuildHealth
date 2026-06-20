@@ -5,6 +5,7 @@ import { PHARMA_DB } from '../../../core/pharma-database';
 import { calcNutrition } from '../../../engines/nutrition.engine';
 import { getProfile, updateProfile } from '../../../core/profile-manager';
 import { getRecipesByMeal, getRecipes, type Recipe } from '../../../engines/nutrition-periodization.engine';
+import { generateNutritionReport, type NutritionReport } from '../../../engines/nutrition-report.engine';
 import type { UserProfile } from '../../../core/types';
 
 
@@ -429,6 +430,7 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
   // 12. Excluded foods
   const [excludedFoods, setExcludedFoods] = useState<string[]>(() => { try { return JSON.parse(localStorage.getItem('he_excluded_foods') || '[]'); } catch { return []; } });
   const [allergenExcludedCount, setAllergenExcludedCount] = useState(0);
+  const [planTargets, setPlanTargets] = useState<{ kcal: number; protein: number; fats: number; carbs: number }>({ kcal: 2500, protein: 160, fats: 70, carbs: 300 });
 
   // 13-14: Cycling toggles
   const [cyclingMode, setCyclingMode] = useState<CycleType>('none');
@@ -725,6 +727,7 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
     const tP = Math.round(effectiveP * pMod * nutrMult);
     const tF = Math.round(effectiveF * fMod * nutrMult);
     const tC = Math.round(effectiveC * cMod * nutrMult);
+    setPlanTargets({ kcal: tKcal, protein: tP, fats: tF, carbs: tC });
 
     // Seeded random for food variety
     const seedRand = (seed: number) => {
@@ -1423,6 +1426,7 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
   const [qualityReport, setQualityReport] = useState<{ avgScore: number; bestItems: string[]; weakItems: string[]; recommendations: string[] } | null>(null);
   const [riskReport, setRiskReport] = useState<{ systems: Record<string, { score: number; impact: string; recommendation: string }>; totalRisk: string; summary: string } | null>(null);
   const [drugCompatReport, setDrugCompatReport] = useState<{ interactions: { drug: string; food: string; effect: string; severity: 'low' | 'medium' | 'high' }[]; warnings: string[] } | null>(null);
+  const [nutritionReport, setNutritionReport] = useState<NutritionReport | null>(null);
 
   const generateAllergenReport = () => {
     if (!dayPlan) return;
@@ -1624,6 +1628,36 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
     if (warnings.length === 0) warnings.push('✅ Все препараты совместимы с рационом');
     setDrugCompatReport({ interactions, warnings });
     setActiveReports(prev => prev.includes('drug') ? prev : [...prev, 'drug']);
+  };
+
+  const generateFullNutritionReport = () => {
+    if (!dayPlan) return;
+    const meals = dayPlan.meals.map((m: any) => ({
+      label: m.label,
+      items: m.items.map((i: any) => ({ name: i.name, id: i.id || '', amount: i.amount || 100, kcal: i.kcal||0, p: i.p||0, f: i.f||0, c: i.c||0 })),
+      totals: { kcal: m.totals?.kcal || 0, p: m.totals?.p || 0, f: m.totals?.f || 0, c: m.totals?.c || 0 },
+      time: m.time || '',
+    }));
+    const rep = generateNutritionReport({
+      meals, totals: { kcal: dayPlan.totals.kcal, p: dayPlan.totals.p, f: dayPlan.totals.f, c: dayPlan.totals.c },
+      targets: { kcal: planTargets.kcal, protein: planTargets.protein, fats: planTargets.fats, carbs: planTargets.carbs },
+      userWeight: getProfileSafe()?.settings?.weight || 80,
+      userTDEE: planTargets.kcal,
+      healthIssues, planType, variety, budget,
+      allergens, cyclingMode,
+      goal: getProfileSafe()?.settings?.primaryGoal || 'maintenance',
+      waterMl: waterCalc?.total ? Math.round(waterCalc.total * 1000) : 0,
+      injections: injections.map(i => ({ type: i.type, dose: i.dose, name: i.name, time: i.time })),
+      workoutTime: linkToTraining && trainingDays.some(Boolean) ? trainStart : undefined,
+    });
+    setNutritionReport(rep);
+    setActiveReports(prev => prev.includes('nutrition') ? prev : [...prev, 'nutrition']);
+    // Save to archive
+    try {
+      const arch = JSON.parse(localStorage.getItem('he_nutrition_report_archive') || '[]');
+      arch.unshift(rep);
+      localStorage.setItem('he_nutrition_report_archive', JSON.stringify(arch.slice(0, 50)));
+    } catch {}
   };
 
   // ─── Render ───
@@ -3098,7 +3132,8 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
             <button onClick={generateNutrientReport} style={reportPillStyle('#22c55e', activeReports.includes('nutrient') && !!nutrientReport)}>🧬 Нутриенты</button>
             <button onClick={generateQualityReport} style={reportPillStyle('#f59e0b', activeReports.includes('quality') && !!qualityReport)}>⭐ Качество</button>
             <button onClick={generateRiskReport} style={reportPillStyle('#ef4444', activeReports.includes('risk') && !!riskReport)}>🩺 Риски здоровья</button>
-            {injections.length > 0 && <button onClick={generateDrugCompatReport} style={reportPillStyle('#8b5cf6', activeReports.includes('drug') && !!drugCompatReport)}>💉 Совместимость</button>}
+            {injections.length > 0 &&             <button onClick={generateDrugCompatReport} style={reportPillStyle('#8b5cf6', activeReports.includes('drug') && !!drugCompatReport)}>💉 Совместимость</button>}
+            <button onClick={generateFullNutritionReport} style={reportPillStyle('#3b82f6', activeReports.includes('nutrition') && !!nutritionReport)}>📋 Полный отчёт</button>
             <button onClick={() => {
               generateAllergenReport();
               generateNutrientReport();
@@ -3187,6 +3222,47 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
               <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.85)', marginTop: 3 }}>
                 {drugCompatReport.warnings.join('; ')}
               </div>
+            </div>
+          )}
+
+          {/* Nutrition report */}
+          {nutritionReport && activeReports.includes('nutrition') && (
+            <div style={{ padding: '6px 8px', borderRadius: 8, marginBottom: 4, background: 'rgba(59,130,246,0.04)', border: '1px solid rgba(59,130,246,0.12)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 3 }}>
+                <span style={{ fontSize: 9, fontWeight: 700, color: '#3b82f6' }}>📋 Полный отчёт о питании</span>
+                <span style={{ fontSize: 12, fontWeight: 800, color: nutritionReport.overallGrade === 'A' ? '#22c55e' : nutritionReport.overallGrade === 'B' ? '#8b5cf6' : nutritionReport.overallGrade === 'C' ? '#f59e0b' : '#ef4444' }}>{nutritionReport.overallGrade}</span>
+              </div>
+              <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.85)', marginBottom: 3 }}>{nutritionReport.overallGradeLabel}</div>
+
+              {/* KBJU % */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 3, marginBottom: 4 }}>
+                {[{l:'Ккал',v:nutritionReport.kbjuPct.kcal},{l:'Белки',v:nutritionReport.kbjuPct.p},{l:'Жиры',v:nutritionReport.kbjuPct.f},{l:'Угл.',v:nutritionReport.kbjuPct.c}].map(s => (
+                  <div key={s.l} style={{ background:'rgba(0,0,0,0.2)', borderRadius:4, padding:'3px', textAlign:'center' }}>
+                    <div style={{ fontSize:7, color:'rgba(255,255,255,0.7)' }}>{s.l}</div>
+                    <div style={{ fontSize:11, fontWeight:700, color: s.v >= 85 && s.v <= 115 ? '#22c55e' : s.v >= 70 ? '#f59e0b' : '#ef4444' }}>{s.v}%</div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Weight dynamics */}
+              <div style={{ display: 'flex', gap: 4, marginBottom: 4 }}>
+                <div style={{ flex: 1, background: 'rgba(59,130,246,0.06)', borderRadius: 4, padding: '3px 5px' }}>
+                  <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.7)' }}>Вес/нед</div>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: nutritionReport.weightDynamicsBasic.direction === 'loss' ? '#22c55e' : nutritionReport.weightDynamicsBasic.direction === 'gain' ? '#f59e0b' : '#fff' }}>
+                    {nutritionReport.weightDynamicsBasic.direction === 'loss' ? '−' : nutritionReport.weightDynamicsBasic.direction === 'gain' ? '+' : '∼'}{nutritionReport.weightDynamicsBasic.weeklyKg} кг
+                  </div>
+                </div>
+                <div style={{ flex: 1, background: 'rgba(139,92,246,0.06)', borderRadius: 4, padding: '3px 5px' }}>
+                  <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.7)' }}>Качество</div>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: nutritionReport.foodQualityScore >= 7 ? '#22c55e' : '#f59e0b' }}>{nutritionReport.foodQualityScore}/10</div>
+                </div>
+              </div>
+
+              {/* Micros */}
+              {nutritionReport.microDeficiencies.length > 0 && <div style={{ fontSize: 7, color: '#f59e0b', marginBottom: 2 }}>⚠ {nutritionReport.microDeficiencies.length} дефицитов: {nutritionReport.microDeficiencies.slice(0, 3).join('; ')}</div>}
+
+              {/* Recommendations */}
+              {nutritionReport.recommendations.length > 0 && <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.85)', lineHeight: 1.4 }}>💡 {nutritionReport.recommendations.slice(0, 2).join(' • ')}</div>}
             </div>
           )}
         </GlassCard>

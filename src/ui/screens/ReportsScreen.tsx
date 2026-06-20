@@ -6,6 +6,7 @@ import { generateWeeklyReportHTML, type WeeklyReportData } from '../../engines/w
 import { generateMedicalReportHTML } from '../../engines/pdf-report.engine';
 import { UCUM_MAP } from '../../core/constants';
 import type { LabPoint, CourseEntry, GamificationState, UserContext } from '../../core/types';
+import type { NutritionReport } from '../../engines/nutrition-report.engine';
 
 const EXPORT_VERSION = '1.1';
 
@@ -164,18 +165,93 @@ export const ReportsScreen: React.FC = () => {
         </div>
       )}
 
-      {tab === 'nutrition' && (
-        <div style={{ background: 'var(--bg-secondary)', borderRadius: 12, padding: 16, marginBottom: 12 }}>
-          <h4 style={{ margin: '0 0 8px' }}>Питание</h4>
+      {tab === 'nutrition' && (() => {
+        const nutritionReports = loadFromLS<NutritionReport[]>('he_nutrition_report_archive', []);
+        const currentReport = nutritionReports[0] || null;
+        const profileReports = loadFromLS<{ date: string; summary: { grade: string; kcalPct: number; pPct: number; deficits: number } }[]>('he_profile_nutrition_reports', []);
+        return (<div style={{ background: 'var(--bg-secondary)', borderRadius: 12, padding: 16, marginBottom: 12 }}>
+          <h4 style={{ margin: '0 0 8px' }}>🍎 Питание</h4>
+
+          {/* Current averages */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 8, textAlign: 'center', marginBottom: 12 }}>
             <div><div style={{ fontSize: 18, fontWeight: 700 }}>{avgWeeklyKcal}</div><div style={{ fontSize: 11, opacity: 0.6 }}>ккал</div></div>
             <div><div style={{ fontSize: 18, fontWeight: 700 }}>{avgWeeklyProtein}г</div><div style={{ fontSize: 11, opacity: 0.6 }}>Белок</div></div>
             <div><div style={{ fontSize: 18, fontWeight: 700 }}>{avgWeeklyFat}г</div><div style={{ fontSize: 11, opacity: 0.6 }}>Жиры</div></div>
             <div><div style={{ fontSize: 18, fontWeight: 700 }}>{avgWeeklyCarbs}г</div><div style={{ fontSize: 11, opacity: 0.6 }}>Углеводы</div></div>
           </div>
+
+          {/* Full report from archive */}
+          {currentReport && (
+            <div style={{ marginBottom: 12, padding: 12, borderRadius: 10, background: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.15)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                <span style={{ fontSize: 13, fontWeight: 700, color: '#3b82f6' }}>📋 Последний отчёт о питании</span>
+                <span style={{ fontSize: 16, fontWeight: 800, color: currentReport.overallGrade === 'A' ? '#22c55e' : currentReport.overallGrade === 'B' ? '#8b5cf6' : currentReport.overallGrade === 'C' ? '#f59e0b' : '#ef4444' }}>{currentReport.overallGrade}</span>
+              </div>
+              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', marginBottom: 6 }}>{currentReport.overallGradeLabel}</div>
+
+              {/* KBJU % */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 4, marginBottom: 8 }}>
+                {[{l:'Ккал',v:currentReport.kbjuPct.kcal},{l:'Белки',v:currentReport.kbjuPct.p},{l:'Жиры',v:currentReport.kbjuPct.f},{l:'Угл.',v:currentReport.kbjuPct.c}].map(s => (
+                  <div key={s.l} style={{ background:'rgba(0,0,0,0.2)', borderRadius:6, padding:'4px', textAlign:'center' }}>
+                    <div style={{ fontSize:8, color:'rgba(255,255,255,0.7)' }}>{s.l}</div>
+                    <div style={{ fontSize:14, fontWeight:700, color: s.v >= 85 && s.v <= 115 ? '#22c55e' : s.v >= 70 ? '#f59e0b' : '#ef4444' }}>{s.v}%</div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Weight + Quality */}
+              <div style={{ display: 'flex', gap: 8, marginBottom: 6 }}>
+                <div style={{ flex: 1, padding: '6px 8px', borderRadius: 8, background: 'rgba(59,130,246,0.06)' }}>
+                  <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.7)' }}>⚖️ Динамика</div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: currentReport.weightDynamicsBasic.direction === 'loss' ? '#22c55e' : currentReport.weightDynamicsBasic.direction === 'gain' ? '#f59e0b' : '#fff' }}>
+                    {currentReport.weightDynamicsBasic.direction === 'loss' ? '−' : currentReport.weightDynamicsBasic.direction === 'gain' ? '+' : '∼'}{currentReport.weightDynamicsBasic.weeklyKg} кг/нед
+                  </div>
+                </div>
+                <div style={{ flex: 1, padding: '6px 8px', borderRadius: 8, background: 'rgba(139,92,246,0.06)' }}>
+                  <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.7)' }}>⭐ Качество</div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: currentReport.foodQualityScore >= 7 ? '#22c55e' : '#f59e0b' }}>{currentReport.foodQualityScore}/10</div>
+                </div>
+              </div>
+
+              {/* Micros */}
+              {currentReport.microDeficiencies.length > 0 && <div style={{ fontSize: 9, color: '#f59e0b', marginBottom: 4 }}>⚠ {currentReport.microDeficiencies.length} дефицитов: {currentReport.microDeficiencies.slice(0, 4).join('; ')}</div>}
+
+              {/* Risk */}
+              <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 4 }}>
+                {currentReport.riskAnalysis.slice(0, 4).map(r => (
+                  <span key={r.system} style={{ fontSize: 8, padding: '2px 6px', borderRadius: 4, background: r.score > 4 ? 'rgba(239,68,68,0.1)' : r.score > 2 ? 'rgba(245,158,11,0.1)' : 'rgba(34,197,94,0.1)', color: r.score > 4 ? '#ef4444' : r.score > 2 ? '#f59e0b' : '#22c55e' }}>
+                    {r.system}: {r.score}/{r.maxScore}
+                  </span>
+                ))}
+              </div>
+
+              {/* Recs */}
+              {currentReport.recommendations.length > 0 && (
+                <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', lineHeight: 1.5, marginBottom: 4 }}>
+                  💡 {currentReport.recommendations.slice(0, 3).map((r, i) => <div key={i}>• {r}</div>)}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* History */}
+          {profileReports.length > 0 && (
+            <div style={{ marginBottom: 8 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: '#fff', marginBottom: 4 }}>История оценок</div>
+              <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                {profileReports.slice(0, 10).map((r, i) => (
+                  <span key={i} style={{ fontSize: 9, padding: '2px 6px', borderRadius: 4, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                    {r.date?.slice(5, 10)}: <strong style={{ color: r.summary.grade === 'A' ? '#22c55e' : r.summary.grade === 'B' ? '#8b5cf6' : r.summary.grade === 'C' ? '#f59e0b' : '#ef4444' }}>{r.summary.grade}</strong> {r.summary.kcalPct}% {r.summary.deficits > 0 ? `⚠${r.summary.deficits}` : ''}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {!currentReport && profileReports.length === 0 && <p style={{ fontSize: 13, opacity: 0.6 }}>Нет сохранённых отчётов. Сгенерируйте полный отчёт в разделе «Питание → Отчёты».</p>}
           <button style={btn} onClick={handleExportDiaryCSV}>Экспорт дневника CSV</button>
-        </div>
-      )}
+        </div>);
+      })()}
 
       {tab === 'pharma' && (
         <div style={{ background: 'var(--bg-secondary)', borderRadius: 12, padding: 16, marginBottom: 12 }}>

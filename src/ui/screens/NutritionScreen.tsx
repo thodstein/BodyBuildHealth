@@ -582,6 +582,8 @@ const ReportsTab: React.FC<{ foodEntries: DiaryEntry[]; profile?: any; targets?:
               userTDEE: targets?.kcal || 2500,
               healthIssues: [], planType: 'classic', variety: 'max', budget: 'medium',
               allergens: [], cyclingMode: 'none', goal: 'maintenance',
+              waterMl: (() => { try { const diary = JSON.parse(localStorage.getItem('nutrition_diary') || '{}'); const today = diary[new Date().toISOString().split('T')[0]]; return today?.water || 0; } catch { return 0; } })(),
+              injections: (() => { try { return JSON.parse(localStorage.getItem('he_injection_schedule') || '[]').slice(0,5); } catch { return []; } })(),
             });
             setFullReport(rep);
             saveReportToArchive(rep);
@@ -654,6 +656,156 @@ const ReportsTab: React.FC<{ foodEntries: DiaryEntry[]; profile?: any; targets?:
               <div style={{ fontSize:18, fontWeight:800, color: fullReport.foodQualityScore >= 7 ? '#00e68a' : fullReport.foodQualityScore >= 5 ? '#f59e0b' : '#ef4444' }}>{fullReport.foodQualityScore}/10</div>
               <div style={{ fontSize:7, color:'rgba(255,255,255,0.7)' }}>Средний тир: {fullReport.foodQualityDetails.avgTier} · {fullReport.foodQualityDetails.bestItems.length} лучших</div>
             </div>
+          </div>
+
+          {/* Water Balance */}
+          <div style={{ padding:'6px 10px', borderRadius:8, background:'#202023' }}>
+            <div style={{ fontSize:10, fontWeight:700, color:'#fff', marginBottom:4 }}>💧 Водный баланс</div>
+            <div style={{ display:'flex', gap:4, marginBottom:2 }}>
+              <div style={{ flex:1, background:'rgba(6,182,212,0.06)', borderRadius:6, padding:'4px', textAlign:'center' }}>
+                <div style={{ fontSize:7, color:'rgba(255,255,255,0.7)' }}>Выпито</div>
+                <div style={{ fontSize:11, fontWeight:700, color: fullReport.waterBalance.status === 'ok' ? '#00e68a' : fullReport.waterBalance.status === 'low' ? '#f59e0b' : '#ef4444' }}>{fullReport.waterBalance.intakeMl} мл</div>
+              </div>
+              <div style={{ flex:1, background:'rgba(6,182,212,0.06)', borderRadius:6, padding:'4px', textAlign:'center' }}>
+                <div style={{ fontSize:7, color:'rgba(255,255,255,0.7)' }}>Норма</div>
+                <div style={{ fontSize:11, fontWeight:700, color:'#fff' }}>{fullReport.waterBalance.targetMl} мл</div>
+              </div>
+              <div style={{ flex:1, background:'rgba(6,182,212,0.06)', borderRadius:6, padding:'4px', textAlign:'center' }}>
+                <div style={{ fontSize:7, color:'rgba(255,255,255,0.7)' }}>мл/кг</div>
+                <div style={{ fontSize:11, fontWeight:700, color:'#fff' }}>{fullReport.waterBalance.intakePerKg}/{fullReport.waterBalance.targetPerKg}</div>
+              </div>
+            </div>
+            {fullReport.waterBalance.deficitMl > 0 && <div style={{ fontSize:7, color:'#f59e0b' }}>Дефицит {fullReport.waterBalance.deficitMl} мл</div>}
+            <div style={{ fontSize:7, color:'rgba(255,255,255,0.7)', marginTop:2, lineHeight:1.4 }}>{fullReport.waterBalance.recommendation}</div>
+          </div>
+
+          {/* Sodium/Potassium */}
+          <div style={{ padding:'6px 10px', borderRadius:8, background:'#202023' }}>
+            <div style={{ fontSize:10, fontWeight:700, color:'#fff', marginBottom:4 }}>🧂 Натрий/Калий</div>
+            <div style={{ display:'flex', gap:4, marginBottom:2 }}>
+              <div style={{ flex:1, background:'rgba(251,191,36,0.06)', borderRadius:6, padding:'4px', textAlign:'center' }}>
+                <div style={{ fontSize:7, color:'rgba(255,255,255,0.7)' }}>Na</div>
+                <div style={{ fontSize:11, fontWeight:700, color: fullReport.sodiumPotassium.status === 'high' ? '#ef4444' : '#00e68a' }}>{fullReport.sodiumPotassium.naMg} мг</div>
+              </div>
+              <div style={{ flex:1, background:'rgba(59,130,246,0.06)', borderRadius:6, padding:'4px', textAlign:'center' }}>
+                <div style={{ fontSize:7, color:'rgba(255,255,255,0.7)' }}>K</div>
+                <div style={{ fontSize:11, fontWeight:700, color:'#60a5fa' }}>{fullReport.sodiumPotassium.kMg} мг</div>
+              </div>
+              <div style={{ flex:1, background:'rgba(139,92,246,0.06)', borderRadius:6, padding:'4px', textAlign:'center' }}>
+                <div style={{ fontSize:7, color:'rgba(255,255,255,0.7)' }}>Na/K</div>
+                <div style={{ fontSize:11, fontWeight:700, color: fullReport.sodiumPotassium.ratio > 1.5 ? '#ef4444' : fullReport.sodiumPotassium.ratio > 1 ? '#f59e0b' : '#00e68a' }}>{fullReport.sodiumPotassium.ratio}</div>
+              </div>
+            </div>
+            <div style={{ fontSize:7, color:'rgba(255,255,255,0.7)', lineHeight:1.4 }}>{fullReport.sodiumPotassium.recommendation}</div>
+          </div>
+
+          {/* Protein Timing */}
+          <div style={{ padding:'6px 10px', borderRadius:8, background:'#202023' }}>
+            <div style={{ fontSize:10, fontWeight:700, color:'#fff', marginBottom:4 }}>⏱ Тайминг белка</div>
+            <div style={{ display:'flex', gap:4, marginBottom:2 }}>
+              <div style={{ flex:1, background:'rgba(59,130,246,0.06)', borderRadius:6, padding:'4px', textAlign:'center' }}>
+                <div style={{ fontSize:7, color:'rgba(255,255,255,0.7)' }}>Равномерность</div>
+                <div style={{ fontSize:11, fontWeight:700, color: fullReport.proteinTiming.evennessScore >= 80 ? '#00e68a' : fullReport.proteinTiming.evennessScore >= 60 ? '#f59e0b' : '#ef4444' }}>{fullReport.proteinTiming.evennessScore}%</div>
+              </div>
+              <div style={{ flex:1, background:'rgba(59,130,246,0.06)', borderRadius:6, padding:'4px', textAlign:'center' }}>
+                <div style={{ fontSize:7, color:'rgba(255,255,255,0.7)' }}>Макс разрыв</div>
+                <div style={{ fontSize:11, fontWeight:700, color: fullReport.proteinTiming.maxGapHours > 5 ? '#f59e0b' : '#00e68a' }}>{fullReport.proteinTiming.maxGapHours}ч</div>
+              </div>
+            </div>
+            {fullReport.proteinTiming.gaps.length > 0 && <div style={{ fontSize:7, color:'#f59e0b', lineHeight:1.3 }}>{fullReport.proteinTiming.gaps.slice(0, 2).join('; ')}</div>}
+            <div style={{ fontSize:7, color:'rgba(255,255,255,0.7)', marginTop:2, lineHeight:1.4 }}>{fullReport.proteinTiming.recommendation}</div>
+          </div>
+
+          {/* Glycemic Load */}
+          <div style={{ padding:'6px 10px', borderRadius:8, background:'#202023' }}>
+            <div style={{ fontSize:10, fontWeight:700, color:'#fff', marginBottom:4 }}>🍚 Гликемическая нагрузка</div>
+            <div style={{ display:'flex', gap:4, marginBottom:2 }}>
+              <div style={{ flex:1, background:'rgba(251,191,36,0.06)', borderRadius:6, padding:'4px', textAlign:'center' }}>
+                <div style={{ fontSize:7, color:'rgba(255,255,255,0.7)' }}>Общая ГН</div>
+                <div style={{ fontSize:11, fontWeight:700, color: fullReport.glycemicLoad.status === 'high' ? '#ef4444' : '#00e68a' }}>{fullReport.glycemicLoad.totalGL}</div>
+              </div>
+              <div style={{ flex:1, background:'rgba(251,191,36,0.06)', borderRadius:6, padding:'4px', textAlign:'center' }}>
+                <div style={{ fontSize:7, color:'rgba(255,255,255,0.7)' }}>Средний GI</div>
+                <div style={{ fontSize:11, fontWeight:700, color: fullReport.glycemicLoad.avgGI > 60 ? '#f59e0b' : '#00e68a' }}>{fullReport.glycemicLoad.avgGI}</div>
+              </div>
+              <div style={{ flex:1, background:'rgba(251,191,36,0.06)', borderRadius:6, padding:'4px', textAlign:'center' }}>
+                <div style={{ fontSize:7, color:'rgba(255,255,255,0.7)' }}>Макс/приём</div>
+                <div style={{ fontSize:11, fontWeight:700, color: fullReport.glycemicLoad.maxPerMeal > 25 ? '#ef4444' : '#00e68a' }}>{fullReport.glycemicLoad.maxPerMeal}</div>
+              </div>
+            </div>
+            <div style={{ fontSize:7, color:'rgba(255,255,255,0.7)', lineHeight:1.4 }}>{fullReport.glycemicLoad.recommendation}</div>
+          </div>
+
+          {/* Fat Quality */}
+          <div style={{ padding:'6px 10px', borderRadius:8, background:'#202023' }}>
+            <div style={{ fontSize:10, fontWeight:700, color:'#fff', marginBottom:4 }}>🥑 Качество жиров</div>
+            <div style={{ display:'flex', gap:4, marginBottom:2 }}>
+              <div style={{ flex:1, background:'rgba(251,191,36,0.06)', borderRadius:6, padding:'4px', textAlign:'center' }}>
+                <div style={{ fontSize:7, color:'rgba(255,255,255,0.7)' }}>Насыщ.</div>
+                <div style={{ fontSize:11, fontWeight:700, color: fullReport.fatQuality.satPct > 15 ? '#ef4444' : '#00e68a' }}>{fullReport.fatQuality.satPct}%</div>
+              </div>
+              <div style={{ flex:1, background:'rgba(59,130,246,0.06)', borderRadius:6, padding:'4px', textAlign:'center' }}>
+                <div style={{ fontSize:7, color:'rgba(255,255,255,0.7)' }}>Омега-3</div>
+                <div style={{ fontSize:11, fontWeight:700, color: fullReport.fatQuality.omega3G >= 1.6 ? '#00e68a' : '#f59e0b' }}>{fullReport.fatQuality.omega3G}г</div>
+              </div>
+              <div style={{ flex:1, background:'rgba(139,92,246,0.06)', borderRadius:6, padding:'4px', textAlign:'center' }}>
+                <div style={{ fontSize:7, color:'rgba(255,255,255,0.7)' }}>Ом-6/3</div>
+                <div style={{ fontSize:11, fontWeight:700, color: fullReport.fatQuality.omega6to3ratio > 6 ? '#ef4444' : '#00e68a' }}>{fullReport.fatQuality.omega6to3ratio}:1</div>
+              </div>
+            </div>
+            <div style={{ fontSize:7, color:'rgba(255,255,255,0.7)', lineHeight:1.4 }}>{fullReport.fatQuality.recommendation}</div>
+          </div>
+
+          {/* Meal Timing */}
+          <div style={{ padding:'6px 10px', borderRadius:8, background:'#202023' }}>
+            <div style={{ fontSize:10, fontWeight:700, color:'#fff', marginBottom:4 }}>🕐 Режим питания</div>
+            <div style={{ display:'flex', gap:4, marginBottom:2, flexWrap:'wrap' }}>
+              <div style={{ background:'rgba(99,102,241,0.06)', borderRadius:6, padding:'3px 6px', fontSize:8, color:'#fff' }}>Приёмов: {fullReport.mealTiming.mealCount}</div>
+              <div style={{ background:'rgba(99,102,241,0.06)', borderRadius:6, padding:'3px 6px', fontSize:8, color: fullReport.mealTiming.longestGapHours > 5 ? '#f59e0b' : '#fff' }}>Разрыв: {fullReport.mealTiming.longestGapHours}ч</div>
+              <div style={{ background: fullReport.mealTiming.hasPreWorkout ? 'rgba(0,230,138,0.1)' : 'rgba(239,68,68,0.06)', borderRadius:6, padding:'3px 6px', fontSize:8, color: fullReport.mealTiming.hasPreWorkout ? '#00e68a' : '#ef4444' }}>{fullReport.mealTiming.hasPreWorkout ? '✓ Предтрен' : '✕ Предтрен'}</div>
+              <div style={{ background: fullReport.mealTiming.hasPostWorkout ? 'rgba(0,230,138,0.1)' : 'rgba(239,68,68,0.06)', borderRadius:6, padding:'3px 6px', fontSize:8, color: fullReport.mealTiming.hasPostWorkout ? '#00e68a' : '#ef4444' }}>{fullReport.mealTiming.hasPostWorkout ? '✓ Посттрен' : '✕ Посттрен'}</div>
+            </div>
+            <div style={{ fontSize:7, color:'rgba(255,255,255,0.7)', lineHeight:1.4 }}>{fullReport.mealTiming.recommendation}</div>
+          </div>
+
+          {/* Fiber */}
+          <div style={{ padding:'6px 10px', borderRadius:8, background:'#202023' }}>
+            <div style={{ fontSize:10, fontWeight:700, color:'#fff', marginBottom:4 }}>🥬 Клетчатка</div>
+            <div style={{ display:'flex', gap:4, alignItems:'center' }}>
+              <div style={{ flex:1, background:'rgba(34,197,94,0.06)', borderRadius:6, padding:'4px', textAlign:'center' }}>
+                <div style={{ fontSize:7, color:'rgba(255,255,255,0.7)' }}>Факт</div>
+                <div style={{ fontSize:11, fontWeight:700, color: fullReport.fiberAnalysis.status === 'ok' ? '#00e68a' : fullReport.fiberAnalysis.status === 'low' ? '#f59e0b' : '#ef4444' }}>{fullReport.fiberAnalysis.totalG}г</div>
+              </div>
+              <div style={{ flex:1, background:'rgba(34,197,94,0.06)', borderRadius:6, padding:'4px', textAlign:'center' }}>
+                <div style={{ fontSize:7, color:'rgba(255,255,255,0.7)' }}>Цель</div>
+                <div style={{ fontSize:11, fontWeight:700, color:'#fff' }}>{fullReport.fiberAnalysis.targetG}г</div>
+              </div>
+              <div style={{ flex:1, background:'rgba(34,197,94,0.06)', borderRadius:6, padding:'4px', textAlign:'center' }}>
+                <div style={{ fontSize:7, color:'rgba(255,255,255,0.7)' }}>%</div>
+                <div style={{ fontSize:11, fontWeight:700, color: fullReport.fiberAnalysis.pct >= 80 ? '#00e68a' : '#f59e0b' }}>{fullReport.fiberAnalysis.pct}%</div>
+              </div>
+            </div>
+            <div style={{ fontSize:7, color:'rgba(255,255,255,0.7)', marginTop:2, lineHeight:1.4 }}>{fullReport.fiberAnalysis.recommendation}</div>
+          </div>
+
+          {/* Ca/Mg */}
+          <div style={{ padding:'6px 10px', borderRadius:8, background:'#202023' }}>
+            <div style={{ fontSize:10, fontWeight:700, color:'#fff', marginBottom:4 }}>🦴 Кальций/Магний</div>
+            <div style={{ display:'flex', gap:4, marginBottom:2 }}>
+              <div style={{ flex:1, background:'rgba(168,85,247,0.06)', borderRadius:6, padding:'4px', textAlign:'center' }}>
+                <div style={{ fontSize:7, color:'rgba(255,255,255,0.7)' }}>Ca</div>
+                <div style={{ fontSize:11, fontWeight:700, color:'#a78bfa' }}>{fullReport.calciumMagnesium.caMg} мг</div>
+              </div>
+              <div style={{ flex:1, background:'rgba(168,85,247,0.06)', borderRadius:6, padding:'4px', textAlign:'center' }}>
+                <div style={{ fontSize:7, color:'rgba(255,255,255,0.7)' }}>Mg</div>
+                <div style={{ fontSize:11, fontWeight:700, color:'#a78bfa' }}>{fullReport.calciumMagnesium.mgMg} мг</div>
+              </div>
+              <div style={{ flex:1, background:'rgba(168,85,247,0.06)', borderRadius:6, padding:'4px', textAlign:'center' }}>
+                <div style={{ fontSize:7, color:'rgba(255,255,255,0.7)' }}>Ca/Mg</div>
+                <div style={{ fontSize:11, fontWeight:700, color: fullReport.calciumMagnesium.ratio > 3.5 ? '#ef4444' : fullReport.calciumMagnesium.ratio < 1.5 ? '#f59e0b' : '#00e68a' }}>{fullReport.calciumMagnesium.ratio}</div>
+              </div>
+            </div>
+            <div style={{ fontSize:7, color:'rgba(255,255,255,0.7)', lineHeight:1.4 }}>{fullReport.calciumMagnesium.recommendation}</div>
           </div>
 
           {/* Plan decisions */}

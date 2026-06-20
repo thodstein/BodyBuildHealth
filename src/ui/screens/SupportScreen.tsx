@@ -2496,7 +2496,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
   };
 
   return (
-    <div className="screen support-screen" style={{ paddingTop: section === 'info' || calcView === 'info' || ['mixcalc','neuro','joints','acne'].includes(calcView) || section === 'generator' || section === 'hormonal' ? '88px' : section !== 'home' ? '50px' : '10px', paddingBottom: '0px', overflowY: 'auto' }}>
+    <div className="screen support-screen" style={{ paddingTop: section === 'info' || calcView === 'info' || ['mixcalc','neuro','joints','acne'].includes(calcView) || section === 'generator' ? '88px' : section !== 'home' ? '50px' : '10px', paddingBottom: '0px', overflowY: 'auto' }}>
 
       {/* ===== GENERATOR SUB-TAB PILLS (with back/home) ===== */}
       {section === 'generator' && (
@@ -2526,29 +2526,12 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
         </div>
       )}
 
-      {/* ===== HORMONAL SUB-TAB PILLS (with back/home) ===== */}
+      {/* ===== HORMONAL HEADER (back/home only) ===== */}
       {section === 'hormonal' && (
         <div style={{ position:'fixed', top:0, left:0, right:0, zIndex:150, background:'var(--bg-primary)', borderBottom:'1px solid var(--border)' }}>
           <div style={{ display:'flex', gap:6, padding:'4px 12px', borderBottom:'1px solid var(--border)', alignItems:'center', overflowX:'auto' }}>
             <button onClick={goBack} style={{ padding:'3px 10px', borderRadius:6, fontSize:10, cursor:'pointer', background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600, whiteSpace:'nowrap' }}>← Назад</button>
             <button onClick={goHome} style={{ padding:'3px 10px', borderRadius:6, fontSize:10, cursor:'pointer', background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600, whiteSpace:'nowrap' }}>← На главную</button>
-          </div>
-          <div style={{ display:'flex', gap:4, padding:'6px 12px 8px', overflowX:'auto', scrollbarWidth:'none' }}>
-            {[['pct','ПКТ'],['fertility','Фертильность'],['hrt','ГЗТ']].map(([id,label]) => (
-            <button key={id} onClick={() => { setHormonalTab(id as any);
-              const a: Record<string,()=>void> = {
-                pct: ()=>setTab('fertility-pct'),
-                fertility: ()=>setTab('fertility-pct'),
-                hrt: ()=>setTab('fertility-pct'),
-              };
-              a[id]?.();
-            }} style={{
-              padding:'6px 14px', borderRadius:22, fontSize:11, fontWeight:700, whiteSpace:'nowrap', cursor:'pointer', flexShrink:0,
-              background: hormonalTab === id ? 'var(--accent)' : 'var(--bg-secondary)',
-              color: hormonalTab === id ? '#000' : 'var(--text-dim)',
-              border: '1px solid ' + (hormonalTab === id ? 'var(--accent)' : 'var(--border)'),
-            }}>{label}</button>
-          ))}
           </div>
         </div>
       )}
@@ -3634,35 +3617,34 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
       )}
 
       {section === 'hormonal' && tab === 'main' && supportView === 'fertility' && (
-        <div style={{ position:'fixed', inset:0, zIndex:100, display:'flex', flexDirection:'column', paddingTop:'46px' }}>
-          <img src="/fertility-hero.jpg" alt="" style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'cover', objectPosition:'center top' }} />
-          <div style={{ position:'absolute', inset:0, background:'linear-gradient(transparent 50%, rgba(0,0,0,0.85))' }} />
-          <div style={{ position:'relative', zIndex:2, flex:1, display:'flex', flexDirection:'column', justifyContent:'flex-end', padding:'16px 16px 80px' }}>
-            <button onClick={goHome} style={{ alignSelf:'flex-start', padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', marginBottom:8, background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600 }}>← Назад</button>
-            <h2 style={{ fontSize:18, fontWeight:800, color:'#fff', margin:'8px 0 2px', textShadow:'0 2px 10px rgba(0,0,0,0.9)' }}>ПКТ и Фертильность</h2>
-            <p style={{ fontSize:10, color:'rgba(255,255,255,0.9)', margin:'0 0 16px', textShadow:'0 1px 6px rgba(0,0,0,0.8)' }}>
-              Анализы, план ПКТ и восстановление фертильности
-            </p>
-            <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
-              {[
-                { icon:'🩸', title:'Анализы', desc:'Ингибин B, ФСГ, ЛГ, эстрадиол, тестостерон, прогестерон', action:() => { setHormonalTab('pct'); setTab('fertility-pct'); }, color:'#ef4444' },
-                { icon:'📋', title:'План ПКТ', desc:'Протокол послекурсовой терапии и таймер', action:() => { setHormonalTab('pct'); setTab('fertility-pct'); }, color:'var(--accent)' },
-                { icon:'🌱', title:'План восстановления Фертильности', desc:'Восстановление сперматогенеза и гормонального фона', action:() => { setHormonalTab('fertility'); setTab('fertility-pct'); }, color:'#8b5cf6' },
-              ].map((card, i) => (
-                <div key={i} onClick={card.action} style={{
-                  display:'flex', alignItems:'center', gap:12, padding:'12px 14px', borderRadius:14, cursor:'pointer', textAlign:'left', width:'100%',
-                  background:'rgba(20,22,30,0.35)', border:'1px solid var(--glass-border)',
-                }}>
-                  <div style={{ width:40, height:40, borderRadius:12, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, background:card.color+'18', fontSize:20 }}>{card.icon}</div>
-                  <div style={{ flex:1 }}>
-                    <div style={{ fontSize:13, fontWeight:700, marginBottom:2, color:card.color }}>{card.title}</div>
-                    <div style={{ fontSize:10, color:'rgba(255,255,255,0.85)', lineHeight:1.3 }}>{card.desc}</div>
-                  </div>
-                  <span style={{ color:card.color, fontSize:16, opacity:0.6 }}>→</span>
-                </div>
-              ))}
+        <div style={{ padding:'0 12px 12px' }}>
+          {/* Warning Card */}
+          <div style={{ margin:'12px 0 10px', padding:'22px 18px', borderRadius:16,
+            background:'linear-gradient(135deg, rgba(239,68,68,0.10) 0%, rgba(245,158,11,0.06) 100%)',
+            border:'2px solid rgba(239,68,68,0.30)',
+            boxShadow:'0 6px 28px rgba(239,68,68,0.15)',
+          }}>
+            <div style={{ fontSize:15, fontWeight:800, color:'#ef4444', marginBottom:12, display:'flex', alignItems:'center', gap:8 }}>
+              <span style={{ fontSize:22 }}>⚠️</span> ВАЖНАЯ ИНФОРМАЦИЯ
+            </div>
+            <div style={{ fontSize:14, lineHeight:1.7, color:'rgba(255,255,255,0.92)', fontWeight:500 }}>
+              Информация в данном блоке является ознакомительной, выбор конкретной схемы восстановления и лечения, интерпретация анализов и динамики восстановления должен производиться исключительно специалистом под конкретный случай конкретного человека. Настоятельно рекомендуем обратиться к специалисту для решения данных вопросов.
             </div>
           </div>
+
+          {/* Sub-tab pills */}
+          <div style={{ display:'flex', gap:4, padding:'4px 0 8px', overflowX:'auto', scrollbarWidth:'none' }}>
+            {[['pct','ПКТ'],['fertility','Фертильность'],['hrt','ГЗТ']].map(([id,label]) => (
+              <button key={id} onClick={() => { setHormonalTab(id as any); setTab('fertility-pct'); }} style={{
+                padding:'7px 16px', borderRadius:22, fontSize:12, fontWeight:700, whiteSpace:'nowrap', cursor:'pointer', flexShrink:0,
+                background: hormonalTab === id ? 'var(--accent)' : 'var(--bg-secondary)',
+                color: hormonalTab === id ? '#000' : 'var(--text-dim)',
+                border: '1px solid ' + (hormonalTab === id ? 'var(--accent)' : 'var(--border)'),
+              }}>{label}</button>
+            ))}
+          </div>
+
+          <FertilityPCTScreen initialTab={hormonalTab === 'pct' ? 'pct-plan' : hormonalTab === 'hrt' ? 'hrt' : undefined} restrictToMode={hormonalTab} />
         </div>
       )}
 
@@ -6122,7 +6104,35 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
 
       {/* ===== FERTILITY/PCT TAB ===== */}
       {section === 'hormonal' && tab === 'fertility-pct' && (
-        <FertilityPCTScreen initialTab={hormonalTab === 'pct' ? 'pct-plan' : hormonalTab === 'hrt' ? 'hrt' : undefined} restrictToMode={hormonalTab} />
+        <div style={{ padding:'0 12px 12px' }}>
+          {/* Warning Card */}
+          <div style={{ margin:'12px 0 10px', padding:'22px 18px', borderRadius:16,
+            background:'linear-gradient(135deg, rgba(239,68,68,0.10) 0%, rgba(245,158,11,0.06) 100%)',
+            border:'2px solid rgba(239,68,68,0.30)',
+            boxShadow:'0 6px 28px rgba(239,68,68,0.15)',
+          }}>
+            <div style={{ fontSize:15, fontWeight:800, color:'#ef4444', marginBottom:12, display:'flex', alignItems:'center', gap:8 }}>
+              <span style={{ fontSize:22 }}>⚠️</span> ВАЖНАЯ ИНФОРМАЦИЯ
+            </div>
+            <div style={{ fontSize:14, lineHeight:1.7, color:'rgba(255,255,255,0.92)', fontWeight:500 }}>
+              Информация в данном блоке является ознакомительной, выбор конкретной схемы восстановления и лечения, интерпретация анализов и динамики восстановления должен производиться исключительно специалистом под конкретный случай конкретного человека. Настоятельно рекомендуем обратиться к специалисту для решения данных вопросов.
+            </div>
+          </div>
+
+          {/* Sub-tab pills */}
+          <div style={{ display:'flex', gap:4, padding:'4px 0 8px', overflowX:'auto', scrollbarWidth:'none' }}>
+            {[['pct','ПКТ'],['fertility','Фертильность'],['hrt','ГЗТ']].map(([id,label]) => (
+              <button key={id} onClick={() => setHormonalTab(id as any)} style={{
+                padding:'7px 16px', borderRadius:22, fontSize:12, fontWeight:700, whiteSpace:'nowrap', cursor:'pointer', flexShrink:0,
+                background: hormonalTab === id ? 'var(--accent)' : 'var(--bg-secondary)',
+                color: hormonalTab === id ? '#000' : 'var(--text-dim)',
+                border: '1px solid ' + (hormonalTab === id ? 'var(--accent)' : 'var(--border)'),
+              }}>{label}</button>
+            ))}
+          </div>
+
+          <FertilityPCTScreen initialTab={hormonalTab === 'pct' ? 'pct-plan' : hormonalTab === 'hrt' ? 'hrt' : undefined} restrictToMode={hormonalTab} />
+        </div>
       )}
 
       {/* ===== MODAL OVERLAY ===== */}
