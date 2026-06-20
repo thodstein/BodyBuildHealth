@@ -5,6 +5,7 @@ import { parseFatSecretText, parseNutritionScreenshot } from '../../../engines/n
 import { processUploadedFile, saveParsedMeals } from '../../../core/ocr-engine';
 import { FOOD_DB } from '../../../core/nutrition-database';
 import { CAT_MAP_EMOJI } from '../../../core/nutrition-utils';
+import { calcMealQuality, getQualityLabel } from '../../../engines/nutrition-quality.engine';
 
 const MEAL_PRESETS = ['Завтрак', 'Второй завтрак', 'Обед', 'Полдник', 'Ужин', 'Перекус', 'До тренировки', 'После тренировки', 'Поздний перекус'];
 const DAY_NAMES = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
@@ -352,7 +353,6 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
           {/* Quality score card */}
           {(function() {
             try {
-              const { calcMealQuality, getQualityLabel } = require('../../../engines/nutrition-quality.engine');
               const items = Object.values(dayMeals).flat() as any[];
               if (items.length === 0) return null;
               const q = calcMealQuality(items);

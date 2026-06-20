@@ -172,8 +172,8 @@ SUBSTANCE_LIST.forEach(s => {
 
 export const PHARMA_CLASSES = [
   'testosterone', 'trenbolone', 'nandrolone', 'boldenone', 'primobolan', 'oral_17aa',
-  'sarm', 'peptide_ghrh', 'peptide_ghrp', 'igf1', 'mgf', 'glp1', 'insulin', 'pct_serm',
-  'pct_aromatase', 'pct_dopamine', 'pct_gonadotropin', 'drostanolone', 'peptide_gnrh',
+  'sarm', 'peptide_ghrh', 'peptide_ghrp', 'igf1', 'mgf', 'glp1', 'insulin',
+  'drostanolone', 'peptide_gnrh',
   'peptide_fat_loss', 'peptide_other'
 ] as const;
 

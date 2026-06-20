@@ -881,6 +881,15 @@ const ReportsTab: React.FC<{ foodEntries: DiaryEntry[]; profile?: any; targets?:
         {reportBtn(reportMode === 'month', () => setReportMode('month'), 'Месяц')}
       </div>
       {reportMode === 'day' && <input type="date" value={reportDate} onChange={e => setReportDate(e.target.value)} style={{ ...inputStyle, marginBottom:8 }} />}
+      {/* Generate + save button */}
+      <button onClick={() => {
+        try {
+          const report = { id: Date.now().toString(), date: new Date().toISOString().slice(0,10), kcal: Math.round(totals.kcal), protein: Math.round(totals.p), fat: Math.round(totals.f), carbs: Math.round(totals.c), items: data.length, timestamp: Date.now() };
+          const archive = JSON.parse(localStorage.getItem('he_nutrition_report_archive') || '[]');
+          archive.unshift(report);
+          localStorage.setItem('he_nutrition_report_archive', JSON.stringify(archive.slice(0, 20)));
+        } catch {}
+      }} style={{ width:'100%', padding:'8px', borderRadius:8, border:'1px solid rgba(0,230,138,0.25)', background:'rgba(0,230,138,0.06)', color:'#00e68a', cursor:'pointer', fontSize:9, fontWeight:600, marginBottom:8 }}>📄 Сгенерировать и сохранить отчёт</button>
       {reportMode === 'week' && <div style={{ display:'flex', gap:2, marginBottom:8 }}>
         {Array.from({length:7}, (_,i) => { const d = new Date(new Date(weekStart)); d.setDate(d.getDate()+i); const ds = d.toISOString().split('T')[0]; const hasData = !!raw[ds]; return <div key={i} style={{ flex:1, textAlign:'center', padding:'5px 2px', borderRadius:8, background: hasData ? 'rgba(0,230,138,0.12)' : '#202023', fontSize:8, color: hasData ? '#00e68a' : 'rgba(255,255,255,0.8)' }}>
           <div>{dayNames[i]}</div><div style={{ fontWeight:700, fontSize:11 }}>{d.getDate()}</div>
@@ -895,7 +904,6 @@ const ReportsTab: React.FC<{ foodEntries: DiaryEntry[]; profile?: any; targets?:
         try {
           const nv2 = getNutritionV2Data();
           if (nv2.qualityScore <= 0) return null;
-          const { getQualityLabel } = require('../../engines/nutrition-quality.engine');
           const ql = getQualityLabel(nv2.qualityScore);
           return (
             <div style={{ padding:'8px 10px', borderRadius:8, background:'#202023', display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>

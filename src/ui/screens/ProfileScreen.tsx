@@ -1639,9 +1639,30 @@ export const ProfileScreen: React.FC = () => {
                     }}>📦 Архив</button>
                   </div>
                 </div>
-                {reportTab === 'current' && (
-                  <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
-                    {[
+                 {reportTab === 'current' && (
+                   <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+                     {/* Generate buttons */}
+                     <div style={{ display:'flex', gap:4, flexWrap:'wrap', marginBottom:4 }}>
+                       {[
+                         { label:'🏋️ Тренеру', color:'#3b82f6', report:trainerReport },
+                         { label:'🏥 Врачу', color:'#ef4444', report:doctorReport },
+                         { label:'📋 Общий', color:'#00e68a', report:generalReport },
+                       ].map((btn, i) => (
+                         <button key={i} onClick={() => {
+                           try {
+                             const rep = { id: Date.now().toString(), date: new Date().toISOString().slice(0,10), type: btn.label, text: btn.report, timestamp: Date.now() };
+                             const archive = JSON.parse(localStorage.getItem('he_profile_reports') || '[]');
+                             archive.unshift(rep);
+                             localStorage.setItem('he_profile_reports', JSON.stringify(archive.slice(0, 30)));
+                           } catch {}
+                         }} style={{
+                           padding:'6px 12px', borderRadius:8, fontSize:9, cursor:'pointer', fontWeight:600,
+                           background: btn.color + '15', border: '1px solid ' + btn.color + '30',
+                           color: btn.color, whiteSpace:'nowrap',
+                         }}>📄 {btn.label}</button>
+                       ))}
+                     </div>
+                     {[
                 { title: 'Отчёт для тренера', text: trainerReport, color: '#3b82f6', icon: '🏋️' },
                 { title: 'Отчёт для врача', text: doctorReport, color: '#ef4444', icon: '🏥' },
                 { title: 'Общий отчёт', text: generalReport, color: '#00e68a', icon: '📋' },
@@ -2052,20 +2073,20 @@ export const ProfileScreen: React.FC = () => {
 
               <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
                 {[
-                  { icon:'🏋️', title:'Тренировок', desc:'Упражнения, подходы, веса, объём, RPE. История тренировок, прогресс по упражнениям, сплиты.', color:'#3b82f6', action:() => setTab('progress') },
-                  { icon:'🥗', title:'Питания', desc:'Продукты, калории, белки/жиры/углеводы. OCR сканирование, штрихкоды, рецепты.', color:'#22c55e', action:() => setTab('diet') },
-                  { icon:'🍽', title:'Приёмов пищи', desc:'Завтрак, обед, ужин, перекусы. Дневное/недельное меню, корзина продуктов.', color:'#f59e0b', action:() => setTab('diet') },
-                  { icon:'📏', title:'Замеров тела', desc:'Вес, обхваты (талия, грудь, бицепс, бедро), % жира. Фото прогресса с разных ракурсов.', color:'#a855f7', action:() => setTab('measurements') },
-                  { icon:'🩸', title:'Анализов', desc:'Результаты анализов, референсные диапазоны, отклонения, динамика по датам.', color:'#ef4444', action:() => setTab('progress') },
-                  { icon:'💊', title:'Курса', desc:'Препараты, дозировки, фазы. Календарь приёма, корзина покупок.', color:'#ec4899', action:() => setTab('overview') },
-                  { icon:'🧪', title:'Поддержки', desc:'БАДы, протоколы, стеки, синергии. Недельный план приёма.', color:'#06b6d4', action:() => setTab('reports') },
-                  { icon:'❤️', title:'Давления', desc:'Систолическое/диастолическое давление, пульс. Дневник на день/неделю/месяц.', color:'#f43f5e', action:() => setTab('bp_diary') },
-                  { icon:'🛌', title:'Сна', desc:'Продолжительность, качество, пробуждения. Корреляция с тренировками.', color:'#8b5cf6', action:() => setTab('sleep') },
-                  { icon:'📊', title:'Отчётов', desc:'Полные отчёты по всем блокам: тренировки, анализы, риски, курс. Архив.', color:'#84cc16', action:() => setTab('reports') },
-                  { icon:'⚠️', title:'Рисков', desc:'Оценка рисков по системам, Монте-Карло, клинические модели, MDSS.', color:'#f97316', action:() => setTab('progress') },
-                  { icon:'🩺', title:'Травм', desc:'Журнал травм, реабилитация, ограничения движений, восстановление.', color:'#14b8a6', action:() => setTab('injuries') },
+                  { icon:'🏋️', title:'Тренировок', desc:'Упражнения, подходы, веса, объём, RPE. История тренировок, прогресс по упражнениям, сплиты.', color:'#3b82f6', tab:'progress' },
+                  { icon:'🥗', title:'Питания', desc:'Продукты, калории, белки/жиры/углеводы. OCR сканирование, штрихкоды, рецепты.', color:'#22c55e', tab:'diet' },
+                  { icon:'🍽', title:'Приёмов пищи', desc:'Завтрак, обед, ужин, перекусы. Дневное/недельное меню, корзина продуктов.', color:'#f59e0b', tab:'diet' },
+                  { icon:'📏', title:'Замеров тела', desc:'Вес, обхваты (талия, грудь, бицепс, бедро), % жира. Фото прогресса с разных ракурсов.', color:'#a855f7', tab:'measurements' },
+                  { icon:'🩸', title:'Анализов', desc:'Результаты анализов, референсные диапазоны, отклонения, динамика по датам.', color:'#ef4444', tab:'reports' },
+                  { icon:'💊', title:'Курса', desc:'Препараты, дозировки, фазы. Календарь приёма, корзина покупок.', color:'#ec4899', tab:'overview' },
+                  { icon:'🧪', title:'Поддержки', desc:'БАДы, протоколы, стеки, синергии. Недельный план приёма.', color:'#06b6d4', tab:'reports' },
+                  { icon:'❤️', title:'Давления', desc:'Систолическое/диастолическое давление, пульс. Дневник на день/неделю/месяц.', color:'#f43f5e', tab:'bp_diary' },
+                  { icon:'🛌', title:'Сна', desc:'Продолжительность, качество, пробуждения. Корреляция с тренировками.', color:'#8b5cf6', tab:'sleep' },
+                  { icon:'📊', title:'Отчётов', desc:'Полные отчёты по всем блокам: тренировки, анализы, риски, курс. Архив.', color:'#84cc16', tab:'reports' },
+                  { icon:'⚠️', title:'Рисков', desc:'Оценка рисков по системам, Монте-Карло, клинические модели, MDSS.', color:'#f97316', tab:'reports' },
+                  { icon:'🩺', title:'Травм', desc:'Журнал травм, реабилитация, ограничения движений, восстановление.', color:'#14b8a6', tab:'injuries' },
                 ].map((d, i) => (
-                  <div key={i} onClick={d.action} style={{
+                  <div key={i} onClick={() => { try { if (d.tab) setTab(d.tab as ProfileTab); } catch(e) { console.warn('[Diary] nav:', e); } }} style={{
                     display:'flex', alignItems:'center', gap:10, padding:'12px 14px', borderRadius:12, cursor:'pointer',
                     background:'rgba(24,24,27,0.12)', border:'1px solid rgba(255,255,255,0.04)',
                   }}>

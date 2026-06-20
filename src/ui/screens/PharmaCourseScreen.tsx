@@ -11,11 +11,8 @@ const CLASS_LABELS: Record<string, string> = {
   boldenone: 'Болденон', primobolan: 'Примоболан', oral_17aa: 'Оральные 17-α',
   sarm: 'SARM', peptide_ghrh: 'GHRH', peptide_ghrp: 'GHRP',
   igf1: 'IGF-1', mgf: 'МГФ', insulin: 'Инсулин',
-  pct_serm: 'СЕРМ', pct_aromatase: 'Ингиб. ароматазы', pct_dopamine: 'Дофамин',
-  pct_gonadotropin: 'Гонадотропин', drostanolone: 'Дростанолон',
+  drostanolone: 'Дростанолон',
   peptide_gnrh: 'GnRH', peptide_fat_loss: 'Жиросжигающие', peptide_other: 'Прочие',
-  support: 'Поддержка', peptide_regenerative: 'Регенеративные', peptide_immune: 'Иммунные',
-  peptide_nootropic: 'Ноотропы',
 };
 
 const CLASS_COLORS: Record<string, string> = {
@@ -23,11 +20,8 @@ const CLASS_COLORS: Record<string, string> = {
   boldenone: '#a855f7', primobolan: '#06b6d4', oral_17aa: '#f97316',
   sarm: '#8b5cf6', peptide_ghrh: '#14b8a6', peptide_ghrp: '#14b8a6',
   igf1: '#ec4899', mgf: '#ec4899', insulin: '#f59e0b',
-  pct_serm: '#22c55e', pct_aromatase: '#ef4444', pct_dopamine: '#eab308',
-  pct_gonadotropin: '#3b82f6', drostanolone: '#f97316',
+  drostanolone: '#f97316',
   peptide_gnrh: '#14b8a6', peptide_fat_loss: '#f97316', peptide_other: '#6b7280',
-  support: '#22c55e', peptide_regenerative: '#ec4899', peptide_immune: '#a855f7',
-  peptide_nootropic: '#8b5cf6',
 };
 
 const FREQ_OPTIONS = [
@@ -242,11 +236,9 @@ export const PharmaCourseScreen: React.FC = () => {
                     {cls === 'testosterone' || cls === 'trenbolone' || cls === 'nandrolone' || cls === 'boldenone' || cls === 'primobolan' || cls === 'drostanolone' ? '💉'
                     : cls === 'oral_17aa' ? '💊'
                     : cls === 'sarm' ? '🧬'
-                    : cls === 'peptide_ghrh' || cls === 'peptide_ghrp' || cls === 'peptide_fat_loss' || cls === 'peptide_gnrh' || cls === 'peptide_regenerative' || cls === 'peptide_immune' || cls === 'peptide_nootropic' || cls === 'peptide_other' ? '🧪'
+                    : cls === 'peptide_ghrh' || cls === 'peptide_ghrp' || cls === 'peptide_fat_loss' || cls === 'peptide_gnrh' || cls === 'peptide_other' ? '🧪'
                     : cls === 'igf1' || cls === 'mgf' ? '🔬'
                     : cls === 'insulin' ? '🩸'
-                    : cls === 'pct_serm' || cls === 'pct_aromatase' || cls === 'pct_dopamine' || cls === 'pct_gonadotropin' ? '🔄'
-                    : cls === 'support' ? '🛡️'
                     : '💊'}
                   </div>
 

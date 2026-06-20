@@ -2092,7 +2092,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
     }));
     const dedupedEngine = fromEngine.filter(e => !seen.has(`${e.substanceA}|${e.substanceB}`) && !seen.has(e.interactionId));
     // Pharma synergy pairs (AAS + peptides + insulin)
-    const PHARMA_CLASSES = new Set(['testosterone','trenbolone','nandrolone','boldenone','primobolan','oral_17aa','sarm','drostanolone','dht_derivative','igf1','mgf','insulin','pct_serm','pct_aromatase','pct_dopamine','pct_gonadotropin']);
+    const PHARMA_CLASSES = new Set(['testosterone','trenbolone','nandrolone','boldenone','primobolan','oral_17aa','sarm','drostanolone','dht_derivative','igf1','mgf','insulin']);
     const pharmaFromEngine = SYNERGY_PAIRS
       .filter(p => {
         const a = PHARMA_DB[p.substanceA];
@@ -2620,7 +2620,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                 <div style={{ width:48, height:48, borderRadius:14, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, background:'rgba(139,92,246,0.15)', fontSize:24 }}>🧬</div>
                 <div style={{ flex:1 }}>
                   <div style={{ fontSize:15, fontWeight:800, marginBottom:4, color:'#8b5cf6' }}>Гормональное здоровье</div>
-                  <div style={{ fontSize:10, color:'rgba(255,255,255,0.85)', lineHeight:1.3 }}>Протоколы восстановления, ГЗТ и фертильности</div>
+                  <div style={{ fontSize:10, color:'rgba(255,255,255,0.85)', lineHeight:1.3 }}>Протоколы восстановления гормонального фона</div>
                 </div>
                 <span style={{ color:'#8b5cf6', fontSize:18, opacity:0.6 }}>→</span>
               </div>
@@ -3279,7 +3279,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                     <div>
                       <div style={{ display:'flex', flexDirection:'column', gap:6, marginBottom:8 }}>
                         {(() => {
-                          const PHARMA_CORE_FILTER = new Set(['testosterone','trenbolone','nandrolone','boldenone','primobolan','oral_17aa','sarm','drostanolone','dht_derivative','igf1','mgf','insulin','pct_serm','pct_aromatase','pct_dopamine','pct_gonadotropin']);
+                          const PHARMA_CORE_FILTER = new Set(['testosterone','trenbolone','nandrolone','boldenone','primobolan','oral_17aa','sarm','drostanolone','dht_derivative','igf1','mgf','insulin']);
                           const pharmaAll = Object.values(PHARMA_DB).filter((s): s is (typeof PHARMA_DB)[string] => !!s?.name && PHARMA_CORE_FILTER.has(s.class));
                           const pharmaFiltered = pharmaInteractSearch ? pharmaAll.filter(s => (s.name||'').toLowerCase().includes(pharmaInteractSearch.toLowerCase())) : pharmaAll;
                           const pharmaValid = pharmaInteractIds.filter(Boolean);

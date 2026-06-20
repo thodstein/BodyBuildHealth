@@ -47,17 +47,10 @@ const CLASS_LABELS: Record<string, string> = {
   igf1: 'IGF-1',
   mgf: 'МГФ',
   insulin: 'Инсулин',
-  pct_serm: 'СЕРМ',
-  pct_aromatase: 'Ингиб. ароматазы',
-  pct_dopamine: 'Дофамин',
-  pct_gonadotropin: 'Гонадотропин',
   drostanolone: 'Дростанолон',
   peptide_gnrh: 'GnRH',
   peptide_fat_loss: 'Жиросжигающие',
   peptide_other: 'Прочие',
-  peptide_regenerative: 'Регенеративные',
-  peptide_immune: 'Иммунные',
-  peptide_nootropic: 'Ноотропы',
   dht_derivative: 'DHT производные',
 };
 
@@ -158,19 +151,17 @@ const formatHalfLife = (hours: number): string => {
 
 const PHARMA_CLASSES = [
   'testosterone', 'trenbolone', 'nandrolone', 'boldenone', 'primobolan', 'oral_17aa',
-  'sarm', 'peptide_ghrh', 'peptide_ghrp', 'igf1', 'mgf', 'insulin', 'pct_serm',
-  'pct_aromatase', 'pct_dopamine', 'pct_gonadotropin', 'drostanolone', 'peptide_gnrh',
-  'peptide_fat_loss', 'peptide_other', 'peptide_regenerative', 'peptide_immune',
-  'peptide_nootropic', 'dht_derivative'
+  'sarm', 'peptide_ghrh', 'peptide_ghrp', 'igf1', 'mgf', 'insulin',
+  'drostanolone', 'peptide_gnrh',
+  'peptide_fat_loss', 'peptide_other', 'dht_derivative'
 ] as const;
 
 // Core pharma classes for synergies (exclude support/vitamins)
 const PHARMA_CORE_CLASSES = [
   'testosterone', 'trenbolone', 'nandrolone', 'boldenone', 'primobolan', 'oral_17aa',
-  'sarm', 'peptide_ghrh', 'peptide_ghrp', 'igf1', 'mgf', 'insulin', 'pct_serm',
-  'pct_aromatase', 'pct_dopamine', 'pct_gonadotropin', 'drostanolone', 'peptide_gnrh',
-  'peptide_fat_loss', 'peptide_other', 'peptide_regenerative', 'peptide_immune',
-  'peptide_nootropic', 'dht_derivative'
+  'sarm', 'peptide_ghrh', 'peptide_ghrp', 'igf1', 'mgf', 'insulin',
+  'drostanolone', 'peptide_gnrh',
+  'peptide_fat_loss', 'peptide_other', 'dht_derivative'
 ] as const;
 
 type PharmaClass = typeof PHARMA_CLASSES[number];
@@ -1745,7 +1736,7 @@ const PeptideCalcTab: React.FC = () => {
             }}>{p.shortName}</div>;
           })}
           {(() => {
-            const GROWTH_CLASSES = new Set(['peptide_ghrh','peptide_ghrp','igf1','mgf','insulin','peptide_gnrh','peptide_fat_loss','peptide_other','peptide_regenerative','peptide_immune','peptide_nootropic','pct_gonadotropin']);
+            const GROWTH_CLASSES = new Set(['peptide_ghrh','peptide_ghrp','igf1','mgf','insulin','peptide_gnrh','peptide_fat_loss','peptide_other']);
             const inPeptideDb = new Set(PEPTIDE_LIST.map(p => (PEPTIDE_DB[p.id]?.name||'').toLowerCase()));
             return Object.values(PHARMA_DB).filter(s => !!s?.name && GROWTH_CLASSES.has(s.class) && s.id !== 'mk677' && !inPeptideDb.has((s.name||'').toLowerCase())).map(s => {
               const sel = growthId === s.id;
@@ -2012,7 +2003,7 @@ const InteractionCheckerTab: React.FC = () => {
 
   const pharmaSynergies = useMemo(() => {
     // Include drugs from SYNERGY_PAIRS that match pharma classes (AAS, peptides, PCT)
-    const ALLOWED_CLASSES = new Set(['testosterone','trenbolone','nandrolone','boldenone','primobolan','oral_17aa','sarm','drostanolone','dht_derivative','igf1','mgf','insulin','pct_serm','pct_aromatase','pct_dopamine','pct_gonadotropin','peptide_ghrh','peptide_regenerative']);
+    const ALLOWED_CLASSES = new Set(['testosterone','trenbolone','nandrolone','boldenone','primobolan','oral_17aa','sarm','drostanolone','dht_derivative','igf1','mgf','insulin','peptide_ghrh']);
     return SYNERGY_PAIRS.filter(p => {
       const aKey = synergyToPharmaId(p.substanceA);
       const bKey = synergyToPharmaId(p.substanceB);

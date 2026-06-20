@@ -636,20 +636,47 @@ export const FertilityPCTScreen: React.FC<{ initialTab?: FertTab; restrictToMode
               const maxWeek = pctCourse.length > 0 ? Math.max(...pctCourse.map(e => e.endWeek)) : 0;
               const pctWeek = pctPlan.pctStartWeek;
               const totalCourseWeeks = maxWeek - minWeek;
+              // Calculate real-time week based on course start date from profile
+              let realWeek = 0;
+              let courseStartStr = '';
+              try {
+                const { getProfile } = require('../../core/profile-manager');
+                const prof = getProfile();
+                courseStartStr = prof?.settings?.courseStartDate || '';
+                if (courseStartStr) {
+                  const start = new Date(courseStartStr).getTime();
+                  const now = Date.now();
+                  const daysSinceStart = (now - start) / 86400000;
+                  realWeek = Math.max(1, Math.floor(daysSinceStart / 7) + 1);
+                }
+              } catch {}
+              const displayWeek = realWeek > 0 ? realWeek : pctWeek;
+              const weeksUntilPct = Math.max(0, pctWeek - displayWeek);
+              const pctStarted = displayWeek >= pctWeek;
+              const pctWeeksIn = pctStarted ? Math.max(1, displayWeek - pctWeek + 1) : 0;
+              const totalPctWeeks = pctPlan.pctProtocol.reduce((max: number, p: any) => Math.max(max, p.endWeek || 0), 0) - pctWeek + 1;
               return (
                 <div>
-                  <div style={{ fontSize: 28, fontWeight: 800, color: '#ec4899' }}>
-                    Неделя <span style={{ fontSize: 36 }}>{pctWeek}</span>
+                  <div style={{ fontSize: 28, fontWeight: 800, color: pctStarted ? '#22c55e' : '#ec4899' }}>
+                    {pctStarted ? `ПКТ: нед ${pctWeeksIn}` : `Неделя ${displayWeek}`}
                   </div>
                   <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 2 }}>
-                    Старт ПКТ через {Math.max(1, pctWeek - maxWeek)} нед после курса
+                    {pctStarted
+                      ? `Прогресс ПКТ: ${pctWeeksIn} из ${totalPctWeeks} нед`
+                      : `Старт ПКТ через ${weeksUntilPct} нед (всего курс: ${totalCourseWeeks} нед)`
+                    }
                   </div>
                   <div style={{ marginTop: 8, height: 6, borderRadius: 3, background: 'var(--border)', overflow: 'hidden', maxWidth: 240, marginLeft: 'auto', marginRight: 'auto' }}>
-                    <div style={{ height: '100%', borderRadius: 3, width: `${Math.min(100, (pctWeek / (totalCourseWeeks + 12)) * 100)}%`, background: 'linear-gradient(90deg, #ec4899, #8b5cf6)', transition: 'width 0.5s' }} />
+                    {pctStarted ? (
+                      <div style={{ height: '100%', borderRadius: 3, width: `${Math.min(100, (pctWeeksIn / totalPctWeeks) * 100)}%`, background: 'linear-gradient(90deg, #22c55e, #8b5cf6)', transition: 'width 0.5s' }} />
+                    ) : (
+                      <div style={{ height: '100%', borderRadius: 3, width: `${Math.min(100, (displayWeek / (totalCourseWeeks + 12)) * 100)}%`, background: 'linear-gradient(90deg, #ec4899, #8b5cf6)', transition: 'width 0.5s' }} />
+                    )}
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'center', gap: 16, marginTop: 6, fontSize: 10, color: 'var(--text-dim)' }}>
-                    <span>Курс: {minWeek}-{maxWeek} нед</span>
-                    <span>ПКТ: {pctWeek}+ нед</span>
+                    <span>Курс: нед {minWeek}-{maxWeek}</span>
+                    <span>ПКТ: нед {pctWeek}+</span>
+                    {courseStartStr && <span style={{fontSize:8,color:'var(--text-dim)'}}>Старт: {courseStartStr}</span>}
                   </div>
                 </div>
               );
@@ -1129,28 +1156,37 @@ export const FertilityPCTScreen: React.FC<{ initialTab?: FertTab; restrictToMode
                 <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
                   {analysesSTab === 'before' && (
                     <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-                      <div style={s.card}>
-                        <h4 style={{ margin:'0 0 8px', fontSize:14 }}>Гормоны крови (10 маркеров)</h4>
-                        <p style={{ fontSize:10, opacity:0.6, margin:'0 0 8px' }}>Автозаполнение из LabsScreen</p>
-                        <div style={s.row}>
-                          <div>{field('LH (mIU/mL)', lh, setLh, '5')}</div>
-                          <div>{field('FSH (mIU/mL)', fsh, setFsh, '4')}</div>
+                      {/* Гормоны карточка */}
+                      <div style={{ borderRadius:14, overflow:'hidden', border:'1px solid rgba(59,130,246,0.2)' }}>
+                        <div style={{ padding:'8px 12px', background:'linear-gradient(135deg,rgba(59,130,246,0.12),rgba(99,102,241,0.06))', borderBottom:'1px solid rgba(59,130,246,0.1)' }}>
+                          <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                            <span style={{ fontSize:16 }}>🧬</span>
+                            <span style={{ fontSize:12, fontWeight:700, color:'#3b82f6' }}>Гормоны крови</span>
+                            <span style={{ fontSize:9, color:'rgba(255,255,255,0.4)', marginLeft:'auto' }}>10 маркеров</span>
+                          </div>
                         </div>
-                        <div style={s.row}>
-                          <div>{field('TT общ. (ng/dL)', tt, setTt, '500')}</div>
-                          <div>{field('FT своб. (pg/mL)', ft, setFt, '15')}</div>
-                        </div>
-                        <div style={s.row}>
-                          <div>{field('E2 (pg/mL)', e2, setE2, '25')}</div>
-                          <div>{field('Пролактин (ng/mL)', prl, setPrl, '8')}</div>
-                        </div>
-                        <div style={s.row}>
-                          <div>{field('SHBG (nmol/L)', shbg, setShbg, '30')}</div>
-                          <div>{field('Ингибин B (pg/mL)', inhb, setInhb, '150')}</div>
-                        </div>
-                        <div style={s.row}>
-                          <div>{field('AMH (ng/mL)', amh, setAmh, '4')}</div>
-                          <div></div>
+                        <div style={{ padding:12, background:'rgba(24,24,27,0.12)' }}>
+                          <p style={{ fontSize:9, color:'rgba(255,255,255,0.5)', margin:'0 0 8px' }}>Автозаполнение из LabsScreen. Заполните или проверьте значения.</p>
+                          <div style={s.row}>
+                            <div>{field('LH (mIU/mL)', lh, setLh, '5')}</div>
+                            <div>{field('FSH (mIU/mL)', fsh, setFsh, '4')}</div>
+                          </div>
+                          <div style={s.row}>
+                            <div>{field('TT общ. (ng/dL)', tt, setTt, '500')}</div>
+                            <div>{field('FT своб. (pg/mL)', ft, setFt, '15')}</div>
+                          </div>
+                          <div style={s.row}>
+                            <div>{field('E2 (pg/mL)', e2, setE2, '25')}</div>
+                            <div>{field('Пролактин (ng/mL)', prl, setPrl, '8')}</div>
+                          </div>
+                          <div style={s.row}>
+                            <div>{field('SHBG (nmol/L)', shbg, setShbg, '30')}</div>
+                            <div>{field('Ингибин B (pg/mL)', inhb, setInhb, '150')}</div>
+                          </div>
+                          <div style={s.row}>
+                            <div>{field('AMH (ng/mL)', amh, setAmh, '4')}</div>
+                            <div></div>
+                          </div>
                         </div>
                       </div>
                       {renderChecklist('Гормональные маркеры фертильности', 'Базовые и контрольные', FERT_LABS, '#3b82f6')}
@@ -1158,37 +1194,46 @@ export const FertilityPCTScreen: React.FC<{ initialTab?: FertTab; restrictToMode
                   )}
                   {analysesSTab === 'spermogram' && (
                     <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-                      <div style={s.card}>
-                        <h4 style={{ margin:'0 0 8px', fontSize:14 }}>Спермограмма расширенная</h4>
-                        <div style={s.row}>
-                          <div>{field('Объём (мл) >=1.5', volume, setVolume, '1.5')}</div>
-                          <div>{field('Концентрация (млн/мл) >=16', concentration, setConcentration, '16')}</div>
+                      {/* Спермограмма карточка */}
+                      <div style={{ borderRadius:14, overflow:'hidden', border:'1px solid rgba(34,197,94,0.2)' }}>
+                        <div style={{ padding:'8px 12px', background:'linear-gradient(135deg,rgba(34,197,94,0.12),rgba(22,163,74,0.06))', borderBottom:'1px solid rgba(34,197,94,0.1)' }}>
+                          <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                            <span style={{ fontSize:16 }}>🔬</span>
+                            <span style={{ fontSize:12, fontWeight:700, color:'#22c55e' }}>Спермограмма расширенная</span>
+                            <span style={{ fontSize:9, color:'rgba(255,255,255,0.4)', marginLeft:'auto' }}>ВОЗ 2021</span>
+                          </div>
                         </div>
-                        <div style={s.row}>
-                          <div>{field('Общее кол-во (млн) >=39', totalCount, setTotalCount, '39')}</div>
-                          <div>{field('PR подвижность (%) >=30', pr, setPr, '30')}</div>
-                        </div>
-                        <div style={s.row}>
-                          <div>{field('NP подвижность (%)', np, setNp, '10')}</div>
-                          <div>{field('Неподвижные (%)', immotile, setImmotile, '0')}</div>
-                        </div>
-                        <div style={s.row}>
-                          <div>{field('Морфология (%) >=4', morphology, setMorphology, '4')}</div>
-                          <div>{field('Жизнеспособность (%) >=58', viability, setViability, '58')}</div>
-                        </div>
-                        <div style={s.row}>
-                          <div>{field('pH 7.2-8.0', ph, setPh, '7.4')}</div>
-                          <div>{field('Фруктоза (ммоль/л)', fructose, setFructose, '13')}</div>
-                        </div>
-                        <div style={s.row}>
-                          <div>{field('Цинк (ммоль/л)', zincMmol, setZincMmol, '2')}</div>
-                          <div>{field('MAR-тест (%) <50', mar, setMar, '0')}</div>
-                        </div>
-                        <div style={s.row}>
-                          <div>{field('Лейкоциты (млн/мл)', leukocytes, setLeukocytes, '0')}</div>
-                          <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
-                            <label style={{ fontSize:10 }}><input type='checkbox' style={s.check} checked={viscosity} onChange={e => setViscosity(e.target.checked)} /> Вязкость</label>
-                            <label style={{ fontSize:10 }}><input type='checkbox' style={s.check} checked={agglutination} onChange={e => setAgglutination(e.target.checked)} /> Агглютинация</label>
+                        <div style={{ padding:12, background:'rgba(24,24,27,0.12)' }}>
+                          <div style={s.row}>
+                            <div>{field('Объём (мл) >=1.5', volume, setVolume, '1.5')}</div>
+                            <div>{field('Концентрация (млн/мл) >=16', concentration, setConcentration, '16')}</div>
+                          </div>
+                          <div style={s.row}>
+                            <div>{field('Общее кол-во (млн) >=39', totalCount, setTotalCount, '39')}</div>
+                            <div>{field('PR подвижность (%) >=30', pr, setPr, '30')}</div>
+                          </div>
+                          <div style={s.row}>
+                            <div>{field('NP подвижность (%)', np, setNp, '10')}</div>
+                            <div>{field('Неподвижные (%)', immotile, setImmotile, '0')}</div>
+                          </div>
+                          <div style={s.row}>
+                            <div>{field('Морфология (%) >=4', morphology, setMorphology, '4')}</div>
+                            <div>{field('Жизнеспособность (%) >=58', viability, setViability, '58')}</div>
+                          </div>
+                          <div style={s.row}>
+                            <div>{field('pH 7.2-8.0', ph, setPh, '7.4')}</div>
+                            <div>{field('Фруктоза (ммоль/л)', fructose, setFructose, '13')}</div>
+                          </div>
+                          <div style={s.row}>
+                            <div>{field('Цинк (ммоль/л)', zincMmol, setZincMmol, '2')}</div>
+                            <div>{field('MAR-тест (%) <50', mar, setMar, '0')}</div>
+                          </div>
+                          <div style={s.row}>
+                            <div>{field('Лейкоциты (млн/мл)', leukocytes, setLeukocytes, '0')}</div>
+                            <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
+                              <label style={{ fontSize:10 }}><input type='checkbox' style={s.check} checked={viscosity} onChange={e => setViscosity(e.target.checked)} /> Вязкость</label>
+                              <label style={{ fontSize:10 }}><input type='checkbox' style={s.check} checked={agglutination} onChange={e => setAgglutination(e.target.checked)} /> Агглютинация</label>
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -1197,14 +1242,23 @@ export const FertilityPCTScreen: React.FC<{ initialTab?: FertTab; restrictToMode
                   )}
                   {analysesSTab === 'structure' && (
                     <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-                      <div style={s.card}>
-                        <h4 style={{ margin:'0 0 8px', fontSize:14 }}>DFI и структурные факторы</h4>
-                        <div style={s.row}>
-                          <div>{field('DFI (%) <=15 норма', dfi, setDfi, '0')}</div>
-                          <div>
-                            <span style={s.label}>Варикоцеле</span>
-                            <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
-                              {VARICOCELE.map(v => <button key={v.id} style={varicocele === v.id ? s.btnActive : s.btn} onClick={() => setVaricocele(v.id)}>{v.label}</button>)}
+                      {/* DFI карточка */}
+                      <div style={{ borderRadius:14, overflow:'hidden', border:'1px solid rgba(168,85,247,0.2)' }}>
+                        <div style={{ padding:'8px 12px', background:'linear-gradient(135deg,rgba(168,85,247,0.12),rgba(139,92,246,0.06))', borderBottom:'1px solid rgba(168,85,247,0.1)' }}>
+                          <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                            <span style={{ fontSize:16 }}>🧬</span>
+                            <span style={{ fontSize:12, fontWeight:700, color:'#a855f7' }}>DFI и структурные факторы</span>
+                            <span style={{ fontSize:9, color:'rgba(255,255,255,0.4)', marginLeft:'auto' }}>Фрагментация ДНК</span>
+                          </div>
+                        </div>
+                        <div style={{ padding:12, background:'rgba(24,24,27,0.12)' }}>
+                          <div style={s.row}>
+                            <div>{field('DFI (%) <=15 норма', dfi, setDfi, '0')}</div>
+                            <div>
+                              <span style={s.label}>Варикоцеле</span>
+                              <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
+                                {VARICOCELE.map(v => <button key={v.id} style={varicocele === v.id ? s.btnActive : s.btn} onClick={() => setVaricocele(v.id)}>{v.label}</button>)}
+                              </div>
                             </div>
                           </div>
                         </div>
