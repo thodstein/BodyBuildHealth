@@ -7,7 +7,8 @@ import { NutritionDiary } from './NutritionScreen_parts/NutritionDiary';
 import { NutritionCharts } from './NutritionScreen_parts/NutritionCharts';
 import { IndividualPlan } from './NutritionScreen_parts/IndividualPlan';
 import { NutritionReference } from './NutritionScreen_parts/NutritionReference';
-import { addToCart } from '../../core/nutrition-utils';
+import { addToCart, getCarts, saveCarts, getActiveStoreId, setActiveStoreId, CART_CAT_LABELS, CartStore, CartItemEnhanced } from '../../core/nutrition-utils';
+import { generateNutritionReport, NutritionReport } from '../../engines/nutrition-report.engine';
 
 interface DiaryEntry { name: string; kcal: number; p: number; f: number; c: number; date?: string; }
 type NutritionPage = 'hero' | 'tabs';
@@ -37,64 +38,223 @@ const inputStyle: React.CSSProperties = { width:'100%', padding:'10px 14px', bor
 const labelSec: React.CSSProperties = { fontSize:14, fontWeight:600, color:'#fff', marginBottom:10, letterSpacing:-0.3 };
 
 const CartTab: React.FC = () => {
-  const [refreshCount, forceUpdate] = useState(0);
-  const [storeName, setStoreName] = useState(() => localStorage.getItem('he_cart_store') || '');
-  const cart: any[] = useMemo(() => { try { return JSON.parse(localStorage.getItem('he_nutrition_cart') || '[]'); } catch { return []; } }, [refreshCount]);
-  const saveCart = (c: any[]) => { localStorage.setItem('he_nutrition_cart', JSON.stringify(c)); forceUpdate(n => n + 1); };
-  const clearCart = () => saveCart([]);
-  const removeItem = (idx: number) => saveCart(cart.filter((_, i) => i !== idx));
-  const updateQty = (idx: number, delta: number) => saveCart(cart.map((item, i) => i === idx ? { ...item, amount: Math.max(10, (item.amount || 100) + delta), kcal: Math.round((item.kcal || 0) * Math.max(10, (item.amount || 100) + delta) / Math.max(1, item.amount || 100)) } : item));
-  const totalKcal = cart.reduce((s: number, i: any) => s + (i.kcal || 0), 0);
-  const groups: Record<string, any[]> = {};
-  cart.forEach((item, idx) => { const cat = item.category || 'other'; if (!groups[cat]) groups[cat] = []; groups[cat].push({ ...item, idx }); });
-  const catLabels: Record<string, string> = {
-    protein: '🥩 Мясо/рыба', dairy: '🥛 Молочка', carb: '🍚 Крупы', grain: '🌾 Зерновые',
-    fat: '🧈 Жиры/масла', veg_fruit: '🥦 Овощи/фрукты', fast_food: '🍔 Фастфуд',
-    supplement: '💊 Добавки', other: '📦 Прочее',
+  const [refresh, setRefresh] = useState(0);
+  const [editingStoreId, setEditingStoreId] = useState<string | null>(null);
+  const [editingPrice, setEditingPrice] = useState<Record<string, string>>({});
+  const [editingNote, setEditingNote] = useState<Record<string, string>>({});
+  const [storeNotes, setStoreNotes] = useState<Record<string, string>>({});
+  const [newStoreName, setNewStoreName] = useState('');
+  const [showNewStore, setShowNewStore] = useState(false);
+
+  const carts = useMemo(() => getCarts(), [refresh]);
+  const activeId = getActiveStoreId();
+  let activeStore = carts.find(s => s.id === activeId);
+  if (!activeStore && carts.length > 0) { activeStore = carts[0]; setActiveStoreId(carts[0].id); }
+  const activeIdx = activeStore ? carts.findIndex(s => s.id === activeStore!.id) : -1;
+
+  const rerender = () => setRefresh(n => n + 1);
+  const updateCarts = (newCarts: CartStore[]) => { saveCarts(newCarts); rerender(); };
+
+  const switchStore = (id: string) => { setActiveStoreId(id); rerender(); };
+
+  const addStore = () => {
+    const name = newStoreName.trim() || 'Магазин ' + (carts.length + 1);
+    const nc: CartStore = { id: 'store_' + Date.now(), name, notes: '', sortOrder: carts.length, items: [] };
+    updateCarts([...carts, nc]);
+    setActiveStoreId(nc.id);
+    setNewStoreName('');
+    setShowNewStore(false);
   };
+
+  const deleteStore = (id: string) => {
+    const filtered = carts.filter(s => s.id !== id);
+    updateCarts(filtered);
+    if (getActiveStoreId() === id && filtered.length > 0) setActiveStoreId(filtered[0].id);
+  };
+
+  const renameStore = (id: string, name: string) => {
+    updateCarts(carts.map(s => s.id === id ? { ...s, name } : s));
+  };
+
+  const duplicateStore = (id: string) => {
+    const src = carts.find(s => s.id === id);
+    if (!src) return;
+    const dup: CartStore = { ...src, id: 'store_' + Date.now(), name: src.name + ' (копия)', sortOrder: carts.length };
+    updateCarts([...carts, dup]);
+  };
+
+  const updateStoreNotes = (id: string, notes: string) => {
+    updateCarts(carts.map(s => s.id === id ? { ...s, notes } : s));
+  };
+
+  const addItem = (name: string, kcal: number, amount?: number, category?: string) => {
+    addToCart({ name, kcal, amount, category });
+    rerender();
+  };
+
+  const removeItem = (itemId: string) => {
+    if (activeIdx < 0) return;
+    const newCarts = [...carts];
+    newCarts[activeIdx] = { ...newCarts[activeIdx], items: newCarts[activeIdx].items.filter(i => i.id !== itemId) };
+    updateCarts(newCarts);
+  };
+
+  const updateQty = (itemId: string, delta: number) => {
+    if (activeIdx < 0) return;
+    const newCarts = [...carts];
+    newCarts[activeIdx] = { ...newCarts[activeIdx], items: newCarts[activeIdx].items.map(i => i.id === itemId ? { ...i, amount: Math.max(10, i.amount + delta), kcal: Math.round(i.kcal * Math.max(10, i.amount + delta) / Math.max(1, i.amount)) } : i) };
+    updateCarts(newCarts);
+  };
+
+  const setItemPrice = (itemId: string, price: string) => {
+    setEditingPrice(p => ({ ...p, [itemId]: price }));
+  };
+  const confirmPrice = (itemId: string) => {
+    if (activeIdx < 0) return;
+    const price = parseFloat(editingPrice[itemId] || '0') || 0;
+    const newCarts = [...carts];
+    newCarts[activeIdx] = { ...newCarts[activeIdx], items: newCarts[activeIdx].items.map(i => i.id === itemId ? { ...i, price } : i) };
+    updateCarts(newCarts);
+  };
+
+  const setItemNote = (itemId: string, note: string) => {
+    if (activeIdx < 0) return;
+    const newCarts = [...carts];
+    newCarts[activeIdx] = { ...newCarts[activeIdx], items: newCarts[activeIdx].items.map(i => i.id === itemId ? { ...i, note } : i) };
+    updateCarts(newCarts);
+  };
+
+  const clearStore = () => {
+    if (activeIdx < 0) return;
+    const newCarts = [...carts];
+    newCarts[activeIdx] = { ...newCarts[activeIdx], items: [] };
+    updateCarts(newCarts);
+  };
+
+  const items = activeStore?.items || [];
+  const totalKcal = items.reduce((s, i) => s + (i.kcal || 0), 0);
+  const totalPrice = items.reduce((s, i) => s + (i.price || 0), 0);
+  const groups: Record<string, CartItemEnhanced[]> = {};
+  items.forEach(item => { const cat = item.category || 'other'; if (!groups[cat]) groups[cat] = []; groups[cat].push(item); });
+
+  const storeBtn = (isActive: boolean, onClick: () => void, children: React.ReactNode, extra?: React.CSSProperties) => (
+    <button onClick={onClick} style={{ padding:'4px 10px', borderRadius:8, fontSize:9, cursor:'pointer', border: isActive ? '1px solid #00e68a' : '1px solid rgba(255,255,255,0.06)', background: isActive ? 'rgba(0,230,138,0.12)' : '#202023', color: isActive ? '#00e68a' : 'rgba(255,255,255,0.85)', fontWeight: isActive ? 700 : 400, whiteSpace:'nowrap', ...extra }}>{children}</button>
+  );
+
   return (
     <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+      {/* Stores bar */}
       <div style={{ padding:14, ...cardBg }}>
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:6 }}>
-          <div>
-            <div style={{ fontSize:15, fontWeight:700, color:'#fff', letterSpacing:-0.3 }}>🛒 Корзина</div>
-            <div style={{ fontSize:10, color:'rgba(255,255,255,0.85)', marginTop:2 }}>{cart.length} позиций • {Math.round(totalKcal)} ккал</div>
-          </div>
-          {cart.length > 0 && (
-            <button onClick={clearCart} style={{ padding:'6px 12px', borderRadius:10, border:'none', cursor:'pointer', background:'rgba(239,68,68,0.15)', color:'#ef4444', fontSize:9, fontWeight:600 }}>✕ Очистить</button>
-          )}
+          <div style={{ fontSize:15, fontWeight:700, color:'#fff', letterSpacing:-0.3 }}>🛒 Корзина</div>
+          <button onClick={() => setShowNewStore(!showNewStore)} style={{ padding:'5px 10px', borderRadius:8, fontSize:9, cursor:'pointer', border:'1px solid rgba(0,230,138,0.3)', background:'rgba(0,230,138,0.08)', color:'#00e68a', fontWeight:600 }}>+ Магазин</button>
         </div>
-        <input value={storeName} onChange={e => { setStoreName(e.target.value); localStorage.setItem('he_cart_store', e.target.value); }} placeholder="🏪 Магазин (например: Пятёрочка, Ашан)" style={{ ...inputStyle, marginBottom:6, fontSize:10 }} />
-        {cart.length === 0 ? (
-          <div style={{ textAlign:'center', padding:24, color:'rgba(255,255,255,0.8)', fontSize:11 }}>
-            Корзина пуста. Добавляйте продукты из плана питания кнопкой «🛒 В корзину».
+        {showNewStore && (
+          <div style={{ display:'flex', gap:4, marginBottom:8 }}>
+            <input value={newStoreName} onChange={e => setNewStoreName(e.target.value)} placeholder="Название магазина" style={{ flex:1, padding:'6px 10px', borderRadius:8, fontSize:9, border:'1px solid rgba(255,255,255,0.06)', background:'#202023', color:'#fff', outline:'none' }}
+              onKeyDown={e => { if (e.key === 'Enter') addStore(); }} />
+            <button onClick={addStore} style={{ padding:'6px 12px', borderRadius:8, border:'none', cursor:'pointer', background:'linear-gradient(135deg,#00e68a,#00c8a0)', color:'#000', fontSize:9, fontWeight:700 }}>✅</button>
+            <button onClick={() => setShowNewStore(false)} style={{ padding:'6px 10px', borderRadius:8, border:'1px solid rgba(255,255,255,0.06)', cursor:'pointer', background:'#202023', color:'rgba(255,255,255,0.7)', fontSize:9 }}>✕</button>
+          </div>
+        )}
+        <div style={{ display:'flex', gap:3, flexWrap:'wrap', marginBottom:6 }}>
+          {carts.map(s => (
+            <div key={s.id} style={{ display:'flex', alignItems:'center', gap:2 }}>
+              {storeBtn(s.id === (activeStore?.id || ''), () => switchStore(s.id), `${s.name} (${s.items.length})`)}
+              <button onClick={() => duplicateStore(s.id)} style={{ padding:'2px 4px', borderRadius:4, border:'none', cursor:'pointer', background:'rgba(255,255,255,0.04)', color:'rgba(255,255,255,0.5)', fontSize:7 }}>📋</button>
+              {carts.length > 1 && <button onClick={() => deleteStore(s.id)} style={{ padding:'2px 4px', borderRadius:4, border:'none', cursor:'pointer', background:'rgba(239,68,68,0.08)', color:'#ef4444', fontSize:7 }}>✕</button>}
+            </div>
+          ))}
+        </div>
+
+        {!activeStore ? (
+          <div style={{ textAlign:'center', padding:16, color:'rgba(255,255,255,0.8)', fontSize:11 }}>
+            Создайте магазин, чтобы начать собирать список покупок.
           </div>
         ) : (
-          <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
-            {Object.entries(groups).map(([cat, items]) => (
-              <div key={cat}>
-                <div style={{ fontSize:10, fontWeight:700, color:'#f97316', marginBottom:3, padding:'2px 0', borderBottom:'1px solid rgba(249,115,22,0.1)', display:'flex', alignItems:'center', gap:4 }}>
-                  {catLabels[cat] || cat} <span style={{ fontSize:8, color:'rgba(255,255,255,0.8)', fontWeight:400 }}>({items.length})</span>
-                </div>
-                {items.map((item: any) => (
-                  <div key={item.idx} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'5px 8px', borderRadius:8, background:'#202023', border:'1px solid rgba(255,255,255,0.04)', marginBottom:2 }}>
-                    <div style={{ flex:1 }}>
-                      <div style={{ fontSize:10, fontWeight:600, color:'#fff' }}>{item.name}</div>
-                      <div style={{ display:'flex', alignItems:'center', gap:4, marginTop:1 }}>
-                        <button onClick={() => updateQty(item.idx, -10)} style={{ width:18, height:18, borderRadius:4, border:'1px solid rgba(255,255,255,0.06)', background:'rgba(255,255,255,0.03)', color:'#fff', cursor:'pointer', fontSize:9, display:'flex', alignItems:'center', justifyContent:'center' }}>−</button>
-                        <span style={{ fontSize:9, fontWeight:700, color:'#00e68a' }}>{item.amount || 100}г</span>
-                        <button onClick={() => updateQty(item.idx, 10)} style={{ width:18, height:18, borderRadius:4, border:'1px solid rgba(255,255,255,0.06)', background:'rgba(255,255,255,0.03)', color:'#fff', cursor:'pointer', fontSize:9, display:'flex', alignItems:'center', justifyContent:'center' }}>+</button>
+          <>
+            {/* Store name + rename */}
+            <input value={editingStoreId === activeStore.id ? (editingStoreId === activeStore.id ? storeNotes['_name'] ?? activeStore.name : activeStore.name) : activeStore.name}
+              onChange={e => { setEditingStoreId(activeStore.id); setStoreNotes(p => ({ ...p, _name: e.target.value })); }}
+              onBlur={() => { if (editingStoreId === activeStore.id) { renameStore(activeStore.id, storeNotes['_name'] ?? activeStore.name); setEditingStoreId(null); } }}
+              placeholder="🏪 Название магазина" style={{ ...inputStyle, marginBottom:4, fontSize:12, fontWeight:600 }} />
+
+            {/* Summary */}
+            <div style={{ display:'flex', gap:8, marginBottom:6 }}>
+              <div style={{ flex:1, background:'#202023', borderRadius:8, padding:'5px 8px', textAlign:'center' }}>
+                <div style={{ fontSize:7, color:'rgba(255,255,255,0.85)' }}>Позиций</div>
+                <div style={{ fontSize:14, fontWeight:800, color:'#00e68a' }}>{items.length}</div>
+              </div>
+              <div style={{ flex:1, background:'#202023', borderRadius:8, padding:'5px 8px', textAlign:'center' }}>
+                <div style={{ fontSize:7, color:'rgba(255,255,255,0.85)' }}>Ккал</div>
+                <div style={{ fontSize:14, fontWeight:800, color:'#8b5cf6' }}>{Math.round(totalKcal)}</div>
+              </div>
+              <div style={{ flex:1, background:'#202023', borderRadius:8, padding:'5px 8px', textAlign:'center' }}>
+                <div style={{ fontSize:7, color:'rgba(255,255,255,0.85)' }}>Сумма</div>
+                <div style={{ fontSize:14, fontWeight:800, color:'#f59e0b' }}>{totalPrice.toFixed(0)}₽</div>
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div style={{ display:'flex', gap:3, marginBottom:6, flexWrap:'wrap' }}>
+              <button onClick={clearStore} style={{ padding:'4px 8px', borderRadius:6, fontSize:8, cursor:'pointer', border:'1px solid rgba(239,68,68,0.2)', background:'rgba(239,68,68,0.08)', color:'#ef4444' }}>✕ Очистить список</button>
+              <button onClick={() => duplicateStore(activeStore.id)} style={{ padding:'4px 8px', borderRadius:6, fontSize:8, cursor:'pointer', border:'1px solid rgba(139,92,246,0.2)', background:'rgba(139,92,246,0.08)', color:'#8b5cf6' }}>📋 Дублировать</button>
+            </div>
+
+            {/* General notes */}
+            <textarea value={storeNotes[activeStore.id] ?? activeStore.notes ?? ''}
+              onChange={e => { setStoreNotes(p => ({ ...p, [activeStore.id]: e.target.value })); }}
+              onBlur={() => { updateStoreNotes(activeStore.id, storeNotes[activeStore.id] ?? activeStore.notes ?? ''); }}
+              placeholder="📝 Общие заметки к списку..." style={{ width:'100%', boxSizing:'border-box', padding:'6px 10px', borderRadius:8, fontSize:9, border:'1px solid rgba(255,255,255,0.06)', background:'#202023', color:'#fff', outline:'none', resize:'vertical', minHeight:36, marginBottom:6, fontFamily:'inherit' }} />
+
+            {items.length === 0 ? (
+              <div style={{ textAlign:'center', padding:16, color:'rgba(255,255,255,0.8)', fontSize:10 }}>
+                Список пуст. Добавляйте продукты из плана питания кнопкой «🛒».
+              </div>
+            ) : (
+              <div style={{ maxHeight:400, overflowY:'auto', display:'flex', flexDirection:'column', gap:6 }}>
+                {Object.entries(groups).map(([cat, catItems]) => (
+                  <div key={cat}>
+                    <div style={{ fontSize:10, fontWeight:700, color:'#f97316', marginBottom:3, padding:'2px 0', borderBottom:'1px solid rgba(249,115,22,0.1)', display:'flex', alignItems:'center', gap:4 }}>
+                      {CART_CAT_LABELS[cat] || cat} <span style={{ fontSize:8, color:'rgba(255,255,255,0.8)', fontWeight:400 }}>({catItems.length})</span>
+                      <span style={{ marginLeft:'auto', fontSize:8, color:'#f59e0b' }}>{catItems.reduce((s,i) => s+(i.price||0),0).toFixed(0)}₽</span>
+                    </div>
+                    {catItems.map(item => (
+                      <div key={item.id} style={{ padding:'6px 8px', borderRadius:8, background:'#202023', border:'1px solid rgba(255,255,255,0.04)' }}>
+                        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                          <div style={{ flex:1 }}>
+                            <div style={{ fontSize:10, fontWeight:600, color:'#fff' }}>{item.name}</div>
+                            <div style={{ display:'flex', alignItems:'center', gap:4, marginTop:1 }}>
+                              <button onClick={() => updateQty(item.id, -10)} style={{ width:18, height:18, borderRadius:4, border:'1px solid rgba(255,255,255,0.06)', background:'rgba(255,255,255,0.03)', color:'#fff', cursor:'pointer', fontSize:9, display:'flex', alignItems:'center', justifyContent:'center' }}>−</button>
+                              <span style={{ fontSize:9, fontWeight:700, color:'#00e68a' }}>{item.amount}г</span>
+                              <button onClick={() => updateQty(item.id, 10)} style={{ width:18, height:18, borderRadius:4, border:'1px solid rgba(255,255,255,0.06)', background:'rgba(255,255,255,0.03)', color:'#fff', cursor:'pointer', fontSize:9, display:'flex', alignItems:'center', justifyContent:'center' }}>+</button>
+                            </div>
+                          </div>
+                          <div style={{ display:'flex', alignItems:'center', gap:3 }}>
+                            <div style={{ fontSize:11, fontWeight:800, color:'#00e68a' }}>{Math.round(item.kcal)}</div>
+                            <button onClick={() => removeItem(item.id)} style={{ padding:'2px 5px', borderRadius:4, border:'none', cursor:'pointer', background:'rgba(239,68,68,0.12)', color:'#ef4444', fontSize:8 }}>✕</button>
+                          </div>
+                        </div>
+                        {/* Price + Note row */}
+                        <div style={{ display:'flex', gap:4, marginTop:3, alignItems:'center' }}>
+                          <div style={{ display:'flex', alignItems:'center', gap:2, background:'#18181b', borderRadius:6, padding:'2px 6px' }}>
+                            <span style={{ fontSize:8, color:'rgba(255,255,255,0.5)' }}>₽</span>
+                            <input value={editingPrice[item.id] ?? (item.price ? item.price.toString() : '')} onChange={e => setItemPrice(item.id, e.target.value)}
+                              onBlur={() => confirmPrice(item.id)}
+                              style={{ width:45, padding:'2px 4px', borderRadius:4, border:'none', background:'transparent', color:'#f59e0b', fontSize:9, fontWeight:600, textAlign:'right', outline:'none' }}
+                              placeholder="0" />
+                          </div>
+                          <input value={item.note} onChange={e => setItemNote(item.id, e.target.value)}
+                            placeholder="📌 Заметка к продукту..." style={{ flex:1, padding:'3px 6px', borderRadius:6, fontSize:8, border:'1px solid rgba(255,255,255,0.04)', background:'#18181b', color:'rgba(255,255,255,0.85)', outline:'none' }} />
+                          {item.price > 0 && <span style={{ fontSize:8, color:'#f59e0b', fontWeight:700 }}>{(item.price).toFixed(0)}₽</span>}
+                        </div>
                       </div>
-                    </div>
-                    <div style={{ display:'flex', alignItems:'center', gap:4 }}>
-                      <span style={{ fontSize:11, fontWeight:800, color:'#00e68a' }}>{Math.round(item.kcal || 0)}</span>
-                      <button onClick={() => removeItem(item.idx)} style={{ padding:'2px 5px', borderRadius:4, border:'none', cursor:'pointer', background:'rgba(239,68,68,0.12)', color:'#ef4444', fontSize:8 }}>✕</button>
-                    </div>
+                    ))}
                   </div>
                 ))}
               </div>
-            ))}
-          </div>
+            )}
+          </>
         )}
       </div>
     </div>
@@ -353,9 +513,12 @@ const SleepGuide: React.FC = () => {
   </>);
 };
 
-const ReportsTab: React.FC<{ foodEntries: DiaryEntry[] }> = ({ foodEntries }) => {
+const ReportsTab: React.FC<{ foodEntries: DiaryEntry[]; profile?: any; targets?: { kcal: number; protein: number; fats: number; carbs: number } }> = ({ foodEntries, profile, targets }) => {
   const [reportMode, setReportMode] = React.useState<'day'|'week'|'month'>('day');
   const [reportDate, setReportDate] = React.useState(new Date().toISOString().split('T')[0]);
+  const [reportSubTab, setReportSubTab] = React.useState<'overview' | 'full' | 'archive'>('overview');
+  const [fullReport, setFullReport] = React.useState<NutritionReport | null>(null);
+  const [archiveReports, setArchiveReports] = React.useState<NutritionReport[]>(() => { try { return JSON.parse(localStorage.getItem('he_nutrition_report_archive') || '[]'); } catch { return []; } });
   const raw = React.useMemo(() => { try { return JSON.parse(localStorage.getItem('nutrition_diary') || '{}'); } catch { return {}; } }, [foodEntries]);
   const dayData = raw[reportDate];
   const weekStart = React.useMemo(() => { const d = new Date(reportDate); d.setDate(d.getDate() - d.getDay() + 1); return d.toISOString().split('T')[0]; }, [reportDate]);
@@ -377,9 +540,184 @@ const ReportsTab: React.FC<{ foodEntries: DiaryEntry[] }> = ({ foodEntries }) =>
   const reportBtn = (isActive: boolean, onClick: () => void, children: React.ReactNode) => (
     <button onClick={onClick} style={{ padding:'5px 12px', borderRadius:8, fontSize:9, cursor:'pointer', border: isActive ? '1px solid #00e68a' : '1px solid rgba(255,255,255,0.06)', background: isActive ? 'linear-gradient(135deg,rgba(0,230,138,0.2),rgba(0,200,160,0.12))' : '#202023', color: isActive ? '#00e68a' : 'rgba(255,255,255,0.85)', fontWeight: isActive ? 700 : 400 }}>{children}</button>
   );
+  const saveReportToArchive = (report: NutritionReport) => {
+    const updated = [report, ...archiveReports].slice(0, 50);
+    setArchiveReports(updated);
+    localStorage.setItem('he_nutrition_report_archive', JSON.stringify(updated));
+    try {
+      const profileReports = JSON.parse(localStorage.getItem('he_profile_nutrition_reports') || '[]');
+      profileReports.push({ date: reportDate, summary: { grade: report.overallGrade, kcalPct: report.kbjuPct.kcal, pPct: report.kbjuPct.p, deficits: report.microDeficiencies.length } });
+      localStorage.setItem('he_profile_nutrition_reports', JSON.stringify(profileReports.slice(-100)));
+    } catch {}
+  };
+  const curTab = reportSubTab;
+
+  const tabButtons = (
+    <div style={{ display:'flex', gap:4, marginBottom:8 }}>
+      {reportBtn(curTab === 'overview', () => setReportSubTab('overview'), '📊 Обзор')}
+      {reportBtn(curTab === 'full', () => setReportSubTab('full'), '📋 Полный отчёт')}
+      {reportBtn(curTab === 'archive', () => setReportSubTab('archive'), '🗄 Архив')}
+    </div>
+  );
+
   return (<div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-    <div style={{ padding:14, ...cardBg }}>
-      <div style={labelSec}>📊 Отчёты</div>
+    {reportSubTab === 'full' && (<div style={{ padding:14, ...cardBg }}>
+      {tabButtons}
+      <div style={labelSec}>📋 Полный отчёт о питании</div>
+      {data.length === 0 ? (
+        <div style={{ textAlign:'center', padding:20, color:'rgba(255,255,255,0.7)', fontSize:10 }}>
+          Нет данных за выбранный период. Вносите приёмы пищи в дневник.
+        </div>
+      ) : !fullReport ? (
+        <div style={{ textAlign:'center', padding:20 }}>
+          <button onClick={() => {
+            const meals = reportMode === 'day' && dayData ? Object.entries(dayData.meals||{}).map(([label, items]:[string,any]) => ({
+              label, items: (items||[]).map((i:any) => ({ name: i.name, id: i.id || '', amount: i.amount || 100, kcal: i.kcal||0, p: i.p||0, f: i.f||0, c: i.c||0 })),
+              totals: { kcal: (items||[]).reduce((s:number,i:any)=>s+(i.kcal||0),0), p: (items||[]).reduce((s:number,i:any)=>s+(i.p||0),0), f: (items||[]).reduce((s:number,i:any)=>s+(i.f||0),0), c: (items||[]).reduce((s:number,i:any)=>s+(i.c||0),0) },
+            })) : [{ label: reportMode === 'week' ? 'Неделя' : 'Месяц', items: data.map((i:any) => ({ name: i.name, id: i.id || '', amount: i.amount || 100, kcal: i.kcal||0, p: i.p||0, f: i.f||0, c: i.c||0 })), totals }];
+            const rep = generateNutritionReport({
+              meals, totals,
+              targets: targets || { kcal: 2500, protein: 160, fats: 70, carbs: 300 },
+              userWeight: profile?.settings?.weight || 80,
+              userTDEE: targets?.kcal || 2500,
+              healthIssues: [], planType: 'classic', variety: 'max', budget: 'medium',
+              allergens: [], cyclingMode: 'none', goal: 'maintenance',
+            });
+            setFullReport(rep);
+            saveReportToArchive(rep);
+          }} style={{ padding:'10px 24px', borderRadius:12, border:'none', cursor:'pointer', background:'linear-gradient(135deg,#00e68a,#00c8a0)', color:'#000', fontWeight:700, fontSize:12, boxShadow:'0 4px 16px rgba(0,230,138,0.2)' }}>
+            📊 Сгенерировать полный отчёт
+          </button>
+          <div style={{ fontSize:9, color:'rgba(255,255,255,0.6)', marginTop:8 }}>Отчёт будет сохранён в архив и профиль</div>
+        </div>
+      ) : (
+        <div style={{ display:'flex', flexDirection:'column', gap:6, maxHeight:'calc(100vh - 320px)', overflowY:'auto' }}>
+          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'6px 10px', borderRadius:8, background:'rgba(0,230,138,0.06)', border:'1px solid rgba(0,230,138,0.2)', fontSize:10 }}>
+            <span>Оценка: <strong style={{ color: fullReport.overallGrade === 'A' ? '#00e68a' : fullReport.overallGrade === 'B' ? '#8b5cf6' : fullReport.overallGrade === 'C' ? '#f59e0b' : '#ef4444', fontSize:14 }}>{fullReport.overallGrade}</strong> — {fullReport.overallGradeLabel}</span>
+            <span style={{ color:'rgba(255,255,255,0.5)', fontSize:8 }}>{fullReport.generatedAt.slice(0,10)}</span>
+          </div>
+
+          {/* KBJU % */}
+          <div style={{ padding:'6px 10px', borderRadius:8, background:'#202023' }}>
+            <div style={{ fontSize:10, fontWeight:700, color:'#fff', marginBottom:4 }}>📊 Выполнение КБЖУ</div>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr', gap:4 }}>
+              {[{l:'Ккал',v:fullReport.kbjuPct.kcal,c:'#00e68a'},{l:'Белки',v:fullReport.kbjuPct.p,c:'#60a5fa'},{l:'Жиры',v:fullReport.kbjuPct.f,c:'#fbbf24'},{l:'Углеводы',v:fullReport.kbjuPct.c,c:'#fb923c'}].map(s => (
+                <div key={s.l} style={{ background:'#18181b', borderRadius:6, padding:'4px', textAlign:'center' }}>
+                  <div style={{ fontSize:7, color:'rgba(255,255,255,0.7)' }}>{s.l}</div>
+                  <div style={{ fontSize:16, fontWeight:800, color: s.v >= 85 && s.v <= 115 ? '#00e68a' : s.v >= 70 ? '#f59e0b' : '#ef4444' }}>{s.v}%</div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Weight dynamics */}
+          <div style={{ padding:'6px 10px', borderRadius:8, background:'#202023' }}>
+            <div style={{ fontSize:10, fontWeight:700, color:'#fff', marginBottom:4 }}>⚖️ Динамика веса</div>
+            <div style={{ display:'flex', gap:6, marginBottom:4 }}>
+              <div style={{ flex:1, background:'rgba(59,130,246,0.08)', borderRadius:6, padding:'4px 6px' }}>
+                <div style={{ fontSize:7, color:'rgba(255,255,255,0.7)' }}>Базовая</div>
+                <div style={{ fontSize:12, fontWeight:700, color: fullReport.weightDynamicsBasic.direction === 'loss' ? '#00e68a' : fullReport.weightDynamicsBasic.direction === 'gain' ? '#f59e0b' : '#fff' }}>
+                  {fullReport.weightDynamicsBasic.direction === 'loss' ? '−' : fullReport.weightDynamicsBasic.direction === 'gain' ? '+' : '∼'}{fullReport.weightDynamicsBasic.weeklyKg} кг/нед
+                </div>
+              </div>
+              <div style={{ flex:1, background:'rgba(139,92,246,0.08)', borderRadius:6, padding:'4px 6px' }}>
+                <div style={{ fontSize:7, color:'rgba(255,255,255,0.7)' }}>Усиленная</div>
+                <div style={{ fontSize:12, fontWeight:700, color:'#8b5cf6', display:'flex', alignItems:'center', gap:2 }}>
+                  {fullReport.weightDynamicsEnhanced.weeklyKg} кг/нед
+                  <span style={{ fontSize:7, color:'rgba(255,255,255,0.5)', fontWeight:400 }}>({fullReport.weightDynamicsEnhanced.confidence === 'high' ? '✓' : '?'})</span>
+                </div>
+              </div>
+            </div>
+            <div style={{ fontSize:8, color:'rgba(255,255,255,0.7)', lineHeight:1.4 }}>{fullReport.weightDynamicsBasic.explanation}</div>
+            {fullReport.weightDynamicsEnhanced.factors.length > 0 && <div style={{ fontSize:7, color:'rgba(255,255,255,0.6)', marginTop:2 }}>Факторы: {fullReport.weightDynamicsEnhanced.factors.join('; ')}</div>}
+          </div>
+
+          {/* Micros */}
+          <div style={{ padding:'6px 10px', borderRadius:8, background:'#202023' }}>
+            <div style={{ fontSize:10, fontWeight:700, color:'#fff', marginBottom:4 }}>🧬 Микронутриенты</div>
+            {fullReport.microDeficiencies.length > 0 && <div style={{ fontSize:8, color:'#f59e0b', marginBottom:4 }}>⚠ {fullReport.microDeficiencies.length} дефицитов</div>}
+            <div style={{ maxHeight:100, overflowY:'auto', display:'flex', flexDirection:'column', gap:2 }}>
+              {Object.entries(fullReport.micros).slice(0,15).map(([k, v]) => (
+                <div key={k} style={{ display:'flex', justifyContent:'space-between', fontSize:8, padding:'1px 0', borderBottom:'1px solid rgba(255,255,255,0.03)' }}>
+                  <span style={{ color:'rgba(255,255,255,0.85)' }}>{k}</span>
+                  <span style={{ color: v.status === 'ok' ? '#00e68a' : v.status === 'low' ? '#f59e0b' : '#ef4444', fontWeight:600 }}>{v.actual}/{v.target} ({v.pct}%)</span>
+                </div>
+              ))}
+            </div>
+            {fullReport.microDeficiencies.length > 0 && <div style={{ fontSize:7, color:'#f59e0b', marginTop:4, lineHeight:1.4 }}>Рекомендации: {fullReport.microDeficiencies.slice(0,3).join('; ')}</div>}
+          </div>
+
+          {/* Quality */}
+          <div style={{ padding:'6px 10px', borderRadius:8, background:'#202023' }}>
+            <div style={{ fontSize:10, fontWeight:700, color:'#fff', marginBottom:4 }}>⭐ Качество продуктов</div>
+            <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+              <div style={{ fontSize:18, fontWeight:800, color: fullReport.foodQualityScore >= 7 ? '#00e68a' : fullReport.foodQualityScore >= 5 ? '#f59e0b' : '#ef4444' }}>{fullReport.foodQualityScore}/10</div>
+              <div style={{ fontSize:7, color:'rgba(255,255,255,0.7)' }}>Средний тир: {fullReport.foodQualityDetails.avgTier} · {fullReport.foodQualityDetails.bestItems.length} лучших</div>
+            </div>
+          </div>
+
+          {/* Plan decisions */}
+          <div style={{ padding:'6px 10px', borderRadius:8, background:'#202023' }}>
+            <div style={{ fontSize:10, fontWeight:700, color:'#fff', marginBottom:4 }}>📋 Параметры составления рациона</div>
+            {fullReport.planDecisions.map((d, i) => (
+              <div key={i} style={{ display:'flex', justifyContent:'space-between', fontSize:8, padding:'2px 0', borderBottom:'1px solid rgba(255,255,255,0.03)' }}>
+                <span style={{ color:'rgba(255,255,255,0.6)' }}>{d.param}</span>
+                <span style={{ color:'#fff', fontWeight:600, textAlign:'right', maxWidth:'60%' }}>{d.value}</span>
+              </div>
+            ))}
+          </div>
+
+          {/* Risks */}
+          <div style={{ padding:'6px 10px', borderRadius:8, background:'#202023' }}>
+            <div style={{ fontSize:10, fontWeight:700, color:'#fff', marginBottom:4 }}>⚠ Анализ рисков</div>
+            {fullReport.riskAnalysis.map((r, i) => (
+              <div key={i} style={{ display:'flex', justifyContent:'space-between', fontSize:8, padding:'2px 0', borderBottom:'1px solid rgba(255,255,255,0.03)' }}>
+                <span style={{ color:'rgba(255,255,255,0.85)' }}>{r.system}</span>
+                <span style={{ color: r.score > 4 ? '#ef4444' : r.score > 2 ? '#f59e0b' : '#00e68a', fontWeight:600 }}>{r.score}/{r.maxScore}</span>
+              </div>
+            ))}
+          </div>
+
+          {/* Allergens */}
+          {fullReport.allergenWarnings.length > 0 && <div style={{ padding:'6px 10px', borderRadius:8, background:'rgba(239,68,68,0.06)', border:'1px solid rgba(239,68,68,0.15)' }}>
+            <div style={{ fontSize:10, fontWeight:700, color:'#ef4444', marginBottom:4 }}>🚫 Аллергены</div>
+            {fullReport.allergenWarnings.map((w, i) => <div key={i} style={{ fontSize:8, color:'rgba(255,255,255,0.85)' }}>• {w.food}: {w.allergens.join(', ')}</div>)}
+          </div>}
+
+          {/* Recommendations */}
+          {fullReport.recommendations.length > 0 && <div style={{ padding:'6px 10px', borderRadius:8, background:'rgba(168,85,247,0.06)', border:'1px solid rgba(168,85,247,0.15)' }}>
+            <div style={{ fontSize:10, fontWeight:700, color:'#a855f7', marginBottom:4 }}>💡 Рекомендации</div>
+            {fullReport.recommendations.map((r, i) => <div key={i} style={{ fontSize:8, color:'rgba(255,255,255,0.85)', lineHeight:1.5, marginBottom:2 }}>• {r}</div>)}
+          </div>}
+        </div>
+      )}
+    </div>)}
+
+    {reportSubTab === 'archive' && (<div style={{ padding:14, ...cardBg }}>
+      {tabButtons}
+      <div style={labelSec}>🗄 Архив отчётов</div>
+      {archiveReports.length === 0 ? (
+        <div style={{ textAlign:'center', padding:20, color:'rgba(255,255,255,0.7)', fontSize:10 }}>Нет сохранённых отчётов. Сгенерируйте полный отчёт.</div>
+      ) : (
+        <div style={{ maxHeight:400, overflowY:'auto', display:'flex', flexDirection:'column', gap:4 }}>
+          {archiveReports.map((rep, idx) => (
+            <div key={idx} style={{ padding:'6px 10px', borderRadius:8, background:'#202023', border:'1px solid rgba(255,255,255,0.04)', cursor:'pointer' }}
+              onClick={() => { setFullReport(rep); setReportSubTab('full'); }}>
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                <span style={{ fontSize:10, fontWeight:600, color:'#fff' }}>Отчёт от {rep.generatedAt?.slice(0,10) || 'N/A'}</span>
+                <span style={{ fontSize:12, fontWeight:800, color: rep.overallGrade === 'A' ? '#00e68a' : rep.overallGrade === 'B' ? '#8b5cf6' : rep.overallGrade === 'C' ? '#f59e0b' : '#ef4444' }}>{rep.overallGrade}</span>
+              </div>
+              <div style={{ fontSize:8, color:'rgba(255,255,255,0.6)', marginTop:2 }}>{rep.overallGradeLabel} · КБЖУ {rep.kbjuPct.kcal}% · {rep.microDeficiencies.length} дефицитов</div>
+            </div>
+          ))}
+        </div>
+      )}
+      {archiveReports.length > 0 && <button onClick={() => { setArchiveReports([]); localStorage.removeItem('he_nutrition_report_archive'); }} style={{ marginTop:6, padding:'4px 8px', borderRadius:6, fontSize:8, cursor:'pointer', border:'1px solid rgba(239,68,68,0.2)', background:'rgba(239,68,68,0.06)', color:'#ef4444' }}>🗑 Очистить архив</button>}
+    </div>)}
+
+    {reportSubTab === 'overview' && (<div style={{ padding:14, ...cardBg }}>
+      {tabButtons}
+      <div style={labelSec}>📊 Обзор питания</div>
       <div style={{ display:'flex', gap:4, marginBottom:8 }}>
         {reportBtn(reportMode === 'day', () => setReportMode('day'), 'День')}
         {reportBtn(reportMode === 'week', () => setReportMode('week'), 'Неделя')}
@@ -405,14 +743,14 @@ const ReportsTab: React.FC<{ foodEntries: DiaryEntry[] }> = ({ foodEntries }) =>
       </div>}
       {data.length > 0 && <div style={{ marginTop:6 }}>
         <div style={{ fontSize:9, color:'rgba(255,255,255,0.85)', marginBottom:4 }}>Продукты:</div>
-        <div style={{ maxHeight:150, overflowY:'auto' }}>
+        <div style={{ maxHeight:120, overflowY:'auto' }}>
           {data.map((i:any, idx:number) => <div key={idx} style={{ display:'flex', justifyContent:'space-between', padding:'2px 0', fontSize:8, color:'rgba(255,255,255,0.85)' }}>
             <span>{i.name} {i.meal ? <span style={{ color:'rgba(255,255,255,0.8)' }}>({i.meal})</span> : ''}</span>
             <span>{Math.round(i.kcal||0)}ккал</span>
           </div>)}
         </div>
       </div>}
-    </div>
+    </div>)}
   </div>);
 };
 
@@ -424,15 +762,22 @@ const InfoTab: React.FC = () => {
     { title: '💉 Инсулиновое правило', body: '10г углеводов на 1 ЕД инсулина короткого действия — базовое правило коррекции. Алгоритм учитывает гликемический индекс продуктов и подбирает источники углеводов так, чтобы избежать резких скачков сахара.' },
     { title: '🥦 Алгоритм подбора продуктов', body: '1) Выбор категории под цель (белок для роста, углеводы для энергии) 2) Фильтр по бюджету и предпочтениям 3) Проверка аллергенов 4) Исключение конфликтующих с фармакологией продуктов 5) Рандомизация в рамках пула для разнообразия.' },
     { title: '⚠ Типичные ошибки', body: '• Пропуск углеводов в тренировочный день\n• Недостаток жиров (ниже 0.8г/кг)\n• Слишком быстрый дефицит (>30% от TDEE)\n• Игнорирование клетчатки (нужно 25-35г/день)\n• Однообразный рацион (дефицит микронутриентов)' },
+    { title: '🛒 Корзина с магазинами', body: 'Поддержка нескольких магазинов: добавляйте, переименовывайте, удаляйте и дублируйте списки покупок. У каждого товара можно указать цену и заметки. Есть итоговая сумма и калорийность по магазину. Активный магазин сохраняется между сессиями.' },
+    { title: '🎚 Контроль разнообразия', body: 'Три режима: «Минимум» (2 продукта на категорию), «Средний» (4), «Максимум» (весь пул). Разнообразие влияет на количество повторяющихся продуктов в рационе. Пул сортируется детерминированно по seed — одинаковые параметры дают одинаковый результат.' },
+    { title: '🩺 Проблемы со здоровьем', body: '8 предустановленных проблем: отёки, непереносимость лактозы/глютена, диабет, гипертония, ЖКТ, подагра, камни в почках. Выбор автоматически исключает продукты из рациона. Apple-style карточки с иконкой, описанием и галочкой.' },
+    { title: '🌙 Вечер — минимум углеводов', body: 'Автоматически активируется при выборе «Отёки» или «Диабет». Уменьшает углеводы в ужине на 60%, перенося их на обед. Можно отключить вручную переключателем.' },
+    { title: '📋 Полный отчёт о питании', body: 'Генерирует детальный отчёт: КБЖУ по приёмам, микронутриенты vs RDA, дефициты, динамика веса (базовая + усиленная), оценка качества продуктов, анализ рисков, параметры рациона, аллергены, рекомендации и итоговая оценка A/B/C/D. Сохраняется в архив и профиль.' },
+    { title: '👨‍🍳 Рецепты с инструкциями', body: '60 рецептов с пошаговыми инструкциями, временем приготовления, тегами и типом приёма пищи (завтрак/обед/ужин/перекус). Карточки с раскрытием по клику, нумерованные шаги. Фильтр по типу приёма пищи и поиск по названию.' },
+    { title: '⚡ Быстрые пресеты', body: 'Готовые наборы настроек: мясной, вегетарианский, средиземноморский, кето, High Carb, бюджетный, массонаборный, жиросжигающий. Один клик — и план настроен под выбранную стратегию.' },
   ];
   return (<div style={{ display:'flex', flexDirection:'column', gap:8 }}>
     <div style={{ padding:14, ...cardBg }}>
       <div style={labelSec}>ℹ️ Как работает планировщик питания</div>
-      <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+      <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
         {sections.map((s, i) => (
-          <div key={i} style={{ padding:'10px 12px', borderRadius:10, background:'#202023', border:'1px solid rgba(255,255,255,0.06)' }}>
-            <div style={{ fontSize:12, fontWeight:700, color:'#fff', marginBottom:4 }}>{s.title}</div>
-            <div style={{ fontSize:10, color:'rgba(255,255,255,0.85)', lineHeight:1.6, whiteSpace:'pre-wrap' }}>{s.body}</div>
+          <div key={i} style={{ padding:'8px 10px', borderRadius:10, background:'#202023', border:'1px solid rgba(255,255,255,0.06)' }}>
+            <div style={{ fontSize:11, fontWeight:700, color:'#fff', marginBottom:3 }}>{s.title}</div>
+            <div style={{ fontSize:9, color:'rgba(255,255,255,0.85)', lineHeight:1.5, whiteSpace:'pre-wrap' }}>{s.body}</div>
           </div>
         ))}
       </div>
@@ -509,7 +854,7 @@ export const NutritionScreen: React.FC = () => {
   const avgWeeklyFat = useMemo(() => foodEntries.reduce((s, e) => s + e.f, 0) / Math.max(1, foodEntries.length / 7), [foodEntries]);
   const avgWeeklyCarbs = useMemo(() => foodEntries.reduce((s, e) => s + e.c, 0) / Math.max(1, foodEntries.length / 7), [foodEntries]);
 
-  const cartCount = useMemo(() => { try { return JSON.parse(localStorage.getItem('he_nutrition_cart') || '[]').length; } catch { return 0; } }, [tab]);
+  const cartCount = useMemo(() => { try { return JSON.parse(localStorage.getItem('he_nutrition_carts') || '[]').reduce((s:number,st:any) => s + (st.items?.length || 0), 0); } catch { return 0; } }, [tab]);
 
   const macroTargets = useMemo(() => {
     const s = linked.profile?.settings;
@@ -533,7 +878,7 @@ export const NutritionScreen: React.FC = () => {
       case 'catalog': return <CatalogTab />;
       case 'reference': return <ReferenceTab />;
       case 'recipes': return <RecipesTab />;
-      case 'reports': return <ReportsTab foodEntries={foodEntries} />;
+      case 'reports': return <ReportsTab foodEntries={foodEntries} profile={linked.profile} targets={macroTargets} />;
       case 'info': return <InfoTab />;
       default: return null;
     }

@@ -82,6 +82,17 @@ const ALLERGEN_LIST = [
   { id: 'люпин', label: 'Люпин (мука/белок)', icon: '🌱' },
 ];
 
+const HEALTH_ISSUES = [
+  { id: 'oedema', label: 'Отёки', icon: '🫧', desc: 'Задержка жидкости, склонность к отёкам', foodIds: ['salt','soy_sauce','kfc_wings','kfc_soup','kfc_bucket','bk_whopper','mcd_big_mac','mcd_royale','vt_big_smoke','french_fries','bread_white','pizza_margherita','sausage'] },
+  { id: 'lactose_intolerance', label: 'Непереносимость лактозы', icon: '🥛', desc: 'Вздутие, дискомфорт от молочных продуктов', foodIds: ['milk','cheese','yogurt','kefir','cheese_cream','sour_cream','condensed_milk','ice_cream','cottage_cheese_5','cottage_cheese_2','cottage_cheese_0','yogurt_greek','ricotta','mozzarella','parmesan','feta'] },
+  { id: 'gluten_intolerance', label: 'Непереносимость глютена', icon: '🌾', desc: 'Реакция на пшеницу, рожь, ячмень', foodIds: ['bread_white','bread_rye','pasta','mantua','bread_protein','pancakes','pita','lavash','muesli','oats_instant','pelmeni','pizza_margherita','chebureki','pyanse','ramen_egg','falafel_pita','greek_gyros','tortilla_corn','cornmeal','rice_cakes'] },
+  { id: 'diabetes', label: 'Диабет / Преддиабет', icon: '💉', desc: 'Контроль гликемии, низкий GI', foodIds: ['sugar','honey','syrup','bread_white','rice_white','rice_cakes','pasta','potato_mashed','potato_baked','french_fries','pancakes','pizza_margherita','ice_cream','watermelon','dates','banana','coca_cola','juice_apple','juice_orange','muesli','chocolate','cookie','marmalade'] },
+  { id: 'hypertension', label: 'Гипертония', icon: '❤️', desc: 'Повышенное давление, ограничение натрия', foodIds: ['salt','soy_sauce','kfc_wings','kfc_bucket','bk_whopper','mcd_big_mac','mcd_royale','vt_big_smoke','french_fries','sausage','bacon','ham','ketchup','mayonnaise','chips','pickles','olives','suluguni','cheese_processed','bouillon_cube'] },
+  { id: 'gi_issues', label: 'Проблемы с ЖКТ', icon: '🫀', desc: 'Гастрит, вздутие, синдром раздражённого кишечника', foodIds: ['cabbage','broccoli','cauliflower','brussels_sprouts','beans','lentils','chickpeas','peas','cornmeal','pancakes','pizza_margherita','french_fries','fried_rice_egg','chicken_curry_rice','soda','chebureki','pyanse','khachapuri','shaurma','mayonnaise','ketchup','cream_sauce','milk','ice_cream','onion_raw'] },
+  { id: 'gout', label: 'Подагра', icon: '🦶', desc: 'Повышенная мочевая кислота, низкие пурины', foodIds: ['liver','kidneys','sardines','anchovies','mussels','beef_liver','chicken_liver','pork_liver','beef_kidney','green_peas','spinach','mushrooms','cauliflower','broccoli','asparagus','beer','red_meat','bacon','ham','sausage','tuna_canned','sprats','broth_bone'] },
+  { id: 'kidney_stones', label: 'Камни в почках', icon: '🫘', desc: 'Оксалаты, ограничение кальция/оксалатов', foodIds: ['spinach','rhubarb','beetroot','nuts','almonds','walnuts','cashews','peanuts','chocolate','sweet_potato','okra','swiss_chard','parsley','poppy_seeds','sesame','soy_flour','buckwheat','millet','bran','berries'] },
+];
+
 // ─── Helpers ───
 const getProfileSafe = () => { try { return getProfile(); } catch { return null; } };
 
@@ -372,6 +383,7 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
 
   // 7. Nutrition level
   const [nutrLevel, setNutrLevel] = useState<NutritionLevel>('base');
+  const [variety, setVariety] = useState<'minimal' | 'medium' | 'max'>('max');
 
   // 8. Schedule
   const [wakeTime, setWakeTime] = useState('07:00');
@@ -393,6 +405,18 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
 
   // 9. Allergens
   const [allergens, setAllergens] = useState<string[]>(() => { try { return JSON.parse(localStorage.getItem('he_food_allergens') || '[]'); } catch { return []; } });
+  const [healthIssues, setHealthIssues] = useState<string[]>(() => { try { return JSON.parse(localStorage.getItem('he_health_issues') || '[]'); } catch { return []; } });
+  const [eveningLowCarb, setEveningLowCarb] = useState(() => {
+    try { return localStorage.getItem('he_evening_low_carb') === 'true'; } catch { return false; }
+  });
+  // Auto-enable eveningLowCarb when oedema or diabetes is selected
+  React.useEffect(() => {
+    const relevantActive = healthIssues.some(h => h === 'oedema' || h === 'diabetes');
+    if (relevantActive && !eveningLowCarb) {
+      setEveningLowCarb(true);
+      localStorage.setItem('he_evening_low_carb', 'true');
+    }
+  }, [healthIssues]);
 
   // 10. Plan type
   const [planType, setPlanType] = useState<PlanType>('classic');
@@ -567,8 +591,15 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
 
   const toggleAllergen = (id: string) => {
     setAllergens(prev => {
-      const updated = prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id];
+      const updated = prev.includes(id) ? prev.filter(a => a !== id) : [...prev, id];
       localStorage.setItem('he_food_allergens', JSON.stringify(updated));
+      return updated;
+    });
+  };
+  const toggleHealthIssue = (id: string) => {
+    setHealthIssues(prev => {
+      const updated = prev.includes(id) ? prev.filter(h => h !== id) : [...prev, id];
+      localStorage.setItem('he_health_issues', JSON.stringify(updated));
       return updated;
     });
   };
@@ -591,6 +622,11 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
     const cMod = planTypeMod?.cMult || 1.0;
 
     const excludedIds = new Set(excludedFoods);
+    // Add health issue food exclusions
+    healthIssues.forEach(hid => {
+      const issue = HEALTH_ISSUES.find(h => h.id === hid);
+      if (issue?.foodIds) issue.foodIds.forEach(fid => excludedIds.add(fid));
+    });
     // Build food allergen map from authoritative sources
     const getFoodAllergens = (foodId: string): string[] => {
       const fromDiet = FOOD_ALLERGEN_DIET[foodId];
@@ -795,11 +831,24 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
       // Pharma-aware carb timing: insulin = 10g carbs per 1 unit
       const insulinsWithTiming = injections.filter(i => i.type === 'инсулин' && (i.esterType === 'rapid' || i.esterType === 'short'));
 
+      // Evening low carb: reduce dinner carbs by 60%, add them to lunch
+      let mealCAdjust: Record<number, number> = {};
+      if (eveningLowCarb) {
+        const dinnerIdx = mealTimes.findIndex(m => m.label === 'Ужин');
+        const lunchIdx = mealTimes.findIndex(m => m.label === 'Обед');
+        if (dinnerIdx >= 0) {
+          const carbReduction = Math.round((tCAdj / mealTimes.length) * 0.6);
+          mealCAdjust[dinnerIdx] = -carbReduction;
+          if (lunchIdx >= 0) mealCAdjust[lunchIdx] = carbReduction;
+        }
+      }
+
       const meals = mealTimes.map((mt, idx) => {
         const p = Math.round(tP / mealTimes.length);
         const f = Math.round(tF / mealTimes.length);
-        const c = Math.round(tCAdj / mealTimes.length);
-        const kcal = Math.round(tKcalAdj / mealTimes.length);
+        const c = Math.round(tCAdj / mealTimes.length) + (mealCAdjust[idx] || 0);
+        const kcalAdj = Math.round((mealCAdjust[idx] || 0) * 4); // 1g carbs ≈ 4 kcal
+        const kcal = Math.round(tKcalAdj / mealTimes.length) + kcalAdj;
 
         // Select items based on budget, allergens, preferences
         const items: any[] = [];
@@ -869,12 +918,20 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
           return preferredPool.length >= 2 ? preferredPool : pool;
         };
 
+        // Variety limiter: sort pool deterministically by seed, take N items
+        const limitPool = (pool: any[], seed: number) => {
+          if (variety === 'max') return pool;
+          const sorted = [...pool].sort((a, b) => seedRand(seed + (a.id||'').length) - seedRand(seed + (b.id||'').length));
+          const limit = variety === 'minimal' ? 2 : 4;
+          return sorted.slice(0, Math.min(limit, sorted.length));
+        };
+
         let protPool = foods.filter(f => f.id !== 'egg_white' && (f.category === 'protein' || f.category === 'dairy'));
         if (planType === 'vegetarian') protPool = protPool.filter(f => f.isVegetarian !== false);
         if (planType === 'mediterranean') protPool = protPool.filter(f => !f.name.toLowerCase().includes('говядин') && !f.name.toLowerCase().includes('свинин') && !f.name.toLowerCase().includes('баранин'));
         protPool = protPool.filter(f => !excludedIds.has(f.id) && !allergenIds.has(f.id));
         const prefProtPool = protPool.filter(f => preferredFoods.some(pf => pf === f.id));
-        const mixProtPool = prefProtPool.length >= 2 ? prefProtPool : protPool;
+        const mixProtPool = limitPool(prefProtPool.length >= 2 ? prefProtPool : protPool, foodSeed + 1);
         if (mixProtPool.length > 0) {
           const protIdx = Math.floor(seedRand(foodSeed + 1) * mixProtPool.length);
           const prot = mixProtPool[protIdx % mixProtPool.length];
@@ -886,7 +943,7 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
         // Carb source
         if (remainingC > 5) {
           let carbPool = foods.filter(f => f.category === 'carb' || f.category === 'grain');
-          carbPool = applyFoodPrefs(carbPool, 'carb');
+          carbPool = limitPool(applyFoodPrefs(carbPool, 'carb'), foodSeed + 2);
           if (carbPool.length > 0) {
             let carbAmount = remainingC;
             const mealMin = parseInt(mt.time.split(':')[0]) * 60 + parseInt(mt.time.split(':')[1]);
@@ -913,7 +970,7 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
         });
         if (remainingF > 3 && !mt.label.includes('Предтрен') && !mt.label.includes('Пост-трен') && !isInsulinWindow) {
           let fatPool = foods.filter(f => f.category === 'fat');
-          fatPool = applyFoodPrefs(fatPool, 'fat');
+          fatPool = limitPool(applyFoodPrefs(fatPool, 'fat'), foodSeed + 3);
           if (fatPool.length > 0) {
             const fatIdx = Math.floor(seedRand(foodSeed + 3) * fatPool.length);
             const fat = fatPool[fatIdx % fatPool.length];
@@ -923,7 +980,7 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
         }
 
         // Vegetables
-        const vegPool = applyFoodPrefs(FOOD_DB.filter(f => f.category === 'veg_fruit'), 'veg');
+        const vegPool = limitPool(applyFoodPrefs(FOOD_DB.filter(f => f.category === 'veg_fruit'), 'veg'), foodSeed + 4);
         if (vegPool.length > 0) {
           const vegIdx = Math.floor(seedRand(foodSeed + 4) * vegPool.length);
           const v = vegPool[vegIdx % vegPool.length];
@@ -2123,6 +2180,32 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
         </div>
       </GlassCard>
 
+      {/* 6.5 Variety level */}
+      <GlassCard title="Разнообразие рациона" icon="🎲" color="#8b5cf6">
+        <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginBottom: 8, lineHeight: 1.5 }}>
+          Минимум — одни и те же продукты каждый день (проще готовить и закупать). Максимум — полная ротация для разнообразия нутриентов.
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 5 }}>
+          {[
+            { id: 'minimal' as const, label: '🎯 База', desc: '2-3 продукта на категорию, минимум разнообразия', color: '#22c55e' },
+            { id: 'medium' as const, label: '⚖️ Средний', desc: '4-5 продуктов, баланс удобства и разнообразия', color: '#f59e0b' },
+            { id: 'max' as const, label: '🎪 Максимум', desc: 'Полный пул продуктов, макс. разнообразие', color: '#8b5cf6' },
+          ].map(v => (
+            <button key={v.id} onClick={() => setVariety(v.id)} style={{
+              padding: '10px 8px', borderRadius: 12, cursor: 'pointer', textAlign: 'center',
+              background: variety === v.id ? `${v.color}18` : '#202023',
+              border: variety === v.id ? `2px solid ${v.color}` : '1px solid rgba(255,255,255,0.06)',
+              color: variety === v.id ? v.color : 'rgba(255,255,255,0.85)',
+              fontWeight: variety === v.id ? 700 : 500, fontSize: 10,
+            }}>
+              <div style={{ fontSize: 14, marginBottom: 2 }}>{v.label.split(' ')[0]}</div>
+              <div style={{ fontWeight: 700, fontSize: 10 }}>{v.label.split(' ').slice(1).join(' ')}</div>
+              <div style={{ fontSize: 7, color: variety === v.id ? `${v.color}aa` : 'rgba(255,255,255,0.85)', marginTop: 2 }}>{v.desc}</div>
+            </button>
+          ))}
+        </div>
+      </GlassCard>
+
       {/* 7. Nutrition level */}
       <GlassCard title="Уровень питания" icon="📈" color="#22c55e">
         <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginBottom: 8, lineHeight: 1.5 }}>
@@ -2188,6 +2271,59 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
               {allergens.includes(a.id) ? '✕ ' : '○ '}{a.icon} {a.label}
             </PillBtn>
           ))}
+        </div>
+      </GlassCard>
+
+      {/* 9.5 Health Issues — Apple-style cards */}
+      <GlassCard title="Проблемы со здоровьем" icon="🩺" color="#06b6d4">
+        <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginBottom: 8, lineHeight: 1.5 }}>
+          Отметьте проблемы — план автоматически исключит продукты, которые их усугубляют. Например, отёки → снижение натрия, диабет → низкий GI, подагра → низкие пурины.
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          {HEALTH_ISSUES.map(h => {
+            const active = healthIssues.includes(h.id);
+            return (
+              <button key={h.id} onClick={() => toggleHealthIssue(h.id)} style={{
+                display: 'flex', alignItems: 'flex-start', gap: 8, padding: '8px 10px', borderRadius: 12, cursor: 'pointer', textAlign: 'left', width: '100%',
+                background: active ? 'rgba(6,182,212,0.12)' : '#202023',
+                border: active ? '1.5px solid #06b6d4' : '1px solid rgba(255,255,255,0.06)',
+                transition: 'all 0.2s',
+              }}>
+                <div style={{ width: 32, height: 32, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                  background: active ? 'rgba(6,182,212,0.2)' : 'rgba(255,255,255,0.04)', fontSize: 16 }}>{h.icon}</div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontWeight: 700, fontSize: 11, color: active ? '#06b6d4' : '#fff', marginBottom: 1 }}>{h.label}</div>
+                  <div style={{ fontSize: 8, color: active ? 'rgba(6,182,212,0.8)' : 'rgba(255,255,255,0.7)', lineHeight: 1.4 }}>{h.desc}</div>
+                </div>
+                <div style={{ width: 20, height: 20, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                  background: active ? '#06b6d4' : 'rgba(255,255,255,0.06)', color: active ? '#000' : 'rgba(255,255,255,0.5)', fontWeight: 800, fontSize: 10, transition: 'all 0.2s' }}>
+                  {active ? '✓' : ''}
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </GlassCard>
+
+      {/* 9.7 Evening Low Carb */}
+      <GlassCard title="🌙 Вечерний режим" icon="🌙" color="#6366f1">
+        <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginBottom: 8, lineHeight: 1.5 }}>
+          Автоматически включается при выборе «Отёки» или «Диабет». Снижает количество углеводов в вечернем приёме пищи, перенося их на обед.
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 10px', borderRadius: 10, background: eveningLowCarb ? 'rgba(99,102,241,0.12)' : '#202023', border: `1px solid ${eveningLowCarb ? '#6366f1' : 'rgba(255,255,255,0.06)'}` }}>
+          <div>
+            <div style={{ fontSize: 10, fontWeight: 600, color: eveningLowCarb ? '#6366f1' : '#fff' }}>Вечер — минимум углеводов</div>
+            <div style={{ fontSize: 8, color: eveningLowCarb ? 'rgba(99,102,241,0.8)' : 'rgba(255,255,255,0.6)' }}>Углеводы ужина → обед</div>
+          </div>
+          <button onClick={() => { const nv = !eveningLowCarb; setEveningLowCarb(nv); localStorage.setItem('he_evening_low_carb', nv ? 'true' : 'false'); }} style={{
+            width: 48, height: 24, borderRadius: 12, border: 'none', cursor: 'pointer', position: 'relative', transition: 'all 0.2s',
+            background: eveningLowCarb ? '#6366f1' : 'rgba(255,255,255,0.15)',
+          }}>
+            <div style={{
+              width: 18, height: 18, borderRadius: '50%', background: '#fff', position: 'absolute', top: 3, transition: 'all 0.2s',
+              left: eveningLowCarb ? 27 : 3, boxShadow: '0 1px 4px rgba(0,0,0,0.3)',
+            }} />
+          </button>
         </div>
       </GlassCard>
 
