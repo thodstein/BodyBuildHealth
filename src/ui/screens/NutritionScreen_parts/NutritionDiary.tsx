@@ -305,25 +305,43 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
 
           {parsedItems.length > 0 && (
             <div style={{ padding:14, borderRadius:16, background:'rgba(0,230,138,0.06)', border:'1px solid rgba(0,230,138,0.2)' }}>
-              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:6 }}>
-                <span style={{ fontSize:10, color:'#00e68a', fontWeight:600 }}>📋 На очереди ({parsedItems.length})</span>
-                <span style={{ fontSize:9, color:'rgba(255,255,255,0.85)' }}>{mealType || 'Приём пищи'}</span>
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
+                <span style={{ fontSize:11, color:'#00e68a', fontWeight:700 }}>📋 На очереди ({parsedItems.length})</span>
+                <span style={{ fontSize:10, color:'rgba(255,255,255,0.85)' }}>{mealType || 'Приём пищи'}</span>
               </div>
-              {parsedItems.map((item,i) => (
-                <div key={i} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'4px 8px', borderRadius:8, background:'#202023', marginBottom:2 }}>
-                  <div style={{ display:'flex', alignItems:'center', gap:6, flex:1 }}>
-                    <span style={{ fontSize:10, fontWeight:500, color:'#fff' }}>{item.name}</span>
-                    <input type="number" value={item.qty || 100} onChange={e => { const v = +e.target.value || 0; setParsedItems(prev => prev.map((x,j) => j===i ? {...x, qty: v} : x)); }}
-                      style={{ width:45, padding:'2px 4px', borderRadius:4, background:'#18181b', border:'1px solid rgba(255,255,255,0.06)', color:'#fff', fontSize:8, textAlign:'center' }} />
-                    <span style={{ fontSize:7, color:'rgba(255,255,255,0.8)' }}>г</span>
+              {parsedItems.map((item,i) => {
+                const q = item.qty || 100;
+                const kcal = Math.round(item.kcal * q / 100);
+                const p = Math.round(((item.p||0) * q / 100) * 10) / 10;
+                const f = Math.round(((item.f||0) * q / 100) * 10) / 10;
+                const c = Math.round(((item.c||0) * q / 100) * 10) / 10;
+                return (
+                <div key={i} style={{ padding:'6px 10px', borderRadius:10, background:'#202023', border:'1px solid rgba(255,255,255,0.06)', marginBottom:4 }}>
+                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:4 }}>
+                    <span style={{ fontSize:11, fontWeight:600, color:'#fff' }}>{item.name}</span>
+                    <button onClick={() => setParsedItems(prev => prev.filter((_,j) => j !== i))} style={{ padding:'2px 6px', borderRadius:4, border:'none', cursor:'pointer', background:'rgba(239,68,68,0.12)', color:'#ef4444', fontSize:9 }}>✕</button>
                   </div>
-                  <div style={{ display:'flex', gap:3, fontSize:8, color:'rgba(255,255,255,0.85)' }}>
-                    <span style={{ color:'#00e68a' }}>{Math.round(item.kcal * (item.qty||100) / 100)}</span>
-                    <button onClick={() => setParsedItems(prev => prev.filter((_,j) => j !== i))} style={{ padding:'1px 5px', borderRadius:4, border:'none', cursor:'pointer', background:'rgba(239,68,68,0.15)', color:'#ef4444', fontSize:8, lineHeight:1 }}>✕</button>
+                  <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                    <div style={{ display:'flex', alignItems:'center', gap:3, background:'#18181b', borderRadius:8, padding:'2px 4px' }}>
+                      <button onClick={() => setParsedItems(prev => prev.map((x,j) => j===i ? {...x, qty: Math.max(10, (x.qty||100) - 10)} : x))} style={{ width:24, height:24, borderRadius:6, border:'none', background:'rgba(255,255,255,0.06)', color:'#fff', cursor:'pointer', fontSize:12, fontWeight:600, display:'flex', alignItems:'center', justifyContent:'center' }}>−</button>
+                      <input type="number" value={q} onChange={e => { const v = +e.target.value || 0; setParsedItems(prev => prev.map((x,j) => j===i ? {...x, qty: v} : x)); }}
+                        style={{ width:50, padding:'4px 2px', borderRadius:4, background:'transparent', border:'none', color:'#fff', fontSize:13, fontWeight:700, textAlign:'center', outline:'none' }} />
+                      <button onClick={() => setParsedItems(prev => prev.map((x,j) => j===i ? {...x, qty: Math.min(1000, (x.qty||100) + 10)} : x))} style={{ width:24, height:24, borderRadius:6, border:'none', background:'rgba(255,255,255,0.06)', color:'#fff', cursor:'pointer', fontSize:12, fontWeight:600, display:'flex', alignItems:'center', justifyContent:'center' }}>+</button>
+                    </div>
+                    <span style={{ fontSize:9, color:'rgba(255,255,255,0.5)' }}>г</span>
+                    <div style={{ display:'flex', gap:3, marginLeft:'auto' }}>
+                      {[50,100,200,300].map(v => <button key={v} onClick={() => setParsedItems(prev => prev.map((x,j) => j===i ? {...x, qty: v} : x))} style={{ padding:'3px 8px', borderRadius:6, border:'1px solid rgba(255,255,255,0.06)', background: q===v ? 'rgba(0,230,138,0.12)' : '#18181b', color: q===v ? '#00e68a' : 'rgba(255,255,255,0.7)', cursor:'pointer', fontSize:8, fontWeight: q===v ? 700 : 400 }}>{v}г</button>)}
+                    </div>
                   </div>
-                </div>
-              ))}
-              <button onClick={() => saveItemsToDiary(parsedItems)} style={{ width:'100%', marginTop:6, padding:8, borderRadius:8, border:'none', cursor:'pointer', background:'linear-gradient(135deg,#00e68a,#00c8a0)', color:'#000', fontWeight:600, fontSize:10 }}>💾 Сохранить {parsedItems.length} позиций</button>
+                  <div style={{ display:'flex', gap:8, marginTop:4, fontSize:8 }}>
+                    <span style={{ color:'#00e68a', fontWeight:700 }}>{kcal} ккал</span>
+                    <span style={{ color:'#60a5fa' }}>Б {p}г</span>
+                    <span style={{ color:'#fbbf24' }}>Ж {f}г</span>
+                    <span style={{ color:'#fb923c' }}>У {c}г</span>
+                  </div>
+                </div>);
+              })}
+              <button onClick={() => saveItemsToDiary(parsedItems)} style={{ width:'100%', marginTop:6, padding:'10px 0', borderRadius:10, border:'none', cursor:'pointer', background:'linear-gradient(135deg,#00e68a,#00c8a0)', color:'#000', fontWeight:700, fontSize:11, boxShadow:'0 4px 16px rgba(0,230,138,0.2)' }}>💾 Сохранить {parsedItems.length} позиций</button>
             </div>
           )}
         </>

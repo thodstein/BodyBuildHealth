@@ -12,13 +12,13 @@ import { addToCart } from '../../core/nutrition-utils';
 interface DiaryEntry { name: string; kcal: number; p: number; f: number; c: number; date?: string; }
 type NutritionPage = 'hero' | 'tabs';
 type NutritionSection = 'diary' | 'planning' | 'overview' | 'analytics' | 'all';
-type ActiveTab = 'diary' | 'charts' | 'mealplan' | 'cart' | 'favorites' | 'catalog' | 'reference' | 'recipes' | 'reports' | 'restaurant';
+type ActiveTab = 'diary' | 'charts' | 'mealplan' | 'cart' | 'favorites' | 'catalog' | 'reference' | 'recipes' | 'reports' | 'restaurant' | 'info';
 
 const SECTION_TABS: Record<NutritionSection, string[]> = {
   overview: ['diary', 'charts', 'mealplan', 'cart', 'favorites', 'catalog', 'reference', 'recipes', 'reports', 'restaurant'],
   analytics: ['charts', 'reports'],
-  diary: ['diary'],
-  planning: ['mealplan', 'reference'],
+  diary: ['diary', 'charts', 'reports'],
+  planning: ['mealplan', 'reference', 'info'],
   all: ['diary', 'charts', 'mealplan', 'cart', 'favorites', 'catalog', 'reference', 'recipes', 'reports', 'restaurant'],
 };
 
@@ -27,7 +27,7 @@ const TAB_LABELS: Record<string, string> = {
   mealplan: '🥗 План', cart: '🛒 Корзина',
   restaurant: '🍽 Ресторан',
   favorites: '⭐ Избранное', catalog: '📦 Каталог',
-  reference: '📖 Справочник', recipes: '🍳 Рецепты', reports: '📊 Отчёты',
+  reference: '📖 Справочник', recipes: '🍳 Рецепты', reports: '📊 Отчёты', info: 'ℹ️ Инфо',
 };
 
 const cardBg = { background: '#18181b', borderRadius: 18, border: '1px solid rgba(255,255,255,0.06)', boxShadow: '0 2px 16px rgba(0,0,0,0.2)' };
@@ -37,9 +37,9 @@ const inputStyle: React.CSSProperties = { width:'100%', padding:'10px 14px', bor
 const labelSec: React.CSSProperties = { fontSize:14, fontWeight:600, color:'#fff', marginBottom:10, letterSpacing:-0.3 };
 
 const CartTab: React.FC = () => {
-  const [, forceUpdate] = useState(0);
+  const [refreshCount, forceUpdate] = useState(0);
   const [storeName, setStoreName] = useState(() => localStorage.getItem('he_cart_store') || '');
-  const cart: any[] = useMemo(() => { try { return JSON.parse(localStorage.getItem('he_nutrition_cart') || '[]'); } catch { return []; } }, [forceUpdate]);
+  const cart: any[] = useMemo(() => { try { return JSON.parse(localStorage.getItem('he_nutrition_cart') || '[]'); } catch { return []; } }, [refreshCount]);
   const saveCart = (c: any[]) => { localStorage.setItem('he_nutrition_cart', JSON.stringify(c)); forceUpdate(n => n + 1); };
   const clearCart = () => saveCart([]);
   const removeItem = (idx: number) => saveCart(cart.filter((_, i) => i !== idx));
@@ -108,10 +108,8 @@ const ReferenceTab: React.FC = () => (
   </div>
 );
 
-const CATEGORY_ORDER: Record<string, string> = {
+const CATEGORY_LABELS: Record<string, string> = {
   protein: '🥩 Мясо/Рыба',
-  poultry: '🍗 Птица',
-  fish: '🐟 Рыба',
   dairy: '🥛 Молочка',
   grain: '🌾 Крупы',
   carb: '🥔 Углеводы',
@@ -121,11 +119,11 @@ const CATEGORY_ORDER: Record<string, string> = {
   supplement: '💊 Добавки',
   other: '📦 Прочее',
 };
-const CATEGORY_KEYS = Object.keys(CATEGORY_ORDER);
 
 const CatalogTab: React.FC = () => {
   const [catSearch, setCatSearch] = React.useState('');
   const [catFilter, setCatFilter] = React.useState('all');
+  const categories = React.useMemo(() => [...new Set(FOOD_DB.map(f => f.category).filter(Boolean) as string[])], []);
   const addFav = (food: { id: string; name: string; kcal: number; protein: number; fat: number; carbs: number }) => {
     try { const ids: string[] = JSON.parse(localStorage.getItem('he_food_favs') || '[]'); const updated = [food.id, ...ids.filter(f => f !== food.id)].slice(0, 100); localStorage.setItem('he_food_favs', JSON.stringify(updated)); } catch {}
   };
@@ -136,10 +134,6 @@ const CatalogTab: React.FC = () => {
       return true;
     });
   }, [catFilter, catSearch]);
-  const activeCategories = React.useMemo(() => {
-    const set = new Set<string>(FOOD_DB.map(f => f.category || 'other'));
-    return CATEGORY_KEYS.filter(k => set.has(k));
-  }, []);
   const filterBtn = (isActive: boolean, onClick: () => void, children: React.ReactNode) => (
     <button onClick={onClick} style={{ padding:'5px 10px', borderRadius:8, fontSize:8, cursor:'pointer', fontWeight: isActive ? 700 : 400, letterSpacing:0.2, whiteSpace:'nowrap', border: isActive ? '1px solid #00e68a' : '1px solid rgba(255,255,255,0.06)', background: isActive ? 'linear-gradient(135deg,rgba(0,230,138,0.2),rgba(0,200,160,0.12))' : '#202023', color: isActive ? '#00e68a' : 'rgba(255,255,255,0.85)' }}>{children}</button>
   );
@@ -147,15 +141,21 @@ const CatalogTab: React.FC = () => {
     <div style={{ padding:14, ...cardBg }}>
       <div style={labelSec}>📦 Каталог продуктов ({FOOD_DB.length})</div>
       <input value={catSearch} onChange={e => setCatSearch(e.target.value)} placeholder="🔍 Поиск по названию..." style={inputStyle} />
-      <div style={{ marginTop:8, display:'flex', gap:3, flexWrap:'wrap', marginBottom:8 }}>
-        {filterBtn(catFilter === 'all', () => setCatFilter('all'), 'Все')}
-        {activeCategories.map(c => filterBtn(catFilter === c, () => setCatFilter(c), CATEGORY_ORDER[c] || c))}
+      <div style={{ marginTop:6, display:'flex', alignItems:'center', gap:6, flexWrap:'wrap' }}>
+        {filterBtn(catFilter === 'all', () => setCatFilter('all'), `Все (${FOOD_DB.length})`)}
+        {categories.map(c => {
+          const count = FOOD_DB.filter(f => f.category === c).length;
+          return filterBtn(catFilter === c, () => setCatFilter(c), `${CATEGORY_LABELS[c] || c} (${count})`);
+        })}
       </div>
-      <div style={{ maxHeight:380, overflowY:'auto', display:'flex', flexDirection:'column', gap:3, borderRadius:8 }}>
+      <div style={{ marginTop:6, fontSize:9, color:'rgba(255,255,255,0.7)' }}>
+        {catFilter === 'all' ? 'Показаны все продукты' : `${CATEGORY_LABELS[catFilter] || catFilter} — ${filtered.length} продуктов`}
+      </div>
+      <div style={{ marginTop:8, maxHeight:340, overflowY:'auto', display:'flex', flexDirection:'column', gap:3, borderRadius:8 }}>
         {filtered.map(f => <div key={f.id} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'6px 10px', borderRadius:10, background:'#202023', border:'1px solid rgba(255,255,255,0.06)' }}>
           <div>
             <div style={{ fontSize:11, fontWeight:600, color:'#fff' }}>{f.name}</div>
-            <div style={{ fontSize:7, color:'rgba(255,255,255,0.8)', marginTop:1 }}>{CATEGORY_ORDER[f.category] || f.category} • {f.kcal}ккал • Б{f.protein} Ж{f.fat} У{f.carbs}</div>
+            <div style={{ fontSize:7, color:'rgba(255,255,255,0.8)', marginTop:1 }}>{CATEGORY_LABELS[f.category] || f.category} • {f.kcal}ккал • Б{f.protein} Ж{f.fat} У{f.carbs}</div>
           </div>
           <div style={{ display:'flex', gap:3, alignItems:'center' }}>
             <button onClick={() => addFav(f)} style={{ padding:'4px 8px', borderRadius:6, fontSize:9, cursor:'pointer', background:'rgba(139,92,246,0.15)', border:'1px solid rgba(139,92,246,0.3)', color:'#8b5cf6' }}>⭐</button>
@@ -170,13 +170,18 @@ const CatalogTab: React.FC = () => {
 const RecipesTab: React.FC = () => {
   const [recMeal, setRecMeal] = React.useState('all');
   const [recSearch, setRecSearch] = React.useState('');
+  const [recExpanded, setRecExpanded] = React.useState<Record<number, boolean>>({});
   const recipes = React.useMemo(() => getRecipes(), []);
-  let list = recipes;
-  if (recMeal !== 'all') list = list.filter((r: any) => r.mealType === recMeal);
-  if (recSearch.trim()) { const q = recSearch.toLowerCase(); list = list.filter((r: any) => r.name?.toLowerCase().includes(q) || r.ingredients?.some((i: string) => i.toLowerCase().includes(q))); }
+  const list = React.useMemo(() => {
+    let filtered = recipes;
+    if (recMeal !== 'all') filtered = filtered.filter((r: any) => r.meal === recMeal);
+    if (recSearch.trim()) { const q = recSearch.toLowerCase(); filtered = filtered.filter((r: any) => r.name?.toLowerCase().includes(q) || r.ingredients?.some((i: string) => i.toLowerCase().includes(q)) || r.tags?.some((t: string) => t.toLowerCase().includes(q))); }
+    return filtered;
+  }, [recipes, recMeal, recSearch]);
   const mealBtn = (isActive: boolean, onClick: () => void, children: React.ReactNode) => (
-    <button onClick={onClick} style={{ padding:'4px 10px', borderRadius:8, fontSize:8, cursor:'pointer', border: isActive ? '1px solid #00e68a' : '1px solid rgba(255,255,255,0.06)', background: isActive ? 'linear-gradient(135deg,rgba(0,230,138,0.2),rgba(0,200,160,0.12))' : '#202023', color: isActive ? '#00e68a' : 'rgba(255,255,255,0.85)', fontWeight: isActive ? 700 : 400 }}>{children}</button>
+    <button onClick={onClick} style={{ padding:'5px 12px', borderRadius:8, fontSize:10, cursor:'pointer', border: isActive ? '1px solid #00e68a' : '1px solid rgba(255,255,255,0.06)', background: isActive ? 'linear-gradient(135deg,rgba(0,230,138,0.2),rgba(0,200,160,0.12))' : '#202023', color: isActive ? '#00e68a' : 'rgba(255,255,255,0.85)', fontWeight: isActive ? 700 : 400 }}>{children}</button>
   );
+  const mealLabel = (m: string) => m === 'breakfast' ? '🌅' : m === 'lunch' ? '☀️' : m === 'dinner' ? '🌙' : m === 'snack' ? '🍿' : '';
   return (<div style={{ display:'flex', flexDirection:'column', gap:8 }}>
     <div style={{ padding:14, ...cardBg }}>
       <div style={labelSec}>🍳 Рецепты ({recipes.length})</div>
@@ -184,25 +189,44 @@ const RecipesTab: React.FC = () => {
       <div style={{ marginTop:8, display:'flex', gap:3, flexWrap:'wrap', marginBottom:6 }}>
         {mealBtn(recMeal === 'all', () => setRecMeal('all'), 'Все')}
         {mealBtn(recMeal === 'breakfast', () => setRecMeal('breakfast'), 'Завтрак')}
-        {mealBtn(recMeal === 'main', () => setRecMeal('main'), 'Основное')}
-        {mealBtn(recMeal === 'salad', () => setRecMeal('salad'), 'Салат')}
+        {mealBtn(recMeal === 'lunch', () => setRecMeal('lunch'), 'Обед')}
+        {mealBtn(recMeal === 'dinner', () => setRecMeal('dinner'), 'Ужин')}
         {mealBtn(recMeal === 'snack', () => setRecMeal('snack'), 'Перекус')}
       </div>
-      <div style={{ maxHeight:380, overflowY:'auto' }}>
-        {list.map((r: any, i: number) => <div key={i} style={{ padding:'6px 10px', borderRadius:10, background:'#202023', border:'1px solid rgba(255,255,255,0.06)', marginBottom:3 }}>
-          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-            <div style={{ fontSize:11, fontWeight:600, color:'#fff' }}>{r.name}</div>
-            <div style={{ fontSize:9, display:'flex', gap:4 }}>
-              <span style={{ color:'#00e68a', fontWeight:700 }}>{r.kcal}ккал</span>
-              <span style={{ color:'#3b82f6' }}>Б{r.protein}</span>
-              <span style={{ color:'#f59e0b' }}>Ж{r.fat}</span>
-              <span style={{ color:'#f97316' }}>У{r.carbs}</span>
+      <div style={{ maxHeight:420, overflowY:'auto' }}>
+        {list.map((r: any, i: number) => {
+          const isExpanded = recExpanded[i] || false;
+          return <div key={i} style={{ padding:'8px 10px', borderRadius:10, background:'#202023', border:'1px solid rgba(255,255,255,0.06)', marginBottom:4 }}>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+              <div style={{ flex:1 }}>
+                <div style={{ display:'flex', alignItems:'center', gap:4 }}>
+                  <span style={{ fontSize:11, fontWeight:600, color:'#fff' }}>{mealLabel(r.meal)} {r.name}</span>
+                  <span style={{ fontSize:8, color:'rgba(255,255,255,0.4)' }}>{r.prepTimeMin} мин</span>
+                </div>
+                <div style={{ fontSize:10, display:'flex', gap:4, marginTop:2 }}>
+                  <span style={{ color:'#00e68a', fontWeight:700 }}>{r.kcal} ккал</span>
+                  <span style={{ color:'#60a5fa' }}>Б{r.protein}</span>
+                  <span style={{ color:'#fbbf24' }}>Ж{r.fat}</span>
+                  <span style={{ color:'#fb923c' }}>У{r.carbs}</span>
+                </div>
+              </div>
+              <button onClick={() => setRecExpanded(prev => ({...prev, [i]: !prev[i]}))} style={{ padding:'4px 8px', borderRadius:6, fontSize:9, cursor:'pointer', border:'1px solid rgba(255,255,255,0.06)', background:'#18181b', color:'rgba(255,255,255,0.7)' }}>{isExpanded ? '▲' : '▼'}</button>
             </div>
-          </div>
-          {r.ingredients && <div style={{ display:'flex', flexWrap:'wrap', gap:2, marginTop:2 }}>
-            {r.ingredients.map((ing: string, j: number) => <span key={j} style={{ padding:'1px 5px', borderRadius:4, fontSize:7, background:'#202023', border:'1px solid rgba(255,255,255,0.06)', color:'rgba(255,255,255,0.85)' }}>{ing}</span>)}
-          </div>}
-        </div>)}
+            {r.tags && <div style={{ display:'flex', flexWrap:'wrap', gap:3, marginTop:3 }}>
+              {r.tags.map((t: string, j: number) => <span key={j} style={{ padding:'1px 6px', borderRadius:8, fontSize:8, background:'rgba(255,255,255,0.04)', color:'rgba(255,255,255,0.65)' }}>{t}</span>)}
+            </div>}
+            {r.ingredients && <div style={{ display:'flex', flexWrap:'wrap', gap:2, marginTop:3 }}>
+              {r.ingredients.map((ing: string, j: number) => <span key={j} style={{ padding:'2px 6px', borderRadius:6, fontSize:9, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', color:'rgba(255,255,255,0.85)' }}>{ing}</span>)}
+            </div>}
+            {isExpanded && r.instructions && <div style={{ marginTop:6, paddingTop:6, borderTop:'1px solid rgba(255,255,255,0.06)' }}>
+              <div style={{ fontSize:10, fontWeight:700, color:'#00e68a', marginBottom:4 }}>📝 Приготовление</div>
+              {r.instructions.map((step: string, j: number) => <div key={j} style={{ display:'flex', gap:4, fontSize:10, color:'rgba(255,255,255,0.85)', marginBottom:3 }}>
+                <span style={{ color:'#00e68a', fontWeight:700, minWidth:16, fontSize:9 }}>{j+1}.</span>
+                <span>{step}</span>
+              </div>)}
+            </div>}
+          </div>;
+        })}
       </div>
     </div>
   </div>);
@@ -212,7 +236,7 @@ const RESTAURANT_CUISINE: Record<string, string[]> = {
   russian: ['харчо','лагман','долма','хачапури','чебуреки','пян-се','шницель','котлета по-киевски','бефстроганов','щавелевый суп'],
   asian: ['рамен','жареный рис','курица терияки','вок','поке','том ям','мисо суп','оладьи','курица карри','греческий','оладьи'],
   italian: ['пицца'],
-  fastfood: ['шаурма','бургер','kfc','mcdonald','burger king','макнаггетс','big mac','whopper','maple','maple grilled','фалафель','гирос','сэндвич с тунцом','картофель фри'],
+  fastfood: ['шаурма','бургер','kfc','mcdonald','burger king','макнаггетс','big mac','whopper','вкусно и точка','биг смоук','чизбургер','чизбургер','лонг чикен','twister','твистер','боксмастер','гриль-ролл','куриные фри','наггетс','цезарь','картофель фри','луковые кольца','фалафель','гирос','сэндвич с тунцом','картофель фри'],
 };
 function detectCuisine(name: string): string {
   const low = name.toLowerCase();
@@ -392,6 +416,64 @@ const ReportsTab: React.FC<{ foodEntries: DiaryEntry[] }> = ({ foodEntries }) =>
   </div>);
 };
 
+const InfoTab: React.FC = () => {
+  const sections = [
+    { title: '🎯 Расчёт целей КБЖУ', body: 'Калькулятор использует формулу Миффлина-Сан-Жеора для определения базового метаболизма (BMR), умножает на коэффициент активности (PAL) и корректирует под цель: дефицит 20% для похудения, профицит 10-15% для набора массы, поддержание на уровне TDEE.' },
+    { title: '🔄 Циклирование углеводов', body: 'Чередование высоко- и низкоуглеводных дней для ускорения метаболизма. В тренировочные дни — норма или повышение углеводов, в дни отдыха — снижение на 30-50%. Автоматически привязывается к дням тренировок из профиля.' },
+    { title: '⏱ Тайминг белка', body: 'Равномерное распределение белка (20-40г на приём) каждые 3-4 часа для максимальной стимуляции MPS (мышечного протеинового синтеза). Приоритет: после тренировки (быстрый белок), перед сном (казеин).' },
+    { title: '💉 Инсулиновое правило', body: '10г углеводов на 1 ЕД инсулина короткого действия — базовое правило коррекции. Алгоритм учитывает гликемический индекс продуктов и подбирает источники углеводов так, чтобы избежать резких скачков сахара.' },
+    { title: '🥦 Алгоритм подбора продуктов', body: '1) Выбор категории под цель (белок для роста, углеводы для энергии) 2) Фильтр по бюджету и предпочтениям 3) Проверка аллергенов 4) Исключение конфликтующих с фармакологией продуктов 5) Рандомизация в рамках пула для разнообразия.' },
+    { title: '⚠ Типичные ошибки', body: '• Пропуск углеводов в тренировочный день\n• Недостаток жиров (ниже 0.8г/кг)\n• Слишком быстрый дефицит (>30% от TDEE)\n• Игнорирование клетчатки (нужно 25-35г/день)\n• Однообразный рацион (дефицит микронутриентов)' },
+  ];
+  return (<div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+    <div style={{ padding:14, ...cardBg }}>
+      <div style={labelSec}>ℹ️ Как работает планировщик питания</div>
+      <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+        {sections.map((s, i) => (
+          <div key={i} style={{ padding:'10px 12px', borderRadius:10, background:'#202023', border:'1px solid rgba(255,255,255,0.06)' }}>
+            <div style={{ fontSize:12, fontWeight:700, color:'#fff', marginBottom:4 }}>{s.title}</div>
+            <div style={{ fontSize:10, color:'rgba(255,255,255,0.85)', lineHeight:1.6, whiteSpace:'pre-wrap' }}>{s.body}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  </div>);
+};
+
+const FavoritesTab: React.FC = () => {
+  const [favs, setFavs] = useState<typeof FOOD_DB>(() => { try { const ids: string[] = JSON.parse(localStorage.getItem('he_food_favs') || '[]'); return ids.map(id => FOOD_DB.find(f => f.id === id)).filter(Boolean) as typeof FOOD_DB; } catch { return []; } });
+  const removeFav = (id: string) => { try { const ids: string[] = JSON.parse(localStorage.getItem('he_food_favs') || '[]'); localStorage.setItem('he_food_favs', JSON.stringify(ids.filter(f => f !== id))); setFavs(prev => prev.filter(f => f.id !== id)); } catch {} };
+  const catLabels: Record<string, string> = { protein:'🥩 Мясо', dairy:'🥛 Молочка', carb:'🍚 Крупы', grain:'🌾 Зерно', fat:'🧈 Жиры', veg_fruit:'🥦 Овощи', fast_food:'🍔 Фастфуд', supplement:'💊 Добавки', other:'📦 Прочее' };
+  const groups: Record<string, typeof FOOD_DB> = {};
+  favs.forEach(f => { const g = catLabels[f.category] || '📦 Прочее'; if (!groups[g]) groups[g] = []; groups[g].push(f); });
+  return (<div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+    <div style={{ padding:14, ...cardBg }}>
+      <div style={labelSec}>⭐ Избранное ({favs.length}/100)</div>
+      {favs.length === 0 ? <div style={{ textAlign:'center', padding:16, color:'rgba(255,255,255,0.8)', fontSize:10 }}>Нет избранных. Добавляйте из каталога кнопкой ⭐.</div> : <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
+        {Object.entries(groups).map(([cat, items]) => (
+          <div key={cat}>
+            <div style={{ fontSize:9, fontWeight:700, color:'#f97316', marginBottom:2, padding:'2px 0', borderBottom:'1px solid rgba(249,115,22,0.08)', display:'flex', alignItems:'center', gap:4 }}>
+              {cat} <span style={{ fontSize:7, color:'rgba(255,255,255,0.85)', fontWeight:400 }}>({items.length})</span>
+            </div>
+            {items.map(f => (
+              <div key={f.id} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'4px 8px', borderRadius:8, background:'#202023', border:'1px solid rgba(255,255,255,0.04)', marginBottom:2 }}>
+                <div>
+                  <div style={{ fontSize:10, fontWeight:600, color:'#fff' }}>{f.name}</div>
+                  <div style={{ fontSize:7, color:'rgba(255,255,255,0.8)' }}>{f.kcal}ккал • Б{f.protein} Ж{f.fat} У{f.carbs}</div>
+                </div>
+                <div style={{ display:'flex', gap:2, alignItems:'center' }}>
+                  <button onClick={() => addToCart({ name: f.name, kcal: f.kcal, amount: 100, category: f.category })} style={{ padding:'3px 6px', borderRadius:5, fontSize:8, cursor:'pointer', background:'rgba(0,230,138,0.12)', border:'1px solid rgba(0,230,138,0.2)', color:'#00e68a' }}>🛒</button>
+                  <button onClick={() => removeFav(f.id)} style={{ padding:'3px 6px', borderRadius:5, border:'none', cursor:'pointer', background:'rgba(239,68,68,0.12)', color:'#ef4444', fontSize:8 }}>✕</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        ))}
+      </div>}
+    </div>
+  </div>);
+};
+
 export const NutritionScreen: React.FC = () => {
   const linked = useDataLink();
   const [tab, setTab] = useState<ActiveTab>('mealplan');
@@ -452,42 +534,9 @@ export const NutritionScreen: React.FC = () => {
       case 'reference': return <ReferenceTab />;
       case 'recipes': return <RecipesTab />;
       case 'reports': return <ReportsTab foodEntries={foodEntries} />;
+      case 'info': return <InfoTab />;
       default: return null;
     }
-  };
-
-  const FavoritesTab: React.FC = () => {
-    const [favs, setFavs] = useState<typeof FOOD_DB>(() => { try { const ids: string[] = JSON.parse(localStorage.getItem('he_food_favs') || '[]'); return ids.map(id => FOOD_DB.find(f => f.id === id)).filter(Boolean) as typeof FOOD_DB; } catch { return []; } });
-    const removeFav = (id: string) => { try { const ids: string[] = JSON.parse(localStorage.getItem('he_food_favs') || '[]'); localStorage.setItem('he_food_favs', JSON.stringify(ids.filter(f => f !== id))); setFavs(prev => prev.filter(f => f.id !== id)); } catch {} };
-    const catLabels: Record<string, string> = { protein:'🥩 Мясо', dairy:'🥛 Молочка', carb:'🍚 Крупы', grain:'🌾 Зерно', fat:'🧈 Жиры', veg_fruit:'🥦 Овощи', fast_food:'🍔 Фастфуд', supplement:'💊 Добавки', other:'📦 Прочее' };
-    const groups: Record<string, typeof FOOD_DB> = {};
-    favs.forEach(f => { const g = catLabels[f.category] || '📦 Прочее'; if (!groups[g]) groups[g] = []; groups[g].push(f); });
-    return (<div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-      <div style={{ padding:14, ...cardBg }}>
-        <div style={labelSec}>⭐ Избранное ({favs.length}/100)</div>
-        {favs.length === 0 ? <div style={{ textAlign:'center', padding:16, color:'rgba(255,255,255,0.8)', fontSize:10 }}>Нет избранных. Добавляйте из каталога кнопкой ⭐.</div> : <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
-          {Object.entries(groups).map(([cat, items]) => (
-            <div key={cat}>
-              <div style={{ fontSize:9, fontWeight:700, color:'#f97316', marginBottom:2, padding:'2px 0', borderBottom:'1px solid rgba(249,115,22,0.08)', display:'flex', alignItems:'center', gap:4 }}>
-                {cat} <span style={{ fontSize:7, color:'rgba(255,255,255,0.85)', fontWeight:400 }}>({items.length})</span>
-              </div>
-              {items.map(f => (
-                <div key={f.id} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'4px 8px', borderRadius:8, background:'#202023', border:'1px solid rgba(255,255,255,0.04)', marginBottom:2 }}>
-                  <div>
-                    <div style={{ fontSize:10, fontWeight:600, color:'#fff' }}>{f.name}</div>
-                    <div style={{ fontSize:7, color:'rgba(255,255,255,0.8)' }}>{f.kcal}ккал • Б{f.protein} Ж{f.fat} У{f.carbs}</div>
-                  </div>
-                  <div style={{ display:'flex', gap:2, alignItems:'center' }}>
-                    <button onClick={() => addToCart({ name: f.name, kcal: f.kcal, amount: 100, category: f.category })} style={{ padding:'3px 6px', borderRadius:5, fontSize:8, cursor:'pointer', background:'rgba(0,230,138,0.12)', border:'1px solid rgba(0,230,138,0.2)', color:'#00e68a' }}>🛒</button>
-                    <button onClick={() => removeFav(f.id)} style={{ padding:'3px 6px', borderRadius:5, border:'none', cursor:'pointer', background:'rgba(239,68,68,0.12)', color:'#ef4444', fontSize:8 }}>✕</button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ))}
-        </div>}
-      </div>
-    </div>);
   };
 
   if (page === 'hero') {
@@ -498,14 +547,14 @@ export const NutritionScreen: React.FC = () => {
           <div style={{ position:'absolute', inset:0, background:'linear-gradient(transparent 50%, rgba(0,0,0,0.85))' }} />
           <div style={{ position:'relative', zIndex:2, display:'flex', flexDirection:'column', justifyContent:'flex-end', height:'100%', padding:'0 16px 24px' }}>
             <h1 style={{ fontSize:28, fontWeight:800, color:'#fff', margin:0, textShadow:'0 2px 14px rgba(0,0,0,0.9)', letterSpacing:-0.5 }}>Питание</h1>
-            <p style={{ fontSize:11, color:'rgba(255,255,255,0.85)', margin:'2px 0 0', textShadow:'0 1px 6px rgba(0,0,0,0.8)' }}>Дневник • Графики • План • Корзина</p>
+            <p style={{ fontSize:11, color:'rgba(255,255,255,0.85)', margin:'2px 0 0', textShadow:'0 1px 6px rgba(0,0,0,0.8)' }}>Рекомендации и составление рациона под указанные параметры</p>
           </div>
         </div>
         <div style={{ padding:'8px 12px 12px', background:'#18181b', borderTop:'1px solid rgba(255,255,255,0.06)' }}>
           <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
               {[
-                { section: 'overview' as NutritionSection, tab: 'diary' as ActiveTab, icon: '📋', title: 'Дневник и аналитика', desc: 'Дневник, графики, отчёты, справочник', color: '#22c55e' },
-                { section: 'planning' as NutritionSection, tab: 'mealplan' as ActiveTab, icon: '🥗', title: 'Планирование питания', desc: 'План, корзина, каталог, рецепты', color: '#f97316' },
+                { section: 'diary' as NutritionSection, tab: 'diary' as ActiveTab, icon: '📋', title: 'Дневник и аналитика', desc: 'Дневник, графики, отчёты', color: '#22c55e' },
+                { section: 'planning' as NutritionSection, tab: 'mealplan' as ActiveTab, icon: '🥗', title: 'Планирование питания', desc: 'План, справочник, инфо', color: '#f97316' },
               ].map(card => (
               <button key={card.tab} onClick={() => { setPage('tabs'); setNutritionSection(card.section); setTab(card.tab); }} style={{
                 display:'flex', alignItems:'center', gap:12, padding:'12px 14px', borderRadius:14, cursor:'pointer', textAlign:'left', width:'100%',

@@ -258,15 +258,15 @@ export const NutritionReference: React.FC = () => {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
       {/* Search bar */}
       <div style={{ position: 'sticky', top: 0, zIndex: 10, paddingBottom: 6, background: '#18181b' }}>
-        <input value={search} onChange={e => setSearch(e.target.value)} placeholder="🔍 Поиск по всему справочнику..." style={{ width: '100%', padding: '8px 10px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.1)', background: '#202023', color: '#fff', fontSize: 11, outline: 'none', boxShadow: search ? '0 0 0 1px rgba(0,230,138,0.3)' : 'none' }} />
+        <input value={search} onChange={e => setSearch(e.target.value)} placeholder="🔍 Поиск по всему справочнику..." style={{ width: '100%', padding: '10px 12px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.1)', background: '#202023', color: '#fff', fontSize: 13, outline: 'none', boxShadow: search ? '0 0 0 1px rgba(0,230,138,0.3)' : 'none' }} />
       </div>
 
       {/* Search results overlay */}
       {filtered && filtered.length > 0 && (
         <div style={{ padding: '6px 8px', borderRadius: 10, background: '#202023', border: '1px solid rgba(255,255,255,0.06)', marginBottom: 4 }}>
-          <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)', marginBottom: 4, fontWeight: 600 }}>Результатов: {filtered.length}</div>
+          <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', marginBottom: 4, fontWeight: 600 }}>Результатов: {filtered.length}</div>
           {filtered.slice(0, 30).map(item => (
-            <div key={item.id} style={{ padding: '4px 0', borderBottom: '1px solid rgba(255,255,255,0.03)', fontSize: 9, lineHeight: 1.4 }}>
+            <div key={item.id} style={{ padding: '5px 0', borderBottom: '1px solid rgba(255,255,255,0.03)', fontSize: 12, lineHeight: 1.5 }}>
               <span style={{ color: '#00e68a', fontWeight: 700 }}>
                 {item.section === 'rules' ? '📋 ' : item.section === 'insulin' ? '💉 ' : item.section === 'synergy' ? '🍽 ' : item.section === 'restricted' ? '⚠️ ' : '📚 '}
                 {'title' in item ? (item as any).title : 'pair' in item ? (item as any).pair : 'item' in item ? (item as any).item : ''}
@@ -276,12 +276,12 @@ export const NutritionReference: React.FC = () => {
               </div>
             </div>
           ))}
-          {filtered.length > 30 && <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.4)', textAlign: 'center', padding: 4 }}>...и ещё {filtered.length - 30} результатов</div>}
+          {filtered.length > 30 && <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', textAlign: 'center', padding: 4 }}>...и ещё {filtered.length - 30} результатов</div>}
         </div>
       )}
 
       {filtered && filtered.length === 0 && (
-        <div style={{ padding: 12, borderRadius: 10, background: '#202023', border: '1px solid rgba(255,255,255,0.06)', textAlign: 'center', fontSize: 10, color: 'rgba(255,255,255,0.5)' }}>Ничего не найдено. Попробуйте другой запрос.</div>
+        <div style={{ padding: 14, borderRadius: 10, background: '#202023', border: '1px solid rgba(255,255,255,0.06)', textAlign: 'center', fontSize: 12, color: 'rgba(255,255,255,0.5)' }}>Ничего не найдено. Попробуйте другой запрос.</div>
       )}
 
       {!search && (
@@ -297,10 +297,10 @@ export const NutritionReference: React.FC = () => {
       <SectionCard title="🍽 Рекомендуемые продукты (15 категорий)" isOpen={openSections.has('foods')} onToggle={() => toggle('foods')}>
         {Object.entries(RECOMMENDED_FOODS).map(([cat, { items, color, bg }]) => (
           <div key={cat} style={{ marginBottom: 6 }}>
-            <div style={{ fontSize: 9, fontWeight: 700, color, marginBottom: 3, letterSpacing: 0.3 }}>{cat}</div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color, marginBottom: 4, letterSpacing: 0.3 }}>{cat}</div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
               {items.map((item, j) => (
-                <span key={j} style={{ padding: '2px 6px', borderRadius: 12, fontSize: 8, background: bg, color, border: `1px solid ${color}20`, whiteSpace: 'nowrap' }}>{item}</span>
+                <span key={j} style={{ padding: '3px 8px', borderRadius: 12, fontSize: 10, background: bg, color, border: `1px solid ${color}20`, whiteSpace: 'nowrap' }}>{item}</span>
               ))}
             </div>
           </div>
@@ -333,10 +333,10 @@ export const NutritionReference: React.FC = () => {
               <div style={{ minWidth: 20, height: 20, borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', background: typeColor + '15', color: typeColor, fontWeight: 800, fontSize: 12 }}>{typeIcon}</div>
               <div style={{ flex: 1 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap', marginBottom: 1 }}>
-                  <span style={{ fontSize: 9, fontWeight: 600, color: '#fff' }}>{p.pair}</span>
-                  <span style={{ fontSize: 8, fontWeight: 700, color: typeColor, background: typeColor + '12', padding: '1px 5px', borderRadius: 6, whiteSpace: 'nowrap' }}>{p.effect}</span>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: '#fff' }}>{p.pair}</span>
+                  <span style={{ fontSize: 10, fontWeight: 700, color: typeColor, background: typeColor + '12', padding: '2px 6px', borderRadius: 6, whiteSpace: 'nowrap' }}>{p.effect}</span>
                 </div>
-                <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.85)', lineHeight: 1.4 }}>{p.note}</div>
+                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', lineHeight: 1.5 }}>{p.note}</div>
               </div>
             </div>
           );
@@ -345,7 +345,7 @@ export const NutritionReference: React.FC = () => {
 
       <SectionCard title="⚠️ Ограничить (15 пунктов)" isOpen={openSections.has('restricted')} onToggle={() => toggle('restricted')} color="#ef4444">
         {RESTRICTED.map((w, j) => (
-          <div key={j} style={{ display: 'flex', alignItems: 'flex-start', gap: 6, fontSize: 9, color: 'rgba(255,255,255,0.85)', lineHeight: 1.4, marginBottom: 3, padding: '3px 6px', borderRadius: 6, background: 'rgba(239,68,68,0.03)' }}>
+          <div key={j} style={{ display: 'flex', alignItems: 'flex-start', gap: 6, fontSize: 12, color: 'rgba(255,255,255,0.85)', lineHeight: 1.5, marginBottom: 4, padding: '4px 8px', borderRadius: 8, background: 'rgba(239,68,68,0.03)' }}>
             <span style={{ color: '#ef4444', flexShrink: 0, marginTop: 1 }}>✕</span>
             <div>
               <span style={{ fontWeight: 600, color: '#ef4444' }}>{w.item}</span>
@@ -359,9 +359,9 @@ export const NutritionReference: React.FC = () => {
         {BOOKS.map((b, j) => (
           <a key={j} href={b.link} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none', display: 'block' }}>
             <div style={{ padding: '5px 8px', borderRadius: 8, border: '1px solid rgba(99,102,241,0.1)', background: 'rgba(99,102,241,0.03)', marginBottom: 3 }}>
-              <div style={{ fontSize: 9, fontWeight: 700, color: '#818cf8', marginBottom: 1 }}>{b.title} <span style={{ fontWeight: 400, color: 'rgba(255,255,255,0.5)', fontSize: 8 }}>— {b.author}</span></div>
-              <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.75)', lineHeight: 1.4, marginBottom: 2 }}>{b.desc}</div>
-              <div style={{ fontSize: 7, color: '#00e68a', fontWeight: 600, opacity: 0.7 }}>🔗 Подробнее ↗</div>
+              <div style={{ fontSize: 12, fontWeight: 700, color: '#818cf8', marginBottom: 2 }}>{b.title} <span style={{ fontWeight: 400, color: 'rgba(255,255,255,0.5)', fontSize: 10 }}>— {b.author}</span></div>
+              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.75)', lineHeight: 1.5, marginBottom: 2 }}>{b.desc}</div>
+              <div style={{ fontSize: 10, color: '#00e68a', fontWeight: 600, opacity: 0.7 }}>🔗 Подробнее ↗</div>
             </div>
           </a>
         ))}
@@ -374,7 +374,7 @@ export const NutritionReference: React.FC = () => {
 
 const SectionCard: React.FC<{ title: string; isOpen: boolean; onToggle: () => void; color?: string; children: React.ReactNode }> = ({ title, isOpen, onToggle, color, children }) => (
   <div style={{ padding: 10, borderRadius: 14, background: 'linear-gradient(135deg,rgba(255,255,255,0.06),rgba(255,255,255,0.02))', backdropFilter: 'blur(20px)', border: '1px solid rgba(255,255,255,0.06)' }}>
-    <button onClick={onToggle} style={{ width: '100%', padding: '4px 0', cursor: 'pointer', background: 'none', border: 'none', color: color || '#fff', fontWeight: 700, fontSize: 11, textAlign: 'left', display: 'flex', alignItems: 'center', gap: 6 }}>
+    <button onClick={onToggle} style={{ width: '100%', padding: '6px 0', cursor: 'pointer', background: 'none', border: 'none', color: color || '#fff', fontWeight: 700, fontSize: 13, textAlign: 'left', display: 'flex', alignItems: 'center', gap: 6 }}>
       <span style={{ transition: 'transform 0.2s', transform: isOpen ? 'rotate(90deg)' : 'rotate(0deg)', fontSize: 12 }}>›</span>
       {title}
     </button>
@@ -386,22 +386,22 @@ const RuleItem: React.FC<{ rule: typeof NUTRITION_RULES[number] }> = ({ rule }) 
   const [expanded, setExpanded] = useState(false);
   return (
     <div style={{ borderRadius: 8, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.04)', marginBottom: 3 }}>
-      <button onClick={() => setExpanded(!expanded)} style={{ width: '100%', padding: '6px 8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, background: expanded ? `${rule.color}10` : 'rgba(255,255,255,0.02)', border: 'none', color: '#fff', textAlign: 'left', fontSize: 10, fontWeight: 600 }}>
-        <span style={{ width: 16, height: 16, borderRadius: 4, background: rule.color + '20', color: rule.color, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 10, transition: 'transform 0.2s', transform: expanded ? 'rotate(90deg)' : 'rotate(0deg)' }}>›</span>
+      <button onClick={() => setExpanded(!expanded)} style={{ width: '100%', padding: '8px 10px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, background: expanded ? `${rule.color}10` : 'rgba(255,255,255,0.02)', border: 'none', color: '#fff', textAlign: 'left', fontSize: 12, fontWeight: 600 }}>
+        <span style={{ width: 18, height: 18, borderRadius: 4, background: rule.color + '20', color: rule.color, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 12, transition: 'transform 0.2s', transform: expanded ? 'rotate(90deg)' : 'rotate(0deg)' }}>›</span>
         <span>{rule.title}</span>
       </button>
-      {expanded && <div style={{ padding: '6px 8px 6px 30px', fontSize: 10, color: '#fff', lineHeight: 1.5, borderTop: '1px solid rgba(255,255,255,0.04)', background: 'rgba(0,0,0,0.15)' }}>{rule.body}</div>}
+      {expanded && <div style={{ padding: '8px 10px 8px 36px', fontSize: 12, color: '#fff', lineHeight: 1.6, borderTop: '1px solid rgba(255,255,255,0.04)', background: 'rgba(0,0,0,0.15)' }}>{rule.body}</div>}
     </div>
   );
 };
 
 const ScoreSection: React.FC<{ label: string; color: string; items: { name: string; score: number }[] }> = ({ label, color, items }) => (
   <>
-    <h5 style={{ margin: '4px 0 3px', fontSize: 9, color, letterSpacing: 0.3 }}>{label}</h5>
+    <h5 style={{ margin: '6px 0 4px', fontSize: 12, color, letterSpacing: 0.3 }}>{label}</h5>
     {items.map((p, j) => (
-      <div key={j} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '1.5px 0', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
-        <div style={{ minWidth: 26, height: 16, borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', background: scoreColor(p.score) + '15', color: scoreColor(p.score), fontWeight: 800, fontSize: 8 }}>{p.score}/10</div>
-        <span style={{ fontSize: 8, fontWeight: 600 }}>{p.name}</span>
+      <div key={j} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '3px 0', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
+        <div style={{ minWidth: 32, height: 20, borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', background: scoreColor(p.score) + '15', color: scoreColor(p.score), fontWeight: 800, fontSize: 10 }}>{p.score}/10</div>
+        <span style={{ fontSize: 11, fontWeight: 600 }}>{p.name}</span>
       </div>
     ))}
   </>

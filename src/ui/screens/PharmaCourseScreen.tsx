@@ -100,8 +100,8 @@ export const PharmaCourseScreen: React.FC = () => {
     }
   }, [course]);
 
-  const addEntry = async (substanceId: string) => {
-    const d = parseFloat(dose);
+  const addEntry = async (substanceId: string, doseVal?: number) => {
+    const d = doseVal ?? parseFloat(dose);
     if (!substanceId || isNaN(d) || d <= 0) return;
     const entry: CourseEntry = {
       id: crypto.randomUUID(),
@@ -447,8 +447,9 @@ export const PharmaCourseScreen: React.FC = () => {
                   const hl = sub.pk?.halfLifeHours;
                   return (
                     <div key={sub.id} onClick={() => {
-                      setDose(String(defDose));
-                      addEntry(sub.id);
+                      const doseVal = defDose;
+                      setDose(String(doseVal));
+                      addEntry(sub.id, doseVal);
                     }} className="pc-sub-btn" style={{
                       background: '#202023',
                       border: `1px solid #3f3f46`,
