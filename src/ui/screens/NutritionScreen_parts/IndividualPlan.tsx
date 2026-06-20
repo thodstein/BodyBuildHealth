@@ -7,6 +7,7 @@ import { getProfile, updateProfile } from '../../../core/profile-manager';
 import { getRecipesByMeal, getRecipes, type Recipe } from '../../../engines/nutrition-periodization.engine';
 import { generateNutritionReport, type NutritionReport } from '../../../engines/nutrition-report.engine';
 import type { UserProfile } from '../../../core/types';
+import { getContraindications, saveContraindications } from '../../../core/contraindications';
 
 
 // ─── Types ───
@@ -404,9 +405,21 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
     else setMealsCount(3);
   }, [wakeTime, bedTime]);
 
-  // 9. Allergens
-  const [allergens, setAllergens] = useState<string[]>(() => { try { return JSON.parse(localStorage.getItem('he_food_allergens') || '[]'); } catch { return []; } });
-  const [healthIssues, setHealthIssues] = useState<string[]>(() => { try { return JSON.parse(localStorage.getItem('he_health_issues') || '[]'); } catch { return []; } });
+  // 9. Allergens — pre-populate from shared contraindications, fallback to local
+  const [allergens, setAllergens] = useState<string[]>(() => {
+    try {
+      const local = JSON.parse(localStorage.getItem('he_food_allergens') || 'null');
+      if (local && Array.isArray(local) && local.length > 0) return local;
+    } catch {}
+    return getContraindications().foodAllergies || [];
+  });
+  const [healthIssues, setHealthIssues] = useState<string[]>(() => {
+    try {
+      const local = JSON.parse(localStorage.getItem('he_health_issues') || 'null');
+      if (local && Array.isArray(local) && local.length > 0) return local;
+    } catch {}
+    return getContraindications().chronicConditions || [];
+  });
   const [eveningLowCarb, setEveningLowCarb] = useState(() => {
     try { return localStorage.getItem('he_evening_low_carb') === 'true'; } catch { return false; }
   });
@@ -595,6 +608,7 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
     setAllergens(prev => {
       const updated = prev.includes(id) ? prev.filter(a => a !== id) : [...prev, id];
       localStorage.setItem('he_food_allergens', JSON.stringify(updated));
+      saveContraindications({ foodAllergies: updated });
       return updated;
     });
   };
@@ -602,6 +616,7 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
     setHealthIssues(prev => {
       const updated = prev.includes(id) ? prev.filter(h => h !== id) : [...prev, id];
       localStorage.setItem('he_health_issues', JSON.stringify(updated));
+      saveContraindications({ chronicConditions: updated });
       return updated;
     });
   };

@@ -1,6 +1,7 @@
 ﻿import React, { useEffect, useState, useRef } from 'react';
 import type { UserProfile, InjuryRecord, SupplementEntry, MedicationEntry, LabPoint, WorkoutLog, StrengthLogEntry } from '../../core/types';
 import { getProfile, updateProfile, useProfileRefresh } from '../../core/profile-manager';
+import { saveContraindications, CHRONIC_CONDITIONS_LIST } from '../../core/contraindications';
 import { db } from '../../core/db';
 import { calcReadiness } from '../../engines/readiness.engine';
 import { computeLabIndices, interpretLabIndices } from '../../engines/labs-indices.engine';
@@ -205,6 +206,7 @@ export const ProfileScreen: React.FC = () => {
   const [bpSystolic, setBpSystolic] = useState('');
   const [bpDiastolic, setBpDiastolic] = useState('');
   const [bpHr, setBpHr] = useState('');
+  const [reportTab, setReportTab] = useState<'current' | 'archive'>('current');
 
   // Food diary data for reports
   const [foodDiaryAvg, setFoodDiaryAvg] = useState<{avgKcal:number;avgProtein:number;avgFat:number;avgCarbs:number} | null>(null);
@@ -282,6 +284,15 @@ export const ProfileScreen: React.FC = () => {
   };
 
   const settings = profile.settings;
+  useEffect(() => {
+    if (settings) saveContraindications({
+      chronicConditions: settings.chronicConditions || [],
+      foodAllergies: settings.foodAllergies || [],
+      foodIntolerances: settings.foodIntolerances || [],
+      excludedFoods: settings.excludedFoods || [],
+      allergyNotes: settings.allergyNotes || '',
+    });
+  }, [settings.chronicConditions, settings.foodAllergies, settings.foodIntolerances, settings.excludedFoods, settings.allergyNotes]);
   const readinessScores = calcReadiness({
     sleepHours: settings.baselineSleepHours ?? 7,
     sleepQuality: settings.baselineSleepQuality ?? 5,
@@ -1337,7 +1348,6 @@ export const ProfileScreen: React.FC = () => {
 
           {/* ═══ REPORTS TAB ═══ */}
            {tab === 'reports' && (() => {
-             const [reportTab, setReportTab] = useState<'current' | 'archive'>('current');
              const bmiVal = settings.weight && settings.height ? (settings.weight / Math.pow(settings.height / 100, 2)).toFixed(1) : '—';
             const lbmVal = settings.weight && settings.bodyFat ? (settings.weight * (1 - settings.bodyFat / 100)).toFixed(1) : '—';
             const ffmiVal = lbmVal !== '—' && settings.height ? (parseFloat(lbmVal) / Math.pow(settings.height / 100, 2) + 6.1 * (1.8 - settings.height / 100)).toFixed(1) : '—';

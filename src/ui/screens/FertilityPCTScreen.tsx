@@ -58,7 +58,7 @@ export const FertilityPCTScreen: React.FC<{ initialTab?: FertTab; restrictToMode
 
   // Filter tabs based on mode
   const fertTabsAll: { id: FertTab; label: string }[] = [
-    { id: 'overview', label: '📋 Обзор' },
+    { id: 'overview', label: '📋 Ориентировочные протоколы' },
     { id: 'semen', label: 'Спермограмма' },
     { id: 'hormones', label: 'Гормоны' },
     { id: 'structure', label: 'DFI/Структура' },
@@ -285,7 +285,7 @@ export const FertilityPCTScreen: React.FC<{ initialTab?: FertTab; restrictToMode
       <div style={{ maxWidth: '100%', overflowX: 'hidden', overflowY: 'auto', wordBreak: 'break-word' }}>
 
       {/* ─── OVERVIEW TAB ─── */}
-      {tab === 'overview' && (
+      {tab === 'overview' && restrictToMode !== 'fertility' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {/* Quick-reference cards */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>

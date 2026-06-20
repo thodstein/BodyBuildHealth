@@ -11,6 +11,7 @@ import { SUPPORT_BASE_COVERAGE } from '../../core/constants';
 import { INTERACTIONS_DB } from '../../data/interactions';
 import { ALL_SUBSTANCES, ALL_INTERACTIONS, type SupportSubstance, type SupportInteraction } from '../../data/support-database';
 import { getSubstanceTier, TIER_LABELS } from '../../data/substance-tiers';
+import { getBpRiskLevel } from '../../core/bp-hr-data';
 import { SUPPORT_CATALOG_DATA, ORGAN_LABELS as CATALOG_ORGAN_LABELS, SYSTEM_LABELS_CATALOG, CATEGORY_LABELS as CATALOG_CATEGORY_LABELS, TIER_LABELS_CATALOG, type SupportCatalogEntry } from '../../data/support-catalog';
 
 import { CANONICAL_ID_MAP } from '../../data/catalog-exports';
@@ -1337,6 +1338,17 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
       drugDoses: Object.fromEntries((linked.course || []).map(c => [c.substanceId, c.doseValue])),
     };
     const calcResultData = calculateSupport(input);
+    // Apply BP/HR adjustment to cardio risk
+    try {
+      const bpRisk = getBpRiskLevel();
+      if (bpRisk === 'high' && calcResultData?.riskAssessment?.systemBreakdown?.cardio) {
+        calcResultData.riskAssessment.systemBreakdown.cardio.raw = Math.min(100, calcResultData.riskAssessment.systemBreakdown.cardio.raw * 1.3);
+        calcResultData.riskAssessment.systemBreakdown.cardio.net = Math.min(100, calcResultData.riskAssessment.systemBreakdown.cardio.net * 1.3);
+      } else if (bpRisk === 'medium' && calcResultData?.riskAssessment?.systemBreakdown?.cardio) {
+        calcResultData.riskAssessment.systemBreakdown.cardio.raw = Math.min(100, calcResultData.riskAssessment.systemBreakdown.cardio.raw * 1.15);
+        calcResultData.riskAssessment.systemBreakdown.cardio.net = Math.min(100, calcResultData.riskAssessment.systemBreakdown.cardio.net * 1.15);
+      }
+    } catch {}
     setSupportResult(calcResultData);
     setCalcResult(calcResultData);
     setCalcDone(true);
@@ -2608,7 +2620,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                 <div style={{ width:48, height:48, borderRadius:14, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, background:'rgba(139,92,246,0.15)', fontSize:24 }}>🧬</div>
                 <div style={{ flex:1 }}>
                   <div style={{ fontSize:15, fontWeight:800, marginBottom:4, color:'#8b5cf6' }}>Гормональное здоровье</div>
-                  <div style={{ fontSize:10, color:'rgba(255,255,255,0.85)', lineHeight:1.3 }}>ПКТ, фертильность, ГЗТ</div>
+                  <div style={{ fontSize:10, color:'rgba(255,255,255,0.85)', lineHeight:1.3 }}>Протоколы восстановления, ГЗТ и фертильности</div>
                 </div>
                 <span style={{ color:'#8b5cf6', fontSize:18, opacity:0.6 }}>→</span>
               </div>
