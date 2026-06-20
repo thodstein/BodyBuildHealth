@@ -11,13 +11,14 @@ import { CAT_MAP_LABEL, addToCart } from '../../core/nutrition-utils';
 
 interface DiaryEntry { name: string; kcal: number; p: number; f: number; c: number; date?: string; }
 type NutritionPage = 'hero' | 'tabs';
-type NutritionSection = 'diary' | 'planning' | 'overview' | 'all';
+type NutritionSection = 'diary' | 'planning' | 'overview' | 'analytics' | 'all';
 type ActiveTab = 'diary' | 'charts' | 'mealplan' | 'cart' | 'favorites' | 'catalog' | 'reference' | 'recipes' | 'reports' | 'restaurant';
 
 const SECTION_TABS: Record<NutritionSection, string[]> = {
-  diary: ['diary', 'charts', 'mealplan', 'cart'],
-  planning: ['mealplan', 'cart', 'recipes', 'catalog'],
-  overview: ['charts', 'reports', 'reference', 'restaurant', 'favorites'],
+  overview: ['diary', 'charts', 'mealplan', 'cart', 'favorites', 'catalog', 'reference', 'recipes', 'reports', 'restaurant'],
+  analytics: ['charts', 'reports'],
+  diary: ['diary'],
+  planning: ['mealplan', 'reference'],
   all: ['diary', 'charts', 'mealplan', 'cart', 'favorites', 'catalog', 'reference', 'recipes', 'reports', 'restaurant'],
 };
 
@@ -59,7 +60,7 @@ const CartTab: React.FC = () => {
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:6 }}>
           <div>
             <div style={{ fontSize:15, fontWeight:700, color:'#fff', letterSpacing:-0.3 }}>🛒 Корзина</div>
-            <div style={{ fontSize:10, color:'rgba(255,255,255,0.6)', marginTop:2 }}>{cart.length} позиций • {Math.round(totalKcal)} ккал</div>
+            <div style={{ fontSize:10, color:'rgba(255,255,255,0.85)', marginTop:2 }}>{cart.length} позиций • {Math.round(totalKcal)} ккал</div>
           </div>
           {cart.length > 0 && (
             <button onClick={clearCart} style={{ padding:'6px 12px', borderRadius:10, border:'none', cursor:'pointer', background:'rgba(239,68,68,0.15)', color:'#ef4444', fontSize:9, fontWeight:600 }}>✕ Очистить</button>
@@ -122,7 +123,7 @@ const CatalogTab: React.FC = () => {
     return true;
   });
   const filterBtn = (isActive: boolean, onClick: () => void, children: React.ReactNode) => (
-    <button onClick={onClick} style={{ padding:'5px 10px', borderRadius:8, fontSize:8, cursor:'pointer', fontWeight: isActive ? 700 : 400, letterSpacing:0.2, whiteSpace:'nowrap', border: isActive ? '1px solid #00e68a' : '1px solid rgba(255,255,255,0.06)', background: isActive ? 'linear-gradient(135deg,rgba(0,230,138,0.2),rgba(0,200,160,0.12))' : '#202023', color: isActive ? '#00e68a' : 'rgba(255,255,255,0.6)' }}>{children}</button>
+    <button onClick={onClick} style={{ padding:'5px 10px', borderRadius:8, fontSize:8, cursor:'pointer', fontWeight: isActive ? 700 : 400, letterSpacing:0.2, whiteSpace:'nowrap', border: isActive ? '1px solid #00e68a' : '1px solid rgba(255,255,255,0.06)', background: isActive ? 'linear-gradient(135deg,rgba(0,230,138,0.2),rgba(0,200,160,0.12))' : '#202023', color: isActive ? '#00e68a' : 'rgba(255,255,255,0.85)' }}>{children}</button>
   );
   return (<div style={{ display:'flex', flexDirection:'column', gap:8 }}>
     <div style={{ padding:14, ...cardBg }}>
@@ -156,7 +157,7 @@ const RecipesTab: React.FC = () => {
   if (recMeal !== 'all') list = list.filter((r: any) => r.mealType === recMeal);
   if (recSearch.trim()) { const q = recSearch.toLowerCase(); list = list.filter((r: any) => r.name?.toLowerCase().includes(q) || r.ingredients?.some((i: string) => i.toLowerCase().includes(q))); }
   const mealBtn = (isActive: boolean, onClick: () => void, children: React.ReactNode) => (
-    <button onClick={onClick} style={{ padding:'4px 10px', borderRadius:8, fontSize:8, cursor:'pointer', border: isActive ? '1px solid #00e68a' : '1px solid rgba(255,255,255,0.06)', background: isActive ? 'linear-gradient(135deg,rgba(0,230,138,0.2),rgba(0,200,160,0.12))' : '#202023', color: isActive ? '#00e68a' : 'rgba(255,255,255,0.6)', fontWeight: isActive ? 700 : 400 }}>{children}</button>
+    <button onClick={onClick} style={{ padding:'4px 10px', borderRadius:8, fontSize:8, cursor:'pointer', border: isActive ? '1px solid #00e68a' : '1px solid rgba(255,255,255,0.06)', background: isActive ? 'linear-gradient(135deg,rgba(0,230,138,0.2),rgba(0,200,160,0.12))' : '#202023', color: isActive ? '#00e68a' : 'rgba(255,255,255,0.85)', fontWeight: isActive ? 700 : 400 }}>{children}</button>
   );
   return (<div style={{ display:'flex', flexDirection:'column', gap:8 }}>
     <div style={{ padding:14, ...cardBg }}>
@@ -181,7 +182,7 @@ const RecipesTab: React.FC = () => {
             </div>
           </div>
           {r.ingredients && <div style={{ display:'flex', flexWrap:'wrap', gap:2, marginTop:2 }}>
-            {r.ingredients.map((ing: string, j: number) => <span key={j} style={{ padding:'1px 5px', borderRadius:4, fontSize:7, background:'#202023', border:'1px solid rgba(255,255,255,0.06)', color:'rgba(255,255,255,0.6)' }}>{ing}</span>)}
+            {r.ingredients.map((ing: string, j: number) => <span key={j} style={{ padding:'1px 5px', borderRadius:4, fontSize:7, background:'#202023', border:'1px solid rgba(255,255,255,0.06)', color:'rgba(255,255,255,0.85)' }}>{ing}</span>)}
           </div>}
         </div>)}
       </div>
@@ -220,7 +221,7 @@ const RestaurantTab: React.FC = () => {
     c: filtered.reduce((s,f) => s + f.carbs * (portions[f.id] || 1), 0),
   }), [filtered, portions]);
   const cuisineBtn = (v: typeof g, label: string) => (
-    <button onClick={() => setG(v)} style={{ padding:'3px 8px', borderRadius:6, fontSize:8, cursor:'pointer', border: g === v ? '1px solid #00e68a' : '1px solid rgba(255,255,255,0.06)', background: g === v ? 'rgba(0,230,138,0.15)' : '#202023', color: g === v ? '#00e68a' : 'rgba(255,255,255,0.6)', fontWeight: g === v ? 600 : 400 }}>{label}</button>
+    <button onClick={() => setG(v)} style={{ padding:'3px 8px', borderRadius:6, fontSize:8, cursor:'pointer', border: g === v ? '1px solid #00e68a' : '1px solid rgba(255,255,255,0.06)', background: g === v ? 'rgba(0,230,138,0.15)' : '#202023', color: g === v ? '#00e68a' : 'rgba(255,255,255,0.85)', fontWeight: g === v ? 600 : 400 }}>{label}</button>
   );
   return (<div style={{ display:'flex', flexDirection:'column', gap:8 }}>
     {/* КБЖУ сводка */}
@@ -230,7 +231,7 @@ const RestaurantTab: React.FC = () => {
         <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr', gap:6 }}>
           {[{l:'Калории',v:Math.round(totals.kcal),c:'#00e68a',u:'ккал'},{l:'Белки',v:Math.round(totals.p),c:'#3b82f6',u:'г'},{l:'Жиры',v:Math.round(totals.f),c:'#f59e0b',u:'г'},{l:'Углеводы',v:Math.round(totals.c),c:'#f97316',u:'г'}].map((s,i) => (
             <div key={i} style={{ background:'#202023', borderRadius:8, padding:'5px 8px', textAlign:'center' }}>
-              <div style={{ fontSize:7, color:'rgba(255,255,255,0.6)' }}>{s.l}</div>
+              <div style={{ fontSize:7, color:'rgba(255,255,255,0.85)' }}>{s.l}</div>
               <div style={{ fontSize:16, fontWeight:800, color:s.c }}>{s.v}<span style={{ fontSize:9, fontWeight:400, color:'rgba(255,255,255,0.8)' }}> {s.u}</span></div>
             </div>
           ))}
@@ -264,12 +265,13 @@ const RestaurantTab: React.FC = () => {
                   <div style={{ fontSize:7, color:'rgba(255,255,255,0.8)' }}>{food.servingSize || ''} · {detectCuisine(food.name)}</div>
                 </div>
                 <div style={{ display:'flex', gap:2 }}>
-                  {[-1,1].map(d => <button key={d} onClick={() => setPortions(p => ({...p, [food.id]: Math.max(0.25, (p[food.id]||1) + d * 0.25)}))} style={{ width:18, height:18, borderRadius:4, border:'1px solid rgba(255,255,255,0.06)', background:'#18181b', color:'rgba(255,255,255,0.6)', cursor:'pointer', fontSize:10, display:'flex', alignItems:'center', justifyContent:'center' }}>{d>0?'+':'-'}</button>)}
+                  {[-1,1].map(d => <button key={d} onClick={() => setPortions(p => ({...p, [food.id]: Math.max(0.25, (p[food.id]||1) + d * 0.25)}))} style={{ width:18, height:18, borderRadius:4, border:'1px solid rgba(255,255,255,0.06)', background:'#18181b', color:'rgba(255,255,255,0.85)', cursor:'pointer', fontSize:10, display:'flex', alignItems:'center', justifyContent:'center' }}>{d>0?'+':'-'}</button>)}
                 </div>
                 <button onClick={() => addToCart({ name: food.name, amount: Math.round(portion * (parseInt(food.servingSize) || 100)), kcal: Math.round(food.kcal * portion), category: 'fast_food' })} style={{ padding:'3px 6px', borderRadius:4, border:'1px solid rgba(0,230,138,0.3)', background:'rgba(0,230,138,0.08)', color:'#00e68a', cursor:'pointer', fontSize:7, fontWeight:600 }}>🛒</button>
+                <button onClick={() => { try { const planItems = JSON.parse(localStorage.getItem('he_quick_plan_items') || '[]'); planItems.push({ name: food.name, id: food.id, amount: Math.round(portion * 100), kcal: Math.round(food.kcal * portion), p: Math.round(food.protein * portion), f: Math.round(food.fat * portion), c: Math.round(food.carbs * portion) }); localStorage.setItem('he_quick_plan_items', JSON.stringify(planItems)); alert('✅ Добавлено в план питания'); } catch {} }} style={{ padding:'3px 6px', borderRadius:4, border:'1px solid rgba(139,92,246,0.3)', background:'rgba(139,92,246,0.08)', color:'#a78bfa', cursor:'pointer', fontSize:7, fontWeight:600 }}>📋</button>
               </div>
               <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr', gap:3, marginTop:4 }}>
-                <div style={{ background:'#18181b', borderRadius:4, padding:'2px 4px', textAlign:'center', fontSize:7, color:'rgba(255,255,255,0.6)' }}>🔥 {Math.round(food.kcal * portion)}</div>
+                <div style={{ background:'#18181b', borderRadius:4, padding:'2px 4px', textAlign:'center', fontSize:7, color:'rgba(255,255,255,0.85)' }}>🔥 {Math.round(food.kcal * portion)}</div>
                 <div style={{ background:'rgba(59,130,246,0.08)', borderRadius:4, padding:'2px 4px', textAlign:'center', fontSize:7, color:'#60a5fa' }}>Б {Math.round(food.protein * portion)}</div>
                 <div style={{ background:'rgba(245,158,11,0.08)', borderRadius:4, padding:'2px 4px', textAlign:'center', fontSize:7, color:'#fbbf24' }}>Ж {Math.round(food.fat * portion)}</div>
                 <div style={{ background:'rgba(249,115,22,0.08)', borderRadius:4, padding:'2px 4px', textAlign:'center', fontSize:7, color:'#fb923c' }}>У {Math.round(food.carbs * portion)}</div>
@@ -288,7 +290,7 @@ const TravelGuide: React.FC = () => {
   return (<>
     <div style={{ fontSize:12, fontWeight:600, color:'#fff', marginBottom:6 }}>✈ Питание в дороге</div>
     {travelAdvice.length > 0 ? travelAdvice.map((a, i) => <div key={i} style={{ fontSize:9, color:'#fff', marginBottom:4 }}>{a}</div>) : <div style={{ fontSize:10, color:'rgba(255,255,255,0.8)', padding:10 }}>Нет сохранённых советов.</div>}
-    <div style={{ fontSize:9, color:'rgba(255,255,255,0.6)', marginTop:6 }}>
+    <div style={{ fontSize:9, color:'rgba(255,255,255,0.85)', marginTop:6 }}>
       🥜 Берите с собой: орехи, протеиновые батончики, сухофрукты<br />
       🍗 В ресторане: выбирайте белковую основу, просите соус отдельно<br />
       💧 В самолёте: пейте больше воды, ограничьте алкоголь
@@ -301,7 +303,7 @@ const SleepGuide: React.FC = () => {
   return (<>
     <div style={{ fontSize:12, fontWeight:600, color:'#fff', marginBottom:6 }}>💤 Сон и восстановление</div>
     {sleepStacks.length > 0 ? sleepStacks.map((s: any, i: number) => <div key={i} style={{ fontSize:9, color:'#fff', marginBottom:4 }}>{s}</div>) : <div style={{ fontSize:10, color:'rgba(255,255,255,0.8)', padding:10 }}>Нет сохранённых стеков.</div>}
-    <div style={{ fontSize:9, color:'rgba(255,255,255,0.6)', marginTop:6 }}>
+    <div style={{ fontSize:9, color:'rgba(255,255,255,0.85)', marginTop:6 }}>
       🌙 Последний приём за 2-3 ч до сна<br />
       🥛 Казеин/творог 30г на ночь ↓ катаболизм<br />
       🧘 Магний 400-600 мг + глицинат улучшают качество сна
@@ -331,7 +333,7 @@ const ReportsTab: React.FC<{ foodEntries: DiaryEntry[] }> = ({ foodEntries }) =>
   const byMeal: Record<string,{kcal:number;p:number;f:number;c:number;count:number}> = reportMode === 'day' && dayData ? Object.fromEntries(Object.entries(dayData.meals||{}).map(([meal,items]:[string,any]) => { const mealItems = items||[]; return [meal, {kcal:mealItems.reduce((s:number,i:any)=>s+(i.kcal||0),0), p:mealItems.reduce((s:number,i:any)=>s+(i.p||0),0), f:mealItems.reduce((s:number,i:any)=>s+(i.f||0),0), c:mealItems.reduce((s:number,i:any)=>s+(i.c||0),0), count:mealItems.length}]; })) : {};
   const dayNames = ['Пн','Вт','Ср','Чт','Пт','Сб','Вс'];
   const reportBtn = (isActive: boolean, onClick: () => void, children: React.ReactNode) => (
-    <button onClick={onClick} style={{ padding:'5px 12px', borderRadius:8, fontSize:9, cursor:'pointer', border: isActive ? '1px solid #00e68a' : '1px solid rgba(255,255,255,0.06)', background: isActive ? 'linear-gradient(135deg,rgba(0,230,138,0.2),rgba(0,200,160,0.12))' : '#202023', color: isActive ? '#00e68a' : 'rgba(255,255,255,0.6)', fontWeight: isActive ? 700 : 400 }}>{children}</button>
+    <button onClick={onClick} style={{ padding:'5px 12px', borderRadius:8, fontSize:9, cursor:'pointer', border: isActive ? '1px solid #00e68a' : '1px solid rgba(255,255,255,0.06)', background: isActive ? 'linear-gradient(135deg,rgba(0,230,138,0.2),rgba(0,200,160,0.12))' : '#202023', color: isActive ? '#00e68a' : 'rgba(255,255,255,0.85)', fontWeight: isActive ? 700 : 400 }}>{children}</button>
   );
   return (<div style={{ display:'flex', flexDirection:'column', gap:8 }}>
     <div style={{ padding:14, ...cardBg }}>
@@ -349,20 +351,20 @@ const ReportsTab: React.FC<{ foodEntries: DiaryEntry[] }> = ({ foodEntries }) =>
       </div>}
       <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr 1fr', gap:6, marginBottom:8 }}>
         {[{l:'Ккал',v:Math.round(totals.kcal),c:'#00e68a'},{l:'Белки',v:Math.round(totals.p),c:'#3b82f6'},{l:'Жиры',v:Math.round(totals.f),c:'#f59e0b'},{l:'Угл.',v:Math.round(totals.c),c:'#f97316'},{l:'Ед.',v:totals.count,c:'#a78bfa'}].map((s,i) => <div key={i} style={{ background:'#202023', borderRadius:8, padding:'5px', textAlign:'center' }}>
-          <div style={{ fontSize:7, color:'rgba(255,255,255,0.6)' }}>{s.l}</div><div style={{ fontSize:15, fontWeight:800, color:s.c }}>{s.v}</div>
+          <div style={{ fontSize:7, color:'rgba(255,255,255,0.85)' }}>{s.l}</div><div style={{ fontSize:15, fontWeight:800, color:s.c }}>{s.v}</div>
         </div>)}
       </div>
       {reportMode === 'day' && Object.keys(byMeal).length > 0 && <div>
-        <div style={{ fontSize:9, color:'rgba(255,255,255,0.6)', marginBottom:4 }}>По приёмам пищи:</div>
+        <div style={{ fontSize:9, color:'rgba(255,255,255,0.85)', marginBottom:4 }}>По приёмам пищи:</div>
         {Object.entries(byMeal).map(([meal, vals]) => <div key={meal} style={{ display:'flex', justifyContent:'space-between', padding:'3px 0', borderBottom:'1px solid rgba(255,255,255,0.06)', fontSize:9, color:'#fff' }}>
           <span style={{ fontWeight:600 }}>{meal}</span>
-          <span style={{ color:'rgba(255,255,255,0.6)' }}>{Math.round(vals.kcal)} ккал | Б{Math.round(vals.p)} Ж{Math.round(vals.f)} У{Math.round(vals.c)}</span>
+          <span style={{ color:'rgba(255,255,255,0.85)' }}>{Math.round(vals.kcal)} ккал | Б{Math.round(vals.p)} Ж{Math.round(vals.f)} У{Math.round(vals.c)}</span>
         </div>)}
       </div>}
       {data.length > 0 && <div style={{ marginTop:6 }}>
-        <div style={{ fontSize:9, color:'rgba(255,255,255,0.6)', marginBottom:4 }}>Продукты:</div>
+        <div style={{ fontSize:9, color:'rgba(255,255,255,0.85)', marginBottom:4 }}>Продукты:</div>
         <div style={{ maxHeight:150, overflowY:'auto' }}>
-          {data.map((i:any, idx:number) => <div key={idx} style={{ display:'flex', justifyContent:'space-between', padding:'2px 0', fontSize:8, color:'rgba(255,255,255,0.6)' }}>
+          {data.map((i:any, idx:number) => <div key={idx} style={{ display:'flex', justifyContent:'space-between', padding:'2px 0', fontSize:8, color:'rgba(255,255,255,0.85)' }}>
             <span>{i.name} {i.meal ? <span style={{ color:'rgba(255,255,255,0.8)' }}>({i.meal})</span> : ''}</span>
             <span>{Math.round(i.kcal||0)}ккал</span>
           </div>)}
@@ -449,7 +451,7 @@ export const NutritionScreen: React.FC = () => {
           {Object.entries(groups).map(([cat, items]) => (
             <div key={cat}>
               <div style={{ fontSize:9, fontWeight:700, color:'#f97316', marginBottom:2, padding:'2px 0', borderBottom:'1px solid rgba(249,115,22,0.08)', display:'flex', alignItems:'center', gap:4 }}>
-                {cat} <span style={{ fontSize:7, color:'rgba(255,255,255,0.6)', fontWeight:400 }}>({items.length})</span>
+                {cat} <span style={{ fontSize:7, color:'rgba(255,255,255,0.85)', fontWeight:400 }}>({items.length})</span>
               </div>
               {items.map(f => (
                 <div key={f.id} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'4px 8px', borderRadius:8, background:'#202023', border:'1px solid rgba(255,255,255,0.04)', marginBottom:2 }}>
@@ -482,10 +484,10 @@ export const NutritionScreen: React.FC = () => {
         </div>
         <div style={{ padding:'8px 12px 12px', background:'#18181b', borderTop:'1px solid rgba(255,255,255,0.06)' }}>
           <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-            {[
-              { section: 'diary' as NutritionSection, tab: 'mealplan' as ActiveTab, icon: '🥗', title: 'Планирование питания', desc: 'Индивидуальный план, дневник, корзина', color: '#3b82f6' },
-              { section: 'diary' as NutritionSection, tab: 'charts' as ActiveTab, icon: '📊', title: 'Аналитика питания', desc: 'Графики КБЖУ, отчёты, рецепты', color: '#8b5cf6' },
-            ].map(card => (
+              {[
+                { section: 'overview' as NutritionSection, tab: 'diary' as ActiveTab, icon: '📋', title: 'Дневник и аналитика', desc: 'Дневник, графики, отчёты, справочник', color: '#22c55e' },
+                { section: 'planning' as NutritionSection, tab: 'mealplan' as ActiveTab, icon: '🥗', title: 'Планирование питания', desc: 'План, корзина, каталог, рецепты', color: '#f97316' },
+              ].map(card => (
               <button key={card.tab} onClick={() => { setPage('tabs'); setNutritionSection(card.section); setTab(card.tab); }} style={{
                 display:'flex', alignItems:'center', gap:12, padding:'12px 14px', borderRadius:14, cursor:'pointer', textAlign:'left', width:'100%',
                 background:'#202023', border:'1px solid rgba(255,255,255,0.06)', color:'#fff',
@@ -494,7 +496,7 @@ export const NutritionScreen: React.FC = () => {
                 <div style={{ width:40, height:40, borderRadius:12, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, background: card.color + '20', fontSize:20 }}>{card.icon}</div>
                 <div style={{ flex:1 }}>
                   <div style={{ fontSize:13, fontWeight:700, marginBottom:1, color: card.color, letterSpacing:-0.2 }}>{card.title}</div>
-                  <div style={{ fontSize:9, color:'#fff', opacity:0.5 }}>{card.desc}</div>
+                  <div style={{ fontSize:9, color:'rgba(255,255,255,0.8)' }}>{card.desc}</div>
                 </div>
                 <span style={{ color: card.color, fontSize:16, opacity:0.5 }}>→</span>
               </button>
@@ -514,11 +516,11 @@ export const NutritionScreen: React.FC = () => {
         position:'sticky', top:0, zIndex:20,
       }}>
         <button onClick={() => setPage('hero')} style={{
-          padding:'4px 8px', cursor:'pointer', fontSize:20, color:'rgba(255,255,255,0.6)',
+          padding:'4px 8px', cursor:'pointer', fontSize:20, color:'rgba(255,255,255,0.85)',
           border:'none', background:'transparent', display:'flex', alignItems:'center',
         }}>←</button>
         <div style={{ flex:1, fontSize:15, fontWeight:700, color:'#fff', letterSpacing:-0.3 }}>Питание</div>
-        <span style={{ fontSize:9, color:'rgba(255,255,255,0.6)' }}>
+        <span style={{ fontSize:9, color:'#fff' }}>
           {nutritionSection === 'diary' ? 'Дневник' : 'Всё'}
         </span>
       </div>
@@ -538,7 +540,7 @@ export const NutritionScreen: React.FC = () => {
                 fontSize:10, fontWeight: isActive ? 700 : 500, letterSpacing:0.2,
                 border: isActive ? '1px solid #00e68a' : '1px solid rgba(255,255,255,0.06)',
                 background: isActive ? 'linear-gradient(135deg,#00e68a,#00c8a0)' : '#18181b',
-                color: isActive ? '#000' : 'rgba(255,255,255,0.6)',
+                color: isActive ? '#000' : '#fff',
                 transition:'all 0.2s cubic-bezier(0.22,1,0.36,1)',
               }}>
                 {TAB_LABELS[t] || t}

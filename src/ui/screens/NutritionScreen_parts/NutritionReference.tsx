@@ -286,7 +286,7 @@ export const NutritionReference: React.FC = () => {
 
 const SectionCard: React.FC<{ title: string; isOpen: boolean; onToggle: () => void; color?: string; children: React.ReactNode }> = ({ title, isOpen, onToggle, color, children }) => (
   <div style={{ padding: 10, borderRadius: 14, background: 'linear-gradient(135deg,rgba(255,255,255,0.06),rgba(255,255,255,0.02))', backdropFilter: 'blur(20px)', border: '1px solid rgba(255,255,255,0.06)' }}>
-    <button onClick={onToggle} style={{ width: '100%', padding: '3px 0', cursor: 'pointer', background: 'none', border: 'none', color: color || 'rgba(255,255,255,0.35)', fontWeight: 600, fontSize: 10, textAlign: 'left', display: 'flex', alignItems: 'center', gap: 6 }}>
+    <button onClick={onToggle} style={{ width: '100%', padding: '3px 0', cursor: 'pointer', background: 'none', border: 'none', color: color || '#fff', fontWeight: 600, fontSize: 10, textAlign: 'left', display: 'flex', alignItems: 'center', gap: 6 }}>
       <span style={{ transition: 'transform 0.2s', transform: isOpen ? 'rotate(90deg)' : 'rotate(0deg)', fontSize: 12 }}>›</span>
       {title}
     </button>
@@ -302,7 +302,7 @@ const RuleItem: React.FC<{ rule: typeof NUTRITION_RULES[number] }> = ({ rule }) 
         <span style={{ width: 16, height: 16, borderRadius: 4, background: rule.color + '20', color: rule.color, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 10, transition: 'transform 0.2s', transform: expanded ? 'rotate(90deg)' : 'rotate(0deg)' }}>›</span>
         <span>{rule.title}</span>
       </button>
-      {expanded && <div style={{ padding: '5px 8px 5px 30px', fontSize: 8, color: 'rgba(255,255,255,0.65)', lineHeight: 1.5, borderTop: '1px solid rgba(255,255,255,0.04)', background: 'rgba(0,0,0,0.15)' }}>{rule.body}</div>}
+      {expanded && <div style={{ padding: '5px 8px 5px 30px', fontSize: 8, color: '#fff', lineHeight: 1.5, borderTop: '1px solid rgba(255,255,255,0.04)', background: 'rgba(0,0,0,0.15)' }}>{rule.body}</div>}
     </div>
   );
 };
