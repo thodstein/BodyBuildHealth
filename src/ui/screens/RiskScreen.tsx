@@ -52,8 +52,8 @@ export const RiskScreen: React.FC = () => {
   const linked = useDataLink();
   const labAnalysis = linked.labAnalysis;
   const readinessData = linked.readiness;
-  const [mainTab, setMainTab] = useState<'hero' | 'calculations' | 'clinical' | 'info' | 'reports'>('hero');
-  const [subTab, setSubTab] = useState<'overview' | 'dynamics' | 'mechanisms' | 'v7' | 'model' | 'info' | 'mdss' | 'compliance' | 'clinical' | 'labs_risks'>('overview');
+  const [mainTab, setMainTab] = useState<'hero' | 'calculations' | 'clinical' | 'info'>('hero');
+  const [subTab, setSubTab] = useState<'overview' | 'dynamics' | 'mechanisms' | 'v7' | 'model' | 'info' | 'reports' | 'mdss' | 'compliance' | 'clinical' | 'labs_risks'>('overview');
 
   // Force subTab when mainTab changes
   useEffect(() => {
@@ -470,6 +470,7 @@ export const RiskScreen: React.FC = () => {
       </React.Suspense>;
       case 'dynamics': return weeklyDynamics ? <WeeklyRiskChart dynamics={weeklyDynamics} selectedWeek={selectedWeek} onWeekSelect={setSelectedWeek} mode={weekMode} onModeChange={setWeekMode} /> : <div style={{ textAlign:'center', padding:40, color:'var(--text-dim)' }}>Нет данных для динамики</div>;
       case 'info': return <RiskInfo />;
+      case 'reports': return renderRiskReports();
       case 'mdss': return <MDSSRiskDisplay />;
       case 'compliance': return <ComplianceDisplay />;
       case 'clinical': return <ClinicalRiskDisplay />;
@@ -784,7 +785,6 @@ export const RiskScreen: React.FC = () => {
                 { id: 'calculations', icon: '🧮', title: 'Комплексные расчеты', desc: 'Базовый расчёт, Монте Карло (V7), MDSS — все аналитические модели рисков.', color: '#22c55e' },
                 { id: 'clinical', icon: '🏥', title: 'Клиника', desc: '3D модель, комплаенс, клинические риски и анализы.', color: '#3b82f6' },
                 { id: 'info', icon: 'ℹ️', title: 'Общая информация', desc: 'Формулы, механизмы, пороги препаратов и справочные данные.', color: '#a855f7' },
-                { id: 'reports', icon: '📄', title: 'Отчёты', desc: 'Генерация полных отчётов по рискам с архивом.', color: '#f59e0b' },
               ].map(card => (
                 <button key={card.id} onClick={() => { setMainTab(card.id as any); setSubTab(card.id === 'info' ? 'info' : card.id === 'clinical' ? 'model' : 'overview'); }} style={{
                   display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', borderRadius: 14, cursor: 'pointer', textAlign: 'left', width: '100%',
@@ -902,16 +902,15 @@ export const RiskScreen: React.FC = () => {
                   }}>← Назад</button>
                 )}
         {(mainTab === 'calculations'
-          ? (calcPage === 'basic'
-            ? (basicPage === 'main' ? ['main'] as const : [basicPage] as const)
-            : calcPage === 'montecarlo'
-            ? (mcPage === 'main' ? ['main'] as const : [mcPage] as const)
-            : calcPage === 'mdss' ? ['mdss'] as const
-            : ['overview'] as const)
-          : mainTab === 'clinical' ? CLINICAL_SUBTABS as readonly string[]
-          : mainTab === 'reports' ? ['reports'] as readonly string[]
-          : ['info'] as readonly string[]
-        ).map(t => (
+            ? (calcPage === 'basic'
+              ? (basicPage === 'main' ? ['main'] as const : [basicPage] as const)
+              : calcPage === 'montecarlo'
+              ? (mcPage === 'main' ? ['main'] as const : [mcPage] as const)
+              : calcPage === 'mdss' ? ['mdss'] as const
+              : ['overview'] as const)
+            : mainTab === 'clinical' ? CLINICAL_SUBTABS as readonly string[]
+            : ['info', 'reports'] as readonly string[]
+          ).map(t => (
           <button key={t} onClick={() => {
             if (mainTab === 'calculations') {
               if (calcPage === 'basic') setBasicPage(t as any);
@@ -936,9 +935,7 @@ export const RiskScreen: React.FC = () => {
               {/* MONTE CARLO — multi-page */}
               {mainTab === 'calculations' && calcPage === 'montecarlo' && renderMonteCarlo()}
               {/* All other content */}
-              {!((mainTab === 'calculations' && calcPage === 'basic') || (mainTab === 'calculations' && calcPage === 'montecarlo')) && (
-                mainTab === 'reports' ? renderRiskReports() : renderContent()
-              )}
+              {!((mainTab === 'calculations' && calcPage === 'basic') || (mainTab === 'calculations' && calcPage === 'montecarlo')) && renderContent()}
             </>
           )}
           </div>

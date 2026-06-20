@@ -206,28 +206,6 @@ const QUALITY_VEGGIES = [
 
 const scoreColor = (s: number) => s >= 9 ? '#22c55e' : s >= 7 ? '#f59e0b' : s >= 5 ? '#f97316' : '#ef4444';
 
-const BOOKS = [
-  { title: 'Спортивное питание: от теории к практике', author: 'Л.М. Гунина, С.А. Олейник', desc: 'Фундаментальный учебник по спортивной нутрициологии с акцентом на доказательную медицину. Рекомендуется тренерам и спортсменам.', link: 'https://www.ncbi.nlm.nih.gov/books/NBK567778/' },
-  { title: 'Essentials of Sports Nutrition and Supplements', author: 'J. Antonio et al.', desc: 'Практическое руководство по спортивному питанию и добавкам с клиническими протоколами. Охватывает все группы добавок.', link: 'https://pubmed.ncbi.nlm.nih.gov/29027147/' },
-  { title: 'The Art and Science of Low Carbohydrate Living', author: 'J. Volek, S. Phinney', desc: 'Научное обоснование низкоуглеводного питания для спортивных результатов и метаболического здоровья. Классика кето-диеты.', link: 'https://pubmed.ncbi.nlm.nih.gov/22296900/' },
-  { title: 'Nutrient Timing: The Future of Sports Nutrition', author: 'J. Ivy, R. Portman', desc: 'Концепция нутриентного тайминга (до/во время/после тренировки) с протоколами восстановления и роста мышц.', link: 'https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4961797/' },
-  { title: 'Clinical Sports Nutrition', author: 'L. Burke, V. Deakin', desc: 'Полный справочник по клиническим аспектам спортивного питания — от гидратации до нутриентов для восстановления после травм.', link: 'https://pubmed.ncbi.nlm.nih.gov/32093029/' },
-  { title: 'The Protein Book', author: 'L. Norton, B. Wilson', desc: 'Всё о белке: метаболизм, расщепление, синтез MPS, качество протеина. Практические рекомендации по дозировкам и таймингу.', link: 'https://jissn.biomedcentral.com/articles/10.1186/s12970-019-0288-4' },
-  { title: 'Биохимия мышечной деятельности', author: 'Н.И. Волков, Э.Н. Несен', desc: 'Советский учебник по биохимии спорта — фундаментальные основы метаболизма при физической нагрузке различной интенсивности.', link: 'https://www.researchgate.net/publication/281672412' },
-  { title: 'International Society of Sports Nutrition (ISSN) Position Stands', author: 'ISSN', desc: 'Официальные консенсусные документы ISSN по протеину, креатину, BCAA, HMB, углеводам, гидратации и другим темам.', link: 'https://jissn.biomedcentral.com/articles?searchType=journalSearch&query=position+stand' },
-  { title: 'Dietary Reference Intakes (DRI)', author: 'Institute of Medicine', desc: 'Нормы потребления макро- и микронутриентов — основа для расчёта суточных потребностей в белках, жирах, углеводах, витаминах и минералах.', link: 'https://www.ncbi.nlm.nih.gov/books/NBK56068/' },
-  { title: 'The Female Athlete Triad', author: 'A. Nattiv et al.', desc: 'Специализированное руководство по питанию женщин-спортсменок: менструальная функция, плотность костей, энергетический баланс.', link: 'https://pubmed.ncbi.nlm.nih.gov/17921406/' },
-  { title: 'Metabolic Regulation: A Human Perspective', author: 'K. Frayn', desc: 'Регуляция метаболизма человека — от усвоения глюкозы до липогенеза. Необходимая база для понимания биохимии питания.', link: 'https://www.ncbi.nlm.nih.gov/books/NBK278999/' },
-  { title: 'Гидратация в спорте: мифы и факты', author: 'World Athletics', desc: 'Научный обзор гидратации спортсменов — риски гипергидратации и дегидратации, электролиты, изотоники, рекомендации.', link: 'https://worldathletics.org/about-iaaf/documents/health-and-science' },
-  { title: 'Sports Nutrition: Energy Metabolism and Exercise', author: 'I. Wolinsky, J. Driskell', desc: 'Углублённое рассмотрение энергетического обмена при занятиях спортом с акцентом на субстратный метаболизм и адаптацию.', link: 'https://pubmed.ncbi.nlm.nih.gov/17921406/' },
-  { title: 'Contemporary Nutrition: A Functional Approach', author: 'G. Wardlaw, A. Smith', desc: 'Функциональный подход к питанию — нутриенты как регуляторы клеточных процессов, влияние на иммунитет, гормоны и восстановление.', link: 'https://www.ncbi.nlm.nih.gov/books/NBK209049/' },
-  { title: 'Exercise Physiology: Nutrition, Energy, and Human Performance', author: 'W. McArdle, F. Katch, V. Katch', desc: 'Классический учебник по физиологии упражнений и спортивному питанию — 8 изданий, золотой стандарт образования.', link: 'https://www.worldcat.org/title/1005952784' },
-];
-
-const BOOK_CATEGORIES = ['Общая нутрициология', 'Спортивное питание', 'Метаболизм', 'Биохимия', 'Клинические аспекты'];
-
-const allBookIndex = BOOKS.map((b, i) => ({ ...b, origIndex: i }));
-
 export const NutritionReference: React.FC = () => {
   const [openSections, setOpenSections] = useState<Set<string>>(new Set());
   const toggle = (k: string) => setOpenSections(prev => { const s = new Set(prev); s.has(k) ? s.delete(k) : s.add(k); return s; });
@@ -238,9 +216,8 @@ export const NutritionReference: React.FC = () => {
   const allInsulin = INSULIN_GUIDE.map((r, i) => ({ ...r, section: 'insulin', id: `i${i}` }));
   const allSynergies = FOOD_SYNERGIES.map((s, i) => ({ section: 'synergy', ...s, id: `s${i}` }));
   const allRestricted = RESTRICTED.map((r, i) => ({ ...r, section: 'restricted', id: `re${i}` }));
-  const allBooks = allBookIndex.map(b => ({ title: b.title, body: `${b.author}: ${b.desc}`, section: 'books', id: `b${b.origIndex}`, color: '#6366f1' }));
 
-  const allItems = [...allRules, ...allInsulin, ...allSynergies, ...allRestricted, ...allBooks];
+  const allItems = [...allRules, ...allInsulin, ...allSynergies, ...allRestricted];
 
   const filtered = search.length >= 2
     ? allItems.filter(item => {
@@ -354,19 +331,7 @@ export const NutritionReference: React.FC = () => {
           </div>
         ))}
       </SectionCard>
-
-      <SectionCard title="📚 Книги и литература (15 источников)" isOpen={openSections.has('books')} onToggle={() => toggle('books')} color="#6366f1">
-        {BOOKS.map((b, j) => (
-          <a key={j} href={b.link} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none', display: 'block' }}>
-            <div style={{ padding: '5px 8px', borderRadius: 8, border: '1px solid rgba(99,102,241,0.1)', background: 'rgba(99,102,241,0.03)', marginBottom: 3 }}>
-              <div style={{ fontSize: 12, fontWeight: 700, color: '#818cf8', marginBottom: 2 }}>{b.title} <span style={{ fontWeight: 400, color: 'rgba(255,255,255,0.5)', fontSize: 10 }}>— {b.author}</span></div>
-              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.75)', lineHeight: 1.5, marginBottom: 2 }}>{b.desc}</div>
-              <div style={{ fontSize: 10, color: '#00e68a', fontWeight: 600, opacity: 0.7 }}>🔗 Подробнее ↗</div>
-            </div>
-          </a>
-        ))}
-      </SectionCard>
-      </>
+        </>
       )}
     </div>
   );
