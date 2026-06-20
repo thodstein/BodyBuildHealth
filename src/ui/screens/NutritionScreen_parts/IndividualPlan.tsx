@@ -167,6 +167,18 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
 
   // 3. Phase + course drugs
   const [phase, setPhase] = useState<PhaseId>('course');
+
+  // Auto-cycling: phase → recommended goal
+  const phaseToGoal: Record<PhaseId, GoalId> = {
+    course: 'mass', bridge: 'maintenance', pct: 'maintenance',
+    recovery: 'maintenance', cutting: 'cutting', maintenance: 'maintenance',
+    recomp: 'recomposition', fat_loss: 'fat_loss', post_cut: 'post_cut',
+  };
+  const autoGoal = phaseToGoal[phase] || 'maintenance';
+  const [goalUserSet, setGoalUserSet] = useState(false);
+  useEffect(() => {
+    if (!goalUserSet) setGoal(autoGoal);
+  }, [phase, autoGoal, goalUserSet]);
   const [injections, setInjections] = useState<DrugInjection[]>(() => {
     // Auto-pull from pharma course with proper type detection
     if (courseEntries.length > 0) {
@@ -1830,11 +1842,18 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
       <GlassCard title="Цель" icon="🎯" color="#00e68a">
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
           {GOALS.map(g => (
-            <PillBtn key={g.id} active={goal === g.id} onClick={() => setGoal(g.id)} color={goal === g.id ? '#00e68a' : undefined}>
+            <PillBtn key={g.id} active={goal === g.id} onClick={() => { setGoal(g.id); setGoalUserSet(true); }} color={goal === g.id ? '#00e68a' : undefined}>
               {g.icon} {g.label}
+              {autoGoal === g.id && !goalUserSet && <span style={{ marginLeft: 3, fontSize: 7, color: '#00e68a', fontWeight: 800 }}>⚡</span>}
             </PillBtn>
           ))}
         </div>
+        {autoGoal !== goal && goalUserSet && (
+          <div style={{ marginTop: 4, fontSize: 8, color: 'rgba(255,255,255,0.5)', textAlign: 'center' }}>
+            Фаза «{PHASES.find(p => p.id === phase)?.label}» → рекомендована цель «{GOALS.find(g => g.id === autoGoal)?.label}».
+            <span onClick={() => { setGoal(autoGoal); setGoalUserSet(false); }} style={{ color: '#00e68a', cursor: 'pointer', fontWeight: 600, marginLeft: 2 }}>Применить</span>
+          </div>
+        )}
       </GlassCard>
 
       {/* 3. Phase + drugs card */}

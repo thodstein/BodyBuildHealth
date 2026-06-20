@@ -206,12 +206,86 @@ const QUALITY_VEGGIES = [
 
 const scoreColor = (s: number) => s >= 9 ? '#22c55e' : s >= 7 ? '#f59e0b' : s >= 5 ? '#f97316' : '#ef4444';
 
+const BOOKS = [
+  { title: 'Спортивное питание: от теории к практике', author: 'Л.М. Гунина, С.А. Олейник', desc: 'Фундаментальный учебник по спортивной нутрициологии с акцентом на доказательную медицину. Рекомендуется тренерам и спортсменам.', link: 'https://www.ncbi.nlm.nih.gov/books/NBK567778/' },
+  { title: 'Essentials of Sports Nutrition and Supplements', author: 'J. Antonio et al.', desc: 'Практическое руководство по спортивному питанию и добавкам с клиническими протоколами. Охватывает все группы добавок.', link: 'https://pubmed.ncbi.nlm.nih.gov/29027147/' },
+  { title: 'The Art and Science of Low Carbohydrate Living', author: 'J. Volek, S. Phinney', desc: 'Научное обоснование низкоуглеводного питания для спортивных результатов и метаболического здоровья. Классика кето-диеты.', link: 'https://pubmed.ncbi.nlm.nih.gov/22296900/' },
+  { title: 'Nutrient Timing: The Future of Sports Nutrition', author: 'J. Ivy, R. Portman', desc: 'Концепция нутриентного тайминга (до/во время/после тренировки) с протоколами восстановления и роста мышц.', link: 'https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4961797/' },
+  { title: 'Clinical Sports Nutrition', author: 'L. Burke, V. Deakin', desc: 'Полный справочник по клиническим аспектам спортивного питания — от гидратации до нутриентов для восстановления после травм.', link: 'https://pubmed.ncbi.nlm.nih.gov/32093029/' },
+  { title: 'The Protein Book', author: 'L. Norton, B. Wilson', desc: 'Всё о белке: метаболизм, расщепление, синтез MPS, качество протеина. Практические рекомендации по дозировкам и таймингу.', link: 'https://jissn.biomedcentral.com/articles/10.1186/s12970-019-0288-4' },
+  { title: 'Биохимия мышечной деятельности', author: 'Н.И. Волков, Э.Н. Несен', desc: 'Советский учебник по биохимии спорта — фундаментальные основы метаболизма при физической нагрузке различной интенсивности.', link: 'https://www.researchgate.net/publication/281672412' },
+  { title: 'International Society of Sports Nutrition (ISSN) Position Stands', author: 'ISSN', desc: 'Официальные консенсусные документы ISSN по протеину, креатину, BCAA, HMB, углеводам, гидратации и другим темам.', link: 'https://jissn.biomedcentral.com/articles?searchType=journalSearch&query=position+stand' },
+  { title: 'Dietary Reference Intakes (DRI)', author: 'Institute of Medicine', desc: 'Нормы потребления макро- и микронутриентов — основа для расчёта суточных потребностей в белках, жирах, углеводах, витаминах и минералах.', link: 'https://www.ncbi.nlm.nih.gov/books/NBK56068/' },
+  { title: 'The Female Athlete Triad', author: 'A. Nattiv et al.', desc: 'Специализированное руководство по питанию женщин-спортсменок: менструальная функция, плотность костей, энергетический баланс.', link: 'https://pubmed.ncbi.nlm.nih.gov/17921406/' },
+  { title: 'Metabolic Regulation: A Human Perspective', author: 'K. Frayn', desc: 'Регуляция метаболизма человека — от усвоения глюкозы до липогенеза. Необходимая база для понимания биохимии питания.', link: 'https://www.ncbi.nlm.nih.gov/books/NBK278999/' },
+  { title: 'Гидратация в спорте: мифы и факты', author: 'World Athletics', desc: 'Научный обзор гидратации спортсменов — риски гипергидратации и дегидратации, электролиты, изотоники, рекомендации.', link: 'https://worldathletics.org/about-iaaf/documents/health-and-science' },
+  { title: 'Sports Nutrition: Energy Metabolism and Exercise', author: 'I. Wolinsky, J. Driskell', desc: 'Углублённое рассмотрение энергетического обмена при занятиях спортом с акцентом на субстратный метаболизм и адаптацию.', link: 'https://pubmed.ncbi.nlm.nih.gov/17921406/' },
+  { title: 'Contemporary Nutrition: A Functional Approach', author: 'G. Wardlaw, A. Smith', desc: 'Функциональный подход к питанию — нутриенты как регуляторы клеточных процессов, влияние на иммунитет, гормоны и восстановление.', link: 'https://www.ncbi.nlm.nih.gov/books/NBK209049/' },
+  { title: 'Exercise Physiology: Nutrition, Energy, and Human Performance', author: 'W. McArdle, F. Katch, V. Katch', desc: 'Классический учебник по физиологии упражнений и спортивному питанию — 8 изданий, золотой стандарт образования.', link: 'https://www.worldcat.org/title/1005952784' },
+];
+
+const BOOK_CATEGORIES = ['Общая нутрициология', 'Спортивное питание', 'Метаболизм', 'Биохимия', 'Клинические аспекты'];
+
+const allBookIndex = BOOKS.map((b, i) => ({ ...b, origIndex: i }));
+
 export const NutritionReference: React.FC = () => {
   const [openSections, setOpenSections] = useState<Set<string>>(new Set());
   const toggle = (k: string) => setOpenSections(prev => { const s = new Set(prev); s.has(k) ? s.delete(k) : s.add(k); return s; });
+  const [search, setSearch] = useState('');
+
+  // Combine all searchable content
+  const allRules = NUTRITION_RULES.map((r, i) => ({ ...r, section: 'rules', id: `r${i}` }));
+  const allInsulin = INSULIN_GUIDE.map((r, i) => ({ ...r, section: 'insulin', id: `i${i}` }));
+  const allSynergies = FOOD_SYNERGIES.map((s, i) => ({ section: 'synergy', ...s, id: `s${i}` }));
+  const allRestricted = RESTRICTED.map((r, i) => ({ ...r, section: 'restricted', id: `re${i}` }));
+  const allBooks = allBookIndex.map(b => ({ title: b.title, body: `${b.author}: ${b.desc}`, section: 'books', id: `b${b.origIndex}`, color: '#6366f1' }));
+
+  const allItems = [...allRules, ...allInsulin, ...allSynergies, ...allRestricted, ...allBooks];
+
+  const filtered = search.length >= 2
+    ? allItems.filter(item => {
+        const q = search.toLowerCase();
+        const t = 'title' in item ? (item.title || '').toLowerCase() : '';
+        const b = 'body' in item ? (item.body || '').toLowerCase() : '';
+        const pair = 'pair' in item ? (item.pair || '').toLowerCase() : '';
+        const effect = 'effect' in item ? (item.effect || '').toLowerCase() : '';
+        const itemS = 'item' in item ? (item.item || '').toLowerCase() : '';
+        return t.includes(q) || b.includes(q) || pair.includes(q) || effect.includes(q) || itemS.includes(q);
+      })
+    : null;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      {/* Search bar */}
+      <div style={{ position: 'sticky', top: 0, zIndex: 10, paddingBottom: 6, background: '#18181b' }}>
+        <input value={search} onChange={e => setSearch(e.target.value)} placeholder="🔍 Поиск по всему справочнику..." style={{ width: '100%', padding: '8px 10px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.1)', background: '#202023', color: '#fff', fontSize: 11, outline: 'none', boxShadow: search ? '0 0 0 1px rgba(0,230,138,0.3)' : 'none' }} />
+      </div>
+
+      {/* Search results overlay */}
+      {filtered && filtered.length > 0 && (
+        <div style={{ padding: '6px 8px', borderRadius: 10, background: '#202023', border: '1px solid rgba(255,255,255,0.06)', marginBottom: 4 }}>
+          <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)', marginBottom: 4, fontWeight: 600 }}>Результатов: {filtered.length}</div>
+          {filtered.slice(0, 30).map(item => (
+            <div key={item.id} style={{ padding: '4px 0', borderBottom: '1px solid rgba(255,255,255,0.03)', fontSize: 9, lineHeight: 1.4 }}>
+              <span style={{ color: '#00e68a', fontWeight: 700 }}>
+                {item.section === 'rules' ? '📋 ' : item.section === 'insulin' ? '💉 ' : item.section === 'synergy' ? '🍽 ' : item.section === 'restricted' ? '⚠️ ' : '📚 '}
+                {'title' in item ? (item as any).title : 'pair' in item ? (item as any).pair : 'item' in item ? (item as any).item : ''}
+              </span>
+              <div style={{ color: 'rgba(255,255,255,0.65)', marginTop: 1 }}>
+                {'body' in item ? (item as any).body?.slice(0, 200) : 'note' in item ? (item as any).note?.slice(0, 200) : ''}
+              </div>
+            </div>
+          ))}
+          {filtered.length > 30 && <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.4)', textAlign: 'center', padding: 4 }}>...и ещё {filtered.length - 30} результатов</div>}
+        </div>
+      )}
+
+      {filtered && filtered.length === 0 && (
+        <div style={{ padding: 12, borderRadius: 10, background: '#202023', border: '1px solid rgba(255,255,255,0.06)', textAlign: 'center', fontSize: 10, color: 'rgba(255,255,255,0.5)' }}>Ничего не найдено. Попробуйте другой запрос.</div>
+      )}
+
+      {!search && (
+        <>
       <SectionCard title="📋 Правила питания (35 правил)" isOpen={openSections.has('rules')} onToggle={() => toggle('rules')}>
         {NUTRITION_RULES.map((r, i) => <RuleItem key={i} rule={r} />)}
       </SectionCard>
@@ -259,10 +333,10 @@ export const NutritionReference: React.FC = () => {
               <div style={{ minWidth: 20, height: 20, borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', background: typeColor + '15', color: typeColor, fontWeight: 800, fontSize: 12 }}>{typeIcon}</div>
               <div style={{ flex: 1 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap', marginBottom: 1 }}>
-                  <span style={{ fontSize: 9, fontWeight: 600, color: 'var(--text)' }}>{p.pair}</span>
+                  <span style={{ fontSize: 9, fontWeight: 600, color: '#fff' }}>{p.pair}</span>
                   <span style={{ fontSize: 8, fontWeight: 700, color: typeColor, background: typeColor + '12', padding: '1px 5px', borderRadius: 6, whiteSpace: 'nowrap' }}>{p.effect}</span>
                 </div>
-                <div style={{ fontSize: 7, color: 'var(--text-dim)', lineHeight: 1.4 }}>{p.note}</div>
+                <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.85)', lineHeight: 1.4 }}>{p.note}</div>
               </div>
             </div>
           );
@@ -271,15 +345,29 @@ export const NutritionReference: React.FC = () => {
 
       <SectionCard title="⚠️ Ограничить (15 пунктов)" isOpen={openSections.has('restricted')} onToggle={() => toggle('restricted')} color="#ef4444">
         {RESTRICTED.map((w, j) => (
-          <div key={j} style={{ display: 'flex', alignItems: 'flex-start', gap: 6, fontSize: 9, color: 'rgba(255,255,255,0.75)', lineHeight: 1.4, marginBottom: 3, padding: '3px 6px', borderRadius: 6, background: 'rgba(239,68,68,0.03)' }}>
+          <div key={j} style={{ display: 'flex', alignItems: 'flex-start', gap: 6, fontSize: 9, color: 'rgba(255,255,255,0.85)', lineHeight: 1.4, marginBottom: 3, padding: '3px 6px', borderRadius: 6, background: 'rgba(239,68,68,0.03)' }}>
             <span style={{ color: '#ef4444', flexShrink: 0, marginTop: 1 }}>✕</span>
             <div>
               <span style={{ fontWeight: 600, color: '#ef4444' }}>{w.item}</span>
-              <span style={{ color: 'var(--text-dim)', marginLeft: 2 }}>— {w.note}</span>
+              <span style={{ color: 'rgba(255,255,255,0.85)', marginLeft: 2 }}>— {w.note}</span>
             </div>
           </div>
         ))}
       </SectionCard>
+
+      <SectionCard title="📚 Книги и литература (15 источников)" isOpen={openSections.has('books')} onToggle={() => toggle('books')} color="#6366f1">
+        {BOOKS.map((b, j) => (
+          <a key={j} href={b.link} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none', display: 'block' }}>
+            <div style={{ padding: '5px 8px', borderRadius: 8, border: '1px solid rgba(99,102,241,0.1)', background: 'rgba(99,102,241,0.03)', marginBottom: 3 }}>
+              <div style={{ fontSize: 9, fontWeight: 700, color: '#818cf8', marginBottom: 1 }}>{b.title} <span style={{ fontWeight: 400, color: 'rgba(255,255,255,0.5)', fontSize: 8 }}>— {b.author}</span></div>
+              <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.75)', lineHeight: 1.4, marginBottom: 2 }}>{b.desc}</div>
+              <div style={{ fontSize: 7, color: '#00e68a', fontWeight: 600, opacity: 0.7 }}>🔗 Подробнее ↗</div>
+            </div>
+          </a>
+        ))}
+      </SectionCard>
+      </>
+      )}
     </div>
   );
 };
