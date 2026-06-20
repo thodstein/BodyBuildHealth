@@ -3,6 +3,8 @@ import { FOOD_DB } from '../../core/nutrition-database';
 import { useDataLink, derivePAL } from '../../core/data-link';
 import { getRecipes } from '../../engines/nutrition-periodization.engine';
 import { calcNutrition } from '../../engines/nutrition.engine';
+import { calcNutritionV2 } from '../../engines/nutrition-v2.engine';
+import { checkMetabolicAdaptation, suggestNextPhase } from '../../engines/nutrition-periodization-v2.engine';
 import { NutritionDiary } from './NutritionScreen_parts/NutritionDiary';
 import { IndividualPlan } from './NutritionScreen_parts/IndividualPlan';
 import { NutritionReference } from './NutritionScreen_parts/NutritionReference';
@@ -10,6 +12,8 @@ import { addToCart, getCarts, saveCarts, getActiveStoreId, setActiveStoreId, CAR
 
 const NutritionCharts = lazy(() => import('./NutritionScreen_parts/NutritionCharts').then(m => ({ default: m.NutritionCharts })));
 import { generateNutritionReport, NutritionReport } from '../../engines/nutrition-report.engine';
+import { getNutritionV2Data, saveNutritionV2Data } from '../../core/nutrition-v2-data';
+import { getQualityLabel } from '../../engines/nutrition-quality.engine';
 
 interface DiaryEntry { name: string; kcal: number; p: number; f: number; c: number; date?: string; }
 type NutritionPage = 'hero' | 'tabs';
@@ -887,6 +891,23 @@ const ReportsTab: React.FC<{ foodEntries: DiaryEntry[]; profile?: any; targets?:
           <div style={{ fontSize:7, color:'rgba(255,255,255,0.85)' }}>{s.l}</div><div style={{ fontSize:15, fontWeight:800, color:s.c }}>{s.v}</div>
         </div>)}
       </div>
+      {(function() {
+        try {
+          const nv2 = getNutritionV2Data();
+          if (nv2.qualityScore <= 0) return null;
+          const { getQualityLabel } = require('../../engines/nutrition-quality.engine');
+          const ql = getQualityLabel(nv2.qualityScore);
+          return (
+            <div style={{ padding:'8px 10px', borderRadius:8, background:'#202023', display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
+              <div>
+                <div style={{ fontSize:9, color:'rgba(255,255,255,0.85)' }}>{ql.emoji} Качество рациона</div>
+                <div style={{ fontSize:8, color:'rgba(255,255,255,0.5)' }}>Клетчатка: {nv2.qualityBreakdown.fiber}/15 · Микро: {nv2.qualityBreakdown.microDensity}/30</div>
+              </div>
+              <div style={{ fontSize:20, fontWeight:800, color:ql.color }}>{nv2.qualityScore}<span style={{ fontSize:10, fontWeight:400 }}>/100</span></div>
+            </div>
+          );
+        } catch { return null; }
+      })()}
       {reportMode === 'day' && Object.keys(byMeal).length > 0 && <div>
         <div style={{ fontSize:9, color:'rgba(255,255,255,0.85)', marginBottom:4 }}>По приёмам пищи:</div>
         {Object.entries(byMeal).map(([meal, vals]) => <div key={meal} style={{ display:'flex', justifyContent:'space-between', padding:'3px 0', borderBottom:'1px solid rgba(255,255,255,0.06)', fontSize:9, color:'#fff' }}>
@@ -1039,21 +1060,17 @@ export const NutritionScreen: React.FC = () => {
 
   if (page === 'hero') {
     return (
-      <div className="screen nutrition" style={{ flex:1, minHeight:0, display:'flex', flexDirection:'column', overflow:'auto', padding:0 }}>
-        <div style={{ flex:1, position:'relative', overflow:'hidden' }}>
-          <img src="/nutrition-hero.jpg" alt="" style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'cover', objectPosition:'center top' }} />
-          <div style={{ position:'absolute', inset:0, background:'linear-gradient(transparent 50%, rgba(0,0,0,0.85))' }} />
-          <div style={{ position:'relative', zIndex:2, display:'flex', flexDirection:'column', justifyContent:'flex-end', height:'100%', padding:'0 16px 24px' }}>
-            <h1 style={{ fontSize:28, fontWeight:800, color:'#fff', margin:0, textShadow:'0 2px 14px rgba(0,0,0,0.9)', letterSpacing:-0.5 }}>Питание</h1>
-            <p style={{ fontSize:11, color:'rgba(255,255,255,0.85)', margin:'2px 0 0', textShadow:'0 1px 6px rgba(0,0,0,0.8)' }}>Рекомендации и составление рациона под указанные параметры</p>
-          </div>
-        </div>
-        <div style={{ padding:'8px 12px 12px', background:'rgba(24,24,27,0.12)', borderTop:'1px solid rgba(255,255,255,0.04)' }}>
+      <div style={{ position:'fixed', inset:0, display:'flex', flexDirection:'column' }}>
+        <img src="/nutrition-hero.jpg" alt="" style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'cover', objectPosition:'center top' }} />
+        <div style={{ position:'absolute', inset:0, background:'linear-gradient(transparent 45%, rgba(0,0,0,0.85))' }} />
+        <div style={{ position:'relative', zIndex:2, flex:1, display:'flex', flexDirection:'column', justifyContent:'flex-end', padding:'16px 16px 80px' }}>
+          <h1 style={{ fontSize:22, fontWeight:800, color:'#fff', margin:'0 0 2px', textShadow:'0 2px 14px rgba(0,0,0,0.9)' }}>Питание</h1>
+          <p style={{ fontSize:11, color:'rgba(255,255,255,0.9)', margin:'0 0 14px', textShadow:'0 1px 8px rgba(0,0,0,0.8)' }}>Рекомендации и составление рациона под указанные параметры</p>
           <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-              {[
-                { section: 'diary' as NutritionSection, tab: 'diary' as ActiveTab, icon: '📋', title: 'Дневник и аналитика', desc: 'Дневник, графики, отчёты', color: '#22c55e' },
-                { section: 'planning' as NutritionSection, tab: 'mealplan' as ActiveTab, icon: '🥗', title: 'Планирование питания', desc: 'План, справочник, инфо', color: '#f97316' },
-              ].map(card => (
+            {[
+              { section: 'diary' as NutritionSection, tab: 'diary' as ActiveTab, icon: '📋', title: 'Дневник и аналитика', desc: 'Дневник, графики, отчёты', color: '#22c55e' },
+              { section: 'planning' as NutritionSection, tab: 'mealplan' as ActiveTab, icon: '🥗', title: 'Планирование питания', desc: 'План, справочник, инфо', color: '#f97316' },
+            ].map(card => (
               <button key={card.tab} onClick={() => { setPage('tabs'); setNutritionSection(card.section); setTab(card.tab); }} style={{
                 display:'flex', alignItems:'center', gap:12, padding:'12px 14px', borderRadius:14, cursor:'pointer', textAlign:'left', width:'100%',
                 background:'rgba(24,24,27,0.15)', border:'1px solid rgba(255,255,255,0.04)', color:'var(--text)',
@@ -1089,6 +1106,41 @@ export const NutritionScreen: React.FC = () => {
           {nutritionSection === 'diary' ? 'Дневник' : 'Всё'}
         </span>
       </div>
+
+      {/* V2 adjustments bar — shows on mealplan tab */}
+      {tab === 'mealplan' && (function() {
+        const nv2 = getNutritionV2Data();
+        const s = linked.profile?.settings;
+        const v2Result = (() => {
+          if (!s) return null;
+          try {
+            const engineGoal = ({ mass:'bulk', strength:'strength', fat_loss:'cut', cutting:'cut', maintenance:'maintenance', recomposition:'recomp' } as any)[s.primaryGoal || 'maintenance'] || 'maintenance';
+            return calcNutritionV2({ weightKg: s.weight || 80, heightCm: s.height || 175, age: s.age || 30, sex: s.sex || 'male', pal: 1.55, goal: engineGoal, bodyFatPercent: s.bodyFat });
+          } catch { return null; }
+        })();
+        const active: string[] = [];
+        if (nv2.lazyDayActive) active.push('🛋 Ленивый день');
+        if (nv2.cravingMode) active.push('🍬 Хочу сладкое');
+        if (nv2.compensationActive) active.push(`⚖ Компенсация ${nv2.compensationRemaining}ккал`);
+        if (nv2.hungryLevel > 7) active.push('😋 Высокий голод');
+        if (nv2.metabolicAdaptation > 0) active.push(`📉 Адаптация -${Math.round(nv2.metabolicAdaptation * 100)}%`);
+        if (v2Result && v2Result.adjustment !== 0) active.push(`📊 TDEE корр. ${v2Result.adjustment > 0 ? '+' : ''}${v2Result.adjustment}ккал`);
+        if (s.bodyFat) active.push(`🧬 %жира: ${s.bodyFat}%`);
+        // Periodization suggestions
+        const metaCheck = checkMetabolicAdaptation();
+        metaCheck.suggestions.forEach(sug => {
+          active.push(`${sug.urgency === 'critical' ? '🔴' : sug.urgency === 'warning' ? '🟡' : 'ℹ️'} ${sug.action.slice(0, 40)}`);
+        });
+
+        if (active.length === 0) return null;
+        return (
+          <div style={{ display:'flex', gap:3, padding:'4px 8px', overflowX:'auto', scrollbarWidth:'none', flexShrink:0 }}>
+            {active.map((a,i) => (
+              <span key={i} style={{ padding:'3px 8px', borderRadius:6, fontSize:8, background:'rgba(0,230,138,0.1)', color:'#00e68a', border:'1px solid rgba(0,230,138,0.2)', whiteSpace:'nowrap' }}>{a}</span>
+            ))}
+          </div>
+        );
+      })()}
 
       <div style={{ flex:1, minHeight:0, overflowY:'auto', padding:'0 8px 80px' }}>
         <div style={{

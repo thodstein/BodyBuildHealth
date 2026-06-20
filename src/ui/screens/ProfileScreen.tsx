@@ -2,6 +2,7 @@
 import type { UserProfile, InjuryRecord, SupplementEntry, MedicationEntry, LabPoint, WorkoutLog, StrengthLogEntry } from '../../core/types';
 import { getProfile, updateProfile, useProfileRefresh } from '../../core/profile-manager';
 import { saveContraindications, CHRONIC_CONDITIONS_LIST, ORGAN_WEAKNESSES, GENETIC_POLYMORPHISMS, getContraindications } from '../../core/contraindications';
+import { getNutritionV2Data, saveNutritionV2Data, addWeightEntry, calcTrend } from '../../core/nutrition-v2-data';
 import { db } from '../../core/db';
 import { calcReadiness } from '../../engines/readiness.engine';
 import { computeLabIndices, interpretLabIndices } from '../../engines/labs-indices.engine';
@@ -293,6 +294,13 @@ export const ProfileScreen: React.FC = () => {
       allergyNotes: settings.allergyNotes || '',
     });
   }, [settings.chronicConditions, settings.foodAllergies, settings.foodIntolerances, settings.excludedFoods, settings.allergyNotes]);
+  const nutV2 = getNutritionV2Data();
+  useEffect(() => {
+    if (settings.weight && nutV2.weightHistory.length === 0) {
+      addWeightEntry(settings.weight);
+    }
+    if (settings.bodyFat) saveNutritionV2Data({ bodyFatPercent: settings.bodyFat });
+  }, []);
   const readinessScores = calcReadiness({
     sleepHours: settings.baselineSleepHours ?? 7,
     sleepQuality: settings.baselineSleepQuality ?? 5,
@@ -606,6 +614,69 @@ export const ProfileScreen: React.FC = () => {
               <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginTop:10 }}>
                 <div><span style={sectionLabel}>Экстренный контакт (имя)</span><input style={appleInput} value={settings.emergencyName ?? ''} onChange={e => save({ emergencyName: e.target.value })} /></div>
                 <div><span style={sectionLabel}>Экстренный телефон</span><input style={appleInput} value={settings.emergencyPhone ?? ''} onChange={e => save({ emergencyPhone: e.target.value })} /></div>
+              </div>
+            </div>
+
+            <div style={glassCard}>
+              <div style={sectionLabel}>Питание v2 (динамический TDEE)</div>
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginTop:4 }}>
+                <div style={{ background:'rgba(0,230,138,0.06)', borderRadius:10, padding:'8px 10px', textAlign:'center' }}>
+                  <div style={{ fontSize:9, color:'rgba(255,255,255,0.5)' }}>Текущий TDEE</div>
+                  <div style={{ fontSize:20, fontWeight:800, color:'#00e68a' }}>{Math.round(nutV2.currentTDEE)}</div>
+                  <div style={{ fontSize:9, color: nutV2.tdeeAdjustment > 50 ? '#ef4444' : nutV2.tdeeAdjustment < -50 ? '#22c55e' : 'rgba(255,255,255,0.5)' }}>
+                    {nutV2.tdeeAdjustment !== 0 ? `${nutV2.tdeeAdjustment > 0 ? '+' : ''}${Math.round(nutV2.tdeeAdjustment)} ккал корр.` : 'базовый'}
+                  </div>
+                </div>
+                <div style={{ background:'rgba(59,130,246,0.06)', borderRadius:10, padding:'8px 10px', textAlign:'center' }}>
+                  <div style={{ fontSize:9, color:'rgba(255,255,255,0.5)' }}>Тренд веса</div>
+                  <div style={{ fontSize:20, fontWeight:800, color:'#3b82f6' }}>{nutV2.lastTrendKgPerWeek.toFixed(2)}</div>
+                  <div style={{ fontSize:9, color:'rgba(255,255,255,0.5)' }}>кг/нед</div>
+                </div>
+              </div>
+              <div style={{ marginTop:8, display:'flex', gap:6 }}>
+                <input type="number" id="v2-weight-input" placeholder="Вес, кг" style={{ flex:1, padding:'8px 10px', borderRadius:8, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', fontSize:12 }} />
+                <button onClick={() => { const inp = document.getElementById('v2-weight-input') as HTMLInputElement; if (inp?.value) { addWeightEntry(parseFloat(inp.value)); inp.value = ''; } }} style={{ padding:'8px 14px', borderRadius:8, border:'none', background:'var(--accent)', color:'#000', fontWeight:700, fontSize:11, cursor:'pointer' }}>Записать</button>
+              </div>
+              {nutV2.weightHistory.length > 0 && (
+                <div style={{ fontSize:9, color:'rgba(255,255,255,0.4)', marginTop:4, textAlign:'center' }}>
+                  {nutV2.weightHistory.length} записей, последняя: {nutV2.weightHistory[nutV2.weightHistory.length-1].kg} кг ({nutV2.weightHistory[nutV2.weightHistory.length-1].date})
+                </div>
+              )}
+            </div>
+
+            <div style={glassCard}>
+              <div style={sectionLabel}>🍬 Поведенческие режимы</div>
+              <div style={{ display:'flex', flexDirection:'column', gap:6, marginTop:4 }}>
+                <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                  <button onClick={() => saveNutritionV2Data({ cravingMode: !nutV2.cravingMode })} style={{
+                    padding:'5px 10px', borderRadius:8, fontSize:9, cursor:'pointer', fontWeight: nutV2.cravingMode ? 700 : 400,
+                    background: nutV2.cravingMode ? 'rgba(239,68,68,0.15)' : 'rgba(255,255,255,0.04)',
+                    border: nutV2.cravingMode ? '1px solid #ef4444' : '1px solid rgba(255,255,255,0.06)',
+                    color: nutV2.cravingMode ? '#ef4444' : 'rgba(255,255,255,0.8)',
+                  }}>🍬 Хочу сладкое</button>
+                  {nutV2.cravingMode && (
+                    <select value={nutV2.cravingDays} onChange={e => saveNutritionV2Data({ cravingDays: parseInt(e.target.value) })} style={{
+                      padding:'4px 6px', borderRadius:6, fontSize:9, background:'#202023', border:'1px solid rgba(255,255,255,0.06)', color:'#fff',
+                    }}>
+                      {[1,2,3,4,5,6,7].map(d => <option key={d} value={d}>{d} дн.</option>)}
+                    </select>
+                  )}
+                </div>
+                <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                  <button onClick={() => saveNutritionV2Data({ lazyDayActive: !nutV2.lazyDayActive })} style={{
+                    padding:'5px 10px', borderRadius:8, fontSize:9, cursor:'pointer', fontWeight: nutV2.lazyDayActive ? 700 : 400,
+                    background: nutV2.lazyDayActive ? 'rgba(245,158,11,0.15)' : 'rgba(255,255,255,0.04)',
+                    border: nutV2.lazyDayActive ? '1px solid #f59e0b' : '1px solid rgba(255,255,255,0.06)',
+                    color: nutV2.lazyDayActive ? '#f59e0b' : 'rgba(255,255,255,0.8)',
+                  }}>🛋 Ленивый день</button>
+                  {nutV2.lazyDayActive && (
+                    <select value={nutV2.lazyDayDays} onChange={e => saveNutritionV2Data({ lazyDayDays: parseInt(e.target.value) })} style={{
+                      padding:'4px 6px', borderRadius:6, fontSize:9, background:'#202023', border:'1px solid rgba(255,255,255,0.06)', color:'#fff',
+                    }}>
+                      {[1,2,3,4,5,6,7].map(d => <option key={d} value={d}>{d} дн.</option>)}
+                    </select>
+                  )}
+                </div>
               </div>
             </div>
 

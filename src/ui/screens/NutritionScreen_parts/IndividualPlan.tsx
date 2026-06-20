@@ -3,11 +3,13 @@ import { addToCart } from '../../../core/nutrition-utils';
 import { FOOD_DB, FOOD_ALLERGEN_DIET } from '../../../core/nutrition-database';
 import { PHARMA_DB } from '../../../core/pharma-database';
 import { calcNutrition } from '../../../engines/nutrition.engine';
+import { calcNutritionV2 } from '../../../engines/nutrition-v2.engine';
 import { getProfile, updateProfile } from '../../../core/profile-manager';
 import { getRecipesByMeal, getRecipes, type Recipe } from '../../../engines/nutrition-periodization.engine';
 import { generateNutritionReport, type NutritionReport } from '../../../engines/nutrition-report.engine';
 import type { UserProfile } from '../../../core/types';
 import { getContraindications, saveContraindications } from '../../../core/contraindications';
+import { getNutritionV2Data, saveNutritionV2Data } from '../../../core/nutrition-v2-data';
 
 
 // ─── Types ───
@@ -174,6 +176,11 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
   const [sex, setSex] = useState<'male' | 'female'>(s?.sex || 'male');
   const [dailySteps, setDailySteps] = useState(s?.dailySteps || 8000);
   const [cookTimeMin, setCookTimeMin] = useState(60);
+  const [cravingMode, setCravingMode] = useState(false);
+  const [cravingDays, setCravingDays] = useState(1);
+  const [lazyDayMode, setLazyDayMode] = useState(false);
+  const [lazyDayDays, setLazyDayDays] = useState(1);
+  const [periodizationEnabled, setPeriodizationEnabled] = useState(false);
 
   // 2. Goal (synced with profile)
   const [goal, setGoal] = useState<GoalId>((s?.primaryGoal as GoalId) || 'maintenance');
@@ -273,7 +280,8 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
       recomposition: 'recomp', rehab: 'rehab',
     };
     const engineGoal = goalMap[goal] || 'maintenance';
-    const targets = calcNutrition({ weightKg: weight, heightCm: height, age, sex, pal: Math.min(1.9, Math.max(1.2, pal)), goal: engineGoal });
+    const targetsV2 = calcNutritionV2({ weightKg: weight, heightCm: height, age, sex: sex || 'male', pal: Math.min(1.9, Math.max(1.2, pal)), goal: engineGoal as any, bodyFatPercent: profile?.settings?.bodyFat });
+    const targets = { kcal: targetsV2.kcal, protein: targetsV2.proteinG, fats: targetsV2.fatG, carbs: targetsV2.carbsG };
     // Phase-aware adjustments
     const phaseMult: Record<string, { kcalMod: number; pAdd: number }> = {
       course:      { kcalMod: 1.0,  pAdd: 0.3 },
@@ -2515,6 +2523,44 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
           <input type="date" value={heavyTrainDay} onChange={e => setHeavyTrainDay(e.target.value)} style={inputStyle} />
         </GlassCard>
       )}
+
+      {/* 14b. V2: craving / lazy day toggles with days */}
+      <div style={{ display:'flex', gap:3, flexWrap:'wrap', marginBottom:4 }}>
+        <button onClick={() => setCravingMode(!cravingMode)} style={{
+          padding:'5px 10px', borderRadius:8, fontSize:9, cursor:'pointer', fontWeight: cravingMode ? 700 : 400,
+          background: cravingMode ? 'rgba(239,68,68,0.15)' : '#202023',
+          border: cravingMode ? '1px solid #ef4444' : '1px solid rgba(255,255,255,0.06)',
+          color: cravingMode ? '#ef4444' : 'rgba(255,255,255,0.8)',
+        }}>🍬 Хочу сладкое{cravingMode ? ' ✓' : ''}</button>
+        {cravingMode && (
+          <select value={cravingDays} onChange={e => setCravingDays(parseInt(e.target.value))} style={{
+            padding:'4px 6px', borderRadius:6, fontSize:9, background:'#202023', border:'1px solid rgba(255,255,255,0.06)', color:'#fff',
+          }}>
+            {[1,2,3,4,5,6,7].map(d => <option key={d} value={d}>{d} {d === 1 ? 'день' : 'дней'}</option>)}
+          </select>
+        )}
+        <button onClick={() => setLazyDayMode(!lazyDayMode)} style={{
+          padding:'5px 10px', borderRadius:8, fontSize:9, cursor:'pointer', fontWeight: lazyDayMode ? 700 : 400,
+          background: lazyDayMode ? 'rgba(245,158,11,0.15)' : '#202023',
+          border: lazyDayMode ? '1px solid #f59e0b' : '1px solid rgba(255,255,255,0.06)',
+          color: lazyDayMode ? '#f59e0b' : 'rgba(255,255,255,0.8)',
+        }}>🛋 Ленивый день{lazyDayMode ? ' ✓' : ''}</button>
+        {lazyDayMode && (
+          <select value={lazyDayDays} onChange={e => setLazyDayDays(parseInt(e.target.value))} style={{
+            padding:'4px 6px', borderRadius:6, fontSize:9, background:'#202023', border:'1px solid rgba(255,255,255,0.06)', color:'#fff',
+          }}>
+            {[1,2,3,4,5,6,7].map(d => <option key={d} value={d}>{d} {d === 1 ? 'день' : 'дней'}</option>)}
+          </select>
+        )}
+      </div>
+
+      {/* 14c. Periodization toggle */}
+      <button onClick={() => setPeriodizationEnabled(!periodizationEnabled)} style={{
+        padding:'5px 10px', borderRadius:8, fontSize:9, cursor:'pointer', fontWeight: periodizationEnabled ? 700 : 400,
+        background: periodizationEnabled ? 'rgba(139,92,246,0.15)' : '#202023',
+        border: periodizationEnabled ? '1px solid #8b5cf6' : '1px solid rgba(255,255,255,0.06)',
+        color: periodizationEnabled ? '#8b5cf6' : 'rgba(255,255,255,0.8)', marginBottom:6,
+      }}>🔄 Периодизация диеты{periodizationEnabled ? ' ✓' : ''}</button>
 
       {/* 15. Generate button */}
       <button onClick={() => generatePlan(1)} style={{

@@ -349,6 +349,36 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
 
       {tab === 'day' && (
         <>
+          {/* Quality score card */}
+          {(function() {
+            try {
+              const { calcMealQuality, getQualityLabel } = require('../../../engines/nutrition-quality.engine');
+              const items = Object.values(dayMeals).flat() as any[];
+              if (items.length === 0) return null;
+              const q = calcMealQuality(items);
+              const ql = getQualityLabel(q.total);
+              return (
+                <div style={{ padding:'8px 12px', borderRadius:12, background:'rgba(24,24,27,0.12)', border:'1px solid rgba(255,255,255,0.04)', marginBottom:4 }}>
+                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                    <span style={{ fontSize:11, fontWeight:700, color:'#fff' }}>{ql.emoji} Качество рациона</span>
+                    <span style={{ fontSize:16, fontWeight:800, color:ql.color }}>{q.total}/100</span>
+                  </div>
+                  <div style={{ fontSize:9, color:ql.color, marginTop:2 }}>{ql.label}</div>
+                  {q.microDeficiencies.length > 0 && (
+                    <div style={{ marginTop:4, display:'flex', gap:2, flexWrap:'wrap' }}>
+                      {q.microDeficiencies.slice(0, 4).map((d: any, i: number) => (
+                        <span key={i} style={{ padding:'2px 6px', borderRadius:4, fontSize:7, background:'rgba(239,68,68,0.08)', color:'#ef4444' }}>
+                          {d.nutrient}: {d.current}/{d.target} {d.unit}
+                        </span>
+                      ))}
+                      {q.microDeficiencies.length > 4 && <span style={{ fontSize:7, color:'rgba(255,255,255,0.4)' }}>+{q.microDeficiencies.length-4}</span>}
+                    </div>
+                  )}
+                </div>
+              );
+            } catch { return null; }
+          })()}
+
           <div style={{ padding:14, borderRadius:16, background:'#18181b', border:'1px solid rgba(255,255,255,0.06)' }}>
               <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
                 <div style={{ fontSize:12, fontWeight:600, color:'#fff' }}>📋 {selectedDate}</div>
