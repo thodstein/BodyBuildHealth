@@ -480,6 +480,7 @@ export const NutritionScreen: React.FC = () => {
           <div style={{ position:'absolute', inset:0, background:'linear-gradient(transparent 50%, rgba(0,0,0,0.85))' }} />
           <div style={{ position:'relative', zIndex:2, display:'flex', flexDirection:'column', justifyContent:'flex-end', height:'100%', padding:'0 16px 24px' }}>
             <h1 style={{ fontSize:28, fontWeight:800, color:'#fff', margin:0, textShadow:'0 2px 14px rgba(0,0,0,0.9)', letterSpacing:-0.5 }}>Питание</h1>
+            <p style={{ fontSize:11, color:'rgba(255,255,255,0.85)', margin:'2px 0 0', textShadow:'0 1px 6px rgba(0,0,0,0.8)' }}>Дневник • Графики • План • Корзина</p>
           </div>
         </div>
         <div style={{ padding:'8px 12px 12px', background:'#18181b', borderTop:'1px solid rgba(255,255,255,0.06)' }}>

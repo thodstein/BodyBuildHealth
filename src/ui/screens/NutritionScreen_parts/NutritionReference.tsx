@@ -286,7 +286,7 @@ export const NutritionReference: React.FC = () => {
 
 const SectionCard: React.FC<{ title: string; isOpen: boolean; onToggle: () => void; color?: string; children: React.ReactNode }> = ({ title, isOpen, onToggle, color, children }) => (
   <div style={{ padding: 10, borderRadius: 14, background: 'linear-gradient(135deg,rgba(255,255,255,0.06),rgba(255,255,255,0.02))', backdropFilter: 'blur(20px)', border: '1px solid rgba(255,255,255,0.06)' }}>
-    <button onClick={onToggle} style={{ width: '100%', padding: '3px 0', cursor: 'pointer', background: 'none', border: 'none', color: color || '#fff', fontWeight: 600, fontSize: 10, textAlign: 'left', display: 'flex', alignItems: 'center', gap: 6 }}>
+    <button onClick={onToggle} style={{ width: '100%', padding: '4px 0', cursor: 'pointer', background: 'none', border: 'none', color: color || '#fff', fontWeight: 700, fontSize: 11, textAlign: 'left', display: 'flex', alignItems: 'center', gap: 6 }}>
       <span style={{ transition: 'transform 0.2s', transform: isOpen ? 'rotate(90deg)' : 'rotate(0deg)', fontSize: 12 }}>›</span>
       {title}
     </button>
@@ -298,11 +298,11 @@ const RuleItem: React.FC<{ rule: typeof NUTRITION_RULES[number] }> = ({ rule }) 
   const [expanded, setExpanded] = useState(false);
   return (
     <div style={{ borderRadius: 8, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.04)', marginBottom: 3 }}>
-      <button onClick={() => setExpanded(!expanded)} style={{ width: '100%', padding: '5px 8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, background: expanded ? `${rule.color}10` : 'rgba(255,255,255,0.02)', border: 'none', color: 'var(--text)', textAlign: 'left', fontSize: 9, fontWeight: 600 }}>
+      <button onClick={() => setExpanded(!expanded)} style={{ width: '100%', padding: '6px 8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, background: expanded ? `${rule.color}10` : 'rgba(255,255,255,0.02)', border: 'none', color: '#fff', textAlign: 'left', fontSize: 10, fontWeight: 600 }}>
         <span style={{ width: 16, height: 16, borderRadius: 4, background: rule.color + '20', color: rule.color, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 10, transition: 'transform 0.2s', transform: expanded ? 'rotate(90deg)' : 'rotate(0deg)' }}>›</span>
         <span>{rule.title}</span>
       </button>
-      {expanded && <div style={{ padding: '5px 8px 5px 30px', fontSize: 8, color: '#fff', lineHeight: 1.5, borderTop: '1px solid rgba(255,255,255,0.04)', background: 'rgba(0,0,0,0.15)' }}>{rule.body}</div>}
+      {expanded && <div style={{ padding: '6px 8px 6px 30px', fontSize: 10, color: '#fff', lineHeight: 1.5, borderTop: '1px solid rgba(255,255,255,0.04)', background: 'rgba(0,0,0,0.15)' }}>{rule.body}</div>}
     </div>
   );
 };

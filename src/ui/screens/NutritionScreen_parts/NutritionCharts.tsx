@@ -13,7 +13,7 @@ type ChartRange = 7 | 14 | 30;
 interface DailyLog { date: string; kcal: number; protein: number; fat: number; carbs: number; }
 
 const cardBg = { background: '#18181b', borderRadius: 18, padding: 16, border: '1px solid rgba(255,255,255,0.06)', boxShadow: '0 2px 20px rgba(0,0,0,0.3)' };
-const label = (s: string, c: string) => <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)' }}>{s}: <strong style={{ color: c }}>{c}</strong></span>;
+const label = (s: string, c: string) => <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)' }}>{s}: <strong style={{ color: c }}>{c}</strong></span>;
 
 const commonChartOptions = (hasWeight: boolean) => ({
   responsive: true, maintainAspectRatio: false,
@@ -174,7 +174,7 @@ export const NutritionCharts: React.FC<{
           <div style={{ flex: fatPct, background: '#f59e0b', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 8, fontWeight: 700, color: '#fff', minWidth: 30 }}>Ж {fatPct}%</div>
           <div style={{ flex: carbPct, background: '#f97316', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 8, fontWeight: 700, color: '#fff', minWidth: 30 }}>У {carbPct}%</div>
         </div>
-        <div style={{ display: 'flex', gap: 12, fontSize: 9, color: 'rgba(255,255,255,0.5)' }}>
+        <div style={{ display: 'flex', gap: 12, fontSize: 9, color: 'rgba(255,255,255,0.85)' }}>
           <span>💪 <strong style={{ color: '#3b82f6' }}>{avgProtein}г</strong> белка</span>
           <span>🧈 <strong style={{ color: '#f59e0b' }}>{avgFat}г</strong> жиров</span>
           <span>🌾 <strong style={{ color: '#f97316' }}>{avgCarbs}г</strong> углеводов</span>
@@ -192,7 +192,7 @@ export const NutritionCharts: React.FC<{
             { label: 'Углеводы', val: chartData.avgCarbs, unit: 'г', color: '#a855f7' },
           ].map(s => (
             <div key={s.label} style={{ background: '#202023', padding: '8px 10px', borderRadius: 10, textAlign: 'center', border: '1px solid rgba(255,255,255,0.04)' }}>
-              <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)' }}>{s.label}</div>
+              <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)' }}>{s.label}</div>
               <div style={{ fontSize: 22, fontWeight: 800, color: s.color }}>{s.val}</div>
               <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)' }}>{s.unit}</div>
             </div>
@@ -205,7 +205,7 @@ export const NutritionCharts: React.FC<{
         <div style={{ fontSize: 12, fontWeight: 700, color: '#fff', marginBottom: 8, letterSpacing: -0.3 }}>🎯 Выполнение целей за {range} дней</div>
         {(() => {
           const daysWithAnyData = realDailyData.filter(d => d.kcal > 0).length;
-          if (daysWithAnyData === 0) return <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)' }}>Нет данных дневника для анализа.</div>;
+          if (daysWithAnyData === 0) return <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)' }}>Нет данных дневника для анализа.</div>;
           const goalChecks = [
             { label: 'Калории ±10%', met: realDailyData.filter(d => d.kcal > 0 && Math.abs(d.kcal - avgKcal) / avgKcal < 0.1).length, total: daysWithAnyData, color: '#22c55e' },
             { label: 'Белки ≥90%', met: realDailyData.filter(d => d.protein > 0 && d.protein >= avgProtein * 0.9).length, total: daysWithAnyData, color: '#3b82f6' },
@@ -218,7 +218,7 @@ export const NutritionCharts: React.FC<{
               {goalChecks.map(g => {
                 const pct = g.total > 0 ? Math.round(g.met / g.total * 100) : 0;
                 return <div key={g.label} style={{ background: '#202023', padding: '8px 10px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.04)' }}>
-                  <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.5)', marginBottom: 2 }}>{g.label}</div>
+                  <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.85)', marginBottom: 2 }}>{g.label}</div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                     <div style={{ fontSize: 16, fontWeight: 800, color: g.color }}>{pct}%</div>
                     <div style={{ flex: 1, height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.06)' }}>
