@@ -1889,46 +1889,41 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
           + Добавить инъекцию
         </button>
         {showAddDrug && (
-          <div style={{ position:'fixed', inset:0, zIndex:100, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(0,0,0,0.7)', padding:12 }}
+          <div style={{ position:'fixed', inset:0, zIndex:100, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(0,0,0,0.7)' }}
             onClick={() => setShowAddDrug(false)}>
-            <div onClick={e => e.stopPropagation()} style={{ width:'100%', maxWidth:320, padding:20, borderRadius:16, background:'#18181b', border:'1px solid rgba(255,255,255,0.1)', boxShadow:'0 8px 40px rgba(0,0,0,0.4)', maxHeight:'90vh', overflowY:'auto' }}>
-              <div style={{ fontSize:14, fontWeight:700, color:'#fff', marginBottom:14 }}>💉 Добавить препарат</div>
-              <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-                <input value={injName} onChange={e => { setInjName(e.target.value); const sub = PHARMA_DB[e.target.value.trim()]; if (sub?.class === 'insulin') setInjType('инсулин'); else if (['testosterone','trenbolone','nandrolone','boldenone','primobolan','drostanolone'].includes(sub?.class || '')) setInjType('ААС'); else if (sub?.class === 'glp1') setInjType('семаглутид'); }} placeholder="Название" style={inputStyle} list="drug-list" />
-                <datalist id="drug-list">{injectDrugTypes.map(d => <option key={d} value={d} />)}</datalist>
-                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
-                  <select value={injType} onChange={e => setInjType(e.target.value)} style={{ ...selectStyle, fontSize:10 }}>
-                    {injectDrugTypes.map(d => <option key={d} value={d}>{d}</option>)}
-                  </select>
-                  <select value={injEster} onChange={e => setInjEster(e.target.value as any)} style={{ ...selectStyle, fontSize:10 }}>
-                    <option value="none">Авто</option><option value="rapid">⚡ Быстрый</option><option value="short">🕐 Короткий</option><option value="long">🌙 Длинный</option>
-                  </select>
-                </div>
-                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 70px', gap:6 }}>
-                  <input type="number" value={injDose} onChange={e => setInjDose(+e.target.value || 0)} style={inputStyle} placeholder="Доза" />
-                  <select value={injUnit} onChange={e => setInjUnit(e.target.value)} style={selectStyle}>
-                    <option value="mg">mg</option><option value="mcg">mcg</option><option value="IU">IU</option><option value="ml">ml</option>
-                  </select>
-                  <input type="time" value={injTime} onChange={e => setInjTime(e.target.value)} style={inputStyle} />
-                </div>
-                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6, marginTop:4 }}>
-                  <button onClick={() => setShowAddDrug(false)} style={{ padding:'10px', borderRadius:10, cursor:'pointer', border:'1px solid rgba(255,255,255,0.1)', background:'#202023', color:'#fff', fontSize:10, fontWeight:600 }}>Отмена</button>
-                  <button onClick={() => {
-                    if (!injName.trim()) return;
-                    const sub = PHARMA_DB[injName.trim()]; const hl = sub?.pk?.halfLifeHours || 24;
-                    let dt = injType, de = injEster;
-                    if (sub?.class === 'insulin') { dt = 'инсулин'; de = hl < 2 ? 'rapid' : hl <= 8 ? 'short' : 'long'; }
-                    else if (sub?.class === 'glp1') { dt = 'семаглутид'; de = 'long'; }
-                    else if (['testosterone','trenbolone','nandrolone','boldenone','primobolan','drostanolone'].includes(sub?.class || '')) { dt = 'ААС'; de = 'long'; }
-                    if (injEster !== 'none') de = injEster;
-                    let autoTime = injTime;
-                    if (dt === 'инсулин' && de === 'long') autoTime = '22:00'; else if (dt === 'инсулин') autoTime = '08:00';
-                    else if (dt === 'ГР' || dt === 'GHRP' || dt === 'CJC') autoTime = '22:00';
-                    else if (dt === 'семаглутид' || dt === 'тирзепатид') autoTime = '09:00';
-                    setInjections([...injections, { id: Date.now().toString(), name: injName.trim(), time: autoTime, dose: injDose, unit: injUnit, type: dt, esterType: de, halfLifeHours: hl, trainLinked: false, trainTiming: 'none' }]);
-                    setInjName(''); setShowAddDrug(false);
-                  }} style={{ padding:'10px', borderRadius:10, cursor:'pointer', border:'none', background:'linear-gradient(135deg,#00e68a,#00c8a0)', color:'#000', fontSize:10, fontWeight:700 }}>✓ Добавить</button>
-                </div>
+            <div onClick={e => e.stopPropagation()} style={{ width:320, padding:20, borderRadius:16, background:'#18181b', border:'1px solid rgba(255,255,255,0.15)', boxShadow:'0 8px 40px rgba(0,0,0,0.4)' }}>
+              <div style={{ fontSize:15, fontWeight:700, color:'#fff', marginBottom:14, textAlign:'center', letterSpacing:-0.3 }}>💉 Добавить</div>
+              <input value={injName} onChange={e => setInjName(e.target.value)} placeholder="Название препарата" style={{ ...inputStyle, marginBottom:6, fontSize:12 }} list="drug-list" />
+              <datalist id="drug-list">{injectDrugTypes.map(d => <option key={d} value={d} />)}</datalist>
+              <div style={{ display:'flex', gap:4, marginBottom:6 }}>
+                <select value={injType} onChange={e => setInjType(e.target.value)} style={{ ...selectStyle, flex:1, fontSize:10 }}>
+                  {injectDrugTypes.map(d => <option key={d} value={d}>{d}</option>)}
+                </select>
+                <select value={injEster} onChange={e => setInjEster(e.target.value as any)} style={{ ...selectStyle, flex:1, fontSize:10 }}>
+                  <option value="none">Авто</option><option value="rapid">Быстрый</option><option value="short">Короткий</option><option value="long">Длинный</option>
+                </select>
+              </div>
+              <div style={{ display:'flex', gap:4, marginBottom:6 }}>
+                <input type="number" value={injDose} onChange={e => setInjDose(+e.target.value || 0)} style={{ ...inputStyle, flex:1, fontSize:12 }} placeholder="Доза" />
+                <select value={injUnit} onChange={e => setInjUnit(e.target.value)} style={{ ...selectStyle, width:50, fontSize:10 }}>
+                  <option value="mg">mg</option><option value="mcg">mcg</option><option value="IU">IU</option><option value="ml">ml</option>
+                </select>
+                <input type="time" value={injTime} onChange={e => setInjTime(e.target.value)} style={{ ...inputStyle, width:65, fontSize:10 }} />
+              </div>
+              <div style={{ display:'flex', gap:4 }}>
+                <button onClick={() => setShowAddDrug(false)} style={{ flex:1, padding:'10px', borderRadius:10, cursor:'pointer', border:'1px solid rgba(255,255,255,0.15)', background:'#202023', color:'#fff', fontSize:10, fontWeight:600 }}>Отмена</button>
+                <button onClick={() => {
+                  if (!injName.trim()) return;
+                  const sub = PHARMA_DB[injName.trim()]; const hl = sub?.pk?.halfLifeHours || 24;
+                  let dt = injType, de = injEster;
+                  if (sub?.class === 'insulin') { dt = 'инсулин'; de = hl < 2 ? 'rapid' : hl <= 8 ? 'short' : 'long'; }
+                  let autoTime = +injTime.split(':')[0] * 60 + +injTime.split(':')[1] > 0 ? injTime : '08:00';
+                  if (dt === 'инсулин' && de === 'long') autoTime = '22:00';
+                  if (injEster !== 'none') de = injEster;
+                  const newInj = { id: Date.now().toString(), name: injName.trim(), time: autoTime, dose: injDose, unit: injUnit, type: dt, esterType: de, halfLifeHours: hl, trainLinked: false, trainTiming: 'none' as const };
+                  setInjections(prev => [...prev, newInj]);
+                  setInjName(''); setShowAddDrug(false);
+                }} style={{ flex:1, padding:'10px', borderRadius:10, cursor:'pointer', border:'none', background:'linear-gradient(135deg,#00e68a,#00c8a0)', color:'#000', fontSize:10, fontWeight:700 }}>✓ Добавить</button>
               </div>
             </div>
           </div>
