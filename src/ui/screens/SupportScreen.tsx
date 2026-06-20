@@ -1023,7 +1023,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
     // Fallback to ALL_SUBSTANCES search
     const terms = [key, ...key.split(/[\s-]+/).filter((t:string)=>t.length>2)];
     const found = ALL_SUBSTANCES.find((s:any) => {
-      const sn = (s.name||s.id).toLowerCase(); const sid = s.id.toLowerCase();
+      const sn = ((s.name||'')+'').toLowerCase(); const sid = ((s.id||'')+'').toLowerCase();
       return terms.some(t => sid.includes(t) || sid.replace(/_/g,'').includes(t) || sn.includes(t));
     });
     return found?.id || '';

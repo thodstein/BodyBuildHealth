@@ -308,7 +308,7 @@ export const LabsScreen: React.FC = () => {
   const filteredCatalogEntries = useMemo(() => {
     if (!catalogSearch) return catalogEntries;
     const q = catalogSearch.toLowerCase();
-    return catalogEntries.filter(e => e.code.toLowerCase().includes(q) || e.name.toLowerCase().includes(q));
+    return catalogEntries.filter(e => (e.code||'').toLowerCase().includes(q) || (e.name||'').toLowerCase().includes(q));
   }, [catalogEntries, catalogSearch]);
 
   const filteredCatalogBySys = useMemo(() => {

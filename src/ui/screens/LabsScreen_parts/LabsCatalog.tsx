@@ -91,9 +91,9 @@ export const LabsCatalog: React.FC = () => {
 
   const filtered = catalogEntries.filter(e => {
     const matchSearch = !search ||
-      e.code.toLowerCase().includes(search.toLowerCase()) ||
-      e.name.toLowerCase().includes(search.toLowerCase()) ||
-      e.description.toLowerCase().includes(search.toLowerCase());
+      (e.code||'').toLowerCase().includes(search.toLowerCase()) ||
+      (e.name||'').toLowerCase().includes(search.toLowerCase()) ||
+      (e.description||'').toLowerCase().includes(search.toLowerCase());
     const matchSystem = filterSystem === 'all' || e.system === filterSystem;
     return matchSearch && matchSystem;
   });

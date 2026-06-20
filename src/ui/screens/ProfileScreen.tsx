@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState } from 'react';
+﻿import React, { useEffect, useState, useRef } from 'react';
 import type { UserProfile, InjuryRecord, SupplementEntry, MedicationEntry, LabPoint, WorkoutLog, StrengthLogEntry } from '../../core/types';
 import { getProfile, updateProfile, useProfileRefresh } from '../../core/profile-manager';
 import { db } from '../../core/db';
@@ -7,7 +7,7 @@ import { computeLabIndices, interpretLabIndices } from '../../engines/labs-indic
 import { calculateIndices } from '../../engines/clinical-indices.engine';
 import { NAVY_BF_FORMULAS, MUSCLE_GROUPS_FULL, INJURY_LOCATIONS } from '../../core/constants';
 
-type ProfileTab = 'overview' | 'anthropometry' | 'sleep' | 'lifestyle' | 'diet' | 'nutrition_v7' | 'genetics' | 'injuries' | 'progress' | 'reports' | 'contacts' | 'bp_diary' | 'measurements';
+type ProfileTab = 'overview' | 'anthropometry' | 'sleep' | 'lifestyle' | 'diet' | 'nutrition_v7' | 'genetics' | 'injuries' | 'progress' | 'reports' | 'contacts' | 'bp_diary' | 'measurements' | 'diaries';
 type ProfilePage = 'hero' | 'tabs';
 
 const SPORT_TYPES = [
@@ -382,7 +382,7 @@ export const ProfileScreen: React.FC = () => {
     { id: 'sleep', label: 'Сон' }, { id: 'lifestyle', label: 'Образ жизни' },
     { id: 'diet', label: 'Питание' }, { id: 'injuries', label: 'Травмы' },
     { id: 'progress', label: 'Прогресс' }, { id: 'reports', label: 'Отчёты' },
-    { id: 'bp_diary', label: 'Давление' }, { id: 'measurements', label: 'Замеры' }, { id: 'contacts', label: 'Контакты' }
+    { id: 'bp_diary', label: 'Давление' }, { id: 'measurements', label: 'Замеры' }, { id: 'diaries', label: 'Дневники' }, { id: 'contacts', label: 'Контакты' }
   ];
 
   const initials = (profile.name || 'П').charAt(0).toUpperCase();
@@ -1834,22 +1834,39 @@ export const ProfileScreen: React.FC = () => {
             const [thigh, setThigh] = useState('');
             const [hip, setHip] = useState('');
             const [bodyFat, setBodyFat] = useState('');
+            const [weightKg, setWeightKg] = useState('');
+            const [photos, setPhotos] = useState<string[]>([]);
+            const photoRef = useRef<HTMLInputElement>(null);
+
+            const addPhoto = (e: React.ChangeEvent<HTMLInputElement>) => {
+              const file = e.target.files?.[0];
+              if (!file) return;
+              const reader = new FileReader();
+              reader.onload = (ev) => {
+                const dataUrl = ev.target?.result as string;
+                setPhotos(prev => [...prev, dataUrl].slice(-4));
+                try { localStorage.setItem('he_meas_photos', JSON.stringify([...(JSON.parse(localStorage.getItem('he_meas_photos')||'[]')), { date: new Date().toISOString().split('T')[0], photo: dataUrl }].slice(-20))); } catch {}
+              };
+              reader.readAsDataURL(file);
+            };
 
             const saveMeas = () => {
-              if (!waist && !chest && !bicep) return;
+              if (!waist && !chest && !bicep && !weightKg && photos.length === 0) return;
               const entry = {
                 date: new Date().toISOString().split('T')[0],
+                weightKg: weightKg ? parseFloat(weightKg) : null,
                 waistCm: waist ? parseFloat(waist) : null,
                 chestCm: chest ? parseFloat(chest) : null,
                 bicepCm: bicep ? parseFloat(bicep) : null,
                 thighCm: thigh ? parseFloat(thigh) : null,
                 hipCm: hip ? parseFloat(hip) : null,
                 bodyFat: bodyFat ? parseFloat(bodyFat) : null,
+                photos: photos.length > 0 ? photos : undefined,
               };
               const updated = [...measLog, entry];
               setMeasLog(updated);
               try { localStorage.setItem('he_measurements_log', JSON.stringify(updated)); } catch {}
-              setWaist(''); setChest(''); setBicep(''); setThigh(''); setHip(''); setBodyFat('');
+              setWaist(''); setChest(''); setBicep(''); setThigh(''); setHip(''); setBodyFat(''); setWeightKg(''); setPhotos([]);
             };
 
             return (
@@ -1864,6 +1881,7 @@ export const ProfileScreen: React.FC = () => {
                   <h4 style={{ margin:'0 0 8px', fontSize:11, fontWeight:700, color:'#00e68a' }}>Новый замер</h4>
                   <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:6 }}>
                     {[
+                      { label:'Вес, кг', val:weightKg, set:setWeightKg },
                       { label:'Талия, см', val:waist, set:setWaist },
                       { label:'Грудь, см', val:chest, set:setChest },
                       { label:'Бицепс, см', val:bicep, set:setBicep },
@@ -1877,6 +1895,22 @@ export const ProfileScreen: React.FC = () => {
                       </div>
                     ))}
                   </div>
+                  {/* Photo upload */}
+                  <div style={{ display:'flex', gap:6, alignItems:'center', marginTop:6 }}>
+                    <input ref={photoRef} type="file" accept="image/*" capture="environment" onChange={addPhoto} style={{ display:'none' }} />
+                    <button onClick={() => photoRef.current?.click()} style={{ padding:'6px 12px', borderRadius:8, border:'1px solid rgba(255,255,255,0.08)', background:'rgba(255,255,255,0.04)', color:'rgba(255,255,255,0.7)', fontWeight:600, fontSize:10, cursor:'pointer' }}>📸 Фото ракурсов</button>
+                    {photos.length > 0 && <span style={{ fontSize:8, color:'rgba(255,255,255,0.5)' }}>{photos.length} фото</span>}
+                  </div>
+                  {photos.length > 0 && (
+                    <div style={{ display:'flex', gap:4, marginTop:4, overflowX:'auto' }}>
+                      {photos.map((p,i) => (
+                        <div key={i} style={{ width:48, height:48, borderRadius:6, overflow:'hidden', flexShrink:0, position:'relative' }}>
+                          <img src={p} alt="" style={{ width:'100%', height:'100%', objectFit:'cover' }} />
+                          <div onClick={() => setPhotos(prev => prev.filter((_,idx) => idx !== i))} style={{ position:'absolute', top:0, right:0, width:14, height:14, background:'rgba(0,0,0,0.6)', borderRadius:'50%', fontSize:9, display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', color:'#fff' }}>✕</div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                   <button onClick={saveMeas} style={{ marginTop:8, padding:'8px 16px', borderRadius:8, border:'none', background:'var(--accent)', color:'#000', fontWeight:700, fontSize:12, cursor:'pointer', width:'100%' }}>💾 Сохранить замер</button>
                 </div>
 
@@ -1888,7 +1922,7 @@ export const ProfileScreen: React.FC = () => {
                         <div key={i} style={{ display:'flex', justifyContent:'space-between', padding:'4px 8px', borderRadius:4, background:i%2===0?'rgba(255,255,255,0.03)':'transparent', fontSize:9 }}>
                           <span style={{ fontWeight:600 }}>{m.date}</span>
                           <span style={{ color:'rgba(255,255,255,0.6)' }}>
-                            {m.waistCm ? `Тал:${m.waistCm} ` : ''}{m.chestCm ? `Гр:${m.chestCm} ` : ''}{m.bicepCm ? `Биц:${m.bicepCm} ` : ''}{m.thighCm ? `Бед:${m.thighCm} ` : ''}{m.hipCm ? `Яг:${m.hipCm} ` : ''}{m.bodyFat ? `Жир:${m.bodyFat}%` : ''}
+                            {m.weightKg ? `Вес:${m.weightKg}кг ` : ''}{m.waistCm ? `Тал:${m.waistCm} ` : ''}{m.chestCm ? `Гр:${m.chestCm} ` : ''}{m.bicepCm ? `Биц:${m.bicepCm} ` : ''}{m.thighCm ? `Бед:${m.thighCm} ` : ''}{m.hipCm ? `Яг:${m.hipCm} ` : ''}{m.bodyFat ? `Жир:${m.bodyFat}%` : ''}{m.photos?.length ? `📸${m.photos.length}` : ''}
                           </span>
                         </div>
                       ))}
@@ -1904,6 +1938,45 @@ export const ProfileScreen: React.FC = () => {
               </div>
             );
           })()}
+
+          {/* ═══ DIARIES TAB ═══ */}
+          {tab === 'diaries' && (
+            <div>
+              <div style={{ marginBottom:12 }}>
+                <h3 style={{ margin:'0 0 4px', fontSize:15, fontWeight:800, color:'#fff' }}>📔 Дневники</h3>
+                <p style={{ fontSize:10, color:'rgba(255,255,255,0.7)', margin:0 }}>Все дневники приложения для отслеживания прогресса</p>
+              </div>
+
+              <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                {[
+                  { icon:'🏋️', title:'Тренировок', desc:'Упражнения, подходы, веса, объём, RPE. История тренировок, прогресс по упражнениям, сплиты.', color:'#3b82f6', action:() => setTab('progress') },
+                  { icon:'🥗', title:'Питания', desc:'Продукты, калории, белки/жиры/углеводы. OCR сканирование, штрихкоды, рецепты.', color:'#22c55e', action:() => setTab('diet') },
+                  { icon:'🍽', title:'Приёмов пищи', desc:'Завтрак, обед, ужин, перекусы. Дневное/недельное меню, корзина продуктов.', color:'#f59e0b', action:() => setTab('diet') },
+                  { icon:'📏', title:'Замеров тела', desc:'Вес, обхваты (талия, грудь, бицепс, бедро), % жира. Фото прогресса с разных ракурсов.', color:'#a855f7', action:() => setTab('measurements') },
+                  { icon:'🩸', title:'Анализов', desc:'Результаты анализов, референсные диапазоны, отклонения, динамика по датам.', color:'#ef4444', action:() => setTab('progress') },
+                  { icon:'💊', title:'Курса', desc:'Препараты, дозировки, фазы. Календарь приёма, корзина покупок.', color:'#ec4899', action:() => setTab('overview') },
+                  { icon:'🧪', title:'Поддержки', desc:'БАДы, протоколы, стеки, синергии. Недельный план приёма.', color:'#06b6d4', action:() => setTab('reports') },
+                  { icon:'❤️', title:'Давления', desc:'Систолическое/диастолическое давление, пульс. Дневник на день/неделю/месяц.', color:'#f43f5e', action:() => setTab('bp_diary') },
+                  { icon:'🛌', title:'Сна', desc:'Продолжительность, качество, пробуждения. Корреляция с тренировками.', color:'#8b5cf6', action:() => setTab('sleep') },
+                  { icon:'📊', title:'Отчётов', desc:'Полные отчёты по всем блокам: тренировки, анализы, риски, курс. Архив.', color:'#84cc16', action:() => setTab('reports') },
+                  { icon:'⚠️', title:'Рисков', desc:'Оценка рисков по системам, Монте-Карло, клинические модели, MDSS.', color:'#f97316', action:() => setTab('progress') },
+                  { icon:'🩺', title:'Травм', desc:'Журнал травм, реабилитация, ограничения движений, восстановление.', color:'#14b8a6', action:() => setTab('injuries') },
+                ].map((d, i) => (
+                  <div key={i} onClick={d.action} style={{
+                    display:'flex', alignItems:'center', gap:10, padding:'12px 14px', borderRadius:12, cursor:'pointer',
+                    background:'rgba(24,24,27,0.12)', border:'1px solid rgba(255,255,255,0.04)',
+                  }}>
+                    <div style={{ width:40, height:40, borderRadius:10, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, background:d.color+'18', fontSize:18 }}>{d.icon}</div>
+                    <div style={{ flex:1, minWidth:0 }}>
+                      <div style={{ fontSize:12, fontWeight:700, color:d.color, marginBottom:1, letterSpacing:-0.2 }}>{d.title}</div>
+                      <div style={{ fontSize:9, color:'rgba(255,255,255,0.7)', lineHeight:1.3 }}>{d.desc}</div>
+                    </div>
+                    <span style={{ color:d.color, fontSize:14, opacity:0.5 }}>→</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* ═══ CONTACTS TAB ═══ */}
           {tab === 'contacts' && (
