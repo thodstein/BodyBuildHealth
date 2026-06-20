@@ -50,10 +50,8 @@ function initTelegramWebApp() {
       // Can be used for navigation back
     });
 
-    console.log('Telegram WebApp initialized successfully');
     return true;
   } catch (e) {
-    console.warn('Telegram WebApp init failed:', e);
     return false;
   }
 }
@@ -95,13 +93,9 @@ async function bootstrap() {
   try { isTg = initTelegramWebApp(); } catch (e) { console.warn('initTelegramWebApp failed:', e); }
 
   if (!isTg) {
-    console.log('[bootstrap] not TG, initPWA');
     try { initPWA(); } catch (e) { console.warn('initPWA failed:', e); }
-  } else {
-    console.log('[bootstrap] is TG mode');
   }
 
-  console.log('[bootstrap] step 3: db.init');
   try {
     await db.init();
   } catch (e) {
@@ -109,7 +103,6 @@ async function bootstrap() {
     return;
   }
 
-  console.log('[bootstrap] step 4: ensureAdmin');
   try {
     const adminEmail = import.meta.env.VITE_ADMIN_EMAIL || '';
     const adminPass = import.meta.env.VITE_ADMIN_PASSWORD || '';
@@ -120,7 +113,6 @@ async function bootstrap() {
     console.warn('Admin seed failed:', e);
   }
 
-  console.log('[bootstrap] step 5: registry.init + crypto');
   try {
     await registry.init();
     const cryptoKey = import.meta.env.VITE_CRYPTO_KEY || '';
@@ -133,26 +125,20 @@ async function bootstrap() {
     console.warn('Crypto/Registry init failed:', e);
   }
 
-  console.log('[bootstrap] step 6: error handler + optimize');
   try { initErrorHandler('app'); } catch (e) { console.warn('initErrorHandler failed:', e); }
   try { optimizeDBSpace(db, 50); } catch (e) { console.warn('optimizeDBSpace failed:', e); }
 
   if (!isTg) {
-    console.log('[bootstrap] step 7: registerSW');
     try { registerSW(); } catch (e) { console.warn('registerSW failed:', e); }
   }
 
-  console.log('[bootstrap] step 8: initCloudSync + processQueue');
   try { initCloudSync(); } catch (e) { console.warn('initCloudSync failed:', e); }
   try { processQueue(); } catch (e) { console.warn('processQueue failed:', e); }
 
-  console.log('[bootstrap] step 9: renderAuthModule');
   const onLogin = (profile: any) => {
-    console.log('[bootstrap] onLogin called, profile.id:', profile?.id);
     try {
       try { initRealtime(profile.id || 'user_default'); } catch (e) { console.warn('initRealtime failed:', e); }
       const root = createRoot(app);
-      console.log('[bootstrap] createRoot done, rendering <App />');
       root.render(<App />);
     } catch (e) {
       console.error('[bootstrap] React render failed:', e);

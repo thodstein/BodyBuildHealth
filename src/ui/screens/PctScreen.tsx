@@ -2,6 +2,7 @@
 import { db } from '../../core/db';
 import type { CourseEntry } from '../../core/types';
 import { generatePCTPlan } from '../../engines/pct-planner.engine';
+import type { PCTProtocolItem } from '../../engines/pct-planner.engine';
 import { PHARMA_DB } from '../../core/pharma-database';
 
 const CLASS_COLORS: Record<string, string> = {
@@ -10,8 +11,8 @@ const CLASS_COLORS: Record<string, string> = {
 };
 
 const CLASS_LABELS: Record<string, string> = {
-  pct_serm: '', pct_aromatase: '',
-  pct_dopamine: '', pct_gonadotropin: '',
+  pct_serm: 'СЕРМ', pct_aromatase: 'Ингибиторы ароматазы',
+  pct_dopamine: 'Дофаминовые агонисты', pct_gonadotropin: 'Гонадотропины',
 };
 
 interface Props {
@@ -79,7 +80,7 @@ export const PctScreen: React.FC<Props> = ({ onBack }) => {
                 ))}
               </div>
             )}
-            {pctPlan.pctProtocol.map((p: any, i: number) => (
+            {pctPlan.pctProtocol.map((p: PCTProtocolItem, i: number) => (
               <div key={i} style={{
                 background: 'var(--bg-secondary)', borderRadius: 8, padding: '10px 12px', marginBottom: 6,
                 borderLeft: `3px solid ${CLASS_COLORS[p.class] || '#666'}`,
@@ -92,10 +93,10 @@ export const PctScreen: React.FC<Props> = ({ onBack }) => {
                       background: `${CLASS_COLORS[p.class] || '#666'}22`, color: CLASS_COLORS[p.class] || '#666',
                     }}>{CLASS_LABELS[p.class] || p.class}</span>
                   </div>
-                  <span style={{ fontWeight: 700, fontSize: 13 }}>{p.doseValue}{p.doseUnit}</span>
+                  <span style={{ fontWeight: 700, fontSize: 13 }}>{p.dose}</span>
                 </div>
                 <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 4 }}>
-                  {p.timing || `${p.frequency}`} | Нед {p.startWeek}-{p.endWeek}
+                  {p.timing} | Нед {p.startWeek}-{p.endWeek}
                 </div>
               </div>
             ))}

@@ -197,8 +197,6 @@ export function parseFHIRObservation(obs: any, patientId: string): LabPoint {
  * @returns Promise resolving with a mock message ID
  */
 export function sendHL7v2Message(message: string): Promise<string> {
-   // In a real implementation, this would send to an HL7 listener/via MLLP
-   console.log('Sending HL7 v2 message:', message);
    return Promise.resolve(`HL7MSG-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`);
 }
 
@@ -208,8 +206,6 @@ export function sendHL7v2Message(message: string): Promise<string> {
  * @returns Promise resolving with parsed HL7 message
  */
 export function receiveHL7v2Message(messageId: string): Promise<string> {
-   // In a real implementation, this would retrieve from a message queue or database
-   console.log('Receiving HL7 v2 message with ID:', messageId);
    return Promise.resolve(`MSH|^~\\&|SENDING_FACILITY|RECEIVING_FACILITY|${new Date().toISOString()}||ORU^R01|${messageId}|P|2.5.1\rPID|1||PATIENT123^^^Hospital^MR||DOE^JOHN||19800101|M\rOBR|1||${messageId}^LAB^L||20230101080000|||^^^|||F|||||||||`);
 }
 

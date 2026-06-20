@@ -31,7 +31,6 @@ export async function optimizeDBSpace(db: any, maxSizeMB: number = 50) {
       const cutoff = Date.now() - 90 * 24 * 60 * 60 * 1000;
       const toDelete = stores.filter((l: any) => new Date(l.date).getTime() < cutoff);
       for (const item of toDelete) await db.delete('labs_log', item.id);
-      console.log(`🗑️ Cleaned ${toDelete.length} old records. Freed ~${(toDelete.length * 0.002).toFixed(2)}MB`);
     }
   } catch {}
 }

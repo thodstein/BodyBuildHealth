@@ -1,11 +1,26 @@
 import { CourseEntry } from '../core/types';
 import { PHARMA_DB } from '../core/constants';
 
+export interface PCTProtocolItem {
+  drug: string;
+  substanceId: string;
+  dose: string;
+  doseValue: string;
+  doseUnit: string;
+  durationWeeks: number;
+  startDayOffset: number;
+  startWeek: number;
+  endWeek: number;
+  class: string;
+  timing: string;
+  frequency: string;
+}
+
 export interface PCTSchedule {
   startDate: string;
   taperWeeks: { week: number; drugId: string; dosePercent: number; note: string }[];
   pctStartWeek: number;
-  pctProtocol: { drug: string; dose: string; durationWeeks: number; startDayOffset: number }[];
+  pctProtocol: PCTProtocolItem[];
   supportStack: { id: string; name: string; dose: string; durationWeeks: number }[];
   warnings: string[];
 }
@@ -35,10 +50,10 @@ export function generatePCTPlan(course: CourseEntry[], lastCourseWeek: number): 
     });
   }
 
-  const pctProtocol = [
-    { drug: 'clomi', dose: '50 мг/день', durationWeeks: 2, startDayOffset: 0 },
-    { drug: 'clomi', dose: '25 мг/день', durationWeeks: 2, startDayOffset: 14 },
-    { drug: 'hcg', dose: '500 МЕ 2×/нед', durationWeeks: 3, startDayOffset: 0 }
+  const pctProtocol: PCTProtocolItem[] = [
+    { drug: 'clomi', substanceId: 'clomi', dose: '50 мг/день', doseValue: '50', doseUnit: 'мг/день', durationWeeks: 2, startDayOffset: 0, startWeek: pctStartWeek, endWeek: pctStartWeek + 2, class: 'pct_serm', timing: 'Ежедневно', frequency: '1 раз/день' },
+    { drug: 'clomi', substanceId: 'clomi', dose: '25 мг/день', doseValue: '25', doseUnit: 'мг/день', durationWeeks: 2, startDayOffset: 14, startWeek: pctStartWeek + 2, endWeek: pctStartWeek + 4, class: 'pct_serm', timing: 'Ежедневно', frequency: '1 раз/день' },
+    { drug: 'hcg', substanceId: 'hcg', dose: '500 МЕ 2×/нед', doseValue: '500', doseUnit: 'МЕ 2×/нед', durationWeeks: 3, startDayOffset: 0, startWeek: pctStartWeek, endWeek: pctStartWeek + 3, class: 'pct_gonadotropin', timing: '2 раза/нед', frequency: '2 раза/нед' }
   ];
 
   const supportStack = [

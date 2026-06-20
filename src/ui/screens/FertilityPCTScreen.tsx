@@ -711,48 +711,6 @@ export const FertilityPCTScreen: React.FC<{ initialTab?: FertTab; restrictToMode
               </div>
             </>
           )}
-          {/* PCT analyses */}
-          <div style={{ ...s.card, borderLeft:'3px solid #60a5fa', marginTop:10 }}>
-            <h4 style={{ margin:'0 0 8px', fontSize:12, color:'#60a5fa' }}>🧪 Анализы для ПКТ</h4>
-            <div style={{ display:'flex', flexDirection:'column', gap:3 }}>
-              {[
-                { code:'LH', name:'Лютеинизирующий гормон', range:'1.7-8.6', note:'Восстановление оси HPT' },
-                { code:'FSH', name:'Фолликулостимулирующий гормон', range:'1.5-12.4', note:'Восстановление сперматогенеза' },
-                { code:'TT', name:'Тестостерон общий', range:'300-1000', note:'Основной маркер восстановления' },
-                { code:'FT', name:'Тестостерон свободный', range:'5-21', note:'Активная фракция' },
-                { code:'E2', name:'Эстрадиол (чувствительный)', range:'11-44', note:'Контроль эстрогенового rebound' },
-                { code:'PRL', name:'Пролактин', range:'4-15.2', note:'Исключение гиперпролактинемии' },
-                { code:'SHBG', name:'ГСПГ (SHBG)', range:'18-54', note:'Влияние на свободный тестостерон' },
-                { code:'TSH', name:'Тиреотропный гормон', range:'0.4-4.0', note:'Тиреоидный статус влияет на гонады' },
-                { code:'CORT', name:'Кортизол', range:'6.2-19.4', note:'Катаболический статус' },
-                { code:'PSA', name:'ПСА общий', range:'<4.0', note:'Скрининг простаты' },
-                { code:'HCT', name:'Гематокрит (Hct)', range:'<50%', note:'Полицитемия после курса' },
-                { code:'GLU', name:'Глюкоза', range:'3.9-5.6', note:'Инсулинорезистентность после ААС' },
-              ].map((a, i) => (
-                <div key={i} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'5px 8px', borderRadius:6, background:'rgba(59,130,246,0.04)', border:'1px solid rgba(59,130,246,0.08)', flexWrap:'wrap', gap:2 }}>
-                  <div style={{ fontSize:9, fontWeight:600, color:'var(--text-light)' }}>{a.code} — {a.name} <span style={{ color:'var(--text-dim)', fontWeight:400 }}>({a.range})</span></div>
-                  <span style={{ fontSize:7, color:'#60a5fa', opacity:0.7 }}>{a.note}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-          {/* Instrumental for PCT */}
-          <div style={{ ...s.card, borderLeft:'3px solid #a855f7', marginTop:10 }}>
-            <h4 style={{ margin:'0 0 8px', fontSize:12, color:'#a855f7' }}>🔬 Инструментальные исследования</h4>
-            <div style={{ display:'flex', flexDirection:'column', gap:3 }}>
-              {[
-                { name:'УЗИ мошонки/яичек', purpose:'Оценка объёма яичек, исключение варикоцеле' },
-                { name:'УЗИ простаты (трансректальное)', purpose:'Исключение простатита/аденомы после курса ААС' },
-                { name:'ЭКГ', purpose:'Скрининг нарушений ритма, гипертрофии ЛЖ на фоне ААС' },
-                { name:'Спермограмма', purpose:'Контроль восстановления сперматогенеза после ПКТ' },
-              ].map((e, i) => (
-                <div key={i} style={{ padding:'5px 8px', borderRadius:6, background:'rgba(168,85,247,0.04)', border:'1px solid rgba(168,85,247,0.08)' }}>
-                  <span style={{ fontSize:9, fontWeight:600, color:'var(--text-light)' }}>{e.name}</span>
-                  <span style={{ fontSize:8, color:'var(--text-dim)', marginLeft:4 }}>— {e.purpose}</span>
-                </div>
-              ))}
-            </div>
-          </div>
         </div>
       )}
 
@@ -781,42 +739,6 @@ export const FertilityPCTScreen: React.FC<{ initialTab?: FertTab; restrictToMode
                     <span style={{ fontSize:8, color:'var(--text-dim)' }}>{r.freq}</span>
                     <span style={{ fontSize:8, color:'rgba(0,230,138,0.7)', fontStyle:'italic' }}>{r.note}</span>
                   </div>
-                </div>
-              ))}
-            </div>
-
-            <h5 style={{ margin:'0 0 6px', fontSize:11, color:'#60a5fa' }}>📊 Параметры мониторинга</h5>
-            <div style={{ display:'flex', flexDirection:'column', gap:4, marginBottom:10 }}>
-              {[
-                { param:'Общий тестостерон (TT)', target:'500-900 нг/дл', freq:'Каждые 3-6 мес' },
-                { param:'Свободный тестостерон (FT)', target:'15-25 пг/мл', freq:'Каждые 3-6 мес' },
-                { param:'Эстрадиол E2 (чувствительный)', target:'20-40 пг/мл', freq:'Каждые 3-6 мес' },
-                { param:'SHBG (ГСПГ)', target:'20-40 нмоль/л', freq:'Каждые 6 мес' },
-                { param:'Гематокрит (Hct)', target:'< 50%', freq:'Каждые 3 мес' },
-                { param:'ПСА (простат-специфический антиген)', target:'< 4.0 нг/мл', freq:'Каждые 6-12 мес (мужчины >40)' },
-                { param:'Липидный профиль', target:'ЛПНП < 100, ЛПВП > 40', freq:'Каждые 6-12 мес' },
-              ].map((m, i) => (
-                <div key={i} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'6px 8px', borderRadius:6, background:'rgba(59,130,246,0.06)', border:'1px solid rgba(59,130,246,0.1)', flexWrap:'wrap', gap:4 }}>
-                  <div>
-                    <div style={{ fontSize:10, fontWeight:600, color:'var(--text-light)' }}>{m.param}</div>
-                    <div style={{ fontSize:8, color:'var(--text-dim)' }}>{m.freq}</div>
-                  </div>
-                  <span style={{ fontSize:9, fontWeight:700, color:'#60a5fa' }}>{m.target}</span>
-                </div>
-              ))}
-            </div>
-
-            <h5 style={{ margin:'0 0 6px', fontSize:11, color:'#a855f7' }}>🔬 Инструментальные исследования</h5>
-            <div style={{ display:'flex', flexDirection:'column', gap:4, marginBottom:10 }}>
-              {[
-                { name:'УЗИ простаты (трансректальное)', purpose:'Оценка объёма, исключение узлов/РПЖ' },
-                { name:'Денситометрия (DEXA)', purpose:'Оценка минеральной плотности костей при длительной ГЗТ' },
-                { name:'Эхокардиография', purpose:'Скрининг гипертрофии ЛЖ при длительной терапии' },
-                { name:'УЗИ мошонки', purpose:'Исключение варикоцеле, оценка яичек' },
-              ].map((e, i) => (
-                <div key={i} style={{ padding:'5px 8px', borderRadius:6, background:'rgba(168,85,247,0.04)', border:'1px solid rgba(168,85,247,0.08)' }}>
-                  <span style={{ fontSize:9, fontWeight:600, color:'var(--text-light)' }}>{e.name}</span>
-                  <span style={{ fontSize:8, color:'var(--text-dim)', marginLeft:4 }}>— {e.purpose}</span>
                 </div>
               ))}
             </div>
@@ -883,56 +805,7 @@ export const FertilityPCTScreen: React.FC<{ initialTab?: FertTab; restrictToMode
       {tab === 'analyses' && (
         <div>
           {(() => {
-            const BEFORE_PCT = [
-              { code:'LH', name:'LH', range:'1.7-8.6 mIU/mL' },
-              { code:'FSH', name:'FSH (Фолликулостимулирующий гормон)', range:'1.5-12.4 mIU/mL' },
-              { code:'TT', name:'Тестостерон общий', range:'300-1000 ng/dL' },
-              { code:'FT', name:'Тестостерон свободный', range:'5.0-21.0 pg/mL' },
-              { code:'E2', name:'Эстрадиол (E2)', range:'11-44 pg/mL' },
-              { code:'PRL', name:'Пролактин', range:'4.0-15.2 ng/mL' },
-              { code:'SHBG', name:'SHBG (ГСПГ)', range:'18-54 nmol/L' },
-              { code:'TSH', name:'TSH (ТТГ)', range:'0.4-4.0 mIU/L' },
-              { code:'FT4', name:'Свободный T4', range:'0.8-1.8 ng/dL' },
-              { code:'FT3', name:'Свободный T3', range:'2.3-4.2 pg/mL' },
-              { code:'CORT', name:'Кортизол (утро)', range:'6.2-19.4 mkg/dL' },
-              { code:'DHEAS', name:'DHEA-S (ДГЭА-С)', range:'80-560 mkg/dL' },
-              { code:'CBC', name:'Общий анализ крови (CBC)', range:'Гемоглобин/лейкоциты/тромбоциты' },
-              { code:'ALT', name:'АЛТ (ALT)', range:'< 45 U/L' },
-              { code:'AST', name:'АСТ (AST)', range:'< 40 U/L' },
-              { code:'GGT', name:'ГГТ (GGT)', range:'< 60 U/L' },
-              { code:'CREAT', name:'Креатинин', range:'0.7-1.3 mg/dL' },
-              { code:'EGFR', name:'eGFR (СКФ)', range:'> 90 mL/min' },
-              { code:'LIPID', name:'Липидный профиль', range:'ХС/ЛПНП/ЛПВП/ТГ' },
-              { code:'PSA', name:'ПСА (простат-специфический антиген)', range:'< 4.0 ng/mL' },
-              { code:'VITD', name:'25-OH Витамин D', range:'30-100 ng/mL' },
-              { code:'FERR', name:'Ферритин', range:'30-400 ng/mL' },
-            ];
-            const AFTER_PCT = [
-              { code:'LH', name:'LH (повторно)', range:'1.7-8.6 mIU/mL' },
-              { code:'FSH', name:'FSH (повторно)', range:'1.5-12.4 mIU/mL' },
-              { code:'TT', name:'Тестостерон общий (повторно)', range:'300-1000 ng/dL' },
-              { code:'FT', name:'Тестостерон свободный (повторно)', range:'5.0-21.0 pg/mL' },
-              { code:'E2', name:'Эстрадиол E2 (повторно)', range:'11-44 pg/mL' },
-              { code:'PRL', name:'Пролактин (повторно)', range:'4.0-15.2 ng/mL' },
-              { code:'SHBG', name:'SHBG (повторно)', range:'18-54 nmol/L' },
-              { code:'TSH', name:'TSH (повторно)', range:'0.4-4.0 mIU/L' },
-              { code:'FT4', name:'Свободный T4 (повторно)', range:'0.8-1.8 ng/dL' },
-              { code:'FT3', name:'Свободный T3 (повторно)', range:'2.3-4.2 pg/mL' },
-              { code:'CORT', name:'Кортизол (повторно)', range:'6.2-19.4 mkg/dL' },
-              { code:'DHEAS', name:'DHEA-S (повторно)', range:'80-560 mkg/dL' },
-              { code:'CBC', name:'Общий анализ крови (повторно)', range:'Гемоглобин/лейкоциты/тромбоциты' },
-              { code:'ALT', name:'АЛТ ALT (повторно)', range:'< 45 U/L' },
-              { code:'AST', name:'АСТ AST (повторно)', range:'< 40 U/L' },
-              { code:'GGT', name:'ГГТ GGT (повторно)', range:'< 60 U/L' },
-              { code:'CREAT', name:'Креатинин (повторно)', range:'0.7-1.3 mg/dL' },
-              { code:'EGFR', name:'eGFR СКФ (повторно)', range:'> 90 mL/min' },
-              { code:'LIPID', name:'Липидный профиль (повторно)', range:'ХС/ЛПНП/ЛПВП/ТГ' },
-              { code:'PSA', name:'ПСА (повторно)', range:'< 4.0 ng/mL' },
-              { code:'VITD', name:'25-OH Витамин D (повторно)', range:'30-100 ng/mL' },
-              { code:'FERR', name:'Ферритин (повторно)', range:'30-400 ng/mL' },
-              { code:'SPERM', name:'Спермограмма', range:'Объём ≥1.5 мл, конц. ≥15 млн/мл, PR ≥32%' },
-            ];
-            const renderChecklist = (title: string, subtitle: string, items: typeof BEFORE_PCT, borderColor: string) => {
+            const renderChecklist = (title: string, subtitle: string, items: {code:string;name:string;range:string}[], borderColor: string) => {
               const has = items.filter(i => allLabs[i.code]);
               const total = items.length;
               return (
@@ -971,126 +844,393 @@ export const FertilityPCTScreen: React.FC<{ initialTab?: FertTab; restrictToMode
                 </div>
               );
             };
-            return (
-              <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-                <div style={{ fontSize:11, color:'var(--text-dim)', marginBottom:2 }}>
-                  Автоматическая проверка по данным из LabsScreen. Заполните анализы во вкладке Анализы главного экрана.
+
+            if (restrictToMode === 'pct') {
+              const PCT_BEFORE = [
+                { code:'LH', name:'Лютеинизирующий гормон', range:'1.7-8.6 mIU/mL' },
+                { code:'FSH', name:'Фолликулостимулирующий гормон', range:'1.5-12.4 mIU/mL' },
+                { code:'TT', name:'Тестостерон общий', range:'300-1000 ng/dL' },
+                { code:'FT', name:'Тестостерон свободный', range:'5.0-21.0 pg/mL' },
+                { code:'E2', name:'Эстрадиол E2', range:'11-44 pg/mL' },
+                { code:'PRL', name:'Пролактин', range:'4.0-15.2 ng/mL' },
+                { code:'SHBG', name:'SHBG (ГСПГ)', range:'18-54 nmol/L' },
+                { code:'TSH', name:'Тиреотропный гормон', range:'0.4-4.0 mIU/L' },
+                { code:'FT4', name:'Свободный T4', range:'0.8-1.8 ng/dL' },
+                { code:'CORT', name:'Кортизол (утро)', range:'6.2-19.4 mkg/dL' },
+                { code:'CBC', name:'Гематокрит (Hct)', range:'<50%' },
+                { code:'ALT', name:'АЛТ/AST (печень)', range:'<45/<40 U/L' },
+                { code:'LIPID', name:'Липидный профиль', range:'ЛПНП<100, ЛПВП>40' },
+                { code:'PSA', name:'ПСА общий', range:'<4.0 ng/mL' },
+              ];
+              const PCT_AFTER = [
+                { code:'LH', name:'LH (контроль)', range:'1.7-8.6 mIU/mL' },
+                { code:'FSH', name:'FSH (контроль)', range:'1.5-12.4 mIU/mL' },
+                { code:'TT', name:'Тестостерон общий (контроль)', range:'300-1000 ng/dL' },
+                { code:'FT', name:'Тестостерон свободный (контроль)', range:'5.0-21.0 pg/mL' },
+                { code:'E2', name:'Эстрадиол E2 (контроль)', range:'11-44 pg/mL' },
+                { code:'PRL', name:'Пролактин (контроль)', range:'4.0-15.2 ng/mL' },
+                { code:'SHBG', name:'SHBG (контроль)', range:'18-54 nmol/L' },
+                { code:'CBC', name:'Гематокрит (контроль)', range:'<50%' },
+                { code:'ALT', name:'АЛТ/AST (контроль)', range:'<45/<40 U/L' },
+                { code:'LIPID', name:'Липидный профиль (контроль)', range:'ЛПНП<100, ЛПВП>40' },
+                { code:'SPERM', name:'Спермограмма', range:'Объём≥1.5мл, PR≥32%' },
+              ];
+              const PCT_INSTR = [
+                { name:'УЗИ мошонки/яичек', purpose:'Оценка объёма яичек, исключение варикоцеле' },
+                { name:'УЗИ простаты (трансректальное)', purpose:'Исключение простатита/аденомы' },
+                { name:'ЭКГ', purpose:'Скрининг нарушений ритма, гипертрофии ЛЖ' },
+              ];
+              return (
+                <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                  <div style={s.card}>
+                    <h4 style={{ margin:'0 0 6px', fontSize:12, color:'#f59e0b' }}>⏱ Периоды сдачи анализов ПКТ</h4>
+                    <div style={{ fontSize:10, color:'var(--text-dim)', lineHeight:1.5 }}>
+                      <b>До ПКТ (неделя -1–0):</b> за 7-14 дней до последней инъекции — полный чек-ап<br/>
+                      <b>На ПКТ (недели 1–8):</b> контроль гормонов каждые 2 недели (LH, FSH, TT, E2)<br/>
+                      <b>После ПКТ (недели 4–6 после завершения):</b> финальная проверка — все маркеры + спермограмма
+                    </div>
+                  </div>
+                  {renderChecklist('До ПКТ', 'Обязательный минимум перед стартом', PCT_BEFORE, '#f59e0b')}
+                  {renderChecklist('После ПКТ (4-6 нед)', 'Контроль восстановления', PCT_AFTER, '#22c55e')}
+                  <div style={{ ...s.card, borderLeft:'3px solid #a855f7' }}>
+                    <h4 style={{ margin:'0 0 6px', fontSize:12, color:'#a855f7' }}>🔬 Инструментальные исследования ПКТ</h4>
+                    {PCT_INSTR.map((e,i) => (
+                      <div key={i} style={{ padding:'4px 0', fontSize:10, color:'var(--text-dim)' }}><b>{e.name}</b> — {e.purpose}</div>
+                    ))}
+                  </div>
                 </div>
-                {renderChecklist('До ПКТ', 'Обязательный минимум перед началом ПКТ', BEFORE_PCT, '#f59e0b')}
-                {renderChecklist('После ПКТ (4-6 нед)', 'Контроль через 4-6 недель после завершения ПКТ', AFTER_PCT, '#22c55e')}
-              </div>
-            );
+              );
+            }
+
+            if (restrictToMode === 'hrt') {
+              const HRT_BASELINE = [
+                { code:'TT', name:'Тестостерон общий', range:'300-1000 ng/dL' },
+                { code:'FT', name:'Тестостерон свободный', range:'5.0-21.0 pg/mL' },
+                { code:'E2', name:'Эстрадиол E2', range:'11-44 pg/mL' },
+                { code:'SHBG', name:'SHBG (ГСПГ)', range:'18-54 nmol/L' },
+                { code:'LH', name:'Лютеинизирующий гормон', range:'1.7-8.6 mIU/mL' },
+                { code:'FSH', name:'Фолликулостимулирующий гормон', range:'1.5-12.4 mIU/mL' },
+                { code:'PRL', name:'Пролактин', range:'4.0-15.2 ng/mL' },
+                { code:'CBC', name:'Гематокрит (Hct)', range:'<50%' },
+                { code:'TSH', name:'Тиреотропный гормон', range:'0.4-4.0 mIU/L' },
+                { code:'LIPID', name:'Липидный профиль', range:'ЛПНП<100, ЛПВП>40' },
+                { code:'PSA', name:'ПСА общий', range:'<4.0 ng/mL' },
+                { code:'INHB', name:'Ингибин B', range:'>80 pg/mL' },
+                { code:'VITD', name:'25-OH Витамин D', range:'30-100 ng/mL' },
+              ];
+              const HRT_DURING = [
+                { code:'TT', name:'Тестостерон общий (пик/надир)', range:'500-900 ng/dL' },
+                { code:'FT', name:'Тестостерон свободный', range:'15-25 pg/mL' },
+                { code:'E2', name:'Эстрадиол E2', range:'20-40 pg/mL' },
+                { code:'CBC', name:'Гематокрит', range:'<50%' },
+                { code:'PSA', name:'ПСА', range:'<4.0 ng/mL' },
+                { code:'LIPID', name:'Липиды', range:'ЛПНП<100, ЛПВП>40' },
+              ];
+              const HRT_FOLLOWUP = [
+                { code:'TT', name:'Тестостерон (плато)', range:'500-900 ng/dL' },
+                { code:'FT', name:'Свободный тестостерон', range:'15-25 pg/mL' },
+                { code:'E2', name:'Эстрадиол', range:'20-40 pg/mL' },
+                { code:'CBC', name:'Гематокрит', range:'<50%' },
+                { code:'PSA', name:'ПСА', range:'<4.0 ng/mL' },
+                { code:'LIPID', name:'Липидный профиль', range:'ЛПНП<100, ЛПВП>40' },
+                { code:'DEXA', name:'Денситометрия (DEXA)', range:'Z-score > -1.5' },
+              ];
+              const HRT_INSTR = [
+                { name:'УЗИ простаты (трансректальное)', purpose:'Оценка объёма, исключение узлов/РПЖ (базово + ежегодно)' },
+                { name:'Денситометрия DEXA', purpose:'МПК при длительной ГЗТ >2 лет (каждые 1-2 года)' },
+                { name:'Эхокардиография', purpose:'Скрининг гипертрофии ЛЖ (базово, затем по показаниям)' },
+                { name:'УЗИ мошонки', purpose:'Исключение варикоцеле, оценка яичек (базово)' },
+              ];
+              return (
+                <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                  <div style={s.card}>
+                    <h4 style={{ margin:'0 0 6px', fontSize:12, color:'#8b5cf6' }}>⏱ Периоды сдачи анализов ГЗТ</h4>
+                    <div style={{ fontSize:10, color:'var(--text-dim)', lineHeight:1.5 }}>
+                      <b>Базово (до старта):</b> полный гормональный профиль + CBC + биохимия<br/>
+                      <b>Через 6-8 недель:</b> TT/FT/E2 на пике и надире, Hct<br/>
+                      <b>Каждые 3-6 месяцев:</b> TT, FT, E2, Hct, PSA, липиды<br/>
+                      <b>Ежегодно:</b> полный чек-ап + DEXA + УЗИ простаты
+                    </div>
+                  </div>
+                  {renderChecklist('Базовые анализы (до старта ГЗТ)', 'Исходный профиль', HRT_BASELINE, '#8b5cf6')}
+                  {renderChecklist('Контроль на терапии (6-8 нед)', 'Пик/надир + Hct', HRT_DURING, '#60a5fa')}
+                  {renderChecklist('Ежегодный мониторинг', 'Плато + скрининг', HRT_FOLLOWUP, '#22c55e')}
+                  <div style={{ ...s.card, borderLeft:'3px solid #a855f7' }}>
+                    <h4 style={{ margin:'0 0 6px', fontSize:12, color:'#a855f7' }}>🔬 Инструментальные исследования ГЗТ</h4>
+                    {HRT_INSTR.map((e,i) => (
+                      <div key={i} style={{ padding:'4px 0', fontSize:10, color:'var(--text-dim)' }}><b>{e.name}</b> — {e.purpose}</div>
+                    ))}
+                  </div>
+                </div>
+              );
+            }
+
+            if (restrictToMode === 'fertility') {
+              const FERT_LABS = [
+                { code:'INHB', name:'Ингибин B', range:'>80 pg/mL' },
+                { code:'AMH', name:'АМГ (анти-Мюллеров гормон)', range:'>2.0 ng/mL' },
+                { code:'LH', name:'Лютеинизирующий гормон', range:'1.7-8.6 mIU/mL' },
+                { code:'FSH', name:'Фолликулостимулирующий гормон', range:'1.5-12.4 mIU/mL' },
+                { code:'TT', name:'Тестостерон общий', range:'300-1000 ng/dL' },
+                { code:'FT', name:'Тестостерон свободный', range:'5.0-21.0 pg/mL' },
+                { code:'E2', name:'Эстрадиол E2', range:'11-44 pg/mL' },
+                { code:'PRL', name:'Пролактин', range:'4.0-15.2 ng/mL' },
+                { code:'SHBG', name:'SHBG (ГСПГ)', range:'18-54 nmol/L' },
+              ];
+              const FERT_SPERM = [
+                { code:'SPERM_VOL', name:'Объём эякулята', range:'≥1.5 мл' },
+                { code:'SPERM_CONC', name:'Концентрация сперматозоидов', range:'≥15 млн/мл' },
+                { code:'SPERM_PR', name:'Прогрессивно-подвижные (PR)', range:'≥32%' },
+                { code:'SPERM_NP', name:'Непрогрессивно-подвижные (NP)', range:'—' },
+                { code:'SPERM_MORPH', name:'Морфология (строгие критерии Крюгера)', range:'≥4%' },
+                { code:'SPERM_MAR', name:'MAR-тест (антиспермальные антитела)', range:'<50%' },
+                { code:'SPERM_DFI', name:'DFI (фрагментация ДНК)', range:'<15%' },
+                { code:'SPERM_VIT', name:'Жизнеспособность', range:'≥58%' },
+              ];
+              const FERT_PERIODS = [
+                { name:'Ингибин B + АМГ', period:'базово + каждые 3-6 мес восстановления', note:'Ключевые маркеры сперматогенеза и овариального резерва' },
+                { name:'Гормональный профиль', period:'базово + каждые 4-6 нед на фоне терапии', note:'LH, FSH, TT, FT, E2, PRL, SHBG' },
+                { name:'Спермограмма', period:'базово, затем через 3 и 6 мес восстановления', note:'Полный анализ + MAR + DFI' },
+              ];
+              return (
+                <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                  <div style={s.card}>
+                    <h4 style={{ margin:'0 0 6px', fontSize:12, color:'#3b82f6' }}>⏱ Периоды сдачи анализов фертильности</h4>
+                    {FERT_PERIODS.map((p,i) => (
+                      <div key={i} style={{ padding:'6px 8px', borderRadius:6, background:'rgba(59,130,246,0.04)', border:'1px solid rgba(59,130,246,0.08)', marginBottom:4 }}>
+                        <div style={{ fontSize:10, fontWeight:600, color:'var(--text-light)' }}>{p.name}</div>
+                        <div style={{ fontSize:9, color:'#60a5fa' }}>{p.period}</div>
+                        <div style={{ fontSize:8, color:'var(--text-dim)' }}>{p.note}</div>
+                      </div>
+                    ))}
+                  </div>
+                  {renderChecklist('Гормональные маркеры фертильности', 'Базовые и контрольные', FERT_LABS, '#3b82f6')}
+                  {renderChecklist('Спермограмма + MAR + DFI', 'Полная оценка сперматогенеза', FERT_SPERM, '#22c55e')}
+                </div>
+              );
+            }
+
+            return null;
           })()}
         </div>
       )}
 
       {tab === 'brain' && (
         <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
-          <div style={s.card}>
-            <h4 style={{ margin:'0 0 6px', fontSize:14, color:'#ec4899' }}>🧠 Мозг и фертильность</h4>
-            <p style={{ fontSize:11, color:'var(--text-dim)', lineHeight:1.5, margin:0 }}>
-              Анаболические стероиды напрямую повреждают гипоталамо-гипофизарно-тестикулярную ось (HPTA). Андрогены подавляют GnRH-нейроны гипоталамуса через андрогеновые рецепторы → снижение секреции гонадотропин-рилизинг-гормона → падение ЛГ и ФСГ. Нейростероиды (аллопрегнанолон, андростандиол) модулируют GABA-A рецепторы, вызывая депрессию и тревожность. Кисспептин-нейроны повреждаются нандролоном и тренболоном, блокируя половое поведение и сперматогенез. Восстановление оси занимает от 6 до 18+ месяцев.
-            </p>
-          </div>
-
-          <div style={s.card}>
-            <h4 style={{ margin:'0 0 8px', fontSize:13, color:'#f59e0b' }}>💊 Степень вреда ААС для HPTA</h4>
-            <div style={{ display:'flex', flexDirection:'column', gap:5 }}>
-              {[
-                { name:'Тренболон', level:'Чрезвычайно высокий', detail:'Полное выключение оси за 2-3 дня. Глубокое подавление кисспептина и GnRH. Восстановление 12-18+ мес.', color:'#ef4444', bg:'rgba(239,68,68,0.1)' },
-                { name:'Нандролон', level:'Очень высокий', detail:'Прогестиновое подавление + андрогеновое. Ось выключается за 5-7 дней. Восстановление 9-15 мес.', color:'#ef4444', bg:'rgba(239,68,68,0.1)' },
-                { name:'Станозолол', level:'Высокий', detail:'Сильное подавление ГСПГ + андрогеновое выключение. Восстановление 6-12 мес.', color:'#f97316', bg:'rgba(249,115,22,0.1)' },
-                { name:'Оксандролон', level:'Средний', detail:'Умеренное подавление оси при дозировках >20 мг/день. Восстановление 4-8 нед.', color:'#f59e0b', bg:'rgba(245,158,11,0.1)' },
-                { name:'Тестостерон', level:'Дозозависимый', detail:'Физиологические дозы (ТЗТ): минимальное подавление ЛГ. Супрафизиологические: полное выключение. Восстановление 6-18 мес.', color:'#eab308', bg:'rgba(234,179,8,0.1)' },
-                { name:'Примоболан', level:'Низкий', detail:'Метил-ДГТ, слабое подавление. Частичное сохранение ЛГ. Восстановление 4-8 нед.', color:'#22c55e', bg:'rgba(34,197,94,0.1)' },
-                { name:'Мастерон', level:'Низкий', detail:'Дростанолон, слабое подавление оси. Восстановление 4-8 нед.', color:'#22c55e', bg:'rgba(34,197,94,0.1)' },
-                { name:'Туринабол', level:'Средне-высокий', detail:'17α-алкилирован, гепатотоксичен + подавление оси. Восстановление 6-10 нед.', color:'#f59e0b', bg:'rgba(245,158,11,0.1)' },
-              ].map((r, i) => (
-                <div key={i} style={{ padding:'8px 10px', borderRadius:8, background:r.bg, border:`1px solid ${r.color}22` }}>
-                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', gap:4 }}>
-                    <span style={{ fontSize:11, fontWeight:600, color:'var(--text-light)' }}>{r.name}</span>
-                    <span style={{ fontSize:9, fontWeight:700, color:r.color }}>{r.level}</span>
-                  </div>
-                  <div style={{ fontSize:9, color:'var(--text-dim)', marginTop:2, lineHeight:1.3 }}>{r.detail}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div style={s.card}>
-            <h4 style={{ margin:'0 0 8px', fontSize:13, color:'#22c55e' }}>🛡 Универсальные добавки для восстановления</h4>
-            <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
-              {[
-                { name:'Коэнзим Q10', dose:'200-600 мг/день', note:'Митохондриальная поддержка сперматозоидов, антиоксидант' },
-                { name:'Омега-3 (EPA+DHA)', dose:'3-5 г/день', note:'Мембраны сперматозоидов, противовоспалительный' },
-                { name:'Цинк пиколинат', dose:'30-50 мг/день', note:'Кофактор 5α-редуктазы, сперматогенез, тестостерон' },
-                { name:'Селен (селексен)', dose:'200 мкг/день', note:'Глутатионпероксидаза, подвижность сперматозоидов' },
-                { name:'Витамин D3', dose:'4000-5000 МЕ/день', note:'Рецепторы VDR в яичках, ↑ тестостерон через ЛГ' },
-                { name:'Витамин E', dose:'400-800 МЕ/день', note:'Мембранный антиоксидант, защита сперматозоидов' },
-                { name:'L-карнитин', dose:'2-3 г/день', note:'Энергетика митохондрий сперматозоидов, подвижность' },
-                { name:'NAC', dose:'1200 мг/день', note:'Предшественник глутатиона, защита клеток Лейдига' },
-              ].map((sup, i) => (
-                <div key={i} style={{ padding:'6px 8px', borderRadius:6, background:'rgba(0,230,138,0.04)', border:'1px solid rgba(0,230,138,0.1)' }}>
-                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', gap:4 }}>
-                    <span style={{ fontSize:10, fontWeight:600, color:'var(--text-light)' }}>{sup.name}</span>
-                    <span style={{ fontSize:9, fontWeight:700, color:'#00e68a' }}>{sup.dose}</span>
-                  </div>
-                  <div style={{ fontSize:8, color:'var(--text-dim)', marginTop:1 }}>{sup.note}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div style={s.card}>
-            <h4 style={{ margin:'0 0 8px', fontSize:13, color:'#8b5cf6' }}>💉 Протокол ПКТ</h4>
-            <div style={{ fontSize:11, color:'var(--text-dim)', marginBottom:8, lineHeight:1.4 }}>
-              Восстановление HPTA после курса ААС: 2-фазный подход с гонадотропинами и СЕРМами.
-            </div>
-            <div style={{ background:'rgba(139,92,246,0.08)', borderRadius:8, padding:10, border:'1px solid rgba(139,92,246,0.15)', marginBottom:8 }}>
-              <div style={{ fontSize:10, fontWeight:700, color:'#8b5cf6', marginBottom:4 }}>Фаза 1: hCG (стимуляция Лейдигов)</div>
-              <div style={{ fontSize:10, color:'var(--text-light)', lineHeight:1.4 }}>
-                hCG 2000-3000 МЕ через день (EOD) × 2-3 недели.<br/>
-                Цель: восстановление объёма яичек, подготовка к СЕРМ-терапии.
+          {restrictToMode === 'pct' && (
+            <>
+              <div style={s.card}>
+                <h4 style={{ margin:'0 0 6px', fontSize:14, color:'#8b5cf6' }}>🔄 Полный протокол ПКТ и нейроэндокринной реабилитации</h4>
+                <p style={{ fontSize:11, color:'var(--text-dim)', lineHeight:1.5, margin:0 }}>
+                  Послекурсовая терапия (ПКТ) направлена на восстановление гипоталамо-гипофизарно-тестикулярной оси (HPTA) после подавления экзогенными андрогенами. Мозг является главным регулятором фертильности — нейротоксичность ААС затрагивает глутаматную эксайтотоксичность, окислительный стресс, нейровоспаление, подавление нейрогенеза и нейростероидную недостаточность. Восстановление оси занимает 6-20+ недель в зависимости от стажа, соединений и возраста.
+                </p>
               </div>
-            </div>
-            <div style={{ background:'rgba(34,197,94,0.08)', borderRadius:8, padding:10, border:'1px solid rgba(34,197,94,0.15)', marginBottom:8 }}>
-              <div style={{ fontSize:10, fontWeight:700, color:'#22c55e', marginBottom:4 }}>Фаза 2: СЕРМ (стимуляция оси)</div>
-              <div style={{ fontSize:10, color:'var(--text-light)', lineHeight:1.4 }}>
-                <b>Вариант A:</b> Кломифен 50 мг/день 2 нед + Тамоксифен 20 мг/день 4-6 нед<br/>
-                <b>Вариант B:</b> Энкломифен 25 мг/день 4-6 нед<br/>
-                Цель: ЛГ, ФСГ &gt; 5; тестостерон &gt; 15 нмоль/л.
-              </div>
-            </div>
-            <div style={{ background:'rgba(245,158,11,0.08)', borderRadius:8, padding:10, border:'1px solid rgba(245,158,11,0.15)' }}>
-              <div style={{ fontSize:10, fontWeight:700, color:'#f59e0b', marginBottom:4 }}>⏱ Тайминг</div>
-              <div style={{ fontSize:10, color:'var(--text-light)', lineHeight:1.4 }}>
-                • Эфиры тестостерона (эн/цип): через 14-21 день после последней инъекции<br/>
-                • Ундеканоат: через 4-6 недель<br/>
-                • Нандролон: через 21-28 дней (деканоат), через 7-10 дней (фенилпропионат)<br/>
-                • Тренболон: через 14-21 день (энантат), через 5-7 дней (ацетат)
-              </div>
-            </div>
-          </div>
 
-          <div style={s.card}>
-            <h4 style={{ margin:'0 0 8px', fontSize:13, color:'#3b82f6' }}>🧬 Пептиды для восстановления</h4>
-            <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
-              {[
-                { name:'Гонадорелин (GnRH)', dose:'100 мкг 2-3×/день', note:'Синтетический GnRH, непосредственно стимулирует гипофиз → ↑ЛГ/ФСГ. Пульсаторный режим обязателен.' },
-                { name:'Кисспептин-10', dose:'1-3 мкг/кг', note:'Активатор GnRH-нейронов. Критичен при подавлении тренболоном/нандролоном. Восстанавливает половое поведение.' },
-                { name:'hMG (менопаузный гонадотропин)', dose:'75-150 МЕ/день', note:'Содержит ЛГ и ФСГ. Стимулирует сперматогенез напрямую. 3-6 мес курс.' },
-                { name:'рФСГ (рекомбинантный ФСГ)', dose:'75-150 МЕ 3×/нед', note:'Чистый ФСГ, стимуляция клеток Сертоли → сперматогенез. При азооспермии.' },
-              ].map((p, i) => (
-                <div key={i} style={{ padding:'8px 10px', borderRadius:8, background:'rgba(59,130,246,0.04)', border:'1px solid rgba(59,130,246,0.12)' }}>
-                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', gap:4 }}>
-                    <span style={{ fontSize:10, fontWeight:600, color:'var(--text-light)' }}>{p.name}</span>
-                    <span style={{ fontSize:9, fontWeight:700, color:'#3b82f6' }}>{p.dose}</span>
-                  </div>
-                  <div style={{ fontSize:9, color:'var(--text-dim)', marginTop:2, lineHeight:1.3 }}>{p.note}</div>
+              <div style={s.card}>
+                <h4 style={{ margin:'0 0 6px', fontSize:12, color:'#f59e0b' }}>🧠 Нейроанатомия репродуктивной оси</h4>
+                <div style={{ fontSize:10, color:'var(--text-dim)', lineHeight:1.5 }}>
+                  <b>GnRH-нейроны</b> — главные регуляторы HPTA. ААС подавляют их через андрогеновые рецепторы и нейростероидную модуляцию GABA-A.<br/><br/>
+                  <b>Кисспептин (KNDy-нейроны)</b> — критические активаторы GnRH. Тренболон и нандролон разрушают кисспептиновую сигнализацию, блокируя половое поведение и пульсаторную секрецию ЛГ.<br/><br/>
+                  <b>GABA-эргическая система</b> — нейростероиды (аллопрегнанолон) модулируют GABA-A рецепторы, вызывая депрессию, тревожность и подавление GnRH-импульсов.
                 </div>
-              ))}
-            </div>
-          </div>
+              </div>
+
+              <div style={s.card}>
+                <h4 style={{ margin:'0 0 6px', fontSize:12, color:'#22c55e' }}>💊 Фармакологические протоколы ПКТ</h4>
+                <div style={{ display:'flex', flexDirection:'column', gap:5 }}>
+                  <div style={{ padding:'8px', borderRadius:6, background:'rgba(34,197,94,0.06)', border:'1px solid rgba(34,197,94,0.1)' }}>
+                    <div style={{ fontSize:10, fontWeight:600, color:'#22c55e' }}>🔹 СЕРМ-терапия</div>
+                    <div style={{ fontSize:9, color:'var(--text-dim)', marginTop:2, lineHeight:1.3 }}>
+                       <b>Энкломифен 25 мг/день</b> (6-8 нед) — чистый изомер, меньше побочек. ИЛИ <b>Кломифен 50 мг/день</b> (2 нед) → <b>Тамоксифен 20 мг/день</b> (4-6 нед). Цель: ЛГ/ФСГ {'>'}5, TT {'>'}15 нмоль/л.
+                    </div>
+                  </div>
+                  <div style={{ padding:'8px', borderRadius:6, background:'rgba(139,92,246,0.06)', border:'1px solid rgba(139,92,246,0.1)' }}>
+                    <div style={{ fontSize:10, fontWeight:600, color:'#8b5cf6' }}>🔹 hCG + hMG (комбинированная стимуляция)</div>
+                    <div style={{ fontSize:9, color:'var(--text-dim)', marginTop:2, lineHeight:1.3 }}>
+                      hCG 2000-3000 МЕ EOD × 2-3 нед → затем СЕРМ. При азооспермии: hMG 75-150 МЕ/день (3-6 мес) — золотой стандарт.
+                    </div>
+                  </div>
+                  <div style={{ padding:'8px', borderRadius:6, background:'rgba(239,68,68,0.06)', border:'1px solid rgba(239,68,68,0.1)' }}>
+                    <div style={{ fontSize:10, fontWeight:600, color:'#ef4444' }}>🚫 Запрещено на ПКТ</div>
+                    <div style={{ fontSize:9, color:'var(--text-dim)', marginTop:2, lineHeight:1.3 }}>
+                      Финастерид/дутастерид, НПВС, опиоиды, GABA-агонисты, алкоголь, THC, рацетамы — все подавляют ось HPTA и блокируют восстановление.
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div style={s.card}>
+                <h4 style={{ margin:'0 0 6px', fontSize:12, color:'#3b82f6' }}>🧬 Нутрицевтическая поддержка ПКТ</h4>
+                <div style={{ display:'flex', flexDirection:'column', gap:3, fontSize:9, color:'var(--text-dim)', lineHeight:1.4 }}>
+                  <div>CoQ10 200-600 мг · L-карнитин 2-3 г · Цинк 30-50 мг + Медь 2 мг</div>
+                  <div>Селен 200 мкг · Витамин D3 4000-5000 МЕ · Омега-3 3-5 г</div>
+                  <div>NAC 1200 мг · TUDCA 500-1000 мг · Магний треонат 2 г</div>
+                  <div>Ашваганда 600 мг · Maca 3-5 г · Кордицепс 2-3 г</div>
+                </div>
+              </div>
+
+              <div style={s.card}>
+                <h4 style={{ margin:'0 0 6px', fontSize:12, color:'#ec4899' }}>🧠 Нейропротективное ядро ПКТ</h4>
+                <div style={{ fontSize:9, color:'var(--text-dim)', lineHeight:1.5 }}>
+                  <b>GlyNAC</b> (глицин+NAC) 1200 мг — предшественник глутатиона, защита нейронов.<br/>
+                  <b>Alpha-GPC + Уридин</b> — синергия для восстановления дофаминовых нейронов.<br/>
+                  <b>Лития ороат 5-20 мг</b> — активатор BDNF, стимуляция нейрогенеза в гиппокампе.<br/>
+                  <b>Бромантан 50-100 мг/день</b> — дофаминергический адаптоген, восстановление мотивации.<br/>
+                  <b>PQQ 20-40 мг/день</b> — биогенез митохондрий, защита GnRH-нейронов.
+                </div>
+              </div>
+
+              <div style={s.card}>
+                <h4 style={{ margin:'0 0 6px', fontSize:12, color:'#f59e0b' }}>⏱ Пошаговый план ПКТ</h4>
+                <div style={{ fontSize:9, color:'var(--text-dim)', lineHeight:1.6 }}>
+                  <b>Подготовка (нед -2–0):</b> сдать анализы, отменить все ААС, начать нутрицевтическую поддержку<br/>
+                  <b>Фаза 1 (нед 1-2):</b> hCG 2000 МЕ EOD + нутрицевтическая база<br/>
+                  <b>Фаза 2 (нед 3-8):</b> Энкломифен 25 мг/день + нейропротективное ядро<br/>
+                  <b>Стабилизация (нед 9-20):</b> контроль анализов, коррекция доз, переход на ТЗТ при необходимости<br/>
+                  <b>Контроль:</b> анализы на 2, 4, 6, 8, 12, 20 неделях
+                </div>
+              </div>
+            </>
+          )}
+
+          {restrictToMode === 'hrt' && (
+            <>
+              <div style={s.card}>
+                <h4 style={{ margin:'0 0 6px', fontSize:14, color:'#8b5cf6' }}>⚕️ ГЗТ: Ультимативный протокол 2026</h4>
+                <p style={{ fontSize:11, color:'var(--text-dim)', lineHeight:1.5, margin:0 }}>
+                  Гормонозаместительная терапия тестостероном (ТЗТ/ГЗТ) — стандарт лечения гипогонадизма различной этиологии. Эпидемиология: гипогонадизм встречается у 20-30% мужчин с ожирением, 25-40% при диабете 2 типа, 30-50% мужчин {'>'}70 лет. TRAVERSE trial (NEJM 2023) не выявил повышения MACE при физиологических дозах ТЗТ.
+                </p>
+              </div>
+
+              <div style={s.card}>
+                <h4 style={{ margin:'0 0 6px', fontSize:12, color:'#22c55e' }}>💉 Клинические протоколы</h4>
+                <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
+                  <div style={{ padding:'6px 8px', borderRadius:6, background:'rgba(0,230,138,0.04)', border:'1px solid rgba(0,230,138,0.1)' }}>
+                    <div style={{ fontSize:10, fontWeight:600, color:'#00e68a' }}>Классическая ТЗТ</div>
+                    <div style={{ fontSize:9, color:'var(--text-dim)', lineHeight:1.3 }}>Тестостерон энантат/ципионат 100-200 мг/нед. Цель: TT 500-900 нг/дл, FT 15-25 пг/мл. Контроль E2 каждые 3 мес.</div>
+                  </div>
+                  <div style={{ padding:'6px 8px', borderRadius:6, background:'rgba(59,130,246,0.04)', border:'1px solid rgba(59,130,246,0.1)' }}>
+                    <div style={{ fontSize:10, fontWeight:600, color:'#60a5fa' }}>Сохранение фертильности</div>
+                    <div style={{ fontSize:9, color:'var(--text-dim)', lineHeight:1.3 }}>ТЗТ + hCG 250-500 МЕ 2-3×/нед. hCG поддерживает интратестикулярный тестостерон и объём яичек.</div>
+                  </div>
+                  <div style={{ padding:'6px 8px', borderRadius:6, background:'rgba(245,158,11,0.04)', border:'1px solid rgba(245,158,11,0.1)' }}>
+                    <div style={{ fontSize:10, fontWeight:600, color:'#f59e0b' }}>T4DM — ожирение/предиабет</div>
+                    <div style={{ fontSize:9, color:'var(--text-dim)', lineHeight:1.3 }}>ТЗТ + образ жизни. Цель: снижение веса, HbA1c, висцерального жира. Контроль апноэ сна.</div>
+                  </div>
+                  <div style={{ padding:'6px 8px', borderRadius:6, background:'rgba(239,68,68,0.04)', border:'1px solid rgba(239,68,68,0.1)' }}>
+                    <div style={{ fontSize:10, fontWeight:600, color:'#ef4444' }}>Коррекция E2</div>
+                    <div style={{ fontSize:9, color:'var(--text-dim)', lineHeight:1.3 }}>Анастрозол 0.25-0.5 мг 2×/нед только при E2 {'>'}50 пг/мл + симптомы. Ингибиторы ароматазы не рутина.</div>
+                  </div>
+                </div>
+              </div>
+
+              <div style={s.card}>
+                <h4 style={{ margin:'0 0 6px', fontSize:12, color:'#ef4444' }}>⚠ Лекарственные взаимодействия</h4>
+                <div style={{ fontSize:9, color:'var(--text-dim)', lineHeight:1.5 }}>
+                  <b>ТЗТ + антикоагулянты:</b> усиление эффекта варфарина — контроль MHO каждые 2 нед первые 3 мес<br/>
+                  <b>ТЗТ + опиоиды:</b> опиоиды подавляют GnRH — может потребоваться ↑ дозы<br/>
+                  <b>ТЗТ + ингибиторы 5α-редуктазы:</b> финастерид ↓ ДГТ, может ↑ эстрогенов — контроль E2<br/>
+                  <b>ТЗТ + СИОЗС:</b> СИОЗС могут ↓ тестостерон через пролактин — контроль PRL<br/>
+                  <b>ТЗТ + статины:</b> статины ↓ ЛПНП, но могут ↓ ЛГ — контроль гормонов
+                </div>
+              </div>
+
+              <div style={s.card}>
+                <h4 style={{ margin:'0 0 6px', fontSize:12, color:'#f59e0b' }}>📋 15 частых ошибок ГЗТ</h4>
+                <div style={{ fontSize:9, color:'var(--text-dim)', lineHeight:1.5 }}>
+                  1. Старт без базовых анализов · 2. Недостаточная частота инъекций · 3. Игнорирование E2 · 4. Пропуск Hct · 5. ТЗТ при нелеченном апноэ сна<br/>
+                  6. Отсутствие hCG при желании фертильности · 7. Избыточная ароматазная блокада · 8. Старт TT{'<'}300 без симптомов · 9. Пропуск DEXA · 10. Игнорирование липидов<br/>
+                  11. Комбинация с финастеридом без контроля · 12. ТЗТ при активном РПЖ · 13. Одновременный приём опиоидов · 14. Без контроля PRL · 15. Резкая отмена без моста
+                </div>
+              </div>
+
+              <div style={s.card}>
+                <h4 style={{ margin:'0 0 6px', fontSize:12, color:'#3b82f6' }}>📖 Клинические случаи (5 из 25)</h4>
+                <div style={{ fontSize:9, color:'var(--text-dim)', lineHeight:1.5 }}>
+                  <b>1.</b> 34 года, пост-курсовой гипогонадизм 8 мес: TT 180, LH 1.2. Энкломифен 25 мг 8 нед → TT 580, ЛГ 4.8. Симптомы купированы.<br/>
+                  <b>2.</b> 52 года, возрастной гипогонадизм: TT 280, симптомы. ТЗТ энантат 150 мг/нед → TT 720, Hct 48%. Контроль E2 анастрозолом.<br/>
+                  <b>3.</b> 28 лет, фертильность после курса: hCG 2000 МЕ EOD 3 нед → энкломифен 25 мг 8 нед + hMG 75 МЕ × 3 мес. Спермограмма восстановлена.<br/>
+                  <b>4.</b> 45 лет, метаболический синдром + TT 310: ТЗТ ципионат 100 мг/нед + диета. Через 6 мес: −8 кг, HbA1c 5.7%, TT 650.<br/>
+                  <b>5.</b> 60 лет, TT 150, ожирение, апноэ сна: СРАР-терапия 3 мес → затем ТЗТ ундеканоат. TT 550, симптомы улучшились.
+                </div>
+              </div>
+            </>
+          )}
+
+          {restrictToMode === 'fertility' && (
+            <>
+              <div style={s.card}>
+                <h4 style={{ margin:'0 0 6px', fontSize:14, color:'#3b82f6' }}>🧬 Полный гайд по сохранению и восстановлению фертильности</h4>
+                <p style={{ fontSize:11, color:'var(--text-dim)', lineHeight:1.5, margin:0 }}>
+                  Стероид-индуцированный гипогонадизм (SIH) — основная причина мужского бесплодия среди пользователей ААС. Полное восстановление сперматогенеза возможно у 70-80% пациентов при правильном протоколе. Ключевые маркеры: Ингибин B ({'>'}80 pg/mL) — прямой маркер функции клеток Сертоли; АМГ — резерв сперматогенеза; спермограмма + MAR + DFI.
+                </p>
+              </div>
+
+              <div style={s.card}>
+                <h4 style={{ margin:'0 0 6px', fontSize:12, color:'#ef4444' }}>💥 Степень вреда ААС по данным исследований</h4>
+                <div style={{ display:'flex', flexDirection:'column', gap:3, fontSize:9, color:'var(--text-dim)', lineHeight:1.4 }}>
+                  <div><b>Тренболон</b> — чрезвычайно высокий (полное выключение оси за 2-3 дня, кисспептин-блокада)</div>
+                  <div><b>Нандролон</b> — очень высокий (прогестиновое + андрогеновое подавление, 9-15 мес восстановления)</div>
+                  <div><b>Станозолол</b> — высокий (6-12 мес, ↓ SHBG)</div>
+                  <div><b>Оксандролон</b> — средний (4-8 нед при {'>'}20 мг/день)</div>
+                  <div><b>Тестостерон</b> — дозозависимый (ТЗТ → минимально; супра-физиологический → полное выключение)</div>
+                  <div><b>Примоболан/Мастерон</b> — низкий (4-8 нед, частичное сохранение ЛГ)</div>
+                </div>
+              </div>
+
+              <div style={s.card}>
+                <h4 style={{ margin:'0 0 6px', fontSize:12, color:'#22c55e' }}>🛡 Профилактика на курсе</h4>
+                <div style={{ fontSize:9, color:'var(--text-dim)', lineHeight:1.5 }}>
+                  <b>hCG параллельно курсу:</b> 250-500 МЕ 2-3×/нед, начиная с 1-й недели курса. Поддерживает интратестикулярный тестостерон и объём яичек. Доказано: hCG предотвращает атрофию клеток Лейдига.<br/><br/>
+                  <b>Прегненолон backfill:</b> прегненолон 50-100 мг/день — предшественник всех стероидов, снижает подавление эндогенного синтеза.<br/><br/>
+                  <b>Криоконсервация:</b> обязательна при планировании фертильности — заморозка до начала курса.<br/><br/>
+                  <b>Зачатие на «мосту»:</b> hCG 500 МЕ EOD + энкломифен 12.5 мг/день. Риск SDF — обязательный контроль DFI.
+                </div>
+              </div>
+
+              <div style={s.card}>
+                <h4 style={{ margin:'0 0 6px', fontSize:12, color:'#8b5cf6' }}>💊 Протоколы восстановления фертильности</h4>
+                <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
+                  <div style={{ padding:'6px 8px', borderRadius:6, background:'rgba(34,197,94,0.06)', border:'1px solid rgba(34,197,94,0.1)' }}>
+                    <div style={{ fontSize:10, fontWeight:600, color:'#22c55e' }}>Watchful waiting (3-6 мес)</div>
+                    <div style={{ fontSize:9, color:'var(--text-dim)' }}>При лёгком подавлении — отмена ААС + нутрицевтическая поддержка. Контроль спермограммы.</div>
+                  </div>
+                  <div style={{ padding:'6px 8px', borderRadius:6, background:'rgba(59,130,246,0.06)', border:'1px solid rgba(59,130,246,0.1)' }}>
+                    <div style={{ fontSize:10, fontWeight:600, color:'#3b82f6' }}>СЕРМ-монотерапия (4-6 мес)</div>
+                    <div style={{ fontSize:9, color:'var(--text-dim)' }}>Энкломифен 25 мг/день или кломифен 50 мг/день. Эффективность: 51.9% восстановления.</div>
+                  </div>
+                  <div style={{ padding:'6px 8px', borderRadius:6, background:'rgba(139,92,246,0.06)', border:'1px solid rgba(139,92,246,0.1)' }}>
+                    <div style={{ fontSize:10, fontWeight:600, color:'#8b5cf6' }}>Комбинированная (ПКТ+) — золотой стандарт</div>
+                    <div style={{ fontSize:9, color:'var(--text-dim)' }}>hCG 2000-3000 МЕ EOD × 2-3 нед → энкломифен 25 мг 8-12 нед. При азооспермии: hMG 75-150 МЕ/день. Эффективность: 66.8%.</div>
+                  </div>
+                  <div style={{ padding:'6px 8px', borderRadius:6, background:'rgba(245,158,11,0.06)', border:'1px solid rgba(245,158,11,0.1)' }}>
+                    <div style={{ fontSize:10, fontWeight:600, color:'#f59e0b' }}>Пульсаторный GnRH-насос</div>
+                    <div style={{ fontSize:9, color:'var(--text-dim)' }}>При полном отсутствии ответа на СЕРМ/hMG. Восстановление фертильности в 70-80% случаев.</div>
+                  </div>
+                </div>
+              </div>
+
+              <div style={s.card}>
+                <h4 style={{ margin:'0 0 6px', fontSize:12, color:'#f59e0b' }}>⚠ Скрытые помехи восстановлению</h4>
+                <div style={{ fontSize:9, color:'var(--text-dim)', lineHeight:1.5 }}>
+                  <b>Финастерид/дутастерид:</b> блокируют ДГТ → нарушают сперматогенез · <b>Провирон:</b> подавляет ГСПГ, ↑ свободный тестостерон, но ↓ ЛГ<br/>
+                  <b>НПВС:</b> ↓ ФСГ через простагландины · <b>Опиоиды:</b> подавляют GnRH · <b>СИОЗС:</b> ↑ пролактин, ↓ либидо<br/>
+                  <b>Алкоголь:</b> ↓ тестостерон, ↑ ароматазу · <b>ТГК (марихуана):</b> ↓ ФСГ/ЛГ, ↑ фрагментацию ДНК сперматозоидов<br/>
+                  <b>Пептидные ноотропы (рацетамы):</b> GABA-агонисты дополнительно подавляют ось
+                </div>
+              </div>
+
+              <div style={s.card}>
+                <h4 style={{ margin:'0 0 6px', fontSize:12, color:'#3b82f6' }}>🧬 Перспективные пептиды</h4>
+                <div style={{ fontSize:9, color:'var(--text-dim)', lineHeight:1.5 }}>
+                  <b>Кисспептин-10:</b> 1-3 мкг/кг — активатор GnRH, восстанавливает половое поведение при подавлении тренболоном<br/>
+                  <b>BPC-157:</b> улучшает заживление тканей, протекция яичек<br/>
+                  <b>Testivell/Fertivell:</b> бычьи тестикулярные пептиды, восстанавливают сперматогенез в доклинических моделях<br/>
+                  <b>Гонадорелин (GnRH):</b> 100 мкг 2-3×/день пульсаторно — прямая стимуляция гипофиза
+                </div>
+              </div>
+            </>
+          )}
         </div>
       )}
 

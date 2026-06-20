@@ -110,6 +110,5 @@ export async function initializeMasterDB(dataDir: string): Promise<MasterDB> {
     }));
   } catch {}
 
-  console.log('MasterDB initialized with dynamic loader');
   return db;
 }

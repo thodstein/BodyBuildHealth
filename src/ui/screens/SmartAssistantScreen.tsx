@@ -11,21 +11,17 @@ interface GlossaryTerm {
 }
 
 const GLOSSARY: GlossaryTerm[] = [
-  { term: 'RIR (Повторения в запасе)', abbr: 'RIR', definition: '', units: 'шкала 0-10' },
-  { term: '', abbr: 'Hct', definition: '', units: '%' },
-  { term: 'EC50', abbr: 'EC50', definition: '', units: '' },
-  { term: 'BMR (Базовый метаболизм)', abbr: 'BMR', definition: '', units: '' },
-  { term: 'TDEE (Общий расход энергии)', abbr: 'TDEE', definition: '', units: '' },
-  { term: 'HOMA-IR', abbr: 'HOMA-IR', definition: '', units: 'условные единицы' },
-  { term: 'HGI (Индекс гомеостаза/иммунитета)', abbr: 'HGI', definition: '', units: 'условные единицы' },
-  { term: 'MRR (Минимальный диапазон рисков)', abbr: 'MRR', definition: '', units: 'условные единицы' },
-  { term: '', abbr: '', definition: '', units: '' },
-  { term: '', abbr: '', definition: '', units: '' },
-  { term: '', abbr: 'Free T', definition: '', units: '' },
-  { term: 'eGFR', abbr: 'eGFR', definition: '', units: '' },
-  { term: '', abbr: '', definition: '', units: '' },
-  { term: '', abbr: '', definition: '', units: '' },
-  { term: '', abbr: 'Ferritin', definition: '', units: '' },
+  { term: 'RIR (Повторения в запасе)', abbr: 'RIR', definition: 'Безопасный диапазон повторений до отказа при выполнении упражнения. Например, RIR 2 означает, что вы можете выполнить ещё 2 повторения с сохранением техники.', units: 'шкала 0-10' },
+  { term: 'Гематокрит', abbr: 'Hct', definition: 'Доля эритроцитов в общем объёме крови. Повышается при приёме ААС, требует контроля для снижения риска тромбозов.', units: '%' },
+  { term: 'EC50', abbr: 'EC50', definition: 'Концентрация вещества, при которой достигается 50% от максимального эффекта. Чем ниже EC50, тем выше потенция вещества.', units: '' },
+  { term: 'BMR (Базовый метаболизм)', abbr: 'BMR', definition: 'Минимальное количество калорий, необходимое для поддержания жизнедеятельности организма в состоянии покоя.', units: '' },
+  { term: 'TDEE (Общий расход энергии)', abbr: 'TDEE', definition: 'Общее количество калорий, которое организм сжигает за сутки с учётом физической активности.', units: '' },
+  { term: 'HOMA-IR', abbr: 'HOMA-IR', definition: 'Модель оценки инсулинорезистентности. Рассчитывается из уровней глюкозы и инсулина натощак.', units: 'условные единицы' },
+  { term: 'HGI (Индекс гомеостаза/иммунитета)', abbr: 'HGI', definition: 'Композитный показатель состояния иммунной системы и гомеостаза на основе лабораторных маркеров.', units: 'условные единицы' },
+  { term: 'MRR (Минимальный диапазон рисков)', abbr: 'MRR', definition: 'Совокупность минимальных пороговых значений маркеров крови, при которых риск осложнений минимален.', units: 'условные единицы' },
+  { term: 'Свободный тестостерон', abbr: 'Free T', definition: 'Биологически активная фракция тестостерона, не связанная с белками-переносчиками (SHBG, альбумин).', units: '' },
+  { term: 'eGFR', abbr: 'eGFR', definition: 'Расчётная скорость клубочковой фильтрации — показатель функции почек. Снижение указывает на почечную недостаточность.', units: '' },
+  { term: 'Ферритин', abbr: 'Ferritin', definition: 'Белок, депонирующий железо в организме. Маркер запасов железа и воспалительных процессов.', units: '' },
 ];
 
 interface CheckupQuestion {
@@ -65,7 +61,7 @@ export const SmartAssistantScreen: React.FC = () => {
   useEffect(() => {
     setMessages([{
       id: 1,
-      text: '',
+        text: `⚠️ Извините, произошла ошибка при обработке запроса. Попробуйте переформулировать вопрос или обратитесь к справочным материалам.`,
       isUser: false
     }]);
   }, []);
@@ -106,7 +102,7 @@ export const SmartAssistantScreen: React.FC = () => {
     } catch (error) {
       setMessages(prev => [...prev, {
         id: Date.now() + 1,
-        text: '',
+      text: '👋 Привет! Я ваш умный ассистент по здоровью. Задайте любой вопрос о тренировках, питании, фармакологии или лабораторных анализах. Также вы можете пройти чекап недели или изучить глоссарий терминов.',
         isUser: false
       }]);
     } finally {
@@ -135,7 +131,7 @@ export const SmartAssistantScreen: React.FC = () => {
 
     const summaryMsg = {
       id: Date.now(),
-      text: ``,
+      text: `📋 **Результаты чекапа недели:**\n- Сон: ${sleep}/10\n- Стресс: ${stress}/10\n- Крепатура: ${doms}/10\n- Либидо: ${libido}/10\n- Самочувствие: ${wellbeing}/10\n\n**Восстановление:** ${recovery}%\n**Утомление:** ${fatigue}%\n\nРекомендации: ${recovery >= 80 ? 'Отличное состояние, можно увеличивать нагрузку.' : recovery >= 60 ? 'Хорошее состояние, продолжайте текущий режим.' : recovery >= 40 ? 'Умеренное утомление, добавьте дни отдыха.' : 'Высокое утомление — рекомендуется снизить нагрузку и увеличить сон.'}`,
       isUser: false
     };
 
@@ -182,7 +178,7 @@ export const SmartAssistantScreen: React.FC = () => {
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyPress={handleKeyPress}
-          placeholder=""
+              placeholder="Поиск терминов..."
           className="assistant-input"
           disabled={loading}
         />
@@ -191,7 +187,7 @@ export const SmartAssistantScreen: React.FC = () => {
           disabled={loading || !input.trim()}
           className="send-btn"
         >
-          {loading ? '' : ''}
+          {loading ? '⏳' : '➤'}
         </button>
       </div>
       
@@ -202,15 +198,15 @@ export const SmartAssistantScreen: React.FC = () => {
           <button className="quick-action" onClick={() => {
             const rdy = linked.readiness;
             if (!rdy) { setMessages(m => [...m, { id: Date.now(), text: '⚠️ Данные о готовности ещё не загружены. Заполните профиль и анализы.', isUser: false }]); return; }
-            setMessages(m => [...m, { id: Date.now(), text: ``, isUser: false }]);
+            setMessages(m => [...m, { id: Date.now(), text: `🔔 **Напоминания на неделю:**\n- Восстановление: ${rdy.recovery}% (${rdy.recovery >= 80 ? '✅ отлично' : rdy.recovery >= 60 ? '⚠️ норма' : '❌ требуется отдых'})\n- Утомление: ${rdy.fatigue}%\n- Питание: ${rdy.nutrition}%\n\nРекомендуется ${rdy.recovery < 60 ? 'снизить интенсивность тренировок' : rdy.nutrition < 70 ? 'улучшить качество питания' : 'продолжать текущий режим'}.`, isUser: false }]);
           }}>🔔 Напоминания</button>
           <button className="quick-action" onClick={() => {
             const quickQuestions = [
-              '',
-              '',
-              '',
-              '',
-              '',
+              'Какие анализы нужно сдать перед курсом?',
+              'Как рассчитать КБЖУ для массонабора?',
+              'Какие риски у тренболона?',
+              'Что такое RIR и как его использовать?',
+              'Как восстановить фертильность после курса?',
             ];
             const q = quickQuestions[Math.floor(Math.random() * quickQuestions.length)];
             setInput(q);
@@ -229,7 +225,7 @@ export const SmartAssistantScreen: React.FC = () => {
             <input
               type="text"
               className="glossary-search"
-              placeholder=""
+          placeholder="Введите ваш вопрос..."
               value={glossarySearch}
               onChange={e => { setGlossarySearch(e.target.value); setExpandedTerm(null); }}
               autoFocus

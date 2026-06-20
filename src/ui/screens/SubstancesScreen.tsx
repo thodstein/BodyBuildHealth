@@ -2,12 +2,12 @@
 import { PHARMA_DB, SUBSTANCES_BY_CLASS } from '../../core/pharma-database';
 
 const CLASS_LABELS: Record<string, string> = {
-  testosterone: '', trenbolone: '', nandrolone: '',
-  boldenone: '', primobolan: '', oral_17aa: '',
-  sarm: 'SARMs', peptide_ghrh: '', peptide_ghrp: '',
-  igf1: 'IGF-1', mgf: 'MGF', insulin: '',
-  pct_serm: '', pct_aromatase: '', pct_dopamine: '',
-  support: ''
+  testosterone: 'Тестостерон', trenbolone: 'Тренболон', nandrolone: 'Нандролон',
+  boldenone: 'Болденон', primobolan: 'Примоболан', oral_17aa: 'Оральные 17-АА',
+  sarm: 'SARMs', peptide_ghrh: 'GHRH', peptide_ghrp: 'GHRP',
+  igf1: 'IGF-1', mgf: 'MGF', insulin: 'Инсулин',
+  pct_serm: 'СЕРМ', pct_aromatase: 'Ингибиторы ароматазы', pct_dopamine: 'Дофаминовые агонисты',
+  support: 'Поддержка'
 };
 
 const CLASS_COLORS: Record<string, string> = {

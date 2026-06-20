@@ -1,19 +1,15 @@
 export async function registerSW() {
   if (!('serviceWorker' in navigator)) {
-    console.warn('⚠️ Service Workers not supported');
     return;
   }
   try {
     const reg = await navigator.serviceWorker.register('/sw.js');
-    console.log('✅ Service Worker registered:', reg.scope);
 
-    // Force update check on page load
     reg.update();
 
     reg.addEventListener('updatefound', () => {
       const newSW = reg.installing;
       if (!newSW) return;
-      console.log('📦 SW update found');
       newSW.addEventListener('statechange', () => {
         if (newSW.state === 'installed' && navigator.serviceWorker.controller) {
           const existing = document.getElementById('sw-update-toast');
@@ -38,11 +34,10 @@ export async function registerSW() {
       reloading = true;
       const toast = document.getElementById('sw-update-toast');
       if (toast) toast.remove();
-      console.log('🔄 New SW activated, reloading...');
       window.location.reload();
     });
   } catch (e) {
-    console.warn('⚠️ SW registration failed:', e);
+    console.warn('SW registration failed:', e);
   }
 }
 

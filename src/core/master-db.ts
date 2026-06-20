@@ -7,7 +7,7 @@ import { BANDS_DB } from './data/bands';
 import { CATEGORIES_DB } from './data/categories';
 import { HORMONAL_AXES_DB } from './data/hormonal-axes';
 import { INTERACTION_LINKS_DB } from './data/interaction-links';
-import { INTERACTIONS_DB } from './data/interactions';
+import { INTERACTIONS_DB } from '../data/interactions';
 import substancesJson from '../substances.json';
 import interactionsJson from '../interactions.json';
 import type { 
