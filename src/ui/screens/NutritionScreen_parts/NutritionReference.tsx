@@ -373,7 +373,7 @@ export const NutritionReference: React.FC = () => {
 };
 
 const SectionCard: React.FC<{ title: string; isOpen: boolean; onToggle: () => void; color?: string; children: React.ReactNode }> = ({ title, isOpen, onToggle, color, children }) => (
-  <div style={{ padding: 10, borderRadius: 14, background: 'linear-gradient(135deg,rgba(255,255,255,0.06),rgba(255,255,255,0.02))', backdropFilter: 'blur(20px)', border: '1px solid rgba(255,255,255,0.06)' }}>
+  <div style={{ padding: 10, borderRadius: 14, background: 'rgba(24,24,27,0.12)', border: '1px solid rgba(255,255,255,0.04)' }}>
     <button onClick={onToggle} style={{ width: '100%', padding: '6px 0', cursor: 'pointer', background: 'none', border: 'none', color: color || '#fff', fontWeight: 700, fontSize: 13, textAlign: 'left', display: 'flex', alignItems: 'center', gap: 6 }}>
       <span style={{ transition: 'transform 0.2s', transform: isOpen ? 'rotate(90deg)' : 'rotate(0deg)', fontSize: 12 }}>›</span>
       {title}

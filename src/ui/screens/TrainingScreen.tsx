@@ -2810,7 +2810,7 @@ export const TrainingScreen: React.FC = () => {
       {tab === 'cycles' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {/* Controls - glass card */}
-          <div style={{ padding:12, borderRadius:14, background:'linear-gradient(135deg,rgba(255,255,255,0.06),rgba(255,255,255,0.02))', backdropFilter:'blur(20px)', border:'1px solid rgba(255,255,255,0.06)' }}>
+          <div style={{ padding:12, borderRadius:14, background:'rgba(24,24,27,0.12)', border:'1px solid rgba(255,255,255,0.04)' }}>
             <div style={{ fontSize:10, color:'rgba(255,255,255,0.35)', fontWeight:500, letterSpacing:'0.3px', textTransform:'uppercase', marginBottom:8 }}>🔄 Параметры цикла</div>
             {/* Goal */}
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:4, marginBottom:8 }}>
@@ -2876,7 +2876,7 @@ export const TrainingScreen: React.FC = () => {
 
           {/* Empty state */}
           {!macrocycle && !cyclesError && (
-            <div style={{ padding:24, borderRadius:14, background:'linear-gradient(135deg,rgba(255,255,255,0.04),rgba(255,255,255,0.01))', backdropFilter:'blur(20px)', border:'1px solid rgba(255,255,255,0.06)', textAlign:'center' }}>
+            <div style={{ padding:24, borderRadius:14, background:'rgba(24,24,27,0.08)', border:'1px solid rgba(255,255,255,0.04)', textAlign:'center' }}>
               <div style={{ fontSize:28, marginBottom:6 }}>🔄</div>
               <div style={{ fontSize:12, color:'rgba(255,255,255,0.4)', marginBottom:4 }}>Макроцикл ещё не сгенерирован</div>
               <div style={{ fontSize:10, color:'rgba(255,255,255,0.3)' }}>Выберите параметры выше и нажмите «Сгенерировать макроцикл»</div>
@@ -2884,7 +2884,7 @@ export const TrainingScreen: React.FC = () => {
           )}
 
           {macrocycle && (() => {
-            const gCard: React.CSSProperties = { padding:12, borderRadius:14, background:'linear-gradient(135deg,rgba(255,255,255,0.06),rgba(255,255,255,0.02))', backdropFilter:'blur(20px)', border:'1px solid rgba(255,255,255,0.06)', marginBottom:8 };
+            const gCard: React.CSSProperties = { padding:12, borderRadius:14, background:'rgba(24,24,27,0.12)', border:'1px solid rgba(255,255,255,0.04)', marginBottom:8 };
             const gLabel: React.CSSProperties = { fontSize:10, color:'rgba(255,255,255,0.35)', fontWeight:500, letterSpacing:'0.3px', textTransform:'uppercase', marginBottom:8 };
             // Determine cycle type name
             const ctName = cycleType === 'auto' ? 'Авто' : ({ bb_mass:'Масса', bb_specialization:'Специализация', pl_peaking:'Пауэрлифтинг', wl_tech:'Тяжелоатлет', cf_cond:'Кроссфит', rehab:'Реабилитация' } as Record<string,string>)[cycleType] || 'Авто';
@@ -3045,7 +3045,7 @@ export const TrainingScreen: React.FC = () => {
       {/* ═══════════ HISTORY TAB ═══════════ */}
       {tab === 'history' && (() => {
         try {
-        const gCard: React.CSSProperties = { padding:12, borderRadius:14, background:'linear-gradient(135deg,rgba(255,255,255,0.06),rgba(255,255,255,0.02))', backdropFilter:'blur(20px)', border:'1px solid rgba(255,255,255,0.06)', marginBottom:8 };
+        const gCard: React.CSSProperties = { padding:12, borderRadius:14, background:'rgba(24,24,27,0.12)', border:'1px solid rgba(255,255,255,0.04)', marginBottom:8 };
         if (diaryProgress.length === 0) return (
           <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
             <div style={gCard}>
@@ -3677,13 +3677,13 @@ const VisualTab: React.FC<{ sessions: any[] }> = ({ sessions }) => {
   const prog = React.useMemo(() => { try { return computeProgression(vizSessions); } catch { return []; } }, [vizSessions]);
 
   if (sessions.length < 2) return (
-    <div style={{ padding:24, textAlign:'center', background:'linear-gradient(135deg,rgba(255,255,255,0.04),rgba(255,255,255,0.01))', backdropFilter:'blur(20px)', borderRadius:16, border:'1px solid rgba(255,255,255,0.06)' }}>
+    <div style={{ padding:24, textAlign:'center', background:'rgba(24,24,27,0.08)', borderRadius:16, border:'1px solid rgba(255,255,255,0.04)' }}>
       <div style={{ fontSize:28, marginBottom:6 }}>📊</div>
       <div style={{ fontSize:12, color:'rgba(255,255,255,0.4)' }}>Нужно минимум 2 тренировки для визуализации</div>
     </div>
   );
 
-  const glassCard: React.CSSProperties = { padding:12, borderRadius:14, background:'linear-gradient(135deg,rgba(255,255,255,0.06),rgba(255,255,255,0.02))', backdropFilter:'blur(20px)', border:'1px solid rgba(255,255,255,0.06)', marginBottom:10 };
+  const glassCard: React.CSSProperties = { padding:12, borderRadius:14, background:'rgba(24,24,27,0.12)', border:'1px solid rgba(255,255,255,0.04)', marginBottom:10 };
   const gLabel: React.CSSProperties = { fontSize:10, color:'rgba(255,255,255,0.35)', fontWeight:500, letterSpacing:'0.3px', textTransform:'uppercase', marginBottom:8 };
 
   return (<div style={{ display:'flex', flexDirection:'column', gap:4 }}>
@@ -5594,8 +5594,7 @@ const ProgramsTab: React.FC<{ selectedProgram: string | null; setSelectedProgram
           <div key={p.id} onClick={() => setSelectedId(p.id)}
             style={{
               padding: 12, borderRadius: 14, cursor: 'pointer',
-              background: 'rgba(20,22,30,0.5)', border: '1px solid var(--glass-border)',
-              backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)',
+              background: 'rgba(24,24,27,0.12)', border: '1px solid var(--glass-border)',
             }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
               <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--text)' }}>{p.name}</div>
@@ -5624,8 +5623,8 @@ const ProgramsTab: React.FC<{ selectedProgram: string | null; setSelectedProgram
           }}>← К списку</button>
 
         <div style={{
-          padding: 14, borderRadius: 14, background: 'rgba(20,22,30,0.5)',
-          border: '1px solid var(--glass-border)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)',
+          padding: 14, borderRadius: 14, background: 'rgba(24,24,27,0.12)',
+          border: '1px solid var(--glass-border)',
         }}>
           <h3 style={{ margin: '0 0 4px', fontSize: 16, color: 'var(--text)' }}>{selected.name}</h3>
           <p style={{ fontSize: 10, color: 'var(--text-dim)', margin: '0 0 8px' }}>{selected.description}</p>
@@ -5884,8 +5883,7 @@ const TimersTab: React.FC = () => {
   return (<div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
     <div style={{
       padding: 16, borderRadius: 16, textAlign: 'center',
-      background: 'rgba(20,22,30,0.5)', border: '1px solid var(--glass-border)',
-      backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)',
+      background: 'rgba(24,24,27,0.12)', border: '1px solid var(--glass-border)',
     }}>
       <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 4 }}>
         {phase === 'work' ? 'РАБОТА' : 'ОТДЫХ'} · Раунд {currentRound}/{rounds}

@@ -14,6 +14,7 @@ export interface PCTProtocolItem {
   class: string;
   timing: string;
   frequency: string;
+  scheme?: string;
 }
 
 export interface PCTSchedule {
@@ -53,7 +54,7 @@ export function generatePCTPlan(course: CourseEntry[], lastCourseWeek: number): 
   const pctProtocol: PCTProtocolItem[] = [
     { drug: 'clomi', substanceId: 'clomi', dose: '50 мг/день', doseValue: '50', doseUnit: 'мг/день', durationWeeks: 2, startDayOffset: 0, startWeek: pctStartWeek, endWeek: pctStartWeek + 2, class: 'pct_serm', timing: 'Ежедневно', frequency: '1 раз/день' },
     { drug: 'clomi', substanceId: 'clomi', dose: '25 мг/день', doseValue: '25', doseUnit: 'мг/день', durationWeeks: 2, startDayOffset: 14, startWeek: pctStartWeek + 2, endWeek: pctStartWeek + 4, class: 'pct_serm', timing: 'Ежедневно', frequency: '1 раз/день' },
-    { drug: 'hcg', substanceId: 'hcg', dose: '500 МЕ 2×/нед', doseValue: '500', doseUnit: 'МЕ 2×/нед', durationWeeks: 3, startDayOffset: 0, startWeek: pctStartWeek, endWeek: pctStartWeek + 3, class: 'pct_gonadotropin', timing: '2 раза/нед', frequency: '2 раза/нед' }
+    { drug: 'hcg', substanceId: 'hcg', dose: '500 МЕ 2×/нед', doseValue: '500', doseUnit: 'МЕ 2×/нед', durationWeeks: 3, startDayOffset: 0, startWeek: pctStartWeek, endWeek: pctStartWeek + 3, class: 'pct_gonadotropin', timing: '2 раза/нед', frequency: '2 раза/нед', scheme: '3/1 (3 нед приема, 1 нед отдых)' }
   ];
 
   const supportStack = [

@@ -73,7 +73,7 @@ Profile → useDataLink → { profile, labs, course, readiness, risk, avgWeeklyK
 14. [x] Expand food database: 50+ products with micros (all proteins + key carbs/fats have micros)
 15. [x] Add КБЖУ chart (7/14/30 day ranges) to NutritionScreen
 16. [x] Fix OCR parser for FatSecret/MFP screenshots
-17. [ ] Add barcode search improvements (Open Food Facts cache)
+17. [x] Add barcode search improvements (Open Food Facts cache)
 
 ### Phase 4: Training Overhaul - **ALL COMPLETE**
 18. [x] **RIR matrix: goal×level×mesocyclePhase with weekly progression**
@@ -230,7 +230,15 @@ if (shouldApplyPenalty && finalResult.systemBreakdown) {
   - **Fertility guide** (+11 new cards): AAS neurotoxicity (6 mechanisms), universal supplements table (16 rows with doses), hMG full chapter (mechanics/vs hCG/protocols/efficacy 66.8%/side effects/availability), female factor & ART (IUI/IVF/ICSI/PICSI), enclomiphene detail (4 studies, BSSM/AUA position), hidden obstacles table (8 substances), nootropics compatibility table (6 classes), FAQ (8 Qs), psychological traps (4 + CBT), appendices (WHO 2021 norms + pre-cycle checklist), 16 key PubMed references
 - **DashboardScreen**: FULL REWRITE — from 3-button stub to aggregated overview with profile card (name, goal, PAL, TDEE), risk card (score bar + system count), training/course stats grid, today's KBJU with targets vs actual, 12-button navigation grid
 - **DashboardScreen REMOVED + navigation simplified**: удалена вкладка `home` из PRIMARY_NAV, default tab изменён на `training`, удалён импорт DashboardScreen, handleNavigate маппинги починены
+- **DashboardScreen RESTORED**: возвращена вкладка `home` в PRIMARY_NAV, default tab изменён на `home`, DashboardScreen импорт и switch-case восстановлены, back button починен
 - **FertilityPCTScreen**: 3 stray `</>` фрагмента удалены (ошибки TS1005/TS1003/TS1109)
+- **Nutrition diary crash**: починен импорт BarcodeScanner (`../../components/BarcodeScanner` → правильный путь)
+- **Glass эффект удалён**: убраны backdropFilter/WebkitBackdropFilter из 46 мест: DashboardScreen, SupportScreen, NutritionScreen, ProfileScreen, TrainingScreen, MarketplaceScreen, FertilityPCTScreen, NutritionReference, NutritionDiary, IndividualPlan, LabsScreen. Все карты переведены на `rgba(24,24,27,0.15)` с `border: 1px solid rgba(255,255,255,0.04)`
+- **Back button SupportScreen**: добавлен `peptides` в обработку goBack (пустая страница при первом нажатии)
+- **hCG дозировки исправлены**: везде установлено 500 МЕ 2р/нед, схема 3/1 (3 нед приема, 1 нед отдых). Изменены: support-levels.ts, support-catalog.ts, SupportScreen.tsx, FertilityPCTScreen.tsx, risk-engine-v7-matrix.ts, recommendations.ts, system-mechanisms.ts, injury-cycle-blood.engine.ts, pct-planner.engine.ts, periodization-meet-pct.engine.ts
+- **Risk engine fix**: protectionFraction capped at 0.7 (max 70% reduction), diminishing factor 0.65 applied. Предотвращает ложное 96-100% снижение риска
+- **Risk display sync**: калькулятор использует calcResult.riskBeforeSupport вместо linked.risk.overallRaw (95%→30% bug fixed)
+- **Report support plan**: добавлена колонка "Цель" с отображением категорий поддержки
 - `tsc --noEmit` ✓, `vite build` ✓
 
 ## Build Commands

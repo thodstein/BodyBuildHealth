@@ -422,7 +422,7 @@ export const DRUG_THRESHOLDS_V7: Record<string, DrugThreshold> = {
   }},
 
   // === HCG ===
-  hcg: { dosePerWeek: 2000, androgenicity: 0, systems: {
+  hcg: { dosePerWeek: 1000, androgenicity: 0, systems: {
     reproductive: { 1: -0.3, 2: -0.2 },  // reduces testicular atrophy
     endocrine: { 3: 0.1 },  // slight prolactin increase
   }},

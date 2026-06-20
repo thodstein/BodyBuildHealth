@@ -38,7 +38,7 @@ export const SUBSTANCE_ANALOGS: Record<string, { id: string; name: string; reaso
   telmisartan: [{ id: 'telmisartan', name: 'Тельмисартан', reason: 'Оригинал', form: 'таблетки', mg: 40, timing: 'утро' }],
   nebivolol: [{ id: 'nebivolol', name: 'Небиволол', reason: 'Оригинал', form: 'таблетки', mg: 5, timing: 'утро' }],
   saw_palmetto: [{ id: 'saw_palmetto', name: 'Сабаль пальметто', reason: 'Оригинал', form: 'капсулы', mg: 640, timing: 'с едой, 2x/д' }],
-  hcg: [{ id: 'hcg', name: 'ХГЧ', reason: 'Оригинал', form: 'инъекции', mg: 2500, timing: '2x/нед (МЕ)' }],
+  hcg: [{ id: 'hcg', name: 'ХГЧ', reason: '500 МЕ 2р/нед, схема 3/1 (3 нед приема, 1 нед отдых)', form: 'инъекции', mg: 500, timing: '2x/нед (МЕ)' }],
 };
 
 // Substance enhancers: what boosts each substance
@@ -70,7 +70,7 @@ export const DEFAULT_DOSAGES: Record<string, SubstanceDosage> = {
   milk_thistle: { mg: 600, timing: 'с едой, 2x/д' }, saw_palmetto: { mg: 640, timing: 'с едой, 2x/д' },
   ashwagandha: { mg: 600, timing: 'вечер' }, vitamin_b12: { mg: 1000, timing: 'утро (мкг)' },
   folate: { mg: 800, timing: 'с едой (мкг)' }, taurine: { mg: 2000, timing: 'натощак' },
-  hcg: { mg: 5000, timing: '2x/нед (МЕ)' }, l_carnitine: { mg: 2000, timing: 'натощак' },
+  hcg: { mg: 500, timing: '2x/нед, схема 3/1 (МЕ)' }, l_carnitine: { mg: 2000, timing: 'натощак' },
   vitamin_e: { mg: 400, timing: 'с едой (МЕ)' }, selenium: { mg: 200, timing: 'с едой (мкг)' },
   vitamin_c: { mg: 1000, timing: 'натощак' }, probiotics: { mg: 20, timing: 'натощак (млрд КОЕ)' },
   coq10: { mg: 200, timing: 'с едой' }, prebiotics: { mg: 5000, timing: 'с едой (мг)' },

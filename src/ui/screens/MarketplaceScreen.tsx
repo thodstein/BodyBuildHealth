@@ -76,7 +76,7 @@ export const MarketplaceScreen: React.FC = () => {
   }
 
   const appleShop = {
-    bg: 'rgba(20,22,30,0.35)', border: '1px solid rgba(255,255,255,0.06)', cardRadius: 14,
+    bg: 'rgba(24,24,27,0.15)', border: '1px solid rgba(255,255,255,0.04)', cardRadius: 14,
     accent: '#00e68a', accentDim: 'rgba(0,230,138,0.15)', accentBorder: '1px solid rgba(0,230,138,0.3)',
     textPrimary: 'rgba(255,255,255,0.95)', textSecondary: 'rgba(255,255,255,0.9)', textDim: 'rgba(255,255,255,0.85)',
     gradientGreen: 'linear-gradient(135deg, #00e68a, #00b864)',
@@ -143,7 +143,6 @@ export const MarketplaceScreen: React.FC = () => {
                 <div key={item.id} style={{
                   background: appleShop.bg, borderRadius: appleShop.cardRadius, padding:12,
                   border: isExpanded ? appleShop.accentBorder : appleShop.border,
-                  backdropFilter:'blur(12px)', WebkitBackdropFilter:'blur(12px)',
                 }}>
                   <div onClick={() => setExpandedId(isExpanded ? null : item.id)} style={{ cursor:'pointer' }}>
                     <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start' }}>
@@ -232,7 +231,7 @@ export const MarketplaceScreen: React.FC = () => {
                   <div key={idx} style={{
                     display:'flex', alignItems:'center', gap:10, padding:'10px 12px',
                     background: appleShop.bg, borderRadius: appleShop.cardRadius,
-                    border: appleShop.border, backdropFilter:'blur(12px)',
+                    border: appleShop.border,
                   }}>
                     <div style={{ width:36, height:36, borderRadius:10, display:'flex', alignItems:'center', justifyContent:'center', background: appleShop.accentDim, fontSize:16 }}>💊</div>
                     <div style={{ flex:1 }}>
@@ -247,7 +246,7 @@ export const MarketplaceScreen: React.FC = () => {
                 ))}
               </div>
               {/* Cart total */}
-              <div style={{ marginTop:12, padding:12, background: appleShop.bg, borderRadius: appleShop.cardRadius, border: appleShop.accentBorder, backdropFilter:'blur(12px)' }}>
+              <div style={{ marginTop:12, padding:12, background: appleShop.bg, borderRadius: appleShop.cardRadius, border: appleShop.accentBorder }}>
                 <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:6 }}>
                   <span style={{ fontSize:10, color: appleShop.textDim }}>Всего препаратов</span>
                   <span style={{ fontSize:14, fontWeight:700, color: appleShop.accent }}>{cart.length}</span>

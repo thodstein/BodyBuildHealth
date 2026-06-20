@@ -88,7 +88,7 @@ export const DRUG_THRESHOLDS: Record<string, { dosePerWeek: number; androgenicit
   letrozole:  { dosePerWeek: 3.5, androgenicity: 0.0 },
   caberg:  { dosePerWeek: 3.5, androgenicity: 0.0 },
   bromocriptine:  { dosePerWeek: 7, androgenicity: 0.0 },
-  hcg:  { dosePerWeek: 5000, androgenicity: 0.0 },
+  hcg:  { dosePerWeek: 1000, androgenicity: 0.0 },
   telmi:  { dosePerWeek: 70, androgenicity: 0.0 },
   nebivolol:  { dosePerWeek: 35, androgenicity: 0.0 },
   nac:  { dosePerWeek: 1400, androgenicity: 0.0 },

@@ -185,7 +185,7 @@ function getDoseSuggestion(id: string): string {
     folate: '400-800 мкг', taurine: '1000-3000 мг', melatonin: '1-3 мг',
     curcumin: '500-1000 мг', vitamin_c: '500-1000 мг', l_carnitine: '1000-2000 мг',
     glucosamine: '1500 мг', collagen: '5-10 г', bpc157: '250-500 мкг',
-    tb500: '5-10 мг', hcg: '250-500 МЕ', telmisartan: '20-40 мг', nebivolol: '2.5-5 мг',
+    tb500: '5-10 мг', hcg: '500 МЕ 2р/нед, 3/1', telmisartan: '20-40 мг', nebivolol: '2.5-5 мг',
   };
   return doses[id] ?? 'См. инструкцию';
 }

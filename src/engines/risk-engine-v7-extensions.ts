@@ -152,7 +152,7 @@ export function computeReproductiveRisk(
   for (const drug of drugs) {
     const doseRatio = drug.threshold > 0 ? (drug.dosePerWeek / drug.threshold) : 0;
     androgenicLoad += Math.pow(doseRatio, 2) * drug.androgenicity;
-    if (drug.isHCG && drug.hcgDose > 500) hcgReduction += 0.6;
+    if (drug.isHCG && drug.hcgDose > 0) hcgReduction += 0.6;
     if (drug.isSERM) sermReduction += drug.sermFactor;
   }
 

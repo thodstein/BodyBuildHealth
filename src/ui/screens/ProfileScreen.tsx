@@ -119,9 +119,9 @@ const MOVEMENT_LIMITS: { id: InjuryRecord['movementLimit']; label: string }[] = 
 
 // ── Apple-style design tokens ──
 const apple = {
-  glassBg: 'rgba(20,22,30,0.35)',
-  glassBorder: '1px solid rgba(255,255,255,0.06)',
-  glassHover: 'rgba(20,22,30,0.5)',
+  glassBg: 'rgba(24,24,27,0.12)',
+  glassBorder: '1px solid rgba(255,255,255,0.04)',
+  glassHover: 'rgba(24,24,27,0.2)',
   cardRadius: 14,
   accent: '#00e68a',
   accentDim: 'rgba(0,230,138,0.15)',
@@ -145,8 +145,6 @@ const glassCard: React.CSSProperties = {
   background: apple.glassBg,
   borderRadius: apple.cardRadius,
   border: apple.glassBorder,
-  backdropFilter: 'blur(12px)',
-  WebkitBackdropFilter: 'blur(12px)',
   padding: 16,
   marginBottom: 10,
 };
@@ -182,7 +180,6 @@ const pillBtn = (active: boolean): React.CSSProperties => ({
   background: active ? apple.accentDim : apple.glassBg,
   color: active ? apple.accent : apple.textSecondary,
   transition: 'all 0.15s',
-  backdropFilter: 'blur(4px)',
 });
 
 const sectionLabel: React.CSSProperties = {
@@ -451,7 +448,7 @@ export const ProfileScreen: React.FC = () => {
             <button onClick={() => setPage('hero')} style={{
               padding:'6px 10px', borderRadius:8, cursor:'pointer', fontSize:12, fontWeight:600,
               background: apple.glassBg, border: apple.glassBorder,
-              color: apple.textSecondary, backdropFilter:'blur(4px)',
+              color: apple.textSecondary,
             }}>← На главную</button>
           </div>
 
@@ -462,7 +459,6 @@ export const ProfileScreen: React.FC = () => {
                 background: tab === t.id ? apple.accentDim : apple.glassBg,
                 border: tab === t.id ? apple.accentBorder : apple.glassBorder,
                 color: tab === t.id ? apple.accent : apple.textSecondary,
-                backdropFilter:'blur(4px)', WebkitBackdropFilter:'blur(4px)',
                 transition:'all 0.2s',
               }}>{t.label}</button>
             ))}

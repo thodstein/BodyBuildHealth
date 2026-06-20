@@ -190,7 +190,7 @@ export const MOCK_MARKETPLACE_DB: MarketplaceItem[] = [
     id: 'hcg',
     name: 'ХГЧ 5000 МЕ',
     category: 'pharma',
-    dailyDose: 'по протоколу (2500–5000 МЕ 2×/нед)',
+    dailyDose: 'по протоколу (500 МЕ 2×/нед, схема 3/1)',
     mechanisms: ['reproductive_1', 'endocrine_2', 'reproductive_2'],
     synergy: '+Цинк/Селен: сперматогенез, восстановление HPTA',
     purchaseOptions: [

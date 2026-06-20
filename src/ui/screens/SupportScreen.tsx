@@ -1035,8 +1035,9 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
     if (calcView !== 'main') {
       if (section === 'generator') {
         setSection('home'); setTab('main'); setSupportView('main'); setCalcView('main');
-      } else if (['mixcalc','neuro','joints','acne'].includes(calcView)) {
+      } else if (['mixcalc','neuro','joints','acne','peptides'].includes(calcView)) {
         setCalcView('info'); setInfoView('catalog'); setInfoTab('catalog');
+        if (calcView === 'peptides') setSection('home');
       } else if (calcView === 'info') {
         setSection('home'); setTab('main'); setSupportView('main'); setCalcView('main'); setInfoView('catalog');
       } else {
@@ -1184,7 +1185,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
     basic: { label: '🟢 База', desc: 'Минимум — покрытие всех систем', subs: ['nac', 'tudca', 'vitamin_d3', 'vitamin_k2', 'magnesium', 'folate', 'taurine', 'selenium'], dosages: { nac: { mg: 600, timing: 'утро, натощак' }, tudca: { mg: 500, timing: 'перед едой' }, vitamin_d3: { mg: 5000, timing: 'с едой (МЕ)' }, vitamin_k2: { mg: 200, timing: 'с едой (мкг)' }, magnesium: { mg: 400, timing: 'на ночь (бисглицинат)' }, folate: { mg: 800, timing: 'с едой (мкг, 5-MTHF)' }, taurine: { mg: 1000, timing: 'натощак' }, selenium: { mg: 200, timing: 'с едой (мкг, селен метионин)' } } },
     mid: { label: '🟡 Средний', desc: 'Стандарт — глубокое покрытие + конкретные формы', subs: ['nac', 'tudca', 'magnesium', 'vitamin_d3', 'vitamin_k2', 'coq10', 'folate', 'taurine', 'selenium', 'milk_thistle', 'alpha_lipoic', 'curcumin', 'vitamin_b12', 'vitamin_c'], dosages: { nac: { mg: 1200, timing: 'утро/вечер, натощак' }, tudca: { mg: 1000, timing: 'перед едой, 2x/д' }, magnesium: { mg: 400, timing: 'на ночь (бисглицинат)' }, vitamin_d3: { mg: 5000, timing: 'с едой (МЕ)' }, vitamin_k2: { mg: 200, timing: 'с едой (мкг)' }, coq10: { mg: 200, timing: 'с едой (убихинол)' }, folate: { mg: 800, timing: 'с едой (мкг, 5-MTHF)' }, taurine: { mg: 1500, timing: 'натощак' }, selenium: { mg: 200, timing: 'с едой (мкг, селен метионин)' }, milk_thistle: { mg: 600, timing: 'с едой (силимарин 80%)' }, alpha_lipoic: { mg: 600, timing: 'натощак (R-форма)' }, curcumin: { mg: 1000, timing: 'с пиперином, с едой' }, vitamin_b12: { mg: 1000, timing: 'утро (мкг, метилкобаламин)' }, vitamin_c: { mg: 1000, timing: 'натощак' } } },
     max: { label: '🟠 Максимум', desc: 'Максимальное покрытие всех рисков', subs: ['nac', 'tudca', 'magnesium', 'vitamin_d3', 'vitamin_k2', 'coq10', 'folate', 'taurine', 'selenium', 'milk_thistle', 'alpha_lipoic', 'curcumin', 'vitamin_b12', 'vitamin_c', 'ashwagandha', 'berberine', 'probiotics', 'glucosamine', 'collagen', 'vitamin_e', 'phosphatidylcholine'], dosages: { nac: { mg: 1800, timing: 'утро/вечер, натощак' }, tudca: { mg: 1500, timing: 'перед едой, 2-3x/д' }, magnesium: { mg: 600, timing: 'на ночь (L-треонат)' }, vitamin_d3: { mg: 5000, timing: 'с едой (МЕ)' }, vitamin_k2: { mg: 400, timing: 'с едой (мкг, MK-7)' }, coq10: { mg: 300, timing: 'с едой (убихинол)' }, folate: { mg: 1000, timing: 'с едой (мкг, 5-MTHF)' }, taurine: { mg: 2000, timing: 'натощак' }, selenium: { mg: 400, timing: 'с едой (мкг, селен метионин)' }, milk_thistle: { mg: 900, timing: 'с едой, 2x/д (силимарин 80%)' }, alpha_lipoic: { mg: 900, timing: 'натощак, 2x/д (R-форма)' }, curcumin: { mg: 1000, timing: 'с пиперином, с едой' }, vitamin_b12: { mg: 2000, timing: 'утро (мкг, метилкобаламин)' }, vitamin_c: { mg: 2000, timing: 'натощак, 2x/д' }, ashwagandha: { mg: 600, timing: 'вечер (KSM-66)' }, berberine: { mg: 500, timing: 'с едой, 2x/д' }, probiotics: { mg: 20, timing: 'натощак (млрд КОЕ)' }, glucosamine: { mg: 1500, timing: 'с едой' }, collagen: { mg: 15000, timing: 'с едой (мг, гидролизат + вит.C)' }, vitamin_e: { mg: 400, timing: 'с едой (МЕ, смесь токоферолов)' }, phosphatidylcholine: { mg: 1200, timing: 'с едой' } } },
-    boost: { label: '🔴 Усиление', desc: 'Максимальная защита + рецептурные', subs: ['nac', 'tudca', 'magnesium', 'vitamin_d3', 'vitamin_k2', 'coq10', 'folate', 'taurine', 'selenium', 'milk_thistle', 'alpha_lipoic', 'curcumin', 'vitamin_b12', 'vitamin_c', 'ashwagandha', 'berberine', 'probiotics', 'glucosamine', 'collagen', 'vitamin_e', 'phosphatidylcholine', 'telmisartan', 'nebivolol', 'saw_palmetto', 'hcg', 'iron', 'copper', 'astragalus', 'melatonin', 'ginseng', 'egcg', 'l_carnitine', 'chondroitin', 'msm', 'hyaluronic', 'boswellia', 'bromelain', 'bpc157', 'tb500', 'omega3', 'zinc'], dosages: { nac: { mg: 2400, timing: 'натощак, 2-3x/д' }, tudca: { mg: 1500, timing: 'перед едой, 2-3x/д' }, magnesium: { mg: 800, timing: 'на ночь (L-треонат)' }, vitamin_d3: { mg: 10000, timing: 'с едой (МЕ)' }, vitamin_k2: { mg: 400, timing: 'с едой (мкг, MK-7)' }, coq10: { mg: 400, timing: 'с едой (убихинол)' }, folate: { mg: 1000, timing: 'с едой (мкг, 5-MTHF)' }, taurine: { mg: 3000, timing: 'натощак, 2x/д' }, selenium: { mg: 400, timing: 'с едой (мкг, селен метионин)' }, milk_thistle: { mg: 900, timing: 'с едой, 2x/д (силимарин 80%)' }, alpha_lipoic: { mg: 900, timing: 'натощак, 2x/д (R-форма)' }, curcumin: { mg: 1000, timing: 'с пиперином, с едой' }, vitamin_b12: { mg: 5000, timing: 'утро (мкг, метилкобаламин)' }, vitamin_c: { mg: 2000, timing: 'натощак, 2x/д' }, ashwagandha: { mg: 900, timing: 'вечер (KSM-66)' }, berberine: { mg: 500, timing: 'с едой, 2x/д' }, probiotics: { mg: 20, timing: 'натощак (млрд КОЕ)' }, glucosamine: { mg: 1500, timing: 'с едой' }, collagen: { mg: 20000, timing: 'с едой (мг, гидролизат + вит.C)' }, vitamin_e: { mg: 400, timing: 'с едой (МЕ, смесь токоферолов)' }, phosphatidylcholine: { mg: 1200, timing: 'с едой' }, telmisartan: { mg: 40, timing: 'утро (КАД и ЧСС контроль!)' }, nebivolol: { mg: 5, timing: 'утро (ЧСС контроль!)' }, saw_palmetto: { mg: 640, timing: 'с едой, 2x/д' }, hcg: { mg: 5000, timing: '2x/нед (МЕ)' }, iron: { mg: 18, timing: 'натощак (контроль ферритина!)' }, copper: { mg: 2, timing: 'отдельно от цинка (мг)' }, astragalus: { mg: 1500, timing: 'с едой' }, melatonin: { mg: 5, timing: 'на ночь' }, ginseng: { mg: 400, timing: 'утро' }, egcg: { mg: 400, timing: 'натощак' }, l_carnitine: { mg: 2000, timing: 'натощак' }, chondroitin: { mg: 1200, timing: 'с едой' }, msm: { mg: 3000, timing: 'с едой' }, hyaluronic: { mg: 200, timing: 'с едой (мг)' }, boswellia: { mg: 500, timing: 'с едой, 2x/д' }, bromelain: { mg: 500, timing: 'натощак' }, bpc157: { mg: 500, timing: 'натощак (мкг)' }, tb500: { mg: 500, timing: 'натощак (мкг)' }, omega3: { mg: 4000, timing: 'с едой, 2x/д (EPA+DHA 60%)' }, zinc: { mg: 50, timing: 'на ночь (пиколинат, контроль СЖК!)' } } },
+    boost: { label: '🔴 Усиление', desc: 'Максимальная защита + рецептурные', subs: ['nac', 'tudca', 'magnesium', 'vitamin_d3', 'vitamin_k2', 'coq10', 'folate', 'taurine', 'selenium', 'milk_thistle', 'alpha_lipoic', 'curcumin', 'vitamin_b12', 'vitamin_c', 'ashwagandha', 'berberine', 'probiotics', 'glucosamine', 'collagen', 'vitamin_e', 'phosphatidylcholine', 'telmisartan', 'nebivolol', 'saw_palmetto', 'hcg', 'iron', 'copper', 'astragalus', 'melatonin', 'ginseng', 'egcg', 'l_carnitine', 'chondroitin', 'msm', 'hyaluronic', 'boswellia', 'bromelain', 'bpc157', 'tb500', 'omega3', 'zinc'], dosages: { nac: { mg: 2400, timing: 'натощак, 2-3x/д' }, tudca: { mg: 1500, timing: 'перед едой, 2-3x/д' }, magnesium: { mg: 800, timing: 'на ночь (L-треонат)' }, vitamin_d3: { mg: 10000, timing: 'с едой (МЕ)' }, vitamin_k2: { mg: 400, timing: 'с едой (мкг, MK-7)' }, coq10: { mg: 400, timing: 'с едой (убихинол)' }, folate: { mg: 1000, timing: 'с едой (мкг, 5-MTHF)' }, taurine: { mg: 3000, timing: 'натощак, 2x/д' }, selenium: { mg: 400, timing: 'с едой (мкг, селен метионин)' }, milk_thistle: { mg: 900, timing: 'с едой, 2x/д (силимарин 80%)' }, alpha_lipoic: { mg: 900, timing: 'натощак, 2x/д (R-форма)' }, curcumin: { mg: 1000, timing: 'с пиперином, с едой' }, vitamin_b12: { mg: 5000, timing: 'утро (мкг, метилкобаламин)' }, vitamin_c: { mg: 2000, timing: 'натощак, 2x/д' }, ashwagandha: { mg: 900, timing: 'вечер (KSM-66)' }, berberine: { mg: 500, timing: 'с едой, 2x/д' }, probiotics: { mg: 20, timing: 'натощак (млрд КОЕ)' }, glucosamine: { mg: 1500, timing: 'с едой' }, collagen: { mg: 20000, timing: 'с едой (мг, гидролизат + вит.C)' }, vitamin_e: { mg: 400, timing: 'с едой (МЕ, смесь токоферолов)' }, phosphatidylcholine: { mg: 1200, timing: 'с едой' }, telmisartan: { mg: 40, timing: 'утро (КАД и ЧСС контроль!)' }, nebivolol: { mg: 5, timing: 'утро (ЧСС контроль!)' }, saw_palmetto: { mg: 640, timing: 'с едой, 2x/д' }, hcg: { mg: 500, timing: '2x/нед, схема 3/1 (МЕ)' }, iron: { mg: 18, timing: 'натощак (контроль ферритина!)' }, copper: { mg: 2, timing: 'отдельно от цинка (мг)' }, astragalus: { mg: 1500, timing: 'с едой' }, melatonin: { mg: 5, timing: 'на ночь' }, ginseng: { mg: 400, timing: 'утро' }, egcg: { mg: 400, timing: 'натощак' }, l_carnitine: { mg: 2000, timing: 'натощак' }, chondroitin: { mg: 1200, timing: 'с едой' }, msm: { mg: 3000, timing: 'с едой' }, hyaluronic: { mg: 200, timing: 'с едой (мг)' }, boswellia: { mg: 500, timing: 'с едой, 2x/д' }, bromelain: { mg: 500, timing: 'натощак' }, bpc157: { mg: 500, timing: 'натощак (мкг)' }, tb500: { mg: 500, timing: 'натощак (мкг)' }, omega3: { mg: 4000, timing: 'с едой, 2x/д (EPA+DHA 60%)' }, zinc: { mg: 50, timing: 'на ночь (пиколинат, контроль СЖК!)' } } },
   };
 
   const BOOST_SUBS = ['telmisartan','nebivolol','omega3','iron','copper','zinc',
@@ -1208,7 +1209,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
     boswellia: { mg: 500, timing: 'с едой, 2x/д' },
     bromelain: { mg: 500, timing: 'натощак' },
     saw_palmetto: { mg: 640, timing: 'с едой, 2x/д' },
-    hcg: { mg: 5000, timing: '2x/нед (МЕ)' },
+    hcg: { mg: 500, timing: '2x/нед, схема 3/1 (МЕ)' },
     astragalus: { mg: 1500, timing: 'с едой' },
     melatonin: { mg: 5, timing: 'на ночь' },
     ginseng: { mg: 400, timing: 'утро' },
@@ -2591,8 +2592,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
             <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
               <div onClick={() => { setSection('generator'); setTab('calculator'); setSupportView('calc'); setCalcView('main'); }} style={{
                 display:'flex', alignItems:'center', gap:12, padding:'14px 16px', borderRadius:16, cursor:'pointer', textAlign:'left', width:'100%',
-                background:'rgba(20,22,30,0.4)', border:'1px solid var(--glass-border)', color:'var(--text)', transition:'all 0.2s',
-                backdropFilter:'blur(12px)', WebkitBackdropFilter:'blur(12px)',
+                background:'rgba(24,24,27,0.15)', border:'1px solid rgba(255,255,255,0.04)', color:'var(--text)', transition:'all 0.2s',
               }}>
                 <div style={{ width:48, height:48, borderRadius:14, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, background:'rgba(0,230,138,0.15)', fontSize:24 }}>🧮</div>
                 <div style={{ flex:1 }}>
@@ -2603,8 +2603,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
               </div>
               <div onClick={() => { setSection('hormonal'); setTab('fertility-pct'); setHormonalTab('pct'); setSupportView('fertility'); setCalcView('main'); }} style={{
                 display:'flex', alignItems:'center', gap:12, padding:'14px 16px', borderRadius:16, cursor:'pointer', textAlign:'left', width:'100%',
-                background:'rgba(20,22,30,0.4)', border:'1px solid var(--glass-border)', color:'var(--text)', transition:'all 0.2s',
-                backdropFilter:'blur(12px)', WebkitBackdropFilter:'blur(12px)',
+                background:'rgba(24,24,27,0.15)', border:'1px solid rgba(255,255,255,0.04)', color:'var(--text)', transition:'all 0.2s',
               }}>
                 <div style={{ width:48, height:48, borderRadius:14, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, background:'rgba(139,92,246,0.15)', fontSize:24 }}>🧬</div>
                 <div style={{ flex:1 }}>
@@ -2615,8 +2614,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
               </div>
               <div onClick={() => { setSection('home'); setTab('main'); setSupportView('calc'); setCalcView('info'); setInfoView('catalog'); }} style={{
                 display:'flex', alignItems:'center', gap:12, padding:'14px 16px', borderRadius:16, cursor:'pointer', textAlign:'left', width:'100%',
-                background:'rgba(20,22,30,0.4)', border:'1px solid var(--glass-border)', color:'var(--text)', transition:'all 0.2s',
-                backdropFilter:'blur(12px)', WebkitBackdropFilter:'blur(12px)',
+                background:'rgba(24,24,27,0.15)', border:'1px solid rgba(255,255,255,0.04)', color:'var(--text)', transition:'all 0.2s',
               }}>
                 <div style={{ width:48, height:48, borderRadius:14, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, background:'rgba(96,165,250,0.15)', fontSize:24 }}>📚</div>
                 <div style={{ flex:1 }}>
@@ -2659,8 +2657,8 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                 ].map((card, i) => (
                   <div key={i} onClick={card.action} style={{
                     display:'flex', alignItems:'center', gap:12, padding:'12px 14px', borderRadius:14, cursor:'pointer',
-                    background:'rgba(20,22,30,0.35)', border:'1px solid var(--glass-border)', color:'var(--text)',
-                    transition:'all 0.2s', backdropFilter:'blur(10px)', WebkitBackdropFilter:'blur(10px)',
+                    background:'rgba(24,24,27,0.12)', border:'1px solid rgba(255,255,255,0.04)', color:'var(--text)',
+                    transition:'all 0.2s',
                   }}>
                     <div style={{ width:44, height:44, borderRadius:12, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, background:`${card.color}18`, fontSize:20 }}>{card.icon}</div>
                     <div style={{ flex:1, minWidth:0 }}>
@@ -3633,7 +3631,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
 
           <div style={{ display:'flex', flexDirection:'column', gap:10, fontSize:10, color:'rgba(255,255,255,0.85)', lineHeight:1.6 }}>
 
-            <div style={{ borderRadius:12, padding:14, background:'rgba(20,22,30,0.4)', backdropFilter:'blur(12px)', border:'1px solid var(--glass-border)' }}>
+            <div style={{ borderRadius:12, padding:14, background:'rgba(24,24,27,0.15)', border:'1px solid rgba(255,255,255,0.04)' }}>
               <h3 style={{ margin:'0 0 6px', fontSize:12, fontWeight:700, color:'#00e68a' }}>1. Оценка рисков от курса</h3>
               <p style={{ margin:0 }}>
                 Первый шаг — анализ всех активных соединений вашего курса. Каждое вещество в базе PHARMA_DB содержит PK/PD-профиль с показателями гепатотоксичности, андрогенности, ароматизации, кардиотоксичности и т.д. Система суммирует риски по 8 системам организма:
@@ -3650,7 +3648,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
               </ul>
             </div>
 
-            <div style={{ borderRadius:12, padding:14, background:'rgba(20,22,30,0.4)', backdropFilter:'blur(12px)', border:'1px solid var(--glass-border)' }}>
+            <div style={{ borderRadius:12, padding:14, background:'rgba(24,24,27,0.15)', border:'1px solid rgba(255,255,255,0.04)' }}>
               <h3 style={{ margin:'0 0 6px', fontSize:12, fontWeight:700, color:'#00e68a' }}>2. Анализ лабораторных данных</h3>
               <p style={{ margin:0 }}>
                 Если у вас есть загруженные анализы крови, система автоматически сверяет ваши показатели с референсными значениями:
@@ -3665,7 +3663,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
               <p style={{ margin:'4px 0 0' }}>Каждое отклонение увеличивает риск соответствующей системы.</p>
             </div>
 
-            <div style={{ borderRadius:12, padding:14, background:'rgba(20,22,30,0.4)', backdropFilter:'blur(12px)', border:'1px solid var(--glass-border)' }}>
+            <div style={{ borderRadius:12, padding:14, background:'rgba(24,24,27,0.15)', border:'1px solid rgba(255,255,255,0.04)' }}>
               <h3 style={{ margin:'0 0 6px', fontSize:12, fontWeight:700, color:'#00e68a' }}>3. Выбор уровня поддержки</h3>
               <p style={{ margin:0 }}>
                 На основе суммарного риска выбирается уровень поддержки:
@@ -3679,7 +3677,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
               <p style={{ margin:'4px 0 0' }}>Вы также можете вручную указать желаемый уровень — он будет использован как целевой при генерации стека.</p>
             </div>
 
-            <div style={{ borderRadius:12, padding:14, background:'rgba(20,22,30,0.4)', backdropFilter:'blur(12px)', border:'1px solid var(--glass-border)' }}>
+            <div style={{ borderRadius:12, padding:14, background:'rgba(24,24,27,0.15)', border:'1px solid rgba(255,255,255,0.04)' }}>
               <h3 style={{ margin:'0 0 6px', fontSize:12, fontWeight:700, color:'#00e68a' }}>4. Подбор веществ по механизмам</h3>
               <p style={{ margin:0 }}>
                 Каждое вещество в базе ALL_SUBSTANCES имеет один или несколько механизмов действия (из 553+ возможных). Для каждой системы подбираются вещества, которые:
@@ -3692,7 +3690,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
               <p style={{ margin:'4px 0 0' }}>Подбор учитывает до 6 механизмов на вещество и до 5 синергий на пару.</p>
             </div>
 
-            <div style={{ borderRadius:12, padding:14, background:'rgba(20,22,30,0.4)', backdropFilter:'blur(12px)', border:'1px solid var(--glass-border)' }}>
+            <div style={{ borderRadius:12, padding:14, background:'rgba(24,24,27,0.15)', border:'1px solid rgba(255,255,255,0.04)' }}>
               <h3 style={{ margin:'0 0 6px', fontSize:12, fontWeight:700, color:'#00e68a' }}>5. Дозирование и режим приёма</h3>
               <p style={{ margin:0 }}>
                 Для каждого вещества определена стандартная дозировка (мг/день) и рекомендуемое время приёма:
@@ -3707,7 +3705,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
               <p style={{ margin:'4px 0 0' }}>Длительность курса поддержки обычно совпадает с курсом ААС + 2–4 недели после для восстановления.</p>
             </div>
 
-            <div style={{ borderRadius:12, padding:14, background:'rgba(20,22,30,0.4)', backdropFilter:'blur(12px)', border:'1px solid var(--glass-border)' }}>
+            <div style={{ borderRadius:12, padding:14, background:'rgba(24,24,27,0.15)', border:'1px solid rgba(255,255,255,0.04)' }}>
               <h3 style={{ margin:'0 0 6px', fontSize:12, fontWeight:700, color:'#00e68a' }}>6. Генерация стека</h3>
               <p style={{ margin:0 }}>
                 Алгоритм генератора стеков работает в 4 этапа:
@@ -3720,7 +3718,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
               </ol>
             </div>
 
-            <div style={{ borderRadius:12, padding:14, background:'rgba(20,22,30,0.4)', backdropFilter:'blur(12px)', border:'1px solid var(--glass-border)' }}>
+            <div style={{ borderRadius:12, padding:14, background:'rgba(24,24,27,0.15)', border:'1px solid rgba(255,255,255,0.04)' }}>
               <h3 style={{ margin:'0 0 6px', fontSize:12, fontWeight:700, color:'#00e68a' }}>7. Проверка взаимодействий</h3>
               <p style={{ margin:0 }}>
                 Финальная проверка на взаимодействия между всеми веществами курса и поддержки. База ALL_INTERACTIONS содержит 206 записей:
@@ -3733,7 +3731,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
               <p style={{ margin:'4px 0 0' }}>Взаимодействия проверяются как внутри класса (Поддержка—Поддержка), так и между классами (Фарма—Поддержка).</p>
             </div>
 
-            <div style={{ borderRadius:12, padding:14, background:'rgba(20,22,30,0.4)', backdropFilter:'blur(12px)', border:'1px solid var(--glass-border)' }}>
+            <div style={{ borderRadius:12, padding:14, background:'rgba(24,24,27,0.15)', border:'1px solid rgba(255,255,255,0.04)' }}>
               <h3 style={{ margin:'0 0 6px', fontSize:12, fontWeight:700, color:'#00e68a' }}>8. Формирование недельного плана</h3>
               <p style={{ margin:0 }}>
                 Готовый стек раскладывается в недельный план с указанием:
@@ -3747,7 +3745,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
               <p style={{ margin:'4px 0 0' }}>План можно сохранить в избранное, экспортировать или добавить всё в корзину магазина.</p>
             </div>
 
-            <div style={{ borderRadius:12, padding:14, background:'rgba(20,22,30,0.4)', backdropFilter:'blur(12px)', border:'1px solid var(--glass-border)' }}>
+            <div style={{ borderRadius:12, padding:14, background:'rgba(24,24,27,0.15)', border:'1px solid rgba(255,255,255,0.04)' }}>
               <h3 style={{ margin:'0 0 6px', fontSize:12, fontWeight:700, color:'#f59e0b' }}>⚠️ Важные замечания</h3>
               <div style={{ margin:0 }}>
                 <p style={{ margin:'0 0 4px' }}><b>Информация носит ознакомительный характер.</b> Подбор поддержки должен производиться врачом или профильным специалистом с учётом индивидуальных особенностей: возраста, веса, генетических полиморфизмов (MTHFR, COMT, CYP), сопутствующих заболеваний и принимаемых лекарств.</p>
@@ -4702,19 +4700,19 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
               const r = supportResult;
               const mr = mechanismReport;
               const tp = timedPlan;
-              const mr2 = modelRiskResult;
               const weekly = weeklyPlan;
               const dbInt = dbInteractions;
 
-              // Risk assessment per system
+              // Risk assessment per system — use calcResult for consistency with calculator
               const systemLabels: Record<string,{name:string,emoji:string}> = {
                 cardio:{name:'Сердце',emoji:'❤️'}, hepatic:{name:'Печень',emoji:'🧪'}, renal:{name:'Почки',emoji:'🫘'},
                 neuro:{name:'Нейро',emoji:'🧠'}, endocrine:{name:'Эндокринная',emoji:'🔄'}, hematologic:{name:'Кровь',emoji:'🩸'},
                 reproductive:{name:'Репродуктивная',emoji:'🧬'}, musculoskeletal:{name:'КМС',emoji:'💪'},
               };
-              const risks = mr2 ? Object.entries(mr2).map(([k,v]) => ({ system:systemLabels[k]?.name||k, emoji:systemLabels[k]?.emoji||'⚕️', raw:v.raw, net:v.net })) : [];
-              const overallRaw = risks.length ? Math.round(risks.reduce((a,r)=>a+r.raw,0)/risks.length) : 0;
-              const overallNet = risks.length ? Math.round(risks.reduce((a,r)=>a+r.net,0)/risks.length) : 0;
+              const sysBreakdown = calcResult?.riskAssessment?.systemBreakdown || {};
+              const risks = Object.keys(sysBreakdown).length > 0 ? Object.entries(sysBreakdown).map(([k,v]) => { const sys = v as { raw: number; net: number }; return { system:systemLabels[k]?.name||k, emoji:systemLabels[k]?.emoji||'⚕️', raw:sys.raw, net:sys.net }; }) : [];
+              const overallRaw = risks.length ? Math.round(Math.max(...risks.map(r=>r.raw))) : 0;
+              const overallNet = risks.length ? Math.round(Math.max(...risks.map(r=>r.net))) : 0;
 
               // Course compounds
               const compounds = course.map(c => {
@@ -4839,14 +4837,38 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
                   </div>
                 )}
 
-                {/* Support Plan */}
+                {/* Support Plan — detailed table */}
                 {supportReportCurrent.plan.items.length > 0 && (
                   <div style={{ marginBottom:8 }}>
                     <div style={{ fontSize:9, fontWeight:700, color:'var(--text)', marginBottom:4 }}>🧩 План поддержки · {supportReportCurrent.plan.level}</div>
-                    <div style={{ display:'flex', gap:3, flexWrap:'wrap' }}>
-                      {supportReportCurrent.plan.items.map((s:any,i:number) => (
-                        <span key={i} style={{ padding:'2px 6px', borderRadius:4, fontSize:7, background:'rgba(0,230,138,0.06)', color:'#00e68a', border:'1px solid rgba(0,230,138,0.12)' }}>{s.name}</span>
-                      ))}
+                    <div style={{ overflowX:'auto' }}>
+                      <table style={{ width:'100%', borderCollapse:'collapse', fontSize:7 }}>
+                        <thead>
+                          <tr style={{ color:'var(--text-dim)', borderBottom:'1px solid var(--border)' }}>
+                            <th style={{ padding:'3px 4px', textAlign:'left', fontWeight:600 }}>Препарат</th>
+                            <th style={{ padding:'3px 4px', textAlign:'left', fontWeight:600 }}>Цель</th>
+                            <th style={{ padding:'3px 4px', textAlign:'left', fontWeight:600 }}>Доза</th>
+                            <th style={{ padding:'3px 4px', textAlign:'left', fontWeight:600 }}>Приём</th>
+                            <th style={{ padding:'3px 4px', textAlign:'left', fontWeight:600 }}>Механизм</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {supportReportCurrent.plan.items.map((s:any,i:number) => (
+                            <tr key={i} style={{ borderBottom:'1px solid rgba(255,255,255,0.04)' }}>
+                              <td style={{ padding:'4px 4px', color:'#00e68a', fontWeight:600, whiteSpace:'nowrap' }}>{s.name}</td>
+                              <td style={{ padding:'4px 4px', color:'var(--accent)', whiteSpace:'nowrap', fontSize:8 }}>
+                                {(s.categories || []).slice(0, 2).map((c:string) => CATALOG_CATEGORY_LABELS[c] || c).join(', ')}
+                              </td>
+                              <td style={{ padding:'4px 4px', color:'var(--text-light)', whiteSpace:'nowrap' }}>{s.dose}</td>
+                              <td style={{ padding:'4px 4px', color:'var(--text-dim)', whiteSpace:'nowrap' }}>{s.timing}</td>
+                              <td style={{ padding:'4px 4px', color:'var(--text-dim)' }}>
+                                {(s.mechanisms || []).slice(0, 3).join(', ')}
+                                {(s.mechanisms || []).length > 3 && <span style={{ color:'var(--text-dim)', fontSize:6 }}> +{(s.mechanisms||[]).length-3}</span>}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
                     </div>
                   </div>
                 )}
@@ -5328,7 +5350,7 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
                       <div style={{ display:'flex', justifyContent:'space-around', fontSize:13, fontWeight:800, color:'var(--text-light)', marginBottom:8, padding:'10px 12px', borderRadius:8, background:'rgba(0,0,0,0.08)', border:'1px solid var(--border)' }}>
                         <div style={{ textAlign:'center' }}>
                           <div style={{ fontSize:9, fontWeight:600, color:'var(--text-dim)', marginBottom:2 }}>Без поддержки</div>
-                          <span style={{ fontSize:28, fontWeight:800, color:'#ef4444' }}>{Math.round(linked?.risk?.overallRaw ?? calcResult.riskBeforeSupport)}</span><span style={{ fontSize:14, color:'#ef4444' }}>%</span>
+                          <span style={{ fontSize:28, fontWeight:800, color:'#ef4444' }}>{Math.round(calcResult.riskBeforeSupport)}</span><span style={{ fontSize:14, color:'#ef4444' }}>%</span>
                         </div>
                         <div style={{ display:'flex', alignItems:'center', color:'var(--text-dim)', fontSize:16 }}>/</div>
                         <div style={{ textAlign:'center' }}>
@@ -5547,7 +5569,7 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
                         <div style={{ fontSize:8, color:'var(--text-light)', marginBottom:2 }}>⚗️ <b>Эндокринная:</b> витамин D3 5000 МЕ + цинк 30 мг</div>
                       )}
                       {((calcResult.systemSupport || {}).reproductive || 0) < 30 && (
-                        <div style={{ fontSize:8, color:'var(--text-light)', marginBottom:2 }}>⚧ <b>Репродуктивная:</b> ХГЧ 2500 МЕ 2x/нед + сабаль 640 мг</div>
+                        <div style={{ fontSize:8, color:'var(--text-light)', marginBottom:2 }}>⚧ <b>Репродуктивная:</b> ХГЧ 500 МЕ 2x/нед (схема 3/1) + сабаль 640 мг</div>
                       )}
                       {((calcResult.systemSupport || {}).hematologic || 0) < 30 && (
                         <div style={{ fontSize:8, color:'var(--text-light)', marginBottom:2 }}>🩸 <b>Кроветворение:</b> фолат 800 мкг + B12 1000 мкг + железо (по анализам)</div>
@@ -5566,7 +5588,7 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
                   <details style={{ marginTop:6 }}>
                     <summary style={{ fontSize:8, fontWeight:600, color:'var(--text-dim)', cursor:'pointer' }}>📖 Как считаются риски и оценка поддержки</summary>
                     <div style={{ fontSize:7, color:'var(--text-dim)', lineHeight:1.5, marginTop:4, padding:'6px 8px', borderRadius:6, background:'rgba(0,0,0,0.06)' }}>
-                      <b>Риск без поддержки:</b> {Math.round(calcResult.riskBeforeSupport)}% = среднее по {Object.keys(calcResult.riskAssessment?.systemBreakdown || {}).length} системам.<br/>
+                      <b>Риск без поддержки:</b> {Math.round(calcResult.riskBeforeSupport)}% = максимальный риск по всем системам.<br/>
                       <b>Снижение риска:</b> каждый препарат покрывает системы с {calcResult.supportScore.toFixed(0)}% эффективностью. Защита = покрытие / 100 от базового риска.<br/>
                       <b>Риск с поддержкой:</b> {Math.round(calcResult.riskAfterSupport)}% = базовый риск × (1 - защита).<br/>
                       <b>Оценка поддержки:</b> {Math.round(calcResult.supportScore)}/100 — взвешенное среднее покрытия всех систем (вес систем: сердечно-сосуд. 15, печень 15, почки 10, нейро 10, эндокринная 12, кровь 8, репродуктивная 10, опорно-двиг. 10).<br/>
@@ -6684,7 +6706,7 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
 
       {/* ===== STACK BUILDER FLOATING BADGE ===== */}
       {stackBuilder.length > 0 && (
-        <div style={{ position:'sticky', bottom:0, zIndex:100, display:'flex', alignItems:'center', justifyContent:'center', gap:8, padding:'8px 14px', borderRadius:16, background:'rgba(0,0,0,0.9)', backdropFilter:'blur(12px)', border:'1px solid rgba(0,230,138,0.3)', boxShadow:'0 4px 20px rgba(0,0,0,0.5)' }}>
+        <div style={{ position:'sticky', bottom:0, zIndex:100, display:'flex', alignItems:'center', justifyContent:'center', gap:8, padding:'8px 14px', borderRadius:16, background:'rgba(0,0,0,0.6)', border:'1px solid rgba(0,230,138,0.3)', boxShadow:'0 4px 20px rgba(0,0,0,0.5)' }}>
           <span style={{ fontSize:10, fontWeight:700, color:'#00e68a' }}>🧮 Стек: {stackBuilder.length} веществ</span>
           <button onClick={() => setStackBuilder([])} style={{ padding:'4px 10px', borderRadius:8, fontSize:9, cursor:'pointer', background:'rgba(239,68,68,0.1)', border:'1px solid rgba(239,68,68,0.2)', color:'#f87171', fontWeight:600 }}>Очистить</button>
           <button onClick={saveBuilderStack} style={{ padding:'4px 10px', borderRadius:8, fontSize:9, cursor:'pointer', background:'linear-gradient(135deg,#00e68a,#00c853)', border:'none', color:'#000', fontWeight:700 }}>Сохранить</button>

@@ -51,7 +51,7 @@ export interface CycleDesign {
   totalWeeks: number;
   compounds: CycleCompound[];
   pctStartWeek: number;
-  pctProtocol: { compound: string; dosageMg: number; frequency: string; weeks: number }[];
+  pctProtocol: { compound: string; dosageMg: number; frequency: string; weeks: number; scheme?: string }[];
   onCycleSupport: string[];
   labSchedule: { week: number; panel: string; markers: string[] }[];
   expectedResults: string;
@@ -434,7 +434,7 @@ const CYCLE_TEMPLATES: CycleDesign[] = [
       { compound: 'Кломифен', dosageMg: 50, frequency: 'ежедневно', weeks: 2 },
       { compound: 'Кломифен', dosageMg: 25, frequency: 'ежедневно', weeks: 2 },
       { compound: 'Тамоксифен', dosageMg: 20, frequency: 'ежедневно', weeks: 6 },
-      { compound: 'ХГЧ', dosageMg: 500, frequency: '2×/нед', weeks: 3 },
+      { compound: 'ХГЧ', dosageMg: 500, frequency: '2×/нед', weeks: 3, scheme: '3/1 (3 нед через 1)' },
     ],
     onCycleSupport: ['TUDCA 1000мг', 'NAC 1200мг', 'Омега-3 6г', 'Магний 600мг', 'Каберголин 0.25мг 2×/нед (профилактика)'],
     labSchedule: [
@@ -477,7 +477,7 @@ export function designCustomCycle(
     pctStartWeek,
     pctProtocol: has19nor
       ? [
-          { compound: 'ХГЧ', dosageMg: 500, frequency: '2×/нед', weeks: 3 },
+          { compound: 'ХГЧ', dosageMg: 500, frequency: '2×/нед', weeks: 3, scheme: '3/1 (3 нед через 1)' },
           { compound: 'Кломифен', dosageMg: 50, frequency: 'ежедневно', weeks: 2 },
           { compound: 'Кломифен', dosageMg: 25, frequency: 'ежедневно', weeks: 2 },
           { compound: 'Тамоксифен', dosageMg: 20, frequency: 'ежедневно', weeks: 4 },

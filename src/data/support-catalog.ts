@@ -1489,18 +1489,18 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     tier: 'specialty',
     category: ['peptide', 'hormonal'],
     forms: [
-      { id: 'hcg', name: 'HCG', nameRu: 'ХГЧ 5000 МЕ', dose: '250 мг 2x/д', best: true },
-      { id: 'hcg_2', name: 'HCG', nameRu: 'ХГЧ 10000 МЕ', dose: '250 мг', best: false }
+      { id: 'hcg', name: 'HCG', nameRu: 'ХГЧ 5000 МЕ', dose: '500 МЕ 2р/нед', best: true },
+      { id: 'hcg_2', name: 'HCG', nameRu: 'ХГЧ 10000 МЕ', dose: '500 МЕ 2р/нед', best: false }
     ],
     organs: ['REPRODUCTIVE', 'TESTES'],
     systems: ['reproductive', 'endocrine'],
     mechanisms: ['LH_MIMIC', 'TESTOSTERONE_PRODUCTION', 'SPERMATOGENESIS_RESTORE', 'TESTICULAR_VOLUME_PRESERVATION'],
-    description: 'ХГЧ — мимик ЛГ, стимулирует клетки Лейдига к продукции тестостерона. На курсе ААС предотвращает атрофию яичек.',
+    description: 'ХГЧ — мимик ЛГ, стимулирует клетки Лейдига к продукции тестостерона. Стандартная схема: 500 МЕ 2 раза в неделю, 3 недели приема, 1 неделя отдыха (3/1).',
     synergies: [
       { with: "testosterone", effect: "ХГЧ + Тестостерон — восстановление оси ГРГ-ЛГ", mechanism: "Комбинированное действие", severity: "MEDIUM" }
     ],
     conflicts: [
-        {with: "aromatase_inhibitor", effect: "Десенситизация", mechanism: "Высокие дозы ХГЧ", severity: "HIGH"},
+        {with: "aromatase_inhibitor", effect: "Десенситизация", mechanism: "Высокие дозы ХГЧ (>1000 МЕ)", severity: "HIGH"},
       ],
     monitoring: [
       { what: 'Тестостерон общий', when: 'Каждые 4 нед', targetRange: '12-33 нмоль/л' },
@@ -1508,7 +1508,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     ],
     contraindications: ['Рак яичек', 'Рак простаты', 'Гинекомастия в анамнезе'],
     sideEffects: ['Гинекомастия (без ИА)', 'Задержка жидкости', 'Повышение эстрадиола'],
-    dosage: { mg: 250, timing: '2x/нед п/к или в/м', form: 'ХГЧ лиофилизат (реконструкция)' },
+    dosage: { mg: 500, timing: '2x/нед, схема 3/1 (3 нед приема, 1 нед отдых)', form: 'ХГЧ лиофилизат (реконструкция)' },
     bestForCourse: true,
   },
   l_carnitine: {

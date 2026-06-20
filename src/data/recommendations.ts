@@ -59,8 +59,8 @@ export const RECOMMENDATIONS_DB: Recommendation[] = [
   { recId: "REC_NEURO_DEPRESSION_HIGH", type: "RISK", riskId: "NEURO_DEPRESSION", level: "HIGH", title: "Тяжёлая депрессия", text: "Консультация психиатра, антидепрессанты." },
 
   // === ЭНДОКРИННАЯ СИСТЕМА ===
-  { recId: "REC_ENDO_HPG_LOW", type: "RISK", riskId: "ENDO_HPG_SUPPRESSION", level: "LOW", title: "Лёгкое подавление ГГГ", text: "ХГЧ 1500-3000 МЕ/нед, контроль ЛГ/ФСГ." },
-  { recId: "REC_ENDO_HPG_MED", type: "RISK", riskId: "ENDO_HPG_SUPPRESSION", level: "MEDIUM", title: "Умеренное подавление ГГГ", text: "ХГЧ + Кломид, контроль тестостерона и эстрадиола." },
+  { recId: "REC_ENDO_HPG_LOW", type: "RISK", riskId: "ENDO_HPG_SUPPRESSION", level: "LOW", title: "Лёгкое подавление ГГГ", text: "ХГЧ 500 МЕ 2р/нед (схема 3/1), контроль ЛГ/ФСГ." },
+  { recId: "REC_ENDO_HPG_MED", type: "RISK", riskId: "ENDO_HPG_SUPPRESSION", level: "MEDIUM", title: "Умеренное подавление ГГГ", text: "ХГЧ (500 МЕ 2р/нед, 3/1) + Кломид, контроль тестостерона и эстрадиола." },
   { recId: "REC_ENDO_HPG_HIGH", type: "RISK", riskId: "ENDO_HPG_SUPPRESSION", level: "HIGH", title: "Выраженное подавление ГГГ", text: "Длительная ПКТ (Кломид + Тамоксифен), эндокринолог." },
   { recId: "REC_ENDO_GYNECO_LOW", type: "RISK", riskId: "ENDO_GYNECOMASTIA", level: "LOW", title: "Риск гинекомастии", text: "Контроль эстрадиола, при ↑ — АИ." },
   { recId: "REC_ENDO_GYNECO_MED", type: "RISK", riskId: "ENDO_GYNECOMASTIA", level: "MEDIUM", title: "Гинекомастия", text: "Анастрозол 0.25-0.5 мг, контроль E2." },
@@ -75,8 +75,8 @@ export const RECOMMENDATIONS_DB: Recommendation[] = [
   { recId: "REC_HEMA_THROMBOSIS_HIGH", type: "RISK", riskId: "HEMA_THROMBOSIS_RISK", level: "HIGH", title: "Высокий риск тромбоза", text: "Антикоагулянты, снижение дозы ААС." },
 
   // === РЕПРОДУКТИВНАЯ СИСТЕМА ===
-  { recId: "REC_REPO_ATROPHY_LOW", type: "RISK", riskId: "REPRO_TESTICULAR_ATROPHY", level: "LOW", title: "Лёгкая атрофия яичек", text: "ХГЧ 1500 МЕ 2×/нед." },
-  { recId: "REC_REPO_ATROPHY_MED", type: "RISK", riskId: "REPRO_TESTICULAR_ATROPHY", level: "MEDIUM", title: "Атрофия яичек", text: "ХГЧ 3000 МЕ 2×/нед, контроль объёма." },
+  { recId: "REC_REPO_ATROPHY_LOW", type: "RISK", riskId: "REPRO_TESTICULAR_ATROPHY", level: "LOW", title: "Лёгкая атрофия яичек", text: "ХГЧ 500 МЕ 2×/нед, 3 нед через 1." },
+  { recId: "REC_REPO_ATROPHY_MED", type: "RISK", riskId: "REPRO_TESTICULAR_ATROPHY", level: "MEDIUM", title: "Атрофия яичек", text: "ХГЧ 500 МЕ 2×/нед, 3 нед через 1, контроль объёма." },
   { recId: "REC_REPO_ATROPHY_HIGH", type: "RISK", riskId: "REPRO_TESTICULAR_ATROPHY", level: "HIGH", title: "Выраженная атрофия", text: "Экстренная ПКТ, консультация андролога." },
   { recId: "REC_REPO_PROSTATE_LOW", type: "RISK", riskId: "REPRO_PROSTATE", level: "LOW", title: "Риск гиперплазии простаты", text: "Контроль ПСА, пальцевое исследование." },
   { recId: "REC_REPO_PROSTATE_MED", type: "RISK", riskId: "REPRO_PROSTATE", level: "MEDIUM", title: "Гиперплазия простаты", text: "Финастерид, контроль ПСА каждые 3 месяца." },

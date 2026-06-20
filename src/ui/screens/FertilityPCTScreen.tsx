@@ -35,7 +35,7 @@ const addToCart = (id: string, name: string, dose: string) => {
 };
 
 const s: Record<string, React.CSSProperties> = {
-  card: { background: 'var(--glass-bg)', borderRadius: 14, padding: 16, marginBottom: 12, border: '1px solid var(--glass-border)', backdropFilter: 'blur(12px)' },
+  card: { background: 'rgba(24,24,27,0.15)', borderRadius: 14, padding: 16, marginBottom: 12, border: '1px solid rgba(255,255,255,0.04)' },
   row: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 8 },
   label: { fontSize: 10, fontWeight: 600, opacity: 0.6, marginBottom: 3, letterSpacing: '0.3px' },
   input: { width: '100%', padding: '10px 12px', borderRadius: 10, border: '1px solid var(--border)', background: 'var(--bg-primary)', color: 'inherit', fontSize: 14, boxSizing: 'border-box' as const, outline: 'none', transition: 'border 0.2s' },
@@ -534,7 +534,7 @@ export const FertilityPCTScreen: React.FC<{ initialTab?: FertTab; restrictToMode
             <h4 style={{ margin: '0 0 8px', fontSize: 14 }}>Рекомендации по ПКТ и восстановлению</h4>
             <div style={{ fontSize: 12, lineHeight: 1.6 }}>
               <h5 style={{ fontSize: 12, margin: '0 0 4px' }}>HCG на цикле</h5>
-              <p style={{ fontSize: 11, margin: '0 0 8px' }}>500–1000 МЕ 2–3 раза в неделю начиная с 3-й недели цикла.</p>
+              <p style={{ fontSize: 11, margin: '0 0 8px' }}>500 МЕ 2 раза в неделю (схема 3/1: 3 нед приема, 1 нед отдых) начиная с 3-й недели цикла.</p>
               <h5 style={{ fontSize: 12, margin: '0 0 4px' }}>ПКТ: Кломифен</h5>
               <p style={{ fontSize: 11, margin: '0 0 8px' }}>50 мг/день — 2 нед, затем 25 мг/день — 2 нед.</p>
               <h5 style={{ fontSize: 12, margin: '0 0 4px' }}>ПКТ: Тамоксифен (альтернатива)</h5>
@@ -765,7 +765,7 @@ export const FertilityPCTScreen: React.FC<{ initialTab?: FertTab; restrictToMode
                 { id:'testosterone_e', name:'Тестостерон энантат/ципионат', dose:'100-200 мг/нед', freq:'Инъекция 1 раз/нед', note:'Базовый протокол, стабильный уровень' },
                 { id:'testosterone_u', name:'Тестостерон ундеканоат (Nebido)', dose:'1000 мг', freq:'Каждые 10-14 недель', note:'Длительное действие, редкие инъекции' },
                 { id:'testosterone_g', name:'Тестостерон гель', dose:'50-100 мг/день', freq:'Ежедневно на кожу', note:'Физиологичные уровни, меньше колебаний' },
-                { id:'hcg', name:'ХГЧ (hCG)', dose:'250-500 МЕ', freq:'2-3 раза/нед', note:'Сохранение фертильности, стимуляция Лейдигов' },
+                { id:'hcg', name:'ХГЧ (hCG)', dose:'500 МЕ', freq:'2 раза/нед', note:'Сохранение фертильности, стимуляция Лейдигов. Схема 3/1: 3 нед приема, 1 нед отдых' },
               ].map((r, i) => (
                 <div key={i} style={{ padding:'8px 10px', borderRadius:8, background:'rgba(0,230,138,0.04)', border:'1px solid rgba(0,230,138,0.1)' }}>
                   <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', gap:4 }}>
@@ -788,7 +788,7 @@ export const FertilityPCTScreen: React.FC<{ initialTab?: FertTab; restrictToMode
             <div style={{ display:'flex', flexDirection:'column', gap:5, marginBottom:10 }}>
               {[
                 { id:'anastrozole', name:'Анастрозол', dose:'0.25-0.5 мг 2×/нед', note:'Только при E2 > 50 пг/мл + симптомы' },
-                { id:'hcg', name:'ХГЧ (hCG)', dose:'250-500 МЕ 2×/нед', note:'При желании сохранить фертильность' },
+                { id:'hcg', name:'ХГЧ (hCG)', dose:'500 МЕ 2×/нед', note:'При желании сохранить фертильность. Схема 3/1: 3 нед приема, 1 нед отдых' },
                 { id:'l_citrulline', name:'Донаторы NO (цитруллин)', dose:'3-6 г/день', note:'Поддержка эндотелиальной функции' },
               ].map((r, i) => (
                 <div key={i} style={{ padding:'6px 8px', borderRadius:6, background:'rgba(245,158,11,0.06)', border:'1px solid rgba(245,158,11,0.1)' }}>
@@ -1188,7 +1188,7 @@ export const FertilityPCTScreen: React.FC<{ initialTab?: FertTab; restrictToMode
                   <div style={{ padding:'8px', borderRadius:6, background:'rgba(139,92,246,0.06)', border:'1px solid rgba(139,92,246,0.1)' }}>
                     <div style={{ fontSize:10, fontWeight:600, color:'#8b5cf6' }}>🔹 hCG + hMG (комбинированная стимуляция)</div>
                     <div style={{ fontSize:9, color:'var(--text-dim)', marginTop:2, lineHeight:1.3 }}>
-                      hCG 2000-3000 МЕ EOD × 2-3 нед → затем СЕРМ. При азооспермии: hMG 75-150 МЕ/день (3-6 мес) — золотой стандарт.
+                      hCG 500 МЕ 2р/нед, 3/1 × 2-3 нед → затем СЕРМ. При азооспермии: hMG 75-150 МЕ/день (3-6 мес) — золотой стандарт.
                     </div>
                   </div>
                   <div style={{ padding:'8px', borderRadius:6, background:'rgba(239,68,68,0.06)', border:'1px solid rgba(239,68,68,0.1)' }}>
@@ -1242,7 +1242,7 @@ export const FertilityPCTScreen: React.FC<{ initialTab?: FertTab; restrictToMode
                 <h4 style={{ margin:'0 0 6px', fontSize:12, color:'#f59e0b' }}>⏱ Пошаговый план ПКТ</h4>
                 <div style={{ fontSize:9, color:'var(--text-dim)', lineHeight:1.6 }}>
                   <b>Подготовка (нед -2–0):</b> сдать анализы, отменить все ААС, начать нутрицевтическую поддержку<br/>
-                  <b>Фаза 1 (нед 1-2):</b> hCG 2000 МЕ EOD + нутрицевтическая база<br/>
+                  <b>Фаза 1 (нед 1-2):</b> hCG 500 МЕ 2р/нед, 3/1 + нутрицевтическая база<br/>
                   <b>Фаза 2 (нед 3-8):</b> Энкломифен 25 мг/день + нейропротективное ядро<br/>
                   <b>Стабилизация (нед 9-20):</b> контроль анализов, коррекция доз, переход на ТЗТ при необходимости<br/>
                   <b>Контроль:</b> анализы на 2, 4, 6, 8, 12, 20 неделях
@@ -1341,8 +1341,8 @@ export const FertilityPCTScreen: React.FC<{ initialTab?: FertTab; restrictToMode
               <div style={s.card}>
                 <h4 style={{ margin:'0 0 6px', fontSize:12, color:'#8b5cf6' }}>📖 Клинические кейсы ПКТ</h4>
                 <div style={{ fontSize:9, color:'var(--text-dim)', lineHeight:1.5 }}>
-                  <b>Кейс 1</b> (Fertil Steril 2003): 38 лет, азооспермия после 5 лет ААС. hCG 2000 МЕ EOD 4 нед → hMG 150 МЕ/день 6 мес. Спермограмма: 38 млн, подвижность 45%. Зачатие через 7 мес.<br/><br/>
-                  <b>Кейс 2</b> (Ibis 2025, n=47): кломифен 50 мг/день + ХГЧ 3000 МЕ/нед 12 нед. Восстановление сперматогенеза у 87.5% пациентов. Среднее время: 4.2 мес.<br/><br/>
+                  <b>Кейс 1</b> (Fertil Steril 2003): 38 лет, азооспермия после 5 лет ААС. hCG 500 МЕ 2р/нед, 3/1 4 нед → hMG 150 МЕ/день 6 мес. Спермограмма: 38 млн, подвижность 45%. Зачатие через 7 мес.<br/><br/>
+                  <b>Кейс 2</b> (Ibis 2025, n=47): кломифен 50 мг/день + ХГЧ 500 МЕ 2р/нед (1000 МЕ/нед), 3/1 12 нед. Восстановление сперматогенеза у 87.5% пациентов. Среднее время: 4.2 мес.<br/><br/>
                   <b>Кейс 3</b> (форум, подтверждён): 27 лет, 2 года тренболон+тестостерон. TT {'<'}50 нг/дл, ЛГ {'<'}0.1. Энкломифен 25 мг 12 нед + кисспептин 0.5 мкг/кг × 3 мес. TT 580, ЛГ 4.2. Субъективно: «нейроэндокринное похмелье» купировано к 6 нед.
                 </div>
               </div>
@@ -1354,7 +1354,7 @@ export const FertilityPCTScreen: React.FC<{ initialTab?: FertTab; restrictToMode
                   <b>2. Стану ли я бесплодным после ААС?</b> У 70-80% полное восстановление сперматогенеза. Риск необратимости: стаж {">"}3 лет непрерывно, ААС до 20 лет, тренболон/нандролон в высоких дозах.<br/><br/>
                   <b>3. Энкломифен vs кломифен?</b> Энкломифен — чистый изомер (zu-кломифен). Меньше побочек (нет блокады эстрогена в ЦНС), выше эффективность. Кломифен — рацемическая смесь, больше побочных.<br/><br/>
                   <b>4. Можно ли креатин и протеин?</b> Да. Креатин — до 5 г/день безопасен. Сывороточный протеин — полезен для восстановления. Соевый протеин — ограничить (фитоэстрогены).<br/><br/>
-                  <b>5. ТЗТ + фертильность?</b> Возможно: ТЗТ + hCG 250-500 МЕ 2-3×/нед. Либо альтернатива: энкломифен 12.5 мг/день монотерапия (без ТЗТ).
+                  <b>5. ТЗТ + фертильность?</b> Возможно: ТЗТ + hCG 500 МЕ 2р/нед, 3/1. Либо альтернатива: энкломифен 12.5 мг/день монотерапия (без ТЗТ).
                 </div>
               </div>
 
@@ -1390,7 +1390,7 @@ export const FertilityPCTScreen: React.FC<{ initialTab?: FertTab; restrictToMode
                   </div>
                   <div style={{ padding:'6px 8px', borderRadius:6, background:'rgba(59,130,246,0.04)', border:'1px solid rgba(59,130,246,0.1)' }}>
                     <div style={{ fontSize:10, fontWeight:600, color:'#60a5fa' }}>Сохранение фертильности</div>
-                    <div style={{ fontSize:9, color:'var(--text-dim)', lineHeight:1.3 }}>ТЗТ + hCG 250-500 МЕ 2-3×/нед. hCG поддерживает интратестикулярный тестостерон и объём яичек.</div>
+                    <div style={{ fontSize:9, color:'var(--text-dim)', lineHeight:1.3 }}>ТЗТ + hCG 500 МЕ 2р/нед, 3/1. hCG поддерживает интратестикулярный тестостерон и объём яичек.</div>
                   </div>
                   <div style={{ padding:'6px 8px', borderRadius:6, background:'rgba(245,158,11,0.04)', border:'1px solid rgba(245,158,11,0.1)' }}>
                     <div style={{ fontSize:10, fontWeight:600, color:'#f59e0b' }}>T4DM — ожирение/предиабет</div>
@@ -1428,7 +1428,7 @@ export const FertilityPCTScreen: React.FC<{ initialTab?: FertTab; restrictToMode
                 <div style={{ fontSize:9, color:'var(--text-dim)', lineHeight:1.5 }}>
                   <b>1.</b> 34 года, пост-курсовой гипогонадизм 8 мес: TT 180, LH 1.2. Энкломифен 25 мг 8 нед → TT 580, ЛГ 4.8. Симптомы купированы.<br/>
                   <b>2.</b> 52 года, возрастной гипогонадизм: TT 280, симптомы. ТЗТ энантат 150 мг/нед → TT 720, Hct 48%. Контроль E2 анастрозолом.<br/>
-                  <b>3.</b> 28 лет, фертильность после курса: hCG 2000 МЕ EOD 3 нед → энкломифен 25 мг 8 нед + hMG 75 МЕ × 3 мес. Спермограмма восстановлена.<br/>
+                  <b>3.</b> 28 лет, фертильность после курса: hCG 500 МЕ 2р/нед, 3/1 3 нед → энкломифен 25 мг 8 нед + hMG 75 МЕ × 3 мес. Спермограмма восстановлена.<br/>
                   <b>4.</b> 45 лет, метаболический синдром + TT 310: ТЗТ ципионат 100 мг/нед + диета. Через 6 мес: −8 кг, HbA1c 5.7%, TT 650.<br/>
                   <b>5.</b> 60 лет, TT 150, ожирение, апноэ сна: СРАР-терапия 3 мес → затем ТЗТ ундеканоат. TT 550, симптомы улучшились.
                 </div>
@@ -1517,7 +1517,7 @@ export const FertilityPCTScreen: React.FC<{ initialTab?: FertTab; restrictToMode
                     <span><b>ГЗТ + ИА (анастрозол)</b></span><span>↓ E2 — риск остеопороза при избытке. Только E2 {">"}50 пг/мл + симптомы</span>
                   </div>
                   <div style={{ display:'flex', justifyContent:'space-between', padding:'4px 6px', borderRadius:4 }}>
-                    <span><b>ГЗТ + hCG</b></span><span>Сохранение фертильности и объёма яичек. hCG 250-500 МЕ 2-3×/нед</span>
+                    <span><b>ГЗТ + hCG</b></span><span>Сохранение фертильности и объёма яичек. hCG 500 МЕ 2р/нед, 3/1</span>
                   </div>
                   <div style={{ display:'flex', justifyContent:'space-between', padding:'4px 6px', background:'rgba(239,68,68,0.05)', borderRadius:4 }}>
                     <span><b>ГЗТ + финастерид</b></span><span>↓ ДГТ, может ↑ E2 и T. Контроль эстрогенов, риск гинекомастии</span>
@@ -1557,7 +1557,7 @@ export const FertilityPCTScreen: React.FC<{ initialTab?: FertTab; restrictToMode
                 <div style={{ fontSize:9, color:'var(--text-dim)', lineHeight:1.5 }}>
                   <b>Кейс 6 (Эритроцитоз):</b> 47 лет, ТЗТ энантат 200 мг/нед 6 мес. Hct 56%, Hb 18.5. Донорство 400 мл × 2 + снижение дозы до 120 мг/нед. Hct стабилизирован на 49%. Рекомендация: контроль Hct каждые 3 мес, донация при {">"}54%.<br/><br/>
                   <b>Кейс 7 (Гинекомастия):</b> 31 год, ТЗТ ципионат 150 мг/нед + отсутствие контроля E2. Через 4 мес: E2 78 пг/мл, болезненность груди, субклиническая гинекомастия. Анастрозол 0.5 мг 2×/нед 4 нед → E2 28, симптомы регресс. Рекомендация: при E2 {">"}50 + симптомы — короткий курс ИА.<br/><br/>
-                  <b>Кейс 8 (Фертильность):</b> 29 лет, ТЗТ 3 года без hCG. Объём яичек 8 мл, азооспермия. ТЗТ → hCG 1000 МЕ EOD 8 нед → энкломифен 25 мг 12 нед. Спермограмма: 22 млн, подвижность 38%.<br/><br/>
+                  <b>Кейс 8 (Фертильность):</b> 29 лет, ТЗТ 3 года без hCG. Объём яичек 8 мл, азооспермия. ТЗТ → hCG 500 МЕ 2р/нед, 3/1 8 нед → энкломифен 25 мг 12 нед. Спермограмма: 22 млн, подвижность 38%.<br/><br/>
                   <b>Кейс 9 (T4DM-метаболический):</b> 48 лет, TT 290, ожирение II, HbA1c 6.9%. ТЗТ ундеканоат 750 мг + диета DASH 1800 ккал + метформин 500 мг. 12 мес: −14 кг, HbA1c 5.8%, TT 620.<br/><br/>
                   <b>Кейс 10 (ПСА-скачок):</b> 62 года, ТЗТ 100 мг/нед 8 нед. ПСА 2.8 → 6.2. МП-МРТ: PIRADS 2 (доброкачественная). ТЗТ продолжена под контролем ПСА каждые 3 мес. Стабилизация на 3.5.
                 </div>
@@ -1597,7 +1597,7 @@ export const FertilityPCTScreen: React.FC<{ initialTab?: FertTab; restrictToMode
                   <div style={{ padding:'4px 6px', background:'rgba(34,197,94,0.05)', borderRadius:4, marginBottom:2 }}>☐ Подтверждён гипогонадизм (TT {'<'}300 + симптомы × 2 забора до 10:00)</div>
                   <div style={{ padding:'4px 6px', borderRadius:4, marginBottom:2 }}>☐ Базовые анализы: TT, FT, SHBG, ЛГ, ФСГ, E2, PRL, ПСА, Hct, липиды, HOMA-IR + ферритин, D3, ТТГ</div>
                   <div style={{ padding:'4px 6px', background:'rgba(34,197,94,0.05)', borderRadius:4, marginBottom:2 }}>☐ Выбрана форма: энантат/ципионат 100 мг 1×/нед (старт) / ундеканоат 750 мг / гель 50 мг</div>
-                  <div style={{ padding:'4px 6px', borderRadius:4, marginBottom:2 }}>☐ Обсуждена фертильность — hCG 250-500 МЕ 2-3×/нед при желании</div>
+                  <div style={{ padding:'4px 6px', borderRadius:4, marginBottom:2 }}>☐ Обсуждена фертильность — hCG 500 МЕ 2р/нед, 3/1 при желании</div>
                   <div style={{ padding:'4px 6px', background:'rgba(34,197,94,0.05)', borderRadius:4, marginBottom:2 }}>☐ Исключены противопоказания: ПСА {">"}4, Hct {">"}50%, апноэ сна, РПЖ, неконтролируемая СН</div>
                   <div style={{ padding:'4px 6px', borderRadius:4, marginBottom:2 }}>☐ Мониторинг: 6 нед → 3-6 мес → ежегодно</div>
                   <div style={{ padding:'4px 6px', background:'rgba(34,197,94,0.05)', borderRadius:4, marginBottom:2 }}>☐ Целевые значения: TT 500-850 нг/дл, E2 20-40 пг/мл, Hct {'<'}50%</div>
@@ -1634,10 +1634,10 @@ export const FertilityPCTScreen: React.FC<{ initialTab?: FertTab; restrictToMode
               <div style={s.card}>
                 <h4 style={{ margin:'0 0 6px', fontSize:12, color:'#22c55e' }}>🛡 Профилактика на курсе</h4>
                 <div style={{ fontSize:9, color:'var(--text-dim)', lineHeight:1.5 }}>
-                  <b>hCG параллельно курсу:</b> 250-500 МЕ 2-3×/нед, начиная с 1-й недели курса. Поддерживает интратестикулярный тестостерон и объём яичек. Доказано: hCG предотвращает атрофию клеток Лейдига.<br/><br/>
+                  <b>hCG параллельно курсу:</b> 500 МЕ 2р/нед, 3/1, начиная с 1-й недели курса. Поддерживает интратестикулярный тестостерон и объём яичек. Доказано: hCG предотвращает атрофию клеток Лейдига.<br/><br/>
                   <b>Прегненолон backfill:</b> прегненолон 50-100 мг/день — предшественник всех стероидов, снижает подавление эндогенного синтеза.<br/><br/>
                   <b>Криоконсервация:</b> обязательна при планировании фертильности — заморозка до начала курса.<br/><br/>
-                  <b>Зачатие на «мосту»:</b> hCG 500 МЕ EOD + энкломифен 12.5 мг/день. Риск SDF — обязательный контроль DFI.
+                  <b>Зачатие на «мосту»:</b> hCG 500 МЕ 2р/нед, 3/1 + энкломифен 12.5 мг/день. Риск SDF — обязательный контроль DFI.
                 </div>
               </div>
 
@@ -1654,7 +1654,7 @@ export const FertilityPCTScreen: React.FC<{ initialTab?: FertTab; restrictToMode
                   </div>
                   <div style={{ padding:'6px 8px', borderRadius:6, background:'rgba(139,92,246,0.06)', border:'1px solid rgba(139,92,246,0.1)' }}>
                     <div style={{ fontSize:10, fontWeight:600, color:'#8b5cf6' }}>Комбинированная (ПКТ+) — золотой стандарт</div>
-                    <div style={{ fontSize:9, color:'var(--text-dim)' }}>hCG 2000-3000 МЕ EOD × 2-3 нед → энкломифен 25 мг 8-12 нед. При азооспермии: hMG 75-150 МЕ/день. Эффективность: 66.8%.</div>
+                    <div style={{ fontSize:9, color:'var(--text-dim)' }}>hCG 500 МЕ 2р/нед, 3/1 × 2-3 нед → энкломифен 25 мг 8-12 нед. При азооспермии: hMG 75-150 МЕ/день. Эффективность: 66.8%.</div>
                   </div>
                   <div style={{ padding:'6px 8px', borderRadius:6, background:'rgba(245,158,11,0.06)', border:'1px solid rgba(245,158,11,0.1)' }}>
                     <div style={{ fontSize:10, fontWeight:600, color:'#f59e0b' }}>Пульсаторный GnRH-насос</div>
@@ -1892,7 +1892,7 @@ export const FertilityPCTScreen: React.FC<{ initialTab?: FertTab; restrictToMode
                   <div style={{ padding:'4px 6px', borderRadius:4 }}>☐ Базовая спермограмма + MAR-тест + DFI</div>
                   <div style={{ padding:'4px 6px', background:'rgba(34,197,94,0.05)', borderRadius:4 }}>☐ Ингибин B, АМГ, ЛГ, ФСГ, TT, E2, PRL, SHBG</div>
                   <div style={{ padding:'4px 6px', borderRadius:4 }}>☐ Планирование длительности курса (не {'>'}20 нед без перерыва при желании фертильности)</div>
-                  <div style={{ padding:'4px 6px', background:'rgba(34,197,94,0.05)', borderRadius:4 }}>☐ hCG на курсе (250-500 МЕ 2-3×/нед) или прегненолон backfill</div>
+                  <div style={{ padding:'4px 6px', background:'rgba(34,197,94,0.05)', borderRadius:4 }}>☐ hCG на курсе (500 МЕ 2р/нед, 3/1) или прегненолон backfill</div>
                 </div>
               </div>
 

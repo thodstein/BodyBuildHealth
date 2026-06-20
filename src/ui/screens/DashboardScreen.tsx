@@ -31,7 +31,7 @@ const NAV_BUTTONS: { id: ScreenId; icon: string; label: string }[] = [
 ];
 
 const s: Record<string, React.CSSProperties> = {
-  card: { borderRadius:12, padding:14, marginBottom:10 },
+  card: { borderRadius:12, padding:14, marginBottom:10, background:'rgba(24,24,27,0.15)', border:'1px solid rgba(255,255,255,0.04)' },
   label: { fontSize:9, color:'rgba(255,255,255,0.6)', marginBottom:2, textTransform:'uppercase', letterSpacing:0.5 },
   value: { fontSize:18, fontWeight:700, color:'#fff' },
   row: { display:'flex', justifyContent:'space-between', alignItems:'center' },
@@ -78,7 +78,7 @@ export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
       </div>
 
       <div style={{ flex:1, overflow:'auto', padding:'0 14px 14px' }}>
-        <div style={{ ...s.card, background:'rgba(20,22,30,0.4)', backdropFilter:'blur(12px)', WebkitBackdropFilter:'blur(12px)', border:'1px solid var(--glass-border)' }}>
+        <div style={s.card}>
           <div style={s.label}>Профиль</div>
           <div style={s.value}>{profile?.name || 'Не заполнен'}</div>
           <div style={{ ...s.row, marginTop:6, gap:4 }}>
@@ -89,7 +89,7 @@ export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
         </div>
 
         {risk && (
-          <div style={{ ...s.card, background:'rgba(20,22,30,0.4)', backdropFilter:'blur(12px)', WebkitBackdropFilter:'blur(12px)', border:'1px solid var(--glass-border)' }}>
+          <div style={s.card}>
             <div style={s.label}>Общий риск</div>
             <div style={{ display:'flex', alignItems:'center', gap:10 }}>
               <span style={{ fontSize:32, fontWeight:800, color: risk.overallRaw > 60 ? '#ef4444' : risk.overallRaw > 30 ? '#eab308' : '#22c55e' }}>{Math.round(risk.overallRaw)}%</span>
@@ -104,12 +104,12 @@ export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
         )}
 
         <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
-          <div style={{ ...s.card, background:'rgba(20,22,30,0.4)', backdropFilter:'blur(12px)', WebkitBackdropFilter:'blur(12px)', border:'1px solid var(--glass-border)' }}>
+          <div style={s.card}>
             <div style={s.label}>Тренировки</div>
             <div style={{ fontSize:13, fontWeight:600, color:'#fff' }}>{profile?.settings?.workoutsPerWeek || 0}×/нед</div>
             <div style={{ fontSize:10, color:'rgba(255,255,255,0.6)' }}>{profile?.settings?.avgWorkoutMinutes || 45} мин/тренировка</div>
           </div>
-          <div style={{ ...s.card, background:'rgba(20,22,30,0.4)', backdropFilter:'blur(12px)', WebkitBackdropFilter:'blur(12px)', border:'1px solid var(--glass-border)' }}>
+          <div style={s.card}>
             <div style={s.label}>Курс</div>
             <div style={{ fontSize:13, fontWeight:600, color:'#fff' }}>{course?.length || 0} препаратов</div>
             <div style={{ fontSize:10, color:'rgba(255,255,255,0.6)' }}>{course?.length ? `Нед ${Math.min(...course.map(c=>c.startWeek))}-${Math.max(...course.map(c=>c.endWeek))}` : 'Нет активного курса'}</div>
@@ -117,7 +117,7 @@ export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
         </div>
 
         {nutrition && (
-          <div style={{ ...s.card, background:'rgba(20,22,30,0.4)', backdropFilter:'blur(12px)', WebkitBackdropFilter:'blur(12px)', border:'1px solid var(--glass-border)' }}>
+          <div style={s.card}>
             <div style={s.label}>Питание сегодня</div>
             <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:6, marginTop:6 }}>
               <div style={{ textAlign:'center' }}>
@@ -146,8 +146,7 @@ export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
             {NAV_BUTTONS.map(btn => (
               <button key={btn.id} onClick={() => onNavigate?.(btn.id)} style={{
                 padding:'10px 4px', borderRadius:10, cursor:'pointer', textAlign:'center',
-                background:'rgba(20,22,30,0.35)', border:'1px solid var(--glass-border)', transition:'all 0.15s',
-                backdropFilter:'blur(8px)', WebkitBackdropFilter:'blur(8px)',
+                background:'rgba(24,24,27,0.12)', border:'1px solid rgba(255,255,255,0.04)',
               }}>
                 <div style={{ fontSize:18, marginBottom:2 }}>{btn.icon}</div>
                 <div style={{ fontSize:8, fontWeight:600, color:'#fff', lineHeight:1.2 }}>{btn.label}</div>
