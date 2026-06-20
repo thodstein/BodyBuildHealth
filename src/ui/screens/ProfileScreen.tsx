@@ -1482,6 +1482,7 @@ export const ProfileScreen: React.FC = () => {
               `  БАДы: ${suppsList}`,
               ...(riskData?.systemSupport ? RISK_SYSTEMS.filter(sys => riskData.systemSupport[sys] !== undefined).map(sys => `    ${sysLabels[sys] || sys}: покрытие ${Math.round(riskData.systemSupport[sys])}%`) : []),
               `  Покрытие поддержки: ${riskData?.totalSupport ? Math.round(riskData.totalSupport) + '%' : '—'}`,
+              ...(function(){try{var r=JSON.parse(localStorage.getItem('he_profile_support_reports')||'[]')[0];if(!r)return[];return['  Отчёт поддержки: '+r.grade+' | Риск '+r.overallNet+'/100 | '+r.compoundsCount+' соединений, '+r.supportCount+' в поддержке']}catch{return[]}})(),
               ``,
               `АНАЛИЗЫ`,
               `  ${labsList}`,
@@ -1581,6 +1582,26 @@ export const ProfileScreen: React.FC = () => {
                     </div>
                   </div>
                   {(r.microDeficiencies || []).length > 0 && <div style={{ fontSize:8, color:'#f59e0b' }}>⚠ {r.microDeficiencies.slice(0,3).join('; ')}</div>}
+                </div>
+              ); } catch { return null; }})()}
+              {(() => { try { const reports = JSON.parse(localStorage.getItem('he_profile_support_reports') || '[]'); if (reports.length === 0) return null; const r = reports[0]; return (
+                <div style={{ ...glassCard, borderLeft:'3px solid #8b5cf6', background:'rgba(139,92,246,0.06)' }}>
+                  <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:6 }}>
+                    <span style={{ fontSize:16 }}>🧩</span>
+                    <div style={{ fontSize:13, fontWeight:700, color:'#8b5cf6' }}>Отчёт о поддержке</div>
+                    <span style={{ marginLeft:'auto', fontSize:16, fontWeight:800, color: r.grade === 'A' ? '#22c55e' : r.grade === 'B' ? '#8b5cf6' : r.grade === 'C' ? '#f59e0b' : '#ef4444' }}>{r.grade}</span>
+                  </div>
+                  <div style={{ fontSize:10, color:'rgba(255,255,255,0.85)', marginBottom:4 }}>{r.date?.slice(0,10)} · Риск {r.overallNet}/100</div>
+                  <div style={{ display:'flex', gap:6 }}>
+                    <div style={{ flex:1, background:'rgba(139,92,246,0.06)', borderRadius:6, padding:'4px 6px' }}>
+                      <div style={{ fontSize:8, color:'rgba(255,255,255,0.7)' }}>Соединений</div>
+                      <div style={{ fontSize:11, fontWeight:700, color:'#fff' }}>{r.compoundsCount || '—'}</div>
+                    </div>
+                    <div style={{ flex:1, background:'rgba(0,230,138,0.06)', borderRadius:6, padding:'4px 6px' }}>
+                      <div style={{ fontSize:8, color:'rgba(255,255,255,0.7)' }}>Поддержка</div>
+                      <div style={{ fontSize:11, fontWeight:700, color:'#00e68a' }}>{r.supportCount || '—'}</div>
+                    </div>
+                  </div>
                 </div>
               ); } catch { return null; }})()}
             </div>);

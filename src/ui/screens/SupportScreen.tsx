@@ -49,7 +49,7 @@ import { searchPubMed, type PubMedArticle } from '../../engines/pubmed-search.en
 
 type SupportTab = 'main' | 'catalog' | 'synergies' | 'calculator' | 'interactions' | 'stacks' | 'peptides' | 'fertility-pct';
 type SupportView = 'main' | 'calc' | 'fertility';
-type CalcView = 'main' | 'calculator' | 'peptides' | 'info' | 'stackcalc' | 'mystacks' | 'mixcalc' | 'plan' | 'neuro' | 'joints' | 'acne';
+type CalcView = 'main' | 'calculator' | 'peptides' | 'info' | 'stackcalc' | 'mystacks' | 'mixcalc' | 'plan' | 'reports' | 'neuro' | 'joints' | 'acne';
 type InfoView = 'main' | 'catalog' | 'synergies' | 'stacks' | 'interactions' | 'research';
 
 const INTERACTION_TYPE_LABELS: Record<string, { label: string; emoji: string; color: string }> = {
@@ -937,7 +937,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   const [calcView, setCalcView] = useState<CalcView>('main');
   const [infoView, setInfoView] = useState<InfoView>('main');
   const [section, setSection] = useState<'home'|'generator'|'hormonal'|'info'>('home');
-  const [genTab, setGenTab] = useState<'calculator'|'stackgen'|'mystacks'|'plan'>('calculator');
+  const [genTab, setGenTab] = useState<'calculator'|'stackgen'|'mystacks'|'plan'|'reports'>('calculator');
   const [hormonalTab, setHormonalTab] = useState<'pct'|'fertility'|'hrt'>('pct');
   const [infoTab, setInfoTab] = useState<'peptides'|'catalog'|'synergies'|'readystacks'|'interactions'|'research'|'mixcalc'|'neuro'|'joints'|'acne'>('catalog');
   const [searchQuery, setSearchQuery] = useState('');
@@ -1038,7 +1038,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
       } else if (['mixcalc','neuro','joints','acne'].includes(calcView)) {
         setCalcView('info'); setInfoView('catalog'); setInfoTab('catalog');
       } else if (calcView === 'info') {
-        setSection('home'); setTab('main'); setSupportView('calc'); setCalcView('main');
+        setSection('home'); setTab('main'); setSupportView('main'); setCalcView('main'); setInfoView('catalog');
       } else {
         setCalcView('main');
       }
@@ -1113,6 +1113,12 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   const [manualFilter, setManualFilter] = useState<string>('all');
   const [manualResult, setManualResult] = useState<OptimizerStackResult | null>(null);
   const [calcExpandedSubs, setCalcExpandedSubs] = useState<Record<string, boolean>>({});
+
+  // Support report state
+  const [supportReports, setSupportReports] = useState<any[]>(() => {
+    try { return JSON.parse(localStorage.getItem('he_support_reports') || '[]'); } catch { return []; }
+  });
+  const [supportReportCurrent, setSupportReportCurrent] = useState<any>(null);
 
   // Neurotoxicity calculator state
   const courseCompounds = useMemo(() => (linked.course || []).map(c => {
@@ -2496,7 +2502,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
   };
 
   return (
-    <div className="screen support-screen" style={{ paddingTop: section === 'info' || calcView === 'info' || ['mixcalc','neuro','joints','acne'].includes(calcView) || section === 'generator' ? '88px' : section !== 'home' ? '50px' : '10px', paddingBottom: '0px', overflowY: 'auto' }}>
+    <div className="screen support-screen" style={{ paddingTop: section === 'info' || calcView === 'info' || ['mixcalc','neuro','joints','acne','peptides'].includes(calcView) || section === 'generator' ? '88px' : section !== 'home' ? '50px' : '10px', paddingBottom: '0px', overflowY: 'auto' }}>
 
       {/* ===== GENERATOR SUB-TAB PILLS (with back/home) ===== */}
       {section === 'generator' && (
@@ -2506,13 +2512,14 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
             <button onClick={goHome} style={{ padding:'3px 10px', borderRadius:6, fontSize:10, cursor:'pointer', background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600, whiteSpace:'nowrap' }}>← На главную</button>
           </div>
           <div style={{ display:'flex', gap:4, padding:'6px 12px 8px', overflowX:'auto', scrollbarWidth:'none' }}>
-            {[['calculator','Калькулятор'],['stackgen','Генератор стеков'],['mystacks','Мои стеки'],['plan','План']].map(([id,label]) => (
+            {[['calculator','Калькулятор'],['stackgen','Генератор стеков'],['mystacks','Мои стеки'],['plan','План'],['reports','Отчёты']].map(([id,label]) => (
               <button key={id} onClick={() => { setGenTab(id as any); 
               const a: Record<string,()=>void> = {
                 calculator: ()=>{ setTab('calculator'); setSupportView('calc'); },
                 stackgen: ()=>{ setTab('main'); setSupportView('calc'); setCalcView('stackcalc'); },
                 mystacks: ()=>{ setTab('main'); setSupportView('calc'); setCalcView('mystacks'); },
                 plan: ()=>{ setTab('main'); setSupportView('calc'); setCalcView('plan'); },
+                reports: ()=>{ setTab('main'); setSupportView('calc'); setCalcView('reports'); },
               };
               a[id]?.();
             }} style={{
@@ -2547,7 +2554,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
             {[['peptides','Пептиды'],['catalog','Каталог'],['synergies','Синергии'],['readystacks','Стеки'],['interactions','Взаимодействия'],['research','Исследования'],['mixcalc','Микс'],['neuro','Нейро'],['joints','Суставы'],['acne','Акне']].map(([id,label]) => (
               <button key={id} onClick={() => { setInfoTab(id as any);
                 const a: Record<string,()=>void> = {
-                  peptides: ()=>setTab('peptides'),
+                  peptides: ()=>{ setSection('info'); setTab('main'); setSupportView('calc'); setCalcView('peptides'); setInfoTab('peptides'); },
                   catalog: ()=>{ setTab('main'); setSupportView('calc'); setCalcView('info'); setInfoView('catalog'); setSection('home'); },
                   synergies: ()=>{ setTab('main'); setSupportView('calc'); setCalcView('info'); setInfoView('synergies'); setSection('home'); },
                   readystacks: ()=>{ setTab('main'); setSupportView('calc'); setCalcView('info'); setInfoView('stacks'); setSection('home'); },
@@ -4538,6 +4545,224 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
           )}
         </div>
       )}
+
+      {/* ===== SUPPORT REPORTS ===== */}
+      {section === 'generator' && tab === 'main' && supportView === 'calc' && calcView === 'reports' && (() => {
+        return (
+          <div style={{ paddingBottom:80 }}>
+            <h3 style={{ fontSize:14, fontWeight:800, color:'#fff', margin:'0 0 6px' }}>📊 Отчёты поддержки</h3>
+            <p style={{ fontSize:9, color:'var(--text-dim)', margin:'0 0 10px', lineHeight:1.3 }}>
+              Полный отчёт по рискам, поддержке, взаимодействиям и курсу. Сохраняется в архив.
+            </p>
+
+            {/* Generate Button */}
+            <button onClick={() => {
+              const profile = linked.profile;
+              const course = linked.course || [];
+              const weightKg = profile?.settings?.weight ?? 80;
+              const age = profile?.settings?.age ?? 30;
+              const sex = profile?.settings?.sex ?? 'male';
+              const r = supportResult;
+              const mr = mechanismReport;
+              const tp = timedPlan;
+              const mr2 = modelRiskResult;
+              const weekly = weeklyPlan;
+              const dbInt = dbInteractions;
+
+              // Risk assessment per system
+              const systemLabels: Record<string,{name:string,emoji:string}> = {
+                cardio:{name:'Сердце',emoji:'❤️'}, hepatic:{name:'Печень',emoji:'🧪'}, renal:{name:'Почки',emoji:'🫘'},
+                neuro:{name:'Нейро',emoji:'🧠'}, endocrine:{name:'Эндокринная',emoji:'🔄'}, hematologic:{name:'Кровь',emoji:'🩸'},
+                reproductive:{name:'Репродуктивная',emoji:'🧬'}, musculoskeletal:{name:'КМС',emoji:'💪'},
+              };
+              const risks = mr2 ? Object.entries(mr2).map(([k,v]) => ({ system:systemLabels[k]?.name||k, emoji:systemLabels[k]?.emoji||'⚕️', raw:v.raw, net:v.net })) : [];
+              const overallRaw = risks.length ? Math.round(risks.reduce((a,r)=>a+r.raw,0)/risks.length) : 0;
+              const overallNet = risks.length ? Math.round(risks.reduce((a,r)=>a+r.net,0)/risks.length) : 0;
+
+              // Course compounds
+              const compounds = course.map(c => {
+                const ph = PHARMA_DB[c.substanceId];
+                return { id:c.substanceId, name:ph?.name||c.substanceId, cls:ph?.class||'other', dose:c.doseValue, freq:c.frequency, start:c.startWeek, end:c.endWeek };
+              });
+
+              // Support plan from SUPPORT_LEVELS + current level
+              const levelSubIds = SUPPORT_LEVELS[supportLevel]?.subs || [];
+              const planItems = levelSubIds.map((id:string) => {
+                const sub = ALL_SUBSTANCES.find((s:any) => s.id === id);
+                const dos = DEFAULT_DOSAGES[id] || { mg:500, timing:'с едой' };
+                return { id, name:sub?.name||id, dose:dos.mg+'мг', timing:dos.timing, categories:sub?.categories||[], mechanisms:sub?.mechanisms||[] };
+              });
+
+              // Interactions
+              const allInteractions = [
+                ...(dbInt?.synergies||[]).map((i:any) => ({ ...i, type:'synergy' })),
+                ...(dbInt?.conflicts||[]).map((i:any) => ({ ...i, type:'conflict' })),
+                ...(dbInt?.cautions||[]).map((i:any) => ({ ...i, type:'caution' })),
+              ];
+              const synergyCount = dbInt?.synergies?.length || 0;
+              const conflictCount = dbInt?.conflicts?.length || 0;
+
+              // Recommendations
+              const recs: string[] = [];
+              if (overallNet >= 70) recs.push('🔴 Высокий риск — необходима поддержка всех систем');
+              else if (overallNet >= 50) recs.push('🟡 Средний риск — усиленная поддержка');
+              else recs.push('🟢 Низкий риск — базовая поддержка');
+              if (compounds.some((c:any)=>c.cls==='aas'||c.cls==='aan'||c.cls==='sarm'||c.cls==='prohormone')) recs.push('💊 Анаболические соединения — контроль липидов, печени, ГГЯ');
+              if (compounds.some((c:any)=>c.cls==='other')) recs.push('📋 Дополнительные соединения — проверка взаимодействий');
+              if (conflictCount > 0) recs.push('⚡ Обнаружены конфликты — проверьте взаимодействия');
+              if (planItems.length === 0) recs.push('🧩 Поддержка не выбрана — выберите уровень в Калькуляторе');
+
+              // Overall grade
+              const penalty = (overallNet > 70 ? 2 : overallNet > 50 ? 1 : 0) + (conflictCount > 0 ? 1 : 0) + (compounds.length > 3 ? 1 : 0);
+              const gradeScore = Math.max(0, 10 - penalty);
+              const grade = gradeScore >= 8 ? 'A' : gradeScore >= 6 ? 'B' : gradeScore >= 4 ? 'C' : 'D';
+
+              const report = {
+                date: new Date().toISOString(),
+                profile: { age, weight: weightKg, sex },
+                compounds,
+                risks, overallRaw, overallNet,
+                plan: { level: SUPPORT_LEVELS[supportLevel]?.label || 'Не выбран', items: planItems },
+                interactions: { count:allInteractions.length, synergyCount, conflictCount, list:allInteractions },
+                mechanismReport: mr ? { systems:Object.keys(mr).length } : null,
+                timedPlan: tp ? true : false,
+                weeklyPlan: weekly ? true : false,
+                overallGrade: grade,
+                recommendations: recs,
+              };
+
+              // Save to archive
+              const prev = JSON.parse(localStorage.getItem('he_support_reports') || '[]');
+              const updated = [report, ...prev].slice(0, 30);
+              localStorage.setItem('he_support_reports', JSON.stringify(updated));
+              setSupportReports(updated);
+              setSupportReportCurrent(report);
+
+              // Push to Profile
+              try {
+                const profileReports = JSON.parse(localStorage.getItem('he_profile_support_reports') || '[]');
+                profileReports.unshift({ date: report.date, grade, overallNet, compoundsCount: report.compounds.length, supportCount: report.plan.items.length });
+                localStorage.setItem('he_profile_support_reports', JSON.stringify(profileReports.slice(0, 30)));
+              } catch(e) {}
+            }} style={{
+              padding:'10px 20px', borderRadius:10, fontSize:12, fontWeight:700, cursor:'pointer', width:'100%', marginBottom:12,
+              background: 'var(--accent)', border:'none', color:'#000',
+            }}>
+              🚀 Сгенерировать отчёт
+            </button>
+
+            {/* Current Report */}
+            {supportReportCurrent && (
+              <div style={{ background:'var(--bg-secondary)', borderRadius:12, padding:14, marginBottom:10, border:'1px solid var(--border)' }}>
+                <div style={{ fontSize:11, fontWeight:700, color:'var(--accent)', marginBottom:8, display:'flex', alignItems:'center', gap:6 }}>
+                  📄 Текущий отчёт
+                  <span style={{ fontSize:8, color:'var(--text-dim)', fontWeight:400 }}>{new Date(supportReportCurrent.date).toLocaleString('ru-RU')}</span>
+                </div>
+
+                {/* Grade */}
+                <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:8, padding:'8px 10px', borderRadius:8, background:'rgba(0,230,138,0.06)' }}>
+                  <div style={{ fontSize:24, fontWeight:800, color:supportReportCurrent.overallGrade === 'A' ? '#00e68a' : supportReportCurrent.overallGrade === 'B' ? '#22c55e' : supportReportCurrent.overallGrade === 'C' ? '#f59e0b' : '#ef4444' }}>{supportReportCurrent.overallGrade}</div>
+                  <div style={{ flex:1, fontSize:9, color:'var(--text-dim)' }}>
+                    Общая оценка поддержки · Риск: {supportReportCurrent.overallNet}/100 · {supportReportCurrent.compounds.length} соединений · {supportReportCurrent.plan.items.length} препаратов поддержки
+                  </div>
+                </div>
+
+                {/* Profile */}
+                <div style={{ display:'flex', gap:6, marginBottom:8, flexWrap:'wrap' }}>
+                  <div style={{ padding:'3px 8px', borderRadius:6, background:'rgba(255,255,255,0.04)', fontSize:8, color:'var(--text-dim)' }}>👤 {supportReportCurrent.profile.age} лет</div>
+                  <div style={{ padding:'3px 8px', borderRadius:6, background:'rgba(255,255,255,0.04)', fontSize:8, color:'var(--text-dim)' }}>⚖️ {supportReportCurrent.profile.weight} кг</div>
+                  <div style={{ padding:'3px 8px', borderRadius:6, background:'rgba(255,255,255,0.04)', fontSize:8, color:'var(--text-dim)' }}>⚧ {supportReportCurrent.profile.sex === 'male' ? 'Муж' : 'Жен'}</div>
+                </div>
+
+                {/* Compounds */}
+                {supportReportCurrent.compounds.length > 0 && (
+                  <div style={{ marginBottom:8 }}>
+                    <div style={{ fontSize:9, fontWeight:700, color:'var(--text)', marginBottom:4 }}>💊 Соединения на курсе</div>
+                    <div style={{ display:'flex', gap:3, flexWrap:'wrap' }}>
+                      {supportReportCurrent.compounds.map((c:any,i:number) => (
+                        <span key={i} style={{ padding:'2px 6px', borderRadius:4, fontSize:7, background:'rgba(167,139,250,0.08)', color:'#a78bfa', border:'1px solid rgba(167,139,250,0.15)' }}>{c.name}</span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Risks */}
+                {supportReportCurrent.risks.length > 0 && (
+                  <div style={{ marginBottom:8 }}>
+                    <div style={{ fontSize:9, fontWeight:700, color:'var(--text)', marginBottom:4 }}>📊 Риски по системам</div>
+                    <div style={{ display:'flex', gap:4, overflowX:'auto', paddingBottom:2 }}>
+                      {supportReportCurrent.risks.map((r:any,i:number) => (
+                        <div key={i} style={{ flexShrink:0, padding:'4px 8px', borderRadius:6, background:'rgba(239,68,68,0.04)', border:'1px solid rgba(239,68,68,0.12)', minWidth:50, textAlign:'center' }}>
+                          <div style={{ fontSize:10 }}>{r.emoji}</div>
+                          <div style={{ fontSize:7, color:'var(--text-dim)' }}>{r.system}</div>
+                          <div style={{ fontSize:11, fontWeight:700, color:r.net >= 70 ? '#ef4444' : r.net >= 50 ? '#f59e0b' : '#22c55e' }}>{r.net}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Support Plan */}
+                {supportReportCurrent.plan.items.length > 0 && (
+                  <div style={{ marginBottom:8 }}>
+                    <div style={{ fontSize:9, fontWeight:700, color:'var(--text)', marginBottom:4 }}>🧩 План поддержки · {supportReportCurrent.plan.level}</div>
+                    <div style={{ display:'flex', gap:3, flexWrap:'wrap' }}>
+                      {supportReportCurrent.plan.items.map((s:any,i:number) => (
+                        <span key={i} style={{ padding:'2px 6px', borderRadius:4, fontSize:7, background:'rgba(0,230,138,0.06)', color:'#00e68a', border:'1px solid rgba(0,230,138,0.12)' }}>{s.name}</span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Interactions */}
+                {supportReportCurrent.interactions.count > 0 && (
+                  <div style={{ marginBottom:8 }}>
+                    <div style={{ fontSize:9, fontWeight:700, color:'var(--text)', marginBottom:4 }}>⚡ Взаимодействия</div>
+                    <div style={{ display:'flex', gap:6, fontSize:8, color:'var(--text-dim)' }}>
+                      <span>Всего: {supportReportCurrent.interactions.count}</span>
+                      <span style={{ color:'#22c55e' }}>⊕ Синергии: {supportReportCurrent.interactions.synergyCount}</span>
+                      <span style={{ color:'#ef4444' }}>⊖ Конфликты: {supportReportCurrent.interactions.conflictCount}</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Recommendations */}
+                {supportReportCurrent.recommendations.length > 0 && (
+                  <div style={{ background:'rgba(255,152,0,0.04)', borderRadius:8, padding:'6px 8px', border:'1px solid rgba(255,152,0,0.1)' }}>
+                    <div style={{ fontSize:9, fontWeight:700, color:'#f59e0b', marginBottom:4 }}>💡 Рекомендации</div>
+                    {supportReportCurrent.recommendations.map((r:string,i:number) => (
+                      <div key={i} style={{ fontSize:8, color:'var(--text-dim)', lineHeight:1.4, marginBottom:1 }}>• {r}</div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Archive */}
+            <div style={{ fontSize:11, fontWeight:700, color:'var(--text)', marginBottom:6 }}>📦 Архив отчётов ({supportReports.length})</div>
+            {supportReports.length === 0 && (
+              <div style={{ padding:'14px', borderRadius:10, background:'var(--bg-secondary)', border:'1px solid var(--border)', fontSize:9, color:'var(--text-dim)', textAlign:'center' }}>
+                Пока нет отчётов. Нажмите «Сгенерировать отчёт» для создания первого отчёта.
+              </div>
+            )}
+            {supportReports.map((rep:any, idx:number) => (
+              <div key={idx} onClick={() => setSupportReportCurrent(rep)} style={{
+                padding:'8px 10px', borderRadius:8, marginBottom:4, cursor:'pointer',
+                background: supportReportCurrent === rep ? 'rgba(0,230,138,0.06)' : 'var(--bg-secondary)',
+                border: '1px solid ' + (supportReportCurrent === rep ? 'rgba(0,230,138,0.2)' : 'var(--border)'),
+                display:'flex', alignItems:'center', gap:8,
+              }}>
+                <div style={{ fontSize:16, fontWeight:800, color:rep.overallGrade === 'A' ? '#00e68a' : rep.overallGrade === 'B' ? '#22c55e' : rep.overallGrade === 'C' ? '#f59e0b' : '#ef4444', width:24, textAlign:'center' }}>{rep.overallGrade}</div>
+                <div style={{ flex:1 }}>
+                  <div style={{ fontSize:9, fontWeight:600, color:'var(--text)' }}>{rep.compounds.length} соединений · {rep.plan.items.length} в поддержке</div>
+                  <div style={{ fontSize:8, color:'var(--text-dim)' }}>{new Date(rep.date).toLocaleString('ru-RU')} · Риск {rep.overallNet}/100</div>
+                </div>
+                <span style={{ fontSize:8, color:'var(--accent)' }}>→</span>
+              </div>
+            ))}
+          </div>
+        );
+      })()}
 
       {/* ===== SUPPORT CALCULATOR — FULL DATA-INTEGRATED OVERHAUL ===== */}
       {section === 'generator' && ((tab === 'main' && supportView === 'calc' && calcView === 'calculator') || tab === 'calculator') && (() => {
