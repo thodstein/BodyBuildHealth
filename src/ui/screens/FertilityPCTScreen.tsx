@@ -8,7 +8,7 @@ import { generatePCTPlan } from '../../engines/pct-planner.engine';
 import { PHARMA_DB } from '../../core/pharma-database';
 
 type FertTab = 'overview' | 'semen' | 'hormones' | 'structure' | 'pct-plan' | 'hrt' | 'analyses';
-type AnalysesSubTab = 'before' | 'during' | 'after' | 'spermogram' | 'instrumental';
+type AnalysesSubTab = 'before' | 'during' | 'after' | 'spermogram' | 'instrumental' | 'structure';
 
 const addToPlan = async (substanceId: string, doseValue: number, doseUnit: string, freq: string, startWeek: number, endWeek: number) => {
   try {
@@ -70,7 +70,7 @@ export const FertilityPCTScreen: React.FC<{ initialTab?: FertTab; restrictToMode
     if (!restrictToMode) return true;
     if (restrictToMode === 'pct') return ['pct-plan', 'analyses'].includes(t.id);
     if (restrictToMode === 'hrt') return ['hrt', 'analyses'].includes(t.id);
-    if (restrictToMode === 'fertility') return ['overview', 'semen', 'hormones', 'structure', 'analyses'].includes(t.id);
+    if (restrictToMode === 'fertility') return ['overview', 'analyses'].includes(t.id);
     return true;
   });
 
@@ -862,17 +862,18 @@ export const FertilityPCTScreen: React.FC<{ initialTab?: FertTab; restrictToMode
               { id:'after' as AnalysesSubTab, label:'Ежегодно' },
               { id:'instrumental' as AnalysesSubTab, label:'Инструментальные' },
             ] : [
-              { id:'before' as AnalysesSubTab, label:'Гормональные' },
+              { id:'before' as AnalysesSubTab, label:'Гормоны + Данные' },
               { id:'spermogram' as AnalysesSubTab, label:'Спермограмма' },
+              { id:'structure' as AnalysesSubTab, label:'DFI/Структура' },
               { id:'during' as AnalysesSubTab, label:'Периоды сдачи' },
               { id:'instrumental' as AnalysesSubTab, label:'Инструментальные' },
-            ]).map(st => (
+            ]).map(st =>
               <button key={st.id} onClick={() => setAnalysesSTab(st.id)} style={{
                 padding:'5px 10px', borderRadius:16, fontSize:9, cursor:'pointer', whiteSpace:'nowrap',
                 background: analysesSTab===st.id ? 'var(--accent-green)' : 'var(--bg-secondary)',
                 color: analysesSTab===st.id ? '#000' : 'var(--text-dim)', border:'none', fontWeight: analysesSTab===st.id ? 700 : 400,
               }}>{st.label}</button>
-            ))}
+            )}
           </div>
           {(() => {
             const renderChecklist = (title: string, subtitle: string, items: {code:string;name:string;range:string}[], borderColor: string) => {
@@ -1126,8 +1127,90 @@ export const FertilityPCTScreen: React.FC<{ initialTab?: FertTab; restrictToMode
               );
               return (
                 <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-                  {analysesSTab === 'before' && renderChecklist('Гормональные маркеры фертильности', 'Базовые и контрольные', FERT_LABS, '#3b82f6')}
-                  {analysesSTab === 'spermogram' && renderChecklist('Спермограмма + MAR + DFI', 'Полная оценка сперматогенеза', FERT_SPERM, '#22c55e')}
+                  {analysesSTab === 'before' && (
+                    <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                      <div style={s.card}>
+                        <h4 style={{ margin:'0 0 8px', fontSize:14 }}>Гормоны крови (10 маркеров)</h4>
+                        <p style={{ fontSize:10, opacity:0.6, margin:'0 0 8px' }}>Автозаполнение из LabsScreen</p>
+                        <div style={s.row}>
+                          <div>{field('LH (mIU/mL)', lh, setLh, '5')}</div>
+                          <div>{field('FSH (mIU/mL)', fsh, setFsh, '4')}</div>
+                        </div>
+                        <div style={s.row}>
+                          <div>{field('TT общ. (ng/dL)', tt, setTt, '500')}</div>
+                          <div>{field('FT своб. (pg/mL)', ft, setFt, '15')}</div>
+                        </div>
+                        <div style={s.row}>
+                          <div>{field('E2 (pg/mL)', e2, setE2, '25')}</div>
+                          <div>{field('Пролактин (ng/mL)', prl, setPrl, '8')}</div>
+                        </div>
+                        <div style={s.row}>
+                          <div>{field('SHBG (nmol/L)', shbg, setShbg, '30')}</div>
+                          <div>{field('Ингибин B (pg/mL)', inhb, setInhb, '150')}</div>
+                        </div>
+                        <div style={s.row}>
+                          <div>{field('AMH (ng/mL)', amh, setAmh, '4')}</div>
+                          <div></div>
+                        </div>
+                      </div>
+                      {renderChecklist('Гормональные маркеры фертильности', 'Базовые и контрольные', FERT_LABS, '#3b82f6')}
+                    </div>
+                  )}
+                  {analysesSTab === 'spermogram' && (
+                    <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                      <div style={s.card}>
+                        <h4 style={{ margin:'0 0 8px', fontSize:14 }}>Спермограмма расширенная</h4>
+                        <div style={s.row}>
+                          <div>{field('Объём (мл) >=1.5', volume, setVolume, '1.5')}</div>
+                          <div>{field('Концентрация (млн/мл) >=16', concentration, setConcentration, '16')}</div>
+                        </div>
+                        <div style={s.row}>
+                          <div>{field('Общее кол-во (млн) >=39', totalCount, setTotalCount, '39')}</div>
+                          <div>{field('PR подвижность (%) >=30', pr, setPr, '30')}</div>
+                        </div>
+                        <div style={s.row}>
+                          <div>{field('NP подвижность (%)', np, setNp, '10')}</div>
+                          <div>{field('Неподвижные (%)', immotile, setImmotile, '0')}</div>
+                        </div>
+                        <div style={s.row}>
+                          <div>{field('Морфология (%) >=4', morphology, setMorphology, '4')}</div>
+                          <div>{field('Жизнеспособность (%) >=58', viability, setViability, '58')}</div>
+                        </div>
+                        <div style={s.row}>
+                          <div>{field('pH 7.2-8.0', ph, setPh, '7.4')}</div>
+                          <div>{field('Фруктоза (ммоль/л)', fructose, setFructose, '13')}</div>
+                        </div>
+                        <div style={s.row}>
+                          <div>{field('Цинк (ммоль/л)', zincMmol, setZincMmol, '2')}</div>
+                          <div>{field('MAR-тест (%) <50', mar, setMar, '0')}</div>
+                        </div>
+                        <div style={s.row}>
+                          <div>{field('Лейкоциты (млн/мл)', leukocytes, setLeukocytes, '0')}</div>
+                          <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
+                            <label style={{ fontSize:10 }}><input type='checkbox' style={s.check} checked={viscosity} onChange={e => setViscosity(e.target.checked)} /> Вязкость</label>
+                            <label style={{ fontSize:10 }}><input type='checkbox' style={s.check} checked={agglutination} onChange={e => setAgglutination(e.target.checked)} /> Агглютинация</label>
+                          </div>
+                        </div>
+                      </div>
+                      {renderChecklist('Спермограмма + MAR + DFI', 'Полная оценка сперматогенеза', FERT_SPERM, '#22c55e')}
+                    </div>
+                  )}
+                  {analysesSTab === 'structure' && (
+                    <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                      <div style={s.card}>
+                        <h4 style={{ margin:'0 0 8px', fontSize:14 }}>DFI и структурные факторы</h4>
+                        <div style={s.row}>
+                          <div>{field('DFI (%) <=15 норма', dfi, setDfi, '0')}</div>
+                          <div>
+                            <span style={s.label}>Варикоцеле</span>
+                            <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
+                              {VARICOCELE.map(v => <button key={v.id} style={varicocele === v.id ? s.btnActive : s.btn} onClick={() => setVaricocele(v.id)}>{v.label}</button>)}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                   {analysesSTab === 'during' && <FertTimeline />}
                   {analysesSTab === 'instrumental' && (
                     <div style={s.card}>
@@ -1138,7 +1221,7 @@ export const FertilityPCTScreen: React.FC<{ initialTab?: FertTab; restrictToMode
                           { name:'Спермограмма + MAR-тест', purpose:'Количество, подвижность, морфология, антиспермальные антитела' },
                           { name:'Фрагментация ДНК (SCD/Halosperm)', purpose:'Целостность хроматина, DFI < 15%' },
                           { name:'УЗИ простаты (трансректальное)', purpose:'Исключение инфекции/воспаления' },
-                          { name:'Гормональный профиль (кровь)', purpose:'ЛГ, ФСГ, ТТ, Е2, Пролактин, Ингибин В, АМГ' },
+                          { name:'Гормональный профиль (кровь)', purpose:'ЛГ, ФСГ, ТТ, ⣔, Пролактин, Ингибин В, АМГ' },
                         ].map((e, i) => (
                           <div key={i} style={{ padding:'5px 8px', borderRadius:6, background:'rgba(168,85,247,0.04)', border:'1px solid rgba(168,85,247,0.08)' }}>
                             <span style={{ fontSize:10, fontWeight:600, color:'var(--text-light)' }}>{e.name}</span>

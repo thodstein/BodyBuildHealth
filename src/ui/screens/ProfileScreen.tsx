@@ -7,7 +7,7 @@ import { computeLabIndices, interpretLabIndices } from '../../engines/labs-indic
 import { calculateIndices } from '../../engines/clinical-indices.engine';
 import { NAVY_BF_FORMULAS, MUSCLE_GROUPS_FULL, INJURY_LOCATIONS } from '../../core/constants';
 
-type ProfileTab = 'overview' | 'anthropometry' | 'sleep' | 'lifestyle' | 'diet' | 'nutrition_v7' | 'genetics' | 'injuries' | 'progress' | 'reports' | 'contacts' | 'bp_diary';
+type ProfileTab = 'overview' | 'anthropometry' | 'sleep' | 'lifestyle' | 'diet' | 'nutrition_v7' | 'genetics' | 'injuries' | 'progress' | 'reports' | 'contacts' | 'bp_diary' | 'measurements';
 type ProfilePage = 'hero' | 'tabs';
 
 const SPORT_TYPES = [
@@ -382,7 +382,7 @@ export const ProfileScreen: React.FC = () => {
     { id: 'sleep', label: 'Сон' }, { id: 'lifestyle', label: 'Образ жизни' },
     { id: 'diet', label: 'Питание' }, { id: 'injuries', label: 'Травмы' },
     { id: 'progress', label: 'Прогресс' }, { id: 'reports', label: 'Отчёты' },
-    { id: 'bp_diary', label: 'Давление' }, { id: 'contacts', label: 'Контакты' }
+    { id: 'bp_diary', label: 'Давление' }, { id: 'measurements', label: 'Замеры' }, { id: 'contacts', label: 'Контакты' }
   ];
 
   const initials = (profile.name || 'П').charAt(0).toUpperCase();
@@ -1336,8 +1336,9 @@ export const ProfileScreen: React.FC = () => {
           )}
 
           {/* ═══ REPORTS TAB ═══ */}
-          {tab === 'reports' && (() => {
-            const bmiVal = settings.weight && settings.height ? (settings.weight / Math.pow(settings.height / 100, 2)).toFixed(1) : '—';
+           {tab === 'reports' && (() => {
+             const [reportTab, setReportTab] = useState<'current' | 'archive'>('current');
+             const bmiVal = settings.weight && settings.height ? (settings.weight / Math.pow(settings.height / 100, 2)).toFixed(1) : '—';
             const lbmVal = settings.weight && settings.bodyFat ? (settings.weight * (1 - settings.bodyFat / 100)).toFixed(1) : '—';
             const ffmiVal = lbmVal !== '—' && settings.height ? (parseFloat(lbmVal) / Math.pow(settings.height / 100, 2) + 6.1 * (1.8 - settings.height / 100)).toFixed(1) : '—';
             const riskData = (() => { try { return JSON.parse(localStorage.getItem('he_last_risk') || 'null'); } catch { return null; } })();
@@ -1515,8 +1516,29 @@ export const ProfileScreen: React.FC = () => {
               }
             };
 
-            return (<div style={{ display:'flex', flexDirection:'column', gap:10 }}>
-              {[
+            return (
+              <div>
+                <div style={{ marginBottom:10 }}>
+                  <h3 style={{ margin:'0 0 4px', fontSize:15, fontWeight:800, color:'#fff' }}>📄 Отчёты</h3>
+                  <p style={{ fontSize:10, color:'rgba(255,255,255,0.7)', margin:'0 0 8px' }}>Текущие отчёты по всем блокам и архив</p>
+                  <div style={{ display:'flex', gap:4 }}>
+                    <button onClick={() => setReportTab('current')} style={{
+                      padding:'6px 14px', borderRadius:16, fontSize:10, fontWeight:700, cursor:'pointer',
+                      background: reportTab === 'current' ? 'var(--accent)' : 'rgba(255,255,255,0.06)',
+                      color: reportTab === 'current' ? '#000' : 'rgba(255,255,255,0.85)',
+                      border: 'none',
+                    }}>📋 Текущие</button>
+                    <button onClick={() => setReportTab('archive')} style={{
+                      padding:'6px 14px', borderRadius:16, fontSize:10, fontWeight:700, cursor:'pointer',
+                      background: reportTab === 'archive' ? 'var(--accent)' : 'rgba(255,255,255,0.06)',
+                      color: reportTab === 'archive' ? '#000' : 'rgba(255,255,255,0.85)',
+                      border: 'none',
+                    }}>📦 Архив</button>
+                  </div>
+                </div>
+                {reportTab === 'current' && (
+                  <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+                    {[
                 { title: 'Отчёт для тренера', text: trainerReport, color: '#3b82f6', icon: '🏋️' },
                 { title: 'Отчёт для врача', text: doctorReport, color: '#ef4444', icon: '🏥' },
                 { title: 'Общий отчёт', text: generalReport, color: '#00e68a', icon: '📋' },
@@ -1600,7 +1622,53 @@ export const ProfileScreen: React.FC = () => {
                   </div>
                 </div>
               ); } catch { return null; }})()}
-            </div>);
+                  </div>
+                )}
+                {reportTab === 'archive' && (() => {
+                  const allArchives: any[] = [];
+                  try {
+                    const labReports = JSON.parse(localStorage.getItem('he_lab_reports') || '[]');
+                    const riskReports = JSON.parse(localStorage.getItem('he_risk_reports') || '[]');
+                    const courseReports = JSON.parse(localStorage.getItem('he_course_reports') || '[]');
+                    const trainingReports = JSON.parse(localStorage.getItem('he_training_reports') || '[]');
+                    allArchives.push(...labReports.map((r:any) => ({ ...r, block:'Лаборатория' })));
+                    allArchives.push(...riskReports.map((r:any) => ({ ...r, block:'Риски' })));
+                    allArchives.push(...courseReports.map((r:any) => ({ ...r, block:'Курс' })));
+                    allArchives.push(...trainingReports.map((r:any) => ({ ...r, block:'Тренировки' })));
+                    allArchives.sort((a,b) => b.timestamp - a.timestamp);
+                  } catch {}
+                  return (
+                    <div>
+                      {allArchives.length > 0 ? (
+                        <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
+                          {allArchives.slice(0, 50).map((r: any, i: number) => (
+                            <div key={r.id || i} style={{ borderRadius:10, padding:10, background:'rgba(24,24,27,0.12)', border:'1px solid rgba(255,255,255,0.03)' }}>
+                              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                                <div>
+                                  <span style={{ fontSize:11, fontWeight:700, color:'#00e68a' }}>{r.block}</span>
+                                  <span style={{ fontSize:9, color:'rgba(255,255,255,0.5)', marginLeft:6 }}>от {r.date}</span>
+                                </div>
+                                <span style={{ fontSize:9, padding:'2px 8px', borderRadius:4, background:'rgba(0,230,138,0.1)', color:'#00e68a' }}>
+                                  {r.overallNet !== undefined ? `${Math.round(r.overallNet)}%` : r.compoundCount ? `${r.compoundCount} преп.` : r.totalMarkers ? `${r.totalMarkers} марк.` : '✓'}
+                                </span>
+                              </div>
+                              {r.overallRaw !== undefined && (
+                                <div style={{ fontSize:8, color:'rgba(255,255,255,0.5)', marginTop:2 }}>
+                                  raw: {Math.round(r.overallRaw)}% · net: {Math.round(r.overallNet)}% · систем: {r.systems?.length || 0}
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div style={{ textAlign:'center', padding:30, fontSize:11, color:'rgba(255,255,255,0.5)' }}>
+                          Нет архивных отчётов. Сгенерируйте отчёты в Лаборатории, Рисках, Курсе или Тренировках.
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+              </div>);
           })()}
 
           {/* ═══ BP/HR DIARY ═══ */}
@@ -1754,6 +1822,88 @@ export const ProfileScreen: React.FC = () => {
               })()}
             </div>
           )}
+
+          {/* ═══ MEASUREMENTS TAB ═══ */}
+          {tab === 'measurements' && (() => {
+            const [measLog, setMeasLog] = useState<any[]>(() => {
+              try { return JSON.parse(localStorage.getItem('he_measurements_log') || '[]'); } catch { return []; }
+            });
+            const [waist, setWaist] = useState('');
+            const [chest, setChest] = useState('');
+            const [bicep, setBicep] = useState('');
+            const [thigh, setThigh] = useState('');
+            const [hip, setHip] = useState('');
+            const [bodyFat, setBodyFat] = useState('');
+
+            const saveMeas = () => {
+              if (!waist && !chest && !bicep) return;
+              const entry = {
+                date: new Date().toISOString().split('T')[0],
+                waistCm: waist ? parseFloat(waist) : null,
+                chestCm: chest ? parseFloat(chest) : null,
+                bicepCm: bicep ? parseFloat(bicep) : null,
+                thighCm: thigh ? parseFloat(thigh) : null,
+                hipCm: hip ? parseFloat(hip) : null,
+                bodyFat: bodyFat ? parseFloat(bodyFat) : null,
+              };
+              const updated = [...measLog, entry];
+              setMeasLog(updated);
+              try { localStorage.setItem('he_measurements_log', JSON.stringify(updated)); } catch {}
+              setWaist(''); setChest(''); setBicep(''); setThigh(''); setHip(''); setBodyFat('');
+            };
+
+            return (
+              <div>
+                <div style={{ marginBottom:12 }}>
+                  <h3 style={{ margin:'0 0 4px', fontSize:15, fontWeight:800, color:'#fff' }}>📏 Дневник прогресса и замеров</h3>
+                  <p style={{ fontSize:10, color:'rgba(255,255,255,0.7)', margin:0 }}>Антропометрия, обхваты, композиция тела. Синхронизируется с тренировками.</p>
+                </div>
+
+                {/* Input form */}
+                <div style={{ borderRadius:12, padding:14, marginBottom:10, background:'rgba(24,24,27,0.15)', border:'1px solid rgba(255,255,255,0.04)' }}>
+                  <h4 style={{ margin:'0 0 8px', fontSize:11, fontWeight:700, color:'#00e68a' }}>Новый замер</h4>
+                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:6 }}>
+                    {[
+                      { label:'Талия, см', val:waist, set:setWaist },
+                      { label:'Грудь, см', val:chest, set:setChest },
+                      { label:'Бицепс, см', val:bicep, set:setBicep },
+                      { label:'Бедро, см', val:thigh, set:setThigh },
+                      { label:'Ягодицы, см', val:hip, set:setHip },
+                      { label:'Жир, %', val:bodyFat, set:setBodyFat },
+                    ].map((f,i) => (
+                      <div key={i} style={{ display:'flex', flexDirection:'column', gap:2 }}>
+                        <label style={{ fontSize:8, color:'rgba(255,255,255,0.5)' }}>{f.label}</label>
+                        <input type="number" value={f.val} onChange={e => f.set(e.target.value)} placeholder="—" style={{ padding:'8px 6px', borderRadius:8, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', fontSize:12, width:'100%', boxSizing:'border-box' }} />
+                      </div>
+                    ))}
+                  </div>
+                  <button onClick={saveMeas} style={{ marginTop:8, padding:'8px 16px', borderRadius:8, border:'none', background:'var(--accent)', color:'#000', fontWeight:700, fontSize:12, cursor:'pointer', width:'100%' }}>💾 Сохранить замер</button>
+                </div>
+
+                {measLog.length > 0 && (
+                  <div style={{ borderRadius:12, padding:14, background:'rgba(24,24,27,0.15)', border:'1px solid rgba(255,255,255,0.04)' }}>
+                    <h4 style={{ margin:'0 0 8px', fontSize:11, fontWeight:700, color:'#fff' }}>История замеров ({measLog.length})</h4>
+                    <div style={{ display:'flex', flexDirection:'column', gap:2 }}>
+                      {[...measLog].reverse().map((m: any, i: number) => (
+                        <div key={i} style={{ display:'flex', justifyContent:'space-between', padding:'4px 8px', borderRadius:4, background:i%2===0?'rgba(255,255,255,0.03)':'transparent', fontSize:9 }}>
+                          <span style={{ fontWeight:600 }}>{m.date}</span>
+                          <span style={{ color:'rgba(255,255,255,0.6)' }}>
+                            {m.waistCm ? `Тал:${m.waistCm} ` : ''}{m.chestCm ? `Гр:${m.chestCm} ` : ''}{m.bicepCm ? `Биц:${m.bicepCm} ` : ''}{m.thighCm ? `Бед:${m.thighCm} ` : ''}{m.hipCm ? `Яг:${m.hipCm} ` : ''}{m.bodyFat ? `Жир:${m.bodyFat}%` : ''}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {measLog.length === 0 && (
+                  <div style={{ textAlign:'center', padding:30, fontSize:11, color:'rgba(255,255,255,0.5)' }}>
+                    Нет записей замеров. Внесите первый замер для отслеживания прогресса.
+                  </div>
+                )}
+              </div>
+            );
+          })()}
 
           {/* ═══ CONTACTS TAB ═══ */}
           {tab === 'contacts' && (

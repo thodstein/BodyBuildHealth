@@ -63,14 +63,14 @@ const PHASE_HINTS: Record<string, string> = {
   deload: 'Разгрузка: снижаем объём и интенсивность, восстанавливаем суставы и нервную систему.',
 };
 
-type TrainingTab = 'plan' | 'runtime' | 'exercises' | 'calculators' | 'diary' | 'cycles' | 'history' | 'analytics' | 'methods' | 'visual' | 'programs' | 'timers' | 'progress' | 'mytraining' | 'programcalc';
+type TrainingTab = 'plan' | 'runtime' | 'exercises' | 'calculators' | 'diary' | 'cycles' | 'history' | 'analytics' | 'methods' | 'visual' | 'programs' | 'timers' | 'progress' | 'mytraining' | 'programcalc' | 'reports';
 type TrainingPage = 'hero' | 'tabs';
 type TrainingGroup = 'training' | 'planning' | 'info' | null;
 
 const TAB_GROUPS: Record<string, { title: string; icon: string; tabs: TrainingTab[]; color: string }> = {
   training: { title: '🏋️ Тренировки', icon: '🏋️', tabs: ['runtime', 'timers'], color: 'var(--accent)' },
   planning: { title: '📐 Планирование', icon: '📐', tabs: ['plan', 'cycles', 'programs', 'mytraining', 'methods', 'programcalc'], color: '#3b82f6' },
-  info: { title: '📊 Инфо', icon: '📊', tabs: ['analytics', 'visual', 'progress', 'calculators', 'exercises', 'diary', 'history'], color: '#8b5cf6' },
+  info: { title: '📊 Инфо', icon: '📊', tabs: ['analytics', 'visual', 'progress', 'calculators', 'exercises', 'diary', 'history', 'reports'], color: '#8b5cf6' },
 };
 
 const TAB_LABELS: Record<TrainingTab, string> = {
@@ -78,6 +78,7 @@ const TAB_LABELS: Record<TrainingTab, string> = {
   diary: '📝 Дневник', cycles: '🔄 Циклы', history: '📜 История', analytics: '📊 Аналитика',
   methods: '🧠 Методики', visual: '📈 Визуализация', programs: '📚 Программы', timers: '⏱ Таймеры',
   progress: '📏 Прогресс', mytraining: '⭐ Мои', programcalc: '🛠️ Ручной конструктор',
+  reports: '📄 Отчёты',
 };
 
 export const TrainingScreen: React.FC = () => {
@@ -111,6 +112,10 @@ export const TrainingScreen: React.FC = () => {
   const [lastAddedEx, setLastAddedEx] = useState<string | null>(null);
   const [trainingOutput, setTrainingOutput] = useState<TrainingOutput | null>(null);
   const [macrocycle, setMacrocycle] = useState<MacrocyclePlan | null>(null);
+  const [trainingReportGenerated, setTrainingReportGenerated] = useState(false);
+  const [trainingArchive, setTrainingArchive] = useState<any[]>(() => {
+    try { return JSON.parse(localStorage.getItem('he_training_reports') || '[]'); } catch { return []; }
+  });
   const [selectedWeek, setSelectedWeek] = useState(1);
   const [currentMicrocycle, setCurrentMicrocycle] = useState<Microcycle | null>(null);
   const [selectedProgram, setSelectedProgram] = useState<string | null>(null);
@@ -3121,6 +3126,87 @@ export const TrainingScreen: React.FC = () => {
       {tab === 'mytraining' && (
         <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
           <MyTrainingTab customExercises={customExercises} setCustomExercises={setCustomExercises} goal={goal} level={level} daysPerWeek={daysPerWeek} mesoLength={mesoLength} />
+        </div>
+      )}
+
+      {/* ═══════════ REPORTS TAB ═══════════ */}
+      {tab === 'reports' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div className="card" style={{ padding: '10px 12px' }}>
+            <h3 style={{ margin: '0 0 4px', fontSize: 13 }}>📄 Отчёты по тренировкам</h3>
+            <p style={{ margin: '0 0 8px', fontSize: 11, color: 'var(--text-dim)' }}>
+              Сгенерируйте комплексный отчёт по вашим тренировкам: информация из каталога упражнений, статистика плана (недели, упражнения в неделю), метрики тренировок (объём, интенсивность).
+            </p>
+
+            <button onClick={() => {
+              const planWeeks = macrocycle?.totalWeeks ?? (trainingOutput?.plan?.length ? Math.ceil(trainingOutput.plan.length / daysPerWeek) : 0);
+              const totalVolume = trainingOutput?.weeklyVolume ?? 0;
+              const avgIntensity = trainingOutput?.estimatedProgress ? Math.round(50 + trainingOutput.estimatedProgress * 5) : 0;
+              const report = {
+                id: 'report_' + Date.now(),
+                date: new Date().toISOString(),
+                exerciseCatalogCount: Object.keys(EXERCISE_CATALOG).length,
+                planWeeks,
+                exercisesPerWeek: daysPerWeek,
+                totalVolume,
+                avgIntensity,
+                goal, level, daysPerWeek, splitType, periodizationType, mesoLength,
+              };
+              const updated = [...trainingArchive, report];
+              setTrainingArchive(updated);
+              localStorage.setItem('he_training_reports', JSON.stringify(updated));
+              setTrainingReportGenerated(true);
+            }} style={{
+              padding: '8px 16px', borderRadius: 8, fontSize: 12, fontWeight: 600,
+              background: 'var(--accent)', color: '#000', border: 'none', cursor: 'pointer',
+            }}>Сгенерировать отчёт</button>
+
+            {trainingReportGenerated && (
+              <p style={{ margin: '6px 0 0', fontSize: 11, color: '#22c55e' }}>✓ Отчёт сгенерирован и сохранён в архиве</p>
+            )}
+          </div>
+
+          {/* Archive */}
+          <div className="card" style={{ padding: '10px 12px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+              <h4 style={{ margin: 0, fontSize: 12 }}>📦 Архив отчетов ({trainingArchive.length})</h4>
+              {trainingArchive.length > 0 && (
+                <button onClick={() => {
+                  setTrainingArchive([]);
+                  localStorage.removeItem('he_training_reports');
+                  setTrainingReportGenerated(false);
+                }} style={{
+                  padding: '4px 10px', borderRadius: 6, fontSize: 10, fontWeight: 600,
+                  background: 'rgba(239,68,68,0.2)', color: '#ef4444', border: 'none', cursor: 'pointer',
+                }}>Очистить архив</button>
+              )}
+            </div>
+            {trainingArchive.length === 0 ? (
+              <p style={{ margin: 0, fontSize: 11, color: 'var(--text-dim)' }}>Архив пуст. Сгенерируйте первый отчёт.</p>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                {[...trainingArchive].reverse().map((r: any) => (
+                  <div key={r.id} style={{
+                    padding: '8px 10px', borderRadius: 6,
+                    background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)',
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                      <span style={{ fontSize: 11, fontWeight: 600 }}>Отчёт {new Date(r.date).toLocaleDateString('ru')}</span>
+                      <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>{new Date(r.date).toLocaleTimeString('ru', { hour: '2-digit', minute: '2-digit' })}</span>
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2px 12px', fontSize: 10, color: 'var(--text-dim)' }}>
+                      <span>Упражнений в каталоге: {r.exerciseCatalogCount}</span>
+                      <span>Недель в плане: {r.planWeeks}</span>
+                      <span>Тренировок/нед: {r.exercisesPerWeek}</span>
+                      <span>Общий объём: {r.totalVolume}</span>
+                      <span>Ср. интенсивность: {r.avgIntensity}%</span>
+                      <span>Цель: {r.goal}, Уровень: {r.level}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>
