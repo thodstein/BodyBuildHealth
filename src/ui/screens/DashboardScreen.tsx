@@ -31,8 +31,8 @@ const NAV_BUTTONS: { id: ScreenId; icon: string; label: string }[] = [
 ];
 
 const s: Record<string, React.CSSProperties> = {
-  card: { background:'#202023', borderRadius:12, padding:14, border:'1px solid #27272a', marginBottom:10 },
-  label: { fontSize:9, color:'#a1a1aa', marginBottom:2, textTransform:'uppercase', letterSpacing:0.5 },
+  card: { borderRadius:12, padding:14, marginBottom:10 },
+  label: { fontSize:9, color:'rgba(255,255,255,0.6)', marginBottom:2, textTransform:'uppercase', letterSpacing:0.5 },
   value: { fontSize:18, fontWeight:700, color:'#fff' },
   row: { display:'flex', justifyContent:'space-between', alignItems:'center' },
   grid2: { display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 },
@@ -71,14 +71,14 @@ export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
   const nutrition = calcNutrition({ weightKg: weight, heightCm: height, age, sex: profile?.settings?.sex || 'male', pal, goal });
 
   return (
-    <div style={{ height:'100%', display:'flex', flexDirection:'column', background:'#18181b', overflow:'hidden' }}>
+    <div style={{ height:'100%', display:'flex', flexDirection:'column', overflow:'hidden' }}>
       <div style={{ padding:'16px 14px 8px' }}>
         <h2 style={{ margin:0, fontSize:20, color:'#fff' }}>🏠 Главная</h2>
-        <p style={{ margin:'2px 0 0', fontSize:11, color:'#a1a1aa' }}>Сводка по всем системам</p>
+        <p style={{ margin:'2px 0 0', fontSize:11, color:'rgba(255,255,255,0.7)' }}>Сводка по всем системам</p>
       </div>
 
       <div style={{ flex:1, overflow:'auto', padding:'0 14px 14px' }}>
-        <div style={s.card}>
+        <div style={{ ...s.card, background:'rgba(20,22,30,0.4)', backdropFilter:'blur(12px)', WebkitBackdropFilter:'blur(12px)', border:'1px solid var(--glass-border)' }}>
           <div style={s.label}>Профиль</div>
           <div style={s.value}>{profile?.name || 'Не заполнен'}</div>
           <div style={{ ...s.row, marginTop:6, gap:4 }}>
@@ -89,64 +89,65 @@ export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
         </div>
 
         {risk && (
-          <div style={s.card}>
+          <div style={{ ...s.card, background:'rgba(20,22,30,0.4)', backdropFilter:'blur(12px)', WebkitBackdropFilter:'blur(12px)', border:'1px solid var(--glass-border)' }}>
             <div style={s.label}>Общий риск</div>
             <div style={{ display:'flex', alignItems:'center', gap:10 }}>
               <span style={{ fontSize:32, fontWeight:800, color: risk.overallRaw > 60 ? '#ef4444' : risk.overallRaw > 30 ? '#eab308' : '#22c55e' }}>{Math.round(risk.overallRaw)}%</span>
               <div style={{ flex:1 }}>
-                <div style={{ height:6, borderRadius:3, background:'#27272a', overflow:'hidden' }}>
+                <div style={{ height:6, borderRadius:3, background:'rgba(255,255,255,0.1)', overflow:'hidden' }}>
                   <div style={{ height:'100%', width:`${risk.overallRaw}%`, borderRadius:3, background: risk.overallRaw > 60 ? '#ef4444' : risk.overallRaw > 30 ? '#eab308' : '#22c55e', transition:'width 0.4s' }} />
                 </div>
-                <div style={{ fontSize:9, color:'#a1a1aa', marginTop:3 }}>{risk.systemBreakdown ? Object.entries(risk.systemBreakdown).filter(([_,v]) => v.raw > 20).length : 0} систем с повышенным риском</div>
+                <div style={{ fontSize:9, color:'rgba(255,255,255,0.6)', marginTop:3 }}>{risk.systemBreakdown ? Object.entries(risk.systemBreakdown).filter(([_,v]) => v.raw > 20).length : 0} систем с повышенным риском</div>
               </div>
             </div>
           </div>
         )}
 
-        <div style={s.grid2}>
-          <div style={s.card}>
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+          <div style={{ ...s.card, background:'rgba(20,22,30,0.4)', backdropFilter:'blur(12px)', WebkitBackdropFilter:'blur(12px)', border:'1px solid var(--glass-border)' }}>
             <div style={s.label}>Тренировки</div>
             <div style={{ fontSize:13, fontWeight:600, color:'#fff' }}>{profile?.settings?.workoutsPerWeek || 0}×/нед</div>
-            <div style={{ fontSize:10, color:'#a1a1aa' }}>{profile?.settings?.avgWorkoutMinutes || 45} мин/тренировка</div>
+            <div style={{ fontSize:10, color:'rgba(255,255,255,0.6)' }}>{profile?.settings?.avgWorkoutMinutes || 45} мин/тренировка</div>
           </div>
-          <div style={s.card}>
+          <div style={{ ...s.card, background:'rgba(20,22,30,0.4)', backdropFilter:'blur(12px)', WebkitBackdropFilter:'blur(12px)', border:'1px solid var(--glass-border)' }}>
             <div style={s.label}>Курс</div>
             <div style={{ fontSize:13, fontWeight:600, color:'#fff' }}>{course?.length || 0} препаратов</div>
-            <div style={{ fontSize:10, color:'#a1a1aa' }}>{course?.length ? `Нед ${Math.min(...course.map(c=>c.startWeek))}-${Math.max(...course.map(c=>c.endWeek))}` : 'Нет активного курса'}</div>
+            <div style={{ fontSize:10, color:'rgba(255,255,255,0.6)' }}>{course?.length ? `Нед ${Math.min(...course.map(c=>c.startWeek))}-${Math.max(...course.map(c=>c.endWeek))}` : 'Нет активного курса'}</div>
           </div>
         </div>
 
         {nutrition && (
-          <div style={s.card}>
+          <div style={{ ...s.card, background:'rgba(20,22,30,0.4)', backdropFilter:'blur(12px)', WebkitBackdropFilter:'blur(12px)', border:'1px solid var(--glass-border)' }}>
             <div style={s.label}>Питание сегодня</div>
             <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:6, marginTop:6 }}>
               <div style={{ textAlign:'center' }}>
                 <div style={{ fontSize:16, fontWeight:700, color:'#00e68a' }}>{Math.round(dailyKcal)}</div>
-                <div style={{ fontSize:9, color:'#a1a1aa' }}>ккал / {Math.round(nutrition.kcal)}</div>
+                <div style={{ fontSize:9, color:'rgba(255,255,255,0.6)' }}>ккал / {Math.round(nutrition.kcal)}</div>
               </div>
               <div style={{ textAlign:'center' }}>
                 <div style={{ fontSize:16, fontWeight:700, color:'#3b82f6' }}>{Math.round(dailyProtein)}</div>
-                <div style={{ fontSize:9, color:'#a1a1aa' }}>белки / {Math.round(nutrition.protein)}г</div>
+                <div style={{ fontSize:9, color:'rgba(255,255,255,0.6)' }}>белки / {Math.round(nutrition.protein)}г</div>
               </div>
               <div style={{ textAlign:'center' }}>
                 <div style={{ fontSize:16, fontWeight:700, color:'#eab308' }}>{Math.round(dailyFat)}</div>
-                <div style={{ fontSize:9, color:'#a1a1aa' }}>жиры / {Math.round(nutrition.fats)}г</div>
+                <div style={{ fontSize:9, color:'rgba(255,255,255,0.6)' }}>жиры / {Math.round(nutrition.fats)}г</div>
               </div>
               <div style={{ textAlign:'center' }}>
                 <div style={{ fontSize:16, fontWeight:700, color:'#ef4444' }}>{Math.round(dailyCarbs)}</div>
-                <div style={{ fontSize:9, color:'#a1a1aa' }}>угли / {Math.round(nutrition.carbs)}г</div>
+                <div style={{ fontSize:9, color:'rgba(255,255,255,0.6)' }}>угли / {Math.round(nutrition.carbs)}г</div>
               </div>
             </div>
           </div>
         )}
 
-        <div style={{ ...s.card, background:'transparent', border:'none', padding:0 }}>
+        <div style={{ marginTop:0 }}>
           <div style={s.label}>Навигация</div>
           <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:6, marginTop:6 }}>
             {NAV_BUTTONS.map(btn => (
               <button key={btn.id} onClick={() => onNavigate?.(btn.id)} style={{
                 padding:'10px 4px', borderRadius:10, cursor:'pointer', textAlign:'center',
-                background:'#202023', border:'1px solid #27272a', transition:'all 0.15s',
+                background:'rgba(20,22,30,0.35)', border:'1px solid var(--glass-border)', transition:'all 0.15s',
+                backdropFilter:'blur(8px)', WebkitBackdropFilter:'blur(8px)',
               }}>
                 <div style={{ fontSize:18, marginBottom:2 }}>{btn.icon}</div>
                 <div style={{ fontSize:8, fontWeight:600, color:'#fff', lineHeight:1.2 }}>{btn.label}</div>

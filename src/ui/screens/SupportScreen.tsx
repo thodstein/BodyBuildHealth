@@ -937,7 +937,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   const [calcView, setCalcView] = useState<CalcView>('main');
   const [infoView, setInfoView] = useState<InfoView>('main');
   const [section, setSection] = useState<'home'|'generator'|'hormonal'|'info'>('home');
-  const [genTab, setGenTab] = useState<'calculator'|'stackgen'|'mystacks'|'plan'|'reports'>('calculator');
+  const [genTab, setGenTab] = useState<'calculator'|'stackgen'|'mystacks'|'plan'|'reports'|'info'>('calculator');
   const [hormonalTab, setHormonalTab] = useState<'pct'|'fertility'|'hrt'>('pct');
   const [infoTab, setInfoTab] = useState<'peptides'|'catalog'|'synergies'|'readystacks'|'interactions'|'research'|'mixcalc'|'neuro'|'joints'|'acne'>('catalog');
   const [searchQuery, setSearchQuery] = useState('');
@@ -2512,10 +2512,11 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
             <button onClick={goHome} style={{ padding:'3px 10px', borderRadius:6, fontSize:10, cursor:'pointer', background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600, whiteSpace:'nowrap' }}>← На главную</button>
           </div>
           <div style={{ display:'flex', gap:4, padding:'6px 12px 8px', overflowX:'auto', scrollbarWidth:'none' }}>
-            {[['calculator','Калькулятор'],['stackgen','Генератор стеков'],['mystacks','Мои стеки'],['plan','План'],['reports','Отчёты']].map(([id,label]) => (
+            {[['calculator','Калькулятор'],['info','О подборе'],['stackgen','Генератор стеков'],['mystacks','Мои стеки'],['plan','План'],['reports','Отчёты']].map(([id,label]) => (
               <button key={id} onClick={() => { setGenTab(id as any); 
               const a: Record<string,()=>void> = {
                 calculator: ()=>{ setTab('calculator'); setSupportView('calc'); },
+                info: ()=>{},
                 stackgen: ()=>{ setTab('main'); setSupportView('calc'); setCalcView('stackcalc'); },
                 mystacks: ()=>{ setTab('main'); setSupportView('calc'); setCalcView('mystacks'); },
                 plan: ()=>{ setTab('main'); setSupportView('calc'); setCalcView('plan'); },
@@ -3618,6 +3619,142 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
               ))}
 
 
+
+          </div>
+        </div>
+      )}
+
+      {/* ===== INFO: КАК РАБОТАЕТ ПОДБОР ПОДДЕРЖКИ ===== */}
+      {genTab === 'info' && section === 'generator' && (
+        <div style={{ padding:'0 12px 80px', maxWidth:600, margin:'0 auto' }}>
+          <h2 style={{ fontSize:16, fontWeight:800, color:'#fff', margin:'0 0 16px', display:'flex', alignItems:'center', gap:6 }}>
+            <span>📖</span> Как работает подбор поддержки
+          </h2>
+
+          <div style={{ display:'flex', flexDirection:'column', gap:10, fontSize:10, color:'rgba(255,255,255,0.85)', lineHeight:1.6 }}>
+
+            <div style={{ borderRadius:12, padding:14, background:'rgba(20,22,30,0.4)', backdropFilter:'blur(12px)', border:'1px solid var(--glass-border)' }}>
+              <h3 style={{ margin:'0 0 6px', fontSize:12, fontWeight:700, color:'#00e68a' }}>1. Оценка рисков от курса</h3>
+              <p style={{ margin:0 }}>
+                Первый шаг — анализ всех активных соединений вашего курса. Каждое вещество в базе PHARMA_DB содержит PK/PD-профиль с показателями гепатотоксичности, андрогенности, ароматизации, кардиотоксичности и т.д. Система суммирует риски по 8 системам организма:
+              </p>
+              <ul style={{ paddingLeft:16, margin:'4px 0' }}>
+                <li><b>❤️ Сердце:</b> кардиотоксичность соединений + влияние на липидный профиль + АД</li>
+                <li><b>🧪 Печень:</b> 17-алкилированные оральные стероиды — основной фактор. Внутривенная нагрузка метаболитами</li>
+                <li><b>🫘 Почки:</b> нагрузка на нефроны, влияние на РААС, гипертензия</li>
+                <li><b>🧠 Нейро:</b> нейротоксичность (особенно тренболон, нандролон), дофаминовая регуляция</li>
+                <li><b>🔄 Эндокринная:</b> подавление ГГЯ-оси, влияние на кортизол, Т3/Т4</li>
+                <li><b>🩸 Кровь:</b> гематокрит, эритроцитоз, тромбоцитарный фактор</li>
+                <li><b>⚧ Репродуктивная:</b> супрессия ЛГ/ФСГ, снижение ингибина B, атрофия Лейдига-клеток</li>
+                <li><b>🦴 Опорно-двиг.:</b> влияние на коллаген, сухожилия, суставы, костную плотность</li>
+              </ul>
+            </div>
+
+            <div style={{ borderRadius:12, padding:14, background:'rgba(20,22,30,0.4)', backdropFilter:'blur(12px)', border:'1px solid var(--glass-border)' }}>
+              <h3 style={{ margin:'0 0 6px', fontSize:12, fontWeight:700, color:'#00e68a' }}>2. Анализ лабораторных данных</h3>
+              <p style={{ margin:0 }}>
+                Если у вас есть загруженные анализы крови, система автоматически сверяет ваши показатели с референсными значениями:
+              </p>
+              <ul style={{ paddingLeft:16, margin:'4px 0' }}>
+                <li>Печень: АСТ, АЛТ, ГГТ, общий билирубин</li>
+                <li>Сердце: ЛПНП, ЛПВП, триглицериды, гомоцистеин</li>
+                <li>Почки: креатинин, мочевина, СКФ, цистатин C</li>
+                <li>Кровь: гематокрит, гемоглобин, эритроциты</li>
+                <li>Гормоны: ТТГ, Т3, кортизол, ЛГ, ФСГ, тестостерон</li>
+              </ul>
+              <p style={{ margin:'4px 0 0' }}>Каждое отклонение увеличивает риск соответствующей системы.</p>
+            </div>
+
+            <div style={{ borderRadius:12, padding:14, background:'rgba(20,22,30,0.4)', backdropFilter:'blur(12px)', border:'1px solid var(--glass-border)' }}>
+              <h3 style={{ margin:'0 0 6px', fontSize:12, fontWeight:700, color:'#00e68a' }}>3. Выбор уровня поддержки</h3>
+              <p style={{ margin:0 }}>
+                На основе суммарного риска выбирается уровень поддержки:
+              </p>
+              <ul style={{ paddingLeft:16, margin:'4px 0' }}>
+                <li><b>🟢 Базовый (lvl 1, 0–20%):</b> минимальная профилактика. Omega-3, Витамин D3+K2, Магний, Цинк, CoQ10</li>
+                <li><b>🟡 Средний (lvl 2, 20–45%):</b> расширенная поддержка. Добавляются: NAC, TUDCA, пальметто, ашваганда, В-комплекс</li>
+                <li><b>🟠 Повышенный (lvl 3, 45–70%):</b> усиленная поддержка. Полный набор: берберин, астаксантин, АЛК, ALCAR</li>
+                <li><b>🔴 Интенсивный (lvl 4, 70%+):</b> максимальная поддержка. Все доступные механизмы, нейропротекция, гепатопротекция</li>
+              </ul>
+              <p style={{ margin:'4px 0 0' }}>Вы также можете вручную указать желаемый уровень — он будет использован как целевой при генерации стека.</p>
+            </div>
+
+            <div style={{ borderRadius:12, padding:14, background:'rgba(20,22,30,0.4)', backdropFilter:'blur(12px)', border:'1px solid var(--glass-border)' }}>
+              <h3 style={{ margin:'0 0 6px', fontSize:12, fontWeight:700, color:'#00e68a' }}>4. Подбор веществ по механизмам</h3>
+              <p style={{ margin:0 }}>
+                Каждое вещество в базе ALL_SUBSTANCES имеет один или несколько механизмов действия (из 553+ возможных). Для каждой системы подбираются вещества, которые:
+              </p>
+              <ol style={{ paddingLeft:16, margin:'4px 0' }} type="a">
+                <li><b>Покрывают проблемные механизмы</b> — например, при высоком гематокрите добавляются вещества с механизмами крови (Ω-3, наттокиназа)</li>
+                <li><b>Синергируют друг с другом</b> — комбинации с подтверждённой эффективностью (D3+K2, Mg+B6, C+железо)</li>
+                <li><b>Не конфликтуют</b> — система проверяет все пары на наличие известных взаимодействий</li>
+              </ol>
+              <p style={{ margin:'4px 0 0' }}>Подбор учитывает до 6 механизмов на вещество и до 5 синергий на пару.</p>
+            </div>
+
+            <div style={{ borderRadius:12, padding:14, background:'rgba(20,22,30,0.4)', backdropFilter:'blur(12px)', border:'1px solid var(--glass-border)' }}>
+              <h3 style={{ margin:'0 0 6px', fontSize:12, fontWeight:700, color:'#00e68a' }}>5. Дозирование и режим приёма</h3>
+              <p style={{ margin:0 }}>
+                Для каждого вещества определена стандартная дозировка (мг/день) и рекомендуемое время приёма:
+              </p>
+              <ul style={{ paddingLeft:16, margin:'4px 0' }}>
+                <li><b>Утром</b> — энергия, жирорастворимые витамины, дофаминергические</li>
+                <li><b>С едой</b> — жирорастворимые (D3, K2, CoQ10, куркумин), гепатопротекторы</li>
+                <li><b>На ночь</b> — магний, ZMA, адаптогены, сонные</li>
+                <li><b>До тренировки</b> — NO-бустеры, креатин, бета-аланин</li>
+                <li><b>После тренировки</b> — протеин, ALCAR, HMB</li>
+              </ul>
+              <p style={{ margin:'4px 0 0' }}>Длительность курса поддержки обычно совпадает с курсом ААС + 2–4 недели после для восстановления.</p>
+            </div>
+
+            <div style={{ borderRadius:12, padding:14, background:'rgba(20,22,30,0.4)', backdropFilter:'blur(12px)', border:'1px solid var(--glass-border)' }}>
+              <h3 style={{ margin:'0 0 6px', fontSize:12, fontWeight:700, color:'#00e68a' }}>6. Генерация стека</h3>
+              <p style={{ margin:0 }}>
+                Алгоритм генератора стеков работает в 4 этапа:
+              </p>
+              <ol style={{ paddingLeft:16, margin:'4px 0' }}>
+                <li><b>Фильтрация:</b> отбираются вещества, соответствующие вашей цели (печень, сердце, нейро, общая поддержка)</li>
+                <li><b>Ранжирование:</b> каждое вещество получает оценку по 3 критериям: покрытие механизмов (40%), уровень доказательности (35%), безопасность (25%)</li>
+                <li><b>Оптимизация:</b> из топ-50 выбирается оптимальная комбинация 5–10 веществ с максимальным покрытием и минимальными конфликтами</li>
+                <li><b>Валидация:</b> проверка всех пар на синергии и конфликты из базы ALL_INTERACTIONS (206 записей)</li>
+              </ol>
+            </div>
+
+            <div style={{ borderRadius:12, padding:14, background:'rgba(20,22,30,0.4)', backdropFilter:'blur(12px)', border:'1px solid var(--glass-border)' }}>
+              <h3 style={{ margin:'0 0 6px', fontSize:12, fontWeight:700, color:'#00e68a' }}>7. Проверка взаимодействий</h3>
+              <p style={{ margin:0 }}>
+                Финальная проверка на взаимодействия между всеми веществами курса и поддержки. База ALL_INTERACTIONS содержит 206 записей:
+              </p>
+              <ul style={{ paddingLeft:16, margin:'4px 0' }}>
+                <li><b>🟢 Синергии (положительные):</b> пары, усиливающие действие друг друга. Например, D3+K2 → кальциевый транспорт, Mg+B6 → GABA</li>
+                <li><b>🔴 Конфликты (отрицательные):</b> пары, снижающие эффективность. Например, кальций+железо → конкуренция за всасывание</li>
+                <li><b>🟡 Осторожность:</b> пары, требующие временного разнесения или контроля. Например, цинк+медь → антагонизм при высоких дозах</li>
+              </ul>
+              <p style={{ margin:'4px 0 0' }}>Взаимодействия проверяются как внутри класса (Поддержка—Поддержка), так и между классами (Фарма—Поддержка).</p>
+            </div>
+
+            <div style={{ borderRadius:12, padding:14, background:'rgba(20,22,30,0.4)', backdropFilter:'blur(12px)', border:'1px solid var(--glass-border)' }}>
+              <h3 style={{ margin:'0 0 6px', fontSize:12, fontWeight:700, color:'#00e68a' }}>8. Формирование недельного плана</h3>
+              <p style={{ margin:0 }}>
+                Готовый стек раскладывается в недельный план с указанием:
+              </p>
+              <ul style={{ paddingLeft:16, margin:'4px 0' }}>
+                <li>Конкретной дозировки (мг/мкг/МЕ)</li>
+                <li>Времени приёма (утро/день/вечер/ночь, до/после еды, до/после тренировки)</li>
+                <li>Дней недели (ежедневно/через день/2 раза в неделю)</li>
+                <li>Продолжительности приёма (недели цикла)</li>
+              </ul>
+              <p style={{ margin:'4px 0 0' }}>План можно сохранить в избранное, экспортировать или добавить всё в корзину магазина.</p>
+            </div>
+
+            <div style={{ borderRadius:12, padding:14, background:'rgba(20,22,30,0.4)', backdropFilter:'blur(12px)', border:'1px solid var(--glass-border)' }}>
+              <h3 style={{ margin:'0 0 6px', fontSize:12, fontWeight:700, color:'#f59e0b' }}>⚠️ Важные замечания</h3>
+              <div style={{ margin:0 }}>
+                <p style={{ margin:'0 0 4px' }}><b>Информация носит ознакомительный характер.</b> Подбор поддержки должен производиться врачом или профильным специалистом с учётом индивидуальных особенностей: возраста, веса, генетических полиморфизмов (MTHFR, COMT, CYP), сопутствующих заболеваний и принимаемых лекарств.</p>
+                <p style={{ margin:'0 0 4px' }}><b>Без лабораторных данных</b> система использует среднестатистические риски по курсу. Для точного подбора необходимы свежие анализы (не старше 3 месяцев).</p>
+                <p style={{ margin:0 }}><b>Противопоказания:</b> некоторые вещества несовместимы с определёнными заболеваниями или лекарствами. Если вы принимаете варфарин, антидепрессанты, антипсихотики, антигипертензивные — проконсультируйтесь со специалистом.</p>
+              </div>
+            </div>
 
           </div>
         </div>

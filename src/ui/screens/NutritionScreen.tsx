@@ -1047,7 +1047,7 @@ export const NutritionScreen: React.FC = () => {
             <p style={{ fontSize:11, color:'rgba(255,255,255,0.85)', margin:'2px 0 0', textShadow:'0 1px 6px rgba(0,0,0,0.8)' }}>Рекомендации и составление рациона под указанные параметры</p>
           </div>
         </div>
-        <div style={{ padding:'8px 12px 12px', background:'#18181b', borderTop:'1px solid rgba(255,255,255,0.06)' }}>
+        <div style={{ padding:'8px 12px 12px', background:'rgba(20,22,30,0.35)', backdropFilter:'blur(14px)', WebkitBackdropFilter:'blur(14px)', borderTop:'1px solid var(--glass-border)' }}>
           <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
               {[
                 { section: 'diary' as NutritionSection, tab: 'diary' as ActiveTab, icon: '📋', title: 'Дневник и аналитика', desc: 'Дневник, графики, отчёты', color: '#22c55e' },
@@ -1055,8 +1055,8 @@ export const NutritionScreen: React.FC = () => {
               ].map(card => (
               <button key={card.tab} onClick={() => { setPage('tabs'); setNutritionSection(card.section); setTab(card.tab); }} style={{
                 display:'flex', alignItems:'center', gap:12, padding:'12px 14px', borderRadius:14, cursor:'pointer', textAlign:'left', width:'100%',
-                background:'#202023', border:'1px solid rgba(255,255,255,0.06)', color:'#fff',
-                transition:'all 0.2s',
+                background:'rgba(20,22,30,0.4)', border:'1px solid var(--glass-border)', color:'var(--text)',
+                transition:'all 0.2s', backdropFilter:'blur(12px)', WebkitBackdropFilter:'blur(12px)',
               }}>
                 <div style={{ width:40, height:40, borderRadius:12, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, background: card.color + '20', fontSize:20 }}>{card.icon}</div>
                 <div style={{ flex:1 }}>
