@@ -57,7 +57,7 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
   const foodSearchResults = useMemo(() => {
     if (!foodSearch.trim()) return [];
     const q = foodSearch.toLowerCase();
-    return FOOD_DB.filter(f => f.name.toLowerCase().includes(q)).slice(0, 10);
+    return FOOD_DB.filter(f => (f.name||'').toLowerCase().includes(q)).slice(0, 10);
   }, [foodSearch]);
 
   const addFoodFromDB = (food: typeof FOOD_DB[number]) => {

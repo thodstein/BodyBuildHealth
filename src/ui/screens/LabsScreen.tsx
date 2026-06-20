@@ -124,9 +124,10 @@ const MAIN_LAB_TABS: { id: MainLabTab; label: string; icon: string }[] = [
   { id: 'lab', label: 'Анализы', icon: '🔬' },
   { id: 'investigations', label: 'Обследования', icon: '🩺' },
   { id: 'risks', label: 'Риски и индексы', icon: '⚠️' },
+  { id: 'reports', label: 'Отчёты', icon: '📄' },
 ];
 
-type MainLabTab = 'hero' | 'lab' | 'investigations' | 'risks';
+type MainLabTab = 'hero' | 'lab' | 'investigations' | 'risks' | 'reports';
 
 const LAB_SUB_TABS: { id: LabSubTab; label: string; icon: string }[] = [
   { id: 'current', label: 'Текущие', icon: '🔬' },
@@ -172,6 +173,10 @@ export const LabsScreen: React.FC = () => {
     pharma: true, indices: true, systems: true, markers: true,
   });
   const [addError, setAddError] = useState('');
+  const [labReportGenerated, setLabReportGenerated] = useState(false);
+  const [labArchive, setLabArchive] = useState<any[]>(() => {
+    try { return JSON.parse(localStorage.getItem('he_lab_reports') || '[]'); } catch { return []; }
+  });
 
   const uid = () => { try { return crypto.randomUUID?.() || `${Date.now()}_${Math.random().toString(36).slice(2)}`; } catch { return `${Date.now()}_${Math.random().toString(36).slice(2)}`; } };
 
@@ -1361,6 +1366,129 @@ export const LabsScreen: React.FC = () => {
 
       </div>
       )}
+
+      {/* ≡≡≡ LAB REPORTS TAB ≡≡≡ */}
+      {mainTab === 'reports' && (() => {
+        const saveArchive = (report: any) => {
+          const updated = [report, ...labArchive].slice(0, 20);
+          setLabArchive(updated);
+          try { localStorage.setItem('he_lab_reports', JSON.stringify(updated)); } catch {}
+        };
+
+        const generateLabReport = () => {
+          const labsData = labs || [];
+          const report = {
+            id: Date.now().toString(),
+            date: new Date().toISOString().slice(0, 10),
+            generatedAt: new Date().toISOString(),
+            labs: labsData.map((l: LabPoint) => ({
+              code: l.code, name: l.name || l.code, value: l.value, unit: l.unit,
+              ref: UCUM_MAP[l.code] ? `${UCUM_MAP[l.code].lln}–${UCUM_MAP[l.code].uln}` : '—',
+              system: Object.entries(LAB_SYSTEM_GROUPS).find(([_,codes]) => codes.includes(l.code))?.[0] || 'other',
+              date: l.date,
+            })),
+            deviations: labRisks?.markerDeviations || [],
+            phase: selectedPhase,
+            totalMarkers: labs.length,
+            abnormalCount: deviationCount,
+            timestamp: Date.now(),
+          };
+          saveArchive(report);
+          setLabReportGenerated(true);
+        };
+
+        return (
+          <div style={{ padding:'0 12px 80px' }}>
+            <h3 style={{ fontSize:15, fontWeight:800, color:'#fff', margin:'0 0 4px' }}>📄 Отчёты по лаборатории</h3>
+            <p style={{ fontSize:10, color:'rgba(255,255,255,0.7)', margin:'0 0 12px' }}>Полный отчёт по анализам, отклонениям и динамике</p>
+
+            <div style={{ display:'flex', gap:6, marginBottom:12 }}>
+              <button onClick={generateLabReport} style={{
+                padding:'8px 16px', borderRadius:10, cursor:'pointer', fontWeight:700, fontSize:12,
+                background:'var(--accent)', color:'#000', border:'none', flex:1,
+              }}>📄 Сгенерировать отчёт</button>
+              <button onClick={() => { try { localStorage.removeItem('he_lab_reports'); setLabArchive([]); setLabReportGenerated(false); } catch {} }}
+                style={{ padding:'8px 12px', borderRadius:10, cursor:'pointer', fontWeight:600, fontSize:11,
+                  background:'rgba(239,68,68,0.1)', color:'#ef4444', border:'1px solid rgba(239,68,68,0.2)' }}>
+                🗑 Очистить архив
+              </button>
+            </div>
+
+            {/* Current report */}
+            {labReportGenerated && (
+              <div style={{ borderRadius:12, padding:14, marginBottom:10, background:'rgba(24,24,27,0.15)', border:'1px solid rgba(255,255,255,0.04)' }}>
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
+                  <h4 style={{ margin:0, fontSize:12, fontWeight:700, color:'#00e68a' }}>✅ Отчёт сгенерирован</h4>
+                  <span style={{ fontSize:9, color:'rgba(255,255,255,0.5)' }}>{new Date().toLocaleString()}</span>
+                </div>
+                <div style={{ fontSize:10, color:'rgba(255,255,255,0.85)', lineHeight:1.5 }}>
+                  <b>Фаза:</b> {PHASE_LABELS[selectedPhase] || selectedPhase}<br/>
+                  <b>Всего маркеров:</b> {labs.length} (из них с отклонениями: {deviationCount})<br/>
+                  <b>Систем:</b> {labRisks ? Object.keys(labRisks.systemBreakdown||{}).length : 0} с риском<br/>
+                </div>
+                {/* Detailed table */}
+                <div style={{ marginTop:8, display:'flex', flexDirection:'column', gap:2 }}>
+                  {labs.map((l: LabPoint,i: number) => {
+                    const info = UCUM_MAP[l.code];
+                    const dev = labRisks?.markerDeviations?.find(d => d.code === l.code);
+                    return (
+                      <div key={i} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'4px 8px', borderRadius:6, background:i%2===0?'rgba(255,255,255,0.03)':'transparent', fontSize:9 }}>
+                        <span style={{ flex:1, fontWeight:600 }}>{l.name || l.code}</span>
+                        <span style={{ color:'rgba(255,255,255,0.5)', marginRight:8 }}>{info ? `${info.lln}–${info.uln}` : '—'}</span>
+                        <span style={{ fontWeight:700, color: dev ? '#ef4444' : '#22c55e' }}>{l.value} {l.unit}</span>
+                        {dev && <span style={{ color:'#ef4444', marginLeft:4, fontSize:8 }}>{dev.deviation > 0 ? '↑' : '↓'}{Math.abs(dev.deviation)}%</span>}
+                        <span style={{ fontSize:8, color:'rgba(255,255,255,0.4)', marginLeft:6 }}>{l.date}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+                <div style={{ fontSize:9, color:'rgba(255,255,255,0.6)', textAlign:'center', marginTop:8 }}>
+                  Отчёт автоматически сохранён в архив. Доступен в Профиле → Отчёты.
+                </div>
+              </div>
+            )}
+
+            {/* Archive */}
+            {labArchive.length > 0 && (
+              <div>
+                <h4 style={{ fontSize:12, fontWeight:700, color:'#fff', margin:'0 0 8px' }}>
+                  📦 Архив отчётов ({labArchive.length})
+                </h4>
+                <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
+                  {labArchive.map((r: any) => (
+                    <div key={r.id} style={{
+                      borderRadius:10, padding:10, background:'rgba(24,24,27,0.12)', border:'1px solid rgba(255,255,255,0.03)',
+                    }}>
+                      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:4 }}>
+                        <span style={{ fontSize:11, fontWeight:700, color:'#00e68a' }}>Отчёт от {r.date}</span>
+                        <span style={{ fontSize:9, color:'rgba(255,255,255,0.5)' }}>{r.totalMarkers} маркеров, {r.abnormalCount} откл.</span>
+                      </div>
+                      <div style={{ display:'flex', gap:2, flexWrap:'wrap' }}>
+                        {(r.deviations || []).slice(0, 5).map((d: any, di: number) => (
+                          <span key={di} style={{ fontSize:8, padding:'1px 6px', borderRadius:3, background:'rgba(239,68,68,0.08)', color:'#ef4444' }}>
+                            {d.name} {d.deviation > 0 ? '↑' : '↓'}{Math.abs(d.deviation)}%
+                          </span>
+                        ))}
+                        {r.deviations?.length > 5 && (
+                          <span style={{ fontSize:8, padding:'1px 6px', color:'rgba(255,255,255,0.4)' }}>
+                            +{r.deviations.length - 5} ещё
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {!labReportGenerated && labArchive.length === 0 && (
+              <div style={{ textAlign:'center', padding:40, fontSize:11, color:'rgba(255,255,255,0.5)' }}>
+                Нажмите «Сгенерировать отчёт» для создания полного отчёта по анализам
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {/* OCR Import Modal — centered */}
       {showImport && (

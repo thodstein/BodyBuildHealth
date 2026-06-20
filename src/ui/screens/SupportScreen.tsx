@@ -4720,8 +4720,8 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
                 return { id:c.substanceId, name:ph?.name||c.substanceId, cls:ph?.class||'other', dose:c.doseValue, freq:c.frequency, start:c.startWeek, end:c.endWeek };
               });
 
-              // Support plan from SUPPORT_LEVELS + current level
-              const levelSubIds = SUPPORT_LEVELS[supportLevel]?.subs || [];
+              // Support plan from effectiveLevel (with phase adjustments)
+              const levelSubIds = effectiveLevel?.subs || SUPPORT_LEVELS[supportLevel]?.subs || [];
               const planItems = levelSubIds.map((id:string) => {
                 const sub = ALL_SUBSTANCES.find((s:any) => s.id === id);
                 const dos = DEFAULT_DOSAGES[id] || { mg:500, timing:'с едой' };

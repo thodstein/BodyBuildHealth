@@ -30,7 +30,7 @@ export const SubstancesScreen: React.FC = () => {
 
   const filteredSubstances = filteredClasses.flatMap(cls =>
     (SUBSTANCES_BY_CLASS[cls] ?? [])
-      .filter(s => !search || s.name.toLowerCase().includes(search.toLowerCase()) || s.id.toLowerCase().includes(search.toLowerCase()))
+      .filter(s => !search || (s.name||'').toLowerCase().includes(search.toLowerCase()) || (s.id||'').toLowerCase().includes(search.toLowerCase()))
   );
 
   const toggleExpand = (id: string) => setExpandedId(prev => prev === id ? null : id);

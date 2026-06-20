@@ -290,7 +290,7 @@ const CatalogTab: React.FC = () => {
   const filtered = React.useMemo(() => {
     return FOOD_DB.filter(f => {
       if (catFilter !== 'all' && f.category !== catFilter) return false;
-      if (catSearch && !f.name.toLowerCase().includes(catSearch.toLowerCase())) return false;
+      if (catSearch && !(f.name||'').toLowerCase().includes(catSearch.toLowerCase())) return false;
       return true;
     });
   }, [catFilter, catSearch]);
@@ -413,7 +413,7 @@ const RestaurantTab: React.FC = () => {
   const restaurantDishes = useMemo(() => FOOD_DB.filter(f => f.category === 'fast_food'), []);
   const filtered = useMemo(() => {
     let list = g === 'all' ? restaurantDishes : restaurantDishes.filter(f => detectCuisine(f.name) === g);
-    if (search.trim()) { const q = search.toLowerCase(); list = list.filter(f => f.name.toLowerCase().includes(q)); }
+    if (search.trim()) { const q = search.toLowerCase(); list = list.filter(f => (f.name||'').toLowerCase().includes(q)); }
     return list;
   }, [g, search, restaurantDishes]);
   const totals = useMemo(() => ({

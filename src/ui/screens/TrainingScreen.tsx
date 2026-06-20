@@ -266,7 +266,7 @@ export const TrainingScreen: React.FC = () => {
     let list = EXERCISE_CATALOG;
     if (exSearch) {
       const q = exSearch.toLowerCase();
-      list = list.filter(e => e.name.toLowerCase().includes(q) || e.id.toLowerCase().includes(q) || (e.targetMuscle || '').toLowerCase().includes(q));
+      list = list.filter(e => (e.name||'').toLowerCase().includes(q) || (e.id||'').toLowerCase().includes(q) || (e.targetMuscle || '').toLowerCase().includes(q));
     }
     if (exGroup !== 'all') list = list.filter(e => e.group === exGroup);
     if (exType !== 'all') list = list.filter(e => e.type === exType);
