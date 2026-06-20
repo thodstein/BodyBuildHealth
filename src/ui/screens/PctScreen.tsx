@@ -98,6 +98,15 @@ export const PctScreen: React.FC<Props> = ({ onBack }) => {
                 <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 4 }}>
                   {p.timing} | Нед {p.startWeek}-{p.endWeek}
                 </div>
+                <div style={{ display: 'flex', gap: 4, marginTop: 6 }}>
+                  <button onClick={() => {
+                    const doseNum = parseFloat(p.dose) || 0;
+                    db.put('course_log', { id:crypto.randomUUID(), substanceId:p.substanceId, doseValue:doseNum, doseUnit:'mg', frequency:'2x/wk', startWeek:p.startWeek, endWeek:p.endWeek }).catch(()=>{});
+                  }} style={{ flex:1, padding:'4px 8px', borderRadius:6, border:'none', cursor:'pointer', fontSize:9, fontWeight:600, background:'rgba(0,230,138,0.12)', color:'#00e68a' }}>+ В план</button>
+                  <button onClick={() => {
+                    try { const e=JSON.parse(localStorage.getItem('supportCart')||'[]'); if(!e.some((x:any)=>x.id===p.substanceId)) localStorage.setItem('supportCart', JSON.stringify([...e,{id:p.substanceId,name:PHARMA_DB[p.substanceId]?.name||p.substanceId,dose:p.dose,timing:'daily'}])); } catch{}
+                  }} style={{ flex:1, padding:'4px 8px', borderRadius:6, border:'none', cursor:'pointer', fontSize:9, fontWeight:600, background:'rgba(245,158,11,0.12)', color:'#f59e0b' }}>🛒 В корзину</button>
+                </div>
               </div>
             ))}
           </div>

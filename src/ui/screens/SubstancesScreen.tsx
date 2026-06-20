@@ -1,5 +1,6 @@
 ﻿import React, { useState } from 'react';
 import { PHARMA_DB, SUBSTANCES_BY_CLASS } from '../../core/pharma-database';
+import { db } from '../../core/db';
 
 const CLASS_LABELS: Record<string, string> = {
   testosterone: 'Тестостерон', trenbolone: 'Тренболон', nandrolone: 'Нандролон',
@@ -117,6 +118,21 @@ export const SubstancesScreen: React.FC = () => {
 
                   <div style={{ marginTop: 8, fontSize: 11, color: 'var(--text-dim)' }}>
                     EC50: {s.ec50} · Хилл: {s.n_hill} · Макс. эффект: {(s.maxEffect * 100).toFixed(0)}%
+                  </div>
+                  <div style={{ display: 'flex', gap: 4, marginTop: 8 }}>
+                    <button onClick={() => {
+                      const dr = s.dosageRange; const val = dr ? Math.round((dr.min+dr.max)/2) : 250; const unit = dr?.unit||'mg/wk';
+                      db.put('course_log', { id:crypto.randomUUID(), substanceId:s.id, doseValue:val, doseUnit:unit, frequency:dr?.frequency||'2x/wk', startWeek:1, endWeek:12 }).catch(()=>{});
+                    }} style={{
+                      flex:1, padding:'6px 10px', borderRadius:6, border:'none', cursor:'pointer',
+                      fontSize:10, fontWeight:600, background:'rgba(0,230,138,0.12)', color:'#00e68a',
+                    }}>+ В план</button>
+                    <button onClick={() => {
+                      try { const e=JSON.parse(localStorage.getItem('supportCart')||'[]'); if(!e.some((x:any)=>x.id===s.id)) localStorage.setItem('supportCart', JSON.stringify([...e,{id:s.id,name:s.name,dose:'—',timing:'daily'}])); } catch{}
+                    }} style={{
+                      flex:1, padding:'6px 10px', borderRadius:6, border:'none', cursor:'pointer',
+                      fontSize:10, fontWeight:600, background:'rgba(245,158,11,0.12)', color:'#f59e0b',
+                    }}>🛒 В корзину</button>
                   </div>
                 </div>
               )}

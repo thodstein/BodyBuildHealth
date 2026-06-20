@@ -1,5 +1,6 @@
 ﻿import React, { useState } from 'react';
 import { PHARMA_DB } from '../../core/pharma-database';
+import { db } from '../../core/db';
 import { calculateDose } from '../../engines/dosage.engine';
 
 const PEPTIDE_CLASSES = ['peptide_ghrh', 'peptide_ghrp', 'igf1', 'mgf'] as const;
@@ -130,13 +131,22 @@ export const PeptidesScreen: React.FC = () => {
               <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 8, color: 'var(--accent)' }}>{CLASS_LABELS[cls]}</div>
               <div style={{ display: 'grid', gap: 8 }}>
                 {items.map(p => (
-                  <div key={p.id} style={{ background: 'var(--bg-secondary)', borderRadius: 10, padding: 12, cursor: 'pointer' }} onClick={() => setSelected(p.id)}>
+                  <div key={p.id} style={{ background: 'var(--bg-secondary)', borderRadius: 10, padding: 12 }} onClick={() => setSelected(p.id)}>
                     <div style={{ fontWeight: 600, fontSize: 13 }}>{p.name}</div>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, fontSize: 11, color: 'var(--text-dim)', marginTop: 4 }}>
                       <div>T½: {p.pk.halfLifeHours} ч</div>
                       <div>Биодоступность: {(p.pk.bioavailability * 100).toFixed(0)}%</div>
                       <div>Гепатотоксичность: {p.pd.hepatotoxicity}</div>
                       <div>Влияние на липиды: {p.pd.lipid_impact}</div>
+                    </div>
+                    <div style={{ display: 'flex', gap: 3, marginTop: 6 }} onClick={e => e.stopPropagation()}>
+                      <button onClick={() => {
+                        const dr = p.dosageRange; const val = dr ? Math.round((dr.min+dr.max)/2) : 100; const unit = dr?.unit||'mcg';
+                        db.put('course_log', { id:crypto.randomUUID(), substanceId:p.id, doseValue:val, doseUnit:unit, frequency:dr?.frequency||'daily', startWeek:1, endWeek:8 }).catch(()=>{});
+                      }} style={{ flex:1, padding:'3px 8px', borderRadius:4, border:'none', cursor:'pointer', fontSize:8, fontWeight:600, background:'rgba(0,230,138,0.12)', color:'#00e68a' }}>+ В план</button>
+                      <button onClick={() => {
+                        try { const e=JSON.parse(localStorage.getItem('supportCart')||'[]'); if(!e.some((x:any)=>x.id===p.id)) localStorage.setItem('supportCart', JSON.stringify([...e,{id:p.id,name:p.name,dose:p.dosageRange?`${p.dosageRange.min} ${p.dosageRange.unit}`:'—',timing:'daily'}])); } catch{}
+                      }} style={{ flex:1, padding:'3px 8px', borderRadius:4, border:'none', cursor:'pointer', fontSize:8, fontWeight:600, background:'rgba(245,158,11,0.12)', color:'#f59e0b' }}>🛒 В корзину</button>
                     </div>
                   </div>
                 ))}

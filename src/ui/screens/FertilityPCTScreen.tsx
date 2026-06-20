@@ -1,4 +1,4 @@
-﻿import React, { useState, useMemo, useEffect } from 'react';
+﻿import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { calcFertility } from '../../engines/fertility.engine';
 import type { FertilityInput, FertilityResult, LabPoint, CourseEntry } from '../../core/types';
 import { FERTILITY_TARGET, FERTILITY_TAU_WEEKS } from '../../core/constants';
@@ -7,16 +7,41 @@ import { getProfile } from '../../core/profile-manager';
 import { generatePCTPlan } from '../../engines/pct-planner.engine';
 import { PHARMA_DB } from '../../core/pharma-database';
 
-type FertTab = 'overview' | 'semen' | 'hormones' | 'structure' | 'pct-plan' | 'hrt' | 'analyses' | 'brain';
+type FertTab = 'overview' | 'semen' | 'hormones' | 'structure' | 'pct-plan' | 'hrt' | 'analyses';
+type AnalysesSubTab = 'before' | 'during' | 'after' | 'spermogram' | 'instrumental';
+
+const addToPlan = async (substanceId: string, doseValue: number, doseUnit: string, freq: string, startWeek: number, endWeek: number) => {
+  try {
+    await db.put('course_log', {
+      id: crypto.randomUUID(),
+      substanceId,
+      doseValue,
+      doseUnit,
+      frequency: freq,
+      startWeek,
+      endWeek,
+    });
+    return true;
+  } catch { return false; }
+};
+
+const addToCart = (id: string, name: string, dose: string) => {
+  try {
+    const existing = JSON.parse(localStorage.getItem('supportCart') || '[]');
+    if (existing.some((x: any) => x.id === id)) return false;
+    localStorage.setItem('supportCart', JSON.stringify([...existing, { id, name, dose, timing: 'daily' }]));
+    return true;
+  } catch { return false; }
+};
 
 const s: Record<string, React.CSSProperties> = {
-  card: { background: 'var(--bg-secondary)', borderRadius: 12, padding: 16, marginBottom: 12 },
+  card: { background: 'var(--glass-bg)', borderRadius: 14, padding: 16, marginBottom: 12, border: '1px solid var(--glass-border)', backdropFilter: 'blur(12px)' },
   row: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 8 },
-  label: { fontSize: 11, opacity: 0.7, marginBottom: 2 },
-  input: { width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg-primary)', color: 'inherit', fontSize: 14, boxSizing: 'border-box' as const },
+  label: { fontSize: 10, fontWeight: 600, opacity: 0.6, marginBottom: 3, letterSpacing: '0.3px' },
+  input: { width: '100%', padding: '10px 12px', borderRadius: 10, border: '1px solid var(--border)', background: 'var(--bg-primary)', color: 'inherit', fontSize: 14, boxSizing: 'border-box' as const, outline: 'none', transition: 'border 0.2s' },
   btn: { padding: '6px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg-primary)', color: 'inherit', fontSize: 12, cursor: 'pointer' },
   btnActive: { padding: '6px 12px', borderRadius: 8, border: '1px solid #00e68a', background: 'rgba(0,230,138,0.15)', color: '#00e68a', fontSize: 12, cursor: 'pointer' },
-  barTrack: { height: 10, borderRadius: 5, background: 'var(--border)', overflow: 'hidden', margin: '4px 0' },
+  barTrack: { height: 8, borderRadius: 4, background: 'var(--border)', overflow: 'hidden', margin: '4px 0' },
   check: { width: 18, height: 18, accentColor: '#00e68a' },
 };
 
@@ -29,22 +54,23 @@ export const FertilityPCTScreen: React.FC<{ initialTab?: FertTab; restrictToMode
   const [tab, setTab] = useState<FertTab>(initialTab || 'overview');
   useEffect(() => { setTab(initialTab || 'overview'); }, [initialTab]);
 
+  const [analysesSTab, setAnalysesSTab] = useState<AnalysesSubTab>('before');
+
   // Filter tabs based on mode
   const fertTabsAll: { id: FertTab; label: string }[] = [
     { id: 'overview', label: '📋 Обзор' },
     { id: 'semen', label: 'Спермограмма' },
     { id: 'hormones', label: 'Гормоны' },
     { id: 'structure', label: 'DFI/Структура' },
-    { id: 'pct-plan', label: 'ПКТ план' },
-    { id: 'hrt', label: '⚕️ ГЗТ' },
+    { id: 'pct-plan', label: 'ПКТ базовый протокол' },
+    { id: 'hrt', label: '⚕️ Ориентировочные протоколы ГЗТ' },
     { id: 'analyses', label: '🧪 Анализы' },
-    { id: 'brain', label: '🧠 Гайд' }
   ];
   const fertTabs = fertTabsAll.filter(t => {
     if (!restrictToMode) return true;
-    if (restrictToMode === 'pct') return ['pct-plan', 'analyses', 'brain'].includes(t.id);
-    if (restrictToMode === 'hrt') return ['hrt', 'analyses', 'brain'].includes(t.id);
-    if (restrictToMode === 'fertility') return ['overview', 'semen', 'hormones', 'structure', 'analyses', 'brain'].includes(t.id);
+    if (restrictToMode === 'pct') return ['pct-plan', 'analyses'].includes(t.id);
+    if (restrictToMode === 'hrt') return ['hrt', 'analyses'].includes(t.id);
+    if (restrictToMode === 'fertility') return ['overview', 'semen', 'hormones', 'structure', 'analyses'].includes(t.id);
     return true;
   });
 
@@ -659,7 +685,7 @@ export const FertilityPCTScreen: React.FC<{ initialTab?: FertTab; restrictToMode
           ) : (
             <>
               <div style={s.card}>
-                <h4 style={{ margin: '0 0 8px', fontSize: 14 }}>План ПКТ</h4>
+                <h4 style={{ margin: '0 0 8px', fontSize: 14 }}>Базовый План, подлежит корректировке</h4>
                 <div style={{ fontSize: 12, marginBottom: 6 }}>
                   Начало: <b>неделя {pctPlan.pctStartWeek}</b>
                 </div>
@@ -672,7 +698,8 @@ export const FertilityPCTScreen: React.FC<{ initialTab?: FertTab; restrictToMode
                 )}
                 {pctPlan.pctProtocol.map((p: any, i: number) => (
                   <div key={i} style={{
-                    background: 'var(--bg-secondary)', borderRadius: 8, padding: '10px 12px', marginBottom: 6,
+                    background: 'var(--glass-bg)', borderRadius: 10, padding: '12px 14px', marginBottom: 6,
+                    border: `1px solid ${CLASS_COLORS[p.class] || '#666'}44`,
                     borderLeft: `3px solid ${CLASS_COLORS[p.class] || '#666'}`,
                   }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 4 }}>
@@ -684,6 +711,16 @@ export const FertilityPCTScreen: React.FC<{ initialTab?: FertTab; restrictToMode
                     </div>
                     <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 4 }}>
                       {p.timing || `${p.frequency}`} | Нед {p.startWeek}-{p.endWeek}
+                    </div>
+                    <div style={{ display: 'flex', gap: 4, marginTop: 6 }}>
+                      <button onClick={() => addToPlan(p.substanceId, p.doseValue, p.doseUnit, p.frequency || '2x/wk', p.startWeek, p.endWeek)} style={{
+                        flex: 1, padding: '5px 8px', borderRadius: 6, border: 'none', cursor: 'pointer', fontSize: 9, fontWeight: 600,
+                        background: 'rgba(0,230,138,0.12)', color: '#00e68a',
+                      }}>+ В план</button>
+                      <button onClick={() => addToCart(p.substanceId, PHARMA_DB[p.substanceId]?.name || p.substanceId, `${p.doseValue}${p.doseUnit}`)} style={{
+                        flex: 1, padding: '5px 8px', borderRadius: 6, border: 'none', cursor: 'pointer', fontSize: 9, fontWeight: 600,
+                        background: 'rgba(245,158,11,0.12)', color: '#f59e0b',
+                      }}>🛒 В корзину</button>
                     </div>
                   </div>
                 ))}
@@ -719,16 +756,16 @@ export const FertilityPCTScreen: React.FC<{ initialTab?: FertTab; restrictToMode
           <div style={{ ...s.card, borderLeft:'3px solid #8b5cf6' }}>
             <h4 style={{ margin:'0 0 8px', fontSize:13, color:'#8b5cf6' }}>⚕️ Гормонозаместительная терапия</h4>
             <p style={{ fontSize:10, color:'var(--text-dim)', margin:'0 0 10px', lineHeight:1.4 }}>
-              Научно обоснованные протоколы ТЗТ/ГЗТ, мониторинг и адъювантная терапия.
+              Ориентировочные протоколы ТЗТ/ГЗТ, которые подлежат корректировке под конкретную ситуацию.
             </p>
 
             <h5 style={{ margin:'0 0 6px', fontSize:11, color:'#22c55e' }}>💉 Протоколы ТЗТ (тестостерон-заместительная терапия)</h5>
             <div style={{ display:'flex', flexDirection:'column', gap:5, marginBottom:10 }}>
               {[
-                { name:'Тестостерон энантат/ципионат', dose:'100-200 мг/нед', freq:'Инъекция 1 раз/нед', note:'Базовый протокол, стабильный уровень' },
-                { name:'Тестостерон ундеканоат (Nebido)', dose:'1000 мг', freq:'Каждые 10-14 недель', note:'Длительное действие, редкие инъекции' },
-                { name:'Тестостерон гель', dose:'50-100 мг/день', freq:'Ежедневно на кожу', note:'Физиологичные уровни, меньше колебаний' },
-                { name:'ХГЧ (hCG)', dose:'250-500 МЕ', freq:'2-3 раза/нед', note:'Сохранение фертильности, стимуляция Лейдигов' },
+                { id:'testosterone_e', name:'Тестостерон энантат/ципионат', dose:'100-200 мг/нед', freq:'Инъекция 1 раз/нед', note:'Базовый протокол, стабильный уровень' },
+                { id:'testosterone_u', name:'Тестостерон ундеканоат (Nebido)', dose:'1000 мг', freq:'Каждые 10-14 недель', note:'Длительное действие, редкие инъекции' },
+                { id:'testosterone_g', name:'Тестостерон гель', dose:'50-100 мг/день', freq:'Ежедневно на кожу', note:'Физиологичные уровни, меньше колебаний' },
+                { id:'hcg', name:'ХГЧ (hCG)', dose:'250-500 МЕ', freq:'2-3 раза/нед', note:'Сохранение фертильности, стимуляция Лейдигов' },
               ].map((r, i) => (
                 <div key={i} style={{ padding:'8px 10px', borderRadius:8, background:'rgba(0,230,138,0.04)', border:'1px solid rgba(0,230,138,0.1)' }}>
                   <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', gap:4 }}>
@@ -739,6 +776,10 @@ export const FertilityPCTScreen: React.FC<{ initialTab?: FertTab; restrictToMode
                     <span style={{ fontSize:8, color:'var(--text-dim)' }}>{r.freq}</span>
                     <span style={{ fontSize:8, color:'rgba(0,230,138,0.7)', fontStyle:'italic' }}>{r.note}</span>
                   </div>
+                  <div style={{ display:'flex', gap:3, marginTop:4 }}>
+                    <button onClick={() => addToPlan(r.id, parseInt(r.dose) || 100, 'mg/wk', '1x/wk', 1, 12)} style={{ padding:'3px 8px', borderRadius:4, border:'none', cursor:'pointer', fontSize:8, fontWeight:600, background:'rgba(0,230,138,0.12)', color:'#00e68a' }}>+ В план</button>
+                    <button onClick={() => addToCart(r.id, r.name, r.dose)} style={{ padding:'3px 8px', borderRadius:4, border:'none', cursor:'pointer', fontSize:8, fontWeight:600, background:'rgba(245,158,11,0.12)', color:'#f59e0b' }}>🛒 В корзину</button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -746,9 +787,9 @@ export const FertilityPCTScreen: React.FC<{ initialTab?: FertTab; restrictToMode
             <h5 style={{ margin:'0 0 6px', fontSize:11, color:'#f59e0b' }}>💊 Адъювантная терапия</h5>
             <div style={{ display:'flex', flexDirection:'column', gap:5, marginBottom:10 }}>
               {[
-                { name:'Анастрозол', dose:'0.25-0.5 мг 2×/нед', note:'Только при E2 > 50 пг/мл + симптомы' },
-                { name:'ХГЧ (hCG)', dose:'250-500 МЕ 2×/нед', note:'При желании сохранить фертильность' },
-                { name:'Донаторы NO (цитруллин)', dose:'3-6 г/день', note:'Поддержка эндотелиальной функции' },
+                { id:'anastrozole', name:'Анастрозол', dose:'0.25-0.5 мг 2×/нед', note:'Только при E2 > 50 пг/мл + симптомы' },
+                { id:'hcg', name:'ХГЧ (hCG)', dose:'250-500 МЕ 2×/нед', note:'При желании сохранить фертильность' },
+                { id:'l_citrulline', name:'Донаторы NO (цитруллин)', dose:'3-6 г/день', note:'Поддержка эндотелиальной функции' },
               ].map((r, i) => (
                 <div key={i} style={{ padding:'6px 8px', borderRadius:6, background:'rgba(245,158,11,0.06)', border:'1px solid rgba(245,158,11,0.1)' }}>
                   <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', gap:4 }}>
@@ -756,6 +797,10 @@ export const FertilityPCTScreen: React.FC<{ initialTab?: FertTab; restrictToMode
                     <span style={{ fontSize:9, fontWeight:700, color:'#f59e0b' }}>{r.dose}</span>
                   </div>
                   <div style={{ fontSize:8, color:'var(--text-dim)', marginTop:1 }}>{r.note}</div>
+                  <div style={{ display:'flex', gap:3, marginTop:4 }}>
+                    <button onClick={() => addToPlan(r.id, parseInt(r.dose) || 0, 'mg', '2x/wk', 1, 4)} style={{ padding:'3px 8px', borderRadius:4, border:'none', cursor:'pointer', fontSize:8, fontWeight:600, background:'rgba(0,230,138,0.12)', color:'#00e68a' }}>+ В план</button>
+                    <button onClick={() => addToCart(r.id, r.name, r.dose)} style={{ padding:'3px 8px', borderRadius:4, border:'none', cursor:'pointer', fontSize:8, fontWeight:600, background:'rgba(245,158,11,0.12)', color:'#f59e0b' }}>🛒 В корзину</button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -804,6 +849,31 @@ export const FertilityPCTScreen: React.FC<{ initialTab?: FertTab; restrictToMode
 
       {tab === 'analyses' && (
         <div>
+          {/* Analyses sub-tabs */}
+          <div style={{ display:'flex', gap:4, marginBottom:8, overflowX:'auto', scrollbarWidth:'none' }}>
+            {(restrictToMode === 'pct' ? [
+              { id:'before' as AnalysesSubTab, label:'До ПКТ' },
+              { id:'during' as AnalysesSubTab, label:'Во время' },
+              { id:'after' as AnalysesSubTab, label:'После ПКТ' },
+              { id:'instrumental' as AnalysesSubTab, label:'Инструментальные' },
+            ] : restrictToMode === 'hrt' ? [
+              { id:'before' as AnalysesSubTab, label:'До старта' },
+              { id:'during' as AnalysesSubTab, label:'Контроль (6-8 нед)' },
+              { id:'after' as AnalysesSubTab, label:'Ежегодно' },
+              { id:'instrumental' as AnalysesSubTab, label:'Инструментальные' },
+            ] : [
+              { id:'before' as AnalysesSubTab, label:'Гормональные' },
+              { id:'spermogram' as AnalysesSubTab, label:'Спермограмма' },
+              { id:'during' as AnalysesSubTab, label:'Периоды сдачи' },
+              { id:'instrumental' as AnalysesSubTab, label:'Инструментальные' },
+            ]).map(st => (
+              <button key={st.id} onClick={() => setAnalysesSTab(st.id)} style={{
+                padding:'5px 10px', borderRadius:16, fontSize:9, cursor:'pointer', whiteSpace:'nowrap',
+                background: analysesSTab===st.id ? 'var(--accent-green)' : 'var(--bg-secondary)',
+                color: analysesSTab===st.id ? '#000' : 'var(--text-dim)', border:'none', fontWeight: analysesSTab===st.id ? 700 : 400,
+              }}>{st.label}</button>
+            ))}
+          </div>
           {(() => {
             const renderChecklist = (title: string, subtitle: string, items: {code:string;name:string;range:string}[], borderColor: string) => {
               const has = items.filter(i => allLabs[i.code]);
@@ -880,24 +950,51 @@ export const FertilityPCTScreen: React.FC<{ initialTab?: FertTab; restrictToMode
                 { name:'УЗИ простаты (трансректальное)', purpose:'Исключение простатита/аденомы' },
                 { name:'ЭКГ', purpose:'Скрининг нарушений ритма, гипертрофии ЛЖ' },
               ];
-              return (
-                <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-                  <div style={s.card}>
-                    <h4 style={{ margin:'0 0 6px', fontSize:12, color:'#f59e0b' }}>⏱ Периоды сдачи анализов ПКТ</h4>
-                    <div style={{ fontSize:10, color:'var(--text-dim)', lineHeight:1.5 }}>
-                      <b>До ПКТ (неделя -1–0):</b> за 7-14 дней до последней инъекции — полный чек-ап<br/>
-                      <b>На ПКТ (недели 1–8):</b> контроль гормонов каждые 2 недели (LH, FSH, TT, E2)<br/>
-                      <b>После ПКТ (недели 4–6 после завершения):</b> финальная проверка — все маркеры + спермограмма
-                    </div>
-                  </div>
-                  {renderChecklist('До ПКТ', 'Обязательный минимум перед стартом', PCT_BEFORE, '#f59e0b')}
-                  {renderChecklist('После ПКТ (4-6 нед)', 'Контроль восстановления', PCT_AFTER, '#22c55e')}
-                  <div style={{ ...s.card, borderLeft:'3px solid #a855f7' }}>
-                    <h4 style={{ margin:'0 0 6px', fontSize:12, color:'#a855f7' }}>🔬 Инструментальные исследования ПКТ</h4>
-                    {PCT_INSTR.map((e,i) => (
-                      <div key={i} style={{ padding:'4px 0', fontSize:10, color:'var(--text-dim)' }}><b>{e.name}</b> — {e.purpose}</div>
+              const PCTTimeline = () => (
+                <div style={s.card}>
+                  <h4 style={{ margin:'0 0 10px', fontSize:13, color:'#f59e0b', fontWeight:700 }}>⏱ Таймлайн анализов ПКТ</h4>
+                  <div style={{ position:'relative', paddingLeft:20 }}>
+                    <div style={{ position:'absolute', left:8, top:4, bottom:4, width:2, background:'linear-gradient(180deg, #f59e0b, #22c55e)', borderRadius:1 }} />
+                    {[
+                      { period:'За 7-14 дней до последней инъекции', label:'До ПКТ', color:'#f59e0b', items:'Полный гормональный профиль + CBC + биохимия + ПСА' },
+                      { period:'Недели 1-2', label:'Старт ПКТ', color:'#ec4899', items:'LH, FSH, TT — контроль базы' },
+                      { period:'Недели 3-4', label:'Первичный контроль', color:'#a855f7', items:'LH, FSH, TT, E2, PRL — каждые 2 нед' },
+                      { period:'Недели 5-8', label:'Коррекция', color:'#3b82f6', items:'LH, FSH, TT, E2, Hct, ALT — каждые 2 нед' },
+                      { period:'Через 4-6 нед после ПКТ', label:'Финальный контроль', color:'#22c55e', items:'Все маркеры + спермограмма + DFI + ингибин B' },
+                    ].map((item, i) => (
+                      <div key={i} style={{ position:'relative', marginBottom:10, paddingLeft:12, borderLeft:`2px solid ${item.color}` }}>
+                        <div style={{ position:'absolute', left:-17, top:2, width:10, height:10, borderRadius:'50%', background:item.color }} />
+                        <div style={{ fontSize:8, color:item.color, fontWeight:700, letterSpacing:'0.5px' }}>{item.label}</div>
+                        <div style={{ fontSize:9, fontWeight:600, color:'var(--text-light)' }}>{item.period}</div>
+                        <div style={{ fontSize:8, color:'var(--text-dim)', marginTop:1 }}>{item.items}</div>
+                      </div>
                     ))}
                   </div>
+                </div>
+              );
+              const PCT_DURING = [
+                { code:'LH', name:'LH (контроль каждые 2 нед)', range:'1.7-8.6 mIU/mL' },
+                { code:'FSH', name:'FSH (контроль каждые 2 нед)', range:'1.5-12.4 mIU/mL' },
+                { code:'TT', name:'Тестостерон общий', range:'300-1000 ng/dL' },
+                { code:'FT', name:'Тестостерон свободный', range:'5.0-21.0 pg/mL' },
+                { code:'E2', name:'Эстрадиол E2', range:'11-44 pg/mL' },
+                { code:'PRL', name:'Пролактин', range:'4.0-15.2 ng/mL' },
+                { code:'CBC', name:'Гематокрит (Hct)', range:'<50%' },
+                { code:'ALT', name:'АЛТ/AST (печень)', range:'<45/<40 U/L' },
+              ];
+              return (
+                <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                  {analysesSTab === 'before' && renderChecklist('До ПКТ', 'Обязательный минимум перед стартом', PCT_BEFORE, '#f59e0b')}
+                  {analysesSTab === 'during' && renderChecklist('Во время ПКТ', 'Контроль каждые 2 нед', PCT_DURING, '#a855f7')}
+                  {analysesSTab === 'after' && renderChecklist('После ПКТ (4-6 нед)', 'Контроль восстановления', PCT_AFTER, '#22c55e')}
+                  {analysesSTab === 'instrumental' && (
+                    <div style={{ ...s.card, borderLeft:'3px solid #a855f7' }}>
+                      <h4 style={{ margin:'0 0 6px', fontSize:12, color:'#a855f7' }}>🔬 Инструментальные исследования ПКТ</h4>
+                      {PCT_INSTR.map((e,i) => (
+                        <div key={i} style={{ padding:'4px 0', fontSize:10, color:'var(--text-dim)' }}><b>{e.name}</b> — {e.purpose}</div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               );
             }
@@ -941,26 +1038,40 @@ export const FertilityPCTScreen: React.FC<{ initialTab?: FertTab; restrictToMode
                 { name:'Эхокардиография', purpose:'Скрининг гипертрофии ЛЖ (базово, затем по показаниям)' },
                 { name:'УЗИ мошонки', purpose:'Исключение варикоцеле, оценка яичек (базово)' },
               ];
-              return (
-                <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-                  <div style={s.card}>
-                    <h4 style={{ margin:'0 0 6px', fontSize:12, color:'#8b5cf6' }}>⏱ Периоды сдачи анализов ГЗТ</h4>
-                    <div style={{ fontSize:10, color:'var(--text-dim)', lineHeight:1.5 }}>
-                      <b>Базово (до старта):</b> полный гормональный профиль + CBC + биохимия<br/>
-                      <b>Через 6-8 недель:</b> TT/FT/E2 на пике и надире, Hct<br/>
-                      <b>Каждые 3-6 месяцев:</b> TT, FT, E2, Hct, PSA, липиды<br/>
-                      <b>Ежегодно:</b> полный чек-ап + DEXA + УЗИ простаты
-                    </div>
-                  </div>
-                  {renderChecklist('Базовые анализы (до старта ГЗТ)', 'Исходный профиль', HRT_BASELINE, '#8b5cf6')}
-                  {renderChecklist('Контроль на терапии (6-8 нед)', 'Пик/надир + Hct', HRT_DURING, '#60a5fa')}
-                  {renderChecklist('Ежегодный мониторинг', 'Плато + скрининг', HRT_FOLLOWUP, '#22c55e')}
-                  <div style={{ ...s.card, borderLeft:'3px solid #a855f7' }}>
-                    <h4 style={{ margin:'0 0 6px', fontSize:12, color:'#a855f7' }}>🔬 Инструментальные исследования ГЗТ</h4>
-                    {HRT_INSTR.map((e,i) => (
-                      <div key={i} style={{ padding:'4px 0', fontSize:10, color:'var(--text-dim)' }}><b>{e.name}</b> — {e.purpose}</div>
+              const HRTTimeline = () => (
+                <div style={s.card}>
+                  <h4 style={{ margin:'0 0 10px', fontSize:13, color:'#8b5cf6', fontWeight:700 }}>⏱ Таймлайн анализов ГЗТ</h4>
+                  <div style={{ position:'relative', paddingLeft:20 }}>
+                    <div style={{ position:'absolute', left:8, top:4, bottom:4, width:2, background:'linear-gradient(180deg, #8b5cf6, #22c55e)', borderRadius:1 }} />
+                    {[
+                      { period:'До старта (за 1-2 нед)', label:'Базовый', color:'#8b5cf6', items:'TT, FT, SHBG, ЛГ, ФСГ, E2, PRL, ПСА, Hct, липиды, HOMA-IR, DEXA' },
+                      { period:'Через 6-8 нед', label:'Коррекция дозы', color:'#60a5fa', items:'TT/FT/E2 на пике и надире, Hct, ПСА' },
+                      { period:'Каждые 3-6 мес', label:'Плановый', color:'#06b6d4', items:'TT, FT, E2, Hct, ПСА, липиды, HOMA-IR' },
+                      { period:'Ежегодно', label:'Полный чек-ап', color:'#22c55e', items:'Гормоны + DEXA + УЗИ простаты + ЭхоКГ' },
+                    ].map((item, i) => (
+                      <div key={i} style={{ position:'relative', marginBottom:10, paddingLeft:12, borderLeft:`2px solid ${item.color}` }}>
+                        <div style={{ position:'absolute', left:-17, top:2, width:10, height:10, borderRadius:'50%', background:item.color }} />
+                        <div style={{ fontSize:8, color:item.color, fontWeight:700, letterSpacing:'0.5px' }}>{item.label}</div>
+                        <div style={{ fontSize:9, fontWeight:600, color:'var(--text-light)' }}>{item.period}</div>
+                        <div style={{ fontSize:8, color:'var(--text-dim)', marginTop:1 }}>{item.items}</div>
+                      </div>
                     ))}
                   </div>
+                </div>
+              );
+              return (
+                <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                  {analysesSTab === 'before' && renderChecklist('Базовые анализы (до старта ГЗТ)', 'Исходный профиль', HRT_BASELINE, '#8b5cf6')}
+                  {analysesSTab === 'during' && renderChecklist('Контроль на терапии (6-8 нед)', 'Пик/надир + Hct', HRT_DURING, '#60a5fa')}
+                  {analysesSTab === 'after' && renderChecklist('Ежегодный мониторинг', 'Плато + скрининг', HRT_FOLLOWUP, '#22c55e')}
+                  {analysesSTab === 'instrumental' && (
+                    <div style={{ ...s.card, borderLeft:'3px solid #a855f7' }}>
+                      <h4 style={{ margin:'0 0 6px', fontSize:12, color:'#a855f7' }}>🔬 Инструментальные исследования ГЗТ</h4>
+                      {HRT_INSTR.map((e,i) => (
+                        <div key={i} style={{ padding:'4px 0', fontSize:10, color:'var(--text-dim)' }}><b>{e.name}</b> — {e.purpose}</div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               );
             }
@@ -992,20 +1103,51 @@ export const FertilityPCTScreen: React.FC<{ initialTab?: FertTab; restrictToMode
                 { name:'Гормональный профиль', period:'базово + каждые 4-6 нед на фоне терапии', note:'LH, FSH, TT, FT, E2, PRL, SHBG' },
                 { name:'Спермограмма', period:'базово, затем через 3 и 6 мес восстановления', note:'Полный анализ + MAR + DFI' },
               ];
-              return (
-                <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-                  <div style={s.card}>
-                    <h4 style={{ margin:'0 0 6px', fontSize:12, color:'#3b82f6' }}>⏱ Периоды сдачи анализов фертильности</h4>
-                    {FERT_PERIODS.map((p,i) => (
-                      <div key={i} style={{ padding:'6px 8px', borderRadius:6, background:'rgba(59,130,246,0.04)', border:'1px solid rgba(59,130,246,0.08)', marginBottom:4 }}>
-                        <div style={{ fontSize:10, fontWeight:600, color:'var(--text-light)' }}>{p.name}</div>
-                        <div style={{ fontSize:9, color:'#60a5fa' }}>{p.period}</div>
-                        <div style={{ fontSize:8, color:'var(--text-dim)' }}>{p.note}</div>
+              const FertTimeline = () => (
+                <div style={s.card}>
+                  <h4 style={{ margin:'0 0 10px', fontSize:13, color:'#3b82f6', fontWeight:700 }}>⏱ Таймлайн анализов фертильности</h4>
+                  <div style={{ position:'relative', paddingLeft:20 }}>
+                    <div style={{ position:'absolute', left:8, top:4, bottom:4, width:2, background:'linear-gradient(180deg, #3b82f6, #22c55e)', borderRadius:1 }} />
+                    {[
+                      { period:'До старта терапии (базово)', label:'Базовые маркеры', color:'#3b82f6', items:'Ингибин B, АМГ, LH, FSH, TT, FT, E2, PRL, SHBG' },
+                      { period:'Каждые 4-6 нед на фоне терапии', label:'Контроль динамики', color:'#60a5fa', items:'LH, FSH, TT, FT, E2, PRL, SHBG' },
+                      { period:'Базово + через 3 и 6 мес', label:'Спермограмма', color:'#06b6d4', items:'Полный анализ + MAR-тест + DFI + жизнеспособность' },
+                      { period:'Каждые 3-6 мес восстановления', label:'Ингибин B + АМГ', color:'#22c55e', items:'Оценка сперматогенеза и овариального резерва' },
+                    ].map((item, i) => (
+                      <div key={i} style={{ position:'relative', marginBottom:10, paddingLeft:12, borderLeft:`2px solid ${item.color}` }}>
+                        <div style={{ position:'absolute', left:-17, top:2, width:10, height:10, borderRadius:'50%', background:item.color }} />
+                        <div style={{ fontSize:8, color:item.color, fontWeight:700, letterSpacing:'0.5px' }}>{item.label}</div>
+                        <div style={{ fontSize:9, fontWeight:600, color:'var(--text-light)' }}>{item.period}</div>
+                        <div style={{ fontSize:8, color:'var(--text-dim)', marginTop:1 }}>{item.items}</div>
                       </div>
                     ))}
                   </div>
-                  {renderChecklist('Гормональные маркеры фертильности', 'Базовые и контрольные', FERT_LABS, '#3b82f6')}
-                  {renderChecklist('Спермограмма + MAR + DFI', 'Полная оценка сперматогенеза', FERT_SPERM, '#22c55e')}
+                </div>
+              );
+              return (
+                <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                  {analysesSTab === 'before' && renderChecklist('Гормональные маркеры фертильности', 'Базовые и контрольные', FERT_LABS, '#3b82f6')}
+                  {analysesSTab === 'spermogram' && renderChecklist('Спермограмма + MAR + DFI', 'Полная оценка сперматогенеза', FERT_SPERM, '#22c55e')}
+                  {analysesSTab === 'during' && <FertTimeline />}
+                  {analysesSTab === 'instrumental' && (
+                    <div style={s.card}>
+                      <h4 style={{ margin:'0 0 6px', fontSize:12, color:'#a855f7' }}>🔬 Инструментальные исследования фертильности</h4>
+                      <div style={{ display:'flex', flexDirection:'column', gap:3 }}>
+                        {[
+                          { name:'УЗИ мошонки с допплером', purpose:'Кровоток яичек, варикоцеле, объём яичек' },
+                          { name:'Спермограмма + MAR-тест', purpose:'Количество, подвижность, морфология, антиспермальные антитела' },
+                          { name:'Фрагментация ДНК (SCD/Halosperm)', purpose:'Целостность хроматина, DFI < 15%' },
+                          { name:'УЗИ простаты (трансректальное)', purpose:'Исключение инфекции/воспаления' },
+                          { name:'Гормональный профиль (кровь)', purpose:'ЛГ, ФСГ, ТТ, Е2, Пролактин, Ингибин В, АМГ' },
+                        ].map((e, i) => (
+                          <div key={i} style={{ padding:'5px 8px', borderRadius:6, background:'rgba(168,85,247,0.04)', border:'1px solid rgba(168,85,247,0.08)' }}>
+                            <span style={{ fontSize:10, fontWeight:600, color:'var(--text-light)' }}>{e.name}</span>
+                            <span style={{ fontSize:9, color:'var(--text-dim)', marginLeft:4 }}>— {e.purpose}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               );
             }
@@ -1015,12 +1157,11 @@ export const FertilityPCTScreen: React.FC<{ initialTab?: FertTab; restrictToMode
         </div>
       )}
 
-      {tab === 'brain' && (
+      {/* === APPENDED GUIDE CONTENT: PCT === */}
+      {tab === 'pct-plan' && restrictToMode === 'pct' && (
         <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
-          {restrictToMode === 'pct' && (
-            <>
-              <div style={s.card}>
-                <h4 style={{ margin:'0 0 6px', fontSize:14, color:'#8b5cf6' }}>🔄 Полный протокол ПКТ и нейроэндокринной реабилитации</h4>
+          <div style={s.card}>
+            <h4 style={{ margin:'0 0 6px', fontSize:14, color:'#8b5cf6' }}>🔄 Ориентировочный протокол ПКТ и нейроэндокринной реабилитации</h4>
                 <p style={{ fontSize:11, color:'var(--text-dim)', lineHeight:1.5, margin:0 }}>
                   Послекурсовая терапия (ПКТ) направлена на восстановление гипоталамо-гипофизарно-тестикулярной оси (HPTA) после подавления экзогенными андрогенами. Мозг является главным регулятором фертильности — нейротоксичность ААС затрагивает глутаматную эксайтотоксичность, окислительный стресс, нейровоспаление, подавление нейрогенеза и нейростероидную недостаточность. Восстановление оси занимает 6-20+ недель в зависимости от стажа, соединений и возраста.
                 </p>
@@ -1061,11 +1202,28 @@ export const FertilityPCTScreen: React.FC<{ initialTab?: FertTab; restrictToMode
 
               <div style={s.card}>
                 <h4 style={{ margin:'0 0 6px', fontSize:12, color:'#3b82f6' }}>🧬 Нутрицевтическая поддержка ПКТ</h4>
-                <div style={{ display:'flex', flexDirection:'column', gap:3, fontSize:9, color:'var(--text-dim)', lineHeight:1.4 }}>
-                  <div>CoQ10 200-600 мг · L-карнитин 2-3 г · Цинк 30-50 мг + Медь 2 мг</div>
-                  <div>Селен 200 мкг · Витамин D3 4000-5000 МЕ · Омега-3 3-5 г</div>
-                  <div>NAC 1200 мг · TUDCA 500-1000 мг · Магний треонат 2 г</div>
-                  <div>Ашваганда 600 мг · Maca 3-5 г · Кордицепс 2-3 г</div>
+                <div style={{ display:'flex', flexDirection:'column', gap:4, fontSize:9, color:'var(--text-dim)', lineHeight:1.4 }}>
+                  {[
+                    { name:'CoQ10', dose:'200-600 мг' },
+                    { name:'L-карнитин', dose:'2-3 г' },
+                    { name:'Цинк + Медь', dose:'30-50 мг + 2 мг' },
+                    { name:'Селен', dose:'200 мкг' },
+                    { name:'Витамин D3', dose:'4000-5000 МЕ' },
+                    { name:'Омега-3', dose:'3-5 г' },
+                    { name:'NAC', dose:'1200 мг' },
+                    { name:'TUDCA', dose:'500-1000 мг' },
+                    { name:'Магний треонат', dose:'2 г' },
+                    { name:'Ашваганда', dose:'600 мг' },
+                    { name:'Maca', dose:'3-5 г' },
+                    { name:'Кордицепс', dose:'2-3 г' },
+                  ].map((item, i) => (
+                    <div key={i} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'3px 6px', borderRadius:4, background:i%2===0 ? 'rgba(0,0,0,0.03)' : 'transparent' }}>
+                      <span>{item.name} <span style={{ color:'#60a5fa' }}>{item.dose}</span></span>
+                      <div style={{ display:'flex', gap:3 }}>
+                        <button onClick={() => addToCart(`su_${item.name}`, item.name, item.dose)} style={{ padding:'2px 6px', borderRadius:4, border:'none', cursor:'pointer', fontSize:7, background:'rgba(245,158,11,0.12)', color:'#f59e0b' }}>🛒</button>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
 
@@ -1124,54 +1282,59 @@ export const FertilityPCTScreen: React.FC<{ initialTab?: FertTab; restrictToMode
               <div style={s.card}>
                 <h4 style={{ margin:'0 0 6px', fontSize:12, color:'#22c55e' }}>🥗 Подробная нутрицевтическая поддержка</h4>
                 <div style={{ display:'flex', flexDirection:'column', gap:3, fontSize:9, color:'var(--text-dim)', lineHeight:1.4 }}>
-                  <div style={{ display:'flex', justifyContent:'space-between', padding:'4px 6px', background:'rgba(34,197,94,0.05)', borderRadius:4 }}>
-                    <span>CoQ10 (убихинон)</span><span style={{ fontWeight:600, color:'#22c55e' }}>200-400 мг/день</span>
-                  </div>
-                  <div style={{ display:'flex', justifyContent:'space-between', padding:'4px 6px', borderRadius:4 }}>
-                    <span>L-карнитин + ALCAR</span><span style={{ fontWeight:600, color:'#22c55e' }}>2-3 г/день</span>
-                  </div>
-                  <div style={{ display:'flex', justifyContent:'space-between', padding:'4px 6px', background:'rgba(34,197,94,0.05)', borderRadius:4 }}>
-                    <span>Цинк (пиколинат/цитрат)</span><span style={{ fontWeight:600, color:'#f59e0b' }}>30-50 мг/день + Медь 2 мг</span>
-                  </div>
-                  <div style={{ display:'flex', justifyContent:'space-between', padding:'4px 6px', borderRadius:4 }}>
-                    <span>Селен (L-селенометионин)</span><span style={{ fontWeight:600, color:'#22c55e' }}>200 мкг/день</span>
-                  </div>
-                  <div style={{ display:'flex', justifyContent:'space-between', padding:'4px 6px', background:'rgba(34,197,94,0.05)', borderRadius:4 }}>
-                    <span>Витамин D3</span><span style={{ fontWeight:600, color:'#22c55e' }}>3000-5000 МЕ/день</span>
-                  </div>
-                  <div style={{ display:'flex', justifyContent:'space-between', padding:'4px 6px', borderRadius:4 }}>
-                    <span>Омега-3 (ЭПК+ДГК)</span><span style={{ fontWeight:600, color:'#22c55e' }}>2-4 г/день</span>
-                  </div>
-                  <div style={{ display:'flex', justifyContent:'space-between', padding:'4px 6px', background:'rgba(34,197,94,0.05)', borderRadius:4 }}>
-                    <span>Магний (треонат/глицинат)</span><span style={{ fontWeight:600, color:'#8b5cf6' }}>2-3 г/день</span>
-                  </div>
-                  <div style={{ display:'flex', justifyContent:'space-between', padding:'4px 6px', borderRadius:4 }}>
-                    <span>Фолиевая кислота (5-MTHF)</span><span style={{ fontWeight:600, color:'#22c55e' }}>400-800 мкг/день</span>
-                  </div>
-                  <div style={{ display:'flex', justifyContent:'space-between', padding:'4px 6px', background:'rgba(34,197,94,0.05)', borderRadius:4 }}>
-                    <span>Витамин E (токоферолы)</span><span style={{ fontWeight:600, color:'#22c55e' }}>400-800 МЕ/день</span>
-                  </div>
-                  <div style={{ display:'flex', justifyContent:'space-between', padding:'4px 6px', borderRadius:4 }}>
-                    <span>Витамин C</span><span style={{ fontWeight:600, color:'#22c55e' }}>1-2 г/день</span>
-                  </div>
+                  {[
+                    { n:'CoQ10 (убихинон)', d:'200-400 мг/день' },
+                    { n:'L-карнитин + ALCAR', d:'2-3 г/день' },
+                    { n:'Цинк (пиколинат/цитрат) + Медь', d:'30-50 мг/день + 2 мг' },
+                    { n:'Селен (L-селенометионин)', d:'200 мкг/день' },
+                    { n:'Витамин D3', d:'3000-5000 МЕ/день' },
+                    { n:'Омега-3 (ЭПК+ДГК)', d:'2-4 г/день' },
+                    { n:'Магний (треонат/глицинат)', d:'2-3 г/день' },
+                    { n:'Фолиевая кислота (5-MTHF)', d:'400-800 мкг/день' },
+                    { n:'Витамин E (токоферолы)', d:'400-800 МЕ/день' },
+                    { n:'Витамин C', d:'1-2 г/день' },
+                  ].map((it, idx) => (
+                    <div key={idx} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'4px 6px', borderRadius:4, background:idx%2===0 ? 'rgba(34,197,94,0.05)' : 'transparent' }}>
+                      <span style={{ flex:1 }}>{it.n}</span>
+                      <span style={{ fontWeight:600, color:'#22c55e', marginRight:4 }}>{it.d}</span>
+                      <button onClick={() => addToCart(`su_pct_${it.n}`, it.n, it.d)} style={{ padding:'2px 6px', borderRadius:4, border:'none', cursor:'pointer', fontSize:7, background:'rgba(245,158,11,0.12)', color:'#f59e0b', flexShrink:0 }}>🛒</button>
+                    </div>
+                  ))}
                 </div>
               </div>
 
               <div style={s.card}>
                 <h4 style={{ margin:'0 0 6px', fontSize:12, color:'#ef4444' }}>🛡 Органопротекция на ПКТ</h4>
                 <div style={{ display:'flex', flexDirection:'column', gap:5, fontSize:9, color:'var(--text-dim)', lineHeight:1.4 }}>
-                  <div style={{ padding:'6px 8px', borderRadius:6, background:'rgba(239,68,68,0.05)', border:'1px solid rgba(239,68,68,0.1)' }}>
-                    <div style={{ fontWeight:600, color:'#ef4444', marginBottom:2 }}>Гепатопротекция</div>
-                    <div>NAC 1200-1800 мг/день · TUDCA 500-1000 мг/день · Силимарин 300-600 мг/день (стандартиз. 80% силибинина)</div>
-                  </div>
-                  <div style={{ padding:'6px 8px', borderRadius:6, background:'rgba(59,130,246,0.05)', border:'1px solid rgba(59,130,246,0.1)' }}>
-                    <div style={{ fontWeight:600, color:'#60a5fa', marginBottom:2 }}>Кардиопротекция</div>
-                    <div>Берберин 500 мг 2-3 р/день · Кверцетин 500 мг/день · Омега-3 3-5 г · Астаксантин 12 мг/день · Контроль липидов и Hct</div>
-                  </div>
-                  <div style={{ padding:'6px 8px', borderRadius:6, background:'rgba(6,182,212,0.05)', border:'1px solid rgba(6,182,212,0.1)' }}>
-                    <div style={{ fontWeight:600, color:'#06b6d4', marginBottom:2 }}>Нефропротекция</div>
-                    <div>Цистатин C контроль · Гидратация 2.5-3 л/день · Избегать НПВС · Кверцетин 500 мг (↓ TGF-β1) · Калий-контроль</div>
-                  </div>
+                  {[
+                    { color:'#ef4444', label:'Гепатопротекция', items:[
+                      { id:'nac', name:'NAC', dose:'1200-1800 мг/день' },
+                      { id:'tudca', name:'TUDCA', dose:'500-1000 мг/день' },
+                      { id:'silymarin', name:'Силимарин', dose:'300-600 мг/день' },
+                    ]},
+                    { color:'#60a5fa', label:'Кардиопротекция', items:[
+                      { id:'berberine', name:'Берберин', dose:'500 мг 2-3 р/день' },
+                      { id:'quercetin', name:'Кверцетин', dose:'500 мг/день' },
+                      { id:'omega3', name:'Омега-3', dose:'3-5 г' },
+                      { id:'astaxanthin', name:'Астаксантин', dose:'12 мг/день' },
+                    ]},
+                    { color:'#06b6d4', label:'Нефропротекция', items:[
+                      { id:'water', name:'Гидратация', dose:'2.5-3 л/день' },
+                      { id:'quercetin_kidney', name:'Кверцетин (↓ TGF-β1)', dose:'500 мг' },
+                    ]},
+                  ].map((section, si) => (
+                    <div key={si} style={{ padding:'6px 8px', borderRadius:6, background:'rgba('+(si===0?'239,68,68':si===1?'59,130,246':'6,182,212')+',0.05)', border:'1px solid rgba('+(si===0?'239,68,68':si===1?'59,130,246':'6,182,212')+',0.1)' }}>
+                      <div style={{ fontWeight:600, color:section.color, marginBottom:2, fontSize:10 }}>{section.label}</div>
+                      <div style={{ display:'flex', flexWrap:'wrap', gap:3 }}>
+                        {section.items.map((it, i) => (
+                          <span key={i} style={{ display:'inline-flex', alignItems:'center', gap:3, padding:'2px 6px', borderRadius:4, background:'rgba(255,255,255,0.05)' }}>
+                            {it.name} {it.dose}
+                            <button onClick={() => addToCart(`su_prot_${it.id}`, it.name, it.dose)} style={{ padding:'1px 4px', borderRadius:3, border:'none', cursor:'pointer', fontSize:6, background:'rgba(245,158,11,0.12)', color:'#f59e0b' }}>🛒</button>
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
 
@@ -1204,31 +1367,15 @@ export const FertilityPCTScreen: React.FC<{ initialTab?: FertTab; restrictToMode
                 </div>
               </div>
 
-              <div style={s.card}>
-                <h4 style={{ margin:'0 0 6px', fontSize:12, color:'#3b82f6' }}>📚 Ключевые исследования ПКТ (PubMed)</h4>
-                <div style={{ fontSize:9, color:'var(--text-dim)', lineHeight:1.5 }}>
-                  <div>1. <b>PMID: 20463213</b> — Coviello et al. Intratesticular testosterone in men. JCEM 2010</div>
-                  <div>2. <b>PMID: 21645530</b> — Kaminetsky et al. Enclomiphene vs T. J Urol 2013</div>
-                  <div>3. <b>PMID: 17662261</b> — Bhasin et al. Testosterone therapy. NEJM 2006</div>
-                  <div>4. <b>PMID: 12801577</b> — De Rosa et al. hCG+hMG for hypogonadism. Fertil Steril 2003</div>
-                  <div>5. <b>PMID: 39434392</b> — Ibis et al. Clomiphene+HCG for SIH. Int J Import Res 2025</div>
-                  <div>6. <b>PMID: 37907228</b> — Tan et al. Kisspeptin restoration of HPTA. Endocrine 2024</div>
-                  <div>7. <b>PMID: 20843455</b> — Ramasamy et al. SERM therapy for male infertility. Fertil Steril 2011</div>
-                  <div>8. <b>PMID: 27605271</b> — Grinspon et al. AMH and inhibin B in male infertility. Nat Rev Endocrinol 2016</div>
-                  <div>9. <b>PMID: 25329451</b> — McBride et al. Enclomiphene citrate for secondary hypogonadism. BJU Int 2015</div>
-                  <div>10. <b>PMID: 28289758</b> — Zitzmann et al. T restoration with enclomiphene. Andrology 2017</div>
-                  <div>11. <b>PMID: 32975554</b> — Leder et al. Neuroendocrine effects of AAS. J Clin Endocrinol Metab 2021</div>
-                </div>
-              </div>
-
               {/* === PCT ADDITIONS END === */}
-            </>
-          )}
+          </div>
+        )}
 
-          {restrictToMode === 'hrt' && (
-            <>
-              <div style={s.card}>
-                <h4 style={{ margin:'0 0 6px', fontSize:14, color:'#8b5cf6' }}>⚕️ ГЗТ: Ультимативный протокол 2026</h4>
+        {/* === APPENDED GUIDE CONTENT: HRT === */}
+        {tab === 'hrt' && restrictToMode === 'hrt' && (
+          <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+            <div style={s.card}>
+              <h4 style={{ margin:'0 0 6px', fontSize:14, color:'#8b5cf6' }}>⚕️ Ориентировочный протокол</h4>
                 <p style={{ fontSize:11, color:'var(--text-dim)', lineHeight:1.5, margin:0 }}>
                   Гормонозаместительная терапия тестостероном (ТЗТ/ГЗТ) — стандарт лечения гипогонадизма различной этиологии. Эпидемиология: гипогонадизм встречается у 20-30% мужчин с ожирением, 25-40% при диабете 2 типа, 30-50% мужчин {'>'}70 лет. TRAVERSE trial (NEJM 2023) не выявил повышения MACE при физиологических дозах ТЗТ.
                 </p>
@@ -1459,13 +1606,14 @@ export const FertilityPCTScreen: React.FC<{ initialTab?: FertTab; restrictToMode
               </div>
 
               {/* === HRT ADDITIONS END === */}
-            </>
-          )}
+          </div>
+        )}
 
-          {restrictToMode === 'fertility' && (
-            <>
-              <div style={s.card}>
-                <h4 style={{ margin:'0 0 6px', fontSize:14, color:'#3b82f6' }}>🧬 Полный гайд по сохранению и восстановлению фертильности</h4>
+        {/* === APPENDED GUIDE CONTENT: FERTILITY === */}
+        {tab === 'overview' && restrictToMode === 'fertility' && (
+          <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+            <div style={s.card}>
+              <h4 style={{ margin:'0 0 6px', fontSize:14, color:'#3b82f6' }}>🧬 Ориентировочный протокол по сохранению и восстановлению фертильности</h4>
                 <p style={{ fontSize:11, color:'var(--text-dim)', lineHeight:1.5, margin:0 }}>
                   Стероид-индуцированный гипогонадизм (SIH) — основная причина мужского бесплодия среди пользователей ААС. Полное восстановление сперматогенеза возможно у 70-80% пациентов при правильном протоколе. Ключевые маркеры: Ингибин B ({'>'}80 pg/mL) — прямой маркер функции клеток Сертоли; АМГ — резерв сперматогенеза; спермограмма + MAR + DFI.
                 </p>
@@ -1555,54 +1703,30 @@ export const FertilityPCTScreen: React.FC<{ initialTab?: FertTab; restrictToMode
               <div style={s.card}>
                 <h4 style={{ margin:'0 0 6px', fontSize:12, color:'#22c55e' }}>🥗 Универсальные добавки для фертильности</h4>
                 <div style={{ display:'flex', flexDirection:'column', gap:2, fontSize:9, color:'var(--text-dim)', lineHeight:1.4 }}>
-                  <div style={{ display:'flex', justifyContent:'space-between', padding:'3px 6px', background:'rgba(34,197,94,0.05)', borderRadius:4 }}>
-                    <span>Цинк (пиколинат)</span><span style={{ fontWeight:600, color:'#22c55e' }}>30-50 мг/день</span>
-                  </div>
-                  <div style={{ display:'flex', justifyContent:'space-between', padding:'3px 6px', borderRadius:4 }}>
-                    <span>Селен (L-селенометионин)</span><span style={{ fontWeight:600, color:'#22c55e' }}>200 мкг/день</span>
-                  </div>
-                  <div style={{ display:'flex', justifyContent:'space-between', padding:'3px 6px', background:'rgba(34,197,94,0.05)', borderRadius:4 }}>
-                    <span>Витамин D3</span><span style={{ fontWeight:600, color:'#22c55e' }}>3000-5000 МЕ/день</span>
-                  </div>
-                  <div style={{ display:'flex', justifyContent:'space-between', padding:'3px 6px', borderRadius:4 }}>
-                    <span>Фолиевая (5-MTHF)</span><span style={{ fontWeight:600, color:'#22c55e' }}>400-800 мкг/день</span>
-                  </div>
-                  <div style={{ display:'flex', justifyContent:'space-between', padding:'3px 6px', background:'rgba(34,197,94,0.05)', borderRadius:4 }}>
-                    <span>Омега-3 (ЭПК+ДГК)</span><span style={{ fontWeight:600, color:'#22c55e' }}>2-4 г/день</span>
-                  </div>
-                  <div style={{ display:'flex', justifyContent:'space-between', padding:'3px 6px', borderRadius:4 }}>
-                    <span>L-карнитин + ALCAR</span><span style={{ fontWeight:600, color:'#22c55e' }}>2-3 г/день</span>
-                  </div>
-                  <div style={{ display:'flex', justifyContent:'space-between', padding:'3px 6px', background:'rgba(34,197,94,0.05)', borderRadius:4 }}>
-                    <span>L-аргинин + L-цитруллин</span><span style={{ fontWeight:600, color:'#22c55e' }}>3-6 г/день</span>
-                  </div>
-                  <div style={{ display:'flex', justifyContent:'space-between', padding:'3px 6px', borderRadius:4 }}>
-                    <span>CoQ10 (убихинон)</span><span style={{ fontWeight:600, color:'#22c55e' }}>200-400 мг/день</span>
-                  </div>
-                  <div style={{ display:'flex', justifyContent:'space-between', padding:'3px 6px', background:'rgba(34,197,94,0.05)', borderRadius:4 }}>
-                    <span>Витамин C</span><span style={{ fontWeight:600, color:'#22c55e' }}>1-2 г/день</span>
-                  </div>
-                  <div style={{ display:'flex', justifyContent:'space-between', padding:'3px 6px', borderRadius:4 }}>
-                    <span>Витамин E (токоферолы)</span><span style={{ fontWeight:600, color:'#22c55e' }}>400-800 МЕ/день</span>
-                  </div>
-                  <div style={{ display:'flex', justifyContent:'space-between', padding:'3px 6px', background:'rgba(34,197,94,0.05)', borderRadius:4 }}>
-                    <span>NAC</span><span style={{ fontWeight:600, color:'#22c55e' }}>1200 мг/день</span>
-                  </div>
-                  <div style={{ display:'flex', justifyContent:'space-between', padding:'3px 6px', borderRadius:4 }}>
-                    <span>Мелатонин</span><span style={{ fontWeight:600, color:'#f59e0b' }}>1-3 мг перед сном</span>
-                  </div>
-                  <div style={{ display:'flex', justifyContent:'space-between', padding:'3px 6px', background:'rgba(34,197,94,0.05)', borderRadius:4 }}>
-                    <span>Ашваганда (KSM-66)</span><span style={{ fontWeight:600, color:'#22c55e' }}>600 мг/день</span>
-                  </div>
-                  <div style={{ display:'flex', justifyContent:'space-between', padding:'3px 6px', borderRadius:4 }}>
-                    <span>Мака (Lepidium meyenii)</span><span style={{ fontWeight:600, color:'#22c55e' }}>3-5 г/день</span>
-                  </div>
-                  <div style={{ display:'flex', justifyContent:'space-between', padding:'3px 6px', background:'rgba(34,197,94,0.05)', borderRadius:4 }}>
-                    <span>D-аспарагиновая кислота</span><span style={{ fontWeight:600, color:'#f59e0b' }}>3 г/день × 2 нед (циклами)</span>
-                  </div>
-                  <div style={{ display:'flex', justifyContent:'space-between', padding:'3px 6px', borderRadius:4 }}>
-                    <span>Тадалафил</span><span style={{ fontWeight:600, color:'#60a5fa' }}>5 мг/день (кровоток яичек)</span>
-                  </div>
+                  {[
+                    { n:'Цинк (пиколинат)', d:'30-50 мг/день' },
+                    { n:'Селен (L-селенометионин)', d:'200 мкг/день' },
+                    { n:'Витамин D3', d:'3000-5000 МЕ/день' },
+                    { n:'Фолиевая (5-MTHF)', d:'400-800 мкг/день' },
+                    { n:'Омега-3 (ЭПК+ДГК)', d:'2-4 г/день' },
+                    { n:'L-карнитин + ALCAR', d:'2-3 г/день' },
+                    { n:'L-аргинин + L-цитруллин', d:'3-6 г/день' },
+                    { n:'CoQ10 (убихинон)', d:'200-400 мг/день' },
+                    { n:'Витамин C', d:'1-2 г/день' },
+                    { n:'Витамин E (токоферолы)', d:'400-800 МЕ/день' },
+                    { n:'NAC', d:'1200 мг/день' },
+                    { n:'Мелатонин', d:'1-3 мг перед сном' },
+                    { n:'Ашваганда (KSM-66)', d:'600 мг/день' },
+                    { n:'Мака (Lepidium meyenii)', d:'3-5 г/день' },
+                    { n:'D-аспарагиновая кислота', d:'3 г/день × 2 нед (циклами)' },
+                    { n:'Тадалафил', d:'5 мг/день (кровоток яичек)' },
+                  ].map((it, i) => (
+                    <div key={i} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'3px 6px', borderRadius:4, background:i%2===0 ? 'rgba(34,197,94,0.05)' : 'transparent' }}>
+                      <span style={{ flex:1 }}>{it.n}</span>
+                      <span style={{ fontWeight:600, color:'#22c55e', marginRight:4 }}>{it.d}</span>
+                      <button onClick={() => addToCart(`su_fert_${it.n}`, it.n, it.d)} style={{ padding:'2px 6px', borderRadius:4, border:'none', cursor:'pointer', fontSize:7, background:'rgba(245,158,11,0.12)', color:'#f59e0b', flexShrink:0 }}>🛒</button>
+                    </div>
+                  ))}
                   <div style={{ fontSize:8, color:'var(--text-dim)', marginTop:2 }}>Курс: минимум 3-6 мес для улучшения спермограммы. Комбинации дают синергию.</div>
                 </div>
               </div>
@@ -1772,33 +1896,9 @@ export const FertilityPCTScreen: React.FC<{ initialTab?: FertTab; restrictToMode
                 </div>
               </div>
 
-              <div style={s.card}>
-                <h4 style={{ margin:'0 0 6px', fontSize:12, color:'#3b82f6' }}>📚 Ключевые ссылки — фертильность (PubMed)</h4>
-                <div style={{ fontSize:9, color:'var(--text-dim)', lineHeight:1.5 }}>
-                  <div>1. <b>PMID: 20463213</b> — Coviello et al. Intratesticular T after exogenous T. JCEM 2010</div>
-                  <div>2. <b>PMID: 21645530</b> — Kaminetsky et al. Enclomiphene restores T in hypogonadal men. J Urol 2013</div>
-                  <div>3. <b>PMID: 17662261</b> — Bhasin et al. T therapy and spermatogenesis. NEJM 2006</div>
-                  <div>4. <b>PMID: 12801577</b> — De Rosa et al. hCG+hMG for male hypogonadotropic hypogonadism. Fertil Steril 2003</div>
-                  <div>5. <b>PMID: 39434392</b> — Ibis et al. Clomiphene+HCG for SIH. Int J Impot Res 2025</div>
-                  <div>6. <b>PMID: 37907228</b> — Tan et al. Kisspeptin restores HPTA after AAS. Endocrine 2024</div>
-                  <div>7. <b>PMID: 20843455</b> — Ramasamy et al. SERM for male infertility. Fertil Steril 2011</div>
-                  <div>8. <b>PMID: 27605271</b> — Grinspon et al. Inhibin B and AMH in male infertility. Nat Rev Endocrinol 2016</div>
-                  <div>9. <b>PMID: 32975554</b> — Leder et al. AAS and HPTA suppression. J Clin Endocrinol Metab 2021</div>
-                  <div>10. <b>PMID: 29087853</b> — Thirumavalavan et al. Fertility after AAS. J Sex Med 2018</div>
-                  <div>11. <b>PMID: 33590925</b> — Nackeeran et al. Recovery of spermatogenesis after AAS. World J Mens Health 2021</div>
-                  <div>12. <b>PMID: 26621483</b> — Kim et al. Enclomiphene vs T gel in hypogonadal men. Andrology 2016</div>
-                  <div>13. <b>PMID: 25329451</b> — McBride et al. Enclomiphene for secondary hypogonadism. BJU Int 2015</div>
-                  <div>14. <b>PMID: 32701695</b> — Спасов et al. Гонадотропины в лечении бесплодия. Проблемы Эндокринологии 2020</div>
-                  <div>15. <b>PMID: 28130723</b> — Jungwirth et al. EAU guidelines on male infertility. Eur Urol 2017</div>
-                  <div>16. <b>PMID: 31995336</b> — Minim et al. DFI and fertilization outcomes. Hum Reprod Update 2020</div>
-                </div>
-              </div>
-
               {/* === FERTILITY ADDITIONS END === */}
-            </>
-          )}
-        </div>
-      )}
+          </div>
+        )}
 
       </div>
     </div>

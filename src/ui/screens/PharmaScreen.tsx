@@ -1,5 +1,6 @@
 ﻿import React, { useState, useMemo, useEffect } from 'react';
 import { PHARMA_DB, SUBSTANCES_BY_CLASS, getPharmaDetail } from '../../core/pharma-database';
+import { db } from '../../core/db';
 import { calculateDose } from '../../engines/dosage.engine';
 import { simulateCourse, steadyStatePeak, steadyStateTrough, eliminationConstant } from '../../engines/pk-pd.engine';
 import { calculateMultiSubstancePKPD } from '../../engines/pkpd-superposition.engine';
@@ -511,13 +512,23 @@ const CatalogTab: React.FC = () => {
                   <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>{isCollapsed ? '▸' : '▾'}</span>
                 </div>
                 {!isCollapsed && substances.map(s => (
-                  <div key={s.id} onClick={() => setSelectedId(s.id)} style={{
+                  <div key={s.id} style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                     padding: '5px 10px 5px 16px', borderRadius: 4, cursor: 'pointer',
                     background: selectedId === s.id ? 'rgba(0,230,138,0.12)' : 'transparent',
                     borderLeft: selectedId === s.id ? '3px solid var(--accent)' : '3px solid transparent',
                     marginBottom: 1,
-                  }}>
+                  }} onClick={() => setSelectedId(s.id)}>
                     <div style={{ fontWeight: 600, fontSize: 12 }}>{s.name}</div>
+                    <div style={{ display: 'flex', gap: 2 }} onClick={e => e.stopPropagation()}>
+                      <button onClick={() => {
+                        const dr = s.dosageRange; const val = dr ? Math.round((dr.min+dr.max)/2) : 250; const unit = dr?.unit||'mg/wk';
+                        db.put('course_log', { id:crypto.randomUUID(), substanceId:s.id, doseValue:val, doseUnit:unit, frequency:dr?.frequency||'2x/wk', startWeek:1, endWeek:12 }).catch(()=>{});
+                      }} style={{ padding:'2px 6px', borderRadius:4, border:'none', cursor:'pointer', fontSize:8, background:'rgba(0,230,138,0.12)', color:'#00e68a' }}>+</button>
+                      <button onClick={() => {
+                        try { const e=JSON.parse(localStorage.getItem('supportCart')||'[]'); if(!e.some((x:any)=>x.id===s.id)) localStorage.setItem('supportCart', JSON.stringify([...e,{id:s.id,name:s.name,dose:'—',timing:'daily'}])); } catch{}
+                      }} style={{ padding:'2px 6px', borderRadius:4, border:'none', cursor:'pointer', fontSize:8, background:'rgba(245,158,11,0.12)', color:'#f59e0b' }}>🛒</button>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -527,13 +538,25 @@ const CatalogTab: React.FC = () => {
       ) : (
         /* Flat list when filter is specific class or search is active */
         filteredList.map(s => (
-          <div key={s.id} onClick={() => setSelectedId(s.id)} style={{
+          <div key={s.id} style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
             padding: '7px 10px', borderRadius: 6, cursor: 'pointer', marginBottom: 3,
             background: selectedId === s.id ? 'rgba(0,230,138,0.12)' : 'var(--bg-secondary)',
             border: selectedId === s.id ? '1px solid var(--accent)' : '1px solid transparent',
-          }}>
-            <div style={{ fontWeight: 600, fontSize: 12 }}>{s.name}</div>
-            <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>{CLASS_LABELS[s.class] || s.class}</div>
+          }} onClick={() => setSelectedId(s.id)}>
+            <div>
+              <div style={{ fontWeight: 600, fontSize: 12 }}>{s.name}</div>
+              <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>{CLASS_LABELS[s.class] || s.class}</div>
+            </div>
+            <div style={{ display: 'flex', gap: 2 }} onClick={e => e.stopPropagation()}>
+              <button onClick={() => {
+                const dr = s.dosageRange; const val = dr ? Math.round((dr.min+dr.max)/2) : 250; const unit = dr?.unit||'mg/wk';
+                db.put('course_log', { id:crypto.randomUUID(), substanceId:s.id, doseValue:val, doseUnit:unit, frequency:dr?.frequency||'2x/wk', startWeek:1, endWeek:12 }).catch(()=>{});
+              }} style={{ padding:'2px 6px', borderRadius:4, border:'none', cursor:'pointer', fontSize:8, background:'rgba(0,230,138,0.12)', color:'#00e68a' }}>+</button>
+              <button onClick={() => {
+                try { const e=JSON.parse(localStorage.getItem('supportCart')||'[]'); if(!e.some((x:any)=>x.id===s.id)) localStorage.setItem('supportCart', JSON.stringify([...e,{id:s.id,name:s.name,dose:'—',timing:'daily'}])); } catch{}
+              }} style={{ padding:'2px 6px', borderRadius:4, border:'none', cursor:'pointer', fontSize:8, background:'rgba(245,158,11,0.12)', color:'#f59e0b' }}>🛒</button>
+            </div>
           </div>
         ))
       )}
@@ -691,6 +714,33 @@ const DrugDetailCard: React.FC<{ sub: PharmaSubstance; detail?: PharmaDetail }> 
         </div>
       )}
 
+      <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+        <button onClick={() => {
+          const dr = (detail?.dosageRange || sub.dosageRange);
+          const val = dr ? Math.round((dr.min + dr.max) / 2) : 250;
+          const unit = dr?.unit || 'mg/wk';
+          db.put('course_log', {
+            id: crypto.randomUUID(), substanceId: sub.id,
+            doseValue: val, doseUnit: unit,
+            frequency: dr?.frequency || '2x/wk',
+            startWeek: 1, endWeek: 12,
+          }).catch(() => {});
+        }} style={{
+          flex: 1, padding: '8px 12px', borderRadius: 8, border: 'none', cursor: 'pointer',
+          fontSize: 11, fontWeight: 700, background: 'rgba(0,230,138,0.12)', color: '#00e68a',
+        }}>+ В план</button>
+        <button onClick={() => {
+          try {
+            const existing = JSON.parse(localStorage.getItem('supportCart') || '[]');
+            if (!existing.some((x: any) => x.id === sub.id)) {
+              localStorage.setItem('supportCart', JSON.stringify([...existing, { id: sub.id, name: sub.name, dose: (detail?.dosageRange || sub.dosageRange)?.min ? `${(detail?.dosageRange || sub.dosageRange)!.min} ${(detail?.dosageRange || sub.dosageRange)!.unit}` : '—', timing: 'daily' }]));
+            }
+          } catch {}
+        }} style={{
+          flex: 1, padding: '8px 12px', borderRadius: 8, border: 'none', cursor: 'pointer',
+          fontSize: 11, fontWeight: 700, background: 'rgba(245,158,11,0.12)', color: '#f59e0b',
+        }}>🛒 В корзину</button>
+      </div>
     </div>
   );
 };

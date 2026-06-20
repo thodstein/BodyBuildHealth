@@ -25,14 +25,13 @@ Profile → useDataLink → { profile, labs, course, readiness, risk, avgWeeklyK
 - TrainingLoadRatio auto-derive: `workoutsPerWeek × avgWorkoutMinutes → trainingLoadRatio`
 - КБЖУ auto from diary: `food_diary → avgWeeklyKcal/Protein/Fat/Carbs → readiness → risk → support`
 
-### Navigation (7 tabs)
-1. **Главная** — Dashboard (aggregated overview)
-2. **Фарма** — Pharmacology + Support (combined, 2 columns: catalog left, detail right)
-3. **Тренировки** — Unified training (merged training + cycles, NO duplicates)
-4. **Питание** — Nutrition with КБЖУ charts, expanded food DB, OCR
-5. **Анализы** — Labs + Catalog (2-column: lab results left, schedule/catalog right)
-6. **Риски** — All risks aggregated (pharma + support + labs + training + nutrition)
-7. **Профиль** — Settings, measurements, support stack separate
+### Navigation (6 tabs — Главная removed)
+1. **Тренинг** — Unified training (merged training + cycles, NO duplicates), also default/start tab
+2. **Питание** — Nutrition with КБЖУ charts, expanded food DB, OCR
+3. **Анализы** — Labs + Catalog (2-column: lab results left, schedule/catalog right)
+4. **Риски** — All risks aggregated (pharma + support + labs + training + nutrition)
+5. **Фарма** — Pharmacology (substances, PCT, peptides, fertility/PCT protocols)
+6. **БАДы** — Support database (2164 substances, 206 interactions)
 
 ### Key Engines & Files
 - `src/engines/rir-matrix.engine.ts` — **NEW**: RIR matrix + weekly progression
@@ -230,6 +229,8 @@ if (shouldApplyPenalty && finalResult.systemBreakdown) {
   - **HRT guide** (+8 new cards): ADAM scale (10-question screening), lab minimum table (10 markers with targets), drug forms pharmacokinetics (6 forms), full interaction table (12 pairs), 5 additional clinical cases, monitoring schedule (4 periods), special situations (post-RP/CKD/>70yo), final checklist
   - **Fertility guide** (+11 new cards): AAS neurotoxicity (6 mechanisms), universal supplements table (16 rows with doses), hMG full chapter (mechanics/vs hCG/protocols/efficacy 66.8%/side effects/availability), female factor & ART (IUI/IVF/ICSI/PICSI), enclomiphene detail (4 studies, BSSM/AUA position), hidden obstacles table (8 substances), nootropics compatibility table (6 classes), FAQ (8 Qs), psychological traps (4 + CBT), appendices (WHO 2021 norms + pre-cycle checklist), 16 key PubMed references
 - **DashboardScreen**: FULL REWRITE — from 3-button stub to aggregated overview with profile card (name, goal, PAL, TDEE), risk card (score bar + system count), training/course stats grid, today's KBJU with targets vs actual, 12-button navigation grid
+- **DashboardScreen REMOVED + navigation simplified**: удалена вкладка `home` из PRIMARY_NAV, default tab изменён на `training`, удалён импорт DashboardScreen, handleNavigate маппинги починены
+- **FertilityPCTScreen**: 3 stray `</>` фрагмента удалены (ошибки TS1005/TS1003/TS1109)
 - `tsc --noEmit` ✓, `vite build` ✓
 
 ## Build Commands
