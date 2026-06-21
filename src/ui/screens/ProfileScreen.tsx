@@ -1948,120 +1948,7 @@ export const ProfileScreen: React.FC = () => {
           )}
 
           {/* ═══ MEASUREMENTS TAB ═══ */}
-          {tab === 'measurements' && (() => {
-            const [measLog, setMeasLog] = useState<any[]>(() => {
-              try { return JSON.parse(localStorage.getItem('he_measurements_log') || '[]'); } catch { return []; }
-            });
-            const [waist, setWaist] = useState('');
-            const [chest, setChest] = useState('');
-            const [bicep, setBicep] = useState('');
-            const [thigh, setThigh] = useState('');
-            const [hip, setHip] = useState('');
-            const [bodyFat, setBodyFat] = useState('');
-            const [weightKg, setWeightKg] = useState('');
-            const [photos, setPhotos] = useState<string[]>([]);
-            const photoRef = useRef<HTMLInputElement>(null);
-
-            const addPhoto = (e: React.ChangeEvent<HTMLInputElement>) => {
-              const file = e.target.files?.[0];
-              if (!file) return;
-              const reader = new FileReader();
-              reader.onload = (ev) => {
-                const dataUrl = ev.target?.result as string;
-                setPhotos(prev => [...prev, dataUrl].slice(-4));
-                try { localStorage.setItem('he_meas_photos', JSON.stringify([...(JSON.parse(localStorage.getItem('he_meas_photos')||'[]')), { date: new Date().toISOString().split('T')[0], photo: dataUrl }].slice(-20))); } catch {}
-              };
-              reader.readAsDataURL(file);
-            };
-
-            const saveMeas = () => {
-              if (!waist && !chest && !bicep && !weightKg && photos.length === 0) return;
-              const entry = {
-                date: new Date().toISOString().split('T')[0],
-                weightKg: weightKg ? parseFloat(weightKg) : null,
-                waistCm: waist ? parseFloat(waist) : null,
-                chestCm: chest ? parseFloat(chest) : null,
-                bicepCm: bicep ? parseFloat(bicep) : null,
-                thighCm: thigh ? parseFloat(thigh) : null,
-                hipCm: hip ? parseFloat(hip) : null,
-                bodyFat: bodyFat ? parseFloat(bodyFat) : null,
-                photos: photos.length > 0 ? photos : undefined,
-              };
-              const updated = [...measLog, entry];
-              setMeasLog(updated);
-              try { localStorage.setItem('he_measurements_log', JSON.stringify(updated)); } catch {}
-              setWaist(''); setChest(''); setBicep(''); setThigh(''); setHip(''); setBodyFat(''); setWeightKg(''); setPhotos([]);
-            };
-
-            return (
-              <div>
-                <div style={{ marginBottom:12 }}>
-                  <h3 style={{ margin:'0 0 4px', fontSize:15, fontWeight:800, color:'#fff' }}>📏 Дневник прогресса и замеров</h3>
-                  <p style={{ fontSize:10, color:'rgba(255,255,255,0.7)', margin:0 }}>Антропометрия, обхваты, композиция тела. Синхронизируется с тренировками.</p>
-                </div>
-
-                {/* Input form */}
-                <div style={{ borderRadius:12, padding:14, marginBottom:10, background:'rgba(24,24,27,0.15)', border:'1px solid rgba(255,255,255,0.04)' }}>
-                  <h4 style={{ margin:'0 0 8px', fontSize:11, fontWeight:700, color:'#00e68a' }}>Новый замер</h4>
-                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:6 }}>
-                    {[
-                      { label:'Вес, кг', val:weightKg, set:setWeightKg },
-                      { label:'Талия, см', val:waist, set:setWaist },
-                      { label:'Грудь, см', val:chest, set:setChest },
-                      { label:'Бицепс, см', val:bicep, set:setBicep },
-                      { label:'Бедро, см', val:thigh, set:setThigh },
-                      { label:'Ягодицы, см', val:hip, set:setHip },
-                      { label:'Жир, %', val:bodyFat, set:setBodyFat },
-                    ].map((f,i) => (
-                      <div key={i} style={{ display:'flex', flexDirection:'column', gap:2 }}>
-                        <label style={{ fontSize:8, color:'rgba(255,255,255,0.5)' }}>{f.label}</label>
-                        <input type="number" value={f.val} onChange={e => f.set(e.target.value)} placeholder="—" style={{ padding:'8px 6px', borderRadius:8, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', fontSize:12, width:'100%', boxSizing:'border-box' }} />
-                      </div>
-                    ))}
-                  </div>
-                  {/* Photo upload */}
-                  <div style={{ display:'flex', gap:6, alignItems:'center', marginTop:6 }}>
-                    <input ref={photoRef} type="file" accept="image/*" capture="environment" onChange={addPhoto} style={{ display:'none' }} />
-                    <button onClick={() => photoRef.current?.click()} style={{ padding:'6px 12px', borderRadius:8, border:'1px solid rgba(255,255,255,0.08)', background:'rgba(255,255,255,0.04)', color:'rgba(255,255,255,0.7)', fontWeight:600, fontSize:10, cursor:'pointer' }}>📸 Фото ракурсов</button>
-                    {photos.length > 0 && <span style={{ fontSize:8, color:'rgba(255,255,255,0.5)' }}>{photos.length} фото</span>}
-                  </div>
-                  {photos.length > 0 && (
-                    <div style={{ display:'flex', gap:4, marginTop:4, overflowX:'auto' }}>
-                      {photos.map((p,i) => (
-                        <div key={i} style={{ width:48, height:48, borderRadius:6, overflow:'hidden', flexShrink:0, position:'relative' }}>
-                          <img src={p} alt="" style={{ width:'100%', height:'100%', objectFit:'cover' }} />
-                          <div onClick={() => setPhotos(prev => prev.filter((_,idx) => idx !== i))} style={{ position:'absolute', top:0, right:0, width:14, height:14, background:'rgba(0,0,0,0.6)', borderRadius:'50%', fontSize:9, display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', color:'#fff' }}>✕</div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                  <button onClick={saveMeas} style={{ marginTop:8, padding:'8px 16px', borderRadius:8, border:'none', background:'var(--accent)', color:'#000', fontWeight:700, fontSize:12, cursor:'pointer', width:'100%' }}>💾 Сохранить замер</button>
-                </div>
-
-                {measLog.length > 0 && (
-                  <div style={{ borderRadius:12, padding:14, background:'rgba(24,24,27,0.15)', border:'1px solid rgba(255,255,255,0.04)' }}>
-                    <h4 style={{ margin:'0 0 8px', fontSize:11, fontWeight:700, color:'#fff' }}>История замеров ({measLog.length})</h4>
-                    <div style={{ display:'flex', flexDirection:'column', gap:2 }}>
-                      {[...measLog].reverse().map((m: any, i: number) => (
-                        <div key={i} style={{ display:'flex', justifyContent:'space-between', padding:'4px 8px', borderRadius:4, background:i%2===0?'rgba(255,255,255,0.03)':'transparent', fontSize:9 }}>
-                          <span style={{ fontWeight:600 }}>{m.date}</span>
-                          <span style={{ color:'rgba(255,255,255,0.6)' }}>
-                            {m.weightKg ? `Вес:${m.weightKg}кг ` : ''}{m.waistCm ? `Тал:${m.waistCm} ` : ''}{m.chestCm ? `Гр:${m.chestCm} ` : ''}{m.bicepCm ? `Биц:${m.bicepCm} ` : ''}{m.thighCm ? `Бед:${m.thighCm} ` : ''}{m.hipCm ? `Яг:${m.hipCm} ` : ''}{m.bodyFat ? `Жир:${m.bodyFat}%` : ''}{m.photos?.length ? `📸${m.photos.length}` : ''}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {measLog.length === 0 && (
-                  <div style={{ textAlign:'center', padding:30, fontSize:11, color:'rgba(255,255,255,0.5)' }}>
-                    Нет записей замеров. Внесите первый замер для отслеживания прогресса.
-                  </div>
-                )}
-              </div>
-            );
-          })()}
+          {tab === 'measurements' && <ProfileMeasurementsTab />}
 
           {/* ═══ DIARIES TAB ═══ */}
           {tab === 'diaries' && (
@@ -2185,6 +2072,70 @@ export const ProfileScreen: React.FC = () => {
           </div>
         </div>
       )}
+    </div>
+  );
+};
+
+const ProfileMeasurementsTab: React.FC = () => {
+  const [measLog, setMeasLog] = React.useState<any[]>(() => { try { return JSON.parse(localStorage.getItem('he_measurements_log') || '[]'); } catch { return []; } });
+  const [weightKg, setWeightKg] = React.useState('');
+  const [waist, setWaist] = React.useState('');
+  const [chest, setChest] = React.useState('');
+  const [bicep, setBicep] = React.useState('');
+  const [thigh, setThigh] = React.useState('');
+  const [hip, setHip] = React.useState('');
+  const [bodyFat, setBodyFat] = React.useState('');
+  const [photos, setPhotos] = React.useState<string[]>([]);
+  const photoRef = React.useRef<HTMLInputElement>(null);
+  const addPhoto = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]; if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const dataUrl = ev.target?.result as string;
+      setPhotos(prev => [...prev, dataUrl].slice(-4));
+      try { localStorage.setItem('he_meas_photos', JSON.stringify([...(JSON.parse(localStorage.getItem('he_meas_photos')||'[]')), { date: new Date().toISOString().split('T')[0], photo: dataUrl }].slice(-20))); } catch {}
+    }; reader.readAsDataURL(file);
+  };
+  const saveMeas = () => {
+    if (!waist && !chest && !bicep && !weightKg) return;
+    const entry = { date: new Date().toISOString().split('T')[0], weightKg: weightKg ? parseFloat(weightKg) : null, waistCm: waist ? parseFloat(waist) : null, chestCm: chest ? parseFloat(chest) : null, bicepCm: bicep ? parseFloat(bicep) : null, thighCm: thigh ? parseFloat(thigh) : null, hipCm: hip ? parseFloat(hip) : null, bodyFat: bodyFat ? parseFloat(bodyFat) : null, photos: photos.length > 0 ? photos : undefined };
+    const updated = [...measLog, entry]; setMeasLog(updated);
+    try { localStorage.setItem('he_measurements_log', JSON.stringify(updated)); } catch {}
+    setWaist(''); setChest(''); setBicep(''); setThigh(''); setHip(''); setBodyFat(''); setWeightKg(''); setPhotos([]);
+  };
+  return (
+    <div style={{ padding:'0 0 80px' }}>
+      <h3 style={{ margin:'0 0 4px', fontSize:15, fontWeight:800, color:'#fff' }}>📏 Дневник замеров</h3>
+      <p style={{ fontSize:10, color:'rgba(255,255,255,0.7)', margin:'0 0 12px' }}>Вес, обхваты, жир, фото</p>
+      <div style={{ borderRadius:12, padding:14, marginBottom:10, background:'rgba(24,24,27,0.15)', border:'1px solid rgba(255,255,255,0.04)' }}>
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:6 }}>
+          {[{l:'Вес, кг',v:weightKg,s:setWeightKg},{l:'Талия, см',v:waist,s:setWaist},{l:'Грудь, см',v:chest,s:setChest},{l:'Бицепс, см',v:bicep,s:setBicep},{l:'Бедро, см',v:thigh,s:setThigh},{l:'Ягодицы, см',v:hip,s:setHip},{l:'Жир, %',v:bodyFat,s:setBodyFat}].map((f,i) => (
+            <div key={i} style={{ display:'flex', flexDirection:'column', gap:2 }}>
+              <label style={{ fontSize:8, color:'rgba(255,255,255,0.5)' }}>{f.l}</label>
+              <input type="number" value={f.v} onChange={e => f.s(e.target.value)} placeholder="—" style={{ padding:'8px 6px', borderRadius:8, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', fontSize:12 }} />
+            </div>
+          ))}
+        </div>
+        <div style={{ display:'flex', gap:6, marginTop:6 }}>
+          <input ref={photoRef} type="file" accept="image/*" onChange={addPhoto} style={{ display:'none' }} />
+          <button onClick={() => photoRef.current?.click()} style={{ padding:'6px 12px', borderRadius:8, border:'1px solid rgba(255,255,255,0.08)', background:'rgba(255,255,255,0.04)', color:'rgba(255,255,255,0.7)', fontSize:10, cursor:'pointer' }}>📸 Фото</button>
+          <button onClick={saveMeas} style={{ flex:1, padding:'8px', borderRadius:8, border:'none', background:'var(--accent)', color:'#000', fontWeight:700, fontSize:12, cursor:'pointer' }}>💾 Сохранить</button>
+        </div>
+        {photos.length > 0 && <div style={{ display:'flex', gap:4, marginTop:4, overflowX:'auto' }}>
+          {photos.map((p,i) => <div key={i} style={{ width:48, height:48, borderRadius:6, overflow:'hidden', flexShrink:0, position:'relative' }}>
+            <img src={p} alt="" style={{ width:'100%', height:'100%', objectFit:'cover' }} />
+            <div onClick={() => setPhotos(prev => prev.filter((_,idx) => idx !== i))} style={{ position:'absolute', top:0, right:0, width:14, height:14, background:'rgba(0,0,0,0.6)', borderRadius:'50%', fontSize:9, display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', color:'#fff' }}>✕</div>
+          </div>)}
+        </div>}
+      </div>
+      {measLog.length > 0 && <div style={{ borderRadius:12, padding:14, background:'rgba(24,24,27,0.15)', border:'1px solid rgba(255,255,255,0.04)' }}>
+        <h4 style={{ margin:'0 0 8px', fontSize:11, fontWeight:700, color:'#fff' }}>История ({measLog.length})</h4>
+        {[...measLog].reverse().map((m:any,i:number) => <div key={i} style={{ display:'flex', justifyContent:'space-between', padding:'4px 8px', borderRadius:4, background:i%2===0?'rgba(255,255,255,0.03)':'transparent', fontSize:9 }}>
+          <span style={{ fontWeight:600 }}>{m.date}</span>
+          <span style={{ color:'rgba(255,255,255,0.6)' }}>{m.weightKg ? `В:${m.weightKg}кг ` : ''}{m.waistCm ? `Т:${m.waistCm} ` : ''}{m.chestCm ? `Г:${m.chestCm} ` : ''}{m.bodyFat ? `Ж:${m.bodyFat}%` : ''}{m.photos?.length ? `📸${m.photos.length}` : ''}</span>
+        </div>)}
+      </div>}
+      {measLog.length === 0 && <div style={{ textAlign:'center', padding:30, fontSize:11, color:'rgba(255,255,255,0.5)' }}>Нет записей. Добавьте первый замер.</div>}
     </div>
   );
 };

@@ -14,9 +14,9 @@ interface Props {
 
 export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
   const CARDS = [
-    { id: 'profile', icon: '👤', label: 'Профиль', color: '#00e68a' },
-    { id: 'marketplace', icon: '🛍️', label: 'Магазин', color: '#06b6d4' },
-    { id: 'articles', icon: '📚', label: 'Статьи', color: '#84cc16' },
+    { id: 'profile', icon: '👤' },
+    { id: 'marketplace', icon: '🛍️' },
+    { id: 'articles', icon: '📚' },
   ];
 
   return (
@@ -27,12 +27,10 @@ export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
         <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:10 }}>
           {CARDS.map(card => (
             <button key={card.id} onClick={() => onNavigate?.(card.id as ScreenId)} style={{
-              display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:4,
-              aspectRatio:'1', borderRadius:14, cursor:'pointer',
+              display:'flex', alignItems:'center', justifyContent:'center', aspectRatio:'1', borderRadius:16, cursor:'pointer',
               background:'rgba(24,24,27,0.15)', border:'1px solid rgba(255,255,255,0.04)',
             }}>
-              <span style={{ fontSize:26 }}>{card.icon}</span>
-              <span style={{ fontSize:9, fontWeight:700, color: card.color }}>{card.label}</span>
+              <span style={{ fontSize:32 }}>{card.icon}</span>
             </button>
           ))}
         </div>
