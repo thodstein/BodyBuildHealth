@@ -11617,32 +11617,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     dosage: { mg: 0, timing: 'контроль маркера', form: 'глюкагон (анализ)' },
     bestForCourse: false,
   },
-  water: {
-    id: 'water',
-    name: 'Water',
-    nameRu: 'Вода (гидратация)',
-    tier: 'core',
-    category: ['hydration', 'metabolic'],
-    forms: [
-      { id: 'water', name: 'Water', nameRu: 'Вода 2.5 л/день', dose: '2.5 г 2x/д', best: true },
-      { id: 'water_2', name: 'Water', nameRu: 'Вода + Электролиты', dose: '2.5 г', best: false }
-    ],
-    organs: ['KIDNEYS', 'HEART', 'MUSCLES'],
-    systems: ['renal', 'cardio', 'musculoskeletal'],
-    mechanisms: ['HYDRATION', 'TEMPERATURE_REGULATION', 'NUTRIENT_TRANSPORT', 'WASTE_REMOVAL'],
-    description: 'Вода — основа гидратации и метаболизма. 30-40 мл/кг/день — обязательна на курсе для всех процессов.',
-    synergies: [
-        {with: "sodium", effect: "Гидратация", mechanism: "Натрий + вода — осмотический баланс", severity: "MEDIUM"},
-      ],
-    conflicts: [],
-    monitoring: [
-      { what: 'Электролиты', when: 'Каждые 4 нед' }
-    ],
-    contraindications: ['Нет'],
-    sideEffects: ['Нет'],
-    dosage: { mg: 2500, timing: 'в течение дня', form: 'вода 2.5 л/день' },
-    bestForCourse: true,
-  },
+  
   nmn: {
     id: 'nmn',
     name: 'NMN',

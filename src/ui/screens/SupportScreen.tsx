@@ -284,6 +284,19 @@ const TYPE_LABELS_RU: Record<string, string> = {
   AXIS: 'Гормональные оси', SYSTEM: 'Системы', ORGAN: 'Органы',
   SUBSTANCE: 'Вещества', INTERACTION: 'Взаимодействия', MECHANISM: 'Механизмы',
   RISK: 'Риски', caution: 'Предупреждения', conflict: 'Конфликты', synergy: 'Синергии',
+  gut: 'ЖКТ', hepatoprotector: 'Защита печени', metabolic: 'Метаболизм',
+  gastrointestinal: 'ЖКТ и пищеварение', cardioprotector: 'Сердце и сосуды',
+  anti_aging: 'Антивозраст', stimulant: 'Стимуляторы', immunomodulator: 'Иммунитет',
+  neuroprotector: 'Нейропротекторы', antiinflammatory: 'Противовоспалительные',
+  anti_inflammatory: 'Противовоспалительные', antimicrobial: 'Антимикробные',
+  anxiolytic: 'Противотревожные', antidepressant: 'Антидепрессанты',
+  anticoagulant: 'Антикоагулянты', urinary_protector: 'Урологические',
+  eye_protector: 'Защита глаз', respiratory: 'Дыхательная система',
+  bone: 'Кости и суставы', recovery: 'Восстановление', anabolic: 'Анаболические',
+  lipid: 'Липидные', beauty: 'Красота', multivitamin: 'Мультивитамины', marker: 'Маркеры',
+  bile_acid: 'Желчные кислоты',
+  choleretic: 'Желчегонные', thyroid: 'Щитовидная железа',
+  mitochondrial: 'Митохондриальные', hematologic: 'Гематология',
 };
 
 // Class base-name grouping for catalog badges
@@ -1496,7 +1509,11 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   const [neuroTab, setNeuroTab] = useState<'calc' | 'mechanisms' | 'support'>('calc');
 
   // Catalog sub-tab
-  const [catalogSubTab, setCatalogSubTab] = useState<'type' | 'organ' | 'tier'>('type');
+  const [catalogSubTab, setCatalogSubTab] = useState<'type' | 'organ' | 'tier' | 'complexes'>('type');
+  const isComplexId = (id: string) => {
+    const low = id.toLowerCase();
+    return low.includes('complex') || low.includes('_blend') || low.includes('_mix') || low.endsWith('_combo');
+  };
 
   const handlePubMedSearch = async () => {
     if (!pubMedQuery.trim()) return;
@@ -1782,6 +1799,11 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
     // Use 289 curated catalog entries directly
     let filtered = catalogSubstances;
     // Apply tier filter
+    if (catalogSubTab === 'complexes') {
+      filtered = filtered.filter(s => isComplexId(s.id));
+    } else {
+      filtered = filtered.filter(s => !isComplexId(s.id));
+    }
     if (supportTierFilter !== 'all') {
       filtered = filtered.filter(s => getSubstanceTier(s.id) === supportTierFilter);
     }
@@ -2612,7 +2634,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
             <button onClick={goHome} style={{ padding:'3px 10px', borderRadius:6, fontSize:10, cursor:'pointer', background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600, whiteSpace:'nowrap' }}>← На главную</button>
           </div>
           <div style={{ display:'flex', gap:4, padding:'6px 12px 8px', overflowX:'auto', scrollbarWidth:'none' }}>
-            {[['peptides','Пептиды'],['catalog','Каталог'],['synergies','Взаимодействие препаратов'],['readystacks','Стеки'],['interactions','Взаимодействия'],['research','Исследования'],['mixcalc','Микс'],['neuro','Нейро'],['joints','Суставы'],['acne','Акне']].map(([id,label]) => (
+            {[['peptides','Пептиды'],['catalog','Каталог'],['synergies','Взаимодействие препаратов'],['readystacks','Стеки'],['research','Исследования'],['mixcalc','Микс'],['protocols','Примерные протоколы поддержки']].map(([id,label]) => (
               <button key={id} onClick={() => { setInfoTab(id as any);
                 const a: Record<string,()=>void> = {
                   peptides: ()=>{ setSection('info'); setTab('main'); setSupportView('calc'); setCalcView('peptides'); setInfoTab('peptides'); },
@@ -2744,13 +2766,13 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
               <div>
                 {/* Sub-tabs: По типам / По органам / По уровням */}
                 <div style={{ display:'flex', gap:4, marginBottom:8, overflowX:'auto', scrollbarWidth:'none' }}>
-                  {(['type','organ','tier'] as const).map(t => (
+                  {(['type','organ','tier','complexes'] as const).map(t => (
                     <button key={t} onClick={() => setCatalogSubTab(t)} style={{
                       padding:'6px 12px', borderRadius:16, fontSize:9, fontWeight:700, whiteSpace:'nowrap', cursor:'pointer',
                       background: catalogSubTab === t ? 'var(--accent)' : 'var(--bg-secondary)',
                       color: catalogSubTab === t ? '#000' : 'var(--text-dim)',
                       border: `1px solid ${catalogSubTab === t ? 'var(--accent)' : 'var(--border)'}`,
-                    }}>{t === 'type' ? '📋 По типам' : t === 'organ' ? '🫀 По органам' : '⚡ По уровням'}</button>
+                    }}>{t === 'type' ? '📋 По типам' : t === 'organ' ? '🫀 По органам' : t === 'tier' ? '⚡ По уровням' : '🧩 Комплексы'}</button>
                   ))}
                 </div>
                 <div style={{ display:'flex', gap:6, marginBottom:8, alignItems:'center' }}>
@@ -2894,6 +2916,38 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                         </div>
                       );
                     })}
+                  </div>
+                )}
+                {catalogSubTab === 'complexes' && (
+                  /* Комплексы */
+                  <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
+                    {(() => {
+                      const complexItems = catalogSubstances.filter(s => isComplexId(s.id));
+                      return complexItems.length > 0 ? (
+                        complexItems.map(sub => {
+                          const isSelected = selectedSub === sub?.id;
+                          return (
+                            <div key={sub?.id||'x'} style={{ background:'var(--bg-secondary)', borderRadius:10, overflow:'hidden', border:'1px solid var(--border)' }}>
+                              <div onClick={() => setSelectedSub(isSelected ? null : (sub?.id||null))} style={{ display:'flex', alignItems:'flex-start', gap:4, padding:'8px 10px', cursor:'pointer' }}>
+                                <div style={{ flex:1 }}>
+                                  <div style={{ fontSize:10, fontWeight:700, color:'#8b5cf6', lineHeight:1.3 }}>🧩 {sub?.name||(sub?.id||'').replace(/_/g,' ')}</div>
+                                  <div style={{ display:'flex', gap:2, flexWrap:'wrap', marginTop:2 }}>
+                                    {(sub?.categories||[]).slice(0,3).map(c => <span key={c} style={{ fontSize:8, padding:'1px 4px', borderRadius:3, background:'rgba(139,92,246,0.08)', color:'#a78bfa' }}>{c||''}</span>)}
+                                  </div>
+                                </div>
+                                <span style={{ fontSize:9, color:'var(--text-dim)', fontWeight:600 }}>{complexItems.length}</span>
+                              </div>
+                              {isSelected && sub && (
+                                <div style={{ padding:'6px 10px 8px', background:'rgba(0,0,0,0.15)' }}>
+                                  {catDetailInteractions(sub, ALL_INTERACTIONS)}
+                                  {renderCatalogDetail(sub.id || (sub as any)?.id)}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })
+                      ) : <div style={{ padding:20, textAlign:'center', color:'var(--text-dim)', fontSize:10 }}>Комплексы не найдены</div>;
+                    })()}
                   </div>
                 )}
                 {(catalogSubTab === 'type' || !catalogSubTab) && (
@@ -3190,7 +3244,11 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                 ) : (
                   /* ─── СИНЕРГИИ/КОНФЛИКТЫ/ОСТОРОЖНОСТИ ─── */
                   <>
-                    {/* Severity filter + search */}
+                    {/* Search bar BELOW sub-tabs */}
+                    <div style={{ marginBottom:6 }}>
+                      <input value={synergySearch} onChange={e => setSynergySearch(e.target.value)} placeholder="🔍 Поиск по веществу/эффекту..." style={{ width:'100%', padding:'7px 10px', borderRadius:8, border:'1px solid var(--border)', background:'var(--bg-secondary)', color:'var(--text)', fontSize:10, boxSizing:'border-box' }} />
+                    </div>
+                    {/* Severity filter */}
                     <div style={{ display:'flex', gap:4, marginBottom:8, overflowX:'auto', scrollbarWidth:'none', flexWrap:'wrap' }}>
                       {(['all','LOW','MEDIUM','HIGH'] as const).map(s => (
                         <button key={s} onClick={() => { setInfoSynergySeverity(s); setSynergyPage(1); }} style={{
@@ -3200,7 +3258,6 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                           border: `1px solid ${infoSynergySeverity === s ? (INTERACTION_SEVERITY_LABELS[s]?.color || 'var(--accent)') : 'var(--border)'}`,
                         }}>{s === 'all' ? '♾️ Все' : `${INTERACTION_SEVERITY_LABELS[s]?.label||s}`}</button>
                       ))}
-                      <input value={synergySearch} onChange={e => setSynergySearch(e.target.value)} placeholder="🔍 Поиск по веществу/эффекту..." style={{ flex:1, minWidth:120, padding:'6px 8px', borderRadius:8, border:'1px solid var(--border)', background:'var(--bg-secondary)', color:'var(--text)', fontSize:9, boxSizing:'border-box' }} />
                     </div>
                      <div style={{ maxHeight:'calc(70vh)', overflowY:'auto', paddingRight:4 }}>{synergiesContent(
                        (() => {
@@ -3318,295 +3375,27 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                 </div>
               </div>
             )}
-            {renderView(infoView, 'interactions', () =>
+            {renderView(infoView, 'protocols', () =>
               <div>
-                <div style={{ marginBottom:8 }}>
-                  <div style={{ display:'flex', gap:4, marginBottom:8 }}>
-                    {(['support','pharma'] as const).map(t => (
-                      <button key={t} onClick={() => setInteractTab(t)} style={{
-                        flex:1, padding:'7px 0', borderRadius:8, fontSize:10, fontWeight:700, cursor:'pointer', transition:'all 0.15s',
-                        background: interactTab === t ? 'var(--accent)' : 'var(--bg-secondary)',
-                        color: interactTab === t ? '#000' : 'var(--text-dim)',
-                        border: 'none',
-                      }}>{t === 'support' ? '💊 Поддержка' : '💉 Фарма'}</button>
-                    ))}
-                  </div>
-                  {interactTab === 'support' ? (
-                    <div>
-                      <div style={{ display:'flex', flexDirection:'column', gap:6, marginBottom:8 }}>
-                        {interactionIds.map((id, idx) => {
-                          const selectedName = id ? (allSupport.find(s => s.id === id)?.name || id) : '';
-                          return (
-                            <div key={idx} style={{ background:'var(--bg-secondary)', borderRadius:10, padding:'8px 10px', border:'1px solid var(--border)' }}>
-                              <div style={{ display:'flex', alignItems:'center', gap:4, marginBottom:4 }}>
-                                <span style={{ fontSize:8, color:'var(--text-dim)', fontWeight:600, background:'rgba(255,255,255,0.04)', padding:'1px 5px', borderRadius:3 }}>#{idx+1}</span>
-                                <span style={{ flex:1, fontSize:9, color:'var(--text-dim)' }}>{id ? selectedName : 'Препарат'}</span>
-                                {id && <button onClick={() => { updateInteraction(idx, ''); setInteractionSearch(''); }} style={{ padding:'2px 6px', borderRadius:4, fontSize:8, cursor:'pointer', background:'rgba(239,68,68,0.1)', border:'1px solid rgba(239,68,68,0.2)', color:'#ef4444' }}>✕</button>}
-                              </div>
-                              <div style={{ position:'relative' }}>
-                                {id ? (
-                                  <div style={{ padding:'7px 8px', borderRadius:6, background:'rgba(0,230,138,0.06)', border:'1px solid rgba(0,230,138,0.15)', color:'#00e68a', fontSize:10, fontWeight:600 }}>{selectedName}</div>
-                                ) : (
-                                  <>
-                                    <input value={interactionSearchIdx===idx ? interactionSearch : ''} placeholder="🔍 Введите название..." onFocus={() => { setInteractionSearchIdx(idx); setInteractionSearch(''); }} onChange={e => { setInteractionSearchIdx(idx); setInteractionSearch(e.target.value); }} style={{ width:'100%', padding:'7px 8px', borderRadius:6, background:'rgba(0,0,0,0.2)', border:'1px solid var(--border)', color:'var(--text)', fontSize:10, boxSizing:'border-box' }} />
-                                    {interactionSearch && interactionSearchIdx===idx && (
-                                      <div style={{ position:'absolute', top:'100%', left:0, right:0, zIndex:10, background:'var(--bg)', border:'1px solid var(--border)', borderRadius:6, maxHeight:150, overflowY:'auto', marginTop:1 }}>
-                                        {allSupport.filter(s => (s.name||'').toLowerCase().includes(interactionSearch.toLowerCase())).slice(0,10).map(s => (
-                                          <div key={s.id} onClick={() => { updateInteraction(idx, s.id); setInteractionSearch(''); setInteractionSearchIdx(-1); }} style={{ padding:'7px 10px', cursor:'pointer', fontSize:10, borderBottom:'1px solid var(--border)' }}>
-                                            <span style={{ fontWeight:600, color:'var(--text)' }}>{s.name}</span>
-                                            <span style={{ fontSize:8, color:'var(--text-dim)', marginLeft:4 }}>{s.id}</span>
-                                          </div>
-                                        ))}
-                                      </div>
-                                    )}
-                                  </>
-                                )}
-                              </div>
-                            </div>
-                          );
-                        })}
-                        <button onClick={addInteraction} style={{ padding:'8px', borderRadius:8, fontSize:10, fontWeight:600, cursor:'pointer', background:'rgba(0,230,138,0.06)', border:'1px dashed rgba(0,230,138,0.3)', color:'#00e68a' }}>+ Добавить препарат</button>
-                      </div>
-                      {validInteractionIds.length<2 && <div style={{ textAlign:'center', padding:'20px 12px', background:'var(--bg-secondary)', borderRadius:10, border:'1px solid var(--border)' }}><div style={{ fontSize:20, marginBottom:4 }}>⚡</div><div style={{ fontSize:10, color:'var(--text-dim)' }}>Выберите минимум 2 препарата</div></div>}
-                      {validInteractionIds.length>=2 && !hasSupportInteractions && <div style={{ textAlign:'center', padding:'10px', borderRadius:8, background:'rgba(0,230,138,0.06)', border:'1px solid rgba(0,230,138,0.2)' }}><span style={{ fontSize:10, color:'#4caf50', fontWeight:600 }}>✓ Конфликтов не обнаружено</span></div>}
-                      {hasSupportInteractions && (
-                        <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
-                          {[
-                            { list: supportSynergiesList, label:'⊕ Синергия — положительное взаимодействие', color:'#22c55e' },
-                            { list: supportConflicts, label:'⊖ Конфликт — отрицательное взаимодействие', color:'#ef4444' },
-                            { list: supportCautions, label:'⚡ Осторожность — потенциальный риск', color:'#f59e0b' },
-                          ].filter(s => s.list.length>0).map(section => (
-                            <div key={section.label} style={{ background:'var(--bg-secondary)', borderRadius:10, padding:'8px 10px', border:'1px solid var(--border)' }}>
-                              <div style={{ fontSize:10, fontWeight:700, color:section.color, marginBottom:4 }}>{section.label} ({section.list.length})</div>
-                              {section.list.map(i => {
-                                const sevColor = i.severity === 'HIGH' ? '#ef4444' : i.severity === 'MEDIUM' ? '#f59e0b' : '#22c55e';
-                                const aName = resolveSubName(i.substanceA) || i.substanceA;
-                                const bName = resolveSubName(i.substanceB) || i.substanceB;
-                                const effDesc = showEffect(i);
-                                return (
-                                  <div key={i.id} style={{ padding:'5px 0', borderBottom:'1px solid var(--border)' }}>
-                                    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-                                      <span style={{ color:section.color, fontWeight:700, fontSize:9 }}>{aName} + {bName}</span>
-                                      <div style={{ display:'flex', gap:3 }}>
-                                        <span style={{ fontSize:7, padding:'1px 4px', borderRadius:3, background:section.color+'22', color:section.color, fontWeight:600 }}>{i.type === 'synergy' ? '⊕ Синергия' : i.type === 'conflict' ? '⊖ Конфликт' : '⚡ Осторожно'}</span>
-                                        {i.severity && <span style={{ fontSize:7, padding:'1px 4px', borderRadius:3, background:sevColor+'22', color:sevColor }}>{i.severity==='HIGH'?'Высокий':i.severity==='MEDIUM'?'Средний':'Низкий'}</span>}
-                                      </div>
-                                    </div>
-                                    {effDesc && <div style={{ fontSize:9, color:'rgba(255,255,255,0.85)', lineHeight:1.3, marginTop:2 }}>{effDesc}</div>}
-                                    {i.mechanisms && i.mechanisms.length > 0 && (
-                                      <div style={{ display:'flex', flexWrap:'wrap', gap:2, marginTop:2 }}>
-                                        {i.mechanisms.map((m: string, mi: number) => (
-                                          <span key={mi} style={{ fontSize:6, padding:'1px 5px', borderRadius:3, background:'rgba(139,92,246,0.12)', color:'#a78bfa', border:'1px solid rgba(139,92,246,0.15)' }}>{MECH_LABELS[m] || MECH_TRANSLATIONS_RU[m] || m}</span>
-                                        ))}
-                                      </div>
-                                    )}
-                                    {i.notes && <div style={{ fontSize:8, color:'var(--text-dim)', fontStyle:'italic', lineHeight:1.2, marginTop:1 }}>{i.notes}</div>}
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                      {/* Support interaction reference */}
-                      <div style={{ marginTop:8 }}>
-                        <div onClick={() => setExpandedCategories(prev => ({ ...prev, support_combo_ref: !prev.support_combo_ref }))} style={{ display:'flex', alignItems:'center', gap:6, padding:'7px 10px', cursor:'pointer', userSelect:'none', background:'var(--bg-secondary)', borderRadius:8 }}>
-                          <span style={{ fontSize:13 }}>💊</span>
-                          <div style={{ flex:1, fontSize:10, fontWeight:700, color:'var(--text-light)' }}>Взаимодействия препаратов поддержки</div>
-                          <span style={{ fontSize:9, color:'var(--text-dim)', transform: expandedCategories.support_combo_ref !== false ? 'rotate(180deg)' : 'none', transition:'transform 0.2s' }}>▼</span>
-                        </div>
-                        {expandedCategories.support_combo_ref !== false && (
-                          <div style={{ display:'flex', flexDirection:'column', gap:3, marginTop:4 }}>
-                            {supportInteractions && supportInteractions.length > 0 ? (
-                              supportInteractions.map(i => {
-                                const sevColor = i.severity === 'HIGH' ? '#ef4444' : i.severity === 'MEDIUM' ? '#f59e0b' : '#22c55e';
-                                const aName = resolveSubName(i.substanceA) || i.substanceA;
-                                const bName = resolveSubName(i.substanceB) || i.substanceB;
-                                const effDesc = showEffect(i);
-                                return (
-                                  <div key={i.id} style={{ padding:'6px 8px', borderRadius:8, background: i.type === 'synergy' ? 'rgba(34,197,94,0.06)' : i.type === 'conflict' ? 'rgba(239,68,68,0.06)' : 'rgba(234,179,8,0.06)', borderLeft:`3px solid ${sevColor}`, border:'1px solid var(--border)' }}>
-                                    <div style={{ display:'flex', justifyContent:'space-between', fontSize:9 }}>
-                                      <span style={{ fontWeight:600, color:'var(--text-light)' }}>{aName} + {bName}</span>
-                                      <span style={{ padding:'1px 5px', borderRadius:3, background:sevColor+'22', color:sevColor, fontSize:8, fontWeight:600 }}>{i.type === 'synergy' ? '⊕ Синергия' : i.type === 'conflict' ? '⊖ Конфликт' : '⚡ Осторожно'} · {i.severity}</span>
-                                    </div>
-                                    {effDesc && <div style={{ fontSize:9, color:'rgba(255,255,255,0.85)', marginTop:2 }}>{effDesc}</div>}
-                                    {i.mechanisms && i.mechanisms.length > 0 && (
-                                      <div style={{ display:'flex', flexWrap:'wrap', gap:2, marginTop:2 }}>
-                                        {i.mechanisms.map((m: string, mi: number) => (
-                                          <span key={mi} style={{ fontSize:7, padding:'1px 5px', borderRadius:3, background:'rgba(139,92,246,0.12)', color:'#a78bfa' }}>{MECH_LABELS[m] || MECH_TRANSLATIONS_RU[m] || m}</span>
-                                        ))}
-                                      </div>
-                                    )}
-                                    {i.notes && <div style={{ fontSize:8, color:'var(--text-dim)', fontStyle:'italic', marginTop:1 }}>{i.notes}</div>}
-                                  </div>
-                                );
-                              })
-                            ) : (
-                              <div style={{ textAlign:'center', padding:'12px', color:'var(--text-dim)', fontSize:10 }}>Добавьте препараты поддержки выше для проверки их взаимодействий</div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  ) : (
-                    <div>
-                      <div style={{ display:'flex', flexDirection:'column', gap:6, marginBottom:8 }}>
-                        {(() => {
-                          const PHARMA_CORE_FILTER = new Set(['testosterone','trenbolone','nandrolone','boldenone','primobolan','oral_17aa','sarm','drostanolone','dht_derivative','igf1','mgf','insulin']);
-                          const pharmaAll = Object.values(PHARMA_DB).filter((s): s is (typeof PHARMA_DB)[string] => !!s?.name && PHARMA_CORE_FILTER.has(s.class));
-                          const pharmaFiltered = pharmaInteractSearch ? pharmaAll.filter(s => (s.name||'').toLowerCase().includes(pharmaInteractSearch.toLowerCase())) : pharmaAll;
-                          const pharmaValid = pharmaInteractIds.filter(Boolean);
-                          return (<>
-                            {pharmaInteractIds.map((id, idx) => {
-                              const selectedName = id ? (PHARMA_DB[id]?.name || '') : '';
-                              return (
-                                <div key={idx} style={{ background:'var(--bg-secondary)', borderRadius:10, padding:'8px 10px', border:'1px solid var(--border)' }}>
-                                  <div style={{ display:'flex', alignItems:'center', gap:4, marginBottom:4 }}>
-                                    <span style={{ fontSize:8, color:'var(--text-dim)', fontWeight:600, background:'rgba(255,255,255,0.04)', padding:'1px 5px', borderRadius:3 }}>#{idx+1}</span>
-                                    <span style={{ flex:1, fontSize:9, color:'var(--text-dim)' }}>{id ? selectedName : 'Препарат'}</span>
-                                    {id && <button onClick={() => { const next=[...pharmaInteractIds]; next[idx]=''; setPharmaInteractIds(next); setPharmaInteractSearch(''); }} style={{ padding:'2px 6px', borderRadius:4, fontSize:8, cursor:'pointer', background:'rgba(239,68,68,0.1)', border:'1px solid rgba(239,68,68,0.2)', color:'#ef4444' }}>✕</button>}
-                                  </div>
-                                  <div style={{ position:'relative' }}>
-                                    {id ? (
-                                      <div style={{ padding:'7px 8px', borderRadius:6, background:'rgba(139,92,246,0.06)', border:'1px solid rgba(139,92,246,0.15)', color:'#a78bfa', fontSize:10, fontWeight:600 }}>{selectedName}</div>
-                                    ) : (
-                                      <>
-                                        <input value={pharmaInteractSearch} onChange={e => { setPharmaInteractSearch(e.target.value); }} placeholder="🔍 Введите название..." style={{ width:'100%', padding:'7px 8px', borderRadius:6, background:'rgba(0,0,0,0.2)', border:'1px solid var(--border)', color:'var(--text)', fontSize:10, boxSizing:'border-box' }} />
-                                        {pharmaInteractSearch && (
-                                          <div style={{ position:'absolute', zIndex:10, background:'var(--bg)', border:'1px solid var(--border)', borderRadius:6, maxHeight:150, overflowY:'auto', marginTop:1, width:'calc(100% - 2px)' }}>
-                                            {pharmaFiltered.slice(0,10).map(s => <div key={s.id} onClick={() => { const next=[...pharmaInteractIds]; next[idx]=s.id; setPharmaInteractIds(next); setPharmaInteractSearch(''); }} style={{ padding:'7px 10px', cursor:'pointer', fontSize:10, borderBottom:'1px solid var(--border)' }}><span style={{ fontWeight:600, color:'var(--text)' }}>{s.name}</span><span style={{ marginLeft:4, color:'var(--text-dim)', fontSize:8 }}>{s.class}</span></div>)}
-                                          </div>
-                                        )}
-                                      </>
-                                    )}
-                                  </div>
-                                </div>
-                              );
-                            })}
-                            <button onClick={() => setPharmaInteractIds([...pharmaInteractIds, ''])} style={{ padding:'8px', borderRadius:8, fontSize:10, fontWeight:600, cursor:'pointer', background:'rgba(0,230,138,0.06)', border:'1px dashed rgba(0,230,138,0.3)', color:'#00e68a' }}>+ Добавить препарат</button>
-                            {pharmaValid.length>=2 && checkDrugInteractions(pharmaValid.map((id,i)=>({id:`${id}-${i}`,substanceId:id,doseValue:300,doseUnit:'mg/wk',frequency:'2x/week',startWeek:0,endWeek:12}))).length===0 && (
-                              <div style={{ padding:'10px', borderRadius:8, background:'rgba(0,230,138,0.06)', border:'1px solid rgba(0,230,138,0.2)', textAlign:'center' }}><span style={{ fontSize:10, color:'#4caf50', fontWeight:600 }}>✓ Конфликтов не обнаружено</span></div>
-                            )}
-                            {pharmaValid.length>=2 && checkDrugInteractions(pharmaValid.map((id,i)=>({id:`${id}-${i}`,substanceId:id,doseValue:300,doseUnit:'mg/wk',frequency:'2x/week',startWeek:0,endWeek:12}))).map((alert,i)=>{
-                              const c = alert.type==='critical'?'#ff1744':alert.type==='warning'?'#ff9100':'#2979ff';
-                              const icon = alert.type==='critical'?'🚫':alert.type==='warning'?'⚠️':'ℹ️';
-                              return <div key={i} style={{ background:'var(--bg-secondary)', borderRadius:10, padding:'10px', marginBottom:4, borderLeft:`3px solid ${c}`, border:'1px solid var(--border)' }}>
-                                <div style={{ display:'flex', alignItems:'center', gap:4, marginBottom:3 }}><span style={{ fontSize:12 }}>{icon}</span><span style={{ fontWeight:700, fontSize:9, color:c }}>{alert.type==='critical'?'КРИТИЧЕСКОЕ':alert.type==='warning'?'ПРЕДУПРЕЖДЕНИЕ':'ИНФО'}</span></div>
-                                <div style={{ fontSize:10, fontWeight:600, color:'var(--text-light)', marginBottom:2 }}>{alert.drugs.join(' + ')}</div>
-                                <div style={{ fontSize:9, color:'var(--text-dim)', lineHeight:1.3 }}><b>Механизм:</b> {alert.mechanism}</div>
-                                <div style={{ fontSize:9, color:'var(--text-dim)', lineHeight:1.3 }}><b>Рекомендация:</b> {alert.recommendation}</div>
-                              </div>;
-                            })}
-                          </>);
-                        })()}
-                      </div>
-                    </div>
-              )}
-                    {/* Hardcoded drug interaction cards */}
-                    <div style={{ marginTop:8, display: interactTab === 'pharma' ? 'block' : 'none' }}>
-                      <div onClick={() => setExpandedCategories(prev => ({ ...prev, drug_combo_ref: !prev.drug_combo_ref }))} style={{ display:'flex', alignItems:'center', gap:6, padding:'7px 10px', cursor:'pointer', userSelect:'none', background:'var(--bg-secondary)', borderRadius:8 }}>
-                        <span style={{ fontSize:13 }}>💊</span>
-                        <div style={{ flex:1, fontSize:10, fontWeight:700, color:'var(--text-light)' }}>Фармакологические взаимодействия</div>
-                          <span style={{ fontSize:9, color:'var(--text-dim)', marginRight:2 }}>70</span>
-                        <span style={{ fontSize:9, color:'var(--text-dim)', transform: expandedCategories.drug_combo_ref !== false ? 'rotate(180deg)' : 'none', transition:'transform 0.2s' }}>▼</span>
-                      </div>
-                      {expandedCategories.drug_combo_ref !== false && (
-                        <div style={{ display:'flex', flexDirection:'column', gap:3, marginTop:4 }}>
-                          {([
-                            { a:'Тестостерон', b:'Тренболон', effect:'Усиление андрогенного эффекта', risk:'Агрессия, акне, липиды', control:'Липидограмма каждые 4 нед.', type:'warning' },
-                            { a:'Тестостерон', b:'Мастерон', effect:'Синергия. Мастерон снижает ароматизацию тестостерона', risk:'Подавление Е2', control:'Контроль Е2', type:'synergy' },
-                            { a:'Тестостерон', b:'Болденон', effect:'Медленный набор массы', risk:'Повышение гематокрита', control:'ОАК', type:'caution' },
-                            { a:'Тренболон', b:'Болденон', effect:'Оба повышают гематокрит и АД', risk:'Тромбоз', control:'ОАК + АД еженедельно', type:'critical' },
-                            { a:'Телмисартан', b:'Небиволол', effect:'Усиление гипотензивного эффекта (БРА + бета-блокатор)', risk:'Брадикардия, гипотония', control:'АД и ЧСС 2x/день. Коррекция дозы при ЧСС <50', type:'caution' },
-                            { a:'Телмисартан', b:'Амлодипин', effect:'Синергия. БРА + блокатор кальциевых каналов', risk:'Меньше отёков чем амлодипин отдельно', control:'Контроль АД', type:'synergy' },
-                            { a:'Метформин', b:'Берберин', effect:'Оба снижают глюкозу', risk:'Гипогликемия', control:'Глюкометр', type:'warning' },
-                            { a:'Инсулин', b:'Метформин', effect:'Метформин снижает потребность в инсулине на 20-30%', risk:'Гипогликемия', control:'Коррекция дозы инсулина', type:'caution' },
-                            { a:'Станазолол', b:'Оксандролон', effect:'Оба 17α-алкилированные гепатотоксичные', risk:'Холестаз', control:'АЛТ/АСТ/ГГТ каждые 2 нед. НЕ комбинировать!', type:'critical' },
-                            { a:'Оксандролон', b:'Тестостерон', effect:'Синергия. Оксандролон снижает ГСПГ', risk:'Больше свободного тестостерона', control:'Контроль ГСПГ', type:'synergy' },
-                            { a:'Тамоксифен', b:'Кломифен', effect:'Оба СЕРМ. Синергия в ПКТ', risk:'Тамоксифен для Е2, кломифен для ЛГ/ФСГ', control:'Гормональная панель', type:'synergy' },
-                            { a:'Анастрозол', b:'Тамоксифен', effect:'Анастрозол снижает Е2, тамоксифен блокирует рецепторы', risk:'Синергия при гинекомастии', control:'Контроль Е2', type:'synergy' },
-                            { a:'Дексаметазон', b:'Тестостерон', effect:'Глюкокортикоид + андроген', risk:'Гипергликемия, катаболизм', control:'Глюкоза', type:'warning' },
-                            { a:'Тестостерон', b:'Примоболан', effect:'Синергия. Нет ароматизации', risk:'Липиды', control:'Липидограмма', type:'synergy' },
-                            { a:'Тренболон', b:'Мастерон', effect:'Синергия (сухая масса)', risk:'Липиды, агрессия', control:'Липидограмма, настроение', type:'synergy' },
-                            { a:'Болденон', b:'Нандролон', effect:'Оба повышают гематокрит', risk:'Тромбоз', control:'ОАК каждые 2 нед.', type:'critical' },
-                            { a:'Анавар', b:'Винстрол', effect:'Оба 17α-алкилированные', risk:'Гепатотоксичность x2', control:'НЕ комбинировать >4 нед. АЛТ/АСТ', type:'critical' },
-                            { a:'Кломид', b:'ХГЧ', effect:'Синергия в ПКТ. ХГЧ восстанавливает тестикулы, кломид стимулирует гипофиз', risk:'Эстрогеновый отскок', control:'Е2, ЛГ, ФСГ', type:'synergy' },
-                            { a:'Аримидекс', b:'Тамоксифен', effect:'Разные механизмы. Аримидекс снижает ароматизацию, тамоксифен блокирует рецепторы Е2', risk:'Избыточное подавление Е2', control:'Е2 каждые 4 нед.', type:'synergy' },
-                            { a:'Метформин', b:'ГР', effect:'ГР повышает глюкозу, метформин компенсирует', risk:'Гипогликемия', control:'Глюкоза натощак', type:'caution' },
-                            { a:'L-тироксин', b:'Кленбутерол', effect:'Оба повышают ЧСС и метаболизм', risk:'Тахикардия, тремор', control:'ЧСС, ТТГ', type:'warning' },
-                            { a:'Тестостерон', b:'Дека-дураболин', effect:'Дека (нандролон) с тестостероном — классика', risk:'Пролактин, прогестероновая активность', control:'Пролактин каждые 4 нед.', type:'caution' },
-                             { a:'Тренболон', b:'ГР', effect:'Синергия. Тренболон повышает IGF-1, ГР добавляет IGF-1 из печени', risk:'Гипогликемия (ГР + инсулин)', control:'Глюкоза', type:'synergy' },
-                             { a:'Тестостерон', b:'Экземестан (Аромазин)', effect:'Экземестан снижает Е2 (суицидальный ингибитор ароматазы)', risk:'Избыточное подавление Е2', control:'Е2 через 2 недели', type:'synergy' },
-                             { a:'Тренболон', b:'Каберголин', effect:'Каберголин снижает пролактин от тренболона', risk:'Передозировка каберголина', control:'Пролактин, доза 0.25мг 2р/нед', type:'synergy' },
-                             { a:'Оксандролон', b:'Тамоксифен', effect:'Тамоксифен снижает ГСПГ — больше свободного оксандролона', risk:'Снижение ГСПГ', control:'Контроль ГСПГ', type:'synergy' },
-                             { a:'Кленбутерол', b:'Кетотифен', effect:'Кетотифен восстанавливает β2-рецепторы, продлевает действие кленбутерола', risk:'Седация от кетотифена', control:'Цикл 2 нед кленбутерол + 1 нед кетотифен', type:'synergy' },
-                             { a:'T3', b:'Кленбутерол', effect:'Синергия жиросжигания', risk:'Катаболизм, тахикардия', control:'ЧСС, ТТГ', type:'warning' },
-                             { a:'Гидрохлортиазид', b:'Калий', effect:'Гидрохлортиазид вымывает калий — обязательная компенсация', risk:'Гипокалиемия', control:'Калий сыворотки', type:'caution' },
-                             { a:'Фуросемид', b:'Калий', effect:'Мощный диуретик, резкая потеря калия', risk:'Аритмия', control:'Калий + ЭКГ', type:'critical' },
-                             { a:'Спиронолактон', b:'Калий', effect:'Калий-сберегающий диуретик', risk:'Гиперкалиемия. НЕ добавлять калий!', control:'Калий сыворотки', type:'critical' },
-                             { a:'Статины', b:'Убихинол (CoQ10)', effect:'Статины блокируют синтез CoQ10', risk:'Миопатия, слабость', control:'CoQ10 100-200 мг/день обязательно', type:'warning' },
-                             { a:'Финастерид', b:'Цинк', effect:'Оба снижают DHT — усиление эффекта против выпадения волос', risk:'Снижение либидо', control:'DHT, контроль симптомов', type:'synergy' },
-                             { a:'Тестостерон', b:'Дутастерид', effect:'Полная защита от DHT (оба типа 5α-редуктазы)', risk:'Депрессия либидо (пост-финастеридный синдром)', control:'PSA, DHT', type:'warning' },
-                             { a:'Нандролон', b:'Прамипексол', effect:'Прамипексол (D2-агонист) снижает пролактин от нандролона', risk:'Избыточное снижение пролактина', control:'Пролактин каждые 2 нед.', type:'caution' },
-                             { a:'Тестостерон', b:'Финастерид', effect:'Финастерид блокирует 5α-редуктазу II типа. Защита от DHT на простату и волосы.', risk:'Пост-финастеридный синдром', control:'DHT, простата', type:'caution' },
-                             { a:'Метформин', b:'Витамин B12', effect:'Метформин истощает B12 через 6-12 мес приёма', risk:'Дефицит B12', control:'B12 каждые 6 мес. Добавка 500-1000 мкг/день.', type:'warning' },
-                             { a:'Кленбутерол', b:'Таурин', effect:'Кленбутерол истощает таурин в миокарде', risk:'Судороги, аритмия', control:'Таурин 3-5 г/день обязательно', type:'warning' },
-                             { a:'Аспирин', b:'Омепразол', effect:'Омепразол защищает желудок от НПВС-гастропатии', risk:'Симптомы гастрита', control:'Контроль симптомов гастрита', type:'caution' },
-                             { a:'Ибупрофен', b:'Телмисартан', effect:'НПВС снижают антигипертензивный эффект БРА', risk:'Задержка натрия и воды', control:'Контроль АД', type:'caution' },
-                             { a:'Эналаприл', b:'Калий', effect:'иАПФ задерживают калий. Добавка калия может вызвать гиперкалиемию.', risk:'Гиперкалиемия', control:'Калий сыворотки', type:'warning' },
-                             { a:'Тамоксифен', b:'Варфарин', effect:'Тамоксифен усиливает действие варфарина (ингибирует CYP2C9)', risk:'Кровотечения', control:'МНО', type:'critical' },
-                             { a:'Анастрозол', b:'Витамин D', effect:'Анастрозол снижает Е2, ухудшая усвоение витамина D и кальция', risk:'Остеопороз, дефицит витамина D', control:'D3 повысить до 4000-5000 IU', type:'caution' },
-                             { a:'Мифепристон', b:'Кортизол', effect:'Мифепристон блокирует рецепторы кортизола. При синдроме Кушинга.', risk:'Недостаточность надпочечников', control:'Кортизол', type:'warning' },
-                             { a:'Цинк', b:'Медь', effect:'Цинк конкурирует с медью за всасывание. Соотношение Zn:Cu = 10:1.', risk:'Дефицит меди', control:'Добавка меди при длительном приёме цинка', type:'caution' },
-                             { a:'Кальций', b:'Магний', effect:'Кальций и магний конкурируют за транспорт', risk:'Снижение усвоения', control:'Принимать раздельно: Ca утром, Mg вечером.', type:'caution' },
-                             { a:'Витамин D', b:'Витамин K2', effect:'Синергия. D3 повышает всасывание Ca, K2 направляет Ca в кости.', risk:'Кальцификация сосудов без K2', control:'Обязательная комбинация при D3 >2000 IU', type:'synergy' },
-                             { a:'Витамин C', b:'Железо', effect:'Витамин C удваивает всасывание негемового железа', risk:'Перегрузка железом при гемохроматозе', control:'Принимать вместе. Контроль ферритина.', type:'caution' },
-                             { a:'Грейпфрутовый сок', b:'Статины', effect:'Грейпфрут ингибирует CYP3A4, повышая уровень статинов в 3-5 раз', risk:'Рабдомиолиз', control:'ИЗБЕГАТЬ совместного приёма!', type:'critical' },
-                              { a:'L-тироксин', b:'Кальций/Железо', effect:'Кальций и железо снижают всасывание L-тироксина на 30-40%', risk:'Гипотиреоз', control:'Принимать тироксин за 4 часа до/после', type:'warning' },
-                              { a:'Тестостерон', b:'Провирон', effect:'Провирон (местеролон) снижает ГСПГ → повышает свободный Т на 30-50%', risk:'Не ароматизируется. Антиэстрогенный эффект.', control:'Контроль ГСПГ, свободного Т', type:'synergy' },
-                              { a:'Тренболон', b:'Бромокриптин', effect:'Бромокриптин (D2-агонист) снижает тренболон-индуцированный пролактин', risk:'Альтернатива каберголину', control:'Пролактин каждые 2 нед.', type:'caution' },
-                              { a:'Нандролон', b:'Провирон', effect:'Провирон маскирует "дека-дик" (либидо) через DHT-активность', risk:'Контроль Е2', control:'Е2, ГСПГ', type:'synergy' },
-                              { a:'Болденон', b:'Анастрозол', effect:'Болденон ароматизируется слабо (50% от Т)', risk:'Применять анастрозол только при симптомах Е2', control:'Е2', type:'caution' },
-                              { a:'Метандиенон', b:'Туринабол', effect:'Оба 17α-алкилированные оральные → гепатотоксичность x2', risk:'Максимум: 4 недели комбинации', control:'АЛТ/АСТ/ГГТ каждые 2 нед.', type:'critical' },
-                              { a:'Туринабол', b:'NAC', effect:'Туринабол гепатотоксичен. NAC обязателен для защиты печени', risk:'1800-2400 мг/день NAC', control:'АЛТ/АСТ каждые 2 нед.', type:'warning' },
-                              { a:'Оксандролон', b:'Креатин', effect:'Оксандролон + креатин усиливают синтез фосфокреатина', risk:'Больше силы на сушке', control:'Гидратация', type:'synergy' },
-                              { a:'ГР', b:'Инсулин', effect:'Мощная анаболическая синергия (IGF-1 x2)', risk:'Гипогликемия', control:'Инсулин через 30 мин после ГР. Глюкометр', type:'critical' },
-                              { a:'ИФР-1', b:'Инсулин', effect:'ИФР-1 повышает чувствительность к инсулину', risk:'Гипогликемия — снизить дозу инсулина на 30%', control:'Глюкоза', type:'warning' },
-                              { a:'Метформин', b:'Альфа-липоевая кислота', effect:'Оба улучшают чувствительность к инсулину', risk:'ALA защищает от метформин-индуцированного дефицита B12', control:'B12 каждые 6 мес.', type:'synergy' },
-                              { a:'Т3', b:'L-карнитин', effect:'Усиливают транспорт жирных кислот в митохондрии', risk:'Жиросжигающая синергия', control:'ТТГ', type:'caution' },
-                              { a:'Эфедрин', b:'Кофеин', effect:'ECA-стек: термогенный синергизм (x2 эффект)', risk:'Тахикардия, АД. Макс: 25/200 мг 2-3x/д.', control:'АД, ЧСС', type:'warning' },
-                              { a:'Йохимбин', b:'Кофеин', effect:'α2-антагонист + кофеин = липолиз упрямых зон', risk:'Паника, тахикардия', control:'Натощак. Контроль ЧСС', type:'caution' },
-                              { a:'Тестостерон', b:'Инсулин', effect:'Тестостерон повышает чувствительность к инсулину на 30%', risk:'Снизить дозу инсулина при старте курса Т', control:'Глюкометр', type:'warning' },
-                              { a:'Витамин К2', b:'Витамин D3', effect:'D3 повышает всасывание Ca, K2 направляет в кости', risk:'Без K2 — кальцификация сосудов', control:'Обязательная комбинация при D3 >2000 IU', type:'caution' },
-                              { a:'Куркумин', b:'Пиперин', effect:'Пиперин повышает биодоступность куркумина на 2000%', risk:'Обязательная комбинация', control:'', type:'synergy' },
-                              { a:'Ресвератрол', b:'Кверцетин', effect:'Оба активируют сиртуины (SIRT1)', risk:'Антивозрастной + антивоспалительный эффект', control:'', type:'synergy' },
-                              { a:'NMN', b:'Ресвератрол', effect:'NMN повышает NAD+, ресвератрол активирует SIRT1', risk:'NMN→топливо, ресвератрол→двигатель', control:'', type:'synergy' },
-                              { a:'Магний', b:'Кальций', effect:'Конкуренция за всасывание', risk:'Раздельный приём: Mg на ночь, Ca утром', control:'Соотношение 1:2', type:'caution' },
-                              { a:'Цинк', b:'Железо', effect:'Цинк и железо конкурируют за всасывание', risk:'Zn на ночь, Fe утром', control:'Раздельный приём', type:'caution' },
-                             ] as const).map((combo, ci) => {
-                            const typeColor = combo.type === 'critical' ? '#ff1744' : combo.type === 'warning' ? '#ff9100' : combo.type === 'synergy' ? '#22c55e' : '#f59e0b';
-                            const typeLabel = combo.type === 'critical' ? '🚫 КРИТИЧНО' : combo.type === 'warning' ? '⚡ ОСТОРОЖНО' : combo.type === 'synergy' ? '⊕ СИНЕРГИЯ' : 'ℹ УМЕРЕННО';
-                            return (
-                              <div key={ci} style={{ background:'var(--bg-secondary)', borderRadius:8, padding:'6px 8px', borderLeft:`3px solid ${typeColor}`, border:'1px solid var(--border)' }}>
-                                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:2 }}>
-                                  <span style={{ fontSize:9, fontWeight:700, color:'var(--text-light)' }}>{combo.a} + {combo.b}</span>
-                                  <span style={{ fontSize:7, padding:'1px 5px', borderRadius:3, background:typeColor+'22', color:typeColor, fontWeight:600 }}>{typeLabel}</span>
-                                </div>
-                                <div style={{ fontSize:8, color:'rgba(255,255,255,0.85)', lineHeight:1.3 }}>{combo.effect}</div>
-                                <div style={{ fontSize:7, color:'#f87171', lineHeight:1.2, marginTop:1 }}>⚠ Риск: {combo.risk}</div>
-                                <div style={{ fontSize:7, color:'#60a5fa', lineHeight:1.2 }}>📋 Контроль: {combo.control}</div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </div>
-                  </div>
+                <div style={{ display:'flex', gap:4, marginBottom:8, overflowX:'auto', scrollbarWidth:'none', flexWrap:'wrap' }}>
+                  {[['neuro','🧠 Нейротоксичность'],['joints','🦴 Суставы'],['acne','🔴 Акне'],['peptides','🧬 Пептиды']].map(([id,label]) => (
+                    <button key={id} onClick={() => setCalcView(id as CalcView)} style={{
+                      padding:'7px 14px', borderRadius:20, fontSize:10, fontWeight:700, whiteSpace:'nowrap', cursor:'pointer', flexShrink:0,
+                      background: calcView === id ? 'var(--accent)' : 'var(--bg-secondary)',
+                      color: calcView === id ? '#000' : 'var(--text-dim)',
+                      border: '1px solid ' + (calcView === id ? 'var(--accent)' : 'var(--border)'),
+                    }}>{label}</button>
+                  ))}
                 </div>
-              )}
-
-              {/* ===== RESEARCH: Multi-Source ===== */}
-              {renderView(infoView, 'research', () => (
+                <div style={{ fontSize:10, color:'var(--text-dim)', margin: '4px 0 8px' }}>
+                  {(calcView as string) === 'neuro' && 'Детальные механизмы нейротоксичности ААС и протокол нейропротекции'}
+                  {(calcView as string) === 'joints' && 'Калькулятор поддержки суставов, анализы и протоколы'}
+                  {(calcView as string) === 'acne' && 'Анти-прыщ протокол: ниацинамид, ретиноиды, солярий, гигиена'}
+                  {(calcView as string) === 'peptides' && 'Пептидный калькулятор, протоколы, PK/PD'}
+                </div>
+              </div>
+            )}
+            {renderView(infoView, 'research', () => (
                 <div>
                   <div style={{fontSize:13,fontWeight:700,color:'var(--accent)',marginBottom:4}}>🔬 Поиск исследований</div>
                   <div style={{fontSize:9,color:'var(--text-dim)',marginBottom:8}}>PubMed, PubChem, Google Scholar, OpenFDA и каталог препаратов</div>
