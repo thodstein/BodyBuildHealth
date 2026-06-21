@@ -386,12 +386,17 @@ export const ProfileScreen: React.FC = () => {
   const [weightLog, setWeightLog] = useState<WeightEntry[]>(getWeightLog);
   const [workoutLogs, setWorkoutLogs] = useState<WorkoutLog[]>([]);
   const [bpEntries, setBpEntries] = useState<BPEntry[]>(getBPDiary);
-  const [bpPeriod, setBpPeriod] = useState<'day' | 'week' | 'month'>('week');
+  const [bpPeriod, setBpPeriod] = useState<'day' | 'week' | 'month' | 'all'>('week');
   const [showBpForm, setShowBpForm] = useState(false);
   const [bpSystolic, setBpSystolic] = useState('');
   const [bpDiastolic, setBpDiastolic] = useState('');
   const [bpHr, setBpHr] = useState('');
   const [reportTab, setReportTab] = useState<'current' | 'archive'>('current');
+  const [showCustomReport, setShowCustomReport] = useState(false);
+  const [customReportBlocks, setCustomReportBlocks] = useState<Record<string, boolean>>({
+    profile: true, training: true, nutrition: true, labs: true,
+    pharma: true, risk: true, support: true, bp: true, sleep: true,
+  });
 
   // Food diary data for reports
   const [foodDiaryAvg, setFoodDiaryAvg] = useState<{avgKcal:number;avgProtein:number;avgFat:number;avgCarbs:number} | null>(null);
@@ -1797,24 +1802,85 @@ export const ProfileScreen: React.FC = () => {
                        {[
                          { label:'🏋️ Тренеру', color:'#3b82f6', report:trainerReport },
                          { label:'🏥 Врачу', color:'#ef4444', report:doctorReport },
-                         { label:'📋 Общий', color:'#00e68a', report:generalReport },
-                       ].map((btn, i) => (
-                         <button key={i} onClick={() => {
-                           try {
-                             const rep = { id: Date.now().toString(), date: new Date().toISOString().slice(0,10), type: btn.label, text: btn.report, timestamp: Date.now() };
-                             const archive = JSON.parse(localStorage.getItem('he_profile_reports') || '[]');
-                             archive.unshift(rep);
-                             localStorage.setItem('he_profile_reports', JSON.stringify(archive.slice(0, 30)));
-                           } catch {}
-                         }} style={{
-                           padding:'6px 12px', borderRadius:8, fontSize:9, cursor:'pointer', fontWeight:600,
-                           background: btn.color + '15', border: '1px solid ' + btn.color + '30',
-                           color: btn.color, whiteSpace:'nowrap',
-                         }}>📄 {btn.label}</button>
-                       ))}
-                     </div>
-                     {[
-                { title: 'Отчёт для тренера', text: trainerReport, color: '#3b82f6', icon: '🏋️' },
+                          { label:'📋 Общий', color:'#00e68a', report:generalReport },
+                          { label:'🎨 Свой', color:'#8b5cf6', report:'custom' },
+                        ].map((btn, i) => (
+                          <button key={i} onClick={() => {
+                            if (btn.report === 'custom') { setShowCustomReport(true); return; }
+                            try {
+                              const rep = { id: Date.now().toString(), date: new Date().toISOString().slice(0,10), type: btn.label, text: btn.report, timestamp: Date.now() };
+                              const archive = JSON.parse(localStorage.getItem('he_profile_reports') || '[]');
+                              archive.unshift(rep);
+                              localStorage.setItem('he_profile_reports', JSON.stringify(archive.slice(0, 30)));
+                            } catch {}
+                          }} style={{
+                            padding:'6px 12px', borderRadius:8, fontSize:9, cursor:'pointer', fontWeight:600,
+                            background: btn.color + '15', border: '1px solid ' + btn.color + '30',
+                            color: btn.color, whiteSpace:'nowrap',
+                          }}>📄 {btn.label}</button>
+                        ))}
+                      </div>
+
+                      {/* Custom report popup */}
+                      {showCustomReport && (
+                        <div style={{ position:'fixed', inset:0, zIndex:1000, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(0,0,0,0.6)', padding:20 }} onClick={() => setShowCustomReport(false)}>
+                          <div style={{ background:'#18181b', borderRadius:16, padding:20, maxWidth:380, width:'100%', border:'1px solid rgba(255,255,255,0.06)' }} onClick={e => e.stopPropagation()}>
+                            <h3 style={{ margin:'0 0 4px', fontSize:14, fontWeight:700, color:'#fff' }}>🎨 Свой отчёт</h3>
+                            <p style={{ fontSize:9, color:'rgba(255,255,255,0.6)', margin:'0 0 12px' }}>Выберите блоки для включения в отчёт</p>
+                            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6, marginBottom:12 }}>
+                              {[
+                                { key:'profile', label:'Профиль', icon:'👤', color:'#a78bfa' },
+                                { key:'training', label:'Тренировки', icon:'🏋️', color:'#3b82f6' },
+                                { key:'nutrition', label:'Питание', icon:'🥗', color:'#22c55e' },
+                                { key:'labs', label:'Анализы', icon:'🩸', color:'#ef4444' },
+                                { key:'pharma', label:'Курс', icon:'💊', color:'#ec4899' },
+                                { key:'risk', label:'Риски', icon:'⚠️', color:'#f97316' },
+                                { key:'support', label:'Поддержка', icon:'🧪', color:'#06b6d4' },
+                                { key:'bp', label:'Давление', icon:'❤️', color:'#f43f5e' },
+                                { key:'sleep', label:'Сон', icon:'🛌', color:'#8b5cf6' },
+                              ].map(b => (
+                                <label key={b.key} style={{ display:'flex', alignItems:'center', gap:8, padding:'8px 10px', borderRadius:8, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', cursor:'pointer' }}>
+                                  <input type="checkbox" checked={!!customReportBlocks[b.key]} onChange={() => setCustomReportBlocks(prev => ({ ...prev, [b.key]: !prev[b.key] }))} style={{ width:16, height:16, accentColor:'#00e68a', cursor:'pointer' }} />
+                                  <span style={{ fontSize:12 }}>{b.icon}</span>
+                                  <span style={{ fontSize:10, color:'rgba(255,255,255,0.85)', fontWeight:600, flex:1 }}>{b.label}</span>
+                                </label>
+                              ))}
+                            </div>
+                            <button onClick={() => {
+                              const sections: string[] = [];
+                              if (customReportBlocks.profile) sections.push(`👤 Профиль:\n  Имя: ${profile.name || '—'} · ${settings.age || '—'} лет · ${settings.weight || '—'} кг · ${settings.height || '—'} см · BMI: ${bmiVal} · Цель: ${goalLabelR}`);
+                              if (customReportBlocks.training) sections.push(`🏋️ Тренировки:\n  Частота: ${settings.workoutsPerWeek || '—'}/нед · Длит: ${settings.avgWorkoutMinutes || '—'} мин · Программа: ${localStorage.getItem('he_current_program') || '—'}\n${workoutSummary}`);
+                              if (customReportBlocks.nutrition) sections.push(`🥗 Питание:\n  Ккал: ${foodDiaryAvg?.avgKcal || '—'} · Б: ${foodDiaryAvg?.avgProtein || '—'}г · Ж: ${foodDiaryAvg?.avgFat || '—'}г · У: ${foodDiaryAvg?.avgCarbs || '—'}г`);
+                              if (customReportBlocks.labs) sections.push(`🩸 Анализы:\n  ${labsList || 'нет данных'}`);
+                              if (customReportBlocks.pharma) sections.push(`💊 Курс:\n  ${medsList || 'нет'}`);
+                              if (customReportBlocks.risk) sections.push(`⚠️ Риски:\n  Общий: ${riskData?.overallNet || '—'}% · Без поддержки: ${riskData?.overallRaw || '—'}%`);
+                              if (customReportBlocks.support) sections.push(`🧪 Поддержка:\n  ${suppsList || 'нет'}`);
+                              if (customReportBlocks.bp) {
+                                const lastBp = bpEntries[0];
+                                sections.push(`❤️ Давление:\n  ${lastBp ? `${lastBp.systolic}/${lastBp.diastolic} · Пульс: ${lastBp.hr} · ${lastBp.date}` : 'нет записей'} (всего: ${bpEntries.length} зап.)`);
+                              }
+                              if (customReportBlocks.sleep) {
+                                const sleepDiary = (() => { try { return JSON.parse(localStorage.getItem('he_sleep_diary') || '[]'); } catch { return []; } })();
+                                const avgHours = sleepDiary.length > 0 ? (sleepDiary.reduce((s: number, e: any) => s + e.hours, 0) / sleepDiary.length).toFixed(1) : '—';
+                                sections.push(`🛌 Сон:\n  Средняя длит: ${avgHours}ч · Записей: ${sleepDiary.length}`);
+                              }
+                              const text = sections.join('\n\n');
+                              const rep = { id: Date.now().toString(), date: new Date().toISOString().slice(0,10), type: '🎨 Свой отчёт', text, timestamp: Date.now() };
+                              try {
+                                const archive = JSON.parse(localStorage.getItem('he_profile_reports') || '[]');
+                                archive.unshift(rep);
+                                localStorage.setItem('he_profile_reports', JSON.stringify(archive.slice(0, 30)));
+                              } catch {}
+                              setShowCustomReport(false);
+                            }} style={{ width:'100%', padding:'10px', borderRadius:10, border:'none', cursor:'pointer', background:'linear-gradient(135deg,#00e68a,#00c8a0)', color:'#000', fontWeight:700, fontSize:12 }}>
+                              📄 Сгенерировать отчёт
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {[
+                 { title: 'Отчёт для тренера', text: trainerReport, color: '#3b82f6', icon: '🏋️' },
                 { title: 'Отчёт для врача', text: doctorReport, color: '#ef4444', icon: '🏥' },
                 { title: 'Общий отчёт', text: generalReport, color: '#00e68a', icon: '📋' },
               ].map(r => (
@@ -1989,16 +2055,24 @@ export const ProfileScreen: React.FC = () => {
                 </div>
               )}
 
-              {/* Period toggle */}
+              {/* Period toggle + archive */}
               <div style={{ display:'flex', gap:4, marginBottom:10 }}>
-                {(['day','week','month'] as const).map(p => (
+                {(['day','week','month','all'] as const).map(p => (
                   <button key={p} onClick={() => setBpPeriod(p)} style={{
                     flex:1, padding:'8px', borderRadius:10, fontSize:11, fontWeight:700, cursor:'pointer',
                     background: bpPeriod === p ? apple.accentDim : apple.glassBg,
                     border: bpPeriod === p ? apple.accentBorder : apple.glassBorder,
                     color: bpPeriod === p ? apple.accent : apple.textSecondary,
-                  }}>{p === 'day' ? 'День' : p === 'week' ? 'Неделя' : 'Месяц'}</button>
+                  }}>{p === 'day' ? 'День' : p === 'week' ? 'Неделя' : p === 'month' ? 'Месяц' : 'Всё'}</button>
                 ))}
+                <button onClick={() => {
+                  if (confirm('Очистить все записи давления?')) {
+                    setBpEntries([]); localStorage.removeItem('he_bp_diary');
+                  }
+                }} style={{
+                  padding:'8px 10px', borderRadius:10, fontSize:10, fontWeight:600, cursor:'pointer',
+                  background:'rgba(239,68,68,0.1)', border:'1px solid rgba(239,68,68,0.2)', color:'#ef4444',
+                }}>🗑</button>
               </div>
 
               {/* Filtered entries */}
@@ -2007,7 +2081,8 @@ export const ProfileScreen: React.FC = () => {
                 const cutoff = new Date(now);
                 if (bpPeriod === 'day') cutoff.setDate(cutoff.getDate() - 1);
                 else if (bpPeriod === 'week') cutoff.setDate(cutoff.getDate() - 7);
-                else cutoff.setMonth(cutoff.getMonth() - 1);
+                else if (bpPeriod === 'month') cutoff.setMonth(cutoff.getMonth() - 1);
+                else cutoff.setFullYear(cutoff.getFullYear() - 10); // all
                 const filtered = bpEntries.filter(e => new Date(e.date) >= cutoff).sort((a, b) => b.date.localeCompare(a.date));
                 const avgSystolic = filtered.length ? Math.round(filtered.reduce((s, e) => s + e.systolic, 0) / filtered.length) : 0;
                 const avgDiastolic = filtered.length ? Math.round(filtered.reduce((s, e) => s + e.diastolic, 0) / filtered.length) : 0;
@@ -2034,10 +2109,13 @@ export const ProfileScreen: React.FC = () => {
                       </div>
                     </div>
 
-                    {/* Simple chart */}
+                    {/* Chart */}
                     {filtered.length >= 2 && (
                       <div style={{ ...glassCard, marginBottom:10, padding:'12px 10px', overflow:'hidden' }}>
-                        <div style={{ fontSize:10, color: apple.textDim, fontWeight:600, marginBottom:6 }}>📈 Динамика</div>
+                        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:6 }}>
+                          <span style={{ fontSize:10, color: apple.textDim, fontWeight:600 }}>📈 Динамика</span>
+                          <span style={{ fontSize:8, color: apple.textDim }}>{filtered.length} записей</span>
+                        </div>
                         <div style={{ display:'flex', alignItems:'flex-end', gap:2, height:80 }}>
                           {filtered.slice().reverse().map((e, i) => {
                             const maxVal = 200;
@@ -2047,7 +2125,7 @@ export const ProfileScreen: React.FC = () => {
                               <div key={i} style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', gap:1, position:'relative' }}>
                                 <div style={{ width:'70%', height:`${hS}%`, borderRadius:'4px 4px 0 0', background:'linear-gradient(180deg, #ef4444, #dc2626)', opacity:0.8 }} />
                                 <div style={{ width:'70%', height:`${hD}%`, borderRadius:'4px 4px 0 0', background:'linear-gradient(180deg, #f59e0b, #d97706)', opacity:0.8 }} />
-                                {filtered.length <= 14 && (
+                                {filtered.length <= 31 && (
                                   <span style={{ fontSize:6, color: apple.textDim, marginTop:2, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', maxWidth:'100%', textAlign:'center' }}>
                                     {e.date.slice(5)}
                                   </span>
@@ -2059,6 +2137,9 @@ export const ProfileScreen: React.FC = () => {
                         <div style={{ display:'flex', gap:10, fontSize:8, color: apple.textDim, marginTop:6 }}>
                           <span><span style={{ display:'inline-block', width:8, height:8, borderRadius:2, background:'#ef4444', marginRight:3 }} /> Систолическое</span>
                           <span><span style={{ display:'inline-block', width:8, height:8, borderRadius:2, background:'#f59e0b', marginRight:3 }} /> Диастолическое</span>
+                          <span style={{ marginLeft:'auto', color: avgSystolic <= 120 && avgDiastolic <= 80 ? '#22c55e' : avgSystolic <= 130 && avgDiastolic <= 85 ? '#f59e0b' : '#ef4444', fontWeight:700 }}>
+                            Ø {avgSystolic}/{avgDiastolic}
+                          </span>
                         </div>
                       </div>
                     )}

@@ -36,13 +36,13 @@ const addToCart = (id: string, name: string, dose: string) => {
 
 const s: Record<string, React.CSSProperties> = {
   card: { background: 'rgba(24,24,27,0.15)', borderRadius: 14, padding: 16, marginBottom: 12, border: '1px solid rgba(255,255,255,0.04)' },
-  row: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 8 },
-  label: { fontSize: 10, fontWeight: 600, opacity: 0.6, marginBottom: 3, letterSpacing: '0.3px' },
-  input: { width: '100%', padding: '10px 12px', borderRadius: 10, border: '1px solid var(--border)', background: 'var(--bg-primary)', color: 'inherit', fontSize: 14, boxSizing: 'border-box' as const, outline: 'none', transition: 'border 0.2s' },
-  btn: { padding: '6px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg-primary)', color: 'inherit', fontSize: 12, cursor: 'pointer' },
-  btnActive: { padding: '6px 12px', borderRadius: 8, border: '1px solid #00e68a', background: 'rgba(0,230,138,0.15)', color: '#00e68a', fontSize: 12, cursor: 'pointer' },
-  barTrack: { height: 8, borderRadius: 4, background: 'var(--border)', overflow: 'hidden', margin: '4px 0' },
-  check: { width: 18, height: 18, accentColor: '#00e68a' },
+  row: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 10 },
+  label: { fontSize: 11, fontWeight: 700, opacity: 0.75, marginBottom: 4, letterSpacing: '0.2px', color: 'rgba(255,255,255,0.85)' },
+  input: { width: '100%', padding: '12px 14px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(0,0,0,0.2)', color: '#fff', fontSize: 15, boxSizing: 'border-box' as const, outline: 'none', transition: 'border 0.2s' },
+  btn: { padding: '8px 14px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.85)', fontSize: 12, cursor: 'pointer' },
+  btnActive: { padding: '8px 14px', borderRadius: 8, border: '1px solid #00e68a', background: 'rgba(0,230,138,0.12)', color: '#00e68a', fontSize: 12, cursor: 'pointer', fontWeight: 700 },
+  barTrack: { height: 8, borderRadius: 4, background: 'rgba(255,255,255,0.06)', overflow: 'hidden', margin: '4px 0' },
+  check: { width: 18, height: 18, accentColor: '#00e68a', cursor: 'pointer' },
 };
 
 const VARICOCELE = [
@@ -189,9 +189,9 @@ export const FertilityPCTScreen: React.FC<{ initialTab?: FertTab; restrictToMode
   const areaPoints = polyline + ` ${toX(maxWeek)},${toY(0)} ${toX(0)},${toY(0)}`;
 
   const field = (label: string, val: string, set: React.Dispatch<React.SetStateAction<string>>, placeholder: string, step = '0.1') => (
-    <div className="form-group">
-      <label>{label}</label>
-      <input type="number" step={step} value={val || ''} onChange={e => set(e.target.value)} placeholder={placeholder} />
+    <div style={{ marginBottom: 2 }}>
+      <div style={s.label}>{label}</div>
+      <input type="number" step={step} value={val || ''} onChange={e => set(e.target.value)} placeholder={placeholder} style={s.input} />
     </div>
   );
 
@@ -1285,6 +1285,51 @@ export const FertilityPCTScreen: React.FC<{ initialTab?: FertTab; restrictToMode
                       </div>
                     </div>
                   )}
+
+                  {/* Save/Load all fertility analysis data */}
+                  <div style={{ display:'flex', gap:6, marginTop:4 }}>
+                    <button onClick={() => {
+                      try {
+                        const data = { volume, concentration, totalCount, pr, np, immotile, morphology, viability, ph, viscosity, mar, leukocytes, agglutination, fructose, zincMmol, dfi, varicocele, tt, ft, e2, lh, fsh, prl, shbg, inhb, amh };
+                        localStorage.setItem('he_fertility_analysis', JSON.stringify(data));
+                      } catch {}
+                    }} style={{ flex:1, padding:'10px', borderRadius:10, border:'1px solid rgba(0,230,138,0.25)', background:'rgba(0,230,138,0.06)', color:'#00e68a', cursor:'pointer', fontWeight:700, fontSize:11 }}>
+                      💾 Сохранить все анализы
+                    </button>
+                    <button onClick={() => {
+                      try {
+                        const data = JSON.parse(localStorage.getItem('he_fertility_analysis') || '{}');
+                        if (data.volume !== undefined) setVolume(data.volume);
+                        if (data.concentration !== undefined) setConcentration(data.concentration);
+                        if (data.totalCount !== undefined) setTotalCount(data.totalCount);
+                        if (data.pr !== undefined) setPr(data.pr);
+                        if (data.np !== undefined) setNp(data.np);
+                        if (data.immotile !== undefined) setImmotile(data.immotile);
+                        if (data.morphology !== undefined) setMorphology(data.morphology);
+                        if (data.viability !== undefined) setViability(data.viability);
+                        if (data.ph !== undefined) setPh(data.ph);
+                        if (data.viscosity !== undefined) setViscosity(data.viscosity);
+                        if (data.mar !== undefined) setMar(data.mar);
+                        if (data.leukocytes !== undefined) setLeukocytes(data.leukocytes);
+                        if (data.agglutination !== undefined) setAgglutination(data.agglutination);
+                        if (data.fructose !== undefined) setFructose(data.fructose);
+                        if (data.zincMmol !== undefined) setZincMmol(data.zincMmol);
+                        if (data.dfi !== undefined) setDfi(data.dfi);
+                        if (data.varicocele !== undefined) setVaricocele(data.varicocele);
+                        if (data.tt !== undefined) setTt(data.tt);
+                        if (data.ft !== undefined) setFt(data.ft);
+                        if (data.e2 !== undefined) setE2(data.e2);
+                        if (data.lh !== undefined) setLh(data.lh);
+                        if (data.fsh !== undefined) setFsh(data.fsh);
+                        if (data.prl !== undefined) setPrl(data.prl);
+                        if (data.shbg !== undefined) setShbg(data.shbg);
+                        if (data.inhb !== undefined) setInhb(data.inhb);
+                        if (data.amh !== undefined) setAmh(data.amh);
+                      } catch {}
+                    }} style={{ padding:'10px 14px', borderRadius:10, border:'1px solid rgba(255,255,255,0.1)', background:'rgba(255,255,255,0.04)', color:'rgba(255,255,255,0.85)', cursor:'pointer', fontWeight:600, fontSize:11 }}>
+                      📂 Загрузить
+                    </button>
+                  </div>
                 </div>
               );
             }
