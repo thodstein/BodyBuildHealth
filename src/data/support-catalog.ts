@@ -52,6 +52,7 @@ export interface SupportCatalogEntry {
   sideEffects: string[];
   dosage: { mg: number; timing: string; form?: string };
   bestForCourse: boolean;
+  analog?: string[];
 }
 
 export const ORGAN_LABELS: Record<string, string> = {

@@ -372,6 +372,18 @@ export interface PharmaSubstance {
   contraindications?: string[];
   sideEffects?: SideEffect[];
   dosageRange?: { min: number; max: number; unit: string; frequency: string };
+  // NEW: organ/system/mechanism/risk mapping
+  targetSystems?: string[];
+  targetMechanisms?: string[];
+  linkedRisks?: { system: string; direction: 'up' | 'down' | 'both'; strength: number }[];
+  linkedSubstances?: { id: string; type: 'synergy' | 'anti_synergy'; mechanism: string; strength: number }[];
+  cvProfile?: {
+    bloodPressure: 'up' | 'down' | 'neutral';
+    heartRate: 'up' | 'down' | 'neutral';
+    vascularTone: 'constrict' | 'dilate' | 'neutral';
+    thrombosisRisk: 'low' | 'medium' | 'high';
+    cnsLoad: 'low' | 'medium' | 'high';
+  };
 }
 export interface UserContext {
   id?: string;
