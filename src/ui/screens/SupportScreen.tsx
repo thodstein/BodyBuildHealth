@@ -1060,10 +1060,12 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   const [interactionTypeFilter, setInteractionTypeFilter] = useState<string>('all');
   const [interactionSeverityFilter, setInteractionSeverityFilter] = useState<string>('all');
   const [infoSynergySeverity, setInfoSynergySeverity] = useState<string>('all');
+  const [synergySubTab, setSynergySubTab] = useState<'all' | 'synergies' | 'conflicts' | 'cautions' | 'calculator'>('all');
   const [activeSystems, setActiveSystems] = useState<Record<string, boolean>>({
     cardio: true, hepatic: true, renal: true, neuro: true, endocrine: true, hematologic: true, reproductive: true, musculoskeletal: true,
   });
   const [synergyPage, setSynergyPage] = useState<number>(1);
+  const [synergySearch, setSynergySearch] = useState('');
   const SYNERGY_PAGE_SIZE = 30;
   const [interactionPage, setInteractionPage] = useState<number>(1);
   const [showModal, setShowModal] = useState<string | null>(null);
@@ -2610,7 +2612,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
             <button onClick={goHome} style={{ padding:'3px 10px', borderRadius:6, fontSize:10, cursor:'pointer', background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600, whiteSpace:'nowrap' }}>← На главную</button>
           </div>
           <div style={{ display:'flex', gap:4, padding:'6px 12px 8px', overflowX:'auto', scrollbarWidth:'none' }}>
-            {[['peptides','Пептиды'],['catalog','Каталог'],['synergies','Синергии'],['readystacks','Стеки'],['interactions','Взаимодействия'],['research','Исследования'],['mixcalc','Микс'],['neuro','Нейро'],['joints','Суставы'],['acne','Акне']].map(([id,label]) => (
+            {[['peptides','Пептиды'],['catalog','Каталог'],['synergies','Взаимодействие препаратов'],['readystacks','Стеки'],['interactions','Взаимодействия'],['research','Исследования'],['mixcalc','Микс'],['neuro','Нейро'],['joints','Суставы'],['acne','Акне']].map(([id,label]) => (
               <button key={id} onClick={() => { setInfoTab(id as any);
                 const a: Record<string,()=>void> = {
                   peptides: ()=>{ setSection('info'); setTab('main'); setSupportView('calc'); setCalcView('peptides'); setInfoTab('peptides'); },
@@ -2758,7 +2760,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                 <div style={{ display:'flex', gap:4, marginBottom:8, flexWrap:'wrap' }}>
                   {(['all','core','standard','advanced','specialty'] as const).map(tier => {
                     const isSel = supportTierFilter === tier;
-                    const info = tier === 'all' ? { label:'Все', emoji:'🔍', color:'var(--text-dim)' } : TIER_LABELS[tier];
+                    const info = tier === 'all' ? { label:'Все', emoji:'🔍', color:'var(--text-dim)' } : TIER_LABELS_CATALOG[tier];
                     const count = tier === 'all' ? catalogSubstances.length : catalogSubstances.filter(s => getSubstanceTier(s.id) === tier).length;
                     return (
                       <button key={tier} onClick={() => setSupportTierFilter(tier)} style={{
@@ -3077,18 +3079,137 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
             )}
             {renderView(infoView, 'synergies', () =>
               <div>
-                <div style={{ display:'flex', gap:4, marginBottom:8, overflowX:'auto', scrollbarWidth:'none', flexWrap:'wrap' }}>
-                  {(['all','LOW','MEDIUM','HIGH'] as const).map(s => (
-                    <button key={s} onClick={() => { setInfoSynergySeverity(s); setSynergyPage(1); }} style={{
-                      padding:'4px 8px', borderRadius:10, fontSize:8, fontWeight:600, whiteSpace:'nowrap', cursor:'pointer', flexShrink:0,
-                      background: infoSynergySeverity === s ? (INTERACTION_SEVERITY_LABELS[s]?.color || 'var(--accent)') : 'transparent',
-                      color: infoSynergySeverity === s ? '#000' : 'var(--text-dim)',
-                      border: `1px solid ${infoSynergySeverity === s ? (INTERACTION_SEVERITY_LABELS[s]?.color || 'var(--accent)') : 'var(--border)'}`,
-                    }}>{s === 'all' ? '♾️ Все' : `${INTERACTION_SEVERITY_LABELS[s]?.label||s}`}</button>
+                {/* Type sub-tabs */}
+                <div style={{ display:'flex', gap:4, marginBottom:6, overflowX:'auto', scrollbarWidth:'none', flexWrap:'wrap' }}>
+                  {(['all','synergies','conflicts','cautions','calculator'] as const).map(st => (
+                    <button key={st} onClick={() => { setSynergySubTab(st); setSynergyPage(1); }} style={{
+                      padding:'6px 12px', borderRadius:16, fontSize:9, fontWeight:700, whiteSpace:'nowrap', cursor:'pointer', flexShrink:0,
+                      background: synergySubTab === st ? 'var(--accent)' : 'var(--bg-secondary)',
+                      color: synergySubTab === st ? '#000' : 'var(--text-dim)',
+                      border: `1px solid ${synergySubTab === st ? 'var(--accent)' : 'var(--border)'}`,
+                    }}>{st === 'all' ? '♾️ Все' : st === 'synergies' ? '🤝 Синергии' : st === 'conflicts' ? '🔴 Конфликты' : st === 'cautions' ? '🟡 Осторожности' : '🧮 Калькулятор'}</button>
                   ))}
-                  <div style={{ fontSize:9, color:'var(--text-dim)', display:'flex', alignItems:'center', marginLeft:2, whiteSpace:'nowrap' }}>{filteredInteractions.length} из {mergedInteractions.length}</div>
                 </div>
-                 <div style={{ maxHeight:'calc(70vh)', overflowY:'auto', paddingRight:4 }}>{synergiesContent(infoSynergySeverity === 'all' ? mergedInteractions : mergedInteractions.filter((i: any) => i.severity === infoSynergySeverity), mergedInteractions, expandedCategories)}</div>
+
+                {synergySubTab === 'calculator' ? (
+                  /* ─── КАЛЬКУЛЯТОР ВЗАИМОДЕЙСТВИЙ ─── */
+                  <div>
+                    <div style={{ display:'flex', gap:4, marginBottom:8 }}>
+                      {(['support','pharma'] as const).map(t => (
+                        <button key={t} onClick={() => setInteractTab(t)} style={{
+                          flex:1, padding:'7px 0', borderRadius:8, fontSize:10, fontWeight:700, cursor:'pointer', transition:'all 0.15s',
+                          background: interactTab === t ? 'var(--accent)' : 'var(--bg-secondary)',
+                          color: interactTab === t ? '#000' : 'var(--text-dim)', border: 'none',
+                        }}>{t === 'support' ? '💊 Поддержка' : '💉 Фарма'}</button>
+                      ))}
+                    </div>
+                    {interactTab === 'support' ? (
+                      <div>
+                        <div style={{ display:'flex', flexDirection:'column', gap:6, marginBottom:8 }}>
+                          {interactionIds.map((id, idx) => {
+                            const selectedName = id ? (allSupport.find(s => s.id === id)?.name || id) : '';
+                            return (
+                              <div key={idx} style={{ background:'var(--bg-secondary)', borderRadius:10, padding:'8px 10px', border:'1px solid var(--border)' }}>
+                                <div style={{ display:'flex', alignItems:'center', gap:4, marginBottom:4 }}>
+                                  <span style={{ fontSize:8, color:'var(--text-dim)', fontWeight:600, background:'rgba(255,255,255,0.04)', padding:'1px 5px', borderRadius:3 }}>#{idx+1}</span>
+                                  <span style={{ flex:1, fontSize:9, color:'var(--text-dim)' }}>{id ? selectedName : 'Препарат'}</span>
+                                  {id && <button onClick={() => { updateInteraction(idx, ''); setInteractionSearch(''); }} style={{ padding:'2px 6px', borderRadius:4, fontSize:8, cursor:'pointer', background:'rgba(239,68,68,0.1)', border:'1px solid rgba(239,68,68,0.2)', color:'#ef4444' }}>✕</button>}
+                                </div>
+                                <div style={{ position:'relative' }}>
+                                  {id ? (
+                                    <div style={{ padding:'7px 8px', borderRadius:6, background:'rgba(0,230,138,0.06)', border:'1px solid rgba(0,230,138,0.15)', color:'#00e68a', fontSize:10, fontWeight:600 }}>{selectedName}</div>
+                                  ) : (
+                                    <>
+                                      <input value={interactionSearchIdx===idx ? interactionSearch : ''} placeholder="🔍 Введите название..." onFocus={() => { setInteractionSearchIdx(idx); setInteractionSearch(''); }} onChange={e => { setInteractionSearchIdx(idx); setInteractionSearch(e.target.value); }} style={{ width:'100%', padding:'7px 8px', borderRadius:6, background:'rgba(0,0,0,0.2)', border:'1px solid var(--border)', color:'var(--text)', fontSize:10, boxSizing:'border-box' }} />
+                                      {interactionSearch && interactionSearchIdx===idx && (
+                                        <div style={{ position:'absolute', top:'100%', left:0, right:0, zIndex:10, background:'var(--bg)', border:'1px solid var(--border)', borderRadius:6, maxHeight:150, overflowY:'auto', marginTop:1 }}>
+                                          {allSupport.filter(s => (s.name||'').toLowerCase().includes(interactionSearch.toLowerCase())).slice(0,10).map(s => (
+                                            <div key={s.id} onClick={() => { updateInteraction(idx, s.id); setInteractionSearch(''); setInteractionSearchIdx(-1); }} style={{ padding:'7px 10px', cursor:'pointer', fontSize:10, borderBottom:'1px solid var(--border)' }}>
+                                              <span style={{ fontWeight:600, color:'var(--text)' }}>{s.name}</span>
+                                              <span style={{ fontSize:8, color:'var(--text-dim)', marginLeft:4 }}>{s.id}</span>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      )}
+                                    </>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
+                          <button onClick={addInteraction} style={{ padding:'8px', borderRadius:8, fontSize:10, fontWeight:600, cursor:'pointer', background:'rgba(0,230,138,0.06)', border:'1px dashed rgba(0,230,138,0.3)', color:'#00e68a' }}>+ Добавить препарат</button>
+                        </div>
+                        {validInteractionIds.length<2 && <div style={{ textAlign:'center', padding:'20px 12px', background:'var(--bg-secondary)', borderRadius:10, border:'1px solid var(--border)' }}><div style={{ fontSize:20, marginBottom:4 }}>⚡</div><div style={{ fontSize:10, color:'var(--text-dim)' }}>Выберите минимум 2 препарата</div></div>}
+                        {validInteractionIds.length>=2 && !hasSupportInteractions && <div style={{ textAlign:'center', padding:'10px', borderRadius:8, background:'rgba(0,230,138,0.06)', border:'1px solid rgba(0,230,138,0.2)' }}><span style={{ fontSize:10, color:'#4caf50', fontWeight:600 }}>✓ Конфликтов не обнаружено</span></div>}
+                        {hasSupportInteractions && (
+                          <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
+                            {[
+                              { list: supportSynergiesList, label:'⊕ Синергия', color:'#22c55e' },
+                              { list: supportConflicts, label:'⊖ Конфликт', color:'#ef4444' },
+                              { list: supportCautions, label:'⚡ Осторожность', color:'#f59e0b' },
+                            ].filter(s => s.list.length>0).map(section => (
+                              <div key={section.label} style={{ background:'var(--bg-secondary)', borderRadius:10, padding:'8px 10px', border:'1px solid var(--border)' }}>
+                                <div style={{ fontSize:10, fontWeight:700, color:section.color, marginBottom:4 }}>{section.label} ({section.list.length})</div>
+                                {section.list.map(i => {
+                                  const sevColor = i.severity === 'HIGH' ? '#ef4444' : i.severity === 'MEDIUM' ? '#f59e0b' : '#22c55e';
+                                  const aName = resolveSubName(i.substanceA) || i.substanceA;
+                                  const bName = resolveSubName(i.substanceB) || i.substanceB;
+                                  return (
+                                    <div key={i.id} style={{ padding:'5px 0', borderBottom:'1px solid var(--border)' }}>
+                                      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                                        <span style={{ color:section.color, fontWeight:700, fontSize:9 }}>{aName} + {bName}</span>
+                                        <div style={{ display:'flex', gap:3 }}>
+                                          <span style={{ fontSize:7, padding:'1px 4px', borderRadius:3, background:section.color+'22', color:section.color, fontWeight:600 }}>{i.type === 'synergy' ? '⊕ Синергия' : i.type === 'conflict' ? '⊖ Конфликт' : '⚡ Осторожно'}</span>
+                                          {i.severity && <span style={{ fontSize:7, padding:'1px 4px', borderRadius:3, background:sevColor+'22', color:sevColor }}>{i.severity==='HIGH'?'Высокий':i.severity==='MEDIUM'?'Средний':'Низкий'}</span>}
+                                        </div>
+                                      </div>
+                                      <div style={{ fontSize:9, color:'rgba(255,255,255,0.85)', lineHeight:1.3, marginTop:2 }}>{showEffect(i)}</div>
+                                      {i.notes && <div style={{ fontSize:8, color:'var(--text-dim)', fontStyle:'italic', lineHeight:1.2, marginTop:1 }}>{i.notes}</div>}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div style={{ textAlign:'center', padding:'20px', color:'var(--text-dim)' }}>
+                        <div style={{ fontSize:20, marginBottom:4 }}>💉</div>
+                        <div style={{ fontSize:10 }}>Фарма-взаимодействия будут здесь</div>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  /* ─── СИНЕРГИИ/КОНФЛИКТЫ/ОСТОРОЖНОСТИ ─── */
+                  <>
+                    {/* Severity filter + search */}
+                    <div style={{ display:'flex', gap:4, marginBottom:8, overflowX:'auto', scrollbarWidth:'none', flexWrap:'wrap' }}>
+                      {(['all','LOW','MEDIUM','HIGH'] as const).map(s => (
+                        <button key={s} onClick={() => { setInfoSynergySeverity(s); setSynergyPage(1); }} style={{
+                          padding:'4px 8px', borderRadius:10, fontSize:8, fontWeight:600, whiteSpace:'nowrap', cursor:'pointer', flexShrink:0,
+                          background: infoSynergySeverity === s ? (INTERACTION_SEVERITY_LABELS[s]?.color || 'var(--accent)') : 'transparent',
+                          color: infoSynergySeverity === s ? '#000' : 'var(--text-dim)',
+                          border: `1px solid ${infoSynergySeverity === s ? (INTERACTION_SEVERITY_LABELS[s]?.color || 'var(--accent)') : 'var(--border)'}`,
+                        }}>{s === 'all' ? '♾️ Все' : `${INTERACTION_SEVERITY_LABELS[s]?.label||s}`}</button>
+                      ))}
+                      <input value={synergySearch} onChange={e => setSynergySearch(e.target.value)} placeholder="🔍 Поиск по веществу/эффекту..." style={{ flex:1, minWidth:120, padding:'6px 8px', borderRadius:8, border:'1px solid var(--border)', background:'var(--bg-secondary)', color:'var(--text)', fontSize:9, boxSizing:'border-box' }} />
+                    </div>
+                     <div style={{ maxHeight:'calc(70vh)', overflowY:'auto', paddingRight:4 }}>{synergiesContent(
+                       (() => {
+                         let list = infoSynergySeverity === 'all' ? mergedInteractions : mergedInteractions.filter((i: any) => i.severity === infoSynergySeverity);
+                         if (synergySubTab !== 'all') {
+                           const typeMap: Record<string, string> = { synergies: 'synergy', conflicts: 'conflict', cautions: 'caution' };
+                           list = list.filter((i: any) => i.type === typeMap[synergySubTab]);
+                         }
+                         if (synergySearch) {
+                           const sq = synergySearch.toLowerCase();
+                           list = list.filter((i: any) => (i.effect||'').toLowerCase().includes(sq) || (i.substanceA||'').toLowerCase().includes(sq) || (i.substanceB||'').toLowerCase().includes(sq) || (i.notes||'').toLowerCase().includes(sq));
+                         }
+                         return list;
+                       })(), mergedInteractions, expandedCategories)}</div>
+                  </>
+                )}
               </div>
             )}
             {renderView(infoView, 'stacks', () =>
