@@ -8,7 +8,6 @@ import { updateProfile, getProfile } from '../../core/profile-manager';
 import { SYSTEM_INFO_ALL } from '../../core/risk-info';
 import { getRiskColor } from '../../core/utils/risk-colors';
 import { SUPPORT_BASE_COVERAGE } from '../../core/constants';
-import { INTERACTIONS_DB } from '../../data/support-database';
 import { ALL_SUBSTANCES, ALL_INTERACTIONS, type SupportSubstance, type SupportInteraction } from '../../data/support-database';
 import { getSubstanceTier, TIER_LABELS } from '../../data/support-database';
 import { getBpRiskLevel } from '../../core/bp-hr-data';
@@ -51,7 +50,7 @@ import { searchPubMed, type PubMedArticle } from '../../engines/pubmed-search.en
 type SupportTab = 'main' | 'catalog' | 'synergies' | 'calculator' | 'interactions' | 'stacks' | 'peptides' | 'fertility-pct';
 type SupportView = 'main' | 'calc' | 'fertility';
 type CalcView = 'main' | 'calculator' | 'peptides' | 'info' | 'stackcalc' | 'mystacks' | 'mixcalc' | 'plan' | 'reports' | 'neuro' | 'joints' | 'acne';
-type InfoView = 'main' | 'catalog' | 'synergies' | 'stacks' | 'interactions' | 'research' | 'favorites' | 'supportstacks';
+type InfoView = 'main' | 'catalog' | 'synergies' | 'stacks' | 'interactions' | 'research' | 'favorites' | 'supportstacks' | 'protocols';
 
 const INTERACTION_TYPE_LABELS: Record<string, { label: string; emoji: string; color: string }> = {
   synergy: { label: 'Синергия', emoji: '🔗', color: '#22c55e' },
@@ -953,7 +952,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   const [section, setSection] = useState<'home'|'generator'|'hormonal'|'info'>('home');
   const [genTab, setGenTab] = useState<'calculator'|'stackgen'|'mystacks'|'plan'|'reports'|'info'>('calculator');
   const [hormonalTab, setHormonalTab] = useState<'pct'|'fertility'|'hrt'>('pct');
-  const [infoTab, setInfoTab] = useState<'peptides'|'catalog'|'synergies'|'readystacks'|'interactions'|'research'|'mixcalc'|'neuro'|'joints'|'acne'>('catalog');
+  const [infoTab, setInfoTab] = useState<'peptides'|'catalog'|'synergies'|'readystacks'|'interactions'|'research'|'mixcalc'|'neuro'|'joints'|'acne'|'protocols'>('catalog');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedSub, setSelectedSub] = useState<string | null>(null);
   const [systemFilter, setSystemFilter] = useState<string>('all');
@@ -1742,7 +1741,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
         const c = norm(subName);
         return a === b || a.includes(b) || b.includes(a) || a === c || a.includes(c) || c.includes(a);
       };
-      return INTERACTIONS_DB.filter(i => {
+      return ALL_INTERACTIONS.filter(i => {
         if (!i || !i.substanceA || !i.substanceB) return false;
         const matched: string[] = [];
         validInteractionIds.forEach(id => {
@@ -2131,16 +2130,26 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   }, [conflictLookup]);
 
   // Merge ALL_INTERACTIONS + SYNERGY_PAIRS for synergies tab (with null filter + dedup + catalog filter)
+  // Pre-compute the set of ALL substance IDs from interactions + catalog + ALL_SUBSTANCES
+  const allSubstanceIds = useMemo(() => {
+    const s = new Set<string>();
+    CATALOG_IDS.forEach(id => s.add(id));
+    ALL_SUBSTANCES.forEach((sub: any) => s.add((sub.id||'').toLowerCase()));
+    ALL_INTERACTIONS.forEach((i: any) => {
+      ['A','B','C','D','E','F'].forEach(f => {
+        const sid = i[`substance${f}`];
+        if (sid) s.add(sid.toLowerCase());
+      });
+    });
+    return s;
+  }, []);
+
   const catalogOk = useCallback((id: string) => {
     const lower = id.toLowerCase();
-    if (CATALOG_IDS.has(lower)) return true;
-    for (const cid of CATALOG_IDS) {
-      if (cid.startsWith(lower) || lower.startsWith(cid)) return true;
-    }
-    if (ALL_SUBSTANCES.find((s: any) => (s.id||'').toLowerCase() === lower)) return true;
+    if (allSubstanceIds.has(lower)) return true;
     if (PHARMA_DB && PHARMA_DB[lower]) return true;
     return false;
-  }, [CATALOG_IDS]);
+  }, [allSubstanceIds]);
 
   const mergedInteractions = useMemo(() => {
     const seen = new Set<string>();
@@ -2671,7 +2680,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
             <button onClick={goHome} style={{ padding:'3px 10px', borderRadius:6, fontSize:10, cursor:'pointer', background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600, whiteSpace:'nowrap' }}>← На главную</button>
           </div>
           <div style={{ display:'flex', gap:4, padding:'6px 12px 8px', overflowX:'auto', scrollbarWidth:'none' }}>
-            {[['peptides','Пептиды'],['catalog','Каталог'],['synergies','Взаимодействие препаратов'],['favorites','Избранное'],['supportstacks','Стеки поддержки'],['research','Исследования']].map(([id,label]) => (
+            {[['peptides','Пептиды'],['catalog','Каталог'],['synergies','Взаимодействие препаратов'],['protocols','📋 Протоколы'],['favorites','Избранное'],['supportstacks','Стеки поддержки'],['research','Исследования']].map(([id,label]) => (
               <button key={id} onClick={() => { setInfoTab(id as any);
                 const a: Record<string,()=>void> = {
                   peptides: ()=>{ setSection('info'); setTab('main'); setSupportView('calc'); setCalcView('peptides'); setInfoTab('peptides'); },
@@ -2680,6 +2689,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                   readystacks: ()=>{ setTab('main'); setSupportView('calc'); setCalcView('info'); setInfoView('stacks'); setSection('home'); },
                   interactions: ()=>{ setTab('main'); setSupportView('calc'); setCalcView('info'); setInfoView('interactions'); setSection('home'); },
                   research: ()=>{ setTab('main'); setSupportView('calc'); setCalcView('info'); setInfoView('research'); setSection('home'); },
+                  protocols: ()=>{ setTab('main'); setSupportView('calc'); setCalcView('info'); setInfoView('protocols'); setSection('home'); },
                   mixcalc: ()=>{ setSection('home'); setTab('main'); setSupportView('calc'); setCalcView('mixcalc'); },
                   neuro: ()=>{ setSection('home'); setTab('main'); setSupportView('calc'); setCalcView('neuro'); },
                   joints: ()=>{ setSection('home'); setTab('main'); setSupportView('calc'); setCalcView('joints'); },
@@ -3263,7 +3273,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                                   const aName = resolveSubName(i.substanceA) || i.substanceA;
                                   const bName = resolveSubName(i.substanceB) || i.substanceB;
                                   return (
-                                    <div key={i.id} style={{ padding:'5px 0', borderBottom:'1px solid var(--border)' }}>
+                                     <div key={i.interactionId} style={{ padding:'5px 0', borderBottom:'1px solid var(--border)' }}>
                                       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
                                         <span style={{ color:section.color, fontWeight:700, fontSize:9 }}>{aName} + {bName}</span>
                                         <div style={{ display:'flex', gap:3 }}>
@@ -3289,9 +3299,88 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                         )}
                       </div>
                     ) : (
-                      <div style={{ textAlign:'center', padding:'20px', color:'var(--text-dim)' }}>
-                        <div style={{ fontSize:20, marginBottom:4 }}>💉</div>
-                        <div style={{ fontSize:10 }}>Фарма-взаимодействия будут здесь</div>
+                      /* ─── ФАРМА-ВЗАИМОДЕЙСТВИЯ ─── */
+                      <div>
+                        <div style={{ display:'flex', flexDirection:'column', gap:6, marginBottom:8 }}>
+                          {pharmaInteractIds.map((id, idx) => {
+                            const pharmaEntry = id ? PHARMA_DB[id] : null;
+                            const selectedName = pharmaEntry?.name || '';
+                            return (
+                              <div key={idx} style={{ background:'var(--bg-secondary)', borderRadius:10, padding:'8px 10px', border:'1px solid var(--border)' }}>
+                                <div style={{ display:'flex', alignItems:'center', gap:4, marginBottom:4 }}>
+                                  <span style={{ fontSize:8, color:'var(--text-dim)', fontWeight:600, background:'rgba(255,255,255,0.04)', padding:'1px 5px', borderRadius:3 }}>#{idx+1}</span>
+                                  <span style={{ flex:1, fontSize:9, color:'var(--text-dim)' }}>{id ? selectedName : 'Препарат'}</span>
+                                  {id && <button onClick={() => { const next = [...pharmaInteractIds]; next[idx] = ''; setPharmaInteractIds(next); }} style={{ padding:'2px 6px', borderRadius:4, fontSize:8, cursor:'pointer', background:'rgba(239,68,68,0.1)', border:'1px solid rgba(239,68,68,0.2)', color:'#ef4444' }}>✕</button>}
+                                </div>
+                                <div style={{ position:'relative' }}>
+                                  {id ? (
+                                    <div style={{ padding:'7px 8px', borderRadius:6, background:'rgba(59,130,246,0.06)', border:'1px solid rgba(59,130,246,0.15)', color:'#60a5fa', fontSize:10, fontWeight:600 }}>{selectedName} ({id})</div>
+                                  ) : (
+                                    <>
+                                      <input value={pharmaInteractSearch} placeholder="🔍 Введите название препарата..." onChange={e => setPharmaInteractSearch(e.target.value)} style={{ width:'100%', padding:'7px 8px', borderRadius:6, background:'rgba(0,0,0,0.2)', border:'1px solid var(--border)', color:'var(--text)', fontSize:10, boxSizing:'border-box' }} />
+                                      {pharmaInteractSearch && (
+                                        <div style={{ position:'absolute', top:'100%', left:0, right:0, zIndex:10, background:'var(--bg)', border:'1px solid var(--border)', borderRadius:6, maxHeight:150, overflowY:'auto', marginTop:1 }}>
+                                          {Object.entries(PHARMA_DB)
+                                            .filter(([key, val]) => (val.name||'').toLowerCase().includes(pharmaInteractSearch.toLowerCase()) || key.toLowerCase().includes(pharmaInteractSearch.toLowerCase()))
+                                            .slice(0, 10).map(([key, val]) => (
+                                            <div key={key} onClick={() => { const next = [...pharmaInteractIds]; next[idx] = key; setPharmaInteractIds(next); setPharmaInteractSearch(''); }} style={{ padding:'7px 10px', cursor:'pointer', fontSize:10, borderBottom:'1px solid var(--border)' }}>
+                                              <span style={{ fontWeight:600, color:'var(--text)' }}>{val.name}</span>
+                                              <span style={{ fontSize:8, color:'var(--text-dim)', marginLeft:4 }}>{key}</span>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      )}
+                                    </>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
+                          <button onClick={() => setPharmaInteractIds(prev => [...prev, ''])} style={{ padding:'8px', borderRadius:8, fontSize:10, fontWeight:600, cursor:'pointer', background:'rgba(59,130,246,0.06)', border:'1px dashed rgba(59,130,246,0.3)', color:'#60a5fa' }}>+ Добавить препарат</button>
+                        </div>
+                        {(() => {
+                          const validIds = pharmaInteractIds.filter(Boolean);
+                          if (validIds.length < 2) {
+                            return <div style={{ textAlign:'center', padding:'20px 12px', background:'var(--bg-secondary)', borderRadius:10, border:'1px solid var(--border)' }}><div style={{ fontSize:20, marginBottom:4 }}>💉</div><div style={{ fontSize:10, color:'var(--text-dim)' }}>Выберите минимум 2 препарата</div></div>;
+                          }
+                          try {
+                            const course = validIds.map((sid, i) => ({
+                              id: `pharma_int_${i}`,
+                              substanceId: sid,
+                              doseValue: 100,
+                              doseUnit: 'мг/нед',
+                              frequency: '1x/day',
+                              startWeek: 0,
+                              endWeek: 12,
+                            }));
+                            const alerts = checkDrugInteractions(course);
+                            if (!alerts.length) {
+                              return <div style={{ textAlign:'center', padding:'10px', borderRadius:8, background:'rgba(0,230,138,0.06)', border:'1px solid rgba(0,230,138,0.2)' }}><span style={{ fontSize:10, color:'#4caf50', fontWeight:600 }}>✓ Конфликтов не обнаружено</span></div>;
+                            }
+                            return (
+                              <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
+                                {alerts.map((alert, ai) => {
+                                  const color = alert.type === 'critical' ? '#ef4444' : alert.type === 'warning' ? '#f59e0b' : '#60a5fa';
+                                  return (
+                                    <div key={ai} style={{ background:'var(--bg-secondary)', borderRadius:10, padding:'8px 10px', border:`1px solid ${color}33` }}>
+                                      <div style={{ display:'flex', alignItems:'center', gap:4, marginBottom:2 }}>
+                                        <span style={{ fontSize:10, fontWeight:700, color }}>{alert.type === 'critical' ? '🔴' : alert.type === 'warning' ? '🟡' : '🔵'}</span>
+                                        <span style={{ fontSize:9, padding:'1px 5px', borderRadius:3, background:color+'22', color, fontWeight:600 }}>
+                                          {alert.type === 'critical' ? 'Критично' : alert.type === 'warning' ? 'Предупреждение' : 'Инфо'}
+                                        </span>
+                                        <span style={{ fontSize:8, color:'var(--text-dim)' }}>{(alert.drugs||[]).map(d => resolveSubName(d)).join(', ')}</span>
+                                      </div>
+                                      <div style={{ fontSize:9, color:'rgba(255,255,255,0.9)', lineHeight:1.3, marginTop:1 }}>{alert.mechanism}</div>
+                                      <div style={{ fontSize:8, color:'#f59e0b', lineHeight:1.3, marginTop:2, background:'rgba(245,158,11,0.06)', padding:'3px 6px', borderRadius:4 }}>💊 {alert.recommendation}</div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            );
+                          } catch (e) {
+                            return <div style={{ textAlign:'center', padding:'10px', borderRadius:8, background:'rgba(239,68,68,0.08)', border:'1px solid rgba(239,68,68,0.2)' }}><span style={{ fontSize:9, color:'#ef4444' }}>Ошибка: {String(e)}</span></div>;
+                          }
+                        })()}
                       </div>
                     )}
                   </div>
@@ -3351,18 +3440,22 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                            const typeMap: Record<string, string> = { synergies: 'synergy', conflicts: 'conflict', cautions: 'caution' };
                            list = list.filter((i: any) => i.type === typeMap[synergySubTab]);
                          }
-                          if (synergyCountFilter > 0) {
-                            list = list.filter((i: any) => {
-                              let count = 0;
-                              if (i.substanceA) count++;
-                              if (i.substanceB) count++;
-                              if (i.substanceC) count++;
-                              if (i.substanceD) count++;
-                              if (i.substanceE) count++;
-                              if (i.substanceF) count++;
-                              return count >= synergyCountFilter;
-                            });
-                          }
+                           if (synergyCountFilter > 0) {
+                             list = list.filter((i: any) => {
+                               // Count substances from notes (look for "+" separator patterns or explicit count)
+                               const notes = i.notes || '';
+                               const countMatch = notes.match(/(\d+)\s*[+]?\s*компонент/);
+                               if (countMatch) return parseInt(countMatch[1]) >= synergyCountFilter;
+                               // Count "+" signs that indicate substance lists (e.g. "A + B + C + ...")
+                               const plusCount = (notes.match(/\s\+[\s]/g) || []).length + 1;
+                               if (plusCount > 1) return plusCount >= synergyCountFilter;
+                               // Fallback: count defined substance fields
+                               let count = 0;
+                               if (i.substanceA) count++;
+                               if (i.substanceB) count++;
+                               return count >= synergyCountFilter;
+                             });
+                           }
                           if (synergyMechFilter) {
                             list = list.filter((i: any) => (i.mechanisms||[]).includes(synergyMechFilter));
                           }
@@ -3516,11 +3609,11 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
               <div>
                 <div style={{ display:'flex', gap:4, marginBottom:8, overflowX:'auto', scrollbarWidth:'none', flexWrap:'wrap' }}>
                   {[['neuro','🧠 Нейротоксичность'],['joints','🦴 Суставы'],['acne','🔴 Акне'],['peptides','🧬 Пептиды']].map(([id,label]) => (
-                    <button key={id} onClick={() => setCalcView(id as CalcView)} style={{
+                    <button key={id} onClick={() => { setSection('home'); setTab('main'); setSupportView('calc'); setCalcView(id as CalcView); }} style={{
                       padding:'7px 14px', borderRadius:20, fontSize:10, fontWeight:700, whiteSpace:'nowrap', cursor:'pointer', flexShrink:0,
-                      background: calcView === id ? 'var(--accent)' : 'var(--bg-secondary)',
-                      color: calcView === id ? '#000' : 'var(--text-dim)',
-                      border: '1px solid ' + (calcView === id ? 'var(--accent)' : 'var(--border)'),
+                      background: (section==='home' && calcView === id) ? 'var(--accent)' : 'var(--bg-secondary)',
+                      color: (section==='home' && calcView === id) ? '#000' : 'var(--text-dim)',
+                      border: '1px solid ' + ((section==='home' && calcView === id) ? 'var(--accent)' : 'var(--border)'),
                     }}>{label}</button>
                   ))}
                 </div>
@@ -3529,6 +3622,9 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                   {(calcView as string) === 'joints' && 'Калькулятор поддержки суставов, анализы и протоколы'}
                   {(calcView as string) === 'acne' && 'Анти-прыщ протокол: ниацинамид, ретиноиды, солярий, гигиена'}
                   {(calcView as string) === 'peptides' && 'Пептидный калькулятор, протоколы, PK/PD'}
+                </div>
+                <div style={{ fontSize:9, color:'var(--text-dim)', padding:6, background:'var(--bg-secondary)', borderRadius:8, marginTop:4 }}>
+                  Выберите протокол для просмотра. Доступны: Нейротоксичность, Суставы, Акне, Пептидный калькулятор.
                 </div>
               </div>
             )}
