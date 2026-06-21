@@ -524,6 +524,8 @@ const ReportsTab: React.FC<{ foodEntries: DiaryEntry[]; profile?: any; targets?:
   const [reportSubTab, setReportSubTab] = React.useState<'overview' | 'full' | 'archive'>('overview');
   const [fullReport, setFullReport] = React.useState<NutritionReport | null>(null);
   const [archiveReports, setArchiveReports] = React.useState<NutritionReport[]>(() => { try { return JSON.parse(localStorage.getItem('he_nutrition_report_archive') || '[]'); } catch { return []; } });
+  const [reportEditMode, setReportEditMode] = React.useState(false);
+  const [reportEditText, setReportEditText] = React.useState('');
   const raw = React.useMemo(() => { try { return JSON.parse(localStorage.getItem('nutrition_diary') || '{}'); } catch { return {}; } }, [foodEntries]);
   const dayData = raw[reportDate];
   const weekStart = React.useMemo(() => { const d = new Date(reportDate); d.setDate(d.getDate() - d.getDay() + 1); return d.toISOString().split('T')[0]; }, [reportDate]);
@@ -580,17 +582,17 @@ const ReportsTab: React.FC<{ foodEntries: DiaryEntry[]; profile?: any; targets?:
               label, items: (items||[]).map((i:any) => ({ name: i.name, id: i.id || '', amount: i.amount || 100, kcal: i.kcal||0, p: i.p||0, f: i.f||0, c: i.c||0 })),
               totals: { kcal: (items||[]).reduce((s:number,i:any)=>s+(i.kcal||0),0), p: (items||[]).reduce((s:number,i:any)=>s+(i.p||0),0), f: (items||[]).reduce((s:number,i:any)=>s+(i.f||0),0), c: (items||[]).reduce((s:number,i:any)=>s+(i.c||0),0) },
             })) : [{ label: reportMode === 'week' ? 'Неделя' : 'Месяц', items: data.map((i:any) => ({ name: i.name, id: i.id || '', amount: i.amount || 100, kcal: i.kcal||0, p: i.p||0, f: i.f||0, c: i.c||0 })), totals }];
-            const rep = generateNutritionReport({
-              meals, totals,
+            const rep = generateNutritionReport({ meals, totals,
               targets: targets || { kcal: 2500, protein: 160, fats: 70, carbs: 300 },
               userWeight: profile?.settings?.weight || 80,
               userTDEE: targets?.kcal || 2500,
               healthIssues: [], planType: 'classic', variety: 'max', budget: 'medium',
               allergens: [], cyclingMode: 'none', goal: 'maintenance',
-              waterMl: (() => { try { const diary = JSON.parse(localStorage.getItem('nutrition_diary') || '{}'); const today = diary[new Date().toISOString().split('T')[0]]; return today?.water || 0; } catch { return 0; } })(),
-              injections: (() => { try { return JSON.parse(localStorage.getItem('he_injection_schedule') || '[]').slice(0,5); } catch { return []; } })(),
             });
             setFullReport(rep);
+            setReportEditText(JSON.stringify(rep, null, 2));
+            setReportEditMode(false);
+            try { localStorage.setItem('he_nutrition_report_current', JSON.stringify(rep)); } catch {}
             saveReportToArchive(rep);
           }} style={{ padding:'10px 24px', borderRadius:12, border:'none', cursor:'pointer', background:'linear-gradient(135deg,#00e68a,#00c8a0)', color:'#000', fontWeight:700, fontSize:12, boxShadow:'0 4px 16px rgba(0,230,138,0.2)' }}>
             📊 Сгенерировать полный отчёт
@@ -846,6 +848,18 @@ const ReportsTab: React.FC<{ foodEntries: DiaryEntry[]; profile?: any; targets?:
             <div style={{ fontSize:10, fontWeight:700, color:'#a855f7', marginBottom:4 }}>💡 Рекомендации</div>
             {fullReport.recommendations.map((r, i) => <div key={i} style={{ fontSize:8, color:'rgba(255,255,255,0.85)', lineHeight:1.5, marginBottom:2 }}>• {r}</div>)}
           </div>}
+          {/* Edit/Save buttons */}
+          <div style={{ display:'flex', gap:4, marginTop:4 }}>
+            <button onClick={() => { if (reportEditMode) { try { localStorage.setItem('he_nutrition_report_current', reportEditText); } catch {} }; setReportEditMode(!reportEditMode); }} style={{ flex:1, padding:'6px', borderRadius:8, cursor:'pointer', border:'1px solid rgba(96,165,250,0.3)', background: reportEditMode ? 'rgba(96,165,250,0.15)' : 'rgba(96,165,250,0.06)', color:'#60a5fa', fontSize:9, fontWeight:600 }}>
+              {reportEditMode ? '💾 Сохранить правки' : '✏️ Редактировать отчёт'}
+            </button>
+            <button onClick={() => { try { const edited = reportEditMode ? JSON.parse(reportEditText) : fullReport; saveReportToArchive(edited); } catch(e) { alert('Ошибка сохранения: ' + e); } }} style={{ flex:1, padding:'6px', borderRadius:8, cursor:'pointer', border:'1px solid rgba(0,230,138,0.3)', background:'rgba(0,230,138,0.06)', color:'#00e68a', fontSize:9, fontWeight:600 }}>
+              📥 Сохранить в архив
+            </button>
+          </div>
+          {reportEditMode && (
+            <textarea value={reportEditText} onChange={e => setReportEditText(e.target.value)} style={{ width:'100%', height:200, padding:8, borderRadius:8, background:'#18181b', border:'1px solid rgba(255,255,255,0.06)', color:'#fff', fontSize:9, fontFamily:'monospace', marginTop:4, boxSizing:'border-box' }} />
+          )}
         </div>
       )}
     </div>)}

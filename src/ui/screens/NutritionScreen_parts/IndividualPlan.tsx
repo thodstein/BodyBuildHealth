@@ -280,8 +280,8 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
       recomposition: 'recomp', rehab: 'rehab',
     };
     const engineGoal = goalMap[goal] || 'maintenance';
-    const targetsV2 = calcNutritionV2({ weightKg: weight, heightCm: height, age, sex: sex || 'male', pal: Math.min(1.9, Math.max(1.2, pal)), goal: engineGoal as any, bodyFatPercent: profile?.settings?.bodyFat });
-    const targets = { kcal: targetsV2.kcal, protein: targetsV2.proteinG, fats: targetsV2.fatG, carbs: targetsV2.carbsG };
+    const targetsV2 = (() => { try { return calcNutritionV2({ weightKg: weight, heightCm: height, age, sex: sex || 'male', pal: Math.min(1.9, Math.max(1.2, pal)), goal: engineGoal as any, bodyFatPercent: profile?.settings?.bodyFat }); } catch { return null; } })();
+    const targets = targetsV2 ? { kcal: targetsV2.kcal, protein: targetsV2.proteinG, fats: targetsV2.fatG, carbs: targetsV2.carbsG } : calcNutrition({ weightKg: weight, heightCm: height, age, sex, pal: Math.min(1.9, Math.max(1.2, pal)), goal: engineGoal });
     // Phase-aware adjustments
     const phaseMult: Record<string, { kcalMod: number; pAdd: number }> = {
       course:      { kcalMod: 1.0,  pAdd: 0.3 },
