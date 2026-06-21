@@ -256,7 +256,7 @@ export const FertilityPCTScreen: React.FC<{ initialTab?: FertTab; restrictToMode
 
   return (
     <div className="screen fertility-pct" style={{ paddingBottom: 70 }}>
-      <h2 style={{ fontSize: 18, fontWeight: 800, margin: '0 0 6px' }}>🧬 ПКТ и Фертильность</h2>
+
       <div style={{
         display: 'flex', gap: 5, marginBottom: 10, overflowX: 'auto', scrollbarWidth: 'none' as const,
         WebkitOverflowScrolling: 'touch', paddingBottom: 4, msOverflowStyle: 'none' as const,
