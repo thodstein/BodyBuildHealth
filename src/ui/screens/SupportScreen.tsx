@@ -12,7 +12,7 @@ import { INTERACTIONS_DB } from '../../data/support-database';
 import { ALL_SUBSTANCES, ALL_INTERACTIONS, type SupportSubstance, type SupportInteraction } from '../../data/support-database';
 import { getSubstanceTier, TIER_LABELS } from '../../data/support-database';
 import { getBpRiskLevel } from '../../core/bp-hr-data';
-import { SUPPORT_CATALOG_DATA, CATALOG_ENRICHMENT, ORGAN_LABELS as CATALOG_ORGAN_LABELS, SYSTEM_LABELS_CATALOG, CATEGORY_LABELS as CATALOG_CATEGORY_LABELS, TIER_LABELS_CATALOG, type SupportCatalogEntry } from '../../data/support-database';
+import { SUPPORT_CATALOG_DATA, CATALOG_ENRICHMENT, MECHANISM_LABELS, ORGAN_LABELS as CATALOG_ORGAN_LABELS, SYSTEM_LABELS_CATALOG, CATEGORY_LABELS as CATALOG_CATEGORY_LABELS, TIER_LABELS_CATALOG, type SupportCatalogEntry } from '../../data/support-database';
 
 import { CANONICAL_ID_MAP } from '../../data/support-database';
 import { SUBSTANCE_ANALOGS, SUBSTANCE_ENHANCERS, PHASE_MODS, DEFAULT_DOSAGES, getPhaseLevel, type SupportPhase } from '../../data/support-database';
