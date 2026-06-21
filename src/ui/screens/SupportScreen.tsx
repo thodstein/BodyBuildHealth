@@ -1049,7 +1049,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
     if (calcView !== 'main') {
       if (section === 'generator') {
         setSection('home'); setTab('main'); setSupportView('main'); setCalcView('main');
-      } else if (['mixcalc','neuro','joints','acne','peptides'].includes(calcView)) {
+      } else if (['mixcalc','💪 Тренировочные миксы','joints','acne','peptides'].includes(calcView)) {
         setCalcView('info'); setInfoView('catalog'); setInfoTab('catalog');
         if (calcView === 'peptides') setSection('home');
       } else if (calcView === 'info') {
@@ -2577,7 +2577,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
   };
 
   return (
-    <div className="screen support-screen" style={{ paddingTop: section === 'info' || calcView === 'info' || ['mixcalc','neuro','joints','acne','peptides'].includes(calcView) || section === 'generator' ? '88px' : section !== 'home' ? '50px' : '10px', paddingBottom: '0px', overflowY: 'auto' }}>
+    <div className="screen support-screen" style={{ paddingTop: section === 'info' || calcView === 'info' || ['mixcalc','💪 Тренировочные миксы','joints','acne','peptides'].includes(calcView) || section === 'generator' ? '88px' : section !== 'home' ? '50px' : '10px', paddingBottom: '0px', overflowY: 'auto' }}>
 
       {/* ===== GENERATOR SUB-TAB PILLS (with back/home) ===== */}
       {section === 'generator' && (
@@ -2620,7 +2620,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
       )}
 
       {/* ===== INFO HEADER (back/home + pills) ===== */}
-      {(section === 'info' || calcView === 'info' || ['mixcalc','neuro','joints','acne','peptides'].includes(calcView)) && (
+      {(section === 'info' || calcView === 'info' || ['mixcalc','💪 Тренировочные миксы','joints','acne','peptides'].includes(calcView)) && (
         <div style={{ position:'fixed', top:0, left:0, right:0, zIndex:150, background:'var(--bg-primary)', borderBottom:'1px solid var(--border)' }}>
           <div style={{ display:'flex', gap:6, padding:'4px 12px', borderBottom:'1px solid var(--border)', alignItems:'center', overflowX:'auto' }}>
             <button onClick={goBack} style={{ padding:'3px 10px', borderRadius:6, fontSize:10, cursor:'pointer', background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600, whiteSpace:'nowrap' }}>← Назад</button>
@@ -3407,7 +3407,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
             {renderView(infoView, 'supportstacks', () =>
               <div>
                 <div style={{ display:'flex', gap:4, marginBottom:8, overflowX:'auto', scrollbarWidth:'none', flexWrap:'wrap' }}>
-                  {[['stackcalc','🧮 Калькулятор стеков'],['readystacks','📦 Предлагаемые стеки'],['mixcalc','🔬 Микс']].map(([id,label]) => (
+                  {[['stackcalc','🧮 Калькулятор стеков'],['readystacks','📦 Предлагаемые стеки'],['mixcalc','💪 Тренировочные миксы']].map(([id,label]) => (
                     <button key={id} onClick={() => {
                       if (id === 'readystacks') { setInfoTab('readystacks'); setCalcView('info'); setInfoView('stacks'); }
                       else if (id === 'stackcalc') setCalcView('stackcalc');
