@@ -1423,7 +1423,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
 
   // Interaction checker state
   const [interactTab, setInteractTab] = useState<'support' | 'pharma'>('support');
-  const [interactionIds, setInteractionIds] = useState<string[]>(['', '']);
+  const [interactionIds, setInteractionIds] = useState<string[]>(['', '', '', '', '', '', '', '', '', '']);
   const [interactionSearch, setInteractionSearch] = useState('');
   const [interactionSearchIdx, setInteractionSearchIdx] = useState<number>(0);
   const [pharmaInteractIds, setPharmaInteractIds] = useState<string[]>(['', '']);
@@ -1699,7 +1699,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   const selectedDetail = selectedSub ? supplementList.find(s => s.id === selectedSub) : null;
 
   // Interaction checker
-  const addInteraction = () => setInteractionIds([...interactionIds, '']);
+  const addInteraction = () => { if (interactionIds.length < 10) setInteractionIds([...interactionIds, '']); };
   const removeInteraction = (idx: number) => setInteractionIds(interactionIds.filter((_, i) => i !== idx));
   const updateInteraction = (idx: number, value: string) => {
     const updated = [...interactionIds];
@@ -3164,6 +3164,13 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                                         </div>
                                       </div>
                                       <div style={{ fontSize:9, color:'rgba(255,255,255,0.85)', lineHeight:1.3, marginTop:2 }}>{showEffect(i)}</div>
+                                      {i.mechanisms && i.mechanisms.length > 0 && (
+                                        <div style={{ display:'flex', flexWrap:'wrap', gap:2, marginTop:2 }}>
+                                          {i.mechanisms.map((m: string, mi: number) => (
+                                            <span key={mi} style={{ fontSize:6, padding:'1px 5px', borderRadius:3, background:'rgba(139,92,246,0.12)', color:'#a78bfa', border:'1px solid rgba(139,92,246,0.15)' }}>{MECH_LABELS[m] || MECH_TRANSLATIONS_RU[m] || m}</span>
+                                          ))}
+                                        </div>
+                                      )}
                                       {i.notes && <div style={{ fontSize:8, color:'var(--text-dim)', fontStyle:'italic', lineHeight:1.2, marginTop:1 }}>{i.notes}</div>}
                                     </div>
                                   );
