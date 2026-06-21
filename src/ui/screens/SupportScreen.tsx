@@ -1079,6 +1079,8 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   });
   const [synergyPage, setSynergyPage] = useState<number>(1);
   const [synergySearch, setSynergySearch] = useState('');
+  const [synergyCountFilter, setSynergyCountFilter] = useState<number>(0);
+  const [synergyMechFilter, setSynergyMechFilter] = useState<string>('');
   const SYNERGY_PAGE_SIZE = 30;
   const [interactionPage, setInteractionPage] = useState<number>(1);
   const [showModal, setShowModal] = useState<string | null>(null);
@@ -1774,12 +1776,17 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
 
   const groupedSubstances = useMemo(() => {
     const normCat = (cat: string): string => {
+      // Organ-based categories → map to 'other' for type view (they belong in organ view)
+      const organCats = ['gut','gastrointestinal','cardioprotector','hepatoprotector','neuroprotector',
+        'immunomodulator','immune','joint','bone','respiratory','eye_protector','renal','skin','beauty',
+        'urinary_protector','anticoagulant','thyroid','bile_acid','choleretic','lipid','anabolic',
+        'hematologic','antimicrobial','recovery','marker','nsaid','electrolyte','multivitamin'];
+      if (organCats.includes(cat) || organCats.some(oc => cat.includes(oc))) return 'other';
       const m: Record<string,string> = {
         amino_acid:'amino_acids',aminoacids:'amino_acids',
         vitamin:'vitamins',vitamin_:'vitamins',
         mineral:'minerals',mineral_:'minerals',
         herb:'herbs',herbal:'herbs',
-        antioxidant:'antioxidants',antioxid:'antioxidants',
         peptide:'peptides',peptid:'peptides',
         nootropic:'nootropics',nootrop:'nootropics',
         adaptogen:'adaptogens',adaptog:'adaptogens',
@@ -1905,8 +1912,11 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
     NAILS: { key: 'skin_hair', label: 'Кожа и волосы', emoji: '✨' },
     EYES: { key: 'eyes', label: 'Глаза', emoji: '👁️' },
     eye: { key: 'eyes', label: 'Глаза', emoji: '👁️' },
-    PROSTATE: { key: 'male_repro', label: 'Мужская репродуктивная', emoji: '♂️' },
-    TESTES: { key: 'male_repro', label: 'Мужская репродуктивная', emoji: '♂️' },
+    PROSTATE: { key: 'reproductive', label: 'Репродуктивная система', emoji: '🧬' },
+    TESTES: { key: 'reproductive', label: 'Репродуктивная система', emoji: '🧬' },
+    REPRODUCTIVE: { key: 'reproductive', label: 'Репродуктивная система', emoji: '🧬' },
+    female: { key: 'reproductive', label: 'Репродуктивная система', emoji: '🧬' },
+    male: { key: 'reproductive', label: 'Репродуктивная система', emoji: '🧬' },
     BLOOD: { key: 'blood', label: 'Кровь и кроветворение', emoji: '🩸' },
     PLATELETS: { key: 'blood', label: 'Кровь и кроветворение', emoji: '🩸' },
     LUNGS: { key: 'lungs', label: 'Лёгкие и дыхание', emoji: '🫁' },
@@ -1924,6 +1934,27 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
     INFANT: { key: 'other', label: 'Прочее', emoji: '📦' },
     TISSUES: { key: 'other', label: 'Прочее', emoji: '📦' },
     ORGANS: { key: 'other', label: 'Прочее', emoji: '📦' },
+    MUCOSA: { key: 'skin_hair', label: 'Кожа и слизистые', emoji: '🧴' },
+    THYMUS: { key: 'immune', label: 'Иммунная система', emoji: '🛡️' },
+    INTESTINES: { key: 'gi', label: 'ЖКТ и пищеварение', emoji: '🫃' },
+    GUT: { key: 'gi', label: 'ЖКТ и пищеварение', emoji: '🫃' },
+    BLOOD_VESSELS: { key: 'heart_vessels', label: 'Сердце и сосуды', emoji: '❤️' },
+    VASCULAR: { key: 'heart_vessels', label: 'Сердце и сосуды', emoji: '❤️' },
+    WHOLE_BODY: { key: 'other', label: 'Общее', emoji: '🔬' },
+    BONE: { key: 'joints_bones', label: 'Суставы и кости', emoji: '🦴' },
+    URINARY_TRACT: { key: 'kidneys', label: 'Почки и мочевыводящие', emoji: '🫘' },
+    liver: { key: 'liver', label: 'Печень', emoji: '🫁' },
+    brain: { key: 'brain_nerves', label: 'Мозг и нервная система', emoji: '🧠' },
+    heart: { key: 'heart_vessels', label: 'Сердце и сосуды', emoji: '❤️' },
+    vessels: { key: 'heart_vessels', label: 'Сердце и сосуды', emoji: '❤️' },
+    skin: { key: 'skin_hair', label: 'Кожа и волосы', emoji: '✨' },
+    cells: { key: 'mitochondria', label: 'Митохондрии и энергия', emoji: '⚡' },
+    mitochondria: { key: 'mitochondria', label: 'Митохондрии и энергия', emoji: '⚡' },
+    stomach: { key: 'gi', label: 'ЖКТ и пищеварение', emoji: '🫃' },
+    pancreas: { key: 'endocrine', label: 'Эндокринная система', emoji: '🦋' },
+    blood: { key: 'blood', label: 'Кровь и кроветворение', emoji: '🩸' },
+    pituitary: { key: 'endocrine', label: 'Эндокринная система', emoji: '🦋' },
+    testes: { key: 'reproductive', label: 'Репродуктивная система', emoji: '🧬' },
   };
   const OrganGroupedSubstances = useMemo(() => {
     const groups: Record<string, { key: string; label: string; emoji: string; items: SupportSubstance[]; count: number }> = {};
@@ -2106,14 +2137,24 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
     for (const cid of CATALOG_IDS) {
       if (cid.startsWith(lower) || lower.startsWith(cid)) return true;
     }
+    if (ALL_SUBSTANCES.find((s: any) => (s.id||'').toLowerCase() === lower)) return true;
+    if (PHARMA_DB && PHARMA_DB[lower]) return true;
     return false;
   }, [CATALOG_IDS]);
 
   const mergedInteractions = useMemo(() => {
     const seen = new Set<string>();
+    const pairKey = (a: string, b: string) => [a.toLowerCase(), b.toLowerCase()].sort().join('||');
     const fromDB = ALL_INTERACTIONS
       .filter(i => i && i.interactionId && i.substanceA && i.substanceB && i.substanceA !== i.substanceB && catalogOk(i.substanceA) && catalogOk(i.substanceB))
+      .filter(i => {
+        const pk = pairKey(i.substanceA, i.substanceB);
+        if (seen.has(pk)) return false;
+        seen.add(pk);
+        return true;
+      })
       .map(i => ({ ...i, source: 'db' as const }));
+    seen.clear();
     for (const item of fromDB) {
       seen.add(item.interactionId);
       seen.add(`${item.substanceA}|${item.substanceB}`);
@@ -2395,13 +2436,16 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
 };
 ;
 
-  const synergiesContent = (filtered: any[], merged: any[], cats: Record<string, boolean>): React.ReactNode => {
+  const synergiesContent = (filtered: any[], merged: any[], cats: Record<string, boolean>, tab?: string): React.ReactNode => {
     return safeRender('synergies_content', () => {
       const list = filtered || [];
-      const synergies = list.filter((i:any) => i?.type === 'synergy');
-      const conflicts = list.filter((i:any) => i?.type === 'conflict' || i?.type === 'caution');
+      const currentTab = tab || 'all';
+      const synergies = currentTab === 'synergies' || currentTab === 'all' ? list.filter((i:any) => i?.type === 'synergy') : [];
+      const conflicts = currentTab === 'conflicts' || currentTab === 'all' ? list.filter((i:any) => i?.type === 'conflict') : [];
+      const cautions = currentTab === 'cautions' || currentTab === 'all' ? list.filter((i:any) => i?.type === 'caution') : [];
       const synTotal = synergies.length;
       const confTotal = conflicts.length;
+      const cautTotal = cautions.length;
       const maxItems = synergyPage * SYNERGY_PAGE_SIZE;
       const synPage = synergies.slice(0, maxItems);
       const confPage = conflicts.slice(0, maxItems);
@@ -3258,6 +3302,17 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                     <div style={{ marginBottom:6 }}>
                       <input value={synergySearch} onChange={e => setSynergySearch(e.target.value)} placeholder="🔍 Поиск по веществу/эффекту..." style={{ width:'100%', padding:'7px 10px', borderRadius:8, border:'1px solid var(--border)', background:'var(--bg-secondary)', color:'var(--text)', fontSize:10, boxSizing:'border-box' }} />
                     </div>
+                    {/* Count filter */}
+                    <div style={{ display:'flex', gap:4, marginBottom:6, overflowX:'auto', scrollbarWidth:'none', flexWrap:'wrap' }}>
+                      {[{v:0,l:'Все'},{v:2,l:'2 в-ва'},{v:3,l:'3+ в-ва'},{v:5,l:'5+ в-в'}].map(opt => (
+                        <button key={opt.v} onClick={() => setSynergyCountFilter(opt.v)} style={{
+                          padding:'3px 8px', borderRadius:8, fontSize:8, fontWeight:600, whiteSpace:'nowrap', cursor:'pointer',
+                          background: synergyCountFilter === opt.v ? 'var(--accent)' : 'transparent',
+                          color: synergyCountFilter === opt.v ? '#000' : 'var(--text-dim)',
+                          border: `1px solid ${synergyCountFilter === opt.v ? 'var(--accent)' : 'var(--border)'}`,
+                        }}>{opt.l}</button>
+                      ))}
+                    </div>
                     {/* Severity filter */}
                     <div style={{ display:'flex', gap:4, marginBottom:8, overflowX:'auto', scrollbarWidth:'none', flexWrap:'wrap' }}>
                       {(['all','LOW','MEDIUM','HIGH'] as const).map(s => (
@@ -3269,19 +3324,54 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                         }}>{s === 'all' ? '♾️ Все' : `${INTERACTION_SEVERITY_LABELS[s]?.label||s}`}</button>
                       ))}
                     </div>
+                    {/* Mechanism filter */}
+                    <div style={{ display:'flex', gap:4, marginBottom:6, overflowX:'auto', scrollbarWidth:'none', flexWrap:'wrap' }}>
+                      {(() => {
+                        const allMechs = new Set<string>();
+                        mergedInteractions.forEach((i: any) => (i.mechanisms||[]).forEach((m: string) => allMechs.add(m)));
+                        const topMechs = [...allMechs].filter(m => {
+                          let count = 0;
+                          mergedInteractions.forEach((i: any) => { if ((i.mechanisms||[]).includes(m)) count++; });
+                          return count > 15 && m.length < 30;
+                        }).sort().slice(0, 20);
+                        return [['','Все'], ...topMechs.map(m => [m, MECH_LABELS[m] || MECH_TRANSLATIONS_RU[m] || m])].map(([val, label]) => (
+                          <button key={val as string} onClick={() => setSynergyMechFilter(val as string)} style={{
+                            padding:'3px 8px', borderRadius:8, fontSize:7, fontWeight:600, whiteSpace:'nowrap', cursor:'pointer',
+                            background: synergyMechFilter === val ? 'var(--accent)' : 'transparent',
+                            color: synergyMechFilter === val ? '#000' : 'var(--text-dim)',
+                            border: `1px solid ${synergyMechFilter === val ? 'var(--accent)' : 'var(--border)'}`,
+                          }}>{label as string}</button>
+                        ));
+                      })()}
+                    </div>
                      <div style={{ maxHeight:'calc(70vh)', overflowY:'auto', paddingRight:4 }}>{synergiesContent(
-                       (() => {
-                         let list = infoSynergySeverity === 'all' ? mergedInteractions : mergedInteractions.filter((i: any) => i.severity === infoSynergySeverity);
+                        (() => {
+                          let list = infoSynergySeverity === 'all' ? mergedInteractions : mergedInteractions.filter((i: any) => i.severity === infoSynergySeverity);
                          if (synergySubTab !== 'all') {
                            const typeMap: Record<string, string> = { synergies: 'synergy', conflicts: 'conflict', cautions: 'caution' };
                            list = list.filter((i: any) => i.type === typeMap[synergySubTab]);
                          }
-                         if (synergySearch) {
-                           const sq = synergySearch.toLowerCase();
-                           list = list.filter((i: any) => (i.effect||'').toLowerCase().includes(sq) || (i.substanceA||'').toLowerCase().includes(sq) || (i.substanceB||'').toLowerCase().includes(sq) || (i.notes||'').toLowerCase().includes(sq));
-                         }
-                         return list;
-                       })(), mergedInteractions, expandedCategories)}</div>
+                          if (synergyCountFilter > 0) {
+                            list = list.filter((i: any) => {
+                              let count = 0;
+                              if (i.substanceA) count++;
+                              if (i.substanceB) count++;
+                              if (i.substanceC) count++;
+                              if (i.substanceD) count++;
+                              if (i.substanceE) count++;
+                              if (i.substanceF) count++;
+                              return count >= synergyCountFilter;
+                            });
+                          }
+                          if (synergyMechFilter) {
+                            list = list.filter((i: any) => (i.mechanisms||[]).includes(synergyMechFilter));
+                          }
+                          if (synergySearch) {
+                             const sq = synergySearch.toLowerCase();
+                             list = list.filter((i: any) => (i.effect||'').toLowerCase().includes(sq) || (i.substanceA||'').toLowerCase().includes(sq) || (i.substanceB||'').toLowerCase().includes(sq) || (i.notes||'').toLowerCase().includes(sq));
+                          }
+                          return list;
+                       })(), mergedInteractions, expandedCategories, synergySubTab)}</div>
                   </>
                 )}
               </div>
