@@ -3155,6 +3155,7 @@ export const TrainingScreen: React.FC = () => {
               const updated = [...trainingArchive, report];
               setTrainingArchive(updated);
               localStorage.setItem('he_training_reports', JSON.stringify(updated));
+              try { localStorage.setItem('he_training_report_current', JSON.stringify(report)); } catch {}
               setTrainingReportGenerated(true);
             }} style={{
               padding: '8px 16px', borderRadius: 8, fontSize: 12, fontWeight: 600,
@@ -3174,6 +3175,7 @@ export const TrainingScreen: React.FC = () => {
                 <button onClick={() => {
                   setTrainingArchive([]);
                   localStorage.removeItem('he_training_reports');
+                  localStorage.removeItem('he_training_report_current');
                   setTrainingReportGenerated(false);
                 }} style={{
                   padding: '4px 10px', borderRadius: 6, fontSize: 10, fontWeight: 600,

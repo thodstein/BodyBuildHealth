@@ -372,6 +372,7 @@ export const RiskScreen: React.FC = () => {
         timestamp: Date.now(),
       };
       saveArchive(report);
+      try { localStorage.setItem('he_risks_report_current', JSON.stringify(report)); } catch {}
       setRiskReportGenerated(true);
     };
 
@@ -385,7 +386,7 @@ export const RiskScreen: React.FC = () => {
             padding:'8px 16px', borderRadius:10, cursor:'pointer', fontWeight:700, fontSize:12,
             background:'var(--accent)', color:'#000', border:'none', flex:1,
           }}>📄 Сгенерировать отчёт</button>
-          <button onClick={() => { try { localStorage.removeItem('he_risk_reports'); setRiskArchive([]); setRiskReportGenerated(false); } catch {} }}
+          <button onClick={() => { try { localStorage.removeItem('he_risk_reports'); localStorage.removeItem('he_risks_report_current'); setRiskArchive([]); setRiskReportGenerated(false); } catch {} }}
             style={{ padding:'8px 12px', borderRadius:10, cursor:'pointer', fontWeight:600, fontSize:11,
               background:'rgba(239,68,68,0.1)', color:'#ef4444', border:'1px solid rgba(239,68,68,0.2)' }}>
             🗑 Очистить архив
@@ -571,6 +572,37 @@ export const RiskScreen: React.FC = () => {
               ))}
             </div>
           </div>
+
+          {/* Поддержка — эффективность */}
+          {(() => {
+            try {
+              const sr = JSON.parse(localStorage.getItem('he_support_risk') || 'null');
+              if (!sr || !sr.riskBeforeSupport) return null;
+              const reduction = sr.riskBeforeSupport - sr.riskAfterSupport;
+              const reductionPct = sr.riskBeforeSupport > 0 ? Math.round((reduction / sr.riskBeforeSupport) * 100) : 0;
+              return (
+                <div className="card" style={{ marginBottom:10, padding:12 }}>
+                  <div style={{ fontSize:12, fontWeight:700, color:'var(--accent)', marginBottom:6 }}>🧪 Эффективность поддержки</div>
+                  <div style={{ display:'flex', gap:8, alignItems:'center', marginBottom:4 }}>
+                    <div style={{ flex:1, textAlign:'center', padding:'6px', borderRadius:8, background:'var(--bg-secondary)' }}>
+                      <div style={{ fontSize:8, color:'var(--text-dim)' }}>Без поддержки</div>
+                      <div style={{ fontSize:18, fontWeight:800, color:'#ef4444' }}>{Math.round(sr.riskBeforeSupport)}%</div>
+                    </div>
+                    <div style={{ fontSize:16, color:'var(--text-dim)' }}>→</div>
+                    <div style={{ flex:1, textAlign:'center', padding:'6px', borderRadius:8, background:'var(--bg-secondary)' }}>
+                      <div style={{ fontSize:8, color:'var(--text-dim)' }}>С поддержкой</div>
+                      <div style={{ fontSize:18, fontWeight:800, color:'#22c55e' }}>{Math.round(sr.riskAfterSupport)}%</div>
+                    </div>
+                    <div style={{ flex:1, textAlign:'center', padding:'6px', borderRadius:8, background:'rgba(0,230,138,0.06)', border:'1px solid rgba(0,230,138,0.15)' }}>
+                      <div style={{ fontSize:8, color:'var(--text-dim)' }}>Снижение</div>
+                      <div style={{ fontSize:18, fontWeight:800, color: reduction > 0 ? '#00e68a' : '#ef4444' }}>-{reductionPct}%</div>
+                    </div>
+                  </div>
+                  <div style={{ fontSize:8, color:'var(--text-dim)', textAlign:'center' }}>Данные из калькулятора поддержки · {sr.subs?.length || 0} веществ</div>
+                </div>
+              );
+            } catch { return null; }
+          })()}
 
           {/* 4 nav cards */}
           <div style={{ display:'flex', flexDirection:'column', gap:8 }}>

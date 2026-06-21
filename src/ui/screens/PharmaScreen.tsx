@@ -305,6 +305,7 @@ export const PharmaScreen: React.FC = () => {
           });
           const report = { id: Date.now().toString(), date: new Date().toISOString().slice(0, 10), generatedAt: new Date().toISOString(), compounds, compoundCount: compounds.length, totalWeeks: compounds.length ? Math.max(...compounds.map((c:any) => c.end || c.endWeek || 0)) : 0, totalDoseMg: compounds.reduce((s: number, c: any) => s + (c.dose || 0), 0), risk: linked.risk?.overallRaw || 0, pctPlanned: compounds.some((c: any) => c.cls === 'serm' || c.cls === 'pct_gonadotropin'), timestamp: Date.now() };
           saveArchive(report);
+          try { localStorage.setItem('he_pharma_report_current', JSON.stringify(report)); } catch {}
           setCourseReportGenerated(true);
         };
         return (
@@ -313,7 +314,7 @@ export const PharmaScreen: React.FC = () => {
             <p style={{ fontSize:10, color:'rgba(255,255,255,0.7)', margin:'0 0 12px' }}>Полный отчёт по препаратам, дозам, фазам и рискам</p>
             <div style={{ display:'flex', gap:6, marginBottom:12 }}>
               <button onClick={generateReport} style={{ padding:'8px 16px', borderRadius:10, cursor:'pointer', fontWeight:700, fontSize:12, background:'var(--accent)', color:'#000', border:'none', flex:1 }}>📄 Сгенерировать отчёт</button>
-              <button onClick={() => { try { localStorage.removeItem('he_course_reports'); setCourseArchive([]); setCourseReportGenerated(false); } catch {} }} style={{ padding:'8px 12px', borderRadius:10, cursor:'pointer', fontWeight:600, fontSize:11, background:'rgba(239,68,68,0.1)', color:'#ef4444', border:'1px solid rgba(239,68,68,0.2)' }}>🗑 Очистить архив</button>
+              <button onClick={() => { try { localStorage.removeItem('he_course_reports'); localStorage.removeItem('he_pharma_report_current'); setCourseArchive([]); setCourseReportGenerated(false); } catch {} }} style={{ padding:'8px 12px', borderRadius:10, cursor:'pointer', fontWeight:600, fontSize:11, background:'rgba(239,68,68,0.1)', color:'#ef4444', border:'1px solid rgba(239,68,68,0.2)' }}>🗑 Очистить архив</button>
             </div>
             {courseReportGenerated && (
               <div style={{ borderRadius:12, padding:14, marginBottom:10, background:'rgba(24,24,27,0.15)', border:'1px solid rgba(255,255,255,0.04)' }}>

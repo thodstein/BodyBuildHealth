@@ -1320,8 +1320,17 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
         finalDosages[s] = dosages[s] || DEFAULT_DOSAGES[s] || { mg: 500, timing: 'с едой' };
       }
     }
+    // Auto-add hCG if AAS are in the course
+    const hasAAS = (linked.course || []).some((c: any) => {
+      const ph = PHARMA_DB[c.substanceId];
+      return ph?.class && ['testosterone','trenbolone','nandrolone','boldenone','primobolan','drostanolone','stanozolol','oxandrolone','methandienone'].includes(ph.class);
+    });
+    if (hasAAS && !finalSubs.includes('hcg')) {
+      finalSubs = [...finalSubs, 'hcg'];
+      finalDosages = { ...finalDosages, hcg: DEFAULT_DOSAGES['hcg'] || BOOST_DOSAGES['hcg'] || { mg: 500, timing: '2x/нед, схема 3/1 (МЕ)' } };
+    }
     return { ...phaseResult, subs: finalSubs, dosages: finalDosages };
-  }, [supportLevel, supportPhase, selectedAnalogs, enhancedSubs, boostEnabled, jointMode]);
+  }, [supportLevel, supportPhase, selectedAnalogs, enhancedSubs, boostEnabled, jointMode, linked.course]);
 
   const calcSupport = (overrideLevel?: 'basic' | 'mid' | 'max' | 'boost', overrideSubs?: string[]) => {
     const s = linked.profile?.settings;
@@ -1396,6 +1405,14 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
       });
       updateProfile({ settings: { ...(getProfile().settings || {}), currentSupplements: supps } });
       notifyDataChange();
+      // Sync support risk data for RiskScreen
+      localStorage.setItem('he_support_risk', JSON.stringify({
+        riskBeforeSupport: calcResultData.riskBeforeSupport,
+        riskAfterSupport: calcResultData.riskAfterSupport,
+        systemSupport: calcResultData.systemSupport,
+        subs: effectiveLevel?.subs || SUPPORT_LEVELS[level]?.subs || [],
+        timestamp: Date.now(),
+      }));
     } catch (e2) { /* ignore profile save errors */ }
   };
 
@@ -4607,7 +4624,27 @@ const [lo,hi]=stackCalcSize.split('-').map(Number);
                   const plan = { period:'daily', date:new Date().toISOString(), level:supportLevel, subs, dosages, levelLabel:level?.label };
                   localStorage.setItem('supportPlans', JSON.stringify(plan));
                   setPlanSaved(true);
-                }} style={{ width:'100%', padding:'12px', borderRadius:10, border:'none', cursor:'pointer', background:'linear-gradient(135deg,#00e68a,#00c853)', color:'#000', fontWeight:800, fontSize:13 }}>💾 Сохранить план (старый → архив)</button>
+                }} style={{ width:'100%', padding:'10px', borderRadius:10, border:'none', cursor:'pointer', background:'linear-gradient(135deg,#00e68a,#00c853)', color:'#000', fontWeight:800, fontSize:12 }}>💾 Сохранить план (старый → архив)</button>
+                <div style={{ display:'flex', gap:6, marginTop:6 }}>
+                  <button onClick={() => {
+                    const level = SUPPORT_LEVELS[supportLevel];
+                    if (!level) return;
+                    const id = 'stack_' + Date.now();
+                    const newStack = { id, name: 'План: ' + (level?.label || supportLevel) + ' ' + new Date().toLocaleDateString('ru'), date: new Date().toISOString(), subs, dosages: dosages || {}, notes: '' };
+                    const updated = [...savedStacks, newStack];
+                    setSavedStacks(updated);
+                    localStorage.setItem('savedStacks', JSON.stringify(updated));
+                    setPlanSaved(true);
+                  }} style={{ flex:1, padding:'8px', borderRadius:10, border:'1px solid rgba(139,92,246,0.3)', cursor:'pointer', background:'rgba(139,92,246,0.08)', color:'#8b5cf6', fontWeight:700, fontSize:11 }}>📂 В Мои стеки</button>
+                  <button onClick={() => {
+                    const planText = 'План поддержки (' + (level?.label || supportLevel) + '):\n' + subs.map((s: string) => {
+                      const sub = ALL_SUBSTANCES.find((x: any) => x.id === s);
+                      const dose = (dosages || {})[s];
+                      return '• ' + (sub?.name || s) + (dose ? ' — ' + dose.mg + ' мг' : '');
+                    }).join('\n');
+                    navigator.clipboard?.writeText(planText);
+                  }} style={{ padding:'8px 12px', borderRadius:10, border:'1px solid rgba(255,255,255,0.1)', cursor:'pointer', background:'rgba(255,255,255,0.04)', color:'rgba(255,255,255,0.9)', fontWeight:600, fontSize:11 }}>📋</button>
+                </div>
                 {planSaved && <div style={{ textAlign:'center', fontSize:10, color:'#22c55e', marginTop:4 }}>✅ План сохранён</div>}
               </>
             );

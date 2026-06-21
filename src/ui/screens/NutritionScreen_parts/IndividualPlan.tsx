@@ -238,13 +238,13 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
         return {
           id: `course_${ce.substanceId}_${Date.now()}`,
           name,
-          time: type === 'инсулин' ? (esterType === 'long' ? '22:00' : (linkToTraining ? '00:00' : '08:00')) : '08:00',
+          time: type === 'инсулин' ? (esterType === 'long' ? '22:00' : '08:00') : '08:00',
           dose: ce.doseValue || 10,
           unit: ce.doseUnit || 'mg',
           type,
           esterType,
           halfLifeHours: halfLife,
-          trainLinked: linkToTraining && (type === 'инсулин' || type === 'ИФР-1'),
+          trainLinked: false,
           trainTiming: 'before' as 'before' | 'after' | 'both' | 'none',
         };
       });
@@ -257,12 +257,12 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
   const [injUnit, setInjUnit] = useState('mg');
   const [injType, setInjType] = useState('инсулин');
   const [injEster, setInjEster] = useState<'rapid' | 'short' | 'long' | 'none'>('none');
-  const injectDrugTypes = ['инсулин', 'ГР', 'ИФР-1', 'MGF', 'IGF-1 DES', 'IGF-1 LR3', 'HMG', 'HCG', 'GHRP', 'CJC', 'BPC-157', 'TB-500', 'меланотан', 'семаглутид', 'тирзепатид', 'другое'];
-
   // 4. Training link
   const [trainStart, setTrainStart] = useState('16:00');
   const [trainEnd, setTrainEnd] = useState('17:30');
   const [linkToTraining, setLinkToTraining] = useState(false);
+
+  const injectDrugTypes = ['инсулин', 'ГР', 'ИФР-1', 'MGF', 'IGF-1 DES', 'IGF-1 LR3', 'HMG', 'HCG', 'GHRP', 'CJC', 'BPC-157', 'TB-500', 'меланотан', 'семаглутид', 'тирзепатид', 'другое'];
 
   // 5. Editable KBJU
   const calcTargets = useMemo(() => {
@@ -281,7 +281,7 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
     };
     const engineGoal = goalMap[goal] || 'maintenance';
     const targetsV2 = (() => { try { return calcNutritionV2({ weightKg: weight, heightCm: height, age, sex: sex || 'male', pal: Math.min(1.9, Math.max(1.2, pal)), goal: engineGoal as any, bodyFatPercent: profile?.settings?.bodyFat }); } catch { return null; } })();
-    const targets = targetsV2 ? { kcal: targetsV2.kcal, protein: targetsV2.proteinG, fats: targetsV2.fatG, carbs: targetsV2.carbsG } : calcNutrition({ weightKg: weight, heightCm: height, age, sex, pal: Math.min(1.9, Math.max(1.2, pal)), goal: engineGoal });
+    const targets = targetsV2 ? { kcal: targetsV2.kcal, protein: targetsV2.proteinG, fats: targetsV2.fatG, carbs: targetsV2.carbsG } : (() => { try { return calcNutrition({ weightKg: weight, heightCm: height, age, sex, pal: Math.min(1.9, Math.max(1.2, pal)), goal: engineGoal }); } catch { return { kcal: 2500, protein: 160, fats: 70, carbs: 300 }; } })();
     // Phase-aware adjustments
     const phaseMult: Record<string, { kcalMod: number; pAdd: number }> = {
       course:      { kcalMod: 1.0,  pAdd: 0.3 },

@@ -193,6 +193,190 @@ const sectionLabel: React.CSSProperties = {
   marginBottom: 4,
 };
 
+const SLEEP_DIARY_KEY = 'he_sleep_diary';
+
+interface SleepEntry {
+  date: string;
+  hours: number;
+  quality: number;
+  awakenings: number;
+  bedtime: string;
+  wakeTime: string;
+  notes: string;
+}
+
+const loadSleepDiary = (): SleepEntry[] => {
+  try { return JSON.parse(localStorage.getItem(SLEEP_DIARY_KEY) || '[]'); } catch { return []; }
+};
+
+const saveSleepDiaryEntry = (entry: SleepEntry) => {
+  try {
+    const diary = loadSleepDiary();
+    const idx = diary.findIndex(e => e.date === entry.date);
+    if (idx >= 0) diary[idx] = entry; else diary.unshift(entry);
+    localStorage.setItem(SLEEP_DIARY_KEY, JSON.stringify(diary.slice(0, 365)));
+  } catch {}
+};
+
+const deleteSleepEntry = (date: string) => {
+  try {
+    const diary = loadSleepDiary().filter(e => e.date !== date);
+    localStorage.setItem(SLEEP_DIARY_KEY, JSON.stringify(diary));
+  } catch {}
+};
+
+const SleepDiary: React.FC<{ settings: any; save: (data: any) => void }> = ({ settings, save }) => {
+  const [diary, setDiary] = useState<SleepEntry[]>(loadSleepDiary);
+  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+  const [hours, setHours] = useState(settings.baselineSleepHours ?? 7);
+  const [quality, setQuality] = useState(settings.baselineSleepQuality ?? 5);
+  const [awakenings, setAwakenings] = useState(settings.nightAwakenings ?? 1);
+  const [bedtime, setBedtime] = useState(settings.bedtime ?? '23:00');
+  const [wakeTime, setWakeTime] = useState(settings.wakeTime ?? '07:00');
+  const [notes, setNotes] = useState('');
+  const [showForm, setShowForm] = useState(false);
+  const [viewMode, setViewMode] = useState<'diary' | 'chart'>('diary');
+
+  const addEntry = () => {
+    const entry: SleepEntry = { date, hours, quality, awakenings, bedtime, wakeTime, notes };
+    saveSleepDiaryEntry(entry);
+    setDiary(loadSleepDiary());
+    setShowForm(false);
+    setNotes('');
+  };
+
+  const removeEntry = (d: string) => {
+    deleteSleepEntry(d);
+    setDiary(loadSleepDiary());
+  };
+
+  const weekData = diary.slice(0, 7).reverse();
+  const maxHeight = 60;
+
+  return (
+    <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+      <button onClick={() => setShowForm(!showForm)} style={{
+        width:'100%', padding:'10px', borderRadius:12, border:apple.accentBorder,
+        background:apple.accentDim, color:apple.accent, cursor:'pointer', fontSize:12, fontWeight:700,
+      }}>
+        {showForm ? '✕ Закрыть' : '➕ Добавить запись сна'}
+      </button>
+
+      {showForm && (
+        <div style={glassCard}>
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom:8 }}>
+            <div>
+              <span style={sectionLabel}>Дата</span>
+              <input type="date" value={date} onChange={e => setDate(e.target.value)} style={appleInput} />
+            </div>
+            <div>
+              <span style={sectionLabel}>Часов сна</span>
+              <input type="number" min={0} max={24} step={0.5} value={hours} onChange={e => setHours(parseFloat(e.target.value) || 0)} style={appleInput} />
+            </div>
+          </div>
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom:8 }}>
+            <div>
+              <span style={sectionLabel}>Качество (1-10)</span>
+              <input type="range" min={1} max={10} step={1} value={quality} onChange={e => setQuality(parseInt(e.target.value))} style={appleSlider} />
+              <div style={{ fontSize:11, fontWeight:700, color:apple.accent, textAlign:'center' }}>{quality}/10</div>
+            </div>
+            <div>
+              <span style={sectionLabel}>Пробуждения</span>
+              <input type="range" min={0} max={10} step={1} value={awakenings} onChange={e => setAwakenings(parseInt(e.target.value))} style={appleSlider} />
+              <div style={{ fontSize:11, fontWeight:700, color:apple.accent, textAlign:'center' }}>{awakenings}</div>
+            </div>
+          </div>
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom:8 }}>
+            <div><span style={sectionLabel}>Засыпание</span><input type="time" value={bedtime} onChange={e => setBedtime(e.target.value)} style={appleInput} /></div>
+            <div><span style={sectionLabel}>Подъём</span><input type="time" value={wakeTime} onChange={e => setWakeTime(e.target.value)} style={appleInput} /></div>
+          </div>
+          <div style={{ marginBottom:8 }}>
+            <span style={sectionLabel}>Заметки</span>
+            <input type="text" value={notes} onChange={e => setNotes(e.target.value)} placeholder="Стресс, кофеин, алкоголь..." style={appleInput} />
+          </div>
+          <div style={{ display:'flex', gap:6 }}>
+            <button onClick={addEntry} style={{
+              flex:1, padding:'8px', borderRadius:10, border:'none', cursor:'pointer',
+              background:apple.gradientGreen, color:'#000', fontWeight:700, fontSize:11,
+            }}>💾 Сохранить</button>
+            <button onClick={() => {
+              save({ baselineSleepHours: hours, baselineSleepQuality: quality, nightAwakenings: awakenings, bedtime, wakeTime });
+            }} style={{
+              padding:'8px 12px', borderRadius:10, cursor:'pointer', fontSize:10, fontWeight:600,
+              border:'1px solid rgba(255,255,255,0.1)', background:'rgba(255,255,255,0.04)', color:'rgba(255,255,255,0.9)',
+            }}>↕ В профиль</button>
+          </div>
+        </div>
+      )}
+
+      {/* View mode toggle */}
+      <div style={{ display:'flex', gap:6, marginBottom:4 }}>
+        {['diary','chart'].map(m => (
+          <button key={m} onClick={() => setViewMode(m as any)} style={pillBtn(viewMode === m)}>
+            {m === 'diary' ? '📋 Журнал' : '📊 График'}
+          </button>
+        ))}
+      </div>
+
+      {/* Chart view */}
+      {viewMode === 'chart' && diary.length > 0 && (
+        <div style={glassCard}>
+          <span style={sectionLabel}>Последние 7 дней</span>
+          <div style={{ display:'flex', alignItems:'flex-end', gap:4, height:maxHeight+30, padding:'8px 0' }}>
+            {weekData.map((e, i) => {
+              const h = Math.min(maxHeight, (e.hours / 12) * maxHeight);
+              return <div key={i} style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', gap:2 }}>
+                <div style={{ width:'100%', background:'rgba(0,230,138,0.12)', borderRadius:'4px 4px 0 0', height:h, minHeight:4, position:'relative', border:'1px solid rgba(0,230,138,0.2)' }}>
+                  <div style={{ position:'absolute', top:-14, left:'50%', transform:'translateX(-50%)', fontSize:8, fontWeight:700, color:apple.accent, whiteSpace:'nowrap' }}>{e.hours}ч</div>
+                </div>
+                <span style={{ fontSize:7, color:apple.textSecondary, textAlign:'center' }}>{e.date.slice(5)}</span>
+              </div>;
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Diary log */}
+      {viewMode === 'diary' && (
+        <div style={glassCard}>
+          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
+            <span style={sectionLabel}>История сна ({diary.length} записей)</span>
+          </div>
+          {diary.length === 0 ? (
+            <div style={{ textAlign:'center', padding:20, fontSize:10, color:apple.textSecondary }}>
+              Нет записей. Добавьте первую запись сна.
+            </div>
+          ) : (
+            <div style={{ maxHeight:400, overflowY:'auto', display:'flex', flexDirection:'column', gap:4 }}>
+              {diary.map((e, i) => (
+                <div key={i} style={{
+                  padding:'8px 10px', borderRadius:10, background:'rgba(255,255,255,0.02)',
+                  border:'1px solid rgba(255,255,255,0.04)',
+                }}>
+                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:2 }}>
+                    <span style={{ fontSize:11, fontWeight:700, color:'#fff' }}>{e.date}</span>
+                    <button onClick={() => removeEntry(e.date)} style={{
+                      padding:'2px 6px', borderRadius:6, fontSize:8, cursor:'pointer',
+                      border:'1px solid rgba(239,68,68,0.2)', background:'rgba(239,68,68,0.06)', color:'#ef4444',
+                    }}>✕</button>
+                  </div>
+                  <div style={{ display:'flex', gap:8, fontSize:9, color:apple.textSecondary }}>
+                    <span style={{ color:apple.accent, fontWeight:700 }}>💤 {e.hours}ч</span>
+                    <span style={{ color: e.quality >= 7 ? '#00e68a' : e.quality >= 4 ? '#f59e0b' : '#ef4444' }}>⭐ {e.quality}/10</span>
+                    <span>🌙 {e.awakenings} проб.</span>
+                    <span>🛌 {e.bedtime}-{e.wakeTime}</span>
+                  </div>
+                  {e.notes && <div style={{ fontSize:8, color:apple.textDim, marginTop:2 }}>{e.notes}</div>}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
 export const ProfileScreen: React.FC = () => {
   const profile = useProfileRefresh();
   const [tab, setTab] = useState<ProfileTab>('overview');
@@ -823,42 +1007,9 @@ export const ProfileScreen: React.FC = () => {
           </>
           )}
 
-          {/* ═══ SLEEP TAB ═══ */}
+          {/* ═══ SLEEP TAB — ДНЕВНИК СНА ═══ */}
           {tab === 'sleep' && (
-            <div style={glassCard}>
-              <div style={sectionLabel}>Параметры сна</div>
-              <div style={{ marginBottom:12 }}>
-                <div style={{ display:'flex', justifyContent:'space-between', marginBottom:4 }}>
-                  <span style={{ fontSize:12, color: apple.textSecondary }}>Длительность сна</span>
-                  <span style={{ fontSize:14, fontWeight:700, color: apple.accent }}>{settings.baselineSleepHours ?? 7} ч</span>
-                </div>
-                <input style={appleSlider} type="range" min="0" max="12" step="0.5" value={settings.baselineSleepHours ?? 7} onChange={e => save({ baselineSleepHours: parseFloat(e.target.value) || 0 })} />
-              </div>
-              <div style={{ marginBottom:12 }}>
-                <div style={{ display:'flex', justifyContent:'space-between', marginBottom:4 }}>
-                  <span style={{ fontSize:12, color: apple.textSecondary }}>Качество сна</span>
-                  <span style={{ fontSize:14, fontWeight:700, color: apple.accent }}>{settings.baselineSleepQuality ?? 5}/10</span>
-                </div>
-                <input style={appleSlider} type="range" min="1" max="10" step="1" value={settings.baselineSleepQuality ?? 5} onChange={e => save({ baselineSleepQuality: parseFloat(e.target.value) || 0 })} />
-              </div>
-              <div style={{ marginBottom:12 }}>
-                <div style={{ display:'flex', justifyContent:'space-between', marginBottom:4 }}>
-                  <span style={{ fontSize:12, color: apple.textSecondary }}>Пробуждения ночью</span>
-                  <span style={{ fontSize:14, fontWeight:700, color: apple.accent }}>{settings.nightAwakenings ?? 1}</span>
-                </div>
-                <input style={appleSlider} type="range" min="0" max="10" step="1" value={settings.nightAwakenings ?? 1} onChange={e => save({ nightAwakenings: parseFloat(e.target.value) || 0 })} />
-              </div>
-              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginTop:8 }}>
-                <div><span style={sectionLabel}>Время засыпания</span><input style={appleInput} type="time" value={settings.bedtime ?? '23:00'} onChange={e => save({ bedtime: e.target.value })} /></div>
-                <div><span style={sectionLabel}>Время подъёма</span><input style={appleInput} type="time" value={settings.wakeTime ?? '07:00'} onChange={e => save({ wakeTime: e.target.value })} /></div>
-              </div>
-              <div style={{ marginTop:10 }}>
-                <span style={sectionLabel}>Хронотип</span>
-                <div style={{ display:'flex', gap:5, marginTop:4 }}>
-                  {CHRONOTYPES.map(c => <button key={c.id} style={pillBtn((settings.chronotype ?? 'mixed') === c.id)} onClick={() => save({ chronotype: c.id })}>{c.label}</button>)}
-                </div>
-              </div>
-            </div>
+            <SleepDiary settings={settings} save={save} />
           )}
 
           {/* ═══ LIFESTYLE TAB ═══ */}
@@ -1966,7 +2117,7 @@ export const ProfileScreen: React.FC = () => {
                   { icon:'📏', title:'Замеров тела', desc:'Вес, обхваты (талия, грудь, бицепс, бедро), % жира. Фото прогресса с разных ракурсов.', color:'#a855f7', tab:'measurements' },
                   { icon:'🩸', title:'Анализов', desc:'Результаты анализов, референсные диапазоны, отклонения, динамика по датам.', color:'#ef4444', tab:'reports' },
                   { icon:'💊', title:'Курса', desc:'Препараты, дозировки, фазы. Календарь приёма, корзина покупок.', color:'#ec4899', tab:'overview' },
-                  { icon:'🧪', title:'Поддержки', desc:'БАДы, протоколы, стеки, синергии. Недельный план приёма.', color:'#06b6d4', tab:'reports' },
+                  { icon:'🧪', title:'Поддержки', desc:'БАДы, протоколы, стеки, синергии. Недельный план приёма.', color:'#06b6d4', tab:'overview' },
                   { icon:'❤️', title:'Давления', desc:'Систолическое/диастолическое давление, пульс. Дневник на день/неделю/месяц.', color:'#f43f5e', tab:'bp_diary' },
                   { icon:'🛌', title:'Сна', desc:'Продолжительность, качество, пробуждения. Корреляция с тренировками.', color:'#8b5cf6', tab:'sleep' },
                   { icon:'📊', title:'Отчётов', desc:'Полные отчёты по всем блокам: тренировки, анализы, риски, курс. Архив.', color:'#84cc16', tab:'reports' },
