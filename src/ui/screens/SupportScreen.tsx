@@ -51,7 +51,7 @@ import { searchPubMed, type PubMedArticle } from '../../engines/pubmed-search.en
 type SupportTab = 'main' | 'catalog' | 'synergies' | 'calculator' | 'interactions' | 'stacks' | 'peptides' | 'fertility-pct';
 type SupportView = 'main' | 'calc' | 'fertility';
 type CalcView = 'main' | 'calculator' | 'peptides' | 'info' | 'stackcalc' | 'mystacks' | 'mixcalc' | 'plan' | 'reports' | 'neuro' | 'joints' | 'acne';
-type InfoView = 'main' | 'catalog' | 'synergies' | 'stacks' | 'interactions' | 'research';
+type InfoView = 'main' | 'catalog' | 'synergies' | 'stacks' | 'interactions' | 'research' | 'favorites' | 'supportstacks';
 
 const INTERACTION_TYPE_LABELS: Record<string, { label: string; emoji: string; color: string }> = {
   synergy: { label: 'Синергия', emoji: '🔗', color: '#22c55e' },
@@ -400,7 +400,7 @@ const SUPPORT_CLASS_LABELS: Record<string, string> = {
   bady: '🌿 БАДы',
 };
 
-const MECH_LABELS: Record<string,string> = {
+const MECH_LABELS: Record<string,string> = { ...MECHANISM_LABELS,
   'NAD_PATHWAY': 'NAD+ метаболизм', 'MITO_REPAIR': 'Митохондриальная защита',
   'OXIDATIVE_STRESS_REDUCTION': 'Антиоксидант', 'COLLAGEN_SUPPORT': 'Синтез коллагена',
   'CALCIUM_HOMEOSTASIS': 'Кальциевый гомеостаз', 'CALCIUM_DISTRIBUTION': 'Распределение Ca²⁺',
@@ -2286,13 +2286,6 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
           {entry.bestForCourse && <span style={{ fontSize: 7, padding: '1px 4px', borderRadius: 3, marginLeft: 4, background: 'rgba(0,230,138,0.1)', color: '#00e68a', border: '1px solid rgba(0,230,138,0.2)' }}>✓ На курсе</span>}
         </div>
       )}
-      {entry.category && entry.category.length > 0 && (
-        <div style={{ display: 'flex', gap: 2, flexWrap: 'wrap', marginBottom: 3 }}>
-          {entry.category.map((c, i) => (
-            <span key={i} style={{ fontSize: 7, padding: '1px 4px', borderRadius: 3, background: 'rgba(59,130,246,0.08)', color: '#60a5fa' }}>{CATALOG_CATEGORY_LABELS[c] || c}</span>
-          ))}
-        </div>
-      )}
       {entry.dosage && (
         <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.9)', marginBottom: 3 }}>
           💊 Дозировка: <span style={{ fontWeight: 600 }}>{entry.dosage.mg}{entry.dosage.mg >= 1000 ? ' г' : entry.dosage.mg < 1 ? ' мкг' : ' мг'}</span> · {entry.dosage.timing}{entry.dosage.form ? ' · ' + entry.dosage.form : ''}
@@ -2634,7 +2627,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
             <button onClick={goHome} style={{ padding:'3px 10px', borderRadius:6, fontSize:10, cursor:'pointer', background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600, whiteSpace:'nowrap' }}>← На главную</button>
           </div>
           <div style={{ display:'flex', gap:4, padding:'6px 12px 8px', overflowX:'auto', scrollbarWidth:'none' }}>
-            {[['peptides','Пептиды'],['catalog','Каталог'],['synergies','Взаимодействие препаратов'],['readystacks','Стеки'],['research','Исследования'],['mixcalc','Микс'],['protocols','Примерные протоколы поддержки']].map(([id,label]) => (
+            {[['peptides','Пептиды'],['catalog','Каталог'],['synergies','Взаимодействие препаратов'],['favorites','Избранное'],['supportstacks','Стеки поддержки'],['research','Исследования']].map(([id,label]) => (
               <button key={id} onClick={() => { setInfoTab(id as any);
                 const a: Record<string,()=>void> = {
                   peptides: ()=>{ setSection('info'); setTab('main'); setSupportView('calc'); setCalcView('peptides'); setInfoTab('peptides'); },
@@ -2682,16 +2675,33 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                 </div>
                 <span style={{ color:'var(--accent)', fontSize:18, opacity:0.6 }}>→</span>
               </div>
-              <div onClick={() => { setSection('hormonal'); setTab('fertility-pct'); setHormonalTab('pct'); setSupportView('fertility'); setCalcView('main'); }} style={{
-                display:'flex', alignItems:'center', gap:12, padding:'14px 16px', borderRadius:16, cursor:'pointer', textAlign:'left', width:'100%',
-                background:'rgba(24,24,27,0.15)', border:'1px solid rgba(255,255,255,0.04)', color:'var(--text)', transition:'all 0.2s',
+               <div style={{
+                display:'flex', flexDirection:'column', gap:8, padding:'14px 16px', borderRadius:16,
+                background:'rgba(24,24,27,0.15)', border:'1px solid rgba(255,255,255,0.04)',
               }}>
-                <div style={{ width:48, height:48, borderRadius:14, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, background:'rgba(139,92,246,0.15)', fontSize:24 }}>🧬</div>
-                <div style={{ flex:1 }}>
-                  <div style={{ fontSize:15, fontWeight:800, marginBottom:4, color:'#8b5cf6' }}>Гормональное здоровье</div>
-                  <div style={{ fontSize:10, color:'rgba(255,255,255,0.85)', lineHeight:1.3 }}>Протоколы восстановления гормонального фона</div>
+                {/* Banner warning */}
+                <div style={{ padding:'8px 10px', borderRadius:8, background:'rgba(239,68,68,0.06)', border:'1px solid rgba(239,68,68,0.15)', display:'flex', alignItems:'center', gap:6 }}>
+                  <span style={{ fontSize:12, flexShrink:0 }}>⚠️</span>
+                  <span style={{ fontSize:8, color:'rgba(255,255,255,0.6)', lineHeight:1.3 }}>Информация ознакомительная. Схемы назначаются специалистом.</span>
                 </div>
-                <span style={{ color:'#8b5cf6', fontSize:18, opacity:0.6 }}>→</span>
+                {/* Title */}
+                <div style={{ fontSize:13, fontWeight:700, color:'#8b5cf6' }}>📋 Примерные протоколы поддержки</div>
+                {/* 6 sub-tabs */}
+                <div style={{ display:'flex', gap:4, flexWrap:'wrap' }}>
+                  {[
+                    { id:'pct', label:'ПКТ', color:'#8b5cf6', action:() => { setSection('hormonal'); setTab('fertility-pct'); setHormonalTab('pct'); setSupportView('fertility'); setCalcView('main'); } },
+                    { id:'fertility', label:'Фертильность', color:'#ec4899', action:() => { setSection('hormonal'); setTab('fertility-pct'); setHormonalTab('fertility'); setSupportView('fertility'); setCalcView('main'); } },
+                    { id:'hrt', label:'ГЗТ', color:'#f59e0b', action:() => { setSection('hormonal'); setTab('fertility-pct'); setHormonalTab('hrt'); setSupportView('fertility'); setCalcView('main'); } },
+                    { id:'neuro', label:'Нейро', color:'#06b6d4', action:() => { setSection('home'); setTab('main'); setSupportView('calc'); setCalcView('neuro'); } },
+                    { id:'joints', label:'Суставы', color:'#22c55e', action:() => { setSection('home'); setTab('main'); setSupportView('calc'); setCalcView('joints'); } },
+                    { id:'acne', label:'Акне', color:'#ef4444', action:() => { setSection('home'); setTab('main'); setSupportView('calc'); setCalcView('acne'); } },
+                  ].map(t => (
+                    <button key={t.id} onClick={t.action} style={{
+                      padding:'5px 10px', borderRadius:12, fontSize:9, fontWeight:600, cursor:'pointer', border:'none',
+                      background:t.color+'18', color:t.color,
+                    }}>{t.label}</button>
+                  ))}
+                </div>
               </div>
               <div onClick={() => { setSection('home'); setTab('main'); setSupportView('calc'); setCalcView('info'); setInfoView('catalog'); }} style={{
                 display:'flex', alignItems:'center', gap:12, padding:'14px 16px', borderRadius:16, cursor:'pointer', textAlign:'left', width:'100%',
@@ -3372,6 +3382,43 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
                     </div>
                   ))}
                   {stackSearch && filteredStacks.length === 0 && <div style={{ padding:20, textAlign:'center', color:'var(--text-dim)', fontSize:11 }}>Ничего не найдено</div>}
+                </div>
+              </div>
+            )}
+            {renderView(infoView, 'favorites', () =>
+              <div>
+                <div style={{ display:'flex', gap:4, marginBottom:8, overflowX:'auto', scrollbarWidth:'none', flexWrap:'wrap' }}>
+                  {[['mystacks','📂 Мои стеки'],['plan','📋 План'],['reports','📊 Отчеты']].map(([id,label]) => (
+                    <button key={id} onClick={() => setCalcView(id as CalcView)} style={{
+                      padding:'7px 14px', borderRadius:20, fontSize:10, fontWeight:700, whiteSpace:'nowrap', cursor:'pointer', flexShrink:0,
+                      background: calcView === id ? 'var(--accent)' : 'var(--bg-secondary)',
+                      color: calcView === id ? '#000' : 'var(--text-dim)',
+                      border: '1px solid ' + (calcView === id ? 'var(--accent)' : 'var(--border)'),
+                    }}>{label}</button>
+                  ))}
+                </div>
+                <div style={{ fontSize:10, color:'var(--text-dim)', margin:'4px 0 8px', textAlign:'center' }}>
+                  {(calcView as string) === 'mystacks' && 'Сохранённые стеки с оценкой синергий и конфликтов'}
+                  {(calcView as string) === 'plan' && 'Недельный план приёма поддержки'}
+                  {(calcView as string) === 'reports' && 'Отчёты по поддержке'}
+                </div>
+              </div>
+            )}
+            {renderView(infoView, 'supportstacks', () =>
+              <div>
+                <div style={{ display:'flex', gap:4, marginBottom:8, overflowX:'auto', scrollbarWidth:'none', flexWrap:'wrap' }}>
+                  {[['stackcalc','🧮 Калькулятор стеков'],['readystacks','📦 Предлагаемые стеки'],['mixcalc','🔬 Микс']].map(([id,label]) => (
+                    <button key={id} onClick={() => {
+                      if (id === 'readystacks') { setInfoTab('readystacks'); setCalcView('info'); setInfoView('stacks'); }
+                      else if (id === 'stackcalc') setCalcView('stackcalc');
+                      else if (id === 'mixcalc') setCalcView('mixcalc');
+                    }} style={{
+                      padding:'7px 14px', borderRadius:20, fontSize:10, fontWeight:700, whiteSpace:'nowrap', cursor:'pointer', flexShrink:0,
+                      background: (id === 'readystacks' && infoView === 'stacks') || (id === 'stackcalc' && (calcView as string) === 'stackcalc') ? 'var(--accent)' : 'var(--bg-secondary)',
+                      color: (id === 'readystacks' && infoView === 'stacks') || (id === 'stackcalc' && (calcView as string) === 'stackcalc') ? '#000' : 'var(--text-dim)',
+                      border: '1px solid ' + ((id === 'readystacks' && infoView === 'stacks') || (id === 'stackcalc' && (calcView as string) === 'stackcalc') ? 'var(--accent)' : 'var(--border)'),
+                    }}>{label}</button>
+                  ))}
                 </div>
               </div>
             )}
