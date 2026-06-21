@@ -7176,7 +7176,7 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     name: 'Lions Mane',
     nameRu: 'Ежовик гребенчатый',
     tier: 'advanced',
-    category: ['adaptogen', 'nootropic'],
+    category: ['mushroom', 'adaptogen', 'nootropic'],
     forms: [
       { id: 'lions_mane', name: 'Lions Mane', nameRu: 'Ежовик экстракт 500 мг', dose: '500 мг 2x/д', best: true },
       { id: 'lions_mane_2', name: 'Lions Mane', nameRu: 'Ежовик + Бакопа комплекс', dose: '500 мг', best: false }
@@ -7202,13 +7202,13 @@ export const SUPPORT_CATALOG_DATA: Record<string, SupportCatalogEntry> = {
     name: 'Cordyceps',
     nameRu: 'Кордицепс',
     tier: 'advanced',
-    category: ['adaptogen', 'metabolic'],
+    category: ['mushroom', 'adaptogen', 'metabolic'],
     forms: [
       { id: 'cordyceps', name: 'Cordyceps', nameRu: 'Кордицепс 500 мг', dose: '500 мг 2x/д', best: true },
       { id: 'cordyceps_2', name: 'Cordyceps', nameRu: 'Кордицепс CS-4 1000 мг', dose: '500 мг', best: false }
     ],
     organs: ['LUNGS', 'MUSCLES', 'KIDNEYS'],
-    systems: ['cardio', 'renal', 'metabolic'],
+    systems: ['cardio', 'renal', 'immune', 'metabolic'],
     mechanisms: ['ATP_PRODUCTION', 'OXYGEN_UTILIZATION', 'ADAPTOGENIC', 'TESTOSTERONE_SUPPORT'],
     description: 'Кордицепс — адаптоген, повышает VO2max и продукцию АТФ. Улучшает кислородное снабжение. На курсе поддерживает выносливость.',
     synergies: [
@@ -14625,6 +14625,27 @@ export const SYNERGY_NETWORK: SynergyNetworkEntry[] = [
   {a:'telmisartan',b:'nsaid_drugs',type:'conflict',effect:'↓ гипотензивного эффекта',mechanism:'НПВС блокируют синтез простагландинов, снижая гипотензивный эффект сартанов',severity:'MEDIUM',score:6},
   {a:'nebivolol',b:'verapamil',type:'conflict',effect:'Брадикардия',mechanism:'β1-блокатор + верапамил (Ca-блокатор) → риск тяжёлой брадикардии и AV-блокады',severity:'HIGH',score:9},
   {a:'omega3',b:'anticoagulants',type:'conflict',effect:'↑ риска кровотечений',mechanism:'Высокие дозы Омега-3 (>4г/д) ↓ агрегацию тромбоцитов → ↑ риск с антикоагулянтами',severity:'MEDIUM',score:6},
+
+  // ═══════════════════════════════════════════════════════════════════
+  // ГРИБЫ (mushroom network)
+  // ═══════════════════════════════════════════════════════════════════
+  {a:'lions_mane',b:'bacopa',type:'synergy',effect:'NGF + ацетилхолин = нейрогенез и память',mechanism:'Ежовик ↑ NGF и миелинизацию, бакопа ↑ ацетилхолин. Синергия когнитивного усиления: рост нейронов + нейротрансмиссия',severity:'HIGH',score:9},
+  {a:'lions_mane',b:'noopept',type:'synergy',effect:'Нейропластичность + BDNF',mechanism:'Ежовик ↑ NGF, ноопепт ↑ BDNF и модулирует NMDA. Двойной механизм нейропротекции и нейрогенеза',severity:'MEDIUM',score:8},
+  {a:'lions_mane',b:'alpha_gpc',type:'synergy',effect:'Миелин + ацетилхолин',mechanism:'Ежовик восстанавливает миелин, Alpha-GPC ↑ ацетилхолин. Комбинация для когнитивного восстановления',severity:'MEDIUM',score:7},
+  {a:'cordyceps',b:'rhodiola',type:'synergy',effect:'Адаптогенный дуэт: выносливость + стресс',mechanism:'Кордицепс ↑ АТФ и VO2max, родиола ↑ стрессоустойчивость и ↓ утомление. Физическая + ментальная выносливость',severity:'HIGH',score:8},
+  {a:'cordyceps',b:'creatine',type:'synergy',effect:'АТФ-продукция + регенерация',mechanism:'Кордицепс ↑ митохондриальный АТФ, креатин ↑ регенерацию АТФ через креатинфосфатную систему. Синергия энергообеспечения',severity:'MEDIUM',score:7},
+  {a:'cordyceps',b:'carnitine',type:'synergy',effect:'Жирные кислоты + митохондрии',mechanism:'Кордицепс ↑ окислительный метаболизм, L-карнитин транспортирует ЖК в митохондрии. Синергия жиросжигания и энергии',severity:'MEDIUM',score:6},
+  {a:'reishi',b:'ashwagandha',type:'synergy',effect:'Иммунитет + адаптация к стрессу',mechanism:'Рейши модулирует иммунитет через β-глюканы, ашваганда ↓ кортизол. Комбинация для иммунной и стресс-резистентности',severity:'MEDIUM',score:8},
+  {a:'reishi',b:'melatonin',type:'synergy',effect:'Сон + иммунитет',mechanism:'Рейши ↑ CD4+/NK-клетки и ↓ воспаление, мелатонин регулирует циркадный ритм. Синергия сна и иммунной защиты',severity:'MEDIUM',score:7},
+  {a:'reishi',b:'zinc',type:'synergy',effect:'Антиоксидантная иммунная защита',mechanism:'Тритерпены рейши + цинк (кофактор SOD) = двойная антиоксидантная и иммунная поддержка',severity:'LOW',score:6},
+  {a:'chaga',b:'curcumin',type:'synergy',effect:'Антиоксидантный суперкаскад',mechanism:'Чага (ORAC >2500) + куркумин (NF-κB ↓) = мощное противовоспалительное и антиоксидантное действие через разные пути',severity:'MEDIUM',score:8},
+  {a:'chaga',b:'vitamin_c',type:'synergy',effect:'Повышение ORAC + коллаген',mechanism:'Чага богата меланином и антиоксидантами, вит.C регенерирует антиоксидантную сеть и ↑ синтез коллагена',severity:'MEDIUM',score:7},
+  {a:'chaga',b:'probiotics',type:'synergy',effect:'Пребиотик + иммунитет',mechanism:'Полисахариды чаги питают микробиом, пробиотики восстанавливают флору. Синергия оси кишка-иммунитет',severity:'MEDIUM',score:7},
+  {a:'maitake',b:'cordyceps',type:'synergy',effect:'Иммунитет + энергия',mechanism:'Майтаке ↑ NK-клетки и β-глюканы, кордицепс ↑ АТФ и O2-утилизацию. Физическая + иммунная поддержка',severity:'MEDIUM',score:7},
+  {a:'maitake',b:'chromium',type:'synergy',effect:'Гликемический контроль',mechanism:'Майтаке ↓ глюкозу через инсулино-сенситизацию, хром ↑ uptake глюкозы в клетки. Синергия метаболического контроля',severity:'MEDIUM',score:6},
+  {a:'shiitake',b:'reishi',type:'synergy',effect:'Синергия грибов: бета-глюканы',mechanism:'Шиитаке (лентинан) + рейши (β-глюканы) = усиленная иммунная стимуляция через разные рецепторы (Dectin-1, TLR)',severity:'HIGH',score:8},
+  {a:'shiitake',b:'omega3',type:'synergy',effect:'Липиды + иммунитет',mechanism:'Шиитаке ↓ LDL и ↑ иммунитет, Омега-3 ↓ ТГ и ↓ воспаление. Синергия кардио-иммунной защиты',severity:'MEDIUM',score:6},
+  {a:'cordyceps',b:'reishi',type:'synergy',effect:'Адаптогенный грибной комплекс',mechanism:'Кордицепс для энергии и O2, рейши для иммунитета и сна. Полный спектр: утро-день-вечер',severity:'MEDIUM',score:8},
 ];
 
 // ── FROM: support-stacks.ts ──
